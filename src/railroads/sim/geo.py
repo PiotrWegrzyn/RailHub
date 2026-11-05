@@ -1,4 +1,3 @@
-import itertools
 from dataclasses import dataclass
 
 import numpy as np
@@ -55,16 +54,3 @@ def polygon_mask(
             x_at_y = x1 + (ys - y1) * (x2 - x1) / (y2 - y1)
         inside ^= crosses & (xs < x_at_y)
     return inside
-
-
-def distance_to_polyline(
-    xs: FloatGrid, ys: FloatGrid, projection: Projection, polyline: list[LonLat]
-) -> FloatGrid:
-    points = [projection.to_tile(lon, lat) for lon, lat in polyline]
-    best = np.full(xs.shape, np.inf)
-    for (x1, y1), (x2, y2) in itertools.pairwise(points):
-        dx, dy = x2 - x1, y2 - y1
-        length_sq = dx * dx + dy * dy or 1.0
-        t = np.clip(((xs - x1) * dx + (ys - y1) * dy) / length_sq, 0.0, 1.0)
-        best = np.minimum(best, np.hypot(xs - (x1 + t * dx), ys - (y1 + t * dy)))
-    return best

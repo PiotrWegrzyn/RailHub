@@ -57,10 +57,9 @@ def fractal_noise(
     height: int,
     rng: np.random.Generator,
     octaves: int = 7,
-    first_cell: float | None = None,
 ) -> npt.NDArray[np.float64]:
     noise = np.zeros((height, width))
-    cell = first_cell if first_cell is not None else max(width, height) / 4
+    cell = max(width, height) / 4
     amplitude = 1.0
     for _ in range(octaves):
         noise += amplitude * _value_noise(width, height, cell, rng)

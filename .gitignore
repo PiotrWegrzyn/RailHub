@@ -14,3 +14,6 @@ wheels/
 
 # Window layout saved by Hello ImGui
 *.ini
+
+# Downloaded source data for tools/ (see README)
+data/raw/

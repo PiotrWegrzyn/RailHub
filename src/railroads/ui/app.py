@@ -1,10 +1,13 @@
+import math
+
 import numpy as np
 import numpy.typing as npt
-from imgui_bundle import hello_imgui, imgui, immapp, implot
+from imgui_bundle import hello_imgui, imgui, immapp
 
 from railroads.sim.maps import poland
 from railroads.sim.units import KM_PER_TILE
 from railroads.sim.world import Terrain, World
+from railroads.ui.iso_camera import IsoCamera, Vec2
 
 TERRAIN_COLORS: dict[Terrain, tuple[int, int, int]] = {
     Terrain.WATER: (56, 107, 189),
@@ -12,8 +15,12 @@ TERRAIN_COLORS: dict[Terrain, tuple[int, int, int]] = {
     Terrain.HILLS: (158, 143, 92),
     Terrain.MOUNTAINS: (143, 138, 133),
 }
+BACKGROUND_COLOR = (0.08, 0.09, 0.11, 1.0)
 GRID_COLOR = (0.0, 0.0, 0.0, 0.25)
-MIN_TILE_PIXELS_FOR_GRID = 8
+HOVER_COLOR = (1.0, 1.0, 1.0, 0.9)
+MIN_TILE_WIDTH_FOR_GRID = 16
+# Camera rotation (quarter turns) that puts map north (row 0) towards the top-left of the screen.
+NORTH_TOP_LEFT = 3
 # The renderer samples textures with linear filtering; drawing each tile as a block of
 # identical pixels keeps tile edges sharp when zoomed in.
 PIXELS_PER_TILE = 8
@@ -27,80 +34,141 @@ def terrain_rgba(terrain: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
     return np.ascontiguousarray(pixels)
 
 
+def _color(rgba: tuple[float, float, float, float]) -> int:
+    return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))
+
+
+def _any_key_pressed(*keys: imgui.Key) -> bool:
+    return any(imgui.is_key_pressed(key, repeat=False) for key in keys)
+
+
 class MapView:
     def __init__(self, world: World) -> None:
         self._world = world
+        self.camera = IsoCamera(
+            center_x=world.width / 2, center_y=world.height / 2, rotation=NORTH_TOP_LEFT
+        )
         self._texture: hello_imgui.TextureGpu | None = None
         self._hovered_tile: tuple[int, int] | None = None
-        self._fit_on_next_frame = True
+        self._wheel = 0.0
 
     def gui(self) -> None:
         self._draw_tile_info()
         self._draw_map()
 
     def _draw_tile_info(self) -> None:
+        if imgui.button("Turn left (Q)") or imgui.is_key_pressed(imgui.Key.q, repeat=False):
+            self.camera.turn(-1)
+        imgui.same_line()
+        if imgui.button("Turn right (E)") or imgui.is_key_pressed(imgui.Key.e, repeat=False):
+            self.camera.turn(1)
+        imgui.same_line()
+        if imgui.button(" - ") or _any_key_pressed(imgui.Key.minus, imgui.Key.keypad_subtract):
+            self.camera.zoom(-1, (0, 0), (0, 0))
+        imgui.same_line()
+        if imgui.button(" + ") or _any_key_pressed(imgui.Key.equal, imgui.Key.keypad_add):
+            self.camera.zoom(1, (0, 0), (0, 0))
+        imgui.same_line()
+        zoom = f"Zoom {self.camera.zoom_level + 1}/5"
         if self._hovered_tile is None:
-            imgui.text("Drag to pan, scroll to zoom, double-click to fit the map.")
+            imgui.text(f"{zoom}. Drag to pan, scroll or -/+ to zoom.")
             return
         x, y = self._hovered_tile
         terrain = self._world.terrain_at(x, y).name.title()
-        imgui.text(f"Tile ({x}, {y}) at {x * KM_PER_TILE:g} km, {y * KM_PER_TILE:g} km: {terrain}")
+        km = f"{x * KM_PER_TILE:g} km, {y * KM_PER_TILE:g} km"
+        imgui.text(f"{zoom}. Tile ({x}, {y}) at {km}: {terrain}")
 
     def _draw_map(self) -> None:
-        world = self._world
         if self._texture is None:
             self._texture = hello_imgui.create_texture_gpu_from_rgba_data(
-                terrain_rgba(world.terrain)
+                terrain_rgba(self._world.terrain)
             )
-        if self._fit_on_next_frame:
-            implot.set_next_axes_to_fit()
-            self._fit_on_next_frame = False
-
-        flags = implot.Flags_.equal | implot.Flags_.no_legend | implot.Flags_.no_menus
-        if not implot.begin_plot("##map", (-1, -1), flags):
+        origin = imgui.get_cursor_screen_pos()
+        size = imgui.get_content_region_avail()
+        if size.x <= 0 or size.y <= 0:
             return
-        implot.setup_axes("", "", 0, implot.AxisFlags_.invert)
-        implot.setup_axis_format(implot.ImAxis_.x1, "%g km")
-        implot.setup_axis_format(implot.ImAxis_.y1, "%g km")
-        # The y axis grows downwards (row 0 at the top), so flip the texture's v coordinate.
-        implot.plot_image(
-            "terrain",
+        imgui.invisible_button("map", size)
+        center = (origin.x + size.x / 2, origin.y + size.y / 2)
+        self._handle_input(center)
+
+        draw_list = imgui.get_window_draw_list()
+        top_left = (origin.x, origin.y)
+        bottom_right = (origin.x + size.x, origin.y + size.y)
+        draw_list.push_clip_rect(top_left, bottom_right, True)
+        draw_list.add_rect_filled(top_left, bottom_right, _color(BACKGROUND_COLOR))
+        self._draw_terrain(draw_list, center)
+        if self.camera.tile_width >= MIN_TILE_WIDTH_FOR_GRID:
+            self._draw_grid(draw_list, center, top_left, bottom_right)
+        if self._hovered_tile is not None:
+            self._draw_tile_outline(draw_list, center, self._hovered_tile)
+        draw_list.pop_clip_rect()
+
+    def _handle_input(self, center: Vec2) -> None:
+        io = imgui.get_io()
+        if imgui.is_item_active():
+            self.camera.pan(io.mouse_delta.x, io.mouse_delta.y)
+        hovered = imgui.is_item_hovered()
+        if hovered:
+            self._wheel += io.mouse_wheel
+            steps = int(self._wheel)
+            if steps:
+                self._wheel -= steps
+                self.camera.zoom(steps, (io.mouse_pos.x, io.mouse_pos.y), center)
+        self._hovered_tile = None
+        if hovered:
+            tx, ty = self.camera.to_tile(io.mouse_pos.x, io.mouse_pos.y, center)
+            x, y = math.floor(tx), math.floor(ty)
+            if 0 <= x < self._world.width and 0 <= y < self._world.height:
+                self._hovered_tile = (x, y)
+
+    def _draw_terrain(self, draw_list: imgui.ImDrawList, center: Vec2) -> None:
+        assert self._texture is not None
+        w, h = self._world.width, self._world.height
+        to_screen = self.camera.to_screen
+        draw_list.add_image_quad(
             imgui.ImTextureRef(self._texture.texture_id()),
-            bounds_min=implot.Point(0, 0),
-            bounds_max=implot.Point(world.width_km, world.height_km),
-            uv0=(0, 1),
-            uv1=(1, 0),
+            to_screen(0, 0, center),
+            to_screen(w, 0, center),
+            to_screen(w, h, center),
+            to_screen(0, h, center),
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1),
         )
-        self._draw_tile_grid()
-        mouse = implot.get_plot_mouse_pos()
-        hovered = implot.is_plot_hovered()
-        self._hovered_tile = world.tile_at_km(mouse.x, mouse.y) if hovered else None
-        implot.end_plot()
 
-    def _draw_tile_grid(self) -> None:
-        limits = implot.get_plot_limits()
-        pixels_per_km = implot.get_plot_size().x / (limits.x.max - limits.x.min)
-        if pixels_per_km * KM_PER_TILE < MIN_TILE_PIXELS_FOR_GRID:
-            return
-        world = self._world
-        y_low, y_high = sorted((limits.y.min, limits.y.max))
-        x0, x1 = _visible_lines(limits.x.min, limits.x.max, world.width)
-        y0, y1 = _visible_lines(y_low, y_high, world.height)
-        xs = np.arange(x0, x1 + 1, dtype=np.float64) * KM_PER_TILE
-        ys = np.arange(y0, y1 + 1, dtype=np.float64) * KM_PER_TILE
-        top, bottom = y0 * KM_PER_TILE, y1 * KM_PER_TILE
-        left, right = x0 * KM_PER_TILE, x1 * KM_PER_TILE
-        seg_x = np.concatenate([np.repeat(xs, 2), np.tile([left, right], len(ys))])
-        seg_y = np.concatenate([np.tile([top, bottom], len(xs)), np.repeat(ys, 2)])
-        spec = implot.Spec(line_color=GRID_COLOR)
-        spec.flags = implot.LineFlags_.segments | implot.ItemFlags_.no_fit
-        implot.plot_line("grid", seg_x, seg_y, spec=spec)
+    def _draw_grid(
+        self, draw_list: imgui.ImDrawList, center: Vec2, top_left: Vec2, bottom_right: Vec2
+    ) -> None:
+        corners = [
+            self.camera.to_tile(x, y, center)
+            for x in (top_left[0], bottom_right[0])
+            for y in (top_left[1], bottom_right[1])
+        ]
+        x0 = max(0, math.floor(min(c[0] for c in corners)))
+        x1 = min(self._world.width, math.ceil(max(c[0] for c in corners)))
+        y0 = max(0, math.floor(min(c[1] for c in corners)))
+        y1 = min(self._world.height, math.ceil(max(c[1] for c in corners)))
+        color = _color(GRID_COLOR)
+        to_screen = self.camera.to_screen
+        for x in range(x0, x1 + 1):
+            draw_list.add_line(to_screen(x, y0, center), to_screen(x, y1, center), color)
+        for y in range(y0, y1 + 1):
+            draw_list.add_line(to_screen(x0, y, center), to_screen(x1, y, center), color)
 
-
-def _visible_lines(low_km: float, high_km: float, tile_count: int) -> tuple[int, int]:
-    first = max(0, int(low_km / KM_PER_TILE))
-    last = min(tile_count, int(high_km / KM_PER_TILE) + 1)
-    return first, last
+    def _draw_tile_outline(
+        self, draw_list: imgui.ImDrawList, center: Vec2, tile: tuple[int, int]
+    ) -> None:
+        x, y = tile
+        to_screen = self.camera.to_screen
+        draw_list.add_quad(
+            to_screen(x, y, center),
+            to_screen(x + 1, y, center),
+            to_screen(x + 1, y + 1, center),
+            to_screen(x, y + 1, center),
+            _color(HOVER_COLOR),
+            2.0,
+        )
 
 
 def main() -> None:

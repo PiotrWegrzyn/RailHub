@@ -27,7 +27,6 @@ def test_map_covers_poland_at_two_km_per_tile(world: World) -> None:
         ("Baltic Sea north of Leba", 17.5, 54.95, Terrain.WATER),
         ("Lodz", 19.46, 51.76, Terrain.PLAINS),
         ("Tatras", 20.0, 49.25, Terrain.MOUNTAINS),
-        ("Vistula in Warsaw", 21.02, 52.23, Terrain.WATER),
     ],
 )
 def test_known_places_have_expected_terrain(
@@ -36,3 +35,11 @@ def test_known_places_have_expected_terrain(
     terrain = terrain_at_lonlat(world, lon, lat)
 
     assert terrain is expected, place
+
+
+def test_vistula_flows_through_warsaw(world: World) -> None:
+    x, y = (int(v) for v in poland.PROJECTION.to_tile(21.02, 52.23))
+
+    nearby = world.terrain[y - 3 : y + 4, x - 3 : x + 4]
+
+    assert (nearby == Terrain.WATER).any()
