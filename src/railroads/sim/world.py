@@ -1,9 +1,12 @@
+import math
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Self
 
 import numpy as np
 import numpy.typing as npt
+
+from railroads.sim.units import km_to_tiles, tiles_to_km
 
 
 class Terrain(IntEnum):
@@ -26,20 +29,38 @@ class World:
     @classmethod
     def generate(cls, width: int, height: int, seed: int) -> Self:
         rng = np.random.default_rng(seed)
-        elevation = _fractal_noise(width, height, rng)
+        elevation = fractal_noise(width, height, rng)
         thresholds = np.quantile(elevation, TERRAIN_QUANTILES)
         terrain = np.digitize(elevation, thresholds).astype(np.uint8)
         return cls(width=width, height=height, terrain=terrain)
 
+    @property
+    def width_km(self) -> float:
+        return tiles_to_km(self.width)
+
+    @property
+    def height_km(self) -> float:
+        return tiles_to_km(self.height)
+
     def terrain_at(self, x: int, y: int) -> Terrain:
         return Terrain(int(self.terrain[y, x]))
 
+    def tile_at_km(self, x_km: float, y_km: float) -> tuple[int, int] | None:
+        x, y = math.floor(km_to_tiles(x_km)), math.floor(km_to_tiles(y_km))
+        if 0 <= x < self.width and 0 <= y < self.height:
+            return x, y
+        return None
 
-def _fractal_noise(
-    width: int, height: int, rng: np.random.Generator, octaves: int = 5
+
+def fractal_noise(
+    width: int,
+    height: int,
+    rng: np.random.Generator,
+    octaves: int = 7,
+    first_cell: float | None = None,
 ) -> npt.NDArray[np.float64]:
     noise = np.zeros((height, width))
-    cell = max(width, height) / 4
+    cell = first_cell if first_cell is not None else max(width, height) / 4
     amplitude = 1.0
     for _ in range(octaves):
         noise += amplitude * _value_noise(width, height, cell, rng)

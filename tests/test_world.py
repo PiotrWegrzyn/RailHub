@@ -1,5 +1,6 @@
 import numpy as np
 
+from railroads.sim.units import KM_PER_TILE
 from railroads.sim.world import Terrain, World
 
 
@@ -41,3 +42,27 @@ def test_terrain_at_reads_column_x_of_row_y() -> None:
     result = world.terrain_at(x=2, y=0)
 
     assert result is Terrain.HILLS
+
+
+def test_world_size_in_km_uses_km_per_tile() -> None:
+    world = World.generate(width=100, height=50, seed=7)
+
+    size = (world.width_km, world.height_km)
+
+    assert size == (100 * KM_PER_TILE, 50 * KM_PER_TILE)
+
+
+def test_tile_at_km_maps_position_to_tile() -> None:
+    world = World.generate(width=10, height=10, seed=7)
+
+    tile = world.tile_at_km(3.5 * KM_PER_TILE, 0.2 * KM_PER_TILE)
+
+    assert tile == (3, 0)
+
+
+def test_tile_at_km_returns_none_outside_the_map() -> None:
+    world = World.generate(width=10, height=10, seed=7)
+
+    tile = world.tile_at_km(-0.1, 10 * KM_PER_TILE)
+
+    assert tile is None
