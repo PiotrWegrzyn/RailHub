@@ -3,18 +3,18 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
-from railroads.sim.units import km_to_tiles
-
 KM_PER_DEGREE_LAT = 111.32
 
-LonLat = tuple[float, float]
-FloatGrid = npt.NDArray[np.float64]
-BoolGrid = npt.NDArray[np.bool_]
+type Coord = float | npt.NDArray[np.float64]
 
 
 @dataclass(frozen=True, slots=True)
-class Projection:
-    """Equirectangular projection of a lon/lat box onto the tile grid, north at row 0."""
+class Bounds:
+    """A lon/lat box laid flat: x runs in km east of the west edge, y in km south of the north edge.
+
+    The projection is equirectangular around the middle latitude, which is accurate to a few
+    percent across a country.
+    """
 
     west: float
     east: float
@@ -26,31 +26,15 @@ class Projection:
         return KM_PER_DEGREE_LAT * float(np.cos(np.radians((self.south + self.north) / 2)))
 
     @property
-    def width_tiles(self) -> int:
-        return round(km_to_tiles((self.east - self.west) * self.km_per_degree_lon))
+    def width_km(self) -> float:
+        return (self.east - self.west) * self.km_per_degree_lon
 
     @property
-    def height_tiles(self) -> int:
-        return round(km_to_tiles((self.north - self.south) * KM_PER_DEGREE_LAT))
+    def height_km(self) -> float:
+        return (self.north - self.south) * KM_PER_DEGREE_LAT
 
-    def to_tile(self, lon: float, lat: float) -> tuple[float, float]:
-        x = (lon - self.west) / (self.east - self.west) * self.width_tiles
-        y = (self.north - lat) / (self.north - self.south) * self.height_tiles
-        return x, y
+    def to_km(self, lon: Coord, lat: Coord) -> tuple[Coord, Coord]:
+        return (lon - self.west) * self.km_per_degree_lon, (self.north - lat) * KM_PER_DEGREE_LAT
 
-    def tile_centers(self) -> tuple[FloatGrid, FloatGrid]:
-        ys, xs = np.mgrid[0 : self.height_tiles, 0 : self.width_tiles]
-        return xs + 0.5, ys + 0.5
-
-
-def polygon_mask(
-    xs: FloatGrid, ys: FloatGrid, projection: Projection, polygon: list[LonLat]
-) -> BoolGrid:
-    points = [projection.to_tile(lon, lat) for lon, lat in polygon]
-    inside = np.zeros(xs.shape, dtype=bool)
-    for (x1, y1), (x2, y2) in zip(points, points[1:] + points[:1], strict=True):
-        crosses = (y1 > ys) != (y2 > ys)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            x_at_y = x1 + (ys - y1) * (x2 - x1) / (y2 - y1)
-        inside ^= crosses & (xs < x_at_y)
-    return inside
+    def to_lonlat(self, x_km: Coord, y_km: Coord) -> tuple[Coord, Coord]:
+        return self.west + x_km / self.km_per_degree_lon, self.north - y_km / KM_PER_DEGREE_LAT
