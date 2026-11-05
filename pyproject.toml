@@ -1,0 +1,38 @@
+[project]
+name = "railroads"
+version = "0.1.0"
+description = "A mechanics-first railroad tycoon game."
+readme = "README.md"
+authors = [
+    { name = "piotr-wegrzyn", email = "piotr.wegrzyn@instream.io" }
+]
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "imgui-bundle==1.93.0",
+    "numpy>=2.5.4",
+]
+
+[project.scripts]
+railroads = "railroads.ui.app:main"
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+extend-select = ["I", "UP", "B", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"imgui_bundle".msg = "The simulation must not depend on the UI. Import imgui_bundle only inside railroads.ui."
+
+[tool.ruff.lint.per-file-ignores]
+"src/railroads/ui/**" = ["TID251"]
