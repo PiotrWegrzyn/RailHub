@@ -8,6 +8,7 @@ from railroads.mapgen.area import MapArea, clip_ring, densify
 from railroads.mapgen.generate import generate_map
 from railroads.mapgen.sources import ElevationGrid, Shape
 from railroads.mapgen.strategies import (
+    Climate,
     HeightFromElevation,
     Layer,
     TemperatureFromClimate,
@@ -168,6 +169,23 @@ def test_height_is_the_average_over_each_cell(area: MapArea) -> None:
     assert heights == pytest.approx((lon - 19.0) * 100, abs=1)
 
 
+def test_height_needs_elevation_data_that_covers_the_map(area: MapArea) -> None:
+    west_of_the_map = ElevationGrid(
+        lons=np.array([18.0, 19.0]), lats=np.array([49.0, 51.0]), heights=np.zeros((2, 2))
+    )
+
+    with pytest.raises(ValueError, match="cover"):
+        HeightFromElevation(west_of_the_map)(area, {})
+
+
+def test_climate_is_warmest_at_the_equator_and_cools_with_height() -> None:
+    climate = Climate()
+
+    temperatures = climate.mean_c(np.array([0.0, 90.0, 0.0]), np.array([0, 0, 1000]))
+
+    assert temperatures == pytest.approx([27.0, -20.0, 21.0])
+
+
 def test_higher_cells_are_colder(area: MapArea) -> None:
     height = np.zeros(area.grid.shape, dtype=np.int16)
     height[:, : area.grid.cols // 2] = 2000
@@ -181,12 +199,26 @@ def test_higher_cells_are_colder(area: MapArea) -> None:
 def test_a_warm_climate_makes_cells_hot(area: MapArea) -> None:
     height = np.zeros(area.grid.shape, dtype=np.int16)
 
-    temperature = TemperatureFromClimate(sea_level_c=25.0)(area, {"height_m": height})
+    warm = TemperatureFromClimate(climate=Climate(equator_c=40.0, pole_c=30.0))
+
+    temperature = warm(area, {"height_m": height})
 
     assert (temperature == Temperature.HOT).all()
 
 
-def test_nothing_grows_on_water_or_high_ground(area: MapArea) -> None:
+def test_deserts_feel_hotter(area: MapArea) -> None:
+    width, height = area.grid.size()
+    half = width / 2
+    desert = polygon(area, [(-1, -1), (half, -1), (half, height + 1), (-1, height + 1)])
+    mild = TemperatureFromClimate(hot_above_c=12.0, deserts=[desert])
+
+    temperature = mild(area, {"height_m": np.zeros(area.grid.shape, dtype=np.int16)})
+
+    assert (temperature[:, 0] == Temperature.HOT).all()
+    assert (temperature[:, -1] == Temperature.NORMAL).all()
+
+
+def test_nothing_grows_on_water_or_where_it_is_too_cold(area: MapArea) -> None:
     terrain = np.full(area.grid.shape, Terrain.LAND, dtype=np.uint8)
     terrain[0] = Terrain.SEA
     height = np.zeros(area.grid.shape, dtype=np.int16)
@@ -196,6 +228,21 @@ def test_nothing_grows_on_water_or_high_ground(area: MapArea) -> None:
 
     assert (vegetation[0] == Vegetation.BARREN).all()
     assert (vegetation[-1] == Vegetation.BARREN).all()
+
+
+def test_deserts_are_barren(area: MapArea) -> None:
+    width, height = area.grid.size()
+    half = width / 2
+    desert = polygon(area, [(-1, -1), (half, -1), (half, height + 1), (-1, height + 1)])
+    layers = {
+        "terrain": np.full(area.grid.shape, Terrain.LAND, dtype=np.uint8),
+        "height_m": np.zeros(area.grid.shape, dtype=np.int16),
+    }
+
+    vegetation = VegetationPlaceholder(deserts=[desert])(area, layers)
+
+    assert (vegetation[:, 0] == Vegetation.BARREN).all()
+    assert (vegetation[:, -1] != Vegetation.BARREN).any()
 
 
 def test_forest_covers_the_chosen_share_of_land(area: MapArea) -> None:

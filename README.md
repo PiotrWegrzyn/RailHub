@@ -8,6 +8,22 @@ Run the game:
 uv run railroads
 ```
 
+Every game starts at a random, mostly-land spot in the world, on a 600 x 600 km map. The limits
+for that spot (longitude, latitude, how much land) are `START_REGION` in
+`src/railroads/newgame.py`. Options:
+
+```bash
+uv run railroads --seed 42
+```
+
+replays the start location of seed 42, and
+
+```bash
+uv run railroads --poland
+```
+
+plays on the baked map of Poland.
+
 Run the tests and linter:
 
 ```bash
@@ -33,23 +49,37 @@ where a property comes from. The UI then draws every cell as a biome picked from
 
 ## Map data
 
-`src/railroads/maps/poland-square.npz` and `poland-hex.npz` are baked by
-`tools/build_poland_map.py` from public-domain data:
+Maps are built from these sources:
 
-- Elevation: NOAA ETOPO1, 1 arc-minute (via NOAA CoastWatch ERDDAP, dataset `etopo180`).
-- Sea, lakes and rivers: [Natural Earth](https://www.naturalearthdata.com/) 1:10m. Rivers running
-  less than 200 km on the map are left out. Without the ocean file, the sea falls back to low
-  ground (0 m or below) connected to the map edge.
-- Temperature: a climate rule from latitude and height.
+- Elevation for new games: Mapzen terrain tiles on [AWS Open Data](https://registry.opendata.aws/terrain-tiles/),
+  made from SRTM, GMTED2010, ETOPO1, EU-DEM and others
+  ([attribution](https://github.com/tilezen/joerd/blob/master/docs/attribution.md)). They are
+  downloaded once into a local database, so starting a game needs no internet.
+- Elevation for Poland: NOAA ETOPO1, 1 arc-minute (via NOAA CoastWatch ERDDAP, dataset `etopo180`).
+- Sea, lakes, rivers and deserts: [Natural Earth](https://www.naturalearthdata.com/) 1:10m,
+  public domain. Rivers running less than 200 km on the map are left out.
+- Temperature: a climate rule from latitude and height that works anywhere in the world.
 - Forests: random placeholder patches until a land-cover source is added.
 
-To rebuild them:
+Set up the data once:
 
 ```bash
 mkdir -p data/raw && cd data/raw
 curl -o etopo_poland.csv "https://coastwatch.pfeg.noaa.gov/erddap/griddap/etopo180.csv?altitude%5B(48.9):1:(55.0)%5D%5B(13.6):1:(24.4)%5D"
-for f in ne_10m_ocean ne_10m_lakes ne_10m_lakes_europe ne_10m_rivers_lake_centerlines ne_10m_rivers_europe; do
+for f in ne_10m_ocean ne_10m_lakes ne_10m_lakes_europe ne_10m_rivers_lake_centerlines ne_10m_rivers_europe ne_10m_geography_regions_polys; do
   curl -O "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/$f.geojson"
 done
-cd ../.. && uv run python tools/build_poland_map.py
+cd ../..
+```
+
+Then build the elevation database for new games (about 70 MB download, resumes if interrupted):
+
+```bash
+uv run python tools/build_elevation_db.py
+```
+
+and, to rebake the Poland maps:
+
+```bash
+uv run python tools/build_poland_map.py
 ```

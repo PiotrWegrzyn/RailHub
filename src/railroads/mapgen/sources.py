@@ -1,16 +1,24 @@
-"""Map data that strategies read: mapped shapes and elevation grids, all in lon/lat."""
+"""Map data that strategies read: mapped shapes and elevation, all in lon/lat."""
 
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Self
+from typing import Any, Literal, Protocol, Self
 
 import numpy as np
 import numpy.typing as npt
 
-from railroads.sim.geo import Coord
+from railroads.sim.geo import Bounds, Coord
 
 FloatArray = npt.NDArray[np.float64]
+
+
+class Elevation(Protocol):
+    """Anything that can tell the ground height in metres at lon/lat points."""
+
+    def covers(self, bounds: Bounds) -> bool: ...
+
+    def sample(self, lon: Coord, lat: Coord) -> FloatArray: ...
 
 
 @dataclass(frozen=True)
@@ -70,13 +78,29 @@ class ElevationGrid:
         lats, lons = np.unique(rows[:, 0]), np.unique(rows[:, 1])
         return cls(lons=lons, lats=lats, heights=rows[:, 2].reshape(len(lats), len(lons)))
 
+    def covers(self, bounds: Bounds) -> bool:
+        slack = 1e-6
+        return bool(
+            self.lons[0] <= bounds.west + slack
+            and self.lons[-1] >= bounds.east - slack
+            and self.lats[0] <= bounds.south + slack
+            and self.lats[-1] >= bounds.north - slack
+        )
+
     def sample(self, lon: Coord, lat: Coord) -> FloatArray:
-        i = np.interp(lat, self.lats, np.arange(len(self.lats)))
-        j = np.interp(lon, self.lons, np.arange(len(self.lons)))
-        i0 = np.minimum(np.floor(i).astype(np.int64), len(self.lats) - 2)
-        j0 = np.minimum(np.floor(j).astype(np.int64), len(self.lons) - 2)
-        ti, tj = i - i0, j - j0
-        h = self.heights
-        top = h[i0, j0] * (1 - tj) + h[i0, j0 + 1] * tj
-        bottom = h[i0 + 1, j0] * (1 - tj) + h[i0 + 1, j0 + 1] * tj
-        return top * (1 - ti) + bottom * ti
+        rows = np.interp(lat, self.lats, np.arange(len(self.lats)))
+        cols = np.interp(lon, self.lons, np.arange(len(self.lons)))
+        return bilinear(self.heights, rows, cols)
+
+
+def bilinear(values: npt.NDArray[np.generic], rows: Coord, cols: Coord) -> FloatArray:
+    """Values between the points of a 2D array at fractional row and column positions, clamped
+    to the array's edges."""
+    rows = np.clip(rows, 0, values.shape[0] - 1)
+    cols = np.clip(cols, 0, values.shape[1] - 1)
+    r0 = np.minimum(np.floor(rows).astype(np.int64), values.shape[0] - 2)
+    c0 = np.minimum(np.floor(cols).astype(np.int64), values.shape[1] - 2)
+    tr, tc = rows - r0, cols - c0
+    top = values[r0, c0] * (1 - tc) + values[r0, c0 + 1] * tc
+    bottom = values[r0 + 1, c0] * (1 - tc) + values[r0 + 1, c0 + 1] * tc
+    return top * (1 - tr) + bottom * tr

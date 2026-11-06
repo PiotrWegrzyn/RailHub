@@ -14,7 +14,8 @@ import numpy.typing as npt
 
 from railroads.mapgen.area import MapArea
 from railroads.mapgen.noise import fractal_noise
-from railroads.mapgen.sources import ElevationGrid, Shape
+from railroads.mapgen.sources import Elevation, Shape
+from railroads.sim.geo import Coord
 from railroads.sim.grids import BoolGrid
 from railroads.sim.tilemap import Temperature, Terrain, Vegetation
 
@@ -26,12 +27,29 @@ class Strategy(Protocol):
 
 
 @dataclass(frozen=True)
+class Climate:
+    """Yearly mean temperature from latitude and height: at sea level about 27 °C at the equator
+    and -20 °C at the poles, and 6 °C colder for every km up. Rough, but enough to tell tropics,
+    temperate land, tundra and snowy peaks apart anywhere in the world."""
+
+    equator_c: float = 27.0
+    pole_c: float = -20.0
+    colder_per_km_up_c: float = 6.0
+
+    def mean_c(self, lat: Coord, height_m: Layer) -> Layer:
+        sea_level = self.pole_c + (self.equator_c - self.pole_c) * np.cos(np.radians(lat))
+        return sea_level - self.colder_per_km_up_c * np.maximum(height_m, 0) / 1000
+
+
+@dataclass(frozen=True)
 class HeightFromElevation:
     """Average ground height over each cell, in metres."""
 
-    elevation: ElevationGrid
+    elevation: Elevation
 
     def __call__(self, area: MapArea, layers: Mapping[str, Layer]) -> Layer:
+        if not self.elevation.covers(area.bounds):
+            raise ValueError("the elevation data does not cover the map area")
         heights = self.elevation.sample(*area.sample_lonlat())
         return np.rint(area.samples.per_cell_mean(heights)).astype(np.int16)
 
@@ -97,27 +115,20 @@ def sea_from_height(height_m: Layer) -> BoolGrid:
 
 @dataclass(frozen=True)
 class TemperatureFromClimate:
-    """How warm each cell feels, from a simple climate rule: colder further north and higher up.
+    """How warm each cell feels: cold where the yearly mean is below `cold_below_c`, hot above
+    `hot_above_c`, normal in between. Mapped deserts count `desert_warming_c` warmer, since
+    cloudless deserts run hotter than the average for their latitude."""
 
-    The defaults fit Central Europe, about 9 °C a year at sea level at 51° N. A cell whose yearly
-    average is below `cold_below_c` is cold, above `hot_above_c` it is hot.
-    """
-
-    sea_level_c: float = 9.0
-    reference_lat: float = 51.0
-    colder_per_degree_north_c: float = 0.6
-    colder_per_km_up_c: float = 6.0
+    climate: Climate = Climate()
     cold_below_c: float = 4.0
-    hot_above_c: float = 16.0
+    hot_above_c: float = 20.0
+    deserts: Sequence[Shape] = ()
+    desert_warming_c: float = 4.0
 
     def __call__(self, area: MapArea, layers: Mapping[str, Layer]) -> Layer:
         _, lat = area.center_lonlat()
-        height_km = np.maximum(layers["height_m"], 0) / 1000
-        celsius = (
-            self.sea_level_c
-            - self.colder_per_degree_north_c * (lat - self.reference_lat)
-            - self.colder_per_km_up_c * height_km
-        )
+        desert = area.cover(self.deserts) >= 0.5
+        celsius = self.climate.mean_c(lat, layers["height_m"]) + self.desert_warming_c * desert
         temperature = np.full(area.grid.shape, Temperature.NORMAL, dtype=np.uint8)
         temperature[celsius < self.cold_below_c] = Temperature.COLD
         temperature[celsius > self.hot_above_c] = Temperature.HOT
@@ -127,11 +138,14 @@ class TemperatureFromClimate:
 @dataclass(frozen=True)
 class VegetationPlaceholder:
     """A stand-in until real land-cover data is plugged in: random forest patches over
-    `forest_share` of the land, bare ground above `barren_above_m`, and nothing on water."""
+    `forest_share` of the land, and bare ground on water, inside mapped deserts and where it is
+    too cold for trees (a yearly mean below `treeline_c`)."""
 
+    deserts: Sequence[Shape] = ()
     seed: int = 1
     forest_share: float = 0.3
-    barren_above_m: int = 1300
+    treeline_c: float = 1.0
+    climate: Climate = Climate()
     patch_size_cells: float = 12.0
 
     def __call__(self, area: MapArea, layers: Mapping[str, Layer]) -> Layer:
@@ -142,5 +156,8 @@ class VegetationPlaceholder:
         if land.any():
             forest = noise >= np.quantile(noise[land], 1 - self.forest_share)
             vegetation[forest] = Vegetation.FOREST
-        vegetation[~land | (layers["height_m"] >= self.barren_above_m)] = Vegetation.BARREN
+        _, lat = area.center_lonlat()
+        too_cold = self.climate.mean_c(lat, layers["height_m"]) < self.treeline_c
+        desert = area.cover(self.deserts) >= 0.5
+        vegetation[~land | too_cold | desert] = Vegetation.BARREN
         return vegetation

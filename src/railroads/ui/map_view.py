@@ -8,10 +8,11 @@ import numpy as np
 import numpy.typing as npt
 from imgui_bundle import hello_imgui, imgui
 
+from railroads.sim.geo import describe_lonlat
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, GridKind
 from railroads.sim.tilemap import TileMap
 from railroads.ui.biomes import biome_colors, biome_of
-from railroads.ui.iso_camera import IsoCamera, Vec2
+from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS, IsoCamera, Vec2
 
 BACKGROUND_COLOR = (0.08, 0.09, 0.11, 1.0)
 GRID_COLOR = (0.0, 0.0, 0.0, 0.25)
@@ -21,6 +22,8 @@ COMPASS_COLOR = (1.0, 1.0, 1.0, 0.85)
 # identical pixels keeps cell edges sharp when zoomed in.
 PIXELS_PER_CELL = 8
 TEXTURE_ROWS_PER_PASS = 256
+# How much grid lines baked into the ground darken it, close to the look of the drawn lines.
+BAKED_LINE_SHADE = 0.3
 # Lower left, upper left, top and upper right corner: three edges per hexagon draw the whole grid.
 _HEX_EDGE_ANGLES = np.radians([150, 210, 270, 330])
 
@@ -33,16 +36,21 @@ class GridLook:
     base_angle: float
     cell_units: float
     start_rotation: int
-    min_cell_width_for_lines: int
+    # Cell widths in pixels from which the grid shows: first baked into the ground picture, while
+    # there are too many cells to outline one by one, then as sharp lines drawn on top.
+    baked_lines_from: int | None
+    drawn_lines_from: int
 
 
 LOOKS: dict[GridKind, GridLook] = {
-    "square": GridLook(45.0, math.sqrt(2), start_rotation=3, min_cell_width_for_lines=16),
-    "hex": GridLook(0.0, 1.0, start_rotation=0, min_cell_width_for_lines=32),
+    "square": GridLook(
+        45.0, math.sqrt(2), start_rotation=3, baked_lines_from=None, drawn_lines_from=16
+    ),
+    "hex": GridLook(0.0, 1.0, start_rotation=0, baked_lines_from=8, drawn_lines_from=24),
 }
 
 
-def ground_rgba(tile_map: TileMap) -> npt.NDArray[np.uint8]:
+def ground_rgba(tile_map: TileMap, with_lines: bool = False) -> npt.NDArray[np.uint8]:
     grid = tile_map.grid
     colors = biome_colors(tile_map)
     width, height = grid.size()
@@ -52,9 +60,16 @@ def ground_rgba(tile_map: TileMap) -> npt.NDArray[np.uint8]:
     xs = (np.arange(width_px) + 0.5) / PIXELS_PER_CELL
     for top in range(0, height_px, TEXTURE_ROWS_PER_PASS):
         ys = (np.arange(top, min(top + TEXTURE_ROWS_PER_PASS, height_px)) + 0.5) / PIXELS_PER_CELL
-        rows, cols = grid.cell_at(*np.meshgrid(xs, ys))
+        px, py = np.meshgrid(xs, ys)
+        rows, cols = grid.cell_at(px, py)
         on_map = grid.contains(rows, cols)
-        rgba[top : top + len(ys)][on_map] = colors[rows[on_map], cols[on_map]]
+        block = colors[rows.clip(0, grid.rows - 1), cols.clip(0, grid.cols - 1)]
+        if with_lines:
+            on_edge = np.clip(1 - grid.edge_distance(px, py) * PIXELS_PER_CELL, 0, 1)
+            shade = 1 - BAKED_LINE_SHADE * on_edge[..., None]
+            block[..., :3] = (block[..., :3] * shade).astype(np.uint8)
+        block[~on_map] = 0
+        rgba[top : top + len(ys)] = block
     return rgba
 
 
@@ -79,7 +94,7 @@ class MapView:
             cell_units=self._look.cell_units,
             rotation=self._look.start_rotation,
         )
-        self._texture: hello_imgui.TextureGpu | None = None
+        self._textures: dict[bool, hello_imgui.TextureGpu] = {}
         self._texture_size = (0.0, 0.0)
         self._hovered: Cell | None = None
         self._wheel = 0.0
@@ -104,7 +119,7 @@ class MapView:
         imgui.text(self._status())
 
     def _status(self) -> str:
-        zoom = f"Zoom {self.camera.zoom_level + 1}/5"
+        zoom = f"Zoom {self.camera.zoom_level + 1}/{len(ZOOM_CELL_WIDTHS)}"
         if self._hovered is None:
             return f"{zoom}. Drag to pan, scroll or -/+ to zoom, Q/E to turn."
         tile = self.tile_map.tile(self._hovered)
@@ -114,14 +129,17 @@ class MapView:
             f"{tile.terrain.name.lower()}, {tile.vegetation.name.lower()}, "
             f"{tile.temperature.name.lower()}, {tile.height_m} m"
         )
-        place = f"Cell {row}, {col} at {lat:.2f}°N {lon:.2f}°E"
+        place = f"Cell {row}, {col} at {describe_lonlat(lon, lat)}"
         return f"{zoom}. {place}: {biome_of(tile).name.title()} ({properties})"
 
-    def _draw_map(self) -> None:
-        if self._texture is None:
-            rgba = ground_rgba(self.tile_map)
-            self._texture = hello_imgui.create_texture_gpu_from_rgba_data(rgba)
+    def _ground_texture(self, with_lines: bool) -> hello_imgui.TextureGpu:
+        if with_lines not in self._textures:
+            rgba = ground_rgba(self.tile_map, with_lines)
+            self._textures[with_lines] = hello_imgui.create_texture_gpu_from_rgba_data(rgba)
             self._texture_size = (rgba.shape[1] / PIXELS_PER_CELL, rgba.shape[0] / PIXELS_PER_CELL)
+        return self._textures[with_lines]
+
+    def _draw_map(self) -> None:
         origin = imgui.get_cursor_screen_pos()
         size = imgui.get_content_region_avail()
         if size.x <= 0 or size.y <= 0:
@@ -135,8 +153,12 @@ class MapView:
         bottom_right = (origin.x + size.x, origin.y + size.y)
         draw_list.push_clip_rect(top_left, bottom_right, True)
         draw_list.add_rect_filled(top_left, bottom_right, _color(BACKGROUND_COLOR))
-        self._draw_ground(draw_list, center)
-        if self.camera.cell_width >= self._look.min_cell_width_for_lines:
+        cell_width = self.camera.cell_width
+        drawn_lines = cell_width >= self._look.drawn_lines_from
+        baked_from = self._look.baked_lines_from
+        baked_lines = not drawn_lines and baked_from is not None and cell_width >= baked_from
+        self._draw_ground(draw_list, center, self._ground_texture(baked_lines))
+        if drawn_lines:
             self._draw_grid(draw_list, center, top_left, bottom_right)
         if self._hovered is not None:
             self._draw_outline(draw_list, center, self._hovered)
@@ -162,12 +184,13 @@ class MapView:
             if self.tile_map.grid.contains(*cell):
                 self._hovered = cell
 
-    def _draw_ground(self, draw_list: imgui.ImDrawList, center: Vec2) -> None:
-        assert self._texture is not None
+    def _draw_ground(
+        self, draw_list: imgui.ImDrawList, center: Vec2, texture: hello_imgui.TextureGpu
+    ) -> None:
         width, height = self._texture_size
         to_screen = self.camera.to_screen
         draw_list.add_image_quad(
-            imgui.ImTextureRef(self._texture.texture_id()),
+            imgui.ImTextureRef(texture.texture_id()),
             to_screen(0, 0, center),
             to_screen(width, 0, center),
             to_screen(width, height, center),

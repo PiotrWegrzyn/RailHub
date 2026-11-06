@@ -83,6 +83,10 @@ class Grid(ABC):
         """Add cells to the mask wherever two of its cells touch only at a corner, so that what
         the mask outlines, like a river, cannot be crossed diagonally."""
 
+    @abstractmethod
+    def edge_distance(self, x: Coord, y: Coord) -> Coord:
+        """How far each point is from the nearest edge of the cell it lies in, in cell units."""
+
 
 @dataclass(frozen=True, slots=True)
 class SquareGrid(Grid):
@@ -115,6 +119,11 @@ class SquareGrid(Grid):
         steps = (np.arange(4) + 0.5) / 4 - 0.5
         dx, dy = np.meshgrid(steps, steps)
         return np.column_stack([dx.ravel(), dy.ravel()])
+
+    def edge_distance(self, x: Coord, y: Coord) -> Coord:
+        dx = np.abs(np.asarray(x, dtype=float) % 1 - 0.5)
+        dy = np.abs(np.asarray(y, dtype=float) % 1 - 0.5)
+        return 0.5 - np.maximum(dx, dy)
 
     def seal_corner_gaps(self, mask: BoolGrid) -> BoolGrid:
         sealed = mask.copy()
@@ -181,6 +190,14 @@ class HexGrid(Grid):
         dx, dy = np.meshgrid(steps, steps * 2 * HEX_RADIUS)
         inside = np.abs(dy) < HEX_RADIUS - np.abs(dx) / math.sqrt(3) - 1e-9
         return np.column_stack([dx[inside], dy[inside]])
+
+    def edge_distance(self, x: Coord, y: Coord) -> Coord:
+        x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+        cx, cy = self.center(*self.cell_at(x, y))
+        dx, dy = x - cx, y - cy
+        slant = math.sqrt(3) / 2
+        across = np.maximum(np.abs(dx / 2 + slant * dy), np.abs(dx / 2 - slant * dy))
+        return 0.5 - np.maximum(np.abs(dx), across)
 
     def seal_corner_gaps(self, mask: BoolGrid) -> BoolGrid:
         return mask.copy()

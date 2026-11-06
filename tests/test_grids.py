@@ -101,3 +101,31 @@ def test_grid_covering_an_area_spans_it(grid_type: type[Grid]) -> None:
 
     assert width * 2.0 == pytest.approx(100, abs=2.0)
     assert height * 2.0 == pytest.approx(60, abs=2.0)
+
+
+@EACH_GRID
+def test_cell_centre_is_half_a_unit_from_the_edge(grid: Grid) -> None:
+    x, y = grid.center(2, 3)
+
+    distance = grid.edge_distance(x, y)
+
+    assert distance == pytest.approx(0.5)
+
+
+@EACH_GRID
+def test_corners_lie_on_the_edge(grid: Grid) -> None:
+    corners = np.array(grid.corners(2, 3))
+
+    distances = grid.edge_distance(corners[:, 0], corners[:, 1])
+
+    assert distances == pytest.approx(np.zeros(len(corners)), abs=1e-9)
+
+
+@EACH_GRID
+def test_points_halfway_to_each_neighbour_lie_on_the_edge(grid: Grid) -> None:
+    centre = np.array(grid.center(2, 3))
+    halfway = np.array([(centre + grid.center(*cell)) / 2 for cell in grid.neighbours(2, 3)])
+
+    distances = grid.edge_distance(halfway[:, 0], halfway[:, 1])
+
+    assert distances == pytest.approx(np.zeros(len(halfway)), abs=1e-9)

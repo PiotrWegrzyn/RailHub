@@ -17,3 +17,6 @@ wheels/
 
 # Downloaded source data for tools/ (see README)
 data/raw/
+
+# Worldwide elevation database built by tools/build_elevation_db.py
+data/elevation.sqlite

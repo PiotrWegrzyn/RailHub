@@ -2,7 +2,7 @@
 
 Inputs in data/raw/ (download commands in README.md):
 - etopo_poland.csv: NOAA ETOPO1 elevation, 1 arc-minute grid.
-- ne_10m_*.geojson: Natural Earth lakes and rivers, and the ocean when it has been downloaded.
+- ne_10m_*.geojson: Natural Earth sea, lakes, rivers and geography regions (for deserts).
 
 Run with: uv run python tools/build_poland_map.py
 """
@@ -12,14 +12,13 @@ from pathlib import Path
 
 from railroads import maps
 from railroads.mapgen.generate import generate_map
-from railroads.mapgen.sources import ElevationGrid, Shape, read_geojson
-from railroads.mapgen.strategies import (
-    HeightFromElevation,
-    Strategy,
-    TemperatureFromClimate,
-    VegetationPlaceholder,
-    WaterFromShapes,
+from railroads.mapgen.presets import (
+    ETOPO_SOURCE,
+    NATURAL_EARTH_SOURCE,
+    NaturalEarth,
+    real_world_strategies,
 )
+from railroads.mapgen.sources import ElevationGrid
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import GRIDS
 from railroads.sim.tilemap import LAYERS, Temperature, Terrain, TileMap, Vegetation
@@ -27,32 +26,7 @@ from railroads.sim.tilemap import LAYERS, Temperature, Terrain, TileMap, Vegetat
 RAW = Path(__file__).resolve().parent.parent / "data" / "raw"
 BOUNDS = Bounds(west=13.6, east=24.4, south=48.9, north=55.0)
 KM_PER_CELL = 2.0
-MIN_RIVER_KM = 200.0
-LAKE_FILES = ("ne_10m_lakes.geojson", "ne_10m_lakes_europe.geojson")
-RIVER_FILES = ("ne_10m_rivers_lake_centerlines.geojson", "ne_10m_rivers_europe.geojson")
-OCEAN_FILE = RAW / "ne_10m_ocean.geojson"
-SOURCES = (
-    "Elevation: NOAA ETOPO1, 1 arc-minute, public domain",
-    "Sea, lakes and rivers: Natural Earth 1:10m, public domain",
-)
-
-
-def strategies() -> dict[str, Strategy]:
-    return {
-        "height_m": HeightFromElevation(ElevationGrid.from_erddap_csv(RAW / "etopo_poland.csv")),
-        "terrain": WaterFromShapes(
-            lakes=_shapes(LAKE_FILES),
-            rivers=_shapes(RIVER_FILES),
-            sea=read_geojson(OCEAN_FILE) if OCEAN_FILE.exists() else None,
-            min_river_km=MIN_RIVER_KM,
-        ),
-        "temperature": TemperatureFromClimate(),
-        "vegetation": VegetationPlaceholder(seed=7),
-    }
-
-
-def _shapes(file_names: tuple[str, ...]) -> list[Shape]:
-    return [shape for name in file_names for shape in read_geojson(RAW / name)]
+SEED = 7
 
 
 def _summary(tile_map: TileMap) -> str:
@@ -68,11 +42,12 @@ def _summary(tile_map: TileMap) -> str:
 
 
 def main() -> None:
-    chosen = strategies()
-    print("sea from", "Natural Earth ocean" if OCEAN_FILE.exists() else "height (no ocean file)")
+    elevation = ElevationGrid.from_erddap_csv(RAW / "etopo_poland.csv")
+    strategies = real_world_strategies(NaturalEarth.load(RAW), elevation, SEED)
     for kind, grid_type in GRIDS.items():
         grid = grid_type.covering(BOUNDS.width_km, BOUNDS.height_km, KM_PER_CELL)
-        tile_map = generate_map("Poland", BOUNDS, grid, chosen, SOURCES)
+        sources = (ETOPO_SOURCE, NATURAL_EARTH_SOURCE)
+        tile_map = generate_map("Poland", BOUNDS, grid, strategies, sources)
         path = maps.map_file("poland", kind)
         tile_map.save(path)
         print(f"wrote {path.name}: {grid.rows} x {grid.cols} {kind} cells; {_summary(tile_map)}")

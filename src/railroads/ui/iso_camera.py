@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from railroads.sim.geo import Coord
 
 # On-screen width in pixels of one cell at each zoom level.
-ZOOM_CELL_WIDTHS = (4, 8, 16, 32, 64)
+ZOOM_CELL_WIDTHS = (4, 8, 16, 24, 32, 64)
 # Screen y is squashed by this much to fake looking at the map from an angle.
 TILT = 0.5
 
