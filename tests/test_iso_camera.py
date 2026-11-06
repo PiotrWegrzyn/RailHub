@@ -114,6 +114,25 @@ def test_zoom_is_limited_to_six_levels(start: int, steps: int, expected: int) ->
     assert camera.zoom_level == expected
 
 
+def test_screen_top_left_is_north_for_squares_at_rotation_three() -> None:
+    camera = IsoCamera(center_x=0, center_y=0, rotation=3, **SQUARES)
+
+    x, y = camera.map_direction(-1.0, -1.0)
+
+    assert y < 0
+    assert abs(y) > abs(x)
+
+
+def test_screen_top_left_is_north_west_for_unturned_hexagons() -> None:
+    camera = IsoCamera(center_x=0, center_y=0, **HEXAGONS)
+
+    x, y = camera.map_direction(-1.0, -1.0)
+
+    assert x < 0
+    assert y < 0
+    assert x * x + y * y == pytest.approx(1.0)
+
+
 def test_zoom_level_four_sits_between_three_and_five() -> None:
     widths = [IsoCamera(center_x=0, center_y=0, zoom_level=level).cell_width for level in (2, 3, 4)]
 

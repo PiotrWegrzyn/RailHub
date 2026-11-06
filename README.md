@@ -44,8 +44,17 @@ cell shape, bounds and data sources in one `.npz` file.
 
 `railroads.mapgen` makes a map by laying a grid over a lon/lat box and filling in each property
 with a strategy, in order, so a strategy can use the layers before it. Swap a strategy to change
-where a property comes from. The UI then draws every cell as a biome picked from its properties
-(`railroads.ui.biomes`): water is always water, hot and barren is desert, hot and forest is jungle.
+where a property comes from.
+
+The UI draws the map from those properties alone:
+
+- `railroads.ui.biomes`: every cell is a biome picked from terrain, temperature and vegetation.
+  Water is always water, hot and barren is desert, hot and forest is jungle.
+- `railroads.ui.relief`: land sits on one of eleven height levels (0 under 50 m up to 10 at
+  3000 m and above), drawn lighter the higher it is, and slopes are shaded as if lit from the
+  top-left of the screen.
+- `railroads.ui.ground`: puts both together into the ground picture, repainted when the view
+  turns so the light keeps coming from the same side.
 
 ## Map data
 

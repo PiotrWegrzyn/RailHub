@@ -65,6 +65,12 @@ class IsoCamera:
     def turn(self, steps: int) -> None:
         self.rotation = (self.rotation + steps) % self.turn_steps
 
+    def map_direction(self, screen_dx: float, screen_dy: float) -> Vec2:
+        """The direction on the map, as a unit vector, that points that way on screen."""
+        x, y = self._unproject(screen_dx, screen_dy)
+        length = math.hypot(x, y)
+        return x / length, y / length
+
     @property
     def _scale(self) -> float:
         return self.cell_width / self.cell_units

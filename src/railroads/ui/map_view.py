@@ -5,25 +5,22 @@ import math
 from dataclasses import dataclass
 
 import numpy as np
-import numpy.typing as npt
 from imgui_bundle import hello_imgui, imgui
 
 from railroads.sim.geo import describe_lonlat
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, GridKind
 from railroads.sim.tilemap import TileMap
-from railroads.ui.biomes import biome_colors, biome_of
+from railroads.ui.biomes import biome_of
+from railroads.ui.ground import GroundLayout, cell_colors
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS, IsoCamera, Vec2
+from railroads.ui.relief import height_levels
 
 BACKGROUND_COLOR = (0.08, 0.09, 0.11, 1.0)
 GRID_COLOR = (0.0, 0.0, 0.0, 0.25)
 HOVER_COLOR = (1.0, 1.0, 1.0, 0.9)
 COMPASS_COLOR = (1.0, 1.0, 1.0, 0.85)
-# The renderer samples textures with linear filtering; drawing each cell as a block of many
-# identical pixels keeps cell edges sharp when zoomed in.
-PIXELS_PER_CELL = 8
-TEXTURE_ROWS_PER_PASS = 256
-# How much grid lines baked into the ground darken it, close to the look of the drawn lines.
-BAKED_LINE_SHADE = 0.3
+# Slopes are lit from the top-left of the screen, whichever way the map is turned.
+LIGHT_ON_SCREEN = (-1.0, -1.0)
 # Lower left, upper left, top and upper right corner: three edges per hexagon draw the whole grid.
 _HEX_EDGE_ANGLES = np.radians([150, 210, 270, 330])
 
@@ -50,29 +47,6 @@ LOOKS: dict[GridKind, GridLook] = {
 }
 
 
-def ground_rgba(tile_map: TileMap, with_lines: bool = False) -> npt.NDArray[np.uint8]:
-    grid = tile_map.grid
-    colors = biome_colors(tile_map)
-    width, height = grid.size()
-    width_px = math.ceil(width * PIXELS_PER_CELL)
-    height_px = math.ceil(height * PIXELS_PER_CELL)
-    rgba = np.zeros((height_px, width_px, 4), dtype=np.uint8)
-    xs = (np.arange(width_px) + 0.5) / PIXELS_PER_CELL
-    for top in range(0, height_px, TEXTURE_ROWS_PER_PASS):
-        ys = (np.arange(top, min(top + TEXTURE_ROWS_PER_PASS, height_px)) + 0.5) / PIXELS_PER_CELL
-        px, py = np.meshgrid(xs, ys)
-        rows, cols = grid.cell_at(px, py)
-        on_map = grid.contains(rows, cols)
-        block = colors[rows.clip(0, grid.rows - 1), cols.clip(0, grid.cols - 1)]
-        if with_lines:
-            on_edge = np.clip(1 - grid.edge_distance(px, py) * PIXELS_PER_CELL, 0, 1)
-            shade = 1 - BAKED_LINE_SHADE * on_edge[..., None]
-            block[..., :3] = (block[..., :3] * shade).astype(np.uint8)
-        block[~on_map] = 0
-        rgba[top : top + len(ys)] = block
-    return rgba
-
-
 def _color(rgba: tuple[float, float, float, float]) -> int:
     return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))
 
@@ -94,8 +68,8 @@ class MapView:
             cell_units=self._look.cell_units,
             rotation=self._look.start_rotation,
         )
-        self._textures: dict[bool, hello_imgui.TextureGpu] = {}
-        self._texture_size = (0.0, 0.0)
+        self._layout: GroundLayout | None = None
+        self._textures: dict[tuple[bool, int], hello_imgui.TextureGpu] = {}
         self._hovered: Cell | None = None
         self._wheel = 0.0
 
@@ -125,19 +99,26 @@ class MapView:
         tile = self.tile_map.tile(self._hovered)
         lon, lat = self.tile_map.lonlat(self._hovered)
         row, col = self._hovered
+        level = int(height_levels(np.array(tile.height_m)))
         properties = (
             f"{tile.terrain.name.lower()}, {tile.vegetation.name.lower()}, "
-            f"{tile.temperature.name.lower()}, {tile.height_m} m"
+            f"{tile.temperature.name.lower()}, {tile.height_m} m, level {level}"
         )
         place = f"Cell {row}, {col} at {describe_lonlat(lon, lat)}"
         return f"{zoom}. {place}: {biome_of(tile).name.title()} ({properties})"
 
     def _ground_texture(self, with_lines: bool) -> hello_imgui.TextureGpu:
-        if with_lines not in self._textures:
-            rgba = ground_rgba(self.tile_map, with_lines)
-            self._textures[with_lines] = hello_imgui.create_texture_gpu_from_rgba_data(rgba)
-            self._texture_size = (rgba.shape[1] / PIXELS_PER_CELL, rgba.shape[0] / PIXELS_PER_CELL)
-        return self._textures[with_lines]
+        """The ground picture for the current turn of the view; turning repaints it, so the
+        shading keeps coming from the same side of the screen."""
+        if self._layout is None:
+            self._layout = GroundLayout.of(self.tile_map.grid)
+        key = (with_lines, self.camera.rotation)
+        if key not in self._textures:
+            self._textures = {k: t for k, t in self._textures.items() if k[1] == key[1]}
+            colors = cell_colors(self.tile_map, self.camera.map_direction(*LIGHT_ON_SCREEN))
+            rgba = self._layout.paint(colors, with_lines)
+            self._textures[key] = hello_imgui.create_texture_gpu_from_rgba_data(rgba)
+        return self._textures[key]
 
     def _draw_map(self) -> None:
         origin = imgui.get_cursor_screen_pos()
@@ -187,7 +168,8 @@ class MapView:
     def _draw_ground(
         self, draw_list: imgui.ImDrawList, center: Vec2, texture: hello_imgui.TextureGpu
     ) -> None:
-        width, height = self._texture_size
+        assert self._layout is not None
+        width, height = self._layout.size
         to_screen = self.camera.to_screen
         draw_list.add_image_quad(
             imgui.ImTextureRef(texture.texture_id()),
