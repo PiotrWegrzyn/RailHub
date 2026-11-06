@@ -37,3 +37,4 @@ extend-select = ["I", "UP", "B", "TID"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/railroads/ui/**" = ["TID251"]
+"tests/test_building_drawing.py" = ["TID251"]

@@ -42,6 +42,8 @@ class Grid(ABC):
     symmetry: ClassVar[int]
     # How far out a cell's corner is, as a share of the way to the cell beyond that corner.
     corner_share: ClassVar[float]
+    # Area of one cell, in square cell units.
+    cell_area: ClassVar[float]
 
     @classmethod
     @abstractmethod
@@ -154,6 +156,7 @@ class SquareGrid(Grid):
     kind: ClassVar[GridKind] = "square"
     symmetry: ClassVar[int] = 4
     corner_share: ClassVar[float] = 1 / 2
+    cell_area: ClassVar[float] = 1.0
 
     @classmethod
     def covering(cls, width_km: float, height_km: float, km_per_cell: float) -> Self:
@@ -210,6 +213,7 @@ class HexGrid(Grid):
     kind: ClassVar[GridKind] = "hex"
     symmetry: ClassVar[int] = 6
     corner_share: ClassVar[float] = 1 / 3
+    cell_area: ClassVar[float] = math.sqrt(3) / 2
 
     @classmethod
     def covering(cls, width_km: float, height_km: float, km_per_cell: float) -> Self:

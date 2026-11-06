@@ -16,7 +16,7 @@ for that spot (longitude, latitude, how much land) are `START_REGION` in
 uv run railroads --seed 42
 ```
 
-replays the start location of seed 42, and
+replays the start location and buildings of seed 42, and
 
 ```bash
 uv run railroads --poland
@@ -55,6 +55,8 @@ The UI draws the map from those properties alone:
   higher cell gets a bevel lit from the top-left of the screen.
 - `railroads.ui.ground`: puts both together into the ground picture, repainted when the view
   turns so the light keeps coming from the same side.
+- `railroads.ui.buildings`: draws each building in its share of the cell, as a little picture
+  close up and a coloured dot further out.
 
 Relief (flat, hills, mountains) comes from how steeply each cell climbs to its neighbours:
 hills from a 3% grade, mountains from 8%. `railroads.sim.track_rules` says what that means for
@@ -77,6 +79,24 @@ Every cell has room for 6 units:
 - A station fills its whole cell.
 - Houses take 1 unit, mines and lumber mills 2, farms, factories and ports 3. Only mines can be
   dug in mountains, and ports need water next to them.
+
+## Seeding
+
+`railroads.mapgen.seeding` gives a new map its towns and industry; track and stations are left
+for the player. Each building has a rule saying which kinds of cell suit it: weights from 0 to 1
+for the cell's relief, vegetation and temperature, for the water next to it and for whether it
+lies in a town. A cell's suitability is the product of its weights. The more suitable land a map
+has, the more of a building it gets, drawn at random with the most suitable cells the likeliest,
+and spaced apart:
+
+- Houses come in towns, best on flat grassland by water. The best-placed town is the biggest
+  with 240 houses, the next has 120, then 80 and so on. Each grows outwards from a full centre
+  cell along the most suitable land.
+- Factories stand in or next to towns, on open, flat land.
+- Ports stand by the sea, or less often a lake, mostly in towns.
+- Farms spread over flat or hilly grassland that isn't cold.
+- Lumber mills stand in forests.
+- Mines are dug in mountains, and less often hills.
 
 ## Map data
 

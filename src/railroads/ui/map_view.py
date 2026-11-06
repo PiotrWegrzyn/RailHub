@@ -2,16 +2,19 @@
 compass on top."""
 
 import math
+from collections import Counter
 from dataclasses import dataclass
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
+from railroads.sim.constructions import Building, Construction, Constructions, Station, Track
 from railroads.sim.geo import describe_lonlat
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, GridKind
 from railroads.sim.tilemap import Tile, TileMap
 from railroads.sim.track_rules import TrackBed, track_rules_for
 from railroads.ui.biomes import biome_of
+from railroads.ui.buildings import BuildingSpots, draw_buildings
 from railroads.ui.ground import GroundLayout, cell_colors
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS, IsoCamera, Vec2
 
@@ -66,13 +69,26 @@ def _track_note(tile: Tile) -> str:
     return "no track"
 
 
+def _construction_name(construction: Construction) -> str:
+    match construction:
+        case Building():
+            return construction.kind.value
+        case Station():
+            return "station"
+        case Track():
+            bed = "" if construction.bed == TrackBed.GROUND else f" {construction.bed.name.lower()}"
+            return f"{construction.width.name.lower()} track{bed}"
+
+
 def _key_pressed(*keys: imgui.Key) -> bool:
     return any(imgui.is_key_pressed(key, repeat=False) for key in keys)
 
 
 class MapView:
-    def __init__(self, tile_map: TileMap) -> None:
+    def __init__(self, tile_map: TileMap, constructions: Constructions | None = None) -> None:
         self.tile_map = tile_map
+        self.constructions = Constructions(tile_map) if constructions is None else constructions
+        self._spots = BuildingSpots.of(self.constructions)
         self._look = LOOKS[tile_map.grid.kind]
         width, height = tile_map.grid.size()
         self.camera = IsoCamera(
@@ -120,7 +136,17 @@ class MapView:
         )
         place = f"Cell {row}, {col} at {describe_lonlat(lon, lat)}"
         land = f"{tile.relief.name.lower()}, {_track_note(tile)}"
-        return f"{zoom}. {place}: {biome_of(tile).name.title()} ({properties}); {land}"
+        built = self._built_note(self._hovered)
+        return f"{zoom}. {place}: {biome_of(tile).name.title()} ({properties}); {land}{built}"
+
+    def _built_note(self, cell: Cell) -> str:
+        built = self.constructions.at(cell)
+        if not built:
+            return ""
+        counts = Counter(_construction_name(construction) for construction in built)
+        listed = ", ".join(name if n == 1 else f"{name} x{n}" for name, n in counts.items())
+        left = self.constructions.space_left(cell)
+        return f"; {listed}, " + (f"room for {left} more" if left else "full")
 
     def _ground_texture(self, with_lines: bool) -> hello_imgui.TextureGpu:
         """The ground picture for the current turn of the view; turning repaints it, so the
@@ -157,6 +183,7 @@ class MapView:
         self._draw_ground(draw_list, center, self._ground_texture(baked_lines))
         if drawn_lines:
             self._draw_grid(draw_list, center, top_left, bottom_right)
+        draw_buildings(draw_list, self.camera, center, (top_left, bottom_right), self._spots)
         if self._hovered is not None:
             self._draw_outline(draw_list, center, self._hovered)
         self._draw_compass(draw_list, (bottom_right[0] - 36, top_left[1] + 36))

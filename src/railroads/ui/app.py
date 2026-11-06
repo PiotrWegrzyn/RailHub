@@ -1,9 +1,11 @@
 import argparse
 import random
 
+import numpy as np
 from imgui_bundle import imgui, immapp
 
 from railroads import maps
+from railroads.mapgen.seeding import seed_buildings
 from railroads.newgame import start_new_game
 from railroads.sim.grids import GridKind
 from railroads.sim.tilemap import TileMap
@@ -29,20 +31,26 @@ class App:
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="railroads", description="A railroad tycoon game.")
-    parser.add_argument("--seed", type=int, help="replay the start location of this seed")
+    parser.add_argument(
+        "--seed", type=int, help="replay the start location and buildings of this seed"
+    )
     parser.add_argument("--poland", action="store_true", help="play on the baked map of Poland")
     args = parser.parse_args()
 
+    seed = random.randrange(1_000_000) if args.seed is None else args.seed
     tile_maps: dict[GridKind, TileMap]
     if args.poland:
         tile_maps = {kind: maps.load("poland", kind) for kind in GRID_CHOICES}
-        title = "Poland"
+        title = f"Poland, seed {seed}"
     else:
-        seed = random.randrange(1_000_000) if args.seed is None else args.seed
         game = start_new_game(seed)
         tile_maps = game.maps
         title = f"Seed {seed}, {game.place}"
 
-    views = {kind: MapView(tile_maps[kind]) for kind in GRID_CHOICES}
+    print("Placing towns and industry")
+    views = {
+        kind: MapView(tile_maps[kind], seed_buildings(tile_maps[kind], np.random.default_rng(seed)))
+        for kind in GRID_CHOICES
+    }
     app = App(views, shown="hex", title=title)
     immapp.run(gui_function=app.gui, window_title=f"Railroads: {title}", window_size=(1280, 800))
