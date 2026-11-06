@@ -144,11 +144,11 @@ source = { editable = "." }
 dependencies = [
     { name = "imgui-bundle" },
     { name = "numpy" },
+    { name = "pillow" },
 ]
 
 [package.dev-dependencies]
 dev = [
-    { name = "pillow" },
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -157,11 +157,11 @@ dev = [
 requires-dist = [
     { name = "imgui-bundle", specifier = "==1.93.0" },
     { name = "numpy", specifier = ">=2.5.4" },
+    { name = "pillow", specifier = ">=13.0.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pillow", specifier = ">=13.0.0" },
     { name = "pytest", specifier = ">=9.2.0" },
     { name = "ruff", specifier = ">=0.17.3" },
 ]

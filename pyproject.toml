@@ -10,6 +10,7 @@ requires-python = ">=3.14,<3.15"
 dependencies = [
     "imgui-bundle==1.93.0",
     "numpy>=2.5.4",
+    "pillow>=13.0.0",
 ]
 
 [project.scripts]
@@ -21,7 +22,6 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "pillow>=13.0.0",
     "pytest>=9.2.0",
     "ruff>=0.17.3",
 ]
@@ -38,3 +38,4 @@ extend-select = ["I", "UP", "B", "TID"]
 [tool.ruff.lint.per-file-ignores]
 "src/railroads/ui/**" = ["TID251"]
 "tests/test_building_drawing.py" = ["TID251"]
+"tests/test_minimap.py" = ["TID251"]

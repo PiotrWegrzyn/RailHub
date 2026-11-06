@@ -9,8 +9,8 @@ from railroads.sim.constructions import Building, BuildingKind, Constructions, T
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
-from railroads.ui.buildings import BuildingSpots, draw_buildings
-from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS, IsoCamera
+from railroads.ui.buildings import BuildingSpots, draw_building_dots
+from railroads.ui.iso_camera import IsoCamera
 
 
 def make_constructions(grid_type: type[Grid] = HexGrid) -> Constructions:
@@ -79,16 +79,16 @@ def test_houses_sharing_a_cell_stand_apart() -> None:
     assert min(gaps) > 0.2
 
 
-@pytest.mark.parametrize("zoom_level", range(len(ZOOM_CELL_WIDTHS)))
-def test_every_kind_of_building_is_drawn_at_every_zoom(
+@pytest.mark.parametrize("zoom_level", [0, 1, 2])
+def test_every_kind_of_building_shows_as_a_dot_when_zoomed_out(
     draw_list: imgui.ImDrawList, zoom_level: int
 ) -> None:
     spots = BuildingSpots.of(make_constructions())
-    camera = IsoCamera(center_x=2.5, center_y=2.0, turn_steps=6, base_angle=0.0, cell_units=1.0)
+    camera = IsoCamera(center_x=2.5, center_y=2.0, angle_deg=0.0, cell_units=1.0)
     camera.zoom_level = zoom_level
     before = draw_list.vtx_buffer.size()
 
-    draw_buildings(draw_list, camera, (640.0, 400.0), ((0.0, 0.0), (1280.0, 800.0)), spots)
+    draw_building_dots(draw_list, camera, (640.0, 400.0), ((0.0, 0.0), (1280.0, 800.0)), spots)
 
     assert set(spots.kinds) == set(BuildingKind)
     assert draw_list.vtx_buffer.size() > before
@@ -96,9 +96,9 @@ def test_every_kind_of_building_is_drawn_at_every_zoom(
 
 def test_buildings_off_screen_are_not_drawn(draw_list: imgui.ImDrawList) -> None:
     spots = BuildingSpots.of(make_constructions())
-    camera = IsoCamera(center_x=500.0, center_y=500.0, turn_steps=6, base_angle=0.0, cell_units=1.0)
+    camera = IsoCamera(center_x=500.0, center_y=500.0, angle_deg=0.0, cell_units=1.0)
     before = draw_list.vtx_buffer.size()
 
-    draw_buildings(draw_list, camera, (640.0, 400.0), ((0.0, 0.0), (1280.0, 800.0)), spots)
+    draw_building_dots(draw_list, camera, (640.0, 400.0), ((0.0, 0.0), (1280.0, 800.0)), spots)
 
     assert draw_list.vtx_buffer.size() == before

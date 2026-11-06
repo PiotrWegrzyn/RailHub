@@ -1,28 +1,44 @@
-"""Draws one TileMap: the ground as a single texture, with the cell grid, the hovered cell and a
-compass on top."""
+"""Draws one TileMap. Zoomed out, the ground is one smooth texture with the cell grid and
+buildings as dots on top; close up, it is pixel art (see railroads.ui.pixel). The hovered cell, a
+compass and the minimap go over both."""
 
 import math
 from collections import Counter
 from dataclasses import dataclass
+from functools import cache
+from typing import Literal
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
-from railroads.sim.constructions import Building, Construction, Constructions, Station, Track
+from railroads import maps
+from railroads.mapgen.world import WorldLand
+from railroads.sim.constructions import (
+    Building,
+    BuildingKind,
+    Construction,
+    Constructions,
+    Station,
+    Track,
+)
 from railroads.sim.geo import describe_lonlat
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, GridKind
 from railroads.sim.tilemap import Tile, TileMap
 from railroads.sim.track_rules import TrackBed, track_rules_for
 from railroads.ui.biomes import biome_of
-from railroads.ui.buildings import BuildingSpots, draw_buildings
+from railroads.ui.buildings import BuildingSpots, draw_building_dots
 from railroads.ui.ground import GroundLayout, cell_colors
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS, IsoCamera, Vec2
+from railroads.ui.minimap import Minimap, MinimapLayout, view_corners
+from railroads.ui.pixel.layer import PixelLayer
+from railroads.ui.pixel.sheet import SpriteSheet
+from railroads.ui.pixel.world import PixelWorld
 
 BACKGROUND_COLOR = (0.08, 0.09, 0.11, 1.0)
 GRID_COLOR = (0.0, 0.0, 0.0, 0.25)
 HOVER_COLOR = (1.0, 1.0, 1.0, 0.9)
 COMPASS_COLOR = (1.0, 1.0, 1.0, 0.85)
-# Slopes are lit from the top-left of the screen, whichever way the map is turned.
+# Slopes are lit from the top-left of the screen.
 LIGHT_ON_SCREEN = (-1.0, -1.0)
 # Lower left, upper left, top and upper right corner: three edges per hexagon draw the whole grid.
 _HEX_EDGE_ANGLES = np.radians([150, 210, 270, 330])
@@ -30,12 +46,11 @@ _HEX_EDGE_ANGLES = np.radians([150, 210, 270, 330])
 
 @dataclass(frozen=True)
 class GridLook:
-    """How a grid sits on screen. Squares start as diamonds with north at the top-left, like RT2;
-    hexagons start with north up."""
+    """How a grid sits on screen. Squares are diamonds with north at the top-left, like RT2;
+    hexagons have north up."""
 
-    base_angle: float
+    angle_deg: float
     cell_units: float
-    start_rotation: int
     # Cell widths in pixels from which the grid shows: first baked into the ground picture, while
     # there are too many cells to outline one by one, then as sharp lines drawn on top.
     baked_lines_from: int | None
@@ -43,10 +58,8 @@ class GridLook:
 
 
 LOOKS: dict[GridKind, GridLook] = {
-    "square": GridLook(
-        45.0, math.sqrt(2), start_rotation=3, baked_lines_from=None, drawn_lines_from=16
-    ),
-    "hex": GridLook(0.0, 1.0, start_rotation=0, baked_lines_from=8, drawn_lines_from=24),
+    "square": GridLook(-45.0, math.sqrt(2), baked_lines_from=None, drawn_lines_from=16),
+    "hex": GridLook(0.0, 1.0, baked_lines_from=8, drawn_lines_from=24),
 }
 
 
@@ -80,28 +93,46 @@ def _construction_name(construction: Construction) -> str:
             return f"{construction.width.name.lower()} track{bed}"
 
 
+@cache
+def _sprite_sheet() -> SpriteSheet:
+    return SpriteSheet.load()
+
+
 def _key_pressed(*keys: imgui.Key) -> bool:
     return any(imgui.is_key_pressed(key, repeat=False) for key in keys)
 
 
 class MapView:
-    def __init__(self, tile_map: TileMap, constructions: Constructions | None = None) -> None:
+    def __init__(
+        self,
+        tile_map: TileMap,
+        constructions: Constructions | None = None,
+        world: WorldLand | None = None,
+    ) -> None:
         self.tile_map = tile_map
         self.constructions = Constructions(tile_map) if constructions is None else constructions
+        towns = (
+            built.cell
+            for built in self.constructions
+            if isinstance(built, Building) and built.kind == BuildingKind.HOUSE
+        )
+        self.minimap = Minimap(tile_map, maps.world_land() if world is None else world, towns)
         self._spots = BuildingSpots.of(self.constructions)
         self._look = LOOKS[tile_map.grid.kind]
         width, height = tile_map.grid.size()
         self.camera = IsoCamera(
             center_x=width / 2,
             center_y=height / 2,
-            turn_steps=tile_map.grid.symmetry,
-            base_angle=self._look.base_angle,
+            angle_deg=self._look.angle_deg,
             cell_units=self._look.cell_units,
-            rotation=self._look.start_rotation,
         )
         self._layout: GroundLayout | None = None
-        self._textures: dict[tuple[bool, int], hello_imgui.TextureGpu] = {}
+        self._pixels: PixelLayer | None = None
+        self._textures: dict[bool, hello_imgui.TextureGpu] = {}
         self._hovered: Cell | None = None
+        self._over_minimap = False
+        # Which minimap the current drag started on, if any.
+        self._pressed_on: Literal["world", "overview"] | None = None
         self._wheel = 0.0
 
     def gui(self) -> None:
@@ -109,24 +140,24 @@ class MapView:
         self._draw_map()
 
     def _draw_toolbar(self) -> None:
-        if imgui.button("Turn left (Q)") or _key_pressed(imgui.Key.q):
-            self.camera.turn(-1)
-        imgui.same_line()
-        if imgui.button("Turn right (E)") or _key_pressed(imgui.Key.e):
-            self.camera.turn(1)
-        imgui.same_line()
         if imgui.button(" - ") or _key_pressed(imgui.Key.minus, imgui.Key.keypad_subtract):
             self.camera.zoom(-1, (0, 0), (0, 0))
         imgui.same_line()
         if imgui.button(" + ") or _key_pressed(imgui.Key.equal, imgui.Key.keypad_add):
             self.camera.zoom(1, (0, 0), (0, 0))
         imgui.same_line()
+        _, self.minimap.shown = imgui.checkbox("Minimap (M)", self.minimap.shown)
+        if _key_pressed(imgui.Key.m):
+            self.minimap.shown = not self.minimap.shown
+        imgui.same_line()
         imgui.text(self._status())
 
     def _status(self) -> str:
         zoom = f"Zoom {self.camera.zoom_level + 1}/{len(ZOOM_CELL_WIDTHS)}"
+        if self._over_minimap:
+            return f"{zoom}. Click or drag on the map overview to look there."
         if self._hovered is None:
-            return f"{zoom}. Drag to pan, scroll or -/+ to zoom, Q/E to turn."
+            return f"{zoom}. Drag to pan, scroll or -/+ to zoom."
         tile = self.tile_map.tile(self._hovered)
         lon, lat = self.tile_map.lonlat(self._hovered)
         row, col = self._hovered
@@ -148,19 +179,19 @@ class MapView:
         left = self.constructions.space_left(cell)
         return f"; {listed}, " + (f"room for {left} more" if left else "full")
 
-    def _ground_texture(self, with_lines: bool) -> hello_imgui.TextureGpu:
-        """The ground picture for the current turn of the view; turning repaints it, so the
-        shading keeps coming from the same side of the screen."""
+    def _ground_layout(self) -> GroundLayout:
         if self._layout is None:
             self._layout = GroundLayout.of(self.tile_map.grid)
-        key = (with_lines, self.camera.rotation)
-        if key not in self._textures:
-            self._textures = {k: t for k, t in self._textures.items() if k[1] == key[1]}
+        return self._layout
+
+    def _ground_texture(self, with_lines: bool) -> hello_imgui.TextureGpu:
+        """The smooth ground picture used when zoomed out, with or without grid lines."""
+        if with_lines not in self._textures:
             light = self.camera.map_direction(*LIGHT_ON_SCREEN)
             colors = cell_colors(self.tile_map)
-            rgba = self._layout.paint(colors, self.tile_map.relief, light, with_lines)
-            self._textures[key] = hello_imgui.create_texture_gpu_from_rgba_data(rgba)
-        return self._textures[key]
+            rgba = self._ground_layout().paint(colors, self.tile_map.relief, light, with_lines)
+            self._textures[with_lines] = hello_imgui.create_texture_gpu_from_rgba_data(rgba)
+        return self._textures[with_lines]
 
     def _draw_map(self) -> None:
         origin = imgui.get_cursor_screen_pos()
@@ -169,13 +200,33 @@ class MapView:
             return
         imgui.invisible_button("map", size)
         center = (origin.x + size.x / 2, origin.y + size.y / 2)
-        self._handle_input(center)
-
-        draw_list = imgui.get_window_draw_list()
         top_left = (origin.x, origin.y)
         bottom_right = (origin.x + size.x, origin.y + size.y)
+        map_size = self._ground_layout().size
+        minimap = MinimapLayout.of(map_size, bottom_right) if self.minimap.shown else None
+        self._handle_input(center, minimap)
+
+        draw_list = imgui.get_window_draw_list()
         draw_list.push_clip_rect(top_left, bottom_right, True)
         draw_list.add_rect_filled(top_left, bottom_right, _color(BACKGROUND_COLOR))
+        if self.camera.pixel_scale:
+            self._draw_ground(draw_list, center, self._ground_texture(False))
+            self._pixel_layer().draw(draw_list, self.camera, center, (top_left, bottom_right))
+        else:
+            self._draw_smooth_map(draw_list, center, top_left, bottom_right)
+        if self._hovered is not None:
+            self._draw_outline(draw_list, center, self._hovered)
+        self._draw_compass(draw_list, (bottom_right[0] - 36, top_left[1] + 36))
+        if minimap is not None:
+            corners = view_corners(self.camera, center, top_left, bottom_right)
+            ground = imgui.ImTextureRef(self._ground_texture(False).texture_id())
+            textures = (self.minimap.world_texture(), ground)
+            self.minimap.draw(draw_list, minimap, textures, corners)
+        draw_list.pop_clip_rect()
+
+    def _draw_smooth_map(
+        self, draw_list: imgui.ImDrawList, center: Vec2, top_left: Vec2, bottom_right: Vec2
+    ) -> None:
         cell_width = self.camera.cell_width
         drawn_lines = cell_width >= self._look.drawn_lines_from
         baked_from = self._look.baked_lines_from
@@ -183,17 +234,40 @@ class MapView:
         self._draw_ground(draw_list, center, self._ground_texture(baked_lines))
         if drawn_lines:
             self._draw_grid(draw_list, center, top_left, bottom_right)
-        draw_buildings(draw_list, self.camera, center, (top_left, bottom_right), self._spots)
-        if self._hovered is not None:
-            self._draw_outline(draw_list, center, self._hovered)
-        self._draw_compass(draw_list, (bottom_right[0] - 36, top_left[1] + 36))
-        draw_list.pop_clip_rect()
+        draw_building_dots(draw_list, self.camera, center, (top_left, bottom_right), self._spots)
 
-    def _handle_input(self, center: Vec2) -> None:
+    def _pixel_layer(self) -> PixelLayer:
+        if self._pixels is None:
+            world = PixelWorld(
+                self.tile_map,
+                self.constructions,
+                _sprite_sheet(),
+                self._look.angle_deg,
+                self._look.cell_units,
+            )
+            self._pixels = PixelLayer(world)
+        return self._pixels
+
+    def _handle_input(self, center: Vec2, minimap: MinimapLayout | None) -> None:
         io = imgui.get_io()
+        self._over_minimap = minimap is not None and minimap.contains(
+            io.mouse_pos.x, io.mouse_pos.y
+        )
+        if imgui.is_item_activated():
+            self._pressed_on = (
+                None
+                if minimap is None or not self._over_minimap
+                else "overview"
+                if minimap.overview.contains(io.mouse_pos.x, io.mouse_pos.y)
+                else "world"
+            )
         if imgui.is_item_active():
-            self.camera.pan(io.mouse_delta.x, io.mouse_delta.y)
-        hovered = imgui.is_item_hovered()
+            if self._pressed_on is None:
+                self.camera.pan(io.mouse_delta.x, io.mouse_delta.y)
+            elif self._pressed_on == "overview" and minimap is not None:
+                x, y = minimap.overview_to_map(io.mouse_pos.x, io.mouse_pos.y)
+                self.camera.center_x, self.camera.center_y = x, y
+        hovered = imgui.is_item_hovered() and not self._over_minimap
         if hovered:
             self._wheel += io.mouse_wheel
             steps = int(self._wheel)
@@ -211,8 +285,7 @@ class MapView:
     def _draw_ground(
         self, draw_list: imgui.ImDrawList, center: Vec2, texture: hello_imgui.TextureGpu
     ) -> None:
-        assert self._layout is not None
-        width, height = self._layout.size
+        width, height = self._ground_layout().size
         to_screen = self.camera.to_screen
         draw_list.add_image_quad(
             imgui.ImTextureRef(texture.texture_id()),

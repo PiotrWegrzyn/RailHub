@@ -24,6 +24,9 @@ uv run railroads --poland
 
 plays on the baked map of Poland.
 
+In the corner of the view, a minimap (M to show or hide) shows where the map lies in the world
+and the whole map from above with the part on screen outlined; click or drag on it to look there.
+
 Run the tests and linter:
 
 ```bash
@@ -46,17 +49,36 @@ cell shape, bounds and data sources in one `.npz` file.
 with a strategy, in order, so a strategy can use the layers before it. Swap a strategy to change
 where a property comes from.
 
-The UI draws the map from those properties alone:
+The UI draws the map from those properties alone, always from the same direction: squares as
+diamonds with north at the top left, hexagons with north up. The three furthest zoom levels show
+the map as one smooth picture; the three closest show it as pixel art, at 1, 2 and 3 screen pixels
+per art pixel.
 
 - `railroads.ui.biomes`: every cell is a biome picked from terrain, relief, temperature and
   vegetation. Water is always water, mountains are grey rock or snow, hot and barren is desert,
   hot and forest is jungle.
 - `railroads.ui.relief`: hills are drawn lighter, and wherever the land steps up a level the
   higher cell gets a bevel lit from the top-left of the screen.
-- `railroads.ui.ground`: puts both together into the ground picture, repainted when the view
-  turns so the light keeps coming from the same side.
-- `railroads.ui.buildings`: draws each building in its share of the cell, as a little picture
-  close up and a coloured dot further out.
+- `railroads.ui.ground`: puts both together into the smooth ground picture.
+- `railroads.ui.buildings`: where each building stands in its share of the cell, drawn as a
+  coloured dot when zoomed out.
+- `railroads.ui.pixel`: the pixel art. The ground gets a few shades per biome, dithered pixel
+  by pixel, with sandy shores, rippled water and striped fields under farms, and every slope lit
+  from the top left by the land's real heights. Hills, mountains, trees, rocks and buildings stand
+  on it as sprites, back to front. Hills and mountain peaks are small height fields lit from the
+  left, drawn in grey in the sheet, and take the shades of the ground under them, so the same hill
+  fits grass, forest or desert; the tallest peaks keep white snow on top. The map is drawn in
+  256-pixel chunks as the view reaches them and kept as textures.
+- `railroads.ui.minimap`: the world with the map marked on it, from a quarter-degree picture of
+  the world's land baked into `src/railroads/maps/world-land.npz`, next to the whole map.
+
+The sprites are drawn in code by `railroads.ui.pixel.art` and saved to
+`src/railroads/ui/pixel/sprites.png`, with `sprites.json` saying where each one sits and which pixel
+stands on the ground. Repaint the PNG by hand to change a sprite; to start over from the code, run:
+
+```bash
+uv run python tools/build_sprites.py
+```
 
 Relief (flat, hills, mountains) comes from how steeply each cell climbs to its neighbours:
 hills from a 3% grade, mountains from 8%. `railroads.sim.track_rules` says what that means for
@@ -129,8 +151,9 @@ Then build the elevation database for new games (about 70 MB download, resumes i
 uv run python tools/build_elevation_db.py
 ```
 
-and, to rebake the Poland maps:
+and, to rebake the Poland maps and the world picture for the minimap:
 
 ```bash
 uv run python tools/build_poland_map.py
+uv run python tools/build_world_map.py
 ```
