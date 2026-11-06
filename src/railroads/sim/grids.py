@@ -40,6 +40,8 @@ class Grid(ABC):
     kind: ClassVar[GridKind]
     # How many equal turns of the view bring the grid back onto itself.
     symmetry: ClassVar[int]
+    # How far out a cell's corner is, as a share of the way to the cell beyond that corner.
+    corner_share: ClassVar[float]
 
     @classmethod
     @abstractmethod
@@ -106,11 +108,52 @@ class Grid(ABC):
             neighbour_cols.append(np.where(inside, col, cols))
         return np.stack(neighbour_rows), np.stack(neighbour_cols)
 
+    def track_steps(self) -> FloatArray:
+        """From a cell's centre to the centre of the cell that track leaving through each track
+        point runs into, as an (n, 2) array. The points go round the cell, alternating the middle
+        of an edge, which leads to the neighbour across it, and a corner, which leads along the
+        edge between the two cells beside it to the cell beyond."""
+        normals = self.edge_normals()
+        beyond_corners = normals + np.roll(normals, -1, axis=0)
+        return np.stack([normals, beyond_corners], axis=1).reshape(-1, 2)
+
+    def track_points(self) -> FloatArray:
+        """Where track can cross into or out of a cell, relative to its centre, in the order of
+        `track_steps`: twelve on a hexagon, eight on a square."""
+        points = self.track_steps()
+        points[0::2] *= 0.5
+        points[1::2] *= self.corner_share
+        return points
+
+    def track_exit(self, cell: Cell, point: int) -> tuple[Cell, int]:
+        """The cell that track leaving through this point runs into, and the point it enters by."""
+        steps = self.track_steps()
+        x, y = self.center(*cell)
+        row, col = self.cell_at(x + steps[point, 0], y + steps[point, 1])
+        return (int(row), int(col)), (point + len(steps) // 2) % len(steps)
+
+    def track_flanks(self, cell: Cell, point: int) -> list[Cell]:
+        """The two cells that track through a corner runs between; none at the middle of an
+        edge."""
+        if point % 2 == 0:
+            return []
+        count = len(self.track_steps())
+        return [self.track_exit(cell, side % count)[0] for side in (point - 1, point + 1)]
+
+    def track_turn(self, start: int, end: int) -> float:
+        """How many degrees track bends going into a cell at one track point and out at
+        another."""
+        points = self.track_points()
+        heading_in = -points[start] / np.linalg.norm(points[start])
+        heading_out = points[end] / np.linalg.norm(points[end])
+        return math.degrees(math.acos(float(np.clip(heading_in @ heading_out, -1.0, 1.0))))
+
 
 @dataclass(frozen=True, slots=True)
 class SquareGrid(Grid):
     kind: ClassVar[GridKind] = "square"
     symmetry: ClassVar[int] = 4
+    corner_share: ClassVar[float] = 1 / 2
 
     @classmethod
     def covering(cls, width_km: float, height_km: float, km_per_cell: float) -> Self:
@@ -166,6 +209,7 @@ class HexGrid(Grid):
 
     kind: ClassVar[GridKind] = "hex"
     symmetry: ClassVar[int] = 6
+    corner_share: ClassVar[float] = 1 / 3
 
     @classmethod
     def covering(cls, width_km: float, height_km: float, km_per_cell: float) -> Self:

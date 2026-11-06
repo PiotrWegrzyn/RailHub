@@ -58,7 +58,25 @@ The UI draws the map from those properties alone:
 
 Relief (flat, hills, mountains) comes from how steeply each cell climbs to its neighbours:
 hills from a 3% grade, mountains from 8%. `railroads.sim.track_rules` says what that means for
-play: no track on mountains, and on hills track costs twice as much and trains run at 60% speed.
+play: no track on mountains except in a tunnel, and on hills track costs twice as much and trains
+run at 60% speed.
+
+## Building
+
+`railroads.sim.constructions` holds what the player can build and the rules for where it fits.
+Every cell has room for 6 units:
+
+- Track is laid one piece per cell, from one of the cell's track points to another: the middles
+  of its edges and its corners, 12 on a hexagon and 8 on a square. Through an edge, track runs
+  into the neighbour; through a corner, it runs along the edge between the two cells beside it
+  and into the cell beyond. A piece turns at most 60°.
+- Single track takes 1 unit and double track 2, so a cell with a double track still fits four
+  houses.
+- Track lies on the ground, on a bridge over a river or lake (x5 cost), or in a tunnel through
+  mountains (x8 cost).
+- A station fills its whole cell.
+- Houses take 1 unit, mines and lumber mills 2, farms, factories and ports 3. Only mines can be
+  dug in mountains, and ports need water next to them.
 
 ## Map data
 

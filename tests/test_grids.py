@@ -151,3 +151,84 @@ def test_points_halfway_to_each_neighbour_lie_on_the_edge(grid: Grid) -> None:
     distances = grid.edge_distance(halfway[:, 0], halfway[:, 1])
 
     assert distances == pytest.approx(np.zeros(len(halfway)), abs=1e-9)
+
+
+@EACH_GRID
+def test_track_points_lie_on_the_edge(grid: Grid) -> None:
+    x, y = grid.center(2, 3)
+    points = grid.track_points()
+
+    distances = grid.edge_distance(x + points[:, 0], y + points[:, 1])
+
+    assert distances == pytest.approx(np.zeros(len(points)), abs=1e-9)
+
+
+def test_hexagons_have_twelve_track_points_and_squares_eight() -> None:
+    square, hexagon = GRIDS
+
+    counts = len(square.track_points()), len(hexagon.track_points())
+
+    assert counts == (8, 12)
+
+
+@EACH_GRID
+def test_track_runs_through_edges_to_neighbours_and_through_corners_beyond(grid: Grid) -> None:
+    neighbours = set(grid.neighbours(2, 3))
+
+    reached = [grid.track_exit((2, 3), point)[0] for point in range(len(grid.track_points()))]
+
+    assert set(reached[0::2]) == neighbours
+    assert not set(reached[1::2]) & (neighbours | {(2, 3)})
+    assert len(set(reached)) == len(reached)
+
+
+@EACH_GRID
+def test_track_exits_lead_back_the_way_they_came(grid: Grid) -> None:
+    points = range(len(grid.track_points()))
+
+    returns = [grid.track_exit(*grid.track_exit((2, 3), point)) for point in points]
+
+    assert returns == [((2, 3), point) for point in points]
+
+
+@EACH_GRID
+def test_track_through_a_corner_runs_along_the_edge_of_the_cells_beside_it(grid: Grid) -> None:
+    points = grid.track_points()
+    next_cell, entry = grid.track_exit((2, 3), 1)
+    start = np.array(grid.center(2, 3)) + points[1]
+    end = np.array(grid.center(*next_cell)) + points[entry]
+
+    along = start + np.linspace(0, 1, 5)[:, None] * (end - start)
+    flanks = grid.track_flanks((2, 3), 1)
+
+    assert grid.edge_distance(along[:, 0], along[:, 1]) == pytest.approx(np.zeros(5), abs=1e-9)
+    assert len(flanks) == 2
+    assert set(flanks) <= set(grid.neighbours(2, 3)) & set(grid.neighbours(*next_cell))
+
+
+@EACH_GRID
+def test_track_through_the_middle_of_an_edge_runs_between_no_cells(grid: Grid) -> None:
+    flanks = grid.track_flanks((2, 3), 0)
+
+    assert flanks == []
+
+
+@pytest.mark.parametrize(
+    ("grid", "end", "turn"),
+    [
+        (GRIDS[1], 6, 0.0),
+        (GRIDS[1], 5, 30.0),
+        (GRIDS[1], 4, 60.0),
+        (GRIDS[1], 3, 90.0),
+        (GRIDS[0], 4, 0.0),
+        (GRIDS[0], 3, 45.0),
+        (GRIDS[0], 2, 90.0),
+    ],
+    ids=["hex-straight", "hex-30", "hex-60", "hex-90", "square-straight", "square-45", "square-90"],
+)
+def test_track_turns_more_the_further_its_ends_are_from_opposite(
+    grid: Grid, end: int, turn: float
+) -> None:
+    turned = grid.track_turn(0, end)
+
+    assert turned == pytest.approx(turn)

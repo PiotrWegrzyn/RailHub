@@ -9,8 +9,8 @@ from imgui_bundle import hello_imgui, imgui
 
 from railroads.sim.geo import describe_lonlat
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, GridKind
-from railroads.sim.tilemap import Relief, TileMap
-from railroads.sim.track_rules import RELIEF_RULES
+from railroads.sim.tilemap import Tile, TileMap
+from railroads.sim.track_rules import TrackBed, track_rules_for
 from railroads.ui.biomes import biome_of
 from railroads.ui.ground import GroundLayout, cell_colors
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS, IsoCamera, Vec2
@@ -51,11 +51,19 @@ def _color(rgba: tuple[float, float, float, float]) -> int:
     return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))
 
 
-def _track_note(relief: Relief) -> str:
-    rules = RELIEF_RULES[relief]
-    if not rules.can_build:
-        return "no track"
-    return f"track costs x{rules.cost_factor:g}, trains at {rules.speed_factor:.0%} speed"
+TRACK_ON = {
+    TrackBed.GROUND: "track",
+    TrackBed.BRIDGE: "track on a bridge",
+    TrackBed.TUNNEL: "track in a tunnel",
+}
+
+
+def _track_note(tile: Tile) -> str:
+    for bed, track in TRACK_ON.items():
+        rules = track_rules_for(tile, bed)
+        if rules.can_build:
+            return f"{track} costs x{rules.cost_factor:g}, trains at {rules.speed_factor:.0%} speed"
+    return "no track"
 
 
 def _key_pressed(*keys: imgui.Key) -> bool:
@@ -111,7 +119,7 @@ class MapView:
             f"{tile.temperature.name.lower()}, {tile.height_m} m"
         )
         place = f"Cell {row}, {col} at {describe_lonlat(lon, lat)}"
-        land = f"{tile.relief.name.lower()}, {_track_note(tile.relief)}"
+        land = f"{tile.relief.name.lower()}, {_track_note(tile)}"
         return f"{zoom}. {place}: {biome_of(tile).name.title()} ({properties}); {land}"
 
     def _ground_texture(self, with_lines: bool) -> hello_imgui.TextureGpu:
