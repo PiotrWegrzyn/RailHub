@@ -15,7 +15,6 @@ from railroads import maps
 from railroads.mapgen.world import WorldLand
 from railroads.sim.constructions import (
     Building,
-    BuildingKind,
     Construction,
     Constructions,
     Station,
@@ -23,6 +22,7 @@ from railroads.sim.constructions import (
 )
 from railroads.sim.geo import describe_lonlat
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, GridKind
+from railroads.sim.growth import Growth
 from railroads.sim.tilemap import Tile, TileMap
 from railroads.sim.track_rules import TrackBed, track_rules_for
 from railroads.ui.biomes import biome_of
@@ -40,6 +40,8 @@ HOVER_COLOR = (1.0, 1.0, 1.0, 0.9)
 COMPASS_COLOR = (1.0, 1.0, 1.0, 0.85)
 # Slopes are lit from the top-left of the screen.
 LIGHT_ON_SCREEN = (-1.0, -1.0)
+# Population points a cell needs to show as a town on the minimap.
+MINIMAP_TOWN_POINTS = 3
 # Lower left, upper left, top and upper right corner: three edges per hexagon draw the whole grid.
 _HEX_EDGE_ANGLES = np.radians([150, 210, 270, 330])
 
@@ -111,12 +113,10 @@ class MapView:
     ) -> None:
         self.tile_map = tile_map
         self.constructions = Constructions(tile_map) if constructions is None else constructions
-        towns = (
-            built.cell
-            for built in self.constructions
-            if isinstance(built, Building) and built.kind == BuildingKind.HOUSE
+        self.growth = Growth(self.constructions)
+        self.minimap = Minimap(
+            tile_map, maps.world_land() if world is None else world, self._town_cells()
         )
-        self.minimap = Minimap(tile_map, maps.world_land() if world is None else world, towns)
         self._spots = BuildingSpots.of(self.constructions)
         self._look = LOOKS[tile_map.grid.kind]
         width, height = tile_map.grid.size()
@@ -138,6 +138,21 @@ class MapView:
     def gui(self) -> None:
         self._draw_toolbar()
         self._draw_map()
+
+    def month_passed(self, rng: np.random.Generator) -> None:
+        """Grows the towns by a month and shows what changed."""
+        changed = self.growth.month(rng)
+        if not changed:
+            return
+        self._spots = BuildingSpots.of(self.constructions)
+        self.minimap.show_towns(self._town_cells())
+        if self._pixels is not None:
+            self._pixels.refresh(self._pixels.world.buildings_changed(changed))
+
+    def _town_cells(self) -> list[Cell]:
+        """Cells big enough to show as towns on the minimap."""
+        town = self.growth.points() >= MINIMAP_TOWN_POINTS
+        return [(int(row), int(col)) for row, col in np.argwhere(town)]
 
     def _draw_toolbar(self) -> None:
         if imgui.button(" - ") or _key_pressed(imgui.Key.minus, imgui.Key.keypad_subtract):

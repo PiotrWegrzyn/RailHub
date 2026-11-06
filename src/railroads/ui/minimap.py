@@ -127,8 +127,10 @@ class Minimap:
         self.world = world
         self.shown = True
         self._world_texture: hello_imgui.TextureGpu | None = None
-        town_cells = sorted(set(towns))
-        self._towns = np.array(town_cells, dtype=int).reshape(-1, 2)
+        self.show_towns(towns)
+
+    def show_towns(self, towns: Iterable[Cell]) -> None:
+        self._towns = np.array(sorted(set(towns)), dtype=int).reshape(-1, 2)
 
     def world_texture(self) -> imgui.ImTextureRef:
         if self._world_texture is None:

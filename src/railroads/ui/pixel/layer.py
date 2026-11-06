@@ -23,6 +23,14 @@ class PixelLayer:
         self.world = world
         self._chunks: OrderedDict[ChunkKey, Rgba] = OrderedDict()
         self._textures: OrderedDict[tuple[int, int, int], hello_imgui.TextureGpu] = OrderedDict()
+        self._stale: set[tuple[int, int, int]] = set()
+
+    def refresh(self, chunks: set[ChunkKey]) -> None:
+        """Draws these chunks again next time they show, keeping their old textures on screen
+        until then."""
+        for chunk in chunks:
+            self._chunks.pop(chunk, None)
+        self._stale |= {key for key in self._textures if key[:2] in chunks}
 
     def draw(
         self,
@@ -47,17 +55,20 @@ class PixelLayer:
         for chunk in placement.chunks:
             key = (*chunk, placement.scale * density)
             texture = self._textures.get(key)
-            if texture is None:
+            if texture is None or key in self._stale:
                 if drawn_new and time.perf_counter() - started > FRAME_BUDGET_S:
                     complete = False
-                    continue
-                texture = self._upload(chunk, placement.scale * density)
-                drawn_new = True
+                    if texture is None:
+                        continue
+                else:
+                    texture = self._upload(chunk, placement.scale * density)
+                    self._stale.discard(key)
+                    drawn_new = True
             self._textures.move_to_end(key)
             top_left, bottom_right = placement.screen_rect(chunk)
             draw_list.add_image(imgui.ImTextureRef(texture.texture_id()), top_left, bottom_right)
         while len(self._textures) > KEPT_TEXTURES:
-            self._textures.popitem(last=False)
+            self._stale.discard(self._textures.popitem(last=False)[0])
         return complete
 
     def _upload(self, chunk: ChunkKey, scale: int) -> hello_imgui.TextureGpu:

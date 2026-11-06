@@ -195,14 +195,20 @@ def test_a_port_needs_water_next_to_it() -> None:
     assert inland == "A port needs water next to it"
 
 
-def test_only_mines_can_be_built_in_mountains() -> None:
+def test_only_mines_and_town_buildings_can_be_built_in_mountains() -> None:
     constructions = Constructions(make_map("m"))
 
     allowed = {
         kind for kind in BuildingKind if constructions.why_not(Building((0, 0), kind)) is None
     }
 
-    assert allowed == {BuildingKind.MINE}
+    assert allowed == {
+        BuildingKind.MINE,
+        BuildingKind.HOUSE,
+        BuildingKind.TENEMENT,
+        BuildingKind.FLATS,
+        BuildingKind.SKYSCRAPER,
+    }
     assert constructions.why_not(Station((0, 0))) == "A station cannot be built on mountains"
 
 

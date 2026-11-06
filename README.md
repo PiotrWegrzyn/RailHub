@@ -22,7 +22,13 @@ replays the start location and buildings of seed 42, and
 uv run railroads --poland
 ```
 
-plays on the baked map of Poland.
+plays on the baked map of Poland. Towns grow for 300 years before play starts;
+
+```bash
+uv run railroads --years 100
+```
+
+grows them for 100 instead.
 
 In the corner of the view, a minimap (M to show or hide) shows where the map lies in the world
 and the whole map from above with the part on screen outlined; click or drag on it to look there.
@@ -99,26 +105,59 @@ Every cell has room for 6 units:
 - Track lies on the ground, on a bridge over a river or lake (x5 cost), or in a tunnel through
   mountains (x8 cost).
 - A station fills its whole cell.
-- Houses take 1 unit, mines and lumber mills 2, farms, factories and ports 3. Only mines can be
-  dug in mountains, and ports need water next to them.
+- Every building takes 1 unit. Only mines and town buildings (houses, tenements, flats and
+  skyscrapers) can be built in mountains, and ports need water next to them.
 
-## Seeding
+## Growth
 
-`railroads.mapgen.seeding` gives a new map its towns and industry; track and stations are left
-for the player. Each building has a rule saying which kinds of cell suit it: weights from 0 to 1
-for the cell's relief, vegetation and temperature, for the water next to it and for whether it
-lies in a town. A cell's suitability is the product of its weights. The more suitable land a map
-has, the more of a building it gets, drawn at random with the most suitable cells the likeliest,
-and spaced apart:
+`railroads.sim.growth` grows the whole map by itself, like a cellular automaton, one month at a
+time: towns, farms, orchards, mines, lumber mills, ports and several kinds of factory. Every
+building gives points of one kind, and each cell adds up the points of every kind in its
+neighbourhood (the cell and the six around it):
 
-- Houses come in towns, best on flat grassland by water. The best-placed town is the biggest
-  with 240 houses, the next has 120, then 80 and so on. Each grows outwards from a full centre
-  cell along the most suitable land.
-- Factories stand in or next to towns, on open, flat land.
-- Ports stand by the sea, or less often a lake, mostly in towns.
-- Farms spread over flat or hilly grassland that isn't cold.
-- Lumber mills stand in forests.
-- Mines are dug in mountains, and less often hills.
+| Points | Buildings |
+|---|---|
+| Population | house 1, tenement (kamienica) 2, block of flats 5 |
+| Food | farm 1, orchard 1 |
+| Ore | mine 1 |
+| Timber | lumber mill 1 |
+| Trade | port 1 |
+| Industry | factory 1, big factory 3, mega factory 9, food plant 2, steel mill 3, shipyard 3 |
+| Corporate | skyscraper 1 |
+
+Each kind of building grows on its own ladder. Every month each cell may take a turn on each
+ladder, with the ladder's base chance plus its chance per nearby point, but none until the
+neighbourhood holds the points the ladder needs. The land multiplies the chance by its
+vegetation, relief, temperature and the best water next to the cell:
+
+| Ladder | Chance per month | Needs nearby | Land |
+|---|---|---|---|
+| Houses | 0.00001 + 0.00025 per population | | best on flat grass; forest and mountains x0.05, barren x0.5, hills x0.8, cold x0.6, hot x0.8; river or sea x1.7 |
+| Farms | 0.000002 + 0.000002 per population | | flat grass; hills x0.5, barren x0.1, forest x0.02, cold x0.2, hot x0.6; none in mountains |
+| Orchards | 0.000001 + 0.000001 per population | | hills; flat x0.5, hot x1.2, cold x0.05; water x1.2 to x1.5 |
+| Mines | 0.000004 + 0.00005 per ore | | mountains; hills x0.4, flat x0.01 |
+| Lumber mills | 0.0000015 + 0.000002 per population | | forest only; river x1.5 |
+| Ports | 0.000002 + 0.00002 per population | 3 population | next to the sea, or a lake x0.3 |
+| Factories | 0.000001 per population + 0.00001 per industry | | flat; hills x0.5, forest x0.2; river x1.5 |
+| Food plants | 0.00002 per food + 0.000001 per population | 1 food, 6 population | as factories |
+| Steel mills | 0.0001 per ore + 0.00001 per industry | 1 ore, 2 population | as factories |
+| Shipyards | 0.00005 per trade + 0.00001 per industry | 1 trade | on the water |
+
+Farms and orchards keep to one per cell and two per neighbourhood, lumber mills, ports and the
+special factories to one per neighbourhood, and mines to five. On its turn a ladder builds its
+first kind, unless it can merge: six houses nearby let three of them make way for a tenement and
+six tenements let three make way for a block of flats; three factories nearby make a big factory
+and three big factories a mega factory. On a town or factory turn, a neighbourhood with 100
+population and 10 industry points puts up a skyscraper instead: it pulls down three blocks of
+flats and three points of factories and gives a corporate point.
+
+Chances are kept up to date as buildings come and go, and cells are drawn by thinning, so a
+month costs about as much as what grows in it.
+
+A new map grows for three centuries before play starts (`--years` changes that);
+`railroads.mapgen.seeding` runs it. In play the calendar (`railroads.sim.clock`) runs from
+January 1850 to January 2050, a month every two and a half minutes: a hundred hours at normal
+speed. The map keeps growing each month.
 
 ## Map data
 

@@ -44,12 +44,17 @@ LEAVES: list[tuple[RGB, RGB, RGB]] = [
 ]
 WALLS: list[RGB] = [(226, 214, 190), (210, 176, 146), (232, 228, 218)]
 ROOFS: list[RGB] = [(176, 70, 52), (106, 102, 112), (150, 92, 56), (72, 94, 132)]
+TENEMENT_WALLS: list[RGB] = [(232, 196, 120), (220, 160, 150), (170, 204, 176), (214, 210, 196)]
+TENEMENT_ROOFS: list[RGB] = [(164, 74, 50), (130, 70, 56)]
+FLAT_WALLS: list[RGB] = [(196, 190, 178), (214, 200, 160), (176, 184, 190)]
 WINDOW: RGB = (58, 70, 92)
 BRICK: RGB = (168, 86, 60)
 METAL: RGB = (150, 152, 160)
 TIMBER: RGB = (150, 112, 74)
 STONE: RGB = (154, 150, 140)
 ROCK: RGB = (124, 120, 114)
+GLASS: RGB = (96, 136, 168)
+FRUIT: list[RGB] = [(212, 52, 44), (236, 196, 60), (226, 112, 40)]
 
 
 def shade(color: RGB, factor: float) -> RGB:
@@ -183,6 +188,37 @@ def house(wall: RGB, roof: RGB) -> Sprite:
     return p.sprite()
 
 
+def tenement(wall: RGB, roof: RGB) -> Sprite:
+    """A tenement (kamienica): three floors of painted front under a steep tiled roof."""
+    p = Painter(17, 26, (8, 20))
+    p.shadow(7, 2.5)
+    s, floors = 6, 3
+    top = p.box(0, 0, s, 3 * floors + 1, wall, None)
+    p.gable(top, 5, roof, wall)
+    for floor in range(floors):
+        rise = 3 * floor + 2.5
+        for t in (0.3, 0.7):
+            p.point(-s + t * s, t * s / 2 - rise, WINDOW)
+            p.point(t * s, s / 2 - t * s / 2 - rise, shade(WINDOW, 0.75))
+    p.line([(-s, -3 * floors - 1), (0, s / 2 - 3 * floors - 1)], shade(wall, 1.15))
+    return p.sprite()
+
+
+def flats(wall: RGB) -> Sprite:
+    """A block of flats: five floors under a flat roof, with rows of windows."""
+    p = Painter(19, 32, (9, 26))
+    p.shadow(8, 3, reach=5)
+    s, floors = 7, 5
+    p.box(0, 0, s, 3 * floors + 1, wall, shade(wall, 0.62))
+    for floor in range(floors):
+        rise = 3 * floor + 2.5
+        for t in (0.2, 0.45, 0.7):
+            p.point(-s + t * s * 1.2, t * s * 0.6 - rise, WINDOW)
+            p.point(t * s * 1.2, s / 2 - t * s * 0.6 - rise, shade(WINDOW, 0.75))
+    p.rect(-1, -3 * floors - 3, 1, -3 * floors - 1, shade(wall, 0.7))
+    return p.sprite()
+
+
 def farm() -> Sprite:
     p = Painter(22, 22, (9, 17))
     p.shadow(8, 3)
@@ -196,6 +232,56 @@ def farm() -> Sprite:
 
 
 def factory() -> Sprite:
+    """A small brick works with one chimney."""
+    p = Painter(20, 28, (9, 22))
+    p.shadow(7, 2.5)
+    p.box(0, 0, 7, 6, BRICK, (96, 94, 100))
+    for k in range(2):
+        x, y = -5 + 5 * k, -6 + 1.2 * k
+        p.polygon([(x, y), (x + 5, y - 2.5), (x + 5, y + 1)], METAL, shade(METAL, 0.55))
+    p.rect(3, -16, 5, -6, shade(BRICK, 0.8))
+    p.line([(3, -14), (5, -14)], (220, 220, 214))
+    for i, (x, y, r) in enumerate([(4, -18, 1.5), (6, -20, 2)]):
+        p.blob(x - r, y - r, x + r, y + r, (226, 226, 230) if i % 2 else (204, 204, 210))
+    return p.sprite()
+
+
+def mega_factory() -> Sprite:
+    """Two long halls with a row of chimneys, filling a whole cell."""
+    p = Painter(40, 50, (18, 41))
+    p.shadow(16, 5, reach=4)
+    p.box(-4, -2, 11, 9, shade(BRICK, 0.9), (88, 86, 92))
+    p.box(5, 3, 12, 7, BRICK, (96, 94, 100))
+    for k in range(4):
+        x, y = -6 + 5.5 * k, -4 + 1.4 * k
+        p.polygon([(x, y), (x + 5.5, y - 2.8), (x + 5.5, y + 1.4)], METAL, shade(METAL, 0.55))
+        p.polygon([(x, y), (x, y - 1.4), (x + 5.5, y - 2.8)], shade(METAL, 1.15))
+    for x in (-12, -6, 0):
+        p.rect(x, -30, x + 2, -10, shade(BRICK, 0.75))
+        p.line([(x, -28), (x + 2, -28)], (220, 220, 214))
+        for i, (dx, dy, r) in enumerate([(1, -33, 2), (3, -36, 2.5)]):
+            p.blob(
+                x + dx - r, dy - r, x + dx + r, dy + r, (226, 226, 230) if i else (204, 204, 210)
+            )
+    return p.sprite()
+
+
+def skyscraper() -> Sprite:
+    """A glass tower with a grid of windows and an aerial on top."""
+    p = Painter(17, 60, (8, 54))
+    p.shadow(7, 2.5, reach=8)
+    s, height = 6, 44
+    p.box(0, 0, s, height, GLASS, shade(GLASS, 0.8))
+    lit, dark = shade(GLASS, 1.35), shade(GLASS, 0.62)
+    for floor in range(2, height - 1, 3):
+        p.line([(-s, -floor), (0, s / 2 - floor)], lit)
+        p.line([(0, s / 2 - floor), (s, -floor)], dark)
+    p.line([(-s / 2, s / 4), (-s / 2, s / 4 - height)], shade(GLASS, 0.85))
+    p.line([(0, -height - 1), (0, -height - 6)], METAL)
+    return p.sprite()
+
+
+def big_factory() -> Sprite:
     p = Painter(30, 40, (14, 33))
     p.shadow(12, 4)
     p.box(0, 0, 12, 8, BRICK, (96, 94, 100))
@@ -258,6 +344,68 @@ def port() -> Sprite:
     p.line([(4, -18), (14, -16)], crane)
     p.line([(13, -16), (13, -9)], (70, 64, 58))
     p.rect(12, -9, 14, -7, (120, 70, 50))
+    return p.sprite()
+
+
+def orchard() -> Sprite:
+    """Rows of small fruit trees on a patch of mown grass."""
+    p = Painter(32, 22, (16, 13))
+    p.polygon([(-14, 0), (0, 7), (14, 0), (0, -7)], (116, 158, 66), (92, 128, 54))
+    leaves = LEAVES[1]
+    for row in range(3):
+        for col in range(3):
+            x = -8 + 5 * col + 3 * row - 3
+            y = -3 + 2.5 * row - 1.2 * col + 1
+            p.line([(x, y), (x, y - 2)], TRUNK)
+            p.blob(x - 2.5, y - 6, x + 2.5, y - 1.5, leaves[1])
+            p.point(x - 1, y - 5, leaves[2])
+            p.point(x + 1, y - 3, FRUIT[(row + col) % len(FRUIT)])
+    return p.sprite()
+
+
+def food_plant() -> Sprite:
+    """A cannery: a pale hall with a green roof and two tall silos."""
+    p = Painter(26, 32, (12, 25))
+    p.shadow(10, 3)
+    wall = (222, 214, 192)
+    p.box(-2, 0, 8, 6, wall, (86, 128, 84))
+    for x in (6, 10):
+        p.rect(x - 2, -18, x + 1, 1, shade(METAL, 1.1))
+        p.ellipse(x - 2, -20, x + 1, -16, shade(METAL, 1.25))
+    p.point(-6, -2, WINDOW)
+    p.point(-3, -1, WINDOW)
+    return p.sprite()
+
+
+def steel_mill() -> Sprite:
+    """A dark mill with a blast furnace glowing at its foot and a plume of smoke."""
+    p = Painter(32, 46, (14, 38))
+    p.shadow(12, 4)
+    iron = (82, 80, 84)
+    p.box(0, 0, 11, 9, iron, (60, 58, 62))
+    p.rect(4, -26, 9, -6, shade(iron, 0.85))
+    p.polygon([(4, -26), (6.5, -30), (9, -26)], shade(iron, 0.7))
+    p.rect(-9, -12, -6, -2, (238, 132, 40))
+    p.point(-8, -10, (255, 214, 120))
+    p.rect(-3, -30, -1, -9, shade(BRICK, 0.7))
+    for i, (x, y, r) in enumerate([(-2, -33, 2), (0, -36, 3), (3, -39, 3.5)]):
+        p.blob(x - r, y - r, x + r, y + r, (150, 148, 150) if i % 2 else (124, 122, 126))
+    return p.sprite()
+
+
+def shipyard() -> Sprite:
+    """A ship's hull on a slipway under a gantry crane."""
+    p = Painter(34, 34, (16, 24))
+    p.polygon([(-15, 0), (0, 7.5), (15, 0), (0, -7.5)], STONE, shade(STONE, 0.6))
+    hull = (120, 60, 50)
+    p.polygon([(-10, -2), (6, 6), (9, 3), (-8, -5)], hull, shade(hull, 0.55))
+    p.polygon([(-8, -5), (9, 3), (8, 0), (-7, -7)], (176, 172, 160), shade(STONE, 0.5))
+    p.rect(-1, -8, 3, -3, (210, 206, 196))
+    crane = (214, 168, 40)
+    for x in (-12, 12):
+        p.line([(x, 0), (x, -20)], crane)
+    p.line([(-12, -20), (12, -20)], crane)
+    p.line([(2, -20), (2, -11)], (70, 64, 58))
     return p.sprite()
 
 
@@ -350,11 +498,23 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
         for i, (w, h) in enumerate(MOUNTAIN_SIZES)
     },
     **{f"house_{i}": (lambda w=WALLS[i % 3], r=ROOFS[i % 4]: house(w, r)) for i in range(12)},
+    **{
+        f"tenement_{i}": (lambda w=w, r=TENEMENT_ROOFS[i % 2]: tenement(w, r))
+        for i, w in enumerate(TENEMENT_WALLS)
+    },
+    **{f"flats_{i}": (lambda w=w: flats(w)) for i, w in enumerate(FLAT_WALLS)},
     "farm": farm,
     "factory": factory,
+    "big_factory": big_factory,
+    "mega_factory": mega_factory,
+    "skyscraper": skyscraper,
     "mine": mine,
     "lumber_mill": lumber_mill,
     "port": port,
+    "orchard": orchard,
+    "food_plant": food_plant,
+    "steel_mill": steel_mill,
+    "shipyard": shipyard,
 }
 
 

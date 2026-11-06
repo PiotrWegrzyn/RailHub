@@ -25,9 +25,18 @@ FloatArray = npt.NDArray[np.float64]
 SLOT_RADIUS = 0.3
 DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.HOUSE: ((176, 66, 50), 0.09),
+    BuildingKind.TENEMENT: ((206, 150, 96), 0.12),
+    BuildingKind.FLATS: ((92, 86, 96), 0.14),
     BuildingKind.FARM: ((222, 196, 96), 0.12),
     BuildingKind.MINE: ((48, 46, 50), 0.14),
-    BuildingKind.FACTORY: ((235, 120, 40), 0.16),
+    BuildingKind.FACTORY: ((235, 120, 40), 0.12),
+    BuildingKind.BIG_FACTORY: ((222, 96, 30), 0.16),
+    BuildingKind.MEGA_FACTORY: ((200, 70, 20), 0.2),
+    BuildingKind.SKYSCRAPER: ((110, 170, 220), 0.16),
+    BuildingKind.ORCHARD: ((150, 196, 70), 0.12),
+    BuildingKind.FOOD_PLANT: ((232, 220, 170), 0.14),
+    BuildingKind.STEEL_MILL: ((90, 88, 96), 0.16),
+    BuildingKind.SHIPYARD: ((80, 140, 200), 0.16),
     BuildingKind.LUMBER_MILL: ((128, 88, 52), 0.14),
     BuildingKind.PORT: ((60, 110, 190), 0.16),
 }

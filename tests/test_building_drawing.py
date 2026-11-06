@@ -36,6 +36,14 @@ def make_constructions(grid_type: type[Grid] = HexGrid) -> Constructions:
     for kind in (BuildingKind.FACTORY, BuildingKind.MINE):
         constructions.build(Building((3, 2), kind))
     constructions.build(Building((2, 1), BuildingKind.PORT))
+    constructions.build(Building((1, 3), BuildingKind.FLATS))
+    constructions.build(Building((1, 3), BuildingKind.TENEMENT))
+    constructions.build(Building((1, 2), BuildingKind.BIG_FACTORY))
+    constructions.build(Building((1, 2), BuildingKind.SKYSCRAPER))
+    constructions.build(Building((3, 4), BuildingKind.MEGA_FACTORY))
+    for kind in (BuildingKind.ORCHARD, BuildingKind.FOOD_PLANT, BuildingKind.STEEL_MILL):
+        constructions.build(Building((4, 3), kind))
+    constructions.build(Building((2, 1), BuildingKind.SHIPYARD))
     return constructions
 
 

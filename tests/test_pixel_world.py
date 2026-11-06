@@ -325,3 +325,17 @@ def test_slopes_facing_the_light_are_lighter_than_slopes_facing_away(sheet: Spri
 
     assert facing_light.mean() > 0.3
     assert facing_away.mean() < -0.3
+
+
+def test_new_buildings_put_up_the_scenery_again_and_name_the_chunks_to_redraw(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet)
+    cell = (6, 3)
+    world.constructions.build(Building(cell, BuildingKind.FLATS))
+    px, py = world.projection.to_pixels(*world.tile_map.grid.center(*cell))
+
+    chunks = world.buildings_changed([cell])
+
+    assert (int(px // CHUNK), int(py // CHUNK)) in chunks
+    assert np.isin(world.scenery.sprite, sheet.variants("flats")).sum() == 1

@@ -1,8 +1,8 @@
 """Things the player can build: track, stations and buildings.
 
 Every cell has room for CELL_SPACE units. A single track takes one unit and a double track two,
-a station fills its whole cell and each building takes the room its kind needs, so a cell with a
-double track through it still fits four houses.
+a station fills its whole cell and each building takes one unit, so a cell with a double track
+through it still fits four houses.
 """
 
 from collections.abc import Iterator
@@ -27,28 +27,46 @@ class TrackWidth(IntEnum):
 class BuildingKind(Enum):
     FARM = "farm"
     HOUSE = "house"
+    TENEMENT = "tenement"
+    FLATS = "block of flats"
     MINE = "mine"
     FACTORY = "factory"
+    BIG_FACTORY = "big factory"
+    MEGA_FACTORY = "mega factory"
+    SKYSCRAPER = "skyscraper"
+    ORCHARD = "orchard"
+    FOOD_PLANT = "food plant"
+    STEEL_MILL = "steel mill"
+    SHIPYARD = "shipyard"
     LUMBER_MILL = "lumber mill"
     PORT = "port"
 
 
 @dataclass(frozen=True, slots=True)
 class BuildingRules:
-    space: int
     relief: frozenset[Relief]
     by_water: bool = False
+    space: int = 1
 
 
 _OFF_MOUNTAINS = frozenset({Relief.FLAT, Relief.HILLS})
 
 BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
-    BuildingKind.FARM: BuildingRules(space=3, relief=_OFF_MOUNTAINS),
-    BuildingKind.HOUSE: BuildingRules(space=1, relief=_OFF_MOUNTAINS),
-    BuildingKind.MINE: BuildingRules(space=2, relief=frozenset(Relief)),
-    BuildingKind.FACTORY: BuildingRules(space=3, relief=_OFF_MOUNTAINS),
-    BuildingKind.LUMBER_MILL: BuildingRules(space=2, relief=_OFF_MOUNTAINS),
-    BuildingKind.PORT: BuildingRules(space=3, relief=_OFF_MOUNTAINS, by_water=True),
+    BuildingKind.FARM: BuildingRules(relief=_OFF_MOUNTAINS),
+    BuildingKind.HOUSE: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.TENEMENT: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.FLATS: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.MINE: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.FACTORY: BuildingRules(relief=_OFF_MOUNTAINS),
+    BuildingKind.BIG_FACTORY: BuildingRules(relief=_OFF_MOUNTAINS),
+    BuildingKind.MEGA_FACTORY: BuildingRules(relief=_OFF_MOUNTAINS),
+    BuildingKind.SKYSCRAPER: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.LUMBER_MILL: BuildingRules(relief=_OFF_MOUNTAINS),
+    BuildingKind.PORT: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True),
+    BuildingKind.ORCHARD: BuildingRules(relief=_OFF_MOUNTAINS),
+    BuildingKind.FOOD_PLANT: BuildingRules(relief=_OFF_MOUNTAINS),
+    BuildingKind.STEEL_MILL: BuildingRules(relief=_OFF_MOUNTAINS),
+    BuildingKind.SHIPYARD: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True),
 }
 STATION_RELIEF = _OFF_MOUNTAINS
 
@@ -145,6 +163,10 @@ class Constructions:
         built.remove(construction)
         if not built:
             del self._cells[construction.cell]
+
+    def site_problem(self, building: Building) -> str | None:
+        """Why the building cannot stand in its cell, leaving aside the room already taken."""
+        return self._building_problem(building)
 
     def _track_problem(self, track: Track) -> str | None:
         grid = self.tile_map.grid

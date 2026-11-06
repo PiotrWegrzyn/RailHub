@@ -9,6 +9,7 @@ meet without seams and look the same each time they are drawn.
 """
 
 import math
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Self
 
@@ -16,7 +17,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.grids import Grid
+from railroads.sim.grids import Cell, Grid
 from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.buildings import BuildingSpots
@@ -25,6 +26,8 @@ from railroads.ui.pixel.art import HILL, MOUNTAIN, TINT_GREYS
 from railroads.ui.pixel.sheet import SpriteSheet
 
 CHUNK = 256
+# How far in art pixels a sprite can reach from where it stands.
+SPRITE_REACH = 48
 # Room left above the map's top corner for the tallest sprites, in art pixels.
 TOP_MARGIN = 48
 # Ground is worked out this far past a chunk's edges, so shores and bevels meet across chunks.
@@ -97,10 +100,23 @@ TINT_OUTLINE = 0.72
 TINT_HIGHLIGHT = 1.12
 ROCK_CHANCE = 0.4
 TREE_SPREAD = 0.4
+# Buildings drawn in one of several looks, picked by sprite name prefix; others by one name.
+VARIED_SPRITES = {
+    BuildingKind.HOUSE: "house",
+    BuildingKind.TENEMENT: "tenement",
+    BuildingKind.FLATS: "flats",
+}
 BUILDING_SPRITES = {
     BuildingKind.FARM: "farm",
     BuildingKind.MINE: "mine",
     BuildingKind.FACTORY: "factory",
+    BuildingKind.BIG_FACTORY: "big_factory",
+    BuildingKind.MEGA_FACTORY: "mega_factory",
+    BuildingKind.SKYSCRAPER: "skyscraper",
+    BuildingKind.ORCHARD: "orchard",
+    BuildingKind.FOOD_PLANT: "food_plant",
+    BuildingKind.STEEL_MILL: "steel_mill",
+    BuildingKind.SHIPYARD: "shipyard",
     BuildingKind.LUMBER_MILL: "lumber_mill",
     BuildingKind.PORT: "port",
 }
@@ -218,14 +234,14 @@ class Scenery:
         sprites.append(np.full(len(x), sheet.index("rocks")))
         tints.append(np.full(len(x), -1))
         spots = BuildingSpots.of(constructions)
-        houses = sheet.variants("house")
+        looks = {kind: sheet.variants(name) for kind, name in VARIED_SPRITES.items()}
         xs.append(np.asarray(spots.x, dtype=np.float64))
         ys.append(np.asarray(spots.y, dtype=np.float64))
         sprites.append(
             np.array(
                 [
-                    houses[variant % len(houses)]
-                    if kind == BuildingKind.HOUSE
+                    looks[kind][variant % len(looks[kind])]
+                    if kind in looks
                     else sheet.index(BUILDING_SPRITES[kind])
                     for kind, variant in zip(spots.kinds, spots.variants, strict=True)
                 ],
@@ -265,6 +281,7 @@ class PixelWorld:
         cell_units: float,
     ) -> None:
         self.tile_map = tile_map
+        self.constructions = constructions
         self.sheet = sheet
         self.projection = PixelProjection.of(tile_map.grid, angle_deg, cell_units)
         self.scenery = Scenery.of(tile_map, constructions, self.projection, sheet)
@@ -288,6 +305,30 @@ class PixelWorld:
         self._premultiplied = [
             np.concatenate([p[..., :3] * p[..., 3:], p[..., 3:]], axis=-1) for p in sheet.pixels
         ]
+
+    def buildings_changed(self, cells: Iterable[Cell]) -> set[tuple[int, int]]:
+        """Puts the scenery up again after buildings changed in `cells`; returns the chunks that
+        look different now."""
+        self.scenery = Scenery.of(self.tile_map, self.constructions, self.projection, self.sheet)
+        self._farm_cells = sorted(
+            {
+                built.cell
+                for built in self.constructions
+                if isinstance(built, Building) and built.kind == BuildingKind.FARM
+            }
+        )
+        cells = list(cells)
+        if not cells:
+            return set()
+        rows, cols = np.array(cells).T
+        px, py = self.projection.to_pixels(*self.tile_map.grid.center(rows, cols))
+        reach = PIXEL_CELL_WIDTH + SPRITE_REACH
+        chunks: set[tuple[int, int]] = set()
+        for x, y in zip(px.tolist(), py.tolist(), strict=True):
+            for cx in range(int((x - reach) // CHUNK), int((x + reach) // CHUNK) + 1):
+                for cy in range(int((y - reach) // CHUNK), int((y + reach) // CHUNK) + 1):
+                    chunks.add((cx, cy))
+        return chunks
 
     def render(self, chunk_x: int, chunk_y: int) -> Rgba:
         """One chunk as CHUNK x CHUNK RGBA pixels; off the map it is clear."""
