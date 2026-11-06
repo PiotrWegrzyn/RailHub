@@ -3,16 +3,16 @@ import pytest
 
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import Grid, HexGrid, SquareGrid
-from railroads.sim.tilemap import Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 from railroads.ui.biomes import biome_colors
 from railroads.ui.ground import PIXELS_PER_CELL, GroundLayout, cell_colors
 
-LIGHT = (-1.0, -1.0)
+FROM_WEST = (-1.0, 0.0)
 
 
 def make_map(grid: Grid, terrain: Terrain = Terrain.LAND) -> TileMap:
-    height = np.zeros(grid.shape, dtype=np.int16)
-    height[:, grid.cols // 2 :] = 1200
+    relief = np.full(grid.shape, Relief.FLAT, dtype=np.uint8)
+    relief[:, grid.cols // 2 :] = Relief.HILLS
     return TileMap(
         name="Test",
         grid=grid,
@@ -20,23 +20,28 @@ def make_map(grid: Grid, terrain: Terrain = Terrain.LAND) -> TileMap:
         terrain=np.full(grid.shape, terrain, dtype=np.uint8),
         vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
         temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=height,
+        height_m=np.zeros(grid.shape, dtype=np.int16),
+        relief=relief,
     )
 
 
-def test_higher_land_is_drawn_lighter() -> None:
+def pixel(grid: Grid, x: float, y: float) -> tuple[int, int]:
+    return int(y * PIXELS_PER_CELL), int(x * PIXELS_PER_CELL)
+
+
+def test_hills_are_drawn_lighter_than_flat_land() -> None:
     tile_map = make_map(SquareGrid(rows=4, cols=8, km_per_cell=2.0))
 
-    colors = cell_colors(tile_map, LIGHT)
+    colors = cell_colors(tile_map)
 
-    low, high = colors[1, 0, :3].astype(int), colors[1, -1, :3].astype(int)
-    assert (high > low).all()
+    flat, hills = colors[1, 0, :3].astype(int), colors[1, -1, :3].astype(int)
+    assert (hills > flat).all()
 
 
-def test_water_keeps_its_own_colour_at_any_height() -> None:
+def test_water_keeps_its_own_colour() -> None:
     tile_map = make_map(SquareGrid(rows=4, cols=8, km_per_cell=2.0), Terrain.LAKE)
 
-    colors = cell_colors(tile_map, LIGHT)
+    colors = cell_colors(tile_map)
 
     assert np.array_equal(colors, biome_colors(tile_map))
 
@@ -53,8 +58,7 @@ def test_each_pixel_shows_the_colour_of_its_cell(grid: Grid) -> None:
 
     rgba = layout.paint(colors)
 
-    pixel = rgba[int(y * PIXELS_PER_CELL), int(x * PIXELS_PER_CELL)]
-    assert pixel.tolist() == colors[1, 2].tolist()
+    assert rgba[pixel(grid, x, y)].tolist() == colors[1, 2].tolist()
 
 
 def test_pixels_off_the_map_stay_clear() -> None:
@@ -66,14 +70,25 @@ def test_pixels_off_the_map_stay_clear() -> None:
     assert rgba[0, 0].tolist() == [0, 0, 0, 0]
 
 
+def test_raised_edges_are_lit_on_the_side_facing_the_light() -> None:
+    grid = SquareGrid(rows=3, cols=3, km_per_cell=2.0)
+    layout = GroundLayout.of(grid)
+    colors = np.full((3, 3, 4), 120, dtype=np.uint8)
+    relief = np.zeros((3, 3), dtype=np.uint8)
+    relief[1, 1] = Relief.HILLS
+
+    rgba = layout.paint(colors, relief, FROM_WEST)
+
+    west_edge, centre, east_edge = (rgba[pixel(grid, x, 1.5)][0] for x in (1.05, 1.5, 1.95))
+    assert west_edge > centre > east_edge
+
+
 def test_baked_grid_lines_darken_cell_edges_only() -> None:
     grid = SquareGrid(rows=3, cols=4, km_per_cell=2.0)
     layout = GroundLayout.of(grid)
     colors = np.full((3, 4, 4), 200, dtype=np.uint8)
-    middle = (int(1.5 * PIXELS_PER_CELL), int(1.5 * PIXELS_PER_CELL))
-    edge = (int(1.5 * PIXELS_PER_CELL), PIXELS_PER_CELL)
 
     rgba = layout.paint(colors, with_lines=True)
 
-    assert rgba[middle].tolist() == [200, 200, 200, 200]
-    assert (rgba[edge][:3] < 200).all()
+    assert rgba[pixel(grid, 1.5, 1.5)].tolist() == [200, 200, 200, 200]
+    assert (rgba[pixel(grid, 1.5, 1.01)][:3] < 200).all()

@@ -8,6 +8,7 @@ from typing import Self
 from railroads.mapgen.sources import Elevation, Shape, read_geojson
 from railroads.mapgen.strategies import (
     HeightFromElevation,
+    ReliefFromSlopes,
     Strategy,
     TemperatureFromClimate,
     VegetationPlaceholder,
@@ -52,6 +53,7 @@ def real_world_strategies(
         "terrain": WaterFromShapes(
             lakes=data.lakes, rivers=data.rivers, sea=data.ocean, min_river_km=MIN_RIVER_KM
         ),
+        "relief": ReliefFromSlopes(),
         "temperature": TemperatureFromClimate(deserts=data.deserts),
         "vegetation": VegetationPlaceholder(deserts=data.deserts, seed=seed),
     }

@@ -11,6 +11,7 @@ from railroads.mapgen.strategies import (
     Climate,
     HeightFromElevation,
     Layer,
+    ReliefFromSlopes,
     TemperatureFromClimate,
     VegetationPlaceholder,
     WaterFromShapes,
@@ -18,7 +19,7 @@ from railroads.mapgen.strategies import (
 )
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import Cell, Grid, HexGrid, SquareGrid
-from railroads.sim.tilemap import Temperature, Terrain, Vegetation
+from railroads.sim.tilemap import Relief, Temperature, Terrain, Vegetation
 
 BOUNDS = Bounds(west=20.0, east=21.0, south=50.0, north=50.6)
 
@@ -178,6 +179,52 @@ def test_height_needs_elevation_data_that_covers_the_map(area: MapArea) -> None:
         HeightFromElevation(west_of_the_map)(area, {})
 
 
+def relief_for(area: MapArea, height: np.ndarray, terrain: Terrain = Terrain.LAND) -> np.ndarray:
+    layers = {
+        "height_m": height.astype(np.int16),
+        "terrain": np.full(area.grid.shape, terrain, dtype=np.uint8),
+    }
+    return ReliefFromSlopes()(area, layers)
+
+
+def test_gentle_ground_is_flat(area: MapArea) -> None:
+    rising_east = np.tile(np.arange(area.grid.cols) * 20, (area.grid.rows, 1))
+
+    relief = relief_for(area, rising_east)
+
+    assert (relief == Relief.FLAT).all()
+
+
+def test_slopes_become_hills_and_steep_slopes_mountains(area: MapArea) -> None:
+    columns = np.arange(area.grid.cols)
+    climb = np.where(columns < 12, 0, np.where(columns < 24, 100, 300)) * (columns - 6).clip(0)
+
+    relief = relief_for(area, np.tile(climb, (area.grid.rows, 1)))
+
+    middle = area.grid.rows // 2
+    assert relief[middle, 2] == Relief.FLAT
+    assert relief[middle, 18] == Relief.HILLS
+    assert relief[middle, 30] == Relief.MOUNTAINS
+
+
+def test_one_steep_step_among_gentle_slopes_stays_hills(area: MapArea) -> None:
+    height = np.full(area.grid.shape, 85)
+    height[10, 10], height[10, 11] = 170, 0
+
+    relief = relief_for(area, height)
+
+    assert relief[10, 10] == Relief.HILLS
+    assert relief[10, 11] == Relief.HILLS
+
+
+def test_water_is_flat_however_steep(area: MapArea) -> None:
+    steep = np.tile(np.arange(area.grid.cols) * 400, (area.grid.rows, 1))
+
+    relief = relief_for(area, steep, Terrain.LAKE)
+
+    assert (relief == Relief.FLAT).all()
+
+
 def test_climate_is_warmest_at_the_equator_and_cools_with_height() -> None:
     climate = Climate()
 
@@ -269,6 +316,7 @@ def test_later_strategies_can_read_earlier_layers(area: MapArea) -> None:
     strategies = {
         "height_m": height,
         "terrain": terrain,
+        "relief": constant,
         "temperature": constant,
         "vegetation": constant,
     }

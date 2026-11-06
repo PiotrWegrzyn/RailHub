@@ -9,11 +9,11 @@ from imgui_bundle import hello_imgui, imgui
 
 from railroads.sim.geo import describe_lonlat
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, GridKind
-from railroads.sim.tilemap import TileMap
+from railroads.sim.tilemap import Relief, TileMap
+from railroads.sim.track_rules import RELIEF_RULES
 from railroads.ui.biomes import biome_of
 from railroads.ui.ground import GroundLayout, cell_colors
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS, IsoCamera, Vec2
-from railroads.ui.relief import height_levels
 
 BACKGROUND_COLOR = (0.08, 0.09, 0.11, 1.0)
 GRID_COLOR = (0.0, 0.0, 0.0, 0.25)
@@ -49,6 +49,13 @@ LOOKS: dict[GridKind, GridLook] = {
 
 def _color(rgba: tuple[float, float, float, float]) -> int:
     return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))
+
+
+def _track_note(relief: Relief) -> str:
+    rules = RELIEF_RULES[relief]
+    if not rules.can_build:
+        return "no track"
+    return f"track costs x{rules.cost_factor:g}, trains at {rules.speed_factor:.0%} speed"
 
 
 def _key_pressed(*keys: imgui.Key) -> bool:
@@ -99,13 +106,13 @@ class MapView:
         tile = self.tile_map.tile(self._hovered)
         lon, lat = self.tile_map.lonlat(self._hovered)
         row, col = self._hovered
-        level = int(height_levels(np.array(tile.height_m)))
         properties = (
             f"{tile.terrain.name.lower()}, {tile.vegetation.name.lower()}, "
-            f"{tile.temperature.name.lower()}, {tile.height_m} m, level {level}"
+            f"{tile.temperature.name.lower()}, {tile.height_m} m"
         )
         place = f"Cell {row}, {col} at {describe_lonlat(lon, lat)}"
-        return f"{zoom}. {place}: {biome_of(tile).name.title()} ({properties})"
+        land = f"{tile.relief.name.lower()}, {_track_note(tile.relief)}"
+        return f"{zoom}. {place}: {biome_of(tile).name.title()} ({properties}); {land}"
 
     def _ground_texture(self, with_lines: bool) -> hello_imgui.TextureGpu:
         """The ground picture for the current turn of the view; turning repaints it, so the
@@ -115,8 +122,9 @@ class MapView:
         key = (with_lines, self.camera.rotation)
         if key not in self._textures:
             self._textures = {k: t for k, t in self._textures.items() if k[1] == key[1]}
-            colors = cell_colors(self.tile_map, self.camera.map_direction(*LIGHT_ON_SCREEN))
-            rgba = self._layout.paint(colors, with_lines)
+            light = self.camera.map_direction(*LIGHT_ON_SCREEN)
+            colors = cell_colors(self.tile_map)
+            rgba = self._layout.paint(colors, self.tile_map.relief, light, with_lines)
             self._textures[key] = hello_imgui.create_texture_gpu_from_rgba_data(rgba)
         return self._textures[key]
 

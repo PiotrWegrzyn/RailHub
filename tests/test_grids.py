@@ -10,6 +10,28 @@ EACH_GRID = pytest.mark.parametrize("grid", GRIDS, ids=lambda grid: grid.kind)
 
 
 @EACH_GRID
+@pytest.mark.parametrize("cell", [(3, 3), (2, 4), (0, 0), (5, 6)])
+def test_neighbour_grids_list_the_same_neighbours(grid: Grid, cell: tuple[int, int]) -> None:
+    rows, cols = grid.neighbour_index_grids()
+    row, col = cell
+
+    listed = {(int(r), int(c)) for r, c in zip(rows[:, row, col], cols[:, row, col], strict=True)}
+
+    assert listed - {cell} == set(grid.neighbours(*cell))
+
+
+@EACH_GRID
+def test_edge_normals_lead_to_the_neighbours(grid: Grid) -> None:
+    x, y = grid.center(3, 3)
+
+    reached = {
+        tuple(int(v) for v in grid.cell_at(x + dx, y + dy)) for dx, dy in grid.edge_normals()
+    }
+
+    assert reached == set(grid.neighbours(3, 3))
+
+
+@EACH_GRID
 def test_every_cell_centre_lies_in_its_own_cell(grid: Grid) -> None:
     rows, cols = np.indices(grid.shape)
     x, y = grid.center(rows, cols)

@@ -16,8 +16,8 @@ import numpy.typing as npt
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import GRIDS, Cell, Grid
 
-FORMAT_VERSION = 1
-LAYERS = ("terrain", "vegetation", "temperature", "height_m")
+FORMAT_VERSION = 2
+LAYERS = ("terrain", "vegetation", "temperature", "height_m", "relief")
 
 
 class Terrain(IntEnum):
@@ -39,12 +39,21 @@ class Temperature(IntEnum):
     HOT = 2
 
 
+class Relief(IntEnum):
+    """The shape of the land: flat, hills (slower, dearer track) or mountains (no track)."""
+
+    FLAT = 0
+    HILLS = 1
+    MOUNTAINS = 2
+
+
 @dataclass(frozen=True, slots=True)
 class Tile:
     terrain: Terrain
     vegetation: Vegetation
     temperature: Temperature
     height_m: int
+    relief: Relief = Relief.FLAT
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +65,7 @@ class TileMap:
     vegetation: npt.NDArray[np.uint8]
     temperature: npt.NDArray[np.uint8]
     height_m: npt.NDArray[np.int16]
+    relief: npt.NDArray[np.uint8]
     sources: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -71,6 +81,7 @@ class TileMap:
             vegetation=Vegetation(self.vegetation[cell]),
             temperature=Temperature(self.temperature[cell]),
             height_m=int(self.height_m[cell]),
+            relief=Relief(self.relief[cell]),
         )
 
     def cell_at_lonlat(self, lon: float, lat: float) -> Cell | None:

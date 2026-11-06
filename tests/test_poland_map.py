@@ -4,7 +4,7 @@ import pytest
 
 from railroads import maps
 from railroads.sim.grids import Cell
-from railroads.sim.tilemap import Temperature, Terrain, TileMap
+from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap
 
 WARSAW = (21.01, 52.23)
 
@@ -86,6 +86,21 @@ def test_warsaw_lies_in_the_lowlands(poland: TileMap) -> None:
     tile = poland.tile(cell_at(poland, *WARSAW))
 
     assert 60 < tile.height_m < 150
+    assert tile.relief is Relief.FLAT
+
+
+def test_tatras_are_mountains(poland: TileMap) -> None:
+    tile = poland.tile(cell_at(poland, 20.0, 49.23))
+
+    assert tile.relief is Relief.MOUNTAINS
+
+
+def test_most_of_poland_is_flat(poland: TileMap) -> None:
+    land = poland.terrain == Terrain.LAND
+
+    flat_share = (poland.relief[land] == Relief.FLAT).mean()
+
+    assert flat_share > 0.8
 
 
 def test_vistula_carries_water_from_warsaw_to_the_sea(poland: TileMap) -> None:

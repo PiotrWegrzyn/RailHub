@@ -5,7 +5,15 @@ import pytest
 
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import Grid, HexGrid, SquareGrid
-from railroads.sim.tilemap import LAYERS, Temperature, Terrain, Tile, TileMap, Vegetation
+from railroads.sim.tilemap import (
+    LAYERS,
+    Relief,
+    Temperature,
+    Terrain,
+    Tile,
+    TileMap,
+    Vegetation,
+)
 
 BOUNDS = Bounds(west=14.0, east=15.0, south=50.0, north=51.0)
 SMALL_GRID = SquareGrid(rows=2, cols=3, km_per_cell=2.0)
@@ -21,6 +29,7 @@ def make_map(grid: Grid = SMALL_GRID) -> TileMap:
         vegetation=(index % len(Vegetation)).astype(np.uint8),
         temperature=(index % len(Temperature)).astype(np.uint8),
         height_m=(index * 100).astype(np.int16),
+        relief=(index % len(Relief)).astype(np.uint8),
         sources=("Test data",),
     )
 
@@ -60,7 +69,9 @@ def test_tile_gathers_every_property_of_one_cell() -> None:
 
     tile = tile_map.tile((1, 2))
 
-    assert tile == Tile(Terrain.SEA, Vegetation.FOREST, Temperature.HOT, height_m=500)
+    assert tile == Tile(
+        Terrain.SEA, Vegetation.FOREST, Temperature.HOT, height_m=500, relief=Relief.MOUNTAINS
+    )
 
 
 def test_layers_cannot_be_changed() -> None:

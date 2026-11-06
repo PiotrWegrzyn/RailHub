@@ -17,7 +17,7 @@ from railroads.mapgen.noise import fractal_noise
 from railroads.mapgen.sources import Elevation, Shape
 from railroads.sim.geo import Coord
 from railroads.sim.grids import BoolGrid
-from railroads.sim.tilemap import Temperature, Terrain, Vegetation
+from railroads.sim.tilemap import Relief, Temperature, Terrain, Vegetation
 
 type Layer = npt.NDArray[np.generic]
 
@@ -111,6 +111,33 @@ def sea_from_height(height_m: Layer) -> BoolGrid:
         if np.array_equal(grown, sea):
             return sea
         sea = grown
+
+
+@dataclass(frozen=True)
+class ReliefFromSlopes:
+    """Flat, hills or mountains, from the grade of the climb to the steepest neighbouring cell:
+    hills from `hills_from_pct`, mountains from `mountains_from_pct`. Then each cell takes the
+    middle level of itself and its neighbours, so lone steep cells don't speckle the map and
+    ranges have no holes. Water is flat, and the sea counts as ground at 0 m."""
+
+    hills_from_pct: float = 3.0
+    mountains_from_pct: float = 8.0
+
+    def __call__(self, area: MapArea, layers: Mapping[str, Layer]) -> Layer:
+        grid = area.grid
+        water = layers["terrain"] != Terrain.LAND
+        height = np.maximum(layers["height_m"], 0).astype(float)
+        rows, cols = grid.neighbour_index_grids()
+        climb_m = np.abs(height[rows, cols] - height).max(axis=0)
+        grade_pct = climb_m / (grid.km_per_cell * 10)
+        relief = np.full(grid.shape, Relief.FLAT, dtype=np.uint8)
+        relief[grade_pct >= self.hills_from_pct] = Relief.HILLS
+        relief[grade_pct >= self.mountains_from_pct] = Relief.MOUNTAINS
+        relief[water] = Relief.FLAT
+        around = np.concatenate([relief[None], relief[rows, cols]])
+        relief = np.median(around, axis=0).astype(np.uint8)
+        relief[water] = Relief.FLAT
+        return relief
 
 
 @dataclass(frozen=True)

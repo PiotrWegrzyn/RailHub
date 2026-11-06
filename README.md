@@ -48,13 +48,17 @@ where a property comes from.
 
 The UI draws the map from those properties alone:
 
-- `railroads.ui.biomes`: every cell is a biome picked from terrain, temperature and vegetation.
-  Water is always water, hot and barren is desert, hot and forest is jungle.
-- `railroads.ui.relief`: land sits on one of eleven height levels (0 under 50 m up to 10 at
-  3000 m and above), drawn lighter the higher it is, and slopes are shaded as if lit from the
-  top-left of the screen.
+- `railroads.ui.biomes`: every cell is a biome picked from terrain, relief, temperature and
+  vegetation. Water is always water, mountains are grey rock or snow, hot and barren is desert,
+  hot and forest is jungle.
+- `railroads.ui.relief`: hills are drawn lighter, and wherever the land steps up a level the
+  higher cell gets a bevel lit from the top-left of the screen.
 - `railroads.ui.ground`: puts both together into the ground picture, repainted when the view
   turns so the light keeps coming from the same side.
+
+Relief (flat, hills, mountains) comes from how steeply each cell climbs to its neighbours:
+hills from a 3% grade, mountains from 8%. `railroads.sim.track_rules` says what that means for
+play: no track on mountains, and on hills track costs twice as much and trains run at 60% speed.
 
 ## Map data
 

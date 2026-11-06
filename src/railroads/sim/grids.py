@@ -18,6 +18,7 @@ type GridKind = Literal["square", "hex"]
 type Coord = float | npt.NDArray[np.float64]
 type Index = int | npt.NDArray[np.int64]
 FloatArray = npt.NDArray[np.float64]
+IntArray = npt.NDArray[np.int64]
 BoolGrid = npt.NDArray[np.bool_]
 
 HEX_RADIUS = 1 / math.sqrt(3)
@@ -87,6 +88,24 @@ class Grid(ABC):
     def edge_distance(self, x: Coord, y: Coord) -> Coord:
         """How far each point is from the nearest edge of the cell it lies in, in cell units."""
 
+    @abstractmethod
+    def edge_normals(self) -> FloatArray:
+        """One unit vector per edge, pointing from a cell's centre straight across that edge to
+        the neighbour's centre, as a (directions, 2) array."""
+
+    def neighbour_index_grids(self) -> tuple[IntArray, IntArray]:
+        """Row and column of every cell's neighbour in each direction of `edge_normals`, as
+        arrays of shape (directions, rows, cols). Off the map, a cell is its own neighbour."""
+        x, y = self.centers()
+        rows, cols = np.indices(self.shape)
+        neighbour_rows, neighbour_cols = [], []
+        for dx, dy in self.edge_normals():
+            row, col = self.cell_at(x + dx, y + dy)
+            inside = self.contains(row, col)
+            neighbour_rows.append(np.where(inside, row, rows))
+            neighbour_cols.append(np.where(inside, col, cols))
+        return np.stack(neighbour_rows), np.stack(neighbour_cols)
+
 
 @dataclass(frozen=True, slots=True)
 class SquareGrid(Grid):
@@ -124,6 +143,9 @@ class SquareGrid(Grid):
         dx = np.abs(np.asarray(x, dtype=float) % 1 - 0.5)
         dy = np.abs(np.asarray(y, dtype=float) % 1 - 0.5)
         return 0.5 - np.maximum(dx, dy)
+
+    def edge_normals(self) -> FloatArray:
+        return np.array([(1.0, 0.0), (0.0, -1.0), (-1.0, 0.0), (0.0, 1.0)])
 
     def seal_corner_gaps(self, mask: BoolGrid) -> BoolGrid:
         sealed = mask.copy()
@@ -198,6 +220,10 @@ class HexGrid(Grid):
         slant = math.sqrt(3) / 2
         across = np.maximum(np.abs(dx / 2 + slant * dy), np.abs(dx / 2 - slant * dy))
         return 0.5 - np.maximum(np.abs(dx), across)
+
+    def edge_normals(self) -> FloatArray:
+        angles = np.radians(np.arange(0, 360, 60))
+        return np.column_stack([np.cos(angles), np.sin(angles)])
 
     def seal_corner_gaps(self, mask: BoolGrid) -> BoolGrid:
         return mask.copy()
