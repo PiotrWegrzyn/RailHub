@@ -16,7 +16,8 @@ from typing import Self
 import numpy as np
 import numpy.typing as npt
 
-from railroads.sim.constructions import Building, BuildingKind, Constructions
+from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
+from railroads.sim.economy import Satisfaction
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.ui.biomes import Biome, biome_grid
@@ -75,6 +76,14 @@ RELIEF_SMOOTHING_CELLS = 0.75
 SLOPE_LIGHT = 16.0
 MAX_SLOPE_SHADES = 1.5
 EDGE_SHADE = 0.94
+# Land whose buildings are content or satisfied is washed with a warm glow: how strongly, by
+# their satisfaction.
+GLOW: RGB = (255, 214, 110)
+SATISFIED_GLOW = {
+    Satisfaction.UNSATISFIED: 0.0,
+    Satisfaction.CONTENT: 0.12,
+    Satisfaction.SATISFIED: 0.24,
+}
 BEVEL_LIGHT = 1.18
 BEVEL_SHADE = 0.78
 
@@ -170,6 +179,12 @@ class PixelProjection:
         return math.ceil(self.size[0] / CHUNK), math.ceil(self.size[1] / CHUNK)
 
 
+def glow_strength(levels: npt.NDArray[np.int8]) -> FloatArray:
+    """How strongly each cell glows for its Satisfaction; -1 (nothing trading) does not."""
+    table = np.array([0.0, *(SATISFIED_GLOW[level] for level in Satisfaction)])
+    return table[levels.astype(np.int64) + 1]
+
+
 @dataclass(frozen=True)
 class Scenery:
     """Everything standing on the ground, sorted back to front: where each stands in art pixels,
@@ -233,6 +248,14 @@ class Scenery:
         ys.append(y)
         sprites.append(np.full(len(x), sheet.index("rocks")))
         tints.append(np.full(len(x), -1))
+        stations = [built.cell for built in constructions if isinstance(built, Station)]
+        if stations:
+            rows, cols = np.array(stations).T
+            x, y = grid.center(rows, cols)
+            xs.append(np.asarray(x, dtype=np.float64))
+            ys.append(np.asarray(y, dtype=np.float64))
+            sprites.append(np.full(len(stations), sheet.index("station")))
+            tints.append(np.full(len(stations), -1))
         spots = BuildingSpots.of(constructions)
         looks = {kind: sheet.variants(name) for kind, name in VARIED_SPRITES.items()}
         xs.append(np.asarray(spots.x, dtype=np.float64))
@@ -288,6 +311,8 @@ class PixelWorld:
         self._biomes = biome_grid(tile_map)
         land = tile_map.terrain == Terrain.LAND
         self._levels = np.where(land, tile_map.relief.astype(np.int64), -1)
+        # Each cell's Satisfaction, or -1 where nothing trades.
+        self.satisfaction = np.full(tile_map.grid.shape, -1, dtype=np.int8)
         self._hills = land & (tile_map.relief == Relief.HILLS)
         self._relief_light = self._light_slopes(angle_deg)
         self._ramps = np.zeros((len(Biome), 4, 3))
@@ -317,6 +342,15 @@ class PixelWorld:
                 if isinstance(built, Building) and built.kind == BuildingKind.FARM
             }
         )
+        return self._chunks_around(cells)
+
+    def satisfaction_changed(self, levels: npt.NDArray[np.int8]) -> set[tuple[int, int]]:
+        """Takes each cell's new satisfaction; returns the chunks whose glow changed."""
+        changed = np.argwhere(levels != self.satisfaction)
+        self.satisfaction = levels.copy()
+        return self._chunks_around([(int(r), int(c)) for r, c in changed])
+
+    def _chunks_around(self, cells: Iterable[Cell]) -> set[tuple[int, int]]:
         cells = list(cells)
         if not cells:
             return set()
@@ -379,6 +413,8 @@ class PixelWorld:
         )
         rgb[lit & ~water] *= BEVEL_LIGHT
         rgb[shaded & ~water] *= BEVEL_SHADE
+        strength = glow_strength(self.satisfaction)[rows, cols][..., None] * ~water[..., None]
+        rgb = rgb * (1 - strength) + np.array(GLOW) * strength
         self._plough(rgb, x, y, rows * grid.cols + cols)
 
         inner = (slice(APRON, APRON + CHUNK), slice(APRON, APRON + CHUNK))

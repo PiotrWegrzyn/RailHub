@@ -148,3 +148,14 @@ def test_a_big_map_keeps_its_true_size_on_the_world() -> None:
 
     assert right - left == pytest.approx(layout.world.width / 6)
     assert bottom - top == pytest.approx(layout.world.height * 30 / (WORLD_NORTH - WORLD_SOUTH))
+
+
+def test_the_world_map_alone_takes_the_corner() -> None:
+    layout = MinimapLayout.of((30.0, 20.0), SCREEN, overview=False, world=True)
+
+    world = layout.world
+
+    assert layout.overview is None
+    assert world is not None
+    assert world.right < SCREEN[0] and world.bottom < SCREEN[1]
+    assert layout.contains(world.left + 1, world.top + 1)

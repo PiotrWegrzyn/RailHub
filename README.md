@@ -128,28 +128,63 @@ neighbourhood (the cell and the six around it):
 Each kind of building grows on its own ladder. Every month each cell may take a turn on each
 ladder, with the ladder's base chance plus its chance per nearby point, but none until the
 neighbourhood holds the points the ladder needs. The land multiplies the chance by its
-vegetation, relief, temperature and the best water next to the cell:
+vegetation, relief, temperature and the best water next to the cell. The chances below are for
+content buildings; unsatisfied ones grow at half of them and thriving ones at one and a half:
 
 | Ladder | Chance per month | Needs nearby | Land |
 |---|---|---|---|
-| Houses | 0.00001 + 0.00025 per population | | best on flat grass; forest and mountains x0.05, barren x0.5, hills x0.8, cold x0.6, hot x0.8; river or sea x1.7 |
-| Farms | 0.000002 + 0.000002 per population | | flat grass; hills x0.5, barren x0.1, forest x0.02, cold x0.2, hot x0.6; none in mountains |
-| Orchards | 0.000001 + 0.000001 per population | | hills; flat x0.5, hot x1.2, cold x0.05; water x1.2 to x1.5 |
-| Mines | 0.000004 + 0.00005 per ore | | mountains; hills x0.4, flat x0.01 |
-| Lumber mills | 0.0000015 + 0.000002 per population | | forest only; river x1.5 |
-| Ports | 0.000002 + 0.00002 per population | 3 population | next to the sea, or a lake x0.3 |
-| Factories | 0.000001 per population + 0.00001 per industry | | flat; hills x0.5, forest x0.2; river x1.5 |
-| Food plants | 0.00002 per food + 0.000001 per population | 1 food, 6 population | as factories |
-| Steel mills | 0.0001 per ore + 0.00001 per industry | 1 ore, 2 population | as factories |
-| Shipyards | 0.00005 per trade + 0.00001 per industry | 1 trade | on the water |
+| Houses | 0.0000085 + 0.0002125 per population | | forest x0.3, mountains x0.05, barren x0.5, hills x0.8, cold x0.6, hot x0.8 |
+| Farms | 0.000004 + 0.00003 per population + 0.00002 per food | | flat grass; hills x0.5, barren x0.1, forest x0.02, cold x0.2, hot x0.6; river or lake x5, sea x2; none in mountains |
+| Orchards | 0.000002 + 0.000004 per population + 0.00002 per food | | hills; flat x0.5, hot x1.2, cold x0.05; river or lake x3, sea x2 |
+| Mines | 0.000008 + 0.0001 per ore | | mountains; hills x0.4, flat x0.01; beside mountains x3 |
+| Lumber mills | 0.00002 + 0.00005 per population | | forest with open land next to it; river x1.5 |
+| Ports | 0.000004 + 0.00004 per population | 3 population | next to the sea, or a lake x0.3 |
+| Factories | 0.000002 per population + 0.00002 per industry | | flat; hills x0.5, forest x0.2; river x1.5 |
+| Food plants | 0.00004 per food + 0.000002 per population | 1 food, 6 population | as factories |
+| Steel mills | 0.0002 per ore + 0.00002 per industry | 1 ore, 2 population | as factories |
+| Shipyards | 0.0001 per trade + 0.00002 per industry | 1 trade | on the water |
 
-Farms and orchards keep to one per cell and two per neighbourhood, lumber mills, ports and the
-special factories to one per neighbourhood, and mines to five. On its turn a ladder builds its
+Farms and orchards may crowd together; lumber mills keep to two per neighbourhood, ports and the
+special factories to one, and mines to five. On its turn a ladder builds its
 first kind, unless it can merge: six houses nearby let three of them make way for a tenement and
 six tenements let three make way for a block of flats; three factories nearby make a big factory
 and three big factories a mega factory. On a town or factory turn, a neighbourhood with 100
 population and 10 industry points puts up a skyscraper instead: it pulls down three blocks of
 flats and three points of factories and gives a corporate point.
+
+### Goods and satisfaction
+
+`railroads.sim.economy` shares goods out every month (once a year before play, to seed quickly).
+Buildings make and need goods, and the land feeds people by itself: every water cell makes 2
+food, every flat or forest cell 1.
+
+| Building | Makes | Needs |
+|---|---|---|
+| House | | 1 food |
+| Tenement | | 2 food, 1 goods |
+| Block of flats | | 5 food, 2 goods |
+| Farm | 6 food | |
+| Orchard | 3 food | |
+| Mine | 2 coal | |
+| Lumber mill | 2 lumber | |
+| Factory, big, mega | 3, 9, 27 goods | 2, 6, 18 lumber |
+| Food plant | 3 goods | 3 food |
+| Steel mill | 2 steel | 3 coal |
+| Shipyard | 3 goods | 2 steel, 1 lumber |
+| Port | 2 goods | |
+| Skyscraper | | 3 goods |
+
+Goods go no further than a neighbourhood: each cell serves itself first, then shares what is left
+with the cells next to it, unsatisfied cells first, then content ones. Factories make only as much
+as their inputs allow. A building that gets all it needs and gives away all it makes is
+satisfied; at least half, content; less, unsatisfied. Each ladder's chances in a cell are scaled
+by how its kinds of building fare around it: x0.5 unsatisfied, x1 content, x1.5 satisfied, and x1
+where there are none yet. The ground under content and satisfied buildings has a warm glow, and
+the status bar names the hovered cell's satisfaction.
+
+Farms with more than 10 population points around them are pulled down. Stations still go up
+after 100 years of growth, one per 3,000 land cells beside the bigger groups of buildings, but do
+nothing until there are trains.
 
 Chances are kept up to date as buildings come and go, and cells are drawn by thinning, so a
 month costs about as much as what grows in it.

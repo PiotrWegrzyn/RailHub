@@ -1,4 +1,5 @@
-"""Two small maps in the corner of the view: the world, with the game's map marked on it, and the
+"""Two small maps in the corner of the view, each with its own toggle: the world, with the game's
+map marked on it, and the
 whole game map seen from above, with the part on screen outlined. Clicking or dragging on the
 second one moves the view there."""
 
@@ -55,36 +56,46 @@ class Panel:
 
 @dataclass(frozen=True, slots=True)
 class MinimapLayout:
-    """Where the two maps sit on screen, side by side in the bottom-right corner of the view."""
+    """Where the maps that are shown sit on screen, side by side in the bottom-right corner of
+    the view: the overview of the game map in the corner, the world to its left."""
 
-    world: Panel
-    overview: Panel
+    world: Panel | None
+    overview: Panel | None
     map_size: Vec2
 
     @classmethod
-    def of(cls, map_size: Vec2, bottom_right: Vec2) -> MinimapLayout:
+    def of(
+        cls, map_size: Vec2, bottom_right: Vec2, overview: bool = True, world: bool = True
+    ) -> MinimapLayout:
         width, height = map_size
         scale = OVERVIEW_SIDE / max(width, height)
-        overview = Panel(
-            bottom_right[0] - MARGIN - width * scale,
-            bottom_right[1] - MARGIN - height * scale,
-            width * scale,
-            height * scale,
-        )
-        world_height = WORLD_WIDTH * (WORLD_NORTH - WORLD_SOUTH) / 360.0
-        world = Panel(
-            overview.left - GAP - WORLD_WIDTH,
-            bottom_right[1] - MARGIN - world_height,
-            WORLD_WIDTH,
-            world_height,
-        )
-        return cls(world, overview, map_size)
+        right = bottom_right[0] - MARGIN
+        overview_panel = None
+        if overview:
+            overview_panel = Panel(
+                right - width * scale,
+                bottom_right[1] - MARGIN - height * scale,
+                width * scale,
+                height * scale,
+            )
+            right = overview_panel.left - GAP
+        world_panel = None
+        if world:
+            world_height = WORLD_WIDTH * (WORLD_NORTH - WORLD_SOUTH) / 360.0
+            world_panel = Panel(
+                right - WORLD_WIDTH,
+                bottom_right[1] - MARGIN - world_height,
+                WORLD_WIDTH,
+                world_height,
+            )
+        return cls(world_panel, overview_panel, map_size)
 
     def contains(self, x: float, y: float) -> bool:
-        return self.world.contains(x, y) or self.overview.contains(x, y)
+        return any(panel.contains(x, y) for panel in (self.world, self.overview) if panel)
 
     def world_point(self, lon: float, lat: float) -> Vec2:
         panel = self.world
+        assert panel is not None
         return (
             panel.left + (lon + 180.0) / 360.0 * panel.width,
             panel.top + (WORLD_NORTH - lat) / (WORLD_NORTH - WORLD_SOUTH) * panel.height,
@@ -100,11 +111,13 @@ class MinimapLayout:
 
     def overview_point(self, x: float, y: float) -> Vec2:
         panel, (width, height) = self.overview, self.map_size
+        assert panel is not None
         return panel.left + x / width * panel.width, panel.top + y / height * panel.height
 
     def overview_to_map(self, screen_x: float, screen_y: float) -> Vec2:
         """The map point under a spot on the overview, kept on the map."""
         panel, (width, height) = self.overview, self.map_size
+        assert panel is not None
         u = min(max((screen_x - panel.left) / panel.width, 0.0), 1.0)
         v = min(max((screen_y - panel.top) / panel.height, 0.0), 1.0)
         return u * width, v * height
@@ -125,7 +138,9 @@ class Minimap:
     def __init__(self, tile_map: TileMap, world: WorldLand, towns: Iterable[Cell] = ()) -> None:
         self.tile_map = tile_map
         self.world = world
+        # The overview of the game map, and the world map.
         self.shown = True
+        self.world_shown = False
         self._world_texture: hello_imgui.TextureGpu | None = None
         self.show_towns(towns)
 
@@ -145,15 +160,19 @@ class Minimap:
         textures: tuple[imgui.ImTextureRef, imgui.ImTextureRef],
         view_corners: list[Vec2],
     ) -> None:
-        """Draws both maps, given the world picture and the ground picture of the game map."""
+        """Draws the maps the layout holds, given the world picture and the ground picture of the
+        game map."""
         world, ground = textures
-        self._draw_world(draw_list, layout, world)
-        self._draw_overview(draw_list, layout, ground, view_corners)
+        if layout.world is not None:
+            self._draw_world(draw_list, layout, world)
+        if layout.overview is not None:
+            self._draw_overview(draw_list, layout, ground, view_corners)
 
     def _draw_world(
         self, draw_list: imgui.ImDrawList, layout: MinimapLayout, texture: imgui.ImTextureRef
     ) -> None:
         panel = layout.world
+        assert panel is not None
         _frame(draw_list, panel)
         draw_list.add_image(
             texture,
@@ -181,6 +200,7 @@ class Minimap:
         view_corners: list[Vec2],
     ) -> None:
         panel = layout.overview
+        assert panel is not None
         _frame(draw_list, panel)
         draw_list.add_image(
             ground,

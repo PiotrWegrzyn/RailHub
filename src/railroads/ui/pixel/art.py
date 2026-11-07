@@ -347,6 +347,24 @@ def port() -> Sprite:
     return p.sprite()
 
 
+def station() -> Sprite:
+    """A brick station hall with a long platform canopy and a clock tower."""
+    p = Painter(34, 34, (16, 24))
+    p.polygon([(-15, 0), (0, 7.5), (15, 0), (0, -7.5)], STONE, shade(STONE, 0.6))
+    p.shadow(10, 3)
+    top = p.box(-3, 0, 8, 7, BRICK, None)
+    p.gable(top, 4, (70, 76, 92), BRICK)
+    p.polygon([(4, 3), (14, -2), (14, -6), (4, -1)], (150, 156, 168), shade(METAL, 0.55))
+    p.line([(13, -2), (13, 1)], shade(METAL, 0.6))
+    p.line([(6, 3), (6, 6)], shade(METAL, 0.6))
+    p.rect(-6, -20, -2, -8, shade(BRICK, 1.1))
+    p.ellipse(-5.5, -18.5, -2.5, -15.5, (236, 232, 220))
+    p.polygon([(-6, -20), (-4, -24), (-2, -20)], (70, 76, 92))
+    for x in (-9, -6, 0):
+        p.point(x, -2 + (x + 9) * 0.05, WINDOW)
+    return p.sprite()
+
+
 def orchard() -> Sprite:
     """Rows of small fruit trees on a patch of mown grass."""
     p = Painter(32, 22, (16, 13))
@@ -512,6 +530,7 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "lumber_mill": lumber_mill,
     "port": port,
     "orchard": orchard,
+    "station": station,
     "food_plant": food_plant,
     "steel_mill": steel_mill,
     "shipyard": shipyard,

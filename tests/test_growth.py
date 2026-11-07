@@ -25,6 +25,8 @@ from railroads.sim.growth import (
 )
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 
+NO_TRADE = GrowthRule(trades=False)
+
 
 def make_map(size: int = 12) -> TileMap:
     grid = HexGrid(rows=size, cols=size, km_per_cell=2.0)
@@ -56,11 +58,11 @@ def build(constructions: Constructions, cell: tuple[int, int], kind: BuildingKin
 
 
 def only(*ladders: object) -> GrowthRule:
-    return GrowthRule(ladders=tuple(ladders))  # type: ignore[arg-type]
+    return GrowthRule(ladders=tuple(ladders), trades=False)  # type: ignore[arg-type]
 
 
 def test_an_empty_map_has_the_base_chance_on_flat_grass_away_from_water() -> None:
-    growth = Growth(Constructions(make_map()))
+    growth = Growth(Constructions(make_map()), NO_TRADE)
 
     chances = growth.chances(TOWNS)
 
@@ -76,11 +78,11 @@ def test_an_empty_map_has_the_base_chance_on_flat_grass_away_from_water() -> Non
         ((1, 6), TOWN_LAND.vegetation[Vegetation.FOREST]),
         ((2, 6), TOWN_LAND.vegetation[Vegetation.BARREN]),
         ((3, 6), TOWN_LAND.temperature[Temperature.COLD]),
-        ((5, 1), TOWN_LAND.water[Terrain.SEA]),
+        ((5, 1), 1.0),
     ],
 )
 def test_the_land_multiplies_the_chance(cell: tuple[int, int], weight: float) -> None:
-    growth = Growth(Constructions(make_map()))
+    growth = Growth(Constructions(make_map()), NO_TRADE)
 
     chances = growth.chances(TOWNS)
 
@@ -136,9 +138,10 @@ def test_buildings_raise_the_chance_across_their_neighbourhood_by_their_points()
     build(constructions, (8, 3), BuildingKind.FLATS, 1)
     build(constructions, (8, 8), BuildingKind.TENEMENT, 1)
     neighbour = tile_map.grid.neighbours(5, 5)[0]
-    base, per_point = TOWNS.base_chance, TOWNS.chance_per_point[Points.POPULATION]
+    base = TOWNS.base_chance
+    per_point = TOWNS.chance_per_point[Points.POPULATION]
 
-    chances = Growth(constructions).chances(TOWNS)
+    chances = Growth(constructions, NO_TRADE).chances(TOWNS)
 
     assert chances[5, 5] == pytest.approx(base + 2 * per_point)
     assert chances[neighbour] == pytest.approx(base + 2 * per_point)
@@ -149,13 +152,13 @@ def test_buildings_raise_the_chance_across_their_neighbourhood_by_their_points()
 
 def test_chances_follow_buildings_as_they_come_and_go() -> None:
     constructions = Constructions(make_map())
-    growth = Growth(constructions)
+    growth = Growth(constructions, NO_TRADE)
     build(constructions, (5, 5), BuildingKind.HOUSE, 1)
     growth._add((5, 5), BuildingKind.HOUSE, 1)
 
     after = growth.chances(TOWNS)
 
-    fresh = Growth(constructions).chances(TOWNS)
+    fresh = Growth(constructions, NO_TRADE).chances(TOWNS)
     np.testing.assert_allclose(after, fresh)
 
 
@@ -164,10 +167,10 @@ def test_a_ladder_has_no_chance_until_the_neighbourhood_holds_what_it_needs() ->
     constructions = Constructions(tile_map)
     build(constructions, (5, 4), BuildingKind.FARM, 1)
     build(constructions, (5, 6), BuildingKind.HOUSE, 5)
-    without_people = Growth(constructions).chances(FOOD_PLANTS)
+    without_people = Growth(constructions, NO_TRADE).chances(FOOD_PLANTS)
     build(constructions, (5, 6), BuildingKind.HOUSE, 1)
 
-    with_people = Growth(constructions).chances(FOOD_PLANTS)
+    with_people = Growth(constructions, NO_TRADE).chances(FOOD_PLANTS)
 
     assert without_people[5, 5] == 0
     assert with_people[5, 5] > 0
@@ -198,16 +201,30 @@ def test_small_chances_are_drawn_as_often_as_they_should_be() -> None:
     assert turns == pytest.approx(expected, rel=0.05)
 
 
-def test_farms_keep_to_one_per_cell_and_two_per_neighbourhood() -> None:
+def test_farms_can_share_a_cell() -> None:
+    constructions = Constructions(make_map())
+    growth = Growth(constructions, only(FARMS))
+
+    turns = [growth._turn((5, 5), FARMS) for _ in range(3)]
+
+    assert turns == [{(5, 5)}] * 3
+    assert growth.count(BuildingKind.FARM)[5, 5] == 3
+
+
+def test_a_town_crowds_out_the_farms_beside_it() -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
-    growth = Growth(constructions, only(FARMS))
-    first, second = tile_map.grid.neighbours(5, 5)[:2]
+    build(constructions, (5, 5), BuildingKind.FARM, 2)
+    build(constructions, (5, 7), BuildingKind.FARM, 1)
+    build(constructions, tile_map.grid.neighbours(5, 5)[0], BuildingKind.FLATS, 2)
+    build(constructions, tile_map.grid.neighbours(5, 5)[1], BuildingKind.HOUSE, 1)
+    growth = Growth(constructions, NO_TRADE)
 
-    turns = [growth._turn(cell, FARMS) for cell in [(5, 5), (5, 5), first, second]]
+    changed = growth._crowd_out_farms()
 
-    assert turns == [{(5, 5)}, set(), {first}, set()]
-    assert growth.count(BuildingKind.FARM).sum() == 2
+    assert changed == {(5, 5)}
+    assert growth.count(BuildingKind.FARM)[5, 5] == 0
+    assert growth.count(BuildingKind.FARM)[5, 7] == 1
 
 
 def test_six_houses_nearby_let_three_make_way_for_a_tenement_the_cells_own_first() -> None:
@@ -281,7 +298,7 @@ def test_people_and_factories_nearby_raise_the_chance_of_a_factory() -> None:
     build(constructions, tile_map.grid.neighbours(5, 5)[0], BuildingKind.BIG_FACTORY, 1)
     per = FACTORIES.chance_per_point
 
-    chances = Growth(constructions).chances(FACTORIES)
+    chances = Growth(constructions, NO_TRADE).chances(FACTORIES)
 
     expected = 5 * per[Points.POPULATION] + 3 * per[Points.INDUSTRY]
     assert chances[5, 5] == pytest.approx(expected)
@@ -355,7 +372,7 @@ def test_farms_never_merge_or_raise_skyscrapers() -> None:
 def test_a_long_run_keeps_its_counts_and_chances_in_step_with_what_is_built() -> None:
     constructions = Constructions(make_map(30))
     busy = tuple(replace(ladder, base_chance=ladder.base_chance + 0.002) for ladder in LADDERS)
-    growth = Growth(constructions, GrowthRule(ladders=busy))
+    growth = Growth(constructions, GrowthRule(ladders=busy, trades=False))
 
     growth.run(600, np.random.default_rng(2))
 

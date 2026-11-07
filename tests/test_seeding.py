@@ -1,14 +1,19 @@
 import numpy as np
 import pytest
 
-from railroads.mapgen.seeding import seed_buildings
-from railroads.sim.constructions import Building, BuildingKind, Constructions
+from railroads.mapgen.seeding import (
+    STATION_PEOPLE,
+    STATION_SPACING_CELLS,
+    place_stations,
+    seed_buildings,
+)
+from railroads.sim.constructions import Building, BuildingKind, Constructions, Track
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
-from railroads.sim.growth import Growth
+from railroads.sim.growth import Growth, Points
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 
-YEARS = 200 * 12
+YEARS = 300 * 12
 
 
 def make_map(
@@ -119,7 +124,26 @@ def test_seeding_with_the_same_seed_gives_the_same_buildings() -> None:
     assert first == second
 
 
-def test_seeding_leaves_track_and_stations_to_the_player(country: Constructions) -> None:
+def test_seeding_leaves_track_to_the_player(country: Constructions) -> None:
     built = list(country)
 
-    assert all(isinstance(construction, Building) for construction in built)
+    assert not any(isinstance(construction, Track) for construction in built)
+
+
+def test_stations_go_up_beside_people_spaced_apart() -> None:
+    constructions = seed_buildings(make_country(), np.random.default_rng(2), months=1200)
+    growth = Growth(constructions)
+    growth.run(1200, np.random.default_rng(3))
+
+    placed = place_stations(growth, np.random.default_rng(4))
+
+    grid = constructions.tile_map.grid
+    gaps = [
+        np.hypot(*np.subtract(grid.center(*a), grid.center(*b)))
+        for i, a in enumerate(placed)
+        for b in placed[i + 1 :]
+    ]
+    people = growth.nearby(Points.POPULATION)
+    assert placed
+    assert all(people[cell] >= STATION_PEOPLE for cell in placed)
+    assert min(gaps, default=np.inf) >= STATION_SPACING_CELLS * 0.99

@@ -22,6 +22,11 @@ On town and factory turns, a neighbourhood with SKYSCRAPER_PEOPLE population and
 SKYSCRAPER_INDUSTRY industry points puts up a skyscraper: it pulls down three blocks of flats and
 three points of factories (three factories, or else a big factory) and gives a corporate point.
 
+Every TRADE_EVERY_MONTHS the buildings share out their goods (railroads.sim.economy), which
+leaves each kind unsatisfied, content or satisfied. A ladder's chances in a cell are scaled by
+how its kinds of building fare across the cell's neighbourhood: x0.5 when unsatisfied, x1 when
+content, x1.5 when satisfied, and x1 where there are none yet.
+
 A new map runs this for MONTHS_BEFORE_PLAY before play starts; in play it carries on, one month
 every few minutes.
 """
@@ -36,6 +41,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import CELL_SPACE, Building, BuildingKind, Constructions
+from railroads.sim.economy import Economy, Trade, growth_factors, levels_of
 from railroads.sim.grids import Cell
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 
@@ -54,6 +60,9 @@ class Points(Enum):
 
 
 MONTHS_BEFORE_PLAY = 300 * 12
+# Farms with more population points than this around them are pulled down.
+FARMS_CROWDED_OUT = 10
+TRADE_EVERY_MONTHS = 1
 SKYSCRAPER_PEOPLE = 100
 SKYSCRAPER_INDUSTRY = 10
 SKYSCRAPER_FLATS = 3
@@ -86,19 +95,22 @@ POINTS: Mapping[BuildingKind, tuple[Points, int]] = MappingProxyType(
 @dataclass(frozen=True, slots=True)
 class Land:
     """How the land changes a ladder's chances: each weight multiplies them. Water weights go by
-    the best water next to the cell, LAND standing for none; anything left out weighs 1, or 0
-    for water."""
+    the best water next to the cell, LAND standing for none; anything left out weighs 1."""
 
     vegetation: Mapping[Vegetation, float] = field(default_factory=dict)
     relief: Mapping[Relief, float] = field(default_factory=dict)
     temperature: Mapping[Temperature, float] = field(default_factory=dict)
     water: Mapping[Terrain, float] = field(default_factory=dict)
+    # Weight for a cell with mountains next to it.
+    beside_mountains: float = 1.0
+    # Only where at least one cell next to it is open land, not forest.
+    forest_edge: bool = False
 
     def weights(self, tile_map: TileMap) -> FloatGrid:
         vegetation = np.array([self.vegetation.get(v, 1.0) for v in Vegetation])
         relief = np.array([self.relief.get(r, 1.0) for r in Relief])
         temperature = np.array([self.temperature.get(t, 1.0) for t in Temperature])
-        water = np.array([self.water.get(t, 1.0 if t == Terrain.LAND else 0.0) for t in Terrain])
+        water = np.array([self.water.get(t, 1.0) for t in Terrain])
         rows, cols = tile_map.grid.neighbour_index_grids()
         around = tile_map.terrain[rows, cols]
         is_water = around != Terrain.LAND
@@ -110,6 +122,14 @@ class Land:
             * temperature[tile_map.temperature]
             * by_water
         )
+        real = (rows != np.indices(tile_map.grid.shape)[0]) | (
+            cols != np.indices(tile_map.grid.shape)[1]
+        )
+        beside = tile_map.relief[rows, cols] == Relief.MOUNTAINS
+        weight = weight * np.where((beside & real).any(axis=0), self.beside_mountains, 1.0)
+        if self.forest_edge:
+            open_land = (tile_map.vegetation[rows, cols] != Vegetation.FOREST) & ~is_water
+            weight = weight * (open_land & real).any(axis=0)
         return np.where(tile_map.terrain == Terrain.LAND, weight, 0.0)
 
 
@@ -144,11 +164,12 @@ class Ladder:
 
 
 # Built land: towns and the factories that follow them.
+# Food decides where houses do well (railroads.sim.economy), so water weighs nothing more here;
+# few people clear a forest to live in it.
 TOWN_LAND = Land(
-    vegetation={Vegetation.BARREN: 0.5, Vegetation.FOREST: 0.05},
+    vegetation={Vegetation.BARREN: 0.5, Vegetation.FOREST: 0.3},
     relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.05},
     temperature={Temperature.COLD: 0.6, Temperature.HOT: 0.8},
-    water={Terrain.RIVER: 1.7, Terrain.SEA: 1.7, Terrain.LAKE: 1.0},
 )
 FACTORY_LAND = Land(
     vegetation={Vegetation.FOREST: 0.2},
@@ -160,27 +181,27 @@ FACTORY_LAND = Land(
 TOWNS = Ladder(
     kinds=(BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS),
     land=TOWN_LAND,
-    base_chance=0.00001,
-    chance_per_point={Points.POPULATION: 0.00025},
+    base_chance=0.0000085,
+    chance_per_point={Points.POPULATION: 0.0002125},
     merges={
         BuildingKind.HOUSE: Merge(needed=6, pulled_down=3),
         BuildingKind.TENEMENT: Merge(needed=6, pulled_down=3),
     },
     skyscrapers=True,
 )
-# Farms want open, flat, mild grassland, and towns nearby to feed; each fills its cell with fields.
+# Farms want open, flat, mild grassland by water, towns nearby to feed and other farms and orchards
+# around them; several can share a cell. A town that grows over them (FARMS_CROWDED_OUT) pulls
+# them down.
 FARMS = Ladder(
     kinds=(BuildingKind.FARM,),
     land=Land(
         vegetation={Vegetation.BARREN: 0.1, Vegetation.FOREST: 0.02},
         relief={Relief.HILLS: 0.5, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.2, Temperature.HOT: 0.6},
-        water={Terrain.RIVER: 1.3, Terrain.LAKE: 1.2},
+        water={Terrain.RIVER: 5.0, Terrain.LAKE: 5.0, Terrain.SEA: 2.0},
     ),
-    base_chance=0.000002,
-    chance_per_point={Points.POPULATION: 0.000002},
-    most_per_cell=1,
-    most_nearby=2,
+    base_chance=0.000004,
+    chance_per_point={Points.POPULATION: 0.00003, Points.FOOD: 0.00002},
 )
 # Orchards like sunny slopes and water nearby, and stay off the cold.
 ORCHARDS = Ladder(
@@ -189,27 +210,27 @@ ORCHARDS = Ladder(
         vegetation={Vegetation.BARREN: 0.2, Vegetation.FOREST: 0.1},
         relief={Relief.FLAT: 0.5, Relief.HILLS: 1.0, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.05, Temperature.HOT: 1.2},
-        water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.5, Terrain.SEA: 1.2},
+        water={Terrain.RIVER: 3.0, Terrain.LAKE: 3.0, Terrain.SEA: 2.0},
     ),
-    base_chance=0.000001,
-    chance_per_point={Points.POPULATION: 0.000001},
-    most_per_cell=1,
-    most_nearby=2,
+    base_chance=0.000002,
+    chance_per_point={Points.POPULATION: 0.000004, Points.FOOD: 0.00002},
 )
-# Mines are dug in mountains and hills, where finding ore draws more digging nearby.
+# Mines are dug in and beside mountains and in hills, where finding ore draws more digging nearby.
 MINES = Ladder(
     kinds=(BuildingKind.MINE,),
     land=Land(
         vegetation={Vegetation.FOREST: 0.6, Vegetation.GRASS: 0.8},
         relief={Relief.FLAT: 0.01, Relief.HILLS: 0.4, Relief.MOUNTAINS: 1.0},
         temperature={Temperature.COLD: 0.8},
+        beside_mountains=3.0,
     ),
-    base_chance=0.000004,
-    chance_per_point={Points.ORE: 0.00005},
+    base_chance=0.000008,
+    chance_per_point={Points.ORE: 0.0001},
     most_per_cell=2,
     most_nearby=5,
 )
-# Lumber mills stand in forests, best by a river to float the logs and near towns to buy them.
+# Lumber mills stand at the edge of forests, best by a river to float the logs and near towns to
+# buy them.
 LUMBER_MILLS = Ladder(
     kinds=(BuildingKind.LUMBER_MILL,),
     land=Land(
@@ -217,21 +238,22 @@ LUMBER_MILLS = Ladder(
         relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.HOT: 0.6},
         water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.2, Terrain.SEA: 1.0},
+        forest_edge=True,
     ),
-    base_chance=0.0000015,
-    chance_per_point={Points.POPULATION: 0.000002},
+    base_chance=0.00002,
+    chance_per_point={Points.POPULATION: 0.00005},
     most_per_cell=1,
-    most_nearby=1,
+    most_nearby=2,
 )
 # Ports open on the sea, or less often a lake, where a town has grown to use them.
 PORTS = Ladder(
     kinds=(BuildingKind.PORT,),
     land=Land(
         relief={Relief.HILLS: 0.5, Relief.MOUNTAINS: 0.0},
-        water={Terrain.LAND: 0.0, Terrain.SEA: 1.0, Terrain.LAKE: 0.3},
+        water={Terrain.LAND: 0.0, Terrain.RIVER: 0.0, Terrain.SEA: 1.0, Terrain.LAKE: 0.3},
     ),
-    base_chance=0.000002,
-    chance_per_point={Points.POPULATION: 0.00002},
+    base_chance=0.000004,
+    chance_per_point={Points.POPULATION: 0.00004},
     needs={Points.POPULATION: 3},
     most_per_cell=1,
     most_nearby=1,
@@ -240,7 +262,7 @@ PORTS = Ladder(
 FACTORIES = Ladder(
     kinds=(BuildingKind.FACTORY, BuildingKind.BIG_FACTORY, BuildingKind.MEGA_FACTORY),
     land=FACTORY_LAND,
-    chance_per_point={Points.POPULATION: 0.000001, Points.INDUSTRY: 0.00001},
+    chance_per_point={Points.POPULATION: 0.000002, Points.INDUSTRY: 0.00002},
     merges={
         BuildingKind.FACTORY: Merge(needed=3, pulled_down=3),
         BuildingKind.BIG_FACTORY: Merge(needed=3, pulled_down=3),
@@ -251,7 +273,7 @@ FACTORIES = Ladder(
 FOOD_PLANTS = Ladder(
     kinds=(BuildingKind.FOOD_PLANT,),
     land=FACTORY_LAND,
-    chance_per_point={Points.FOOD: 0.00002, Points.POPULATION: 0.000001},
+    chance_per_point={Points.FOOD: 0.00004, Points.POPULATION: 0.000002},
     needs={Points.FOOD: 1, Points.POPULATION: 6},
     most_per_cell=1,
     most_nearby=1,
@@ -264,7 +286,7 @@ STEEL_MILLS = Ladder(
         relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
         water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.2, Terrain.SEA: 1.2},
     ),
-    chance_per_point={Points.ORE: 0.0001, Points.INDUSTRY: 0.00001},
+    chance_per_point={Points.ORE: 0.0002, Points.INDUSTRY: 0.00002},
     needs={Points.ORE: 1, Points.POPULATION: 2},
     most_per_cell=1,
     most_nearby=1,
@@ -276,7 +298,7 @@ SHIPYARDS = Ladder(
         relief={Relief.HILLS: 0.3, Relief.MOUNTAINS: 0.0},
         water={Terrain.LAND: 0.0, Terrain.SEA: 1.0, Terrain.LAKE: 0.4, Terrain.RIVER: 0.3},
     ),
-    chance_per_point={Points.TRADE: 0.00005, Points.INDUSTRY: 0.00001},
+    chance_per_point={Points.TRADE: 0.0001, Points.INDUSTRY: 0.00002},
     needs={Points.TRADE: 1},
     most_per_cell=1,
     most_nearby=1,
@@ -297,6 +319,9 @@ LADDERS = (
 
 @dataclass(frozen=True, slots=True)
 class GrowthRule:
+    # Whether goods are shared out and satisfaction scales the chances, and how often.
+    trades: bool = True
+    trade_every_months: int = TRADE_EVERY_MONTHS
     ladders: tuple[Ladder, ...] = LADDERS
     points: Mapping[BuildingKind, tuple[Points, int]] = field(default=POINTS)
     skyscraper_people: int = SKYSCRAPER_PEOPLE
@@ -308,11 +333,13 @@ GROWTH = GrowthRule()
 
 @dataclass(frozen=True, slots=True)
 class _Place:
-    """Where a ladder can grow: its cells as flat indices, every cell's land weight, and every
-    cell's chance before the ladder's needs, kept up to date as buildings come and go."""
+    """Where a ladder can grow: its cells as flat indices, every cell's weight for its land
+    alone and scaled by satisfaction, and every cell's chance before the ladder's needs, kept up
+    to date as buildings come and go."""
 
     ladder: Ladder
     cells: npt.NDArray[np.intp]
+    land: FloatGrid
     weights: FloatGrid
     chances: FloatGrid
 
@@ -336,12 +363,76 @@ class Growth:
         }
         self._places = []
         for ladder in rule.ladders:
-            weights = ladder.land.weights(tile_map).ravel()
-            chances = np.full(weights.size, ladder.base_chance)
+            land = ladder.land.weights(tile_map).ravel()
+            chances = np.full(land.size, ladder.base_chance)
             for points, per_point in ladder.chance_per_point.items():
                 chances += per_point * self._nearby[points].ravel()
-            place = _Place(ladder, np.flatnonzero(weights > 0), weights, chances * weights)
-            self._places.append(place)
+            self._places.append(
+                _Place(ladder, np.flatnonzero(land > 0), land, land.copy(), chances * land)
+            )
+        self.economy = Economy(tile_map)
+        self.trade: Trade | None = None
+        self._months = 0
+        if rule.trades:
+            self.trade_goods()
+
+    def trade_goods(self) -> set[Cell]:
+        """Pulls down farms that towns have crowded out, shares out a month of goods, and scales
+        every ladder's chances by how satisfied its buildings are around each cell; returns the
+        cells whose buildings changed."""
+        changed = self._crowd_out_farms()
+        last = self.economy.active.copy()
+        self.trade = self.economy.trade(self._counts)
+        cells = self.trade.cells
+        stale = np.flatnonzero(last & ~self.economy.active)
+        neighbourhoods = self.economy.neighbourhoods
+        for place in self._places:
+            self._reweigh(place, stale, np.ones(stale.size))
+            kinds = place.ladder.kinds
+            wanted = self.trade.wanted(kinds)
+            if not wanted.any():
+                self._reweigh(place, cells, np.ones(cells.size))
+                continue
+            done = neighbourhoods.including(self.trade.done(kinds))
+            wanted = neighbourhoods.including(wanted)
+            share = done / np.where(wanted > 0, wanted, 1.0)
+            factors = np.where(wanted > 0, growth_factors(levels_of(share)), 1.0)
+            self._reweigh(place, cells, factors)
+        return changed
+
+    def _crowd_out_farms(self) -> set[Cell]:
+        farms = self._counts.get(BuildingKind.FARM)
+        if farms is None:
+            return set()
+        crowded = np.argwhere((farms > 0) & (self._nearby[Points.POPULATION] > FARMS_CROWDED_OUT))
+        changed: set[Cell] = set()
+        for row, col in crowded.tolist():
+            for _ in range(int(farms[row, col])):
+                self.constructions.remove(Building((row, col), BuildingKind.FARM))
+            self._add((row, col), BuildingKind.FARM, -int(farms[row, col]))
+            changed.add((row, col))
+        return changed
+
+    def _reweigh(self, place: _Place, cells: npt.NDArray[np.intp], factors: FloatGrid) -> None:
+        """Scales the ladder's land weights in these cells by their satisfaction factors."""
+        if not cells.size:
+            return
+        weights = place.land[cells] * factors
+        raw = np.full(cells.size, place.ladder.base_chance)
+        for points, per_point in place.ladder.chance_per_point.items():
+            raw += per_point * self._nearby[points].ravel()[cells]
+        place.weights[cells] = weights
+        place.chances[cells] = raw * weights
+
+    def satisfaction(self) -> npt.NDArray[np.int8]:
+        """How satisfied each cell's buildings are on the whole, or -1 where none trade."""
+        if self.trade is None:
+            return np.full(self._grid.shape, -1, dtype=np.int8)
+        levels = np.full(self._grid.rows * self._grid.cols, -1, dtype=np.int8)
+        everything = tuple(self.trade.got)
+        trading = self.trade.wanted(everything) > 0
+        levels[self.trade.cells[trading]] = self.trade.levels()[trading]
+        return levels.reshape(self._grid.shape)
 
     def count(self, kind: BuildingKind) -> IntGrid:
         """How many grown buildings of a kind stand in each cell."""
@@ -370,10 +461,13 @@ class Growth:
 
     def month(self, rng: np.random.Generator) -> set[Cell]:
         """Grows one month; returns the cells whose buildings changed."""
+        self._months += 1
+        changed: set[Cell] = set()
+        if self.rule.trades and self._months % self.rule.trade_every_months == 0:
+            changed = self.trade_goods()
         turns: list[tuple[int, Ladder]] = []
         for place in self._places:
             turns += [(index, place.ladder) for index in self._hits(place, rng).tolist()]
-        changed: set[Cell] = set()
         for turn in rng.permutation(len(turns)).tolist():
             index, ladder = turns[turn]
             changed |= self._turn(divmod(index, self._grid.cols), ladder)
