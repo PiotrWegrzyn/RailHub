@@ -8,12 +8,13 @@ import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
 from railroads.ui.iso_camera import IsoCamera, Vec2
-from railroads.ui.pixel.world import ChunkPlacement, PixelWorld, Rgba
+from railroads.ui.pixel.world import CHUNK, ChunkPlacement, PixelWorld, Rgba
 
 # Time a frame may spend drawing new chunks; at least one is always drawn.
 FRAME_BUDGET_S = 0.025
 KEPT_CHUNKS = 256
-KEPT_TEXTURES = 64
+# Most bytes of chunk textures kept on the graphics card; the least recently shown go first.
+TEXTURE_BUDGET = 512 * 1024 * 1024
 
 type ChunkKey = tuple[int, int]
 
@@ -67,9 +68,12 @@ class PixelLayer:
             self._textures.move_to_end(key)
             top_left, bottom_right = placement.screen_rect(chunk)
             draw_list.add_image(imgui.ImTextureRef(texture.texture_id()), top_left, bottom_right)
-        while len(self._textures) > KEPT_TEXTURES:
+        while len(self._textures) > 1 and self._texture_bytes() > TEXTURE_BUDGET:
             self._stale.discard(self._textures.popitem(last=False)[0])
         return complete
+
+    def _texture_bytes(self) -> int:
+        return sum((CHUNK * key[2]) ** 2 * 4 for key in self._textures)
 
     def _upload(self, chunk: ChunkKey, scale: int) -> hello_imgui.TextureGpu:
         pixels = self._chunks.get(chunk)

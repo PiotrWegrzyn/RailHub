@@ -41,8 +41,9 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import CELL_SPACE, Building, BuildingKind, Constructions
-from railroads.sim.economy import Economy, Trade, growth_factors, levels_of
+from railroads.sim.economy import Economy, StationOrder, Trade, growth_factors, levels_of
 from railroads.sim.grids import Cell
+from railroads.sim.railway import STOCKPILE, Railway
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 
 IntGrid = npt.NDArray[np.int64]
@@ -372,6 +373,8 @@ class Growth:
             )
         self.economy = Economy(tile_map)
         self.trade: Trade | None = None
+        # Trains and their stations, once the player has any (railroads.sim.railway).
+        self.railway: Railway | None = None
         self._months = 0
         if rule.trades:
             self.trade_goods()
@@ -382,7 +385,8 @@ class Growth:
         cells whose buildings changed."""
         changed = self._crowd_out_farms()
         last = self.economy.active.copy()
-        self.trade = self.economy.trade(self._counts)
+        self.trade = self.economy.trade(self._counts, self._station_orders())
+        self._settle_stations(self.trade)
         cells = self.trade.cells
         stale = np.flatnonzero(last & ~self.economy.active)
         neighbourhoods = self.economy.neighbourhoods
@@ -400,6 +404,54 @@ class Growth:
             self._reweigh(place, cells, factors)
         return changed
 
+    def clear_room(self, cell: Cell, units: int, avoid: frozenset[Cell] = frozenset()) -> set[Cell]:
+        """Makes `units` of room in the cell for track or a station: buildings move to a cell
+        next to it with room for them (never into `avoid`) while any can, and when none can,
+        the lowest of them comes down. Returns the cells whose buildings changed."""
+        changed: set[Cell] = set()
+        while self.constructions.space_left(cell) < units:
+            here = sorted(
+                (b for b in self.constructions.at(cell) if isinstance(b, Building)),
+                key=lambda b: (
+                    self.rule.points.get(b.kind, (Points.POPULATION, 0))[1],
+                    b.kind.value,
+                ),
+            )
+            if not here:
+                break
+            moved = next(
+                (
+                    (building, target)
+                    for building in here
+                    if (target := self._room_beside(building, avoid | {cell})) is not None
+                ),
+                None,
+            )
+            victim, target = moved if moved is not None else (here[0], None)
+            self._take_down(victim)
+            changed.add(cell)
+            if target is not None:
+                self.constructions.build(Building(target, victim.kind))
+                if victim.kind in self._counts:
+                    self._add(target, victim.kind, 1)
+                changed.add(target)
+        return changed
+
+    def _room_beside(self, building: Building, avoid: frozenset[Cell]) -> Cell | None:
+        """The cell next to the building's with the most room that would take it, if any."""
+        options = [
+            near
+            for near in self._grid.neighbours(*building.cell)
+            if near not in avoid
+            and self.constructions.why_not(Building(near, building.kind)) is None
+        ]
+        return max(options, key=self.constructions.space_left, default=None)
+
+    def _take_down(self, building: Building) -> None:
+        self.constructions.remove(building)
+        if building.kind in self._counts:
+            self._add(building.cell, building.kind, -1)
+
     def _crowd_out_farms(self) -> set[Cell]:
         farms = self._counts.get(BuildingKind.FARM)
         if farms is None:
@@ -412,6 +464,27 @@ class Growth:
             self._add((row, col), BuildingKind.FARM, -int(farms[row, col]))
             changed.add((row, col))
         return changed
+
+    def _station_orders(self) -> dict[Cell, StationOrder]:
+        if self.railway is None:
+            return {}
+        orders = {}
+        for station in self.railway.stations():
+            goods = self.railway.station_goods(station)
+            orders[station] = StationOrder(dict(goods.brought), max(0.0, STOCKPILE - goods.stocked))
+        return orders
+
+    def _settle_stations(self, trade: Trade) -> None:
+        if self.railway is None:
+            return
+        for station, handed in trade.handed.items():
+            goods = self.railway.station_goods(station)
+            for good, amount in handed.items():
+                goods.brought[good] = max(0.0, goods.brought.get(good, 0.0) - amount)
+        for station, gathered in trade.gathered.items():
+            goods = self.railway.station_goods(station)
+            for good, amount in gathered.items():
+                goods.stockpile[good] = goods.stockpile.get(good, 0.0) + amount
 
     def _reweigh(self, place: _Place, cells: npt.NDArray[np.intp], factors: FloatGrid) -> None:
         """Scales the ladder's land weights in these cells by their satisfaction factors."""

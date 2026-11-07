@@ -85,8 +85,8 @@ def test_hexagons_have_north_up() -> None:
     assert north[1] < SCREEN_CENTER[1]
 
 
-@pytest.mark.parametrize(("start", "steps", "expected"), [(0, -1, 0), (5, 3, 5), (2, 10, 5)])
-def test_zoom_is_limited_to_six_levels(start: int, steps: int, expected: int) -> None:
+@pytest.mark.parametrize(("start", "steps", "expected"), [(0, -1, 0), (6, 3, 6), (2, 10, 6)])
+def test_zoom_is_limited_to_seven_levels(start: int, steps: int, expected: int) -> None:
     camera = IsoCamera(center_x=0, center_y=0, zoom_level=start)
 
     camera.zoom(steps, SCREEN_CENTER, SCREEN_CENTER)

@@ -164,6 +164,10 @@ class Constructions:
         if not built:
             del self._cells[construction.cell]
 
+    def track_problem(self, track: Track) -> str | None:
+        """Why this track cannot be laid, leaving aside the room already taken."""
+        return self._track_problem(track)
+
     def site_problem(self, building: Building) -> str | None:
         """Why the building cannot stand in its cell, leaving aside the room already taken."""
         return self._building_problem(building)

@@ -57,8 +57,8 @@ where a property comes from.
 
 The UI draws the map from those properties alone, always from the same direction: squares as
 diamonds with north at the top left, hexagons with north up. The three furthest zoom levels show
-the map as one smooth picture; the three closest show it as pixel art, at 1, 2 and 3 screen pixels
-per art pixel.
+the map as one smooth picture; the four closest show it as pixel art, at 1, 2, 3 and 4 screen
+pixels per art pixel.
 
 - `railroads.ui.biomes`: every cell is a biome picked from terrain, relief, temperature and
   vegetation. Water is always water, mountains are grey rock or snow, hot and barren is desert,
@@ -183,8 +183,40 @@ where there are none yet. The ground under content and satisfied buildings has a
 the status bar names the hovered cell's satisfaction.
 
 Farms with more than 10 population points around them are pulled down. Stations still go up
-after 100 years of growth, one per 3,000 land cells beside the bigger groups of buildings, but do
-nothing until there are trains.
+after 100 years of growth, one per 3,000 land cells beside the bigger groups of buildings.
+
+### Building and trains
+
+The Build window chooses what a left click builds: a station (what stands in the cell moves to a
+cell next to it, or the lowest building comes down when nothing can move), or track. For track,
+click where it starts and then where it goes; `railroads.sim.routes` plans the cheapest way that
+turns at most 60 degrees per cell, through edges or corners, bridging rivers and lakes and
+tunnelling through mountains, and makes room the same way. While placing a station, and when the
+mouse is over one, the cells it hands goods out to (2 steps away) are shaded orange, the areas of
+other stations pink, cells two stations share grey and the stations themselves blue, with a blue
+line round the cells it gathers from (4 steps). A right click cancels whatever is being built;
+with nothing being built it opens the details of a cell: its land, points, and every building
+with what it makes and needs and what it got and gave last month.
+
+The Trains window buys a steam engine and sets its stops from the stations and its cars: up to 6,
+each for one good and holding 10 of it, so a food car carries only food. It shows what each car
+carries, and every station's stockpile and the goods waiting to be handed out there. Trains
+(`railroads.sim.railway`) run along the track at 30 cells a month on the flat, slower on hills,
+and each car slows them: an empty car weighs 1, a full one 2, and every unit of weight costs 8%
+of the engine's speed, so six full cars still run at about half of it. On the pixel map
+(`railroads.ui.pixel.trains`) a steam engine with its tender leads the cars, each drawn as pixel
+art from a small model of boxes and cylinders for 24 headings, so they turn with the track, at
+twice the map's art resolution: red boxcars for goods, cream reefers for food, hoppers for coal,
+flatcars with logs or steel beams, and puffs of smoke from the chimney. Closed cars show an open
+door when empty, open ones their bare deck. Track is drawn into the ground as pixel art too:
+gravel, sleepers and rails, timber decks over rivers and lakes, and portals where it enters
+mountains. Zoomed out, trains and track are plain shapes.
+
+At each stop a train unloads its cars and fills them from the station's stockpile. Once a month
+each station hands what trains brought to buildings within 2 cells, unsatisfied first, then
+content, nearest first, and takes every spare good that buildings made within 4 cells into its
+stockpile, up to 100 goods in all, which counts as selling them. Food the land makes by itself
+only feeds its neighbours and never goes to a station.
 
 Chances are kept up to date as buildings come and go, and cells are drawn by thinning, so a
 month costs about as much as what grows in it.

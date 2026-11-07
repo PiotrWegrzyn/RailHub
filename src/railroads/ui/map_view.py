@@ -24,9 +24,20 @@ from railroads.sim.economy import Satisfaction
 from railroads.sim.geo import describe_lonlat
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, GridKind
 from railroads.sim.growth import Growth
+from railroads.sim.railway import Railway
+from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.tilemap import Terrain, Tile, TileMap
 from railroads.sim.track_rules import TrackBed, track_rules_for
 from railroads.ui.biomes import biome_of
+from railroads.ui.build_menu import (
+    BuildMenu,
+    Tool,
+    draw_route,
+    draw_station_reach,
+    draw_track,
+    draw_trains,
+    draw_trains_window,
+)
 from railroads.ui.buildings import BuildingSpots, draw_building_dots
 from railroads.ui.ground import GroundLayout, cell_colors
 from railroads.ui.hex_details import describe, draw_hex_details
@@ -34,6 +45,7 @@ from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS, IsoCamera, Vec2
 from railroads.ui.minimap import Minimap, MinimapLayout, view_corners
 from railroads.ui.pixel.layer import PixelLayer
 from railroads.ui.pixel.sheet import SpriteSheet
+from railroads.ui.pixel.train_layer import TrainLayer
 from railroads.ui.pixel.world import GLOW, PixelWorld, glow_strength
 
 BACKGROUND_COLOR = (0.08, 0.09, 0.11, 1.0)
@@ -136,10 +148,14 @@ class MapView:
         )
         self._layout: GroundLayout | None = None
         self._pixels: PixelLayer | None = None
+        self._trains: TrainLayer | None = None
         self._textures: dict[bool, hello_imgui.TextureGpu] = {}
         self._hovered: Cell | None = None
         # The cell whose details are open, picked by clicking without dragging.
         self.selected: Cell | None = None
+        self.build = BuildMenu()
+        self.railway = Railway(self.constructions)
+        self.growth.railway = self.railway
         self._dragged = 0.0
         self._over_minimap = False
         # Which minimap the current drag started on, if any.
@@ -150,6 +166,12 @@ class MapView:
         self._draw_toolbar()
         self._draw_map()
         self._draw_details()
+        self.build.draw()
+        draw_trains_window(self.railway)
+
+    def time_passed(self, months: float) -> None:
+        """Moves the trains on by this much of a month."""
+        self.railway.run(months)
 
     def _draw_details(self) -> None:
         if self.selected is None:
@@ -275,8 +297,25 @@ class MapView:
             self._pixel_layer().draw(draw_list, self.camera, center, (top_left, bottom_right))
         else:
             self._draw_smooth_map(draw_list, center, top_left, bottom_right)
+        if self.camera.pixel_scale:
+            self._train_layer().draw(draw_list, self.railway, self.camera, center)
+        else:
+            draw_track(draw_list, self.constructions, self.camera, center)
+            draw_trains(draw_list, self.railway, self.camera, center)
+        if self.build.preview is not None:
+            draw_route(draw_list, self.build.preview, self.constructions, self.camera, center)
+        if self.build.track_from is not None:
+            self._draw_outline(draw_list, center, self.build.track_from, SELECTED_COLOR)
         if self._hovered is not None:
             self._draw_outline(draw_list, center, self._hovered)
+            hovering_station = any(
+                isinstance(built, Station) for built in self.constructions.at(self._hovered)
+            )
+            if self.build.tool == Tool.STATION or hovering_station:
+                stations = self.railway.stations() if self.build.tool == Tool.STATION else []
+                draw_station_reach(
+                    draw_list, self.tile_map.grid, self._hovered, stations, self.camera, center
+                )
         if self.selected is not None:
             self._draw_outline(draw_list, center, self.selected, SELECTED_COLOR)
         self._draw_compass(draw_list, (bottom_right[0] - 36, top_left[1] + 36))
@@ -298,6 +337,11 @@ class MapView:
         if drawn_lines:
             self._draw_grid(draw_list, center, top_left, bottom_right)
         draw_building_dots(draw_list, self.camera, center, (top_left, bottom_right), self._spots)
+
+    def _train_layer(self) -> TrainLayer:
+        if self._trains is None:
+            self._trains = TrainLayer(self._pixel_layer().world)
+        return self._trains
 
     def _pixel_layer(self) -> PixelLayer:
         if self._pixels is None:
@@ -350,7 +394,56 @@ class MapView:
                 self._hovered = cell
         clicked = imgui.is_item_deactivated() and self._dragged < CLICK_SLOP
         if clicked and self._pressed_on is None and self._hovered is not None:
-            self.selected = None if self.selected == self._hovered else self._hovered
+            self._click(self._hovered)
+        if imgui.is_item_clicked(imgui.MouseButton_.right.value):
+            if self.build.tool != Tool.NONE:
+                self.build.choose(Tool.NONE)
+                self.build.message = "Building cancelled."
+            elif self._hovered is not None:
+                self.selected = None if self.selected == self._hovered else self._hovered
+        if _key_pressed(imgui.Key.escape):
+            self.build.stop()
+        self._update_preview()
+
+    def _click(self, cell: Cell) -> None:
+        build = self.build
+        match build.tool:
+            case Tool.NONE:
+                pass
+            case Tool.STATION:
+                changed = build_station(self.growth, cell)
+                build.message = "Station built." if changed else "A station can't go there."
+                if changed:
+                    self._buildings_changed(changed)
+            case Tool.TRACK:
+                if build.track_from is None:
+                    build.track_from = cell
+                    build.message = "Now click where the track goes."
+                    return
+                route = plan_route(self.constructions, build.track_from, cell)
+                if route is None:
+                    build.message = "No way for track to get there."
+                    return
+                self._buildings_changed(lay_route(self.growth, route))
+                build.message = f"Laid {len(route.pieces)} pieces of track."
+                build.track_from = cell
+                build.preview, build.preview_to = None, None
+
+    def _update_preview(self) -> None:
+        build = self.build
+        if build.tool != Tool.TRACK or build.track_from is None or self._hovered is None:
+            build.preview, build.preview_to = None, None
+            return
+        if self._hovered != build.preview_to:
+            build.preview_to = self._hovered
+            build.preview = plan_route(self.constructions, build.track_from, self._hovered)
+
+    def _buildings_changed(self, changed: set[Cell]) -> None:
+        """Shows buildings, track and stations that changed outside the monthly growth."""
+        self._spots = BuildingSpots.of(self.constructions)
+        self.minimap.show_towns(self._town_cells())
+        if self._pixels is not None:
+            self._pixels.refresh(self._pixels.world.buildings_changed(changed))
 
     def _draw_ground(
         self, draw_list: imgui.ImDrawList, center: Vec2, texture: hello_imgui.TextureGpu

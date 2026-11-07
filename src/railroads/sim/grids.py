@@ -76,6 +76,21 @@ class Grid(ABC):
     def neighbours(self, row: int, col: int) -> list[Cell]:
         """Cells that share an edge with this one."""
 
+    def within(self, cell: Cell, steps: int) -> dict[Cell, int]:
+        """Every cell at most `steps` steps from this one, cell to neighbouring cell, and how
+        many steps away it is."""
+        reached = {cell: 0}
+        edge = [cell]
+        for step in range(1, steps + 1):
+            nxt = []
+            for here in edge:
+                for near in self.neighbours(*here):
+                    if near not in reached:
+                        reached[near] = step
+                        nxt.append(near)
+            edge = nxt
+        return reached
+
     @abstractmethod
     def corners(self, row: int, col: int) -> list[tuple[float, float]]: ...
 

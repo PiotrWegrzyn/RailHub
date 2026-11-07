@@ -503,6 +503,25 @@ def _noise(rng: np.random.Generator, shape: tuple[int, ...], cells: int) -> np.n
     return top * (1 - fv) + bottom * fv
 
 
+BUILDING_SCALE = 0.7
+BUILDINGS = (
+    "house",
+    "tenement",
+    "flats",
+    "farm",
+    "orchard",
+    "factory",
+    "big_factory",
+    "mega_factory",
+    "skyscraper",
+    "food_plant",
+    "steel_mill",
+    "shipyard",
+    "mine",
+    "lumber_mill",
+    "port",
+)
+
 SPRITES: dict[str, Callable[[], Sprite]] = {
     **{f"pine_{i}": (lambda c=c: pine(c)) for i, c in enumerate(PINES)},
     **{f"leafy_{i}": (lambda c=c: leafy(c)) for i, c in enumerate(LEAVES)},
@@ -537,10 +556,24 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
 }
 
 
+def shrink(sprite: Sprite, factor: float) -> Sprite:
+    """A smaller copy of a sprite: each new pixel takes the colour of the old pixel under its
+    middle, so edges stay hard and colours stay the sprite's own."""
+    w, h = sprite.image.size
+    small = sprite.image.resize(
+        (max(1, round(w * factor)), max(1, round(h * factor))), Image.Resampling.NEAREST
+    )
+    ax, ay = sprite.anchor
+    return Sprite(small, (round(ax * factor), round(ay * factor)))
+
+
 def draw_sheet(padding: int = 1) -> tuple[Image.Image, dict[str, list[int]]]:
     """Every sprite packed in rows on one sheet, and where each sits: x, y, width, height and its
-    anchor inside it."""
-    sprites = {name: draw() for name, draw in SPRITES.items()}
+    anchor inside it. Buildings other than stations are drawn at BUILDING_SCALE."""
+    sprites = {
+        name: shrink(draw(), BUILDING_SCALE) if name.startswith(BUILDINGS) else draw()
+        for name, draw in SPRITES.items()
+    }
     width = 128
     x = y = row_height = 0
     places: dict[str, list[int]] = {}

@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from railroads.sim.geo import Coord
 
 # On-screen width in pixels of one cell at each zoom level. The furthest levels draw the map as
-# one smooth picture; from PIXEL_CELL_WIDTH on it is pixel art, shown 1, 2 or 3 times as big.
-ZOOM_CELL_WIDTHS = (4, 8, 16, 32, 64, 96)
+# one smooth picture; from PIXEL_CELL_WIDTH on it is pixel art, shown 1 to 4 times as big.
+ZOOM_CELL_WIDTHS = (4, 8, 16, 32, 64, 96, 128)
 PIXEL_CELL_WIDTH = 32
 # Screen y is squashed by this much to fake looking at the map from an angle.
 TILT = 0.5

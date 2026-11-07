@@ -8,13 +8,19 @@ left with the cells next to it, the hungriest first (unsatisfied cells weigh mor
 ones, content more than satisfied). Factories make only as much as their inputs allow, so goods
 are shared out in ORDER, raw goods before what is made from them.
 
+Stations stand in between (railroads.sim.railway): after neighbours have shared, a station hands
+what trains brought to buildings within DELIVERY_RADIUS cells, unsatisfied ones first, then
+content ones, nearest first, and takes every spare good buildings made within COLLECTION_RADIUS
+cells into its stockpile while it has room, which counts as giving them away. The food the land
+makes by itself only ever feeds its neighbours.
+
 A building is satisfied when it gets all it needs and gives away all it makes, content when it
 manages at least half, and unsatisfied below that. Satisfaction scales the chances of more
 buildings of its kind growing nearby (GROWTH_FACTORS).
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, IntEnum
 from types import MappingProxyType
 
@@ -22,7 +28,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.grids import Grid
+from railroads.sim.grids import Cell, Grid
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 
 FloatCells = npt.NDArray[np.float64]
@@ -43,6 +49,8 @@ class Satisfaction(IntEnum):
 
 
 ORDER = (Good.FOOD, Good.LUMBER, Good.COAL, Good.STEEL, Good.GOODS)
+DELIVERY_RADIUS = 2
+COLLECTION_RADIUS = 4
 CONTENT_SHARE = 0.5
 GROWTH_FACTORS = {
     Satisfaction.UNSATISFIED: 0.5,
@@ -156,6 +164,15 @@ class Neighbourhoods:
 
 
 @dataclass(frozen=True)
+class StationOrder:
+    """What one station brings to a month's trade: goods trains left there to hand out, and how
+    many more goods its stockpile can take in."""
+
+    brought: Mapping[Good, float]
+    room: float
+
+
+@dataclass(frozen=True)
 class Trade:
     """One month of sharing on the cells near buildings (`cells`, flat indices): per kind of
     building and cell, how much of its needs it got and how much of what it can make it gave
@@ -166,6 +183,9 @@ class Trade:
     needed: Mapping[BuildingKind, FloatCells]
     gave: Mapping[BuildingKind, FloatCells]
     could_make: Mapping[BuildingKind, FloatCells]
+    # Per station, the goods it handed out and the goods it gathered.
+    handed: Mapping[Cell, Mapping[Good, float]] = field(default_factory=dict)
+    gathered: Mapping[Cell, Mapping[Good, float]] = field(default_factory=dict)
 
     def done(self, kinds: tuple[BuildingKind, ...]) -> FloatCells:
         return sum(
@@ -201,8 +221,14 @@ class Economy:
         # The cells near buildings that trade, as a mask.
         self.active = np.zeros(self.cells, dtype=bool)
 
-    def trade(self, counts: Mapping[BuildingKind, npt.NDArray[np.int64]]) -> Trade:
-        """Shares out one month of goods between the buildings counted in each cell."""
+    def trade(
+        self,
+        counts: Mapping[BuildingKind, npt.NDArray[np.int64]],
+        stations: Mapping[Cell, StationOrder] | None = None,
+    ) -> Trade:
+        """Shares out one month of goods between the buildings counted in each cell, and with
+        the stations."""
+        stations = stations or {}
         flat = {k: counts[k].ravel() for k in self.kinds if k in counts}
         built = np.zeros(self.cells, dtype=bool)
         for n in flat.values():
@@ -219,6 +245,17 @@ class Economy:
         gave = {k: zero.copy() for k in count}
         could_make = {k: zero.copy() for k in count}
         input_share = {k: np.ones(cells.size) for k in count}
+        handed: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
+        gathered: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
+        room = {station: order.room for station, order in stations.items()}
+        reach = {
+            station: (
+                self._around(station, cells, DELIVERY_RADIUS),
+                self._around(station, cells, COLLECTION_RADIUS),
+            )
+            for station in stations
+        }
+        priority = self.levels[cells]
         for good in ORDER:
             want = {k: n * NEEDS[k][good] for k, n in count.items() if good in NEEDS.get(k, {})}
             make = {
@@ -227,10 +264,22 @@ class Economy:
                 if good in MAKES.get(k, {})
             }
             supply = sum(make.values(), start=zero.copy())
+            made = supply.copy()
             if good == Good.FOOD:
                 supply = supply + self.free_food[cells]
             demand = sum(want.values(), start=zero.copy())
             received, sold = self._share(supply, demand, weights)
+            for station, order in stations.items():
+                near, far = reach[station]
+                brought = order.brought.get(good, 0.0)
+                if brought > 0:
+                    handed[station][good] = self._hand_out(
+                        brought, near, demand, received, priority
+                    )
+                taken = self._gather(room[station], far, supply, made, sold)
+                if taken > 0:
+                    gathered[station][good] = taken
+                    room[station] -= taken
             met = received / np.where(demand > 0, demand, 1.0)
             given = sold / np.where(supply > 0, supply, 1.0)
             for kind, amount in want.items():
@@ -243,10 +292,68 @@ class Economy:
             for kind, amount in make.items():
                 gave[kind] += given * amount
                 could_make[kind] += count[kind] * MAKES[kind][good]
-        trade = Trade(cells, got, needed, gave, could_make)
+        trade = Trade(cells, got, needed, gave, could_make, handed, gathered)
         self.levels[:] = Satisfaction.UNSATISFIED
         self.levels[cells] = trade.levels()
         return trade
+
+    def _around(
+        self, station: Cell, cells: npt.NDArray[np.intp], radius: float
+    ) -> tuple[npt.NDArray[np.intp], FloatCells]:
+        """The traded cells within `radius` steps of a station, as positions among `cells`,
+        nearest first, and how many steps away each is."""
+        grid = self.tile_map.grid
+        reached = grid.within(station, int(radius))
+        flat = np.array([np.ravel_multi_index(c, grid.shape) for c in reached], dtype=np.intp)
+        steps = np.array(list(reached.values()), dtype=np.float64)
+        positions = np.searchsorted(cells, flat)
+        found = (positions < cells.size) & (cells[np.minimum(positions, cells.size - 1)] == flat)
+        positions, steps = positions[found], steps[found]
+        order = np.argsort(steps, kind="stable")
+        return positions[order], steps[order]
+
+    @staticmethod
+    def _hand_out(
+        amount: float,
+        near: tuple[npt.NDArray[np.intp], FloatCells],
+        demand: FloatCells,
+        received: FloatCells,
+        priority: npt.NDArray[np.int8],
+    ) -> float:
+        """Hands goods out to the cells still short of them, the least satisfied first and then
+        the nearest; returns how much went."""
+        positions, _ = near
+        order = positions[np.argsort(priority[positions], kind="stable")]
+        left = amount
+        for position in order.tolist():
+            if left <= 0:
+                break
+            give = min(left, demand[position] - received[position])
+            if give > 0:
+                received[position] += give
+                left -= give
+        return amount - left
+
+    @staticmethod
+    def _gather(
+        room: float,
+        far: tuple[npt.NDArray[np.intp], FloatCells],
+        supply: FloatCells,
+        made: FloatCells,
+        sold: FloatCells,
+    ) -> float:
+        """Takes spare goods that buildings made from the cells around, evenly, up to the room
+        left; returns how much was taken. Food the land makes by itself feeds its neighbours
+        first and is never taken."""
+        positions, _ = far
+        spare = np.maximum(supply[positions] - sold[positions], 0.0)
+        spare = np.minimum(spare, made[positions])
+        total = float(spare.sum())
+        if total <= 0 or room <= 0:
+            return 0.0
+        take = min(room, total)
+        sold[positions] += spare * (take / total)
+        return take
 
     def _share(
         self, supply: FloatCells, demand: FloatCells, weights: FloatCells

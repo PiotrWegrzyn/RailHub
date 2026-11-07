@@ -31,7 +31,11 @@ class App:
         self.rng = np.random.default_rng() if rng is None else rng
 
     def gui(self) -> None:
-        for _ in range(self.clock.advance(imgui.get_io().delta_time)):
+        seconds = imgui.get_io().delta_time
+        months = 0.0 if self.clock.finished else seconds / self.clock.seconds_per_month
+        for view in self.views.values():
+            view.time_passed(months)
+        for _ in range(self.clock.advance(seconds)):
             for view in self.views.values():
                 view.month_passed(self.rng)
         heading = f"{self.title}   {self.clock.date}" if self.title else self.clock.date
