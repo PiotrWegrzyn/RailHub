@@ -14,6 +14,7 @@ import math
 from dataclasses import dataclass
 
 from railroads.sim.constructions import MAX_TURN_DEG, Building, Constructions, Station, Track
+from railroads.sim.finance import TRACK_PRICE
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.tilemap import Relief, Terrain
@@ -112,6 +113,16 @@ def plan_route(constructions: Constructions, start: Cell, end: Cell) -> Route | 
                     frontier, (total + math.dist((nx, ny), (ex, ey)), next(counter), nxt, nxt_entry)
                 )
     return None
+
+
+def route_price(constructions: Constructions, route: Route) -> float:
+    """What laying the route costs: TRACK_PRICE times the price factor of each new piece."""
+    tile_map = constructions.tile_map
+    return sum(
+        TRACK_PRICE * track_rules_for(tile_map.tile(piece.cell), piece.bed).price_factor
+        for piece in route.pieces
+        if piece not in constructions.at(piece.cell)
+    )
 
 
 def lay_route(growth: Growth, route: Route) -> set[Cell]:

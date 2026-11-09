@@ -2,16 +2,18 @@ import argparse
 import random
 
 import numpy as np
+from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui, immapp
 
 from railroads import maps
 from railroads.mapgen.seeding import seed_buildings
 from railroads.newgame import start_new_game
-from railroads.sim.clock import GameClock
+from railroads.sim.clock import MAX_PLAY_SPEED, SPEEDS, GameClock
 from railroads.sim.grids import GridKind
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
 from railroads.sim.tilemap import TileMap
 from railroads.ui.map_view import MapView
+from railroads.ui.theme import BRASS, apply_theme, toggle_button
 
 GRID_CHOICES: dict[GridKind, str] = {"hex": "Hexagons", "square": "Squares"}
 
@@ -29,22 +31,50 @@ class App:
         self.title = title
         self.clock = GameClock()
         self.rng = np.random.default_rng() if rng is None else rng
+        self._styled = False
 
     def gui(self) -> None:
+        if not self._styled:
+            apply_theme()
+            self._styled = True
         seconds = imgui.get_io().delta_time
-        months = 0.0 if self.clock.finished else seconds / self.clock.seconds_per_month
+        months = self.clock.months_in(seconds)
         for view in self.views.values():
             view.time_passed(months)
-        for _ in range(self.clock.advance(seconds)):
+        first = self.clock.months
+        for month in range(first + 1, first + 1 + self.clock.advance(seconds)):
             for view in self.views.values():
-                view.month_passed(self.rng)
-        heading = f"{self.title}   {self.clock.date}" if self.title else self.clock.date
-        imgui.text(f"{heading}   Cells:")
-        for kind, label in GRID_CHOICES.items():
-            imgui.same_line()
-            if imgui.radio_button(label, self.shown == kind):
-                self.shown = kind
+                view.month_passed(self.rng, self.clock.date_of(month))
+        self._draw_top_bar()
         self.views[self.shown].gui()
+
+    def _draw_top_bar(self) -> None:
+        imgui.align_text_to_frame_padding()
+        imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_CLOCK}  {self.clock.date}")
+        imgui.same_line(0, 16)
+        self.views[self.shown].draw_money()
+        imgui.same_line(0, 16)
+        for speed in SPEEDS:
+            testing = speed > MAX_PLAY_SPEED
+            tooltip = f"Run {speed} times as fast" + (" (for testing)" if testing else "")
+            if testing:
+                imgui.push_style_var(imgui.StyleVar_.alpha.value, 0.6)
+            if toggle_button(f"x{speed}", self.clock.speed == speed, tooltip):
+                self.clock.speed = speed
+            if testing:
+                imgui.pop_style_var()
+            imgui.same_line(0, 2)
+        imgui.same_line(0, 16)
+        for kind, label in GRID_CHOICES.items():
+            if toggle_button(label, self.shown == kind, f"Show the map in {label.lower()}"):
+                self.shown = kind
+            imgui.same_line(0, 2)
+        imgui.same_line(0, 16)
+        self.views[self.shown].draw_controls()
+        if self.title:
+            imgui.same_line(0, 16)
+            imgui.align_text_to_frame_padding()
+            imgui.text_disabled(self.title)
 
 
 def main() -> None:

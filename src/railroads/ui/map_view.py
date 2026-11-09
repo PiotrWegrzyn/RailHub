@@ -10,6 +10,7 @@ from typing import Literal
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
+from imgui_bundle import icons_fontawesome_4 as fa
 
 from railroads import maps
 from railroads.mapgen.world import WorldLand
@@ -21,11 +22,13 @@ from railroads.sim.constructions import (
     Track,
 )
 from railroads.sim.economy import Satisfaction
+from railroads.sim.finance import STATION_PRICE, TRACK_PRICE, dollars
 from railroads.sim.geo import describe_lonlat
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, GridKind
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
-from railroads.sim.routes import build_station, lay_route, plan_route
+from railroads.sim.routes import build_station, lay_route, plan_route, route_price
+from railroads.sim.summaries import Reach, snapshot, summarize
 from railroads.sim.tilemap import Terrain, Tile, TileMap
 from railroads.sim.track_rules import TrackBed, track_rules_for
 from railroads.ui.biomes import biome_of
@@ -36,7 +39,6 @@ from railroads.ui.build_menu import (
     draw_station_reach,
     draw_track,
     draw_trains,
-    draw_trains_window,
 )
 from railroads.ui.buildings import BuildingSpots, draw_building_dots
 from railroads.ui.ground import GroundLayout, cell_colors
@@ -47,6 +49,8 @@ from railroads.ui.pixel.layer import PixelLayer
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.train_layer import TrainLayer
 from railroads.ui.pixel.world import GLOW, PixelWorld, glow_strength
+from railroads.ui.summaries_panel import SummariesPanel
+from railroads.ui.theme import BRASS, GONE, GROWN, OVERLAY, TEXT, color_u32, toggle_button
 
 BACKGROUND_COLOR = (0.08, 0.09, 0.11, 1.0)
 GRID_COLOR = (0.0, 0.0, 0.0, 0.25)
@@ -54,7 +58,9 @@ HOVER_COLOR = (1.0, 1.0, 1.0, 0.9)
 SELECTED_COLOR = (1.0, 0.85, 0.2, 1.0)
 # A press that moves the mouse less than this many pixels is a click, not a drag.
 CLICK_SLOP = 4.0
-DETAILS_POS = (12.0, 90.0)
+DETAILS_POS = (16.0, 96.0)
+STATUS_MARGIN = 10.0
+STATUS_PADDING = 10.0
 DETAILS_SIZE = (560.0, 320.0)
 COMPASS_COLOR = (1.0, 1.0, 1.0, 0.85)
 # Slopes are lit from the top-left of the screen.
@@ -99,7 +105,8 @@ def _track_note(tile: Tile) -> str:
     for bed, track in TRACK_ON.items():
         rules = track_rules_for(tile, bed)
         if rules.can_build:
-            return f"{track} costs x{rules.cost_factor:g}, trains at {rules.speed_factor:.0%} speed"
+            price = dollars(TRACK_PRICE * rules.price_factor)
+            return f"{track} costs {price}, trains at {rules.speed_factor:.0%} speed"
     return "no track"
 
 
@@ -161,13 +168,23 @@ class MapView:
         # Which minimap the current drag started on, if any.
         self._pressed_on: Literal["world", "overview"] | None = None
         self._wheel = 0.0
+        self._map_rect: tuple[Vec2, Vec2] = ((0.0, 0.0), (0.0, 0.0))
+        self.summaries = SummariesPanel()
+        self._reach = Reach(self.tile_map.grid)
 
     def gui(self) -> None:
-        self._draw_toolbar()
+        self._handle_keys()
         self._draw_map()
         self._draw_details()
-        self.build.draw()
-        draw_trains_window(self.railway)
+        self.build.draw(*self._map_rect)
+        self.build.trains.draw(self.railway)
+        self.build.stations.draw(self.railway, self.look_at)
+        self.summaries.draw(*self._map_rect, self.look_at)
+
+    def look_at(self, cell: Cell) -> None:
+        """Centres the view on a cell."""
+        x, y = self.tile_map.grid.center(*cell)
+        self.camera.center_x, self.camera.center_y = float(x), float(y)
 
     def time_passed(self, months: float) -> None:
         """Moves the trains on by this much of a month."""
@@ -185,9 +202,14 @@ class MapView:
         if not still_open:
             self.selected = None
 
-    def month_passed(self, rng: np.random.Generator) -> None:
-        """Grows the towns by a month and shows what changed."""
+    def month_passed(self, rng: np.random.Generator, date: str = "") -> None:
+        """Grows the towns by a month, shows what changed, and sums up what changed within
+        reach of the stations."""
+        reach = self._reach.of(self.railway.stations())
+        before = snapshot(self.growth, reach)
         changed = self.growth.month(rng)
+        if (summary := summarize(date, self.growth, reach, before)) is not None:
+            self.summaries.add(summary)
         satisfaction = self.growth.satisfaction()
         moods_changed = not np.array_equal(satisfaction, self._satisfaction)
         self._satisfaction = satisfaction
@@ -207,22 +229,78 @@ class MapView:
         town = self.growth.points() >= MINIMAP_TOWN_POINTS
         return [(int(row), int(col)) for row, col in np.argwhere(town)]
 
-    def _draw_toolbar(self) -> None:
-        if imgui.button(" - ") or _key_pressed(imgui.Key.minus, imgui.Key.keypad_subtract):
+    def draw_money(self) -> None:
+        """The cash, on the current line, with this month's and last month's books on hover."""
+        finances = self.railway.finances
+        imgui.align_text_to_frame_padding()
+        color = BRASS if finances.cash >= 0 else GONE
+        imgui.text_colored(
+            imgui.ImVec4(*color), f"{fa.ICON_FA_MONEY_BILL}  {dollars(finances.cash)}"
+        )
+        if imgui.is_item_hovered():
+            imgui.begin_tooltip()
+            for title, books in (
+                ("This month", finances.month),
+                ("Last month", finances.last_month),
+            ):
+                imgui.text(f"{title}: {dollars(sum(books.values()))}")
+                for what, amount in sorted(books.items(), key=lambda item: -item[1]):
+                    imgui.text_colored(
+                        imgui.ImVec4(*(GROWN if amount >= 0 else GONE)), f"   {dollars(amount)}"
+                    )
+                    imgui.same_line()
+                    imgui.text_disabled(what)
+            imgui.end_tooltip()
+
+    def draw_controls(self) -> None:
+        """The view's buttons, on the current line: zoom, and the two minimaps."""
+        if imgui.button(f"{fa.ICON_FA_SEARCH_MINUS}"):
             self.camera.zoom(-1, (0, 0), (0, 0))
-        imgui.same_line()
-        if imgui.button(" + ") or _key_pressed(imgui.Key.equal, imgui.Key.keypad_add):
+        if imgui.is_item_hovered():
+            imgui.set_tooltip("Zoom out (-)")
+        imgui.same_line(0, 4)
+        if imgui.button(f"{fa.ICON_FA_SEARCH_PLUS}"):
             self.camera.zoom(1, (0, 0), (0, 0))
+        if imgui.is_item_hovered():
+            imgui.set_tooltip("Zoom in (+)")
         imgui.same_line()
-        _, self.minimap.shown = imgui.checkbox("Minimap (M)", self.minimap.shown)
+        if toggle_button(f"{fa.ICON_FA_MAP}", self.minimap.shown, "Map overview (M)"):
+            self.minimap.shown = not self.minimap.shown
+        imgui.same_line(0, 4)
+        if toggle_button(f"{fa.ICON_FA_GLOBE}", self.minimap.world_shown, "World map (W)"):
+            self.minimap.world_shown = not self.minimap.world_shown
+
+    def _handle_keys(self) -> None:
+        if imgui.get_io().want_text_input:
+            return
+        if _key_pressed(imgui.Key.minus, imgui.Key.keypad_subtract):
+            self.camera.zoom(-1, (0, 0), (0, 0))
+        if _key_pressed(imgui.Key.equal, imgui.Key.keypad_add):
+            self.camera.zoom(1, (0, 0), (0, 0))
         if _key_pressed(imgui.Key.m):
             self.minimap.shown = not self.minimap.shown
-        imgui.same_line()
-        _, self.minimap.world_shown = imgui.checkbox("World (W)", self.minimap.world_shown)
         if _key_pressed(imgui.Key.w):
             self.minimap.world_shown = not self.minimap.world_shown
-        imgui.same_line()
-        imgui.text(self._status())
+        for key, tool in ((imgui.Key._1, Tool.STATION), (imgui.Key._2, Tool.TRACK)):
+            if _key_pressed(key):
+                self.build.choose(Tool.NONE if self.build.tool == tool else tool)
+        if _key_pressed(imgui.Key.t):
+            self.build.trains.open = not self.build.trains.open
+        if _key_pressed(imgui.Key.s):
+            self.build.stations.open = not self.build.stations.open
+
+    def _draw_status(self, draw_list: imgui.ImDrawList, top_left: Vec2, bottom_right: Vec2) -> None:
+        """What is under the mouse, in a strip along the top of the map."""
+        text = self._status()
+        size = imgui.calc_text_size(text)
+        x, y = top_left[0] + STATUS_MARGIN, top_left[1] + STATUS_MARGIN
+        right = min(x + size.x + 2 * STATUS_PADDING, bottom_right[0] - 80)
+        draw_list.add_rect_filled(
+            (x, y), (right, y + size.y + 2 * STATUS_PADDING * 0.6), color_u32(OVERLAY), 6.0
+        )
+        draw_list.push_clip_rect((x, y), (right - STATUS_PADDING / 2, bottom_right[1]), True)
+        draw_list.add_text((x + STATUS_PADDING, y + STATUS_PADDING * 0.6), color_u32(TEXT), text)
+        draw_list.pop_clip_rect()
 
     def _status(self) -> str:
         zoom = f"Zoom {self.camera.zoom_level + 1}/{len(ZOOM_CELL_WIDTHS)}"
@@ -280,6 +358,7 @@ class MapView:
         center = (origin.x + size.x / 2, origin.y + size.y / 2)
         top_left = (origin.x, origin.y)
         bottom_right = (origin.x + size.x, origin.y + size.y)
+        self._map_rect = (top_left, bottom_right)
         map_size = self._ground_layout().size
         shown, world_shown = self.minimap.shown, self.minimap.world_shown
         minimap = (
@@ -318,7 +397,10 @@ class MapView:
                 )
         if self.selected is not None:
             self._draw_outline(draw_list, center, self.selected, SELECTED_COLOR)
+        for cell in self.summaries.outlined():
+            self._draw_outline(draw_list, center, cell, BRASS)
         self._draw_compass(draw_list, (bottom_right[0] - 36, top_left[1] + 36))
+        self._draw_status(draw_list, top_left, bottom_right)
         if minimap is not None:
             corners = view_corners(self.camera, center, top_left, bottom_right)
             ground = imgui.ImTextureRef(self._ground_texture(False).texture_id())
@@ -398,7 +480,7 @@ class MapView:
         if imgui.is_item_clicked(imgui.MouseButton_.right.value):
             if self.build.tool != Tool.NONE:
                 self.build.choose(Tool.NONE)
-                self.build.message = "Building cancelled."
+                self.build.say("Building cancelled.")
             elif self._hovered is not None:
                 self.selected = None if self.selected == self._hovered else self._hovered
         if _key_pressed(imgui.Key.escape):
@@ -411,21 +493,41 @@ class MapView:
             case Tool.NONE:
                 pass
             case Tool.STATION:
+                finances = self.railway.finances
+                if not finances.can_afford(STATION_PRICE):
+                    build.say(
+                        f"A station costs {dollars(STATION_PRICE)}; you have {dollars(finances.cash)}."
+                    )
+                    return
                 changed = build_station(self.growth, cell)
-                build.message = "Station built." if changed else "A station can't go there."
+                build.say(
+                    f"Station built for {dollars(STATION_PRICE)}."
+                    if changed
+                    else "A station can't go there."
+                )
                 if changed:
+                    finances.spend(STATION_PRICE, "stations")
+                    self.growth.measure_demand(cell)
                     self._buildings_changed(changed)
             case Tool.TRACK:
                 if build.track_from is None:
                     build.track_from = cell
-                    build.message = "Now click where the track goes."
+                    build.say("Now click where the track goes.")
                     return
                 route = plan_route(self.constructions, build.track_from, cell)
                 if route is None:
-                    build.message = "No way for track to get there."
+                    build.say("No way for track to get there.")
+                    return
+                price = route_price(self.constructions, route)
+                finances = self.railway.finances
+                if not finances.can_afford(price):
+                    build.say(
+                        f"This track costs {dollars(price)}; you have {dollars(finances.cash)}."
+                    )
                     return
                 self._buildings_changed(lay_route(self.growth, route))
-                build.message = f"Laid {len(route.pieces)} pieces of track."
+                finances.spend(price, "track")
+                build.say(f"Laid {len(route.pieces)} pieces of track for {dollars(price)}.")
                 build.track_from = cell
                 build.preview, build.preview_to = None, None
 
@@ -437,6 +539,9 @@ class MapView:
         if self._hovered != build.preview_to:
             build.preview_to = self._hovered
             build.preview = plan_route(self.constructions, build.track_from, self._hovered)
+            build.preview_price = (
+                None if build.preview is None else route_price(self.constructions, build.preview)
+            )
 
     def _buildings_changed(self, changed: set[Cell]) -> None:
         """Shows buildings, track and stations that changed outside the monthly growth."""

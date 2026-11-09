@@ -1,8 +1,10 @@
 import numpy as np
 import pytest
 
-from railroads.sim.constructions import Building, BuildingKind, Constructions
+from railroads.sim.constructions import Building, BuildingKind, Constructions, Track
+from railroads.sim.demand import CARGO_PRICE
 from railroads.sim.economy import Economy, Good, StationOrder
+from railroads.sim.finance import STATION_UPKEEP, TRACK_UPKEEP, TRAIN_PRICE
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth, GrowthRule
@@ -15,7 +17,7 @@ from railroads.sim.railway import (
     Railway,
     Stop,
 )
-from railroads.sim.routes import build_station, lay_route, plan_route
+from railroads.sim.routes import build_station, lay_route, plan_route, route_price
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 
 
@@ -275,3 +277,75 @@ def test_a_train_called_back_on_its_first_trip_keeps_what_it_loaded() -> None:
     assert running
     assert [car.load for car in train.cars] == [CAR_CAPACITY] * (MAX_CARS - 1)
     assert railway.station_goods((6, 3)).stockpile[Good.FOOD] == pytest.approx(10.0)
+
+
+def test_a_train_costs_five_thousand_and_sells_for_half() -> None:
+    _, railway = joined_stations()
+    cash = railway.finances.cash
+
+    train = railway.buy()
+    assert train is not None
+    after_buying = railway.finances.cash
+    railway.sell(train)
+
+    assert after_buying == cash - TRAIN_PRICE
+    assert railway.finances.cash == cash - TRAIN_PRICE / 2
+
+
+def test_without_the_cash_no_train_is_bought() -> None:
+    _, railway = joined_stations()
+    railway.finances.cash = TRAIN_PRICE - 1
+
+    train = railway.buy()
+
+    assert train is None
+    assert railway.trains == []
+
+
+def test_unloading_cargo_earns_money_by_the_demand_at_the_station() -> None:
+    _, railway = joined_stations()
+    railway.station_goods((6, 3)).stockpile[Good.FOOD] = 10.0
+    railway.station_demand((6, 20)).capacity = {Good.FOOD: 200.0}
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3), [Good.FOOD]), Stop((6, 20))]
+    cash = railway.finances.cash
+
+    railway.run(0.01)
+    railway.run(25 / CELLS_PER_MONTH)
+
+    assert railway.finances.month["cargo"] == pytest.approx(railway.finances.cash - cash)
+    assert 0.95 * 10 * CARGO_PRICE < railway.finances.month["cargo"] <= 10 * CARGO_PRICE
+
+
+def test_each_month_stations_and_track_cost_their_upkeep() -> None:
+    growth, railway = joined_stations()
+    track = {built.cell for built in growth.constructions if isinstance(built, Track)}
+    cash = railway.finances.cash
+
+    railway.turn_month({}, {})
+
+    assert railway.finances.cash == cash - 2 * STATION_UPKEEP - len(track) * TRACK_UPKEEP
+
+
+def test_station_demand_is_twice_the_needs_of_buildings_in_its_inner_ring() -> None:
+    growth, railway = joined_stations()
+    for cell in [(6, 21), (6, 21), (5, 20), (6, 25)]:
+        growth.constructions.build(Building(cell, BuildingKind.HOUSE))
+        growth._counts[BuildingKind.HOUSE][cell] += 1
+
+    growth.trade_goods()
+
+    demand = railway.station_demand((6, 20))
+    assert demand.capacity == {Good.FOOD: 6.0}
+    assert demand.used[Good.FOOD][-1] == pytest.approx(3.0)
+
+
+def test_a_route_costs_a_hundred_a_cell_on_the_flat() -> None:
+    constructions = Constructions(make_map())
+    route = plan_route(constructions, (6, 3), (6, 8))
+    assert route is not None
+
+    price = route_price(constructions, route)
+
+    assert price == 100 * len(route.pieces)

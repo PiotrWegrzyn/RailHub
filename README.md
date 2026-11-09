@@ -197,7 +197,25 @@ after 100 years of growth, one per 3,000 land cells beside the bigger groups of 
 
 ### Building and trains
 
-The Build window chooses what a left click builds: a station (what stands in the cell moves to a
+A game starts with $100,000 (`railroads.sim.finance`). Track costs $100 a cell on the flat, $150
+in hills, $10,000 a cell of bridge and $20,000 a cell of tunnel; a station $15,000 and a steam
+engine $5,000, which sells back for half. Every month each station costs $100 in upkeep and each
+cell of track $1. Building needs the cash for it, but upkeep is charged anyway and can run into
+debt. The top bar shows the cash, with this month's and last month's books on hover, and the
+build bar shows what the track under the mouse would cost. Route planning still weighs hills,
+bridges and tunnels lightly, so it stays quick; click a point in between to steer track round a
+river.
+
+Cargo earns money where it is unloaded, by the demand around the station
+(`railroads.sim.demand`). Each month a station's capacity for a good is twice what the buildings
+within 2 cells need of it. What they use up is what they consumed from anywhere, the land, their
+neighbours or the station, plus every unit trains unloaded there; the demand left is the capacity
+less that use averaged over the last 3 months. Each unit unloaded earns $20 times the share of
+demand left as it arrives and uses up demand itself, so a town nobody feeds pays the full $20 a
+unit, a town that feeds itself pays half, and a flood of cargo drives the price down for up to
+three months. The Stations window shows the share of demand left for each good.
+
+The build bar along the bottom of the map chooses what a left click builds (keys 1 and 2): a station (what stands in the cell moves to a
 cell next to it, or the lowest building comes down when nothing can move), or track. For track,
 click where it starts and then where it goes; `railroads.sim.routes` plans the cheapest way that
 turns at most 60 degrees per cell, through edges or corners, bridging rivers and lakes and
@@ -208,11 +226,15 @@ line round the cells it gathers from (4 steps). A right click cancels whatever i
 with nothing being built it opens the details of a cell: its land, points, and every building
 with what it makes and needs and what it got and gave last month.
 
-The Trains window buys a steam engine and sets its stops from the stations. Each stop has its own
+The bar also opens the Trains window (T) and the Stations window (S). The Trains window lists
+the trains on the left and shows the chosen one on the right: what it pulls, each car filled by
+its load, and its route as a table of stops. It buys a steam engine and sets its stops from the
+stations. Each stop has its own
 cars, up to 6, which the train pulls when it leaves that stop for the next, so the way out and the
 way back can carry different goods; each car is for one good and holds 10 of it, so a food car
 carries only food. A new train starts at its first stop. The window shows what the train pulls
-now, and every station's stockpile and the goods waiting to be handed out there. Trains
+now. The Stations window shows every station's stockpile and the goods waiting to be handed out
+there, with a button to look at the station. Trains
 (`railroads.sim.railway`) run along the track at 60 cells a month on the flat, slower on hills,
 and each car slows them: an empty car weighs 1, a full one 2, and every unit of weight costs 8%
 of the engine's speed, so six full cars still run at about half of it. On the pixel map
@@ -231,6 +253,16 @@ stops. Once a month each station hands what trains brought to buildings within 2
 first, then content, nearest first, and takes every spare good that buildings made within 4 cells
 into its stockpile, up to 100 goods in all, which counts as selling them. Food the land makes by
 itself only feeds its neighbours and never goes to a station.
+
+Buildings grow as each month turns over. Whenever that changes something within reach of a
+station (4 cells), a card for the month appears along the right edge of the map
+(`railroads.sim.summaries`): how many buildings went up and came down near how many stations.
+Clicking a card opens what changed, station by station, and outlines those cells on the map;
+a right click dismisses it. The newest five cards show.
+
+The top bar shows the date and runs the game at x1, x2, x3 or x6 speed; x12 and x24 are there
+for testing. It also switches between hexagons and squares, zooms, and toggles the map overview
+(M) and the world map (W). What is under the mouse shows in a strip at the top of the map.
 
 Chances are kept up to date as buildings come and go, and cells are drawn by thinning, so a
 month costs about as much as what grows in it.

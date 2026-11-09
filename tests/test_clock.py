@@ -40,3 +40,12 @@ def test_a_whole_game_lasts_a_hundred_hours_at_normal_speed() -> None:
     hours = clock.months_left * SECONDS_PER_MONTH / 3600
 
     assert hours == pytest.approx(100)
+
+
+def test_at_six_times_speed_a_month_takes_a_sixth_of_its_seconds() -> None:
+    clock = GameClock(speed=6)
+
+    turned = clock.advance(SECONDS_PER_MONTH / 6)
+
+    assert turned == 1
+    assert clock.months_in(SECONDS_PER_MONTH) == 6.0

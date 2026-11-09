@@ -7,15 +7,27 @@ stop's cars and fills those from the station's stockpile. Stations deal with the
 are shared out (railroads.sim.economy): they hand what trains brought to buildings within
 DELIVERY_RADIUS cells, and take every spare good made within COLLECTION_RADIUS cells into their
 stockpile, up to STOCKPILE goods in all.
+
+Cargo unloaded at a station earns money by the demand around it (railroads.sim.demand). Trains
+cost TRAIN_PRICE, and every month stations and track cost their upkeep (railroads.sim.finance).
 """
 
 import heapq
 import itertools
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from railroads.sim.constructions import Constructions, Station, Track
+from railroads.sim.demand import StationDemand
 from railroads.sim.economy import Good
+from railroads.sim.finance import (
+    STATION_UPKEEP,
+    TRACK_UPKEEP,
+    TRAIN_PRICE,
+    TRAIN_RESALE,
+    Finances,
+)
 from railroads.sim.grids import Cell
 from railroads.sim.track_rules import track_rules_for
 
@@ -141,25 +153,51 @@ class StationGoods:
 class Railway:
     """The trains on one map, and the goods held at its stations."""
 
-    def __init__(self, constructions: Constructions) -> None:
+    def __init__(self, constructions: Constructions, finances: Finances | None = None) -> None:
         self.constructions = constructions
+        self.finances = Finances() if finances is None else finances
         self.trains: list[Train] = []
         self.goods: dict[Cell, StationGoods] = {}
+        self.demand: dict[Cell, StationDemand] = {}
         self._names = itertools.count(1)
 
     def stations(self) -> list[Cell]:
         return sorted(built.cell for built in self.constructions if isinstance(built, Station))
 
-    def buy(self) -> Train:
+    def buy(self) -> Train | None:
+        """Buys a train for TRAIN_PRICE; None without the cash for it."""
+        if not self.finances.can_afford(TRAIN_PRICE):
+            return None
+        self.finances.spend(TRAIN_PRICE, "trains")
         train = Train(f"{TRAIN_COST_NAME} {next(self._names)}")
         self.trains.append(train)
         return train
 
     def sell(self, train: Train) -> None:
         self.trains.remove(train)
+        self.finances.earn(TRAIN_PRICE * TRAIN_RESALE, "trains")
 
     def station_goods(self, station: Cell) -> StationGoods:
         return self.goods.setdefault(station, StationGoods())
+
+    def station_demand(self, station: Cell) -> StationDemand:
+        return self.demand.setdefault(station, StationDemand())
+
+    def turn_month(
+        self,
+        capacity: Mapping[Cell, Mapping[Good, float]],
+        consumed: Mapping[Cell, Mapping[Good, float]],
+    ) -> None:
+        """Starts a new month: each station's demand for it, from its capacity and what the
+        buildings around it consumed from elsewhere, and the upkeep of stations and track."""
+        for station in self.stations():
+            self.station_demand(station).turn_month(
+                capacity.get(station, {}), consumed.get(station, {})
+            )
+        self.finances.close_month()
+        track = {built.cell for built in self.constructions if isinstance(built, Track)}
+        self.finances.spend(STATION_UPKEEP * len(self.stations()), "station upkeep")
+        self.finances.spend(TRACK_UPKEEP * len(track), "track upkeep")
 
     def run(self, months: float) -> None:
         """Moves every train on by this many months."""
@@ -282,9 +320,11 @@ class Railway:
         if train.loaded_at == stop.cell:
             train.cars = self._swap_cars(train.cars, stop.cars, goods)
         else:
+            demand = self.station_demand(stop.cell)
             for car in train.cars:
                 if car.load > 0:
                     goods.brought[car.good] = goods.brought.get(car.good, 0.0) + car.load
+                    self.finances.earn(demand.deliver(car.good, car.load), "cargo")
             train.cars = [Car(good) for good in stop.cars]
         train.loaded_at = stop.cell
         self._load(train, stop)

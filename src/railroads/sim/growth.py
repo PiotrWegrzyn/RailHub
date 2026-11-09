@@ -45,8 +45,12 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import CELL_SPACE, Building, BuildingKind, Constructions
+from railroads.sim.demand import capacity_of
 from railroads.sim.economy import (
+    DELIVERY_RADIUS,
+    NEEDS,
     Economy,
+    Good,
     Neighbourhoods,
     StationOrder,
     Trade,
@@ -537,6 +541,51 @@ class Growth:
             goods = self.railway.station_goods(station)
             for good, amount in gathered.items():
                 goods.stockpile[good] = goods.stockpile.get(good, 0.0) + amount
+        capacity, consumed = {}, {}
+        for station in self.railway.stations():
+            ring = self._inner_ring(station)
+            capacity[station] = capacity_of(self._needs_in(ring))
+            handed = trade.handed.get(station, {})
+            consumed[station] = {
+                good: max(0.0, amount - handed.get(good, 0.0))
+                for good, amount in self._consumed_in(trade, ring).items()
+            }
+        self.railway.turn_month(capacity, consumed)
+
+    def measure_demand(self, station: Cell) -> None:
+        """Sets a new station's demand capacity from the buildings around it now, so cargo pays
+        before its first month turns over."""
+        if self.railway is not None:
+            needs = self._needs_in(self._inner_ring(station))
+            self.railway.station_demand(station).capacity = capacity_of(needs)
+
+    def _inner_ring(self, station: Cell) -> npt.NDArray[np.intp]:
+        """The cells a station hands goods out to, as flat indices."""
+        reached = self._grid.within(station, DELIVERY_RADIUS)
+        return np.array([np.ravel_multi_index(c, self._grid.shape) for c in reached])
+
+    def _needs_in(self, cells: npt.NDArray[np.intp]) -> dict[Good, float]:
+        """What the buildings in these cells need in a month."""
+        needs: dict[Good, float] = {}
+        for kind, wanted in NEEDS.items():
+            if kind not in self._counts:
+                continue
+            count = float(self._counts[kind].ravel()[cells].sum())
+            for good, amount in wanted.items():
+                needs[good] = needs.get(good, 0.0) + count * amount
+        return needs
+
+    @staticmethod
+    def _consumed_in(trade: Trade, cells: npt.NDArray[np.intp]) -> dict[Good, float]:
+        """What the buildings in these cells got this month, from anywhere."""
+        at = np.searchsorted(trade.cells, cells)
+        found = at < trade.cells.size
+        found[found] &= trade.cells[at[found]] == cells[found]
+        positions = at[found]
+        consumed: dict[Good, float] = {}
+        for (_, good), (got, _) in trade.goods_got.items():
+            consumed[good] = consumed.get(good, 0.0) + float(got[positions].sum())
+        return consumed
 
     def _reweigh(self, place: _Place, cells: npt.NDArray[np.intp], factors: FloatGrid) -> None:
         """Scales the ladder's land weights in these cells by their satisfaction factors."""

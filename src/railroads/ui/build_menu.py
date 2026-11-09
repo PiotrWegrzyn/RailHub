@@ -1,20 +1,27 @@
-"""The build menu: what a left click on the map builds (a station, track), the trains window with
-each train's cars and each station's stockpile, and drawing the track and trains."""
+"""The build bar: what a left click on the map builds (a station, track) and the buttons for the
+trains and stations windows; and drawing the track, routes, station reach and far-off trains."""
 
 import itertools
 import math
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 
+from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import Constructions, Track
 from railroads.sim.economy import COLLECTION_RADIUS, DELIVERY_RADIUS, Good
+from railroads.sim.finance import STATION_PRICE, TRACK_PRICE, dollars
 from railroads.sim.grids import Cell, Grid
-from railroads.sim.railway import CAR_CAPACITY, MAX_CARS, STOCKPILE, Railway, Stop, Train
+from railroads.sim.railway import Railway
 from railroads.sim.routes import Route
-from railroads.sim.track_rules import TrackBed
+from railroads.sim.tilemap import Relief
+from railroads.sim.track_rules import BRIDGE_RULES, RELIEF_RULES, TUNNEL_RULES, TrackBed
 from railroads.ui.iso_camera import IsoCamera, Vec2
+from railroads.ui.stations_window import StationsWindow
+from railroads.ui.theme import BORDER, BRASS, color_u32, toggle_button
+from railroads.ui.trains_window import TrainsWindow
 
 BALLAST = (0.36, 0.3, 0.24, 1.0)
 RAIL = (0.82, 0.8, 0.76, 1.0)
@@ -55,10 +62,12 @@ CAR_LENGTH = 0.34
 CAR_WIDTH = 0.16
 CAR_GAP = 0.02
 OUTLINE = (0.05, 0.05, 0.05, 1.0)
-MENU_POS = (12.0, 420.0)
-HINT_WIDTH = 360.0
-TRAINS_POS = (12.0, 540.0)
-TRAINS_SIZE = (520.0, 220.0)
+# How far above the bottom of the map the build bar floats, how wide its hints run, and how long
+# a message stays up, in seconds.
+BAR_MARGIN = 16.0
+HINT_WIDTH = 520.0
+MESSAGE_SECONDS = 4.0
+BUTTON_HEIGHT = 34.0
 
 
 class Tool(Enum):
@@ -67,19 +76,32 @@ class Tool(Enum):
     TRACK = "Track"
 
 
+HILLS_PRICE = TRACK_PRICE * RELIEF_RULES[Relief.HILLS].price_factor
+BRIDGE_PRICE = TRACK_PRICE * BRIDGE_RULES.price_factor
+TUNNEL_PRICE = TRACK_PRICE * TUNNEL_RULES.price_factor
 HINTS = {
-    Tool.NONE: "Choose what to build. Right click any cell to see what is there.",
     Tool.STATION: (
-        "Click a cell to build a station; what stands there moves aside. Orange: where it hands "
+        f"A station costs {dollars(STATION_PRICE)}. Click a cell to build one; what stands there moves aside. Orange: where it hands "
         "goods out; pink: other stations; grey: shared; blue line: where it gathers goods. "
         "Right click cancels."
     ),
-    Tool.TRACK: "Click where track starts, then where it goes. Right click cancels.",
+    Tool.TRACK: (
+        f"Click where track starts, then where it goes. {dollars(TRACK_PRICE)} a cell on the flat, "
+        f"{dollars(HILLS_PRICE)} in hills, {dollars(BRIDGE_PRICE)} a bridge, "
+        f"{dollars(TUNNEL_PRICE)} a tunnel. Right click cancels."
+    ),
 }
+TOOL_BUTTONS = (
+    (Tool.STATION, f"{fa.ICON_FA_BUILDING}  Station", "Build a station (1)"),
+    (Tool.TRACK, f"{fa.ICON_FA_ROAD}  Track", "Lay track (2)"),
+)
 
 
 @dataclass
 class BuildMenu:
+    """The build bar along the bottom of the map: what a left click builds, and the buttons that
+    open the trains and stations windows."""
+
     tool: Tool = Tool.NONE
     # Where the next piece of track starts, once the first click is made.
     track_from: Cell | None = None
@@ -87,22 +109,68 @@ class BuildMenu:
     preview: Route | None = None
     preview_to: Cell | None = None
     message: str = ""
-    laid: list[str] = field(default_factory=list)
+    message_at: float = -MESSAGE_SECONDS
+    # What the previewed track would cost.
+    preview_price: float | None = None
+    trains: TrainsWindow = field(default_factory=TrainsWindow)
+    stations: StationsWindow = field(default_factory=StationsWindow)
 
-    def draw(self) -> None:
-        imgui.set_next_window_pos(MENU_POS, imgui.Cond_.first_use_ever.value)
-        imgui.begin("Build", flags=imgui.WindowFlags_.always_auto_resize.value)
-        for tool in Tool:
-            if imgui.radio_button(tool.value, self.tool == tool):
-                self.choose(tool)
+    def draw(self, top_left: Vec2, bottom_right: Vec2) -> None:
+        x = (top_left[0] + bottom_right[0]) / 2
+        imgui.set_next_window_pos(
+            (x, bottom_right[1] - BAR_MARGIN), imgui.Cond_.always.value, (0.5, 1.0)
+        )
+        flags = (
+            imgui.WindowFlags_.no_decoration.value
+            | imgui.WindowFlags_.always_auto_resize.value
+            | imgui.WindowFlags_.no_move.value
+            | imgui.WindowFlags_.no_saved_settings.value
+            | imgui.WindowFlags_.no_focus_on_appearing.value
+            | imgui.WindowFlags_.no_nav.value
+        )
+        imgui.push_style_var(imgui.StyleVar_.window_rounding.value, 12.0)
+        imgui.push_style_var(imgui.StyleVar_.window_padding.value, imgui.ImVec2(10, 8))
+        imgui.begin("##build bar", flags=flags)
+        self._draw_hint()
+        for tool, label, tooltip in TOOL_BUTTONS:
+            if toggle_button(label, self.tool == tool, tooltip, (0, BUTTON_HEIGHT)):
+                self.choose(Tool.NONE if self.tool == tool else tool)
             imgui.same_line()
-        imgui.new_line()
-        imgui.push_text_wrap_pos(HINT_WIDTH)
-        imgui.text_disabled(HINTS[self.tool])
-        imgui.pop_text_wrap_pos()
-        if self.message:
-            imgui.text(self.message)
+        _vertical_rule()
+        imgui.same_line()
+        if toggle_button(
+            f"{fa.ICON_FA_TRAIN}  Trains", self.trains.open, "Your trains (T)", (0, BUTTON_HEIGHT)
+        ):
+            self.trains.open = not self.trains.open
+        imgui.same_line()
+        if toggle_button(
+            f"{fa.ICON_FA_CUBES}  Stations",
+            self.stations.open,
+            "What your stations hold (S)",
+            (0, BUTTON_HEIGHT),
+        ):
+            self.stations.open = not self.stations.open
         imgui.end()
+        imgui.pop_style_var(2)
+
+    def _draw_hint(self) -> None:
+        recent = time.monotonic() - self.message_at < MESSAGE_SECONDS
+        if not recent and self.tool not in HINTS:
+            return
+        imgui.push_text_wrap_pos(HINT_WIDTH)
+        if recent:
+            imgui.text_colored(imgui.ImVec4(*BRASS), self.message)
+        if self.tool in HINTS:
+            imgui.text_disabled(HINTS[self.tool])
+        if self.tool == Tool.TRACK and self.preview is not None and self.preview_price is not None:
+            imgui.text_colored(imgui.ImVec4(*BRASS), f"This track: {dollars(self.preview_price)}")
+        imgui.pop_text_wrap_pos()
+        imgui.spacing()
+
+    def say(self, message: str) -> None:
+        """Shows a message above the build bar for a few seconds."""
+        self.message = message
+        self.message_at = time.monotonic()
 
     def choose(self, tool: Tool) -> None:
         self.tool = tool
@@ -112,112 +180,19 @@ class BuildMenu:
         self.track_from = None
         self.preview = None
         self.preview_to = None
+        self.preview_price = None
 
 
-def draw_trains_window(railway: Railway) -> None:
-    """The trains window: buy a train, set its stops and cars, or sell it; and what each station
-    holds."""
-    imgui.set_next_window_pos(TRAINS_POS, imgui.Cond_.first_use_ever.value)
-    imgui.set_next_window_size(TRAINS_SIZE, imgui.Cond_.first_use_ever.value)
-    imgui.begin("Trains")
-    stations = railway.stations()
-    if imgui.button("Buy a train"):
-        railway.buy()
-    if len(stations) < 2:
-        imgui.same_line()
-        imgui.text_disabled("Build two stations joined by track for it to run.")
-    for train in list(railway.trains):
-        imgui.push_id(train.name)
-        load = _goods_text(train.load)
-        header = f"{train.name}: {train.status}" + (f" ({load})" if load else "")
-        if imgui.collapsing_header(header, imgui.TreeNodeFlags_.default_open.value):
-            _draw_stops(train, stations)
-            _draw_cars(train)
-            if imgui.button("Sell"):
-                railway.sell(train)
-        imgui.pop_id()
-    if stations and imgui.collapsing_header("Stations", imgui.TreeNodeFlags_.default_open.value):
-        for station in stations:
-            goods = railway.station_goods(station)
-            imgui.bullet_text(
-                f"{station_name(station)}: stockpile {goods.stocked:.0f}/{STOCKPILE:.0f}"
-            )
-            imgui.indent()
-            imgui.text_disabled(f"Stockpile: {_goods_text(goods.stockpile) or 'empty'}")
-            imgui.text_disabled(f"To hand out: {_goods_text(goods.brought) or 'nothing'}")
-            imgui.unindent()
-    imgui.end()
-
-
-def _draw_cars(train: Train) -> None:
-    """What the train pulls now and carries."""
-    if not train.cars:
-        imgui.text_disabled("Pulling no cars.")
-        return
-    imgui.text("Pulling:")
-    for car in train.cars:
-        imgui.same_line()
-        imgui.color_button(f"##{id(car)}", imgui.ImVec4(*CAR_COLORS[car.good]), 0, (12, 12))
-        imgui.same_line()
-        imgui.text(f"{car.load:.0f}/{CAR_CAPACITY:.0f}")
-
-
-def _goods_text(goods: dict[Good, float]) -> str:
-    return ", ".join(
-        f"{amount:.0f} {good.value}" for good, amount in goods.items() if amount >= 0.5
+def _vertical_rule() -> None:
+    """A thin upright line between groups of buttons."""
+    position = imgui.get_cursor_screen_pos()
+    imgui.dummy((1, BUTTON_HEIGHT))
+    imgui.get_window_draw_list().add_line(
+        (position.x, position.y + 4),
+        (position.x, position.y + BUTTON_HEIGHT - 4),
+        color_u32(BORDER),
+        1.0,
     )
-
-
-def _draw_stops(train: Train, stations: list[Cell]) -> None:
-    """The stops in order, each with the cars the train pulls on to the next stop."""
-    imgui.text("Stops, and the cars it pulls to the next one:")
-    for index, stop in enumerate(list(train.stops)):
-        imgui.push_id(index)
-        following = train.stops[(index + 1) % len(train.stops)] if len(train.stops) > 1 else None
-        towards = f" to {station_name(following.cell)}" if following else ""
-        imgui.bullet_text(f"{index + 1}. {station_name(stop.cell)}")
-        imgui.same_line()
-        if imgui.small_button("remove stop"):
-            train.stops.pop(index)
-            train.restart()
-            imgui.pop_id()
-            break
-        imgui.same_line()
-        _, stop.wait_for_load = imgui.checkbox("wait for full load", stop.wait_for_load)
-        imgui.indent()
-        imgui.text_disabled(f"Cars{towards} ({len(stop.cars)}/{MAX_CARS}):")
-        for car_index, good in enumerate(list(stop.cars)):
-            imgui.same_line()
-            imgui.push_id(car_index)
-            imgui.color_button("##car", imgui.ImVec4(*CAR_COLORS[good]), 0, (12, 12))
-            if imgui.is_item_hovered():
-                imgui.set_tooltip(f"{good.value} car; click to remove")
-            if imgui.is_item_clicked():
-                stop.cars.pop(car_index)
-                train.cars_changed()
-            imgui.pop_id()
-        if len(stop.cars) < MAX_CARS:
-            imgui.same_line()
-            imgui.set_next_item_width(130)
-            if imgui.begin_combo("##add", "add a car"):
-                for good in Good:
-                    if imgui.selectable(f"{good.value} car", False)[0] and stop.add_car(good):
-                        train.cars_changed()
-                imgui.end_combo()
-        imgui.unindent()
-        imgui.pop_id()
-    choices = [s for s in stations if not train.stops or train.stops[-1].cell != s]
-    if choices and imgui.begin_combo("Add stop", "choose a station"):
-        for station in choices:
-            if imgui.selectable(station_name(station), False)[0]:
-                cars = list(train.stops[-1].cars) if train.stops else []
-                train.stops.append(Stop(station, cars))
-                train.restart()
-        imgui.end_combo()
-
-
-def station_name(cell: Cell) -> str:
-    return f"Station at {cell[0]}, {cell[1]}"
 
 
 def draw_trains(
