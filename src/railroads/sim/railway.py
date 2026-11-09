@@ -1,8 +1,9 @@
-"""Trains: they run along laid track from stop to stop, pulling up to MAX_CARS cars. Each car
-carries one good, up to CAR_CAPACITY of it.
+"""Trains: they run along laid track from stop to stop, starting at the first. Each stop says
+which cars, up to MAX_CARS, the train pulls on to the next one; each car carries one good, up to
+CAR_CAPACITY of it.
 
-At each stop a train unloads its cars into the station, to be handed out, and fills them from
-the station's stockpile. Stations deal with the buildings around them once a month, when goods
+At each stop a train unloads its cars into the station, to be handed out, swaps them for that
+stop's cars and fills those from the station's stockpile. Stations deal with the buildings around them once a month, when goods
 are shared out (railroads.sim.economy): they hand what trains brought to buildings within
 DELIVERY_RADIUS cells, and take every spare good made within COLLECTION_RADIUS cells into their
 stockpile, up to STOCKPILE goods in all.
@@ -27,6 +28,8 @@ MAX_CARS = 6
 FULL_LOAD = 1.0
 DRAG_PER_CAR = 0.08
 CAR_CAPACITY = 10.0
+# Longest a train waits at a stop for its cars to fill, in months.
+WAIT_MONTHS = 1.0
 # Most goods a station's stockpile holds, of all kinds together.
 STOCKPILE = 100.0
 
@@ -42,12 +45,36 @@ class Car:
 
 
 @dataclass
+class Stop:
+    """A station a train calls at, and the goods of the cars it pulls when it leaves for the
+    next stop."""
+
+    cell: Cell
+    cars: list[Good] = field(default_factory=list)
+    # Whether the train waits here, up to WAIT_MONTHS, for its cars to fill.
+    wait_for_load: bool = True
+
+    def add_car(self, good: Good) -> bool:
+        if len(self.cars) >= MAX_CARS:
+            return False
+        self.cars.append(good)
+        return True
+
+
+@dataclass
 class Train:
     name: str
-    stops: list[Cell] = field(default_factory=list)
+    stops: list[Stop] = field(default_factory=list)
+    # The cars it pulls now.
     cars: list[Car] = field(default_factory=list)
     # Which stop it is heading for, the way there as points on the map, and how far along it is.
-    heading: int = 0
+    heading: int = 1
+    # Whether it has called at the stop it is leaving, taking on that stop's cars, and how many
+    # stops it has reached since it last set off from its first.
+    called: bool = False
+    arrivals: int = 0
+    # How much longer it will wait at the stop it is leaving for its cars to fill, in months.
+    waiting: float = 0.0
     path: list[Point] = field(default_factory=list)
     speeds: list[float] = field(default_factory=list)
     along: float = 0.0
@@ -72,11 +99,24 @@ class Train:
         """How much of the engine's top speed the train makes with its cars behind it."""
         return 1.0 / (1.0 + DRAG_PER_CAR * self.weight)
 
-    def add_car(self, good: Good) -> bool:
-        if len(self.cars) >= MAX_CARS:
-            return False
-        self.cars.append(Car(good))
-        return True
+    @property
+    def full(self) -> bool:
+        return all(car.load >= CAR_CAPACITY - 1e-9 for car in self.cars)
+
+    def restart(self) -> None:
+        """Sends the train back to its first stop after its stops change."""
+        self.heading = 1
+        self.called = False
+        self.arrivals = 0
+        self.waiting = 0.0
+        self.path = []
+
+    def cars_changed(self) -> None:
+        """Takes in new cars at a stop. A train still on its first trip goes back to its first
+        stop to take them on, so the cars set up after the stops still carry goods that trip;
+        later on, changes show at the next call."""
+        if self.arrivals == 0:
+            self.restart()
 
 
 @dataclass
@@ -122,35 +162,25 @@ class Railway:
 
     def route(self, start: Cell, end: Cell) -> tuple[list[Point], list[float]] | None:
         """The way along laid track from one station to another, as points on the map and the
-        speed on each stretch between them; None without track joining them."""
+        speed on each stretch between them; None without track joining them. Trains pass
+        through stations on the way, which join track at any of their sides."""
         grid = self.constructions.tile_map.grid
-        points = len(grid.track_points())
         steps = grid.track_steps()
         counter = itertools.count()
-        frontier: list[tuple[float, int, Cell, int, tuple]] = []
-        for point in range(points):
-            nxt, entry = grid.track_exit(start, point)
-            if grid.contains(*nxt):
-                heapq.heappush(frontier, (0.0, next(counter), nxt, entry, ((start, point),)))
-        seen: set[tuple[Cell, int]] = set()
+        frontier: list[tuple[float, int, Cell, int | None, tuple]] = [
+            (0.0, next(counter), start, None, ())
+        ]
+        seen: set[tuple[Cell, int | None]] = set()
         while frontier:
             cost, _, cell, entry, trail = heapq.heappop(frontier)
-            if cell == end:
-                return self._way(trail, (cell, entry))
+            if cell == end and trail:
+                return self._way(trail, (cell, entry or 0))
             if (cell, entry) in seen:
                 continue
             seen.add((cell, entry))
-            for piece in self.constructions.at(cell):
-                if not isinstance(piece, Track) or entry not in piece.ends:
-                    continue
-                exit_point = piece.ends[1] if piece.ends[0] == entry else piece.ends[0]
+            for exit_point in self._exits(cell, entry):
                 nxt, nxt_entry = grid.track_exit(cell, exit_point)
-                if not grid.contains(*nxt):
-                    continue
-                continues = any(
-                    isinstance(b, Track) and nxt_entry in b.ends for b in self.constructions.at(nxt)
-                )
-                if nxt != end and not continues:
+                if not grid.contains(*nxt) or not (nxt == end or self._joins(nxt, nxt_entry)):
                     continue
                 length = float(math.hypot(*steps[exit_point]))
                 heapq.heappush(
@@ -158,6 +188,26 @@ class Railway:
                     (cost + length, next(counter), nxt, nxt_entry, (*trail, (cell, exit_point))),
                 )
         return None
+
+    def _exits(self, cell: Cell, entry: int | None) -> list[int]:
+        """The points a train that came in by `entry` can leave the cell by: any side of a
+        station, else the other end of each piece of track that starts where it came in."""
+        built = self.constructions.at(cell)
+        if any(isinstance(b, Station) for b in built):
+            points = range(len(self.constructions.tile_map.grid.track_points()))
+            return [point for point in points if point != entry]
+        return [
+            piece.ends[1] if piece.ends[0] == entry else piece.ends[0]
+            for piece in built
+            if isinstance(piece, Track) and entry in piece.ends
+        ]
+
+    def _joins(self, cell: Cell, entry: int) -> bool:
+        """Whether a train coming in by `entry` can go on from this cell."""
+        return any(
+            isinstance(b, Station) or (isinstance(b, Track) and entry in b.ends)
+            for b in self.constructions.at(cell)
+        )
 
     def _way(self, trail: tuple, arrival: tuple[Cell, int]) -> tuple[list[Point], list[float]]:
         grid = self.constructions.tile_map.grid
@@ -190,8 +240,18 @@ class Railway:
             train.path = []
             return
         if not train.path:
-            here = train.stops[(train.heading - 1) % len(train.stops)]
-            there = train.stops[train.heading % len(train.stops)]
+            leaving = train.stops[(train.heading - 1) % len(train.stops)]
+            if not train.called:
+                self._arrive(train, leaving)
+            if train.waiting > 0:
+                self._load(train, leaving)
+                if train.full:
+                    train.waiting = 0.0
+                else:
+                    train.waiting -= months
+                    train.status = f"Loading at {leaving.cell[0]}, {leaving.cell[1]}"
+                    return
+            here, there = leaving.cell, train.stops[train.heading % len(train.stops)].cell
             way = self.route(here, there)
             if way is None:
                 train.status = "No track to its next stop"
@@ -202,22 +262,32 @@ class Railway:
         train.along += months * CELLS_PER_MONTH * self._speed_at(train) * train.pull
         if train.along >= self._length(train.path):
             self._arrive(train, train.stops[train.heading % len(train.stops)])
+            train.arrivals += 1
             train.heading = (train.heading + 1) % len(train.stops)
             train.path = []
 
-    def _arrive(self, train: Train, station: Cell) -> None:
-        if not any(isinstance(b, Station) for b in self.constructions.at(station)):
+    def _arrive(self, train: Train, stop: Stop) -> None:
+        """Calls at a stop: unloads every car, takes on the stop's cars and fills them."""
+        train.called = True
+        if not any(isinstance(b, Station) for b in self.constructions.at(stop.cell)):
             train.status = "Its stop has no station"
             return
-        goods = self.station_goods(station)
+        goods = self.station_goods(stop.cell)
         for car in train.cars:
             if car.load > 0:
                 goods.brought[car.good] = goods.brought.get(car.good, 0.0) + car.load
-                car.load = 0.0
+        train.cars = [Car(good) for good in stop.cars]
+        self._load(train, stop)
+        if stop.wait_for_load and train.cars and not train.full:
+            train.waiting = WAIT_MONTHS
+
+    def _load(self, train: Train, stop: Stop) -> None:
+        """Tops each car up from the stop's stockpile."""
+        goods = self.station_goods(stop.cell)
         for car in train.cars:
-            take = min(CAR_CAPACITY, goods.stockpile.get(car.good, 0.0))
+            take = min(CAR_CAPACITY - car.load, goods.stockpile.get(car.good, 0.0))
             if take > 0:
-                car.load = take
+                car.load += take
                 goods.stockpile[car.good] -= take
 
     def position(self, train: Train, back: float = 0.0) -> tuple[Point, Point] | None:

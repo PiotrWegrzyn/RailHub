@@ -11,7 +11,7 @@ from imgui_bundle import imgui
 from railroads.sim.constructions import Constructions, Track
 from railroads.sim.economy import COLLECTION_RADIUS, DELIVERY_RADIUS, Good
 from railroads.sim.grids import Cell, Grid
-from railroads.sim.railway import CAR_CAPACITY, MAX_CARS, STOCKPILE, Railway, Train
+from railroads.sim.railway import CAR_CAPACITY, MAX_CARS, STOCKPILE, Railway, Stop, Train
 from railroads.sim.routes import Route
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.iso_camera import IsoCamera, Vec2
@@ -150,21 +150,16 @@ def draw_trains_window(railway: Railway) -> None:
 
 
 def _draw_cars(train: Train) -> None:
-    imgui.text(f"Cars ({len(train.cars)}/{MAX_CARS}):")
-    for index, car in enumerate(list(train.cars)):
-        imgui.push_id(f"car{index}")
-        imgui.color_button("##colour", imgui.ImVec4(*CAR_COLORS[car.good]), 0, (12, 12))
+    """What the train pulls now and carries."""
+    if not train.cars:
+        imgui.text_disabled("Pulling no cars.")
+        return
+    imgui.text("Pulling:")
+    for car in train.cars:
         imgui.same_line()
-        imgui.text(f"{car.good.value} car {car.load:.0f}/{CAR_CAPACITY:.0f}")
+        imgui.color_button(f"##{id(car)}", imgui.ImVec4(*CAR_COLORS[car.good]), 0, (12, 12))
         imgui.same_line()
-        if imgui.small_button("remove"):
-            train.cars.pop(index)
-        imgui.pop_id()
-    if len(train.cars) < MAX_CARS and imgui.begin_combo("Add car", "choose a good"):
-        for good in Good:
-            if imgui.selectable(f"{good.value} car", False)[0]:
-                train.add_car(good)
-        imgui.end_combo()
+        imgui.text(f"{car.load:.0f}/{CAR_CAPACITY:.0f}")
 
 
 def _goods_text(goods: dict[Good, float]) -> str:
@@ -174,22 +169,50 @@ def _goods_text(goods: dict[Good, float]) -> str:
 
 
 def _draw_stops(train: Train, stations: list[Cell]) -> None:
-    imgui.text("Stops:")
+    """The stops in order, each with the cars the train pulls on to the next stop."""
+    imgui.text("Stops, and the cars it pulls to the next one:")
     for index, stop in enumerate(list(train.stops)):
         imgui.push_id(index)
-        imgui.bullet_text(f"{index + 1}. {station_name(stop)}")
+        following = train.stops[(index + 1) % len(train.stops)] if len(train.stops) > 1 else None
+        towards = f" to {station_name(following.cell)}" if following else ""
+        imgui.bullet_text(f"{index + 1}. {station_name(stop.cell)}")
         imgui.same_line()
-        if imgui.small_button("remove"):
+        if imgui.small_button("remove stop"):
             train.stops.pop(index)
-            train.path = []
-            train.heading = 0
+            train.restart()
+            imgui.pop_id()
+            break
+        imgui.same_line()
+        _, stop.wait_for_load = imgui.checkbox("wait for full load", stop.wait_for_load)
+        imgui.indent()
+        imgui.text_disabled(f"Cars{towards} ({len(stop.cars)}/{MAX_CARS}):")
+        for car_index, good in enumerate(list(stop.cars)):
+            imgui.same_line()
+            imgui.push_id(car_index)
+            imgui.color_button("##car", imgui.ImVec4(*CAR_COLORS[good]), 0, (12, 12))
+            if imgui.is_item_hovered():
+                imgui.set_tooltip(f"{good.value} car; click to remove")
+            if imgui.is_item_clicked():
+                stop.cars.pop(car_index)
+                train.cars_changed()
+            imgui.pop_id()
+        if len(stop.cars) < MAX_CARS:
+            imgui.same_line()
+            imgui.set_next_item_width(130)
+            if imgui.begin_combo("##add", "add a car"):
+                for good in Good:
+                    if imgui.selectable(f"{good.value} car", False)[0] and stop.add_car(good):
+                        train.cars_changed()
+                imgui.end_combo()
+        imgui.unindent()
         imgui.pop_id()
-    choices = [station for station in stations if not train.stops or train.stops[-1] != station]
+    choices = [s for s in stations if not train.stops or train.stops[-1].cell != s]
     if choices and imgui.begin_combo("Add stop", "choose a station"):
         for station in choices:
             if imgui.selectable(station_name(station), False)[0]:
-                train.stops.append(station)
-                train.path = []
+                cars = list(train.stops[-1].cars) if train.stops else []
+                train.stops.append(Stop(station, cars))
+                train.restart()
         imgui.end_combo()
 
 

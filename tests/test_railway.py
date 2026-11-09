@@ -6,7 +6,15 @@ from railroads.sim.economy import Economy, Good, StationOrder
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth, GrowthRule
-from railroads.sim.railway import CAR_CAPACITY, CELLS_PER_MONTH, MAX_CARS, STOCKPILE, Car, Railway
+from railroads.sim.railway import (
+    CAR_CAPACITY,
+    CELLS_PER_MONTH,
+    MAX_CARS,
+    STOCKPILE,
+    Car,
+    Railway,
+    Stop,
+)
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 
@@ -49,43 +57,77 @@ def test_trains_find_their_way_along_track_between_stations() -> None:
     assert railway.route((6, 3), (2, 3)) is None
 
 
-def test_a_train_runs_to_its_next_stop_and_unloads_there() -> None:
+def test_a_new_train_leaves_its_first_stop_with_that_stops_cars_full() -> None:
     _, railway = joined_stations()
+    railway.station_goods((6, 3)).stockpile[Good.FOOD] = 15.0
     train = railway.buy()
-    train.stops = [(6, 3), (6, 20)]
-    train.cars = [Car(Good.FOOD, 10.0)]
-    train.heading = 1
+    train.stops = [Stop((6, 3), [Good.FOOD, Good.FOOD], wait_for_load=False), Stop((6, 20))]
 
     railway.run(0.1)
-    halfway = railway.position(train)
+
+    assert train.heading == 1
+    assert [car.load for car in train.cars] == [CAR_CAPACITY, 5.0]
+    assert railway.position(train) is not None
+
+
+def test_a_train_waits_at_its_stop_until_new_goods_fill_its_cars() -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    train.stops = [Stop((6, 3), [Good.FOOD]), Stop((6, 20))]
+    railway.run(0.1)
+    waiting = train.status
+
+    railway.station_goods((6, 3)).stockpile[Good.FOOD] = 12.0
+    railway.run(0.1)
+
+    assert waiting == "Loading at 6, 3"
+    assert [car.load for car in train.cars] == [CAR_CAPACITY]
+    assert train.status == "Running"
+
+
+def test_a_train_gives_up_waiting_after_a_month() -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    train.stops = [Stop((6, 3), [Good.FOOD]), Stop((6, 20))]
+
+    for _ in range(12):
+        railway.run(0.1)
+
+    assert train.status == "Running"
+    assert train.cars[0].load == 0.0
+
+
+def test_at_the_next_stop_it_unloads_and_takes_that_stops_cars() -> None:
+    _, railway = joined_stations()
+    railway.station_goods((6, 3)).stockpile[Good.FOOD] = 10.0
+    railway.station_goods((6, 20)).stockpile[Good.COAL] = 30.0
+    train = railway.buy()
+    train.stops = [Stop((6, 3), [Good.FOOD]), Stop((6, 20), [Good.COAL, Good.COAL])]
+
+    railway.run(0.1)
     railway.run(25 / CELLS_PER_MONTH)
 
-    assert halfway is not None
     assert train.heading == 0
     assert railway.station_goods((6, 20)).brought[Good.FOOD] == 10.0
-    assert train.load == {}
-    assert train.cars == [Car(Good.FOOD, 0.0)]
+    assert [(car.good, car.load) for car in train.cars] == [(Good.COAL, 10.0), (Good.COAL, 10.0)]
 
 
 def test_each_car_fills_with_its_own_good_from_the_stockpile() -> None:
     _, railway = joined_stations()
     train = railway.buy()
-    train.stops = [(6, 20), (6, 3)]
-    train.cars = [Car(Good.LUMBER), Car(Good.LUMBER), Car(Good.FOOD)]
+    train.stops = [Stop((6, 3), [Good.LUMBER, Good.LUMBER, Good.FOOD]), Stop((6, 20))]
     railway.station_goods((6, 3)).stockpile.update({Good.LUMBER: 14.0, Good.COAL: 30.0})
-    train.heading = 1
 
-    railway.run(30 / CELLS_PER_MONTH)
+    railway.run(0.01)
 
     assert [car.load for car in train.cars] == [CAR_CAPACITY, 4.0, 0.0]
     assert railway.station_goods((6, 3)).stockpile == {Good.LUMBER: 0.0, Good.COAL: 30.0}
 
 
-def test_a_train_pulls_at_most_six_cars() -> None:
-    _, railway = joined_stations()
-    train = railway.buy()
+def test_a_stop_sends_at_most_six_cars() -> None:
+    stop = Stop((6, 3))
 
-    added = [train.add_car(Good.COAL) for _ in range(MAX_CARS + 1)]
+    added = [stop.add_car(Good.COAL) for _ in range(MAX_CARS + 1)]
 
     assert added == [True] * MAX_CARS + [False]
 
@@ -94,7 +136,7 @@ def test_without_track_a_train_waits() -> None:
     constructions = Constructions(make_map())
     railway = Railway(constructions)
     train = railway.buy()
-    train.stops = [(6, 3), (6, 20)]
+    train.stops = [Stop((6, 3)), Stop((6, 20))]
 
     railway.run(1.0)
 
@@ -155,3 +197,47 @@ def test_cars_slow_a_train_and_full_cars_slow_it_more() -> None:
 
     assert pulls[0] == 1.0
     assert pulls[0] > pulls[1] > pulls[2] >= 0.5
+
+
+def test_trains_run_through_a_station_on_the_way() -> None:
+    growth, railway = joined_stations()
+    build_station(growth, (6, 27))
+    route = plan_route(growth.constructions, (6, 20), (6, 27))
+    assert route is not None
+    lay_route(growth, route)
+
+    way = railway.route((6, 3), (6, 27))
+
+    assert way is not None
+    points, _ = way
+    assert any(
+        np.allclose(point, growth.constructions.tile_map.grid.center(6, 20)) for point in points
+    )
+
+
+def test_cars_set_after_the_stops_still_load_on_the_first_trip() -> None:
+    _, railway = joined_stations()
+    railway.station_goods((6, 3)).stockpile[Good.FOOD] = 10.0
+    train = railway.buy()
+    train.stops = [Stop((6, 3)), Stop((6, 20))]
+    railway.run(0.05)
+
+    train.stops[0].add_car(Good.FOOD)
+    train.cars_changed()
+    railway.run(0.05)
+
+    assert [(car.good, car.load) for car in train.cars] == [(Good.FOOD, 10.0)]
+
+
+def test_later_car_changes_wait_for_the_next_call() -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    train.stops = [Stop((6, 3)), Stop((6, 20))]
+    railway.run(1.0)
+    heading = train.heading
+
+    train.stops[0].add_car(Good.COAL)
+    train.cars_changed()
+
+    assert train.arrivals >= 1
+    assert train.heading == heading

@@ -37,9 +37,10 @@ def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded(
     rows = {row.name: row for row in details.buildings}
     assert rows["house"].count == 3
     assert rows["house"].needs == "3 food"
-    assert rows["house"].got == "3.0 of 3"
+    assert rows["house"].got == "food 3.0 of 3.0"
     assert rows["house"].satisfaction == "satisfied"
     assert rows["farm"].makes == "6 food"
+    assert rows["farm"].gave.startswith("food ")
     assert details.free_food == 1
     assert ("population", 3, 3) in details.points
     assert ("food", 1, 1) in details.points
@@ -56,3 +57,25 @@ def test_details_of_an_empty_cell_show_its_land_and_nearby_points() -> None:
     assert details.others == ["station"]
     assert details.satisfaction == "nothing trades here"
     assert details.title.startswith("Cell 5, 6")
+
+
+def test_a_building_needing_two_goods_lists_each_with_what_it_got() -> None:
+    constructions = Constructions(make_map())
+    constructions.build(Building((5, 5), BuildingKind.TENEMENT))
+    growth = Growth(constructions)
+
+    details = describe(growth, (5, 5))
+
+    tenement = details.buildings[0]
+    assert tenement.needs == "2 food, 1 goods"
+    assert tenement.got == "food 2.0 of 2.0\ngoods 0.0 of 1.0"
+
+
+def test_a_factory_without_lumber_makes_nothing_and_shows_what_it_could() -> None:
+    constructions = Constructions(make_map())
+    constructions.build(Building((5, 5), BuildingKind.FACTORY))
+    growth = Growth(constructions)
+
+    details = describe(growth, (5, 5))
+
+    assert details.buildings[0].gave == "goods 0.0 of 0.0 (up to 3)"

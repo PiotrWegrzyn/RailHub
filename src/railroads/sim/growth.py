@@ -201,8 +201,8 @@ FARMS = Ladder(
         temperature={Temperature.COLD: 0.2, Temperature.HOT: 0.6},
         water={Terrain.RIVER: 5.0, Terrain.LAKE: 5.0, Terrain.SEA: 2.0},
     ),
-    base_chance=0.000004,
-    chance_per_point={Points.POPULATION: 0.00003, Points.FOOD: 0.00002},
+    base_chance=0.000008,
+    chance_per_point={Points.POPULATION: 0.00006, Points.FOOD: 0.00004},
 )
 # Orchards like sunny slopes and water nearby, and stay off the cold.
 ORCHARDS = Ladder(
@@ -259,11 +259,12 @@ PORTS = Ladder(
     most_per_cell=1,
     most_nearby=1,
 )
-# Factories make goods for the people around them and draw more factories.
+# Factories make goods for the people around them, from lumber mills nearby, and draw more
+# factories.
 FACTORIES = Ladder(
     kinds=(BuildingKind.FACTORY, BuildingKind.BIG_FACTORY, BuildingKind.MEGA_FACTORY),
     land=FACTORY_LAND,
-    chance_per_point={Points.POPULATION: 0.000002, Points.INDUSTRY: 0.00002},
+    chance_per_point={Points.POPULATION: 0.00001, Points.INDUSTRY: 0.00005, Points.TIMBER: 0.0001},
     merges={
         BuildingKind.FACTORY: Merge(needed=3, pulled_down=3),
         BuildingKind.BIG_FACTORY: Merge(needed=3, pulled_down=3),
@@ -274,10 +275,10 @@ FACTORIES = Ladder(
 FOOD_PLANTS = Ladder(
     kinds=(BuildingKind.FOOD_PLANT,),
     land=FACTORY_LAND,
-    chance_per_point={Points.FOOD: 0.00004, Points.POPULATION: 0.000002},
-    needs={Points.FOOD: 1, Points.POPULATION: 6},
+    chance_per_point={Points.FOOD: 0.0002, Points.POPULATION: 0.00001},
+    needs={Points.FOOD: 1, Points.POPULATION: 3},
     most_per_cell=1,
-    most_nearby=1,
+    most_nearby=2,
 )
 # Steel mills need ore from mines nearby and workers, and grow among other industry.
 STEEL_MILLS = Ladder(

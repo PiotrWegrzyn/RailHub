@@ -166,7 +166,7 @@ def test_a_ladder_has_no_chance_until_the_neighbourhood_holds_what_it_needs() ->
     tile_map = make_map()
     constructions = Constructions(tile_map)
     build(constructions, (5, 4), BuildingKind.FARM, 1)
-    build(constructions, (5, 6), BuildingKind.HOUSE, 5)
+    build(constructions, (5, 6), BuildingKind.HOUSE, FOOD_PLANTS.needs[Points.POPULATION] - 1)
     without_people = Growth(constructions, NO_TRADE).chances(FOOD_PLANTS)
     build(constructions, (5, 6), BuildingKind.HOUSE, 1)
 

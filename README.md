@@ -134,18 +134,18 @@ content buildings; unsatisfied ones grow at half of them and thriving ones at on
 | Ladder | Chance per month | Needs nearby | Land |
 |---|---|---|---|
 | Houses | 0.0000085 + 0.0002125 per population | | forest x0.3, mountains x0.05, barren x0.5, hills x0.8, cold x0.6, hot x0.8 |
-| Farms | 0.000004 + 0.00003 per population + 0.00002 per food | | flat grass; hills x0.5, barren x0.1, forest x0.02, cold x0.2, hot x0.6; river or lake x5, sea x2; none in mountains |
+| Farms | 0.000008 + 0.00006 per population + 0.00004 per food | | flat grass; hills x0.5, barren x0.1, forest x0.02, cold x0.2, hot x0.6; river or lake x5, sea x2; none in mountains |
 | Orchards | 0.000002 + 0.000004 per population + 0.00002 per food | | hills; flat x0.5, hot x1.2, cold x0.05; river or lake x3, sea x2 |
 | Mines | 0.000008 + 0.0001 per ore | | mountains; hills x0.4, flat x0.01; beside mountains x3 |
 | Lumber mills | 0.00002 + 0.00005 per population | | forest with open land next to it; river x1.5 |
 | Ports | 0.000004 + 0.00004 per population | 3 population | next to the sea, or a lake x0.3 |
-| Factories | 0.000002 per population + 0.00002 per industry | | flat; hills x0.5, forest x0.2; river x1.5 |
-| Food plants | 0.00004 per food + 0.000002 per population | 1 food, 6 population | as factories |
+| Factories | 0.00001 per population + 0.00005 per industry + 0.0001 per timber | | flat; hills x0.5, forest x0.2; river x1.5 |
+| Food plants | 0.0002 per food + 0.00001 per population | 1 food, 3 population | as factories |
 | Steel mills | 0.0002 per ore + 0.00002 per industry | 1 ore, 2 population | as factories |
 | Shipyards | 0.0001 per trade + 0.00002 per industry | 1 trade | on the water |
 
-Farms and orchards may crowd together; lumber mills keep to two per neighbourhood, ports and the
-special factories to one, and mines to five. On its turn a ladder builds its
+Farms and orchards may crowd together; lumber mills and food plants keep to two per
+neighbourhood, ports, steel mills and shipyards to one, and mines to five. On its turn a ladder builds its
 first kind, unless it can merge: six houses nearby let three of them make way for a tenement and
 six tenements let three make way for a block of flats; three factories nearby make a big factory
 and three big factories a mega factory. On a town or factory turn, a neighbourhood with 100
@@ -175,12 +175,13 @@ food, every flat or forest cell 1.
 | Skyscraper | | 3 goods |
 
 Goods go no further than a neighbourhood: each cell serves itself first, then shares what is left
-with the cells next to it, unsatisfied cells first, then content ones. Factories make only as much
-as their inputs allow. A building that gets all it needs and gives away all it makes is
-satisfied; at least half, content; less, unsatisfied. Each ladder's chances in a cell are scaled
-by how its kinds of building fare around it: x0.5 unsatisfied, x1 content, x1.5 satisfied, and x1
-where there are none yet. The ground under content and satisfied buildings has a warm glow, and
-the status bar names the hovered cell's satisfaction.
+with the cells next to it, unsatisfied cells first, then content ones. Factories, food plants, steel
+mills and shipyards make only as much as their inputs allow, and are judged on what they actually
+make, not on what they could. A building that gets all it needs and gives away all it makes is
+satisfied; at least half, content; less, unsatisfied. Each ladder's chances in a cell are scaled by
+how its kinds of building fare around it: x0.5 unsatisfied, x1 content, x1.5 satisfied, and x1 where
+there are none yet. The ground under content and satisfied buildings has a warm glow, and the status
+bar names the hovered cell's satisfaction.
 
 Farms with more than 10 population points around them are pulled down. Stations still go up
 after 100 years of growth, one per 3,000 land cells beside the bigger groups of buildings.
@@ -198,9 +199,11 @@ line round the cells it gathers from (4 steps). A right click cancels whatever i
 with nothing being built it opens the details of a cell: its land, points, and every building
 with what it makes and needs and what it got and gave last month.
 
-The Trains window buys a steam engine and sets its stops from the stations and its cars: up to 6,
-each for one good and holding 10 of it, so a food car carries only food. It shows what each car
-carries, and every station's stockpile and the goods waiting to be handed out there. Trains
+The Trains window buys a steam engine and sets its stops from the stations. Each stop has its own
+cars, up to 6, which the train pulls when it leaves that stop for the next, so the way out and the
+way back can carry different goods; each car is for one good and holds 10 of it, so a food car
+carries only food. A new train starts at its first stop. The window shows what the train pulls
+now, and every station's stockpile and the goods waiting to be handed out there. Trains
 (`railroads.sim.railway`) run along the track at 30 cells a month on the flat, slower on hills,
 and each car slows them: an empty car weighs 1, a full one 2, and every unit of weight costs 8%
 of the engine's speed, so six full cars still run at about half of it. On the pixel map
@@ -212,11 +215,13 @@ door when empty, open ones their bare deck. Track is drawn into the ground as pi
 gravel, sleepers and rails, timber decks over rivers and lakes, and portals where it enters
 mountains. Zoomed out, trains and track are plain shapes.
 
-At each stop a train unloads its cars and fills them from the station's stockpile. Once a month
-each station hands what trains brought to buildings within 2 cells, unsatisfied first, then
-content, nearest first, and takes every spare good that buildings made within 4 cells into its
-stockpile, up to 100 goods in all, which counts as selling them. Food the land makes by itself
-only feeds its neighbours and never goes to a station.
+At each stop a train unloads its cars, takes on that stop's cars and fills them from the station's
+stockpile. Unless the stop says not to, it waits there up to a month for its cars to fill, topping
+them up as the station gathers more. Trains run through stations on the way that are not among their
+stops. Once a month each station hands what trains brought to buildings within 2 cells, unsatisfied
+first, then content, nearest first, and takes every spare good that buildings made within 4 cells
+into its stockpile, up to 100 goods in all, which counts as selling them. Food the land makes by
+itself only feeds its neighbours and never goes to a station.
 
 Chances are kept up to date as buildings come and go, and cells are drawn by thinning, so a
 month costs about as much as what grows in it.

@@ -6,9 +6,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 import numpy as np
+import numpy.typing as npt
+
+FloatCells = npt.NDArray[np.float64]
 from imgui_bundle import imgui
 
-from railroads.sim.constructions import Building, Construction, Station, Track
+from railroads.sim.constructions import Building, BuildingKind, Construction, Station, Track
 from railroads.sim.economy import MAKES, NEEDS, Good, Satisfaction
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth, Points
@@ -62,8 +65,8 @@ def describe(growth: Growth, cell: Cell) -> HexDetails:
     for kind, count in kinds.items():
         got = gave = mood = "-"
         if trade is not None and position is not None and kind in trade.got:
-            got = _out_of(trade.got[kind][position], trade.needed[kind][position])
-            gave = _out_of(trade.gave[kind][position], trade.could_make[kind][position])
+            got = _per_good(trade.goods_got, kind, position)
+            gave = _per_good(trade.goods_gave, kind, position, MAKES.get(kind, {}), count)
             mood = Satisfaction(int(trade.levels((kind,))[position])).name.lower()
         rows.append(
             BuildingRow(
@@ -108,21 +111,13 @@ def draw_hex_details(details: HexDetails) -> None:
         return
     if details.buildings:
         flags = imgui.TableFlags_.borders.value | imgui.TableFlags_.row_bg.value
-        if imgui.begin_table("buildings", 7, flags):
-            for heading in ("Building", "#", "Makes", "Needs", "Got", "Gave", "Mood"):
+        if imgui.begin_table("buildings", 5, flags):
+            for heading in ("Building", "#", "Needs: got of needed", "Makes: gave of made", "Mood"):
                 imgui.table_setup_column(heading)
             imgui.table_headers_row()
             for row in details.buildings:
                 imgui.table_next_row()
-                for value in (
-                    row.name,
-                    str(row.count),
-                    row.makes,
-                    row.needs,
-                    row.got,
-                    row.gave,
-                    row.satisfaction,
-                ):
+                for value in (row.name, str(row.count), row.got, row.gave, row.satisfaction):
                     imgui.table_next_column()
                     imgui.text(value)
             imgui.end_table()
@@ -136,8 +131,24 @@ def _goods(per_building: Mapping[Good, float], count: int) -> str:
     return ", ".join(f"{amount * count:g} {good.value}" for good, amount in per_building.items())
 
 
-def _out_of(done: float, wanted: float) -> str:
-    return "-" if wanted <= 0 else f"{done:.1f} of {wanted:g}"
+def _per_good(
+    goods: Mapping[tuple[BuildingKind, Good], tuple[FloatCells, FloatCells]],
+    kind: BuildingKind,
+    position: int,
+    most: Mapping[Good, float] | None = None,
+    count: int = 1,
+) -> str:
+    """How much of each good the buildings got or gave, out of what they needed or made, one
+    good to a line; for goods made, also the most they could make with all their inputs."""
+    lines = []
+    for (of, good), (done, wanted) in goods.items():
+        if of != kind or (wanted[position] <= 0 and not most):
+            continue
+        line = f"{good.value} {done[position]:.1f} of {wanted[position]:.1f}"
+        if most and most.get(good, 0) * count > wanted[position] + 1e-9:
+            line += f" (up to {most[good] * count:g})"
+        lines.append(line)
+    return "\n".join(lines) or "-"
 
 
 def _other(construction: Construction) -> str:

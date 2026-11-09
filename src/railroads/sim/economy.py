@@ -6,7 +6,8 @@ water cell feeds two, every flat or forest cell one. Goods go no further than a 
 the cell and the cells next to it: each cell first serves its own needs, then shares what is
 left with the cells next to it, the hungriest first (unsatisfied cells weigh more than content
 ones, content more than satisfied). Factories make only as much as their inputs allow, so goods
-are shared out in ORDER, raw goods before what is made from them.
+are shared out in ORDER, raw goods before what is made from them; what they cannot make for want
+of inputs does not count against them as goods left unsold.
 
 Stations stand in between (railroads.sim.railway): after neighbours have shared, a station hands
 what trains brought to buildings within DELIVERY_RADIUS cells, unsatisfied ones first, then
@@ -186,6 +187,13 @@ class Trade:
     # Per station, the goods it handed out and the goods it gathered.
     handed: Mapping[Cell, Mapping[Good, float]] = field(default_factory=dict)
     gathered: Mapping[Cell, Mapping[Good, float]] = field(default_factory=dict)
+    # The same per kind of building and good: got and needed, gave and could make.
+    goods_got: Mapping[tuple[BuildingKind, Good], tuple[FloatCells, FloatCells]] = field(
+        default_factory=dict
+    )
+    goods_gave: Mapping[tuple[BuildingKind, Good], tuple[FloatCells, FloatCells]] = field(
+        default_factory=dict
+    )
 
     def done(self, kinds: tuple[BuildingKind, ...]) -> FloatCells:
         return sum(
@@ -244,6 +252,8 @@ class Economy:
         needed = {k: zero.copy() for k in count}
         gave = {k: zero.copy() for k in count}
         could_make = {k: zero.copy() for k in count}
+        goods_got: dict[tuple[BuildingKind, Good], tuple[FloatCells, FloatCells]] = {}
+        goods_gave: dict[tuple[BuildingKind, Good], tuple[FloatCells, FloatCells]] = {}
         input_share = {k: np.ones(cells.size) for k in count}
         handed: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
         gathered: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
@@ -285,14 +295,16 @@ class Economy:
             for kind, amount in want.items():
                 got[kind] += met * amount
                 needed[kind] += amount
+                goods_got[(kind, good)] = (met * amount, amount)
                 if kind in MAKES:
                     input_share[kind] = np.minimum(
                         input_share[kind], np.where(amount > 0, met, 1.0)
                     )
             for kind, amount in make.items():
                 gave[kind] += given * amount
-                could_make[kind] += count[kind] * MAKES[kind][good]
-        trade = Trade(cells, got, needed, gave, could_make, handed, gathered)
+                could_make[kind] += amount
+                goods_gave[(kind, good)] = (given * amount, amount)
+        trade = Trade(cells, got, needed, gave, could_make, handed, gathered, goods_got, goods_gave)
         self.levels[:] = Satisfaction.UNSATISFIED
         self.levels[cells] = trade.levels()
         return trade
