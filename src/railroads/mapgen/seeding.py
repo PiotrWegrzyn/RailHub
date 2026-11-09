@@ -17,8 +17,10 @@ from railroads.sim.growth import GROWTH, MONTHS_BEFORE_PLAY, Growth, GrowthRule,
 from railroads.sim.tilemap import Terrain, TileMap
 
 STATIONS_AFTER_MONTHS = 100 * 12
-# Before play, goods are shared out once a year instead of every month, to seed quickly.
+# Before play, goods are shared out and forests change once a year instead of every month, to
+# seed quickly.
 TRADE_EVERY_MONTHS = 12
+FORESTS_EVERY_MONTHS = 12
 # One station for this many land cells, beside at least STATION_PEOPLE population points.
 LAND_CELLS_PER_STATION = 3000
 STATION_PEOPLE = 3
@@ -32,8 +34,16 @@ def seed_buildings(
     months: int = MONTHS_BEFORE_PLAY,
     stations_after: int | None = STATIONS_AFTER_MONTHS,
 ) -> Constructions:
+    """Grows the map's buildings for `months` on a copy of the map, whose forests change as
+    they grow; the copy is the constructions' tile_map."""
+    tile_map = replace(tile_map, vegetation=tile_map.vegetation.copy())
     constructions = Constructions(tile_map)
-    grower = Growth(constructions, replace(growth, trade_every_months=TRADE_EVERY_MONTHS))
+    rule = replace(
+        growth,
+        trade_every_months=TRADE_EVERY_MONTHS,
+        forests_every_months=FORESTS_EVERY_MONTHS,
+    )
+    grower = Growth(constructions, rule)
     if stations_after is None or months <= stations_after:
         grower.run(months, rng)
         return constructions

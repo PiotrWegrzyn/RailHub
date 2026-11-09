@@ -137,7 +137,7 @@ content buildings; unsatisfied ones grow at half of them and thriving ones at on
 | Farms | 0.000008 + 0.00006 per population + 0.00004 per food | | flat grass; hills x0.5, barren x0.1, forest x0.02, cold x0.2, hot x0.6; river or lake x5, sea x2; none in mountains |
 | Orchards | 0.000002 + 0.000004 per population + 0.00002 per food | | hills; flat x0.5, hot x1.2, cold x0.05; river or lake x3, sea x2 |
 | Mines | 0.000008 + 0.0001 per ore | | mountains; hills x0.4, flat x0.01; beside mountains x3 |
-| Lumber mills | 0.00002 + 0.00005 per population | | forest with open land next to it; river x1.5 |
+| Lumber mills | 0.00008 + 0.0002 per population | | forest with at least 4 forest cells in its neighbourhood and flat open land next to it; river x1.5 |
 | Ports | 0.000004 + 0.00004 per population | 3 population | next to the sea, or a lake x0.3 |
 | Factories | 0.00001 per population + 0.00005 per industry + 0.0001 per timber | | flat; hills x0.5, forest x0.2; river x1.5 |
 | Food plants | 0.0002 per food + 0.00001 per population | 1 food, 3 population | as factories |
@@ -151,6 +151,15 @@ six tenements let three make way for a block of flats; three factories nearby ma
 and three big factories a mega factory. On a town or factory turn, a neighbourhood with 100
 population and 10 industry points puts up a skyscraper instead: it pulls down three blocks of
 flats and three points of factories and gives a corporate point.
+
+### Forests
+
+Forests come and go as the map grows. Each month a forest cell may be cleared: 0.00002 for every
+population or industry point in its neighbourhood, and 0.002, a hundred times as much, for every
+lumber mill there. Open grassland with nothing built on it turns to forest by 0.00007 for every
+forest cell next to it. A lumber mill left with fewer than 3 forest cells in its neighbourhood
+closes, so mills clear their patch of forest and move on. Wherever a forest comes or goes, the
+land weighs again for every ladder and for the food the land makes.
 
 ### Goods and satisfaction
 
@@ -204,7 +213,7 @@ cars, up to 6, which the train pulls when it leaves that stop for the next, so t
 way back can carry different goods; each car is for one good and holds 10 of it, so a food car
 carries only food. A new train starts at its first stop. The window shows what the train pulls
 now, and every station's stockpile and the goods waiting to be handed out there. Trains
-(`railroads.sim.railway`) run along the track at 30 cells a month on the flat, slower on hills,
+(`railroads.sim.railway`) run along the track at 60 cells a month on the flat, slower on hills,
 and each car slows them: an empty car weighs 1, a full one 2, and every unit of weight costs 8%
 of the engine's speed, so six full cars still run at about half of it. On the pixel map
 (`railroads.ui.pixel.trains`) a steam engine with its tender leads the cars, each drawn as pixel

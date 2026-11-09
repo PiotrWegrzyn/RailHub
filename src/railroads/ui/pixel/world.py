@@ -354,8 +354,9 @@ class PixelWorld:
         ]
 
     def buildings_changed(self, cells: Iterable[Cell]) -> set[tuple[int, int]]:
-        """Puts the scenery up again after buildings changed in `cells`; returns the chunks that
-        look different now."""
+        """Puts the ground and scenery up again after buildings or forests changed in `cells`;
+        returns the chunks that look different now."""
+        self._biomes = biome_grid(self.tile_map)
         self.scenery = Scenery.of(self.tile_map, self.constructions, self.projection, self.sheet)
         self._farm_cells = sorted(
             {

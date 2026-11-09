@@ -191,7 +191,7 @@ class MapView:
         satisfaction = self.growth.satisfaction()
         moods_changed = not np.array_equal(satisfaction, self._satisfaction)
         self._satisfaction = satisfaction
-        if moods_changed:
+        if moods_changed or self.growth.forests_changed:
             self._textures.clear()
             if self._pixels is not None:
                 self._pixels.refresh(self._pixels.world.satisfaction_changed(satisfaction))

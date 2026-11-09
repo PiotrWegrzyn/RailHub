@@ -27,6 +27,10 @@ leaves each kind unsatisfied, content or satisfied. A ladder's chances in a cell
 how its kinds of building fare across the cell's neighbourhood: x0.5 when unsatisfied, x1 when
 content, x1.5 when satisfied, and x1 where there are none yet.
 
+Forests come and go as well (railroads.sim.forests): people, industry and above all lumber mills
+clear them, they spread onto open grassland beside them, and the land weighs again wherever they
+changed.
+
 A new map runs this for MONTHS_BEFORE_PLAY before play starts; in play it carries on, one month
 every few minutes.
 """
@@ -41,13 +45,23 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import CELL_SPACE, Building, BuildingKind, Constructions
-from railroads.sim.economy import Economy, StationOrder, Trade, growth_factors, levels_of
+from railroads.sim.economy import (
+    Economy,
+    Neighbourhoods,
+    StationOrder,
+    Trade,
+    free_food,
+    growth_factors,
+    levels_of,
+)
+from railroads.sim.forests import FORESTS, ForestRule, forest_turn, forests_nearby
 from railroads.sim.grids import Cell
 from railroads.sim.railway import STOCKPILE, Railway
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 
 IntGrid = npt.NDArray[np.int64]
 FloatGrid = npt.NDArray[np.float64]
+Cells = npt.NDArray[np.intp]
 
 
 class Points(Enum):
@@ -104,34 +118,54 @@ class Land:
     water: Mapping[Terrain, float] = field(default_factory=dict)
     # Weight for a cell with mountains next to it.
     beside_mountains: float = 1.0
-    # Only where at least one cell next to it is open land, not forest.
+    # Only where at least one cell next to it is flat open land: not forest, not water.
     forest_edge: bool = False
+    # Only where the neighbourhood holds at least this many forest cells.
+    least_forest_nearby: int = 0
 
-    def weights(self, tile_map: TileMap) -> FloatGrid:
-        vegetation = np.array([self.vegetation.get(v, 1.0) for v in Vegetation])
-        relief = np.array([self.relief.get(r, 1.0) for r in Relief])
-        temperature = np.array([self.temperature.get(t, 1.0) for t in Temperature])
+    def weights(
+        self,
+        tile_map: TileMap,
+        cells: npt.NDArray[np.intp] | None = None,
+        near: Cells | None = None,
+    ) -> FloatGrid:
+        """The weight of every cell as a grid, or of the given flat cells alone. `near` holds
+        every cell's neighbours as flat indices, one past the last cell for off the map."""
+        size = tile_map.grid.rows * tile_map.grid.cols
+        if near is None:
+            near = Neighbourhoods(tile_map.grid).index
+        chosen = np.arange(size) if cells is None else cells
+        terrain = tile_map.terrain.ravel()
+        vegetation = tile_map.vegetation.ravel()
+        relief = tile_map.relief.ravel()
+        around = near[:, chosen]
+        real = around < size
+        around = np.where(real, around, 0)
+        vegetation_weights = np.array([self.vegetation.get(v, 1.0) for v in Vegetation])
+        relief_weights = np.array([self.relief.get(r, 1.0) for r in Relief])
+        temperature_weights = np.array([self.temperature.get(t, 1.0) for t in Temperature])
         water = np.array([self.water.get(t, 1.0) for t in Terrain])
-        rows, cols = tile_map.grid.neighbour_index_grids()
-        around = tile_map.terrain[rows, cols]
-        is_water = around != Terrain.LAND
-        best = np.where(is_water, water[around], 0.0).max(axis=0)
+        terrain_around = terrain[around]
+        is_water = real & (terrain_around != Terrain.LAND)
+        best = np.where(is_water, water[terrain_around], 0.0).max(axis=0)
         by_water = np.where(is_water.any(axis=0), best, water[Terrain.LAND])
         weight = (
-            vegetation[tile_map.vegetation]
-            * relief[tile_map.relief]
-            * temperature[tile_map.temperature]
+            vegetation_weights[vegetation[chosen]]
+            * relief_weights[relief[chosen]]
+            * temperature_weights[tile_map.temperature.ravel()[chosen]]
             * by_water
         )
-        real = (rows != np.indices(tile_map.grid.shape)[0]) | (
-            cols != np.indices(tile_map.grid.shape)[1]
-        )
-        beside = tile_map.relief[rows, cols] == Relief.MOUNTAINS
-        weight = weight * np.where((beside & real).any(axis=0), self.beside_mountains, 1.0)
+        beside = real & (relief[around] == Relief.MOUNTAINS)
+        weight = weight * np.where(beside.any(axis=0), self.beside_mountains, 1.0)
+        forest_around = real & (vegetation[around] == Vegetation.FOREST) & ~is_water
         if self.forest_edge:
-            open_land = (tile_map.vegetation[rows, cols] != Vegetation.FOREST) & ~is_water
-            weight = weight * (open_land & real).any(axis=0)
-        return np.where(tile_map.terrain == Terrain.LAND, weight, 0.0)
+            open_flat = real & ~is_water & ~forest_around & (relief[around] == Relief.FLAT)
+            weight = weight * open_flat.any(axis=0)
+        if self.least_forest_nearby:
+            forests = forest_around.sum(axis=0) + (vegetation[chosen] == Vegetation.FOREST)
+            weight = weight * (forests >= self.least_forest_nearby)
+        weight = np.where(terrain[chosen] == Terrain.LAND, weight, 0.0)
+        return weight.reshape(tile_map.grid.shape) if cells is None else weight
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,8 +264,9 @@ MINES = Ladder(
     most_per_cell=2,
     most_nearby=5,
 )
-# Lumber mills stand at the edge of forests, best by a river to float the logs and near towns to
-# buy them.
+# Lumber mills stand in forests with at least four forest cells around them and flat open land
+# beside them, best by a river to float the logs and near towns to buy them. They clear the forest
+# around them (railroads.sim.forests) and close once it is gone.
 LUMBER_MILLS = Ladder(
     kinds=(BuildingKind.LUMBER_MILL,),
     land=Land(
@@ -240,9 +275,10 @@ LUMBER_MILLS = Ladder(
         temperature={Temperature.HOT: 0.6},
         water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.2, Terrain.SEA: 1.0},
         forest_edge=True,
+        least_forest_nearby=4,
     ),
-    base_chance=0.00002,
-    chance_per_point={Points.POPULATION: 0.00005},
+    base_chance=0.00008,
+    chance_per_point={Points.POPULATION: 0.0002},
     most_per_cell=1,
     most_nearby=2,
 )
@@ -328,20 +364,24 @@ class GrowthRule:
     points: Mapping[BuildingKind, tuple[Points, int]] = field(default=POINTS)
     skyscraper_people: int = SKYSCRAPER_PEOPLE
     skyscraper_industry: int = SKYSCRAPER_INDUSTRY
+    # How forests are cleared and spread, if they change at all, and how often.
+    forests: ForestRule | None = FORESTS
+    forests_every_months: int = 1
 
 
 GROWTH = GrowthRule()
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class _Place:
     """Where a ladder can grow: its cells as flat indices, every cell's weight for its land
-    alone and scaled by satisfaction, and every cell's chance before the ladder's needs, kept up
-    to date as buildings come and go."""
+    alone, its satisfaction factor and the two together, and every cell's chance before the
+    ladder's needs, kept up to date as buildings and forests come and go."""
 
     ladder: Ladder
-    cells: npt.NDArray[np.intp]
+    cells: Cells
     land: FloatGrid
+    factors: FloatGrid
     weights: FloatGrid
     chances: FloatGrid
 
@@ -363,16 +403,27 @@ class Growth:
         self._nearby = {
             points: self._neighbourhood_sum(self.points(points), rows, cols) for points in Points
         }
+        self.economy = Economy(tile_map)
+        self._near = self.economy.neighbourhoods.index
         self._places = []
+        everywhere = np.arange(grid.rows * grid.cols)
         for ladder in rule.ladders:
-            land = ladder.land.weights(tile_map).ravel()
+            land = ladder.land.weights(tile_map, everywhere, self._near)
             chances = np.full(land.size, ladder.base_chance)
             for points, per_point in ladder.chance_per_point.items():
                 chances += per_point * self._nearby[points].ravel()
             self._places.append(
-                _Place(ladder, np.flatnonzero(land > 0), land, land.copy(), chances * land)
+                _Place(
+                    ladder,
+                    np.flatnonzero(land > 0),
+                    land,
+                    np.ones(land.size),
+                    land.copy(),
+                    chances * land,
+                )
             )
-        self.economy = Economy(tile_map)
+        # The cells whose forest came or went in the last month.
+        self.forests_changed: set[Cell] = set()
         self.trade: Trade | None = None
         # Trains and their stations, once the player has any (railroads.sim.railway).
         self.railway: Railway | None = None
@@ -491,6 +542,7 @@ class Growth:
         """Scales the ladder's land weights in these cells by their satisfaction factors."""
         if not cells.size:
             return
+        place.factors[cells] = factors
         weights = place.land[cells] * factors
         raw = np.full(cells.size, place.ladder.base_chance)
         for points, per_point in place.ladder.chance_per_point.items():
@@ -537,14 +589,56 @@ class Growth:
         """Grows one month; returns the cells whose buildings changed."""
         self._months += 1
         changed: set[Cell] = set()
+        self.forests_changed = set()
         if self.rule.trades and self._months % self.rule.trade_every_months == 0:
             changed = self.trade_goods()
+        every = self.rule.forests_every_months
+        if self.rule.forests is not None and self._months % every == 0:
+            changed |= self._change_forests(self.rule.forests, every, rng)
         turns: list[tuple[int, Ladder]] = []
         for place in self._places:
             turns += [(index, place.ladder) for index in self._hits(place, rng).tolist()]
         for turn in rng.permutation(len(turns)).tolist():
             index, ladder = turns[turn]
             changed |= self._turn(divmod(index, self._grid.cols), ladder)
+        return changed
+
+    def _change_forests(self, rule: ForestRule, months: int, rng: np.random.Generator) -> set[Cell]:
+        """Clears and spreads forests over `months`, closes the lumber mills left without
+        forest, and weighs the land again around them; returns the cells that changed."""
+        tile_map = self.constructions.tile_map
+        people = (self._nearby[Points.POPULATION] + self._nearby[Points.INDUSTRY]).ravel()
+        mills = self._nearby[Points.TIMBER].ravel()
+        cleared, grown = forest_turn(tile_map, self._near, people, mills, rule, months, rng)
+        cols = self._grid.cols
+        grown = np.array(
+            [index for index in grown.tolist() if not self.constructions.at(divmod(index, cols))],
+            dtype=np.intp,
+        )
+        if not cleared.size and not grown.size:
+            return set()
+        tile_map.set_vegetation(cleared, Vegetation.GRASS)
+        tile_map.set_vegetation(grown, Vegetation.FOREST)
+        changed_cells = np.concatenate([cleared, grown])
+        self.forests_changed = {divmod(index, cols) for index in changed_cells.tolist()}
+        changed = set(self.forests_changed)
+        if BuildingKind.LUMBER_MILL in self._counts:
+            count = self._counts[BuildingKind.LUMBER_MILL]
+            forests = forests_nearby(tile_map, self._near).reshape(self._grid.shape)
+            for row, col in np.argwhere((count > 0) & (forests < rule.mills_close_below)).tolist():
+                for _ in range(int(count[row, col])):
+                    self._take_down(Building((row, col), BuildingKind.LUMBER_MILL))
+                changed.add((row, col))
+        self.economy.free_food = free_food(tile_map)
+        around = self._near[:, changed_cells].ravel()
+        touched = np.unique(np.concatenate([changed_cells, around[around < self._near.shape[1]]]))
+        for place in self._places:
+            land = place.ladder.land.weights(tile_map, touched, self._near)
+            opened = (land > 0) != (place.land[touched] > 0)
+            place.land[touched] = land
+            if opened.any():
+                place.cells = np.flatnonzero(place.land > 0)
+            self._reweigh(place, touched, place.factors[touched])
         return changed
 
     def run(self, months: int, rng: np.random.Generator) -> None:

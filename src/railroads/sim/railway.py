@@ -21,7 +21,7 @@ from railroads.sim.track_rules import track_rules_for
 
 TRAIN_COST_NAME = "Steam engine"
 # How far a train runs in a month, in cells, on flat ground.
-CELLS_PER_MONTH = 30.0
+CELLS_PER_MONTH = 60.0
 MAX_CARS = 6
 # A full car weighs this much more than an empty one, which counts 1; each car's weight slows the
 # train by DRAG_PER_CAR of the engine's speed alone, so six full cars still make about half of it.
@@ -75,6 +75,8 @@ class Train:
     arrivals: int = 0
     # How much longer it will wait at the stop it is leaving for its cars to fill, in months.
     waiting: float = 0.0
+    # The station whose cars it pulls, where they were filled.
+    loaded_at: Cell | None = None
     path: list[Point] = field(default_factory=list)
     speeds: list[float] = field(default_factory=list)
     along: float = 0.0
@@ -112,10 +114,14 @@ class Train:
         self.path = []
 
     def cars_changed(self) -> None:
-        """Takes in new cars at a stop. A train still on its first trip goes back to its first
-        stop to take them on, so the cars set up after the stops still carry goods that trip;
-        later on, changes show at the next call."""
-        if self.arrivals == 0:
+        """Takes in new cars at a stop. A train standing at a stop calls there again to swap
+        its cars, and one still on its first trip goes back to its first stop for them, so the
+        cars set up after the stops still carry goods that trip; later on, changes show at the
+        next call."""
+        if not self.path:
+            self.called = False
+            self.waiting = 0.0
+        elif self.arrivals == 0:
             self.restart()
 
 
@@ -273,13 +279,36 @@ class Railway:
             train.status = "Its stop has no station"
             return
         goods = self.station_goods(stop.cell)
-        for car in train.cars:
-            if car.load > 0:
-                goods.brought[car.good] = goods.brought.get(car.good, 0.0) + car.load
-        train.cars = [Car(good) for good in stop.cars]
+        if train.loaded_at == stop.cell:
+            train.cars = self._swap_cars(train.cars, stop.cars, goods)
+        else:
+            for car in train.cars:
+                if car.load > 0:
+                    goods.brought[car.good] = goods.brought.get(car.good, 0.0) + car.load
+            train.cars = [Car(good) for good in stop.cars]
+        train.loaded_at = stop.cell
         self._load(train, stop)
         if stop.wait_for_load and train.cars and not train.full:
             train.waiting = WAIT_MONTHS
+
+    @staticmethod
+    def _swap_cars(cars: list[Car], wanted: list[Good], goods: StationGoods) -> list[Car]:
+        """Swaps a train's cars for the wanted ones at the station that filled them: each wanted
+        car keeps the fullest car of its good, and what dropped cars held goes back into the
+        stockpile."""
+        left = sorted(cars, key=lambda car: -car.load)
+        kept = []
+        for good in wanted:
+            car = next((car for car in left if car.good == good), None)
+            if car is None:
+                kept.append(Car(good))
+            else:
+                left.remove(car)
+                kept.append(car)
+        for car in left:
+            if car.load > 0:
+                goods.stockpile[car.good] = goods.stockpile.get(car.good, 0.0) + car.load
+        return kept
 
     def _load(self, train: Train, stop: Stop) -> None:
         """Tops each car up from the stop's stockpile."""

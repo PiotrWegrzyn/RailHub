@@ -241,3 +241,37 @@ def test_later_car_changes_wait_for_the_next_call() -> None:
 
     assert train.arrivals >= 1
     assert train.heading == heading
+
+
+def test_removing_one_loaded_car_keeps_the_others_full_and_returns_its_goods() -> None:
+    _, railway = joined_stations()
+    stockpile = railway.station_goods((6, 3)).stockpile
+    stockpile[Good.FOOD] = 80.0
+    train = railway.buy()
+    train.stops = [Stop((6, 3), [Good.FOOD] * MAX_CARS, wait_for_load=False), Stop((6, 20))]
+    railway.run(0.001)
+
+    train.stops[0].cars.pop()
+    train.cars_changed()
+    railway.run(0.001)
+
+    assert [car.load for car in train.cars] == [CAR_CAPACITY] * (MAX_CARS - 1)
+    assert stockpile[Good.FOOD] == pytest.approx(30.0)
+    assert railway.station_goods((6, 3)).brought == {}
+
+
+def test_a_train_called_back_on_its_first_trip_keeps_what_it_loaded() -> None:
+    _, railway = joined_stations()
+    railway.station_goods((6, 3)).stockpile[Good.FOOD] = 60.0
+    train = railway.buy()
+    train.stops = [Stop((6, 3), [Good.FOOD] * MAX_CARS), Stop((6, 20))]
+    railway.run(0.2)
+    running = bool(train.path)
+
+    train.stops[0].cars.pop()
+    train.cars_changed()
+    railway.run(0.001)
+
+    assert running
+    assert [car.load for car in train.cars] == [CAR_CAPACITY] * (MAX_CARS - 1)
+    assert railway.station_goods((6, 3)).stockpile[Good.FOOD] == pytest.approx(10.0)

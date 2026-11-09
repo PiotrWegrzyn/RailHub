@@ -106,7 +106,7 @@ def test_land_weights_of_one_cell_multiply_and_the_best_water_counts() -> None:
         (FARMS, (5, 5), True),
         (FARMS, (2, 6), True),
         (FARMS, (5, -1), False),
-        (LUMBER_MILLS, (1, 6), True),
+        (LUMBER_MILLS, (1, 6), False),
         (LUMBER_MILLS, (5, 5), False),
         (MINES, (5, -1), True),
         (MINES, (5, 5), True),

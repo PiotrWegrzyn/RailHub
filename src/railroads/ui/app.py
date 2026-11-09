@@ -72,12 +72,10 @@ def main() -> None:
         title = f"Seed {seed}, {game.place}"
 
     print(f"Growing towns for {args.years} years and placing industry")
-    views = {
-        kind: MapView(
-            tile_maps[kind],
-            seed_buildings(tile_maps[kind], np.random.default_rng(seed), months=args.years * 12),
-        )
+    seeded = {
+        kind: seed_buildings(tile_maps[kind], np.random.default_rng(seed), months=args.years * 12)
         for kind in GRID_CHOICES
     }
+    views = {kind: MapView(seeded[kind].tile_map, seeded[kind]) for kind in GRID_CHOICES}
     app = App(views, shown="hex", title=title, rng=np.random.default_rng(seed + 1))
     immapp.run(gui_function=app.gui, window_title=f"Railroads: {title}", window_size=(1280, 800))

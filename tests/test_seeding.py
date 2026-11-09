@@ -8,6 +8,8 @@ from railroads.mapgen.seeding import (
     seed_buildings,
 )
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Track
+from railroads.sim.economy import Neighbourhoods
+from railroads.sim.forests import MILLS_CLOSE_BELOW, forests_nearby
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth, Points
@@ -75,7 +77,6 @@ def test_seeding_grows_towns_and_the_industry_that_suits_the_land(country: Const
     ("kind", "allowed"),
     [
         (BuildingKind.FARM, lambda t: t.vegetation != Vegetation.FOREST),
-        (BuildingKind.LUMBER_MILL, lambda t: t.vegetation == Vegetation.FOREST),
         (BuildingKind.MINE, lambda t: t.relief != Relief.FLAT),
     ],
 )
@@ -89,6 +90,19 @@ def test_seeded_industry_mostly_stands_where_its_land_suits_it(
     suited = [allowed(tile_map.tile(b.cell)) for b in built]  # type: ignore[operator]
     assert built
     assert np.mean(suited) > 0.9
+
+
+def test_seeded_lumber_mills_all_keep_enough_forest_around_them(country: Constructions) -> None:
+    tile_map = country.tile_map
+    forests = forests_nearby(tile_map, Neighbourhoods(tile_map.grid).index)
+
+    mills = buildings_of(country, BuildingKind.LUMBER_MILL)
+
+    assert mills
+    assert all(
+        forests[np.ravel_multi_index(mill.cell, tile_map.grid.shape)] >= MILLS_CLOSE_BELOW
+        for mill in mills
+    )
 
 
 def test_ports_stand_by_the_water(country: Constructions) -> None:

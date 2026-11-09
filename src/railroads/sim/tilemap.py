@@ -75,6 +75,13 @@ class TileMap:
                 raise ValueError(f"{layer} is {values.shape} but the grid is {self.grid.shape}")
             values.setflags(write=False)
 
+    def set_vegetation(self, cells: npt.NDArray[np.intp], vegetation: Vegetation) -> None:
+        """Changes the vegetation of these flat cells, as forests come and go; every other layer
+        stays as the map was made."""
+        self.vegetation.setflags(write=True)
+        self.vegetation.flat[cells] = vegetation
+        self.vegetation.setflags(write=False)
+
     def tile(self, cell: Cell) -> Tile:
         return Tile(
             terrain=Terrain(self.terrain[cell]),
