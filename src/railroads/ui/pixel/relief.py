@@ -158,22 +158,34 @@ class Elevation:
         rise, _, _ = self.rise(x, y)
         return self.to_lift(rise).astype(np.float64)
 
-    def area(self, left: int, top: int, width: int, rows: int) -> Raised | None:
+    def area(
+        self, left: int, top: int, width: int, rows: int, resolution: int = 1
+    ) -> Raised | None:
         """The raised ground over `width` by `rows` art pixels from (`left`, `top`), at the
-        middle of each; None where nothing there rises."""
-        py, px = np.mgrid[0:rows, 0:width]
-        x, y = self.projection.to_plane(left + px + 0.5, top + py + 0.5)
+        middle of each of `resolution` pixels a side in every art pixel, with its lift in those
+        pixels; None where nothing there rises."""
+        k = resolution
+        py, px = np.mgrid[0 : rows * k, 0 : width * k]
+        x, y = self.projection.to_plane(left + (px + 0.5) / k, top + (py + 0.5) / k)
         rise, m, h = self.rise(x, y)
         if not (m > 0).any() and not (h > 0).any():
             return None
         height = sample(self._valley, x * STEPS, y * STEPS).astype(np.float32) + rise
-        shade, steep = self._light(height)
-        return Raised(self.to_lift(rise), rise, m, h, shade, steep)
+        shade, steep = self._light(height, k)
+        return Raised(self.to_lift(rise) * k, rise, m, h, shade, steep)
 
-    def _light(self, height: Floats) -> tuple[Floats, Floats]:
-        """How much light ground of these heights, one per art pixel, catches, and how steep it
-        is (0 flat, nearing 1 sheer)."""
+    def rises_in(self, left: int, top: int, width: int, rows: int) -> bool:
+        """Whether any ground over these art pixels rises, from a sample every few pixels."""
+        py, px = np.mgrid[0:rows:4, 0:width:4]
+        x, y = self.projection.to_plane(left + px + 0.5, top + py + 0.5)
+        m, h = self._shares(x, y)
+        return bool((m > 0).any() or (h > 0).any())
+
+    def _light(self, height: Floats, resolution: int = 1) -> tuple[Floats, Floats]:
+        """How much light ground of these heights, `resolution` to an art pixel each way,
+        catches, and how steep it is (0 flat, nearing 1 sheer)."""
         per_row, per_col = np.gradient(height)
+        per_row, per_col = per_row * resolution, per_col * resolution
         # A plane step moves the pixel by the projection's columns, so height per plane unit is
         # height per pixel along them.
         m = self.projection.matrix

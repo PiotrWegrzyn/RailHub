@@ -130,8 +130,12 @@ pixels per art pixel.
     and every zoom on a Retina screen), track, trees and buildings are drawn at 2× from the finer
     sprite sheet, so their outlines and windows stay thin. Ground, hills and mountains are worked
     out at 1× and blown up.
-  - **Cost:** a chunk takes about 30 ms to draw, or about 95 ms over mountains. The heights are
+  - **Cost:** a chunk takes about 30 ms to draw, or about 80 ms over mountains. The heights are
     worked out once, about 0.3 s when the pixel map is first shown.
+  - **Sharper mountains in the background** (`layer`): a chunk where hills or mountains rise shows
+    first as it is quickly drawn. A worker then draws it again in the background with the heights,
+    lift and colours of its raised ground at 2× (about 0.3 s), and that takes its place once
+    ready. A chunk drawn again because something in it changed is refined again the same way.
 - `railroads.ui.map_view`: the map view, which owns the layers and the order they draw in. Beside it:
   `map_input` (mouse and keys), `map_tools` (what clicks do with each build tool), `map_overlays`
   (outlines, grid lines, station names, compass, search marks, the status strip and hover card)

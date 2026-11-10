@@ -1,10 +1,16 @@
 """Shows the pixel art on screen: chunks are drawn as the view reaches them, a few per frame, and
 kept as textures blown up to the zoom's pixel scale. Where each art pixel covers an even number
 of screen pixels the chunks are drawn finer (PixelWorld.render), so buildings, trees and track keep
-thin lines instead of growing blocky."""
+thin lines instead of growing blocky.
+
+Chunks where hills or mountains rise show first as they are quickly drawn, then a worker in the
+background draws them again with the heights, lift and colours of their raised ground at the full
+resolution, and the finer drawing takes their place once it is ready. A chunk drawn again because
+something in it changed is refined again the same way."""
 
 import time
 from collections import OrderedDict
+from concurrent.futures import Future, ThreadPoolExecutor
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
@@ -36,6 +42,12 @@ class PixelLayer:
         self._chunks: OrderedDict[tuple[int, int, int], Rgba] = OrderedDict()
         self._textures: OrderedDict[tuple[int, int, int], hello_imgui.TextureGpu] = OrderedDict()
         self._stale: set[tuple[int, int, int]] = set()
+        # Chunks being drawn again with fine raised ground, and how many times each chunk has
+        # been refreshed, so a drawing started before a refresh is thrown away.
+        self._worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="relief")
+        self._refining: dict[tuple[int, int, int], tuple[int, Future[Rgba]]] = {}
+        self._refined: set[tuple[int, int, int]] = set()
+        self._refreshes: dict[ChunkKey, int] = {}
 
     def refresh(self, chunks: set[ChunkKey]) -> None:
         """Draws these chunks again next time they show, keeping their old textures on screen
@@ -43,6 +55,25 @@ class PixelLayer:
         for key in [key for key in self._chunks if key[:2] in chunks]:
             del self._chunks[key]
         self._stale |= {key for key in self._textures if key[:2] in chunks}
+        for chunk in chunks:
+            self._refreshes[chunk] = self._refreshes.get(chunk, 0) + 1
+        self._refined = {key for key in self._refined if key[:2] not in chunks}
+
+    def take_refined(self) -> set[ChunkKey]:
+        """Puts in place the chunks the worker has finished drawing finely; returns them."""
+        taken: set[ChunkKey] = set()
+        for drawn, (refreshes, job) in list(self._refining.items()):
+            if not job.done():
+                continue
+            del self._refining[drawn]
+            chunk = drawn[:2]
+            if job.exception() is not None or refreshes != self._refreshes.get(chunk, 0):
+                continue
+            self._chunks[drawn] = job.result()
+            self._refined.add(drawn)
+            self._stale |= {key for key in self._textures if key[:2] == chunk}
+            taken.add(chunk)
+        return taken
 
     def draw(
         self,
@@ -61,6 +92,7 @@ class PixelLayer:
             clip,
         )
         density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
+        self.take_refined()
         started = time.perf_counter()
         drawn_new = False
         complete = True
@@ -83,6 +115,18 @@ class PixelLayer:
             self._stale.discard(self._textures.popitem(last=False)[0])
         return complete
 
+    def _refine(self, drawn: tuple[int, int, int]) -> None:
+        """Has the worker draw a chunk again with fine raised ground, if it has any and is not
+        drawn finely already."""
+        resolution = drawn[2]
+        if resolution == 1 or drawn in self._refined or drawn in self._refining:
+            return
+        if not self.world.rises(*drawn[:2]):
+            return
+        refreshes = self._refreshes.get(drawn[:2], 0)
+        job = self._worker.submit(self.world.render, *drawn[:2], resolution, True)
+        self._refining[drawn] = (refreshes, job)
+
     def _chunk_bytes(self) -> int:
         return sum(pixels.nbytes for pixels in self._chunks.values())
 
@@ -96,9 +140,11 @@ class PixelLayer:
         if pixels is None:
             pixels = self.world.render(*chunk, resolution)
             self._chunks[drawn] = pixels
+            self._refined.discard(drawn)
             while len(self._chunks) > 1 and self._chunk_bytes() > CHUNK_BUDGET:
                 self._chunks.popitem(last=False)
         self._chunks.move_to_end(drawn)
+        self._refine(drawn)
         blow_up = scale // resolution
         big = np.repeat(np.repeat(pixels, blow_up, axis=0), blow_up, axis=1)
         texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))

@@ -21,7 +21,7 @@ import numpy.typing as npt
 
 from railroads.sim.constructions import Constructions
 from railroads.sim.grids import Cell
-from railroads.sim.tilemap import TileMap
+from railroads.sim.tilemap import Relief, TileMap
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
 from railroads.ui.pixel.ground import Ground
 from railroads.ui.pixel.projection import CHUNK, FloatArray, IntArray, PixelProjection, Rgba
@@ -116,11 +116,22 @@ class PixelWorld:
                     chunks.add((cx, cy))
         return chunks
 
-    def render(self, chunk_x: int, chunk_y: int, resolution: int = 1) -> Rgba:
+    def rises(self, chunk_x: int, chunk_y: int) -> bool:
+        """Whether any hills or mountains rise in a chunk, or in the ground below it that it
+        shows lifted."""
+        return self.elevation.rises_in(chunk_x * CHUNK, chunk_y * CHUNK, CHUNK, CHUNK + MOST_LIFT)
+
+    def render(
+        self, chunk_x: int, chunk_y: int, resolution: int = 1, fine_relief: bool = False
+    ) -> Rgba:
         """One chunk as RGBA pixels, `resolution` of them for every art pixel each way; off the
         map it is clear. Above 1 the ground is blown up and the track and everything standing
         on it are drawn that much finer. Where hills and mountains rise, the ground with its
-        track is lifted, so the chunk shows ground from below it too."""
+        track is lifted, so the chunk shows ground from below it too; with `fine_relief` their
+        heights, lift and colours are worked out at the full resolution too, which is smoother
+        and slower."""
+        if fine_relief and resolution > 1:
+            return self._render_fine(chunk_x, chunk_y, resolution)
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
         raised = self.elevation.area(left, top, CHUNK, CHUNK + MOST_LIFT)
         offset = None if raised is None else raycast(raised.lift, CHUNK, CHUNK)
@@ -133,6 +144,32 @@ class PixelWorld:
         if offset is not None:
             canvas = raise_picture(canvas, offset, resolution)
         self._stand_scenery(canvas, left, top, resolution)
+        alpha = canvas[..., 3:]
+        canvas[..., :3] /= np.maximum(alpha, 1e-6)
+        return np.ascontiguousarray(np.rint(np.clip(canvas, 0, 1) * 255).astype(np.uint8))
+
+    def _render_fine(self, chunk_x: int, chunk_y: int, k: int) -> Rgba:
+        left, top = chunk_x * CHUNK, chunk_y * CHUNK
+        raised = self.elevation.area(left, top, CHUNK, CHUNK + MOST_LIFT + 1, k)
+        if raised is None:
+            return self.render(chunk_x, chunk_y, k)
+        offset = raycast(raised.lift, CHUNK * k, CHUNK * k)
+        rows = -(-(CHUNK * k + int(offset.max()) + 1) // k)
+        rgb, alpha = self.ground.render(left, top, rows)
+        rgb = rgb.repeat(k, axis=0).repeat(k, axis=1)
+        alpha = alpha.repeat(k, axis=0).repeat(k, axis=1)
+        py, px = np.mgrid[0 : rows * k, 0 : CHUNK * k]
+        x, y = self.projection.to_plane(left + (px + 0.5) / k, top + (py + 0.5) / k)
+        grid = self.tile_map.grid
+        r, c = grid.cell_at(x, y)
+        r, c = np.clip(r, 0, grid.rows - 1), np.clip(c, 0, grid.cols - 1)
+        rocky = self.tile_map.relief[r, c] == Relief.MOUNTAINS
+        self.elevation.colour(rgb, raised.top(rows * k), x, y, rocky)
+        rgb = np.clip(rgb, 0, 255) * alpha[..., None]
+        canvas = np.concatenate([rgb / 255, alpha[..., None]], axis=-1)
+        self._lay_track(canvas, left, top, k)
+        canvas = raise_picture(canvas, offset, 1)
+        self._stand_scenery(canvas, left, top, k)
         alpha = canvas[..., 3:]
         canvas[..., :3] /= np.maximum(alpha, 1e-6)
         return np.ascontiguousarray(np.rint(np.clip(canvas, 0, 1) * 255).astype(np.uint8))

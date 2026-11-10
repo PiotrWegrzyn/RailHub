@@ -126,3 +126,34 @@ def test_marks_on_the_map_follow_the_raised_ground() -> None:
     assert raised[0] == flat[0]
     assert flat[1] - raised[1] == float(elevation.lift(x, y)) * camera.pixel_scale
     assert 0 < flat[1] - raised[1] <= MOST_LIFT * camera.pixel_scale
+
+
+def world_over_mountains() -> tuple[PixelWorld, tuple[int, int], tuple[int, int]]:
+    tile_map = mountain_map()
+    look = LOOKS[tile_map.grid.kind]
+    world = PixelWorld(
+        tile_map,
+        Constructions(tile_map),
+        SpriteSheet.load(),
+        look.angle_deg,
+        look.cell_units,
+        fine=SpriteSheet.load_fine(),
+    )
+    grid = tile_map.grid
+    chunks = []
+    for col in (25, 3):
+        px, py = world.projection.to_pixels(*grid.center(10, col))
+        chunks.append((int(px) // 256, int(py) // 256))
+    return world, chunks[0], chunks[1]
+
+
+def test_fine_relief_draws_raised_ground_finely_and_flat_ground_as_before() -> None:
+    world, mountains, plains = world_over_mountains()
+
+    fast, fine = world.render(*mountains, 2), world.render(*mountains, 2, fine_relief=True)
+
+    assert fine.shape == fast.shape
+    assert (fine != fast).any(axis=-1).mean() > 0.05
+    assert world.rises(*mountains)
+    assert not world.rises(*plains)
+    np.testing.assert_array_equal(world.render(*plains, 2, True), world.render(*plains, 2))
