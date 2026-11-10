@@ -24,6 +24,8 @@ from railroads.ui.pixel.trains import (
 from railroads.ui.pixel.world import PixelWorld
 
 SMOKE = (0.88, 0.88, 0.9)
+# The biggest texture a graphics card takes on each side; a bigger one draws black.
+MAX_TEXTURE = 16384
 PUFFS = 5
 
 
@@ -132,7 +134,9 @@ class TrainLayer:
     def _texture(self, device_scale: int) -> tuple[hello_imgui.TextureGpu, int]:
         """The sprite sheet blown up by a whole number so it shows crisp at this many device
         pixels per art pixel, and by how much it was blown up."""
-        factor = max(1, device_scale // DETAIL)
+        height, width = self.sprites.image.shape[:2]
+        fits = max(1, MAX_TEXTURE // max(height, width))
+        factor = max(1, min(device_scale // DETAIL, fits))
         if factor not in self._textures:
             big = np.repeat(np.repeat(self.sprites.image, factor, axis=0), factor, axis=1)
             texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))

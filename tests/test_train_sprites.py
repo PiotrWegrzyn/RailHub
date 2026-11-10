@@ -4,8 +4,10 @@ import numpy as np
 
 from railroads.sim.goods import Good
 from railroads.sim.grids import HexGrid
+from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, ZOOM_CELL_WIDTHS
 from railroads.ui.pixel.projection import PixelProjection
-from railroads.ui.pixel.trains import HEADINGS, MODELS, Look, render, train_sprites
+from railroads.ui.pixel.train_layer import MAX_TEXTURE
+from railroads.ui.pixel.trains import DETAIL, HEADINGS, MODELS, Look, render, train_sprites
 
 
 def projection() -> PixelProjection:
@@ -47,3 +49,13 @@ def test_the_nearest_heading_is_picked() -> None:
     almost_east = sprites.place(Look.ENGINE, 2 * math.pi - 0.01)
 
     assert east == almost_east
+
+
+def test_the_sheet_blown_up_for_the_closest_zoom_on_a_sharp_screen_still_fits_a_texture() -> None:
+    projection = PixelProjection.of(HexGrid(rows=10, cols=10, km_per_cell=2.0), 0.0, 1.0)
+    closest = ZOOM_CELL_WIDTHS[-1] // PIXEL_CELL_WIDTH * 2
+
+    sprites = train_sprites(tuple(float(v) for v in projection.matrix.ravel()))
+
+    height, width = sprites.image.shape[:2]
+    assert max(height, width) * (closest // DETAIL) <= MAX_TEXTURE

@@ -786,14 +786,16 @@ class TrainSprites:
 
 @cache
 def train_sprites(matrix_key: tuple[float, float, float, float]) -> TrainSprites:
-    """All the train looks for a map projection, given as its matrix's four numbers."""
+    """All the train looks for a map projection, given as its matrix's four numbers, packed
+    on a roughly square sheet so it stays within MAX_TEXTURE when blown up for the closest zoom."""
     matrix = np.array(matrix_key, dtype=np.float64).reshape(2, 2)
     sprites = {
         (look, index): render(make(), 2 * math.pi * index / HEADINGS, matrix)
         for look, make in MODELS.items()
         for index in range(HEADINGS)
     }
-    width = 1024
+    area = sum(sprite.image.size[0] * (sprite.image.size[1] + 1) for sprite in sprites.values())
+    width = math.ceil(math.sqrt(area * 1.15) / 64) * 64
     x = y = row = 0
     places = {}
     for key, sprite in sprites.items():
