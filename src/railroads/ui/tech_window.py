@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from imgui_bundle import imgui
 
 from railroads.sim.finance import dollars
-from railroads.sim.railway import ENGINES
 from railroads.sim.tech import NODES, TREES, Effect, Node, Research, Tree, xp_for
+from railroads.sim.trains import ENGINES
 from railroads.ui.theme import BRASS
 
 WINDOW_SIZE = (760.0, 520.0)

@@ -23,9 +23,9 @@ from railroads.sim.goods import Good
 from railroads.sim.grids import Cell
 from railroads.sim.ladders import Points
 from railroads.sim.novelties import Novelties
-from railroads.sim.railway import Stop
 from railroads.sim.routes import plan_route
 from railroads.sim.stats import History
+from railroads.sim.trains import Stop
 from railroads.ui.build_menu import BuildMenu, Tool
 from railroads.ui.map_view import MapView
 from railroads.ui.pixel.projection import CHUNK

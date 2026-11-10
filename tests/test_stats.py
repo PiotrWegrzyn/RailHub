@@ -6,10 +6,11 @@ from railroads.sim.goods import Good
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
-from railroads.sim.railway import Car, Railway, Stop
+from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.stats import History
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.trains import Car, Stop
 
 QUIET = GrowthRule(trades=False, ladders=(), forests=None)
 
@@ -58,7 +59,7 @@ def test_a_car_counts_as_delivered_where_it_leaves_its_load() -> None:
     for car in train.cars[:2]:
         car.fill({(6, 3): 10.0})
 
-    railway._arrive(train, Stop((6, 20)))
+    railway.calls.arrive(train, Stop((6, 20)))
 
     assert railway.history.delivered == {1860: {Good.COAL: 2}}
 

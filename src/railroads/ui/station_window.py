@@ -10,7 +10,8 @@ from imgui_bundle import imgui
 from railroads.sim.finance import STATION_PRICE, STORAGE_PRICE, dollars
 from railroads.sim.goods import TRAVELLERS
 from railroads.sim.grids import Cell
-from railroads.sim.railway import MAX_LEVEL, STORAGE_STEP, Railway
+from railroads.sim.railway import MAX_LEVEL, Railway
+from railroads.sim.station_goods import STORAGE_STEP
 from railroads.ui.stations_window import draw_demand
 from railroads.ui.theme import BRASS, BRASS_DARK, goods_inline
 

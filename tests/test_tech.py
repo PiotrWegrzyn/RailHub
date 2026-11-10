@@ -8,7 +8,7 @@ from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import TOWNS, GrowthRule
 from railroads.sim.ownership import OWNER_SHARE
-from railroads.sim.railway import ENGINES, Railway, Stop
+from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.station_trade import TRAIN_LOAD
 from railroads.sim.tech import (
@@ -23,6 +23,7 @@ from railroads.sim.tech import (
     xp_for,
 )
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.trains import ENGINES, Stop
 
 
 def make_map() -> TileMap:

@@ -19,8 +19,8 @@ from railroads.sim.economy import DELIVERY_RADIUS, StationOrder, Trade
 from railroads.sim.goods import FITS, NEEDS, TRAVELLERS, Good, Need, makes_of, needs_of, price_of
 from railroads.sim.grids import Cell
 from railroads.sim.ladders import PASSENGERS_PER_POINT
-from railroads.sim.railway import CAR_CAPACITY, MAX_CARS
 from railroads.sim.tech import GOOD_TREES, Tree
+from railroads.sim.trains import CAR_CAPACITY, MAX_CARS
 
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth

@@ -7,7 +7,8 @@ import math
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
-from railroads.sim.railway import Railway, Train
+from railroads.sim.railway import Railway
+from railroads.sim.trains import Train
 from railroads.ui.iso_camera import IsoCamera, Vec2
 from railroads.ui.pixel.trains import (
     CAR_HALF,

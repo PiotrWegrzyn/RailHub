@@ -58,6 +58,12 @@ uv run ruff check
 `src/railroads/mapgen` turns map data into a map. `src/railroads/ui` draws the game with
 Dear ImGui (imgui-bundle).
 
+`railroads.sim.railway` runs the trains. Its parts are:
+- `trains`: engines, cars, stops and trains;
+- `station_goods`: what stations hold;
+- `track_network`: routes along the track and where trains are;
+- `calls`: what a train does at a station.
+
 `railroads.sim.game` holds one game: the buildings, the growing towns, the railway, the money and
 the yearly history. It runs each month and every player action: building a station, laying
 track, bulldozing and moving a station. Each action checks the price, pays it and returns what

@@ -11,7 +11,7 @@ from imgui_bundle import hello_imgui, imgui
 from PIL import Image
 
 from railroads.sim.goods import Good, Need
-from railroads.sim.railway import CAR_CAPACITY
+from railroads.sim.trains import CAR_CAPACITY
 from railroads.ui.pixel.good_icons import ICON_PIXELS, ICONS_INDEX, ICONS_PNG
 
 type Rgba = tuple[float, float, float, float]

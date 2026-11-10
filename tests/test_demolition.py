@@ -14,9 +14,10 @@ from railroads.sim.goods import Good
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
-from railroads.sim.railway import Railway, Stop
+from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, move_station, plan_route, route_price
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.trains import Stop
 
 QUIET = GrowthRule(trades=False, ladders=(), forests=None)
 

@@ -8,8 +8,8 @@ from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.game import Game
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
-from railroads.sim.railway import Stop
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.trains import Stop
 from railroads.ui.app import App
 from railroads.ui.build_menu import Tool
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS

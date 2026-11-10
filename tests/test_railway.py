@@ -16,19 +16,11 @@ from railroads.sim.goods import Good, Need
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
-from railroads.sim.railway import (
-    CAR_CAPACITY,
-    CELLS_PER_MONTH,
-    MAX_CARS,
-    STOCKPILE,
-    WAITING,
-    Car,
-    Railway,
-    StationGoods,
-    Stop,
-)
+from railroads.sim.railway import CELLS_PER_MONTH, Railway
 from railroads.sim.routes import build_station, lay_route, plan_route, route_price
+from railroads.sim.station_goods import STOCKPILE, WAITING, StationGoods
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.trains import CAR_CAPACITY, MAX_CARS, Car, Stop
 
 
 def make_map() -> TileMap:
@@ -631,7 +623,7 @@ def test_a_train_can_turn_round_at_a_station_it_passes_through() -> None:
     _, railway = joined_stations()
     entry = 0
 
-    exits = railway._exits((6, 20), entry)
+    exits = railway.network._exits((6, 20), entry)
 
     assert entry in exits
-    assert railway._exits((6, 3), None) == exits
+    assert railway.network._exits((6, 3), None) == exits

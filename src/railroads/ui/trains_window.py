@@ -8,7 +8,8 @@ from imgui_bundle import imgui
 
 from railroads.sim.finance import TRAIN_RESALE, dollars
 from railroads.sim.goods import GOOD_YEARS, Good
-from railroads.sim.railway import ENGINES, Railway, Stop, Train
+from railroads.sim.railway import Railway
+from railroads.sim.trains import ENGINES, Stop, Train
 from railroads.ui.theme import BRASS, CARDS_WIDTH, TEXT_DIM, car_chip, danger_button, good_icon
 
 WINDOW_SIZE = (660.0, 300.0)

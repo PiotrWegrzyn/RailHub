@@ -6,9 +6,9 @@ from railroads.sim.finance import STATION_PRICE, dollars
 from railroads.sim.game import Game
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
-from railroads.sim.railway import Stop
 from railroads.sim.routes import plan_route, route_price
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.trains import Stop
 
 
 def make_map() -> TileMap:
