@@ -1,4 +1,4 @@
-"""Bake the Poland maps, one with square cells and one with hexagons, into src/railroads/maps/.
+"""Bake the Poland map, in hexagons, into src/railroads/maps/.
 
 Inputs in data/raw/ (download commands in README.md):
 - etopo_poland.csv: NOAA ETOPO1 elevation, 1 arc-minute grid.
@@ -20,11 +20,11 @@ from railroads.mapgen.presets import (
 )
 from railroads.mapgen.sources import ElevationGrid
 from railroads.sim.geo import Bounds
-from railroads.sim.grids import GRIDS
+from railroads.sim.grids import HexGrid
 from railroads.sim.tilemap import LAYERS, Temperature, Terrain, TileMap, Vegetation
 
 RAW = Path(__file__).resolve().parent.parent / "data" / "raw"
-BOUNDS = Bounds(west=13.6, east=24.4, south=48.9, north=55.0)
+BOUNDS = Bounds(west=14.08, east=24.19, south=48.97, north=54.87)
 KM_PER_CELL = 2.0
 SEED = 7
 
@@ -44,13 +44,12 @@ def _summary(tile_map: TileMap) -> str:
 def main() -> None:
     elevation = ElevationGrid.from_erddap_csv(RAW / "etopo_poland.csv")
     strategies = real_world_strategies(NaturalEarth.load(RAW), elevation, SEED)
-    for kind, grid_type in GRIDS.items():
-        grid = grid_type.covering(BOUNDS.width_km, BOUNDS.height_km, KM_PER_CELL)
-        sources = (ETOPO_SOURCE, NATURAL_EARTH_SOURCE)
-        tile_map = generate_map("Poland", BOUNDS, grid, strategies, sources)
-        path = maps.map_file("poland", kind)
-        tile_map.save(path)
-        print(f"wrote {path.name}: {grid.rows} x {grid.cols} {kind} cells; {_summary(tile_map)}")
+    grid = HexGrid.covering(BOUNDS.width_km, BOUNDS.height_km, KM_PER_CELL)
+    sources = (ETOPO_SOURCE, NATURAL_EARTH_SOURCE)
+    tile_map = generate_map("Poland", BOUNDS, grid, strategies, sources)
+    path = maps.map_file("poland", "hex")
+    tile_map.save(path)
+    print(f"wrote {path.name}: {grid.rows} x {grid.cols} hex cells; {_summary(tile_map)}")
 
 
 if __name__ == "__main__":

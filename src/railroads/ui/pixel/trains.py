@@ -16,7 +16,7 @@ import numpy as np
 import numpy.typing as npt
 from PIL import Image, ImageDraw
 
-from railroads.sim.economy import Good
+from railroads.sim.goods import Good
 from railroads.ui.iso_camera import TILT
 from railroads.ui.pixel.art import Sprite
 
@@ -49,11 +49,101 @@ BOXCAR: RGB = (138, 56, 42)
 REEFER: RGB = (214, 194, 140)
 ROOF_GREY: RGB = (110, 108, 112)
 HOPPER: RGB = (70, 70, 76)
+COACH: RGB = (46, 92, 64)
+COACH_BAND: RGB = (214, 200, 160)
+LIT_WINDOW: RGB = (236, 206, 120)
+MAIL_VAN: RGB = (92, 54, 112)
+GRAIN: RGB = (214, 176, 92)
+GRAIN_HOPPER: RGB = (150, 112, 64)
+APPLE: RGB = (196, 40, 40)
+APPLE_LIGHT: RGB = (226, 92, 60)
+BANANA_VAN: RGB = (228, 204, 72)
+BREAD_VAN: RGB = (176, 120, 70)
+DATE: RGB = (110, 62, 36)
+SUGAR_HOPPER: RGB = (226, 224, 214)
+CANS_STRIPE: RGB = (236, 140, 50)
+# Closed vans, by good: body and stripe.
+VANS: dict[Good, tuple[RGB, RGB]] = {
+    Good.CLOTHES: ((72, 90, 132), (232, 232, 232)),
+    Good.FURNITURE: ((128, 92, 58), (200, 160, 110)),
+    Good.TOOLS: ((86, 92, 100), (220, 180, 70)),
+    Good.WINE: ((110, 40, 70), (220, 190, 120)),
+    Good.ELECTRONICS: ((48, 60, 84), (90, 200, 220)),
+    Good.COFFEE: ((84, 56, 40), (200, 160, 110)),
+    Good.CHEMICALS: ((196, 192, 118), (90, 90, 60)),
+    Good.FISH: ((214, 194, 140), (90, 130, 170)),
+    Good.GOLD: ((96, 98, 106), (232, 190, 70)),
+    Good.DIAMONDS: ((96, 98, 106), (190, 238, 255)),
+    Good.GUNS: ((84, 92, 64), (190, 56, 48)),
+    Good.HONEY: ((200, 150, 50), (250, 220, 120)),
+    Good.WAX: ((220, 208, 150), (150, 120, 70)),
+    Good.INCENSE: ((96, 70, 110), (230, 200, 130)),
+    Good.BEER: ((150, 96, 40), (240, 190, 70)),
+    Good.VODKA: ((210, 214, 220), (60, 90, 170)),
+    Good.LEATHER: ((120, 80, 48), (190, 140, 90)),
+    Good.SHOES: ((82, 52, 38), (200, 160, 110)),
+    Good.CATTLE: ((132, 88, 56), (220, 200, 170)),
+    Good.SHEEP: ((120, 96, 70), (238, 234, 222)),
+    Good.MEAT: ((214, 194, 140), (190, 60, 56)),
+    Good.GLASS: ((96, 130, 150), (190, 236, 244)),
+    Good.PLASTICS: ((220, 220, 224), (220, 70, 80)),
+    Good.APPLIANCES: ((226, 228, 232), (90, 120, 170)),
+    Good.PAPER: ((214, 204, 176), (120, 110, 90)),
+    Good.NEWSPAPERS: ((100, 100, 104), (230, 228, 220)),
+    Good.REFINED_SUGAR: ((236, 230, 232), (220, 120, 150)),
+    Good.PORCELAIN: ((230, 232, 240), (60, 90, 190)),
+}
+# Hoppers, by good: body and load.
+HOPPERS: dict[Good, tuple[RGB, RGB]] = {
+    Good.IRON: ((96, 72, 62), (146, 88, 68)),
+    Good.COPPER: ((96, 84, 66), (194, 122, 72)),
+    Good.SALT: ((176, 176, 172), (238, 238, 232)),
+    Good.RUBBER: ((74, 74, 72), (42, 42, 44)),
+    Good.CLAY: ((112, 80, 62), (194, 116, 76)),
+    Good.LIMESTONE: ((120, 118, 112), (226, 222, 204)),
+    Good.SAND: ((124, 110, 80), (240, 220, 150)),
+    Good.CEMENT: ((150, 150, 148), (196, 196, 192)),
+}
+# Low wagons heaped with a load, and tank cars.
+HEAPS: dict[Good, RGB] = {
+    Good.WOOL: (235, 232, 220),
+    Good.COTTON: (246, 246, 240),
+    Good.GRAPES: (92, 48, 110),
+    Good.BARRELS: (128, 84, 48),
+    Good.POTATOES: (180, 146, 94),
+    Good.FLAX: (196, 180, 120),
+    Good.HOPS: (130, 190, 84),
+    Good.BRICKS: (180, 82, 60),
+    Good.MACHINERY: (96, 100, 112),
+}
+TANKS: dict[Good, RGB] = {
+    Good.OIL: (34, 32, 38),
+    Good.FUEL: (190, 170, 60),
+    Good.GAS: (200, 206, 214),
+}
+MOGUL_GREEN: RGB = (38, 86, 56)
+MOGUL_ROOF: RGB = (24, 54, 36)
+MAROON: RGB = (118, 30, 40)
+MAROON_ROOF: RGB = (70, 20, 26)
+BOXCAB_BROWN: RGB = (122, 74, 42)
+EXPRESS_BLUE: RGB = (36, 78, 168)
+EXPRESS_WHITE: RGB = (230, 232, 236)
+PANTOGRAPH: RGB = (60, 60, 66)
+AUTO_BODY: RGB = (176, 44, 60)
+TANK_HULL: RGB = (88, 100, 60)
+PLANE_BODY: RGB = (188, 196, 206)
+ORANGE: RGB = (240, 140, 36)
 
 # Sizes in cells: how far apart the engine and cars sit, and their half lengths.
 ENGINE_HALF = 0.36
 TENDER_HALF = 0.22
 CAR_HALF = 0.24
+MOGUL_HALF = 0.42
+MOGUL_TENDER_HALF = 0.26
+PACIFIC_HALF = 0.46
+PACIFIC_TENDER_HALF = 0.3
+BOXCAB_HALF = 0.36
+EXPRESS_HALF = 0.42
 COUPLING = 0.04
 
 
@@ -141,6 +231,43 @@ class Model:
             )
         self.faces.append(Face([(a, b, z1) for a, b in ring], color, (0, 0, 1)))
 
+    def slope(
+        self, a: tuple[float, float], b: tuple[float, float], v: tuple[float, float], color: RGB
+    ) -> None:
+        """A flat plate tilted along the track from `a` to `b`, each a (u, z) point, spanning `v`
+        across, like a pantograph arm or a windscreen. It shows from either side."""
+        (au, az), (bu, bz), (v0, v1) = a, b, v
+        du, dz = bu - au, bz - az
+        length = math.hypot(du, dz) or 1
+        normal = (-dz / length, 0.0, du / length)
+        corners = [(au, v0, az), (bu, v0, bz), (bu, v1, bz), (au, v1, az)]
+        self.faces.append(Face(corners, color, normal))
+        self.faces.append(Face(corners[::-1], color, (-normal[0], 0.0, -normal[2])))
+
+    def nose(
+        self, u: tuple[float, float], z: tuple[float, float, float], v: float, color: RGB
+    ) -> None:
+        """A streamlined end running from `u[0]` out to its tip at `u[1]`, `v` either side of the
+        middle: its floor at `z[0]` and its top sloping down from `z[2]` to `z[1]` at the tip."""
+        (u0, u1), (z0, low, high) = u, z
+        out = 1.0 if u1 > u0 else -1.0
+        du, dz = abs(u1 - u0), high - low
+        length = math.hypot(du, dz)
+        self.faces += [
+            Face(
+                [(u0, -v, high), (u1, -v, low), (u1, v, low), (u0, v, high)],
+                color,
+                (out * dz / length, 0.0, du / length),
+            ),
+            Face([(u1, -v, z0), (u1, v, z0), (u1, v, low), (u1, -v, low)], color, (out, 0.0, 0.0)),
+            Face([(u0, v, z0), (u0, v, high), (u1, v, low), (u1, v, z0)], color, (0.0, 1.0, 0.0)),
+            Face(
+                [(u0, -v, z0), (u1, -v, z0), (u1, -v, low), (u0, -v, high)],
+                color,
+                (0.0, -1.0, 0.0),
+            ),
+        ]
+
     def wheels(self, positions: list[float], radius: float, color: RGB, v: float) -> None:
         for u in positions:
             self.box((u - radius, u + radius), (v - 0.012, v + 0.012), (0.0, 2 * radius), color)
@@ -179,19 +306,241 @@ def tender() -> Model:
     return m
 
 
+def _bands(m: Model, positions: tuple[float, ...], radius: float, z: float, color: RGB) -> None:
+    """Thin rings round a boiler."""
+    for u in positions:
+        m.cylinder_along((u - 0.006, u + 0.006), radius + 0.003, z, color)
+
+
+def _side_rods(m: Model, u: tuple[float, float], z: float) -> None:
+    for v in (-0.09, 0.087):
+        m.box(u, (v, v + 0.003), (z - 0.005, z + 0.005), STEEL)
+
+
+def _pantograph(m: Model, u: float, roof: float) -> None:
+    """A diamond-shaped current collector folded up on the roof at `u`."""
+    top = roof + 0.08
+    m.box((u - 0.08, u + 0.08), (-0.04, 0.04), (roof, roof + 0.01), PANTOGRAPH)
+    m.slope((u - 0.07, roof + 0.01), (u, top), (-0.03, 0.03), PANTOGRAPH)
+    m.slope((u + 0.07, roof + 0.01), (u, top), (-0.03, 0.03), PANTOGRAPH)
+    m.box((u - 0.012, u + 0.012), (-0.07, 0.07), (top, top + 0.01), PANTOGRAPH)
+
+
+def mogul() -> Model:
+    """A heavy freight engine of the 1880s: a long dark green boiler banded in brass over three
+    pairs of driving wheels, with a pony truck in front."""
+    m = Model()
+    h = MOGUL_HALF
+    m.box((-h, h - 0.04), (-0.07, 0.07), (0.035, 0.07), FRAME)
+    m.wheels([h - 0.09], 0.03, FRAME, 0.075)
+    m.wheels([0.17, 0.05, -0.07], 0.045, WHEEL_RED, 0.075)
+    _side_rods(m, (-0.07, 0.17), 0.045)
+    m.cylinder_along((-0.14, h - 0.07), 0.08, 0.155, MOGUL_GREEN, SMOKEBOX)
+    m.cylinder_along((h - 0.15, h - 0.07), 0.083, 0.155, SMOKEBOX, SMOKEBOX)
+    _bands(m, (-0.05, 0.08, 0.2), 0.08, 0.155, BRASS)
+    m.box((h - 0.07, h - 0.04), (-0.065, 0.065), (0.07, 0.22), SMOKEBOX)
+    m.box((h - 0.04, h), (-0.08, 0.08), (0.0, 0.055), CAB_RED)
+    m.cylinder_up(h - 0.11, 0.026, (0.22, 0.31), BLACK_IRON)
+    m.box((h - 0.14, h - 0.08), (-0.032, 0.032), (0.31, 0.325), BLACK_IRON)
+    m.cylinder_up(0.06, 0.03, (0.22, 0.27), BRASS)
+    m.cylinder_up(-0.06, 0.018, (0.22, 0.25), BRASS)
+    m.box((-h, -0.12), (-0.088, 0.088), (0.07, 0.28), MOGUL_GREEN)
+    m.panel((-0.3, -0.17), (0.17, 0.24), 0.0885, WINDOW)
+    m.box((-h - 0.02, -0.1), (-0.098, 0.098), (0.28, 0.3), MOGUL_ROOF)
+    m.panel((-h + 0.01, -0.13), (0.08, 0.095), 0.0886, BRASS)
+    return m
+
+
+def mogul_tender() -> Model:
+    m = Model()
+    h = MOGUL_TENDER_HALF
+    m.box((-h, h), (-0.07, 0.07), (0.035, 0.06), FRAME)
+    m.wheels([0.17, 0.0, -0.17], 0.035, FRAME, 0.075)
+    m.box((-h, h), (-0.085, 0.085), (0.06, 0.22), MOGUL_GREEN)
+    m.panel((-h + 0.02, h - 0.02), (0.09, 0.105), 0.0855, BRASS)
+    m.box((-h + 0.03, h - 0.03), (-0.07, 0.07), (0.22, 0.25), COAL)
+    m.box((-0.12, 0.12), (-0.05, 0.05), (0.25, 0.27), COAL)
+    return m
+
+
+def pacific() -> Model:
+    """A fast express engine of the 1910s: a long maroon boiler lined in gold over three pairs of
+    tall driving wheels, with smoke deflectors beside its smokebox and a bogie in front."""
+    m = Model()
+    h = PACIFIC_HALF
+    m.box((-h, h - 0.04), (-0.07, 0.07), (0.035, 0.075), FRAME)
+    m.wheels([h - 0.08, h - 0.16], 0.03, FRAME, 0.075)
+    m.wheels([0.15, 0.01, -0.13], 0.058, MAROON, 0.075)
+    m.wheels([-0.31], 0.032, FRAME, 0.075)
+    _side_rods(m, (-0.13, 0.15), 0.058)
+    m.box((-0.2, h - 0.05), (-0.095, 0.095), (0.075, 0.085), FRAME)
+    m.panel((-0.2, h - 0.06), (0.076, 0.084), 0.0955, BRASS)
+    m.cylinder_along((-0.16, h - 0.07), 0.088, 0.17, MAROON, SMOKEBOX)
+    m.cylinder_along((h - 0.17, h - 0.07), 0.09, 0.17, SMOKEBOX, SMOKEBOX)
+    _bands(m, (-0.06, 0.07, 0.2), 0.088, 0.17, BRASS)
+    for v in ((0.092, 0.1), (-0.1, -0.092)):
+        m.box((h - 0.2, h - 0.08), v, (0.1, 0.25), SMOKEBOX)
+    m.box((h - 0.07, h - 0.04), (-0.07, 0.07), (0.075, 0.24), SMOKEBOX)
+    m.box((h - 0.04, h), (-0.085, 0.085), (0.0, 0.06), CAB_RED)
+    m.cylinder_up(h - 0.12, 0.028, (0.24, 0.3), BLACK_IRON)
+    m.cylinder_up(0.05, 0.03, (0.24, 0.28), MAROON)
+    m.box((-h, -0.14), (-0.09, 0.09), (0.075, 0.3), MAROON)
+    m.panel((-0.38, -0.22), (0.19, 0.26), 0.0905, WINDOW)
+    m.panel((-h + 0.01, -0.15), (0.1, 0.115), 0.0906, BRASS)
+    m.box((-h - 0.02, -0.12), (-0.1, 0.1), (0.3, 0.32), MAROON_ROOF)
+    return m
+
+
+def pacific_tender() -> Model:
+    m = Model()
+    h = PACIFIC_TENDER_HALF
+    m.box((-h, h), (-0.07, 0.07), (0.035, 0.065), FRAME)
+    m.wheels([0.2, 0.0, -0.2], 0.038, FRAME, 0.075)
+    m.box((-h, h), (-0.09, 0.09), (0.065, 0.24), MAROON)
+    m.panel((-h + 0.02, h - 0.02), (0.1, 0.115), 0.0905, BRASS)
+    m.panel((-h + 0.02, h - 0.02), (0.21, 0.222), 0.0905, BRASS)
+    m.box((-h + 0.03, h - 0.08), (-0.075, 0.075), (0.24, 0.27), COAL)
+    m.box((-0.14, 0.1), (-0.05, 0.05), (0.27, 0.29), COAL)
+    return m
+
+
+def boxcab() -> Model:
+    """An electric engine of the 1920s: a plain brown box cab on two bogies, with windows at both
+    ends and a pantograph on its roof."""
+    m = Model()
+    h = BOXCAB_HALF
+    for u in (-0.2, 0.2):
+        m.box((u - 0.12, u + 0.12), (-0.065, 0.065), (0.03, 0.07), FRAME)
+        m.wheels([u - 0.07, u + 0.07], 0.035, FRAME, 0.075)
+    m.box((-h, h), (-0.075, 0.075), (0.07, 0.09), FRAME)
+    m.box((-h + 0.01, h - 0.01), (-0.085, 0.085), (0.09, 0.27), BOXCAB_BROWN)
+    m.box((-h, h), (-0.09, 0.09), (0.27, 0.285), ROOF_GREY)
+    for end in (h - 0.01, -h + 0.01):
+        for v in ((-0.065, -0.012), (0.012, 0.065)):
+            m.box((end - 0.004, end + 0.004), v, (0.18, 0.24), WINDOW)
+    for u in (h - 0.1, -h + 0.03):
+        m.panel((u, u + 0.07), (0.18, 0.24), 0.0855, WINDOW)
+    for u in (h - 0.15, -h + 0.12):
+        m.panel((u, u + 0.03), (0.1, 0.25), 0.0855, shade(BOXCAB_BROWN, 0.72))
+    for u in (-0.12, -0.04, 0.04):
+        m.panel((u, u + 0.06), (0.15, 0.22), 0.0855, shade(BOXCAB_BROWN, 0.82))
+    _pantograph(m, 0.0, 0.285)
+    return m
+
+
+def express() -> Model:
+    """An express electric engine of the 1960s: a long blue-and-white body with a streamlined nose
+    at each end and two pantographs."""
+    m = Model()
+    h = EXPRESS_HALF
+    body = h - 0.1
+    for u in (-0.26, 0.26):
+        m.box((u - 0.1, u + 0.1), (-0.065, 0.065), (0.03, 0.07), FRAME)
+        m.wheels([u - 0.055, u + 0.055], 0.035, FRAME, 0.075)
+    m.box((-body, body), (-0.085, 0.085), (0.07, 0.27), EXPRESS_BLUE)
+    m.panel((-body, body), (0.17, 0.25), 0.0855, EXPRESS_WHITE)
+    for u in (-0.2, -0.1, 0.0, 0.1, 0.2):
+        m.panel((u - 0.03, u + 0.03), (0.19, 0.23), 0.0856, WINDOW)
+    m.box((-body, body), (-0.08, 0.08), (0.27, 0.285), ROOF_GREY)
+    for tip in (h, -h):
+        root = body if tip > 0 else -body
+        m.nose((root, tip), (0.07, 0.13, 0.27), 0.085, EXPRESS_BLUE)
+        out = 0.004 if tip > 0 else -0.004
+        a = (root + out, 0.27 + 0.004)
+        b = (root + (tip - root) * 0.6 + out, 0.27 + (0.13 - 0.27) * 0.6 + 0.004)
+        m.slope(a, b, (-0.065, 0.065), WINDOW)
+    for u in (-0.18, 0.18):
+        _pantograph(m, u, 0.285)
+    return m
+
+
 def car(good: Good, full: bool) -> Model:
     m = Model()
     h = CAR_HALF
     m.box((-h, h), (-0.07, 0.07), (0.035, 0.06), FRAME)
     m.wheels([h - 0.07, -h + 0.07], 0.035, FRAME, 0.075)
+    if good in VANS:
+        body, stripe = VANS[good]
+        m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
+        m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), ROOF_GREY)
+        m.panel((-0.06, 0.06), (0.07, 0.22), 0.0805, shade(body, 0.7) if full else WINDOW)
+        m.panel((-h + 0.01, h - 0.01), (0.2, 0.215), 0.0806, stripe)
+        return m
+    if good in HOPPERS:
+        body, load = HOPPERS[good]
+        m.box((-h, h), (-0.08, 0.08), (0.06, 0.19), body)
+        m.panel((-h + 0.02, h - 0.02), (0.08, 0.17), 0.0805, shade(body, 0.85))
+        if full:
+            m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.19, 0.22), load)
+            m.box((-0.1, 0.1), (-0.05, 0.05), (0.22, 0.24), load)
+        return m
+    if good in HEAPS:
+        m.box((-h, h), (-0.08, 0.08), (0.06, 0.13), DECK)
+        m.panel((-h + 0.02, h - 0.02), (0.075, 0.12), 0.0805, shade(DECK, 0.8))
+        if full:
+            m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.13, 0.17), HEAPS[good])
+            m.box((-0.13, 0.13), (-0.05, 0.05), (0.17, 0.2), HEAPS[good])
+        return m
+    if good in TANKS:
+        m.box((-h, h), (-0.07, 0.07), (0.06, 0.085), DECK)
+        m.cylinder_along((-h + 0.01, h - 0.01), 0.08, 0.165, TANKS[good])
+        m.cylinder_up(0.0, 0.025, (0.24, 0.27), TANKS[good])
+        return m
+    if good == Good.CARS:
+        m.box((-h, h), (-0.08, 0.08), (0.06, 0.085), DECK)
+        if full:
+            for u in (-0.12, 0.12):
+                m.box((u - 0.09, u + 0.09), (-0.05, 0.05), (0.095, 0.14), AUTO_BODY)
+                m.box((u - 0.05, u + 0.05), (-0.045, 0.045), (0.14, 0.18), WINDOW)
+        return m
+    if good == Good.TANKS:
+        m.box((-h, h), (-0.08, 0.08), (0.06, 0.085), DECK)
+        if full:
+            m.box((-0.2, 0.2), (-0.07, 0.07), (0.085, 0.15), TANK_HULL)
+            m.box((-0.08, 0.08), (-0.05, 0.05), (0.15, 0.2), shade(TANK_HULL, 0.85))
+            m.box((0.08, 0.26), (-0.012, 0.012), (0.165, 0.185), shade(TANK_HULL, 0.6))
+        return m
+    if good == Good.PLANES:
+        m.box((-h, h), (-0.08, 0.08), (0.06, 0.085), DECK)
+        if full:
+            m.box((-0.24, 0.24), (-0.03, 0.03), (0.09, 0.15), PLANE_BODY)
+            m.box((-0.05, 0.05), (-0.085, 0.085), (0.12, 0.135), shade(PLANE_BODY, 0.85))
+            m.box((-0.24, -0.17), (-0.012, 0.012), (0.15, 0.2), shade(PLANE_BODY, 0.75))
+        return m
     match good:
-        case Good.FOOD | Good.GOODS:
-            body, roof = (REEFER, (232, 228, 220)) if good == Good.FOOD else (BOXCAR, ROOF_GREY)
+        case Good.GOODS | Good.CANS | Good.BANANAS | Good.BREAD:
+            body, roof = {
+                Good.GOODS: (BOXCAR, ROOF_GREY),
+                Good.CANS: (BOXCAR, ROOF_GREY),
+                Good.BANANAS: (BANANA_VAN, (240, 236, 220)),
+                Good.BREAD: (BREAD_VAN, (236, 226, 204)),
+            }[good]
             m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
             m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), roof)
             door = shade(body, 0.7) if full else WINDOW
             m.panel((-0.06, 0.06), (0.07, 0.22), 0.0805, door)
             m.panel((-h + 0.01, h - 0.01), (0.07, 0.085), 0.0806, shade(body, 0.75))
+            if good == Good.CANS:
+                m.panel((-h + 0.01, h - 0.01), (0.2, 0.215), 0.0806, CANS_STRIPE)
+        case Good.WHEAT | Good.SUGAR:
+            body = GRAIN_HOPPER if good == Good.WHEAT else SUGAR_HOPPER
+            m.box((-h, h), (-0.08, 0.08), (0.06, 0.2), body)
+            m.panel((-h + 0.02, h - 0.02), (0.08, 0.18), 0.0805, shade(body, 0.85))
+            if good == Good.SUGAR:
+                m.box((-h + 0.01, h - 0.01), (-0.07, 0.07), (0.2, 0.235), shade(body, 0.95))
+            elif full:
+                m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.2, 0.22), GRAIN)
+                m.box((-0.12, 0.12), (-0.05, 0.05), (0.22, 0.24), GRAIN)
+        case Good.APPLES | Good.DATES | Good.ORANGES:
+            m.box((-h, h), (-0.08, 0.08), (0.06, 0.13), DECK)
+            m.panel((-h + 0.02, h - 0.02), (0.075, 0.12), 0.0805, shade(DECK, 0.8))
+            if full:
+                fruit = {Good.APPLES: APPLE, Good.DATES: DATE, Good.ORANGES: ORANGE}[good]
+                m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.13, 0.16), fruit)
+                m.box((-0.13, 0.13), (-0.05, 0.05), (0.16, 0.18), fruit)
+                if good == Good.APPLES:
+                    for u in (-0.15, -0.05, 0.06, 0.14):
+                        m.box((u - 0.012, u + 0.012), (-0.04, -0.02), (0.16, 0.175), APPLE_LIGHT)
         case Good.COAL:
             m.box((-h, h), (-0.08, 0.08), (0.06, 0.19), HOPPER)
             m.panel((-h + 0.02, h - 0.02), (0.08, 0.17), 0.0805, shade(HOPPER, 0.85))
@@ -210,6 +559,23 @@ def car(good: Good, full: bool) -> Model:
                             Face([(c[0], c[1] + v, c[2]) for c in f.corners], f.color, f.normal)
                             for f in m.faces[-CYLINDER_SIDES - 2 :]
                         ]
+        case Good.PASSENGERS:
+            m.box((-h, h), (-0.08, 0.08), (0.06, 0.23), COACH)
+            m.box((-h - 0.01, h + 0.01), (-0.086, 0.086), (0.23, 0.25), ROOF_GREY)
+            m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.25, 0.265), ROOF_GREY)
+            m.panel((-h + 0.01, h - 0.01), (0.105, 0.122), 0.0805, COACH_BAND)
+            window = LIT_WINDOW if full else WINDOW
+            for u in (-0.17, -0.085, 0.0, 0.085, 0.17):
+                m.panel((u - 0.03, u + 0.03), (0.135, 0.195), 0.0806, window)
+            m.panel((-h + 0.01, h - 0.01), (0.07, 0.085), 0.0806, shade(COACH, 0.75))
+        case Good.MAIL:
+            m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), MAIL_VAN)
+            m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), ROOF_GREY)
+            m.panel((-h + 0.01, h - 0.01), (0.2, 0.215), 0.0805, BRASS)
+            door = shade(MAIL_VAN, 0.7) if full else WINDOW
+            m.panel((-0.05, 0.05), (0.07, 0.19), 0.0806, door)
+            m.panel((-h + 0.03, -h + 0.08), (0.15, 0.19), 0.0806, WINDOW)
+            m.panel((h - 0.08, h - 0.03), (0.15, 0.19), 0.0806, WINDOW)
         case Good.STEEL:
             m.box((-h, h), (-0.08, 0.08), (0.06, 0.085), DECK)
             if full:
@@ -229,9 +595,37 @@ class Look(Enum):
     TENDER = "tender"
 
 
+@dataclass(frozen=True)
+class EngineModel:
+    """One engine of the catalogue: how to build it and its tender if it has one, their half
+    lengths in cells, and where its chimney is (cells ahead of its middle and above the rails) if
+    it makes smoke."""
+
+    engine: Callable[[], Model]
+    half: float
+    tender: Callable[[], Model] | None = None
+    tender_half: float = 0.0
+    chimney: tuple[float, float] | None = None
+
+
+ENGINES: dict[str, EngineModel] = {
+    "planet": EngineModel(engine, ENGINE_HALF, tender, TENDER_HALF, (ENGINE_HALF - 0.11, 0.31)),
+    "mogul": EngineModel(
+        mogul, MOGUL_HALF, mogul_tender, MOGUL_TENDER_HALF, (MOGUL_HALF - 0.11, 0.33)
+    ),
+    "pacific": EngineModel(
+        pacific, PACIFIC_HALF, pacific_tender, PACIFIC_TENDER_HALF, (PACIFIC_HALF - 0.12, 0.3)
+    ),
+    "boxcab": EngineModel(boxcab, BOXCAB_HALF),
+    "express": EngineModel(express, EXPRESS_HALF),
+}
+
+
 MODELS: dict[object, Callable[[], Model]] = {
     Look.ENGINE: engine,
     Look.TENDER: tender,
+    **{(Look.ENGINE, name): model.engine for name, model in ENGINES.items()},
+    **{(Look.TENDER, name): model.tender for name, model in ENGINES.items() if model.tender},
     **{(good, full): (lambda g=good, f=full: car(g, f)) for good in Good for full in (True, False)},
 }
 

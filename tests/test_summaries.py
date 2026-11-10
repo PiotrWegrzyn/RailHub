@@ -2,9 +2,11 @@ import numpy as np
 
 from railroads.sim.clock import GameClock
 from railroads.sim.constructions import Building, BuildingKind, Constructions
+from railroads.sim.economy import COLLECTION_RADIUS
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
-from railroads.sim.growth import Growth, GrowthRule
+from railroads.sim.growth import Growth
+from railroads.sim.ladders import GrowthRule
 from railroads.sim.routes import build_station
 from railroads.sim.summaries import Reach, snapshot, summarize
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
@@ -34,7 +36,7 @@ def put_up(growth: Growth, cell: tuple[int, int], kind: BuildingKind) -> None:
 
 def test_a_summary_lists_what_was_built_within_reach_of_a_station_and_where() -> None:
     growth = make_growth()
-    reach = Reach(growth.constructions.tile_map.grid).of([(10, 10)])
+    reach = Reach(growth.constructions.tile_map.grid).of([(10, 10)], lambda _: COLLECTION_RADIUS)
     before = snapshot(growth, reach)
     put_up(growth, (10, 12), BuildingKind.HOUSE)
     put_up(growth, (10, 12), BuildingKind.HOUSE)
@@ -54,7 +56,7 @@ def test_a_summary_lists_what_was_built_within_reach_of_a_station_and_where() ->
 def test_buildings_pulled_down_count_against_their_kind() -> None:
     growth = make_growth()
     put_up(growth, (11, 10), BuildingKind.HOUSE)
-    reach = Reach(growth.constructions.tile_map.grid).of([(10, 10)])
+    reach = Reach(growth.constructions.tile_map.grid).of([(10, 10)], lambda _: COLLECTION_RADIUS)
     before = snapshot(growth, reach)
     growth.constructions.remove(Building((11, 10), BuildingKind.HOUSE))
     growth._add((11, 10), BuildingKind.HOUSE, -1)
@@ -69,7 +71,7 @@ def test_buildings_pulled_down_count_against_their_kind() -> None:
 
 def test_a_month_with_nothing_changed_near_a_station_has_no_summary() -> None:
     growth = make_growth()
-    reach = Reach(growth.constructions.tile_map.grid).of([(10, 10)])
+    reach = Reach(growth.constructions.tile_map.grid).of([(10, 10)], lambda _: COLLECTION_RADIUS)
     before = snapshot(growth, reach)
     put_up(growth, (2, 28), BuildingKind.HOUSE)
 

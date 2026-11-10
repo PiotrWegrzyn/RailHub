@@ -4,30 +4,50 @@ trains and stations windows; and drawing the track, routes, station reach and fa
 import itertools
 import math
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.sim.constructions import Constructions, Track
-from railroads.sim.economy import COLLECTION_RADIUS, DELIVERY_RADIUS, Good
-from railroads.sim.finance import STATION_PRICE, TRACK_PRICE, dollars
+from railroads.sim.constructions import Constructions, Track, TrackWidth
+from railroads.sim.demolition import (
+    DEMOLITION_PER_POINT,
+    SKYSCRAPER_DEMOLITION,
+    STATION_REMOVAL,
+)
+from railroads.sim.finance import (
+    DOUBLE_TRACK_FACTOR,
+    ELECTRIC_TRACK_PRICE,
+    ELECTRIC_TRACK_UPKEEP,
+    STATION_PRICE,
+    TRACK_PRICE,
+    TRACK_UPKEEP,
+    dollars,
+)
+from railroads.sim.goods import Good
 from railroads.sim.grids import Cell, Grid
+from railroads.sim.ladders import Points
 from railroads.sim.railway import Railway
 from railroads.sim.routes import Route
 from railroads.sim.tilemap import Relief
 from railroads.sim.track_rules import BRIDGE_RULES, RELIEF_RULES, TUNNEL_RULES, TrackBed
 from railroads.ui.iso_camera import IsoCamera, Vec2
 from railroads.ui.stations_window import StationsWindow
-from railroads.ui.theme import BORDER, BRASS, color_u32, toggle_button
+from railroads.ui.theme import BORDER, BRASS, GOOD_COLORS, color_u32, toggle_button
 from railroads.ui.trains_window import TrainsWindow
 
 BALLAST = (0.36, 0.3, 0.24, 1.0)
 RAIL = (0.82, 0.8, 0.76, 1.0)
 DECK = (0.42, 0.26, 0.12, 1.0)
 TUNNEL = (0.18, 0.17, 0.17, 1.0)
-PREVIEW = (1.0, 0.85, 0.2, 0.9)
+WIRE = (0.12, 0.14, 0.2, 1.0)
+# How far apart the two tracks of double track are drawn, as a share of a cell.
+DOUBLE_SPACING = 0.28
+# Track not laid yet is drawn in this grey, this see-through.
+PLANNED_GREY = 0.82
+PLANNED_OPACITY = 0.7
 FOCUS_FILL = (0.9, 0.72, 0.45, 0.6)
 OTHER_FILL = (0.92, 0.6, 0.65, 0.5)
 SHARED_FILL = (0.82, 0.86, 0.82, 0.6)
@@ -41,19 +61,9 @@ ENGINE = (0.14, 0.15, 0.17, 1.0)
 CAB = (0.62, 0.14, 0.1, 1.0)
 SMOKE = (0.85, 0.85, 0.88, 0.9)
 # What each car looks like empty, and the colour of what it carries.
+CAR_COLORS: dict[Good, Rgba] = dict(GOOD_COLORS)
 CAR_BODIES: dict[Good, Rgba] = {
-    Good.FOOD: (0.52, 0.42, 0.22, 1.0),
-    Good.LUMBER: (0.36, 0.3, 0.26, 1.0),
-    Good.COAL: (0.2, 0.2, 0.22, 1.0),
-    Good.STEEL: (0.36, 0.3, 0.26, 1.0),
-    Good.GOODS: (0.5, 0.18, 0.14, 1.0),
-}
-CAR_COLORS: dict[Good, Rgba] = {
-    Good.FOOD: (0.95, 0.8, 0.25, 1.0),
-    Good.LUMBER: (0.55, 0.35, 0.18, 1.0),
-    Good.COAL: (0.25, 0.25, 0.28, 1.0),
-    Good.STEEL: (0.55, 0.65, 0.8, 1.0),
-    Good.GOODS: (0.85, 0.3, 0.25, 1.0),
+    good: (r * 0.55, g * 0.55, b * 0.55, 1.0) for good, (r, g, b, _) in GOOD_COLORS.items()
 }
 # Sizes in cells: how far apart the engine and each car are drawn, how long and wide they are,
 # and the gap between cars.
@@ -74,6 +84,8 @@ class Tool(Enum):
     NONE = "None"
     STATION = "Station"
     TRACK = "Track"
+    BULLDOZE = "Bulldoze"
+    MOVE_STATION = "Move station"
 
 
 HILLS_PRICE = TRACK_PRICE * RELIEF_RULES[Relief.HILLS].price_factor
@@ -81,19 +93,55 @@ BRIDGE_PRICE = TRACK_PRICE * BRIDGE_RULES.price_factor
 TUNNEL_PRICE = TRACK_PRICE * TUNNEL_RULES.price_factor
 HINTS = {
     Tool.STATION: (
-        f"A station costs {dollars(STATION_PRICE)}. Click a cell to build one; what stands there moves aside. Orange: where it hands "
+        f"A station costs {dollars(STATION_PRICE)}, and clearing its cell what the buildings there "
+        "cost to take down. Click a cell to build one. Orange: where it hands "
         "goods out; pink: other stations; grey: shared; blue line: where it gathers goods. "
         "Right click cancels."
     ),
     Tool.TRACK: (
-        f"Click where track starts, then where it goes. {dollars(TRACK_PRICE)} a cell on the flat, "
-        f"{dollars(HILLS_PRICE)} in hills, {dollars(BRIDGE_PRICE)} a bridge, "
-        f"{dollars(TUNNEL_PRICE)} a tunnel. Right click cancels."
+        f"Click where track starts, then where it goes; starting or ending on track joins it. "
+        f"{dollars(TRACK_PRICE)} a cell on the flat, {dollars(HILLS_PRICE)} in hills, "
+        f"{dollars(BRIDGE_PRICE)} a bridge, {dollars(TUNNEL_PRICE)} a tunnel; double track "
+        f"{DOUBLE_TRACK_FACTOR:g} times as much, and electric {dollars(ELECTRIC_TRACK_PRICE)} "
+        f"a cell more. Laying it along your track widens or electrifies that. Buildings in the way "
+        "cost what taking them down does. Right click cancels."
+    ),
+    Tool.BULLDOZE: (
+        f"Click a cell to clear it: homes from {dollars(DEMOLITION_PER_POINT[Points.POPULATION])}, "
+        f"fields {dollars(DEMOLITION_PER_POINT[Points.FOOD])}, factories and mines from "
+        f"{dollars(DEMOLITION_PER_POINT[Points.INDUSTRY])}, a skyscraper "
+        f"{dollars(SKYSCRAPER_DEMOLITION)}; track a quarter of its price, a station "
+        f"{dollars(STATION_REMOVAL)}. One-off buildings stay. Right click cancels."
+    ),
+    Tool.MOVE_STATION: (
+        f"Click where the station goes: {dollars(STATION_PRICE)} and clearing the cell. Its trains, "
+        "name and goods go with it; its level and storage start again. Right click cancels."
     ),
 }
 TOOL_BUTTONS = (
     (Tool.STATION, f"{fa.ICON_FA_BUILDING}  Station", "Build a station (1)"),
     (Tool.TRACK, f"{fa.ICON_FA_ROAD}  Track", "Lay track (2)"),
+    (Tool.BULLDOZE, f"{fa.ICON_FA_TRASH}  Bulldoze", "Clear cells, for a price (3)"),
+)
+WIDTH_BUTTONS = (
+    (
+        TrackWidth.SINGLE,
+        "Single",
+        f"One track: {dollars(TRACK_PRICE)} a cell, {dollars(TRACK_UPKEEP)} a month",
+    ),
+    (
+        TrackWidth.DOUBLE,
+        "Double",
+        (
+            f"Two tracks side by side: {dollars(TRACK_PRICE * DOUBLE_TRACK_FACTOR)} a cell, "
+            f"${TRACK_UPKEEP * DOUBLE_TRACK_FACTOR:.2f} a month"
+        ),
+    ),
+)
+ELECTRIC_TIP = (
+    f"Wires over the track for electric engines: {dollars(ELECTRIC_TRACK_PRICE)} a cell more, "
+    f"{dollars(ELECTRIC_TRACK_UPKEEP)} a month more ({DOUBLE_TRACK_FACTOR:g} times that on double "
+    "track). Lay it over your track to electrify that."
 )
 
 
@@ -112,6 +160,13 @@ class BuildMenu:
     message_at: float = -MESSAGE_SECONDS
     # What the previewed track would cost.
     preview_price: float | None = None
+    # What the tool would cost in the cell under the mouse, and what it would do there.
+    hover_note: str = ""
+    # The station being moved, with the move tool.
+    moving: Cell | None = None
+    # What the track tool lays: single or double track, and whether it is electric.
+    track_width: TrackWidth = TrackWidth.SINGLE
+    electric: bool = False
     trains: TrainsWindow = field(default_factory=TrainsWindow)
     stations: StationsWindow = field(default_factory=StationsWindow)
 
@@ -136,6 +191,8 @@ class BuildMenu:
             if toggle_button(label, self.tool == tool, tooltip, (0, BUTTON_HEIGHT)):
                 self.choose(Tool.NONE if self.tool == tool else tool)
             imgui.same_line()
+        if self.tool == Tool.TRACK:
+            self._draw_track_options()
         _vertical_rule()
         imgui.same_line()
         if toggle_button(
@@ -153,6 +210,23 @@ class BuildMenu:
         imgui.end()
         imgui.pop_style_var(2)
 
+    def _draw_track_options(self) -> None:
+        _vertical_rule()
+        imgui.same_line()
+        for width, label, tooltip in WIDTH_BUTTONS:
+            if toggle_button(label, self.track_width == width, tooltip, (0, BUTTON_HEIGHT)):
+                self.lay(width, self.electric)
+            imgui.same_line()
+        label = f"{fa.ICON_FA_BOLT}  Electric"
+        if toggle_button(label, self.electric, ELECTRIC_TIP, (0, BUTTON_HEIGHT)):
+            self.lay(self.track_width, not self.electric)
+        imgui.same_line()
+
+    def lay(self, width: TrackWidth, electric: bool) -> None:
+        """Sets what the track tool lays, and plans the previewed track again."""
+        self.track_width, self.electric = width, electric
+        self.preview_to = None
+
     def _draw_hint(self) -> None:
         recent = time.monotonic() - self.message_at < MESSAGE_SECONDS
         if not recent and self.tool not in HINTS:
@@ -164,6 +238,8 @@ class BuildMenu:
             imgui.text_disabled(HINTS[self.tool])
         if self.tool == Tool.TRACK and self.preview is not None and self.preview_price is not None:
             imgui.text_colored(imgui.ImVec4(*BRASS), f"This track: {dollars(self.preview_price)}")
+        if self.hover_note and self.tool in (Tool.STATION, Tool.BULLDOZE, Tool.MOVE_STATION):
+            imgui.text_colored(imgui.ImVec4(*BRASS), self.hover_note)
         imgui.pop_text_wrap_pos()
         imgui.spacing()
 
@@ -177,6 +253,8 @@ class BuildMenu:
         self.stop()
 
     def stop(self) -> None:
+        self.moving = None
+        self.hover_note = ""
         self.track_from = None
         self.preview = None
         self.preview_to = None
@@ -293,21 +371,23 @@ def draw_station_reach(
     stations: list[Cell],
     camera: IsoCamera,
     center: Vec2,
+    reach: Callable[[Cell], tuple[int, int]],
 ) -> None:
     """Shades the cells stations reach, cell by cell as in Civilization: every station's area
-    where it hands goods out, the focused one (being placed or under the mouse) in its own
+    where it hands goods out, the focused one (being placed, under the mouse or open) in its own
     colour, cells two stations share in grey, the border of where the focused station gathers
-    goods, and the stations' own cells in solid blue."""
+    goods, and the stations' own cells in solid blue. `reach` says how far each station hands
+    goods out and gathers them."""
     owners: dict[Cell, set[Cell]] = {}
     for station in {*stations, focus}:
-        for cell in grid.within(station, DELIVERY_RADIUS):
+        for cell in grid.within(station, reach(station)[0]):
             owners.setdefault(cell, set()).add(station)
     for cell, by in owners.items():
         fill = SHARED_FILL if len(by) > 1 else FOCUS_FILL if focus in by else OTHER_FILL
         _hex(draw_list, grid, cell, camera, center, fill, CELL_LINE)
     for station in {*stations, focus}:
         _hex(draw_list, grid, station, camera, center, STATION_FILL, CELL_LINE)
-    gathered = set(grid.within(focus, COLLECTION_RADIUS))
+    gathered = set(grid.within(focus, reach(focus)[1]))
     for a, b in _border(grid, gathered):
         draw_list.add_line(
             imgui.ImVec2(*camera.to_screen(*a, center)),
@@ -350,44 +430,46 @@ def draw_track(
     constructions: Constructions,
     camera: IsoCamera,
     center: Vec2,
+    planned: list[Track] | None = None,
 ) -> None:
-    """Draws every piece of track: ballast with a rail on top, a wooden deck on bridges and a dark
-    line through tunnels, thicker the closer the view."""
+    """Draws every piece of track, or only the planned pieces greyed out: ballast with a rail on
+    top, two rails on double track, a wooden deck on bridges and a dark line through tunnels, with
+    a wire beside electric track, thicker the closer the view. All the beds go down before any
+    rail, so pieces that meet in a cell make one junction or crossing."""
     width = max(1.5, camera.cell_width / 10)
-    for built in constructions:
-        if isinstance(built, Track):
-            _draw_piece(draw_list, built, constructions, camera, center, width)
+    laid = constructions.track()
+    pieces = [
+        (piece, _piece_points(piece, constructions, camera, center))
+        for piece in (laid if planned is None else planned)
+    ]
+    shade = _color if planned is None else _greyed
+    for piece, points in pieces:
+        bed = width * (1.6 + (1.4 if piece.width == TrackWidth.DOUBLE else 0.0))
+        if piece.bed == TrackBed.BRIDGE:
+            draw_list.add_polyline(points, shade(DECK), bed + width * 1.4, 0)
+        if piece.bed == TrackBed.TUNNEL:
+            draw_list.add_polyline(points, shade(TUNNEL), bed, 0)
+        else:
+            draw_list.add_polyline(points, shade(BALLAST), bed, 0)
+    spacing = camera.cell_width * DOUBLE_SPACING / 2
+    for piece, points in pieces:
+        if piece.bed == TrackBed.TUNNEL:
+            continue
+        sides = (-spacing, spacing) if piece.width == TrackWidth.DOUBLE else (0.0,)
+        for side in sides:
+            draw_list.add_polyline(_parallel(points, side), shade(RAIL), max(1.0, width * 0.5), 0)
+    for piece, points in pieces:
+        if piece.electric and piece.bed != TrackBed.TUNNEL:
+            lifted = [imgui.ImVec2(point.x, point.y - width * 1.2) for point in points]
+            draw_list.add_polyline(lifted, shade(WIRE), max(1.0, width * 0.35), 0)
 
 
-def draw_route(
-    draw_list: imgui.ImDrawList,
-    route: Route,
-    constructions: Constructions,
-    camera: IsoCamera,
-    center: Vec2,
-) -> None:
-    width = max(1.5, camera.cell_width / 12)
-    for piece in route.pieces:
-        points = _piece_points(piece, constructions, camera, center)
-        draw_list.add_polyline(points, _color(PREVIEW), width, 0)
-
-
-def _draw_piece(
-    draw_list: imgui.ImDrawList,
-    piece: Track,
-    constructions: Constructions,
-    camera: IsoCamera,
-    center: Vec2,
-    width: float,
-) -> None:
-    points = _piece_points(piece, constructions, camera, center)
-    if piece.bed == TrackBed.BRIDGE:
-        draw_list.add_polyline(points, _color(DECK), width * 3.0, 0)
-    if piece.bed == TrackBed.TUNNEL:
-        draw_list.add_polyline(points, _color(TUNNEL), width * 1.6, 0)
-        return
-    draw_list.add_polyline(points, _color(BALLAST), width * 1.6, 0)
-    draw_list.add_polyline(points, _color(RAIL), max(1.0, width * 0.5), 0)
+def _greyed(rgba: tuple[float, float, float, float]) -> int:
+    """A colour faded to a see-through grey, for track not laid yet."""
+    r, g, b, a = rgba
+    light = 0.3 * r + 0.59 * g + 0.11 * b
+    grey = 0.4 * light + 0.6 * PLANNED_GREY
+    return _color((grey, grey, grey, a * PLANNED_OPACITY))
 
 
 def _piece_points(
@@ -400,6 +482,24 @@ def _piece_points(
     start, end = (offsets[point] for point in piece.ends)
     plane = [(cx + start[0], cy + start[1]), (cx, cy), (cx + end[0], cy + end[1])]
     return [imgui.ImVec2(*camera.to_screen(x, y, center)) for x, y in plane]
+
+
+def _parallel(points: list[imgui.ImVec2], side: float) -> list[imgui.ImVec2]:
+    """The line moved `side` screen pixels to its left, joined where the moved lines meet."""
+    if not side:
+        return points
+    normals = []
+    for a, b in itertools.pairwise(points):
+        length = math.hypot(b.x - a.x, b.y - a.y) or 1.0
+        normals.append((-(b.y - a.y) / length, (b.x - a.x) / length))
+    moved = []
+    for index, point in enumerate(points):
+        before = normals[max(0, index - 1)]
+        after = normals[min(len(normals) - 1, index)]
+        mx, my = before[0] + after[0], before[1] + after[1]
+        dot = (mx * before[0] + my * before[1]) or 1.0
+        moved.append(imgui.ImVec2(point.x + mx / dot * side, point.y + my / dot * side))
+    return moved
 
 
 def _color(rgba: tuple[float, float, float, float]) -> int:

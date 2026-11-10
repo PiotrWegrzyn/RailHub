@@ -49,3 +49,12 @@ def test_at_six_times_speed_a_month_takes_a_sixth_of_its_seconds() -> None:
 
     assert turned == 1
     assert clock.months_in(SECONDS_PER_MONTH) == 6.0
+
+
+def test_a_clock_starts_where_the_maps_history_left_off_and_stops_in_the_last_year() -> None:
+    clock = GameClock(first_year=1950)
+
+    shown = clock.date
+
+    assert shown == "January 1950"
+    assert clock.months_left == (END_YEAR - 1950) * 12

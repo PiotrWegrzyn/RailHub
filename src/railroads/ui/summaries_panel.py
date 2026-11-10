@@ -22,7 +22,6 @@ from railroads.ui.theme import (
     TEXT_DIM,
     color_u32,
 )
-from railroads.ui.trains_window import station_name
 
 CARD_SIZE = (250.0, 50.0)
 CARD_GAP = 6.0
@@ -55,11 +54,17 @@ class SummariesPanel:
             return ()
         return tuple(cell for station in self.open.stations for cell in station.cells)
 
-    def draw(self, top_left: Vec2, bottom_right: Vec2, look_at: Callable[[Cell], None]) -> None:
+    def draw(
+        self,
+        top_left: Vec2,
+        bottom_right: Vec2,
+        look_at: Callable[[Cell], None],
+        name_of: Callable[[Cell], str],
+    ) -> None:
         if self.notes:
             self._draw_cards(top_left, bottom_right)
         if self.open is not None:
-            self._draw_window(look_at)
+            self._draw_window(look_at, name_of)
 
     def _draw_cards(self, top_left: Vec2, bottom_right: Vec2) -> None:
         imgui.set_next_window_pos(
@@ -124,7 +129,7 @@ class SummariesPanel:
             if picked:
                 self.open = None
 
-    def _draw_window(self, look_at: Callable[[Cell], None]) -> None:
+    def _draw_window(self, look_at: Callable[[Cell], None], name_of: Callable[[Cell], str]) -> None:
         summary = self.open
         assert summary is not None
         display = imgui.get_io().display_size
@@ -141,7 +146,7 @@ class SummariesPanel:
                 imgui.push_id(str(station.station))
                 imgui.separator()
                 imgui.align_text_to_frame_padding()
-                imgui.text(station_name(station.station))
+                imgui.text(name_of(station.station))
                 imgui.same_line()
                 if imgui.small_button(fa.ICON_FA_CROSSHAIRS):
                     look_at(station.station)

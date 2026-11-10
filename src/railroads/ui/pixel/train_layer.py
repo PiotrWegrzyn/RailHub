@@ -13,9 +13,8 @@ from railroads.ui.pixel.trains import (
     CAR_HALF,
     COUPLING,
     DETAIL,
-    ENGINE_HALF,
+    ENGINES,
     HEIGHT_PER_WIDTH,
-    TENDER_HALF,
     Look,
     TrainSprites,
     train_sprites,
@@ -24,8 +23,6 @@ from railroads.ui.pixel.world import PixelWorld
 
 SMOKE = (0.88, 0.88, 0.9)
 PUFFS = 5
-# Where the chimney top is, in cells ahead of the engine's middle and above the rails.
-CHIMNEY = (ENGINE_HALF - 0.11, 0.31)
 
 
 class TrainLayer:
@@ -78,10 +75,13 @@ class TrainLayer:
 
     def _parts(self, train: Train) -> list[tuple[object, float]]:
         """Each part of the train and how far its middle is behind the train's front, in cells."""
-        parts: list[tuple[object, float]] = [(Look.ENGINE, ENGINE_HALF)]
-        back = 2 * ENGINE_HALF + COUPLING + TENDER_HALF
-        parts.append((Look.TENDER, back))
-        back += TENDER_HALF
+        model = ENGINES[train.engine]
+        parts: list[tuple[object, float]] = [((Look.ENGINE, train.engine), model.half)]
+        back = 2 * model.half
+        if model.tender is not None:
+            back += COUPLING + model.tender_half
+            parts.append(((Look.TENDER, train.engine), back))
+            back += model.tender_half
         for car in train.cars:
             back += COUPLING + CAR_HALF
             parts.append(((car.good, car.load > 0), back))
@@ -98,7 +98,11 @@ class TrainLayer:
     ) -> None:
         """Puffs of smoke rising from the chimney and drifting back over the train."""
         projection = self.world.projection
-        placed = railway.position(train, ENGINE_HALF - CHIMNEY[0])
+        model = ENGINES[train.engine]
+        if model.chimney is None:
+            return
+        chimney = model.chimney
+        placed = railway.position(train, model.half - chimney[0])
         if placed is None:
             return
         (x, y), (dx, dy) = placed
@@ -111,7 +115,7 @@ class TrainLayer:
             px, py = x - ux * age * 0.5, y - uy * age * 0.5
             ax, ay = projection.to_pixels(px, py)
             sx = origin[0] + float(ax) * scale
-            sy = origin[1] + (float(ay) - (CHIMNEY[1] + age * 0.35) * up) * scale
+            sy = origin[1] + (float(ay) - (chimney[1] + age * 0.35) * up) * scale
             radius = (1.5 + age * 4.0) * scale
             alpha = 0.75 * (1 - age)
             color = imgui.color_convert_float4_to_u32(imgui.ImVec4(*SMOKE, alpha))

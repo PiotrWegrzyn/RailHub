@@ -204,10 +204,19 @@ def test_only_mines_and_town_buildings_can_be_built_in_mountains() -> None:
 
     assert allowed == {
         BuildingKind.MINE,
+        BuildingKind.IRON_MINE,
+        BuildingKind.COPPER_MINE,
+        BuildingKind.GOLD_MINE,
+        BuildingKind.DIAMOND_MINE,
         BuildingKind.HOUSE,
         BuildingKind.TENEMENT,
         BuildingKind.FLATS,
         BuildingKind.SKYSCRAPER,
+        BuildingKind.BAKERY,
+        BuildingKind.TAVERN,
+        BuildingKind.DEPARTMENT_STORE,
+        BuildingKind.HOTEL,
+        BuildingKind.LIMESTONE_QUARRY,
     }
     assert constructions.why_not(Station((0, 0))) == "A station cannot be built on mountains"
 
@@ -247,3 +256,16 @@ def test_removing_a_construction_frees_its_room() -> None:
 
     assert constructions.space_left((0, 1)) == 6
     assert list(constructions) == []
+
+
+def test_a_cell_is_electrified_when_all_its_track_is_electric() -> None:
+    constructions = Constructions(make_map(*WIDE_LAND))
+    constructions.build(Track((2, 2), (0, 6), electric=True))
+    wired = constructions.electrified((2, 2))
+    constructions.build(Track((2, 2), (3, 9)))
+
+    assert wired
+    assert not constructions.electrified((2, 2))
+    assert constructions.electrified((2, 2), (6, 0))
+    assert not constructions.electrified((2, 2), (3, 9))
+    assert not constructions.electrified((2, 3))

@@ -2,10 +2,12 @@ import numpy as np
 
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
 from railroads.sim.geo import Bounds
+from railroads.sim.goods import Good, Need
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
+from railroads.sim.ladders import GrowthRule
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
-from railroads.ui.hex_details import describe
+from railroads.ui.hex_details import Flow, describe
 
 
 def make_map() -> TileMap:
@@ -28,22 +30,28 @@ def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded(
     constructions = Constructions(make_map())
     for _ in range(3):
         constructions.build(Building((5, 5), BuildingKind.HOUSE))
-    constructions.build(Building((5, 5), BuildingKind.FARM))
+    constructions.build(Building((5, 4), BuildingKind.FARM))
     constructions.build(Station((5, 6)))
-    growth = Growth(constructions)
+    growth = Growth(constructions, GrowthRule(trades=True, ladders=()))
 
     details = describe(growth, (5, 5))
+    farm = describe(growth, (5, 4)).buildings[0]
 
-    rows = {row.name: row for row in details.buildings}
-    assert rows["house"].count == 3
-    assert rows["house"].needs == "3 food"
-    assert rows["house"].got == "food 3.0 of 3.0"
-    assert rows["house"].satisfaction == "satisfied"
-    assert rows["farm"].makes == "6 food"
-    assert rows["farm"].gave.startswith("food ")
-    assert details.free_food == 1
+    (house,) = details.buildings
+    assert house.name == "house"
+    assert house.count == 3
+    assert house.needs == [(Need.FOOD, 30), (Need.BEER, 3), (Need.NEWSPAPERS, 3), (Need.HEATING, 3)]
+    assert house.got == [
+        Flow(Need.NEWSPAPERS, 0.0, 3.0),
+        Flow(Need.HEATING, 0.0, 3.0),
+        Flow(Need.BEER, 0.0, 3.0),
+        Flow(Need.FOOD, 0.0, 30.0),
+    ]
+    assert house.satisfaction == "unsatisfied"
+    assert farm.makes == [(Good.WHEAT, 5)]
+    assert farm.gave == [Flow(Good.WHEAT, 0.0, 5.0)]
     assert ("population", 3, 3) in details.points
-    assert ("food", 1, 1) in details.points
+    assert ("food", 0, 1) in details.points
 
 
 def test_details_of_an_empty_cell_show_its_land_and_nearby_points() -> None:
@@ -59,7 +67,7 @@ def test_details_of_an_empty_cell_show_its_land_and_nearby_points() -> None:
     assert details.title.startswith("Cell 5, 6")
 
 
-def test_a_building_needing_two_goods_lists_each_with_what_it_got() -> None:
+def test_a_building_needing_several_goods_lists_each_with_what_it_got() -> None:
     constructions = Constructions(make_map())
     constructions.build(Building((5, 5), BuildingKind.TENEMENT))
     growth = Growth(constructions)
@@ -67,8 +75,36 @@ def test_a_building_needing_two_goods_lists_each_with_what_it_got() -> None:
     details = describe(growth, (5, 5))
 
     tenement = details.buildings[0]
-    assert tenement.needs == "2 food, 1 goods"
-    assert tenement.got == "food 2.0 of 2.0\ngoods 0.0 of 1.0"
+    assert tenement.needs == [
+        (Need.FOOD, 60),
+        (Need.SALT, 2),
+        (Need.GOODS, 20),
+        (Need.COFFEE, 2),
+        (Need.CLOTHES, 3),
+        (Need.FURNITURE, 2),
+        (Need.BEER, 3),
+        (Need.VODKA, 1),
+        (Need.SHOES, 2),
+        (Need.BRICKS, 5),
+        (Need.REFINED_SUGAR, 2),
+        (Need.NEWSPAPERS, 3),
+        (Need.HEATING, 3),
+    ]
+    assert tenement.got == [
+        Flow(Need.SALT, 0.0, 2.0),
+        Flow(Need.COFFEE, 0.0, 2.0),
+        Flow(Need.BRICKS, 0.0, 5.0),
+        Flow(Need.NEWSPAPERS, 0.0, 3.0),
+        Flow(Need.SHOES, 0.0, 2.0),
+        Flow(Need.FURNITURE, 0.0, 2.0),
+        Flow(Need.CLOTHES, 0.0, 3.0),
+        Flow(Need.HEATING, 0.0, 3.0),
+        Flow(Need.BEER, 0.0, 3.0),
+        Flow(Need.VODKA, 0.0, 1.0),
+        Flow(Need.REFINED_SUGAR, 0.0, 2.0),
+        Flow(Need.FOOD, 0.0, 60.0),
+        Flow(Need.GOODS, 0.0, 20.0),
+    ]
 
 
 def test_a_factory_without_lumber_makes_nothing_and_shows_what_it_could() -> None:
@@ -78,4 +114,4 @@ def test_a_factory_without_lumber_makes_nothing_and_shows_what_it_could() -> Non
 
     details = describe(growth, (5, 5))
 
-    assert details.buildings[0].gave == "goods 0.0 of 0.0 (up to 3)"
+    assert details.buildings[0].gave == [Flow(Good.GOODS, 0.0, 0.0, 30)]

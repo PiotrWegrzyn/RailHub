@@ -1,3 +1,4 @@
+import pickle
 from pathlib import Path
 
 import numpy as np
@@ -106,3 +107,12 @@ def test_places_off_the_map_have_no_cell() -> None:
     cell = tile_map.cell_at_lonlat(30.0, 60.0)
 
     assert cell is None
+
+
+def test_a_map_sent_between_processes_can_still_change_its_vegetation() -> None:
+    tile_map = pickle.loads(pickle.dumps(make_map()))
+
+    tile_map.set_vegetation(np.array([0]), Vegetation.FOREST)
+
+    assert tile_map.vegetation.flat[0] == Vegetation.FOREST
+    assert not tile_map.vegetation.flags.writeable

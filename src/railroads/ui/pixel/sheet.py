@@ -12,6 +12,11 @@ from PIL import Image
 SHEET_DIR = Path(__file__).parent
 SHEET_PNG = SHEET_DIR / "sprites.png"
 SHEET_INDEX = SHEET_DIR / "sprites.json"
+# The same sprites drawn FINE times finer, for zooms that show each art pixel as two or more
+# screen pixels.
+FINE = 2
+FINE_PNG = SHEET_DIR / "sprites@2x.png"
+FINE_INDEX = SHEET_DIR / "sprites@2x.json"
 
 Pixels = npt.NDArray[np.float32]
 
@@ -36,6 +41,10 @@ class SpriteSheet:
     def load(cls, png: Path = SHEET_PNG, index: Path = SHEET_INDEX) -> Self:
         with Image.open(png) as sheet:
             return cls.from_image(sheet, json.loads(index.read_text()))
+
+    @classmethod
+    def load_fine(cls) -> Self:
+        return cls.load(FINE_PNG, FINE_INDEX)
 
     def index(self, name: str) -> int:
         return self.names.index(name)

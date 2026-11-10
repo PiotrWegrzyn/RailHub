@@ -3,16 +3,20 @@ import json
 import numpy as np
 import pytest
 
-from railroads.sim.constructions import Building, BuildingKind, Constructions
+from railroads.sim.constructions import Building, BuildingKind, Constructions, Track, TrackWidth
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 from railroads.ui.biomes import Biome
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 from railroads.ui.pixel.art import SPRITES, draw_sheet, relief
-from railroads.ui.pixel.sheet import SHEET_INDEX, SpriteSheet
+from railroads.ui.pixel.layer import resolution_for
+from railroads.ui.pixel.sheet import FINE, SHEET_INDEX, SpriteSheet
+from railroads.ui.pixel.track_preview import ghost
 from railroads.ui.pixel.world import (
     CHUNK,
+    RAIL,
+    WIRE,
     ChunkPlacement,
     PixelProjection,
     PixelWorld,
@@ -339,3 +343,118 @@ def test_new_buildings_put_up_the_scenery_again_and_name_the_chunks_to_redraw(
 
     assert (int(px // CHUNK), int(py // CHUNK)) in chunks
     assert np.isin(world.scenery.sprite, sheet.variants("flats")).sum() == 1
+
+
+def track_pixels(
+    sheet: SpriteSheet, pieces: list[Track], color: tuple[int, int, int]
+) -> np.ndarray:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    for piece in pieces:
+        constructions.build(piece)
+    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+    px, py = world.projection.to_pixels(*tile_map.grid.center(*pieces[0].cell))
+    chunk = world.render(int(px // CHUNK), int(py // CHUNK))
+    return (chunk[..., :3] == color).all(axis=-1)
+
+
+def test_track_crossing_in_a_cell_keeps_the_rails_of_both(sheet: SpriteSheet) -> None:
+    across = Track((10, 3), (0, 6))
+    alone = track_pixels(sheet, [across], RAIL)
+
+    crossed = track_pixels(sheet, [across, Track((10, 3), (3, 9))], RAIL)
+
+    assert (crossed | ~alone).all()
+    assert crossed.sum() > alone.sum()
+
+
+def test_double_track_lays_two_tracks_side_by_side(sheet: SpriteSheet) -> None:
+    single = track_pixels(sheet, [Track((10, 3), (0, 6))], RAIL)
+
+    double = track_pixels(sheet, [Track((10, 3), (0, 6), TrackWidth.DOUBLE)], RAIL)
+
+    assert double.sum() > 1.6 * single.sum()
+
+
+def test_electric_track_hangs_wires_over_it(sheet: SpriteSheet) -> None:
+    plain = track_pixels(sheet, [Track((10, 3), (0, 6))], WIRE)
+
+    electric = track_pixels(sheet, [Track((10, 3), (0, 6), electric=True)], WIRE)
+
+    assert plain.sum() == 0
+    assert electric.sum() > 0
+
+
+def test_planned_track_shows_as_the_real_track_faded_to_a_see_through_grey() -> None:
+    pixels = np.array([[[0.33, 0.24, 0.16, 1.0], [0.7, 0.7, 0.68, 1.0], [0.0, 0.0, 0.0, 0.0]]])
+
+    faded = ghost(pixels).astype(int)
+
+    spread = faded[0, :2, :3].max(axis=1) - faded[0, :2, :3].min(axis=1)
+    assert (spread < 20).all()
+    assert faded[0, 1, 0] > faded[0, 0, 0] + 60
+    assert 0 < faded[0, 0, 3] < 255
+    assert faded[0, 2, 3] == 0
+
+
+@pytest.fixture(scope="module")
+def fine_sheet() -> SpriteSheet:
+    image, places = draw_sheet(resolution=FINE)
+    return SpriteSheet.from_image(image, places)
+
+
+def test_the_fine_sheet_holds_the_same_sprites_twice_as_big_on_the_same_spots(
+    sheet: SpriteSheet, fine_sheet: SpriteSheet
+) -> None:
+    shipped = SpriteSheet.load_fine()
+
+    assert shipped.names == fine_sheet.names == sheet.names
+    assert np.abs(fine_sheet.sizes - FINE * sheet.sizes).max() <= 2
+    assert np.abs(fine_sheet.anchors - FINE * sheet.anchors).max() <= 2
+
+
+def test_a_fine_chunk_keeps_the_ground_and_draws_what_stands_on_it_finer(
+    sheet: SpriteSheet, fine_sheet: SpriteSheet
+) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid], fine=fine_sheet)
+    bare = world.render(0, 1)
+    for _ in range(6):
+        constructions.build(Building((10, 4), BuildingKind.HOUSE))
+    world.buildings_changed([(10, 4)])
+    px, py = world.projection.to_pixels(*tile_map.grid.center(10, 4))
+    chunk = (int(px) // CHUNK, int(py) // CHUNK)
+
+    coarse, fine = world.render(*chunk), world.render(*chunk, FINE)
+
+    blown_up = coarse.repeat(FINE, axis=0).repeat(FINE, axis=1)
+    assert world.resolutions == (1, FINE)
+    assert fine.shape == (CHUNK * FINE, CHUNK * FINE, 4)
+    assert (world.render(0, 1, FINE) == bare.repeat(FINE, axis=0).repeat(FINE, axis=1)).all()
+    assert (fine != blown_up).any(axis=-1).sum() > 100
+
+
+def test_fine_track_keeps_one_pixel_rails_over_twice_the_pixels(sheet: SpriteSheet) -> None:
+    tile_map = make_tile_map()
+    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    piece = Track((10, 3), (0, 6))
+    px, py = world.projection.to_pixels(*tile_map.grid.center(10, 3))
+    left, top = int(px) - 32, int(py) - 32
+
+    coarse = world.track_layer([piece], left, top, 64, 64)
+    fine = world.track_layer([piece], left, top, 64, 64, FINE)
+
+    rails = [
+        np.all(np.abs(layer[..., :3] - np.array(RAIL) / 255) < 0.01, axis=-1)
+        for layer in (coarse, fine)
+    ]
+    assert fine.shape == (128, 128, 4)
+    assert rails[0].sum() < rails[1].sum() < 3 * rails[0].sum()
+
+
+@pytest.mark.parametrize(("screen", "resolution"), [(1, 1), (2, 2), (3, 1), (4, 2), (8, 2)])
+def test_chunks_are_drawn_fine_where_they_blow_up_evenly(screen: int, resolution: int) -> None:
+    chosen = resolution_for(screen, (1, FINE))
+
+    assert chosen == resolution

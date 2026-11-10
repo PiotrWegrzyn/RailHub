@@ -6,32 +6,44 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui, immapp
 
 from railroads import maps
-from railroads.mapgen.seeding import seed_buildings
+from railroads.mapgen.seeding import play_begins, seed_buildings
 from railroads.newgame import start_new_game
-from railroads.sim.clock import MAX_PLAY_SPEED, SPEEDS, GameClock
-from railroads.sim.grids import GridKind
+from railroads.sim.clock import (
+    END_YEAR,
+    HISTORY_START,
+    MAX_PLAY_SPEED,
+    SPEEDS,
+    START_YEAR,
+    GameClock,
+)
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
-from railroads.sim.tilemap import TileMap
+from railroads.sim.novelties import Novelties
+from railroads.sim.stats import History
+from railroads.ui.help_window import HelpWindow
 from railroads.ui.map_view import MapView
+from railroads.ui.reports_window import ReportsWindow
+from railroads.ui.tech_window import TechWindow
 from railroads.ui.theme import BRASS, apply_theme, toggle_button
 
-GRID_CHOICES: dict[GridKind, str] = {"hex": "Hexagons", "square": "Squares"}
+HELP_BUTTON_WIDTH = 30.0
 
 
 class App:
     def __init__(
         self,
-        views: dict[GridKind, MapView],
-        shown: GridKind,
+        view: MapView,
         title: str = "",
         rng: np.random.Generator | None = None,
+        clock: GameClock | None = None,
     ) -> None:
-        self.views = views
-        self.shown = shown
+        self.view = view
         self.title = title
-        self.clock = GameClock()
+        self.clock = GameClock() if clock is None else clock
         self.rng = np.random.default_rng() if rng is None else rng
         self._styled = False
+        self.help = HelpWindow()
+        self.tech = TechWindow()
+        self.reports = ReportsWindow()
 
     def gui(self) -> None:
         if not self._styled:
@@ -39,20 +51,31 @@ class App:
             self._styled = True
         seconds = imgui.get_io().delta_time
         months = self.clock.months_in(seconds)
-        for view in self.views.values():
-            view.time_passed(months)
+        self.view.time_passed(months)
         first = self.clock.months
         for month in range(first + 1, first + 1 + self.clock.advance(seconds)):
-            for view in self.views.values():
-                view.month_passed(self.rng, self.clock.date_of(month))
+            self.view.month_passed(self.rng, self.clock.date_of(month))
         self._draw_top_bar()
-        self.views[self.shown].gui()
+        self.view.gui()
+        self.help.draw()
+        self.tech.draw(self.view.railway.research)
+        growth = self.view.growth
+        self.reports.draw(
+            growth.history, growth.year, len(self.view.railway.stations()), growth.population()
+        )
+        typing = imgui.get_io().want_text_input
+        if not typing and imgui.is_key_pressed(imgui.Key.h, repeat=False):
+            self.help.open = not self.help.open
+        if not typing and imgui.is_key_pressed(imgui.Key.r, repeat=False):
+            self.tech.open = not self.tech.open
+        if not typing and imgui.is_key_pressed(imgui.Key.g, repeat=False):
+            self.reports.open = not self.reports.open
 
     def _draw_top_bar(self) -> None:
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_CLOCK}  {self.clock.date}")
         imgui.same_line(0, 16)
-        self.views[self.shown].draw_money()
+        self.view.draw_money()
         imgui.same_line(0, 16)
         for speed in SPEEDS:
             testing = speed > MAX_PLAY_SPEED
@@ -65,16 +88,24 @@ class App:
                 imgui.pop_style_var()
             imgui.same_line(0, 2)
         imgui.same_line(0, 16)
-        for kind, label in GRID_CHOICES.items():
-            if toggle_button(label, self.shown == kind, f"Show the map in {label.lower()}"):
-                self.shown = kind
-            imgui.same_line(0, 2)
-        imgui.same_line(0, 16)
-        self.views[self.shown].draw_controls()
+        self.view.draw_controls()
         if self.title:
             imgui.same_line(0, 16)
             imgui.align_text_to_frame_padding()
             imgui.text_disabled(self.title)
+        padding = imgui.get_style().window_padding.x
+        imgui.same_line(imgui.get_window_width() - padding - 3 * HELP_BUTTON_WIDTH - 8)
+        label = fa.ICON_FA_CHART_BAR
+        if toggle_button(label, self.reports.open, "Reports (G)", (HELP_BUTTON_WIDTH, 0)):
+            self.reports.open = not self.reports.open
+        imgui.same_line(0, 4)
+        label = fa.ICON_FA_FLASK
+        if toggle_button(label, self.tech.open, "Tech trees (R)", (HELP_BUTTON_WIDTH, 0)):
+            self.tech.open = not self.tech.open
+        imgui.same_line(0, 4)
+        label = fa.ICON_FA_QUESTION_CIRCLE
+        if toggle_button(label, self.help.open, "Buildings and goods (H)", (HELP_BUTTON_WIDTH, 0)):
+            self.help.open = not self.help.open
 
 
 def main() -> None:
@@ -87,25 +118,46 @@ def main() -> None:
         "--years",
         type=int,
         default=MONTHS_BEFORE_PLAY // 12,
-        help="how many years towns grow before play starts",
+        help=f"how many years towns grow, from {HISTORY_START}, before play starts in the year "
+        "they reach",
+    )
+    parser.add_argument(
+        "--simulate",
+        type=int,
+        nargs="?",
+        const=END_YEAR - START_YEAR,
+        metavar="YEARS",
+        help="let a stand-in player build stations and serve the towns for this many years "
+        "(all of play if left out), then open the map where it stopped",
     )
     args = parser.parse_args()
 
     seed = random.randrange(1_000_000) if args.seed is None else args.seed
-    tile_maps: dict[GridKind, TileMap]
     if args.poland:
-        tile_maps = {kind: maps.load("poland", kind) for kind in GRID_CHOICES}
+        tile_map = maps.load("poland", "hex")
         title = f"Poland, seed {seed}"
     else:
         game = start_new_game(seed)
-        tile_maps = game.maps
+        tile_map = game.tile_map
         title = f"Seed {seed}, {game.place}"
 
-    print(f"Growing towns for {args.years} years and placing industry")
-    seeded = {
-        kind: seed_buildings(tile_maps[kind], np.random.default_rng(seed), months=args.years * 12)
-        for kind in GRID_CHOICES
-    }
-    views = {kind: MapView(seeded[kind].tile_map, seeded[kind]) for kind in GRID_CHOICES}
-    app = App(views, shown="hex", title=title, rng=np.random.default_rng(seed + 1))
-    immapp.run(gui_function=app.gui, window_title=f"Railroads: {title}", window_size=(1280, 800))
+    months = min(args.years, END_YEAR - HISTORY_START) * 12
+    begins = play_begins(months)
+    print(f"Growing towns for {months // 12} years, from {HISTORY_START} to {begins}")
+    history = History()
+    seeded = seed_buildings(tile_map, np.random.default_rng(seed), months=months, history=history)
+    view = MapView(seeded.tile_map, seeded, start_year=begins, history=history)
+    view.growth.novelties = Novelties.pick(view.tile_map, np.random.default_rng(seed + 3))
+    if args.simulate is not None:
+        years = min(args.simulate, END_YEAR - begins)
+        print(f"Playing {years} years with a stand-in player")
+        view.simulate(years, np.random.default_rng(seed + 2))
+        title += ", simulated"
+    clock = GameClock(first_year=view.growth.year)
+    app = App(view, title=title, rng=np.random.default_rng(seed + 1), clock=clock)
+    immapp.run(
+        gui_function=app.gui,
+        window_title=f"Railroads: {title}",
+        window_size=(1280, 800),
+        with_implot=True,
+    )

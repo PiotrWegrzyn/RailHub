@@ -5,7 +5,8 @@ from railroads.sim.economy import Neighbourhoods
 from railroads.sim.forests import FORESTS, ForestRule, forest_turn, forests_nearby
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
-from railroads.sim.growth import LUMBER_MILLS, TOWNS, Growth, GrowthRule
+from railroads.sim.growth import Growth
+from railroads.sim.ladders import LUMBER_MILLS, TOWNS, GrowthRule
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 
 STILL = ForestRule(clearing_per_point=0.0, clearing_per_mill=0.0, spread_per_forest=0.0)
@@ -120,21 +121,17 @@ def test_forest_never_spreads_onto_built_cells() -> None:
     assert tile_map.vegetation[1, 6] == Vegetation.FOREST
 
 
-def test_cleared_forest_weighs_again_for_towns_and_for_land_food() -> None:
+def test_cleared_forest_weighs_again_for_towns() -> None:
     tile_map = make_map(hill=(5, 5))
     constructions = Constructions(tile_map)
     constructions.build(Building((5, 5), BuildingKind.HOUSE))
     growth = Growth(constructions, GrowthRule(trades=False, ladders=(TOWNS,), forests=STILL))
     chance_before = growth.chances(TOWNS)[5, 5]
-    food_before = growth.economy.free_food[np.ravel_multi_index((5, 5), tile_map.grid.shape)]
     clearing = ForestRule(clearing_per_point=1.0, spread_per_forest=0.0)
 
     growth._change_forests(clearing, 1, np.random.default_rng(0))
 
-    index = np.ravel_multi_index((5, 5), tile_map.grid.shape)
     assert growth.chances(TOWNS)[5, 5] > 3 * chance_before
-    assert food_before == 1.0
-    assert growth.economy.free_food[index] == 0.0
 
 
 def test_forests_nearby_counts_the_cell_and_the_cells_next_to_it() -> None:

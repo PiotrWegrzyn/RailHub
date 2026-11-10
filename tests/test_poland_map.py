@@ -9,9 +9,9 @@ from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap
 WARSAW = (21.01, 52.23)
 
 
-@pytest.fixture(scope="module", params=["square", "hex"])
-def poland(request: pytest.FixtureRequest) -> TileMap:
-    return maps.load("poland", request.param)
+@pytest.fixture(scope="module")
+def poland() -> TileMap:
+    return maps.load("poland", "hex")
 
 
 def cell_at(tile_map: TileMap, lon: float, lat: float) -> Cell:
@@ -48,8 +48,8 @@ def test_map_covers_poland(poland: TileMap) -> None:
 
     size_km = (width * poland.grid.km_per_cell, height * poland.grid.km_per_cell)
 
-    assert 700 < size_km[0] < 800
-    assert 650 < size_km[1] < 720
+    assert 680 < size_km[0] < 710
+    assert 640 < size_km[1] < 670
 
 
 def test_map_file_keeps_its_scale(poland: TileMap) -> None:
@@ -61,7 +61,7 @@ def test_map_file_keeps_its_scale(poland: TileMap) -> None:
 @pytest.mark.parametrize(
     ("place", "lon", "lat", "expected"),
     [
-        ("Baltic Sea north of Łeba", 17.5, 54.95, Terrain.SEA),
+        ("Baltic Sea north of Łeba", 17.5, 54.84, Terrain.SEA),
         ("Łódź", 19.46, 51.76, Terrain.LAND),
         ("Żuławy delta, below sea level", 19.12, 54.21, Terrain.LAND),
         ("Szczecin Lagoon", 14.2, 53.75, Terrain.SEA),
@@ -109,13 +109,3 @@ def test_vistula_carries_water_from_warsaw_to_the_sea(poland: TileMap) -> None:
     reached = water_reachable_from(poland, river)
 
     assert any(poland.terrain[cell] == Terrain.SEA for cell in reached)
-
-
-def test_square_map_water_cannot_be_crossed_diagonally() -> None:
-    water = maps.load("poland", "square").terrain != Terrain.LAND
-
-    falling = water[:-1, :-1] & water[1:, 1:] & ~water[:-1, 1:] & ~water[1:, :-1]
-    rising = water[:-1, 1:] & water[1:, :-1] & ~water[:-1, :-1] & ~water[1:, 1:]
-
-    assert not falling.any()
-    assert not rising.any()

@@ -7,23 +7,24 @@ from dataclasses import dataclass
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.sim.demand import CARGO_PRICE, StationDemand
-from railroads.sim.economy import Good
+from railroads.sim.demand import StationDemand, price_of
 from railroads.sim.finance import dollars
+from railroads.sim.goods import FITS, Need
 from railroads.sim.grids import Cell
-from railroads.sim.railway import STOCKPILE, Railway
+from railroads.sim.railway import Railway
 from railroads.ui.theme import (
     BRASS,
     BRASS_DARK,
     CARDS_WIDTH,
     GONE,
     GROWN,
-    good_swatch,
+    good_icon,
     goods_inline,
+    next_good_slot,
+    rows_that_fit,
 )
 from railroads.ui.trains_window import WINDOW_SIZE as TRAINS_SIZE
 from railroads.ui.trains_window import WINDOW_TOP as TRAINS_TOP
-from railroads.ui.trains_window import station_name
 
 WINDOW_SIZE = (860.0, 180.0)
 GAP = 12.0
@@ -33,7 +34,12 @@ GAP = 12.0
 class StationsWindow:
     open: bool = False
 
-    def draw(self, railway: Railway, look_at: Callable[[Cell], None]) -> None:
+    def draw(
+        self,
+        railway: Railway,
+        look_at: Callable[[Cell], None],
+        open_station: Callable[[Cell], None],
+    ) -> None:
         if not self.open:
             return
         display = imgui.get_io().display_size
@@ -50,12 +56,15 @@ class StationsWindow:
                     "No stations yet. Pick Station in the build bar and click the map."
                 )
             else:
-                self._draw_table(railway, stations, look_at)
+                self._draw_table(railway, stations, look_at, open_station)
         imgui.end()
 
     @staticmethod
     def _draw_table(
-        railway: Railway, stations: list[Cell], look_at: Callable[[Cell], None]
+        railway: Railway,
+        stations: list[Cell],
+        look_at: Callable[[Cell], None],
+        open_station: Callable[[Cell], None],
     ) -> None:
         flags = (
             imgui.TableFlags_.row_bg.value
@@ -69,7 +78,7 @@ class StationsWindow:
         imgui.table_setup_column("Station")
         imgui.table_setup_column("Stockpile")
         imgui.table_setup_column("Waiting for trains", imgui.TableColumnFlags_.width_stretch.value)
-        imgui.table_setup_column("To hand out", imgui.TableColumnFlags_.width_stretch.value)
+        imgui.table_setup_column("Brought by trains", imgui.TableColumnFlags_.width_stretch.value)
         imgui.table_setup_column("Demand left", imgui.TableColumnFlags_.width_stretch.value)
         imgui.table_setup_column("")
         imgui.table_headers_row()
@@ -79,11 +88,14 @@ class StationsWindow:
             imgui.table_next_row(0, 28)
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()
-            imgui.text(station_name(station))
+            if imgui.selectable(railway.name_of(station), False)[0]:
+                open_station(station)
+            if imgui.is_item_hovered():
+                imgui.set_tooltip("Open this station's details")
             imgui.table_next_column()
             imgui.push_style_color(imgui.Col_.plot_histogram, imgui.ImVec4(*BRASS_DARK))
             imgui.progress_bar(
-                goods.stocked / STOCKPILE, (110, 0), f"{goods.stocked:.0f}/{STOCKPILE:.0f}"
+                goods.stocked / goods.limit, (110, 0), f"{goods.stocked:.0f}/{goods.limit:.0f}"
             )
             imgui.pop_style_color()
             imgui.table_next_column()
@@ -91,7 +103,7 @@ class StationsWindow:
             imgui.table_next_column()
             goods_inline(goods.brought, "nothing")
             imgui.table_next_column()
-            _draw_demand(railway.station_demand(station))
+            draw_demand(railway.station_demand(station))
             imgui.table_next_column()
             if imgui.small_button(fa.ICON_FA_CROSSHAIRS):
                 look_at(station)
@@ -101,27 +113,29 @@ class StationsWindow:
         imgui.end_table()
 
 
-def _draw_demand(demand: StationDemand) -> None:
-    """Each good wanted around the station, with the share of its demand left: what a unit
-    unloaded there earns, of CARGO_PRICE."""
-    wanted = [good for good in Good if demand.capacity.get(good, 0) > 0]
+def draw_demand(demand: StationDemand) -> None:
+    """Each need around the station, with the share of its demand left: the share of its price
+    a unit delivered there for it earns."""
+    wanted = [need for need in Need if demand.capacity.get(need, 0) > 0]
     if not wanted:
         imgui.text_disabled("none")
         return
-    for index, good in enumerate(wanted):
-        record = demand.record(good)
-        if index:
-            imgui.same_line(0, 10)
+    left, per_row = rows_that_fit()
+    for index, need in enumerate(wanted):
+        record = demand.record(need)
+        next_good_slot(index, left, per_row)
         imgui.align_text_to_frame_padding()
-        good_swatch(good)
-        imgui.same_line(0, 4)
+        good_icon(need, framed=True)
+        imgui.same_line(0, 3)
         color = GONE if record.share < 0.25 else BRASS if record.share < 0.75 else GROWN
         imgui.text_colored(imgui.ImVec4(*color), f"{record.share:.0%}")
         if imgui.is_item_hovered():
             imgui.begin_tooltip()
-            imgui.text(f"{good.value}: {record.left:.1f} of {record.capacity:.1f} demand left")
-            imgui.text(f"A unit unloaded now earns {dollars(CARGO_PRICE * record.share)}")
-            last = demand.last_month.get(good)
+            imgui.text(f"{need.value}: {record.left:.1f} of {record.capacity:.1f} demand left")
+            price = price_of(FITS[need][0]) * record.share
+            imgui.text(f"A unit delivered for it now earns {dollars(price)}")
+            imgui.text_disabled(f"Met by {', '.join(good.value for good in FITS[need])}")
+            last = demand.last_month.get(need)
             if last is not None:
                 imgui.text_disabled(
                     f"Last month ended with {last.left:.1f} of {last.capacity:.1f} left"

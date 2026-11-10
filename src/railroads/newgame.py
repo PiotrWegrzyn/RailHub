@@ -12,14 +12,14 @@ from railroads.mapgen.start import StartRegion, pick_start_bounds
 from railroads.mapgen.terrain_tiles import SOURCE as TERRAIN_TILES_SOURCE
 from railroads.mapgen.terrain_tiles import ElevationDatabase
 from railroads.sim.geo import Bounds, describe_lonlat
-from railroads.sim.grids import GRIDS, GridKind
+from railroads.sim.grids import HexGrid
 from railroads.sim.tilemap import TileMap
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 ELEVATION_DB = DATA_DIR / "elevation.sqlite"
 START_REGION = StartRegion()
-MAP_WIDTH_KM = 600.0
-MAP_HEIGHT_KM = 600.0
+MAP_WIDTH_KM = 537.0
+MAP_HEIGHT_KM = 537.0
 KM_PER_CELL = 2.0
 
 
@@ -27,7 +27,7 @@ KM_PER_CELL = 2.0
 class NewGame:
     seed: int
     bounds: Bounds
-    maps: dict[GridKind, TileMap]
+    tile_map: TileMap
 
     @property
     def place(self) -> str:
@@ -54,14 +54,11 @@ def start_new_game(
         database.close()
     strategies = real_world_strategies(world, elevation, seed)
     report("Building the map")
-    maps = {
-        kind: generate_map(
-            f"Seed {seed}",
-            bounds,
-            grid_type.covering(bounds.width_km, bounds.height_km, KM_PER_CELL),
-            strategies,
-            (TERRAIN_TILES_SOURCE, NATURAL_EARTH_SOURCE),
-        )
-        for kind, grid_type in GRIDS.items()
-    }
-    return NewGame(seed, bounds, maps)
+    tile_map = generate_map(
+        f"Seed {seed}",
+        bounds,
+        HexGrid.covering(bounds.width_km, bounds.height_km, KM_PER_CELL),
+        strategies,
+        (TERRAIN_TILES_SOURCE, NATURAL_EARTH_SOURCE),
+    )
+    return NewGame(seed, bounds, tile_map)

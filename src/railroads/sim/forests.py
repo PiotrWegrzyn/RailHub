@@ -16,7 +16,7 @@ from railroads.sim.tilemap import Terrain, TileMap, Vegetation
 
 CLEARING_PER_POINT = 0.00002
 CLEARING_PER_MILL = 100 * CLEARING_PER_POINT
-SPREAD_PER_FOREST = 0.00007
+SPREAD_PER_FOREST = 0.00004
 MILLS_CLOSE_BELOW = 3
 
 type Cells = npt.NDArray[np.intp]
@@ -33,18 +33,23 @@ class ForestRule:
 FORESTS = ForestRule()
 
 
-def forests_nearby(tile_map: TileMap, near: Cells) -> npt.NDArray[np.int64]:
-    """How many forest cells each cell's neighbourhood holds, as a flat array. `near` holds
-    every cell's neighbours as flat indices, one past the last cell standing for off the map."""
+def forests_nearby(
+    tile_map: TileMap, near: Cells, cells: Cells | None = None
+) -> npt.NDArray[np.int64]:
+    """How many forest cells each cell's neighbourhood holds, as a flat array, or each of the
+    given flat cells alone. `near` holds every cell's neighbours as flat indices, one past the
+    last cell standing for off the map."""
     forest = (tile_map.vegetation == Vegetation.FOREST) & (tile_map.terrain == Terrain.LAND)
     padded = np.append(forest.ravel(), False)
-    return forest.ravel().astype(np.int64) + padded[near].sum(axis=0)
+    if cells is None:
+        return forest.ravel().astype(np.int64) + padded[near].sum(axis=0)
+    return forest.ravel()[cells].astype(np.int64) + padded[near[:, cells]].sum(axis=0)
 
 
 def forest_turn(
     tile_map: TileMap,
     near: Cells,
-    people: npt.NDArray[np.int64],
+    people: npt.NDArray[np.float64] | npt.NDArray[np.int64],
     mills: npt.NDArray[np.int64],
     rule: ForestRule,
     months: int,
@@ -59,9 +64,9 @@ def forest_turn(
     forest = np.flatnonzero(is_forest & ((people > 0) | (mills > 0)))
     clearing = rule.clearing_per_point * people[forest] + rule.clearing_per_mill * mills[forest]
     cleared = forest[rng.random(forest.size) < _over(clearing, months)]
-    padded = np.append(is_forest, False)
     grass = np.flatnonzero(land & (vegetation == Vegetation.GRASS))
-    beside = padded[near[:, grass]].sum(axis=0)
+    beside = np.bincount(near[:, np.flatnonzero(is_forest)].ravel(), minlength=near.shape[1] + 1)
+    beside = beside[grass]
     open_ = grass[beside > 0]
     spread = rule.spread_per_forest * beside[beside > 0]
     grown = open_[rng.random(open_.size) < _over(spread, months)]

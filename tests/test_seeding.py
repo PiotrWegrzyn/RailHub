@@ -1,21 +1,41 @@
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
-from railroads.mapgen.seeding import (
-    STATION_PEOPLE,
-    STATION_SPACING_CELLS,
-    place_stations,
-    seed_buildings,
-)
-from railroads.sim.constructions import Building, BuildingKind, Constructions, Track
+from railroads.mapgen.seeding import play_begins, seed_buildings
+from railroads.sim.clock import HISTORY_START
+from railroads.sim.constructions import Building, BuildingKind, Constructions, Station, Track
 from railroads.sim.economy import Neighbourhoods
 from railroads.sim.forests import MILLS_CLOSE_BELOW, forests_nearby
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
-from railroads.sim.growth import Growth, Points
+from railroads.sim.growth import MONTHS_BEFORE_PLAY, Growth
+from railroads.sim.ladders import (
+    FACTORIES,
+    FARMS,
+    GROWTH,
+    LUMBER_MILLS,
+    MINES,
+    PORTS,
+    TOWNS,
+    Ladder,
+)
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 
-YEARS = 300 * 12
+
+def busier(ladder: Ladder, times: float = 10) -> Ladder:
+    return replace(
+        ladder,
+        base_chance=times * ladder.base_chance,
+        chance_per_doubling={p: times * v for p, v in ladder.chance_per_doubling.items()},
+    )
+
+
+# A small country grows the industry under test ten times as fast, and farms a hundred times, so
+# that each turns up in it often enough to judge where; towns grow as they always do.
+INDUSTRY = (busier(FARMS), MINES, LUMBER_MILLS, PORTS, FACTORIES)
+BUSY = replace(GROWTH, ladders=(TOWNS, *(busier(ladder) for ladder in INDUSTRY)))
 
 
 def make_map(
@@ -58,7 +78,8 @@ def buildings_of(constructions: Constructions, kind: BuildingKind) -> list[Build
 
 @pytest.fixture(scope="module")
 def country() -> Constructions:
-    return seed_buildings(make_country(), np.random.default_rng(1), months=YEARS)
+    rng = np.random.default_rng(1)
+    return seed_buildings(make_country(), rng, BUSY, months=MONTHS_BEFORE_PLAY)
 
 
 def test_seeding_grows_towns_and_the_industry_that_suits_the_land(country: Constructions) -> None:
@@ -144,20 +165,17 @@ def test_seeding_leaves_track_to_the_player(country: Constructions) -> None:
     assert not any(isinstance(construction, Track) for construction in built)
 
 
-def test_stations_go_up_beside_people_spaced_apart() -> None:
-    constructions = seed_buildings(make_country(), np.random.default_rng(2), months=1200)
-    growth = Growth(constructions)
-    growth.run(1200, np.random.default_rng(3))
+def test_seeding_leaves_stations_to_the_player() -> None:
+    constructions = seed_buildings(make_country(), np.random.default_rng(2), months=1500)
 
-    placed = place_stations(growth, np.random.default_rng(4))
+    stations = [built for built in constructions if isinstance(built, Station)]
 
-    grid = constructions.tile_map.grid
-    gaps = [
-        np.hypot(*np.subtract(grid.center(*a), grid.center(*b)))
-        for i, a in enumerate(placed)
-        for b in placed[i + 1 :]
-    ]
-    people = growth.nearby(Points.POPULATION)
-    assert placed
-    assert all(people[cell] >= STATION_PEOPLE for cell in placed)
-    assert min(gaps, default=np.inf) >= STATION_SPACING_CELLS * 0.99
+    assert not stations
+
+
+@pytest.mark.parametrize(("years", "begins"), [(1000, 1850), (1100, 1950), (1200, 2050)])
+def test_history_begins_in_850_and_play_where_it_left_off(years: int, begins: int) -> None:
+    year = play_begins(years * 12)
+
+    assert year == begins
+    assert HISTORY_START == 850

@@ -1,8 +1,9 @@
 """Things the player can build: track, stations and buildings.
 
 Every cell has room for CELL_SPACE units. A single track takes one unit and a double track two,
-a station fills its whole cell and each building takes one unit, so a cell with a double track
-through it still fits four houses.
+and a station fills its whole cell. Most buildings take one unit, so a cell with a double track
+through it still fits four houses. Farms, orchards and other fields fill a whole cell, as do the
+biggest works and the novelties, and factories, canneries and mills take three.
 """
 
 from collections.abc import Iterator
@@ -35,11 +36,87 @@ class BuildingKind(Enum):
     MEGA_FACTORY = "mega factory"
     SKYSCRAPER = "skyscraper"
     ORCHARD = "orchard"
-    FOOD_PLANT = "food plant"
+    DATE_PALMS = "date palms"
+    ORANGE_FARM = "orange farm"
+    BANANAS = "banana plantation"
+    SUGAR = "sugar field"
+    FOOD_PLANT = "cannery"
+    BAKERY = "bakery"
+    FISHERY = "fishery"
+    SHEEP_FARM = "sheep farm"
+    COTTON_FIELD = "cotton field"
+    VINEYARD = "vineyard"
+    COFFEE_PLANTATION = "coffee plantation"
+    RUBBER_PLANTATION = "rubber plantation"
+    IRON_MINE = "iron mine"
+    COPPER_MINE = "copper mine"
+    GOLD_MINE = "gold mine"
+    DIAMOND_MINE = "diamond mine"
+    OIL_WELL = "oil well"
+    SALT_WORKS = "salt works"
+    TEXTILE_MILL = "textile mill"
+    FURNITURE_MAKER = "furniture maker"
+    TOOL_WORKS = "tool works"
+    WINERY = "winery"
+    BARREL_MAKER = "barrel maker"
+    BEEKEEPER = "beekeeper"
+    INCENSE_GROVE = "incense grove"
+    CHURCH = "church"
+    BASILICA = "basilica"
+    CATHEDRAL = "cathedral"
+    ST_PAULS = "St. Paul cathedral"
+    REFINERY = "refinery"
+    CHEMICAL_WORKS = "chemical works"
+    ELECTRONICS_PLANT = "electronics plant"
+    CAR_FACTORY = "car factory"
+    CAR_DEALER = "car dealer"
+    JEWELLER = "jeweller"
+    OUTPOST = "military outpost"
+    BASE = "military base"
+    HEADQUARTERS = "headquarters"
+    GUN_FACTORY = "gun factory"
+    TANK_FACTORY = "tank factory"
+    PLANE_FACTORY = "aircraft factory"
+    AIRPORT = "airport"
     STEEL_MILL = "steel mill"
     SHIPYARD = "shipyard"
     LUMBER_MILL = "lumber mill"
     PORT = "port"
+    CLAY_PIT = "clay pit"
+    LIMESTONE_QUARRY = "limestone quarry"
+    SAND_PIT = "sand pit"
+    POTATO_FARM = "potato farm"
+    CATTLE_RANCH = "cattle ranch"
+    FLAX_FIELD = "flax field"
+    HOP_GARDEN = "hop garden"
+    MACHINE_WORKS = "machine works"
+    BRICKWORKS = "brickworks"
+    CEMENT_WORKS = "cement works"
+    GLASSWORKS = "glassworks"
+    BREWERY = "brewery"
+    DISTILLERY = "distillery"
+    TANNERY = "tannery"
+    SHOE_FACTORY = "shoe factory"
+    PLASTICS_WORKS = "plastics works"
+    APPLIANCE_FACTORY = "appliance factory"
+    PAPER_MILL = "paper mill"
+    PRINTING_WORKS = "printing works"
+    SUGAR_REFINERY = "sugar refinery"
+    PORCELAIN_WORKS = "porcelain works"
+    MEAT_FACTORY = "meat factory"
+    POWER_PLANT = "power plant"
+    SPACE_CENTER = "space center"
+    PEAR_HQ = "Pear Company headquarters"
+    ROYAL_PALACE = "royal palace"
+    SALT_CATHEDRAL = "salt mine cathedral"
+    SPA_RESORT = "spa resort"
+    WORLDS_FAIR = "World's Fair hall"
+    FILM_STUDIO = "film studio"
+    AMUSEMENT_PARK = "amusement park"
+    OLYMPIC_STADIUM = "Olympic stadium"
+    TAVERN = "tavern"
+    DEPARTMENT_STORE = "department store"
+    HOTEL = "hotel"
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,21 +129,112 @@ class BuildingRules:
 _OFF_MOUNTAINS = frozenset({Relief.FLAT, Relief.HILLS})
 
 BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
-    BuildingKind.FARM: BuildingRules(relief=_OFF_MOUNTAINS),
+    BuildingKind.FARM: BuildingRules(relief=_OFF_MOUNTAINS, space=CELL_SPACE),
     BuildingKind.HOUSE: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.TENEMENT: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.FLATS: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.MINE: BuildingRules(relief=frozenset(Relief)),
-    BuildingKind.FACTORY: BuildingRules(relief=_OFF_MOUNTAINS),
-    BuildingKind.BIG_FACTORY: BuildingRules(relief=_OFF_MOUNTAINS),
-    BuildingKind.MEGA_FACTORY: BuildingRules(relief=_OFF_MOUNTAINS),
+    BuildingKind.FACTORY: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    BuildingKind.BIG_FACTORY: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    BuildingKind.MEGA_FACTORY: BuildingRules(relief=_OFF_MOUNTAINS, space=CELL_SPACE),
     BuildingKind.SKYSCRAPER: BuildingRules(relief=frozenset(Relief)),
-    BuildingKind.LUMBER_MILL: BuildingRules(relief=_OFF_MOUNTAINS),
+    BuildingKind.LUMBER_MILL: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.PORT: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True),
-    BuildingKind.ORCHARD: BuildingRules(relief=_OFF_MOUNTAINS),
-    BuildingKind.FOOD_PLANT: BuildingRules(relief=_OFF_MOUNTAINS),
-    BuildingKind.STEEL_MILL: BuildingRules(relief=_OFF_MOUNTAINS),
-    BuildingKind.SHIPYARD: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True),
+    **{
+        kind: BuildingRules(relief=_OFF_MOUNTAINS, space=CELL_SPACE)
+        for kind in (
+            BuildingKind.ORCHARD,
+            BuildingKind.DATE_PALMS,
+            BuildingKind.BANANAS,
+            BuildingKind.SUGAR,
+            BuildingKind.ORANGE_FARM,
+            BuildingKind.SHEEP_FARM,
+            BuildingKind.COTTON_FIELD,
+            BuildingKind.VINEYARD,
+            BuildingKind.COFFEE_PLANTATION,
+            BuildingKind.RUBBER_PLANTATION,
+            BuildingKind.POTATO_FARM,
+            BuildingKind.CATTLE_RANCH,
+            BuildingKind.FLAX_FIELD,
+            BuildingKind.HOP_GARDEN,
+        )
+    },
+    BuildingKind.FOOD_PLANT: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    BuildingKind.BAKERY: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.TAVERN: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.DEPARTMENT_STORE: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.HOTEL: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.LIMESTONE_QUARRY: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.STEEL_MILL: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    **{
+        kind: BuildingRules(relief=_OFF_MOUNTAINS, space=CELL_SPACE)
+        for kind in (
+            BuildingKind.POWER_PLANT,
+            BuildingKind.REFINERY,
+            BuildingKind.CAR_FACTORY,
+            BuildingKind.TANK_FACTORY,
+            BuildingKind.PLANE_FACTORY,
+            BuildingKind.SPACE_CENTER,
+            BuildingKind.PEAR_HQ,
+            BuildingKind.ROYAL_PALACE,
+            BuildingKind.SALT_CATHEDRAL,
+            BuildingKind.SPA_RESORT,
+            BuildingKind.WORLDS_FAIR,
+            BuildingKind.FILM_STUDIO,
+            BuildingKind.AMUSEMENT_PARK,
+            BuildingKind.OLYMPIC_STADIUM,
+        )
+    },
+    BuildingKind.TEXTILE_MILL: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    BuildingKind.SHIPYARD: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True, space=CELL_SPACE),
+    BuildingKind.IRON_MINE: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.COPPER_MINE: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.GOLD_MINE: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.DIAMOND_MINE: BuildingRules(relief=frozenset(Relief)),
+    **{
+        kind: BuildingRules(relief=_OFF_MOUNTAINS)
+        for kind in (
+            BuildingKind.FISHERY,
+            BuildingKind.OIL_WELL,
+            BuildingKind.SALT_WORKS,
+            BuildingKind.FURNITURE_MAKER,
+            BuildingKind.TOOL_WORKS,
+            BuildingKind.WINERY,
+            BuildingKind.CHEMICAL_WORKS,
+            BuildingKind.ELECTRONICS_PLANT,
+            BuildingKind.CAR_DEALER,
+            BuildingKind.JEWELLER,
+            BuildingKind.OUTPOST,
+            BuildingKind.BASE,
+            BuildingKind.HEADQUARTERS,
+            BuildingKind.GUN_FACTORY,
+            BuildingKind.AIRPORT,
+            BuildingKind.BARREL_MAKER,
+            BuildingKind.BEEKEEPER,
+            BuildingKind.INCENSE_GROVE,
+            BuildingKind.CHURCH,
+            BuildingKind.BASILICA,
+            BuildingKind.CATHEDRAL,
+            BuildingKind.ST_PAULS,
+            BuildingKind.CLAY_PIT,
+            BuildingKind.SAND_PIT,
+            BuildingKind.MACHINE_WORKS,
+            BuildingKind.BRICKWORKS,
+            BuildingKind.CEMENT_WORKS,
+            BuildingKind.GLASSWORKS,
+            BuildingKind.BREWERY,
+            BuildingKind.DISTILLERY,
+            BuildingKind.TANNERY,
+            BuildingKind.SHOE_FACTORY,
+            BuildingKind.PLASTICS_WORKS,
+            BuildingKind.APPLIANCE_FACTORY,
+            BuildingKind.PAPER_MILL,
+            BuildingKind.PRINTING_WORKS,
+            BuildingKind.SUGAR_REFINERY,
+            BuildingKind.PORCELAIN_WORKS,
+            BuildingKind.MEAT_FACTORY,
+        )
+    },
 }
 STATION_RELIEF = _OFF_MOUNTAINS
 
@@ -74,12 +242,14 @@ STATION_RELIEF = _OFF_MOUNTAINS
 @dataclass(frozen=True, slots=True)
 class Track:
     """A piece of track inside one cell, between two of its track points; it joins the pieces
-    in the cells those points lead to (see `Grid.track_exit`)."""
+    in the cells those points lead to (see `Grid.track_exit`). Electric track has overhead
+    wires along it, which electric engines need."""
 
     cell: Cell
     ends: tuple[int, int]
     width: TrackWidth = TrackWidth.SINGLE
     bed: TrackBed = TrackBed.GROUND
+    electric: bool = False
 
     def __post_init__(self) -> None:
         start, end = sorted(self.ends)
@@ -124,13 +294,43 @@ class Constructions:
     def __init__(self, tile_map: TileMap) -> None:
         self.tile_map = tile_map
         self._cells: dict[Cell, list[Construction]] = {}
+        # Where the stations stand and track runs, kept apart so the railway never looks through
+        # every building for them, and a count that goes up whenever either changes.
+        self._stations: set[Cell] = set()
+        self._track: dict[Cell, int] = {}
+        self.railway_version = 0
 
     def __iter__(self) -> Iterator[Construction]:
         for built in self._cells.values():
             yield from built
 
+    def stations(self) -> list[Cell]:
+        """Every station's cell, in order."""
+        return sorted(self._stations)
+
+    def track(self) -> list[Track]:
+        """Every piece of track."""
+        return [piece for cell in self._track for piece in self.track_at(cell)]
+
     def at(self, cell: Cell) -> tuple[Construction, ...]:
         return tuple(self._cells.get(cell, ()))
+
+    def track_at(self, cell: Cell) -> tuple[Track, ...]:
+        return tuple(built for built in self._cells.get(cell, ()) if isinstance(built, Track))
+
+    def track_between(self, cell: Cell, ends: tuple[int, int]) -> Track | None:
+        """The piece of track in the cell between these two track points, if there is one."""
+        key = tuple(sorted(ends))
+        return next((piece for piece in self.track_at(cell) if piece.ends == key), None)
+
+    def electrified(self, cell: Cell, ends: tuple[int, int] | None = None) -> bool:
+        """Whether track in the cell is electric: the piece between `ends`, or with no ends
+        given, every piece there. False where there is no such track."""
+        if ends is not None:
+            piece = self.track_between(cell, ends)
+            return piece is not None and piece.electric
+        pieces = self.track_at(cell)
+        return bool(pieces) and all(piece.electric for piece in pieces)
 
     def space_left(self, cell: Cell) -> int:
         return CELL_SPACE - sum(built.space for built in self._cells.get(cell, ()))
@@ -155,6 +355,7 @@ class Constructions:
         if (problem := self.why_not(construction)) is not None:
             raise CannotBuild(problem)
         self._cells.setdefault(construction.cell, []).append(construction)
+        self._index(construction, 1)
 
     def remove(self, construction: Construction) -> None:
         built = self._cells.get(construction.cell, [])
@@ -163,6 +364,24 @@ class Constructions:
         built.remove(construction)
         if not built:
             del self._cells[construction.cell]
+        self._index(construction, -1)
+
+    def _index(self, construction: Construction, change: int) -> None:
+        match construction:
+            case Station():
+                if change > 0:
+                    self._stations.add(construction.cell)
+                else:
+                    self._stations.discard(construction.cell)
+            case Track():
+                left = self._track.get(construction.cell, 0) + change
+                if left > 0:
+                    self._track[construction.cell] = left
+                else:
+                    self._track.pop(construction.cell, None)
+            case _:
+                return
+        self.railway_version += 1
 
     def track_problem(self, track: Track) -> str | None:
         """Why this track cannot be laid, leaving aside the room already taken."""
@@ -188,8 +407,7 @@ class Constructions:
             for side in grid.track_flanks(track.cell, point):
                 if self._bed_problem(side, track.bed) is not None:
                     return "Track through a corner needs the cells on both sides to take it"
-        laid = (built for built in self.at(track.cell) if isinstance(built, Track))
-        if any(other.ends == track.ends for other in laid):
+        if self.track_between(track.cell, track.ends) is not None:
             return "There is track between those points already"
         return None
 

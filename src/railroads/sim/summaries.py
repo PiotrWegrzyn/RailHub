@@ -1,14 +1,13 @@
-"""Monthly summaries: what was built and pulled down within reach of each station
-(COLLECTION_RADIUS) when a month turned over."""
+"""Monthly summaries: what was built and pulled down within reach of each station (the cells it
+gathers goods from) when a month turned over."""
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.economy import COLLECTION_RADIUS
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.growth import Growth
 
@@ -39,19 +38,23 @@ class MonthSummary:
 
 
 class Reach:
-    """The cells within reach of each station, worked out once per set of stations."""
+    """The cells within reach of each station, worked out once per set of stations and reaches."""
 
     def __init__(self, grid: Grid) -> None:
         self.grid = grid
-        self._stations: tuple[Cell, ...] = ()
+        self._stations: tuple[tuple[Cell, int], ...] = ()
         self._cells: dict[Cell, tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]]] = {}
 
-    def of(self, stations: list[Cell]) -> dict[Cell, tuple[npt.NDArray[np.intp], ...]]:
-        if tuple(stations) != self._stations:
-            self._stations = tuple(stations)
+    def of(
+        self, stations: list[Cell], radius: Callable[[Cell], int]
+    ) -> dict[Cell, tuple[npt.NDArray[np.intp], ...]]:
+        """Each station's cells within `radius` of it."""
+        key = tuple((station, radius(station)) for station in stations)
+        if key != self._stations:
+            self._stations = key
             self._cells = {}
-            for station in stations:
-                rows, cols = zip(*self.grid.within(station, COLLECTION_RADIUS), strict=True)
+            for station, steps in key:
+                rows, cols = zip(*self.grid.within(station, steps), strict=True)
                 self._cells[station] = (np.array(rows), np.array(cols))
         return self._cells  # type: ignore[return-value]
 

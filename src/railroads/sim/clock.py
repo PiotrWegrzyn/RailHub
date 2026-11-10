@@ -1,12 +1,16 @@
-"""Game time: the calendar runs a month every SECONDS_PER_MONTH of play, from January of
-START_YEAR to January of END_YEAR, where it stops: 2,400 months, a hundred hours at normal speed.
-Play can run faster, at any of SPEEDS; those above MAX_PLAY_SPEED are for testing.
+"""Game time: the calendar runs a month every SECONDS_PER_MONTH of play, from January of the year
+the map's history left off to January of END_YEAR, where it stops. A map's history begins in
+HISTORY_START, so the usual thousand years of it leave off in START_YEAR, for 2,400 months of
+play, a hundred hours at normal speed. Play can run faster, at any of SPEEDS; those above
+MAX_PLAY_SPEED are for testing.
 """
 
 from dataclasses import dataclass
 
 SECONDS_PER_MONTH = 150.0
 START_YEAR = 1850
+# The year every map's history begins: by default a thousand years before play.
+HISTORY_START = 850
 END_YEAR = 2050
 SPEEDS = (1, 2, 3, 6, 12, 24)
 MAX_PLAY_SPEED = 6
@@ -33,6 +37,8 @@ class GameClock:
     seconds_per_month: float = SECONDS_PER_MONTH
     # How many times faster than normal the game runs.
     speed: int = 1
+    # The year play began, which is where the map's history left off.
+    first_year: int = START_YEAR
 
     def months_in(self, seconds: float) -> float:
         """How much of a month `seconds` of play make at the current speed."""
@@ -53,7 +59,7 @@ class GameClock:
 
     @property
     def months_left(self) -> int:
-        return (END_YEAR - START_YEAR) * 12 - self.months
+        return (END_YEAR - self.first_year) * 12 - self.months
 
     @property
     def finished(self) -> bool:
@@ -63,8 +69,7 @@ class GameClock:
     def date(self) -> str:
         return self.date_of(self.months)
 
-    @staticmethod
-    def date_of(months: int) -> str:
-        """The date this many months after the start."""
+    def date_of(self, months: int) -> str:
+        """The date this many months after play began."""
         year, month = divmod(months, 12)
-        return f"{MONTH_NAMES[month]} {START_YEAR + year}"
+        return f"{MONTH_NAMES[month]} {self.first_year + year}"

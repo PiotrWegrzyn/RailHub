@@ -1,5 +1,7 @@
 """Shows the pixel art on screen: chunks are drawn as the view reaches them, a few per frame, and
-kept as textures blown up to the zoom's pixel scale."""
+kept as textures blown up to the zoom's pixel scale. Where each art pixel covers an even number
+of screen pixels the chunks are drawn finer (PixelWorld.render), so buildings, trees and track keep
+thin lines instead of growing blocky."""
 
 import time
 from collections import OrderedDict
@@ -12,25 +14,33 @@ from railroads.ui.pixel.world import CHUNK, ChunkPlacement, PixelWorld, Rgba
 
 # Time a frame may spend drawing new chunks; at least one is always drawn.
 FRAME_BUDGET_S = 0.025
-KEPT_CHUNKS = 256
+# Most bytes of drawn chunks kept in memory; a fine chunk takes four times a plain one's.
+CHUNK_BUDGET = 128 * 1024 * 1024
 # Most bytes of chunk textures kept on the graphics card; the least recently shown go first.
 TEXTURE_BUDGET = 512 * 1024 * 1024
 
 type ChunkKey = tuple[int, int]
 
 
+def resolution_for(screen_pixels: int, resolutions: tuple[int, ...]) -> int:
+    """The finest resolution a chunk can be drawn at that blows up evenly to `screen_pixels`
+    for every art pixel."""
+    return max(r for r in resolutions if screen_pixels % r == 0)
+
+
 class PixelLayer:
     def __init__(self, world: PixelWorld) -> None:
         self.world = world
-        self._chunks: OrderedDict[ChunkKey, Rgba] = OrderedDict()
+        # Drawn chunks by where they are and the resolution they were drawn at.
+        self._chunks: OrderedDict[tuple[int, int, int], Rgba] = OrderedDict()
         self._textures: OrderedDict[tuple[int, int, int], hello_imgui.TextureGpu] = OrderedDict()
         self._stale: set[tuple[int, int, int]] = set()
 
     def refresh(self, chunks: set[ChunkKey]) -> None:
         """Draws these chunks again next time they show, keeping their old textures on screen
         until then."""
-        for chunk in chunks:
-            self._chunks.pop(chunk, None)
+        for key in [key for key in self._chunks if key[:2] in chunks]:
+            del self._chunks[key]
         self._stale |= {key for key in self._textures if key[:2] in chunks}
 
     def draw(
@@ -72,18 +82,24 @@ class PixelLayer:
             self._stale.discard(self._textures.popitem(last=False)[0])
         return complete
 
+    def _chunk_bytes(self) -> int:
+        return sum(pixels.nbytes for pixels in self._chunks.values())
+
     def _texture_bytes(self) -> int:
         return sum((CHUNK * key[2]) ** 2 * 4 for key in self._textures)
 
     def _upload(self, chunk: ChunkKey, scale: int) -> hello_imgui.TextureGpu:
-        pixels = self._chunks.get(chunk)
+        resolution = resolution_for(scale, self.world.resolutions)
+        drawn = (*chunk, resolution)
+        pixels = self._chunks.get(drawn)
         if pixels is None:
-            pixels = self.world.render(*chunk)
-            self._chunks[chunk] = pixels
-            while len(self._chunks) > KEPT_CHUNKS:
+            pixels = self.world.render(*chunk, resolution)
+            self._chunks[drawn] = pixels
+            while len(self._chunks) > 1 and self._chunk_bytes() > CHUNK_BUDGET:
                 self._chunks.popitem(last=False)
-        self._chunks.move_to_end(chunk)
-        big = np.repeat(np.repeat(pixels, scale, axis=0), scale, axis=1)
+        self._chunks.move_to_end(drawn)
+        blow_up = scale // resolution
+        big = np.repeat(np.repeat(pixels, blow_up, axis=0), blow_up, axis=1)
         texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
         self._textures[(*chunk, scale)] = texture
         return texture

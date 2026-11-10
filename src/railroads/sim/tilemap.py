@@ -33,6 +33,25 @@ class Vegetation(IntEnum):
     FOREST = 2
 
 
+class Deposit(IntEnum):
+    NONE = 0
+    IRON = 1
+    COPPER = 2
+    GOLD = 3
+    DIAMONDS = 4
+    OIL = 5
+    SALT = 6
+    FISH = 7
+    WOOL = 8
+    GRAPES = 9
+    COTTON = 10
+    COFFEE = 11
+    RUBBER = 12
+    # Hidden ground where military outposts can open.
+    GARRISON = 13
+    INCENSE = 14
+
+
 class Temperature(IntEnum):
     COLD = 0
     NORMAL = 1
@@ -67,6 +86,8 @@ class TileMap:
     height_m: npt.NDArray[np.int16]
     relief: npt.NDArray[np.uint8]
     sources: tuple[str, ...] = ()
+    # Each cell's Deposit, placed when a game starts (railroads.mapgen.deposits).
+    deposits: npt.NDArray[np.uint8] | None = None
 
     def __post_init__(self) -> None:
         for layer in LAYERS:
@@ -77,10 +98,16 @@ class TileMap:
 
     def set_vegetation(self, cells: npt.NDArray[np.intp], vegetation: Vegetation) -> None:
         """Changes the vegetation of these flat cells, as forests come and go; every other layer
-        stays as the map was made."""
-        self.vegetation.setflags(write=True)
-        self.vegetation.flat[cells] = vegetation
-        self.vegetation.setflags(write=False)
+        stays as the map was made. A map sent between processes holds its layers in memory that
+        cannot be written to, so it takes a copy of its vegetation first."""
+        layer = self.vegetation
+        try:
+            layer.setflags(write=True)
+        except ValueError:
+            layer = layer.copy()
+            object.__setattr__(self, "vegetation", layer)
+        layer.flat[cells] = vegetation
+        layer.setflags(write=False)
 
     def tile(self, cell: Cell) -> Tile:
         return Tile(
