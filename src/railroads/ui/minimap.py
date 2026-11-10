@@ -1,7 +1,8 @@
 """Two small maps in the corner of the view, each with its own toggle: the world, with the game's
 map marked on it, and the
 whole game map seen from above, with the part on screen outlined. Clicking or dragging on the
-second one moves the view there."""
+second one moves the view there, and the wheel over it zooms it in, through OVERVIEW_ZOOMS, to the
+part of the map around the view."""
 
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -24,6 +25,8 @@ MARGIN = 12.0
 GAP = 8.0
 # Smallest size of the map's box on the world map, in pixels, so a small map still shows.
 MIN_BOX = 6.0
+# How many times as close the overview can show the map.
+OVERVIEW_ZOOMS = (1, 2, 4, 8)
 
 SEA_RGB = (32, 58, 92)
 LAND_RGB = (138, 150, 104)
@@ -62,11 +65,21 @@ class MinimapLayout:
     world: Panel | None
     overview: Panel | None
     map_size: Vec2
+    # The part of the map the overview shows: its left, top, right and bottom in map units.
+    window: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
 
     @classmethod
     def of(
-        cls, map_size: Vec2, bottom_right: Vec2, overview: bool = True, world: bool = True
+        cls,
+        map_size: Vec2,
+        bottom_right: Vec2,
+        overview: bool = True,
+        world: bool = True,
+        zoom: int = 1,
+        focus: Vec2 | None = None,
     ) -> MinimapLayout:
+        """`zoom` times as close, the overview shows the part of the map around `focus`, kept
+        on the map."""
         width, height = map_size
         scale = OVERVIEW_SIDE / max(width, height)
         right = bottom_right[0] - MARGIN
@@ -88,7 +101,7 @@ class MinimapLayout:
                 WORLD_WIDTH,
                 world_height,
             )
-        return cls(world_panel, overview_panel, map_size)
+        return cls(world_panel, overview_panel, map_size, _window(map_size, zoom, focus))
 
     def contains(self, x: float, y: float) -> bool:
         return any(panel.contains(x, y) for panel in (self.world, self.overview) if panel)
@@ -110,17 +123,29 @@ class MinimapLayout:
         return left - grow_x, top - grow_y, right + grow_x, bottom + grow_y
 
     def overview_point(self, x: float, y: float) -> Vec2:
-        panel, (width, height) = self.overview, self.map_size
+        panel, (x0, y0, x1, y1) = self.overview, self.window
         assert panel is not None
-        return panel.left + x / width * panel.width, panel.top + y / height * panel.height
+        return (
+            panel.left + (x - x0) / (x1 - x0) * panel.width,
+            panel.top + (y - y0) / (y1 - y0) * panel.height,
+        )
 
     def overview_to_map(self, screen_x: float, screen_y: float) -> Vec2:
-        """The map point under a spot on the overview, kept on the map."""
-        panel, (width, height) = self.overview, self.map_size
+        """The map point under a spot on the overview, kept on the part it shows."""
+        panel, (x0, y0, x1, y1) = self.overview, self.window
         assert panel is not None
         u = min(max((screen_x - panel.left) / panel.width, 0.0), 1.0)
         v = min(max((screen_y - panel.top) / panel.height, 0.0), 1.0)
-        return u * width, v * height
+        return x0 + u * (x1 - x0), y0 + v * (y1 - y0)
+
+
+def _window(map_size: Vec2, zoom: int, focus: Vec2 | None) -> tuple[float, float, float, float]:
+    width, height = map_size
+    span_x, span_y = width / zoom, height / zoom
+    cx, cy = (width / 2, height / 2) if focus is None else focus
+    x0 = min(max(cx - span_x / 2, 0.0), width - span_x)
+    y0 = min(max(cy - span_y / 2, 0.0), height - span_y)
+    return x0, y0, x0 + span_x, y0 + span_y
 
 
 def world_rgba(world: WorldLand) -> np.ndarray:
@@ -141,8 +166,17 @@ class Minimap:
         # The overview of the game map, and the world map.
         self.shown = True
         self.world_shown = False
+        # How many times as close the overview shows the map, and the map point it is centred
+        # on, which follows the view except while the overview is being dragged.
+        self.zoom = OVERVIEW_ZOOMS[0]
+        self.focus: Vec2 | None = None
         self._world_texture: hello_imgui.TextureGpu | None = None
         self.show_towns(towns)
+
+    def zoom_by(self, steps: int) -> None:
+        """Zooms the overview in (above 0) or out by so many of OVERVIEW_ZOOMS."""
+        at = OVERVIEW_ZOOMS.index(self.zoom) + steps
+        self.zoom = OVERVIEW_ZOOMS[min(max(at, 0), len(OVERVIEW_ZOOMS) - 1)]
 
     def show_towns(self, towns: Iterable[Cell]) -> None:
         self._towns = np.array(sorted(set(towns)), dtype=int).reshape(-1, 2)
@@ -202,10 +236,13 @@ class Minimap:
         panel = layout.overview
         assert panel is not None
         _frame(draw_list, panel)
+        (x0, y0, x1, y1), (width, height) = layout.window, layout.map_size
         draw_list.add_image(
             ground,
             (panel.left, panel.top),
             (panel.right, panel.bottom),
+            (x0 / width, y0 / height),
+            (x1 / width, y1 / height),
         )
         draw_list.push_clip_rect((panel.left, panel.top), (panel.right, panel.bottom), True)
         town = _color(TOWN_COLOR)
@@ -217,6 +254,11 @@ class Minimap:
                 draw_list.add_rect_filled((sx - 1, sy - 1), (sx + 1, sy + 1), town)
         outline = [imgui.ImVec2(*layout.overview_point(x, y)) for x, y in view_corners]
         draw_list.add_polyline(outline, _color(VIEW_COLOR), 1.5, imgui.ImDrawFlags_.closed.value)
+        if self.zoom > 1:
+            label = f"x{self.zoom}"
+            size = imgui.calc_text_size(label)
+            spot = (panel.right - size.x - 4, panel.top + 2)
+            draw_list.add_text(spot, _color(VIEW_COLOR), label)
         draw_list.pop_clip_rect()
 
 

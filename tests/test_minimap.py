@@ -149,3 +149,36 @@ def test_the_world_map_alone_takes_the_corner() -> None:
     assert world is not None
     assert world.right < SCREEN[0] and world.bottom < SCREEN[1]
     assert layout.contains(world.left + 1, world.top + 1)
+
+
+def test_a_zoomed_overview_shows_the_part_of_the_map_around_the_view() -> None:
+    layout = MinimapLayout.of((40.0, 20.0), SCREEN, zoom=4, focus=(20.0, 10.0))
+
+    middle = layout.overview_to_map(
+        layout.overview.left + layout.overview.width / 2,
+        layout.overview.top + layout.overview.height / 2,
+    )
+
+    assert layout.window == pytest.approx((15.0, 7.5, 25.0, 12.5))
+    assert middle == pytest.approx((20.0, 10.0))
+    assert layout.overview_to_map(*layout.overview_point(17.0, 9.0)) == pytest.approx((17.0, 9.0))
+
+
+def test_a_zoomed_overview_stays_on_the_map_near_its_edge() -> None:
+    layout = MinimapLayout.of((40.0, 20.0), SCREEN, zoom=2, focus=(1.0, 19.0))
+
+    window = layout.window
+
+    assert window == pytest.approx((0.0, 10.0, 20.0, 20.0))
+
+
+def test_the_overview_zooms_in_and_out_within_its_steps() -> None:
+    minimap = Minimap(make_tile_map(), WorldLand(np.zeros((4, 8), dtype=np.uint8)))
+
+    minimap.zoom_by(2)
+    closest = minimap.zoom
+    minimap.zoom_by(10)
+    minimap.zoom_by(-1)
+
+    assert closest == 4
+    assert minimap.zoom == 4

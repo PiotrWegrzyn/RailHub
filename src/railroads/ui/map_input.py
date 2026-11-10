@@ -35,6 +35,7 @@ class MapInput:
         # Which minimap the current drag started on, if any.
         self._pressed_on: Literal["world", "overview"] | None = None
         self._wheel = 0.0
+        self._overview_wheel = 0.0
 
     def handle_mouse(self, center: Vec2, minimap: MinimapLayout | None) -> None:
         """Reads the mouse over the map, the invisible button drawn last."""
@@ -59,6 +60,19 @@ class MapInput:
             elif self._pressed_on == "overview" and minimap is not None:
                 x, y = minimap.overview_to_map(io.mouse_pos.x, io.mouse_pos.y)
                 camera.center_x, camera.center_y = x, y
+        on_overview = (
+            minimap is not None
+            and minimap.overview is not None
+            and minimap.overview.contains(io.mouse_pos.x, io.mouse_pos.y)
+        )
+        if on_overview and imgui.is_item_hovered():
+            self._overview_wheel += io.mouse_wheel
+            steps = int(self._overview_wheel)
+            if steps:
+                self._overview_wheel -= steps
+                view.minimap.zoom_by(steps)
+        if not (self._pressed_on == "overview" and imgui.is_item_active()):
+            view.minimap.focus = (camera.center_x, camera.center_y)
         hovered = imgui.is_item_hovered() and not self.over_minimap
         if hovered:
             self._wheel += io.mouse_wheel

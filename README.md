@@ -45,7 +45,7 @@ a station reaches, a third thrive, half are content (half their needs met) and t
 unsatisfied, and they grow and glow as if trains served them. Only the hexagon map is grown.
 
 In the corner of the view, a minimap (M to show or hide) shows where the map lies in the world
-and the whole map from above with the part on screen outlined; click or drag on it to look there.
+and the whole map from above with the part on screen outlined; click or drag on it to look there, and scroll over it to zoom it in to x2, x4 or x8 around the view.
 
 Run the tests and linter:
 

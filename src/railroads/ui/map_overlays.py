@@ -219,7 +219,8 @@ def draw_found_on_overview(
     mark = color(FOUND_COLOR)
     sx, sy = minimap.overview_point(xs, ys)
     for x, y in zip(sx.tolist(), sy.tolist(), strict=True):
-        draw_list.add_rect_filled((x - 1.5, y - 1.5), (x + 1.5, y + 1.5), mark)
+        if panel.contains(x, y):
+            draw_list.add_rect_filled((x - 1.5, y - 1.5), (x + 1.5, y + 1.5), mark)
 
 
 def status_text(
@@ -233,7 +234,7 @@ def status_text(
     """What the status strip says: the zoom, and what is under the pointer."""
     zoom = f"Zoom {camera.zoom_level + 1}/{len(ZOOM_CELL_WIDTHS)}"
     if over_minimap:
-        return f"{zoom}. Click or drag on the map overview to look there."
+        return f"{zoom}. Click or drag on the map overview to look there, scroll to zoom it."
     if hovered is None:
         return f"{zoom}. Drag to pan, scroll or -/+ to zoom."
     tile = tile_map.tile(hovered)

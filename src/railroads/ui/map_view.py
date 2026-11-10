@@ -289,7 +289,9 @@ class MapView:
         map_size = self._ground_layout().size
         shown, world_shown = self.minimap.shown, self.minimap.world_shown
         minimap = (
-            MinimapLayout.of(map_size, bottom_right, shown, world_shown)
+            MinimapLayout.of(
+                map_size, bottom_right, shown, world_shown, self.minimap.zoom, self.minimap.focus
+            )
             if shown or world_shown
             else None
         )
