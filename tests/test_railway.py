@@ -85,6 +85,21 @@ def test_a_train_gives_up_waiting_after_a_month() -> None:
     assert train.cars[0].load == 0.0
 
 
+def test_a_train_stops_waiting_as_soon_as_its_stop_no_longer_waits_for_a_full_load() -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    stop = Stop((6, 3), [Good.WHEAT])
+    train.stops = [stop, Stop((6, 20))]
+    railway.run(0.1)
+    waiting = train.status
+
+    stop.wait_for_load = False
+    railway.run(0.1)
+
+    assert waiting == "Loading at 6, 3"
+    assert train.status == "Running"
+
+
 def test_at_the_next_stop_it_unloads_and_takes_that_stops_cars() -> None:
     _, railway = joined_stations()
     railway.station_goods((6, 3)).stockpile[Good.WHEAT] = 50.0

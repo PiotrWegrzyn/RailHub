@@ -241,6 +241,8 @@ class Railway:
             leaving = train.stops[(train.heading - 1) % len(train.stops)]
             if not train.called:
                 self.calls.arrive(train, leaving)
+            if not leaving.wait_for_load:
+                train.waiting = 0.0
             if train.waiting > 0:
                 self.calls.load(train, leaving)
                 if train.full:
