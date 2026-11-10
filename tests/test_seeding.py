@@ -3,12 +3,12 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
+from builders import flat_map
 from railroads.mapgen.seeding import play_begins, seed_buildings
 from railroads.sim.clock import HISTORY_START
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station, Track
 from railroads.sim.economy import Neighbourhoods
 from railroads.sim.forests import MILLS_CLOSE_BELOW, forests_nearby
-from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import MONTHS_BEFORE_PLAY, Growth
 from railroads.sim.ladders import (
@@ -21,7 +21,7 @@ from railroads.sim.ladders import (
     TOWNS,
     Ladder,
 )
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 
 
 def busier(ladder: Ladder, times: float = 10) -> Ladder:
@@ -44,16 +44,12 @@ def make_map(
     vegetation: np.ndarray | None = None,
 ) -> TileMap:
     grid = HexGrid(rows=terrain.shape[0], cols=terrain.shape[1], km_per_cell=2.0)
-    return TileMap(
-        name="Test",
+    return flat_map(
         grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
         terrain=terrain.astype(np.uint8),
         vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8)
         if vegetation is None
         else vegetation.astype(np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
         relief=np.full(grid.shape, Relief.FLAT, dtype=np.uint8)
         if relief is None
         else relief.astype(np.uint8),

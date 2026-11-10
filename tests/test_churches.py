@@ -1,15 +1,14 @@
 import numpy as np
 import pytest
 
+from builders import flat_map
 from railroads.mapgen.deposits import place_deposits
 from railroads.sim.constructions import BUILDING_RULES, Building, BuildingKind, Constructions
 from railroads.sim.economy import Economy, StationOrder
-from railroads.sim.geo import Bounds
 from railroads.sim.goods import NEEDS, Good, Need
-from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import CHURCHES, FARMS, ORCHARDS, PASSENGERS_PER_POINT, POINTS, Points
-from railroads.sim.tilemap import Deposit, Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Deposit, Relief, TileMap
 
 RANKS = (
     BuildingKind.CHURCH,
@@ -20,17 +19,7 @@ RANKS = (
 
 
 def make_map(size: int = 40) -> TileMap:
-    grid = HexGrid(rows=size, cols=size, km_per_cell=2.0)
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=np.full(grid.shape, Terrain.LAND, dtype=np.uint8),
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=np.full(grid.shape, Relief.FLAT, dtype=np.uint8),
-    )
+    return flat_map(size, size)
 
 
 def settle(constructions: Constructions, cell: tuple[int, int], points: int) -> None:

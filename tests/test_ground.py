@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from railroads.sim.geo import Bounds
+from builders import flat_map
 from railroads.sim.grids import Grid, HexGrid, SquareGrid
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.ui.biomes import biome_colors
 from railroads.ui.ground import PIXELS_PER_CELL, GroundLayout, cell_colors
 
@@ -13,16 +13,7 @@ FROM_WEST = (-1.0, 0.0)
 def make_map(grid: Grid, terrain: Terrain = Terrain.LAND) -> TileMap:
     relief = np.full(grid.shape, Relief.FLAT, dtype=np.uint8)
     relief[:, grid.cols // 2 :] = Relief.HILLS
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=np.full(grid.shape, terrain, dtype=np.uint8),
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=relief,
-    )
+    return flat_map(grid=grid, terrain=np.full(grid.shape, terrain, dtype=np.uint8), relief=relief)
 
 
 def pixel(grid: Grid, x: float, y: float) -> tuple[int, int]:

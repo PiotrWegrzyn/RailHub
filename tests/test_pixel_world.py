@@ -3,10 +3,10 @@ import json
 import numpy as np
 import pytest
 
+from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Track, TrackWidth
-from railroads.sim.geo import Bounds
 from railroads.sim.grids import Grid, HexGrid, SquareGrid
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 from railroads.ui.biomes import Biome
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 from railroads.ui.pixel.art import SPRITES, draw_sheet, relief
@@ -43,15 +43,8 @@ def make_tile_map(
     terrain[:, 0] = Terrain.SEA
     vegetation = np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8)
     vegetation[:8, 6:] = Vegetation.FOREST
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=terrain,
-        vegetation=vegetation,
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=heights,
-        relief=relief,
+    return flat_map(
+        grid=grid, terrain=terrain, vegetation=vegetation, height_m=heights, relief=relief
     )
 
 

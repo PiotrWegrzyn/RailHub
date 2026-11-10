@@ -1,13 +1,13 @@
 import numpy as np
 import pytest
 
+from builders import flat_map
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Economy, Satisfaction, StationOrder, levels_of
-from railroads.sim.geo import Bounds
 from railroads.sim.goods import Good, Need, makes_of, needs_of
 from railroads.sim.grids import HexGrid
 from railroads.sim.ladders import LUMBER_MILLS, MINES
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 
 STATION = (8, 10)
 
@@ -21,16 +21,7 @@ def make_map(size: int = 12) -> TileMap:
     relief[:, -1] = Relief.MOUNTAINS
     vegetation = np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8)
     vegetation[:6, 4:8] = Vegetation.FOREST
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=terrain,
-        vegetation=vegetation,
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=relief,
-    )
+    return flat_map(grid=grid, terrain=terrain, vegetation=vegetation, relief=relief)
 
 
 def counts(tile_map: TileMap, *placed: tuple[tuple[int, int], BuildingKind, int]) -> dict:

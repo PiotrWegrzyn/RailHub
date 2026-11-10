@@ -4,10 +4,10 @@ import numpy as np
 import pytest
 from imgui_bundle import imgui
 
+from builders import flat_map
 from railroads.mapgen.world import WorldLand
 from railroads.sim.geo import Bounds
-from railroads.sim.grids import HexGrid
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import TileMap
 from railroads.ui.iso_camera import IsoCamera
 from railroads.ui.minimap import (
     MIN_BOX,
@@ -23,17 +23,7 @@ SCREEN = (1280.0, 800.0)
 
 
 def make_tile_map() -> TileMap:
-    grid = HexGrid(rows=20, cols=30, km_per_cell=2.0)
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=np.full(grid.shape, Terrain.LAND, dtype=np.uint8),
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=np.full(grid.shape, Relief.FLAT, dtype=np.uint8),
-    )
+    return flat_map(20, 30)
 
 
 @pytest.fixture

@@ -1,15 +1,15 @@
 import numpy as np
 import pytest
 
+from builders import flat_map
 from railroads.mapgen.deposits import allowed_land, place_deposits
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.demand import StationDemand, price_of
-from railroads.sim.geo import Bounds
 from railroads.sim.goods import MAKES, Good, Need, needs_of
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import JEWELLERS, RESOURCES, WORKS, GrowthRule
-from railroads.sim.tilemap import Deposit, Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Deposit, Relief, TileMap
 
 GOLD_MINES = next(ladder for ladder in RESOURCES if ladder.kinds[0] == BuildingKind.GOLD_MINE)
 TOOL_WORKS = next(ladder for ladder in WORKS if ladder.kinds[0] == BuildingKind.TOOL_WORKS)
@@ -23,17 +23,7 @@ def make_map(
     relief = np.full(grid.shape, Relief.FLAT, dtype=np.uint8)
     if mountains:
         relief[20:40, 20:40] = Relief.MOUNTAINS
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=np.full(grid.shape, Terrain.LAND, dtype=np.uint8),
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=relief,
-        deposits=deposits,
-    )
+    return flat_map(grid=grid, relief=relief, deposits=deposits)
 
 
 def test_deposits_lie_only_on_land_that_allows_them() -> None:

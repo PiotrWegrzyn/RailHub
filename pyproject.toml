@@ -32,6 +32,9 @@ line-length = 100
 [tool.ruff.lint]
 extend-select = ["I", "UP", "B", "TID"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["railroads", "builders"]
+
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "imgui_bundle".msg = "The simulation must not depend on the UI. Import imgui_bundle only inside railroads.ui."
 

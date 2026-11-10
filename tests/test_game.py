@@ -1,32 +1,16 @@
 import numpy as np
 import pytest
 
+from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
 from railroads.sim.finance import STATION_PRICE, dollars
 from railroads.sim.game import Game
-from railroads.sim.geo import Bounds
-from railroads.sim.grids import HexGrid
 from railroads.sim.routes import plan_route, route_price
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 from railroads.sim.trains import Stop
 
 
-def make_map() -> TileMap:
-    grid = HexGrid(rows=12, cols=30, km_per_cell=2.0)
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=np.full(grid.shape, Terrain.LAND, dtype=np.uint8),
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=np.full(grid.shape, Relief.FLAT, dtype=np.uint8),
-    )
-
-
 def make_game(cash: float = 1_000_000.0) -> Game:
-    game = Game(Constructions(make_map()))
+    game = Game(Constructions(flat_map()))
     game.finances.cash = cash
     return game
 

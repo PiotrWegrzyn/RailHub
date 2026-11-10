@@ -1,13 +1,13 @@
 import numpy as np
 
+from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Neighbourhoods
 from railroads.sim.forests import FORESTS, ForestRule, change_forests, forest_turn, forests_nearby
-from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import LUMBER_MILLS, TOWNS, GrowthRule
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Relief, TileMap, Vegetation
 
 STILL = ForestRule(clearing_per_point=0.0, clearing_per_mill=0.0, spread_per_forest=0.0)
 
@@ -21,16 +21,7 @@ def make_map(size: int = 12, hill: tuple[int, int] | None = None) -> TileMap:
     relief = np.full(grid.shape, Relief.FLAT, dtype=np.uint8)
     if hill is not None:
         relief[hill] = Relief.HILLS
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=np.full(grid.shape, Terrain.LAND, dtype=np.uint8),
-        vegetation=vegetation,
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=relief,
-    )
+    return flat_map(grid=grid, vegetation=vegetation, relief=relief)
 
 
 def near(tile_map: TileMap) -> np.ndarray:

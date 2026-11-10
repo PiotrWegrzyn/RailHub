@@ -3,9 +3,9 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
+from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Trade
-from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import SERVED_POINT_WORTH, Growth, _allowed
 from railroads.sim.ladders import (
@@ -44,15 +44,8 @@ def make_map(size: int = 12) -> TileMap:
     vegetation[2, 6] = Vegetation.BARREN
     temperature = np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8)
     temperature[3, 6] = Temperature.COLD
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=terrain,
-        vegetation=vegetation,
-        temperature=temperature,
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=relief,
+    return flat_map(
+        grid=grid, terrain=terrain, vegetation=vegetation, temperature=temperature, relief=relief
     )
 
 

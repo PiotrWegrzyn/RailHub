@@ -1,12 +1,12 @@
 import numpy as np
 
+from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
-from railroads.sim.geo import Bounds
 from railroads.sim.goods import Good, Need
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Terrain, TileMap
 from railroads.ui.hex_details import Flow, describe
 
 
@@ -14,16 +14,7 @@ def make_map() -> TileMap:
     grid = HexGrid(rows=10, cols=10, km_per_cell=2.0)
     terrain = np.full(grid.shape, Terrain.LAND, dtype=np.uint8)
     terrain[:, 0] = Terrain.SEA
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=terrain,
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=np.full(grid.shape, Relief.FLAT, dtype=np.uint8),
-    )
+    return flat_map(grid=grid, terrain=terrain)
 
 
 def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded() -> None:

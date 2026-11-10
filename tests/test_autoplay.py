@@ -1,32 +1,22 @@
 import numpy as np
 import pytest
 
+from builders import flat_map
 from railroads.sim.autoplay import PlayerRule, StandInPlayer, reach_sums
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Satisfaction
-from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule, Points
 from railroads.sim.railway import Railway
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import TileMap
 
 QUIET = GrowthRule(ladders=(), forests=None)
 TOWNS = [(5, 5), (5, 20), (5, 35), (20, 5), (20, 20), (20, 35)]
 
 
 def make_map(size: int = 40) -> TileMap:
-    grid = HexGrid(rows=size, cols=size, km_per_cell=2.0)
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=np.full(grid.shape, Terrain.LAND, dtype=np.uint8),
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=np.full(grid.shape, Relief.FLAT, dtype=np.uint8),
-    )
+    return flat_map(size, size)
 
 
 def grown(towns: list[tuple[int, int]] = TOWNS, same: bool = False) -> Growth:

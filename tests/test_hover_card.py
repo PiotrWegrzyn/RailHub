@@ -1,31 +1,19 @@
 from collections.abc import Iterator
 
-import numpy as np
 import pytest
 from imgui_bundle import imgui
 
+from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
 from railroads.sim.game import Game
-from railroads.sim.geo import Bounds
 from railroads.sim.goods import Good, Need
-from railroads.sim.grids import HexGrid
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import TileMap
 from railroads.ui import map_overlays
 from railroads.ui.map_view import MapView
 
 
 def make_map() -> TileMap:
-    grid = HexGrid(rows=12, cols=12, km_per_cell=2.0)
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=np.full(grid.shape, Terrain.LAND, dtype=np.uint8),
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=np.full(grid.shape, Relief.FLAT, dtype=np.uint8),
-    )
+    return flat_map(12, 12)
 
 
 @pytest.fixture

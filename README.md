@@ -54,6 +54,9 @@ uv run pytest
 uv run ruff check
 ```
 
+Tests build their maps with `tests/builders.py`: `flat_map(rows, cols)` is flat temperate grassland
+unless a test passes its own layers, and `QUIET` is a growth rule that grows and trades nothing.
+
 `src/railroads/sim` is the game logic and must never import the UI (ruff enforces this).
 `src/railroads/mapgen` turns map data into a map. `src/railroads/ui` draws the game with
 Dear ImGui (imgui-bundle).

@@ -1,10 +1,9 @@
 import numpy as np
 import pytest
 
+from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.geo import Bounds
 from railroads.sim.goods import Good, Need, price_of
-from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import TOWNS, GrowthRule
 from railroads.sim.ownership import OWNER_SHARE
@@ -22,26 +21,11 @@ from railroads.sim.tech import (
     tree_of,
     xp_for,
 )
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 from railroads.sim.trains import ENGINES, Stop
 
 
-def make_map() -> TileMap:
-    grid = HexGrid(rows=12, cols=30, km_per_cell=2.0)
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=np.full(grid.shape, Terrain.LAND, dtype=np.uint8),
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=np.full(grid.shape, Relief.FLAT, dtype=np.uint8),
-    )
-
-
 def joined() -> Growth:
-    constructions = Constructions(make_map())
+    constructions = Constructions(flat_map())
     growth = Growth(constructions, GrowthRule(trades=False))
     build_station(growth, (6, 3))
     build_station(growth, (6, 20))
@@ -215,7 +199,7 @@ def test_nothing_rising_out_of_reach_of_the_stations_gives_experience() -> None:
 
 
 def test_electric_engines_find_a_way_only_along_electrified_track() -> None:
-    constructions = Constructions(make_map())
+    constructions = Constructions(flat_map())
     growth = Growth(constructions, GrowthRule(trades=False))
     for cell in ((6, 3), (6, 20), (2, 3), (2, 20)):
         build_station(growth, cell)
@@ -234,7 +218,7 @@ def test_electric_engines_find_a_way_only_along_electrified_track() -> None:
 
 
 def test_electrified_track_costs_more_upkeep_than_plain_track() -> None:
-    plain, wired = Constructions(make_map()), Constructions(make_map())
+    plain, wired = Constructions(flat_map()), Constructions(flat_map())
     for constructions, electric in ((plain, False), (wired, True)):
         growth = Growth(constructions, GrowthRule(trades=False))
         route = plan_route(constructions, (6, 3), (6, 20), electric=electric)

@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Track
 from railroads.sim.demand import PASSED_ALONG_PAY, price_of
 from railroads.sim.economy import Economy, StationOrder
@@ -11,34 +12,17 @@ from railroads.sim.finance import (
     TRACK_UPKEEP,
     TRAIN_PRICE,
 )
-from railroads.sim.geo import Bounds
 from railroads.sim.goods import Good, Need
-from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import CELLS_PER_MONTH, Railway
 from railroads.sim.routes import build_station, lay_route, plan_route, route_price
 from railroads.sim.station_goods import STOCKPILE, WAITING, StationGoods
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 from railroads.sim.trains import CAR_CAPACITY, MAX_CARS, Car, Stop
 
 
-def make_map() -> TileMap:
-    grid = HexGrid(rows=12, cols=30, km_per_cell=2.0)
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=np.full(grid.shape, Terrain.LAND, dtype=np.uint8),
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=np.full(grid.shape, Relief.FLAT, dtype=np.uint8),
-    )
-
-
 def joined_stations() -> tuple[Growth, Railway]:
-    constructions = Constructions(make_map())
+    constructions = Constructions(flat_map())
     growth = Growth(constructions, GrowthRule(trades=False))
     build_station(growth, (6, 3))
     build_station(growth, (6, 20))
@@ -137,7 +121,7 @@ def test_a_stop_sends_at_most_six_cars() -> None:
 
 
 def test_without_track_a_train_waits() -> None:
-    constructions = Constructions(make_map())
+    constructions = Constructions(flat_map())
     railway = Railway(constructions)
     train = railway.buy()
     train.stops = [Stop((6, 3)), Stop((6, 20))]
@@ -148,7 +132,7 @@ def test_without_track_a_train_waits() -> None:
 
 
 def test_stations_hand_goods_to_the_hungriest_buildings_and_gather_spare_ones() -> None:
-    tile_map = make_map()
+    tile_map = flat_map()
     economy = Economy(tile_map)
     counts = {kind: np.zeros(tile_map.grid.shape, dtype=np.int64) for kind in BuildingKind}
     counts[BuildingKind.FLATS][6, 10] = 6
@@ -179,7 +163,7 @@ def test_growth_hands_station_goods_out_and_stores_what_was_gathered() -> None:
 
 
 def test_a_station_gathers_what_a_farm_makes() -> None:
-    tile_map = make_map()
+    tile_map = flat_map()
     economy = Economy(tile_map)
     counts = {kind: np.zeros(tile_map.grid.shape, dtype=np.int64) for kind in BuildingKind}
     counts[BuildingKind.HOUSE][6, 10] = 1
@@ -355,7 +339,7 @@ def test_station_demand_is_twice_the_needs_of_buildings_in_its_inner_ring() -> N
 
 
 def test_a_route_costs_three_hundred_a_cell_on_the_flat() -> None:
-    constructions = Constructions(make_map())
+    constructions = Constructions(flat_map())
     route = plan_route(constructions, (6, 3), (6, 8))
     assert route is not None
 

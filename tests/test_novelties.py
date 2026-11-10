@@ -1,10 +1,9 @@
 import numpy as np
 import pytest
 
+from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.geo import Bounds
 from railroads.sim.goods import MAKES, Good, Need, needs_of
-from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.novelties import (
@@ -14,25 +13,14 @@ from railroads.sim.novelties import (
     Novelty,
     place_space_center,
 )
-from railroads.sim.tilemap import Deposit, Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Deposit, TileMap
 
 QUIET = GrowthRule(ladders=(), forests=None)
 BY_KIND = {novelty.kind: novelty for novelty in NOVELTIES}
 
 
 def make_map(size: int = 40, deposits: np.ndarray | None = None) -> TileMap:
-    grid = HexGrid(rows=size, cols=size, km_per_cell=2.0)
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=np.full(grid.shape, Terrain.LAND, dtype=np.uint8),
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=np.full(grid.shape, Relief.FLAT, dtype=np.uint8),
-        deposits=deposits,
-    )
+    return flat_map(size, size, deposits=deposits)
 
 
 def grown(year: int, towns: dict[tuple[int, int], BuildingKind] | None = None, **kw) -> Growth:

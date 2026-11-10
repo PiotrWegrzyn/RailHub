@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from builders import flat_map
 from railroads.sim.constructions import (
     Building,
     BuildingKind,
@@ -10,9 +11,8 @@ from railroads.sim.constructions import (
     Track,
     TrackWidth,
 )
-from railroads.sim.geo import Bounds
 from railroads.sim.grids import Grid, HexGrid, SquareGrid
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.sim.track_rules import TrackBed
 
 LEGEND = {
@@ -31,16 +31,7 @@ def make_map(*rows: str, grid_type: type[Grid] = HexGrid) -> TileMap:
     terrain = np.array([[terrain for terrain, _ in row] for row in cells], dtype=np.uint8)
     relief = np.array([[relief for _, relief in row] for row in cells], dtype=np.uint8)
     grid = grid_type(rows=terrain.shape[0], cols=terrain.shape[1], km_per_cell=2.0)
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=terrain,
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=relief,
-    )
+    return flat_map(grid=grid, terrain=terrain, relief=relief)
 
 
 @pytest.mark.parametrize(("width", "houses"), [(TrackWidth.SINGLE, 5), (TrackWidth.DOUBLE, 4)])

@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from builders import flat_map
 from railroads.sim.constructions import (
     Building,
     BuildingKind,
@@ -9,13 +10,12 @@ from railroads.sim.constructions import (
     Track,
     TrackWidth,
 )
-from railroads.sim.geo import Bounds
 from railroads.sim.grids import Cell, Grid, HexGrid, SquareGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import Route, build_station, lay_route, plan_route, route_price
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.sim.track_rules import TrackBed
 
 NO_TRADE = GrowthRule(trades=False)
@@ -31,16 +31,7 @@ def make_map(
         terrain[:, river_col] = Terrain.RIVER
     if mountain_col is not None:
         relief[:, mountain_col] = Relief.MOUNTAINS
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=terrain,
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=relief,
-    )
+    return flat_map(grid=grid, terrain=terrain, relief=relief)
 
 
 def laid(constructions: Constructions, start: Cell, end: Cell, **options: object) -> Route:

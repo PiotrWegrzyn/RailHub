@@ -1,36 +1,18 @@
 import numpy as np
 import pytest
 
+from builders import QUIET, flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.geo import Bounds
 from railroads.sim.goods import Good, price_of
-from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import FACTORIES, FARMS_CROWDED_OUT, GrowthRule
 from railroads.sim.ownership import OWNER_SHARE, PAYBACK_YEARS
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
-
-QUIET = GrowthRule(trades=False, ladders=(), forests=None)
-
-
-def make_map() -> TileMap:
-    grid = HexGrid(rows=12, cols=30, km_per_cell=2.0)
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=np.full(grid.shape, Terrain.LAND, dtype=np.uint8),
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=np.full(grid.shape, Relief.FLAT, dtype=np.uint8),
-    )
 
 
 def grown(*placed: tuple[tuple[int, int], BuildingKind]) -> Growth:
-    constructions = Constructions(make_map())
+    constructions = Constructions(flat_map())
     for cell, kind in placed:
         constructions.build(Building(cell, kind))
     growth = Growth(constructions, QUIET)
@@ -70,7 +52,7 @@ def test_homes_cannot_be_bought_nor_more_than_stand_there(
 
 
 def test_the_player_earns_half_of_what_their_farm_sells_to_a_joined_station() -> None:
-    constructions = Constructions(make_map())
+    constructions = Constructions(flat_map())
     growth = Growth(constructions, GrowthRule(trades=False))
     build_station(growth, (6, 3))
     build_station(growth, (6, 20))

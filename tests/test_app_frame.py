@@ -4,11 +4,11 @@ import numpy as np
 import pytest
 from imgui_bundle import hello_imgui, imgui, implot
 
+from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.game import Game
-from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
-from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Terrain, TileMap
 from railroads.sim.trains import Stop
 from railroads.ui.app import App
 from railroads.ui.build_menu import Tool
@@ -25,16 +25,7 @@ def make_map() -> TileMap:
     grid = HexGrid(rows=20, cols=24, km_per_cell=2.0)
     terrain = np.full(grid.shape, Terrain.LAND, dtype=np.uint8)
     terrain[:, 0] = Terrain.SEA
-    return TileMap(
-        name="Test",
-        grid=grid,
-        bounds=Bounds(west=14.0, east=15.0, south=50.0, north=51.0),
-        terrain=terrain,
-        vegetation=np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8),
-        temperature=np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8),
-        height_m=np.zeros(grid.shape, dtype=np.int16),
-        relief=np.full(grid.shape, Relief.FLAT, dtype=np.uint8),
-    )
+    return flat_map(grid=grid, terrain=terrain)
 
 
 @pytest.fixture
