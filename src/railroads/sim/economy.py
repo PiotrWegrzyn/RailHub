@@ -14,10 +14,12 @@ a processor uses up only the inputs for what it made; the rest waits in its stoc
 handed out in the order of PIPELINE, so the inputs of a processor come before what it makes:
 canneries take their fruit before houses eat what is left.
 
-A building is unsatisfied when it gets none of what it needs and gives away none of what it makes,
-thriving when it gets all it needs and gives away all it makes, and content anywhere between.
-The share of it a building manages adds to the chances of more growing in its cell, up to
-MOST_SERVED times its points (served_multipliers).
+A building's satisfaction is the share of what it demands that it got and of what it makes that
+it gave away, plus BONUS_PER_GOOD for each of its bonus goods (railroads.sim.goods) it got all of,
+and that share of it for part: a house fed and warmed that also got all its beer and half its
+newspapers is at 145%. It is unsatisfied at nothing, thriving from 100% and content between.
+Its satisfaction adds to the chances of more growing in its cell, MOST_SERVED times its points
+at 100% and that much more above it (served_multipliers).
 """
 
 from collections.abc import Mapping
@@ -39,6 +41,7 @@ from railroads.sim.goods import (
     RECIPES,
     Good,
     Need,
+    bonus_of,
     makes_of,
     needs_of,
 )
@@ -65,6 +68,8 @@ INPUT_STOCK = 300.0
 # points towards more growing in its own cell, on top of the plain points every building gives
 # its neighbourhood; one that manages part of it counts that share of this.
 MOST_SERVED = 10.0
+# How much each bonus good a building gets all of adds to its satisfaction.
+BONUS_PER_GOOD = 0.3
 
 
 def levels_of(share: FloatCells) -> npt.NDArray[np.int8]:
@@ -76,9 +81,8 @@ def levels_of(share: FloatCells) -> npt.NDArray[np.int8]:
 
 
 def served_multipliers(share: FloatCells) -> FloatCells:
-    """How many times over buildings count their points as served, for the share of what they
-    need and make that they got and gave."""
-    return MOST_SERVED * np.clip(share, 0.0, 1.0)
+    """How many times over buildings count their points as served, for their satisfaction."""
+    return MOST_SERVED * np.maximum(share, 0.0)
 
 
 class Neighbourhoods:
@@ -110,8 +114,9 @@ class StationOrder:
 @dataclass(frozen=True)
 class Trade:
     """One month of trade on the cells with buildings (`cells`, flat indices): per kind of
-    building and cell, how much of its needs it got and how much of what it can make it gave
-    away, both summed over goods."""
+    building and cell, how much of its demands it got and how much of what it can make it gave
+    away, both summed over goods, and how many of its bonus goods it got, each counted by the
+    share of it that came."""
 
     cells: npt.NDArray[np.intp]
     got: Mapping[BuildingKind, FloatCells]
@@ -134,6 +139,9 @@ class Trade:
     # Per station, the goods it handed out of its own stockpile, and how much of them by need.
     supplied: Mapping[Cell, Mapping[Good, float]] = field(default_factory=dict)
     supplied_for: Mapping[Cell, Mapping[tuple[Need, Good], float]] = field(default_factory=dict)
+    bonus: Mapping[BuildingKind, FloatCells] = field(default_factory=dict)
+    # What each bonus good a building gets all of adds to its satisfaction, with the player's tech.
+    bonus_per_good: float = BONUS_PER_GOOD
 
     def done(self, kinds: tuple[BuildingKind, ...]) -> FloatCells:
         return sum(
@@ -147,12 +155,27 @@ class Trade:
             start=np.zeros(self.cells.size),
         )
 
+    def share(self, kinds: tuple[BuildingKind, ...], empty: float = 1.0) -> FloatCells:
+        """The satisfaction of each cell's buildings of these kinds, from 0 up and past 1 with
+        bonus goods. Where kinds share a cell, each counts by how much it wants; cells where they
+        want nothing get `empty`."""
+        total, weight = np.zeros(self.cells.size), np.zeros(self.cells.size)
+        for kind in kinds:
+            if kind not in self.got:
+                continue
+            wanted = self.needed[kind] + self.could_make[kind]
+            done = self.got[kind] + self.gave[kind]
+            own = np.where(wanted > 0, done / np.where(wanted > 0, wanted, 1.0), 0.0)
+            if kind in self.bonus:
+                own = own + self.bonus_per_good * self.bonus[kind]
+            total += wanted * own
+            weight += wanted
+        return np.where(weight > 0, total / np.where(weight > 0, weight, 1.0), empty)
+
     def levels(self, kinds: tuple[BuildingKind, ...] | None = None) -> npt.NDArray[np.int8]:
         """Satisfaction of each cell's buildings of these kinds, or of all of them; cells with
         none count as thriving."""
-        chosen = kinds if kinds is not None else tuple(self.needed)
-        done, wanted = self.done(chosen), self.wanted(chosen)
-        return levels_of(np.where(wanted > 0, done / np.where(wanted > 0, wanted, 1.0), 1.0))
+        return levels_of(self.share(kinds if kinds is not None else tuple(self.needed)))
 
 
 class Economy:
@@ -166,8 +189,10 @@ class Economy:
         self.kinds = tuple(dict.fromkeys([*MAKES, *NEEDS]))
         # Each cell's satisfaction last month, which decides who is served first.
         self.levels = np.full(self.cells, Satisfaction.UNSATISFIED, dtype=np.int8)
-        # The year, which decides what buildings need.
+        # The year, which decides what buildings need, and what each bonus good a building gets
+        # adds to its satisfaction (railroads.sim.growth sets it from the player's tech).
         self.year = START_YEAR
+        self.bonus_per_good = BONUS_PER_GOOD
         # What the processors of each kind in each cell hold of each input.
         self.stock: dict[tuple[BuildingKind, Need], FloatCells] = {
             (kind, need): np.zeros(self.cells)
@@ -395,10 +420,15 @@ class _Month:
         needed = {k: self.zero.copy() for k in self.count}
         gave = {k: self.zero.copy() for k in self.count}
         could_make = {k: self.zero.copy() for k in self.count}
+        bonus: dict[BuildingKind, FloatCells] = {}
         goods_got = {}
         for (kind, need), received in self.received.items():
             wanted = self.count[kind] * NEEDS[kind][need]
             goods_got[(kind, need)] = (received, wanted)
+            if need in bonus_of(kind, self.economy.year):
+                part = np.minimum(received, wanted) / np.where(wanted > 0, wanted, 1.0)
+                bonus[kind] = bonus.get(kind, self.zero) + part
+                continue
             having = self.stock[(kind, need)] if kind in RECIPES else received
             got[kind] += np.minimum(having, wanted)
             needed[kind] += wanted
@@ -430,6 +460,8 @@ class _Month:
             self.handed_for,
             self.supplied,
             self.supplied_for,
+            bonus,
+            self.economy.bonus_per_good,
         )
         self.economy.levels[:] = Satisfaction.UNSATISFIED
         self.economy.levels[self.cells] = trade.levels()

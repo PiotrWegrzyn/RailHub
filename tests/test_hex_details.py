@@ -7,7 +7,7 @@ from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.tilemap import Terrain, TileMap
-from railroads.ui.hex_details import Flow, describe
+from railroads.ui.hex_details import BuildingRow, Flow, describe, mood_text
 
 
 def make_map() -> TileMap:
@@ -31,7 +31,8 @@ def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded(
     (house,) = details.buildings
     assert house.name == "house"
     assert house.count == 3
-    assert house.needs == [(Need.FOOD, 30), (Need.BEER, 3), (Need.NEWSPAPERS, 3), (Need.HEATING, 3)]
+    assert house.needs == [(Need.FOOD, 30), (Need.HEATING, 3)]
+    assert house.bonus == [(Need.BEER, 3), (Need.NEWSPAPERS, 3)]
     assert house.got == [
         Flow(Need.NEWSPAPERS, 0.0, 3.0),
         Flow(Need.HEATING, 0.0, 3.0),
@@ -68,18 +69,20 @@ def test_a_building_needing_several_goods_lists_each_with_what_it_got() -> None:
     tenement = details.buildings[0]
     assert tenement.needs == [
         (Need.FOOD, 60),
-        (Need.SALT, 2),
         (Need.GOODS, 20),
-        (Need.COFFEE, 2),
         (Need.CLOTHES, 3),
-        (Need.FURNITURE, 2),
-        (Need.BEER, 3),
         (Need.VODKA, 1),
         (Need.SHOES, 2),
         (Need.BRICKS, 5),
         (Need.REFINED_SUGAR, 2),
-        (Need.NEWSPAPERS, 3),
         (Need.HEATING, 3),
+    ]
+    assert tenement.bonus == [
+        (Need.SALT, 2),
+        (Need.COFFEE, 2),
+        (Need.FURNITURE, 2),
+        (Need.BEER, 3),
+        (Need.NEWSPAPERS, 3),
     ]
     assert tenement.got == [
         Flow(Need.SALT, 0.0, 2.0),
@@ -106,3 +109,13 @@ def test_a_factory_without_lumber_makes_nothing_and_shows_what_it_could() -> Non
     details = describe(growth, (5, 5))
 
     assert details.buildings[0].gave == [Flow(Good.GOODS, 0.0, 0.0, 30)]
+
+
+def test_a_building_shows_its_mood_with_its_satisfaction_as_a_percentage() -> None:
+    row = BuildingRow("house", 1, [], [], [], [], [], [], "thriving", percent=1.22)
+    quiet = BuildingRow("house", 1, [], [], [], [], [], [], "-")
+
+    text, none = mood_text(row), mood_text(quiet)
+
+    assert text == "thriving 122%"
+    assert none == "-"

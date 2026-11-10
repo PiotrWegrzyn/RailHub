@@ -1,5 +1,5 @@
 """The panel that opens when a cell is clicked: its land, its points, and every building on it with
-what it makes and needs and how last month's trade went for it."""
+what it makes, demands and takes as bonus goods, and how last month's trade went for it."""
 
 from collections import Counter
 from collections.abc import Mapping
@@ -14,7 +14,7 @@ from imgui_bundle import imgui
 from railroads.sim.constructions import Building, BuildingKind, Construction, Station, Track
 from railroads.sim.economy import Satisfaction
 from railroads.sim.finance import dollars
-from railroads.sim.goods import RECIPES, Good, Need, makes_of, needs_of
+from railroads.sim.goods import RECIPES, Good, Need, bonus_of, demands_of, makes_of
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
@@ -44,7 +44,9 @@ class BuildingRow:
     name: str
     count: int
     makes: list[tuple[Good, float]]
+    # What it must get to be satisfied, and the bonus goods that raise it above that.
     needs: list[tuple[Need, float]]
+    bonus: list[tuple[Need, float]]
     got: list[Flow]
     gave: list[Flow]
     # What processors hold of each input, waiting to be used.
@@ -54,6 +56,8 @@ class BuildingRow:
     # How many of them the player owns, and what one more costs; None for what cannot be bought.
     owned: int = 0
     price: float | None = None
+    # Its satisfaction last month, past 1 with bonus goods; None where it does not trade.
+    percent: float | None = None
 
 
 @dataclass(frozen=True)
@@ -93,18 +97,21 @@ def describe(growth: Growth, cell: Cell) -> HexDetails:
         gave: list[Flow] = []
         stock: list[tuple[Need, float]] = []
         mood = "-"
+        percent = None
         if trade is not None and position is not None and kind in trade.got:
             got = _per_good(trade.goods_got, kind, position)
             if kind in RECIPES:
                 stock = _stock(growth, kind, flat)
             gave = _per_good(trade.goods_gave, kind, position, makes_of(kind, growth.year), count)
             mood = Satisfaction(int(trade.levels((kind,))[position])).name.lower()
+            percent = float(trade.share((kind,))[position])
         rows.append(
             BuildingRow(
                 kind.value,
                 count,
                 [(good, amount * count) for good, amount in makes_of(kind, growth.year).items()],
-                [(need, amount * count) for need, amount in needs_of(kind, growth.year).items()],
+                [(need, amount * count) for need, amount in demands_of(kind, growth.year).items()],
+                [(need, amount * count) for need, amount in bonus_of(kind, growth.year).items()],
                 got,
                 gave,
                 stock,
@@ -112,6 +119,7 @@ def describe(growth: Growth, cell: Cell) -> HexDetails:
                 kind,
                 int(growth.owners.owned(kind)[cell]),
                 growth.owners.price_to_buy(kind),
+                percent,
             )
         )
     return HexDetails(
@@ -180,7 +188,7 @@ def draw_hex_details(details: HexDetails) -> BuildingKind | None:
                 imgui.table_next_column()
                 _draw_flows(row.gave)
                 imgui.table_next_column()
-                imgui.text(row.satisfaction)
+                imgui.text(mood_text(row))
                 imgui.table_next_column()
                 if row.price is None:
                     imgui.text_disabled("-")
@@ -194,6 +202,13 @@ def draw_hex_details(details: HexDetails) -> BuildingKind | None:
     for other in details.others:
         imgui.bullet_text(other)
     return bought
+
+
+def mood_text(row: BuildingRow) -> str:
+    """How satisfied a building is, with its satisfaction as a percentage where it trades."""
+    if row.percent is None:
+        return row.satisfaction
+    return f"{row.satisfaction} {row.percent:.0%}"
 
 
 def _draw_flows(flows: list[Flow]) -> None:

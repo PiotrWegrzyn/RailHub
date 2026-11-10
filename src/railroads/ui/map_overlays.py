@@ -16,7 +16,7 @@ from railroads.sim.railway import Railway
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.biomes import biome_of
-from railroads.ui.hex_details import describe
+from railroads.ui.hex_details import describe, mood_text
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS, IsoCamera, Vec2
 from railroads.ui.minimap import MinimapLayout
 from railroads.ui.search import BuildingSearch, pulse
@@ -285,7 +285,8 @@ def draw_status(draw_list: imgui.ImDrawList, top_left: Vec2, bottom_right: Vec2,
 
 def draw_hovered_buildings(growth: Growth, cell: Cell, top_left: Vec2) -> None:
     """The buildings in the cell under the mouse, one to a line, in a small card below the
-    status strip: how satisfied each is, and icons of what it makes and what it needs."""
+    status strip: how satisfied each is, and icons of what it makes, what it demands and its
+    bonus goods."""
     rows = describe(growth, cell).buildings
     if not rows:
         return
@@ -304,8 +305,8 @@ def draw_hovered_buildings(growth: Growth, cell: Cell, top_left: Vec2) -> None:
             imgui.text(row.name if row.count == 1 else f"{row.name} x{row.count}")
             if row.satisfaction in MOODS:
                 imgui.same_line(0, 8)
-                imgui.text_colored(imgui.ImVec4(*MOODS[row.satisfaction]), row.satisfaction)
-            for goods, label in ((row.makes, "makes"), (row.needs, "needs")):
+                imgui.text_colored(imgui.ImVec4(*MOODS[row.satisfaction]), mood_text(row))
+            for goods, label in ((row.makes, "makes"), (row.needs, "needs"), (row.bonus, "bonus")):
                 if not goods:
                     continue
                 imgui.same_line(0, 10)

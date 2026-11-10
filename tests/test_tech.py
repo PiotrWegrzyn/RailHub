@@ -231,3 +231,15 @@ def test_electrified_track_costs_more_upkeep_than_plain_track() -> None:
 
     paid = [-railway.finances.month["track upkeep"] for railway in railways]
     assert paid[1] == pytest.approx(2.5 * paid[0])
+
+
+def test_fine_living_makes_each_bonus_good_worth_ten_points_more_satisfaction() -> None:
+    growth = joined()
+    growth.build(Building((6, 22), BuildingKind.HOUSE))
+    growth.railway.research = learned(Tree.COMMERCE, "investors", "advertising", "fine_living")
+
+    growth.trade_goods()
+
+    assert growth.economy.bonus_per_good == pytest.approx(0.4)
+    assert growth.trade is not None
+    assert growth.trade.bonus_per_good == pytest.approx(0.4)

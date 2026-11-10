@@ -55,6 +55,9 @@ class Effect(Enum):
     COACHES = "coach capacity"
     # Stations hold this many more waiting passengers and pieces of mail.
     WAITING = "waiting room"
+    # Each bonus good a building gets all of adds this much more to its satisfaction
+    # (railroads.sim.economy).
+    BONUS_GOODS = "per bonus good"
     # Opens an engine (railroads.sim.railway) once its year has come.
     UNLOCK = "unlocks"
 
@@ -153,6 +156,9 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("takeovers", "Hostile takeovers", E.DISCOUNT, 0.15, "chains"),
             _n("brands", "Household brands", E.PRICE, 0.05, "advertising", everywhere=True),
             _n("empire", "Business empire", E.SHARE, 0.1, "holding", "takeovers", everywhere=True),
+            # TODO: a placeholder until bonus goods get their own, stronger tech interactions,
+            # which the user will come back to.
+            _n("fine_living", "Fine living", E.BONUS_GOODS, 0.1, "advertising", everywhere=True),
         ),
         Tree.PASSENGERS: (
             _n("timetables", "Timetables", E.PRICE, 0.1),

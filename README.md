@@ -272,7 +272,7 @@ apples, bananas, dates, sugar, cans or bread); canneries need fruit (apples, ban
 sugar) and bakeries wheat. Towns eat a lot, so they are hard to feed in full, and every farm and
 bakery a station can reach is worth having.
 
-| Building | Makes at most | Needs |
+| Building | Makes at most | Needs (bonus goods among them, see below) |
 |---|---|---|
 | House | | 10 food, 1 beer, 1 newspaper, 1 heating |
 | Tenement | | 60 food, 2 salt, 20 goods, 2 coffee, 3 clothes, 2 furniture, 10 tools, 3 beer, 1 vodka, 2 shoes, 5 bricks, 2 refined sugar, 3 newspapers, 3 heating |
@@ -371,12 +371,29 @@ and sheep farms eat a lot of wheat, alongside the bakeries and breweries, and th
 sheep go to tanneries and meat factories; meat feeds houses like any food.
 
 Goods move only through stations, and only through those that track joins to another station:
-nothing passes between neighbours by itself, and the land feeds no one. A building that gets all
-it needs and gives away all it makes is thriving; one that gets and gives nothing is unsatisfied;
-anything between is content. Needs are counted by amount, so a little salt or a car matters
-little next to a town's food. Processors are judged on what they actually make, not on what they
-could. The ground under content and thriving buildings has a warm glow, and the status bar names
-the hovered cell's satisfaction.
+nothing passes between neighbours by itself, and the land feeds no one.
+
+What a building needs comes in two lists, its demands and its bonus goods. Bonus goods are every
+special resource (iron ore, copper, gold, diamonds, oil, salt, grapes, coffee, rubber, incense)
+and beer, newspapers and furniture; everything else it needs is a demand. A building's
+satisfaction is the share of its demands it got, plus 30% for each bonus good it got all of, and
+that share of 30% for part of one. Demands are counted by amount, so a car matters little next
+to a town's food. A house that gets its food and heating is at 100%, with all its beer at 130%,
+and with half its newspapers on top at 145%; one that gets only its beer is at 30%. A building
+that makes things counts what it gave away alongside what it got, and processors are judged on
+what they actually make, not on what they could.
+
+Processors have no bonus goods: a steel mill needs its iron ore to make steel. A building whose
+every need is a bonus good keeps them as demands, since they are all it is for: a jeweller
+demands its gold and diamonds. The hover card and hex details show demands as "needs" and bonus
+goods apart, with each building's satisfaction as a percentage.
+
+Satisfaction goes wherever it counts with no ceiling: a building at 145% counts its points as
+served 14.5 times over towards growth, against 10 at 100%. A building is unsatisfied at 0%,
+thriving from 100% and content between; the ground under content and thriving buildings has a
+warm glow, and the status bar names the hovered cell's satisfaction. The Fine living node of the
+commerce tree makes each bonus good worth 40% instead of 30%, a placeholder until bonus goods get
+tech of their own.
 
 Factories gather into districts: industry nearby draws more of them only once at least 5
 industry points stand there, more than one steel mill, and then strongly, so three meet and merge
@@ -399,6 +416,10 @@ grassy hills; grapes on mild hills; cotton on hot plains; coffee on hot hills; r
 forest; and, very rarely, incense on any land off the mountains. A map gets a number of clusters for its land, spread apart, closer together where little
 land allows them; those that do not fit are left out, and a map without the land for a resource
 has none. Each resource is worked only on its own deposit, at most once per neighbourhood.
+Deposits stay where the map put them. Wool land is the commonest: one patch of 6 to 12 cells for
+every 12,000 land cells, so sheep farms spread over many small patches of grassy hills. What the
+deposits give are bonus goods to the buildings that use them as they are, such as salt and
+coffee for homes or incense for churches, and demands to the processors that work them up.
 
 Other works open anywhere by chance, a little likelier where people and industry are, whether
 or not their inputs are near, so their inputs usually have to be brought from far away. No

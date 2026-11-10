@@ -26,6 +26,7 @@ PERCENT_EFFECTS = frozenset(
         Effect.UPKEEP,
         Effect.GROWTH,
         Effect.COACHES,
+        Effect.BONUS_GOODS,
     }
 )
 

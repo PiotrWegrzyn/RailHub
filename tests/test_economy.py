@@ -3,7 +3,7 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.economy import Economy, Satisfaction, StationOrder, levels_of
+from railroads.sim.economy import Economy, Satisfaction, StationOrder, levels_of, served_multipliers
 from railroads.sim.goods import Good, Need, makes_of, needs_of
 from railroads.sim.grids import HexGrid
 from railroads.sim.ladders import LUMBER_MILLS, MINES
@@ -392,3 +392,48 @@ def test_a_power_plant_burns_coal_oil_or_gas() -> None:
     at = position(trade, economy, (8, 9))
     assert burned[at] == 150.0
     assert needed[at] == 200.0
+
+
+def test_bonus_goods_raise_a_fed_and_warm_house_past_full_satisfaction() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
+
+    trade = economy.trade(placed, holding(FISH=10.0, COAL=1.0, BEER=1.0, NEWSPAPERS=0.5))
+
+    share = trade.share((BuildingKind.HOUSE,))[position(trade, economy, (8, 9))]
+    assert share == pytest.approx(1.45)
+    assert level_at(economy, trade, (8, 9), BuildingKind.HOUSE) == Satisfaction.THRIVING
+
+
+def test_a_house_that_only_gets_its_beer_is_content_at_thirty_percent() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
+
+    trade = economy.trade(placed, holding(BEER=1.0))
+
+    share = trade.share((BuildingKind.HOUSE,))[position(trade, economy, (8, 9))]
+    assert share == pytest.approx(0.3)
+    assert level_at(economy, trade, (8, 9), BuildingKind.HOUSE) == Satisfaction.CONTENT
+
+
+def test_each_bonus_good_counts_what_the_economy_is_told_it_is_worth() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    economy.bonus_per_good = 0.4
+    placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
+
+    trade = economy.trade(placed, holding(BEER=1.0))
+
+    assert trade.share((BuildingKind.HOUSE,))[position(trade, economy, (8, 9))] == pytest.approx(
+        0.4
+    )
+
+
+def test_growth_counts_satisfaction_past_full_without_a_ceiling() -> None:
+    share = np.array([0.5, 1.0, 1.45])
+
+    multipliers = served_multipliers(share)
+
+    assert multipliers.tolist() == pytest.approx([5.0, 10.0, 14.5])

@@ -11,6 +11,12 @@ Processors turn their inputs into something else by a recipe (RECIPES): steel mi
 iron ore into steel, canneries fruit and steel into cans, factories lumber and steel into goods,
 big factories steel and copper, mega factories steel, copper and machinery. An input whose need
 starts later is left out of a recipe until its year.
+
+What a building needs is split in two. Its demands (demands_of) are what it must get to be
+satisfied. Its bonus goods (bonus_of, from BONUS_NEEDS) it can do without, but each one it gets
+raises its satisfaction above what its demands give (railroads.sim.economy). Processors have no
+bonus goods: their inputs make what they make. A building whose every need is a bonus good keeps
+them all as demands, since getting them is what it is there for.
 """
 
 from collections.abc import Mapping
@@ -657,6 +663,28 @@ def makes_of(kind: BuildingKind, year: int) -> Mapping[Good, float]:
     )
 
 
+# Needs buildings can do without but that raise their satisfaction: every special resource
+# (railroads.mapgen.deposits), and beer, newspapers and furniture. Wool, cotton and fish meet
+# needs that ordinary goods meet too (fibre and food), so those stay demands.
+BONUS_NEEDS = frozenset(
+    {
+        Need.IRON,
+        Need.COPPER,
+        Need.GOLD,
+        Need.DIAMONDS,
+        Need.OIL,
+        Need.SALT,
+        Need.GRAPES,
+        Need.COFFEE,
+        Need.RUBBER,
+        Need.INCENSE,
+        Need.BEER,
+        Need.NEWSPAPERS,
+        Need.FURNITURE,
+    }
+)
+
+
 @cache
 def needs_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
     """What a kind of building needs in a month in a given year."""
@@ -666,4 +694,24 @@ def needs_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
             for need, amount in NEEDS.get(kind, {}).items()
             if NEED_YEARS.get(need, 0) <= year and KIND_NEED_YEARS.get((kind, need), 0) <= year
         }
+    )
+
+
+@cache
+def bonus_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
+    """The bonus goods among what a kind of building needs in a month in a given year."""
+    needs = needs_of(kind, year)
+    bonus = {need: amount for need, amount in needs.items() if need in BONUS_NEEDS}
+    if kind in RECIPES or len(bonus) == len(needs):
+        return MappingProxyType({})
+    return MappingProxyType(bonus)
+
+
+@cache
+def demands_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
+    """What a kind of building must get in a month in a given year to be satisfied: its needs
+    that are not bonus goods."""
+    bonus = bonus_of(kind, year)
+    return MappingProxyType(
+        {need: amount for need, amount in needs_of(kind, year).items() if need not in bonus}
     )

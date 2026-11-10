@@ -1,9 +1,10 @@
 """The map grows by itself, a month at a time, like a cellular automaton, by the ladders of
 railroads.sim.ladders: towns, farms, orchards, mines, lumber mills, ports and every kind of works.
 
-A building's points count as served up to MOST_SERVED times over, by the share of what it needs
-and makes that stations handled, each at SERVED_POINT_WORTH of a doubling, so only what stations
-supply compounds. A building that finds no room in its cell spills over into a cell nearby
+A building's points count as served MOST_SERVED times over at 100% satisfaction, and by its
+satisfaction above or below that (railroads.sim.economy: what it demands and makes that stations
+handled, and its bonus goods on top), each at SERVED_POINT_WORTH of a doubling, so only what
+stations supply compounds. A building that finds no room in its cell spills over into a cell nearby
 (railroads.sim.room).
 
 On town turns, a neighbourhood with SKYSCRAPER_PEOPLE population and SKYSCRAPER_FLATS blocks of
@@ -38,6 +39,7 @@ import numpy.typing as npt
 from railroads.sim.clock import START_YEAR
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import (
+    BONUS_PER_GOOD,
     Economy,
     FloatCells,
     Trade,
@@ -190,6 +192,9 @@ class Growth:
         to every ladder's chances; returns the cells whose buildings changed."""
         changed = self._crowd_out_farms()
         self.economy.year = self.year
+        self.economy.bonus_per_good = BONUS_PER_GOOD + (
+            0.0 if self.railway is None else self.railway.research.bonus(Effect.BONUS_GOODS)
+        )
         if self._trades_anything():
             self.trade = self.economy.trade(
                 self.owners.working_counts(),
@@ -219,11 +224,11 @@ class Growth:
         served = {points: np.zeros(trade.cells.size) for points in Points}
         assumed = None if self.assumed_shares is None else self.assumed_shares[trade.cells]
         for kind in trade.got:
-            done = trade.done((kind,))
-            if not done.any() and assumed is None:
+            bonus = trade.bonus.get(kind)
+            got_any = trade.done((kind,)).any() or (bonus is not None and bonus.any())
+            if not got_any and assumed is None:
                 continue
-            wanted = trade.wanted((kind,))
-            share = done / np.where(wanted > 0, wanted, 1.0)
+            share = trade.share((kind,), empty=0.0)
             if assumed is not None:
                 share = np.where(np.isnan(assumed), share, assumed)
             points, value = self.rule.points[kind]
