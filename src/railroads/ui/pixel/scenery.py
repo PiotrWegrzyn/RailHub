@@ -1,4 +1,6 @@
-"""Everything standing on the pixel map's ground, back to front: trees, rocks, hills and mountains, and every building, station and farmstead, each with its sprite."""
+"""Everything standing on the pixel map's ground, back to front: trees, rocks, and every building,
+station and farmstead, each with its sprite, lifted with the ground under it where hills and
+mountains rise (railroads.ui.pixel.relief)."""
 
 import math
 from collections.abc import Mapping
@@ -9,11 +11,11 @@ import numpy as np
 
 from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.grids import Cell, Grid
-from railroads.sim.tilemap import Relief, Terrain, TileMap
+from railroads.sim.tilemap import Relief, TileMap
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.buildings import BuildingSpots
-from railroads.ui.pixel.art import HILL, MOUNTAIN
 from railroads.ui.pixel.projection import FloatArray, IntArray, PixelProjection, hash01
+from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import SpriteSheet
 
 # What grows on each biome: how many trees per cell (a fraction is a chance of one) and which
@@ -29,17 +31,6 @@ TREES: dict[Biome, tuple[float, tuple[str, ...]]] = {
 
 
 ROCKS_ON = (Biome.MOUNTAIN, Biome.SNOW)
-
-
-# Sprites raised on hill and mountain cells: which kind, and the chance of each of a cell's
-# places holding one.
-RELIEF_SPRITES = {
-    Relief.HILLS: (HILL, (0.55, 0.35)),
-    Relief.MOUNTAINS: (MOUNTAIN, (0.95, 0.6)),
-}
-
-
-RELIEF_SPREAD = 0.3
 
 
 ROCK_CHANCE = 0.4
@@ -156,12 +147,12 @@ def station_sprite(level: int) -> str:
 @dataclass(frozen=True)
 class Scenery:
     """Everything standing on the ground, sorted back to front: where each stands in art pixels,
-    which sprite it is, and for tinted sprites the biome whose shades colour it (else -1)."""
+    which sprite it is, and how many art pixels the ground under it is lifted."""
 
     x: IntArray
     y: IntArray
     sprite: IntArray
-    tint: IntArray
+    lift: IntArray
 
     @classmethod
     def of(
@@ -171,6 +162,7 @@ class Scenery:
         projection: PixelProjection,
         sheet: SpriteSheet,
         station_levels: Mapping[Cell, int] | None = None,
+        elevation: Elevation | None = None,
     ) -> Self:
         grid = tile_map.grid
         biomes = biome_grid(tile_map)
@@ -180,7 +172,6 @@ class Scenery:
         xs: list[FloatArray] = []
         ys: list[FloatArray] = []
         sprites: list[IntArray] = []
-        tints: list[IntArray] = []
         for biome, (per_cell, kinds) in TREES.items():
             rows, cols = np.nonzero((biomes == biome) & ~built)
             choices = np.concatenate([sheet.variants(kind) for kind in kinds])
@@ -195,20 +186,6 @@ class Scenery:
                 xs.append(x)
                 ys.append(y)
                 sprites.append(choices[np.minimum(pick, len(choices) - 1)])
-                tints.append(np.full(len(x), -1))
-        for relief, (kind, chances) in RELIEF_SPRITES.items():
-            raised = (tile_map.relief == relief) & (tile_map.terrain == Terrain.LAND) & ~built
-            rows, cols = np.nonzero(raised)
-            shapes = np.array(sheet.variants(kind))
-            for k, chance in enumerate(chances):
-                keep = hash01(rows, cols, k, 30 + relief) < chance
-                r, c = rows[keep], cols[keep]
-                x, y = _jitter(grid, r, c, 31 + 3 * relief + k, RELIEF_SPREAD)
-                xs.append(x)
-                ys.append(y)
-                pick = (hash01(r, c, k, 32 + relief) * len(shapes)).astype(np.int64)
-                sprites.append(shapes[np.minimum(pick, len(shapes) - 1)])
-                tints.append(biomes[r, c].astype(np.int64))
         rocky = np.isin(biomes, ROCKS_ON) & (tile_map.relief != Relief.MOUNTAINS)
         rows, cols = np.nonzero(rocky & ~built)
         keep = hash01(rows, cols, 3) < ROCK_CHANCE
@@ -216,7 +193,6 @@ class Scenery:
         xs.append(x)
         ys.append(y)
         sprites.append(np.full(len(x), sheet.index("rocks")))
-        tints.append(np.full(len(x), -1))
         stations = constructions.stations()
         if stations:
             rows, cols = np.array(stations).T
@@ -227,7 +203,6 @@ class Scenery:
             sprites.append(
                 np.array([sheet.index(station_sprite(levels.get(cell, 1))) for cell in stations])
             )
-            tints.append(np.full(len(stations), -1))
         spots = BuildingSpots.of(constructions)
         looks = {kind: sheet.variants(name) for kind, name in VARIED_SPRITES.items()}
         xs.append(np.asarray(spots.x, dtype=np.float64))
@@ -243,13 +218,15 @@ class Scenery:
                 dtype=np.int64,
             )
         )
-        tints.append(np.full(len(spots.kinds), -1))
         px, py = projection.to_pixels(np.concatenate(xs), np.concatenate(ys))
         px, py = np.rint(px).astype(np.int64), np.rint(py).astype(np.int64)
         sprite = np.concatenate(sprites).astype(np.int64)
-        tint = np.concatenate(tints).astype(np.int64)
+        lift = np.zeros(px.shape, dtype=np.int64)
+        if elevation is not None and px.size:
+            x, y = projection.to_plane(px, py)
+            lift = np.rint(elevation.lift(x, y)).astype(np.int64)
         order = np.lexsort((px, py))
-        return cls(px[order], py[order], sprite[order], tint[order])
+        return cls(px[order], py[order], sprite[order], lift[order])
 
     def __len__(self) -> int:
         return len(self.x)

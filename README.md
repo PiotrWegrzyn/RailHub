@@ -108,20 +108,30 @@ pixels per art pixel.
 - `railroads.ui.ground`: puts both together into the smooth ground picture.
 - `railroads.ui.buildings`: where each building stands in its share of the cell, drawn as a
   coloured dot when zoomed out.
-- `railroads.ui.pixel`: the pixel art. The ground gets a few shades per biome, dithered pixel
-  by pixel, with sandy shores, rippled water, striped fields under farms and rows of fruit trees under orchards, and every slope lit
-  from the top left by the land's real heights. Hills, mountains, trees, rocks and buildings stand
-  on it as sprites, back to front. Hills and mountain peaks are small height fields lit from the
-  left, drawn in grey in the sheet, and take the shades of the ground under them, so the same hill
-  fits grass, forest or desert; the tallest peaks keep white snow on top. The map is drawn in
-  256-pixel chunks as the view reaches them and kept as textures (`world`). Each chunk is put
-  together from the ground (`ground`), the track (`track_art`) and what stands on it (`scenery`),
-  and `projection` says where map points land in the picture. Wherever an art pixel covers
-  an even number of screen pixels (2 and 4 times, and every zoom on a Retina screen), chunks are
-  drawn twice as finely. The ground is blown up as before, but track, trees and buildings are
-  drawn at 2× from the finer sprite sheet, so their outlines and windows stay thin instead of
-  growing blocky. A chunk takes about a third longer to draw and four times the memory; nothing
-  changes from frame to frame.
+- `railroads.ui.pixel`: the pixel art.
+  - **Ground** (`ground`): soft patches of a few shades per biome, with tufts of grass, sandy
+    shores, rippled water and slopes lit from the top left by the land's real heights. Farms grow
+    potatoes, wheat or cabbages in rows behind hedges, and orchards grow rows of trees. Deposits
+    show as small signs: sheep grazing wool land, and rocks with a vein of their ore elsewhere.
+  - **Hills and mountains** (`relief`): raised ground, not sprites. Every point gets a height from
+    the map's own heights, with winding ridges and valleys carved into mountains and gentle
+    rolling ground on hills. The picture lifts each point by its height (3.2 times as tall as
+    true), so peaks stand up and hide what lies behind them. Raised ground is lit from a low sun
+    in the top left and coloured by its height above the valley and its steepness: green
+    foothills, bare rock above the treeline, and snow above a wavy snowline with rock ribs on
+    steep slopes.
+  - **Everything on the ground rises with it:** track, fields, trees, buildings, trains, the
+    planned-track preview, cell outlines, station names and reach, and the cell the mouse picks.
+  - **Chunks:** the map is drawn in 256-pixel chunks as the view reaches them and kept as textures
+    (`world`). Each chunk is put together from the ground, the track (`track_art`) and what stands
+    on it (`scenery`); `projection` says where map points land in the picture, and `noise` gives
+    the smooth randomness everything is textured with.
+  - **Fine drawing:** wherever an art pixel covers an even number of screen pixels (2 and 4 times,
+    and every zoom on a Retina screen), track, trees and buildings are drawn at 2× from the finer
+    sprite sheet, so their outlines and windows stay thin. Ground, hills and mountains are worked
+    out at 1× and blown up.
+  - **Cost:** a chunk takes about 30 ms to draw, or about 95 ms over mountains. The heights are
+    worked out once, about 0.3 s when the pixel map is first shown.
 - `railroads.ui.map_view`: the map view, which owns the layers and the order they draw in. Beside it:
   `map_input` (mouse and keys), `map_tools` (what clicks do with each build tool), `map_overlays`
   (outlines, grid lines, station names, compass, search marks, the status strip and hover card)

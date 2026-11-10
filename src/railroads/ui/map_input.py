@@ -82,7 +82,7 @@ class MapInput:
                 camera.zoom(steps, (io.mouse_pos.x, io.mouse_pos.y), center)
         view.hovered = None
         if hovered:
-            x, y = camera.to_plane(io.mouse_pos.x, io.mouse_pos.y, center)
+            x, y = view.ground_under(io.mouse_pos.x, io.mouse_pos.y, center)
             row, col = grid.cell_at(x, y)
             cell = int(row), int(col)
             if grid.contains(*cell):

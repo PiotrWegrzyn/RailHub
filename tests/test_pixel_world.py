@@ -7,9 +7,8 @@ from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Track, TrackWidth
 from railroads.sim.grids import Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
-from railroads.ui.biomes import Biome
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
-from railroads.ui.pixel.art import SPRITES, draw_sheet, relief
+from railroads.ui.pixel.art import SPRITES, draw_sheet
 from railroads.ui.pixel.layer import resolution_for
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection, hash01
 from railroads.ui.pixel.sheet import FINE, SHEET_INDEX, SpriteSheet
@@ -239,36 +238,7 @@ def make_hilly_world(sheet: SpriteSheet, rise_per_col: float = 0.0) -> PixelWorl
     return PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
 
 
-def test_hill_sprites_stand_only_on_hill_cells_tinted_by_their_biome(sheet: SpriteSheet) -> None:
-    world = make_hilly_world(sheet)
-    scenery = world.scenery
-
-    hills = np.isin(scenery.sprite, sheet.variants("hill"))
-    x, y = world.projection.to_plane(scenery.x[hills], scenery.y[hills])
-    rows, cols = world.tile_map.grid.cell_at(x, y)
-    on_hills = world.tile_map.relief[rows, cols] == Relief.HILLS
-    assert hills.sum() > 20
-    assert on_hills.mean() > 0.9
-    assert (scenery.tint[hills] >= 0).all()
-    assert (scenery.tint[~hills] == -1).all()
-
-
-def test_tinted_hills_take_the_shades_of_their_ground(sheet: SpriteSheet) -> None:
-    world = make_hilly_world(sheet)
-    hill = sheet.variants("hill")[0]
-    grass, desert = int(Biome.GRASSLAND), int(Biome.DESERT)
-
-    on_grass, on_sand = world._tinted(hill, grass), world._tinted(hill, desert)
-
-    opaque = sheet.pixels[hill][..., 3] == 1
-    grass_rgb, sand_rgb = on_grass[opaque, :3].mean(axis=0), on_sand[opaque, :3].mean(axis=0)
-    assert grass_rgb[1] > grass_rgb[0] and grass_rgb[1] > grass_rgb[2]
-    assert sand_rgb[0] > sand_rgb[2]
-
-
-def test_mountain_sprites_stand_only_on_mountain_cells_without_loose_rocks(
-    sheet: SpriteSheet,
-) -> None:
+def test_mountains_have_no_sprites_and_no_loose_rocks(sheet: SpriteSheet) -> None:
     tile_map = make_tile_map(hills_from_col=4, mountains_from_col=8)
     world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
     scenery = world.scenery
@@ -276,36 +246,9 @@ def test_mountain_sprites_stand_only_on_mountain_cells_without_loose_rocks(
     x, y = world.projection.to_plane(scenery.x, scenery.y)
     rows, cols = tile_map.grid.cell_at(x, y)
     relief = tile_map.relief[rows, cols]
-    mountains = np.isin(scenery.sprite, sheet.variants("mountain"))
     rocks = scenery.sprite == sheet.index("rocks")
-    assert mountains.sum() > 40
-    assert (relief[mountains] == Relief.MOUNTAINS).mean() > 0.9
-    assert (scenery.tint[mountains] == int(Biome.MOUNTAIN)).mean() > 0.9
+    assert sheet.variants("hill") == [] and sheet.variants("mountain") == []
     assert not (rocks & (relief == Relief.MOUNTAINS)).any()
-
-
-def test_snow_on_mountain_tops_keeps_its_colour_when_tinted(sheet: SpriteSheet) -> None:
-    world = make_hilly_world(sheet)
-    mountain = sheet.variants("mountain")[0]
-    pixels = sheet.pixels[mountain]
-    snow = (pixels[..., 3] == 1) & (pixels[..., 2] > pixels[..., 0])
-
-    tinted = world._tinted(mountain, int(Biome.DESERT))
-
-    assert snow.sum() > 5
-    np.testing.assert_allclose(tinted[snow, :3], pixels[snow, :3])
-
-
-@pytest.mark.parametrize("peaked", [False, True])
-def test_relief_sprites_are_lit_on_the_left_and_shaded_on_the_right(peaked: bool) -> None:
-    sprite = relief(28, 10, 0, peaked=peaked)
-
-    pixels = np.asarray(sprite.image, dtype=np.float64)
-    middle = sprite.anchor[0]
-    opaque, grey = pixels[..., 3] == 255, pixels[..., 0]
-    left = grey[:, :middle][opaque[:, :middle]].mean()
-    right = grey[:, middle:][opaque[:, middle:]].mean()
-    assert left > right + 20
 
 
 def test_slopes_facing_the_light_are_lighter_than_slopes_facing_away(sheet: SpriteSheet) -> None:

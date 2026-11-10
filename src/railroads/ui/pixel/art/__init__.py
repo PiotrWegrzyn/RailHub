@@ -5,10 +5,6 @@ be repainted by hand afterwards; the game only ever reads the PNG. Sprites are d
 pixels wide, seen from the fixed view angle, with light from the top left. Each one stands on an
 anchor: the point that sits on the ground where the thing is.
 
-Hills and mountains are drawn in TINT_GREYS and coloured with the shades of the ground they stand
-on when the map is drawn, so one hill fits grass, forest, desert or snow alike. Only pure greys
-are recoloured.
-
 Each family of sprites has its own module; the Painter they draw with is in painter, and pieces
 several families share are in parts. This module lists them all (SPRITES) and packs the sheet.
 """
@@ -95,19 +91,14 @@ from railroads.ui.pixel.art.mines import (
     sand_pit,
     shaft_mine,
 )
-from railroads.ui.pixel.art.nature import leafy, pine, relief, rocks
+from railroads.ui.pixel.art.nature import leafy, pine, rocks
 from railroads.ui.pixel.art.painter import (
     FLAT_WALLS,
-    HILL,
-    HILL_SIZES,
     LEAVES,
-    MOUNTAIN,
-    MOUNTAIN_SIZES,
     PINES,
     ROOFS,
     TENEMENT_ROOFS,
     TENEMENT_WALLS,
-    TINT_GREYS,
     WALLS,
     Painter,
     Sprite,
@@ -117,16 +108,12 @@ from railroads.ui.pixel.art.painter import (
 from railroads.ui.pixel.art.stations import station, station_2, station_3
 
 __all__ = [
-    "HILL",
-    "MOUNTAIN",
     "SPRITES",
-    "TINT_GREYS",
     "Painter",
     "Sprite",
     "draw_sheet",
     "drawn_at",
     "fine_sprite",
-    "relief",
     "shade",
     "shrink",
 ]
@@ -240,14 +227,6 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     **{f"pine_{i}": (lambda c=c: pine(c)) for i, c in enumerate(PINES)},
     **{f"leafy_{i}": (lambda c=c: leafy(c)) for i, c in enumerate(LEAVES)},
     "rocks": rocks,
-    **{
-        f"{HILL}_{i}": (lambda w=w, h=h, i=i: relief(w, h, i, peaked=False))
-        for i, (w, h) in enumerate(HILL_SIZES)
-    },
-    **{
-        f"{MOUNTAIN}_{i}": (lambda w=w, h=h, i=i: relief(w, h, 100 + i, peaked=True))
-        for i, (w, h) in enumerate(MOUNTAIN_SIZES)
-    },
     **{f"house_{i}": (lambda w=WALLS[i % 3], r=ROOFS[i % 4]: house(w, r)) for i in range(12)},
     **{
         f"tenement_{i}": (lambda w=w, r=TENEMENT_ROOFS[i % 2]: tenement(w, r))
@@ -369,12 +348,7 @@ def _scale_of(name: str) -> float:
 
 def fine_sprite(name: str, resolution: int) -> Sprite:
     """A sprite drawn at `resolution` pixels for every art pixel of the map, at its size on the
-    map. Hills and mountains are not drawn with a Painter, so they are blown up instead."""
-    if name.startswith((HILL, MOUNTAIN)):
-        sprite = SPRITES[name]()
-        w, h = sprite.image.size
-        big = sprite.image.resize((w * resolution, h * resolution), Image.Resampling.NEAREST)
-        return Sprite(big, (sprite.anchor[0] * resolution, sprite.anchor[1] * resolution))
+    map."""
     with drawn_at(_scale_of(name) * resolution):
         return SPRITES[name]()
 

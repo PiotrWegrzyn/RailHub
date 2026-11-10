@@ -1,6 +1,7 @@
 """Shows trains as pixel art over the pixel map: each engine, tender and car drawn from the train
 sprite sheet (railroads.ui.pixel.trains), turned to the track, lined up on the map's own art
-pixels, with puffs of smoke from the chimney."""
+pixels and lifted with the ground where hills and mountains rise, with puffs of smoke from the
+chimney."""
 
 import math
 
@@ -47,16 +48,21 @@ class TrainLayer:
         texture, _ = self._texture(scale * density)
         height, width = self.sprites.image.shape[:2]
         per_pixel = scale / DETAIL
-        parts = []
+        found = []
         for train in railway.trains:
             for look, back in self._parts(train):
                 placed = railway.position(train, back)
-                if placed is None:
-                    continue
-                (x, y), (dx, dy) = placed
-                ax, ay = projection.to_pixels(x, y)
-                sx = origin[0] + round(float(ax) * DETAIL) * per_pixel
-                sy = origin[1] + round(float(ay) * DETAIL) * per_pixel
+                if placed is not None:
+                    found.append((placed, look))
+        parts = []
+        if found:
+            xs = np.array([placed[0][0] for placed, _ in found])
+            ys = np.array([placed[0][1] for placed, _ in found])
+            ax, ay = projection.to_pixels(xs, ys)
+            ay = ay - self.world.elevation.lift(xs, ys)
+            for k, (((_, _), (dx, dy)), look) in enumerate(found):
+                sx = origin[0] + round(float(ax[k]) * DETAIL) * per_pixel
+                sy = origin[1] + round(float(ay[k]) * DETAIL) * per_pixel
                 parts.append((sy, sx, look, math.atan2(dy, dx)))
         parts.sort(key=lambda part: part[0])
         ref = imgui.ImTextureRef(texture.texture_id())
@@ -107,6 +113,7 @@ class TrainLayer:
         if placed is None:
             return
         (x, y), (dx, dy) = placed
+        lift = float(self.world.elevation.lift(x, y))
         length = math.hypot(dx, dy) or 1.0
         ux, uy = dx / length, dy / length
         up = float(np.hypot(*projection.matrix[:, 0])) * HEIGHT_PER_WIDTH
@@ -116,7 +123,7 @@ class TrainLayer:
             px, py = x - ux * age * 0.5, y - uy * age * 0.5
             ax, ay = projection.to_pixels(px, py)
             sx = origin[0] + float(ax) * scale
-            sy = origin[1] + (float(ay) - (chimney[1] + age * 0.35) * up) * scale
+            sy = origin[1] + (float(ay) - lift - (chimney[1] + age * 0.35) * up) * scale
             radius = (1.5 + age * 4.0) * scale
             alpha = 0.75 * (1 - age)
             color = imgui.color_convert_float4_to_u32(imgui.ImVec4(*SMOKE, alpha))

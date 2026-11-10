@@ -10,23 +10,6 @@ type RGB = tuple[int, int, int]
 
 type Point = tuple[float, float]
 
-# Greys of tinted sprites, standing for: outline, the ground's four shades dark to light, and a
-# highlight above the lightest shade.
-TINT_GREYS = (0, 51, 102, 153, 204, 255)
-
-HILL = "hill"
-
-MOUNTAIN = "mountain"
-
-# Width and height in pixels of each hill and mountain sprite.
-HILL_SIZES = [(20, 5), (17, 4), (14, 4), (12, 3)]
-
-MOUNTAIN_SIZES = [(32, 13), (28, 12), (26, 10), (22, 9)]
-
-SNOW_LIT: RGB = (238, 242, 250)
-
-SNOW_SHADE: RGB = (184, 196, 218)
-
 SHADOW = (0, 0, 0, 72)
 
 TRUNK: RGB = (88, 60, 38)

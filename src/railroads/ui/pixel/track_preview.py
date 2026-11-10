@@ -1,6 +1,7 @@
 """Shows track the player is about to lay as the real track would look, greyed out, over the pixel
 map: the planned pieces drawn like laid track (railroads.ui.pixel.track_art) into a picture of just the
-area they cover, as finely as the map's chunks are drawn, faded to grey and see-through."""
+area they cover, as finely as the map's chunks are drawn and lifted with the ground where hills and
+mountains rise, faded to grey and see-through."""
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
@@ -9,6 +10,7 @@ from railroads.sim.constructions import Track
 from railroads.sim.routes import Route
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, IsoCamera, Vec2
 from railroads.ui.pixel.layer import resolution_for
+from railroads.ui.pixel.relief import MOST_LIFT
 from railroads.ui.pixel.world import PixelWorld
 
 # How much of the track's own colour is kept, and the greys its darkest and lightest parts fade
@@ -73,7 +75,8 @@ class TrackPreview:
         left, top = int(np.min(xs)) - reach, int(np.min(ys)) - reach
         width, height = int(np.max(xs)) + reach - left, int(np.max(ys)) + reach - top
         resolution = resolution_for(device_scale, self.world.resolutions)
-        pixels = ghost(self.world.track.layer(pieces, left, top, width, height, resolution))
+        layer = self.world.track.layer(pieces, left, top, width, height + MOST_LIFT, resolution)
+        pixels = ghost(self.world.raised(layer, left, top, width, height, resolution))
         most = int((MOST_PIXELS / max(width * height * resolution**2, 1)) ** 0.5)
         factor = max(1, min(device_scale // resolution, most))
         big = np.repeat(np.repeat(pixels, factor, axis=0), factor, axis=1)

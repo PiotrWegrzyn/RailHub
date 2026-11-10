@@ -23,19 +23,15 @@ from railroads.sim.constructions import Constructions
 from railroads.sim.grids import Cell
 from railroads.sim.tilemap import TileMap
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
-from railroads.ui.pixel.art import TINT_GREYS
 from railroads.ui.pixel.ground import Ground
 from railroads.ui.pixel.projection import CHUNK, FloatArray, IntArray, PixelProjection, Rgba
+from railroads.ui.pixel.relief import MOST_LIFT, Elevation, raise_picture, raycast
 from railroads.ui.pixel.scenery import Scenery
 from railroads.ui.pixel.sheet import FINE, SpriteSheet
 from railroads.ui.pixel.track_art import TrackArt
 
 # How far in art pixels a sprite can reach from where it stands.
 SPRITE_REACH = 48
-# How much darker a tinted sprite's outline is than the darkest shade of its ground, and how much
-# lighter its highlight than the lightest.
-TINT_OUTLINE = 0.72
-TINT_HIGHLIGHT = 1.12
 
 
 class PixelWorld:
@@ -56,9 +52,13 @@ class PixelWorld:
         self.projection = PixelProjection.of(tile_map.grid, angle_deg, cell_units)
         # Each station's level (railroads.sim.railway), which picks how grand it looks.
         self.station_levels: Mapping[Cell, int] = {}
-        self.scenery = Scenery.of(tile_map, constructions, self.projection, sheet)
+        # The height of every point, which raises hills and mountains (railroads.ui.pixel.relief).
+        self.elevation = Elevation(tile_map, self.projection)
+        self.scenery = Scenery.of(
+            tile_map, constructions, self.projection, sheet, elevation=self.elevation
+        )
         # The ground and the track over it (railroads.ui.pixel.ground, railroads.ui.pixel.track_art).
-        self.ground = Ground(tile_map, constructions, self.projection, angle_deg)
+        self.ground = Ground(tile_map, constructions, self.projection, angle_deg, self.elevation)
         self.track = TrackArt(tile_map, constructions, self.projection)
         # The sprites at each resolution chunks can be drawn at: the sheet, and the same sprites
         # drawn finer if there are any.
@@ -67,7 +67,6 @@ class PixelWorld:
             if fine.names != sheet.names:
                 raise ValueError("The fine sprite sheet must hold the same sprites in order")
             self._sprites[FINE] = _Sprites.of(fine)
-        self._tints: dict[tuple[int, int, int], npt.NDArray[np.float32]] = {}
 
     @property
     def satisfaction(self) -> npt.NDArray[np.int8]:
@@ -88,7 +87,12 @@ class PixelWorld:
         returns the chunks that look different now."""
         self.ground.refresh()
         self.scenery = Scenery.of(
-            self.tile_map, self.constructions, self.projection, self.sheet, self.station_levels
+            self.tile_map,
+            self.constructions,
+            self.projection,
+            self.sheet,
+            self.station_levels,
+            self.elevation,
         )
         return self._chunks_around(cells)
 
@@ -104,7 +108,7 @@ class PixelWorld:
             return set()
         rows, cols = np.array(cells).T
         px, py = self.projection.to_pixels(*self.tile_map.grid.center(rows, cols))
-        reach = PIXEL_CELL_WIDTH + SPRITE_REACH
+        reach = PIXEL_CELL_WIDTH + SPRITE_REACH + MOST_LIFT
         chunks: set[tuple[int, int]] = set()
         for x, y in zip(px.tolist(), py.tolist(), strict=True):
             for cx in range(int((x - reach) // CHUNK), int((x + reach) // CHUNK) + 1):
@@ -115,13 +119,19 @@ class PixelWorld:
     def render(self, chunk_x: int, chunk_y: int, resolution: int = 1) -> Rgba:
         """One chunk as RGBA pixels, `resolution` of them for every art pixel each way; off the
         map it is clear. Above 1 the ground is blown up and the track and everything standing
-        on it are drawn that much finer."""
+        on it are drawn that much finer. Where hills and mountains rise, the ground with its
+        track is lifted, so the chunk shows ground from below it too."""
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
-        rgb, alpha = self.ground.render(left, top)
+        raised = self.elevation.area(left, top, CHUNK, CHUNK + MOST_LIFT)
+        offset = None if raised is None else raycast(raised.lift, CHUNK, CHUNK)
+        rows = CHUNK if offset is None else CHUNK + int(offset.max()) + 1
+        rgb, alpha = self.ground.render(left, top, rows, raised)
         canvas = np.concatenate([rgb / 255, alpha[..., None]], axis=-1)
         if resolution > 1:
             canvas = canvas.repeat(resolution, axis=0).repeat(resolution, axis=1)
         self._lay_track(canvas, left, top, resolution)
+        if offset is not None:
+            canvas = raise_picture(canvas, offset, resolution)
         self._stand_scenery(canvas, left, top, resolution)
         alpha = canvas[..., 3:]
         canvas[..., :3] /= np.maximum(alpha, 1e-6)
@@ -132,40 +142,30 @@ class PixelWorld:
         pieces = self.constructions.track()
         if not pieces:
             return
-        track = self.track.layer(pieces, left, top, CHUNK, CHUNK, resolution)
+        rows = canvas.shape[0] // resolution
+        track = self.track.layer(pieces, left, top, CHUNK, rows, resolution)
         alpha = track[..., 3:] * (canvas[..., 3:] > 0)
         canvas[..., :3] = canvas[..., :3] * (1 - alpha) + track[..., :3] * alpha
 
     def _stand_scenery(self, canvas: FloatArray, left: int, top: int, resolution: int) -> None:
         scenery, drawn, k = self.scenery, self._sprites[resolution], resolution
         x0 = (scenery.x - left) * k - drawn.anchors[scenery.sprite, 0]
-        y0 = (scenery.y - top) * k - drawn.anchors[scenery.sprite, 1]
+        y0 = (scenery.y - scenery.lift - top) * k - drawn.anchors[scenery.sprite, 1]
         w, h = drawn.sizes[scenery.sprite, 0], drawn.sizes[scenery.sprite, 1]
         span = CHUNK * k
         overlapping = (x0 < span) & (x0 + w > 0) & (y0 < span) & (y0 + h > 0)
         for i in np.flatnonzero(overlapping).tolist():
-            sprite, tint = int(scenery.sprite[i]), int(scenery.tint[i])
-            pixels = (
-                drawn.premultiplied[sprite] if tint < 0 else self._tinted(sprite, tint, resolution)
-            )
-            _blend(canvas, pixels, int(x0[i]), int(y0[i]))
+            _blend(canvas, drawn.premultiplied[int(scenery.sprite[i])], int(x0[i]), int(y0[i]))
 
-    def _tinted(self, sprite: int, biome: int, resolution: int = 1) -> npt.NDArray[np.float32]:
-        """A sprite with its pure greys coloured with a biome's shades, premultiplied."""
-        key = (sprite, biome, resolution)
-        if key not in self._tints:
-            ramp = self.ground.ramps[biome]
-            colors = np.vstack([ramp[0] * TINT_OUTLINE, ramp, ramp[3] * TINT_HIGHLIGHT]) / 255
-            pixels = self._sprites[resolution].pixels[sprite].copy()
-            grey = (pixels[..., 3] == 1) & (pixels[..., 0] == pixels[..., 1])
-            grey &= pixels[..., 1] == pixels[..., 2]
-            levels = np.rint(pixels[..., 0] * 255).astype(np.int64)
-            level = np.abs(levels[..., None] - np.array(TINT_GREYS)).argmin(axis=-1)
-            pixels[grey, :3] = np.clip(colors[level[grey]], 0, 1)
-            self._tints[key] = np.concatenate(
-                [pixels[..., :3] * pixels[..., 3:], pixels[..., 3:]], axis=-1
-            )
-        return self._tints[key]
+    def raised(
+        self, picture: FloatArray, left: int, top: int, width: int, height: int, resolution: int
+    ) -> FloatArray:
+        """A picture of track or other marks on the ground over `width` by `height` art pixels
+        from (`left`, `top`), lifted with the ground: `picture` covers MOST_LIFT more rows."""
+        raised = self.elevation.area(left, top, width, height + MOST_LIFT)
+        if raised is None:
+            return picture[: height * resolution]
+        return raise_picture(picture, raycast(raised.lift, height, width), resolution)
 
 
 @dataclass(frozen=True)

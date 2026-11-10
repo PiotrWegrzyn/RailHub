@@ -16,6 +16,7 @@ from railroads.sim.constructions import (
     Station,
 )
 from railroads.sim.game import Game
+from railroads.sim.geo import Coord
 from railroads.sim.grids import Cell, GridKind
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
@@ -49,6 +50,7 @@ from railroads.ui.map_tools import MapTools
 from railroads.ui.minimap import Minimap, MinimapLayout, view_corners
 from railroads.ui.pixel.ground import GLOW, glow_strength
 from railroads.ui.pixel.layer import PixelLayer
+from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.track_preview import TrackPreview
 from railroads.ui.pixel.train_layer import TrainLayer
@@ -102,6 +104,25 @@ def _sprite_sheet() -> SpriteSheet:
 @cache
 def _fine_sprite_sheet() -> SpriteSheet:
     return SpriteSheet.load_fine()
+
+
+class OnGround:
+    """A camera that puts map points on the raised ground of the pixel map: like the camera it
+    stands for, but each point lifted by the ground under it (railroads.ui.pixel.relief)."""
+
+    def __init__(self, camera: IsoCamera, elevation: Elevation) -> None:
+        self._camera = camera
+        self._elevation = elevation
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._camera, name)
+
+    def to_screen(self, x: Coord, y: Coord, screen_center: Vec2) -> tuple[Coord, Coord]:
+        sx, sy = self._camera.to_screen(x, y, screen_center)
+        lift = self._elevation.lift(x, y) * self._camera.pixel_scale
+        if np.ndim(lift) == 0:
+            return float(sx), float(sy - lift)
+        return sx, sy - lift
 
 
 class MapView:
@@ -317,17 +338,18 @@ class MapView:
                 draw_track(
                     draw_list, self.constructions, self.camera, center, self.build.preview.pieces
                 )
+        marks = self._marks_camera()
         if self.build.track_from is not None:
             draw_outline(
                 draw_list,
-                self.camera,
+                marks,
                 self.tile_map.grid,
                 center,
                 self.build.track_from,
                 SELECTED_COLOR,
             )
         if self.hovered is not None:
-            draw_outline(draw_list, self.camera, self.tile_map.grid, center, self.hovered)
+            draw_outline(draw_list, marks, self.tile_map.grid, center, self.hovered)
             hovering_station = any(
                 isinstance(built, Station) for built in self.constructions.at(self.hovered)
             )
@@ -338,7 +360,7 @@ class MapView:
                     self.tile_map.grid,
                     self.hovered,
                     stations,
-                    self.camera,
+                    marks,
                     center,
                     self.railway.reach,
                 )
@@ -355,18 +377,18 @@ class MapView:
             and self.build.tool != Tool.STATION
         ):
             draw_station_reach(
-                draw_list, self.tile_map.grid, opened, [], self.camera, center, self.railway.reach
+                draw_list, self.tile_map.grid, opened, [], marks, center, self.railway.reach
             )
         if self.selected is not None:
             draw_outline(
-                draw_list, self.camera, self.tile_map.grid, center, self.selected, SELECTED_COLOR
+                draw_list, marks, self.tile_map.grid, center, self.selected, SELECTED_COLOR
             )
         for cell in self.summaries.outlined():
-            draw_outline(draw_list, self.camera, self.tile_map.grid, center, cell, BRASS)
+            draw_outline(draw_list, marks, self.tile_map.grid, center, cell, BRASS)
         draw_found(
-            draw_list, self.camera, self.tile_map.grid, self.search, center, top_left, bottom_right
+            draw_list, marks, self.tile_map.grid, self.search, center, top_left, bottom_right
         )
-        draw_station_names(draw_list, self.camera, self.tile_map.grid, self.railway, center)
+        draw_station_names(draw_list, marks, self.tile_map.grid, self.railway, center)
         draw_compass(draw_list, self.camera, (bottom_right[0] - 36, top_left[1] + 36))
         self._draw_status(draw_list, top_left, bottom_right)
         if minimap is not None:
@@ -389,6 +411,21 @@ class MapView:
             visible = visible_area(self.camera, center, top_left, bottom_right)
             draw_grid_lines(draw_list, self.camera, self.tile_map.grid, center, visible)
         draw_building_dots(draw_list, self.camera, center, (top_left, bottom_right), self._spots)
+
+    def _marks_camera(self) -> IsoCamera | OnGround:
+        """The camera marks on the map are drawn with: lifted onto raised ground in pixel art."""
+        if not self.camera.pixel_scale:
+            return self.camera
+        return OnGround(self.camera, self._pixel_layer().world.elevation)
+
+    def ground_under(self, screen_x: float, screen_y: float, center: Vec2) -> tuple[float, float]:
+        """The map point showing at a spot on screen, on raised ground where it rises."""
+        x, y = self.camera.to_plane(screen_x, screen_y, center)
+        if not self.camera.pixel_scale:
+            return x, y
+        world = self._pixel_layer().world
+        px, py = world.projection.to_pixels(x, y)
+        return world.elevation.ground_at(float(px), float(py))
 
     def _draw_status(self, draw_list: imgui.ImDrawList, top_left: Vec2, bottom_right: Vec2) -> None:
         """What is under the mouse, in a strip along the top of the map, and the card of the
