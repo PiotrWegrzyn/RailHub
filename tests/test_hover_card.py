@@ -5,6 +5,7 @@ import pytest
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
+from railroads.sim.game import Game
 from railroads.sim.geo import Bounds
 from railroads.sim.goods import Good, Need
 from railroads.sim.grids import HexGrid
@@ -47,7 +48,7 @@ def test_the_card_lists_each_building_with_what_it_makes_and_needs(
     constructions = Constructions(make_map())
     constructions.build(Building((5, 5), BuildingKind.HOUSE))
     constructions.build(Building((5, 5), BuildingKind.BAKERY))
-    view = MapView(constructions.tile_map, constructions)
+    view = MapView(Game(constructions))
     view._hovered = (5, 5)
     drawn: list[Good | Need] = []
     monkeypatch.setattr(map_view, "good_icon", lambda good, **_: drawn.append(good))
@@ -62,7 +63,7 @@ def test_the_card_lists_each_building_with_what_it_makes_and_needs(
 def test_a_left_click_on_a_station_opens_it() -> None:
     constructions = Constructions(make_map())
     constructions.build(Station((5, 5)))
-    view = MapView(constructions.tile_map, constructions)
+    view = MapView(Game(constructions))
 
     view._click((5, 5))
 

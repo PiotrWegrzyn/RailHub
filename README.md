@@ -58,6 +58,22 @@ uv run ruff check
 `src/railroads/mapgen` turns map data into a map. `src/railroads/ui` draws the game with
 Dear ImGui (imgui-bundle).
 
+`railroads.sim.game` holds one game: the buildings, the growing towns, the railway, the money and
+the yearly history. It runs each month and every player action: building a station, laying
+track, bulldozing and moving a station. Each action checks the price, pays it and returns what
+to tell the player, so the map view only passes on clicks and shows the answer.
+
+To check that a refactor changed nothing the game works out, run the fingerprint before and after
+it; every line must match:
+
+```bash
+uv run python tools/fingerprint.py
+```
+
+It grows a seeded map of Poland and builds and plays on it through the map view's own clicks.
+Then it hashes the buildings, money, trains, goods, history, messages, rendered chunks and
+planned routes.
+
 ## Maps
 
 A map is a grid of hexagon cells (the grids can also be squares, which the game no longer uses),

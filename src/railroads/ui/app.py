@@ -16,6 +16,7 @@ from railroads.sim.clock import (
     START_YEAR,
     GameClock,
 )
+from railroads.sim.game import Game, place_names
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
 from railroads.sim.novelties import Novelties
 from railroads.sim.stats import History
@@ -146,8 +147,9 @@ def main() -> None:
     print(f"Growing towns for {months // 12} years, from {HISTORY_START} to {begins}")
     history = History()
     seeded = seed_buildings(tile_map, np.random.default_rng(seed), months=months, history=history)
-    view = MapView(seeded.tile_map, seeded, start_year=begins, history=history)
-    view.growth.novelties = Novelties.pick(view.tile_map, np.random.default_rng(seed + 3))
+    game = Game(seeded, start_year=begins, history=history, names=place_names(seeded.tile_map))
+    game.growth.novelties = Novelties.pick(game.tile_map, np.random.default_rng(seed + 3))
+    view = MapView(game)
     if args.simulate is not None:
         years = min(args.simulate, END_YEAR - begins)
         print(f"Playing {years} years with a stand-in player")

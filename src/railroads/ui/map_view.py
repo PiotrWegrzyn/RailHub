@@ -14,9 +14,6 @@ from imgui_bundle import icons_fontawesome_4 as fa
 
 from railroads import maps
 from railroads.mapgen.world import WorldLand
-from railroads.places import Places, StationNames
-from railroads.sim.autoplay import StandInPlayer, play
-from railroads.sim.clock import START_YEAR
 from railroads.sim.constructions import (
     Building,
     Construction,
@@ -24,15 +21,14 @@ from railroads.sim.constructions import (
     Station,
     Track,
 )
-from railroads.sim.demolition import bulldoze, bulldoze_price, station_site_price
+from railroads.sim.demolition import bulldoze_price, station_site_price
 from railroads.sim.economy import Satisfaction
 from railroads.sim.finance import STATION_PRICE, dollars
+from railroads.sim.game import Game
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, GridKind
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
-from railroads.sim.routes import build_station, lay_route, move_station, plan_route, route_price
-from railroads.sim.stats import History
-from railroads.sim.summaries import Reach, snapshot, summarize
+from railroads.sim.routes import plan_route, route_price
 from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.biomes import biome_of
@@ -153,17 +149,9 @@ def _key_pressed(*keys: imgui.Key) -> bool:
 
 
 class MapView:
-    def __init__(
-        self,
-        tile_map: TileMap,
-        constructions: Constructions | None = None,
-        world: WorldLand | None = None,
-        start_year: int = START_YEAR,
-        history: History | None = None,
-    ) -> None:
-        self.tile_map = tile_map
-        self.constructions = Constructions(tile_map) if constructions is None else constructions
-        self.growth = Growth(self.constructions, start_year=start_year, history=history)
+    def __init__(self, game: Game, world: WorldLand | None = None) -> None:
+        self.game = game
+        tile_map = game.tile_map
         self._satisfaction = self.growth.satisfaction()
         self.minimap = Minimap(
             tile_map, maps.world_land() if world is None else world, self._town_cells()
@@ -186,13 +174,6 @@ class MapView:
         # The cell whose details are open, picked by clicking without dragging.
         self.selected: Cell | None = None
         self.build = BuildMenu()
-        names = StationNames(self.tile_map, Places.load(self.tile_map.bounds))
-        self.railway = Railway(self.constructions, names=names)
-        self.railway.year = start_year
-        self.railway.history = self.growth.history
-        self.growth.railway = self.railway
-        # Plays in the player's place in a simulated game (railroads.sim.autoplay).
-        self.stand_in: StandInPlayer | None = None
         # What came of the last Buy pressed in the hex details.
         self._bought = ""
         # The station levels the map shows, to redraw stations raised since.
@@ -210,7 +191,22 @@ class MapView:
         self.summaries = SummariesPanel()
         self.station_window = StationWindow()
         self.search = BuildingSearch()
-        self._reach = Reach(self.tile_map.grid)
+
+    @property
+    def tile_map(self) -> TileMap:
+        return self.game.tile_map
+
+    @property
+    def constructions(self) -> Constructions:
+        return self.game.constructions
+
+    @property
+    def growth(self) -> Growth:
+        return self.game.growth
+
+    @property
+    def railway(self) -> Railway:
+        return self.game.railway
 
     def gui(self) -> None:
         if self.railway.levels != self._shown_levels:
@@ -260,7 +256,7 @@ class MapView:
 
     def time_passed(self, months: float) -> None:
         """Moves the trains on by this much of a month."""
-        self.railway.run(months)
+        self.game.time_passed(months)
 
     def _draw_details(self) -> None:
         if self.selected is None:
@@ -280,16 +276,11 @@ class MapView:
             self._bought = ""
 
     def month_passed(self, rng: np.random.Generator, date: str = "") -> None:
-        """Grows the towns by a month, shows what changed, and sums up what changed within
-        reach of the stations."""
-        reach = self._reach.of(self.railway.stations(), lambda s: self.railway.reach(s)[1])
-        before = snapshot(self.growth, reach)
-        if self.stand_in is None:
-            changed = self.growth.month(rng)
-        else:
-            changed = self.stand_in.month(rng)
-        if (summary := summarize(date, self.growth, reach, before)) is not None:
-            self.summaries.add(summary)
+        """Lets a month of the game pass and shows what changed."""
+        month = self.game.month(rng, date)
+        changed = month.changed
+        if month.summary is not None:
+            self.summaries.add(month.summary)
         satisfaction = self.growth.satisfaction()
         moods_changed = not np.array_equal(satisfaction, self._satisfaction)
         self._satisfaction = satisfaction
@@ -714,27 +705,10 @@ class MapView:
                 if any(isinstance(built, Station) for built in self.constructions.at(cell)):
                     self.open_station(cell)
             case Tool.STATION:
-                finances = self.railway.finances
-                site = station_site_price(self.constructions, cell)
-                if site is None:
-                    build.say("A station can't go there.")
-                    return
-                if not finances.can_afford(STATION_PRICE + site):
-                    build.say(
-                        f"This station costs {dollars(STATION_PRICE + site)}; "
-                        f"you have {dollars(finances.cash)}."
-                    )
-                    return
-                changed = build_station(self.growth, cell)
-                if not changed:
-                    build.say("A station can't go there.")
-                    return
-                finances.spend(STATION_PRICE, "stations")
-                if site:
-                    finances.spend(site, "demolition")
-                build.say(f"Station built for {dollars(STATION_PRICE + site)}.")
-                self.growth.measure_demand(cell)
-                self._buildings_changed(changed)
+                done = self.game.build_station(cell)
+                build.say(done.message)
+                if done.ok:
+                    self._buildings_changed(done.changed)
             case Tool.BULLDOZE:
                 self._bulldoze(cell)
             case Tool.MOVE_STATION:
@@ -744,69 +718,37 @@ class MapView:
                     build.track_from = cell
                     build.say("Now click where the track goes.")
                     return
-                route = plan_route(
-                    self.constructions, build.track_from, cell, build.track_width, build.electric
+                done = self.game.lay_track(
+                    build.track_from, cell, build.track_width, build.electric
                 )
-                if route is None:
-                    build.say("No way for track to get there.")
+                build.say(done.message)
+                if not done.ok:
                     return
-                laid = len(route.changes(self.constructions))
-                price = route_price(self.constructions, route)
-                finances = self.railway.finances
-                if not finances.can_afford(price):
-                    build.say(
-                        f"This track costs {dollars(price)}; you have {dollars(finances.cash)}."
-                    )
-                    return
-                self._buildings_changed(lay_route(self.growth, route))
-                finances.spend(price, "track")
-                build.say(
-                    f"Laid {laid} pieces of track for {dollars(price)}."
-                    if laid
-                    else "That track is laid already."
-                )
+                self._buildings_changed(done.changed)
                 build.track_from = cell
                 build.preview, build.preview_to = None, None
 
     def _bulldoze(self, cell: Cell) -> None:
-        build, finances = self.build, self.railway.finances
-        price = bulldoze_price(self.constructions, cell)
-        if price is None:
-            build.say("Nothing here can be cleared.")
+        done = self.game.bulldoze(cell)
+        self.build.say(done.message)
+        if not done.ok:
             return
-        if not finances.can_afford(price):
-            build.say(f"Clearing this costs {dollars(price)}; you have {dollars(finances.cash)}.")
-            return
-        changed = bulldoze(self.growth, cell)
-        finances.spend(price, "demolition")
-        build.say(f"Cleared for {dollars(price)}.")
         if self.station_window.station == cell:
             self.station_window.station = None
-        self._buildings_changed(changed)
+        self._buildings_changed(done.changed)
 
     def _move_station(self, cell: Cell) -> None:
-        build, finances = self.build, self.railway.finances
-        old = build.moving
-        site = station_site_price(self.constructions, cell)
-        if old is None or site is None:
+        build = self.build
+        if build.moving is None:
             build.say("The station can't go there.")
             return
-        price = STATION_PRICE + site
-        if not finances.can_afford(price):
-            build.say(f"Moving it there costs {dollars(price)}; you have {dollars(finances.cash)}.")
+        done = self.game.move_station(build.moving, cell)
+        build.say(done.message)
+        if not done.ok:
             return
-        changed = move_station(self.growth, self.railway, old, cell)
-        if changed is None:
-            build.say("The station can't go there.")
-            return
-        finances.spend(STATION_PRICE, "stations")
-        if site:
-            finances.spend(site, "demolition")
-        build.say(f"Station moved for {dollars(price)}.")
         build.choose(Tool.NONE)
         self.station_window.station = cell
-        self.growth.measure_demand(cell)
-        self._buildings_changed(changed)
+        self._buildings_changed(done.changed)
 
     def start_moving(self, station: Cell) -> None:
         """Lets the next click choose where a station goes."""
@@ -858,7 +800,7 @@ class MapView:
     def simulate(self, years: int, rng: np.random.Generator) -> None:
         """Lets a stand-in player build stations and serve the towns for `years`, printing the
         map every ten years, and goes on playing for the player from there."""
-        self.stand_in = play(self.growth, self.railway, years, rng)
+        self.game.simulate(years, rng)
         self._satisfaction = self.growth.satisfaction()
         self._buildings_changed(set())
 
