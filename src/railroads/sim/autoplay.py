@@ -141,10 +141,10 @@ class StandInPlayer:
         cells, as experience too, since no trains run."""
         growth = self.growth
         served = self._served()
-        for kind in growth.owned_kinds():
+        for kind in growth.owners.kinds():
             tree = tree_of(kind)
-            sold = float((growth.owned(kind) * served).sum()) * self._monthly_worth(kind)
-            earned = sold * growth.owner_share(kind) * growth.output_factor(kind)
+            sold = float((growth.owners.owned(kind) * served).sum()) * self._monthly_worth(kind)
+            earned = sold * growth.owners.share(kind) * growth.owners.output_factor(kind)
             if earned <= 0:
                 continue
             self.railway.finances.earn(earned, "owned buildings")
@@ -157,18 +157,18 @@ class StandInPlayer:
         served = self._served()
         offers = []
         for kind in growth.rule.points:
-            price = growth.price_to_buy(kind)
+            price = growth.owners.price_to_buy(kind)
             if not price:
                 continue
-            left = growth.count(kind) - growth.owned(kind)
+            left = growth.count(kind) - growth.owners.owned(kind)
             for row, col in np.argwhere(left > 0).tolist():
-                if (row, col) in growth.in_reach and served[row, col] > 0:
+                if (row, col) in growth.station_trade.in_reach and served[row, col] > 0:
                     worth = self._monthly_worth(kind) * served[row, col]
                     offers.append((worth / price, (row, col), kind, price))
         offers.sort(key=lambda offer: -offer[0])
         for _, cell, kind, price in offers[: self.rule.buys_per_year]:
             self.railway.finances.spend(price, "buildings bought")
-            growth.own(cell, kind)
+            growth.owners.own(cell, kind)
 
     def _learn(self) -> None:
         """Spends every point on the first node of its tree that can be taken."""

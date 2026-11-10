@@ -267,7 +267,9 @@ class MapView:
         if expanded:
             bought = draw_hex_details(describe(self.growth, self.selected))
             if bought is not None:
-                self._bought = self.growth.buy(self.selected, bought) or f"You own a {bought.value}"
+                self._bought = (
+                    self.growth.owners.buy(self.selected, bought) or f"You own a {bought.value}"
+                )
             if self._bought:
                 imgui.text_disabled(self._bought)
         imgui.end()

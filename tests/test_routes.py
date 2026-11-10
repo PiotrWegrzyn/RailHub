@@ -116,7 +116,7 @@ def test_laying_track_moves_buildings_aside_or_pulls_down_the_lowest() -> None:
     constructions.build(Building((6, 5), BuildingKind.FLATS))
     growth = Growth(constructions, NO_TRADE)
 
-    changed = growth.clear_room((6, 5), 1)
+    changed = growth.room.clear((6, 5), 1)
 
     houses_here = sum(1 for b in constructions.at((6, 5)) if b.kind == BuildingKind.HOUSE)
     houses = sum(
@@ -137,7 +137,7 @@ def test_with_nowhere_to_move_the_lowest_building_comes_down() -> None:
         constructions.build(Building(near, BuildingKind.FARM))
     growth = Growth(constructions, NO_TRADE)
 
-    growth.clear_room((6, 5), 1)
+    growth.room.clear((6, 5), 1)
 
     kinds = [b.kind for b in constructions.at((6, 5))]
     assert kinds.count(BuildingKind.FLATS) == 5

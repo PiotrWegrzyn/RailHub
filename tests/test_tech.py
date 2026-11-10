@@ -5,10 +5,12 @@ from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.geo import Bounds
 from railroads.sim.goods import Good, Need, price_of
 from railroads.sim.grids import HexGrid
-from railroads.sim.growth import OWNER_SHARE, TRAIN_LOAD, Growth
+from railroads.sim.growth import Growth
 from railroads.sim.ladders import TOWNS, GrowthRule
+from railroads.sim.ownership import OWNER_SHARE
 from railroads.sim.railway import ENGINES, Railway, Stop
 from railroads.sim.routes import build_station, lay_route, plan_route
+from railroads.sim.station_trade import TRAIN_LOAD
 from railroads.sim.tech import (
     FIRST_LEVEL,
     GOOD_TREES,
@@ -103,14 +105,14 @@ def test_bonuses_add_up_in_their_own_tree_and_from_nodes_that_reach_everywhere()
 def test_an_owned_farm_with_better_seed_sells_more_and_earns_food_experience() -> None:
     growth = joined()
     growth.build(Building((6, 22), BuildingKind.FARM))
-    growth.own((6, 22), BuildingKind.FARM)
+    growth.owners.own((6, 22), BuildingKind.FARM)
     growth.railway.research = learned(Tree.FOOD, "seed")
     before = growth.railway.research.xp[Tree.FOOD]
 
     growth.trade_goods()
 
     earned = 5 * 1.1 * price_of(Good.WHEAT) * OWNER_SHARE
-    assert growth.owner_income[BuildingKind.FARM] == pytest.approx(earned)
+    assert growth.owners.income[BuildingKind.FARM] == pytest.approx(earned)
     assert growth.railway.research.xp[Tree.FOOD] - before == pytest.approx(earned)
 
 
@@ -190,10 +192,10 @@ def test_a_tenement_rising_by_a_station_gives_two_trains_worth_of_experience() -
     growth._turn(centre, TOWNS, np.random.default_rng(0))
 
     gained = sum(growth.railway.research.xp.values()) - before
-    _, kind, xp = growth.growth_rewards[-1]
+    _, kind, xp = growth.station_trade.rewards[-1]
     assert kind == BuildingKind.TENEMENT
     assert gained == pytest.approx(xp) and xp > 0
-    worth = growth._load_worth(BuildingKind.TENEMENT)
+    worth = growth.station_trade._load_worth(BuildingKind.TENEMENT)
     assert xp == pytest.approx(2 * TRAIN_LOAD * sum(worth.values()))
 
 
@@ -208,7 +210,7 @@ def test_nothing_rising_out_of_reach_of_the_stations_gives_experience() -> None:
     growth._turn((1, 12), TOWNS, np.random.default_rng(0))
 
     assert growth.count(BuildingKind.TENEMENT).sum() == 1
-    assert growth.growth_rewards == []
+    assert growth.station_trade.rewards == []
 
 
 def test_electric_engines_find_a_way_only_along_electrified_track() -> None:

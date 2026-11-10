@@ -141,8 +141,12 @@ def test_soldiers_travel_more_the_higher_their_rank() -> None:
     growth = Growth(constructions)
     grid = constructions.tile_map.grid
 
-    outpost = growth._travellers_in(np.array([np.ravel_multi_index((5, 5), grid.shape)]))
-    headquarters = growth._travellers_in(np.array([np.ravel_multi_index((9, 9), grid.shape)]))
+    outpost = growth.station_trade.travellers_in(
+        np.array([np.ravel_multi_index((5, 5), grid.shape)])
+    )
+    headquarters = growth.station_trade.travellers_in(
+        np.array([np.ravel_multi_index((9, 9), grid.shape)])
+    )
 
     assert outpost[Good.PASSENGERS] == 60
     assert headquarters[Good.PASSENGERS] == 540

@@ -110,8 +110,8 @@ def describe(growth: Growth, cell: Cell) -> HexDetails:
                 stock,
                 mood,
                 kind,
-                int(growth.owned(kind)[cell]),
-                growth.price_to_buy(kind),
+                int(growth.owners.owned(kind)[cell]),
+                growth.owners.price_to_buy(kind),
             )
         )
     return HexDetails(

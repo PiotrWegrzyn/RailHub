@@ -3,17 +3,21 @@ railroads.sim.ladders: towns, farms, orchards, mines, lumber mills, ports and ev
 
 A building's points count as served up to MOST_SERVED times over, by the share of what it needs
 and makes that stations handled, each at SERVED_POINT_WORTH of a doubling, so only what stations
-supply compounds. A building that finds no room in its cell spills over into the nearest cell
-within SPILL_STEPS with the room and land for it that the ladder's caps allow, chosen among cells
-equally near at random by how well their land suits it.
+supply compounds. A building that finds no room in its cell spills over into a cell nearby
+(railroads.sim.room).
 
 On town turns, a neighbourhood with SKYSCRAPER_PEOPLE population and SKYSCRAPER_FLATS blocks of
 flats may put up a skyscraper, SKYSCRAPER_CHANCE of the time: a business centre that pulls down the
 flats and gives corporate points, whose people move into SKYSCRAPER_HOMES houses in the nearest
 cells with room for them.
 
-Every TRADE_EVERY_MONTHS the stations hand out their goods (railroads.sim.economy), which leaves
-each kind of building in each cell unsatisfied, content or thriving.
+Every TRADE_EVERY_MONTHS the stations hand out their goods (railroads.sim.economy, settled with
+the railway by railroads.sim.station_trade), which leaves each kind of building in each cell
+unsatisfied, content or thriving, and pays the player for the buildings they own
+(railroads.sim.ownership).
+
+Growth keeps the tally the other parts share: how many of each kind stand in each cell (counts),
+the points around each cell (nearby) and every ladder's chances, all kept up to date by add.
 
 Forests come and go as well (railroads.sim.forests): people, industry and above all lumber mills
 clear them, they spread onto open grassland beside them, and the land weighs again wherever they
@@ -33,25 +37,18 @@ import numpy.typing as npt
 
 from railroads.sim.clock import START_YEAR
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.demand import capacity_of
 from railroads.sim.economy import (
-    DELIVERY_RADIUS,
     Economy,
     FloatCells,
-    StationOrder,
     Trade,
     levels_of,
     served_multipliers,
 )
-from railroads.sim.forests import ForestRule, forest_turn, forests_nearby
-from railroads.sim.goods import FITS, NEEDS, TRAVELLERS, Good, Need, makes_of, needs_of, price_of
-from railroads.sim.grids import Cell
+from railroads.sim.forests import change_forests
+from railroads.sim.grids import Cell, Grid
 from railroads.sim.ladders import (
     FARMS_CROWDED_OUT,
     GROWTH,
-    PASSENGERS_PER_POINT,
-    POINTS,
-    TOWN_LAND,
     TOWNS,
     Cells,
     FloatGrid,
@@ -61,42 +58,26 @@ from railroads.sim.ladders import (
     Land,
     Points,
 )
-from railroads.sim.railway import CAR_CAPACITY, MAX_CARS, Railway
+from railroads.sim.ownership import Owners
+from railroads.sim.railway import Railway
+from railroads.sim.room import Room
+from railroads.sim.station_trade import StationTrade
 from railroads.sim.stats import History
-from railroads.sim.tech import GOOD_TREES, SHOPS, Effect, Tree, tree_of
+from railroads.sim.tech import Effect
 from railroads.sim.tilemap import Relief, Terrain, Vegetation
 
 if TYPE_CHECKING:
     from railroads.sim.novelties import Novelties
 
-# A station sends a piece of mail for every MAIL_PER_PASSENGERS passengers, rounded down.
-MAIL_PER_PASSENGERS = 5
 MONTHS_BEFORE_PLAY = 1000 * 12
 SKYSCRAPER_FLATS = 3
 SKYSCRAPER_HOMES = 10
-# How many cells away the people of the flats a skyscraper pulls down may find their new homes.
-HOMES_STEPS = 6
-# Population points that clear a forest as fast as one point of industry.
-POPULATION_PER_CLEARING_POINT = 4
 # Above this chance, a ladder draws for every cell instead of thinning.
 THINNING_UP_TO = 0.05
 # What one served point adds to a ladder's chance, as a share of what a doubling of the points
 # nearby adds.
 SERVED_POINT_WORTH = 2.0
-# The player's share of what a building they own sells to their stations, what it costs to buy
-# (this many years of that share at full output), and how far away a building pulled down by growth
-# goes up again.
-OWNER_SHARE = 0.5
-PAYBACK_YEARS = 5
-# However much tech cuts the price of buildings, they cost at least this share of it.
-MOST_DISCOUNT = 0.5
-# A building rising in a station's reach gives the experience of this many units of its goods for
-# each of its stars: a full train of the first engine.
-TRAIN_LOAD = MAX_CARS * CAR_CAPACITY
 SKYSCRAPER_STARS = 4
-RELOCATE_STEPS = 12
-# How many cells away a building that finds no room in its own may go up instead.
-SPILL_STEPS = 3
 
 
 def _allowed(cells: Cells, opened: Cells, land: FloatGrid) -> Cells:
@@ -123,15 +104,6 @@ class _Place:
     chances: FloatGrid
     # No cell's chance is above this; a month draws its cells against it.
     highest: float = 0.0
-
-
-def leaving_order(
-    buildings: list[Building], points: Mapping[BuildingKind, tuple[Points, int]] = POINTS
-) -> list[Building]:
-    """The order buildings leave a cell to make room: the smallest first."""
-    return sorted(
-        buildings, key=lambda b: (points.get(b.kind, (Points.POPULATION, 0))[1], b.kind.value)
-    )
 
 
 class Growth:
@@ -202,14 +174,11 @@ class Growth:
         self.railway: Railway | None = None
         # The one-off buildings this game may get (railroads.sim.novelties), rolled once a year.
         self.novelties: Novelties | None = None
-        # How many of each kind of building in each cell the player owns, and what each kind they
-        # own earned them last month.
-        self._owned: dict[BuildingKind, IntGrid] = {}
-        self.owner_income: dict[BuildingKind, float] = {}
-        # The cells the player's stations hand goods out to, and the experience growth there
-        # has given since the game began: where, what it became and how much.
-        self.in_reach: set[Cell] = set()
-        self.growth_rewards: list[tuple[Cell, BuildingKind, float]] = []
+        # The buildings the player owns, the stations growth trades with, and the room it makes
+        # (railroads.sim.ownership, railroads.sim.station_trade, railroads.sim.room).
+        self.owners = Owners(self)
+        self.station_trade = StationTrade(self)
+        self.room = Room(self)
         self._months = 0
         self._land_cells = int((tile_map.terrain == Terrain.LAND).sum())
         if rule.trades:
@@ -223,11 +192,13 @@ class Growth:
         self.economy.year = self.year
         if self._trades_anything():
             self.trade = self.economy.trade(
-                self._working_counts(), self._station_orders(), np.flatnonzero(self._occupied)
+                self.owners.working_counts(),
+                self.station_trade.orders(),
+                np.flatnonzero(self._occupied),
             )
-            self._settle_stations(self.trade)
-            self._pay_owners(self.trade)
-            self.in_reach = self._station_reach()
+            self.station_trade.settle(self.trade)
+            self.owners.pay(self.trade)
+            self.station_trade.update_reach()
             changed |= self._raise_buildings()
             self._count_served(self.trade)
         else:
@@ -257,9 +228,9 @@ class Growth:
                 share = np.where(np.isnan(assumed), share, assumed)
             points, value = self.rule.points[kind]
             count = self._counts[kind].ravel()[trade.cells].astype(np.float64)
-            boost = self._boost(kind, Effect.GROWTH)
+            boost = self.owners.boost(kind, Effect.GROWTH)
             if boost:
-                count += boost * self.owned(kind).ravel()[trade.cells]
+                count += boost * self.owners.owned(kind).ravel()[trade.cells]
             served[points] += served_multipliers(share) * value * count
         emptied = np.setdiff1d(self._traded, trade.cells, assume_unique=True)
         self._traded = trade.cells
@@ -280,6 +251,20 @@ class Growth:
     def year(self) -> int:
         return self.start_year + self._months // 12
 
+    @property
+    def grid(self) -> Grid:
+        return self._grid
+
+    @property
+    def counts(self) -> Mapping[BuildingKind, IntGrid]:
+        """How many grown buildings of each kind stand in each cell."""
+        return self._counts
+
+    @property
+    def near(self) -> Cells:
+        """Every cell's neighbours as flat indices (railroads.sim.economy.Neighbourhoods)."""
+        return self._near
+
     def _raise_buildings(self) -> set[Cell]:
         """Turns buildings into the next kind on their ladder wherever enough people have come
         to live around them, the most crowded first and at most one step at a time."""
@@ -298,51 +283,12 @@ class Growth:
                     changed |= self._replace(cell, around, [(small, 1)], big) or set()
         return changed
 
-    def clear_room(self, cell: Cell, units: int, avoid: frozenset[Cell] = frozenset()) -> set[Cell]:
-        """Makes `units` of room in the cell for track or a station, the smallest buildings first
-        (railroads.sim.demolition prices them in the same order): each moves to a cell next to it
-        with room for it (never into `avoid`) if it can, and otherwise comes down. Returns the
-        cells whose buildings changed."""
-        changed: set[Cell] = set()
-        while self.constructions.space_left(cell) < units:
-            here = [b for b in self.constructions.at(cell) if isinstance(b, Building)]
-            if not here:
-                break
-            victim = leaving_order(here, self.rule.points)[0]
-            target = self._room_beside(victim, avoid | {cell})
-            owned = self._take_down(victim)
-            changed.add(cell)
-            if target is not None:
-                self.constructions.build(Building(target, victim.kind))
-                if victim.kind in self._counts:
-                    self._add(target, victim.kind, 1)
-                if owned:
-                    self.own(target, victim.kind)
-                changed.add(target)
-            elif owned:
-                changed |= self._relocate(victim)
-        return changed
-
-    def demolish(self, building: Building) -> None:
-        """Takes a building down for good, the player's too."""
-        self._take_down(building)
-
-    def _room_beside(self, building: Building, avoid: frozenset[Cell]) -> Cell | None:
-        """The cell next to the building's with the most room that would take it, if any."""
-        options = [
-            near
-            for near in self._grid.neighbours(*building.cell)
-            if near not in avoid
-            and self.constructions.why_not(Building(near, building.kind)) is None
-        ]
-        return max(options, key=self.constructions.space_left, default=None)
-
-    def _take_down(self, building: Building) -> bool:
-        """Pulls a building down; returns whether it was one the player owned."""
-        owned = self._lose(building.cell, building.kind, 1) > 0
+    def take_down(self, building: Building) -> bool:
+        """Pulls a building down, the player's too; returns whether it was one they owned."""
+        owned = self.owners.lose(building.cell, building.kind, 1) > 0
         self.constructions.remove(building)
         if building.kind in self._counts:
-            self._add(building.cell, building.kind, -1)
+            self.add(building.cell, building.kind, -1)
         return owned
 
     def _crowd_out_farms(self) -> set[Cell]:
@@ -353,101 +299,14 @@ class Growth:
         changed: set[Cell] = set()
         for row, col in crowded.tolist():
             gone = int(farms[row, col])
-            owned = self._lose((row, col), BuildingKind.FARM, gone)
+            owned = self.owners.lose((row, col), BuildingKind.FARM, gone)
             for _ in range(gone):
                 self.constructions.remove(Building((row, col), BuildingKind.FARM))
-            self._add((row, col), BuildingKind.FARM, -gone)
+            self.add((row, col), BuildingKind.FARM, -gone)
             changed.add((row, col))
             for _ in range(owned):
-                changed |= self._relocate(Building((row, col), BuildingKind.FARM))
+                changed |= self.room.relocate(Building((row, col), BuildingKind.FARM))
         return changed
-
-    def _station_orders(self) -> dict[Cell, StationOrder]:
-        if self.railway is None:
-            return {}
-        orders = {}
-        for station in sorted(self.railway.connected()):
-            goods = self.railway.station_goods(station)
-            delivery, collection = self.railway.reach(station)
-            freight = {g: a for g, a in goods.stockpile.items() if g not in TRAVELLERS}
-            orders[station] = StationOrder(
-                dict(goods.brought), goods.room, delivery, collection, freight
-            )
-        return orders
-
-    def _settle_stations(self, trade: Trade) -> None:
-        if self.railway is None:
-            return
-        for station, handed in trade.handed.items():
-            goods = self.railway.station_goods(station)
-            for good, amount in handed.items():
-                goods.release(good, amount)
-        for station, supplied in trade.supplied.items():
-            goods = self.railway.station_goods(station)
-            for good, amount in supplied.items():
-                goods.stockpile[good] = max(0.0, goods.stockpile.get(good, 0.0) - amount)
-        for station, gathered in trade.gathered.items():
-            goods = self.railway.station_goods(station)
-            for good, amount in gathered.items():
-                goods.stockpile[good] = goods.stockpile.get(good, 0.0) + amount
-        capacity = {}
-        for station in self.railway.stations():
-            ring = self._inner_ring(station)
-            travellers = self._travellers_in(ring)
-            goods = self.railway.station_goods(station)
-            for good, amount in travellers.items():
-                goods.board(good, amount)
-            capacity[station] = capacity_of(self._needs_in(ring) | self._as_needs(travellers))
-        self.railway.year = self.year
-        self.railway.turn_month(capacity)
-        for station, handed_for in trade.handed_for.items():
-            for (need, good), amount in handed_for.items():
-                self.railway.pay_for(station, need, good, amount)
-        for station, supplied_for in trade.supplied_for.items():
-            for (need, good), amount in supplied_for.items():
-                self.railway.pay_for_passing(station, need, good, amount)
-
-    def measure_demand(self, station: Cell) -> None:
-        """Sets a new station's demand capacity from the buildings around it now, so cargo pays
-        before its first month turns over."""
-        if self.railway is not None:
-            ring = self._inner_ring(station)
-            needs = self._needs_in(ring) | self._as_needs(self._travellers_in(ring))
-            self.railway.station_demand(station).capacity = capacity_of(needs)
-
-    def _inner_ring(self, station: Cell) -> npt.NDArray[np.intp]:
-        """The cells a station hands goods out to, as flat indices."""
-        radius = DELIVERY_RADIUS if self.railway is None else self.railway.reach(station)[0]
-        reached = self._grid.within(station, radius)
-        return np.array([np.ravel_multi_index(c, self._grid.shape) for c in reached])
-
-    def _travellers_in(self, cells: npt.NDArray[np.intp]) -> dict[Good, float]:
-        """The passengers and mail the buildings in these cells send, and want, in a month."""
-        passengers = 0
-        for kind, count in self._counts.items():
-            points, value = self.rule.points[kind]
-            passengers += (
-                PASSENGERS_PER_POINT.get(points, 0) * value * int(count.ravel()[cells].sum())
-            )
-        return {
-            Good.PASSENGERS: float(passengers),
-            Good.MAIL: float(passengers // MAIL_PER_PASSENGERS),
-        }
-
-    @staticmethod
-    def _as_needs(travellers: dict[Good, float]) -> dict[Need, float]:
-        return {Need(good.value): amount for good, amount in travellers.items()}
-
-    def _needs_in(self, cells: npt.NDArray[np.intp]) -> dict[Need, float]:
-        """What the buildings in these cells need in a month."""
-        needs: dict[Need, float] = {}
-        for kind in NEEDS:
-            if kind not in self._counts:
-                continue
-            count = float(self._counts[kind].ravel()[cells].sum())
-            for need, amount in needs_of(kind, self.year).items():
-                needs[need] = needs.get(need, 0.0) + count * amount
-        return needs
 
     def _reckon(self, place: _Place, cells: npt.NDArray[np.intp]) -> None:
         """Works out the ladder's chances in these cells afresh."""
@@ -472,92 +331,6 @@ class Growth:
             levels[cells[given]] = levels_of(assumed[given])
         return levels.reshape(self._grid.shape)
 
-    def owned(self, kind: BuildingKind) -> IntGrid:
-        """How many buildings of a kind the player owns in each cell."""
-        return self._owned.get(kind, np.zeros(self._grid.shape, dtype=np.int64))
-
-    def owned_kinds(self) -> list[BuildingKind]:
-        """The kinds of building the player owns any of."""
-        return [kind for kind, grid in self._owned.items() if grid.any()]
-
-    def owner_share(self, kind: BuildingKind) -> float:
-        """The player's share of what one building of a kind they own sells, with their tech."""
-        return OWNER_SHARE + self._boost(kind, Effect.SHARE)
-
-    def output_factor(self, kind: BuildingKind) -> float:
-        """How many buildings' worth one of a kind the player owns makes, with their tech."""
-        return 1.0 + self._boost(kind, Effect.PRODUCTION)
-
-    def own(self, cell: Cell, kind: BuildingKind) -> bool:
-        """Makes one more of the kind in the cell the player's, if any is left to own."""
-        grid = self._owned.setdefault(kind, np.zeros(self._grid.shape, dtype=np.int64))
-        if grid[cell] >= self._counts[kind][cell]:
-            return False
-        grid[cell] += 1
-        return True
-
-    def price_to_buy(self, kind: BuildingKind) -> float | None:
-        """What one building of a kind costs the player; None for what cannot be bought."""
-        makes = makes_of(kind, self.year)
-        if not makes or kind not in self._counts:
-            return None
-        month = sum(amount * price_of(good) for good, amount in makes.items())
-        discount = 0.0 if self.railway is None else self.railway.research.bonus(Effect.DISCOUNT)
-        return 12 * PAYBACK_YEARS * OWNER_SHARE * month * max(MOST_DISCOUNT, 1.0 - discount)
-
-    def buy(self, cell: Cell, kind: BuildingKind) -> str | None:
-        """Buys one building of a kind in a cell; why not, if it cannot be bought."""
-        price = self.price_to_buy(kind)
-        if price is None:
-            return f"A {kind.value} cannot be bought"
-        if self.owned(kind)[cell] >= self._counts[kind][cell]:
-            return f"You already own every {kind.value} here"
-        if self.railway is None or not self.railway.finances.can_afford(price):
-            return "Not enough cash"
-        self.railway.finances.spend(price, "buildings bought")
-        self.own(cell, kind)
-        return None
-
-    def _lose(self, cell: Cell, kind: BuildingKind, gone: int) -> int:
-        """Counts `gone` buildings of a kind leaving a cell, the player's last; returns how
-        many of them the player owned."""
-        grid = self._owned.get(kind)
-        if grid is None or not grid[cell]:
-            return 0
-        unowned = int(self._counts[kind][cell] - grid[cell])
-        owned = max(0, gone - unowned)
-        grid[cell] -= owned
-        return owned
-
-    def _relocate(self, building: Building) -> set[Cell]:
-        """Puts up again, as the player's, a building of theirs that growth pulled down: in the
-        nearest cell with room and the land its ladder grows on."""
-        ladder = next((ld for ld in self.rule.ladders if building.kind in ld.kinds), None)
-        reached = self._grid.within(building.cell, RELOCATE_STEPS)
-        for near, _ in sorted(reached.items(), key=lambda item: item[1]):
-            if near == building.cell:
-                continue
-            moved = Building(near, building.kind)
-            if self.constructions.why_not(moved) is not None:
-                continue
-            if ladder is not None:
-                flat = np.array([np.ravel_multi_index(near, self._grid.shape)])
-                land = ladder.land.weights(self.constructions.tile_map, flat, self._near)
-                if land[0] <= 0:
-                    continue
-            self.build(moved)
-            self.own(near, building.kind)
-            return {near}
-        return set()
-
-    def _station_reach(self) -> set[Cell]:
-        if self.railway is None:
-            return set()
-        reached: set[Cell] = set()
-        for station in self.railway.stations():
-            reached |= set(self._grid.within(station, self.railway.reach(station)[0]))
-        return reached
-
     def stars(self, kind: BuildingKind) -> int:
         """How high a kind stands on its ladder: 1 for the first kind, 2 for the next..."""
         if kind == BuildingKind.SKYSCRAPER:
@@ -565,91 +338,10 @@ class Growth:
         ladder = next((ld for ld in self.rule.ladders if kind in ld.kinds), None)
         return 1 if ladder is None else ladder.kinds.index(kind) + 1
 
-    def _load_worth(self, kind: BuildingKind) -> dict[Tree, float]:
-        """What one unit of a kind's goods is worth to each tree: what it makes, or for those
-        that make nothing, the mix of what they need."""
-        makes = makes_of(kind, self.year)
-        if makes:
-            goods = {good: amount for good, amount in makes.items()}
-        else:
-            goods = {FITS[n][0]: amount for n, amount in needs_of(kind, self.year).items()}
-        total = sum(goods.values())
-        worth: dict[Tree, float] = {}
-        for good, amount in goods.items():
-            tree = GOOD_TREES[good]
-            worth[tree] = worth.get(tree, 0.0) + amount / total * price_of(good)
-        return worth
-
-    def _reward_growth(self, cell: Cell, kind: BuildingKind) -> None:
-        """Gives the player experience when a building in their stations' reach rises: as much
-        as a train full of its goods would earn, for every star it has."""
-        if self.railway is None or cell not in self.in_reach:
-            return
-        stars = self.stars(kind)
-        if stars < 2:
-            return
-        gained = 0.0
-        for tree, worth in self._load_worth(kind).items():
-            xp = stars * TRAIN_LOAD * worth
-            self.railway.research.earn(tree, xp)
-            gained += xp
-        self.growth_rewards.append((cell, kind, gained))
-
-    def _boost(self, kind: BuildingKind, effect: Effect) -> float:
-        """What the player's tech adds, of one effect, to the buildings of a kind they own."""
-        tree = tree_of(kind)
-        if self.railway is None or tree is None:
-            return 0.0
-        return self.railway.research.bonus(effect, tree)
-
-    def _working_counts(self) -> Mapping[BuildingKind, npt.NDArray[np.int64 | np.float64]]:
-        """The buildings as they trade: each the player owns counts as more than one, by what
-        their production tech adds."""
-        if not self._owned:
-            return self._counts
-        counts: dict[BuildingKind, npt.NDArray[np.int64 | np.float64]] = dict(self._counts)
-        for kind, grid in self._owned.items():
-            boost = self._boost(kind, Effect.PRODUCTION)
-            if boost and grid.any():
-                counts[kind] = self._counts[kind] + boost * grid
-        return counts
-
-    def _pay_owners(self, trade: Trade) -> None:
-        """Pays the player their share of what the buildings they own sold this month, which
-        is also experience in their trees, and counts what shops around the player's stations
-        took as commerce experience."""
-        self.owner_income = {}
-        if self.railway is None:
-            return
-        research = self.railway.research
-        for (kind, good), (given, _) in trade.goods_gave.items():
-            grid = self._owned.get(kind)
-            if grid is None:
-                continue
-            owned = grid.ravel()[trade.cells].astype(np.float64)
-            if not owned.any():
-                continue
-            boost = self._boost(kind, Effect.PRODUCTION)
-            count = self._counts[kind].ravel()[trade.cells] + boost * owned
-            theirs = owned * (1.0 + boost) / np.maximum(count, 1.0)
-            share = OWNER_SHARE + self._boost(kind, Effect.SHARE)
-            earned = float((given * theirs).sum()) * price_of(good) * share
-            self.owner_income[kind] = self.owner_income.get(kind, 0.0) + earned
-        for kind, earned in self.owner_income.items():
-            tree = tree_of(kind)
-            if tree is not None:
-                research.earn(tree, earned)
-        total = sum(self.owner_income.values())
-        if total > 0:
-            self.railway.finances.earn(total, "owned buildings")
-        for (kind, need), (got, _) in trade.goods_got.items():
-            if kind in SHOPS:
-                research.earn(Tree.COMMERCE, float(got.sum()) * price_of(FITS[need][0]))
-
     def build(self, building: Building) -> None:
         """Puts up a building no ladder grew, counted like any other."""
         self.constructions.build(building)
-        self._add(building.cell, building.kind, 1)
+        self.add(building.cell, building.kind, 1)
 
     def count(self, kind: BuildingKind) -> IntGrid:
         """How many grown buildings of a kind stand in each cell."""
@@ -698,7 +390,7 @@ class Growth:
             changed |= self.novelties.year(self, rng)
         every = self.rule.forests_every_months
         if self.rule.forests is not None and self._months % every == 0:
-            changed |= self._change_forests(self.rule.forests, every, rng)
+            changed |= change_forests(self, self.rule.forests, every, rng)
         turns: list[tuple[int, Ladder]] = []
         growing = [
             place
@@ -724,39 +416,10 @@ class Growth:
             changed |= self._turn(divmod(index, self._grid.cols), ladder, rng)
         return changed
 
-    def _change_forests(self, rule: ForestRule, months: int, rng: np.random.Generator) -> set[Cell]:
-        """Clears and spreads forests over `months`, closes the lumber mills left without
-        forest, and weighs the land again around them; returns the cells that changed."""
+    def reweigh_land(self, changed_cells: Cells) -> None:
+        """Weighs the land again wherever forests came or went, and the cells beside them for
+        ladders that care about forest nearby."""
         tile_map = self.constructions.tile_map
-        people = (
-            self._nearby[Points.POPULATION] / POPULATION_PER_CLEARING_POINT
-            + self._nearby[Points.INDUSTRY]
-        ).ravel()
-        mills = self._nearby[Points.TIMBER].ravel()
-        cleared, grown = forest_turn(tile_map, self._near, people, mills, rule, months, rng)
-        cols = self._grid.cols
-        grown = np.array(
-            [index for index in grown.tolist() if not self.constructions.at(divmod(index, cols))],
-            dtype=np.intp,
-        )
-        if not cleared.size and not grown.size:
-            return set()
-        tile_map.set_vegetation(cleared, Vegetation.GRASS)
-        tile_map.set_vegetation(grown, Vegetation.FOREST)
-        changed_cells = np.concatenate([cleared, grown])
-        self.forests_changed = {divmod(index, cols) for index in changed_cells.tolist()}
-        changed = set(self.forests_changed)
-        if BuildingKind.LUMBER_MILL in self._counts:
-            count = self._counts[BuildingKind.LUMBER_MILL]
-            mills = np.flatnonzero(count)
-            forests = forests_nearby(tile_map, self._near, mills)
-            closing = mills[forests < rule.mills_close_below]
-            for row, col in (divmod(int(index), cols) for index in closing):
-                for _ in range(int(count[row, col])):
-                    mill = Building((row, col), BuildingKind.LUMBER_MILL)
-                    if self._take_down(mill):
-                        changed |= self._relocate(mill)
-                changed.add((row, col))
         around = self._near[:, changed_cells].ravel()
         beside = np.unique(np.concatenate([changed_cells, around[around < self._near.shape[1]]]))
         own = np.unique(changed_cells)
@@ -779,7 +442,6 @@ class Growth:
                 place.cells = allowed
                 self._reckon(place, cells)
                 place.highest = max(place.highest, float(place.chances[cells].max()))
-        return changed
 
     def run(self, months: int, rng: np.random.Generator) -> None:
         for _ in range(months):
@@ -836,15 +498,15 @@ class Growth:
             and self._counts[first].sum() >= self._land_cells // ladder.land_cells_each
         ):
             return set()
-        if not self._ladder_allows(ladder, cell) or self._not_open(ladder, cell, rng):
+        if not self.ladder_allows(ladder, cell) or self._not_open(ladder, cell, rng):
             return set()
         new = Building(cell, first)
         if self.constructions.site_problem(new) is not None:
             return set()
         if new.space > self.constructions.space_left(cell):
-            return self._spill(cell, ladder, rng)
+            return self.room.spill(cell, ladder, rng)
         self.constructions.build(new)
-        self._add(cell, first, 1)
+        self.add(cell, first, 1)
         return {cell}
 
     def _not_open(self, ladder: Ladder, cell: Cell, rng: np.random.Generator) -> bool:
@@ -857,7 +519,7 @@ class Growth:
             return False
         return bool(rng.random() * ladder.land.open_field >= 1.0)
 
-    def _ladder_allows(self, ladder: Ladder, cell: Cell) -> bool:
+    def ladder_allows(self, ladder: Ladder, cell: Cell) -> bool:
         """Whether the ladder's own caps let one more of its first kind go up in the cell."""
         first = ladder.kinds[0]
         if (
@@ -872,31 +534,6 @@ class Growth:
             if self._around(first, neighbourhood) >= ladder.most_nearby:
                 return False
         return ladder.apart is None or not self._any_within(ladder, cell)
-
-    def _spill(self, cell: Cell, ladder: Ladder, rng: np.random.Generator) -> set[Cell]:
-        """Puts up the ladder's first kind in the nearest cell that will take it, picked among
-        cells equally near at random by how well their land suits it; returns the cell it went up
-        in, if it found one."""
-        reached = [(near, steps) for near, steps in self._grid.within(cell, SPILL_STEPS).items()]
-        steps = np.array([step for _, step in reached])
-        rows, cols = zip(*(near for near, _ in reached), strict=True)
-        flat = np.ravel_multi_index((rows, cols), self._grid.shape)
-        land = ladder.land.weights(self.constructions.tile_map, flat, self._near)
-        first = ladder.kinds[0]
-        suits = rng.random(steps.size) ** (1.0 / np.maximum(land, 1e-12))
-        for index in np.lexsort((-suits, steps)).tolist():
-            near = reached[index][0]
-            new = Building(near, first)
-            if (
-                near != cell
-                and land[index] > 0
-                and self.constructions.why_not(new) is None
-                and self._ladder_allows(ladder, near)
-            ):
-                self.constructions.build(new)
-                self._add(near, first, 1)
-                return {near}
-        return set()
 
     def _any_within(self, ladder: Ladder, cell: Cell) -> bool:
         """Whether any building on the ladder stands within its `apart` steps of the cell."""
@@ -921,32 +558,7 @@ class Growth:
         built = self._replace(cell, neighbourhood, takes, BuildingKind.SKYSCRAPER)
         if built is None:
             return None
-        return built | self._house(cell, SKYSCRAPER_HOMES)
-
-    def _house(self, cell: Cell, homes: int) -> set[Cell]:
-        """Puts up as many as `homes` houses in the nearest cells around this one with room and
-        land for them; returns the cells they went up in."""
-        changed: set[Cell] = set()
-        reached = sorted(self._grid.within(cell, HOMES_STEPS).items(), key=lambda item: item[1])
-        for near, _ in reached:
-            house = Building(near, BuildingKind.HOUSE)
-            if (
-                TOWN_LAND.weights(self.constructions.tile_map, self._flat([near]), self._near)[0]
-                <= 0
-            ):
-                continue
-            while homes and self.constructions.why_not(house) is None:
-                self.constructions.build(house)
-                self._add(near, BuildingKind.HOUSE, 1)
-                changed.add(near)
-                homes -= 1
-            if not homes:
-                break
-        return changed
-
-    def _flat(self, cells: list[Cell]) -> npt.NDArray[np.intp]:
-        rows, cols = zip(*cells, strict=True)
-        return np.ravel_multi_index((rows, cols), self._grid.shape)
+        return built | self.room.house(cell, SKYSCRAPER_HOMES)
 
     def _replace(
         self,
@@ -979,18 +591,20 @@ class Growth:
             return None
         owned = 0
         for near, kind, take in plan:
-            owned += self._lose(near, kind, take)
+            owned += self.owners.lose(near, kind, take)
             for _ in range(take):
                 self.constructions.remove(Building(near, kind))
-            self._add(near, kind, -take)
+            self.add(near, kind, -take)
         self.constructions.build(new)
-        self._add(cell, new_kind, 1)
+        self.add(cell, new_kind, 1)
         if owned:
-            self.own(cell, new_kind)
-        self._reward_growth(cell, new_kind)
+            self.owners.own(cell, new_kind)
+        self.station_trade.reward(cell, new_kind)
         return {cell} | {near for near, _, _ in plan}
 
-    def _add(self, cell: Cell, kind: BuildingKind, how_many: int) -> None:
+    def add(self, cell: Cell, kind: BuildingKind, how_many: int) -> None:
+        """Counts `how_many` buildings of a kind more (or fewer) in the cell, with the points
+        they give its neighbourhood and every ladder's chances there."""
         self._counts[kind][cell] += how_many
         self._occupied[cell] += how_many
         points, value = self.rule.points[kind]

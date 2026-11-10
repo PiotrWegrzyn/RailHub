@@ -605,7 +605,7 @@ def test_a_connected_station_passes_along_what_it_gathered_for_a_share_of_the_pr
     growth, railway = joined_stations()
     settle_houses(growth, (6, 21), 4)
     railway.station_goods((6, 20)).stockpile[Good.WHEAT] = 10.0
-    growth.measure_demand((6, 20))
+    growth.station_trade.measure_demand((6, 20))
 
     growth.trade_goods()
 

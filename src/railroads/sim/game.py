@@ -106,7 +106,7 @@ class Game:
         if not changed:
             return Done("A station can't go there.")
         self._pay_for_station(site)
-        self.growth.measure_demand(cell)
+        self.growth.station_trade.measure_demand(cell)
         return Done(f"Station built for {dollars(STATION_PRICE + site)}.", changed, ok=True)
 
     def lay_track(
@@ -155,7 +155,7 @@ class Game:
         if changed is None:
             return Done("The station can't go there.")
         self._pay_for_station(site)
-        self.growth.measure_demand(new)
+        self.growth.station_trade.measure_demand(new)
         return Done(f"Station moved for {dollars(price)}.", changed, ok=True)
 
     def _pay_for_station(self, site: float) -> None:

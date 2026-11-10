@@ -130,7 +130,7 @@ def lay_route(growth: Growth, route: Route) -> set[Cell]:
         replacing = old is not None and old in constructions.at(piece.cell)
         if replacing:
             constructions.remove(old)
-        changed |= growth.clear_room(piece.cell, piece.space, avoid)
+        changed |= growth.room.clear(piece.cell, piece.space, avoid)
         if constructions.why_not(piece) is None:
             constructions.build(piece)
             changed.add(piece.cell)
@@ -156,7 +156,7 @@ def build_station(growth: Growth, cell: Cell) -> set[Cell] | None:
         return None
     for piece in constructions.track_at(cell):
         constructions.remove(piece)
-    changed = growth.clear_room(cell, station.space, frozenset({cell}))
+    changed = growth.room.clear(cell, station.space, frozenset({cell}))
     constructions.build(station)
     return changed | {cell}
 

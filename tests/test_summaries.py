@@ -31,7 +31,7 @@ def make_growth() -> Growth:
 
 def put_up(growth: Growth, cell: tuple[int, int], kind: BuildingKind) -> None:
     growth.constructions.build(Building(cell, kind))
-    growth._add(cell, kind, 1)
+    growth.add(cell, kind, 1)
 
 
 def test_a_summary_lists_what_was_built_within_reach_of_a_station_and_where() -> None:
@@ -59,7 +59,7 @@ def test_buildings_pulled_down_count_against_their_kind() -> None:
     reach = Reach(growth.constructions.tile_map.grid).of([(10, 10)], lambda _: COLLECTION_RADIUS)
     before = snapshot(growth, reach)
     growth.constructions.remove(Building((11, 10), BuildingKind.HOUSE))
-    growth._add((11, 10), BuildingKind.HOUSE, -1)
+    growth.add((11, 10), BuildingKind.HOUSE, -1)
     put_up(growth, (11, 10), BuildingKind.TENEMENT)
 
     summary = summarize("April 1850", growth, reach, before)

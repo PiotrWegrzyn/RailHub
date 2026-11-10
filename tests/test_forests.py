@@ -2,7 +2,7 @@ import numpy as np
 
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Neighbourhoods
-from railroads.sim.forests import FORESTS, ForestRule, forest_turn, forests_nearby
+from railroads.sim.forests import FORESTS, ForestRule, change_forests, forest_turn, forests_nearby
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
@@ -129,7 +129,7 @@ def test_cleared_forest_weighs_again_for_towns() -> None:
     chance_before = growth.chances(TOWNS)[5, 5]
     clearing = ForestRule(clearing_per_point=1.0, spread_per_forest=0.0)
 
-    growth._change_forests(clearing, 1, np.random.default_rng(0))
+    change_forests(growth, clearing, 1, np.random.default_rng(0))
 
     assert growth.chances(TOWNS)[5, 5] > 3 * chance_before
 

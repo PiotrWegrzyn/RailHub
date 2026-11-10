@@ -4,20 +4,29 @@ Each month a forest cell may be cleared, by chance: CLEARING_PER_POINT for every
 industry point in its neighbourhood (the cell and the cells next to it), and CLEARING_PER_MILL,
 a hundred times as much, for every lumber mill there. Open grassland may turn to forest, by
 SPREAD_PER_FOREST for every forest cell next to it, where nothing is built. A lumber mill with
-fewer than MILLS_CLOSE_BELOW forest cells in its neighbourhood closes.
+fewer than MILLS_CLOSE_BELOW forest cells in its neighbourhood closes. POPULATION_PER_CLEARING_POINT
+population points clear a forest as fast as one point of industry.
 """
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
 
+from railroads.sim.constructions import Building, BuildingKind
+from railroads.sim.grids import Cell
+from railroads.sim.points import Points
 from railroads.sim.tilemap import Terrain, TileMap, Vegetation
+
+if TYPE_CHECKING:
+    from railroads.sim.growth import Growth
 
 CLEARING_PER_POINT = 0.00002
 CLEARING_PER_MILL = 100 * CLEARING_PER_POINT
 SPREAD_PER_FOREST = 0.00004
 MILLS_CLOSE_BELOW = 3
+POPULATION_PER_CLEARING_POINT = 4
 
 type Cells = npt.NDArray[np.intp]
 
@@ -78,3 +87,43 @@ def _over(chance: npt.NDArray[np.float64], months: int) -> npt.NDArray[np.float6
     if months == 1:
         return chance
     return 1.0 - (1.0 - np.minimum(chance, 1.0)) ** months
+
+
+def change_forests(
+    growth: Growth, rule: ForestRule, months: int, rng: np.random.Generator
+) -> set[Cell]:
+    """Clears and spreads forests over `months`, closes the lumber mills left without
+    forest, and has growth weigh the land again around them; returns the cells that changed."""
+    constructions = growth.constructions
+    tile_map, grid, near = constructions.tile_map, growth.grid, growth.near
+    people = (
+        growth.nearby(Points.POPULATION) / POPULATION_PER_CLEARING_POINT
+        + growth.nearby(Points.INDUSTRY)
+    ).ravel()
+    mills = growth.nearby(Points.TIMBER).ravel()
+    cleared, grown = forest_turn(tile_map, near, people, mills, rule, months, rng)
+    cols = grid.cols
+    grown = np.array(
+        [index for index in grown.tolist() if not constructions.at(divmod(index, cols))],
+        dtype=np.intp,
+    )
+    if not cleared.size and not grown.size:
+        return set()
+    tile_map.set_vegetation(cleared, Vegetation.GRASS)
+    tile_map.set_vegetation(grown, Vegetation.FOREST)
+    changed_cells = np.concatenate([cleared, grown])
+    growth.forests_changed = {divmod(index, cols) for index in changed_cells.tolist()}
+    changed = set(growth.forests_changed)
+    if BuildingKind.LUMBER_MILL in growth.counts:
+        count = growth.counts[BuildingKind.LUMBER_MILL]
+        mills = np.flatnonzero(count)
+        forests = forests_nearby(tile_map, near, mills)
+        closing = mills[forests < rule.mills_close_below]
+        for row, col in (divmod(int(index), cols) for index in closing):
+            for _ in range(int(count[row, col])):
+                mill = Building((row, col), BuildingKind.LUMBER_MILL)
+                if growth.take_down(mill):
+                    changed |= growth.room.relocate(mill)
+            changed.add((row, col))
+    growth.reweigh_land(changed_cells)
+    return changed

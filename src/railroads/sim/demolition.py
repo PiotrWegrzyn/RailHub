@@ -15,8 +15,9 @@ from types import MappingProxyType
 from railroads.sim.constructions import CELL_SPACE, Building, BuildingKind, Constructions, Station
 from railroads.sim.finance import track_price
 from railroads.sim.grids import Cell
-from railroads.sim.growth import Growth, leaving_order
+from railroads.sim.growth import Growth
 from railroads.sim.ladders import POINTS, Points
+from railroads.sim.room import leaving_order
 
 DEMOLITION_PER_POINT: Mapping[Points, float] = MappingProxyType(
     {
@@ -126,7 +127,7 @@ def bulldoze(growth: Growth, cell: Cell) -> set[Cell]:
         if isinstance(built, Building):
             if built.kind in UNIQUE:
                 continue
-            growth.demolish(built)
+            growth.take_down(built)
         else:
             constructions.remove(built)
         taken = True

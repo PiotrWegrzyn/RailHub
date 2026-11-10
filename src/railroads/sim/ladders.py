@@ -23,7 +23,6 @@ neighbourhood, so farms and ports keep their distance.
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from enum import Enum
 from types import MappingProxyType
 
 import numpy as np
@@ -32,6 +31,7 @@ import numpy.typing as npt
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Neighbourhoods
 from railroads.sim.forests import FORESTS, ForestRule
+from railroads.sim.points import Points
 from railroads.sim.tilemap import Deposit, Relief, Temperature, Terrain, TileMap, Vegetation
 
 IntGrid = npt.NDArray[np.int64]
@@ -39,19 +39,6 @@ IntGrid = npt.NDArray[np.int64]
 FloatGrid = npt.NDArray[np.float64]
 
 Cells = npt.NDArray[np.intp]
-
-
-class Points(Enum):
-    POPULATION = "population"
-    FOOD = "food"
-    ORE = "ore"
-    TIMBER = "timber"
-    TRADE = "trade"
-    INDUSTRY = "industry"
-    CORPORATE = "corporate"
-    MILITARY = "military"
-    AIR = "air travel"
-    WORSHIP = "worship"
 
 
 # Farms with this many population points around them or more are pulled down, and none grow there.

@@ -121,10 +121,12 @@ def main() -> None:
     parts: dict[str, Callable[[], object]] = {
         "buildings": lambda: sorted(repr(x) for x in view.constructions),
         "counts": lambda: [
-            (k.name, growth.count(k).tobytes()) for k in BuildingKind if k in growth._counts
+            (k.name, growth.count(k).tobytes()) for k in BuildingKind if k in growth.counts
         ],
         "satisfaction": lambda: growth.satisfaction(),
-        "owned": lambda: sorted((k.name, growth.owned(k).sum()) for k in growth.owned_kinds()),
+        "owned": lambda: sorted(
+            (k.name, growth.owners.owned(k).sum()) for k in growth.owners.kinds()
+        ),
         "cash": lambda: (railway.finances.cash, sorted(railway.finances.last_month.items())),
         "trains": lambda: railway.trains,
         "station goods": lambda: sorted(railway.goods.items()),

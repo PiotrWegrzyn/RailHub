@@ -105,9 +105,9 @@ def test_a_refresh_keeps_the_place_when_others_come_and_go() -> None:
     search.choose(BuildingKind.BEEKEEPER, growth, (0.0, 0.0))
     search.step(1)
     search.step(1)
-    growth._take_down(Building((1, 1), BuildingKind.BEEKEEPER))
+    growth.take_down(Building((1, 1), BuildingKind.BEEKEEPER))
     growth.constructions.build(Building((15, 15), BuildingKind.BEEKEEPER))
-    growth._add((15, 15), BuildingKind.BEEKEEPER, 1)
+    growth.add((15, 15), BuildingKind.BEEKEEPER, 1)
 
     search.refresh(growth)
 
@@ -122,7 +122,7 @@ def test_a_refresh_with_the_visited_one_gone_stays_on_the_list(taken: tuple[int,
     search.choose(BuildingKind.BEEKEEPER, growth, (0.0, 0.0))
     search.step(1)
     search.step(1)
-    growth._take_down(Building(taken, BuildingKind.BEEKEEPER))
+    growth.take_down(Building(taken, BuildingKind.BEEKEEPER))
 
     search.refresh(growth)
 

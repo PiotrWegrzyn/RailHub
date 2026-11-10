@@ -152,9 +152,16 @@ Every cell has room for 6 units:
 ## Growth
 
 `railroads.sim.growth` grows the whole map by itself, by the ladders of `railroads.sim.ladders`,
-like a cellular automaton, one month at a time: towns, farms, orchards, mines, lumber mills, ports and several kinds of factory. Every
-building gives points of one kind, and each cell adds up the points of every kind in its
-neighbourhood (the cell and the six around it):
+like a cellular automaton, one month at a time: towns, farms, orchards, mines, lumber mills, ports and several kinds of factory. Its
+other jobs live beside it:
+- `railroads.sim.room`: making room for track and stations, buildings spilling into nearby cells,
+  rehousing people and putting the player's buildings up again.
+- `railroads.sim.ownership`: what the player owns and is paid.
+- `railroads.sim.station_trade`: settling goods with the stations and rewarding growth near them.
+- `railroads.sim.forests`: the forest changes.
+
+Every building gives points of one kind (`railroads.sim.points`), and each cell adds up the points
+of every kind in its neighbourhood (the cell and the six around it):
 
 | Points | Buildings |
 |---|---|

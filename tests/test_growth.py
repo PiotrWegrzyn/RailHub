@@ -7,7 +7,7 @@ from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Trade
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
-from railroads.sim.growth import SERVED_POINT_WORTH, SPILL_STEPS, Growth, _allowed
+from railroads.sim.growth import SERVED_POINT_WORTH, Growth, _allowed
 from railroads.sim.ladders import (
     FACTORIES,
     FARMS,
@@ -25,6 +25,7 @@ from railroads.sim.ladders import (
     Merge,
     Points,
 )
+from railroads.sim.room import SPILL_STEPS
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 
 NO_TRADE = GrowthRule(trades=False)
@@ -157,7 +158,7 @@ def test_chances_follow_buildings_as_they_come_and_go() -> None:
     constructions = Constructions(make_map())
     growth = Growth(constructions, NO_TRADE)
     build(constructions, (5, 5), BuildingKind.HOUSE, 1)
-    growth._add((5, 5), BuildingKind.HOUSE, 1)
+    growth.add((5, 5), BuildingKind.HOUSE, 1)
 
     after = growth.chances(TOWNS)
 

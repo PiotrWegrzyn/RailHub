@@ -128,7 +128,7 @@ def test_churches_send_and_want_their_congregation(kind: BuildingKind, people: i
     growth = Growth(constructions)
     flat = np.array([np.ravel_multi_index((5, 5), constructions.tile_map.grid.shape)])
 
-    travellers = growth._travellers_in(flat)
+    travellers = growth.station_trade.travellers_in(flat)
 
     assert travellers[Good.PASSENGERS] == people
 
