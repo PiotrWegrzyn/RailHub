@@ -455,134 +455,216 @@ def express() -> Model:
 
 
 def car(good: Good, full: bool) -> Model:
+    """A car for a good on its frame and wheels, loaded or empty, its body by what it carries."""
     m = Model()
     h = CAR_HALF
     m.box((-h, h), (-0.07, 0.07), (0.035, 0.06), FRAME)
     m.wheels([h - 0.07, -h + 0.07], 0.035, FRAME, 0.075)
-    if good in VANS:
-        body, stripe = VANS[good]
-        m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
-        m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), ROOF_GREY)
-        m.panel((-0.06, 0.06), (0.07, 0.22), 0.0805, shade(body, 0.7) if full else WINDOW)
-        m.panel((-h + 0.01, h - 0.01), (0.2, 0.215), 0.0806, stripe)
-        return m
-    if good in HOPPERS:
-        body, load = HOPPERS[good]
-        m.box((-h, h), (-0.08, 0.08), (0.06, 0.19), body)
-        m.panel((-h + 0.02, h - 0.02), (0.08, 0.17), 0.0805, shade(body, 0.85))
-        if full:
-            m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.19, 0.22), load)
-            m.box((-0.1, 0.1), (-0.05, 0.05), (0.22, 0.24), load)
-        return m
-    if good in HEAPS:
-        m.box((-h, h), (-0.08, 0.08), (0.06, 0.13), DECK)
-        m.panel((-h + 0.02, h - 0.02), (0.075, 0.12), 0.0805, shade(DECK, 0.8))
-        if full:
-            m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.13, 0.17), HEAPS[good])
-            m.box((-0.13, 0.13), (-0.05, 0.05), (0.17, 0.2), HEAPS[good])
-        return m
-    if good in TANKS:
-        m.box((-h, h), (-0.07, 0.07), (0.06, 0.085), DECK)
-        m.cylinder_along((-h + 0.01, h - 0.01), 0.08, 0.165, TANKS[good])
-        m.cylinder_up(0.0, 0.025, (0.24, 0.27), TANKS[good])
-        return m
-    if good == Good.CARS:
-        m.box((-h, h), (-0.08, 0.08), (0.06, 0.085), DECK)
-        if full:
-            for u in (-0.12, 0.12):
-                m.box((u - 0.09, u + 0.09), (-0.05, 0.05), (0.095, 0.14), AUTO_BODY)
-                m.box((u - 0.05, u + 0.05), (-0.045, 0.045), (0.14, 0.18), WINDOW)
-        return m
-    if good == Good.TANKS:
-        m.box((-h, h), (-0.08, 0.08), (0.06, 0.085), DECK)
-        if full:
-            m.box((-0.2, 0.2), (-0.07, 0.07), (0.085, 0.15), TANK_HULL)
-            m.box((-0.08, 0.08), (-0.05, 0.05), (0.15, 0.2), shade(TANK_HULL, 0.85))
-            m.box((0.08, 0.26), (-0.012, 0.012), (0.165, 0.185), shade(TANK_HULL, 0.6))
-        return m
-    if good == Good.PLANES:
-        m.box((-h, h), (-0.08, 0.08), (0.06, 0.085), DECK)
-        if full:
-            m.box((-0.24, 0.24), (-0.03, 0.03), (0.09, 0.15), PLANE_BODY)
-            m.box((-0.05, 0.05), (-0.085, 0.085), (0.12, 0.135), shade(PLANE_BODY, 0.85))
-            m.box((-0.24, -0.17), (-0.012, 0.012), (0.15, 0.2), shade(PLANE_BODY, 0.75))
-        return m
-    match good:
-        case Good.GOODS | Good.CANS | Good.BANANAS | Good.BREAD:
-            body, roof = {
-                Good.GOODS: (BOXCAR, ROOF_GREY),
-                Good.CANS: (BOXCAR, ROOF_GREY),
-                Good.BANANAS: (BANANA_VAN, (240, 236, 220)),
-                Good.BREAD: (BREAD_VAN, (236, 226, 204)),
-            }[good]
-            m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
-            m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), roof)
-            door = shade(body, 0.7) if full else WINDOW
-            m.panel((-0.06, 0.06), (0.07, 0.22), 0.0805, door)
-            m.panel((-h + 0.01, h - 0.01), (0.07, 0.085), 0.0806, shade(body, 0.75))
-            if good == Good.CANS:
-                m.panel((-h + 0.01, h - 0.01), (0.2, 0.215), 0.0806, CANS_STRIPE)
-        case Good.WHEAT | Good.SUGAR:
-            body = GRAIN_HOPPER if good == Good.WHEAT else SUGAR_HOPPER
-            m.box((-h, h), (-0.08, 0.08), (0.06, 0.2), body)
-            m.panel((-h + 0.02, h - 0.02), (0.08, 0.18), 0.0805, shade(body, 0.85))
-            if good == Good.SUGAR:
-                m.box((-h + 0.01, h - 0.01), (-0.07, 0.07), (0.2, 0.235), shade(body, 0.95))
-            elif full:
-                m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.2, 0.22), GRAIN)
-                m.box((-0.12, 0.12), (-0.05, 0.05), (0.22, 0.24), GRAIN)
-        case Good.APPLES | Good.DATES | Good.ORANGES:
-            m.box((-h, h), (-0.08, 0.08), (0.06, 0.13), DECK)
-            m.panel((-h + 0.02, h - 0.02), (0.075, 0.12), 0.0805, shade(DECK, 0.8))
-            if full:
-                fruit = {Good.APPLES: APPLE, Good.DATES: DATE, Good.ORANGES: ORANGE}[good]
-                m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.13, 0.16), fruit)
-                m.box((-0.13, 0.13), (-0.05, 0.05), (0.16, 0.18), fruit)
-                if good == Good.APPLES:
-                    for u in (-0.15, -0.05, 0.06, 0.14):
-                        m.box((u - 0.012, u + 0.012), (-0.04, -0.02), (0.16, 0.175), APPLE_LIGHT)
-        case Good.COAL:
-            m.box((-h, h), (-0.08, 0.08), (0.06, 0.19), HOPPER)
-            m.panel((-h + 0.02, h - 0.02), (0.08, 0.17), 0.0805, shade(HOPPER, 0.85))
-            if full:
-                m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.19, 0.22), COAL)
-                m.box((-0.1, 0.1), (-0.05, 0.05), (0.22, 0.24), COAL)
-        case Good.LUMBER:
-            m.box((-h, h), (-0.08, 0.08), (0.06, 0.085), DECK)
-            for u in (-h + 0.005, h - 0.025):
-                m.box((u, u + 0.02), (-0.08, 0.08), (0.085, 0.2), FRAME)
-            if full:
-                for row, z in enumerate((0.115, 0.17)):
-                    for v in (-0.045, 0.0, 0.045)[: 3 - row]:
-                        m.cylinder_along((-h + 0.03, h - 0.03), 0.026, z, LOG, LOG_END)
-                        m.faces[-CYLINDER_SIDES - 2 :] = [
-                            Face([(c[0], c[1] + v, c[2]) for c in f.corners], f.color, f.normal)
-                            for f in m.faces[-CYLINDER_SIDES - 2 :]
-                        ]
-        case Good.PASSENGERS:
-            m.box((-h, h), (-0.08, 0.08), (0.06, 0.23), COACH)
-            m.box((-h - 0.01, h + 0.01), (-0.086, 0.086), (0.23, 0.25), ROOF_GREY)
-            m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.25, 0.265), ROOF_GREY)
-            m.panel((-h + 0.01, h - 0.01), (0.105, 0.122), 0.0805, COACH_BAND)
-            window = LIT_WINDOW if full else WINDOW
-            for u in (-0.17, -0.085, 0.0, 0.085, 0.17):
-                m.panel((u - 0.03, u + 0.03), (0.135, 0.195), 0.0806, window)
-            m.panel((-h + 0.01, h - 0.01), (0.07, 0.085), 0.0806, shade(COACH, 0.75))
-        case Good.MAIL:
-            m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), MAIL_VAN)
-            m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), ROOF_GREY)
-            m.panel((-h + 0.01, h - 0.01), (0.2, 0.215), 0.0805, BRASS)
-            door = shade(MAIL_VAN, 0.7) if full else WINDOW
-            m.panel((-0.05, 0.05), (0.07, 0.19), 0.0806, door)
-            m.panel((-h + 0.03, -h + 0.08), (0.15, 0.19), 0.0806, WINDOW)
-            m.panel((h - 0.08, h - 0.03), (0.15, 0.19), 0.0806, WINDOW)
-        case Good.STEEL:
-            m.box((-h, h), (-0.08, 0.08), (0.06, 0.085), DECK)
-            if full:
-                for v in (-0.04, 0.04):
-                    m.box((-h + 0.03, h - 0.03), (v - 0.03, v + 0.03), (0.085, 0.12), STEEL)
-                m.box((-h + 0.05, h - 0.05), (-0.03, 0.03), (0.12, 0.155), STEEL)
+    _body_of(good)(m, good, full)
     return m
+
+
+type CarBody = Callable[[Model, Good, bool], None]
+
+
+def _body_of(good: Good) -> CarBody:
+    if good in VANS:
+        return _van
+    if good in HOPPERS:
+        return _hopper
+    if good in HEAPS:
+        return _heap
+    if good in TANKS:
+        return _tank
+    return CAR_BODIES.get(good, _bare)
+
+
+def _bare(m: Model, good: Good, full: bool) -> None:
+    """Nothing on the frame."""
+
+
+def _van(m: Model, good: Good, full: bool) -> None:
+    h = CAR_HALF
+    body, stripe = VANS[good]
+    m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
+    m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), ROOF_GREY)
+    m.panel((-0.06, 0.06), (0.07, 0.22), 0.0805, shade(body, 0.7) if full else WINDOW)
+    m.panel((-h + 0.01, h - 0.01), (0.2, 0.215), 0.0806, stripe)
+
+
+def _hopper(m: Model, good: Good, full: bool) -> None:
+    h = CAR_HALF
+    body, load = HOPPERS[good]
+    m.box((-h, h), (-0.08, 0.08), (0.06, 0.19), body)
+    m.panel((-h + 0.02, h - 0.02), (0.08, 0.17), 0.0805, shade(body, 0.85))
+    if full:
+        m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.19, 0.22), load)
+        m.box((-0.1, 0.1), (-0.05, 0.05), (0.22, 0.24), load)
+
+
+def _heap(m: Model, good: Good, full: bool) -> None:
+    h = CAR_HALF
+    m.box((-h, h), (-0.08, 0.08), (0.06, 0.13), DECK)
+    m.panel((-h + 0.02, h - 0.02), (0.075, 0.12), 0.0805, shade(DECK, 0.8))
+    if full:
+        m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.13, 0.17), HEAPS[good])
+        m.box((-0.13, 0.13), (-0.05, 0.05), (0.17, 0.2), HEAPS[good])
+
+
+def _tank(m: Model, good: Good, full: bool) -> None:
+    h = CAR_HALF
+    m.box((-h, h), (-0.07, 0.07), (0.06, 0.085), DECK)
+    m.cylinder_along((-h + 0.01, h - 0.01), 0.08, 0.165, TANKS[good])
+    m.cylinder_up(0.0, 0.025, (0.24, 0.27), TANKS[good])
+
+
+def _deck(m: Model) -> None:
+    h = CAR_HALF
+    m.box((-h, h), (-0.08, 0.08), (0.06, 0.085), DECK)
+
+
+def _car_carrier(m: Model, good: Good, full: bool) -> None:
+    _deck(m)
+    if full:
+        for u in (-0.12, 0.12):
+            m.box((u - 0.09, u + 0.09), (-0.05, 0.05), (0.095, 0.14), AUTO_BODY)
+            m.box((u - 0.05, u + 0.05), (-0.045, 0.045), (0.14, 0.18), WINDOW)
+
+
+def _tank_carrier(m: Model, good: Good, full: bool) -> None:
+    _deck(m)
+    if full:
+        m.box((-0.2, 0.2), (-0.07, 0.07), (0.085, 0.15), TANK_HULL)
+        m.box((-0.08, 0.08), (-0.05, 0.05), (0.15, 0.2), shade(TANK_HULL, 0.85))
+        m.box((0.08, 0.26), (-0.012, 0.012), (0.165, 0.185), shade(TANK_HULL, 0.6))
+
+
+def _plane_carrier(m: Model, good: Good, full: bool) -> None:
+    _deck(m)
+    if full:
+        m.box((-0.24, 0.24), (-0.03, 0.03), (0.09, 0.15), PLANE_BODY)
+        m.box((-0.05, 0.05), (-0.085, 0.085), (0.12, 0.135), shade(PLANE_BODY, 0.85))
+        m.box((-0.24, -0.17), (-0.012, 0.012), (0.15, 0.2), shade(PLANE_BODY, 0.75))
+
+
+def _boxcar(m: Model, good: Good, full: bool) -> None:
+    h = CAR_HALF
+    body, roof = {
+        Good.GOODS: (BOXCAR, ROOF_GREY),
+        Good.CANS: (BOXCAR, ROOF_GREY),
+        Good.BANANAS: (BANANA_VAN, (240, 236, 220)),
+        Good.BREAD: (BREAD_VAN, (236, 226, 204)),
+    }[good]
+    m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
+    m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), roof)
+    door = shade(body, 0.7) if full else WINDOW
+    m.panel((-0.06, 0.06), (0.07, 0.22), 0.0805, door)
+    m.panel((-h + 0.01, h - 0.01), (0.07, 0.085), 0.0806, shade(body, 0.75))
+    if good == Good.CANS:
+        m.panel((-h + 0.01, h - 0.01), (0.2, 0.215), 0.0806, CANS_STRIPE)
+
+
+def _grain_hopper(m: Model, good: Good, full: bool) -> None:
+    h = CAR_HALF
+    body = GRAIN_HOPPER if good == Good.WHEAT else SUGAR_HOPPER
+    m.box((-h, h), (-0.08, 0.08), (0.06, 0.2), body)
+    m.panel((-h + 0.02, h - 0.02), (0.08, 0.18), 0.0805, shade(body, 0.85))
+    if good == Good.SUGAR:
+        m.box((-h + 0.01, h - 0.01), (-0.07, 0.07), (0.2, 0.235), shade(body, 0.95))
+    elif full:
+        m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.2, 0.22), GRAIN)
+        m.box((-0.12, 0.12), (-0.05, 0.05), (0.22, 0.24), GRAIN)
+
+
+def _fruit_wagon(m: Model, good: Good, full: bool) -> None:
+    h = CAR_HALF
+    m.box((-h, h), (-0.08, 0.08), (0.06, 0.13), DECK)
+    m.panel((-h + 0.02, h - 0.02), (0.075, 0.12), 0.0805, shade(DECK, 0.8))
+    if full:
+        fruit = {Good.APPLES: APPLE, Good.DATES: DATE, Good.ORANGES: ORANGE}[good]
+        m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.13, 0.16), fruit)
+        m.box((-0.13, 0.13), (-0.05, 0.05), (0.16, 0.18), fruit)
+        if good == Good.APPLES:
+            for u in (-0.15, -0.05, 0.06, 0.14):
+                m.box((u - 0.012, u + 0.012), (-0.04, -0.02), (0.16, 0.175), APPLE_LIGHT)
+
+
+def _coal_hopper(m: Model, good: Good, full: bool) -> None:
+    h = CAR_HALF
+    m.box((-h, h), (-0.08, 0.08), (0.06, 0.19), HOPPER)
+    m.panel((-h + 0.02, h - 0.02), (0.08, 0.17), 0.0805, shade(HOPPER, 0.85))
+    if full:
+        m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.19, 0.22), COAL)
+        m.box((-0.1, 0.1), (-0.05, 0.05), (0.22, 0.24), COAL)
+
+
+def _log_wagon(m: Model, good: Good, full: bool) -> None:
+    h = CAR_HALF
+    m.box((-h, h), (-0.08, 0.08), (0.06, 0.085), DECK)
+    for u in (-h + 0.005, h - 0.025):
+        m.box((u, u + 0.02), (-0.08, 0.08), (0.085, 0.2), FRAME)
+    if full:
+        for row, z in enumerate((0.115, 0.17)):
+            for v in (-0.045, 0.0, 0.045)[: 3 - row]:
+                m.cylinder_along((-h + 0.03, h - 0.03), 0.026, z, LOG, LOG_END)
+                m.faces[-CYLINDER_SIDES - 2 :] = [
+                    Face([(c[0], c[1] + v, c[2]) for c in f.corners], f.color, f.normal)
+                    for f in m.faces[-CYLINDER_SIDES - 2 :]
+                ]
+
+
+def _coach(m: Model, good: Good, full: bool) -> None:
+    h = CAR_HALF
+    m.box((-h, h), (-0.08, 0.08), (0.06, 0.23), COACH)
+    m.box((-h - 0.01, h + 0.01), (-0.086, 0.086), (0.23, 0.25), ROOF_GREY)
+    m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.25, 0.265), ROOF_GREY)
+    m.panel((-h + 0.01, h - 0.01), (0.105, 0.122), 0.0805, COACH_BAND)
+    window = LIT_WINDOW if full else WINDOW
+    for u in (-0.17, -0.085, 0.0, 0.085, 0.17):
+        m.panel((u - 0.03, u + 0.03), (0.135, 0.195), 0.0806, window)
+    m.panel((-h + 0.01, h - 0.01), (0.07, 0.085), 0.0806, shade(COACH, 0.75))
+
+
+def _mail_van(m: Model, good: Good, full: bool) -> None:
+    h = CAR_HALF
+    m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), MAIL_VAN)
+    m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), ROOF_GREY)
+    m.panel((-h + 0.01, h - 0.01), (0.2, 0.215), 0.0805, BRASS)
+    door = shade(MAIL_VAN, 0.7) if full else WINDOW
+    m.panel((-0.05, 0.05), (0.07, 0.19), 0.0806, door)
+    m.panel((-h + 0.03, -h + 0.08), (0.15, 0.19), 0.0806, WINDOW)
+    m.panel((h - 0.08, h - 0.03), (0.15, 0.19), 0.0806, WINDOW)
+
+
+def _steel_wagon(m: Model, good: Good, full: bool) -> None:
+    h = CAR_HALF
+    _deck(m)
+    if full:
+        for v in (-0.04, 0.04):
+            m.box((-h + 0.03, h - 0.03), (v - 0.03, v + 0.03), (0.085, 0.12), STEEL)
+        m.box((-h + 0.05, h - 0.05), (-0.03, 0.03), (0.12, 0.155), STEEL)
+
+
+# The body of each car that is not a van, hopper, heap or tank (VANS, HOPPERS, HEAPS, TANKS).
+CAR_BODIES: dict[Good, CarBody] = {
+    Good.CARS: _car_carrier,
+    Good.TANKS: _tank_carrier,
+    Good.PLANES: _plane_carrier,
+    Good.GOODS: _boxcar,
+    Good.CANS: _boxcar,
+    Good.BANANAS: _boxcar,
+    Good.BREAD: _boxcar,
+    Good.WHEAT: _grain_hopper,
+    Good.SUGAR: _grain_hopper,
+    Good.APPLES: _fruit_wagon,
+    Good.DATES: _fruit_wagon,
+    Good.ORANGES: _fruit_wagon,
+    Good.COAL: _coal_hopper,
+    Good.LUMBER: _log_wagon,
+    Good.PASSENGERS: _coach,
+    Good.MAIL: _mail_van,
+    Good.STEEL: _steel_wagon,
+}
 
 
 def shade(color: RGB, factor: float) -> RGB:

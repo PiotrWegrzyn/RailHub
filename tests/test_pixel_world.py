@@ -11,17 +11,11 @@ from railroads.ui.biomes import Biome
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 from railroads.ui.pixel.art import SPRITES, draw_sheet, relief
 from railroads.ui.pixel.layer import resolution_for
+from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection, hash01
 from railroads.ui.pixel.sheet import FINE, SHEET_INDEX, SpriteSheet
+from railroads.ui.pixel.track_art import RAIL, WIRE
 from railroads.ui.pixel.track_preview import ghost
-from railroads.ui.pixel.world import (
-    CHUNK,
-    RAIL,
-    WIRE,
-    ChunkPlacement,
-    PixelProjection,
-    PixelWorld,
-    hash01,
-)
+from railroads.ui.pixel.world import PixelWorld
 
 LOOKS = {HexGrid: (0.0, 1.0), SquareGrid: (-45.0, float(np.sqrt(2)))}
 
@@ -324,8 +318,12 @@ def test_relief_sprites_are_lit_on_the_left_and_shaded_on_the_right(peaked: bool
 def test_slopes_facing_the_light_are_lighter_than_slopes_facing_away(sheet: SpriteSheet) -> None:
     rising_east, rising_west = make_hilly_world(sheet, 120.0), make_hilly_world(sheet, -120.0)
 
-    facing_light = rising_east._relief_light[rising_east._relief_light.shape[0] // 2, 20:30]
-    facing_away = rising_west._relief_light[rising_west._relief_light.shape[0] // 2, 20:30]
+    facing_light = rising_east.ground._relief_light[
+        rising_east.ground._relief_light.shape[0] // 2, 20:30
+    ]
+    facing_away = rising_west.ground._relief_light[
+        rising_west.ground._relief_light.shape[0] // 2, 20:30
+    ]
 
     assert facing_light.mean() > 0.3
     assert facing_away.mean() < -0.3
@@ -442,8 +440,8 @@ def test_fine_track_keeps_one_pixel_rails_over_twice_the_pixels(sheet: SpriteShe
     px, py = world.projection.to_pixels(*tile_map.grid.center(10, 3))
     left, top = int(px) - 32, int(py) - 32
 
-    coarse = world.track_layer([piece], left, top, 64, 64)
-    fine = world.track_layer([piece], left, top, 64, 64, FINE)
+    coarse = world.track.layer([piece], left, top, 64, 64)
+    fine = world.track.layer([piece], left, top, 64, 64, FINE)
 
     rails = [
         np.all(np.abs(layer[..., :3] - np.array(RAIL) / 255) < 0.01, axis=-1)

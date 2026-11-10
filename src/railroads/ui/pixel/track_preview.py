@@ -1,5 +1,5 @@
 """Shows track the player is about to lay as the real track would look, greyed out, over the pixel
-map: the planned pieces drawn like laid track (PixelWorld.track_layer) into a picture of just the
+map: the planned pieces drawn like laid track (railroads.ui.pixel.track_art) into a picture of just the
 area they cover, as finely as the map's chunks are drawn, faded to grey and see-through."""
 
 import numpy as np
@@ -73,7 +73,7 @@ class TrackPreview:
         left, top = int(np.min(xs)) - reach, int(np.min(ys)) - reach
         width, height = int(np.max(xs)) + reach - left, int(np.max(ys)) + reach - top
         resolution = resolution_for(device_scale, self.world.resolutions)
-        pixels = ghost(self.world.track_layer(pieces, left, top, width, height, resolution))
+        pixels = ghost(self.world.track.layer(pieces, left, top, width, height, resolution))
         most = int((MOST_PIXELS / max(width * height * resolution**2, 1)) ** 0.5)
         factor = max(1, min(device_scale // resolution, most))
         big = np.repeat(np.repeat(pixels, factor, axis=0), factor, axis=1)

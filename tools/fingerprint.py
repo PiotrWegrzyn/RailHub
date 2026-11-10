@@ -28,8 +28,8 @@ from railroads.sim.routes import plan_route
 from railroads.sim.stats import History
 from railroads.ui.build_menu import BuildMenu, Tool
 from railroads.ui.map_view import MapView
+from railroads.ui.pixel.projection import CHUNK
 from railroads.ui.pixel.sheet import FINE
-from railroads.ui.pixel.world import CHUNK
 
 SEED = 7
 YEARS = 1000

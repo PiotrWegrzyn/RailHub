@@ -4,8 +4,8 @@ import numpy as np
 
 from railroads.sim.goods import Good
 from railroads.sim.grids import HexGrid
+from railroads.ui.pixel.projection import PixelProjection
 from railroads.ui.pixel.trains import HEADINGS, MODELS, Look, render, train_sprites
-from railroads.ui.pixel.world import PixelProjection
 
 
 def projection() -> PixelProjection:

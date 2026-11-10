@@ -105,7 +105,9 @@ pixels per art pixel.
   on it as sprites, back to front. Hills and mountain peaks are small height fields lit from the
   left, drawn in grey in the sheet, and take the shades of the ground under them, so the same hill
   fits grass, forest or desert; the tallest peaks keep white snow on top. The map is drawn in
-  256-pixel chunks as the view reaches them and kept as textures. Wherever an art pixel covers
+  256-pixel chunks as the view reaches them and kept as textures (`world`). Each chunk is put
+  together from the ground (`ground`), the track (`track_art`) and what stands on it (`scenery`),
+  and `projection` says where map points land in the picture. Wherever an art pixel covers
   an even number of screen pixels (2 and 4 times, and every zoom on a Retina screen), chunks are
   drawn twice as finely. The ground is blown up as before, but track, trees and buildings are
   drawn at 2× from the finer sprite sheet, so their outlines and windows stay thin instead of
@@ -118,7 +120,9 @@ pixels per art pixel.
 - `railroads.ui.minimap`: the world with the map marked on it, from a quarter-degree picture of
   the world's land baked into `src/railroads/maps/world-land.npz`, next to the whole map.
 
-The sprites are drawn in code by `railroads.ui.pixel.art` and saved to
+The sprites are drawn in code by `railroads.ui.pixel.art`, one module per family (nature, homes,
+farms, mines, industry, commerce, military, churches, stations, landmarks), with the Painter in
+`painter` and shared pieces in `parts`. They are saved to
 `src/railroads/ui/pixel/sprites.png`, with `sprites.json` saying where each one sits and which pixel
 stands on the ground. `sprites@2x.png` and `sprites@2x.json` hold the same sprites drawn twice as
 finely, in the same order. The same drawing code makes them with every coordinate doubled and lines

@@ -47,11 +47,12 @@ from railroads.ui.map_overlays import (
 )
 from railroads.ui.map_tools import MapTools
 from railroads.ui.minimap import Minimap, MinimapLayout, view_corners
+from railroads.ui.pixel.ground import GLOW, glow_strength
 from railroads.ui.pixel.layer import PixelLayer
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.track_preview import TrackPreview
 from railroads.ui.pixel.train_layer import TrainLayer
-from railroads.ui.pixel.world import GLOW, PixelWorld, glow_strength
+from railroads.ui.pixel.world import PixelWorld
 from railroads.ui.search import BuildingSearch
 from railroads.ui.station_window import StationWindow
 from railroads.ui.summaries_panel import SummariesPanel

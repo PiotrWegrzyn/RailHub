@@ -10,7 +10,8 @@ import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
 from railroads.ui.iso_camera import IsoCamera, Vec2
-from railroads.ui.pixel.world import CHUNK, ChunkPlacement, PixelWorld, Rgba
+from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, Rgba
+from railroads.ui.pixel.world import PixelWorld
 
 # Time a frame may spend drawing new chunks; at least one is always drawn.
 FRAME_BUDGET_S = 0.025
