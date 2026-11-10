@@ -86,7 +86,7 @@ def main() -> None:
     def click(tool: Tool, *cells: Cell) -> None:
         view.build.choose(tool)
         for cell in cells:
-            view._click(cell)
+            view.tools.click(cell)
 
     view.railway.finances.cash = 5_000_000.0
     a, b, c = towns(view, 3)
@@ -98,8 +98,8 @@ def main() -> None:
     play_months(24)
     beside = view.tile_map.grid.neighbours(*a)[0]
     click(Tool.BULLDOZE, beside, (0, 0))
-    view.start_moving(c)
-    view._click(view.tile_map.grid.neighbours(*c)[1])
+    view.tools.start_moving(c)
+    view.tools.click(view.tile_map.grid.neighbours(*c)[1])
     play_months(12)
     with contextlib.redirect_stdout(io.StringIO()) as printed:
         view.simulate(STAND_IN_YEARS, np.random.default_rng(SEED + 2))

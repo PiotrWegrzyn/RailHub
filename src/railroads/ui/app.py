@@ -2,7 +2,6 @@ import argparse
 import random
 
 import numpy as np
-from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui, immapp
 
 from railroads import maps
@@ -11,8 +10,6 @@ from railroads.newgame import start_new_game
 from railroads.sim.clock import (
     END_YEAR,
     HISTORY_START,
-    MAX_PLAY_SPEED,
-    SPEEDS,
     START_YEAR,
     GameClock,
 )
@@ -24,9 +21,8 @@ from railroads.ui.help_window import HelpWindow
 from railroads.ui.map_view import MapView
 from railroads.ui.reports_window import ReportsWindow
 from railroads.ui.tech_window import TechWindow
-from railroads.ui.theme import BRASS, apply_theme, toggle_button
-
-HELP_BUTTON_WIDTH = 30.0
+from railroads.ui.theme import apply_theme
+from railroads.ui.top_bar import draw_top_bar
 
 
 class App:
@@ -56,7 +52,7 @@ class App:
         first = self.clock.months
         for month in range(first + 1, first + 1 + self.clock.advance(seconds)):
             self.view.month_passed(self.rng, self.clock.date_of(month))
-        self._draw_top_bar()
+        draw_top_bar(self)
         self.view.gui()
         self.help.draw()
         self.tech.draw(self.view.railway.research)
@@ -71,42 +67,6 @@ class App:
             self.tech.open = not self.tech.open
         if not typing and imgui.is_key_pressed(imgui.Key.g, repeat=False):
             self.reports.open = not self.reports.open
-
-    def _draw_top_bar(self) -> None:
-        imgui.align_text_to_frame_padding()
-        imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_CLOCK}  {self.clock.date}")
-        imgui.same_line(0, 16)
-        self.view.draw_money()
-        imgui.same_line(0, 16)
-        for speed in SPEEDS:
-            testing = speed > MAX_PLAY_SPEED
-            tooltip = f"Run {speed} times as fast" + (" (for testing)" if testing else "")
-            if testing:
-                imgui.push_style_var(imgui.StyleVar_.alpha.value, 0.6)
-            if toggle_button(f"x{speed}", self.clock.speed == speed, tooltip):
-                self.clock.speed = speed
-            if testing:
-                imgui.pop_style_var()
-            imgui.same_line(0, 2)
-        imgui.same_line(0, 16)
-        self.view.draw_controls()
-        if self.title:
-            imgui.same_line(0, 16)
-            imgui.align_text_to_frame_padding()
-            imgui.text_disabled(self.title)
-        padding = imgui.get_style().window_padding.x
-        imgui.same_line(imgui.get_window_width() - padding - 3 * HELP_BUTTON_WIDTH - 8)
-        label = fa.ICON_FA_CHART_BAR
-        if toggle_button(label, self.reports.open, "Reports (G)", (HELP_BUTTON_WIDTH, 0)):
-            self.reports.open = not self.reports.open
-        imgui.same_line(0, 4)
-        label = fa.ICON_FA_FLASK
-        if toggle_button(label, self.tech.open, "Tech trees (R)", (HELP_BUTTON_WIDTH, 0)):
-            self.tech.open = not self.tech.open
-        imgui.same_line(0, 4)
-        label = fa.ICON_FA_QUESTION_CIRCLE
-        if toggle_button(label, self.help.open, "Buildings and goods (H)", (HELP_BUTTON_WIDTH, 0)):
-            self.help.open = not self.help.open
 
 
 def main() -> None:

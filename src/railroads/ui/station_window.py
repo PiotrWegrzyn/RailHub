@@ -44,7 +44,9 @@ class StationWindow:
         expanded, still_open = imgui.begin(f"{fa.ICON_FA_BUILDING}  {name}###station", True, flags)
         if expanded:
             self._draw_body(railway, station, look_at, upgraded)
-            label = f"{fa.ICON_FA_ARROWS}  Move it, keeping its trains  {dollars(STATION_PRICE)}+"
+            label = (
+                f"{fa.ICON_FA_ARROWS_ALT}  Move it, keeping its trains  {dollars(STATION_PRICE)}+"
+            )
             if _priced_button(label, railway.finances.can_afford(STATION_PRICE)):
                 move(station)
         imgui.end()

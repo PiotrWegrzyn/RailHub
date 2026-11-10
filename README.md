@@ -111,6 +111,10 @@ pixels per art pixel.
   drawn at 2× from the finer sprite sheet, so their outlines and windows stay thin instead of
   growing blocky. A chunk takes about a third longer to draw and four times the memory; nothing
   changes from frame to frame.
+- `railroads.ui.map_view`: the map view, which owns the layers and the order they draw in. Beside it:
+  `map_input` (mouse and keys), `map_tools` (what clicks do with each build tool), `map_overlays`
+  (outlines, grid lines, station names, compass, search marks, the status strip and hover card)
+  and `top_bar`.
 - `railroads.ui.minimap`: the world with the map marked on it, from a quarter-degree picture of
   the world's land baked into `src/railroads/maps/world-land.npz`, next to the whole map.
 

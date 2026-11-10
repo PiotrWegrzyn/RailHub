@@ -10,7 +10,7 @@ from railroads.sim.geo import Bounds
 from railroads.sim.goods import Good, Need
 from railroads.sim.grids import HexGrid
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
-from railroads.ui import map_view
+from railroads.ui import map_overlays
 from railroads.ui.map_view import MapView
 
 
@@ -48,12 +48,11 @@ def test_the_card_lists_each_building_with_what_it_makes_and_needs(
     constructions = Constructions(make_map())
     constructions.build(Building((5, 5), BuildingKind.HOUSE))
     constructions.build(Building((5, 5), BuildingKind.BAKERY))
-    view = MapView(Game(constructions))
-    view._hovered = (5, 5)
+    growth = Game(constructions).growth
     drawn: list[Good | Need] = []
-    monkeypatch.setattr(map_view, "good_icon", lambda good, **_: drawn.append(good))
+    monkeypatch.setattr(map_overlays, "good_icon", lambda good, **_: drawn.append(good))
 
-    view._draw_hovered_buildings((10.0, 40.0))
+    map_overlays.draw_hovered_buildings(growth, (5, 5), (10.0, 40.0))
 
     assert Good.BREAD in drawn
     assert Need.WHEAT in drawn
@@ -65,6 +64,6 @@ def test_a_left_click_on_a_station_opens_it() -> None:
     constructions.build(Station((5, 5)))
     view = MapView(Game(constructions))
 
-    view._click((5, 5))
+    view.tools.click((5, 5))
 
     assert view.station_window.station == (5, 5)
