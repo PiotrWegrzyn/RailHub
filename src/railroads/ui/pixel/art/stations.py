@@ -7,6 +7,7 @@ from collections.abc import Callable
 import numpy as np
 
 from railroads.sim.grids import HexGrid
+from railroads.ui.pixel.art.homes import _doorstep, _foot
 from railroads.ui.pixel.art.painter import (
     BRICK,
     NAME_BOARD,
@@ -72,13 +73,18 @@ def station() -> Sprite:
     canopy over the platform, a blue name board and a lamp by the white platform edge."""
     p = Painter(34, 38, (16, 27))
     house = p.hall(*_iso(0, 0, 1, 3), 9, 5, 6, STATION_WALL, None)
-    left, front, *_ = house
+    left, front, right, back = house
     _patch(p, left, front, (0, 1), (4.5, 6), BRICK)
+    _patch(p, front, right, (0, 1), (4.5, 6), shade(BRICK, 0.78))
     _windows(p, left, front, (0.2, 0.75), (1.5,), 2)
+    _windows(p, front, right, (0.5,), (1.5,), 2, shade(WINDOW, 0.75))
     _patch(p, left, front, (0.42, 0.58), (2, 6), (88, 60, 44))
+    _foot(p, house, 6)
+    _doorstep(p, left, front, (0.38, 0.62), 6, shade(STATION_WALL, 0.8))
     p.gable(house, 4, STATION_ROOF, STATION_WALL)
-    chimney = _on_wall(house[0], house[3], 0.5, -5)
-    p.rect(chimney[0] - 1, chimney[1] - 3, chimney[0] + 1, chimney[1], BRICK)
+    cx, cy = _on_wall(_on_wall(left, back, 0.5, -4), _on_wall(front, right, 0.5, -4), 0.3, 0)
+    p.rect(cx - 1, cy - 2, cx + 0.5, cy + 1, BRICK)
+    p.line([(cx - 1, cy - 2.5), (cx + 0.5, cy - 2.5)], shade(BRICK, 0.55))
     _canopy(p, *_iso(0, 0, 0, -1.5), 10, 3, 5)
     _name_board(p, *_iso(0, 0, -5, -4.5))
     _lamp(p, *_iso(0, 0, 5.5, -5))
@@ -95,6 +101,9 @@ def station_2() -> Sprite:
     _windows(p, left, front, (0.1, 0.25, 0.4, 0.6, 0.75, 0.9), (1.5, 5.5), 2)
     _patch(p, left, front, (0.44, 0.56), (6.5, 10), (88, 60, 44))
     _windows(p, front, right, (0.3, 0.7), (1.5, 5.5), 2, shade(WINDOW, 0.75))
+    _patch(p, front, right, (0, 1), (9, 10), shade(BRICK, 0.78))
+    _foot(p, house, 10)
+    _doorstep(p, left, front, (0.4, 0.6), 10, shade(STATION_WALL, 0.8))
     p.gable(house, 4, STATION_ROOF, STATION_WALL)
     gx, gy = _iso(0, 0, 0, 1.5)
     gable = p.hall(gx, gy, 5, 1, 10, STATION_WALL, None)
@@ -116,9 +125,12 @@ def station_3() -> Sprite:
     left, front, *_ = house
     _patch(p, left, front, (0, 1), (10, 11), BRICK)
     _windows(p, left, front, tuple(k / 10 for k in range(1, 10)), (1.5, 5.5), 2)
+    _foot(p, house, 11)
     p.gable(house, 3, STATION_ROOF, STATION_WALL)
     tx, ty = _iso(0, 0, -5, 5)
     tower = p.box(tx, ty, 2.5, 22, STATION_WALL, None)
+    _patch(p, tower[0], tower[1], (0, 1), (21, 22), BRICK)
+    _patch(p, tower[1], tower[2], (0, 1), (21, 22), shade(BRICK, 0.78))
     for a, b in ((tower[0], tower[1]), (tower[1], tower[2])):
         p.line([_on_wall(a, b, 0, 1), _on_wall(a, b, 1, 1)], shade(STATION_WALL, 1.08))
         _windows(p, a, b, (0.5,), (8, 13), 2)
@@ -133,7 +145,9 @@ def station_3() -> Sprite:
     for t in np.linspace(0.07, 0.93, 7):
         p.line([_on_wall(sl, sf, t, 0.5), _on_wall(sl, sf, t, 5)], iron)
     _patch(p, sl, sf, (0, 1), (0, 1), STATION_ROOF)
+    _foot(p, shed, 5)
     _vault(p, shed, 7, glass, glass, tuple(k / 8 for k in range(1, 8)), iron)
+    _patch(p, sf, sr, (0, 1), (4, 5), shade(BRICK, 0.78))
     _patch(p, sf, sr, (0.25, 0.75), (1.5, 5), (52, 56, 66))
     board = _on_wall(sf, sr, 0.5, 0.5)
     p.rect(board[0] - 3, board[1] - 2, board[0] + 3, board[1] + 1, NAME_BOARD)

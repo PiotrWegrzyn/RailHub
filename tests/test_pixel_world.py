@@ -148,7 +148,7 @@ def test_hexagons_are_one_pixel_cell_wide_and_squares_two_to_one_diamonds() -> N
     assert east == pytest.approx((PIXEL_CELL_WIDTH / 2, -PIXEL_CELL_WIDTH / 2 * TILT))
 
 
-def test_trees_grow_only_in_unbuilt_forest_and_everything_is_sorted_back_to_front(
+def test_woods_stand_as_a_canopy_not_trees_and_everything_is_sorted_back_to_front(
     sheet: SpriteSheet,
 ) -> None:
     world = make_world(sheet)
@@ -158,10 +158,50 @@ def test_trees_grow_only_in_unbuilt_forest_and_everything_is_sorted_back_to_fron
     x, y = world.projection.to_plane(scenery.x[trees], scenery.y[trees])
     rows, cols = world.tile_map.grid.cell_at(x, y)
     in_forest = world.tile_map.vegetation[rows, cols] == Vegetation.FOREST
-    in_mill_cell = (rows == 4) & (cols == 8)
-    assert in_forest.mean() > 0.95
-    assert not in_mill_cell.any()
+    assert not in_forest.any()
     assert (np.diff(scenery.y) >= 0).all()
+
+
+def woods_and_meadow(world: PixelWorld) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    grid = world.tile_map.grid
+    px, py = world.projection.to_pixels(*grid.center(3, 9))
+    chunk = (int(px) // CHUNK, int(py) // CHUNK)
+    picture = world.render(*chunk)
+    left, top = chunk[0] * CHUNK, chunk[1] * CHUNK
+    iy, ix = np.mgrid[0:CHUNK, 0:CHUNK]
+    r, c = grid.cell_at(*world.projection.to_plane(left + ix + 0.5, top + iy + 0.5))
+    inside = grid.contains(r, c)
+    r, c = np.clip(r, 0, grid.rows - 1), np.clip(c, 0, grid.cols - 1)
+    forest = inside & (world.tile_map.vegetation[r, c] == Vegetation.FOREST)
+    meadow = inside & (world.tile_map.vegetation[r, c] == Vegetation.GRASS) & (r >= 9)
+    return picture, forest, meadow
+
+
+def test_woods_are_drawn_darker_than_meadow_with_crowns_and_floor(sheet: SpriteSheet) -> None:
+    world = make_world(sheet, houses=0)
+
+    picture, forest, meadow = woods_and_meadow(world)
+
+    woods = picture[forest][:, :3].astype(int)
+    grass = picture[meadow][:, :3].astype(int)
+    assert woods.sum(axis=1).mean() < 0.75 * grass.sum(axis=1).mean()
+    assert len(np.unique(woods, axis=0)) > 20
+
+
+def test_woods_clear_round_what_is_built_in_them(sheet: SpriteSheet) -> None:
+    world = make_world(sheet, houses=0)
+    grid = world.tile_map.grid
+    canvas = np.ones((CHUNK, CHUNK, 4), dtype=np.float32)
+    px, py = world.projection.to_pixels(*grid.center(4, 8))
+    left, top = int(px) - CHUNK // 2, int(py) - CHUNK // 2
+
+    world.ground.canopy(canvas, left, top, 1)
+
+    mill = canvas[CHUNK // 2 - 2 : CHUNK // 2 + 3, CHUNK // 2 - 2 : CHUNK // 2 + 3, :3]
+    fx, fy = world.projection.to_pixels(*grid.center(2, 10))
+    forest = canvas[int(fy) - top, int(fx) - left, :3]
+    assert (mill == 1).all()
+    assert (forest < 1).all()
 
 
 def test_every_building_gets_its_sprite(sheet: SpriteSheet) -> None:
@@ -475,3 +515,29 @@ def test_chunks_are_drawn_fine_where_they_blow_up_evenly(screen: int, resolution
     chosen = resolution_for(screen, (1, FINE))
 
     assert chosen == resolution
+
+
+def test_meadow_grass_is_shaded_smoothly_rather_than_in_a_few_steps(sheet: SpriteSheet) -> None:
+    world = make_world(sheet, houses=0)
+    px, py = world.projection.to_pixels(*world.tile_map.grid.center(12, 4))
+    left, top = int(px) - 40, int(py) - 20
+
+    rgb, _ = world.ground.render(left, top, 40)
+
+    shades = np.unique(rgb[:, :80].round().astype(int).reshape(-1, 3), axis=0)
+    assert len(shades) > 40
+
+
+def test_grass_lies_darker_in_the_shade_of_a_tree(sheet: SpriteSheet) -> None:
+    world = make_world(sheet, houses=0)
+    px, py = world.projection.to_pixels(*world.tile_map.grid.center(12, 4))
+    left, top = int(px) - 40, int(py) - 20
+    world.ground.trees = (np.zeros(0, np.float32), np.zeros(0, np.float32))
+    open_grass, _ = world.ground.render(left, top, 40)
+
+    world.ground.trees = (np.array([px], np.float32), np.array([py], np.float32))
+    shaded, _ = world.ground.render(left, top, 40)
+
+    foot = (20 + 1, 40 + 3)
+    assert shaded[foot].sum() < 0.85 * open_grass[foot].sum()
+    assert np.array_equal(shaded[:, :20], open_grass[:, :20])

@@ -23,6 +23,10 @@ type Color = tuple[int, int, int]
 FloatArray = npt.NDArray[np.float64]
 
 SLOT_RADIUS = 0.3
+# How far from its cell's middle a farmstead stands at the back of the field filling its cell,
+# in cells, and how far either side of straight back it may stand, in radians.
+FARMSTEAD_OUT = 0.42
+FARMSTEAD_SWING = 0.7
 DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.HOUSE: ((176, 66, 50), 0.09),
     BuildingKind.TENEMENT: ((206, 150, 96), 0.12),
@@ -128,7 +132,12 @@ class BuildingSpots:
     variants: list[int]
 
     @classmethod
-    def of(cls, constructions: Constructions) -> Self:
+    def of(
+        cls, constructions: Constructions, at_back: frozenset[BuildingKind] = frozenset()
+    ) -> Self:
+        """Where each building stands: buildings of the kinds `at_back`, the farmsteads of
+        fields filling their cell, stand at the back edge of their field, so it lies in front
+        of them."""
         grid = constructions.tile_map.grid
         used: dict[Cell, int] = {}
         x, y, kinds, variants = [], [], [], []
@@ -141,8 +150,13 @@ class BuildingSpots:
             slots = np.arange(first, first + built.space) + 0.5
             angles = _cell_turn(row, col) + 2 * math.pi * slots / CELL_SPACE
             center_x, center_y = grid.center(row, col)
-            x.append(center_x + SLOT_RADIUS * float(np.cos(angles).mean()))
-            y.append(center_y + SLOT_RADIUS * float(np.sin(angles).mean()))
+            if built.kind in at_back:
+                turn = -math.pi / 2 + FARMSTEAD_SWING * math.sin(_cell_turn(row, col) * 37)
+                x.append(center_x + FARMSTEAD_OUT * math.cos(turn))
+                y.append(center_y + FARMSTEAD_OUT * math.sin(turn))
+            else:
+                x.append(center_x + SLOT_RADIUS * float(np.cos(angles).mean()))
+                y.append(center_y + SLOT_RADIUS * float(np.sin(angles).mean()))
             kinds.append(built.kind)
             variants.append((row * 7 + col * 13 + first) % 16)
         return cls(np.array(x), np.array(y), kinds, variants)

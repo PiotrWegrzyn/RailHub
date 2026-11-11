@@ -23,10 +23,10 @@ from railroads.sim.constructions import Constructions, Track
 from railroads.sim.grids import Cell
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
-from railroads.ui.pixel.ground import Ground
+from railroads.ui.pixel.ground import FIELD_KINDS, YARD_REACH, Ground
 from railroads.ui.pixel.projection import CHUNK, FloatArray, IntArray, PixelProjection, Rgba
-from railroads.ui.pixel.relief import MOST_LIFT, Elevation, raise_picture, raycast
-from railroads.ui.pixel.scenery import Scenery
+from railroads.ui.pixel.relief import MOST_LIFT, Elevation, lighting, raise_picture, raycast
+from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
 from railroads.ui.pixel.sheet import FINE, SpriteSheet
 from railroads.ui.pixel.track_art import TrackArt
 
@@ -62,6 +62,7 @@ class PixelWorld:
         )
         # The ground and the track over it (railroads.ui.pixel.ground, railroads.ui.pixel.track_art).
         self.ground = Ground(tile_map, constructions, self.projection, angle_deg, self.elevation)
+        self._shade_trees()
         self.track = TrackArt(tile_map, constructions, self.projection, self.elevation)
         # The sprites at each resolution chunks can be drawn at: the sheet, and the same sprites
         # drawn finer if there are any.
@@ -97,7 +98,37 @@ class PixelWorld:
             self.station_levels,
             self.elevation,
         )
+        self._shade_trees()
         return self._chunks_around(cells)
+
+    def _shade_trees(self) -> None:
+        """Tells the ground where trees stand, so the grass round them lies in their shade."""
+        trees = np.isin(
+            self.scenery.sprite, [*self.sheet.variants("pine"), *self.sheet.variants("leafy")]
+        )
+        self.ground.trees = (
+            self.scenery.x[trees].astype(np.float32),
+            self.scenery.y[trees].astype(np.float32),
+        )
+        farmsteads = {BUILDING_SPRITES[kind] for kind in FIELD_KINDS if kind in BUILDING_SPRITES}
+        kinds = np.array(
+            ["farmyard" if name in farmsteads else _yard_of(name) for name in self.sheet.names]
+        )
+        reaches = np.array(
+            [
+                YARD_REACH.get(kind, max(6.0, float(width) * YARD_SHARE))
+                for kind, width in zip(kinds, self.sheet.sizes[:, 0], strict=True)
+            ],
+            dtype=np.float32,
+        )
+        yards = kinds[self.scenery.sprite]
+        built = yards != ""
+        self.ground.buildings = (
+            self.scenery.x[built].astype(np.float32),
+            self.scenery.y[built].astype(np.float32),
+            yards[built],
+            reaches[self.scenery.sprite][built],
+        )
 
     def satisfaction_changed(self, levels: npt.NDArray[np.int8]) -> set[tuple[int, int]]:
         """Takes each cell's new satisfaction; returns the chunks whose glow changed."""
@@ -143,6 +174,12 @@ class PixelWorld:
         canvas = np.concatenate([rgb / 255, alpha[..., None]], axis=-1)
         if resolution > 1:
             canvas = canvas.repeat(resolution, axis=0).repeat(resolution, axis=1)
+        lit = None
+        if raised is not None:
+            lit = lighting(raised.top(rows)).repeat(resolution, axis=0).repeat(resolution, axis=1)
+        self.ground.fields(canvas, left, top, resolution, lit)
+        self.ground.yards(canvas, left, top, resolution)
+        self.ground.canopy(canvas, left, top, resolution)
         if offset is None:
             self._lay_track(canvas, left, top, resolution)
         else:
@@ -164,6 +201,10 @@ class PixelWorld:
         rgb, alpha = self.ground.render(left, top, rows)
         rgb = rgb.repeat(k, axis=0).repeat(k, axis=1)
         alpha = alpha.repeat(k, axis=0).repeat(k, axis=1)
+        sown = np.concatenate([rgb / 255, alpha[..., None]], axis=-1)
+        self.ground.fields(sown, left, top, k)
+        self.ground.yards(sown, left, top, k)
+        rgb = sown[..., :3] * 255
         py, px = np.mgrid[0 : rows * k, 0 : CHUNK * k]
         x, y = self.projection.to_plane(left + (px + 0.5) / k, top + (py + 0.5) / k)
         grid = self.tile_map.grid
@@ -173,6 +214,7 @@ class PixelWorld:
         self.elevation.colour(rgb, raised.top(rows * k), x, y, rocky)
         rgb = np.clip(rgb, 0, 255) * alpha[..., None]
         canvas = np.concatenate([rgb / 255, alpha[..., None]], axis=-1)
+        self.ground.canopy(canvas, left, top, k)
         canvas = raise_picture(canvas, offset, 1)
         self._lay_lifted_track(canvas, left, top, k, offset / k)
         self._stand_scenery(canvas, left, top, k)
@@ -246,6 +288,83 @@ class _Sprites:
             np.concatenate([p[..., :3] * p[..., 3:], p[..., 3:]], axis=-1) for p in sheet.pixels
         ]
         return cls(sheet.pixels, premultiplied, sheet.sizes, sheet.anchors)
+
+
+# Words in the names of works' sprites, which stand in a gravel yard.
+WORKS = (
+    "factory",
+    "works",
+    "mill",
+    "plant",
+    "refinery",
+    "brewery",
+    "distillery",
+    "tannery",
+    "bakery",
+    "winery",
+    "maker",
+    "shipyard",
+    "brickworks",
+    "glassworks",
+)
+
+
+# How far the ground round a building reaches, as a share of its sprite's width.
+YARD_SHARE = 0.42
+CHURCHES = ("church", "basilica", "cathedral", "st_pauls")
+LANDMARKS = (
+    "royal_palace",
+    "spa_resort",
+    "worlds_fair",
+    "pear_hq",
+    "space_center",
+    "film_studio",
+    "amusement_park",
+    "olympic_stadium",
+    "salt_cathedral",
+)
+TOWN = (
+    "tenement_",
+    "flats_",
+    "skyscraper",
+    "tavern",
+    "department_store",
+    "hotel",
+    "car_dealer",
+    "jeweller",
+    "headquarters",
+    "airport",
+    "port",
+)
+DIGGINGS = (
+    "mine",
+    "oil_well",
+    "salt_works",
+    "clay_pit",
+    "limestone_quarry",
+    "sand_pit",
+    "lumber_mill",
+    "outpost",
+    "base",
+)
+
+
+def _yard_of(name: str) -> str:
+    """What ground lies round the building a sprite shows (railroads.ui.pixel.ground.YARD_COLOURS),
+    or nothing."""
+    if name.startswith("house_"):
+        return "cottage"
+    if name.startswith(TOWN):
+        return "paved"
+    if name in CHURCHES or name in LANDMARKS:
+        return "flagstones"
+    if name.endswith(DIGGINGS) or name in DIGGINGS:
+        return "spoil"
+    if name in ("date_palms",):
+        return "sand"
+    if any(word in name for word in WORKS):
+        return "gravel"
+    return ""
 
 
 def _blend(canvas: FloatArray, sprite: npt.NDArray[np.float32], x: int, y: int) -> None:

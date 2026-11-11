@@ -29,6 +29,9 @@ Floats = npt.NDArray[np.float32]
 # valley floor under them over VALLEY_SMOOTHING steps.
 STEPS = 4
 SMOOTHING = 6
+# How far, in STEPS, every mountain cell's own peak is spread, so that a lone mountain cell still
+# rises to a peak in its cell rather than spreading thin over its neighbours.
+PEAK_SMOOTHING = 1
 VALLEY_SMOOTHING = 24
 EXAGGERATION = 3.2
 # The most anything is lifted, in art pixels.
@@ -98,6 +101,14 @@ class Raised:
         return Raised(*(getattr(self, name)[:rows] for name in self.__dataclass_fields__))
 
 
+def lighting(raised: Raised) -> Floats:
+    """How much brighter or darker each pixel of raised ground is for the way its slope faces
+    the light, as a factor: 1 on flat ground."""
+    m, h, s = raised.mountains, raised.hills, raised.shade
+    lit = np.clip(1 + 1.3 * (s - np.float32(LIGHT[2])), 0.55, 1.3)
+    return 1 + (lit - 1) * np.clip((m + h) * 4, 0, 1)
+
+
 class Elevation:
     """The height of every point of one map, and how its hills and mountains are drawn."""
 
@@ -115,14 +126,17 @@ class Elevation:
         self._valley = smooth(self._base, VALLEY_SMOOTHING).astype(np.float32)
         mountains = (land & (relief == Relief.MOUNTAINS)).astype(np.float32)
         self._mountains = smooth(mountains, SMOOTHING).astype(np.float32)
+        self._peaks = smooth(mountains, PEAK_SMOOTHING).astype(np.float32)
         self._hills = smooth((land & (relief == Relief.HILLS)).astype(np.float32), 3)
         self._hills = self._hills.astype(np.float32)
         self._metres_per_pixel = grid.km_per_cell * 1000 / float(np.hypot(*projection.matrix[:, 0]))
         self._metres_per_unit = grid.km_per_cell * 1000
 
-    def _shares(self, x: FloatArray, y: FloatArray) -> tuple[Floats, Floats]:
+    def shares(self, x: FloatArray, y: FloatArray) -> tuple[Floats, Floats]:
         """How mountainous and how hilly the ground is at plane points, from 0 to 1."""
         m = np.clip(sample(self._mountains, x * STEPS, y * STEPS) * 2.4 - 0.15, 0, 1)
+        peak = np.clip(sample(self._peaks, x * STEPS, y * STEPS) * 2.2 - 0.25, 0, 1)
+        m = np.maximum(m, peak)
         h = sample(self._hills, x * STEPS, y * STEPS)
         return m.astype(np.float32), h.astype(np.float32)
 
@@ -130,7 +144,7 @@ class Elevation:
         """How many metres plane points rise above their valley, and how mountainous and hilly
         they are; only hills and mountains rise."""
         x, y = np.asarray(x, dtype=np.float64), np.asarray(y, dtype=np.float64)
-        m, h = self._shares(x, y)
+        m, h = self.shares(x, y)
         rise = np.zeros(m.shape, dtype=np.float32)
         raised = (m > 0) | (h > 0)
         if raised.any():
@@ -178,7 +192,7 @@ class Elevation:
         """Whether any ground over these art pixels rises, from a sample every few pixels."""
         py, px = np.mgrid[0:rows:4, 0:width:4]
         x, y = self.projection.to_plane(left + px + 0.5, top + py + 0.5)
-        m, h = self._shares(x, y)
+        m, h = self.shares(x, y)
         return bool((m > 0).any() or (h > 0).any())
 
     def _light(self, height: Floats, resolution: int = 1) -> tuple[Floats, Floats]:
@@ -204,12 +218,13 @@ class Elevation:
         rocky: npt.NDArray[np.bool_],
     ) -> None:
         """Lights and colours raised ground in place: `rgb` is the flat ground's colour over the
-        same art pixels, at plane points `x`, `y`; `rocky` marks mountain cells."""
+        same art pixels, at plane points `x`, `y`; `rocky` marks mountain cells, which take the
+        mountains' colours fully once their mountains start to rise, so a lone low mountain cell
+        does not show its edges."""
         m, h, s, steep = raised.mountains, raised.hills, raised.shade, raised.steep
-        lit = np.clip(1 + 1.3 * (s - np.float32(LIGHT[2])), 0.55, 1.3)
-        lit = 1 + (lit - 1) * np.clip((m + h) * 4, 0, 1)
+        lit = lighting(raised)
         rgb *= lit[..., None]
-        under = np.maximum(m, rocky.astype(np.float32))
+        under = np.maximum(m, rocky * np.clip(m * 3, 0, 1))
         chosen = under > 0
         if not chosen.any():
             return

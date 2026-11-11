@@ -157,3 +157,14 @@ def test_fine_relief_draws_raised_ground_finely_and_flat_ground_as_before() -> N
     assert world.rises(*mountains)
     assert not world.rises(*plains)
     np.testing.assert_array_equal(world.render(*plains, 2, True), world.render(*plains, 2))
+
+
+def test_a_lone_mountain_cell_rises_to_a_peak_of_its_own() -> None:
+    relief = layer(ROWS, COLS, Relief.FLAT)
+    relief[10, 15] = Relief.MOUNTAINS
+    heights = np.where(relief == Relief.MOUNTAINS, 1300, 150).astype(np.int16)
+    elevation = elevation_of(flat_map(ROWS, COLS, relief=relief, height_m=heights))
+    x, y = flat_map(ROWS, COLS).grid.center(10, 15)
+
+    assert float(elevation.lift(x, y)) > 20
+    assert float(elevation.lift(x + 1.0, y)) < 5

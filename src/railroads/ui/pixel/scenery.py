@@ -14,17 +14,16 @@ from railroads.sim.grids import Cell, Grid
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.buildings import BuildingSpots
+from railroads.ui.pixel.ground import FIELD_KINDS
 from railroads.ui.pixel.projection import FloatArray, IntArray, PixelProjection, hash01
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.track_art import station_house, station_line
 
-# What grows on each biome: how many trees per cell (a fraction is a chance of one) and which
-# kinds, by sprite name prefix.
+# What grows on each biome as single trees: how many per cell (a fraction is a chance of one)
+# and which kinds, by sprite name prefix. Woods are drawn into the ground as a canopy instead
+# (railroads.ui.pixel.ground).
 TREES: dict[Biome, tuple[float, tuple[str, ...]]] = {
-    Biome.FOREST: (5, ("pine", "leafy", "leafy")),
-    Biome.TAIGA: (5, ("pine",)),
-    Biome.JUNGLE: (6, ("leafy",)),
     Biome.GRASSLAND: (0.06, ("leafy",)),
     Biome.SAVANNA: (0.04, ("leafy",)),
     Biome.TUNDRA: (0.03, ("pine",)),
@@ -216,7 +215,7 @@ class Scenery:
                     ]
                 )
             )
-        spots = BuildingSpots.of(constructions)
+        spots = BuildingSpots.of(constructions, frozenset(FIELD_KINDS))
         looks = {kind: sheet.variants(name) for kind, name in VARIED_SPRITES.items()}
         xs.append(np.asarray(spots.x, dtype=np.float64))
         ys.append(np.asarray(spots.y, dtype=np.float64))

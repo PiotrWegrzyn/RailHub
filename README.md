@@ -110,12 +110,23 @@ pixels per art pixel.
   coloured dot when zoomed out.
 - `railroads.ui.pixel`: the pixel art.
   - **Ground** (`ground`): soft patches of a few shades per biome, with tufts of grass, sandy
-    shores, rippled water and slopes lit from the top left by the land's real heights. Farms grow
+    shores, rippled water and slopes lit from the top left by the land's real heights. Meadows
+    (grassland, and the ground under mountains) are shaded smoothly instead: short pasture,
+    darker rough grass with blades showing and dry yellowing patches blended into each other,
+    with a fine grain, a few wild flowers and soft shade round each tree. Woods are a canopy
+    seen from above: a roof of small crowns lit towards the light, conifers darker, over a dark
+    floor, with a frayed edge that follows the forest cells without their hexagons, round
+    clearings where anything is built, and a shadow on the ground beside them. Single trees
+    stand only out on open land, and woods give way to bare slopes where mountains rise.
+    Savanna is drawn like meadow in its own grasses: golden grass, greener damp patches and
+    bare red earth. Farm fields and groves are worked out at the zoom's full resolution, like
+    the sprites: lit crops in rows over darker furrows, a headland strip inside a lumpy hedge,
+    and lit trees with their shadows. Farms grow
     potatoes, wheat or cabbages in rows behind hedges, and orchards grow rows of trees. Deposits
     show as small signs: sheep grazing wool land, and rocks with a vein of their ore elsewhere.
   - **Hills and mountains** (`relief`): raised ground, not sprites. Every point gets a height from
     the map's own heights, with winding ridges and valleys carved into mountains and gentle
-    rolling ground on hills. The picture lifts each point by its height (3.2 times as tall as
+    rolling ground on hills. A lone mountain cell still rises to a peak of its own. The picture lifts each point by its height (3.2 times as tall as
     true), so peaks stand up and hide what lies behind them. Raised ground is lit from a low sun
     in the top left and coloured by its height above the valley and its steepness: green
     foothills, bare rock above the treeline, and snow above a wavy snowline with rock ribs on

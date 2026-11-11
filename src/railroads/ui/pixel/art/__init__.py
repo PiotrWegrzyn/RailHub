@@ -224,8 +224,8 @@ BUILDINGS = (
 )
 
 SPRITES: dict[str, Callable[[], Sprite]] = {
-    **{f"pine_{i}": (lambda c=c: pine(c)) for i, c in enumerate(PINES)},
-    **{f"leafy_{i}": (lambda c=c: leafy(c)) for i, c in enumerate(LEAVES)},
+    **{f"pine_{i}": (lambda c=c, i=i: pine(c, i)) for i, c in enumerate(PINES)},
+    **{f"leafy_{i}": (lambda c=c, i=i: leafy(c, i)) for i, c in enumerate(LEAVES)},
     "rocks": rocks,
     **{f"house_{i}": (lambda w=WALLS[i % 3], r=ROOFS[i % 4]: house(w, r)) for i in range(12)},
     **{
