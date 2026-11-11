@@ -92,7 +92,7 @@ class Game:
         map every ten years, and goes on playing for the player from there."""
         self.stand_in = play(self.growth, self.railway, years, rng)
 
-    def build_station(self, cell: Cell) -> Done:
+    def build_station(self, cell: Cell, ends: tuple[int, int] | None = None) -> Done:
         finances = self.finances
         site = station_site_price(self.constructions, cell)
         if site is None:
@@ -102,7 +102,7 @@ class Game:
                 f"This station costs {dollars(STATION_PRICE + site)}; "
                 f"you have {dollars(finances.cash)}."
             )
-        changed = routes.build_station(self.growth, cell)
+        changed = routes.build_station(self.growth, cell, ends)
         if not changed:
             return Done("A station can't go there.")
         self._pay_for_station(site)
@@ -140,8 +140,9 @@ class Game:
         finances.spend(price, "demolition")
         return Done(f"Cleared for {dollars(price)}.", changed, ok=True)
 
-    def move_station(self, old: Cell, new: Cell) -> Done:
-        """Moves a station, keeping its trains, name and goods but not its upgrades."""
+    def move_station(self, old: Cell, new: Cell, ends: tuple[int, int] | None = None) -> Done:
+        """Moves a station, its track running between `ends` in its new cell, keeping its
+        trains, name and goods but not its upgrades."""
         finances = self.finances
         site = station_site_price(self.constructions, new)
         if site is None:
@@ -151,7 +152,7 @@ class Game:
             return Done(
                 f"Moving it there costs {dollars(price)}; you have {dollars(finances.cash)}."
             )
-        changed = routes.move_station(self.growth, self.railway, old, new)
+        changed = routes.move_station(self.growth, self.railway, old, new, ends)
         if changed is None:
             return Done("The station can't go there.")
         self._pay_for_station(site)

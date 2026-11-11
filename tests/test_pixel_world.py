@@ -4,15 +4,23 @@ import numpy as np
 import pytest
 
 from builders import flat_map
-from railroads.sim.constructions import Building, BuildingKind, Constructions, Track, TrackWidth
-from railroads.sim.grids import Grid, HexGrid, SquareGrid
+from railroads.sim.constructions import (
+    Building,
+    BuildingKind,
+    Constructions,
+    Station,
+    Track,
+    TrackWidth,
+)
+from railroads.sim.grids import Cell, Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 from railroads.ui.pixel.art import SPRITES, draw_sheet
+from railroads.ui.pixel.art.stations import TURNED_LINES
 from railroads.ui.pixel.layer import resolution_for
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection, hash01
 from railroads.ui.pixel.sheet import FINE, SHEET_INDEX, SpriteSheet
-from railroads.ui.pixel.track_art import RAIL, WIRE
+from railroads.ui.pixel.track_art import RAIL
 from railroads.ui.pixel.track_preview import ghost
 from railroads.ui.pixel.world import PixelWorld
 
@@ -279,44 +287,119 @@ def test_new_buildings_put_up_the_scenery_again_and_name_the_chunks_to_redraw(
     assert np.isin(world.scenery.sprite, sheet.variants("flats")).sum() == 1
 
 
-def track_pixels(
-    sheet: SpriteSheet, pieces: list[Track], color: tuple[int, int, int]
-) -> np.ndarray:
+def track_chunk(
+    sheet: SpriteSheet,
+    pieces: list[Track],
+    stations: tuple[Station, ...] = (),
+    at: Cell = (10, 3),
+) -> tuple[PixelWorld, np.ndarray]:
     tile_map = make_tile_map()
     constructions = Constructions(tile_map)
     for piece in pieces:
         constructions.build(piece)
+    for station in stations:
+        constructions.build(station)
     world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
-    px, py = world.projection.to_pixels(*tile_map.grid.center(*pieces[0].cell))
-    chunk = world.render(int(px // CHUNK), int(py // CHUNK))
-    return (chunk[..., :3] == color).all(axis=-1)
+    px, py = world.projection.to_pixels(*tile_map.grid.center(*at))
+    return world, world.render(int(px // CHUNK), int(py // CHUNK))
+
+
+def rails(chunk: np.ndarray) -> np.ndarray:
+    """The pixels lit mostly by a rail: on grass and dark track, only rails are this light."""
+    return chunk[..., :3].min(axis=-1) > 140
+
+
+def rails_across(chunk: np.ndarray, column: int, rows: slice = slice(None)) -> int:
+    """How many rails a column of the chunk crosses, within `rows`: how often it turns light
+    and dark again."""
+    light = chunk[rows, column, :3].min(axis=-1).astype(int)
+    peaks = (light[1:-1] > light[:-2]) & (light[1:-1] >= light[2:]) & (light[1:-1] > 115)
+    return int(peaks.sum())
+
+
+def at_cell(world: PixelWorld, cell: Cell, dx: float = 0.0) -> tuple[int, int]:
+    """Where a point `dx` cells right of a cell's centre lies in its chunk, as a column and row."""
+    x, y = world.tile_map.grid.center(*cell)
+    px, py = world.projection.to_pixels(x + dx, y)
+    return int(px) % CHUNK, int(py) % CHUNK
 
 
 def test_track_crossing_in_a_cell_keeps_the_rails_of_both(sheet: SpriteSheet) -> None:
     across = Track((10, 3), (0, 6))
-    alone = track_pixels(sheet, [across], RAIL)
+    alone = rails(track_chunk(sheet, [across])[1])
 
-    crossed = track_pixels(sheet, [across, Track((10, 3), (3, 9))], RAIL)
+    crossed = rails(track_chunk(sheet, [across, Track((10, 3), (3, 9))])[1])
 
     assert (crossed | ~alone).all()
     assert crossed.sum() > alone.sum()
 
 
 def test_double_track_lays_two_tracks_side_by_side(sheet: SpriteSheet) -> None:
-    single = track_pixels(sheet, [Track((10, 3), (0, 6))], RAIL)
+    world, single = track_chunk(sheet, [Track((10, 3), (0, 6))])
 
-    double = track_pixels(sheet, [Track((10, 3), (0, 6), TrackWidth.DOUBLE)], RAIL)
+    _, double = track_chunk(sheet, [Track((10, 3), (0, 6), TrackWidth.DOUBLE)])
 
-    assert double.sum() > 1.6 * single.sum()
+    column, _ = at_cell(world, (10, 3))
+    assert rails_across(single, column) == 2
+    assert rails_across(double, column) == 4
 
 
 def test_electric_track_hangs_wires_over_it(sheet: SpriteSheet) -> None:
-    plain = track_pixels(sheet, [Track((10, 3), (0, 6))], WIRE)
+    plain = track_chunk(sheet, [Track((10, 3), (0, 6))])[1]
 
-    electric = track_pixels(sheet, [Track((10, 3), (0, 6), electric=True)], WIRE)
+    electric = track_chunk(sheet, [Track((10, 3), (0, 6), electric=True)])[1]
 
-    assert plain.sum() == 0
-    assert electric.sum() > 0
+    wired = (electric != plain).any(axis=-1)
+    track_rows = np.flatnonzero((plain != track_chunk(sheet, [])[1]).any(axis=-1).any(axis=1))
+    assert wired.any(axis=1)[: track_rows.min()].any()
+
+
+def test_track_keeps_one_width_on_the_screen_whichever_way_it_runs(sheet: SpriteSheet) -> None:
+    bare = track_chunk(sheet, [])[1]
+
+    across = track_chunk(sheet, [Track((10, 3), (0, 6))])[1]
+    upright = track_chunk(sheet, [Track((10, 3), (3, 9))])[1]
+
+    across_width = ((across != bare).any(axis=-1)).any(axis=1).sum()
+    upright_width = ((upright != bare).any(axis=-1)).any(axis=0).sum()
+    assert abs(across_width - upright_width) <= 2
+
+
+def test_track_into_a_station_runs_on_through_it_past_its_platform(sheet: SpriteSheet) -> None:
+    line = [Track((10, c), (0, 6)) for c in (2, 3)]
+    world, chunk = track_chunk(sheet, line, stations=(Station((10, 4), (0, 6)),))
+    _, bare = track_chunk(sheet, line)
+
+    column, row = at_cell(world, (10, 4), 0.4)
+
+    track = slice(row - 2, row + 3)
+    assert rails_across(chunk, column, track) == 2
+    assert rails_across(bare, column, track) == 0
+    assert (chunk[row - 8 : row, column, :3].min(axis=-1) > 170).any()
+
+
+def test_a_station_house_stands_back_from_its_track_turned_along_it(sheet: SpriteSheet) -> None:
+    across, _ = track_chunk(sheet, [], stations=(Station((10, 4), (0, 6)),))
+    upright, _ = track_chunk(sheet, [], stations=(Station((10, 4), (3, 9)),))
+
+    houses = [
+        (int(world.scenery.x[found][0]), int(world.scenery.y[found][0]))
+        for world, name in ((across, "station_across"), (upright, "station_upright"))
+        if (found := world.scenery.sprite == sheet.index(name)).any()
+    ]
+
+    x, y = (float(v) for v in across.projection.to_pixels(*across.tile_map.grid.center(10, 4)))
+    assert len(houses) == 2
+    assert houses[0][1] < y - 6 and abs(houses[0][0] - x) <= 1
+    assert houses[1][0] < x - 6 and abs(houses[1][1] - y) <= 1
+
+
+def test_a_station_house_is_drawn_turned_each_way_track_runs_through_it(sheet: SpriteSheet) -> None:
+    looks = [sheet.index(f"station_{line}") for line in TURNED_LINES]
+
+    sizes = {tuple(sheet.sizes[index]) for index in looks}
+
+    assert len(sizes) == len(TURNED_LINES)
 
 
 def test_planned_track_shows_as_the_real_track_faded_to_a_see_through_grey() -> None:

@@ -142,6 +142,10 @@ class Grid(ABC):
         points[1::2] *= self.corner_share
         return points
 
+    def track_ends(self) -> tuple[int, ...]:
+        """The track points track may leave a cell by: every one."""
+        return tuple(range(len(self.track_steps())))
+
     def track_exit(self, cell: Cell, point: int) -> tuple[Cell, int]:
         """The cell that track leaving through this point runs into, and the point it enters by."""
         steps = self.track_steps()
@@ -287,6 +291,14 @@ class HexGrid(Grid):
     def edge_normals(self) -> FloatArray:
         angles = np.radians(np.arange(0, 360, 60))
         return np.column_stack([np.cos(angles), np.sin(angles)])
+
+    def track_ends(self) -> tuple[int, ...]:
+        """The middle of every edge, and the top and bottom corners, through which track runs
+        straight up and down along the edge between two cells: eight directions in all."""
+        steps = self.track_steps()
+        return tuple(
+            point for point, (dx, _) in enumerate(steps) if point % 2 == 0 or abs(float(dx)) < 1e-9
+        )
 
     def seal_corner_gaps(self, mask: BoolGrid) -> BoolGrid:
         return mask.copy()

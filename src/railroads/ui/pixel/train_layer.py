@@ -11,12 +11,13 @@ from imgui_bundle import hello_imgui, imgui
 from railroads.sim.railway import Railway
 from railroads.sim.trains import Train
 from railroads.ui.iso_camera import IsoCamera, Vec2
+from railroads.ui.pixel.models import HEIGHT_PER_WIDTH
 from railroads.ui.pixel.trains import (
     CAR_HALF,
     COUPLING,
     DETAIL,
     ENGINES,
-    HEIGHT_PER_WIDTH,
+    SCALE,
     Look,
     TrainSprites,
     train_sprites,
@@ -95,7 +96,7 @@ class TrainLayer:
             back += COUPLING + CAR_HALF
             parts.append(((car.good, car.load > 0), back))
             back += CAR_HALF
-        return parts
+        return [(look, middle * SCALE) for look, middle in parts]
 
     def _smoke(
         self,
@@ -110,8 +111,8 @@ class TrainLayer:
         model = ENGINES[train.engine]
         if model.chimney is None:
             return
-        chimney = model.chimney
-        placed = railway.position(train, model.half - chimney[0])
+        chimney = (model.chimney[0] * SCALE, model.chimney[1] * SCALE)
+        placed = railway.position(train, (model.half - model.chimney[0]) * SCALE)
         if placed is None:
             return
         (x, y), (dx, dy) = placed
@@ -122,11 +123,11 @@ class TrainLayer:
         phase = (train.along * 6.0) % 1.0
         for k in range(PUFFS):
             age = (k + phase) / PUFFS
-            px, py = x - ux * age * 0.5, y - uy * age * 0.5
+            px, py = x - ux * age * 0.5 * SCALE, y - uy * age * 0.5 * SCALE
             ax, ay = projection.to_pixels(px, py)
             sx = origin[0] + float(ax) * scale
-            sy = origin[1] + (float(ay) - lift - (chimney[1] + age * 0.35) * up) * scale
-            radius = (1.5 + age * 4.0) * scale
+            sy = origin[1] + (float(ay) - lift - (chimney[1] + age * 0.35 * SCALE) * up) * scale
+            radius = (1.5 + age * 4.0) * SCALE * scale
             alpha = 0.75 * (1 - age)
             color = imgui.color_convert_float4_to_u32(imgui.ImVec4(*SMOKE, alpha))
             draw_list.add_circle_filled((sx, sy), radius, color)

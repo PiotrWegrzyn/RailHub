@@ -145,7 +145,7 @@ def test_a_station_clears_its_cell_and_track_joins_it_without_entering() -> None
     build_station(growth, (6, 12))
     route = plan_route(constructions, (6, 2), (6, 12))
 
-    assert Station((6, 12)) in constructions.at((6, 12))
+    assert constructions.station_at((6, 12)) is not None
     assert growth.count(BuildingKind.HOUSE).sum() == 3
     assert route is not None
     assert all(piece.cell != (6, 12) for piece in route.pieces)
@@ -170,6 +170,28 @@ def test_track_runs_straight_through_corners_where_edges_would_zigzag() -> None:
     assert route is not None
     assert len(route.pieces) == 4
     assert all(constructions.why_not(piece) is None for piece in route.pieces)
+
+
+def test_on_hexes_a_slanting_route_keeps_to_edges_and_straight_up_and_down() -> None:
+    constructions = Constructions(make_map())
+    ends = set(constructions.tile_map.grid.track_ends())
+
+    route = plan_route(constructions, (3, 2), (6, 14))
+
+    assert route is not None
+    assert all(set(piece.ends) <= ends for piece in route.pieces)
+    assert all(constructions.why_not(piece) is None for piece in route.pieces)
+
+
+def test_a_slanting_route_runs_straight_and_bends_once_instead_of_zigzagging() -> None:
+    constructions = Constructions(make_map())
+    grid = constructions.tile_map.grid
+
+    route = plan_route(constructions, (2, 2), (10, 9))
+
+    assert route is not None
+    bends = [piece for piece in route.pieces if grid.track_turn(*piece.ends) > 1e-6]
+    assert len(bends) == 1
 
 
 def test_on_a_square_grid_track_runs_diagonally_through_corners() -> None:
@@ -348,8 +370,70 @@ def test_a_station_built_on_a_line_takes_the_place_of_its_track_and_keeps_it_joi
 
     assert changed is not None
     assert constructions.track_at(middle) == ()
-    assert Station(middle) in constructions.at(middle)
+    assert constructions.station_ends(middle) == (0, 6)
     assert Railway(constructions).route((6, 2), (6, 14)) is not None
+
+
+def test_track_from_the_side_comes_round_into_a_station_by_one_of_its_ends() -> None:
+    constructions = Constructions(make_map())
+    growth = Growth(constructions, NO_TRADE)
+    build_station(growth, (6, 10), (3, 9))
+
+    route = plan_route(constructions, (6, 2), (6, 10))
+
+    assert route is not None
+    grid = constructions.tile_map.grid
+    last = route.pieces[-1]
+    into = [grid.track_exit(last.cell, point) for point in last.ends]
+    assert any(cell == (6, 10) and entry in (3, 9) for cell, entry in into)
+
+
+def test_track_leaves_a_station_straight_out_of_one_of_its_ends() -> None:
+    constructions = Constructions(make_map())
+    growth = Growth(constructions, NO_TRADE)
+    build_station(growth, (6, 4), (3, 9))
+
+    route = plan_route(constructions, (6, 4), (6, 14))
+
+    assert route is not None
+    grid = constructions.tile_map.grid
+    first = route.pieces[0]
+    out = [grid.track_exit(first.cell, point) for point in first.ends]
+    assert any(cell == (6, 4) and entry in (3, 9) for cell, entry in out)
+
+
+def test_a_station_keeps_its_way_when_track_is_laid_round_it_later() -> None:
+    constructions = Constructions(make_map())
+    growth = Growth(constructions, NO_TRADE)
+    build_station(growth, (6, 8))
+    lay_route(growth, plan_route(constructions, (6, 8), (6, 14)))
+
+    lay_route(growth, plan_route(constructions, (1, 8), (6, 8)))
+
+    assert constructions.station_ends((6, 8)) == (0, 6)
+
+
+def test_a_station_takes_the_way_of_track_pointing_into_its_cell() -> None:
+    constructions = Constructions(make_map())
+    growth = Growth(constructions, NO_TRADE)
+    lay_route(growth, plan_route(constructions, (2, 8), (4, 8)))
+
+    build_station(growth, (6, 8))
+
+    assert constructions.station_ends((6, 8)) == (3, 9)
+
+
+def test_trains_cannot_run_into_a_station_from_its_side() -> None:
+    constructions = Constructions(make_map())
+    growth = Growth(constructions, NO_TRADE)
+    build_station(growth, (6, 2))
+    build_station(growth, (6, 10), (3, 9))
+    for piece in plan_route(constructions, (6, 2), (6, 9)).pieces:
+        constructions.build(piece)
+
+    way = Railway(constructions).route((6, 2), (6, 10))
+
+    assert way is None
 
 
 def test_no_second_station_goes_up_where_one_stands() -> None:

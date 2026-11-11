@@ -41,6 +41,9 @@ BUILDING_COST = 0.4
 DETOUR_CELLS = 12
 # What running along track already laid costs, against new track on open flat land.
 REUSE_COST = 0.5
+# What each bend costs the planner, against a cell of new track on open flat land, so that
+# routes run straight and turn seldom instead of zigzagging.
+BEND_COST = 0.6
 
 # The planner numbers cells row by row with this many cells of border round the map, so that a
 # step from any cell on it, through a corner too, lands on a numbered cell.
@@ -139,13 +142,34 @@ def lay_route(growth: Growth, route: Route) -> set[Cell]:
     return changed
 
 
-def build_station(growth: Growth, cell: Cell) -> set[Cell] | None:
-    """Builds a station in the cell, moving or pulling down the buildings there and taking the
-    place of any track through it, which joins the station at every side as it did the track;
-    None if a station cannot go there (water, mountains, a station already, or a building that
-    cannot be taken down). Clearing the cell costs station_site_price."""
+def station_way(constructions: Constructions, cell: Cell) -> tuple[int, int]:
+    """The way a station built in the cell would take its track through it: along straight
+    track through the cell, else towards track that ends pointing into it, else across."""
+    grid = constructions.tile_map.grid
+    count = len(grid.track_points())
+    for piece in constructions.track_at(cell):
+        start, end = piece.ends
+        if (start + count // 2) % count == end and start in grid.track_ends():
+            return start, end
+    for point in grid.track_ends():
+        beyond, entry = grid.track_exit(cell, point)
+        if grid.contains(*beyond) and any(
+            entry in piece.ends for piece in constructions.track_at(beyond)
+        ):
+            return tuple(sorted((point, (point + count // 2) % count)))  # type: ignore[return-value]
+    return 0, count // 2
+
+
+def build_station(
+    growth: Growth, cell: Cell, ends: tuple[int, int] | None = None
+) -> set[Cell] | None:
+    """Builds a station in the cell, its track running between `ends` (by default the way of
+    station_way), moving or pulling down the buildings there and taking the place of any track
+    through it; None if a station cannot go there (water, mountains, a station already, a way
+    that is not straight, or a building that cannot be taken down). Clearing the cell costs
+    station_site_price."""
     constructions = growth.constructions
-    station = Station(cell)
+    station = Station(cell, station_way(constructions, cell) if ends is None else ends)
     built = constructions.at(cell)
     tile = constructions.tile_map.tile(cell)
     if any(isinstance(b, Station) for b in built) or tile.terrain != Terrain.LAND:
@@ -154,6 +178,8 @@ def build_station(growth: Growth, cell: Cell) -> set[Cell] | None:
         return None
     if tile.relief == Relief.MOUNTAINS:
         return None
+    if ends is not None and constructions._way_problem(ends) is not None:
+        return None
     for piece in constructions.track_at(cell):
         constructions.remove(piece)
     changed = growth.room.clear(cell, station.space, frozenset({cell}))
@@ -161,19 +187,23 @@ def build_station(growth: Growth, cell: Cell) -> set[Cell] | None:
     return changed | {cell}
 
 
-def move_station(growth: Growth, railway: Railway, old: Cell, new: Cell) -> set[Cell] | None:
-    """Moves a station to another cell, clearing it as a new station would; its trains, name and
-    goods go with it, its level and storage start again. Returns the cells that changed, or None
-    if it cannot go there."""
+def move_station(
+    growth: Growth, railway: Railway, old: Cell, new: Cell, ends: tuple[int, int] | None = None
+) -> set[Cell] | None:
+    """Moves a station to another cell, clearing it as a new station would, its track running
+    between `ends` there (by default the way of station_way); its trains, name and goods go with
+    it, its level and storage start again. Returns the cells that changed, or None if it cannot
+    go there."""
     constructions = growth.constructions
-    if new == old or Station(old) not in constructions.at(old):
+    station = constructions.station_at(old)
+    if new == old or station is None:
         return None
     if station_site_price(constructions, new) is None:
         return None
-    constructions.remove(Station(old))
-    changed = build_station(growth, new)
+    constructions.remove(station)
+    changed = build_station(growth, new, ends)
     if changed is None:
-        constructions.build(Station(old))
+        constructions.build(station)
         return None
     railway.moved(old, new)
     return changed | {old}
@@ -185,18 +215,22 @@ class _Geometry:
     The planner numbers cells row by row, `columns` to a row: the map's and a border on either
     side. `turns` holds how far track bends between two points, as Grid.track_turn, and
     `exits`, for each point track comes in by (and _ANYWHERE), the points it may leave by,
-    turning no more than MAX_TURN_DEG. By the point it leaves by, `lengths` is how far it runs
+    turning no more than MAX_TURN_DEG, and `bends` what leaving by each costs the planner
+    for turning. By the point it leaves by, `lengths` is how far it runs
     to the centre of the next cell and `entries` the point it comes in there by; for even and
     odd rows, `steps` is what to add to a cell's number for that next cell and `flanks` for the
-    two cells a corner runs between. `edges` has a bit for each point in the middle of an edge,
-    1 << point, and `corners` lists the others."""
+    two cells a corner runs between. `ends` lists the points track may use at all
+    (Grid.track_ends), `edges` has a bit for each of them in the middle of an edge, 1 << point,
+    and `corners` lists the others."""
 
     points: int
     columns: int
+    ends: tuple[int, ...]
     edges: int
     corners: tuple[int, ...]
     turns: tuple[tuple[float, ...], ...]
     exits: tuple[tuple[int, ...], ...]
+    bends: tuple[tuple[float, ...], ...]
     lengths: tuple[float, ...]
     entries: tuple[int, ...]
     steps: tuple[tuple[int, ...], ...]
@@ -206,18 +240,19 @@ class _Geometry:
 @cache
 def _geometry(grid: Grid) -> _Geometry:
     points = len(grid.track_points())
+    ends = grid.track_ends()
     columns = grid.cols + 2 * _BORDER
     turns = tuple(
         tuple(grid.track_turn(start, end) for end in range(points)) for start in range(points)
     )
     exits: list[tuple[int, ...]] = [()] * (_ANYWHERE + 1)
-    for entry in range(points):
+    for entry in ends:
         exits[entry] = tuple(
-            point
-            for point in range(points)
-            if point != entry and turns[entry][point] <= MAX_TURN_DEG + 1e-6
+            point for point in ends if point != entry and turns[entry][point] <= MAX_TURN_DEG + 1e-6
         )
-    exits[_ANYWHERE] = tuple(range(points))
+    exits[_ANYWHERE] = ends
+    bends = [tuple(0.0 if turn < 1e-6 else BEND_COST for turn in row) for row in turns]
+    bends += [(0.0,) * points] * (_ANYWHERE + 1 - points)
     origins = [(0, 0), (1, 0)]
 
     def offset(origin: Cell, cell: Cell) -> int:
@@ -226,10 +261,12 @@ def _geometry(grid: Grid) -> _Geometry:
     return _Geometry(
         points=points,
         columns=columns,
-        edges=sum(1 << point for point in range(0, points, 2)),
-        corners=tuple(range(1, points, 2)),
+        ends=ends,
+        edges=sum(1 << point for point in ends if point % 2 == 0),
+        corners=tuple(point for point in ends if point % 2 == 1),
         turns=turns,
         exits=tuple(exits),
+        bends=tuple(bends),
         lengths=tuple(float(math.hypot(*step)) for step in grid.track_steps()),
         entries=tuple(grid.track_exit(origins[0], point)[1] for point in range(points)),
         steps=tuple(
@@ -265,6 +302,10 @@ class _Planner:
     _leaving: list[_Leaving | None] = field(init=False)
     _grounds: list[_Ground | None] = field(init=False)
     _exits: dict[int, tuple[tuple[int, ...], ...]] = field(default_factory=dict, init=False)
+    # The ends of the stations the route starts and ends at, if it does: it leaves the first by
+    # running straight through it and out of one end, and comes into the last by one end.
+    _ways_out: tuple[int, ...] = field(default=(), init=False)
+    _ways_in: tuple[int, ...] = field(default=(), init=False)
 
     def __post_init__(self) -> None:
         grid = self.constructions.tile_map.grid
@@ -287,7 +328,11 @@ class _Planner:
         start_station = _is_station(constructions, self.start)
         if not start_station and self._cell_cost(self.start) is None:
             return None
-        seeds: list[int | None] = [] if start_station else [*self._joins(self.start)]
+        if start_station:
+            self._ways_out = constructions.station_ends(self.start)
+        if _is_station(constructions, self.end):
+            self._ways_in = constructions.station_ends(self.end)
+        seeds: list[int | None] = [*self._ways_out] if start_station else [*self._joins(self.start)]
         along = {
             point
             for piece in constructions.track_at(self.start)
@@ -296,8 +341,8 @@ class _Planner:
         }
         joins = [] if _is_station(constructions, self.end) else self._joins(self.end)
         route = self._search([*(seeds or [None]), *sorted(along)], joins, along)
-        if route is None and (seeds or joins):
-            route = self._search([None], [], set())
+        if route is None and (joins or (seeds and not start_station)):
+            route = self._search([*self._ways_out] or [None], [], set())
         return route
 
     def _search(self, seeds: list[int | None], joins: list[int], along: set[int]) -> Route | None:
@@ -306,6 +351,7 @@ class _Planner:
         along track already laid. The last piece must lead out by one of `joins` (with none,
         anywhere), unless the route comes in along laid track and runs on along it."""
         lengths, entries = self._geometry.lengths, self._geometry.entries
+        bends = self._geometry.bends
         to_end, leaving = self._to_end, self._leaving
         start, end = self._number(self.start), self._number(self.end)
         push, pop, count, inf = heapq.heappush, heapq.heappop, itertools.count().__next__, math.inf
@@ -326,6 +372,8 @@ class _Planner:
             index, entry = key >> 4, key & 15
             if index == end:
                 assert entry != _ANYWHERE
+                if self._ways_in and entry not in self._ways_in:
+                    continue
                 join = self._join(entry, joins)
                 if join is None and self._came_along(came, key):
                     join = self._run_on(entry)
@@ -337,7 +385,10 @@ class _Planner:
             leads = exits[entry]
             if index == start and key not in came and entry in along:
                 leads = tuple(point for point in leads if runs_on >> point & 1)
+            if index == start and key not in came and self._ways_out:
+                leads = tuple(point for point in self._ways_out if point != entry)
             so_far = best[key]
+            turning = bends[entry]
             for exit_point in leads:
                 nxt = index + steps[exit_point]
                 left = to_end[nxt]
@@ -346,7 +397,7 @@ class _Planner:
                 if left < 0.0:
                     continue
                 piece = along_cost if runs_on >> exit_point & 1 else cost
-                total = so_far + piece * lengths[exit_point]
+                total = so_far + piece * lengths[exit_point] + turning[exit_point]
                 nxt_key = nxt << 4 | entries[exit_point]
                 if total < known(nxt_key, inf):
                     best[nxt_key] = total
@@ -561,7 +612,7 @@ class _Planner:
         turns = self._geometry.turns[joined]
         straight = (joined + points // 2) % points
         others = sorted(
-            (point for point in range(points) if point != joined), key=turns.__getitem__
+            (point for point in self._geometry.ends if point != joined), key=turns.__getitem__
         )
         crowded = f"Not enough room: needs {int(self.width)}, {constructions.space_left(cell)} left"
         for point in [straight, *others]:
@@ -575,16 +626,15 @@ class _Planner:
 
 
 def _leads_on(constructions: Constructions, cell: Cell, point: int) -> bool:
-    """Whether a train leaving the cell by this point would run on: into a station, or onto
-    track that comes into the cell beyond by that point."""
+    """Whether a train leaving the cell by this point would run on: into a station by one of
+    its ends, or onto track that comes into the cell beyond by that point."""
     grid = constructions.tile_map.grid
     beyond, entry = grid.track_exit(cell, point)
     if not grid.contains(*beyond):
         return False
-    return any(
-        isinstance(built, Station) or (isinstance(built, Track) and entry in built.ends)
-        for built in constructions.at(beyond)
-    )
+    if _is_station(constructions, beyond):
+        return entry in constructions.station_ends(beyond)
+    return any(entry in piece.ends for piece in constructions.track_at(beyond))
 
 
 def _dead_end(

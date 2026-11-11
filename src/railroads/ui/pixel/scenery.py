@@ -17,6 +17,7 @@ from railroads.ui.buildings import BuildingSpots
 from railroads.ui.pixel.projection import FloatArray, IntArray, PixelProjection, hash01
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import SpriteSheet
+from railroads.ui.pixel.track_art import station_house, station_line
 
 # What grows on each biome: how many trees per cell (a fraction is a chance of one) and which
 # kinds, by sprite name prefix.
@@ -139,9 +140,11 @@ BUILDING_SPRITES = {
 }
 
 
-def station_sprite(level: int) -> str:
-    """The sprite of a station raised to a level."""
-    return "station" if level <= 1 else f"station_{level}"
+def station_sprite(level: int, line: str | None = None) -> str:
+    """The sprite of a station raised to a level, turned along track running `line` on the
+    screen (railroads.ui.pixel.track_art.station_line) if it is given."""
+    name = "station" if level <= 1 else f"station_{level}"
+    return name if line is None else f"{name}_{line}"
 
 
 @dataclass(frozen=True)
@@ -195,13 +198,23 @@ class Scenery:
         sprites.append(np.full(len(x), sheet.index("rocks")))
         stations = constructions.stations()
         if stations:
-            rows, cols = np.array(stations).T
-            x, y = grid.center(rows, cols)
-            xs.append(np.asarray(x, dtype=np.float64))
-            ys.append(np.asarray(y, dtype=np.float64))
+            x, y = _station_houses(constructions, projection, stations)
+            xs.append(x)
+            ys.append(y)
             levels = station_levels or {}
+            turned = grid.kind == "hex"
             sprites.append(
-                np.array([sheet.index(station_sprite(levels.get(cell, 1))) for cell in stations])
+                np.array(
+                    [
+                        sheet.index(
+                            station_sprite(
+                                levels.get(cell, 1),
+                                station_line(constructions, cell) if turned else None,
+                            )
+                        )
+                        for cell in stations
+                    ]
+                )
             )
         spots = BuildingSpots.of(constructions)
         looks = {kind: sheet.variants(name) for kind, name in VARIED_SPRITES.items()}
@@ -230,6 +243,21 @@ class Scenery:
 
     def __len__(self) -> int:
         return len(self.x)
+
+
+def _station_houses(
+    constructions: Constructions, projection: PixelProjection, stations: list[Cell]
+) -> tuple[FloatArray, FloatArray]:
+    """Where each station's house stands: set back from the track through it, away from the
+    viewer, so the track runs past in front of it (railroads.ui.pixel.track_art)."""
+    grid = constructions.tile_map.grid
+    xs, ys = [], []
+    for cell in stations:
+        back = np.linalg.solve(projection.matrix, station_house(constructions, projection, cell))
+        cx, cy = grid.center(*cell)
+        xs.append(float(cx) + float(back[0]))
+        ys.append(float(cy) + float(back[1]))
+    return np.array(xs, dtype=np.float64), np.array(ys, dtype=np.float64)
 
 
 def _jitter(

@@ -118,26 +118,36 @@ def test_tunnels_go_through_mountains(cells: str, problem: str | None) -> None:
 
 
 @pytest.mark.parametrize(
-    ("grid_type", "end", "allowed"),
+    ("grid_type", "ends", "allowed"),
     [
-        (HexGrid, 6, True),
-        (HexGrid, 5, True),
-        (HexGrid, 4, True),
-        (HexGrid, 3, False),
-        (SquareGrid, 4, True),
-        (SquareGrid, 3, True),
-        (SquareGrid, 2, False),
+        (HexGrid, (0, 6), True),
+        (HexGrid, (2, 9), True),
+        (HexGrid, (0, 4), True),
+        (HexGrid, (0, 3), False),
+        (SquareGrid, (0, 4), True),
+        (SquareGrid, (0, 3), True),
+        (SquareGrid, (0, 2), False),
     ],
     ids=["hex-straight", "hex-30", "hex-60", "hex-90", "square-straight", "square-45", "square-90"],
 )
 def test_track_turns_at_most_sixty_degrees_in_a_cell(
-    grid_type: type[Grid], end: int, allowed: bool
+    grid_type: type[Grid], ends: tuple[int, int], allowed: bool
 ) -> None:
     constructions = Constructions(make_map(*WIDE_LAND, grid_type=grid_type))
 
-    problem = constructions.why_not(Track((2, 2), (0, end)))
+    problem = constructions.why_not(Track((2, 2), ends))
 
     assert (problem is None) == allowed
+
+
+def test_track_on_hexes_runs_across_edges_or_straight_up_and_down_through_corners() -> None:
+    constructions = Constructions(make_map(*WIDE_LAND))
+
+    slanted = constructions.why_not(Track((2, 2), (1, 7)))
+    upright = constructions.why_not(Track((2, 2), (3, 9)))
+
+    assert slanted == "Track runs across edges, or straight up and down through corners"
+    assert upright is None
 
 
 @pytest.mark.parametrize("ends", [(3, 3), (0, 12), (-1, 5)])
@@ -158,13 +168,25 @@ def test_track_cannot_run_off_the_map() -> None:
 
 
 def test_track_through_a_corner_needs_the_cells_on_both_sides_to_take_it() -> None:
-    constructions = Constructions(make_map(".....", ".....", "...l.", ".....", "....."))
+    constructions = Constructions(make_map(".....", ".....", ".....", ".l...", "....."))
 
-    beside_the_lake = constructions.why_not(Track((2, 2), (1, 7)))
-    away_from_it = constructions.why_not(Track((2, 2), (3, 9)))
+    beside_the_lake = constructions.why_not(Track((2, 2), (3, 9)))
+    away_from_it = constructions.why_not(Track((2, 3), (3, 9)))
 
     assert beside_the_lake == "Track through a corner needs the cells on both sides to take it"
     assert away_from_it is None
+
+
+def test_a_station_runs_its_track_straight_through_between_opposite_sides() -> None:
+    constructions = Constructions(make_map(*WIDE_LAND))
+
+    straight = constructions.why_not(Station((2, 2), (3, 9)))
+    bent = constructions.why_not(Station((2, 2), (0, 4)))
+    slanted = constructions.why_not(Station((2, 2), (1, 7)))
+
+    assert straight is None
+    assert bent == "A station's track runs straight through it, between opposite sides"
+    assert slanted == "A station's track runs across edges, or straight up and down through corners"
 
 
 def test_the_same_track_cannot_be_laid_twice() -> None:

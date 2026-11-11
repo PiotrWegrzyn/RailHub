@@ -105,7 +105,7 @@ from railroads.ui.pixel.art.painter import (
     drawn_at,
     shade,
 )
-from railroads.ui.pixel.art.stations import station, station_2, station_3
+from railroads.ui.pixel.art.stations import TURNED_STATIONS, station, station_2, station_3
 
 __all__ = [
     "SPRITES",
@@ -285,6 +285,7 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "station": station,
     "station_2": station_2,
     "station_3": station_3,
+    **TURNED_STATIONS,
     "food_plant": food_plant,
     "bakery": bakery,
     "steel_mill": steel_mill,

@@ -128,6 +128,8 @@ class MapInput:
         for key, tool in TOOL_KEYS:
             if key_pressed(key):
                 view.build.choose(Tool.NONE if view.build.tool == tool else tool)
+        if key_pressed(imgui.Key.q) and view.build.tool in (Tool.STATION, Tool.MOVE_STATION):
+            view.tools.turn_station(view.hovered)
         if key_pressed(imgui.Key.t):
             view.build.trains.open = not view.build.trains.open
         if key_pressed(imgui.Key.s):

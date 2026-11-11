@@ -262,9 +262,13 @@ class Track:
 
 @dataclass(frozen=True, slots=True)
 class Station:
-    """Fills its whole cell; track joins it at any of the cell's track points."""
+    """Fills its whole cell. Its own track runs straight through the cell between `ends`, two
+    opposite track points, and other track joins it only there: its way in and its way out. It
+    keeps that way however track is laid round it later; with `ends` None its track runs
+    across, from the first track point to the one opposite (Constructions.station_ends)."""
 
     cell: Cell
+    ends: tuple[int, int] | None = None
 
     @property
     def space(self) -> int:
@@ -308,6 +312,29 @@ class Constructions:
         """Every station's cell, in order."""
         return sorted(self._stations)
 
+    def station_at(self, cell: Cell) -> Station | None:
+        """The station in the cell, if there is one."""
+        return next((b for b in self._cells.get(cell, ()) if isinstance(b, Station)), None)
+
+    def station_ends(self, cell: Cell) -> tuple[int, int]:
+        """The two track points the station in the cell joins track by, in order."""
+        station = self.station_at(cell)
+        if station is None:
+            raise ValueError(f"There is no station at {cell}")
+        if station.ends is not None:
+            return station.ends
+        return 0, len(self.tile_map.grid.track_points()) // 2
+
+    def _way_problem(self, ends: tuple[int, int]) -> str | None:
+        grid = self.tile_map.grid
+        count = len(grid.track_points())
+        start, end = ends
+        if start not in grid.track_ends() or end not in grid.track_ends():
+            return "A station's track runs across edges, or straight up and down through corners"
+        if (start + count // 2) % count != end:
+            return "A station's track runs straight through it, between opposite sides"
+        return None
+
     def track(self) -> list[Track]:
         """Every piece of track."""
         return [piece for cell in self._track for piece in self.track_at(cell)]
@@ -345,6 +372,8 @@ class Constructions:
                 problem = self._track_problem(construction)
             case Station():
                 problem = _site_problem(self.tile_map.tile(cell), STATION_RELIEF, "station")
+                if problem is None and construction.ends is not None:
+                    problem = self._way_problem(construction.ends)
             case Building():
                 problem = self._building_problem(construction)
         if problem is None and construction.space > self.space_left(cell):
@@ -397,6 +426,8 @@ class Constructions:
         start, end = track.ends
         if not 0 <= start < end < count:
             return f"Track joins two different track points, numbered 0 to {count - 1}"
+        if start not in (ends := grid.track_ends()) or end not in ends:
+            return "Track runs across edges, or straight up and down through corners"
         if grid.track_turn(start, end) > MAX_TURN_DEG + 1e-6:
             return f"Track can turn at most {MAX_TURN_DEG:g} degrees in one cell"
         if (problem := self._bed_problem(track.cell, track.bed)) is not None:

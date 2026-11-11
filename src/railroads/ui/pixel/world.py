@@ -19,7 +19,7 @@ from typing import Self
 import numpy as np
 import numpy.typing as npt
 
-from railroads.sim.constructions import Constructions
+from railroads.sim.constructions import Constructions, Track
 from railroads.sim.grids import Cell
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
@@ -32,6 +32,9 @@ from railroads.ui.pixel.track_art import TrackArt
 
 # How far in art pixels a sprite can reach from where it stands.
 SPRITE_REACH = 48
+# How many art pixels further down the map than track the ground showing where it is drawn may
+# lie before the track counts as hidden behind it: the track's own width over gentle slopes.
+HIDDEN_BEYOND = 2.0
 
 
 class PixelWorld:
@@ -59,7 +62,7 @@ class PixelWorld:
         )
         # The ground and the track over it (railroads.ui.pixel.ground, railroads.ui.pixel.track_art).
         self.ground = Ground(tile_map, constructions, self.projection, angle_deg, self.elevation)
-        self.track = TrackArt(tile_map, constructions, self.projection)
+        self.track = TrackArt(tile_map, constructions, self.projection, self.elevation)
         # The sprites at each resolution chunks can be drawn at: the sheet, and the same sprites
         # drawn finer if there are any.
         self._sprites = {1: _Sprites.of(sheet)}
@@ -140,9 +143,12 @@ class PixelWorld:
         canvas = np.concatenate([rgb / 255, alpha[..., None]], axis=-1)
         if resolution > 1:
             canvas = canvas.repeat(resolution, axis=0).repeat(resolution, axis=1)
-        self._lay_track(canvas, left, top, resolution)
-        if offset is not None:
+        if offset is None:
+            self._lay_track(canvas, left, top, resolution)
+        else:
             canvas = raise_picture(canvas, offset, resolution)
+            seen = offset.repeat(resolution, axis=0).repeat(resolution, axis=1)
+            self._lay_lifted_track(canvas, left, top, resolution, seen)
         self._stand_scenery(canvas, left, top, resolution)
         alpha = canvas[..., 3:]
         canvas[..., :3] /= np.maximum(alpha, 1e-6)
@@ -167,8 +173,8 @@ class PixelWorld:
         self.elevation.colour(rgb, raised.top(rows * k), x, y, rocky)
         rgb = np.clip(rgb, 0, 255) * alpha[..., None]
         canvas = np.concatenate([rgb / 255, alpha[..., None]], axis=-1)
-        self._lay_track(canvas, left, top, k)
         canvas = raise_picture(canvas, offset, 1)
+        self._lay_lifted_track(canvas, left, top, k, offset / k)
         self._stand_scenery(canvas, left, top, k)
         alpha = canvas[..., 3:]
         canvas[..., :3] /= np.maximum(alpha, 1e-6)
@@ -184,6 +190,20 @@ class PixelWorld:
         alpha = track[..., 3:] * (canvas[..., 3:] > 0)
         canvas[..., :3] = canvas[..., :3] * (1 - alpha) + track[..., :3] * alpha
 
+    def _lay_lifted_track(
+        self, canvas: FloatArray, left: int, top: int, resolution: int, seen: FloatArray
+    ) -> None:
+        """Draws the track crossing the chunk over its raised ground, lifted with it, where the
+        ground shown, `seen` art pixels further down the map in each pixel, is not in front
+        of it."""
+        pieces = self.constructions.track()
+        if not pieces:
+            return
+        track, lift = self.track.lifted(pieces, left, top, CHUNK, CHUNK, resolution)
+        shown = (seen <= lift + HIDDEN_BEYOND) & (canvas[..., 3] > 0)
+        alpha = track[..., 3:] * shown[..., None]
+        canvas[..., :3] = canvas[..., :3] * (1 - alpha) + track[..., :3] * alpha
+
     def _stand_scenery(self, canvas: FloatArray, left: int, top: int, resolution: int) -> None:
         scenery, drawn, k = self.scenery, self._sprites[resolution], resolution
         x0 = (scenery.x - left) * k - drawn.anchors[scenery.sprite, 0]
@@ -194,15 +214,20 @@ class PixelWorld:
         for i in np.flatnonzero(overlapping).tolist():
             _blend(canvas, drawn.premultiplied[int(scenery.sprite[i])], int(x0[i]), int(y0[i]))
 
-    def raised(
-        self, picture: FloatArray, left: int, top: int, width: int, height: int, resolution: int
+    def planned_track(
+        self, pieces: list[Track], left: int, top: int, width: int, height: int, resolution: int
     ) -> FloatArray:
-        """A picture of track or other marks on the ground over `width` by `height` art pixels
-        from (`left`, `top`), lifted with the ground: `picture` covers MOST_LIFT more rows."""
+        """Track not laid yet, over `width` by `height` art pixels from (`left`, `top`), drawn
+        as laid track would be: lifted with the ground and hidden behind raised ground in front
+        of it."""
         raised = self.elevation.area(left, top, width, height + MOST_LIFT)
         if raised is None:
-            return picture[: height * resolution]
-        return raise_picture(picture, raycast(raised.lift, height, width), resolution)
+            return self.track.layer(pieces, left, top, width, height, resolution, stations=False)
+        k = resolution
+        seen = raycast(raised.lift, height, width).repeat(k, axis=0).repeat(k, axis=1)
+        track, lift = self.track.lifted(pieces, left, top, width, height, k, stations=False)
+        track[..., 3] *= seen <= lift + HIDDEN_BEYOND
+        return track
 
 
 @dataclass(frozen=True)

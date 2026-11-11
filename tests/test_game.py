@@ -28,6 +28,24 @@ def test_a_station_costs_its_price_and_clearing_its_site() -> None:
     assert done.message == f"Station built for {dollars(STATION_PRICE + 1_000)}."
 
 
+def test_a_station_is_built_turned_the_way_the_player_chose() -> None:
+    game = make_game()
+
+    done = game.build_station((5, 5), (3, 9))
+
+    assert done.ok
+    assert game.constructions.station_ends((5, 5)) == (3, 9)
+
+
+def test_a_station_cannot_be_built_with_its_track_bent() -> None:
+    game = make_game()
+
+    done = game.build_station((5, 5), (0, 4))
+
+    assert not done.ok
+    assert game.constructions.station_at((5, 5)) is None
+
+
 def test_nothing_is_built_or_paid_without_the_cash_for_it() -> None:
     game = make_game(cash=100.0)
 

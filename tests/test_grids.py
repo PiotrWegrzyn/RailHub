@@ -232,3 +232,23 @@ def test_track_turns_more_the_further_its_ends_are_from_opposite(
     turned = grid.track_turn(0, end)
 
     assert turned == pytest.approx(turn)
+
+
+def test_hex_track_runs_across_every_edge_and_only_up_and_down_through_corners() -> None:
+    grid = HexGrid(rows=5, cols=5, km_per_cell=2.0)
+    steps = grid.track_steps()
+
+    ends = grid.track_ends()
+
+    corners = [point for point in ends if point % 2 == 1]
+    assert set(range(0, 12, 2)) <= set(ends)
+    assert len(ends) == 8
+    assert all(steps[point][0] == pytest.approx(0.0) for point in corners)
+
+
+def test_square_track_may_leave_by_every_point() -> None:
+    grid = SquareGrid(rows=5, cols=5, km_per_cell=2.0)
+
+    ends = grid.track_ends()
+
+    assert ends == tuple(range(8))

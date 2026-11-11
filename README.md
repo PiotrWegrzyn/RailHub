@@ -122,6 +122,17 @@ pixels per art pixel.
     steep slopes.
   - **Everything on the ground rises with it:** track, fields, trees, buildings, trains, the
     planned-track preview, cell outlines, station names and reach, and the cell the mouse picks.
+  - **Track** (`track_art`): dark and distinct, built upright on the screen so it keeps one width
+    whichever way it runs. It has a dark bank round a gravel bed, dark sleepers square to the
+    rails and two light rails, the same on both sides, with a faint shadow round it. It is drawn
+    four times finer at 1× (twice at 2×) and averaged down, so its edges are smooth. It lies in
+    the ground's picture, so trees and buildings stand over it. On hills and mountains each
+    point of it is lifted with the ground, so it climbs smoothly, and it is hidden wherever the
+    raised ground shown in front of it lies further down the map. Through a station it runs
+    past a platform, with the station house set back behind it, turned along its track.
+  - **Models** (`models`): trains and the station houses on hexes are small models of boxes,
+    cylinders and roofs, drawn with the map's own projection, shaded by the light and outlined,
+    so a station house can be drawn turned along each of the four ways track runs.
   - **Chunks:** the map is drawn in 256-pixel chunks as the view reaches them and kept as textures
     (`world`). Each chunk is put together from the ground, the track (`track_art`) and what stands
     on it (`scenery`); `projection` says where map points land in the picture, and `noise` gives
@@ -166,17 +177,22 @@ run at 60% speed.
 `railroads.sim.constructions` holds what the player can build and the rules for where it fits.
 Every cell has room for 6 units:
 
-- Track is laid one piece per cell, from one of the cell's track points to another: the middles
-  of its edges and its corners, 12 on a hexagon and 8 on a square. Through an edge, track runs
-  into the neighbour; through a corner, it runs along the edge between the two cells beside it
-  and into the cell beyond. A piece turns at most 60°.
+- Track is laid one piece per cell, from one of the cell's track points to another. Through the
+  middle of an edge, track runs into the neighbour; through a corner, it runs along the edge
+  between the two cells beside it and into the cell beyond. On a hexagon track uses the six
+  edges and only the top and bottom corners, so it runs across, along both diagonals and
+  straight up and down: eight directions. On a square it uses all eight points. A piece turns
+  at most 60°.
 - Single track takes 1 unit and double track 2, so a cell with a double track still fits four
   houses. Either can be electric, with wires overhead that electric engines need: `Track.electric`
   says so for a piece, and `Constructions.electrified(cell)` for a cell (every piece in it, or
   the piece between two given track points).
 - Track lies on the ground, on a bridge over a river or lake (x5 cost), or in a tunnel through
   mountains (x8 cost).
-- A station fills its whole cell.
+- A station fills its whole cell. Its own track runs straight through it one way (across,
+  along either diagonal, or up and down), set when it is built and kept after, whatever track
+  is laid round it. Track joins it only at its two ends, its way in and its way out; a line
+  coming from the side has to come round to an end, on track paid for like any other.
 - Every building takes 1 unit. Only mines and town buildings (houses, tenements, flats and
   skyscrapers) can be built in mountains, and ports need water next to them.
 
@@ -613,8 +629,10 @@ by the demand there, which only trains use up; they then go on their way rather 
 be handed out.
 
 The build bar along the bottom of the map chooses what a left click builds (keys 1 and 2): a station (what stands in the cell moves to a
-cell next to it, or comes down when it cannot move; built on a line, it takes the place of the
-track in its cell, which joins it on every side), track, or the bulldozer (key 3). Clearing costs
+cell next to it, or comes down when it cannot move; built on a line, it takes the line's way and
+the place of its track; elsewhere it turns towards track ending next to it, or runs across; Q
+turns it while it is being placed, and its track shows greyed out through the cell), track, or
+the bulldozer (key 3). Clearing costs
 money (`railroads.sim.demolition`): every building that has to leave a cell for a station or
 track, smallest first, is paid for as if taken down, and the price shows before the click. A
 building costs $500 a population point (a house $500, a block of flats $9,000), $1,000 a field,
@@ -628,7 +646,8 @@ goods go with it, and it starts again at level 1 with no extra storage. For trac
 click where it starts and then where it goes; while choosing where it goes, the planned track shows
 as the real track would look, greyed out, once the pointer rests on a cell for a moment. `railroads.sim.routes` plans the cheapest way that
 turns at most 60 degrees per cell, through edges or corners, bridging rivers and lakes and
-tunnelling through mountains, and makes room the same way. While the track tool is on, the bar
+tunnelling through mountains, and makes room the same way. Each bend costs it as much as 0.6 of
+a cell of new track, so it runs straight and turns seldom instead of zigzagging. While the track tool is on, the bar
 chooses single or double track and whether it is electric. Track lays only along the way it was
 planned: started on track already laid, its first piece branches off where that track runs on,
 turning at most 60 degrees, so trains can run from one onto the other; ended on track, its last

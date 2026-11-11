@@ -164,6 +164,9 @@ class BuildMenu:
     hover_note: str = ""
     # The station being moved, with the move tool.
     moving: Cell | None = None
+    # Which of the grid's ways the player turned the station being placed to, by its place in
+    # MapTools.station_ways; None while it takes the way of the cell under the pointer.
+    station_turn: int | None = None
     # What the track tool lays: single or double track, and whether it is electric.
     track_width: TrackWidth = TrackWidth.SINGLE
     electric: bool = False
@@ -254,6 +257,7 @@ class BuildMenu:
 
     def stop(self) -> None:
         self.moving = None
+        self.station_turn = None
         self.hover_note = ""
         self.track_from = None
         self.preview = None

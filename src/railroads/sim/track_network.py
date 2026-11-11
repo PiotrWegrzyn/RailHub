@@ -1,6 +1,6 @@
 """The way along laid track (railroads.sim.railway uses it): which stations track joins, the route a
 train takes from one station to another with the speed on each stretch, and where a train is on
-its way. Trains pass through stations, which join track at any of their sides, and may turn round
+its way. Trains pass through stations, which join track only by their two ends, and may turn round
 in them."""
 
 import heapq
@@ -57,8 +57,8 @@ class TrackNetwork:
     ) -> tuple[list[Point], list[float]] | None:
         """The way along laid track, only electrified track if `electric`, from one station to
         another, as points on the map and the speed on each stretch between them; None without
-        track joining them. Trains pass through stations on the way, which join track at any of
-        their sides, and may turn round in them."""
+        track joining them. Trains pass through stations on the way, which join track only by
+        their two ends, and may turn round in them."""
         grid = self.constructions.tile_map.grid
         steps = grid.track_steps()
         counter = itertools.count()
@@ -75,7 +75,7 @@ class TrackNetwork:
             seen.add((cell, entry))
             for exit_point in self._exits(cell, entry, electric):
                 nxt, nxt_entry = grid.track_exit(cell, exit_point)
-                if not grid.contains(*nxt) or not (nxt == end or self._joins(nxt, nxt_entry)):
+                if not grid.contains(*nxt) or not self._joins(nxt, nxt_entry):
                     continue
                 length = float(math.hypot(*steps[exit_point]))
                 heapq.heappush(
@@ -85,12 +85,12 @@ class TrackNetwork:
         return None
 
     def _exits(self, cell: Cell, entry: int | None, electric: bool = False) -> list[int]:
-        """The points a train that came in by `entry` can leave the cell by: any side of a
+        """The points a train that came in by `entry` can leave the cell by: either end of a
         station, the one it came in by too, turning round there; else the other end of each
         piece of track, electrified if `electric`, that starts where it came in."""
         built = self.constructions.at(cell)
         if any(isinstance(b, Station) for b in built):
-            return list(range(len(self.constructions.tile_map.grid.track_points())))
+            return list(self.constructions.station_ends(cell))
         return [
             piece.ends[1] if piece.ends[0] == entry else piece.ends[0]
             for piece in built
@@ -98,11 +98,11 @@ class TrackNetwork:
         ]
 
     def _joins(self, cell: Cell, entry: int) -> bool:
-        """Whether a train coming in by `entry` can go on from this cell."""
-        return any(
-            isinstance(b, Station) or (isinstance(b, Track) and entry in b.ends)
-            for b in self.constructions.at(cell)
-        )
+        """Whether a train coming in by `entry` can go on from this cell: by one of a station's
+        ends, or onto track that starts there."""
+        if self.constructions.station_at(cell) is not None:
+            return entry in self.constructions.station_ends(cell)
+        return any(isinstance(b, Track) and entry in b.ends for b in self.constructions.at(cell))
 
     def _way(self, trail: tuple, arrival: tuple[Cell, int]) -> tuple[list[Point], list[float]]:
         grid = self.constructions.tile_map.grid

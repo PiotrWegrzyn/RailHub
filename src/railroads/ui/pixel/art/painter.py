@@ -132,6 +132,11 @@ def drawn_at(fineness: float) -> Iterator[None]:
         _fineness = before
 
 
+def fineness() -> float:
+    """How many pixels sprites drawn now take for every unit of their layout (drawn_at)."""
+    return _fineness
+
+
 class Painter:
     """Draws on one sprite's canvas, with the anchor at (0, 0), at the fineness of drawn_at."""
 
