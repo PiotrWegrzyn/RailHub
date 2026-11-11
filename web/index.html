@@ -1,0 +1,94 @@
+<!doctype html>
+<!--
+Runs the game in the browser through Pyodide. Build the game's wheel and serve this folder:
+
+    uv build --wheel -o web/wheels
+    python -m http.server -d web 8000
+
+then open http://localhost:8000/ (the baked map of Poland). Query parameters:
+    ?args=--poland --seed 7   the game's command line
+    &measure                  run web/measure.py: pans across the highest ground and prints timings
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Railroads</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v314.0.0/full/pyodide.js" integrity="sha384-e8f9ClJwv45Ix35n3sub5Ws5+Cu3Yqmjvv6oKxm+CCAz4IPmPkqeah86B83AADWw" crossorigin="anonymous"></script>
+    <style>
+        html, body { width: 100%; height: 100%; margin: 0; background: #222; font-family: sans-serif; }
+        #canvas { display: block; width: 100%; height: 100%; }
+        #loader { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+                  background: #222; color: #eee; white-space: pre; }
+    </style>
+</head>
+<body>
+<div id="loader">Loading Pyodide...</div>
+<canvas id="canvas" tabindex="0"></canvas>
+<script>
+    const IMGUI_BUNDLE = "imgui-bundle==1.93.0";
+    const GAME_WHEEL = "wheels/railroads-0.1.0-py3-none-any.whl";
+
+    const loader = document.getElementById("loader");
+    const timings = {};
+    const mark = (stage) => { timings[stage] = Math.round(performance.now()); };
+    const say = async (message) => {
+        loader.textContent = message;
+        await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    };
+
+    function downloaded() {
+        let transfer = 0, body = 0;
+        for (const entry of performance.getEntriesByType("resource")) {
+            transfer += entry.transferSize;
+            body += entry.decodedBodySize;
+        }
+        return { transfer_mb: +(transfer / 1e6).toFixed(1), decoded_mb: +(body / 1e6).toFixed(1) };
+    }
+
+    async function main() {
+        const query = new URLSearchParams(location.search);
+        const args = (query.get("args") ?? "--poland").split(" ").filter(Boolean);
+        const canvas = document.getElementById("canvas");
+        canvas.addEventListener("contextmenu", event => event.preventDefault());
+
+        const pyodide = await loadPyodide();
+        window.pyodide = pyodide;
+        mark("pyodide");
+        pyodide.canvas.setCanvas2D(canvas);
+        pyodide._api._skip_unwind_fatal_error = true;
+
+        await say("Loading numpy, Pillow and imgui-bundle...");
+        await pyodide.loadPackage(["micropip", "numpy", "pillow"]);
+        const micropip = pyodide.pyimport("micropip");
+        await micropip.install(IMGUI_BUNDLE);
+        await micropip.install.callKwargs(GAME_WHEEL, { deps: false });
+        mark("packages");
+
+        await say("Growing towns...\n(the page does not respond until the map is ready)");
+        const measure = query.has("measure");
+        const code = measure
+            ? await (await fetch("measure.py")).text()
+            : "from railroads.ui.app import main\nmain()";
+        pyodide.globals.set("game_args", pyodide.toPy(args));
+        pyodide.runPython("import sys\nsys.argv = ['railroads', *game_args]");
+        mark("python_start");
+        pyodide.runPython(code);
+        mark("app_started");
+        loader.remove();
+        requestAnimationFrame(() => {
+            mark("first_frame");
+            const gl = canvas.getContext("webgl2");
+            const debug = gl?.getExtension("WEBGL_debug_renderer_info");
+            const renderer = debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : null;
+            window.railroadsLoad = { ms: timings, ...downloaded(), renderer, dpr: devicePixelRatio };
+            console.log("LOAD " + JSON.stringify(window.railroadsLoad));
+        });
+    }
+    main().catch(error => {
+        loader.style.background = "#922";
+        loader.textContent = "Error: " + (error?.message || error);
+        console.error(error);
+    });
+</script>
+</body>
+</html>

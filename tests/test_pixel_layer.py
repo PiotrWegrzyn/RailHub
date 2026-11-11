@@ -39,3 +39,17 @@ def test_a_fine_drawing_started_before_a_change_is_thrown_away() -> None:
 
     assert taken == set()
     assert (*mountains, 2) not in layer._chunks
+
+
+def test_without_threads_a_raised_chunk_waits_for_a_frame_to_be_drawn_finely() -> None:
+    world, mountains, _ = world_over_mountains()
+    layer = PixelLayer(world, threads=False)
+    layer._upload(mountains, 2)
+    waiting = layer.take_refined()
+
+    layer._worker.work_once()
+    taken = layer.take_refined()
+
+    assert waiting == set()
+    assert taken == {mountains}
+    np.testing.assert_array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2, True))

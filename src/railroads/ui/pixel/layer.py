@@ -6,11 +6,14 @@ thin lines instead of growing blocky.
 Chunks where hills or mountains rise show first as they are quickly drawn, then a worker in the
 background draws them again with the heights, lift and colours of their raised ground at the full
 resolution, and the finer drawing takes their place once it is ready. A chunk drawn again because
-something in it changed is refined again the same way."""
+something in it changed is refined again the same way. Where threads cannot start, as in a browser,
+one chunk is drawn again on each frame that draws no new chunks."""
 
+import threading
 import time
-from collections import OrderedDict
-from concurrent.futures import Future, ThreadPoolExecutor
+from collections import OrderedDict, deque
+from collections.abc import Callable
+from concurrent.futures import Executor, Future, ThreadPoolExecutor
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
@@ -29,6 +32,34 @@ TEXTURE_BUDGET = 512 * 1024 * 1024
 type ChunkKey = tuple[int, int]
 
 
+def threads_start() -> bool:
+    try:
+        thread = threading.Thread(target=lambda: None)
+        thread.start()
+    except RuntimeError:
+        return False
+    thread.join()
+    return True
+
+
+class FrameWorker(Executor):
+    """Does the submitted work on the calling thread, one job each time it is asked to."""
+
+    def __init__(self) -> None:
+        self._jobs: deque[tuple[Future, Callable[[], object]]] = deque()
+
+    def submit[T](self, fn: Callable[..., T], /, *args: object, **kwargs: object) -> Future[T]:
+        job: Future[T] = Future()
+        self._jobs.append((job, lambda: fn(*args, **kwargs)))
+        return job
+
+    def work_once(self) -> None:
+        if not self._jobs:
+            return
+        job, work = self._jobs.popleft()
+        job.set_result(work())
+
+
 def resolution_for(screen_pixels: int, resolutions: tuple[int, ...]) -> int:
     """The finest resolution a chunk can be drawn at that blows up evenly to `screen_pixels`
     for every art pixel."""
@@ -36,7 +67,7 @@ def resolution_for(screen_pixels: int, resolutions: tuple[int, ...]) -> int:
 
 
 class PixelLayer:
-    def __init__(self, world: PixelWorld) -> None:
+    def __init__(self, world: PixelWorld, threads: bool | None = None) -> None:
         self.world = world
         # Drawn chunks by where they are and the resolution they were drawn at.
         self._chunks: OrderedDict[tuple[int, int, int], Rgba] = OrderedDict()
@@ -44,7 +75,13 @@ class PixelLayer:
         self._stale: set[tuple[int, int, int]] = set()
         # Chunks being drawn again with fine raised ground, and how many times each chunk has
         # been refreshed, so a drawing started before a refresh is thrown away.
-        self._worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="relief")
+        if threads is None:
+            threads = threads_start()
+        self._worker: Executor = (
+            ThreadPoolExecutor(max_workers=1, thread_name_prefix="relief")
+            if threads
+            else FrameWorker()
+        )
         self._refining: dict[tuple[int, int, int], tuple[int, Future[Rgba]]] = {}
         self._refined: set[tuple[int, int, int]] = set()
         self._refreshes: dict[ChunkKey, int] = {}
@@ -113,6 +150,8 @@ class PixelLayer:
             draw_list.add_image(imgui.ImTextureRef(texture.texture_id()), top_left, bottom_right)
         while len(self._textures) > 1 and self._texture_bytes() > TEXTURE_BUDGET:
             self._stale.discard(self._textures.popitem(last=False)[0])
+        if not drawn_new and isinstance(self._worker, FrameWorker):
+            self._worker.work_once()
         return complete
 
     def _refine(self, drawn: tuple[int, int, int]) -> None:
