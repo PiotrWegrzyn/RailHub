@@ -8,9 +8,13 @@ for the background thread that redraws mountain chunks.
 ## How to run it
 
 ```bash
-uv build --wheel -o web/wheels
-python -m http.server -d web 8000
+uv run python web/build_site.py
+python -m http.server -d build/site 8000
 ```
+
+`build_site.py` puts the page, the game's wheel, and Pyodide with numpy, Pillow, micropip and
+imgui-bundle into `build/site` (23.9 MB, about 16 MB gzipped). The page loads nothing from other
+servers, so any static host can serve that folder as it is.
 
 Open http://localhost:8000/. It plays the baked map of Poland; `?args=--poland --seed 7` passes a
 command line. Add `&measure` to run `web/measure.py` instead. It prints `LOAD` and `MEASURE` lines
