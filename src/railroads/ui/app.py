@@ -7,6 +7,7 @@ from concurrent.futures import Future
 import numpy as np
 from imgui_bundle import hello_imgui, imgui, immapp
 
+from railroads import maps
 from railroads.newgame import MapChoice, Settings, make_game
 from railroads.saves import SavedGame, SaveError, Saves, snapshot
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
@@ -287,12 +288,19 @@ class Shell:
 
 def settings_from(args: argparse.Namespace) -> Settings | None:
     """The settings the command line asks for, or None to open the main menu."""
-    if args.seed is None and not args.poland and args.years is None and args.simulate is None:
+    if (
+        args.seed is None
+        and not args.poland
+        and args.map is None
+        and args.years is None
+        and args.simulate is None
+    ):
         return None
     years = MONTHS_BEFORE_PLAY // 12 if args.years is None else args.years
+    baked = maps.start_map("poland" if args.poland else args.map or "")
     return Settings(
         seed=random_seed() if args.seed is None else args.seed,
-        map=MapChoice.POLAND if args.poland else MapChoice.WORLD,
+        map=MapChoice.WORLD if baked is None else MapChoice(baked.title),
         start_year=HISTORY_START + min(years, END_YEAR - HISTORY_START),
         stand_in_years=0 if args.simulate is None else args.simulate,
     )
@@ -308,6 +316,11 @@ def main() -> None:
         "--seed", type=int, help="replay the start location and buildings of this seed"
     )
     parser.add_argument("--poland", action="store_true", help="play on the baked map of Poland")
+    parser.add_argument(
+        "--map",
+        choices=[start.key for start in maps.START_MAPS],
+        help="play on this baked map of a real place",
+    )
     parser.add_argument(
         "--years",
         type=int,

@@ -10,9 +10,16 @@ uv run railroads
 
 It opens on the main menu: start a new game, load a saved one, or quit. A new game is set up
 first with:
-- the map: the baked map of Poland, or a random place in the world (this needs the elevation
-  database, see Map data);
-- the seed, which picks the start location and grows the same towns again;
+- the map: one of the baked maps of real places, or a random place in the world (this needs the
+  elevation database, see Map data). The baked maps are Poland, Germany, France (Paris to Lyon),
+  Great Britain, Italy (Venice to Rome), Moscow, Constantinople, the Alps, the Norwegian fjords,
+  the US Northeast, California, the Colorado Rockies, Central Chile, Japan (Hiroshima to Tokyo),
+  China's Yangtze delta and Southeast Australia, listed in `START_MAPS` in
+  `src/railroads/maps/__init__.py`. Each is cut to its land, so some are long and thin or wide
+  rather than square, and all are 2 km a hex, with up to about 160,000 hexes so towns still grow
+  in seconds;
+- the seed, which picks the start location and grows the same towns again. The menu offers a
+  new random one each time the game opens;
 - the year play begins, so how long towns grow from 850 before it;
 - the starting money, $80,000 by default;
 - under "For testing", how many years a stand-in player runs the railway first (`--simulate`).
@@ -37,8 +44,8 @@ with the save format, the title and the date, then the game pickled and compress
 would make an older save load wrong; a save in another format is then refused with a message
 saying so, not a crash. Saves are Python pickles, so only load saves you trust.
 
-Any of the options below skips the menu and starts that game straight away. Without `--poland`,
-a game starts at a random, mostly-land spot in the world, on a 537 x 537 km map. The limits for
+Any of the options below skips the menu and starts that game straight away. Without `--poland`
+or `--map`, a game starts at a random, mostly-land spot in the world, on a 537 x 537 km map. The limits for
 that spot (longitude, latitude, how much land) are `START_REGION` in
 `src/railroads/newgame.py`. Options:
 
@@ -52,7 +59,8 @@ replays the start location and buildings of seed 42, and
 uv run railroads --poland
 ```
 
-plays on the baked map of Poland. Towns grow for 1,000 years before play starts, from the year 850,
+plays on the baked map of Poland, and `--map japan` (or any other key in `START_MAPS`) on that
+baked map. Towns grow for 1,000 years before play starts, from the year 850,
 so play begins in 1850;
 
 ```bash
@@ -799,7 +807,7 @@ Maps are built from these sources:
   made from SRTM, GMTED2010, ETOPO1, EU-DEM and others
   ([attribution](https://github.com/tilezen/joerd/blob/master/docs/attribution.md)). They are
   downloaded once into a local database, so starting a game needs no internet.
-- Elevation for Poland: NOAA ETOPO1, 1 arc-minute (via NOAA CoastWatch ERDDAP, dataset `etopo180`).
+- Elevation for Poland: NOAA ETOPO1; for the other baked maps the terrain tiles above, 1 arc-minute (via NOAA CoastWatch ERDDAP, dataset `etopo180`).
 - Sea, lakes, rivers and deserts: [Natural Earth](https://www.naturalearthdata.com/) 1:10m,
   public domain. Rivers running less than 200 km on the map are left out.
 - Temperature: a climate rule from latitude and height that works anywhere in the world.
@@ -833,9 +841,11 @@ curl -o data/raw/geonames/cities500.zip https://download.geonames.org/export/dum
 uv run python tools/build_places.py
 ```
 
-and, to rebake the Poland maps and the world picture for the minimap:
+and, to rebake the Poland map, the other start maps (all, or the keys given) and the world
+picture for the minimap:
 
 ```bash
 uv run python tools/build_poland_map.py
+uv run python tools/build_start_maps.py
 uv run python tools/build_world_map.py
 ```

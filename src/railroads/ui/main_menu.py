@@ -1,7 +1,7 @@
 """The menu the game opens on: start a new game with its settings chosen first, load a saved
 one, or quit."""
 
-import random
+import secrets
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -44,7 +44,17 @@ MenuChoice = NewGameChoice | LoadChoice | QuitChoice
 
 
 def random_seed() -> int:
-    return random.randrange(SEEDS)
+    """A seed from the system's randomness, so each start of the game offers a different one."""
+    return secrets.randbelow(SEEDS)
+
+
+def map_note(choice: MapChoice) -> str:
+    """What the menu says under the chosen map: its size and what is on it."""
+    baked = choice.start_map
+    if baked is None:
+        return "A mostly-land spot anywhere in the world, picked by the seed."
+    bounds = baked.bounds
+    return f"{bounds.width_km:,.0f} × {bounds.height_km:,.0f} km. {baked.about}"
 
 
 @dataclass
@@ -116,16 +126,22 @@ class MainMenu:
     def _draw_new(self) -> MenuChoice | None:
         imgui.text("Map")
         world = world_maps_available()
-        for choice in MapChoice:
-            disabled = choice == MapChoice.WORLD and not world
-            imgui.begin_disabled(disabled)
-            if imgui.radio_button(choice.value, self.map == choice):
-                self.map = choice
-            imgui.end_disabled()
-            if disabled and imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-                imgui.set_tooltip(
-                    "Needs the elevation database: uv run python tools/build_elevation_db.py"
-                )
+        if imgui.begin_combo("##map", self.map.value, imgui.ComboFlags_.height_large.value):
+            for choice in MapChoice:
+                disabled = choice == MapChoice.WORLD and not world
+                imgui.begin_disabled(disabled)
+                if imgui.selectable(choice.value, self.map == choice)[0]:
+                    self.map = choice
+                imgui.end_disabled()
+                hovered = imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value)
+                if disabled and hovered:
+                    imgui.set_tooltip(
+                        "Needs the elevation database: uv run python tools/build_elevation_db.py"
+                    )
+            imgui.end_combo()
+        imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)
+        imgui.text_disabled(map_note(self.map))
+        imgui.pop_text_wrap_pos()
         imgui.spacing()
         imgui.text("Seed")
         imgui.set_next_item_width(MENU_WIDTH - 40)

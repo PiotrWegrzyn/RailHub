@@ -118,3 +118,17 @@ def test_close_zoom_levels_show_pixel_art_at_whole_scales(level: int, scale: int
     camera = IsoCamera(center_x=0, center_y=0, zoom_level=level)
 
     assert camera.pixel_scale == scale
+
+
+@pytest.mark.parametrize(
+    ("center", "expected"),
+    [((-5.0, 40.0), (0.0, 40.0)), ((30.0, 300.0), (30.0, 250.0)), ((12.0, 34.0), (12.0, 34.0))],
+)
+def test_the_view_keeps_its_centre_on_a_long_thin_map(
+    center: tuple[float, float], expected: tuple[float, float]
+) -> None:
+    camera = IsoCamera(center_x=center[0], center_y=center[1], **HEXAGONS)
+
+    camera.keep_within(80.0, 250.0)
+
+    assert (camera.center_x, camera.center_y) == expected

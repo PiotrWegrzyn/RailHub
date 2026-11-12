@@ -1,5 +1,6 @@
-"""Start a new game: on the baked map of Poland or on a map of a random, mostly-land spot in the
-world, with the towns grown from HISTORY_START to the year play begins."""
+"""Start a new game: on one of the baked maps of real places (railroads.maps.START_MAPS) or on a
+map of a random, mostly-land spot in the world, with the towns grown from HISTORY_START to the
+year play begins."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -34,8 +35,31 @@ KM_PER_CELL = 2.0
 
 
 class MapChoice(StrEnum):
+    """Each baked map by its title in railroads.maps.START_MAPS, and a random place. Saves keep
+    the value, so a title once used must not change."""
+
     POLAND = "Poland"
+    GERMANY = "Germany"
+    FRANCE = "France: Paris to Lyon"
+    BRITAIN = "Great Britain"
+    ITALY = "Italy: Venice to Rome"
+    MOSCOW = "Moscow"
+    CONSTANTINOPLE = "Constantinople"
+    ALPS = "The Alps"
+    NORWAY = "Norwegian fjords"
+    US_NORTHEAST = "US Northeast"
+    CALIFORNIA = "California"
+    COLORADO = "Colorado Rockies"
+    CHILE = "Central Chile"
+    JAPAN = "Japan: Hiroshima to Tokyo"
+    EAST_CHINA = "China: the Yangtze delta"
+    SOUTHEAST_AUSTRALIA = "Southeast Australia"
     WORLD = "A random place in the world"
+
+    @property
+    def start_map(self) -> maps.StartMap | None:
+        """The baked map this choice plays on, or None for a random place."""
+        return maps.start_map(self.value)
 
 
 @dataclass(frozen=True)
@@ -100,9 +124,10 @@ def start_new_game(
 def make_game(settings: Settings, report: Callable[[str], None] = print) -> SavedGame:
     """A new game with these settings, its towns grown and ready to play."""
     seed = settings.seed
-    if settings.map == MapChoice.POLAND:
-        tile_map = maps.load("poland", "hex")
-        title = f"Poland, seed {seed}"
+    baked = settings.map.start_map
+    if baked is not None:
+        tile_map = maps.load(baked.key, "hex")
+        title = f"{baked.title}, seed {seed}"
     else:
         new = start_new_game(seed, report=report)
         tile_map = new.tile_map
