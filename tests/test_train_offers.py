@@ -2,7 +2,7 @@ from test_railway import joined_stations
 
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.goods import RECIPES, Good, makes_of
-from railroads.ui.trains_window import goods_to_load
+from railroads.ui.station_offers import goods_to_load
 
 
 def test_a_station_supplies_what_buildings_in_its_reach_make() -> None:

@@ -4,7 +4,6 @@ to click into cars, those the next stop wants outlined, and what the next stop w
 cards a map to add stops on, which marks where a hovered good is wanted (railroads.ui.route_map)."""
 
 import time
-from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 from imgui_bundle import icons_fontawesome_4 as fa
@@ -12,12 +11,11 @@ from imgui_bundle import imgui
 
 from railroads.sim.demand import StationDemand
 from railroads.sim.finance import TRAIN_RESALE, dollars
-from railroads.sim.goods import GOOD_YEARS, Good
-from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
 from railroads.sim.trains import ENGINES, Stop, Train
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at
+from railroads.ui.station_offers import Supplies, goods_to_load
 from railroads.ui.theme import (
     BRASS,
     CARDS_WIDTH,
@@ -41,8 +39,6 @@ MAP_SHARE = 0.45
 CARD_LABEL = 130.0
 # How often, in seconds, what a train's cargo is worth is worked out again.
 WORTH_EVERY = 0.5
-
-type Supplies = Callable[[Cell], Mapping[Good, float]]
 
 
 @dataclass
@@ -192,7 +188,7 @@ class TrainsWindow:
         imgui.end_child()
         imgui.same_line()
         imgui.begin_child("map", (0, 0), imgui.ChildFlags_.borders.value)
-        self.map.draw(railway, train, ground)
+        self.map.draw(railway, train, ground, supplies)
         imgui.end_child()
 
     def _draw_stops(self, railway: Railway, train: Train, supplies: Supplies) -> None:
@@ -342,26 +338,6 @@ class TrainsWindow:
             if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
                 self.map.good = offer.good
             imgui.end_disabled()
-
-
-@dataclass(frozen=True)
-class Offer:
-    good: Good
-    waiting: float
-    made: float
-
-
-def goods_to_load(railway: Railway, station: Cell, made: Mapping[Good, float]) -> list[Offer]:
-    """The goods a train can take on at a station: what is made around it and what waits
-    there, gathered or brought by other trains, leaving out goods not yet invented."""
-    goods = railway.station_goods(station)
-    waiting = {g: goods.stockpile.get(g, 0.0) + goods.brought.get(g, 0.0) for g in Good}
-    known = {g for g, a in made.items() if a > 0} | {g for g, a in waiting.items() if a >= 0.5}
-    return [
-        Offer(good, waiting[good], made.get(good, 0.0))
-        for good in Good
-        if good in known and GOOD_YEARS.get(good, 0) <= railway.year
-    ]
 
 
 def _centered_hint(text: str) -> None:

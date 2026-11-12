@@ -57,6 +57,7 @@ from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.track_preview import TrackPreview
 from railroads.ui.pixel.train_layer import TrainLayer
 from railroads.ui.pixel.world import PixelWorld
+from railroads.ui.route_map import soften
 from railroads.ui.search import BuildingSearch
 from railroads.ui.station_window import StationWindow
 from railroads.ui.summaries_panel import SummariesPanel
@@ -150,6 +151,8 @@ class MapView:
         self._trains: TrainLayer | None = None
         self._preview: TrackPreview | None = None
         self._textures: dict[bool, hello_imgui.TextureGpu] = {}
+        # The ground picture softened for the trains window's map, made when it first shows.
+        self._soft_texture: hello_imgui.TextureGpu | None = None
         # The ground shader for the pixel map, once tried (railroads.ui.pixel.ground_shader), and
         # how many times the cells' colours have changed, so it takes them up again.
         self._shader: GroundShader | None = None
@@ -280,6 +283,7 @@ class MapView:
         self._satisfaction = satisfaction
         if moods_changed or self.growth.forests_changed:
             self._textures.clear()
+            self._soft_texture = None
             self._colors_version += 1
             if self._pixels is not None:
                 self._pixels.refresh(self._pixels.world.satisfaction_changed(satisfaction))
@@ -312,8 +316,12 @@ class MapView:
         return self._pictures
 
     def _ground_picture(self) -> tuple[imgui.ImTextureRef, Vec2]:
-        """The smooth ground picture without grid lines, and its size in map units."""
-        texture = imgui.ImTextureRef(self._ground_texture(False).texture_id())
+        """The ground picture softened for the trains window's map, and its size in map units."""
+        if self._soft_texture is None:
+            light = self.camera.map_direction(*LIGHT_ON_SCREEN)
+            rgba = self._ground_pictures().picture(self._ground_colors(), light, False)
+            self._soft_texture = hello_imgui.create_texture_gpu_from_rgba_data(soften(rgba))
+        texture = imgui.ImTextureRef(self._soft_texture.texture_id())
         return texture, self._ground_layout().size
 
     def _ground_texture(self, with_lines: bool) -> hello_imgui.TextureGpu:
