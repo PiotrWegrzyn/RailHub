@@ -48,16 +48,21 @@ _plain_render = PixelWorld.render
 
 
 def _timed_render(
-    self: PixelWorld, chunk_x: int, chunk_y: int, resolution: int = 1, fine_relief: bool = False
+    self: PixelWorld,
+    chunk_x: int,
+    chunk_y: int,
+    resolution: int = 1,
+    fine_relief: bool = False,
+    over_ground: bool = False,
 ):
     before = time.perf_counter()
-    pixels = _plain_render(self, chunk_x, chunk_y, resolution, fine_relief)
+    pixels = _plain_render(self, chunk_x, chunk_y, resolution, fine_relief, over_ground)
     if fine_relief and resolution > 1:
         kind = "fine raised"
     elif self.rises(chunk_x, chunk_y):
         kind = "raised"
     else:
-        kind = "flat"
+        kind = "flat over ground" if over_ground else "flat"
     _renders.append((f"{kind} x{resolution}", time.perf_counter() - before))
     return pixels
 
