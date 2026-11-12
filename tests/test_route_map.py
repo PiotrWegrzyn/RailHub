@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 
+import numpy as np
 import pytest
 from imgui_bundle import hello_imgui, imgui
 from test_railway import joined_stations
@@ -9,12 +10,16 @@ from railroads.sim.trains import Stop
 from railroads.ui.minimap import Panel
 from railroads.ui.route_map import (
     MOST_ZOOM,
+    SUMMARY_MOST,
     MapFrame,
     RouteMap,
     add_stop,
     can_stop_at,
     edge_spot,
+    made_at,
+    soften,
     station_at,
+    summary_of,
     wanted_at,
 )
 
@@ -71,6 +76,65 @@ def test_a_good_no_station_needs_is_wanted_nowhere() -> None:
     wanted = wanted_at(railway, Good.DIAMONDS)
 
     assert wanted == {}
+
+
+def test_a_good_is_made_where_buildings_around_make_it_or_where_it_waits() -> None:
+    _, railway = joined_stations()
+    railway.station_goods((6, 20)).stockpile[Good.COAL] = 12.0
+    made = {(6, 3): {Good.COAL: 30.0}, (6, 20): {}}
+
+    found = made_at(railway, Good.COAL, made.__getitem__)
+
+    assert {station: (o.made, o.waiting) for station, o in found.items()} == {
+        (6, 3): (30.0, 0.0),
+        (6, 20): (0.0, 12.0),
+    }
+
+
+def test_a_good_made_and_waiting_nowhere_is_made_at_no_station() -> None:
+    _, railway = joined_stations()
+
+    found = made_at(railway, Good.IRON, lambda _: {Good.COAL: 30.0})
+
+    assert found == {}
+
+
+def test_a_station_summary_lists_what_it_wants_and_makes_the_most_first() -> None:
+    _, railway = joined_stations()
+    railway.station_demand((6, 3)).capacity = {Need.FOOD: 30.0, Need.COAL: 80.0}
+    railway.station_goods((6, 3)).stockpile[Good.WHEAT] = 7.0
+
+    summary = summary_of(railway, (6, 3), {Good.COAL: 20.0, Good.IRON: 50.0})
+
+    assert summary.wants == [(Need.COAL, 80.0), (Need.FOOD, 30.0)]
+    assert summary.makes == [(Good.IRON, 50.0), (Good.COAL, 20.0), (Good.WHEAT, 7.0)]
+    assert summary.more_wants == summary.more_makes == 0
+
+
+def test_a_station_summary_keeps_only_the_most_and_counts_the_rest() -> None:
+    _, railway = joined_stations()
+    needs = list(Need)[: SUMMARY_MOST + 2]
+    railway.station_demand((6, 3)).capacity = {need: 10.0 + i for i, need in enumerate(needs)}
+
+    summary = summary_of(railway, (6, 3), {})
+
+    assert len(summary.wants) == SUMMARY_MOST
+    assert summary.wants[0] == (needs[-1], 10.0 + len(needs) - 1)
+    assert summary.more_wants == 2
+    assert summary.makes == []
+
+
+def test_softening_blurs_a_hard_edge_and_keeps_flat_ground_as_it_was() -> None:
+    rgba = np.full((32, 32, 4), 255, dtype=np.uint8)
+    rgba[:, :16, :3] = 0
+
+    soft = soften(rgba)
+
+    row = soft[8, :, 0].astype(int)
+    assert soft.shape == (16, 16, 4)
+    assert row[0] == 0 and row[-1] == 255
+    assert 0 < row[7] < 255 or 0 < row[8] < 255
+    assert list(row) == sorted(row)
 
 
 def test_a_station_can_be_added_unless_the_train_already_ends_there() -> None:
@@ -161,7 +225,7 @@ def test_the_map_draws_centred_on_the_trains_stops_with_a_good_marked(context: N
     route_map.good = Good.COAL
     ground = (imgui.ImTextureRef(1), railway.constructions.tile_map.grid.size())
 
-    route_map.draw(railway, train, lambda: ground)
+    route_map.draw(railway, train, lambda: ground, lambda _: {Good.COAL: 10.0})
 
     grid = railway.constructions.tile_map.grid
     (x0, y0), (x1, y1) = grid.center(6, 3), grid.center(6, 20)
