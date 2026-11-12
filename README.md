@@ -20,7 +20,8 @@ first with:
   in seconds;
 - the seed, which picks the start location and grows the same towns again. The menu offers a
   new random one each time the game opens;
-- the year play begins, so how long towns grow from 850 before it;
+- the year play begins, so how long towns grow from 850 before it: 1850 is suggested, and play
+  can't begin before 1750 (`EARLIEST_START_YEAR` in `src/railroads/newgame.py`);
 - the starting money, $80,000 by default;
 - under "For testing", how many years a stand-in player runs the railway first (`--simulate`).
 
@@ -68,7 +69,8 @@ uv run railroads --years 1100
 ```
 
 grows them for 1,100 years instead, so play begins in 1950 with a century more growth behind it
-and the clock showing 1950; play always ends in 2050. A shorter history begins play earlier.
+and the clock showing 1950; play always ends in 2050. A shorter history begins play earlier, but
+not before 1750: `--years` below 900 is refused, and 1,000 years, beginning in 1850, is suggested.
 
 ```bash
 uv run railroads --poland --seed 1 --simulate

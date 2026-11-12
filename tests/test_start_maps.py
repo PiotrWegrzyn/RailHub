@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from railroads import maps
-from railroads.newgame import MapChoice, Settings, make_game
+from railroads import maps, newgame
+from railroads.newgame import EARLIEST_START_YEAR, MapChoice, Settings, make_game
 from railroads.saves import Saves
-from railroads.sim.clock import HISTORY_START
+from railroads.sim.constructions import Constructions
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
 from railroads.ui.app import settings_from
@@ -71,9 +71,14 @@ def test_a_start_map_is_found_by_its_key_or_its_menu_title() -> None:
     assert maps.start_map("atlantis") is None
 
 
-def test_a_game_on_a_long_thin_map_is_set_up_and_loads_again(tmp_path: Path) -> None:
+def test_a_game_on_a_long_thin_map_is_set_up_and_loads_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        newgame, "seed_buildings", lambda tile_map, *_, **__: Constructions(tile_map)
+    )
     saves = Saves(tmp_path)
-    settings = Settings(seed=3, map=MapChoice.CHILE, start_year=HISTORY_START)
+    settings = Settings(seed=3, map=MapChoice.CHILE, start_year=EARLIEST_START_YEAR)
 
     saved = make_game(settings, report=lambda _: None)
     saves.save("Andes", saved)

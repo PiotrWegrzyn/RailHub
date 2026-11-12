@@ -3,7 +3,7 @@ map of a random, mostly-land spot in the world, with the towns grown from HISTOR
 year play begins."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 
@@ -28,6 +28,8 @@ from railroads.sim.tilemap import TileMap
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 ELEVATION_DB = DATA_DIR / "elevation.sqlite"
+# Play can't begin before this year; START_YEAR is the start suggested.
+EARLIEST_START_YEAR = 1750
 START_REGION = StartRegion()
 MAP_WIDTH_KM = 537.0
 MAP_HEIGHT_KM = 537.0
@@ -68,11 +70,17 @@ class Settings:
 
     seed: int
     map: MapChoice = MapChoice.POLAND
-    # Towns grow from HISTORY_START until this year, when play begins.
+    # Towns grow from HISTORY_START until this year, when play begins (see allowed_start_year).
     start_year: int = START_YEAR
     cash: float = START_CASH
     # Years a stand-in player builds and runs the railway before the player takes over.
     stand_in_years: int = 0
+
+
+def allowed_start_year(year: int) -> int:
+    """The nearest year play can begin in: from EARLIEST_START_YEAR to the year before
+    END_YEAR."""
+    return min(max(year, EARLIEST_START_YEAR), END_YEAR - 1)
 
 
 def world_maps_available() -> bool:
@@ -122,7 +130,9 @@ def start_new_game(
 
 
 def make_game(settings: Settings, report: Callable[[str], None] = print) -> SavedGame:
-    """A new game with these settings, its towns grown and ready to play."""
+    """A new game with these settings, its towns grown and ready to play, beginning in the
+    nearest year play can begin in."""
+    settings = replace(settings, start_year=allowed_start_year(settings.start_year))
     seed = settings.seed
     baked = settings.map.start_map
     if baked is not None:
@@ -132,7 +142,7 @@ def make_game(settings: Settings, report: Callable[[str], None] = print) -> Save
         new = start_new_game(seed, report=report)
         tile_map = new.tile_map
         title = f"Seed {seed}, {new.place}"
-    years = min(max(settings.start_year, HISTORY_START), END_YEAR - 1) - HISTORY_START
+    years = settings.start_year - HISTORY_START
     months = years * 12
     begins = play_begins(months)
     report(f"Growing towns for {years} years, from {HISTORY_START} to {begins}")

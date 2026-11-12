@@ -361,3 +361,15 @@ def test_the_main_menu_answers_clicks_after_leaving_a_game(context: None, tmp_pa
 
     assert shell.app is None
     assert shell.menu.page == "new"
+
+
+def test_drawing_the_new_game_page_pulls_an_early_start_up_to_1750(
+    context: None, tmp_path: Path
+) -> None:
+    shell = Shell(Saves(tmp_path))
+    shell.menu.go_to("new")
+    shell.menu.start_year = 1500
+
+    shell_frame(shell)
+
+    assert shell.menu.start_year == 1750

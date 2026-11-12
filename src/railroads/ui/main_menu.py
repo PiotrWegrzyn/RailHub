@@ -8,7 +8,13 @@ from typing import Literal
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.newgame import MapChoice, Settings, world_maps_available
+from railroads.newgame import (
+    EARLIEST_START_YEAR,
+    MapChoice,
+    Settings,
+    allowed_start_year,
+    world_maps_available,
+)
 from railroads.saves import SaveInfo, Saves
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
 from railroads.sim.finance import START_CASH, dollars
@@ -75,7 +81,7 @@ class MainMenu:
         return Settings(
             seed=self.seed,
             map=self.map,
-            start_year=self.start_year,
+            start_year=allowed_start_year(self.start_year),
             cash=float(self.cash),
             stand_in_years=self.stand_in_years,
         )
@@ -155,9 +161,15 @@ class MainMenu:
         imgui.text_disabled("The same seed and map grow the same towns.")
         imgui.spacing()
         imgui.text("Play begins in")
-        _, self.start_year = imgui.slider_int(
-            "##start year", self.start_year, HISTORY_START, END_YEAR - 1
+        _, year = imgui.slider_int(
+            "##start year",
+            self.start_year,
+            EARLIEST_START_YEAR,
+            END_YEAR - 1,
+            flags=imgui.SliderFlags_.always_clamp.value,
         )
+        self.start_year = allowed_start_year(year)
+        imgui.text_colored(imgui.ImVec4(*BRASS), f"{START_YEAR} is suggested.")
         imgui.text_disabled(
             f"Towns grow for {self.start_year - HISTORY_START} years from {HISTORY_START} first; "
             "more years take longer to set up."
