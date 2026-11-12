@@ -1,9 +1,9 @@
-"""Grows the food sandbox (railroads.sim.sandbox): a 50x50 piece of a start map with only houses,
+"""Grows the food sandbox (railroads.sim.sandbox): a square piece of a start map with only houses,
 farms, orchards and fishing grounds, from the first year of history, and prints every decade how
 many of each stand, how well fed the houses are, how much food is made and eaten and how many
 buildings died out.
 
-Run with: uv run python tools/food_sandbox.py [--map poland] [--seed 1] [--years 300]
+Run with: uv run python tools/food_sandbox.py [--map poland] [--size 100] [--seed 1] [--years 300]
 
 With --html PATH it also writes a page that shows the map at every line, to click through.
 """
@@ -23,7 +23,7 @@ from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.economy import Satisfaction
 from railroads.sim.goods import Need
 from railroads.sim.growth import Growth
-from railroads.sim.sandbox import FOOD_ONLY, small_map
+from railroads.sim.sandbox import FOOD_ONLY, SANDBOX_SIZE, small_map
 from railroads.sim.tilemap import Deposit
 
 KINDS = (BuildingKind.HOUSE, BuildingKind.FARM, BuildingKind.ORCHARD, BuildingKind.FISHERY)
@@ -105,13 +105,14 @@ PAGE = (Path(__file__).with_name("food_sandbox.html")).read_text()
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--map", default="poland")
+    parser.add_argument("--size", type=int, default=SANDBOX_SIZE, help="cells along each side")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--years", type=int, default=300)
     parser.add_argument("--every", type=int, default=10, help="years between lines")
     parser.add_argument("--html", type=Path, help="write a page to click through the years")
     args = parser.parse_args()
     rng = np.random.default_rng(args.seed)
-    tile_map = small_map(maps.load(args.map, "hex"))
+    tile_map = small_map(maps.load(args.map, "hex"), args.size)
     tile_map = replace(tile_map, deposits=place_deposits(tile_map, rng))
     fishing = int((tile_map.deposits == Deposit.FISH).sum())
     print(f"{tile_map.name}: {tile_map.grid.shape}, {fishing} fishing ground cells")

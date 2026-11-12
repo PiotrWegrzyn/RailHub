@@ -1,5 +1,6 @@
-"""A small world to balance the economy in: a piece of a start map that grows only houses, farms,
-orchards and fishing grounds (FOOD_ONLY), so food alone decides how towns rise and die out."""
+"""A small world to balance the economy in: a SANDBOX_SIZE square piece of a start map that grows
+only houses, farms, orchards and fishing grounds (FOOD_ONLY), so food alone decides how towns rise
+and die out."""
 
 from dataclasses import replace
 
@@ -10,7 +11,7 @@ from railroads.sim.geo import Bounds
 from railroads.sim.ladders import FARMS, ORCHARDS, RESOURCES, TOWNS, GrowthRule
 from railroads.sim.tilemap import Terrain, TileMap
 
-SANDBOX_SIZE = 50
+SANDBOX_SIZE = 100
 
 HOUSES_ONLY = replace(TOWNS, kinds=(BuildingKind.HOUSE,), merges={}, rises={}, skyscrapers=False)
 FISHERIES = next(ladder for ladder in RESOURCES if ladder.kinds == (BuildingKind.FISHERY,))

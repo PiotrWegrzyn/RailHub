@@ -61,7 +61,7 @@
 <script>
 const D = __DATA__;
 const KINDS = ["domy", "farmy", "sady", "łowiska"];
-const W = 14, H = W * 2 / Math.sqrt(3), STEP = 0.75 * H;
+const W = Math.min(14, 900 / (D.cols + 0.5)), H = W * 2 / Math.sqrt(3), STEP = 0.75 * H;
 const canvas = document.getElementById("map");
 const ctx = canvas.getContext("2d");
 const scale = window.devicePixelRatio || 1;
@@ -122,7 +122,7 @@ function draw() {
       if (farms[i]) dot(x, y, "#e9c43a", -3);
       if (orchards[i]) dot(x, y, "#5d9e2f", 0);
       if (fisheries[i]) dot(x, y, "#1f7fd1", 3);
-      if (houses[i] > 1) {
+      if (houses[i] > 1 && W >= 10) {
         ctx.fillStyle = "#fff"; ctx.font = "bold 8px system-ui"; ctx.textAlign = "center";
         ctx.fillText(houses[i], x, y + 1);
       }
