@@ -7,7 +7,9 @@ Chunks where hills or mountains rise show first as they are quickly drawn, then 
 background draws them again with the heights, lift and colours of their raised ground at the full
 resolution, and the finer drawing takes their place once it is ready. A chunk drawn again because
 something in it changed is refined again the same way. Where threads cannot start, as in a browser,
-one chunk is drawn again on each frame that draws no new chunks."""
+one chunk is drawn again on each frame that draws no new chunks. There, when the ground shader shows
+the ground beneath, new chunks wait until the view has stood still for a moment, so moving the map
+doesn't stall on drawing them."""
 
 import time
 from collections import OrderedDict
@@ -23,6 +25,8 @@ from railroads.ui.workers import FrameWorker, worker
 
 # Time a frame may spend drawing new chunks; at least one is always drawn.
 FRAME_BUDGET_S = 0.025
+# How long the view must stand still before chunks are drawn on frames, where they wait for it.
+SETTLE_S = 0.3
 # Most bytes of drawn chunks kept in memory; a fine chunk takes four times a plain one's.
 CHUNK_BUDGET = 128 * 1024 * 1024
 # Most bytes of chunk textures kept on the graphics card; the least recently shown go first.
@@ -50,6 +54,8 @@ class PixelLayer:
         self._refining: dict[tuple[int, int, int], tuple[int, Future[Rgba]]] = {}
         self._refined: set[tuple[int, int, int]] = set()
         self._refreshes: dict[ChunkKey, int] = {}
+        self._view: tuple[float, float, int] | None = None
+        self._still_since = 0.0
 
     def refresh(self, chunks: set[ChunkKey]) -> None:
         """Draws these chunks again next time they show, keeping their old textures on screen
@@ -83,8 +89,10 @@ class PixelLayer:
         camera: IsoCamera,
         center: Vec2,
         clip: tuple[Vec2, Vec2],
+        ground_below: bool = False,
     ) -> bool:
-        """Draws the chunks on screen; returns whether all of them were ready."""
+        """Draws the chunks on screen; returns whether all of them were ready. With
+        `ground_below`, the ground already shows where a chunk is missing."""
         camera_pixel = self.world.projection.to_pixels(camera.center_x, camera.center_y)
         placement = ChunkPlacement.of(
             self.world.projection,
@@ -96,13 +104,14 @@ class PixelLayer:
         density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
         self.take_refined()
         started = time.perf_counter()
+        waiting = ground_below and self._moved(camera, started)
         drawn_new = False
         complete = True
         for chunk in placement.chunks:
             key = (*chunk, placement.scale * density)
             texture = self._textures.get(key)
             if texture is None or key in self._stale:
-                if drawn_new and time.perf_counter() - started > FRAME_BUDGET_S:
+                if waiting or (drawn_new and time.perf_counter() - started > FRAME_BUDGET_S):
                     complete = False
                     if texture is None:
                         continue
@@ -115,9 +124,17 @@ class PixelLayer:
             draw_list.add_image(imgui.ImTextureRef(texture.texture_id()), top_left, bottom_right)
         while len(self._textures) > 1 and self._texture_bytes() > TEXTURE_BUDGET:
             self._stale.discard(self._textures.popitem(last=False)[0])
-        if not drawn_new and isinstance(self._worker, FrameWorker):
+        if not drawn_new and not waiting and isinstance(self._worker, FrameWorker):
             self._worker.work_once()
         return complete
+
+    def _moved(self, camera: IsoCamera, now: float) -> bool:
+        """Whether chunks drawn on frames must wait because the view moved a moment ago."""
+        view = (camera.center_x, camera.center_y, camera.pixel_scale)
+        if view != self._view:
+            self._view = view
+            self._still_since = now
+        return isinstance(self._worker, FrameWorker) and now - self._still_since < SETTLE_S
 
     def _refine(self, drawn: tuple[int, int, int]) -> None:
         """Has the worker draw a chunk again with fine raised ground, if it has any and is not

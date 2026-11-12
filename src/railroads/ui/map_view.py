@@ -342,9 +342,12 @@ class MapView:
         draw_list.push_clip_rect(top_left, bottom_right, True)
         draw_list.add_rect_filled(top_left, bottom_right, _color(BACKGROUND_COLOR))
         if self.camera.pixel_scale:
-            if not self._draw_shaded_ground(draw_list, center, top_left, bottom_right):
+            shaded = self._draw_shaded_ground(draw_list, center, top_left, bottom_right)
+            if not shaded:
                 self._draw_ground(draw_list, center, self._ground_texture(False))
-            self._pixel_layer().draw(draw_list, self.camera, center, (top_left, bottom_right))
+            self._pixel_layer().draw(
+                draw_list, self.camera, center, (top_left, bottom_right), ground_below=shaded
+            )
         else:
             self._draw_smooth_map(draw_list, center, top_left, bottom_right)
         if self.camera.pixel_scale:

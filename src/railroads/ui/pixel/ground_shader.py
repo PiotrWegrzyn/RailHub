@@ -7,12 +7,14 @@ It draws into a texture the size of the map on screen, which the map then shows 
 under the chunks the CPU draws (railroads.ui.pixel.layer); where a chunk is ready it covers the
 ground. A picture is drawn again only when the view or the cells' colours change.
 
-It needs OpenGL through PyOpenGL, which the browser build doesn't have; without it, or if the
-graphics card refuses the shader, GroundShader.make returns None and the map keeps its smooth
-ground picture under the chunks.
+On the desktop it reaches OpenGL through PyOpenGL; in the browser build, through the GL that
+imgui draws with there (railroads.ui.pixel.webgl), as WebGL 2. Without either, or if the graphics
+card refuses the shader, GroundShader.make returns None and the map keeps its smooth ground
+picture under the chunks.
 """
 
 import ctypes
+import sys
 from dataclasses import dataclass
 
 import numpy as np
@@ -21,24 +23,28 @@ import numpy.typing as npt
 from railroads.sim.tilemap import TileMap
 from railroads.ui.pixel.projection import PixelProjection
 
-try:
-    from OpenGL import GL
-except ImportError:
-    GL = None
+if sys.platform == "emscripten":
+    from railroads.ui.pixel import webgl as GL
+
+    HEADER = "#version 300 es\nprecision highp float;\nprecision highp int;\n"
+else:
+    try:
+        from OpenGL import GL
+    except ImportError:
+        GL = None
+    HEADER = "#version 330 core\n"
 
 # How strongly the grain of light and dark patches, and the slopes, change the cells' colours.
 GRAIN = 0.07
 SLOPE_LIGHT = 0.0018
 
-VERTEX = """#version 330 core
-layout(location = 0) in vec2 corner;
+VERTEX = """layout(location = 0) in vec2 corner;
 void main() {
     gl_Position = vec4(corner, 0.0, 1.0);
 }
 """
 
-FRAGMENT = """#version 330 core
-out vec4 colour;
+FRAGMENT = """out vec4 colour;
 uniform vec2 origin;
 uniform float scale;
 uniform float height;
@@ -87,7 +93,15 @@ float patches(vec2 art, float size) {
 }
 
 float height_at(vec2 p) {
-    return texture(heights, vec2(p.x / float(cells_size.x), p.y / (float(cells_size.y) * 0.8660254))).r;
+    vec2 at = vec2(p.x, p.y / 0.8660254) - 0.5;
+    ivec2 corner = ivec2(floor(at));
+    vec2 f = at - vec2(corner);
+    ivec2 last = cells_size - 1;
+    float a = texelFetch(heights, clamp(corner, ivec2(0), last), 0).r;
+    float b = texelFetch(heights, clamp(corner + ivec2(1, 0), ivec2(0), last), 0).r;
+    float c = texelFetch(heights, clamp(corner + ivec2(0, 1), ivec2(0), last), 0).r;
+    float d = texelFetch(heights, clamp(corner + ivec2(1, 1), ivec2(0), last), 0).r;
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
 void main() {
@@ -101,9 +115,9 @@ void main() {
     }
     vec4 base = texelFetch(cells, cell, 0);
     float speckle = hash(art) - 0.5;
-    float patch = patches(art, 7.0) - 0.5 + 0.6 * (patches(art, 23.0) - 0.5);
+    float blotch = patches(art, 7.0) - 0.5 + 0.6 * (patches(art, 23.0) - 0.5);
     float slope = height_at(p + light * 0.35) - height_at(p - light * 0.35);
-    float shade = 1.0 + grain * (patch + 0.5 * speckle) - slope_light * slope;
+    float shade = 1.0 + grain * (blotch + 0.5 * speckle) - slope_light * slope;
     colour = vec4(clamp(base.rgb * shade, 0.0, 1.0), 1.0);
 }
 """
@@ -159,7 +173,7 @@ class GroundShader:
         GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 0, ctypes.c_void_p(0))
         GL.glBindVertexArray(0)
         self._cells = _texture(GL.GL_NEAREST)
-        self._heights = _texture(GL.GL_LINEAR)
+        self._heights = _texture(GL.GL_NEAREST)
         heights = np.ascontiguousarray(tile_map.height_m.astype(np.float32))
         GL.glBindTexture(GL.GL_TEXTURE_2D, self._heights)
         rows, cols = heights.shape
@@ -178,7 +192,7 @@ class GroundShader:
         if GL is None:
             return None
         try:
-            program = _program(VERTEX, FRAGMENT)
+            program = _program(HEADER + VERTEX, HEADER + FRAGMENT)
             return cls(program, projection, tile_map)
         except Exception:  # noqa: BLE001 - any GL failure means falling back to the CPU ground
             return None
@@ -233,7 +247,7 @@ class GroundShader:
         GL.glUniform2f(at("origin"), *view.origin)
         GL.glUniform1f(at("scale"), view.scale)
         GL.glUniform1f(at("height"), view.height)
-        GL.glUniformMatrix2fv(at("to_plane"), 1, GL.GL_TRUE, np.array([a, b, c, d], np.float32))
+        GL.glUniformMatrix2fv(at("to_plane"), 1, GL.GL_FALSE, np.array([a, c, b, d], np.float32))
         GL.glUniform2f(at("projection_origin"), *map(float, self._projection.origin))
         GL.glUniform2i(at("cells_size"), self._shape[1], self._shape[0])
         GL.glUniform1i(at("cells"), 0)

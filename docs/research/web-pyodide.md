@@ -117,6 +117,12 @@ would pan at about 45 fps, still held back by the 140 ms quick draws of raised c
    the world. Cheaper options: skip the fine redraw in the browser, split it into strips across
    frames, or move map drawing to GPU shaders. Shaders would also remove the 60–140 ms quick
    chunk draws, the next biggest cost.
+   Done in part: the ground shader now runs in the browser on WebGL 2
+   (`railroads.ui.pixel.webgl`), and while the view moves new chunks and fine redraws wait, with
+   the shader's ground showing where chunks are missing. The same pan as above now runs at
+   59.9 fps, with a median frame of 16.7 ms, a 95th percentile of 17.6 ms and a worst frame of
+   33 ms. Chunks still cost 60–160 ms each once the map stops, so the first frames after a pan
+   stutter while they are drawn.
 4. **Pure Python is about 2× slower.** Monthly growth and train simulation will feel this too.
    They were not measured in play.
 5. **Download.** About 16 MB before anything shows. That is acceptable for a game but needs a real
