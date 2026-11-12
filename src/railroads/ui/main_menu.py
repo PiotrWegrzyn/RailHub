@@ -119,7 +119,7 @@ class MainMenu:
             self.go_to("new")
         if self._button(f"{fa.ICON_FA_FOLDER_OPEN}  Load game"):
             self.go_to("load")
-        if self._button(f"{fa.ICON_FA_SIGN_OUT_ALT}  Quit"):
+        if self._button(f"{fa.ICON_FA_POWER_OFF}  Quit"):
             return QuitChoice()
         return None
 
@@ -148,7 +148,7 @@ class MainMenu:
         _, self.seed = imgui.input_int("##seed", self.seed, 0)
         self.seed = min(max(self.seed, 0), SEEDS - 1)
         imgui.same_line(0, 4)
-        if imgui.button(fa.ICON_FA_DICE, (36, 0)):
+        if imgui.button(fa.ICON_FA_RANDOM, (36, 0)):
             self.seed = random_seed()
         if imgui.is_item_hovered():
             imgui.set_tooltip("A new random seed")
