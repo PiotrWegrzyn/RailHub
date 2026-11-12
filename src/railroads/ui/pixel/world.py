@@ -277,12 +277,13 @@ class PixelWorld:
         """Track not laid yet, over `width` by `height` art pixels from (`left`, `top`), drawn
         as laid track would be: lifted with the ground and hidden behind raised ground in front
         of it."""
+        art = self.track.planning(pieces)
         raised = self.elevation.area(left, top, width, height + MOST_LIFT)
         if raised is None:
-            return self.track.layer(pieces, left, top, width, height, resolution, stations=False)
+            return art.layer(pieces, left, top, width, height, resolution, stations=False)
         k = resolution
         seen = raycast(raised.lift, height, width).repeat(k, axis=0).repeat(k, axis=1)
-        track, lift = self.track.lifted(pieces, left, top, width, height, k, stations=False)
+        track, lift = art.lifted(pieces, left, top, width, height, k, stations=False)
         track[..., 3] *= seen <= lift + HIDDEN_BEYOND
         return track
 

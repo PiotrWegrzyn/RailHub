@@ -244,11 +244,31 @@ class TrackArt:
         constructions: Constructions,
         projection: PixelProjection,
         elevation: Elevation | None = None,
+        planned: tuple[Track, ...] = (),
     ) -> None:
         self.tile_map = tile_map
         self.constructions = constructions
         self.projection = projection
         self.elevation = elevation
+        self._planned: dict[Cell, list[Track]] = {}
+        for piece in planned:
+            self._planned.setdefault(piece.cell, []).append(piece)
+
+    def planning(self, pieces: list[Track]) -> TrackArt:
+        """Track art that draws track as it will be once these pieces are laid, each in place
+        of built track between the same two points of its cell, so planned double track widens
+        and narrows by the planned track round it rather than by what is built there now."""
+        return TrackArt(
+            self.tile_map, self.constructions, self.projection, self.elevation, tuple(pieces)
+        )
+
+    def _track_at(self, cell: Cell) -> list[Track]:
+        built = self.constructions.track_at(cell)
+        planned = self._planned.get(cell)
+        if not planned:
+            return list(built)
+        ends = {piece.ends for piece in planned}
+        return [piece for piece in built if piece.ends not in ends] + planned
 
     def layer(
         self,
@@ -466,7 +486,7 @@ class TrackArt:
         whichever side it turns away to, or nothing."""
         steps = self.tile_map.grid.track_steps()
         mine = piece.ends[1] if piece.ends[0] == point else piece.ends[0]
-        for other in self.constructions.track_at(piece.cell):
+        for other in self._track_at(piece.cell):
             if other.width != TrackWidth.DOUBLE or point not in other.ends:
                 continue
             if not self._double_beyond(other, point):
@@ -488,7 +508,7 @@ class TrackArt:
         beyond, entry = grid.track_exit(piece.cell, point)
         if not grid.contains(*beyond):
             return True
-        joined = [other for other in self.constructions.track_at(beyond) if entry in other.ends]
+        joined = [other for other in self._track_at(beyond) if entry in other.ends]
         return not joined or any(other.width == TrackWidth.DOUBLE for other in joined)
 
     def _lay_deck(self, paint: ImageDraw.ImageDraw, lanes: list[Path], cell: float, s: int) -> None:
