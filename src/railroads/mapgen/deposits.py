@@ -1,7 +1,8 @@
 """Rare resources: each new map gets its deposits from its own geography and its seed.
 
 Every resource has the land it can lie in (allowed_land) and a number of clusters for the map's
-land (DEPOSITS). Cluster centres are drawn at random on that land, kept apart so they spread over
+land (DEPOSITS), or for the land it can lie in: fishing grounds come with the length of rivers,
+lakes and coast. Cluster centres are drawn at random on that land, kept apart so they spread over
 the map, and each grows into a small blob. Where little land allows a resource the clusters sit
 closer together; clusters that no longer fit are left out, and a map with no such land has none
 of that resource.
@@ -23,6 +24,8 @@ class DepositRule:
     # One cluster for this many land cells, of between so many cells.
     land_cells_per_cluster: int
     size: tuple[int, int]
+    # Whether the land counted is only the land the resource can lie in.
+    on_its_land: bool = False
 
 
 # Rarest first, so they get the land they want before commoner ones spread over it.
@@ -39,7 +42,7 @@ DEPOSITS: dict[Deposit, DepositRule] = {
     Deposit.GRAPES: DepositRule(30_000, (5, 12)),
     Deposit.IRON: DepositRule(30_000, (6, 14)),
     Deposit.WOOL: DepositRule(12_000, (6, 12)),
-    Deposit.FISH: DepositRule(20_000, (6, 14)),
+    Deposit.FISH: DepositRule(300, (6, 14), on_its_land=True),
 }
 # Military ground, whose few clusters hold every outpost on the map: how many, and of how many cells.
 GARRISONS = (1, 3)
@@ -90,7 +93,8 @@ def place_deposits(tile_map: TileMap, rng: np.random.Generator) -> npt.NDArray[n
     garrisons = int(rng.integers(GARRISONS[0], GARRISONS[1] + 1))
     _place_clusters(layer, allowed, Deposit.GARRISON, garrisons, GARRISON_SIZE, tile_map, rng)
     for deposit, rule in DEPOSITS.items():
-        wanted = round(land_cells / rule.land_cells_per_cluster)
+        counted = int(allowed[deposit].sum()) if rule.on_its_land else land_cells
+        wanted = round(counted / rule.land_cells_per_cluster)
         _place_clusters(layer, allowed, deposit, wanted, rule.size, tile_map, rng)
     return layer
 

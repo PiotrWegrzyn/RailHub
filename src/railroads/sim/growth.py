@@ -12,10 +12,12 @@ flats may put up a skyscraper, SKYSCRAPER_CHANCE of the time: a business centre 
 flats and gives corporate points, whose people move into SKYSCRAPER_HOMES houses in the nearest
 cells with room for them.
 
-Every TRADE_EVERY_MONTHS the stations hand out their goods (railroads.sim.economy, settled with
-the railway by railroads.sim.station_trade), which leaves each kind of building in each cell
-unsatisfied, content or thriving, and pays the player for the buildings they own
-(railroads.sim.ownership).
+Every TRADE_EVERY_MONTHS the stations hand out their goods and buildings sell to each other
+(railroads.sim.economy, settled with the railway by railroads.sim.station_trade), which leaves
+each kind of building in each cell unsatisfied, content or thriving, and pays the player for the
+buildings they own (railroads.sim.ownership). Buildings of a kind left unsatisfied in a cell for
+DIES_AFTER_MONTHS on end are pulled down, the player's too; those that make a bonus good never
+are.
 
 Growth keeps the tally the other parts share: how many of each kind stand in each cell (counts),
 the points around each cell (nearby) and every ladder's chances, all kept up to date by add. Every
@@ -51,6 +53,7 @@ from railroads.sim.economy import (
     served_multipliers,
 )
 from railroads.sim.forests import change_forests
+from railroads.sim.goods import BONUS_NEEDS, FITS, MAKES
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.ladders import (
     FARMS_CROWDED_OUT,
@@ -85,6 +88,14 @@ THINNING_UP_TO = 0.05
 # nearby adds.
 SERVED_POINT_WORTH = 2.0
 SKYSCRAPER_STARS = 4
+# How long the buildings of a kind in a cell last with nothing of what they need or make going.
+DIES_AFTER_MONTHS = 30 * 12
+# Kinds that make a bonus good, which never die out.
+UNDYING = frozenset(
+    kind
+    for kind, goods in MAKES.items()
+    if any(good in FITS[need] for need in BONUS_NEEDS for good in goods)
+)
 
 
 def _allowed(cells: Cells, opened: Cells, land: FloatGrid) -> Cells:
@@ -119,6 +130,11 @@ class Growth:
     # The net change in each cell's count of each kind while changes are logged (log_changes),
     # set only for that while, so it is never saved with the game.
     _log: dict[tuple[Cell, BuildingKind], int] | None = None
+    # Per kind, how many months its buildings in each cell have been unsatisfied on end. None in
+    # saves from before buildings died out, which start counting afresh.
+    _unsatisfied: dict[BuildingKind, npt.NDArray[np.int32]] | None = None
+    # How many buildings have died out since the game began.
+    died_out = 0
 
     def __init__(
         self,
@@ -208,29 +224,53 @@ class Growth:
         self.economy.bonus_per_good = BONUS_PER_GOOD + (
             0.0 if self.railway is None else self.railway.research.bonus(Effect.BONUS_GOODS)
         )
-        if self._trades_anything():
-            self.trade = self.economy.trade(
-                self.owners.working_counts(),
-                self.station_trade.orders(),
-                np.flatnonzero(self._occupied),
-            )
-            yield
-            self.station_trade.settle(self.trade)
-            self.owners.pay(self.trade)
-            self.station_trade.update_reach()
-            changed |= self._raise_buildings()
-            self._count_served(self.trade)
-        else:
-            changed |= self._raise_buildings()
+        self.trade = yield from self.economy.trade_steps(
+            self.owners.working_counts(),
+            self.station_trade.orders(),
+            np.flatnonzero(self._occupied),
+        )
+        yield
+        self.station_trade.settle(self.trade)
+        self.owners.pay(self.trade)
+        self.station_trade.update_reach()
+        changed |= self._die_out(self.trade)
+        changed |= self._raise_buildings()
+        self._count_served(self.trade)
         for place in self._places:
             place.highest = float(place.chances.max())
         return changed
 
-    def _trades_anything(self) -> bool:
-        """Whether a month's trade can change anything: not before there is a railway or a
-        stand-in for one, when no station hands out or gathers goods, once it has been worked
-        out the first time."""
-        return self.trade is None or self.railway is not None or self.assumed_shares is not None
+    def _die_out(self, trade: Trade) -> set[Cell]:
+        """Counts the months each kind has been unsatisfied in each cell, and pulls down those
+        unsatisfied for DIES_AFTER_MONTHS; returns the cells they stood in."""
+        if self._unsatisfied is None:
+            self._unsatisfied = {}
+        months = self.rule.trade_every_months
+        dead: list[tuple[int, BuildingKind]] = []
+        for kind in trade.got:
+            if kind in UNDYING:
+                continue
+            wanted = trade.needed[kind] + trade.could_make[kind]
+            idle = (wanted > 0) & (trade.share((kind,)) <= 0)
+            counted = self._unsatisfied.get(kind)
+            if counted is None:
+                if not idle.any():
+                    continue
+                counted = self._unsatisfied[kind] = np.zeros(self._occupied.size, dtype=np.int32)
+            now = np.where(idle, counted[trade.cells] + months, 0)
+            counted[trade.cells] = now
+            dead += [(int(index), kind) for index in trade.cells[now >= DIES_AFTER_MONTHS]]
+        changed: set[Cell] = set()
+        for index, kind in dead:
+            cell = divmod(index, self._grid.cols)
+            gone = int(self._counts[kind][cell])
+            self.owners.lose(cell, kind, gone)
+            for _ in range(gone):
+                self.constructions.remove(Building(cell, kind))
+            self.add(cell, kind, -gone)
+            self.died_out += gone
+            changed.add(cell)
+        return changed
 
     def _count_served(self, trade: Trade) -> None:
         """Works out each cell's served points of every kind, and what they add to the chances:
@@ -644,6 +684,9 @@ class Growth:
             self._log[(cell, kind)] = self._log.get((cell, kind), 0) + how_many
         self._counts[kind][cell] += how_many
         self._occupied[cell] += how_many
+        unsatisfied = self._unsatisfied
+        if unsatisfied is not None and kind in unsatisfied and not self._counts[kind][cell]:
+            unsatisfied[kind][cell[0] * self._grid.cols + cell[1]] = 0
         points, value = self.rule.points[kind]
         neighbourhood = [cell, *self._grid.neighbours(*cell)]
         rows, cols = zip(*neighbourhood, strict=True)

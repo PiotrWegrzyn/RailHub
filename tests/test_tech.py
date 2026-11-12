@@ -96,7 +96,7 @@ def test_an_owned_farm_with_better_seed_sells_more_and_earns_food_experience() -
 
     growth.trade_goods()
 
-    earned = 5 * 1.1 * price_of(Good.WHEAT) * OWNER_SHARE
+    earned = 8 * 1.1 * price_of(Good.WHEAT) * OWNER_SHARE
     assert growth.owners.income[BuildingKind.FARM] == pytest.approx(earned)
     assert growth.railway.research.xp[Tree.FOOD] - before == pytest.approx(earned)
 

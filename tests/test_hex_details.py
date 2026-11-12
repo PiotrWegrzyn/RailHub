@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
@@ -33,15 +34,17 @@ def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded(
     assert house.count == 3
     assert house.needs == [(Need.FOOD, 30), (Need.HEATING, 3)]
     assert house.bonus == [(Need.BEER, 3), (Need.NEWSPAPERS, 3)]
-    assert house.got == [
-        Flow(Need.NEWSPAPERS, 0.0, 3.0),
-        Flow(Need.HEATING, 0.0, 3.0),
-        Flow(Need.BEER, 0.0, 3.0),
-        Flow(Need.FOOD, 0.0, 30.0),
+    assert [(flow.good, flow.done, flow.wanted) for flow in house.got] == [
+        (Need.NEWSPAPERS, 0.0, 3.0),
+        (Need.HEATING, 0.0, 3.0),
+        (Need.BEER, 0.0, 3.0),
+        (Need.FOOD, pytest.approx(7.2), 30.0),
     ]
-    assert house.satisfaction == "unsatisfied"
-    assert farm.makes == [(Good.WHEAT, 5)]
-    assert farm.gave == [Flow(Good.WHEAT, 0.0, 5.0)]
+    assert house.satisfaction == "content"
+    assert farm.makes == [(Good.WHEAT, 8)]
+    assert [(flow.good, flow.done, flow.wanted) for flow in farm.gave] == [
+        (Good.WHEAT, pytest.approx(7.2), 8.0)
+    ]
     assert ("population", 3, 3) in details.points
     assert ("food", 0, 1) in details.points
 
