@@ -191,10 +191,18 @@ pixels per art pixel.
     out at 1× and blown up.
   - **Cost:** a chunk takes about 30 ms to draw, or about 80 ms over mountains. The heights are
     worked out once, about 0.3 s when the pixel map is first shown.
-  - **Sharper mountains in the background** (`layer`): a chunk where hills or mountains rise shows
-    first as it is quickly drawn. A worker then draws it again in the background with the heights,
-    lift and colours of its raised ground at 2× (about 0.3 s), and that takes its place once
-    ready. A chunk drawn again because something in it changed is refined again the same way.
+  - **Drawn in the background** (`layer`, `painter`): chunks are drawn on a thread of their own,
+    never inside a frame, so panning and month turns don't stall on them. Until a chunk is ready
+    the ground beneath shows, and a chunk that changed keeps its old texture. The painter draws
+    the chunks in view first, newest first, and forgets ones nobody asked for in the last second.
+    A game being loaded draws its first view's chunks during loading.
+  - **Sharper mountains** (`layer`): a chunk where hills or mountains rise shows first as it is
+    quickly drawn, then is drawn again with the heights, lift and colours of its raised ground at
+    2× (about 0.3 s), which takes its place once ready. A chunk drawn again because something in
+    it changed is refined again the same way.
+  - **Month turns** touch only what changed: building spots and field plots are kept per cell
+    (`ui.buildings`), the smooth ground picture is touched up only in cells whose colour changed
+    (`ui.ground`), and the autosave starts on the frame after the turn.
 - `railroads.ui.map_view`: the map view, which owns the layers and the order they draw in. Beside it:
   `map_input` (mouse and keys), `map_tools` (what clicks do with each build tool), `map_overlays`
   (outlines, grid lines, station names, compass, search marks, the status strip and hover card)
