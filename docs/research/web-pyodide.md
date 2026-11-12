@@ -20,6 +20,19 @@ Open http://localhost:8000/. It plays the baked map of Poland; `?args=--poland -
 command line. Add `&measure` to run `web/measure.py` instead. It prints `LOAD` and `MEASURE` lines
 to the console. The same script runs on desktop with `uv run python web/measure.py --poland --seed 7`.
 
+## Hosting
+
+The game is played at https://piotrwegrzyn.github.io/RailHub/, served by GitHub Pages from the
+`main` branch of https://github.com/PiotrWegrzyn/RailHub. That repo holds only the built site, with
+`.nojekyll` and a short README. Loaded there, the page downloads 16.6 MB (Pages gzips the wasm to
+3.6 MB), has Pyodide and its packages ready after 3 s and shows its first frame after about 30 s.
+
+To publish a new build, run `build_site.py`, replace the contents of a RailHub checkout with
+`build/site` (keep its README), commit and push. Pushes this size need a larger
+`http.postBuffer` (150 MB here), or GitHub answers with HTTP 400.
+
+The game's wheel carries its Python source, so anyone playing can read the code.
+
 ## What it took
 
 - **No Python 3.13 port was needed.** Pyodide 314.0.0 runs Python 3.14.0, and imgui-bundle
