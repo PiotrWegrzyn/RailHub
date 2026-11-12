@@ -9,6 +9,7 @@ from railroads.sim.constructions import Building, BuildingKind, Constructions, T
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.ui import buildings
 from railroads.ui.build_menu import draw_track
 from railroads.ui.buildings import BuildingSpots, Plot, draw_building_dots, plots_of
 from railroads.ui.iso_camera import IsoCamera
@@ -181,3 +182,26 @@ def test_houses_stand_beside_track_through_their_cell_not_on_it() -> None:
     here = (rows == 8) & (cols == 8)
     assert here.sum() == 5
     assert (np.abs(spots.y[here] - centre_y) >= 0.25 - 1e-6).all()
+
+
+def test_spots_are_worked_out_again_only_in_cells_that_changed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    constructions = make_constructions()
+    BuildingSpots.of(constructions)
+    worked_out = []
+    original = buildings._cell_spots
+    monkeypatch.setattr(
+        buildings,
+        "_cell_spots",
+        lambda c, cell, *rest: worked_out.append(cell) or original(c, cell, *rest),
+    )
+
+    BuildingSpots.of(constructions)
+    unchanged = list(worked_out)
+    constructions.build(Building((7, 7), BuildingKind.HOUSE))
+    spots = BuildingSpots.of(constructions)
+
+    assert unchanged == []
+    assert worked_out == [(7, 7)]
+    assert spots.kinds[-1] == BuildingKind.HOUSE

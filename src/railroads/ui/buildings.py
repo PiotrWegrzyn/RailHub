@@ -7,6 +7,7 @@ the pixel art (see railroads.ui.pixel).
 """
 
 import math
+import weakref
 from dataclasses import dataclass
 from functools import cache
 from typing import Self
@@ -15,7 +16,13 @@ import numpy as np
 import numpy.typing as npt
 from imgui_bundle import imgui
 
-from railroads.sim.constructions import CELL_SPACE, Building, BuildingKind, Constructions
+from railroads.sim.constructions import (
+    CELL_SPACE,
+    Building,
+    BuildingKind,
+    Construction,
+    Constructions,
+)
 from railroads.sim.grids import Cell
 from railroads.ui.iso_camera import IsoCamera, Vec2
 
@@ -141,34 +148,69 @@ class BuildingSpots:
     ) -> Self:
         """Where each building stands: buildings of the kinds `at_back`, the farmsteads of
         fields filling their cell, stand at the back edge of their field, so it lies in front
-        of them."""
-        grid = constructions.tile_map.grid
-        used: dict[Cell, int] = {}
-        x, y, kinds, variants = [], [], [], []
-        for built in constructions:
-            first = used.get(built.cell, 0)
-            used[built.cell] = first + built.space
-            if not isinstance(built, Building):
-                continue
-            row, col = built.cell
-            slots = np.arange(first, first + built.space) + 0.5
-            angles = _cell_turn(row, col) + 2 * math.pi * slots / CELL_SPACE
-            center_x, center_y = grid.center(row, col)
-            if built.kind in at_back:
-                turn = -math.pi / 2 + FARMSTEAD_SWING * math.sin(_cell_turn(row, col) * 37)
-                x.append(center_x + FARMSTEAD_OUT * math.cos(turn))
-                y.append(center_y + FARMSTEAD_OUT * math.sin(turn))
-            else:
-                spot = (
-                    center_x + SLOT_RADIUS * float(np.cos(angles).mean()),
-                    center_y + SLOT_RADIUS * float(np.sin(angles).mean()),
-                )
-                spot = _clear_of_track(constructions, built.cell, spot)
-                x.append(spot[0])
-                y.append(spot[1])
-            kinds.append(built.kind)
-            variants.append((row * 7 + col * 13 + first) % 16)
+        of them. A cell whose constructions are the same as last time keeps its spots."""
+        known = _known(constructions, ("spots", at_back))
+        x: list[float] = []
+        y: list[float] = []
+        kinds: list[BuildingKind] = []
+        variants: list[int] = []
+        for cell, built in constructions.cells():
+            entry = known.get(cell)
+            if entry is None or entry[0] != built:
+                entry = (list(built), _cell_spots(constructions, cell, built, at_back))
+                known[cell] = entry
+            cell_x, cell_y, cell_kinds, cell_variants = entry[1]
+            x += cell_x
+            y += cell_y
+            kinds += cell_kinds
+            variants += cell_variants
         return cls(np.array(x), np.array(y), kinds, variants)
+
+
+def _cell_spots(
+    constructions: Constructions,
+    cell: Cell,
+    built: list[Construction],
+    at_back: frozenset[BuildingKind],
+) -> tuple[list[float], list[float], list[BuildingKind], list[int]]:
+    grid = constructions.tile_map.grid
+    row, col = cell
+    center_x, center_y = grid.center(row, col)
+    x, y, kinds, variants = [], [], [], []
+    first = 0
+    for one in built:
+        start, first = first, first + one.space
+        if not isinstance(one, Building):
+            continue
+        if one.kind in at_back:
+            turn = -math.pi / 2 + FARMSTEAD_SWING * math.sin(_cell_turn(row, col) * 37)
+            x.append(center_x + FARMSTEAD_OUT * math.cos(turn))
+            y.append(center_y + FARMSTEAD_OUT * math.sin(turn))
+        else:
+            slots = np.arange(start, start + one.space) + 0.5
+            angles = _cell_turn(row, col) + 2 * math.pi * slots / CELL_SPACE
+            spot = (
+                center_x + SLOT_RADIUS * float(np.cos(angles).mean()),
+                center_y + SLOT_RADIUS * float(np.sin(angles).mean()),
+            )
+            spot = _clear_of_track(constructions, cell, spot)
+            x.append(spot[0])
+            y.append(spot[1])
+        kinds.append(one.kind)
+        variants.append((row * 7 + col * 13 + start) % 16)
+    return x, y, kinds, variants
+
+
+# What was worked out per cell, for each Constructions and question, with a copy of the cell's
+# constructions it was worked out from. The copy must stay a list: compared with the cell's own
+# list, a tuple would never be equal and nothing would be kept.
+_KNOWN: weakref.WeakKeyDictionary[Constructions, dict[object, dict[Cell, tuple]]] = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _known(constructions: Constructions, question: object) -> dict[Cell, tuple]:
+    return _KNOWN.setdefault(constructions, {}).setdefault(question, {})
 
 
 @dataclass(frozen=True)
@@ -190,19 +232,34 @@ class Plot:
 def plots_of(
     constructions: Constructions, kinds: tuple[BuildingKind, ...]
 ) -> dict[BuildingKind, list[Plot]]:
-    """Each field of these kinds, on the side of its cell that its slots take up."""
+    """Each field of these kinds, on the side of its cell that its slots take up. A cell whose
+    constructions are the same as last time keeps its plots."""
+    known = _known(constructions, ("plots", kinds))
     plots: dict[BuildingKind, list[Plot]] = {kind: [] for kind in kinds}
-    used: dict[Cell, int] = {}
-    for built in constructions:
-        first = used.get(built.cell, 0)
-        used[built.cell] = first + built.space
-        if isinstance(built, Building) and built.kind in plots:
-            middle = (first + built.space / 2) / CELL_SPACE
-            angle = _cell_turn(*built.cell) + 2 * math.pi * middle
-            spread = math.cos(math.pi * built.space / CELL_SPACE)
-            facing = (math.cos(angle), math.sin(angle))
-            plots[built.kind].append(Plot(built.cell, facing, spread))
+    for cell, built in constructions.cells():
+        entry = known.get(cell)
+        if entry is None or entry[0] != built:
+            entry = (list(built), _cell_plots(cell, built, plots))
+            known[cell] = entry
+        for kind, plot in entry[1]:
+            plots[kind].append(plot)
     return plots
+
+
+def _cell_plots(
+    cell: Cell, built: list[Construction], kinds: dict[BuildingKind, list[Plot]]
+) -> list[tuple[BuildingKind, Plot]]:
+    found = []
+    first = 0
+    for one in built:
+        start, first = first, first + one.space
+        if isinstance(one, Building) and one.kind in kinds:
+            middle = (start + one.space / 2) / CELL_SPACE
+            angle = _cell_turn(*cell) + 2 * math.pi * middle
+            spread = math.cos(math.pi * one.space / CELL_SPACE)
+            facing = (math.cos(angle), math.sin(angle))
+            found.append((one.kind, Plot(cell, facing, spread)))
+    return found
 
 
 def draw_building_dots(

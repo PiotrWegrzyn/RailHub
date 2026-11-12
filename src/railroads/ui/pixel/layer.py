@@ -1,30 +1,31 @@
-"""Shows the pixel art on screen: chunks are drawn as the view reaches them, a few per frame, and
-kept as textures blown up to the zoom's pixel scale. Where each art pixel covers an even number
-of screen pixels the chunks are drawn finer (PixelWorld.render), so buildings, trees and track keep
-thin lines instead of growing blocky.
+"""Shows the pixel art on screen: chunks are drawn as the view reaches them and kept as textures
+blown up to the zoom's pixel scale. Where each art pixel covers an even number of screen pixels the
+chunks are drawn finer (PixelWorld.render), so buildings, trees and track keep thin lines instead of
+growing blocky.
 
-Chunks where hills or mountains rise show first as they are quickly drawn, then a worker in the
-background draws them again with the heights, lift and colours of their raised ground at the full
-resolution, and the finer drawing takes their place once it is ready. A chunk drawn again because
-something in it changed is refined again the same way. Where threads cannot start, as in a browser,
-one chunk is drawn again on each frame that draws no new chunks. There, when the ground shader shows
-the ground beneath, new chunks wait until the view has stood still for a moment, so moving the map
-doesn't stall on drawing them."""
+Chunks are drawn away from the frames (railroads.ui.pixel.painter); until a chunk is ready, the
+ground drawn beneath shows where it is missing, and a chunk that changed keeps its old texture.
+Chunks where hills or mountains rise show first as they are quickly drawn, then are drawn again
+with the heights, lift and colours of their raised ground at the full resolution, and the finer
+drawing takes their place once it is ready.
+
+Where threads cannot start, as in a browser, one chunk is drawn on each frame. There, when the
+ground shader shows the ground beneath, chunks wait until the view has stood still for a moment,
+so moving the map doesn't stall on drawing them."""
 
 import time
 from collections import OrderedDict
-from concurrent.futures import Executor, Future
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
 from railroads.ui.iso_camera import IsoCamera, Vec2
+from railroads.ui.pixel.painter import Painter
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, Rgba
 from railroads.ui.pixel.world import PixelWorld
-from railroads.ui.workers import FrameWorker, worker
 
-# Time a frame may spend drawing new chunks; at least one is always drawn.
-FRAME_BUDGET_S = 0.025
+# Time a frame may spend turning drawn chunks into textures; at least one is always made.
+UPLOAD_BUDGET_S = 0.006
 # How long the view must stand still before chunks are drawn on frames, where they wait for it.
 SETTLE_S = 0.3
 # Most bytes of drawn chunks kept in memory; a fine chunk takes four times a plain one's.
@@ -48,12 +49,13 @@ class PixelLayer:
         self._chunks: OrderedDict[tuple[int, int, int], Rgba] = OrderedDict()
         self._textures: OrderedDict[tuple[int, int, int], hello_imgui.TextureGpu] = OrderedDict()
         self._stale: set[tuple[int, int, int]] = set()
-        # Chunks being drawn again with fine raised ground, and how many times each chunk has
-        # been refreshed, so a drawing started before a refresh is thrown away.
-        self._worker: Executor = worker("relief", threads)
-        self._refining: dict[tuple[int, int, int], tuple[int, Future[Rgba]]] = {}
+        self._painter = Painter(threads)
+        # Chunks drawn finely, and how many times each chunk has been refreshed, so a drawing
+        # asked for before a refresh is thrown away.
         self._refined: set[tuple[int, int, int]] = set()
         self._refreshes: dict[ChunkKey, int] = {}
+        # Whether hills or mountains rise in each chunk, which never changes.
+        self._rises: dict[ChunkKey, bool] = {}
         self._view: tuple[float, float, int] | None = None
         self._still_since = 0.0
 
@@ -67,20 +69,23 @@ class PixelLayer:
             self._refreshes[chunk] = self._refreshes.get(chunk, 0) + 1
         self._refined = {key for key in self._refined if key[:2] not in chunks}
 
-    def take_refined(self) -> set[ChunkKey]:
-        """Puts in place the chunks the worker has finished drawing finely; returns them."""
+    def take_drawn(self) -> set[ChunkKey]:
+        """Keeps the chunks the painter has finished, unless they changed since they were asked
+        for; returns them."""
         taken: set[ChunkKey] = set()
-        for drawn, (refreshes, job) in list(self._refining.items()):
-            if not job.done():
-                continue
-            del self._refining[drawn]
+        for (fine, drawn, refreshes), pixels, error in self._painter.finished():
             chunk = drawn[:2]
-            if job.exception() is not None or refreshes != self._refreshes.get(chunk, 0):
+            if error is not None or refreshes != self._refreshes.get(chunk, 0):
                 continue
-            self._chunks[drawn] = job.result()
-            self._refined.add(drawn)
-            self._stale |= {key for key in self._textures if key[:2] == chunk}
+            if fine:
+                self._refined.add(drawn)
+                self._stale |= {key for key in self._textures if key[:2] == chunk}
+            elif drawn in self._chunks:
+                continue
+            self._chunks[drawn] = pixels
             taken.add(chunk)
+        while len(self._chunks) > 1 and self._chunk_bytes() > CHUNK_BUDGET:
+            self._chunks.popitem(last=False)
         return taken
 
     def draw(
@@ -102,31 +107,37 @@ class PixelLayer:
             clip,
         )
         density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
-        self.take_refined()
-        started = time.perf_counter()
-        waiting = ground_below and self._moved(camera, started)
-        drawn_new = False
+        scale = placement.scale * density
+        resolution = resolution_for(scale, self.world.resolutions)
+        self.take_drawn()
+        now = time.perf_counter()
+        waiting = ground_below and self._moved(camera, now)
+        uploaded = False
         complete = True
         for chunk in placement.chunks:
-            key = (*chunk, placement.scale * density)
+            key = (*chunk, scale)
+            drawn = (*chunk, resolution)
             texture = self._textures.get(key)
             if texture is None or key in self._stale:
-                if waiting or (drawn_new and time.perf_counter() - started > FRAME_BUDGET_S):
-                    complete = False
-                    if texture is None:
-                        continue
-                else:
-                    texture = self._upload(chunk, placement.scale * density)
+                late = uploaded and time.perf_counter() - now > UPLOAD_BUDGET_S
+                if drawn in self._chunks and not late:
+                    texture = self._upload(chunk, scale)
                     self._stale.discard(key)
-                    drawn_new = True
+                    uploaded = True
+                else:
+                    complete = False
+                    self._ask(drawn, now)
+                if texture is None:
+                    continue
+            self._refine(drawn, now)
             self._textures.move_to_end(key)
             top_left, bottom_right = placement.screen_rect(chunk)
             draw_list.add_image(imgui.ImTextureRef(texture.texture_id()), top_left, bottom_right)
         while len(self._textures) > 1 and self._texture_bytes() > TEXTURE_BUDGET:
             self._stale.discard(self._textures.popitem(last=False)[0])
-        if not drawn_new and not waiting and isinstance(self._worker, FrameWorker):
-            self._worker.work_once()
-        return complete
+        if not self._painter.threaded and not waiting:
+            self._painter.work_once(now)
+        return complete and not self._painter.waiting()
 
     def _moved(self, camera: IsoCamera, now: float) -> bool:
         """Whether chunks drawn on frames must wait because the view moved a moment ago."""
@@ -134,19 +145,29 @@ class PixelLayer:
         if view != self._view:
             self._view = view
             self._still_since = now
-        return isinstance(self._worker, FrameWorker) and now - self._still_since < SETTLE_S
+        return not self._painter.threaded and now - self._still_since < SETTLE_S
 
-    def _refine(self, drawn: tuple[int, int, int]) -> None:
-        """Has the worker draw a chunk again with fine raised ground, if it has any and is not
-        drawn finely already."""
-        resolution = drawn[2]
-        if resolution == 1 or drawn in self._refined or drawn in self._refining:
-            return
-        if not self.world.rises(*drawn[:2]):
+    def _ask(self, drawn: tuple[int, int, int], now: float) -> None:
+        if drawn in self._chunks:
             return
         refreshes = self._refreshes.get(drawn[:2], 0)
-        job = self._worker.submit(self.world.render, *drawn[:2], resolution, True)
-        self._refining[drawn] = (refreshes, job)
+        work = lambda: self.world.render(*drawn)
+        self._painter.want((False, drawn, refreshes), work, True, now)
+
+    def _refine(self, drawn: tuple[int, int, int], now: float) -> None:
+        """Asks for a chunk to be drawn again with fine raised ground, if it has any and is not
+        drawn finely already."""
+        resolution = drawn[2]
+        if resolution == 1 or drawn in self._refined or drawn not in self._chunks:
+            return
+        rises = self._rises.get(drawn[:2])
+        if rises is None:
+            rises = self._rises[drawn[:2]] = self.world.rises(*drawn[:2])
+        if not rises:
+            return
+        refreshes = self._refreshes.get(drawn[:2], 0)
+        work = lambda: self.world.render(*drawn, True)
+        self._painter.want((True, drawn, refreshes), work, False, now)
 
     def _chunk_bytes(self) -> int:
         return sum(pixels.nbytes for pixels in self._chunks.values())
@@ -157,15 +178,8 @@ class PixelLayer:
     def _upload(self, chunk: ChunkKey, scale: int) -> hello_imgui.TextureGpu:
         resolution = resolution_for(scale, self.world.resolutions)
         drawn = (*chunk, resolution)
-        pixels = self._chunks.get(drawn)
-        if pixels is None:
-            pixels = self.world.render(*chunk, resolution)
-            self._chunks[drawn] = pixels
-            self._refined.discard(drawn)
-            while len(self._chunks) > 1 and self._chunk_bytes() > CHUNK_BUDGET:
-                self._chunks.popitem(last=False)
+        pixels = self._chunks[drawn]
         self._chunks.move_to_end(drawn)
-        self._refine(drawn)
         blow_up = scale // resolution
         big = np.repeat(np.repeat(pixels, blow_up, axis=0), blow_up, axis=1)
         texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))

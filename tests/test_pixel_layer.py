@@ -1,3 +1,4 @@
+import time
 from types import SimpleNamespace
 
 import numpy as np
@@ -18,43 +19,62 @@ def no_graphics_card(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(hello_imgui, "create_texture_gpu_from_rgba_data", lambda _: FakeTexture())
 
 
-def test_raised_chunks_are_drawn_again_finely_in_the_background() -> None:
-    world, mountains, _ = world_over_mountains()
-    layer = PixelLayer(world)
-    layer._upload(mountains, 2)
-    layer._refining[(*mountains, 2)][1].result()
+def drawn_now(layer: PixelLayer, drawn: tuple[int, int, int]) -> None:
+    layer._ask(drawn, 0.0)
+    layer._painter.work_once(0.0)
+    layer.take_drawn()
 
-    taken = layer.take_refined()
+
+def test_a_chunk_asked_for_is_drawn_and_kept_once_taken() -> None:
+    world, mountains, _ = world_over_mountains()
+    layer = PixelLayer(world, threads=False)
+    layer._ask((*mountains, 2), 0.0)
+    layer._painter.work_once(0.0)
+
+    taken = layer.take_drawn()
+
+    assert taken == {mountains}
+    np.testing.assert_array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2))
+
+
+def test_raised_chunks_are_drawn_again_finely() -> None:
+    world, mountains, _ = world_over_mountains()
+    layer = PixelLayer(world, threads=False)
+    drawn_now(layer, (*mountains, 2))
+    layer._refine((*mountains, 2), 0.0)
+    layer._painter.work_once(0.0)
+
+    taken = layer.take_drawn()
 
     assert taken == {mountains}
     np.testing.assert_array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2, True))
 
 
-def test_a_fine_drawing_started_before_a_change_is_thrown_away() -> None:
+def test_a_drawing_asked_for_before_a_change_is_thrown_away() -> None:
     world, mountains, _ = world_over_mountains()
-    layer = PixelLayer(world)
-    layer._upload(mountains, 2)
-    layer._refining[(*mountains, 2)][1].result()
+    layer = PixelLayer(world, threads=False)
+    layer._ask((*mountains, 2), 0.0)
 
     layer.refresh({mountains})
-    taken = layer.take_refined()
+    layer._painter.work_once(0.0)
+    taken = layer.take_drawn()
 
     assert taken == set()
     assert (*mountains, 2) not in layer._chunks
 
 
-def test_without_threads_a_raised_chunk_waits_for_a_frame_to_be_drawn_finely() -> None:
+def test_with_threads_a_chunk_asked_for_is_drawn_in_the_background() -> None:
     world, mountains, _ = world_over_mountains()
-    layer = PixelLayer(world, threads=False)
-    layer._upload(mountains, 2)
-    waiting = layer.take_refined()
+    layer = PixelLayer(world, threads=True)
+    layer._ask((*mountains, 2), time.perf_counter())
 
-    layer._worker.work_once()
-    taken = layer.take_refined()
+    deadline = time.perf_counter() + 30
+    taken: set = set()
+    while not taken and time.perf_counter() < deadline:
+        time.sleep(0.01)
+        taken = layer.take_drawn()
 
-    assert waiting == set()
     assert taken == {mountains}
-    np.testing.assert_array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2, True))
 
 
 def test_without_threads_new_chunks_wait_until_the_view_has_stood_still() -> None:

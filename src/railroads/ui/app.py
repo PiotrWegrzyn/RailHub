@@ -112,10 +112,11 @@ class App:
         self.view.gui()
         self.help.draw()
         self.tech.draw(self.view.railway.research)
-        growth = self.view.growth
-        self.reports.draw(
-            growth.history, growth.year, len(self.view.railway.stations()), growth.population()
-        )
+        if self.reports.open:
+            growth = self.view.growth
+            self.reports.draw(
+                growth.history, growth.year, len(self.view.railway.stations()), growth.population()
+            )
         self._draw_saves()
         typing = imgui.get_io().want_text_input
         if not typing and imgui.is_key_pressed(imgui.Key.h, repeat=False):

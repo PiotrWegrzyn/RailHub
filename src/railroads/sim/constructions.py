@@ -308,6 +308,10 @@ class Constructions:
         for built in self._cells.values():
             yield from built
 
+    def cells(self) -> Iterator[tuple[Cell, list[Construction]]]:
+        """Each cell with something built on it, and what is built there."""
+        return iter(self._cells.items())
+
     def stations(self) -> list[Cell]:
         """Every station's cell, in order."""
         return sorted(self._stations)

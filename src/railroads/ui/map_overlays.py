@@ -16,7 +16,7 @@ from railroads.sim.railway import Railway
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.biomes import biome_of
-from railroads.ui.hex_details import describe, mood_text
+from railroads.ui.hex_details import mood_text, recently_described
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS, IsoCamera, Vec2
 from railroads.ui.minimap import MinimapLayout
 from railroads.ui.search import BuildingSearch, pulse
@@ -287,7 +287,7 @@ def draw_hovered_buildings(growth: Growth, cell: Cell, top_left: Vec2) -> None:
     """The buildings in the cell under the mouse, one to a line, in a small card below the
     status strip: how satisfied each is, and icons of what it makes, what it demands and its
     bonus goods."""
-    rows = describe(growth, cell).buildings
+    rows = recently_described(growth, cell).buildings
     if not rows:
         return
     imgui.set_next_window_pos(top_left)

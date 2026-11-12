@@ -1,6 +1,8 @@
 """The panel that opens when a cell is clicked: its land, its points, and every building on it with
 what it makes, demands and takes as bonus goods, and how last month's trade went for it."""
 
+import time
+import weakref
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -69,6 +71,25 @@ class HexDetails:
     points: list[tuple[str, int, int]]
     buildings: list[BuildingRow]
     others: list[str]
+
+
+# How long a cell's description is shown again before it is worked out anew. Working it out takes
+# a few milliseconds, too much for every frame the mouse rests on a cell.
+FRESH_S = 0.25
+_last: list[tuple[weakref.ref[Growth], Cell, float, HexDetails]] = []
+
+
+def recently_described(growth: Growth, cell: Cell) -> HexDetails:
+    """The cell's description, worked out again only if the last one is of another cell or
+    older than FRESH_S."""
+    now = time.monotonic()
+    if _last:
+        owner, last_cell, at, details = _last[0]
+        if owner() is growth and last_cell == cell and now - at < FRESH_S:
+            return details
+    details = describe(growth, cell)
+    _last[:] = [(weakref.ref(growth), cell, now, details)]
+    return details
 
 
 def describe(growth: Growth, cell: Cell) -> HexDetails:

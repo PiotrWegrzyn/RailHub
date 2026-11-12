@@ -262,3 +262,20 @@ def test_picture_with_lines_follows_a_new_light() -> None:
     rgba = pictures.picture(colors, FROM_NORTH_EAST, with_lines=True)
 
     np.testing.assert_array_equal(rgba, expected)
+
+
+@pytest.mark.parametrize("grid", GRIDS, ids=grid_id)
+def test_a_picture_touched_up_where_a_few_colours_changed_matches_one_painted_anew(
+    grid: Grid,
+) -> None:
+    layout, relief, colors, light = random_ground(grid)
+    pictures = GroundPictures(layout, relief, grid)
+    pictures.picture(colors, light)
+    rows, cols = grid.shape
+    for row, col in ((0, 0), (rows // 2, cols // 3), (rows - 1, cols - 1)):
+        colors[row, col] = (9, 200, 31, 255)
+    expected = painted_pixel_by_pixel(layout, colors, relief, light, with_lines=False)
+
+    rgba = pictures.picture(colors, light)
+
+    np.testing.assert_array_equal(rgba, expected, strict=True)

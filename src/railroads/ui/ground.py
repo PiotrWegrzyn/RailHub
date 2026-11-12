@@ -31,6 +31,9 @@ ROWS_PER_PASS = 256
 BAKED_LINE_SHADE = 0.3
 # Edge distances are stored in sixteenths of a pixel.
 EDGE_STEPS_PER_PIXEL = 16
+# Most cells whose colour changed for the kept picture to be touched up where they lie instead of
+# being painted again whole.
+TOUCH_UP_CELLS = 2000
 
 
 def cell_colors(tile_map: TileMap) -> Pixels:
@@ -152,10 +155,14 @@ class GroundPictures:
     found once; the pixels near an edge, which grid lines darken, are found the first time lines
     are wanted. The last picture without lines is kept with the colours and light it was painted
     in: while those stay the same it is handed out again, and the picture with lines starts from a
-    copy of it."""
+    copy of it. Given the grid, a picture whose colours changed in a few cells is touched up in
+    place where those cells lie."""
 
-    def __init__(self, layout: GroundLayout, relief: npt.NDArray[np.uint8]) -> None:
+    def __init__(
+        self, layout: GroundLayout, relief: npt.NDArray[np.uint8], grid: Grid | None = None
+    ) -> None:
         self.layout = layout
+        self._grid = grid
         width = BEVEL_PIXELS * EDGE_STEPS_PER_PIXEL
         near = (layout.edge_distance < width) & (layout.cells >= 0) & (layout.across >= 0)
         at = np.flatnonzero(near)
@@ -171,8 +178,14 @@ class GroundPictures:
         """The picture's RGBA pixels for these cell colours, raised edges lit from `light_from`
         (a direction on the map); pixels off the map stay clear. A picture without lines is the
         one kept, so it must not be changed."""
-        if self._plain is None or not self._plain.shows(colors, light_from):
-            self._plain = _Painted(colors.copy(), light_from, self._paint(colors, light_from))
+        plain = self._plain
+        if plain is None or not plain.shows(colors, light_from):
+            changed = self._changed_cells(plain, colors, light_from)
+            if changed is None:
+                self._plain = _Painted(colors.copy(), light_from, self._paint(colors, light_from))
+            else:
+                self._touch_up(plain.rgba, changed, colors, light_from)
+                plain.colors[...] = colors
         if not with_lines:
             return self._plain.rgba
         lined = self._plain.rgba.copy()
@@ -190,12 +203,71 @@ class GroundPictures:
         flat[self._raised, :3] = np.clip(lifted, 0, 255).astype(np.uint8)
         return rgba
 
-    def _shade(self, light_from: tuple[float, float]) -> npt.NDArray[np.float64]:
-        """How much brighter (over 1) or darker (under 1) each pixel on a raised edge is."""
+    def _shade(
+        self, light_from: tuple[float, float], which: npt.NDArray[np.intp] | None = None
+    ) -> npt.NDArray[np.float64]:
+        """How much brighter (over 1) or darker (under 1) each pixel on a raised edge is, or
+        those of them `which` picks."""
         light_x, light_y = np.array(light_from) / math.hypot(*light_from)
         normals = self.layout.normals
         facing = normals[:, 0] * light_x + normals[:, 1] * light_y
-        return 1 + BEVEL_STRENGTH * facing[self._raised_direction] * self._raised_fade
+        direction, fade = self._raised_direction, self._raised_fade
+        if which is not None:
+            direction, fade = direction[which], fade[which]
+        return 1 + BEVEL_STRENGTH * facing[direction] * fade
+
+    def _changed_cells(
+        self, plain: _Painted | None, colors: Pixels, light_from: tuple[float, float]
+    ) -> npt.NDArray[np.intp] | None:
+        """The cells, by their index in the flattened grid, whose colour changed since the kept
+        picture was painted, if it can be touched up there; otherwise None."""
+        if self._grid is None or plain is None or plain.light_from != light_from:
+            return None
+        if plain.colors.shape != colors.shape:
+            return None
+        changed = np.flatnonzero((plain.colors != colors).any(axis=-1).ravel())
+        return changed if len(changed) <= TOUCH_UP_CELLS else None
+
+    def _touch_up(
+        self,
+        rgba: Pixels,
+        changed: npt.NDArray[np.intp],
+        colors: Pixels,
+        light_from: tuple[float, float],
+    ) -> None:
+        """Paints again the pixels of the changed cells, looking only in a box round each."""
+        assert self._grid is not None
+        cells = self.layout.cells
+        height, width = cells.shape
+        flat_colors = colors.reshape(-1, 4)
+        rows, cols = np.divmod(changed, colors.shape[1])
+        centers_x, centers_y = self._grid.center(rows, cols)
+        flat = rgba.reshape(-1, 4)
+        shaded: list[npt.NDArray[np.intp]] = []
+        for cell, cx, cy in zip(
+            changed.tolist(), np.ravel(centers_x), np.ravel(centers_y), strict=True
+        ):
+            left = max(0, math.floor((cx - 1) * PIXELS_PER_CELL))
+            right = min(width, math.ceil((cx + 1) * PIXELS_PER_CELL))
+            top = max(0, math.floor((cy - 1) * PIXELS_PER_CELL))
+            bottom = min(height, math.ceil((cy + 1) * PIXELS_PER_CELL))
+            if left >= right or top >= bottom:
+                continue
+            window = rgba[top:bottom, left:right]
+            window[cells[top:bottom, left:right] == cell] = flat_colors[cell]
+            starts = np.arange(top, bottom) * width
+            low = np.searchsorted(self._raised, starts + left)
+            high = np.searchsorted(self._raised, starts + right)
+            near = np.concatenate([np.arange(a, b) for a, b in zip(low, high, strict=True)])
+            if len(near):
+                shaded.append(near[cells.ravel()[self._raised[near]] == cell])
+        if not shaded:
+            return
+        which = np.concatenate(shaded)
+        at = self._raised[which]
+        base = flat_colors[cells.ravel()[at], :3]
+        lifted = base * self._shade(light_from, which)[:, None]
+        flat[at, :3] = np.clip(lifted, 0, 255).astype(np.uint8)
 
     def _add_lines(self, rgba: Pixels) -> None:
         """Darkens the pixels near an edge as baked grid lines do, each channel looked up in

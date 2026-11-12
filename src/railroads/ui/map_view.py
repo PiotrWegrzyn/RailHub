@@ -30,7 +30,7 @@ from railroads.ui.build_menu import (
 )
 from railroads.ui.buildings import BuildingSpots, draw_building_dots
 from railroads.ui.ground import GroundLayout, GroundPictures, Pixels, cell_colors
-from railroads.ui.hex_details import describe, draw_hex_details
+from railroads.ui.hex_details import draw_hex_details, recently_described
 from railroads.ui.iso_camera import IsoCamera, Vec2
 from railroads.ui.map_input import MapInput
 from railroads.ui.map_overlays import (
@@ -249,7 +249,7 @@ class MapView:
         imgui.set_next_window_size(DETAILS_SIZE, imgui.Cond_.first_use_ever.value)
         expanded, still_open = imgui.begin("Hex details", True)
         if expanded:
-            bought = draw_hex_details(describe(self.growth, self.selected))
+            bought = draw_hex_details(recently_described(self.growth, self.selected))
             if bought is not None:
                 self._bought = (
                     self.growth.owners.buy(self.selected, bought) or f"You own a {bought.value}"
@@ -296,7 +296,9 @@ class MapView:
 
     def _ground_pictures(self) -> GroundPictures:
         if self._pictures is None:
-            self._pictures = GroundPictures(self._ground_layout(), self.tile_map.relief)
+            self._pictures = GroundPictures(
+                self._ground_layout(), self.tile_map.relief, self.tile_map.grid
+            )
         return self._pictures
 
     def _ground_picture(self) -> tuple[imgui.ImTextureRef, Vec2]:
@@ -352,9 +354,12 @@ class MapView:
             shaded = self._draw_shaded_ground(draw_list, center, top_left, bottom_right)
             if not shaded:
                 self._draw_ground(draw_list, center, self._ground_texture(False))
-            self._pixel_layer().draw(
+            ready = self._pixel_layer().draw(
                 draw_list, self.camera, center, (top_left, bottom_right), ground_below=shaded
             )
+            if not ready:
+                # Keeps frames coming while chunks are drawn, so they show without input.
+                hello_imgui.request_refresh()
         else:
             self._draw_smooth_map(draw_list, center, top_left, bottom_right)
         if self.camera.pixel_scale:
