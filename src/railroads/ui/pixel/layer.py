@@ -26,6 +26,8 @@ from railroads.ui.pixel.world import PixelWorld
 
 # Time a frame may spend turning drawn chunks into textures; at least one is always made.
 UPLOAD_BUDGET_S = 0.006
+# Most chunks drawn while a game loads, enough to fill a large window.
+PREPARED_CHUNKS = 48
 # How long the view must stand still before chunks are drawn on frames, where they wait for it.
 SETTLE_S = 0.3
 # Most bytes of drawn chunks kept in memory; a fine chunk takes four times a plain one's.
@@ -138,6 +140,25 @@ class PixelLayer:
         if not self._painter.threaded and not waiting:
             self._painter.work_once(now)
         return complete and not self._painter.waiting()
+
+    def prepare(
+        self, camera: IsoCamera, center: Vec2, clip: tuple[Vec2, Vec2], density: int
+    ) -> None:
+        """Draws the chunks this view would show, at most PREPARED_CHUNKS of them, on the calling
+        thread, so they are ready for the first frame; for a game being loaded."""
+        camera_pixel = self.world.projection.to_pixels(camera.center_x, camera.center_y)
+        placement = ChunkPlacement.of(
+            self.world.projection,
+            (float(camera_pixel[0]), float(camera_pixel[1])),
+            camera.pixel_scale,
+            center,
+            clip,
+        )
+        resolution = resolution_for(placement.scale * density, self.world.resolutions)
+        for chunk in placement.chunks[:PREPARED_CHUNKS]:
+            drawn = (*chunk, resolution)
+            if drawn not in self._chunks:
+                self._chunks[drawn] = self.world.render(*drawn)
 
     def _moved(self, camera: IsoCamera, now: float) -> bool:
         """Whether chunks drawn on frames must wait because the view moved a moment ago."""

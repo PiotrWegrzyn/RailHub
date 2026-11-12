@@ -149,6 +149,24 @@ def test_the_game_autosaves_as_a_month_begins(context: None, tmp_path: Path) -> 
     assert app.notice == "Autosaved"
 
 
+def test_the_autosave_starts_on_the_frame_after_the_month_turns(
+    context: None, tmp_path: Path
+) -> None:
+    app = made_app()
+    app.saves = Saves(tmp_path)
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+
+    frame(app)
+    started_on_the_turn = app._autosaving is not None
+    frame(app)
+    started_after = app._autosaving is not None
+    app.finish_autosave()
+
+    assert not started_on_the_turn
+    assert started_after
+    assert [info.name for info in app.saves.listing()] == ["autosave 1"]
+
+
 def test_no_autosave_is_written_while_the_month_goes_on(context: None, tmp_path: Path) -> None:
     app = made_app()
     app.saves = Saves(tmp_path)

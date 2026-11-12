@@ -490,6 +490,20 @@ class MapView:
             self._preview = TrackPreview(self._pixel_layer().world)
         return self._preview
 
+    def prepare(self, size: Vec2, density: int, chunks: bool = True) -> None:
+        """Builds what the map needs before its first frame, in a window of `size` screen pixels
+        with `density` device pixels to each, so that work can run while a game loads: the
+        ground picture, the pixel world, the trains' sprites and, with `chunks`, the chunks the
+        first frame shows. Nothing here touches the graphics card."""
+        light = self.camera.map_direction(*LIGHT_ON_SCREEN)
+        self._ground_pictures().picture(self._ground_colors(), light)
+        layer = self._pixel_layer()
+        if self.railway.trains:
+            self._train_layer()
+        if chunks and self.camera.pixel_scale:
+            center = (size[0] / 2, size[1] / 2)
+            layer.prepare(self.camera, center, ((0.0, 0.0), size), density)
+
     def _pixel_layer(self) -> PixelLayer:
         if self._pixels is None:
             world = PixelWorld(

@@ -25,6 +25,8 @@ from railroads.ui.workers import FrameWorker, worker
 # How long a notice such as "Autosaved" stays in the top bar.
 NOTICE_SECONDS = 4.0
 WAITING_WIDTH = 320.0
+# The window's size when the game opens.
+WINDOW_SIZE = (1280.0, 800.0)
 # Saves are written one at a time, away from the frames, so play doesn't stutter. Where threads
 # cannot start, an autosave is written on the frame after it was asked for.
 WRITER = worker("saves")
@@ -54,6 +56,7 @@ class App:
         self.notice = ""
         self._notice_until = 0.0
         self._autosaving: Future[object] | None = None
+        self._autosave_due = False
         # What the player asked to leave this game for: a save to load, or the main menu.
         self.load_wanted: str | None = None
         self.menu_wanted = False
@@ -95,6 +98,7 @@ class App:
             self._styled = True
         if self.notice and time.monotonic() > self._notice_until:
             self.notice = ""
+        self._start_due_autosave()
         if isinstance(WRITER, FrameWorker):
             WRITER.work_once()
         self._check_autosave()
@@ -107,7 +111,8 @@ class App:
         for month in range(first + 1, first + 1 + turned):
             self.view.month_passed(self.rng, self.clock.date_of(month))
         if turned:
-            self.autosave()
+            # Saved on the next frame, so the month's work and the save don't stall one frame.
+            self._autosave_due = True
         draw_top_bar(self)
         self.view.gui()
         self.help.draw()
@@ -152,8 +157,14 @@ class App:
             return
         self._autosaving = WRITER.submit(self.saves.autosave, snapshot(self.saved()))
 
+    def _start_due_autosave(self) -> None:
+        if self._autosave_due:
+            self._autosave_due = False
+            self.autosave()
+
     def finish_autosave(self) -> None:
-        """Waits for an autosave being written."""
+        """Waits for an autosave being written, starting it if it is due."""
+        self._start_due_autosave()
         if self._autosaving is not None:
             if isinstance(WRITER, FrameWorker):
                 WRITER.work_once()
@@ -199,7 +210,7 @@ class Shell:
         self.menu = MainMenu(saves)
         self.app: App | None = None
         self._styled = False
-        self._task: Future[SavedGame] | None = None
+        self._task: Future[App] | None = None
         self._doing = ""
         self._progress = ""
         self._executor = worker("setup")
@@ -221,7 +232,20 @@ class Shell:
     def _begin(self, doing: str, work: Callable[[], SavedGame]) -> None:
         self._doing = doing
         self._progress = ""
-        self._task = self._executor.submit(work)
+        size, density = WINDOW_SIZE, 1
+        if imgui.get_current_context() is not None:
+            io = imgui.get_io()
+            size = (io.display_size.x, io.display_size.y)
+            density = max(1, round(io.display_framebuffer_scale.x))
+        # Where frames do the work, the chunks are left to be drawn a frame at a time instead.
+        chunks = not isinstance(self._executor, FrameWorker)
+
+        def prepared() -> App:
+            app = App.from_saved(work(), self.saves)
+            app.view.prepare(size, density, chunks)
+            return app
+
+        self._task = self._executor.submit(prepared)
         self._waiting_shown = False
 
     def gui(self) -> None:
@@ -241,16 +265,16 @@ class Shell:
         else:
             self._choose(self.menu.draw())
 
-    def _finish(self, task: Future[SavedGame]) -> None:
+    def _finish(self, task: Future[App]) -> None:
         self._task = None
         try:
-            saved = task.result()
+            app = task.result()
         except (SaveError, OSError) as error:
             self._failed(str(error))
             return
         if self.app is not None:
             self.app.finish_autosave()
-        self.app = App.from_saved(saved, self.saves)
+        self.app = app
 
     def _failed(self, message: str) -> None:
         if self.app is not None:
@@ -329,6 +353,6 @@ def main() -> None:
     immapp.run(
         gui_function=shell.gui,
         window_title="Railroads",
-        window_size=(1280, 800),
+        window_size=(int(WINDOW_SIZE[0]), int(WINDOW_SIZE[1])),
         with_implot=True,
     )
