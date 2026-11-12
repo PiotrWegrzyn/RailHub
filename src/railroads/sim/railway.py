@@ -55,7 +55,7 @@ from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
 from railroads.sim.tech import GOOD_TREES, Effect, Research
 from railroads.sim.track_network import TrackNetwork
-from railroads.sim.trains import CAR_CAPACITY, ENGINES, FIRST_ENGINE, Point, Train
+from railroads.sim.trains import CAR_CAPACITY, ENGINES, FIRST_ENGINE, Point, Stop, Train
 
 TRAIN_COST_NAME = "Steam engine"
 # How far a train runs in a month, in cells, on flat ground.
@@ -107,8 +107,9 @@ class Railway:
         opened = self.research.engines() | {FIRST_ENGINE}
         return [name for name, e in ENGINES.items() if e.year <= self.year and name in opened]
 
-    def buy(self, engine: str = FIRST_ENGINE) -> Train | None:
-        """Buys a train with an engine the player can buy; None without the cash for it."""
+    def buy(self, engine: str = FIRST_ENGINE, route_of: Train | None = None) -> Train | None:
+        """Buys a train with an engine the player can buy, calling at the stops of `route_of` if
+        given, with no cars yet; None without the cash for it."""
         if engine not in self.engines():
             return None
         price = ENGINES[engine].price
@@ -117,6 +118,8 @@ class Railway:
         self.finances.spend(price, "trains")
         self._bought += 1
         train = Train(f"{TRAIN_COST_NAME} {self._bought}", engine=engine)
+        if route_of is not None:
+            train.stops = [Stop(stop.cell) for stop in route_of.stops]
         self.trains.append(train)
         return train
 

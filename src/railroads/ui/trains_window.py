@@ -92,6 +92,9 @@ class TrainsWindow:
         if imgui.button(f"{fa.ICON_FA_PLUS}  Buy a train", (-1, 0)):
             imgui.open_popup("buy train")
         if imgui.begin_popup("buy train"):
+            shown = next((t for t in railway.trains if t.name == self.chosen), None)
+            if shown is not None and shown.stops:
+                imgui.text_disabled(f"Calls at the stops of {shown.name}, with no cars yet")
             imgui.text_disabled("Buy a train with")
             for name in railway.engines():
                 engine = ENGINES[name]
@@ -99,7 +102,7 @@ class TrainsWindow:
                 imgui.begin_disabled(not affordable)
                 label = f"{engine.title}  {dollars(engine.price)}##{name}"
                 if imgui.selectable(label, False)[0]:
-                    bought = railway.buy(name)
+                    bought = railway.buy(name, route_of=shown)
                     if bought is not None:
                         self.chosen = bought.name
                 imgui.end_disabled()

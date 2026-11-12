@@ -706,3 +706,23 @@ def test_a_train_with_one_stop_has_no_destination() -> None:
 
     assert railway.destination(train) is None
     assert worth == [0.0]
+
+
+def test_a_train_bought_after_another_calls_at_its_stops_with_no_cars() -> None:
+    _, railway = joined_stations()
+    first = railway.buy()
+    first.stops = [Stop((6, 3), [Good.WHEAT, Good.COAL]), Stop((6, 20), [Good.STEEL])]
+
+    second = railway.buy(route_of=first)
+
+    assert [stop.cell for stop in second.stops] == [(6, 3), (6, 20)]
+    assert all(stop.cars == [] for stop in second.stops)
+    assert first.stops[0].cars == [Good.WHEAT, Good.COAL]
+
+
+def test_a_train_bought_on_its_own_has_no_stops() -> None:
+    _, railway = joined_stations()
+
+    train = railway.buy()
+
+    assert train.stops == []
