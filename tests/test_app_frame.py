@@ -61,6 +61,7 @@ def made_app() -> App:
     train.stops = [Stop((10, 6)), Stop((10, 16))]
     app = App(MapView(game))
     app.help.open = app.tech.open = app.reports.open = True
+    app.view.build.trains.open = True
     app.view.selected = (10, 10)
     app.view.station_window.station = (10, 6)
     app.view.build.choose(Tool.TRACK)

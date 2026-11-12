@@ -200,7 +200,9 @@ class MapView:
         self._draw_map()
         self._draw_details()
         self.build.draw(*self._map_rect)
-        self.build.trains.draw(self.railway, self.growth.station_trade.supplies)
+        self.build.trains.draw(
+            self.railway, self.growth.station_trade.supplies, self._ground_picture
+        )
         self.build.stations.draw(self.railway, self.look_at, self.open_station)
         self.station_window.draw(
             self.railway,
@@ -296,6 +298,11 @@ class MapView:
         if self._pictures is None:
             self._pictures = GroundPictures(self._ground_layout(), self.tile_map.relief)
         return self._pictures
+
+    def _ground_picture(self) -> tuple[imgui.ImTextureRef, Vec2]:
+        """The smooth ground picture without grid lines, and its size in map units."""
+        texture = imgui.ImTextureRef(self._ground_texture(False).texture_id())
+        return texture, self._ground_layout().size
 
     def _ground_texture(self, with_lines: bool) -> hello_imgui.TextureGpu:
         """The smooth ground picture used when zoomed out, with or without grid lines."""

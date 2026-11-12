@@ -1,0 +1,168 @@
+from collections.abc import Iterator
+
+import pytest
+from imgui_bundle import hello_imgui, imgui
+from test_railway import joined_stations
+
+from railroads.sim.goods import Good, Need
+from railroads.sim.trains import Stop
+from railroads.ui.minimap import Panel
+from railroads.ui.route_map import (
+    MOST_ZOOM,
+    MapFrame,
+    RouteMap,
+    add_stop,
+    can_stop_at,
+    edge_spot,
+    station_at,
+    wanted_at,
+)
+
+PANEL = Panel(100.0, 50.0, 400.0, 300.0)
+MAP_SIZE = (40.0, 20.0)
+
+
+def test_a_click_picks_the_station_drawn_nearest_it() -> None:
+    spots = {(1, 1): (10.0, 10.0), (1, 2): (16.0, 10.0)}
+
+    picked = station_at(spots, 14.0, 11.0, 9.0)
+
+    assert picked == (1, 2)
+
+
+def test_a_click_away_from_every_station_picks_none() -> None:
+    spots = {(1, 1): (10.0, 10.0)}
+
+    picked = station_at(spots, 30.0, 10.0, 9.0)
+
+    assert picked is None
+
+
+def test_a_station_off_the_map_is_pointed_at_from_the_edge_on_its_side() -> None:
+    middle_y = PANEL.top + PANEL.height / 2
+
+    spot = edge_spot(PANEL, PANEL.right + 200.0, middle_y, 10.0)
+
+    assert spot == pytest.approx((PANEL.right - 10.0, middle_y))
+
+
+def test_a_station_off_a_corner_is_pointed_at_from_inside_the_map() -> None:
+    spot = edge_spot(PANEL, PANEL.left - 500.0, PANEL.top - 500.0, 10.0)
+
+    assert PANEL.contains(*spot)
+    assert spot[0] == pytest.approx(PANEL.left + 10.0) or spot[1] == pytest.approx(PANEL.top + 10.0)
+
+
+def test_a_good_is_wanted_at_the_stations_whose_buildings_need_it() -> None:
+    _, railway = joined_stations()
+    railway.station_demand((6, 3)).capacity = {Need.COAL: 40.0}
+    railway.station_demand((6, 20)).capacity = {Need.FOOD: 30.0}
+
+    wanted = wanted_at(railway, Good.COAL)
+
+    assert wanted == {(6, 3): pytest.approx(railway.station_demand((6, 3)).monthly_want(Good.COAL))}
+    assert wanted[(6, 3)] > 0
+
+
+def test_a_good_no_station_needs_is_wanted_nowhere() -> None:
+    _, railway = joined_stations()
+    railway.station_demand((6, 3)).capacity = {Need.FOOD: 30.0}
+
+    wanted = wanted_at(railway, Good.DIAMONDS)
+
+    assert wanted == {}
+
+
+def test_a_station_can_be_added_unless_the_train_already_ends_there() -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    assert train is not None
+    train.stops.append(Stop((6, 3)))
+
+    add_stop(train, (6, 20))
+
+    assert [stop.cell for stop in train.stops] == [(6, 3), (6, 20)]
+    assert not can_stop_at(train, (6, 20))
+    assert can_stop_at(train, (6, 3))
+
+
+def test_the_whole_map_fits_the_panel_and_turns_points_into_spots_and_back() -> None:
+    frame = MapFrame.of(PANEL, MAP_SIZE, 1.0)
+
+    spot = frame.to_screen(30.0, 5.0)
+    back = frame.to_map(*spot)
+
+    assert PANEL.contains(*frame.to_screen(0.0, 10.0))
+    assert PANEL.contains(*frame.to_screen(39.9, 10.0))
+    assert back == pytest.approx((30.0, 5.0))
+
+
+def test_zoomed_in_the_map_stays_on_the_map_near_its_edge() -> None:
+    frame = MapFrame.of(PANEL, MAP_SIZE, 4.0, (0.0, 0.0))
+
+    corner = frame.to_map(PANEL.left, PANEL.top)
+
+    assert corner == pytest.approx((0.0, 0.0))
+    assert frame.scale == pytest.approx(4 * PANEL.width / MAP_SIZE[0])
+
+
+def test_zooming_keeps_the_map_point_under_the_mouse_in_place() -> None:
+    route_map = RouteMap()
+    frame = MapFrame.of(PANEL, MAP_SIZE, route_map.zoom)
+    mouse = (PANEL.left + 240.0, PANEL.top + 160.0)
+    under = frame.to_map(*mouse)
+
+    route_map.zoom_at(frame, MAP_SIZE, *mouse, 3)
+
+    zoomed = MapFrame.of(PANEL, MAP_SIZE, route_map.zoom, route_map.focus)
+    assert route_map.zoom > 1.0
+    assert zoomed.to_map(*mouse) == pytest.approx(under)
+
+
+def test_zoom_stays_between_the_whole_map_and_the_closest_view() -> None:
+    route_map = RouteMap()
+    frame = MapFrame.of(PANEL, MAP_SIZE, route_map.zoom)
+
+    route_map.zoom_at(frame, MAP_SIZE, PANEL.left, PANEL.top, -5)
+    widest = route_map.zoom
+    route_map.zoom_at(frame, MAP_SIZE, PANEL.left, PANEL.top, 100)
+
+    assert widest == 1.0
+    assert route_map.zoom == MOST_ZOOM
+
+
+class FakeTexture:
+    def texture_id(self) -> int:
+        return 1
+
+
+@pytest.fixture
+def context(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    monkeypatch.setattr(hello_imgui, "create_texture_gpu_from_rgba_data", lambda _: FakeTexture())
+    gui = imgui.create_context()
+    io = imgui.get_io()
+    io.display_size = imgui.ImVec2(800, 600)
+    io.backend_flags |= imgui.BackendFlags_.renderer_has_textures.value
+    imgui.new_frame()
+    imgui.begin("map", None)
+    yield
+    imgui.end()
+    imgui.render()
+    imgui.destroy_context(gui)
+
+
+def test_the_map_draws_centred_on_the_trains_stops_with_a_good_marked(context: None) -> None:
+    _, railway = joined_stations()
+    railway.station_demand((6, 3)).capacity = {Need.COAL: 40.0}
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3)), Stop((6, 20))]
+    route_map = RouteMap()
+    route_map.good = Good.COAL
+    ground = (imgui.ImTextureRef(1), railway.constructions.tile_map.grid.size())
+
+    route_map.draw(railway, train, lambda: ground)
+
+    grid = railway.constructions.tile_map.grid
+    (x0, y0), (x1, y1) = grid.center(6, 3), grid.center(6, 20)
+    assert route_map.focus == pytest.approx(((x0 + x1) / 2, (y0 + y1) / 2))
