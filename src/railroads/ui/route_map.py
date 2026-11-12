@@ -2,8 +2,8 @@
 on it, the chosen train's stops numbered. The wheel zooms it around the mouse, dragging moves it,
 clicking a station adds it to the train's stops, and hovering one sums up what it wants and makes.
 While the player hovers a good, the stations around which it is wanted or made are ringed, a ring
-for each of three kinds, its shade by how much a month (railroads.ui.route_map.SHADES): yellow to
-red where homes want it for a general need like food or heating, light to dark violet where some
+for each of three kinds, its shade by how much a month (SHADE_FROM): yellow to red where homes
+want it for a general need like food, heating or mail, light to dark violet where some
 building wants it for a need only it meets, and light to dark blue where more than LEAST_MADE of it
 is made."""
 
@@ -60,8 +60,9 @@ MADE = (0.35, 0.65, 1.0, 1.0)
 
 type Rgba = tuple[float, float, float, float]
 
-# Needs many goods meet, which homes everywhere have; any other need is a special one.
-GENERAL_NEEDS = frozenset({Need.FOOD, Need.HEATING})
+# Needs homes everywhere have: food and heating, which many goods meet, and the passengers and
+# mail every station both sends and wants. Any other need is a special one.
+GENERAL_NEEDS = frozenset({Need.FOOD, Need.HEATING, Need.PASSENGERS, Need.MAIL})
 # How much of a good made around a station a month marks it as made there.
 LEAST_MADE = 10.0
 # The amounts a month from which a mark takes its second and third shade.

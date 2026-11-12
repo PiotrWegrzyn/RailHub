@@ -90,6 +90,26 @@ def test_heating_is_a_general_need_for_coal_and_a_boiler_a_special_one() -> None
     assert special == pytest.approx(60.0 / DEMAND_PER_NEED)
 
 
+def test_mail_wanted_and_sent_at_a_station_is_a_general_need_and_made_there() -> None:
+    _, railway = joined_stations()
+    railway.station_demand((6, 3)).capacity = {Need.MAIL: 30.0}
+    made = {(6, 3): Offer(Good.MAIL, 0.0, LEAST_MADE + 5)}
+
+    marks = marks_at(railway, Good.MAIL, made)
+
+    assert marks == {(6, 3): Marks(general=30.0 / DEMAND_PER_NEED, made=LEAST_MADE + 5)}
+
+
+def test_a_supplier_wanting_a_little_of_its_good_takes_the_lightest_shade_of_both() -> None:
+    _, railway = joined_stations()
+    railway.station_demand((6, 3)).capacity = {Need.FOOD: 30.0}
+    made = {(6, 3): Offer(Good.APPLES, 115.0, 15.0)}
+
+    shades = marks_at(railway, Good.APPLES, made)[(6, 3)].shades()
+
+    assert shades == [GENERAL_SHADES[0], MADE_SHADES[0]]
+
+
 def test_a_station_is_marked_as_making_a_good_only_above_the_least_made() -> None:
     _, railway = joined_stations()
     made = {
