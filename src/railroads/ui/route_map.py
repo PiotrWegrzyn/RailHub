@@ -1,8 +1,11 @@
 """The map in the trains window: the ground seen from above, softened, with the track and stations
 on it, the chosen train's stops numbered. The wheel zooms it around the mouse, dragging moves it,
 clicking a station adds it to the train's stops, and hovering one sums up what it wants and makes.
-While the player hovers a good, the stations that need it are ringed in red and those it can be
-loaded at, made around them or waiting there, in green."""
+While the player hovers a good, the stations around which it is wanted or made are ringed, a ring
+for each of three kinds, its shade by how much a month (railroads.ui.route_map.SHADES): yellow to
+red where homes want it for a general need like food or heating, light to dark violet where some
+building wants it for a need only it meets, and light to dark blue where more than LEAST_MADE of it
+is made."""
 
 import math
 import time
@@ -15,7 +18,8 @@ from imgui_bundle import imgui
 from PIL import Image, ImageFilter
 
 from railroads.sim.constructions import TrackWidth
-from railroads.sim.goods import Good, Need
+from railroads.sim.demand import DEMAND_PER_NEED, StationDemand
+from railroads.sim.goods import FITS, Good, Need
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
 from railroads.sim.trains import Stop, Train
@@ -52,7 +56,32 @@ HOVER_EDGE = (1.0, 1.0, 1.0, 1.0)
 LABEL_SHADOW = (0.0, 0.0, 0.0, 0.75)
 DIMMED = (0.0, 0.0, 0.0, 0.35)
 NEEDED = (0.95, 0.27, 0.22, 1.0)
-MADE = (0.35, 0.88, 0.38, 1.0)
+MADE = (0.35, 0.65, 1.0, 1.0)
+
+type Rgba = tuple[float, float, float, float]
+
+# Needs many goods meet, which homes everywhere have; any other need is a special one.
+GENERAL_NEEDS = frozenset({Need.FOOD, Need.HEATING})
+# How much of a good made around a station a month marks it as made there.
+LEAST_MADE = 10.0
+# The amounts a month from which a mark takes its second and third shade.
+SHADE_FROM = (40.0, 120.0)
+# The three shades, least to most, of each kind of mark.
+GENERAL_SHADES: tuple[Rgba, Rgba, Rgba] = (
+    (1.0, 0.88, 0.2, 1.0),
+    (1.0, 0.55, 0.1, 1.0),
+    (0.93, 0.18, 0.15, 1.0),
+)
+SPECIAL_SHADES: tuple[Rgba, Rgba, Rgba] = (
+    (0.84, 0.66, 1.0, 1.0),
+    (0.62, 0.36, 0.92, 1.0),
+    (0.4, 0.13, 0.66, 1.0),
+)
+MADE_SHADES: tuple[Rgba, Rgba, Rgba] = (
+    (0.6, 0.85, 1.0, 1.0),
+    (0.25, 0.56, 0.96, 1.0),
+    (0.08, 0.24, 0.72, 1.0),
+)
 
 # The picture of the ground (railroads.ui.ground) and its size in map units.
 type GroundPicture = Callable[[], tuple[imgui.ImTextureRef, Vec2]]
@@ -131,14 +160,53 @@ def edge_spot(panel: Panel, x: float, y: float, inset: float) -> Vec2:
     return cx + dx * share, cy + dy * share
 
 
-def wanted_at(railway: Railway, good: Good) -> dict[Cell, float]:
-    """The stations whose buildings want a good, each with how much of it they could use in
-    a month."""
-    wants = {
-        station: railway.station_demand(station).monthly_want(good)
-        for station in railway.stations()
-    }
-    return {station: want for station, want in wants.items() if want > 0}
+@dataclass(frozen=True)
+class Marks:
+    """How much of a good a station's buildings want a month for general needs and for special
+    ones, and how much of it is made around the station a month, if more than LEAST_MADE."""
+
+    general: float = 0.0
+    special: float = 0.0
+    made: float = 0.0
+
+    def shades(self) -> list[Rgba]:
+        """A shade for each kind of mark the station has: general, special, then made."""
+        kinds = (
+            (self.general, GENERAL_SHADES),
+            (self.special, SPECIAL_SHADES),
+            (self.made, MADE_SHADES),
+        )
+        return [shades[shade_of(amount)] for amount, shades in kinds if amount > 0]
+
+
+def shade_of(amount: float) -> int:
+    """Which of a mark's three shades an amount a month takes: the first under SHADE_FROM[0]."""
+    return sum(amount >= least for least in SHADE_FROM)
+
+
+def needed(demand: StationDemand, good: Good) -> tuple[float, float]:
+    """How much of a good the buildings around a station could use a month, for general needs
+    and for special ones."""
+    general = special = 0.0
+    for need, capacity in demand.capacity.items():
+        if good in FITS[need]:
+            if need in GENERAL_NEEDS:
+                general += capacity / DEMAND_PER_NEED
+            else:
+                special += capacity / DEMAND_PER_NEED
+    return general, special
+
+
+def marks_at(railway: Railway, good: Good, made: Mapping[Cell, Offer]) -> dict[Cell, Marks]:
+    """The stations a good is wanted or made at, given where a train can load it."""
+    found = {}
+    for station in railway.stations():
+        general, special = needed(railway.station_demand(station), good)
+        offer = made.get(station)
+        making = offer.made if offer is not None and offer.made > LEAST_MADE else 0.0
+        if general > 0 or special > 0 or making > 0:
+            found[station] = Marks(general, special, making)
+    return found
 
 
 def made_at(railway: Railway, good: Good, supplies: Supplies) -> dict[Cell, Offer]:
@@ -244,9 +312,8 @@ class RouteMap:
         """Draws a row of zoom buttons and a hint, and the map below them in the space left."""
         texture, map_size = ground()
         good = self.good
-        wanted = wanted_at(railway, good) if good is not None else {}
-        made = self.made(railway, good, supplies) if good is not None else {}
-        steps = self._draw_buttons(wanted, made)
+        marks = {} if good is None else marks_at(railway, good, self.made(railway, good, supplies))
+        steps = self._draw_buttons(marks)
         low = imgui.get_cursor_screen_pos()
         width, height = imgui.get_content_region_avail()
         panel = Panel(low.x, low.y, max(width, 40.0), max(height, 40.0))
@@ -272,14 +339,14 @@ class RouteMap:
             draw_list.add_rect_filled(
                 (panel.left, panel.top), (panel.right, panel.bottom), color_u32(DIMMED)
             )
-        self._draw_stations(draw_list, railway, train, spots, (wanted, made), hovered, frame)
+        self._draw_stations(draw_list, railway, train, spots, marks, hovered, frame)
         draw_list.pop_clip_rect()
         if hovered is not None:
             self._station_tooltip(railway, train, hovered, supplies)
             if clicked and can_stop_at(train, hovered):
                 add_stop(train, hovered)
 
-    def _draw_buttons(self, wanted: Mapping[Cell, float], made: Mapping[Cell, Offer]) -> int:
+    def _draw_buttons(self, marks: Mapping[Cell, Marks]) -> int:
         """The zoom buttons and a line on what the map shows; returns the zoom steps pressed."""
         steps = 0
         if imgui.small_button(f"{fa.ICON_FA_SEARCH_PLUS}##zoom in"):
@@ -296,14 +363,29 @@ class RouteMap:
             imgui.text_disabled("Click a station to add it")
             return steps
         good_icon(self.good)
-        imgui.same_line(0, 6)
-        imgui.text_colored(imgui.ImVec4(*NEEDED), f"needed at {len(wanted)}")
-        if imgui.is_item_hovered():
-            imgui.set_tooltip(f"Red: stations whose buildings want {self.good.value}")
-        imgui.same_line(0, 10)
-        imgui.text_colored(imgui.ImVec4(*MADE), f"made at {len(made)}")
-        if imgui.is_item_hovered():
-            imgui.set_tooltip(f"Green: stations with {self.good.value} made around or waiting")
+        low, high = f"{SHADE_FROM[0]:.0f}", f"{SHADE_FROM[1]:.0f}"
+        counts = (
+            (
+                "needed",
+                GENERAL_SHADES,
+                sum(m.general > 0 for m in marks.values()),
+                "Wanted for food or heating",
+            ),
+            (
+                "special",
+                SPECIAL_SHADES,
+                sum(m.special > 0 for m in marks.values()),
+                "Wanted by buildings that need just this",
+            ),
+            ("made", MADE_SHADES, sum(m.made > 0 for m in marks.values()), "Made around"),
+        )
+        for label, shades, count, why in counts:
+            imgui.same_line(0, 8)
+            imgui.text_colored(imgui.ImVec4(*shades[1]), f"{label} {count}")
+            if imgui.is_item_hovered():
+                imgui.set_tooltip(
+                    f"{why}: lightest under {low} a month, middle {low}-{high}, darkest {high}+"
+                )
         return steps
 
     def _handle_mouse(self, frame: MapFrame, map_size: Vec2) -> tuple[bool, bool]:
@@ -355,7 +437,7 @@ class RouteMap:
         railway: Railway,
         train: Train,
         spots: Mapping[Cell, Vec2],
-        marks: tuple[Mapping[Cell, float], Mapping[Cell, Offer]],
+        marks: Mapping[Cell, Marks],
         hovered: Cell | None,
         frame: MapFrame,
     ) -> None:
@@ -384,26 +466,25 @@ class RouteMap:
         draw_list: imgui.ImDrawList,
         railway: Railway,
         spots: Mapping[Cell, Vec2],
-        marks: tuple[Mapping[Cell, float], Mapping[Cell, Offer]],
+        marks: Mapping[Cell, Marks],
         half: float,
         panel: Panel,
     ) -> None:
-        """Rings in red each station that needs the hovered good and in green each it can be
-        loaded at, both where it is both, and points from the map's edge at those off it."""
+        """Rings each station the hovered good is wanted or made at, a ring for each kind of
+        mark, and points from the map's edge at those off it."""
         assert self.good is not None
-        wanted, made = marks
         pulse = 1.5 * (1 + math.sin(time.monotonic() * 5))
-        for station in set(wanted) | set(made):
+        for station, mark in marks.items():
             x, y = spots[station]
-            colors = [c for c, at in ((NEEDED, wanted), (MADE, made)) if station in at]
+            colors = mark.shades()
             if not panel.contains(x, y):
                 ex, ey = edge_spot(panel, x, y, EDGE_INSET)
                 tip = _toward((ex, ey), (x, y), 14.0)
                 draw_list.add_line((ex, ey), tip, color_u32(colors[0]), 3.0)
-                for ring, color in enumerate(reversed(colors)):
-                    radius = 6.0 + pulse / 2 - ring * 3.0
-                    draw_list.add_circle_filled((ex, ey), radius, color_u32(color))
-                draw_list.add_circle((ex, ey), 6.0 + pulse / 2, color_u32(LABEL_SHADOW), 0, 1.5)
+                outer = 5.0 + 2.5 * len(colors) + pulse / 2
+                for ring, color in enumerate(colors):
+                    draw_list.add_circle_filled((ex, ey), outer - ring * 2.5, color_u32(color))
+                draw_list.add_circle((ex, ey), outer, color_u32(LABEL_SHADOW), 0, 1.5)
                 continue
             radius = half + 4 + pulse
             for ring, color in enumerate(colors):

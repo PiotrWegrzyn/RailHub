@@ -5,23 +5,33 @@ import pytest
 from imgui_bundle import hello_imgui, imgui
 from test_railway import joined_stations
 
+from railroads.sim.demand import DEMAND_PER_NEED
 from railroads.sim.goods import Good, Need
 from railroads.sim.trains import Stop
 from railroads.ui.minimap import Panel
 from railroads.ui.route_map import (
+    GENERAL_SHADES,
+    LEAST_MADE,
+    MADE_SHADES,
     MOST_ZOOM,
+    SHADE_FROM,
+    SPECIAL_SHADES,
     SUMMARY_MOST,
     MapFrame,
+    Marks,
     RouteMap,
     add_stop,
     can_stop_at,
     edge_spot,
     made_at,
+    marks_at,
+    needed,
+    shade_of,
     soften,
     station_at,
     summary_of,
-    wanted_at,
 )
+from railroads.ui.station_offers import Offer
 
 PANEL = Panel(100.0, 50.0, 400.0, 300.0)
 MAP_SIZE = (40.0, 20.0)
@@ -58,24 +68,65 @@ def test_a_station_off_a_corner_is_pointed_at_from_inside_the_map() -> None:
     assert spot[0] == pytest.approx(PANEL.left + 10.0) or spot[1] == pytest.approx(PANEL.top + 10.0)
 
 
-def test_a_good_is_wanted_at_the_stations_whose_buildings_need_it() -> None:
+def test_grain_wanted_by_homes_and_a_bakery_is_both_a_general_and_a_special_need() -> None:
     _, railway = joined_stations()
-    railway.station_demand((6, 3)).capacity = {Need.COAL: 40.0}
-    railway.station_demand((6, 20)).capacity = {Need.FOOD: 30.0}
+    demand = railway.station_demand((6, 3))
+    demand.capacity = {Need.FOOD: 100.0, Need.WHEAT: 300.0, Need.COAL: 80.0}
 
-    wanted = wanted_at(railway, Good.COAL)
+    general, special = needed(demand, Good.WHEAT)
 
-    assert wanted == {(6, 3): pytest.approx(railway.station_demand((6, 3)).monthly_want(Good.COAL))}
-    assert wanted[(6, 3)] > 0
+    assert general == pytest.approx(100.0 / DEMAND_PER_NEED)
+    assert special == pytest.approx(300.0 / DEMAND_PER_NEED)
 
 
-def test_a_good_no_station_needs_is_wanted_nowhere() -> None:
+def test_heating_is_a_general_need_for_coal_and_a_boiler_a_special_one() -> None:
+    _, railway = joined_stations()
+    demand = railway.station_demand((6, 3))
+    demand.capacity = {Need.HEATING: 20.0, Need.BOILER_FUEL: 60.0}
+
+    general, special = needed(demand, Good.COAL)
+
+    assert general == pytest.approx(20.0 / DEMAND_PER_NEED)
+    assert special == pytest.approx(60.0 / DEMAND_PER_NEED)
+
+
+def test_a_station_is_marked_as_making_a_good_only_above_the_least_made() -> None:
+    _, railway = joined_stations()
+    made = {
+        (6, 3): Offer(Good.COAL, 0.0, LEAST_MADE + 1),
+        (6, 20): Offer(Good.COAL, 200.0, LEAST_MADE - 1),
+    }
+
+    marks = marks_at(railway, Good.COAL, made)
+
+    assert marks == {(6, 3): Marks(made=LEAST_MADE + 1)}
+
+
+def test_a_good_wanted_and_made_nowhere_marks_no_station() -> None:
     _, railway = joined_stations()
     railway.station_demand((6, 3)).capacity = {Need.FOOD: 30.0}
 
-    wanted = wanted_at(railway, Good.DIAMONDS)
+    marks = marks_at(railway, Good.DIAMONDS, {})
 
-    assert wanted == {}
+    assert marks == {}
+
+
+@pytest.mark.parametrize(
+    ("amount", "shade"),
+    [(1.0, 0), (SHADE_FROM[0] - 0.1, 0), (SHADE_FROM[0], 1), (SHADE_FROM[1] - 0.1, 1), (500.0, 2)],
+)
+def test_a_marks_shade_darkens_at_each_threshold(amount: float, shade: int) -> None:
+    result = shade_of(amount)
+
+    assert result == shade
+
+
+def test_a_station_gets_a_shade_for_each_kind_of_mark_it_has() -> None:
+    mark = Marks(general=200.0, special=10.0, made=50.0)
+
+    shades = mark.shades()
+
+    assert shades == [GENERAL_SHADES[2], SPECIAL_SHADES[0], MADE_SHADES[1]]
 
 
 def test_a_good_is_made_where_buildings_around_make_it_or_where_it_waits() -> None:
