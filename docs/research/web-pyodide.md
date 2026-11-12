@@ -2,8 +2,9 @@
 
 Proof of concept: the game runs unchanged in a browser. `web/index.html` loads Pyodide, numpy,
 Pillow, imgui-bundle and the game's own wheel, then starts `railroads.ui.app.main`. The map, the
-pixel art with its raised mountains, the menus and the minimap all show. The only change to the game is a fallback
-for the background thread that redraws mountain chunks.
+pixel art with its raised mountains, the menus and the minimap all show. The only changes to the
+game are fallbacks for its three background threads: the mountain redraws, the game setup and the
+autosave writer.
 
 ## How to run it
 
@@ -16,8 +17,9 @@ python -m http.server -d build/site 8000
 imgui-bundle into `build/site` (23.9 MB, about 16 MB gzipped). The page loads nothing from other
 servers, so any static host can serve that folder as it is.
 
-Open http://localhost:8000/. It plays the baked map of Poland; `?args=--poland --seed 7` passes a
-command line. Add `&measure` to run `web/measure.py` instead. It prints `LOAD` and `MEASURE` lines
+Open http://localhost:8000/ for the main menu. Only the Poland map can be picked there, since a
+random place needs data the site doesn't carry. `?args=--poland --seed 7` passes a command line
+and starts that game at once. Add `&measure` to run `web/measure.py` instead. It prints `LOAD` and `MEASURE` lines
 to the console. The same script runs on desktop with `uv run python web/measure.py --poland --seed 7`.
 
 ## Hosting
@@ -25,7 +27,8 @@ to the console. The same script runs on desktop with `uv run python web/measure.
 The game is played at https://piotrwegrzyn.github.io/RailHub/, served by GitHub Pages from the
 `main` branch of https://github.com/PiotrWegrzyn/RailHub. That repo holds only the built site, with
 `.nojekyll` and a short README. Loaded there, the page downloads 16.6 MB (Pages gzips the wasm to
-3.6 MB), has Pyodide and its packages ready after 3 s and shows its first frame after about 30 s.
+3.6 MB), has Pyodide and its packages ready after 3 s and shows the main menu soon after. A new game takes
+about 22 s more on a fast machine.
 
 To publish a new build, run `build_site.py`, replace the contents of a RailHub checkout with
 `build/site` (keep its README), commit and push. Pushes this size need a larger
@@ -46,9 +49,14 @@ The game's wheel carries its Python source, so anyone playing can read the code.
   and the good icons, about 0.66 MB. micropip installs it with `deps=False`, because Pyodide ships
   numpy 2.4.3 and Pillow 12.2.0 while `pyproject.toml` asks for numpy ≥ 2.5.4 and Pillow ≥ 13. The
   older versions work.
-- **No threads.** `PixelLayer` now tests whether a thread can start. If not, it hands the fine
-  redraw of raised chunks to a `FrameWorker`, which runs one job on each frame that draws no new
-  chunk.
+- **No threads.** `railroads.ui.workers.worker` tests whether a thread can start. If not, it
+  hands out a `FrameWorker`, which runs a job only when the caller asks. `PixelLayer` runs a fine
+  redraw of raised chunks on each frame that draws no new chunk. The game setup and loading run
+  on the frame after the waiting screen first shows, so that screen stays up while the page is
+  frozen. An autosave is written on the frame after the month turns.
+- **Saves.** `index.html` mounts Emscripten's IndexedDB file system over the saves folder and
+  copies it to IndexedDB every 2 s, so named saves and autosaves survive a reload. They stay in
+  that browser; there is no way yet to download a save or load one from a file.
 
 ## Measurements
 
@@ -114,5 +122,6 @@ would pan at about 45 fps, still held back by the 140 ms quick draws of raised c
 5. **Download.** About 16 MB before anything shows. That is acceptable for a game but needs a real
    loading screen. imgui-bundle alone is 5.5 MB.
 
-Not checked: saving and loading, the ImPlot reports window, keyboard shortcuts, long play sessions,
+Saving, autosaving and loading were checked in headless Chrome, across a reload. Not checked:
+the ImPlot reports window, keyboard shortcuts, long play sessions,
 memory use, Firefox and Safari.
