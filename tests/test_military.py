@@ -42,7 +42,7 @@ def test_outposts_open_only_on_military_ground() -> None:
     military = (BuildingKind.OUTPOST, BuildingKind.BASE, BuildingKind.HEADQUARTERS)
 
     with growth.log_changes() as changes:
-        growth.run(2400, np.random.default_rng(1))
+        growth.run(2400, np.random.default_rng(0))
 
     built = {cell for (cell, kind), _ in changes.items() if kind in military}
     assert built

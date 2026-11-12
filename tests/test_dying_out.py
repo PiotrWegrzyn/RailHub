@@ -117,3 +117,21 @@ def test_no_house_goes_up_beside_starving_houses() -> None:
 
     assert sum(int(growth.counts[BuildingKind.HOUSE][cell]) for cell in around) == 1
     assert growth.counts[BuildingKind.HOUSE].sum() > 100
+
+
+def test_of_four_houses_beside_one_farm_three_starve() -> None:
+    growth = standing(*[((5, 5), BuildingKind.HOUSE)] * 4, ((5, 6), BuildingKind.FARM))
+    assert growth.trade is not None
+
+    starving = growth.starving(growth.trade, BuildingKind.HOUSE)
+
+    assert starving.tolist() == [3, 0]
+
+
+def test_houses_starving_for_thirty_years_die_and_the_fed_one_stays() -> None:
+    growth = standing(*[((5, 5), BuildingKind.HOUSE)] * 4, ((5, 6), BuildingKind.FARM))
+
+    run(growth, DIES_AFTER_MONTHS)
+
+    assert growth.counts[BuildingKind.HOUSE][5, 5] == 1
+    assert growth.died_out == 3

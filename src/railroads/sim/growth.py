@@ -15,9 +15,10 @@ cells with room for them.
 Every TRADE_EVERY_MONTHS the stations hand out their goods and buildings sell to each other
 (railroads.sim.economy, settled with the railway by railroads.sim.station_trade), which leaves
 each kind of building in each cell unsatisfied, content or thriving, and pays the player for the
-buildings they own (railroads.sim.ownership). Buildings of a kind left unsatisfied in a cell for
-DIES_AFTER_MONTHS on end are pulled down, the player's too; those that make a bonus good never
-are. Houses go up only as well as the buildings around them are fed: a turn on a ladder of homes
+buildings they own (railroads.sim.ownership). Each building in a cell counts on its own: of ten
+houses with food for two, two are fed and eight starve. Buildings that starve for DIES_AFTER_MONTHS
+on end are pulled down, as many as starved all that while, the player's too; those that make a
+bonus good never are. Houses go up only as well as the buildings around them are fed: a turn on a ladder of homes
 goes ahead with the share of the food the neighbourhood needs that it got (FED_LADDERS), and
 always where nobody lives yet.
 
@@ -134,9 +135,10 @@ class Growth:
     # The net change in each cell's count of each kind while changes are logged (log_changes),
     # set only for that while, so it is never saved with the game.
     _log: dict[tuple[Cell, BuildingKind], int] | None = None
-    # Per kind, how many months its buildings in each cell have been unsatisfied on end. None in
-    # saves from before buildings died out, which start counting afresh.
-    _unsatisfied: dict[BuildingKind, npt.NDArray[np.int32]] | None = None
+    # Per kind and cell, how many months some of its buildings have starved on end, and the fewest
+    # that starved in any of those months. None in saves from before buildings died out, which
+    # start counting afresh.
+    _starving: dict[BuildingKind, npt.NDArray[np.int32]] | None = None
     # How many buildings have died out since the game began.
     died_out = 0
     # The food every cell's buildings got and needed last month, one past the last cell standing
@@ -267,30 +269,45 @@ class Growth:
         wanted = needed[around].sum(axis=0)
         return np.where(wanted > 0, got[around].sum(axis=0) / np.where(wanted > 0, wanted, 1), 1.0)
 
+    def starving(self, trade: Trade, kind: BuildingKind) -> npt.NDArray[np.int64]:
+        """How many buildings of a kind starve in each cell traded on: those left over once the
+        share of what they all want that they got is handed to as few of them as it can."""
+        count = self._counts[kind].ravel()[trade.cells]
+        wanted = trade.needed[kind] + trade.could_make[kind]
+        share = np.clip(trade.share((kind,)), 0.0, 1.0)
+        served = np.ceil(share * count - 1e-9).astype(np.int64)
+        return np.where(wanted > 0, np.maximum(count - served, 0), 0)
+
     def _die_out(self, trade: Trade) -> set[Cell]:
-        """Counts the months each kind has been unsatisfied in each cell, and pulls down those
-        unsatisfied for DIES_AFTER_MONTHS; returns the cells they stood in."""
-        if self._unsatisfied is None:
-            self._unsatisfied = {}
+        """Counts the months buildings of each kind have starved in each cell, and pulls down as
+        many as starved all through DIES_AFTER_MONTHS; returns the cells they stood in."""
+        if self._starving is None:
+            self._starving = {}
         months = self.rule.trade_every_months
-        dead: list[tuple[int, BuildingKind]] = []
+        dead: list[tuple[int, BuildingKind, int]] = []
         for kind in trade.got:
             if kind in UNDYING:
                 continue
-            wanted = trade.needed[kind] + trade.could_make[kind]
-            idle = (wanted > 0) & (trade.share((kind,)) <= 0)
-            counted = self._unsatisfied.get(kind)
+            starving = self.starving(trade, kind)
+            counted = self._starving.get(kind)
             if counted is None:
-                if not idle.any():
+                if not starving.any():
                     continue
-                counted = self._unsatisfied[kind] = np.zeros(self._occupied.size, dtype=np.int32)
-            now = np.where(idle, counted[trade.cells] + months, 0)
-            counted[trade.cells] = now
-            dead += [(int(index), kind) for index in trade.cells[now >= DIES_AFTER_MONTHS]]
+                counted = self._starving[kind] = np.zeros((2, self._occupied.size), dtype=np.int32)
+            streak, fewest = counted[:, trade.cells]
+            fewest = np.where(streak > 0, np.minimum(fewest, starving), starving)
+            streak = np.where(starving > 0, streak + months, 0)
+            dying = streak >= DIES_AFTER_MONTHS
+            dead += [
+                (int(index), kind, int(gone))
+                for index, gone in zip(trade.cells[dying], fewest[dying], strict=True)
+            ]
+            streak[dying] = 0
+            counted[0, trade.cells] = streak
+            counted[1, trade.cells] = np.where(streak > 0, fewest, 0)
         changed: set[Cell] = set()
-        for index, kind in dead:
+        for index, kind, gone in dead:
             cell = divmod(index, self._grid.cols)
-            gone = int(self._counts[kind][cell])
             self.owners.lose(cell, kind, gone)
             for _ in range(gone):
                 self.constructions.remove(Building(cell, kind))
@@ -713,9 +730,9 @@ class Growth:
             self._log[(cell, kind)] = self._log.get((cell, kind), 0) + how_many
         self._counts[kind][cell] += how_many
         self._occupied[cell] += how_many
-        unsatisfied = self._unsatisfied
-        if unsatisfied is not None and kind in unsatisfied and not self._counts[kind][cell]:
-            unsatisfied[kind][cell[0] * self._grid.cols + cell[1]] = 0
+        starving = self._starving
+        if starving is not None and kind in starving and not self._counts[kind][cell]:
+            starving[kind][:, cell[0] * self._grid.cols + cell[1]] = 0
         points, value = self.rule.points[kind]
         neighbourhood = [cell, *self._grid.neighbours(*cell)]
         rows, cols = zip(*neighbourhood, strict=True)
