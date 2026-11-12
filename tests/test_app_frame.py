@@ -149,22 +149,45 @@ def test_the_game_autosaves_as_a_month_begins(context: None, tmp_path: Path) -> 
     assert app.notice == "Autosaved"
 
 
-def test_the_autosave_starts_on_the_frame_after_the_month_turns(
+def frames_until_the_month_is_done(app: App) -> int:
+    frames = 1
+    frame(app)
+    while app._turning is not None and frames < 20:
+        frame(app)
+        frames += 1
+    return frames
+
+
+def test_a_month_is_done_over_a_few_frames_and_saved_on_the_frame_after(
     context: None, tmp_path: Path
 ) -> None:
     app = made_app()
     app.saves = Saves(tmp_path)
     app.clock.seconds = app.clock.seconds_per_month - 0.001
 
-    frame(app)
-    started_on_the_turn = app._autosaving is not None
+    frames = frames_until_the_month_is_done(app)
+    started_with_the_month = app._autosaving is not None
     frame(app)
     started_after = app._autosaving is not None
     app.finish_autosave()
 
-    assert not started_on_the_turn
+    assert frames > 1
+    assert not started_with_the_month
     assert started_after
     assert [info.name for info in app.saves.listing()] == ["autosave 1"]
+
+
+def test_the_clock_and_trains_wait_while_a_month_is_half_done(context: None) -> None:
+    app = made_app()
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+    frame(app)
+    seconds = app.clock.seconds
+    months = app.clock.months
+
+    frame(app)
+
+    assert app._turning is not None
+    assert (app.clock.months, app.clock.seconds) == (months, seconds)
 
 
 def test_no_autosave_is_written_while_the_month_goes_on(context: None, tmp_path: Path) -> None:
@@ -241,7 +264,7 @@ def test_a_save_that_fails_to_load_stays_in_the_menu_with_why(
     assert "no save called 'Nothing'" in shell.menu.error
 
 
-def test_without_threads_an_autosave_is_written_on_the_next_frame(
+def test_without_threads_an_autosave_is_written_on_the_frame_after_the_month(
     context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(app_module, "WRITER", FrameWorker())
@@ -249,7 +272,7 @@ def test_without_threads_an_autosave_is_written_on_the_next_frame(
     app.saves = Saves(tmp_path)
     app.clock.seconds = app.clock.seconds_per_month - 0.001
 
-    frame(app)
+    frames_until_the_month_is_done(app)
     asked = app.saves.listing()
     frame(app)
 

@@ -8,7 +8,16 @@ import pytest
 
 from builders import flat_map
 from railroads.newgame import MapChoice, Settings
-from railroads.saves import MAGIC, SAVE_FORMAT, SavedGame, SaveError, Saves, name_problem
+from railroads.saves import (
+    MAGIC,
+    SAVE_FORMAT,
+    ReusedMemory,
+    SavedGame,
+    SaveError,
+    Saves,
+    name_problem,
+    snapshot,
+)
 from railroads.sim.clock import GameClock
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.game import Game
@@ -241,3 +250,18 @@ def test_loading_a_missing_save_says_so(tmp_path: Path) -> None:
 
     with pytest.raises(SaveError, match="no save called 'Nothing'"):
         saves.load("Nothing")
+
+
+def test_a_snapshot_in_reused_memory_holds_the_same_game_each_time(tmp_path: Path) -> None:
+    saves = Saves(tmp_path)
+    memory = ReusedMemory()
+    small = played_game(months=1)
+    saved = played_game()
+    saves.autosave(snapshot(small, memory))
+    saves.autosave(snapshot(saved, memory))
+
+    loaded = saves.load("autosave 1")
+    plain = bytes(snapshot(saved).data)
+
+    assert differences(saved, loaded) == []
+    assert bytes(snapshot(saved, memory).data) == plain

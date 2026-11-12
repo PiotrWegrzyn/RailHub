@@ -16,6 +16,7 @@ import pickle
 import re
 import sys
 import zlib
+from collections.abc import Buffer
 from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
@@ -78,7 +79,7 @@ class Snapshot:
     """A game pickled at one moment, ready to be written while play goes on."""
 
     header: dict[str, Any]
-    data: bytes
+    data: Buffer
 
 
 @dataclass(frozen=True)
@@ -107,16 +108,64 @@ class _Pickler(pickle.Pickler):
         return NotImplemented
 
 
-def snapshot(saved: SavedGame) -> Snapshot:
-    out = BytesIO()
-    _Pickler(out, protocol=pickle.HIGHEST_PROTOCOL).dump(saved)
+class ReusedMemory:
+    """Memory a game is pickled into and kept for the next time, so a monthly autosave doesn't
+    ask for a few hundred megabytes afresh; a snapshot pickled into it holds only until the
+    next one is. The first game is pickled the usual way, to learn how much memory to keep."""
+
+    def __init__(self) -> None:
+        self._memory = np.empty(0, dtype=np.uint8)
+        self._end = 0
+
+    def reserve(self, size: int) -> None:
+        """Keeps room for `size` bytes, a quarter more for the game to grow into; the memory is
+        only taken from the system as it is written."""
+        self._memory = np.empty(size + size // 4, dtype=np.uint8)
+
+    @property
+    def reserved(self) -> bool:
+        return len(self._memory) > 0
+
+    def start(self) -> None:
+        self._end = 0
+
+    def write(self, data: Buffer) -> int:
+        view = np.frombuffer(memoryview(data).cast("B"), dtype=np.uint8)
+        end = self._end + len(view)
+        if end > len(self._memory):
+            # A new block rather than a larger one: an old snapshot may still look into this one.
+            grown = np.empty(end + end // 2, dtype=np.uint8)
+            grown[: self._end] = self._memory[: self._end]
+            self._memory = grown
+        self._memory[self._end : end] = view
+        self._end = end
+        return len(view)
+
+    def written(self) -> memoryview:
+        return memoryview(self._memory[: self._end])
+
+
+def snapshot(saved: SavedGame, memory: ReusedMemory | None = None) -> Snapshot:
+    """The game pickled now, into `memory` if given, which then mustn't be used again until the
+    snapshot has been written."""
+    data: Buffer
+    if memory is None or not memory.reserved:
+        out = BytesIO()
+        _Pickler(out, protocol=pickle.HIGHEST_PROTOCOL).dump(saved)
+        data = out.getvalue()
+        if memory is not None:
+            memory.reserve(len(data))
+    else:
+        memory.start()
+        _Pickler(memory, protocol=pickle.HIGHEST_PROTOCOL).dump(saved)
+        data = memory.written()
     header = {
         "format": SAVE_FORMAT,
         "title": saved.title,
         "date": saved.clock.date,
         "saved_at": datetime.now().isoformat(timespec="seconds"),
     }
-    return Snapshot(header, out.getvalue())
+    return Snapshot(header, data)
 
 
 def is_autosave(name: str) -> bool:

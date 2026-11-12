@@ -9,10 +9,11 @@ from imgui_bundle import hello_imgui, imgui, immapp
 
 from railroads import maps
 from railroads.newgame import MapChoice, Settings, make_game
-from railroads.saves import SavedGame, SaveError, Saves, snapshot
+from railroads.saves import ReusedMemory, SavedGame, SaveError, Saves, snapshot
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
 from railroads.sim.game import Game
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
+from railroads.sim.steps import Steps, finish
 from railroads.ui.help_window import HelpWindow
 from railroads.ui.main_menu import LoadChoice, MainMenu, NewGameChoice, QuitChoice, random_seed
 from railroads.ui.map_view import MapView
@@ -58,6 +59,10 @@ class App:
         self._notice_until = 0.0
         self._autosaving: Future[object] | None = None
         self._autosave_due = False
+        # Kept between autosaves, which are written one at a time.
+        self._autosave_memory = ReusedMemory()
+        # The month being done a step a frame, if one is.
+        self._turning: Steps[None] | None = None
         # What the player asked to leave this game for: a save to load, or the main menu.
         self.load_wanted: str | None = None
         self.menu_wanted = False
@@ -103,17 +108,48 @@ class App:
         if isinstance(WRITER, FrameWorker):
             WRITER.work_once()
         self._check_autosave()
-        seconds = imgui.get_io().delta_time
-        months = self.clock.months_in(seconds)
-        self.view.time_passed(months)
+        if self._turning is None:
+            self._let_time_pass(imgui.get_io().delta_time)
+        else:
+            self._turn_once()
+        busy = self._turning is not None
+        # While a month is half done nothing may change the game, so every control is off for
+        # those few frames, without greying out.
+        imgui.push_style_var(imgui.StyleVar_.disabled_alpha.value, 1.0)
+        imgui.begin_disabled(busy)
+        try:
+            self._draw()
+        finally:
+            imgui.end_disabled()
+            imgui.pop_style_var()
+        if busy:
+            hello_imgui.request_refresh()
+
+    def _let_time_pass(self, seconds: float) -> None:
+        """Moves the trains and the clock on; a month that begins is done a step a frame from
+        here, with the trains and the clock waiting, and saved on the frame after it ends."""
+        self.view.time_passed(self.clock.months_in(seconds))
         self._keep_trains_smooth()
         first = self.clock.months
         turned = self.clock.advance(seconds)
-        for month in range(first + 1, first + 1 + turned):
-            self.view.month_passed(self.rng, self.clock.date_of(month))
         if turned:
-            # Saved on the next frame, so the month's work and the save don't stall one frame.
+            dates = [self.clock.date_of(month) for month in range(first + 1, first + 1 + turned)]
+            self._turning = self._months(dates)
+            self._turn_once()
+
+    def _months(self, dates: list[str]) -> Steps[None]:
+        for date in dates:
+            yield from self.view.month_steps(self.rng, date)
+
+    def _turn_once(self) -> None:
+        assert self._turning is not None
+        try:
+            next(self._turning)
+        except StopIteration:
+            self._turning = None
             self._autosave_due = True
+
+    def _draw(self) -> None:
         draw_top_bar(self)
         self.view.gui()
         self.help.draw()
@@ -156,7 +192,9 @@ class App:
         written."""
         if self.saves is None or self._autosaving is not None:
             return
-        self._autosaving = WRITER.submit(self.saves.autosave, snapshot(self.saved()))
+        self._autosaving = WRITER.submit(
+            self.saves.autosave, snapshot(self.saved(), self._autosave_memory)
+        )
 
     def _start_due_autosave(self) -> None:
         if self._autosave_due:
@@ -164,7 +202,12 @@ class App:
             self.autosave()
 
     def finish_autosave(self) -> None:
-        """Waits for an autosave being written, starting it if it is due."""
+        """Finishes a month being done, then waits for an autosave being written, starting it if
+        it is due."""
+        if self._turning is not None:
+            finish(self._turning)
+            self._turning = None
+            self._autosave_due = True
         self._start_due_autosave()
         if self._autosaving is not None:
             if isinstance(WRITER, FrameWorker):

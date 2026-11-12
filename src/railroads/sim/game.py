@@ -23,6 +23,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
 from railroads.sim.stats import History
+from railroads.sim.steps import Steps, finish
 from railroads.sim.summaries import MonthSummary, Reach, summarize
 from railroads.sim.tilemap import TileMap
 
@@ -78,11 +79,16 @@ class Game:
     def month(self, rng: np.random.Generator, date: str = "") -> Month:
         """Grows the towns by a month, or lets the stand-in player play it, and sums up what
         changed within reach of the stations."""
+        return finish(self.month_steps(rng, date))
+
+    def month_steps(self, rng: np.random.Generator, date: str = "") -> Steps[Month]:
+        """The month in a few steps, which a caller can spread over frames; nothing else may
+        change the game between them."""
         railway = self.railway
         reach = self._reach.of(railway.stations(), lambda s: railway.reach(s)[1])
         with self.growth.log_changes() as changes:
             if self.stand_in is None:
-                changed = self.growth.month(rng)
+                changed = yield from self.growth.month_steps(rng)
             else:
                 changed = self.stand_in.month(rng)
         return Month(changed, summarize(date, self.growth.rule.points, reach, changes))

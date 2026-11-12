@@ -20,6 +20,7 @@ from railroads.sim.geo import Coord
 from railroads.sim.grids import Cell, GridKind
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
+from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.ui.build_menu import (
     BuildMenu,
@@ -263,7 +264,13 @@ class MapView:
 
     def month_passed(self, rng: np.random.Generator, date: str = "") -> None:
         """Lets a month of the game pass and shows what changed."""
-        month = self.game.month(rng, date)
+        finish(self.month_steps(rng, date))
+
+    def month_steps(self, rng: np.random.Generator, date: str = "") -> Steps[None]:
+        """month_passed in a few steps, which the app spreads over frames so no frame stalls on
+        the whole month; nothing may change the game between them."""
+        month = yield from self.game.month_steps(rng, date)
+        yield
         changed = month.changed
         if month.summary is not None:
             self.summaries.add(month.summary)
@@ -282,6 +289,7 @@ class MapView:
         if self.search.open:
             self.search.refresh(self.growth)
         if self._pixels is not None:
+            yield
             self._pixels.refresh(self._pixels.world.buildings_changed(changed))
 
     def _town_cells(self) -> list[Cell]:

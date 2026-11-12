@@ -69,6 +69,7 @@ from railroads.sim.railway import Railway
 from railroads.sim.room import Room
 from railroads.sim.station_trade import StationTrade
 from railroads.sim.stats import History
+from railroads.sim.steps import Steps, finish
 from railroads.sim.tech import Effect
 from railroads.sim.tilemap import Relief, Terrain, Vegetation
 
@@ -198,6 +199,10 @@ class Growth:
         """Pulls down farms that towns have crowded out, lets stations hand out a month of goods,
         raises buildings with enough people around them and counts what the served buildings add
         to every ladder's chances; returns the cells whose buildings changed."""
+        return finish(self._trade_steps())
+
+    def _trade_steps(self) -> Steps[set[Cell]]:
+        """trade_goods, pausing once the economy has traded."""
         changed = self._crowd_out_farms()
         self.economy.year = self.year
         self.economy.bonus_per_good = BONUS_PER_GOOD + (
@@ -209,6 +214,7 @@ class Growth:
                 self.station_trade.orders(),
                 np.flatnonzero(self._occupied),
             )
+            yield
             self.station_trade.settle(self.trade)
             self.owners.pay(self.trade)
             self.station_trade.update_reach()
@@ -391,6 +397,11 @@ class Growth:
 
     def month(self, rng: np.random.Generator) -> set[Cell]:
         """Grows one month; returns the cells whose buildings changed."""
+        return finish(self.month_steps(rng))
+
+    def month_steps(self, rng: np.random.Generator) -> Steps[set[Cell]]:
+        """Grows one month in a few steps, which a caller can spread over frames; nothing else may
+        change the game between them. Returns the cells whose buildings changed."""
         self._months += 1
         if self._months % 12 == 0:
             stations = 0 if self.railway is None else len(self.railway.stations())
@@ -398,7 +409,8 @@ class Growth:
         changed: set[Cell] = set()
         self.forests_changed = set()
         if self.rule.trades and self._months % self.rule.trade_every_months == 0:
-            changed = self.trade_goods()
+            changed = yield from self._trade_steps()
+            yield
         if self.novelties is not None and self._months % 12 == 0:
             changed |= self.novelties.year(self, rng)
         every = self.rule.forests_every_months
