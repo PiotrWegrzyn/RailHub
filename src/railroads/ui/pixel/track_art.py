@@ -249,6 +249,10 @@ class TrackArt:
         self.constructions = constructions
         self.projection = projection
         self.elevation = elevation
+        # How each piece of track opens up or shifts at its ends (`_ends`), kept until track or
+        # stations change.
+        self._shapes: dict[Track, tuple[float, float]] = {}
+        self._shapes_version = -1
 
     def layer(
         self,
@@ -416,20 +420,35 @@ class TrackArt:
         """The track through each station near the area, straight between its two ends with
         its platform beside it: double where double track comes in, electric where electric
         track comes in at both ends."""
-        grid = self.tile_map.grid
-        steps = grid.track_steps()
+        steps = self.tile_map.grid.track_steps()
         laid = []
         for cell in self.constructions.stations():
             if not self._near(cell, near):
                 continue
-            run = self.constructions.station_ends(cell)
-            joined = [_joined(self.constructions, cell, point) for point in run]
-            electric = all(any(piece.electric for piece in found) for found in joined)
-            double = any(piece.width == TrackWidth.DOUBLE for found in joined for piece in found)
-            width = TrackWidth.DOUBLE if double else TrackWidth.SINGLE
-            piece = Track(cell, run, width, TrackBed.GROUND, electric)
-            laid.append(self._laid(piece, station_side(self.projection, steps, run)))
+            piece = self.station_piece(cell)
+            laid.append(self._laid(piece, station_side(self.projection, steps, piece.ends)))
         return laid
+
+    def station_piece(self, cell: Cell) -> Track:
+        """The track drawn through a station, straight between its two ends: double where
+        double track comes in, electric where electric track comes in at both ends."""
+        run = self.constructions.station_ends(cell)
+        joined = [_joined(self.constructions, cell, point) for point in run]
+        electric = all(any(piece.electric for piece in found) for found in joined)
+        double = any(piece.width == TrackWidth.DOUBLE for found in joined for piece in found)
+        width = TrackWidth.DOUBLE if double else TrackWidth.SINGLE
+        return Track(cell, run, width, TrackBed.GROUND, electric)
+
+    def riding_side(self, piece: Track, share: float, forward: bool) -> float:
+        """How far a train `share` of the way along the piece, from its first end to its
+        second, rides to the left of the way it goes (as `_offset` moves a line), in cells: on
+        double track the track to that side of the centre line, so trains going opposite ways
+        keep to different tracks, and on single track the track itself, which leaves the
+        centre line only where it branches off double track."""
+        sides = [lane[0] for lane in self._sides_at(piece, [share])]
+        if piece.width == TrackWidth.DOUBLE:
+            return sides[1] if forward else -sides[0]
+        return sides[0] if forward else -sides[0]
 
     def _sides(self, piece: Track, line: Path) -> list[list[float]]:
         """How far to the left of the centre line each track of the piece lies at each of its
@@ -439,26 +458,42 @@ class TrackArt:
         outer track on the side it turns to, and closes in to its centre line by its other
         end."""
         lengths = _lengths(line)
-        half_length = lengths[-1] / 2
+        return self._sides_at(piece, [along / lengths[-1] for along in lengths])
+
+    def _sides_at(self, piece: Track, shares: list[float]) -> list[list[float]]:
+        """The same as `_sides`, at these shares of the way along the piece from its first end
+        to its second."""
+        start, end = self._ends(piece)
         if piece.width == TrackWidth.SINGLE:
-            shifts = [self._branch_shift(piece, point) for point in piece.ends]
             return [
-                [
-                    shifts[0] * min(1.0, (lengths[-1] - along) / half_length)
-                    + shifts[1] * min(1.0, along / half_length)
-                    for along in lengths
-                ]
+                [start * min(1.0, 2 * (1 - share)) + end * min(1.0, 2 * share) for share in shares]
             ]
-        wide_start, wide_end = (self._double_beyond(piece, point) for point in piece.ends)
+        wide_start, wide_end = start > 0, end > 0
         widths = []
-        for along in lengths:
-            share = 1.0
+        for share in shares:
+            open_by = 1.0
             if not wide_start:
-                share = min(share, along / half_length)
+                open_by = min(open_by, 2 * share)
             if not wide_end:
-                share = min(share, (lengths[-1] - along) / half_length)
-            widths.append(DOUBLE_SPACING / 2 * share)
+                open_by = min(open_by, 2 * (1 - share))
+            widths.append(DOUBLE_SPACING / 2 * open_by)
         return [[-width for width in widths], widths]
+
+    def _ends(self, piece: Track) -> tuple[float, float]:
+        """At each end of the piece, for single track how far to the left of its centre line
+        it starts there (`_branch_shift`), and for double track 1 if it runs on as double
+        track there (`_double_beyond`) or else 0."""
+        if self._shapes_version != self.constructions.railway_version:
+            self._shapes.clear()
+            self._shapes_version = self.constructions.railway_version
+        shape = self._shapes.get(piece)
+        if shape is None:
+            if piece.width == TrackWidth.SINGLE:
+                start, end = (self._branch_shift(piece, point) for point in piece.ends)
+            else:
+                start, end = (float(self._double_beyond(piece, point)) for point in piece.ends)
+            shape = self._shapes[piece] = (start, end)
+        return shape
 
     def _branch_shift(self, piece: Track, point: int) -> float:
         """How far to the left of its centre line single track starts at this end, to leave
