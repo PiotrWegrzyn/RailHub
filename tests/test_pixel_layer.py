@@ -37,17 +37,49 @@ def test_a_chunk_asked_for_is_drawn_and_kept_once_taken() -> None:
     np.testing.assert_array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2))
 
 
+def taken_within(layer: PixelLayer, seconds: float = 30) -> set:
+    deadline = time.perf_counter() + seconds
+    taken: set = set()
+    while not taken and time.perf_counter() < deadline:
+        time.sleep(0.01)
+        taken = layer.take_drawn()
+    return taken
+
+
 def test_raised_chunks_are_drawn_again_finely() -> None:
     world, mountains, _ = world_over_mountains()
-    layer = PixelLayer(world, threads=False)
-    drawn_now(layer, (*mountains, 2))
-    layer._refine((*mountains, 2), 0.0)
-    layer._painter.work_once(0.0)
+    layer = PixelLayer(world, threads=True)
+    layer._ask((*mountains, 2), time.perf_counter())
+    taken_within(layer)
+    layer._refine((*mountains, 2), time.perf_counter())
 
-    taken = layer.take_drawn()
+    taken = taken_within(layer)
 
     assert taken == {mountains}
     np.testing.assert_array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2, True))
+
+
+def test_without_threads_raised_chunks_are_not_drawn_again_finely() -> None:
+    world, mountains, _ = world_over_mountains()
+    layer = PixelLayer(world, threads=False)
+    drawn_now(layer, (*mountains, 2))
+
+    layer._refine((*mountains, 2), 0.0)
+
+    assert layer._painter.waiting() == 0
+
+
+def test_without_threads_chunks_wait_while_the_mouse_moves() -> None:
+    world, _, _ = world_over_mountains()
+    layer = PixelLayer(world, threads=False)
+    camera = SimpleNamespace(center_x=4.0, center_y=6.0, pixel_scale=2)
+    layer._moved(camera, 10.0, (100.0, 200.0))
+
+    settled = layer._moved(camera, 10.0 + SETTLE_S * 2, (100.0, 200.0))
+    pointed = layer._moved(camera, 10.0 + SETTLE_S * 2, (101.0, 200.0))
+
+    assert not settled
+    assert pointed
 
 
 def test_a_drawing_asked_for_before_a_change_is_thrown_away() -> None:
@@ -68,11 +100,7 @@ def test_with_threads_a_chunk_asked_for_is_drawn_in_the_background() -> None:
     layer = PixelLayer(world, threads=True)
     layer._ask((*mountains, 2), time.perf_counter())
 
-    deadline = time.perf_counter() + 30
-    taken: set = set()
-    while not taken and time.perf_counter() < deadline:
-        time.sleep(0.01)
-        taken = layer.take_drawn()
+    taken = taken_within(layer)
 
     assert taken == {mountains}
 

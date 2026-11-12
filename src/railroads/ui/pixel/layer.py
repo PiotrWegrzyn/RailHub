@@ -9,9 +9,10 @@ Chunks where hills or mountains rise show first as they are quickly drawn, then 
 with the heights, lift and colours of their raised ground at the full resolution, and the finer
 drawing takes their place once it is ready.
 
-Where threads cannot start, as in a browser, one chunk is drawn on each frame. There, when the
-ground shader shows the ground beneath, chunks wait until the view has stood still for a moment,
-so moving the map doesn't stall on drawing them."""
+Where threads cannot start, as in a browser, one chunk is drawn on each frame, and raised chunks
+are not drawn again finely, which would stall a frame for a third of a second. There, when the
+ground shader shows the ground beneath, chunks wait until the view and the mouse have stood still
+for a moment, so moving the map or the mouse doesn't stall on drawing them."""
 
 import time
 from collections import OrderedDict
@@ -58,7 +59,7 @@ class PixelLayer:
         self._refreshes: dict[ChunkKey, int] = {}
         # Whether hills or mountains rise in each chunk, which never changes.
         self._rises: dict[ChunkKey, bool] = {}
-        self._view: tuple[float, float, int] | None = None
+        self._view: tuple | None = None
         self._still_since = 0.0
         # Whether the graphics card draws the ground beneath, so chunks where nothing rises are
         # drawn without theirs.
@@ -116,7 +117,9 @@ class PixelLayer:
         resolution = resolution_for(scale, self.world.resolutions)
         self.take_drawn()
         now = time.perf_counter()
-        waiting = ground_below and self._moved(camera, now)
+        io = imgui.get_io()
+        pointer = (io.mouse_pos.x, io.mouse_pos.y, io.mouse_wheel, *io.mouse_down)
+        waiting = ground_below and self._moved(camera, now, pointer)
         uploaded = False
         complete = True
         for chunk in placement.chunks:
@@ -163,9 +166,10 @@ class PixelLayer:
             if drawn not in self._chunks:
                 self._chunks[drawn] = self.world.render(*drawn)
 
-    def _moved(self, camera: IsoCamera, now: float) -> bool:
-        """Whether chunks drawn on frames must wait because the view moved a moment ago."""
-        view = (camera.center_x, camera.center_y, camera.pixel_scale)
+    def _moved(self, camera: IsoCamera, now: float, pointer: tuple = ()) -> bool:
+        """Whether chunks drawn on frames must wait because the view or the mouse (`pointer`:
+        where it is and what it presses) moved a moment ago."""
+        view = (camera.center_x, camera.center_y, camera.pixel_scale, *pointer)
         if view != self._view:
             self._view = view
             self._still_since = now
@@ -183,7 +187,9 @@ class PixelLayer:
         """Asks for a chunk to be drawn again with fine raised ground, if it has any and is not
         drawn finely already."""
         resolution = drawn[2]
-        if resolution == 1 or drawn in self._refined or drawn not in self._chunks:
+        if not self._painter.threaded or resolution == 1:
+            return
+        if drawn in self._refined or drawn not in self._chunks:
             return
         rises = self._rises.get(drawn[:2])
         if rises is None:
