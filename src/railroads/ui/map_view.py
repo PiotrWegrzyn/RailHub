@@ -210,6 +210,7 @@ class MapView:
             self.look_at,
             self.growth.station_trade.measure_demand,
             self.tools.start_moving,
+            self.growth.station_trade.supplies,
         )
         self.summaries.draw(*self._map_rect, self.look_at, self.railway.name_of)
         self.search.draw(self.growth, self.visit, self._view_center)

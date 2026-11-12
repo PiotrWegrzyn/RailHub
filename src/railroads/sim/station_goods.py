@@ -31,6 +31,9 @@ class StationGoods:
     # Room tech adds to every station's stockpile and waiting room (railroads.sim.tech).
     extra_room: float = 0.0
     extra_waiting: float = 0.0
+    # Goods kept for trains, which the station doesn't hand out to the buildings around it. A
+    # frozenset, so saves from before it existed load with none kept.
+    kept: frozenset[Good] = frozenset()
 
     @property
     def limit(self) -> float:
@@ -73,6 +76,10 @@ class StationGoods:
         amount = min(amount, held)
         self.brought[good] = held - amount
         return take_parcels(self.origins.setdefault(good, {}), amount, held)
+
+    def keep_for_trains(self, good: Good, kept: bool = True) -> None:
+        """Keeps a good for trains, or lets the station hand it out around it again."""
+        self.kept = self.kept | {good} if kept else self.kept - {good}
 
     def board(self, good: Good, amount: float) -> None:
         """Lets passengers or mail come to the station to wait, up to its waiting limit."""

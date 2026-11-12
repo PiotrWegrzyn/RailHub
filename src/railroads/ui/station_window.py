@@ -1,20 +1,28 @@
 """The station window, opened by right clicking a station: its level and reach, what it holds
-and wants, the trains that call there, and buttons to raise its level or add storage."""
+and wants, which of the goods made around it are kept for trains rather than handed out there,
+the trains that call there, and buttons to raise its level or add storage."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.sim.finance import STATION_PRICE, STORAGE_PRICE, dollars
-from railroads.sim.goods import TRAVELLERS
+from railroads.sim.goods import TRAVELLERS, Good
 from railroads.sim.grids import Cell
 from railroads.sim.railway import MAX_LEVEL, Railway
-from railroads.sim.station_goods import STORAGE_STEP, WAITING_STEP
+from railroads.sim.station_goods import STORAGE_STEP, WAITING_STEP, StationGoods
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.stations_window import stock_bar
-from railroads.ui.theme import BRASS, BRASS_DARK, goods_inline
+from railroads.ui.theme import (
+    BRASS,
+    BRASS_DARK,
+    good_icon,
+    goods_inline,
+    next_good_slot,
+    rows_that_fit,
+)
 
 WINDOW_POS = (16.0, 96.0)
 WINDOW_WIDTH = 460.0
@@ -32,7 +40,9 @@ class StationWindow:
         look_at: Callable[[Cell], None],
         upgraded: Callable[[Cell], None],
         move: Callable[[Cell], None] = lambda _: None,
+        supplies: Callable[[Cell], Mapping[Good, float]] = lambda _: {},
     ) -> None:
+        """`supplies` says what the buildings around a station make (StationTrade.supplies)."""
         station = self.station
         if station is None:
             return
@@ -45,7 +55,7 @@ class StationWindow:
         flags = imgui.WindowFlags_.always_auto_resize.value
         expanded, still_open = imgui.begin(f"{fa.ICON_FA_BUILDING}  {name}###station", True, flags)
         if expanded:
-            self._draw_body(railway, station, look_at, upgraded)
+            self._draw_body(railway, station, look_at, upgraded, supplies)
             label = (
                 f"{fa.ICON_FA_ARROWS_ALT}  Move it, keeping its trains  {dollars(STATION_PRICE)}+"
             )
@@ -61,6 +71,7 @@ class StationWindow:
         station: Cell,
         look_at: Callable[[Cell], None],
         upgraded: Callable[[Cell], None],
+        supplies: Callable[[Cell], Mapping[Good, float]],
     ) -> None:
         level = railway.level(station)
         delivery, collection = railway.reach(station)
@@ -93,6 +104,9 @@ class StationWindow:
         imgui.text_disabled("Demand left")
         imgui.same_line(LABEL_WIDTH)
         draw_demand(railway.station_demand(station))
+        imgui.text_disabled("Not for local use")
+        imgui.same_line(LABEL_WIDTH)
+        _draw_kept(goods, supplies(station))
         imgui.separator()
         calling = [
             train.name for train in railway.trains if any(s.cell == station for s in train.stops)
@@ -113,6 +127,32 @@ class StationWindow:
         storage = f"{fa.ICON_FA_PLUS}  Storage +{STORAGE_STEP} of each good, +{WAITING_STEP} passengers and mail  {dollars(STORAGE_PRICE)}"
         if _priced_button(storage, railway.finances.can_afford(STORAGE_PRICE)):
             railway.add_storage(station)
+
+
+def _draw_kept(goods: StationGoods, made: Mapping[Good, float]) -> None:
+    """A tick for each good made around the station, and each already kept, to keep it for
+    trains instead of handing it to the buildings around the station."""
+    shown = sorted(
+        {g for g, amount in made.items() if amount > 0 and g not in TRAVELLERS} | goods.kept,
+        key=lambda g: g.value,
+    )
+    if not shown:
+        imgui.text_disabled("nothing is made around it")
+        return
+    left, per_row = rows_that_fit()
+    for index, good in enumerate(shown):
+        next_good_slot(index, left, per_row)
+        kept = good in goods.kept
+        changed, kept = imgui.checkbox(f"##keep {good.value}", kept)
+        if changed:
+            goods.keep_for_trains(good, kept)
+        if imgui.is_item_hovered():
+            imgui.set_tooltip(
+                f"Keep {good.value} for trains: the station won't hand it to the buildings "
+                "around it"
+            )
+        imgui.same_line(0, 3)
+        good_icon(good, framed=True)
 
 
 def _priced_button(label: str, affordable: bool) -> bool:

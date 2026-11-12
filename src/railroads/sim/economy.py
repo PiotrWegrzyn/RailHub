@@ -5,14 +5,17 @@ Each processor keeps a stockpile of up to INPUT_STOCK of every input for every b
 what reaches it even while it waits for another input, and works from it.
 
 Goods only ever move through stations (railroads.sim.railway), and only through those joined by
-track to another station. A station hands what trains brought to buildings within its delivery
-radius, unsatisfied ones first, then content ones, nearest first, and then what it gathered
-before, so a mine in its reach feeds a steel mill in its reach; once a good has been handed out it
-takes every spare unit buildings made within its collection radius into its stockpile while it has
-room for that good. Nothing is made that has nowhere to go: every building makes only what a station takes, and
-a processor uses up only the inputs for what it made; the rest waits in its stockpile. Needs are
-handed out in the order of PIPELINE, so the inputs of a processor come before what it makes:
-canneries take their fruit before houses eat what is left.
+track to another station. Before a need is met, a station takes every spare unit of the goods
+meeting it that buildings made within its collection radius into its stockpile, while it has room
+for that good. It then hands what trains brought to buildings within its delivery radius,
+unsatisfied ones first, then content ones, nearest first, and then its stockpile, freshly gathered
+goods included, so a mine in its reach feeds a steel mill in its reach and a town eats its own
+farms' food the month it is made; only what is left waits for trains. Goods the player keeps for
+trains at a station (StationOrder.kept) are not handed out from its stockpile. Nothing is made
+that has nowhere to go: every building makes only what a station takes, and a processor uses up
+only the inputs for what it made; the rest waits in its stockpile. Needs are handed out in the
+order of PIPELINE, so the inputs of a processor come before what it makes: canneries take their
+fruit before houses eat what is left.
 
 A building's satisfaction is the share of what it demands that it got and of what it makes that
 it gave away, plus BONUS_PER_GOOD for each of its bonus goods (railroads.sim.goods) it got all of,
@@ -33,7 +36,6 @@ from railroads.sim.clock import START_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.goods import (
     FITS,
-    FOOD_INPUTS,
     HANDED_OUT,
     MAKES,
     NEEDS,
@@ -109,6 +111,8 @@ class StationOrder:
     collection: int = COLLECTION_RADIUS
     # Freight it gathered before, which it also hands out to the buildings around it.
     stockpile: Mapping[Good, float] = field(default_factory=dict)
+    # Goods kept for trains: none of its stockpile of them is handed out around it.
+    kept: frozenset[Good] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -339,10 +343,9 @@ class _Month:
             if isinstance(step, BuildingKind):
                 self._produce(step)
                 continue
+            for good in FITS[step]:
+                self._gather(good)
             self._serve(step)
-            if step not in FOOD_INPUTS:
-                for good in FITS[step]:
-                    self._gather(good)
         return self._settle()
 
     def _wants(self, need: Need) -> dict[BuildingKind, FloatCells]:
@@ -359,7 +362,7 @@ class _Month:
 
     def _serve(self, need: Need) -> None:
         """Lets stations hand out the goods meeting a need, the most valuable first: of each
-        good what trains brought, then what they gathered before."""
+        good what trains brought, then their stockpile, unless it is kept for trains."""
         wants = self._wants(need)
         if not wants:
             return
@@ -376,7 +379,7 @@ class _Month:
                     handed_for = self.handed_for[station]
                     handed_for[(need, good)] = handed_for.get((need, good), 0.0) + given
                 held = self.stockpiled[station].get(good, 0.0)
-                if held <= 0:
+                if held <= 0 or good in self.stations[station].kept:
                     continue
                 given = self.economy._hand_out(held, near, demand, received, self.priority)
                 self.stockpiled[station][good] = held - given
@@ -392,7 +395,8 @@ class _Month:
                 self.stock[key] = self.stock[key] + got
 
     def _gather(self, good: Good) -> None:
-        """Lets every station take spare units of a good buildings made into its stockpile."""
+        """Lets every station take spare units of a good buildings made into its stockpile, where
+        they can be handed out at once."""
         for station in self.stations:
             _, far = self.reach[station]
             taken = self.economy._gather(
@@ -405,6 +409,8 @@ class _Month:
             if taken > 0:
                 self.gathered[station][good] = self.gathered[station].get(good, 0.0) + taken
                 self.room[station][good] -= taken
+                stockpiled = self.stockpiled[station]
+                stockpiled[good] = stockpiled.get(good, 0.0) + taken
 
     def _produce(self, kind: BuildingKind) -> None:
         """Offers what a kind of processor could make from its stockpile."""

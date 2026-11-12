@@ -468,17 +468,16 @@ def test_every_car_costs_twenty_each_time_the_train_sets_off() -> None:
     assert railway.finances.month["car trips"] == -2 * CAR_TRIP_PRICE
 
 
-def test_a_mine_in_reach_feeds_a_steel_mill_in_reach_through_the_station() -> None:
+def test_a_mine_in_reach_feeds_a_steel_mill_in_reach_through_the_station_the_same_month() -> None:
     growth, railway = joined_stations()
     for cell, kind in [((6, 24), BuildingKind.MINE), ((6, 21), BuildingKind.STEEL_MILL)]:
         growth.build(Building(cell, kind))
 
     growth.trade_goods()
-    growth.trade_goods()
 
     mill = np.ravel_multi_index((6, 21), growth.constructions.tile_map.grid.shape)
     assert growth.economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][mill] == pytest.approx(100.0)
-    assert railway.station_goods((6, 20)).stockpile[Good.COAL] == pytest.approx(100.0)
+    assert railway.station_goods((6, 20)).stockpile.get(Good.COAL, 0.0) == pytest.approx(0.0)
 
 
 def test_a_train_unloads_only_what_fits_and_keeps_the_rest_aboard() -> None:
@@ -726,3 +725,76 @@ def test_a_train_bought_on_its_own_has_no_stops() -> None:
     train = railway.buy()
 
     assert train.stops == []
+
+
+def food_and_heating(growth: Growth, cell: tuple[int, int]) -> tuple[float, float]:
+    index = np.ravel_multi_index(cell, growth.constructions.tile_map.grid.shape)
+    position = int(np.searchsorted(growth.trade.cells, index))
+    food = growth.trade.goods_got[(BuildingKind.HOUSE, Need.FOOD)][0][position]
+    heating = growth.trade.goods_got[(BuildingKind.HOUSE, Need.HEATING)][0][position]
+    return float(food), float(heating)
+
+
+def test_a_town_eats_its_own_farms_food_the_month_it_is_made_and_only_the_rest_waits() -> None:
+    growth, railway = joined_stations()
+    for cell in ((5, 22), (5, 23), (6, 23), (6, 24)):
+        growth.build(Building(cell, BuildingKind.FARM))
+    growth.build(Building((6, 21), BuildingKind.HOUSE))
+
+    growth.trade_goods()
+
+    food, _ = food_and_heating(growth, (6, 21))
+    assert food == pytest.approx(10.0)
+    assert railway.station_goods((6, 20)).stockpile[Good.WHEAT] == pytest.approx(10.0)
+
+
+def test_coal_mined_near_a_station_heats_its_own_houses_before_waiting_for_trains() -> None:
+    growth, railway = joined_stations()
+    growth.build(Building((6, 24), BuildingKind.MINE))
+    growth.build(Building((6, 21), BuildingKind.HOUSE))
+
+    growth.trade_goods()
+
+    _, heating = food_and_heating(growth, (6, 21))
+    assert heating == pytest.approx(1.0)
+    assert railway.station_goods((6, 20)).stockpile[Good.COAL] == pytest.approx(99.0)
+
+
+def test_a_good_kept_for_trains_is_not_handed_out_around_the_station() -> None:
+    growth, railway = joined_stations()
+    growth.build(Building((6, 24), BuildingKind.MINE))
+    growth.build(Building((6, 21), BuildingKind.HOUSE))
+    railway.station_goods((6, 20)).keep_for_trains(Good.COAL)
+
+    growth.trade_goods()
+
+    _, heating = food_and_heating(growth, (6, 21))
+    assert heating == pytest.approx(0.0)
+    assert railway.station_goods((6, 20)).stockpile[Good.COAL] == pytest.approx(100.0)
+
+
+def test_a_good_let_go_again_is_handed_out_around_the_station() -> None:
+    growth, railway = joined_stations()
+    growth.build(Building((6, 24), BuildingKind.MINE))
+    growth.build(Building((6, 21), BuildingKind.HOUSE))
+    goods = railway.station_goods((6, 20))
+    goods.keep_for_trains(Good.COAL)
+
+    goods.keep_for_trains(Good.COAL, kept=False)
+    growth.trade_goods()
+
+    _, heating = food_and_heating(growth, (6, 21))
+    assert goods.kept == frozenset()
+    assert heating == pytest.approx(1.0)
+
+
+def test_a_station_saved_before_goods_could_be_kept_for_trains_keeps_none() -> None:
+    growth, railway = joined_stations()
+    growth.build(Building((6, 24), BuildingKind.MINE))
+    goods = railway.station_goods((6, 20))
+    goods.__dict__.pop("kept", None)
+
+    growth.trade_goods()
+
+    assert goods.kept == frozenset()
+    assert goods.stockpile[Good.COAL] == pytest.approx(100.0)

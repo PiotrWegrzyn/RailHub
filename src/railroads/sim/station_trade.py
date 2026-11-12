@@ -58,7 +58,7 @@ class StationTrade:
             delivery, collection = railway.reach(station)
             freight = {g: a for g, a in goods.stockpile.items() if g not in TRAVELLERS}
             orders[station] = StationOrder(
-                dict(goods.brought), goods.limit, delivery, collection, freight
+                dict(goods.brought), goods.limit, delivery, collection, freight, goods.kept
             )
         return orders
 
@@ -70,14 +70,14 @@ class StationTrade:
             goods = railway.station_goods(station)
             for good, amount in handed.items():
                 goods.release(good, amount)
-        for station, supplied in trade.supplied.items():
-            goods = railway.station_goods(station)
-            for good, amount in supplied.items():
-                goods.stockpile[good] = max(0.0, goods.stockpile.get(good, 0.0) - amount)
         for station, gathered in trade.gathered.items():
             goods = railway.station_goods(station)
             for good, amount in gathered.items():
                 goods.stockpile[good] = goods.stockpile.get(good, 0.0) + amount
+        for station, supplied in trade.supplied.items():
+            goods = railway.station_goods(station)
+            for good, amount in supplied.items():
+                goods.stockpile[good] = max(0.0, goods.stockpile.get(good, 0.0) - amount)
         capacity = {}
         stations = railway.stations()
         for station, counts in zip(stations, self._ring_counts(stations), strict=True):
