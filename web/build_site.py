@@ -61,6 +61,7 @@ def build() -> None:
     subprocess.run(
         ["uv", "build", "--wheel", "--out-dir", str(SITE / "wheels")], cwd=ROOT, check=True
     )
+    (SITE / "wheels" / ".gitignore").unlink(missing_ok=True)
     for name in ("index.html", "measure.py"):
         shutil.copy(WEB / name, SITE / name)
     (SITE / ".nojekyll").touch()
