@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pytest
 
-from railroads.sim.grids import HEX_RADIUS, Grid, HexGrid, SquareGrid
+from railroads.sim.grids import HEX_RADIUS, Grid, HexGrid, SquareGrid, flat_within
 
 GRIDS = [SquareGrid(rows=6, cols=7, km_per_cell=2.0), HexGrid(rows=6, cols=7, km_per_cell=2.0)]
 EACH_GRID = pytest.mark.parametrize("grid", GRIDS, ids=lambda grid: grid.kind)
@@ -252,3 +252,30 @@ def test_square_track_may_leave_by_every_point() -> None:
     ends = grid.track_ends()
 
     assert ends == tuple(range(8))
+
+
+@EACH_GRID
+def test_cells_within_reach_come_as_flat_indices_in_the_order_within_finds_them(
+    grid: Grid,
+) -> None:
+    reached = grid.within((3, 3), 2)
+
+    within = flat_within(grid, (3, 3), 2)
+
+    assert within.cells.tolist() == [row * grid.cols + col for row, col in reached]
+    assert within.steps.tolist() == list(reached.values())
+
+
+def test_grids_of_one_size_keep_their_own_cells_within_reach() -> None:
+    square, hexagon = GRIDS
+
+    cells = [flat_within(grid, (3, 3), 1).cells.size for grid in (square, hexagon)]
+
+    assert cells == [5, 7]
+
+
+def test_the_cells_kept_within_reach_cannot_be_changed() -> None:
+    within = flat_within(GRIDS[1], (2, 2), 1)
+
+    with pytest.raises(ValueError, match="read-only"):
+        within.cells[0] = 0

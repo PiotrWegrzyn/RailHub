@@ -18,7 +18,10 @@ unsatisfied, content or thriving, and pays the player for the buildings they own
 (railroads.sim.ownership).
 
 Growth keeps the tally the other parts share: how many of each kind stand in each cell (counts),
-the points around each cell (nearby) and every ladder's chances, all kept up to date by add.
+the points around each cell (nearby) and every ladder's chances, all kept up to date by add. Every
+change to the counts goes through add, so it can also log them (log_changes): a month's summary
+(railroads.sim.summaries) is worked out from the log instead of comparing the counts before and
+after.
 
 Forests come and go as well (railroads.sim.forests): people, industry and above all lumber mills
 clear them, they spread onto open grassland beside them, and the land weighs again wherever they
@@ -28,7 +31,8 @@ A new map runs this for MONTHS_BEFORE_PLAY before play starts; in play it carrie
 every few minutes.
 """
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from itertools import pairwise
 from typing import TYPE_CHECKING
@@ -110,6 +114,10 @@ class _Place:
 
 class Growth:
     """The grown buildings on one map, counted per cell, and the rule that grows them."""
+
+    # The net change in each cell's count of each kind while changes are logged (log_changes),
+    # set only for that while, so it is never saved with the game.
+    _log: dict[tuple[Cell, BuildingKind], int] | None = None
 
     def __init__(
         self,
@@ -607,9 +615,21 @@ class Growth:
         self.station_trade.reward(cell, new_kind)
         return {cell} | {near for near, _, _ in plan}
 
+    @contextmanager
+    def log_changes(self) -> Iterator[Mapping[tuple[Cell, BuildingKind], int]]:
+        """Logs the net change in each cell's count of each kind while the block runs."""
+        log: dict[tuple[Cell, BuildingKind], int] = {}
+        self._log = log
+        try:
+            yield log
+        finally:
+            del self._log
+
     def add(self, cell: Cell, kind: BuildingKind, how_many: int) -> None:
         """Counts `how_many` buildings of a kind more (or fewer) in the cell, with the points
         they give its neighbourhood and every ladder's chances there."""
+        if self._log is not None:
+            self._log[(cell, kind)] = self._log.get((cell, kind), 0) + how_many
         self._counts[kind][cell] += how_many
         self._occupied[cell] += how_many
         points, value = self.rule.points[kind]

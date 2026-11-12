@@ -45,7 +45,7 @@ class StationCalls:
                     car.empty(car.load)
                     self._railway.history.deliver(self._railway.year, car.good)
                     continue
-                unloaded = min(car.load, goods.room)
+                unloaded = min(car.load, goods.room(car.good))
                 if unloaded > 0:
                     self._store(goods, stop.cell, car.good, car.empty(unloaded))
                     self._railway.history.deliver(self._railway.year, car.good)

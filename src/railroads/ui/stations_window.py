@@ -7,27 +7,30 @@ from dataclasses import dataclass
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.sim.demand import StationDemand, price_of
-from railroads.sim.finance import dollars
-from railroads.sim.goods import FITS, Need
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
+from railroads.sim.station_goods import StationGoods
+from railroads.ui.demand_view import draw_demand
 from railroads.ui.theme import (
-    BRASS,
     BRASS_DARK,
     CARDS_WIDTH,
-    GONE,
-    GROWN,
-    good_icon,
     goods_inline,
-    next_good_slot,
-    rows_that_fit,
 )
 from railroads.ui.trains_window import WINDOW_SIZE as TRAINS_SIZE
 from railroads.ui.trains_window import WINDOW_TOP as TRAINS_TOP
 
 WINDOW_SIZE = (860.0, 180.0)
 GAP = 12.0
+
+
+def stock_bar(
+    goods: StationGoods, size: tuple[float, float]
+) -> tuple[float, tuple[float, float], str]:
+    """A stockpile bar filled as far as the fullest kind of freight, against the most of each
+    the station holds."""
+    good, held = goods.fullest
+    label = f"{held:.0f}/{goods.limit:.0f}" + (f" {good.value}" if good else "")
+    return min(1.0, held / goods.limit), size, label
 
 
 @dataclass
@@ -94,9 +97,7 @@ class StationsWindow:
                 imgui.set_tooltip("Open this station's details")
             imgui.table_next_column()
             imgui.push_style_color(imgui.Col_.plot_histogram, imgui.ImVec4(*BRASS_DARK))
-            imgui.progress_bar(
-                goods.stocked / goods.limit, (110, 0), f"{goods.stocked:.0f}/{goods.limit:.0f}"
-            )
+            imgui.progress_bar(*stock_bar(goods, (110, 0)))
             imgui.pop_style_color()
             imgui.table_next_column()
             goods_inline(goods.stockpile, "empty")
@@ -111,33 +112,3 @@ class StationsWindow:
                 imgui.set_tooltip("Look at this station")
             imgui.pop_id()
         imgui.end_table()
-
-
-def draw_demand(demand: StationDemand) -> None:
-    """Each need around the station, with the share of its demand left: the share of its price
-    a unit delivered there for it earns."""
-    wanted = [need for need in Need if demand.capacity.get(need, 0) > 0]
-    if not wanted:
-        imgui.text_disabled("none")
-        return
-    left, per_row = rows_that_fit()
-    for index, need in enumerate(wanted):
-        record = demand.record(need)
-        next_good_slot(index, left, per_row)
-        imgui.align_text_to_frame_padding()
-        good_icon(need, framed=True)
-        imgui.same_line(0, 3)
-        color = GONE if record.share < 0.25 else BRASS if record.share < 0.75 else GROWN
-        imgui.text_colored(imgui.ImVec4(*color), f"{record.share:.0%}")
-        if imgui.is_item_hovered():
-            imgui.begin_tooltip()
-            imgui.text(f"{need.value}: {record.left:.1f} of {record.capacity:.1f} demand left")
-            price = price_of(FITS[need][0]) * record.share
-            imgui.text(f"A unit delivered for it now earns {dollars(price)}")
-            imgui.text_disabled(f"Met by {', '.join(good.value for good in FITS[need])}")
-            last = demand.last_month.get(need)
-            if last is not None:
-                imgui.text_disabled(
-                    f"Last month ended with {last.left:.1f} of {last.capacity:.1f} left"
-                )
-            imgui.end_tooltip()

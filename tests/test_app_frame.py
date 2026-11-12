@@ -1,18 +1,22 @@
 from collections.abc import Iterator
+from pathlib import Path
 
 import numpy as np
 import pytest
 from imgui_bundle import hello_imgui, imgui, implot
 
 from builders import flat_map
+from railroads.saves import Saves
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.game import Game
+from railroads.sim.goods import Good
 from railroads.sim.grids import HexGrid
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.sim.trains import Stop
-from railroads.ui.app import App
+from railroads.ui.app import App, Shell
 from railroads.ui.build_menu import Tool
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
+from railroads.ui.main_menu import Page
 from railroads.ui.map_view import MapView
 
 
@@ -83,3 +87,184 @@ def test_every_window_draws_at_every_zoom(context: None, zoom: int) -> None:
         frame(app)
 
     assert app.view.camera.zoom_level == zoom
+
+
+@pytest.fixture
+def refreshes(monkeypatch: pytest.MonkeyPatch) -> list[None]:
+    asked: list[None] = []
+    monkeypatch.setattr(hello_imgui, "request_refresh", lambda: asked.append(None))
+    return asked
+
+
+def test_frames_stay_at_full_speed_while_a_train_runs(context: None, refreshes: list[None]) -> None:
+    app = made_app()
+
+    frame(app)
+
+    assert app.game.railway.trains[0].path
+    assert len(refreshes) == 1
+
+
+def test_frames_may_slow_down_while_trains_wait_at_their_stations(
+    context: None, refreshes: list[None]
+) -> None:
+    app = made_app()
+    app.game.railway.trains[0].stops = [Stop((10, 6), [Good.COAL]), Stop((10, 16))]
+
+    frame(app)
+
+    assert not app.game.railway.trains[0].path
+    assert refreshes == []
+
+
+def test_frames_may_slow_down_once_the_game_is_over(context: None, refreshes: list[None]) -> None:
+    app = made_app()
+    app.clock.months += app.clock.months_left
+
+    frame(app)
+
+    assert app.game.railway.trains[0].path
+    assert refreshes == []
+
+
+def shell_frame(shell: Shell) -> None:
+    imgui.get_io().delta_time = 1 / 60
+    imgui.new_frame()
+    shell.gui()
+    imgui.render()
+
+
+def test_the_game_autosaves_as_a_month_begins(context: None, tmp_path: Path) -> None:
+    app = made_app()
+    app.saves = Saves(tmp_path)
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+
+    frame(app)
+    app.finish_autosave()
+
+    assert app.saves.load("autosave 1").clock.date == app.clock.date
+    assert app.notice == "Autosaved"
+
+
+def test_no_autosave_is_written_while_the_month_goes_on(context: None, tmp_path: Path) -> None:
+    app = made_app()
+    app.saves = Saves(tmp_path)
+
+    frame(app)
+    app.finish_autosave()
+
+    assert app.saves.listing() == []
+
+
+def test_the_saves_window_draws_both_tabs(context: None, tmp_path: Path) -> None:
+    app = made_app()
+    app.saves = Saves(tmp_path)
+    app.saves.save("Earlier", app.saved())
+    app.saves_window.show(app.saves)
+
+    for _ in range(3):
+        frame(app)
+
+    assert app.saves_window.open
+    assert [info.name for info in app.saves_window.listing] == ["Earlier"]
+
+
+@pytest.mark.parametrize("page", ["main", "new", "load"])
+def test_every_page_of_the_main_menu_draws(context: None, tmp_path: Path, page: Page) -> None:
+    saves = Saves(tmp_path)
+    saves.save("Earlier", made_app().saved())
+    shell = Shell(saves)
+    shell.menu.go_to(page)
+
+    for _ in range(3):
+        shell_frame(shell)
+
+    assert shell.app is None
+    assert shell.menu.page == page
+
+
+def test_a_game_loaded_from_the_menu_comes_back_as_it_was_saved(
+    context: None, tmp_path: Path
+) -> None:
+    saves = Saves(tmp_path)
+    app = made_app()
+    app.view.camera.zoom_level = 2
+    saves.save("Earlier", app.saved())
+    shell = Shell(saves)
+
+    shell.load("Earlier")
+    assert shell._task is not None
+    shell._task.result()
+    shell_frame(shell)
+
+    assert shell.app is not None
+    loaded = shell.app
+    assert loaded.game.finances.cash == app.game.finances.cash
+    assert loaded.game.railway.stations() == app.game.railway.stations()
+    assert loaded.clock == app.clock
+    assert loaded.view.camera.zoom_level == 2
+    assert loaded.saves is saves
+
+
+def test_a_save_that_fails_to_load_stays_in_the_menu_with_why(
+    context: None, tmp_path: Path
+) -> None:
+    shell = Shell(Saves(tmp_path))
+
+    shell.load("Nothing")
+    assert shell._task is not None
+    shell._task.exception()
+    shell_frame(shell)
+
+    assert shell.app is None
+    assert "no save called 'Nothing'" in shell.menu.error
+
+
+def test_leaving_a_game_goes_back_to_the_main_menu(context: None, tmp_path: Path) -> None:
+    shell = Shell(Saves(tmp_path))
+    shell.app = made_app()
+    shell.app.saves = shell.saves
+    shell.app.menu_wanted = True
+
+    shell_frame(shell)
+    shell_frame(shell)
+
+    assert shell.app is None
+    assert shell.menu.page == "main"
+
+
+def full_screen_frame(shell: Shell, click: tuple[float, float] | None = None) -> None:
+    io = imgui.get_io()
+    io.delta_time = 1 / 60
+    if click is not None:
+        io.add_mouse_pos_event(*click)
+        io.add_mouse_button_event(0, True)
+    imgui.new_frame()
+    imgui.set_next_window_pos((0, 0))
+    imgui.set_next_window_size((1280, 800))
+    imgui.begin("Railroads", None, imgui.WindowFlags_.no_decoration.value)
+    shell.gui()
+    imgui.end()
+    imgui.render()
+    if click is not None:
+        io.add_mouse_button_event(0, False)
+
+
+def test_the_main_menu_answers_clicks_after_leaving_a_game(context: None, tmp_path: Path) -> None:
+    shell = Shell(Saves(tmp_path))
+    full_screen_frame(shell)
+    shell.app = made_app()
+    shell.app.saves = shell.saves
+    for _ in range(3):
+        full_screen_frame(shell, click=(640.0, 400.0))
+    shell.app.menu_wanted = True
+    full_screen_frame(shell)
+
+    for y in range(0, 800, 8):
+        full_screen_frame(shell, click=(640.0, float(y)))
+        full_screen_frame(shell)
+        if shell.menu.page != "main":
+            break
+
+    assert shell.app is None
+    assert shell.menu.page == "new"

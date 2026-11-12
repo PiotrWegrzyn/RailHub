@@ -3,10 +3,10 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from builders import flat_map
+from builders import flat_map, layer
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Trade
-from railroads.sim.grids import HexGrid
+from railroads.sim.grids import Cell, HexGrid
 from railroads.sim.growth import SERVED_POINT_WORTH, Growth, _allowed
 from railroads.sim.ladders import (
     FACTORIES,
@@ -455,6 +455,44 @@ def test_a_long_run_keeps_its_counts_and_chances_in_step_with_what_is_built() ->
         np.testing.assert_array_equal(growth.count(kind), fresh.count(kind))
     for ladder in busy:
         np.testing.assert_allclose(growth.chances(ladder), fresh.chances(ladder), atol=1e-12)
+
+
+def changes_between(
+    before: dict[BuildingKind, np.ndarray], growth: Growth
+) -> dict[tuple[Cell, BuildingKind], int]:
+    return {
+        ((row, col), kind): int(count[row, col] - before[kind][row, col])
+        for kind, count in growth.counts.items()
+        for row, col in np.argwhere(count != before[kind]).tolist()
+    }
+
+
+def test_the_log_holds_every_change_months_make_to_the_counts() -> None:
+    vegetation = layer(20, 20, Vegetation.GRASS)
+    vegetation[:, 15:] = Vegetation.FOREST
+    constructions = Constructions(flat_map(20, 20, vegetation=vegetation))
+    for row in range(6, 13):
+        for col in range(6, 13):
+            build(constructions, (row, col), BuildingKind.HOUSE, 3)
+    for cell in ((5, 9), (13, 9)):
+        build(constructions, cell, BuildingKind.FARM, 1)
+    for cell in ((3, 16), (15, 17)):
+        build(constructions, cell, BuildingKind.LUMBER_MILL, 1)
+    busy = tuple(replace(ladder, base_chance=ladder.base_chance + 0.002) for ladder in LADDERS)
+    growth = Growth(constructions, GrowthRule(ladders=busy))
+    rng = np.random.default_rng(2)
+    logged, counted = [], []
+
+    for _ in range(120):
+        before = {kind: count.copy() for kind, count in growth.counts.items()}
+        with growth.log_changes() as changes:
+            growth.month(rng)
+        logged.append({change: n for change, n in changes.items() if n})
+        counted.append(changes_between(before, growth))
+
+    assert logged == counted
+    assert any(n > 0 for month in logged for n in month.values())
+    assert any(n < 0 for month in logged for n in month.values())
 
 
 def test_growth_with_the_same_seed_builds_the_same_map() -> None:

@@ -8,7 +8,7 @@ from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.routes import build_station
-from railroads.sim.summaries import Reach, snapshot, summarize
+from railroads.sim.summaries import Reach, summarize
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 
 
@@ -37,12 +37,12 @@ def put_up(growth: Growth, cell: tuple[int, int], kind: BuildingKind) -> None:
 def test_a_summary_lists_what_was_built_within_reach_of_a_station_and_where() -> None:
     growth = make_growth()
     reach = Reach(growth.constructions.tile_map.grid).of([(10, 10)], lambda _: COLLECTION_RADIUS)
-    before = snapshot(growth, reach)
-    put_up(growth, (10, 12), BuildingKind.HOUSE)
-    put_up(growth, (10, 12), BuildingKind.HOUSE)
-    put_up(growth, (10, 25), BuildingKind.FARM)
+    with growth.log_changes() as changes:
+        put_up(growth, (10, 12), BuildingKind.HOUSE)
+        put_up(growth, (10, 12), BuildingKind.HOUSE)
+        put_up(growth, (10, 25), BuildingKind.FARM)
 
-    summary = summarize("March 1850", growth, reach, before)
+    summary = summarize("March 1850", growth.rule.points, reach, changes)
 
     assert summary is not None
     assert summary.date == "March 1850"
@@ -57,12 +57,12 @@ def test_buildings_pulled_down_count_against_their_kind() -> None:
     growth = make_growth()
     put_up(growth, (11, 10), BuildingKind.HOUSE)
     reach = Reach(growth.constructions.tile_map.grid).of([(10, 10)], lambda _: COLLECTION_RADIUS)
-    before = snapshot(growth, reach)
-    growth.constructions.remove(Building((11, 10), BuildingKind.HOUSE))
-    growth.add((11, 10), BuildingKind.HOUSE, -1)
-    put_up(growth, (11, 10), BuildingKind.TENEMENT)
+    with growth.log_changes() as changes:
+        growth.constructions.remove(Building((11, 10), BuildingKind.HOUSE))
+        growth.add((11, 10), BuildingKind.HOUSE, -1)
+        put_up(growth, (11, 10), BuildingKind.TENEMENT)
 
-    summary = summarize("April 1850", growth, reach, before)
+    summary = summarize("April 1850", growth.rule.points, reach, changes)
 
     assert summary is not None
     assert summary.stations[0].changes == {BuildingKind.HOUSE: -1, BuildingKind.TENEMENT: 1}
@@ -72,10 +72,36 @@ def test_buildings_pulled_down_count_against_their_kind() -> None:
 def test_a_month_with_nothing_changed_near_a_station_has_no_summary() -> None:
     growth = make_growth()
     reach = Reach(growth.constructions.tile_map.grid).of([(10, 10)], lambda _: COLLECTION_RADIUS)
-    before = snapshot(growth, reach)
-    put_up(growth, (2, 28), BuildingKind.HOUSE)
+    with growth.log_changes() as changes:
+        put_up(growth, (2, 28), BuildingKind.HOUSE)
 
-    summary = summarize("May 1850", growth, reach, before)
+    summary = summarize("May 1850", growth.rule.points, reach, changes)
+
+    assert summary is None
+
+
+def test_cells_are_listed_nearest_the_station_first_and_kinds_in_the_rules_order() -> None:
+    growth = make_growth()
+    reach = Reach(growth.constructions.tile_map.grid).of([(10, 10)], lambda _: COLLECTION_RADIUS)
+    with growth.log_changes() as changes:
+        put_up(growth, (10, 13), BuildingKind.TENEMENT)
+        put_up(growth, (11, 10), BuildingKind.HOUSE)
+
+    summary = summarize("June 1850", growth.rule.points, reach, changes)
+
+    assert summary is not None
+    assert summary.stations[0].cells == ((11, 10), (10, 13))
+    assert list(summary.stations[0].changes) == [BuildingKind.HOUSE, BuildingKind.TENEMENT]
+
+
+def test_a_building_put_up_and_pulled_down_in_one_month_is_no_change() -> None:
+    growth = make_growth()
+    reach = Reach(growth.constructions.tile_map.grid).of([(10, 10)], lambda _: COLLECTION_RADIUS)
+    with growth.log_changes() as changes:
+        put_up(growth, (10, 12), BuildingKind.HOUSE)
+        growth.take_down(Building((10, 12), BuildingKind.HOUSE))
+
+    summary = summarize("July 1850", growth.rule.points, reach, changes)
 
     assert summary is None
 

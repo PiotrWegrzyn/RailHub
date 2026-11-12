@@ -1,21 +1,20 @@
 """What a station holds: goods trains brought, waiting to be handed out, and its stockpile of spare
-goods from around it and passengers and mail waiting for trains. The stockpile holds STOCKPILE
-freight and WAITING passengers and mail, and each storage upgrade adds STORAGE_STEP to both."""
+goods from around it and passengers and mail waiting for trains. The station holds up to STOCKPILE
+of each kind of freight, gathered and brought together, so one good piling up leaves the others
+their room, and WAITING passengers and mail. Each storage upgrade adds STORAGE_STEP to every kind of
+freight and WAITING_STEP to the passengers and mail."""
 
 from dataclasses import dataclass, field
 
 from railroads.sim.goods import TRAVELLERS, Good
 from railroads.sim.trains import Parcels, take_parcels
 
-# Most freight a station's stockpile holds, of all kinds together, and most passengers, and mail,
-# waiting there.
-STOCKPILE = 1000.0
-
-
+# Most of each kind of freight a station holds, and most passengers, and mail, waiting there.
+STOCKPILE = 500.0
 WAITING = 100.0
-
-
-STORAGE_STEP = 500
+# What each storage upgrade adds to them.
+STORAGE_STEP = 250
+WAITING_STEP = 500
 
 
 @dataclass
@@ -35,24 +34,31 @@ class StationGoods:
 
     @property
     def limit(self) -> float:
-        """The most freight the stockpile holds."""
+        """The most of each kind of freight the station holds."""
         return STOCKPILE + STORAGE_STEP * self.storage + self.extra_room
 
     @property
     def waiting_limit(self) -> float:
         """The most passengers, and the most mail, that wait here."""
-        return WAITING + STORAGE_STEP * self.storage + self.extra_waiting
+        return WAITING + WAITING_STEP * self.storage + self.extra_waiting
+
+    def held(self, good: Good) -> float:
+        """How much of a good the station holds, gathered and brought together."""
+        return self.stockpile.get(good, 0.0) + self.brought.get(good, 0.0)
+
+    def room(self, good: Good) -> float:
+        """How much more of a kind of freight the station can take."""
+        return max(0.0, self.limit - self.held(good))
 
     @property
-    def room(self) -> float:
-        return max(0.0, self.limit - self.stocked)
-
-    @property
-    def stocked(self) -> float:
-        """How much freight the station holds, gathered and brought together; passengers and
-        mail wait apart."""
-        held = [*self.stockpile.items(), *self.brought.items()]
-        return sum(amount for good, amount in held if good not in TRAVELLERS)
+    def fullest(self) -> tuple[Good | None, float]:
+        """The kind of freight the station holds most of, and how much; passengers and mail
+        wait apart."""
+        freight = {*self.stockpile, *self.brought} - set(TRAVELLERS)
+        if not freight:
+            return None, 0.0
+        good = max(freight, key=lambda g: (self.held(g), g.value))
+        return good, self.held(good)
 
     def bring(self, good: Good, parcels: Parcels) -> None:
         """Takes in cargo a train unloaded."""

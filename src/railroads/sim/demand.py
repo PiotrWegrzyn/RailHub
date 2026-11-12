@@ -45,13 +45,12 @@ class StationDemand:
 
     def record(self, need: Need) -> DemandRecord:
         capacity = self.capacity.get(need, 0.0)
-        used = sum(self.used.get(need, ())) / MONTHS_REMEMBERED
-        return DemandRecord(capacity, max(0.0, capacity - used))
+        return DemandRecord(capacity, self._left(need, capacity))
 
     def best_need(self, good: Good) -> Need | None:
         """Of the needs here a good meets, the one with the most demand left."""
         fits = [need for need in self.capacity if good in FITS[need] and self.capacity[need] > 0]
-        return max(fits, key=lambda need: self.record(need).share, default=None)
+        return max(fits, key=self._share, default=None)
 
     def monthly_want(self, good: Good) -> float:
         """How much of a good the buildings around could use in a month."""
@@ -72,14 +71,24 @@ class StationDemand:
             left -= unit
         return earned
 
+    def worth(self, cargo: list[tuple[Good, float]]) -> list[float]:
+        """What each load of cargo would earn if it were delivered here now, one after another,
+        each unit at the share of demand left of the need it meets best, leaving this demand
+        as it is."""
+        trial = StationDemand(
+            dict(self.capacity), {need: list(months) for need, months in self.used.items()}
+        )
+        return [trial.deliver(good, amount) for good, amount in cargo]
+
     def pay(self, need: Need, good: Good, amount: float, rate: float = 1.0) -> float:
         """What buildings taking this much of a good for a need earn, unit by unit, each at the
         share of demand left as it is taken, and at `rate` of the full price."""
+        price = price_of(good)
         earned = 0.0
         left = amount
         while left > 1e-9:
             unit = min(1.0, left)
-            earned += price_of(good) * unit * self.record(need).share * rate
+            earned += price * unit * self._share(need) * rate
             self._use(need, unit)
             left -= unit
         return earned
@@ -93,6 +102,16 @@ class StationDemand:
             months = self.used.setdefault(need, [])
             months.append(0.0)
             del months[:-MONTHS_REMEMBERED]
+
+    def _left(self, need: Need, capacity: float) -> float:
+        """What is left of a need's capacity after what was used up of it in the last months."""
+        used = sum(self.used.get(need, ())) / MONTHS_REMEMBERED
+        return max(0.0, capacity - used)
+
+    def _share(self, need: Need) -> float:
+        """The share of a need's demand left, as its record has it, without making the record."""
+        capacity = self.capacity.get(need, 0.0)
+        return self._left(need, capacity) / capacity if capacity > 0 else 0.0
 
     def _use(self, need: Need, amount: float) -> None:
         months = self.used.setdefault(need, [0.0])

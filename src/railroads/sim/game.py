@@ -23,7 +23,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
 from railroads.sim.stats import History
-from railroads.sim.summaries import MonthSummary, Reach, snapshot, summarize
+from railroads.sim.summaries import MonthSummary, Reach, summarize
 from railroads.sim.tilemap import TileMap
 
 
@@ -80,12 +80,12 @@ class Game:
         changed within reach of the stations."""
         railway = self.railway
         reach = self._reach.of(railway.stations(), lambda s: railway.reach(s)[1])
-        before = snapshot(self.growth, reach)
-        if self.stand_in is None:
-            changed = self.growth.month(rng)
-        else:
-            changed = self.stand_in.month(rng)
-        return Month(changed, summarize(date, self.growth, reach, before))
+        with self.growth.log_changes() as changes:
+            if self.stand_in is None:
+                changed = self.growth.month(rng)
+            else:
+                changed = self.stand_in.month(rng)
+        return Month(changed, summarize(date, self.growth.rule.points, reach, changes))
 
     def simulate(self, years: int, rng: np.random.Generator) -> None:
         """Lets a stand-in player build stations and serve the towns for `years`, printing the

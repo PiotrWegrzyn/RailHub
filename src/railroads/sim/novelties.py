@@ -159,22 +159,24 @@ def place_spa(growth: Growth, kind: BuildingKind, rng: np.random.Generator) -> C
     return _pick(growth, kind, (hills & _spread(tile_map, water, 1)).ravel().astype(float), rng)
 
 
-def _by_town(least: int) -> Placer:
-    def place(growth: Growth, kind: BuildingKind, rng: np.random.Generator) -> Cell | None:
-        town = _town(growth, least)
-        return None if town is None else _nearest_free(growth, kind, town)
+@dataclass(frozen=True)
+class ByTown:
+    """As near as it can to the biggest town, once it has `least` people around."""
 
-    place.__doc__ = f"As near as it can to the biggest town, once it has {least} people around."
-    return place
+    least: int
+
+    def __call__(self, growth: Growth, kind: BuildingKind, rng: np.random.Generator) -> Cell | None:
+        town = _town(growth, self.least)
+        return None if town is None else _nearest_free(growth, kind, town)
 
 
 NOVELTIES = (
     Novelty(BuildingKind.ROYAL_PALACE, 1850, place_royal_palace),
     Novelty(BuildingKind.SALT_CATHEDRAL, 1850, place_salt_cathedral),
     Novelty(BuildingKind.SPA_RESORT, 1850, place_spa),
-    Novelty(BuildingKind.WORLDS_FAIR, 1880, _by_town(FAIR_TOWN), until_year=1940),
-    Novelty(BuildingKind.FILM_STUDIO, 1920, _by_town(FILM_TOWN)),
-    Novelty(BuildingKind.AMUSEMENT_PARK, 1950, _by_town(FAIR_TOWN)),
+    Novelty(BuildingKind.WORLDS_FAIR, 1880, ByTown(FAIR_TOWN), until_year=1940),
+    Novelty(BuildingKind.FILM_STUDIO, 1920, ByTown(FILM_TOWN)),
+    Novelty(BuildingKind.AMUSEMENT_PARK, 1950, ByTown(FAIR_TOWN)),
     Novelty(BuildingKind.SPACE_CENTER, 1960, place_space_center),
     Novelty(BuildingKind.PEAR_HQ, 1980, place_pear_hq),
 )

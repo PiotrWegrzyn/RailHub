@@ -7,6 +7,8 @@ import heapq
 import itertools
 import math
 
+import numpy as np
+
 from railroads.sim.constructions import Constructions, Station, Track
 from railroads.sim.grids import Cell
 from railroads.sim.track_rules import track_rules_for
@@ -14,6 +16,9 @@ from railroads.sim.trains import Point, Train
 
 
 class TrackNetwork:
+    # The cell under each point on the map asked about, kept as they never change.
+    _cells: dict[Point, Cell] | None = None
+
     def __init__(self, constructions: Constructions) -> None:
         self.constructions = constructions
         self._connected: tuple[int, set[Cell]] | None = None
@@ -152,6 +157,48 @@ class TrackNetwork:
                 return speed
             left -= length
         return 1.0
+
+    def cell_at(self, point: Point) -> Cell:
+        """The cell a point on the map lies in."""
+        if self._cells is None:
+            self._cells = {}
+        cell = self._cells.get(point)
+        if cell is None:
+            grid = self.constructions.tile_map.grid
+            row, col = grid.cell_at(np.array(point[0]), np.array(point[1]))
+            cell = self._cells[point] = (int(row), int(col))
+        return cell
+
+    @staticmethod
+    def body(train: Train, step: float) -> list[tuple[Point, Point, Point]]:
+        """Points along the running train from its front back to its tail, `step` cells
+        apart, leaving out what is still inside the station it left: each point, which way the
+        train faces there, and the middle of the stretch of track it is on."""
+        front = train.along
+        tail = max(0.0, front - train.length)
+        if len(train.path) < 2 or front <= 0:
+            return []
+        count = int((front - tail) / step) + 1
+        wanted = [front - step * k for k in range(count)]
+        wanted.reverse()
+        found: list[tuple[Point, Point, Point]] = []
+        start = 0.0
+        index = 0
+        last = len(train.path) - 2
+        for number, (a, b) in enumerate(itertools.pairwise(train.path)):
+            length = math.dist(a, b)
+            end = start + length
+            while index < len(wanted) and (wanted[index] <= end or number == last):
+                share = min(1.0, (wanted[index] - start) / length) if length else 0.0
+                at = (a[0] + (b[0] - a[0]) * share, a[1] + (b[1] - a[1]) * share)
+                middle = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+                found.append((at, (b[0] - a[0], b[1] - a[1]), middle))
+                index += 1
+            if index >= len(wanted):
+                break
+            start = end
+        found.reverse()
+        return found
 
     @staticmethod
     def length(path: list[Point]) -> float:

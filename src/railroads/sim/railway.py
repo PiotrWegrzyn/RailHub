@@ -9,13 +9,20 @@ for. Freight remembers where it came from: it earns money only when buildings at
 take it, and back at its own station it just returns to the stockpile. Stations deal with the buildings around them once a month, when goods
 are shared out (railroads.sim.economy): they hand what trains brought to buildings within
 DELIVERY_RADIUS cells, and take every spare good made within COLLECTION_RADIUS cells into their
-stockpile, up to STOCKPILE goods in all. Each level a station is raised to widens both by a cell,
-and each storage upgrade adds STORAGE_STEP to its stockpile and to its waiting passengers and
-mail.
+stockpile, up to STOCKPILE of each good. Each level a station is raised to widens both by a cell,
+and each storage upgrade adds STORAGE_STEP of each good to its stockpile and WAITING_STEP to its
+waiting passengers and mail.
 
 Cargo earns money by the demand around the station that hands it out (railroads.sim.demand). Trains
 cost TRAIN_PRICE, every car CAR_TRIP_PRICE each time a train leaves a stop with it, and every
 month stations and track cost their upkeep (railroads.sim.finance).
+
+Trains set off from a stand and pick up speed over their engine's pickup time. Trains that meet
+on the line, ahead of or against each other or where lines cross, can't run through each other
+for free: one of them stops and lets the other by, then sets off again from a stand. The train
+that has stood longest letting others by since it left its last stop goes first, so none waits for
+ever; then the better engine, then the train bought first. Within stations, and on double track
+for trains going opposite ways, trains pass each other without stopping.
 
 The engines, cars, stops and trains are in railroads.sim.trains, what stations hold in
 railroads.sim.station_goods, the way along the track in railroads.sim.track_network, and what a
@@ -25,10 +32,12 @@ train does calling at a station in railroads.sim.calls; Railway owns them all an
 import itertools
 from collections.abc import Mapping
 
+import numpy as np
+
 from railroads.places import StationNames
 from railroads.sim.calls import StationCalls
-from railroads.sim.clock import START_YEAR
-from railroads.sim.constructions import Constructions
+from railroads.sim.clock import SECONDS_PER_MONTH, START_YEAR
+from railroads.sim.constructions import Constructions, Track, TrackWidth
 from railroads.sim.demand import PASSED_ALONG_PAY, StationDemand
 from railroads.sim.economy import COLLECTION_RADIUS, DELIVERY_RADIUS
 from railroads.sim.finance import (
@@ -51,6 +60,9 @@ from railroads.sim.trains import CAR_CAPACITY, ENGINES, FIRST_ENGINE, Point, Tra
 TRAIN_COST_NAME = "Steam engine"
 # How far a train runs in a month, in cells, on flat ground.
 CELLS_PER_MONTH = 60.0
+# Trains meet where points along them, MEET_STEP cells apart, come within MEET_DISTANCE cells.
+MEET_STEP = 0.2
+MEET_DISTANCE = 0.2
 MAX_LEVEL = 1 + len(LEVEL_PRICES)
 # Upkeep never falls below this share of its full cost, however much tech cuts it.
 LEAST_UPKEEP = 0.5
@@ -76,7 +88,7 @@ class Railway:
         self.demand: dict[Cell, StationDemand] = {}
         self.levels: dict[Cell, int] = {}
         self.year = START_YEAR
-        self._names = itertools.count(1)
+        self._bought = 0
         # What the player has learned (railroads.sim.tech).
         self.research = Research()
         # What each year ended with and the cars delivered in it (railroads.sim.stats).
@@ -103,7 +115,8 @@ class Railway:
         if not self.finances.can_afford(price):
             return None
         self.finances.spend(price, "trains")
-        train = Train(f"{TRAIN_COST_NAME} {next(self._names)}", engine=engine)
+        self._bought += 1
+        train = Train(f"{TRAIN_COST_NAME} {self._bought}", engine=engine)
         self.trains.append(train)
         return train
 
@@ -159,6 +172,27 @@ class Railway:
         """How much more a good earns with the player's tech."""
         return 1.0 + self.research.bonus(Effect.PRICE, GOOD_TREES[good])
 
+    def destination(self, train: Train) -> Cell | None:
+        """The stop the cars a train pulls now are taken to: the one it is heading for, or the
+        next one from the stop it stands at."""
+        if len(train.stops) < 2:
+            return None
+        return train.stops[train.heading % len(train.stops)].cell
+
+    def cargo_worth(self, train: Train) -> list[float]:
+        """What each of a train's cars would earn if it were unloaded at its destination now,
+        at the demand left there and the player's tech; cargo that came from there earns
+        nothing, as it only goes back to that station's stockpile."""
+        destination = self.destination(train)
+        if destination is None:
+            return [0.0 for _ in train.cars]
+        cargo = [(car.good, car.load - car.origins.get(destination, 0.0)) for car in train.cars]
+        earned = self.station_demand(destination).worth(cargo)
+        return [
+            amount * self.price_factor(car.good)
+            for amount, car in zip(earned, train.cars, strict=True)
+        ]
+
     def pay_for(self, station: Cell, need: Need, good: Good, amount: float) -> None:
         """Pays for cargo trains brought that the buildings around a station took."""
         earned = self.station_demand(station).pay(need, good, amount) * self.price_factor(good)
@@ -200,7 +234,8 @@ class Railway:
         return True
 
     def add_storage(self, station: Cell) -> bool:
-        """Adds STORAGE_STEP to the station's stockpile and waiting room, if there is the cash."""
+        """Adds STORAGE_STEP of each good to the station's stockpile and WAITING_STEP to its waiting
+        room, if there is the cash."""
         if not self.finances.can_afford(STORAGE_PRICE):
             return False
         self.finances.spend(STORAGE_PRICE, "station upgrades")
@@ -222,9 +257,10 @@ class Railway:
         self.finances.spend(track_upkeep(track) * upkeep, "track upkeep")
 
     def run(self, months: float) -> None:
-        """Moves every train on by this many months."""
+        """Moves every train on by this many months, then has trains that met give way."""
         for train in self.trains:
             self._run(train, months)
+        self._meet()
 
     def route(
         self, start: Cell, end: Cell, electric: bool = False
@@ -263,17 +299,120 @@ class Railway:
                 return
             train.path, train.speeds = way
             train.along = 0.0
+            train.pace = 0.0
             train.status = "Running"
             if train.cars:
                 trips = CAR_TRIP_PRICE * len(train.cars) * self._upkeep()
                 self.finances.spend(trips, "car trips")
-        speed = ENGINES[train.engine].speed * (1.0 + self.research.bonus(Effect.SPEED))
+        if train.giving_way:
+            train.status = f"Giving way to {train.giving_way}"
+            train.waited += months
+            return
+        engine = ENGINES[train.engine]
+        pace = train.speed_up(months, engine.pickup / SECONDS_PER_MONTH)
+        speed = engine.speed * (1.0 + self.research.bonus(Effect.SPEED)) * pace
         train.along += months * CELLS_PER_MONTH * self.network.speed_at(train) * train.pull * speed
+        train.status = "Running"
         if train.along >= self.network.length(train.path):
             self.calls.arrive(train, train.stops[train.heading % len(train.stops)])
             train.arrivals += 1
             train.heading = (train.heading + 1) % len(train.stops)
             train.path = []
+            train.pace = 0.0
+            train.waited = 0.0
+
+    def _meet(self) -> None:
+        """Has trains that met give way: of each two running into each other, the one that
+        doesn't go first stops where it is; a train that stopped sets off again once nothing
+        with the right of way is in its way any more."""
+        for train in self.trains:
+            if len(train.path) < 2:
+                train.giving_way = ""
+        running = [train for train in self.trains if len(train.path) >= 2]
+        if not running:
+            return
+        rank = {id(train): self._right_of_way(train) for train in running}
+        running.sort(key=lambda train: rank[id(train)])
+        bodies = [self.network.body(train, MEET_STEP) for train in running]
+        met = self._met(bodies)
+        for i, train in enumerate(running):
+            if train.giving_way:
+                continue
+            for j in met[i]:
+                other = running[j]
+                if j > i and not other.giving_way:
+                    other.giving_way = train.name
+                    other.pace = 0.0
+        for i, train in enumerate(running):
+            if not train.giving_way:
+                continue
+            ahead = [running[j] for j in met[i] if j < i or not running[j].giving_way]
+            train.giving_way = ahead[0].name if ahead else ""
+
+    def _met(self, bodies: list[list[tuple[Point, Point, Point]]]) -> list[list[int]]:
+        """For each running train, as points along it (TrackNetwork.body), the others it has
+        met somewhere they can't pass each other."""
+        met: list[list[int]] = [[] for _ in bodies]
+        boxes = []
+        for body in bodies:
+            xs = [at[0] for at, _, _ in body]
+            ys = [at[1] for at, _, _ in body]
+            boxes.append((min(xs), min(ys), max(xs), max(ys)) if body else None)
+        reach = MEET_DISTANCE
+        for i, j in itertools.combinations(range(len(bodies)), 2):
+            one, other = boxes[i], boxes[j]
+            if one is None or other is None:
+                continue
+            if (
+                one[0] - reach > other[2]
+                or other[0] - reach > one[2]
+                or one[1] - reach > other[3]
+                or other[1] - reach > one[3]
+            ):
+                continue
+            if self._in_the_way(bodies[i], bodies[j]):
+                met[i].append(j)
+                met[j].append(i)
+        return met
+
+    def _right_of_way(self, train: Train) -> tuple[float, float, int]:
+        """What decides which of two trains that meet goes first, the smaller first: having
+        stood longest letting others by on the way, then the better engine, then being bought
+        first."""
+        return -train.waited, -ENGINES[train.engine].speed, self.trains.index(train)
+
+    def _in_the_way(
+        self,
+        one: list[tuple[Point, Point, Point]],
+        other: list[tuple[Point, Point, Point]],
+    ) -> bool:
+        """Whether two running trains, as points along them (TrackNetwork.body), have met
+        somewhere they can't pass each other."""
+        a = np.array([at for at, _, _ in one])
+        b = np.array([at for at, _, _ in other])
+        close = np.argwhere(
+            np.hypot(*(a[:, None, :] - b[None, :, :]).transpose(2, 0, 1)) < MEET_DISTANCE
+        )
+        return any(not self._can_pass(one[i], other[j]) for i, j in close.tolist())
+
+    def _can_pass(self, one: tuple[Point, Point, Point], other: tuple[Point, Point, Point]) -> bool:
+        """Whether two trains can pass each other here: within a station, or on double track
+        going opposite ways."""
+        (_, way, middle), (_, other_way, other_middle) = one, other
+        cells = [self._cell_at(middle), self._cell_at(other_middle)]
+        if all(self.constructions.station_at(cell) is not None for cell in cells):
+            return True
+        opposite = way[0] * other_way[0] + way[1] * other_way[1] < 0
+        return opposite and all(
+            any(
+                isinstance(piece, Track) and piece.width == TrackWidth.DOUBLE
+                for piece in self.constructions.at(cell)
+            )
+            for cell in cells
+        )
+
+    def _cell_at(self, point: Point) -> Cell:
+        return self.network.cell_at(point)
 
     def position(self, train: Train, back: float = 0.0) -> tuple[Point, Point] | None:
         """Where the train is on the map, and which way it faces (TrackNetwork.position)."""

@@ -3,11 +3,15 @@
 Cells are addressed as (row, col) with row 0 along the north edge, and every property of a map is
 a numpy array of shape (rows, cols). Positions on the map are measured in cell units: centres of
 neighbouring cells are one unit apart, so units times km_per_cell gives kilometres.
+
+The cells within some steps of a cell are also kept as flat indices once worked out (flat_within):
+a grid never changes, and every month the simulation asks again for the cells around each station.
 """
 
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import ClassVar, Literal, Self
 
 import numpy as np
@@ -305,3 +309,29 @@ class HexGrid(Grid):
 
 
 GRIDS: dict[GridKind, type[Grid]] = {"square": SquareGrid, "hex": HexGrid}
+
+# How many cells' surroundings flat_within keeps: far more than a big railway's stations at
+# every reach they have.
+WITHIN_KEPT = 1024
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class Within:
+    """The cells at most some steps from one cell, as flat indices in the order Grid.within finds
+    them, nearest first, and how many steps away each is."""
+
+    cells: npt.NDArray[np.intp]
+    steps: FloatArray
+
+
+@lru_cache(maxsize=WITHIN_KEPT)
+def flat_within(grid: Grid, cell: Cell, steps: int) -> Within:
+    """Grid.within as flat indices, worked out once for each grid, cell and number of steps. Its
+    arrays can't be written to, so no caller can spoil what is kept."""
+    reached = grid.within(cell, steps)
+    rows, cols = zip(*reached, strict=True)
+    cells = np.ravel_multi_index((rows, cols), grid.shape)
+    away = np.array(list(reached.values()), dtype=np.float64)
+    cells.setflags(write=False)
+    away.setflags(write=False)
+    return Within(cells, away)

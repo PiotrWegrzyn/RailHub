@@ -3,6 +3,11 @@
 
 Trains are drawn at DETAIL pixels for every map art pixel, so they keep their windows, wheels and
 trim even though a car is less than a cell long.
+
+All the looks go on one sheet. models.draw_model works out a picture one face at a time, which is
+slow for thousands of pictures, so the sheet does its maths over all of a model's faces at once
+instead: the same sums in the same order, so the pictures come out the same to the pixel, and a
+change to draw_model's maths needs the same change here.
 """
 
 import math
@@ -10,14 +15,28 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
+from typing import Self
 
 import numpy as np
 import numpy.typing as npt
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from railroads.sim.goods import Good
+from railroads.ui.iso_camera import TILT
 from railroads.ui.pixel.art import Sprite
-from railroads.ui.pixel.models import CYLINDER_SIDES, RGB, Face, Model, draw_model, shade
+from railroads.ui.pixel.models import (
+    CYLINDER_SIDES,
+    HEIGHT_PER_WIDTH,
+    RGB,
+    SHADES,
+    Face,
+    Model,
+    _outline,
+    shade,
+)
+from railroads.ui.pixel.projection import FloatArray, IntArray
+
+type Points = tuple[FloatArray, FloatArray, FloatArray]
 
 HEADINGS = 24
 DETAIL = 2
@@ -572,10 +591,133 @@ MODELS: dict[object, Callable[[], Model]] = {
 }
 
 
-def render(model: Model, heading: float, matrix: npt.NDArray[np.float64]) -> Sprite:
-    """The model seen running `heading` radians round from the map's x axis, with the map's
-    plane-to-art-pixel matrix, at DETAIL pixels per art pixel and SCALE times its size."""
-    return Sprite(*draw_model(model, heading, matrix, DETAIL * SCALE))
+@dataclass(frozen=True)
+class _Sight:
+    """How models.draw_model sees models on one map projection, worked out the way it does: the
+    plane-to-picture matrix, how many picture pixels tall a cell of height is, the ways to the
+    viewer and to the light, and the empty margins it leaves round a model."""
+
+    scale: FloatArray
+    up: float
+    view: FloatArray
+    light: FloatArray
+    pad: int
+    edge: int
+
+    @classmethod
+    def of(cls, matrix: FloatArray, pixels: float) -> Self:
+        scale = matrix * pixels
+        towards = np.linalg.solve(matrix, np.array([0.0, 1.0]))
+        towards = towards / np.hypot(*towards)
+        light_plane = np.linalg.solve(matrix, np.array([-1.0, -1.0]))
+        light_plane = light_plane / np.hypot(*light_plane)
+        pad = max(2, round(2 * pixels))
+        return cls(
+            scale=scale,
+            up=float(np.hypot(*scale[:, 0])) * HEIGHT_PER_WIDTH,
+            view=np.array([towards[0] * TILT, towards[1] * TILT, HEIGHT_PER_WIDTH]),
+            light=np.array([*light_plane * 0.6, 0.8]),
+            pad=pad,
+            edge=pad + max(1, round(pixels)),
+        )
+
+    def on_picture(self, points: Points) -> tuple[FloatArray, FloatArray]:
+        """Where turned points land in the picture, in pixels from the model's origin."""
+        x, y, z = points
+        (a, b), (c, d) = self.scale
+        return a * x + b * y, c * x + d * y - z * self.up
+
+    def frame(self, xs: FloatArray, ys: FloatArray) -> tuple[int, int, int, int]:
+        """Left, top, width and height of the picture round points, margins and all."""
+        left, top = math.floor(xs.min()) - self.pad, math.floor(ys.min()) - self.pad
+        width = math.ceil(xs.max()) - left + self.edge
+        height = math.ceil(ys.max()) - top + self.edge
+        return left, top, width, height
+
+
+@dataclass(frozen=True)
+class _Faces:
+    """A model's faces as arrays: their normals, the corners of all of them one face after
+    another, where each face's corners start and end, each face's colour in every shade, and the
+    faces grouped by how many corners they have."""
+
+    normals: FloatArray
+    corners: FloatArray
+    counts: IntArray
+    starts: list[int]
+    shades: list[list[RGB]]
+    groups: list[tuple[IntArray, IntArray]]
+
+    @classmethod
+    def of(cls, model: Model) -> Self:
+        faces = model.faces
+        counts = np.array([len(face.corners) for face in faces])
+        starts = np.concatenate([[0], np.cumsum(counts)])
+        groups = []
+        for k in np.unique(counts).tolist():
+            alike = np.flatnonzero(counts == k)
+            groups.append((alike, starts[alike, None] + np.arange(k)))
+        shaded = {
+            color: [shade(color, level) for level in SHADES]
+            for color in {face.color for face in faces}
+        }
+        return cls(
+            normals=np.array([face.normal for face in faces], dtype=np.float64),
+            corners=np.array([c for face in faces for c in face.corners], dtype=np.float64),
+            counts=counts,
+            starts=starts.tolist(),
+            shades=[shaded[face.color] for face in faces],
+            groups=groups,
+        )
+
+    def means(self, values: FloatArray) -> FloatArray:
+        """Each face's mean of values given at every corner, taken as np.mean takes one face's."""
+        means = np.empty(len(self.counts))
+        for faces, corners in self.groups:
+            means[faces] = values[corners].mean(axis=1)
+        return means
+
+
+def _pictures(model: Model, sight: _Sight) -> list[Sprite]:
+    """The model running each of the HEADINGS headings, drawn as models.draw_model draws it but
+    without the outline."""
+    faces = _Faces.of(model)
+    return [_picture(faces, sight, 2 * math.pi * index / HEADINGS) for index in range(HEADINGS)]
+
+
+def _picture(faces: _Faces, sight: _Sight, heading: float) -> Sprite:
+    """One heading of _pictures: every face turned, culled, shaded and placed at once, with the
+    same sums in the same order as draw_model works them out one face at a time."""
+    cos, sin = math.cos(heading), math.sin(heading)
+    normals, corners = _turned(faces.normals, cos, sin), _turned(faces.corners, cos, sin)
+    shown = _along(normals, sight.view) > 1e-6
+    lit = np.clip(_along(normals, sight.light), 0, 1)
+    levels = np.minimum(len(SHADES) - 1, (lit * len(SHADES)).astype(np.int64)).tolist()
+    depth = faces.means(_along(corners, sight.view))
+    order = np.flatnonzero(shown)[np.argsort(depth[shown], kind="stable")].tolist()
+    xs, ys = sight.on_picture(corners)
+    on = np.repeat(shown, faces.counts)
+    left, top, width, height = sight.frame(xs[on], ys[on])
+    image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    paint = ImageDraw.Draw(image)
+    px, py = (xs - left).tolist(), (ys - top).tolist()
+    for f in order:
+        span = slice(faces.starts[f], faces.starts[f + 1])
+        color = faces.shades[f][levels[f]]
+        paint.polygon(list(zip(px[span], py[span], strict=True)), fill=(*color, 255))
+    return Sprite(image, (-left, -top))
+
+
+def _turned(points: FloatArray, cos: float, sin: float) -> Points:
+    """Points given along a model, across it and up, turned round to the map's x and y and up."""
+    u, v, z = points.T
+    return u * cos - v * sin, u * sin + v * cos, z
+
+
+def _along(points: Points, way: FloatArray) -> FloatArray:
+    """How far each point lies along `way`, summed in the order numpy sums `point @ way`."""
+    x, y, z = points
+    return x * way[0] + y * way[1] + z * way[2]
 
 
 @dataclass(frozen=True)
@@ -594,12 +736,15 @@ class TrainSprites:
 @cache
 def train_sprites(matrix_key: tuple[float, float, float, float]) -> TrainSprites:
     """All the train looks for a map projection, given as its matrix's four numbers, packed
-    on a roughly square sheet so it stays within MAX_TEXTURE when blown up for the closest zoom."""
+    on a roughly square sheet so it stays within MAX_TEXTURE when blown up for the closest zoom.
+    The looks go on without their outline, which is drawn round the whole sheet at once: each
+    keeps an empty margin round its model, so every outline pixel lands where draw_model puts it."""
     matrix = np.array(matrix_key, dtype=np.float64).reshape(2, 2)
+    sight = _Sight.of(matrix, DETAIL * SCALE)
     sprites = {
-        (look, index): render(make(), 2 * math.pi * index / HEADINGS, matrix)
+        (look, index): sprite
         for look, make in MODELS.items()
-        for index in range(HEADINGS)
+        for index, sprite in enumerate(_pictures(make(), sight))
     }
     area = sum(sprite.image.size[0] * (sprite.image.size[1] + 1) for sprite in sprites.values())
     width = math.ceil(math.sqrt(area * 1.15) / 64) * 64
@@ -615,4 +760,5 @@ def train_sprites(matrix_key: tuple[float, float, float, float]) -> TrainSprites
     sheet = Image.new("RGBA", (width, y + row), (0, 0, 0, 0))
     for key, sprite in sprites.items():
         sheet.paste(sprite.image, places[key][:2])
+    _outline(sheet)
     return TrainSprites(np.asarray(sheet).copy(), places)

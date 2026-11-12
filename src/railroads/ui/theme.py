@@ -293,6 +293,46 @@ def car_chip(key: str, good: Good, load: float | None = None, tooltip: str = "")
     return clicked
 
 
+OFFER_SIZE = (72.0, 28.0)
+EMPTY_SLOT = (0.13, 0.12, 0.1, 1.0)
+
+
+def empty_car_slot() -> None:
+    """Room for one more car, drawn as a faint outline the size of a car chip."""
+    imgui.dummy(CHIP_SIZE)
+    low, high = imgui.get_item_rect_min(), imgui.get_item_rect_max()
+    draw_list = imgui.get_window_draw_list()
+    draw_list.add_rect_filled(low, high, color_u32(EMPTY_SLOT), 3.0)
+    draw_list.add_rect(low, high, color_u32(BORDER), 3.0, 1.0)
+
+
+def offer_chip(key: str, good: Good, amount: str, wanted: bool, tooltip: str) -> bool:
+    """A good to load, as a wide chip with its icon and how much of it waits, outlined in brass
+    when the next stop wants it; returns whether it was clicked."""
+    clicked = imgui.invisible_button(key, OFFER_SIZE)
+    low, high = imgui.get_item_rect_min(), imgui.get_item_rect_max()
+    hovered = imgui.is_item_hovered()
+    draw_list = imgui.get_window_draw_list()
+    fill = FRAME_HOVER if hovered else FRAME
+    draw_list.add_rect_filled(low, high, color_u32(fill), 4.0)
+    icon_y = low.y + (OFFER_SIZE[1] - CHIP_ICON) / 2
+    draw_good_icon(draw_list, good, (low.x + 4, icon_y), CHIP_ICON)
+    text_size = imgui.calc_text_size(amount)
+    text_color = TEXT if wanted else TEXT_DIM
+    draw_list.add_text(
+        (high.x - 6 - text_size.x, low.y + (OFFER_SIZE[1] - text_size.y) / 2),
+        color_u32(text_color),
+        amount,
+    )
+    if wanted:
+        draw_list.add_rect(low, high, color_u32(BRASS), 4.0, 2.0)
+    elif hovered:
+        draw_list.add_rect(low, high, color_u32(BORDER), 4.0, 1.0)
+    if hovered:
+        imgui.set_tooltip(tooltip)
+    return clicked
+
+
 def rows_that_fit() -> tuple[float, int]:
     """Where a run of goods starts on the current line, and how many fit in a row from there."""
     return imgui.get_cursor_pos_x(), max(

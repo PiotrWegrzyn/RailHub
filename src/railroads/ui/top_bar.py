@@ -1,6 +1,7 @@
 """The bar along the top of the window: the date and the money, the game speeds, the view's
-buttons (zoom, the two minimaps and the search), the map's title, and the buttons opening the
-reports, the tech trees and the help."""
+buttons (zoom, the two minimaps and the search), the map's title and any notice such as an
+autosave, and the buttons opening the reports, the tech trees, the help, the saves and the main
+menu."""
 
 from typing import TYPE_CHECKING
 
@@ -9,13 +10,14 @@ from imgui_bundle import imgui
 
 from railroads.sim.clock import MAX_PLAY_SPEED, SPEEDS
 from railroads.sim.finance import Finances, dollars
-from railroads.ui.theme import BRASS, GONE, GROWN, toggle_button
+from railroads.ui.theme import BRASS, GONE, GROWN, danger_button, toggle_button
 
 if TYPE_CHECKING:
     from railroads.ui.app import App
     from railroads.ui.map_view import MapView
 
 WINDOW_BUTTON_WIDTH = 30.0
+LEAVE_POPUP = "Leave this game?"
 
 
 def draw_top_bar(app: App) -> None:
@@ -41,8 +43,15 @@ def draw_top_bar(app: App) -> None:
         imgui.same_line(0, 16)
         imgui.align_text_to_frame_padding()
         imgui.text_disabled(app.title)
+    if app.notice:
+        imgui.same_line(0, 16)
+        imgui.align_text_to_frame_padding()
+        imgui.text_colored(imgui.ImVec4(*GROWN), app.notice)
     padding = imgui.get_style().window_padding.x
-    imgui.same_line(imgui.get_window_width() - padding - 3 * WINDOW_BUTTON_WIDTH - 8)
+    buttons = 5 if app.saves is not None else 3
+    imgui.same_line(
+        imgui.get_window_width() - padding - buttons * WINDOW_BUTTON_WIDTH - (buttons - 1) * 4
+    )
     size = (WINDOW_BUTTON_WIDTH, 0)
     if toggle_button(fa.ICON_FA_CHART_BAR, app.reports.open, "Reports (G)", size):
         app.reports.open = not app.reports.open
@@ -52,6 +61,28 @@ def draw_top_bar(app: App) -> None:
     imgui.same_line(0, 4)
     if toggle_button(fa.ICON_FA_QUESTION_CIRCLE, app.help.open, "Buildings and goods (H)", size):
         app.help.open = not app.help.open
+    if app.saves is not None:
+        imgui.same_line(0, 4)
+        if toggle_button(fa.ICON_FA_SAVE, app.saves_window.open, "Save and load (F5)", size):
+            app.toggle_saves()
+        imgui.same_line(0, 4)
+        if toggle_button(fa.ICON_FA_HOME, False, "Main menu", size):
+            imgui.open_popup(LEAVE_POPUP)
+        draw_leave_popup(app)
+
+
+def draw_leave_popup(app: App) -> None:
+    """Asks before leaving the game for the main menu."""
+    if not imgui.begin_popup_modal(LEAVE_POPUP, None, imgui.WindowFlags_.always_auto_resize)[0]:
+        return
+    imgui.text("Anything since your last save or autosave will be lost.")
+    if danger_button("Leave for the main menu"):
+        app.menu_wanted = True
+        imgui.close_current_popup()
+    imgui.same_line()
+    if imgui.button("Stay") or imgui.is_key_pressed(imgui.Key.escape):
+        imgui.close_current_popup()
+    imgui.end_popup()
 
 
 def draw_money(finances: Finances) -> None:

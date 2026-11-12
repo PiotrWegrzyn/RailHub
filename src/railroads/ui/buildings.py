@@ -27,6 +27,10 @@ SLOT_RADIUS = 0.3
 # in cells, and how far either side of straight back it may stand, in radians.
 FARMSTEAD_OUT = 0.42
 FARMSTEAD_SWING = 0.7
+# How far from the middle of a track through its cell a building stands at least, in cells, and
+# how much further for double track.
+TRACK_CLEARANCE = 0.25
+DOUBLE_CLEARANCE = 0.11
 DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.HOUSE: ((176, 66, 50), 0.09),
     BuildingKind.TENEMENT: ((206, 150, 96), 0.12),
@@ -155,8 +159,13 @@ class BuildingSpots:
                 x.append(center_x + FARMSTEAD_OUT * math.cos(turn))
                 y.append(center_y + FARMSTEAD_OUT * math.sin(turn))
             else:
-                x.append(center_x + SLOT_RADIUS * float(np.cos(angles).mean()))
-                y.append(center_y + SLOT_RADIUS * float(np.sin(angles).mean()))
+                spot = (
+                    center_x + SLOT_RADIUS * float(np.cos(angles).mean()),
+                    center_y + SLOT_RADIUS * float(np.sin(angles).mean()),
+                )
+                spot = _clear_of_track(constructions, built.cell, spot)
+                x.append(spot[0])
+                y.append(spot[1])
             kinds.append(built.kind)
             variants.append((row * 7 + col * 13 + first) % 16)
         return cls(np.array(x), np.array(y), kinds, variants)
@@ -222,6 +231,42 @@ def draw_building_dots(
         draw_list.add_rect_filled(
             (xs[i] - half, ys[i] - half), (xs[i] + half, ys[i] + half), _color(color)
         )
+
+
+def _clear_of_track(
+    constructions: Constructions, cell: Cell, spot: tuple[float, float]
+) -> tuple[float, float]:
+    """The spot moved, if it must be, straight away from any track through the cell until it
+    stands TRACK_CLEARANCE from the track's middle, so the building stands beside the line
+    rather than on it."""
+    pieces = constructions.track_at(cell)
+    if not pieces:
+        return spot
+    grid = constructions.tile_map.grid
+    steps = grid.track_steps() / 2
+    cx, cy = (float(v) for v in grid.center(*cell))
+    x, y = spot
+    for _ in range(3):
+        nearest, away = math.inf, (0.0, 0.0)
+        for piece in pieces:
+            clearance = TRACK_CLEARANCE + (DOUBLE_CLEARANCE if int(piece.width) > 1 else 0.0)
+            for point in piece.ends:
+                ex, ey = cx + float(steps[point][0]), cy + float(steps[point][1])
+                dx, dy = ex - cx, ey - cy
+                length = math.hypot(dx, dy) or 1.0
+                t = max(0.0, min(1.0, ((x - cx) * dx + (y - cy) * dy) / length**2))
+                px, py = cx + dx * t, cy + dy * t
+                gap = math.hypot(x - px, y - py)
+                if gap - clearance < nearest:
+                    nearest = gap - clearance
+                    if gap > 1e-6:
+                        away = ((x - px) / gap, (y - py) / gap)
+                    else:
+                        away = (-dy / length, dx / length)
+        if nearest >= 0:
+            break
+        x, y = x - away[0] * nearest, y - away[1] * nearest
+    return x, y
 
 
 def _cell_turn(row: int, col: int) -> float:

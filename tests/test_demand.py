@@ -29,6 +29,16 @@ def test_goods_passed_along_earn_a_share_of_a_delivery_and_use_up_as_much_demand
     assert passed.record(Need.FOOD).left == delivered.record(Need.FOOD).left
 
 
+def test_each_unit_earns_at_the_share_of_demand_left_as_it_is_taken() -> None:
+    demand = StationDemand(capacity={Need.FOOD: 4.0})
+
+    earned = demand.pay(Need.FOOD, Good.WHEAT, 2.5)
+
+    shares = [1.0, (4.0 - 1 / 3) / 4.0, (4.0 - 2 / 3) / 4.0]
+    assert earned == pytest.approx(price_of(Good.WHEAT) * (shares[0] + shares[1] + shares[2] / 2))
+    assert demand.used[Need.FOOD] == [2.5]
+
+
 def test_each_unloaded_unit_lowers_the_price_of_the_next() -> None:
     demand = StationDemand(capacity={Need.FOOD: 20.0})
 
@@ -78,3 +88,21 @@ def test_wheat_never_counts_as_fruit() -> None:
     earned = demand.deliver(Good.WHEAT, 5.0)
 
     assert earned == 0.0
+
+
+def test_cargo_is_worth_what_delivering_it_would_earn_without_using_the_demand_up() -> None:
+    demand = StationDemand(capacity_of({Need.PASSENGERS: 30.0}))
+    used = {need: list(months) for need, months in demand.used.items()}
+
+    worth = demand.worth([(Good.PASSENGERS, 20.0)])
+
+    assert demand.used == used
+    assert worth == [pytest.approx(demand.deliver(Good.PASSENGERS, 20.0))]
+
+
+def test_loads_of_one_good_share_the_demand_left_for_it() -> None:
+    demand = StationDemand(capacity_of({Need.COAL: 30.0}))
+
+    first, second = demand.worth([(Good.COAL, 30.0), (Good.COAL, 30.0)])
+
+    assert 0 < second < first

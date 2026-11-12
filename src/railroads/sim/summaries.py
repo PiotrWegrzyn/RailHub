@@ -1,17 +1,15 @@
 """Monthly summaries: what was built and pulled down within reach of each station (the cells it
-gathers goods from) when a month turned over."""
+gathers goods from) when a month turned over, worked out from the changes growth logged while the
+month ran (railroads.sim.growth), so a month costs what changed rather than the stations' reach."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.grids import Cell, Grid
-from railroads.sim.growth import Growth
-
-type Counts = Mapping[BuildingKind, npt.NDArray[np.int64]]
+from railroads.sim.grids import Cell, Grid, flat_within
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,38 +52,35 @@ class Reach:
             self._stations = key
             self._cells = {}
             for station, steps in key:
-                rows, cols = zip(*self.grid.within(station, steps), strict=True)
-                self._cells[station] = (np.array(rows), np.array(cols))
+                flat = flat_within(self.grid, station, steps).cells
+                self._cells[station] = np.divmod(flat, self.grid.cols)
         return self._cells  # type: ignore[return-value]
-
-
-def snapshot(growth: Growth, reach: Mapping[Cell, tuple[npt.NDArray[np.intp], ...]]) -> dict:
-    """The count of every kind in every cell within reach, before a month grows."""
-    return {
-        station: {kind: growth.count(kind)[rows, cols].copy() for kind in growth.rule.points}
-        for station, (rows, cols) in reach.items()
-    }
 
 
 def summarize(
     date: str,
-    growth: Growth,
+    kinds: Collection[BuildingKind],
     reach: Mapping[Cell, tuple[npt.NDArray[np.intp], ...]],
-    before: dict,
+    logged: Mapping[tuple[Cell, BuildingKind], int],
 ) -> MonthSummary | None:
-    """What changed within each station's reach since `before`; None when nothing did."""
+    """What changed within each station's reach, from the net change in each cell's count of
+    each kind logged over the month (Growth.log_changes), the kinds in the order of `kinds`; None
+    when nothing did."""
+    moved: dict[Cell, dict[BuildingKind, int]] = {}
+    for (cell, kind), change in logged.items():
+        if change:
+            moved.setdefault(cell, {})[kind] = change
+    if not moved:
+        return None
     stations = []
     for station, (rows, cols) in reach.items():
-        if station not in before:
-            continue
-        changes: dict[BuildingKind, int] = {}
-        moved = np.zeros(rows.size, dtype=bool)
-        for kind, counts in before[station].items():
-            delta = growth.count(kind)[rows, cols] - counts
-            moved |= delta != 0
-            if total := int(delta.sum()):
-                changes[kind] = total
-        cells = tuple((int(r), int(c)) for r, c in zip(rows[moved], cols[moved], strict=True))
+        reached = zip(rows.tolist(), cols.tolist(), strict=True)
+        cells = tuple(cell for cell in reached if cell in moved)
+        totals: dict[BuildingKind, int] = {}
+        for cell in cells:
+            for kind, change in moved[cell].items():
+                totals[kind] = totals.get(kind, 0) + change
+        changes = {kind: totals[kind] for kind in kinds if totals.get(kind)}
         if changes:
             stations.append(StationSummary(station, changes, cells))
     if not stations:

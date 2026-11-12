@@ -9,7 +9,7 @@ track to another station. A station hands what trains brought to buildings withi
 radius, unsatisfied ones first, then content ones, nearest first, and then what it gathered
 before, so a mine in its reach feeds a steel mill in its reach; once a good has been handed out it
 takes every spare unit buildings made within its collection radius into its stockpile while it has
-room. Nothing is made that has nowhere to go: every building makes only what a station takes, and
+room for that good. Nothing is made that has nowhere to go: every building makes only what a station takes, and
 a processor uses up only the inputs for what it made; the rest waits in its stockpile. Needs are
 handed out in the order of PIPELINE, so the inputs of a processor come before what it makes:
 canneries take their fruit before houses eat what is left.
@@ -45,7 +45,7 @@ from railroads.sim.goods import (
     makes_of,
     needs_of,
 )
-from railroads.sim.grids import Cell, Grid
+from railroads.sim.grids import Cell, Grid, flat_within
 from railroads.sim.tilemap import TileMap
 
 FloatCells = npt.NDArray[np.float64]
@@ -99,11 +99,11 @@ class Neighbourhoods:
 
 @dataclass(frozen=True)
 class StationOrder:
-    """What one station brings to a month's trade: goods trains left there to hand out, and how
-    many more goods its stockpile can take in."""
+    """What one station brings to a month's trade: goods trains left there to hand out, and the
+    most of each good it holds, gathered and brought together."""
 
     brought: Mapping[Good, float]
-    room: float
+    limit: float
     # How many cells out it hands goods out to, and gathers them from.
     delivery: int = DELIVERY_RADIUS
     collection: int = COLLECTION_RADIUS
@@ -215,13 +215,11 @@ class Economy:
     ) -> tuple[npt.NDArray[np.intp], FloatCells]:
         """The traded cells within `radius` steps of a station, as positions among `cells`,
         nearest first, and how many steps away each is."""
-        grid = self.tile_map.grid
-        reached = grid.within(station, int(radius))
-        flat = np.array([np.ravel_multi_index(c, grid.shape) for c in reached], dtype=np.intp)
-        steps = np.array(list(reached.values()), dtype=np.float64)
+        within = flat_within(self.tile_map.grid, station, int(radius))
+        flat = within.cells
         positions = np.searchsorted(cells, flat)
         found = (positions < cells.size) & (cells[np.minimum(positions, cells.size - 1)] == flat)
-        positions, steps = positions[found], steps[found]
+        positions, steps = positions[found], within.steps[found]
         order = np.argsort(steps, kind="stable")
         return positions[order], steps[order]
 
@@ -319,7 +317,15 @@ class _Month:
             station: {} for station in stations
         }
         self.gathered: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
-        self.room = {station: order.room for station, order in stations.items()}
+        self.room = {
+            station: {
+                good: max(
+                    0.0, order.limit - order.brought.get(good, 0.0) - order.stockpile.get(good, 0.0)
+                )
+                for good in Good
+            }
+            for station, order in stations.items()
+        }
         self.reach = {
             station: (
                 economy._around(station, cells, order.delivery),
@@ -390,11 +396,15 @@ class _Month:
         for station in self.stations:
             _, far = self.reach[station]
             taken = self.economy._gather(
-                self.room[station], far, self.offered[good], self.offered[good], self.sold[good]
+                self.room[station][good],
+                far,
+                self.offered[good],
+                self.offered[good],
+                self.sold[good],
             )
             if taken > 0:
                 self.gathered[station][good] = self.gathered[station].get(good, 0.0) + taken
-                self.room[station] -= taken
+                self.room[station][good] -= taken
 
     def _produce(self, kind: BuildingKind) -> None:
         """Offers what a kind of processor could make from its stockpile."""

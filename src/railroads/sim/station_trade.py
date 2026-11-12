@@ -8,6 +8,7 @@ station's reach gives the experience of TRAIN_LOAD units of its goods, a full tr
 engine, for each of its stars.
 """
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -15,9 +16,19 @@ import numpy.typing as npt
 
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.demand import capacity_of
-from railroads.sim.economy import DELIVERY_RADIUS, StationOrder, Trade
-from railroads.sim.goods import FITS, NEEDS, TRAVELLERS, Good, Need, makes_of, needs_of, price_of
-from railroads.sim.grids import Cell
+from railroads.sim.economy import COLLECTION_RADIUS, DELIVERY_RADIUS, StationOrder, Trade
+from railroads.sim.goods import (
+    FITS,
+    NEEDS,
+    RECIPES,
+    TRAVELLERS,
+    Good,
+    Need,
+    makes_of,
+    needs_of,
+    price_of,
+)
+from railroads.sim.grids import Cell, flat_within
 from railroads.sim.ladders import PASSENGERS_PER_POINT
 from railroads.sim.tech import GOOD_TREES, Tree
 from railroads.sim.trains import CAR_CAPACITY, MAX_CARS
@@ -47,7 +58,7 @@ class StationTrade:
             delivery, collection = railway.reach(station)
             freight = {g: a for g, a in goods.stockpile.items() if g not in TRAVELLERS}
             orders[station] = StationOrder(
-                dict(goods.brought), goods.room, delivery, collection, freight
+                dict(goods.brought), goods.limit, delivery, collection, freight
             )
         return orders
 
@@ -68,13 +79,13 @@ class StationTrade:
             for good, amount in gathered.items():
                 goods.stockpile[good] = goods.stockpile.get(good, 0.0) + amount
         capacity = {}
-        for station in railway.stations():
-            ring = self.inner_ring(station)
-            travellers = self.travellers_in(ring)
+        stations = railway.stations()
+        for station, counts in zip(stations, self._ring_counts(stations), strict=True):
+            travellers = self._travellers(counts)
             goods = railway.station_goods(station)
             for good, amount in travellers.items():
                 goods.board(good, amount)
-            capacity[station] = capacity_of(self.needs_in(ring) | as_needs(travellers))
+            capacity[station] = capacity_of(self._needs(counts) | as_needs(travellers))
         railway.year = self._growth.year
         railway.turn_month(capacity)
         for station, handed_for in trade.handed_for.items():
@@ -89,50 +100,91 @@ class StationTrade:
         before its first month turns over."""
         railway = self._growth.railway
         if railway is not None:
-            ring = self.inner_ring(station)
-            needs = self.needs_in(ring) | as_needs(self.travellers_in(ring))
+            (counts,) = self._ring_counts([station])
+            needs = self._needs(counts) | as_needs(self._travellers(counts))
             railway.station_demand(station).capacity = capacity_of(needs)
 
     def inner_ring(self, station: Cell) -> npt.NDArray[np.intp]:
-        """The cells a station hands goods out to, as flat indices."""
-        railway, grid = self._growth.railway, self._growth.grid
+        """The cells a station hands goods out to, as flat indices that are kept and so can't be
+        written to."""
+        railway = self._growth.railway
         radius = DELIVERY_RADIUS if railway is None else railway.reach(station)[0]
-        reached = grid.within(station, radius)
-        return np.array([np.ravel_multi_index(c, grid.shape) for c in reached])
+        return flat_within(self._growth.grid, station, radius).cells
+
+    def supplies(self, station: Cell) -> dict[Good, float]:
+        """What the station has to send on each month: the goods buildings make within the
+        cells it gathers from, the most each processor there makes, and the passengers and mail
+        the buildings it hands out to send."""
+        railway = self._growth.railway
+        radius = COLLECTION_RADIUS if railway is None else railway.reach(station)[1]
+        cells = flat_within(self._growth.grid, station, radius).cells
+        made: dict[Good, float] = {}
+        for kind, count in self._growth.counts.items():
+            n = float(count.ravel()[cells].sum())
+            if n <= 0:
+                continue
+            goods = dict(makes_of(kind, self._growth.year))
+            if kind in RECIPES:
+                goods[RECIPES[kind].makes] = RECIPES[kind].most
+            for good, amount in goods.items():
+                made[good] = made.get(good, 0.0) + n * amount
+        for good, amount in self.travellers_in(self.inner_ring(station)).items():
+            if amount > 0:
+                made[good] = amount
+        return made
 
     def travellers_in(self, cells: npt.NDArray[np.intp]) -> dict[Good, float]:
         """The passengers and mail the buildings in these cells send, and want, in a month."""
+        counts = self._growth.counts
+        return self._travellers(
+            {kind: int(count.ravel()[cells].sum()) for kind, count in counts.items()}
+        )
+
+    def _ring_counts(self, stations: list[Cell]) -> list[dict[BuildingKind, int]]:
+        """How many buildings of each kind stand in each station's inner ring. The rings are laid
+        end to end and summed a kind at a time for all the stations at once; none is empty, as
+        each holds its station's own cell."""
+        if not stations:
+            return []
+        rings = [self.inner_ring(station) for station in stations]
+        starts = np.cumsum([0, *(ring.size for ring in rings[:-1])])
+        cells = np.concatenate(rings)
+        counts = self._growth.counts
+        sums = [np.add.reduceat(count.ravel()[cells], starts).tolist() for count in counts.values()]
+        return [dict(zip(counts, summed, strict=True)) for summed in zip(*sums, strict=True)]
+
+    def _travellers(self, counts: Mapping[BuildingKind, int]) -> dict[Good, float]:
+        """The passengers and mail these many buildings of each kind send, and want, in a month."""
         passengers = 0
-        for kind, count in self._growth.counts.items():
+        for kind, count in counts.items():
             points, value = self._growth.rule.points[kind]
-            passengers += (
-                PASSENGERS_PER_POINT.get(points, 0) * value * int(count.ravel()[cells].sum())
-            )
+            passengers += PASSENGERS_PER_POINT.get(points, 0) * value * count
         return {
             Good.PASSENGERS: float(passengers),
             Good.MAIL: float(passengers // MAIL_PER_PASSENGERS),
         }
 
-    def needs_in(self, cells: npt.NDArray[np.intp]) -> dict[Need, float]:
-        """What the buildings in these cells need in a month."""
-        counts, year = self._growth.counts, self._growth.year
+    def _needs(self, counts: Mapping[BuildingKind, int]) -> dict[Need, float]:
+        """What these many buildings of each kind need in a month."""
+        year = self._growth.year
         needs: dict[Need, float] = {}
         for kind in NEEDS:
             if kind not in counts:
                 continue
-            count = float(counts[kind].ravel()[cells].sum())
+            count = float(counts[kind])
             for need, amount in needs_of(kind, year).items():
                 needs[need] = needs.get(need, 0.0) + count * amount
         return needs
 
     def update_reach(self) -> None:
         """Works out again which cells the player's stations hand goods out to."""
-        railway, grid = self._growth.railway, self._growth.grid
-        reached: set[Cell] = set()
-        if railway is not None:
-            for station in railway.stations():
-                reached |= set(grid.within(station, railway.reach(station)[0]))
-        self.in_reach = reached
+        railway, cols = self._growth.railway, self._growth.grid.cols
+        stations = [] if railway is None else railway.stations()
+        self.in_reach = {
+            divmod(index, cols)
+            for station in stations
+            for index in self.inner_ring(station).tolist()
+        }
 
     def reward(self, cell: Cell, kind: BuildingKind) -> None:
         """Gives the player experience when a building in their stations' reach rises: as much

@@ -1,6 +1,8 @@
 """The trains on the railway (railroads.sim.railway runs them): the engines that can be bought, the
 cars, each carrying one good up to CAR_CAPACITY, the stops a train calls at with the cars it pulls
-from each, and the train itself, slowed by the weight of what it carries.
+from each, and the train itself, slowed by the weight of what it carries. A train sets off from a
+stand and picks up speed evenly until it runs at full speed after its engine's pickup time, the
+first engine's ten seconds at normal speed and better engines' less.
 
 Freight remembers where it came from as parcels: how much from each station."""
 
@@ -22,6 +24,9 @@ DRAG_PER_CAR = 0.08
 
 
 CAR_CAPACITY = 50.0
+# About how long an engine with its tender, and each car, are on the map, in cells.
+ENGINE_LENGTH = 0.8
+CAR_LENGTH = 0.42
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,14 +41,16 @@ class Engine:
     cars: int
     price: float
     electric: bool = False
+    # How many seconds of play at normal speed it takes to get from a stand to full speed.
+    pickup: float = 10.0
 
 
 ENGINES: dict[str, Engine] = {
-    "planet": Engine("Planet steam engine", 1850, 1.0, MAX_CARS, TRAIN_PRICE),
-    "mogul": Engine("Mogul freight engine", 1880, 1.0, 8, 12_000.0),
-    "pacific": Engine("Pacific express engine", 1910, 1.5, 8, 25_000.0),
-    "boxcab": Engine("Boxcab electric", 1925, 1.4, 10, 40_000.0, electric=True),
-    "express": Engine("Express electric", 1965, 2.2, 12, 90_000.0, electric=True),
+    "planet": Engine("Planet steam engine", 1850, 1.0, MAX_CARS, TRAIN_PRICE, pickup=10.0),
+    "mogul": Engine("Mogul freight engine", 1880, 1.0, 8, 12_000.0, pickup=8.0),
+    "pacific": Engine("Pacific express engine", 1910, 1.5, 8, 25_000.0, pickup=6.0),
+    "boxcab": Engine("Boxcab electric", 1925, 1.4, 10, 40_000.0, electric=True, pickup=4.0),
+    "express": Engine("Express electric", 1965, 2.2, 12, 90_000.0, electric=True, pickup=3.0),
 }
 
 
@@ -129,6 +136,12 @@ class Train:
     along: float = 0.0
     status: str = "Waiting for stops"
     engine: str = FIRST_ENGINE
+    # How fast it runs as a share of its full speed, which it picks up after setting off.
+    pace: float = 0.0
+    # The train it has stopped to let by, if any, and how long it has stood letting trains by
+    # since it last set off from a stop, in months.
+    giving_way: str = ""
+    waited: float = 0.0
 
     @property
     def load(self) -> dict[Good, float]:
@@ -153,6 +166,25 @@ class Train:
     def full(self) -> bool:
         return all(car.load >= car.capacity - 1e-9 for car in self.cars)
 
+    @property
+    def length(self) -> float:
+        """How long the train is on the map, engine and cars, in cells."""
+        return ENGINE_LENGTH + CAR_LENGTH * len(self.cars)
+
+    def speed_up(self, months: float, pickup: float) -> float:
+        """Picks up speed for `months`, evenly from a stand to full speed in `pickup` months;
+        returns its average pace meanwhile."""
+        start = self.pace
+        if start >= 1.0 or months <= 0:
+            return start
+        rise = months / pickup
+        if start + rise <= 1.0:
+            self.pace = start + rise
+            return start + rise / 2
+        rising = (1.0 - start) * pickup
+        self.pace = 1.0
+        return (rising * (start + 1.0) / 2 + months - rising) / months
+
     def restart(self) -> None:
         """Sends the train back to its first stop after its stops change."""
         self.heading = 1
@@ -160,14 +192,16 @@ class Train:
         self.arrivals = 0
         self.waiting = 0.0
         self.path = []
+        self.pace = 0.0
+        self.giving_way = ""
+        self.waited = 0.0
 
-    def cars_changed(self) -> None:
-        """Takes in new cars at a stop. A train standing at a stop calls there again to swap
-        its cars, and one still on its first trip goes back to its first stop for them, so the
-        cars set up after the stops still carry goods that trip; later on, changes show at the
-        next call."""
-        if not self.path:
+    def cars_changed(self, index: int) -> None:
+        """Takes in new cars for the stop at `index`. A train standing at that stop calls there
+        again to swap its cars; otherwise it keeps going and takes them the next time it calls
+        there."""
+        if self.path or not self.stops:
+            return
+        if (self.heading - 1) % len(self.stops) == index % len(self.stops):
             self.called = False
             self.waiting = 0.0
-        elif self.arrivals == 0:
-            self.restart()

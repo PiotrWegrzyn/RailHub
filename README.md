@@ -8,8 +8,38 @@ Run the game:
 uv run railroads
 ```
 
-Every game starts at a random, mostly-land spot in the world, on a 537 x 537 km map. The limits
-for that spot (longitude, latitude, how much land) are `START_REGION` in
+It opens on the main menu: start a new game, load a saved one, or quit. A new game is set up
+first with:
+- the map: the baked map of Poland, or a random place in the world (this needs the elevation
+  database, see Map data);
+- the seed, which picks the start location and grows the same towns again;
+- the year play begins, so how long towns grow from 850 before it;
+- the starting money, $80,000 by default;
+- under "For testing", how many years a stand-in player runs the railway first (`--simulate`).
+
+Towns grow away from the window, which shows how far they have got.
+
+In play, the floppy-disk button in the top bar (or F5) opens the saves window. Save the game under
+a name of your own, or over an older save, and load any save. The house button goes back to the
+main menu, after asking. At the start of every month the game saves itself as "autosave 1". The
+autosave before it moves to "autosave 2", and so on, keeping the last 3 (`AUTOSAVES` in
+`src/railroads/saves.py`), so one bad save can't lose the game. Autosaves are written on a
+background thread, so play doesn't stutter.
+
+A save holds the whole game: the towns and buildings, the track, the stations and their fixed
+ends, the trains, the money, the research and history, the date (to the part of the month), the
+random numbers to come, the month summaries and where the map was looked at. Loading it plays on
+exactly as the game would have. Saves go in the player's data folder, not the repository:
+`~/Library/Application Support/Railroads/saves` on macOS, `%APPDATA%\Railroads\saves` on Windows
+and `~/.local/share/railroads/saves` on Linux. Each is a `.save` file: a header line in JSON
+with the save format, the title and the date, then the game pickled and compressed. The format is
+`SAVE_FORMAT` in `src/railroads/saves.py`. Bump it whenever a change to the simulation's classes
+would make an older save load wrong; a save in another format is then refused with a message
+saying so, not a crash. Saves are Python pickles, so only load saves you trust.
+
+Any of the options below skips the menu and starts that game straight away. Without `--poland`,
+a game starts at a random, mostly-land spot in the world, on a 537 x 537 km map. The limits for
+that spot (longitude, latitude, how much land) are `START_REGION` in
 `src/railroads/newgame.py`. Options:
 
 ```bash
@@ -550,15 +580,18 @@ for flats or a mega factory, four for a skyscraper) gives experience as if a tra
 goods, 250 units, had been delivered for every star: for what it makes, or the mix of what it
 needs, to the trees those goods belong to.
 
-| Engine | From | Needs | Speed | Cars | Price |
-|---|---|---|---|---|---|
-| Planet steam engine | 1850 | | 1x | 5 | $5,000 |
-| Mogul freight engine | 1880 | Heavy boilers (metals) | 1x | 8 | $12,000 |
-| Pacific express engine | 1910 | Superheaters (metals) | 1.5x | 8 | $25,000 |
-| Boxcab electric | 1925 | Electric traction (modern) | 1.4x | 10 | $40,000 |
-| Express electric | 1965 | Thyristor control (modern) | 2.2x | 12 | $90,000 |
+| Engine | From | Needs | Speed | To full speed | Cars | Price |
+|---|---|---|---|---|---|---|
+| Planet steam engine | 1850 | | 1x | 10 s | 5 | $5,000 |
+| Mogul freight engine | 1880 | Heavy boilers (metals) | 1x | 8 s | 8 | $12,000 |
+| Pacific express engine | 1910 | Superheaters (metals) | 1.5x | 6 s | 8 | $25,000 |
+| Boxcab electric | 1925 | Electric traction (modern) | 1.4x | 4 s | 10 | $40,000 |
+| Express electric | 1965 | Thyristor control (modern) | 2.2x | 3 s | 12 | $90,000 |
 
 Electric engines run only on electrified track. A train's engine is chosen when it is bought.
+Every train sets off from a stand, from a stop or after letting another train by, and picks up
+speed evenly until it runs at full speed after its engine's time to full speed, in seconds of play
+at normal speed.
 
 ### Churches
 
@@ -658,7 +691,7 @@ click where it starts and then where it goes; while choosing where it goes, the 
 as the real track would look, greyed out, once the pointer rests on a cell for a moment. `railroads.sim.routes` plans the cheapest way that
 turns at most 60 degrees per cell, through edges or corners, bridging rivers and lakes and
 tunnelling through mountains, and makes room the same way. Each bend costs it as much as 0.6 of
-a cell of new track, so it runs straight and turns seldom instead of zigzagging. While the track tool is on, the bar
+a cell of new track, so it runs straight and turns seldom instead of zigzagging. Every building it would have to move out of the way costs it as much as 2.5 cells of track, and half a cell more for each unit of room the building takes, so it goes round farms, works and towns rather than through them. Buildings sharing a cell with track stand beside it, at least a quarter of a cell from its middle. While the track tool is on, the bar
 chooses single or double track and whether it is electric. Track lays only along the way it was
 planned: started on track already laid, its first piece branches off where that track runs on,
 turning at most 60 degrees, so trains can run from one onto the other; ended on track, its last
@@ -677,8 +710,8 @@ with what it makes and needs and what it got and gave last month. Clicking a sta
 right, opens the station instead: its level and reach, its stockpile, waiting passengers and mail, demand and
 the trains that call there, with its reach shaded on the map. There it can be raised a level,
 $100,000 to level 2 and $500,000 to level 3, each level handing goods out and gathering them one
-cell further (3 and 5 cells, then 4 and 6), and given more storage, $10,000 for each 500 more of
-freight, passengers and mail.
+cell further (3 and 5 cells, then 4 and 6), and given more storage, $10,000 for each 250 more of
+every good and 500 more passengers and mail.
 
 The bar also opens the Trains window (T) and the Stations window (S). The Trains window lists
 the trains on the left and shows the chosen one on the right: what it pulls, each car filled by
@@ -714,13 +747,18 @@ At each stop a train unloads its cars, takes on that stop's cars and fills them 
 stockpile. Unless the stop says not to, it waits there up to a month for its cars to fill, topping
 them up as the station gathers more. Trains run through stations on the way that are not among their
 stops, and can turn round in any station, but not on open track. Each time a train sets off it takes
-the shortest way to its next stop over all the track there is. Once a month each station that track joins to another station hands what trains brought
+the shortest way to its next stop over all the track there is. Trains can't run through each other
+for free: when two meet on the line, head on, one catching up with another, or where lines cross,
+one of them stops where it is until the other has gone by, then sets off again from a stand. The
+train that has stood longest letting others by since its last stop goes first, so none waits for
+ever, then the better engine, then the train bought first. Within stations, and on double track
+for trains going opposite ways, trains pass each other without stopping. Once a month each station that track joins to another station hands what trains brought
 to buildings within 2 cells, unsatisfied first, then content, nearest first, then what it gathered
 before, for 30% of the price, and takes every spare good that buildings made within 4 cells into
 its stockpile, which counts as selling them. So a station is a market for its own area: a mine in
 its reach feeds a steel mill in its reach a month later, without a train. A station on its own,
-with no track to another, does nothing. What trains brought and what it gathered share one limit, 1,000 goods in all; a
-train unloads only what fits and keeps the rest aboard if its next leg pulls a car for that good,
+with no track to another, does nothing. A station holds up to 500 of each good, what trains brought and what it gathered together, so
+one good piling up never blocks the others; a train unloads only what fits and keeps the rest aboard if its next leg pulls a car for that good,
 otherwise the rest is lost. Goods a train brought beyond what the area can use in a month can be
 loaded onto another train, so hubs can pass freight along. Freight remembers where it came from:
 it pays only when buildings at another station take it, and back at its own station it just

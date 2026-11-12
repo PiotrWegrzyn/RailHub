@@ -1,6 +1,8 @@
 """Planning track between two cells, the way a player lays it: the cheapest route that turns no
 more than MAX_TURN_DEG in any cell, bridging rivers and lakes and tunnelling through mountains,
-and keeping to empty land where it can (each building in the way costs BUILDING_COST).
+and keeping to empty land where it can: each building that would have to move out of its way
+costs BUILDING_COST and more for the room it takes (SPACE_COST), so track goes round farms and
+works rather than through them.
 
 Track leaves a cell through the middle of an edge, into the cell next to it, or through a corner,
 along the edge between two cells into the cell beyond; corners let track run straight where edges
@@ -35,8 +37,10 @@ from railroads.sim.railway import Railway
 from railroads.sim.tilemap import Relief, Terrain, Tile
 from railroads.sim.track_rules import TrackBed, track_rules_for
 
-# How much each building that must move or come down adds to a cell's cost.
-BUILDING_COST = 0.4
+# How much each building that must move or come down adds to a cell's cost, against a cell of new
+# track on open flat land, and how much more for each unit of room it takes.
+BUILDING_COST = 2.5
+SPACE_COST = 0.5
 # How far beyond the straight line between the ends a route may wander, in cells.
 DETOUR_CELLS = 12
 # What running along track already laid costs, against new track on open flat land.
@@ -512,10 +516,12 @@ class _Planner:
                 self._costs[cell] = None
             else:
                 crowd = max(0, int(self.width) - self.constructions.space_left(cell))
-                if crowd and clearing(self.constructions, cell, int(self.width)) is None:
+                leaving = clearing(self.constructions, cell, int(self.width)) if crowd else []
+                if leaving is None:
                     self._costs[cell] = None
                 else:
-                    self._costs[cell] = factor + BUILDING_COST * crowd
+                    moves = sum(BUILDING_COST + SPACE_COST * b.space for b in leaving)
+                    self._costs[cell] = factor + moves
         return self._costs[cell]
 
     def _enterable(self, cell: Cell) -> bool:

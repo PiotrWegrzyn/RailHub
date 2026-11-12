@@ -29,7 +29,7 @@ from railroads.ui.build_menu import (
     draw_trains,
 )
 from railroads.ui.buildings import BuildingSpots, draw_building_dots
-from railroads.ui.ground import GroundLayout, cell_colors
+from railroads.ui.ground import GroundLayout, GroundPictures, Pixels, cell_colors
 from railroads.ui.hex_details import describe, draw_hex_details
 from railroads.ui.iso_camera import IsoCamera, Vec2
 from railroads.ui.map_input import MapInput
@@ -143,6 +143,7 @@ class MapView:
             cell_units=self._look.cell_units,
         )
         self._layout: GroundLayout | None = None
+        self._pictures: GroundPictures | None = None
         self._pixels: PixelLayer | None = None
         self._trains: TrainLayer | None = None
         self._preview: TrackPreview | None = None
@@ -193,7 +194,7 @@ class MapView:
         self._draw_map()
         self._draw_details()
         self.build.draw(*self._map_rect)
-        self.build.trains.draw(self.railway)
+        self.build.trains.draw(self.railway, self.growth.station_trade.supplies)
         self.build.stations.draw(self.railway, self.look_at, self.open_station)
         self.station_window.draw(
             self.railway,
@@ -284,18 +285,30 @@ class MapView:
             self._layout = GroundLayout.of(self.tile_map.grid)
         return self._layout
 
+    def _ground_pictures(self) -> GroundPictures:
+        if self._pictures is None:
+            self._pictures = GroundPictures(self._ground_layout(), self.tile_map.relief)
+        return self._pictures
+
     def _ground_texture(self, with_lines: bool) -> hello_imgui.TextureGpu:
         """The smooth ground picture used when zoomed out, with or without grid lines."""
         if with_lines not in self._textures:
             light = self.camera.map_direction(*LIGHT_ON_SCREEN)
-            colors = cell_colors(self.tile_map)
-            strength = glow_strength(self._satisfaction)[..., None]
-            land = (self.tile_map.terrain == Terrain.LAND)[..., None]
-            tinted = colors[..., :3] * (1 - strength) + np.array(GLOW) * strength
-            colors[..., :3] = np.where(land, tinted, colors[..., :3]).astype(np.uint8)
-            rgba = self._ground_layout().paint(colors, self.tile_map.relief, light, with_lines)
+            rgba = self._ground_pictures().picture(self._ground_colors(), light, with_lines)
             self._textures[with_lines] = hello_imgui.create_texture_gpu_from_rgba_data(rgba)
         return self._textures[with_lines]
+
+    def _ground_colors(self) -> Pixels:
+        """Every cell's colour on the ground picture, tinted towards GLOW on land that is served."""
+        colors = cell_colors(self.tile_map)
+        strength = glow_strength(self._satisfaction).ravel()
+        land = (self.tile_map.terrain == Terrain.LAND).ravel()
+        glowing = np.flatnonzero(land & (strength > 0))
+        share = strength[glowing, None]
+        flat = colors.reshape(-1, 4)
+        tinted = flat[glowing, :3] * (1 - share) + np.array(GLOW) * share
+        flat[glowing, :3] = tinted.astype(np.uint8)
+        return colors
 
     def _draw_map(self) -> None:
         origin = imgui.get_cursor_screen_pos()
@@ -327,7 +340,8 @@ class MapView:
         else:
             self._draw_smooth_map(draw_list, center, top_left, bottom_right)
         if self.camera.pixel_scale:
-            self._train_layer().draw(draw_list, self.railway, self.camera, center)
+            if self.railway.trains:
+                self._train_layer().draw(draw_list, self.railway, self.camera, center)
         else:
             draw_track(draw_list, self.constructions, self.camera, center)
             draw_trains(draw_list, self.railway, self.camera, center)

@@ -99,6 +99,16 @@ def test_track_keeps_to_empty_land_when_it_can() -> None:
     assert not any(constructions.space_left(cell) == 0 for cell in route.cells)
 
 
+def test_track_goes_round_a_farm_rather_than_moving_it() -> None:
+    constructions = Constructions(make_map())
+    constructions.build(Building((6, 8), BuildingKind.FARM))
+
+    route = plan_route(constructions, (6, 2), (6, 14))
+
+    assert route is not None
+    assert (6, 8) not in route.cells
+
+
 def test_laying_track_moves_buildings_aside_or_pulls_down_the_lowest() -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)

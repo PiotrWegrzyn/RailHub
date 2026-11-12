@@ -437,3 +437,24 @@ def test_growth_counts_satisfaction_past_full_without_a_ceiling() -> None:
     multipliers = served_multipliers(share)
 
     assert multipliers.tolist() == pytest.approx([5.0, 10.0, 14.5])
+
+
+def test_a_station_full_of_one_good_still_gathers_another() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.FARM, 1))
+
+    trade = economy.trade(placed, holding(100.0, COAL=100.0))
+
+    assert trade.gathered[STATION][Good.WHEAT] > 0
+    assert level_at(economy, trade, (8, 9), BuildingKind.FARM) == Satisfaction.THRIVING
+
+
+def test_a_station_full_of_a_good_gathers_no_more_of_it() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.FARM, 1))
+
+    trade = economy.trade(placed, holding(100.0, WHEAT=100.0))
+
+    assert trade.gathered[STATION].get(Good.WHEAT, 0.0) == 0.0

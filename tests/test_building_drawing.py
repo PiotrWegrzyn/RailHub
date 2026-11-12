@@ -165,3 +165,19 @@ def test_zoomed_out_double_and_electric_track_draw_more_than_single(
     more = drawn_track_vertices(draw_list, piece)
 
     assert more > single
+
+
+def test_houses_stand_beside_track_through_their_cell_not_on_it() -> None:
+    constructions = make_constructions()
+    constructions.build(Track((8, 8), (0, 6)))
+    while constructions.why_not(Building((8, 8), BuildingKind.HOUSE)) is None:
+        constructions.build(Building((8, 8), BuildingKind.HOUSE))
+    _, centre_y = constructions.tile_map.grid.center(8, 8)
+
+    spots = BuildingSpots.of(constructions)
+
+    grid = constructions.tile_map.grid
+    rows, cols = grid.cell_at(spots.x, spots.y)
+    here = (rows == 8) & (cols == 8)
+    assert here.sum() == 5
+    assert (np.abs(spots.y[here] - centre_y) >= 0.25 - 1e-6).all()

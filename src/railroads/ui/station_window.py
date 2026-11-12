@@ -11,8 +11,9 @@ from railroads.sim.finance import STATION_PRICE, STORAGE_PRICE, dollars
 from railroads.sim.goods import TRAVELLERS
 from railroads.sim.grids import Cell
 from railroads.sim.railway import MAX_LEVEL, Railway
-from railroads.sim.station_goods import STORAGE_STEP
-from railroads.ui.stations_window import draw_demand
+from railroads.sim.station_goods import STORAGE_STEP, WAITING_STEP
+from railroads.ui.demand_view import draw_demand
+from railroads.ui.stations_window import stock_bar
 from railroads.ui.theme import BRASS, BRASS_DARK, goods_inline
 
 WINDOW_POS = (16.0, 96.0)
@@ -77,9 +78,7 @@ class StationWindow:
         imgui.text_disabled("Stockpile")
         imgui.same_line(LABEL_WIDTH)
         imgui.push_style_color(imgui.Col_.plot_histogram, imgui.ImVec4(*BRASS_DARK))
-        imgui.progress_bar(
-            goods.stocked / goods.limit, (-1, 0), f"{goods.stocked:.0f}/{goods.limit:.0f}"
-        )
+        imgui.progress_bar(*stock_bar(goods, (-1, 0)))
         imgui.pop_style_color()
         freight = {g: a for g, a in goods.stockpile.items() if g not in TRAVELLERS}
         waiting = {g: a for g, a in goods.stockpile.items() if g in TRAVELLERS}
@@ -111,7 +110,7 @@ class StationWindow:
                 station
             ):
                 upgraded(station)
-        storage = f"{fa.ICON_FA_PLUS}  Storage +{STORAGE_STEP} for freight, passengers and mail  {dollars(STORAGE_PRICE)}"
+        storage = f"{fa.ICON_FA_PLUS}  Storage +{STORAGE_STEP} of each good, +{WAITING_STEP} passengers and mail  {dollars(STORAGE_PRICE)}"
         if _priced_button(storage, railway.finances.can_afford(STORAGE_PRICE)):
             railway.add_storage(station)
 
