@@ -18,9 +18,9 @@ each kind of building in each cell unsatisfied, content or thriving, and pays th
 buildings they own (railroads.sim.ownership). Each building in a cell counts on its own: of ten
 houses with food for two, two are fed and eight starve. Buildings that starve for DIES_AFTER_MONTHS
 on end are pulled down, as many as starved all that while, the player's too; those that make a
-bonus good never are. Houses go up only as well as the buildings around them are fed: a turn on a ladder of homes
-goes ahead with the share of the food the neighbourhood needs that it got (FED_LADDERS), and
-always where nobody lives yet.
+bonus good never are. Houses go up only as well as the
+buildings in their cell are fed: a turn on a ladder of homes goes ahead with the share of the food
+the cell needs that it got (FED_LADDERS), and always where nobody lives yet.
 
 Growth keeps the tally the other parts share: how many of each kind stand in each cell (counts),
 the points around each cell (nearby) and every ladder's chances, all kept up to date by add. Every
@@ -93,7 +93,7 @@ SERVED_POINT_WORTH = 2.0
 SKYSCRAPER_STARS = 4
 # How long the buildings of a kind in a cell last with nothing of what they need or make going.
 DIES_AFTER_MONTHS = 30 * 12
-# Ladders of homes, which grow only as well as the neighbourhood is fed.
+# Ladders of homes, which grow in a cell only as well as its buildings are fed.
 FED_LADDERS = frozenset({BuildingKind.HOUSE})
 # Kinds that make a bonus good, which never die out.
 UNDYING = frozenset(
@@ -141,8 +141,8 @@ class Growth:
     _starving: dict[BuildingKind, npt.NDArray[np.int32]] | None = None
     # How many buildings have died out since the game began.
     died_out = 0
-    # The food every cell's buildings got and needed last month, one past the last cell standing
-    # for off the map. None in saves from before homes waited for food, where they don't.
+    # The food every cell's buildings got and needed last month. None in saves from before homes
+    # waited for food, where they don't.
     _food: tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]] | None = None
 
     def __init__(
@@ -251,7 +251,7 @@ class Growth:
         return changed
 
     def _count_food(self, trade: Trade) -> None:
-        size = self._occupied.size + 1
+        size = self._occupied.size
         got, needed = np.zeros(size, dtype=np.float32), np.zeros(size, dtype=np.float32)
         for (_, need), (taken, wanted) in trade.goods_got.items():
             if need == Need.FOOD:
@@ -260,14 +260,13 @@ class Growth:
         self._food = (got, needed)
 
     def fed(self, cells: npt.NDArray[np.intp]) -> FloatCells:
-        """The share of the food they need that the buildings in and around each cell got last
-        month; 1 where none need any."""
+        """The share of the food they need that the buildings in each cell got last month; 1
+        where none need any."""
         if self._food is None:
             return np.ones(cells.size)
         got, needed = self._food
-        around = np.vstack([cells, self._near[:, cells]])
-        wanted = needed[around].sum(axis=0)
-        return np.where(wanted > 0, got[around].sum(axis=0) / np.where(wanted > 0, wanted, 1), 1.0)
+        wanted = needed[cells]
+        return np.where(wanted > 0, got[cells] / np.where(wanted > 0, wanted, 1), 1.0)
 
     def starving(self, trade: Trade, kind: BuildingKind) -> npt.NDArray[np.int64]:
         """How many buildings of a kind starve in each cell traded on: those left over once the
