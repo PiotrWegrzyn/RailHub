@@ -5,9 +5,11 @@ Runs the game in the browser through Pyodide. Build the site and serve it:
     uv run python web/build_site.py
     python -m http.server -d build/site 8000
 
-then open http://localhost:8000/ (the baked map of Poland). Query parameters:
+then open http://localhost:8000/ for the main menu. Saves are kept in the browser's IndexedDB.
+Query parameters:
     ?args=--poland --seed 7   the game's command line
     &measure                  run web/measure.py: pans across the highest ground and prints timings
+                              (with --poland --seed 7 unless args are given)
 -->
 <html lang="en">
 <head>
@@ -45,9 +47,32 @@ then open http://localhost:8000/ (the baked map of Poland). Query parameters:
         return { transfer_mb: +(transfer / 1e6).toFixed(1), decoded_mb: +(body / 1e6).toFixed(1) };
     }
 
+    const SAVE_EVERY_MS = 2000;
+
+    function syncSaves(pyodide, populate) {
+        return new Promise((resolve, reject) =>
+            pyodide.FS.syncfs(populate, error => error ? reject(error) : resolve()));
+    }
+
+    async function keepSaves(pyodide) {
+        const folder = pyodide.runPython("from railroads.saves import SAVES_DIR\nstr(SAVES_DIR)");
+        pyodide.FS.mkdirTree(folder);
+        pyodide.FS.mount(pyodide.FS.filesystems.IDBFS, {}, folder);
+        await syncSaves(pyodide, true);
+        let syncing = false;
+        setInterval(async () => {
+            if (syncing) return;
+            syncing = true;
+            try { await syncSaves(pyodide, false); }
+            catch (error) { console.error("Saves were not kept:", error); }
+            finally { syncing = false; }
+        }, SAVE_EVERY_MS);
+    }
+
     async function main() {
         const query = new URLSearchParams(location.search);
-        const args = (query.get("args") ?? "--poland").split(" ").filter(Boolean);
+        const measure = query.has("measure");
+        const args = (query.get("args") ?? (measure ? "--poland --seed 7" : "")).split(" ").filter(Boolean);
         const canvas = document.getElementById("canvas");
         canvas.addEventListener("contextmenu", event => event.preventDefault());
 
@@ -64,8 +89,10 @@ then open http://localhost:8000/ (the baked map of Poland). Query parameters:
         await micropip.install.callKwargs(GAME_WHEEL, { deps: false });
         mark("packages");
 
-        await say("Growing towns...\n(the page does not respond until the map is ready)");
-        const measure = query.has("measure");
+        await say("Opening saves...");
+        await keepSaves(pyodide);
+
+        await say("Starting the game...");
         const code = measure
             ? await (await fetch("measure.py")).text()
             : "from railroads.ui.app import main\nmain()";

@@ -13,11 +13,13 @@ from railroads.sim.goods import Good
 from railroads.sim.grids import HexGrid
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.sim.trains import Stop
+from railroads.ui import app as app_module
 from railroads.ui.app import App, Shell
 from railroads.ui.build_menu import Tool
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
 from railroads.ui.main_menu import Page
 from railroads.ui.map_view import MapView
+from railroads.ui.workers import FrameWorker
 
 
 class FakeTexture:
@@ -218,6 +220,55 @@ def test_a_save_that_fails_to_load_stays_in_the_menu_with_why(
 
     assert shell.app is None
     assert "no save called 'Nothing'" in shell.menu.error
+
+
+def test_without_threads_an_autosave_is_written_on_the_next_frame(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "WRITER", FrameWorker())
+    app = made_app()
+    app.saves = Saves(tmp_path)
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+
+    frame(app)
+    asked = app.saves.listing()
+    frame(app)
+
+    assert asked == []
+    assert app.saves.load("autosave 1").clock.date == app.clock.date
+    assert app.notice == "Autosaved"
+
+
+def test_without_threads_leaving_a_game_writes_its_autosave_first(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "WRITER", FrameWorker())
+    app = made_app()
+    app.saves = Saves(tmp_path)
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+    frame(app)
+
+    app.finish_autosave()
+
+    assert [info.name for info in app.saves.listing()] == ["autosave 1"]
+
+
+def test_without_threads_a_save_loads_once_the_waiting_screen_has_shown(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
+    saves = Saves(tmp_path)
+    saves.save("Earlier", made_app().saved())
+    shell = Shell(saves)
+    shell.load("Earlier")
+
+    shell_frame(shell)
+    waiting = shell.app
+    shell_frame(shell)
+
+    assert waiting is None
+    assert shell.app is not None
+    assert shell.app.saves is saves
 
 
 def test_leaving_a_game_goes_back_to_the_main_menu(context: None, tmp_path: Path) -> None:

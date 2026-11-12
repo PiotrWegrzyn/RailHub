@@ -2,7 +2,7 @@ import argparse
 import sys
 import time
 from collections.abc import Callable
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui, immapp
@@ -20,12 +20,14 @@ from railroads.ui.saves_window import SavesWindow
 from railroads.ui.tech_window import TechWindow
 from railroads.ui.theme import BRASS, apply_theme
 from railroads.ui.top_bar import draw_top_bar
+from railroads.ui.workers import FrameWorker, worker
 
 # How long a notice such as "Autosaved" stays in the top bar.
 NOTICE_SECONDS = 4.0
 WAITING_WIDTH = 320.0
-# Saves are written one at a time, away from the frames, so play doesn't stutter.
-WRITER = ThreadPoolExecutor(max_workers=1, thread_name_prefix="saves")
+# Saves are written one at a time, away from the frames, so play doesn't stutter. Where threads
+# cannot start, an autosave is written on the frame after it was asked for.
+WRITER = worker("saves")
 
 
 class App:
@@ -93,6 +95,8 @@ class App:
             self._styled = True
         if self.notice and time.monotonic() > self._notice_until:
             self.notice = ""
+        if isinstance(WRITER, FrameWorker):
+            WRITER.work_once()
         self._check_autosave()
         seconds = imgui.get_io().delta_time
         months = self.clock.months_in(seconds)
@@ -150,6 +154,8 @@ class App:
     def finish_autosave(self) -> None:
         """Waits for an autosave being written."""
         if self._autosaving is not None:
+            if isinstance(WRITER, FrameWorker):
+                WRITER.work_once()
             self._autosaving.exception()
             self._check_autosave()
 
@@ -195,7 +201,9 @@ class Shell:
         self._task: Future[SavedGame] | None = None
         self._doing = ""
         self._progress = ""
-        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="setup")
+        self._executor = worker("setup")
+        # Where the setup runs on the frames, it starts once the waiting screen has shown.
+        self._waiting_shown = False
         if start is not None:
             self.start(start)
 
@@ -213,13 +221,17 @@ class Shell:
         self._doing = doing
         self._progress = ""
         self._task = self._executor.submit(work)
+        self._waiting_shown = False
 
     def gui(self) -> None:
         if not self._styled:
             apply_theme()
             self._styled = True
         if self._task is not None:
+            if self._waiting_shown and isinstance(self._executor, FrameWorker):
+                self._executor.work_once()
             self._draw_waiting()
+            self._waiting_shown = True
             if self._task.done():
                 self._finish(self._task)
         elif self.app is not None:
