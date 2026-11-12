@@ -80,6 +80,7 @@ class MapInput:
             if steps:
                 self._wheel -= steps
                 camera.zoom(steps, (io.mouse_pos.x, io.mouse_pos.y), center)
+        camera.keep_within(*grid.size())
         view.hovered = None
         if hovered:
             x, y = view.ground_under(io.mouse_pos.x, io.mouse_pos.y, center)

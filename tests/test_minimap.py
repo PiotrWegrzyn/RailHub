@@ -11,6 +11,7 @@ from railroads.sim.tilemap import TileMap
 from railroads.ui.iso_camera import IsoCamera
 from railroads.ui.minimap import (
     MIN_BOX,
+    OVERVIEW_SIDE,
     WORLD_NORTH,
     WORLD_SOUTH,
     Minimap,
@@ -182,3 +183,13 @@ def test_the_overview_zooms_in_and_out_within_its_steps() -> None:
 
     assert closest == 4
     assert minimap.zoom == 4
+
+
+def test_the_overview_of_a_long_thin_map_keeps_its_shape_within_the_same_side() -> None:
+    layout = MinimapLayout.of((80.0, 250.0), SCREEN)
+
+    overview = layout.overview
+
+    assert overview is not None
+    assert overview.height == pytest.approx(OVERVIEW_SIDE)
+    assert overview.width / overview.height == pytest.approx(80.0 / 250.0)
