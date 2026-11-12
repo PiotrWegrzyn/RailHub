@@ -186,7 +186,7 @@ def test_a_station_gathers_what_a_farm_makes() -> None:
 
     trade = economy.trade(counts, {(6, 12): StationOrder({}, 100.0)})
 
-    assert trade.gathered[(6, 12)][Good.WHEAT] == pytest.approx(8.0)
+    assert trade.gathered[(6, 12)][Good.WHEAT] == pytest.approx(5.0)
 
 
 def test_cars_slow_a_train_and_full_cars_slow_it_more() -> None:
@@ -745,7 +745,7 @@ def test_a_town_eats_its_own_farms_food_the_month_it_is_made_and_only_the_rest_w
 
     food, _ = food_and_heating(growth, (6, 21))
     assert food == pytest.approx(10.0)
-    assert railway.station_goods((6, 20)).stockpile[Good.WHEAT] == pytest.approx(4 * 8 - 10.0)
+    assert railway.station_goods((6, 20)).stockpile[Good.WHEAT] == pytest.approx(10.0)
 
 
 def test_coal_mined_near_a_station_heats_its_own_houses_before_waiting_for_trains() -> None:
