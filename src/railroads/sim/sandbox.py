@@ -11,10 +11,20 @@ from railroads.sim.ladders import FARMS, ORCHARDS, RESOURCES, TOWNS, GrowthRule
 from railroads.sim.tilemap import Terrain, TileMap
 
 SANDBOX_SIZE = 50
+# How many times likelier a house or a farm goes up anywhere at random than in the full game.
+MORE_AT_RANDOM = 5.0
 
-HOUSES_ONLY = replace(TOWNS, kinds=(BuildingKind.HOUSE,), merges={}, rises={}, skyscrapers=False)
+HOUSES_ONLY = replace(
+    TOWNS,
+    kinds=(BuildingKind.HOUSE,),
+    merges={},
+    rises={},
+    skyscrapers=False,
+    base_chance=TOWNS.base_chance * MORE_AT_RANDOM,
+)
+RANDOM_FARMS = replace(FARMS, base_chance=FARMS.base_chance * MORE_AT_RANDOM)
 FISHERIES = next(ladder for ladder in RESOURCES if ladder.kinds == (BuildingKind.FISHERY,))
-FOOD_ONLY = GrowthRule(ladders=(HOUSES_ONLY, FARMS, ORCHARDS, FISHERIES))
+FOOD_ONLY = GrowthRule(ladders=(HOUSES_ONLY, RANDOM_FARMS, ORCHARDS, FISHERIES))
 
 
 def small_map(tile_map: TileMap, size: int = SANDBOX_SIZE) -> TileMap:

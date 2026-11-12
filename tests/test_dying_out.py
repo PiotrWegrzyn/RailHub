@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -5,6 +7,7 @@ from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.growth import DIES_AFTER_MONTHS, UNDYING, Growth
 from railroads.sim.ladders import GrowthRule
+from railroads.sim.sandbox import HOUSES_ONLY
 
 TRADING = GrowthRule(trades=True, ladders=(), forests=None)
 
@@ -83,3 +86,34 @@ def test_the_players_own_buildings_die_out_too() -> None:
     run(growth, DIES_AFTER_MONTHS)
 
     assert growth.counts[BuildingKind.HOUSE].sum() == 0
+
+
+def test_the_neighbourhood_of_starving_houses_is_not_fed_and_empty_land_counts_as_fed() -> None:
+    growth = standing(((5, 5), BuildingKind.HOUSE))
+    cells = np.ravel_multi_index(([5, 5, 15], [5, 6, 20]), (20, 30))
+
+    fed = growth.fed(cells)
+
+    assert fed.tolist() == [0.0, 0.0, 1.0]
+
+
+def test_houses_next_to_a_farm_are_fed_by_the_share_of_food_they_get() -> None:
+    growth = standing(((5, 5), BuildingKind.HOUSE), ((5, 6), BuildingKind.FARM))
+    cells = np.ravel_multi_index(([5], [5]), (20, 30))
+
+    fed = growth.fed(cells)
+
+    assert fed[0] == pytest.approx(8 * 0.9 / 10)
+
+
+def test_no_house_goes_up_beside_starving_houses() -> None:
+    constructions = Constructions(flat_map(20, 30))
+    constructions.build(Building((5, 5), BuildingKind.HOUSE))
+    eager = replace(HOUSES_ONLY, base_chance=1.0)
+    growth = Growth(constructions, GrowthRule(ladders=(eager,), forests=None))
+    around = [(5, 5), *growth.grid.neighbours(5, 5)]
+
+    run(growth, 1)
+
+    assert sum(int(growth.counts[BuildingKind.HOUSE][cell]) for cell in around) == 1
+    assert growth.counts[BuildingKind.HOUSE].sum() > 100

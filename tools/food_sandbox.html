@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Food sandbox</title>
+<style>
+  :root { --bg: #f6f4ee; --ink: #24231f; --muted: #6d6a60; --panel: #ffffff; --line: #ddd8cc; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .bar { display: flex; gap: 8px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+  button { font: inherit; padding: 6px 14px; border: 1px solid var(--line); background: var(--panel);
+           border-radius: 6px; cursor: pointer; }
+  button:hover { border-color: var(--muted); }
+  #year { font-size: 26px; font-weight: 600; min-width: 90px; font-variant-numeric: tabular-nums; }
+  input[type=range] { flex: 1; min-width: 160px; }
+  .layout { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+  canvas { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; max-width: 100%; }
+  .side { flex: 1; min-width: 260px; }
+  .stats { display: grid; grid-template-columns: auto auto; gap: 2px 16px; background: var(--panel);
+           border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+  .stats b { font-variant-numeric: tabular-nums; text-align: right; }
+  .legend { margin-top: 12px; display: grid; gap: 4px; }
+  .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
+  #tip { margin-top: 12px; min-height: 60px; color: var(--muted); }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px;
+        overflow-x: auto; font-size: 12px; }
+  .now { background: #fff3c4; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title"></h1>
+  <div style="color: var(--muted)">Strzałki ← → albo przyciski: kolejne kroki.</div>
+  <div class="bar">
+    <button id="prev">◀ wstecz</button>
+    <div id="year"></div>
+    <button id="next">dalej ▶</button>
+    <input id="slider" type="range" min="0" value="0">
+  </div>
+  <div class="layout">
+    <canvas id="map"></canvas>
+    <div class="side">
+      <div class="stats" id="stats"></div>
+      <div class="legend">
+        <div><span class="sw" style="background:#2e9e5b"></span>domy najedzone (100%)</div>
+        <div><span class="sw" style="background:#e0a030"></span>domy częściowo (50%)</div>
+        <div><span class="sw" style="background:#d64545"></span>domy głodne (0%)</div>
+        <div><span class="sw" style="background:#e9c43a"></span>farma</div>
+        <div><span class="sw" style="background:#5d9e2f"></span>sad</div>
+        <div><span class="sw" style="background:#1f7fd1"></span>łowisko</div>
+        <div><span class="sw" style="background:#9fd0f5; border:1px dashed #1f7fd1"></span>miejsce na łowisko</div>
+        <div><span class="sw" style="background:#fff; border:1px solid #333; text-align:center; line-height:12px">✕</span>domy zniknęły od poprzedniego kroku</div>
+      </div>
+      <div id="tip">Najedź na pole, żeby zobaczyć szczegóły.</div>
+    </div>
+  </div>
+  <pre id="table"></pre>
+</main>
+<script>
+const D = __DATA__;
+const KINDS = ["domy", "farmy", "sady", "łowiska"];
+const W = 14, H = W * 2 / Math.sqrt(3), STEP = 0.75 * H;
+const canvas = document.getElementById("map");
+const ctx = canvas.getContext("2d");
+const scale = window.devicePixelRatio || 1;
+const width = (D.cols + 0.5) * W, height = H + (D.rows - 1) * STEP;
+canvas.width = width * scale; canvas.height = height * scale;
+canvas.style.width = width + "px"; canvas.style.height = height + "px";
+ctx.scale(scale, scale);
+let index = 0;
+
+const center = (r, c) => [(c + 0.5 + 0.5 * (r % 2)) * W, H / 2 + r * STEP];
+
+function hex(x, y, fill, stroke) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 180 * (60 * i - 90);
+    const px = x + H / 2 * Math.cos(a), py = y + H / 2 * Math.sin(a);
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fillStyle = fill; ctx.fill();
+  if (stroke) { ctx.strokeStyle = stroke; ctx.setLineDash([2, 2]); ctx.stroke(); ctx.setLineDash([]); }
+}
+
+function land(i) {
+  const t = D.terrain[i];
+  if (t === 1) return "#8fbbe0";
+  if (t === 2) return "#9cc6e8";
+  if (t === 3) return "#7fb2de";
+  return ["#e6dcc2", "#dfe8c8", "#b9cfa3"][D.vegetation[i]];
+}
+
+function fedColour(f) {
+  const mix = (a, b, t) => a.map((v, k) => Math.round(v + (b[k] - v) * t));
+  const red = [214, 69, 69], amber = [224, 160, 48], green = [46, 158, 91];
+  const c = f < 0.5 ? mix(red, amber, f / 0.5) : mix(amber, green, (f - 0.5) / 0.5);
+  return `rgb(${c})`;
+}
+
+function dot(x, y, colour, dx) {
+  ctx.beginPath(); ctx.arc(x + dx, y + 3, 2.4, 0, Math.PI * 2);
+  ctx.fillStyle = colour; ctx.fill();
+}
+
+function draw() {
+  const f = D.frames[index], before = D.frames[Math.max(0, index - 1)];
+  const [houses, farms, orchards, fisheries] = f.kinds;
+  ctx.clearRect(0, 0, width, height);
+  for (let r = 0; r < D.rows; r++) for (let c = 0; c < D.cols; c++) {
+    const i = r * D.cols + c, [x, y] = center(r, c);
+    let fill = land(i), stroke = null;
+    if (D.fish[i] && !fisheries[i]) { fill = "#9fd0f5"; stroke = "#1f7fd1"; }
+    if (houses[i]) fill = fedColour(Math.max(0, f.fed[i]));
+    else if (farms[i]) fill = "#e9c43a";
+    else if (orchards[i]) fill = "#5d9e2f";
+    else if (fisheries[i]) fill = "#1f7fd1";
+    hex(x, y, fill, stroke);
+    if (houses[i]) {
+      if (farms[i]) dot(x, y, "#e9c43a", -3);
+      if (orchards[i]) dot(x, y, "#5d9e2f", 0);
+      if (fisheries[i]) dot(x, y, "#1f7fd1", 3);
+      if (houses[i] > 1) {
+        ctx.fillStyle = "#fff"; ctx.font = "bold 8px system-ui"; ctx.textAlign = "center";
+        ctx.fillText(houses[i], x, y + 1);
+      }
+    } else if (index > 0 && before.kinds[0][i]) {
+      ctx.fillStyle = "#222"; ctx.font = "bold 10px system-ui"; ctx.textAlign = "center";
+      ctx.fillText("✕", x, y + 4);
+    }
+  }
+  const total = k => f.kinds[k].reduce((a, b) => a + b, 0);
+  let eaten = 0, needed = 0;
+  houses.forEach((h, i) => { if (h && f.fed[i] >= 0) { eaten += h * f.fed[i]; needed += h; } });
+  const rows = [
+    ["rok", f.year],
+    ...KINDS.map((name, k) => [name, total(k)]),
+    ["domy najedzone średnio", needed ? Math.round(100 * eaten / needed) + "%" : "-"],
+    ["zmarło od początku", f.died],
+  ];
+  document.getElementById("stats").innerHTML = rows.map(([a, b]) => `<span>${a}</span><b>${b}</b>`).join("");
+  document.getElementById("year").textContent = f.year;
+  document.getElementById("slider").value = index;
+  const lines = D.lines.map((line, k) => k === index + 1 ? `<span class="now">${line}</span>` : line);
+  document.getElementById("table").innerHTML = lines.join("\n");
+}
+
+function go(step) { index = Math.min(D.frames.length - 1, Math.max(0, index + step)); draw(); }
+document.getElementById("prev").onclick = () => go(-1);
+document.getElementById("next").onclick = () => go(1);
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") go(1);
+  if (e.key === "ArrowLeft") go(-1);
+});
+const slider = document.getElementById("slider");
+slider.max = D.frames.length - 1;
+slider.oninput = () => { index = +slider.value; draw(); };
+
+canvas.addEventListener("mousemove", e => {
+  const box = canvas.getBoundingClientRect();
+  const mx = (e.clientX - box.left) * width / box.width, my = (e.clientY - box.top) * height / box.height;
+  let best = null, dist = Infinity;
+  const r0 = Math.round((my - H / 2) / STEP);
+  for (let r = r0 - 1; r <= r0 + 1; r++) for (let c = 0; c < D.cols; c++) {
+    if (r < 0 || r >= D.rows) continue;
+    const [x, y] = center(r, c), d = (x - mx) ** 2 + (y - my) ** 2;
+    if (d < dist) { dist = d; best = [r, c]; }
+  }
+  if (!best) return;
+  const [r, c] = best, i = r * D.cols + c, f = D.frames[index];
+  const parts = KINDS.map((name, k) => f.kinds[k][i] ? `${name}: ${f.kinds[k][i]}` : null).filter(Boolean);
+  const notes = [];
+  if (f.fed[i] >= 0) notes.push(`domy najedzone w ${Math.round(100 * f.fed[i])}%`);
+  if (f.sold[i] >= 0) notes.push(`jedzenie sprzedane w ${Math.round(100 * f.sold[i])}%`);
+  if (D.fish[i]) notes.push("miejsce na łowisko");
+  document.getElementById("tip").innerHTML =
+    `<b>Pole ${r}, ${c}</b><br>${parts.join(", ") || "pusto"}<br>${notes.join("<br>")}`;
+});
+
+document.getElementById("title").textContent = D.title;
+draw();
+</script>
+</body>
+</html>

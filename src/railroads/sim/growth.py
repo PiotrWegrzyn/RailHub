@@ -17,7 +17,9 @@ Every TRADE_EVERY_MONTHS the stations hand out their goods and buildings sell to
 each kind of building in each cell unsatisfied, content or thriving, and pays the player for the
 buildings they own (railroads.sim.ownership). Buildings of a kind left unsatisfied in a cell for
 DIES_AFTER_MONTHS on end are pulled down, the player's too; those that make a bonus good never
-are.
+are. Houses go up only as well as the buildings around them are fed: a turn on a ladder of homes
+goes ahead with the share of the food the neighbourhood needs that it got (FED_LADDERS), and
+always where nobody lives yet.
 
 Growth keeps the tally the other parts share: how many of each kind stand in each cell (counts),
 the points around each cell (nearby) and every ladder's chances, all kept up to date by add. Every
@@ -53,7 +55,7 @@ from railroads.sim.economy import (
     served_multipliers,
 )
 from railroads.sim.forests import change_forests
-from railroads.sim.goods import BONUS_NEEDS, FITS, MAKES
+from railroads.sim.goods import BONUS_NEEDS, FITS, MAKES, Need
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.ladders import (
     FARMS_CROWDED_OUT,
@@ -90,6 +92,8 @@ SERVED_POINT_WORTH = 2.0
 SKYSCRAPER_STARS = 4
 # How long the buildings of a kind in a cell last with nothing of what they need or make going.
 DIES_AFTER_MONTHS = 30 * 12
+# Ladders of homes, which grow only as well as the neighbourhood is fed.
+FED_LADDERS = frozenset({BuildingKind.HOUSE})
 # Kinds that make a bonus good, which never die out.
 UNDYING = frozenset(
     kind
@@ -135,6 +139,9 @@ class Growth:
     _unsatisfied: dict[BuildingKind, npt.NDArray[np.int32]] | None = None
     # How many buildings have died out since the game began.
     died_out = 0
+    # The food every cell's buildings got and needed last month, one past the last cell standing
+    # for off the map. None in saves from before homes waited for food, where they don't.
+    _food: tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]] | None = None
 
     def __init__(
         self,
@@ -234,11 +241,31 @@ class Growth:
         self.owners.pay(self.trade)
         self.station_trade.update_reach()
         changed |= self._die_out(self.trade)
+        self._count_food(self.trade)
         changed |= self._raise_buildings()
         self._count_served(self.trade)
         for place in self._places:
             place.highest = float(place.chances.max())
         return changed
+
+    def _count_food(self, trade: Trade) -> None:
+        size = self._occupied.size + 1
+        got, needed = np.zeros(size, dtype=np.float32), np.zeros(size, dtype=np.float32)
+        for (_, need), (taken, wanted) in trade.goods_got.items():
+            if need == Need.FOOD:
+                got[trade.cells] += taken
+                needed[trade.cells] += wanted
+        self._food = (got, needed)
+
+    def fed(self, cells: npt.NDArray[np.intp]) -> FloatCells:
+        """The share of the food they need that the buildings in and around each cell got last
+        month; 1 where none need any."""
+        if self._food is None:
+            return np.ones(cells.size)
+        got, needed = self._food
+        around = np.vstack([cells, self._near[:, cells]])
+        wanted = needed[around].sum(axis=0)
+        return np.where(wanted > 0, got[around].sum(axis=0) / np.where(wanted > 0, wanted, 1), 1.0)
 
     def _die_out(self, trade: Trade) -> set[Cell]:
         """Counts the months each kind has been unsatisfied in each cell, and pulls down those
@@ -534,6 +561,8 @@ class Growth:
                 return cells[:0]
             tried = np.unique(cells[rng.integers(0, cells.size, tries)])
             drawn = tried[rng.random(tried.size) * highest < place.chances[tried]]
+        if drawn.size and place.ladder.kinds[0] in FED_LADDERS:
+            drawn = drawn[rng.random(drawn.size) < self.fed(drawn)]
         if not drawn.size or not (place.ladder.needs or place.ladder.crowded_at is not None):
             return drawn
         return drawn[self._meets_needs(place, drawn)]
