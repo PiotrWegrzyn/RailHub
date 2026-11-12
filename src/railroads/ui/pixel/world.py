@@ -23,7 +23,7 @@ from railroads.sim.constructions import Constructions, Track
 from railroads.sim.grids import Cell
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
-from railroads.ui.pixel.ground import FIELD_KINDS, YARD_REACH, Ground
+from railroads.ui.pixel.ground import FIELD_KINDS, YARD_REACH, Ground, glow_strength
 from railroads.ui.pixel.projection import CHUNK, FloatArray, IntArray, PixelProjection, Rgba
 from railroads.ui.pixel.relief import MOST_LIFT, Elevation, lighting, raise_picture, raycast
 from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
@@ -48,17 +48,23 @@ class PixelWorld:
         angle_deg: float,
         cell_units: float,
         fine: SpriteSheet | None = None,
+        station_levels: Mapping[Cell, int] | None = None,
     ) -> None:
         self.tile_map = tile_map
         self.constructions = constructions
         self.sheet = sheet
         self.projection = PixelProjection.of(tile_map.grid, angle_deg, cell_units)
         # Each station's level (railroads.sim.railway), which picks how grand it looks.
-        self.station_levels: Mapping[Cell, int] = {}
+        self.station_levels: Mapping[Cell, int] = {} if station_levels is None else station_levels
         # The height of every point, which raises hills and mountains (railroads.ui.pixel.relief).
         self.elevation = Elevation(tile_map, self.projection)
         self.scenery = Scenery.of(
-            tile_map, constructions, self.projection, sheet, elevation=self.elevation
+            tile_map,
+            constructions,
+            self.projection,
+            sheet,
+            self.station_levels,
+            elevation=self.elevation,
         )
         # The ground and the track over it (railroads.ui.pixel.ground, railroads.ui.pixel.track_art).
         self.ground = Ground(tile_map, constructions, self.projection, angle_deg, self.elevation)
@@ -131,8 +137,9 @@ class PixelWorld:
         )
 
     def satisfaction_changed(self, levels: npt.NDArray[np.int8]) -> set[tuple[int, int]]:
-        """Takes each cell's new satisfaction; returns the chunks whose glow changed."""
-        changed = np.argwhere(levels != self.satisfaction)
+        """Takes each cell's new satisfaction; returns the chunks whose glow changed. Most
+        changes of level, such as from not trading to unsatisfied, leave the glow as it was."""
+        changed = np.argwhere(glow_strength(levels) != glow_strength(self.satisfaction))
         self.satisfaction = levels.copy()
         return self._chunks_around([(int(r), int(c)) for r, c in changed])
 
@@ -229,8 +236,12 @@ class PixelWorld:
             return
         rows = canvas.shape[0] // resolution
         track = self.track.layer(pieces, left, top, CHUNK, rows, resolution)
-        alpha = track[..., 3:] * (canvas[..., 3:] > 0)
-        canvas[..., :3] = canvas[..., :3] * (1 - alpha) + track[..., :3] * alpha
+        box = _drawn_box(track)
+        if box is None:
+            return
+        part, under = track[box], canvas[box]
+        alpha = part[..., 3:] * (under[..., 3:] > 0)
+        under[..., :3] = under[..., :3] * (1 - alpha) + part[..., :3] * alpha
 
     def _lay_lifted_track(
         self, canvas: FloatArray, left: int, top: int, resolution: int, seen: FloatArray
@@ -242,9 +253,13 @@ class PixelWorld:
         if not pieces:
             return
         track, lift = self.track.lifted(pieces, left, top, CHUNK, CHUNK, resolution)
-        shown = (seen <= lift + HIDDEN_BEYOND) & (canvas[..., 3] > 0)
-        alpha = track[..., 3:] * shown[..., None]
-        canvas[..., :3] = canvas[..., :3] * (1 - alpha) + track[..., :3] * alpha
+        box = _drawn_box(track)
+        if box is None:
+            return
+        part, under = track[box], canvas[box]
+        shown = (seen[box] <= lift[box] + HIDDEN_BEYOND) & (under[..., 3] > 0)
+        alpha = part[..., 3:] * shown[..., None]
+        under[..., :3] = under[..., :3] * (1 - alpha) + part[..., :3] * alpha
 
     def _stand_scenery(self, canvas: FloatArray, left: int, top: int, resolution: int) -> None:
         scenery, drawn, k = self.scenery, self._sprites[resolution], resolution
@@ -378,3 +393,14 @@ def _blend(canvas: FloatArray, sprite: npt.NDArray[np.float32], x: int, y: int) 
     under = canvas[cy0:cy1, cx0:cx1]
     under *= 1 - part[..., 3:]
     under += part
+
+
+def _drawn_box(layer: FloatArray) -> tuple[slice, slice] | None:
+    """The smallest box holding every pixel of an RGBA layer that isn't clear; None if all are,
+    so blending the layer can skip the rest, which it would leave as it is."""
+    drawn = layer[..., 3] != 0
+    rows = np.flatnonzero(drawn.any(axis=1))
+    if not len(rows):
+        return None
+    cols = np.flatnonzero(drawn.any(axis=0))
+    return slice(rows[0], rows[-1] + 1), slice(cols[0], cols[-1] + 1)

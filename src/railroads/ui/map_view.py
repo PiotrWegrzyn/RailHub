@@ -119,10 +119,10 @@ class OnGround:
 
     def to_screen(self, x: Coord, y: Coord, screen_center: Vec2) -> tuple[Coord, Coord]:
         sx, sy = self._camera.to_screen(x, y, screen_center)
-        lift = self._elevation.lift(x, y) * self._camera.pixel_scale
-        if np.ndim(lift) == 0:
+        if np.ndim(x) == 0 and np.ndim(y) == 0:
+            lift = self._elevation.lift_at(float(x), float(y)) * self._camera.pixel_scale
             return float(sx), float(sy - lift)
-        return sx, sy - lift
+        return sx, sy - self._elevation.lift(x, y) * self._camera.pixel_scale
 
 
 class MapView:
@@ -155,7 +155,7 @@ class MapView:
         # What came of the last Buy pressed in the hex details.
         self._bought = ""
         # The station levels the map shows, to redraw stations raised since.
-        self._shown_levels: dict[Cell, int] = {}
+        self._shown_levels: dict[Cell, int] = dict(self.railway.levels)
         # What the build tools do with clicks, and the mouse and keys (railroads.ui.map_tools,
         # railroads.ui.map_input).
         self.tools = MapTools(self)
@@ -476,11 +476,10 @@ class MapView:
                 self._look.angle_deg,
                 self._look.cell_units,
                 fine=_fine_sprite_sheet(),
+                station_levels=self.railway.levels,
             )
             world.satisfaction = self._satisfaction.copy()
-            world.station_levels = self.railway.levels
             self._pixels = PixelLayer(world)
-            self.buildings_changed(set(self.railway.levels))
         return self._pixels
 
     def simulate(self, years: int, rng: np.random.Generator) -> None:

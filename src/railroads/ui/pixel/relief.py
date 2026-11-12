@@ -36,6 +36,8 @@ VALLEY_SMOOTHING = 24
 EXAGGERATION = 3.2
 # The most anything is lifted, in art pixels.
 MOST_LIFT = 64
+# How many points' lift Elevation.lift_at keeps before it forgets them all.
+LIFTS_KEPT = 1 << 17
 # How mountains rise above the valley, in metres: at least MOUNTAIN_FLOOR, up to MOUNTAIN_RIDGES
 # more along the ridges; hills roll up to HILL_ROLL.
 MOUNTAIN_FLOOR = 200.0
@@ -64,8 +66,9 @@ def smooth(values: FloatArray, radius: int) -> FloatArray:
             values, [(radius + 1, radius) if a == axis else (0, 0) for a in (0, 1)], mode="edge"
         )
         sums = np.cumsum(padded, axis=axis)
-        upper = np.take(sums, np.arange(2 * radius + 1, sums.shape[axis]), axis=axis)
-        lower = np.take(sums, np.arange(0, sums.shape[axis] - 2 * radius - 1), axis=axis)
+        width = 2 * radius + 1
+        upper = sums[width:] if axis == 0 else sums[:, width:]
+        lower = sums[:-width] if axis == 0 else sums[:, :-width]
         values = (upper - lower) / (2 * radius + 1)
     return values
 
@@ -131,6 +134,7 @@ class Elevation:
         self._hills = self._hills.astype(np.float32)
         self._metres_per_pixel = grid.km_per_cell * 1000 / float(np.hypot(*projection.matrix[:, 0]))
         self._metres_per_unit = grid.km_per_cell * 1000
+        self._lifts: dict[tuple[float, float], float] = {}
 
     def shares(self, x: FloatArray, y: FloatArray) -> tuple[Floats, Floats]:
         """How mountainous and how hilly the ground is at plane points, from 0 to 1."""
@@ -171,6 +175,16 @@ class Elevation:
         """How many art pixels plane points are lifted in the picture."""
         rise, _, _ = self.rise(x, y)
         return self.to_lift(rise).astype(np.float64)
+
+    def lift_at(self, x: float, y: float) -> float:
+        """How many art pixels one plane point is lifted, remembered for the points marks on the
+        map ask about frame after frame, up to LIFTS_KEPT of them."""
+        lift = self._lifts.get((x, y))
+        if lift is None:
+            if len(self._lifts) >= LIFTS_KEPT:
+                self._lifts.clear()
+            lift = self._lifts[(x, y)] = float(self.lift(x, y))
+        return lift
 
     def area(
         self, left: int, top: int, width: int, rows: int, resolution: int = 1

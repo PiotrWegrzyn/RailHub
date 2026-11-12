@@ -168,3 +168,14 @@ def test_a_lone_mountain_cell_rises_to_a_peak_of_its_own() -> None:
 
     assert float(elevation.lift(x, y)) > 20
     assert float(elevation.lift(x + 1.0, y)) < 5
+
+
+def test_a_remembered_lift_is_the_same_as_working_it_out() -> None:
+    elevation = elevation_of(mountain_map())
+    points = [(16 + x * 0.7, 4 + y * 0.9) for x in range(12) for y in range(12)]
+
+    first = [elevation.lift_at(x, y) for x, y in points]
+    again = [elevation.lift_at(x, y) for x, y in points]
+
+    assert first == again == [float(elevation.lift(x, y)) for x, y in points]
+    assert any(lift > 0 for lift in first)

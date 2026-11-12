@@ -1,10 +1,12 @@
 """Shows track the player is about to lay as the real track would look, greyed out, over the pixel
 map: the planned pieces drawn like laid track (railroads.ui.pixel.track_art) into a picture of just the
 area they cover, as finely as the map's chunks are drawn and lifted with the ground where hills and
-mountains rise and hidden behind raised ground in front of it, faded to grey and see-through."""
+mountains rise and hidden behind raised ground in front of it, faded to grey and see-through. A route too long to draw so (PIL refuses pictures that big) shows no
+preview rather than taking the game down."""
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
+from PIL import Image
 
 from railroads.sim.constructions import Track
 from railroads.sim.routes import Route
@@ -74,7 +76,11 @@ class TrackPreview:
         left, top = int(np.min(xs)) - reach, int(np.min(ys)) - reach
         width, height = int(np.max(xs)) + reach - left, int(np.max(ys)) + reach - top
         resolution = resolution_for(device_scale, self.world.resolutions)
-        pixels = ghost(self.world.planned_track(pieces, left, top, width, height, resolution))
+        try:
+            planned = self.world.planned_track(pieces, left, top, width, height, resolution)
+        except Image.DecompressionBombError, MemoryError:
+            return
+        pixels = ghost(planned)
         most = int((MOST_PIXELS / max(width * height * resolution**2, 1)) ** 0.5)
         factor = max(1, min(device_scale // resolution, most))
         big = np.repeat(np.repeat(pixels, factor, axis=0), factor, axis=1)
