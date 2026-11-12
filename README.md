@@ -139,6 +139,11 @@ pixels per art pixel.
 - `railroads.ui.buildings`: where each building stands in its share of the cell, drawn as a
   coloured dot when zoomed out.
 - `railroads.ui.pixel`: the pixel art.
+  - **Ground shader** (`ground_shader`): on the desktop the graphics card draws the ground under
+    the chunks with an OpenGL shader (PyOpenGL), each art pixel in its hex cell's colour with a
+    grain of light and dark patches and light on the slopes, so the whole view shows crisp
+    ground at once while chunks are still being drawn. Where OpenGL isn't there, as in the
+    browser, the smooth ground picture shows under the chunks instead.
   - **Ground** (`ground`): soft patches of a few shades per biome, with tufts of grass, sandy
     shores, rippled water and slopes lit from the top left by the land's real heights. Meadows
     (grassland, and the ground under mountains) are shaded smoothly instead: short pasture,
