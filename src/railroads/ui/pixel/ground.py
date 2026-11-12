@@ -21,6 +21,8 @@ from railroads.ui.pixel.noise import noise, table_hash
 from railroads.ui.pixel.projection import CHUNK, RGB, FloatArray, IntArray, PixelProjection
 from railroads.ui.pixel.relief import Elevation, Raised, sample, smooth
 
+type BoolArray = npt.NDArray[np.bool_]
+
 # Ground is worked out this far past a chunk's edges, so shores meet across chunks.
 APRON = 2
 
@@ -361,13 +363,52 @@ class Ground:
             self.elevation.colour(rgb, raised.top(rows), x[inner], y[inner], rocky)
         return np.clip(rgb, 0, 255) * alpha[..., None], alpha
 
+    @property
+    def biomes(self) -> npt.NDArray[np.integer]:
+        """Each cell's biome."""
+        return self._biomes
+
+    @property
+    def hills(self) -> BoolArray:
+        """Where land is hilly."""
+        return self._hills
+
+    @property
+    def slopes_light(self) -> FloatArray:
+        """How many shades lighter or darker the slopes are, RELIEF_STEPS_PER_CELL steps a cell."""
+        return self._relief_light
+
+    def under(self, left: int, top: int, rows: int) -> tuple[BoolArray, FloatArray]:
+        """For the CHUNK art pixels across and `rows` down from (`left`, `top`): which lie on
+        the map, and how deeply trees shade the grass there, as the cover of a black layer. For
+        a chunk drawn over ground the graphics card draws, which leaves the shade out."""
+        grid = self.tile_map.grid
+        iy, ix = np.mgrid[top : top + rows, left : left + CHUNK]
+        x, y = self.projection.to_plane(ix + 0.5, iy + 0.5)
+        r, c = grid.cell_at(x, y)
+        inside = grid.contains(r, c)
+        r, c = np.clip(r, 0, grid.rows - 1), np.clip(c, 0, grid.cols - 1)
+        biomes = self._biomes[r, c]
+        grass = np.isin(biomes, (*MEADOWS, Biome.SAVANNA)) & inside
+        cover = np.zeros(ix.shape, dtype=np.float32)
+        if grass.any():
+            cover[grass] = TREE_SHADE * self._tree_shade(left, top, ix.shape)[grass]
+        return inside, cover
+
     def fields(
-        self, canvas: FloatArray, left: int, top: int, k: int, lit: FloatArray | None = None
+        self,
+        canvas: FloatArray,
+        left: int,
+        top: int,
+        k: int,
+        lit: FloatArray | None = None,
+        shown: BoolArray | None = None,
     ) -> None:
         """Paints farms' fields and groves over a picture of the ground from (`left`, `top`),
         `k` pixels to an art pixel, RGB from 0 to 1 multiplied by its alpha, worked out at that
         resolution so they keep up with the buildings drawn as finely; `lit` brightens or
-        darkens each pixel with the slope it lies on."""
+        darkens each pixel with the slope it lies on. They go only where the picture shows the
+        map: where `shown`, or else where it isn't clear."""
         rows, a = canvas.shape[0] // k, APRON
         shape = (rows + 2 * a, CHUNK + 2 * a)
         origin = (left - a, top - a)
@@ -400,17 +441,21 @@ class Ground:
             else:
                 self._plant(*args, plot, grove)
         inner = paint[a * k : (a + rows) * k, a * k : (a + CHUNK) * k]
-        laid = ~np.isnan(inner[..., 0]) & (canvas[..., 3] > 0)
+        laid = ~np.isnan(inner[..., 0]) & _on_map(canvas, shown)
         if not laid.any():
             return
         colour = inner[laid]
         if lit is not None:
             colour = colour * lit[laid][:, None]
-        canvas[laid, :3] = np.clip(colour, 0, 255) / 255 * canvas[laid, 3:]
+        canvas[laid, :3] = np.clip(colour, 0, 255) / 255
+        canvas[laid, 3] = 1.0
 
-    def yards(self, canvas: FloatArray, left: int, top: int, k: int) -> None:
+    def yards(
+        self, canvas: FloatArray, left: int, top: int, k: int, shown: BoolArray | None = None
+    ) -> None:
         """Paints the ground round buildings over a picture of the ground from (`left`, `top`),
-        `k` pixels to an art pixel, RGB from 0 to 1 multiplied by its alpha (YARD_REACH)."""
+        `k` pixels to an art pixel, RGB from 0 to 1 multiplied by its alpha (YARD_REACH), where
+        the picture shows the map, as `fields` says."""
         xs, ys, kinds, reaches = self.buildings
         rows, cols = canvas.shape[0] // k, canvas.shape[1] // k
         reach = float(reaches.max()) if reaches.size else 0.0
@@ -418,7 +463,7 @@ class Ground:
         near &= (ys > top - reach) & (ys < top + rows + reach)
         if not near.any():
             return
-        shown = canvas[..., 3] > 0
+        shown = _on_map(canvas, shown)
         for x0, y0, kind, out in zip(
             xs[near].tolist(),
             ys[near].tolist(),
@@ -474,17 +519,16 @@ class Ground:
         else:
             colour = base * (0.86 + 0.24 * table_hash(fx, fy, 36))[..., None]
         cover *= shown[y0:y1, x0:x1]
-        under = canvas[y0:y1, x0:x1]
-        alpha = under[..., 3:]
-        under[..., :3] = (
-            under[..., :3] * (1 - cover[..., None]) + colour / 255 * alpha * cover[..., None]
-        )
+        _over(canvas[y0:y1, x0:x1], colour / 255, cover)
 
-    def canopy(self, canvas: FloatArray, left: int, top: int, k: int) -> None:
+    def canopy(
+        self, canvas: FloatArray, left: int, top: int, k: int, shown: BoolArray | None = None
+    ) -> None:
         """Paints the woods over a picture of the ground from (`left`, `top`), `k` pixels to an
         art pixel, RGB from 0 to 1 multiplied by its alpha: a roof of lit crowns with the dark
         floor between them, and their shadow on the ground beside them, worked out an art pixel
-        at a time like the rest of the ground."""
+        at a time like the rest of the ground, where the picture shows the map, as `fields`
+        says."""
         grid = self.tile_map.grid
         rows, cols = canvas.shape[0] // k, canvas.shape[1] // k
         reach = 4
@@ -511,9 +555,11 @@ class Ground:
         shadow = shadow[reach - 3 :, reach - 2 :] & ~woods[reach:, reach:]
         woods, x, y, r, c = (a[reach:, reach:] for a in (woods, x, y, r, c))
         ax, ay = ax[reach:, reach:], ay[reach:, reach:]
-        shown = canvas[::k, ::k, 3] > 0
+        shown = _on_map(canvas, shown)[::k, ::k]
         if shadow.any():
-            canvas[_blown_up(shadow & shown, k), :3] *= EDGE_SHADOW
+            shaded = _blown_up(shadow & shown, k)
+            canvas[shaded, :3] *= EDGE_SHADOW
+            canvas[shaded, 3] = canvas[shaded, 3] * EDGE_SHADOW + (1 - EDGE_SHADOW)
         woods &= shown
         if not woods.any():
             return
@@ -534,7 +580,8 @@ class Ground:
         colour = np.zeros((rows, cols, 3), dtype=np.float32)
         colour[woods] = np.where((d < radius)[:, None], leaves, WOODS_FLOOR) / 255
         fine = _blown_up(woods, k)
-        canvas[fine, :3] = _blown_up(colour, k)[fine] * canvas[fine, 3:]
+        canvas[fine, :3] = _blown_up(colour, k)[fine]
+        canvas[fine, 3] = 1.0
 
     def _tree_shade(self, left: int, top: int, shape: tuple[int, ...]) -> FloatArray:
         """How deep in a tree's shade each pixel of a block from (`left`, `top`) lies, from 0 to
@@ -710,6 +757,20 @@ class Ground:
         for index, color in enumerate(grove.fruit):
             colors[fruit & (pick == index)] = color
         rgb[ground] = colors
+
+
+def _on_map(canvas: FloatArray, shown: BoolArray | None) -> BoolArray:
+    """Where a picture shows the map: `shown` if given, else wherever it isn't clear."""
+    return canvas[..., 3] > 0 if shown is None else shown
+
+
+def _over(under: FloatArray, colour: FloatArray, cover: FloatArray) -> None:
+    """Lays `colour` (RGB from 0 to 1) over a block of a premultiplied RGBA picture, covering
+    each pixel by `cover`: on opaque ground it blends the colours, on a clear picture it leaves
+    what to lay over the ground later."""
+    cover = cover[..., None]
+    under[..., :3] = under[..., :3] * (1 - cover) + colour * cover
+    under[..., 3:] = under[..., 3:] * (1 - cover) + cover
 
 
 def _sign_deposits(

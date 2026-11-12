@@ -60,6 +60,9 @@ class PixelLayer:
         self._rises: dict[ChunkKey, bool] = {}
         self._view: tuple[float, float, int] | None = None
         self._still_since = 0.0
+        # Whether the graphics card draws the ground beneath, so chunks where nothing rises are
+        # drawn without theirs.
+        self.over_ground = False
 
     def refresh(self, chunks: set[ChunkKey]) -> None:
         """Draws these chunks again next time they show, keeping their old textures on screen
@@ -172,7 +175,8 @@ class PixelLayer:
         if drawn in self._chunks:
             return
         refreshes = self._refreshes.get(drawn[:2], 0)
-        work = lambda: self.world.render(*drawn)
+        over_ground = self.over_ground
+        work = lambda: self.world.render(*drawn, over_ground=over_ground)
         self._painter.want((False, drawn, refreshes), work, True, now)
 
     def _refine(self, drawn: tuple[int, int, int], now: float) -> None:

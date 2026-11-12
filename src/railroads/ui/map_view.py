@@ -50,7 +50,7 @@ from railroads.ui.map_overlays import (
 from railroads.ui.map_tools import MapTools
 from railroads.ui.minimap import Minimap, MinimapLayout, view_corners
 from railroads.ui.pixel.ground import GLOW, glow_strength
-from railroads.ui.pixel.ground_shader import GroundShader, view_of
+from railroads.ui.pixel.ground_shader import GroundShader, cell_info, screen_of, view_of
 from railroads.ui.pixel.layer import PixelLayer
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import SpriteSheet
@@ -291,6 +291,7 @@ class MapView:
         if self._pixels is not None:
             yield
             self._pixels.refresh(self._pixels.world.buildings_changed(changed))
+            self._colors_version += 1
 
     def _town_cells(self) -> list[Cell]:
         """Cells big enough to show as towns on the minimap."""
@@ -362,7 +363,9 @@ class MapView:
             shaded = self._draw_shaded_ground(draw_list, center, top_left, bottom_right)
             if not shaded:
                 self._draw_ground(draw_list, center, self._ground_texture(False))
-            ready = self._pixel_layer().draw(
+            layer = self._pixel_layer()
+            layer.over_ground = shaded
+            ready = layer.draw(
                 draw_list, self.camera, center, (top_left, bottom_right), ground_below=shaded
             )
             if not ready:
@@ -542,6 +545,7 @@ class MapView:
             self.search.refresh(self.growth)
         if self._pixels is not None:
             self._pixels.refresh(self._pixels.world.buildings_changed(changed))
+            self._colors_version += 1
 
     def _draw_shaded_ground(
         self, draw_list: imgui.ImDrawList, center: Vec2, top_left: Vec2, bottom_right: Vec2
@@ -551,9 +555,17 @@ class MapView:
         shader = self._ground_shader()
         if shader is None:
             return False
-        if shader.colors_version != self._colors_version:
-            shader.set_colors(self._ground_colors(), self._colors_version)
-        projection = self._pixel_layer().world.projection
+        world = self._pixel_layer().world
+        if shader.cells_version != self._colors_version:
+            ground = world.ground
+            info = cell_info(
+                ground.biomes,
+                self.tile_map.deposits,
+                ground.hills,
+                glow_strength(ground.satisfaction),
+            )
+            shader.set_cells(info, self._colors_version)
+        projection = world.projection
         camera_pixel = projection.to_pixels(self.camera.center_x, self.camera.center_y)
         scale = self.camera.pixel_scale
         origin = (
@@ -562,12 +574,8 @@ class MapView:
         )
         size = (bottom_right[0] - top_left[0], bottom_right[1] - top_left[1])
         density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
-        light = self.camera.map_direction(*LIGHT_ON_SCREEN)
-        length = math.hypot(*light) or 1.0
-        view = view_of(
-            origin, scale, top_left, size, density, (light[0] / length, light[1] / length)
-        )
-        texture = shader.picture(view)
+        view = view_of(origin, scale, top_left, size)
+        texture = shader.picture(view, screen_of(origin, scale, top_left, size, density))
         draw_list.add_image(imgui.ImTextureRef(texture), top_left, bottom_right)
         return True
 
@@ -577,7 +585,9 @@ class MapView:
             self._shader_tried = True
             if hello_imgui.is_using_hello_imgui():
                 world = self._pixel_layer().world
-                self._shader = GroundShader.make(world.projection, self.tile_map)
+                self._shader = GroundShader.make(
+                    world.projection, self.tile_map, world.ground.slopes_light
+                )
         return self._shader
 
     def _draw_ground(

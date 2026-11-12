@@ -163,16 +163,25 @@ class PixelWorld:
         return self.elevation.rises_in(chunk_x * CHUNK, chunk_y * CHUNK, CHUNK, CHUNK + MOST_LIFT)
 
     def render(
-        self, chunk_x: int, chunk_y: int, resolution: int = 1, fine_relief: bool = False
+        self,
+        chunk_x: int,
+        chunk_y: int,
+        resolution: int = 1,
+        fine_relief: bool = False,
+        over_ground: bool = False,
     ) -> Rgba:
         """One chunk as RGBA pixels, `resolution` of them for every art pixel each way; off the
         map it is clear. Above 1 the ground is blown up and the track and everything standing
         on it are drawn that much finer. Where hills and mountains rise, the ground with its
         track is lifted, so the chunk shows ground from below it too; with `fine_relief` their
         heights, lift and colours are worked out at the full resolution too, which is smoother
-        and slower."""
+        and slower. With `over_ground` a chunk where nothing rises leaves its ground out, clear
+        but for the shade of trees, to be laid over ground the graphics card draws
+        (railroads.ui.pixel.ground_shader)."""
         if fine_relief and resolution > 1:
             return self._render_fine(chunk_x, chunk_y, resolution)
+        if over_ground and not self.rises(chunk_x, chunk_y):
+            return self._render_over_ground(chunk_x, chunk_y, resolution)
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
         raised = self.elevation.area(left, top, CHUNK, CHUNK + MOST_LIFT)
         offset = None if raised is None else raycast(raised.lift, CHUNK, CHUNK)
@@ -194,6 +203,21 @@ class PixelWorld:
             seen = offset.repeat(resolution, axis=0).repeat(resolution, axis=1)
             self._lay_lifted_track(canvas, left, top, resolution, seen)
         self._stand_scenery(canvas, left, top, resolution)
+        alpha = canvas[..., 3:]
+        canvas[..., :3] /= np.maximum(alpha, 1e-6)
+        return np.ascontiguousarray(np.rint(np.clip(canvas, 0, 1) * 255).astype(np.uint8))
+
+    def _render_over_ground(self, chunk_x: int, chunk_y: int, k: int) -> Rgba:
+        left, top = chunk_x * CHUNK, chunk_y * CHUNK
+        inside, shade = self.ground.under(left, top, CHUNK)
+        shown = inside.repeat(k, axis=0).repeat(k, axis=1)
+        canvas = np.zeros((CHUNK * k, CHUNK * k, 4), dtype=np.float64)
+        canvas[..., 3] = shade.repeat(k, axis=0).repeat(k, axis=1)
+        self.ground.fields(canvas, left, top, k, shown=shown)
+        self.ground.yards(canvas, left, top, k, shown=shown)
+        self.ground.canopy(canvas, left, top, k, shown=shown)
+        self._lay_track(canvas, left, top, k, shown=shown)
+        self._stand_scenery(canvas, left, top, k)
         alpha = canvas[..., 3:]
         canvas[..., :3] /= np.maximum(alpha, 1e-6)
         return np.ascontiguousarray(np.rint(np.clip(canvas, 0, 1) * 255).astype(np.uint8))
@@ -229,8 +253,16 @@ class PixelWorld:
         canvas[..., :3] /= np.maximum(alpha, 1e-6)
         return np.ascontiguousarray(np.rint(np.clip(canvas, 0, 1) * 255).astype(np.uint8))
 
-    def _lay_track(self, canvas: FloatArray, left: int, top: int, resolution: int) -> None:
-        """Draws the track crossing the chunk over its ground (TrackArt.layer)."""
+    def _lay_track(
+        self,
+        canvas: FloatArray,
+        left: int,
+        top: int,
+        resolution: int,
+        shown: npt.NDArray[np.bool_] | None = None,
+    ) -> None:
+        """Draws the track crossing the chunk over its ground (TrackArt.layer), where the
+        picture shows the map: where `shown`, or else where it isn't clear."""
         pieces = self.constructions.track()
         if not pieces:
             return
@@ -240,8 +272,10 @@ class PixelWorld:
         if box is None:
             return
         part, under = track[box], canvas[box]
-        alpha = part[..., 3:] * (under[..., 3:] > 0)
+        on_map = under[..., 3:] > 0 if shown is None else shown[box][..., None]
+        alpha = part[..., 3:] * on_map
         under[..., :3] = under[..., :3] * (1 - alpha) + part[..., :3] * alpha
+        under[..., 3:] = under[..., 3:] * (1 - alpha) + alpha
 
     def _lay_lifted_track(
         self, canvas: FloatArray, left: int, top: int, resolution: int, seen: FloatArray

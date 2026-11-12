@@ -556,3 +556,20 @@ def test_only_a_change_of_glow_marks_chunks_to_draw_again(sheet: SpriteSheet) ->
 
     assert unseen == set()
     assert seen
+
+
+def test_a_chunk_drawn_over_ground_laid_on_its_ground_matches_the_whole_chunk(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet)
+    world.ground.trees = (np.zeros(0), np.zeros(0))
+    rgb, alpha = world.ground.render(0, 0, CHUNK)
+
+    whole = world.render(0, 0)
+    over = world.render(0, 0, over_ground=True)
+
+    cover = over[..., 3:] / 255
+    laid = np.rint((over[..., :3] / 255 * cover + rgb / 255 * (1 - cover)) * 255)
+    difference = np.abs(laid - whole[..., :3])[alpha > 0]
+    assert (over[..., 3] < 255).any()
+    assert difference.max() <= 1
