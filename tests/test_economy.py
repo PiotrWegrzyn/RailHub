@@ -213,7 +213,7 @@ def test_inputs_wait_in_a_stockpile_of_three_hundred_until_the_other_input_comes
     assert economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][flat(economy, (8, 8))] == 300.0
 
 
-def test_ten_fruit_and_ten_steel_make_fifty_cans() -> None:
+def test_ten_fruit_and_ten_steel_make_twenty_five_cans() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     economy.stock[(BuildingKind.FOOD_PLANT, Need.FRUIT)][flat(economy, (8, 8))] = 10.0
@@ -222,7 +222,7 @@ def test_ten_fruit_and_ten_steel_make_fifty_cans() -> None:
 
     trade = economy.trade(placed, {STATION: StationOrder({}, 100.0)})
 
-    assert trade.gathered[STATION][Good.CANS] == pytest.approx(50.0)
+    assert trade.gathered[STATION][Good.CANS] == pytest.approx(25.0)
     assert economy.stock[(BuildingKind.FOOD_PLANT, Need.FRUIT)][flat(economy, (8, 8))] == 0.0
 
 
@@ -429,7 +429,7 @@ def test_a_butcher_turns_each_animal_into_two_of_meat(animal: str) -> None:
             BuildingKind.FOOD_PLANT,
             {"APPLES": 130.0, "STEEL": 80.0},
             Good.CANS,
-            500.0,
+            250.0,
             Need.FRUIT,
             30.0,
         ),
@@ -437,7 +437,7 @@ def test_a_butcher_turns_each_animal_into_two_of_meat(animal: str) -> None:
             BuildingKind.SAUSAGE_MAKER,
             {"MEAT": 130.0, "SALT": 80.0},
             Good.SAUSAGES,
-            300.0,
+            200.0,
             Need.MEAT,
             30.0,
         ),

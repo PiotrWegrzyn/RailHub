@@ -417,9 +417,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
         BuildingKind.TILE_WORKS: Recipe(Good.STOVE_TILES, 30, {Need.CLAY: 0.5, Need.SAND: 0.25}),
         BuildingKind.FOUNDRY: Recipe(Good.CASTINGS, 40, {Need.IRON: 0.5, Need.SAND: 0.25}),
         BuildingKind.DAIRY: Recipe(Good.DAIRY, 100, {Need.MILK: 0.5}),
-        BuildingKind.SAUSAGE_MAKER: Recipe(
-            Good.SAUSAGES, 300, {Need.MEAT: 1 / 3, Need.SALT: 1 / 6}
-        ),
+        BuildingKind.SAUSAGE_MAKER: Recipe(Good.SAUSAGES, 200, {Need.MEAT: 0.5, Need.SALT: 0.125}),
         BuildingKind.CARPET_WEAVER: Recipe(Good.LUXURIES, 5, {Need.FIBRE: 4.0}),
         BuildingKind.CLOCK_MAKER: Recipe(Good.LUXURIES, 5, {Need.COPPER: 2.0, Need.GLASS: 1.0}),
         BuildingKind.MIRROR_MAKER: Recipe(Good.LUXURIES, 5, {Need.GLASS: 2.0, Need.GOLD: 0.5}),
@@ -428,7 +426,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
         BuildingKind.PLANE_FACTORY: Recipe(
             Good.PLANES, 20, {Need.STEEL: 3, Need.COPPER: 1, Need.FUEL: 1, Need.ELECTRONICS: 1}
         ),
-        BuildingKind.FOOD_PLANT: Recipe(Good.CANS, 500, {Need.FRUIT: 0.2, Need.STEEL: 0.1}),
+        BuildingKind.FOOD_PLANT: Recipe(Good.CANS, 250, {Need.FRUIT: 0.4, Need.STEEL: 0.1}),
         BuildingKind.BAKERY: Recipe(Good.BREAD, 100, {Need.WHEAT: 0.5}),
         BuildingKind.FACTORY: Recipe(Good.GOODS, 30, {Need.LUMBER: 1 / 3, Need.STEEL: 1 / 3}),
         BuildingKind.BIG_FACTORY: Recipe(Good.GOODS, 90, {Need.STEEL: 1 / 3, Need.COPPER: 1 / 3}),
