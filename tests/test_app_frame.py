@@ -429,3 +429,23 @@ def test_the_trains_window_map_is_softened_anew_a_step_a_frame_once_colours_chan
     assert app.view._soft is not None
     assert np.array_equal(app.view._soft[1], soften(app.view._plain_picture()))
     assert app.view._soft_texture[0] == version
+
+
+def test_without_threads_frames_stay_at_full_speed_while_an_autosave_is_written(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, refreshes: list[None]
+) -> None:
+    monkeypatch.setattr(app_module, "WRITER", FrameWorker())
+    monkeypatch.setattr(app_module, "WRITING_SECONDS", 0.0)
+    app = made_app()
+    app.game.railway.trains.clear()
+    app.saves = Saves(tmp_path)
+    app.autosave()
+
+    frame(app)
+    asked = len(refreshes)
+    app.finish_autosave()
+    refreshes.clear()
+    frame(app)
+
+    assert asked == 1
+    assert refreshes == []

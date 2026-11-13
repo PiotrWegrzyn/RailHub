@@ -130,7 +130,10 @@ class App:
         finally:
             imgui.end_disabled()
             imgui.pop_style_var()
-        if busy:
+        # Frames come slowly while the player only watches; an autosave written a little each
+        # frame is finished at full speed instead.
+        writing = self._autosaving is not None and isinstance(WRITER, FrameWorker)
+        if busy or writing:
             hello_imgui.request_refresh()
 
     def _let_time_pass(self, seconds: float) -> None:
