@@ -57,6 +57,7 @@ DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.STEEL_MILL: ((90, 88, 96), 0.16),
     BuildingKind.SHIPYARD: ((80, 140, 200), 0.16),
     BuildingKind.LUMBER_MILL: ((128, 88, 52), 0.14),
+    BuildingKind.WOODCUTTER: ((118, 82, 50), 0.1),
     BuildingKind.PORT: ((60, 110, 190), 0.16),
     BuildingKind.FISHERY: ((110, 170, 200), 0.12),
     BuildingKind.SHEEP_FARM: ((236, 232, 216), 0.12),

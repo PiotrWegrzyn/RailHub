@@ -425,6 +425,7 @@ MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
         BuildingKind.FISHERY: {Good.FISH: 8},
         BuildingKind.MINE: {Good.COAL: 100},
         BuildingKind.LUMBER_MILL: {Good.LUMBER: 20},
+        BuildingKind.WOODCUTTER: {Good.LUMBER: 5},
         BuildingKind.PORT: {Good.GOODS: 20, Good.OIL: 50, Good.GAS: 50},
         BuildingKind.IRON_MINE: {Good.IRON: 250},
         BuildingKind.COPPER_MINE: {Good.COPPER: 40},

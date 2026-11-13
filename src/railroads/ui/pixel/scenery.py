@@ -100,6 +100,7 @@ BUILDING_SPRITES = {
     BuildingKind.STEEL_MILL: "steel_mill",
     BuildingKind.SHIPYARD: "shipyard",
     BuildingKind.LUMBER_MILL: "lumber_mill",
+    BuildingKind.WOODCUTTER: "woodcutter",
     BuildingKind.PORT: "port",
     BuildingKind.CLAY_PIT: "clay_pit",
     BuildingKind.LIMESTONE_QUARRY: "limestone_quarry",

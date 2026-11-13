@@ -4,7 +4,8 @@ Each month a forest cell may be cleared, by chance: CLEARING_PER_POINT for every
 industry point in its neighbourhood (the cell and the cells next to it), and CLEARING_PER_MILL,
 a hundred times as much, for every lumber mill there. Open grassland may turn to forest, by
 SPREAD_PER_FOREST for every forest cell next to it, where nothing is built. A lumber mill with
-fewer than MILLS_CLOSE_BELOW forest cells in its neighbourhood closes. POPULATION_PER_CLEARING_POINT
+fewer than MILLS_CLOSE_BELOW forest cells in its neighbourhood closes. Woodcutters fell no forest,
+and go when the forest they stand in is cleared. POPULATION_PER_CLEARING_POINT
 population points clear a forest as fast as one point of industry.
 """
 
@@ -100,7 +101,7 @@ def change_forests(
         growth.nearby(Points.POPULATION) / POPULATION_PER_CLEARING_POINT
         + growth.nearby(Points.INDUSTRY)
     ).ravel()
-    mills = growth.nearby(Points.TIMBER).ravel()
+    mills = _mills_nearby(growth, near)
     cleared, grown = forest_turn(tile_map, near, people, mills, rule, months, rng)
     cols = grid.cols
     grown = np.array(
@@ -125,5 +126,22 @@ def change_forests(
                 if growth.take_down(mill):
                     changed |= growth.room.relocate(mill)
             changed.add((row, col))
+    woodcutters = growth.counts.get(BuildingKind.WOODCUTTER)
+    if woodcutters is not None:
+        felled = cleared[woodcutters.ravel()[cleared] > 0]
+        for row, col in (divmod(int(index), cols) for index in felled):
+            for _ in range(int(woodcutters[row, col])):
+                growth.take_down(Building((row, col), BuildingKind.WOODCUTTER))
+            changed.add((row, col))
     growth.reweigh_land(changed_cells)
     return changed
+
+
+def _mills_nearby(growth: Growth, near: Cells) -> npt.NDArray[np.int64]:
+    """How many lumber mills stand in each cell's neighbourhood, as a flat array; woodcutters
+    fell no forest."""
+    mills = growth.counts.get(BuildingKind.LUMBER_MILL)
+    if mills is None:
+        return np.zeros(near.shape[1], dtype=np.int64)
+    padded = np.append(mills.ravel(), 0)
+    return mills.ravel() + padded[near].sum(axis=0)

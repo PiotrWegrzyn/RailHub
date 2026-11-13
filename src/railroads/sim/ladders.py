@@ -96,6 +96,7 @@ POINTS: Mapping[BuildingKind, tuple[Points, int]] = MappingProxyType(
         BuildingKind.SUGAR: (Points.FOOD, 1),
         BuildingKind.MINE: (Points.ORE, 1),
         BuildingKind.LUMBER_MILL: (Points.TIMBER, 1),
+        BuildingKind.WOODCUTTER: (Points.TIMBER, 1),
         BuildingKind.PORT: (Points.TRADE, 1),
         BuildingKind.FACTORY: (Points.INDUSTRY, 1),
         BuildingKind.BIG_FACTORY: (Points.INDUSTRY, 3),
@@ -483,6 +484,19 @@ LUMBER_MILLS = Ladder(
     chance_per_doubling={Points.POPULATION: 0.000001},
     most_per_cell=1,
     most_nearby=2,
+)
+
+# Woodcutters live in the forest without felling it, about one in every five forest cells by the
+# time play begins; those that sell their wood breed, and three nearby join into a lumber mill.
+WOODCUTTERS = Ladder(
+    kinds=(BuildingKind.WOODCUTTER, BuildingKind.LUMBER_MILL),
+    land=Land(
+        vegetation={Vegetation.BARREN: 0.0, Vegetation.GRASS: 0.0},
+        relief={Relief.MOUNTAINS: 0.0},
+    ),
+    base_chance=0.000027,
+    chance_per_doubling={Points.TIMBER: 0.0002},
+    merges={BuildingKind.WOODCUTTER: Merge(needed=3, pulled_down=3)},
 )
 
 # Ports open on the sea, or less often a lake, where a town has grown to use them.
@@ -884,6 +898,7 @@ LADDERS = (
     SUGAR_FIELDS,
     MINES,
     LUMBER_MILLS,
+    WOODCUTTERS,
     PORTS,
     FACTORIES,
     FOOD_PLANTS,

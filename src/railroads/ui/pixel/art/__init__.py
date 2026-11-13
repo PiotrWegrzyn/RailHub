@@ -31,7 +31,7 @@ from railroads.ui.pixel.art.farms import (
     potato_farm,
     sugar,
 )
-from railroads.ui.pixel.art.homes import flats, house, skyscraper, tenement
+from railroads.ui.pixel.art.homes import flats, house, skyscraper, tenement, woodcutter
 from railroads.ui.pixel.art.industry import (
     appliance_factory,
     bakery,
@@ -185,6 +185,7 @@ BUILDINGS = (
     "shipyard",
     "mine",
     "lumber_mill",
+    "woodcutter",
     "port",
     "clay_pit",
     "limestone_quarry",
@@ -240,6 +241,7 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "skyscraper": skyscraper,
     "mine": mine,
     "lumber_mill": lumber_mill,
+    "woodcutter": woodcutter,
     "port": port,
     "orchard": orchard,
     "iron_mine": lambda: shaft_mine((104, 72, 62), (176, 98, 70)),
