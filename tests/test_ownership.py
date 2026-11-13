@@ -26,7 +26,7 @@ def test_a_building_costs_five_years_of_the_players_share_of_what_it_can_make() 
 
     problem = growth.owners.buy((5, 5), BuildingKind.FARM)
 
-    price = 12 * PAYBACK_YEARS * OWNER_SHARE * 5 * price_of(Good.WHEAT)
+    price = 12 * PAYBACK_YEARS * OWNER_SHARE * 10 * price_of(Good.WHEAT)
     assert problem is None
     assert growth.owners.owned(BuildingKind.FARM)[5, 5] == 1
     assert growth.railway.finances.cash == pytest.approx(cash - price)
@@ -66,7 +66,7 @@ def test_the_player_earns_half_of_what_their_farm_sells_to_a_joined_station() ->
     growth.trade_goods()
 
     earned = growth.railway.finances.month["owned buildings"]
-    assert earned == pytest.approx(5 * price_of(Good.WHEAT) * OWNER_SHARE)
+    assert earned == pytest.approx(10 * price_of(Good.WHEAT) * OWNER_SHARE)
     assert growth.owners.income == {BuildingKind.FARM: pytest.approx(earned)}
 
 

@@ -387,7 +387,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             Good.PLANES, 20, {Need.STEEL: 3, Need.COPPER: 1, Need.FUEL: 1, Need.ELECTRONICS: 1}
         ),
         BuildingKind.FOOD_PLANT: Recipe(Good.CANS, 40, {Need.FRUIT: 0.25, Need.STEEL: 0.25}),
-        BuildingKind.BAKERY: Recipe(Good.BREAD, 20, {Need.WHEAT: 0.5}),
+        BuildingKind.BAKERY: Recipe(Good.BREAD, 50, {Need.WHEAT: 0.2}),
         BuildingKind.FACTORY: Recipe(Good.GOODS, 30, {Need.LUMBER: 1 / 3, Need.STEEL: 1 / 3}),
         BuildingKind.BIG_FACTORY: Recipe(Good.GOODS, 90, {Need.STEEL: 1 / 3, Need.COPPER: 1 / 3}),
         BuildingKind.MEGA_FACTORY: Recipe(
@@ -414,7 +414,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
         BuildingKind.BREWERY: Recipe(Good.BEER, 160, {Need.HOPS: 0.25}, {Need.BARRELS: 0.1}),
         BuildingKind.DISTILLERY: Recipe(Good.VODKA, 40, {Need.POTATOES: 0.5, Need.GLASS: 0.1}),
         BuildingKind.TANNERY: Recipe(Good.LEATHER, 40, {Need.LIVESTOCK: 0.5}),
-        BuildingKind.MEAT_FACTORY: Recipe(Good.MEAT, 60, {Need.ANIMALS: 0.5}),
+        BuildingKind.MEAT_FACTORY: Recipe(Good.MEAT, 150, {Need.ANIMALS: 0.2}),
         BuildingKind.SHOE_FACTORY: Recipe(Good.SHOES, 60, {Need.LEATHER: 0.5}),
         BuildingKind.PLASTICS_WORKS: Recipe(
             Good.PLASTICS, 100, {Need.OIL: 0.5, Need.CHEMICALS: 0.5}
@@ -438,13 +438,13 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
 # with all the inputs they need.
 MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
     {
-        BuildingKind.FARM: {Good.WHEAT: 5},
-        BuildingKind.ORCHARD: {Good.APPLES: 5},
-        BuildingKind.DATE_PALMS: {Good.DATES: 6},
-        BuildingKind.ORANGE_FARM: {Good.ORANGES: 6},
-        BuildingKind.BANANAS: {Good.BANANAS: 9},
-        BuildingKind.SUGAR: {Good.SUGAR: 8},
-        BuildingKind.FISHERY: {Good.FISH: 8},
+        BuildingKind.FARM: {Good.WHEAT: 10},
+        BuildingKind.ORCHARD: {Good.APPLES: 10},
+        BuildingKind.DATE_PALMS: {Good.DATES: 12},
+        BuildingKind.ORANGE_FARM: {Good.ORANGES: 12},
+        BuildingKind.BANANAS: {Good.BANANAS: 18},
+        BuildingKind.SUGAR: {Good.SUGAR: 16},
+        BuildingKind.FISHERY: {Good.FISH: 16},
         BuildingKind.MINE: {Good.COAL: 100},
         BuildingKind.LUMBER_MILL: {Good.LUMBER: 20},
         BuildingKind.PORT: {Good.GOODS: 20, Good.OIL: 50, Good.GAS: 50},
@@ -459,15 +459,15 @@ MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
         BuildingKind.VINEYARD: {Good.GRAPES: 60},
         BuildingKind.COFFEE_PLANTATION: {Good.COFFEE: 60},
         BuildingKind.RUBBER_PLANTATION: {Good.RUBBER: 60},
-        BuildingKind.BEEKEEPER: {Good.HONEY: 2, Good.WAX: 10},
+        BuildingKind.BEEKEEPER: {Good.HONEY: 4, Good.WAX: 10},
         BuildingKind.INCENSE_GROVE: {Good.INCENSE: 30},
         BuildingKind.CLAY_PIT: {Good.CLAY: 60},
         BuildingKind.LIMESTONE_QUARRY: {Good.LIMESTONE: 60},
         BuildingKind.SAND_PIT: {Good.SAND: 60},
-        BuildingKind.POTATO_FARM: {Good.POTATOES: 12},
+        BuildingKind.POTATO_FARM: {Good.POTATOES: 24},
         BuildingKind.CATTLE_RANCH: {Good.CATTLE: 10},
         BuildingKind.PIG_FARM: {Good.PIGS: 12},
-        BuildingKind.CHICKEN_FARM: {Good.CHICKENS: 20, Good.EGGS: 20},
+        BuildingKind.CHICKEN_FARM: {Good.CHICKENS: 20, Good.EGGS: 40},
         BuildingKind.FLAX_FIELD: {Good.FLAX: 60},
         BuildingKind.HOP_GARDEN: {Good.HOPS: 40},
         BuildingKind.SALT_CATHEDRAL: {Good.SALT: 200},
