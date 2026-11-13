@@ -23,6 +23,7 @@ from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.layer import resolution_for
 from railroads.ui.pixel.noise import noise, table_hash
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection, hash01
+from railroads.ui.pixel.relief import MOST_LIFT, raycast
 from railroads.ui.pixel.sheet import FINE, SHEET_INDEX, SpriteSheet
 from railroads.ui.pixel.track_art import RAIL
 from railroads.ui.pixel.track_preview import ghost
@@ -646,6 +647,25 @@ def test_the_nearest_crown_is_the_one_found_by_hashing_the_squares_round_each_po
     for value, expected in zip(found, nearest_crown_by_hashing(px, py, CROWN_GAP), strict=True):
         assert value.dtype == expected.dtype
         assert np.array_equal(value, expected)
+
+
+def test_a_chunk_showing_ground_lifted_as_far_as_ground_goes_is_drawn(
+    sheet: SpriteSheet, fine_sheet: SpriteSheet
+) -> None:
+    grid = HexGrid(rows=16, cols=12, km_per_cell=1.0)
+    relief = np.full(grid.shape, Relief.FLAT, dtype=np.uint8)
+    relief[:, 6:] = Relief.MOUNTAINS
+    heights = np.broadcast_to(np.where(np.arange(grid.cols) >= 6, 1500, 0), grid.shape)
+    tile_map = flat_map(grid=grid, height_m=heights.astype(np.int16), relief=relief)
+    constructions = Constructions(tile_map)
+    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid], fine=fine_sheet)
+    raised = world.elevation.area(0, 0, CHUNK, CHUNK + MOST_LIFT)
+
+    pictures = [world.render(0, 0, k) for k in (1, FINE)]
+
+    assert raised is not None and raycast(raised.lift, CHUNK, CHUNK).max() == MOST_LIFT
+    assert [picture.shape[0] for picture in pictures] == [CHUNK, FINE * CHUNK]
+    assert all((picture[..., 3] == 255).any() for picture in pictures)
 
 
 def test_track_drawn_again_after_its_neighbour_changes_matches_track_drawn_fresh(

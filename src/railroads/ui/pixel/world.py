@@ -201,7 +201,9 @@ class PixelWorld:
         if may_rise:
             raised = self.elevation.area(left, top, CHUNK, CHUNK + MOST_LIFT, points=points)
         offset = None if raised is None else raycast(raised.lift, CHUNK, CHUNK)
-        rows = CHUNK if offset is None else CHUNK + int(offset.max()) + 1
+        # The ground goes a row past the furthest any pixel shows, but stops with the raised
+        # ground, MOST_LIFT rows past the chunk, which is as far as any pixel shows.
+        rows = CHUNK if offset is None else CHUNK + min(int(offset.max()) + 1, MOST_LIFT)
         rgb, alpha = self.ground.render(left, top, rows, raised, points)
         canvas = _blown_up(rgb / 255, alpha, resolution)
         lit = None if raised is None else lighting(raised.top(rows))
