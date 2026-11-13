@@ -1,7 +1,8 @@
 """Shows the pixel art on screen: chunks are drawn as the view reaches them and kept as textures
 blown up to the zoom's pixel scale. Where each art pixel covers an even number of screen pixels the
 chunks are drawn finer (PixelWorld.render), so buildings, trees and track keep thin lines instead of
-growing blocky.
+growing blocky. Where the ground shader runs, the graphics card blows the textures up, which saves
+the frames repeating every pixel and sending the graphics card all of them.
 
 Chunks are drawn away from the frames (railroads.ui.pixel.painter); until a chunk is ready, the
 ground drawn beneath shows where it is missing, and a chunk that changed keeps its old texture.
@@ -21,6 +22,8 @@ fills in from the middle out."""
 
 import time
 from collections import OrderedDict
+from collections.abc import Callable
+from typing import Protocol
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
@@ -47,6 +50,12 @@ TEXTURE_BUDGET = 512 * 1024 * 1024
 type ChunkKey = tuple[int, int]
 
 
+class Texture(Protocol):
+    """A chunk's texture: one hello_imgui made, or one the ground shader blew up."""
+
+    def texture_id(self) -> int: ...
+
+
 def resolution_for(screen_pixels: int, resolutions: tuple[int, ...]) -> int:
     """The finest resolution a chunk can be drawn at that blows up evenly to `screen_pixels`
     for every art pixel."""
@@ -69,7 +78,7 @@ class PixelLayer:
         self.world = world
         # Drawn chunks by where they are and the resolution they were drawn at.
         self._chunks: OrderedDict[tuple[int, int, int], Rgba] = OrderedDict()
-        self._textures: OrderedDict[tuple[int, int, int], hello_imgui.TextureGpu] = OrderedDict()
+        self._textures: OrderedDict[tuple[int, int, int], Texture] = OrderedDict()
         self._stale: set[tuple[int, int, int]] = set()
         self._painter = painter_for(world, threads)
         # Chunks drawn finely, and how many times each chunk has been refreshed, so a drawing
@@ -81,8 +90,10 @@ class PixelLayer:
         self._view: tuple | None = None
         self._still_since = 0.0
         # Whether the graphics card draws the ground beneath, so chunks where nothing rises are
-        # drawn without theirs.
+        # drawn without theirs, and what blows textures up on it then, which makes the same
+        # texels as blowing them up here (GroundShader.blow_up).
         self.over_ground = False
+        self.blow_up: Callable[[Rgba, int], Texture] | None = None
 
     def refresh(self, chunks: set[ChunkKey]) -> None:
         """Draws these chunks again next time they show, keeping their old textures on screen
@@ -224,22 +235,27 @@ class PixelLayer:
     def _texture_bytes(self) -> int:
         return sum((CHUNK * key[2]) ** 2 * 4 for key in self._textures)
 
-    def _upload(self, chunk: ChunkKey, scale: int) -> hello_imgui.TextureGpu:
+    def _upload(self, chunk: ChunkKey, scale: int) -> Texture:
         resolution = resolution_for(scale, self.world.resolutions)
         drawn = (*chunk, resolution)
         pixels = self._chunks[drawn]
         self._chunks.move_to_end(drawn)
-        big = blown_up(pixels, scale // resolution)
-        texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
+        times = scale // resolution
+        texture: Texture
+        if times > 1 and self.blow_up is not None:
+            texture = self.blow_up(pixels, times)
+        else:
+            big = blown_up(pixels, times)
+            texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
         self._textures[(*chunk, scale)] = texture
         return texture
 
 
 def blown_up(pixels: Rgba, times: int) -> Rgba:
     """The pixels with each repeated `times` times each way, as the texture of a chunk drawn at
-    a finer scale than the screen's. Drawn at the screen's scale, as every chunk is at zoom 3 on
-    a double-density screen, they are the pixels themselves: copying them anyway cost a browser
-    more than a millisecond a chunk."""
+    a finer scale than the screen's where the graphics card can't blow it up. Drawn at the
+    screen's scale, as every chunk is at zoom 3 on a double-density screen, they are the pixels
+    themselves: copying them anyway cost a browser more than a millisecond a chunk."""
     if times == 1:
         return pixels
     return np.repeat(np.repeat(pixels, times, axis=0), times, axis=1)

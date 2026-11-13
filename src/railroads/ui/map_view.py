@@ -50,7 +50,13 @@ from railroads.ui.map_overlays import (
 from railroads.ui.map_tools import MapTools
 from railroads.ui.minimap import Minimap, MinimapLayout, view_corners
 from railroads.ui.pixel.ground import GLOW, glow_strength
-from railroads.ui.pixel.ground_shader import GroundShader, cell_info, screen_of, view_of
+from railroads.ui.pixel.ground_shader import (
+    GroundShader,
+    cell_info,
+    free_textures,
+    screen_of,
+    view_of,
+)
 from railroads.ui.pixel.layer import PixelLayer
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import SpriteSheet
@@ -374,6 +380,7 @@ class MapView:
                 self._draw_ground(draw_list, center, self._ground_texture(False))
             layer = self._pixel_layer()
             layer.over_ground = shaded
+            layer.blow_up = self._shader.blow_up if shaded and self._shader is not None else None
             ready = layer.draw(
                 draw_list, self.camera, center, (top_left, bottom_right), ground_below=shaded
             )
@@ -586,6 +593,7 @@ class MapView:
         view = view_of(origin, scale, top_left, size)
         texture = shader.picture(view, screen_of(origin, scale, top_left, size, density))
         draw_list.add_image(imgui.ImTextureRef(texture), top_left, bottom_right)
+        free_textures()
         return True
 
     def _ground_shader(self) -> GroundShader | None:

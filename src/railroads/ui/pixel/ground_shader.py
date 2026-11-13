@@ -12,6 +12,11 @@ drawn without their ground (PixelWorld.render with `over_ground`), with only the
 track and buildings to lay over it; chunks where hills or mountains rise still bring their own
 lifted ground. A picture is drawn again only when the view or the cells change.
 
+The same blowing up makes the chunks' textures where a chunk's pixel covers several screen pixels
+(GroundShader.blow_up): imgui samples every texture smoothly, so a texture must hold a texel for
+every screen pixel to show crisp squares, and blowing a chunk up here gives the very texels the CPU
+would (np.repeat) from an upload a fraction of the size.
+
 On the desktop it reaches OpenGL through PyOpenGL; in the browser build, through the GL that
 imgui draws with there (railroads.ui.pixel.webgl), as WebGL 2. Without either, or if the graphics
 card refuses the shader, GroundShader.make returns None and the map keeps its smooth ground
@@ -414,6 +419,42 @@ def screen_of(
     )
 
 
+@dataclass(frozen=True)
+class _Into:
+    """A framebuffer the shaders draw into, `size` device pixels."""
+
+    framebuffer: int
+    size: tuple[int, int]
+
+
+# Textures of chunks let go of since GL was last reached, deleted then: they can be let go of by
+# whichever thread drops the last hold on them, and GL is reached from the frames only.
+_UNWANTED: list[int] = []
+
+
+class ChunkTexture:
+    """A chunk's texture blown up by the graphics card (GroundShader.blow_up), shown like any
+    texture imgui made and deleted once nothing holds it."""
+
+    def __init__(self, texture: int, width: int, height: int) -> None:
+        self._texture = texture
+        self.width = width
+        self.height = height
+
+    def texture_id(self) -> int:
+        return self._texture
+
+    def __del__(self) -> None:
+        _UNWANTED.append(self._texture)
+
+
+def free_textures() -> None:
+    """Deletes the chunks' textures nothing holds any more; called from the frames."""
+    if _UNWANTED:
+        unwanted = [_UNWANTED.pop() for _ in range(len(_UNWANTED))]
+        GL.glDeleteTextures(len(unwanted), unwanted)
+
+
 class _Target:
     """A texture the shaders draw into, with its framebuffer."""
 
@@ -482,6 +523,7 @@ class GroundShader:
         self._drawn: tuple[View, int] | None = None
         self._shown: tuple[View, Screen, int] | None = None
         self.cells_version = -1
+        self._chunks = GL.glGenFramebuffers(1)
 
     @classmethod
     def make(
@@ -539,6 +581,43 @@ class GroundShader:
             self._shown = shown
         return self._screen.texture
 
+    def blow_up(self, pixels: npt.NDArray[np.uint8], times: int) -> ChunkTexture:
+        """A texture of a chunk's RGBA pixels with each repeated `times` times each way."""
+        free_textures()
+        rows, cols = pixels.shape[:2]
+        size = (cols * times, rows * times)
+        small = _texture()
+        GL.glTexImage2D(
+            GL.GL_TEXTURE_2D,
+            0,
+            GL.GL_RGBA8,
+            cols,
+            rows,
+            0,
+            GL.GL_RGBA,
+            GL.GL_UNSIGNED_BYTE,
+            np.ascontiguousarray(pixels),
+        )
+        big = _texture()
+        GL.glTexImage2D(
+            GL.GL_TEXTURE_2D, 0, GL.GL_RGBA8, *size, 0, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, None
+        )
+        saved = GL.glGetIntegerv(GL.GL_FRAMEBUFFER_BINDING)
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self._chunks)
+        GL.glFramebufferTexture2D(
+            GL.GL_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0, GL.GL_TEXTURE_2D, big, 0
+        )
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, int(saved))
+        uniforms = {
+            "origin": ("2f", (0.0, 0.0)),
+            "scale": ("1f", (float(times),)),
+            "art_origin": ("2i", (0, 0)),
+            "art": ("1i", (0,)),
+        }
+        self._run(_Into(self._chunks, size), self._blow_up, uniforms, (small,))
+        GL.glDeleteTextures(1, [small])
+        return ChunkTexture(big, *size)
+
     def _inputs(self) -> tuple[int, ...]:
         return self._cells, self._light, self._table
 
@@ -557,7 +636,7 @@ class GroundShader:
 
     def _run(
         self,
-        target: _Target,
+        target: _Target | _Into,
         program: int,
         uniforms: dict[str, tuple[str, tuple]],
         inputs: tuple[int, ...],

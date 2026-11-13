@@ -159,3 +159,19 @@ def test_textures_repeat_pixels_into_squares_and_skip_the_copy_at_screen_scale()
     np.testing.assert_array_equal(doubled[::2, ::2], pixels)
     np.testing.assert_array_equal(doubled[1::2, 1::2], pixels)
     assert same is pixels
+
+
+def test_where_the_graphics_card_blows_textures_up_only_its_own_pixels_go_up() -> None:
+    world, mountains, _ = world_over_mountains()
+    layer = PixelLayer(world, threads=False)
+    drawn_now(layer, (*mountains, 2))
+    asked: list[tuple[np.ndarray, int]] = []
+    layer.blow_up = lambda pixels, times: asked.append((pixels, times)) or FakeTexture()
+
+    layer._upload(mountains, 4)
+    layer._upload(mountains, 2)
+
+    [(pixels, times)] = asked
+    assert times == 2
+    assert pixels is layer._chunks[(*mountains, 2)]
+    assert set(layer._textures) == {(*mountains, 4), (*mountains, 2)}
