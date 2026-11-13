@@ -229,11 +229,20 @@ class PixelLayer:
         drawn = (*chunk, resolution)
         pixels = self._chunks[drawn]
         self._chunks.move_to_end(drawn)
-        blow_up = scale // resolution
-        big = np.repeat(np.repeat(pixels, blow_up, axis=0), blow_up, axis=1)
+        big = blown_up(pixels, scale // resolution)
         texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
         self._textures[(*chunk, scale)] = texture
         return texture
+
+
+def blown_up(pixels: Rgba, times: int) -> Rgba:
+    """The pixels with each repeated `times` times each way, as the texture of a chunk drawn at
+    a finer scale than the screen's. Drawn at the screen's scale, as every chunk is at zoom 3 on
+    a double-density screen, they are the pixels themselves: copying them anyway cost a browser
+    more than a millisecond a chunk."""
+    if times == 1:
+        return pixels
+    return np.repeat(np.repeat(pixels, times, axis=0), times, axis=1)
 
 
 def middle_out(placement: ChunkPlacement, center: Vec2) -> list[ChunkKey]:

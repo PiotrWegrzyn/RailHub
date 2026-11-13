@@ -7,7 +7,7 @@ from imgui_bundle import hello_imgui
 from test_elevation import world_over_mountains
 
 from railroads.sim.grids import SquareGrid
-from railroads.ui.pixel.layer import SETTLE_S, PixelLayer, middle_out
+from railroads.ui.pixel.layer import SETTLE_S, PixelLayer, blown_up, middle_out
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection
 
 
@@ -148,3 +148,14 @@ def test_chunks_nearest_the_middle_of_the_view_come_first() -> None:
     assert sorted(order) == sorted(placement.chunks)
     assert order[0] == (3000 // CHUNK, 2000 // CHUNK)
     assert off == sorted(off)
+
+
+def test_textures_repeat_pixels_into_squares_and_skip_the_copy_at_screen_scale() -> None:
+    pixels = np.arange(2 * 3 * 4, dtype=np.uint8).reshape(2, 3, 4)
+
+    doubled, same = blown_up(pixels, 2), blown_up(pixels, 1)
+
+    assert doubled.shape == (4, 6, 4)
+    np.testing.assert_array_equal(doubled[::2, ::2], pixels)
+    np.testing.assert_array_equal(doubled[1::2, 1::2], pixels)
+    assert same is pixels
