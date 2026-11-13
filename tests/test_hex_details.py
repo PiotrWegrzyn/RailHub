@@ -104,14 +104,14 @@ def test_a_building_needing_several_goods_lists_each_with_what_it_got() -> None:
     ]
 
 
-def test_a_factory_without_lumber_makes_nothing_and_shows_what_it_could() -> None:
+def test_a_factory_without_lumber_makes_none_of_the_most_it_could() -> None:
     constructions = Constructions(make_map())
     constructions.build(Building((5, 5), BuildingKind.FACTORY))
     growth = Growth(constructions)
 
     details = describe(growth, (5, 5))
 
-    assert details.buildings[0].gave == [Flow(Good.GOODS, 0.0, 0.0, 30)]
+    assert details.buildings[0].gave == [Flow(Good.GOODS, 0.0, 30.0)]
 
 
 def test_a_building_shows_its_mood_with_its_satisfaction_as_a_percentage() -> None:

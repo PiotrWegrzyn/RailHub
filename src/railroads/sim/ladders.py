@@ -445,7 +445,7 @@ SUGAR_FIELDS = Ladder(
         water={Terrain.RIVER: 3.0, Terrain.LAKE: 2.0, Terrain.SEA: 1.5},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000017,
+    base_chance=0.000000013,
     chance_per_doubling={Points.POPULATION: 0.000000042, Points.FOOD: 0.000000168},
 )
 
@@ -685,7 +685,7 @@ POTATO_FARMS = Ladder(
         water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000033,
+    base_chance=0.000000023,
     chance_per_doubling={Points.POPULATION: 0.000001, Points.FOOD: 0.00000004},
     crowded_at=FARMS_CROWDED_OUT,
 )
@@ -728,7 +728,7 @@ HOP_GARDENS = Ladder(
         temperature={Temperature.COLD: 0.3, Temperature.HOT: 0.2},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000012,
+    base_chance=0.000000004,
     chance_per_doubling={Points.POPULATION: 0.00000012},
     crowded_at=FARMS_CROWDED_OUT,
 )

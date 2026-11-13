@@ -212,11 +212,26 @@ def test_eight_people_nearby_crowd_out_a_farm(houses: int, pulled_down: bool) ->
     build(constructions, second, BuildingKind.HOUSE, houses - 4)
     growth = Growth(constructions, NO_TRADE)
 
-    changed = growth._crowd_out_farms()
+    changed = growth._crowd_out()
 
     assert changed == ({(5, 5)} if pulled_down else set())
     assert growth.count(BuildingKind.FARM)[5, 5] == (0 if pulled_down else 1)
     assert growth.count(BuildingKind.FARM)[9, 9] == 1
+
+
+def test_a_town_crowds_out_potato_farms_as_well() -> None:
+    tile_map = make_map()
+    constructions = Constructions(tile_map)
+    build(constructions, (5, 5), BuildingKind.POTATO_FARM, 1)
+    first, second = tile_map.grid.neighbours(5, 5)[:2]
+    build(constructions, first, BuildingKind.HOUSE, 4)
+    build(constructions, second, BuildingKind.HOUSE, 4)
+    growth = Growth(constructions, NO_TRADE)
+
+    changed = growth._crowd_out()
+
+    assert changed == {(5, 5)}
+    assert growth.count(BuildingKind.POTATO_FARM)[5, 5] == 0
 
 
 @pytest.mark.parametrize(("houses", "grows"), [(7, True), (8, False)])

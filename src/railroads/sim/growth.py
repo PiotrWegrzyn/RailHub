@@ -7,9 +7,8 @@ buildings give adds there by how satisfied it is (MOST_SERVED times its points a
 railroads.sim.economy), times the doublings of the points around the cell that draw it: twice the
 people for houses, food and people for food, people and twice the industry for industry, mines,
 mills and ports, and twice the people for shops, inns and churches. So towns and districts draw
-more the bigger they are, and only what is satisfied breeds. Food is EMPTY_LAND_BONUS times
-likelier to spring up where nothing stands around. A building that finds no room in its cell spills
-over into a cell nearby (railroads.sim.room).
+more the bigger they are, and only what is satisfied breeds. A building that finds no room in its
+cell spills over into a cell nearby (railroads.sim.room).
 
 On town turns, a neighbourhood with SKYSCRAPER_PEOPLE population and SKYSCRAPER_FLATS blocks of
 flats may put up a skyscraper, SKYSCRAPER_CHANCE of the time: a business centre that pulls down the
@@ -17,12 +16,13 @@ flats and gives corporate points, whose people move into SKYSCRAPER_HOMES houses
 cells with room for them.
 
 Every TRADE_EVERY_MONTHS the stations hand out their goods and buildings sell to each other
-(railroads.sim.economy, settled with the railway by railroads.sim.station_trade), which leaves
-each kind of building in each cell unsatisfied, content or thriving, and pays the player for the
+(railroads.sim.economy, settled with the railway by railroads.sim.station_trade), which leaves each
+kind of building in each cell unsatisfied, content or thriving, and pays the player for the
 buildings they own (railroads.sim.ownership). Each building in a cell counts on its own: of ten
-houses with food for two, two are fed and eight starve. Buildings that starve on end are pulled down,
-as many as starved all that while, the player's too: homes after HOMES_DIE_AFTER_MONTHS,
-everything else after DIE_AFTER_MONTHS; those that make a bonus good never are.
+houses with food for two, two are fed and eight starve. Buildings that starve on end are pulled
+down, as many as starved all that while, the player's too: homes after HOMES_DIE_AFTER_MONTHS,
+processors and the rest after DIE_AFTER_MONTHS. Producers of what the land gives never starve to
+death (UNDYING); fields go only when a town grows over them (crowded_at).
 
 Growth keeps the tally the other parts share: how many of each kind stand in each cell (counts),
 the points around each cell (nearby) and every ladder's chances, all kept up to date by add. Every
@@ -59,11 +59,11 @@ from railroads.sim.economy import (
     served_multipliers,
 )
 from railroads.sim.forests import change_forests
-from railroads.sim.goods import BONUS_NEEDS, FITS, MAKES
+from railroads.sim.goods import MAKES, RECIPES
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.ladders import (
-    FARMS_CROWDED_OUT,
     GROWTH,
+    LADDERS,
     TOWNS,
     Cells,
     FloatGrid,
@@ -91,14 +91,12 @@ SKYSCRAPER_HOMES = 10
 # Above this chance, a ladder draws for every cell instead of thinning.
 THINNING_UP_TO = 0.05
 SKYSCRAPER_STARS = 4
-# How much likelier food springs up where no building stands in the cell or around it.
-EMPTY_LAND_BONUS = 10.0
 # For every ladder but the homes': its spawn chance, its base chance or, where it has none, its
 # chance per doubling, and what its served points add per doubling, both times these.
 SPAWN_SCALE = 1.0
 BREEDING_SCALE = 0.03
 # The same for food, which springs up far more readily.
-FOOD_SPAWN_SCALE = 0.45
+FOOD_SPAWN_SCALE = 2.5
 FOOD_BREEDING_SCALE = 0.03
 # The points around a cell that draw a ladder's buildings, and how much each counts, by the kind
 # of points they give.
@@ -123,14 +121,13 @@ DRAWN_BY: Mapping[Points, Mapping[Points, float]] = MappingProxyType(
 @dataclass(frozen=True, slots=True)
 class Breeding:
     """How a ladder's buildings come up: the chance anywhere its land allows, the kind of points
-    its buildings give, which points around draw them and how much, what each served point adds
-    per doubling of those, and how much likelier it springs up where nothing stands around."""
+    its buildings give, which points around draw them and how much, and what each served point
+    adds per doubling of those."""
 
     spawn: float
     own: Points
     drawn_by: Mapping[Points, float]
     per_doubling: float
-    empty_bonus: float = 1.0
 
 
 _BREEDINGS: dict[tuple[int, int], tuple[Ladder, Mapping, Breeding]] = {}
@@ -150,8 +147,7 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
         spawn_scale = FOOD_SPAWN_SCALE if food else SPAWN_SCALE
         spawn = spawn_scale * (ladder.base_chance or per_doubling)
         per_doubling *= FOOD_BREEDING_SCALE if food else BREEDING_SCALE
-    bonus = EMPTY_LAND_BONUS if own == Points.FOOD else 1.0
-    breeding = Breeding(spawn, own, DRAWN_BY.get(own, {own: 1.0}), per_doubling, bonus)
+    breeding = Breeding(spawn, own, DRAWN_BY.get(own, {own: 1.0}), per_doubling)
     _BREEDINGS[(id(ladder), id(points))] = (ladder, points, breeding)
     return breeding
 
@@ -167,12 +163,9 @@ def dies_after(kind: BuildingKind) -> int:
     return HOMES_DIE_AFTER_MONTHS if kind in HOMES else DIE_AFTER_MONTHS
 
 
-# Kinds that make a bonus good, which never die out.
-UNDYING = frozenset(
-    kind
-    for kind, goods in MAKES.items()
-    if any(good in FITS[need] for need in BONUS_NEEDS for good in goods)
-)
+# Producers of what the land gives, which stand idle with nobody to sell to rather than dying out:
+# the land decides where they are, and so how many people and what industry it can keep.
+UNDYING = frozenset(kind for kind in MAKES if kind not in RECIPES)
 
 
 def _allowed(cells: Cells, opened: Cells, land: FloatGrid) -> Cells:
@@ -291,7 +284,7 @@ class Growth:
 
     def _trade_steps(self) -> Steps[set[Cell]]:
         """trade_goods, pausing once the economy has traded."""
-        changed = self._crowd_out_farms()
+        changed = self._crowd_out()
         self.economy.year = self.year
         self.economy.bonus_per_good = BONUS_PER_GOOD + (
             0.0 if self.railway is None else self.railway.research.bonus(Effect.BONUS_GOODS)
@@ -443,36 +436,39 @@ class Growth:
             self.add(building.cell, building.kind, -1)
         return owned
 
-    def _crowd_out_farms(self) -> set[Cell]:
-        farms = self._counts.get(BuildingKind.FARM)
-        if farms is None:
-            return set()
-        crowded = np.argwhere((farms > 0) & (self._nearby[Points.POPULATION] >= FARMS_CROWDED_OUT))
+    def _crowd_out(self) -> set[Cell]:
+        """Pulls down the fields towns have grown over: the first kind of every ladder, of the
+        game's or this growth's own, that grows only where fewer people live around than its
+        crowded_at."""
         changed: set[Cell] = set()
-        for row, col in crowded.tolist():
-            gone = int(farms[row, col])
-            owned = self.owners.lose((row, col), BuildingKind.FARM, gone)
-            for _ in range(gone):
-                self.constructions.remove(Building((row, col), BuildingKind.FARM))
-            self.add((row, col), BuildingKind.FARM, -gone)
-            changed.add((row, col))
-            for _ in range(owned):
-                changed |= self.room.relocate(Building((row, col), BuildingKind.FARM))
+        people = self._nearby[Points.POPULATION]
+        crowded_at = {
+            ladder.kinds[0]: ladder.crowded_at
+            for ladder in (*LADDERS, *self.rule.ladders)
+            if ladder.crowded_at is not None
+        }
+        for kind, most in crowded_at.items():
+            fields = self._counts.get(kind)
+            if fields is None:
+                continue
+            for row, col in np.argwhere((fields > 0) & (people >= most)).tolist():
+                gone = int(fields[row, col])
+                owned = self.owners.lose((row, col), kind, gone)
+                for _ in range(gone):
+                    self.constructions.remove(Building((row, col), kind))
+                self.add((row, col), kind, -gone)
+                changed.add((row, col))
+                for _ in range(owned):
+                    changed |= self.room.relocate(Building((row, col), kind))
         return changed
 
     def _breeding(self, place: _Place) -> Breeding:
         return breeding_of(place.ladder, self.rule.points)
 
-    def _crowd(self, cells: npt.NDArray[np.intp]) -> npt.NDArray[np.int64]:
-        """All the points in and around each cell."""
-        return sum((nearby.ravel()[cells] for nearby in self._nearby.values()), start=np.int64(0))
-
     def _reckon(self, place: _Place, cells: npt.NDArray[np.intp]) -> None:
         """Works out the ladder's chances in these cells afresh."""
         breeding = self._breeding(place)
         raw = np.full(cells.size, breeding.spawn)
-        if breeding.empty_bonus != 1.0:
-            raw = np.where(self._crowd(cells) == 0, raw * breeding.empty_bonus, raw)
         if breeding.per_doubling:
             served = self._served[breeding.own][cells]
             if served.any():
@@ -798,17 +794,12 @@ class Growth:
         points, value = self.rule.points[kind]
         neighbourhood = [cell, *self._grid.neighbours(*cell)]
         rows, cols = zip(*neighbourhood, strict=True)
-        before = self._nearby[points][rows, cols]
         self._nearby[points][rows, cols] += how_many * value
-        after = self._nearby[points][rows, cols]
         flat = np.ravel_multi_index((rows, cols), self._grid.shape)
-        crowd = self._crowd(flat)
-        emptied = ((crowd - (after - before)) == 0) != (crowd == 0)
         served = {own: bool(self._served[own][flat].any()) for own in Points}
         for place in self._places:
             breeding = self._breeding(place)
-            drawn = points in breeding.drawn_by and served[breeding.own]
-            if not drawn and not (breeding.empty_bonus != 1.0 and emptied.any()):
+            if points not in breeding.drawn_by or not served[breeding.own]:
                 continue
             self._reckon(place, flat)
             if how_many > 0:
