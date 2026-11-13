@@ -16,6 +16,7 @@ from railroads.sim.trains import Stop
 from railroads.ui import app as app_module
 from railroads.ui.app import App, Shell
 from railroads.ui.build_menu import Tool
+from railroads.ui.ground import GroundPictures
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
 from railroads.ui.main_menu import Page
 from railroads.ui.map_view import MapView
@@ -429,6 +430,41 @@ def test_the_trains_window_map_is_softened_anew_a_step_a_frame_once_colours_chan
     assert app.view._soft is not None
     assert np.array_equal(app.view._soft[1], soften(app.view._plain_picture()))
     assert app.view._soft_texture[0] == version
+
+
+def test_a_month_paints_again_only_the_ground_pictures_the_last_frame_showed(
+    context: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = made_app()
+    app.view.build.trains.open = False
+    app.view.camera.zoom_level = 2
+    frame(app)
+    app.view.camera.zoom_level = 4
+    frame(app)
+    kept = set(app.view._textures)
+    painted: list[bool] = []
+    picture = GroundPictures.picture
+
+    def counted(
+        pictures: GroundPictures,
+        colors: np.ndarray,
+        light_from: tuple[float, float],
+        with_lines: bool = False,
+    ) -> np.ndarray:
+        painted.append(with_lines)
+        return picture(pictures, colors, light_from, with_lines)
+
+    monkeypatch.setattr(GroundPictures, "picture", counted)
+
+    colours_changed_by_a_month(app)
+    frame(app)
+    painted_by_the_month = list(painted)
+    app.view.camera.zoom_level = 2
+    frame(app)
+
+    assert kept == {False, True}
+    assert painted_by_the_month == [False]
+    assert painted == [False, True]
 
 
 def test_without_threads_frames_stay_at_full_speed_while_an_autosave_is_written(

@@ -151,6 +151,8 @@ class MapView:
         self._trains: TrainLayer | None = None
         self._preview: TrackPreview | None = None
         self._textures: dict[bool, hello_imgui.TextureGpu] = {}
+        # Which of those the frame drawn last showed, the ones a month paints again in its colours.
+        self._textures_shown: set[bool] = set()
         # How many times the cells' colours on the ground pictures have changed.
         self._ground_version = 0
         # The ground picture softened for the trains window's map, with the version of the colours
@@ -201,6 +203,7 @@ class MapView:
         return self.game.railway
 
     def gui(self) -> None:
+        self._textures_shown.clear()
         if self.railway.levels != self._shown_levels:
             raised = {
                 cell
@@ -296,8 +299,11 @@ class MapView:
             self._colors_version += 1
             if self._pixels is not None:
                 self._pixels.refresh(self._pixels.world.satisfaction_changed(satisfaction))
-            # Painted again in the new colours in steps of their own, the old ones showing until
-            # then, rather than all on one frame.
+            # The ground pictures the last frame showed are painted again in the new colours in
+            # steps of their own, the old ones showing until then, rather than all on one frame.
+            # The others are dropped, to be painted when they next show.
+            for with_lines in set(self._textures) - self._textures_shown:
+                del self._textures[with_lines]
             for with_lines in list(self._textures):
                 yield
                 self._textures.pop(with_lines, None)
@@ -378,6 +384,7 @@ class MapView:
             light = self.camera.map_direction(*LIGHT_ON_SCREEN)
             rgba = self._ground_pictures().picture(self._ground_colors(), light, with_lines)
             self._textures[with_lines] = hello_imgui.create_texture_gpu_from_rgba_data(rgba)
+        self._textures_shown.add(with_lines)
         return self._textures[with_lines]
 
     def _ground_colors(self) -> Pixels:
