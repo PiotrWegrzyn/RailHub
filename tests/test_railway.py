@@ -18,7 +18,7 @@ from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import CELLS_PER_MONTH, Railway
 from railroads.sim.routes import build_station, lay_route, plan_route, route_price
 from railroads.sim.station_goods import STOCKPILE, WAITING, StationGoods
-from railroads.sim.trains import CAR_CAPACITY, MAX_CARS, Car, Stop
+from railroads.sim.trains import CAR_CAPACITY, MAX_CARS, SMALL_CAR, Car, Stop
 
 
 def joined_stations() -> tuple[Growth, Railway]:
@@ -56,6 +56,24 @@ def test_a_new_train_leaves_its_first_stop_with_that_stops_cars_full() -> None:
     assert train.heading == 1
     assert [car.load for car in train.cars] == [CAR_CAPACITY, 25.0]
     assert railway.position(train) is not None
+
+
+@pytest.mark.parametrize(
+    ("good", "load"),
+    [(Good.GOLD, 10.0), (Good.STEEL, 25.0), (Good.CATTLE, 25.0), (Good.COAL, 50.0)],
+)
+def test_a_car_holds_ten_of_precious_goods_twenty_five_of_heavy_ones_and_fifty_of_the_rest(
+    good: Good, load: float
+) -> None:
+    _, railway = joined_stations()
+    railway.station_goods((6, 3)).stockpile[good] = 100.0
+    train = railway.buy()
+    train.stops = [Stop((6, 3), [good], wait_for_load=False), Stop((6, 20))]
+
+    railway.run(0.1)
+
+    assert [car.load for car in train.cars] == [load]
+    assert railway.station_goods((6, 3)).stockpile[good] == pytest.approx(100.0 - load)
 
 
 def test_a_train_waits_at_its_stop_until_new_goods_fill_its_cars() -> None:
@@ -579,7 +597,9 @@ def test_gold_reaches_a_jeweller_through_a_hub_and_pays_the_moment_he_takes_it()
     railway.run(12 / CELLS_PER_MONTH)
 
     assert railway.station_goods((6, 27)).brought[Good.GOLD] == pytest.approx(0.0)
-    assert 10 * price_of(Good.GOLD) < railway.finances.month["cargo"] <= 20 * price_of(Good.GOLD)
+    assert (
+        5 * price_of(Good.GOLD) < railway.finances.month["cargo"] <= SMALL_CAR * price_of(Good.GOLD)
+    )
 
 
 def settle_houses(growth: Growth, cell: tuple[int, int], houses: int) -> None:
