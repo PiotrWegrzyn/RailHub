@@ -43,17 +43,25 @@ def test_cells_of_a_part_are_held_to_the_grid_and_say_which_lie_on_it(grid: Grid
     assert not inside.all() and inside.any()
 
 
-def test_a_lattice_refuses_pixels_it_does_not_cover() -> None:
+def test_a_lattice_holds_only_the_pixels_it_covers() -> None:
     grid = GRIDS[0]
     lattice = Lattice(projection_of(grid), 0, 0, 10, 10, grid=grid)
 
-    assert lattice.holds(2, 3, 8, 7)
-    assert not lattice.holds(2, 3, 9, 7)
+    inside, beyond = lattice.holds(2, 3, 8, 7), lattice.holds(2, 3, 9, 7)
+
+    assert inside
+    assert not beyond
+
+
+def test_a_lattice_refuses_points_of_pixels_it_does_not_cover() -> None:
+    grid = GRIDS[0]
+    lattice = Lattice(projection_of(grid), 0, 0, 10, 10, grid=grid)
+
     with pytest.raises(ValueError):
         lattice.plane(-1, 0, 5, 5)
 
 
-def test_a_lattice_at_a_resolution_not_a_power_of_two_gives_only_blocks_from_its_corner() -> None:
+def test_a_lattice_at_a_resolution_not_a_power_of_two_gives_blocks_from_its_corner() -> None:
     projection = projection_of(GRIDS[0])
     lattice = Lattice(projection, -7, 5, 12, 10, 3)
 
@@ -62,5 +70,10 @@ def test_a_lattice_at_a_resolution_not_a_power_of_two_gives_only_blocks_from_its
     py, px = np.mgrid[0:30, 0:27]
     alone_x, alone_y = projection.to_plane(-7 + (px + 0.5) / 3, 5 + (py + 0.5) / 3)
     assert np.array_equal(x, alone_x) and np.array_equal(y, alone_y)
+
+
+def test_a_lattice_at_a_resolution_not_a_power_of_two_refuses_blocks_from_elsewhere() -> None:
+    lattice = Lattice(projection_of(GRIDS[0]), -7, 5, 12, 10, 3)
+
     with pytest.raises(ValueError):
         lattice.plane(-6, 5, 9, 10)

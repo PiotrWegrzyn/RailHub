@@ -419,15 +419,15 @@ def test_the_trains_window_map_is_softened_anew_a_step_a_frame_once_colours_chan
     version = app.view._ground_version
 
     frame(app)
-    assert app.view._soft_texture is not None
-    shown_meanwhile = app.view._soft_texture[0]
+    shown_meanwhile = app.view._soft_texture
     frames = 1
     while app.view._soft is not None and app.view._soft[0] != version and frames < 50:
         frame(app)
         frames += 1
     frame(app)
 
-    assert shown_meanwhile == version - 1
+    assert shown_meanwhile is not None
+    assert shown_meanwhile[0] == version - 1
     assert frames > 2
     assert app.view._soft is not None
     assert np.array_equal(app.view._soft[1], soften(app.view._plain_picture()))

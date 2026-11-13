@@ -151,12 +151,12 @@ def traded_growth() -> Growth:
 
 def test_a_cell_alone_is_described_as_the_whole_map_has_it() -> None:
     growth = traded_growth()
-    trade = growth.trade
-    assert trade is not None
     cells = [(row, col) for row in range(10) for col in range(10)]
 
     described = {cell: describe(growth, cell, growth.satisfaction()) for cell in cells}
 
+    trade = growth.trade
+    assert trade is not None
     rated = 0
     for cell, details in described.items():
         assert details == describe(growth, cell)
