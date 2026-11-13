@@ -107,6 +107,7 @@ Query parameters:
     // The first screen: play here, or download the game for the computer from the latest release.
     // The game loads behind it all the while, so Play online starts as soon as it can.
     const RELEASES = "https://github.com/PiotrWegrzyn/RailHub/releases/latest/download/";
+    const RELEASE_LIST = "https://api.github.com/repos/PiotrWegrzyn/RailHub/releases?per_page=10";
     const DOWNLOADS = {
         macOS: ["RailHub-macOS.zip", "A Mac with Apple Silicon and macOS 14 or newer"],
         Windows: ["RailHub-Windows.zip", "Windows 10 or 11, 64-bit"],
@@ -120,16 +121,38 @@ Query parameters:
         return "Windows";
     }
 
+    // The Mac app is built by hand and added to a release after it comes out, so until then each
+    // link points at the newest release that has its file.
+    async function linkNewestBuilds() {
+        try {
+            const response = await fetch(RELEASE_LIST);
+            if (!response.ok) return;
+            const newest = {};
+            for (const release of await response.json()) {
+                if (release.draft || release.prerelease) continue;
+                for (const asset of release.assets) newest[asset.name] ??= asset.browser_download_url;
+            }
+            for (const link of document.querySelectorAll("#landing a[data-file]")) {
+                if (newest[link.dataset.file]) link.href = newest[link.dataset.file];
+            }
+        } catch {
+            // Offline, or GitHub's hourly limit reached: the links to the latest release stay.
+        }
+    }
+
     function showLanding(play) {
         const system = thisSystem();
         const [file, needs] = DOWNLOADS[system];
         const download = document.getElementById("download");
         download.href = RELEASES + file;
+        download.dataset.file = file;
         download.textContent = "Download for " + system;
         document.getElementById("needs").textContent = needs;
         const others = Object.keys(DOWNLOADS).filter(name => name !== system);
-        document.getElementById("others").innerHTML = "Also for " +
-            others.map(name => `<a href="${RELEASES + DOWNLOADS[name][0]}">${name}</a>`).join(" and ");
+        document.getElementById("others").innerHTML = "Also for " + others.map(name =>
+            `<a href="${RELEASES + DOWNLOADS[name][0]}" data-file="${DOWNLOADS[name][0]}">${name}</a>`
+        ).join(" and ");
+        linkNewestBuilds();
         const landing = document.getElementById("landing");
         landing.hidden = false;
         document.getElementById("play").addEventListener("click", () => {
