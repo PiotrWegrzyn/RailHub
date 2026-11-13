@@ -2,6 +2,7 @@
 what it earns and who makes and wants it."""
 
 from dataclasses import dataclass
+from functools import cache
 
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
@@ -43,8 +44,10 @@ def _opening_year(kind: BuildingKind) -> int:
     return next((ladder.from_year for ladder in LADDERS if kind in ladder.kinds), 0)
 
 
-def building_help() -> list[BuildingHelp]:
-    """Every kind of building, grouped by the points it gives."""
+@cache
+def building_help() -> tuple[BuildingHelp, ...]:
+    """Every kind of building, grouped by the points it gives; worked out once, as the open
+    window draws them all every frame."""
     rows = [
         BuildingHelp(
             kind,
@@ -61,11 +64,12 @@ def building_help() -> list[BuildingHelp]:
         for kind in BuildingKind
     ]
     order = list(Points)
-    return sorted(rows, key=lambda row: order.index(row.group))
+    return tuple(sorted(rows, key=lambda row: order.index(row.group)))
 
 
-def good_help() -> list[GoodHelp]:
-    """Every good, with its price where all the demand for it is left."""
+@cache
+def good_help() -> tuple[GoodHelp, ...]:
+    """Every good, with its price where all the demand for it is left; worked out once."""
     rows = []
     for good in Good:
         needs = {need for need, goods in FITS.items() if good in goods}
@@ -78,7 +82,7 @@ def good_help() -> list[GoodHelp]:
                 tuple(kind.value for kind, wanted in NEEDS.items() if needs & set(wanted)),
             )
         )
-    return rows
+    return tuple(rows)
 
 
 @dataclass
