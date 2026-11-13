@@ -1,3 +1,4 @@
+import ctypes
 from types import SimpleNamespace
 from typing import Any
 
@@ -7,6 +8,7 @@ from test_elevation import world_over_mountains
 
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.ui.pixel import layer as layer_module
+from railroads.ui.pixel import web_painter
 from railroads.ui.pixel.copies import ChunkJob, WorldCopy
 from railroads.ui.pixel.layer import PixelLayer, painter_for
 from railroads.ui.pixel.painter import Painter
@@ -14,6 +16,7 @@ from railroads.ui.pixel.web_painter import (
     JOBS_PER_WORKER,
     WorkerPainter,
     Workers,
+    _PageObject,
     page_workers,
 )
 from railroads.ui.pixel.world import PixelWorld
@@ -28,8 +31,11 @@ class FakePage:
         self.copies = [WorldCopy() for _ in range(count)]
         self.queues: list[list[dict[str, Any]]] = [[] for _ in range(count)]
         self.inbox: list[dict[str, Any]] = []
+        self.refusing: set[int] = set()
 
     def post(self, worker: int, message: dict[str, Any]) -> None:
+        if worker in self.refusing:
+            raise RuntimeError("Array buffer allocation failed")
         self.queues[worker].append(message)
 
     def take(self) -> list[dict[str, Any]]:
@@ -296,6 +302,26 @@ def test_a_worker_ready_later_gets_the_world_as_it_is_then() -> None:
         )
 
 
+def test_a_worker_that_cant_be_posted_to_paints_no_more_and_another_takes_its_chunk(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    world, mountains, _ = world_over_mountains()
+    page = FakePage(2)
+    page.start(0, 1)
+    painter = WorkerPainter(world, Workers(page))
+    page.work()
+    page.refusing.add(0)
+
+    painter.want("chunk", job(world, mountains), True, 1.0)
+    page.work()
+    done = painted(painter)
+
+    np.testing.assert_array_equal(done["chunk"], world.render(*mountains, 2))
+    assert painter.threaded
+    assert painter.waiting() == 0
+    assert "can't be sent" in capsys.readouterr().err
+
+
 def test_without_a_page_chunks_are_painted_by_a_thread_or_the_frames() -> None:
     world, _, _ = world_over_mountains()
 
@@ -327,3 +353,95 @@ def test_with_workers_the_layer_never_waits_and_draws_raised_chunks_again_finely
     assert not layer._moved(camera, 1.0)
     assert taken == {mountains}
     np.testing.assert_array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2, True))
+
+
+class FakeJsMessage:
+    """A message from the page as Pyodide hands it over: its fields read one at a time, or the
+    whole of it turned into a dict."""
+
+    def __init__(self, **fields: Any) -> None:
+        vars(self).update(fields)
+
+    def to_py(self) -> dict[str, Any]:
+        return dict(vars(self))
+
+
+class FakeJsPage:
+    """The page's object holding the workers, which copies bytes from and into Python's memory
+    by their address in it."""
+
+    count = 1
+
+    def __init__(self, *messages: FakeJsMessage) -> None:
+        self.messages = list(messages)
+        self.posted: list[tuple[int, dict[str, Any], bytes | None]] = []
+
+    def post(self, worker: int, message: dict[str, Any], address: int = 0, length: int = 0) -> None:
+        data = ctypes.string_at(address, length) if length else None
+        self.posted.append((worker, message, data))
+
+    def take(self) -> list[FakeJsMessage]:
+        taken, self.messages = self.messages, []
+        return taken
+
+    def copy(self, buffer: SimpleNamespace, address: int) -> None:
+        if buffer.data is None:
+            raise RuntimeError("RangeError: offset is out of bounds")
+        ctypes.memmove(address, buffer.data, buffer.byteLength)
+
+
+@pytest.fixture
+def plain_js(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        web_painter, "to_js", lambda message, dict_converter: message, raising=False
+    )
+    js = SimpleNamespace(Object=SimpleNamespace(fromEntries=dict))
+    monkeypatch.setattr(web_painter, "js", js, raising=False)
+
+
+def pixels_message(job: int, data: bytes | None, size: int) -> FakeJsMessage:
+    buffer = SimpleNamespace(data=data, byteLength=size)
+    return FakeJsMessage(worker=0, kind="painted", world=1, job=job, pixels=buffer, shape=[size])
+
+
+@pytest.mark.usefixtures("plain_js")
+def test_bytes_go_to_the_page_by_their_address_in_pythons_memory() -> None:
+    page = FakeJsPage()
+    workers = _PageObject(page)
+    data = bytes(range(256)) * 3
+
+    workers.post(2, {"kind": "world", "world": 1, "data": data})
+    workers.post(3, {"kind": "paint", "world": 1, "job": 7, "chunk": [1, 2, 2]})
+
+    assert page.posted == [
+        (2, {"kind": "world", "world": 1}, data),
+        (3, {"kind": "paint", "world": 1, "job": 7, "chunk": [1, 2, 2]}, None),
+    ]
+
+
+def test_pixels_a_worker_sent_are_copied_into_an_array_by_its_address() -> None:
+    data = bytes(range(200))
+    page = FakeJsPage(FakeJsMessage(worker=1, kind="ready"), pixels_message(5, data, len(data)))
+
+    taken = _PageObject(page).take()
+
+    assert taken[0] == {"worker": 1, "kind": "ready"}
+    assert {key: value for key, value in taken[1].items() if key != "pixels"} == {
+        "worker": 0,
+        "kind": "painted",
+        "world": 1,
+        "job": 5,
+        "shape": [200],
+    }
+    assert taken[1]["pixels"].tobytes() == data
+
+
+def test_a_message_whose_pixels_cant_be_copied_fails_and_the_others_still_come() -> None:
+    page = FakeJsPage(pixels_message(5, None, 64), FakeJsMessage(worker=1, kind="dead"))
+
+    taken = _PageObject(page).take()
+
+    assert taken[0]["kind"] == "failed"
+    assert taken[0]["job"] == 5
+    assert "out of bounds" in taken[0]["error"]
+    assert taken[1] == {"worker": 1, "kind": "dead"}

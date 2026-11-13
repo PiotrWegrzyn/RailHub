@@ -217,11 +217,25 @@ class WorkerPainter:
                 return
         message = {"kind": "world", "world": self._number, "data": self._sent_world[1]}
         for worker in joining:
-            self._workers.page.post(worker, message)
-            self._holding.add(worker)
+            if self._post(worker, message):
+                self._holding.add(worker)
         if not self._workers.starting:
             self._sent_world = None
         self._give_out()
+
+    def _post(self, worker: int, message: Message) -> bool:
+        """Posts a message to a worker, which paints no more of this world if it can't be
+        posted to; returns whether it was."""
+        try:
+            self._workers.page.post(worker, message)
+        except Exception as error:  # noqa: BLE001 - other workers or the frames paint instead
+            print(
+                f"A painting worker can't be sent the map's {message['kind']}: {error}",
+                file=sys.stderr,
+            )
+            self._lose(worker)
+            return False
+        return True
 
     def _lose(self, worker: int) -> None:
         """Takes back the jobs of a worker that failed, for others or the frames to paint."""
@@ -242,22 +256,18 @@ class WorkerPainter:
             return
         update = {"kind": "update", "world": self._number, "data": message}
         for worker in sorted(self._holding):
-            self._workers.page.post(worker, update)
+            self._post(worker, update)
 
     def _give_out(self) -> None:
         """Gives the most wanted jobs to workers with room for more. Jobs that are not urgent
         wait while any urgent one is waiting or being painted, and go only to workers with
         nothing else to do, at most to half of the workers at once."""
         queue = self._queue
-        if not self._holding or not queue.jobs or self._workers.painter is not self:
-            return
-        load = dict.fromkeys(sorted(self._holding), 0)
-        for _, _, worker in self._given.values():
-            load[worker] += 1
-        if min(load.values()) >= JOBS_PER_WORKER:
+        if not queue.jobs or self._workers.painter is not self or not self._room():
             return
         self._catch_up()
-        while True:
+        load = self._load()
+        while load:
             worker = min(load, key=load.__getitem__)
             if load[worker] >= JOBS_PER_WORKER:
                 return
@@ -265,23 +275,36 @@ class WorkerPainter:
             if taken is None:
                 return
             key, job = taken
-            if not job.urgent and not self._free_for_finer_work(load[worker]):
+            if not job.urgent and not self._free_for_finer_work(load[worker], len(load)):
                 queue.jobs[key] = job
                 return
             number = next(self._numbers)
             self._given[number] = (key, job, worker)
-            load[worker] += 1
             chunk: ChunkJob = job.work
-            self._workers.page.post(
-                worker,
-                {"kind": "paint", "world": self._number, "job": number, "chunk": [*chunk.drawing]},
-            )
+            drawing = [*chunk.drawing]
+            message = {"kind": "paint", "world": self._number, "job": number, "chunk": drawing}
+            if self._post(worker, message):
+                load[worker] += 1
+            else:
+                del load[worker]
 
-    def _free_for_finer_work(self, worker_load: int) -> bool:
+    def _load(self) -> dict[int, int]:
+        """How many jobs each worker painting this world holds."""
+        load = dict.fromkeys(sorted(self._holding), 0)
+        for _, _, worker in self._given.values():
+            if worker in load:
+                load[worker] += 1
+        return load
+
+    def _room(self) -> bool:
+        """Whether a worker painting this world has room for another job."""
+        return any(jobs < JOBS_PER_WORKER for jobs in self._load().values())
+
+    def _free_for_finer_work(self, worker_load: int, workers: int) -> bool:
         given = [job for _, job, _ in self._given.values()]
         if worker_load or any(job.urgent for job in given):
             return False
-        return len(given) < max(1, len(self._holding) // 2)
+        return len(given) < max(1, workers // 2)
 
 
 def _pixels(message: Message) -> np.ndarray | None:
@@ -293,9 +316,17 @@ def _pixels(message: Message) -> np.ndarray | None:
     return pixels.reshape(shape)
 
 
+def _address(array: np.ndarray) -> int:
+    """Where an array's data starts in Python's memory, as a number never below zero."""
+    return int(array.__array_interface__["data"][0])
+
+
 class _PageObject:
     """The page's own object holding its workers (window.railroadsPainters), with messages
-    turned from Python and back."""
+    turned from Python and back. The page copies bytes between Python's memory and the workers
+    by their address in it: Pyodide's own conversions read an address past 2 GiB as a negative
+    number, so once Python's memory grows that far they copy the wrong bytes, which no worker
+    can take up, or fail inside a frame."""
 
     def __init__(self, page: Any) -> None:
         self._page = page
@@ -305,10 +336,32 @@ class _PageObject:
         return int(self._page.count)
 
     def post(self, worker: int, message: Message) -> None:
-        self._page.post(worker, to_js(message, dict_converter=js.Object.fromEntries))
+        data = message.get("data")
+        plain = {key: value for key, value in message.items() if key != "data"}
+        converted = to_js(plain, dict_converter=js.Object.fromEntries)
+        if data is None:
+            self._page.post(worker, converted)
+        else:
+            view = np.frombuffer(data, dtype=np.uint8)
+            self._page.post(worker, converted, _address(view), view.size)
 
     def take(self) -> list[Message]:
-        return [message.to_py() for message in self._page.take()]
+        return [self._taken(message) for message in self._page.take()]
+
+    def _taken(self, message: Any) -> Message:
+        """A message from a worker, its pixels, if it has any, copied into an array; a chunk
+        whose pixels can't be is painted on a frame instead."""
+        buffer = getattr(message, "pixels", None)
+        if buffer is None:
+            return message.to_py()
+        del message.pixels
+        taken: Message = message.to_py()
+        try:
+            pixels = np.empty(int(buffer.byteLength), dtype=np.uint8)
+            self._page.copy(buffer, _address(pixels))
+        except Exception as error:  # noqa: BLE001 - the frames paint the chunk instead
+            return taken | {"kind": "failed", "error": f"its pixels could not be taken: {error}"}
+        return taken | {"pixels": pixels}
 
 
 @cache
