@@ -358,8 +358,11 @@ class MapView:
 
     def _softened(self) -> Steps[tuple[int, Pixels]]:
         version = self._ground_version
+        colors = self._ground_colors()
+        yield
+        light = self.camera.map_direction(*LIGHT_ON_SCREEN)
         # A copy, as the kept picture is painted over in place when the colours change again.
-        rgba = self._plain_picture().copy()
+        rgba = self._ground_pictures().picture(colors, light, False).copy()
         yield
         pixels = yield from soften_steps(rgba)
         return version, pixels

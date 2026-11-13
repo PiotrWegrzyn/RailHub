@@ -225,7 +225,7 @@ def test_softening_in_steps_gives_the_picture_softened_at_once(shape: tuple[int,
         taken += 1
 
     assert np.array_equal(soft, soften(rgba))
-    assert taken == 1 + -(-soft.shape[0] // SOFTEN_ROWS)
+    assert taken == 2 * -(-soft.shape[0] // SOFTEN_ROWS)
 
 
 def test_a_station_can_be_added_unless_the_train_already_ends_there() -> None:

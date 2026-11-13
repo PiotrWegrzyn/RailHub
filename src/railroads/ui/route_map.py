@@ -48,9 +48,9 @@ SUMMARY_MOST = 5
 MADE_EVERY = 0.5
 # How far, in pixels of the halved ground picture, it is blurred so the cells' edges soften.
 SOFTEN_RADIUS = 1.2
-# How many rows of the halved picture a step of softening blurs (soften_steps), and how many rows
-# more it takes in on either side: more than the blur reaches, so each band comes out as it does
-# within the whole picture.
+# How many rows of the halved picture a step of softening halves or blurs (soften_steps), and how
+# many rows more a blurred band takes in on either side: more than the blur reaches, so each band
+# comes out as it does within the whole picture.
 SOFTEN_ROWS = 160
 SOFTEN_MARGIN = 8
 
@@ -262,10 +262,15 @@ def soften(rgba: np.ndarray, radius: float = SOFTEN_RADIUS) -> np.ndarray:
 
 
 def soften_steps(rgba: np.ndarray, radius: float = SOFTEN_RADIUS) -> Steps[np.ndarray]:
-    """soften a step at a time, with the same picture at the end: halving the picture, then
-    blurring SOFTEN_ROWS rows of the half a step. The picture is read only in the first step."""
-    half = Image.fromarray(np.ascontiguousarray(rgba), "RGBA").reduce(2)
-    yield
+    """soften a step at a time, with the same picture at the end: SOFTEN_ROWS rows of the half
+    made a step, then as many blurred. The picture must stay as it is until the last step."""
+    whole = Image.fromarray(np.ascontiguousarray(rgba), "RGBA")
+    # Halving takes the pixels two by two, so bands of an even number of rows halve apart.
+    half = Image.new("RGBA", ((whole.width + 1) // 2, (whole.height + 1) // 2))
+    for top in range(0, whole.height, 2 * SOFTEN_ROWS):
+        bottom = min(top + 2 * SOFTEN_ROWS, whole.height)
+        half.paste(whole.crop((0, top, whole.width, bottom)).reduce(2), (0, top // 2))
+        yield
     width, height = half.size
     soft = np.empty((height, width, 4), dtype=np.uint8)
     blur = ImageFilter.GaussianBlur(radius)
