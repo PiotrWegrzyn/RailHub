@@ -153,6 +153,18 @@ POINTS: Mapping[BuildingKind, tuple[Points, int]] = MappingProxyType(
         BuildingKind.PIG_FARM: (Points.FOOD, 1),
         BuildingKind.CHICKEN_FARM: (Points.FOOD, 1),
         BuildingKind.GASWORKS: (Points.INDUSTRY, 1),
+        BuildingKind.COKE_PLANT: (Points.INDUSTRY, 2),
+        BuildingKind.POTTER: (Points.INDUSTRY, 1),
+        BuildingKind.TILE_WORKS: (Points.INDUSTRY, 1),
+        BuildingKind.FOUNDRY: (Points.INDUSTRY, 2),
+        BuildingKind.DAIRY: (Points.INDUSTRY, 1),
+        BuildingKind.SAUSAGE_MAKER: (Points.INDUSTRY, 1),
+        BuildingKind.CARPET_WEAVER: (Points.CORPORATE, 2),
+        BuildingKind.CLOCK_MAKER: (Points.CORPORATE, 2),
+        BuildingKind.MIRROR_MAKER: (Points.CORPORATE, 2),
+        BuildingKind.MANOR: (Points.CORPORATE, 8),
+        BuildingKind.THEATRE: (Points.CORPORATE, 5),
+        BuildingKind.HOSPITAL: (Points.CORPORATE, 5),
         BuildingKind.RAILWAY_WORKS: (Points.INDUSTRY, 20),
         BuildingKind.FLAX_FIELD: (Points.FOOD, 1),
         BuildingKind.HOP_GARDEN: (Points.FOOD, 1),
@@ -704,6 +716,77 @@ BUTCHERS = replace(
     BAKERIES, kinds=(BuildingKind.MEAT_FACTORY,), base_chance=0.000004, from_year=1850
 )
 
+# Town crafts that come up, like bakeries, the likelier the more people live around: potters and
+# dairies as often as other crafts; tile works, foundries and sausage makers, which need two
+# inputs and make goods worth more, half as often; the makers of luxury goods only in towns of
+# LUXURY_TOWN people or more, and seldom.
+LUXURY_TOWN = 20
+
+
+def _town_craft(
+    kind: BuildingKind, share: float, from_year: int = 0, least_people: int = 0
+) -> Ladder:
+    return Ladder(
+        kinds=(kind,),
+        land=TOWN_LAND,
+        base_chance=CRAFT_BASE * share,
+        chance_per_doubling={Points.POPULATION: 0.000001},
+        needs={Points.POPULATION: least_people} if least_people else {},
+        most_per_cell=1,
+        most_nearby=1,
+        from_year=from_year,
+    )
+
+
+TOWN_CRAFTS = (
+    _town_craft(BuildingKind.POTTER, 1.0),
+    _town_craft(BuildingKind.DAIRY, 1.0),
+    _town_craft(BuildingKind.TILE_WORKS, 0.5),
+    _town_craft(BuildingKind.FOUNDRY, 0.5, 1800),
+    _town_craft(BuildingKind.SAUSAGE_MAKER, 0.5, 1850),
+    _town_craft(BuildingKind.CARPET_WEAVER, 0.1, 1700, LUXURY_TOWN),
+    _town_craft(BuildingKind.CLOCK_MAKER, 0.1, 1880, LUXURY_TOWN),
+    _town_craft(BuildingKind.MIRROR_MAKER, 0.1, 1700, LUXURY_TOWN),
+)
+
+# Coke plants bake coal into coke for the steel mills from 1850, drawn to industry.
+COKE_PLANTS = Ladder(
+    kinds=(BuildingKind.COKE_PLANT,),
+    land=FACTORY_LAND,
+    base_chance=0.0000002,
+    chance_per_doubling={Points.INDUSTRY: 0.0000004},
+    most_per_cell=1,
+    most_nearby=2,
+    from_year=1850,
+)
+
+# Buildings that only buy: manors in towns of MANOR_TOWN people, theatres in towns of
+# THEATRE_TOWN and hospitals, from 1850, in towns of HOSPITAL_TOWN; each one to a neighbourhood
+# and the likelier the more people live around.
+MANOR_TOWN = 40
+THEATRE_TOWN = 40
+HOSPITAL_TOWN = 30
+
+
+def _town_sight(kind: BuildingKind, least_people: int, from_year: int = 0) -> Ladder:
+    return Ladder(
+        kinds=(kind,),
+        land=TOWN_LAND,
+        base_chance=CRAFT_BASE * 0.2,
+        chance_per_doubling={Points.POPULATION: 0.000001},
+        needs={Points.POPULATION: least_people},
+        most_per_cell=1,
+        most_nearby=1,
+        from_year=from_year,
+    )
+
+
+TOWN_SIGHTS = (
+    _town_sight(BuildingKind.MANOR, MANOR_TOWN),
+    _town_sight(BuildingKind.THEATRE, THEATRE_TOWN),
+    _town_sight(BuildingKind.HOSPITAL, HOSPITAL_TOWN, 1850),
+)
+
 # Potatoes like cool, open plains; they feed houses and the distilleries.
 POTATO_FARMS = Ladder(
     kinds=(BuildingKind.POTATO_FARM,),
@@ -929,6 +1012,9 @@ LADDERS = (
     BAKERIES,
     BUTCHERS,
     GASWORKS,
+    COKE_PLANTS,
+    *TOWN_CRAFTS,
+    *TOWN_SIGHTS,
     POTATO_FARMS,
     CATTLE_RANCHES,
     PIG_FARMS,

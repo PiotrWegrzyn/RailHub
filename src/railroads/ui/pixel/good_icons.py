@@ -581,6 +581,88 @@ def animals() -> Sprite:
     return p.sprite()
 
 
+def coke() -> Sprite:
+    p = _canvas()
+    for x, y, size in ((-4, 2, 4), (2, 3, 5), (-1, -3, 4), (4, -2, 3)):
+        p.blob(x - size / 2, y - size / 2, x + size / 2, y + size / 2, (70, 70, 76))
+        p.point(x - 1, y - 1, (130, 130, 138))
+    return p.sprite()
+
+
+def milk() -> Sprite:
+    p = _canvas()
+    tin: RGB = (196, 200, 206)
+    p.rect(-4, -3, 4, 7, tin)
+    p.rect(-2, -6, 2, -3, tin)
+    p.line([(-4, -3), (4, -3)], shade(tin, 0.7))
+    p.line([(-3, 2), (3, 2)], shade(tin, 0.8))
+    p.line([(-2, -7), (2, -7)], shade(tin, 0.6))
+    p.point(-2, 0, (240, 240, 236))
+    return p.sprite()
+
+
+def dairy() -> Sprite:
+    p = _canvas()
+    cheese: RGB = (238, 200, 90)
+    p.polygon([(-7, 4), (5, 4), (5, -1), (-7, 1)], cheese, shade(cheese, 0.7))
+    p.polygon([(-7, 1), (5, -1), (1, -4)], shade(cheese, 1.1))
+    for x, y in ((-3, 2), (2, 2)):
+        p.point(x, y, shade(cheese, 0.7))
+    p.rect(1, 1, 7, 6, (246, 232, 170))
+    return p.sprite()
+
+
+def pots() -> Sprite:
+    p = _canvas()
+    clay: RGB = (176, 104, 70)
+    p.ellipse(-6, -3, 6, 7, clay)
+    p.rect(-3, -6, 3, -3, shade(clay, 0.9))
+    p.line([(-4, -6), (4, -6)], shade(clay, 1.2))
+    p.line([(-5, 1), (5, 1)], shade(clay, 0.7))
+    return p.sprite()
+
+
+def stove_tiles() -> Sprite:
+    p = _canvas()
+    glaze: RGB = (70, 120, 170)
+    for x in (-6, 1):
+        for y in (-6, 1):
+            p.rect(x, y, x + 5, y + 5, glaze)
+            p.point(x + 2, y + 2, (236, 236, 226))
+    return p.sprite()
+
+
+def castings() -> Sprite:
+    p = _canvas()
+    iron: RGB = (74, 76, 82)
+    p.ellipse(-7, -2, 5, 6, iron)
+    p.line([(5, 0), (8, -2)], iron)
+    p.line([(-6, -2), (4, -2)], shade(iron, 1.5))
+    p.point(-3, 1, shade(iron, 1.4))
+    return p.sprite()
+
+
+def sausages() -> Sprite:
+    p = _canvas()
+    skin: RGB = (170, 74, 54)
+    for y in (-4, 1):
+        p.ellipse(-7, y, 7, y + 4, skin)
+        p.line([(-4, y + 1), (4, y + 1)], shade(skin, 1.3))
+    p.line([(-8, -2), (-8, 3)], (236, 220, 180))
+    return p.sprite()
+
+
+def luxuries() -> Sprite:
+    p = _canvas()
+    gold: RGB = (232, 190, 70)
+    p.rect(-6, -2, 6, 7, (110, 50, 110))
+    p.line([(-6, 2), (6, 2)], gold)
+    p.line([(0, -2), (0, 7)], gold)
+    p.ellipse(-3, -7, 0, -2, gold)
+    p.ellipse(0, -7, 3, -2, gold)
+    return p.sprite()
+
+
 def flax() -> Sprite:
     p = _canvas()
     stalk: RGB = (170, 170, 92)
@@ -949,6 +1031,14 @@ ICONS: dict[str, Callable[[], Sprite]] = {
     "sand": sand,
     "potatoes": potatoes,
     "cattle": cattle,
+    "coke": coke,
+    "milk": milk,
+    "dairy products": dairy,
+    "pots": pots,
+    "stove tiles": stove_tiles,
+    "castings": castings,
+    "sausages": sausages,
+    "luxury goods": luxuries,
     "pigs": pigs,
     "chickens": chickens,
     "eggs": eggs,

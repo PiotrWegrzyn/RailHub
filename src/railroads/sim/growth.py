@@ -134,6 +134,17 @@ SPAWN_BY_PEOPLE = frozenset(
         BuildingKind.WINERY,
         BuildingKind.FURNITURE_MAKER,
         BuildingKind.SUGAR_REFINERY,
+        BuildingKind.POTTER,
+        BuildingKind.DAIRY,
+        BuildingKind.TILE_WORKS,
+        BuildingKind.FOUNDRY,
+        BuildingKind.SAUSAGE_MAKER,
+        BuildingKind.CARPET_WEAVER,
+        BuildingKind.CLOCK_MAKER,
+        BuildingKind.MIRROR_MAKER,
+        BuildingKind.MANOR,
+        BuildingKind.THEATRE,
+        BuildingKind.HOSPITAL,
     }
 )
 
@@ -177,11 +188,26 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
 # How long buildings last starving: homes, and everything else.
 HOMES_DIE_AFTER_MONTHS = 10 * 12
 DIE_AFTER_MONTHS = 30 * 12
+# The crafts that need two inputs for goods that are no necessity but a bonus worth more last
+# longer starving, since they seldom get both.
+HARD_DIE_AFTER_MONTHS = 50 * 12
+HARD_CRAFTS = frozenset(
+    {
+        BuildingKind.TILE_WORKS,
+        BuildingKind.FOUNDRY,
+        BuildingKind.SAUSAGE_MAKER,
+        BuildingKind.CARPET_WEAVER,
+        BuildingKind.CLOCK_MAKER,
+        BuildingKind.MIRROR_MAKER,
+    }
+)
 
 
 def dies_after(kind: BuildingKind) -> int:
     """How many months buildings of a kind last starving."""
-    return HOMES_DIE_AFTER_MONTHS if kind in HOMES else DIE_AFTER_MONTHS
+    if kind in HOMES:
+        return HOMES_DIE_AFTER_MONTHS
+    return HARD_DIE_AFTER_MONTHS if kind in HARD_CRAFTS else DIE_AFTER_MONTHS
 
 
 # Producers of what the land gives, which stand idle with nobody to sell to rather than dying out:

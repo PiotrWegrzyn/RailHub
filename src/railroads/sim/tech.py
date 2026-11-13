@@ -200,6 +200,9 @@ _GOODS: Mapping[Tree, tuple[Good, ...]] = {
         Good.VODKA,
         Good.REFINED_SUGAR,
         Good.MEAT,
+        Good.MILK,
+        Good.DAIRY,
+        Good.SAUSAGES,
         Good.GRAPES,
         Good.WINE,
         Good.COFFEE,
@@ -217,6 +220,7 @@ _GOODS: Mapping[Tree, tuple[Good, ...]] = {
     ),
     Tree.FUEL: (
         Good.COAL,
+        Good.COKE,
         Good.OIL,
         Good.GAS,
         Good.FUEL,
@@ -226,6 +230,7 @@ _GOODS: Mapping[Tree, tuple[Good, ...]] = {
         Good.BRICKS,
         Good.CEMENT,
         Good.GLASS,
+        Good.STOVE_TILES,
     ),
     Tree.CRAFT: (
         Good.LUMBER,
@@ -240,6 +245,8 @@ _GOODS: Mapping[Tree, tuple[Good, ...]] = {
         Good.PAPER,
         Good.NEWSPAPERS,
         Good.PORCELAIN,
+        Good.POTS,
+        Good.CASTINGS,
         Good.WAX,
         Good.INCENSE,
     ),
@@ -252,7 +259,7 @@ _GOODS: Mapping[Tree, tuple[Good, ...]] = {
         Good.PLANES,
         Good.RUBBER,
     ),
-    Tree.COMMERCE: (Good.GOLD, Good.DIAMONDS),
+    Tree.COMMERCE: (Good.GOLD, Good.DIAMONDS, Good.LUXURIES),
     Tree.PASSENGERS: (Good.PASSENGERS, Good.MAIL),
 }
 # The tree each good, and each kind of building, belongs to.

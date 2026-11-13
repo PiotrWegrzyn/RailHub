@@ -106,6 +106,12 @@ VANS: dict[Good, tuple[RGB, RGB]] = {
     Good.NEWSPAPERS: ((100, 100, 104), (230, 228, 220)),
     Good.REFINED_SUGAR: ((236, 230, 232), (220, 120, 150)),
     Good.PORCELAIN: ((230, 232, 240), (60, 90, 190)),
+    Good.DAIRY: ((236, 232, 218), (230, 196, 90)),
+    Good.SAUSAGES: ((214, 194, 140), (160, 70, 50)),
+    Good.POTS: ((150, 100, 70), (210, 150, 100)),
+    Good.STOVE_TILES: ((214, 206, 190), (60, 110, 160)),
+    Good.CASTINGS: ((70, 72, 78), (150, 150, 156)),
+    Good.LUXURIES: ((90, 40, 90), (232, 190, 70)),
 }
 # Hoppers, by good: body and load.
 HOPPERS: dict[Good, tuple[RGB, RGB]] = {
@@ -129,11 +135,13 @@ HEAPS: dict[Good, RGB] = {
     Good.HOPS: (130, 190, 84),
     Good.BRICKS: (180, 82, 60),
     Good.MACHINERY: (96, 100, 112),
+    Good.COKE: (70, 70, 76),
 }
 TANKS: dict[Good, RGB] = {
     Good.OIL: (34, 32, 38),
     Good.FUEL: (190, 170, 60),
     Good.GAS: (200, 206, 214),
+    Good.MILK: (240, 240, 236),
 }
 MOGUL_GREEN: RGB = (38, 86, 56)
 MOGUL_ROOF: RGB = (24, 54, 36)

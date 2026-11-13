@@ -108,6 +108,14 @@ GOOD_COLORS: Mapping[Good, Rgba] = {
     Good.PORCELAIN: (0.4, 0.56, 0.86, 1.0),
     Good.PASSENGERS: (0.36, 0.76, 0.6, 1.0),
     Good.MAIL: (0.68, 0.44, 0.86, 1.0),
+    Good.COKE: (0.3, 0.3, 0.32, 1.0),
+    Good.MILK: (0.95, 0.95, 0.93, 1.0),
+    Good.DAIRY: (0.95, 0.85, 0.5, 1.0),
+    Good.POTS: (0.7, 0.45, 0.3, 1.0),
+    Good.STOVE_TILES: (0.35, 0.55, 0.75, 1.0),
+    Good.CASTINGS: (0.4, 0.4, 0.44, 1.0),
+    Good.SAUSAGES: (0.7, 0.3, 0.24, 1.0),
+    Good.LUXURIES: (0.6, 0.3, 0.65, 1.0),
 }
 CAR_EMPTY = (0.17, 0.15, 0.13, 1.0)
 CAR_LOADED = (0.62, 0.45, 0.2, 0.75)
