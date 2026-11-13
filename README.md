@@ -32,7 +32,8 @@ a name of your own, or over an older save, and load any save. The house button g
 main menu, after asking. At the start of every month the game saves itself as "autosave 1". The
 autosave before it moves to "autosave 2", and so on, keeping the last 3 (`AUTOSAVES` in
 `src/railroads/saves.py`), so one bad save can't lose the game. Autosaves are written on a
-background thread, so play doesn't stutter.
+background thread, so play doesn't stutter; in a browser, which has no threads, they are written a
+little on each frame.
 
 A save holds the whole game: the towns and buildings, the track, the stations and their fixed
 ends, the trains, the money, the research and history, the date (to the part of the month), the

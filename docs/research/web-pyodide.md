@@ -53,7 +53,9 @@ The game's wheel carries its Python source, so anyone playing can read the code.
   hands out a `FrameWorker`, which runs a job only when the caller asks. `PixelLayer` runs a fine
   redraw of raised chunks on each frame that draws no new chunk. The game setup and loading run
   on the frame after the waiting screen first shows, so that screen stays up while the page is
-  frozen. An autosave is written on the frame after the month turns.
+  frozen. An autosave is pickled on the frame after the month turns, then compressed and written
+  a step at a time, at most `WRITING_SECONDS` (4 ms) of each frame, over the next two seconds or
+  so, the frames kept at full speed meanwhile.
 - **Saves.** `index.html` mounts Emscripten's IndexedDB file system over the saves folder and
   copies it to IndexedDB every 2 s, so named saves and autosaves survive a reload. They stay in
   that browser; there is no way yet to download a save or load one from a file.
