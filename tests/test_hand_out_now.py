@@ -73,3 +73,13 @@ def test_a_station_is_short_only_of_what_its_buildings_still_lack_this_month() -
 
     assert hungry[Need.FOOD] == pytest.approx(10.0)
     assert Need.FOOD not in growth.station_trade.short_of(STATION)
+
+
+def test_a_train_can_leave_diamonds_nobody_around_wants_for_another_train_to_take() -> None:
+    growth, railway = joined_stations()
+    bring(railway, Good.DIAMONDS, 10.0)
+
+    growth.station_trade.hand_out_now(STATION, Good.DIAMONDS)
+    growth.trade_goods()
+
+    assert railway.station_goods(STATION).brought[Good.DIAMONDS] == pytest.approx(10.0)
