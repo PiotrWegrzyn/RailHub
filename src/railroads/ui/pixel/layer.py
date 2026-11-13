@@ -109,6 +109,13 @@ class PixelLayer:
             self._refreshes[chunk] = self._refreshes.get(chunk, 0) + 1
         self._refined = {key for key in self._refined if key[:2] not in chunks}
 
+    def catch_up(self) -> None:
+        """Tells copies of the world painting elsewhere, as web workers do, what changed in it,
+        so the next frame that asks for chunks needn't; nothing to do for a thread or the
+        frames, which paint the world itself."""
+        if isinstance(self._painter, WorkerPainter):
+            self._painter.catch_up()
+
     def take_drawn(self) -> set[ChunkKey]:
         """Keeps the chunks the painter has finished, unless they changed since they were asked
         for; returns them."""

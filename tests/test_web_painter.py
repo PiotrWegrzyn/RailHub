@@ -161,6 +161,28 @@ def test_changes_reach_a_worker_before_any_chunk_asked_for_after_them() -> None:
     np.testing.assert_array_equal(done["plains"], world.render(*plains, 2))
 
 
+def test_a_layer_catching_up_sends_a_change_so_the_chunks_asked_for_next_go_out_alone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    world, _, plains = world_over_mountains()
+    page = FakePage(1)
+    page.start(0)
+    monkeypatch.setattr(layer_module, "threads_start", lambda: False)
+    monkeypatch.setattr(layer_module, "page_workers", lambda: Workers(page))
+    layer = PixelLayer(world)
+    layer.take_drawn()
+    page.work()
+    world.constructions.build(Building((10, 4), BuildingKind.HOUSE))
+    layer.refresh(world.buildings_changed([(10, 4)]))
+
+    layer.catch_up()
+    caught_up = page.kinds(0)
+    layer._ask((*plains, 2), 1.0)
+
+    assert caught_up == ["update"]
+    assert page.kinds(0) == ["update", "paint"]
+
+
 def test_a_failed_workers_chunks_go_to_another() -> None:
     world, mountains, plains = world_over_mountains()
     page = FakePage(2)

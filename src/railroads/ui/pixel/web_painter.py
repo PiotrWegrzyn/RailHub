@@ -235,8 +235,10 @@ class WorkerPainter:
                 del self._given[number]
                 self._queue.jobs.setdefault(key, job)
 
-    def _catch_up(self) -> None:
-        """Sends the workers holding the world whatever changed in it since they last heard."""
+    def catch_up(self) -> None:
+        """Sends the workers holding the world whatever changed in it since they last heard. A
+        chunk asked for after a change does this first anyway; called on a frame of its own, it
+        keeps that frame from pickling the change on top of the work that made it."""
         seen, self._seen = self._seen, Seen.now(self._world)
         if not self._holding:
             return
@@ -252,7 +254,7 @@ class WorkerPainter:
         queue = self._queue
         if not queue.jobs or self._workers.painter is not self or not self._room():
             return
-        self._catch_up()
+        self.catch_up()
         load = self._load()
         while load:
             worker = min(load, key=load.__getitem__)
