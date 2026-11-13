@@ -1,7 +1,8 @@
 """What a station holds: goods trains brought, waiting to be handed out, and its stockpile of spare
-goods from around it and passengers and mail waiting for trains. The station holds up to STOCKPILE
-of each kind of freight, gathered and brought together, so one good piling up leaves the others
-their room, and WAITING passengers and mail. Each storage upgrade adds STORAGE_STEP to every kind of
+goods from around it and passengers and mail waiting for trains. The station gathers freight from
+around it only while it holds less than STOCKPILE of that kind, gathered and brought together, so
+one good piling up leaves the others their room; a train can always leave all it carries, however
+much that is. It holds up to WAITING passengers and mail. Each storage upgrade adds STORAGE_STEP to every kind of
 freight and WAITING_STEP to the passengers and mail."""
 
 from dataclasses import dataclass, field
