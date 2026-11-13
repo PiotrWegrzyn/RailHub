@@ -14,12 +14,14 @@ import numpy.typing as npt
 
 from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.economy import Satisfaction
+from railroads.sim.grids import Grid
 from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.buildings import Plot, plots_of
+from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.noise import noise, table_hash
 from railroads.ui.pixel.projection import CHUNK, RGB, FloatArray, IntArray, PixelProjection
-from railroads.ui.pixel.relief import Elevation, Raised, sample, smooth
+from railroads.ui.pixel.relief import Elevation, Raised, mountain_cover, sample, smooth
 
 type BoolArray = npt.NDArray[np.bool_]
 
@@ -197,12 +199,16 @@ FLOWERS = np.array([(244, 240, 232), (246, 214, 80), (196, 130, 210), (226, 90, 
 # clearings where something is built, and they throw a shadow on the ground beside them.
 WOODS = (Biome.FOREST, Biome.TAIGA, Biome.JUNGLE)
 CROWN_GAP = 3.1
+# How many art pixels above and left of a block the woods are worked out, for their shadow.
+CANOPY_REACH = 4
 CONIFER_CROWNS = np.array([(22, 48, 34), (32, 66, 44), (52, 92, 58)], dtype=np.float32)
 LEAFY_CROWNS = np.array([(38, 76, 30), (62, 112, 40), (106, 152, 58)], dtype=np.float32)
 WOODS_FLOOR = np.array((30, 52, 28), dtype=np.float32) * 0.7
 EDGE_SHADOW = 0.75
-# How mountainous ground may be before woods give way to the mountain's own bare slopes.
+# How mountainous ground may be before woods give way to the mountain's own bare slopes, and how
+# far below that a bound on it (Elevation.most) must stay to show none of the woods are bare.
 BARE_ABOVE = 0.3
+BARE_MARGIN = 1e-4
 CLEARING = -4.0
 # Where the woods' share of the ground is worked out around each point: the point itself and six
 # around it, in cells.
@@ -269,6 +275,10 @@ class Ground:
         self.elevation = elevation
         self._biomes = biome_grid(tile_map)
         land = tile_map.terrain == Terrain.LAND
+        self._land = land
+        # The cells round each cell that points AROUND a point in it can lie in, and where cells
+        # round a cell lie off the map, which never change.
+        self._round, self._off_round = _cells_round(tile_map.grid)
         # Each cell's Satisfaction, or -1 where nothing trades.
         self.satisfaction = np.full(tile_map.grid.shape, -1, dtype=np.int8)
         self._hills = land & (tile_map.relief == Relief.HILLS)
@@ -296,8 +306,8 @@ class Ground:
         # Each cell's say in whether woods cover a point near it: 1 for woods, 0 for open land,
         # and CLEARING where something is built, so the woods give it room.
         self._woods = np.where(built, CLEARING, np.isin(self._biomes, WOODS)).astype(np.float32)
-        self._plots = plots_of(self.constructions, FIELD_KINDS)
         grid = self.tile_map.grid
+        self._plots = plots_of(self.constructions, FIELD_KINDS)
         # Where each kind's fields sit in the picture, to find those near a block quickly.
         self._plot_pixels: dict[BuildingKind, tuple[FloatArray, FloatArray]] = {}
         for kind, plots in self._plots.items():
@@ -306,61 +316,99 @@ class Ground:
             self._plot_pixels[kind] = (np.atleast_1d(px), np.atleast_1d(py))
 
     def render(
-        self, left: int, top: int, rows: int, raised: Raised | None = None
+        self,
+        left: int,
+        top: int,
+        rows: int,
+        raised: Raised | None = None,
+        points: Lattice | None = None,
     ) -> tuple[FloatArray, FloatArray]:
         """The ground over CHUNK art pixels across and `rows` down from (`left`, `top`), as RGB
         from 0 to 255 already multiplied by its alpha, and its alpha: 1 on the map, 0 off it.
-        `raised` is the raised ground over at least these pixels, if any rises there."""
-        grid = self.tile_map.grid
+        `raised` is the raised ground over at least these pixels, if any rises there; `points`
+        may hold their plane points and cells already, and those of the APRON round them.
+
+        Each pixel is coloured by the one kind of ground it shows: water, meadow, savanna or
+        the plain ramp of its biome, each worked out only at its own pixels. Where raised ground
+        takes the mountains' colours fully (relief.mountain_cover), its own colour is not
+        worked out at all."""
         a = APRON
-        iy, ix = np.mgrid[top - a : top + rows + a, left - a : left + CHUNK + a]
-        x, y = self.projection.to_plane(ix + 0.5, iy + 0.5)
-        r, c = grid.cell_at(x, y)
-        inside = grid.contains(r, c)
-        r, c = np.clip(r, 0, grid.rows - 1), np.clip(c, 0, grid.cols - 1)
-        biomes = self._biomes[r, c]
-        water = np.isin(biomes, WATER)
-        value = 1.45 + 1.6 * (noise(x, y, 2.4, 41) - 0.5) + 0.8 * (noise(x, y, 0.75, 42) - 0.5)
-        value += 0.45 * (noise(x, y, 0.22, 43) - 0.5) + 0.45 * BAYER[iy % 4, ix % 4]
-        light = sample(self._relief_light, x * RELIEF_STEPS_PER_CELL, y * RELIEF_STEPS_PER_CELL)
-        value += light + HILL_LIFT * self._hills[r, c]
-        ripple = table_hash(ix // 3, iy, 13) > 0.94
-        calm = 1.3 + 0.6 * (table_hash(ix, iy, 11) - 0.5)
-        value = np.where(water, np.where(ripple, 3, calm), value)
-        shade = np.clip(np.rint(value), 0, 3).astype(np.int64)
-        rgb = self.ramps[biomes, shade]
-        meadow = np.isin(biomes, MEADOWS) & ~water
-        if meadow.any():
-            shaded = self._tree_shade(left - a, top - a, ix.shape)
-            rgb[meadow] = _meadow(x[meadow], y[meadow], ix[meadow], iy[meadow], light[meadow])
-            rgb[meadow] *= (1 - TREE_SHADE * shaded[meadow])[:, None]
-        savanna = (biomes == Biome.SAVANNA) & ~water
-        if savanna.any():
-            args = (x[savanna], y[savanna], ix[savanna], iy[savanna], light[savanna])
-            rgb[savanna] = _meadow(*args, "savanna")
-            rgb[savanna] *= (
-                1 - TREE_SHADE * self._tree_shade(left - a, top - a, ix.shape)[savanna]
-            )[:, None]
-        grassy = np.isin(biomes, GRASSY) & ~water & ~meadow & ~savanna
-        tuft = grassy & (table_hash(ix // 6, iy // 6, 51) > 1 - TUFT_SHARE) & TUFT[iy % 6, ix % 6]
-        rgb[tuft] = self.ramps[biomes[tuft], np.maximum(shade[tuft] - 1, 0)] * 0.92
-        near_water = _near(water, [(0, 1), (0, -1), (1, 0), (-1, 0), (0, 2), (0, -2)])
-        near_land = _near(~water, [(0, 1), (0, -1), (1, 0), (-1, 0)])
-        rgb[~water & near_water & inside] = SAND
-        rgb[water & near_land & inside] = FOAM
-        glow = glow_strength(self.satisfaction)[r, c]
-        if glow.any():
-            strength = (glow * ~water)[..., None].astype(np.float32)
-            rgb = rgb * (1 - strength) + np.array(GLOW, dtype=np.float32) * strength
-        if self.tile_map.deposits is not None:
-            deposit = self.tile_map.deposits[r, c]
-            if deposit.any():
-                _sign_deposits(rgb, deposit, ix, iy, water)
+        around = (left - a, top - a, CHUNK + 2 * a, rows + 2 * a)
+        points = _lattice(points, self.projection, self.tile_map.grid, around)
+        r, c, inside = points.cells(*around)
+        water = _WATER[self._biomes[r, c]]
+        # Only shores look at the apron: the colours are worked out inside it.
         inner = (slice(a, a + rows), slice(a, a + CHUNK))
-        rgb, alpha = rgb[inner], inside[inner].astype(np.float32)
+        r, c, inside, wet = r[inner], c[inner], inside[inner], water[inner]
+        biomes = self._biomes[r, c]
+        x, y = points.plane(left, top, CHUNK, rows)
+        rocky = self.tile_map.relief[r, c] == Relief.MOUNTAINS
+        seen = np.ones(x.shape, dtype=bool)
         if raised is not None:
-            rocky = self.tile_map.relief[r[inner], c[inner]] == Relief.MOUNTAINS
-            self.elevation.colour(rgb, raised.top(rows), x[inner], y[inner], rocky)
+            seen = mountain_cover(raised.mountains[:rows], rocky) < 1
+        meadow = _MEADOW[biomes] & ~wet
+        savanna = (biomes == Biome.SAVANNA) & ~wet
+        plain = ~(wet | meadow | savanna) & seen
+        meadow &= seen
+        savanna &= seen
+        dry = ~wet
+        lit = meadow | savanna | plain
+        light = np.zeros(x.shape, dtype=np.float64)
+        light[lit] = sample(
+            self._relief_light, x[lit] * RELIEF_STEPS_PER_CELL, y[lit] * RELIEF_STEPS_PER_CELL
+        )
+        rgb = np.zeros((*x.shape, 3), dtype=np.float32)
+        shade = np.zeros(x.shape, dtype=np.int64)
+        down, across = np.nonzero(wet & seen)
+        if len(down):
+            ix, iy = left + across, top + down
+            ripple = table_hash(ix // 3, iy, 13) > 0.94
+            calm = 1.3 + 0.6 * (table_hash(ix, iy, 11) - 0.5)
+            shade[down, across] = np.clip(np.rint(np.where(ripple, 3, calm)), 0, 3).astype(np.int64)
+        down, across = np.nonzero(plain)
+        if len(down):
+            ix, iy = left + across, top + down
+            fx, fy = x[plain].astype(np.float32), y[plain].astype(np.float32)
+            value = 1.45 + 1.6 * (noise(fx, fy, 2.4, 41) - 0.5)
+            value += 0.8 * (noise(fx, fy, 0.75, 42) - 0.5)
+            value += 0.45 * (noise(fx, fy, 0.22, 43) - 0.5) + 0.45 * BAYER[iy % 4, ix % 4]
+            value += light[plain] + HILL_LIFT * self._hills[r[plain], c[plain]]
+            shade[plain] = np.clip(np.rint(value), 0, 3).astype(np.int64)
+        ramped = (wet & seen) | plain
+        rgb[ramped] = self.ramps[biomes[ramped], shade[ramped]]
+        if meadow.any() or savanna.any():
+            shaded = self._tree_shade(left, top, x.shape)
+            for grass, kind in ((meadow, "meadow"), (savanna, "savanna")):
+                down, across = np.nonzero(grass)
+                if not len(down):
+                    continue
+                args = (x[grass], y[grass], left + across, top + down, light[grass])
+                colour = _meadow(*args, kind).astype(np.float32)
+                colour *= (1 - TREE_SHADE * shaded[grass])[:, None]
+                rgb[grass] = colour
+        tufted = plain & _GRASSY[biomes]
+        down, across = np.nonzero(tufted)
+        if len(down):
+            ix, iy = left + across, top + down
+            tuft = (table_hash(ix // 6, iy // 6, 51) > 1 - TUFT_SHARE) & TUFT[iy % 6, ix % 6]
+            down, across = down[tuft], across[tuft]
+            lower = np.maximum(shade[down, across] - 1, 0)
+            rgb[down, across] = self.ramps[biomes[down, across], lower] * 0.92
+        near_water = _near(water, a, rows, [(0, 1), (0, -1), (1, 0), (-1, 0), (0, 2), (0, -2)])
+        near_land = _near(~water, a, rows, [(0, 1), (0, -1), (1, 0), (-1, 0)])
+        rgb[~wet & near_water & inside] = SAND
+        rgb[wet & near_land & inside] = FOAM
+        # Ground that does not glow keeps its colour exactly, so only glowing ground is blended.
+        strength = glow_strength(self.satisfaction[r, c])
+        glowing = (strength > 0) & dry
+        if glowing.any():
+            served = strength[glowing].astype(np.float32)[:, None]
+            rgb[glowing] = rgb[glowing] * (1 - served) + np.array(GLOW, np.float32) * served
+        if self.tile_map.deposits is not None:
+            _sign_deposits(rgb, self.tile_map.deposits[r, c], left, top, wet)
+        alpha = inside.astype(np.float32)
+        if raised is not None:
+            self.elevation.colour(rgb, raised.top(rows), x, y, rocky)
         return np.clip(rgb, 0, 255) * alpha[..., None], alpha
 
     @property
@@ -378,21 +426,20 @@ class Ground:
         """How many shades lighter or darker the slopes are, RELIEF_STEPS_PER_CELL steps a cell."""
         return self._relief_light
 
-    def under(self, left: int, top: int, rows: int) -> tuple[BoolArray, FloatArray]:
+    def under(
+        self, left: int, top: int, rows: int, points: Lattice | None = None
+    ) -> tuple[BoolArray, FloatArray]:
         """For the CHUNK art pixels across and `rows` down from (`left`, `top`): which lie on
         the map, and how deeply trees shade the grass there, as the cover of a black layer. For
-        a chunk drawn over ground the graphics card draws, which leaves the shade out."""
-        grid = self.tile_map.grid
-        iy, ix = np.mgrid[top : top + rows, left : left + CHUNK]
-        x, y = self.projection.to_plane(ix + 0.5, iy + 0.5)
-        r, c = grid.cell_at(x, y)
-        inside = grid.contains(r, c)
-        r, c = np.clip(r, 0, grid.rows - 1), np.clip(c, 0, grid.cols - 1)
-        biomes = self._biomes[r, c]
-        grass = np.isin(biomes, (*MEADOWS, Biome.SAVANNA)) & inside
-        cover = np.zeros(ix.shape, dtype=np.float32)
+        a chunk drawn over ground the graphics card draws, which leaves the shade out. `points`
+        may hold their plane points and cells already."""
+        block = (left, top, CHUNK, rows)
+        points = _lattice(points, self.projection, self.tile_map.grid, block)
+        r, c, inside = points.cells(*block)
+        grass = _GRASS[self._biomes[r, c]] & inside
+        cover = np.zeros(inside.shape, dtype=np.float32)
         if grass.any():
-            cover[grass] = TREE_SHADE * self._tree_shade(left, top, ix.shape)[grass]
+            cover[grass] = TREE_SHADE * self._tree_shade(left, top, inside.shape)[grass]
         return inside, cover
 
     def fields(
@@ -403,12 +450,14 @@ class Ground:
         k: int,
         lit: FloatArray | None = None,
         shown: BoolArray | None = None,
+        points: Lattice | None = None,
     ) -> None:
         """Paints farms' fields and groves over a picture of the ground from (`left`, `top`),
         `k` pixels to an art pixel, RGB from 0 to 1 multiplied by its alpha, worked out at that
         resolution so they keep up with the buildings drawn as finely; `lit` brightens or
-        darkens each pixel with the slope it lies on. They go only where the picture shows the
-        map: where `shown`, or else where it isn't clear."""
+        darkens each art pixel with the slope it lies on. They go only where the picture shows the
+        map: where `shown`, or else where it isn't clear. Only the patches round fields are
+        worked out, from `points` where they hold them at this resolution."""
         rows, a = canvas.shape[0] // k, APRON
         shape = (rows + 2 * a, CHUNK + 2 * a)
         origin = (left - a, top - a)
@@ -426,29 +475,89 @@ class Ground:
         ]
         if not jobs:
             return
-        grid = self.tile_map.grid
-        fy, fx = np.mgrid[-a * k : (rows + a) * k, -a * k : (CHUNK + a) * k]
-        ix, iy = left * k + fx, top * k + fy
-        x, y = self.projection.to_plane(left + (fx + 0.5) / k, top + (fy + 0.5) / k)
-        r, c = grid.cell_at(x, y)
-        r, c = np.clip(r, 0, grid.rows - 1), np.clip(c, 0, grid.cols - 1)
-        cells = r * grid.cols + c
-        paint = np.full((*fy.shape, 3), np.nan, dtype=np.float32)
+        # Patches are slices of a picture of the ground with the apron round it; paint covers
+        # just the box round all of them.
+        down = min(patch[0].start for _, patch, _, _ in jobs)
+        across = min(patch[1].start for _, patch, _, _ in jobs)
+        bottom = max(patch[0].stop for _, patch, _, _ in jobs)
+        right = max(patch[1].stop for _, patch, _, _ in jobs)
+        paint = np.empty((bottom - down, right - across, 3), dtype=np.float32)
+        painted = np.zeros(paint.shape[:2], dtype=bool)
+        # Each patch works out the plane points and cells of its own pixels, unless patches
+        # overlap so much that working them out once over the box round all of them is less.
+        boxes = {(p[0].start, p[0].stop, p[1].start, p[1].stop) for _, p, _, _ in jobs}
+        shared = None
+        if sum((b[1] - b[0]) * (b[3] - b[2]) for b in boxes) > paint.shape[0] * paint.shape[1]:
+            shared = self._patch_points((down, bottom, across, right), left - a, top - a, k, points)
+        worked: dict[tuple[int, int, int, int], tuple] = {}
         for plot, patch, crop, grove in jobs:
-            args = (paint[patch], x[patch], y[patch], cells[patch], ix[patch], iy[patch])
+            box = (patch[0].start, patch[0].stop, patch[1].start, patch[1].stop)
+            place = (slice(box[0] - down, box[1] - down), slice(box[2] - across, box[3] - across))
+            if box not in worked:
+                worked[box] = (
+                    self._patch_points(box, left - a, top - a, k, points)
+                    if shared is None
+                    else tuple(values[place] for values in shared)
+                )
+            args = (paint[place], *worked[box])
             if grove is None:
-                self._sow(*args, plot, crop, k)
+                painted[place] |= self._sow(*args, plot, crop, k)
             else:
-                self._plant(*args, plot, grove)
-        inner = paint[a * k : (a + rows) * k, a * k : (a + CHUNK) * k]
-        laid = ~np.isnan(inner[..., 0]) & _on_map(canvas, shown)
+                painted[place] |= self._plant(*args, plot, grove)
+        top_row, left_col = max(down, a * k), max(across, a * k)
+        bottom_row, right_col = min(bottom, (a + rows) * k), min(right, (a + CHUNK) * k)
+        if top_row >= bottom_row or left_col >= right_col:
+            return
+        inside = (
+            slice(top_row - down, bottom_row - down),
+            slice(left_col - across, right_col - across),
+        )
+        inner = paint[inside]
+        region = (
+            slice(top_row - a * k, bottom_row - a * k),
+            slice(left_col - a * k, right_col - a * k),
+        )
+        under = canvas[region]
+        laid = painted[inside] & (under[..., 3] > 0 if shown is None else shown[region])
         if not laid.any():
             return
         colour = inner[laid]
         if lit is not None:
-            colour = colour * lit[laid][:, None]
-        canvas[laid, :3] = np.clip(colour, 0, 255) / 255
-        canvas[laid, 3] = 1.0
+            art_rows, art_cols = np.nonzero(laid)
+            art_rows, art_cols = (
+                (art_rows + region[0].start) // k,
+                (art_cols + region[1].start) // k,
+            )
+            colour = colour * lit[art_rows, art_cols][:, None]
+        under[laid, :3] = np.clip(colour, 0, 255) / 255
+        under[laid, 3] = 1.0
+
+    def _patch_points(
+        self,
+        box: tuple[int, int, int, int],
+        left: int,
+        top: int,
+        k: int,
+        points: Lattice | None,
+    ) -> tuple[FloatArray, FloatArray, IntArray, IntArray, IntArray]:
+        """The plane points, cells (as flat indices), and pixel places of the pixels in rows and
+        columns `box` of a picture from art pixel (`left`, `top`), `k` pixels to an art pixel."""
+        grid = self.tile_map.grid
+        first_row, last_row, first_col, last_col = box
+        fy = np.arange(first_row, last_row)[:, None]
+        fx = np.arange(first_col, last_col)[None, :]
+        shape = (last_row - first_row, last_col - first_col)
+        block = (left + first_col, top + first_row, shape[1], shape[0])
+        if k == 1 and points is not None and points.k == 1 and points.holds(*block):
+            x, y = points.plane(*block)
+            r, c, _ = points.cells(*block)
+        else:
+            x, y = self.projection.to_plane(left + (fx + 0.5) / k, top + (fy + 0.5) / k)
+            r, c = grid.cell_at(x, y)
+            r, c = np.clip(r, 0, grid.rows - 1), np.clip(c, 0, grid.cols - 1)
+        ix = np.broadcast_to(left * k + fx, shape)
+        iy = np.broadcast_to(top * k + fy, shape)
+        return x, y, r * grid.cols + c, ix, iy
 
     def yards(
         self, canvas: FloatArray, left: int, top: int, k: int, shown: BoolArray | None = None
@@ -522,66 +631,108 @@ class Ground:
         _over(canvas[y0:y1, x0:x1], colour / 255, cover)
 
     def canopy(
-        self, canvas: FloatArray, left: int, top: int, k: int, shown: BoolArray | None = None
+        self,
+        canvas: FloatArray,
+        left: int,
+        top: int,
+        k: int,
+        shown: BoolArray | None = None,
+        points: Lattice | None = None,
     ) -> None:
         """Paints the woods over a picture of the ground from (`left`, `top`), `k` pixels to an
         art pixel, RGB from 0 to 1 multiplied by its alpha: a roof of lit crowns with the dark
         floor between them, and their shadow on the ground beside them, worked out an art pixel
         at a time like the rest of the ground, where the picture shows the map, as `fields`
-        says."""
-        grid = self.tile_map.grid
+        says. `points` may hold the plane points and cells of the art pixels already."""
         rows, cols = canvas.shape[0] // k, canvas.shape[1] // k
-        reach = 4
-        fy, fx = np.mgrid[-reach:rows, -reach:cols]
-        ax, ay = left + fx + 0.5, top + fy + 0.5
-        x, y = self.projection.to_plane(ax, ay)
-        r, c = grid.cell_at(x, y)
-        r, c = np.clip(r, 0, grid.rows - 1), np.clip(c, 0, grid.cols - 1)
+        reach = CANOPY_REACH
+        block = (left - reach, top - reach, cols + reach, rows + reach)
+        points = _lattice(points, self.projection, self.tile_map.grid, block)
+        r, c, _ = points.cells(*block)
         if not (self._woods[r.min() : r.max() + 2, c.min() : c.max() + 2] > 0).any():
             return
-        share = np.zeros(x.shape, dtype=np.float32)
-        for dx, dy in AROUND:
-            sr, sc = grid.cell_at(x + dx, y + dy)
-            sr, sc = np.clip(sr, 0, grid.rows - 1), np.clip(sc, 0, grid.cols - 1)
-            share += self._woods[sr, sc]
-        share /= len(AROUND)
-        edge = noise(x, y, 0.55, 61) * 0.55 + noise(x, y, 0.16, 62) * 0.3
-        land = self.tile_map.terrain[r, c] == Terrain.LAND
-        woods = land & (share + (edge - 0.42) * 0.9 > 0.5)
-        if woods.any():
-            mountains, _ = self.elevation.shares(x, y)
-            woods &= mountains < BARE_ABOVE
+        woods = self._wooded(points, block, r, c)
+        if woods.any() and self.elevation.most(*block)[0] >= BARE_ABOVE - BARE_MARGIN:
+            x, y = points.plane(*block)
+            woods[woods] = self.elevation.mountainous(x[woods], y[woods]) < BARE_ABOVE
         shadow = woods[: rows + reach - 3, : cols + reach - 2]
         shadow = shadow[reach - 3 :, reach - 2 :] & ~woods[reach:, reach:]
-        woods, x, y, r, c = (a[reach:, reach:] for a in (woods, x, y, r, c))
-        ax, ay = ax[reach:, reach:], ay[reach:, reach:]
-        shown = _on_map(canvas, shown)[::k, ::k]
-        if shadow.any():
-            shaded = _blown_up(shadow & shown, k)
-            canvas[shaded, :3] *= EDGE_SHADOW
-            canvas[shaded, 3] = canvas[shaded, 3] * EDGE_SHADOW + (1 - EDGE_SHADOW)
-        woods &= shown
-        if not woods.any():
+        woods = woods[reach:, reach:]
+        shown = canvas[::k, ::k, 3] > 0 if shown is None else shown[::k, ::k]
+        blocks = art_pixels(canvas, k)
+        down, across = np.nonzero(shadow & shown)
+        if len(down):
+            shaded = blocks[down, :, across]
+            shaded[..., :3] *= EDGE_SHADOW
+            shaded[..., 3] = shaded[..., 3] * EDGE_SHADOW + (1 - EDGE_SHADOW)
+            blocks[down, :, across] = shaded
+        down, across = np.nonzero(woods & shown)
+        if not len(down):
             return
-        x, y, r, c, ax, ay = (a[woods] for a in (x, y, r, c, ax, ay))
-        d, dx, dy, gx, gy = _nearest_crown(ax, ay, CROWN_GAP)
+        x, y = points.plane(*block)
+        x, y = x[down + reach, across + reach], y[down + reach, across + reach]
+        fx, fy = x.astype(np.float32), y.astype(np.float32)
+        biomes = self._biomes[r[down + reach, across + reach], c[down + reach, across + reach]]
+        d, dx, dy, gx, gy = _nearest_crown(left + across + 0.5, top + down + 0.5, CROWN_GAP)
         radius = 1.25 + 0.75 * table_hash(gx, gy, 53)
-        biomes = self._biomes[r, c]
-        conifers = np.where(
-            biomes == Biome.TAIGA,
-            0.9,
-            np.where(biomes == Biome.JUNGLE, 0.0, 0.2 + 0.6 * noise(x, y, 1.1, 64)),
-        )
+        conifers = np.where(biomes == Biome.TAIGA, 0.9, 0.0)
+        broadleaved = (biomes != Biome.TAIGA) & (biomes != Biome.JUNGLE)
+        conifers[broadleaved] = 0.2 + 0.6 * noise(fx[broadleaved], fy[broadleaved], 1.1, 64)
         conifer = table_hash(gx, gy, 63) < conifers
         towards = (-dx * 0.7 - dy * 0.7) / np.maximum(radius, 0.1)
         part = np.where(towards > 0.25, 2, np.where(towards < -0.45, 0, 1))
         leaves = np.where(conifer[:, None], CONIFER_CROWNS[part], LEAFY_CROWNS[part])
-        leaves *= (0.88 + 0.28 * noise(x, y, 0.9, 65))[:, None]
-        colour = np.zeros((rows, cols, 3), dtype=np.float32)
-        colour[woods] = np.where((d < radius)[:, None], leaves, WOODS_FLOOR) / 255
-        fine = _blown_up(woods, k)
-        canvas[fine, :3] = _blown_up(colour, k)[fine]
-        canvas[fine, 3] = 1.0
+        leaves *= (0.88 + 0.28 * noise(fx, fy, 0.9, 65))[:, None]
+        colour = np.where((d < radius)[:, None], leaves, WOODS_FLOOR) / 255
+        blocks[down, :, across, :, :3] = colour[:, None, None, :]
+        blocks[down, :, across, :, 3] = 1.0
+
+    def _wooded(
+        self, points: Lattice, block: tuple[int, int, int, int], r: IntArray, c: IntArray
+    ) -> BoolArray:
+        """Which art pixels of the block woods cover, before bare mountainsides are taken out:
+        land where the woods' share of the ground round it, frayed by noise, is over half.
+
+        A pixel takes the share of the cells AROUND it, which all lie in its own cell or the
+        cells round it, so where those cells all have the same say as its own, the share is its
+        own cell's say, and where none has woods there are no woods, without looking. Woods
+        cover all of a share of 1 whatever the noise, and none of a share of 0 or less, so only
+        shares between need the noise."""
+        grid = self.tile_map.grid
+        share = self._woods[r, c]
+        unsure = self._unsure_woods(r, c)
+        if unsure.any():
+            x, y = points.plane(*block)
+            x, y = x[unsure], y[unsure]
+            around = np.zeros(x.shape, dtype=np.float32)
+            for dx, dy in AROUND:
+                sr, sc = grid.cell_at(x + dx, y + dy)
+                sr, sc = np.clip(sr, 0, grid.rows - 1), np.clip(sc, 0, grid.cols - 1)
+                around += self._woods[sr, sc]
+            around /= len(AROUND)
+            share[unsure] = around
+        land = self._land[r, c]
+        woods = land & (share >= 1)
+        frayed = land & (share > 0) & (share < 1)
+        if frayed.any():
+            x, y = points.plane(*block)
+            fx, fy = x[frayed].astype(np.float32), y[frayed].astype(np.float32)
+            edge = noise(fx, fy, 0.55, 61) * 0.55 + noise(fx, fy, 0.16, 62) * 0.3
+            woods[frayed] = share[frayed] + (edge - 0.42) * 0.9 > 0.5
+        return woods
+
+    def _unsure_woods(self, r: IntArray, c: IntArray) -> BoolArray:
+        """Which of these cells have woods among the cells round them and another say than
+        their own, or lie where cells round them are off the map: where the woods' share of the
+        ground at a point can't be told from its own cell alone. Worked out for just the cells
+        between the first and last row and column asked about."""
+        top, left = int(r.min()), int(c.min())
+        block = (slice(top, int(r.max()) + 1), slice(left, int(c.max()) + 1))
+        here = self._woods[block]
+        there = self._woods.ravel()[self._round[(slice(None), *block)]]
+        unlike = self._off_round[block] | (there != here).any(axis=0)
+        wooded = (here > 0) | (there > 0).any(axis=0)
+        return (unlike & wooded)[r - top, c - left]
 
     def _tree_shade(self, left: int, top: int, shape: tuple[int, ...]) -> FloatArray:
         """How deep in a tree's shade each pixel of a block from (`left`, `top`) lies, from 0 to
@@ -660,17 +811,18 @@ class Ground:
         plot: Plot,
         crop: BuildingKind | None,
         k: int = 1,
-    ) -> None:
+    ) -> BoolArray:
         """Lays a field of crops in rows over the half of a cell a farm or crop takes up, `k`
         pixels to an art pixel: a farm grows wheat, other crops grow in rows. Plants are
         lit on the side towards the light and shaded on the other, the soil between rows is
-        darker in the furrow, a strip of bare headland runs round inside a lumpy hedge."""
+        darker in the furrow, a strip of bare headland runs round inside a lumpy hedge.
+        Returns which pixels the field covers."""
         grid = self.tile_map.grid
         row, col = plot.cell
         fx, fy = grid.center(row, col)
         field = (cells == row * grid.cols + col) & plot.covers(x - fx, y - fy)
         if not field.any():
-            return
+            return field
         pick = row * 7 + col * 13
         across, along = (x - fx, y - fy) if pick % 2 else (y - fy, x - fx)
         u, w = across[field] * FIELD_STRIPES, along[field] * FIELD_STRIPES
@@ -701,21 +853,16 @@ class Ground:
             out[bush & (fu > 0.66)] = plant * 0.7
             leaf = bush & (table_hash(px, py, 82) > 0.86)
             out[leaf] = light * 1.08
-        depth = np.zeros(field.shape, dtype=np.int16)
-        inside = field.copy()
-        for step in range(1, 3 * k + 1):
-            inside = inside & np.roll(inside, 1, 0) & np.roll(inside, -1, 0)
-            inside = inside & np.roll(inside, 1, 1) & np.roll(inside, -1, 1)
-            depth[inside] = step
-        depth = depth[field]
+        depth = _depths(field, 2 * k)
         hedge = depth < k
         headland = (depth >= k) & (depth < 2 * k)
-        lumps = 0.78 + 0.4 * table_hash(px // (2 * k), py // (2 * k), 91)
+        lumps = 0.78 + 0.4 * table_hash(px[hedge] // (2 * k), py[hedge] // (2 * k), 91)
         out[headland] = HEADLAND * (1 + 0.16 * grain[headland])
-        out[hedge] = HEDGE * lumps[hedge][:, None]
+        out[hedge] = HEDGE * lumps[:, None]
         dark = (hedge & ~np.roll(field, -k, 0)[field]) if k > 1 else np.zeros_like(hedge)
         out[dark] *= 0.72
         rgb[field] = out
+        return field
 
     def _plant(
         self,
@@ -727,16 +874,16 @@ class Ground:
         iy: IntArray,
         plot: Plot,
         grove: Grove,
-    ) -> None:
+    ) -> BoolArray:
         """Lays a grove of trees in rows over the half of a cell an orchard, date palms or
         plantation takes up: each crown lit on the side towards the light, with its shadow on
-        the ground beside it, and some bearing fruit."""
+        the ground beside it, and some bearing fruit. Returns which pixels the grove covers."""
         grid = self.tile_map.grid
         row, col = plot.cell
         fx, fy = grid.center(row, col)
         ground = (cells == row * grid.cols + col) & plot.covers(x - fx, y - fy)
         if not ground.any():
-            return
+            return ground
         u = (x[ground] - fx) * grove.rows + 0.5
         v = (y[ground] - fy) * grove.rows + 0.5
         du, dv = u - np.round(u), v - np.round(v)
@@ -757,6 +904,41 @@ class Ground:
         for index, color in enumerate(grove.fruit):
             colors[fruit & (pick == index)] = color
         rgb[ground] = colors
+        return ground
+
+
+def _depths(field: BoolArray, most: int) -> npt.NDArray[np.int16]:
+    """How many steps in from its edge each pixel of a field lies, up to `most`, in the order
+    of the field's pixels; the edges of the block wrap round to its other side, as np.roll's do.
+    The field shrinks with every step, so a pixel's depth is how many steps it stays in. A field
+    clear of the block's edges is shrunk in just the box round it and a pixel more, where the
+    wrapping brings in nothing but clear pixels."""
+    rows, cols = np.flatnonzero(field.any(axis=1)), np.flatnonzero(field.any(axis=0))
+    top, bottom, left, right = rows[0], rows[-1], cols[0], cols[-1]
+    if top > 0 and left > 0 and bottom < field.shape[0] - 1 and right < field.shape[1] - 1:
+        field = field[top - 1 : bottom + 2, left - 1 : right + 2]
+    depth = np.zeros(field.shape, dtype=np.int16)
+    inside = field
+    for _ in range(most):
+        inside = _shrunk(inside)
+        depth += inside
+    return depth[field]
+
+
+def _shrunk(inside: BoolArray) -> BoolArray:
+    """`inside` less every pixel with one beside it, above, below, left or right, that is not:
+    first up and down, then across, the block's edges wrapping round as np.roll's do."""
+    rows = inside.copy()
+    rows[1:] &= inside[:-1]
+    rows[:1] &= inside[-1:]
+    rows[:-1] &= inside[1:]
+    rows[-1:] &= inside[:1]
+    both = rows.copy()
+    both[:, 1:] &= rows[:, :-1]
+    both[:, :1] &= rows[:, -1:]
+    both[:, :-1] &= rows[:, 1:]
+    both[:, -1:] &= rows[:, :1]
+    return both
 
 
 def _on_map(canvas: FloatArray, shown: BoolArray | None) -> BoolArray:
@@ -776,62 +958,82 @@ def _over(under: FloatArray, colour: FloatArray, cover: FloatArray) -> None:
 def _sign_deposits(
     rgb: FloatArray,
     deposit: npt.NDArray[np.uint8],
-    ix: IntArray,
-    iy: IntArray,
+    left: int,
+    top: int,
     water: npt.NDArray[np.bool_],
 ) -> None:
     """Marks deposits with a few small signs: sheep grazing wool land, rocks with a vein of their
-    ore elsewhere."""
-    shown = (deposit > 0) & (deposit != Deposit.GARRISON) & ~water
+    ore elsewhere; `rgb` is the ground from art pixel (`left`, `top`)."""
+    down, across = np.nonzero((deposit > 0) & (deposit != Deposit.GARRISON) & ~water)
+    if not len(down):
+        return
+    ix, iy = left + across, top + down
+    deposit = deposit[down, across]
+    colour = rgb[down, across]
     lx, ly = ix % 12, iy % 12
-    here = shown & (table_hash(ix // 12, iy // 12, 71) > 1 - DEPOSIT_SIGNS)
+    here = table_hash(ix // 12, iy // 12, 71) > 1 - DEPOSIT_SIGNS
     sheep = here & (deposit == Deposit.WOOL)
-    rgb[sheep & (lx >= 4) & (lx <= 7) & (ly >= 5) & (ly <= 7)] = SHEEP
-    rgb[sheep & (lx == 3) & (ly == 5)] = SHEEP_DARK
-    rgb[sheep & ((lx == 4) | (lx == 7)) & (ly == 8)] = SHEEP_DARK
-    rgb[sheep & (lx >= 4) & (lx <= 7) & (ly == 9)] *= 0.7
+    colour[sheep & (lx >= 4) & (lx <= 7) & (ly >= 5) & (ly <= 7)] = SHEEP
+    colour[sheep & (lx == 3) & (ly == 5)] = SHEEP_DARK
+    colour[sheep & ((lx == 4) | (lx == 7)) & (ly == 8)] = SHEEP_DARK
+    colour[sheep & (lx >= 4) & (lx <= 7) & (ly == 9)] *= 0.7
     rock = here & (deposit != Deposit.WOOL)
     stone = rock & (lx >= 4) & (lx <= 7) & (ly >= 6) & (ly <= 8) & ~((lx == 7) & (ly == 6))
-    rgb[stone] = ORE_ROCK
+    colour[stone] = ORE_ROCK
     vein = rock & (lx == 5) & (ly == 7)
-    rgb[vein] = DEPOSIT_SPECKS[deposit[vein]]
-    rgb[rock & (lx >= 4) & (lx <= 8) & (ly == 9)] *= 0.72
+    colour[vein] = DEPOSIT_SPECKS[deposit[vein]]
+    colour[rock & (lx >= 4) & (lx <= 8) & (ly == 9)] *= 0.72
+    rgb[down, across] = colour
 
 
-def _blown_up(picture: npt.NDArray, k: int) -> npt.NDArray:
-    """The picture with each pixel blown up to `k` by `k`."""
-    return picture if k == 1 else picture.repeat(k, axis=0).repeat(k, axis=1)
+def art_pixels(picture: FloatArray, k: int) -> FloatArray:
+    """The picture seen as art pixels of `k` by `k` pixels, by row, row of pixels, column, column
+    of pixels and channel, sharing the picture's memory, so painting an art pixel paints all of
+    its pixels."""
+    rows, cols = picture.shape[0] // k, picture.shape[1] // k
+    return picture.reshape(rows, k, cols, k, picture.shape[2], copy=False)
 
 
 def _nearest_crown(
     px: FloatArray, py: FloatArray, gap: float
 ) -> tuple[FloatArray, FloatArray, FloatArray, IntArray, IntArray]:
     """The nearest crown to each picture point, crowns standing one to a square `gap` pixels a
-    side at a random spot in it: how far, which way, and which square."""
+    side at a random spot in it: how far, which way, and which square. Where the crown of every
+    square round the points stands is worked out once a square; ties go to the square met
+    first, going down each column of the three by three round a point's own."""
     cx, cy = np.floor(px / gap).astype(np.int64), np.floor(py / gap).astype(np.int64)
+    first_x, first_y = int(cx.min()) - 1, int(cy.min()) - 1
+    gx = np.arange(first_x, int(cx.max()) + 2)[None, :]
+    gy = np.arange(first_y, int(cy.max()) + 2)[:, None]
+    jx = ((gx + 0.15 + 0.7 * table_hash(gx, gy, 51)) * gap).ravel()
+    jy = ((gy + 0.15 + 0.7 * table_hash(gx, gy, 52)) * gap).ravel()
+    width = gx.shape[1]
+    home = (cy - first_y) * width + (cx - first_x)
     best = np.full(px.shape, np.inf, dtype=np.float32)
-    best_dx, best_dy = np.zeros(px.shape, np.float32), np.zeros(px.shape, np.float32)
-    best_x, best_y = cx.copy(), cy.copy()
+    nearest = home.copy()
     for ox in (-1, 0, 1):
         for oy in (-1, 0, 1):
-            gx, gy = cx + ox, cy + oy
-            jx = (gx + 0.15 + 0.7 * table_hash(gx, gy, 51)) * gap
-            jy = (gy + 0.15 + 0.7 * table_hash(gx, gy, 52)) * gap
-            dx, dy = (px - jx).astype(np.float32), (py - jy).astype(np.float32)
-            distance = dx * dx + dy * dy
-            closer = distance < best
-            best = np.where(closer, distance, best)
-            best_dx, best_dy = np.where(closer, dx, best_dx), np.where(closer, dy, best_dy)
-            best_x, best_y = np.where(closer, gx, best_x), np.where(closer, gy, best_y)
-    return np.sqrt(best), best_dx, best_dy, best_x, best_y
+            square = home + (oy * width + ox)
+            dx, dy = (px - jx[square]).astype(np.float32), (py - jy[square]).astype(np.float32)
+            dx *= dx
+            dy *= dy
+            dx += dy
+            closer = dx < best
+            np.copyto(best, dx, where=closer)
+            np.copyto(nearest, square, where=closer)
+    dx, dy = (px - jx[nearest]).astype(np.float32), (py - jy[nearest]).astype(np.float32)
+    return np.sqrt(best), dx, dy, nearest % width + first_x, nearest // width + first_y
 
 
 def _ramp(t: FloatArray, stops: tuple[tuple[float, RGB], ...]) -> FloatArray:
-    """Colours along a smooth ramp of (t, colour) stops for t from 0 to 1."""
-    t = np.clip(t, 0, 1)
+    """Colours along a smooth ramp of (t, colour) stops for t from 0 to 1, held to that range
+    already."""
     marks = np.array([at for at, _ in stops], dtype=np.float32)
     colours = np.array([colour for _, colour in stops], dtype=np.float32)
-    return np.stack([np.interp(t, marks, colours[:, k]) for k in range(3)], axis=-1)
+    rgb = np.empty((*np.shape(t), 3), dtype=np.float64)
+    for k in range(3):
+        rgb[..., k] = np.interp(t, marks, colours[:, k])
+    return rgb
 
 
 def _meadow(
@@ -846,27 +1048,91 @@ def _meadow(
     blended softly, lit with the slopes, with a fine grain, blades in the rough grass and a few
     wild flowers; savanna the same in its own kinds."""
     short, tall, bare, rarity = GRASSES[grass]
+    x, y = np.asarray(x, dtype=np.float32), np.asarray(y, dtype=np.float32)
     kind = noise(x, y, 0.55, 81) + 0.25 * (noise(x, y, 0.15, 85) - 0.5)
     t = 0.5 + 0.36 * (noise(x, y, 2.4, 41) - 0.5) + 0.14 * (noise(x, y, 0.4, 42) - 0.5) + light / 3
     rough = np.clip((kind - 0.55) * 3.5, 0, 1)
     dry = np.clip((noise(x, y, 0.45, 82) - 0.74) * 3.5, 0, 1) * (1 - rough)
     pasture = 1 - rough - dry
+    t = np.clip(t, 0, 1)
     rgb = (
         _ramp(t, short) * pasture[:, None]
         + _ramp(t, tall) * rough[:, None]
         + _ramp(t, bare) * dry[:, None]
     )
-    blade = (table_hash(ix, iy // 2, 83) > 0.72) & (iy % 2 == 0)
-    tip = (table_hash(ix, (iy + 1) // 2, 83) > 0.72) & (iy % 2 == 1)
+    # Blades stand in even rows and their tips in the odd rows below, two rows to a hash.
+    odd = iy % 2 == 1
+    tall_grass = table_hash(ix, (iy + odd) // 2, 83) > 0.72
+    blade, tip = tall_grass & ~odd, tall_grass & odd
     rgb *= (1 - 0.14 * rough * blade + 0.1 * rough * tip)[:, None]
     rgb += ((table_hash(ix, iy, 84) - 0.5) * 8 + (noise(x, y, 0.03, 86) - 0.5) * 10)[:, None]
-    bloom = (noise(x, y, 0.5, 91) > 0.6) & (table_hash(ix, iy, 92) > rarity)
-    rgb[bloom] = FLOWERS[(table_hash(ix[bloom], iy[bloom], 93) * len(FLOWERS)).astype(np.int64)]
+    bloom = table_hash(ix, iy, 92) > rarity
+    if bloom.any():
+        bloom[bloom] = noise(x[bloom], y[bloom], 0.5, 91) > 0.6
+        flower = (table_hash(ix[bloom], iy[bloom], 93) * len(FLOWERS)).astype(np.int64)
+        rgb[bloom] = FLOWERS[flower]
     return rgb
 
 
-def _near(mask: npt.NDArray[np.bool_], shifts: list[tuple[int, int]]) -> npt.NDArray[np.bool_]:
-    near = np.zeros_like(mask)
-    for shift in shifts:
-        near |= np.roll(mask, shift, axis=(0, 1))
+def _near(
+    mask: npt.NDArray[np.bool_], apron: int, rows: int, shifts: list[tuple[int, int]]
+) -> npt.NDArray[np.bool_]:
+    """Where `mask` holds at any of these shifts of each pixel inside the apron round a block
+    of `rows` by CHUNK pixels."""
+    near = np.zeros((rows, CHUNK), dtype=bool)
+    for down, across in shifts:
+        near |= mask[apron - down : apron - down + rows, apron - across : apron - across + CHUNK]
     return near
+
+
+def _lattice(
+    points: Lattice | None,
+    projection: PixelProjection,
+    grid: Grid,
+    block: tuple[int, int, int, int],
+) -> Lattice:
+    """`points` if they hold the plane points and cells of a block of art pixels, or else a
+    lattice of just the block."""
+    if points is not None and points.k == 1 and points.grid is grid and points.holds(*block):
+        return points
+    return Lattice(projection, *block, grid=grid)
+
+
+def _biome_table(biomes: tuple[Biome, ...]) -> BoolArray:
+    """Which biomes are among these, by biome."""
+    table = np.zeros(len(Biome), dtype=bool)
+    table[list(biomes)] = True
+    return table
+
+
+def _cells_round(grid: Grid) -> tuple[npt.NDArray[np.int32], BoolArray]:
+    """The flat index of each cell round every cell in each direction of `_round`, held to the
+    map, and the cells on the map's edge or with a cell round them off it."""
+    rows, cols = np.indices(grid.shape)
+    x, y = grid.center(rows, cols)
+    off = np.zeros(grid.shape, dtype=bool)
+    off[[0, -1], :] = True
+    off[:, [0, -1]] = True
+    round_ = []
+    for dx, dy in _round(grid):
+        r, c = grid.cell_at(x + dx, y + dy)
+        off |= ~grid.contains(r, c)
+        r, c = np.clip(r, 0, grid.rows - 1), np.clip(c, 0, grid.cols - 1)
+        round_.append((r * grid.cols + c).astype(np.int32))
+    return np.stack(round_), off
+
+
+def _round(grid: Grid) -> FloatArray:
+    """The steps from a cell's centre to the cells round it that points AROUND a point in it can
+    lie in: all those no further than the farthest of AROUND and two of the cell's corners."""
+    centre = np.array(grid.center(0, 0), dtype=np.float64)
+    corner = max(float(np.hypot(*(np.array(at) - centre))) for at in grid.corners(0, 0))
+    reach = max(math.hypot(dx, dy) for dx, dy in AROUND) + 2 * corner
+    steps = grid.track_steps()
+    return steps[np.hypot(steps[:, 0], steps[:, 1]) <= reach]
+
+
+_WATER = _biome_table(WATER)
+_MEADOW = _biome_table(MEADOWS)
+_GRASSY = _biome_table(GRASSY)
+_GRASS = _biome_table((*MEADOWS, Biome.SAVANNA))
