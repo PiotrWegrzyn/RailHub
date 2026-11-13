@@ -10,12 +10,12 @@ from pathlib import Path
 import numpy as np
 
 from railroads import maps
+from railroads.mapgen import world_files
 from railroads.mapgen.generate import generate_map
-from railroads.mapgen.presets import NATURAL_EARTH_SOURCE, NaturalEarth, real_world_strategies
+from railroads.mapgen.presets import NATURAL_EARTH_SOURCE, real_world_strategies
 from railroads.mapgen.seeding import play_begins, seed_steps
 from railroads.mapgen.start import StartRegion, pick_start_bounds
 from railroads.mapgen.terrain_tiles import SOURCE as TERRAIN_TILES_SOURCE
-from railroads.mapgen.terrain_tiles import ElevationDatabase
 from railroads.saves import SavedGame
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
 from railroads.sim.finance import START_CASH
@@ -27,6 +27,8 @@ from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import TileMap
 
+# The source data the tools build the world's files from (railroads.mapgen.world_files); the game
+# itself reads only those.
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 ELEVATION_DB = DATA_DIR / "elevation.sqlite"
 # Play can't begin before this year; START_YEAR is the start suggested.
@@ -85,8 +87,8 @@ def allowed_start_year(year: int) -> int:
 
 
 def world_maps_available() -> bool:
-    """Whether the data for maps of random places in the world is here."""
-    return ELEVATION_DB.exists()
+    """Whether the data for maps of random places in the world is here, or can be downloaded."""
+    return world_files.world() is not None
 
 
 @dataclass(frozen=True)
@@ -103,22 +105,21 @@ class NewGame:
 def start_new_game(
     seed: int, region: StartRegion = START_REGION, report: Callable[[str], None] = print
 ) -> NewGame:
-    if not ELEVATION_DB.exists():
+    world = world_files.world()
+    if world is None:
         raise FileNotFoundError(
-            f"No elevation database at {ELEVATION_DB}. "
-            "Build it once with: uv run python tools/build_elevation_db.py"
+            f"No world data at {world_files.WORLD_DIR}. "
+            "Build it with: uv run python tools/build_world_files.py"
         )
     rng = np.random.default_rng(seed)
-    report("Loading world data")
-    world = NaturalEarth.load(DATA_DIR / "raw")
-    bounds = pick_start_bounds(rng, region, MAP_WIDTH_KM, MAP_HEIGHT_KM, world.ocean + world.lakes)
+    bounds = pick_start_bounds(
+        rng, region, MAP_WIDTH_KM, MAP_HEIGHT_KM, maps.world_land().land_share
+    )
     report(f"Starting at {describe_lonlat(*bounds.center)}")
-    database = ElevationDatabase(ELEVATION_DB)
-    try:
-        elevation = database.elevation_for(bounds)
-    finally:
-        database.close()
-    strategies = real_world_strategies(world, elevation, seed)
+    report("Loading the land there")
+    shapes = world.natural_earth(bounds)
+    elevation = world.elevation_for(bounds)
+    strategies = real_world_strategies(shapes, elevation, seed)
     report("Building the map")
     tile_map = generate_map(
         f"Seed {seed}",

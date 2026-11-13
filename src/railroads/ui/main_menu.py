@@ -154,7 +154,7 @@ class MainMenu:
                 hovered = imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value)
                 if disabled and hovered:
                     imgui.set_tooltip(
-                        "Needs the elevation database: uv run python tools/build_elevation_db.py"
+                        "Needs the world's map data: uv run python tools/build_world_files.py"
                     )
             imgui.end_combo()
         imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)

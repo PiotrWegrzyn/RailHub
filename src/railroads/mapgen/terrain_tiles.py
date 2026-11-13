@@ -1,5 +1,6 @@
-"""Worldwide heights from Terrarium terrain tiles, kept in a local SQLite database so starting a
-new map needs no download.
+"""Worldwide heights from Terrarium terrain tiles, gathered once into a local SQLite database by
+tools/build_elevation_db.py. The game reads them from the small files under world/ that
+tools/build_world_files.py writes from it (railroads.mapgen.world_files).
 
 The tiles are Mapzen's elevation served as web map images. They use the Web Mercator projection:
 at zoom z the world is 2**z by 2**z tiles of 256 x 256 pixels, x counting east from 180° W and
@@ -9,6 +10,7 @@ y counting south from about 85° N.
 import math
 import sqlite3
 import zlib
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -114,19 +116,30 @@ class ElevationDatabase:
 
     def elevation_for(self, bounds: Bounds, margin_px: int = 2) -> TileElevation:
         """Heights around the bounds from the stored tiles, and open sea where none is stored."""
-        left, top = world_pixel(bounds.west, bounds.north, self.zoom)
-        right, bottom = world_pixel(bounds.east, bounds.south, self.zoom)
-        tiles_across = 2**self.zoom
-        x0 = math.floor((left - margin_px) / TILE_SIZE)
-        x1 = math.floor((right + margin_px) / TILE_SIZE)
-        y0 = max(0, math.floor((top - margin_px) / TILE_SIZE))
-        y1 = min(tiles_across - 1, math.floor((bottom + margin_px) / TILE_SIZE))
-        shape = ((y1 - y0 + 1) * TILE_SIZE, (x1 - x0 + 1) * TILE_SIZE)
-        heights = np.full(shape, OPEN_SEA_M, dtype=np.int16)
-        for y in range(y0, y1 + 1):
-            for x in range(x0, x1 + 1):
-                tile = self.get(x % tiles_across, y)
-                if tile is not None:
-                    row, col = (y - y0) * TILE_SIZE, (x - x0) * TILE_SIZE
-                    heights[row : row + TILE_SIZE, col : col + TILE_SIZE] = tile
-        return TileElevation(heights, (x0, y0), self.zoom)
+        return elevation_from_tiles(bounds, self.get, self.zoom, margin_px)
+
+
+def elevation_from_tiles(
+    bounds: Bounds,
+    tile: Callable[[int, int], HeightTile | None],
+    zoom: int = ZOOM,
+    margin_px: int = 2,
+) -> TileElevation:
+    """Heights around the bounds from the tiles `tile` gives by x and y, and open sea where it
+    gives none."""
+    left, top = world_pixel(bounds.west, bounds.north, zoom)
+    right, bottom = world_pixel(bounds.east, bounds.south, zoom)
+    tiles_across = 2**zoom
+    x0 = math.floor((left - margin_px) / TILE_SIZE)
+    x1 = math.floor((right + margin_px) / TILE_SIZE)
+    y0 = max(0, math.floor((top - margin_px) / TILE_SIZE))
+    y1 = min(tiles_across - 1, math.floor((bottom + margin_px) / TILE_SIZE))
+    shape = ((y1 - y0 + 1) * TILE_SIZE, (x1 - x0 + 1) * TILE_SIZE)
+    heights = np.full(shape, OPEN_SEA_M, dtype=np.int16)
+    for y in range(y0, y1 + 1):
+        for x in range(x0, x1 + 1):
+            found = tile(x % tiles_across, y)
+            if found is not None:
+                row, col = (y - y0) * TILE_SIZE, (x - x0) * TILE_SIZE
+                heights[row : row + TILE_SIZE, col : col + TILE_SIZE] = found
+    return TileElevation(heights, (x0, y0), zoom)

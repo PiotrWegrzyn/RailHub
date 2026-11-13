@@ -4,7 +4,7 @@ on:
   push:
     tags: ["v*"]
     branches: [staging]
-    paths: [desktop/**, .github/workflows/release.yml, pyproject.toml, uv.lock]
+    paths: [desktop/**, world/**, .github/workflows/release.yml, pyproject.toml, uv.lock]
   workflow_dispatch:
 
 permissions:

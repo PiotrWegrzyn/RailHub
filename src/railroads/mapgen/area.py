@@ -178,9 +178,7 @@ def _clip_half_plane(ring: FloatArray, axis: int, bound: float, keep_above: bool
 def densify(line: FloatArray, step: float) -> FloatArray:
     """Points along a polyline, no further apart than `step`."""
     segments = np.diff(line, axis=0)
-    counts = np.maximum(
-        1, np.ceil(np.hypot(segments[:, 0], segments[:, 1]) / step).astype(np.int64)
-    )
+    counts = np.maximum(1, np.ceil(np.hypot(segments[:, 0], segments[:, 1]) / step).astype(np.intp))
     starts = np.repeat(line[:-1], counts, axis=0)
     steps = np.repeat(segments / counts[:, None], counts, axis=0)
     index = np.arange(counts.sum()) - np.repeat(np.cumsum(counts) - counts, counts)
