@@ -398,7 +398,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
         BuildingKind.FURNITURE_MAKER: Recipe(Good.FURNITURE, 60, {Need.LUMBER: 1.0}),
         BuildingKind.TOOL_WORKS: Recipe(Good.TOOLS, 80, {Need.STEEL: 1.0}),
         BuildingKind.BARREL_MAKER: Recipe(Good.BARRELS, 40, {Need.LUMBER: 0.5}),
-        BuildingKind.WINERY: Recipe(Good.WINE, 80, {Need.GRAPES: 1.0, Need.BARRELS: 0.5}),
+        BuildingKind.WINERY: Recipe(Good.WINE, 80, {Need.GRAPES: 1.0}, {Need.BARRELS: 0.5}),
         BuildingKind.REFINERY: Recipe(Good.FUEL, 300, {Need.OIL: 0.5}),
         BuildingKind.CHEMICAL_WORKS: Recipe(
             Good.CHEMICALS, 100, {Need.SALT: 0.5, Need.BOILER_FUEL: 0.5}
@@ -408,11 +408,13 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
         ),
         BuildingKind.CAR_FACTORY: Recipe(Good.CARS, 20, {Need.STEEL: 5.0, Need.FUEL: 2.0}),
         BuildingKind.MACHINE_WORKS: Recipe(Good.MACHINERY, 40, {Need.STEEL: 1.0, Need.COPPER: 0.5}),
-        BuildingKind.BRICKWORKS: Recipe(Good.BRICKS, 100, {Need.CLAY: 0.5, Need.COAL: 0.25}),
-        BuildingKind.CEMENT_WORKS: Recipe(Good.CEMENT, 100, {Need.LIMESTONE: 0.5, Need.COAL: 0.25}),
-        BuildingKind.GLASSWORKS: Recipe(Good.GLASS, 60, {Need.SAND: 0.5, Need.COAL: 0.25}),
+        BuildingKind.BRICKWORKS: Recipe(Good.BRICKS, 100, {Need.CLAY: 0.5}, {Need.COAL: 0.25}),
+        BuildingKind.CEMENT_WORKS: Recipe(
+            Good.CEMENT, 100, {Need.LIMESTONE: 0.5}, {Need.COAL: 0.25}
+        ),
+        BuildingKind.GLASSWORKS: Recipe(Good.GLASS, 60, {Need.SAND: 0.5}, {Need.COAL: 0.25}),
         BuildingKind.BREWERY: Recipe(Good.BEER, 160, {Need.HOPS: 0.25}, {Need.BARRELS: 0.1}),
-        BuildingKind.DISTILLERY: Recipe(Good.VODKA, 40, {Need.POTATOES: 0.5, Need.GLASS: 0.1}),
+        BuildingKind.DISTILLERY: Recipe(Good.VODKA, 40, {Need.POTATOES: 0.5}, {Need.GLASS: 0.1}),
         BuildingKind.TANNERY: Recipe(Good.LEATHER, 40, {Need.LIVESTOCK: 0.5}),
         BuildingKind.MEAT_FACTORY: Recipe(Good.MEAT, 150, {Need.ANIMALS: 0.2}),
         BuildingKind.SHOE_FACTORY: Recipe(Good.SHOES, 60, {Need.LEATHER: 0.5}),
@@ -427,10 +429,12 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
         BuildingKind.PAPER_MILL: Recipe(Good.PAPER, 100, {Need.LUMBER: 0.5, Need.CHEMICALS: 0.25}),
         BuildingKind.PRINTING_WORKS: Recipe(Good.NEWSPAPERS, 3000, {Need.PAPER: 0.05}),
         BuildingKind.SUGAR_REFINERY: Recipe(
-            Good.REFINED_SUGAR, 60, {Need.SUGAR: 0.5, Need.COAL: 0.1}
+            Good.REFINED_SUGAR, 60, {Need.SUGAR: 0.5}, {Need.COAL: 0.1}
         ),
         BuildingKind.GASWORKS: Recipe(Good.GAS, 200, {Need.COAL: 0.5}),
-        BuildingKind.PORCELAIN_WORKS: Recipe(Good.PORCELAIN, 30, {Need.CLAY: 0.5, Need.COAL: 0.25}),
+        BuildingKind.PORCELAIN_WORKS: Recipe(
+            Good.PORCELAIN, 30, {Need.CLAY: 0.5}, {Need.COAL: 0.25}
+        ),
     }
 )
 
