@@ -6,7 +6,9 @@ import pytest
 from imgui_bundle import hello_imgui
 from test_elevation import world_over_mountains
 
-from railroads.ui.pixel.layer import SETTLE_S, PixelLayer
+from railroads.sim.grids import SquareGrid
+from railroads.ui.pixel.layer import SETTLE_S, PixelLayer, middle_out
+from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection
 
 
 class FakeTexture:
@@ -129,3 +131,20 @@ def test_with_threads_new_chunks_never_wait_for_the_view_to_stand_still() -> Non
     moving = layer._moved(camera, 10.0)
 
     assert not moving
+
+
+def test_chunks_nearest_the_middle_of_the_view_come_first() -> None:
+    projection = PixelProjection.of(SquareGrid(rows=200, cols=200, km_per_cell=2.0), 0.0, 1.0)
+    clip = ((0.0, 0.0), (1280.0, 800.0))
+    placement = ChunkPlacement.of(projection, (3000.0, 2000.0), 1, (640.0, 400.0), clip)
+
+    order = middle_out(placement, (640.0, 400.0))
+
+    rects = [placement.screen_rect(chunk) for chunk in order]
+    off = [
+        ((left + right) / 2 - 640) ** 2 + ((top + bottom) / 2 - 400) ** 2
+        for (left, top), (right, bottom) in rects
+    ]
+    assert sorted(order) == sorted(placement.chunks)
+    assert order[0] == (3000 // CHUNK, 2000 // CHUNK)
+    assert off == sorted(off)

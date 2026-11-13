@@ -14,7 +14,10 @@ In a browser, where threads cannot start, the page's web workers draw the chunks
 Until a worker is ready, or if none can be, one chunk is drawn on each frame, and raised chunks
 are not drawn again finely, which would stall a frame for a third of a second. Then, when the
 ground shader shows the ground beneath, chunks wait until the view and the mouse have stood still
-for a moment, so moving the map or the mouse doesn't stall on drawing them."""
+for a moment, so moving the map or the mouse doesn't stall on drawing them.
+
+Chunks nearest the middle of the view are asked for and turned into textures first, so the view
+fills in from the middle out."""
 
 import time
 from collections import OrderedDict
@@ -138,7 +141,7 @@ class PixelLayer:
         waiting = ground_below and self._moved(camera, now, pointer)
         uploaded = False
         complete = True
-        for chunk in placement.chunks:
+        for chunk in middle_out(placement, center):
             key = (*chunk, scale)
             drawn = (*chunk, resolution)
             texture = self._textures.get(key)
@@ -231,3 +234,13 @@ class PixelLayer:
         texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
         self._textures[(*chunk, scale)] = texture
         return texture
+
+
+def middle_out(placement: ChunkPlacement, center: Vec2) -> list[ChunkKey]:
+    """The chunks placed on screen, those nearest `center`, the middle of the view, first."""
+
+    def off_middle(chunk: ChunkKey) -> float:
+        (left, top), (right, bottom) = placement.screen_rect(chunk)
+        return ((left + right) / 2 - center[0]) ** 2 + ((top + bottom) / 2 - center[1]) ** 2
+
+    return sorted(placement.chunks, key=off_middle)
