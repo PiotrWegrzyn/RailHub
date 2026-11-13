@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             name: macOS
             app: build/desktop/dist/RailHub.app/Contents/MacOS/RailHub
             archive: build/desktop/RailHub-macOS.zip
