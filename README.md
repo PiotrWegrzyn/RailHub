@@ -147,16 +147,16 @@ pixels per art pixel.
 - `railroads.ui.relief`: hills are drawn lighter, and wherever the land steps up a level the
   higher cell gets a bevel lit from the top-left of the screen.
 - `railroads.ui.ground`: puts both together into the smooth ground picture.
-- `railroads.ui.buildings`: where each building stands in its share of the cell, drawn as a
-  coloured dot when zoomed out.
+- `railroads.ui.building_spots`: where each building stands in its share of the cell, drawn as a
+  coloured dot when zoomed out (`railroads.ui.buildings`).
 - `railroads.ui.pixel`: the pixel art.
   - **Ground shader** (`ground_shader`): the graphics card draws the ground under the chunks
     with a shader, each art pixel in its hex cell's colour with a grain of light and dark patches
     and light on the slopes, so the whole view shows crisp ground at once while chunks are still
     being drawn. On the desktop it runs through PyOpenGL; in the browser `webgl` makes the same
-    calls on the WebGL 2 that imgui draws with. There, with no threads to draw chunks in the
-    background, new chunks wait until the map stands still, and the shader's ground shows where
-    they are missing. Where neither GL runs, the smooth ground picture shows under the chunks.
+    calls on the WebGL 2 that imgui draws with. Where neither GL runs, the smooth ground picture
+    shows under the chunks. The shader also blows the chunks' textures up to the zoom's scale,
+    the same texels the CPU would make from an upload a fraction of the size.
   - **Ground** (`ground`): soft patches of a few shades per biome, with tufts of grass, sandy
     shores, rippled water and slopes lit from the top left by the land's real heights. Meadows
     (grassland, and the ground under mountains) are shaded smoothly instead: short pasture,
@@ -205,16 +205,27 @@ pixels per art pixel.
   - **Drawn in the background** (`layer`, `painter`): chunks are drawn on a thread of their own,
     never inside a frame, so panning and month turns don't stall on them. Until a chunk is ready
     the ground beneath shows, and a chunk that changed keeps its old texture. The painter draws
-    the chunks in view first, newest first, and forgets ones nobody asked for in the last second.
-    A game being loaded draws its first view's chunks during loading.
-  - **Sharper mountains** (`layer`): a chunk where hills or mountains rise shows first as it is
-    quickly drawn, then is drawn again with the heights, lift and colours of its raised ground at
-    2× (about 0.3 s), which takes its place once ready. A chunk drawn again because something in
-    it changed is refined again the same way.
+    the chunks in view first, newest first, and forgets ones nobody asked for in the last second;
+    the view fills in from its middle out. A game being loaded draws its first view's chunks
+    during loading.
+  - **Web workers** (`web_painter`, `copies`, `web/painter.js`): in the browser, where Python
+    can't start threads, the page starts up to four web workers, each a Python of its own with a
+    copy of the pixel world, pickled whole while a game loads and kept up with the buildings,
+    track, forests and satisfaction it changes with. Several chunks are drawn at once while the
+    frames carry on. Until a worker is ready, or if all of them fail, chunks are drawn on the
+    frames, one a frame, once the map and the mouse stand still. `?painters=N` on the page sets
+    how many start. The page copies the bytes the workers are sent and send back straight from
+    and into Python's memory by their address there, as Pyodide's own conversions go wrong once
+    that memory passes 2 GiB.
+  - **Sharper mountains** (`layer`): on the desktop, a chunk where hills or mountains rise shows
+    first as it is quickly drawn, then is drawn again with the heights, lift and colours of its
+    raised ground at 2× (about 0.3 s), which takes its place once ready. A chunk drawn again
+    because something in it changed, or let go to save memory, is refined again the same way. The
+    browser shows raised chunks as quickly drawn, whether the frames or the workers draw them.
   - **Month turns** touch only what changed: building spots and field plots are kept per cell
-    (`ui.buildings`), the smooth ground picture is touched up only in cells whose colour changed
-    (`ui.ground`) and painted again during the turn only if the last frame showed it, and the
-    autosave starts on the frame after the turn, or once the last one is written if it still is.
+    (`ui.building_spots`), the smooth ground picture is touched up only in cells whose colour
+    changed (`ui.ground`) and painted again during the turn only if the last frame showed it, and
+    the autosave starts on the frame after the turn, or once the last one is written if it still is.
 - `railroads.ui.map_view`: the map view, which owns the layers and the order they draw in. Beside it:
   `map_input` (mouse and keys), `map_tools` (what clicks do with each build tool), `map_overlays`
   (outlines, grid lines, station names, compass, search marks, the status strip and hover card)

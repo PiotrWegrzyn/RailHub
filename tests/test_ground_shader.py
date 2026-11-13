@@ -4,7 +4,7 @@ import pytest
 from builders import flat_map
 from railroads.ui.map_view import LOOKS
 from railroads.ui.pixel import ground_shader
-from railroads.ui.pixel.ground_shader import GroundShader, screen_of, view_of
+from railroads.ui.pixel.ground_shader import ChunkTexture, GroundShader, screen_of, view_of
 from railroads.ui.pixel.projection import PixelProjection
 
 
@@ -54,3 +54,27 @@ def test_each_cell_hands_the_shader_its_biome_deposit_hills_and_glow() -> None:
     info = ground_shader.cell_info(biomes, deposits, hills, np.array([[0.24, 0.0]]))
 
     assert info.tolist() == [[[7, 8, 1, 60], [0, 0, 0, 0]]]
+
+
+class DeletingGL:
+    def __init__(self) -> None:
+        self.deleted: list[int] = []
+
+    def glDeleteTextures(self, count: int, textures: list[int]) -> None:
+        self.deleted += textures[:count]
+
+
+def test_a_blown_up_chunk_texture_is_deleted_on_a_frame_after_nothing_holds_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gl = DeletingGL()
+    monkeypatch.setattr(ground_shader, "GL", gl)
+    monkeypatch.setattr(ground_shader, "_UNWANTED", [])
+    kept, dropped = ChunkTexture(7, 1024, 1024), ChunkTexture(8, 1024, 1024)
+    del dropped
+
+    ground_shader.free_textures()
+    ground_shader.free_textures()
+
+    assert gl.deleted == [8]
+    assert kept.texture_id() == 7

@@ -17,7 +17,7 @@ from railroads.sim.economy import Satisfaction
 from railroads.sim.grids import Grid
 from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
 from railroads.ui.biomes import Biome, biome_grid
-from railroads.ui.buildings import Plot, plots_of
+from railroads.ui.building_spots import Plot, plots_of
 from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.noise import noise, table_hash
 from railroads.ui.pixel.projection import CHUNK, RGB, FloatArray, IntArray, PixelProjection

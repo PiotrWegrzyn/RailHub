@@ -1,7 +1,8 @@
 """Shows the pixel art on screen: chunks are drawn as the view reaches them and kept as textures
 blown up to the zoom's pixel scale. Where each art pixel covers an even number of screen pixels the
 chunks are drawn finer (PixelWorld.render), so buildings, trees and track keep thin lines instead of
-growing blocky.
+growing blocky. Where the ground shader runs, the graphics card blows the textures up, which saves
+the frames repeating every pixel and sending the graphics card all of them.
 
 Chunks are drawn away from the frames (railroads.ui.pixel.painter); until a chunk is ready, the
 ground drawn beneath shows where it is missing, and a chunk that changed keeps its old texture.
@@ -9,21 +10,33 @@ Chunks where hills or mountains rise show first as they are quickly drawn, then 
 with the heights, lift and colours of their raised ground at the full resolution, and the finer
 drawing takes their place once it is ready.
 
-Where threads cannot start, as in a browser, one chunk is drawn on each frame, and raised chunks
-are not drawn again finely, which would stall a frame for a third of a second. There, when the
+In a browser, where threads cannot start, the page's web workers draw the chunks instead
+(railroads.ui.pixel.web_painter), several at once, and frames carry on meanwhile as with a thread.
+Until a worker is ready, or if none can be, one chunk is drawn on each frame. Then, when the
 ground shader shows the ground beneath, chunks wait until the view and the mouse have stood still
-for a moment, so moving the map or the mouse doesn't stall on drawing them."""
+for a moment, so moving the map or the mouse doesn't stall on drawing them. Raised chunks are not
+drawn again finely in a browser: on a frame that would stall it for a third of a second, and
+workers draw them as the frames do, so the map looks the same whichever draws it and the workers
+are soon free for the next view.
+
+Chunks nearest the middle of the view are asked for and turned into textures first, so the view
+fills in from the middle out."""
 
 import time
 from collections import OrderedDict
+from collections.abc import Callable
+from typing import Protocol
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
 from railroads.ui.iso_camera import IsoCamera, Vec2
+from railroads.ui.pixel.copies import ChunkJob
 from railroads.ui.pixel.painter import Painter
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, Rgba
+from railroads.ui.pixel.web_painter import WorkerPainter, page_workers
 from railroads.ui.pixel.world import PixelWorld
+from railroads.ui.workers import threads_start
 
 # Time a frame may spend turning drawn chunks into textures; at least one is always made.
 UPLOAD_BUDGET_S = 0.006
@@ -39,10 +52,27 @@ TEXTURE_BUDGET = 512 * 1024 * 1024
 type ChunkKey = tuple[int, int]
 
 
+class Texture(Protocol):
+    """A chunk's texture: one hello_imgui made, or one the ground shader blew up."""
+
+    def texture_id(self) -> int: ...
+
+
 def resolution_for(screen_pixels: int, resolutions: tuple[int, ...]) -> int:
     """The finest resolution a chunk can be drawn at that blows up evenly to `screen_pixels`
     for every art pixel."""
     return max(r for r in resolutions if screen_pixels % r == 0)
+
+
+def painter_for(world: PixelWorld, threads: bool | None = None) -> Painter | WorkerPainter:
+    """A painter of its own thread where threads can start; otherwise the page's web workers,
+    if it started any, or else the frames."""
+    if threads is None:
+        threads = threads_start()
+        workers = None if threads else page_workers()
+        if workers is not None:
+            return WorkerPainter(world, workers)
+    return Painter(threads)
 
 
 class PixelLayer:
@@ -50,9 +80,11 @@ class PixelLayer:
         self.world = world
         # Drawn chunks by where they are and the resolution they were drawn at.
         self._chunks: OrderedDict[tuple[int, int, int], Rgba] = OrderedDict()
-        self._textures: OrderedDict[tuple[int, int, int], hello_imgui.TextureGpu] = OrderedDict()
+        self._textures: OrderedDict[tuple[int, int, int], Texture] = OrderedDict()
         self._stale: set[tuple[int, int, int]] = set()
-        self._painter = Painter(threads)
+        self._painter = painter_for(world, threads)
+        # Whether raised chunks are drawn again finely, which only a thread does.
+        self._refines = isinstance(self._painter, Painter) and self._painter.threaded
         # Chunks drawn finely, and how many times each chunk has been refreshed, so a drawing
         # asked for before a refresh is thrown away.
         self._refined: set[tuple[int, int, int]] = set()
@@ -62,8 +94,10 @@ class PixelLayer:
         self._view: tuple | None = None
         self._still_since = 0.0
         # Whether the graphics card draws the ground beneath, so chunks where nothing rises are
-        # drawn without theirs.
+        # drawn without theirs, and what blows textures up on it then, which makes the same
+        # texels as blowing them up here (GroundShader.blow_up).
         self.over_ground = False
+        self.blow_up: Callable[[Rgba, int], Texture] | None = None
 
     def refresh(self, chunks: set[ChunkKey]) -> None:
         """Draws these chunks again next time they show, keeping their old textures on screen
@@ -91,7 +125,9 @@ class PixelLayer:
             self._chunks[drawn] = pixels
             taken.add(chunk)
         while len(self._chunks) > 1 and self._chunk_bytes() > CHUNK_BUDGET:
-            self._chunks.popitem(last=False)
+            # A chunk drawn finely and let go is drawn quickly when it shows again, and so is
+            # drawn finely again too.
+            self._refined.discard(self._chunks.popitem(last=False)[0])
         return taken
 
     def draw(
@@ -122,7 +158,7 @@ class PixelLayer:
         waiting = ground_below and self._moved(camera, now, pointer)
         uploaded = False
         complete = True
-        for chunk in placement.chunks:
+        for chunk in middle_out(placement, center):
             key = (*chunk, scale)
             drawn = (*chunk, resolution)
             texture = self._textures.get(key)
@@ -179,15 +215,14 @@ class PixelLayer:
         if drawn in self._chunks:
             return
         refreshes = self._refreshes.get(drawn[:2], 0)
-        over_ground = self.over_ground
-        work = lambda: self.world.render(*drawn, over_ground=over_ground)
+        work = ChunkJob(self.world, *drawn, over_ground=self.over_ground)
         self._painter.want((False, drawn, refreshes), work, True, now)
 
     def _refine(self, drawn: tuple[int, int, int], now: float) -> None:
         """Asks for a chunk to be drawn again with fine raised ground, if it has any and is not
         drawn finely already."""
         resolution = drawn[2]
-        if not self._painter.threaded or resolution == 1:
+        if not self._refines or resolution == 1:
             return
         if drawn in self._refined or drawn not in self._chunks:
             return
@@ -197,7 +232,7 @@ class PixelLayer:
         if not rises:
             return
         refreshes = self._refreshes.get(drawn[:2], 0)
-        work = lambda: self.world.render(*drawn, True)
+        work = ChunkJob(self.world, *drawn, fine_relief=True)
         self._painter.want((True, drawn, refreshes), work, False, now)
 
     def _chunk_bytes(self) -> int:
@@ -206,13 +241,37 @@ class PixelLayer:
     def _texture_bytes(self) -> int:
         return sum((CHUNK * key[2]) ** 2 * 4 for key in self._textures)
 
-    def _upload(self, chunk: ChunkKey, scale: int) -> hello_imgui.TextureGpu:
+    def _upload(self, chunk: ChunkKey, scale: int) -> Texture:
         resolution = resolution_for(scale, self.world.resolutions)
         drawn = (*chunk, resolution)
         pixels = self._chunks[drawn]
         self._chunks.move_to_end(drawn)
-        blow_up = scale // resolution
-        big = np.repeat(np.repeat(pixels, blow_up, axis=0), blow_up, axis=1)
-        texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
+        times = scale // resolution
+        texture: Texture
+        if times > 1 and self.blow_up is not None:
+            texture = self.blow_up(pixels, times)
+        else:
+            big = blown_up(pixels, times)
+            texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
         self._textures[(*chunk, scale)] = texture
         return texture
+
+
+def blown_up(pixels: Rgba, times: int) -> Rgba:
+    """The pixels with each repeated `times` times each way, as the texture of a chunk drawn at
+    a finer scale than the screen's where the graphics card can't blow it up. Drawn at the
+    screen's scale, as every chunk is at zoom 3 on a double-density screen, they are the pixels
+    themselves: copying them anyway cost a browser more than a millisecond a chunk."""
+    if times == 1:
+        return pixels
+    return np.repeat(np.repeat(pixels, times, axis=0), times, axis=1)
+
+
+def middle_out(placement: ChunkPlacement, center: Vec2) -> list[ChunkKey]:
+    """The chunks placed on screen, those nearest `center`, the middle of the view, first."""
+
+    def off_middle(chunk: ChunkKey) -> float:
+        (left, top), (right, bottom) = placement.screen_rect(chunk)
+        return ((left + right) / 2 - center[0]) ** 2 + ((top + bottom) / 2 - center[1]) ** 2
+
+    return sorted(placement.chunks, key=off_middle)
