@@ -7,6 +7,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
+from functools import lru_cache
 
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
@@ -391,8 +392,7 @@ def draw_station_reach(
         _hex(draw_list, grid, cell, camera, center, fill, CELL_LINE)
     for station in {*stations, focus}:
         _hex(draw_list, grid, station, camera, center, STATION_FILL, CELL_LINE)
-    gathered = set(grid.within(focus, reach(focus)[1]))
-    for a, b in _border(grid, gathered):
+    for a, b in _reach_border(grid, focus, reach(focus)[1]):
         draw_list.add_line(
             imgui.ImVec2(*camera.to_screen(*a, center)),
             imgui.ImVec2(*camera.to_screen(*b, center)),
@@ -413,6 +413,15 @@ def _hex(
     points = [imgui.ImVec2(*camera.to_screen(x, y, center)) for x, y in grid.corners(*cell)]
     draw_list.add_convex_poly_filled(points, _color(fill))
     draw_list.add_polyline(points, _color(line), 1.0, imgui.ImDrawFlags_.closed.value)
+
+
+@lru_cache(maxsize=64)
+def _reach_border(
+    grid: Grid, station: Cell, steps: int
+) -> tuple[tuple[tuple[float, float], tuple[float, float]], ...]:
+    """The border of the cells within `steps` of a station, worked out once: an open station
+    window draws it every frame, and finding it takes hundreds of lookups."""
+    return tuple(_border(grid, set(grid.within(station, steps))))
 
 
 def _border(grid: Grid, cells: set[Cell]) -> list[tuple[tuple[float, float], tuple[float, float]]]:
