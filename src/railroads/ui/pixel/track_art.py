@@ -49,6 +49,11 @@ STEP = 1 / 12
 # How many times finer than shown, each way, track is drawn before it is averaged down, by the
 # resolution it is shown at: enough to smooth it, without drawing a huge picture up close.
 SMOOTHING = {1: 4, 2: 2}
+# How many pieces of track are kept laid out, with where they land in the picture and how far
+# they are lifted, before all are forgotten and laid out again as they are drawn: more than the
+# chunks round a view of a busy railway draw, and few enough that a big railway's pieces do not
+# fill memory.
+PIECES_KEPT = 1 << 11
 # A station's platform beside its track, and how far from the track's middle the station house
 # stands, in cells of the picture's width.
 PLATFORM_WIDTH = 0.12
@@ -223,14 +228,15 @@ def _joined(constructions: Constructions, cell: Cell, point: int) -> list[Track]
     return [piece for piece in constructions.track_at(beyond) if entry in piece.ends]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class _Laid:
     """A piece of track as it is drawn: the piece, its centre line through its cell in the
-    plane, how far to its left each of its tracks lies at each point of that line, in cells,
-    and the side its station's platform is on if it runs through a station."""
+    plane as a row of x and a row of y, how far to its left each of its tracks lies at each
+    point of that line, in cells, and the side its station's platform is on if it runs through
+    a station."""
 
     piece: Track
-    line: Path
+    line: FloatArray
     sides: list[list[float]]
     platform: Point | None = None
 
@@ -252,11 +258,12 @@ class TrackArt:
         self.elevation = elevation
         # How each piece of track opens up or shifts at its ends (`_ends`), each piece as it is
         # drawn (`_laid`), and where the points of its line land in the picture and how far they
-        # are lifted, kept until track or stations change.
+        # are lifted, kept until track or stations change, and the last three for no more than
+        # PIECES_KEPT pieces.
         self._shapes: dict[Track, tuple[float, float]] = {}
         self._laid_pieces: dict[tuple[Track, Point | None], tuple[int, _Laid]] = {}
-        self._placed: dict[tuple[Track, Point | None], tuple[list[float], list[float]]] = {}
-        self._lifts: dict[tuple[Track, Point | None], list[float]] = {}
+        self._placed: dict[tuple[Track, Point | None], FloatArray] = {}
+        self._lifts: dict[tuple[Track, Point | None], FloatArray] = {}
         self._shapes_version = -1
         # The middle of each cell in the picture, and the steps to the cells track leaves
         # each cell for, which never change.
@@ -270,10 +277,14 @@ class TrackArt:
         """Forgets what was kept about pieces of track before track or stations last changed."""
         if self._shapes_version != self.constructions.railway_version:
             self._shapes.clear()
-            self._laid_pieces.clear()
-            self._placed.clear()
-            self._lifts.clear()
+            self._forget_laid()
             self._shapes_version = self.constructions.railway_version
+
+    def _forget_laid(self) -> None:
+        """Forgets the pieces laid out, where they land in the picture and how far they lift."""
+        self._laid_pieces.clear()
+        self._placed.clear()
+        self._lifts.clear()
 
     def planning(self, pieces: list[Track]) -> TrackArt:
         """Track art that draws track as it will be once these pieces are laid, each in place
@@ -458,7 +469,10 @@ class TrackArt:
         cx, cy = (float(v) for v in grid.center(*piece.cell))
         a, b = (steps[point] for point in piece.ends)
         line = _dense(_bend((cx + a[0], cy + a[1]), (cx, cy), (cx + b[0], cy + b[1])), STEP)
-        laid = _Laid(piece, line, self._sides(piece, line), platform)
+        plane = np.array([[x for x, _ in line], [y for _, y in line]])
+        laid = _Laid(piece, plane, self._sides(piece, line), platform)
+        if len(self._laid_pieces) >= PIECES_KEPT:
+            self._forget_laid()
         self._laid_pieces[piece, platform] = (version, laid)
         return laid
 
@@ -466,21 +480,18 @@ class TrackArt:
         """Where the points of a piece's centre line land in the picture."""
         placed = self._placed.get((laid.piece, laid.platform))
         if placed is None:
-            xs = np.array([p[0] for p in laid.line])
-            ys = np.array([p[1] for p in laid.line])
-            px, py = self.projection.to_pixels(xs, ys)
-            placed = self._placed[laid.piece, laid.platform] = (px.tolist(), py.tolist())
-        return placed
+            placed = np.stack(self.projection.to_pixels(*laid.line))
+            self._placed[laid.piece, laid.platform] = placed
+        xs, ys = placed.tolist()
+        return xs, ys
 
     def _lifted_line(self, laid: _Laid) -> list[float]:
         """How many art pixels each point of a piece's centre line is lifted with the ground."""
         lifts = self._lifts.get((laid.piece, laid.platform))
         if lifts is None:
             assert self.elevation is not None
-            xs = np.array([p[0] for p in laid.line])
-            ys = np.array([p[1] for p in laid.line])
-            lifts = self._lifts[laid.piece, laid.platform] = self.elevation.lift(xs, ys).tolist()
-        return lifts
+            lifts = self._lifts[laid.piece, laid.platform] = self.elevation.lift(*laid.line)
+        return lifts.tolist()
 
     def _through_stations(self, near: tuple[int, int, int, int]) -> list[_Laid]:
         """The track through each station near the area, straight between its two ends with

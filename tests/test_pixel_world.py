@@ -16,6 +16,7 @@ from railroads.sim.economy import Satisfaction
 from railroads.sim.grids import Cell, Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
+from railroads.ui.pixel import track_art
 from railroads.ui.pixel.art import SPRITES, draw_sheet
 from railroads.ui.pixel.art.stations import TURNED_LINES
 from railroads.ui.pixel.ground import AROUND, CROWN_GAP, _depths, _nearest_crown
@@ -699,6 +700,19 @@ def test_the_points_of_a_patch_of_fields_are_those_of_a_box_round_it_cut_to_it(
     place = (slice(10 * k, 34 * k), slice(20 * k, 60 * k))
     for values, cut in zip(alone, around, strict=True):
         assert np.array_equal(values, cut[place])
+
+
+def test_track_is_drawn_the_same_when_fewer_pieces_are_kept_than_are_drawn(
+    sheet: SpriteSheet, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pieces = [Track((10, col), (0, 6)) for col in range(2, 7)]
+    _, all_kept = track_chunk(sheet, pieces)
+    monkeypatch.setattr(track_art, "PIECES_KEPT", 2)
+
+    world, few_kept = track_chunk(sheet, pieces)
+
+    assert 0 < len(world.track._laid_pieces) <= 2
+    assert np.array_equal(few_kept, all_kept)
 
 
 def depths_by_rolling(field: np.ndarray, most: int) -> np.ndarray:
