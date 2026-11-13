@@ -8,6 +8,7 @@ with the month's trade."""
 from typing import TYPE_CHECKING
 
 from railroads.sim.constructions import Station
+from railroads.sim.facilities import Facility
 from railroads.sim.goods import TRAVELLERS, Good
 from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
@@ -54,6 +55,9 @@ class StationCalls:
                     self._railway.hand_out_now(stop.cell, car.good)
             train.cars = self._next_cars(train.cars, stop.cars)
         train.loaded_at = stop.cell
+        working = self._railway.working_at(stop.cell)
+        train.fuelled = Facility.ENGINE_SHED in working
+        train.sanded = Facility.SAND_TOWER in working
         self.load(train, stop)
         if stop.wait_for_load and train.cars and not train.full:
             train.waiting = WAIT_MONTHS

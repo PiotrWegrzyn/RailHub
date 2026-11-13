@@ -23,6 +23,7 @@ from railroads.sim.economy import (
     StationOrder,
     Trade,
 )
+from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.goods import (
     FITS,
     NEEDS,
@@ -174,10 +175,17 @@ class StationTrade:
 
     def short_of(self, station: Cell) -> dict[Need, float]:
         """What the buildings a station hands goods out to are still short of this month, need by
-        need: what last month's trade left them wanting, less what they took since."""
+        need: what last month's trade left them wanting, less what they took since; and what its
+        facilities lacked this month."""
+        short: dict[Need, float] = {}
+        railway = self._growth.railway
+        if railway is not None:
+            for facility in railway.facilities_at(station) - railway.working_at(station):
+                good, amount = FACILITY_USES[facility]
+                short[Need(good.value)] = short.get(Need(good.value), 0.0) + amount
         trade = self._growth.trade
-        if trade is None:
-            return {}
+        if trade is None or not trade.cells.size:
+            return short
         ring = self.inner_ring(station)
         positions = np.searchsorted(trade.cells, ring)
         inside = (positions < trade.cells.size) & (
@@ -185,7 +193,6 @@ class StationTrade:
         )
         positions, ring = positions[inside], ring[inside]
         taken = self._growth.economy.taken or {}
-        short: dict[Need, float] = {}
         for (kind, need), (received, wanted) in trade.goods_got.items():
             lacking = np.maximum(wanted[positions] - received[positions], 0.0)
             since = taken.get((kind, need), {})
