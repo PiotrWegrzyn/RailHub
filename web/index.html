@@ -9,7 +9,8 @@ then open http://localhost:8000/ for the main menu. Saves are kept in the browse
 Query parameters:
     ?args=--poland --seed 7   the game's command line
     &measure                  run web/measure.py: pans across the highest ground and prints timings
-                              (with --poland --seed 7 unless args are given)
+                              (with --poland --seed 7 unless args are given); &measure=other.py
+                              runs another script served beside the page
 -->
 <html lang="en">
 <head>
@@ -94,7 +95,7 @@ Query parameters:
 
         await say("Starting the game...");
         const code = measure
-            ? await (await fetch("measure.py")).text()
+            ? await (await fetch(query.get("measure") || "measure.py")).text()
             : "from railroads.ui.app import main\nmain()";
         pyodide.globals.set("game_args", pyodide.toPy(args));
         pyodide.runPython("import sys\nsys.argv = ['railroads', *game_args]");
