@@ -16,9 +16,10 @@ Every TRADE_EVERY_MONTHS the stations hand out their goods and buildings sell to
 (railroads.sim.economy, settled with the railway by railroads.sim.station_trade), which leaves
 each kind of building in each cell unsatisfied, content or thriving, and pays the player for the
 buildings they own (railroads.sim.ownership). Each building in a cell counts on its own: of ten
-houses with food for two, two are fed and eight starve. Buildings that starve for DIES_AFTER_MONTHS
-on end are pulled down, as many as starved all that while, the player's too; those that make a
-bonus good never are.
+houses with food for two, two are fed and eight starve. Buildings that starve on end are pulled down,
+as many as starved all that while, the player's too: those that make goods after
+PRODUCERS_DIE_AFTER_MONTHS, the rest after DIE_AFTER_MONTHS; those that make a bonus good never
+are.
 
 Growth keeps the tally the other parts share: how many of each kind stand in each cell (counts),
 the points around each cell (nearby) and every ladder's chances, all kept up to date by add. Every
@@ -89,8 +90,16 @@ THINNING_UP_TO = 0.05
 # nearby adds.
 SERVED_POINT_WORTH = 2.0
 SKYSCRAPER_STARS = 4
-# How long the buildings of a kind in a cell last with nothing of what they need or make going.
-DIES_AFTER_MONTHS = 30 * 12
+# How long buildings last starving: those that make goods, and the rest.
+PRODUCERS_DIE_AFTER_MONTHS = 50 * 12
+DIE_AFTER_MONTHS = 10 * 12
+
+
+def dies_after(kind: BuildingKind) -> int:
+    """How many months buildings of a kind last starving."""
+    return PRODUCERS_DIE_AFTER_MONTHS if kind in MAKES else DIE_AFTER_MONTHS
+
+
 # Kinds that make a bonus good, which never die out.
 UNDYING = frozenset(
     kind
@@ -244,16 +253,22 @@ class Growth:
 
     def starving(self, trade: Trade, kind: BuildingKind) -> npt.NDArray[np.int64]:
         """How many buildings of a kind starve in each cell traded on: those left over once the
-        share of what they all want that they got is handed to as few of them as it can."""
+        share of what they all want that they got is handed to as few of them as it can. In a
+        simulated game, cells the stand-in serves have the share it assumes."""
         count = self._counts[kind].ravel()[trade.cells]
         wanted = trade.needed[kind] + trade.could_make[kind]
-        share = np.clip(trade.share((kind,)), 0.0, 1.0)
+        share = trade.share((kind,))
+        if self.assumed_shares is not None:
+            assumed = self.assumed_shares[trade.cells]
+            share = np.where(np.isnan(assumed), share, assumed)
+        share = np.clip(share, 0.0, 1.0)
         served = np.ceil(share * count - 1e-9).astype(np.int64)
         return np.where(wanted > 0, np.maximum(count - served, 0), 0)
 
     def _die_out(self, trade: Trade) -> set[Cell]:
         """Counts the months buildings of each kind have starved in each cell, and pulls down as
-        many as starved all through DIES_AFTER_MONTHS; returns the cells they stood in."""
+        many as starved all through the months they last (dies_after); returns the cells they
+        stood in."""
         if self._starving is None:
             self._starving = {}
         months = self.rule.trade_every_months
@@ -270,7 +285,7 @@ class Growth:
             streak, fewest = counted[:, trade.cells]
             fewest = np.where(streak > 0, np.minimum(fewest, starving), starving)
             streak = np.where(starving > 0, streak + months, 0)
-            dying = streak >= DIES_AFTER_MONTHS
+            dying = streak >= dies_after(kind)
             dead += [
                 (int(index), kind, int(gone))
                 for index, gone in zip(trade.cells[dying], fewest[dying], strict=True)

@@ -23,9 +23,10 @@ def test_the_sandbox_map_is_the_piece_of_a_map_around_its_river() -> None:
 def test_the_sandbox_grows_only_houses_and_food() -> None:
     growth = Growth(Constructions(flat_map(30, 30)), FOOD_ONLY, start_year=850)
 
-    growth.run(12 * 300, np.random.default_rng(1))
+    with growth.log_changes() as changes:
+        growth.run(12 * 600, np.random.default_rng(1))
 
-    grown = {kind for kind, count in growth.counts.items() if count.any()}
+    grown = {kind for _, kind in changes}
     assert BuildingKind.HOUSE in grown
     assert grown <= {
         BuildingKind.HOUSE,
