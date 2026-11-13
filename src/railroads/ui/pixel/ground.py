@@ -80,6 +80,8 @@ GROVES: dict[BuildingKind, Grove] = {
     BuildingKind.RUBBER_PLANTATION: Grove((70, 104, 56), (36, 72, 40), ((226, 224, 210),), 5, 0.38),
     BuildingKind.SHEEP_FARM: Grove((140, 182, 86), (238, 234, 222), ((60, 56, 54),), 4, 0.2),
     BuildingKind.CATTLE_RANCH: Grove((132, 176, 80), (120, 78, 48), ((236, 232, 224),), 4, 0.24),
+    BuildingKind.PIG_FARM: Grove((140, 150, 90), (120, 92, 60), ((226, 160, 156),), 4, 0.24),
+    BuildingKind.CHICKEN_FARM: Grove((150, 176, 90), (196, 170, 110), ((244, 240, 230),), 5, 0.2),
     BuildingKind.HOP_GARDEN: Grove((150, 140, 96), (72, 132, 50), ((170, 214, 110),), 7, 0.34),
 }
 

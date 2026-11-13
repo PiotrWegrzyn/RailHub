@@ -100,6 +100,8 @@ DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.SAND_PIT: ((236, 214, 140), 0.12),
     BuildingKind.POTATO_FARM: ((176, 146, 90), 0.12),
     BuildingKind.CATTLE_RANCH: ((140, 96, 60), 0.12),
+    BuildingKind.PIG_FARM: ((226, 160, 156), 0.12),
+    BuildingKind.CHICKEN_FARM: ((236, 224, 196), 0.12),
     BuildingKind.FLAX_FIELD: ((140, 166, 226), 0.12),
     BuildingKind.HOP_GARDEN: ((120, 186, 80), 0.12),
     BuildingKind.MACHINE_WORKS: ((104, 108, 124), 0.16),

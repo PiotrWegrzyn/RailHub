@@ -106,6 +106,8 @@ BUILDING_SPRITES = {
     BuildingKind.SAND_PIT: "sand_pit",
     BuildingKind.POTATO_FARM: "potato_farm",
     BuildingKind.CATTLE_RANCH: "cattle_ranch",
+    BuildingKind.PIG_FARM: "pig_farm",
+    BuildingKind.CHICKEN_FARM: "chicken_farm",
     BuildingKind.FLAX_FIELD: "flax_field",
     BuildingKind.HOP_GARDEN: "hop_garden",
     BuildingKind.MACHINE_WORKS: "machine_works",

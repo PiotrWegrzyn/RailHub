@@ -146,6 +146,8 @@ POINTS: Mapping[BuildingKind, tuple[Points, int]] = MappingProxyType(
         BuildingKind.SAND_PIT: (Points.ORE, 1),
         BuildingKind.POTATO_FARM: (Points.FOOD, 1),
         BuildingKind.CATTLE_RANCH: (Points.FOOD, 1),
+        BuildingKind.PIG_FARM: (Points.FOOD, 1),
+        BuildingKind.CHICKEN_FARM: (Points.FOOD, 1),
         BuildingKind.FLAX_FIELD: (Points.FOOD, 1),
         BuildingKind.HOP_GARDEN: (Points.FOOD, 1),
         BuildingKind.MACHINE_WORKS: (Points.INDUSTRY, 3),
@@ -709,6 +711,10 @@ CATTLE_RANCHES = Ladder(
     crowded_at=FARMS_CROWDED_OUT,
 )
 
+# Pig farms and chicken farms keep to the same land as cattle; pigs are a little rarer.
+PIG_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.PIG_FARM,), base_chance=0.0000000025)
+CHICKEN_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.CHICKEN_FARM,))
+
 # Flax wants cool, wet land by rivers and lakes.
 FLAX_FIELDS = Ladder(
     kinds=(BuildingKind.FLAX_FIELD,),
@@ -901,6 +907,8 @@ LADDERS = (
     BAKERIES,
     POTATO_FARMS,
     CATTLE_RANCHES,
+    PIG_FARMS,
+    CHICKEN_FARMS,
     FLAX_FIELDS,
     HOP_GARDENS,
     CLAY_PITS,

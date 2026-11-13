@@ -87,6 +87,8 @@ class BuildingKind(Enum):
     SAND_PIT = "sand pit"
     POTATO_FARM = "potato farm"
     CATTLE_RANCH = "cattle ranch"
+    PIG_FARM = "pig farm"
+    CHICKEN_FARM = "chicken farm"
     FLAX_FIELD = "flax field"
     HOP_GARDEN = "hop garden"
     MACHINE_WORKS = "machine works"
@@ -103,7 +105,7 @@ class BuildingKind(Enum):
     PRINTING_WORKS = "printing works"
     SUGAR_REFINERY = "sugar refinery"
     PORCELAIN_WORKS = "porcelain works"
-    MEAT_FACTORY = "meat factory"
+    MEAT_FACTORY = "butcher"
     POWER_PLANT = "power plant"
     SPACE_CENTER = "space center"
     PEAR_HQ = "Pear Company headquarters"
@@ -117,6 +119,11 @@ class BuildingKind(Enum):
     TAVERN = "tavern"
     DEPARTMENT_STORE = "department store"
     HOTEL = "hotel"
+
+    @classmethod
+    def _missing_(cls, value: object) -> BuildingKind | None:
+        """Kinds by the names they had before, so older saves still load."""
+        return {"meat factory": cls.MEAT_FACTORY}.get(str(value))
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,6 +162,8 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.RUBBER_PLANTATION,
             BuildingKind.POTATO_FARM,
             BuildingKind.CATTLE_RANCH,
+            BuildingKind.PIG_FARM,
+            BuildingKind.CHICKEN_FARM,
             BuildingKind.FLAX_FIELD,
             BuildingKind.HOP_GARDEN,
         )

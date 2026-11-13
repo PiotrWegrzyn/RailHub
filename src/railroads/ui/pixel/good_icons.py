@@ -525,6 +525,62 @@ def cattle() -> Sprite:
     return p.sprite()
 
 
+def pigs() -> Sprite:
+    p = _canvas()
+    skin: RGB = (232, 166, 160)
+    for x in (-4, -1, 3, 5):
+        p.line([(x, 2), (x, 5)], shade(skin, 0.6))
+    p.ellipse(-6, -4, 7, 3, skin)
+    p.rect(-8, -3, -5, 1, shade(skin, 0.92))
+    p.point(-8, -2, shade(skin, 0.55))
+    p.point(-8, 0, shade(skin, 0.55))
+    p.point(-5, -3, (40, 30, 30))
+    p.line([(-5, -5), (-4, -3)], shade(skin, 0.8))
+    p.line([(7, -2), (8, -3), (8, -1)], shade(skin, 0.7))
+    return p.sprite()
+
+
+def chickens() -> Sprite:
+    p = _canvas()
+    white: RGB = (244, 240, 230)
+    p.line([(-1, 4), (-1, 7)], (222, 160, 60))
+    p.line([(2, 4), (2, 7)], (222, 160, 60))
+    p.ellipse(-5, -2, 6, 5, white)
+    p.line([(5, -4), (7, -1), (6, 2)], shade(white, 0.85))
+    p.ellipse(-7, -7, -2, -2, white)
+    p.point(-8, -5, (222, 160, 60))
+    p.point(-5, -5, (40, 30, 30))
+    p.line([(-6, -8), (-4, -8)], (200, 50, 44))
+    p.point(-6, -2, (200, 50, 44))
+    return p.sprite()
+
+
+def eggs() -> Sprite:
+    p = _canvas()
+    straw: RGB = (196, 156, 84)
+    p.ellipse(-7, 1, 7, 7, straw)
+    p.line([(-6, 3), (6, 3)], shade(straw, 0.8))
+    for x, shell in ((-4, (244, 236, 220)), (0, (226, 190, 150)), (4, (244, 236, 220))):
+        p.ellipse(x - 2, -4, x + 2, 2, shell)
+        p.point(x - 1, -3, shade(shell, 1.1))
+    return p.sprite()
+
+
+def animals() -> Sprite:
+    p = _canvas()
+    skin: RGB = (232, 166, 160)
+    p.ellipse(-1, -1, 8, 5, skin)
+    p.rect(-3, 0, -1, 3, shade(skin, 0.92))
+    p.line([(1, 5), (1, 7)], shade(skin, 0.6))
+    p.line([(6, 5), (6, 7)], shade(skin, 0.6))
+    white: RGB = (244, 240, 230)
+    p.ellipse(-8, -6, -2, -1, white)
+    p.ellipse(-9, -8, -6, -5, white)
+    p.point(-10, -7, (222, 160, 60))
+    p.point(-8, -9, (200, 50, 44))
+    return p.sprite()
+
+
 def flax() -> Sprite:
     p = _canvas()
     stalk: RGB = (170, 170, 92)
@@ -893,6 +949,10 @@ ICONS: dict[str, Callable[[], Sprite]] = {
     "sand": sand,
     "potatoes": potatoes,
     "cattle": cattle,
+    "pigs": pigs,
+    "chickens": chickens,
+    "eggs": eggs,
+    "animals": animals,
     "flax": flax,
     "hops": hops,
     "machinery": machinery,
