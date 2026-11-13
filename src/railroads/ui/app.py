@@ -210,23 +210,32 @@ class App:
             self._autosaving = WRITER.submit(self.saves.autosave, taken)
 
     def _start_due_autosave(self) -> None:
-        if self._autosave_due:
+        """Starts the autosave a month asked for once the last one is written and no month is
+        half done, so a month that ends while an autosave is still being written is saved after
+        it rather than not at all."""
+        if self._autosave_due and self._autosaving is None and self._turning is None:
             self._autosave_due = False
             self.autosave()
 
     def finish_autosave(self) -> None:
-        """Finishes a month being done, then waits for an autosave being written, starting it if
-        it is due."""
+        """Finishes a month being done, then waits for the autosave being written and for one
+        that is due."""
         if self._turning is not None:
             finish(self._turning)
             self._turning = None
             self._autosave_due = True
+        self._finish_writing()
         self._start_due_autosave()
-        if self._autosaving is not None:
-            if isinstance(WRITER, FrameWorker):
-                WRITER.work_once()
-            self._autosaving.exception()
-            self._check_autosave()
+        self._finish_writing()
+
+    def _finish_writing(self) -> None:
+        """Waits for the autosave being written, if one is."""
+        if self._autosaving is None:
+            return
+        if isinstance(WRITER, FrameWorker):
+            WRITER.work_once()
+        self._autosaving.exception()
+        self._check_autosave()
 
     def _check_autosave(self) -> None:
         if self._autosaving is None or not self._autosaving.done():

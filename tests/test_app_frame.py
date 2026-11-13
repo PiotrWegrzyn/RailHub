@@ -1,5 +1,7 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from concurrent.futures import Executor, Future
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -465,6 +467,79 @@ def test_a_month_paints_again_only_the_ground_pictures_the_last_frame_showed(
     assert kept == {False, True}
     assert painted_by_the_month == [False]
     assert painted == [False, True]
+
+
+@pytest.fixture
+def slow_writer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Autosaves written on the frames, so little of the game compressed on each that one takes
+    many frames, as a large game's does in a browser."""
+    monkeypatch.setattr(app_module, "WRITER", FrameWorker())
+    monkeypatch.setattr(app_module, "WRITING_SECONDS", 0.0)
+    stepped = Saves.autosave_steps
+    monkeypatch.setattr(Saves, "autosave_steps", lambda saves, saved: stepped(saves, saved, 16384))
+
+
+def test_a_month_that_ends_while_an_autosave_is_written_is_autosaved_after_it(
+    context: None, tmp_path: Path, slow_writer: None
+) -> None:
+    app = made_app()
+    app.saves = Saves(tmp_path)
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+    frames_until_the_month_is_done(app)
+    frame(app)
+    first = app.clock.date
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+    frames_until_the_month_is_done(app)
+    second = app.clock.date
+    written_meanwhile = app._autosaving is not None
+
+    frames = 0
+    while (app._autosaving is not None or app._autosave_due) and frames < 1000:
+        frame(app)
+        frames += 1
+
+    assert written_meanwhile
+    assert first != second
+    assert app.saves.load("autosave 1").clock.date == second
+    assert app.saves.load("autosave 2").clock.date == first
+
+
+class HeldWriter(Executor):
+    """Takes jobs without doing them, each finished when the test likes."""
+
+    def __init__(self) -> None:
+        self.jobs: list[Future[Any]] = []
+
+    def submit(self, fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Future[Any]:
+        job: Future[Any] = Future()
+        self.jobs.append(job)
+        return job
+
+
+def test_an_autosave_due_while_another_month_is_half_done_waits_for_that_month(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    writer = HeldWriter()
+    monkeypatch.setattr(app_module, "WRITER", writer)
+    app = made_app()
+    app.saves = Saves(tmp_path)
+    app.autosave()
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+    frames_until_the_month_is_done(app)
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+    frame(app)
+    writer.jobs[0].set_result(None)
+
+    frame(app)
+    frame(app)
+    turning = app._turning is not None
+    started_while_turning = len(writer.jobs) > 1
+    frames_until_the_month_is_done(app)
+    frame(app)
+
+    assert turning
+    assert not started_while_turning
+    assert len(writer.jobs) == 2
 
 
 def test_without_threads_frames_stay_at_full_speed_while_an_autosave_is_written(
