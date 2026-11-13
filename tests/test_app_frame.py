@@ -25,7 +25,7 @@ from railroads.ui.app import App, Shell
 from railroads.ui.build_menu import Tool
 from railroads.ui.ground import GroundPictures
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
-from railroads.ui.main_menu import MainMenu, Page
+from railroads.ui.main_menu import MENU_WIDTH, MainMenu, Page
 from railroads.ui.map_view import VISIT_ZOOM, MapView
 from railroads.ui.route_map import soften
 from railroads.ui.web_setup import PageSetup
@@ -235,6 +235,25 @@ def test_every_page_of_the_main_menu_draws(context: None, tmp_path: Path, page: 
 
     assert shell.app is None
     assert shell.menu.page == page
+
+
+@pytest.mark.parametrize("page", ["main", "new", "load"])
+def test_the_menu_draws_nothing_past_its_buttons(context: None, tmp_path: Path, page: Page) -> None:
+    menu = MainMenu(Saves(tmp_path))
+    menu.go_to(page)
+    left = (1280 - MENU_WIDTH) / 2
+
+    for _ in range(3):
+        imgui.new_frame()
+        imgui.set_next_window_pos((0, 0))
+        imgui.set_next_window_size((1280, 800))
+        imgui.begin("Menu")
+        menu.draw()
+        imgui.end()
+        imgui.render()
+
+    clips = [cmd.clip_rect for drawn in imgui.get_draw_data().cmd_lists for cmd in drawn.cmd_buffer]
+    assert (left, left + MENU_WIDTH) in [(clip.x, clip.z) for clip in clips]
 
 
 def test_a_game_loaded_from_the_menu_comes_back_as_it_was_saved(
