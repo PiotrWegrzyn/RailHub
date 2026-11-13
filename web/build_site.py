@@ -10,6 +10,7 @@ Any static host can serve build/site as it is."""
 import hashlib
 import shutil
 import subprocess
+import tomllib
 import urllib.request
 from pathlib import Path
 
@@ -62,8 +63,10 @@ def build() -> None:
         ["uv", "build", "--wheel", "--out-dir", str(SITE / "wheels")], cwd=ROOT, check=True
     )
     (SITE / "wheels" / ".gitignore").unlink(missing_ok=True)
+    version = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
     for name in ("index.html", "painter.js", "measure.py"):
-        shutil.copy(WEB / name, SITE / name)
+        text = (WEB / name).read_text().replace("__VERSION__", version)
+        (SITE / name).write_text(text)
     (SITE / ".nojekyll").touch()
     size = sum(path.stat().st_size for path in SITE.rglob("*") if path.is_file())
     print(f"Built {SITE} ({size / 1e6:.1f} MB)")

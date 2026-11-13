@@ -20,6 +20,7 @@ from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
 from railroads.sim.finance import START_CASH, dollars
 from railroads.ui.saves_window import draw_save_list
 from railroads.ui.theme import BRASS, GONE
+from railroads.version import VERSION
 
 MENU_WIDTH = 460.0
 BUTTON_HEIGHT = 36.0
@@ -47,6 +48,16 @@ class QuitChoice:
 
 
 MenuChoice = NewGameChoice | LoadChoice | QuitChoice
+
+
+def draw_version() -> None:
+    """The game's version, small in the bottom right corner of the current window."""
+    label = f"v{VERSION}"
+    corner = imgui.get_window_pos() + imgui.get_window_size()
+    size = imgui.calc_text_size(label)
+    padding = imgui.get_style().window_padding
+    colour = imgui.get_color_u32(imgui.Col_.text_disabled.value)
+    imgui.get_window_draw_list().add_text(corner - size - padding, colour, label)
 
 
 def random_seed() -> int:
@@ -115,6 +126,7 @@ class MainMenu:
         ]()
         imgui.pop_item_width()
         imgui.end_group()
+        draw_version()
         return choice
 
     def _button(self, label: str) -> bool:
