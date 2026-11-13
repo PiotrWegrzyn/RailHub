@@ -74,7 +74,7 @@ JEWELLERS_APART = 10
 # month.
 PASSENGERS_PER_POINT: Mapping[Points, int] = MappingProxyType(
     {
-        Points.POPULATION: 1,
+        Points.POPULATION: 2,
         Points.FOOD: 5,
         Points.TIMBER: 5,
         Points.ORE: 10,

@@ -191,14 +191,14 @@ def test_a_steel_mill_makes_nothing_with_nowhere_for_its_steel_and_keeps_its_inp
     assert economy.stock[(BuildingKind.STEEL_MILL, Need.IRON)][flat(economy, (8, 8))] == 12.0
 
 
-def test_ten_coal_and_ten_iron_ore_make_twenty_steel_once_a_station_takes_it() -> None:
+def test_ten_coal_and_ten_iron_ore_make_four_steel_once_a_station_takes_it() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 8), BuildingKind.STEEL_MILL, 1))
 
     trade = economy.trade(placed, holding(100.0, COAL=10.0, IRON=10.0))
 
-    assert trade.gathered[STATION][Good.STEEL] == pytest.approx(20.0)
+    assert trade.gathered[STATION][Good.STEEL] == pytest.approx(4.0)
     assert economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][flat(economy, (8, 8))] == 0.0
 
 

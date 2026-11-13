@@ -355,8 +355,8 @@ def test_station_demand_is_twice_the_needs_of_buildings_in_its_inner_ring() -> N
         Need.SHOES: 12.0,
         Need.GLASS: pytest.approx(4.8),
         Need.CASTINGS: pytest.approx(4.8),
-        Need.PASSENGERS: 24.0,
-        Need.MAIL: 4.0,
+        Need.PASSENGERS: 48.0,
+        Need.MAIL: 8.0,
     }
     assert demand.record(Need.FOOD).left == pytest.approx(240.0)
 
@@ -385,9 +385,9 @@ def test_stations_send_passengers_by_the_points_around_them_and_a_fifth_as_much_
 
     goods = railway.station_goods((6, 20))
     demand = railway.station_demand((6, 20))
-    assert goods.stockpile[Good.PASSENGERS] == 2 * 1 + 10 + 5
+    assert goods.stockpile[Good.PASSENGERS] == 2 * 2 + 10 + 5
     assert goods.stockpile[Good.MAIL] == 3
-    assert demand.capacity[Need.PASSENGERS] == 2 * 17
+    assert demand.capacity[Need.PASSENGERS] == 2 * 19
 
 
 def test_waiting_passengers_have_their_own_room_and_leave_freight_its_stockpile() -> None:

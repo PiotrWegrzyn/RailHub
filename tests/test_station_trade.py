@@ -35,7 +35,7 @@ def test_stations_whose_rings_overlap_each_count_every_building_in_their_own_rin
         station: railway.station_demand(station).capacity[Need.PASSENGERS]
         for station in railway.stations()
     }
-    assert passengers == {(6, 10): DEMAND_PER_NEED * 3, (6, 13): DEMAND_PER_NEED * 5}
+    assert passengers == {(6, 10): DEMAND_PER_NEED * 6, (6, 13): DEMAND_PER_NEED * 10}
 
 
 def test_a_raised_station_counts_the_buildings_in_its_wider_ring() -> None:
@@ -48,7 +48,7 @@ def test_a_raised_station_counts_the_buildings_in_its_wider_ring() -> None:
     growth.trade_goods()
 
     assert before is None
-    assert railway.station_demand((6, 10)).capacity[Need.PASSENGERS] == DEMAND_PER_NEED * 4
+    assert railway.station_demand((6, 10)).capacity[Need.PASSENGERS] == DEMAND_PER_NEED * 8
 
 
 def test_the_cells_in_reach_are_every_cell_any_station_hands_goods_out_to() -> None:
