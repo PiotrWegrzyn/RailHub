@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
@@ -33,15 +34,17 @@ def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded(
     assert house.count == 3
     assert house.needs == [(Need.FOOD, 30), (Need.HEATING, 3)]
     assert house.bonus == [(Need.BEER, 3), (Need.NEWSPAPERS, 3)]
-    assert house.got == [
-        Flow(Need.NEWSPAPERS, 0.0, 3.0),
-        Flow(Need.HEATING, 0.0, 3.0),
-        Flow(Need.BEER, 0.0, 3.0),
-        Flow(Need.FOOD, 0.0, 30.0),
+    assert [(flow.good, flow.done, flow.wanted) for flow in house.got] == [
+        (Need.NEWSPAPERS, 0.0, 3.0),
+        (Need.HEATING, 0.0, 3.0),
+        (Need.BEER, 0.0, 3.0),
+        (Need.FOOD, pytest.approx(9.0), 30.0),
     ]
-    assert house.satisfaction == "unsatisfied"
-    assert farm.makes == [(Good.WHEAT, 5)]
-    assert farm.gave == [Flow(Good.WHEAT, 0.0, 5.0)]
+    assert house.satisfaction == "content"
+    assert farm.makes == [(Good.WHEAT, 10)]
+    assert [(flow.good, flow.done, flow.wanted) for flow in farm.gave] == [
+        (Good.WHEAT, pytest.approx(9.0), 10.0)
+    ]
     assert ("population", 3, 3) in details.points
     assert ("food", 0, 1) in details.points
 
@@ -59,7 +62,7 @@ def test_details_of_an_empty_cell_show_its_land_and_nearby_points() -> None:
     assert details.title.startswith("Cell 5, 6")
 
 
-def test_a_building_needing_several_goods_lists_each_with_what_it_got() -> None:
+def test_a_tenement_needs_only_food_and_heating_and_takes_the_rest_as_bonus_goods() -> None:
     constructions = Constructions(make_map())
     constructions.build(Building((5, 5), BuildingKind.TENEMENT))
     growth = Growth(constructions)
@@ -67,21 +70,18 @@ def test_a_building_needing_several_goods_lists_each_with_what_it_got() -> None:
     details = describe(growth, (5, 5))
 
     tenement = details.buildings[0]
-    assert tenement.needs == [
-        (Need.FOOD, 60),
+    assert tenement.needs == [(Need.FOOD, 60), (Need.HEATING, 3)]
+    assert tenement.bonus == [
+        (Need.SALT, 2),
         (Need.GOODS, 20),
+        (Need.COFFEE, 2),
         (Need.CLOTHES, 3),
+        (Need.FURNITURE, 2),
+        (Need.BEER, 3),
         (Need.VODKA, 1),
         (Need.SHOES, 2),
         (Need.BRICKS, 5),
         (Need.REFINED_SUGAR, 2),
-        (Need.HEATING, 3),
-    ]
-    assert tenement.bonus == [
-        (Need.SALT, 2),
-        (Need.COFFEE, 2),
-        (Need.FURNITURE, 2),
-        (Need.BEER, 3),
         (Need.NEWSPAPERS, 3),
     ]
     assert tenement.got == [
@@ -101,14 +101,14 @@ def test_a_building_needing_several_goods_lists_each_with_what_it_got() -> None:
     ]
 
 
-def test_a_factory_without_lumber_makes_nothing_and_shows_what_it_could() -> None:
+def test_a_factory_without_lumber_makes_none_of_the_most_it_could() -> None:
     constructions = Constructions(make_map())
     constructions.build(Building((5, 5), BuildingKind.FACTORY))
     growth = Growth(constructions)
 
     details = describe(growth, (5, 5))
 
-    assert details.buildings[0].gave == [Flow(Good.GOODS, 0.0, 0.0, 30)]
+    assert details.buildings[0].gave == [Flow(Good.GOODS, 0.0, 30.0)]
 
 
 def test_a_building_shows_its_mood_with_its_satisfaction_as_a_percentage() -> None:

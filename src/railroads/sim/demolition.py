@@ -12,7 +12,14 @@ STATION_REMOVAL.
 from collections.abc import Mapping
 from types import MappingProxyType
 
-from railroads.sim.constructions import CELL_SPACE, Building, BuildingKind, Constructions, Station
+from railroads.sim.constructions import (
+    CELL_SPACE,
+    ONE_OFFS,
+    Building,
+    BuildingKind,
+    Constructions,
+    Station,
+)
 from railroads.sim.finance import track_price
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
@@ -34,20 +41,7 @@ DEMOLITION_PER_POINT: Mapping[Points, float] = MappingProxyType(
     }
 )
 SKYSCRAPER_DEMOLITION = 1_000_000.0
-UNIQUE = frozenset(
-    {
-        BuildingKind.SPACE_CENTER,
-        BuildingKind.PEAR_HQ,
-        BuildingKind.ROYAL_PALACE,
-        BuildingKind.SALT_CATHEDRAL,
-        BuildingKind.SPA_RESORT,
-        BuildingKind.WORLDS_FAIR,
-        BuildingKind.FILM_STUDIO,
-        BuildingKind.AMUSEMENT_PARK,
-        BuildingKind.OLYMPIC_STADIUM,
-        BuildingKind.ST_PAULS,
-    }
-)
+UNIQUE = ONE_OFFS
 TRACK_REMOVAL_SHARE = 0.25
 STATION_REMOVAL = 5_000.0
 

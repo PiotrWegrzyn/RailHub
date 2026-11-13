@@ -43,7 +43,10 @@ def test_the_first_five_stations_open_at_the_five_most_crowded_towns() -> None:
 
 
 def test_two_more_stations_open_each_decade() -> None:
-    growth = grown([*TOWNS, (35, 5), (35, 20), (35, 35)], same=True)
+    towns = [*TOWNS, (35, 5), (35, 20), (35, 35)]
+    growth = grown(towns, same=True)
+    for row, col in towns:
+        growth.build(Building((row, col + 1), BuildingKind.FARM))
     player = StandInPlayer(growth, Railway(growth.constructions), np.random.default_rng(0))
 
     for _ in range(120):

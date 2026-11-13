@@ -222,7 +222,8 @@ def made_at(railway: Railway, good: Good, supplies: Supplies) -> dict[Cell, Offe
 
 @dataclass(frozen=True)
 class Summary:
-    """What a station wants, need by need with the demand left, and what a train can load
+    """What a station wants, need by need with what its buildings are still short of this month
+    (or, before they have traded, the demand left), and what a train can load
     there, good by good with how much is made a month, or waits if none is made; the most
     first, at most SUMMARY_MOST of each, and how many more there are."""
 
@@ -233,8 +234,12 @@ class Summary:
 
 
 def summary_of(railway: Railway, station: Cell, made: Mapping[Good, float]) -> Summary:
-    demand = railway.station_demand(station)
-    left = [(need, demand.record(need).left) for need in Need]
+    trade = railway.station_trade
+    if trade is not None and trade.short_of(station):
+        left = list(trade.short_of(station).items())
+    else:
+        demand = railway.station_demand(station)
+        left = [(need, demand.record(need).left) for need in Need]
     wants = sorted(((n, a) for n, a in left if a >= 0.5), key=lambda w: -w[1])
     offers = goods_to_load(railway, station, made)
     amounts = [(o.good, o.made if o.made > 0 else o.waiting) for o in offers]

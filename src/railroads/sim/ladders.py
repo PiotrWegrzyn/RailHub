@@ -146,6 +146,10 @@ POINTS: Mapping[BuildingKind, tuple[Points, int]] = MappingProxyType(
         BuildingKind.SAND_PIT: (Points.ORE, 1),
         BuildingKind.POTATO_FARM: (Points.FOOD, 1),
         BuildingKind.CATTLE_RANCH: (Points.FOOD, 1),
+        BuildingKind.PIG_FARM: (Points.FOOD, 1),
+        BuildingKind.CHICKEN_FARM: (Points.FOOD, 1),
+        BuildingKind.GASWORKS: (Points.INDUSTRY, 1),
+        BuildingKind.RAILWAY_WORKS: (Points.INDUSTRY, 20),
         BuildingKind.FLAX_FIELD: (Points.FOOD, 1),
         BuildingKind.HOP_GARDEN: (Points.FOOD, 1),
         BuildingKind.MACHINE_WORKS: (Points.INDUSTRY, 3),
@@ -352,8 +356,8 @@ FACTORY_LAND = Land(
 TOWNS = Ladder(
     kinds=(BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS),
     land=TOWN_LAND,
-    base_chance=0.0000012,
-    chance_per_doubling={Points.POPULATION: 0.00011},
+    base_chance=0.0000008,
+    chance_per_doubling={Points.POPULATION: 0.000017},
     merges={
         BuildingKind.HOUSE: Merge(needed=16, pulled_down=6),
         BuildingKind.TENEMENT: Merge(needed=5, pulled_down=3),
@@ -374,7 +378,7 @@ FARMS = Ladder(
         water={Terrain.RIVER: 5.0, Terrain.LAKE: 5.0, Terrain.SEA: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000112,
+    base_chance=0.0000000373,
     chance_per_doubling={Points.POPULATION: 0.00000672, Points.FOOD: 0.00000028},
     crowded_at=FARMS_CROWDED_OUT,
 )
@@ -389,7 +393,7 @@ ORCHARDS = Ladder(
         water={Terrain.RIVER: 3.0, Terrain.LAKE: 3.0, Terrain.SEA: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000216,
+    base_chance=0.000000056,
     chance_per_doubling={Points.POPULATION: 0.000000108, Points.FOOD: 0.00000216},
 )
 
@@ -445,7 +449,7 @@ SUGAR_FIELDS = Ladder(
         water={Terrain.RIVER: 3.0, Terrain.LAKE: 2.0, Terrain.SEA: 1.5},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.0000000168,
+    base_chance=0.000000013,
     chance_per_doubling={Points.POPULATION: 0.000000042, Points.FOOD: 0.000000168},
 )
 
@@ -459,10 +463,11 @@ MINES = Ladder(
         temperature={Temperature.COLD: 0.8},
         beside_mountains=3.0,
     ),
-    base_chance=0.000001,
+    base_chance=0.000006,
     chance_per_doubling={Points.ORE: 0.0000014},
     most_per_cell=2,
     most_nearby=8,
+    from_year=1700,
 )
 
 # Lumber mills stand in forests with at least four forest cells around them and flat open land
@@ -478,7 +483,7 @@ LUMBER_MILLS = Ladder(
         forest_edge=True,
         least_forest_nearby=4,
     ),
-    base_chance=0.000016,
+    base_chance=0.00005,
     chance_per_doubling={Points.POPULATION: 0.000001},
     most_per_cell=1,
     most_nearby=2,
@@ -514,6 +519,7 @@ FACTORIES = Ladder(
         BuildingKind.BIG_FACTORY: Merge(needed=3, pulled_down=3),
     },
     draws_from=FACTORIES_DRAW_FROM,
+    from_year=1780,
 )
 
 # Canneries can the fruit of nearby orchards, palms, plantations and sugar fields with steel, and
@@ -530,6 +536,7 @@ FOOD_PLANTS = Ladder(
     needs={Points.FOOD: 1},
     most_per_cell=1,
     most_nearby=6,
+    from_year=1810,
 )
 
 # Steel mills make steel from iron ore and coal, near mines and among other industry.
@@ -544,6 +551,7 @@ STEEL_MILLS = Ladder(
     chance_per_doubling={Points.ORE: 0.000007, Points.INDUSTRY: 0.00000042},
     most_per_cell=1,
     most_nearby=2,
+    from_year=1855,
 )
 
 # Shipyards build on the water beside a port, among industry that feeds them.
@@ -604,13 +612,13 @@ RESOURCES = (
     _resource(BuildingKind.COPPER_MINE, Deposit.COPPER, 1880, 0.003),
     _resource(BuildingKind.GOLD_MINE, Deposit.GOLD),
     _resource(BuildingKind.DIAMOND_MINE, Deposit.DIAMONDS),
-    _resource(BuildingKind.OIL_WELL, Deposit.OIL, 1900, 0.003),
+    _resource(BuildingKind.OIL_WELL, Deposit.OIL, 1855, 0.003),
     _resource(BuildingKind.SALT_WORKS, Deposit.SALT),
     _resource(BuildingKind.FISHERY, Deposit.FISH),
     _resource(BuildingKind.SHEEP_FARM, Deposit.WOOL),
     _resource(BuildingKind.VINEYARD, Deposit.GRAPES),
     _resource(BuildingKind.COTTON_FIELD, Deposit.COTTON),
-    _resource(BuildingKind.COFFEE_PLANTATION, Deposit.COFFEE),
+    _resource(BuildingKind.COFFEE_PLANTATION, Deposit.COFFEE, 1700),
     _resource(BuildingKind.RUBBER_PLANTATION, Deposit.RUBBER, 1900, 0.003),
     _resource(BuildingKind.INCENSE_GROVE, Deposit.INCENSE),
 )
@@ -666,13 +674,30 @@ BEEKEEPERS = Ladder(
 )
 
 # Bakeries bake the wheat brought to them into bread, one to a neighbourhood, in towns.
-BAKERIES = Ladder(
-    kinds=(BuildingKind.BAKERY,),
-    land=TOWN_LAND,
-    base_chance=0.00000001,
+# Gasworks make town gas out of coal from 1820, one to a town, the likelier the more people live
+# around (railroads.sim.growth.SPAWN_BY_PEOPLE).
+GASWORKS = Ladder(
+    kinds=(BuildingKind.GASWORKS,),
+    land=FACTORY_LAND,
+    base_chance=0.000001,
     chance_per_doubling={Points.POPULATION: 0.000001},
     most_per_cell=1,
     most_nearby=1,
+    from_year=1820,
+)
+
+BAKERIES = Ladder(
+    kinds=(BuildingKind.BAKERY,),
+    land=TOWN_LAND,
+    base_chance=0.000008,
+    chance_per_doubling={Points.POPULATION: 0.000001},
+    most_per_cell=1,
+    most_nearby=1,
+)
+
+# Butchers open in towns from 1850, the likelier the more people live around, like bakeries.
+BUTCHERS = replace(
+    BAKERIES, kinds=(BuildingKind.MEAT_FACTORY,), base_chance=0.000004, from_year=1850
 )
 
 # Potatoes like cool, open plains; they feed houses and the distilleries.
@@ -685,9 +710,10 @@ POTATO_FARMS = Ladder(
         water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000017,
+    base_chance=0.000000096,
     chance_per_doubling={Points.POPULATION: 0.000001, Points.FOOD: 0.00000004},
     crowded_at=FARMS_CROWDED_OUT,
+    from_year=1600,
 )
 
 # Cattle graze open grassland and hills, away from the heat.
@@ -703,6 +729,10 @@ CATTLE_RANCHES = Ladder(
     chance_per_doubling={Points.POPULATION: 0.00000018, Points.FOOD: 0.000000009},
     crowded_at=FARMS_CROWDED_OUT,
 )
+
+# Pig farms and chicken farms keep to the same land as cattle; pigs are a little rarer.
+PIG_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.PIG_FARM,), base_chance=0.0000000025)
+CHICKEN_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.CHICKEN_FARM,))
 
 # Flax wants cool, wet land by rivers and lakes.
 FLAX_FIELDS = Ladder(
@@ -728,7 +758,7 @@ HOP_GARDENS = Ladder(
         temperature={Temperature.COLD: 0.3, Temperature.HOT: 0.2},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.0000000012,
+    base_chance=0.000000004,
     chance_per_doubling={Points.POPULATION: 0.00000012},
     crowded_at=FARMS_CROWDED_OUT,
 )
@@ -804,7 +834,7 @@ POWER_PLANTS = Ladder(
     needs={Points.POPULATION: 40},
     most_per_cell=1,
     apart=6,
-    from_year=1900,
+    from_year=1882,
     land_cells_each=15_000,
 )
 
@@ -818,7 +848,7 @@ HOTELS = replace(
 
 # Works that open by people and industry alone: their inputs must be brought to them.
 WORKS = (
-    _works(BuildingKind.TEXTILE_MILL, {POP: 4e-10, IND: 1.2e-8}, {}, base=1e-8),
+    _works(BuildingKind.TEXTILE_MILL, {POP: 4e-10, IND: 1.2e-8}, {}, 1780, base=1e-8),
     _works(
         BuildingKind.FURNITURE_MAKER,
         {POP: 4e-10, IND: 6e-9, Points.TIMBER: 6e-8},
@@ -834,7 +864,7 @@ WORKS = (
     ),
     _works(BuildingKind.TOOL_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 1870, base=2e-6),
     _works(BuildingKind.CHEMICAL_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {}, 1880, 20_000, 2e-8),
-    _works(BuildingKind.REFINERY, {IND: 4e-7, Points.ORE: 1e-6}, {}, 1905, 30_000, 2e-8),
+    _works(BuildingKind.REFINERY, {IND: 4e-7, Points.ORE: 1e-6}, {}, 1856, 30_000, 2e-8),
     _works(BuildingKind.CAR_FACTORY, {IND: 6e-7}, {IND: 6}, 1930, 40_000, 2e-6),
     _works(BuildingKind.ELECTRONICS_PLANT, {POP: 2.5e-8, IND: 4e-7}, {}, 1960, 30_000, 2e-8),
     _works(BuildingKind.PLANE_FACTORY, {POP: 2.5e-8, IND: 6e-7}, {IND: 6}, 1935, 40_000, 2e-6),
@@ -842,14 +872,13 @@ WORKS = (
     _works(BuildingKind.BRICKWORKS, {POP: 1e-9, Points.ORE: 1.2e-8}, {}, base=2e-8),
     _works(BuildingKind.GLASSWORKS, {POP: 4e-10, IND: 6e-9, Points.ORE: 6e-9}, {}, base=1e-8),
     _works(BuildingKind.BREWERY, {POP: 1.5e-9, Points.FOOD: 3e-9}, {}, base=1e-8),
-    _works(BuildingKind.DISTILLERY, {POP: 8e-10, Points.FOOD: 3e-9}, {}, base=1e-8),
+    _works(BuildingKind.DISTILLERY, {POP: 8e-10, Points.FOOD: 3e-9}, {}, 1600, base=1e-8),
     _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=1e-8),
-    _works(BuildingKind.MEAT_FACTORY, {POP: 8e-10, Points.FOOD: 3e-9}, {}, base=1e-8),
-    _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {}, base=1e-8),
-    _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, base=1e-8),
-    _works(BuildingKind.PRINTING_WORKS, {POP: 1.5e-9, IND: 3e-9}, {}, 0, PRINTING_CELLS, 1e-8),
-    _works(BuildingKind.SUGAR_REFINERY, {IND: 6e-9, Points.FOOD: 3e-9}, {}, base=1e-8),
-    _works(BuildingKind.PORCELAIN_WORKS, {POP: 4e-10, Points.ORE: 6e-9}, {}, 0, 30_000, 1e-8),
+    _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {}, 1850, base=1e-8),
+    _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=1e-8),
+    _works(BuildingKind.PRINTING_WORKS, {POP: 1.5e-9, IND: 3e-9}, {}, 1600, PRINTING_CELLS, 1e-8),
+    _works(BuildingKind.SUGAR_REFINERY, {IND: 6e-9, Points.FOOD: 3e-9}, {}, 1800, base=1e-8),
+    _works(BuildingKind.PORCELAIN_WORKS, {POP: 4e-10, Points.ORE: 6e-9}, {}, 1710, 30_000, 1e-8),
     _works(BuildingKind.MACHINE_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 1870, base=2e-6),
     _works(BuildingKind.CEMENT_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {}, 1880, 20_000, 2e-8),
     _works(BuildingKind.PLASTICS_WORKS, {IND: 4e-7}, {}, 1950, 30_000, 2e-8),
@@ -894,8 +923,12 @@ LADDERS = (
     CHURCHES,
     BEEKEEPERS,
     BAKERIES,
+    BUTCHERS,
+    GASWORKS,
     POTATO_FARMS,
     CATTLE_RANCHES,
+    PIG_FARMS,
+    CHICKEN_FARMS,
     FLAX_FIELDS,
     HOP_GARDENS,
     CLAY_PITS,

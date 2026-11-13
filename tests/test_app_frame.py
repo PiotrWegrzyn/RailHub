@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from concurrent.futures import Future
 from pathlib import Path
 
 import numpy as np
@@ -373,3 +374,17 @@ def test_drawing_the_new_game_page_pulls_an_early_start_up_to_1750(
     shell_frame(shell)
 
     assert shell.menu.start_year == 1750
+
+
+def test_the_waiting_screen_shows_how_far_a_new_game_has_grown(
+    context: None, tmp_path: Path
+) -> None:
+    shell = Shell(Saves(tmp_path))
+    shell._task = Future()
+    shell.report("Growing towns")
+    shell.advance(0.4)
+
+    shell_frame(shell)
+
+    assert shell.app is None
+    assert shell._done == 0.4

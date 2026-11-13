@@ -11,6 +11,8 @@ from railroads.saves import Saves
 from railroads.sim.constructions import Constructions
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
+from railroads.sim.steps import Steps
+from railroads.sim.tilemap import TileMap
 from railroads.ui.app import settings_from
 from railroads.ui.main_menu import MainMenu, map_note, random_seed
 
@@ -74,9 +76,11 @@ def test_a_start_map_is_found_by_its_key_or_its_menu_title() -> None:
 def test_a_game_on_a_long_thin_map_is_set_up_and_loads_again(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(
-        newgame, "seed_buildings", lambda tile_map, *_, **__: Constructions(tile_map)
-    )
+    def no_growth(tile_map: TileMap, *_: object, **__: object) -> Steps[Constructions]:
+        yield
+        return Constructions(tile_map)
+
+    monkeypatch.setattr(newgame, "seed_steps", no_growth)
     saves = Saves(tmp_path)
     settings = Settings(seed=3, map=MapChoice.CHILE, start_year=EARLIEST_START_YEAR)
 

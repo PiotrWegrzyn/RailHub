@@ -1,7 +1,9 @@
 """A train calling at a station (railroads.sim.railway): it unloads every car, freight into the
 station and passengers and mail paid for there, swaps them for the stop's cars and fills those, and
 waits up to WAIT_MONTHS for them to fill if the stop says so. Freight from this station goes back
-in its stockpile for nothing; the rest waits as goods brought, to be handed out."""
+in its stockpile for nothing; the rest waits as goods brought. The buildings around the station
+take what they still want of it at once (railroads.sim.station_trade), and the rest is handed out
+with the month's trade."""
 
 from typing import TYPE_CHECKING
 
@@ -49,6 +51,7 @@ class StationCalls:
                 if unloaded > 0:
                     self._store(goods, stop.cell, car.good, car.empty(unloaded))
                     self._railway.history.deliver(self._railway.year, car.good)
+                    self._railway.hand_out_now(stop.cell, car.good)
             train.cars = self._next_cars(train.cars, stop.cars)
         train.loaded_at = stop.cell
         self.load(train, stop)

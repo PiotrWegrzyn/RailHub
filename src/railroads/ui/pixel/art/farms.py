@@ -722,6 +722,90 @@ def cattle_ranch() -> Sprite:
     return p.sprite()
 
 
+def _pig(p: Painter, x: float, y: float) -> None:
+    skin: RGB = (232, 166, 160)
+    p.line([(x - 2, y - 1), (x - 2, y)], shade(skin, 0.6))
+    p.line([(x + 1, y - 1), (x + 1, y)], shade(skin, 0.6))
+    p.ellipse(x - 3, y - 3.5, x + 2.5, y - 0.5, skin)
+    p.rect(x - 4.5, y - 3, x - 3, y - 1.5, shade(skin, 0.9))
+    p.point(x - 4.5, y - 2, shade(skin, 0.6))
+    p.point(x + 2.5, y - 3, shade(skin, 0.75))
+
+
+def _hen(p: Painter, x: float, y: float, feathers: RGB) -> None:
+    p.ellipse(x - 1.5, y - 2, x + 1, y, feathers)
+    p.point(x - 1.5, y - 2.5, feathers)
+    p.point(x - 2, y - 2, (222, 160, 60))
+    p.point(x - 1.5, y - 3, (200, 50, 44))
+
+
+def pig_farm() -> Sprite:
+    """A low boarded sty with a tiled roof over a plinth, a heap of straw, and a fenced pen of
+    trampled mud with a feeding trough and pink pigs in it."""
+    p = Painter(34, 24, (16, 17))
+    p.blob(-2, -0.4, 14, 5.6, WORN)
+    _mud(p, 7, 1.4, 6)
+    _track(p, [(-10.2, 1.2), (-6.6, 3), (-2, 3.4)])
+    _worn(p, -10.4, 1.4, 2.8)
+    _strewn(p, -12.5, 4, 3.6, (220, 186, 96), 7)
+    p.shadow(12, 3)
+    wood = (150, 104, 72)
+    top = p.box(-8, -2, 6, 4.4, wood, None)
+    left, front, right, _ = top
+    _footing(p, top, 4.4)
+    _boards(p, top, wood, (1.5, 3))
+    _plinth(p, top, wood, 4.4)
+    _patch(p, left, front, (0.5, 0.75), (1.4, 4.4), (60, 40, 30))
+    p.gable(top, 3, (150, 80, 60), wood)
+    _tiles(p, top, 3, (150, 80, 60))
+    _heap(p, -12.5, 3.5, 2.4, 3, (220, 186, 96))
+    left, back, right, front = _paddock(6, 2, 9)
+    _fence(p, left, back)
+    _fence(p, back, right)
+    p.hall(9, 0.2, 4, 1.4, 1.2, (122, 90, 60), (150, 120, 70))
+    _pig(p, 4, 1)
+    _pig(p, 9, 4)
+    _pig(p, 2, 4.5)
+    _fence(p, left, front)
+    _fence(p, front, right)
+    return p.sprite()
+
+
+def chicken_farm() -> Sprite:
+    """A whitewashed henhouse on stilts with a ramp up to its hatch and a tiled roof, nesting
+    boxes along its side, and a fenced yard of scratched earth with white and brown hens and a
+    rooster pecking about, grain strewn among them."""
+    p = Painter(32, 24, (15, 17))
+    p.blob(-2, -0.4, 13, 5.6, WORN)
+    p.blob(0, 0.6, 12, 4.8, shade(EARTH, 0.95))
+    _track(p, [(-10.2, 1.2), (-6.6, 3), (-2, 3.4)])
+    _strewn(p, 6, 2.5, 4, (226, 196, 110), 9)
+    p.shadow(10, 3)
+    top = p.box(-7, -1, 5, 4, WHITEWASH, None)
+    left, front, right, _ = top
+    _footing(p, top, 4)
+    _boards(p, top, WHITEWASH, (2,))
+    _patch(p, left, front, (0.55, 0.75), (2, 4), (70, 50, 36))
+    p.line([_on_wall(left, front, 0.65, 4), (-1.6, 4.6)], (150, 110, 70))
+    _patch(p, front, right, (0.2, 0.8), (2.6, 3.4), (150, 110, 70))
+    p.gable(top, 3, (150, 70, 52), WHITEWASH)
+    _tiles(p, top, 3, (150, 70, 52))
+    left, back, right, front = _paddock(6, 2, 8)
+    _fence(p, left, back)
+    _fence(p, back, right)
+    for x, y, feathers in (
+        (3, 1, (244, 240, 230)),
+        (7, 3, (176, 108, 60)),
+        (9, 0.5, (244, 240, 230)),
+        (5, 4.5, (244, 240, 230)),
+        (10, 3.6, (120, 70, 40)),
+    ):
+        _hen(p, x, y, feathers)
+    _fence(p, left, front)
+    _fence(p, front, right)
+    return p.sprite()
+
+
 def flax_field() -> Sprite:
     """A small whitewashed cottage on a plinth with a door, windows with sills, a tiled roof and
     a chimney, a strip of blue-flowered flax before it, and sheaves of flax stood up in stooks to

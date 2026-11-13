@@ -2192,3 +2192,54 @@ def shipyard() -> Sprite:
     p.line([(hook[0], hook[1] - 19), (hook[0], hook[1] - 12)], (70, 64, 58))
     p.rect(hook[0] - 1, hook[1] - 12, hook[0] + 1, hook[1] - 10, (88, 90, 98))
     return p.sprite()
+
+
+def gasworks() -> Sprite:
+    """A round gasholder in a lattice frame of iron columns, its bell riding high, beside a brick
+    retort house with a tall chimney and a heap of coal by its door."""
+    p = Painter(30, 30, (14, 22))
+    p.shadow(12, 3.5)
+    tank = (110, 118, 112)
+    p.ellipse(-2, -10, 12, -3, shade(tank, 0.8))
+    p.rect(-2, -7, 12, 3, tank)
+    p.ellipse(-2, 0, 12, 6, shade(tank, 0.7))
+    p.ellipse(-2, -10, 12, -4, shade(tank, 1.15))
+    for x in (-2, 2.5, 7.5, 12):
+        p.line([(x, -14), (x, 4)], shade(METAL, 0.8))
+    p.line([(-2, -14), (12, -14)], shade(METAL, 0.9))
+    p.line([(-2, -9), (12, -9)], shade(METAL, 0.7))
+    top = p.box(-8, 1, 5, 6, BRICK, None)
+    p.gable(top, 3, (90, 76, 70), BRICK)
+    left, front, _, _ = top
+    _patch(p, left, front, (0.4, 0.62), (1.5, 6), DOORWAY)
+    p.rect(-12, -16, -10.6, -2, shade(BRICK, 0.9))
+    p.line([(-12, -17), (-10.6, -17)], shade(BRICK, 0.5))
+    _heap(p, -12.5, 6, 2.6, 2.6, (54, 52, 56))
+    return p.sprite()
+
+
+def railway_works() -> Sprite:
+    """A long brick erecting shop with roof lights and three great doors, a tall chimney, and
+    tracks running out past a locomotive being finished and a row of new wagons."""
+    p = Painter(40, 32, (19, 22))
+    p.shadow(16, 4)
+    for k in range(3):
+        p.line([(-16 + 2 * k, 6 + k), (16 + 2 * k, -10 + k)], METAL)
+    top = p.hall(-1, -1, 22, 9, 7, BRICK, None)
+    left, front, _, _ = top
+    p.gable(top, 4, (88, 80, 78), BRICK)
+    for f in (0.2, 0.45, 0.7):
+        p.line([_on_wall(left, front, f, -1.6), _on_wall(left, front, f + 0.12, -1.6)], GLASS)
+    for f in (0.15, 0.5, 0.85):
+        _patch(p, left, front, (f - 0.07, f + 0.07), (2, 7), DOORWAY)
+    p.rect(12, -22, 13.6, -6, shade(BRICK, 0.9))
+    p.line([(12, -23), (13.6, -23)], shade(BRICK, 0.5))
+    engine = (40, 44, 48)
+    p.rect(-14, 2, -8, 5, engine)
+    p.rect(-9, 0, -7, 5, engine)
+    p.rect(-14, 0.6, -13, 2, engine)
+    p.point(-12, 5.5, (150, 40, 36))
+    p.point(-9.5, 5.5, (150, 40, 36))
+    for x in (2, 7):
+        p.rect(x, 4, x + 4, 6.5, (120, 64, 44))
+    return p.sprite()

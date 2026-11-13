@@ -13,14 +13,16 @@ big factories steel and copper, mega factories steel, copper and machinery. An i
 starts later is left out of a recipe until its year.
 
 What a building needs is split in two. Its demands (demands_of) are what it must get to be
-satisfied. Its bonus goods (bonus_of, from BONUS_NEEDS) it can do without, but each one it gets
+satisfied; a home's are only food and heating (HOMES). Its bonus goods (bonus_of, from BONUS_NEEDS) it can do without, but each one it gets
 raises its satisfaction above what its demands give (railroads.sim.economy). Processors have no
-bonus goods: their inputs make what they make. A building whose every need is a bonus good keeps
-them all as demands, since getting them is what it is there for.
+bonus goods: their inputs make what they make. A building that makes nothing whose every need is
+a bonus good keeps them all as demands, since getting them is what it is there for. A building
+that makes goods has boosts instead (boosts_of): what it can do without but makes up to BOOST_MOST
+more with, as barrels for a brewery, wheat for animals and lumber for mines.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from functools import cache
 from types import MappingProxyType
@@ -74,6 +76,9 @@ class Good(Enum):
     SAND = "sand"
     POTATOES = "potatoes"
     CATTLE = "cattle"
+    PIGS = "pigs"
+    CHICKENS = "chickens"
+    EGGS = "eggs"
     SHEEP = "sheep"
     FLAX = "flax"
     HOPS = "hops"
@@ -134,6 +139,7 @@ class Need(Enum):
     LIMESTONE = "limestone"
     SAND = "sand"
     LIVESTOCK = "livestock"
+    ANIMALS = "animals"
     HOPS = "hops"
     MACHINERY = "machinery"
     BRICKS = "bricks"
@@ -166,6 +172,7 @@ FOODS = (
     Good.BREAD,
     Good.POTATOES,
     Good.MEAT,
+    Good.EGGS,
 )
 
 # The goods that meet each need.
@@ -175,6 +182,7 @@ FITS: Mapping[Need, tuple[Good, ...]] = MappingProxyType(
         Need.FRUIT: FRUITS,
         Need.FIBRE: (Good.WOOL, Good.COTTON, Good.FLAX),
         Need.LIVESTOCK: (Good.CATTLE, Good.SHEEP),
+        Need.ANIMALS: (Good.CATTLE, Good.PIGS, Good.CHICKENS, Good.SHEEP),
         Need.HEATING: (Good.LUMBER, Good.COAL, Good.GAS),
         Need.BOILER_FUEL: (Good.COAL, Good.OIL, Good.GAS),
         **{need: (Good(need.value),) for need in Need if need.value in Good._value2member_map_},
@@ -184,6 +192,14 @@ FITS: Mapping[Need, tuple[Good, ...]] = MappingProxyType(
 # The year needs start to be felt, where that is after the game begins.
 NEED_YEARS: Mapping[Need, int] = MappingProxyType(
     {
+        Need.VODKA: 1600,
+        Need.NEWSPAPERS: 1600,
+        Need.COAL: 1700,
+        Need.COFFEE: 1700,
+        Need.CLOTHES: 1780,
+        Need.REFINED_SUGAR: 1800,
+        Need.SHOES: 1850,
+        Need.STEEL: 1855,
         Need.TOOLS: 1870,
         Need.MACHINERY: 1870,
         Need.COPPER: 1880,
@@ -204,6 +220,12 @@ KIND_NEED_YEARS: Mapping[tuple[BuildingKind, Need], int] = MappingProxyType(
     {(BuildingKind.FARM, Need.MACHINERY): 1920}
 )
 
+# Goods a kind of building makes only from a later year than everyone else: ports bring in natural
+# gas long after gasworks make town gas.
+KIND_GOOD_YEARS: Mapping[tuple[BuildingKind, Good], int] = MappingProxyType(
+    {(BuildingKind.PORT, Good.GAS): 1950}
+)
+
 # The year goods first appear, where that is after the game begins.
 GOOD_YEARS: Mapping[Good, int] = MappingProxyType(
     {
@@ -212,13 +234,13 @@ GOOD_YEARS: Mapping[Good, int] = MappingProxyType(
         Good.CHEMICALS: 1880,
         Good.CEMENT: 1880,
         Good.COPPER: 1880,
-        Good.OIL: 1900,
+        Good.OIL: 1855,
         Good.RUBBER: 1900,
-        Good.FUEL: 1905,
+        Good.FUEL: 1856,
         Good.CARS: 1930,
         Good.PLANES: 1935,
         Good.TANKS: 1940,
-        Good.GAS: 1950,
+        Good.GAS: 1820,
         Good.PLASTICS: 1950,
         Good.APPLIANCES: 1950,
         Good.ELECTRONICS: 1960,
@@ -245,6 +267,9 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.SAND: 4,
         Good.POTATOES: 6,
         Good.CATTLE: 20,
+        Good.PIGS: 14,
+        Good.CHICKENS: 5,
+        Good.EGGS: 4,
         Good.SHEEP: 15,
         Good.MEAT: 16,
         Good.FLAX: 12,
@@ -319,11 +344,13 @@ TRAVELLERS = (Good.PASSENGERS, Good.MAIL)
 @dataclass(frozen=True, slots=True)
 class Recipe:
     """What a processor makes, the most of it one building makes in a month, and how much of
-    each input every unit of it takes."""
+    each input every unit of it takes; and the inputs it can do without that make it make up to
+    BOOST_MOST more (boosts), and how much of each every unit it makes takes for that."""
 
     makes: Good
     most: float
     per_unit: Mapping[Need, float]
+    boosts: Mapping[Need, float] = field(default_factory=dict)
 
     def inputs(self, year: int) -> Mapping[Need, float]:
         """What every unit takes in a given year: an input whose need starts later is left out
@@ -347,6 +374,10 @@ def _inputs(recipe: Recipe, year: int) -> Mapping[Need, float]:
     return kept[1]
 
 
+# How much more a building makes with all of what boosts it (boosts_of): its share of its boosts
+# times this.
+BOOST_MOST = 1.0
+
 RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
     {
         BuildingKind.STEEL_MILL: Recipe(Good.STEEL, 200, {Need.IRON: 0.5, Need.COAL: 0.5}),
@@ -356,7 +387,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             Good.PLANES, 20, {Need.STEEL: 3, Need.COPPER: 1, Need.FUEL: 1, Need.ELECTRONICS: 1}
         ),
         BuildingKind.FOOD_PLANT: Recipe(Good.CANS, 40, {Need.FRUIT: 0.25, Need.STEEL: 0.25}),
-        BuildingKind.BAKERY: Recipe(Good.BREAD, 20, {Need.WHEAT: 0.5}),
+        BuildingKind.BAKERY: Recipe(Good.BREAD, 50, {Need.WHEAT: 0.2}),
         BuildingKind.FACTORY: Recipe(Good.GOODS, 30, {Need.LUMBER: 1 / 3, Need.STEEL: 1 / 3}),
         BuildingKind.BIG_FACTORY: Recipe(Good.GOODS, 90, {Need.STEEL: 1 / 3, Need.COPPER: 1 / 3}),
         BuildingKind.MEGA_FACTORY: Recipe(
@@ -380,12 +411,10 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
         BuildingKind.BRICKWORKS: Recipe(Good.BRICKS, 100, {Need.CLAY: 0.5, Need.COAL: 0.25}),
         BuildingKind.CEMENT_WORKS: Recipe(Good.CEMENT, 100, {Need.LIMESTONE: 0.5, Need.COAL: 0.25}),
         BuildingKind.GLASSWORKS: Recipe(Good.GLASS, 60, {Need.SAND: 0.5, Need.COAL: 0.25}),
-        BuildingKind.BREWERY: Recipe(
-            Good.BEER, 160, {Need.WHEAT: 0.25, Need.HOPS: 0.25, Need.BARRELS: 0.1}
-        ),
+        BuildingKind.BREWERY: Recipe(Good.BEER, 160, {Need.HOPS: 0.25}, {Need.BARRELS: 0.1}),
         BuildingKind.DISTILLERY: Recipe(Good.VODKA, 40, {Need.POTATOES: 0.5, Need.GLASS: 0.1}),
         BuildingKind.TANNERY: Recipe(Good.LEATHER, 40, {Need.LIVESTOCK: 0.5}),
-        BuildingKind.MEAT_FACTORY: Recipe(Good.MEAT, 60, {Need.LIVESTOCK: 0.5}),
+        BuildingKind.MEAT_FACTORY: Recipe(Good.MEAT, 150, {Need.ANIMALS: 0.2}),
         BuildingKind.SHOE_FACTORY: Recipe(Good.SHOES, 60, {Need.LEATHER: 0.5}),
         BuildingKind.PLASTICS_WORKS: Recipe(
             Good.PLASTICS, 100, {Need.OIL: 0.5, Need.CHEMICALS: 0.5}
@@ -400,6 +429,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
         BuildingKind.SUGAR_REFINERY: Recipe(
             Good.REFINED_SUGAR, 60, {Need.SUGAR: 0.5, Need.COAL: 0.1}
         ),
+        BuildingKind.GASWORKS: Recipe(Good.GAS, 200, {Need.COAL: 0.5}),
         BuildingKind.PORCELAIN_WORKS: Recipe(Good.PORCELAIN, 30, {Need.CLAY: 0.5, Need.COAL: 0.25}),
     }
 )
@@ -408,13 +438,13 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
 # with all the inputs they need.
 MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
     {
-        BuildingKind.FARM: {Good.WHEAT: 5},
-        BuildingKind.ORCHARD: {Good.APPLES: 5},
-        BuildingKind.DATE_PALMS: {Good.DATES: 6},
-        BuildingKind.ORANGE_FARM: {Good.ORANGES: 6},
-        BuildingKind.BANANAS: {Good.BANANAS: 9},
-        BuildingKind.SUGAR: {Good.SUGAR: 8},
-        BuildingKind.FISHERY: {Good.FISH: 8},
+        BuildingKind.FARM: {Good.WHEAT: 10},
+        BuildingKind.ORCHARD: {Good.APPLES: 10},
+        BuildingKind.DATE_PALMS: {Good.DATES: 12},
+        BuildingKind.ORANGE_FARM: {Good.ORANGES: 12},
+        BuildingKind.BANANAS: {Good.BANANAS: 18},
+        BuildingKind.SUGAR: {Good.SUGAR: 16},
+        BuildingKind.FISHERY: {Good.FISH: 16},
         BuildingKind.MINE: {Good.COAL: 100},
         BuildingKind.LUMBER_MILL: {Good.LUMBER: 20},
         BuildingKind.PORT: {Good.GOODS: 20, Good.OIL: 50, Good.GAS: 50},
@@ -429,13 +459,15 @@ MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
         BuildingKind.VINEYARD: {Good.GRAPES: 60},
         BuildingKind.COFFEE_PLANTATION: {Good.COFFEE: 60},
         BuildingKind.RUBBER_PLANTATION: {Good.RUBBER: 60},
-        BuildingKind.BEEKEEPER: {Good.HONEY: 2, Good.WAX: 10},
+        BuildingKind.BEEKEEPER: {Good.HONEY: 4, Good.WAX: 10},
         BuildingKind.INCENSE_GROVE: {Good.INCENSE: 30},
         BuildingKind.CLAY_PIT: {Good.CLAY: 60},
         BuildingKind.LIMESTONE_QUARRY: {Good.LIMESTONE: 60},
         BuildingKind.SAND_PIT: {Good.SAND: 60},
-        BuildingKind.POTATO_FARM: {Good.POTATOES: 12},
+        BuildingKind.POTATO_FARM: {Good.POTATOES: 24},
         BuildingKind.CATTLE_RANCH: {Good.CATTLE: 10},
+        BuildingKind.PIG_FARM: {Good.PIGS: 12},
+        BuildingKind.CHICKEN_FARM: {Good.CHICKENS: 20, Good.EGGS: 40},
         BuildingKind.FLAX_FIELD: {Good.FLAX: 60},
         BuildingKind.HOP_GARDEN: {Good.HOPS: 40},
         BuildingKind.SALT_CATHEDRAL: {Good.SALT: 200},
@@ -501,6 +533,8 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.PORCELAIN: 2,
         },
         BuildingKind.FARM: {Need.MACHINERY: 1},
+        BuildingKind.MINE: {Need.LUMBER: 20},
+        BuildingKind.RAILWAY_WORKS: {Need.STEEL: 200},
         BuildingKind.POWER_PLANT: {Need.BOILER_FUEL: 200},
         BuildingKind.SPACE_CENTER: {Need.ELECTRONICS: 300, Need.FUEL: 1000, Need.FOOD: 300},
         BuildingKind.PEAR_HQ: {Need.ELECTRONICS: 500, Need.FOOD: 1000},
@@ -521,6 +555,8 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.AMUSEMENT_PARK: {Need.FOOD: 200, Need.BEER: 100, Need.FUEL: 50},
         BuildingKind.OLYMPIC_STADIUM: {Need.FOOD: 500, Need.BEER: 200, Need.NEWSPAPERS: 200},
         BuildingKind.CATTLE_RANCH: {Need.WHEAT: 120},
+        BuildingKind.PIG_FARM: {Need.WHEAT: 60},
+        BuildingKind.CHICKEN_FARM: {Need.WHEAT: 30},
         BuildingKind.SHEEP_FARM: {Need.WHEAT: 90},
         BuildingKind.TAVERN: {Need.BEER: 20, Need.VODKA: 10},
         BuildingKind.DEPARTMENT_STORE: {
@@ -547,7 +583,10 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.CATHEDRAL: {Need.WAX: 60, Need.INCENSE: 40},
         BuildingKind.ST_PAULS: {Need.WAX: 200, Need.INCENSE: 120},
         **{
-            kind: {need: recipe.most * amount for need, amount in recipe.per_unit.items()}
+            kind: {
+                need: recipe.most * amount
+                for need, amount in {**recipe.per_unit, **recipe.boosts}.items()
+            }
             for kind, recipe in RECIPES.items()
         },
     }
@@ -556,8 +595,9 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
 # The month's trade, a step at a time: a need is shared out, a kind of processor makes what it
 # can. Inputs come before what is made from them, and the processors of food before houses.
 PIPELINE: tuple[Need | BuildingKind, ...] = (
-    Need.COAL,
     Need.LUMBER,
+    Need.COAL,
+    BuildingKind.GASWORKS,
     Need.IRON,
     Need.COPPER,
     Need.OIL,
@@ -573,6 +613,7 @@ PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.CLAY,
     Need.LIMESTONE,
     Need.SAND,
+    Need.WHEAT,
     Need.LIVESTOCK,
     Need.HOPS,
     BuildingKind.STEEL_MILL,
@@ -625,7 +666,6 @@ PIPELINE: tuple[Need | BuildingKind, ...] = (
     BuildingKind.PLANE_FACTORY,
     Need.PLANES,
     Need.HEATING,
-    Need.WHEAT,
     BuildingKind.BAKERY,
     BuildingKind.BREWERY,
     Need.BEER,
@@ -635,6 +675,7 @@ PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.SUGAR,
     BuildingKind.SUGAR_REFINERY,
     Need.REFINED_SUGAR,
+    Need.ANIMALS,
     BuildingKind.MEAT_FACTORY,
     Need.FRUIT,
     BuildingKind.FOOD_PLANT,
@@ -658,13 +699,14 @@ def makes_of(kind: BuildingKind, year: int) -> Mapping[Good, float]:
         {
             good: amount
             for good, amount in MAKES.get(kind, {}).items()
-            if GOOD_YEARS.get(good, 0) <= year
+            if KIND_GOOD_YEARS.get((kind, good), GOOD_YEARS.get(good, 0)) <= year
         }
     )
 
 
 # Needs buildings can do without but that raise their satisfaction: every special resource
-# (railroads.mapgen.deposits), and beer, newspapers and furniture. Wool, cotton and fish meet
+# (railroads.mapgen.deposits), beer, newspapers and furniture, the wheat animals are fed and the
+# lumber mines prop their shafts with. Wool, cotton and fish meet
 # needs that ordinary goods meet too (fibre and food), so those stay demands.
 BONUS_NEEDS = frozenset(
     {
@@ -681,6 +723,8 @@ BONUS_NEEDS = frozenset(
         Need.BEER,
         Need.NEWSPAPERS,
         Need.FURNITURE,
+        Need.WHEAT,
+        Need.LUMBER,
     }
 )
 
@@ -698,11 +742,39 @@ def needs_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
 
 
 @cache
+def boosts_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
+    """What a kind of building that makes goods can do without but makes up to BOOST_MOST more
+    with, and how much of each it needs in a month for all of that: a processor's recipe boosts,
+    and the bonus goods of one that makes goods from the land, such as wheat for its animals."""
+    recipe = RECIPES.get(kind)
+    if recipe is not None:
+        boosts = {need: recipe.most * amount for need, amount in recipe.boosts.items()}
+        needs = needs_of(kind, year)
+        return MappingProxyType({need: amount for need, amount in boosts.items() if need in needs})
+    if kind not in MAKES:
+        return MappingProxyType({})
+    return MappingProxyType(
+        {need: amount for need, amount in needs_of(kind, year).items() if need in BONUS_NEEDS}
+    )
+
+
+# Homes need only food and heating to live; everything else they want is a bonus good.
+HOMES = frozenset({BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS})
+HOME_DEMANDS = frozenset({Need.FOOD, Need.HEATING})
+
+
+@cache
 def bonus_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
-    """The bonus goods among what a kind of building needs in a month in a given year."""
+    """The bonus goods among what a kind of building needs in a month in a given year: for homes
+    all but food and heating; those of buildings that make goods boost what they make instead
+    (boosts_of)."""
     needs = needs_of(kind, year)
+    if kind in HOMES:
+        return MappingProxyType(
+            {need: amount for need, amount in needs.items() if need not in HOME_DEMANDS}
+        )
     bonus = {need: amount for need, amount in needs.items() if need in BONUS_NEEDS}
-    if kind in RECIPES or len(bonus) == len(needs):
+    if kind in MAKES or len(bonus) == len(needs):
         return MappingProxyType({})
     return MappingProxyType(bonus)
 
@@ -710,8 +782,8 @@ def bonus_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
 @cache
 def demands_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
     """What a kind of building must get in a month in a given year to be satisfied: its needs
-    that are not bonus goods."""
-    bonus = bonus_of(kind, year)
+    that are neither bonus goods nor boosts."""
+    left_out = {**bonus_of(kind, year), **boosts_of(kind, year)}
     return MappingProxyType(
-        {need: amount for need, amount in needs_of(kind, year).items() if need not in bonus}
+        {need: amount for need, amount in needs_of(kind, year).items() if need not in left_out}
     )

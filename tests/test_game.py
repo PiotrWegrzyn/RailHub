@@ -107,6 +107,9 @@ def test_a_month_grows_the_map_and_sums_up_what_changed_near_the_stations() -> N
     for cell in ((6, 7), (5, 6), (7, 6), (6, 5)):
         for _ in range(6):
             game.growth.build(Building(cell, BuildingKind.HOUSE))
+    for row in range(3, 10):
+        for col in (2, 3, 9, 10):
+            game.growth.build(Building((row, col), BuildingKind.FARM))
     rng = np.random.default_rng(0)
 
     months = [game.month(rng, "Jan 1850") for _ in range(120)]

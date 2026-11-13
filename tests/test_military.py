@@ -39,15 +39,12 @@ def test_outposts_open_only_on_military_ground() -> None:
     ground = [(10, 10), (10, 11), (11, 10), (11, 11), (12, 10), (12, 11)]
     constructions = Constructions(make_map(deposits=garrison_at(*ground)))
     growth = Growth(constructions, start_year=1850)
+    military = (BuildingKind.OUTPOST, BuildingKind.BASE, BuildingKind.HEADQUARTERS)
 
-    growth.run(1200, np.random.default_rng(1))
+    with growth.log_changes() as changes:
+        growth.run(2400, np.random.default_rng(0))
 
-    built = {
-        b.cell
-        for b in constructions
-        if isinstance(b, Building)
-        and b.kind in (BuildingKind.OUTPOST, BuildingKind.BASE, BuildingKind.HEADQUARTERS)
-    }
+    built = {cell for (cell, kind), _ in changes.items() if kind in military}
     assert built
     assert built <= set(ground)
 

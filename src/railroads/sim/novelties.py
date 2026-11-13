@@ -6,7 +6,9 @@ When a game starts its seed picks NOVELTIES_PER_GAME of them, more on a bigger m
 has come rolls YEARLY_CHANCE, and only on a hit does it look for a hex by its own rules, building
 nothing that year if none fits. Olympic stadiums are apart from the pick: in every real Summer
 Games year a map hosts one with OLYMPIC_CHANCE, scaled by its land, in its biggest town without a
-stadium yet.
+stadium yet. Railway works are apart from the pick too: from RAILWAY_WORKS_YEAR a map gets a
+few of them, RAILWAY_WORKS_PER_GAME scaled by its land, one a year at most with YEARLY_CHANCE,
+each by the biggest town no other stands near.
 """
 
 from collections.abc import Callable
@@ -23,6 +25,8 @@ from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
 
 REFERENCE_LAND = 121_000
 NOVELTIES_PER_GAME = (2, 3)
+RAILWAY_WORKS_PER_GAME = (2, 3)
+RAILWAY_WORKS_YEAR = 1855
 YEARLY_CHANCE = 0.15
 OLYMPIC_CHANCE = 0.05
 MOST_OLYMPIC_CHANCE = 0.5
@@ -190,6 +194,10 @@ class Novelties:
     olympic_chance: float
     built: set[BuildingKind] = field(default_factory=set)
     hosts: list[Cell] = field(default_factory=list)
+    # How many railway works the map gets, and where those put up so far stand. Saves from
+    # before them get none.
+    railway_works: int = 0
+    works: list[Cell] = field(default_factory=list)
 
     @classmethod
     def pick(cls, tile_map: TileMap, rng: np.random.Generator) -> Novelties:
@@ -199,7 +207,9 @@ class Novelties:
         count = min(len(NOVELTIES), max(1, round(int(rng.integers(low, high + 1)) * land)))
         chosen = rng.choice(len(NOVELTIES), size=count, replace=False)
         olympic = min(MOST_OLYMPIC_CHANCE, OLYMPIC_CHANCE * land)
-        return cls([NOVELTIES[i] for i in sorted(chosen.tolist())], olympic)
+        low, high = RAILWAY_WORKS_PER_GAME
+        works = max(1, round(int(rng.integers(low, high + 1)) * land))
+        return cls([NOVELTIES[i] for i in sorted(chosen.tolist())], olympic, railway_works=works)
 
     def year(self, growth: Growth, rng: np.random.Generator) -> set[Cell]:
         """Rolls once for every novelty whose era has come and, on a hit, puts it up where its
@@ -218,7 +228,30 @@ class Novelties:
                 changed.add(cell)
         if year in OLYMPIC_YEARS and rng.random() < self.olympic_chance:
             changed |= self._host(growth)
+        works = getattr(self, "works", [])
+        wanted = getattr(self, "railway_works", 0)
+        if year >= RAILWAY_WORKS_YEAR and len(works) < wanted and rng.random() < YEARLY_CHANCE:
+            changed |= self._railway_works(growth, works)
         return changed
+
+    def _railway_works(self, growth: Growth, works: list[Cell]) -> set[Cell]:
+        """Puts railway works by the biggest town with none near it yet."""
+        grid = growth.constructions.tile_map.grid
+        near = growth.nearby(Points.POPULATION).astype(np.float64)
+        for standing in works:
+            for cell in grid.within(standing, HOSTS_APART):
+                near[cell] = -1
+        best = np.unravel_index(int(np.argmax(near)), near.shape)
+        town = (int(best[0]), int(best[1]))
+        if near[town] <= 0:
+            return set()
+        cell = _nearest_free(growth, BuildingKind.RAILWAY_WORKS, town)
+        if cell is None:
+            return set()
+        growth.build(Building(cell, BuildingKind.RAILWAY_WORKS))
+        works.append(cell)
+        self.works = works
+        return {cell}
 
     def _host(self, growth: Growth) -> set[Cell]:
         """Puts a stadium in the biggest town far enough from every earlier host."""

@@ -186,7 +186,7 @@ def test_a_station_gathers_what_a_farm_makes() -> None:
 
     trade = economy.trade(counts, {(6, 12): StationOrder({}, 100.0)})
 
-    assert trade.gathered[(6, 12)][Good.WHEAT] == pytest.approx(5.0)
+    assert trade.gathered[(6, 12)][Good.WHEAT] == pytest.approx(10.0)
 
 
 def test_cars_slow_a_train_and_full_cars_slow_it_more() -> None:
@@ -548,7 +548,7 @@ def test_cargo_back_at_the_station_it_came_from_returns_to_its_stockpile_unpaid(
     assert railway.finances.month["cargo"] == 0.0
 
 
-def test_gold_reaches_a_jeweller_through_a_hub_and_pays_only_when_he_takes_it() -> None:
+def test_gold_reaches_a_jeweller_through_a_hub_and_pays_the_moment_he_takes_it() -> None:
     growth, railway = joined_stations()
     build_station(growth, (6, 27))
     route = plan_route(growth.constructions, (6, 20), (6, 27))
@@ -566,12 +566,9 @@ def test_gold_reaches_a_jeweller_through_a_hub_and_pays_only_when_he_takes_it() 
     assert second is not None
     second.stops = [Stop((6, 20), [Good.GOLD], wait_for_load=False), Stop((6, 27))]
     railway.run(0.01)
+
     railway.run(12 / CELLS_PER_MONTH)
-    before_taken = railway.finances.month["cargo"]
 
-    growth.trade_goods()
-
-    assert before_taken == 0.0
     assert railway.station_goods((6, 27)).brought[Good.GOLD] == pytest.approx(0.0)
     assert 10 * price_of(Good.GOLD) < railway.finances.month["cargo"] <= 20 * price_of(Good.GOLD)
 
@@ -745,7 +742,7 @@ def test_a_town_eats_its_own_farms_food_the_month_it_is_made_and_only_the_rest_w
 
     food, _ = food_and_heating(growth, (6, 21))
     assert food == pytest.approx(10.0)
-    assert railway.station_goods((6, 20)).stockpile[Good.WHEAT] == pytest.approx(10.0)
+    assert railway.station_goods((6, 20)).stockpile[Good.WHEAT] == pytest.approx(4 * 10 - 10.0)
 
 
 def test_coal_mined_near_a_station_heats_its_own_houses_before_waiting_for_trains() -> None:

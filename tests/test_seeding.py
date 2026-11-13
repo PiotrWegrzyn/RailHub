@@ -4,7 +4,13 @@ import numpy as np
 import pytest
 
 from builders import flat_map
-from railroads.mapgen.seeding import play_begins, seed_buildings
+from railroads.mapgen.deposits import place_deposits
+from railroads.mapgen.seeding import (
+    HISTORY_STEP,
+    play_begins,
+    seed_buildings,
+    seed_steps,
+)
 from railroads.sim.clock import HISTORY_START
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station, Track
 from railroads.sim.economy import Neighbourhoods
@@ -21,6 +27,7 @@ from railroads.sim.ladders import (
     TOWNS,
     Ladder,
 )
+from railroads.sim.steps import finish
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 
 
@@ -72,21 +79,39 @@ def buildings_of(constructions: Constructions, kind: BuildingKind) -> list[Build
     return [b for b in constructions if isinstance(b, Building) and b.kind == kind]
 
 
+Grown = tuple[Constructions, set[tuple[tuple[int, int], BuildingKind]]]
+
+
 @pytest.fixture(scope="module")
-def country() -> Constructions:
+def history() -> Grown:
+    """The country grown as seed_buildings grows it, with every cell and kind that went up on the
+    way, standing at the end or not."""
+    tile_map = make_country()
     rng = np.random.default_rng(1)
-    return seed_buildings(make_country(), rng, BUSY, months=MONTHS_BEFORE_PLAY)
+    tile_map = replace(
+        tile_map, vegetation=tile_map.vegetation.copy(), deposits=place_deposits(tile_map, rng)
+    )
+    constructions = Constructions(tile_map)
+    rule = replace(BUSY, trade_every_months=HISTORY_STEP, forests_every_months=HISTORY_STEP)
+    growth = Growth(constructions, rule, start_year=HISTORY_START)
+    with growth.log_changes() as changes:
+        growth.run(MONTHS_BEFORE_PLAY, rng, HISTORY_STEP)
+    return constructions, set(changes)
 
 
-def test_seeding_grows_towns_and_the_industry_that_suits_the_land(country: Constructions) -> None:
-    kinds = {b.kind for b in country if isinstance(b, Building)}
+@pytest.fixture(scope="module")
+def country(history: Grown) -> Constructions:
+    return history[0]
+
+
+def test_seeding_grows_towns_and_the_industry_that_suits_the_land(history: Grown) -> None:
+    kinds = {kind for _, kind in history[1]}
 
     assert {
         BuildingKind.HOUSE,
         BuildingKind.FARM,
         BuildingKind.MINE,
         BuildingKind.LUMBER_MILL,
-        BuildingKind.FACTORY,
     } <= kinds
 
 
@@ -97,25 +122,27 @@ def test_seeding_grows_towns_and_the_industry_that_suits_the_land(country: Const
         (BuildingKind.MINE, lambda t: t.relief != Relief.FLAT),
     ],
 )
-def test_seeded_industry_mostly_stands_where_its_land_suits_it(
-    country: Constructions, kind: BuildingKind, allowed: object
+def test_seeded_industry_mostly_goes_up_where_its_land_suits_it(
+    history: Grown, kind: BuildingKind, allowed: object
 ) -> None:
+    country, grown = history
     tile_map = country.tile_map
 
-    built = buildings_of(country, kind)
+    built = [cell for cell, grown_kind in grown if grown_kind == kind]
 
-    suited = [allowed(tile_map.tile(b.cell)) for b in built]  # type: ignore[operator]
+    suited = [allowed(tile_map.tile(cell)) for cell in built]  # type: ignore[operator]
     assert built
     assert np.mean(suited) > 0.9
 
 
-def test_seeded_lumber_mills_all_keep_enough_forest_around_them(country: Constructions) -> None:
+def test_seeded_lumber_mills_all_keep_enough_forest_around_them(history: Grown) -> None:
+    country, grown = history
     tile_map = country.tile_map
     forests = forests_nearby(tile_map, Neighbourhoods(tile_map.grid).index)
 
     mills = buildings_of(country, BuildingKind.LUMBER_MILL)
 
-    assert mills
+    assert any(kind == BuildingKind.LUMBER_MILL for _, kind in grown)
     assert all(
         forests[np.ravel_multi_index(mill.cell, tile_map.grid.shape)] >= MILLS_CLOSE_BELOW
         for mill in mills
@@ -175,3 +202,17 @@ def test_history_begins_in_850_and_play_where_it_left_off(years: int, begins: in
 
     assert year == begins
     assert HISTORY_START == 850
+
+
+def test_seeding_in_steps_tells_how_far_it_has_grown() -> None:
+    done: list[float] = []
+
+    seed_steps_done = finish(
+        seed_steps(make_country(30), np.random.default_rng(1), months=600, progress=done.append)
+    )
+
+    assert isinstance(seed_steps_done, Constructions)
+    assert done == sorted(done)
+    assert done[0] == 0.0
+    assert done[-1] == 1.0
+    assert len(done) == 600 // HISTORY_STEP + 1

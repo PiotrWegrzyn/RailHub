@@ -195,92 +195,108 @@
   0,
   96
  ],
- "flax": [
+ "pigs": [
   16,
+  96
+ ],
+ "chickens": [
+  32,
+  96
+ ],
+ "eggs": [
+  48,
+  96
+ ],
+ "animals": [
+  64,
+  96
+ ],
+ "flax": [
+  80,
   96
  ],
  "hops": [
-  32,
+  96,
   96
  ],
  "machinery": [
-  48,
+  112,
   96
  ],
  "bricks": [
-  64,
-  96
+  0,
+  112
  ],
  "cement": [
-  80,
-  96
+  16,
+  112
  ],
  "glass": [
-  96,
-  96
+  32,
+  112
  ],
  "beer": [
-  112,
-  96
+  48,
+  112
  ],
  "vodka": [
-  0,
+  64,
   112
  ],
  "leather": [
-  16,
+  80,
   112
  ],
  "shoes": [
-  32,
+  96,
   112
  ],
  "plastics": [
-  48,
-  112
- ],
- "appliances": [
-  64,
-  112
- ],
- "paper": [
-  80,
-  112
- ],
- "newspapers": [
-  96,
-  112
- ],
- "refined sugar": [
   112,
   112
  ],
- "porcelain": [
+ "appliances": [
   0,
   128
  ],
- "sheep": [
+ "paper": [
   16,
   128
  ],
- "meat": [
+ "newspapers": [
   32,
   128
  ],
- "livestock": [
+ "refined sugar": [
   48,
   128
  ],
- "gas": [
+ "porcelain": [
   64,
   128
  ],
- "heating": [
+ "sheep": [
   80,
   128
  ],
- "boiler fuel": [
+ "meat": [
   96,
   128
+ ],
+ "livestock": [
+  112,
+  128
+ ],
+ "gas": [
+  0,
+  144
+ ],
+ "heating": [
+  16,
+  144
+ ],
+ "boiler fuel": [
+  32,
+  144
  ]
 }

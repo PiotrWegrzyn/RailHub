@@ -11,11 +11,12 @@ from imgui_bundle import imgui
 
 from railroads.sim.demand import StationDemand
 from railroads.sim.finance import TRAIN_RESALE, dollars
+from railroads.sim.goods import Good
 from railroads.sim.railway import Railway
 from railroads.sim.trains import ENGINES, Stop, Train
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at
-from railroads.ui.station_offers import Supplies, goods_to_load
+from railroads.ui.station_offers import Offer, Supplies, goods_to_load
 from railroads.ui.theme import (
     BRASS,
     CARDS_WIDTH,
@@ -312,6 +313,10 @@ class TrainsWindow:
         imgui.text_disabled("Load here")
         imgui.same_line(CARD_LABEL)
         offers = goods_to_load(railway, stop.cell, supplies(stop.cell))
+        here = {offer.good for offer in offers}
+        waiting = railway.station_goods(stop.cell)
+        carried = [g for g in carried_in(train, index) if g not in here]
+        offers += [Offer(good, waiting.held(good), 0.0) for good in carried]
         if not offers:
             imgui.text_disabled("nothing made or waiting here yet")
             return
@@ -328,6 +333,7 @@ class TrainsWindow:
             wanted = demand.monthly_want(offer.good) > 0
             tip = (
                 f"{offer.good.value}: {offer.waiting:.0f} waiting, about {offer.made:.0f} a month"
+                + (" - comes in on this train" if offer.good in carried else "")
                 + (" - wanted at the next stop" if wanted else "")
                 + ("\nThe train is full: remove a car first" if full else "\nClick to add a car")
             )
@@ -338,6 +344,15 @@ class TrainsWindow:
             if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
                 self.map.good = offer.good
             imgui.end_disabled()
+
+
+def carried_in(train: Train, index: int) -> list[Good]:
+    """The goods a train's cars bring into its stop at `index`: what it takes on at the stop
+    before, so a train can carry them on past a station that has no use for them."""
+    if not train.stops:
+        return []
+    before = train.stops[(index - 1) % len(train.stops)]
+    return list(dict.fromkeys(before.cars))
 
 
 def _centered_hint(text: str) -> None:

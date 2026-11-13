@@ -31,6 +31,7 @@ train does calling at a station in railroads.sim.calls; Railway owns them all an
 
 import itertools
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -57,6 +58,9 @@ from railroads.sim.tech import GOOD_TREES, Effect, Research
 from railroads.sim.track_network import TrackNetwork
 from railroads.sim.trains import CAR_CAPACITY, ENGINES, FIRST_ENGINE, Point, Stop, Train
 
+if TYPE_CHECKING:
+    from railroads.sim.station_trade import StationTrade
+
 TRAIN_COST_NAME = "Steam engine"
 # How far a train runs in a month, in cells, on flat ground.
 CELLS_PER_MONTH = 60.0
@@ -70,6 +74,10 @@ LEAST_UPKEEP = 0.5
 
 class Railway:
     """The trains on one map, and the goods held at its stations."""
+
+    # Where goods reaching a station are handed out at once to the buildings around it
+    # (railroads.sim.station_trade); set by growth, None until then and in older saves.
+    station_trade: StationTrade | None = None
 
     def __init__(
         self,
@@ -195,6 +203,11 @@ class Railway:
             amount * self.price_factor(car.good)
             for amount, car in zip(earned, train.cars, strict=True)
         ]
+
+    def hand_out_now(self, station: Cell, good: Good) -> None:
+        """Lets the buildings around a station take a good that has just reached it."""
+        if self.station_trade is not None:
+            self.station_trade.hand_out_now(station, good)
 
     def pay_for(self, station: Cell, need: Need, good: Good, amount: float) -> None:
         """Pays for cargo trains brought that the buildings around a station took."""

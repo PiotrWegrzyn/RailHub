@@ -7,6 +7,7 @@ from railroads.newgame import EARLIEST_START_YEAR, MapChoice, Settings, allowed_
 from railroads.saves import Saves
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
 from railroads.sim.constructions import Constructions
+from railroads.sim.steps import Steps
 from railroads.ui.app import parse_args, settings_from
 from railroads.ui.main_menu import MainMenu
 
@@ -37,11 +38,14 @@ def test_a_new_game_wished_to_begin_too_early_begins_in_1750(
 ) -> None:
     grown: list[int] = []
 
-    def quick_growth(tile_map: Any, rng: Any, months: int, history: Any) -> Constructions:
+    def quick_growth(
+        tile_map: Any, rng: Any, months: int, history: Any, progress: Any
+    ) -> Steps[Constructions]:
         grown.append(months)
+        yield
         return Constructions(tile_map)
 
-    monkeypatch.setattr(newgame, "seed_buildings", quick_growth)
+    monkeypatch.setattr(newgame, "seed_steps", quick_growth)
 
     saved = newgame.make_game(
         Settings(seed=1, map=MapChoice.POLAND, start_year=1500), report=lambda _: None

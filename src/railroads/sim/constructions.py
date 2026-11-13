@@ -87,6 +87,10 @@ class BuildingKind(Enum):
     SAND_PIT = "sand pit"
     POTATO_FARM = "potato farm"
     CATTLE_RANCH = "cattle ranch"
+    PIG_FARM = "pig farm"
+    CHICKEN_FARM = "chicken farm"
+    GASWORKS = "gasworks"
+    RAILWAY_WORKS = "railway works"
     FLAX_FIELD = "flax field"
     HOP_GARDEN = "hop garden"
     MACHINE_WORKS = "machine works"
@@ -103,7 +107,7 @@ class BuildingKind(Enum):
     PRINTING_WORKS = "printing works"
     SUGAR_REFINERY = "sugar refinery"
     PORCELAIN_WORKS = "porcelain works"
-    MEAT_FACTORY = "meat factory"
+    MEAT_FACTORY = "butcher"
     POWER_PLANT = "power plant"
     SPACE_CENTER = "space center"
     PEAR_HQ = "Pear Company headquarters"
@@ -117,6 +121,30 @@ class BuildingKind(Enum):
     TAVERN = "tavern"
     DEPARTMENT_STORE = "department store"
     HOTEL = "hotel"
+
+    @classmethod
+    def _missing_(cls, value: object) -> BuildingKind | None:
+        """Kinds by the names they had before, so older saves still load."""
+        return {"meat factory": cls.MEAT_FACTORY}.get(str(value))
+
+
+# The buildings a map gets only one of, or a few: novelties, the Olympic stadiums, the railway
+# works and St Paul's.
+ONE_OFFS = frozenset(
+    {
+        BuildingKind.SPACE_CENTER,
+        BuildingKind.PEAR_HQ,
+        BuildingKind.ROYAL_PALACE,
+        BuildingKind.SALT_CATHEDRAL,
+        BuildingKind.SPA_RESORT,
+        BuildingKind.WORLDS_FAIR,
+        BuildingKind.FILM_STUDIO,
+        BuildingKind.AMUSEMENT_PARK,
+        BuildingKind.OLYMPIC_STADIUM,
+        BuildingKind.RAILWAY_WORKS,
+        BuildingKind.ST_PAULS,
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +167,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     BuildingKind.MEGA_FACTORY: BuildingRules(relief=_OFF_MOUNTAINS, space=CELL_SPACE),
     BuildingKind.SKYSCRAPER: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.LUMBER_MILL: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    BuildingKind.GASWORKS: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.PORT: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True),
     **{
         kind: BuildingRules(relief=_OFF_MOUNTAINS, space=CELL_SPACE)
@@ -155,6 +184,8 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.RUBBER_PLANTATION,
             BuildingKind.POTATO_FARM,
             BuildingKind.CATTLE_RANCH,
+            BuildingKind.PIG_FARM,
+            BuildingKind.CHICKEN_FARM,
             BuildingKind.FLAX_FIELD,
             BuildingKind.HOP_GARDEN,
         )
@@ -183,6 +214,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.FILM_STUDIO,
             BuildingKind.AMUSEMENT_PARK,
             BuildingKind.OLYMPIC_STADIUM,
+            BuildingKind.RAILWAY_WORKS,
         )
     },
     BuildingKind.TEXTILE_MILL: BuildingRules(relief=_OFF_MOUNTAINS, space=3),

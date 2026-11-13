@@ -1,6 +1,6 @@
 """The station window, opened by right clicking a station: its level and reach, what it holds
-and wants, which of the goods made around it are kept for trains rather than handed out there,
-the trains that call there, and buttons to raise its level or add storage."""
+and wants, which of the goods made around it or held in it are kept for trains rather than handed
+out there, the trains that call there, and buttons to raise its level or add storage."""
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -130,14 +130,15 @@ class StationWindow:
 
 
 def _draw_kept(goods: StationGoods, made: Mapping[Good, float]) -> None:
-    """A tick for each good made around the station, and each already kept, to keep it for
-    trains instead of handing it to the buildings around the station."""
+    """A tick for each good made around the station or held in it, and each already kept, to
+    keep it for trains instead of handing it to the buildings around the station."""
+    held = {g for g in {*goods.stockpile, *goods.brought} if goods.held(g) > 0}
     shown = sorted(
-        {g for g, amount in made.items() if amount > 0 and g not in TRAVELLERS} | goods.kept,
+        {g for g, amount in made.items() if amount > 0} | held - set(TRAVELLERS) | goods.kept,
         key=lambda g: g.value,
     )
     if not shown:
-        imgui.text_disabled("nothing is made around it")
+        imgui.text_disabled("nothing is made around it or held here")
         return
     left, per_row = rows_that_fit()
     for index, good in enumerate(shown):
