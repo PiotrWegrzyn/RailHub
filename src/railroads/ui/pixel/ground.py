@@ -21,7 +21,7 @@ from railroads.ui.buildings import Plot, plots_of
 from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.noise import noise, table_hash
 from railroads.ui.pixel.projection import CHUNK, RGB, FloatArray, IntArray, PixelProjection
-from railroads.ui.pixel.relief import Elevation, Raised, sample, smooth
+from railroads.ui.pixel.relief import Elevation, Raised, mountain_cover, sample, smooth
 
 type BoolArray = npt.NDArray[np.bool_]
 
@@ -327,7 +327,9 @@ class Ground:
         may hold their plane points and cells already, and those of the APRON round them.
 
         Each pixel is coloured by the one kind of ground it shows: water, meadow, savanna or
-        the plain ramp of its biome, each worked out only at its own pixels."""
+        the plain ramp of its biome, each worked out only at its own pixels. Where raised ground
+        takes the mountains' colours fully (relief.mountain_cover), its own colour is not
+        worked out at all."""
         a = APRON
         around = (left - a, top - a, CHUNK + 2 * a, rows + 2 * a)
         points = _lattice(points, self.projection, self.tile_map.grid, around)
@@ -338,22 +340,29 @@ class Ground:
         r, c, inside, wet = r[inner], c[inner], inside[inner], water[inner]
         biomes = self._biomes[r, c]
         x, y = points.plane(left, top, CHUNK, rows)
+        rocky = self.tile_map.relief[r, c] == Relief.MOUNTAINS
+        seen = np.ones(x.shape, dtype=bool)
+        if raised is not None:
+            seen = mountain_cover(raised.mountains[:rows], rocky) < 1
         meadow = _MEADOW[biomes] & ~wet
         savanna = (biomes == Biome.SAVANNA) & ~wet
-        plain = ~(wet | meadow | savanna)
+        plain = ~(wet | meadow | savanna) & seen
+        meadow &= seen
+        savanna &= seen
         dry = ~wet
+        lit = meadow | savanna | plain
         light = np.zeros(x.shape, dtype=np.float64)
-        light[dry] = sample(
-            self._relief_light, x[dry] * RELIEF_STEPS_PER_CELL, y[dry] * RELIEF_STEPS_PER_CELL
+        light[lit] = sample(
+            self._relief_light, x[lit] * RELIEF_STEPS_PER_CELL, y[lit] * RELIEF_STEPS_PER_CELL
         )
-        rgb = np.empty((*x.shape, 3), dtype=np.float32)
+        rgb = np.zeros((*x.shape, 3), dtype=np.float32)
         shade = np.zeros(x.shape, dtype=np.int64)
-        down, across = np.nonzero(wet)
+        down, across = np.nonzero(wet & seen)
         if len(down):
             ix, iy = left + across, top + down
             ripple = table_hash(ix // 3, iy, 13) > 0.94
             calm = 1.3 + 0.6 * (table_hash(ix, iy, 11) - 0.5)
-            shade[wet] = np.clip(np.rint(np.where(ripple, 3, calm)), 0, 3).astype(np.int64)
+            shade[down, across] = np.clip(np.rint(np.where(ripple, 3, calm)), 0, 3)
         down, across = np.nonzero(plain)
         if len(down):
             ix, iy = left + across, top + down
@@ -363,7 +372,8 @@ class Ground:
             value += 0.45 * (noise(fx, fy, 0.22, 43) - 0.5) + 0.45 * BAYER[iy % 4, ix % 4]
             value += light[plain] + HILL_LIFT * self._hills[r[plain], c[plain]]
             shade[plain] = np.clip(np.rint(value), 0, 3).astype(np.int64)
-        rgb[wet | plain] = self.ramps[biomes[wet | plain], shade[wet | plain]]
+        ramped = (wet & seen) | plain
+        rgb[ramped] = self.ramps[biomes[ramped], shade[ramped]]
         if meadow.any() or savanna.any():
             shaded = self._tree_shade(left, top, x.shape)
             for grass, kind in ((meadow, "meadow"), (savanna, "savanna")):
@@ -396,7 +406,6 @@ class Ground:
             _sign_deposits(rgb, self.tile_map.deposits[r, c], left, top, wet)
         alpha = inside.astype(np.float32)
         if raised is not None:
-            rocky = self.tile_map.relief[r, c] == Relief.MOUNTAINS
             self.elevation.colour(rgb, raised.top(rows), x, y, rocky)
         return np.clip(rgb, 0, 255) * alpha[..., None], alpha
 

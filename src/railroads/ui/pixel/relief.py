@@ -227,26 +227,34 @@ class Elevation:
         x, y = np.asarray(x, dtype=np.float64), np.asarray(y, dtype=np.float64)
         return self._rise(x, y, Blend.at(self._base.shape, x * STEPS, y * STEPS))
 
-    def _rise(self, x: FloatArray, y: FloatArray, at: Blend) -> tuple[Floats, Floats, Floats]:
+    def _rise(
+        self, x: FloatArray, y: FloatArray, at: Blend, valley: FloatArray | None = None
+    ) -> tuple[Floats, Floats, Floats]:
+        """`rise` at points `at` blends, with the valley floor there if it is read already."""
         m, h = self._shares(at)
         rise = np.zeros(m.shape, dtype=np.float32)
         raised = (m > 0) | (h > 0)
         if raised.any():
             rx, ry, rm, rh = x[raised], y[raised], m[raised], h[raised]
             there = at.where(raised)
-            base, valley = there.read(self._base), there.read(self._valley)
-            # Noise turns its points to float32; turned once, they serve every scale.
-            fx, fy = rx.astype(np.float32), ry.astype(np.float32)
-            wx = rx + 0.9 * (noise(fx, fy, 2.5, 11) - 0.5)
-            wy = ry + 0.9 * (noise(fx, fy, 2.5, 12) - 0.5)
-            rolling = 0.6 * noise(fx, fy, 0.9, 4) + 0.4 * noise(fx, fy, 0.35, 5)
-            fx, fy = wx.astype(np.float32), wy.astype(np.float32)
-            big = ridged(fx, fy, 2.6, 1)
-            ridges = 0.55 * big + 0.28 * big * ridged(fx, fy, 1.0, 2)
-            ridges = ridges + 0.12 * ridged(fx, fy, 0.42, 3) + 0.05 * ridged(fx, fy, 0.16, 6)
+            base = there.read(self._base)
+            valley = there.read(self._valley) if valley is None else valley[raised]
             lifted = np.clip(rm + rh, 0, 1) * np.maximum(base - valley, 0) * 0.5
-            lifted = lifted + rm**1.6 * (MOUNTAIN_FLOOR + MOUNTAIN_RIDGES * ridges)
-            rise[raised] = lifted + rh * (1 - rm) * HILL_ROLL * rolling
+            # Ridges lift only mountains and rolling ground only hills; elsewhere each adds
+            # nothing, so neither is worked out there.
+            mountains = rm > 0
+            if mountains.any():
+                ridges = _ridges(rx[mountains], ry[mountains])
+                lifted[mountains] += rm[mountains] ** 1.6 * (
+                    MOUNTAIN_FLOOR + MOUNTAIN_RIDGES * ridges
+                )
+            rolls = rh * (1 - rm) * HILL_ROLL
+            rolling = rolls != 0
+            if rolling.any():
+                fx, fy = rx[rolling].astype(np.float32), ry[rolling].astype(np.float32)
+                ground = 0.6 * noise(fx, fy, 0.9, 4) + 0.4 * noise(fx, fy, 0.35, 5)
+                lifted[rolling] += rolls[rolling] * ground
+            rise[raised] = lifted
         return rise, m, h
 
     def to_lift(self, rise: Floats) -> Floats:
@@ -288,10 +296,11 @@ class Elevation:
             points = Lattice(self.projection, left, top, width, rows, k)
         x, y = points.plane(left, top, width, rows)
         at = Blend.at(self._base.shape, x * STEPS, y * STEPS)
-        rise, m, h = self._rise(x, y, at)
+        valley = at.read(self._valley)
+        rise, m, h = self._rise(x, y, at, valley)
         if not (m > 0).any() and not (h > 0).any():
             return None
-        height = at.read(self._valley).astype(np.float32) + rise
+        height = valley.astype(np.float32) + rise
         shade, steep = self._light(height, k)
         return Raised(self.to_lift(rise) * k, rise, m, h, shade, steep)
 
@@ -333,7 +342,7 @@ class Elevation:
         m, h, s, steep = raised.mountains, raised.hills, raised.shade, raised.steep
         lit = lighting(raised)
         rgb *= lit[..., None]
-        under = np.maximum(m, rocky * np.clip(m * 3, 0, 1))
+        under = mountain_cover(m, rocky)
         chosen = under > 0
         if not chosen.any():
             return
@@ -343,21 +352,32 @@ class Elevation:
         u = under[chosen][:, None]
         foothill = FOOTHILL * (0.9 + 0.2 * noise(fx, fy, 0.3, 13))[:, None]
         col = rgb[chosen] * (1 - u) + foothill * u * lit[chosen][:, None]
-        grain = noise(fx, fy, 0.05, 7)[:, None]
-        rock = ROCK_DARK + (ROCK_LIT - ROCK_DARK) * np.clip(s * 1.3 - 0.2, 0, 1)[:, None]
-        rock = rock * (0.9 + 0.2 * grain)
-        rock = np.where((st > 0.55)[:, None], rock * 0.85, rock)
-        treeline = TREELINE + TREELINE_SPREAD * noise(fx, fy, 0.7, 8)
-        bare = (np.clip((above - treeline) / 200 + st * 1.4 - 0.3, 0, 1) * mm)[:, None]
-        col = col * (1 - bare) + rock * bare
-        snowline = SNOWLINE + SNOWLINE_SPREAD * noise(fx, fy, 0.6, 9) - 140 * (1 - s)
-        snow = np.clip((above - snowline) / 140, 0, 1) * np.clip(1.8 - st * 2.0, 0, 1) * mm
-        steep_enough = st > 0.3
-        ribs = np.zeros(st.shape, dtype=bool)
-        ribs[steep_enough] = ridged(xs[steep_enough] * 3.0, ys[steep_enough] * 0.8, 0.12, 14) > 0.55
-        snow = np.where(ribs, snow * 0.25, snow)[:, None]
-        snowy = SNOW_DARK + (SNOW_LIT - SNOW_DARK) * np.clip(s * 1.5 - 0.35, 0, 1)[:, None]
-        col = col * (1 - snow) + snowy * snow
+        # Bare rock and snow cover ground only above the treeline and the snowline, which never
+        # lie below TREELINE and SNOWLINE less 140 metres, and ground they don't cover keeps its
+        # colour exactly; so their noise is worked out only where they may show.
+        bare = (above - np.float64(TREELINE)) / 200 + st * 1.4 - 0.3 > 0
+        if bare.any():
+            at = np.flatnonzero(bare)
+            treeline = TREELINE + TREELINE_SPREAD * noise(fx[at], fy[at], 0.7, 8)
+            cover = np.clip((above[at] - treeline) / 200 + st[at] * 1.4 - 0.3, 0, 1) * mm[at]
+            grain = noise(fx[at], fy[at], 0.05, 7)[:, None]
+            rock = ROCK_DARK + (ROCK_LIT - ROCK_DARK) * np.clip(s[at] * 1.3 - 0.2, 0, 1)[:, None]
+            rock = rock * (0.9 + 0.2 * grain)
+            rock = np.where((st[at] > 0.55)[:, None], rock * 0.85, rock)
+            col[at] = col[at] * (1 - cover[:, None]) + rock * cover[:, None]
+        lying = np.clip(1.8 - st * 2.0, 0, 1)
+        snowy = ((above - (np.float64(SNOWLINE) - 140 * (1 - s))) / 140 > 0) & (lying > 0)
+        if snowy.any():
+            at = np.flatnonzero(snowy)
+            snowline = (
+                SNOWLINE + SNOWLINE_SPREAD * noise(fx[at], fy[at], 0.6, 9) - 140 * (1 - s[at])
+            )
+            snow = np.clip((above[at] - snowline) / 140, 0, 1) * lying[at] * mm[at]
+            ribs = st[at] > 0.3
+            ribs[ribs] = ridged(xs[at][ribs] * 3.0, ys[at][ribs] * 0.8, 0.12, 14) > 0.55
+            snow = np.where(ribs, snow * 0.25, snow)[:, None]
+            white = SNOW_DARK + (SNOW_LIT - SNOW_DARK) * np.clip(s[at] * 1.5 - 0.35, 0, 1)[:, None]
+            col[at] = col[at] * (1 - snow) + white * snow
         dark = (np.clip((0.45 - s) * 2, 0, 1) * (mm + 0.3 * hh))[:, None]
         rgb[chosen] = col * (1 - dark * (1 - SHADOW_TINT) * 0.6)
 
@@ -368,6 +388,25 @@ class Elevation:
         reach = self.lift(x, y) >= np.arange(MOST_LIFT + 1)
         d = int(np.flatnonzero(reach)[-1]) if reach.any() else 0
         return float(x[d]), float(y[d])
+
+
+def mountain_cover(mountains: Floats, rocky: npt.NDArray[np.bool_]) -> Floats:
+    """How fully raised ground takes the mountains' own colours over its ground's, from 0 to 1:
+    as far as it is mountainous, and fully on mountain cells (`rocky`) once their mountains start
+    to rise. Where it is 1 the ground's own colour does not show at all."""
+    return np.maximum(mountains, rocky * np.clip(mountains * 3, 0, 1))
+
+
+def _ridges(x: FloatArray, y: FloatArray) -> FloatArray:
+    """How high mountain ridges, winding by noise, stand at plane points, from 0 to 1."""
+    # Noise turns its points to float32; turned once, they serve every scale.
+    fx, fy = x.astype(np.float32), y.astype(np.float32)
+    wx = x + 0.9 * (noise(fx, fy, 2.5, 11) - 0.5)
+    wy = y + 0.9 * (noise(fx, fy, 2.5, 12) - 0.5)
+    fx, fy = wx.astype(np.float32), wy.astype(np.float32)
+    big = ridged(fx, fy, 2.6, 1)
+    ridges = 0.55 * big + 0.28 * big * ridged(fx, fy, 1.0, 2)
+    return ridges + 0.12 * ridged(fx, fy, 0.42, 3) + 0.05 * ridged(fx, fy, 0.16, 6)
 
 
 def _steps_read(low: float, high: float, size: int) -> slice:
