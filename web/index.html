@@ -131,8 +131,13 @@ Query parameters:
         await micropip.install.callKwargs(IMGUI_BUNDLE, { deps: false });
         await micropip.install.callKwargs(GAME_WHEEL, { deps: false });
         mark("packages");
-        // Started once the page has fetched what they load too, so they find it cached.
-        window.railroadsPainters = new Painters(paintersWanted(query));
+        // Started once the page has fetched what they load too, so they find it cached. Without
+        // them the game paints the map on its frames.
+        try {
+            window.railroadsPainters = new Painters(paintersWanted(query));
+        } catch (error) {
+            console.error("The painting workers could not start:", error);
+        }
 
         await say("Opening saves...");
         await keepSaves(pyodide);
