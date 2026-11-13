@@ -254,7 +254,8 @@ class MapView:
         imgui.set_next_window_size(DETAILS_SIZE, imgui.Cond_.first_use_ever.value)
         expanded, still_open = imgui.begin("Hex details", True)
         if expanded:
-            bought = draw_hex_details(recently_described(self.growth, self.selected))
+            details = recently_described(self.growth, self.selected, self._satisfaction)
+            bought = draw_hex_details(details)
             if bought is not None:
                 self._bought = (
                     self.growth.owners.buy(self.selected, bought) or f"You own a {bought.value}"
@@ -498,7 +499,7 @@ class MapView:
         )
         below = draw_status(draw_list, top_left, bottom_right, text)
         if self.hovered is not None and not over_minimap:
-            draw_hovered_buildings(self.growth, self.hovered, below)
+            draw_hovered_buildings(self.growth, self.hovered, below, self._satisfaction)
 
     def _train_layer(self) -> TrainLayer:
         if self._trains is None:

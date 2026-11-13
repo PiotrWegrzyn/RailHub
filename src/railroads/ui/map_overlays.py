@@ -283,11 +283,13 @@ def draw_status(draw_list: imgui.ImDrawList, top_left: Vec2, bottom_right: Vec2,
     return x, y + size.y + 2 * STATUS_PADDING * 0.6 + STATUS_MARGIN / 2
 
 
-def draw_hovered_buildings(growth: Growth, cell: Cell, top_left: Vec2) -> None:
+def draw_hovered_buildings(
+    growth: Growth, cell: Cell, top_left: Vec2, satisfaction: np.ndarray | None = None
+) -> None:
     """The buildings in the cell under the mouse, one to a line, in a small card below the
     status strip: how satisfied each is, and icons of what it makes, what it demands and its
-    bonus goods."""
-    rows = recently_described(growth, cell).buildings
+    bonus goods. `satisfaction` is every cell's, if known (railroads.ui.hex_details.describe)."""
+    rows = recently_described(growth, cell, satisfaction).buildings
     if not rows:
         return
     imgui.set_next_window_pos(top_left)
