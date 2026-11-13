@@ -109,6 +109,55 @@ Query parameters:
         }
     }
 
+    // A web worker growing a new game's towns (railroads.ui.web_setup), so the page doesn't
+    // freeze meanwhile: one for each game, stopped once the game is handed over, so the memory
+    // growing took goes with it. The first is started with the page, so its Python is up by the
+    // time a game is started. Bytes are copied by their address in Python's memory, as the
+    // painting workers' are.
+    class Setup {
+        constructor(memory) {
+            this.memory = memory;
+            this.inbox = [];
+            this.worker = null;
+            this.spare = this.started();
+        }
+
+        started() {
+            const worker = new Worker("painter.js", { type: "module" });
+            worker.onmessage = event => {
+                if (worker === this.worker) this.inbox.push(event.data);
+            };
+            worker.onerror = event => {
+                event.preventDefault();
+                if (worker === this.worker) this.inbox.push({ kind: "failed", error: event.message });
+            };
+            return worker;
+        }
+
+        // Starts a worker growing the game the `length` bytes of pickled settings at `address` make.
+        start(address, length) {
+            this.stop();
+            this.worker = this.spare ?? this.started();
+            this.spare = null;
+            const data = this.memory().slice(address, address + length);
+            this.worker.postMessage({ kind: "setup", data }, [data.buffer]);
+        }
+
+        take() {
+            return this.inbox.splice(0);
+        }
+
+        copy(bytes, address) {
+            this.memory().set(new Uint8Array(bytes), address);
+        }
+
+        stop() {
+            this.worker?.terminate();
+            this.worker = null;
+            this.inbox = [];
+        }
+    }
+
     function syncSaves(pyodide, populate) {
         return new Promise((resolve, reject) =>
             pyodide.FS.syncfs(populate, error => error ? reject(error) : resolve()));
@@ -153,6 +202,7 @@ Query parameters:
         try {
             const memory = () => pyodide._module.HEAPU8;
             window.railroadsPainters = new Painters(paintersWanted(query), memory);
+            window.railroadsSetup = new Setup(memory);
         } catch (error) {
             console.error("The painting workers could not start:", error);
         }

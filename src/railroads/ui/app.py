@@ -1,7 +1,7 @@
 import argparse
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from concurrent.futures import Future
 
 import numpy as np
@@ -29,6 +29,7 @@ from railroads.ui.saves_window import SavesWindow
 from railroads.ui.tech_window import TechWindow
 from railroads.ui.theme import BRASS, apply_theme
 from railroads.ui.top_bar import draw_top_bar
+from railroads.ui.web_setup import page_setup
 from railroads.ui.workers import FrameWorker, worker
 
 # How long a notice such as "Autosaved" stays in the top bar.
@@ -295,12 +296,22 @@ class Shell:
         self._progress = progress
 
     def start(self, settings: Settings) -> None:
-        self._begin("Setting up a new game", lambda: make_game(settings, self.report))
+        self._begin("Setting up a new game", lambda: self._new_game(settings))
+
+    def _new_game(self, settings: Settings) -> Steps[SavedGame]:
+        """A new game, grown in the page's setup worker where there is one, so a browser doesn't
+        freeze while its towns grow; grown here where there isn't, or if the worker fails."""
+        setup = page_setup()
+        if setup is not None:
+            saved = yield from setup.grow(settings, self.report)
+            if saved is not None:
+                return saved
+        return make_game(settings, self.report)
 
     def load(self, name: str) -> None:
         self._begin(f"Loading '{name}'", lambda: self.saves.load(name))
 
-    def _begin(self, doing: str, work: Callable[[], SavedGame]) -> None:
+    def _begin(self, doing: str, work: Callable[[], SavedGame | Steps[SavedGame]]) -> None:
         self._doing = doing
         self._progress = ""
         size, density = WINDOW_SIZE, 1
@@ -311,12 +322,20 @@ class Shell:
         # Where frames do the work, the chunks are left to be drawn a frame at a time instead.
         chunks = not isinstance(self._executor, FrameWorker)
 
-        def prepared() -> App:
-            app = App.from_saved(work(), self.saves)
+        def prepared() -> Steps[App]:
+            saved = work()
+            if isinstance(saved, Generator):
+                saved = yield from saved
+            yield
+            app = App.from_saved(saved, self.saves)
+            yield
             app.view.prepare(size, density, chunks)
             return app
 
-        self._task = self._executor.submit(prepared)
+        if isinstance(self._executor, FrameWorker):
+            self._task = self._executor.submit_steps(prepared())
+        else:
+            self._task = self._executor.submit(finish, prepared())
         self._waiting_shown = False
 
     def gui(self) -> None:
@@ -328,7 +347,8 @@ class Shell:
         free_textures()
         if self._task is not None:
             if self._waiting_shown and isinstance(self._executor, FrameWorker):
-                self._executor.work_once()
+                # A step a frame, so the waiting screen shows between them.
+                self._executor.work_once(0.0)
             self._draw_waiting()
             self._waiting_shown = True
             if self._task.done():

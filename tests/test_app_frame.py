@@ -319,7 +319,10 @@ def test_without_threads_a_save_loads_once_the_waiting_screen_has_shown(
 
     shell_frame(shell)
     waiting = shell.app
-    shell_frame(shell)
+    frames = 1
+    while shell.app is None and frames < 10:
+        shell_frame(shell)
+        frames += 1
 
     assert waiting is None
     assert shell.app is not None

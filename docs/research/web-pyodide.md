@@ -3,8 +3,8 @@
 Proof of concept: the game runs unchanged in a browser. `web/index.html` loads Pyodide, numpy,
 Pillow, imgui-bundle and the game's own wheel, then starts `railroads.ui.app.main`. The map, the
 pixel art with its raised mountains, the menus and the minimap all show. The only changes to the
-game are stand-ins for its background threads: web workers paint the map's chunks, and the game
-setup and the autosave writer run on the frames.
+game are stand-ins for its background threads: web workers paint the map's chunks and grow a new
+game's towns, and loading a save and the autosave writer run on the frames.
 
 ## How to run it
 
@@ -56,9 +56,10 @@ The game's wheel carries its Python source, so anyone playing can read the code.
   is pickled whole while a game loads and kept up with what changes in it. `?painters=N` on the
   page sets how many start, and 0 paints a chunk a frame once the map and mouse stand still, as
   happens until a worker is ready. Raised chunks are never drawn again finely in the browser, as
-  the desktop does, so its mountains look as they always have there. The game setup and loading run
-  on the frame after the waiting screen first shows, so that screen stays up while the page is
-  frozen. An autosave is pickled on the frame after the month turns, then compressed and written
+  the desktop does, so its mountains look as they always have there. A new game's towns grow in a
+  web worker of their own (`railroads.ui.web_setup`), started with the page and stopped once the
+  game is handed over, compressed, then uncompressed on the frames a few megabytes at a time.
+  Loading a save runs on the frames after the waiting screen first shows, a step each. An autosave is pickled on the frame after the month turns, then compressed and written
   a step at a time, at most `WRITING_SECONDS` (4 ms) of each frame, over the next two seconds or
   so, the frames kept at full speed meanwhile. A month that ends before that is done is autosaved
   once it is, and an open saves window lists the new autosave as soon as it is written.
@@ -120,6 +121,9 @@ would pan at about 45 fps, still held back by the 140 ms quick draws of raised c
    build maps on a server.
 2. **A 24-second frozen start.** Town growth before play blocks the page. Options: save the grown
    start with the map, grow in slices that yield to the browser (async), or grow in a Web Worker.
+   Done: the towns grow in a web worker. The page no longer freezes (its longest frame while a
+   Poland game starts is about 140 ms), but the game shows after about 29.5 s instead of 23 s:
+   growth runs about a fifth slower in the worker, and handing the game over adds about a second.
 3. **No threads, so redraws stall.** Fine mountain redraws cost about 400 ms each on the main
    thread. Pyodide has no threads, and a Web Worker would need its own Pyodide and its own copy of
    the world. Cheaper options: skip the fine redraw in the browser, split it into strips across

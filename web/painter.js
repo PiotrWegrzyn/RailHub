@@ -7,6 +7,10 @@
 // and back to it: {kind: "ready"} once Python has started, {kind: "painted", world, job, pixels,
 // shape, ms} with the pixels' buffer handed over rather than copied, {kind: "failed", world, job,
 // error}, and {kind: "dead", error} if the worker can't go on. Pyodide runs only in module workers.
+// A worker started to grow a new game's towns instead (railroads.ui.web_setup) is sent
+//     {kind: "setup", data}               the game's settings, pickled
+// and answers {kind: "progress", text} as the towns grow, then {kind: "grown", game, size} with
+// the game pickled and compressed, or {kind: "failed", error}.
 import { loadPyodide } from "./pyodide/pyodide.mjs";
 
 const GAME_WHEEL = "wheels/railroads-0.1.0-py3-none-any.whl";
@@ -32,6 +36,10 @@ function handle(message) {
     const { kind, world } = message;
     if (kind === "paint") {
         paint(message);
+        return;
+    }
+    if (kind === "setup") {
+        setup(message);
         return;
     }
     const data = pyodide.toPy(message.data);
@@ -64,6 +72,23 @@ function paint({ world, job, chunk }) {
         postMessage({ kind: "failed", world, job, error: String(error?.message || error) });
     } finally {
         pixels?.destroy();
+    }
+}
+
+function setup({ data }) {
+    const settings = pyodide.toPy(data);
+    let grown = null;
+    try {
+        const report = text => postMessage({ kind: "progress", text });
+        grown = pyodide.pyimport("railroads.ui.web_setup").grow(settings, report);
+        // Copied by its address in Python's memory, as Pyodide's own copies go wrong past 2 GiB.
+        const game = pyodide._module.HEAPU8.slice(grown.address, grown.address + grown.length);
+        postMessage({ kind: "grown", game: game.buffer, size: grown.size }, [game.buffer]);
+    } catch (error) {
+        postMessage({ kind: "failed", error: String(error?.message || error) });
+    } finally {
+        settings.destroy();
+        grown?.destroy();
     }
 }
 

@@ -25,7 +25,8 @@ first with:
 - the starting money, $80,000 by default;
 - under "For testing", how many years a stand-in player runs the railway first (`--simulate`).
 
-Towns grow away from the window, which shows how far they have got.
+Towns grow away from the window, which shows how far they have got: on a thread of its own on
+the desktop, and in a web worker in the browser (`railroads.ui.web_setup`).
 
 In play, the floppy-disk button in the top bar (or F5) opens the saves window. Save the game under
 a name of your own, or over an older save, and load any save. The house button goes back to the
