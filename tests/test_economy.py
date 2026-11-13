@@ -140,6 +140,7 @@ def test_a_factory_makes_only_as_much_as_its_lumber_and_steel_allow(
 ) -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
+    economy.year = 1855
     placed = counts(tile_map, ((8, 8), BuildingKind.FACTORY, 1))
 
     trade = economy.trade(placed, holding(100.0, LUMBER=lumber, STEEL=steel))
@@ -240,6 +241,7 @@ def test_houses_eat_raw_fruit_as_food() -> None:
 def test_canneries_take_their_fruit_before_houses_eat_it() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
+    economy.year = 1855
     placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1), ((8, 8), BuildingKind.FOOD_PLANT, 1))
 
     trade = economy.trade(placed, holding(APPLES=3.0))
@@ -247,6 +249,19 @@ def test_canneries_take_their_fruit_before_houses_eat_it() -> None:
     eaten, _ = trade.goods_got[(BuildingKind.HOUSE, Need.FOOD)]
     assert eaten[position(trade, economy, (8, 9))] == 0.0
     assert economy.stock[(BuildingKind.FOOD_PLANT, Need.FRUIT)][flat(economy, (8, 8))] == 3.0
+
+
+@pytest.mark.parametrize(("year", "goods"), [(1854, 10.0), (1855, 0.0)])
+def test_a_factory_works_on_lumber_alone_until_steel_comes_in_1855(year: int, goods: float) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    economy.year = year
+    placed = counts(tile_map, ((8, 8), BuildingKind.FACTORY, 1))
+
+    trade = economy.trade(placed, holding(100.0, LUMBER=10.0 / 3))
+
+    made = trade.gave[BuildingKind.FACTORY][position(trade, economy, (8, 8))]
+    assert made == pytest.approx(goods)
 
 
 def test_a_station_counts_what_it_passes_along_from_its_stockpile_by_need() -> None:

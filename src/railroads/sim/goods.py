@@ -184,6 +184,14 @@ FITS: Mapping[Need, tuple[Good, ...]] = MappingProxyType(
 # The year needs start to be felt, where that is after the game begins.
 NEED_YEARS: Mapping[Need, int] = MappingProxyType(
     {
+        Need.VODKA: 1600,
+        Need.NEWSPAPERS: 1600,
+        Need.COAL: 1700,
+        Need.COFFEE: 1700,
+        Need.CLOTHES: 1780,
+        Need.REFINED_SUGAR: 1800,
+        Need.SHOES: 1850,
+        Need.STEEL: 1855,
         Need.TOOLS: 1870,
         Need.MACHINERY: 1870,
         Need.COPPER: 1880,
@@ -212,9 +220,9 @@ GOOD_YEARS: Mapping[Good, int] = MappingProxyType(
         Good.CHEMICALS: 1880,
         Good.CEMENT: 1880,
         Good.COPPER: 1880,
-        Good.OIL: 1900,
+        Good.OIL: 1855,
         Good.RUBBER: 1900,
-        Good.FUEL: 1905,
+        Good.FUEL: 1856,
         Good.CARS: 1930,
         Good.PLANES: 1935,
         Good.TANKS: 1940,

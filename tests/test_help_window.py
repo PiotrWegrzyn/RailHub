@@ -37,7 +37,7 @@ def test_the_help_says_when_a_need_begins() -> None:
     [
         (BuildingKind.HOUSE, 1, 1, 0),
         (BuildingKind.ST_PAULS, 2137, 1, 0),
-        (BuildingKind.FACTORY, 10, 3, 0),
+        (BuildingKind.FACTORY, 10, 3, 1780),
         (BuildingKind.AIRPORT, 200, 1, 1920),
     ],
 )
