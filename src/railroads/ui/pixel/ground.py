@@ -275,6 +275,10 @@ class Ground:
         self.elevation = elevation
         self._biomes = biome_grid(tile_map)
         land = tile_map.terrain == Terrain.LAND
+        self._land = land
+        # The cells round each cell that points AROUND a point in it can lie in, and where cells
+        # round a cell lie off the map, which never change.
+        self._round, self._off_round = _cells_round(tile_map.grid)
         # Each cell's Satisfaction, or -1 where nothing trades.
         self.satisfaction = np.full(tile_map.grid.shape, -1, dtype=np.int8)
         self._hills = land & (tile_map.relief == Relief.HILLS)
@@ -303,8 +307,6 @@ class Ground:
         # and CLEARING where something is built, so the woods give it room.
         self._woods = np.where(built, CLEARING, np.isin(self._biomes, WOODS)).astype(np.float32)
         grid = self.tile_map.grid
-        self._unsure_woods = _unsure_woods(grid, self._woods)
-        self._land = self.tile_map.terrain == Terrain.LAND
         self._plots = plots_of(self.constructions, FIELD_KINDS)
         # Where each kind's fields sit in the picture, to find those near a block quickly.
         self._plot_pixels: dict[BuildingKind, tuple[FloatArray, FloatArray]] = {}
@@ -682,12 +684,13 @@ class Ground:
         land where the woods' share of the ground round it, frayed by noise, is over half.
 
         A pixel takes the share of the cells AROUND it, which all lie in its own cell or the
-        cells round it, so outside `_unsure_woods` cells the share is its own cell's say (or no
-        woods are near), without looking. Woods cover all of a share of 1 whatever the noise,
-        and none of a share of 0 or less, so only shares between need the noise."""
+        cells round it, so where those cells all have the same say as its own, the share is its
+        own cell's say, and where none has woods there are no woods, without looking. Woods
+        cover all of a share of 1 whatever the noise, and none of a share of 0 or less, so only
+        shares between need the noise."""
         grid = self.tile_map.grid
         share = self._woods[r, c]
-        unsure = self._unsure_woods[r, c]
+        unsure = self._unsure_woods(r, c)
         if unsure.any():
             x, y = points.plane(*block)
             x, y = x[unsure], y[unsure]
@@ -707,6 +710,19 @@ class Ground:
             edge = noise(fx, fy, 0.55, 61) * 0.55 + noise(fx, fy, 0.16, 62) * 0.3
             woods[frayed] = share[frayed] + (edge - 0.42) * 0.9 > 0.5
         return woods
+
+    def _unsure_woods(self, r: IntArray, c: IntArray) -> BoolArray:
+        """Which of these cells have woods among the cells round them and another say than
+        their own, or lie where cells round them are off the map: where the woods' share of the
+        ground at a point can't be told from its own cell alone. Worked out for just the cells
+        between the first and last row and column asked about."""
+        top, left = int(r.min()), int(c.min())
+        block = (slice(top, int(r.max()) + 1), slice(left, int(c.max()) + 1))
+        here = self._woods[block]
+        there = self._woods.ravel()[self._round[(slice(None), *block)]]
+        unlike = self._off_round[block] | (there != here).any(axis=0)
+        wooded = (here > 0) | (there > 0).any(axis=0)
+        return (unlike & wooded)[r - top, c - left]
 
     def _tree_shade(self, left: int, top: int, shape: tuple[int, ...]) -> FloatArray:
         """How deep in a tree's shade each pixel of a block from (`left`, `top`) lies, from 0 to
@@ -1079,24 +1095,21 @@ def _biome_table(biomes: tuple[Biome, ...]) -> BoolArray:
     return table
 
 
-def _unsure_woods(grid: Grid, woods: FloatArray) -> BoolArray:
-    """The cells where the woods' share of the ground at a point can't be told from the cell
-    alone: those with woods among the cells AROUND a point in them can reach and with another
-    say than their own among them, or on the map's edge, where cells round them lie off it.
-    Elsewhere every point's share is its own cell's say, or no woods are near."""
+def _cells_round(grid: Grid) -> tuple[npt.NDArray[np.int32], BoolArray]:
+    """The flat index of each cell round every cell in each direction of `_round`, held to the
+    map, and the cells on the map's edge or with a cell round them off it."""
     rows, cols = np.indices(grid.shape)
     x, y = grid.center(rows, cols)
-    unlike = np.zeros(grid.shape, dtype=bool)
-    unlike[[0, -1], :] = True
-    unlike[:, [0, -1]] = True
-    wooded = woods > 0
+    off = np.zeros(grid.shape, dtype=bool)
+    off[[0, -1], :] = True
+    off[:, [0, -1]] = True
+    round_ = []
     for dx, dy in _round(grid):
         r, c = grid.cell_at(x + dx, y + dy)
-        unlike |= ~grid.contains(r, c)
+        off |= ~grid.contains(r, c)
         r, c = np.clip(r, 0, grid.rows - 1), np.clip(c, 0, grid.cols - 1)
-        unlike |= woods[r, c] != woods
-        wooded |= woods[r, c] > 0
-    return unlike & wooded
+        round_.append((r * grid.cols + c).astype(np.int32))
+    return np.stack(round_), off
 
 
 def _round(grid: Grid) -> FloatArray:
