@@ -209,14 +209,18 @@ pixels per art pixel.
     during loading.
   - **Web workers** (`web_painter`, `copies`, `web/painter.js`): in the browser, where Python
     can't start threads, the page starts up to four web workers, each a Python of its own with a
-    copy of the pixel world, pickled whole and kept up with the buildings, track, forests and
-    satisfaction it changes with. Several chunks are drawn at once while the frames carry on.
-    Until a worker is ready, or if all of them fail, chunks are drawn on the frames, one a frame,
-    once the map and the mouse stand still. `?painters=N` on the page sets how many start.
-  - **Sharper mountains** (`layer`): a chunk where hills or mountains rise shows first as it is
-    quickly drawn, then is drawn again with the heights, lift and colours of its raised ground at
-    2× (about 0.3 s), which takes its place once ready. A chunk drawn again because something in
-    it changed is refined again the same way.
+    copy of the pixel world, pickled whole while a game loads and kept up with the buildings,
+    track, forests and satisfaction it changes with. Several chunks are drawn at once while the
+    frames carry on. Until a worker is ready, or if all of them fail, chunks are drawn on the
+    frames, one a frame, once the map and the mouse stand still. `?painters=N` on the page sets
+    how many start. The page copies the bytes the workers are sent and send back straight from
+    and into Python's memory by their address there, as Pyodide's own conversions go wrong once
+    that memory passes 2 GiB.
+  - **Sharper mountains** (`layer`): on the desktop, a chunk where hills or mountains rise shows
+    first as it is quickly drawn, then is drawn again with the heights, lift and colours of its
+    raised ground at 2× (about 0.3 s), which takes its place once ready. A chunk drawn again
+    because something in it changed, or let go to save memory, is refined again the same way. The
+    browser shows raised chunks as quickly drawn, whether the frames or the workers draw them.
   - **Month turns** touch only what changed: building spots and field plots are kept per cell
     (`ui.building_spots`), the smooth ground picture is touched up only in cells whose colour changed
     (`ui.ground`), and the autosave starts on the frame after the turn.
