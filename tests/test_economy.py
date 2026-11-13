@@ -348,16 +348,52 @@ def test_new_works_turn_their_inputs_into_their_goods(
     assert trade.gathered[STATION][made] == pytest.approx(amount)
 
 
-def test_a_brewery_takes_wheat_before_houses_eat_it_and_its_beer_quenches_them() -> None:
+def test_a_brewery_takes_its_hops_and_its_beer_quenches_houses() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1), ((8, 8), BuildingKind.BREWERY, 1))
 
-    trade = economy.trade(placed, holding(WHEAT=3.0, BEER=1.0))
+    trade = economy.trade(placed, holding(HOPS=3.0, BEER=1.0))
 
     drunk, _ = trade.goods_got[(BuildingKind.HOUSE, Need.BEER)]
-    assert economy.stock[(BuildingKind.BREWERY, Need.WHEAT)][flat(economy, (8, 8))] == 3.0
     assert drunk[position(trade, economy, (8, 9))] == 1.0
+
+
+@pytest.mark.parametrize(("barrels", "beer"), [(0.0, 40.0), (2.0, 60.0), (4.0, 80.0), (9.0, 80.0)])
+def test_barrels_let_a_brewery_make_up_to_twice_the_beer_from_its_hops(
+    barrels: float, beer: float
+) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 8), BuildingKind.BREWERY, 1))
+
+    trade = economy.trade(placed, holding(100.0, HOPS=10.0, BARRELS=barrels))
+
+    made = trade.gathered[STATION].get(Good.BEER, 0.0)
+    assert made == pytest.approx(beer)
+
+
+def test_a_brewery_makes_no_beer_from_barrels_without_hops() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 8), BuildingKind.BREWERY, 1))
+
+    trade = economy.trade(placed, holding(100.0, BARRELS=10.0))
+
+    assert trade.gathered[STATION].get(Good.BEER, 0.0) == 0.0
+
+
+@pytest.mark.parametrize(("wheat", "cattle"), [(0.0, 10.0), (60.0, 15.0), (120.0, 20.0)])
+def test_wheat_lets_a_cattle_ranch_raise_up_to_twice_the_cattle(
+    wheat: float, cattle: float
+) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 8), BuildingKind.CATTLE_RANCH, 1))
+
+    trade = economy.trade(placed, holding(100.0, WHEAT=wheat))
+
+    assert trade.gathered[STATION].get(Good.CATTLE, 0.0) == pytest.approx(cattle)
 
 
 def test_flax_spins_into_clothes_like_wool_and_cotton() -> None:

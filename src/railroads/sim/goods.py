@@ -15,13 +15,14 @@ starts later is left out of a recipe until its year.
 What a building needs is split in two. Its demands (demands_of) are what it must get to be
 satisfied. Its bonus goods (bonus_of, from BONUS_NEEDS) it can do without, but each one it gets
 raises its satisfaction above what its demands give (railroads.sim.economy). Processors have no
-bonus goods: their inputs make what they make. A building other than a producer whose every need
-is a bonus good keeps them all as demands, since getting them is what it is there for; animal
-farms make their animals without wheat, and fatten them faster with it.
+bonus goods: their inputs make what they make. A building that makes nothing whose every need is
+a bonus good keeps them all as demands, since getting them is what it is there for. A building
+that makes goods has boosts instead (boosts_of): what it can do without but makes up to BOOST_MOST
+more with, as barrels for a brewery and wheat for animals.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from functools import cache
 from types import MappingProxyType
@@ -337,11 +338,13 @@ TRAVELLERS = (Good.PASSENGERS, Good.MAIL)
 @dataclass(frozen=True, slots=True)
 class Recipe:
     """What a processor makes, the most of it one building makes in a month, and how much of
-    each input every unit of it takes."""
+    each input every unit of it takes; and the inputs it can do without that make it make up to
+    BOOST_MOST more (boosts), and how much of each every unit it makes takes for that."""
 
     makes: Good
     most: float
     per_unit: Mapping[Need, float]
+    boosts: Mapping[Need, float] = field(default_factory=dict)
 
     def inputs(self, year: int) -> Mapping[Need, float]:
         """What every unit takes in a given year: an input whose need starts later is left out
@@ -364,6 +367,10 @@ def _inputs(recipe: Recipe, year: int) -> Mapping[Need, float]:
         kept = _RECIPE_INPUTS[(id(recipe), year)] = (recipe, MappingProxyType(inputs))
     return kept[1]
 
+
+# How much more a building makes with all of what boosts it (boosts_of): its share of its boosts
+# times this.
+BOOST_MOST = 1.0
 
 RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
     {
@@ -398,9 +405,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
         BuildingKind.BRICKWORKS: Recipe(Good.BRICKS, 100, {Need.CLAY: 0.5, Need.COAL: 0.25}),
         BuildingKind.CEMENT_WORKS: Recipe(Good.CEMENT, 100, {Need.LIMESTONE: 0.5, Need.COAL: 0.25}),
         BuildingKind.GLASSWORKS: Recipe(Good.GLASS, 60, {Need.SAND: 0.5, Need.COAL: 0.25}),
-        BuildingKind.BREWERY: Recipe(
-            Good.BEER, 160, {Need.WHEAT: 0.25, Need.HOPS: 0.25, Need.BARRELS: 0.1}
-        ),
+        BuildingKind.BREWERY: Recipe(Good.BEER, 160, {Need.HOPS: 0.25}, {Need.BARRELS: 0.1}),
         BuildingKind.DISTILLERY: Recipe(Good.VODKA, 40, {Need.POTATOES: 0.5, Need.GLASS: 0.1}),
         BuildingKind.TANNERY: Recipe(Good.LEATHER, 40, {Need.LIVESTOCK: 0.5}),
         BuildingKind.MEAT_FACTORY: Recipe(Good.MEAT, 60, {Need.ANIMALS: 0.5}),
@@ -569,7 +574,10 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.CATHEDRAL: {Need.WAX: 60, Need.INCENSE: 40},
         BuildingKind.ST_PAULS: {Need.WAX: 200, Need.INCENSE: 120},
         **{
-            kind: {need: recipe.most * amount for need, amount in recipe.per_unit.items()}
+            kind: {
+                need: recipe.most * amount
+                for need, amount in {**recipe.per_unit, **recipe.boosts}.items()
+            }
             for kind, recipe in RECIPES.items()
         },
     }
@@ -595,6 +603,7 @@ PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.CLAY,
     Need.LIMESTONE,
     Need.SAND,
+    Need.WHEAT,
     Need.LIVESTOCK,
     Need.HOPS,
     BuildingKind.STEEL_MILL,
@@ -647,7 +656,6 @@ PIPELINE: tuple[Need | BuildingKind, ...] = (
     BuildingKind.PLANE_FACTORY,
     Need.PLANES,
     Need.HEATING,
-    Need.WHEAT,
     BuildingKind.BAKERY,
     BuildingKind.BREWERY,
     Need.BEER,
@@ -722,11 +730,29 @@ def needs_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
 
 
 @cache
+def boosts_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
+    """What a kind of building that makes goods can do without but makes up to BOOST_MOST more
+    with, and how much of each it needs in a month for all of that: a processor's recipe boosts,
+    and the bonus goods of one that makes goods from the land, such as wheat for its animals."""
+    recipe = RECIPES.get(kind)
+    if recipe is not None:
+        boosts = {need: recipe.most * amount for need, amount in recipe.boosts.items()}
+        needs = needs_of(kind, year)
+        return MappingProxyType({need: amount for need, amount in boosts.items() if need in needs})
+    if kind not in MAKES:
+        return MappingProxyType({})
+    return MappingProxyType(
+        {need: amount for need, amount in needs_of(kind, year).items() if need in BONUS_NEEDS}
+    )
+
+
+@cache
 def bonus_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
-    """The bonus goods among what a kind of building needs in a month in a given year."""
+    """The bonus goods among what a kind of building needs in a month in a given year; those of
+    buildings that make goods boost what they make instead (boosts_of)."""
     needs = needs_of(kind, year)
     bonus = {need: amount for need, amount in needs.items() if need in BONUS_NEEDS}
-    if kind in RECIPES or (len(bonus) == len(needs) and kind not in MAKES):
+    if kind in MAKES or len(bonus) == len(needs):
         return MappingProxyType({})
     return MappingProxyType(bonus)
 
@@ -734,8 +760,8 @@ def bonus_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
 @cache
 def demands_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
     """What a kind of building must get in a month in a given year to be satisfied: its needs
-    that are not bonus goods."""
-    bonus = bonus_of(kind, year)
+    that are neither bonus goods nor boosts."""
+    left_out = {**bonus_of(kind, year), **boosts_of(kind, year)}
     return MappingProxyType(
-        {need: amount for need, amount in needs_of(kind, year).items() if need not in bonus}
+        {need: amount for need, amount in needs_of(kind, year).items() if need not in left_out}
     )

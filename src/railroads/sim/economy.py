@@ -42,6 +42,7 @@ import numpy.typing as npt
 from railroads.sim.clock import START_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.goods import (
+    BOOST_MOST,
     FITS,
     HANDED_OUT,
     MAKES,
@@ -51,6 +52,7 @@ from railroads.sim.goods import (
     Good,
     Need,
     bonus_of,
+    boosts_of,
     makes_of,
     needs_of,
 )
@@ -347,6 +349,9 @@ class _Month:
         self.count = {k: n[cells].astype(np.float64) for k, n in flat.items() if n[cells].any()}
         self.zero = np.zeros(cells.size)
         self.priority = economy.levels[cells]
+        for kind, recipe in RECIPES.items():
+            for need in {**recipe.per_unit, **recipe.boosts}:
+                economy.stock.setdefault((kind, need), np.zeros(economy.cells))
         self.stock = {
             (kind, need): np.minimum(
                 economy.stock[(kind, need)][cells], INPUT_STOCK * self.count.get(kind, self.zero)
@@ -372,6 +377,10 @@ class _Month:
             for good, amount in makes_of(kind, economy.year).items():
                 self.offers[(kind, good)] = self.count[kind] * amount
                 self.offered[good] += self.count[kind] * amount
+        # Per kind of processor, what it makes from its inputs alone, and the share it has of each
+        # of its boosts; per kind making goods from the land, the share it has of its boosts.
+        self.boosted: dict[BuildingKind, tuple[FloatCells, dict[Need, FloatCells]]] = {}
+        self.raw_boost: dict[BuildingKind, FloatCells] = {}
         self.received: dict[tuple[BuildingKind, Need], FloatCells] = {}
         self.brought = {station: dict(order.brought) for station, order in stations.items()}
         self.stockpiled = {station: dict(order.stockpile) for station, order in stations.items()}
@@ -421,7 +430,10 @@ class _Month:
         wants = {}
         for kind, n in self.count.items():
             recipe = RECIPES.get(kind)
-            if recipe is not None and need in recipe.inputs(self.economy.year):
+            year = self.economy.year
+            if recipe is not None and (
+                need in recipe.inputs(year) or need in boosts_of(kind, year)
+            ):
                 wants[kind] = np.maximum(INPUT_STOCK * n - self.stock[(kind, need)], 0.0)
             elif recipe is None and need in needs_of(kind, self.economy.year):
                 wants[kind] = n * NEEDS[kind][need]
@@ -464,6 +476,24 @@ class _Month:
             self.received[key] = self.received.get(key, self.zero) + got
             if kind in RECIPES:
                 self.stock[key] = self.stock[key] + got
+            else:
+                self._boost_from_land(kind, need, got)
+
+    def _boost_from_land(self, kind: BuildingKind, need: Need, got: FloatCells) -> None:
+        """Lets what a kind making goods from the land got of one of its boosts make it make more
+        of each of its goods, before any of them is sold."""
+        boosts = boosts_of(kind, self.economy.year)
+        if need not in boosts:
+            return
+        wanted = self.count[kind] * boosts[need]
+        share = np.minimum(got / np.where(wanted > 0, wanted, 1.0), 1.0) * (wanted > 0)
+        share = share / len(boosts)
+        before = self.raw_boost.get(kind, self.zero)
+        self.raw_boost[kind] = before + share
+        for good, amount in makes_of(kind, self.economy.year).items():
+            more = self.count[kind] * amount * BOOST_MOST * share
+            self.offers[(kind, good)] = self.offers[(kind, good)] + more
+            self.offered[good] = self.offered[good] + more
 
     def _sell_nearby(self, good: Good, demand: FloatCells, received: FloatCells) -> None:
         """Lets the cells with spare goods sell them to the buildings still short of them, the
@@ -545,13 +575,26 @@ class _Month:
                 stockpiled[good] = stockpiled.get(good, 0.0) + taken
 
     def _produce(self, kind: BuildingKind) -> None:
-        """Offers what a kind of processor could make from its stockpile."""
+        """Offers what a kind of processor could make from its stockpile: what its inputs allow,
+        and up to BOOST_MOST more by the share it has of its boosts."""
         if kind not in self.count:
             return
         recipe = RECIPES[kind]
         can = self.count[kind] * recipe.most
         for need, per_unit in recipe.inputs(self.economy.year).items():
             can = np.minimum(can, self.stock[(kind, need)] / per_unit)
+        boosts = boosts_of(kind, self.economy.year)
+        if boosts:
+            shares = {
+                need: np.minimum(
+                    self.stock[(kind, need)] / np.where(can > 0, can * recipe.boosts[need], 1.0),
+                    1.0,
+                )
+                * (can > 0)
+                for need in boosts
+            }
+            self.boosted[kind] = (can, shares)
+            can = can * (1.0 + BOOST_MOST * sum(shares.values()) / len(shares))
         self.offers[(kind, recipe.makes)] = can
         self.offered[recipe.makes] += can
 
@@ -577,7 +620,7 @@ class _Month:
                 part = np.minimum(received, wanted) / np.where(wanted > 0, wanted, 1.0)
                 bonus[kind] = bonus.get(kind, self.zero) + part
                 continue
-            if kind in RECIPES:
+            if kind in RECIPES or need in boosts_of(kind, self.economy.year):
                 continue
             got[kind] += np.minimum(received, wanted)
             needed[kind] += wanted
@@ -591,9 +634,15 @@ class _Month:
             could_make[kind] += most
             recipe = RECIPES.get(kind)
             if recipe is not None:
-                for need, per_unit in recipe.inputs(self.economy.year).items():
+                went = np.where(offer > 0, sent / np.where(offer > 0, offer, 1.0), 0.0)
+                base, shares = self.boosted.get(kind, (offer, {}))
+                used = {
+                    **{need: base * per for need, per in recipe.inputs(self.economy.year).items()},
+                    **{need: base * share * recipe.boosts[need] for need, share in shares.items()},
+                }
+                for need, amount in used.items():
                     key = (kind, need)
-                    self.stock[key] = np.maximum(self.stock[key] - sent * per_unit, 0.0)
+                    self.stock[key] = np.maximum(self.stock[key] - went * amount, 0.0)
         for key, stock in self.economy.stock.items():
             stock[:] = 0.0
             stock[self.cells] = self.stock[key]
