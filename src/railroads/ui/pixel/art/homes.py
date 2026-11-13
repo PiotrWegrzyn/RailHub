@@ -1,4 +1,4 @@
-"""Houses, tenements, flats, skyscrapers and woodcutters' huts."""
+"""Houses, tenements, flats and skyscrapers."""
 
 from railroads.ui.pixel.art.painter import (
     BRICK,
@@ -138,34 +138,6 @@ def house(wall: RGB, roof: RGB) -> Sprite:
     _, ridge_front = _ridge(top, 4)
     p.point(ridge_front[0] - 0.5, ridge_front[1] + 1.6, shade(WINDOW, 0.8))
     _chimney_on(p, top, 4, 0.35, 1.4)
-    return p.sprite()
-
-
-def woodcutter() -> Sprite:
-    """A woodcutter's hut of logs under a shingled roof with a chimney, a chopping block with an
-    axe in it by the door and a stack of logs cut to show their rings."""
-    log, roof, cut = (118, 82, 50), (84, 72, 60), (204, 168, 116)
-    p = Painter(19, 15, (8, 11))
-    p.shadow(6, 2)
-    top = p.box(0, 0, 5, 3.4, log, None)
-    left, front, right, _ = top
-    for height in (1.1, 2.0, 2.9):
-        p.line(
-            [_on_wall(left, front, 0, height), _on_wall(left, front, 1, height)], shade(log, 0.7)
-        )
-        p.line(
-            [_on_wall(front, right, 0, height), _on_wall(front, right, 1, height)], shade(log, 0.5)
-        )
-    _patch(p, left, front, (0.42, 0.62), (1.2, 3.4), DOOR)
-    _window(p, front, right, (0.35, 0.6), 1.0, shade(WINDOW, 0.8))
-    _foot(p, top, 3.4)
-    p.gable(top, 3.4, roof, log)
-    _chimney_on(p, top, 3.4, 0.3, 1.2)
-    for x, y in ((6.2, 2.6), (7.6, 2.6), (6.9, 1.4)):
-        p.ellipse(x - 0.8, y - 0.8, x + 0.8, y + 0.8, cut)
-        p.point(x, y, shade(cut, 0.7))
-    p.rect(-6.6, 1.6, -5.4, 2.8, shade(log, 0.8))
-    p.line([(-6, 1.6), (-5.2, 0.4)], METAL)
     return p.sprite()
 
 
