@@ -9,9 +9,10 @@ pixels are saved too. Last, every cell round a flat chunk and a hilly one that w
 filled with fields and groves, crowded far more than any real farmland, and both are drawn again.
 
 Run it on the code before a change, then on the code after; the check names every difference:
-    uv run python tools/chunk_pixels.py save before.npz
-    uv run python tools/chunk_pixels.py check before.npz
-Building the game takes a while, so `--game` keeps it in a save file to start from next time.
+    uv run python tools/chunk_pixels.py save build/chunks.npz --game build/chunks-game.save
+    uv run python tools/chunk_pixels.py check build/chunks.npz --game build/chunks-game.save
+Building the game takes a while, so `--game` keeps it in a save file to start from next time. Both
+files go under build/, which git leaves out.
 """
 
 import argparse

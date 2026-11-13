@@ -38,7 +38,7 @@ WAITING_WIDTH = 320.0
 WINDOW_SIZE = (1280.0, 800.0)
 # Saves are written one at a time, away from the frames, so play doesn't stutter. Where threads
 # cannot start, an autosave is written a step at a time from the frame after it was asked for,
-# each frame spending up to WRITING_SECONDS on it.
+# each frame spending about WRITING_SECONDS on it: steps until that much has passed, one at least.
 WRITER = worker("saves")
 WRITING_SECONDS = 0.004
 

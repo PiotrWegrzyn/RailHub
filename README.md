@@ -124,6 +124,16 @@ It grows a seeded map of Poland and builds and plays on it through the map view'
 Then it hashes the buildings, money, trains, goods, history, messages, rendered chunks and
 planned routes.
 
+To check that a change to the drawing code left every pixel of the map as it was, save the
+pixels of a fixed set of chunks before it and check them after it. The chunks cover flat land,
+coast, towns, fields, woods, hills, mountains, track and stations, at both resolutions and every
+way they are drawn; `--game` keeps the game it grows to start from next time:
+
+```bash
+uv run python tools/chunk_pixels.py save build/chunks.npz --game build/chunks-game.save
+uv run python tools/chunk_pixels.py check build/chunks.npz --game build/chunks-game.save
+```
+
 ## Maps
 
 A map is a grid of hexagon cells (the grids can also be squares, which the game no longer uses),
@@ -200,8 +210,8 @@ pixels per art pixel.
     and every zoom on a Retina screen), track, trees and buildings are drawn at 2× from the finer
     sprite sheet, so their outlines and windows stay thin. Ground, hills and mountains are worked
     out at 1× and blown up.
-  - **Cost:** a chunk takes about 30 ms to draw, or about 80 ms over mountains. The heights are
-    worked out once, about 0.3 s when the pixel map is first shown.
+  - **Cost:** at 2×, a chunk takes about 30 ms to draw on the desktop, or about 65 ms over
+    mountains. The heights are worked out once, about 0.3 s when the pixel map is first shown.
   - **Drawn in the background** (`layer`, `painter`): chunks are drawn on a thread of their own,
     never inside a frame, so panning and month turns don't stall on them. Until a chunk is ready
     the ground beneath shows, and a chunk that changed keeps its old texture. The painter draws
@@ -219,7 +229,7 @@ pixels per art pixel.
     that memory passes 2 GiB.
   - **Sharper mountains** (`layer`): on the desktop, a chunk where hills or mountains rise shows
     first as it is quickly drawn, then is drawn again with the heights, lift and colours of its
-    raised ground at 2× (about 0.3 s), which takes its place once ready. A chunk drawn again
+    raised ground at 2× (about 0.15 s), which takes its place once ready. A chunk drawn again
     because something in it changed, or let go to save memory, is refined again the same way. The
     browser shows raised chunks as quickly drawn, whether the frames or the workers draw them.
   - **Month turns** touch only what changed: building spots and field plots are kept per cell
