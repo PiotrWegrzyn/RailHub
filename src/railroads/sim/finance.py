@@ -14,9 +14,11 @@ from railroads.sim.track_rules import track_rules_for
 
 START_CASH = 80_000.0
 # Track costs TRACK_PRICE per cell times its bed's cost factor (railroads.sim.track_rules), and
-# electrifying it ELECTRIC_TRACK_PRICE more; double track costs DOUBLE_TRACK_FACTOR as much.
+# electrifying it ELECTRIC_TRACK_PRICE more, or making it a maglev guideway MAGLEV_TRACK_PRICE
+# more; double track costs DOUBLE_TRACK_FACTOR as much.
 TRACK_PRICE = 300.0
 ELECTRIC_TRACK_PRICE = 450.0
+MAGLEV_TRACK_PRICE = 4_000.0
 DOUBLE_TRACK_FACTOR = 1.8
 STATION_PRICE = 15_000.0
 TRAIN_PRICE = 5_000.0
@@ -32,9 +34,11 @@ ENGINE_SHED_PRICE = 40_000.0
 SAND_TOWER_PRICE = 25_000.0
 STATION_UPKEEP = 200.0
 # Every cell of track costs TRACK_UPKEEP a month, ELECTRIC_TRACK_UPKEEP more where it is
-# electric, and DOUBLE_TRACK_FACTOR as much where it is double.
+# electric, MAGLEV_TRACK_UPKEEP more where it is maglev, and DOUBLE_TRACK_FACTOR as much where
+# it is double.
 TRACK_UPKEEP = 2.0
 ELECTRIC_TRACK_UPKEEP = 3.0
+MAGLEV_TRACK_UPKEEP = 25.0
 
 
 def track_price(piece: Track, tile: Tile) -> float:
@@ -42,6 +46,8 @@ def track_price(piece: Track, tile: Tile) -> float:
     price = TRACK_PRICE * track_rules_for(tile, piece.bed).price_factor
     if piece.electric:
         price += ELECTRIC_TRACK_PRICE
+    if piece.maglev:
+        price += MAGLEV_TRACK_PRICE
     return price * (DOUBLE_TRACK_FACTOR if piece.width == TrackWidth.DOUBLE else 1.0)
 
 
@@ -51,6 +57,7 @@ def track_upkeep(pieces: Iterable[Track]) -> float:
     dearest: dict[tuple[int, int], float] = {}
     for piece in pieces:
         upkeep = TRACK_UPKEEP + (ELECTRIC_TRACK_UPKEEP if piece.electric else 0.0)
+        upkeep += MAGLEV_TRACK_UPKEEP if piece.maglev else 0.0
         upkeep *= DOUBLE_TRACK_FACTOR if piece.width == TrackWidth.DOUBLE else 1.0
         dearest[piece.cell] = max(upkeep, dearest.get(piece.cell, 0.0))
     return sum(dearest.values())

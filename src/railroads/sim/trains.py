@@ -100,6 +100,7 @@ class Power(Enum):
     STEAM = "steam"
     DIESEL = "diesel"
     ELECTRIC = "electric"
+    MAGLEV = "maglev"
 
 
 # Speed 1, the Planet's, stands for this many km/h.
@@ -132,6 +133,10 @@ class Engine:
         return self.power == Power.ELECTRIC
 
     @property
+    def maglev(self) -> bool:
+        return self.power == Power.MAGLEV
+
+    @property
     def express(self) -> bool:
         return self.kind == Kind.EXPRESS
 
@@ -146,9 +151,13 @@ class Engine:
 
     def replaces(self, older: Engine) -> bool:
         """Whether it takes an older engine's place on sale: a newer one of the same line that
-        runs on the same track, so an electric never ends the sale of a steam or diesel engine."""
+        runs on the same track, so an electric never ends the sale of a steam or diesel engine,
+        nor a maglev that of anything on rails."""
         return (
-            self.line == older.line and self.electric == older.electric and self.year > older.year
+            self.line == older.line
+            and self.electric == older.electric
+            and self.maglev == older.maglev
+            and self.year > older.year
         )
 
     @property
@@ -287,15 +296,15 @@ ENGINES: dict[str, Engine] = {
         needs=("boilers", "diesel"),
     ),
     "maglev": Engine(
-        "500 km/h electric",
+        "Maglev",
         2040,
         500.0 / KMH_PER_SPEED,
         11,
         700_000.0,
         X,
-        ELECTRIC,
+        Power.MAGLEV,
         pickup=2.0,
-        needs=("express_trains", "thyristors"),
+        needs=("express_trains", "maglev"),
     ),
 }
 

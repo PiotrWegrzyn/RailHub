@@ -128,13 +128,13 @@ def test_the_specialised_classes_come_soon_after_1850_and_need_their_tech() -> N
     assert not {"goods", "single"} & set(without.engines())
 
 
-def test_the_game_ends_with_a_500_kmh_electric_and_a_diesel_pulling_forty_cars() -> None:
+def test_the_game_ends_with_a_500_kmh_maglev_and_a_diesel_pulling_forty_cars() -> None:
     railway = knowing(line(), *EVERY_NODE)
     railway.year = 2040
 
     engines = {name: ENGINES[name] for name in railway.engines()}
 
-    assert any(e.electric and e.kmh == pytest.approx(500.0) for e in engines.values())
+    assert any(e.maglev and e.kmh == pytest.approx(500.0) for e in engines.values())
     assert any(e.power.value == "diesel" and e.cars == 40 for e in engines.values())
 
 

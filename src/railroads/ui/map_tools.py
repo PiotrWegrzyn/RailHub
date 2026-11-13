@@ -49,7 +49,9 @@ class MapTools:
                     build.track_from = cell
                     build.say("Now click where the track goes.")
                     return
-                done = game.lay_track(build.track_from, cell, build.track_width, build.electric)
+                done = game.lay_track(
+                    build.track_from, cell, build.track_width, build.electric, build.maglev
+                )
                 build.say(done.message)
                 if not done.ok:
                     return
@@ -146,7 +148,12 @@ class MapTools:
                 return
             build.preview_to = cell
             build.preview = plan_route(
-                constructions, build.track_from, cell, build.track_width, build.electric
+                constructions,
+                build.track_from,
+                cell,
+                build.track_width,
+                build.electric,
+                build.maglev,
             )
             build.preview_price = (
                 None if build.preview is None else route_price(constructions, build.preview)

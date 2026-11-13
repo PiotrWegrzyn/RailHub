@@ -324,6 +324,10 @@ def _other(construction: Construction, growth: Growth) -> str:
                 return "station"
             return f"station: {growth.railway.name_of(construction.cell)}"
         case Track():
-            electric = ", electric" if construction.electric else ""
-            return f"track ({construction.width.name.lower()}, {construction.bed.name.lower()}{electric})"
+            kind = (
+                ", maglev" if construction.maglev else ", electric" if construction.electric else ""
+            )
+            return (
+                f"track ({construction.width.name.lower()}, {construction.bed.name.lower()}{kind})"
+            )
     return str(construction)

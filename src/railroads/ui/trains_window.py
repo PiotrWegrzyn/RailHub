@@ -383,6 +383,8 @@ def engine_summary(engine: Engine) -> str:
         lines.append(f"Passengers only, paying {EXPRESS_FARE - 1:.0%} more")
     if engine.electric:
         lines.append("Runs on electrified track only")
+    if engine.maglev:
+        lines.append("Runs on maglev track only")
     return "\n".join(lines)
 
 

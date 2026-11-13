@@ -276,7 +276,8 @@ Every cell has room for 6 units:
 - Single track takes 1 unit and double track 2, so a cell with a double track still fits four
   houses. Either can be electric, with wires overhead that electric engines need: `Track.electric`
   says so for a piece, and `Constructions.electrified(cell)` for a cell (every piece in it, or
-  the piece between two given track points).
+  the piece between two given track points). Or it can be maglev (`Track.maglev`): a concrete
+  guideway with no rails or wires, which only maglev engines run on, and they on nothing else.
 - Track lies on the ground, on a bridge over a river or lake (x5 cost), or in a tunnel through
   mountains (x8 cost).
 - A station fills its whole cell. Its own track runs straight through it one way (across,
@@ -635,13 +636,15 @@ is balanced around: five cars at 60 km/h for $5,000. Beside it come cheap light 
 fewer cars, and soon after heavy freight engines, slower but pulling two more cars, and express
 engines, fast and dear, that carry only passengers, who pay 20% more on them, and always lead with
 a dining car that carries nothing but weighs and costs its trips like any other car. From then on
-each line gets better engines, up to 500 km/h electrics and diesels pulling 40 cars by 2040. An
+each line gets better engines, up to a 500 km/h maglev and diesels pulling 40 cars by 2040. An
 engine is sold only until a newer one of its line, running on the same track, can be bought: an
-electric never ends the sale of a steam or diesel engine. Engines built to pull more cars are
+electric never ends the sale of a steam or diesel engine, nor the maglev that of the fastest
+electric. Engines built to pull more cars are
 slowed less by each: a full train as long as its engine is built for slows it as much as five
 full cars slow the Planet. Some lines and kinds of power need a tech node: heavy freight Heavy
 boilers, express Express trains, diesels Diesel engines, electrics Electric traction or, for the
-fast ones, Thyristor control, and steam engines from 1900 on Superheaters.
+fast ones, Thyristor control, the maglev Magnetic levitation (after Thyristor control), and steam
+engines from 1900 on Superheaters.
 
 | Engine | Class | From | Needs | Power | Speed | To full speed | Cars | Price |
 |---|---|---|---|---|---|---|---|---|
@@ -675,9 +678,10 @@ fast ones, Thyristor control, and steam engines from 1900 on Superheaters.
 | Twin-unit diesel | heavy freight | 1995 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 84 km/h | 5 s | 20 | $140,000 |
 | Modern electric | general | 2000 | Thyristor control (modern) | electric | 180 km/h | 2.5 s | 12 | $120,000 |
 | Super-heavy diesel | heavy freight | 2040 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 90 km/h | 6 s | 40 | $300,000 |
-| 500 km/h electric | express | 2040 | Express trains (passengers), Thyristor control (modern) | electric | 500 km/h | 2 s | 11 + dining car | $700,000 |
+| Maglev | express | 2040 | Express trains (passengers), Magnetic levitation (modern) | maglev | 500 km/h | 2 s | 11 + dining car | $700,000 |
 
-Electric engines run only on electrified track. A train's engine is chosen when it is bought.
+Electric engines run only on electrified track, and the maglev only on maglev track, which can be
+laid once it is on sale. A train's engine is chosen when it is bought.
 Every train sets off from a stand, from a stop or after letting another train by, and picks up
 speed evenly until it runs at full speed after its engine's time to full speed, in seconds of play
 at normal speed.
@@ -722,9 +726,10 @@ station's name shows on a tag above it.
 A game starts with $80,000 (`railroads.sim.finance`). Track costs $300 a cell on the flat, $450
 in hills, $10,000 a cell of bridge and $20,000 a cell of tunnel; electric track $450 a cell more,
 and double track 1.8 times as much as single, wires included, so a cell on the flat costs $540
-double, $750 electric and $1,350 double and electric. A station costs $15,000 and a steam engine $5,000, which
+double, $750 electric and $1,350 double and electric; maglev track $4,000 a cell more, with no
+wires. A station costs $15,000 and a steam engine $5,000, which
 sells back for half. Every month each station costs $200 in upkeep and each cell of track $2,
-$3 more where it is electric and 1.8 times as much where it is double, charged once a cell for
+$3 more where it is electric, $25 more where it is maglev, and 1.8 times as much where it is double, charged once a cell for
 the dearest track in it (`track_upkeep`). Building needs the cash for it, but upkeep is charged
 anyway and can run into debt. The top bar shows the cash, with this month's and last month's books on hover, and the
 build bar shows what the track under the mouse would cost. Route planning still weighs hills,
@@ -781,7 +786,8 @@ as the real track would look, greyed out, once the pointer rests on a cell for a
 turns at most 60 degrees per cell, through edges or corners, bridging rivers and lakes and
 tunnelling through mountains, and makes room the same way. Each bend costs it as much as 0.6 of
 a cell of new track, so it runs straight and turns seldom instead of zigzagging. Every building it would have to move out of the way costs it as much as 2.5 cells of track, and half a cell more for each unit of room the building takes, so it goes round farms, works and towns rather than through them. Buildings sharing a cell with track stand beside it, at least a quarter of a cell from its middle. While the track tool is on, the bar
-chooses single or double track and whether it is electric. Track lays only along the way it was
+chooses single or double track and whether it is electric, or, once the maglev is on sale, maglev.
+Track lays only along the way it was
 planned: started on track already laid, its first piece branches off where that track runs on,
 turning at most 60 degrees, so trains can run from one onto the other; ended on track, its last
 piece joins it the same way, facing the way the new track was heading. A dead end there turns
@@ -789,7 +795,8 @@ to where the new track goes rather than staying as a stub, for no more than the 
 price. Where the way crosses track it crosses it in one cell, and running along track already
 laid costs the planner half as much as new track, so it follows a line rather than laying a
 second one beside it. The track it runs along is widened or electrified to match, for the
-difference in price, so laying electric track along a line electrifies it. An open end with no
+difference in price, so laying electric track along a line electrifies it, and laying maglev
+track along it turns its rails into a guideway; rails laid along a guideway leave it one. An open end with no
 track runs straight on across its cell. While placing a station, and when the
 mouse is over one, the cells it hands goods out to (2 steps away) are shaded orange, the areas of
 other stations pink, cells two stations share grey and the stations themselves blue, with a blue
@@ -831,7 +838,8 @@ is two tracks side by side that close up where they run into single track, and s
 branching off double leaves from its outer track on that side. Electric track has a wire over
 each track and a mast beside it every cell, on its far side, reaching over to the wires. Zoomed
 out, trains and track are plain shapes: two rails for double track and a dark wire beside
-electric track.
+electric track. Maglev track is a pale concrete beam with darker edges and a groove down its
+middle instead of rails and sleepers, and a station shows it where only maglev track comes in.
 
 At each stop a train unloads its cars, takes on that stop's cars and fills them from the station's
 stockpile. Unless the stop says not to, it waits there up to a month for its cars to fill, topping

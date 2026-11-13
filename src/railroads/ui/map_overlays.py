@@ -264,8 +264,10 @@ def _construction_name(construction: Construction) -> str:
             return "station"
         case Track():
             bed = "" if construction.bed == TrackBed.GROUND else f" {construction.bed.name.lower()}"
-            electric = " electric" if construction.electric else ""
-            return f"{construction.width.name.lower()}{electric} track{bed}"
+            kind = (
+                " maglev" if construction.maglev else " electric" if construction.electric else ""
+            )
+            return f"{construction.width.name.lower()}{kind} track{bed}"
 
 
 def draw_status(draw_list: imgui.ImDrawList, top_left: Vec2, bottom_right: Vec2, text: str) -> Vec2:

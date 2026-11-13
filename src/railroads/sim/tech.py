@@ -161,6 +161,14 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("thyristors", "Thyristor control", E.UNLOCK, 0.0, "relays", opens="fast electrics"),
             _n("tech_trust", "Technology giant", E.SHARE, 0.1, "patents", "automation"),
             _n("computers", "Computer timetables", E.SPEED, 0.1, "thyristors"),
+            _n(
+                "maglev",
+                "Magnetic levitation",
+                E.UNLOCK,
+                0.0,
+                "thyristors",
+                opens="maglev track and trains",
+            ),
         ),
         Tree.COMMERCE: (
             _n("books", "Double-entry books", E.DISCOUNT, 0.1),

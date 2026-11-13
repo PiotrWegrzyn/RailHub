@@ -73,7 +73,12 @@ if TYPE_CHECKING:
     from railroads.sim.station_trade import StationTrade
 
 # What new trains are called, by what drives them, before the number they were bought as.
-TRAIN_NAMES = {Power.STEAM: "Steam engine", Power.DIESEL: "Diesel", Power.ELECTRIC: "Electric"}
+TRAIN_NAMES = {
+    Power.STEAM: "Steam engine",
+    Power.DIESEL: "Diesel",
+    Power.ELECTRIC: "Electric",
+    Power.MAGLEV: "Maglev",
+}
 # How far a train runs in a month, in cells, on flat ground.
 CELLS_PER_MONTH = 60.0
 # Trains meet where points along them, MEET_STEP cells apart, come within MEET_DISTANCE cells.
@@ -124,6 +129,16 @@ class Railway:
 
     def stations(self) -> list[Cell]:
         return self.constructions.stations()
+
+    @property
+    def maglev_open(self) -> bool:
+        """Whether the player can lay maglev track: once a maglev engine's year has come and
+        they have its tech."""
+        taken = self.research.taken
+        return any(
+            engine.maglev and engine.year <= self.year and all(n in taken for n in engine.needs)
+            for engine in ENGINES.values()
+        )
 
     def engines(self) -> list[str]:
         """The engines the player can buy now: those whose year has come and whose tech they
@@ -343,10 +358,10 @@ class Railway:
         self._meet()
 
     def route(
-        self, start: Cell, end: Cell, electric: bool = False
+        self, start: Cell, end: Cell, electric: bool = False, maglev: bool = False
     ) -> tuple[list[Point], list[float]] | None:
         """The way along laid track from one station to another (TrackNetwork.route)."""
-        return self.network.route(start, end, electric)
+        return self.network.route(start, end, electric, maglev)
 
     def _run(self, train: Train, months: float) -> None:
         if len(train.stops) < 2:
@@ -368,12 +383,14 @@ class Railway:
                     train.status = f"Loading at {leaving.cell[0]}, {leaving.cell[1]}"
                     return
             here, there = leaving.cell, train.stops[train.heading % len(train.stops)].cell
-            electric = ENGINES[train.engine].electric
-            way = self.route(here, there, electric)
+            engine = ENGINES[train.engine]
+            way = self.route(here, there, engine.electric, engine.maglev)
             if way is None:
                 train.status = (
                     "No electrified track to its next stop"
-                    if electric
+                    if engine.electric
+                    else "No maglev track to its next stop"
+                    if engine.maglev
                     else "No track to its next stop"
                 )
                 return

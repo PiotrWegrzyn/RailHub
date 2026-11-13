@@ -441,6 +441,25 @@ def test_electric_track_hangs_wires_over_it(sheet: SpriteSheet) -> None:
     assert wired.any(axis=1)[: track_rows.min()].any()
 
 
+def test_maglev_track_is_a_beam_without_rails(sheet: SpriteSheet) -> None:
+    bare = track_chunk(sheet, [])[1]
+    plain = track_chunk(sheet, [Track((10, 3), (0, 6))])[1]
+
+    guideway = track_chunk(sheet, [Track((10, 3), (0, 6), maglev=True)])[1]
+
+    def rail_coloured(chunk: np.ndarray) -> int:
+        return int((np.abs(chunk[..., :3].astype(int) - RAIL).max(axis=-1) < 12).sum())
+
+    def concrete(chunk: np.ndarray) -> int:
+        rgb = chunk[..., :3].astype(int)
+        grey = rgb.max(axis=-1) - rgb.min(axis=-1) < 16
+        return int((grey & (rgb.min(axis=-1) > 150) & (rgb.max(axis=-1) < 220)).sum())
+
+    assert (guideway != bare).any()
+    assert rail_coloured(guideway) * 4 < rail_coloured(plain)
+    assert concrete(guideway) > 2 * concrete(plain)
+
+
 def test_track_keeps_one_width_on_the_screen_whichever_way_it_runs(sheet: SpriteSheet) -> None:
     bare = track_chunk(sheet, [])[1]
 
@@ -450,6 +469,27 @@ def test_track_keeps_one_width_on_the_screen_whichever_way_it_runs(sheet: Sprite
     across_width = ((across != bare).any(axis=-1)).any(axis=1).sum()
     upright_width = ((upright != bare).any(axis=-1)).any(axis=0).sum()
     assert abs(across_width - upright_width) <= 2
+
+
+@pytest.mark.parametrize(
+    ("kinds", "maglev"),
+    [((True, True), True), ((True, None), True), ((True, False), False), ((None, None), False)],
+)
+def test_a_station_shows_a_guideway_where_only_maglev_track_comes_in(
+    sheet: SpriteSheet, kinds: tuple[bool | None, bool | None], maglev: bool
+) -> None:
+    sides = ((10, 3), (10, 5))
+    line = [
+        Track(cell, (0, 6), maglev=kind)
+        for cell, kind in zip(sides, kinds, strict=True)
+        if kind is not None
+    ]
+    world, _ = track_chunk(sheet, line, stations=(Station((10, 4), (0, 6)),))
+
+    piece = world.track.station_piece((10, 4))
+
+    assert piece.maglev == maglev
+    assert not (piece.maglev and piece.electric)
 
 
 def test_track_into_a_station_runs_on_through_it_past_its_platform(sheet: SpriteSheet) -> None:
