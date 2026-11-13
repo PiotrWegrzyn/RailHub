@@ -8,6 +8,7 @@ from functools import cache
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
+from imgui_bundle import icons_fontawesome_4 as fa
 from PIL import Image
 
 from railroads.sim.goods import Good, Need
@@ -308,6 +309,23 @@ def car_chip(
     if tooltip and hovered:
         imgui.set_tooltip(tooltip)
     return clicked
+
+
+def dining_chip(key: str, tooltip: str = "") -> None:
+    """An express's dining car as a chip like car_chip's, with a cup on it."""
+    imgui.invisible_button(key, CHIP_SIZE)
+    low = imgui.get_item_rect_min()
+    high = imgui.get_item_rect_max()
+    draw_list = imgui.get_window_draw_list()
+    draw_list.add_rect_filled(low, high, color_u32(CAR_EMPTY), 3.0)
+    size = imgui.calc_text_size(fa.ICON_FA_COFFEE)
+    corner = (low.x + (high.x - low.x - size.x) / 2, low.y + (high.y - low.y - size.y) / 2)
+    draw_list.add_text(corner, color_u32(BRASS), fa.ICON_FA_COFFEE)
+    hovered = imgui.is_item_hovered()
+    edge = BRASS if hovered else (0.0, 0.0, 0.0, 0.6)
+    draw_list.add_rect(low, high, color_u32(edge), 3.0, 1.5 if hovered else 1.0)
+    if tooltip and hovered:
+        imgui.set_tooltip(tooltip)
 
 
 OFFER_SIZE = (72.0, 28.0)

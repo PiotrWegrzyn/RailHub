@@ -25,6 +25,7 @@ from railroads.ui.theme import (
     car_chip,
     color_u32,
     danger_button,
+    dining_chip,
     empty_car_slot,
     offer_chip,
 )
@@ -167,6 +168,9 @@ class TrainsWindow:
         worths = self.worth(railway, train)
         for index, (car, worth) in enumerate(zip(train.cars, worths, strict=True)):
             imgui.same_line(0, 4 if index else 12)
+            if car.dining:
+                dining_chip(f"pulled{index}", "Dining car: carries nothing, costs its trips")
+                continue
             tooltip = f"{car.good.value}: {car.load:.0f}/{car.capacity:.0f}"
             if destination is not None and car.load >= 0.5:
                 tooltip += f"\nWorth about {dollars(worth)} at {onward}"
