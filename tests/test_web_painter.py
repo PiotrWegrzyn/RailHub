@@ -108,6 +108,17 @@ def test_a_ready_worker_gets_the_world_and_paints_its_chunks() -> None:
     assert painter.waiting() == 0
 
 
+def test_workers_ready_before_a_map_is_made_get_its_world_as_it_is_made() -> None:
+    world, _, _ = world_over_mountains()
+    page = FakePage(2)
+    page.start(0, 1)
+
+    painter = WorkerPainter(world, Workers(page))
+
+    assert painter.threaded
+    assert page.kinds(0) == page.kinds(1) == ["world"]
+
+
 def test_the_most_wanted_jobs_go_out_first_a_couple_to_each_worker() -> None:
     world, mountains, plains = world_over_mountains()
     page = FakePage(1)

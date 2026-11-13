@@ -122,6 +122,9 @@ class WorkerPainter:
         # Jobs a worker could not paint, to paint on the frames instead.
         self._failed: list[tuple[Hashable, _Job]] = []
         self._number = workers.serve(self)
+        # Hearing from the workers now, as a game loads, sends them the world then rather than
+        # on the map's first frame.
+        workers.poll()
         self._join(list(workers.ready))
 
     @property
