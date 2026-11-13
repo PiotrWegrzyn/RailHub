@@ -7,8 +7,9 @@ from builders import flat_map, layer
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Trade
 from railroads.sim.grids import Cell, HexGrid
-from railroads.sim.growth import Growth, _allowed, breeding_of
+from railroads.sim.growth import SPAWN_SCALE, Growth, _allowed, breeding_of
 from railroads.sim.ladders import (
+    BAKERIES,
     FACTORIES,
     FARMS,
     FOOD_PLANTS,
@@ -658,3 +659,17 @@ def test_growing_years_at_a_step_still_closes_every_year() -> None:
     growth.run(10 * 12, np.random.default_rng(0), step=60)
 
     assert sorted(growth.history.population) == list(range(850, 860))
+
+
+@pytest.mark.parametrize(("houses", "times"), [(0, 0), (2, 2), (6, 6)])
+def test_a_bakery_is_as_likely_as_the_people_around_it(houses: int, times: int) -> None:
+    tile_map = make_map()
+    constructions = Constructions(tile_map)
+    if houses:
+        build(constructions, (5, 5), BuildingKind.HOUSE, houses)
+    growth = Growth(constructions, NO_TRADE)
+    land = BAKERIES.land.weights(tile_map)[5, 5]
+
+    chance = growth.chances(BAKERIES)[5, 5]
+
+    assert chance == pytest.approx(BAKERIES.base_chance * SPAWN_SCALE * times * land)

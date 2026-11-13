@@ -118,6 +118,11 @@ DRAWN_BY: Mapping[Points, Mapping[Points, float]] = MappingProxyType(
 )
 
 
+# Kinds that come up where people live: their spawn chance counts once for every population
+# point in the neighbourhood, and nowhere without any.
+SPAWN_BY_PEOPLE = frozenset({BuildingKind.BAKERY})
+
+
 @dataclass(frozen=True, slots=True)
 class Breeding:
     """How a ladder's buildings come up: the chance anywhere its land allows, the kind of points
@@ -128,6 +133,7 @@ class Breeding:
     own: Points
     drawn_by: Mapping[Points, float]
     per_doubling: float
+    spawn_by_people: bool = False
 
 
 _BREEDINGS: dict[tuple[int, int], tuple[Ladder, Mapping, Breeding]] = {}
@@ -147,7 +153,8 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
         spawn_scale = FOOD_SPAWN_SCALE if food else SPAWN_SCALE
         spawn = spawn_scale * (ladder.base_chance or per_doubling)
         per_doubling *= FOOD_BREEDING_SCALE if food else BREEDING_SCALE
-    breeding = Breeding(spawn, own, DRAWN_BY.get(own, {own: 1.0}), per_doubling)
+    by_people = ladder.kinds[0] in SPAWN_BY_PEOPLE
+    breeding = Breeding(spawn, own, DRAWN_BY.get(own, {own: 1.0}), per_doubling, by_people)
     _BREEDINGS[(id(ladder), id(points))] = (ladder, points, breeding)
     return breeding
 
@@ -469,6 +476,8 @@ class Growth:
         """Works out the ladder's chances in these cells afresh."""
         breeding = self._breeding(place)
         raw = np.full(cells.size, breeding.spawn)
+        if breeding.spawn_by_people:
+            raw = raw * self._nearby[Points.POPULATION].ravel()[cells]
         if breeding.per_doubling:
             served = self._served[breeding.own][cells]
             if served.any():
@@ -817,7 +826,8 @@ class Growth:
         served = {own: bool(self._served[own][flat].any()) for own in Points}
         for place in self._places:
             breeding = self._breeding(place)
-            if points not in breeding.drawn_by or not served[breeding.own]:
+            drawn = points in breeding.drawn_by and served[breeding.own]
+            if not drawn and not (breeding.spawn_by_people and points == Points.POPULATION):
                 continue
             self._reckon(place, flat)
             if how_many > 0:
