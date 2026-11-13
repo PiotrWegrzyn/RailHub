@@ -58,12 +58,22 @@ from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
 from railroads.sim.tech import GOOD_TREES, Effect, Research
 from railroads.sim.track_network import TrackNetwork
-from railroads.sim.trains import ENGINES, FIRST_ENGINE, Point, Stop, Train, car_size
+from railroads.sim.trains import (
+    ENGINES,
+    EXPRESS_FARE,
+    FIRST_ENGINE,
+    Point,
+    Power,
+    Stop,
+    Train,
+    car_size,
+)
 
 if TYPE_CHECKING:
     from railroads.sim.station_trade import StationTrade
 
-TRAIN_COST_NAME = "Steam engine"
+# What new trains are called, by what drives them, before the number they were bought as.
+TRAIN_NAMES = {Power.STEAM: "Steam engine", Power.DIESEL: "Diesel", Power.ELECTRIC: "Electric"}
 # How far a train runs in a month, in cells, on flat ground.
 CELLS_PER_MONTH = 60.0
 # Trains meet where points along them, MEET_STEP cells apart, come within MEET_DISTANCE cells.
@@ -116,10 +126,23 @@ class Railway:
         return self.constructions.stations()
 
     def engines(self) -> list[str]:
-        """The engines the player can buy now: those whose year has come and whose tech
-        they have."""
-        opened = self.research.engines() | {FIRST_ENGINE}
-        return [name for name, e in ENGINES.items() if e.year <= self.year and name in opened]
+        """The engines the player can buy now: those whose year has come and whose tech they
+        have, but not those a newer one of their line has replaced (Engine.replaces)."""
+        taken = self.research.taken
+        opened = [
+            name
+            for name, engine in ENGINES.items()
+            if engine.year <= self.year and all(need in taken for need in engine.needs)
+        ]
+        return [
+            name
+            for name in opened
+            if not any(ENGINES[newer].replaces(ENGINES[name]) for newer in opened)
+        ]
+
+    def can_carry(self, train: Train, good: Good) -> bool:
+        """Whether a train's engine takes cars of a good: an express takes only passengers."""
+        return not ENGINES[train.engine].express or good == Good.PASSENGERS
 
     def buy(self, engine: str = FIRST_ENGINE, route_of: Train | None = None) -> Train | None:
         """Buys a train with an engine the player can buy, calling at the stops of `route_of` if
@@ -131,7 +154,7 @@ class Railway:
             return None
         self.finances.spend(price, "trains")
         self._bought += 1
-        train = Train(f"{TRAIN_COST_NAME} {self._bought}", engine=engine)
+        train = Train(f"{TRAIN_NAMES[ENGINES[engine].power]} {self._bought}", engine=engine)
         if route_of is not None:
             train.stops = [Stop(stop.cell) for stop in route_of.stops]
         self.trains.append(train)
@@ -208,9 +231,14 @@ class Railway:
         cargo = [(car.good, car.load - car.origins.get(destination, 0.0)) for car in train.cars]
         earned = self.station_demand(destination).worth(cargo)
         return [
-            amount * self.price_factor(car.good)
+            amount * self.price_factor(car.good) * self.fare_factor(train)
             for amount, car in zip(earned, train.cars, strict=True)
         ]
+
+    @staticmethod
+    def fare_factor(train: Train) -> float:
+        """How much more passengers on this train pay: EXPRESS_FARE on an express."""
+        return EXPRESS_FARE if ENGINES[train.engine].express else 1.0
 
     def hand_out_now(self, station: Cell, good: Good) -> None:
         """Lets the buildings around a station take a good that has just reached it."""

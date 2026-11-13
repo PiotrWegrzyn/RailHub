@@ -58,7 +58,7 @@ class Effect(Enum):
     # Each bonus good a building gets all of adds this much more to its satisfaction
     # (railroads.sim.economy).
     BONUS_GOODS = "per bonus good"
-    # Opens an engine (railroads.sim.railway) once its year has come.
+    # Opens the engines (railroads.sim.trains) that need it, once their year has come.
     UNLOCK = "unlocks"
 
 
@@ -69,8 +69,8 @@ class Node:
     effect: Effect
     amount: float = 0.0
     requires: tuple[str, ...] = ()
-    # For UNLOCK, the engine it opens.
-    engine: str = ""
+    # For UNLOCK, the engines it opens, in a few words.
+    opens: str = ""
     # Whether the effect reaches every tree's buildings and goods, not just its own.
     everywhere: bool = False
 
@@ -99,12 +99,19 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
         ),
         Tree.METALS: (
             _n("bessemer", "Bessemer converters", E.PRODUCTION, 0.1),
-            _n("boilers", "Heavy boilers", E.UNLOCK, engine="mogul"),
+            _n("boilers", "Heavy boilers", E.UNLOCK, opens="heavy freight engines"),
             _n("couplings", "Steel couplings", E.PULL, 1, "bessemer"),
             _n("open_hearth", "Open hearth", E.PRODUCTION, 0.15, "bessemer"),
             _n("bearings", "Roller bearings", E.SPEED, 0.05, "boilers"),
             _n("cartel", "Steel cartel", E.SHARE, 0.05, "open_hearth"),
-            _n("superheaters", "Superheaters", E.UNLOCK, 0.0, "bearings", engine="pacific"),
+            _n(
+                "superheaters",
+                "Superheaters",
+                E.UNLOCK,
+                0.0,
+                "bearings",
+                opens="steam engines from 1900 on",
+            ),
             _n("drawbars", "Heavy drawbars", E.PULL, 1, "couplings"),
             _n("rolling", "Rolling mills", E.PRODUCTION, 0.2, "open_hearth"),
             _n("streamlining", "Streamlining", E.SPEED, 0.1, "superheaters"),
@@ -121,6 +128,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("grid", "Power grid", E.UPKEEP, 0.05, "depots"),
             _n("drilling", "Rotary drilling", E.PRODUCTION, 0.2, "seams"),
             _n("pipelines", "Pipelines", E.STORAGE, 300, "drilling"),
+            _n("diesel", "Diesel engines", E.UNLOCK, 0.0, "drilling", opens="diesel engines"),
             _n("fuel_trust", "Fuel trust", E.SHARE, 0.1, "kilns", "drilling"),
             _n("efficiency", "Fuel efficiency", E.UPKEEP, 0.1, "grid"),
         ),
@@ -138,12 +146,19 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
         Tree.MODERN: (
             _n("labs", "Research labs", E.PRODUCTION, 0.1),
             _n("telegraph", "Telegraph signals", E.SPEED, 0.05),
-            _n("traction", "Electric traction", E.UNLOCK, 0.0, "telegraph", engine="boxcab"),
+            _n(
+                "traction",
+                "Electric traction",
+                E.UNLOCK,
+                0.0,
+                "telegraph",
+                opens="electric engines",
+            ),
             _n("assembly", "Assembly lines", E.PRODUCTION, 0.15, "labs"),
             _n("relays", "Relay interlocking", E.SPEED, 0.05, "traction"),
             _n("patents", "Patents", E.PRICE, 0.1, "labs"),
             _n("automation", "Automation", E.PRODUCTION, 0.2, "assembly"),
-            _n("thyristors", "Thyristor control", E.UNLOCK, 0.0, "relays", engine="express"),
+            _n("thyristors", "Thyristor control", E.UNLOCK, 0.0, "relays", opens="fast electrics"),
             _n("tech_trust", "Technology giant", E.SHARE, 0.1, "patents", "automation"),
             _n("computers", "Computer timetables", E.SPEED, 0.1, "thyristors"),
         ),
@@ -167,6 +182,9 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("dining", "Dining cars", E.PRICE, 0.1, "timetables"),
             _n("corridors", "Corridor coaches", E.COACHES, 0.2, "coaches"),
             _n("express_mail", "Express mail", E.PRICE, 0.15, "dining"),
+            _n(
+                "express_trains", "Express trains", E.UNLOCK, 0.0, "dining", opens="express engines"
+            ),
             _n("concourse", "Grand concourses", E.WAITING, 200, "waiting"),
             _n("sleepers", "Sleeping cars", E.PRICE, 0.15, "express_mail"),
             _n("double_deck", "Double-deck coaches", E.COACHES, 0.3, "corridors"),
@@ -335,7 +353,3 @@ class Research:
             if node.effect == effect and (tree is None or of == tree or node.everywhere):
                 total += node.amount
         return total
-
-    def engines(self) -> set[str]:
-        """The engines the taken nodes opened."""
-        return {NODES[key][1].engine for key in self.taken if NODES[key][1].effect == Effect.UNLOCK}

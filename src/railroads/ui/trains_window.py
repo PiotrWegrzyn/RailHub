@@ -13,7 +13,7 @@ from railroads.sim.demand import StationDemand
 from railroads.sim.finance import TRAIN_RESALE, dollars
 from railroads.sim.goods import Good
 from railroads.sim.railway import Railway
-from railroads.sim.trains import ENGINES, Stop, Train
+from railroads.sim.trains import ENGINES, EXPRESS_FARE, Engine, Kind, Stop, Train
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at
 from railroads.ui.station_offers import Offer, Supplies, goods_to_load
@@ -84,6 +84,20 @@ class TrainsWindow:
             imgui.end_child()
         imgui.end()
 
+    def _engine_choice(self, railway: Railway, name: str, shown: Train | None) -> None:
+        engine = ENGINES[name]
+        affordable = railway.finances.can_afford(engine.price)
+        imgui.begin_disabled(not affordable)
+        label = f"{engine.title}  {dollars(engine.price)}##{name}"
+        if imgui.selectable(label, False)[0]:
+            bought = railway.buy(name, route_of=shown)
+            if bought is not None:
+                self.chosen = bought.name
+        imgui.end_disabled()
+        if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
+            money = "" if affordable else "\nNot enough money"
+            imgui.set_tooltip(f"{engine_summary(engine)}{money}")
+
     def _draw_list(self, railway: Railway) -> Train | None:
         imgui.begin_child("list", (LIST_WIDTH, 0), imgui.ChildFlags_.borders.value)
         if imgui.button(f"{fa.ICON_FA_PLUS}  Buy a train", (-1, 0)):
@@ -93,22 +107,10 @@ class TrainsWindow:
             if shown is not None and shown.stops:
                 imgui.text_disabled(f"Calls at the stops of {shown.name}, with no cars yet")
             imgui.text_disabled("Buy a train with")
-            for name in railway.engines():
-                engine = ENGINES[name]
-                affordable = railway.finances.can_afford(engine.price)
-                imgui.begin_disabled(not affordable)
-                label = f"{engine.title}  {dollars(engine.price)}##{name}"
-                if imgui.selectable(label, False)[0]:
-                    bought = railway.buy(name, route_of=shown)
-                    if bought is not None:
-                        self.chosen = bought.name
-                imgui.end_disabled()
-                if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-                    track = ", electrified track only" if engine.electric else ""
-                    money = "" if affordable else " - not enough money"
-                    imgui.set_tooltip(
-                        f"{engine.speed:g}x speed, up to {engine.cars} cars{track}{money}"
-                    )
+            for kind, names in engines_by_kind(railway.engines()):
+                imgui.separator_text(kind.value.capitalize())
+                for name in names:
+                    self._engine_choice(railway, name, shown)
             imgui.end_popup()
         imgui.spacing()
         chosen = None
@@ -314,10 +316,16 @@ class TrainsWindow:
         imgui.align_text_to_frame_padding()
         imgui.text_disabled("Load here")
         imgui.same_line(CARD_LABEL)
-        offers = goods_to_load(railway, stop.cell, supplies(stop.cell))
+        offers = [
+            offer
+            for offer in goods_to_load(railway, stop.cell, supplies(stop.cell))
+            if railway.can_carry(train, offer.good)
+        ]
         here = {offer.good for offer in offers}
         waiting = railway.station_goods(stop.cell)
-        carried = [g for g in carried_in(train, index) if g not in here]
+        carried = [
+            g for g in carried_in(train, index) if g not in here and railway.can_carry(train, g)
+        ]
         offers += [Offer(good, waiting.held(good), 0.0) for good in carried]
         if not offers:
             imgui.text_disabled("nothing made or waiting here yet")
@@ -346,6 +354,32 @@ class TrainsWindow:
             if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
                 self.map.good = offer.good
             imgui.end_disabled()
+
+
+def engines_by_kind(names: list[str]) -> list[tuple[Kind, list[str]]]:
+    """Engines grouped by what they are for, in the order of Kind, each group newest first."""
+    groups = [
+        (
+            kind,
+            sorted((n for n in names if ENGINES[n].kind == kind), key=lambda n: -ENGINES[n].year),
+        )
+        for kind in Kind
+    ]
+    return [(kind, group) for kind, group in groups if group]
+
+
+def engine_summary(engine: Engine) -> str:
+    """An engine's speed, cars and what it runs on, for its tooltip."""
+    cars = f"{engine.cars} coaches and a dining car" if engine.express else f"{engine.cars} cars"
+    lines = [
+        f"{engine.year}, {engine.power.value}: {engine.kmh:.0f} km/h, pulls up to {cars}",
+        f"Up to speed in {engine.pickup:g} s",
+    ]
+    if engine.express:
+        lines.append(f"Passengers only, paying {EXPRESS_FARE - 1:.0%} more")
+    if engine.electric:
+        lines.append("Runs on electrified track only")
+    return "\n".join(lines)
 
 
 def carried_in(train: Train, index: int) -> list[Good]:

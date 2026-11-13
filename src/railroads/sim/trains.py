@@ -1,12 +1,15 @@
 """The trains on the railway (railroads.sim.railway runs them): the engines that can be bought, the
 cars, each carrying one good up to its car_size, the stops a train calls at with the cars it pulls
-from each, and the train itself, slowed by the weight of what it carries. A train sets off from a
-stand and picks up speed evenly until it runs at full speed after its engine's pickup time, the
-first engine's ten seconds at normal speed and better engines' less.
+from each, and the train itself, slowed by the weight of what it carries against the cars its
+engine is built to pull. A train sets off from a stand and picks up speed evenly until it runs at
+full speed after its engine's pickup time, the Planet's ten seconds at normal speed, better
+engines' less and earlier ones' more. An express always leads its coaches with a dining car,
+which carries nothing but weighs and costs like any other car.
 
 Freight remembers where it came from as parcels: how much from each station."""
 
 from dataclasses import dataclass, field
+from enum import Enum
 
 from railroads.sim.finance import TRAIN_PRICE
 from railroads.sim.goods import Good
@@ -17,6 +20,8 @@ MAX_CARS = 5
 
 # A full car weighs this much more than an empty one, which counts 1; each car's weight slows the
 # train by DRAG_PER_CAR of the engine's speed alone, so six full cars still make about half of it.
+# That is for an engine built to pull MAX_CARS, like the Planet; one built to pull more is slowed
+# less by each car, in proportion.
 FULL_LOAD = 1.0
 
 
@@ -79,28 +84,219 @@ ENGINE_LENGTH = 0.8
 CAR_LENGTH = 0.42
 
 
+class Kind(Enum):
+    """What an engine is for. Pioneers come before the Planet; light engines are cheap and pull
+    few cars, general ones are the Planet and its heirs, heavy freight engines pull more cars more
+    slowly, and express engines carry only passengers, faster and dearer, with a dining car."""
+
+    PIONEER = "pioneer"
+    LIGHT = "light"
+    GENERAL = "general"
+    HEAVY = "heavy freight"
+    EXPRESS = "express"
+
+
+class Power(Enum):
+    STEAM = "steam"
+    DIESEL = "diesel"
+    ELECTRIC = "electric"
+
+
+# Speed 1, the Planet's, stands for this many km/h.
+KMH_PER_SPEED = 60.0
+# Passengers on an express pay this much more.
+EXPRESS_FARE = 1.2
+
+
 @dataclass(frozen=True, slots=True)
 class Engine:
-    """An engine model: from what year it can be bought, how fast it runs against the first,
-    how many cars it pulls, what it costs, and whether it runs only on electrified track. All but
-    the first also need a tech node (railroads.sim.tech) to open."""
+    """An engine model: from what year it can be bought, how fast it runs against the Planet,
+    how many cars it pulls (an express's coaches, without its dining car), what it costs, what it
+    is for and what drives it, and the tech nodes (railroads.sim.tech) it needs to open. Electric
+    engines run only on electrified track. Once a newer engine of its line can be bought, it is
+    no longer sold (railroads.sim.railway.Railway.engines)."""
 
     title: str
     year: int
     speed: float
     cars: int
     price: float
-    electric: bool = False
+    kind: Kind = Kind.GENERAL
+    power: Power = Power.STEAM
     # How many seconds of play at normal speed it takes to get from a stand to full speed.
     pickup: float = 10.0
+    needs: tuple[str, ...] = ()
+
+    @property
+    def electric(self) -> bool:
+        return self.power == Power.ELECTRIC
+
+    @property
+    def express(self) -> bool:
+        return self.kind == Kind.EXPRESS
+
+    @property
+    def kmh(self) -> float:
+        return self.speed * KMH_PER_SPEED
+
+    @property
+    def line(self) -> Kind:
+        """The line of engines it belongs to: pioneers lead up to the Planet's."""
+        return Kind.GENERAL if self.kind == Kind.PIONEER else self.kind
+
+    def replaces(self, older: Engine) -> bool:
+        """Whether it takes an older engine's place on sale: a newer one of the same line that
+        runs on the same track, so an electric never ends the sale of a steam or diesel engine."""
+        return (
+            self.line == older.line and self.electric == older.electric and self.year > older.year
+        )
+
+    @property
+    def hauls(self) -> int:
+        """How many cars it is built to pull, the dining car included: a train of that many
+        full cars slows it as much as five full cars slow the Planet."""
+        return self.cars + (1 if self.express else 0)
 
 
+P, L, G, H, X = Kind.PIONEER, Kind.LIGHT, Kind.GENERAL, Kind.HEAVY, Kind.EXPRESS
+DIESEL, ELECTRIC = Power.DIESEL, Power.ELECTRIC
 ENGINES: dict[str, Engine] = {
-    "planet": Engine("Planet steam engine", 1850, 1.0, MAX_CARS, TRAIN_PRICE, pickup=10.0),
-    "mogul": Engine("Mogul freight engine", 1880, 1.0, 8, 12_000.0, pickup=8.0),
-    "pacific": Engine("Pacific express engine", 1910, 1.5, 8, 25_000.0, pickup=6.0),
-    "boxcab": Engine("Boxcab electric", 1925, 1.4, 10, 40_000.0, electric=True, pickup=4.0),
-    "express": Engine("Express electric", 1965, 2.2, 12, 90_000.0, electric=True, pickup=3.0),
+    "penydarren": Engine("Penydarren steam wagon", 1804, 0.3, 1, 500.0, P, pickup=14.0),
+    "catch_me": Engine("Catch Me Who Can", 1808, 0.45, 1, 800.0, P, pickup=13.0),
+    "salamanca": Engine("Salamanca", 1812, 0.4, 2, 1_200.0, P, pickup=13.0),
+    "puffing_billy": Engine("Puffing Billy", 1813, 0.5, 2, 1_500.0, P, pickup=12.0),
+    "locomotion": Engine("Locomotion", 1825, 0.6, 3, 2_500.0, P, pickup=12.0),
+    "rocket": Engine("Rocket", 1829, 0.8, 3, 3_500.0, P, pickup=11.0),
+    "lion": Engine("Lion", 1838, 0.85, 4, 4_000.0, P, pickup=11.0),
+    "planet": Engine("Planet steam engine", 1850, 1.0, MAX_CARS, TRAIN_PRICE, G, pickup=10.0),
+    "tank": Engine("Tank engine", 1850, 0.7, 3, 2_000.0, L, pickup=9.0),
+    "goods": Engine("Goods engine", 1865, 0.8, 7, 7_000.0, H, pickup=10.0, needs=("boilers",)),
+    "single": Engine(
+        "Single-driver express", 1865, 1.5, 4, 12_000.0, X, pickup=8.0, needs=("express_trains",)
+    ),
+    "american": Engine("American 4-4-0", 1870, 1.15, 6, 8_000.0, G, pickup=9.0),
+    "mogul": Engine(
+        "Mogul freight engine", 1880, 0.9, 8, 11_000.0, H, pickup=8.0, needs=("boilers",)
+    ),
+    "light_tank": Engine("Light tank engine", 1895, 0.9, 4, 4_000.0, L, pickup=8.0),
+    "atlantic": Engine(
+        "Atlantic express",
+        1900,
+        1.8,
+        5,
+        25_000.0,
+        X,
+        pickup=6.0,
+        needs=("express_trains", "superheaters"),
+    ),
+    "mallet": Engine(
+        "Mallet articulated",
+        1905,
+        0.95,
+        10,
+        22_000.0,
+        H,
+        pickup=8.0,
+        needs=("boilers", "superheaters"),
+    ),
+    "pacific": Engine(
+        "Pacific engine", 1910, 1.4, 7, 16_000.0, G, pickup=6.0, needs=("superheaters",)
+    ),
+    "boxcab": Engine(
+        "Boxcab electric", 1925, 1.4, 8, 30_000.0, G, ELECTRIC, pickup=4.0, needs=("traction",)
+    ),
+    "railbus": Engine("Railbus", 1935, 1.3, 4, 9_000.0, L, DIESEL, pickup=5.0, needs=("diesel",)),
+    "streamliner": Engine(
+        "Streamliner",
+        1935,
+        2.3,
+        6,
+        60_000.0,
+        X,
+        pickup=5.0,
+        needs=("express_trains", "superheaters"),
+    ),
+    "big_boy": Engine(
+        "Big articulated", 1940, 1.1, 12, 45_000.0, H, pickup=7.0, needs=("boilers", "superheaters")
+    ),
+    "mixed_diesel": Engine(
+        "Mixed-traffic diesel", 1950, 1.8, 8, 40_000.0, G, DIESEL, pickup=4.0, needs=("diesel",)
+    ),
+    "heavy_diesel": Engine(
+        "Heavy diesel", 1960, 1.3, 14, 70_000.0, H, DIESEL, pickup=5.0, needs=("boilers", "diesel")
+    ),
+    "bullet": Engine(
+        "Bullet train",
+        1964,
+        3.5,
+        7,
+        150_000.0,
+        X,
+        ELECTRIC,
+        pickup=3.0,
+        needs=("express_trains", "thyristors"),
+    ),
+    "express": Engine(
+        "Universal electric",
+        1965,
+        2.2,
+        10,
+        70_000.0,
+        G,
+        ELECTRIC,
+        pickup=3.0,
+        needs=("thyristors",),
+    ),
+    "sprinter": Engine(
+        "Sprinter unit", 1985, 2.0, 5, 18_000.0, L, DIESEL, pickup=3.0, needs=("diesel",)
+    ),
+    "high_speed": Engine(
+        "High-speed electric",
+        1990,
+        5.0,
+        9,
+        300_000.0,
+        X,
+        ELECTRIC,
+        pickup=2.5,
+        needs=("express_trains", "thyristors"),
+    ),
+    "twin_diesel": Engine(
+        "Twin-unit diesel",
+        1995,
+        1.4,
+        20,
+        140_000.0,
+        H,
+        DIESEL,
+        pickup=5.0,
+        needs=("boilers", "diesel"),
+    ),
+    "modern_electric": Engine(
+        "Modern electric", 2000, 3.0, 12, 120_000.0, G, ELECTRIC, pickup=2.5, needs=("thyristors",)
+    ),
+    "super_diesel": Engine(
+        "Super-heavy diesel",
+        2040,
+        1.5,
+        40,
+        300_000.0,
+        H,
+        DIESEL,
+        pickup=6.0,
+        needs=("boilers", "diesel"),
+    ),
+    "maglev": Engine(
+        "500 km/h electric",
+        2040,
+        500.0 / KMH_PER_SPEED,
+        11,
+        700_000.0,
+        X,
+        ELECTRIC,
+        pickup=2.0,
+        needs=("express_trains", "thyristors"),
+    ),
 }
 
 
@@ -136,6 +332,8 @@ class Car:
     load: float = 0.0
     origins: Parcels = field(default_factory=dict)
     capacity: float = 0.0
+    # An express's dining car, which carries nothing.
+    dining: bool = False
 
     def __post_init__(self) -> None:
         if not self.capacity:
@@ -218,11 +416,12 @@ class Train:
     @property
     def pull(self) -> float:
         """How much of the engine's top speed the train makes with its cars behind it."""
-        return 1.0 / (1.0 + DRAG_PER_CAR * self.weight)
+        drag = DRAG_PER_CAR * MAX_CARS / ENGINES[self.engine].hauls
+        return 1.0 / (1.0 + drag * self.weight)
 
     @property
     def full(self) -> bool:
-        return all(car.load >= car.capacity - 1e-9 for car in self.cars)
+        return all(car.dining or car.load >= car.capacity - 1e-9 for car in self.cars)
 
     @property
     def length(self) -> float:

@@ -385,7 +385,7 @@ def test_the_main_menu_answers_clicks_after_leaving_a_game(context: None, tmp_pa
     assert shell.menu.page == "new"
 
 
-def test_drawing_the_new_game_page_pulls_an_early_start_up_to_1750(
+def test_drawing_the_new_game_page_pulls_an_early_start_up_to_1804(
     context: None, tmp_path: Path
 ) -> None:
     shell = Shell(Saves(tmp_path))
@@ -394,7 +394,7 @@ def test_drawing_the_new_game_page_pulls_an_early_start_up_to_1750(
 
     shell_frame(shell)
 
-    assert shell.menu.start_year == 1750
+    assert shell.menu.start_year == 1804
 
 
 def test_the_waiting_screen_shows_how_far_a_new_game_has_grown(

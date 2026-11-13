@@ -39,13 +39,15 @@ def run_until(railway: Railway, done, seconds: float = 600.0) -> None:
             return
 
 
-def test_the_first_engine_takes_ten_seconds_to_full_speed_and_better_ones_less() -> None:
-    first = ENGINES["planet"].pickup
+def test_the_planet_takes_ten_seconds_to_full_speed_and_later_engines_less() -> None:
+    planet = ENGINES["planet"]
 
-    later = [engine.pickup for name, engine in ENGINES.items() if name != "planet"]
+    later = [engine.pickup for engine in ENGINES.values() if engine.year > planet.year]
+    earlier = [engine.pickup for engine in ENGINES.values() if engine.year < planet.year]
 
-    assert first == 10.0
-    assert all(pickup < first for pickup in later)
+    assert planet.pickup == 10.0
+    assert all(pickup <= planet.pickup for pickup in later)
+    assert all(pickup > planet.pickup for pickup in earlier)
 
 
 def test_a_train_sets_off_slowly_and_reaches_full_speed_after_its_pickup_time() -> None:
