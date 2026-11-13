@@ -99,10 +99,6 @@ class Workers:
                 painter.heard(message)
 
 
-class PaintFailed(Exception):
-    """A chunk a worker could not paint."""
-
-
 class WorkerPainter:
     """Paints chunks (railroads.ui.pixel.copies.ChunkJob) in the page's workers, with the
     interface of railroads.ui.pixel.painter.Painter."""

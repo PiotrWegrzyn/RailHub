@@ -10,6 +10,7 @@ paints itself. Nothing here needs imgui, which a worker doesn't load."""
 
 import pickle
 from dataclasses import dataclass, field
+from typing import Self
 
 import numpy as np
 import numpy.typing as npt
@@ -56,7 +57,7 @@ class Seen:
     satisfaction: int
 
     @classmethod
-    def now(cls, world: PixelWorld) -> Seen:
+    def now(cls, world: PixelWorld) -> Self:
         return cls(world.buildings_version, world.satisfaction_version)
 
 
@@ -86,6 +87,7 @@ class WorldCopy:
 
     def start(self, number: int, message: bytes) -> None:
         """Takes up a new world (world_message) in place of the one it had."""
+        # Let go of the old world first, so the new one can take its memory.
         self.world = None
         self.world = pickle.loads(message)
         self.number = number
