@@ -35,7 +35,7 @@ class _Queue:
     now: float = 0.0
     stopped: bool = False
 
-    def next(self) -> tuple[Hashable, _Job] | None:
+    def most_wanted(self) -> tuple[Hashable, _Job] | None:
         """Takes the most wanted job, forgetting those asked for too long ago."""
         stale = [key for key, job in self.jobs.items() if job.wanted < self.now - FORGET_S]
         for key in stale:
@@ -43,8 +43,14 @@ class _Queue:
         if not self.jobs:
             return None
         key = max(self.jobs, key=lambda k: (self.jobs[k].urgent, self.jobs[k].wanted))
-        self.busy = key
         return key, self.jobs.pop(key)
+
+    def next(self) -> tuple[Hashable, _Job] | None:
+        """Takes the most wanted job to do it on this thread."""
+        taken = self.most_wanted()
+        if taken is not None:
+            self.busy = taken[0]
+        return taken
 
     def run(self, key: Hashable, job: _Job) -> None:
         try:

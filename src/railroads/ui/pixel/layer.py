@@ -9,8 +9,10 @@ Chunks where hills or mountains rise show first as they are quickly drawn, then 
 with the heights, lift and colours of their raised ground at the full resolution, and the finer
 drawing takes their place once it is ready.
 
-Where threads cannot start, as in a browser, one chunk is drawn on each frame, and raised chunks
-are not drawn again finely, which would stall a frame for a third of a second. There, when the
+In a browser, where threads cannot start, the page's web workers draw the chunks instead
+(railroads.ui.pixel.web_painter), several at once, and frames carry on meanwhile as with a thread.
+Until a worker is ready, or if none can be, one chunk is drawn on each frame, and raised chunks
+are not drawn again finely, which would stall a frame for a third of a second. Then, when the
 ground shader shows the ground beneath, chunks wait until the view and the mouse have stood still
 for a moment, so moving the map or the mouse doesn't stall on drawing them."""
 
@@ -21,9 +23,12 @@ import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
 from railroads.ui.iso_camera import IsoCamera, Vec2
+from railroads.ui.pixel.copies import ChunkJob
 from railroads.ui.pixel.painter import Painter
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, Rgba
+from railroads.ui.pixel.web_painter import WorkerPainter, page_workers
 from railroads.ui.pixel.world import PixelWorld
+from railroads.ui.workers import threads_start
 
 # Time a frame may spend turning drawn chunks into textures; at least one is always made.
 UPLOAD_BUDGET_S = 0.006
@@ -45,6 +50,17 @@ def resolution_for(screen_pixels: int, resolutions: tuple[int, ...]) -> int:
     return max(r for r in resolutions if screen_pixels % r == 0)
 
 
+def painter_for(world: PixelWorld, threads: bool | None = None) -> Painter | WorkerPainter:
+    """A painter of its own thread where threads can start; otherwise the page's web workers,
+    if it started any, or else the frames."""
+    if threads is None:
+        threads = threads_start()
+        workers = None if threads else page_workers()
+        if workers is not None:
+            return WorkerPainter(world, workers)
+    return Painter(threads)
+
+
 class PixelLayer:
     def __init__(self, world: PixelWorld, threads: bool | None = None) -> None:
         self.world = world
@@ -52,7 +68,7 @@ class PixelLayer:
         self._chunks: OrderedDict[tuple[int, int, int], Rgba] = OrderedDict()
         self._textures: OrderedDict[tuple[int, int, int], hello_imgui.TextureGpu] = OrderedDict()
         self._stale: set[tuple[int, int, int]] = set()
-        self._painter = Painter(threads)
+        self._painter = painter_for(world, threads)
         # Chunks drawn finely, and how many times each chunk has been refreshed, so a drawing
         # asked for before a refresh is thrown away.
         self._refined: set[tuple[int, int, int]] = set()
@@ -179,8 +195,7 @@ class PixelLayer:
         if drawn in self._chunks:
             return
         refreshes = self._refreshes.get(drawn[:2], 0)
-        over_ground = self.over_ground
-        work = lambda: self.world.render(*drawn, over_ground=over_ground)
+        work = ChunkJob(self.world, *drawn, over_ground=self.over_ground)
         self._painter.want((False, drawn, refreshes), work, True, now)
 
     def _refine(self, drawn: tuple[int, int, int], now: float) -> None:
@@ -197,7 +212,7 @@ class PixelLayer:
         if not rises:
             return
         refreshes = self._refreshes.get(drawn[:2], 0)
-        work = lambda: self.world.render(*drawn, True)
+        work = ChunkJob(self.world, *drawn, fine_relief=True)
         self._painter.want((True, drawn, refreshes), work, False, now)
 
     def _chunk_bytes(self) -> int:
