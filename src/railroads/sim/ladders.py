@@ -479,7 +479,7 @@ LUMBER_MILLS = Ladder(
         forest_edge=True,
         least_forest_nearby=4,
     ),
-    base_chance=0.000016,
+    base_chance=0.00005,
     chance_per_doubling={Points.POPULATION: 0.000001},
     most_per_cell=1,
     most_nearby=2,
