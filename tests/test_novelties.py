@@ -155,3 +155,25 @@ def test_novelties_want_only_goods_the_game_already_has_and_fill_a_whole_hex() -
         assert constructions.space_left((5, 5)) == 0
         constructions.remove(Building((5, 5), novelty.kind))
         assert all(isinstance(need, Need) for need in needs_of(novelty.kind, 2050))
+
+
+@pytest.mark.parametrize(("year", "most"), [(1854, 0), (1855, 2)])
+def test_railway_works_go_up_from_1855_by_the_biggest_towns_apart_up_to_their_number(
+    year: int, most: int
+) -> None:
+    towns = {
+        (10, 10): BuildingKind.FLATS,
+        (30, 30): BuildingKind.HOUSE,
+        (10, 30): BuildingKind.HOUSE,
+    }
+    growth = grown(year, towns)
+    novelties = Novelties([], olympic_chance=0.0, railway_works=2)
+
+    for _ in range(200):
+        novelties.year(growth, np.random.default_rng(len(novelties.works) + _))
+
+    works = built(growth, BuildingKind.RAILWAY_WORKS)
+    assert len(works) == most
+    if most:
+        grid = growth.constructions.tile_map.grid
+        assert any(cell in grid.within((10, 10), 2) for cell in works)

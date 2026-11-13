@@ -569,3 +569,26 @@ def test_a_station_full_of_a_good_gathers_no_more_of_it() -> None:
     trade = economy.trade(placed, holding(100.0, WHEAT=100.0))
 
     assert trade.gathered[STATION].get(Good.WHEAT, 0.0) == 0.0
+
+
+@pytest.mark.parametrize(("lumber", "coal"), [(0.0, 100.0), (10.0, 150.0), (20.0, 200.0)])
+def test_lumber_for_pit_props_lets_a_mine_dig_up_to_twice_the_coal(
+    lumber: float, coal: float
+) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.MINE, 1))
+
+    trade = economy.trade(placed, holding(1000.0, LUMBER=lumber))
+
+    assert trade.gathered[STATION].get(Good.COAL, 0.0) == pytest.approx(coal)
+
+
+def test_gasworks_make_town_gas_out_of_coal() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 8), BuildingKind.GASWORKS, 1))
+
+    trade = economy.trade(placed, holding(1000.0, COAL=50.0))
+
+    assert trade.gathered[STATION][Good.GAS] == pytest.approx(100.0)

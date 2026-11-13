@@ -148,6 +148,8 @@ POINTS: Mapping[BuildingKind, tuple[Points, int]] = MappingProxyType(
         BuildingKind.CATTLE_RANCH: (Points.FOOD, 1),
         BuildingKind.PIG_FARM: (Points.FOOD, 1),
         BuildingKind.CHICKEN_FARM: (Points.FOOD, 1),
+        BuildingKind.GASWORKS: (Points.INDUSTRY, 1),
+        BuildingKind.RAILWAY_WORKS: (Points.INDUSTRY, 20),
         BuildingKind.FLAX_FIELD: (Points.FOOD, 1),
         BuildingKind.HOP_GARDEN: (Points.FOOD, 1),
         BuildingKind.MACHINE_WORKS: (Points.INDUSTRY, 3),
@@ -672,6 +674,18 @@ BEEKEEPERS = Ladder(
 )
 
 # Bakeries bake the wheat brought to them into bread, one to a neighbourhood, in towns.
+# Gasworks make town gas out of coal from 1820, one to a town, the likelier the more people live
+# around (railroads.sim.growth.SPAWN_BY_PEOPLE).
+GASWORKS = Ladder(
+    kinds=(BuildingKind.GASWORKS,),
+    land=FACTORY_LAND,
+    base_chance=0.000001,
+    chance_per_doubling={Points.POPULATION: 0.000001},
+    most_per_cell=1,
+    most_nearby=1,
+    from_year=1820,
+)
+
 BAKERIES = Ladder(
     kinds=(BuildingKind.BAKERY,),
     land=TOWN_LAND,
@@ -905,6 +919,7 @@ LADDERS = (
     CHURCHES,
     BEEKEEPERS,
     BAKERIES,
+    GASWORKS,
     POTATO_FARMS,
     CATTLE_RANCHES,
     PIG_FARMS,

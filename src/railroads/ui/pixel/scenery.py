@@ -97,6 +97,8 @@ BUILDING_SPRITES = {
     BuildingKind.SUGAR: "sugar",
     BuildingKind.FOOD_PLANT: "food_plant",
     BuildingKind.BAKERY: "bakery",
+    BuildingKind.GASWORKS: "gasworks",
+    BuildingKind.RAILWAY_WORKS: "railway_works",
     BuildingKind.STEEL_MILL: "steel_mill",
     BuildingKind.SHIPYARD: "shipyard",
     BuildingKind.LUMBER_MILL: "lumber_mill",

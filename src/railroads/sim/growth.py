@@ -49,7 +49,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.clock import START_YEAR
-from railroads.sim.constructions import Building, BuildingKind, Constructions
+from railroads.sim.constructions import ONE_OFFS, Building, BuildingKind, Constructions
 from railroads.sim.economy import (
     BONUS_PER_GOOD,
     Economy,
@@ -120,7 +120,7 @@ DRAWN_BY: Mapping[Points, Mapping[Points, float]] = MappingProxyType(
 
 # Kinds that come up where people live: their spawn chance counts once for every population
 # point in the neighbourhood, and nowhere without any.
-SPAWN_BY_PEOPLE = frozenset({BuildingKind.BAKERY})
+SPAWN_BY_PEOPLE = frozenset({BuildingKind.BAKERY, BuildingKind.GASWORKS})
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,8 +171,9 @@ def dies_after(kind: BuildingKind) -> int:
 
 
 # Producers of what the land gives, which stand idle with nobody to sell to rather than dying out:
-# the land decides where they are, and so how many people and what industry it can keep.
-UNDYING = frozenset(kind for kind in MAKES if kind not in RECIPES)
+# the land decides where they are, and so how many people and what industry it can keep; and the
+# one-off buildings, which wait for what they need however long it takes.
+UNDYING = frozenset(kind for kind in MAKES if kind not in RECIPES) | ONE_OFFS
 
 
 def _allowed(cells: Cells, opened: Cells, land: FloatGrid) -> Cells:

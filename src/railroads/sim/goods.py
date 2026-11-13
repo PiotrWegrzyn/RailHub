@@ -18,7 +18,7 @@ raises its satisfaction above what its demands give (railroads.sim.economy). Pro
 bonus goods: their inputs make what they make. A building that makes nothing whose every need is
 a bonus good keeps them all as demands, since getting them is what it is there for. A building
 that makes goods has boosts instead (boosts_of): what it can do without but makes up to BOOST_MOST
-more with, as barrels for a brewery and wheat for animals.
+more with, as barrels for a brewery, wheat for animals and lumber for mines.
 """
 
 from collections.abc import Mapping
@@ -220,6 +220,12 @@ KIND_NEED_YEARS: Mapping[tuple[BuildingKind, Need], int] = MappingProxyType(
     {(BuildingKind.FARM, Need.MACHINERY): 1920}
 )
 
+# Goods a kind of building makes only from a later year than everyone else: ports bring in natural
+# gas long after gasworks make town gas.
+KIND_GOOD_YEARS: Mapping[tuple[BuildingKind, Good], int] = MappingProxyType(
+    {(BuildingKind.PORT, Good.GAS): 1950}
+)
+
 # The year goods first appear, where that is after the game begins.
 GOOD_YEARS: Mapping[Good, int] = MappingProxyType(
     {
@@ -234,7 +240,7 @@ GOOD_YEARS: Mapping[Good, int] = MappingProxyType(
         Good.CARS: 1930,
         Good.PLANES: 1935,
         Good.TANKS: 1940,
-        Good.GAS: 1950,
+        Good.GAS: 1820,
         Good.PLASTICS: 1950,
         Good.APPLIANCES: 1950,
         Good.ELECTRONICS: 1960,
@@ -423,6 +429,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
         BuildingKind.SUGAR_REFINERY: Recipe(
             Good.REFINED_SUGAR, 60, {Need.SUGAR: 0.5, Need.COAL: 0.1}
         ),
+        BuildingKind.GASWORKS: Recipe(Good.GAS, 200, {Need.COAL: 0.5}),
         BuildingKind.PORCELAIN_WORKS: Recipe(Good.PORCELAIN, 30, {Need.CLAY: 0.5, Need.COAL: 0.25}),
     }
 )
@@ -526,6 +533,8 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.PORCELAIN: 2,
         },
         BuildingKind.FARM: {Need.MACHINERY: 1},
+        BuildingKind.MINE: {Need.LUMBER: 20},
+        BuildingKind.RAILWAY_WORKS: {Need.STEEL: 200},
         BuildingKind.POWER_PLANT: {Need.BOILER_FUEL: 200},
         BuildingKind.SPACE_CENTER: {Need.ELECTRONICS: 300, Need.FUEL: 1000, Need.FOOD: 300},
         BuildingKind.PEAR_HQ: {Need.ELECTRONICS: 500, Need.FOOD: 1000},
@@ -586,8 +595,9 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
 # The month's trade, a step at a time: a need is shared out, a kind of processor makes what it
 # can. Inputs come before what is made from them, and the processors of food before houses.
 PIPELINE: tuple[Need | BuildingKind, ...] = (
-    Need.COAL,
     Need.LUMBER,
+    Need.COAL,
+    BuildingKind.GASWORKS,
     Need.IRON,
     Need.COPPER,
     Need.OIL,
@@ -689,13 +699,14 @@ def makes_of(kind: BuildingKind, year: int) -> Mapping[Good, float]:
         {
             good: amount
             for good, amount in MAKES.get(kind, {}).items()
-            if GOOD_YEARS.get(good, 0) <= year
+            if KIND_GOOD_YEARS.get((kind, good), GOOD_YEARS.get(good, 0)) <= year
         }
     )
 
 
 # Needs buildings can do without but that raise their satisfaction: every special resource
-# (railroads.mapgen.deposits), beer, newspapers and furniture, and the wheat animals are fed. Wool, cotton and fish meet
+# (railroads.mapgen.deposits), beer, newspapers and furniture, the wheat animals are fed and the
+# lumber mines prop their shafts with. Wool, cotton and fish meet
 # needs that ordinary goods meet too (fibre and food), so those stay demands.
 BONUS_NEEDS = frozenset(
     {
@@ -713,6 +724,7 @@ BONUS_NEEDS = frozenset(
         Need.NEWSPAPERS,
         Need.FURNITURE,
         Need.WHEAT,
+        Need.LUMBER,
     }
 )
 
