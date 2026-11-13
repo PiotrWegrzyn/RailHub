@@ -159,6 +159,9 @@ class MapView:
         self._shader_tried = False
         self._colors_version = 0
         self.hovered: Cell | None = None
+        # The art pixel last looked up under the mouse and the ground point showing there, as the
+        # mouse often rests while frames go on.
+        self._under: tuple[tuple[float, float], tuple[float, float]] | None = None
         # The cell whose details are open, picked by clicking without dragging.
         self.selected: Cell | None = None
         self.build = BuildMenu()
@@ -483,7 +486,10 @@ class MapView:
             return x, y
         world = self._pixel_layer().world
         px, py = world.projection.to_pixels(x, y)
-        return world.elevation.ground_at(float(px), float(py))
+        pixel = (float(px), float(py))
+        if self._under is None or self._under[0] != pixel:
+            self._under = (pixel, world.elevation.ground_at(*pixel))
+        return self._under[1]
 
     def _draw_status(self, draw_list: imgui.ImDrawList, top_left: Vec2, bottom_right: Vec2) -> None:
         """What is under the mouse, in a strip along the top of the map, and the card of the
