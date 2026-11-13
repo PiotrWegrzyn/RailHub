@@ -12,7 +12,7 @@ import numpy as np
 from railroads import maps
 from railroads.mapgen.generate import generate_map
 from railroads.mapgen.presets import NATURAL_EARTH_SOURCE, NaturalEarth, real_world_strategies
-from railroads.mapgen.seeding import play_begins, seed_buildings
+from railroads.mapgen.seeding import play_begins, seed_steps
 from railroads.mapgen.start import StartRegion, pick_start_bounds
 from railroads.mapgen.terrain_tiles import SOURCE as TERRAIN_TILES_SOURCE
 from railroads.mapgen.terrain_tiles import ElevationDatabase
@@ -24,6 +24,7 @@ from railroads.sim.geo import Bounds, describe_lonlat
 from railroads.sim.grids import HexGrid
 from railroads.sim.novelties import Novelties
 from railroads.sim.stats import History
+from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import TileMap
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -123,6 +124,15 @@ def start_new_game(
 
 def make_game(settings: Settings, report: Callable[[str], None] = print) -> SavedGame:
     """A new game with these settings, its towns grown and ready to play."""
+    return finish(make_game_steps(settings, report))
+
+
+def make_game_steps(
+    settings: Settings,
+    report: Callable[[str], None] = print,
+    progress: Callable[[float], None] = lambda done: None,
+) -> Steps[SavedGame]:
+    """make_game in steps, telling `progress` the share of the towns' history grown so far."""
     seed = settings.seed
     baked = settings.map.start_map
     if baked is not None:
@@ -137,7 +147,9 @@ def make_game(settings: Settings, report: Callable[[str], None] = print) -> Save
     begins = play_begins(months)
     report(f"Growing towns for {years} years, from {HISTORY_START} to {begins}")
     history = History()
-    seeded = seed_buildings(tile_map, np.random.default_rng(seed), months=months, history=history)
+    seeded = yield from seed_steps(
+        tile_map, np.random.default_rng(seed), months=months, history=history, progress=progress
+    )
     game = Game(seeded, start_year=begins, history=history, names=place_names(seeded.tile_map))
     game.finances.cash = settings.cash
     game.growth.novelties = Novelties.pick(game.tile_map, np.random.default_rng(seed + 3))

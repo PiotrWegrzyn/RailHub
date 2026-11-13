@@ -9,6 +9,7 @@ from railroads.mapgen.seeding import (
     HISTORY_STEP,
     play_begins,
     seed_buildings,
+    seed_steps,
 )
 from railroads.sim.clock import HISTORY_START
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station, Track
@@ -26,6 +27,7 @@ from railroads.sim.ladders import (
     TOWNS,
     Ladder,
 )
+from railroads.sim.steps import finish
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 
 
@@ -201,3 +203,17 @@ def test_history_begins_in_850_and_play_where_it_left_off(years: int, begins: in
 
     assert year == begins
     assert HISTORY_START == 850
+
+
+def test_seeding_in_steps_tells_how_far_it_has_grown() -> None:
+    done: list[float] = []
+
+    seed_steps_done = finish(
+        seed_steps(make_country(30), np.random.default_rng(1), months=600, progress=done.append)
+    )
+
+    assert isinstance(seed_steps_done, Constructions)
+    assert done == sorted(done)
+    assert done[0] == 0.0
+    assert done[-1] == 1.0
+    assert len(done) == 600 // HISTORY_STEP + 1

@@ -8,7 +8,7 @@ import numpy as np
 from imgui_bundle import hello_imgui, imgui, immapp
 
 from railroads import maps
-from railroads.newgame import MapChoice, Settings, make_game
+from railroads.newgame import MapChoice, Settings, make_game_steps
 from railroads.saves import ReusedMemory, SavedGame, SaveError, Saves, snapshot
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
 from railroads.sim.game import Game
@@ -22,7 +22,7 @@ from railroads.ui.saves_window import SavesWindow
 from railroads.ui.tech_window import TechWindow
 from railroads.ui.theme import BRASS, apply_theme
 from railroads.ui.top_bar import draw_top_bar
-from railroads.ui.workers import FrameWorker, worker
+from railroads.ui.workers import FrameWorker, submit_steps, worker
 
 # How long a notice such as "Autosaved" stays in the top bar.
 NOTICE_SECONDS = 4.0
@@ -257,6 +257,8 @@ class Shell:
         self._task: Future[App] | None = None
         self._doing = ""
         self._progress = ""
+        # How much of the work is done, where it can tell.
+        self._done: float | None = None
         self._executor = worker("setup")
         # Where the setup runs on the frames, it starts once the waiting screen has shown.
         self._waiting_shown = False
@@ -267,15 +269,21 @@ class Shell:
         print(progress)
         self._progress = progress
 
+    def advance(self, done: float) -> None:
+        self._done = done
+
     def start(self, settings: Settings) -> None:
-        self._begin("Setting up a new game", lambda: make_game(settings, self.report))
+        self._begin(
+            "Setting up a new game", lambda: make_game_steps(settings, self.report, self.advance)
+        )
 
     def load(self, name: str) -> None:
-        self._begin(f"Loading '{name}'", lambda: self.saves.load(name))
+        self._begin(f"Loading '{name}'", lambda: _at_once(lambda: self.saves.load(name)))
 
-    def _begin(self, doing: str, work: Callable[[], SavedGame]) -> None:
+    def _begin(self, doing: str, work: Callable[[], Steps[SavedGame]]) -> None:
         self._doing = doing
         self._progress = ""
+        self._done = None
         size, density = WINDOW_SIZE, 1
         if imgui.get_current_context() is not None:
             io = imgui.get_io()
@@ -284,12 +292,14 @@ class Shell:
         # Where frames do the work, the chunks are left to be drawn a frame at a time instead.
         chunks = not isinstance(self._executor, FrameWorker)
 
-        def prepared() -> App:
-            app = App.from_saved(work(), self.saves)
+        def prepared() -> Steps[App]:
+            saved = yield from work()
+            yield
+            app = App.from_saved(saved, self.saves)
             app.view.prepare(size, density, chunks)
             return app
 
-        self._task = self._executor.submit(prepared)
+        self._task = submit_steps(self._executor, prepared)
         self._waiting_shown = False
 
     def gui(self) -> None:
@@ -351,7 +361,15 @@ class Shell:
         dots = "." * (1 + int(time.monotonic() * 2) % 3)
         imgui.text_colored(imgui.ImVec4(*BRASS), f"{self._doing}{dots:<3}")
         imgui.text_disabled(self._progress or " ")
+        if self._done is not None:
+            imgui.progress_bar(self._done, imgui.ImVec2(WAITING_WIDTH, 0))
         imgui.end_group()
+
+
+def _at_once[T](work: Callable[[], T]) -> Steps[T]:
+    """Work done in one go, as steps: it starts after the first pause."""
+    yield
+    return work()
 
 
 def settings_from(args: argparse.Namespace) -> Settings | None:
