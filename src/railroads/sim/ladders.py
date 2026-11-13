@@ -689,10 +689,15 @@ GASWORKS = Ladder(
 BAKERIES = Ladder(
     kinds=(BuildingKind.BAKERY,),
     land=TOWN_LAND,
-    base_chance=0.000004,
+    base_chance=0.000008,
     chance_per_doubling={Points.POPULATION: 0.000001},
     most_per_cell=1,
     most_nearby=1,
+)
+
+# Butchers open in towns from 1850, the likelier the more people live around, like bakeries.
+BUTCHERS = replace(
+    BAKERIES, kinds=(BuildingKind.MEAT_FACTORY,), base_chance=0.000004, from_year=1850
 )
 
 # Potatoes like cool, open plains; they feed houses and the distilleries.
@@ -869,7 +874,6 @@ WORKS = (
     _works(BuildingKind.BREWERY, {POP: 1.5e-9, Points.FOOD: 3e-9}, {}, base=1e-8),
     _works(BuildingKind.DISTILLERY, {POP: 8e-10, Points.FOOD: 3e-9}, {}, 1600, base=1e-8),
     _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=1e-8),
-    _works(BuildingKind.MEAT_FACTORY, {POP: 8e-10, Points.FOOD: 3e-9}, {}, 1865, base=1e-8),
     _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {}, 1850, base=1e-8),
     _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=1e-8),
     _works(BuildingKind.PRINTING_WORKS, {POP: 1.5e-9, IND: 3e-9}, {}, 1600, PRINTING_CELLS, 1e-8),
@@ -919,6 +923,7 @@ LADDERS = (
     CHURCHES,
     BEEKEEPERS,
     BAKERIES,
+    BUTCHERS,
     GASWORKS,
     POTATO_FARMS,
     CATTLE_RANCHES,

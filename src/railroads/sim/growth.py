@@ -120,7 +120,7 @@ DRAWN_BY: Mapping[Points, Mapping[Points, float]] = MappingProxyType(
 
 # Kinds that come up where people live: their spawn chance counts once for every population
 # point in the neighbourhood, and nowhere without any.
-SPAWN_BY_PEOPLE = frozenset({BuildingKind.BAKERY, BuildingKind.GASWORKS})
+SPAWN_BY_PEOPLE = frozenset({BuildingKind.BAKERY, BuildingKind.MEAT_FACTORY, BuildingKind.GASWORKS})
 
 
 @dataclass(frozen=True, slots=True)
