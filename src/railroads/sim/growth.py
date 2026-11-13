@@ -543,22 +543,29 @@ class Growth:
         """Grows one month; returns the cells whose buildings changed."""
         return finish(self.month_steps(rng))
 
-    def month_steps(self, rng: np.random.Generator) -> Steps[set[Cell]]:
-        """Grows one month in a few steps, which a caller can spread over frames; nothing else may
-        change the game between them. Returns the cells whose buildings changed."""
-        self._months += 1
-        if self._months % 12 == 0:
-            stations = 0 if self.railway is None else len(self.railway.stations())
-            self.history.close_year(self.year - 1, stations, self.population())
+    def month_steps(self, rng: np.random.Generator, months: int = 1) -> Steps[set[Cell]]:
+        """Grows one month, or this many months at once, in a few steps, which a caller can
+        spread over frames; nothing else may change the game between them. Over many months each
+        ladder's chances count that many times over, and a cell may take several turns. Returns
+        the cells whose buildings changed."""
+        before = self._months
+        self._months += months
+
+        def reached(every: int) -> bool:
+            return self._months // every > before // every
+
+        stations = 0 if self.railway is None else len(self.railway.stations())
+        for month in range((before // 12 + 1) * 12, self._months + 1, 12):
+            self.history.close_year(self.start_year + month // 12 - 1, stations, self.population())
         changed: set[Cell] = set()
         self.forests_changed = set()
-        if self.rule.trades and self._months % self.rule.trade_every_months == 0:
+        if self.rule.trades and reached(self.rule.trade_every_months):
             changed = yield from self._trade_steps()
             yield
-        if self.novelties is not None and self._months % 12 == 0:
+        if self.novelties is not None and reached(12):
             changed |= self.novelties.year(self, rng)
         every = self.rule.forests_every_months
-        if self.rule.forests is not None and self._months % every == 0:
+        if self.rule.forests is not None and reached(every):
             changed |= change_forests(self, self.rule.forests, every, rng)
         turns: list[tuple[int, Ladder]] = []
         growing = [
@@ -566,7 +573,7 @@ class Growth:
             for place in self._places
             if place.ladder.from_year <= self.year and place.cells.size and place.highest > 0
         ]
-        thin = [place for place in growing if place.highest <= THINNING_UP_TO]
+        thin = [place for place in growing if place.highest <= THINNING_UP_TO and months == 1]
         tries = dict(
             zip(
                 map(id, thin),
@@ -578,7 +585,7 @@ class Growth:
             drawn = tries.get(id(place))
             if drawn == 0:
                 continue
-            hits = self._hits(place, rng, drawn)
+            hits = self._hits(place, rng, drawn, months)
             turns += [(index, place.ladder) for index in hits.tolist()]
         for turn in rng.permutation(len(turns)).tolist():
             index, ladder = turns[turn]
@@ -612,24 +619,35 @@ class Growth:
                 self._reckon(place, cells)
                 place.highest = max(place.highest, float(place.chances[cells].max()))
 
-    def run(self, months: int, rng: np.random.Generator) -> None:
-        for _ in range(months):
-            self.month(rng)
+    def run(self, months: int, rng: np.random.Generator, step: int = 1) -> None:
+        """Grows these many months, `step` months at a time and what is left at the end."""
+        for _ in range(months // step):
+            finish(self.month_steps(rng, step))
+        if months % step:
+            finish(self.month_steps(rng, months % step))
 
     def _hits(
-        self, place: _Place, rng: np.random.Generator, tries: int | None = None
+        self,
+        place: _Place,
+        rng: np.random.Generator,
+        tries: int | None = None,
+        months: int = 1,
     ) -> npt.NDArray[np.intp]:
         """The cells that take a turn on the ladder this month. With small chances, cells are
         drawn as if all had the highest chance and each kept by how its own compares, so a month
         costs what grows rather than the size of the map: `tries` of them, if already drawn
-        for every ladder at once."""
+        for every ladder at once. Over many months, a cell is drawn as many times as it takes
+        turns, on average its chance times the months."""
         cells = place.cells
         if not cells.size:
             return cells
         highest = place.highest
         if highest <= 0:
             return cells[:0]
-        if highest > THINNING_UP_TO:
+        if months > 1:
+            tried = cells[rng.integers(0, cells.size, rng.poisson(cells.size * highest * months))]
+            drawn = tried[rng.random(tried.size) * highest < place.chances[tried]]
+        elif highest > THINNING_UP_TO:
             drawn = cells[rng.random(cells.size, dtype=np.float32) < place.chances[cells]]
         else:
             if tries is None:

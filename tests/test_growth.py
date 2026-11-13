@@ -636,3 +636,25 @@ def test_a_cell_closed_and_opened_again_is_allowed_only_once() -> None:
     allowed = _allowed(cells, np.array([5, 6]), land)
 
     assert allowed.tolist() == [2, 5, 6, 9]
+
+
+def test_over_many_months_a_cell_takes_its_chance_times_the_months_of_turns() -> None:
+    growth = Growth(Constructions(make_map()), NO_TRADE)
+    place = growth._places[0]
+    place.chances[:] = 0.0
+    place.chances[place.cells] = 0.01
+    place.highest = 0.01
+
+    hits = growth._hits(place, np.random.default_rng(0), months=300)
+
+    turns = np.bincount(hits, minlength=place.chances.size)[place.cells]
+    assert turns.mean() == pytest.approx(3.0, rel=0.1)
+    assert turns.max() > 1
+
+
+def test_growing_years_at_a_step_still_closes_every_year() -> None:
+    growth = Growth(Constructions(make_map()), NO_TRADE, start_year=850)
+
+    growth.run(10 * 12, np.random.default_rng(0), step=60)
+
+    assert sorted(growth.history.population) == list(range(850, 860))

@@ -6,8 +6,7 @@ import pytest
 from builders import flat_map
 from railroads.mapgen.deposits import place_deposits
 from railroads.mapgen.seeding import (
-    FORESTS_EVERY_MONTHS,
-    TRADE_EVERY_MONTHS,
+    HISTORY_STEP,
     play_begins,
     seed_buildings,
 )
@@ -91,12 +90,10 @@ def history() -> Grown:
         tile_map, vegetation=tile_map.vegetation.copy(), deposits=place_deposits(tile_map, rng)
     )
     constructions = Constructions(tile_map)
-    rule = replace(
-        BUSY, trade_every_months=TRADE_EVERY_MONTHS, forests_every_months=FORESTS_EVERY_MONTHS
-    )
+    rule = replace(BUSY, trade_every_months=HISTORY_STEP, forests_every_months=HISTORY_STEP)
     growth = Growth(constructions, rule, start_year=HISTORY_START)
     with growth.log_changes() as changes:
-        growth.run(MONTHS_BEFORE_PLAY, rng)
+        growth.run(MONTHS_BEFORE_PLAY, rng, HISTORY_STEP)
     return constructions, set(changes)
 
 

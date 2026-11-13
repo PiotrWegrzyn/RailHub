@@ -15,10 +15,10 @@ from railroads.sim.ladders import GROWTH, GrowthRule
 from railroads.sim.stats import History
 from railroads.sim.tilemap import TileMap
 
-# Before play, goods are shared out every two years and forests change once a year, to
-# seed quickly.
-TRADE_EVERY_MONTHS = 24
-FORESTS_EVERY_MONTHS = 12
+# Before play, the map grows this many years at a step: goods are shared out, forests change and
+# buildings come up once a step, at the chances of every month of it, to seed quickly.
+HISTORY_STEP_YEARS = 5
+HISTORY_STEP = HISTORY_STEP_YEARS * 12
 
 
 def seed_buildings(
@@ -35,12 +35,10 @@ def seed_buildings(
         tile_map, vegetation=tile_map.vegetation.copy(), deposits=place_deposits(tile_map, rng)
     )
     constructions = Constructions(tile_map)
-    rule = replace(
-        growth,
-        trade_every_months=TRADE_EVERY_MONTHS,
-        forests_every_months=FORESTS_EVERY_MONTHS,
+    rule = replace(growth, trade_every_months=HISTORY_STEP, forests_every_months=HISTORY_STEP)
+    Growth(constructions, rule, start_year=HISTORY_START, history=history).run(
+        months, rng, HISTORY_STEP
     )
-    Growth(constructions, rule, start_year=HISTORY_START, history=history).run(months, rng)
     return constructions
 
 
