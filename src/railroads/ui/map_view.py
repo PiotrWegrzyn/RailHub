@@ -29,7 +29,8 @@ from railroads.ui.build_menu import (
     draw_track,
     draw_trains,
 )
-from railroads.ui.buildings import BuildingSpots, draw_building_dots
+from railroads.ui.building_spots import BuildingSpots
+from railroads.ui.buildings import draw_building_dots
 from railroads.ui.ground import GroundLayout, GroundPictures, Pixels, cell_colors
 from railroads.ui.hex_details import draw_hex_details, recently_described
 from railroads.ui.iso_camera import IsoCamera, Vec2

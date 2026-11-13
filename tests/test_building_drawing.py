@@ -11,7 +11,8 @@ from railroads.sim.grids import Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 from railroads.ui import building_spots
 from railroads.ui.build_menu import draw_track
-from railroads.ui.buildings import BuildingSpots, Plot, draw_building_dots, plots_of
+from railroads.ui.building_spots import BuildingSpots, Plot, plots_of
+from railroads.ui.buildings import draw_building_dots
 from railroads.ui.iso_camera import IsoCamera
 
 

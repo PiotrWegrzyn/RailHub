@@ -1,6 +1,6 @@
 """How buildings show when zoomed out: a dot in each kind's colour where each one stands
-(railroads.ui.building_spots, whose names are kept here too); close up they are sprites in the
-pixel art (see railroads.ui.pixel).
+(railroads.ui.building_spots); close up they are sprites in the pixel art (see
+railroads.ui.pixel).
 """
 
 from functools import cache
@@ -9,10 +9,8 @@ import numpy as np
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import BuildingKind
-from railroads.ui.building_spots import BuildingSpots, Plot, plots_of
+from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.iso_camera import IsoCamera, Vec2
-
-__all__ = ["DOTS", "BuildingSpots", "Plot", "draw_building_dots", "plots_of"]
 
 type Color = tuple[int, int, int]
 
