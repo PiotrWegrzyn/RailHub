@@ -111,13 +111,15 @@ class StationTrade:
 
     def hand_out_now(self, station: Cell, good: Good) -> None:
         """Hands a good that has just reached a station to the buildings around it that still
-        want it this month, the nearest first, at once: what trains brought, then the stockpile
-        unless the good is kept for trains. Each takes up to what it needs in a month, less what
+        want it this month, the nearest first, at once, unless the good is kept for trains: what
+        trains brought, then the stockpile. Each takes up to what it needs in a month, less what
         it took already; a processor up to the room in its stockpile. They pay as they take."""
         growth, railway = self._growth, self._growth.railway
         if railway is None or good in TRAVELLERS:
             return
         goods = railway.station_goods(station)
+        if good in goods.kept:
+            return
         within = flat_within(growth.grid, station, railway.reach(station)[0])
         cells = within.cells[np.argsort(within.steps, kind="stable")]
         economy, year = growth.economy, growth.year
@@ -153,7 +155,7 @@ class StationTrade:
         self, station: Cell, goods: StationGoods, need: Need, good: Good, want: float
     ) -> float:
         """Gives up to `want` of a good from a station, first of what trains brought, then of its
-        stockpile unless kept for trains, and pays for it; returns how much went."""
+        stockpile, and pays for it; returns how much went."""
         railway = self._growth.railway
         assert railway is not None
         given = 0.0
@@ -162,13 +164,36 @@ class StationTrade:
             goods.release(good, brought)
             railway.pay_for(station, need, good, brought)
             given += brought
-        held = 0.0 if good in goods.kept else goods.stockpile.get(good, 0.0)
+        held = goods.stockpile.get(good, 0.0)
         stocked = min(want - given, held)
         if stocked > 0:
             goods.stockpile[good] = held - stocked
             railway.pay_for_passing(station, need, good, stocked)
             given += stocked
         return given
+
+    def short_of(self, station: Cell) -> dict[Need, float]:
+        """What the buildings a station hands goods out to are still short of this month, need by
+        need: what last month's trade left them wanting, less what they took since."""
+        trade = self._growth.trade
+        if trade is None:
+            return {}
+        ring = self.inner_ring(station)
+        positions = np.searchsorted(trade.cells, ring)
+        inside = (positions < trade.cells.size) & (
+            trade.cells[np.minimum(positions, trade.cells.size - 1)] == ring
+        )
+        positions, ring = positions[inside], ring[inside]
+        taken = self._growth.economy.taken or {}
+        short: dict[Need, float] = {}
+        for (kind, need), (received, wanted) in trade.goods_got.items():
+            lacking = np.maximum(wanted[positions] - received[positions], 0.0)
+            since = taken.get((kind, need), {})
+            if since:
+                lacking = np.maximum(lacking - [since.get(int(c), 0.0) for c in ring], 0.0)
+            if lacking.sum() > 0:
+                short[need] = short.get(need, 0.0) + float(lacking.sum())
+        return short
 
     def measure_demand(self, station: Cell) -> None:
         """Sets a new station's demand capacity from the buildings around it now, so cargo pays

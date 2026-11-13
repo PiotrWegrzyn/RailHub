@@ -9,7 +9,7 @@ need is met, a station takes every spare unit of the goods meeting it that build
 its collection radius into its stockpile, while it has room for that good. It then hands what
 trains brought to buildings within its delivery radius, unsatisfied ones first, then content ones,
 nearest first, and then its stockpile, freshly gathered goods included. Goods the player keeps for
-trains at a station (StationOrder.kept) are not handed out from its stockpile.
+trains at a station (StationOrder.kept) are not handed out at all, brought or gathered.
 
 What stations leave, buildings sell on their own (LOCAL_REACH): every cell's spare goods go first
 to the buildings in the same cell, then to those one cell away, and so on outwards, and each cell
@@ -155,7 +155,7 @@ class StationOrder:
     collection: int = COLLECTION_RADIUS
     # Freight it gathered before, which it also hands out to the buildings around it.
     stockpile: Mapping[Good, float] = field(default_factory=dict)
-    # Goods kept for trains: none of its stockpile of them is handed out around it.
+    # Goods kept for trains: none of them is handed out around it, brought or gathered.
     kept: frozenset[Good] = frozenset()
 
 
@@ -455,7 +455,7 @@ class _Month:
 
     def _serve(self, need: Need) -> None:
         """Lets stations hand out the goods meeting a need, the most valuable first: of each
-        good what trains brought, then their stockpile, unless it is kept for trains. Buildings
+        good what trains brought, then their stockpile, unless the good is kept for trains. Buildings
         want only what they did not take already this month."""
         wants = self._wants(need)
         if not wants:
@@ -468,6 +468,8 @@ class _Month:
         for station in self.stations:
             near, _ = self.reach[station]
             for good in HANDED_OUT[need]:
+                if good in self.stations[station].kept:
+                    continue
                 brought = self.brought[station].get(good, 0.0)
                 if brought > 0:
                     given = self.economy._hand_out(brought, near, demand, received, self.priority)
@@ -476,7 +478,7 @@ class _Month:
                     handed_for = self.handed_for[station]
                     handed_for[(need, good)] = handed_for.get((need, good), 0.0) + given
                 held = self.stockpiled[station].get(good, 0.0)
-                if held <= 0 or good in self.stations[station].kept:
+                if held <= 0:
                     continue
                 given = self.economy._hand_out(held, near, demand, received, self.priority)
                 self.stockpiled[station][good] = held - given

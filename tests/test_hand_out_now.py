@@ -48,3 +48,28 @@ def test_goods_kept_for_trains_stay_in_the_stockpile() -> None:
     growth.station_trade.hand_out_now(STATION, Good.WHEAT)
 
     assert goods.stockpile[Good.WHEAT] == 30.0
+
+
+def test_goods_trains_brought_but_kept_for_trains_are_not_handed_out_either() -> None:
+    growth, railway = joined_stations()
+    growth.build(Building((6, 21), BuildingKind.HOUSE))
+    bring(railway, Good.BREAD, 50.0)
+    railway.station_goods(STATION).keep_for_trains(Good.BREAD)
+
+    growth.station_trade.hand_out_now(STATION, Good.BREAD)
+    growth.trade_goods()
+
+    assert railway.station_goods(STATION).brought[Good.BREAD] == pytest.approx(50.0)
+
+
+def test_a_station_is_short_only_of_what_its_buildings_still_lack_this_month() -> None:
+    growth, railway = joined_stations()
+    growth.build(Building((6, 21), BuildingKind.HOUSE))
+    growth.trade_goods()
+    hungry = growth.station_trade.short_of(STATION)
+    bring(railway, Good.BREAD, 50.0)
+
+    growth.station_trade.hand_out_now(STATION, Good.BREAD)
+
+    assert hungry[Need.FOOD] == pytest.approx(10.0)
+    assert Need.FOOD not in growth.station_trade.short_of(STATION)
