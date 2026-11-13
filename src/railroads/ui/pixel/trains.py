@@ -155,6 +155,10 @@ AUTO_BODY: RGB = (176, 44, 60)
 TANK_HULL: RGB = (88, 100, 60)
 PLANE_BODY: RGB = (188, 196, 206)
 ORANGE: RGB = (240, 140, 36)
+DINER: RGB = (98, 58, 40)
+DINER_CREAM: RGB = (232, 218, 178)
+WOOD: RGB = (128, 88, 54)
+COPPER: RGB = (184, 108, 58)
 
 # Sizes in cells: how far apart the engine and cars sit, and their half lengths.
 ENGINE_HALF = 0.36
@@ -349,6 +353,459 @@ def express() -> Model:
     return m
 
 
+def _disc(
+    m: Model, u: float, z: float, radius: float, v: float, color: RGB, teeth: bool = False
+) -> None:
+    """A flat round plate on the side of the model `v` out from its middle, facing out: a
+    flywheel, or with `teeth` a cog."""
+    points = 16 if teeth else 8
+    corners = []
+    for k in range(points):
+        angle = 2 * math.pi * k / points
+        reach = radius * (0.8 if teeth and k % 2 else 1.0)
+        corners.append((u + reach * math.cos(angle), v, z + reach * math.sin(angle)))
+    m.faces.append(Face(corners, color, (0, 1 if v > 0 else -1, 0)))
+
+
+def _slant(
+    m: Model, a: tuple[float, float], b: tuple[float, float], thick: float, v: float, color: RGB
+) -> None:
+    """A bar `thick` tall running at a slant from `a` to `b`, each a (u, z) point, on both sides
+    of the model `v` out from its middle."""
+    (au, az), (bu, bz) = a, b
+    half = thick / 2
+    for side in (v, -v):
+        corners = [(au, side, az - half), (bu, side, bz - half), (bu, side, bz + half)]
+        corners.append((au, side, az + half))
+        m.faces.append(Face(corners, color, (0, 1 if side > 0 else -1, 0)))
+
+
+@dataclass(frozen=True)
+class Pioneer:
+    """A steam engine of the first years: a small boiler on a frame with no cab, a tall thin
+    chimney at the front and wheels given as (u, radius). It may have upright cylinders on the
+    boiler with crossheads over them, beams along both sides worked by side cylinders, a flywheel
+    or a cog for a rack rail on one side, cylinders slanting down to the front wheels, and a
+    firebox at the back, square or with a domed top."""
+
+    half: float
+    boiler: RGB
+    frame: RGB
+    wheels: tuple[tuple[float, float], ...]
+    wheel: RGB = FRAME
+    chimney_color: RGB = BLACK_IRON
+    chimney_top: float = 0.42
+    radius: float = 0.065
+    rods: bool = False
+    uprights: tuple[float, ...] = ()
+    crossheads: bool = False
+    beams: bool = False
+    flywheel: bool = False
+    rack: bool = False
+    slanted: bool = False
+    firebox: RGB | None = None
+    haystack: bool = False
+
+    @property
+    def chimney(self) -> tuple[float, float]:
+        return self.half - 0.06, self.chimney_top
+
+    def model(self) -> Model:
+        m = Model()
+        h, r = self.half, self.radius
+        z = 0.075 + r
+        top = z + r
+        m.box((-h, h), (-0.065, 0.065), (0.045, 0.075), self.frame)
+        for u, size in self.wheels:
+            m.wheels([u], size, self.wheel, 0.075)
+        if self.rods:
+            us = [u for u, _ in self.wheels]
+            _side_rods(m, (min(us), max(us)), self.wheels[0][1])
+        start = -h + 0.07
+        if self.firebox is not None:
+            m.box((start, start + 0.08), (-r, r), (0.075, top + 0.01), self.firebox)
+            if self.haystack:
+                m.spire(start + 0.04, r, (top + 0.01, top + 0.07), self.firebox)
+            start += 0.08
+        m.cylinder_along((start, h - 0.02), r, z, self.boiler, shade(self.boiler, 0.8))
+        u = self.chimney[0]
+        m.cylinder_up(u, 0.017, (top - 0.01, self.chimney_top - 0.02), self.chimney_color)
+        m.box(
+            (u - 0.026, u + 0.026),
+            (-0.026, 0.026),
+            (self.chimney_top - 0.025, self.chimney_top),
+            self.chimney_color,
+        )
+        for u in self.uprights:
+            m.cylinder_up(u, 0.024, (top - 0.01, top + 0.06), BRASS)
+            if self.crossheads:
+                m.box(
+                    (u - 0.008, u + 0.008), (-0.095, 0.095), (top + 0.06, top + 0.072), BLACK_IRON
+                )
+                for v in (-0.095, 0.087):
+                    m.box((u - 0.005, u + 0.005), (v, v + 0.008), (0.05, top + 0.06), STEEL)
+        if self.beams:
+            self._beams(m, z, top)
+        if self.flywheel:
+            for v in (0.096, -0.096):
+                _disc(m, -0.03, z + 0.02, 0.09, v, BLACK_IRON)
+                _disc(m, -0.03, z + 0.02, 0.025, v * 1.01, BRASS)
+        if self.rack:
+            for v in (0.096, -0.096):
+                _disc(m, 0.0, 0.065, 0.065, v, STEEL, teeth=True)
+        if self.slanted:
+            (front, size), *_ = self.wheels
+            _slant(m, (-h + 0.12, z + 0.04), (front, size), 0.03, 0.09, self.boiler)
+        return m
+
+    def _beams(self, m: Model, z: float, top: float) -> None:
+        """Puffing Billy's cylinders standing at the boiler's sides, working beams pivoted at the
+        back that drive the wheels through rods hanging from their front ends."""
+        h = self.half
+        high = top + 0.08
+        for v0, v1 in ((0.07, 0.092), (-0.092, -0.07)):
+            m.box((0.0, 0.045), (v0, v1), (z - 0.03, high - 0.01), BLACK_IRON)
+            m.box((-h + 0.07, 0.17), (v0 + 0.004, v1 - 0.004), (high, high + 0.016), FRAME)
+            m.box((-h + 0.07, -h + 0.085), (v0 + 0.004, v1 - 0.004), (z, high), FRAME)
+            m.box((0.155, 0.165), (v0 + 0.006, v1 - 0.006), (0.05, high), STEEL)
+
+
+@dataclass(frozen=True)
+class Steam:
+    """A steam engine with a cab: driving wheels in one group, or two each with its own
+    cylinders for an articulated engine, small wheels ahead and behind, and a boiler with a
+    smokebox, chimney and domes. A tank engine carries its water in tanks along the boiler and its
+    coal in a bunker behind the cab instead of a tender; a streamlined one is cased in a smooth
+    shroud with stripes along it."""
+
+    half: float
+    body: RGB
+    roof: RGB
+    drivers: tuple[tuple[float, ...], ...]
+    driver: float
+    wheel: RGB
+    leading: tuple[float, ...] = ()
+    trailing: tuple[float, ...] = ()
+    radius: float = 0.08
+    cab: float = 0.22
+    cab_color: RGB | None = None
+    trim: RGB = BRASS
+    smokebox: RGB = SMOKEBOX
+    domes: tuple[float, ...] = (0.0,)
+    stack: float = 0.09
+    balloon: bool = False
+    cowcatcher: RGB | None = None
+    headlight: bool = False
+    deflectors: bool = False
+    tanks: bool = False
+    shroud: RGB | None = None
+
+    @property
+    def middle(self) -> float:
+        """How high the middle of the boiler is."""
+        return 0.08 + self.radius
+
+    @property
+    def chimney(self) -> tuple[float, float]:
+        top = self.middle + self.radius
+        front = self.half - 0.04
+        if self.shroud is not None:
+            return front - 0.145, top + 0.025
+        return front - 0.07 - (0.03 if self.headlight else 0.0), top + self.stack
+
+    def model(self) -> Model:
+        m = Model()
+        h, r, z = self.half, self.radius, self.middle
+        front, top = h - 0.04, z + r
+        cab_front = -h + self.cab
+        m.box((-h, front), (-0.07, 0.07), (0.035, 0.08), FRAME)
+        m.wheels([*self.leading, *self.trailing], 0.03, FRAME, 0.075)
+        for group in self.drivers:
+            m.wheels(list(group), self.driver, self.wheel, 0.075)
+            if len(group) > 1:
+                _side_rods(m, (min(group), max(group)), self.driver)
+            c = max(group) + self.driver + 0.045
+            d = self.driver
+            m.box((c - 0.035, c + 0.035), (-0.1, 0.1), (d - 0.02, d + 0.03), self.smokebox)
+        m.box((cab_front, front), (-0.095, 0.095), (0.08, 0.09), FRAME)
+        if self.shroud is not None:
+            self._shroud(m, front, top, self.shroud)
+        else:
+            self._boiler(m, front, top)
+        if self.cowcatcher is not None:
+            m.nose((front, h + 0.03), (0.0, 0.012, 0.075), 0.075, self.cowcatcher)
+        else:
+            m.box((front, h), (-0.085, 0.085), (0.01, 0.075), CAB_RED)
+        if self.tanks:
+            self._tanks(m, cab_front, front, top)
+        else:
+            self._cab(m, -h, cab_front, top + (0.04 if self.shroud else 0.05))
+        return m
+
+    def _boiler(self, m: Model, front: float, top: float) -> None:
+        r, z = self.radius, self.middle
+        cab_front = -self.half + self.cab
+        m.cylinder_along((cab_front - 0.01, front - 0.11), r, z, self.body)
+        m.cylinder_along((front - 0.11, front - 0.03), r + 0.003, z, self.smokebox, self.smokebox)
+        m.box((front - 0.03, front), (-0.065, 0.065), (0.08, z + 0.05), self.smokebox)
+        _bands(m, (cab_front + 0.05,), r, z, self.trim)
+        for u in self.domes:
+            m.cylinder_up(u, 0.03, (top - 0.01, top + 0.045), self.trim)
+        u, high = self.chimney
+        if self.balloon:
+            m.cylinder_up(u, 0.022, (top - 0.01, high - 0.04), BLACK_IRON)
+            m.box((u - 0.035, u + 0.035), (-0.035, 0.035), (high - 0.04, high - 0.015), BLACK_IRON)
+            m.box((u - 0.045, u + 0.045), (-0.045, 0.045), (high - 0.015, high), BLACK_IRON)
+        else:
+            m.cylinder_up(u, 0.026, (top - 0.01, high - 0.015), BLACK_IRON)
+            m.box((u - 0.032, u + 0.032), (-0.032, 0.032), (high - 0.015, high), BLACK_IRON)
+        if self.headlight:
+            m.box(
+                (front - 0.045, front - 0.005),
+                (-0.025, 0.025),
+                (top - 0.005, top + 0.045),
+                BLACK_IRON,
+            )
+            m.box((front - 0.005, front), (-0.016, 0.016), (top + 0.005, top + 0.035), LIT_WINDOW)
+        if self.deflectors:
+            for v in ((r + 0.004, r + 0.012), (-r - 0.012, -r - 0.004)):
+                m.box((front - 0.16, front - 0.04), v, (0.1, top + 0.0), self.smokebox)
+
+    def _shroud(self, m: Model, front: float, top: float, stripe: RGB) -> None:
+        h, z = self.half, self.middle
+        cab_front = -h + self.cab
+        nose = front - 0.12
+        m.box((cab_front, nose), (-0.092, 0.092), (0.07, top + 0.015), self.body)
+        m.nose((nose, h + 0.02), (0.02, 0.09, top + 0.015), 0.092, self.body)
+        for low in (z + 0.012, top - 0.035):
+            m.panel((cab_front, nose), (low, low + 0.012), 0.0925, stripe)
+        u, high = self.chimney
+        m.box((u - 0.015, u + 0.015), (-0.02, 0.02), (top + 0.015, high - 0.003), BLACK_IRON)
+
+    def _tanks(self, m: Model, cab_front: float, front: float, top: float) -> None:
+        h, z = self.half, self.middle
+        bunker = -h + 0.07
+        m.box((-h, bunker), (-0.088, 0.088), (0.08, top - 0.03), self.body)
+        m.box((-h + 0.01, bunker - 0.005), (-0.075, 0.075), (top - 0.03, top - 0.01), COAL)
+        self._cab(m, bunker, cab_front, top + 0.05)
+        m.box((cab_front, front - 0.12), (-0.092, 0.092), (0.08, z + 0.035), self.body)
+        m.panel(
+            (cab_front + 0.015, front - 0.135),
+            (z - 0.035, z + 0.02),
+            0.0925,
+            shade(self.body, 0.85),
+        )
+
+    def _cab(self, m: Model, back: float, front: float, high: float) -> None:
+        color = self.cab_color or self.body
+        m.box((back, front), (-0.09, 0.09), (0.08, high), color)
+        m.panel((back + 0.03, front - 0.03), (high - 0.1, high - 0.035), 0.0905, WINDOW)
+        m.box((back - 0.02, front + 0.02), (-0.1, 0.1), (high, high + 0.02), self.roof)
+
+
+@dataclass(frozen=True)
+class Tender:
+    """A tender behind a steam engine on wheels at `wheels`: its sides `top` high, lined in
+    `trim`, heaped with its load, or for the first engines a low open wagon with a water barrel
+    on it, or for a streamlined engine cased to match it."""
+
+    half: float
+    body: RGB
+    wheels: tuple[float, ...]
+    top: float = 0.22
+    trim: RGB | None = BRASS
+    trim_z: tuple[float, float] | None = None
+    load: RGB = COAL
+    barrel: RGB | None = None
+    shroud: bool = False
+    width: float = 0.085
+
+    def model(self) -> Model:
+        m = Model()
+        h, w, top = self.half, self.width, self.top
+        m.box((-h, h), (-0.07, 0.07), (0.035, 0.06), FRAME)
+        m.wheels(list(self.wheels), 0.035, FRAME, 0.075)
+        m.box((-h, h), (-w, w), (0.06, top), self.body)
+        if self.trim is not None:
+            low, high = self.trim_z or (top - 0.035, top - 0.022)
+            m.panel((-h + 0.02, h - 0.02), (low, high), w + 0.0005, self.trim)
+        if self.shroud:
+            m.box(
+                (-h + 0.01, h - 0.01),
+                (-w + 0.01, w - 0.01),
+                (top, top + 0.02),
+                shade(self.body, 0.85),
+            )
+        elif self.barrel is not None:
+            m.cylinder_along(
+                (-h + 0.02, 0.05), 0.048, top + 0.048, self.barrel, shade(self.barrel, 0.75)
+            )
+            m.box((0.07, h - 0.02), (-w + 0.015, w - 0.015), (top, top + 0.035), self.load)
+        else:
+            m.box((-h + 0.03, h - 0.03), (-w + 0.015, w - 0.015), (top, top + 0.03), self.load)
+            m.box((-0.5 * h, 0.5 * h), (-0.05, 0.05), (top + 0.03, top + 0.05), self.load)
+        return m
+
+
+def _running_gear(m: Model, half: float, bogies: tuple[float, ...], axles: int) -> None:
+    """An underframe the length of the body, on bogies of `axles` axles each at `bogies`."""
+    m.box((-half + 0.01, half - 0.01), (-0.075, 0.075), (0.07, 0.09), FRAME)
+    span = 0.0375 * (axles - 1)
+    for c in bogies:
+        m.box((c - span - 0.05, c + span + 0.05), (-0.065, 0.065), (0.03, 0.07), FRAME)
+        m.wheels([c - span + 0.075 * k for k in range(axles)], 0.032, FRAME, 0.075)
+
+
+@dataclass(frozen=True)
+class Unit:
+    """A diesel or electric engine. Most have a body the full width of the frame with a cab at
+    the front, and at the back too if `both`: flat with windows, or a sloped nose `nose` long
+    coming down to `tip` at its end, curving for a long one; with passenger windows along it for
+    a railcar or a high-speed train. A hood unit instead has a narrow hood with walkways round it
+    and its cab near the front. Electrics carry pantographs; a maglev floats over its guideway on
+    a skirt instead of wheels."""
+
+    half: float
+    body: RGB
+    stripe: RGB
+    bogies: tuple[float, ...] = ()
+    axles: int = 2
+    top: float = 0.27
+    hood: bool = False
+    nose: float = 0.0
+    tip: float = 0.2
+    both: bool = True
+    ends: RGB | None = None
+    band: RGB | None = None
+    windows: int = 0
+    vents: int = 0
+    glass: RGB = WINDOW
+    pantographs: tuple[float, ...] = ()
+    floats: bool = False
+    roof: RGB = ROOF_GREY
+
+    @property
+    def chimney(self) -> None:
+        return None
+
+    def model(self) -> Model:
+        m = Model()
+        h = self.half
+        if self.floats:
+            m.box((-h + 0.02, h - self.nose), (-0.07, 0.07), (0.0, 0.03), FRAME)
+        else:
+            _running_gear(m, h, self.bogies, self.axles)
+        roof = self._hood(m) if self.hood else self._shell(m)
+        for u in self.pantographs:
+            _pantograph(m, u, roof)
+        for k in range(0 if self.hood else self.vents):
+            u = (k - (self.vents - 1) / 2) * 0.12
+            m.box((u - 0.04, u + 0.04), (-0.05, 0.05), (roof, roof + 0.012), shade(self.roof, 0.7))
+        return m
+
+    def _shell(self, m: Model) -> float:
+        h, top = self.half, self.top
+        floor = 0.02 if self.floats else 0.09
+        front = h - self.nose
+        back = -front if self.both else -h
+        skirt = floor + 0.04
+        m.box((back, front), (-0.085, 0.085), (floor, skirt), self.stripe)
+        m.box((back, front), (-0.085, 0.085), (skirt, top), self.body)
+        m.box((back, front), (-0.08, 0.08), (top, top + 0.015), self.roof)
+        if self.band is not None:
+            m.panel((back, front), (top - 0.09, top - 0.03), 0.0855, self.band)
+        for k in range(self.windows):
+            u = back + 0.1 + (front - back - 0.2) * (k + 0.5) / self.windows
+            m.panel((u - 0.025, u + 0.025), (top - 0.08, top - 0.035), 0.0856, self.glass)
+        for root, end in [(front, h), (back, -h)][: 2 if self.both else 1]:
+            self._end(m, root, end, floor)
+        if not self.both:
+            m.box((-h - 0.012, -h), (-0.045, 0.045), (floor + 0.02, top - 0.02), FRAME)
+        return top + 0.015
+
+    def _end(self, m: Model, root: float, end: float, floor: float) -> None:
+        """One end of the body: a flat cab front with windows, or a sloped nose with a
+        windscreen, and cab windows on its sides."""
+        top, color = self.top, self.ends or self.body
+        out = 1.0 if end > 0 else -1.0
+        side = root - out * 0.08
+        m.panel(
+            (min(root, side) + 0.015, max(root, side) - 0.015),
+            (top - 0.085, top - 0.035),
+            0.0857,
+            WINDOW,
+        )
+        if not self.nose:
+            m.box((end - 0.004, end + 0.004), (-0.065, 0.065), (top - 0.08, top - 0.025), WINDOW)
+            if self.ends is not None:
+                m.box(
+                    (end - out * 0.01 - 0.004, end - out * 0.01 + 0.004),
+                    (-0.085, 0.085),
+                    (floor, top - 0.09),
+                    self.ends,
+                )
+            return
+        if self.nose > 0.1:
+            bend = root + (end - root) * 0.6
+            high = top - (top - self.tip) * 0.35
+            m.nose((root, bend), (floor, high, top), 0.085, color)
+            m.nose((bend, end), (floor, self.tip, high), 0.085, color)
+            reach = 0.08
+            fall = (top - high) * reach / abs(bend - root)
+        else:
+            m.nose((root, end), (floor, self.tip, top), 0.085, color)
+            reach = abs(end - root) * 0.6
+            fall = (top - self.tip) * 0.6
+        a = (root + out * 0.004, top + 0.004)
+        b = (root + out * (reach + 0.004), top - fall + 0.004)
+        m.slope(a, b, (-0.065, 0.065), WINDOW)
+
+    def _hood(self, m: Model) -> float:
+        h, top = self.half, self.top
+        cab = (h - 0.22, h - 0.1)
+        m.box((-h, h), (-0.09, 0.09), (0.09, 0.1), FRAME)
+        m.box((h - 0.1, h - 0.01), (-0.05, 0.05), (0.1, top - 0.08), self.body)
+        m.box(cab, (-0.085, 0.085), (0.1, top), self.body)
+        m.box((cab[0] - 0.01, cab[1] + 0.01), (-0.09, 0.09), (top, top + 0.012), self.roof)
+        m.box((cab[1] - 0.004, cab[1] + 0.004), (-0.07, 0.07), (top - 0.07, top - 0.02), WINDOW)
+        m.panel((cab[0] + 0.02, cab[1] - 0.02), (top - 0.07, top - 0.02), 0.0855, WINDOW)
+        m.box((-h + 0.02, cab[0]), (-0.055, 0.055), (0.1, top - 0.025), self.body)
+        m.panel((-h + 0.02, cab[0]), (top - 0.08, top - 0.055), 0.0555, self.stripe)
+        m.panel((h - 0.1, h - 0.01), (0.15, 0.17), 0.0505, self.stripe)
+        for k in range(self.vents):
+            u = -h + 0.07 + k * 0.09
+            m.box(
+                (u - 0.03, u + 0.03),
+                (-0.04, 0.04),
+                (top - 0.025, top - 0.012),
+                shade(self.body, 0.6),
+            )
+        return top + 0.012
+
+
+@dataclass(frozen=True)
+class Turned:
+    """An engine turned to face backwards, like the second unit of a pair coupled back to back."""
+
+    unit: Unit
+
+    @property
+    def half(self) -> float:
+        return self.unit.half
+
+    def model(self) -> Model:
+        m = Model()
+        m.faces = [
+            Face(
+                [(-u, -v, z) for u, v, z in face.corners],
+                face.color,
+                (-face.normal[0], -face.normal[1], face.normal[2]),
+            )
+            for face in self.unit.model().faces
+        ]
+        return m
+
+
 def car(good: Good, full: bool) -> Model:
     """A car for a good on its frame and wheels, loaded or empty, its body by what it carries."""
     m = Model()
@@ -520,6 +977,26 @@ def _coach(m: Model, good: Good, full: bool) -> None:
     m.panel((-h + 0.01, h - 0.01), (0.07, 0.085), 0.0806, shade(COACH, 0.75))
 
 
+def dining() -> Model:
+    """An express's dining car: umber below and cream above, its saloon windows always lit,
+    with a kitchen at the back end behind small windows and a stovepipe through the roof."""
+    m = Model()
+    h = CAR_HALF
+    m.box((-h, h), (-0.07, 0.07), (0.035, 0.06), FRAME)
+    m.wheels([h - 0.07, -h + 0.07], 0.035, FRAME, 0.075)
+    m.box((-h, h), (-0.08, 0.08), (0.06, 0.23), DINER)
+    m.panel((-h + 0.01, h - 0.01), (0.125, 0.215), 0.0805, DINER_CREAM)
+    m.box((-h - 0.01, h + 0.01), (-0.086, 0.086), (0.23, 0.25), ROOF_GREY)
+    m.box((-h + 0.08, h - 0.02), (-0.045, 0.045), (0.25, 0.27), shade(ROOF_GREY, 0.8))
+    m.box((-h + 0.025, -h + 0.055), (-0.015, 0.015), (0.25, 0.3), BLACK_IRON)
+    for u in (-0.03, 0.06, 0.15):
+        m.panel((u - 0.035, u + 0.035), (0.14, 0.2), 0.0806, LIT_WINDOW)
+    for u in (-0.2, -0.15):
+        m.panel((u - 0.015, u + 0.015), (0.17, 0.2), 0.0806, WINDOW)
+    m.panel((-h + 0.01, h - 0.01), (0.07, 0.085), 0.0806, shade(DINER, 0.75))
+    return m
+
+
 def _mail_van(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), MAIL_VAN)
@@ -565,6 +1042,7 @@ CAR_BODIES: dict[Good, CarBody] = {
 class Look(Enum):
     ENGINE = "engine"
     TENDER = "tender"
+    DINING = "dining"
 
 
 @dataclass(frozen=True)
@@ -580,16 +1058,378 @@ class EngineModel:
     chimney: tuple[float, float] | None = None
 
 
+def _entry(engine: Pioneer | Steam | Unit, tender: Tender | Turned | None = None) -> EngineModel:
+    if tender is None:
+        return EngineModel(engine.model, engine.half, chimney=engine.chimney)
+    return EngineModel(engine.model, engine.half, tender.model, tender.half, engine.chimney)
+
+
+def _twin(unit: Unit) -> EngineModel:
+    """A pair of units coupled back to back, the second drawn as the tender."""
+    return _entry(unit, Turned(unit))
+
+
+# Each engine of railroads.sim.trains.ENGINES, its tender if it has one, and where its chimney is.
 ENGINES: dict[str, EngineModel] = {
+    "penydarren": _entry(
+        Pioneer(0.24, (70, 70, 76), WOOD, ((0.12, 0.045), (-0.1, 0.045)), flywheel=True)
+    ),
+    "catch_me": _entry(
+        Pioneer(
+            0.25,
+            (58, 82, 130),
+            FRAME,
+            ((0.12, 0.05), (-0.1, 0.05)),
+            WHEEL_RED,
+            uprights=(-0.08,),
+            crossheads=True,
+        )
+    ),
+    "salamanca": _entry(
+        Pioneer(
+            0.27,
+            COPPER,
+            WOOD,
+            ((0.14, 0.045), (-0.14, 0.045)),
+            uprights=(-0.04, 0.08),
+            crossheads=True,
+            rack=True,
+        ),
+        Tender(0.16, WOOD, (0.08, -0.08), top=0.11, trim=None),
+    ),
+    "puffing_billy": _entry(
+        Pioneer(
+            0.3,
+            (56, 56, 62),
+            WOOD,
+            ((0.16, 0.05), (-0.12, 0.05)),
+            chimney_top=0.5,
+            beams=True,
+        ),
+        Tender(0.17, WOOD, (0.09, -0.09), top=0.11, trim=None, barrel=(110, 74, 44)),
+    ),
+    "locomotion": _entry(
+        Pioneer(
+            0.3,
+            (58, 96, 66),
+            WOOD,
+            ((0.16, 0.05), (-0.04, 0.05), (-0.2, 0.05)),
+            BRASS,
+            rods=True,
+            uprights=(-0.1, 0.1),
+            crossheads=True,
+        ),
+        Tender(0.17, WOOD, (0.09, -0.09), top=0.11, trim=None, barrel=(150, 104, 62)),
+    ),
+    "rocket": _entry(
+        Pioneer(
+            0.3,
+            (234, 192, 44),
+            (234, 192, 44),
+            ((0.14, 0.072), (-0.18, 0.04)),
+            (236, 234, 224),
+            chimney_color=(236, 234, 224),
+            chimney_top=0.46,
+            radius=0.06,
+            slanted=True,
+            firebox=COPPER,
+        ),
+        Tender(0.16, (234, 192, 44), (0.08, -0.08), top=0.11, trim=None, barrel=(236, 234, 224)),
+    ),
+    "lion": _entry(
+        Pioneer(
+            0.32,
+            (52, 112, 64),
+            CAB_RED,
+            ((0.17, 0.055), (0.02, 0.055), (-0.22, 0.035)),
+            rods=True,
+            firebox=COPPER,
+            haystack=True,
+        ),
+        Tender(0.2, (52, 112, 64), (0.11, -0.11), top=0.17),
+    ),
     "planet": EngineModel(engine, ENGINE_HALF, tender, TENDER_HALF, (ENGINE_HALF - 0.11, 0.31)),
+    "tank": _entry(
+        Steam(
+            0.3,
+            (192, 148, 58),
+            (120, 92, 40),
+            ((0.11, -0.03),),
+            0.045,
+            (192, 148, 58),
+            radius=0.068,
+            cab=0.2,
+            domes=(0.02,),
+            tanks=True,
+        )
+    ),
+    "goods": _entry(
+        Steam(
+            0.38,
+            (56, 56, 62),
+            (36, 36, 40),
+            ((0.17, 0.05, -0.07),),
+            0.046,
+            (80, 80, 88),
+            radius=0.078,
+            trim=CAB_RED,
+        ),
+        Tender(0.24, (56, 56, 62), (0.15, 0.0, -0.15), top=0.21, trim=CAB_RED),
+    ),
+    "single": _entry(
+        Steam(
+            0.4,
+            (92, 142, 72),
+            (52, 84, 42),
+            ((0.0,),),
+            0.088,
+            (92, 142, 72),
+            leading=(0.29, 0.2),
+            trailing=(-0.22,),
+            radius=0.072,
+            cab=0.2,
+            domes=(),
+            stack=0.1,
+        ),
+        Tender(0.24, (92, 142, 72), (0.15, 0.0, -0.15), top=0.2),
+    ),
+    "american": _entry(
+        Steam(
+            0.4,
+            (88, 106, 120),
+            ROOF_RED,
+            ((0.04, -0.11),),
+            0.055,
+            WHEEL_RED,
+            leading=(0.27, 0.19),
+            radius=0.07,
+            cab=0.2,
+            cab_color=CAB_RED,
+            domes=(0.08, -0.04),
+            stack=0.11,
+            balloon=True,
+            cowcatcher=CAB_RED,
+            headlight=True,
+        ),
+        Tender(0.24, CAB_RED, (0.17, 0.09, -0.09, -0.17), top=0.19, load=LOG),
+    ),
     "mogul": EngineModel(
         mogul, MOGUL_HALF, mogul_tender, MOGUL_TENDER_HALF, (MOGUL_HALF - 0.11, 0.33)
+    ),
+    "light_tank": _entry(
+        Steam(
+            0.4,
+            (44, 66, 112),
+            (26, 40, 70),
+            ((0.17, 0.06, -0.05),),
+            0.048,
+            WHEEL_RED,
+            trailing=(-0.29,),
+            radius=0.078,
+            cab=0.24,
+            tanks=True,
+        )
+    ),
+    "atlantic": _entry(
+        Steam(
+            0.44,
+            (72, 112, 172),
+            (40, 64, 104),
+            ((0.08, -0.08),),
+            0.066,
+            (72, 112, 172),
+            leading=(0.35, 0.26),
+            trailing=(-0.28,),
+            radius=0.086,
+            domes=(0.02,),
+        ),
+        Tender(0.28, (72, 112, 172), (0.19, 0.0, -0.19), top=0.23),
+    ),
+    "mallet": _entry(
+        Steam(
+            0.52,
+            (86, 70, 54),
+            (52, 42, 32),
+            ((0.27, 0.18, 0.09), (-0.07, -0.16, -0.25)),
+            0.042,
+            WHEEL_RED,
+            leading=(0.43,),
+            trailing=(-0.37,),
+            radius=0.086,
+            domes=(0.0, -0.14),
+            stack=0.07,
+        ),
+        Tender(0.28, (86, 70, 54), (0.2, 0.12, -0.12, -0.2), top=0.24, trim=None),
     ),
     "pacific": EngineModel(
         pacific, PACIFIC_HALF, pacific_tender, PACIFIC_TENDER_HALF, (PACIFIC_HALF - 0.12, 0.3)
     ),
     "boxcab": EngineModel(boxcab, BOXCAB_HALF),
+    "railbus": _entry(
+        Unit(
+            0.3,
+            (176, 48, 40),
+            (176, 48, 40),
+            (0.17, -0.17),
+            axles=1,
+            top=0.25,
+            nose=0.04,
+            tip=0.2,
+            band=DINER_CREAM,
+            windows=4,
+        )
+    ),
+    "streamliner": _entry(
+        Steam(
+            0.5,
+            (40, 60, 96),
+            (26, 38, 62),
+            ((0.12, -0.01, -0.14),),
+            0.062,
+            (176, 40, 40),
+            leading=(0.38, 0.29),
+            trailing=(-0.3,),
+            radius=0.088,
+            cab=0.2,
+            shroud=(200, 206, 216),
+        ),
+        Tender(
+            0.32,
+            (40, 60, 96),
+            (0.22, 0.13, -0.13, -0.22),
+            top=0.25,
+            trim=(200, 206, 216),
+            trim_z=(0.18, 0.192),
+            shroud=True,
+        ),
+    ),
+    "big_boy": _entry(
+        Steam(
+            0.6,
+            (50, 50, 56),
+            (30, 30, 34),
+            ((0.3, 0.21, 0.12, 0.03), (-0.145, -0.235, -0.325, -0.415)),
+            0.045,
+            (128, 128, 136),
+            leading=(0.53, 0.45),
+            trailing=(-0.5,),
+            radius=0.098,
+            smokebox=(108, 108, 116),
+            trim=(108, 108, 116),
+            domes=(0.08, -0.08),
+            stack=0.06,
+            cowcatcher=(108, 108, 116),
+            headlight=True,
+        ),
+        Tender(
+            0.36,
+            (50, 50, 56),
+            (0.28, 0.19, 0.1, -0.1, -0.19, -0.28),
+            top=0.26,
+            trim=None,
+            width=0.092,
+        ),
+    ),
+    "mixed_diesel": _entry(
+        Unit(
+            0.42,
+            (186, 190, 198),
+            (176, 40, 40),
+            (0.25, -0.25),
+            top=0.28,
+            nose=0.1,
+            tip=0.17,
+            both=False,
+            ends=(176, 40, 40),
+            vents=3,
+        )
+    ),
+    "heavy_diesel": _entry(
+        Unit(0.48, (222, 112, 34), (40, 40, 44), (0.29, -0.29), axles=3, hood=True, vents=4)
+    ),
+    "bullet": _entry(
+        Unit(
+            0.5,
+            (238, 238, 232),
+            (36, 64, 156),
+            (0.3, -0.3),
+            nose=0.18,
+            tip=0.11,
+            both=False,
+            band=(36, 64, 156),
+            windows=5,
+            pantographs=(-0.12,),
+        )
+    ),
     "express": EngineModel(express, EXPRESS_HALF),
+    "sprinter": _entry(
+        Unit(
+            0.42,
+            (224, 226, 230),
+            (40, 84, 170),
+            (0.27, -0.27),
+            nose=0.05,
+            tip=0.21,
+            ends=(236, 200, 40),
+            windows=6,
+        )
+    ),
+    "high_speed": _entry(
+        Unit(
+            0.54,
+            (236, 236, 238),
+            (200, 30, 40),
+            (0.32, -0.3),
+            nose=0.22,
+            tip=0.1,
+            both=False,
+            pantographs=(-0.2,),
+        )
+    ),
+    "twin_diesel": _twin(
+        Unit(0.5, (40, 62, 120), (236, 196, 40), (0.3, -0.3), axles=3, hood=True, vents=4)
+    ),
+    "modern_electric": _entry(
+        Unit(
+            0.46,
+            (196, 32, 40),
+            (236, 236, 236),
+            (0.25, -0.25),
+            top=0.28,
+            nose=0.05,
+            tip=0.21,
+            pantographs=(-0.2, 0.2),
+        )
+    ),
+    "super_diesel": _entry(
+        Unit(
+            0.66,
+            (52, 56, 64),
+            ORANGE,
+            (0.42, -0.42),
+            axles=3,
+            top=0.3,
+            nose=0.07,
+            tip=0.22,
+            ends=(236, 200, 40),
+            vents=5,
+        )
+    ),
+    "maglev": _entry(
+        Unit(
+            0.58,
+            (226, 232, 238),
+            (0, 150, 160),
+            top=0.22,
+            nose=0.3,
+            tip=0.05,
+            both=False,
+            band=(36, 44, 58),
+            windows=6,
+            glass=LIT_WINDOW,
+            floats=True,
+        )
+    ),
 }
 
 
@@ -598,6 +1438,7 @@ MODELS: dict[object, Callable[[], Model]] = {
     Look.TENDER: tender,
     **{(Look.ENGINE, name): model.engine for name, model in ENGINES.items()},
     **{(Look.TENDER, name): model.tender for name, model in ENGINES.items() if model.tender},
+    Look.DINING: dining,
     **{(good, full): (lambda g=good, f=full: car(g, f)) for good in Good for full in (True, False)},
 }
 

@@ -101,7 +101,7 @@ class TrainLayer:
             back += model.tender_half
         for car in train.cars:
             back += COUPLING + CAR_HALF
-            parts.append(((car.good, car.load > 0), back))
+            parts.append((Look.DINING if car.dining else (car.good, car.load > 0), back))
             back += CAR_HALF
         return [(look, middle * SCALE) for look, middle in parts]
 
