@@ -55,7 +55,8 @@ The game's wheel carries its Python source, so anyone playing can read the code.
   on the frame after the waiting screen first shows, so that screen stays up while the page is
   frozen. An autosave is pickled on the frame after the month turns, then compressed and written
   a step at a time, at most `WRITING_SECONDS` (4 ms) of each frame, over the next two seconds or
-  so, the frames kept at full speed meanwhile.
+  so, the frames kept at full speed meanwhile. A month that ends before that is done is autosaved
+  once it is, and an open saves window lists the new autosave as soon as it is written.
 - **Saves.** `index.html` mounts Emscripten's IndexedDB file system over the saves folder and
   copies it to IndexedDB every 2 s, so named saves and autosaves survive a reload. They stay in
   that browser; there is no way yet to download a save or load one from a file.

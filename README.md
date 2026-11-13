@@ -213,7 +213,8 @@ pixels per art pixel.
     it changed is refined again the same way.
   - **Month turns** touch only what changed: building spots and field plots are kept per cell
     (`ui.buildings`), the smooth ground picture is touched up only in cells whose colour changed
-    (`ui.ground`), and the autosave starts on the frame after the turn.
+    (`ui.ground`) and painted again during the turn only if the last frame showed it, and the
+    autosave starts on the frame after the turn, or once the last one is written if it still is.
 - `railroads.ui.map_view`: the map view, which owns the layers and the order they draw in. Beside it:
   `map_input` (mouse and keys), `map_tools` (what clicks do with each build tool), `map_overlays`
   (outlines, grid lines, station names, compass, search marks, the status strip and hover card)
