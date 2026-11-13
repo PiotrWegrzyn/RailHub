@@ -53,12 +53,14 @@ Query parameters:
     const SAVE_EVERY_MS = 2000;
 
     // Web workers painting the map's chunks (web/painter.js), each a Python of its own taking a few
-    // hundred megabytes, so as many as the cores leave room for beside the page, at most four, and
-    // fewer where the device has little memory.
+    // hundred megabytes, so as many as the cores leave room for beside the page, at most four.
+    // Only Chromium says how much memory the device has (navigator.deviceMemory, never above 8),
+    // so it gets fewer on a device with little; elsewhere two, which keep most of the speed.
     function paintersWanted(query) {
         if (query.has("painters")) return Math.max(0, Number(query.get("painters")) || 0);
         let count = Math.min(4, (navigator.hardwareConcurrency || 4) - 2);
-        if (navigator.deviceMemory) count = Math.min(count, Math.floor(navigator.deviceMemory / 2));
+        const memory = navigator.deviceMemory;
+        count = Math.min(count, memory ? Math.floor(memory / 2) : 2);
         return Math.max(1, count);
     }
 
