@@ -104,7 +104,7 @@ INDUSTRIAL = {Points.POPULATION: 1.0, Points.INDUSTRY: 2.0}
 SOCIAL = {Points.POPULATION: 2.0}
 DRAWN_BY: Mapping[Points, Mapping[Points, float]] = MappingProxyType(
     {
-        Points.POPULATION: {Points.POPULATION: 2.0},
+        Points.POPULATION: {Points.POPULATION: 4.0},
         Points.FOOD: {Points.FOOD: 1.0, Points.POPULATION: 1.0},
         Points.ORE: INDUSTRIAL,
         Points.TIMBER: INDUSTRIAL,
