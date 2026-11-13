@@ -7,8 +7,8 @@ import pytest
 from test_elevation import world_over_mountains
 
 from railroads.sim.constructions import Building, BuildingKind
+from railroads.ui.pixel import copies, web_painter
 from railroads.ui.pixel import layer as layer_module
-from railroads.ui.pixel import web_painter
 from railroads.ui.pixel.copies import ChunkJob, WorldCopy
 from railroads.ui.pixel.layer import PixelLayer, painter_for
 from railroads.ui.pixel.painter import Painter
@@ -95,7 +95,7 @@ def test_until_a_worker_is_ready_chunks_are_painted_on_the_frames() -> None:
     np.testing.assert_array_equal(done["chunk"], world.render(*mountains, 2))
 
 
-def test_a_ready_worker_gets_the_world_and_paints_its_chunks() -> None:
+def test_a_ready_worker_paints_the_chunks_and_one_still_starting_only_holds_the_world() -> None:
     world, mountains, plains = world_over_mountains()
     page = FakePage(2)
     painter = WorkerPainter(world, Workers(page))
@@ -103,12 +103,13 @@ def test_a_ready_worker_gets_the_world_and_paints_its_chunks() -> None:
     painter.finished()
     painter.want("mountains", job(world, mountains), True, 1.0)
     painter.want("plains", job(world, plains), True, 1.0)
+    starting = page.kinds(1)
 
     page.work()
     done = painted(painter)
 
     assert painter.threaded
-    assert page.kinds(1) == []
+    assert starting == ["world"]
     np.testing.assert_array_equal(done["mountains"], world.render(*mountains, 2))
     np.testing.assert_array_equal(done["plains"], world.render(*plains, 2))
     assert painter.waiting() == 0
@@ -282,8 +283,29 @@ def test_a_new_map_takes_the_workers_over_and_the_old_one_paints_on_its_frames()
     np.testing.assert_array_equal(done["new"], new.render(*plains, 2))
 
 
-def test_a_worker_ready_later_gets_the_world_as_it_is_then() -> None:
-    world, _, plains = world_over_mountains()
+def test_workers_still_starting_get_the_world_as_the_map_is_made_and_never_again(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    world, _, _ = world_over_mountains()
+    page = FakePage(2)
+    made: list[PixelWorld] = []
+    monkeypatch.setattr(
+        web_painter, "world_message", lambda w: made.append(w) or copies.world_message(w)
+    )
+    painter = WorkerPainter(world, Workers(page))
+    sent = [page.kinds(0), page.kinds(1)]
+
+    page.start(0, 1)
+    painter.finished()
+
+    assert sent == [["world"], ["world"]]
+    assert painter.threaded
+    assert page.kinds(0) == page.kinds(1) == ["world"]
+    assert made == [world]
+
+
+def test_a_worker_ready_later_paints_the_world_as_it_is_then() -> None:
+    world, mountains, plains = world_over_mountains()
     page = FakePage(2)
     page.start(0)
     painter = WorkerPainter(world, Workers(page))
@@ -294,12 +316,15 @@ def test_a_worker_ready_later_gets_the_world_as_it_is_then() -> None:
 
     page.start(1)
     painter.finished()
+    painter.want("mountains", job(world, mountains), True, 1.0)
+    painter.want("plains", job(world, plains), True, 1.0)
+    painting = [page.kinds(worker).count("paint") for worker in (0, 1)]
     page.work()
+    done = painted(painter)
 
-    for copy in page.copies:
-        np.testing.assert_array_equal(
-            copy.paint(1, (*plains, 2, False, False)), world.render(*plains, 2)
-        )
+    assert painting == [1, 1]
+    np.testing.assert_array_equal(done["mountains"], world.render(*mountains, 2))
+    np.testing.assert_array_equal(done["plains"], world.render(*plains, 2))
 
 
 def test_a_worker_that_cant_be_posted_to_paints_no_more_and_another_takes_its_chunk(

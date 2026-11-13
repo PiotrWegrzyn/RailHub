@@ -5,11 +5,12 @@ frame stops to paint a chunk and several chunks are painted at once.
 The page starts the workers (web/painter.js) while it loads and hands them over as
 window.railroadsPainters (web/index.html), which posts messages to them and keeps what they send
 back until it is taken. The workers paint for the map shown last: its painter sends them its
-world, then whatever changed in it before any chunk asked for after the change, and hands them the
-chunks the frames want, the most wanted first and a couple to each at a time, so a worker starts
-the next the moment one is done. Finer redraws of raised ground (jobs that are not urgent, see
-railroads.ui.pixel.layer) wait until every chunk wanted urgently is painted, and some workers are
-kept free of them for the chunks the view needs next.
+world as the map is made, while a game loads, then whatever changed in it before any chunk asked
+for after the change, and hands them the chunks the frames want, the most wanted first and a
+couple to each at a time, so a worker starts the next the moment one is done. Finer redraws of
+raised ground (jobs that are not urgent, see railroads.ui.pixel.layer) wait until every chunk
+wanted urgently is painted, and some workers are kept free of them for the chunks the view needs
+next.
 
 WorkerPainter has the interface of railroads.ui.pixel.painter.Painter. Until a worker is ready,
 and if every worker fails, chunks are painted on the frames the way Painter does there; a chunk a
@@ -69,11 +70,6 @@ class Workers:
     def painter(self) -> WorkerPainter | None:
         return None if self._painter is None else self._painter()
 
-    @property
-    def starting(self) -> int:
-        """How many workers are still starting."""
-        return self.page.count - len(self.ready) - len(self.dead)
-
     def serve(self, painter: WorkerPainter) -> int:
         """Has the workers paint for `painter` from now on, and no longer for the one before;
         returns the number `painter`'s world goes by."""
@@ -107,26 +103,26 @@ class WorkerPainter:
         self._world = world
         self._workers = workers
         self._queue = _Queue()
-        # The workers holding this world and what they have seen of its changes, and the world
-        # as last sent, kept for workers still starting.
+        # The workers sent this world, ready or still starting, and what they have seen of its
+        # changes.
         self._holding: set[int] = set()
         self._seen = Seen.now(world)
-        self._sent_world: tuple[Seen, bytes] | None = None
         # Jobs given to workers by their numbers, each with its key and its worker.
         self._given: dict[int, tuple[Hashable, _Job, int]] = {}
         self._numbers = itertools.count()
         # Jobs a worker could not paint, to paint on the frames instead.
         self._failed: list[tuple[Hashable, _Job]] = []
         self._number = workers.serve(self)
-        # Hearing from the workers now, as a game loads, sends them the world then rather than
-        # on the map's first frame.
         workers.poll()
-        self._join(list(workers.ready))
+        # Sent as the map is made, while a game loads, the world waits in the messages of
+        # workers still starting until they can take it up, rather than stalling a frame of the
+        # map when they are ready.
+        self._send_world()
 
     @property
     def threaded(self) -> bool:
         """Whether workers paint, so the frames need not."""
-        return bool(self._holding)
+        return bool(self._painting())
 
     def want(self, key: Hashable, work: ChunkJob, urgent: bool, now: float) -> None:
         """Asks for a chunk, or asks again for one already waiting; one being painted, or
@@ -169,7 +165,7 @@ class WorkerPainter:
         """Takes in a message from a worker (Workers.poll)."""
         worker, kind = message["worker"], message["kind"]
         if kind == "ready":
-            self._join([worker])
+            self._give_out()
         elif kind == "dead":
             self._lose(worker)
         elif message.get("world") == self._number and message.get("job") in self._given:
@@ -187,10 +183,13 @@ class WorkerPainter:
         """Gives up the workers to another painter; jobs given to them wait to be painted on
         the frames."""
         self._holding.clear()
-        self._sent_world = None
         for key, job, _ in self._given.values():
             self._queue.jobs.setdefault(key, job)
         self._given.clear()
+
+    def _painting(self) -> list[int]:
+        """The workers holding this world that are ready to paint it."""
+        return [worker for worker in self._workers.ready if worker in self._holding]
 
     def _taken(self, key: Hashable) -> bool:
         """Whether a chunk is being painted, or painted and not yet taken."""
@@ -202,26 +201,20 @@ class WorkerPainter:
             or any(key == failed[0] for failed in self._failed)
         )
 
-    def _join(self, workers: list[int]) -> None:
-        """Sends the world as it is now to these workers, which then paint it."""
-        joining = [worker for worker in workers if worker not in self._holding]
-        if not joining or self._workers.painter is not self:
+    def _send_world(self) -> None:
+        """Sends the world as it is now to every worker that has not failed."""
+        workers = [w for w in range(self._workers.page.count) if w not in self._workers.dead]
+        if not workers:
             return
-        self._catch_up()
-        seen = Seen.now(self._world)
-        if self._sent_world is None or self._sent_world[0] != seen:
-            try:
-                self._sent_world = (seen, world_message(self._world))
-            except Exception as error:  # noqa: BLE001 - the frames paint instead
-                print(f"The workers can't be sent the map: {error}", file=sys.stderr)
-                return
-        message = {"kind": "world", "world": self._number, "data": self._sent_world[1]}
-        for worker in joining:
+        self._seen = Seen.now(self._world)
+        try:
+            message = {"kind": "world", "world": self._number, "data": world_message(self._world)}
+        except Exception as error:  # noqa: BLE001 - the frames paint instead
+            print(f"The workers can't be sent the map: {error}", file=sys.stderr)
+            return
+        for worker in workers:
             if self._post(worker, message):
                 self._holding.add(worker)
-        if not self._workers.starting:
-            self._sent_world = None
-        self._give_out()
 
     def _post(self, worker: int, message: Message) -> bool:
         """Posts a message to a worker, which paints no more of this world if it can't be
@@ -246,8 +239,7 @@ class WorkerPainter:
                 self._queue.jobs.setdefault(key, job)
 
     def _catch_up(self) -> None:
-        """Sends the workers holding the world whatever changed in it since they last heard;
-        a worker that gets the world later gets it as it is then."""
+        """Sends the workers holding the world whatever changed in it since they last heard."""
         seen, self._seen = self._seen, Seen.now(self._world)
         if not self._holding:
             return
@@ -290,7 +282,7 @@ class WorkerPainter:
 
     def _load(self) -> dict[int, int]:
         """How many jobs each worker painting this world holds."""
-        load = dict.fromkeys(sorted(self._holding), 0)
+        load = dict.fromkeys(self._painting(), 0)
         for _, _, worker in self._given.values():
             if worker in load:
                 load[worker] += 1
