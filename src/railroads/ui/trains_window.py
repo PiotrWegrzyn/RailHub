@@ -11,12 +11,12 @@ from imgui_bundle import imgui
 
 from railroads.sim.demand import StationDemand
 from railroads.sim.finance import TRAIN_RESALE, dollars
-from railroads.sim.goods import GOOD_YEARS, Good
+from railroads.sim.goods import Good
 from railroads.sim.railway import Railway
 from railroads.sim.trains import ENGINES, Stop, Train
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at
-from railroads.ui.station_offers import Supplies, goods_to_load
+from railroads.ui.station_offers import Offer, Supplies, goods_to_load
 from railroads.ui.theme import (
     BRASS,
     CARDS_WIDTH,
@@ -38,8 +38,6 @@ LIST_WIDTH = 190.0
 MAP_SHARE = 0.45
 # Where a stop card's rows start, after their labels.
 CARD_LABEL = 130.0
-# How wide the list of every other car is.
-OTHER_CAR_WIDTH = 170.0
 # How often, in seconds, what a train's cargo is worth is worked out again.
 WORTH_EVERY = 0.5
 
@@ -315,12 +313,15 @@ class TrainsWindow:
         imgui.text_disabled("Load here")
         imgui.same_line(CARD_LABEL)
         offers = goods_to_load(railway, stop.cell, supplies(stop.cell))
-        most = railway.most_cars(train)
-        full = len(stop.cars) >= most
+        here = {offer.good for offer in offers}
+        waiting = railway.station_goods(stop.cell)
+        carried = [g for g in carried_in(train, index) if g not in here]
+        offers += [Offer(good, waiting.held(good), 0.0) for good in carried]
         if not offers:
             imgui.text_disabled("nothing made or waiting here yet")
-            self._draw_any_car(railway, train, index, stop, set(), full)
             return
+        most = railway.most_cars(train)
+        full = len(stop.cars) >= most
         offers.sort(key=lambda o: (-(demand.monthly_want(o.good) > 0), -o.waiting, -o.made))
         left = imgui.get_cursor_pos_x()
         per_row = max(1, int(imgui.get_content_region_avail().x // (OFFER_SIZE[0] + 4)))
@@ -332,6 +333,7 @@ class TrainsWindow:
             wanted = demand.monthly_want(offer.good) > 0
             tip = (
                 f"{offer.good.value}: {offer.waiting:.0f} waiting, about {offer.made:.0f} a month"
+                + (" - comes in on this train" if offer.good in carried else "")
                 + (" - wanted at the next stop" if wanted else "")
                 + ("\nThe train is full: remove a car first" if full else "\nClick to add a car")
             )
@@ -342,27 +344,15 @@ class TrainsWindow:
             if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
                 self.map.good = offer.good
             imgui.end_disabled()
-        imgui.set_cursor_pos_x(left)
-        self._draw_any_car(railway, train, index, stop, {o.good for o in offers}, full)
 
-    @staticmethod
-    def _draw_any_car(
-        railway: Railway, train: Train, index: int, stop: Stop, shown: set[Good], full: bool
-    ) -> None:
-        """A list of every other good there is by now, to add a car for one nothing makes or
-        holds here yet, such as goods another train will leave."""
-        others = [g for g in Good if g not in shown and GOOD_YEARS.get(g, 0) <= railway.year]
-        if not others:
-            return
-        imgui.begin_disabled(full)
-        imgui.set_next_item_width(OTHER_CAR_WIDTH)
-        if imgui.begin_combo(f"##other car {index}", "Any other car..."):
-            for good in others:
-                if imgui.selectable(good.value, False)[0]:
-                    stop.add_car(good, railway.most_cars(train))
-                    train.cars_changed(index)
-            imgui.end_combo()
-        imgui.end_disabled()
+
+def carried_in(train: Train, index: int) -> list[Good]:
+    """The goods a train's cars bring into its stop at `index`: what it takes on at the stop
+    before, so a train can carry them on past a station that has no use for them."""
+    if not train.stops:
+        return []
+    before = train.stops[(index - 1) % len(train.stops)]
+    return list(dict.fromkeys(before.cars))
 
 
 def _centered_hint(text: str) -> None:
