@@ -329,10 +329,12 @@ def test_farms_want_machinery_only_from_1920() -> None:
 @pytest.mark.parametrize(
     ("kind", "inputs", "made", "amount"),
     [
-        (BuildingKind.BRICKWORKS, {"CLAY": 10.0, "COAL": 5.0}, Good.BRICKS, 20.0),
+        (BuildingKind.BRICKWORKS, {"CLAY": 10.0}, Good.BRICKS, 20.0),
+        (BuildingKind.BRICKWORKS, {"CLAY": 10.0, "COAL": 5.0}, Good.BRICKS, 40.0),
         (BuildingKind.TANNERY, {"CATTLE": 10.0}, Good.LEATHER, 20.0),
         (BuildingKind.SHOE_FACTORY, {"LEATHER": 10.0}, Good.SHOES, 20.0),
-        (BuildingKind.GLASSWORKS, {"SAND": 10.0, "COAL": 5.0}, Good.GLASS, 20.0),
+        (BuildingKind.GLASSWORKS, {"SAND": 10.0}, Good.GLASS, 20.0),
+        (BuildingKind.GLASSWORKS, {"SAND": 10.0, "COAL": 5.0}, Good.GLASS, 40.0),
         (BuildingKind.PRINTING_WORKS, {"PAPER": 4.0}, Good.NEWSPAPERS, 80.0),
     ],
 )

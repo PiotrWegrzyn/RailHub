@@ -41,6 +41,8 @@ from railroads.sim.clock import SECONDS_PER_MONTH, START_YEAR
 from railroads.sim.constructions import Constructions, Track, TrackWidth
 from railroads.sim.demand import PASSED_ALONG_PAY, StationDemand
 from railroads.sim.economy import COLLECTION_RADIUS, DELIVERY_RADIUS
+from railroads.sim.facilities import ENGINE_SHED_SPEED, SAND_TOWER_PICKUP, Facility, supply
+from railroads.sim.facilities import PRICES as FACILITY_PRICES
 from railroads.sim.finance import (
     CAR_TRIP_PRICE,
     LEVEL_PRICES,
@@ -78,6 +80,10 @@ class Railway:
     # Where goods reaching a station are handed out at once to the buildings around it
     # (railroads.sim.station_trade); set by growth, None until then and in older saves.
     station_trade: StationTrade | None = None
+    # The facilities put up beside each station, and those that got what they use this month
+    # (railroads.sim.facilities). None in older saves, which have none.
+    facilities: dict[Cell, set[Facility]] | None = None
+    supplied: dict[Cell, set[Facility]] | None = None
 
     def __init__(
         self,
@@ -150,7 +156,7 @@ class Railway:
 
     def moved(self, old: Cell, new: Cell) -> None:
         """Carries a station's name, goods, demand and trains over to where it now stands; its
-        level and storage start again from nothing. Trains calling there start their rounds
+        level, storage and facilities start again from nothing. Trains calling there start their rounds
         again."""
         self.name_of.move(old, new)
         goods = self.goods.pop(old, None)
@@ -161,6 +167,8 @@ class Railway:
         if demand is not None:
             self.demand[new] = demand
         self.levels.pop(old, None)
+        if self.facilities is not None:
+            self.facilities.pop(old, None)
         for train in self.trains:
             calling = [stop for stop in train.stops if stop.cell == old]
             for stop in calling:
@@ -249,6 +257,33 @@ class Railway:
         self.levels[station] = self.level(station) + 1
         return True
 
+    def facilities_at(self, station: Cell) -> set[Facility]:
+        return (self.facilities or {}).get(station, set())
+
+    def working_at(self, station: Cell) -> set[Facility]:
+        """The facilities at a station that got what they use this month."""
+        return (self.supplied or {}).get(station, set())
+
+    def build_facility(self, station: Cell, facility: Facility) -> bool:
+        """Puts up a facility beside a station, if it has none of the kind and there is the cash;
+        it works from the month after, given what it uses."""
+        price = FACILITY_PRICES[facility]
+        if facility in self.facilities_at(station) or not self.finances.can_afford(price):
+            return False
+        self.finances.spend(price, "station upgrades")
+        if self.facilities is None:
+            self.facilities = {}
+        self.facilities.setdefault(station, set()).add(facility)
+        return True
+
+    def _supply_facilities(self) -> None:
+        """Lets every facility take a month of what it uses from its station."""
+        self.supplied = {
+            station: {f for f in facilities if supply(self.station_goods(station), f)}
+            for station, facilities in (self.facilities or {}).items()
+            if station in self.goods
+        }
+
     def add_storage(self, station: Cell) -> bool:
         """Adds STORAGE_STEP of each good to the station's stockpile and WAITING_STEP to its waiting
         room, if there is the cash."""
@@ -266,6 +301,7 @@ class Railway:
         of stations and track."""
         for station in self.stations():
             self.station_demand(station).turn_month(capacity.get(station, {}))
+        self._supply_facilities()
         self.finances.close_month()
         track = self.constructions.track()
         upkeep = self._upkeep()
@@ -325,8 +361,11 @@ class Railway:
             train.waited += months
             return
         engine = ENGINES[train.engine]
-        pace = train.speed_up(months, engine.pickup / SECONDS_PER_MONTH)
+        pickup = engine.pickup / SECONDS_PER_MONTH * (SAND_TOWER_PICKUP if train.sanded else 1.0)
+        pace = train.speed_up(months, pickup)
         speed = engine.speed * (1.0 + self.research.bonus(Effect.SPEED)) * pace
+        if train.fuelled:
+            speed *= ENGINE_SHED_SPEED
         train.along += months * CELLS_PER_MONTH * self.network.speed_at(train) * train.pull * speed
         train.status = "Running"
         if train.along >= self.network.length(train.path):

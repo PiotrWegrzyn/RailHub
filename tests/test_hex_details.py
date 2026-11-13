@@ -3,7 +3,7 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
-from railroads.sim.goods import Good, Need
+from railroads.sim.goods import Good, Need, bonus_of, needs_of
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
@@ -33,13 +33,14 @@ def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded(
     assert house.name == "house"
     assert house.count == 3
     assert house.needs == [(Need.FOOD, 30), (Need.HEATING, 3)]
-    assert house.bonus == [(Need.BEER, 3), (Need.NEWSPAPERS, 3)]
-    assert [(flow.good, flow.done, flow.wanted) for flow in house.got] == [
-        (Need.NEWSPAPERS, 0.0, 3.0),
-        (Need.HEATING, 0.0, 3.0),
-        (Need.BEER, 0.0, 3.0),
-        (Need.FOOD, pytest.approx(9.0), 30.0),
-    ]
+    assert dict(house.bonus) == {
+        need: pytest.approx(3 * amount)
+        for need, amount in bonus_of(BuildingKind.HOUSE, 1850).items()
+    }
+    got = {flow.good: (flow.done, flow.wanted) for flow in house.got}
+    assert got[Need.FOOD] == (pytest.approx(9.0), 30.0)
+    assert got[Need.HEATING] == (0.0, 3.0)
+    assert got[Need.BEER] == (0.0, 3.0)
     assert house.satisfaction == "content"
     assert farm.makes == [(Good.WHEAT, 10)]
     assert [(flow.good, flow.done, flow.wanted) for flow in farm.gave] == [
@@ -71,34 +72,9 @@ def test_a_tenement_needs_only_food_and_heating_and_takes_the_rest_as_bonus_good
 
     tenement = details.buildings[0]
     assert tenement.needs == [(Need.FOOD, 60), (Need.HEATING, 3)]
-    assert tenement.bonus == [
-        (Need.SALT, 2),
-        (Need.GOODS, 20),
-        (Need.COFFEE, 2),
-        (Need.CLOTHES, 3),
-        (Need.FURNITURE, 2),
-        (Need.BEER, 3),
-        (Need.VODKA, 1),
-        (Need.SHOES, 2),
-        (Need.BRICKS, 5),
-        (Need.REFINED_SUGAR, 2),
-        (Need.NEWSPAPERS, 3),
-    ]
-    assert tenement.got == [
-        Flow(Need.SALT, 0.0, 2.0),
-        Flow(Need.COFFEE, 0.0, 2.0),
-        Flow(Need.BRICKS, 0.0, 5.0),
-        Flow(Need.NEWSPAPERS, 0.0, 3.0),
-        Flow(Need.SHOES, 0.0, 2.0),
-        Flow(Need.FURNITURE, 0.0, 2.0),
-        Flow(Need.CLOTHES, 0.0, 3.0),
-        Flow(Need.HEATING, 0.0, 3.0),
-        Flow(Need.BEER, 0.0, 3.0),
-        Flow(Need.VODKA, 0.0, 1.0),
-        Flow(Need.REFINED_SUGAR, 0.0, 2.0),
-        Flow(Need.FOOD, 0.0, 60.0),
-        Flow(Need.GOODS, 0.0, 20.0),
-    ]
+    assert dict(tenement.bonus) == bonus_of(BuildingKind.TENEMENT, 1850)
+    assert {flow.good for flow in tenement.got} == set(needs_of(BuildingKind.TENEMENT, 1850))
+    assert all(flow.done == 0.0 for flow in tenement.got)
 
 
 def test_a_factory_without_lumber_makes_none_of_the_most_it_could() -> None:

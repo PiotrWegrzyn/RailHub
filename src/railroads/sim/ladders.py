@@ -54,6 +54,10 @@ SKYSCRAPER_PEOPLE = 150
 
 SKYSCRAPER_CHANCE = 0.005
 
+# The chance every person around adds to a town craft coming up: breweries, brickworks, mills and
+# the like (railroads.sim.growth.SPAWN_BY_PEOPLE).
+CRAFT_BASE = 0.000002
+
 # Factories gather into districts: industry nearby draws more of them only from this many points,
 # more than a lone steel mill, and then strongly, so that they meet and merge.
 FACTORIES_DRAW_FROM = 5
@@ -149,6 +153,18 @@ POINTS: Mapping[BuildingKind, tuple[Points, int]] = MappingProxyType(
         BuildingKind.PIG_FARM: (Points.FOOD, 1),
         BuildingKind.CHICKEN_FARM: (Points.FOOD, 1),
         BuildingKind.GASWORKS: (Points.INDUSTRY, 1),
+        BuildingKind.COKE_PLANT: (Points.INDUSTRY, 2),
+        BuildingKind.POTTER: (Points.INDUSTRY, 1),
+        BuildingKind.TILE_WORKS: (Points.INDUSTRY, 1),
+        BuildingKind.FOUNDRY: (Points.INDUSTRY, 2),
+        BuildingKind.DAIRY: (Points.INDUSTRY, 1),
+        BuildingKind.SAUSAGE_MAKER: (Points.INDUSTRY, 1),
+        BuildingKind.CARPET_WEAVER: (Points.CORPORATE, 2),
+        BuildingKind.CLOCK_MAKER: (Points.CORPORATE, 2),
+        BuildingKind.MIRROR_MAKER: (Points.CORPORATE, 2),
+        BuildingKind.MANOR: (Points.CORPORATE, 8),
+        BuildingKind.THEATRE: (Points.CORPORATE, 5),
+        BuildingKind.HOSPITAL: (Points.CORPORATE, 5),
         BuildingKind.RAILWAY_WORKS: (Points.INDUSTRY, 20),
         BuildingKind.FLAX_FIELD: (Points.FOOD, 1),
         BuildingKind.HOP_GARDEN: (Points.FOOD, 1),
@@ -463,7 +479,7 @@ MINES = Ladder(
         temperature={Temperature.COLD: 0.8},
         beside_mountains=3.0,
     ),
-    base_chance=0.000006,
+    base_chance=0.0000036,
     chance_per_doubling={Points.ORE: 0.0000014},
     most_per_cell=2,
     most_nearby=8,
@@ -700,6 +716,77 @@ BUTCHERS = replace(
     BAKERIES, kinds=(BuildingKind.MEAT_FACTORY,), base_chance=0.000004, from_year=1850
 )
 
+# Town crafts that come up, like bakeries, the likelier the more people live around: potters and
+# dairies as often as other crafts; tile works, foundries and sausage makers, which need two
+# inputs and make goods worth more, half as often; the makers of luxury goods only in towns of
+# LUXURY_TOWN people or more, and seldom.
+LUXURY_TOWN = 20
+
+
+def _town_craft(
+    kind: BuildingKind, share: float, from_year: int = 0, least_people: int = 0
+) -> Ladder:
+    return Ladder(
+        kinds=(kind,),
+        land=TOWN_LAND,
+        base_chance=CRAFT_BASE * share,
+        chance_per_doubling={Points.POPULATION: 0.000001},
+        needs={Points.POPULATION: least_people} if least_people else {},
+        most_per_cell=1,
+        most_nearby=1,
+        from_year=from_year,
+    )
+
+
+TOWN_CRAFTS = (
+    _town_craft(BuildingKind.POTTER, 1.0),
+    _town_craft(BuildingKind.DAIRY, 1.0),
+    _town_craft(BuildingKind.TILE_WORKS, 0.5),
+    _town_craft(BuildingKind.FOUNDRY, 0.5, 1800),
+    _town_craft(BuildingKind.SAUSAGE_MAKER, 0.5, 1850),
+    _town_craft(BuildingKind.CARPET_WEAVER, 0.1, 1700, LUXURY_TOWN),
+    _town_craft(BuildingKind.CLOCK_MAKER, 0.1, 1880, LUXURY_TOWN),
+    _town_craft(BuildingKind.MIRROR_MAKER, 0.1, 1700, LUXURY_TOWN),
+)
+
+# Coke plants bake coal into coke for the steel mills from 1850, drawn to industry.
+COKE_PLANTS = Ladder(
+    kinds=(BuildingKind.COKE_PLANT,),
+    land=FACTORY_LAND,
+    base_chance=0.0000002,
+    chance_per_doubling={Points.INDUSTRY: 0.0000004},
+    most_per_cell=1,
+    most_nearby=2,
+    from_year=1850,
+)
+
+# Buildings that only buy: manors in towns of MANOR_TOWN people, theatres in towns of
+# THEATRE_TOWN and hospitals, from 1850, in towns of HOSPITAL_TOWN; each one to a neighbourhood
+# and the likelier the more people live around.
+MANOR_TOWN = 40
+THEATRE_TOWN = 40
+HOSPITAL_TOWN = 30
+
+
+def _town_sight(kind: BuildingKind, least_people: int, from_year: int = 0) -> Ladder:
+    return Ladder(
+        kinds=(kind,),
+        land=TOWN_LAND,
+        base_chance=CRAFT_BASE * 0.2,
+        chance_per_doubling={Points.POPULATION: 0.000001},
+        needs={Points.POPULATION: least_people},
+        most_per_cell=1,
+        most_nearby=1,
+        from_year=from_year,
+    )
+
+
+TOWN_SIGHTS = (
+    _town_sight(BuildingKind.MANOR, MANOR_TOWN),
+    _town_sight(BuildingKind.THEATRE, THEATRE_TOWN),
+    _town_sight(BuildingKind.HOSPITAL, HOSPITAL_TOWN, 1850),
+)
+
 # Potatoes like cool, open plains; they feed houses and the distilleries.
 POTATO_FARMS = Ladder(
     kinds=(BuildingKind.POTATO_FARM,),
@@ -744,7 +831,7 @@ FLAX_FIELDS = Ladder(
         water={Terrain.LAND: 0.3, Terrain.RIVER: 3.0, Terrain.LAKE: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000006,
+    base_chance=0.000000003,
     chance_per_doubling={Points.POPULATION: 0.0000003, Points.FOOD: 0.00000002},
     crowded_at=FARMS_CROWDED_OUT,
 )
@@ -758,7 +845,7 @@ HOP_GARDENS = Ladder(
         temperature={Temperature.COLD: 0.3, Temperature.HOT: 0.2},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000004,
+    base_chance=0.0000000016,
     chance_per_doubling={Points.POPULATION: 0.00000012},
     crowded_at=FARMS_CROWDED_OUT,
 )
@@ -771,7 +858,7 @@ CLAY_PITS = Ladder(
         relief={Relief.HILLS: 0.3, Relief.MOUNTAINS: 0.0},
         water={Terrain.LAND: 0.1, Terrain.RIVER: 3.0, Terrain.LAKE: 1.5},
     ),
-    base_chance=0.0000001,
+    base_chance=0.00000006,
     chance_per_doubling={Points.POPULATION: 0.0000001, Points.ORE: 0.0000002},
     most_per_cell=1,
     most_nearby=2,
@@ -848,14 +935,14 @@ HOTELS = replace(
 
 # Works that open by people and industry alone: their inputs must be brought to them.
 WORKS = (
-    _works(BuildingKind.TEXTILE_MILL, {POP: 4e-10, IND: 1.2e-8}, {}, 1780, base=1e-8),
+    _works(BuildingKind.TEXTILE_MILL, {POP: 4e-10, IND: 1.2e-8}, {}, 1780, base=CRAFT_BASE),
     _works(
         BuildingKind.FURNITURE_MAKER,
         {POP: 4e-10, IND: 6e-9, Points.TIMBER: 6e-8},
         {},
-        base=1e-8,
+        base=CRAFT_BASE,
     ),
-    _works(BuildingKind.WINERY, {POP: 8e-10, Points.FOOD: 6e-9}, {}, base=1e-8),
+    _works(BuildingKind.WINERY, {POP: 8e-10, Points.FOOD: 6e-9}, {}, base=CRAFT_BASE),
     _works(
         BuildingKind.BARREL_MAKER,
         {POP: 4e-10, IND: 6e-9, Points.TIMBER: 6e-8},
@@ -869,15 +956,15 @@ WORKS = (
     _works(BuildingKind.ELECTRONICS_PLANT, {POP: 2.5e-8, IND: 4e-7}, {}, 1960, 30_000, 2e-8),
     _works(BuildingKind.PLANE_FACTORY, {POP: 2.5e-8, IND: 6e-7}, {IND: 6}, 1935, 40_000, 2e-6),
     _works(BuildingKind.TANK_FACTORY, {IND: 6e-7}, {IND: 6}, 1940, 40_000, 2e-6),
-    _works(BuildingKind.BRICKWORKS, {POP: 1e-9, Points.ORE: 1.2e-8}, {}, base=2e-8),
-    _works(BuildingKind.GLASSWORKS, {POP: 4e-10, IND: 6e-9, Points.ORE: 6e-9}, {}, base=1e-8),
-    _works(BuildingKind.BREWERY, {POP: 1.5e-9, Points.FOOD: 3e-9}, {}, base=1e-8),
-    _works(BuildingKind.DISTILLERY, {POP: 8e-10, Points.FOOD: 3e-9}, {}, 1600, base=1e-8),
-    _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=1e-8),
+    _works(BuildingKind.BRICKWORKS, {POP: 1e-9, Points.ORE: 1.2e-8}, {}, base=CRAFT_BASE),
+    _works(BuildingKind.GLASSWORKS, {POP: 4e-10, IND: 6e-9, Points.ORE: 6e-9}, {}, base=CRAFT_BASE),
+    _works(BuildingKind.BREWERY, {POP: 1.5e-9, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
+    _works(BuildingKind.DISTILLERY, {POP: 8e-10, Points.FOOD: 3e-9}, {}, 1600, base=CRAFT_BASE),
+    _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
     _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {}, 1850, base=1e-8),
     _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=1e-8),
     _works(BuildingKind.PRINTING_WORKS, {POP: 1.5e-9, IND: 3e-9}, {}, 1600, PRINTING_CELLS, 1e-8),
-    _works(BuildingKind.SUGAR_REFINERY, {IND: 6e-9, Points.FOOD: 3e-9}, {}, 1800, base=1e-8),
+    _works(BuildingKind.SUGAR_REFINERY, {IND: 6e-9, Points.FOOD: 3e-9}, {}, 1800, base=CRAFT_BASE),
     _works(BuildingKind.PORCELAIN_WORKS, {POP: 4e-10, Points.ORE: 6e-9}, {}, 1710, 30_000, 1e-8),
     _works(BuildingKind.MACHINE_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 1870, base=2e-6),
     _works(BuildingKind.CEMENT_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {}, 1880, 20_000, 2e-8),
@@ -925,6 +1012,9 @@ LADDERS = (
     BAKERIES,
     BUTCHERS,
     GASWORKS,
+    COKE_PLANTS,
+    *TOWN_CRAFTS,
+    *TOWN_SIGHTS,
     POTATO_FARMS,
     CATTLE_RANCHES,
     PIG_FARMS,

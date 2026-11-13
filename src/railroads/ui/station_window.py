@@ -8,6 +8,9 @@ from dataclasses import dataclass
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
+from railroads.sim.facilities import ENGINE_SHED_SPEED, SAND_TOWER_PICKUP, Facility
+from railroads.sim.facilities import PRICES as FACILITY_PRICES
+from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.finance import STATION_PRICE, STORAGE_PRICE, dollars
 from railroads.sim.goods import TRAVELLERS, Good
 from railroads.sim.grids import Cell
@@ -127,6 +130,30 @@ class StationWindow:
         storage = f"{fa.ICON_FA_PLUS}  Storage +{STORAGE_STEP} of each good, +{WAITING_STEP} passengers and mail  {dollars(STORAGE_PRICE)}"
         if _priced_button(storage, railway.finances.can_afford(STORAGE_PRICE)):
             railway.add_storage(station)
+        _draw_facilities(railway, station)
+
+
+FACILITY_EFFECTS = {
+    Facility.ENGINE_SHED: f"trains leaving here run {ENGINE_SHED_SPEED - 1:.0%} faster",
+    Facility.SAND_TOWER: f"trains leaving here pick up speed {1 / SAND_TOWER_PICKUP:.0f} times as fast",
+}
+
+
+def _draw_facilities(railway: Railway, station: Cell) -> None:
+    """A line for each facility: whether it works this month, or a button to put it up."""
+    built, working = railway.facilities_at(station), railway.working_at(station)
+    for facility, (good, amount) in FACILITY_USES.items():
+        effect = FACILITY_EFFECTS[facility]
+        if facility in built:
+            state = "working" if facility in working else f"idle: needs {amount:.0f} {good.value}"
+            imgui.text(f"{facility.value.capitalize()}: {state}")
+            if imgui.is_item_hovered():
+                imgui.set_tooltip(f"Uses {amount:.0f} {good.value} a month; {effect}")
+            continue
+        price = FACILITY_PRICES[facility]
+        label = f"{fa.ICON_FA_PLUS}  {facility.value.capitalize()}: uses {amount:.0f} {good.value} a month, {effect}  {dollars(price)}"
+        if _priced_button(label, railway.finances.can_afford(price)):
+            railway.build_facility(station, facility)
 
 
 def _draw_kept(goods: StationGoods, made: Mapping[Good, float]) -> None:

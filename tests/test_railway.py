@@ -343,9 +343,18 @@ def test_station_demand_is_twice_the_needs_of_buildings_in_its_inner_ring() -> N
     demand = railway.station_demand((6, 20))
     assert demand.capacity == {
         Need.FOOD: 240.0,
+        Need.HEATING: 24.0,
         Need.BEER: 24.0,
         Need.NEWSPAPERS: 24.0,
-        Need.HEATING: 24.0,
+        Need.CLOTHES: 24.0,
+        Need.POTS: 12.0,
+        Need.FURNITURE: 12.0,
+        Need.VODKA: 12.0,
+        Need.REFINED_SUGAR: 12.0,
+        Need.BRICKS: 12.0,
+        Need.SHOES: 12.0,
+        Need.GLASS: pytest.approx(4.8),
+        Need.CASTINGS: pytest.approx(4.8),
         Need.PASSENGERS: 24.0,
         Need.MAIL: 4.0,
     }

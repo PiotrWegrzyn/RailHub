@@ -90,6 +90,18 @@ class BuildingKind(Enum):
     PIG_FARM = "pig farm"
     CHICKEN_FARM = "chicken farm"
     GASWORKS = "gasworks"
+    COKE_PLANT = "coke plant"
+    POTTER = "potter"
+    TILE_WORKS = "tile works"
+    FOUNDRY = "foundry"
+    DAIRY = "dairy"
+    SAUSAGE_MAKER = "sausage maker"
+    CARPET_WEAVER = "carpet weaver"
+    CLOCK_MAKER = "clock maker"
+    MIRROR_MAKER = "mirror maker"
+    MANOR = "manor"
+    THEATRE = "theatre"
+    HOSPITAL = "hospital"
     RAILWAY_WORKS = "railway works"
     FLAX_FIELD = "flax field"
     HOP_GARDEN = "hop garden"
@@ -168,6 +180,23 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     BuildingKind.SKYSCRAPER: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.LUMBER_MILL: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.GASWORKS: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    BuildingKind.COKE_PLANT: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    BuildingKind.TILE_WORKS: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    BuildingKind.FOUNDRY: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    BuildingKind.MANOR: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    BuildingKind.THEATRE: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    BuildingKind.HOSPITAL: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    **{
+        kind: BuildingRules(relief=_OFF_MOUNTAINS)
+        for kind in (
+            BuildingKind.POTTER,
+            BuildingKind.DAIRY,
+            BuildingKind.SAUSAGE_MAKER,
+            BuildingKind.CARPET_WEAVER,
+            BuildingKind.CLOCK_MAKER,
+            BuildingKind.MIRROR_MAKER,
+        )
+    },
     BuildingKind.PORT: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True),
     **{
         kind: BuildingRules(relief=_OFF_MOUNTAINS, space=CELL_SPACE)

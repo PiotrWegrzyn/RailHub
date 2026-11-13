@@ -130,9 +130,11 @@ def test_each_rank_of_church_wants_more_wax_and_incense(need: Need) -> None:
 
 
 @pytest.mark.parametrize(
-    ("grapes", "barrels", "wine"), [(30.0, 0.0, 0.0), (0.0, 30.0, 0.0), (30.0, 30.0, 30.0)]
+    ("grapes", "barrels", "wine"), [(30.0, 0.0, 30.0), (0.0, 30.0, 0.0), (30.0, 30.0, 60.0)]
 )
-def test_wine_takes_both_grapes_and_barrels(grapes: float, barrels: float, wine: float) -> None:
+def test_wine_is_made_of_grapes_and_barrels_make_up_to_twice_as_much(
+    grapes: float, barrels: float, wine: float
+) -> None:
     tile_map = make_map(12)
     economy = Economy(tile_map)
     flat = int(np.ravel_multi_index((5, 5), tile_map.grid.shape))
@@ -173,14 +175,25 @@ def test_incense_lies_in_only_a_handful_of_cells(seed: int) -> None:
     assert int((layer == Deposit.INCENSE).sum()) <= 12
 
 
-def test_a_house_is_one_population_and_one_traveller_and_wants_food_beer_paper_heat() -> None:
+def test_a_house_is_one_population_and_one_traveller_and_wants_food_heat_and_small_comforts() -> (
+    None
+):
     assert POINTS[BuildingKind.HOUSE] == (Points.POPULATION, 1)
     assert PASSENGERS_PER_POINT[Points.POPULATION] == 1
     assert NEEDS[BuildingKind.HOUSE] == {
         Need.FOOD: 10,
+        Need.HEATING: 1,
         Need.BEER: 1,
         Need.NEWSPAPERS: 1,
-        Need.HEATING: 1,
+        Need.CLOTHES: 1,
+        Need.POTS: 0.5,
+        Need.FURNITURE: 0.5,
+        Need.VODKA: 0.5,
+        Need.REFINED_SUGAR: 0.5,
+        Need.BRICKS: 0.5,
+        Need.SHOES: 0.5,
+        Need.GLASS: 0.2,
+        Need.CASTINGS: 0.2,
     }
 
 

@@ -27,6 +27,9 @@ CAR_TRIP_PRICE = 20.0
 # What raising a station to level 2, and then to level 3, costs; and each 50 more storage.
 LEVEL_PRICES = (100_000.0, 500_000.0)
 STORAGE_PRICE = 10_000.0
+# What an engine shed and a sand tower at a station cost.
+ENGINE_SHED_PRICE = 40_000.0
+SAND_TOWER_PRICE = 25_000.0
 STATION_UPKEEP = 200.0
 # Every cell of track costs TRACK_UPKEEP a month, ELECTRIC_TRACK_UPKEEP more where it is
 # electric, and DOUBLE_TRACK_FACTOR as much where it is double.

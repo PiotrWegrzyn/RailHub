@@ -142,6 +142,10 @@ class Train:
     # since it last set off from a stop, in months.
     giving_way: str = ""
     waited: float = 0.0
+    # Whether it set off from a station whose engine shed had its coal, and whose sand tower had
+    # its sand, this month (railroads.sim.facilities).
+    fuelled: bool = False
+    sanded: bool = False
 
     @property
     def load(self) -> dict[Good, float]:

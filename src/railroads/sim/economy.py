@@ -252,7 +252,7 @@ class Economy:
         self.stock: dict[tuple[BuildingKind, Need], FloatCells] = {
             (kind, need): np.zeros(self.cells)
             for kind, recipe in RECIPES.items()
-            for need in recipe.per_unit
+            for need in {**recipe.per_unit, **recipe.boosts}
         }
 
     def trade(
