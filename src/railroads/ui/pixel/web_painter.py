@@ -7,9 +7,7 @@ window.railroadsPainters (web/index.html), which posts messages to them and keep
 back until it is taken. The workers paint for the map shown last: its painter sends them its
 world as the map is made, while a game loads, then whatever changed in it before any chunk asked
 for after the change, and hands them the chunks the frames want, the most wanted first and a
-couple to each at a time, so a worker starts the next the moment one is done. Jobs that are not
-urgent wait until every chunk wanted urgently is painted, and some workers are kept free of them
-for the chunks the view needs next.
+couple to each at a time, so a worker starts the next the moment one is done.
 
 WorkerPainter has the interface of railroads.ui.pixel.painter.Painter. Until a worker is ready,
 and if every worker fails, chunks are painted on the frames the way Painter does there; a chunk a
@@ -250,9 +248,7 @@ class WorkerPainter:
             self._post(worker, update)
 
     def _give_out(self) -> None:
-        """Gives the most wanted jobs to workers with room for more. Jobs that are not urgent
-        wait while any urgent one is waiting or being painted, and go only to workers with
-        nothing else to do, at most to half of the workers at once."""
+        """Gives the most wanted jobs to workers with room for more."""
         queue = self._queue
         if not queue.jobs or self._workers.painter is not self or not self._room():
             return
@@ -266,9 +262,6 @@ class WorkerPainter:
             if taken is None:
                 return
             key, job = taken
-            if not job.urgent and not self._free_for_finer_work(load[worker], len(load)):
-                queue.jobs[key] = job
-                return
             number = next(self._numbers)
             self._given[number] = (key, job, worker)
             chunk: ChunkJob = job.work
@@ -290,12 +283,6 @@ class WorkerPainter:
     def _room(self) -> bool:
         """Whether a worker painting this world has room for another job."""
         return any(jobs < JOBS_PER_WORKER for jobs in self._load().values())
-
-    def _free_for_finer_work(self, worker_load: int, workers: int) -> bool:
-        given = [job for _, job, _ in self._given.values()]
-        if worker_load or any(job.urgent for job in given):
-            return False
-        return len(given) < max(1, workers // 2)
 
 
 def _pixels(message: Message) -> np.ndarray | None:

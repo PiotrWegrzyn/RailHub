@@ -70,7 +70,7 @@ def test_a_blown_up_chunk_texture_is_deleted_on_a_frame_after_nothing_holds_it(
     gl = DeletingGL()
     monkeypatch.setattr(ground_shader, "GL", gl)
     monkeypatch.setattr(ground_shader, "_UNWANTED", [])
-    kept, dropped = ChunkTexture(7, 1024, 1024), ChunkTexture(8, 1024, 1024)
+    kept, dropped = ChunkTexture(7), ChunkTexture(8)
     del dropped
 
     ground_shader.free_textures()

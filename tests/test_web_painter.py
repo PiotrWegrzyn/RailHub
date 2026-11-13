@@ -74,8 +74,8 @@ class FakePage:
                         )
 
 
-def job(world: PixelWorld, chunk: tuple[int, int], fine: bool = False) -> ChunkJob:
-    return ChunkJob(world, *chunk, 2, fine_relief=fine)
+def job(world: PixelWorld, chunk: tuple[int, int]) -> ChunkJob:
+    return ChunkJob(world, *chunk, 2)
 
 
 def painted(painter: WorkerPainter) -> dict[Any, np.ndarray]:
@@ -159,28 +159,6 @@ def test_changes_reach_a_worker_before_any_chunk_asked_for_after_them() -> None:
 
     assert kinds == ["update", "paint"]
     np.testing.assert_array_equal(done["plains"], world.render(*plains, 2))
-
-
-def test_finer_redraws_wait_for_urgent_chunks_and_leave_workers_free() -> None:
-    world, mountains, plains = world_over_mountains()
-    page = FakePage(4)
-    page.start(0, 1, 2, 3)
-    painter = WorkerPainter(world, Workers(page))
-    painter.finished()
-    page.work()
-    fine = [(mountains[0] + x, mountains[1]) for x in range(-1, 3)]
-    painter.want("plains", job(world, plains), True, 1.0)
-
-    for chunk in fine:
-        painter.want(chunk, job(world, chunk, fine=True), False, 1.0)
-    while_urgent = sum(kinds.count("paint") for kinds in map(page.kinds, range(4)))
-    page.work()
-    painter.finished()
-    finer = sum(kinds.count("paint") for kinds in map(page.kinds, range(4)))
-
-    assert while_urgent == 1
-    assert finer == 2
-    assert max(len(page.queues[worker]) for worker in range(4)) == 1
 
 
 def test_a_failed_workers_chunks_go_to_another() -> None:

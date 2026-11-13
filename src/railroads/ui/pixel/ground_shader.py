@@ -436,10 +436,8 @@ class ChunkTexture:
     """A chunk's texture blown up by the graphics card (GroundShader.blow_up), shown like any
     texture imgui made and deleted once nothing holds it."""
 
-    def __init__(self, texture: int, width: int, height: int) -> None:
+    def __init__(self, texture: int) -> None:
         self._texture = texture
-        self.width = width
-        self.height = height
 
     def texture_id(self) -> int:
         return self._texture
@@ -616,7 +614,7 @@ class GroundShader:
         }
         self._run(_Into(self._chunks, size), self._blow_up, uniforms, (small,))
         GL.glDeleteTextures(1, [small])
-        return ChunkTexture(big, *size)
+        return ChunkTexture(big)
 
     def _inputs(self) -> tuple[int, ...]:
         return self._cells, self._light, self._table
