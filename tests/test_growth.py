@@ -7,7 +7,7 @@ from builders import flat_map, layer
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Trade
 from railroads.sim.grids import Cell, HexGrid
-from railroads.sim.growth import SERVED_POINT_WORTH, Growth, _allowed
+from railroads.sim.growth import Growth, _allowed
 from railroads.sim.ladders import (
     FACTORIES,
     FARMS,
@@ -128,23 +128,17 @@ def test_mines_are_likelier_in_mountains_than_on_the_flat() -> None:
     assert weights[5, -1] > 50 * weights[5, 5]
 
 
-def test_buildings_raise_the_chance_across_their_neighbourhood_by_doublings_of_points() -> None:
+def test_houses_nobody_serves_leave_every_cell_at_the_base_chance_of_a_house() -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
     build(constructions, (5, 5), BuildingKind.HOUSE, 2)
     build(constructions, (8, 3), BuildingKind.FLATS, 1)
-    build(constructions, (8, 8), BuildingKind.TENEMENT, 1)
     neighbour = tile_map.grid.neighbours(5, 5)[0]
-    base = TOWNS.base_chance
-    per_doubling = TOWNS.chance_per_doubling[Points.POPULATION]
 
     chances = Growth(constructions, NO_TRADE).chances(TOWNS)
 
-    assert chances[5, 5] == pytest.approx(base + np.log2(3) * per_doubling)
-    assert chances[neighbour] == pytest.approx(base + np.log2(3) * per_doubling)
-    assert chances[5, 8] == pytest.approx(base)
-    assert chances[8, 3] == pytest.approx(base + np.log2(19) * per_doubling)
-    assert chances[8, 8] == pytest.approx(base + np.log2(7) * per_doubling)
+    for cell in ((5, 5), neighbour, (5, 8), (8, 3)):
+        assert chances[cell] == pytest.approx(TOWNS.base_chance)
 
 
 def test_chances_follow_buildings_as_they_come_and_go() -> None:
@@ -572,9 +566,8 @@ def test_served_buildings_add_their_points_by_the_share_they_are_served_to_their
 
     chances = growth.chances(TOWNS)
     per_doubling = TOWNS.chance_per_doubling[Points.POPULATION]
-    plain = TOWNS.base_chance + np.log2(5) * per_doubling
-    served = SERVED_POINT_WORTH * multiplier * 4 * per_doubling
-    assert chances[5, 5] == pytest.approx(plain + served)
+    bred = multiplier * 4 * per_doubling * np.log2(5)
+    assert chances[5, 5] == pytest.approx(TOWNS.base_chance + bred)
     assert chances[neighbour] == pytest.approx(neighbour_before)
 
 
@@ -591,16 +584,21 @@ def test_the_served_bonus_goes_once_a_cell_is_no_longer_served() -> None:
     assert growth.chances(TOWNS)[5, 5] == pytest.approx(unserved)
 
 
-@pytest.mark.parametrize(("houses", "draws"), [(1, False), (2, True)])
-def test_a_lone_house_draws_no_more_houses_but_two_do(houses: int, draws: bool) -> None:
+@pytest.mark.parametrize("around", [0, 3])
+def test_a_served_house_breeds_faster_the_more_people_live_around_it(around: int) -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
-    build(constructions, (5, 5), BuildingKind.HOUSE, houses)
+    build(constructions, (5, 5), BuildingKind.HOUSE, 1)
     neighbour = tile_map.grid.neighbours(5, 5)[0]
+    if around:
+        build(constructions, neighbour, BuildingKind.HOUSE, around)
+    growth = Growth(constructions, NO_TRADE)
 
-    chances = Growth(constructions, NO_TRADE).chances(TOWNS)
+    growth._count_served(houses_trade(tile_map, (5, 5), 2.0, 2.0))
 
-    assert bool(chances[neighbour] > TOWNS.base_chance * 1.001) is draws
+    per_doubling = TOWNS.chance_per_doubling[Points.POPULATION]
+    bred = 10 * per_doubling * np.log2(2 + around)
+    assert growth.chances(TOWNS)[5, 5] == pytest.approx(TOWNS.base_chance + bred)
 
 
 def test_a_cell_closed_and_opened_again_is_allowed_only_once() -> None:
