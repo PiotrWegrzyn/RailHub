@@ -22,6 +22,7 @@ from railroads.sim.demand import DEMAND_PER_NEED, StationDemand
 from railroads.sim.goods import FITS, Good, Need
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
+from railroads.sim.steps import Steps
 from railroads.sim.trains import Stop, Train
 from railroads.ui.iso_camera import Vec2
 from railroads.ui.minimap import Panel
@@ -47,6 +48,11 @@ SUMMARY_MOST = 5
 MADE_EVERY = 0.5
 # How far, in pixels of the halved ground picture, it is blurred so the cells' edges soften.
 SOFTEN_RADIUS = 1.2
+# How many rows of the halved picture a step of softening blurs (soften_steps), and how many rows
+# more it takes in on either side: more than the blur reaches, so each band comes out as it does
+# within the whole picture.
+SOFTEN_ROWS = 160
+SOFTEN_MARGIN = 8
 
 SEA = (0.12, 0.17, 0.24, 1.0)
 TRACK = (0.2, 0.15, 0.11, 0.95)
@@ -253,6 +259,23 @@ def soften(rgba: np.ndarray, radius: float = SOFTEN_RADIUS) -> np.ndarray:
     picture = Image.fromarray(np.ascontiguousarray(rgba), "RGBA").reduce(2)
     blurred = picture.filter(ImageFilter.GaussianBlur(radius))
     return np.ascontiguousarray(np.asarray(blurred, dtype=np.uint8))
+
+
+def soften_steps(rgba: np.ndarray, radius: float = SOFTEN_RADIUS) -> Steps[np.ndarray]:
+    """soften a step at a time, with the same picture at the end: halving the picture, then
+    blurring SOFTEN_ROWS rows of the half a step. The picture is read only in the first step."""
+    half = Image.fromarray(np.ascontiguousarray(rgba), "RGBA").reduce(2)
+    yield
+    width, height = half.size
+    soft = np.empty((height, width, 4), dtype=np.uint8)
+    blur = ImageFilter.GaussianBlur(radius)
+    for top in range(0, height, SOFTEN_ROWS):
+        bottom = min(top + SOFTEN_ROWS, height)
+        start, end = max(0, top - SOFTEN_MARGIN), min(height, bottom + SOFTEN_MARGIN)
+        band = half.crop((0, start, width, end)).filter(blur)
+        soft[top:bottom] = np.asarray(band, dtype=np.uint8)[top - start : bottom - start]
+        yield
+    return soft
 
 
 def can_stop_at(train: Train, station: Cell) -> bool:

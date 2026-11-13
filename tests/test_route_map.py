@@ -15,6 +15,7 @@ from railroads.ui.route_map import (
     MADE_SHADES,
     MOST_ZOOM,
     SHADE_FROM,
+    SOFTEN_ROWS,
     SPECIAL_SHADES,
     SUMMARY_MOST,
     MapFrame,
@@ -28,6 +29,7 @@ from railroads.ui.route_map import (
     needed,
     shade_of,
     soften,
+    soften_steps,
     station_at,
     summary_of,
 )
@@ -206,6 +208,24 @@ def test_softening_blurs_a_hard_edge_and_keeps_flat_ground_as_it_was() -> None:
     assert row[0] == 0 and row[-1] == 255
     assert 0 < row[7] < 255 or 0 < row[8] < 255
     assert list(row) == sorted(row)
+
+
+@pytest.mark.parametrize("shape", [(2 * SOFTEN_ROWS * 3 + 7, 31), (5, 3), (1, 1)])
+def test_softening_in_steps_gives_the_picture_softened_at_once(shape: tuple[int, int]) -> None:
+    rgba = np.random.default_rng(5).integers(0, 256, size=(*shape, 4), dtype=np.uint8)
+    steps = soften_steps(rgba)
+
+    taken = 0
+    while True:
+        try:
+            next(steps)
+        except StopIteration as done:
+            soft = done.value
+            break
+        taken += 1
+
+    assert np.array_equal(soft, soften(rgba))
+    assert taken == 1 + -(-soft.shape[0] // SOFTEN_ROWS)
 
 
 def test_a_station_can_be_added_unless_the_train_already_ends_there() -> None:

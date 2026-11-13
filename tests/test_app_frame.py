@@ -19,6 +19,7 @@ from railroads.ui.build_menu import Tool
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
 from railroads.ui.main_menu import Page
 from railroads.ui.map_view import MapView
+from railroads.ui.route_map import soften
 from railroads.ui.workers import FrameWorker
 
 
@@ -382,3 +383,36 @@ def test_drawing_the_new_game_page_pulls_an_early_start_up_to_1750(
     shell_frame(shell)
 
     assert shell.menu.start_year == 1750
+
+
+def colours_changed_by_a_month(app: App) -> None:
+    """Lets a month pass that the view takes as changing every cell's mood, so the ground
+    pictures take their colours again."""
+    view = app.view
+    view._satisfaction = np.full_like(view._satisfaction, 2)
+    view.month_passed(np.random.default_rng(1))
+
+
+def test_the_trains_window_map_is_softened_anew_a_step_a_frame_once_colours_change(
+    context: None,
+) -> None:
+    app = made_app()
+    app.view.prepare((1280.0, 800.0), 1, chunks=False)
+    frame(app)
+    colours_changed_by_a_month(app)
+    version = app.view._ground_version
+
+    frame(app)
+    assert app.view._soft_texture is not None
+    shown_meanwhile = app.view._soft_texture[0]
+    frames = 1
+    while app.view._soft is not None and app.view._soft[0] != version and frames < 50:
+        frame(app)
+        frames += 1
+    frame(app)
+
+    assert shown_meanwhile == version - 1
+    assert frames > 2
+    assert app.view._soft is not None
+    assert np.array_equal(app.view._soft[1], soften(app.view._plain_picture()))
+    assert app.view._soft_texture[0] == version
