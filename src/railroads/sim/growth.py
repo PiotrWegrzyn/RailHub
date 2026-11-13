@@ -1,15 +1,14 @@
 """The map grows by itself, a month at a time, like a cellular automaton, by the ladders of
 railroads.sim.ladders: towns, farms, orchards, mines, lumber mills, ports and every kind of works.
 
-Houses breed (BREEDING): a cell's chance of another is the base chance, the same everywhere, plus
-what every house in it adds by how satisfied it is, times the doublings of the people around it,
-so that towns draw more people the bigger they are. Where a cell is full, the new house goes up in
-the nearest cell with room.
-
-Elsewhere, a building's points count as served MOST_SERVED times over at 100% satisfaction, and by its
-satisfaction above or below that (railroads.sim.economy: what it demands and makes that stations
-handled, and its bonus goods on top), each at SERVED_POINT_WORTH of a doubling, so only what
-stations supply compounds. A building that finds no room in its cell spills over into a cell nearby
+Buildings breed (breeding_of): a cell's chance of another of a ladder's kinds is its spawn chance,
+the same everywhere the land allows, plus what every building of the kind of points the ladder's
+buildings give adds there by how satisfied it is (MOST_SERVED times its points at 100%,
+railroads.sim.economy), times the doublings of the points around the cell that draw it: people for
+houses, food and people for food, people and twice the industry for industry, mines, mills and
+ports, and twice the people for shops, inns and churches. So towns and districts draw more the
+bigger they are, and only what is satisfied breeds. Food is EMPTY_LAND_BONUS times likelier to
+spring up where nothing stands around. A building that finds no room in its cell spills over into a cell nearby
 (railroads.sim.room).
 
 On town turns, a neighbourhood with SKYSCRAPER_PEOPLE population and SKYSCRAPER_FLATS blocks of
@@ -22,9 +21,8 @@ Every TRADE_EVERY_MONTHS the stations hand out their goods and buildings sell to
 each kind of building in each cell unsatisfied, content or thriving, and pays the player for the
 buildings they own (railroads.sim.ownership). Each building in a cell counts on its own: of ten
 houses with food for two, two are fed and eight starve. Buildings that starve on end are pulled down,
-as many as starved all that while, the player's too: those that make goods after
-PRODUCERS_DIE_AFTER_MONTHS, the rest after DIE_AFTER_MONTHS; those that make a bonus good never
-are.
+as many as starved all that while, the player's too: homes after HOMES_DIE_AFTER_MONTHS,
+everything else after DIE_AFTER_MONTHS; those that make a bonus good never are.
 
 Growth keeps the tally the other parts share: how many of each kind stand in each cell (counts),
 the points around each cell (nearby) and every ladder's chances, all kept up to date by add. Every
@@ -44,6 +42,7 @@ from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from itertools import pairwise
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -91,20 +90,76 @@ SKYSCRAPER_FLATS = 3
 SKYSCRAPER_HOMES = 10
 # Above this chance, a ladder draws for every cell instead of thinning.
 THINNING_UP_TO = 0.05
-# What one served point adds to a ladder's chance, as a share of what a doubling of the points
-# nearby adds.
-SERVED_POINT_WORTH = 2.0
 SKYSCRAPER_STARS = 4
-# Ladders whose buildings breed, rather than drawing more of them to every cell nearby.
-BREEDING = frozenset({BuildingKind.HOUSE})
-# How long buildings last starving: those that make goods, and the rest.
-PRODUCERS_DIE_AFTER_MONTHS = 50 * 12
-DIE_AFTER_MONTHS = 10 * 12
+# How much likelier food springs up where no building stands in the cell or around it.
+EMPTY_LAND_BONUS = 10.0
+# For every ladder but the homes': its spawn chance, its base chance or, where it has none, its
+# chance per doubling, and what its served points add per doubling, both times these.
+SPAWN_SCALE = 1.0
+BREEDING_SCALE = 0.03
+# The points around a cell that draw a ladder's buildings, and how much each counts, by the kind
+# of points they give.
+INDUSTRIAL = {Points.POPULATION: 1.0, Points.INDUSTRY: 2.0}
+SOCIAL = {Points.POPULATION: 2.0}
+DRAWN_BY: Mapping[Points, Mapping[Points, float]] = MappingProxyType(
+    {
+        Points.POPULATION: {Points.POPULATION: 1.0},
+        Points.FOOD: {Points.FOOD: 1.0, Points.POPULATION: 1.0},
+        Points.ORE: INDUSTRIAL,
+        Points.TIMBER: INDUSTRIAL,
+        Points.TRADE: INDUSTRIAL,
+        Points.INDUSTRY: INDUSTRIAL,
+        Points.CORPORATE: SOCIAL,
+        Points.WORSHIP: SOCIAL,
+        Points.AIR: SOCIAL,
+        Points.MILITARY: {Points.MILITARY: 1.0},
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class Breeding:
+    """How a ladder's buildings come up: the chance anywhere its land allows, the kind of points
+    its buildings give, which points around draw them and how much, what each served point adds
+    per doubling of those, and how much likelier it springs up where nothing stands around."""
+
+    spawn: float
+    own: Points
+    drawn_by: Mapping[Points, float]
+    per_doubling: float
+    empty_bonus: float = 1.0
+
+
+_BREEDINGS: dict[tuple[int, int], tuple[Ladder, Mapping, Breeding]] = {}
+
+
+def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]]) -> Breeding:
+    """How a ladder's buildings come up, worked out once for each ladder and points."""
+    kept = _BREEDINGS.get((id(ladder), id(points)))
+    if kept is not None and kept[0] is ladder and kept[1] is points:
+        return kept[2]
+    own = points[ladder.kinds[0]][0]
+    per_doubling = sum(ladder.chance_per_doubling.values())
+    if own == Points.POPULATION or not per_doubling:
+        spawn = ladder.base_chance
+    else:
+        spawn = SPAWN_SCALE * (ladder.base_chance or per_doubling)
+        per_doubling *= BREEDING_SCALE
+    bonus = EMPTY_LAND_BONUS if own == Points.FOOD else 1.0
+    breeding = Breeding(spawn, own, DRAWN_BY.get(own, {own: 1.0}), per_doubling, bonus)
+    _BREEDINGS[(id(ladder), id(points))] = (ladder, points, breeding)
+    return breeding
+
+
+# How long buildings last starving: homes, and everything else.
+HOMES_DIE_AFTER_MONTHS = 10 * 12
+DIE_AFTER_MONTHS = 30 * 12
+HOMES = frozenset({BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS})
 
 
 def dies_after(kind: BuildingKind) -> int:
     """How many months buildings of a kind last starving."""
-    return PRODUCERS_DIE_AFTER_MONTHS if kind in MAKES else DIE_AFTER_MONTHS
+    return HOMES_DIE_AFTER_MONTHS if kind in HOMES else DIE_AFTER_MONTHS
 
 
 # Kinds that make a bonus good, which never die out.
@@ -183,7 +238,6 @@ class Growth:
         }
         self.economy = Economy(tile_map)
         self._near = self.economy.neighbourhoods.index
-        self._by_points: dict[Points, list[tuple[_Place, float]]] = {p: [] for p in Points}
         # Each cell's points of every kind counted as served, multiplied by how satisfied.
         self._served = {points: np.zeros(grid.rows * grid.cols) for points in Points}
         self._places = []
@@ -200,16 +254,10 @@ class Growth:
                     np.flatnonzero(weights > 0),
                 )
             _, land, cells = shared
-            chances = np.full(land.size, ladder.base_chance)
-            for points, per_doubling in ladder.chance_per_doubling.items():
-                if ladder.kinds[0] not in BREEDING:
-                    chances += per_doubling * ladder.pull(self._nearby[points].ravel())
-            self._places.append(
-                _Place(ladder, cells, land, chances * land, float((chances * land).max()))
-            )
-        for place in self._places:
-            for points, per_doubling in place.ladder.chance_per_doubling.items():
-                self._by_points[points].append((place, per_doubling))
+            place = _Place(ladder, cells, land, np.zeros(land.size))
+            self._reckon(place, everywhere)
+            place.highest = float(place.chances.max())
+            self._places.append(place)
         # The cells whose forest came or went in the last month.
         self.forests_changed: set[Cell] = set()
         self.trade: Trade | None = None
@@ -341,13 +389,10 @@ class Growth:
             if not moved.any():
                 continue
             cells = every[moved]
-            added = SERVED_POINT_WORTH * (now[moved] - old[cells])
             old[cells] = now[moved]
-            for place, per_doubling in self._by_points[points]:
-                if place.ladder.kinds[0] in BREEDING:
+            for place in self._places:
+                if self._breeding(place).own == points:
                     self._reckon(place, cells)
-                else:
-                    place.chances[cells] += per_doubling * added * place.land[cells]
 
     @property
     def year(self) -> int:
@@ -410,17 +455,27 @@ class Growth:
                 changed |= self.room.relocate(Building((row, col), BuildingKind.FARM))
         return changed
 
+    def _breeding(self, place: _Place) -> Breeding:
+        return breeding_of(place.ladder, self.rule.points)
+
+    def _crowd(self, cells: npt.NDArray[np.intp]) -> npt.NDArray[np.int64]:
+        """All the points in and around each cell."""
+        return sum((nearby.ravel()[cells] for nearby in self._nearby.values()), start=np.int64(0))
+
     def _reckon(self, place: _Place, cells: npt.NDArray[np.intp]) -> None:
         """Works out the ladder's chances in these cells afresh."""
-        raw = np.full(cells.size, place.ladder.base_chance)
-        breeding = place.ladder.kinds[0] in BREEDING
-        for points, per_doubling in place.ladder.chance_per_doubling.items():
-            if breeding:
-                doublings = np.log2(1 + self._nearby[points].ravel()[cells])
-                raw += per_doubling * self._served[points][cells] * doublings
-                continue
-            nearby = place.ladder.pull(self._nearby[points].ravel()[cells])
-            raw += per_doubling * (nearby + SERVED_POINT_WORTH * self._served[points][cells])
+        breeding = self._breeding(place)
+        raw = np.full(cells.size, breeding.spawn)
+        if breeding.empty_bonus != 1.0:
+            raw = np.where(self._crowd(cells) == 0, raw * breeding.empty_bonus, raw)
+        if breeding.per_doubling:
+            served = self._served[breeding.own][cells]
+            if served.any():
+                drawing = sum(
+                    weight * self._nearby[points].ravel()[cells]
+                    for points, weight in breeding.drawn_by.items()
+                )
+                raw = raw + breeding.per_doubling * served * np.log2(1 + drawing)
         place.chances[cells] = raw * place.land[cells]
 
     def satisfaction(self) -> npt.NDArray[np.int8]:
@@ -742,21 +797,17 @@ class Growth:
         self._nearby[points][rows, cols] += how_many * value
         after = self._nearby[points][rows, cols]
         flat = np.ravel_multi_index((rows, cols), self._grid.shape)
-        pulls: dict[int, FloatGrid] = {}
-        for place, per_doubling in self._by_points[points]:
-            ladder = place.ladder
-            if ladder.kinds[0] in BREEDING:
-                self._reckon(place, flat)
-                if how_many > 0:
-                    place.highest = max(place.highest, float(place.chances[flat].max()))
+        crowd = self._crowd(flat)
+        emptied = ((crowd - (after - before)) == 0) != (crowd == 0)
+        served = {own: bool(self._served[own][flat].any()) for own in Points}
+        for place in self._places:
+            breeding = self._breeding(place)
+            drawn = points in breeding.drawn_by and served[breeding.own]
+            if not drawn and not (breeding.empty_bonus != 1.0 and emptied.any()):
                 continue
-            added = pulls.get(ladder.draws_from)
-            if added is None:
-                added = pulls[ladder.draws_from] = ladder.pull(after) - ladder.pull(before)
-            chances = place.chances[flat] + per_doubling * added * place.land[flat]
-            place.chances[flat] = chances
+            self._reckon(place, flat)
             if how_many > 0:
-                place.highest = max(place.highest, float(chances.max()))
+                place.highest = max(place.highest, float(place.chances[flat].max()))
 
     @staticmethod
     def _neighbourhood_sum(values: IntGrid, rows: IntGrid, cols: IntGrid) -> IntGrid:

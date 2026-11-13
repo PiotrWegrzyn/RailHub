@@ -3,7 +3,7 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.growth import DIE_AFTER_MONTHS, PRODUCERS_DIE_AFTER_MONTHS, UNDYING, Growth
+from railroads.sim.growth import DIE_AFTER_MONTHS, HOMES_DIE_AFTER_MONTHS, UNDYING, Growth
 from railroads.sim.ladders import GrowthRule
 
 TRADING = GrowthRule(trades=True, ladders=(), forests=None)
@@ -23,7 +23,7 @@ def run(growth: Growth, months: int) -> None:
 def test_a_house_with_nothing_dies_out_after_ten_years() -> None:
     growth = standing(((5, 5), BuildingKind.HOUSE))
 
-    run(growth, DIE_AFTER_MONTHS)
+    run(growth, HOMES_DIE_AFTER_MONTHS)
 
     assert growth.counts[BuildingKind.HOUSE].sum() == 0
     assert growth.died_out == 1
@@ -32,7 +32,7 @@ def test_a_house_with_nothing_dies_out_after_ten_years() -> None:
 def test_a_house_with_nothing_still_stands_just_short_of_ten_years() -> None:
     growth = standing(((5, 5), BuildingKind.HOUSE))
 
-    run(growth, DIE_AFTER_MONTHS - 2)
+    run(growth, HOMES_DIE_AFTER_MONTHS - 2)
 
     assert growth.counts[BuildingKind.HOUSE].sum() == 1
 
@@ -40,16 +40,16 @@ def test_a_house_with_nothing_still_stands_just_short_of_ten_years() -> None:
 def test_a_farm_and_a_house_near_enough_to_trade_both_live_on() -> None:
     growth = standing(((5, 5), BuildingKind.HOUSE), ((5, 9), BuildingKind.FARM))
 
-    run(growth, PRODUCERS_DIE_AFTER_MONTHS + 12)
+    run(growth, DIE_AFTER_MONTHS + 12)
 
     assert growth.counts[BuildingKind.HOUSE].sum() == 1
     assert growth.counts[BuildingKind.FARM].sum() == 1
 
 
-def test_a_farm_with_no_one_to_sell_to_dies_out_after_fifty_years() -> None:
+def test_a_farm_with_no_one_to_sell_to_dies_out_after_thirty_years() -> None:
     growth = standing(((5, 2), BuildingKind.HOUSE), ((5, 25), BuildingKind.FARM))
 
-    run(growth, PRODUCERS_DIE_AFTER_MONTHS)
+    run(growth, DIE_AFTER_MONTHS)
 
     assert growth.counts[BuildingKind.FARM].sum() == 0
     assert growth.died_out == 2
@@ -58,14 +58,14 @@ def test_a_farm_with_no_one_to_sell_to_dies_out_after_fifty_years() -> None:
 def test_a_farm_with_no_one_to_sell_to_still_stands_after_ten_years() -> None:
     growth = standing(((5, 25), BuildingKind.FARM))
 
-    run(growth, DIE_AFTER_MONTHS + 12)
+    run(growth, HOMES_DIE_AFTER_MONTHS + 12)
 
     assert growth.counts[BuildingKind.FARM].sum() == 1
 
 
 def test_a_house_left_to_starve_counts_its_ten_years_afresh_once_fed() -> None:
     growth = standing(((5, 5), BuildingKind.HOUSE))
-    run(growth, DIE_AFTER_MONTHS - 12)
+    run(growth, HOMES_DIE_AFTER_MONTHS - 12)
     growth.build(Building((5, 6), BuildingKind.FARM))
     run(growth, 1)
     growth.take_down(Building((5, 6), BuildingKind.FARM))
@@ -79,7 +79,7 @@ def test_a_house_left_to_starve_counts_its_ten_years_afresh_once_fed() -> None:
 def test_buildings_that_make_a_bonus_good_never_die_out(kind: BuildingKind) -> None:
     growth = standing(((5, 5), kind))
 
-    run(growth, PRODUCERS_DIE_AFTER_MONTHS + 12)
+    run(growth, DIE_AFTER_MONTHS + 12)
 
     assert kind in UNDYING
     assert growth.counts[kind].sum() == 1
@@ -89,7 +89,7 @@ def test_the_players_own_buildings_die_out_too() -> None:
     growth = standing(((5, 5), BuildingKind.HOUSE))
     growth.owners.own((5, 5), BuildingKind.HOUSE)
 
-    run(growth, DIE_AFTER_MONTHS)
+    run(growth, HOMES_DIE_AFTER_MONTHS)
 
     assert growth.counts[BuildingKind.HOUSE].sum() == 0
 
@@ -106,7 +106,7 @@ def test_of_four_houses_beside_one_farm_three_starve() -> None:
 def test_houses_starving_for_ten_years_die_and_the_fed_one_stays() -> None:
     growth = standing(*[((5, 5), BuildingKind.HOUSE)] * 4, ((5, 6), BuildingKind.FARM))
 
-    run(growth, DIE_AFTER_MONTHS)
+    run(growth, HOMES_DIE_AFTER_MONTHS)
 
     assert growth.counts[BuildingKind.HOUSE][5, 5] == 1
     assert growth.died_out == 3
@@ -117,6 +117,6 @@ def test_a_house_the_stand_in_player_serves_does_not_starve() -> None:
     growth.assumed_shares = np.full(20 * 30, np.nan)
     growth.assumed_shares[5 * 30 + 5] = 1.0
 
-    run(growth, DIE_AFTER_MONTHS + 12)
+    run(growth, HOMES_DIE_AFTER_MONTHS + 12)
 
     assert growth.counts[BuildingKind.HOUSE][5, 5] == 1

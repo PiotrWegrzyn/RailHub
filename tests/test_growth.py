@@ -7,7 +7,7 @@ from builders import flat_map, layer
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Trade
 from railroads.sim.grids import Cell, HexGrid
-from railroads.sim.growth import Growth, _allowed
+from railroads.sim.growth import Growth, _allowed, breeding_of
 from railroads.sim.ladders import (
     FACTORIES,
     FARMS,
@@ -329,25 +329,38 @@ def test_a_merge_that_would_not_fit_leaves_the_houses_standing_and_a_house_spill
     assert growth.count(BuildingKind.TENEMENT).sum() == 0
 
 
-@pytest.mark.parametrize(
-    ("factory", "industry", "drawn"),
-    [(BuildingKind.BIG_FACTORY, 3, False), (BuildingKind.MEGA_FACTORY, 9, True)],
-)
-def test_factories_are_drawn_by_industry_only_from_five_points_nearby(
-    factory: BuildingKind, industry: int, drawn: bool
+def industry_trade(tile_map: TileMap, cell: tuple[int, int]) -> Trade:
+    cells = np.array([np.ravel_multi_index(cell, tile_map.grid.shape)])
+    factory = BuildingKind.FACTORY
+    nothing = {factory: np.zeros(1)}
+    one = {factory: np.ones(1)}
+    return Trade(cells, one, one, nothing, nothing)
+
+
+@pytest.mark.parametrize(("people", "industry"), [(0, 0), (6, 0), (0, 1)])
+def test_a_served_factory_breeds_by_the_people_and_twice_the_industry_around_it(
+    people: int, industry: int
 ) -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
-    build(constructions, (5, 5), BuildingKind.FLATS, 1)
-    build(constructions, tile_map.grid.neighbours(5, 5)[0], factory, 1)
-    per = FACTORIES.chance_per_doubling
+    build(constructions, (5, 5), BuildingKind.FACTORY, 1)
+    neighbour = tile_map.grid.neighbours(5, 5)[0]
+    if people:
+        build(constructions, neighbour, BuildingKind.HOUSE, people)
+    if industry:
+        build(constructions, neighbour, BuildingKind.STEEL_MILL, industry)
+    growth = Growth(constructions, NO_TRADE)
+    breeding = breeding_of(FACTORIES, growth.rule.points)
+    points, value = growth.rule.points[BuildingKind.FACTORY]
 
-    chances = Growth(constructions, NO_TRADE).chances(FACTORIES)
+    growth._count_served(industry_trade(tile_map, (5, 5)))
 
-    pull = np.log2(1 + industry) * per[Points.INDUSTRY] if drawn else 0.0
-    nearby = np.log2(19) * per[Points.POPULATION] + pull
-    assert chances[5, 5] == pytest.approx(FACTORIES.base_chance + nearby)
-    assert chances[5, 8] == pytest.approx(FACTORIES.base_chance)
+    drawing = people + 2 * (value + industry * growth.rule.points[BuildingKind.STEEL_MILL][1])
+    bred = breeding.per_doubling * 10 * value * np.log2(1 + drawing)
+    assert points == Points.INDUSTRY
+    assert growth.chances(FACTORIES)[5, 5] == pytest.approx(
+        (breeding.spawn + bred) * FACTORIES.land.weights(tile_map)[5, 5]
+    )
 
 
 def test_three_factories_merge_into_a_big_factory_on_a_factory_turn() -> None:
