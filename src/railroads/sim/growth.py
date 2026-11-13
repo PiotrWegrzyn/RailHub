@@ -97,6 +97,9 @@ EMPTY_LAND_BONUS = 10.0
 # chance per doubling, and what its served points add per doubling, both times these.
 SPAWN_SCALE = 1.0
 BREEDING_SCALE = 0.03
+# The same for food, which springs up far more readily.
+FOOD_SPAWN_SCALE = 0.45
+FOOD_BREEDING_SCALE = 0.03
 # The points around a cell that draw a ladder's buildings, and how much each counts, by the kind
 # of points they give.
 INDUSTRIAL = {Points.POPULATION: 1.0, Points.INDUSTRY: 2.0}
@@ -143,8 +146,10 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
     if own == Points.POPULATION or not per_doubling:
         spawn = ladder.base_chance
     else:
-        spawn = SPAWN_SCALE * (ladder.base_chance or per_doubling)
-        per_doubling *= BREEDING_SCALE
+        food = own == Points.FOOD
+        spawn_scale = FOOD_SPAWN_SCALE if food else SPAWN_SCALE
+        spawn = spawn_scale * (ladder.base_chance or per_doubling)
+        per_doubling *= FOOD_BREEDING_SCALE if food else BREEDING_SCALE
     bonus = EMPTY_LAND_BONUS if own == Points.FOOD else 1.0
     breeding = Breeding(spawn, own, DRAWN_BY.get(own, {own: 1.0}), per_doubling, bonus)
     _BREEDINGS[(id(ladder), id(points))] = (ladder, points, breeding)

@@ -389,7 +389,7 @@ ORCHARDS = Ladder(
         water={Terrain.RIVER: 3.0, Terrain.LAKE: 3.0, Terrain.SEA: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000216,
+    base_chance=0.00000013,
     chance_per_doubling={Points.POPULATION: 0.000000108, Points.FOOD: 0.00000216},
 )
 
