@@ -20,6 +20,7 @@ import numpy.typing as npt
 
 from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.ui.iso_camera import TILT
+from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.noise import noise, ridged
 from railroads.ui.pixel.projection import FloatArray, PixelProjection
 
@@ -43,6 +44,15 @@ LIFTS_KEPT = 1 << 17
 MOUNTAIN_FLOOR = 200.0
 MOUNTAIN_RIDGES = 1700.0
 HILL_ROLL = 140.0
+# How mountainous ground is from its share of mountain cells round it: that share times the gain
+# less where it starts, or more where the peak of a single mountain cell stands.
+MOUNTAIN_GAIN = 2.4
+MOUNTAIN_FROM = 0.15
+PEAK_GAIN = 2.2
+PEAK_FROM = 0.25
+# How far over the most a bound on how mountainous ground is reaches, far more than rounding in
+# blending four steps of a raster can add.
+BOUND_MARGIN = 1e-6
 LIGHT = np.array([-0.68, -0.38, 0.5]) / math.sqrt(0.68**2 + 0.38**2 + 0.5**2)
 ROCK_LIT = np.array((150, 132, 112), dtype=np.float32)
 ROCK_DARK = np.array((92, 84, 80), dtype=np.float32)
@@ -75,15 +85,51 @@ def smooth(values: FloatArray, radius: int) -> FloatArray:
 
 def sample(raster: FloatArray, x: FloatArray, y: FloatArray) -> FloatArray:
     """The raster at fractional raster positions, blended from its four nearest steps."""
-    fx, fy = np.clip(x - 0.5, 0, raster.shape[1] - 1), np.clip(y - 0.5, 0, raster.shape[0] - 1)
-    x0, y0 = (
-        np.minimum(fx.astype(np.int64), raster.shape[1] - 2),
-        np.minimum(fy.astype(np.int64), raster.shape[0] - 2),
-    )
-    tx, ty = fx - x0, fy - y0
-    top = raster[y0, x0] * (1 - tx) + raster[y0, x0 + 1] * tx
-    bottom = raster[y0 + 1, x0] * (1 - tx) + raster[y0 + 1, x0 + 1] * tx
-    return top * (1 - ty) + bottom * ty
+    return Blend.at(raster.shape, x, y).read(raster)
+
+
+class Blend:
+    """Where fractional positions fall on rasters of one shape and how much each of the four
+    steps round them counts, worked out once to read several rasters at the same positions:
+    the flat index of the step before and above each, and how far past it each lies."""
+
+    def __init__(
+        self, shape: tuple[int, int], corner: npt.NDArray[np.int64], tx: FloatArray, ty: FloatArray
+    ) -> None:
+        self.shape = shape
+        self._corner, self._tx, self._ty = corner, tx, ty
+        self._sx, self._sy = 1 - tx, 1 - ty
+
+    @classmethod
+    def at(cls, shape: tuple[int, ...], x: npt.ArrayLike, y: npt.ArrayLike) -> Blend:
+        """The blend at raster positions `x`, `y` on rasters of this shape."""
+        height, width = shape
+        fx = np.asarray(np.clip(np.subtract(x, 0.5), 0, width - 1))
+        fy = np.asarray(np.clip(np.subtract(y, 0.5), 0, height - 1))
+        x0 = np.minimum(fx.astype(np.int64), width - 2)
+        y0 = np.minimum(fy.astype(np.int64), height - 2)
+        corner = np.asarray(y0 * width + x0)
+        return cls((height, width), corner, np.asarray(fx - x0), np.asarray(fy - y0))
+
+    def where(self, chosen: npt.NDArray[np.bool_]) -> Blend:
+        """The same positions, only those chosen."""
+        return Blend(self.shape, self._corner[chosen], self._tx[chosen], self._ty[chosen])
+
+    def read(self, raster: FloatArray) -> FloatArray:
+        """The raster at these positions."""
+        if raster.shape != self.shape:
+            raise ValueError("A blend reads only rasters of the shape it was worked out for")
+        flat = raster.ravel()
+        corner = self._corner
+        top = flat[corner] * self._sx
+        top += flat[corner + 1] * self._tx
+        below = corner + self.shape[1]
+        bottom = flat[below] * self._sx
+        bottom += flat[below + 1] * self._tx
+        top *= self._sy
+        bottom *= self._ty
+        top += bottom
+        return top
 
 
 @dataclass(frozen=True)
@@ -138,29 +184,66 @@ class Elevation:
 
     def shares(self, x: FloatArray, y: FloatArray) -> tuple[Floats, Floats]:
         """How mountainous and how hilly the ground is at plane points, from 0 to 1."""
-        m = np.clip(sample(self._mountains, x * STEPS, y * STEPS) * 2.4 - 0.15, 0, 1)
-        peak = np.clip(sample(self._peaks, x * STEPS, y * STEPS) * 2.2 - 0.25, 0, 1)
-        m = np.maximum(m, peak)
-        h = sample(self._hills, x * STEPS, y * STEPS)
-        return m.astype(np.float32), h.astype(np.float32)
+        return self._shares(Blend.at(self._mountains.shape, x * STEPS, y * STEPS))
+
+    def mountainous(self, x: FloatArray, y: FloatArray) -> Floats:
+        """How mountainous the ground is at plane points, from 0 to 1, as `shares` says."""
+        return self._mountainous(Blend.at(self._mountains.shape, x * STEPS, y * STEPS))
+
+    def _mountainous(self, at: Blend) -> Floats:
+        m = np.clip(at.read(self._mountains) * MOUNTAIN_GAIN - MOUNTAIN_FROM, 0, 1)
+        peak = np.clip(at.read(self._peaks) * PEAK_GAIN - PEAK_FROM, 0, 1)
+        return np.maximum(m, peak).astype(np.float32)
+
+    def _shares(self, at: Blend) -> tuple[Floats, Floats]:
+        return self._mountainous(at), at.read(self._hills).astype(np.float32)
+
+    def most(self, left: float, top: float, width: float, rows: float) -> tuple[float, float]:
+        """At least as mountainous and as hilly as any ground over these art pixels is, from
+        the most of each that the steps of the rasters read there hold: a cheap bound, a hair
+        over, that lets a block where nothing can rise skip working out its points."""
+        px = np.array([left, left + width, left, left + width], dtype=np.float64)
+        py = np.array([top, top, top + rows, top + rows], dtype=np.float64)
+        x, y = self.projection.to_plane(px, py)
+        height, width_steps = self._mountains.shape
+        steps = (
+            _steps_read(float(y.min()) * STEPS, float(y.max()) * STEPS, height),
+            _steps_read(float(x.min()) * STEPS, float(x.max()) * STEPS, width_steps),
+        )
+        mountains = float(self._mountains[steps].max()) * MOUNTAIN_GAIN - MOUNTAIN_FROM
+        peaks = float(self._peaks[steps].max()) * PEAK_GAIN - PEAK_FROM
+        most = min(max(mountains, peaks, 0.0) + BOUND_MARGIN, 1.0)
+        return most, float(self._hills[steps].max())
+
+    def may_rise(self, left: float, top: float, width: float, rows: float) -> bool:
+        """Whether any ground over these art pixels may rise, by `most`: False only where none
+        can."""
+        mountains, hills = self.most(left, top, width, rows)
+        return mountains > BOUND_MARGIN or hills > 0
 
     def rise(self, x: npt.ArrayLike, y: npt.ArrayLike) -> tuple[Floats, Floats, Floats]:
         """How many metres plane points rise above their valley, and how mountainous and hilly
         they are; only hills and mountains rise."""
         x, y = np.asarray(x, dtype=np.float64), np.asarray(y, dtype=np.float64)
-        m, h = self.shares(x, y)
+        return self._rise(x, y, Blend.at(self._base.shape, x * STEPS, y * STEPS))
+
+    def _rise(self, x: FloatArray, y: FloatArray, at: Blend) -> tuple[Floats, Floats, Floats]:
+        m, h = self._shares(at)
         rise = np.zeros(m.shape, dtype=np.float32)
         raised = (m > 0) | (h > 0)
         if raised.any():
             rx, ry, rm, rh = x[raised], y[raised], m[raised], h[raised]
-            base = sample(self._base, rx * STEPS, ry * STEPS)
-            valley = sample(self._valley, rx * STEPS, ry * STEPS)
-            wx = rx + 0.9 * (noise(rx, ry, 2.5, 11) - 0.5)
-            wy = ry + 0.9 * (noise(rx, ry, 2.5, 12) - 0.5)
-            big = ridged(wx, wy, 2.6, 1)
-            ridges = 0.55 * big + 0.28 * big * ridged(wx, wy, 1.0, 2)
-            ridges = ridges + 0.12 * ridged(wx, wy, 0.42, 3) + 0.05 * ridged(wx, wy, 0.16, 6)
-            rolling = 0.6 * noise(rx, ry, 0.9, 4) + 0.4 * noise(rx, ry, 0.35, 5)
+            there = at.where(raised)
+            base, valley = there.read(self._base), there.read(self._valley)
+            # Noise turns its points to float32; turned once, they serve every scale.
+            fx, fy = rx.astype(np.float32), ry.astype(np.float32)
+            wx = rx + 0.9 * (noise(fx, fy, 2.5, 11) - 0.5)
+            wy = ry + 0.9 * (noise(fx, fy, 2.5, 12) - 0.5)
+            rolling = 0.6 * noise(fx, fy, 0.9, 4) + 0.4 * noise(fx, fy, 0.35, 5)
+            fx, fy = wx.astype(np.float32), wy.astype(np.float32)
+            big = ridged(fx, fy, 2.6, 1)
+            ridges = 0.55 * big + 0.28 * big * ridged(fx, fy, 1.0, 2)
+            ridges = ridges + 0.12 * ridged(fx, fy, 0.42, 3) + 0.05 * ridged(fx, fy, 0.16, 6)
             lifted = np.clip(rm + rh, 0, 1) * np.maximum(base - valley, 0) * 0.5
             lifted = lifted + rm**1.6 * (MOUNTAIN_FLOOR + MOUNTAIN_RIDGES * ridges)
             rise[raised] = lifted + rh * (1 - rm) * HILL_ROLL * rolling
@@ -187,23 +270,35 @@ class Elevation:
         return lift
 
     def area(
-        self, left: int, top: int, width: int, rows: int, resolution: int = 1
+        self,
+        left: int,
+        top: int,
+        width: int,
+        rows: int,
+        resolution: int = 1,
+        points: Lattice | None = None,
     ) -> Raised | None:
         """The raised ground over `width` by `rows` art pixels from (`left`, `top`), at the
         middle of each of `resolution` pixels a side in every art pixel, with its lift in those
-        pixels; None where nothing there rises."""
+        pixels; None where nothing there rises. `points` may hold their plane points already."""
+        if not self.may_rise(left, top, width, rows):
+            return None
         k = resolution
-        py, px = np.mgrid[0 : rows * k, 0 : width * k]
-        x, y = self.projection.to_plane(left + (px + 0.5) / k, top + (py + 0.5) / k)
-        rise, m, h = self.rise(x, y)
+        if points is None or points.k != k or not points.holds(left, top, width, rows):
+            points = Lattice(self.projection, left, top, width, rows, k)
+        x, y = points.plane(left, top, width, rows)
+        at = Blend.at(self._base.shape, x * STEPS, y * STEPS)
+        rise, m, h = self._rise(x, y, at)
         if not (m > 0).any() and not (h > 0).any():
             return None
-        height = sample(self._valley, x * STEPS, y * STEPS).astype(np.float32) + rise
+        height = at.read(self._valley).astype(np.float32) + rise
         shade, steep = self._light(height, k)
         return Raised(self.to_lift(rise) * k, rise, m, h, shade, steep)
 
     def rises_in(self, left: int, top: int, width: int, rows: int) -> bool:
         """Whether any ground over these art pixels rises, from a sample every few pixels."""
+        if not self.may_rise(left, top, width, rows):
+            return False
         py, px = np.mgrid[0:rows:4, 0:width:4]
         x, y = self.projection.to_plane(left + px + 0.5, top + py + 0.5)
         m, h = self.shares(x, y)
@@ -244,19 +339,22 @@ class Elevation:
             return
         s, st, above, mm, hh = s[chosen], steep[chosen], raised.rise[chosen], m[chosen], h[chosen]
         xs, ys = x[chosen], y[chosen]
+        fx, fy = xs.astype(np.float32), ys.astype(np.float32)
         u = under[chosen][:, None]
-        foothill = FOOTHILL * (0.9 + 0.2 * noise(xs, ys, 0.3, 13))[:, None]
+        foothill = FOOTHILL * (0.9 + 0.2 * noise(fx, fy, 0.3, 13))[:, None]
         col = rgb[chosen] * (1 - u) + foothill * u * lit[chosen][:, None]
-        grain = noise(xs, ys, 0.05, 7)[:, None]
+        grain = noise(fx, fy, 0.05, 7)[:, None]
         rock = ROCK_DARK + (ROCK_LIT - ROCK_DARK) * np.clip(s * 1.3 - 0.2, 0, 1)[:, None]
         rock = rock * (0.9 + 0.2 * grain)
         rock = np.where((st > 0.55)[:, None], rock * 0.85, rock)
-        treeline = TREELINE + TREELINE_SPREAD * noise(xs, ys, 0.7, 8)
+        treeline = TREELINE + TREELINE_SPREAD * noise(fx, fy, 0.7, 8)
         bare = (np.clip((above - treeline) / 200 + st * 1.4 - 0.3, 0, 1) * mm)[:, None]
         col = col * (1 - bare) + rock * bare
-        snowline = SNOWLINE + SNOWLINE_SPREAD * noise(xs, ys, 0.6, 9) - 140 * (1 - s)
+        snowline = SNOWLINE + SNOWLINE_SPREAD * noise(fx, fy, 0.6, 9) - 140 * (1 - s)
         snow = np.clip((above - snowline) / 140, 0, 1) * np.clip(1.8 - st * 2.0, 0, 1) * mm
-        ribs = (ridged(xs * 3.0, ys * 0.8, 0.12, 14) > 0.55) & (st > 0.3)
+        steep_enough = st > 0.3
+        ribs = np.zeros(st.shape, dtype=bool)
+        ribs[steep_enough] = ridged(xs[steep_enough] * 3.0, ys[steep_enough] * 0.8, 0.12, 14) > 0.55
         snow = np.where(ribs, snow * 0.25, snow)[:, None]
         snowy = SNOW_DARK + (SNOW_LIT - SNOW_DARK) * np.clip(s * 1.5 - 0.35, 0, 1)[:, None]
         col = col * (1 - snow) + snowy * snow
@@ -272,16 +370,25 @@ class Elevation:
         return float(x[d]), float(y[d])
 
 
+def _steps_read(low: float, high: float, size: int) -> slice:
+    """The steps of a raster `size` steps long that blending reads at any position from `low`
+    to `high`, and one more each way for positions rounded a hair outside them."""
+    first = min(int(np.clip(low - 0.5, 0, size - 1)), size - 2)
+    last = min(int(np.clip(high - 0.5, 0, size - 1)), size - 2) + 1
+    return slice(max(first - 1, 0), min(last + 1, size - 1) + 1)
+
+
 def raycast(lift: Floats, rows: int, cols: int) -> npt.NDArray[np.int64]:
     """How many rows below each of `rows` by `cols` pixels lies the point that shows there: the
     nearest one whose lift reaches up to it. `lift` covers at least the highest lift's rows more."""
-    offset = np.zeros((rows, cols), dtype=np.int64)
-    found = np.zeros((rows, cols), dtype=bool)
-    for d in range(int(lift.max()), -1, -1):
-        reach = lift[d : d + rows, :cols] >= d
-        offset[reach & ~found] = d
-        found |= reach
-    return offset
+    highest = int(lift.max())
+    # Rows further down that reach a pixel overwrite those nearer, leaving the furthest; a lift
+    # reaches a whole number of rows exactly when its whole part does.
+    whole = np.floor(lift).astype(np.int16 if highest < 1 << 15 else np.int64)
+    offset = np.zeros((rows, cols), dtype=whole.dtype)
+    for d in range(1, highest + 1):
+        np.copyto(offset, d, where=whole[d : d + rows, :cols] >= d)
+    return offset.astype(np.int64)
 
 
 def raise_picture(
@@ -293,4 +400,7 @@ def raise_picture(
     rows, cols = offset.shape[0] * k, offset.shape[1] * k
     fine = np.repeat(np.repeat(offset, k, axis=0), k, axis=1) * k
     shown = np.minimum(np.arange(rows)[:, None] + fine, picture.shape[0] - 1)
-    return picture[shown, np.arange(cols)[None, :]]
+    width = picture.shape[1]
+    shown *= width
+    shown += np.arange(cols)[None, :]
+    return picture.reshape(-1, *picture.shape[2:])[shown]
