@@ -23,6 +23,7 @@ from railroads.sim.steps import Steps, finish
 from railroads.ui.help_window import HelpWindow
 from railroads.ui.main_menu import LoadChoice, MainMenu, NewGameChoice, QuitChoice, random_seed
 from railroads.ui.map_view import MapView
+from railroads.ui.pixel.ground_shader import free_textures
 from railroads.ui.reports_window import ReportsWindow
 from railroads.ui.saves_window import SavesWindow
 from railroads.ui.tech_window import TechWindow
@@ -322,6 +323,9 @@ class Shell:
         if not self._styled:
             apply_theme()
             self._styled = True
+        # Chunk textures of a game left behind are deleted here, as the menu or a game shown
+        # zoomed out draws none that would delete them.
+        free_textures()
         if self._task is not None:
             if self._waiting_shown and isinstance(self._executor, FrameWorker):
                 self._executor.work_once()
