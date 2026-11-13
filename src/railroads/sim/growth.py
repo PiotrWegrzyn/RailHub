@@ -96,7 +96,7 @@ SKYSCRAPER_STARS = 4
 SPAWN_SCALE = 1.0
 BREEDING_SCALE = 0.03
 # The same for food, which springs up far more readily.
-FOOD_SPAWN_SCALE = 2.5
+FOOD_SPAWN_SCALE = 3.75
 FOOD_BREEDING_SCALE = 0.03
 # The points around a cell that draw a ladder's buildings, and how much each counts, by the kind
 # of points they give.
