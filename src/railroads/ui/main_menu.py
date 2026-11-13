@@ -101,7 +101,7 @@ class MainMenu:
         imgui.begin_group()
         imgui.push_item_width(MENU_WIDTH)
         imgui.push_font(None, imgui.get_style().font_size_base * TITLE_SCALE)
-        imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_TRAIN}  Railroads")
+        imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_TRAIN}  RailHub")
         imgui.pop_font()
         imgui.spacing()
         if self.error:
@@ -149,6 +149,21 @@ class MainMenu:
         imgui.text_disabled(map_note(self.map))
         imgui.pop_text_wrap_pos()
         imgui.spacing()
+        self.start_year = allowed_start_year(self.start_year)
+        if imgui.collapsing_header("Advanced options"):
+            self._draw_advanced()
+        if imgui.collapsing_header("Cheats"):
+            self._draw_cheats()
+        imgui.spacing()
+        imgui.separator()
+        if self._button(f"{fa.ICON_FA_PLAY}  Start"):
+            self.error = ""
+            return NewGameChoice(self.settings())
+        if self._button("Back"):
+            self.go_to("main")
+        return None
+
+    def _draw_advanced(self) -> None:
         imgui.text("Seed")
         imgui.set_next_item_width(MENU_WIDTH - 40)
         _, self.seed = imgui.input_int("##seed", self.seed, 0)
@@ -175,24 +190,18 @@ class MainMenu:
             "more years take longer to set up."
         )
         imgui.spacing()
+
+    def _draw_cheats(self) -> None:
+        imgui.text_disabled("For trying the game out while it is made.")
         imgui.text("Starting money")
         _, self.cash = imgui.input_int("##cash", self.cash, CASH_STEP, CASH_STEP * 10)
         self.cash = min(max(self.cash, 0), MOST_CASH)
         imgui.text_disabled(f"{dollars(self.cash)}; the usual start is {dollars(START_CASH)}.")
+        imgui.text("A stand-in player runs the railway first for (years)")
+        _, self.stand_in_years = imgui.slider_int(
+            "##stand-in", self.stand_in_years, 0, END_YEAR - self.start_year
+        )
         imgui.spacing()
-        if imgui.collapsing_header("For testing"):
-            imgui.text("A stand-in player runs the railway first for (years)")
-            _, self.stand_in_years = imgui.slider_int(
-                "##stand-in", self.stand_in_years, 0, END_YEAR - self.start_year
-            )
-        imgui.spacing()
-        imgui.separator()
-        if self._button(f"{fa.ICON_FA_PLAY}  Start"):
-            self.error = ""
-            return NewGameChoice(self.settings())
-        if self._button("Back"):
-            self.go_to("main")
-        return None
 
     def _draw_load(self) -> MenuChoice | None:
         self.selected, chosen = draw_save_list(self.listing, self.selected, 320.0)

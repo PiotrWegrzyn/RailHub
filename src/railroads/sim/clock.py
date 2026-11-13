@@ -1,8 +1,7 @@
 """Game time: the calendar runs a month every SECONDS_PER_MONTH of play, from January of the year
 the map's history left off to January of END_YEAR, where it stops. A map's history begins in
 HISTORY_START, so the usual thousand years of it leave off in START_YEAR, for 2,400 months of
-play, a hundred hours at normal speed. Play can run faster, at any of SPEEDS; those above
-MAX_PLAY_SPEED are for testing.
+play, a hundred hours at normal speed. Play can run faster, at any of SPEEDS.
 """
 
 from dataclasses import dataclass
@@ -12,8 +11,7 @@ START_YEAR = 1850
 # The year every map's history begins: by default a thousand years before play.
 HISTORY_START = 850
 END_YEAR = 2050
-SPEEDS = (1, 2, 3, 6, 12, 24)
-MAX_PLAY_SPEED = 6
+SPEEDS = (1, 2, 3, 6)
 MONTH_NAMES = (
     "January",
     "February",

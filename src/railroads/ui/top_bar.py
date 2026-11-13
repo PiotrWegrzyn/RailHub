@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.sim.clock import MAX_PLAY_SPEED, SPEEDS
+from railroads.sim.clock import SPEEDS
 from railroads.sim.finance import Finances, dollars
 from railroads.ui.theme import BRASS, GONE, GROWN, danger_button, toggle_button
 
@@ -28,14 +28,8 @@ def draw_top_bar(app: App) -> None:
     draw_money(app.view.railway.finances)
     imgui.same_line(0, 16)
     for speed in SPEEDS:
-        testing = speed > MAX_PLAY_SPEED
-        tooltip = f"Run {speed} times as fast" + (" (for testing)" if testing else "")
-        if testing:
-            imgui.push_style_var(imgui.StyleVar_.alpha.value, 0.6)
-        if toggle_button(f"x{speed}", clock.speed == speed, tooltip):
+        if toggle_button(f"x{speed}", clock.speed == speed, f"Run {speed} times as fast"):
             clock.speed = speed
-        if testing:
-            imgui.pop_style_var()
         imgui.same_line(0, 2)
     imgui.same_line(0, 16)
     draw_view_controls(app.view)

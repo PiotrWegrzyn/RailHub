@@ -490,7 +490,7 @@ def main() -> None:
     shell = Shell(Saves(), settings_from(args))
     immapp.run(
         gui_function=shell.gui,
-        window_title="Railroads",
+        window_title="RailHub",
         window_size=(int(WINDOW_SIZE[0]), int(WINDOW_SIZE[1])),
         with_implot=True,
     )
