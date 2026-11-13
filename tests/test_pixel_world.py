@@ -194,20 +194,61 @@ def test_woods_are_drawn_darker_than_meadow_with_crowns_and_floor(sheet: SpriteS
     assert len(np.unique(woods, axis=0)) > 20
 
 
-def test_woods_clear_round_what_is_built_in_them(sheet: SpriteSheet) -> None:
-    world = make_world(sheet, houses=0)
+def canopy_round(world: PixelWorld, cell: Cell) -> tuple[np.ndarray, int, int]:
     grid = world.tile_map.grid
     canvas = np.ones((CHUNK, CHUNK, 4), dtype=np.float32)
-    px, py = world.projection.to_pixels(*grid.center(4, 8))
+    px, py = world.projection.to_pixels(*grid.center(*cell))
     left, top = int(px) - CHUNK // 2, int(py) - CHUNK // 2
-
     world.ground.canopy(canvas, left, top, 1)
+    return canvas, left, top
 
-    mill = canvas[CHUNK // 2 - 2 : CHUNK // 2 + 3, CHUNK // 2 - 2 : CHUNK // 2 + 3, :3]
-    fx, fy = world.projection.to_pixels(*grid.center(2, 10))
-    forest = canvas[int(fy) - top, int(fx) - left, :3]
-    assert (mill == 1).all()
-    assert (forest < 1).all()
+
+def test_woods_clear_round_what_is_built_in_them(sheet: SpriteSheet) -> None:
+    world = make_world(sheet, houses=0)
+    world.constructions.build(Building((2, 9), BuildingKind.FACTORY))
+    world.buildings_changed({(2, 9)})
+
+    canvas, _, _ = canopy_round(world, (2, 9))
+
+    factory = canvas[CHUNK // 2 - 2 : CHUNK // 2 + 3, CHUNK // 2 - 2 : CHUNK // 2 + 3, :3]
+    assert (factory == 1).all()
+
+
+def test_a_lumber_mill_stands_in_a_small_clearing_with_woods_round_it_in_its_cell(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet, houses=0)
+    grid = world.tile_map.grid
+    mill = Building((4, 8), BuildingKind.LUMBER_MILL)
+    sawmill = world.scenery.sprite == sheet.index("lumber_mill")
+    x, y = world.scenery.x[sawmill][0], world.scenery.y[sawmill][0]
+
+    canvas, left, top = canopy_round(world, mill.cell)
+
+    iy, ix = np.mgrid[0:CHUNK, 0:CHUNK]
+    r, c = grid.cell_at(*world.projection.to_plane(left + ix + 0.5, top + iy + 0.5))
+    in_cell = (r == mill.cell[0]) & (c == mill.cell[1])
+    wooded = (canvas[..., :3] < 1).any(axis=-1)
+    yard = canvas[int(y) - top + 4 : int(y) - top + 6, int(x) - left - 3 : int(x) - left + 4, :3]
+    assert (yard == 1).all()
+    assert wooded[in_cell].mean() > 0.6
+
+
+def test_a_lumber_mill_keeps_woods_in_its_cell_after_the_forest_there_is_cleared(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet, houses=0)
+    grid = world.tile_map.grid
+    world.tile_map.set_vegetation(np.array([4 * grid.cols + 8]), Vegetation.GRASS)
+    world.buildings_changed({(4, 8)})
+
+    canvas, left, top = canopy_round(world, (4, 8))
+
+    iy, ix = np.mgrid[0:CHUNK, 0:CHUNK]
+    r, c = grid.cell_at(*world.projection.to_plane(left + ix + 0.5, top + iy + 0.5))
+    in_cell = (r == 4) & (c == 8)
+    wooded = (canvas[..., :3] < 1).any(axis=-1)
+    assert wooded[in_cell].mean() > 0.6
 
 
 def test_every_building_gets_its_sprite(sheet: SpriteSheet) -> None:
