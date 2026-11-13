@@ -13,9 +13,9 @@ from railroads.sim.finance import ENGINE_SHED_PRICE, SAND_TOWER_PRICE
 from railroads.sim.goods import Good
 from railroads.sim.station_goods import StationGoods
 
-ENGINE_SHED_SPEED = 1.1
+ENGINE_SHED_SPEED = 1.2
 SAND_TOWER_PICKUP = 0.5
-COAL_A_MONTH = 30.0
+COAL_A_MONTH = 50.0
 SAND_A_MONTH = 15.0
 
 
