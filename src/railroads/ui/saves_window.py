@@ -7,6 +7,7 @@ from typing import Literal
 from imgui_bundle import imgui
 
 from railroads.saves import SaveInfo, Saves, name_problem
+from railroads.ui.save_files import BrowserFiles, DesktopFiles, draw_file_buttons, save_files
 from railroads.ui.theme import BRASS, GONE
 
 WINDOW_SIZE = (560.0, 420.0)
@@ -58,6 +59,7 @@ class SavesWindow:
     selected: str | None = None
     message: str = ""
     listing: list[SaveInfo] = field(default_factory=list)
+    files: BrowserFiles | DesktopFiles = field(default_factory=save_files)
 
     def show(self, saves: Saves) -> None:
         self.open = True
@@ -66,6 +68,10 @@ class SavesWindow:
 
     def refresh(self, saves: Saves) -> None:
         self.listing = saves.listing()
+
+    def _brought_in(self, saves: Saves, name: str) -> None:
+        self.refresh(saves)
+        self.selected = name
 
     def draw(self, saves: Saves) -> SaveRequest | None:
         if not self.open:
@@ -82,7 +88,7 @@ class SavesWindow:
                 request = self._draw_save(saves)
                 imgui.end_tab_item()
             if imgui.begin_tab_item("Load")[0]:
-                request = self._draw_load() or request
+                request = self._draw_load(saves) or request
                 imgui.end_tab_item()
             imgui.end_tab_bar()
             if self.message:
@@ -113,12 +119,21 @@ class SavesWindow:
             return SaveRequest("save", self.name.strip())
         return None
 
-    def _draw_load(self) -> SaveRequest | None:
+    def _draw_load(self, saves: Saves) -> SaveRequest | None:
         self.selected, chosen = draw_save_list(self.listing, self.selected)
         loadable = any(info.name == self.selected and info.problem is None for info in self.listing)
         imgui.begin_disabled(not loadable)
         clicked = imgui.button("Load", (-1, 0))
         imgui.end_disabled()
+        message = draw_file_buttons(
+            self.files,
+            saves,
+            self.selected,
+            imgui.get_content_region_avail().x,
+            lambda name: self._brought_in(saves, name),
+        )
+        if message:
+            self.message = message
         imgui.text_colored(
             imgui.ImVec4(*BRASS), "Loading leaves this game; save it first to keep it."
         )

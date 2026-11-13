@@ -18,8 +18,10 @@ from railroads.newgame import (
 from railroads.saves import SaveInfo, Saves
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
 from railroads.sim.finance import START_CASH, dollars
+from railroads.ui.save_files import BrowserFiles, DesktopFiles, draw_file_buttons, save_files
 from railroads.ui.saves_window import draw_save_list
 from railroads.ui.theme import BRASS, GONE
+from railroads.version import VERSION
 
 MENU_WIDTH = 460.0
 BUTTON_HEIGHT = 36.0
@@ -49,6 +51,16 @@ class QuitChoice:
 MenuChoice = NewGameChoice | LoadChoice | QuitChoice
 
 
+def draw_version() -> None:
+    """The game's version, small in the bottom right corner of the current window."""
+    label = f"v{VERSION}"
+    corner = imgui.get_window_pos() + imgui.get_window_size()
+    size = imgui.calc_text_size(label)
+    padding = imgui.get_style().window_padding
+    colour = imgui.get_color_u32(imgui.Col_.text_disabled.value)
+    imgui.get_window_draw_list().add_text(corner - size - padding, colour, label)
+
+
 def random_seed() -> int:
     """A seed from the system's randomness, so each start of the game offers a different one."""
     return secrets.randbelow(SEEDS)
@@ -76,6 +88,9 @@ class MainMenu:
     listing: list[SaveInfo] = field(default_factory=list)
     # What went wrong with the last game started or loaded, if anything.
     error: str = ""
+    files: BrowserFiles | DesktopFiles = field(default_factory=save_files)
+    # What came of the last save file exported or imported.
+    note: str = ""
 
     def settings(self) -> Settings:
         return Settings(
@@ -101,7 +116,7 @@ class MainMenu:
         imgui.begin_group()
         imgui.push_item_width(MENU_WIDTH)
         imgui.push_font(None, imgui.get_style().font_size_base * TITLE_SCALE)
-        imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_TRAIN}  Railroads")
+        imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_TRAIN}  RailHub")
         imgui.pop_font()
         imgui.spacing()
         if self.error:
@@ -115,6 +130,7 @@ class MainMenu:
         ]()
         imgui.pop_item_width()
         imgui.end_group()
+        draw_version()
         return choice
 
     def _button(self, label: str) -> bool:
@@ -142,13 +158,28 @@ class MainMenu:
                 hovered = imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value)
                 if disabled and hovered:
                     imgui.set_tooltip(
-                        "Needs the elevation database: uv run python tools/build_elevation_db.py"
+                        "Needs the world's map data: uv run python tools/build_world_files.py"
                     )
             imgui.end_combo()
         imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)
         imgui.text_disabled(map_note(self.map))
         imgui.pop_text_wrap_pos()
         imgui.spacing()
+        self.start_year = allowed_start_year(self.start_year)
+        if imgui.collapsing_header("Advanced options"):
+            self._draw_advanced()
+        if imgui.collapsing_header("Cheats"):
+            self._draw_cheats()
+        imgui.spacing()
+        imgui.separator()
+        if self._button(f"{fa.ICON_FA_PLAY}  Start"):
+            self.error = ""
+            return NewGameChoice(self.settings())
+        if self._button("Back"):
+            self.go_to("main")
+        return None
+
+    def _draw_advanced(self) -> None:
         imgui.text("Seed")
         imgui.set_next_item_width(MENU_WIDTH - 40)
         _, self.seed = imgui.input_int("##seed", self.seed, 0)
@@ -175,28 +206,35 @@ class MainMenu:
             "more years take longer to set up."
         )
         imgui.spacing()
+
+    def _draw_cheats(self) -> None:
+        imgui.text_disabled("For trying the game out while it is made.")
         imgui.text("Starting money")
         _, self.cash = imgui.input_int("##cash", self.cash, CASH_STEP, CASH_STEP * 10)
         self.cash = min(max(self.cash, 0), MOST_CASH)
         imgui.text_disabled(f"{dollars(self.cash)}; the usual start is {dollars(START_CASH)}.")
+        imgui.text("A stand-in player runs the railway first for (years)")
+        _, self.stand_in_years = imgui.slider_int(
+            "##stand-in", self.stand_in_years, 0, END_YEAR - self.start_year
+        )
         imgui.spacing()
-        if imgui.collapsing_header("For testing"):
-            imgui.text("A stand-in player runs the railway first for (years)")
-            _, self.stand_in_years = imgui.slider_int(
-                "##stand-in", self.stand_in_years, 0, END_YEAR - self.start_year
-            )
-        imgui.spacing()
-        imgui.separator()
-        if self._button(f"{fa.ICON_FA_PLAY}  Start"):
-            self.error = ""
-            return NewGameChoice(self.settings())
-        if self._button("Back"):
-            self.go_to("main")
-        return None
+
+    def _brought_in(self, name: str) -> None:
+        self.listing = self.saves.listing()
+        self.selected = name
 
     def _draw_load(self) -> MenuChoice | None:
         self.selected, chosen = draw_save_list(self.listing, self.selected, 320.0)
         loadable = any(info.name == self.selected and info.problem is None for info in self.listing)
+        message = draw_file_buttons(
+            self.files, self.saves, self.selected, MENU_WIDTH, self._brought_in
+        )
+        if message:
+            self.note = message
+        if self.note:
+            imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)
+            imgui.text_disabled(self.note)
+            imgui.pop_text_wrap_pos()
         imgui.text_disabled(f"Saves are kept in {self.saves.folder}")
         imgui.begin_disabled(not loadable)
         clicked = self._button(f"{fa.ICON_FA_FOLDER_OPEN}  Load")

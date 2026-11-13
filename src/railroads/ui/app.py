@@ -21,7 +21,14 @@ from railroads.sim.game import Game
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
 from railroads.sim.steps import Steps, finish
 from railroads.ui.help_window import HelpWindow
-from railroads.ui.main_menu import LoadChoice, MainMenu, NewGameChoice, QuitChoice, random_seed
+from railroads.ui.main_menu import (
+    LoadChoice,
+    MainMenu,
+    NewGameChoice,
+    QuitChoice,
+    draw_version,
+    random_seed,
+)
 from railroads.ui.map_view import MapView
 from railroads.ui.pixel.ground_shader import free_textures
 from railroads.ui.reports_window import ReportsWindow
@@ -413,6 +420,7 @@ class Shell:
         if self._done is not None:
             imgui.progress_bar(self._done, imgui.ImVec2(WAITING_WIDTH, 0))
         imgui.end_group()
+        draw_version()
 
 
 def _at_once[T](work: Callable[[], T]) -> Steps[T]:
@@ -490,7 +498,7 @@ def main() -> None:
     shell = Shell(Saves(), settings_from(args))
     immapp.run(
         gui_function=shell.gui,
-        window_title="Railroads",
+        window_title="RailHub",
         window_size=(int(WINDOW_SIZE[0]), int(WINDOW_SIZE[1])),
         with_implot=True,
     )

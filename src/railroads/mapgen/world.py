@@ -14,6 +14,7 @@ from railroads.sim.geo import KM_PER_DEGREE_LAT, Bounds, Coord
 from railroads.sim.grids import SquareGrid
 
 WHOLE_WORLD = Bounds(west=-180.0, east=180.0, south=-90.0, north=90.0)
+LAND_CHECK_KM_PER_CELL = 20.0
 
 
 @dataclass(frozen=True)
@@ -48,3 +49,9 @@ class WorldLand:
         row = np.clip(((90.0 - np.asarray(lat)) / self.degrees_per_cell).astype(int), 0, rows - 1)
         col = np.clip(((np.asarray(lon) + 180.0) / self.degrees_per_cell).astype(int), 0, cols - 1)
         return self.land[row, col]
+
+    def land_share(self, bounds: Bounds, km_per_cell: float = LAND_CHECK_KM_PER_CELL) -> float:
+        """Roughly how much of the bounds is land, from cells `km_per_cell` apart."""
+        grid = SquareGrid.covering(bounds.width_km, bounds.height_km, km_per_cell)
+        lon, lat = MapArea.of(bounds, grid).center_lonlat()
+        return float(self.land_at(lon, lat).mean()) / 255

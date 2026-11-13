@@ -14,7 +14,7 @@
 // compressed, or {kind: "failed", error}.
 import { loadPyodide } from "./pyodide/pyodide.mjs";
 
-const GAME_WHEEL = "wheels/railroads-0.1.0-py3-none-any.whl";
+const GAME_WHEEL = "wheels/railroads-__VERSION__-py3-none-any.whl";
 
 let pyodide = null;
 let copy = null;

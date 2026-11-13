@@ -2,7 +2,7 @@ name: Pages
 
 on:
   push:
-    branches: [master]
+    branches: [master, staging]
   workflow_dispatch:
 
 permissions:
@@ -19,17 +19,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: master
+          path: master
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          path: staging
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.14"
       - uses: actions/cache@v4
         with:
-          path: build/web-cache
-          key: web-cache-${{ hashFiles('web/build_site.py') }}
+          path: |
+            master/build/web-cache
+            staging/build/web-cache
+          key: web-cache-${{ hashFiles('master/web/build_site.py', 'staging/web/build_site.py') }}
       - run: uv run --no-project python web/build_site.py
+        working-directory: master
+      - run: uv run --no-project python web/build_site.py
+        working-directory: staging
+      - name: Put the staging build under /staging/
+        run: |
+          sed -i 's#<title>\(.*\)</title>#<title>\1 (staging)</title>#' staging/build/site/index.html
+          mv staging/build/site master/build/site/staging
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: build/site
+          path: master/build/site
 
   deploy:
     needs: build

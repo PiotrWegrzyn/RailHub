@@ -1,7 +1,7 @@
-from pathlib import Path
-
 import numpy as np
 
+from builders import MemoryFiles
+from railroads.mapgen.world_files import INDEX_FILE, World, WorldIndex, places_file, square_of
 from railroads.places import Places, StationNames
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
@@ -83,22 +83,32 @@ def test_a_station_in_two_towns_reaches_takes_the_one_it_is_deeper_in() -> None:
     assert town == "City"
 
 
-def test_places_load_only_around_the_map_and_none_without_the_file(tmp_path: Path) -> None:
-    names = ["Łódź", "Paris"]
-    encoded = [name.encode() for name in names]
-    path = tmp_path / "places.npz"
-    np.savez_compressed(
-        path,
-        names=np.frombuffer(b"".join(encoded), dtype=np.uint8),
-        ends=np.cumsum([len(e) for e in encoded]),
-        lat=np.array([51.76, 48.85], dtype=np.float32),
-        lon=np.array([19.46, 2.35], dtype=np.float32),
-        population=np.array([650_000, 2_100_000]),
+def test_places_come_from_the_squares_around_the_map_only() -> None:
+    lodz = Places(("Łódź",), np.array([19.46]), np.array([51.76]), np.array([650_000]))
+    paris = Places(("Paris",), np.array([2.35]), np.array([48.85]), np.array([2_100_000]))
+    squares = frozenset({square_of(19.46, 51.76), square_of(2.35, 48.85)})
+    files = MemoryFiles(
+        {
+            INDEX_FILE: WorldIndex(frozenset(), frozenset(), squares).write(),
+            places_file(*square_of(19.46, 51.76)): lodz.write(),
+            places_file(*square_of(2.35, 48.85)): paris.write(),
+        }
     )
+    world = World(files)
 
-    loaded = Places.load(BOUNDS, path)
-    missing = Places.load(BOUNDS, tmp_path / "none.npz")
+    loaded = Places.near(BOUNDS, world)
 
     assert loaded is not None
     assert loaded.names == ("Łódź",)
-    assert missing is None
+    assert files.asked == {INDEX_FILE, places_file(*square_of(19.46, 51.76))}
+
+
+def test_places_file_reads_back_unchanged() -> None:
+    places = Places(("Łódź", "Kraków"), np.array([19.46, 19.94]), np.array([51.76, 50.06]),
+                    np.array([650_000, 780_000]))  # fmt: skip
+
+    again = Places.read(places.write(), Bounds(west=0.0, east=40.0, south=40.0, north=60.0))
+
+    assert again.names == places.names
+    assert np.allclose(again.lon, places.lon)
+    assert np.array_equal(again.population, places.population)
