@@ -254,7 +254,7 @@ class TrackArt:
         # drawn (`_laid`), and where the points of its line land in the picture and how far they
         # are lifted, kept until track or stations change.
         self._shapes: dict[Track, tuple[float, float]] = {}
-        self._laid_pieces: dict[tuple[Track, Point | None], _Laid] = {}
+        self._laid_pieces: dict[tuple[Track, Point | None], tuple[int, _Laid]] = {}
         self._placed: dict[tuple[Track, Point | None], tuple[list[float], list[float]]] = {}
         self._lifts: dict[tuple[Track, Point | None], list[float]] = {}
         self._shapes_version = -1
@@ -447,15 +447,19 @@ class TrackArt:
 
     def _laid(self, piece: Track, platform: Point | None = None) -> _Laid:
         self._keep_current()
-        laid = self._laid_pieces.get((piece, platform))
-        if laid is None:
-            grid = self.tile_map.grid
-            steps = self._steps / 2
-            cx, cy = (float(v) for v in grid.center(*piece.cell))
-            a, b = (steps[point] for point in piece.ends)
-            line = _dense(_bend((cx + a[0], cy + a[1]), (cx, cy), (cx + b[0], cy + b[1])), STEP)
-            laid = _Laid(piece, line, self._sides(piece, line), platform)
-            self._laid_pieces[piece, platform] = laid
+        # Each piece is kept with the railway it was laid out for, so one laid out while the
+        # railway changed, as the painter's thread can, is laid out again.
+        version = self._shapes_version
+        kept = self._laid_pieces.get((piece, platform))
+        if kept is not None and kept[0] == version:
+            return kept[1]
+        grid = self.tile_map.grid
+        steps = self._steps / 2
+        cx, cy = (float(v) for v in grid.center(*piece.cell))
+        a, b = (steps[point] for point in piece.ends)
+        line = _dense(_bend((cx + a[0], cy + a[1]), (cx, cy), (cx + b[0], cy + b[1])), STEP)
+        laid = _Laid(piece, line, self._sides(piece, line), platform)
+        self._laid_pieces[piece, platform] = (version, laid)
         return laid
 
     def _placed_line(self, laid: _Laid) -> tuple[list[float], list[float]]:
