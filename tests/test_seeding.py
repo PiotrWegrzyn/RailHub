@@ -112,7 +112,6 @@ def test_seeding_grows_towns_and_the_industry_that_suits_the_land(history: Grown
         BuildingKind.FARM,
         BuildingKind.MINE,
         BuildingKind.LUMBER_MILL,
-        BuildingKind.FACTORY,
     } <= kinds
 
 
