@@ -5,7 +5,9 @@ finds the cells under them once instead of once a layer.
 
 A point is the same however large the block it was worked out in: pixel middles are whole numbers
 and halves (quarters at two pixels to an art pixel), which add up exactly, so the plane point of a
-pixel comes out the same to the last bit whichever block it is part of."""
+pixel comes out the same to the last bit whichever block it is part of. At a resolution that is
+not a power of two they need not add up exactly, so a lattice there gives only blocks from its own
+top left corner, whose points it works out just as a lattice of the block alone would."""
 
 from functools import cached_property
 
@@ -33,8 +35,6 @@ class Lattice:
         k: int = 1,
         grid: Grid | None = None,
     ) -> None:
-        if k & (k - 1):
-            raise ValueError("Pixel middles add up exactly only at a power of two to an art pixel")
         self.projection, self.grid = projection, grid
         self.left, self.top, self.width, self.rows, self.k = left, top, width, rows, k
 
@@ -53,6 +53,8 @@ class Lattice:
             raise ValueError("The lattice does not cover these art pixels")
         k = self.k
         down, across = (top - self.top) * k, (left - self.left) * k
+        if (down or across) and k & (k - 1):
+            raise ValueError("Pixel middles add up exactly only at a power of two to an art pixel")
         return slice(down, down + rows * k), slice(across, across + width * k)
 
     @cached_property

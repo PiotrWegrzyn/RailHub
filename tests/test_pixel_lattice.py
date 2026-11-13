@@ -53,6 +53,14 @@ def test_a_lattice_refuses_pixels_it_does_not_cover() -> None:
         lattice.plane(-1, 0, 5, 5)
 
 
-def test_a_lattice_takes_only_resolutions_whose_pixel_middles_add_up_exactly() -> None:
+def test_a_lattice_at_a_resolution_not_a_power_of_two_gives_only_blocks_from_its_corner() -> None:
+    projection = projection_of(GRIDS[0])
+    lattice = Lattice(projection, -7, 5, 12, 10, 3)
+
+    x, y = lattice.plane(-7, 5, 9, 10)
+
+    py, px = np.mgrid[0:30, 0:27]
+    alone_x, alone_y = projection.to_plane(-7 + (px + 0.5) / 3, 5 + (py + 0.5) / 3)
+    assert np.array_equal(x, alone_x) and np.array_equal(y, alone_y)
     with pytest.raises(ValueError):
-        Lattice(projection_of(GRIDS[0]), 0, 0, 10, 10, 3)
+        lattice.plane(-6, 5, 9, 10)

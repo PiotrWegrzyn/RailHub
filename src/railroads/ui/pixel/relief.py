@@ -442,9 +442,10 @@ def raise_picture(
     if whole and (art_rows + int(offset.max())) * k <= picture.shape[0]:
         # No pixel is taken from below the picture, so each art pixel's rows of pixels come
         # whole from the art pixel its offset below.
-        runs = picture.reshape(picture.shape[0], art_cols, k * picture.shape[2])
+        run = k * math.prod(picture.shape[2:])
+        runs = picture.reshape(picture.shape[0], art_cols, run)
         below = (np.arange(art_rows)[:, None] + offset) * k
-        raised = np.empty((art_rows, k, art_cols, k * picture.shape[2]), dtype=picture.dtype)
+        raised = np.empty((art_rows, k, art_cols, run), dtype=picture.dtype)
         for row in range(k):
             raised[:, row] = runs[below + row, np.arange(art_cols)[None, :]]
         return raised.reshape(rows, cols, *picture.shape[2:])

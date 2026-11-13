@@ -91,10 +91,13 @@ def test_raycast_finds_the_furthest_point_reaching_each_pixel(highest: float) ->
 
 @pytest.mark.parametrize("k", [1, 2])
 @pytest.mark.parametrize("below", [6, 2], ids=["rows enough", "rows short"])
-def test_a_raised_picture_takes_each_pixel_from_its_offset_below(k: int, below: int) -> None:
+@pytest.mark.parametrize("channels", [(4,), ()], ids=["rgba", "one value"])
+def test_a_raised_picture_takes_each_pixel_from_its_offset_below(
+    k: int, below: int, channels: tuple[int, ...]
+) -> None:
     rng = np.random.default_rng(4)
     offset = rng.integers(0, 6, (10, 12))
-    picture = rng.random(((10 + below) * k, 12 * k, 4)).astype(np.float32)
+    picture = rng.random(((10 + below) * k, 12 * k, *channels)).astype(np.float32)
 
     raised = raise_picture(picture, offset, k)
 
@@ -149,6 +152,23 @@ def test_raised_ground_from_points_of_a_larger_block_rises_as_its_own_points_do(
     assert np.array_equal(raised.mountains, mountains)
     assert np.array_equal(raised.hills, hills)
     assert np.array_equal(raised.lift, elevation.to_lift(rise) * k)
+
+
+def test_raised_ground_at_a_resolution_not_a_power_of_two_rises_as_its_points_do() -> None:
+    elevation = elevation_of(mountain_map())
+    corner = elevation.projection.to_pixels(19.0, 12.0)
+    left, top = int(corner[0]), int(corner[1])
+
+    raised = elevation.area(left, top, 20, 16, 3)
+
+    py, px = np.mgrid[0:48, 0:60]
+    x, y = elevation.projection.to_plane(left + (px + 0.5) / 3, top + (py + 0.5) / 3)
+    rise, mountains, hills = elevation.rise(x, y)
+    assert raised is not None
+    assert np.array_equal(raised.rise, rise)
+    assert np.array_equal(raised.mountains, mountains)
+    assert np.array_equal(raised.hills, hills)
+    assert np.array_equal(raised.lift, elevation.to_lift(rise) * 3)
 
 
 def test_the_lift_of_a_single_point_is_its_lift_among_many() -> None:
