@@ -250,13 +250,30 @@ class TrackArt:
         self.constructions = constructions
         self.projection = projection
         self.elevation = elevation
-        # How each piece of track opens up or shifts at its ends (`_ends`), kept until track or
-        # stations change.
+        # How each piece of track opens up or shifts at its ends (`_ends`), each piece as it is
+        # drawn (`_laid`), and where the points of its line land in the picture and how far they
+        # are lifted, kept until track or stations change.
         self._shapes: dict[Track, tuple[float, float]] = {}
+        self._laid_pieces: dict[tuple[Track, Point | None], _Laid] = {}
+        self._placed: dict[tuple[Track, Point | None], tuple[list[float], list[float]]] = {}
+        self._lifts: dict[tuple[Track, Point | None], list[float]] = {}
         self._shapes_version = -1
+        # The middle of each cell in the picture, and the steps to the cells track leaves
+        # each cell for, which never change.
+        self._centres: dict[Cell, tuple[float, float]] = {}
+        self._steps = tile_map.grid.track_steps()
         self._planned: dict[Cell, list[Track]] = {}
         for piece in planned:
             self._planned.setdefault(piece.cell, []).append(piece)
+
+    def _keep_current(self) -> None:
+        """Forgets what was kept about pieces of track before track or stations last changed."""
+        if self._shapes_version != self.constructions.railway_version:
+            self._shapes.clear()
+            self._laid_pieces.clear()
+            self._placed.clear()
+            self._lifts.clear()
+            self._shapes_version = self.constructions.railway_version
 
     def planning(self, pieces: list[Track]) -> TrackArt:
         """Track art that draws track as it will be once these pieces are laid, each in place
@@ -339,26 +356,23 @@ class TrackArt:
             ImageDraw.Draw(heights),
         )
         cell = PIXEL_CELL_WIDTH * s
-        projection = self.projection
-        elevation = self.elevation if lifted else None
+        raise_up = lifted and self.elevation is not None
 
-        def screen(points: Path) -> tuple[Path, list[float]]:
-            xs = np.array([p[0] for p in points])
-            ys = np.array([p[1] for p in points])
-            px, py = projection.to_pixels(xs, ys)
-            lifts = np.zeros(len(points)) if elevation is None else elevation.lift(xs, ys)
+        def screen(each: _Laid) -> tuple[Path, list[float]]:
+            xs, ys = self._placed_line(each)
+            lifts = self._lifted_line(each) if raise_up else [0.0] * len(xs)
             on_screen = [
-                ((float(x) - left) * s, (float(y) - lift - top) * s)
-                for x, y, lift in zip(px, py, lifts, strict=True)
+                ((x - left) * s, (y - lift - top) * s)
+                for x, y, lift in zip(xs, ys, lifts, strict=True)
             ]
-            return on_screen, [float(lift) for lift in lifts]
+            return on_screen, lifts
 
         drawn = []
         for each in laid:
-            line, lifts = screen(each.line)
+            line, lifts = screen(each)
             lanes = [_offset(line, [side * cell for side in sides]) for sides in each.sides]
             drawn.append((each, line, lanes))
-            if elevation is not None:
+            if raise_up:
                 self._measure(measure, each, line, lanes, lifts, cell, s)
         ground = [item for item in drawn if item[0].piece.bed != TrackBed.TUNNEL]
         for each, _, lanes in ground:
@@ -425,28 +439,55 @@ class TrackArt:
                 measure.polygon(stretch, fill=(la + lb) / 2)
 
     def _near(self, cell: Cell, near: tuple[int, int, int, int]) -> bool:
-        px, py = self.projection.to_pixels(*self.tile_map.grid.center(*cell))
-        return near[0] < float(px) < near[2] and near[1] < float(py) < near[3]
+        centre = self._centres.get(cell)
+        if centre is None:
+            px, py = self.projection.to_pixels(*self.tile_map.grid.center(*cell))
+            centre = self._centres[cell] = (float(px), float(py))
+        return near[0] < centre[0] < near[2] and near[1] < centre[1] < near[3]
 
     def _laid(self, piece: Track, platform: Point | None = None) -> _Laid:
-        grid = self.tile_map.grid
-        steps = grid.track_steps() / 2
-        cx, cy = (float(v) for v in grid.center(*piece.cell))
-        a, b = (steps[point] for point in piece.ends)
-        line = _dense(_bend((cx + a[0], cy + a[1]), (cx, cy), (cx + b[0], cy + b[1])), STEP)
-        return _Laid(piece, line, self._sides(piece, line), platform)
+        self._keep_current()
+        laid = self._laid_pieces.get((piece, platform))
+        if laid is None:
+            grid = self.tile_map.grid
+            steps = self._steps / 2
+            cx, cy = (float(v) for v in grid.center(*piece.cell))
+            a, b = (steps[point] for point in piece.ends)
+            line = _dense(_bend((cx + a[0], cy + a[1]), (cx, cy), (cx + b[0], cy + b[1])), STEP)
+            laid = _Laid(piece, line, self._sides(piece, line), platform)
+            self._laid_pieces[piece, platform] = laid
+        return laid
+
+    def _placed_line(self, laid: _Laid) -> tuple[list[float], list[float]]:
+        """Where the points of a piece's centre line land in the picture."""
+        placed = self._placed.get((laid.piece, laid.platform))
+        if placed is None:
+            xs = np.array([p[0] for p in laid.line])
+            ys = np.array([p[1] for p in laid.line])
+            px, py = self.projection.to_pixels(xs, ys)
+            placed = self._placed[laid.piece, laid.platform] = (px.tolist(), py.tolist())
+        return placed
+
+    def _lifted_line(self, laid: _Laid) -> list[float]:
+        """How many art pixels each point of a piece's centre line is lifted with the ground."""
+        lifts = self._lifts.get((laid.piece, laid.platform))
+        if lifts is None:
+            assert self.elevation is not None
+            xs = np.array([p[0] for p in laid.line])
+            ys = np.array([p[1] for p in laid.line])
+            lifts = self._lifts[laid.piece, laid.platform] = self.elevation.lift(xs, ys).tolist()
+        return lifts
 
     def _through_stations(self, near: tuple[int, int, int, int]) -> list[_Laid]:
         """The track through each station near the area, straight between its two ends with
         its platform beside it: double where double track comes in, electric where electric
         track comes in at both ends."""
-        steps = self.tile_map.grid.track_steps()
         laid = []
         for cell in self.constructions.stations():
             if not self._near(cell, near):
                 continue
             piece = self.station_piece(cell)
-            laid.append(self._laid(piece, station_side(self.projection, steps, piece.ends)))
+            laid.append(self._laid(piece, station_side(self.projection, self._steps, piece.ends)))
         return laid
 
     def station_piece(self, cell: Cell) -> Track:
@@ -503,9 +544,7 @@ class TrackArt:
         """At each end of the piece, for single track how far to the left of its centre line
         it starts there (`_branch_shift`), and for double track 1 if it runs on as double
         track there (`_double_beyond`) or else 0."""
-        if self._shapes_version != self.constructions.railway_version:
-            self._shapes.clear()
-            self._shapes_version = self.constructions.railway_version
+        self._keep_current()
         shape = self._shapes.get(piece)
         if shape is None:
             if piece.width == TrackWidth.SINGLE:
@@ -519,7 +558,7 @@ class TrackArt:
         """How far to the left of its centre line single track starts at this end, to leave
         from the outer track of full double track it branches off there: half the spacing to
         whichever side it turns away to, or nothing."""
-        steps = self.tile_map.grid.track_steps()
+        steps = self._steps
         mine = piece.ends[1] if piece.ends[0] == point else piece.ends[0]
         for other in self._track_at(piece.cell):
             if other.width != TrackWidth.DOUBLE or point not in other.ends:
@@ -633,15 +672,39 @@ def _middle(lanes: list[Path]) -> Path:
 
 
 def _highest(heights: Image.Image, smoothing: int) -> FloatArray:
-    """The highest lift marked in each pixel once the fine picture is averaged down."""
-    fine = np.asarray(heights, dtype=np.float32)
+    """The highest lift marked in each pixel once the fine picture is averaged down; nothing is
+    marked outside the box round what was, which stays 0."""
+    width, height = heights.size
+    out = np.zeros((height // smoothing, width // smoothing), dtype=np.float32)
+    box = heights.getbbox()
+    if box is None:
+        return out
+    x0, y0, x1, y1 = _whole_pixels(box, smoothing)
+    fine = np.asarray(heights.crop((x0, y0, x1, y1)), dtype=np.float32)
     h, w = fine.shape[0] // smoothing, fine.shape[1] // smoothing
-    return fine.reshape(h, smoothing, w, smoothing).max(axis=(1, 3))
+    top, left = y0 // smoothing, x0 // smoothing
+    out[top : top + h, left : left + w] = fine.reshape(h, smoothing, w, smoothing).max(axis=(1, 3))
+    return out
+
+
+def _whole_pixels(box: tuple[int, int, int, int], smoothing: int) -> tuple[int, int, int, int]:
+    """A box of the fine picture grown to whole pixels of the picture averaged down."""
+    x0, y0, x1, y1 = box
+    return (
+        x0 // smoothing * smoothing,
+        y0 // smoothing * smoothing,
+        -(-x1 // smoothing) * smoothing,
+        -(-y1 // smoothing) * smoothing,
+    )
 
 
 def _averaged(picture: Image.Image, shadow: Image.Image, smoothing: int) -> FloatArray:
     """The fine picture with its shadow under it, averaged down `smoothing` times each way, as
-    RGBA from 0 to 1."""
+    RGBA from 0 to 1.
+
+    The fine pixels are worked out a channel at a time and each pixel's are summed row by row,
+    as numpy's mean over the fine pixels of a channel-last picture sums them, but along whole
+    rows of pixels at once."""
     width, height = picture.size
     out = np.zeros((height // smoothing, width // smoothing, 4), dtype=np.float32)
     box = picture.getbbox()
@@ -649,19 +712,30 @@ def _averaged(picture: Image.Image, shadow: Image.Image, smoothing: int) -> Floa
     if box is None and shadow_box is None:
         return out
     boxes = [b for b in (box, shadow_box) if b is not None]
-    x0 = min(b[0] for b in boxes) // smoothing * smoothing
-    y0 = min(b[1] for b in boxes) // smoothing * smoothing
-    x1 = -(-max(b[2] for b in boxes) // smoothing) * smoothing
-    y1 = -(-max(b[3] for b in boxes) // smoothing) * smoothing
-    pixels = np.asarray(picture.crop((x0, y0, x1, y1)), dtype=np.float32) / 255
+    x0, y0, x1, y1 = _whole_pixels(
+        (
+            min(b[0] for b in boxes),
+            min(b[1] for b in boxes),
+            max(b[2] for b in boxes),
+            max(b[3] for b in boxes),
+        ),
+        smoothing,
+    )
+    channels = np.asarray(picture.crop((x0, y0, x1, y1))).transpose(2, 0, 1)
+    fine = channels.astype(np.float32)
+    fine /= 255
     dark = np.asarray(shadow.crop((x0, y0, x1, y1)), dtype=np.float32) / 255 * SHADOW
-    alpha = pixels[..., 3]
-    covered = np.maximum(alpha, dark)
-    fine = np.empty_like(pixels)
-    fine[..., :3] = pixels[..., :3] * alpha[..., None]
-    fine[..., 3] = covered
-    h, w = fine.shape[0] // smoothing, fine.shape[1] // smoothing
-    coarse = fine.reshape(h, smoothing, w, smoothing, 4).mean(axis=(1, 3))
-    coarse[..., :3] /= np.maximum(coarse[..., 3:], 1e-6)
-    out[y0 // smoothing : y0 // smoothing + h, x0 // smoothing : x0 // smoothing + w] = coarse
+    alpha = fine[3].copy()
+    fine[:3] *= alpha
+    np.maximum(alpha, dark, out=fine[3])
+    h, w = fine.shape[1] // smoothing, fine.shape[2] // smoothing
+    blocks = fine.reshape(4, h, smoothing, w, smoothing)
+    coarse = blocks[:, :, 0, :, 0].copy()
+    for down, across in itertools.product(range(smoothing), repeat=2):
+        if down or across:
+            coarse += blocks[:, :, down, :, across]
+    coarse /= smoothing * smoothing
+    coarse[:3] /= np.maximum(coarse[3], 1e-6)
+    top, left = y0 // smoothing, x0 // smoothing
+    out[top : top + h, left : left + w] = coarse.transpose(1, 2, 0)
     return out

@@ -646,3 +646,21 @@ def test_the_nearest_crown_is_the_one_found_by_hashing_the_squares_round_each_po
     for value, expected in zip(found, nearest_crown_by_hashing(px, py, CROWN_GAP), strict=True):
         assert value.dtype == expected.dtype
         assert np.array_equal(value, expected)
+
+
+def test_track_drawn_again_after_its_neighbour_changes_matches_track_drawn_fresh(
+    sheet: SpriteSheet,
+) -> None:
+    double = Track((10, 3), (0, 6), TrackWidth.DOUBLE)
+    single = Track((10, 4), (0, 6))
+    world, before = track_chunk(sheet, [double, single])
+    widened = Track((10, 4), (0, 6), TrackWidth.DOUBLE)
+
+    world.constructions.remove(single)
+    world.constructions.build(widened)
+    px, py = world.projection.to_pixels(*world.tile_map.grid.center(10, 3))
+    again = world.render(int(px // CHUNK), int(py // CHUNK))
+
+    _, fresh = track_chunk(sheet, [double, widened])
+    assert not np.array_equal(before, fresh)
+    assert np.array_equal(again, fresh)

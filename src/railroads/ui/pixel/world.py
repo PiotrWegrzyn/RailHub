@@ -79,6 +79,9 @@ class PixelWorld:
         self.ground = Ground(tile_map, constructions, self.projection, angle_deg, self.elevation)
         self._shade_trees()
         self.track = TrackArt(tile_map, constructions, self.projection, self.elevation)
+        # Every piece of track, kept until track or stations change.
+        self._pieces: list[Track] = []
+        self._pieces_version = -1
         # The sprites at each resolution chunks can be drawn at: the sheet, and the same sprites
         # drawn finer if there are any.
         self._sprites = {1: _Sprites.of(sheet)}
@@ -273,6 +276,13 @@ class PixelWorld:
         self._stand_scenery(canvas, left, top, k)
         return _finished(canvas)
 
+    def _track_pieces(self) -> list[Track]:
+        version = self.constructions.railway_version
+        if version != self._pieces_version:
+            self._pieces = self.constructions.track()
+            self._pieces_version = version
+        return self._pieces
+
     def _lay_track(
         self,
         canvas: FloatArray,
@@ -283,7 +293,7 @@ class PixelWorld:
     ) -> None:
         """Draws the track crossing the chunk over its ground (TrackArt.layer), where the
         picture shows the map: where `shown`, or else where it isn't clear."""
-        pieces = self.constructions.track()
+        pieces = self._track_pieces()
         if not pieces:
             return
         rows = canvas.shape[0] // resolution
@@ -303,7 +313,7 @@ class PixelWorld:
         """Draws the track crossing the chunk over its raised ground, lifted with it, where the
         ground shown, `seen` art pixels further down the map in each pixel, is not in front
         of it."""
-        pieces = self.constructions.track()
+        pieces = self._track_pieces()
         if not pieces:
             return
         track, lift = self.track.lifted(pieces, left, top, CHUNK, CHUNK, resolution)
