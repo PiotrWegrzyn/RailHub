@@ -1,9 +1,9 @@
-"""A train calling at a station (railroads.sim.railway): it unloads every car, all freight into the
-station however full it is and passengers and mail paid for there, swaps them for the stop's
-cars and fills those, and waits up to WAIT_MONTHS for them to fill if the stop says so. Freight
-from this station goes back in its stockpile for nothing; the rest waits as goods brought. The
-buildings around the station take what they still want of it at once
-(railroads.sim.station_trade), and the rest is handed out with the month's trade."""
+"""A train calling at a station (railroads.sim.railway): it unloads every car, freight into the
+station and passengers and mail paid for there, swaps them for the stop's cars and fills those, and
+waits up to WAIT_MONTHS for them to fill if the stop says so. Freight from this station goes back
+in its stockpile for nothing; the rest waits as goods brought. The buildings around the station
+take what they still want of it at once (railroads.sim.station_trade), and the rest is handed out
+with the month's trade."""
 
 from typing import TYPE_CHECKING
 
@@ -47,9 +47,11 @@ class StationCalls:
                     car.empty(car.load)
                     self._railway.history.deliver(self._railway.year, car.good)
                     continue
-                self._store(goods, stop.cell, car.good, car.empty(car.load))
-                self._railway.history.deliver(self._railway.year, car.good)
-                self._railway.hand_out_now(stop.cell, car.good)
+                unloaded = min(car.load, goods.room(car.good))
+                if unloaded > 0:
+                    self._store(goods, stop.cell, car.good, car.empty(unloaded))
+                    self._railway.history.deliver(self._railway.year, car.good)
+                    self._railway.hand_out_now(stop.cell, car.good)
             train.cars = self._next_cars(train.cars, stop.cars)
         train.loaded_at = stop.cell
         self.load(train, stop)
@@ -57,8 +59,8 @@ class StationCalls:
             train.waiting = WAIT_MONTHS
 
     def _next_cars(self, cars: list[Car], wanted: list[Good]) -> list[Car]:
-        """The cars for the next leg: each keeps the fullest car of its good, empty now that every
-        car has unloaded, or a new one."""
+        """The cars for the next leg: each keeps what the fullest car of its good still holds,
+        freight that did not fit into the station; anything else left aboard is lost."""
         left = sorted(cars, key=lambda car: -car.load)
         kept = []
         for good in wanted:

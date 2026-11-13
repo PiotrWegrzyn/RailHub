@@ -480,22 +480,24 @@ def test_a_mine_in_reach_feeds_a_steel_mill_in_reach_through_the_station_the_sam
     assert railway.station_goods((6, 20)).stockpile.get(Good.COAL, 0.0) == pytest.approx(0.0)
 
 
-def test_a_train_always_leaves_all_it_carries_even_at_a_full_station() -> None:
+def test_a_train_unloads_only_what_fits_and_keeps_the_rest_aboard() -> None:
     _, railway = joined_stations()
     railway.station_goods((6, 3)).stockpile[Good.WHEAT] = 10.0
-    railway.station_goods((6, 20)).bring(Good.WHEAT, {(6, 3): STOCKPILE})
+    railway.station_goods((6, 20)).bring(Good.WHEAT, {(6, 3): STOCKPILE - 4.0})
+    railway.station_demand((6, 20)).capacity = {Need.FOOD: 2 * STOCKPILE}
     train = railway.buy()
     assert train is not None
     train.stops = [
         Stop((6, 3), [Good.WHEAT], wait_for_load=False),
-        Stop((6, 20), [Good.COAL], wait_for_load=False),
+        Stop((6, 20), [Good.WHEAT], wait_for_load=False),
     ]
 
     railway.run(0.01)
     railway.run(25 / CELLS_PER_MONTH)
 
-    assert railway.station_goods((6, 20)).held(Good.WHEAT) == pytest.approx(STOCKPILE + 10.0)
-    assert all(car.good == Good.COAL for car in train.cars)
+    assert railway.station_goods((6, 20)).held(Good.WHEAT) <= STOCKPILE
+    assert [car.load for car in train.cars] == [pytest.approx(6.0)]
+    assert railway.finances.month["cargo"] == 0.0
 
 
 def test_goods_the_area_has_no_use_for_can_be_carried_on_by_another_train() -> None:
