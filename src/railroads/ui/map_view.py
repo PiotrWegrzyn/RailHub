@@ -292,13 +292,19 @@ class MapView:
         moods_changed = not np.array_equal(satisfaction, self._satisfaction)
         self._satisfaction = satisfaction
         if moods_changed or self.growth.forests_changed:
+            shown = list(self._textures)
             self._textures.clear()
             self._ground_version += 1
             self._colors_version += 1
             if self._pixels is not None:
                 self._pixels.refresh(self._pixels.world.satisfaction_changed(satisfaction))
+            # Painted again here, a step each, rather than on the frame after the month.
+            for with_lines in shown:
+                yield
+                self._ground_texture(with_lines)
         if not changed:
             return
+        yield
         self._spots = BuildingSpots.of(self.constructions)
         self.minimap.show_towns(self._town_cells())
         if self.search.open:

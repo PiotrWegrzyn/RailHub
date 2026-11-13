@@ -393,6 +393,19 @@ def colours_changed_by_a_month(app: App) -> None:
     view.month_passed(np.random.default_rng(1))
 
 
+def test_a_month_that_changes_colours_paints_the_overview_again_within_its_steps(
+    context: None,
+) -> None:
+    app = made_app()
+    frame(app)
+    shown = set(app.view._textures)
+
+    colours_changed_by_a_month(app)
+
+    assert shown == {False}
+    assert set(app.view._textures) == shown
+
+
 def test_the_trains_window_map_is_softened_anew_a_step_a_frame_once_colours_change(
     context: None,
 ) -> None:
