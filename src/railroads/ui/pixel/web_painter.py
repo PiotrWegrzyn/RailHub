@@ -175,13 +175,13 @@ class WorkerPainter:
             self._lose(worker)
         elif message.get("world") == self._number and message.get("job") in self._given:
             key, job, _ = self._given.pop(message["job"])
-            if kind == "painted":
-                pixels = np.frombuffer(message["pixels"], dtype=np.uint8)
-                self._queue.done.append((key, pixels.reshape(message["shape"]), None))
-            else:
-                error = message.get("error")
+            pixels = _pixels(message) if kind == "painted" else None
+            if pixels is None:
+                error = message.get("error", "pixels of the wrong size")
                 print(f"A worker could not paint {job.work}: {error}", file=sys.stderr)
                 self._failed.append((key, job))
+            else:
+                self._queue.done.append((key, pixels, None))
             self._give_out()
 
     def dropped(self) -> None:
@@ -283,6 +283,15 @@ class WorkerPainter:
         if worker_load or any(job.urgent for job in given):
             return False
         return len(given) < max(1, len(self._holding) // 2)
+
+
+def _pixels(message: Message) -> np.ndarray | None:
+    """The chunk a worker painted, or None if its pixels don't fill the shape it gave."""
+    pixels = np.frombuffer(message["pixels"], dtype=np.uint8)
+    shape = tuple(message["shape"])
+    if len(shape) != 3 or shape[2] != 4 or pixels.size != np.prod(shape):
+        return None
+    return pixels.reshape(shape)
 
 
 class _PageObject:

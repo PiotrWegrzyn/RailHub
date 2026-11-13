@@ -223,6 +223,25 @@ def test_a_chunk_a_worker_could_not_paint_is_painted_on_a_frame(
     assert "could not paint" in capsys.readouterr().err
 
 
+def test_pixels_that_dont_fill_their_shape_count_as_a_chunk_not_painted(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    world, mountains, _ = world_over_mountains()
+    page = FakePage(1)
+    page.start(0)
+    painter = WorkerPainter(world, Workers(page))
+    painter.finished()
+    page.work()
+    painter.want("chunk", job(world, mountains), True, 1.0)
+    page.work()
+    page.inbox[-1]["pixels"] = page.inbox[-1]["pixels"][:100]
+
+    done = painted(painter)
+
+    np.testing.assert_array_equal(done["chunk"], world.render(*mountains, 2))
+    assert "wrong size" in capsys.readouterr().err
+
+
 def test_a_new_map_takes_the_workers_over_and_the_old_one_paints_on_its_frames() -> None:
     old, mountains, _ = world_over_mountains()
     new, _, plains = world_over_mountains()
