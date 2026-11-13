@@ -702,9 +702,9 @@ def _averaged(picture: Image.Image, shadow: Image.Image, smoothing: int) -> Floa
     """The fine picture with its shadow under it, averaged down `smoothing` times each way, as
     RGBA from 0 to 1.
 
-    The fine pixels are worked out a channel at a time and each pixel's are summed row by row,
-    as numpy's mean over the fine pixels of a channel-last picture sums them, but along whole
-    rows of pixels at once."""
+    Each pixel sums the fine pixels behind it row by row, in the order numpy's mean over them
+    adds them up, but with the channels laid one after another, so each addition runs along a
+    whole row of pixels at once."""
     width, height = picture.size
     out = np.zeros((height // smoothing, width // smoothing, 4), dtype=np.float32)
     box = picture.getbbox()

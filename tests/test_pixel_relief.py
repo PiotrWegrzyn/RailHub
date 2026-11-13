@@ -113,8 +113,9 @@ def test_the_bound_on_rising_ground_holds_at_every_pixel(grid_type: type[Grid]) 
         x, y = elevation.projection.to_plane(left + px + 0.5, top + py + 0.5)
         mountains, hills = elevation.shares(x, y)
         most_mountains, most_hills = elevation.most(left, top, width, rows)
-        assert mountains.max() <= most_mountains
-        assert hills.max() <= most_hills
+        assert mountains.max() <= max(most_mountains, 0.0)
+        assert hills.max() <= max(most_hills, 0.0)
+        assert most_mountains > 0 or not mountains.any()
 
 
 def test_ground_far_from_hills_and_mountains_may_not_rise() -> None:

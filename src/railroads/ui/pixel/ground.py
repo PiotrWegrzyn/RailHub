@@ -362,7 +362,7 @@ class Ground:
             ix, iy = left + across, top + down
             ripple = table_hash(ix // 3, iy, 13) > 0.94
             calm = 1.3 + 0.6 * (table_hash(ix, iy, 11) - 0.5)
-            shade[down, across] = np.clip(np.rint(np.where(ripple, 3, calm)), 0, 3)
+            shade[down, across] = np.clip(np.rint(np.where(ripple, 3, calm)), 0, 3).astype(np.int64)
         down, across = np.nonzero(plain)
         if len(down):
             ix, iy = left + across, top + down
@@ -511,9 +511,12 @@ class Ground:
             return
         colour = inner[laid]
         if lit is not None:
-            down, across = np.nonzero(laid)
-            down, across = (down + region[0].start) // k, (across + region[1].start) // k
-            colour = colour * lit[down, across][:, None]
+            art_rows, art_cols = np.nonzero(laid)
+            art_rows, art_cols = (
+                (art_rows + region[0].start) // k,
+                (art_cols + region[1].start) // k,
+            )
+            colour = colour * lit[art_rows, art_cols][:, None]
         under[laid, :3] = np.clip(colour, 0, 255) / 255
         under[laid, 3] = 1.0
 

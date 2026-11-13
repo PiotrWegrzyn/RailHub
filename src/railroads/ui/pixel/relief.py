@@ -201,7 +201,8 @@ class Elevation:
     def most(self, left: float, top: float, width: float, rows: float) -> tuple[float, float]:
         """At least as mountainous and as hilly as any ground over these art pixels is, from
         the most of each that the steps of the rasters read there hold: a cheap bound, a hair
-        over, that lets a block where nothing can rise skip working out its points."""
+        over, that lets a block where nothing can rise skip working out its points. Where the
+        bound is 0 or less, no ground there is mountainous or hilly at all."""
         px = np.array([left, left + width, left, left + width], dtype=np.float64)
         py = np.array([top, top, top + rows, top + rows], dtype=np.float64)
         x, y = self.projection.to_plane(px, py)
@@ -212,14 +213,13 @@ class Elevation:
         )
         mountains = float(self._mountains[steps].max()) * MOUNTAIN_GAIN - MOUNTAIN_FROM
         peaks = float(self._peaks[steps].max()) * PEAK_GAIN - PEAK_FROM
-        most = min(max(mountains, peaks, 0.0) + BOUND_MARGIN, 1.0)
-        return most, float(self._hills[steps].max())
+        return max(mountains, peaks) + BOUND_MARGIN, float(self._hills[steps].max())
 
     def may_rise(self, left: float, top: float, width: float, rows: float) -> bool:
         """Whether any ground over these art pixels may rise, by `most`: False only where none
         can."""
         mountains, hills = self.most(left, top, width, rows)
-        return mountains > BOUND_MARGIN or hills > 0
+        return mountains > 0 or hills > 0
 
     def rise(self, x: npt.ArrayLike, y: npt.ArrayLike) -> tuple[Floats, Floats, Floats]:
         """How many metres plane points rise above their valley, and how mountainous and hilly
