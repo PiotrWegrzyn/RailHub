@@ -125,7 +125,9 @@ class PixelLayer:
             self._chunks[drawn] = pixels
             taken.add(chunk)
         while len(self._chunks) > 1 and self._chunk_bytes() > CHUNK_BUDGET:
-            self._chunks.popitem(last=False)
+            # A chunk drawn finely and let go is drawn quickly when it shows again, and so is
+            # drawn finely again too.
+            self._refined.discard(self._chunks.popitem(last=False)[0])
         return taken
 
     def draw(

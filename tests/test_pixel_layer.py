@@ -7,6 +7,7 @@ from imgui_bundle import hello_imgui
 from test_elevation import world_over_mountains
 
 from railroads.sim.grids import SquareGrid
+from railroads.ui.pixel import layer as layer_module
 from railroads.ui.pixel.layer import SETTLE_S, PixelLayer, blown_up, middle_out
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection
 
@@ -59,6 +60,29 @@ def test_raised_chunks_are_drawn_again_finely() -> None:
 
     assert taken == {mountains}
     np.testing.assert_array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2, True))
+
+
+def test_a_chunk_drawn_finely_and_let_go_is_drawn_finely_again_when_it_comes_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    world, mountains, plains = world_over_mountains()
+    layer = PixelLayer(world, threads=True)
+    drawn = (*mountains, 2)
+    layer._ask(drawn, time.perf_counter())
+    taken_within(layer)
+    layer._refine(drawn, time.perf_counter())
+    taken_within(layer)
+    monkeypatch.setattr(layer_module, "CHUNK_BUDGET", layer._chunks[drawn].nbytes)
+    layer._ask((*plains, 2), time.perf_counter())
+    taken_within(layer)
+    layer._ask(drawn, time.perf_counter())
+    taken_within(layer)
+
+    layer._refine(drawn, time.perf_counter())
+    taken = taken_within(layer)
+
+    assert taken == {mountains}
+    np.testing.assert_array_equal(layer._chunks[drawn], world.render(*drawn, True))
 
 
 def test_without_threads_raised_chunks_are_not_drawn_again_finely() -> None:
