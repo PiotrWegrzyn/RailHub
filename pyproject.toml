@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A mechanics-first railroad tycoon game."
 readme = "README.md"
 authors = [
-    { name = "piotr-wegrzyn", email = "peterw1114@gmail.com" }
+    { name = "piotr-wegrzyn", email = "15418214+PiotrWegrzyn@users.noreply.github.com" }
 ]
 requires-python = ">=3.14,<3.15"
 dependencies = [
