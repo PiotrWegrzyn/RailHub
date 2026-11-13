@@ -77,6 +77,10 @@ class PixelWorld:
             if fine.names != sheet.names:
                 raise ValueError("The fine sprite sheet must hold the same sprites in order")
             self._sprites[FINE] = _Sprites.of(fine)
+        # How many times buildings and satisfaction have changed, so copies of the world painting
+        # elsewhere (railroads.ui.pixel.copies) know when to catch up.
+        self.buildings_version = 0
+        self.satisfaction_version = 0
 
     @property
     def satisfaction(self) -> npt.NDArray[np.int8]:
@@ -86,6 +90,7 @@ class PixelWorld:
     @satisfaction.setter
     def satisfaction(self, levels: npt.NDArray[np.int8]) -> None:
         self.ground.satisfaction = levels
+        self.satisfaction_version += 1
 
     @property
     def resolutions(self) -> tuple[int, ...]:
@@ -105,6 +110,7 @@ class PixelWorld:
             self.elevation,
         )
         self._shade_trees()
+        self.buildings_version += 1
         return self._chunks_around(cells)
 
     def _shade_trees(self) -> None:
