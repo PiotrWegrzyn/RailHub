@@ -48,11 +48,8 @@ SUMMARY_MOST = 5
 MADE_EVERY = 0.5
 # How far, in pixels of the halved ground picture, it is blurred so the cells' edges soften.
 SOFTEN_RADIUS = 1.2
-# How many rows of the halved picture a step of softening halves or blurs (soften_steps), and how
-# many rows more a blurred band takes in on either side: more than the blur reaches, so each band
-# comes out as it does within the whole picture.
+# How many rows of the halved picture a step of softening halves or blurs (soften_steps).
 SOFTEN_ROWS = 160
-SOFTEN_MARGIN = 8
 
 SEA = (0.12, 0.17, 0.24, 1.0)
 TRACK = (0.2, 0.15, 0.11, 0.95)
@@ -274,13 +271,22 @@ def soften_steps(rgba: np.ndarray, radius: float = SOFTEN_RADIUS) -> Steps[np.nd
     width, height = half.size
     soft = np.empty((height, width, 4), dtype=np.uint8)
     blur = ImageFilter.GaussianBlur(radius)
+    # A band is blurred with as many rows more on either side as the blur reaches, so it comes
+    # out as it does within the whole picture.
+    reach = blur_reach(radius)
     for top in range(0, height, SOFTEN_ROWS):
         bottom = min(top + SOFTEN_ROWS, height)
-        start, end = max(0, top - SOFTEN_MARGIN), min(height, bottom + SOFTEN_MARGIN)
+        start, end = max(0, top - reach), min(height, bottom + reach)
         band = half.crop((0, start, width, end)).filter(blur)
         soft[top:bottom] = np.asarray(band, dtype=np.uint8)[top - start : bottom - start]
         yield
     return soft
+
+
+def blur_reach(radius: float) -> int:
+    """How many rows away a Gaussian blur of `radius` takes colour from: Pillow blurs in three box
+    blurs, each with a radius no larger than the Gaussian one and reaching a row past it."""
+    return 3 * (math.floor(radius) + 1)
 
 
 def can_stop_at(train: Train, station: Cell) -> bool:

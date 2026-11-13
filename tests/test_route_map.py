@@ -7,6 +7,7 @@ from test_railway import joined_stations
 
 from railroads.sim.demand import DEMAND_PER_NEED
 from railroads.sim.goods import Good, Need
+from railroads.sim.steps import finish
 from railroads.sim.trains import Stop
 from railroads.ui.minimap import Panel
 from railroads.ui.route_map import (
@@ -226,6 +227,26 @@ def test_softening_in_steps_gives_the_picture_softened_at_once(shape: tuple[int,
 
     assert np.array_equal(soft, soften(rgba))
     assert taken == 2 * -(-soft.shape[0] // SOFTEN_ROWS)
+
+
+def striped(rows: int, cols: int) -> np.ndarray:
+    """A picture whose half is random with white and black rows every few rows, so that some
+    stripe lies as far from every band's edge as a blur reaches and shows a band cut too short."""
+    half = np.random.default_rng(7).integers(0, 256, size=(rows, cols, 4), dtype=np.uint8)
+    half[::7] = 255
+    half[3::11] = 0
+    return np.repeat(np.repeat(half, 2, axis=0), 2, axis=1)
+
+
+@pytest.mark.parametrize("radius", [0.3, 2.99, 3.0, 6.0, 10.5])
+def test_softening_in_steps_gives_the_picture_softened_at_once_however_wide_the_blur(
+    radius: float,
+) -> None:
+    rgba = striped(2 * SOFTEN_ROWS + 3, 5)
+
+    soft = finish(soften_steps(rgba, radius))
+
+    assert np.array_equal(soft, soften(rgba, radius))
 
 
 def test_a_station_can_be_added_unless_the_train_already_ends_there() -> None:
