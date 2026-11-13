@@ -11,6 +11,8 @@ Query parameters:
     &measure                  run web/measure.py: pans across the highest ground and prints timings
                               (with --poland --seed 7 unless args are given); &measure=other.py
                               runs another script served beside the page
+    &painters=N               start N web workers to paint the map (web/painter.js) instead of as
+                              many as the device seems to have room for; 0 paints on the frames
 -->
 <html lang="en">
 <head>
@@ -49,6 +51,46 @@ Query parameters:
     }
 
     const SAVE_EVERY_MS = 2000;
+
+    // Web workers painting the map's chunks (web/painter.js), each a Python of its own taking a few
+    // hundred megabytes, so as many as the cores leave room for beside the page, at most four, and
+    // fewer where the device has little memory.
+    function paintersWanted(query) {
+        if (query.has("painters")) return Math.max(0, Number(query.get("painters")) || 0);
+        let count = Math.min(4, (navigator.hardwareConcurrency || 4) - 2);
+        if (navigator.deviceMemory) count = Math.min(count, Math.floor(navigator.deviceMemory / 2));
+        return Math.max(1, count);
+    }
+
+    // The painting workers as the game reaches them (railroads.ui.pixel.web_painter): it posts
+    // messages to a worker by its number and takes what all of them sent since it last asked.
+    class Painters {
+        constructor(count) {
+            this.inbox = [];
+            this.workers = Array.from({ length: count }, (_, worker) => {
+                const painter = new Worker("painter.js", { type: "module" });
+                painter.onmessage = event => this.inbox.push({ worker, ...event.data });
+                painter.onerror = event => {
+                    event.preventDefault();
+                    this.inbox.push({ worker, kind: "dead", error: event.message });
+                    painter.terminate();
+                };
+                return painter;
+            });
+        }
+
+        get count() {
+            return this.workers.length;
+        }
+
+        post(worker, message) {
+            this.workers[worker].postMessage(message, message.data ? [message.data.buffer] : []);
+        }
+
+        take() {
+            return this.inbox.splice(0);
+        }
+    }
 
     function syncSaves(pyodide, populate) {
         return new Promise((resolve, reject) =>
@@ -89,6 +131,8 @@ Query parameters:
         await micropip.install.callKwargs(IMGUI_BUNDLE, { deps: false });
         await micropip.install.callKwargs(GAME_WHEEL, { deps: false });
         mark("packages");
+        // Started once the page has fetched what they load too, so they find it cached.
+        window.railroadsPainters = new Painters(paintersWanted(query));
 
         await say("Opening saves...");
         await keepSaves(pyodide);
