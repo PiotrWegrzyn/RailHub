@@ -7,7 +7,9 @@ whenever a change to the simulation's classes would make an older save load wron
 refused with a clear message instead.
 
 Named saves are the player's; AUTOSAVES more are written in turn at the start of every month,
-"autosave 1" the newest, so one bad save can't lose the game.
+"autosave 1" the newest, so one bad save can't lose the game. An autosave can be written in steps
+(Saves.autosave_steps), compressing COMPRESS_STEP bytes of the game at a time, for a caller with
+no thread to write it on to spread over frames.
 """
 
 import json
@@ -27,6 +29,7 @@ import numpy as np
 
 from railroads.sim.clock import GameClock
 from railroads.sim.game import Game
+from railroads.sim.steps import Steps, finish
 from railroads.sim.summaries import MonthSummary
 
 if TYPE_CHECKING:
@@ -39,6 +42,11 @@ AUTOSAVES = 3
 AUTOSAVE_NAME = "autosave"
 MAX_NAME = 40
 NAME_PATTERN = re.compile(r"[\w ,.'()-]+")
+# How much of a pickled game a step of an autosave compresses: a few milliseconds' work even in a
+# browser, where the parts of a game that compress worst go at some 50 MB a second.
+COMPRESS_STEP = 1 << 17
+# The compression saves use: fast, and the games' many empty arrays shrink to almost nothing.
+LEVEL = 1
 
 
 def user_data_dir() -> Path:
@@ -166,6 +174,21 @@ def snapshot(saved: SavedGame, memory: ReusedMemory | None = None) -> Snapshot:
     return Snapshot(header, data)
 
 
+def compressed(data: Buffer, step: int | None = None) -> Steps[bytes]:
+    """The pickled game compressed as a save holds it: all at once, or `step` bytes at a time
+    with a step yielded after each."""
+    if step is None:
+        return zlib.compress(data, LEVEL)
+    compressor = zlib.compressobj(LEVEL)
+    view = memoryview(data).cast("B")
+    parts = []
+    for start in range(0, len(view), step):
+        parts.append(compressor.compress(view[start : start + step]))
+        yield
+    parts.append(compressor.flush())
+    return b"".join(parts)
+
+
 def is_autosave(name: str) -> bool:
     return name.casefold().startswith(AUTOSAVE_NAME)
 
@@ -230,22 +253,36 @@ class Saves:
     def autosave(self, saved: SavedGame | Snapshot) -> Path:
         """Saves the game as the newest autosave, each older one moving down a place and the
         oldest dropped."""
+        return finish(self.autosave_steps(saved, None))
+
+    def autosave_steps(
+        self, saved: SavedGame | Snapshot, step: int | None = COMPRESS_STEP
+    ) -> Steps[Path]:
+        """autosave in steps a caller can spread over frames, each compressing `step` bytes of
+        the game (all of it at once if None); the older autosaves move down only once the new
+        one is ready to write."""
+        snap = snapshot(saved) if isinstance(saved, SavedGame) else saved
+        data = yield from compressed(snap.data, step)
         self.folder.mkdir(parents=True, exist_ok=True)
         self.path(_autosave_name(self.autosaves)).unlink(missing_ok=True)
         for number in range(self.autosaves - 1, 0, -1):
             older = self.path(_autosave_name(number))
             if older.exists():
                 older.replace(self.path(_autosave_name(number + 1)))
-        return self._write(self.path(_autosave_name(1)), saved)
+        return self._store(self.path(_autosave_name(1)), snap.header, data)
 
     def _write(self, path: Path, saved: SavedGame | Snapshot) -> Path:
         snap = snapshot(saved) if isinstance(saved, SavedGame) else saved
-        header = json.dumps(snap.header).encode() + b"\n"
-        data = zlib.compress(snap.data, 1)
+        return self._store(path, snap.header, finish(compressed(snap.data)))
+
+    def _store(self, path: Path, header: dict[str, Any], data: bytes) -> Path:
+        """Writes a save's header and its compressed game, through a file of its own so a save
+        cut short leaves the old one as it was."""
+        line = json.dumps(header).encode() + b"\n"
         try:
             self.folder.mkdir(parents=True, exist_ok=True)
             partial = path.with_suffix(".partial")
-            partial.write_bytes(MAGIC + header + data)
+            partial.write_bytes(MAGIC + line + data)
             partial.replace(path)
         except OSError as error:
             raise SaveError(f"The game couldn't be saved: {error.strerror or error}.") from error
@@ -259,9 +296,9 @@ class Saves:
         with path.open("rb") as file:
             file.read(len(MAGIC))
             file.readline()
-            compressed = file.read()
+            packed = file.read()
         try:
-            saved = pickle.loads(zlib.decompress(compressed))
+            saved = pickle.loads(zlib.decompress(packed))
         except (zlib.error, pickle.UnpicklingError, EOFError) as error:
             raise SaveError(f"'{name}' is damaged and can't be loaded.") from error
         except (AttributeError, ImportError, TypeError, ValueError) as error:

@@ -264,20 +264,29 @@ def test_a_save_that_fails_to_load_stays_in_the_menu_with_why(
     assert "no save called 'Nothing'" in shell.menu.error
 
 
-def test_without_threads_an_autosave_is_written_on_the_frame_after_the_month(
+def test_without_threads_an_autosave_is_written_a_little_each_frame_after_the_month(
     context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(app_module, "WRITER", FrameWorker())
+    monkeypatch.setattr(app_module, "WRITING_SECONDS", 0.0)
     app = made_app()
     app.saves = Saves(tmp_path)
     app.clock.seconds = app.clock.seconds_per_month - 0.001
-
     frames_until_the_month_is_done(app)
-    asked = app.saves.listing()
-    frame(app)
+    along = app.game.railway.trains[0].along
 
-    assert asked == []
-    assert app.saves.load("autosave 1").clock.date == app.clock.date
+    frame(app)
+    first = app.saves.listing()
+    frames = 1
+    while app._autosaving is not None and frames < 1000:
+        frame(app)
+        frames += 1
+
+    loaded = app.saves.load("autosave 1")
+    assert first == []
+    assert frames > 2
+    assert loaded.clock.date == app.clock.date
+    assert loaded.game.railway.trains[0].along == along != app.game.railway.trains[0].along
     assert app.notice == "Autosaved"
 
 

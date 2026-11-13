@@ -36,8 +36,10 @@ WAITING_WIDTH = 320.0
 # The window's size when the game opens.
 WINDOW_SIZE = (1280.0, 800.0)
 # Saves are written one at a time, away from the frames, so play doesn't stutter. Where threads
-# cannot start, an autosave is written on the frame after it was asked for.
+# cannot start, an autosave is written a step at a time from the frame after it was asked for,
+# each frame spending up to WRITING_SECONDS on it.
 WRITER = worker("saves")
+WRITING_SECONDS = 0.004
 
 
 class App:
@@ -112,7 +114,7 @@ class App:
             self.notice = ""
         self._start_due_autosave()
         if isinstance(WRITER, FrameWorker):
-            WRITER.work_once()
+            WRITER.work_once(WRITING_SECONDS)
         self._check_autosave()
         if self._turning is None:
             self._let_time_pass(imgui.get_io().delta_time)
@@ -198,9 +200,11 @@ class App:
         written."""
         if self.saves is None or self._autosaving is not None:
             return
-        self._autosaving = WRITER.submit(
-            self.saves.autosave, snapshot(self.saved(), self._autosave_memory)
-        )
+        taken = snapshot(self.saved(), self._autosave_memory)
+        if isinstance(WRITER, FrameWorker):
+            self._autosaving = WRITER.submit_steps(self.saves.autosave_steps(taken))
+        else:
+            self._autosaving = WRITER.submit(self.saves.autosave, taken)
 
     def _start_due_autosave(self) -> None:
         if self._autosave_due:
