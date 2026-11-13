@@ -26,7 +26,14 @@ from railroads.sim.growth import Growth
 from railroads.sim.sandbox import FOOD_ONLY, SANDBOX_SIZE, small_map
 from railroads.sim.tilemap import Deposit
 
-KINDS = (BuildingKind.HOUSE, BuildingKind.FARM, BuildingKind.ORCHARD, BuildingKind.FISHERY)
+KINDS = (
+    BuildingKind.HOUSE,
+    BuildingKind.FARM,
+    BuildingKind.ORCHARD,
+    BuildingKind.FISHERY,
+    BuildingKind.POTATO_FARM,
+    BuildingKind.BAKERY,
+)
 
 
 def report(growth: Growth, seconds: float) -> str:
@@ -53,6 +60,7 @@ def report(growth: Growth, seconds: float) -> str:
     sold = f"{made / could:4.0%}" if could else "-"
     return (
         f"{growth.year:5d} {counts[0]:6d} {counts[1]:5d} {counts[2]:7d} {counts[3]:8d}"
+        f" {counts[4]:7d} {counts[5]:7d}"
         f" {fed:>5s} {hungry:>6s} {food:>15s} {sold:>5s} {growth.died_out:6d} {seconds:6.2f}s"
     )
 
@@ -117,7 +125,10 @@ def main() -> None:
     fishing = int((tile_map.deposits == Deposit.FISH).sum())
     print(f"{tile_map.name}: {tile_map.grid.shape}, {fishing} fishing ground cells")
     growth = Growth(Constructions(tile_map), FOOD_ONLY, start_year=HISTORY_START)
-    header = " year houses farms orchards fisheries   fed hungry  house food got/need  sold  died"
+    header = (
+        " year houses farms orchards fisheries potatoes bakeries   fed hungry"
+        "  house food got/need  sold  died"
+    )
     print(header)
     started = time.perf_counter()
     frames = [snapshot(growth)]

@@ -374,7 +374,7 @@ FARMS = Ladder(
         water={Terrain.RIVER: 5.0, Terrain.LAKE: 5.0, Terrain.SEA: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000112,
+    base_chance=0.0000000373,
     chance_per_doubling={Points.POPULATION: 0.00000672, Points.FOOD: 0.00000028},
     crowded_at=FARMS_CROWDED_OUT,
 )
@@ -669,7 +669,7 @@ BEEKEEPERS = Ladder(
 BAKERIES = Ladder(
     kinds=(BuildingKind.BAKERY,),
     land=TOWN_LAND,
-    base_chance=0.00000001,
+    base_chance=0.0000002,
     chance_per_doubling={Points.POPULATION: 0.000001},
     most_per_cell=1,
     most_nearby=1,
@@ -685,7 +685,7 @@ POTATO_FARMS = Ladder(
         water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000017,
+    base_chance=0.000000034,
     chance_per_doubling={Points.POPULATION: 0.000001, Points.FOOD: 0.00000004},
     crowded_at=FARMS_CROWDED_OUT,
 )

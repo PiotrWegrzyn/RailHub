@@ -20,7 +20,7 @@ def test_the_sandbox_map_is_the_piece_of_a_map_around_its_river() -> None:
     assert (small.terrain == Terrain.LAND).sum() >= 49 * 49 - 50
 
 
-def test_the_sandbox_grows_only_houses_and_food() -> None:
+def test_the_sandbox_grows_only_houses_food_and_bakeries() -> None:
     growth = Growth(Constructions(flat_map(30, 30)), FOOD_ONLY, start_year=850)
 
     with growth.log_changes() as changes:
@@ -33,4 +33,6 @@ def test_the_sandbox_grows_only_houses_and_food() -> None:
         BuildingKind.FARM,
         BuildingKind.ORCHARD,
         BuildingKind.FISHERY,
+        BuildingKind.POTATO_FARM,
+        BuildingKind.BAKERY,
     }

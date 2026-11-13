@@ -579,7 +579,7 @@ def test_served_buildings_add_their_points_by_the_share_they_are_served_to_their
 
     chances = growth.chances(TOWNS)
     per_doubling = TOWNS.chance_per_doubling[Points.POPULATION]
-    bred = multiplier * 4 * per_doubling * np.log2(5)
+    bred = multiplier * 4 * per_doubling * np.log2(1 + 2 * 4)
     assert chances[5, 5] == pytest.approx(TOWNS.base_chance + bred)
     assert chances[neighbour] == pytest.approx(neighbour_before)
 
@@ -610,7 +610,7 @@ def test_a_served_house_breeds_faster_the_more_people_live_around_it(around: int
     growth._count_served(houses_trade(tile_map, (5, 5), 2.0, 2.0))
 
     per_doubling = TOWNS.chance_per_doubling[Points.POPULATION]
-    bred = 10 * per_doubling * np.log2(2 + around)
+    bred = 10 * per_doubling * np.log2(1 + 2 * (1 + around))
     assert growth.chances(TOWNS)[5, 5] == pytest.approx(TOWNS.base_chance + bred)
 
 

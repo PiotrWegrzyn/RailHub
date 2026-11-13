@@ -50,6 +50,8 @@
         <div><span class="sw" style="background:#e9c43a"></span>farma</div>
         <div><span class="sw" style="background:#5d9e2f"></span>sad</div>
         <div><span class="sw" style="background:#1f7fd1"></span>łowisko</div>
+        <div><span class="sw" style="background:#c9a66b"></span>ziemniaki</div>
+        <div><span class="sw" style="background:#8d5524"></span>piekarnia</div>
         <div><span class="sw" style="background:#9fd0f5; border:1px dashed #1f7fd1"></span>miejsce na łowisko</div>
         <div><span class="sw" style="background:#fff; border:1px solid #333; text-align:center; line-height:12px">✕</span>domy zniknęły od poprzedniego kroku</div>
       </div>
@@ -60,7 +62,7 @@
 </main>
 <script>
 const D = __DATA__;
-const KINDS = ["domy", "farmy", "sady", "łowiska"];
+const KINDS = ["domy", "farmy", "sady", "łowiska", "ziemniaki", "piekarnie"];
 const W = Math.min(14, 900 / (D.cols + 0.5)), H = W * 2 / Math.sqrt(3), STEP = 0.75 * H;
 const canvas = document.getElementById("map");
 const ctx = canvas.getContext("2d");
@@ -107,14 +109,16 @@ function dot(x, y, colour, dx) {
 
 function draw() {
   const f = D.frames[index], before = D.frames[Math.max(0, index - 1)];
-  const [houses, farms, orchards, fisheries] = f.kinds;
+  const [houses, farms, orchards, fisheries, potatoes, bakeries] = f.kinds;
   ctx.clearRect(0, 0, width, height);
   for (let r = 0; r < D.rows; r++) for (let c = 0; c < D.cols; c++) {
     const i = r * D.cols + c, [x, y] = center(r, c);
     let fill = land(i), stroke = null;
     if (D.fish[i] && !fisheries[i]) { fill = "#9fd0f5"; stroke = "#1f7fd1"; }
     if (houses[i]) fill = fedColour(Math.max(0, f.fed[i]));
+    else if (bakeries[i]) fill = "#8d5524";
     else if (farms[i]) fill = "#e9c43a";
+    else if (potatoes[i]) fill = "#c9a66b";
     else if (orchards[i]) fill = "#5d9e2f";
     else if (fisheries[i]) fill = "#1f7fd1";
     hex(x, y, fill, stroke);
@@ -122,6 +126,7 @@ function draw() {
       if (farms[i]) dot(x, y, "#e9c43a", -3);
       if (orchards[i]) dot(x, y, "#5d9e2f", 0);
       if (fisheries[i]) dot(x, y, "#1f7fd1", 3);
+      if (bakeries[i]) dot(x, y - 5, "#8d5524", 0);
       if (houses[i] > 1 && W >= 10) {
         ctx.fillStyle = "#fff"; ctx.font = "bold 8px system-ui"; ctx.textAlign = "center";
         ctx.fillText(houses[i], x, y + 1);
