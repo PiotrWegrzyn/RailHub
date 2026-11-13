@@ -19,6 +19,7 @@ from railroads.saves import (
     SaveError,
     Saves,
     _Pickler,
+    imported_name,
     name_problem,
     snapshot,
 )
@@ -333,3 +334,51 @@ def test_a_snapshot_is_the_game_pickled_as_ever() -> None:
     held = bytes(snapshot(saved, ReusedMemory()).data)
 
     assert joined == held == plain.getvalue()
+
+
+def test_a_save_exported_from_one_folder_loads_after_being_brought_into_another(
+    tmp_path: Path,
+) -> None:
+    there = Saves(tmp_path / "browser")
+    here = Saves(tmp_path / "desktop")
+    there.save("Warsaw line", played_game())
+    data = there.export("Warsaw line")
+
+    name = here.bring_in("Warsaw line.save", data)
+
+    assert name == "Warsaw line"
+    assert here.load(name).title == "Test, seed 7"
+
+
+def test_bringing_in_a_save_whose_name_is_taken_adds_a_number(tmp_path: Path) -> None:
+    saves = Saves(tmp_path)
+    saves.save("Warsaw line", played_game())
+    data = saves.export("Warsaw line")
+
+    names = [saves.bring_in("Warsaw line.save", data) for _ in range(2)]
+
+    assert names == ["Warsaw line (2)", "Warsaw line (3)"]
+
+
+def test_bringing_in_a_file_that_is_no_save_is_refused(tmp_path: Path) -> None:
+    saves = Saves(tmp_path)
+
+    with pytest.raises(SaveError, match="not a Railroads save"):
+        saves.bring_in("notes.save", b"shopping list\n")
+
+    assert saves.listing() == []
+
+
+@pytest.mark.parametrize(
+    ("file_name", "expected"),
+    [
+        ("C:\\Users\\me\\Downloads\\Kraków run.save", "Kraków run"),
+        ("autosave 1.save", "Imported autosave 1"),
+        ("***.save", "Imported save"),
+        ("line: one / two?.save", "two"),
+    ],
+)
+def test_a_brought_in_file_gets_a_save_name_from_its_own(file_name: str, expected: str) -> None:
+    name = imported_name(file_name, lambda name: False)
+
+    assert name == expected

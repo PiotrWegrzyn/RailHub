@@ -18,7 +18,7 @@ import pickle
 import re
 import sys
 import zlib
-from collections.abc import Buffer
+from collections.abc import Buffer, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -213,21 +213,40 @@ def _autosave_name(number: int) -> str:
 
 def read_header(path: Path) -> dict[str, Any]:
     with path.open("rb") as file:
-        if file.read(len(MAGIC)) != MAGIC:
-            raise SaveError(f"'{path.stem}' is not a Railroads save.")
-        try:
-            header = json.loads(file.readline())
-        except ValueError as error:
-            raise SaveError(f"'{path.stem}' is damaged: its header can't be read.") from error
+        return _header(file.read(len(MAGIC)), file.readline(), path.stem)
+
+
+def _header(magic: bytes, line: bytes, name: str) -> dict[str, Any]:
+    if magic != MAGIC:
+        raise SaveError(f"'{name}' is not a Railroads save.")
+    try:
+        header = json.loads(line)
+    except ValueError as error:
+        raise SaveError(f"'{name}' is damaged: its header can't be read.") from error
     if not isinstance(header, dict):
-        raise SaveError(f"'{path.stem}' is damaged: its header can't be read.")
+        raise SaveError(f"'{name}' is damaged: its header can't be read.")
     found = header.get("format")
     if found != SAVE_FORMAT:
         raise SaveError(
-            f"'{path.stem}' was saved in format {found}, and this version of the game reads only "
+            f"'{name}' was saved in format {found}, and this version of the game reads only "
             f"format {SAVE_FORMAT}, so it can't be loaded."
         )
     return header
+
+
+def imported_name(file_name: str, taken: Callable[[str], bool]) -> str:
+    """A save name for a file brought in from elsewhere: its own name without what a save name
+    can't hold, made free of autosave names and of saves already there."""
+    stem = Path(file_name.replace("\\", "/")).name.removesuffix(SUFFIX)
+    base = " ".join("".join(NAME_PATTERN.findall(stem)).split())[:MAX_NAME].strip()
+    if name_problem(base) is not None:
+        base = f"Imported {base}"[:MAX_NAME].strip() if base else "Imported save"
+    name, number = base, 2
+    while taken(name):
+        suffix = f" ({number})"
+        name = base[: MAX_NAME - len(suffix)].strip() + suffix
+        number += 1
+    return name
 
 
 class Saves:
@@ -287,6 +306,29 @@ class Saves:
         except OSError as error:
             raise SaveError(f"The game couldn't be saved: {error.strerror or error}.") from error
         return path
+
+    def export(self, name: str) -> bytes:
+        """The save's file as it is, to keep or carry to the game elsewhere."""
+        try:
+            return self.path(name).read_bytes()
+        except OSError as error:
+            raise SaveError(f"'{name}' couldn't be read: {error.strerror or error}.") from error
+
+    def bring_in(self, file_name: str, data: bytes) -> str:
+        """Adds a save file from elsewhere, such as the game in a browser or on another
+        computer, under a free name made from the file's own; returns that name."""
+        line = data[len(MAGIC) :].split(b"\n", 1)[0]
+        _header(data[: len(MAGIC)], line, Path(file_name).stem)
+        name = imported_name(file_name, self.exists)
+        path = self.path(name)
+        try:
+            self.folder.mkdir(parents=True, exist_ok=True)
+            partial = path.with_suffix(".partial")
+            partial.write_bytes(data)
+            partial.replace(path)
+        except OSError as error:
+            raise SaveError(f"The save couldn't be added: {error.strerror or error}.") from error
+        return name
 
     def load(self, name: str) -> SavedGame:
         path = self.path(name)

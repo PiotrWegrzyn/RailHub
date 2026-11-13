@@ -18,6 +18,7 @@ from railroads.newgame import (
 from railroads.saves import SaveInfo, Saves
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
 from railroads.sim.finance import START_CASH, dollars
+from railroads.ui.save_files import BrowserFiles, DesktopFiles, draw_file_buttons, save_files
 from railroads.ui.saves_window import draw_save_list
 from railroads.ui.theme import BRASS, GONE
 from railroads.version import VERSION
@@ -87,6 +88,9 @@ class MainMenu:
     listing: list[SaveInfo] = field(default_factory=list)
     # What went wrong with the last game started or loaded, if anything.
     error: str = ""
+    files: BrowserFiles | DesktopFiles = field(default_factory=save_files)
+    # What came of the last save file exported or imported.
+    note: str = ""
 
     def settings(self) -> Settings:
         return Settings(
@@ -215,9 +219,22 @@ class MainMenu:
         )
         imgui.spacing()
 
+    def _brought_in(self, name: str) -> None:
+        self.listing = self.saves.listing()
+        self.selected = name
+
     def _draw_load(self) -> MenuChoice | None:
         self.selected, chosen = draw_save_list(self.listing, self.selected, 320.0)
         loadable = any(info.name == self.selected and info.problem is None for info in self.listing)
+        message = draw_file_buttons(
+            self.files, self.saves, self.selected, MENU_WIDTH, self._brought_in
+        )
+        if message:
+            self.note = message
+        if self.note:
+            imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)
+            imgui.text_disabled(self.note)
+            imgui.pop_text_wrap_pos()
         imgui.text_disabled(f"Saves are kept in {self.saves.folder}")
         imgui.begin_disabled(not loadable)
         clicked = self._button(f"{fa.ICON_FA_FOLDER_OPEN}  Load")
