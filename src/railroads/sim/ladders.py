@@ -54,6 +54,10 @@ SKYSCRAPER_PEOPLE = 150
 
 SKYSCRAPER_CHANCE = 0.005
 
+# The chance every person around adds to a town craft coming up: breweries, brickworks, mills and
+# the like (railroads.sim.growth.SPAWN_BY_PEOPLE).
+CRAFT_BASE = 0.000002
+
 # Factories gather into districts: industry nearby draws more of them only from this many points,
 # more than a lone steel mill, and then strongly, so that they meet and merge.
 FACTORIES_DRAW_FROM = 5
@@ -463,7 +467,7 @@ MINES = Ladder(
         temperature={Temperature.COLD: 0.8},
         beside_mountains=3.0,
     ),
-    base_chance=0.000006,
+    base_chance=0.0000036,
     chance_per_doubling={Points.ORE: 0.0000014},
     most_per_cell=2,
     most_nearby=8,
@@ -744,7 +748,7 @@ FLAX_FIELDS = Ladder(
         water={Terrain.LAND: 0.3, Terrain.RIVER: 3.0, Terrain.LAKE: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000006,
+    base_chance=0.000000003,
     chance_per_doubling={Points.POPULATION: 0.0000003, Points.FOOD: 0.00000002},
     crowded_at=FARMS_CROWDED_OUT,
 )
@@ -758,7 +762,7 @@ HOP_GARDENS = Ladder(
         temperature={Temperature.COLD: 0.3, Temperature.HOT: 0.2},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000004,
+    base_chance=0.0000000016,
     chance_per_doubling={Points.POPULATION: 0.00000012},
     crowded_at=FARMS_CROWDED_OUT,
 )
@@ -771,7 +775,7 @@ CLAY_PITS = Ladder(
         relief={Relief.HILLS: 0.3, Relief.MOUNTAINS: 0.0},
         water={Terrain.LAND: 0.1, Terrain.RIVER: 3.0, Terrain.LAKE: 1.5},
     ),
-    base_chance=0.0000001,
+    base_chance=0.00000006,
     chance_per_doubling={Points.POPULATION: 0.0000001, Points.ORE: 0.0000002},
     most_per_cell=1,
     most_nearby=2,
@@ -848,14 +852,14 @@ HOTELS = replace(
 
 # Works that open by people and industry alone: their inputs must be brought to them.
 WORKS = (
-    _works(BuildingKind.TEXTILE_MILL, {POP: 4e-10, IND: 1.2e-8}, {}, 1780, base=1e-8),
+    _works(BuildingKind.TEXTILE_MILL, {POP: 4e-10, IND: 1.2e-8}, {}, 1780, base=CRAFT_BASE),
     _works(
         BuildingKind.FURNITURE_MAKER,
         {POP: 4e-10, IND: 6e-9, Points.TIMBER: 6e-8},
         {},
-        base=1e-8,
+        base=CRAFT_BASE,
     ),
-    _works(BuildingKind.WINERY, {POP: 8e-10, Points.FOOD: 6e-9}, {}, base=1e-8),
+    _works(BuildingKind.WINERY, {POP: 8e-10, Points.FOOD: 6e-9}, {}, base=CRAFT_BASE),
     _works(
         BuildingKind.BARREL_MAKER,
         {POP: 4e-10, IND: 6e-9, Points.TIMBER: 6e-8},
@@ -869,15 +873,15 @@ WORKS = (
     _works(BuildingKind.ELECTRONICS_PLANT, {POP: 2.5e-8, IND: 4e-7}, {}, 1960, 30_000, 2e-8),
     _works(BuildingKind.PLANE_FACTORY, {POP: 2.5e-8, IND: 6e-7}, {IND: 6}, 1935, 40_000, 2e-6),
     _works(BuildingKind.TANK_FACTORY, {IND: 6e-7}, {IND: 6}, 1940, 40_000, 2e-6),
-    _works(BuildingKind.BRICKWORKS, {POP: 1e-9, Points.ORE: 1.2e-8}, {}, base=2e-8),
-    _works(BuildingKind.GLASSWORKS, {POP: 4e-10, IND: 6e-9, Points.ORE: 6e-9}, {}, base=1e-8),
-    _works(BuildingKind.BREWERY, {POP: 1.5e-9, Points.FOOD: 3e-9}, {}, base=1e-8),
-    _works(BuildingKind.DISTILLERY, {POP: 8e-10, Points.FOOD: 3e-9}, {}, 1600, base=1e-8),
-    _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=1e-8),
+    _works(BuildingKind.BRICKWORKS, {POP: 1e-9, Points.ORE: 1.2e-8}, {}, base=CRAFT_BASE),
+    _works(BuildingKind.GLASSWORKS, {POP: 4e-10, IND: 6e-9, Points.ORE: 6e-9}, {}, base=CRAFT_BASE),
+    _works(BuildingKind.BREWERY, {POP: 1.5e-9, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
+    _works(BuildingKind.DISTILLERY, {POP: 8e-10, Points.FOOD: 3e-9}, {}, 1600, base=CRAFT_BASE),
+    _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
     _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {}, 1850, base=1e-8),
     _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=1e-8),
     _works(BuildingKind.PRINTING_WORKS, {POP: 1.5e-9, IND: 3e-9}, {}, 1600, PRINTING_CELLS, 1e-8),
-    _works(BuildingKind.SUGAR_REFINERY, {IND: 6e-9, Points.FOOD: 3e-9}, {}, 1800, base=1e-8),
+    _works(BuildingKind.SUGAR_REFINERY, {IND: 6e-9, Points.FOOD: 3e-9}, {}, 1800, base=CRAFT_BASE),
     _works(BuildingKind.PORCELAIN_WORKS, {POP: 4e-10, Points.ORE: 6e-9}, {}, 1710, 30_000, 1e-8),
     _works(BuildingKind.MACHINE_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 1870, base=2e-6),
     _works(BuildingKind.CEMENT_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {}, 1880, 20_000, 2e-8),
