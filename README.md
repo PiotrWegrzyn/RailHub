@@ -10,8 +10,8 @@ uv run railroads
 
 It opens on the main menu: start a new game, load a saved one, or quit. A new game is set up
 first with:
-- the map: one of the baked maps of real places, or a random place in the world (this needs the
-  elevation database, see Map data). The baked maps are Poland, Germany, France (Paris to Lyon),
+- the map: one of the baked maps of real places, or a random place in the world (made from the
+  world's map data in `world/`, see Map data). The baked maps are Poland, Germany, France (Paris to Lyon),
   Great Britain, Italy (Venice to Rome), Moscow, Constantinople, the Alps, the Norwegian fjords,
   the US Northeast, California, the Colorado Rockies, Central Chile, Japan (Hiroshima to Tokyo),
   China's Yangtze delta and Southeast Australia, listed in `START_MAPS` in
@@ -839,8 +839,7 @@ Maps are built from these sources:
 
 - Elevation for new games: Mapzen terrain tiles on [AWS Open Data](https://registry.opendata.aws/terrain-tiles/),
   made from SRTM, GMTED2010, ETOPO1, EU-DEM and others
-  ([attribution](https://github.com/tilezen/joerd/blob/master/docs/attribution.md)). They are
-  downloaded once into a local database, so starting a game needs no internet.
+  ([attribution](https://github.com/tilezen/joerd/blob/master/docs/attribution.md)).
 - Elevation for Poland: NOAA ETOPO1; for the other baked maps the terrain tiles above, 1 arc-minute (via NOAA CoastWatch ERDDAP, dataset `etopo180`).
 - Sea, lakes, rivers and deserts: [Natural Earth](https://www.naturalearthdata.com/) 1:10m,
   public domain. Rivers running less than 200 km on the map are left out.
@@ -850,7 +849,14 @@ Maps are built from these sources:
   people, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Without it stations are
   numbered.
 
-Set up the data once:
+The game reads the elevation, the shapes and the places from `world/`, which is in the repository
+(about 97 MB in some 3,700 small files; `railroads.mapgen.world_files`): one file per elevation
+tile and per 5° square of shapes and of places, so a map reads only the few it needs. The desktop
+apps ship the whole folder, so random places work offline; the web game downloads each file
+beside its page as a map needs it, half a megabyte or so for a random place.
+
+To rebuild `world/` or the baked maps, set up the source data in `data/` (not in the repository)
+once:
 
 ```bash
 mkdir -p data/raw && cd data/raw
@@ -861,7 +867,7 @@ done
 cd ../..
 ```
 
-Then build the elevation database for new games (about 70 MB download, resumes if interrupted):
+Then build the elevation database (about 70 MB download, resumes if interrupted):
 
 ```bash
 uv run python tools/build_elevation_db.py
@@ -873,6 +879,12 @@ Build the place names stations are named from (about 14 MB download):
 mkdir -p data/raw/geonames
 curl -o data/raw/geonames/cities500.zip https://download.geonames.org/export/dump/cities500.zip
 uv run python tools/build_places.py
+```
+
+Then cut all of it into `world/` (about half a minute):
+
+```bash
+uv run python tools/build_world_files.py
 ```
 
 and, to rebake the Poland map, the other start maps (all, or the keys given) and the world

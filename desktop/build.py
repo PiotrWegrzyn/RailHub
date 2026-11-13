@@ -36,6 +36,7 @@ def freeze() -> None:
             "--collect-data", "railroads",
             "--collect-data", "imgui_bundle",
             "--copy-metadata", "railroads",
+            "--add-data", f"{ROOT / 'world'}:world",
             str(ROOT / "desktop" / "railroads_app.py"),
         ],
         check=True,

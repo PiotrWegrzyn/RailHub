@@ -1,4 +1,5 @@
-"""Build the worldwide file of place names (data/places.npz) that stations are named from.
+"""Build the worldwide file of place names (data/places.npz) that tools/build_world_files.py cuts
+into the squares stations are named from.
 
 Reads GeoNames' cities500 (every place with more than 500 people, CC BY 4.0) straight from
 data/raw/geonames/cities500.zip (see README.md) and keeps each populated place's name,
@@ -13,9 +14,10 @@ import zipfile
 
 import numpy as np
 
-from railroads.places import DATA_DIR, PLACES_FILE
+from railroads.newgame import DATA_DIR
 
 SOURCE = DATA_DIR / "raw" / "geonames" / "cities500.zip"
+PLACES_FILE = DATA_DIR / "places.npz"
 LEFT_OUT = {"PPLX", "PPLQ", "PPLW", "PPLH", "PPLCH"}
 
 

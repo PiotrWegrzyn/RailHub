@@ -1,7 +1,7 @@
 """Where a new game starts: a random spot in the world that is mostly land."""
 
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -40,11 +40,12 @@ def pick_start_bounds(
     region: StartRegion,
     width_km: float,
     height_km: float,
-    water: Sequence[Shape],
+    land_share_of: Callable[[Bounds], float],
     attempts: int = 1000,
 ) -> Bounds:
-    """A random map area inside the region with enough land. Spots are spread evenly over the
-    globe's surface, so high latitudes are not picked more often than their real size."""
+    """A random map area inside the region with enough land, as `land_share_of` tells it. Spots
+    are spread evenly over the globe's surface, so high latitudes are not picked more often than
+    their real size."""
     low, high = np.sin(np.radians([region.south, region.north]))
     half_height = height_km / 2 / KM_PER_DEGREE_LAT
     for _ in range(attempts):
@@ -57,7 +58,7 @@ def pick_start_bounds(
             south=lat - half_height,
             north=lat + half_height,
         )
-        if region.contains(bounds) and land_share(bounds, water) >= region.min_land_share:
+        if region.contains(bounds) and land_share_of(bounds) >= region.min_land_share:
             return bounds
     raise ValueError("found no spot in the start region with enough land")
 

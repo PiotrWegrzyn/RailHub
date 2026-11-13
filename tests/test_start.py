@@ -13,7 +13,14 @@ ALL_SEA = Shape("polygon", (np.array([(-1.0, -1.0), (21.0, -1.0), (21.0, 11.0), 
 
 
 def pick(seed: int, water: list[Shape]) -> Bounds:
-    return pick_start_bounds(np.random.default_rng(seed), REGION, 200, 200, water, attempts=200)
+    return pick_start_bounds(
+        np.random.default_rng(seed),
+        REGION,
+        200,
+        200,
+        lambda bounds: land_share(bounds, water),
+        attempts=200,
+    )
 
 
 def test_start_area_fits_inside_the_region() -> None:

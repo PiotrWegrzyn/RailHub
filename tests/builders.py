@@ -1,6 +1,6 @@
 """What tests build their games on: a small flat map of grassland, any layer of which a test can
 give itself, and a growth rule that grows and trades nothing, for tests that place every building
-themselves."""
+themselves; and world files held in memory."""
 
 import numpy as np
 import numpy.typing as npt
@@ -46,3 +46,15 @@ def flat_map(
         relief=layer(rows, cols, Relief.FLAT) if relief is None else relief,
         deposits=deposits,
     )
+
+
+class MemoryFiles:
+    """World files held in memory, noting which were asked for."""
+
+    def __init__(self, files: dict[str, bytes]) -> None:
+        self.files = files
+        self.asked: set[str] = set()
+
+    def read(self, name: str) -> bytes | None:
+        self.asked.add(name)
+        return self.files.get(name)

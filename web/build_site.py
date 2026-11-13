@@ -1,6 +1,7 @@
 """Builds the game as a static web site that needs no other server: the page, the web worker that
-paints the map (painter.js), the game's wheel, and Pyodide with numpy, Pillow, micropip and
-imgui-bundle beside it. Downloads are kept in a cache, so only the first build fetches them.
+paints the map (painter.js), the game's wheel, Pyodide with numpy, Pillow, micropip and
+imgui-bundle beside it, and the world's map data (world/), of which a game downloads only the few
+files its map needs. Downloads are kept in a cache, so only the first build fetches them.
 
     uv run python web/build_site.py
     python -m http.server -d build/site 8000
@@ -67,6 +68,7 @@ def build() -> None:
     for name in ("index.html", "painter.js", "measure.py"):
         text = (WEB / name).read_text().replace("__VERSION__", version)
         (SITE / name).write_text(text)
+    shutil.copytree(ROOT / "world", SITE / "world")
     (SITE / ".nojekyll").touch()
     size = sum(path.stat().st_size for path in SITE.rglob("*") if path.is_file())
     print(f"Built {SITE} ({size / 1e6:.1f} MB)")

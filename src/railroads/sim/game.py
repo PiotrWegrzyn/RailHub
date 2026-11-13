@@ -46,7 +46,7 @@ class Month:
 
 def place_names(tile_map: TileMap) -> StationNames:
     """Station names taken from the real places on the map."""
-    return StationNames(tile_map, Places.load(tile_map.bounds))
+    return StationNames(tile_map, Places.near(tile_map.bounds))
 
 
 class Game:
