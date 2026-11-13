@@ -686,6 +686,21 @@ def test_track_drawn_again_after_its_neighbour_changes_matches_track_drawn_fresh
     assert np.array_equal(again, fresh)
 
 
+@pytest.mark.parametrize("k", [1, 2])
+def test_the_points_of_a_patch_of_fields_are_those_of_a_box_round_it_cut_to_it(
+    sheet: SpriteSheet, k: int
+) -> None:
+    ground = make_world(sheet).ground
+    left, top = 30, 50
+    around = ground._patch_points((0, 48 * k, 0, 90 * k), left, top, k, None)
+
+    alone = ground._patch_points((10 * k, 34 * k, 20 * k, 60 * k), left, top, k, None)
+
+    place = (slice(10 * k, 34 * k), slice(20 * k, 60 * k))
+    for values, cut in zip(alone, around, strict=True):
+        assert np.array_equal(values, cut[place])
+
+
 def depths_by_rolling(field: np.ndarray, most: int) -> np.ndarray:
     depth = np.zeros(field.shape, dtype=np.int16)
     inside = field.copy()

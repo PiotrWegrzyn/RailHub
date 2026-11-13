@@ -483,12 +483,22 @@ class Ground:
         right = max(patch[1].stop for _, patch, _, _ in jobs)
         paint = np.empty((bottom - down, right - across, 3), dtype=np.float32)
         painted = np.zeros(paint.shape[:2], dtype=bool)
+        # Each patch works out the plane points and cells of its own pixels, unless patches
+        # overlap so much that working them out once over the box round all of them is less.
+        boxes = {(p[0].start, p[0].stop, p[1].start, p[1].stop) for _, p, _, _ in jobs}
+        shared = None
+        if sum((b[1] - b[0]) * (b[3] - b[2]) for b in boxes) > paint.shape[0] * paint.shape[1]:
+            shared = self._patch_points((down, bottom, across, right), left - a, top - a, k, points)
         worked: dict[tuple[int, int, int, int], tuple] = {}
         for plot, patch, crop, grove in jobs:
             box = (patch[0].start, patch[0].stop, patch[1].start, patch[1].stop)
-            if box not in worked:
-                worked[box] = self._patch_points(box, left - a, top - a, k, points)
             place = (slice(box[0] - down, box[1] - down), slice(box[2] - across, box[3] - across))
+            if box not in worked:
+                worked[box] = (
+                    self._patch_points(box, left - a, top - a, k, points)
+                    if shared is None
+                    else tuple(values[place] for values in shared)
+                )
             args = (paint[place], *worked[box])
             if grove is None:
                 painted[place] |= self._sow(*args, plot, crop, k)
