@@ -242,6 +242,10 @@ class App:
             return
         error = self._autosaving.exception()
         self._autosaving = None
+        # The autosaves have moved down a place, so an open saves window lists them anew: what
+        # it lists is what loads, the newest autosave showing as soon as it is written.
+        if self.saves is not None and self.saves_window.open:
+            self.saves_window.refresh(self.saves)
         if error is None:
             self.tell("Autosaved")
         else:

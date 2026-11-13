@@ -542,6 +542,29 @@ def test_an_autosave_due_while_another_month_is_half_done_waits_for_that_month(
     assert len(writer.jobs) == 2
 
 
+def test_a_saves_window_opened_while_an_autosave_is_written_lists_it_once_it_is_written(
+    context: None, tmp_path: Path, slow_writer: None
+) -> None:
+    app = made_app()
+    app.saves = Saves(tmp_path)
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+    frames_until_the_month_is_done(app)
+    frame(app)
+    app.toggle_saves()
+    listed_meanwhile = list(app.saves_window.listing)
+    written_meanwhile = app._autosaving is not None
+
+    frames = 0
+    while app._autosaving is not None and frames < 1000:
+        frame(app)
+        frames += 1
+
+    listed = [(info.name, info.date) for info in app.saves_window.listing]
+    assert written_meanwhile
+    assert listed_meanwhile == []
+    assert listed == [("autosave 1", app.clock.date)]
+
+
 def test_without_threads_frames_stay_at_full_speed_while_an_autosave_is_written(
     context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, refreshes: list[None]
 ) -> None:
