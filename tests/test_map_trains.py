@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 
+import numpy as np
 import pytest
 from imgui_bundle import hello_imgui, imgui  # noqa: TID251
 
@@ -10,6 +11,7 @@ from railroads.sim.grids import HexGrid
 from railroads.sim.trains import Stop
 from railroads.ui import map_view
 from railroads.ui.map_view import MapView
+from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.train_layer import TrainLayer
 
 
@@ -82,3 +84,29 @@ def test_the_pixel_map_draws_its_trains_from_the_train_sheet(
     frame(view)
 
     assert drawn == [view.railway]
+
+
+def test_the_ground_under_every_trains_smoke_is_looked_up_in_one_go(
+    context: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    view = railway_seen_in_pixel_art()
+    for stops in ([(10, 6), (10, 16)], [(10, 16), (10, 6)]):
+        train = view.railway.buy()
+        assert train is not None
+        train.stops = [Stop(stop) for stop in stops]
+    view.time_passed(0.1)
+    layer = TrainLayer(view._pixel_layer().world)
+    looked: list[int] = []
+    plain = Elevation.lift
+
+    def counted(elevation: Elevation, x: object, y: object) -> object:
+        looked.append(np.size(x))
+        return plain(elevation, x, y)
+
+    monkeypatch.setattr(Elevation, "lift", counted)
+    imgui.new_frame()
+
+    layer.draw(imgui.get_foreground_draw_list(), view.railway, view.camera, (640.0, 400.0))
+
+    imgui.end_frame()
+    assert looked == [4, 2]
