@@ -11,6 +11,7 @@ from imgui_bundle import imgui
 
 from railroads.sim.demand import StationDemand
 from railroads.sim.finance import TRAIN_RESALE, dollars
+from railroads.sim.goods import GOOD_YEARS, Good
 from railroads.sim.railway import Railway
 from railroads.sim.trains import ENGINES, Stop, Train
 from railroads.ui.demand_view import draw_demand
@@ -37,6 +38,8 @@ LIST_WIDTH = 190.0
 MAP_SHARE = 0.45
 # Where a stop card's rows start, after their labels.
 CARD_LABEL = 130.0
+# How wide the list of every other car is.
+OTHER_CAR_WIDTH = 170.0
 # How often, in seconds, what a train's cargo is worth is worked out again.
 WORTH_EVERY = 0.5
 
@@ -312,11 +315,12 @@ class TrainsWindow:
         imgui.text_disabled("Load here")
         imgui.same_line(CARD_LABEL)
         offers = goods_to_load(railway, stop.cell, supplies(stop.cell))
-        if not offers:
-            imgui.text_disabled("nothing made or waiting here yet")
-            return
         most = railway.most_cars(train)
         full = len(stop.cars) >= most
+        if not offers:
+            imgui.text_disabled("nothing made or waiting here yet")
+            self._draw_any_car(railway, train, index, stop, set(), full)
+            return
         offers.sort(key=lambda o: (-(demand.monthly_want(o.good) > 0), -o.waiting, -o.made))
         left = imgui.get_cursor_pos_x()
         per_row = max(1, int(imgui.get_content_region_avail().x // (OFFER_SIZE[0] + 4)))
@@ -338,6 +342,27 @@ class TrainsWindow:
             if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
                 self.map.good = offer.good
             imgui.end_disabled()
+        imgui.set_cursor_pos_x(left)
+        self._draw_any_car(railway, train, index, stop, {o.good for o in offers}, full)
+
+    @staticmethod
+    def _draw_any_car(
+        railway: Railway, train: Train, index: int, stop: Stop, shown: set[Good], full: bool
+    ) -> None:
+        """A list of every other good there is by now, to add a car for one nothing makes or
+        holds here yet, such as goods another train will leave."""
+        others = [g for g in Good if g not in shown and GOOD_YEARS.get(g, 0) <= railway.year]
+        if not others:
+            return
+        imgui.begin_disabled(full)
+        imgui.set_next_item_width(OTHER_CAR_WIDTH)
+        if imgui.begin_combo(f"##other car {index}", "Any other car..."):
+            for good in others:
+                if imgui.selectable(good.value, False)[0]:
+                    stop.add_car(good, railway.most_cars(train))
+                    train.cars_changed(index)
+            imgui.end_combo()
+        imgui.end_disabled()
 
 
 def _centered_hint(text: str) -> None:

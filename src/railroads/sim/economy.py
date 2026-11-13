@@ -281,6 +281,8 @@ class Economy:
         """The traded cells within `radius` steps of a station, as positions among `cells`,
         nearest first, and how many steps away each is."""
         within = flat_within(self.tile_map.grid, station, int(radius))
+        if not cells.size:
+            return cells, np.zeros(0)
         flat = within.cells
         positions = np.searchsorted(cells, flat)
         found = (positions < cells.size) & (cells[np.minimum(positions, cells.size - 1)] == flat)
