@@ -3,8 +3,8 @@
 Proof of concept: the game runs unchanged in a browser. `web/index.html` loads Pyodide, numpy,
 Pillow, imgui-bundle and the game's own wheel, then starts `railroads.ui.app.main`. The map, the
 pixel art with its raised mountains, the menus and the minimap all show. The only changes to the
-game are fallbacks for its three background threads: the mountain redraws, the game setup and the
-autosave writer.
+game are stand-ins for its background threads: web workers paint the map's chunks and grow a new
+game's towns, and loading a save and the autosave writer run on the frames.
 
 ## How to run it
 
@@ -50,10 +50,19 @@ The game's wheel carries its Python source, so anyone playing can read the code.
   numpy 2.4.3 and Pillow 12.2.0 while `pyproject.toml` asks for numpy ≥ 2.5.4 and Pillow ≥ 13. The
   older versions work.
 - **No threads.** `railroads.ui.workers.worker` tests whether a thread can start. If not, it
-  hands out a `FrameWorker`, which runs a job only when the caller asks. `PixelLayer` runs a fine
-  redraw of raised chunks on each frame that draws no new chunk. The game setup and loading run
-  on the frame after the waiting screen first shows, so that screen stays up while the page is
-  frozen. An autosave is written on the frame after the month turns.
+  hands out a `FrameWorker`, which runs a job only when the caller asks. The map's chunks are
+  painted by up to four web workers instead (`web/painter.js`, `railroads.ui.pixel.web_painter`),
+  each a Pyodide of its own holding a copy of the pixel world (`railroads.ui.pixel.copies`): it
+  is pickled whole while a game loads and kept up with what changes in it. `?painters=N` on the
+  page sets how many start, and 0 paints a chunk a frame once the map and mouse stand still, as
+  happens until a worker is ready. Raised chunks are never drawn again finely in the browser, as
+  the desktop does, so its mountains look as they always have there. A new game's towns grow in a
+  web worker of their own (`railroads.ui.web_setup`), started with the page and stopped once the
+  game is handed over, compressed, then uncompressed on the frames a few megabytes at a time.
+  Loading a save runs on the frames after the waiting screen first shows, a step each. An autosave is pickled on the frame after the month turns, then compressed and written
+  a step at a time, at most `WRITING_SECONDS` (4 ms) of each frame, over the next two seconds or
+  so, the frames kept at full speed meanwhile. A month that ends before that is done is autosaved
+  once it is, and an open saves window lists the new autosave as soon as it is written.
 - **Saves.** `index.html` mounts Emscripten's IndexedDB file system over the saves folder and
   copies it to IndexedDB every 2 s, so named saves and autosaves survive a reload. They stay in
   that browser; there is no way yet to download a save or load one from a file.
@@ -112,17 +121,20 @@ would pan at about 45 fps, still held back by the 140 ms quick draws of raised c
    build maps on a server.
 2. **A 24-second frozen start.** Town growth before play blocks the page. Options: save the grown
    start with the map, grow in slices that yield to the browser (async), or grow in a Web Worker.
+   Done: the towns grow in a web worker. The page no longer freezes (its longest frame while a
+   Poland game starts is about 140 ms), but the game shows after about 29.5 s instead of 23 s:
+   growth runs about a fifth slower in the worker, and handing the game over adds about a second.
 3. **No threads, so redraws stall.** Fine mountain redraws cost about 400 ms each on the main
    thread. Pyodide has no threads, and a Web Worker would need its own Pyodide and its own copy of
    the world. Cheaper options: skip the fine redraw in the browser, split it into strips across
    frames, or move map drawing to GPU shaders. Shaders would also remove the 60–140 ms quick
    chunk draws, the next biggest cost.
-   Done in part: the ground shader now runs in the browser on WebGL 2
-   (`railroads.ui.pixel.webgl`), and while the view moves new chunks and fine redraws wait, with
-   the shader's ground showing where chunks are missing. The same pan as above now runs at
-   59.9 fps, with a median frame of 16.7 ms, a 95th percentile of 17.6 ms and a worst frame of
-   33 ms. Chunks still cost 60–160 ms each once the map stops, so the first frames after a pan
-   stutter while they are drawn.
+   Done: the ground shader runs in the browser on WebGL 2 (`railroads.ui.pixel.webgl`), the
+   browser skips the fine redraw, chunks draw about twice as fast as they did, and web workers
+   with their own Pyodide and copy of the world paint them, so no frame waits on one. In headless
+   Chrome on the 1440×860 window at 2×, filling the screen after a jump onto unseen land at zoom
+   4/7 went from 2.2 s to 0.3 s over flat land and from 5.1 s to 0.7 s over mountains, with frames
+   at 16.7 ms throughout instead of 100–270 ms. Each worker takes about 250–350 MB.
 4. **Pure Python is about 2× slower.** Monthly growth and train simulation will feel this too.
    They were not measured in play.
 5. **Download.** About 16 MB before anything shows. That is acceptable for a game but needs a real

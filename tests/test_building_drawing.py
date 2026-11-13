@@ -9,9 +9,10 @@ from railroads.sim.constructions import Building, BuildingKind, Constructions, T
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
-from railroads.ui import buildings
+from railroads.ui import building_spots
 from railroads.ui.build_menu import draw_track
-from railroads.ui.buildings import BuildingSpots, Plot, draw_building_dots, plots_of
+from railroads.ui.building_spots import BuildingSpots, Plot, plots_of
+from railroads.ui.buildings import draw_building_dots
 from railroads.ui.iso_camera import IsoCamera
 
 
@@ -190,9 +191,9 @@ def test_spots_are_worked_out_again_only_in_cells_that_changed(
     constructions = make_constructions()
     BuildingSpots.of(constructions)
     worked_out = []
-    original = buildings._cell_spots
+    original = building_spots._cell_spots
     monkeypatch.setattr(
-        buildings,
+        building_spots,
         "_cell_spots",
         lambda c, cell, *rest: worked_out.append(cell) or original(c, cell, *rest),
     )

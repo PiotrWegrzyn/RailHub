@@ -1,10 +1,12 @@
 import numpy as np
+import pytest
 
 from builders import flat_map, layer
 from railroads.sim.constructions import Building, BuildingKind, Constructions
+from railroads.sim.game import Game
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.ui.iso_camera import IsoCamera
-from railroads.ui.map_view import LOOKS, OnGround
+from railroads.ui.map_view import LOOKS, MapView, OnGround
 from railroads.ui.pixel.projection import PixelProjection
 from railroads.ui.pixel.relief import (
     MOST_LIFT,
@@ -179,3 +181,27 @@ def test_a_remembered_lift_is_the_same_as_working_it_out() -> None:
 
     assert first == again == [float(elevation.lift(x, y)) for x, y in points]
     assert any(lift > 0 for lift in first)
+
+
+def test_the_ground_under_a_resting_mouse_is_looked_up_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = MapView(Game(Constructions(mountain_map())))
+    view.camera.zoom_level = 4
+    view.look_at((10, 25))
+    looked: list[tuple[float, float]] = []
+    plain = Elevation.ground_at
+
+    def counted(elevation: Elevation, px: float, py: float) -> tuple[float, float]:
+        looked.append((px, py))
+        return plain(elevation, px, py)
+
+    monkeypatch.setattr(Elevation, "ground_at", counted)
+
+    first = view.ground_under(600.0, 380.0, (640.0, 400.0))
+    again = view.ground_under(600.0, 380.0, (640.0, 400.0))
+    moved = view.ground_under(610.0, 380.0, (640.0, 400.0))
+
+    assert again == first
+    assert moved != first
+    assert len(looked) == 2

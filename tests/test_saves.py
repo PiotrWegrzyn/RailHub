@@ -1,5 +1,8 @@
 import json
+import pickle
+import zlib
 from enum import Enum
+from io import BytesIO
 from pathlib import Path
 from types import BuiltinFunctionType, FunctionType
 
@@ -15,6 +18,7 @@ from railroads.saves import (
     SavedGame,
     SaveError,
     Saves,
+    _Pickler,
     name_problem,
     snapshot,
 )
@@ -265,3 +269,67 @@ def test_a_snapshot_in_reused_memory_holds_the_same_game_each_time(tmp_path: Pat
 
     assert differences(saved, loaded) == []
     assert bytes(snapshot(saved, memory).data) == plain
+
+
+@pytest.mark.parametrize("memory", [None, ReusedMemory()])
+def test_a_snapshot_holds_the_game_as_it_was_when_taken(
+    tmp_path: Path, memory: ReusedMemory | None
+) -> None:
+    saves = Saves(tmp_path)
+    saved = played_game()
+    houses = saved.game.growth.count(BuildingKind.HOUSE)
+    before = houses.copy()
+    taken = snapshot(saved, memory)
+
+    houses[8, 15] += 5
+    saves.autosave(taken)
+
+    assert np.array_equal(saves.load("autosave 1").game.growth.count(BuildingKind.HOUSE), before)
+
+
+def unpacked(path: Path) -> tuple[bytes, bytes]:
+    """A save's header line and its game, uncompressed."""
+    _, line, packed = path.read_bytes().split(b"\n", 2)
+    return line, zlib.decompress(packed)
+
+
+def test_an_autosave_written_in_steps_is_the_one_written_at_once(tmp_path: Path) -> None:
+    whole, stepped = Saves(tmp_path / "whole"), Saves(tmp_path / "stepped")
+    saved = played_game()
+    taken = snapshot(saved)
+    steps = stepped.autosave_steps(taken, 4096)
+
+    whole.autosave(taken)
+    taken_steps = sum(1 for _ in steps)
+
+    assert taken_steps > 1
+    assert unpacked(stepped.path("autosave 1")) == unpacked(whole.path("autosave 1"))
+    assert differences(saved, stepped.load("autosave 1")) == []
+
+
+def test_older_autosaves_stay_put_until_the_new_one_is_written(tmp_path: Path) -> None:
+    saves = Saves(tmp_path)
+    earlier = played_game(months=0)
+    saves.autosave(earlier)
+    later = played_game()
+    steps = saves.autosave_steps(later, 4096)
+
+    next(steps)
+    midway = [(info.name, info.date) for info in saves.listing()]
+    for _ in steps:
+        pass
+
+    assert midway == [("autosave 1", earlier.clock.date)]
+    assert saves.load("autosave 1").clock.date == later.clock.date
+    assert saves.load("autosave 2").clock.date == earlier.clock.date
+
+
+def test_a_snapshot_is_the_game_pickled_as_ever() -> None:
+    saved = played_game()
+    plain = BytesIO()
+    _Pickler(plain, protocol=pickle.HIGHEST_PROTOCOL).dump(saved)
+
+    joined = bytes(snapshot(saved).data)
+    held = bytes(snapshot(saved, ReusedMemory()).data)
+
+    assert joined == held == plain.getvalue()

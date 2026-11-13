@@ -88,8 +88,7 @@ class TrainLayer:
                 (px / width, py / height),
                 ((px + w) / width, (py + h) / height),
             )
-        for train in railway.trains:
-            self._smoke(draw_list, railway, train, origin, scale)
+        self._smoke(draw_list, railway, origin, scale)
 
     def _parts(self, train: Train) -> list[tuple[object, float]]:
         """Each part of the train and how far its middle is behind the train's front, in cells."""
@@ -110,38 +109,60 @@ class TrainLayer:
         self,
         draw_list: imgui.ImDrawList,
         railway: Railway,
-        train: Train,
         origin: tuple[int, int],
         scale: int,
     ) -> None:
-        """Puffs of smoke rising from the chimney and drifting back over the train."""
+        """Puffs of smoke rising from each chimney and drifting back over its train. The ground
+        under every chimney and where every puff lies in the picture are worked out for all the
+        trains at once: on hills a lift takes nearly as long for one point as for many."""
+        chimneys = [
+            chimney
+            for train in railway.trains
+            if (chimney := self._chimney(railway, train)) is not None
+        ]
+        if not chimneys:
+            return
         projection = self.world.projection
-        model = ENGINES[train.engine]
-        if model.chimney is None:
-            return
-        chimney = (model.chimney[0] * SCALE, model.chimney[1] * SCALE)
-        back = (model.half - model.chimney[0]) * SCALE
-        placed = railway.position(train, back)
-        if placed is None:
-            return
-        (x, y), (dx, dy) = placed
-        shift = self.lanes.sideways(train.path, train.along - back)
-        lift = float(self.world.elevation.lift(x, y))
-        length = math.hypot(dx, dy) or 1.0
-        ux, uy = dx / length, dy / length
+        lifts = self.world.elevation.lift(
+            np.array([chimney.x for chimney in chimneys]),
+            np.array([chimney.y for chimney in chimneys]),
+        )
         up = float(np.hypot(*projection.matrix[:, 0])) * HEIGHT_PER_WIDTH
-        phase = (train.along * 6.0) % 1.0
-        for k in range(PUFFS):
-            age = (k + phase) / PUFFS
-            px, py = x - ux * age * 0.5 * SCALE, y - uy * age * 0.5 * SCALE
-            ax, ay = projection.to_pixels(px, py)
-            sx = origin[0] + (float(ax) + shift[0]) * scale
-            rise = (chimney[1] + age * 0.35 * SCALE) * up
-            sy = origin[1] + (float(ay) + shift[1] - lift - rise) * scale
+        puffs = []
+        for index, chimney in enumerate(chimneys):
+            length = math.hypot(chimney.dx, chimney.dy) or 1.0
+            ux, uy = chimney.dx / length, chimney.dy / length
+            for k in range(PUFFS):
+                age = (k + chimney.phase) / PUFFS
+                px, py = chimney.x - ux * age * 0.5 * SCALE, chimney.y - uy * age * 0.5 * SCALE
+                puffs.append((index, age, px, py))
+        ax, ay = projection.to_pixels(
+            np.array([puff[2] for puff in puffs]), np.array([puff[3] for puff in puffs])
+        )
+        for (index, age, _, _), x, y in zip(puffs, ax.tolist(), ay.tolist(), strict=True):
+            chimney = chimneys[index]
+            shift = chimney.shift
+            sx = origin[0] + (x + shift[0]) * scale
+            rise = (chimney.height + age * 0.35 * SCALE) * up
+            sy = origin[1] + (y + shift[1] - float(lifts[index]) - rise) * scale
             radius = (1.5 + age * 4.0) * SCALE * scale
             alpha = 0.75 * (1 - age)
             color = imgui.color_convert_float4_to_u32(imgui.ImVec4(*SMOKE, alpha))
             draw_list.add_circle_filled((sx, sy), radius, color)
+
+    def _chimney(self, railway: Railway, train: Train) -> _Chimney | None:
+        """Where a train's chimney is on the map, if it has one and is on the map."""
+        model = ENGINES[train.engine]
+        if model.chimney is None:
+            return None
+        back = (model.half - model.chimney[0]) * SCALE
+        placed = railway.position(train, back)
+        if placed is None:
+            return None
+        (x, y), (dx, dy) = placed
+        shift = self.lanes.sideways(train.path, train.along - back)
+        phase = (train.along * 6.0) % 1.0
+        return _Chimney(x, y, dx, dy, shift, model.chimney[1] * SCALE, phase)
 
     def _texture(self, device_scale: int) -> tuple[hello_imgui.TextureGpu, int]:
         """The sprite sheet blown up by a whole number so it shows crisp at this many device
@@ -154,6 +175,21 @@ class TrainLayer:
             texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
             self._textures[factor] = (texture, factor)
         return self._textures[factor]
+
+
+@dataclass(frozen=True, slots=True)
+class _Chimney:
+    """A train's chimney: where it is on the map, which way the train runs, how far across the
+    picture the train is moved onto its track, how high the chimney stands in model cells, and
+    how far along its cycle the smoke is."""
+
+    x: float
+    y: float
+    dx: float
+    dy: float
+    shift: Point
+    height: float
+    phase: float
 
 
 @dataclass(frozen=True)

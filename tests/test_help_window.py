@@ -61,3 +61,12 @@ def test_the_help_says_who_makes_and_wants_a_good() -> None:
 
     assert honey.made_by == ("beekeeper",)
     assert "house" in honey.wanted_by
+
+
+def test_the_help_tables_are_worked_out_once() -> None:
+    buildings, goods = building_help(), good_help()
+
+    again = building_help(), good_help()
+
+    assert again[0] is buildings
+    assert again[1] is goods

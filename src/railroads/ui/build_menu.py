@@ -7,7 +7,9 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
+from functools import lru_cache
 
+import numpy as np
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
@@ -381,38 +383,44 @@ def draw_station_reach(
     where it hands goods out, the focused one (being placed, under the mouse or open) in its own
     colour, cells two stations share in grey, the border of where the focused station gathers
     goods, and the stations' own cells in solid blue. `reach` says how far each station hands
-    goods out and gathers them."""
+    goods out and gathers them. Every corner is put on screen in one go: on raised ground each
+    is lifted, which takes nearly as long for one point as for all of them."""
     owners: dict[Cell, set[Cell]] = {}
-    for station in {*stations, focus}:
+    shown = {*stations, focus}
+    for station in shown:
         for cell in grid.within(station, reach(station)[0]):
             owners.setdefault(cell, set()).add(station)
-    for cell, by in owners.items():
-        fill = SHARED_FILL if len(by) > 1 else FOCUS_FILL if focus in by else OTHER_FILL
-        _hex(draw_list, grid, cell, camera, center, fill, CELL_LINE)
-    for station in {*stations, focus}:
-        _hex(draw_list, grid, station, camera, center, STATION_FILL, CELL_LINE)
-    gathered = set(grid.within(focus, reach(focus)[1]))
-    for a, b in _border(grid, gathered):
-        draw_list.add_line(
-            imgui.ImVec2(*camera.to_screen(*a, center)),
-            imgui.ImVec2(*camera.to_screen(*b, center)),
-            _color(COLLECTION_RING),
-            2.5,
+    hexes = [
+        (
+            grid.corners(*cell),
+            SHARED_FILL if len(by) > 1 else FOCUS_FILL if focus in by else OTHER_FILL,
         )
+        for cell, by in owners.items()
+    ]
+    hexes += [(grid.corners(*station), STATION_FILL) for station in shown]
+    border = _reach_border(grid, focus, reach(focus)[1])
+    plane = [corner for corners, _ in hexes for corner in corners]
+    plane += [end for edge in border for end in edge]
+    xs, ys = (np.array(values, dtype=np.float64) for values in zip(*plane, strict=True))
+    sx, sy = camera.to_screen(xs, ys, center)
+    points = [imgui.ImVec2(x, y) for x, y in zip(sx.tolist(), sy.tolist(), strict=True)]
+    start = 0
+    for corners, fill in hexes:
+        polygon = points[start : start + len(corners)]
+        start += len(corners)
+        draw_list.add_convex_poly_filled(polygon, _color(fill))
+        draw_list.add_polyline(polygon, _color(CELL_LINE), 1.0, imgui.ImDrawFlags_.closed.value)
+    for a, b in itertools.batched(points[start:], 2, strict=True):
+        draw_list.add_line(a, b, _color(COLLECTION_RING), 2.5)
 
 
-def _hex(
-    draw_list: imgui.ImDrawList,
-    grid: Grid,
-    cell: Cell,
-    camera: IsoCamera,
-    center: Vec2,
-    fill: Rgba,
-    line: Rgba,
-) -> None:
-    points = [imgui.ImVec2(*camera.to_screen(x, y, center)) for x, y in grid.corners(*cell)]
-    draw_list.add_convex_poly_filled(points, _color(fill))
-    draw_list.add_polyline(points, _color(line), 1.0, imgui.ImDrawFlags_.closed.value)
+@lru_cache(maxsize=64)
+def _reach_border(
+    grid: Grid, station: Cell, steps: int
+) -> tuple[tuple[tuple[float, float], tuple[float, float]], ...]:
+    """The border of the cells within `steps` of a station, worked out once: an open station
+    window draws it every frame, and finding it takes hundreds of lookups."""
+    return tuple(_border(grid, set(grid.within(station, steps))))
 
 
 def _border(grid: Grid, cells: set[Cell]) -> list[tuple[tuple[float, float], tuple[float, float]]]:

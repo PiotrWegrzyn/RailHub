@@ -4,6 +4,7 @@ every one on the map and steps from one to the next."""
 import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from functools import cache
 
 import numpy as np
 import numpy.typing as npt
@@ -25,12 +26,14 @@ FOOTER_HEIGHT = 92.0
 MOST_ROW_ICONS = 3
 
 
-def goods_of(kind: BuildingKind) -> set[str]:
-    """The names of every good a kind of building makes or could take."""
+@cache
+def goods_of(kind: BuildingKind) -> frozenset[str]:
+    """The names of every good a kind of building makes or could take, worked out once: the
+    search and the help match every kind against what is typed each frame."""
     made = {good.value for good in MAKES.get(kind, {})}
     wanted = {need.value for need in NEEDS.get(kind, {})}
     meeting = {good.value for need in NEEDS.get(kind, {}) for good in FITS[need]}
-    return made | wanted | meeting
+    return frozenset(made | wanted | meeting)
 
 
 def kinds_matching(query: str) -> list[BuildingKind]:

@@ -1,25 +1,34 @@
-from collections.abc import Iterator
-from concurrent.futures import Future
+from collections.abc import Callable, Iterator
+from concurrent.futures import Executor, Future
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
 from imgui_bundle import hello_imgui, imgui, implot
+from test_saves import played_game
+from test_web_setup import SETTINGS, FakePage, grows_as
 
 from builders import flat_map
-from railroads.saves import Saves
+from railroads.newgame import Settings
+from railroads.saves import SavedGame, Saves
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.game import Game
 from railroads.sim.goods import Good
 from railroads.sim.grids import HexGrid
+from railroads.sim.steps import Steps
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.sim.trains import Stop
 from railroads.ui import app as app_module
+from railroads.ui import web_setup
 from railroads.ui.app import App, Shell
 from railroads.ui.build_menu import Tool
+from railroads.ui.ground import GroundPictures
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
 from railroads.ui.main_menu import Page
 from railroads.ui.map_view import MapView
+from railroads.ui.route_map import soften
+from railroads.ui.web_setup import PageSetup
 from railroads.ui.workers import FrameWorker
 
 
@@ -265,20 +274,29 @@ def test_a_save_that_fails_to_load_stays_in_the_menu_with_why(
     assert "no save called 'Nothing'" in shell.menu.error
 
 
-def test_without_threads_an_autosave_is_written_on_the_frame_after_the_month(
+def test_without_threads_an_autosave_is_written_a_little_each_frame_after_the_month(
     context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(app_module, "WRITER", FrameWorker())
+    monkeypatch.setattr(app_module, "WRITING_SECONDS", 0.0)
     app = made_app()
     app.saves = Saves(tmp_path)
     app.clock.seconds = app.clock.seconds_per_month - 0.001
-
     frames_until_the_month_is_done(app)
-    asked = app.saves.listing()
-    frame(app)
+    along = app.game.railway.trains[0].along
 
-    assert asked == []
-    assert app.saves.load("autosave 1").clock.date == app.clock.date
+    frame(app)
+    first = app.saves.listing()
+    frames = 1
+    while app._autosaving is not None and frames < 1000:
+        frame(app)
+        frames += 1
+
+    loaded = app.saves.load("autosave 1")
+    assert first == []
+    assert frames > 2
+    assert loaded.clock.date == app.clock.date
+    assert loaded.game.railway.trains[0].along == along != app.game.railway.trains[0].along
     assert app.notice == "Autosaved"
 
 
@@ -307,7 +325,10 @@ def test_without_threads_a_save_loads_once_the_waiting_screen_has_shown(
 
     shell_frame(shell)
     waiting = shell.app
-    shell_frame(shell)
+    frames = 1
+    while shell.app is None and frames < 10:
+        shell_frame(shell)
+        frames += 1
 
     assert waiting is None
     assert shell.app is not None
@@ -388,3 +409,268 @@ def test_the_waiting_screen_shows_how_far_a_new_game_has_grown(
 
     assert shell.app is None
     assert shell._done == 0.4
+
+
+def grown_on_the_frames(saved: SavedGame) -> Callable[..., Steps[SavedGame]]:
+    def made(
+        settings: Settings,
+        report: Callable[[str], None],
+        progress: Callable[[float], None] = lambda done: None,
+    ) -> Steps[SavedGame]:
+        for done in (0.0, 0.5):
+            progress(done)
+            yield
+        progress(1.0)
+        return saved
+
+    return made
+
+
+def never_grown_here(*args: Any) -> Steps[SavedGame]:
+    raise AssertionError("the game was to grow in the page's worker")
+
+
+def test_without_threads_a_new_game_grown_by_the_page_worker_fills_the_waiting_bar(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
+    monkeypatch.setattr(app_module, "make_game_steps", never_grown_here)
+    grown = played_game()
+    monkeypatch.setattr(web_setup, "make_game", grows_as(grown))
+    page = FakePage()
+    monkeypatch.setattr(app_module, "page_setup", lambda: PageSetup(page))
+    shell = Shell(Saves(tmp_path))
+    shell.start(SETTINGS)
+    shell_frame(shell)
+    shell_frame(shell)
+    page.work()
+
+    shell_frame(shell)
+    share = shell._done
+    frames = 1
+    while shell.app is None and frames < 20:
+        shell_frame(shell)
+        frames += 1
+
+    assert share == 0.5
+    assert shell.app is not None
+    assert shell.app.game.finances.cash == grown.game.finances.cash
+
+
+def test_without_threads_a_new_game_grows_on_the_frames_when_the_page_worker_fails(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
+    monkeypatch.setattr(app_module, "make_game_steps", grown_on_the_frames(played_game()))
+    page = FakePage(fails=True)
+    monkeypatch.setattr(app_module, "page_setup", lambda: PageSetup(page))
+    shell = Shell(Saves(tmp_path))
+    shell.start(SETTINGS)
+    shell_frame(shell)
+    shell_frame(shell)
+    page.work()
+
+    frames = 0
+    while shell.app is None and frames < 20:
+        shell_frame(shell)
+        frames += 1
+
+    assert shell.app is not None
+    assert shell._done == 1.0
+
+
+def colours_changed_by_a_month(app: App) -> None:
+    """Lets a month pass that the view takes as changing every cell's mood, so the ground
+    pictures take their colours again."""
+    view = app.view
+    view._satisfaction = np.full_like(view._satisfaction, 2)
+    view.month_passed(np.random.default_rng(1))
+
+
+def test_a_month_that_changes_colours_paints_the_overview_again_within_its_steps(
+    context: None,
+) -> None:
+    app = made_app()
+    frame(app)
+    shown = set(app.view._textures)
+
+    colours_changed_by_a_month(app)
+
+    assert shown == {False}
+    assert set(app.view._textures) == shown
+
+
+def test_the_trains_window_map_is_softened_anew_a_step_a_frame_once_colours_change(
+    context: None,
+) -> None:
+    app = made_app()
+    app.view.prepare((1280.0, 800.0), 1, chunks=False)
+    frame(app)
+    colours_changed_by_a_month(app)
+    version = app.view._ground_version
+
+    frame(app)
+    shown_meanwhile = app.view._soft_texture
+    frames = 1
+    while app.view._soft is not None and app.view._soft[0] != version and frames < 50:
+        frame(app)
+        frames += 1
+    frame(app)
+
+    assert shown_meanwhile is not None
+    assert shown_meanwhile[0] == version - 1
+    assert frames > 2
+    assert app.view._soft is not None
+    assert np.array_equal(app.view._soft[1], soften(app.view._plain_picture()))
+    assert app.view._soft_texture[0] == version
+
+
+def test_a_month_paints_again_only_the_ground_pictures_the_last_frame_showed(
+    context: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = made_app()
+    app.view.build.trains.open = False
+    app.view.camera.zoom_level = 2
+    frame(app)
+    app.view.camera.zoom_level = 4
+    frame(app)
+    kept = set(app.view._textures)
+    painted: list[bool] = []
+    picture = GroundPictures.picture
+
+    def counted(
+        pictures: GroundPictures,
+        colors: np.ndarray,
+        light_from: tuple[float, float],
+        with_lines: bool = False,
+    ) -> np.ndarray:
+        painted.append(with_lines)
+        return picture(pictures, colors, light_from, with_lines)
+
+    monkeypatch.setattr(GroundPictures, "picture", counted)
+
+    colours_changed_by_a_month(app)
+    frame(app)
+    painted_by_the_month = list(painted)
+    app.view.camera.zoom_level = 2
+    frame(app)
+
+    assert kept == {False, True}
+    assert painted_by_the_month == [False]
+    assert painted == [False, True]
+
+
+@pytest.fixture
+def slow_writer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Autosaves written on the frames, so little of the game compressed on each that one takes
+    many frames, as a large game's does in a browser."""
+    monkeypatch.setattr(app_module, "WRITER", FrameWorker())
+    monkeypatch.setattr(app_module, "WRITING_SECONDS", 0.0)
+    stepped = Saves.autosave_steps
+    monkeypatch.setattr(Saves, "autosave_steps", lambda saves, saved: stepped(saves, saved, 16384))
+
+
+def test_a_month_that_ends_while_an_autosave_is_written_is_autosaved_after_it(
+    context: None, tmp_path: Path, slow_writer: None
+) -> None:
+    app = made_app()
+    app.saves = Saves(tmp_path)
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+    frames_until_the_month_is_done(app)
+    frame(app)
+    first = app.clock.date
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+    frames_until_the_month_is_done(app)
+    second = app.clock.date
+    written_meanwhile = app._autosaving is not None
+
+    frames = 0
+    while (app._autosaving is not None or app._autosave_due) and frames < 1000:
+        frame(app)
+        frames += 1
+
+    assert written_meanwhile
+    assert first != second
+    assert app.saves.load("autosave 1").clock.date == second
+    assert app.saves.load("autosave 2").clock.date == first
+
+
+class HeldWriter(Executor):
+    """Takes jobs without doing them, each finished when the test likes."""
+
+    def __init__(self) -> None:
+        self.jobs: list[Future[Any]] = []
+
+    def submit(self, fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Future[Any]:
+        job: Future[Any] = Future()
+        self.jobs.append(job)
+        return job
+
+
+def test_an_autosave_due_while_another_month_is_half_done_waits_for_that_month(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    writer = HeldWriter()
+    monkeypatch.setattr(app_module, "WRITER", writer)
+    app = made_app()
+    app.saves = Saves(tmp_path)
+    app.autosave()
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+    frames_until_the_month_is_done(app)
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+    frame(app)
+    writer.jobs[0].set_result(None)
+
+    frame(app)
+    frame(app)
+    turning = app._turning is not None
+    started_while_turning = len(writer.jobs) > 1
+    frames_until_the_month_is_done(app)
+    frame(app)
+
+    assert turning
+    assert not started_while_turning
+    assert len(writer.jobs) == 2
+
+
+def test_a_saves_window_opened_while_an_autosave_is_written_lists_it_once_it_is_written(
+    context: None, tmp_path: Path, slow_writer: None
+) -> None:
+    app = made_app()
+    app.saves = Saves(tmp_path)
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+    frames_until_the_month_is_done(app)
+    frame(app)
+    app.toggle_saves()
+    listed_meanwhile = list(app.saves_window.listing)
+    written_meanwhile = app._autosaving is not None
+
+    frames = 0
+    while app._autosaving is not None and frames < 1000:
+        frame(app)
+        frames += 1
+
+    listed = [(info.name, info.date) for info in app.saves_window.listing]
+    assert written_meanwhile
+    assert listed_meanwhile == []
+    assert listed == [("autosave 1", app.clock.date)]
+
+
+def test_without_threads_frames_stay_at_full_speed_while_an_autosave_is_written(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, refreshes: list[None]
+) -> None:
+    monkeypatch.setattr(app_module, "WRITER", FrameWorker())
+    monkeypatch.setattr(app_module, "WRITING_SECONDS", 0.0)
+    app = made_app()
+    app.game.railway.trains.clear()
+    app.saves = Saves(tmp_path)
+    app.autosave()
+
+    frame(app)
+    asked = len(refreshes)
+    app.finish_autosave()
+    refreshes.clear()
+    frame(app)
+
+    assert asked == 1
+    assert refreshes == []

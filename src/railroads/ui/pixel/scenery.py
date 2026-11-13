@@ -13,7 +13,7 @@ from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.ui.biomes import Biome, biome_grid
-from railroads.ui.buildings import BuildingSpots
+from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.pixel.ground import FIELD_KINDS
 from railroads.ui.pixel.projection import FloatArray, IntArray, PixelProjection, hash01
 from railroads.ui.pixel.relief import Elevation

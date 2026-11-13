@@ -5,7 +5,7 @@ import time
 import weakref
 from collections import Counter
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 import numpy.typing as npt
@@ -14,7 +14,7 @@ FloatCells = npt.NDArray[np.float64]
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import Building, BuildingKind, Construction, Station, Track
-from railroads.sim.economy import Satisfaction
+from railroads.sim.economy import Satisfaction, Trade
 from railroads.sim.finance import dollars
 from railroads.sim.goods import RECIPES, Good, Need, bonus_of, demands_of, makes_of
 from railroads.sim.grids import Cell
@@ -73,34 +73,43 @@ class HexDetails:
     others: list[str]
 
 
-# How long a cell's description is shown again before it is worked out anew. Working it out takes
-# a few milliseconds, too much for every frame the mouse rests on a cell.
+# How long a cell's description is shown again before it is worked out anew, and how many cells'
+# descriptions are kept: the hovered cell's and the open details' at least. Working one out takes
+# a millisecond or so, too much for every frame the mouse rests on a cell.
 FRESH_S = 0.25
+KEPT = 4
 _last: list[tuple[weakref.ref[Growth], Cell, float, HexDetails]] = []
 
 
-def recently_described(growth: Growth, cell: Cell) -> HexDetails:
-    """The cell's description, worked out again only if the last one is of another cell or
-    older than FRESH_S."""
+def recently_described(
+    growth: Growth, cell: Cell, satisfaction: npt.NDArray[np.int8] | None = None
+) -> HexDetails:
+    """The cell's description, worked out again only if none of the last few is of this cell
+    or it is older than FRESH_S; `satisfaction` as for describe."""
     now = time.monotonic()
-    if _last:
-        owner, last_cell, at, details = _last[0]
+    for owner, last_cell, at, details in _last:
         if owner() is growth and last_cell == cell and now - at < FRESH_S:
             return details
-    details = describe(growth, cell)
-    _last[:] = [(weakref.ref(growth), cell, now, details)]
+    details = describe(growth, cell, satisfaction)
+    others = [kept for kept in _last if kept[1] != cell]
+    _last[:] = [(weakref.ref(growth), cell, now, details), *others[: KEPT - 1]]
     return details
 
 
-def describe(growth: Growth, cell: Cell) -> HexDetails:
-    """Everything the panel shows about one cell."""
+def describe(
+    growth: Growth, cell: Cell, satisfaction: npt.NDArray[np.int8] | None = None
+) -> HexDetails:
+    """Everything the panel shows about one cell. `satisfaction`, every cell's as
+    Growth.satisfaction has it now, saves working it out for the whole map again."""
     constructions = growth.constructions
     tile_map = constructions.tile_map
     tile = tile_map.tile(cell)
     flat = int(np.ravel_multi_index(cell, tile_map.grid.shape))
-    level = int(growth.satisfaction()[cell])
+    moods = growth.satisfaction() if satisfaction is None else satisfaction
+    level = int(moods[cell])
+    here = points_here(growth, cell)
     points = [
-        (kind.value, int(growth.points(kind)[cell]), int(growth.nearby(kind)[cell]))
+        (kind.value, here[kind], int(growth.nearby(kind)[cell]))
         for kind in Points
         if growth.nearby(kind)[cell]
     ]
@@ -124,8 +133,9 @@ def describe(growth: Growth, cell: Cell) -> HexDetails:
             if kind in RECIPES:
                 stock = _stock(growth, kind, flat)
             gave = _per_good(trade.goods_gave, kind, position, makes_of(kind, growth.year), count)
-            mood = Satisfaction(int(trade.levels((kind,))[position])).name.lower()
-            percent = float(trade.share((kind,))[position])
+            alone = one_cell(trade, position, kind)
+            mood = Satisfaction(int(alone.levels((kind,))[0])).name.lower()
+            percent = float(alone.share((kind,))[0])
         rows.append(
             BuildingRow(
                 kind.value,
@@ -154,6 +164,33 @@ def describe(growth: Growth, cell: Cell) -> HexDetails:
         points=points,
         buildings=rows,
         others=[_other(c, growth) for c in built if not isinstance(c, Building)],
+    )
+
+
+def points_here(growth: Growth, cell: Cell) -> Counter[Points]:
+    """Each kind of points one cell's buildings give, summed as Growth.points sums them for
+    every cell, without going over the whole map."""
+    here: Counter[Points] = Counter()
+    for kind, (given, value) in growth.rule.points.items():
+        count = int(growth.count(kind)[cell])
+        if count:
+            here[given] += value * count
+    return here
+
+
+def one_cell(trade: Trade, position: int, kind: BuildingKind) -> Trade:
+    """The month's trade of one kind of building in the cell at `position` among the traded
+    cells, alone: what Trade.share and Trade.levels work out for it there, without going over
+    every cell."""
+    at = slice(position, position + 1)
+    return replace(
+        trade,
+        cells=trade.cells[at],
+        got={kind: trade.got[kind][at]},
+        needed={kind: trade.needed[kind][at]},
+        gave={kind: trade.gave[kind][at]},
+        could_make={kind: trade.could_make[kind][at]},
+        bonus={kind: trade.bonus[kind][at]} if kind in trade.bonus else {},
     )
 
 

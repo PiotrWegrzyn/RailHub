@@ -23,12 +23,14 @@ from railroads.sim.steps import Steps, finish
 from railroads.ui.help_window import HelpWindow
 from railroads.ui.main_menu import LoadChoice, MainMenu, NewGameChoice, QuitChoice, random_seed
 from railroads.ui.map_view import MapView
+from railroads.ui.pixel.ground_shader import free_textures
 from railroads.ui.reports_window import ReportsWindow
 from railroads.ui.saves_window import SavesWindow
 from railroads.ui.tech_window import TechWindow
 from railroads.ui.theme import BRASS, apply_theme
 from railroads.ui.top_bar import draw_top_bar
-from railroads.ui.workers import FrameWorker, submit_steps, worker
+from railroads.ui.web_setup import page_setup
+from railroads.ui.workers import FRAME_SECONDS, FrameWorker, submit_steps, worker
 
 # How long a notice such as "Autosaved" stays in the top bar.
 NOTICE_SECONDS = 4.0
@@ -36,8 +38,10 @@ WAITING_WIDTH = 320.0
 # The window's size when the game opens.
 WINDOW_SIZE = (1280.0, 800.0)
 # Saves are written one at a time, away from the frames, so play doesn't stutter. Where threads
-# cannot start, an autosave is written on the frame after it was asked for.
+# cannot start, an autosave is written a step at a time from the frame after it was asked for,
+# each frame spending about WRITING_SECONDS on it: steps until that much has passed, one at least.
 WRITER = worker("saves")
+WRITING_SECONDS = 0.004
 
 
 class App:
@@ -112,7 +116,7 @@ class App:
             self.notice = ""
         self._start_due_autosave()
         if isinstance(WRITER, FrameWorker):
-            WRITER.work_once()
+            WRITER.work_once(WRITING_SECONDS)
         self._check_autosave()
         if self._turning is None:
             self._let_time_pass(imgui.get_io().delta_time)
@@ -128,7 +132,10 @@ class App:
         finally:
             imgui.end_disabled()
             imgui.pop_style_var()
-        if busy:
+        # Frames come slowly while the player only watches; an autosave written a little each
+        # frame is finished at full speed instead.
+        writing = self._autosaving is not None and isinstance(WRITER, FrameWorker)
+        if busy or writing:
             hello_imgui.request_refresh()
 
     def _let_time_pass(self, seconds: float) -> None:
@@ -198,34 +205,49 @@ class App:
         written."""
         if self.saves is None or self._autosaving is not None:
             return
-        self._autosaving = WRITER.submit(
-            self.saves.autosave, snapshot(self.saved(), self._autosave_memory)
-        )
+        taken = snapshot(self.saved(), self._autosave_memory)
+        if isinstance(WRITER, FrameWorker):
+            self._autosaving = WRITER.submit_steps(self.saves.autosave_steps(taken))
+        else:
+            self._autosaving = WRITER.submit(self.saves.autosave, taken)
 
     def _start_due_autosave(self) -> None:
-        if self._autosave_due:
+        """Starts the autosave a month asked for once the last one is written and no month is
+        half done, so a month that ends while an autosave is still being written is saved after
+        it rather than not at all."""
+        if self._autosave_due and self._autosaving is None and self._turning is None:
             self._autosave_due = False
             self.autosave()
 
     def finish_autosave(self) -> None:
-        """Finishes a month being done, then waits for an autosave being written, starting it if
-        it is due."""
+        """Finishes a month being done, then waits for the autosave being written and for one
+        that is due."""
         if self._turning is not None:
             finish(self._turning)
             self._turning = None
             self._autosave_due = True
+        self._finish_writing()
         self._start_due_autosave()
-        if self._autosaving is not None:
-            if isinstance(WRITER, FrameWorker):
-                WRITER.work_once()
-            self._autosaving.exception()
-            self._check_autosave()
+        self._finish_writing()
+
+    def _finish_writing(self) -> None:
+        """Waits for the autosave being written, if one is."""
+        if self._autosaving is None:
+            return
+        if isinstance(WRITER, FrameWorker):
+            WRITER.work_once()
+        self._autosaving.exception()
+        self._check_autosave()
 
     def _check_autosave(self) -> None:
         if self._autosaving is None or not self._autosaving.done():
             return
         error = self._autosaving.exception()
         self._autosaving = None
+        # The autosaves have moved down a place, so an open saves window lists them anew: what
+        # it lists is what loads, the newest autosave showing as soon as it is written.
+        if self.saves is not None and self.saves_window.open:
+            self.saves_window.refresh(self.saves)
         if error is None:
             self.tell("Autosaved")
         else:
@@ -266,8 +288,10 @@ class Shell:
         # How much of the work is done, where it can tell.
         self._done: float | None = None
         self._executor = worker("setup")
-        # Where the setup runs on the frames, it starts once the waiting screen has shown.
+        # Where the setup runs on the frames, it starts once the waiting screen has shown, and
+        # each frame spends about this long on it.
         self._waiting_shown = False
+        self._frame_seconds = FRAME_SECONDS
         if start is not None:
             self.start(start)
 
@@ -279,9 +303,21 @@ class Shell:
         self._done = done
 
     def start(self, settings: Settings) -> None:
-        self._begin(
-            "Setting up a new game", lambda: make_game_steps(settings, self.report, self.advance)
-        )
+        self._begin("Setting up a new game", lambda: self._new_game(settings))
+
+    def _new_game(self, settings: Settings) -> Steps[SavedGame]:
+        """A new game, grown in the page's setup worker where there is one, so a browser doesn't
+        freeze while its towns grow; grown here where there isn't, or if the worker fails, a few
+        steps a frame where the frames grow it."""
+        setup = page_setup()
+        if setup is not None:
+            # The frames only look for word from the worker and take up what it grew, a step each.
+            self._frame_seconds = 0.0
+            saved = yield from setup.grow(settings, self.report, self.advance)
+            self._frame_seconds = FRAME_SECONDS
+            if saved is not None:
+                return saved
+        return (yield from make_game_steps(settings, self.report, self.advance))
 
     def load(self, name: str) -> None:
         self._begin(f"Loading '{name}'", lambda: _at_once(lambda: self.saves.load(name)))
@@ -290,6 +326,7 @@ class Shell:
         self._doing = doing
         self._progress = ""
         self._done = None
+        self._frame_seconds = FRAME_SECONDS
         size, density = WINDOW_SIZE, 1
         if imgui.get_current_context() is not None:
             io = imgui.get_io()
@@ -302,6 +339,7 @@ class Shell:
             saved = yield from work()
             yield
             app = App.from_saved(saved, self.saves)
+            yield
             app.view.prepare(size, density, chunks)
             return app
 
@@ -312,9 +350,14 @@ class Shell:
         if not self._styled:
             apply_theme()
             self._styled = True
+        # Chunk textures of a game left behind are deleted here, as the menu or a game shown
+        # zoomed out draws none that would delete them.
+        free_textures()
         if self._task is not None:
             if self._waiting_shown and isinstance(self._executor, FrameWorker):
-                self._executor.work_once()
+                # Steps for the frame's share of time, one at least, so the waiting screen shows
+                # between them.
+                self._executor.work_once(self._frame_seconds)
             self._draw_waiting()
             self._waiting_shown = True
             if self._task.done():

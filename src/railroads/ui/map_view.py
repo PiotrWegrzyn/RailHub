@@ -29,7 +29,8 @@ from railroads.ui.build_menu import (
     draw_track,
     draw_trains,
 )
-from railroads.ui.buildings import BuildingSpots, draw_building_dots
+from railroads.ui.building_spots import BuildingSpots
+from railroads.ui.buildings import draw_building_dots
 from railroads.ui.ground import GroundLayout, GroundPictures, Pixels, cell_colors
 from railroads.ui.hex_details import draw_hex_details, recently_described
 from railroads.ui.iso_camera import IsoCamera, Vec2
@@ -50,14 +51,20 @@ from railroads.ui.map_overlays import (
 from railroads.ui.map_tools import MapTools
 from railroads.ui.minimap import Minimap, MinimapLayout, view_corners
 from railroads.ui.pixel.ground import GLOW, glow_strength
-from railroads.ui.pixel.ground_shader import GroundShader, cell_info, screen_of, view_of
+from railroads.ui.pixel.ground_shader import (
+    GroundShader,
+    cell_info,
+    free_textures,
+    screen_of,
+    view_of,
+)
 from railroads.ui.pixel.layer import PixelLayer
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.track_preview import TrackPreview
 from railroads.ui.pixel.train_layer import TrainLayer
 from railroads.ui.pixel.world import PixelWorld
-from railroads.ui.route_map import soften
+from railroads.ui.route_map import soften, soften_steps
 from railroads.ui.search import BuildingSearch
 from railroads.ui.station_window import StationWindow
 from railroads.ui.summaries_panel import SummariesPanel
@@ -151,14 +158,25 @@ class MapView:
         self._trains: TrainLayer | None = None
         self._preview: TrackPreview | None = None
         self._textures: dict[bool, hello_imgui.TextureGpu] = {}
-        # The ground picture softened for the trains window's map, made when it first shows.
-        self._soft_texture: hello_imgui.TextureGpu | None = None
+        # Which of those the frame drawn last showed, the ones a month paints again in its colours.
+        self._textures_shown: set[bool] = set()
+        # How many times the cells' colours on the ground pictures have changed.
+        self._ground_version = 0
+        # The ground picture softened for the trains window's map, with the version of the colours
+        # it shows: its pixels, softened with the map or anew a step a frame (_soften_on), and its
+        # texture.
+        self._soft: tuple[int, Pixels] | None = None
+        self._softening: Steps[tuple[int, Pixels]] | None = None
+        self._soft_texture: tuple[int, hello_imgui.TextureGpu] | None = None
         # The ground shader for the pixel map, once tried (railroads.ui.pixel.ground_shader), and
         # how many times the cells' colours have changed, so it takes them up again.
         self._shader: GroundShader | None = None
         self._shader_tried = False
         self._colors_version = 0
         self.hovered: Cell | None = None
+        # The art pixel last looked up under the mouse and the ground point showing there, as the
+        # mouse often rests while frames go on.
+        self._under: tuple[tuple[float, float], tuple[float, float]] | None = None
         # The cell whose details are open, picked by clicking without dragging.
         self.selected: Cell | None = None
         self.build = BuildMenu()
@@ -192,6 +210,7 @@ class MapView:
         return self.game.railway
 
     def gui(self) -> None:
+        self._textures_shown.clear()
         if self.railway.levels != self._shown_levels:
             raised = {
                 cell
@@ -254,7 +273,8 @@ class MapView:
         imgui.set_next_window_size(DETAILS_SIZE, imgui.Cond_.first_use_ever.value)
         expanded, still_open = imgui.begin("Hex details", True)
         if expanded:
-            bought = draw_hex_details(recently_described(self.growth, self.selected))
+            details = recently_described(self.growth, self.selected, self._satisfaction)
+            bought = draw_hex_details(details)
             if bought is not None:
                 self._bought = (
                     self.growth.owners.buy(self.selected, bought) or f"You own a {bought.value}"
@@ -282,20 +302,34 @@ class MapView:
         moods_changed = not np.array_equal(satisfaction, self._satisfaction)
         self._satisfaction = satisfaction
         if moods_changed or self.growth.forests_changed:
-            self._textures.clear()
-            self._soft_texture = None
+            self._ground_version += 1
             self._colors_version += 1
             if self._pixels is not None:
                 self._pixels.refresh(self._pixels.world.satisfaction_changed(satisfaction))
+            # The ground pictures the last frame showed are painted again in the new colours in
+            # steps of their own, the old ones showing until then, rather than all on one frame.
+            # The others are dropped, to be painted when they next show.
+            for with_lines in set(self._textures) - self._textures_shown:
+                del self._textures[with_lines]
+            for with_lines in list(self._textures):
+                yield
+                self._textures.pop(with_lines, None)
+                self._ground_texture(with_lines)
         if not changed:
             return
+        yield
         self._spots = BuildingSpots.of(self.constructions)
         self.minimap.show_towns(self._town_cells())
         if self.search.open:
             self.search.refresh(self.growth)
         if self._pixels is not None:
             yield
-            self._pixels.refresh(self._pixels.world.buildings_changed(changed))
+            chunks = self._pixels.world.buildings_changed(changed)
+            # Copies of the world painting elsewhere hear of the change on a frame of its own;
+            # asking for the changed chunks on this one would add that to it.
+            yield
+            self._pixels.catch_up()
+            self._pixels.refresh(chunks)
             self._colors_version += 1
 
     def _town_cells(self) -> list[Cell]:
@@ -316,13 +350,45 @@ class MapView:
         return self._pictures
 
     def _ground_picture(self) -> tuple[imgui.ImTextureRef, Vec2]:
-        """The ground picture softened for the trains window's map, and its size in map units."""
-        if self._soft_texture is None:
-            light = self.camera.map_direction(*LIGHT_ON_SCREEN)
-            rgba = self._ground_pictures().picture(self._ground_colors(), light, False)
-            self._soft_texture = hello_imgui.create_texture_gpu_from_rgba_data(soften(rgba))
-        texture = imgui.ImTextureRef(self._soft_texture.texture_id())
-        return texture, self._ground_layout().size
+        """The ground picture softened for the trains window's map, and its size in map units.
+        Once the cells' colours change it is softened anew a step each frame it is asked for,
+        the old picture showing meanwhile."""
+        if self._soft is None:
+            self._soft = (self._ground_version, soften(self._plain_picture()))
+        elif self._soft[0] != self._ground_version:
+            self._soften_on()
+        version, pixels = self._soft
+        if self._soft_texture is None or self._soft_texture[0] != version:
+            texture = hello_imgui.create_texture_gpu_from_rgba_data(pixels)
+            self._soft_texture = (version, texture)
+        texture_id = self._soft_texture[1].texture_id()
+        return imgui.ImTextureRef(texture_id), self._ground_layout().size
+
+    def _soften_on(self) -> None:
+        """Takes the next step of softening the ground picture in the cells' new colours."""
+        if self._softening is None:
+            self._softening = self._softened()
+        try:
+            next(self._softening)
+        except StopIteration as done:
+            self._soft = done.value
+            self._softening = None
+
+    def _softened(self) -> Steps[tuple[int, Pixels]]:
+        version = self._ground_version
+        colors = self._ground_colors()
+        yield
+        light = self.camera.map_direction(*LIGHT_ON_SCREEN)
+        # A copy, as the kept picture is painted over in place when the colours change again.
+        rgba = self._ground_pictures().picture(colors, light, False).copy()
+        yield
+        pixels = yield from soften_steps(rgba)
+        return version, pixels
+
+    def _plain_picture(self) -> Pixels:
+        """The ground picture without grid lines, in the cells' colours now."""
+        light = self.camera.map_direction(*LIGHT_ON_SCREEN)
+        return self._ground_pictures().picture(self._ground_colors(), light, False)
 
     def _ground_texture(self, with_lines: bool) -> hello_imgui.TextureGpu:
         """The smooth ground picture used when zoomed out, with or without grid lines."""
@@ -330,6 +396,7 @@ class MapView:
             light = self.camera.map_direction(*LIGHT_ON_SCREEN)
             rgba = self._ground_pictures().picture(self._ground_colors(), light, with_lines)
             self._textures[with_lines] = hello_imgui.create_texture_gpu_from_rgba_data(rgba)
+        self._textures_shown.add(with_lines)
         return self._textures[with_lines]
 
     def _ground_colors(self) -> Pixels:
@@ -374,6 +441,7 @@ class MapView:
                 self._draw_ground(draw_list, center, self._ground_texture(False))
             layer = self._pixel_layer()
             layer.over_ground = shaded
+            layer.blow_up = self._shader.blow_up if shaded and self._shader is not None else None
             ready = layer.draw(
                 draw_list, self.camera, center, (top_left, bottom_right), ground_below=shaded
             )
@@ -482,7 +550,10 @@ class MapView:
             return x, y
         world = self._pixel_layer().world
         px, py = world.projection.to_pixels(x, y)
-        return world.elevation.ground_at(float(px), float(py))
+        pixel = (float(px), float(py))
+        if self._under is None or self._under[0] != pixel:
+            self._under = (pixel, world.elevation.ground_at(*pixel))
+        return self._under[1]
 
     def _draw_status(self, draw_list: imgui.ImDrawList, top_left: Vec2, bottom_right: Vec2) -> None:
         """What is under the mouse, in a strip along the top of the map, and the card of the
@@ -498,7 +569,7 @@ class MapView:
         )
         below = draw_status(draw_list, top_left, bottom_right, text)
         if self.hovered is not None and not over_minimap:
-            draw_hovered_buildings(self.growth, self.hovered, below)
+            draw_hovered_buildings(self.growth, self.hovered, below, self._satisfaction)
 
     def _train_layer(self) -> TrainLayer:
         if self._trains is None:
@@ -513,10 +584,10 @@ class MapView:
     def prepare(self, size: Vec2, density: int, chunks: bool = True) -> None:
         """Builds what the map needs before its first frame, in a window of `size` screen pixels
         with `density` device pixels to each, so that work can run while a game loads: the
-        ground picture, the pixel world, the trains' sprites and, with `chunks`, the chunks the
-        first frame shows. Nothing here touches the graphics card."""
-        light = self.camera.map_direction(*LIGHT_ON_SCREEN)
-        self._ground_pictures().picture(self._ground_colors(), light)
+        ground picture and its softened copy for the trains window, the pixel world, the trains'
+        sprites and, with `chunks`, the chunks the first frame shows. Nothing here touches the
+        graphics card."""
+        self._soft = (self._ground_version, soften(self._plain_picture()))
         layer = self._pixel_layer()
         if self.railway.trains:
             self._train_layer()
@@ -586,6 +657,7 @@ class MapView:
         view = view_of(origin, scale, top_left, size)
         texture = shader.picture(view, screen_of(origin, scale, top_left, size, density))
         draw_list.add_image(imgui.ImTextureRef(texture), top_left, bottom_right)
+        free_textures()
         return True
 
     def _ground_shader(self) -> GroundShader | None:

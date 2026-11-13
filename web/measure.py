@@ -1,7 +1,8 @@
 """Times the game the same way on desktop and in the browser: how long it takes to show its first
-frame, how long each chunk of pixel art takes to draw, and how long each frame takes while the
-camera pans steadily across the highest ground at a pixel-art zoom. The view first rests on the
-middle of the map, so flat chunks are timed too.
+frame, how long each chunk of pixel art takes to draw (in the browser's web workers, those that
+paint it there), and how long each frame takes while the camera pans steadily across the highest
+ground at a pixel-art zoom. The view first rests on the middle of the map, so flat chunks are
+timed too.
 
 Desktop: uv run python web/measure.py --poland --seed 7
 Browser: index.html?measure runs it in place of the plain game and prints the same summary to
@@ -16,6 +17,7 @@ import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
 from railroads.ui import app
+from railroads.ui.pixel.web_painter import Message, WorkerPainter
 from railroads.ui.pixel.world import PixelWorld
 
 ZOOM_LEVEL = 4
@@ -57,14 +59,39 @@ def _timed_render(
 ):
     before = time.perf_counter()
     pixels = _plain_render(self, chunk_x, chunk_y, resolution, fine_relief, over_ground)
+    kind = _kind(self, chunk_x, chunk_y, resolution, fine_relief, over_ground)
+    _renders.append((kind, time.perf_counter() - before))
+    return pixels
+
+
+def _kind(
+    world: PixelWorld,
+    chunk_x: int,
+    chunk_y: int,
+    resolution: int,
+    fine_relief: bool,
+    over_ground: bool,
+) -> str:
     if fine_relief and resolution > 1:
         kind = "fine raised"
-    elif self.rises(chunk_x, chunk_y):
+    elif world.rises(chunk_x, chunk_y):
         kind = "raised"
     else:
         kind = "flat over ground" if over_ground else "flat"
-    _renders.append((f"{kind} x{resolution}", time.perf_counter() - before))
-    return pixels
+    return f"{kind} x{resolution}"
+
+
+_plain_heard = WorkerPainter.heard
+
+
+def _timed_heard(self: WorkerPainter, message: Message) -> None:
+    """Notes how long a web worker took over a chunk it painted, as it says itself."""
+    given = self._given.get(message.get("job"))
+    if message["kind"] == "painted" and given is not None:
+        job = given[1].work
+        kind = _kind(job.world, *job.drawing)
+        _renders.append((f"{kind} in a worker", message["ms"] / 1000))
+    _plain_heard(self, message)
 
 
 _plain_gui = app.App.gui
@@ -120,6 +147,7 @@ def _report() -> None:
 
 
 PixelWorld.render = _timed_render
+WorkerPainter.heard = _timed_heard
 app.App.gui = _timed_gui
 
 if __name__ == "__main__":

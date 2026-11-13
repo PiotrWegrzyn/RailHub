@@ -23,7 +23,16 @@ from railroads.sim.constructions import Constructions, Track
 from railroads.sim.grids import Cell
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
-from railroads.ui.pixel.ground import FIELD_KINDS, YARD_REACH, Ground, glow_strength
+from railroads.ui.pixel.ground import (
+    APRON,
+    CANOPY_REACH,
+    FIELD_KINDS,
+    YARD_REACH,
+    Ground,
+    art_pixels,
+    glow_strength,
+)
+from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.projection import CHUNK, FloatArray, IntArray, PixelProjection, Rgba
 from railroads.ui.pixel.relief import MOST_LIFT, Elevation, lighting, raise_picture, raycast
 from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
@@ -70,6 +79,9 @@ class PixelWorld:
         self.ground = Ground(tile_map, constructions, self.projection, angle_deg, self.elevation)
         self._shade_trees()
         self.track = TrackArt(tile_map, constructions, self.projection, self.elevation)
+        # Every piece of track, kept until track or stations change.
+        self._pieces: list[Track] = []
+        self._pieces_version = -1
         # The sprites at each resolution chunks can be drawn at: the sheet, and the same sprites
         # drawn finer if there are any.
         self._sprites = {1: _Sprites.of(sheet)}
@@ -77,6 +89,10 @@ class PixelWorld:
             if fine.names != sheet.names:
                 raise ValueError("The fine sprite sheet must hold the same sprites in order")
             self._sprites[FINE] = _Sprites.of(fine)
+        # How many times buildings and satisfaction have changed, so copies of the world painting
+        # elsewhere (railroads.ui.pixel.copies) know when to catch up.
+        self.buildings_version = 0
+        self.satisfaction_version = 0
 
     @property
     def satisfaction(self) -> npt.NDArray[np.int8]:
@@ -86,6 +102,7 @@ class PixelWorld:
     @satisfaction.setter
     def satisfaction(self, levels: npt.NDArray[np.int8]) -> None:
         self.ground.satisfaction = levels
+        self.satisfaction_version += 1
 
     @property
     def resolutions(self) -> tuple[int, ...]:
@@ -105,6 +122,7 @@ class PixelWorld:
             self.elevation,
         )
         self._shade_trees()
+        self.buildings_version += 1
         return self._chunks_around(cells)
 
     def _shade_trees(self) -> None:
@@ -183,75 +201,92 @@ class PixelWorld:
         if over_ground and not self.rises(chunk_x, chunk_y):
             return self._render_over_ground(chunk_x, chunk_y, resolution)
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
-        raised = self.elevation.area(left, top, CHUNK, CHUNK + MOST_LIFT)
+        may_rise = self.elevation.may_rise(left, top, CHUNK, CHUNK + MOST_LIFT)
+        points = self._points(left, top, CHUNK + MOST_LIFT + 1 if may_rise else CHUNK)
+        raised = None
+        if may_rise:
+            raised = self.elevation.area(left, top, CHUNK, CHUNK + MOST_LIFT, points=points)
         offset = None if raised is None else raycast(raised.lift, CHUNK, CHUNK)
-        rows = CHUNK if offset is None else CHUNK + int(offset.max()) + 1
-        rgb, alpha = self.ground.render(left, top, rows, raised)
-        canvas = np.concatenate([rgb / 255, alpha[..., None]], axis=-1)
-        if resolution > 1:
-            canvas = canvas.repeat(resolution, axis=0).repeat(resolution, axis=1)
-        lit = None
-        if raised is not None:
-            lit = lighting(raised.top(rows)).repeat(resolution, axis=0).repeat(resolution, axis=1)
-        self.ground.fields(canvas, left, top, resolution, lit)
+        # The ground goes a row past the furthest any pixel shows, but stops with the raised
+        # ground, MOST_LIFT rows past the chunk, which is as far as any pixel shows.
+        rows = CHUNK if offset is None else CHUNK + min(int(offset.max()) + 1, MOST_LIFT)
+        rgb, alpha = self.ground.render(left, top, rows, raised, points)
+        canvas = _blown_up(rgb / 255, alpha, resolution)
+        lit = None if raised is None else lighting(raised.top(rows))
+        self.ground.fields(canvas, left, top, resolution, lit, points=points)
         self.ground.yards(canvas, left, top, resolution)
-        self.ground.canopy(canvas, left, top, resolution)
+        self.ground.canopy(canvas, left, top, resolution, points=points)
         if offset is None:
             self._lay_track(canvas, left, top, resolution)
         else:
             canvas = raise_picture(canvas, offset, resolution)
-            seen = offset.repeat(resolution, axis=0).repeat(resolution, axis=1)
-            self._lay_lifted_track(canvas, left, top, resolution, seen)
+            self._lay_lifted_track(canvas, left, top, resolution, offset, resolution)
         self._stand_scenery(canvas, left, top, resolution)
-        alpha = canvas[..., 3:]
-        canvas[..., :3] /= np.maximum(alpha, 1e-6)
-        return np.ascontiguousarray(np.rint(np.clip(canvas, 0, 1) * 255).astype(np.uint8))
+        return _finished(canvas)
+
+    def _points(self, left: int, top: int, rows: int) -> Lattice:
+        """The plane points and cells of the art pixels a chunk's layers work out from: CHUNK
+        across and `rows` down from (`left`, `top`), with the ground's apron round them and room
+        above and to the left for the shadows of woods."""
+        before = max(APRON, CANOPY_REACH)
+        return Lattice(
+            self.projection,
+            left - before,
+            top - before,
+            CHUNK + before + APRON,
+            rows + before + APRON,
+            grid=self.tile_map.grid,
+        )
 
     def _render_over_ground(self, chunk_x: int, chunk_y: int, k: int) -> Rgba:
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
-        inside, shade = self.ground.under(left, top, CHUNK)
+        points = self._points(left, top, CHUNK)
+        inside, shade = self.ground.under(left, top, CHUNK, points)
         shown = inside.repeat(k, axis=0).repeat(k, axis=1)
         canvas = np.zeros((CHUNK * k, CHUNK * k, 4), dtype=np.float64)
-        canvas[..., 3] = shade.repeat(k, axis=0).repeat(k, axis=1)
-        self.ground.fields(canvas, left, top, k, shown=shown)
+        art_pixels(canvas, k)[..., 3] = shade[:, None, :, None]
+        self.ground.fields(canvas, left, top, k, shown=shown, points=points)
         self.ground.yards(canvas, left, top, k, shown=shown)
-        self.ground.canopy(canvas, left, top, k, shown=shown)
+        self.ground.canopy(canvas, left, top, k, shown=shown, points=points)
         self._lay_track(canvas, left, top, k, shown=shown)
         self._stand_scenery(canvas, left, top, k)
-        alpha = canvas[..., 3:]
-        canvas[..., :3] /= np.maximum(alpha, 1e-6)
-        return np.ascontiguousarray(np.rint(np.clip(canvas, 0, 1) * 255).astype(np.uint8))
+        return _finished(canvas)
 
     def _render_fine(self, chunk_x: int, chunk_y: int, k: int) -> Rgba:
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
-        raised = self.elevation.area(left, top, CHUNK, CHUNK + MOST_LIFT + 1, k)
+        fine = Lattice(
+            self.projection, left, top, CHUNK, CHUNK + MOST_LIFT + 1, k, self.tile_map.grid
+        )
+        raised = self.elevation.area(left, top, CHUNK, CHUNK + MOST_LIFT + 1, k, fine)
         if raised is None:
             return self.render(chunk_x, chunk_y, k)
         offset = raycast(raised.lift, CHUNK * k, CHUNK * k)
         rows = -(-(CHUNK * k + int(offset.max()) + 1) // k)
-        rgb, alpha = self.ground.render(left, top, rows)
-        rgb = rgb.repeat(k, axis=0).repeat(k, axis=1)
-        alpha = alpha.repeat(k, axis=0).repeat(k, axis=1)
-        sown = np.concatenate([rgb / 255, alpha[..., None]], axis=-1)
+        points = self._points(left, top, rows)
+        rgb, alpha = self.ground.render(left, top, rows, points=points)
+        sown = _blown_up(rgb / 255, alpha, k)
+        alpha = sown[..., 3].copy()
         self.ground.fields(sown, left, top, k)
         self.ground.yards(sown, left, top, k)
         rgb = sown[..., :3] * 255
-        py, px = np.mgrid[0 : rows * k, 0 : CHUNK * k]
-        x, y = self.projection.to_plane(left + (px + 0.5) / k, top + (py + 0.5) / k)
-        grid = self.tile_map.grid
-        r, c = grid.cell_at(x, y)
-        r, c = np.clip(r, 0, grid.rows - 1), np.clip(c, 0, grid.cols - 1)
+        x, y = fine.plane(left, top, CHUNK, rows)
+        r, c, _ = fine.cells(left, top, CHUNK, rows)
         rocky = self.tile_map.relief[r, c] == Relief.MOUNTAINS
         self.elevation.colour(rgb, raised.top(rows * k), x, y, rocky)
         rgb = np.clip(rgb, 0, 255) * alpha[..., None]
         canvas = np.concatenate([rgb / 255, alpha[..., None]], axis=-1)
-        self.ground.canopy(canvas, left, top, k)
+        self.ground.canopy(canvas, left, top, k, points=points)
         canvas = raise_picture(canvas, offset, 1)
         self._lay_lifted_track(canvas, left, top, k, offset / k)
         self._stand_scenery(canvas, left, top, k)
-        alpha = canvas[..., 3:]
-        canvas[..., :3] /= np.maximum(alpha, 1e-6)
-        return np.ascontiguousarray(np.rint(np.clip(canvas, 0, 1) * 255).astype(np.uint8))
+        return _finished(canvas)
+
+    def _track_pieces(self) -> list[Track]:
+        version = self.constructions.railway_version
+        if version != self._pieces_version:
+            self._pieces = self.constructions.track()
+            self._pieces_version = version
+        return self._pieces
 
     def _lay_track(
         self,
@@ -263,7 +298,7 @@ class PixelWorld:
     ) -> None:
         """Draws the track crossing the chunk over its ground (TrackArt.layer), where the
         picture shows the map: where `shown`, or else where it isn't clear."""
-        pieces = self.constructions.track()
+        pieces = self._track_pieces()
         if not pieces:
             return
         rows = canvas.shape[0] // resolution
@@ -278,12 +313,18 @@ class PixelWorld:
         under[..., 3:] = under[..., 3:] * (1 - alpha) + alpha
 
     def _lay_lifted_track(
-        self, canvas: FloatArray, left: int, top: int, resolution: int, seen: FloatArray
+        self,
+        canvas: FloatArray,
+        left: int,
+        top: int,
+        resolution: int,
+        seen: FloatArray,
+        blow: int = 1,
     ) -> None:
         """Draws the track crossing the chunk over its raised ground, lifted with it, where the
-        ground shown, `seen` art pixels further down the map in each pixel, is not in front
-        of it."""
-        pieces = self.constructions.track()
+        ground shown, `seen` art pixels further down the map in each pixel (of a picture `blow`
+        times coarser than the chunk's), is not in front of it."""
+        pieces = self._track_pieces()
         if not pieces:
             return
         track, lift = self.track.lifted(pieces, left, top, CHUNK, CHUNK, resolution)
@@ -291,7 +332,9 @@ class PixelWorld:
         if box is None:
             return
         part, under = track[box], canvas[box]
-        shown = (seen[box] <= lift[box] + HIDDEN_BEYOND) & (under[..., 3] > 0)
+        down, across = (np.arange(span.start, span.stop) // blow for span in box)
+        seen = seen[down[:, None], across[None, :]]
+        shown = (seen <= lift[box] + HIDDEN_BEYOND) & (under[..., 3] > 0)
         alpha = part[..., 3:] * shown[..., None]
         under[..., :3] = under[..., :3] * (1 - alpha) + part[..., :3] * alpha
 
@@ -428,6 +471,22 @@ def _blend(canvas: FloatArray, sprite: npt.NDArray[np.float32], x: int, y: int) 
     under = canvas[cy0:cy1, cx0:cx1]
     under *= 1 - part[..., 3:]
     under += part
+
+
+def _blown_up(rgb: FloatArray, alpha: FloatArray, k: int) -> FloatArray:
+    """RGB and its alpha as one RGBA picture, each pixel blown up to `k` by `k`."""
+    picture = np.concatenate([rgb, alpha[..., None]], axis=-1)
+    return picture if k == 1 else picture.repeat(k, axis=0).repeat(k, axis=1)
+
+
+def _finished(canvas: FloatArray) -> Rgba:
+    """A premultiplied RGBA picture from 0 to 1 as RGBA bytes, its colours no longer multiplied
+    by its alpha; the picture itself is used up working them out."""
+    canvas[..., :3] /= np.maximum(canvas[..., 3:], 1e-6)
+    np.clip(canvas, 0, 1, out=canvas)
+    canvas *= 255
+    np.rint(canvas, out=canvas)
+    return np.ascontiguousarray(canvas.astype(np.uint8))
 
 
 def _drawn_box(layer: FloatArray) -> tuple[slice, slice] | None:

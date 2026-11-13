@@ -9,7 +9,10 @@ then open http://localhost:8000/ for the main menu. Saves are kept in the browse
 Query parameters:
     ?args=--poland --seed 7   the game's command line
     &measure                  run web/measure.py: pans across the highest ground and prints timings
-                              (with --poland --seed 7 unless args are given)
+                              (with --poland --seed 7 unless args are given); &measure=other.py
+                              runs another script served beside the page
+    &painters=N               start N web workers to paint the map (web/painter.js) instead of as
+                              many as the device seems to have room for; 0 paints on the frames
 -->
 <html lang="en">
 <head>
@@ -48,6 +51,112 @@ Query parameters:
     }
 
     const SAVE_EVERY_MS = 2000;
+
+    // Web workers painting the map's chunks (web/painter.js), each a Python of its own taking a few
+    // hundred megabytes, so as many as the cores leave room for beside the page, at most four.
+    // Only Chromium says how much memory the device has (navigator.deviceMemory, never above 8),
+    // so it gets fewer on a device with little; elsewhere two, which keep most of the speed.
+    function paintersWanted(query) {
+        if (query.has("painters")) return Math.max(0, Number(query.get("painters")) || 0);
+        let count = Math.min(4, (navigator.hardwareConcurrency || 4) - 2);
+        const memory = navigator.deviceMemory;
+        count = Math.min(count, memory ? Math.floor(memory / 2) : 2);
+        return Math.max(1, count);
+    }
+
+    // The painting workers as the game reaches them (railroads.ui.pixel.web_painter): it posts
+    // messages to a worker by its number and takes what all of them sent since it last asked.
+    // Bytes in a message are copied here from or into Python's memory (`memory()`, a fresh view
+    // each time, as the memory grows) by their address in it: Pyodide's own conversions read an
+    // address past 2 GiB as a negative number, and copy the wrong bytes there or fail.
+    class Painters {
+        constructor(count, memory) {
+            this.memory = memory;
+            this.inbox = [];
+            this.workers = Array.from({ length: count }, (_, worker) => {
+                const painter = new Worker("painter.js", { type: "module" });
+                painter.onmessage = event => this.inbox.push({ worker, ...event.data });
+                painter.onerror = event => {
+                    event.preventDefault();
+                    this.inbox.push({ worker, kind: "dead", error: event.message });
+                    painter.terminate();
+                };
+                return painter;
+            });
+        }
+
+        get count() {
+            return this.workers.length;
+        }
+
+        // Posts a message to a worker, with the `length` bytes at `address` as its data if any.
+        post(worker, message, address = 0, length = 0) {
+            const transfer = [];
+            if (length) {
+                message.data = this.memory().slice(address, address + length);
+                transfer.push(message.data.buffer);
+            }
+            this.workers[worker].postMessage(message, transfer);
+        }
+
+        take() {
+            return this.inbox.splice(0);
+        }
+
+        // Copies the bytes of an ArrayBuffer a worker sent into Python's memory at `address`.
+        copy(bytes, address) {
+            this.memory().set(new Uint8Array(bytes), address);
+        }
+    }
+
+    // A web worker growing a new game's towns (railroads.ui.web_setup), so the page doesn't
+    // freeze meanwhile: one for each game, stopped once the game is handed over, so the memory
+    // growing took goes with it. The first is started with the page, so its Python is up by the
+    // time a game is started. Bytes are copied by their address in Python's memory, as the
+    // painting workers' are.
+    class Setup {
+        constructor(memory) {
+            this.memory = memory;
+            this.inbox = [];
+            this.worker = null;
+            this.spare = this.started();
+        }
+
+        started() {
+            const worker = new Worker("painter.js", { type: "module" });
+            worker.onmessage = event => {
+                if (worker === this.worker) this.inbox.push(event.data);
+            };
+            worker.onerror = event => {
+                event.preventDefault();
+                if (worker === this.worker) this.inbox.push({ kind: "failed", error: event.message });
+            };
+            return worker;
+        }
+
+        // Starts a worker growing the game the `length` bytes of pickled settings at `address` make.
+        start(address, length) {
+            this.stop();
+            this.worker = this.spare ?? this.started();
+            this.spare = null;
+            const data = this.memory().slice(address, address + length);
+            this.worker.postMessage({ kind: "setup", data }, [data.buffer]);
+        }
+
+        take() {
+            return this.inbox.splice(0);
+        }
+
+        copy(bytes, address) {
+            this.memory().set(new Uint8Array(bytes), address);
+        }
+
+        stop() {
+            this.worker?.terminate();
+            this.worker = null;
+            this.inbox = [];
+        }
+    }
 
     function syncSaves(pyodide, populate) {
         return new Promise((resolve, reject) =>
@@ -88,13 +197,22 @@ Query parameters:
         await micropip.install.callKwargs(IMGUI_BUNDLE, { deps: false });
         await micropip.install.callKwargs(GAME_WHEEL, { deps: false });
         mark("packages");
+        // Started once the page has fetched what they load too, so they find it cached. Without
+        // them the game paints the map on its frames.
+        try {
+            const memory = () => pyodide._module.HEAPU8;
+            window.railroadsPainters = new Painters(paintersWanted(query), memory);
+            window.railroadsSetup = new Setup(memory);
+        } catch (error) {
+            console.error("The painting workers could not start:", error);
+        }
 
         await say("Opening saves...");
         await keepSaves(pyodide);
 
         await say("Starting the game...");
         const code = measure
-            ? await (await fetch("measure.py")).text()
+            ? await (await fetch(query.get("measure") || "measure.py")).text()
             : "from railroads.ui.app import main\nmain()";
         pyodide.globals.set("game_args", pyodide.toPy(args));
         pyodide.runPython("import sys\nsys.argv = ['railroads', *game_args]");

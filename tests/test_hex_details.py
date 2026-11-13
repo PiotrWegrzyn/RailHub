@@ -3,12 +3,22 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
+from railroads.sim.economy import Satisfaction
+from railroads.sim.game import Game
 from railroads.sim.goods import Good, Need, bonus_of, needs_of
-from railroads.sim.grids import HexGrid
+from railroads.sim.grids import Cell, HexGrid
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import GrowthRule
+from railroads.sim.ladders import GrowthRule, Points
 from railroads.sim.tilemap import Terrain, TileMap
-from railroads.ui.hex_details import BuildingRow, Flow, describe, mood_text
+from railroads.ui import hex_details
+from railroads.ui.hex_details import (
+    BuildingRow,
+    Flow,
+    HexDetails,
+    describe,
+    mood_text,
+    recently_described,
+)
 
 
 def make_map() -> TileMap:
@@ -95,3 +105,69 @@ def test_a_building_shows_its_mood_with_its_satisfaction_as_a_percentage() -> No
 
     assert text == "thriving 122%"
     assert none == "-"
+
+
+def traded_growth() -> Growth:
+    game = Game(Constructions(make_map()))
+    game.finances.cash = 1_000_000.0
+    for _ in range(3):
+        game.growth.build(Building((5, 5), BuildingKind.HOUSE))
+    game.growth.build(Building((5, 5), BuildingKind.BAKERY))
+    game.growth.build(Building((5, 4), BuildingKind.FARM))
+    game.growth.build(Building((4, 6), BuildingKind.FARM))
+    game.build_station((5, 6))
+    game.build_station((5, 2))
+    game.lay_track((5, 6), (5, 2))
+    rng = np.random.default_rng(3)
+    for _ in range(3):
+        game.month(rng)
+    return game.growth
+
+
+def test_a_cell_alone_is_described_as_the_whole_map_has_it() -> None:
+    growth = traded_growth()
+    cells = [(row, col) for row in range(10) for col in range(10)]
+
+    described = {cell: describe(growth, cell, growth.satisfaction()) for cell in cells}
+
+    trade = growth.trade
+    assert trade is not None
+    rated = 0
+    for cell, details in described.items():
+        assert details == describe(growth, cell)
+        whole_map = [
+            (kind.value, int(growth.points(kind)[cell]), int(growth.nearby(kind)[cell]))
+            for kind in Points
+            if growth.nearby(kind)[cell]
+        ]
+        assert details.points == whole_map
+        position = int(np.searchsorted(trade.cells, cell[0] * 10 + cell[1]))
+        for row in details.buildings:
+            if row.percent is None:
+                continue
+            rated += 1
+            assert row.kind is not None
+            assert row.percent == float(trade.share((row.kind,))[position])
+            level = Satisfaction(int(trade.levels((row.kind,))[position]))
+            assert row.satisfaction == level.name.lower()
+    assert rated >= 3
+
+
+def test_cells_described_by_turns_are_each_worked_out_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    growth = traded_growth()
+    worked: list[Cell] = []
+    plain = hex_details.describe
+
+    def counted(growth: Growth, cell: Cell, satisfaction: object = None) -> HexDetails:
+        worked.append(cell)
+        return plain(growth, cell)
+
+    monkeypatch.setattr(hex_details, "describe", counted)
+
+    for _ in range(3):
+        recently_described(growth, (5, 5))
+        recently_described(growth, (5, 4))
+
+    assert worked == [(5, 5), (5, 4)]

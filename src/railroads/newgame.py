@@ -130,10 +130,14 @@ def start_new_game(
     return NewGame(seed, bounds, tile_map)
 
 
-def make_game(settings: Settings, report: Callable[[str], None] = print) -> SavedGame:
+def make_game(
+    settings: Settings,
+    report: Callable[[str], None] = print,
+    progress: Callable[[float], None] = lambda done: None,
+) -> SavedGame:
     """A new game with these settings, its towns grown and ready to play, beginning in the
-    nearest year play can begin in."""
-    return finish(make_game_steps(settings, report))
+    nearest year play can begin in; `progress` hears the share of the towns' history grown."""
+    return finish(make_game_steps(settings, report, progress))
 
 
 def make_game_steps(

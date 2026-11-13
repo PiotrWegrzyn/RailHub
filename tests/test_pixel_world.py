@@ -16,10 +16,15 @@ from railroads.sim.economy import Satisfaction
 from railroads.sim.grids import Cell, Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
+from railroads.ui.pixel import track_art
 from railroads.ui.pixel.art import SPRITES, draw_sheet
 from railroads.ui.pixel.art.stations import TURNED_LINES
+from railroads.ui.pixel.ground import AROUND, CROWN_GAP, _depths, _nearest_crown
+from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.layer import resolution_for
+from railroads.ui.pixel.noise import noise, table_hash
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection, hash01
+from railroads.ui.pixel.relief import MOST_LIFT, raycast
 from railroads.ui.pixel.sheet import FINE, SHEET_INDEX, SpriteSheet
 from railroads.ui.pixel.track_art import RAIL
 from railroads.ui.pixel.track_preview import ghost
@@ -573,3 +578,168 @@ def test_a_chunk_drawn_over_ground_laid_on_its_ground_matches_the_whole_chunk(
     difference = np.abs(laid - whole[..., :3])[alpha > 0]
     assert (over[..., 3] < 255).any()
     assert difference.max() <= 1
+
+
+def woods_sampled_at_every_pixel(
+    world: PixelWorld, left: int, top: int, width: int, rows: int
+) -> np.ndarray:
+    grid = world.tile_map.grid
+    iy, ix = np.mgrid[top : top + rows, left : left + width]
+    x, y = world.projection.to_plane(ix + 0.5, iy + 0.5)
+    r, c = grid.cell_at(x, y)
+    r, c = np.clip(r, 0, grid.rows - 1), np.clip(c, 0, grid.cols - 1)
+    share = np.zeros(x.shape, dtype=np.float32)
+    for dx, dy in AROUND:
+        sr, sc = grid.cell_at(x + dx, y + dy)
+        sr, sc = np.clip(sr, 0, grid.rows - 1), np.clip(sc, 0, grid.cols - 1)
+        share += world.ground._woods[sr, sc]
+    share /= len(AROUND)
+    edge = noise(x, y, 0.55, 61) * 0.55 + noise(x, y, 0.16, 62) * 0.3
+    land = world.tile_map.terrain[r, c] == Terrain.LAND
+    return land & (share + (edge - 0.42) * 0.9 > 0.5)
+
+
+@pytest.mark.parametrize("grid_type", [HexGrid, SquareGrid], ids=["hex", "square"])
+def test_woods_cover_what_the_cells_round_each_pixel_say_without_looking_at_all(
+    sheet: SpriteSheet, grid_type: type[Grid]
+) -> None:
+    world = make_world(sheet, grid_type)
+    grid = world.tile_map.grid
+
+    for cell in ((4, 6), (0, 11)):
+        px, py = world.projection.to_pixels(*grid.center(*cell))
+        left, top, cols, rows = int(px) - 110, int(py) - 100, 220, 200
+        points = Lattice(world.projection, left, top, cols, rows, grid=grid)
+        r, c, _ = points.cells(left, top, cols, rows)
+
+        woods = world.ground._wooded(points, (left, top, cols, rows), r, c)
+
+        expected = woods_sampled_at_every_pixel(world, left, top, cols, rows)
+        assert expected.any()
+        assert np.array_equal(woods, expected)
+
+
+def nearest_crown_by_hashing(px: np.ndarray, py: np.ndarray, gap: float) -> tuple:
+    cx, cy = np.floor(px / gap).astype(np.int64), np.floor(py / gap).astype(np.int64)
+    best = np.full(px.shape, np.inf, dtype=np.float32)
+    best_dx, best_dy = np.zeros(px.shape, np.float32), np.zeros(px.shape, np.float32)
+    best_x, best_y = cx.copy(), cy.copy()
+    for ox in (-1, 0, 1):
+        for oy in (-1, 0, 1):
+            gx, gy = cx + ox, cy + oy
+            jx = (gx + 0.15 + 0.7 * table_hash(gx, gy, 51)) * gap
+            jy = (gy + 0.15 + 0.7 * table_hash(gx, gy, 52)) * gap
+            dx, dy = (px - jx).astype(np.float32), (py - jy).astype(np.float32)
+            distance = dx * dx + dy * dy
+            closer = distance < best
+            best = np.where(closer, distance, best)
+            best_dx, best_dy = np.where(closer, dx, best_dx), np.where(closer, dy, best_dy)
+            best_x, best_y = np.where(closer, gx, best_x), np.where(closer, gy, best_y)
+    return np.sqrt(best), best_dx, best_dy, best_x, best_y
+
+
+def test_the_nearest_crown_is_the_one_found_by_hashing_the_squares_round_each_point() -> None:
+    rng = np.random.default_rng(8)
+    px = np.floor(rng.uniform(-300, 900, 20_000)) + 0.5
+    py = np.floor(rng.uniform(-50, 700, 20_000)) + 0.5
+
+    found = _nearest_crown(px, py, CROWN_GAP)
+
+    for value, expected in zip(found, nearest_crown_by_hashing(px, py, CROWN_GAP), strict=True):
+        assert value.dtype == expected.dtype
+        assert np.array_equal(value, expected)
+
+
+def test_a_chunk_showing_ground_lifted_as_far_as_ground_goes_is_drawn(
+    sheet: SpriteSheet, fine_sheet: SpriteSheet
+) -> None:
+    grid = HexGrid(rows=16, cols=12, km_per_cell=1.0)
+    relief = np.full(grid.shape, Relief.FLAT, dtype=np.uint8)
+    relief[:, 6:] = Relief.MOUNTAINS
+    heights = np.broadcast_to(np.where(np.arange(grid.cols) >= 6, 1500, 0), grid.shape)
+    tile_map = flat_map(grid=grid, height_m=heights.astype(np.int16), relief=relief)
+    constructions = Constructions(tile_map)
+    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid], fine=fine_sheet)
+    raised = world.elevation.area(0, 0, CHUNK, CHUNK + MOST_LIFT)
+
+    pictures = [world.render(0, 0, k) for k in (1, FINE)]
+
+    assert raised is not None and raycast(raised.lift, CHUNK, CHUNK).max() == MOST_LIFT
+    assert [picture.shape[0] for picture in pictures] == [CHUNK, FINE * CHUNK]
+    assert all((picture[..., 3] == 255).any() for picture in pictures)
+
+
+def test_track_drawn_again_after_its_neighbour_changes_matches_track_drawn_fresh(
+    sheet: SpriteSheet,
+) -> None:
+    double = Track((10, 3), (0, 6), TrackWidth.DOUBLE)
+    single = Track((10, 4), (0, 6))
+    world, before = track_chunk(sheet, [double, single])
+    widened = Track((10, 4), (0, 6), TrackWidth.DOUBLE)
+
+    world.constructions.remove(single)
+    world.constructions.build(widened)
+    px, py = world.projection.to_pixels(*world.tile_map.grid.center(10, 3))
+    again = world.render(int(px // CHUNK), int(py // CHUNK))
+
+    _, fresh = track_chunk(sheet, [double, widened])
+    assert not np.array_equal(before, fresh)
+    assert np.array_equal(again, fresh)
+
+
+@pytest.mark.parametrize("k", [1, 2])
+def test_the_points_of_a_patch_of_fields_are_those_of_a_box_round_it_cut_to_it(
+    sheet: SpriteSheet, k: int
+) -> None:
+    ground = make_world(sheet).ground
+    left, top = 30, 50
+    around = ground._patch_points((0, 48 * k, 0, 90 * k), left, top, k, None)
+
+    alone = ground._patch_points((10 * k, 34 * k, 20 * k, 60 * k), left, top, k, None)
+
+    place = (slice(10 * k, 34 * k), slice(20 * k, 60 * k))
+    for values, cut in zip(alone, around, strict=True):
+        assert np.array_equal(values, cut[place])
+
+
+def test_track_is_drawn_the_same_when_fewer_pieces_are_kept_than_are_drawn(
+    sheet: SpriteSheet, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pieces = [Track((10, col), (0, 6)) for col in range(2, 7)]
+    _, all_kept = track_chunk(sheet, pieces)
+    monkeypatch.setattr(track_art, "PIECES_KEPT", 2)
+
+    world, few_kept = track_chunk(sheet, pieces)
+
+    assert 0 < len(world.track._laid_pieces) <= 2
+    assert np.array_equal(few_kept, all_kept)
+
+
+def depths_by_rolling(field: np.ndarray, most: int) -> np.ndarray:
+    depth = np.zeros(field.shape, dtype=np.int16)
+    inside = field.copy()
+    for step in range(1, most + 1):
+        inside = inside & np.roll(inside, 1, 0) & np.roll(inside, -1, 0)
+        inside = inside & np.roll(inside, 1, 1) & np.roll(inside, -1, 1)
+        depth[inside] = step
+    return depth[field]
+
+
+@pytest.mark.parametrize("shape", [(1, 1), (2, 7), (24, 40), (48, 80)])
+def test_depths_into_a_field_are_those_of_shrinking_it_with_wrapping_edges(
+    shape: tuple[int, int],
+) -> None:
+    rng = np.random.default_rng(sum(shape))
+    rows, cols = np.mgrid[0 : shape[0], 0 : shape[1]]
+
+    for _ in range(40):
+        cy, cx = rng.uniform(-3, shape[0] + 3), rng.uniform(-3, shape[1] + 3)
+        reach = rng.uniform(0.5, max(shape))
+        field = (rows - cy) ** 2 + ((cols - cx) / 1.7) ** 2 < reach**2
+        field &= rng.random(shape) < 0.97
+        if not field.any():
+            continue
+
+        depths = _depths(field, 4)
+
+        assert np.array_equal(depths, depths_by_rolling(field, 4))
