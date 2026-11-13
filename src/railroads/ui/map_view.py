@@ -292,15 +292,15 @@ class MapView:
         moods_changed = not np.array_equal(satisfaction, self._satisfaction)
         self._satisfaction = satisfaction
         if moods_changed or self.growth.forests_changed:
-            shown = list(self._textures)
-            self._textures.clear()
             self._ground_version += 1
             self._colors_version += 1
             if self._pixels is not None:
                 self._pixels.refresh(self._pixels.world.satisfaction_changed(satisfaction))
-            # Painted again here, a step each, rather than on the frame after the month.
-            for with_lines in shown:
+            # Painted again in the new colours in steps of their own, the old ones showing until
+            # then, rather than all on one frame.
+            for with_lines in list(self._textures):
                 yield
+                self._textures.pop(with_lines, None)
                 self._ground_texture(with_lines)
         if not changed:
             return
