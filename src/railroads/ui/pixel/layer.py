@@ -12,10 +12,12 @@ drawing takes their place once it is ready.
 
 In a browser, where threads cannot start, the page's web workers draw the chunks instead
 (railroads.ui.pixel.web_painter), several at once, and frames carry on meanwhile as with a thread.
-Until a worker is ready, or if none can be, one chunk is drawn on each frame, and raised chunks
-are not drawn again finely, which would stall a frame for a third of a second. Then, when the
+Until a worker is ready, or if none can be, one chunk is drawn on each frame. Then, when the
 ground shader shows the ground beneath, chunks wait until the view and the mouse have stood still
-for a moment, so moving the map or the mouse doesn't stall on drawing them.
+for a moment, so moving the map or the mouse doesn't stall on drawing them. Raised chunks are not
+drawn again finely in a browser: on a frame that would stall it for a third of a second, and
+workers draw them as the frames do, so the map looks the same whichever draws it and the workers
+are soon free for the next view.
 
 Chunks nearest the middle of the view are asked for and turned into textures first, so the view
 fills in from the middle out."""
@@ -81,6 +83,8 @@ class PixelLayer:
         self._textures: OrderedDict[tuple[int, int, int], Texture] = OrderedDict()
         self._stale: set[tuple[int, int, int]] = set()
         self._painter = painter_for(world, threads)
+        # Whether raised chunks are drawn again finely, which only a thread does.
+        self._refines = isinstance(self._painter, Painter) and self._painter.threaded
         # Chunks drawn finely, and how many times each chunk has been refreshed, so a drawing
         # asked for before a refresh is thrown away.
         self._refined: set[tuple[int, int, int]] = set()
@@ -216,7 +220,7 @@ class PixelLayer:
         """Asks for a chunk to be drawn again with fine raised ground, if it has any and is not
         drawn finely already."""
         resolution = drawn[2]
-        if not self._painter.threaded or resolution == 1:
+        if not self._refines or resolution == 1:
             return
         if drawn in self._refined or drawn not in self._chunks:
             return

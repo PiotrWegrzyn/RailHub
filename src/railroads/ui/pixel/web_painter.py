@@ -7,10 +7,9 @@ window.railroadsPainters (web/index.html), which posts messages to them and keep
 back until it is taken. The workers paint for the map shown last: its painter sends them its
 world as the map is made, while a game loads, then whatever changed in it before any chunk asked
 for after the change, and hands them the chunks the frames want, the most wanted first and a
-couple to each at a time, so a worker starts the next the moment one is done. Finer redraws of
-raised ground (jobs that are not urgent, see railroads.ui.pixel.layer) wait until every chunk
-wanted urgently is painted, and some workers are kept free of them for the chunks the view needs
-next.
+couple to each at a time, so a worker starts the next the moment one is done. Jobs that are not
+urgent wait until every chunk wanted urgently is painted, and some workers are kept free of them
+for the chunks the view needs next.
 
 WorkerPainter has the interface of railroads.ui.pixel.painter.Painter. Until a worker is ready,
 and if every worker fails, chunks are painted on the frames the way Painter does there; a chunk a

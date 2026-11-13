@@ -356,7 +356,7 @@ def test_without_a_page_chunks_are_painted_by_a_thread_or_the_frames() -> None:
     assert all(isinstance(painter, Painter) for painter in painters)
 
 
-def test_with_workers_the_layer_never_waits_and_draws_raised_chunks_again_finely(
+def test_with_workers_the_layer_never_waits_and_draws_raised_chunks_as_the_frames_do(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     world, mountains, _ = world_over_mountains()
@@ -365,19 +365,17 @@ def test_with_workers_the_layer_never_waits_and_draws_raised_chunks_again_finely
     monkeypatch.setattr(layer_module, "threads_start", lambda: False)
     monkeypatch.setattr(layer_module, "page_workers", lambda: Workers(page))
     layer = PixelLayer(world)
-    layer.take_drawn()
     camera = SimpleNamespace(center_x=4.0, center_y=6.0, pixel_scale=2)
     layer._ask((*mountains, 2), 1.0)
     page.work()
-    layer.take_drawn()
+    taken = layer.take_drawn()
 
     layer._refine((*mountains, 2), 1.0)
-    page.work()
-    taken = layer.take_drawn()
 
     assert not layer._moved(camera, 1.0)
     assert taken == {mountains}
-    np.testing.assert_array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2, True))
+    assert layer._painter.waiting() == 0
+    np.testing.assert_array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2))
 
 
 class FakeJsMessage:
