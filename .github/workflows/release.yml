@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+    branches: [staging]
+    paths: [desktop/**, .github/workflows/release.yml, pyproject.toml, uv.lock]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            name: macOS
+            app: build/desktop/dist/RailHub.app/Contents/MacOS/RailHub
+            archive: build/desktop/RailHub-macOS.zip
+          - os: windows-latest
+            name: Windows
+            app: build/desktop/dist/RailHub/RailHub.exe
+            archive: build/desktop/RailHub-Windows.zip
+          - os: ubuntu-22.04
+            name: Linux
+            app: build/desktop/dist/RailHub/RailHub
+            archive: build/desktop/RailHub-Linux.tar.gz
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.14"
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgl1 libegl1 libxrandr2 libxinerama1 libxcursor1 libxi6
+      - run: uv run --with pyinstaller python desktop/build.py
+      - name: Check the app imports everything
+        shell: bash
+        env:
+          RAILROADS_SMOKE_TEST: "1"
+        run: ${{ matrix.app }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RailHub-${{ matrix.name }}
+          path: ${{ matrix.archive }}
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: desktop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: archives
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" archives/*
+          --repo "$GITHUB_REPOSITORY" --title "RailHub $GITHUB_REF_NAME" --generate-notes --latest
