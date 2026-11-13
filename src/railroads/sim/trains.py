@@ -1,5 +1,5 @@
 """The trains on the railway (railroads.sim.railway runs them): the engines that can be bought, the
-cars, each carrying one good up to CAR_CAPACITY, the stops a train calls at with the cars it pulls
+cars, each carrying one good up to its car_size, the stops a train calls at with the cars it pulls
 from each, and the train itself, slowed by the weight of what it carries. A train sets off from a
 stand and picks up speed evenly until it runs at full speed after its engine's pickup time, the
 first engine's ten seconds at normal speed and better engines' less.
@@ -24,6 +24,56 @@ DRAG_PER_CAR = 0.08
 
 
 CAR_CAPACITY = 50.0
+MEDIUM_CAR = 25.0
+SMALL_CAR = 10.0
+# Goods carried in small or medium cars; everything else goes CAR_CAPACITY to a car.
+SMALL_CAR_GOODS = frozenset(
+    {
+        Good.GOLD,
+        Good.DIAMONDS,
+        Good.LUXURIES,
+        Good.INCENSE,
+        Good.ELECTRONICS,
+        Good.CARS,
+        Good.TANKS,
+        Good.PLANES,
+    }
+)
+MEDIUM_CAR_GOODS = frozenset(
+    {
+        Good.STEEL,
+        Good.COPPER,
+        Good.COKE,
+        Good.CASTINGS,
+        Good.MACHINERY,
+        Good.TOOLS,
+        Good.GUNS,
+        Good.APPLIANCES,
+        Good.BRICKS,
+        Good.CEMENT,
+        Good.GLASS,
+        Good.PORCELAIN,
+        Good.STOVE_TILES,
+        Good.POTS,
+        Good.FURNITURE,
+        Good.BARRELS,
+        Good.CATTLE,
+        Good.PIGS,
+        Good.SHEEP,
+        Good.CHICKENS,
+    }
+)
+
+
+def car_size(good: Good) -> float:
+    """How much of a good one car carries, before what tech adds to coaches."""
+    if good in SMALL_CAR_GOODS:
+        return SMALL_CAR
+    if good in MEDIUM_CAR_GOODS:
+        return MEDIUM_CAR
+    return CAR_CAPACITY
+
+
 # About how long an engine with its tender, and each car, are on the map, in cells.
 ENGINE_LENGTH = 0.8
 CAR_LENGTH = 0.42
@@ -85,7 +135,11 @@ class Car:
     good: Good
     load: float = 0.0
     origins: Parcels = field(default_factory=dict)
-    capacity: float = CAR_CAPACITY
+    capacity: float = 0.0
+
+    def __post_init__(self) -> None:
+        if not self.capacity:
+            self.capacity = car_size(self.good)
 
     def fill(self, parcels: Parcels) -> None:
         for origin, amount in parcels.items():

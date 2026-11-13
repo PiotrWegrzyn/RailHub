@@ -52,7 +52,7 @@ Query parameters:
     <div class="panel">
         <h1>RailHub</h1>
         <button id="play">Play online</button>
-        <p class="status" id="landing-status">Getting the game ready...</p>
+        <p class="status" id="landing-status">Loading (0%)...</p>
         <p class="slow">Too slow? Download and play outside the browser</p>
         <a class="download" id="download"></a>
         <p class="needs" id="needs"></p>
@@ -60,7 +60,7 @@ Query parameters:
         <p class="fine">Saves work in both: in Load game, Export file, then Import file in the other.</p>
     </div>
 </div>
-<div id="loader">Loading Pyodide...</div>
+<div id="loader">Loading (0%)...</div>
 <div id="version">v__VERSION__</div>
 <canvas id="canvas" tabindex="0"></canvas>
 <script>
@@ -71,10 +71,26 @@ Query parameters:
     const landingStatus = document.getElementById("landing-status");
     const timings = {};
     const mark = (stage) => { timings[stage] = Math.round(performance.now()); };
-    const say = async (message) => {
-        loader.textContent = message;
-        landingStatus.textContent = message;
-        await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    // How far loading has got: the share of the bytes the page loads at the start that have come
+    // (build_site.py counts them), never less than the stage reached, and 100 once it is done.
+    const LOAD_BYTES = Number("__LOAD_BYTES__") || 0;
+    let reached = 0;
+    function showProgress() {
+        let bytes = 0;
+        for (const entry of performance.getEntriesByType("resource")) bytes += entry.decodedBodySize;
+        const share = LOAD_BYTES ? Math.min(99, Math.round(100 * bytes / LOAD_BYTES)) : 0;
+        const text = `Loading (${Math.max(reached, share)}%)...`;
+        loader.textContent = text;
+        landingStatus.textContent = text;
+    }
+    const progress = setInterval(showProgress, 200);
+    const stage = async (percent) => {
+        reached = percent;
+        if (percent >= 100) clearInterval(progress);
+        showProgress();
+        // A pause for the page to show it, but not a frame: frames stop in a hidden tab, and
+        // loading should go on behind another tab too.
+        await new Promise(resolve => setTimeout(resolve, 0));
     };
 
     function downloaded() {
@@ -265,15 +281,15 @@ Query parameters:
         pyodide.canvas.setCanvas2D(canvas);
         pyodide._api._skip_unwind_fatal_error = true;
 
-        await say("Loading numpy, Pillow and imgui-bundle...");
+        await stage(40);
         await pyodide.loadPackage(["micropip", "numpy", "pillow"]);
         const micropip = pyodide.pyimport("micropip");
         await micropip.install.callKwargs(IMGUI_BUNDLE, { deps: false });
         await micropip.install.callKwargs(GAME_WHEEL, { deps: false });
         mark("packages");
-        await say("Opening saves...");
+        await stage(90);
         await keepSaves(pyodide);
-        await say("Ready");
+        await stage(100);
         await chosen;
         // Started once the page has fetched what they load too, so they find it cached, and only
         // for play here, not for a visit that ends in a download. Without them the game paints
@@ -286,7 +302,6 @@ Query parameters:
             console.error("The painting workers could not start:", error);
         }
 
-        await say("Starting the game...");
         const code = measure
             ? await (await fetch(query.get("measure") || "measure.py")).text()
             : "from railroads.ui.app import main\nmain()";
@@ -307,6 +322,7 @@ Query parameters:
         });
     }
     main().catch(error => {
+        clearInterval(progress);
         loader.style.background = "#922";
         loader.textContent = "Error: " + (error?.message || error);
         console.error(error);

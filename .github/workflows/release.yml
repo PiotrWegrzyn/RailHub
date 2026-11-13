@@ -1,9 +1,12 @@
 name: Release
 
+# On staging it only checks that the desktop apps build. On master, which changes only through a
+# pull request from staging, it releases the version in pyproject.toml: it builds the apps and
+# creates the tag vX.Y.Z and its GitHub Release, unless that version is already released. Each
+# promotion bumps the version, so it always touches pyproject.toml.
 on:
   push:
-    tags: ["v*"]
-    branches: [staging]
+    branches: [master, staging]
     paths: [desktop/**, world/**, .github/workflows/release.yml, pyproject.toml, uv.lock]
   workflow_dispatch:
 
@@ -11,7 +14,28 @@ permissions:
   contents: write
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+      release: ${{ steps.check.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_NAME" = master ] && ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
   desktop:
+    needs: version
+    if: github.ref_name != 'master' || needs.version.outputs.release == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -48,8 +72,8 @@ jobs:
           path: ${{ matrix.archive }}
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: desktop
+    if: needs.version.outputs.release == 'true'
+    needs: [version, desktop]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -58,6 +82,7 @@ jobs:
           merge-multiple: true
       - env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
         run: >
-          gh release create "$GITHUB_REF_NAME" archives/*
-          --repo "$GITHUB_REPOSITORY" --title "RailHub $GITHUB_REF_NAME" --generate-notes --latest
+          gh release create "$TAG" archives/* --target "$GITHUB_SHA"
+          --repo "$GITHUB_REPOSITORY" --title "RailHub $TAG" --generate-notes --latest

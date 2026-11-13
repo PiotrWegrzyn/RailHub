@@ -1,6 +1,6 @@
 """Trains: they run along laid track from stop to stop, starting at the first. Each stop says
 which cars, up to MAX_CARS, the train pulls on to the next one; each car carries one good, up to
-CAR_CAPACITY of it.
+its car_size of it.
 
 At each stop a train unloads its cars into the station, freight to be handed out or carried on
 by another train and passengers and mail to go on their way, swaps them for that stop's cars and
@@ -58,7 +58,7 @@ from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
 from railroads.sim.tech import GOOD_TREES, Effect, Research
 from railroads.sim.track_network import TrackNetwork
-from railroads.sim.trains import CAR_CAPACITY, ENGINES, FIRST_ENGINE, Point, Stop, Train
+from railroads.sim.trains import ENGINES, FIRST_ENGINE, Point, Stop, Train, car_size
 
 if TYPE_CHECKING:
     from railroads.sim.station_trade import StationTrade
@@ -148,8 +148,8 @@ class Railway:
     def car_capacity(self, good: Good) -> float:
         """How much of a good one car carries: coaches and mail vans more with tech."""
         if good in TRAVELLERS:
-            return CAR_CAPACITY * (1.0 + self.research.bonus(Effect.COACHES))
-        return CAR_CAPACITY
+            return car_size(good) * (1.0 + self.research.bonus(Effect.COACHES))
+        return car_size(good)
 
     def _upkeep(self) -> float:
         return max(LEAST_UPKEEP, 1.0 - self.research.bonus(Effect.UPKEEP))

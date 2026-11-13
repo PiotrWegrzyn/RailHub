@@ -36,6 +36,7 @@ from railroads.ui.saves_window import SavesWindow
 from railroads.ui.tech_window import TechWindow
 from railroads.ui.theme import BRASS, apply_theme
 from railroads.ui.top_bar import draw_top_bar
+from railroads.ui.waiting_screen import Label, Shatter, waiting_line
 from railroads.ui.web_setup import page_setup
 from railroads.ui.workers import FRAME_SECONDS, FrameWorker, submit_steps, worker
 
@@ -295,6 +296,12 @@ class Shell:
         # How much of the work is done, where it can tell.
         self._done: float | None = None
         self._executor = worker("setup")
+        # Whether the work is a new game, and on a random place; when it began; what the waiting
+        # screen last showed; and the screen breaking up over a new game just begun.
+        self._new_game_on: MapChoice | None = None
+        self._began = 0.0
+        self._labels: list[Label] = []
+        self._shatter: Shatter | None = None
         # Where the setup runs on the frames, it starts once the waiting screen has shown, and
         # each frame spends about this long on it.
         self._waiting_shown = False
@@ -310,7 +317,7 @@ class Shell:
         self._done = done
 
     def start(self, settings: Settings) -> None:
-        self._begin("Setting up a new game", lambda: self._new_game(settings))
+        self._begin("Setting up a new game", lambda: self._new_game(settings), settings.map)
 
     def _new_game(self, settings: Settings) -> Steps[SavedGame]:
         """A new game, grown in the page's setup worker where there is one, so a browser doesn't
@@ -329,8 +336,15 @@ class Shell:
     def load(self, name: str) -> None:
         self._begin(f"Loading '{name}'", lambda: _at_once(lambda: self.saves.load(name)))
 
-    def _begin(self, doing: str, work: Callable[[], Steps[SavedGame]]) -> None:
+    def _begin(
+        self, doing: str, work: Callable[[], Steps[SavedGame]], new_game_on: MapChoice | None = None
+    ) -> None:
+        """Starts the work of setting up or loading a game; `new_game_on` is the map of a new
+        game, None for a game loaded."""
         self._doing = doing
+        self._new_game_on = new_game_on
+        self._began = time.monotonic()
+        self._shatter = None
         self._progress = ""
         self._done = None
         self._frame_seconds = FRAME_SECONDS
@@ -346,6 +360,8 @@ class Shell:
             saved = yield from work()
             yield
             app = App.from_saved(saved, self.saves)
+            if new_game_on is not None:
+                app.view.visit_biggest_town()
             yield
             app.view.prepare(size, density, chunks)
             return app
@@ -371,6 +387,8 @@ class Shell:
                 self._finish(self._task)
         elif self.app is not None:
             self.app.gui()
+            if self._shatter is not None and not self._shatter.draw(imgui.get_io().delta_time):
+                self._shatter = None
             self._follow(self.app)
         else:
             self._choose(self.menu.draw())
@@ -385,6 +403,12 @@ class Shell:
         if self.app is not None:
             self.app.finish_autosave()
         self.app = app
+        if self._new_game_on is not None:
+            size = imgui.get_io().display_size
+            # The see-through background as it shows over the black behind every window.
+            bg = imgui.get_style_color_vec4(imgui.Col_.window_bg.value)
+            colour = imgui.get_color_u32(imgui.ImVec4(bg.x * bg.w, bg.y * bg.w, bg.z * bg.w, 1.0))
+            self._shatter = Shatter(size.x, size.y, colour, self._labels)
 
     def _failed(self, message: str) -> None:
         if self.app is not None:
@@ -415,12 +439,36 @@ class Shell:
         imgui.set_cursor_pos((width / 2 - WAITING_WIDTH / 2, height / 2 - 24))
         imgui.begin_group()
         dots = "." * (1 + int(time.monotonic() * 2) % 3)
-        imgui.text_colored(imgui.ImVec4(*BRASS), f"{self._doing}{dots:<3}")
-        imgui.text_disabled(self._progress or " ")
+        doing = self._doing
+        if self._new_game_on is not None:
+            random_place = self._new_game_on == MapChoice.WORLD
+            doing = waiting_line(time.monotonic() - self._began, random_place)
+        self._labels = [
+            self._text(f"{doing}{dots:<3}", imgui.ImVec4(*BRASS)),
+            self._text(
+                self._progress or " ", imgui.get_style_color_vec4(imgui.Col_.text_disabled.value)
+            ),
+        ]
         if self._done is not None:
+            corner = imgui.get_cursor_screen_pos()
             imgui.progress_bar(self._done, imgui.ImVec2(WAITING_WIDTH, 0))
+            bar_height = imgui.get_item_rect_size().y
+            self._labels += [
+                Label(corner.x, corner.y, WAITING_WIDTH, bar_height,
+                      imgui.get_color_u32(imgui.Col_.frame_bg.value)),
+                Label(corner.x, corner.y, WAITING_WIDTH * self._done, bar_height,
+                      imgui.get_color_u32(imgui.Col_.plot_histogram.value)),
+            ]  # fmt: skip
         imgui.end_group()
         draw_version()
+
+    @staticmethod
+    def _text(text: str, colour: imgui.ImVec4) -> Label:
+        """Shows a line of the waiting screen, and where it is for the screen's breaking up."""
+        corner = imgui.get_cursor_screen_pos()
+        size = imgui.calc_text_size(text)
+        imgui.text_colored(colour, text)
+        return Label(corner.x, corner.y, size.x, size.y, imgui.get_color_u32(colour), text)
 
 
 def _at_once[T](work: Callable[[], T]) -> Steps[T]:

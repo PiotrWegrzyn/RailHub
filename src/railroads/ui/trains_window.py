@@ -168,7 +168,7 @@ class TrainsWindow:
             tooltip = f"{car.good.value}: {car.load:.0f}/{car.capacity:.0f}"
             if destination is not None and car.load >= 0.5:
                 tooltip += f"\nWorth about {dollars(worth)} at {onward}"
-            car_chip(f"pulled{index}", car.good, car.load, tooltip)
+            car_chip(f"pulled{index}", car.good, car.load, tooltip, car.capacity)
         if destination is not None and any(car.load >= 0.5 for car in train.cars):
             imgui.same_line(0, 14)
             imgui.text_colored(imgui.ImVec4(*BRASS), f"worth about {dollars(sum(worths))}")
@@ -283,7 +283,9 @@ class TrainsWindow:
             if car_index:
                 imgui.same_line(0, 4)
             removed = car_chip(
-                f"car{car_index}", good, tooltip=f"{good.value} car - click to remove"
+                f"car{car_index}",
+                good,
+                tooltip=f"{good.value} car of {railway.car_capacity(good):.0f} - click to remove",
             )
             if imgui.is_item_hovered():
                 self.map.good = good

@@ -11,7 +11,7 @@ from imgui_bundle import hello_imgui, imgui
 from PIL import Image
 
 from railroads.sim.goods import Good, Need
-from railroads.sim.trains import CAR_CAPACITY
+from railroads.sim.trains import car_size
 from railroads.ui.pixel.good_icons import ICON_PIXELS, ICONS_INDEX, ICONS_PNG
 
 type Rgba = tuple[float, float, float, float]
@@ -281,16 +281,22 @@ def good_amount(good: Good | Need, amount: str, *, framed: bool = False) -> None
     imgui.text(amount)
 
 
-def car_chip(key: str, good: Good, load: float | None = None, tooltip: str = "") -> bool:
+def car_chip(
+    key: str,
+    good: Good,
+    load: float | None = None,
+    tooltip: str = "",
+    capacity: float | None = None,
+) -> bool:
     """A car drawn as a small upright chip with its good's icon, filled from the bottom by its
-    load when one is given; returns whether it was clicked."""
+    load out of its capacity when one is given; returns whether it was clicked."""
     clicked = imgui.invisible_button(key, CHIP_SIZE)
     low = imgui.get_item_rect_min()
     high = imgui.get_item_rect_max()
     draw_list = imgui.get_window_draw_list()
     draw_list.add_rect_filled(low, high, color_u32(CAR_EMPTY), 3.0)
     if load is not None:
-        share = max(0.0, min(1.0, load / CAR_CAPACITY))
+        share = max(0.0, min(1.0, load / (capacity or car_size(good))))
         if share > 0:
             top = high.y - (high.y - low.y) * share
             draw_list.add_rect_filled((low.x, top), high, color_u32(CAR_LOADED), 3.0)

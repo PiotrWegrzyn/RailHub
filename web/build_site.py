@@ -65,8 +65,11 @@ def build() -> None:
     )
     (SITE / "wheels" / ".gitignore").unlink(missing_ok=True)
     version = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
+    first = [*(SITE / "pyodide").iterdir(), *(SITE / "wheels").glob("*.whl")]
+    load_bytes = str(sum(path.stat().st_size for path in first))
     for name in ("index.html", "painter.js", "measure.py"):
         text = (WEB / name).read_text().replace("__VERSION__", version)
+        text = text.replace("__LOAD_BYTES__", load_bytes)
         (SITE / name).write_text(text)
     shutil.copytree(ROOT / "world", SITE / "world")
     (SITE / ".nojekyll").touch()

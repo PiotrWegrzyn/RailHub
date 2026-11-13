@@ -10,7 +10,7 @@ from test_saves import played_game
 from test_web_setup import SETTINGS, FakePage, grows_as
 
 from builders import flat_map
-from railroads.newgame import Settings
+from railroads.newgame import MapChoice, Settings
 from railroads.saves import SavedGame, Saves
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.game import Game
@@ -25,8 +25,8 @@ from railroads.ui.app import App, Shell
 from railroads.ui.build_menu import Tool
 from railroads.ui.ground import GroundPictures
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
-from railroads.ui.main_menu import Page
-from railroads.ui.map_view import MapView
+from railroads.ui.main_menu import MainMenu, Page
+from railroads.ui.map_view import VISIT_ZOOM, MapView
 from railroads.ui.route_map import soften
 from railroads.ui.web_setup import PageSetup
 from railroads.ui.workers import FrameWorker
@@ -674,3 +674,40 @@ def test_without_threads_frames_stay_at_full_speed_while_an_autosave_is_written(
 
     assert asked == 1
     assert refreshes == []
+
+
+def test_a_new_game_opens_on_its_biggest_town_as_the_waiting_screen_falls_away(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
+    monkeypatch.setattr(app_module, "page_setup", lambda: None)
+    monkeypatch.setattr(app_module, "make_game_steps", grown_on_the_frames(played_game()))
+    shell = Shell(Saves(tmp_path))
+    shell.start(SETTINGS)
+    frames = 0
+    while shell.app is None and frames < 20:
+        shell_frame(shell)
+        frames += 1
+
+    opened = shell._shatter is not None
+    view = shell.app.view if shell.app is not None else None
+    while shell._shatter is not None and frames < 400:
+        shell_frame(shell)
+        frames += 1
+
+    assert opened
+    assert shell._shatter is None
+    assert view is not None
+    assert view.camera.zoom_level >= VISIT_ZOOM
+    assert (view.camera.center_x, view.camera.center_y) == view.tile_map.grid.center(8, 15)
+
+
+def test_the_yolo_button_starts_a_random_place_with_the_other_settings_kept(
+    tmp_path: Path,
+) -> None:
+    menu = MainMenu(Saves(tmp_path), seed=42, start_year=1900)
+
+    settings = menu.random_settings()
+
+    assert settings.map == MapChoice.WORLD
+    assert (settings.seed, settings.start_year) == (42, 1900)

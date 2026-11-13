@@ -2,7 +2,7 @@
 one, or quit."""
 
 import secrets
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from imgui_bundle import icons_fontawesome_4 as fa
@@ -79,6 +79,7 @@ def map_note(choice: MapChoice) -> str:
 class MainMenu:
     saves: Saves
     page: Page = "main"
+    # One of the ready-made maps; a random place is started with its own button.
     map: MapChoice = MapChoice.POLAND
     seed: int = field(default_factory=random_seed)
     start_year: int = START_YEAR
@@ -100,6 +101,10 @@ class MainMenu:
             cash=float(self.cash),
             stand_in_years=self.stand_in_years,
         )
+
+    def random_settings(self) -> Settings:
+        """The settings with a random place in the world for the map."""
+        return replace(self.settings(), map=MapChoice.WORLD)
 
     def go_to(self, page: Page) -> None:
         self.page = page
@@ -147,23 +152,34 @@ class MainMenu:
 
     def _draw_new(self) -> MenuChoice | None:
         imgui.text("Map")
-        world = world_maps_available()
         if imgui.begin_combo("##map", self.map.value, imgui.ComboFlags_.height_large.value):
             for choice in MapChoice:
-                disabled = choice == MapChoice.WORLD and not world
-                imgui.begin_disabled(disabled)
-                if imgui.selectable(choice.value, self.map == choice)[0]:
+                if (
+                    choice != MapChoice.WORLD
+                    and imgui.selectable(choice.value, self.map == choice)[0]
+                ):
                     self.map = choice
-                imgui.end_disabled()
-                hovered = imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value)
-                if disabled and hovered:
-                    imgui.set_tooltip(
-                        "Needs the world's map data: uv run python tools/build_world_files.py"
-                    )
             imgui.end_combo()
         imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)
         imgui.text_disabled(map_note(self.map))
         imgui.pop_text_wrap_pos()
+        imgui.spacing()
+        left = imgui.get_cursor_pos_x()
+        imgui.align_text_to_frame_padding()
+        imgui.text("If you don't like any of these:")
+        imgui.same_line()
+        world = world_maps_available()
+        imgui.begin_disabled(not world)
+        width = left + MENU_WIDTH - imgui.get_cursor_pos_x()
+        yolo = imgui.button(f"{fa.ICON_FA_RANDOM}  Yolo! random map", (width, 0))
+        imgui.end_disabled()
+        if not world and imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
+            imgui.set_tooltip(
+                "Needs the world's map data: uv run python tools/build_world_files.py"
+            )
+        if yolo:
+            self.error = ""
+            return NewGameChoice(self.random_settings())
         imgui.spacing()
         self.start_year = allowed_start_year(self.start_year)
         if imgui.collapsing_header("Advanced options"):

@@ -245,6 +245,14 @@ class MapView:
         self.camera.zoom_level = max(self.camera.zoom_level, VISIT_ZOOM)
         self.look_at(cell)
 
+    def visit_biggest_town(self) -> None:
+        """Takes the view to the cell with the most people around it, and of those to the one with
+        the most people on it."""
+        near = self.growth.nearby()
+        on = np.where(near == near.max(), self.growth.points(), -1)
+        row, col = np.unravel_index(int(np.argmax(on)), on.shape)
+        self.visit((int(row), int(col)))
+
     def toggle_search(self) -> None:
         if self.search.open:
             self.search.close()
