@@ -145,7 +145,7 @@ def make_game_steps(
     years = min(max(settings.start_year, HISTORY_START), END_YEAR - 1) - HISTORY_START
     months = years * 12
     begins = play_begins(months)
-    report(f"Growing towns for {years} years, from {HISTORY_START} to {begins}")
+    report(f"Generating map from year {HISTORY_START} to {begins}")
     history = History()
     seeded = yield from seed_steps(
         tile_map, np.random.default_rng(seed), months=months, history=history, progress=progress
