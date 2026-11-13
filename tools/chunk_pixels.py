@@ -5,7 +5,8 @@ mountains, then draws chunks of flat land, coast, lakes and rivers, towns, field
 mountains, track, bridges, tunnels and stations, the map's edge and beyond it: each at both
 resolutions, plain and over the ground the graphics card draws, and with fine raised ground where
 the land rises. Track being planned, the lift of points on raised ground and the ground showing at
-pixels are saved too.
+pixels are saved too. Last, every cell round a flat chunk and a hilly one that will take them is
+filled with fields and groves, crowded far more than any real farmland, and both are drawn again.
 
 Run it on the code before a change, then on the code after; the check names every difference:
     uv run python tools/chunk_pixels.py save before.npz
@@ -26,7 +27,7 @@ import numpy as np
 from railroads.newgame import MapChoice, Settings, allowed_start_year, make_game
 from railroads.saves import SavedGame, Saves
 from railroads.sim.clock import HISTORY_START
-from railroads.sim.constructions import Track, TrackWidth
+from railroads.sim.constructions import Building, BuildingKind, Track, TrackWidth
 from railroads.sim.grids import Cell
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
 from railroads.sim.ladders import Points
@@ -34,6 +35,7 @@ from railroads.sim.tilemap import Relief, Terrain
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.biomes import Biome
 from railroads.ui.map_view import LOOKS
+from railroads.ui.pixel.ground import CROP_ROWS, GROVES
 from railroads.ui.pixel.projection import CHUNK
 from railroads.ui.pixel.sheet import FINE, SpriteSheet
 from railroads.ui.pixel.world import PixelWorld
@@ -235,6 +237,27 @@ def extras(world: PixelWorld, saved: SavedGame) -> Iterator[tuple[str, np.ndarra
     yield "ground at", np.array(shown)
 
 
+def crowd_fields(world: PixelWorld, chunks: list[tuple[int, int]]) -> None:
+    """Builds fields, crops or a grove in every cell round these chunks that will take one, a
+    different kind from cell to cell, so their patches overlap more than in any real farmland."""
+    grid = world.tile_map.grid
+    kinds = [BuildingKind.FARM, *CROP_ROWS, *GROVES]
+    px, py = world.projection.to_pixels(*grid.center(*np.indices(grid.shape)))
+    built = []
+    for cx, cy in chunks:
+        near = (px > cx * CHUNK - 40) & (px < (cx + 1) * CHUNK + 40)
+        near &= (py > cy * CHUNK - 40) & (py < (cy + 1) * CHUNK + 40)
+        for row, col in np.argwhere(near).tolist():
+            turn = (row + col) % len(kinds)
+            for kind in kinds[turn:] + kinds[:turn]:
+                building = Building((row, col), kind)
+                if world.constructions.why_not(building) is None:
+                    world.constructions.build(building)
+                    built.append((row, col))
+                    break
+    world.buildings_changed(built)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("action", choices=("save", "check"))
@@ -249,6 +272,9 @@ def main() -> None:
     print(f"game ready in {time.perf_counter() - began:.1f} s; {len(chunks)} chunks", flush=True)
     began = time.perf_counter()
     drawn = dict(drawings(world, chunks)) | dict(extras(world, saved))
+    crowded = {f"crowded {name}": chunks[name] for name in ("flat 0", "hills 0") if name in chunks}
+    crowd_fields(world, list(crowded.values()))
+    drawn |= dict(drawings(world, crowded))
     print(f"{len(drawn)} drawn in {time.perf_counter() - began:.1f} s", flush=True)
     if args.action == "save":
         np.savez_compressed(args.pixels, **drawn)
