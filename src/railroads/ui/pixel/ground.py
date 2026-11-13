@@ -453,7 +453,7 @@ class Ground:
         """Paints farms' fields and groves over a picture of the ground from (`left`, `top`),
         `k` pixels to an art pixel, RGB from 0 to 1 multiplied by its alpha, worked out at that
         resolution so they keep up with the buildings drawn as finely; `lit` brightens or
-        darkens each pixel with the slope it lies on. They go only where the picture shows the
+        darkens each art pixel with the slope it lies on. They go only where the picture shows the
         map: where `shown`, or else where it isn't clear. Only the patches round fields are
         worked out, from `points` where they hold them at this resolution."""
         rows, a = canvas.shape[0] // k, APRON
@@ -479,7 +479,8 @@ class Ground:
         across = min(patch[1].start for _, patch, _, _ in jobs)
         bottom = max(patch[0].stop for _, patch, _, _ in jobs)
         right = max(patch[1].stop for _, patch, _, _ in jobs)
-        paint = np.full((bottom - down, right - across, 3), np.nan, dtype=np.float32)
+        paint = np.empty((bottom - down, right - across, 3), dtype=np.float32)
+        painted = np.zeros(paint.shape[:2], dtype=bool)
         worked: dict[tuple[int, int, int, int], tuple] = {}
         for plot, patch, crop, grove in jobs:
             box = (patch[0].start, patch[0].stop, patch[1].start, patch[1].stop)
@@ -488,25 +489,31 @@ class Ground:
             place = (slice(box[0] - down, box[1] - down), slice(box[2] - across, box[3] - across))
             args = (paint[place], *worked[box])
             if grove is None:
-                self._sow(*args, plot, crop, k)
+                painted[place] |= self._sow(*args, plot, crop, k)
             else:
-                self._plant(*args, plot, grove)
+                painted[place] |= self._plant(*args, plot, grove)
         top_row, left_col = max(down, a * k), max(across, a * k)
         bottom_row, right_col = min(bottom, (a + rows) * k), min(right, (a + CHUNK) * k)
         if top_row >= bottom_row or left_col >= right_col:
             return
-        inner = paint[top_row - down : bottom_row - down, left_col - across : right_col - across]
+        inside = (
+            slice(top_row - down, bottom_row - down),
+            slice(left_col - across, right_col - across),
+        )
+        inner = paint[inside]
         region = (
             slice(top_row - a * k, bottom_row - a * k),
             slice(left_col - a * k, right_col - a * k),
         )
         under = canvas[region]
-        laid = ~np.isnan(inner[..., 0]) & (under[..., 3] > 0 if shown is None else shown[region])
+        laid = painted[inside] & (under[..., 3] > 0 if shown is None else shown[region])
         if not laid.any():
             return
         colour = inner[laid]
         if lit is not None:
-            colour = colour * lit[region][laid][:, None]
+            down, across = np.nonzero(laid)
+            down, across = (down + region[0].start) // k, (across + region[1].start) // k
+            colour = colour * lit[down, across][:, None]
         under[laid, :3] = np.clip(colour, 0, 255) / 255
         under[laid, 3] = 1.0
 
@@ -775,17 +782,18 @@ class Ground:
         plot: Plot,
         crop: BuildingKind | None,
         k: int = 1,
-    ) -> None:
+    ) -> BoolArray:
         """Lays a field of crops in rows over the half of a cell a farm or crop takes up, `k`
         pixels to an art pixel: a farm grows wheat, other crops grow in rows. Plants are
         lit on the side towards the light and shaded on the other, the soil between rows is
-        darker in the furrow, a strip of bare headland runs round inside a lumpy hedge."""
+        darker in the furrow, a strip of bare headland runs round inside a lumpy hedge.
+        Returns which pixels the field covers."""
         grid = self.tile_map.grid
         row, col = plot.cell
         fx, fy = grid.center(row, col)
         field = (cells == row * grid.cols + col) & plot.covers(x - fx, y - fy)
         if not field.any():
-            return
+            return field
         pick = row * 7 + col * 13
         across, along = (x - fx, y - fy) if pick % 2 else (y - fy, x - fx)
         u, w = across[field] * FIELD_STRIPES, along[field] * FIELD_STRIPES
@@ -816,21 +824,16 @@ class Ground:
             out[bush & (fu > 0.66)] = plant * 0.7
             leaf = bush & (table_hash(px, py, 82) > 0.86)
             out[leaf] = light * 1.08
-        depth = np.zeros(field.shape, dtype=np.int16)
-        inside = field.copy()
-        for step in range(1, 3 * k + 1):
-            inside = inside & np.roll(inside, 1, 0) & np.roll(inside, -1, 0)
-            inside = inside & np.roll(inside, 1, 1) & np.roll(inside, -1, 1)
-            depth[inside] = step
-        depth = depth[field]
+        depth = _depths(field, 2 * k)
         hedge = depth < k
         headland = (depth >= k) & (depth < 2 * k)
-        lumps = 0.78 + 0.4 * table_hash(px // (2 * k), py // (2 * k), 91)
+        lumps = 0.78 + 0.4 * table_hash(px[hedge] // (2 * k), py[hedge] // (2 * k), 91)
         out[headland] = HEADLAND * (1 + 0.16 * grain[headland])
-        out[hedge] = HEDGE * lumps[hedge][:, None]
+        out[hedge] = HEDGE * lumps[:, None]
         dark = (hedge & ~np.roll(field, -k, 0)[field]) if k > 1 else np.zeros_like(hedge)
         out[dark] *= 0.72
         rgb[field] = out
+        return field
 
     def _plant(
         self,
@@ -842,16 +845,16 @@ class Ground:
         iy: IntArray,
         plot: Plot,
         grove: Grove,
-    ) -> None:
+    ) -> BoolArray:
         """Lays a grove of trees in rows over the half of a cell an orchard, date palms or
         plantation takes up: each crown lit on the side towards the light, with its shadow on
-        the ground beside it, and some bearing fruit."""
+        the ground beside it, and some bearing fruit. Returns which pixels the grove covers."""
         grid = self.tile_map.grid
         row, col = plot.cell
         fx, fy = grid.center(row, col)
         ground = (cells == row * grid.cols + col) & plot.covers(x - fx, y - fy)
         if not ground.any():
-            return
+            return ground
         u = (x[ground] - fx) * grove.rows + 0.5
         v = (y[ground] - fy) * grove.rows + 0.5
         du, dv = u - np.round(u), v - np.round(v)
@@ -872,6 +875,41 @@ class Ground:
         for index, color in enumerate(grove.fruit):
             colors[fruit & (pick == index)] = color
         rgb[ground] = colors
+        return ground
+
+
+def _depths(field: BoolArray, most: int) -> npt.NDArray[np.int16]:
+    """How many steps in from its edge each pixel of a field lies, up to `most`, in the order
+    of the field's pixels; the edges of the block wrap round to its other side, as np.roll's do.
+    The field shrinks with every step, so a pixel's depth is how many steps it stays in. A field
+    clear of the block's edges is shrunk in just the box round it and a pixel more, where the
+    wrapping brings in nothing but clear pixels."""
+    rows, cols = np.flatnonzero(field.any(axis=1)), np.flatnonzero(field.any(axis=0))
+    top, bottom, left, right = rows[0], rows[-1], cols[0], cols[-1]
+    if top > 0 and left > 0 and bottom < field.shape[0] - 1 and right < field.shape[1] - 1:
+        field = field[top - 1 : bottom + 2, left - 1 : right + 2]
+    depth = np.zeros(field.shape, dtype=np.int16)
+    inside = field
+    for _ in range(most):
+        inside = _shrunk(inside)
+        depth += inside
+    return depth[field]
+
+
+def _shrunk(inside: BoolArray) -> BoolArray:
+    """`inside` less every pixel with one beside it, above, below, left or right, that is not:
+    first up and down, then across, the block's edges wrapping round as np.roll's do."""
+    rows = inside.copy()
+    rows[1:] &= inside[:-1]
+    rows[:1] &= inside[-1:]
+    rows[:-1] &= inside[1:]
+    rows[-1:] &= inside[:1]
+    both = rows.copy()
+    both[:, 1:] &= rows[:, :-1]
+    both[:, :1] &= rows[:, -1:]
+    both[:, :-1] &= rows[:, 1:]
+    both[:, -1:] &= rows[:, :1]
+    return both
 
 
 def _on_map(canvas: FloatArray, shown: BoolArray | None) -> BoolArray:

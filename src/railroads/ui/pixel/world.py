@@ -204,9 +204,7 @@ class PixelWorld:
         rows = CHUNK if offset is None else CHUNK + int(offset.max()) + 1
         rgb, alpha = self.ground.render(left, top, rows, raised, points)
         canvas = _blown_up(rgb / 255, alpha, resolution)
-        lit = None
-        if raised is not None:
-            lit = lighting(raised.top(rows)).repeat(resolution, axis=0).repeat(resolution, axis=1)
+        lit = None if raised is None else lighting(raised.top(rows))
         self.ground.fields(canvas, left, top, resolution, lit, points=points)
         self.ground.yards(canvas, left, top, resolution)
         self.ground.canopy(canvas, left, top, resolution, points=points)
@@ -214,8 +212,7 @@ class PixelWorld:
             self._lay_track(canvas, left, top, resolution)
         else:
             canvas = raise_picture(canvas, offset, resolution)
-            seen = offset.repeat(resolution, axis=0).repeat(resolution, axis=1)
-            self._lay_lifted_track(canvas, left, top, resolution, seen)
+            self._lay_lifted_track(canvas, left, top, resolution, offset, resolution)
         self._stand_scenery(canvas, left, top, resolution)
         return _finished(canvas)
 
@@ -308,11 +305,17 @@ class PixelWorld:
         under[..., 3:] = under[..., 3:] * (1 - alpha) + alpha
 
     def _lay_lifted_track(
-        self, canvas: FloatArray, left: int, top: int, resolution: int, seen: FloatArray
+        self,
+        canvas: FloatArray,
+        left: int,
+        top: int,
+        resolution: int,
+        seen: FloatArray,
+        blow: int = 1,
     ) -> None:
         """Draws the track crossing the chunk over its raised ground, lifted with it, where the
-        ground shown, `seen` art pixels further down the map in each pixel, is not in front
-        of it."""
+        ground shown, `seen` art pixels further down the map in each pixel (of a picture `blow`
+        times coarser than the chunk's), is not in front of it."""
         pieces = self._track_pieces()
         if not pieces:
             return
@@ -321,7 +324,9 @@ class PixelWorld:
         if box is None:
             return
         part, under = track[box], canvas[box]
-        shown = (seen[box] <= lift[box] + HIDDEN_BEYOND) & (under[..., 3] > 0)
+        down, across = (np.arange(span.start, span.stop) // blow for span in box)
+        seen = seen[down[:, None], across[None, :]]
+        shown = (seen <= lift[box] + HIDDEN_BEYOND) & (under[..., 3] > 0)
         alpha = part[..., 3:] * shown[..., None]
         under[..., :3] = under[..., :3] * (1 - alpha) + part[..., :3] * alpha
 
@@ -462,13 +467,8 @@ def _blend(canvas: FloatArray, sprite: npt.NDArray[np.float32], x: int, y: int) 
 
 def _blown_up(rgb: FloatArray, alpha: FloatArray, k: int) -> FloatArray:
     """RGB and its alpha as one RGBA picture, each pixel blown up to `k` by `k`."""
-    picture = np.empty(
-        (rgb.shape[0] * k, rgb.shape[1] * k, 4), dtype=np.result_type(rgb.dtype, alpha.dtype)
-    )
-    blocks = art_pixels(picture, k)
-    blocks[..., :3] = rgb[:, None, :, None, :]
-    blocks[..., 3] = alpha[:, None, :, None]
-    return picture
+    picture = np.concatenate([rgb, alpha[..., None]], axis=-1)
+    return picture if k == 1 else picture.repeat(k, axis=0).repeat(k, axis=1)
 
 
 def _finished(canvas: FloatArray) -> Rgba:

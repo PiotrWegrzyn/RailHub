@@ -90,10 +90,11 @@ def test_raycast_finds_the_furthest_point_reaching_each_pixel(highest: float) ->
 
 
 @pytest.mark.parametrize("k", [1, 2])
-def test_a_raised_picture_takes_each_pixel_from_its_offset_below(k: int) -> None:
+@pytest.mark.parametrize("below", [6, 2], ids=["rows enough", "rows short"])
+def test_a_raised_picture_takes_each_pixel_from_its_offset_below(k: int, below: int) -> None:
     rng = np.random.default_rng(4)
     offset = rng.integers(0, 6, (10, 12))
-    picture = rng.random(((10 + 6) * k, 12 * k, 4)).astype(np.float32)
+    picture = rng.random(((10 + below) * k, 12 * k, 4)).astype(np.float32)
 
     raised = raise_picture(picture, offset, k)
 

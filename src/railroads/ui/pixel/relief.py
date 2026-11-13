@@ -437,9 +437,19 @@ def raise_picture(
     pixels below it, `picture` holding `resolution` pixels for every art pixel and enough rows."""
     k = resolution
     rows, cols = offset.shape[0] * k, offset.shape[1] * k
+    art_rows, art_cols = offset.shape
+    whole = picture.shape[0] % k == 0 and picture.shape[1] == cols
+    if whole and (art_rows + int(offset.max())) * k <= picture.shape[0]:
+        # No pixel is taken from below the picture, so each art pixel's rows of pixels come
+        # whole from the art pixel its offset below.
+        runs = picture.reshape(picture.shape[0], art_cols, k * picture.shape[2])
+        below = (np.arange(art_rows)[:, None] + offset) * k
+        raised = np.empty((art_rows, k, art_cols, k * picture.shape[2]), dtype=picture.dtype)
+        for row in range(k):
+            raised[:, row] = runs[below + row, np.arange(art_cols)[None, :]]
+        return raised.reshape(rows, cols, *picture.shape[2:])
     fine = np.repeat(np.repeat(offset, k, axis=0), k, axis=1) * k
     shown = np.minimum(np.arange(rows)[:, None] + fine, picture.shape[0] - 1)
-    width = picture.shape[1]
-    shown *= width
+    shown *= picture.shape[1]
     shown += np.arange(cols)[None, :]
     return picture.reshape(-1, *picture.shape[2:])[shown]

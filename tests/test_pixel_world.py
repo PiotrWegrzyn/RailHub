@@ -18,7 +18,7 @@ from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 from railroads.ui.pixel.art import SPRITES, draw_sheet
 from railroads.ui.pixel.art.stations import TURNED_LINES
-from railroads.ui.pixel.ground import AROUND, CROWN_GAP, _nearest_crown
+from railroads.ui.pixel.ground import AROUND, CROWN_GAP, _depths, _nearest_crown
 from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.layer import resolution_for
 from railroads.ui.pixel.noise import noise, table_hash
@@ -664,3 +664,33 @@ def test_track_drawn_again_after_its_neighbour_changes_matches_track_drawn_fresh
     _, fresh = track_chunk(sheet, [double, widened])
     assert not np.array_equal(before, fresh)
     assert np.array_equal(again, fresh)
+
+
+def depths_by_rolling(field: np.ndarray, most: int) -> np.ndarray:
+    depth = np.zeros(field.shape, dtype=np.int16)
+    inside = field.copy()
+    for step in range(1, most + 1):
+        inside = inside & np.roll(inside, 1, 0) & np.roll(inside, -1, 0)
+        inside = inside & np.roll(inside, 1, 1) & np.roll(inside, -1, 1)
+        depth[inside] = step
+    return depth[field]
+
+
+@pytest.mark.parametrize("shape", [(1, 1), (2, 7), (24, 40), (48, 80)])
+def test_depths_into_a_field_are_those_of_shrinking_it_with_wrapping_edges(
+    shape: tuple[int, int],
+) -> None:
+    rng = np.random.default_rng(sum(shape))
+    rows, cols = np.mgrid[0 : shape[0], 0 : shape[1]]
+
+    for _ in range(40):
+        cy, cx = rng.uniform(-3, shape[0] + 3), rng.uniform(-3, shape[1] + 3)
+        reach = rng.uniform(0.5, max(shape))
+        field = (rows - cy) ** 2 + ((cols - cx) / 1.7) ** 2 < reach**2
+        field &= rng.random(shape) < 0.97
+        if not field.any():
+            continue
+
+        depths = _depths(field, 4)
+
+        assert np.array_equal(depths, depths_by_rolling(field, 4))
