@@ -548,7 +548,7 @@ def test_cargo_back_at_the_station_it_came_from_returns_to_its_stockpile_unpaid(
     assert railway.finances.month["cargo"] == 0.0
 
 
-def test_gold_reaches_a_jeweller_through_a_hub_and_pays_only_when_he_takes_it() -> None:
+def test_gold_reaches_a_jeweller_through_a_hub_and_pays_the_moment_he_takes_it() -> None:
     growth, railway = joined_stations()
     build_station(growth, (6, 27))
     route = plan_route(growth.constructions, (6, 20), (6, 27))
@@ -566,12 +566,9 @@ def test_gold_reaches_a_jeweller_through_a_hub_and_pays_only_when_he_takes_it() 
     assert second is not None
     second.stops = [Stop((6, 20), [Good.GOLD], wait_for_load=False), Stop((6, 27))]
     railway.run(0.01)
+
     railway.run(12 / CELLS_PER_MONTH)
-    before_taken = railway.finances.month["cargo"]
 
-    growth.trade_goods()
-
-    assert before_taken == 0.0
     assert railway.station_goods((6, 27)).brought[Good.GOLD] == pytest.approx(0.0)
     assert 10 * price_of(Good.GOLD) < railway.finances.month["cargo"] <= 20 * price_of(Good.GOLD)
 

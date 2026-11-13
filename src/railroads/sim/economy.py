@@ -232,6 +232,11 @@ class Economy:
     """Lets stations hand goods out on one map each month, on the cells with buildings that
     trade, and keeps every processor's stockpile of inputs from month to month."""
 
+    # What buildings that are no processors took this month as goods reached a station by them,
+    # by kind and need, then cell: the month's trade counts it as got and hands out only the rest.
+    # None in saves from before stations handed goods out at once.
+    taken: dict[tuple[BuildingKind, Need], dict[int, float]] | None = None
+
     def __init__(self, tile_map: TileMap) -> None:
         self.tile_map = tile_map
         self.cells = tile_map.grid.rows * tile_map.grid.cols
@@ -439,12 +444,25 @@ class _Month:
                 wants[kind] = n * NEEDS[kind][need]
         return wants
 
+    def _taken(self, kind: BuildingKind, need: Need) -> FloatCells:
+        """What buildings of a kind took of a need this month as goods reached their station."""
+        taken = self.zero.copy()
+        for cell, amount in ((self.economy.taken or {}).get((kind, need)) or {}).items():
+            position = self.position[cell]
+            if position >= 0:
+                taken[position] += amount
+        return taken
+
     def _serve(self, need: Need) -> None:
         """Lets stations hand out the goods meeting a need, the most valuable first: of each
-        good what trains brought, then their stockpile, unless it is kept for trains."""
+        good what trains brought, then their stockpile, unless it is kept for trains. Buildings
+        want only what they did not take already this month."""
         wants = self._wants(need)
         if not wants:
             return
+        early = {kind: self._taken(kind, need) for kind in wants if kind not in RECIPES}
+        for kind, taken in early.items():
+            wants[kind] = np.maximum(wants[kind] - taken, 0.0)
         demand = sum(wants.values(), start=self.zero.copy())
         received = self.zero.copy()
         for station in self.stations:
@@ -473,6 +491,7 @@ class _Month:
         for kind, want in wants.items():
             got = met * want
             key = (kind, need)
+            got = got + early.get(kind, 0.0)
             self.received[key] = self.received.get(key, self.zero) + got
             if kind in RECIPES:
                 self.stock[key] = self.stock[key] + got
@@ -646,6 +665,7 @@ class _Month:
         for key, stock in self.economy.stock.items():
             stock[:] = 0.0
             stock[self.cells] = self.stock[key]
+        self.economy.taken = {}
         trade = Trade(
             self.cells,
             got,

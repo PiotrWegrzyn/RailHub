@@ -296,6 +296,8 @@ class Growth:
         self.economy.bonus_per_good = BONUS_PER_GOOD + (
             0.0 if self.railway is None else self.railway.research.bonus(Effect.BONUS_GOODS)
         )
+        if self.railway is not None:
+            self.railway.station_trade = self.station_trade
         self.trade = yield from self.economy.trade_steps(
             self.owners.working_counts(),
             self.station_trade.orders(),

@@ -16,20 +16,29 @@ import numpy.typing as npt
 
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.demand import capacity_of
-from railroads.sim.economy import COLLECTION_RADIUS, DELIVERY_RADIUS, StationOrder, Trade
+from railroads.sim.economy import (
+    COLLECTION_RADIUS,
+    DELIVERY_RADIUS,
+    INPUT_STOCK,
+    StationOrder,
+    Trade,
+)
 from railroads.sim.goods import (
     FITS,
     NEEDS,
+    PIPELINE,
     RECIPES,
     TRAVELLERS,
     Good,
     Need,
+    boosts_of,
     makes_of,
     needs_of,
     price_of,
 )
 from railroads.sim.grids import Cell, flat_within
 from railroads.sim.ladders import PASSENGERS_PER_POINT
+from railroads.sim.station_goods import StationGoods
 from railroads.sim.tech import GOOD_TREES, Tree
 from railroads.sim.trains import CAR_CAPACITY, MAX_CARS
 
@@ -38,6 +47,11 @@ if TYPE_CHECKING:
 
 MAIL_PER_PASSENGERS = 5
 TRAIN_LOAD = MAX_CARS * CAR_CAPACITY
+# The needs each good meets, in the order a month's trade hands them out.
+MEETS: dict[Good, tuple[Need, ...]] = {
+    good: tuple(step for step in PIPELINE if isinstance(step, Need) and good in FITS[step])
+    for good in Good
+}
 
 
 class StationTrade:
@@ -94,6 +108,67 @@ class StationTrade:
         for station, supplied_for in trade.supplied_for.items():
             for (need, good), amount in supplied_for.items():
                 railway.pay_for_passing(station, need, good, amount)
+
+    def hand_out_now(self, station: Cell, good: Good) -> None:
+        """Hands a good that has just reached a station to the buildings around it that still
+        want it this month, the nearest first, at once: what trains brought, then the stockpile
+        unless the good is kept for trains. Each takes up to what it needs in a month, less what
+        it took already; a processor up to the room in its stockpile. They pay as they take."""
+        growth, railway = self._growth, self._growth.railway
+        if railway is None or good in TRAVELLERS:
+            return
+        goods = railway.station_goods(station)
+        within = flat_within(growth.grid, station, railway.reach(station)[0])
+        cells = within.cells[np.argsort(within.steps, kind="stable")]
+        economy, year = growth.economy, growth.year
+        if economy.taken is None:
+            economy.taken = {}
+        for need in MEETS[good]:
+            for kind, count in growth.counts.items():
+                recipe = RECIPES.get(kind)
+                if recipe is not None:
+                    if need not in recipe.inputs(year) and need not in boosts_of(kind, year):
+                        continue
+                elif need not in needs_of(kind, year):
+                    continue
+                here = count.ravel()[cells]
+                for cell, n in zip(cells[here > 0].tolist(), here[here > 0].tolist(), strict=True):
+                    if recipe is not None:
+                        stock = economy.stock[(kind, need)]
+                        want = INPUT_STOCK * n - stock[cell]
+                    else:
+                        taken = economy.taken.setdefault((kind, need), {})
+                        want = n * NEEDS[kind][need] - taken.get(cell, 0.0)
+                    given = self._give(station, goods, need, good, want)
+                    if given <= 0:
+                        continue
+                    if recipe is not None:
+                        stock[cell] += given
+                    else:
+                        taken[cell] = taken.get(cell, 0.0) + given
+                    if not goods.held(good):
+                        return
+
+    def _give(
+        self, station: Cell, goods: StationGoods, need: Need, good: Good, want: float
+    ) -> float:
+        """Gives up to `want` of a good from a station, first of what trains brought, then of its
+        stockpile unless kept for trains, and pays for it; returns how much went."""
+        railway = self._growth.railway
+        assert railway is not None
+        given = 0.0
+        brought = min(want, goods.brought.get(good, 0.0))
+        if brought > 0:
+            goods.release(good, brought)
+            railway.pay_for(station, need, good, brought)
+            given += brought
+        held = 0.0 if good in goods.kept else goods.stockpile.get(good, 0.0)
+        stocked = min(want - given, held)
+        if stocked > 0:
+            goods.stockpile[good] = held - stocked
+            railway.pay_for_passing(station, need, good, stocked)
+            given += stocked
+        return given
 
     def measure_demand(self, station: Cell) -> None:
         """Sets a new station's demand capacity from the buildings around it now, so cargo pays
