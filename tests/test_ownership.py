@@ -77,7 +77,7 @@ def test_a_crowded_out_farm_of_the_players_goes_up_again_nearby_and_stays_theirs
     for i in range(FARMS_CROWDED_OUT):
         growth.build(Building(neighbours[i % len(neighbours)], BuildingKind.HOUSE))
 
-    growth._crowd_out_farms()
+    growth._crowd_out()
 
     owned = growth.owners.owned(BuildingKind.FARM)
     assert growth.count(BuildingKind.FARM)[5, 5] == 0

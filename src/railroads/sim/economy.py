@@ -21,11 +21,13 @@ rest waits in its stockpile. Needs are handed out in the order of PIPELINE, so t
 processor come before what it makes: canneries take their fruit before houses eat what is left.
 
 A building's satisfaction is the share of what it demands that it got and of what it makes that
-reached a buyer, plus BONUS_PER_GOOD for each of its bonus goods (railroads.sim.goods) it got all
-of, and that share of it for part: a house fed and warmed that also got all its beer and half its
-newspapers is at 145%. It is unsatisfied at nothing, thriving from 100% and content between.
-Its satisfaction adds to the chances of more growing in its cell, MOST_SERVED times its points
-at 100% and that much more above it (served_multipliers).
+reached a buyer; a processor's is only the share of all it could make that reached a buyer, so one
+whose stockpile holds one input but not the other is unsatisfied however full it is, plus
+BONUS_PER_GOOD for each of its bonus goods (railroads.sim.goods) it got all of, and that share of
+it for part: a house fed and warmed that also got all its beer and half its newspapers is at 145%.
+It is unsatisfied at nothing, thriving from 100% and content between. Its satisfaction adds to the
+chances of more growing in its cell, MOST_SERVED times its points at 100% and that much more above
+it (served_multipliers).
 """
 
 import time
@@ -575,14 +577,15 @@ class _Month:
                 part = np.minimum(received, wanted) / np.where(wanted > 0, wanted, 1.0)
                 bonus[kind] = bonus.get(kind, self.zero) + part
                 continue
-            having = self.stock[(kind, need)] if kind in RECIPES else received
-            got[kind] += np.minimum(having, wanted)
+            if kind in RECIPES:
+                continue
+            got[kind] += np.minimum(received, wanted)
             needed[kind] += wanted
         goods_gave = {}
         for (kind, good), offer in self.offers.items():
             sent = self._given(offer, good, self.sold[good])
             given = self._given(offer, good, self.sold[good] - self.lost[good])
-            most = offer if kind in RECIPES else self.count[kind] * MAKES[kind][good]
+            most = self.count[kind] * MAKES[kind][good]
             goods_gave[(kind, good)] = (given, most)
             gave[kind] += given
             could_make[kind] += most
