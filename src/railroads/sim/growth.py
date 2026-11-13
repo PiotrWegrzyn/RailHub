@@ -59,7 +59,7 @@ from railroads.sim.economy import (
     served_multipliers,
 )
 from railroads.sim.forests import change_forests
-from railroads.sim.goods import MAKES, RECIPES
+from railroads.sim.goods import HOMES, MAKES, RECIPES
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.ladders import (
     GROWTH,
@@ -162,7 +162,6 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
 # How long buildings last starving: homes, and everything else.
 HOMES_DIE_AFTER_MONTHS = 10 * 12
 DIE_AFTER_MONTHS = 30 * 12
-HOMES = frozenset({BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS})
 
 
 def dies_after(kind: BuildingKind) -> int:

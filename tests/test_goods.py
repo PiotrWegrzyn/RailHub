@@ -1,3 +1,5 @@
+import pytest
+
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.goods import FITS, Need, bonus_of, demands_of, makes_of, needs_of
 from railroads.sim.ladders import LADDERS
@@ -42,3 +44,13 @@ def test_nothing_that_can_open_needs_what_nothing_open_makes_yet() -> None:
         ]
 
     assert unmet == []
+
+
+@pytest.mark.parametrize("kind", [BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS])
+def test_homes_must_have_only_food_and_heating_and_take_the_rest_as_bonus_goods(
+    kind: BuildingKind,
+) -> None:
+    demands = demands_of(kind, 2000)
+
+    assert set(demands) == {Need.FOOD, Need.HEATING}
+    assert set(bonus_of(kind, 2000)) == set(needs_of(kind, 2000)) - set(demands)

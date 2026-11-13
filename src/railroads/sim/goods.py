@@ -13,7 +13,7 @@ big factories steel and copper, mega factories steel, copper and machinery. An i
 starts later is left out of a recipe until its year.
 
 What a building needs is split in two. Its demands (demands_of) are what it must get to be
-satisfied. Its bonus goods (bonus_of, from BONUS_NEEDS) it can do without, but each one it gets
+satisfied; a home's are only food and heating (HOMES). Its bonus goods (bonus_of, from BONUS_NEEDS) it can do without, but each one it gets
 raises its satisfaction above what its demands give (railroads.sim.economy). Processors have no
 bonus goods: their inputs make what they make. A building that makes nothing whose every need is
 a bonus good keeps them all as demands, since getting them is what it is there for. A building
@@ -758,11 +758,21 @@ def boosts_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
     )
 
 
+# Homes need only food and heating to live; everything else they want is a bonus good.
+HOMES = frozenset({BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS})
+HOME_DEMANDS = frozenset({Need.FOOD, Need.HEATING})
+
+
 @cache
 def bonus_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
-    """The bonus goods among what a kind of building needs in a month in a given year; those of
-    buildings that make goods boost what they make instead (boosts_of)."""
+    """The bonus goods among what a kind of building needs in a month in a given year: for homes
+    all but food and heating; those of buildings that make goods boost what they make instead
+    (boosts_of)."""
     needs = needs_of(kind, year)
+    if kind in HOMES:
+        return MappingProxyType(
+            {need: amount for need, amount in needs.items() if need not in HOME_DEMANDS}
+        )
     bonus = {need: amount for need, amount in needs.items() if need in BONUS_NEEDS}
     if kind in MAKES or len(bonus) == len(needs):
         return MappingProxyType({})

@@ -62,7 +62,7 @@ def test_details_of_an_empty_cell_show_its_land_and_nearby_points() -> None:
     assert details.title.startswith("Cell 5, 6")
 
 
-def test_a_building_needing_several_goods_lists_each_with_what_it_got() -> None:
+def test_a_tenement_needs_only_food_and_heating_and_takes_the_rest_as_bonus_goods() -> None:
     constructions = Constructions(make_map())
     constructions.build(Building((5, 5), BuildingKind.TENEMENT))
     growth = Growth(constructions)
@@ -70,21 +70,18 @@ def test_a_building_needing_several_goods_lists_each_with_what_it_got() -> None:
     details = describe(growth, (5, 5))
 
     tenement = details.buildings[0]
-    assert tenement.needs == [
-        (Need.FOOD, 60),
+    assert tenement.needs == [(Need.FOOD, 60), (Need.HEATING, 3)]
+    assert tenement.bonus == [
+        (Need.SALT, 2),
         (Need.GOODS, 20),
+        (Need.COFFEE, 2),
         (Need.CLOTHES, 3),
+        (Need.FURNITURE, 2),
+        (Need.BEER, 3),
         (Need.VODKA, 1),
         (Need.SHOES, 2),
         (Need.BRICKS, 5),
         (Need.REFINED_SUGAR, 2),
-        (Need.HEATING, 3),
-    ]
-    assert tenement.bonus == [
-        (Need.SALT, 2),
-        (Need.COFFEE, 2),
-        (Need.FURNITURE, 2),
-        (Need.BEER, 3),
         (Need.NEWSPAPERS, 3),
     ]
     assert tenement.got == [
