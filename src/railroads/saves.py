@@ -19,7 +19,6 @@ import zlib
 from collections.abc import Buffer
 from dataclasses import dataclass, field
 from datetime import datetime
-from io import BytesIO
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
@@ -108,57 +107,56 @@ class _Pickler(pickle.Pickler):
         return NotImplemented
 
 
+class _Pieces:
+    """What a pickler writes, kept as it comes rather than copied: its frames, and on their own
+    the large buffers of arrays, which it hands over as they are (pickle protocol 5). Those are
+    the game's own arrays, so the pieces hold the game only until it next changes."""
+
+    def __init__(self) -> None:
+        self.parts: list[memoryview] = []
+        self.size = 0
+
+    def write(self, data: Buffer) -> int:
+        part = memoryview(data).cast("B")
+        self.parts.append(part)
+        self.size += len(part)
+        return len(part)
+
+
 class ReusedMemory:
-    """Memory a game is pickled into and kept for the next time, so a monthly autosave doesn't
-    ask for a few hundred megabytes afresh; a snapshot pickled into it holds only until the
-    next one is. The first game is pickled the usual way, to learn how much memory to keep."""
+    """Memory games are pickled into and kept for the next time, so a monthly autosave doesn't
+    ask for a few hundred megabytes afresh; a snapshot held in it holds only until the next one
+    is."""
 
     def __init__(self) -> None:
         self._memory = np.empty(0, dtype=np.uint8)
-        self._end = 0
 
-    def reserve(self, size: int) -> None:
-        """Keeps room for `size` bytes, a quarter more for the game to grow into; the memory is
-        only taken from the system as it is written."""
-        self._memory = np.empty(size + size // 4, dtype=np.uint8)
-
-    @property
-    def reserved(self) -> bool:
-        return len(self._memory) > 0
-
-    def start(self) -> None:
-        self._end = 0
-
-    def write(self, data: Buffer) -> int:
-        view = np.frombuffer(memoryview(data).cast("B"), dtype=np.uint8)
-        end = self._end + len(view)
-        if end > len(self._memory):
+    def hold(self, parts: list[memoryview], size: int) -> memoryview:
+        """Copies the parts one after another, `size` bytes in all, into the memory; returns
+        them there."""
+        if size > len(self._memory):
             # A new block rather than a larger one: an old snapshot may still look into this one.
-            grown = np.empty(end + end // 2, dtype=np.uint8)
-            grown[: self._end] = self._memory[: self._end]
-            self._memory = grown
-        self._memory[self._end : end] = view
-        self._end = end
-        return len(view)
-
-    def written(self) -> memoryview:
-        return memoryview(self._memory[: self._end])
+            # A quarter more leaves the game room to grow; the system only hands the memory over
+            # as it is written.
+            self._memory = np.empty(size + size // 4, dtype=np.uint8)
+        end = 0
+        for part in parts:
+            self._memory[end : end + len(part)] = part
+            end += len(part)
+        return memoryview(self._memory[:size])
 
 
 def snapshot(saved: SavedGame, memory: ReusedMemory | None = None) -> Snapshot:
     """The game pickled now, into `memory` if given, which then mustn't be used again until the
-    snapshot has been written."""
+    snapshot has been written. It is pickled before anything is copied, so the copy goes into
+    memory of the size it needs."""
+    pieces = _Pieces()
+    _Pickler(pieces, protocol=pickle.HIGHEST_PROTOCOL).dump(saved)
     data: Buffer
-    if memory is None or not memory.reserved:
-        out = BytesIO()
-        _Pickler(out, protocol=pickle.HIGHEST_PROTOCOL).dump(saved)
-        data = out.getvalue()
-        if memory is not None:
-            memory.reserve(len(data))
+    if memory is None:
+        data = b"".join(pieces.parts)
     else:
-        memory.start()
-        _Pickler(memory, protocol=pickle.HIGHEST_PROTOCOL).dump(saved)
-        data = memory.written()
+        data = memory.hold(pieces.parts, pieces.size)
     header = {
         "format": SAVE_FORMAT,
         "title": saved.title,

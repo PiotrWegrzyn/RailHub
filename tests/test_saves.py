@@ -1,5 +1,7 @@
 import json
+import pickle
 from enum import Enum
+from io import BytesIO
 from pathlib import Path
 from types import BuiltinFunctionType, FunctionType
 
@@ -15,6 +17,7 @@ from railroads.saves import (
     SavedGame,
     SaveError,
     Saves,
+    _Pickler,
     name_problem,
     snapshot,
 )
@@ -265,3 +268,30 @@ def test_a_snapshot_in_reused_memory_holds_the_same_game_each_time(tmp_path: Pat
 
     assert differences(saved, loaded) == []
     assert bytes(snapshot(saved, memory).data) == plain
+
+
+@pytest.mark.parametrize("memory", [None, ReusedMemory()])
+def test_a_snapshot_holds_the_game_as_it_was_when_taken(
+    tmp_path: Path, memory: ReusedMemory | None
+) -> None:
+    saves = Saves(tmp_path)
+    saved = played_game()
+    houses = saved.game.growth.count(BuildingKind.HOUSE)
+    before = houses.copy()
+    taken = snapshot(saved, memory)
+
+    houses[8, 15] += 5
+    saves.autosave(taken)
+
+    assert np.array_equal(saves.load("autosave 1").game.growth.count(BuildingKind.HOUSE), before)
+
+
+def test_a_snapshot_is_the_game_pickled_as_ever() -> None:
+    saved = played_game()
+    plain = BytesIO()
+    _Pickler(plain, protocol=pickle.HIGHEST_PROTOCOL).dump(saved)
+
+    joined = bytes(snapshot(saved).data)
+    held = bytes(snapshot(saved, ReusedMemory()).data)
+
+    assert joined == held == plain.getvalue()
