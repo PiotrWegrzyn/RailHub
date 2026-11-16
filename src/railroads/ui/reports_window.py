@@ -150,6 +150,17 @@ def fuel_breakdown(fuel: Fuel, month: FuelMonth) -> list[tuple[str, str]]:
     return rows
 
 
+def _begin_year_plot(plot_id: str, height: float, unit: str) -> bool:
+    """Starts a plot the window's width over the years, both axes fitted to what it shows;
+    whether it is drawn (then end it with implot.end_plot)."""
+    if not implot.begin_plot(plot_id, (-1.0, height)):
+        return False
+    flags = implot.AxisFlags_.auto_fit.value
+    implot.setup_axes("", unit, flags, flags)
+    implot.setup_axis_format(implot.ImAxis_.x1.value, "%.0f")
+    return True
+
+
 def _draw_fuel(market: FuelMarket) -> None:
     """Each fuel's price over the years, what moved it last month, and what the trains bought of
     it this month."""
@@ -158,10 +169,7 @@ def _draw_fuel(market: FuelMarket) -> None:
         imgui.text_disabled("Fuel prices start after the first month")
         return
     imgui.text("Fuel prices, a unit")
-    if implot.begin_plot("##fuel prices", (-1.0, PLOT_HEIGHT * 1.4)):
-        flags = implot.AxisFlags_.auto_fit.value
-        implot.setup_axes("", "$", flags, flags)
-        implot.setup_axis_format(implot.ImAxis_.x1.value, "%.0f")
+    if _begin_year_plot("##fuel prices", PLOT_HEIGHT * 1.4, "$"):
         for fuel in opened:
             xs, ys = price_line(market.history[fuel])
             implot.plot_line(
@@ -224,11 +232,8 @@ class ReportsWindow:
 
     def _draw_deliveries(self, shown: Report) -> None:
         imgui.text("Cars delivered, by what they carried")
-        if not implot.begin_plot("##deliveries", (-1.0, PLOT_HEIGHT * 1.4)):
+        if not _begin_year_plot("##deliveries", PLOT_HEIGHT * 1.4, "cars"):
             return
-        flags = implot.AxisFlags_.auto_fit.value
-        implot.setup_axes("", "cars", flags, flags)
-        implot.setup_axis_format(implot.ImAxis_.x1.value, "%.0f")
         implot.setup_legend(implot.Location_.north_west.value, implot.LegendFlags_.outside.value)
         if shown.goods:
             implot.push_colormap(_goods_colormap())
@@ -253,11 +258,8 @@ class ReportsWindow:
 
     def _draw_line(self, title: str, key: str, years: list[int], values: list[int]) -> None:
         imgui.text(title)
-        if not implot.begin_plot(f"##{key}", (-1.0, PLOT_HEIGHT)):
+        if not _begin_year_plot(f"##{key}", PLOT_HEIGHT, ""):
             return
-        flags = implot.AxisFlags_.auto_fit.value
-        implot.setup_axes("", "", flags, flags)
-        implot.setup_axis_format(implot.ImAxis_.x1.value, "%.0f")
         xs = np.array(years, dtype=np.float64)
         ys = np.array(values, dtype=np.float64)
         implot.plot_stairs(title, xs, ys, implot.Spec(flags=implot.ItemFlags_.no_legend.value))
