@@ -140,6 +140,8 @@ BUILDING_SPRITES = {
     BuildingKind.PORCELAIN_WORKS: "porcelain_works",
     BuildingKind.MEAT_FACTORY: "meat_factory",
     BuildingKind.POWER_PLANT: "power_plant",
+    BuildingKind.DIESEL_POWER_PLANT: "diesel_power_plant",
+    BuildingKind.GAS_POWER_PLANT: "gas_power_plant",
     BuildingKind.SPACE_CENTER: "space_center",
     BuildingKind.PEAR_HQ: "pear_hq",
     BuildingKind.ROYAL_PALACE: "royal_palace",

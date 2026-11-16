@@ -177,7 +177,7 @@ def test_homes_and_factories_want_electricity_by_their_points_and_how_far_electr
     signals = signals_of(trade, None, 1000.0, 1955)
 
     assert signals[Fuel.ELECTRICITY].buildings == pytest.approx(ELECTRICITY_PER_POINT * 1000 * 0.5)
-    assert signals[Fuel.ELECTRICITY].natural == signals[Fuel.ELECTRICITY].buildings
+    assert signals[Fuel.ELECTRICITY].natural == 0.0
 
 
 def test_electricity_from_the_players_own_power_plants_costs_a_fifth() -> None:
@@ -194,13 +194,13 @@ def test_electricity_from_the_players_own_power_plants_costs_a_fifth() -> None:
 def test_a_fed_power_plant_the_player_owns_makes_electricity_and_others_do_not() -> None:
     cells = np.array([0, 1])
     got = {
-        (BuildingKind.POWER_PLANT, Need.BOILER_FUEL): (
+        (BuildingKind.POWER_PLANT, Need.COAL): (
             np.array([200.0, 200.0]),
             np.array([200.0, 200.0]),
         )
     }
     trade = Trade(cells, {}, {}, {}, {}, goods_got=got)
-    owned = np.array([[1, 0]])
+    owned = {BuildingKind.POWER_PLANT: np.array([[1, 0]])}
 
     signals = signals_of(trade, owned)
 

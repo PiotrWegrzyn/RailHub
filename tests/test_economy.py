@@ -534,18 +534,28 @@ def test_ports_bring_in_gas_only_once_there_is_any_in_1950(year: int, made: set)
     assert set(makes) == made
 
 
-def test_a_power_plant_burns_coal_oil_or_gas() -> None:
+@pytest.mark.parametrize(
+    ("kind", "need", "wanted"),
+    [
+        (BuildingKind.POWER_PLANT, Need.COAL, 200.0),
+        (BuildingKind.DIESEL_POWER_PLANT, Need.FUEL, 100.0),
+        (BuildingKind.GAS_POWER_PLANT, Need.GAS, 150.0),
+    ],
+)
+def test_each_kind_of_power_plant_burns_only_its_own_fuel(
+    kind: BuildingKind, need: Need, wanted: float
+) -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     economy.year = 1950
-    placed = counts(tile_map, ((8, 9), BuildingKind.POWER_PLANT, 1))
+    placed = counts(tile_map, ((8, 9), kind, 1))
 
-    trade = economy.trade(placed, holding(COAL=50.0, OIL=50.0, GAS=50.0))
+    trade = economy.trade(placed, holding(COAL=50.0, FUEL=50.0, GAS=50.0, OIL=50.0))
 
-    burned, needed = trade.goods_got[(BuildingKind.POWER_PLANT, Need.BOILER_FUEL)]
+    burned, needed = trade.goods_got[(kind, need)]
     at = position(trade, economy, (8, 9))
-    assert burned[at] == 150.0
-    assert needed[at] == 200.0
+    assert burned[at] == 50.0
+    assert needed[at] == wanted
 
 
 def test_bonus_goods_raise_a_fed_warm_and_furnished_house_past_full_satisfaction() -> None:

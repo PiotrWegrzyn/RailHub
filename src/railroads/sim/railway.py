@@ -45,7 +45,7 @@ import numpy.typing as npt
 from railroads.places import StationNames
 from railroads.sim.calls import StationCalls
 from railroads.sim.clock import SECONDS_PER_MONTH, START_YEAR
-from railroads.sim.constructions import BuildingKind, Constructions
+from railroads.sim.constructions import Constructions
 from railroads.sim.demand import PASSED_ALONG_PAY, StationDemand
 from railroads.sim.economy import COLLECTION_RADIUS, Trade
 from railroads.sim.facilities import (
@@ -67,7 +67,15 @@ from railroads.sim.finance import (
     storage_price,
     track_upkeep,
 )
-from railroads.sim.fuel_market import FUEL_OF, GOOD_OF, RETAIL_MARKUP, Fuel, FuelMarket, signals_of
+from railroads.sim.fuel_market import (
+    FUEL_OF,
+    GOOD_OF,
+    PLANT_FUEL,
+    RETAIL_MARKUP,
+    Fuel,
+    FuelMarket,
+    signals_of,
+)
 from railroads.sim.goods import TRAVELLERS, General, Good, Need
 from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
@@ -304,7 +312,9 @@ class Railway:
     def fuel_month(self, trade: Trade, points: float = 0.0) -> None:
         """Closes the fuel market's month with what this month's trade said about it, and the
         points of the map's homes and factories, which want electricity."""
-        owned = None if self.owners is None else self.owners.owned(BuildingKind.POWER_PLANT)
+        owned = (
+            None if self.owners is None else {kind: self.owners.owned(kind) for kind in PLANT_FUEL}
+        )
         self.fuel.month(self.year, signals_of(trade, owned, points, self.year))
 
     def car_capacity(

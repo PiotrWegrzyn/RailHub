@@ -2,7 +2,7 @@
 each cell, what buying one costs, and the share of what they sell that the player is paid.
 
 A building costs PAYBACK_YEARS of its owner's share at full output, OWNER_SHARE of what it sells,
-less what the player's tech takes off, down to MOST_DISCOUNT of the price; a power plant, which
+less what the player's tech takes off, down to MOST_DISCOUNT of the price; a power plant of any kind, which
 sells nothing but makes cheap electricity for the player's trains (railroads.sim.fuel_market),
 costs POWER_PLANT_PRICE. Tech in a building's
 tree can raise the share it pays and how many buildings' worth it makes. When buildings leave a
@@ -32,6 +32,9 @@ PAYBACK_YEARS = 5
 # However much tech cuts the price of buildings, they cost at least this share of it.
 MOST_DISCOUNT = 0.5
 POWER_PLANT_PRICE = 2_000_000.0
+POWER_PLANTS = frozenset(
+    {BuildingKind.POWER_PLANT, BuildingKind.DIESEL_POWER_PLANT, BuildingKind.GAS_POWER_PLANT}
+)
 
 
 class Owners:
@@ -77,7 +80,7 @@ class Owners:
         railway = growth.railway
         discount = 0.0 if railway is None else railway.research.bonus(Effect.DISCOUNT)
         kept = max(MOST_DISCOUNT, 1.0 - discount)
-        if kind == BuildingKind.POWER_PLANT:
+        if kind in POWER_PLANTS:
             return POWER_PLANT_PRICE * kept
         makes = makes_of(kind, growth.year)
         if not makes:

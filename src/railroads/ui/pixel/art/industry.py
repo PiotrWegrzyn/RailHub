@@ -2118,6 +2118,70 @@ def power_plant() -> Sprite:
     return p.sprite()
 
 
+def diesel_power_plant() -> Sprite:
+    """A diesel power station filling its cell: a long low engine hall in pale render with a row
+    of short exhaust stacks along its roof, white fuel tanks with stairs up their sides on a pad
+    behind, a transformer and a pylon carrying power lines away."""
+    p = Painter(50, 58, (24, 46))
+    plate = (164, 160, 152)
+    _plate(p, plate)
+    white = (224, 222, 216)
+    for u, v in ((-8, 7), (-2, 8.5), (4, 9)):
+        x, y = _iso(0, 0, u, v)
+        _turned(p, x, y, [(0, 3.2), (5, 3.2)], white, cap=shade(white, 1.08))
+        p.line([(x - 3, y - 0.5), (x - 0.5, y - 5)], shade(white, 0.62))
+    _pylon(p, *_iso(0, 0, -8, -8), -4)
+    wall = (206, 196, 176)
+    top = p.hall(*_iso(0, 0, -1, -1), 16, 6, 8, wall, None)
+    left, front, right, _ = top
+    _plinth(p, top, 8, shade(wall, 0.7))
+    _windows(
+        p, left, front, (0.15, 0.32, 0.5, 0.68, 0.85), (2.5,), 4, (88, 112, 140), shade(wall, 1.1)
+    )
+    _windows(p, front, right, (0.5,), (2.5,), 4, (70, 90, 112), shade(wall, 1.0))
+    p.gable(top, 2.5, (96, 92, 96), wall)
+    stack = (86, 84, 90)
+    for t in (0.2, 0.4, 0.6, 0.8):
+        x, y = _on_wall(left, front, t, -2)
+        p.line([(x + 2, y), (x + 2, y - 7)], stack)
+        p.line([(x + 3, y), (x + 3, y - 7)], shade(stack, 1.3))
+    _smoke(p, *_on_wall(left, front, 0.4, -10), (120, 118, 122), 2)
+    return p.sprite()
+
+
+def gas_power_plant() -> Sprite:
+    """A gas power station filling its cell: a modern turbine hall clad in grey-green panels, two
+    slim steel stacks, a round gas holder banded in green, a transformer yard and a pylon carrying
+    power lines away."""
+    p = Painter(50, 64, (24, 52))
+    plate = (166, 168, 162)
+    _plate(p, plate)
+    holder = (110, 140, 120)
+    x, y = _iso(0, 0, 6, 8)
+    _turned(p, x, y, [(0, 5.5), (12, 5.5), (13.5, 4.2)], holder)
+    for ring in (3, 6, 9):
+        p.line([(x - 6, y - ring), (x + 6, y - ring)], shade(holder, 0.7))
+    steel = (176, 180, 186)
+    for u in (-9, -6):
+        sx, sy = _iso(0, 0, u, 8)
+        p.line([(sx, sy), (sx, sy - 34)], shade(steel, 0.75))
+        p.line([(sx + 1, sy), (sx + 1, sy - 34)], steel)
+        p.line([(sx, sy - 31), (sx + 1, sy - 31)], (206, 60, 50))
+    _pylon(p, *_iso(0, 0, -8, -8), -4)
+    tx, ty = _iso(0, 0, 5, -7)
+    grey = (120, 126, 120)
+    p.box(tx, ty, 2, 2.5, grey, shade(grey, 1.15))
+    clad = (150, 170, 160)
+    top = p.hall(*_iso(0, 0, -2, -0.5), 13, 7, 11, clad, None)
+    left, front, right, _ = top
+    _plinth(p, top, 11, shade(clad, 0.7))
+    _band(p, left, front, 7, shade(clad, 1.2))
+    _band(p, front, right, 7, shade(clad, 1.05))
+    _windows(p, left, front, (0.2, 0.4, 0.6, 0.8), (2.5,), 3, (88, 112, 140), shade(clad, 1.2))
+    p.gable(top, 2, (100, 112, 108), clad)
+    return p.sprite()
+
+
 def shipyard() -> Sprite:
     """A shipyard filling its cell: a big ship's hull with a row of portholes on a slipway running
     down into the water past bollards on the quay, a gantry crane with its cab straddling it, a

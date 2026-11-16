@@ -164,6 +164,7 @@ class Need(Enum):
     NEWSPAPERS = "newspapers"
     REFINED_SUGAR = "refined sugar"
     PORCELAIN = "porcelain"
+    GAS = "gas"
     HEATING = "heating"
     BOILER_FUEL = "boiler fuel"
     COKE = "coke"
@@ -729,7 +730,9 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.FARM: {Need.MACHINERY: 1, Need.LIMESTONE: 2},
         BuildingKind.MINE: {Need.LUMBER: 20},
         BuildingKind.RAILWAY_WORKS: {Need.STEEL: 200},
-        BuildingKind.POWER_PLANT: {Need.BOILER_FUEL: 200},
+        BuildingKind.POWER_PLANT: {Need.COAL: 200},
+        BuildingKind.DIESEL_POWER_PLANT: {Need.FUEL: 100},
+        BuildingKind.GAS_POWER_PLANT: {Need.GAS: 150},
         BuildingKind.SPACE_CENTER: {Need.ELECTRONICS: 300, Need.FUEL: 1000, Need.FOOD: 300},
         BuildingKind.PEAR_HQ: {Need.ELECTRONICS: 500, Need.FOOD: 1000},
         BuildingKind.ROYAL_PALACE: {
@@ -787,6 +790,7 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.LUMBER,
     Need.COAL,
     BuildingKind.GASWORKS,
+    Need.GAS,
     BuildingKind.COKE_PLANT,
     Need.COKE,
     Need.IRON,

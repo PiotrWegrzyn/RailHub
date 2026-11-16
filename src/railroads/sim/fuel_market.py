@@ -15,9 +15,9 @@ ELECTRICITY_LEAST and ELECTRICITY_MOST of it, with supply against demand. It is 
 player's electric and maglev trains and by the map's homes and factories, ELECTRICITY_PER_POINT for
 each of their points times the share of them electrified, which grows by year from ELECTRIFICATION
 to ELECTRIFIED; the buildings only pull the price, they need no power delivered. It is made by the
-map's power plants, POWER_PLANT_OUTPUT a month each at full fuel and less on less, and the world
-around makes what the buildings want, so without trains and plants the price rests at its base.
-Power plants the player owns are counted among the map's, and their trains use what those make
+map's coal, diesel and gas power plants (PLANT_FUEL, railroads.sim.power_plants), POWER_PLANT_OUTPUT
+a month each at full fuel and less on less. Power plants the player owns are counted among the
+map's, and their trains use what those make
 first, at OWN_POWER_SHARE of the price.
 """
 
@@ -51,6 +51,14 @@ FUEL_OF: Mapping[Power, Fuel] = MappingProxyType(
 )
 # The good a fuel is, which trains can take from a station's stockpile; electricity is no good.
 GOOD_OF: Mapping[Fuel, Good] = MappingProxyType({Fuel.COAL: Good.COAL, Fuel.DIESEL: Good.FUEL})
+# Each kind of power plant and what it burns.
+PLANT_FUEL: Mapping[BuildingKind, Need] = MappingProxyType(
+    {
+        BuildingKind.POWER_PLANT: Need.COAL,
+        BuildingKind.DIESEL_POWER_PLANT: Need.FUEL,
+        BuildingKind.GAS_POWER_PLANT: Need.GAS,
+    }
+)
 # What a unit of each fuel costs at first, and the year its market opens.
 BASE_PRICE: Mapping[Fuel, float] = MappingProxyType(
     {Fuel.COAL: price_of(Good.COAL), Fuel.DIESEL: price_of(Good.FUEL), Fuel.ELECTRICITY: 5.0}
@@ -122,7 +130,7 @@ def electrified(year: int) -> float:
 
 def signals_of(
     trade: Trade,
-    owned_plants: np.ndarray | None = None,
+    owned: Mapping[BuildingKind, np.ndarray] | None = None,
     points: float = 0.0,
     year: int = OPENS[Fuel.ELECTRICITY],
 ) -> dict[Fuel, Signals]:
@@ -130,7 +138,7 @@ def signals_of(
     player's stations handed out of it to them and what the map's makers of it could make; for
     electricity what the map's homes and factories, worth `points` together, want of it in a
     year, what the map's power plants made and what share of their fuel they got, and what the
-    ones the player owns (a count per cell, on the map's grid) made."""
+    ones the player owns (a count per cell of each kind, on the map's grid) made."""
     signals = {}
     for fuel, good in GOOD_OF.items():
         needs = NEEDS[fuel]
@@ -148,18 +156,23 @@ def signals_of(
             float(most.sum()) for (_, made), (_, most) in trade.goods_gave.items() if made == good
         )
         signals[fuel] = Signals(wanted, handed, NATURAL_SUPPLY * makers)
-    got, want = trade.goods_got.get((BuildingKind.POWER_PLANT, Need.BOILER_FUEL), (None, None))
-    fed, own, made = 0.0, 0.0, 0.0
-    if got is not None and want is not None and float(want.sum()) > 0:
-        fed = min(1.0, float(got.sum()) / float(want.sum()))
-        per_plant = BUILDING_NEEDS[BuildingKind.POWER_PLANT][Need.BOILER_FUEL]
-        made = POWER_PLANT_OUTPUT * float(np.minimum(got, want).sum()) / per_plant
-        if owned_plants is not None:
+    made, own, got_all, wanted_all = 0.0, 0.0, 0.0, 0.0
+    for kind, need in PLANT_FUEL.items():
+        got, want = trade.goods_got.get((kind, need), (None, None))
+        if got is None or want is None or float(want.sum()) <= 0:
+            continue
+        per_plant = BUILDING_NEEDS[kind][need]
+        made += POWER_PLANT_OUTPUT * float(np.minimum(got, want).sum()) / per_plant
+        got_all += float(np.minimum(got, want).sum())
+        wanted_all += float(want.sum())
+        grid = None if owned is None else owned.get(kind)
+        if grid is not None:
             share = np.where(want > 0, np.minimum(1.0, got / np.where(want > 0, want, 1.0)), 0.0)
-            counts = np.asarray(owned_plants).ravel()[trade.cells]
-            own = POWER_PLANT_OUTPUT * float((counts * share).sum())
+            counts = np.asarray(grid).ravel()[trade.cells]
+            own += POWER_PLANT_OUTPUT * float((counts * share).sum())
+    fed = got_all / wanted_all if wanted_all > 0 else 0.0
     homes = ELECTRICITY_PER_POINT * points * electrified(year)
-    signals[Fuel.ELECTRICITY] = Signals(homes, made, homes, fed, own)
+    signals[Fuel.ELECTRICITY] = Signals(homes, made, 0.0, fed, own)
     return signals
 
 
