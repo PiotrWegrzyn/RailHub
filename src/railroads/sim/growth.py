@@ -383,7 +383,7 @@ class Growth:
             np.flatnonzero(self._occupied),
         )
         yield
-        self.station_trade.settle(self.trade)
+        yield from self.station_trade.settle_steps(self.trade)
         self.owners.pay(self.trade)
         self.station_trade.update_reach()
         yield

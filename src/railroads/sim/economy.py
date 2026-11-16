@@ -370,19 +370,16 @@ class _Month:
                 built |= n > 0
             cells = np.flatnonzero(built)
         self.cells = cells
-        self.count = {k: n[cells].astype(np.float64) for k, n in flat.items() if n[cells].any()}
+        in_cells = ((k, n[cells]) for k, n in flat.items())
+        self.count = {k: n.astype(np.float64) for k, n in in_cells if n.any()}
         self.zero = np.zeros(cells.size)
         self.priority = economy.levels[cells]
         for kind, recipe in RECIPES.items():
             for need in recipe.every_need:
-                economy.stock.setdefault((kind, need), np.zeros(economy.cells))
-        self.stock = {
-            (kind, need): np.minimum(
-                economy.stock[(kind, need)][cells],
-                input_stock(kind) * self.count.get(kind, self.zero),
-            )
-            for kind, need in economy.stock
-        }
+                if (kind, need) not in economy.stock:
+                    economy.stock[(kind, need)] = np.zeros(economy.cells)
+        # What each kind of processor holds of each input, worked out as the trade begins.
+        self.stock: dict[tuple[BuildingKind, Need], FloatCells] = {}
         # What buildings offer of each good, by kind and in all, and how much of it went.
         self.offers: dict[tuple[BuildingKind, Good], FloatCells] = {}
         self.offered = {good: self.zero.copy() for good in Good}
@@ -439,6 +436,15 @@ class _Month:
         }
 
     def run_steps(self) -> Steps[Trade]:
+        yield
+        economy, cells = self.economy, self.cells
+        self.stock = {
+            (kind, need): np.minimum(
+                economy.stock[(kind, need)][cells],
+                input_stock(kind) * self.count.get(kind, self.zero),
+            )
+            for kind, need in economy.stock
+        }
         yield
         paused = time.perf_counter()
         for step in PIPELINE:

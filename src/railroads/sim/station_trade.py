@@ -41,6 +41,7 @@ from railroads.sim.grids import Cell, Within, flat_within_any
 from railroads.sim.ladders import PASSENGERS_PER_POINT
 from railroads.sim.power_plants import powered_points
 from railroads.sim.station_goods import StationGoods
+from railroads.sim.steps import Steps, finish
 from railroads.sim.tech import GOOD_TREES, Tree
 from railroads.sim.trains import CAR_CAPACITY, MAX_CARS
 
@@ -85,6 +86,11 @@ class StationTrade:
         return orders
 
     def settle(self, trade: Trade) -> None:
+        finish(self.settle_steps(trade))
+
+    def settle_steps(self, trade: Trade) -> Steps[None]:
+        """settle in a few steps, which a caller can spread over frames; nothing else may change
+        the game between them."""
         railway = self._growth.railway
         if railway is None:
             return
@@ -101,6 +107,7 @@ class StationTrade:
             for good, amount in supplied.items():
                 goods.stockpile[good] = max(0.0, goods.stockpile.get(good, 0.0) - amount)
         railway.fuel_month(trade, powered_points(self._growth))
+        yield
         capacity = {}
         stations = railway.stations()
         for station, counts in zip(stations, self._ring_counts(stations), strict=True):
@@ -111,6 +118,7 @@ class StationTrade:
             capacity[station] = capacity_of(self._needs(counts) | as_needs(travellers))
         railway.year = self._growth.year
         railway.turn_month(capacity)
+        yield
         for station, handed_for in trade.handed_for.items():
             for (need, good), amount in handed_for.items():
                 railway.pay_for(station, need, good, amount)
