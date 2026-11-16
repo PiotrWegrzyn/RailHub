@@ -263,15 +263,18 @@ def test_every_building_gets_its_sprite(sheet: SpriteSheet) -> None:
     assert names.count("farm") == 1
 
 
-@pytest.mark.parametrize("small", [BuildingKind.BAKERY, BuildingKind.DAIRY])
-def test_big_and_mega_bakeries_and_dairies_stand_out_bigger_than_the_one_they_grew_from(
+@pytest.mark.parametrize("small", list(MERGED))
+def test_big_and_mega_works_have_sprites_of_their_own_no_smaller_than_the_one_they_grew_from(
     sheet: SpriteSheet, small: BuildingKind
 ) -> None:
     big, mega = MERGED[small]
 
-    widths = [sheet.sizes[sheet.index(BUILDING_SPRITES[kind]), 0] for kind in (small, big, mega)]
+    names = [BUILDING_SPRITES[kind] for kind in (small, big, mega)]
+    widths = [sheet.sizes[sheet.index(name), 0] for name in names]
 
-    assert widths[0] < widths[1] < widths[2]
+    assert len(set(names)) == 3
+    assert widths[0] <= widths[1] <= widths[2]
+    assert widths[0] < widths[2]
 
 
 @pytest.mark.parametrize("kind", [BuildingKind.BAKERY, BuildingKind.DAIRY])

@@ -16,6 +16,7 @@ from railroads.ui.pixel.art.painter import (
 from railroads.ui.pixel.art.parts import _heap, _on_wall, _patch
 
 ROOF: RGB = (150, 70, 52)
+MOLTEN: RGB = (240, 128, 36)
 SLATE: RGB = (88, 84, 92)
 
 
@@ -86,18 +87,30 @@ def tile_works() -> Sprite:
 
 
 def foundry() -> Sprite:
-    """A soot-dark foundry hall with a cupola furnace glowing at its door and iron castings laid
+    """A soot-dark foundry hall with its door glowing, a tall iron cupola furnace beside it with
+    fire and sparks at its top, molten iron running from its tap into a ladle and castings laid
     out on the sand in front."""
     p = Painter(30, 28, (14, 20))
     p.shadow(12, 3)
     top = _hall(p, shade(BRICK, 0.75), SLATE, 15)
     left, front, _, _ = top
-    _patch(p, left, front, (0.45, 0.6), (2, 6), (230, 120, 40))
+    _patch(p, left, front, (0.45, 0.6), (2, 6), MOLTEN)
     p.rect(9, -18, 11, -4, (60, 60, 64))
-    p.point(10, -19, (230, 120, 40))
+    p.point(10, -19, MOLTEN)
     p.blob(-12, 3, -4, 6, (214, 196, 146))
     for x in (-10, -7):
         p.ellipse(x - 1.2, 3.4, x + 1.2, 5.4, (74, 76, 82))
+    iron = (66, 62, 64)
+    p.rect(11, -9, 15, 5, iron)
+    for y in (-5, 0):
+        p.line([(11, y), (15, y)], shade(iron, 1.4))
+    p.ellipse(10.6, -10.6, 15.4, -8.4, MOLTEN)
+    p.blob(11.8, -10, 14.2, -9, (255, 226, 120))
+    for x, y in ((12, -13), (14.5, -14.5), (13, -16.5), (11, -15)):
+        p.point(x, y, (255, 200, 80))
+    p.polygon([(11, 3), (8, 4.6), (8.6, 5.4), (11, 4.4)], (40, 36, 36))
+    p.blob(6, 4.4, 9.4, 6.6, MOLTEN)
+    p.point(7.4, 5.2, (255, 226, 120))
     return p.sprite()
 
 
@@ -112,8 +125,8 @@ def sausage_maker() -> Sprite:
     return p.sprite()
 
 
-def _luxury_shop(sign: RGB, goods: RGB) -> Sprite:
-    p = Painter(22, 24, (10, 18))
+def _luxury_shop(sign: RGB, goods: RGB) -> Painter:
+    p = Painter(26, 26, (14, 20))
     p.shadow(8, 2.5)
     top = p.box(0, 0, 5, 6, (214, 200, 176), None)
     left, front, right, _ = top
@@ -124,22 +137,51 @@ def _luxury_shop(sign: RGB, goods: RGB) -> Sprite:
     _window(p, front, right, (0.3, 0.6), 1.2, shade(WINDOW, 0.8))
     _foot(p, top, 6)
     p.gable(top, 3, SLATE, (214, 200, 176))
-    return p.sprite()
+    return p
 
 
 def carpet_weaver() -> Sprite:
-    """A townhouse workshop with a red sign, carpets in reds and blues hung in its window."""
-    return _luxury_shop((150, 40, 40), (60, 90, 170))
+    """A townhouse workshop with a red sign and carpets in reds and blues hung in its window, and
+    two patterned rugs hung over a line beside it."""
+    p = _luxury_shop((150, 40, 40), (60, 90, 170))
+    pole = (110, 84, 60)
+    rugs = (((-10, -0.5), (176, 40, 44), (232, 190, 80)), ((-6, 1.5), (50, 80, 160), (220, 70, 60)))
+    for x, y in ((-12.5, -1.5), (-3.5, 3)):
+        p.line([(x, y), (x, y - 8)], pole)
+    p.line([(-12.5, -9.5), (-3.5, -5)], shade(pole, 1.2))
+    for (x, y), field, border in rugs:
+        p.polygon([(x - 2, y - 8), (x + 2, y - 6), (x + 2, y), (x - 2, y - 2)], border)
+        p.polygon(
+            [(x - 1.2, y - 6.8), (x + 1.2, y - 5.6), (x + 1.2, y - 1), (x - 1.2, y - 2.2)], field
+        )
+        p.point(x, y - 4, border)
+    return p.sprite()
 
 
 def clock_maker() -> Sprite:
-    """A townhouse shop with a dark green sign and a clock face showing in its window."""
-    return _luxury_shop((40, 90, 60), (232, 190, 70))
+    """A townhouse shop with a dark green sign and a clock face showing in its window, under a
+    little clock turret with a big white face."""
+    p = _luxury_shop((40, 90, 60), (232, 190, 70))
+    turret = (40, 90, 60)
+    p.rect(-2.5, -15, 2.5, -9, turret)
+    p.polygon([(-3.2, -15), (0, -19), (3.2, -15)], SLATE, shade(SLATE, 0.6))
+    p.ellipse(-2, -14.4, 2, -10.4, (246, 244, 236))
+    p.line([(0, -12.4), (0, -14)], (30, 30, 34))
+    p.line([(0, -12.4), (1.2, -12.4)], (30, 30, 34))
+    return p.sprite()
 
 
 def mirror_maker() -> Sprite:
-    """A townhouse shop with a gilded sign and mirrors glinting in its window."""
-    return _luxury_shop((200, 160, 60), GLASS)
+    """A townhouse shop with a gilded sign and mirrors glinting in its window, and tall mirrors
+    in gilt frames leant against its wall glinting in the sun."""
+    p = _luxury_shop((200, 160, 60), GLASS)
+    gilt = (214, 170, 60)
+    for x, y in ((-9, 1), (-6, 2.5)):
+        p.rect(x - 1.6, y - 6, x + 1.6, y, gilt)
+        p.rect(x - 0.8, y - 5.2, x + 0.8, y - 0.8, (176, 214, 236))
+        p.line([(x - 0.6, y - 2), (x + 0.6, y - 4.4)], (250, 252, 255))
+    p.point(-10.5, -6.5, (255, 255, 255))
+    return p.sprite()
 
 
 def manor() -> Sprite:

@@ -8,7 +8,6 @@ from railroads.ui.pixel.art.painter import (
     BARREL,
     BRICK,
     CAR_COLOURS,
-    CLOTH,
     COPPER,
     DOORWAY,
     GLASS,
@@ -556,12 +555,12 @@ def steel_mill() -> Sprite:
 
 
 def textile_mill() -> Sprite:
-    """A red-brick cotton mill of Łódź: a long block of storeys with rows of small arched windows
+    """A yellow-brick cotton mill of Łódź: a long block of storeys with rows of small arched windows
     over a dark plinth stained by the damp, a drainpipe and a cornice, a sawtooth weaving shed at
     its end, a tall banded round chimney, cart tracks worn out of both doors and bales of cloth
     by the door."""
-    p = Painter(37, 55, (17, 44))
-    wall, roof = (178, 78, 58), (80, 76, 84)
+    p = Painter(41, 55, (21, 44))
+    wall, roof = (206, 164, 92), (80, 76, 84)
     mill_foot, shed_foot = _footing(-4, -1, 14, 8), _footing(7, 4.5, 8, 8)
     _bed(p, mill_foot)
     _bed(p, shed_foot)
@@ -590,9 +589,42 @@ def textile_mill() -> Sprite:
     _door(p, shed[1], shed[2], (0.4, 0.75), 2, 5, (60, 44, 36), shade(wall, 1.1))
     _sawtooth(p, shed, 3, 4, (104, 100, 108), (160, 196, 218), wall)
     _windows(p, shed[0], shed[1], (0.2, 0.5, 0.8), (2.5,), 1, arch=lintel)
-    for x, y, colour in ((-10, 6, CLOTH[0]), (-6.5, 7.5, CLOTH[1]), (-10, 4, CLOTH[2])):
-        _bale(p, x, y, colour)
+    _spool(p, *_on_wall(left, front, 0.36, 3))
+    _drying_cloth(p, (-20, 1.5), (-6, 8.5), 8)
     return p.sprite()
+
+
+DYES: list[RGB] = [(206, 52, 50), (56, 98, 200), (238, 196, 56), (64, 158, 90), (150, 70, 170)]
+
+
+def _spool(p: Painter, x: float, y: float) -> None:
+    """A big cotton reel hung on a wall at (x, y) as a mill's sign, wound with red thread."""
+    p.line([(x, y - 1), (x, y + 1)], (60, 56, 54))
+    p.rect(x - 2.2, y + 1, x + 2.2, y + 1.8, (226, 200, 150))
+    p.rect(x - 1.5, y + 1.8, x + 1.5, y + 4.8, DYES[0])
+    p.line([(x - 1.5, y + 2.8), (x + 1.5, y + 2.8)], shade(DYES[0], 1.3))
+    p.rect(x - 2.2, y + 4.8, x + 2.2, y + 5.6, (226, 200, 150))
+
+
+def _drying_cloth(p: Painter, a: Point, b: Point, height: float) -> None:
+    """A rack of dyed cloth hung out to dry: a pole on two posts from `a` to `b` on the ground,
+    `height` up, with lengths of cloth in every dye hanging from it."""
+    post = (110, 84, 60)
+    for x, y in (a, b):
+        p.line([(x, y), (x, y - height)], post)
+    p.line([(a[0], a[1] - height), (b[0], b[1] - height)], shade(post, 1.2))
+    pieces = 5
+    for k in range(pieces):
+        t0, t1 = (k + 0.1) / pieces, (k + 0.9) / pieces
+        top0, top1 = _on_wall(a, b, t0, -height + 0.4), _on_wall(a, b, t1, -height + 0.4)
+        drop = height - 1.6 - 0.8 * (k % 2)
+        colour = DYES[k % len(DYES)]
+        p.polygon(
+            [top0, top1, (top1[0], top1[1] + drop), (top0[0], top0[1] + drop)],
+            colour,
+            shade(colour, 0.7),
+        )
+        p.line([top0, (top0[0], top0[1] + drop)], shade(colour, 1.25))
 
 
 def furniture_maker() -> Sprite:
@@ -1518,7 +1550,7 @@ def printing_works() -> Sprite:
 
 
 def sugar_refinery() -> Sprite:
-    """A tall brick refinery over a dark plinth stained by the damp, with rows of arched windows
+    """A tall refinery rendered sugar white over a dark plinth stained by the damp, with rows of arched windows
     and a cornice, a big banded square chimney, a cart track worn out of its door past a heap of
     sugar beet spreading over the ground, and white sacks and sugar loaves in blue paper at its
     foot."""
@@ -1530,9 +1562,9 @@ def sugar_refinery() -> Sprite:
     _spill(p, -12, 6, 2.5, beet)
     p.shadow(13, 4, reach=5)
     _track(p, foot[0], foot[1], (0.53, 0.77), 3.5)
-    wall = (184, 110, 74)
-    lintel = shade(wall, 1.25)
-    stack = p.box(8, -3, 2, 34, shade(wall, 0.9), (60, 52, 50))
+    wall = (232, 226, 210)
+    lintel = shade(wall, 1.1)
+    stack = p.box(8, -3, 2, 34, shade(BRICK, 0.95), (60, 52, 50))
     for a, b in ((stack[0], stack[1]), (stack[1], stack[2])):
         p.line([_on_wall(a, b, 0, 2), _on_wall(a, b, 1, 2)], (220, 220, 214))
         p.line([_on_wall(a, b, 0, 14), _on_wall(a, b, 1, 14)], shade(wall, 0.65))
@@ -2197,12 +2229,24 @@ def railway_works() -> Sprite:
         _patch(p, left, front, (f - 0.07, f + 0.07), (2, 7), DOORWAY)
     p.rect(12, -22, 13.6, -6, shade(BRICK, 0.9))
     p.line([(12, -23), (13.6, -23)], shade(BRICK, 0.5))
-    engine = (40, 44, 48)
-    p.rect(-14, 2, -8, 5, engine)
-    p.rect(-9, 0, -7, 5, engine)
-    p.rect(-14, 0.6, -13, 2, engine)
-    p.point(-12, 5.5, (150, 40, 36))
-    p.point(-9.5, 5.5, (150, 40, 36))
-    for x in (2, 7):
-        p.rect(x, 4, x + 4, 6.5, (120, 64, 44))
+    _locomotive(p, -12, 6)
+    for x in (3, 8):
+        p.rect(x, 3.5, x + 4, 6.5, (120, 64, 44))
+        p.point(x + 1, 7, (40, 40, 44))
+        p.point(x + 3, 7, (40, 40, 44))
     return p.sprite()
+
+
+def _locomotive(p: Painter, x: float, y: float) -> None:
+    """A green steam locomotive with red wheels and a tall black funnel, standing on (x, y)."""
+    green, black, red = (48, 120, 72), (36, 38, 42), (190, 48, 40)
+    p.rect(x - 4, y - 5, x + 3, y - 2, green)
+    p.line([(x - 4, y - 4.4), (x + 3, y - 4.4)], shade(green, 1.4))
+    p.rect(x + 2, y - 7.5, x + 5.5, y - 2, shade(green, 0.85))
+    p.rect(x + 2.6, y - 6.8, x + 4.8, y - 5.4, WINDOW)
+    p.rect(x - 3.6, y - 8, x - 2.2, y - 5, black)
+    p.rect(x - 4.4, y - 8.8, x - 1.4, y - 8, black)
+    p.rect(x - 5, y - 2, x + 5.5, y - 1.2, black)
+    p.line([(x - 5.4, y - 2.6), (x - 5.4, y - 1)], red)
+    for wx in (x - 2.5, x, x + 3.2):
+        p.ellipse(wx - 1.1, y - 1.8, wx + 1.1, y + 0.4, red)

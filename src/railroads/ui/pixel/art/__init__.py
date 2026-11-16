@@ -10,9 +10,11 @@ several families share are in parts. This module lists them all (SPRITES) and pa
 """
 
 from collections.abc import Callable
+from functools import cache
 
 from PIL import Image
 
+from railroads.sim.constructions import MERGED
 from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_pauls
 from railroads.ui.pixel.art.commerce import airport, department_store, hotel, port, shop, tavern
 from railroads.ui.pixel.art.crafts import (
@@ -391,6 +393,16 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "olympic_stadium": olympic_stadium,
 }
 
+# Works merge into big and mega ones (railroads.sim.constructions.MERGED), which look like the
+# works they grew from drawn GROWN_SCALE times as big, but no wider on the map than GROWN_WIDTH
+# pixels and never smaller, unless they have sprites of their own.
+GROWN_SCALE = {"big": 1.2, "mega": 1.4}
+GROWN_WIDTH = {"big": 38, "mega": 44}
+
+for _kind in MERGED:
+    for _size in GROWN_SCALE:
+        SPRITES.setdefault(f"{_size}_{_kind.name.lower()}", SPRITES[_kind.name.lower()])
+
 
 def shrink(sprite: Sprite, factor: float) -> Sprite:
     """A smaller copy of a sprite: each new pixel takes the colour of the old pixel under its
@@ -404,11 +416,23 @@ def shrink(sprite: Sprite, factor: float) -> Sprite:
 
 
 def _scale_of(name: str) -> float:
+    size, _, base = name.partition("_")
+    if size in GROWN_SCALE and SPRITES.get(name) is SPRITES.get(base):
+        scale = _scale_of(base)
+        room = GROWN_WIDTH[size] / _width(base)
+        return scale * max(1.0, min(GROWN_SCALE[size], room))
     if name.startswith(HOMES):
         return HOME_SCALE
     if name in FARMSTEADS:
         return FARMSTEAD_SCALE
     return BUILDING_SCALE if name.startswith(BUILDINGS) else 1.0
+
+
+@cache
+def _width(name: str) -> float:
+    """How many pixels wide a sprite is on the map."""
+    with drawn_at(_scale_of(name)):
+        return SPRITES[name]().image.width
 
 
 def fine_sprite(name: str, resolution: int) -> Sprite:

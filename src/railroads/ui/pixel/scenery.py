@@ -154,17 +154,9 @@ BUILDING_SPRITES = {
     BuildingKind.HOTEL: "hotel",
 }
 
-# Big and mega works look like the works they grew from.
-for _grown, _kind in GREW_FROM.items():
-    BUILDING_SPRITES[_grown] = BUILDING_SPRITES[_kind]
-
-# But big and mega bakeries and dairies have sprites of their own.
-BUILDING_SPRITES |= {
-    BuildingKind.BIG_BAKERY: "big_bakery",
-    BuildingKind.MEGA_BAKERY: "mega_bakery",
-    BuildingKind.BIG_DAIRY: "big_dairy",
-    BuildingKind.MEGA_DAIRY: "mega_dairy",
-}
+# Big and mega works have sprites of their own (railroads.ui.pixel.art.GROWN_SCALE).
+for _grown in GREW_FROM:
+    BUILDING_SPRITES[_grown] = _grown.name.lower()
 
 
 def station_sprite(level: int, line: str | None = None) -> str:
