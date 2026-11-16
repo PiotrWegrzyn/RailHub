@@ -9,7 +9,6 @@ from railroads.ui.pixel.art.industry import (
     GLAZING,
     STILL_SLATE,
     _bed,
-    _chimney,
     _crate,
     _door,
     _footing,
@@ -21,6 +20,7 @@ from railroads.ui.pixel.art.industry import (
     _ring,
     _roof_rows,
     _smoke,
+    _smoking_chimney,
     _spill,
     _stack,
     _stains,
@@ -405,8 +405,7 @@ def mega_brewery() -> Sprite:
     p.shadow(24, 5.5)
     _track(p, foot[0], foot[1], (0.62, 0.7), 5, ruts=False)
     _track(p, tower_foot[1], tower_foot[2], (0.3, 0.7), 5)
-    _chimney(p, 20, -6, -44, BRICK)
-    _smoke(p, 20.5, -46, (200, 200, 204), 4)
+    _smoking_chimney(p, 20, -6, -44, smoke=(200, 200, 204), puffs=4, close=True)
     for x, y in ((-18, -12), (-9, -15)):
         _kiln(p, x, y, 4.5, 14)
     top = _brewhouse(p, -6, 0, 24, 13)
@@ -997,8 +996,7 @@ def big_meat_factory() -> Sprite:
     _puddle(p, 21, 9.5, 1.5)
     top = _slaughterhouse(p, -2, -4, 18, 9)
     left, front, _, _ = top
-    _chimney(p, -6, -18, -30, BRICK)
-    _smoke(p, -5.5, -32, (200, 200, 204), 3)
+    _smoking_chimney(p, -6, -18, -30, smoke=(200, 200, 204), close=True)
     _ham(p, *_on_wall(left, front, 0.04, 2), 1)
     _pen(p, -17, 5, 6, ((-19, 4), (-15, 6.5), (-15, 2.5)))
     _cold_store(p, 15, 4, 8, 7, 8)
@@ -1017,8 +1015,7 @@ def mega_meat_factory() -> Sprite:
     _bed(p, foot)
     _bed(p, store_foot, margin=1)
     p.shadow(25, 5.5)
-    _chimney(p, -14, -18, -44, BRICK)
-    _smoke(p, -13.5, -46, (200, 200, 204), 4)
+    _smoking_chimney(p, -14, -18, -44, smoke=(200, 200, 204), puffs=4, close=True)
     top = _slaughterhouse(p, -4, -6, 26, 12)
     left, front, _, _ = top
     _ham(p, *_on_wall(left, front, 0.03, 2), 1.4)
@@ -1309,8 +1306,7 @@ def mega_barrel_maker() -> Sprite:
     left, front, _, _ = top
     _windows(p, left, front, (0.1, 0.24, 0.84, 0.94), (6,), 2, shade(WINDOW, 1.1))
     _louvre(p, top, 4, (0.3, 0.75))
-    _chimney(p, -18, -17, -30, BRICK)
-    _smoke(p, -17.5, -32, puffs=3)
+    _smoking_chimney(p, -18, -17, -30, close=True)
     _shavings(p, ((-9, 8.5), (-6, 9.4), (-12, 7.6), (-4, 8.6), (-8, 10.4), (-1, 10)))
     for x, y in ((8, 10), (13, 7.5), (18, 5)):
         _firing(p, x, y)

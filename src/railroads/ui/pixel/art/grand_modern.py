@@ -12,7 +12,6 @@ from railroads.ui.pixel.art.industry import (
     GLAZING,
     _bed,
     _car,
-    _chimney,
     _door,
     _drum,
     _footing,
@@ -23,6 +22,7 @@ from railroads.ui.pixel.art.industry import (
     _sack,
     _sawtooth,
     _smoke,
+    _smoking_chimney,
     _stains,
     _tank_vehicle,
     _track,
@@ -1144,8 +1144,7 @@ def big_gun_factory() -> Sprite:
     p.polygon(yard, (140, 130, 104))
     p.shadow(19, 5)
     for x, tall in ((-10, 26), (0, 20)):
-        _chimney(p, x, -10, -10 - tall, shade(BRICK, 0.8))
-        _smoke(p, x + 1, -13 - tall, (150, 148, 150), 3)
+        _smoking_chimney(p, x, -10, -10 - tall, shade(BRICK, 0.8))
     _gun_shop(p, 7, -8, 13, 7, 11)
     top = _gun_hall(p, -4, 1, 17, 9, 8)
     left, front, _, _ = top
@@ -1170,8 +1169,7 @@ def mega_gun_factory() -> Sprite:
         p.line([_iso(0, 0, 0, v), _iso(0, 0, 10, v)], shade(EARTH, 0.82))
     for k, u in enumerate((-12, -7, -2)):
         x, y = _iso(0, 0, u, 13)
-        _chimney(p, x, y, y - 32 + 2 * k, shade(BRICK, 0.8))
-        _smoke(p, x + 1, y - 35 + 2 * k, (150, 148, 150), 3)
+        _smoking_chimney(p, x, y, y - 32 + 2 * k, shade(BRICK, 0.8))
     _gun_shop(p, *_iso(0, 0, -1, 8), 22, 9, 15)
     gx, gy = _iso(0, 0, 11, 3)
     for dv in (-3.5, 3.5):
@@ -1281,8 +1279,7 @@ def big_tank_factory() -> Sprite:
     _plate(p, TANK_YARD, 24)
     for u in (4, 9):
         x, y = _iso(0, 0, u, 12)
-        _chimney(p, x, y, y - 22, shade(BRICK, 0.8))
-        _smoke(p, x + 1, y - 25, (150, 148, 150), 2)
+        _smoking_chimney(p, x, y, y - 22, shade(BRICK, 0.8), puffs=2)
     _proving_ground(p, -2, 12, -12, -1)
     under = shade(TANK_YARD, 0.76)
     halls = (((0, 9.5), 22, 5, 8, 0.95), ((-6.5, 2.5), 11, 7, 7, 1.0), ((5.5, 3.5), 9, 5, 6, 0.9))
@@ -1311,8 +1308,7 @@ def mega_tank_factory() -> Sprite:
     _plate(p, TANK_YARD, 29)
     for k, u in enumerate((0, 5, 10)):
         x, y = _iso(0, 0, u, 14)
-        _chimney(p, x, y, y - 26 + 2 * k, shade(BRICK, 0.8))
-        _smoke(p, x + 1, y - 29 + 2 * k, (150, 148, 150), 3)
+        _smoking_chimney(p, x, y, y - 26 + 2 * k, shade(BRICK, 0.8))
     _proving_ground(p, -1, 14.5, -14.5, 0.5)
     under = shade(TANK_YARD, 0.76)
     halls = (((0.5, 11.5), 27, 5, 9, 0.95), ((-8, 4.5), 12, 8, 8, 1.0), ((7, 5.5), 13, 5, 7, 0.9))

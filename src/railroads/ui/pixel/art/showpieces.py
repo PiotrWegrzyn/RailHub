@@ -4,15 +4,13 @@ furnaces and converters throwing fire."""
 
 from railroads.ui.pixel.art.grand_fire import WHITE_HOT
 from railroads.ui.pixel.art.industry import (
-    SMOKE,
     _bed,
-    _chimney,
     _door,
     _footing,
     _ring,
     _roof_rows,
     _sawtooth,
-    _smoke,
+    _smoking_chimney,
     _spill,
     _stains,
     _window,
@@ -324,8 +322,7 @@ def big_steel_mill() -> Sprite:
         _stove(p, x, y, 18)
     for x, y in ((-4, -6), (4, -7)):
         _blast_furnace(p, x, y, 22)
-    _chimney(p, -10, -6, -34, shade(BRICK, 0.75))
-    _smoke(p, -9.5, -36, SMOKE, 4)
+    _smoking_chimney(p, -10, -6, -34, shade(BRICK, 0.75), puffs=4, close=True)
     top = _casting_hall(p, 2, 1, 18, 8, 7)
     p.gable(top, 3, (60, 58, 62), IRON)
     _heap(p, -15, 4, 3, 3, ORE)
@@ -347,8 +344,7 @@ def mega_steel_mill() -> Sprite:
     _spill(p, -21, 6, 3.5, ORE)
     p.shadow(23, 6)
     for k, x in enumerate((-14, -6, 2, 10)):
-        _chimney(p, x, -14 + k, -48 + k, shade(BRICK, 0.72))
-        _smoke(p, x + 0.5, -50 + k, SMOKE, 4)
+        _smoking_chimney(p, x, -14 + k, -48 + k, shade(BRICK, 0.72), puffs=4, close=True)
     for x, y in ((14, -12), (17, -10.5), (20, -9), (23, -7.5)):
         _stove(p, x, y, 20)
     for x, y in ((-10, -8), (-2, -9), (6, -10)):

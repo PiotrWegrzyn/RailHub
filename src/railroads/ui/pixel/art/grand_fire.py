@@ -12,7 +12,6 @@ from railroads.ui.pixel.art.industry import (
     SMOKE,
     SOIL,
     _bed,
-    _chimney,
     _crate,
     _door,
     _footing,
@@ -21,6 +20,7 @@ from railroads.ui.pixel.art.industry import (
     _roof_rows,
     _sack,
     _smoke,
+    _smoking_chimney,
     _spill,
     _stains,
     _track,
@@ -211,8 +211,7 @@ def big_coke_plant() -> Sprite:
     them, a timber quench tower pouring steam, two tall chimneys smoking and a heap of grey coke."""
     p = Painter(54, 64, (27, 52))
     for x, foot, tip in ((-8, -16, -40), (9, -11, -35)):
-        _chimney(p, x, foot, tip, shade(BRICK, 0.85))
-        _smoke(p, x + 0.5, tip - 2, SMOKE, 3)
+        _smoking_chimney(p, x, foot, tip, shade(BRICK, 0.85), close=True)
     p.shadow(22, 6)
     _quench_tower(p, 19, -5, 3.5, 17, 4, -0.8)
     back = _battery(p, 2, -8, 24, 6, 8, (), 6)
@@ -236,8 +235,7 @@ def mega_coke_plant() -> Sprite:
     three tall chimneys smoking, coke wagons and a great heap of coke."""
     p = Painter(64, 80, (31, 62))
     for x, foot, tip in ((-19, -20, -50), (-4, -14, -48), (12, -7, -44)):
-        _chimney(p, x, foot, tip, shade(BRICK, 0.82))
-        _smoke(p, x + 0.5, tip - 2, SMOKE, 3)
+        _smoking_chimney(p, x, foot, tip, shade(BRICK, 0.82), close=True)
     for x, y, half, tall in ((2, -16, 2.2, 16), (6, -14, 1.6, 20), (-9, -18, 1.6, 14)):
         _column(p, x, y, half, tall, TANK)
     p.shadow(28, 7)
@@ -357,8 +355,7 @@ def big_foundry() -> Sprite:
     tall iron cupolas throwing sparks beside a charging deck, molten iron running from their tap
     into a ladle, glowing moulds in a bed of sand, castings laid out and a chimney smoking."""
     p = Painter(52, 58, (25, 46))
-    _chimney(p, -11, -12, -35, shade(BRICK, 0.7))
-    _smoke(p, -10.5, -37, SMOKE, 3)
+    _smoking_chimney(p, -11, -12, -35, shade(BRICK, 0.7), close=True)
     p.shadow(20, 5)
     foot = _footing(-3, -1, 20, 8)
     _bed(p, foot, SOIL)
@@ -404,8 +401,7 @@ def mega_foundry() -> Sprite:
     flywheel and pig iron laid out, two chimneys smoking and a wagon of castings on the siding."""
     p = Painter(64, 72, (31, 56))
     for x, foot, tip in ((-15, -17, -45), (-3, -14, -42)):
-        _chimney(p, x, foot, tip, shade(BRICK, 0.7))
-        _smoke(p, x + 0.5, tip - 2, SMOKE, 3)
+        _smoking_chimney(p, x, foot, tip, shade(BRICK, 0.7), close=True)
     p.shadow(27, 6)
     foot = _footing(-4, 0, 28, 10)
     _bed(p, foot, SOIL)
@@ -527,8 +523,7 @@ def big_gasworks() -> Sprite:
     beside it, a long brick retort house with its retort mouths glowing and a louvred vent on its
     ridge, a tall chimney smoking, a coal wagon on the siding and a heap of coal."""
     p = Painter(54, 56, (27, 44))
-    _chimney(p, -18, -8, -32, shade(BRICK, 0.9))
-    _smoke(p, -17.5, -34, SMOKE, 3)
+    _smoking_chimney(p, -18, -8, -32, shade(BRICK, 0.9), close=True)
     p.shadow(22, 5)
     _gasholder(p, 8, -5, 8.5, 20, 12)
     _gasholder(p, 19, 3.5, 5, 12, 5)
@@ -552,8 +547,7 @@ def mega_gasworks() -> Sprite:
     and coke."""
     p = Painter(64, 74, (31, 54))
     for x, foot, tip in ((-25, -4, -38), (-17, -8, -42)):
-        _chimney(p, x, foot, tip, shade(BRICK, 0.9))
-        _smoke(p, x + 0.5, tip - 2, SMOKE, 3)
+        _smoking_chimney(p, x, foot, tip, shade(BRICK, 0.9), close=True)
     p.shadow(28, 6)
     _gasholder(p, -4, -12, 9, 26, 18, 2)
     _gasholder(p, 15, -5, 10, 26, 10, 2)
@@ -1150,8 +1144,7 @@ def _long_kiln(p: Painter, x: float, y: float, length: float, depth: float, chim
     for along in (0.15, 0.35, 0.65, 0.85):
         p.point(*_on_roof(top, 2.5, along, 0.5), (60, 54, 54))
     cx, cy = _mid(_mid(top[0], top[3]), _mid(top[1], top[2]))
-    _chimney(p, cx, cy - 2, y - chimney, shade(BRICK, 0.9))
-    _smoke(p, cx + 1, y - chimney - 3, SMOKE, 3)
+    _smoking_chimney(p, cx, cy - 2, y - chimney, shade(BRICK, 0.9))
     return top
 
 
@@ -1170,8 +1163,7 @@ def _round_kiln(p: Painter, x: float, y: float, r: float, chimney: float) -> Non
     for k in range(6):
         a = 0.4 + k * 0.5
         p.point(x + (r - 1) * math.cos(a), y - 7.5 + (r - 1) / 2 * math.sin(a), (60, 54, 54))
-    _chimney(p, x, y - 8, y - chimney, shade(BRICK, 0.9))
-    _smoke(p, x + 1, y - chimney - 3, SMOKE, 3)
+    _smoking_chimney(p, x, y - 8, y - chimney, shade(BRICK, 0.9))
 
 
 def _clay_heap(p: Painter, x: float, y: float, half: float) -> None:
@@ -1342,8 +1334,7 @@ def mega_cement_works() -> Sprite:
     p = Painter(64, 80, (31, 60))
     p.polygon([(-30, 2), (-10, -20), (26, -16), (31, 6), (8, 18.5), (-22, 15)], CEMENT_GROUND)
     p.shadow(27, 7)
-    _chimney(p, 25, -8, -46, shade(CEMENT, 0.85))
-    _smoke(p, 25.5, -48, CEMENT_DUST, 3)
+    _smoking_chimney(p, 25, -8, -46, shade(CEMENT, 0.85), smoke=CEMENT_DUST, close=True)
     _preheater(p, 18, -10, 4, 27)
     _preheater(p, 10, -13, 4, 31)
     for k in range(6):

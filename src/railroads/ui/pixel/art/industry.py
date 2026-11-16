@@ -148,8 +148,7 @@ def works(wall: RGB, roof: RGB, sign: RGB, stacks: int) -> Sprite:
     p.line([(-8, -4), (-5, -3.5)], (240, 240, 236))
     for k in range(stacks):
         x = 3 + 4 * k
-        _chimney(p, x, -9, -23, shade(BRICK, 0.8))
-        _smoke(p, x + 1, -26, (150, 148, 150), 2)
+        _smoking_chimney(p, x, -9, -23, shade(BRICK, 0.8), puffs=2)
     for x, y in ((9, 6.5), (11, 5.5)):
         _crate(p, x, y)
     _oil(p, 4.5, 5.5, 1.2)
@@ -195,6 +194,25 @@ def _smoke(p: Painter, x: float, y: float, colour: RGB = SMOKE, puffs: int = 3) 
         r = 1.5 + 0.6 * i
         cx, cy = x + 1.5 * i, y - 2.5 * i
         p.blob(cx - r, cy - r, cx + r, cy + r, colour if i % 2 else shade(colour, 0.86))
+
+
+def _smoking_chimney(
+    p: Painter,
+    x: float,
+    foot: float,
+    top: float,
+    colour: RGB = BRICK,
+    smoke: RGB = SMOKE,
+    puffs: int = 3,
+    close: bool = False,
+) -> None:
+    """A chimney (_chimney) with smoke rising from its cap, puffing from right over it if `close`
+    and a little higher and further right otherwise."""
+    _chimney(p, x, foot, top, colour)
+    if close:
+        _smoke(p, x + 0.5, top - 2, smoke, puffs)
+    else:
+        _smoke(p, x + 1, top - 3, smoke, puffs)
 
 
 def _gear(p: Painter, x: float, y: float, radius: float, colour: RGB) -> None:
@@ -547,8 +565,7 @@ def textile_mill() -> Sprite:
     p.shadow(15, 5, reach=4)
     _track(p, mill_foot[0], mill_foot[1], (0.68, 0.84), 3.5)
     _track(p, shed_foot[1], shed_foot[2], (0.4, 0.75), 3)
-    _chimney(p, 11, 0, -32, shade(wall, 0.92))
-    _smoke(p, 12, -35)
+    _smoking_chimney(p, 11, 0, -32, shade(wall, 0.92))
     top = p.hall(-4, -1, 14, 8, 15, wall, roof)
     left, front, right, _ = top
     _plinth(p, top, 15, wall)
@@ -982,8 +999,7 @@ def brickworks() -> Sprite:
     _turned(p, x, y - 6, [(0, r + 1), (3, r - 4)], (96, 86, 86), cap=(118, 106, 104))
     for a in (0.5, 1.2, 1.9, 2.6):
         p.point(x + (r - 1) * math.cos(a), y - 7.5 + (r - 1) / 2 * math.sin(a), (60, 54, 54))
-    _chimney(p, x, y - 8, y - 35, shade(BRICK, 0.9))
-    _smoke(p, x + 1, y - 38, puffs=2)
+    _smoking_chimney(p, x, y - 8, y - 35, shade(BRICK, 0.9), puffs=2)
     _heap(p, -12, 7, 3, 2.5, (176, 122, 86))
     for bx, by in ((13, 2), (8.5, 5.5)):
         stack = p.hall(bx, by, 4, 3, 3, BRICK, shade(BRICK, 1.25))
@@ -1432,8 +1448,7 @@ def paper_mill() -> Sprite:
     p.blob(12, 4, 18, 8, (120, 96, 66))
     p.shadow(11, 4)
     _track(p, foot[1], foot[2], (0.4, 0.65), 4)
-    _chimney(p, 8, -4, -30)
-    _smoke(p, 9, -33)
+    _smoking_chimney(p, 8, -4, -30)
     wall, roof = (192, 168, 136), (100, 86, 80)
     top = p.hall(-1, -3, 12, 8, 9, wall, None)
     left, front, right, _ = top
@@ -1939,8 +1954,7 @@ def mega_factory() -> Sprite:
     _puddle(p, *_iso(0, 0, 3, -9), 1.3)
     for u in (-9, -4, 1, 6):
         x, y = _iso(0, 0, u, 10)
-        _chimney(p, x, y - 4, y - 30, shade(BRICK, 0.8))
-        _smoke(p, x + 1, y - 33, (214, 214, 218))
+        _smoking_chimney(p, x, y - 4, y - 30, shade(BRICK, 0.8), smoke=(214, 214, 218))
     lintel = shade(BRICK, 1.3)
     for v, height, tone in ((6, 8, 0.9), (0, 9, 1.0), (-6, 7, 1.08)):
         wall = shade(BRICK, tone)
@@ -2036,8 +2050,7 @@ def power_plant() -> Sprite:
     _spill(p, cx, cy, 5, (48, 46, 50))
     _puddle(p, *_iso(0, 0, -8.5, -2), 1.3)
     cx, cy = _iso(0, 0, -9, 9)
-    _chimney(p, cx, cy - 4, cy - 38, shade(BRICK, 0.9))
-    _smoke(p, cx + 1, cy - 41, (124, 122, 126))
+    _smoking_chimney(p, cx, cy - 4, cy - 38, shade(BRICK, 0.9), smoke=(124, 122, 126))
     _cooling_tower(p, *_iso(0, 0, -2, 9.5))
     _pylon(p, *_iso(0, 0, -8, -8), -4)
     tx, ty = _iso(0, 0, -4.5, -6)

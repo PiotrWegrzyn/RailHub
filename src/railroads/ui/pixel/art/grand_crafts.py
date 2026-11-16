@@ -36,6 +36,7 @@ from railroads.ui.pixel.art.industry import (
     _sawtooth,
     _skylight,
     _smoke,
+    _smoking_chimney,
     _spill,
     _spool,
     _stack,
@@ -542,8 +543,7 @@ def big_tannery() -> Sprite:
     p.blob(-12, 5, -3, 10, SODDEN)
     _spill(p, -20, 0, 3, BARK)
     p.shadow(16, 4)
-    _chimney(p, 13, -9, -30, shade(BRICK, 0.8))
-    _smoke(p, 14, -33, SMOKE, 3)
+    _smoking_chimney(p, 13, -9, -30, shade(BRICK, 0.8))
     _tan_shed(p, 6, -9, 10, 5, 4, False)
     _track(p, near[0], near[1], (0.75, 0.92), 3)
     _tan_shed(p, -6, -2, 16, 7, 9, True)
@@ -821,8 +821,7 @@ def mega_furniture_maker() -> Sprite:
     p.blob(4, -12, 30, 6, SOIL)
     p.shadow(24, 5)
     _track(p, foot[0], foot[1], (0.78, 0.94), 3.5)
-    _chimney(p, 2, -14, -44, shade(BRICK, 0.85))
-    _smoke(p, 3, -47, STEAM, 3)
+    _smoking_chimney(p, 2, -14, -44, shade(BRICK, 0.85), smoke=STEAM)
     kiln = p.box(16, -10, 4, 16, shade(JOINER_WALL, 0.9), None)
     _plank_walls(p, kiln, 16)
     for a, b in ((kiln[0], kiln[1]), (kiln[1], kiln[2])):
@@ -947,8 +946,7 @@ def big_paper_mill() -> Sprite:
     p.blob(10, 2, 24, 10, (120, 96, 66))
     p.shadow(16, 4)
     _track(p, foot[1], foot[2], (0.4, 0.65), 4)
-    _chimney(p, 11, -8, -38)
-    _smoke(p, 12, -41, puffs=3)
+    _smoking_chimney(p, 11, -8, -38)
     top = _paper_mill_hall(p, 1, -6, 18, 9, 10, 2)
     left, front, _, _ = top
     p.gable(top, 5, PAPER_ROOF, PAPER_WALL)
@@ -977,8 +975,7 @@ def mega_paper_mill() -> Sprite:
     p.blob(8, 2, 30, 14, (120, 96, 66))
     p.shadow(22, 5)
     for x, foot_y, tall in ((4, -18, 34), (24, -12, 34)):
-        _chimney(p, x, foot_y, foot_y - tall)
-        _smoke(p, x + 1, foot_y - tall - 3, puffs=3)
+        _smoking_chimney(p, x, foot_y, foot_y - tall)
     for x, y in ((20, -14), (25, -11.5)):
         _turned(
             p,
@@ -1256,8 +1253,7 @@ def mega_tool_works() -> Sprite:
     _spill(p, -22, 5, 4.5, COAL)
     p.shadow(23, 5)
     for k, x in enumerate((-12, -2, 8)):
-        _chimney(p, x, -14 + k, -42 + k, (74, 58, 52))
-        _smoke(p, x + 1, -45 + k, (96, 94, 98), 3)
+        _smoking_chimney(p, x, -14 + k, -42 + k, (74, 58, 52), smoke=(96, 94, 98))
     _sparks(p, ((-14, -46), (-10, -44), (-4, -47), (0, -45), (6, -46), (10, -44), (-8, -49)))
     house = p.hall(14, -10, 8, 8, 16, shade(FORGE_WALL, 1.08), None)
     _plinth(p, house, 16, FORGE_WALL)
@@ -1385,8 +1381,7 @@ def big_machine_works() -> Sprite:
     _bed(p, _footing(12, -9, 10, 7))
     p.polygon([(4, 9), (17, 2.5), (26, 7), (13, 13.5)], GRAVEL)
     p.shadow(20, 5)
-    _chimney(p, 2, -14, -40, shade(BRICK, 0.85))
-    _smoke(p, 3, -43, SMOKE, 3)
+    _smoking_chimney(p, 2, -14, -40, shade(BRICK, 0.85))
     shop = p.hall(12, -9, 10, 7, 7, shade(BRICK, 0.95), None)
     _plinth(p, shop, 7, BRICK)
     _windows(p, shop[0], shop[1], (0.25, 0.5, 0.75), (2.4,), 3, arch=shade(BRICK, 1.3))
