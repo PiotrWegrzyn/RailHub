@@ -665,3 +665,16 @@ def test_food_taken_at_a_station_after_its_need_was_served_counts_for_the_next_m
     finish(steps)
 
     assert economy.taken == late
+
+
+@pytest.mark.parametrize("good", ["SHOES", "CLOTHES", "FURNITURE", "POTS"])
+def test_any_common_good_meets_a_homes_need_for_common_goods(good: str) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
+
+    trade = economy.trade(placed, holding(**{good: 10.0}))
+
+    got, wanted = trade.goods_got[(BuildingKind.HOUSE, Need.COMMON)]
+    at = position(trade, economy, (8, 9))
+    assert got[at] == wanted[at] == 3.0

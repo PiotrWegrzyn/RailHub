@@ -60,16 +60,17 @@ from railroads.sim.finance import (
     storage_price,
     track_upkeep,
 )
-from railroads.sim.goods import TRAVELLERS, Good, Need
+from railroads.sim.goods import TRAVELLERS, General, Good, Need
 from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
-from railroads.sim.tech import GOOD_TREES, Effect, Research
+from railroads.sim.tech import GENERAL_CARS, GOOD_TREES, Effect, Research
 from railroads.sim.track_network import TrackNetwork
 from railroads.sim.trains import (
     ENGINES,
     EXPRESS_FARE,
     FIRST_ENGINE,
+    Cargo,
     Point,
     Power,
     Stop,
@@ -163,9 +164,16 @@ class Railway:
             if not any(ENGINES[newer].replaces(ENGINES[name]) for newer in opened)
         ]
 
-    def can_carry(self, train: Train, good: Good) -> bool:
-        """Whether a train's engine takes cars of a good: an express takes only passengers."""
-        return not ENGINES[train.engine].express or good == Good.PASSENGERS
+    def can_carry(self, train: Train, cargo: Cargo) -> bool:
+        """Whether a train's engine takes cars of a good: an express takes only passengers;
+        and a general car only once its tech is taken."""
+        if isinstance(cargo, General) and not self.general_open(cargo):
+            return False
+        return not ENGINES[train.engine].express or cargo == Good.PASSENGERS
+
+    def general_open(self, general: General) -> bool:
+        """Whether the player has the tech for general cars of a kind."""
+        return GENERAL_CARS[general] in self.research.taken
 
     def buy(self, engine: str = FIRST_ENGINE, route_of: Train | None = None) -> Train | None:
         """Buys a train with an engine the player can buy, calling at the stops of `route_of` if

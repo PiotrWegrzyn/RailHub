@@ -106,8 +106,8 @@ def links(tree: Tree) -> list[tuple[str, str]]:
 def describe(node: Node) -> str:
     """What a node does, in a few words."""
     if node.effect == Effect.UNLOCK:
-        first = min(engine.year for engine in ENGINES.values() if node.key in engine.needs)
-        return f"opens {node.opens} (from {first})"
+        years = [engine.year for engine in ENGINES.values() if node.key in engine.needs]
+        return f"opens {node.opens} (from {min(years)})" if years else f"opens {node.opens}"
     if node.effect in PERCENT_EFFECTS:
         sign = "-" if node.effect in (Effect.UPKEEP, Effect.DISCOUNT) else "+"
         reach = ", everywhere" if node.everywhere else ""

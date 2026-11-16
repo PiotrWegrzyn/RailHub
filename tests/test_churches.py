@@ -185,15 +185,11 @@ def test_a_house_is_one_population_and_one_traveller_and_wants_food_heat_and_sma
         Need.HEATING: 1,
         Need.BEER: 1,
         Need.NEWSPAPERS: 1,
-        Need.CLOTHES: 1,
-        Need.POTS: 0.5,
-        Need.FURNITURE: 0.5,
+        Need.COMMON: 3,
         Need.VODKA: 0.5,
         Need.REFINED_SUGAR: 0.5,
         Need.BRICKS: 0.5,
-        Need.SHOES: 0.5,
         Need.GLASS: 0.2,
-        Need.CASTINGS: 0.2,
         Need.LIMESTONE: 0.5,
     }
 

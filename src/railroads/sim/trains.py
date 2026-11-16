@@ -13,7 +13,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from railroads.sim.finance import TRAIN_PRICE
-from railroads.sim.goods import Good
+from railroads.sim.goods import General, Good
+
+# What a stop asks for a car of: one good, or a whole kind of goods.
+type Cargo = Good | General
 from railroads.sim.grids import Cell
 
 MAX_CARS = 5
@@ -403,7 +406,8 @@ def take_parcels(parcels: Parcels, amount: float, total: float) -> Parcels:
 
 @dataclass
 class Car:
-    """A car for one good, how much of it it carries, and where that came from."""
+    """A car for one good, how much of it it carries, and where that came from. A general car
+    takes any good of its kind, one at a time: `good` is the one it carries, or carried last."""
 
     good: Good
     load: float = 0.0
@@ -411,10 +415,16 @@ class Car:
     capacity: float = 0.0
     # An express's dining car, which carries nothing.
     dining: bool = False
+    general: General | None = None
 
     def __post_init__(self) -> None:
         if not self.capacity:
             self.capacity = car_size(self.good)
+
+    @property
+    def cargo(self) -> Cargo:
+        """What a stop asks for to get this car: its kind of goods if it is general."""
+        return self.general or self.good
 
     def fill(self, parcels: Parcels) -> None:
         for origin, amount in parcels.items():
@@ -433,14 +443,14 @@ class Stop:
     next stop."""
 
     cell: Cell
-    cars: list[Good] = field(default_factory=list)
+    cars: list[Cargo] = field(default_factory=list)
     # Whether the train waits here, up to WAIT_MONTHS, for its cars to fill.
     wait_for_load: bool = True
 
-    def add_car(self, good: Good, most: int = MAX_CARS) -> bool:
+    def add_car(self, cargo: Cargo, most: int = MAX_CARS) -> bool:
         if len(self.cars) >= most:
             return False
-        self.cars.append(good)
+        self.cars.append(cargo)
         return True
 
 

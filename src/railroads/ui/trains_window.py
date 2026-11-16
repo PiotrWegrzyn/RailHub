@@ -13,7 +13,7 @@ from imgui_bundle import imgui
 
 from railroads.sim.demand import StationDemand
 from railroads.sim.finance import TRAIN_RESALE, dollars
-from railroads.sim.goods import Good
+from railroads.sim.goods import GENERAL_GOODS, General, Good
 from railroads.sim.railway import Railway
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, Engine, Kind, Stop, Train
 from railroads.ui.demand_view import draw_demand
@@ -177,6 +177,8 @@ class TrainsWindow:
                 dining_chip(f"pulled{index}", "Dining car: carries nothing, costs its trips")
                 continue
             tooltip = f"{car.good.value}: {car.load:.0f}/{car.capacity:.0f}"
+            if car.general is not None:
+                tooltip = f"{car.general.value} car, now {tooltip}"
             if destination is not None and car.load >= 0.5:
                 tooltip += f"\nWorth about {dollars(worth)} at {onward}"
             car_chip(f"pulled{index}", car.good, car.load, tooltip, car.capacity)
@@ -290,16 +292,20 @@ class TrainsWindow:
         imgui.text_disabled(f"Cars to {onward}")
         imgui.same_line(CARD_LABEL)
         most = railway.most_cars(train)
-        for car_index, good in enumerate(list(stop.cars)):
+        for car_index, cargo in enumerate(list(stop.cars)):
             if car_index:
                 imgui.same_line(0, 4)
-            removed = car_chip(
-                f"car{car_index}",
-                good,
-                tooltip=f"{good.value} car of {railway.car_capacity(good):.0f} - click to remove",
-            )
-            if imgui.is_item_hovered():
-                self.map.good = good
+            if isinstance(cargo, General):
+                tooltip = (
+                    f"{cargo.value} car: takes whichever of its goods pays best at the next stop"
+                    " - click to remove"
+                )
+            else:
+                size = railway.car_capacity(cargo)
+                tooltip = f"{cargo.value} car of {size:.0f} - click to remove"
+            removed = car_chip(f"car{car_index}", cargo, tooltip=tooltip)
+            if imgui.is_item_hovered() and isinstance(cargo, Good):
+                self.map.good = cargo
             if removed:
                 stop.cars.pop(car_index)
                 train.cars_changed(index)
@@ -331,12 +337,13 @@ class TrainsWindow:
             if railway.can_carry(train, offer.good)
         ]
         here = {offer.good for offer in offers}
-        waiting = railway.station_goods(stop.cell)
+        waiting_here = railway.station_goods(stop.cell)
         carried = [
             g for g in carried_in(train, index) if g not in here and railway.can_carry(train, g)
         ]
-        offers += [Offer(good, waiting.held(good), 0.0) for good in carried]
-        if not offers:
+        offers += [Offer(good, waiting_here.held(good), 0.0) for good in carried]
+        generals = [general for general in General if railway.can_carry(train, general)]
+        if not offers and not generals:
             imgui.text_disabled("nothing made or waiting here yet")
             return
         most = railway.most_cars(train)
@@ -362,6 +369,22 @@ class TrainsWindow:
                 train.cars_changed(index)
             if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
                 self.map.good = offer.good
+            imgui.end_disabled()
+        for number, general in enumerate(generals, start=len(offers)):
+            if number % per_row:
+                imgui.same_line(0, 4)
+            elif number:
+                imgui.set_cursor_pos_x(left)
+            waiting = sum(waiting_here.held(good) for good in GENERAL_GOODS[general])
+            tip = (
+                f"{general.value}: a car that takes whichever of its goods pays best at the "
+                f"next stop; {waiting:.0f} of them waiting here"
+                + ("\nThe train is full: remove a car first" if full else "\nClick to add a car")
+            )
+            imgui.begin_disabled(full)
+            if offer_chip(f"general{number}", general, f"{waiting:.0f}", waiting > 0, tip):
+                stop.add_car(general, most)
+                train.cars_changed(index)
             imgui.end_disabled()
 
 
@@ -448,7 +471,7 @@ def carried_in(train: Train, index: int) -> list[Good]:
     if not train.stops:
         return []
     before = train.stops[(index - 1) % len(train.stops)]
-    return list(dict.fromkeys(before.cars))
+    return list(dict.fromkeys(cargo for cargo in before.cars if isinstance(cargo, Good)))
 
 
 def _centered_hint(text: str) -> None:

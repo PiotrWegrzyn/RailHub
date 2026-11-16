@@ -11,7 +11,7 @@ from imgui_bundle import hello_imgui, imgui
 from imgui_bundle import icons_fontawesome_4 as fa
 from PIL import Image
 
-from railroads.sim.goods import Good, Need
+from railroads.sim.goods import General, Good, Need
 from railroads.sim.trains import car_size
 from railroads.ui.pixel.good_icons import ICON_PIXELS, ICONS_INDEX, ICONS_PNG
 
@@ -251,7 +251,7 @@ def _icon_atlas() -> IconAtlas:
 
 def draw_good_icon(
     draw_list: imgui.ImDrawList,
-    good: Good | Need,
+    good: Good | Need | General,
     top_left: tuple[float, float],
     size: float = ICON_SIZE,
 ) -> None:
@@ -284,7 +284,7 @@ def good_amount(good: Good | Need, amount: str, *, framed: bool = False) -> None
 
 def car_chip(
     key: str,
-    good: Good,
+    good: Good | General,
     load: float | None = None,
     tooltip: str = "",
     capacity: float | None = None,
@@ -297,7 +297,8 @@ def car_chip(
     draw_list = imgui.get_window_draw_list()
     draw_list.add_rect_filled(low, high, color_u32(CAR_EMPTY), 3.0)
     if load is not None:
-        share = max(0.0, min(1.0, load / (capacity or car_size(good))))
+        size = capacity or (car_size(good) if isinstance(good, Good) else 0.0)
+        share = max(0.0, min(1.0, load / size)) if size else 0.0
         if share > 0:
             top = high.y - (high.y - low.y) * share
             draw_list.add_rect_filled((low.x, top), high, color_u32(CAR_LOADED), 3.0)
@@ -341,7 +342,7 @@ def empty_car_slot() -> None:
     draw_list.add_rect(low, high, color_u32(BORDER), 3.0, 1.0)
 
 
-def offer_chip(key: str, good: Good, amount: str, wanted: bool, tooltip: str) -> bool:
+def offer_chip(key: str, good: Good | General, amount: str, wanted: bool, tooltip: str) -> bool:
     """A good to load, as a wide chip with its icon and how much of it waits, outlined in brass
     when the next stop wants it; returns whether it was clicked."""
     clicked = imgui.invisible_button(key, OFFER_SIZE)

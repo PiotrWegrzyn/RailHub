@@ -172,6 +172,7 @@ class Need(Enum):
     STOVE_TILES = "stove tiles"
     CASTINGS = "castings"
     LUXURIES = "luxury goods"
+    COMMON = "common goods"
     PASSENGERS = "passengers"
     MAIL = "mail"
 
@@ -192,10 +193,34 @@ FOODS = (
     Good.SAUSAGES,
 )
 
+# Everyday things for the home: any of them meets a home's need for common goods.
+COMMON_GOODS = (
+    Good.CLOTHES,
+    Good.SHOES,
+    Good.FURNITURE,
+    Good.POTS,
+    Good.STOVE_TILES,
+    Good.CASTINGS,
+)
+
+
+class General(Enum):
+    """A car for a whole kind of goods (railroads.sim.trains), which takes whichever of them pays
+    best where the train goes next."""
+
+    FOOD = "general food"
+    COMMON = "general common goods"
+
+
+GENERAL_GOODS: Mapping[General, tuple[Good, ...]] = MappingProxyType(
+    {General.FOOD: FOODS, General.COMMON: COMMON_GOODS}
+)
+
 # The goods that meet each need.
 FITS: Mapping[Need, tuple[Good, ...]] = MappingProxyType(
     {
         Need.FOOD: FOODS,
+        Need.COMMON: COMMON_GOODS,
         Need.FRUIT: FRUITS,
         Need.FIBRE: (Good.WOOL, Good.COTTON, Good.FLAX),
         Need.LIVESTOCK: (Good.CATTLE, Good.SHEEP),
@@ -570,15 +595,11 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.HEATING: 1,
             Need.BEER: 1,
             Need.NEWSPAPERS: 1,
-            Need.CLOTHES: 1,
-            Need.POTS: 0.5,
-            Need.FURNITURE: 0.5,
+            Need.COMMON: 3,
             Need.VODKA: 0.5,
             Need.REFINED_SUGAR: 0.5,
             Need.BRICKS: 0.5,
-            Need.SHOES: 0.5,
             Need.GLASS: 0.2,
-            Need.CASTINGS: 0.2,
             Need.LIMESTONE: 0.5,
         },
         BuildingKind.MANOR: {
@@ -600,19 +621,14 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.SALT: 10,
             Need.GOODS: 20,
             Need.COFFEE: 10,
-            Need.CLOTHES: 10,
-            Need.FURNITURE: 10,
+            Need.COMMON: 60,
             Need.TOOLS: 10,
             Need.BEER: 10,
             Need.VODKA: 10,
-            Need.SHOES: 10,
             Need.BRICKS: 10,
             Need.REFINED_SUGAR: 10,
             Need.NEWSPAPERS: 10,
             Need.HEATING: 3,
-            Need.POTS: 10,
-            Need.STOVE_TILES: 10,
-            Need.CASTINGS: 10,
             Need.LIMESTONE: 10,
             Need.LUXURIES: 1,
         },
@@ -621,14 +637,12 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.SALT: 30,
             Need.GOODS: 40,
             Need.COFFEE: 30,
-            Need.CLOTHES: 30,
-            Need.FURNITURE: 30,
+            Need.COMMON: 120,
             Need.TOOLS: 10,
             Need.FUEL: 30,
             Need.CARS: 3,
             Need.BEER: 30,
             Need.VODKA: 30,
-            Need.SHOES: 30,
             Need.BRICKS: 30,
             Need.CEMENT: 30,
             Need.GLASS: 30,
@@ -636,7 +650,6 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.APPLIANCES: 5,
             Need.REFINED_SUGAR: 30,
             Need.HEATING: 5,
-            Need.STOVE_TILES: 30,
             Need.LUXURIES: 3,
         },
         BuildingKind.SKYSCRAPER: {
@@ -784,6 +797,7 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.FURNITURE,
     BuildingKind.TEXTILE_MILL,
     Need.CLOTHES,
+    Need.COMMON,
     BuildingKind.BARREL_MAKER,
     Need.BARRELS,
     BuildingKind.WINERY,

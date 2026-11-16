@@ -10,7 +10,7 @@ from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
-from railroads.sim.tech import NODES, Effect, Research
+from railroads.sim.tech import GENERAL_CARS, NODES, Effect, Research
 from railroads.sim.trains import (
     ENGINES,
     EXPRESS_FARE,
@@ -209,7 +209,7 @@ def test_every_tech_an_engine_needs_is_a_node_that_opens_engines() -> None:
 
     opening = {key for key, (_, node) in NODES.items() if node.effect == Effect.UNLOCK}
 
-    assert needed == opening
+    assert needed == opening - set(GENERAL_CARS.values())
 
 
 def test_an_express_carries_only_passengers() -> None:
