@@ -403,8 +403,8 @@ FACTORY_LAND = Land(
 TOWNS = Ladder(
     kinds=(BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS),
     land=TOWN_LAND,
-    base_chance=0.0000008,
-    chance_per_doubling={Points.POPULATION: 0.000017},
+    base_chance=0.000001,
+    chance_per_doubling={Points.POPULATION: 0.00003},
     merges={
         BuildingKind.HOUSE: Merge(needed=16, pulled_down=6),
         BuildingKind.TENEMENT: Merge(needed=5, pulled_down=3),
@@ -597,7 +597,7 @@ STEEL_MILLS = _merges(
             relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
             water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.2, Terrain.SEA: 1.2},
         ),
-        base_chance=0.000000056,
+        base_chance=0.00000004,
         chance_per_doubling={Points.ORE: 0.000007, Points.INDUSTRY: 0.00000042},
         most_per_cell=1,
         most_nearby=2,
@@ -747,7 +747,7 @@ FOOD_TOWN = 4
 _BAKERY = Ladder(
     kinds=(BuildingKind.BAKERY,),
     land=TOWN_LAND,
-    base_chance=0.0001,
+    base_chance=0.00005,
     chance_per_doubling={Points.POPULATION: 0.000001},
     needs={Points.POPULATION: FOOD_TOWN},
     most_per_cell=1,
@@ -947,7 +947,7 @@ CLUB_TOWN = 30
 TAVERNS = Ladder(
     kinds=(BuildingKind.TAVERN,),
     land=TOWN_LAND,
-    base_chance=0.0001,
+    base_chance=0.00005,
     chance_per_doubling={Points.POPULATION: 0.000001},
     needs={Points.POPULATION: FOOD_TOWN},
     most_per_cell=1,

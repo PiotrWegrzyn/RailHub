@@ -92,12 +92,12 @@ SKYSCRAPER_HOMES = 10
 THINNING_UP_TO = 0.05
 SKYSCRAPER_STARS = 4
 # For every ladder but the homes': its spawn chance, its base chance or, where it has none, its
-# chance per doubling, and what its served points add per doubling, both times these.
+# chance per doubling, times this; food springs up far more readily.
 SPAWN_SCALE = 1.0
-BREEDING_SCALE = 0.03
-# The same for food, which springs up far more readily.
 FOOD_SPAWN_SCALE = 3.75
-FOOD_BREEDING_SCALE = 0.03
+# What the served points of every ladder but the homes' add per doubling, the same for all of them
+# that grow on being served; the homes' own chance per doubling is theirs.
+SERVED_GROWTH = 0.000015
 # The points around a cell that draw a ladder's buildings, and how much each counts, by the kind
 # of points they give.
 INDUSTRIAL = {Points.POPULATION: 1.0, Points.INDUSTRY: 2.0}
@@ -178,10 +178,9 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
     if own == Points.POPULATION or not per_doubling:
         spawn = ladder.base_chance
     else:
-        food = own == Points.FOOD
-        spawn_scale = FOOD_SPAWN_SCALE if food else SPAWN_SCALE
+        spawn_scale = FOOD_SPAWN_SCALE if own == Points.FOOD else SPAWN_SCALE
         spawn = spawn_scale * (ladder.base_chance or per_doubling)
-        per_doubling *= FOOD_BREEDING_SCALE if food else BREEDING_SCALE
+        per_doubling = SERVED_GROWTH
     by_people = ladder.kinds[0] in SPAWN_BY_PEOPLE
     breeding = Breeding(spawn, own, DRAWN_BY.get(own, {own: 1.0}), per_doubling, by_people)
     _BREEDINGS[(id(ladder), id(points))] = (ladder, points, breeding)
