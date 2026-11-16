@@ -96,9 +96,8 @@ class Owners:
         if self.owned(kind)[cell] >= self._growth.counts[kind][cell]:
             return f"You already own every {kind.value} here"
         railway = self._growth.railway
-        if railway is None or not railway.finances.can_afford(price):
+        if railway is None or not railway.finances.pay(price, "buildings bought"):
             return "Not enough cash"
-        railway.finances.spend(price, "buildings bought")
         self.own(cell, kind)
         return None
 

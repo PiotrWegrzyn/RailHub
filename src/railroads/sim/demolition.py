@@ -124,14 +124,14 @@ def bulldoze(growth: Growth, cell: Cell) -> set[Cell]:
             growth.take_down(built)
         else:
             if isinstance(built, Station) and built.main is None:
-                taken |= _take_platforms(constructions, cell)
+                taken |= remove_platforms(constructions, cell)
             constructions.remove(built)
         taken.add(cell)
     return taken
 
 
-def _take_platforms(constructions: Constructions, station: Cell) -> set[Cell]:
-    """Takes down the platforms added to a station, which go with it."""
+def remove_platforms(constructions: Constructions, station: Cell) -> set[Cell]:
+    """Takes down every platform added to a station; returns their cells."""
     cells = set(constructions.platforms(station))
     for cell in cells:
         platform = constructions.station_at(cell)

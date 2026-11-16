@@ -92,6 +92,13 @@ class Finances:
     def can_afford(self, price: float) -> bool:
         return price <= self.cash + 1e-9
 
+    def pay(self, price: float, what: str) -> bool:
+        """Spends the price if there is cash enough; whether it was paid."""
+        if not self.can_afford(price):
+            return False
+        self.spend(price, what)
+        return True
+
     def spend(self, amount: float, what: str) -> None:
         self.cash -= amount
         self.month[what] -= amount
