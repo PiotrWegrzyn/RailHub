@@ -50,8 +50,11 @@ class StationWindow:
         upgraded: Callable[[Cell], None],
         move: Callable[[Cell], None] = lambda _: None,
         supplies: Callable[[Cell], Mapping[Good, float]] = lambda _: {},
+        add_platform: Callable[[Cell], None] = lambda _: None,
     ) -> None:
-        """`supplies` says what the buildings around a station make (StationTrade.supplies)."""
+        """`supplies` says what the buildings around a station make (StationTrade.supplies);
+        `add_platform` lets the player choose where a platform goes, which raising a station to
+        a level that allows one does at once."""
         station = self.station
         if station is None:
             return
@@ -64,7 +67,23 @@ class StationWindow:
         flags = imgui.WindowFlags_.always_auto_resize.value
         expanded, still_open = imgui.begin(f"{fa.ICON_FA_BUILDING}  {name}###station", True, flags)
         if expanded:
-            self._draw_body(railway, station, look_at, upgraded, supplies)
+
+            def raised(cell: Cell) -> None:
+                upgraded(cell)
+                if railway.platforms_left(cell):
+                    add_platform(cell)
+
+            self._draw_body(railway, station, look_at, raised, supplies)
+            left = railway.platforms_left(station)
+            if left:
+                label = f"{fa.ICON_FA_PLUS}  Add a platform beside it ({left} to add)"
+                if imgui.button(label):
+                    add_platform(station)
+                if imgui.is_item_hovered():
+                    imgui.set_tooltip(
+                        "Its own way through lets lines come in from another side;\n"
+                        "trains cross to it inside the station"
+                    )
             label = (
                 f"{fa.ICON_FA_ARROWS_ALT}  Move it, keeping its trains  {dollars(STATION_PRICE)}+"
             )

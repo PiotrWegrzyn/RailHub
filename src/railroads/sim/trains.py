@@ -555,6 +555,9 @@ class Train:
     # its sand, this month (railroads.sim.facilities).
     fuelled: bool = False
     sanded: bool = False
+    # The platform of its station the train stands at, which it sets off from: the station's own
+    # cell, or one of the platforms added to it; None for the station's own cell.
+    platform: Cell | None = None
     # Whether it stands at its first stop until the player is done setting it up, so it does not
     # set off empty with half a route.
     held: bool = False
@@ -606,6 +609,7 @@ class Train:
 
     def restart(self) -> None:
         """Sends the train back to its first stop after its stops change."""
+        self.platform = None
         self.heading = 1
         self.called = False
         self.arrivals = 0

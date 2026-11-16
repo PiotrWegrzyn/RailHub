@@ -92,6 +92,7 @@ class Tool(Enum):
     TRACK = "Track"
     BULLDOZE = "Bulldoze"
     MOVE_STATION = "Move station"
+    ADD_PLATFORM = "Add platform"
 
 
 HILLS_PRICE = TRACK_PRICE * RELIEF_RULES[Relief.HILLS].price_factor
@@ -118,6 +119,10 @@ HINTS = {
         f"{dollars(DEMOLITION_PER_POINT[Points.INDUSTRY])}, a skyscraper "
         f"{dollars(SKYSCRAPER_DEMOLITION)}; track a quarter of its price, a station "
         f"{dollars(STATION_REMOVAL)}. One-off buildings stay. Right click cancels."
+    ),
+    Tool.ADD_PLATFORM: (
+        "Click a free cell beside the station for its new platform; Q turns its track. Clearing "
+        "the cell costs what the buildings there cost to take down. Right click cancels."
     ),
     Tool.MOVE_STATION: (
         f"Click where the station goes: {dollars(STATION_PRICE)} and clearing the cell. Its trains, "
@@ -265,7 +270,12 @@ class BuildMenu:
             imgui.text_disabled(HINTS[self.tool])
         if self.tool == Tool.TRACK and self.preview is not None and self.preview_price is not None:
             imgui.text_colored(imgui.ImVec4(*BRASS), f"This track: {dollars(self.preview_price)}")
-        if self.hover_note and self.tool in (Tool.STATION, Tool.BULLDOZE, Tool.MOVE_STATION):
+        if self.hover_note and self.tool in (
+            Tool.STATION,
+            Tool.BULLDOZE,
+            Tool.MOVE_STATION,
+            Tool.ADD_PLATFORM,
+        ):
             imgui.text_colored(imgui.ImVec4(*BRASS), self.hover_note)
         imgui.pop_text_wrap_pos()
         imgui.spacing()

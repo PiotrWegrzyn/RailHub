@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from imgui_bundle import imgui
 
-from railroads.sim.constructions import Station, Track
+from railroads.sim.constructions import Track
 from railroads.sim.demolition import bulldoze_price, station_site_price
 from railroads.sim.finance import STATION_PRICE, dollars
 from railroads.sim.grids import Cell
@@ -33,8 +33,9 @@ class MapTools:
         build, game = view.build, view.game
         match build.tool:
             case Tool.NONE:
-                if any(isinstance(built, Station) for built in view.constructions.at(cell)):
-                    view.open_station(cell)
+                station = view.constructions.main_station(cell)
+                if station is not None:
+                    view.open_station(station)
             case Tool.STATION:
                 done = game.build_station(cell, self.station_ends(cell))
                 build.say(done.message)
@@ -44,6 +45,8 @@ class MapTools:
                 self._bulldoze(cell)
             case Tool.MOVE_STATION:
                 self._move_station(cell)
+            case Tool.ADD_PLATFORM:
+                self._add_platform(cell)
             case Tool.TRACK:
                 if build.track_from is None:
                     build.track_from = cell
@@ -83,6 +86,29 @@ class MapTools:
         view.station_window.station = cell
         view.buildings_changed(done.changed)
 
+    def _add_platform(self, cell: Cell) -> None:
+        view = self._view
+        build = view.build
+        if build.moving is None:
+            return
+        station = build.moving
+        done = view.game.add_platform(station, cell, self.station_ends(cell))
+        build.say(done.message)
+        if not done.ok:
+            return
+        view.buildings_changed(done.changed)
+        if view.railway.platforms_left(station):
+            build.say(f"{done.message} Click where the next one goes.")
+            return
+        build.choose(Tool.NONE)
+
+    def start_adding_platform(self, station: Cell) -> None:
+        """Lets the next click choose where a station's new platform goes."""
+        build = self._view.build
+        build.choose(Tool.ADD_PLATFORM)
+        build.moving = station
+        build.say("Click a free cell beside the station for its new platform; Q turns it.")
+
     def start_moving(self, station: Cell) -> None:
         """Lets the next click choose where a station goes."""
         build = self._view.build
@@ -115,7 +141,12 @@ class MapTools:
     def update_hover_note(self, cell: Cell | None) -> None:
         """What the chosen tool would cost in the cell under the mouse."""
         build, constructions = self._view.build, self._view.constructions
-        if cell is None or build.tool not in (Tool.STATION, Tool.BULLDOZE, Tool.MOVE_STATION):
+        if cell is None or build.tool not in (
+            Tool.STATION,
+            Tool.BULLDOZE,
+            Tool.MOVE_STATION,
+            Tool.ADD_PLATFORM,
+        ):
             build.hover_note = ""
             return
         if build.tool == Tool.BULLDOZE:
@@ -123,6 +154,13 @@ class MapTools:
             build.hover_note = "" if price is None else f"Clearing this cell: {dollars(price)}"
             return
         site = station_site_price(constructions, cell)
+        if build.tool == Tool.ADD_PLATFORM:
+            build.hover_note = (
+                "A platform can't go here"
+                if site is None
+                else f"New platform here: {dollars(site)}. Q turns it."
+            )
+            return
         build.hover_note = (
             "A station can't go here"
             if site is None
@@ -133,7 +171,7 @@ class MapTools:
 
     def update_preview(self, cell: Cell | None) -> None:
         build, constructions = self._view.build, self._view.constructions
-        if build.tool in (Tool.STATION, Tool.MOVE_STATION) and cell is not None:
+        if build.tool in (Tool.STATION, Tool.MOVE_STATION, Tool.ADD_PLATFORM) and cell is not None:
             build.preview = Route([cell], [Track(cell, self.station_ends(cell))], 0.0)
             build.preview_to, build.preview_price = cell, None
             return

@@ -1,7 +1,8 @@
 """The way along laid track (railroads.sim.railway uses it): which stations track joins, the route a
 train takes from one station to another with the speed on each stretch, and where a train is on
 its way. Trains pass through stations, which join track only by their two ends, and may turn round
-in them."""
+in them; in a station with more platforms they may cross to a platform beside the one they are on,
+and they reach a station at whichever of its platforms their way comes to first."""
 
 import bisect
 import heapq
@@ -17,6 +18,8 @@ from railroads.sim.trains import Point, Train
 
 # A route: the points along it and the speed on each stretch between them.
 type Way = tuple[list[Point], list[float]]
+# The step of a route that crosses from one platform of a station to the one beside it.
+CROSSING = -1
 
 
 class TrackNetwork:
@@ -54,9 +57,13 @@ class TrackNetwork:
         return joined
 
     def _next_station(self, start: Cell, stations: set[Cell]) -> Cell | None:
-        """Another station track leads to from this one, if there is any."""
-        grid = self.constructions.tile_map.grid
-        frontier: list[tuple[Cell, int | None]] = [(start, None)]
+        """Another station track leads to from this one, by any of its platforms, if there is
+        any."""
+        constructions = self.constructions
+        grid = constructions.tile_map.grid
+        frontier: list[tuple[Cell, int | None]] = [
+            (cell, None) for cell in constructions.station_cells(start)
+        ]
         seen = set(frontier)
         while frontier:
             cell, entry = frontier.pop()
@@ -64,8 +71,9 @@ class TrackNetwork:
                 nxt, nxt_entry = self._track_exit(cell, exit_point)
                 if not grid.contains(*nxt) or not self._joins(nxt, nxt_entry):
                     continue
-                if nxt in stations and nxt != start:
-                    return nxt
+                main = constructions.main_station(nxt)
+                if main is not None and main in stations and main != start:
+                    return main
                 if (nxt, nxt_entry) not in seen:
                     seen.add((nxt, nxt_entry))
                     frontier.append((nxt, nxt_entry))
@@ -91,8 +99,10 @@ class TrackNetwork:
 
     def _find_way(self, start: Cell, end: Cell, electric: bool, maglev: bool) -> Way | None:
         self._find_exits()
-        grid = self.constructions.tile_map.grid
+        constructions = self.constructions
+        grid = constructions.tile_map.grid
         lengths = [float(math.hypot(*step)) for step in grid.track_steps()]
+        arrivals = set(constructions.station_cells(constructions.main_station(end) or end))
         counter = itertools.count()
         # Each step taken: the step before it (-1 for none), the cell and the point left by.
         taken: list[tuple[int, Cell, int]] = []
@@ -102,11 +112,14 @@ class TrackNetwork:
         seen: set[tuple[Cell, int | None]] = set()
         while frontier:
             cost, _, cell, entry, last = heapq.heappop(frontier)
-            if cell == end and last >= 0:
+            if cell in arrivals and last >= 0:
                 return self._way(_trail(taken, last), (cell, entry or 0))
             if (cell, entry) in seen:
                 continue
             seen.add((cell, entry))
+            for beside in self._platforms_beside(cell):
+                taken.append((last, cell, CROSSING))
+                heapq.heappush(frontier, (cost + 1.0, next(counter), beside, None, len(taken) - 1))
             for exit_point in self._exits(cell, entry, electric, maglev):
                 nxt, nxt_entry = self._track_exit(cell, exit_point)
                 if not grid.contains(*nxt) or not self._joins(nxt, nxt_entry):
@@ -117,6 +130,18 @@ class TrackNetwork:
                     (cost + lengths[exit_point], next(counter), nxt, nxt_entry, len(taken) - 1),
                 )
         return None
+
+    def _platforms_beside(self, cell: Cell) -> list[Cell]:
+        """The other platforms of the station in a cell that lie beside it."""
+        constructions = self.constructions
+        main = constructions.main_station(cell)
+        if main is None:
+            return []
+        cells = constructions.station_cells(main)
+        if len(cells) < 2:
+            return []
+        near = set(constructions.tile_map.grid.within(cell, 1))
+        return [other for other in cells if other != cell and other in near]
 
     def _exits(
         self, cell: Cell, entry: int | None, electric: bool = False, maglev: bool = False
@@ -148,7 +173,10 @@ class TrackNetwork:
             self._exits_to = {}
         self._exits_for = version
         cells = sorted(
-            {*self.constructions.stations(), *(p.cell for p in self.constructions.track())}
+            {
+                *self.constructions.every_station_cell(),
+                *(p.cell for p in self.constructions.track()),
+            }
             - {cell for cell, point in self._exits_to if point == 0}
         )
         if not cells:
@@ -192,10 +220,12 @@ class TrackNetwork:
         speeds: list[float] = []
         for cell, exit_point in trail:
             cx, cy = grid.center(*cell)
-            sx, sy = steps[exit_point] / 2
             if cell != start_cell:
                 points.append((float(cx), float(cy)))
                 speeds.append(self._speed(cell))
+            if exit_point == CROSSING:
+                continue
+            sx, sy = steps[exit_point] / 2
             points.append((float(cx + sx), float(cy + sy)))
             speeds.append(self._speed(cell))
         points.append(tuple(float(v) for v in grid.center(*arrival[0])))  # type: ignore[arg-type]

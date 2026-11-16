@@ -192,6 +192,40 @@ def build_station(
     return changed | {cell}
 
 
+def add_platform(
+    growth: Growth, station: Cell, cell: Cell, ends: tuple[int, int] | None = None
+) -> set[Cell] | None:
+    """Adds a platform to a station in a cell beside it or beside one of its platforms, its
+    track running between `ends`, clearing the cell as a new station would; None if it cannot go
+    there."""
+    constructions = growth.constructions
+    if constructions.station_at(station) is None or constructions.main_station(station) != station:
+        return None
+    beside = {
+        near for own in constructions.station_cells(station) for near in growth.grid.within(own, 1)
+    }
+    if cell not in beside:
+        return None
+    changed = build_station(growth, cell, ends)
+    if changed is None:
+        return None
+    built = constructions.station_at(cell)
+    assert built is not None
+    constructions.remove(built)
+    constructions.build(Station(cell, built.ends, station))
+    return changed
+
+
+def remove_platforms(constructions: Constructions, station: Cell) -> set[Cell]:
+    """Takes down every platform added to a station; returns their cells."""
+    cells = set(constructions.platforms(station))
+    for cell in cells:
+        built = constructions.station_at(cell)
+        if built is not None:
+            constructions.remove(built)
+    return cells
+
+
 def move_station(
     growth: Growth, railway: Railway, old: Cell, new: Cell, ends: tuple[int, int] | None = None
 ) -> set[Cell] | None:
@@ -201,7 +235,7 @@ def move_station(
     go there."""
     constructions = growth.constructions
     station = constructions.station_at(old)
-    if new == old or station is None:
+    if new == old or station is None or station.main is not None:
         return None
     if station_site_price(constructions, new) is None:
         return None
@@ -210,8 +244,9 @@ def move_station(
     if changed is None:
         constructions.build(station)
         return None
+    platforms = remove_platforms(constructions, old)
     railway.moved(old, new)
-    return changed | {old}
+    return changed | {old} | platforms
 
 
 @dataclass(frozen=True, slots=True)

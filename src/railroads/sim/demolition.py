@@ -116,13 +116,25 @@ def bulldoze(growth: Growth, cell: Cell) -> set[Cell]:
     """Takes down everything in the cell that can be, buildings the player owns too; returns
     the cells that changed."""
     constructions = growth.constructions
-    taken = False
+    taken: set[Cell] = set()
     for built in constructions.at(cell):
         if isinstance(built, Building):
             if built.kind in UNIQUE:
                 continue
             growth.take_down(built)
         else:
+            if isinstance(built, Station) and built.main is None:
+                taken |= _take_platforms(constructions, cell)
             constructions.remove(built)
-        taken = True
-    return {cell} if taken else set()
+        taken.add(cell)
+    return taken
+
+
+def _take_platforms(constructions: Constructions, station: Cell) -> set[Cell]:
+    """Takes down the platforms added to a station, which go with it."""
+    cells = set(constructions.platforms(station))
+    for cell in cells:
+        platform = constructions.station_at(cell)
+        if platform is not None:
+            constructions.remove(platform)
+    return cells
