@@ -45,7 +45,7 @@ every few minutes.
 
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from itertools import pairwise
 from types import MappingProxyType
 from typing import TYPE_CHECKING
@@ -361,6 +361,21 @@ class Growth:
         self._land_cells = int((tile_map.terrain == Terrain.LAND).sum())
         if rule.trades:
             self.trade_goods()
+
+    def __getstate__(self) -> dict[str, object]:
+        """What a saved game keeps of the growth: everything but each ladder's chances, which
+        are worked out afresh from the rest as it loads (__setstate__) and would make over a
+        quarter of a save."""
+        state = dict(self.__dict__)
+        state["_places"] = [replace(place, chances=np.empty(0)) for place in self._places]
+        return state
+
+    def __setstate__(self, state: dict[str, object]) -> None:
+        self.__dict__.update(state)
+        everywhere = np.arange(self._grid.rows * self._grid.cols)
+        for place in self._places:
+            place.chances = np.zeros(place.land.size)
+            self._reckon(place, everywhere)
 
     def trade_goods(self) -> set[Cell]:
         """Pulls down farms that towns have crowded out, lets stations hand out a month of goods,

@@ -357,6 +357,19 @@ def test_a_big_array_of_zeros_is_saved_as_its_shape_alone() -> None:
     assert np.array_equal(loaded["used"], used)
 
 
+def test_a_big_array_of_few_values_is_saved_as_their_places_and_loads_bit_for_bit() -> None:
+    sparse = np.zeros((300, 400))
+    sparse[3, 5], sparse[7, 9], sparse[200, 0] = 2.5, np.nan, -0.0
+    dense = np.arange(300 * 400, dtype=np.float64).reshape(300, 400)
+
+    data = pickled({"sparse": sparse, "dense": dense})
+
+    loaded = pickle.loads(data)
+    assert len(data) < dense.nbytes + sparse.nbytes // 10
+    assert loaded["sparse"].tobytes() == sparse.tobytes()
+    assert loaded["dense"].tobytes() == dense.tobytes()
+
+
 def test_a_save_exported_from_one_folder_loads_after_being_brought_into_another(
     tmp_path: Path,
 ) -> None:

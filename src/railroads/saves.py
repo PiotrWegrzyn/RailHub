@@ -26,6 +26,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+import numpy.typing as npt
 
 from railroads.sim.clock import GameClock
 from railroads.sim.game import Game
@@ -47,10 +48,11 @@ NAME_PATTERN = re.compile(r"[\w ,.'()-]+")
 COMPRESS_STEP = 1 << 17
 # The compression saves use: fast, and the games' many empty arrays shrink to almost nothing.
 LEVEL = 1
-# Arrays at least this big that hold only zeros are saved as their shape alone: the game keeps
-# hundreds, a cell's worth for every kind of building and every input, most for kinds not on the
-# map, and they made over half of a save before it was compressed.
-BLANK_BYTES = 1 << 16
+# Arrays at least this big are saved as their shape alone if they hold only zeros, and as the
+# places of their other values and those values if that is less than half as big: the game keeps
+# hundreds, a cell's worth for every kind of building and every input, most of them for kinds not
+# on the map or standing in a few cells, which made most of a save before it was compressed.
+SPARSE_BYTES = 1 << 12
 
 
 def user_data_dir() -> Path:
@@ -116,9 +118,25 @@ class _Pickler(pickle.Pickler):
     def reducer_override(self, obj: object) -> Any:
         if type(obj) is MappingProxyType:
             return _frozen, (dict(obj),)
-        if type(obj) is np.ndarray and obj.nbytes >= BLANK_BYTES and not obj.any():
-            return np.zeros, (obj.shape, obj.dtype)
+        if type(obj) is np.ndarray and obj.nbytes >= SPARSE_BYTES and obj.itemsize in (1, 2, 4, 8):
+            flat = obj.reshape(-1)
+            held = flat.view(f"u{obj.itemsize}") != 0
+            count = np.count_nonzero(held)
+            if count == 0:
+                return np.zeros, (obj.shape, obj.dtype)
+            if count * (obj.itemsize + 1) < obj.nbytes // 2:
+                return _spread, (obj.shape, obj.dtype, np.packbits(held), flat[held])
         return NotImplemented
+
+
+def _spread(
+    shape: tuple[int, ...], dtype: np.dtype[Any], held: npt.NDArray[np.uint8], values: Any
+) -> npt.NDArray[Any]:
+    """An array of zeros but for `values`, in the places whose bits `held` sets."""
+    spread = np.zeros(shape, dtype)
+    flat = spread.reshape(-1)
+    flat[np.unpackbits(held, count=flat.size).view(bool)] = values
+    return spread
 
 
 class _Pieces:
