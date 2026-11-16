@@ -7,20 +7,29 @@ works and great engine halls of machine works under gantry cranes."""
 import math
 
 from railroads.ui.pixel.art.industry import (
+    BUNDLE,
+    FRAME,
     GLAZING,
+    JOINER_WALL,
     SMOKE,
     SOIL,
+    _anvil,
     _bed,
+    _bundle,
+    _chair,
     _chimney,
     _crate,
     _door,
     _drying_cloth,
     _footing,
+    _forge_stack,
     _gear,
+    _hide_frame,
     _lengths,
     _locomotive,
     _oil,
     _on_roof,
+    _plank_walls,
     _puddle,
     _ring,
     _roof_rows,
@@ -42,6 +51,7 @@ from railroads.ui.pixel.art.painter import (
     Painter,
     Point,
     Sprite,
+    Top,
     shade,
 )
 from railroads.ui.pixel.art.parts import (
@@ -57,7 +67,6 @@ from railroads.ui.pixel.art.parts import (
     _windows,
 )
 
-type Top = tuple[Point, Point, Point, Point]
 type RGB = tuple[int, int, int]
 
 MILL_WALL: RGB = (206, 164, 92)
@@ -78,7 +87,6 @@ GOLD: RGB = (232, 190, 80)
 
 TAN_WALL: RGB = (184, 160, 124)
 TAN_ROOF: RGB = (96, 82, 74)
-FRAME: RGB = (104, 76, 50)
 HIDES: list[RGB] = [(198, 150, 100), (162, 108, 68), (214, 180, 130), (140, 92, 58)]
 BARK: RGB = (140, 92, 58)
 SODDEN: RGB = (92, 84, 56)
@@ -91,10 +99,8 @@ BOOT: RGB = (140, 54, 40)
 SHOE_BOX: RGB = (196, 160, 112)
 PAVING: RGB = (176, 170, 158)
 
-JOINER_WALL: RGB = (176, 134, 88)
 BOARD: RGB = (226, 190, 134)
 JOINER_ROOF: RGB = (98, 74, 58)
-CHAIR: RGB = (156, 62, 44)
 SAWDUST: RGB = (222, 196, 140)
 LEG: RGB = (110, 80, 56)
 
@@ -113,7 +119,6 @@ PRESS_ROOF: RGB = (110, 106, 116)
 PAGE: RGB = (242, 240, 230)
 INK: RGB = (40, 40, 48)
 PRINT: RGB = (150, 150, 160)
-BUNDLE: RGB = (236, 234, 224)
 MASTHEAD: RGB = (170, 40, 40)
 
 FORGE_WALL: RGB = (92, 84, 82)
@@ -122,7 +127,6 @@ FORGE_GROUND: RGB = (62, 58, 56)
 GLOW: RGB = (238, 132, 40)
 HOT: RGB = (255, 208, 112)
 COAL: RGB = (48, 46, 50)
-ANVIL: RGB = (40, 40, 46)
 SIGNBOARD: RGB = (214, 202, 176)
 BAR: RGB = (120, 122, 130)
 HANDLE: RGB = (150, 112, 74)
@@ -519,20 +523,6 @@ def _tan_shed(
     return top
 
 
-def _hide_frame(p: Painter, x: float, y: float, hide: RGB) -> None:
-    """A hide stretched to dry on a wooden frame standing on (x, y), dripping on the ground."""
-    p.blob(x + 0.5, y - 0.5, x + 4, y + 1, (100, 108, 60))
-    p.line([(x, y), (x, y - 7)], FRAME)
-    p.line([(x + 4, y - 1), (x + 4, y - 8)], FRAME)
-    p.line([(x, y - 7), (x + 4, y - 8)], FRAME)
-    p.polygon(
-        [(x + 1, y - 6), (x + 3, y - 7), (x + 3.5, y - 2), (x + 2, y - 1.5), (x + 0.5, y - 1)],
-        hide,
-        shade(hide, 0.65),
-    )
-    p.line([(x + 1, y - 6), (x + 3, y - 7)], FRAME)
-
-
 def _pit(p: Painter, x: float, y: float, liquor: RGB) -> None:
     """A round pit of tan liquor sunk in the ground at (x, y), with a timber rim."""
     p.ellipse(x - 3, y - 1.5, x + 3, y + 1.5, PIT_RIM)
@@ -756,13 +746,6 @@ def mega_shoe_factory() -> Sprite:
     return p.sprite()
 
 
-def _chair(p: Painter, x0: float, y0: float, s: float, colour: RGB = CHAIR) -> None:
-    """A chair seen side on, standing on (x0, y0), `s` times the size of the small sign."""
-    pts = ((0, 0), (0, -7), (1, -7), (1, -3), (5, -3), (5, 0), (4, 0), (4, -2), (1, -2), (1, 0))
-    p.polygon([(x0 + dx * s, y0 + dy * s) for dx, dy in pts], colour)
-    p.line([(x0 + 1 * s, y0 - 3 * s), (x0 + 5 * s, y0 - 3 * s)], shade(colour, 1.35))
-
-
 def _boards(p: Painter, x: float, y: float, length: float, depth: float, h: float) -> None:
     """A stack of sawn boards on bearers, the gaps between them showing."""
     for t in (0.15, 0.85):
@@ -773,14 +756,6 @@ def _boards(p: Painter, x: float, y: float, length: float, depth: float, h: floa
     for drop in range(2, int(h), 2):
         for a, b in ((stack[0], stack[1]), (stack[1], stack[2])):
             _band(p, a, b, drop, gap)
-
-
-def _plank_walls(p: Painter, top: Top, height: float) -> None:
-    left, front, right, _ = top
-    for drop in range(2, int(height), 2):
-        _bands(p, left, front, right, drop, shade(JOINER_WALL, 0.86), shade(JOINER_WALL, 0.68))
-    _plinth(p, top, height, JOINER_WALL)
-    _stains(p, front, right, height, (0.2, 0.55, 0.9), shade(JOINER_WALL, 0.55), 1.4)
 
 
 def _furniture(p: Painter, x: float, y: float) -> None:
@@ -1056,9 +1031,7 @@ def _newspaper(p: Painter, x: float, y: float, half: float, tall: float) -> None
 
 def _bundles(p: Painter, x: float, y: float, count: int) -> None:
     for k in range(count):
-        bx, by = x + 3.4 * (k % 3) - 1.7 * (k // 3), y - 1.7 * (k % 3) - 1.6 * (k // 3)
-        bundle = p.box(bx, by, 2, 1.6, BUNDLE, shade(BUNDLE, 1.04))
-        p.line([bundle[1], (bundle[1][0], bundle[1][1] + 1.6)], (150, 110, 80))
+        _bundle(p, x + 3.4 * (k % 3) - 1.7 * (k // 3), y - 1.7 * (k % 3) - 1.6 * (k // 3))
 
 
 def _press_house(
@@ -1185,12 +1158,6 @@ def mega_printing_works() -> Sprite:
     return p.sprite()
 
 
-def _anvil(p: Painter, cx: float, cy: float, s: float = 1) -> None:
-    pts = ((-3, -1), (2, -1), (2, 0), (1, 0), (1, 1), (2, 2), (-2, 2), (-1, 1), (-1, 0), (-2, 0))
-    p.polygon([(cx + dx * s, cy + dy * s) for dx, dy in pts], ANVIL)
-    p.line([(cx - 2 * s, cy - s), (cx + 1 * s, cy - s)], (110, 110, 120))
-
-
 def _forge_hall(
     p: Painter,
     x: float,
@@ -1230,13 +1197,6 @@ def _tools(p: Painter, x: float, y: float, count: int) -> None:
             p.line([(tx - 1, ty - 5), (tx + 1, ty - 4.6)], BAR)
         else:
             p.rect(tx - 0.6, ty - 1, tx + 0.6, ty, BAR)
-
-
-def _forge_stack(p: Painter, x: float, foot: float, top: float) -> None:
-    p.rect(x - 1, top, x + 1, foot, (74, 58, 52))
-    p.line([(x - 1, top + 2), (x + 1, top + 2)], (200, 190, 180))
-    p.rect(x - 1.5, top - 1, x + 1.5, top, (50, 40, 36))
-    p.point(x, top - 1, (255, 170, 60))
 
 
 def _sparks(p: Painter, points: tuple[Point, ...]) -> None:

@@ -7,6 +7,7 @@ a timber cooperage with barrels firing over the coals."""
 
 from railroads.ui.pixel.art.industry import (
     GLAZING,
+    STILL_SLATE,
     _bed,
     _chimney,
     _crate,
@@ -14,6 +15,7 @@ from railroads.ui.pixel.art.industry import (
     _footing,
     _heap,
     _on_roof,
+    _pagoda,
     _pipe,
     _puddle,
     _ring,
@@ -39,6 +41,7 @@ from railroads.ui.pixel.art.painter import (
     Painter,
     Point,
     Sprite,
+    Top,
     shade,
 )
 from railroads.ui.pixel.art.parts import (
@@ -55,8 +58,6 @@ from railroads.ui.pixel.art.parts import (
     _turned,
     _windows,
 )
-
-type Top = tuple[Point, Point, Point, Point]
 
 WINE_WALL: RGB = (238, 224, 192)
 WINE_ROOF: RGB = (178, 86, 58)
@@ -429,29 +430,9 @@ def mega_brewery() -> Sprite:
     return p.sprite()
 
 
-STILL_SLATE: RGB = (68, 72, 82)
 PEAT: RGB = (112, 84, 60)
 DAMP: RGB = (204, 204, 194)
 TAR: RGB = (44, 46, 52)
-
-
-def _pagoda(p: Painter, x: float, y: float, size: float = 1) -> None:
-    """A whitewashed kiln vent on a roof at (x, y) under a flared slate pagoda cap."""
-    s = size
-    p.rect(x - 1.5 * s, y - 2 * s, x + 1.5 * s, y + 0.5, WHITEWASH)
-    p.line([(x - s, y - s), (x + s, y - s)], shade(WHITEWASH, 0.6))
-    p.polygon(
-        [
-            (x - 3 * s, y - 1.5 * s),
-            (x - s, y - 3 * s),
-            (x, y - 5 * s),
-            (x + s, y - 3 * s),
-            (x + 3 * s, y - 1.5 * s),
-        ],
-        STILL_SLATE,
-        shade(STILL_SLATE, 0.6),
-    )
-    p.point(x, y - 6 * s, (60, 60, 64))
 
 
 def _still_house(p: Painter, x: float, y: float, length: float, depth: float, height: float) -> Top:

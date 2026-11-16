@@ -35,8 +35,6 @@ PAVING: RGB = (190, 184, 170)
 POST: RGB = (52, 50, 54)
 LEAF: RGB = (60, 112, 48)
 
-type Top = tuple[Point, Point, Point, Point]
-
 
 def _crate(p: Painter, x: float, y: float) -> None:
     p.box(x, y, 1.5, 2, TIMBER, shade(TIMBER, 1.2))

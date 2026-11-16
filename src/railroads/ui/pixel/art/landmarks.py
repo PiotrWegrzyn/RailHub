@@ -42,8 +42,6 @@ from railroads.ui.pixel.art.parts import (
     _windows,
 )
 
-type Top = tuple[Point, Point, Point, Point]
-
 LAMP: RGB = (250, 236, 170)
 
 PAVING: RGB = (196, 190, 176)

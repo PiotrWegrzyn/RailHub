@@ -26,6 +26,7 @@ from railroads.ui.pixel.art.painter import (
     Painter,
     Point,
     Sprite,
+    Top,
     shade,
 )
 from railroads.ui.pixel.art.parts import (
@@ -38,8 +39,6 @@ from railroads.ui.pixel.art.parts import (
     _turned,
     _windows,
 )
-
-type Top = tuple[Point, Point, Point, Point]
 
 STONE_WALL: RGB = (228, 216, 188)
 GREEN: RGB = (40, 90, 60)

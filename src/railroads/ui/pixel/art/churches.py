@@ -19,6 +19,7 @@ from railroads.ui.pixel.art.painter import (
     Painter,
     Point,
     Sprite,
+    Top,
     shade,
 )
 from railroads.ui.pixel.art.parts import (
@@ -32,8 +33,6 @@ from railroads.ui.pixel.art.parts import (
     _turned,
     _windows,
 )
-
-type Top = tuple[Point, Point, Point, Point]
 
 GRAVEL: RGB = (204, 194, 168)
 FLAGS: RGB = (190, 184, 170)
@@ -140,7 +139,7 @@ def _tower(
     spire: float,
     roof: RGB,
     wall: RGB = CHURCH_WALL,
-) -> tuple[Point, Point, Point, Point]:
+) -> Top:
     """A square church tower on a stone plinth, with a string course under its arched belfry
     openings, lancets lower down a tall one, and a pyramid spire with a gold cross. Returns the
     corners of its top."""

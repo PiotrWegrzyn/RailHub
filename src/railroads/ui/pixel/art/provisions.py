@@ -23,6 +23,7 @@ from railroads.ui.pixel.art.painter import (
     Painter,
     Point,
     Sprite,
+    Top,
     shade,
 )
 from railroads.ui.pixel.art.parts import _cow, _fence, _on_wall, _paddock, _patch, _plinth
@@ -39,8 +40,6 @@ DAIRY_BLUE: RGB = (58, 104, 178)
 CHURN: RGB = (204, 208, 216)
 HIDE: RGB = (242, 240, 234)
 PATCH: RGB = (40, 36, 36)
-
-type Top = tuple[Point, Point, Point, Point]
 
 
 def _awning(p: Painter, a: Point, b: Point, span: tuple[float, float], drop: float) -> None:

@@ -17,8 +17,6 @@ from railroads.ui.pixel.art.painter import (
 )
 from railroads.ui.pixel.art.parts import _band, _flag, _on_wall, _pale_plinth, _patch
 
-type Top = tuple[Point, Point, Point, Point]
-
 SANDBAG: RGB = (196, 178, 124)
 
 OLIVE: RGB = (110, 118, 74)

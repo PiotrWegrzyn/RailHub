@@ -17,6 +17,7 @@ from railroads.ui.pixel.art.painter import (
     Painter,
     Point,
     Sprite,
+    Top,
     shade,
 )
 from railroads.ui.pixel.art.parts import (
@@ -45,8 +46,6 @@ EARTH: RGB = (146, 124, 84)
 WORN: RGB = (120, 128, 70)
 MUD: RGB = (96, 76, 54)
 FOOTING: RGB = (62, 70, 40)
-
-type Top = tuple[Point, Point, Point, Point]
 
 _SCATTER: tuple[Point, ...] = (
     (-0.9, 0.2),

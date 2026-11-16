@@ -17,8 +17,8 @@ from railroads.ui.pixel.art.painter import (
     STATION_WALL,
     WINDOW,
     Painter,
-    Point,
     Sprite,
+    Top,
     fineness,
     shade,
 )
@@ -58,9 +58,7 @@ def _clock(p: Painter, x: float, y: float, radius: float = 1.5) -> None:
     p.point(x + 1, y, (30, 30, 34))
 
 
-def _canopy(
-    p: Painter, x: float, y: float, length: float, depth: float, height: float
-) -> tuple[Point, Point, Point, Point]:
+def _canopy(p: Painter, x: float, y: float, length: float, depth: float, height: float) -> Top:
     """A platform canopy on posts: a flat dark red roof `height` up with a cream valance."""
     top = p.hall(x, y - height, length, depth, 1.5, STATION_WALL, STATION_ROOF)
     _band(p, top[0], top[1], 1.5, STATION_ROOF)

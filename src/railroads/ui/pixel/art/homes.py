@@ -9,6 +9,7 @@ from railroads.ui.pixel.art.painter import (
     Painter,
     Point,
     Sprite,
+    Top,
     shade,
 )
 from railroads.ui.pixel.art.parts import (
@@ -30,9 +31,7 @@ SOIL: RGB = (74, 64, 46)
 TRODDEN: RGB = (146, 130, 92)
 
 
-def _chimney_on(
-    p: Painter, top: tuple[Point, Point, Point, Point], rise: float, along: float, tall: float = 2
-) -> None:
+def _chimney_on(p: Painter, top: Top, rise: float, along: float, tall: float = 2) -> None:
     """A brick chimney with a dark cap standing on the ridge, `along` of the way to its front."""
     ridge_back, ridge_front = _ridge(top, rise)
     x = ridge_back[0] + (ridge_front[0] - ridge_back[0]) * along
@@ -41,7 +40,7 @@ def _chimney_on(
     p.line([(x - 1, y - tall - 1), (x, y - tall - 1)], shade(BRICK, 0.55))
 
 
-def _foot(p: Painter, top: tuple[Point, Point, Point, Point], height: float) -> None:
+def _foot(p: Painter, top: Top, height: float) -> None:
     """A dark line of shaded earth where a box's two front walls meet the ground."""
     left, front, right, _ = top
     feet = [_on_wall(left, front, 0, height), _on_wall(front, right, 0, height)]
@@ -89,7 +88,7 @@ def _worn(
     p.polygon([near, far, *out], fill)
 
 
-def _eaves(p: Painter, top: tuple[Point, Point, Point, Point], wall: RGB) -> None:
+def _eaves(p: Painter, top: Top, wall: RGB) -> None:
     """The shadow the eaves cast along the tops of a box's two front walls."""
     left, front, right, _ = top
     _bands(p, left, front, right, 0.6, shade(wall, 0.78), shade(wall, 0.6))

@@ -20,6 +20,7 @@ from railroads.ui.pixel.art.painter import (
     Painter,
     Point,
     Sprite,
+    Top,
     shade,
 )
 from railroads.ui.pixel.art.parts import (
@@ -50,6 +51,12 @@ EARTH: RGB = (150, 128, 90)
 
 SOIL: RGB = (78, 74, 52)
 SMOKE: RGB = (150, 148, 150)
+FRAME: RGB = (104, 76, 50)
+JOINER_WALL: RGB = (176, 134, 88)
+CHAIR: RGB = (156, 62, 44)
+BUNDLE: RGB = (236, 234, 224)
+ANVIL: RGB = (40, 40, 46)
+STILL_SLATE: RGB = (68, 72, 82)
 
 OIL: RGB = (62, 60, 62)
 
@@ -151,7 +158,7 @@ def works(wall: RGB, roof: RGB, sign: RGB, stacks: int) -> Sprite:
 
 def _sawtooth(
     p: Painter,
-    top: tuple[Point, Point, Point, Point],
+    top: Top,
     teeth: int,
     rise: float,
     roof: RGB,
@@ -232,7 +239,7 @@ def _door(
         p.line([_on_wall(a, b, span[0], drop - 0.6), _on_wall(a, b, span[1], drop - 0.6)], lintel)
 
 
-def _on_roof(top: tuple[Point, Point, Point, Point], rise: float, along: float, up: float) -> Point:
+def _on_roof(top: Top, rise: float, along: float, up: float) -> Point:
     """The point on the lit side of a gable roof `along` of the way from its back to its front and
     `up` of the way from its eave to its ridge."""
     left, front, _, _ = top
@@ -244,7 +251,7 @@ def _on_roof(top: tuple[Point, Point, Point, Point], rise: float, along: float, 
 
 def _roof_rows(
     p: Painter,
-    top: tuple[Point, Point, Point, Point],
+    top: Top,
     rise: float,
     roof: RGB,
     rows: tuple[float, ...] = (0.34, 0.68),
@@ -256,7 +263,7 @@ def _roof_rows(
 
 def _skylight(
     p: Painter,
-    top: tuple[Point, Point, Point, Point],
+    top: Top,
     rise: float,
     span: tuple[float, float] = (0.1, 0.9),
 ) -> None:
@@ -323,7 +330,7 @@ def _lengths(p: Painter, x: float, y: float, colour: RGB, rows: int = 2) -> None
             p.point(*_on_wall(front, right, t, drop - 0.5), shade(colour, 0.45))
 
 
-def _footing(x: float, y: float, length: float, depth: float) -> tuple[Point, Point, Point, Point]:
+def _footing(x: float, y: float, length: float, depth: float) -> Top:
     """The left, front, right and back corners on the ground of a block that Painter.hall raises at
     (x, y) with the same `length` and `depth`; a box of half width s has both s."""
     front = (x + (length - depth) / 2, y + (length + depth) / 4)
@@ -332,9 +339,7 @@ def _footing(x: float, y: float, length: float, depth: float) -> tuple[Point, Po
     return left, front, right, (left[0] + depth, left[1] - depth / 2)
 
 
-def _bed(
-    p: Painter, foot: tuple[Point, Point, Point, Point], colour: RGB = SOIL, margin: float = 1.2
-) -> None:
+def _bed(p: Painter, foot: Top, colour: RGB = SOIL, margin: float = 1.2) -> None:
     """Darker ground hugging a block's foot `margin` out past its walls, so that it stands in the
     ground rather than on it; drawn before the block."""
     left, front, right, back = foot
@@ -601,6 +606,73 @@ def _drying_cloth(p: Painter, a: Point, b: Point, height: float) -> None:
         p.line([top0, (top0[0], top0[1] + drop)], shade(colour, 1.25))
 
 
+def _hide_frame(p: Painter, x: float, y: float, hide: RGB) -> None:
+    """A hide stretched to dry on a wooden frame standing on (x, y), dripping on the ground."""
+    p.blob(x + 0.5, y - 0.5, x + 4, y + 1, (100, 108, 60))
+    p.line([(x, y), (x, y - 7)], FRAME)
+    p.line([(x + 4, y - 1), (x + 4, y - 8)], FRAME)
+    p.line([(x, y - 7), (x + 4, y - 8)], FRAME)
+    p.polygon(
+        [(x + 1, y - 6), (x + 3, y - 7), (x + 3.5, y - 2), (x + 2, y - 1.5), (x + 0.5, y - 1)],
+        hide,
+        shade(hide, 0.65),
+    )
+    p.line([(x + 1, y - 6), (x + 3, y - 7)], FRAME)
+
+
+def _chair(p: Painter, x0: float, y0: float, s: float, colour: RGB = CHAIR) -> None:
+    """A chair seen side on, standing on (x0, y0), `s` times the size of the small sign."""
+    pts = ((0, 0), (0, -7), (1, -7), (1, -3), (5, -3), (5, 0), (4, 0), (4, -2), (1, -2), (1, 0))
+    p.polygon([(x0 + dx * s, y0 + dy * s) for dx, dy in pts], colour)
+    p.line([(x0 + 1 * s, y0 - 3 * s), (x0 + 5 * s, y0 - 3 * s)], shade(colour, 1.35))
+
+
+def _plank_walls(p: Painter, top: Top, height: float) -> None:
+    left, front, right, _ = top
+    for drop in range(2, int(height), 2):
+        _bands(p, left, front, right, drop, shade(JOINER_WALL, 0.86), shade(JOINER_WALL, 0.68))
+    _plinth(p, top, height, JOINER_WALL)
+    _stains(p, front, right, height, (0.2, 0.55, 0.9), shade(JOINER_WALL, 0.55), 1.4)
+
+
+def _anvil(p: Painter, cx: float, cy: float, s: float = 1) -> None:
+    pts = ((-3, -1), (2, -1), (2, 0), (1, 0), (1, 1), (2, 2), (-2, 2), (-1, 1), (-1, 0), (-2, 0))
+    p.polygon([(cx + dx * s, cy + dy * s) for dx, dy in pts], ANVIL)
+    p.line([(cx - 2 * s, cy - s), (cx + 1 * s, cy - s)], (110, 110, 120))
+
+
+def _forge_stack(p: Painter, x: float, foot: float, top: float) -> None:
+    p.rect(x - 1, top, x + 1, foot, (74, 58, 52))
+    p.line([(x - 1, top + 2), (x + 1, top + 2)], (200, 190, 180))
+    p.rect(x - 1.5, top - 1, x + 1.5, top, (50, 40, 36))
+    p.point(x, top - 1, (255, 170, 60))
+
+
+def _pagoda(p: Painter, x: float, y: float, size: float = 1) -> None:
+    """A whitewashed kiln vent on a roof at (x, y) under a flared slate pagoda cap."""
+    s = size
+    p.rect(x - 1.5 * s, y - 2 * s, x + 1.5 * s, y + 0.5, WHITEWASH)
+    p.line([(x - s, y - s), (x + s, y - s)], shade(WHITEWASH, 0.6))
+    p.polygon(
+        [
+            (x - 3 * s, y - 1.5 * s),
+            (x - s, y - 3 * s),
+            (x, y - 5 * s),
+            (x + s, y - 3 * s),
+            (x + 3 * s, y - 1.5 * s),
+        ],
+        STILL_SLATE,
+        shade(STILL_SLATE, 0.6),
+    )
+    p.point(x, y - 6 * s, (60, 60, 64))
+
+
+def _bundle(p: Painter, x: float, y: float) -> None:
+    """A bundle of papers tied with string, standing on (x, y)."""
+    bundle = p.box(x, y, 2, 1.6, BUNDLE, shade(BUNDLE, 1.04))
+    p.line([bundle[1], (bundle[1][0], bundle[1][1] + 1.6)], (150, 110, 80))
+
+
 def furniture_maker() -> Sprite:
     """A joiner's plank-walled workshop with a window and a wide door, sawn boards stacked on
     bearers in its yard, a plank on a sawhorse over a heap of sawdust, a cart track worn out of its
@@ -611,7 +683,7 @@ def furniture_maker() -> Sprite:
     p.blob(1, -2, 15, 4, SOIL)
     p.shadow(12, 3.5)
     _track(p, foot[0], foot[1], (0.45, 0.82), 3)
-    wall, board, roof = (176, 134, 88), (226, 190, 134), (98, 74, 58)
+    wall, board, roof = JOINER_WALL, (226, 190, 134), (98, 74, 58)
     for x, y, h in ((9, -3, 6), (7, 2, 4)):
         for t in (0.15, 0.85):
             bx, by = _on_wall(*_footing(x, y, 8, 3)[:2], t, 0)
@@ -624,37 +696,14 @@ def furniture_maker() -> Sprite:
         p.point(*_on_wall(stack[1], stack[2], 0.5, h - 1), shade(board, 0.7))
     top = p.box(-4, 0, 7, 6, wall, None)
     left, front, right, _ = top
-    for drop in (2, 4):
-        _bands(p, left, front, right, drop, shade(wall, 0.86), shade(wall, 0.68))
-    _plinth(p, top, 6, wall)
-    _stains(p, front, right, 6, (0.2, 0.55, 0.9), shade(wall, 0.55), 1.4)
+    _plank_walls(p, top, 6)
     _window(p, left, front, (0.1, 0.32), 1.8)
     _door(p, left, front, (0.45, 0.82), 1.8, 6, (56, 40, 30), shade(wall, 1.3))
     p.line([_on_wall(left, front, 0.635, 1.9), _on_wall(left, front, 0.635, 6)], (88, 64, 44))
     _window(p, front, right, (0.3, 0.6), 1.8, shade(WINDOW, 0.8))
     p.gable(top, 4, roof, wall)
     _roof_rows(p, top, 4, roof)
-    chair = (156, 62, 44)
-    x0, y0 = -6, -10
-    p.polygon(
-        [
-            (x0 + dx, y0 + dy)
-            for dx, dy in (
-                (0, 0),
-                (0, -7),
-                (1, -7),
-                (1, -3),
-                (5, -3),
-                (5, 0),
-                (4, 0),
-                (4, -2),
-                (1, -2),
-                (1, 0),
-            )
-        ],
-        chair,
-    )
-    p.line([(x0 + 1, y0 - 3), (x0 + 5, y0 - 3)], shade(chair, 1.35))
+    _chair(p, -6, -10, 1)
     sawdust = (222, 196, 140)
     p.blob(-12.5, 6.5, -6.5, 8.5, sawdust)
     p.point(-11, 7, shade(sawdust, 1.1))
@@ -689,33 +738,11 @@ def tool_works() -> Sprite:
         p.line([_on_wall(left, front, t, 1.9), _on_wall(left, front, t, 7)], shade(wall, 0.6))
     _patch(p, left, front, (0.03, 0.47), (0.5, 6), (214, 202, 176))
     _patch(p, left, front, (0.03, 0.47), (5.2, 6), shade((214, 202, 176), 0.8))
-    cx, cy = _on_wall(left, front, 0.25, 3.5)
-    p.polygon(
-        [
-            (cx + dx, cy + dy)
-            for dx, dy in (
-                (-3, -1),
-                (2, -1),
-                (2, 0),
-                (1, 0),
-                (1, 1),
-                (2, 2),
-                (-2, 2),
-                (-1, 1),
-                (-1, 0),
-                (-2, 0),
-            )
-        ],
-        (40, 40, 46),
-    )
-    p.line([(cx - 2, cy - 1), (cx + 1, cy - 1)], (110, 110, 120))
+    _anvil(p, *_on_wall(left, front, 0.25, 3.5))
     _windows(p, front, right, (0.3, 0.7), (3,), 1, (240, 150, 60), shade(wall, 1.5))
     p.gable(top, 4, roof, wall)
     _roof_rows(p, top, 4, roof)
-    p.rect(-1, -17, 1, -10, (74, 58, 52))
-    p.line([(-1, -15), (1, -15)], (200, 190, 180))
-    p.rect(-1.5, -18, 1.5, -17, (50, 40, 36))
-    p.point(0, -18, (255, 170, 60))
+    _forge_stack(p, 0, -10, -17)
     _smoke(p, 1, -21, (96, 94, 98))
     _heap(p, -9, 5, 3, 2.5, (48, 46, 50))
     p.point(-10, 3.5, (104, 104, 116))
@@ -1149,7 +1176,7 @@ def distillery() -> Sprite:
     p.shadow(13, 4)
     _track(p, foot[0], foot[1], (0.48, 0.68), 3.5)
     _puddle(p, 9, 7.5, 1.6)
-    slate = (68, 72, 82)
+    slate = STILL_SLATE
     p.rect(3, -33, 4, -4, (150, 80, 60))
     for y in (-31, -20):
         p.line([(3, y), (4, y)], (230, 228, 222))
@@ -1170,15 +1197,7 @@ def distillery() -> Sprite:
     _windows(p, front, right, (0.5,), (2,), 2, (44, 46, 52))
     p.gable(top, 4, slate, WHITEWASH)
     _roof_rows(p, top, 4, slate, (0.5,))
-    vx, vy = _on_roof(top, 4, 0.35, 1)
-    p.rect(vx - 1.5, vy - 2, vx + 1.5, vy + 0.5, WHITEWASH)
-    p.line([(vx - 1, vy - 1), (vx + 1, vy - 1)], shade(WHITEWASH, 0.6))
-    p.polygon(
-        [(vx - 3, vy - 1.5), (vx - 1, vy - 3), (vx, vy - 5), (vx + 1, vy - 3), (vx + 3, vy - 1.5)],
-        slate,
-        shade(slate, 0.6),
-    )
-    p.point(vx, vy - 6, (60, 60, 64))
+    _pagoda(p, *_on_roof(top, 4, 0.35, 1))
     _turned(p, 8, 5, [(0, 3), (2, 4), (4, 3.5), (6, 1.5), (7, 1)], COPPER)
     p.blob(5, -1, 7, 2, shade(COPPER, 1.3))
     _ring(p, 8, 2, 3.6, shade(COPPER, 0.7))
@@ -1231,19 +1250,8 @@ def tannery() -> Sprite:
     p.blob(-5, 4.5, -1, 6.5, (96, 66, 40))
     p.point(-4, 5, (140, 100, 62))
     _heap(p, -12, 7, 3, 2.5, (140, 92, 58))
-    frame = (104, 76, 50)
     for k, hide in enumerate(((198, 150, 100), (162, 108, 68), (214, 180, 130))):
-        x, y = 2 + 4 * k, 6 - 2 * k
-        p.blob(x + 0.5, y - 0.5, x + 4, y + 1, (100, 108, 60))
-        p.line([(x, y), (x, y - 7)], frame)
-        p.line([(x + 4, y - 1), (x + 4, y - 8)], frame)
-        p.line([(x, y - 7), (x + 4, y - 8)], frame)
-        p.polygon(
-            [(x + 1, y - 6), (x + 3, y - 7), (x + 3.5, y - 2), (x + 2, y - 1.5), (x + 0.5, y - 1)],
-            hide,
-            shade(hide, 0.65),
-        )
-        p.line([(x + 1, y - 6), (x + 3, y - 7)], frame)
+        _hide_frame(p, 2 + 4 * k, 6 - 2 * k, hide)
     return p.sprite()
 
 
@@ -1500,10 +1508,8 @@ def printing_works() -> Sprite:
     p.rect(-5, -21, -2, -19, (150, 150, 160))
     for y in (-21, -19):
         p.line([(0, y), (5, y)], (150, 150, 160))
-    paper = (236, 234, 224)
     for x, y, lift in ((6.5, 6, 0), (6.5, 6, 1.6), (10, 4.5, 0)):
-        bundle = p.box(x, y - lift, 2, 1.6, paper, shade(paper, 1.04))
-        p.line([bundle[1], (bundle[1][0], bundle[1][1] + 1.6)], (150, 110, 80))
+        _bundle(p, x, y - lift)
     return p.sprite()
 
 

@@ -14,6 +14,7 @@ from railroads.ui.pixel.art.painter import (
     WINDOW,
     Painter,
     Point,
+    Top,
     shade,
 )
 
@@ -54,8 +55,6 @@ def _patch(
         fill,
     )
 
-
-type Top = tuple[Point, Point, Point, Point]
 
 SILL: RGB = (240, 236, 226)
 DOOR: RGB = (104, 66, 44)
@@ -143,7 +142,7 @@ def _windows(
 
 def _vault(
     p: Painter,
-    top: tuple[Point, Point, Point, Point],
+    top: Top,
     rise: float,
     roof: RGB,
     wall: RGB,
@@ -225,9 +224,7 @@ def _iso(x: float, y: float, u: float, v: float) -> Point:
     return x + u + v, y + u / 2 - v / 2
 
 
-def _gable_across(
-    p: Painter, top: tuple[Point, Point, Point, Point], rise: float, roof: RGB, wall: RGB
-) -> None:
+def _gable_across(p: Painter, top: Top, rise: float, roof: RGB, wall: RGB) -> None:
     """A pitched roof on a box's top whose ridge runs back from the middle of its lit wall, so
     that wall ends in a gable: the front of a church."""
     left, front, right, back = top
@@ -270,7 +267,7 @@ def _cow(p: Painter, x: float, y: float, hide: RGB, patch: RGB) -> None:
     p.point(x - 5, y - 6, (232, 222, 196))
 
 
-def _paddock(x: float, y: float, half: float) -> tuple[Point, Point, Point, Point]:
+def _paddock(x: float, y: float, half: float) -> Top:
     """The left, back, right and front corners of a fenced patch of ground centred at (x, y)."""
     return (x - half, y), (x, y - half / 2), (x + half, y), (x, y + half / 2)
 

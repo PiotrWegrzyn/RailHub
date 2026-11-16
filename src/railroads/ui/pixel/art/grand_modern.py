@@ -40,6 +40,7 @@ from railroads.ui.pixel.art.painter import (
     Painter,
     Point,
     Sprite,
+    Top,
     shade,
 )
 from railroads.ui.pixel.art.parts import (
@@ -55,8 +56,6 @@ from railroads.ui.pixel.art.parts import (
     _vault,
     _windows,
 )
-
-type Top = tuple[Point, Point, Point, Point]
 
 COLUMN: RGB = (176, 178, 184)
 TANK_WHITE: RGB = (224, 226, 228)
