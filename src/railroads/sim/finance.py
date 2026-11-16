@@ -122,11 +122,6 @@ class Finances:
                 books[what] = books.get(what, 0.0) + amount
         return books
 
-    @property
-    def profit(self) -> float:
-        """This month's money in less money out so far."""
-        return sum(self.month.values())
-
 
 def dollars(amount: float) -> str:
     """An amount of money as the game shows it: $15,000, or -$1,200 in debt."""

@@ -197,10 +197,6 @@ def _gear(p: Painter, x: float, y: float, radius: float, colour: RGB) -> None:
     p.blob(x - 1, y - 1, x + 1, y + 1, shade(colour, 0.45))
 
 
-def _bale(p: Painter, x: float, y: float, colour: RGB) -> None:
-    p.box(x, y, 2, 2, colour, shade(colour, 1.15))
-
-
 def _plinth(
     p: Painter, top: tuple[Point, Point, Point, Point], height: float, wall: RGB, tall: float = 0.8
 ) -> None:

@@ -60,17 +60,6 @@ def depth(key: str) -> int:
     return 1 + max((depth(need) for need in node.requires), default=-1)
 
 
-def rows_of(tree: Tree) -> list[list[Node]]:
-    """A tree's nodes in rows: those needing nothing first, then each row building on the last."""
-    rows: list[list[Node]] = []
-    for node in TREES[tree]:
-        at = depth(node.key)
-        while len(rows) <= at:
-            rows.append([])
-        rows[at].append(node)
-    return rows
-
-
 def layout(tree: Tree) -> dict[str, tuple[float, int]]:
     """Where each node of a tree stands: its column, in node widths, and its row. Every node hangs
     from the first node it needs, so each branch takes columns of its own, its tips side by side

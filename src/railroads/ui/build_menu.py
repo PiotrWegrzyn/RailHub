@@ -60,7 +60,6 @@ SHARED_FILL = (0.82, 0.86, 0.82, 0.6)
 STATION_FILL = (0.27, 0.35, 0.8, 0.85)
 CELL_LINE = (0.25, 0.22, 0.2, 0.5)
 COLLECTION_RING = (0.4, 0.6, 1.0, 0.95)
-BLOCKED = (0.95, 0.3, 0.25, 0.9)
 type Rgba = tuple[float, float, float, float]
 
 ENGINE = (0.14, 0.15, 0.17, 1.0)

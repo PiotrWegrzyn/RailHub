@@ -1,7 +1,6 @@
 """Where map points land in the big picture of the pixel map, in art pixels, and where the picture's chunks sit on screen."""
 
 import math
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Self
 
@@ -25,9 +24,6 @@ type Point = tuple[float, float]
 
 
 type Path = list[Point]
-
-
-type ToArt = Callable[[Path], Path]
 
 
 FloatArray = npt.NDArray[np.float64]

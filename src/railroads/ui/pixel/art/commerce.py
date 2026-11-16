@@ -87,14 +87,6 @@ def _bush(p: Painter, x: float, y: float, size: float = 1.6) -> None:
     p.point(x - size * 0.5, y - 1.2 * size, shade(LEAF, 1.35))
 
 
-def _bench(p: Painter, x: float, y: float, colour: RGB = TIMBER) -> None:
-    """A bench along a lit wall, its left foot at (x, y)."""
-    p.line([(x, y - 1.5), (x + 2.5, y - 0.25)], colour)
-    p.line([(x, y - 2.5), (x, y - 1.5)], shade(colour, 0.8))
-    for dx in (0, 2.5):
-        p.line([(x + dx, y + dx / 2 - 1.5), (x + dx, y + dx / 2)], shade(colour, 0.55))
-
-
 def port() -> Sprite:
     """A paved quay with bollards along its edge, a warehouse with a big cargo door under a tiled
     roof, crates, and a crane with a cab and a counterweight lifting a load."""
