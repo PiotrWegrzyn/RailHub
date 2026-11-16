@@ -73,6 +73,13 @@ class StationCalls:
     def _next_cars(self, cars: list[Car], wanted: list[Cargo], engine: str) -> list[Car]:
         """The cars for the next leg: each keeps what the fullest car of its cargo still holds,
         freight that did not fit into the station; anything else left aboard is lost."""
+        return self._match_cars(cars, wanted, engine)[0]
+
+    def _match_cars(
+        self, cars: list[Car], wanted: list[Cargo], engine: str
+    ) -> tuple[list[Car], list[Car]]:
+        """The wanted cars, each the fullest car of its cargo or else a new one, and the cars
+        left over."""
         left = sorted(cars, key=lambda car: -car.load)
         kept = []
         for cargo in wanted:
@@ -82,7 +89,7 @@ class StationCalls:
             else:
                 left.remove(car)
                 kept.append(car)
-        return kept
+        return kept, left
 
     def _new_car(self, cargo: Cargo, engine: str) -> Car:
         railway = self._railway
@@ -102,15 +109,7 @@ class StationCalls:
         """Swaps a train's cars for the wanted ones at the station that filled them: each wanted
         car keeps the fullest car of its cargo, and what dropped cars held goes back into the
         stockpile."""
-        left = sorted(cars, key=lambda car: -car.load)
-        kept = []
-        for cargo in wanted:
-            car = next((car for car in left if car.cargo == cargo), None)
-            if car is None:
-                kept.append(self._new_car(cargo, engine))
-            else:
-                left.remove(car)
-                kept.append(car)
+        kept, left = self._match_cars(cars, wanted, engine)
         for car in left:
             if car.load > 0:
                 self._store(goods, station, car.good, car.empty(car.load))

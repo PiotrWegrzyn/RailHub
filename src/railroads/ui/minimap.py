@@ -15,6 +15,7 @@ from railroads.sim.geo import Bounds
 from railroads.sim.grids import Cell
 from railroads.sim.tilemap import TileMap
 from railroads.ui.iso_camera import IsoCamera, Vec2
+from railroads.ui.theme import rgba_u32
 
 # Latitudes the world map shows, north to south; the poles are left out.
 WORLD_NORTH = 84.0
@@ -155,10 +156,6 @@ def world_rgba(world: WorldLand) -> np.ndarray:
     return np.ascontiguousarray(np.concatenate([rgb, alpha], axis=-1).astype(np.uint8))
 
 
-def _color(rgba: tuple[float, float, float, float]) -> int:
-    return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))
-
-
 class Minimap:
     def __init__(self, tile_map: TileMap, world: WorldLand, towns: Iterable[Cell] = ()) -> None:
         self.tile_map = tile_map
@@ -218,12 +215,12 @@ class Minimap:
         left, top, right, bottom = layout.map_box(self.tile_map.bounds)
         mid_x, mid_y = (left + right) / 2, (top + bottom) / 2
         draw_list.push_clip_rect((panel.left, panel.top), (panel.right, panel.bottom), True)
-        crosshair = _color(CROSSHAIR_COLOR)
+        crosshair = rgba_u32(CROSSHAIR_COLOR)
         draw_list.add_line((panel.left, mid_y), (left, mid_y), crosshair)
         draw_list.add_line((right, mid_y), (panel.right, mid_y), crosshair)
         draw_list.add_line((mid_x, panel.top), (mid_x, top), crosshair)
         draw_list.add_line((mid_x, bottom), (mid_x, panel.bottom), crosshair)
-        draw_list.add_rect((left, top), (right, bottom), _color(MARK_COLOR), 0.0, 2.0)
+        draw_list.add_rect((left, top), (right, bottom), rgba_u32(MARK_COLOR), 0.0, 2.0)
         draw_list.pop_clip_rect()
 
     def _draw_overview(
@@ -245,7 +242,7 @@ class Minimap:
             (x1 / width, y1 / height),
         )
         draw_list.push_clip_rect((panel.left, panel.top), (panel.right, panel.bottom), True)
-        town = _color(TOWN_COLOR)
+        town = rgba_u32(TOWN_COLOR)
         grid = self.tile_map.grid
         if len(self._towns):
             xs, ys = grid.center(self._towns[:, 0], self._towns[:, 1])
@@ -253,12 +250,12 @@ class Minimap:
                 sx, sy = layout.overview_point(x, y)
                 draw_list.add_rect_filled((sx - 1, sy - 1), (sx + 1, sy + 1), town)
         outline = [imgui.ImVec2(*layout.overview_point(x, y)) for x, y in view_corners]
-        draw_list.add_polyline(outline, _color(VIEW_COLOR), 1.5, imgui.ImDrawFlags_.closed.value)
+        draw_list.add_polyline(outline, rgba_u32(VIEW_COLOR), 1.5, imgui.ImDrawFlags_.closed.value)
         if self.zoom > 1:
             label = f"x{self.zoom}"
             size = imgui.calc_text_size(label)
             spot = (panel.right - size.x - 4, panel.top + 2)
-            draw_list.add_text(spot, _color(VIEW_COLOR), label)
+            draw_list.add_text(spot, rgba_u32(VIEW_COLOR), label)
         draw_list.pop_clip_rect()
 
 
@@ -276,12 +273,12 @@ def _frame(draw_list: imgui.ImDrawList, panel: Panel) -> None:
     draw_list.add_rect_filled(
         (panel.left - pad, panel.top - pad),
         (panel.right + pad, panel.bottom + pad),
-        _color(FRAME_COLOR),
+        rgba_u32(FRAME_COLOR),
         4.0,
     )
     draw_list.add_rect(
         (panel.left - pad, panel.top - pad),
         (panel.right + pad, panel.bottom + pad),
-        _color(BORDER_COLOR),
+        rgba_u32(BORDER_COLOR),
         4.0,
     )

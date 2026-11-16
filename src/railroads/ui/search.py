@@ -16,10 +16,9 @@ from railroads.sim.goods import FITS, MAKES, NEEDS
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.ui.iso_camera import Vec2
-from railroads.ui.theme import TEXT, TEXT_DIM, color_u32, draw_good_icon
+from railroads.ui.theme import SIDE_WINDOW_POS, TEXT, TEXT_DIM, color_u32, draw_good_icon
 
 WINDOW_SIZE = (360.0, 440.0)
-WINDOW_POS = (16.0, 96.0)
 ROW_HEIGHT = 24.0
 ROW_ICON = 18.0
 FOOTER_HEIGHT = 92.0
@@ -136,7 +135,7 @@ class BuildingSearch:
         """The window, if it is open: `visit` shows a cell and `around` is the view's centre."""
         if not self.open:
             return
-        imgui.set_next_window_pos(WINDOW_POS, imgui.Cond_.first_use_ever.value)
+        imgui.set_next_window_pos(SIDE_WINDOW_POS, imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
         expanded, still_open = imgui.begin(f"{fa.ICON_FA_SEARCH}  Find buildings###find", True)
         if expanded:

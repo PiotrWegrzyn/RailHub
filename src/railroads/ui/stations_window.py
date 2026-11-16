@@ -14,7 +14,9 @@ from railroads.ui.demand_view import draw_demand
 from railroads.ui.theme import (
     BRASS_DARK,
     CARDS_WIDTH,
+    LIST_TABLE_FLAGS,
     goods_inline,
+    tip,
 )
 from railroads.ui.trains_window import WINDOW_SIZE as TRAINS_SIZE
 from railroads.ui.trains_window import WINDOW_TOP as TRAINS_TOP
@@ -23,14 +25,21 @@ WINDOW_SIZE = (860.0, 180.0)
 GAP = 12.0
 
 
-def stock_bar(
-    goods: StationGoods, size: tuple[float, float]
-) -> tuple[float, tuple[float, float], str]:
+def stock_bar(goods: StationGoods, size: tuple[float, float]) -> None:
     """A stockpile bar filled as far as the fullest kind of freight, against the most of each
     the station holds."""
     good, held = goods.fullest
     label = f"{held:.0f}/{goods.limit:.0f}" + (f" {good.value}" if good else "")
-    return min(1.0, held / goods.limit), size, label
+    imgui.push_style_color(imgui.Col_.plot_histogram, imgui.ImVec4(*BRASS_DARK))
+    imgui.progress_bar(min(1.0, held / goods.limit), size, label)
+    imgui.pop_style_color()
+
+
+def look_at_button(station: Cell, look_at: Callable[[Cell], None]) -> None:
+    """A small crosshair button that turns the map to the station."""
+    if imgui.small_button(fa.ICON_FA_CROSSHAIRS):
+        look_at(station)
+    tip("Look at this station")
 
 
 @dataclass
@@ -69,13 +78,7 @@ class StationsWindow:
         look_at: Callable[[Cell], None],
         open_station: Callable[[Cell], None],
     ) -> None:
-        flags = (
-            imgui.TableFlags_.row_bg.value
-            | imgui.TableFlags_.borders_inner_h.value
-            | imgui.TableFlags_.scroll_y.value
-            | imgui.TableFlags_.sizing_fixed_fit.value
-        )
-        if not imgui.begin_table("stations", 6, flags):
+        if not imgui.begin_table("stations", 6, LIST_TABLE_FLAGS):
             return
         imgui.table_setup_scroll_freeze(0, 1)
         imgui.table_setup_column("Station")
@@ -93,12 +96,9 @@ class StationsWindow:
             imgui.align_text_to_frame_padding()
             if imgui.selectable(railway.name_of(station), False)[0]:
                 open_station(station)
-            if imgui.is_item_hovered():
-                imgui.set_tooltip("Open this station's details")
+            tip("Open this station's details")
             imgui.table_next_column()
-            imgui.push_style_color(imgui.Col_.plot_histogram, imgui.ImVec4(*BRASS_DARK))
-            imgui.progress_bar(*stock_bar(goods, (110, 0)))
-            imgui.pop_style_color()
+            stock_bar(goods, (110, 0))
             imgui.table_next_column()
             goods_inline(goods.stockpile, "empty")
             imgui.table_next_column()
@@ -106,9 +106,6 @@ class StationsWindow:
             imgui.table_next_column()
             draw_demand(railway.station_demand(station))
             imgui.table_next_column()
-            if imgui.small_button(fa.ICON_FA_CROSSHAIRS):
-                look_at(station)
-            if imgui.is_item_hovered():
-                imgui.set_tooltip("Look at this station")
+            look_at_button(station, look_at)
             imgui.pop_id()
         imgui.end_table()

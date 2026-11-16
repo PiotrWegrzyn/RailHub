@@ -146,3 +146,25 @@ def test_reach_sums_add_up_every_cell_within_reach() -> None:
 
     for cell in [(0, 0), (3, 4), (4, 4), (8, 10), (5, 1)]:
         assert sums[cell] == sum(int(values[c]) for c in grid.within(cell, 2))
+
+
+def test_a_month_of_the_stand_in_is_done_in_steps_as_one_done_at_once() -> None:
+    stepped, whole = grown(), grown()
+    players = [
+        StandInPlayer(growth, Railway(growth.constructions), np.random.default_rng(0))
+        for growth in (stepped, whole)
+    ]
+    steps = players[0].month_steps(np.random.default_rng(1))
+
+    taken = 0
+    while True:
+        try:
+            next(steps)
+            taken += 1
+        except StopIteration as done:
+            changed = done.value
+            break
+
+    assert taken > 1
+    assert changed == players[1].month(np.random.default_rng(1))
+    assert np.array_equal(stepped.assumed_shares, whole.assumed_shares, equal_nan=True)

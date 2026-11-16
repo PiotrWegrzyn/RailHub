@@ -47,6 +47,7 @@ from railroads.sim.goods import (
     BOOST_MOST,
     FITS,
     HANDED_OUT,
+    LAND_BOOST_MOST,
     MAKES,
     NEEDS,
     PIPELINE,
@@ -438,6 +439,7 @@ class _Month:
         }
 
     def run_steps(self) -> Steps[Trade]:
+        yield
         paused = time.perf_counter()
         for step in PIPELINE:
             if isinstance(step, BuildingKind):
@@ -540,17 +542,19 @@ class _Month:
 
     def _boost_from_land(self, kind: BuildingKind, need: Need, got: FloatCells) -> None:
         """Lets what a kind making goods from the land got of one of its boosts make it make more
-        of each of its goods, before any of them is sold."""
+        of each of its goods, before any of them is sold: up to its own LAND_BOOST_MOST more, or
+        its part of BOOST_MOST shared with the other boosts."""
         boosts = boosts_of(kind, self.economy.year)
         if need not in boosts:
             return
         wanted = self.count[kind] * boosts[need]
         share = np.minimum(got / np.where(wanted > 0, wanted, 1.0), 1.0) * (wanted > 0)
-        share = share / len(boosts)
+        shared = [boost for boost in boosts if boost not in LAND_BOOST_MOST]
+        most = LAND_BOOST_MOST.get(need, BOOST_MOST / max(len(shared), 1))
         before = self.raw_boost.get(kind, self.zero)
-        self.raw_boost[kind] = before + share
+        self.raw_boost[kind] = before + share * most
         for good, amount in makes_of(kind, self.economy.year).items():
-            more = self.count[kind] * amount * BOOST_MOST * share
+            more = self.count[kind] * amount * most * share
             self.offers[(kind, good)] = self.offers[(kind, good)] + more
             self.offered[good] = self.offered[good] + more
 

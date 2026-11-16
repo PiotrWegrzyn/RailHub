@@ -329,6 +329,7 @@ SHOPS = frozenset(
     {
         BuildingKind.TAVERN,
         BuildingKind.CLUB,
+        BuildingKind.FILLING_STATION,
         BuildingKind.DEPARTMENT_STORE,
         BuildingKind.HOTEL,
         BuildingKind.JEWELLER,

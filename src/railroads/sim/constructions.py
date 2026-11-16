@@ -136,6 +136,7 @@ class BuildingKind(Enum):
     DEPARTMENT_STORE = "department store"
     HOTEL = "hotel"
     CLUB = "club"
+    FILLING_STATION = "filling station"
     JUICE_WORKS = "juice works"
     BIG_JUICE_WORKS = "big juice works"
     MEGA_JUICE_WORKS = "mega juice works"
@@ -309,6 +310,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     BuildingKind.BAKERY: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.TAVERN: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.CLUB: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.FILLING_STATION: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.DEPARTMENT_STORE: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.HOTEL: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.LIMESTONE_QUARRY: BuildingRules(relief=frozenset(Relief)),
@@ -479,6 +481,8 @@ class Constructions:
         self._platforms: dict[Cell, set[Cell]] = {}
         self._track: dict[Cell, int] = {}
         self.railway_version = 0
+        # A count that goes up whenever anything is built or removed.
+        self.version = 0
 
     def __iter__(self) -> Iterator[Construction]:
         for built in self._cells.values():
@@ -583,6 +587,7 @@ class Constructions:
         if (problem := self.why_not(construction)) is not None:
             raise CannotBuild(problem)
         self._cells.setdefault(construction.cell, []).append(construction)
+        self.version += 1
         self._index(construction, 1)
 
     def remove(self, construction: Construction) -> None:
@@ -592,6 +597,7 @@ class Constructions:
         built.remove(construction)
         if not built:
             del self._cells[construction.cell]
+        self.version += 1
         self._index(construction, -1)
 
     def _index(self, construction: Construction, change: int) -> None:
@@ -617,10 +623,6 @@ class Constructions:
             case _:
                 return
         self.railway_version += 1
-
-    def track_problem(self, track: Track) -> str | None:
-        """Why this track cannot be laid, leaving aside the room already taken."""
-        return self._track_problem(track)
 
     def site_problem(self, building: Building) -> str | None:
         """Why the building cannot stand in its cell, leaving aside the room already taken."""

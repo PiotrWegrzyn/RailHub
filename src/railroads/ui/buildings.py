@@ -123,6 +123,7 @@ DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.OLYMPIC_STADIUM: ((220, 90, 70), 0.3),
     BuildingKind.TAVERN: ((196, 130, 56), 0.1),
     BuildingKind.CLUB: ((150, 60, 130), 0.12),
+    BuildingKind.FILLING_STATION: ((230, 200, 60), 0.12),
     BuildingKind.DEPARTMENT_STORE: ((232, 200, 110), 0.16),
     BuildingKind.HOTEL: ((200, 70, 90), 0.16),
     BuildingKind.JUICE_WORKS: ((236, 150, 40), 0.1),

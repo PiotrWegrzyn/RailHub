@@ -9,10 +9,9 @@ from imgui_bundle import imgui
 from railroads.sim.finance import dollars
 from railroads.sim.tech import NODES, TREES, Effect, Node, Research, Tree, xp_for
 from railroads.sim.trains import ENGINES
-from railroads.ui.theme import BRASS
+from railroads.ui.theme import BRASS, WINDOW_TOP
 
 WINDOW_SIZE = (940.0, 560.0)
-WINDOW_TOP = 56.0
 NODE_SIZE = (170.0, 44.0)
 # The space between nodes side by side, and between rows.
 NODE_GAP = (14.0, 34.0)
@@ -58,17 +57,6 @@ def depth(key: str) -> int:
     """How many nodes stand before this one, along its longest line of requirements."""
     node = NODES[key][1]
     return 1 + max((depth(need) for need in node.requires), default=-1)
-
-
-def rows_of(tree: Tree) -> list[list[Node]]:
-    """A tree's nodes in rows: those needing nothing first, then each row building on the last."""
-    rows: list[list[Node]] = []
-    for node in TREES[tree]:
-        at = depth(node.key)
-        while len(rows) <= at:
-            rows.append([])
-        rows[at].append(node)
-    return rows
 
 
 def layout(tree: Tree) -> dict[str, tuple[float, int]]:
