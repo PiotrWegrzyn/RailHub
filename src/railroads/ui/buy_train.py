@@ -25,8 +25,8 @@ MOST_BLOW_UP = 8
 FIGURES_LABEL = 130.0
 PICTURE_BACK = (0.08, 0.07, 0.06, 1.0)
 
-# An engine's picture (railroads.ui.pixel.train_layer.engine_picture) as a texture blown up so
-# many times each way, and its size in art pixels.
+# An engine's picture (railroads.ui.pixel.train_layer.engine_picture) as a texture drawn so many
+# times as fine each way, and its size in the sprite sheet's pixels.
 type EnginePicture = Callable[[str, int], tuple[imgui.ImTextureRef, Vec2]]
 type DrawRoute = Callable[[Train], None]
 # The engines on sale grouped by what they are for, and an engine's tooltip.
@@ -149,12 +149,12 @@ class BuyScreen:
 
     @staticmethod
     def _draw_picture(name: str, picture: EnginePicture) -> None:
-        """The engine big, its art pixels blown up as many whole times as fit, on a dark band."""
+        """The engine big, as many whole times as fit, drawn fine on a dark band."""
         density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
         _, (width, height) = picture(name, density)
         room = imgui.get_content_region_avail().x
         times = max(1, min(MOST_BLOW_UP, int(room // width), int(PICTURE_HEIGHT // height)))
-        texture, _ = picture(name, times * density)
+        texture, (width, height) = picture(name, times * density)
         low = imgui.get_cursor_screen_pos()
         band = PICTURE_HEIGHT + 16
         draw_list = imgui.get_window_draw_list()
