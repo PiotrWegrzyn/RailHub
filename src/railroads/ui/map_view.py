@@ -58,7 +58,7 @@ from railroads.ui.pixel.ground_shader import (
     screen_of,
     view_of,
 )
-from railroads.ui.pixel.layer import PixelLayer
+from railroads.ui.pixel.layer import PixelLayer, blown_up_texture
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.track_preview import TrackPreview
@@ -597,8 +597,7 @@ class MapView:
         if kept is None:
             layer = self._train_layer()
             pixels = engine_picture(layer.sprites, layer.world.projection.matrix, engine)
-            big = np.repeat(np.repeat(pixels, times, axis=0), times, axis=1)
-            texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
+            texture = blown_up_texture(pixels, times)
             kept = (texture, (float(pixels.shape[1]), float(pixels.shape[0])))
             self._engine_pictures[(engine, times)] = kept
         return imgui.ImTextureRef(kept[0].texture_id()), kept[1]

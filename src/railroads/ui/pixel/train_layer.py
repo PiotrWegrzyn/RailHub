@@ -20,6 +20,7 @@ from railroads.sim.constructions import Track
 from railroads.sim.railway import Railway
 from railroads.sim.trains import Point, Train
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, IsoCamera, Vec2
+from railroads.ui.pixel.layer import blown_up_texture
 from railroads.ui.pixel.models import HEIGHT_PER_WIDTH
 from railroads.ui.pixel.relief import MOST_LIFT
 from railroads.ui.pixel.track_art import BEND, TrackArt
@@ -276,9 +277,10 @@ class TrainLayer:
         for index, (px, py, w, h, _, _) in enumerate(boxes):
             x, y = spots[index]
             pixels[y : y + h, x : x + w] = self.sprites.image[py : py + h, px : px + w]
-        big = np.repeat(np.repeat(pixels, factor, axis=0), factor, axis=1)
-        texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
-        page = self._pages[look] = _Page(texture, (width, pixels.shape[0]), spots, big.nbytes)
+        texture = blown_up_texture(pixels, factor)
+        page = self._pages[look] = _Page(
+            texture, (width, pixels.shape[0]), spots, pixels.nbytes * factor**2
+        )
         return page
 
     def _let_go(self, drawn: set[object]) -> None:

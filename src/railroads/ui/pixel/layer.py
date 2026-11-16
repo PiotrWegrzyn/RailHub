@@ -258,8 +258,7 @@ class PixelLayer:
         if times > 1 and self.blow_up is not None:
             texture = self.blow_up(pixels, times)
         else:
-            big = blown_up(pixels, times)
-            texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
+            texture = blown_up_texture(pixels, times)
         self._textures[(*chunk, scale)] = texture
         return texture
 
@@ -272,6 +271,13 @@ def blown_up(pixels: Rgba, times: int) -> Rgba:
     if times == 1:
         return pixels
     return np.repeat(np.repeat(pixels, times, axis=0), times, axis=1)
+
+
+def blown_up_texture(pixels: Rgba, times: int) -> hello_imgui.TextureGpu:
+    """A texture of the pixels, each repeated `times` times each way (blown_up)."""
+    return hello_imgui.create_texture_gpu_from_rgba_data(
+        np.ascontiguousarray(blown_up(pixels, times))
+    )
 
 
 def middle_out(placement: ChunkPlacement, center: Vec2) -> list[ChunkKey]:

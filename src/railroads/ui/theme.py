@@ -14,6 +14,7 @@ from PIL import Image
 from railroads.sim.goods import General, Good, Need
 from railroads.sim.trains import car_size
 from railroads.ui.pixel.good_icons import ICON_PIXELS, ICONS_INDEX, ICONS_PNG
+from railroads.ui.pixel.layer import blown_up_texture
 
 type Rgba = tuple[float, float, float, float]
 
@@ -271,15 +272,12 @@ class IconAtlas:
 def _icon_atlas() -> IconAtlas:
     with Image.open(ICONS_PNG) as sheet:
         rgba = np.asarray(sheet.convert("RGBA"), dtype=np.uint8)
-    big = np.repeat(np.repeat(rgba, ICON_TEXTURE_SCALE, axis=0), ICON_TEXTURE_SCALE, axis=1)
     height, width = rgba.shape[:2]
     places = {
         name: ((x / width, y / height), ((x + ICON_PIXELS) / width, (y + ICON_PIXELS) / height))
         for name, (x, y) in json.loads(ICONS_INDEX.read_text()).items()
     }
-    return IconAtlas(
-        hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big)), places
-    )
+    return IconAtlas(blown_up_texture(rgba, ICON_TEXTURE_SCALE), places)
 
 
 def draw_good_icon(

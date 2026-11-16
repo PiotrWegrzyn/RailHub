@@ -11,7 +11,7 @@ from PIL import Image
 from railroads.sim.constructions import Track
 from railroads.sim.routes import Route
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, IsoCamera, Vec2
-from railroads.ui.pixel.layer import resolution_for
+from railroads.ui.pixel.layer import blown_up_texture, resolution_for
 from railroads.ui.pixel.world import PixelWorld
 
 # How much of the track's own colour is kept, and the greys its darkest and lightest parts fade
@@ -83,7 +83,6 @@ class TrackPreview:
         pixels = ghost(planned)
         most = int((MOST_PIXELS / max(width * height * resolution**2, 1)) ** 0.5)
         factor = max(1, min(device_scale // resolution, most))
-        big = np.repeat(np.repeat(pixels, factor, axis=0), factor, axis=1)
-        self._texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
+        self._texture = blown_up_texture(pixels, factor)
         self._rect = (left, top, width, height)
         self._factor = factor
