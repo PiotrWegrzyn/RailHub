@@ -104,12 +104,13 @@ def plan_route(
     end: Cell,
     width: TrackWidth = TrackWidth.SINGLE,
     electric: bool = False,
+    maglev: bool = False,
 ) -> Route | None:
-    """The cheapest track of this width, electric or not, from `start` to `end`, or None if
-    there is no way."""
+    """The cheapest track of this width, electric, maglev or neither, from `start` to `end`, or
+    None if there is no way."""
     if start == end:
         return None
-    return _Planner(constructions, start, end, width, electric).plan()
+    return _Planner(constructions, start, end, width, electric and not maglev, maglev).plan()
 
 
 def route_price(constructions: Constructions, route: Route) -> float:
@@ -298,6 +299,7 @@ class _Planner:
     end: Cell
     width: TrackWidth
     electric: bool
+    maglev: bool
     _costs: dict[Cell, float | None] = field(default_factory=dict, init=False)
     _reach: float = field(default=0.0, init=False)
     _centers: tuple[tuple[float, float], tuple[float, float]] = field(init=False)
@@ -599,7 +601,7 @@ class _Planner:
                 ends = (entry, join) if join is not None else self._loose_end(cell, entry, bed)
             else:
                 ends = (entry, exit_point)
-            piece = Track(cell, ends, self.width, bed, self.electric)
+            piece = Track(cell, ends, self.width, bed, self.electric, self.maglev)
             old = constructions.track_between(cell, ends)
             if old is None and joined is not None:
                 old = _dead_end(constructions, cell, joined, piece.ends)
@@ -624,7 +626,7 @@ class _Planner:
         for point in [straight, *others]:
             if turns[point] > MAX_TURN_DEG + 1e-6:
                 continue
-            piece = Track(cell, (joined, point), self.width, bed, self.electric)
+            piece = Track(cell, (joined, point), self.width, bed, self.electric, self.maglev)
             laid = constructions.track_between(cell, piece.ends) is not None
             if laid or constructions.why_not(piece) in (None, crowded):
                 return piece.ends
@@ -660,13 +662,17 @@ def _dead_end(
 
 
 def _merged(piece: Track, old: Track) -> Track:
-    """The piece, as wide as the track it replaces and electric if that was."""
+    """The piece, as wide as the track it replaces, maglev if either is and else electric if
+    either is: a guideway laid over rails takes their place, and rails laid along a guideway
+    keep it."""
+    maglev = piece.maglev or old.maglev
     return Track(
         piece.cell,
         piece.ends,
         max(piece.width, old.width),
         piece.bed,
-        piece.electric or old.electric,
+        (piece.electric or old.electric) and not maglev,
+        maglev,
     )
 
 

@@ -117,9 +117,16 @@ class Game:
         return Done(f"Station built for {dollars(STATION_PRICE + site)}.", changed, ok=True)
 
     def lay_track(
-        self, start: Cell, end: Cell, width: TrackWidth = TrackWidth.SINGLE, electric: bool = False
+        self,
+        start: Cell,
+        end: Cell,
+        width: TrackWidth = TrackWidth.SINGLE,
+        electric: bool = False,
+        maglev: bool = False,
     ) -> Done:
-        route = routes.plan_route(self.constructions, start, end, width, electric)
+        if maglev and not self.railway.maglev_open:
+            return Done("Maglev track needs Magnetic levitation and a maglev engine on sale.")
+        route = routes.plan_route(self.constructions, start, end, width, electric, maglev)
         if route is None:
             return Done("No way for track to get there.")
         laid = len(route.changes(self.constructions))

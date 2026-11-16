@@ -194,20 +194,61 @@ def test_woods_are_drawn_darker_than_meadow_with_crowns_and_floor(sheet: SpriteS
     assert len(np.unique(woods, axis=0)) > 20
 
 
-def test_woods_clear_round_what_is_built_in_them(sheet: SpriteSheet) -> None:
-    world = make_world(sheet, houses=0)
+def canopy_round(world: PixelWorld, cell: Cell) -> tuple[np.ndarray, int, int]:
     grid = world.tile_map.grid
     canvas = np.ones((CHUNK, CHUNK, 4), dtype=np.float32)
-    px, py = world.projection.to_pixels(*grid.center(4, 8))
+    px, py = world.projection.to_pixels(*grid.center(*cell))
     left, top = int(px) - CHUNK // 2, int(py) - CHUNK // 2
-
     world.ground.canopy(canvas, left, top, 1)
+    return canvas, left, top
 
-    mill = canvas[CHUNK // 2 - 2 : CHUNK // 2 + 3, CHUNK // 2 - 2 : CHUNK // 2 + 3, :3]
-    fx, fy = world.projection.to_pixels(*grid.center(2, 10))
-    forest = canvas[int(fy) - top, int(fx) - left, :3]
-    assert (mill == 1).all()
-    assert (forest < 1).all()
+
+def test_woods_clear_round_what_is_built_in_them(sheet: SpriteSheet) -> None:
+    world = make_world(sheet, houses=0)
+    world.constructions.build(Building((2, 9), BuildingKind.FACTORY))
+    world.buildings_changed({(2, 9)})
+
+    canvas, _, _ = canopy_round(world, (2, 9))
+
+    factory = canvas[CHUNK // 2 - 2 : CHUNK // 2 + 3, CHUNK // 2 - 2 : CHUNK // 2 + 3, :3]
+    assert (factory == 1).all()
+
+
+def test_a_lumber_mill_stands_in_a_small_clearing_with_woods_round_it_in_its_cell(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet, houses=0)
+    grid = world.tile_map.grid
+    mill = Building((4, 8), BuildingKind.LUMBER_MILL)
+    sawmill = world.scenery.sprite == sheet.index("lumber_mill")
+    x, y = world.scenery.x[sawmill][0], world.scenery.y[sawmill][0]
+
+    canvas, left, top = canopy_round(world, mill.cell)
+
+    iy, ix = np.mgrid[0:CHUNK, 0:CHUNK]
+    r, c = grid.cell_at(*world.projection.to_plane(left + ix + 0.5, top + iy + 0.5))
+    in_cell = (r == mill.cell[0]) & (c == mill.cell[1])
+    wooded = (canvas[..., :3] < 1).any(axis=-1)
+    yard = canvas[int(y) - top + 4 : int(y) - top + 6, int(x) - left - 3 : int(x) - left + 4, :3]
+    assert (yard == 1).all()
+    assert wooded[in_cell].mean() > 0.6
+
+
+def test_a_lumber_mill_keeps_woods_in_its_cell_after_the_forest_there_is_cleared(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet, houses=0)
+    grid = world.tile_map.grid
+    world.tile_map.set_vegetation(np.array([4 * grid.cols + 8]), Vegetation.GRASS)
+    world.buildings_changed({(4, 8)})
+
+    canvas, left, top = canopy_round(world, (4, 8))
+
+    iy, ix = np.mgrid[0:CHUNK, 0:CHUNK]
+    r, c = grid.cell_at(*world.projection.to_plane(left + ix + 0.5, top + iy + 0.5))
+    in_cell = (r == 4) & (c == 8)
+    wooded = (canvas[..., :3] < 1).any(axis=-1)
+    assert wooded[in_cell].mean() > 0.6
 
 
 def test_every_building_gets_its_sprite(sheet: SpriteSheet) -> None:
@@ -390,6 +431,27 @@ def test_double_track_lays_two_tracks_side_by_side(sheet: SpriteSheet) -> None:
     assert rails_across(double, column) == 4
 
 
+def reach(sheet: SpriteSheet, piece: Track) -> float:
+    """How far from the middle of its cell, in art pixels, the farthest pixel the piece changes
+    lies."""
+    bare = track_chunk(sheet, [])[1].astype(int)
+    world, laid = track_chunk(sheet, [piece])
+    column, row = at_cell(world, piece.cell)
+    rows, columns = np.nonzero((np.abs(laid.astype(int) - bare) > 8).any(axis=-1))
+    return float(np.hypot(columns - column, rows - row).max())
+
+
+@pytest.mark.parametrize("ends", [(0, 4), (0, 8), (2, 6), (2, 10), (4, 8), (4, 10), (6, 10)])
+def test_double_track_round_a_bend_reaches_no_further_than_straight_track(
+    sheet: SpriteSheet, ends: tuple[int, int]
+) -> None:
+    straight = reach(sheet, Track((10, 3), (0, 6), TrackWidth.DOUBLE))
+
+    bent = reach(sheet, Track((10, 3), ends, TrackWidth.DOUBLE))
+
+    assert bent <= straight
+
+
 def test_electric_track_hangs_wires_over_it(sheet: SpriteSheet) -> None:
     plain = track_chunk(sheet, [Track((10, 3), (0, 6))])[1]
 
@@ -398,6 +460,25 @@ def test_electric_track_hangs_wires_over_it(sheet: SpriteSheet) -> None:
     wired = (electric != plain).any(axis=-1)
     track_rows = np.flatnonzero((plain != track_chunk(sheet, [])[1]).any(axis=-1).any(axis=1))
     assert wired.any(axis=1)[: track_rows.min()].any()
+
+
+def test_maglev_track_is_a_beam_without_rails(sheet: SpriteSheet) -> None:
+    bare = track_chunk(sheet, [])[1]
+    plain = track_chunk(sheet, [Track((10, 3), (0, 6))])[1]
+
+    guideway = track_chunk(sheet, [Track((10, 3), (0, 6), maglev=True)])[1]
+
+    def rail_coloured(chunk: np.ndarray) -> int:
+        return int((np.abs(chunk[..., :3].astype(int) - RAIL).max(axis=-1) < 12).sum())
+
+    def concrete(chunk: np.ndarray) -> int:
+        rgb = chunk[..., :3].astype(int)
+        grey = rgb.max(axis=-1) - rgb.min(axis=-1) < 16
+        return int((grey & (rgb.min(axis=-1) > 150) & (rgb.max(axis=-1) < 220)).sum())
+
+    assert (guideway != bare).any()
+    assert rail_coloured(guideway) * 4 < rail_coloured(plain)
+    assert concrete(guideway) > 2 * concrete(plain)
 
 
 def test_track_keeps_one_width_on_the_screen_whichever_way_it_runs(sheet: SpriteSheet) -> None:
@@ -409,6 +490,27 @@ def test_track_keeps_one_width_on_the_screen_whichever_way_it_runs(sheet: Sprite
     across_width = ((across != bare).any(axis=-1)).any(axis=1).sum()
     upright_width = ((upright != bare).any(axis=-1)).any(axis=0).sum()
     assert abs(across_width - upright_width) <= 2
+
+
+@pytest.mark.parametrize(
+    ("kinds", "maglev"),
+    [((True, True), True), ((True, None), True), ((True, False), False), ((None, None), False)],
+)
+def test_a_station_shows_a_guideway_where_only_maglev_track_comes_in(
+    sheet: SpriteSheet, kinds: tuple[bool | None, bool | None], maglev: bool
+) -> None:
+    sides = ((10, 3), (10, 5))
+    line = [
+        Track(cell, (0, 6), maglev=kind)
+        for cell, kind in zip(sides, kinds, strict=True)
+        if kind is not None
+    ]
+    world, _ = track_chunk(sheet, line, stations=(Station((10, 4), (0, 6)),))
+
+    piece = world.track.station_piece((10, 4))
+
+    assert piece.maglev == maglev
+    assert not (piece.maglev and piece.electric)
 
 
 def test_track_into_a_station_runs_on_through_it_past_its_platform(sheet: SpriteSheet) -> None:

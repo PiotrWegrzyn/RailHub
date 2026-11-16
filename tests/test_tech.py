@@ -115,7 +115,7 @@ def test_market_stalls_raise_what_food_cargo_earns() -> None:
     assert railway.finances.month["cargo"] == pytest.approx(1.05 * plain.finances.month["cargo"])
 
 
-def test_only_the_first_engine_can_be_bought_until_its_tech_and_year_have_come() -> None:
+def test_the_mogul_can_be_bought_only_once_its_tech_and_year_have_come() -> None:
     railway = joined().railway
     railway.year = 1879
     railway.research = learned(Tree.METALS, "boilers")
@@ -123,8 +123,8 @@ def test_only_the_first_engine_can_be_bought_until_its_tech_and_year_have_come()
 
     railway.year = 1880
 
-    assert early == ["planet"]
-    assert railway.engines() == ["planet", "mogul"]
+    assert "mogul" not in early
+    assert "mogul" in railway.engines()
     assert railway.buy("pacific") is None
 
 

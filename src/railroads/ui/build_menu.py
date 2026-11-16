@@ -23,6 +23,8 @@ from railroads.sim.finance import (
     DOUBLE_TRACK_FACTOR,
     ELECTRIC_TRACK_PRICE,
     ELECTRIC_TRACK_UPKEEP,
+    MAGLEV_TRACK_PRICE,
+    MAGLEV_TRACK_UPKEEP,
     STATION_PRICE,
     TRACK_PRICE,
     TRACK_UPKEEP,
@@ -45,6 +47,8 @@ RAIL = (0.82, 0.8, 0.76, 1.0)
 DECK = (0.42, 0.26, 0.12, 1.0)
 TUNNEL = (0.18, 0.17, 0.17, 1.0)
 WIRE = (0.12, 0.14, 0.2, 1.0)
+GUIDEWAY = (0.74, 0.74, 0.72, 1.0)
+GUIDEWAY_EDGE = (0.42, 0.42, 0.44, 1.0)
 # How far apart the two tracks of double track are drawn, as a share of a cell.
 DOUBLE_SPACING = 0.28
 # Track not laid yet is drawn in this grey, this see-through.
@@ -145,6 +149,12 @@ ELECTRIC_TIP = (
     f"{dollars(ELECTRIC_TRACK_UPKEEP)} a month more ({DOUBLE_TRACK_FACTOR:g} times that on double "
     "track). Lay it over your track to electrify that."
 )
+MAGLEV_TIP = (
+    f"A concrete guideway for maglev engines, which run on nothing else, and nothing else runs "
+    f"on it: {dollars(MAGLEV_TRACK_PRICE)} a cell more, {dollars(MAGLEV_TRACK_UPKEEP)} a month "
+    f"more ({DOUBLE_TRACK_FACTOR:g} times that on double track). Laid over your track it takes "
+    "the place of the rails."
+)
 
 
 @dataclass
@@ -169,9 +179,12 @@ class BuildMenu:
     # Which of the grid's ways the player turned the station being placed to, by its place in
     # MapTools.station_ways; None while it takes the way of the cell under the pointer.
     station_turn: int | None = None
-    # What the track tool lays: single or double track, and whether it is electric.
+    # What the track tool lays: single or double track, and whether it is electric or maglev.
     track_width: TrackWidth = TrackWidth.SINGLE
     electric: bool = False
+    maglev: bool = False
+    # Whether maglev track can be laid yet (Railway.maglev_open).
+    maglev_open: bool = False
     trains: TrainsWindow = field(default_factory=TrainsWindow)
     stations: StationsWindow = field(default_factory=StationsWindow)
 
@@ -220,16 +233,25 @@ class BuildMenu:
         imgui.same_line()
         for width, label, tooltip in WIDTH_BUTTONS:
             if toggle_button(label, self.track_width == width, tooltip, (0, BUTTON_HEIGHT)):
-                self.lay(width, self.electric)
+                self.lay(width, self.electric, self.maglev)
             imgui.same_line()
         label = f"{fa.ICON_FA_BOLT}  Electric"
         if toggle_button(label, self.electric, ELECTRIC_TIP, (0, BUTTON_HEIGHT)):
             self.lay(self.track_width, not self.electric)
         imgui.same_line()
+        if not self.maglev_open:
+            if self.maglev:
+                self.lay(self.track_width, self.electric)
+            return
+        label = f"{fa.ICON_FA_MAGNET}  Maglev"
+        if toggle_button(label, self.maglev, MAGLEV_TIP, (0, BUTTON_HEIGHT)):
+            self.lay(self.track_width, False, not self.maglev)
+        imgui.same_line()
 
-    def lay(self, width: TrackWidth, electric: bool) -> None:
-        """Sets what the track tool lays, and plans the previewed track again."""
-        self.track_width, self.electric = width, electric
+    def lay(self, width: TrackWidth, electric: bool, maglev: bool = False) -> None:
+        """Sets what the track tool lays, and plans the previewed track again. Maglev track
+        carries no wires, so choosing one leaves out the other."""
+        self.track_width, self.electric, self.maglev = width, electric and not maglev, maglev
         self.preview_to = None
 
     def _draw_hint(self) -> None:
@@ -445,9 +467,10 @@ def draw_track(
     planned: list[Track] | None = None,
 ) -> None:
     """Draws every piece of track, or only the planned pieces greyed out: ballast with a rail on
-    top, two rails on double track, a wooden deck on bridges and a dark line through tunnels, with
-    a wire beside electric track, thicker the closer the view. All the beds go down before any
-    rail, so pieces that meet in a cell make one junction or crossing."""
+    top, two rails on double track, a pale concrete beam instead of rails on maglev track, a
+    wooden deck on bridges and a dark line through tunnels, with a wire beside electric track,
+    thicker the closer the view. All the beds go down before any rail, so pieces that meet in a
+    cell make one junction or crossing."""
     width = max(1.5, camera.cell_width / 10)
     laid = constructions.track()
     pieces = [
@@ -469,7 +492,12 @@ def draw_track(
             continue
         sides = (-spacing, spacing) if piece.width == TrackWidth.DOUBLE else (0.0,)
         for side in sides:
-            draw_list.add_polyline(_parallel(points, side), shade(RAIL), max(1.0, width * 0.5), 0)
+            lane = _parallel(points, side)
+            if piece.maglev:
+                draw_list.add_polyline(lane, shade(GUIDEWAY_EDGE), width * 1.3, 0)
+                draw_list.add_polyline(lane, shade(GUIDEWAY), width * 0.9, 0)
+            else:
+                draw_list.add_polyline(lane, shade(RAIL), max(1.0, width * 0.5), 0)
     for piece, points in pieces:
         if piece.electric and piece.bed != TrackBed.TUNNEL:
             lifted = [imgui.ImVec2(point.x, point.y - width * 1.2) for point in points]

@@ -68,8 +68,8 @@ def rows_of(tree: Tree) -> list[list[Node]]:
 def describe(node: Node) -> str:
     """What a node does, in a few words."""
     if node.effect == Effect.UNLOCK:
-        engine = ENGINES[node.engine]
-        return f"opens the {engine.title} (from {engine.year})"
+        first = min(engine.year for engine in ENGINES.values() if node.key in engine.needs)
+        return f"opens {node.opens} (from {first})"
     if node.effect in PERCENT_EFFECTS:
         sign = "-" if node.effect in (Effect.UPKEEP, Effect.DISCOUNT) else "+"
         reach = ", everywhere" if node.everywhere else ""

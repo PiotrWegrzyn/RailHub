@@ -65,6 +65,9 @@ MAST_SIDE = 0.13
 MAST_GAP = 1.0
 MAST_HEIGHT = 6
 WIRE_HEIGHT = 4
+# Maglev track's concrete beam: how wide it is and how wide its darker edges, in cells.
+GUIDEWAY_WIDTH = 0.16
+GUIDEWAY_RIM = 0.025
 
 BANK_EDGE: RGB = (58, 52, 44)
 GRAVEL: RGB = (98, 90, 80)
@@ -77,7 +80,20 @@ RAILING: RGB = (70, 48, 30)
 PORTAL_STONE: RGB = (118, 112, 104)
 PORTAL_DARK: RGB = (20, 18, 18)
 MAST: RGB = (96, 96, 104)
+GUIDEWAY: RGB = (196, 194, 188)
+GUIDEWAY_EDGE: RGB = (112, 110, 108)
+GUIDEWAY_GROOVE: RGB = (70, 72, 80)
 WIRE: RGB = (40, 40, 46)
+
+
+def _lay_guideway(paint: ImageDraw.ImageDraw, lanes: list[Path], cell: float, line: int) -> None:
+    """Maglev track: a pale concrete beam with darker edges and a groove down its middle where
+    rails and sleepers would be."""
+    for lane in lanes:
+        paint.polygon(_strip(lane, GUIDEWAY_WIDTH / 2 * cell), fill=(*GUIDEWAY_EDGE, 255))
+        inner = (GUIDEWAY_WIDTH / 2 - GUIDEWAY_RIM) * cell
+        paint.polygon(_strip(lane, inner), fill=(*GUIDEWAY, 255))
+        paint.line(lane, fill=(*GUIDEWAY_GROOVE, 255), width=line, joint="curve")
 
 
 def _offset(path: Path, side: float | list[float]) -> Path:
@@ -93,7 +109,10 @@ def _offset(path: Path, side: float | list[float]) -> Path:
         before = normals[max(0, index - 1)]
         after = normals[min(len(normals) - 1, index)]
         mx, my = before[0] + after[0], before[1] + after[1]
-        dot = (mx * before[0] + my * before[1]) or 1.0
+        # Where the line doubles back, the moved lines meet far off: they are kept at most
+        # twice as far out as the line is moved.
+        dot = mx * before[0] + my * before[1]
+        dot = max(0.5, dot) if dot else 1.0
         moved.append((x + mx / dot * amount, y + my / dot * amount))
     return moved
 
@@ -105,24 +124,40 @@ def _strip(path: Path, left: float, right: float | None = None) -> Path:
     return _offset(path, left) + _offset(path, right)[::-1]
 
 
-def _bend(start: Point, middle: Point, end: Point) -> Path:
-    """The line from `start` through `middle` to `end`, rounded off over the last BEND before
-    and after the middle instead of turning sharply there."""
-    (ax, ay), (cx, cy), (bx, by) = start, middle, end
-    la, lb = math.hypot(ax - cx, ay - cy), math.hypot(bx - cx, by - cy)
-    ua, ub = ((ax - cx) / la, (ay - cy) / la), ((bx - cx) / lb, (by - cy) / lb)
-    if ua[0] * ub[0] + ua[1] * ub[1] < -0.999:
+def _bend(start: Point, middle: Point, end: Point, matrix: FloatArray, radius: float) -> Path:
+    """The line from `start` through `middle` to `end`, rounded off round the middle instead of
+    turning sharply there: on a circle in the picture, which `matrix` turns the map into, from
+    BEND before the middle to BEND after it, or further out where the turn looks sharp in the
+    picture, so the circle is at least `radius` art pixels round where it can be. Anything laid
+    along the line no further than `radius` to its side then turns with it instead of folding
+    over itself on the inside of the turn into spikes."""
+    centre = np.array(middle)
+    arms = [np.asarray(point) - centre for point in (start, end)]
+    seen = [matrix @ arm for arm in arms]
+    lengths = [float(np.hypot(*arm)) for arm in seen]
+    ua, ub = (arm / length for arm, length in zip(seen, lengths, strict=True))
+    cos = float(ua @ ub)
+    if cos < -0.999:
         return [start, middle, end]
-    p = (cx + ua[0] * BEND, cy + ua[1] * BEND)
-    q = (cx + ub[0] * BEND, cy + ub[1] * BEND)
-    curve = [
-        (
-            (1 - t) ** 2 * p[0] + 2 * (1 - t) * t * cx + t**2 * q[0],
-            (1 - t) ** 2 * p[1] + 2 * (1 - t) * t * cy + t**2 * q[1],
-        )
-        for t in (0.2, 0.4, 0.6, 0.8)
+    half = math.acos(max(-1.0, min(1.0, cos))) / 2
+    shortest = min(
+        BEND * seen_length / float(np.hypot(*arm))
+        for arm, seen_length in zip(arms, lengths, strict=True)
+    )
+    tangent = min(max(shortest, radius / math.tan(half)), 0.95 * min(lengths))
+    across = (ua + ub) / float(np.hypot(*(ua + ub)))
+    hub = across * tangent / math.cos(half)
+    p, q = ua * tangent - hub, ub * tangent - hub
+    first = math.atan2(p[1], p[0])
+    sweep = (math.atan2(q[1], q[0]) - first + math.pi) % (2 * math.pi) - math.pi
+    round_by = tangent * math.tan(half)
+    seen_curve = [
+        hub + round_by * np.array([math.cos(angle), math.sin(angle)])
+        for angle in (first + sweep * k / 8 for k in range(9))
     ]
-    return [start, p, *curve, q, end]
+    back = np.linalg.inv(matrix)
+    curve = [tuple(float(v) for v in centre + back @ point) for point in seen_curve]
+    return [start, *curve, end]
 
 
 def _dense(path: Path, step: float) -> Path:
@@ -400,24 +435,28 @@ class TrackArt:
         for each, line, lanes in ground:
             if each.platform is not None:
                 self._lay_platform(paint, line, lanes, each.platform, cell, s)
-        for each, _, lanes in ground:
+        railed = [item for item in ground if not item[0].piece.maglev]
+        for each, _, lanes in railed:
             if each.piece.bed == TrackBed.GROUND:
                 for lane in lanes:
                     paint.polygon(_strip(lane, TRACK_BED / 2 * cell), fill=(*GRAVEL, 255))
         for each, line, lanes in drawn:
             if each.piece.bed == TrackBed.TUNNEL:
                 self._lay_portals(paint, each, line, lanes, cell)
-        for _, _, lanes in ground:
+        for each, _, lanes in ground:
+            if each.piece.maglev:
+                _lay_guideway(paint, lanes, cell, smoothing)
+        for _, _, lanes in railed:
             for lane in lanes:
                 for sleeper in _sleepers(lane, cell):
                     paint.polygon(sleeper, fill=(*SLEEPER, 255))
         rail = smoothing
-        for _, _, lanes in ground:
+        for _, _, lanes in railed:
             for lane in lanes:
                 for side in (-GAUGE / 2 * cell, GAUGE / 2 * cell):
                     rail_line = _offset(lane, side)
                     paint.line(rail_line, fill=(*RAIL_UNDER, 255), width=2 * rail, joint="curve")
-        for _, _, lanes in ground:
+        for _, _, lanes in railed:
             for lane in lanes:
                 for side in (-GAUGE / 2 * cell, GAUGE / 2 * cell):
                     paint.line(_offset(lane, side), fill=(*RAIL, 255), width=rail, joint="curve")
@@ -468,7 +507,11 @@ class TrackArt:
         steps = self._steps / 2
         cx, cy = (float(v) for v in grid.center(*piece.cell))
         a, b = (steps[point] for point in piece.ends)
-        line = _dense(_bend((cx + a[0], cy + a[1]), (cx, cy), (cx + b[0], cy + b[1])), STEP)
+        reach = max(abs(side) for lane in self._sides_at(piece, [0.0, 0.5, 1.0]) for side in lane)
+        bed = BRIDGE_WIDTH if piece.bed == TrackBed.BRIDGE else BANK
+        radius = (reach + bed / 2 + SHADOW_REACH) * PIXEL_CELL_WIDTH
+        ends = (cx + a[0], cy + a[1]), (cx + b[0], cy + b[1])
+        line = _dense(_bend(ends[0], (cx, cy), ends[1], self.projection.matrix, radius), STEP)
         plane = np.array([[x for x, _ in line], [y for _, y in line]])
         laid = _Laid(piece, plane, self._sides(piece, line), platform)
         if len(self._laid_pieces) >= PIECES_KEPT:
@@ -496,7 +539,7 @@ class TrackArt:
     def _through_stations(self, near: tuple[int, int, int, int]) -> list[_Laid]:
         """The track through each station near the area, straight between its two ends with
         its platform beside it: double where double track comes in, electric where electric
-        track comes in at both ends."""
+        track comes in at both ends, maglev where only maglev track comes in."""
         laid = []
         for cell in self.constructions.stations():
             if not self._near(cell, near):
@@ -507,13 +550,16 @@ class TrackArt:
 
     def station_piece(self, cell: Cell) -> Track:
         """The track drawn through a station, straight between its two ends: double where
-        double track comes in, electric where electric track comes in at both ends."""
+        double track comes in, electric where electric track comes in at both ends, maglev where
+        only maglev track comes in."""
         run = self.constructions.station_ends(cell)
         joined = [_joined(self.constructions, cell, point) for point in run]
         electric = all(any(piece.electric for piece in found) for found in joined)
+        coming_in = [piece for found in joined for piece in found]
+        maglev = bool(coming_in) and all(piece.maglev for piece in coming_in)
         double = any(piece.width == TrackWidth.DOUBLE for found in joined for piece in found)
         width = TrackWidth.DOUBLE if double else TrackWidth.SINGLE
-        return Track(cell, run, width, TrackBed.GROUND, electric)
+        return Track(cell, run, width, TrackBed.GROUND, electric and not maglev, maglev)
 
     def riding_side(self, piece: Track, share: float, forward: bool) -> float:
         """How far a train `share` of the way along the piece, from its first end to its

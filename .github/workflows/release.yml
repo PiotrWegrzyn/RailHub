@@ -4,6 +4,9 @@ name: Release
 # pull request from staging, it releases the version in pyproject.toml: it builds the apps and
 # creates the tag vX.Y.Z and its GitHub Release, unless that version is already released. Each
 # promotion bumps the version, so it always touches pyproject.toml.
+#
+# GitHub's Macs are too often all busy, so the Mac app is built on a Mac by hand and added to the
+# release afterwards: uv run --with pyinstaller python desktop/build.py --upload
 on:
   push:
     branches: [master, staging]
@@ -40,10 +43,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-15
-            name: macOS
-            app: build/desktop/dist/RailHub.app/Contents/MacOS/RailHub
-            archive: build/desktop/RailHub-macOS.zip
           - os: windows-latest
             name: Windows
             app: build/desktop/dist/RailHub/RailHub.exe

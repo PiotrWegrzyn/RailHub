@@ -32,7 +32,8 @@ from railroads.sim.tilemap import TileMap
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 ELEVATION_DB = DATA_DIR / "elevation.sqlite"
 # Play can't begin before this year; START_YEAR is the start suggested.
-EARLIEST_START_YEAR = 1750
+# The year of the first steam engine on rails (railroads.sim.trains).
+EARLIEST_START_YEAR = 1804
 START_REGION = StartRegion()
 MAP_WIDTH_KM = 537.0
 MAP_HEIGHT_KM = 537.0

@@ -10,6 +10,7 @@ from railroads.sim.game import Game
 from railroads.sim.grids import HexGrid
 from railroads.sim.trains import Stop
 from railroads.ui import map_view
+from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
 from railroads.ui.map_view import MapView
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.train_layer import TrainLayer
@@ -110,3 +111,59 @@ def test_the_ground_under_every_trains_smoke_is_looked_up_in_one_go(
 
     imgui.end_frame()
     assert looked == [4, 2]
+
+
+def test_no_zoom_on_any_screen_makes_a_train_texture_bigger_than_every_graphics_card_takes(
+    context: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    view = railway_seen_in_pixel_art()
+    train = view.railway.buy()
+    assert train is not None
+    train.stops = [Stop((10, 6)), Stop((10, 16))]
+    view.time_passed(0.1)
+    layer = TrainLayer(view._pixel_layer().world)
+    sizes: list[int] = []
+    monkeypatch.setattr(
+        hello_imgui,
+        "create_texture_gpu_from_rgba_data",
+        lambda pixels: sizes.append(max(pixels.shape[:2])) or FakeTexture(),
+    )
+    io = imgui.get_io()
+
+    for density in (1, 2):
+        io.display_framebuffer_scale = imgui.ImVec2(density, density)
+        for zoom in range(len(ZOOM_CELL_WIDTHS)):
+            view.camera.zoom_level = zoom
+            imgui.new_frame()
+            layer.draw(imgui.get_foreground_draw_list(), view.railway, view.camera, (640.0, 400.0))
+            imgui.end_frame()
+
+    assert sizes
+    assert max(sizes) <= 4096
+
+
+def test_up_close_only_the_looks_on_screen_are_blown_up(
+    context: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    view = railway_seen_in_pixel_art()
+    train = view.railway.buy()
+    assert train is not None
+    train.stops = [Stop((10, 6)), Stop((10, 16))]
+    view.time_passed(0.1)
+    view.camera.zoom_level = len(ZOOM_CELL_WIDTHS) - 1
+    imgui.get_io().display_framebuffer_scale = imgui.ImVec2(2, 2)
+    layer = TrainLayer(view._pixel_layer().world)
+    made: list[int] = []
+    monkeypatch.setattr(
+        hello_imgui,
+        "create_texture_gpu_from_rgba_data",
+        lambda pixels: made.append(pixels.nbytes) or FakeTexture(),
+    )
+    imgui.new_frame()
+
+    layer.draw(imgui.get_foreground_draw_list(), view.railway, view.camera, (640.0, 400.0))
+
+    imgui.end_frame()
+    looks = {look for look, _ in layer._parts(train)}
+    assert len(made) == len(looks)
+    assert sum(made) < 64 * 1024 * 1024

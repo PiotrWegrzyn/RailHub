@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
-from railroads.sim.constructions import BuildingKind, Constructions
+from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Satisfaction
 from railroads.sim.grids import Grid
 from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
@@ -212,6 +212,12 @@ EDGE_SHADOW = 0.75
 BARE_ABOVE = 0.3
 BARE_MARGIN = 1e-4
 CLEARING = -4.0
+# Lumber mills stand in the woods: their cells keep their trees, but for a small clearing round
+# the mill itself, MILL_CLEARING of its yard's reach across and half that down, its edge frayed,
+# its middle CLEARING_DROP art pixels in front of the mill so its yard shows below it.
+IN_THE_WOODS = (BuildingKind.LUMBER_MILL,)
+MILL_CLEARING = 1.2
+CLEARING_DROP = 3.0
 # Where the woods' share of the ground is worked out around each point: the point itself and six
 # around it, in cells.
 AROUND = (
@@ -294,6 +300,12 @@ class Ground:
             np.zeros(0, dtype=str),
             np.zeros(0),
         )
+        # Where lumber mills stand in the picture and how far the clearing round each reaches.
+        self.clearings: tuple[FloatArray, FloatArray, FloatArray] = (
+            np.zeros(0),
+            np.zeros(0),
+            np.zeros(0),
+        )
         self.ramps = np.zeros((len(Biome), 4, 3), dtype=np.float32)
         for biome, ramp in RAMPS.items():
             self.ramps[biome] = ramp
@@ -303,11 +315,16 @@ class Ground:
         """Works out the biomes and fields again after buildings or forests changed."""
         self._biomes = biome_grid(self.tile_map)
         built = np.zeros(self.tile_map.grid.shape, dtype=bool)
+        woodland = np.zeros(self.tile_map.grid.shape, dtype=bool)
         for construction in self.constructions:
-            built[construction.cell] = True
-        # Each cell's say in whether woods cover a point near it: 1 for woods, 0 for open land,
-        # and CLEARING where something is built, so the woods give it room.
-        self._woods = np.where(built, CLEARING, np.isin(self._biomes, WOODS)).astype(np.float32)
+            if isinstance(construction, Building) and construction.kind in IN_THE_WOODS:
+                woodland[construction.cell] = True
+            else:
+                built[construction.cell] = True
+        # Each cell's say in whether woods cover a point near it: 1 for woods and lumber mills,
+        # 0 for open land, and CLEARING where anything else is built, so the woods give it room.
+        woods = np.isin(self._biomes, WOODS) | woodland
+        self._woods = np.where(built, CLEARING, woods).astype(np.float32)
         grid = self.tile_map.grid
         self._plots = plots_of(self.constructions, FIELD_KINDS)
         # Where each kind's fields sit in the picture, to find those near a block quickly.
@@ -654,6 +671,8 @@ class Ground:
         if not (self._woods[r.min() : r.max() + 2, c.min() : c.max() + 2] > 0).any():
             return
         woods = self._wooded(points, block, r, c)
+        if woods.any():
+            self._clear_round_mills(woods, block)
         if woods.any() and self.elevation.most(*block)[0] >= BARE_ABOVE - BARE_MARGIN:
             x, y = points.plane(*block)
             woods[woods] = self.elevation.mountainous(x[woods], y[woods]) < BARE_ABOVE
@@ -688,6 +707,29 @@ class Ground:
         colour = np.where((d < radius)[:, None], leaves, WOODS_FLOOR) / 255
         blocks[down, :, across, :, :3] = colour[:, None, None, :]
         blocks[down, :, across, :, 3] = 1.0
+
+    def _clear_round_mills(self, woods: BoolArray, block: tuple[int, int, int, int]) -> None:
+        """Takes the woods out of the clearing round each lumber mill in the block, an oval
+        frayed at its edge like a yard's."""
+        left, top = block[0], block[1]
+        rows, cols = woods.shape
+        xs, ys, reaches = self.clearings
+        reach = float(reaches.max()) + CLEARING_DROP if reaches.size else 0.0
+        near = (xs > left - reach) & (xs < left + cols + reach)
+        near &= (ys > top - reach) & (ys < top + rows + reach)
+        for cx, foot, rx in zip(
+            xs[near].tolist(), ys[near].tolist(), reaches[near].tolist(), strict=True
+        ):
+            cy, ry = foot + CLEARING_DROP, rx / 2
+            x0, x1 = max(int(cx - rx) - 1, left), min(int(cx + rx) + 2, left + cols)
+            y0, y1 = max(int(cy - ry) - 1, top), min(int(cy + ry) + 2, top + rows)
+            if x0 >= x1 or y0 >= y1:
+                continue
+            fy, fx = np.mgrid[y0:y1, x0:x1]
+            seed = int(cx * 7 + cy * 13) & 1023
+            d = np.hypot((fx + 0.5 - cx) / rx, (fy + 0.5 - cy) / ry)
+            clear = d + table_hash(fx, fy, seed) * 0.35 < 1.0
+            woods[y0 - top : y1 - top, x0 - left : x1 - left] &= ~clear
 
     def _wooded(
         self, points: Lattice, block: tuple[int, int, int, int], r: IntArray, c: IntArray

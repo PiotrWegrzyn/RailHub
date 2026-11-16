@@ -222,6 +222,7 @@ class MapView:
         self.input.handle_keys()
         self._draw_map()
         self._draw_details()
+        self.build.maglev_open = self.railway.maglev_open
         self.build.draw(*self._map_rect)
         self.build.trains.draw(
             self.railway, self.growth.station_trade.supplies, self._ground_picture

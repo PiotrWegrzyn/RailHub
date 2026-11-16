@@ -304,13 +304,15 @@ STATION_RELIEF = _OFF_MOUNTAINS
 class Track:
     """A piece of track inside one cell, between two of its track points; it joins the pieces
     in the cells those points lead to (see `Grid.track_exit`). Electric track has overhead
-    wires along it, which electric engines need."""
+    wires along it, which electric engines need. Maglev track is a concrete guideway instead of
+    rails: only maglev engines run on it, and they run on nothing else."""
 
     cell: Cell
     ends: tuple[int, int]
     width: TrackWidth = TrackWidth.SINGLE
     bed: TrackBed = TrackBed.GROUND
     electric: bool = False
+    maglev: bool = False
 
     def __post_init__(self) -> None:
         start, end = sorted(self.ends)

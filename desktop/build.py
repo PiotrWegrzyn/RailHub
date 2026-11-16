@@ -4,18 +4,29 @@
 
 macOS gives build/desktop/RailHub-macOS.zip (RailHub.app), Windows RailHub-Windows.zip (a folder
 with RailHub.exe) and Linux RailHub-Linux.tar.gz (a folder with RailHub). The release workflow
-(.github/workflows/release.yml) runs this on each system and attaches the archives to a release."""
+(.github/workflows/release.yml) runs this on Windows and Linux and attaches the archives to a
+release. GitHub's Macs are too often all busy, so the Mac app is added by hand once the release
+is out, from a clean checkout of its tag:
 
+    git checkout vX.Y.Z
+    uv run --with pyinstaller python desktop/build.py --upload
+
+which checks the app starts and adds its archive to that release, replacing one already there."""
+
+import argparse
+import os
 import platform
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "build" / "desktop"
 DIST = OUT / "dist"
 NAME = "RailHub"
+REPO = "PiotrWegrzyn/RailHub"
 
 
 def system() -> str:
@@ -61,8 +72,63 @@ def executable(name: str) -> Path:
     return DIST / NAME / (f"{NAME}.exe" if name == "Windows" else NAME)
 
 
+def release_tag() -> str:
+    with (ROOT / "pyproject.toml").open("rb") as file:
+        return f"v{tomllib.load(file)['project']['version']}"
+
+
+def upload_problem(tag: str, released: str | None, head: str, changes: str) -> str | None:
+    """Why the app built from this checkout must not go into the release `tag`, if it must not:
+    `released` is the commit the release was made from, `head` this checkout's and `changes` what
+    git status lists."""
+    if released is None:
+        return f"There is no release {tag} yet: it comes out when master gets that version."
+    if released != head:
+        return f"{tag} was released from {released[:7]}, not {head[:7]}: git checkout {tag} first."
+    if changes:
+        return "This checkout has uncommitted changes, which the release does not have."
+    return None
+
+
+def output(*command: str) -> str | None:
+    done = subprocess.run(command, check=False, capture_output=True, text=True, cwd=ROOT)
+    return done.stdout.strip() if done.returncode == 0 else None
+
+
+def check_release(tag: str) -> None:
+    released = output("gh", "api", f"repos/{REPO}/commits/{tag}", "--jq", ".sha")
+    head = output("git", "rev-parse", "HEAD") or ""
+    changes = output("git", "status", "--porcelain") or ""
+    if problem := upload_problem(tag, released, head, changes):
+        sys.exit(problem)
+
+
+def smoke_test(name: str) -> None:
+    environment = {**os.environ, "RAILROADS_SMOKE_TEST": "1"}
+    subprocess.run([str(executable(name))], env=environment, check=True)
+
+
+def upload(tag: str, archive: Path) -> None:
+    subprocess.run(
+        ["gh", "release", "upload", tag, str(archive), "--clobber", "--repo", REPO], check=True
+    )
+
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--upload", action="store_true", help="add the app to its version's release"
+    )
+    upload_it = parser.parse_args().upload
     name = system()
+    tag = release_tag()
+    if upload_it:
+        check_release(tag)
     freeze()
     print(executable(name))
-    print(pack(name))
+    archive = pack(name)
+    print(archive)
+    if upload_it:
+        smoke_test(name)
+        upload(tag, archive)
+        print(f"Added {archive.name} to {tag}: https://github.com/{REPO}/releases/tag/{tag}")

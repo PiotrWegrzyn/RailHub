@@ -118,7 +118,8 @@ class MainMenu:
         one, so nothing left over from play can stand in front of it."""
         width, height = imgui.get_window_size()
         imgui.set_cursor_pos(((width - MENU_WIDTH) / 2, max(24.0, height * 0.12)))
-        imgui.begin_group()
+        # A child window of the menu's width, so headers and lines end where the buttons do.
+        imgui.begin_child("##menu", (MENU_WIDTH, 0), imgui.ChildFlags_.auto_resize_y.value)
         imgui.push_item_width(MENU_WIDTH)
         imgui.push_font(None, imgui.get_style().font_size_base * TITLE_SCALE)
         imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_TRAIN}  RailHub")
@@ -134,7 +135,7 @@ class MainMenu:
             self.page
         ]()
         imgui.pop_item_width()
-        imgui.end_group()
+        imgui.end_child()
         draw_version()
         return choice
 

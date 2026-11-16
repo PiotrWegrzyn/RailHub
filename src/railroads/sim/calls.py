@@ -13,7 +13,7 @@ from railroads.sim.goods import TRAVELLERS, Good
 from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.tech import Tree
-from railroads.sim.trains import Car, Parcels, Stop, Train
+from railroads.sim.trains import ENGINES, Car, Parcels, Stop, Train
 
 WAIT_MONTHS = 1.0
 
@@ -32,16 +32,20 @@ class StationCalls:
             train.status = "Its stop has no station"
             return
         goods = self._railway.station_goods(stop.cell)
+        wanted = [good for good in stop.cars if self._railway.can_carry(train, good)]
+        aboard = [car for car in train.cars if not car.dining]
         if train.loaded_at == stop.cell:
-            train.cars = self._swap_cars(train.cars, stop.cars, goods, stop.cell)
+            aboard = self._swap_cars(aboard, wanted, goods, stop.cell)
         else:
             demand = self._railway.station_demand(stop.cell)
             for car in train.cars:
                 if car.load <= 0:
                     continue
                 if car.good in TRAVELLERS:
-                    earned = demand.deliver(car.good, car.load) * self._railway.price_factor(
-                        car.good
+                    earned = (
+                        demand.deliver(car.good, car.load)
+                        * self._railway.price_factor(car.good)
+                        * self._railway.fare_factor(train)
                     )
                     self._railway.finances.earn(earned, car.good.value)
                     self._railway.research.earn(Tree.PASSENGERS, earned)
@@ -53,7 +57,9 @@ class StationCalls:
                     self._store(goods, stop.cell, car.good, car.empty(unloaded))
                     self._railway.history.deliver(self._railway.year, car.good)
                     self._railway.hand_out_now(stop.cell, car.good)
-            train.cars = self._next_cars(train.cars, stop.cars)
+            aboard = self._next_cars(aboard, wanted)
+        dining = [Car(Good.PASSENGERS, dining=True)] if ENGINES[train.engine].express else []
+        train.cars = dining + aboard
         train.loaded_at = stop.cell
         working = self._railway.working_at(stop.cell)
         train.fuelled = Facility.ENGINE_SHED in working
@@ -111,6 +117,8 @@ class StationCalls:
         buildings around it have no use for this month."""
         goods = self._railway.station_goods(stop.cell)
         for car in train.cars:
+            if car.dining:
+                continue
             take = min(car.capacity - car.load, goods.stockpile.get(car.good, 0.0))
             if take > 0:
                 car.fill({stop.cell: take})

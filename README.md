@@ -21,7 +21,7 @@ first with:
 - the seed, which picks the start location and grows the same towns again. The menu offers a
   new random one each time the game opens;
 - the year play begins, so how long towns grow from 850 before it: 1850 is suggested, and play
-  can't begin before 1750 (`EARLIEST_START_YEAR` in `src/railroads/newgame.py`);
+  can't begin before 1804, the year of the first steam engine on rails (`EARLIEST_START_YEAR` in `src/railroads/newgame.py`);
 - the starting money, $80,000 by default;
 - under "For testing", how many years a stand-in player runs the railway first (`--simulate`).
 
@@ -72,7 +72,7 @@ uv run railroads --years 1100
 
 grows them for 1,100 years instead, so play begins in 1950 with a century more growth behind it
 and the clock showing 1950; play always ends in 2050. A shorter history begins play earlier, but
-not before 1750: `--years` below 900 is refused, and 1,000 years, beginning in 1850, is suggested.
+not before 1804: `--years` below 954 is refused, and 1,000 years, beginning in 1850, is suggested.
 
 ```bash
 uv run railroads --poland --seed 1 --simulate
@@ -276,7 +276,8 @@ Every cell has room for 6 units:
 - Single track takes 1 unit and double track 2, so a cell with a double track still fits four
   houses. Either can be electric, with wires overhead that electric engines need: `Track.electric`
   says so for a piece, and `Constructions.electrified(cell)` for a cell (every piece in it, or
-  the piece between two given track points).
+  the piece between two given track points). Or it can be maglev (`Track.maglev`): a concrete
+  guideway with no rails or wires, which only maglev engines run on, and they on nothing else.
 - Track lies on the ground, on a bridge over a river or lake (x5 cost), or in a tunnel through
   mountains (x8 cost).
 - A station fills its whole cell. Its own track runs straight through it one way (across,
@@ -629,15 +630,58 @@ for flats or a mega factory, four for a skyscraper) gives experience as if a tra
 goods, 250 units, had been delivered for every star: for what it makes, or the mix of what it
 needs, to the trees those goods belong to.
 
-| Engine | From | Needs | Speed | To full speed | Cars | Price |
-|---|---|---|---|---|---|---|
-| Planet steam engine | 1850 | | 1x | 10 s | 5 | $5,000 |
-| Mogul freight engine | 1880 | Heavy boilers (metals) | 1x | 8 s | 8 | $12,000 |
-| Pacific express engine | 1910 | Superheaters (metals) | 1.5x | 6 s | 8 | $25,000 |
-| Boxcab electric | 1925 | Electric traction (modern) | 1.4x | 4 s | 10 | $40,000 |
-| Express electric | 1965 | Thyristor control (modern) | 2.2x | 3 s | 12 | $90,000 |
+Engines (`railroads.sim.trains`) come in lines. Pioneers, from the first steam engine on rails in
+1804, each a little better than the one before, lead up to the Planet of 1850, the engine the game
+is balanced around: five cars at 60 km/h for $5,000. Beside it come cheap light engines that pull
+fewer cars, and soon after heavy freight engines, slower but pulling two more cars, and express
+engines, fast and dear, that carry only passengers, who pay 20% more on them, and always lead with
+a dining car that carries nothing but weighs and costs its trips like any other car. From then on
+each line gets better engines, up to a 500 km/h maglev and diesels pulling 40 cars by 2040. An
+engine is sold only until a newer one of its line, running on the same track, can be bought: an
+electric never ends the sale of a steam or diesel engine, nor the maglev that of the fastest
+electric. Engines built to pull more cars are
+slowed less by each: a full train as long as its engine is built for slows it as much as five
+full cars slow the Planet. Some lines and kinds of power need a tech node: heavy freight Heavy
+boilers, express Express trains, diesels Diesel engines, electrics Electric traction or, for the
+fast ones, Thyristor control, the maglev Magnetic levitation (after Thyristor control), and steam
+engines from 1900 on Superheaters.
 
-Electric engines run only on electrified track. A train's engine is chosen when it is bought.
+| Engine | Class | From | Needs | Power | Speed | To full speed | Cars | Price |
+|---|---|---|---|---|---|---|---|---|
+| Penydarren steam wagon | pioneer | 1804 |  | steam | 18 km/h | 14 s | 1 | $500 |
+| Catch Me Who Can | pioneer | 1808 |  | steam | 27 km/h | 13 s | 1 | $800 |
+| Salamanca | pioneer | 1812 |  | steam | 24 km/h | 13 s | 2 | $1,200 |
+| Puffing Billy | pioneer | 1813 |  | steam | 30 km/h | 12 s | 2 | $1,500 |
+| Locomotion | pioneer | 1825 |  | steam | 36 km/h | 12 s | 3 | $2,500 |
+| Rocket | pioneer | 1829 |  | steam | 48 km/h | 11 s | 3 | $3,500 |
+| Lion | pioneer | 1838 |  | steam | 51 km/h | 11 s | 4 | $4,000 |
+| Planet steam engine | general | 1850 |  | steam | 60 km/h | 10 s | 5 | $5,000 |
+| Tank engine | light | 1850 |  | steam | 42 km/h | 9 s | 3 | $2,000 |
+| Goods engine | heavy freight | 1865 | Heavy boilers (metals) | steam | 48 km/h | 10 s | 7 | $7,000 |
+| Single-driver express | express | 1865 | Express trains (passengers) | steam | 90 km/h | 8 s | 4 + dining car | $12,000 |
+| American 4-4-0 | general | 1870 |  | steam | 69 km/h | 9 s | 6 | $8,000 |
+| Mogul freight engine | heavy freight | 1880 | Heavy boilers (metals) | steam | 54 km/h | 8 s | 8 | $11,000 |
+| Light tank engine | light | 1895 |  | steam | 54 km/h | 8 s | 4 | $4,000 |
+| Atlantic express | express | 1900 | Express trains (passengers), Superheaters (metals) | steam | 108 km/h | 6 s | 5 + dining car | $25,000 |
+| Mallet articulated | heavy freight | 1905 | Heavy boilers (metals), Superheaters (metals) | steam | 57 km/h | 8 s | 10 | $22,000 |
+| Pacific engine | general | 1910 | Superheaters (metals) | steam | 84 km/h | 6 s | 7 | $16,000 |
+| Boxcab electric | general | 1925 | Electric traction (modern) | electric | 84 km/h | 4 s | 8 | $30,000 |
+| Railbus | light | 1935 | Diesel engines (fuel) | diesel | 78 km/h | 5 s | 4 | $9,000 |
+| Streamliner | express | 1935 | Express trains (passengers), Superheaters (metals) | steam | 138 km/h | 5 s | 6 + dining car | $60,000 |
+| Big articulated | heavy freight | 1940 | Heavy boilers (metals), Superheaters (metals) | steam | 66 km/h | 7 s | 12 | $45,000 |
+| Mixed-traffic diesel | general | 1950 | Diesel engines (fuel) | diesel | 108 km/h | 4 s | 8 | $40,000 |
+| Heavy diesel | heavy freight | 1960 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 78 km/h | 5 s | 14 | $70,000 |
+| Bullet train | express | 1964 | Express trains (passengers), Thyristor control (modern) | electric | 210 km/h | 3 s | 7 + dining car | $150,000 |
+| Universal electric | general | 1965 | Thyristor control (modern) | electric | 132 km/h | 3 s | 10 | $70,000 |
+| Sprinter unit | light | 1985 | Diesel engines (fuel) | diesel | 120 km/h | 3 s | 5 | $18,000 |
+| High-speed electric | express | 1990 | Express trains (passengers), Thyristor control (modern) | electric | 300 km/h | 2.5 s | 9 + dining car | $300,000 |
+| Twin-unit diesel | heavy freight | 1995 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 84 km/h | 5 s | 20 | $140,000 |
+| Modern electric | general | 2000 | Thyristor control (modern) | electric | 180 km/h | 2.5 s | 12 | $120,000 |
+| Super-heavy diesel | heavy freight | 2040 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 90 km/h | 6 s | 40 | $300,000 |
+| Maglev | express | 2040 | Express trains (passengers), Magnetic levitation (modern) | maglev | 500 km/h | 2 s | 11 + dining car | $700,000 |
+
+Electric engines run only on electrified track, and the maglev only on maglev track, which can be
+laid once it is on sale. A train's engine is chosen when it is bought.
 Every train sets off from a stand, from a stop or after letting another train by, and picks up
 speed evenly until it runs at full speed after its engine's time to full speed, in seconds of play
 at normal speed.
@@ -682,9 +726,10 @@ station's name shows on a tag above it.
 A game starts with $80,000 (`railroads.sim.finance`). Track costs $300 a cell on the flat, $450
 in hills, $10,000 a cell of bridge and $20,000 a cell of tunnel; electric track $450 a cell more,
 and double track 1.8 times as much as single, wires included, so a cell on the flat costs $540
-double, $750 electric and $1,350 double and electric. A station costs $15,000 and a steam engine $5,000, which
+double, $750 electric and $1,350 double and electric; maglev track $4,000 a cell more, with no
+wires. A station costs $15,000 and a steam engine $5,000, which
 sells back for half. Every month each station costs $200 in upkeep and each cell of track $2,
-$3 more where it is electric and 1.8 times as much where it is double, charged once a cell for
+$3 more where it is electric, $25 more where it is maglev, and 1.8 times as much where it is double, charged once a cell for
 the dearest track in it (`track_upkeep`). Building needs the cash for it, but upkeep is charged
 anyway and can run into debt. The top bar shows the cash, with this month's and last month's books on hover, and the
 build bar shows what the track under the mouse would cost. Route planning still weighs hills,
@@ -741,7 +786,8 @@ as the real track would look, greyed out, once the pointer rests on a cell for a
 turns at most 60 degrees per cell, through edges or corners, bridging rivers and lakes and
 tunnelling through mountains, and makes room the same way. Each bend costs it as much as 0.6 of
 a cell of new track, so it runs straight and turns seldom instead of zigzagging. Every building it would have to move out of the way costs it as much as 2.5 cells of track, and half a cell more for each unit of room the building takes, so it goes round farms, works and towns rather than through them. Buildings sharing a cell with track stand beside it, at least a quarter of a cell from its middle. While the track tool is on, the bar
-chooses single or double track and whether it is electric. Track lays only along the way it was
+chooses single or double track and whether it is electric, or, once the maglev is on sale, maglev.
+Track lays only along the way it was
 planned: started on track already laid, its first piece branches off where that track runs on,
 turning at most 60 degrees, so trains can run from one onto the other; ended on track, its last
 piece joins it the same way, facing the way the new track was heading. A dead end there turns
@@ -749,7 +795,8 @@ to where the new track goes rather than staying as a stub, for no more than the 
 price. Where the way crosses track it crosses it in one cell, and running along track already
 laid costs the planner half as much as new track, so it follows a line rather than laying a
 second one beside it. The track it runs along is widened or electrified to match, for the
-difference in price, so laying electric track along a line electrifies it. An open end with no
+difference in price, so laying electric track along a line electrifies it, and laying maglev
+track along it turns its rails into a guideway; rails laid along a guideway leave it one. An open end with no
 track runs straight on across its cell. While placing a station, and when the
 mouse is over one, the cells it hands goods out to (2 steps away) are shaded orange, the areas of
 other stations pink, cells two stations share grey and the stations themselves blue, with a blue
@@ -774,7 +821,8 @@ now. The Stations window shows every station's stockpile and the goods waiting t
 there, with a button to look at the station; clicking a name opens the station. Trains
 (`railroads.sim.railway`) run along the track at 60 cells a month on the flat, slower on hills,
 and each car slows them: an empty car weighs 1, a full one 2, and every unit of weight costs 8%
-of the engine's speed, so five full cars still run at a little over half of it. On the pixel map
+of a Planet's speed, so five full cars still run at a little over half of it; engines built for
+more cars lose less per unit, in proportion. On the pixel map
 (`railroads.ui.pixel.trains`) a steam engine with its tender leads the cars, each drawn as pixel
 art from a small model of boxes and cylinders for 24 headings, so they turn with the track, at
 twice the map's art resolution: a car of its own for every good: red boxcars for goods and
@@ -790,7 +838,8 @@ is two tracks side by side that close up where they run into single track, and s
 branching off double leaves from its outer track on that side. Electric track has a wire over
 each track and a mast beside it every cell, on its far side, reaching over to the wires. Zoomed
 out, trains and track are plain shapes: two rails for double track and a dark wire beside
-electric track.
+electric track. Maglev track is a pale concrete beam with darker edges and a groove down its
+middle instead of rails and sleepers, and a station shows it where only maglev track comes in.
 
 At each stop a train unloads its cars, takes on that stop's cars and fills them from the station's
 stockpile. Unless the stop says not to, it waits there up to a month for its cars to fill, topping

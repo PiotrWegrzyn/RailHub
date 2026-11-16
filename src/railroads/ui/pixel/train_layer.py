@@ -7,7 +7,9 @@ trains going opposite ways pass on different tracks."""
 import bisect
 import itertools
 import math
+from collections import OrderedDict
 from dataclasses import dataclass
+from typing import Protocol
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
@@ -23,17 +25,28 @@ from railroads.ui.pixel.trains import (
     COUPLING,
     DETAIL,
     ENGINES,
+    HEADINGS,
     SCALE,
     Look,
     TrainSprites,
     train_sprites,
+    turned,
 )
 from railroads.ui.pixel.world import PixelWorld
 
 SMOKE = (0.88, 0.88, 0.9)
-# The biggest texture a graphics card takes on each side; a bigger one draws black.
-MAX_TEXTURE = 16384
+# The biggest texture made for trains on each side: many graphics cards and browsers take no
+# bigger, and draw a bigger one black.
+MAX_TEXTURE = 4096
+# How wide a page of one look's pictures is before it is blown up, in sheet pixels, and how many
+# bytes the pages blown up for the zoom shown may take before those not drawn lately are let go.
+PAGE_WIDTH = 512
+PAGES_BUDGET = 128 * 1024 * 1024
 PUFFS = 5
+
+
+class Texture(Protocol):
+    def texture_id(self) -> int: ...
 
 
 class TrainLayer:
@@ -41,7 +54,9 @@ class TrainLayer:
         self.world = world
         matrix = world.projection.matrix.ravel()
         self.sprites: TrainSprites = train_sprites(tuple(float(v) for v in matrix))
-        self._textures: dict[int, tuple[hello_imgui.TextureGpu, int]] = {}
+        self._sheet: Texture | None = None
+        self._factor = 1
+        self._pages: OrderedDict[object, _Page] = OrderedDict()
         self.lanes = Lanes(world.track)
 
     def draw(
@@ -55,8 +70,7 @@ class TrainLayer:
             round(center[0] - float(camera_pixel[0]) * scale),
             round(center[1] - float(camera_pixel[1]) * scale),
         )
-        texture, _ = self._texture(scale * density)
-        height, width = self.sprites.image.shape[:2]
+        factor = self._blown_up_by(scale * density)
         per_pixel = scale / DETAIL
         found = []
         for train in railway.trains:
@@ -76,18 +90,26 @@ class TrainLayer:
                 sy = origin[1] + round((float(ay[k]) + shift[1]) * DETAIL) * per_pixel
                 parts.append((sy, sx, look, math.atan2(dy, dx)))
         parts.sort(key=lambda part: part[0])
-        ref = imgui.ImTextureRef(texture.texture_id())
+        drawn: set[object] = set()
         for sy, sx, look, heading in parts:
             px, py, w, h, anchor_x, anchor_y = self.sprites.place(look, heading)
+            if factor == 1:
+                texture, (width, height) = self._whole_sheet(), self._sheet_size()
+            else:
+                page = self._page(look, factor)
+                texture, (width, height) = page.texture, page.size
+                px, py = page.spots[turned(heading)]
+                drawn.add(look)
             left = sx - anchor_x * per_pixel
             top = sy - anchor_y * per_pixel
             draw_list.add_image(
-                ref,
+                imgui.ImTextureRef(texture.texture_id()),
                 (left, top),
                 (left + w * per_pixel, top + h * per_pixel),
                 (px / width, py / height),
                 ((px + w) / width, (py + h) / height),
             )
+        self._let_go(drawn)
         self._smoke(draw_list, railway, origin, scale)
 
     def _parts(self, train: Train) -> list[tuple[object, float]]:
@@ -101,7 +123,7 @@ class TrainLayer:
             back += model.tender_half
         for car in train.cars:
             back += COUPLING + CAR_HALF
-            parts.append(((car.good, car.load > 0), back))
+            parts.append((Look.DINING if car.dining else (car.good, car.load > 0), back))
             back += CAR_HALF
         return [(look, middle * SCALE) for look, middle in parts]
 
@@ -164,17 +186,73 @@ class TrainLayer:
         phase = (train.along * 6.0) % 1.0
         return _Chimney(x, y, dx, dy, shift, model.chimney[1] * SCALE, phase)
 
-    def _texture(self, device_scale: int) -> tuple[hello_imgui.TextureGpu, int]:
-        """The sprite sheet blown up by a whole number so it shows crisp at this many device
-        pixels per art pixel, and by how much it was blown up."""
+    def _blown_up_by(self, device_scale: int) -> int:
+        """How many times each way the pictures are blown up to show crisp at this many device
+        pixels per art pixel: imgui samples every texture smoothly, so a texture must hold a
+        texel for every device pixel. Pages blown up for another zoom are let go of."""
+        factor = max(1, min(device_scale // DETAIL, MAX_TEXTURE // PAGE_WIDTH))
+        if factor != self._factor:
+            self._pages.clear()
+            self._factor = factor
+        return factor
+
+    def _sheet_size(self) -> tuple[int, int]:
         height, width = self.sprites.image.shape[:2]
-        fits = max(1, MAX_TEXTURE // max(height, width))
-        factor = max(1, min(device_scale // DETAIL, fits))
-        if factor not in self._textures:
-            big = np.repeat(np.repeat(self.sprites.image, factor, axis=0), factor, axis=1)
-            texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
-            self._textures[factor] = (texture, factor)
-        return self._textures[factor]
+        return width, height
+
+    def _whole_sheet(self) -> Texture:
+        """The whole sprite sheet at its own size, for zooms that need it no bigger."""
+        if self._sheet is None:
+            image = np.ascontiguousarray(self.sprites.image)
+            self._sheet = hello_imgui.create_texture_gpu_from_rgba_data(image)
+        return self._sheet
+
+    def _page(self, look: object, factor: int) -> _Page:
+        """A texture of one look's pictures every way round, blown up `factor` times each way.
+        Only the looks on screen are blown up: the whole sheet blown up for the closest zoom on
+        a sharp screen is too big a texture for many graphics cards, which draw it black."""
+        page = self._pages.get(look)
+        if page is not None:
+            self._pages.move_to_end(look)
+            return page
+        boxes = [self.sprites.places[(look, index)] for index in range(HEADINGS)]
+        width = max(PAGE_WIDTH, *(box[2] for box in boxes))
+        spots = {}
+        x = y = row = 0
+        for index, (_, _, w, h, _, _) in enumerate(boxes):
+            if x + w > width:
+                x, y, row = 0, y + row + 1, 0
+            spots[index] = (x, y)
+            x += w + 1
+            row = max(row, h)
+        pixels = np.zeros((y + row, width, 4), dtype=np.uint8)
+        for index, (px, py, w, h, _, _) in enumerate(boxes):
+            x, y = spots[index]
+            pixels[y : y + h, x : x + w] = self.sprites.image[py : py + h, px : px + w]
+        big = np.repeat(np.repeat(pixels, factor, axis=0), factor, axis=1)
+        texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
+        page = self._pages[look] = _Page(texture, (width, pixels.shape[0]), spots, big.nbytes)
+        return page
+
+    def _let_go(self, drawn: set[object]) -> None:
+        """Lets go of the pages not drawn lately while they take more than PAGES_BUDGET."""
+        held = sum(page.bytes for page in self._pages.values())
+        for look in list(self._pages):
+            if held <= PAGES_BUDGET:
+                break
+            if look not in drawn:
+                held -= self._pages.pop(look).bytes
+
+
+@dataclass(frozen=True)
+class _Page:
+    """One look's pictures every way round on a texture of their own: the texture, its size
+    before it was blown up, where each picture lies on it before then, and its bytes."""
+
+    texture: Texture
+    size: tuple[int, int]
+    spots: dict[int, tuple[int, int]]
+    bytes: int
 
 
 @dataclass(frozen=True, slots=True)

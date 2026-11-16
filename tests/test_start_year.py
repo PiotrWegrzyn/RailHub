@@ -16,24 +16,24 @@ from railroads.ui.main_menu import MainMenu
     ("wished", "allowed"),
     [
         (HISTORY_START, EARLIEST_START_YEAR),
-        (1749, EARLIEST_START_YEAR),
-        (1750, 1750),
+        (1803, EARLIEST_START_YEAR),
+        (1804, 1804),
         (START_YEAR, START_YEAR),
         (2049, 2049),
         (2100, END_YEAR - 1),
     ],
 )
-def test_play_begins_no_earlier_than_1750(wished: int, allowed: int) -> None:
+def test_play_begins_no_earlier_than_1804(wished: int, allowed: int) -> None:
     year = allowed_start_year(wished)
 
     assert year == allowed
 
 
-def test_the_earliest_start_is_1750_and_the_suggested_one_1850() -> None:
-    assert (EARLIEST_START_YEAR, START_YEAR) == (1750, 1850)
+def test_the_earliest_start_is_1804_and_the_suggested_one_1850() -> None:
+    assert (EARLIEST_START_YEAR, START_YEAR) == (1804, 1850)
 
 
-def test_a_new_game_wished_to_begin_too_early_begins_in_1750(
+def test_a_new_game_wished_to_begin_too_early_begins_in_1804(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     grown: list[int] = []
@@ -51,19 +51,19 @@ def test_a_new_game_wished_to_begin_too_early_begins_in_1750(
         Settings(seed=1, map=MapChoice.POLAND, start_year=1500), report=lambda _: None
     )
 
-    assert grown == [(1750 - HISTORY_START) * 12]
-    assert saved.clock.first_year == 1750
-    assert saved.game.growth.year == 1750
+    assert grown == [(1804 - HISTORY_START) * 12]
+    assert saved.clock.first_year == 1804
+    assert saved.game.growth.year == 1804
     assert saved.settings is not None
-    assert saved.settings.start_year == 1750
+    assert saved.settings.start_year == 1804
 
 
-def test_the_menu_never_sets_up_a_game_before_1750(tmp_path: Any) -> None:
+def test_the_menu_never_sets_up_a_game_before_1804(tmp_path: Any) -> None:
     menu = MainMenu(Saves(tmp_path), start_year=1500)
 
     settings = menu.settings()
 
-    assert settings.start_year == 1750
+    assert settings.start_year == 1804
 
 
 def test_the_menu_suggests_1850_to_begin_with(tmp_path: Any) -> None:
@@ -74,24 +74,24 @@ def test_the_menu_suggests_1850_to_begin_with(tmp_path: Any) -> None:
     assert settings.start_year == 1850
 
 
-def test_the_command_line_refuses_a_history_that_begins_play_before_1750(
+def test_the_command_line_refuses_a_history_that_begins_play_before_1804(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit):
-        parse_args(["--poland", "--years", "899"])
+        parse_args(["--poland", "--years", "953"])
 
     error = capsys.readouterr().err
-    assert "--years must be at least 900" in error
+    assert "--years must be at least 954" in error
     assert "1850" in error
 
 
-def test_the_command_line_allows_play_to_begin_in_1750() -> None:
-    args = parse_args(["--poland", "--years", "900"])
+def test_the_command_line_allows_play_to_begin_in_1804() -> None:
+    args = parse_args(["--poland", "--years", "954"])
 
     settings = settings_from(args)
 
     assert settings is not None
-    assert settings.start_year == 1750
+    assert settings.start_year == 1804
 
 
 def test_the_command_line_begins_play_in_1850_by_default() -> None:

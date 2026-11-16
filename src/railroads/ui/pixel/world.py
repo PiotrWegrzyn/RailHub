@@ -27,6 +27,8 @@ from railroads.ui.pixel.ground import (
     APRON,
     CANOPY_REACH,
     FIELD_KINDS,
+    IN_THE_WOODS,
+    MILL_CLEARING,
     YARD_REACH,
     Ground,
     art_pixels,
@@ -152,6 +154,13 @@ class PixelWorld:
             self.scenery.y[built].astype(np.float32),
             yards[built],
             reaches[self.scenery.sprite][built],
+        )
+        woodland = [self.sheet.index(BUILDING_SPRITES[kind]) for kind in IN_THE_WOODS]
+        mills = np.isin(self.scenery.sprite, woodland)
+        self.ground.clearings = (
+            self.scenery.x[mills].astype(np.float32),
+            self.scenery.y[mills].astype(np.float32),
+            reaches[self.scenery.sprite][mills] * MILL_CLEARING,
         )
 
     def satisfaction_changed(self, levels: npt.NDArray[np.int8]) -> set[tuple[int, int]]:
