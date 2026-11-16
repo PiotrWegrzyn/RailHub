@@ -15,6 +15,7 @@ from functools import partial
 from PIL import Image
 
 from railroads.sim.constructions import MERGED
+from railroads.ui.pixel.art import grand_crafts, grand_fire, grand_food, grand_modern
 from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_pauls
 from railroads.ui.pixel.art.commerce import airport, department_store, hotel, port, shop, tavern
 from railroads.ui.pixel.art.crafts import (
@@ -413,6 +414,14 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "amusement_park": amusement_park,
     "olympic_stadium": olympic_stadium,
 }
+
+# Big and mega works drawn as buildings of their own, by trade.
+for _module in (grand_fire, grand_food, grand_crafts, grand_modern):
+    SPRITES |= {
+        name: draw
+        for name, draw in vars(_module).items()
+        if name.startswith(("big_", "mega_")) and callable(draw)
+    }
 
 # Works merge into big and mega ones (railroads.sim.constructions.MERGED): unless they have
 # sprites of their own, a big works is two of the buildings of the works it grew from and a mega
