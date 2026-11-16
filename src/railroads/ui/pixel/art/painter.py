@@ -140,7 +140,7 @@ def fineness() -> float:
 class Painter:
     """Draws on one sprite's canvas, with the anchor at (0, 0), at the fineness of drawn_at."""
 
-    def __init__(self, width: int, height: int, anchor: tuple[int, int]) -> None:
+    def __init__(self, width: float, height: float, anchor: tuple[float, float]) -> None:
         k = self._k = _fineness
         self.image = Image.new("RGBA", (round(width * k), round(height * k)), (0, 0, 0, 0))
         self.anchor = (round(anchor[0] * k), round(anchor[1] * k))
