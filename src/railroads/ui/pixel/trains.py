@@ -1581,8 +1581,12 @@ class TrainSprites:
 
     def place(self, look: object, heading: float) -> tuple[int, int, int, int, int, int]:
         """x, y, width, height and anchor of the look running closest to `heading` radians."""
-        index = round(heading / (2 * math.pi) * HEADINGS) % HEADINGS
-        return self.places[(look, index)]
+        return self.places[(look, turned(heading))]
+
+
+def turned(heading: float) -> int:
+    """Which of the HEADINGS pictures of a look runs closest to `heading` radians."""
+    return round(heading / (2 * math.pi) * HEADINGS) % HEADINGS
 
 
 @cache

@@ -431,6 +431,27 @@ def test_double_track_lays_two_tracks_side_by_side(sheet: SpriteSheet) -> None:
     assert rails_across(double, column) == 4
 
 
+def reach(sheet: SpriteSheet, piece: Track) -> float:
+    """How far from the middle of its cell, in art pixels, the farthest pixel the piece changes
+    lies."""
+    bare = track_chunk(sheet, [])[1].astype(int)
+    world, laid = track_chunk(sheet, [piece])
+    column, row = at_cell(world, piece.cell)
+    rows, columns = np.nonzero((np.abs(laid.astype(int) - bare) > 8).any(axis=-1))
+    return float(np.hypot(columns - column, rows - row).max())
+
+
+@pytest.mark.parametrize("ends", [(0, 4), (0, 8), (2, 6), (2, 10), (4, 8), (4, 10), (6, 10)])
+def test_double_track_round_a_bend_reaches_no_further_than_straight_track(
+    sheet: SpriteSheet, ends: tuple[int, int]
+) -> None:
+    straight = reach(sheet, Track((10, 3), (0, 6), TrackWidth.DOUBLE))
+
+    bent = reach(sheet, Track((10, 3), ends, TrackWidth.DOUBLE))
+
+    assert bent <= straight
+
+
 def test_electric_track_hangs_wires_over_it(sheet: SpriteSheet) -> None:
     plain = track_chunk(sheet, [Track((10, 3), (0, 6))])[1]
 
