@@ -136,6 +136,7 @@ class BuildingKind(Enum):
     DEPARTMENT_STORE = "department store"
     HOTEL = "hotel"
     CLUB = "club"
+    FILLING_STATION = "filling station"
     JUICE_WORKS = "juice works"
     BIG_JUICE_WORKS = "big juice works"
     MEGA_JUICE_WORKS = "mega juice works"
@@ -309,6 +310,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     BuildingKind.BAKERY: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.TAVERN: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.CLUB: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.FILLING_STATION: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.DEPARTMENT_STORE: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.HOTEL: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.LIMESTONE_QUARRY: BuildingRules(relief=frozenset(Relief)),

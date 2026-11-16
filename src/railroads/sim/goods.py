@@ -237,7 +237,7 @@ FITS: Mapping[Need, tuple[Good, ...]] = MappingProxyType(
         Need.FIBRE: (Good.WOOL, Good.COTTON, Good.FLAX),
         Need.LIVESTOCK: (Good.CATTLE, Good.SHEEP),
         Need.ANIMALS: (Good.CATTLE, Good.PIGS, Good.CHICKENS, Good.SHEEP),
-        Need.HEATING: (Good.LUMBER, Good.COAL, Good.GAS),
+        Need.HEATING: (Good.LUMBER, Good.COAL, Good.GAS, Good.FUEL),
         Need.BOILER_FUEL: (Good.COAL, Good.OIL, Good.GAS),
         **{need: (Good(need.value),) for need in Need if need.value in Good._value2member_map_},
     }
@@ -274,8 +274,40 @@ NEED_YEARS: Mapping[Need, int] = MappingProxyType(
 )
 
 # Needs a kind of building feels only from a later year than everyone else.
+# Diesel fuel lets what makes goods from the land make up to DIESEL_BOOST more: farms from
+# TRACTOR_YEAR, mines, quarries and lumber mills from MACHINE_YEAR, fisheries and ports from
+# MOTOR_BOAT_YEAR (DIESEL_USERS).
+DIESEL_BOOST = 0.5
+TRACTOR_YEAR = 1920
+MACHINE_YEAR = 1920
+MOTOR_BOAT_YEAR = 1910
+DIESEL_USERS: Mapping[BuildingKind, tuple[float, int]] = MappingProxyType(
+    {
+        BuildingKind.FARM: (2.0, TRACTOR_YEAR),
+        BuildingKind.POTATO_FARM: (2.0, TRACTOR_YEAR),
+        BuildingKind.MINE: (10.0, MACHINE_YEAR),
+        BuildingKind.IRON_MINE: (10.0, MACHINE_YEAR),
+        BuildingKind.COPPER_MINE: (5.0, MACHINE_YEAR),
+        BuildingKind.GOLD_MINE: (2.0, MACHINE_YEAR),
+        BuildingKind.DIAMOND_MINE: (2.0, MACHINE_YEAR),
+        BuildingKind.SALT_WORKS: (5.0, MACHINE_YEAR),
+        BuildingKind.CLAY_PIT: (5.0, MACHINE_YEAR),
+        BuildingKind.LIMESTONE_QUARRY: (5.0, MACHINE_YEAR),
+        BuildingKind.SAND_PIT: (5.0, MACHINE_YEAR),
+        BuildingKind.LUMBER_MILL: (3.0, MACHINE_YEAR),
+        BuildingKind.FISHERY: (2.0, MOTOR_BOAT_YEAR),
+        BuildingKind.PORT: (10.0, MOTOR_BOAT_YEAR),
+    }
+)
+# Boosts of what makes goods from the land that make up to so much more each, whatever else
+# boosts it; its other boosts share BOOST_MOST between them.
+LAND_BOOST_MOST: Mapping[Need, float] = MappingProxyType({Need.FUEL: DIESEL_BOOST})
+
 KIND_NEED_YEARS: Mapping[tuple[BuildingKind, Need], int] = MappingProxyType(
-    {(BuildingKind.FARM, Need.MACHINERY): 1920}
+    {
+        (BuildingKind.FARM, Need.MACHINERY): 1920,
+        **{(kind, Need.FUEL): year for kind, (_, year) in DIESEL_USERS.items()},
+    }
 )
 
 # Goods a kind of building makes only from a later year than everyone else: ports bring in natural
@@ -645,7 +677,7 @@ MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
 
 # What each building needs in a month: consumers what they use, processors what they take in to
 # make all they can.
-NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
+_NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
     {
         BuildingKind.HOUSE: {
             Need.FOOD: 10,
@@ -776,6 +808,7 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.TANKS: 90,
         },
         BuildingKind.AIRPORT: {Need.FUEL: 40},
+        BuildingKind.FILLING_STATION: {Need.FUEL: 40},
         BuildingKind.CHURCH: {Need.WAX: 10, Need.INCENSE: 10},
         BuildingKind.BASILICA: {Need.WAX: 30, Need.INCENSE: 20},
         BuildingKind.CATHEDRAL: {Need.WAX: 60, Need.INCENSE: 40},
@@ -783,10 +816,22 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         **{kind: recipe.needs() for kind, recipe in RECIPES.items()},
     }
 )
+NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
+    {
+        **_NEEDS,
+        **{
+            kind: {**_NEEDS.get(kind, {}), Need.FUEL: amount}
+            for kind, (amount, _) in DIESEL_USERS.items()
+        },
+    }
+)
 
 # The month's trade, a step at a time: a need is shared out, a kind of processor makes what it
 # can. Inputs come before what is made from them, and the processors of food before houses.
 _PIPELINE: tuple[Need | BuildingKind, ...] = (
+    Need.OIL,
+    BuildingKind.REFINERY,
+    Need.FUEL,
     Need.LUMBER,
     Need.COAL,
     BuildingKind.GASWORKS,
@@ -795,7 +840,6 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.COKE,
     Need.IRON,
     Need.COPPER,
-    Need.OIL,
     Need.SALT,
     Need.GRAPES,
     Need.FIBRE,
@@ -823,8 +867,6 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.TOOLS,
     BuildingKind.MACHINE_WORKS,
     Need.MACHINERY,
-    BuildingKind.REFINERY,
-    Need.FUEL,
     Need.BOILER_FUEL,
     BuildingKind.CHEMICAL_WORKS,
     Need.CHEMICALS,
@@ -973,7 +1015,11 @@ def boosts_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
     if kind not in MAKES:
         return MappingProxyType({})
     return MappingProxyType(
-        {need: amount for need, amount in needs_of(kind, year).items() if need in BONUS_NEEDS}
+        {
+            need: amount
+            for need, amount in needs_of(kind, year).items()
+            if need in BONUS_NEEDS or need in LAND_BOOST_MOST
+        }
     )
 
 
