@@ -8,8 +8,8 @@ import math
 
 from railroads.ui.pixel.art.industry import (
     GLAZING,
+    SMOKE,
     SOIL,
-    _band,
     _bed,
     _chimney,
     _crate,
@@ -21,7 +21,6 @@ from railroads.ui.pixel.art.industry import (
     _locomotive,
     _oil,
     _on_roof,
-    _plinth,
     _puddle,
     _ring,
     _roof_rows,
@@ -45,7 +44,18 @@ from railroads.ui.pixel.art.painter import (
     Sprite,
     shade,
 )
-from railroads.ui.pixel.art.parts import _barrel, _flag, _heap, _on_wall, _patch, _turned, _windows
+from railroads.ui.pixel.art.parts import (
+    _band,
+    _bands,
+    _barrel,
+    _flag,
+    _heap,
+    _on_wall,
+    _patch,
+    _plinth,
+    _turned,
+    _windows,
+)
 
 type Top = tuple[Point, Point, Point, Point]
 type RGB = tuple[int, int, int]
@@ -124,7 +134,6 @@ GRAVEL: RGB = (140, 134, 120)
 CASTING: RGB = (88, 90, 98)
 RAIL: RGB = (96, 92, 90)
 SLEEPER: RGB = (110, 84, 60)
-SMOKE: RGB = (150, 148, 150)
 DOORWAY_PRESS: RGB = (54, 46, 48)
 METAL_GREEN: RGB = (60, 100, 80)
 
@@ -164,8 +173,7 @@ def _mill_block(
     _plinth(p, top, height, MILL_WALL)
     _stains(p, left, front, height, (0.04, 0.3, 0.56, 0.82), shade(MILL_WALL, 0.6), 2)
     _stains(p, front, right, height, (0.2, 0.8), shade(MILL_WALL, 0.5), 2)
-    _band(p, left, front, 1, shade(MILL_WALL, 1.2))
-    _band(p, front, right, 1, shade(MILL_WALL, 0.95))
+    _bands(p, left, front, right, 1, shade(MILL_WALL, 1.2), shade(MILL_WALL, 0.95))
     p.line([left, front, right], shade(MILL_ROOF, 1.3))
     floor = (height - 2.5) / storeys
     drops = tuple(2.8 + floor * f for f in range(storeys))
@@ -176,8 +184,7 @@ def _mill_block(
     side = tuple((k + 0.5) / m for k in range(m))
     _windows(p, front, right, side, drops, 2, shade(WINDOW, 0.75), lintel)
     for f in range(1, storeys):
-        _band(p, left, front, drops[f] - 1.3, shade(MILL_WALL, 0.88))
-        _band(p, front, right, drops[f] - 1.3, shade(MILL_WALL, 0.7))
+        _bands(p, left, front, right, drops[f] - 1.3, shade(MILL_WALL, 0.88), shade(MILL_WALL, 0.7))
     return top
 
 
@@ -191,8 +198,7 @@ def _mill_tower(p: Painter, x: float, y: float, half: float, tall: float, dome: 
     drops = tuple(3 + 4.2 * k for k in range(int((tall - 4) / 4.2)))
     _windows(p, left, front, (0.5,), drops, 2, arch=lintel)
     _windows(p, front, right, (0.5,), drops, 2, shade(WINDOW, 0.75), lintel)
-    _band(p, left, front, 1.2, shade(MILL_WALL, 0.8))
-    _band(p, front, right, 1.2, shade(MILL_WALL, 0.65))
+    _bands(p, left, front, right, 1.2, shade(MILL_WALL, 0.8), shade(MILL_WALL, 0.65))
     for a, b in ((left, front), (front, right)):
         for t in (0.0, 0.5, 1.0):
             mx, my = _on_wall(a, b, t, 0)
@@ -633,8 +639,7 @@ def _shoe_block(p: Painter, x: float, y: float, length: float, depth: float, flo
     _plinth(p, top, h, SHOE_WALL)
     _stains(p, front, right, h, (0.15, 0.5, 0.85), shade(SHOE_WALL, 0.58), 1.5)
     for f in range(1, floors):
-        _band(p, left, front, 4 * f - 0.5, shade(SHOE_WALL, 1.15))
-        _band(p, front, right, 4 * f - 0.5, shade(SHOE_WALL, 0.85))
+        _bands(p, left, front, right, 4 * f - 0.5, shade(SHOE_WALL, 1.15), shade(SHOE_WALL, 0.85))
     n = max(2, round(length / 4.6))
     m = max(2, round(depth / 4))
     for f in range(floors - 1):
@@ -767,14 +772,13 @@ def _boards(p: Painter, x: float, y: float, length: float, depth: float, h: floa
     gap = shade(BOARD, 0.5)
     for drop in range(2, int(h), 2):
         for a, b in ((stack[0], stack[1]), (stack[1], stack[2])):
-            p.line([_on_wall(a, b, 0, drop), _on_wall(a, b, 1, drop)], gap)
+            _band(p, a, b, drop, gap)
 
 
 def _plank_walls(p: Painter, top: Top, height: float) -> None:
     left, front, right, _ = top
     for drop in range(2, int(height), 2):
-        _band(p, left, front, drop, shade(JOINER_WALL, 0.86))
-        _band(p, front, right, drop, shade(JOINER_WALL, 0.68))
+        _bands(p, left, front, right, drop, shade(JOINER_WALL, 0.86), shade(JOINER_WALL, 0.68))
     _plinth(p, top, height, JOINER_WALL)
     _stains(p, front, right, height, (0.2, 0.55, 0.9), shade(JOINER_WALL, 0.55), 1.4)
 
@@ -1085,8 +1089,9 @@ def _press_house(
             shade(WINDOW, 0.75),
         )
         if f:
-            _band(p, left, front, drop - 1.2, shade(PRESS_WALL, 0.85))
-            _band(p, front, right, drop - 1.2, shade(PRESS_WALL, 0.68))
+            _bands(
+                p, left, front, right, drop - 1.2, shade(PRESS_WALL, 0.85), shade(PRESS_WALL, 0.68)
+            )
     return top
 
 
@@ -1331,8 +1336,7 @@ def _engine_hall(p: Painter, x: float, y: float, length: float, depth: float, he
     _plinth(p, top, height, BRICK)
     _stains(p, left, front, height, (0.04, 0.21, 0.39, 0.57, 0.73), shade(BRICK, 0.62), 2)
     _stains(p, front, right, height, (0.2, 0.8), shade(BRICK, 0.5), 2)
-    _band(p, left, front, 1, lintel)
-    _band(p, front, right, 1, shade(BRICK, 1.05))
+    _bands(p, left, front, right, 1, lintel, shade(BRICK, 1.05))
     n = max(4, round(length / 3.6))
     spans = tuple((k + 0.5) / (n + 1) for k in range(n))
     _windows(p, left, front, spans, (2.5,), round(height * 0.5), arch=lintel)

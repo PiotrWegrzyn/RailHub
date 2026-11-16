@@ -23,6 +23,7 @@ from railroads.ui.pixel.art.painter import (
     shade,
 )
 from railroads.ui.pixel.art.parts import (
+    _band,
     _flag,
     _gable_across,
     _iso,
@@ -62,7 +63,7 @@ def _canopy(
 ) -> tuple[Point, Point, Point, Point]:
     """A platform canopy on posts: a flat dark red roof `height` up with a cream valance."""
     top = p.hall(x, y - height, length, depth, 1.5, STATION_WALL, STATION_ROOF)
-    p.line([_on_wall(top[0], top[1], 0, 1.5), _on_wall(top[0], top[1], 1, 1.5)], STATION_ROOF)
+    _band(p, top[0], top[1], 1.5, STATION_ROOF)
     for t in np.linspace(0.08, 0.92, max(2, round(length / 4))):
         fx, fy = _on_wall(top[0], top[1], t, height + 1.5)
         p.line([(fx, fy), (fx, fy - height)], (60, 58, 62))
@@ -133,7 +134,7 @@ def station_3() -> Sprite:
     _patch(p, tower[0], tower[1], (0, 1), (21, 22), BRICK)
     _patch(p, tower[1], tower[2], (0, 1), (21, 22), shade(BRICK, 0.78))
     for a, b in ((tower[0], tower[1]), (tower[1], tower[2])):
-        p.line([_on_wall(a, b, 0, 1), _on_wall(a, b, 1, 1)], shade(STATION_WALL, 1.08))
+        _band(p, a, b, 1, shade(STATION_WALL, 1.08))
         _windows(p, a, b, (0.5,), (8, 13), 2)
     _clock(p, *_on_wall(tower[0], tower[1], 0.5, 4), 1.6)
     apex = (tx, ty - 31)

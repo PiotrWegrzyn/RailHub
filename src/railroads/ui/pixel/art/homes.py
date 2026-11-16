@@ -11,35 +11,23 @@ from railroads.ui.pixel.art.painter import (
     Sprite,
     shade,
 )
-from railroads.ui.pixel.art.parts import _on_wall, _patch
+from railroads.ui.pixel.art.parts import (
+    DOOR,
+    LIT,
+    SILL,
+    _bands,
+    _on_wall,
+    _patch,
+    _ridge,
+    _tiles,
+    _window,
+)
 
-DOOR: RGB = (104, 66, 44)
-SILL: RGB = (240, 236, 226)
 AWNINGS: list[RGB] = [(178, 52, 46), (52, 104, 70), (60, 88, 150)]
-LIT: RGB = (236, 206, 120)
 STEP: RGB = (206, 200, 188)
 CONCRETE: RGB = (176, 178, 182)
 SOIL: RGB = (74, 64, 46)
 TRODDEN: RGB = (146, 130, 92)
-
-
-def _ridge(top: tuple[Point, Point, Point, Point], rise: float) -> tuple[Point, Point]:
-    """The back and front ends of the ridge of a gable `rise` high on a box's top (Painter.gable)."""
-    left, front, right, back = top
-    return (
-        ((left[0] + back[0]) / 2, (left[1] + back[1]) / 2 - rise),
-        ((front[0] + right[0]) / 2, (front[1] + right[1]) / 2 - rise),
-    )
-
-
-def _tiles(p: Painter, top: tuple[Point, Point, Point, Point], rise: float, roof: RGB) -> None:
-    """Rows of tiles across the lit side of a gable roof."""
-    left, front, _, _ = top
-    ridge_back, ridge_front = _ridge(top, rise)
-    for f in (0.34, 0.68):
-        a = (left[0] + (ridge_back[0] - left[0]) * f, left[1] + (ridge_back[1] - left[1]) * f)
-        b = (front[0] + (ridge_front[0] - front[0]) * f, front[1] + (ridge_front[1] - front[1]) * f)
-        p.line([a, b], shade(roof, 0.8))
 
 
 def _chimney_on(
@@ -51,14 +39,6 @@ def _chimney_on(
     y = ridge_back[1] + (ridge_front[1] - ridge_back[1]) * along
     p.rect(x - 1, y - tall, x, y + 1, BRICK)
     p.line([(x - 1, y - tall - 1), (x, y - tall - 1)], shade(BRICK, 0.55))
-
-
-def _window(
-    p: Painter, a: Point, b: Point, span: tuple[float, float], drop: float, fill: RGB
-) -> None:
-    """A window with a light sill under it on the wall under the edge from `a` to `b`."""
-    _patch(p, a, b, span, (drop, drop + 1.2), fill)
-    p.line([_on_wall(a, b, span[0], drop + 1.5), _on_wall(a, b, span[1], drop + 1.5)], SILL)
 
 
 def _foot(p: Painter, top: tuple[Point, Point, Point, Point], height: float) -> None:
@@ -112,8 +92,7 @@ def _worn(
 def _eaves(p: Painter, top: tuple[Point, Point, Point, Point], wall: RGB) -> None:
     """The shadow the eaves cast along the tops of a box's two front walls."""
     left, front, right, _ = top
-    p.line([_on_wall(left, front, 0, 0.6), _on_wall(left, front, 1, 0.6)], shade(wall, 0.78))
-    p.line([_on_wall(front, right, 0, 0.6), _on_wall(front, right, 1, 0.6)], shade(wall, 0.6))
+    _bands(p, left, front, right, 0.6, shade(wall, 0.78), shade(wall, 0.6))
 
 
 def house(wall: RGB, roof: RGB) -> Sprite:
@@ -167,10 +146,7 @@ def tenement(wall: RGB, roof: RGB) -> Sprite:
         for span in ((0.25, 0.4), (0.62, 0.77)):
             _window(p, front, right, span, drop, shade(WINDOW, 0.75))
     for drop in (0.3, 3.3, 6.2):
-        p.line([_on_wall(left, front, 0, drop), _on_wall(left, front, 1, drop)], shade(wall, 1.15))
-        p.line(
-            [_on_wall(front, right, 0, drop), _on_wall(front, right, 1, drop)], shade(wall, 0.85)
-        )
+        _bands(p, left, front, right, drop, shade(wall, 1.15), shade(wall, 0.85))
     p.gable(top, 5, roof, wall)
     _tiles(p, top, 5, roof)
     ridge_back, ridge_front = _ridge(top, 5)
@@ -231,8 +207,7 @@ def skyscraper() -> Sprite:
         p.line([(-s, -floor), (0, s / 2 - floor)], lit)
         p.line([(0, s / 2 - floor), (s, -floor)], dark)
     p.line([(-s / 2, s / 4 - 4), (-s / 2, s / 4 - height)], shade(GLASS, 0.85))
-    p.line([_on_wall(left, front, 0, 0.6), _on_wall(left, front, 1, 0.6)], shade(GLASS, 1.6))
-    p.line([_on_wall(front, right, 0, 0.6), _on_wall(front, right, 1, 0.6)], shade(GLASS, 1.1))
+    _bands(p, left, front, right, 0.6, shade(GLASS, 1.6), shade(GLASS, 1.1))
     _patch(p, left, front, (0, 1), (height - 3.6, height), CONCRETE)
     _patch(p, front, right, (0, 1), (height - 3.6, height), shade(CONCRETE, 0.74))
     _patch(p, left, front, (0.12, 0.36), (height - 2.8, height - 1), shade(GLASS, 0.75))

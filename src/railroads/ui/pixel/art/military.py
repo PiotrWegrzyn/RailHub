@@ -15,7 +15,7 @@ from railroads.ui.pixel.art.painter import (
     Sprite,
     shade,
 )
-from railroads.ui.pixel.art.parts import _flag, _on_wall, _patch
+from railroads.ui.pixel.art.parts import _band, _flag, _on_wall, _pale_plinth, _patch
 
 type Top = tuple[Point, Point, Point, Point]
 
@@ -26,18 +26,11 @@ OLIVE: RGB = (110, 118, 74)
 FLAGS: RGB = (176, 170, 150)
 
 
-def _plinth(p: Painter, top: Top, height: float, wall: RGB, depth: float = 0.8) -> None:
-    """A darker band along the foot of a box's two front walls."""
-    left, front, right, _ = top
-    _patch(p, left, front, (0, 1), (height - depth, height), shade(wall, 0.7))
-    _patch(p, front, right, (0, 1), (height - depth, height), shade(wall, 0.52))
-
-
 def _barracks(p: Painter, x: float, y: float, half: float, height: float) -> None:
     """A low barrack hut with a door and windows under a flat roof with a vent along it."""
     top = p.box(x, y, half, height, MILITARY_YARD, MILITARY_ROOF)
     left, front, right, back = top
-    _plinth(p, top, height, MILITARY_YARD)
+    _pale_plinth(p, top, height, MILITARY_YARD)
     _foot(p, top, height)
     _patch(p, left, front, (0.15, 0.35), (1.8, 3), WINDOW)
     _patch(p, left, front, (0.58, 0.8), (2, height), DOORWAY)
@@ -78,7 +71,7 @@ def outpost() -> Sprite:
     _crate(p, -6, -1)
     top = p.box(0, -1, 5, 6, MILITARY_YARD, MILITARY_ROOF)
     hut_left, hut_front, hut_right, _ = top
-    _plinth(p, top, 6, MILITARY_YARD)
+    _pale_plinth(p, top, 6, MILITARY_YARD)
     _patch(p, hut_left, hut_front, (0.15, 0.38), (1.8, 3), WINDOW)
     _patch(p, hut_left, hut_front, (0.58, 0.82), (2.2, 6), DOORWAY)
     _patch(p, hut_front, hut_right, (0.3, 0.55), (1.8, 3), shade(WINDOW, 0.75))
@@ -104,7 +97,7 @@ def base() -> Sprite:
     left, front, right, _ = yard
     _foot(p, yard, 3)
     for a, b, tone in ((left, front, 0.8), (front, right, 0.62)):
-        p.line([_on_wall(a, b, 0, 1.5), _on_wall(a, b, 1, 1.5)], shade(STONE, tone))
+        _band(p, a, b, 1.5, shade(STONE, tone))
     p.line([left, front, right], shade(STONE, 1.15))
     _patch(p, left, front, (0.6, 0.78), (0.4, 3), DOORWAY)
     for t, colour in ((0.56, MILITARY_FLAG), (0.64, (240, 240, 236)), (0.72, MILITARY_FLAG)):
@@ -143,7 +136,7 @@ def headquarters() -> Sprite:
     height = 15
     top = p.box(0, -2, 11, height, wall, MILITARY_ROOF)
     left, front, right, _ = top
-    _plinth(p, top, height, wall)
+    _pale_plinth(p, top, height, wall)
     _foot(p, top, height)
     _worn(p, left, front, (0.42, 0.58), height, 2.6, FLAGS)
     sill = shade(wall, 1.2)
@@ -161,7 +154,7 @@ def headquarters() -> Sprite:
             _patch(p, front, right, span, (drop, drop + 1.6), shade(WINDOW, 0.75))
     for a, b, tone in ((left, front, 1.15), (front, right, 0.88)):
         for drop in (0.6, 11):
-            p.line([_on_wall(a, b, 0, drop), _on_wall(a, b, 1, drop)], shade(wall, tone))
+            _band(p, a, b, drop, shade(wall, tone))
     portico = shade(wall, 1.25)
     _patch(p, left, front, (0.35, 0.65), (5, height), shade(wall, 0.45))
     _patch(p, left, front, (0.46, 0.54), (11.4, height), DOORWAY)

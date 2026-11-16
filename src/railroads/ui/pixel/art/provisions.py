@@ -8,7 +8,6 @@ from railroads.ui.pixel.art.industry import (
     _chimney,
     _door,
     _footing,
-    _plinth,
     _ring,
     _roof_rows,
     _sack,
@@ -26,7 +25,7 @@ from railroads.ui.pixel.art.painter import (
     Sprite,
     shade,
 )
-from railroads.ui.pixel.art.parts import _cow, _fence, _on_wall, _paddock, _patch
+from railroads.ui.pixel.art.parts import _cow, _fence, _on_wall, _paddock, _patch, _plinth
 
 CRUST: RGB = (236, 180, 96)
 BAKERY_ROOF: RGB = (172, 66, 46)

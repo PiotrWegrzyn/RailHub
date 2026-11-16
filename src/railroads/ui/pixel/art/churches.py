@@ -22,6 +22,7 @@ from railroads.ui.pixel.art.painter import (
     shade,
 )
 from railroads.ui.pixel.art.parts import (
+    _band,
     _cross,
     _gable_across,
     _iso,
@@ -154,7 +155,7 @@ def _tower(
         _windows(p, left, front, (0.5,), (height * 0.42,), 3, STAINED, shade(wall, 0.7))
         _windows(p, front, right, (0.5,), (height * 0.42,), 3, shade(STAINED, 0.8))
     for a, b, tone in ((left, front, 0.8), (front, right, 0.62)):
-        p.line([_on_wall(a, b, 0, 5.8), _on_wall(a, b, 1, 5.8)], shade(wall, tone))
+        _band(p, a, b, 5.8, shade(wall, tone))
     p.line([left, front, right], shade(wall, 1.12))
     apex = (x, y - height - spire)
     p.polygon([left, front, apex], roof, shade(roof, 0.55))
@@ -234,9 +235,7 @@ def basilica() -> Sprite:
         shade(STAINED, 0.8),
         shade(CHURCH_WALL, 0.6),
     )
-    p.line(
-        [_on_wall(front, right, 0, 6.5), _on_wall(front, right, 1, 6.5)], shade(CHURCH_WALL, 0.65)
-    )
+    _band(p, front, right, 6.5, shade(CHURCH_WALL, 0.65))
     _gable_across(p, top, 4, CHURCH_ROOF, CHURCH_WALL)
     _courses(p, top, 4, CHURCH_ROOF)
     _rose(p, *_on_wall(left, front, 0.5, 2.5), 2)
@@ -347,7 +346,7 @@ def st_pauls() -> Sprite:
         _windows(p, tower[0], tower[1], (0.33, 0.67), (3,), 3, DOORWAY)
         _windows(p, tower[1], tower[2], (0.33, 0.67), (3,), 3, shade(DOORWAY, 0.8))
         for a, b, tone in ((tower[0], tower[1], 0.8), (tower[1], tower[2], 0.62)):
-            p.line([_on_wall(a, b, 0, 7), _on_wall(a, b, 1, 7)], shade(stone, tone))
+            _band(p, a, b, 7, shade(stone, tone))
         if clock:
             x, y = _on_wall(tower[0], tower[1], 0.5, 10)
             p.ellipse(x - 1.5, y - 1.5, x + 1.5, y + 1.5, (240, 236, 222))
@@ -367,7 +366,7 @@ def st_pauls() -> Sprite:
             shade(stone, 0.68),
         )
     _windows(p, front, right, (0.15, 0.35, 0.55, 0.75, 0.95), (3,), 4, shade(DOORWAY, 0.8))
-    p.line([_on_wall(front, right, 0, 8.5), _on_wall(front, right, 1, 8.5)], shade(stone, 0.6))
+    _band(p, front, right, 8.5, shade(stone, 0.6))
     _gable_across(p, top, 3, LEAD, stone)
     p.line([front, right], shade(stone, 1.12))
     dome_x, dome_y = _iso(cx, cy, 0, 5)

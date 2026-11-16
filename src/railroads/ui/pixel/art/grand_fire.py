@@ -7,15 +7,16 @@ cones lit at their mouths and gasworks of great gasholders in iron guide frames.
 import itertools
 import math
 
+from railroads.ui.pixel.art.crafts import MOLTEN
 from railroads.ui.pixel.art.industry import (
-    _band,
+    SMOKE,
+    SOIL,
     _bed,
     _chimney,
     _crate,
     _door,
     _footing,
     _on_roof,
-    _plinth,
     _ring,
     _roof_rows,
     _sack,
@@ -38,16 +39,23 @@ from railroads.ui.pixel.art.painter import (
     Sprite,
     shade,
 )
-from railroads.ui.pixel.art.parts import _heap, _on_wall, _patch, _turned, _vault, _windows
+from railroads.ui.pixel.art.parts import (
+    _band,
+    _bands,
+    _heap,
+    _on_wall,
+    _patch,
+    _plinth,
+    _turned,
+    _vault,
+    _windows,
+)
 
 type Top = tuple[Point, Point, Point, Point]
 
-SMOKE: RGB = (150, 148, 150)
 STEAM: RGB = (238, 238, 242)
-MOLTEN: RGB = (240, 128, 36)
 WHITE_HOT: RGB = (255, 226, 120)
 IRON: RGB = (66, 62, 64)
-SOIL: RGB = (78, 74, 52)
 BALLAST: RGB = (126, 118, 106)
 RAIL: RGB = (92, 92, 100)
 WAGON: RGB = (104, 74, 54)
@@ -147,7 +155,7 @@ def _battery(
     for k in range(doors):
         bx, by = _on_wall(back, right, (k + 0.5) / doors, 0)
         p.line([(bx, by), (bx, by - 2.4)], IRON)
-    p.line([_on_wall(back, right, 0, -2.6), _on_wall(back, right, 1, -2.6)], shade(IRON, 1.4))
+    _band(p, back, right, -2.6, shade(IRON, 1.4))
     return top
 
 
@@ -245,8 +253,7 @@ def mega_coke_plant() -> Sprite:
     tower = p.box(-0.5, -7.5, 4, 20, CONCRETE, shade(CONCRETE, 1.1))
     tl, tf, tr, _ = tower
     _windows(p, tl, tf, (0.3, 0.7), (3, 8), 2, WINDOW)
-    _band(p, tl, tf, 13, shade(CONCRETE, 0.75))
-    _band(p, tf, tr, 13, shade(CONCRETE, 0.6))
+    _bands(p, tl, tf, tr, 13, shade(CONCRETE, 0.75), shade(CONCRETE, 0.6))
     _patch(p, tl, tf, (0.25, 0.75), (16, 20), OVEN_DOOR)
     _quench_tower(p, 26, 1, 4, 22, 5, -1.2)
     two = _battery(p, 12, 4.5, 18, 7, 6, (1, 4), 6)
@@ -739,8 +746,7 @@ def _tile_stack(p: Painter, x: float, y: float, rows: int = 3) -> None:
     top = p.hall(x, y, 3, 2.4, 0.9 * rows, TILE, shade(TILE, 1.25))
     left, front, right, _ = top
     for row in range(1, rows):
-        _band(p, left, front, 0.9 * row, GLAZE)
-        _band(p, front, right, 0.9 * row, shade(GLAZE, 0.8))
+        _bands(p, left, front, right, 0.9 * row, GLAZE, shade(GLAZE, 0.8))
 
 
 def _checker(
@@ -882,7 +888,7 @@ def _plank(p: Painter, x: float, y: float, length: float, pots: int) -> None:
         px, py = _on_wall(a, b, t, 0)
         p.line([(px - 0.6, py), (px, py - 2)], shade(TIMBER, 0.7))
         p.line([(px + 0.6, py), (px, py - 2)], shade(TIMBER, 0.7))
-    p.line([_on_wall(a, b, 0, -2), _on_wall(a, b, 1, -2)], TIMBER)
+    _band(p, a, b, -2, TIMBER)
     for k in range(pots):
         px, py = _on_wall(a, b, (k + 0.5) / pots, -2.2)
         p.ellipse(px - 0.9, py - 2, px + 0.9, py, POT)
@@ -987,7 +993,7 @@ def _ware_racks(p: Painter, x: float, y: float, length: float, rows: int = 2) ->
         p.line([(px, py), (px, py - 3 * rows - 1)], FRAME)
     for r in range(rows):
         d = -1 - 3 * r
-        p.line([_on_wall(a, b, 0, d), _on_wall(a, b, 1, d)], FRAME)
+        _band(p, a, b, d, FRAME)
         items = max(3, round(length / 2))
         for k in range(items):
             px, py = _on_wall(a, b, (k + 0.5) / items, d - 0.4)
@@ -1114,7 +1120,7 @@ def _brick_stack(p: Painter, x: float, y: float, length: float = 4) -> None:
     """A stack of new red bricks on (x, y), their courses and joints showing."""
     stack = p.hall(x, y, length, 3, 3, BRICK, shade(BRICK, 1.25))
     for a, b in ((stack[0], stack[1]), (stack[1], stack[2])):
-        p.line([_on_wall(a, b, 0, 1.5), _on_wall(a, b, 1, 1.5)], shade(BRICK, 1.3))
+        _band(p, a, b, 1.5, shade(BRICK, 1.3))
         for t in (0.25, 0.5, 0.75):
             d = (0, 1.5) if t == 0.5 else (1.5, 3)
             p.line([_on_wall(a, b, t, d[0]), _on_wall(a, b, t, d[1])], shade(BRICK, 0.7))
@@ -1137,8 +1143,7 @@ def _long_kiln(p: Painter, x: float, y: float, length: float, depth: float, chim
     height = 6
     top = p.hall(x, y, length, depth, height, HOFFMANN, None)
     left, front, right, _ = top
-    _band(p, left, front, 0.8, shade(HOFFMANN, 0.7))
-    _band(p, front, right, 0.8, shade(HOFFMANN, 0.55))
+    _bands(p, left, front, right, 0.8, shade(HOFFMANN, 0.7), shade(HOFFMANN, 0.55))
     steps = max(3, round(length / 4))
     _firing_doors(p, left, front, tuple((k + 0.5) / steps for k in range(steps)), height)
     _firing_doors(p, front, right, (0.35, 0.65), height)
@@ -1255,7 +1260,7 @@ def _preheater(p: Painter, x: float, y: float, half: float, tall: float) -> Top:
     storeys = round(tall / 5)
     for k in range(1, storeys + 1):
         drop = tall * k / (storeys + 0.4)
-        p.line([_on_wall(left, front, 0, drop), _on_wall(left, front, 1, drop)], shade(CEMENT, 0.6))
+        _band(p, left, front, drop, shade(CEMENT, 0.6))
         p.point(*_on_wall(left, front, 0.5, drop - 2.5), WINDOW)
         p.point(*_on_wall(front, right, 0.5, drop - 2.5), shade(WINDOW, 0.8))
     _plinth(p, tower, tall, grey)

@@ -1,6 +1,7 @@
 """Pieces several kinds of sprite are built from."""
 
 import math
+from functools import partial
 
 import numpy as np
 
@@ -52,6 +53,73 @@ def _patch(
         ],
         fill,
     )
+
+
+type Top = tuple[Point, Point, Point, Point]
+
+SILL: RGB = (240, 236, 226)
+DOOR: RGB = (104, 66, 44)
+LIT: RGB = (236, 206, 120)
+
+
+def _band(p: Painter, a: Point, b: Point, drop: float, colour: RGB) -> None:
+    """A line right along the wall under the edge from `a` to `b`, `drop` down it."""
+    p.line([_on_wall(a, b, 0, drop), _on_wall(a, b, 1, drop)], colour)
+
+
+def _bands(p: Painter, a: Point, b: Point, c: Point, drop: float, lit: RGB, shaded: RGB) -> None:
+    """Bands `drop` down the lit wall under `a`-`b` and then the shaded wall under `b`-`c`."""
+    _band(p, a, b, drop, lit)
+    _band(p, b, c, drop, shaded)
+
+
+def _plinth(
+    p: Painter,
+    top: Top,
+    height: float,
+    wall: RGB,
+    depth: float = 0.8,
+    lit: float = 0.7,
+    dark: float = 0.55,
+) -> None:
+    """A darker band `depth` high along the foot of a block's lit and shaded walls, `height`
+    below its top."""
+    left, front, right, _ = top
+    _patch(p, left, front, (0, 1), (height - depth, height), shade(wall, lit))
+    _patch(p, front, right, (0, 1), (height - depth, height), shade(wall, dark))
+
+
+# The plinth of shops, landmarks and barracks, a touch lighter on the shaded wall.
+_pale_plinth = partial(_plinth, dark=0.52)
+
+
+def _ridge(top: Top, rise: float) -> tuple[Point, Point]:
+    """The back and front ends of the ridge of a gable `rise` high on a box's top (Painter.gable)."""
+    left, front, right, back = top
+    return (
+        ((left[0] + back[0]) / 2, (left[1] + back[1]) / 2 - rise),
+        ((front[0] + right[0]) / 2, (front[1] + right[1]) / 2 - rise),
+    )
+
+
+def _tiles(
+    p: Painter, top: Top, rise: float, roof: RGB, rows: tuple[float, ...] = (0.34, 0.68)
+) -> None:
+    """Rows of tiles, slates or thatch across the lit side of a gable roof."""
+    left, front, _, _ = top
+    ridge_back, ridge_front = _ridge(top, rise)
+    for f in rows:
+        a = (left[0] + (ridge_back[0] - left[0]) * f, left[1] + (ridge_back[1] - left[1]) * f)
+        b = (front[0] + (ridge_front[0] - front[0]) * f, front[1] + (ridge_front[1] - front[1]) * f)
+        p.line([a, b], shade(roof, 0.8))
+
+
+def _window(
+    p: Painter, a: Point, b: Point, span: tuple[float, float], drop: float, fill: RGB = WINDOW
+) -> None:
+    """A window with a light sill under it on the wall under the edge from `a` to `b`."""
+    _patch(p, a, b, span, (drop, drop + 1.2), fill)
+    p.line([_on_wall(a, b, span[0], drop + 1.5), _on_wall(a, b, span[1], drop + 1.5)], SILL)
 
 
 def _windows(

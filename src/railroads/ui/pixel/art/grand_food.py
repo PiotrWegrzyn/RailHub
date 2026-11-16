@@ -6,7 +6,7 @@ a brick slaughterhouse with a white cold store, a half-timbered sausage works wi
 a timber cooperage with barrels firing over the coals."""
 
 from railroads.ui.pixel.art.industry import (
-    _band,
+    GLAZING,
     _bed,
     _chimney,
     _crate,
@@ -15,9 +15,7 @@ from railroads.ui.pixel.art.industry import (
     _heap,
     _on_roof,
     _pipe,
-    _plinth,
     _puddle,
-    _ridge,
     _ring,
     _roof_rows,
     _smoke,
@@ -44,12 +42,16 @@ from railroads.ui.pixel.art.painter import (
     shade,
 )
 from railroads.ui.pixel.art.parts import (
+    _band,
+    _bands,
     _barrel,
     _cow,
     _fence,
     _on_wall,
     _paddock,
     _patch,
+    _plinth,
+    _ridge,
     _turned,
     _windows,
 )
@@ -169,7 +171,7 @@ def _terrace(p: Painter, x: float, y: float, length: float, height: float) -> No
     strip on (x, y) planted with two rows of trellised vines hung with grapes."""
     top = p.hall(x, y, length, 6, height, CELLAR, shade(VINE, 0.8))
     left, front, right, back = top
-    p.line([_on_wall(left, front, 0, 0.6), _on_wall(left, front, 1, 0.6)], shade(CELLAR, 1.12))
+    _band(p, left, front, 0.6, shade(CELLAR, 1.12))
     for t in (0.2, 0.5, 0.8):
         p.point(*_on_wall(left, front, t, height * 0.6), shade(CELLAR, 0.8))
     posts = round(length / 3)
@@ -351,8 +353,7 @@ def _brew_tower(p: Painter, x: float, y: float, half: float, tall: float) -> Top
     left, front, right, _ = top
     _plinth(p, top, tall, tower)
     _stains(p, front, right, tall, (0.1, 0.9), shade(tower, 0.5), 1.6)
-    _band(p, left, front, 0.8, shade(tower, 1.25))
-    _band(p, front, right, 0.8, shade(tower, 1.0))
+    _bands(p, left, front, right, 0.8, shade(tower, 1.25), shade(tower, 1.0))
     drops = tuple(3 + 5 * k for k in range(int((tall - 6) // 5)))
     _windows(p, left, front, (0.5,), drops, 2, arch=shade(BRICK, 1.35))
     _windows(p, front, right, (0.5,), drops[:1], 2, shade(WINDOW, 0.8), shade(BRICK, 1.1))
@@ -600,7 +601,6 @@ LABEL: RGB = (196, 58, 48)
 LABEL_TEXT: RGB = (240, 230, 210)
 SILO: RGB = (165, 167, 176)
 TIN: RGB = (206, 210, 218)
-GLAZING: RGB = (160, 196, 218)
 BALLAST: RGB = (138, 130, 120)
 RAIL: RGB = (90, 88, 92)
 SLEEPER: RGB = (96, 70, 50)
@@ -767,7 +767,7 @@ def _square_stack(p: Painter, x: float, y: float, half: float, tall: float) -> N
     stack = p.box(x, y, half, tall, shade(BRICK, 0.95), (60, 52, 50))
     for a, b in ((stack[0], stack[1]), (stack[1], stack[2])):
         for drop, colour in ((2, (220, 220, 214)), (tall * 0.4, shade(SUGAR_WALL, 0.65))):
-            p.line([_on_wall(a, b, 0, drop), _on_wall(a, b, 1, drop)], colour)
+            _band(p, a, b, drop, colour)
     _smoke(p, x + 1, y - tall - 5, puffs=4)
 
 
@@ -779,8 +779,7 @@ def _refinery(p: Painter, top: Top, height: float, spans: tuple[float, ...], doo
     _plinth(p, top, height, SUGAR_WALL)
     _stains(p, left, front, height, (0.08, 0.33, 0.85), shade(SUGAR_WALL, 0.6), 2)
     _stains(p, front, right, height, (0.15, 0.5, 0.85), shade(SUGAR_WALL, 0.5), 2)
-    _band(p, left, front, 0.8, lintel)
-    _band(p, front, right, 0.8, shade(SUGAR_WALL, 0.95))
+    _bands(p, left, front, right, 0.8, lintel, shade(SUGAR_WALL, 0.95))
     p.line([left, front, right], shade(SUGAR_ROOF, 1.3))
     rows = tuple(2.5 + 3.5 * k for k in range(int((height - 4) // 3.5)))
     _windows(p, left, front, spans, rows, 2, arch=lintel)
@@ -1072,8 +1071,7 @@ def _half_timbered(p: Painter, top: Top, height: float, bays: int) -> None:
         p.line([_on_wall(left, front, t, 0), _on_wall(left, front, t, height)], FRAME)
     for f in range(floors + 1):
         d = height * f / floors
-        p.line([_on_wall(left, front, 0, d), _on_wall(left, front, 1, d)], FRAME)
-        p.line([_on_wall(front, right, 0, d), _on_wall(front, right, 1, d)], shade(FRAME, 0.8))
+        _bands(p, left, front, right, d, FRAME, shade(FRAME, 0.8))
     for k in range(0, bays, 2):
         t0, t1 = k / bays, (k + 1) / bays
         for f in range(floors):
@@ -1115,8 +1113,7 @@ def _smokehouse(p: Painter, x: float, y: float, half: float, tall: float) -> Non
     _plinth(p, top, tall, SMOKEHOUSE)
     _stains(p, left, front, tall, (0.2, 0.8), shade(SMOKEHOUSE, 0.65), 2)
     _patch(p, front, right, (0.3, 0.7), (tall - 3.4, tall - 0.4), (54, 50, 52))
-    _band(p, left, front, 1, (54, 48, 46))
-    _band(p, front, right, 1, (44, 40, 40))
+    _bands(p, left, front, right, 1, (54, 48, 46), (44, 40, 40))
     cx, cy = front[0], (left[1] + right[1]) / 2
     p.rect(cx - half * 0.5, cy - 2.4, cx + half * 0.5, cy, shade(SMOKEHOUSE, 0.8))
     p.polygon(

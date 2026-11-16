@@ -3,7 +3,6 @@
 import itertools
 
 from railroads.ui.pixel.art.farms import (
-    DOOR,
     EARTH,
     FOOTING,
     SACK,
@@ -17,9 +16,7 @@ from railroads.ui.pixel.art.farms import (
     _ruts,
     _sack,
     _strewn,
-    _tiles,
     _track,
-    _window,
     _worn,
 )
 from railroads.ui.pixel.art.painter import (
@@ -34,7 +31,15 @@ from railroads.ui.pixel.art.painter import (
     Sprite,
     shade,
 )
-from railroads.ui.pixel.art.parts import _heap, _on_wall, _patch, _turned
+from railroads.ui.pixel.art.parts import (
+    DOOR,
+    _heap,
+    _on_wall,
+    _patch,
+    _tiles,
+    _turned,
+    _window,
+)
 
 RAIL: RGB = (138, 136, 144)
 SLEEPER: RGB = (92, 70, 50)

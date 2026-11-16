@@ -20,17 +20,22 @@ from railroads.ui.pixel.art.painter import (
     shade,
 )
 from railroads.ui.pixel.art.parts import (
+    DOOR,
+    SILL,
+    _band,
+    _bands,
     _cow,
     _fence,
     _heap,
     _on_wall,
     _paddock,
     _patch,
+    _ridge,
+    _tiles,
     _turned,
+    _window,
 )
 
-DOOR: RGB = (104, 66, 44)
-SILL: RGB = (240, 236, 226)
 CRATE: RGB = (156, 108, 62)
 SACK: RGB = (192, 162, 112)
 WICKER: RGB = (176, 132, 76)
@@ -108,25 +113,6 @@ def _strewn(p: Painter, x: float, y: float, half: float, colour: RGB, count: int
         p.point(x + u * half, y + v * half / 2, shade(colour, 0.85 if k % 2 else 1))
 
 
-def _ridge(top: Top, rise: float) -> tuple[Point, Point]:
-    """The back and front ends of the ridge of a gable `rise` high on a box's top (Painter.gable)."""
-    left, front, right, back = top
-    return (
-        ((left[0] + back[0]) / 2, (left[1] + back[1]) / 2 - rise),
-        ((front[0] + right[0]) / 2, (front[1] + right[1]) / 2 - rise),
-    )
-
-
-def _tiles(p: Painter, top: Top, rise: float, roof: RGB, rows: tuple[float, ...] = (0.34, 0.68)):
-    """Rows of tiles, slates or thatch across the lit side of a gable roof."""
-    left, front, _, _ = top
-    ridge_back, ridge_front = _ridge(top, rise)
-    for f in rows:
-        a = (left[0] + (ridge_back[0] - left[0]) * f, left[1] + (ridge_back[1] - left[1]) * f)
-        b = (front[0] + (ridge_front[0] - front[0]) * f, front[1] + (ridge_front[1] - front[1]) * f)
-        p.line([a, b], shade(roof, 0.8))
-
-
 def _chimney(
     p: Painter, top: Top, rise: float, along: float, tall: float = 2, colour: RGB = BRICK
 ) -> Point:
@@ -138,14 +124,6 @@ def _chimney(
     p.rect(x - 1, y - tall, x, y + 1, colour)
     p.line([(x - 1, y - tall - 1), (x, y - tall - 1)], shade(colour, 0.55))
     return x, y - tall - 1
-
-
-def _window(
-    p: Painter, a: Point, b: Point, span: tuple[float, float], drop: float, fill: RGB = WINDOW
-) -> None:
-    """A window with a light sill under it on the wall under the edge from `a` to `b`."""
-    _patch(p, a, b, span, (drop, drop + 1.2), fill)
-    p.line([_on_wall(a, b, span[0], drop + 1.5), _on_wall(a, b, span[1], drop + 1.5)], SILL)
 
 
 def _door(
@@ -174,18 +152,13 @@ def _boards(p: Painter, top: Top, wall: RGB, drops: tuple[float, ...]) -> None:
     """The seams between the boards of a timber wall, `drops` down both walls."""
     left, front, right, _ = top
     for drop in drops:
-        p.line([_on_wall(left, front, 0, drop), _on_wall(left, front, 1, drop)], shade(wall, 0.84))
-        p.line(
-            [_on_wall(front, right, 0, drop), _on_wall(front, right, 1, drop)], shade(wall, 0.66)
-        )
+        _bands(p, left, front, right, drop, shade(wall, 0.84), shade(wall, 0.66))
 
 
 def _crate(p: Painter, x: float, y: float, load: RGB, half: float = 1.6) -> None:
     """A slatted wooden crate standing on (x, y), filled to its brim with `load`."""
     left, front, _, _ = p.box(x, y, half, half, CRATE, load)
-    p.line(
-        [_on_wall(left, front, 0, half / 2), _on_wall(left, front, 1, half / 2)], shade(CRATE, 0.7)
-    )
+    _band(p, left, front, half / 2, shade(CRATE, 0.7))
     p.point(x - half / 2, y - half - 0.5, shade(load, 1.3))
 
 
