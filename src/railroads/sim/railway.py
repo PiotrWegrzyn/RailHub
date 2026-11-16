@@ -79,6 +79,7 @@ from railroads.sim.trains import (
     Stop,
     Train,
     car_size,
+    general_car_size,
 )
 
 if TYPE_CHECKING:
@@ -271,10 +272,14 @@ class Railway:
         player's business and tech take off."""
         return running_cost(ENGINES[engine], self.year, self.business()) * self._upkeep()
 
-    def car_capacity(self, good: Good, engine: str | None = None) -> float:
-        """How much of a good one car carries: coaches and mail vans more with tech, and every
-        car pulled by a diesel engine more (Engine.car_size)."""
-        size = car_size(good) * (1.0 if engine is None else ENGINES[engine].car_size)
+    def car_capacity(
+        self, good: Good, engine: str | None = None, general: General | None = None
+    ) -> float:
+        """How much of a good one car carries, a general car of a kind (general_car_size) or
+        one for the good alone: coaches and mail vans more with tech, and every car pulled by a
+        diesel engine more (Engine.car_size)."""
+        base = car_size(good) if general is None else general_car_size(general, good)
+        size = base * (1.0 if engine is None else ENGINES[engine].car_size)
         if good in TRAVELLERS:
             return size * (1.0 + self.research.bonus(Effect.COACHES))
         return size

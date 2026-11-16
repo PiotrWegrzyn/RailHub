@@ -231,116 +231,124 @@
   16,
   112
  ],
- "general food": [
+ "juice": [
   32,
+  112
+ ],
+ "general food": [
+  48,
+  112
+ ],
+ "general processed food": [
+  64,
   112
  ],
  "general common goods": [
-  48,
+  80,
   112
  ],
  "pigs": [
-  64,
+  96,
   112
  ],
  "chickens": [
-  80,
+  112,
   112
  ],
  "eggs": [
-  96,
-  112
+  0,
+  128
  ],
  "animals": [
-  112,
-  112
+  16,
+  128
  ],
  "flax": [
-  0,
+  32,
   128
  ],
  "hops": [
-  16,
+  48,
   128
  ],
  "machinery": [
-  32,
+  64,
   128
  ],
  "bricks": [
-  48,
+  80,
   128
  ],
  "cement": [
-  64,
+  96,
   128
  ],
  "glass": [
-  80,
+  112,
   128
  ],
  "beer": [
-  96,
-  128
+  0,
+  144
  ],
  "vodka": [
-  112,
-  128
+  16,
+  144
  ],
  "leather": [
-  0,
+  32,
   144
  ],
  "shoes": [
-  16,
+  48,
   144
  ],
  "plastics": [
-  32,
+  64,
   144
  ],
  "appliances": [
-  48,
+  80,
   144
  ],
  "paper": [
-  64,
-  144
- ],
- "newspapers": [
-  80,
-  144
- ],
- "refined sugar": [
   96,
   144
  ],
- "porcelain": [
+ "newspapers": [
   112,
   144
  ],
- "sheep": [
+ "refined sugar": [
   0,
   160
  ],
- "meat": [
+ "porcelain": [
   16,
   160
  ],
- "livestock": [
+ "sheep": [
   32,
   160
  ],
- "gas": [
+ "meat": [
   48,
   160
  ],
- "heating": [
+ "livestock": [
   64,
   160
  ],
- "boiler fuel": [
+ "gas": [
   80,
+  160
+ ],
+ "heating": [
+  96,
+  160
+ ],
+ "boiler fuel": [
+  112,
   160
  ]
 }

@@ -9,8 +9,10 @@ which carries nothing but weighs and costs like any other car.
 
 Freight remembers where it came from as parcels: how much from each station."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
+from types import MappingProxyType
 
 from railroads.sim.finance import TRAIN_PRICE
 from railroads.sim.goods import General, Good
@@ -114,6 +116,15 @@ def car_size(good: Good) -> float:
     if good in MEDIUM_CAR_GOODS:
         return MEDIUM_CAR
     return CAR_CAPACITY
+
+
+# The most a general car of a kind carries, whatever it holds: processed food rides in medium cars.
+GENERAL_CAR_MOST: Mapping[General, float] = MappingProxyType({General.PROCESSED_FOOD: MEDIUM_CAR})
+
+
+def general_car_size(general: General, good: Good) -> float:
+    """How much of a good one general car of a kind carries, before what engines add."""
+    return min(car_size(good), GENERAL_CAR_MOST.get(general, car_size(good)))
 
 
 # About how long an engine with its tender, and each car, are on the map, in cells.

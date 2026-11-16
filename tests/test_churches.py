@@ -182,10 +182,10 @@ def test_a_house_is_one_population_and_one_traveller_and_wants_food_heat_and_sma
     assert PASSENGERS_PER_POINT[Points.POPULATION] == 1
     assert NEEDS[BuildingKind.HOUSE] == {
         Need.FOOD: 10,
-        Need.HEATING: 1,
+        Need.HEATING: 3,
         Need.BEER: 1,
         Need.NEWSPAPERS: 1,
-        Need.COMMON: 3,
+        Need.COMMON: 5,
         Need.VODKA: 0.5,
         Need.REFINED_SUGAR: 0.5,
         Need.BRICKS: 0.5,

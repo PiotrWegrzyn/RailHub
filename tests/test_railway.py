@@ -371,10 +371,10 @@ def test_station_demand_is_twice_the_needs_of_buildings_in_its_inner_ring() -> N
     demand = railway.station_demand((6, 20))
     assert demand.capacity == {
         Need.FOOD: 240.0,
-        Need.HEATING: 24.0,
+        Need.HEATING: 72.0,
         Need.BEER: 24.0,
         Need.NEWSPAPERS: 24.0,
-        Need.COMMON: 72.0,
+        Need.COMMON: 120.0,
         Need.VODKA: 12.0,
         Need.REFINED_SUGAR: 12.0,
         Need.BRICKS: 12.0,
@@ -802,8 +802,8 @@ def test_coal_mined_near_a_station_heats_its_own_houses_before_waiting_for_train
     growth.trade_goods()
 
     _, heating = food_and_heating(growth, (6, 21))
-    assert heating == pytest.approx(1.0)
-    assert railway.station_goods((6, 20)).stockpile[Good.COAL] == pytest.approx(99.0)
+    assert heating == pytest.approx(3.0)
+    assert railway.station_goods((6, 20)).stockpile[Good.COAL] == pytest.approx(97.0)
 
 
 def test_a_good_kept_for_trains_is_not_handed_out_around_the_station() -> None:
@@ -831,7 +831,7 @@ def test_a_good_let_go_again_is_handed_out_around_the_station() -> None:
 
     _, heating = food_and_heating(growth, (6, 21))
     assert goods.kept == frozenset()
-    assert heating == pytest.approx(1.0)
+    assert heating == pytest.approx(3.0)
 
 
 def test_a_station_saved_before_goods_could_be_kept_for_trains_keeps_none() -> None:

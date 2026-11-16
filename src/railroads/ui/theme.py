@@ -116,6 +116,7 @@ GOOD_COLORS: Mapping[Good, Rgba] = {
     Good.STOVE_TILES: (0.35, 0.55, 0.75, 1.0),
     Good.CASTINGS: (0.4, 0.4, 0.44, 1.0),
     Good.SAUSAGES: (0.7, 0.3, 0.24, 1.0),
+    Good.JUICE: (0.96, 0.6, 0.16, 1.0),
     Good.LUXURIES: (0.6, 0.3, 0.65, 1.0),
 }
 CAR_EMPTY = (0.17, 0.15, 0.13, 1.0)

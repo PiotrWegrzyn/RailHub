@@ -130,7 +130,7 @@ class StationTrade:
             for kind, count in growth.counts.items():
                 recipe = RECIPES.get(kind)
                 if recipe is not None:
-                    if need not in recipe.inputs(year) and need not in boosts_of(kind, year):
+                    if need not in recipe.takes(year) and need not in boosts_of(kind, year):
                         continue
                 elif need not in needs_of(kind, year):
                     continue

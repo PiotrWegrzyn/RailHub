@@ -63,9 +63,9 @@ MADE = (0.35, 0.65, 1.0, 1.0)
 
 type Rgba = tuple[float, float, float, float]
 
-# Needs homes everywhere have: food and heating, which many goods meet, and the passengers and
-# mail every station both sends and wants. Any other need is a special one.
-GENERAL_NEEDS = frozenset({Need.FOOD, Need.HEATING, Need.PASSENGERS, Need.MAIL})
+# Needs homes everywhere have: food, common goods and heating, which many goods meet, and the
+# passengers and mail every station both sends and wants. Any other need is a special one.
+GENERAL_NEEDS = frozenset({Need.FOOD, Need.COMMON, Need.HEATING, Need.PASSENGERS, Need.MAIL})
 # How much of a good made around a station a month marks it as made there.
 LEAST_MADE = 10.0
 # The amounts a month from which a mark takes its second and third shade.

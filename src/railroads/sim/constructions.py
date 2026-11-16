@@ -133,6 +133,10 @@ class BuildingKind(Enum):
     TAVERN = "tavern"
     DEPARTMENT_STORE = "department store"
     HOTEL = "hotel"
+    CLUB = "club"
+    JUICE_WORKS = "juice works"
+    BIG_JUICE_WORKS = "big juice works"
+    MEGA_JUICE_WORKS = "mega juice works"
     BIG_STEEL_MILL = "big steel mill"
     MEGA_STEEL_MILL = "mega steel mill"
     BIG_COKE_PLANT = "big coke plant"
@@ -302,6 +306,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     BuildingKind.FOOD_PLANT: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.BAKERY: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.TAVERN: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.CLUB: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.DEPARTMENT_STORE: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.HOTEL: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.LIMESTONE_QUARRY: BuildingRules(relief=frozenset(Relief)),
@@ -374,6 +379,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.SUGAR_REFINERY,
             BuildingKind.PORCELAIN_WORKS,
             BuildingKind.MEAT_FACTORY,
+            BuildingKind.JUICE_WORKS,
         )
     },
 }
