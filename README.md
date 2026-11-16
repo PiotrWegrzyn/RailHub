@@ -633,8 +633,8 @@ needs, to the trees those goods belong to.
 Engines (`railroads.sim.trains`) come in lines. Pioneers, from the first steam engine on rails in
 1804, each a little better than the one before, lead up to the Planet of 1840, the engine the game
 is balanced around: three cars at 30 km/h for $10,000. Each newer engine of a line costs about
-three times the one before it. Early steam engines are very slow and pull few cars; diesels pull
-cars that hold half as much again, and electrics run fastest. Engines burn fuel
+three times the one before it. Early steam engines are very slow and pull few cars; diesels,
+electrics and the maglev pull cars a size bigger, and electrics run fastest. Engines burn fuel
 (`railroads.sim.fuel_market`): steam coal, diesels diesel fuel, electrics and the maglev
 electricity, a set amount a cell for each car they are built to pull, light engines half as much.
 A train buys the fuel for the way to its next stop as it sets off: coal or diesel fuel out of the
