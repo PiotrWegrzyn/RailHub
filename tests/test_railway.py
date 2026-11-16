@@ -79,7 +79,7 @@ def test_a_car_holds_ten_of_precious_goods_twenty_five_of_heavy_ones_and_fifty_o
 def test_a_train_waits_at_its_stop_until_new_goods_fill_its_cars() -> None:
     _, railway = joined_stations()
     train = railway.buy()
-    train.stops = [Stop((6, 3), [Good.WHEAT]), Stop((6, 20))]
+    train.stops = [Stop((6, 3), [Good.WHEAT], wait_for_load=True), Stop((6, 20))]
     railway.run(0.1)
     waiting = train.status
 
@@ -94,7 +94,7 @@ def test_a_train_waits_at_its_stop_until_new_goods_fill_its_cars() -> None:
 def test_a_train_gives_up_waiting_after_a_month() -> None:
     _, railway = joined_stations()
     train = railway.buy()
-    train.stops = [Stop((6, 3), [Good.WHEAT]), Stop((6, 20))]
+    train.stops = [Stop((6, 3), [Good.WHEAT], wait_for_load=True), Stop((6, 20))]
 
     for _ in range(12):
         railway.run(0.1)
@@ -106,7 +106,7 @@ def test_a_train_gives_up_waiting_after_a_month() -> None:
 def test_a_train_stops_waiting_as_soon_as_its_stop_no_longer_waits_for_a_full_load() -> None:
     _, railway = joined_stations()
     train = railway.buy()
-    stop = Stop((6, 3), [Good.WHEAT])
+    stop = Stop((6, 3), [Good.WHEAT], wait_for_load=True)
     train.stops = [stop, Stop((6, 20))]
     railway.run(0.1)
     waiting = train.status
@@ -286,7 +286,7 @@ def test_removing_one_loaded_car_keeps_the_others_full_and_returns_its_goods() -
     stockpile = railway.station_goods((6, 3)).stockpile
     stockpile[Good.WHEAT] = (MAX_CARS - 1) * CAR_CAPACITY + 10.0
     train = railway.buy()
-    train.stops = [Stop((6, 3), [Good.WHEAT] * MAX_CARS), Stop((6, 20))]
+    train.stops = [Stop((6, 3), [Good.WHEAT] * MAX_CARS, wait_for_load=True), Stop((6, 20))]
     railway.run(0.001)
 
     train.stops[0].cars.pop()
@@ -824,3 +824,27 @@ def test_a_station_saved_before_goods_could_be_kept_for_trains_keeps_none() -> N
 
     assert goods.kept == frozenset()
     assert goods.stockpile[Good.COAL] == pytest.approx(100.0)
+
+
+def test_a_new_stop_does_not_wait_for_a_full_load() -> None:
+    stop = Stop((6, 3))
+
+    waits = stop.wait_for_load
+
+    assert waits is False
+
+
+def test_a_held_train_stands_at_its_first_stop_until_let_go() -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    train.stops = [Stop((6, 3)), Stop((6, 20))]
+    train.held = True
+    railway.run(0.1)
+    stood = not train.path
+
+    railway.let_go()
+    railway.run(0.1)
+
+    assert stood
+    assert train.path
+    assert train.status == "Running"

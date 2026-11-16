@@ -6,7 +6,9 @@ from test_app_frame import FakeTexture
 from test_railway import joined_stations
 
 from railroads.sim.goods import Good
-from railroads.sim.trains import Stop, Train
+from railroads.sim.railway import Railway
+from railroads.sim.trains import ENGINES, EXPRESS_FARE, Stop, Train
+from railroads.ui.buy_train import engine_figures
 from railroads.ui.trains_window import TrainsWindow, carried_in
 
 
@@ -64,7 +66,82 @@ def test_the_buy_button_stays_at_the_top_while_a_long_list_of_trains_scrolls(
 
     for _ in range(3):
         imgui.new_frame()
-        window.draw(railway, lambda _: {}, lambda: ground)
+        window.draw(railway, lambda _: {}, lambda: ground, picture)
         imgui.end_frame()
 
     assert scrolls[-1] == 0.0
+
+
+def picture(_: str, __: int) -> tuple[imgui.ImTextureRef, tuple[float, float]]:
+    return imgui.ImTextureRef(1), (40.0, 20.0)
+
+
+def draw_frames(window: TrainsWindow, railway: Railway, count: int = 2) -> None:
+    ground = (imgui.ImTextureRef(1), railway.constructions.tile_map.grid.size())
+    for _ in range(count):
+        imgui.new_frame()
+        window.draw(railway, lambda _: {}, lambda: ground, picture)
+        imgui.end_frame()
+
+
+def pressing(monkeypatch: pytest.MonkeyPatch, wanted: str) -> None:
+    button = imgui.button
+
+    def pressed(label: str, size: tuple[float, float] = (0, 0)) -> bool:
+        return button(label, size) or wanted in label
+
+    monkeypatch.setattr(imgui, "button", pressed)
+
+
+def test_a_train_bought_on_the_buy_screen_stands_until_the_screen_is_closed(
+    gui: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, railway = joined_stations()
+    window = TrainsWindow(open=True)
+    window.buy.open_for(None)
+    pressing(monkeypatch, "Buy for")
+
+    draw_frames(window, railway, 1)
+
+    assert len(railway.trains) == 1
+    train = railway.trains[0]
+    assert window.chosen == train.name
+    assert window.buy.bought == train.name
+    assert train.held
+
+
+def test_closing_the_buy_screen_lets_the_trains_bought_on_it_set_off(gui: None) -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    assert train is not None
+    train.held = True
+    window = TrainsWindow(open=True)
+    window.buy.open_for(None)
+    window.buy.bought = train.name
+    draw_frames(window, railway)
+    held_while_open = train.held
+
+    window.buy.open = False
+    draw_frames(window, railway)
+
+    assert held_while_open
+    assert not train.held
+
+
+def test_closing_the_trains_window_closes_the_buy_screen_too(gui: None) -> None:
+    _, railway = joined_stations()
+    window = TrainsWindow(open=False)
+    window.buy.open_for(None)
+
+    draw_frames(window, railway, 1)
+
+    assert not window.buy.open
+
+
+def test_an_express_shows_its_dining_car_and_dearer_fares_among_its_figures() -> None:
+    figures = dict(engine_figures(ENGINES["bullet"]))
+
+    pulls, fares = figures["Pulls up to"], figures["Fares"]
+
+    assert pulls.endswith("coaches and a dining car")
+    assert fares == f"Passengers only, paying {EXPRESS_FARE - 1:.0%} more"

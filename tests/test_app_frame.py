@@ -122,7 +122,10 @@ def test_frames_may_slow_down_while_trains_wait_at_their_stations(
     context: None, refreshes: list[None]
 ) -> None:
     app = made_app()
-    app.game.railway.trains[0].stops = [Stop((10, 6), [Good.COAL]), Stop((10, 16))]
+    app.game.railway.trains[0].stops = [
+        Stop((10, 6), [Good.COAL], wait_for_load=True),
+        Stop((10, 16)),
+    ]
 
     frame(app)
 

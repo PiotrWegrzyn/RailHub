@@ -12,7 +12,9 @@ from dataclasses import dataclass
 from typing import Protocol
 
 import numpy as np
+import numpy.typing as npt
 from imgui_bundle import hello_imgui, imgui
+from PIL import Image
 
 from railroads.sim.constructions import Track
 from railroads.sim.railway import Railway
@@ -32,6 +34,8 @@ from railroads.ui.pixel.trains import (
     train_sprites,
     turned,
 )
+
+type Pixels = npt.NDArray[np.uint8]
 from railroads.ui.pixel.world import PixelWorld
 
 SMOKE = (0.88, 0.88, 0.9)
@@ -112,7 +116,8 @@ class TrainLayer:
         self._let_go(drawn)
         self._smoke(draw_list, railway, origin, scale)
 
-    def _parts(self, train: Train) -> list[tuple[object, float]]:
+    @staticmethod
+    def _parts(train: Train) -> list[tuple[object, float]]:
         """Each part of the train and how far its middle is behind the train's front, in cells."""
         model = ENGINES[train.engine]
         parts: list[tuple[object, float]] = [((Look.ENGINE, train.engine), model.half)]
@@ -394,3 +399,37 @@ class Lanes:
 def _point(steps: np.ndarray, dx: float, dy: float) -> int:
     """The track point this far from a cell's middle lies at."""
     return int(np.argmin(np.hypot(steps[:, 0] / 2 - dx, steps[:, 1] / 2 - dy)))
+
+
+# Which way on the screen an engine shown on its own faces: to the right and a little down, so
+# its side and a bit of its front show.
+SHOWN_FACING = (0.95, 0.3)
+
+
+def engine_picture(sprites: TrainSprites, matrix: npt.NDArray[np.float64], engine: str) -> Pixels:
+    """An engine with its tender, as the map draws it, facing SHOWN_FACING: RGBA at the size of
+    the sprite sheet."""
+    facing = np.array(SHOWN_FACING) / math.hypot(*SHOWN_FACING)
+
+    def on_screen(heading: float) -> float:
+        way = matrix @ (math.cos(heading), math.sin(heading))
+        return float(way @ facing / (np.hypot(*way) or 1.0))
+
+    heading = max((2 * math.pi * k / HEADINGS for k in range(HEADINGS)), key=on_screen)
+    ahead = matrix @ (math.cos(heading), math.sin(heading)) * DETAIL
+    placed = []
+    for look, back in TrainLayer._parts(Train("", engine=engine)):
+        x, y, w, h, anchor_x, anchor_y = sprites.place(look, heading)
+        left = -ahead[0] * back - anchor_x
+        top = -ahead[1] * back - anchor_y
+        placed.append((-ahead[1] * back, top, left, sprites.image[y : y + h, x : x + w]))
+    low_x = math.floor(min(left for _, _, left, _ in placed))
+    low_y = math.floor(min(top for _, top, _, _ in placed))
+    high_x = math.ceil(max(left + p.shape[1] for _, _, left, p in placed))
+    high_y = math.ceil(max(top + p.shape[0] for _, top, _, p in placed))
+    canvas = Image.new("RGBA", (high_x - low_x, high_y - low_y), (0, 0, 0, 0))
+    for _, top, left, pixels in sorted(placed, key=lambda part: part[0]):
+        part = Image.fromarray(np.ascontiguousarray(pixels), "RGBA")
+        spot = (round(left) - low_x, round(top) - low_y)
+        canvas.alpha_composite(part, spot)
+    return np.asarray(canvas).copy()

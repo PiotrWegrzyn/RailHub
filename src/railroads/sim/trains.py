@@ -367,7 +367,7 @@ class Stop:
     cell: Cell
     cars: list[Good] = field(default_factory=list)
     # Whether the train waits here, up to WAIT_MONTHS, for its cars to fill.
-    wait_for_load: bool = True
+    wait_for_load: bool = False
 
     def add_car(self, good: Good, most: int = MAX_CARS) -> bool:
         if len(self.cars) >= most:
@@ -410,6 +410,9 @@ class Train:
     # its sand, this month (railroads.sim.facilities).
     fuelled: bool = False
     sanded: bool = False
+    # Whether it stands at its first stop until the player is done setting it up, so it does not
+    # set off empty with half a route.
+    held: bool = False
 
     @property
     def load(self) -> dict[Good, float]:

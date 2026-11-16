@@ -175,6 +175,11 @@ class Railway:
         self.trains.append(train)
         return train
 
+    def let_go(self) -> None:
+        """Lets every held train set off (Train.held)."""
+        for train in self.trains:
+            train.held = False
+
     def sell(self, train: Train) -> None:
         self.trains.remove(train)
         self.finances.earn(ENGINES[train.engine].price * TRAIN_RESALE, "trains")
@@ -367,6 +372,9 @@ class Railway:
         if len(train.stops) < 2:
             train.status = "Needs two stops"
             train.path = []
+            return
+        if train.held and not train.path:
+            train.status = "Sets off once the trains window is closed"
             return
         if not train.path:
             leaving = train.stops[(train.heading - 1) % len(train.stops)]
