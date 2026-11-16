@@ -336,6 +336,27 @@ def test_a_snapshot_is_the_game_pickled_as_ever() -> None:
     assert joined == held == plain.getvalue()
 
 
+def pickled(value: object) -> bytes:
+    out = BytesIO()
+    _Pickler(out, protocol=pickle.HIGHEST_PROTOCOL).dump(value)
+    return out.getvalue()
+
+
+def test_a_big_array_of_zeros_is_saved_as_its_shape_alone() -> None:
+    blank = np.zeros((300, 400), dtype=np.int64)
+    used = blank.copy()
+    used[7, 9] = 3
+
+    data = pickled({"blank": blank, "again": blank, "used": used})
+
+    loaded = pickle.loads(data)
+    assert len(data) < used.nbytes + 1024
+    assert loaded["blank"] is loaded["again"]
+    assert loaded["blank"].dtype == np.int64
+    assert np.array_equal(loaded["blank"], blank)
+    assert np.array_equal(loaded["used"], used)
+
+
 def test_a_save_exported_from_one_folder_loads_after_being_brought_into_another(
     tmp_path: Path,
 ) -> None:

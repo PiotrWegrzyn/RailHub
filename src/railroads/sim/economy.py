@@ -438,6 +438,7 @@ class _Month:
         }
 
     def run_steps(self) -> Steps[Trade]:
+        yield
         paused = time.perf_counter()
         for step in PIPELINE:
             if isinstance(step, BuildingKind):

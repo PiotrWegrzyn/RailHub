@@ -359,6 +359,7 @@ class Growth:
         self.station_trade.settle(self.trade)
         self.owners.pay(self.trade)
         self.station_trade.update_reach()
+        yield
         changed |= self._die_out(self.trade)
         changed |= self._raise_buildings()
         self._count_served(self.trade)

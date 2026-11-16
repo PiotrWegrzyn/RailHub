@@ -173,6 +173,9 @@ class BuildMenu:
     # The route to the cell under the mouse, worked out when that cell changes.
     preview: Route | None = None
     preview_to: Cell | None = None
+    # What the previewed route was planned for: where it runs, the track it lays and the
+    # constructions' version then.
+    preview_for: tuple[object, ...] = ()
     message: str = ""
     message_at: float = -MESSAGE_SECONDS
     # What the previewed track would cost.
@@ -296,6 +299,7 @@ class BuildMenu:
         self.track_from = None
         self.preview = None
         self.preview_to = None
+        self.preview_for = ()
         self.preview_price = None
 
 

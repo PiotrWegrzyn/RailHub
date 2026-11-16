@@ -667,6 +667,7 @@ def test_food_taken_at_a_station_after_its_need_was_served_counts_for_the_next_m
     placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
     steps = economy.trade_steps(placed)
     needs = [step for step in PIPELINE if isinstance(step, Need)]
+    next(steps)
     for _ in range(needs.index(Need.FOOD) + 1):
         next(steps)
     late = {(BuildingKind.HOUSE, Need.FOOD): {flat(economy, (8, 9)): 4.0}}

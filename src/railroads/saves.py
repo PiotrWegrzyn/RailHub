@@ -47,6 +47,10 @@ NAME_PATTERN = re.compile(r"[\w ,.'()-]+")
 COMPRESS_STEP = 1 << 17
 # The compression saves use: fast, and the games' many empty arrays shrink to almost nothing.
 LEVEL = 1
+# Arrays at least this big that hold only zeros are saved as their shape alone: the game keeps
+# hundreds, a cell's worth for every kind of building and every input, most for kinds not on the
+# map, and they made over half of a save before it was compressed.
+BLANK_BYTES = 1 << 16
 
 
 def user_data_dir() -> Path:
@@ -112,6 +116,8 @@ class _Pickler(pickle.Pickler):
     def reducer_override(self, obj: object) -> Any:
         if type(obj) is MappingProxyType:
             return _frozen, (dict(obj),)
+        if type(obj) is np.ndarray and obj.nbytes >= BLANK_BYTES and not obj.any():
+            return np.zeros, (obj.shape, obj.dtype)
         return NotImplemented
 
 
