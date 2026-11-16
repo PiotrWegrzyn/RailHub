@@ -304,14 +304,19 @@ class Saves:
         """Writes a save's header and its compressed game, through a file of its own so a save
         cut short leaves the old one as it was."""
         line = json.dumps(header).encode() + b"\n"
+        self._write_whole(path, MAGIC + line + data, "The game couldn't be saved")
+        return path
+
+    def _write_whole(self, path: Path, data: bytes, failed: str) -> None:
+        """Writes the file through one of its own, so a write cut short leaves the old file as
+        it was; a failure is a SaveError starting with `failed`."""
         try:
             self.folder.mkdir(parents=True, exist_ok=True)
             partial = path.with_suffix(".partial")
-            partial.write_bytes(MAGIC + line + data)
+            partial.write_bytes(data)
             partial.replace(path)
         except OSError as error:
-            raise SaveError(f"The game couldn't be saved: {error.strerror or error}.") from error
-        return path
+            raise SaveError(f"{failed}: {error.strerror or error}.") from error
 
     def export(self, name: str) -> bytes:
         """The save's file as it is, to keep or carry to the game elsewhere."""
@@ -326,14 +331,7 @@ class Saves:
         line = data[len(MAGIC) :].split(b"\n", 1)[0]
         _header(data[: len(MAGIC)], line, Path(file_name).stem)
         name = imported_name(file_name, self.exists)
-        path = self.path(name)
-        try:
-            self.folder.mkdir(parents=True, exist_ok=True)
-            partial = path.with_suffix(".partial")
-            partial.write_bytes(data)
-            partial.replace(path)
-        except OSError as error:
-            raise SaveError(f"The save couldn't be added: {error.strerror or error}.") from error
+        self._write_whole(self.path(name), data, "The save couldn't be added")
         return name
 
     def load(self, name: str) -> SavedGame:

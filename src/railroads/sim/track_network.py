@@ -154,7 +154,7 @@ class TrackNetwork:
         if any(isinstance(b, Station) for b in built):
             return list(self.constructions.station_ends(cell))
         return [
-            piece.ends[1] if piece.ends[0] == entry else piece.ends[0]
+            piece.other_end(entry)
             for piece in built
             if isinstance(piece, Track)
             and entry in piece.ends

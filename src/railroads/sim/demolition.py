@@ -60,7 +60,7 @@ def clearing(constructions: Constructions, cell: Cell, units: int) -> list[Build
     """The buildings that must leave the cell for `units` of room, in the order they go; None if
     one of them cannot be taken down."""
     room = constructions.space_left(cell)
-    here = [b for b in constructions.at(cell) if isinstance(b, Building)]
+    here = constructions.buildings_at(cell)
     leaving = []
     for building in leaving_order(here):
         if room >= units:
@@ -85,7 +85,7 @@ def station_site_price(constructions: Constructions, cell: Cell) -> float | None
     free; None where one cannot be taken down."""
     track = sum(piece.space for piece in constructions.track_at(cell))
     room = constructions.space_left(cell) + track
-    here = [b for b in constructions.at(cell) if isinstance(b, Building)]
+    here = constructions.buildings_at(cell)
     if room >= CELL_SPACE:
         return 0.0
     if any(b.kind in UNIQUE for b in here):

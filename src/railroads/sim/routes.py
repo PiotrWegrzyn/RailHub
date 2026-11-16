@@ -616,7 +616,7 @@ class _Planner:
         comes in, if there is one."""
         for piece in self.constructions.track_at(self.end):
             if entry in piece.ends:
-                return piece.ends[1] if piece.ends[0] == entry else piece.ends[0]
+                return piece.other_end(entry)
         return None
 
     def _route(self, came: dict[int, int], key: int, cost: float, join: int | None) -> Route:
@@ -696,7 +696,7 @@ def _dead_end(
     for piece in pieces:
         if joined not in piece.ends or piece.ends == ends:
             continue
-        loose = piece.ends[1] if piece.ends[0] == joined else piece.ends[0]
+        loose = piece.other_end(joined)
         shared = any(loose in other.ends for other in pieces if other is not piece)
         if not shared and not _leads_on(constructions, cell, loose):
             return piece
