@@ -71,7 +71,7 @@ uv run railroads --years 1100
 ```
 
 grows them for 1,100 years instead, so play begins in 1950 with a century more growth behind it
-and the clock showing 1950; play always ends in 2050. A shorter history begins play earlier, but
+and the clock showing 1950; play can begin no later than 2049 and runs on past 2050 for ever. A shorter history begins play earlier, but
 not before 1804: `--years` below 954 is refused, and 1,000 years, beginning in 1850, is suggested.
 
 ```bash
@@ -925,8 +925,9 @@ month costs about as much as what grows in it.
 
 A new map grows for a thousand years before play starts, from 850 (`--years` changes that);
 `railroads.mapgen.seeding` runs it. In play the calendar (`railroads.sim.clock`) runs from
-January of the year the history reached, 1850 after a thousand years, to January 2050, a month
-every two and a half minutes: a hundred hours at normal speed from 1850. The map keeps growing each month.
+January of the year the history reached, 1850 after a thousand years, and on for ever, a month
+every two and a half minutes: a hundred hours at normal speed from 1850 to 2050. Summer Games
+come every four years from 2024 on. The map keeps growing each month.
 
 ## Map data
 

@@ -134,16 +134,6 @@ def test_frames_may_slow_down_while_trains_wait_at_their_stations(
     assert refreshes == []
 
 
-def test_frames_may_slow_down_once_the_game_is_over(context: None, refreshes: list[None]) -> None:
-    app = made_app()
-    app.clock.months += app.clock.months_left
-
-    frame(app)
-
-    assert app.game.railway.trains[0].path
-    assert refreshes == []
-
-
 def shell_frame(shell: Shell) -> None:
     imgui.get_io().delta_time = 1 / 60
     imgui.new_frame()

@@ -31,11 +31,20 @@ YEARLY_CHANCE = 0.15
 OLYMPIC_CHANCE = 0.05
 MOST_OLYMPIC_CHANCE = 0.5
 # The real Summer Games, without the cancelled ones of 1916, 1940 and 1944 and with Tokyo's a year
-# late, then every four years to the end of play.
-OLYMPIC_YEARS = frozenset(
+# late; from FUTURE_OLYMPICS on, every four years for ever (olympic_year).
+PAST_OLYMPIC_YEARS = frozenset(
     [1896, 1900, 1904, 1908, 1912, *range(1920, 1937, 4), *range(1948, 2017, 4), 2021]
-    + list(range(2024, 2050, 4))
 )
+FUTURE_OLYMPICS = 2024
+
+
+def olympic_year(year: int) -> bool:
+    """Whether Summer Games are held in a year."""
+    if year >= FUTURE_OLYMPICS:
+        return (year - FUTURE_OLYMPICS) % 4 == 0
+    return year in PAST_OLYMPIC_YEARS
+
+
 # How far from its town a novelty looks for a free hex, and how far apart host towns must be.
 TOWN_STEPS = 8
 HOSTS_APART = 10
@@ -226,7 +235,7 @@ class Novelties:
                 growth.build(Building(cell, novelty.kind))
                 self.built.add(novelty.kind)
                 changed.add(cell)
-        if year in OLYMPIC_YEARS and rng.random() < self.olympic_chance:
+        if olympic_year(year) and rng.random() < self.olympic_chance:
             changed |= self._host(growth)
         works = getattr(self, "works", [])
         wanted = getattr(self, "railway_works", 0)

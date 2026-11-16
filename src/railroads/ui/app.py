@@ -202,8 +202,6 @@ class App:
         """Has the next frame drawn at full speed while a train runs. A few seconds after the
         last input hello_imgui slows to 10 frames a second to save power, and running trains
         would move in jumps while the player only watches."""
-        if self.clock.finished:
-            return
         if any(train.path and not train.giving_way for train in self.view.railway.trains):
             hello_imgui.request_refresh()
 

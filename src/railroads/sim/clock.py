@@ -1,7 +1,8 @@
 """Game time: the calendar runs a month every SECONDS_PER_MONTH of play, from January of the year
-the map's history left off to January of END_YEAR, where it stops. A map's history begins in
-HISTORY_START, so the usual thousand years of it leave off in START_YEAR, for 2,400 months of
-play, a hundred hours at normal speed. Play can run faster, at any of SPEEDS.
+the map's history left off, and on for ever. A map's history begins in HISTORY_START, so the
+usual thousand years of it leave off in START_YEAR; play can begin as late as the year before
+END_YEAR, and from START_YEAR to END_YEAR is a hundred hours at normal speed. Play can run faster,
+at any of SPEEDS.
 """
 
 from dataclasses import dataclass
@@ -40,28 +41,16 @@ class GameClock:
 
     def months_in(self, seconds: float) -> float:
         """How much of a month `seconds` of play make at the current speed."""
-        return 0.0 if self.finished else seconds * self.speed / self.seconds_per_month
+        return seconds * self.speed / self.seconds_per_month
 
     def advance(self, seconds: float) -> int:
         """Lets `seconds` of play pass at the current speed; returns how many months turned
         over."""
-        if self.finished:
-            return 0
         self.seconds += seconds * self.speed
-        turned = min(int(self.seconds // self.seconds_per_month), self.months_left)
+        turned = int(self.seconds // self.seconds_per_month)
         self.seconds -= turned * self.seconds_per_month
         self.months += turned
-        if self.finished:
-            self.seconds = 0.0
         return turned
-
-    @property
-    def months_left(self) -> int:
-        return (END_YEAR - self.first_year) * 12 - self.months
-
-    @property
-    def finished(self) -> bool:
-        return self.months_left <= 0
 
     @property
     def date(self) -> str:
