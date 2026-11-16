@@ -280,7 +280,7 @@ class Railway:
         burnt = ENGINES[engine]
         fuel = FUEL_OF[burnt.power]
         markup = 0.0 if fuel == Fuel.ELECTRICITY else self.fuel_markup()
-        price = self.fuel.price(fuel, self.year) * (1.0 + markup)
+        price = self.fuel.price(fuel) * (1.0 + markup)
         return burnt.burn * cells * price * self._upkeep()
 
     def _take_fuel(self, train: Train, station: Cell, cells: float) -> None:
@@ -298,7 +298,7 @@ class Railway:
             stocked = min(amount, stockpile.get(good, 0.0))
             if stocked > 0:
                 stockpile[good] -= stocked
-        cost = self.fuel.buy(fuel, amount, self.year, stocked, self.fuel_markup())
+        cost = self.fuel.buy(fuel, amount, stocked, self.fuel_markup())
         self.finances.spend(cost * self._upkeep(), fuel.value)
 
     def fuel_month(self, trade: Trade) -> None:

@@ -642,9 +642,9 @@ station's stockpile at the market price, the rest at retail, 50% dearer, or 25% 
 customer node of the commerce tree. Coal and diesel engines carry only so much, so a train can't
 set off for a stop further than its range: the first steam engines run only 4 to 12 cells, the
 Planet 20, and lines need stations to take on fuel along the way; electrics run as far as the
-wires go. Every fuel's price rises with inflation, compounded every year (coal 2% a year from
-1840, diesel fuel 1.5% from 1935, electricity 1% from 1925), and in a tug of war between demand
-and supply: the coal or diesel fuel the map's buildings need and the player's trains bought last
+wires go. Every fuel's price, from the year it comes in (coal 1804, electricity 1925, diesel fuel
+1935), moves only in a tug of war between demand and supply, between 0.4 and 4 times its first
+price: the coal or diesel fuel the map's buildings need and the player's trains bought last
 month against what the player's stations hand out to those buildings and a quarter of what the
 map's mines or refineries can make, measured against the first month of play, the price moving a
 quarter of the way to where they put it each month. Electricity costs twice as much while the

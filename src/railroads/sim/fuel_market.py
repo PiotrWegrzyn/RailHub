@@ -1,8 +1,8 @@
 """The market for what engines burn: coal for steam, diesel fuel for diesels and electricity for
 electric and maglev engines (railroads.sim.railway buys it as trains set off).
 
-Every fuel's price rises with inflation, compounding every year from when it came in, and moves
-with what the map wants of it against what it gets, a tug of war. Coal and diesel fuel are wanted
+Every fuel's price, from the year it comes in, moves only with what the map wants of it against
+what it gets, a tug of war. Coal and diesel fuel are wanted
 by the buildings that need them and by the player's trains, which wanted what they bought last
 month; they are supplied by what the player's stations hand out to those buildings, and a little,
 NATURAL_SUPPLY of what the map's mines and refineries can make, by the world around. How hard
@@ -43,16 +43,12 @@ FUEL_OF: Mapping[Power, Fuel] = MappingProxyType(
 )
 # The good a fuel is, which trains can take from a station's stockpile; electricity is no good.
 GOOD_OF: Mapping[Fuel, Good] = MappingProxyType({Fuel.COAL: Good.COAL, Fuel.DIESEL: Good.FUEL})
-# What a unit of each fuel costs at first, and the year it came in, from which its price rises by
-# INFLATION a year, compounded.
+# What a unit of each fuel costs at first, and the year its market opens.
 BASE_PRICE: Mapping[Fuel, float] = MappingProxyType(
     {Fuel.COAL: price_of(Good.COAL), Fuel.DIESEL: price_of(Good.FUEL), Fuel.ELECTRICITY: 5.0}
 )
 OPENS: Mapping[Fuel, int] = MappingProxyType(
-    {Fuel.COAL: 1840, Fuel.DIESEL: 1935, Fuel.ELECTRICITY: 1925}
-)
-INFLATION: Mapping[Fuel, float] = MappingProxyType(
-    {Fuel.COAL: 0.02, Fuel.DIESEL: 0.015, Fuel.ELECTRICITY: 0.01}
+    {Fuel.COAL: 1804, Fuel.DIESEL: 1935, Fuel.ELECTRICITY: 1925}
 )
 # The buildings' needs each good fuel meets.
 NEEDS: Mapping[Fuel, frozenset[Need]] = MappingProxyType(
@@ -77,7 +73,7 @@ RETAIL_MARKUP = 0.5
 
 @dataclass(frozen=True, slots=True)
 class FuelMonth:
-    """One month of a fuel's market: the year, its price, how much of it inflation makes, what
+    """One month of a fuel's market: the year, its price, what
     the buildings and the player's trains wanted, what the player's stations handed out and the
     world supplied, how hard demand pulled against supply then and in the first month, and for
     electricity what share of their fuel the map's power plants got and what the player's own
@@ -85,7 +81,6 @@ class FuelMonth:
 
     year: int
     price: float
-    inflation: float
     buildings: float = 0.0
     trains: float = 0.0
     network: float = 0.0
@@ -105,11 +100,6 @@ class Signals:
     natural: float = 0.0
     plants_fed: float = 0.0
     own_power: float = 0.0
-
-
-def inflation(fuel: Fuel, year: int) -> float:
-    """How many times its first price inflation has made a fuel by a year."""
-    return float((1.0 + INFLATION[fuel]) ** max(0, year - OPENS[fuel]))
 
 
 def signals_of(trade: Trade, owned_plants: np.ndarray | None = None) -> dict[Fuel, Signals]:
@@ -164,20 +154,20 @@ class FuelMarket:
     # What the trains bought last month.
     last_bought: dict[Fuel, float] = field(default_factory=lambda: dict.fromkeys(Fuel, 0.0))
 
-    def price(self, fuel: Fuel, year: int) -> float:
+    def price(self, fuel: Fuel) -> float:
         """What a unit of a fuel costs on the market now."""
-        return BASE_PRICE[fuel] * inflation(fuel, year) * self.factor[fuel]
+        return BASE_PRICE[fuel] * self.factor[fuel]
 
     def bought(self, fuel: Fuel) -> float:
         return self.from_stations[fuel] + self.at_retail[fuel]
 
     def buy(
-        self, fuel: Fuel, amount: float, year: int, from_station: float = 0.0, markup: float = 0.0
+        self, fuel: Fuel, amount: float, from_station: float = 0.0, markup: float = 0.0
     ) -> float:
         """What `amount` of a fuel costs a train setting off: `from_station` of it out of the
         station's stockpile at the market price, electricity from the player's own power plants
         first at OWN_POWER_SHARE of it, and the rest at retail, `markup` more."""
-        price = self.price(fuel, year)
+        price = self.price(fuel)
         cost = 0.0
         if fuel == Fuel.ELECTRICITY:
             own = min(amount, self.own_power)
@@ -218,8 +208,7 @@ class FuelMarket:
             self.history[fuel].append(
                 FuelMonth(
                     year,
-                    self.price(fuel, year),
-                    inflation(fuel, year),
+                    self.price(fuel),
                     got.buildings,
                     trains,
                     got.network,

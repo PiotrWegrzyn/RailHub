@@ -122,7 +122,6 @@ def fuel_breakdown(fuel: Fuel, month: FuelMonth) -> list[tuple[str, str]]:
             "Price",
             f"{dollars(month.price)} a unit" if month.price >= 1 else f"${month.price:.2f} a unit",
         ),
-        ("Inflation since it came in", f"x{month.inflation:.2f}"),
     ]
     if fuel == Fuel.ELECTRICITY:
         rows += [
