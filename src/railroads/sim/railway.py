@@ -14,8 +14,9 @@ and each storage upgrade adds STORAGE_STEP of each good to its stockpile and WAI
 waiting passengers and mail.
 
 Cargo earns money by the demand around the station that hands it out (railroads.sim.demand). Trains
-cost TRAIN_PRICE, every car CAR_TRIP_PRICE each time a train leaves a stop with it, and every
-month stations and track cost their upkeep (railroads.sim.finance).
+cost their engine's price, every car CAR_TRIP_PRICE each time a train leaves a stop with it, and every
+month each engine costs its running cost and stations and track their upkeep
+(railroads.sim.finance).
 
 Trains set off from a stand and pick up speed over their engine's pickup time. Trains that meet
 on the line, ahead of or against each other or where lines cross, can't run through each other
@@ -80,7 +81,7 @@ TRAIN_NAMES = {
     Power.MAGLEV: "Maglev",
 }
 # How far a train runs in a month, in cells, on flat ground.
-CELLS_PER_MONTH = 60.0
+CELLS_PER_MONTH = 30.0
 # Trains meet where points along them, MEET_STEP cells apart, come within MEET_DISTANCE cells.
 MEET_STEP = 0.2
 MEET_DISTANCE = 0.2
@@ -340,8 +341,8 @@ class Railway:
         self,
         capacity: Mapping[Cell, Mapping[Good, float]],
     ) -> None:
-        """Starts a new month: each station's demand for it, from its capacity, and the upkeep
-        of stations and track."""
+        """Starts a new month: each station's demand for it, from its capacity, the running cost
+        of the engines and the upkeep of stations and track."""
         for station in self.stations():
             self.station_demand(station).turn_month(capacity.get(station, {}))
         self._supply_facilities()
@@ -350,6 +351,8 @@ class Railway:
         upkeep = self._upkeep()
         self.finances.spend(STATION_UPKEEP * len(self.stations()) * upkeep, "station upkeep")
         self.finances.spend(track_upkeep(track) * upkeep, "track upkeep")
+        running = sum(ENGINES[train.engine].running for train in self.trains)
+        self.finances.spend(running * upkeep, "running trains")
 
     def run(self, months: float) -> None:
         """Moves every train on by this many months, then has trains that met give way."""

@@ -4,6 +4,7 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Constructions
+from railroads.sim.finance import CAR_TRIP_PRICE
 from railroads.sim.goods import Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
@@ -16,9 +17,11 @@ from railroads.sim.trains import (
     FULL_LOAD,
     MAX_CARS,
     Car,
+    Engine,
     Kind,
     Stop,
     Train,
+    car_size,
 )
 from railroads.ui.tech_window import describe
 from railroads.ui.trains_window import engine_summary, engines_by_kind
@@ -107,20 +110,64 @@ def test_each_class_only_gets_better_over_time(kind: Kind) -> None:
     assert all(new.speed > old.speed or new.cars > old.cars for old, new in pairs)
 
 
-def test_the_first_heavy_freight_engine_pulls_two_more_cars_than_the_planet_more_slowly() -> None:
-    heavy = ENGINES[by_year(Kind.HEAVY)[0]]
+def of_its_day(engine: Engine, kind: Kind) -> Engine:
+    return ENGINES[[name for name in by_year(kind) if ENGINES[name].year <= engine.year][-1]]
 
-    planet = ENGINES["planet"]
 
-    assert heavy.cars == planet.cars + 2
-    assert heavy.speed < planet.speed
+@pytest.mark.parametrize("name", by_year(Kind.HEAVY))
+def test_a_heavy_freight_engine_pulls_twice_the_cars_of_a_general_one_of_its_day_slower(
+    name: str,
+) -> None:
+    heavy = ENGINES[name]
+
+    general = of_its_day(heavy, Kind.GENERAL)
+
+    assert heavy.cars >= 2 * general.cars
+    assert heavy.speed < general.speed
+    assert heavy.pickup > 2 * general.pickup
+
+
+@pytest.mark.parametrize("name", by_year(Kind.LIGHT))
+def test_a_light_engine_costs_far_less_to_run_and_is_quicker_off_the_mark_than_a_general_one(
+    name: str,
+) -> None:
+    light = ENGINES[name]
+
+    general = of_its_day(light, Kind.GENERAL)
+
+    assert light.running < general.running / 2
+    assert light.pickup < general.pickup / 2
+    assert light.cars < general.cars
+
+
+@pytest.mark.parametrize("name", by_year(Kind.EXPRESS))
+def test_an_express_runs_far_faster_than_a_general_engine_but_takes_longer_to_get_going(
+    name: str,
+) -> None:
+    express = ENGINES[name]
+
+    general = of_its_day(express, Kind.GENERAL)
+
+    assert express.speed >= 1.4 * general.speed
+    assert express.pickup > general.pickup
+    assert express.price > general.price
+
+
+def test_a_better_engine_than_the_planet_comes_within_six_years_of_an_1850_start() -> None:
+    railway = line()
+    railway.year = 1856
+
+    engines = railway.engines()
+
+    assert "american" in engines
+    assert ENGINES["american"].speed > ENGINES["planet"].speed
 
 
 def test_the_specialised_classes_come_soon_after_1850_and_need_their_tech() -> None:
     railway = knowing(line(), "boilers", "express_trains")
-    railway.year = 1865
+    railway.year = 1858
     without = line()
-    without.year = 1865
+    without.year = 1858
 
     engines = railway.engines()
 
@@ -167,7 +214,7 @@ def test_every_tech_an_engine_needs_is_a_node_that_opens_engines() -> None:
 
 def test_an_express_carries_only_passengers() -> None:
     railway = knowing(line(), "express_trains")
-    railway.year = 1865
+    railway.year = 1858
     train = railway.buy("single")
     assert train is not None
 
@@ -178,7 +225,7 @@ def test_an_express_carries_only_passengers() -> None:
 
 def test_an_express_leads_its_coaches_with_an_empty_dining_car() -> None:
     railway = knowing(line(), "express_trains")
-    railway.year = 1865
+    railway.year = 1858
     train = railway.buy("single")
     assert train is not None
     train.stops = [Stop(WEST, [Good.PASSENGERS, Good.COAL]), Stop(EAST)]
@@ -195,7 +242,7 @@ def test_an_express_leads_its_coaches_with_an_empty_dining_car() -> None:
 
 def test_an_express_pays_a_car_trip_for_its_dining_car() -> None:
     railway = knowing(line(), "express_trains")
-    railway.year = 1865
+    railway.year = 1858
     train = railway.buy("single")
     assert train is not None
     train.stops = [Stop(WEST, [Good.PASSENGERS]), Stop(EAST)]
@@ -203,13 +250,13 @@ def test_an_express_pays_a_car_trip_for_its_dining_car() -> None:
 
     railway.run(0.001)
 
-    assert railway.finances.month["car trips"] == pytest.approx(-2 * 20.0)
+    assert railway.finances.month["car trips"] == pytest.approx(-2 * CAR_TRIP_PRICE)
 
 
 def test_passengers_on_an_express_pay_more() -> None:
     plain_railway, express_railway = line(), knowing(line(), "express_trains")
-    express_railway.year = plain_railway.year = 1865
-    plain = plain_railway.buy("planet")
+    express_railway.year = plain_railway.year = 1858
+    plain = plain_railway.buy("american")
     express = express_railway.buy("single")
     assert plain is not None and express is not None
     for railway, train in ((plain_railway, plain), (express_railway, express)):
@@ -226,14 +273,52 @@ def test_passengers_on_an_express_pay_more() -> None:
     assert paid > 0
 
 
-def test_a_full_train_as_long_as_its_engine_is_built_for_slows_it_as_much_as_a_full_planet() -> (
+def test_a_full_train_as_long_as_its_engine_is_built_for_slows_a_light_one_most_and_a_heavy_least() -> (
     None
 ):
+    light = full_train("tank", ENGINES["tank"].cars)
     planet = full_train("planet", MAX_CARS)
 
-    giant = full_train("super_diesel", ENGINES["super_diesel"].cars)
+    heavy = full_train("goods", ENGINES["goods"].cars)
 
-    assert giant.pull == pytest.approx(planet.pull)
+    assert light.pull < planet.pull < heavy.pull
+
+
+def test_a_full_bulk_car_weighs_three_times_as_much_as_a_full_car_of_anything_else() -> None:
+    bulk = full_train("planet", 1)
+    other = Train("Test", cars=[Car(Good.MAIL, Car(Good.MAIL).capacity)])
+
+    weights = bulk.weight - 1, other.weight - 1
+
+    assert weights == (pytest.approx(3 * FULL_LOAD), pytest.approx(FULL_LOAD))
+
+
+@pytest.mark.parametrize("good", [Good.WHEAT, Good.IRON, Good.APPLES, Good.COAL, Good.LUMBER])
+def test_grain_ore_apples_and_other_bulk_goods_go_three_times_as_much_to_a_car(good: Good) -> None:
+    size = car_size(good)
+
+    assert size == 3 * car_size(Good.MAIL)
+
+
+def test_every_engine_costs_its_running_cost_each_month() -> None:
+    railway = line()
+    railway.buy("planet")
+    railway.buy("tank")
+
+    railway.turn_month({})
+
+    running = ENGINES["planet"].running + ENGINES["tank"].running
+    assert railway.finances.month["running trains"] == pytest.approx(-running)
+    assert ENGINES["planet"].running >= ENGINES["planet"].price / 50
+
+
+def test_steam_costs_the_most_to_run_for_its_price_and_electric_the_least() -> None:
+    steam, diesel, electric = (ENGINES[name] for name in ("pacific", "mixed_diesel", "boxcab"))
+
+    shares = [engine.running / engine.price for engine in (steam, diesel, electric)]
+
+    assert shares == sorted(shares, reverse=True)
+    assert len(set(shares)) == 3
 
 
 def test_trains_are_named_by_what_drives_them() -> None:
@@ -261,7 +346,8 @@ def test_the_buy_menu_groups_engines_by_class_newest_first() -> None:
 def test_an_express_tells_it_takes_only_passengers_and_has_a_dining_car() -> None:
     summary = engine_summary(ENGINES["bullet"])
 
-    assert "210 km/h" in summary
+    assert "240 km/h" in summary
+    assert "$5,625 a month to run" in summary
     assert "7 coaches and a dining car" in summary
     assert "Passengers only, paying 20% more" in summary
     assert "electrified track only" in summary
@@ -272,4 +358,4 @@ def test_a_node_that_opens_engines_says_which_and_from_when() -> None:
 
     text = describe(node)
 
-    assert text == "opens express engines (from 1865)"
+    assert text == "opens express engines (from 1858)"

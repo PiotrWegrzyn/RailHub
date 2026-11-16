@@ -1,9 +1,10 @@
 """The trains on the railway (railroads.sim.railway runs them): the engines that can be bought, the
 cars, each carrying one good up to its car_size, the stops a train calls at with the cars it pulls
 from each, and the train itself, slowed by the weight of what it carries against the cars its
-engine is built to pull. A train sets off from a stand and picks up speed evenly until it runs at
-full speed after its engine's pickup time, the Planet's ten seconds at normal speed, better
-engines' less and earlier ones' more. An express always leads its coaches with a dining car,
+engine is built to pull. Every engine costs a share of its price to run each month, by what drives
+it (RUNNING_SHARE). A train sets off from a stand and picks up speed evenly until it runs at full
+speed after its engine's pickup time, the Planet's twelve seconds at normal speed, a light
+engine's a few and a heavy or express engine's more. An express always leads its coaches with a dining car,
 which carries nothing but weighs and costs like any other car.
 
 Freight remembers where it came from as parcels: how much from each station."""
@@ -31,6 +32,29 @@ DRAG_PER_CAR = 0.08
 CAR_CAPACITY = 50.0
 MEDIUM_CAR = 25.0
 SMALL_CAR = 10.0
+# Bulk goods, dug or grown in great amounts, go BULK_CAR to a car, and a full bulk car weighs as
+# much as BULK_CAR / CAR_CAPACITY full cars of anything else, so only heavy engines pull a long
+# train of them at a fair speed.
+BULK_CAR = 150.0
+BULK_CAR_GOODS = frozenset(
+    {
+        Good.WHEAT,
+        Good.POTATOES,
+        Good.APPLES,
+        Good.ORANGES,
+        Good.BANANAS,
+        Good.DATES,
+        Good.SUGAR,
+        Good.GRAPES,
+        Good.COAL,
+        Good.IRON,
+        Good.SAND,
+        Good.CLAY,
+        Good.LIMESTONE,
+        Good.SALT,
+        Good.LUMBER,
+    }
+)
 # Goods carried in small or medium cars; everything else goes CAR_CAPACITY to a car.
 SMALL_CAR_GOODS = frozenset(
     {
@@ -70,8 +94,18 @@ MEDIUM_CAR_GOODS = frozenset(
 )
 
 
+BULK_HEFT = BULK_CAR / CAR_CAPACITY
+
+
+def heft(good: Good) -> float:
+    """How many times as heavy as other full cars a full car of a good is."""
+    return BULK_HEFT if good in BULK_CAR_GOODS else 1.0
+
+
 def car_size(good: Good) -> float:
     """How much of a good one car carries, before what tech adds to coaches."""
+    if good in BULK_CAR_GOODS:
+        return BULK_CAR
     if good in SMALL_CAR_GOODS:
         return SMALL_CAR
     if good in MEDIUM_CAR_GOODS:
@@ -85,9 +119,13 @@ CAR_LENGTH = 0.42
 
 
 class Kind(Enum):
-    """What an engine is for. Pioneers come before the Planet; light engines are cheap and pull
-    few cars, general ones are the Planet and its heirs, heavy freight engines pull more cars more
-    slowly, and express engines carry only passengers, faster and dearer, with a dining car."""
+    """What an engine is for. Pioneers come before the Planet. Light engines are cheap to buy and
+    run and are up to speed at once, but pull three or four cars, slowly, and a heavy load slows
+    them most: for short lines with many stops. General ones are the Planet and its heirs. Heavy
+    freight engines pull twice as many cars or more and are hardly slowed by a full load, but run
+    slowly, take long to get going and cost the most to run after express engines. Express engines
+    carry only passengers, much faster, with a dining car, but cost the most and take longest to
+    get up to speed, so they pay on long lines."""
 
     PIONEER = "pioneer"
     LIGHT = "light"
@@ -105,8 +143,19 @@ class Power(Enum):
 
 # Speed 1, the Planet's, stands for this many km/h.
 KMH_PER_SPEED = 60.0
+# How much a load slows an engine of a kind, against the Planet: light engines the most, heavy
+# freight engines half as much.
+LOAD_DRAG = {Kind.LIGHT: 1.5, Kind.HEAVY: 0.5}
 # Passengers on an express pay this much more.
 EXPRESS_FARE = 1.2
+# What an engine costs to run each month, as a share of its price: coal-fired steam the most,
+# electric engines, which need wired track, the least.
+RUNNING_SHARE = {
+    Power.STEAM: 0.03,
+    Power.DIESEL: 0.02,
+    Power.ELECTRIC: 0.0125,
+    Power.MAGLEV: 0.0125,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,6 +190,11 @@ class Engine:
         return self.kind == Kind.EXPRESS
 
     @property
+    def running(self) -> float:
+        """What it costs to run each month, before tech cuts upkeep."""
+        return self.price * RUNNING_SHARE[self.power]
+
+    @property
     def kmh(self) -> float:
         return self.speed * KMH_PER_SPEED
 
@@ -168,143 +222,157 @@ class Engine:
 
 
 P, L, G, H, X = Kind.PIONEER, Kind.LIGHT, Kind.GENERAL, Kind.HEAVY, Kind.EXPRESS
-DIESEL, ELECTRIC = Power.DIESEL, Power.ELECTRIC
+DIESEL, ELECTRIC, MAGLEV = Power.DIESEL, Power.ELECTRIC, Power.MAGLEV
+BOILERS, SUPERHEATED = ("boilers",), ("superheaters",)
+EXPRESS_TECH = ("express_trains",)
 ENGINES: dict[str, Engine] = {
-    "penydarren": Engine("Penydarren steam wagon", 1804, 0.3, 1, 500.0, P, pickup=14.0),
-    "catch_me": Engine("Catch Me Who Can", 1808, 0.45, 1, 800.0, P, pickup=13.0),
-    "salamanca": Engine("Salamanca", 1812, 0.4, 2, 1_200.0, P, pickup=13.0),
-    "puffing_billy": Engine("Puffing Billy", 1813, 0.5, 2, 1_500.0, P, pickup=12.0),
-    "locomotion": Engine("Locomotion", 1825, 0.6, 3, 2_500.0, P, pickup=12.0),
-    "rocket": Engine("Rocket", 1829, 0.8, 3, 3_500.0, P, pickup=11.0),
-    "lion": Engine("Lion", 1838, 0.85, 4, 4_000.0, P, pickup=11.0),
-    "planet": Engine("Planet steam engine", 1850, 1.0, MAX_CARS, TRAIN_PRICE, G, pickup=10.0),
-    "tank": Engine("Tank engine", 1850, 0.7, 3, 2_000.0, L, pickup=9.0),
-    "goods": Engine("Goods engine", 1865, 0.8, 7, 7_000.0, H, pickup=10.0, needs=("boilers",)),
+    "penydarren": Engine("Penydarren steam wagon", 1804, 0.3, 1, 1_500.0, P, pickup=14.0),
+    "catch_me": Engine("Catch Me Who Can", 1808, 0.45, 1, 2_400.0, P, pickup=13.0),
+    "salamanca": Engine("Salamanca", 1812, 0.4, 2, 3_600.0, P, pickup=13.0),
+    "puffing_billy": Engine("Puffing Billy", 1815, 0.5, 2, 4_500.0, P, pickup=13.0),
+    "locomotion": Engine("Locomotion", 1820, 0.6, 3, 7_500.0, P, pickup=13.0),
+    "rocket": Engine("Rocket", 1826, 0.8, 3, 10_500.0, P, pickup=13.0),
+    "lion": Engine("Lion", 1834, 0.85, 4, 12_000.0, P, pickup=13.0),
+    "planet": Engine("Planet steam engine", 1840, 1.0, MAX_CARS, TRAIN_PRICE, G, pickup=12.0),
+    "tank": Engine("Tank engine", 1840, 0.75, 3, 4_500.0, L, pickup=3.0),
+    "goods": Engine("Goods engine", 1853, 0.6, 10, 24_000.0, H, pickup=30.0, needs=BOILERS),
+    "american": Engine("American 4-4-0", 1856, 1.2, 6, 27_000.0, G, pickup=11.0),
     "single": Engine(
-        "Single-driver express", 1865, 1.5, 4, 12_000.0, X, pickup=8.0, needs=("express_trains",)
+        "Single-driver express", 1858, 1.8, 4, 42_000.0, X, pickup=25.0, needs=EXPRESS_TECH
     ),
-    "american": Engine("American 4-4-0", 1870, 1.15, 6, 8_000.0, G, pickup=9.0),
-    "mogul": Engine(
-        "Mogul freight engine", 1880, 0.9, 8, 11_000.0, H, pickup=8.0, needs=("boilers",)
-    ),
-    "light_tank": Engine("Light tank engine", 1895, 0.9, 4, 4_000.0, L, pickup=8.0),
+    "light_tank": Engine("Light tank engine", 1862, 0.9, 3, 7_500.0, L, pickup=3.0),
+    "mogul": Engine("Mogul freight engine", 1865, 0.7, 12, 33_000.0, H, pickup=28.0, needs=BOILERS),
     "atlantic": Engine(
         "Atlantic express",
         1900,
-        1.8,
+        2.2,
         5,
-        25_000.0,
+        90_000.0,
         X,
-        pickup=6.0,
-        needs=("express_trains", "superheaters"),
+        pickup=22.0,
+        needs=EXPRESS_TECH + SUPERHEATED,
     ),
     "mallet": Engine(
         "Mallet articulated",
         1905,
-        0.95,
-        10,
-        22_000.0,
+        0.75,
+        16,
+        66_000.0,
         H,
-        pickup=8.0,
-        needs=("boilers", "superheaters"),
+        pickup=25.0,
+        needs=BOILERS + SUPERHEATED,
     ),
-    "pacific": Engine(
-        "Pacific engine", 1910, 1.4, 7, 16_000.0, G, pickup=6.0, needs=("superheaters",)
-    ),
+    "pacific": Engine("Pacific engine", 1910, 1.5, 8, 54_000.0, G, pickup=9.0, needs=SUPERHEATED),
     "boxcab": Engine(
-        "Boxcab electric", 1925, 1.4, 8, 30_000.0, G, ELECTRIC, pickup=4.0, needs=("traction",)
+        "Boxcab electric", 1925, 1.5, 9, 90_000.0, G, ELECTRIC, pickup=6.0, needs=("traction",)
     ),
-    "railbus": Engine("Railbus", 1935, 1.3, 4, 9_000.0, L, DIESEL, pickup=5.0, needs=("diesel",)),
+    "railbus": Engine("Railbus", 1935, 1.3, 3, 24_000.0, L, DIESEL, pickup=2.0, needs=("diesel",)),
     "streamliner": Engine(
         "Streamliner",
         1935,
-        2.3,
+        2.8,
         6,
-        60_000.0,
+        180_000.0,
         X,
-        pickup=5.0,
-        needs=("express_trains", "superheaters"),
+        pickup=20.0,
+        needs=EXPRESS_TECH + SUPERHEATED,
     ),
     "big_boy": Engine(
-        "Big articulated", 1940, 1.1, 12, 45_000.0, H, pickup=7.0, needs=("boilers", "superheaters")
+        "Big articulated", 1940, 0.85, 20, 135_000.0, H, pickup=22.0, needs=BOILERS + SUPERHEATED
     ),
     "mixed_diesel": Engine(
-        "Mixed-traffic diesel", 1950, 1.8, 8, 40_000.0, G, DIESEL, pickup=4.0, needs=("diesel",)
+        "Mixed-traffic diesel", 1950, 1.8, 9, 120_000.0, G, DIESEL, pickup=7.0, needs=("diesel",)
     ),
     "heavy_diesel": Engine(
-        "Heavy diesel", 1960, 1.3, 14, 70_000.0, H, DIESEL, pickup=5.0, needs=("boilers", "diesel")
+        "Heavy diesel",
+        1960,
+        1.0,
+        24,
+        210_000.0,
+        H,
+        DIESEL,
+        pickup=18.0,
+        needs=BOILERS + ("diesel",),
     ),
     "bullet": Engine(
         "Bullet train",
         1964,
-        3.5,
+        4.0,
         7,
-        150_000.0,
+        450_000.0,
         X,
         ELECTRIC,
-        pickup=3.0,
-        needs=("express_trains", "thyristors"),
+        pickup=15.0,
+        needs=EXPRESS_TECH + ("thyristors",),
     ),
     "express": Engine(
         "Universal electric",
         1965,
         2.2,
         10,
-        70_000.0,
+        210_000.0,
         G,
         ELECTRIC,
-        pickup=3.0,
+        pickup=5.0,
         needs=("thyristors",),
     ),
     "sprinter": Engine(
-        "Sprinter unit", 1985, 2.0, 5, 18_000.0, L, DIESEL, pickup=3.0, needs=("diesel",)
+        "Sprinter unit", 1985, 1.9, 4, 54_000.0, L, DIESEL, pickup=2.0, needs=("diesel",)
     ),
     "high_speed": Engine(
         "High-speed electric",
         1990,
         5.0,
         9,
-        300_000.0,
+        900_000.0,
         X,
         ELECTRIC,
-        pickup=2.5,
-        needs=("express_trains", "thyristors"),
+        pickup=14.0,
+        needs=EXPRESS_TECH + ("thyristors",),
     ),
     "twin_diesel": Engine(
         "Twin-unit diesel",
         1995,
-        1.4,
-        20,
-        140_000.0,
+        1.1,
+        30,
+        420_000.0,
         H,
         DIESEL,
-        pickup=5.0,
-        needs=("boilers", "diesel"),
+        pickup=18.0,
+        needs=BOILERS + ("diesel",),
     ),
     "modern_electric": Engine(
-        "Modern electric", 2000, 3.0, 12, 120_000.0, G, ELECTRIC, pickup=2.5, needs=("thyristors",)
+        "Modern electric",
+        2000,
+        2.8,
+        12,
+        360_000.0,
+        G,
+        ELECTRIC,
+        pickup=4.0,
+        needs=("thyristors",),
     ),
     "super_diesel": Engine(
         "Super-heavy diesel",
         2040,
-        1.5,
+        1.2,
         40,
-        300_000.0,
+        900_000.0,
         H,
         DIESEL,
-        pickup=6.0,
-        needs=("boilers", "diesel"),
+        pickup=20.0,
+        needs=BOILERS + ("diesel",),
     ),
     "maglev": Engine(
         "Maglev",
         2040,
         500.0 / KMH_PER_SPEED,
         11,
-        700_000.0,
+        2_100_000.0,
         X,
-        Power.MAGLEV,
-        pickup=2.0,
-        needs=("express_trains", "maglev"),
+        MAGLEV,
+        pickup=13.0,
+        needs=EXPRESS_TECH + ("maglev",),
     ),
 }
 
@@ -419,13 +487,15 @@ class Train:
 
     @property
     def weight(self) -> float:
-        """How heavy the cars are, in empty cars: an empty car weighs 1, a full one 1 + FULL_LOAD."""
-        return sum(1.0 + FULL_LOAD * car.load / car.capacity for car in self.cars)
+        """How heavy the cars are, in empty cars: an empty car weighs 1, a full one 1 + FULL_LOAD,
+        and a full bulk car 1 + FULL_LOAD * BULK_HEFT."""
+        return sum(1.0 + FULL_LOAD * heft(car.good) * car.load / car.capacity for car in self.cars)
 
     @property
     def pull(self) -> float:
         """How much of the engine's top speed the train makes with its cars behind it."""
-        drag = DRAG_PER_CAR * MAX_CARS / ENGINES[self.engine].hauls
+        engine = ENGINES[self.engine]
+        drag = DRAG_PER_CAR * MAX_CARS / engine.hauls * LOAD_DRAG.get(engine.kind, 1.0)
         return 1.0 / (1.0 + drag * self.weight)
 
     @property

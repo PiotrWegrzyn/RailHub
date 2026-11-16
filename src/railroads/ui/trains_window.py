@@ -378,6 +378,7 @@ def engine_summary(engine: Engine) -> str:
     lines = [
         f"{engine.year}, {engine.power.value}: {engine.kmh:.0f} km/h, pulls up to {cars}",
         f"Up to speed in {engine.pickup:g} s",
+        f"Costs {dollars(engine.running)} a month to run",
     ]
     if engine.express:
         lines.append(f"Passengers only, paying {EXPRESS_FARE - 1:.0%} more")
