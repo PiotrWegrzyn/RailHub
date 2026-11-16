@@ -228,12 +228,15 @@ class Railway:
             del stop.cars[most:]
         return True
 
-    def swap_all_engines(self, old: str, engine: str) -> int:
-        """Swaps the engine of every train running an `old` one for `engine`, in the order they
-        were bought, while the cash lasts; returns how many were swapped."""
-        return sum(
-            self.swap_engine(train, engine) for train in list(self.trains) if train.engine == old
-        )
+    def trains_to_upgrade(self, engine: str) -> list[Train]:
+        """The trains whose engine can be swapped for `engine`: those of its line with an older
+        one."""
+        return [train for train in self.trains if engine in self.engine_upgrades(train)]
+
+    def swap_all_engines(self, engine: str) -> int:
+        """Swaps the engine of every train of `engine`'s line with an older one for it, in the
+        order they were bought, while the cash lasts; returns how many were swapped."""
+        return sum(self.swap_engine(train, engine) for train in self.trains_to_upgrade(engine))
 
     def sell(self, train: Train) -> None:
         self.trains.remove(train)

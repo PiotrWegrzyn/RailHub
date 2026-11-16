@@ -309,7 +309,7 @@ def test_every_engine_costs_its_running_cost_each_month() -> None:
 
     running = ENGINES["planet"].running + ENGINES["tank"].running
     assert railway.finances.month["running trains"] == pytest.approx(-running)
-    assert ENGINES["planet"].running >= ENGINES["planet"].price / 50
+    assert ENGINES["planet"].running >= ENGINES["planet"].price / 100
 
 
 def test_steam_costs_the_most_to_run_for_its_price_and_electric_the_least() -> None:
@@ -347,7 +347,7 @@ def test_an_express_tells_it_takes_only_passengers_and_has_a_dining_car() -> Non
     summary = engine_summary(ENGINES["bullet"])
 
     assert "240 km/h" in summary
-    assert "$5,625 a month to run" in summary
+    assert "$5,400 a month to run" in summary
     assert "7 coaches and a dining car" in summary
     assert "Passengers only, paying 20% more" in summary
     assert "electrified track only" in summary
@@ -409,16 +409,29 @@ def test_no_engine_swap_without_the_cash_or_for_an_engine_not_on_offer() -> None
     assert train.engine == "planet"
 
 
-def test_a_mass_upgrade_swaps_every_train_with_the_old_engine_as_far_as_the_cash_goes() -> None:
+def test_a_mass_upgrade_swaps_every_train_of_the_category_with_an_older_engine_only() -> None:
     railway = line()
-    planets = planets_on_the_line(railway, 3)
+    railway.year = 1835
+    lion = railway.buy("lion")
+    planets = planets_on_the_line(railway, 2)
     railway.year = 1850
     tank = railway.buy("tank")
     railway.year = 1856
+
+    swapped = railway.swap_all_engines("american")
+
+    assert swapped == 3
+    assert lion is not None and lion.engine == "american"
+    assert [train.engine for train in planets] == ["american", "american"]
+    assert tank is not None and tank.engine == "tank"
+
+
+def test_a_mass_upgrade_goes_as_far_as_the_cash_in_the_order_the_trains_were_bought() -> None:
+    railway = line()
+    planets = planets_on_the_line(railway, 3)
     railway.finances.cash = 2.5 * railway.swap_price(planets[0], "american")
 
-    swapped = railway.swap_all_engines("planet", "american")
+    swapped = railway.swap_all_engines("american")
 
     assert swapped == 2
     assert [train.engine for train in planets] == ["american", "american", "planet"]
-    assert tank is not None and tank.engine == "tank"

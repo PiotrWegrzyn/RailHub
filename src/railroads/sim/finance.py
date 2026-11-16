@@ -21,7 +21,7 @@ ELECTRIC_TRACK_PRICE = 450.0
 MAGLEV_TRACK_PRICE = 4_000.0
 DOUBLE_TRACK_FACTOR = 1.8
 STATION_PRICE = 15_000.0
-TRAIN_PRICE = 15_000.0
+TRAIN_PRICE = 45_000.0
 # What selling a train gives back, as a share of its price.
 TRAIN_RESALE = 0.5
 # What each car costs every time a train leaves a stop with it.

@@ -35,6 +35,7 @@ def test_an_engine_shed_works_a_month_only_on_a_months_coal(coal: float, works: 
 
 def test_a_train_leaving_a_working_engine_shed_runs_faster() -> None:
     _, railway = joined_stations()
+    railway.finances.earn(1_000_000.0, "test")
     plain, fuelled = railway.buy(), railway.buy()
     assert plain is not None and fuelled is not None
     for train in (plain, fuelled):

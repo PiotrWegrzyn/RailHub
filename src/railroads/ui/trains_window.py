@@ -2,8 +2,8 @@
 right, a card for each stop with the cars it pulls on to the next, the goods made or waiting there
 to click into cars, those the next stop wants outlined, and what the next stop wants; and beside the
 cards a map to add stops on, which marks where a hovered good is wanted (railroads.ui.route_map).
-The chosen train's engine can be upgraded to a newer one of its line, alone or with every train
-running the same engine."""
+The chosen train's engine can be upgraded to a newer one of its line, alone or with every train of
+that line with an older engine."""
 
 import time
 from collections.abc import Mapping
@@ -453,13 +453,12 @@ def upgrade_button(railway: Railway, train: Train) -> None:
 
 def upgrade_menu(railway: Railway, train: Train) -> None:
     """The menu the upgrade button opens: each newer engine for this train, and for every train
-    with the same old engine at once."""
+    of its line with an older engine at once."""
     if not imgui.begin_popup("upgrade engine"):
         return
-    old = ENGINES[train.engine]
-    alike = [t for t in railway.trains if t.engine == train.engine]
     for name in railway.engine_upgrades(train):
         engine = ENGINES[name]
+        alike = railway.trains_to_upgrade(name)
         imgui.separator_text(engine.title)
         price = railway.swap_price(train, name)
         imgui.begin_disabled(not railway.finances.can_afford(price))
@@ -471,9 +470,12 @@ def upgrade_menu(railway: Railway, train: Train) -> None:
         if len(alike) > 1:
             total = sum(railway.swap_price(t, name) for t in alike)
             imgui.begin_disabled(not railway.finances.can_afford(price))
-            label = f"All {len(alike)} trains with a {old.title}  {dollars(total)}##all{name}"
+            line = engine.line.value
+            label = (
+                f"All {len(alike)} {line} trains with older engines  {dollars(total)}##all{name}"
+            )
             if imgui.selectable(label, False)[0]:
-                railway.swap_all_engines(train.engine, name)
+                railway.swap_all_engines(name)
             imgui.end_disabled()
             if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
                 imgui.set_tooltip(

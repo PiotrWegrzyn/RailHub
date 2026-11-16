@@ -217,6 +217,7 @@ def test_a_station_gathers_what_a_farm_makes() -> None:
 
 def test_cars_slow_a_train_and_full_cars_slow_it_more() -> None:
     _, railway = joined_stations()
+    railway.finances.earn(1_000_000.0, "test")
     light, empty, full = railway.buy(), railway.buy(), railway.buy()
     empty.cars = [Car(Good.COAL) for _ in range(MAX_CARS)]
     full.cars = [Car(Good.COAL, CAR_CAPACITY) for _ in range(MAX_CARS)]
@@ -306,7 +307,7 @@ def test_removing_one_loaded_car_keeps_the_others_full_and_returns_its_goods() -
     assert railway.station_goods((6, 3)).brought == {}
 
 
-def test_a_train_costs_fifteen_thousand_and_sells_for_half() -> None:
+def test_a_train_costs_forty_five_thousand_and_sells_for_half() -> None:
     _, railway = joined_stations()
     cash = railway.finances.cash
 
@@ -593,6 +594,7 @@ def test_cargo_back_at_the_station_it_came_from_returns_to_its_stockpile_unpaid(
 
 def test_gold_reaches_a_jeweller_through_a_hub_and_pays_the_moment_he_takes_it() -> None:
     growth, railway = joined_stations()
+    railway.finances.earn(1_000_000.0, "test")
     build_station(growth, (6, 27))
     route = plan_route(growth.constructions, (6, 20), (6, 27))
     assert route is not None
@@ -751,6 +753,7 @@ def test_a_train_with_one_stop_has_no_destination() -> None:
 
 def test_a_train_bought_after_another_calls_at_its_stops_with_no_cars() -> None:
     _, railway = joined_stations()
+    railway.finances.earn(1_000_000.0, "test")
     first = railway.buy()
     first.stops = [Stop((6, 3), [Good.WHEAT, Good.COAL]), Stop((6, 20), [Good.STEEL])]
 

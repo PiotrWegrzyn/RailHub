@@ -32,6 +32,7 @@ def test_a_car_counts_as_delivered_where_it_leaves_its_load() -> None:
     lay_route(growth, route)
     railway = Railway(growth.constructions)
     railway.year = 1860
+    railway.finances.earn(1_000_000.0, "test")
     train = railway.buy("american")
     assert train is not None
     train.stops = [Stop((6, 3)), Stop((6, 20))]
