@@ -507,8 +507,8 @@ def engine_summary(engine: Engine, per_cell: float | None = None) -> str:
         f"Burns {fuel_use(engine, per_cell)}",
         f"Range: {engine_range(engine)}",
     ]
-    if engine.car_size > 1.0:
-        lines.append(f"Its cars hold {engine.car_size - 1:.0%} more")
+    if engine.car_levels:
+        lines.append(f"Its cars are {engine.car_levels} size bigger")
     if engine.express:
         fare = MAGLEV_FARE if engine.maglev else EXPRESS_FARE
         lines.append(f"Passengers only, paying {fare - 1:.0%} more")

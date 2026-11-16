@@ -34,13 +34,16 @@ FULL_LOAD = 1.0
 DRAG_PER_CAR = 0.08
 
 
-CAR_CAPACITY = 50.0
-MEDIUM_CAR = 25.0
-SMALL_CAR = 10.0
+# Cars come in sizes up the Fibonacci numbers, each holding about 1.6 times the one before; an
+# engine (CAR_LEVELS) or tech (railroads.sim.tech.Effect.CAR_SIZE) moves a car that many sizes up.
+CAR_SIZES = (5.0, 8.0, 13.0, 21.0, 34.0, 55.0, 89.0, 144.0, 233.0, 377.0, 610.0)
+SMALL_CAR = 8.0
+MEDIUM_CAR = 21.0
+CAR_CAPACITY = 55.0
 # Bulk goods, dug or grown in great amounts, go BULK_CAR to a car, and a full bulk car weighs as
 # much as BULK_CAR / CAR_CAPACITY full cars of anything else, so only heavy engines pull a long
 # train of them at a fair speed.
-BULK_CAR = 150.0
+BULK_CAR = 144.0
 BULK_CAR_GOODS = frozenset(
     {
         Good.WHEAT,
@@ -127,6 +130,11 @@ def general_car_size(general: General, good: Good) -> float:
     return min(car_size(good), GENERAL_CAR_MOST.get(general, car_size(good)))
 
 
+def bigger(size: float, levels: int) -> float:
+    """A car size `levels` sizes up CAR_SIZES."""
+    return CAR_SIZES[min(CAR_SIZES.index(size) + levels, len(CAR_SIZES) - 1)]
+
+
 # About how long an engine with its tender, and each car, are on the map, in cells.
 ENGINE_LENGTH = 0.8
 CAR_LENGTH = 0.42
@@ -172,8 +180,8 @@ BURN_PER_CAR = {
     Power.MAGLEV: 0.4,
 }
 LIGHT_BURN = 0.5
-# Diesel engines pull heavier cars, which hold this many times as much.
-CAR_SIZE_FACTOR = {Power.DIESEL: 1.5}
+# Diesel, electric and maglev engines pull heavier cars, this many sizes up CAR_SIZES.
+CAR_LEVELS = {Power.DIESEL: 1, Power.ELECTRIC: 1, Power.MAGLEV: 1}
 
 
 @dataclass(frozen=True, slots=True)
@@ -218,9 +226,9 @@ class Engine:
         return BURN_PER_CAR[self.power] * self.hauls * light
 
     @property
-    def car_size(self) -> float:
-        """How many times as much its cars hold."""
-        return CAR_SIZE_FACTOR.get(self.power, 1.0)
+    def car_levels(self) -> int:
+        """How many sizes up CAR_SIZES its cars are."""
+        return CAR_LEVELS.get(self.power, 0)
 
     @property
     def kmh(self) -> float:

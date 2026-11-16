@@ -12,6 +12,9 @@ from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.tech import GENERAL_CARS, NODES, Effect, Research
 from railroads.sim.trains import (
+    BULK_CAR,
+    CAR_CAPACITY,
+    CAR_SIZES,
     ENGINES,
     EXPRESS_FARE,
     FULL_LOAD,
@@ -20,6 +23,7 @@ from railroads.sim.trains import (
     Kind,
     Stop,
     Train,
+    bigger,
     car_size,
 )
 from railroads.ui.tech_window import describe
@@ -121,15 +125,13 @@ def test_each_engine_of_a_class_costs_about_three_times_the_one_before(kind: Kin
     assert all(2.5 <= step <= 3.5 for step in steps)
 
 
-def test_electric_engines_run_faster_than_diesels_and_diesels_cars_hold_half_as_much_again() -> (
-    None
-):
-    diesel, electric = ENGINES["mixed_diesel"], ENGINES["express"]
+def test_electric_engines_run_faster_than_diesels_and_both_pull_cars_one_size_bigger() -> None:
+    steam, diesel, electric = ENGINES["planet"], ENGINES["mixed_diesel"], ENGINES["express"]
 
-    sizes = diesel.car_size, electric.car_size
+    levels = steam.car_levels, diesel.car_levels, electric.car_levels
 
     assert electric.speed > diesel.speed
-    assert sizes == (1.5, 1.0)
+    assert levels == (0, 1, 1)
 
 
 def of_its_day(engine: Engine, kind: Kind) -> Engine:
@@ -306,20 +308,32 @@ def test_a_full_train_as_long_as_its_engine_is_built_for_slows_a_light_one_most_
     assert light.pull < planet.pull < heavy.pull
 
 
-def test_a_full_bulk_car_weighs_three_times_as_much_as_a_full_car_of_anything_else() -> None:
+def test_a_full_bulk_car_weighs_as_many_times_as_much_as_it_holds_more() -> None:
     bulk = full_train("planet", 1)
     other = Train("Test", cars=[Car(Good.MAIL, Car(Good.MAIL).capacity)])
 
     weights = bulk.weight - 1, other.weight - 1
 
-    assert weights == (pytest.approx(3 * FULL_LOAD), pytest.approx(FULL_LOAD))
+    assert weights == (pytest.approx(BULK_CAR / CAR_CAPACITY * FULL_LOAD), pytest.approx(FULL_LOAD))
 
 
 @pytest.mark.parametrize("good", [Good.WHEAT, Good.IRON, Good.APPLES, Good.COAL, Good.LUMBER])
-def test_grain_ore_apples_and_other_bulk_goods_go_three_times_as_much_to_a_car(good: Good) -> None:
+def test_grain_ore_apples_and_other_bulk_goods_go_two_car_sizes_up(good: Good) -> None:
     size = car_size(good)
 
-    assert size == 3 * car_size(Good.MAIL)
+    assert size == bigger(car_size(Good.MAIL), 2)
+
+
+def test_each_car_size_holds_as_much_as_the_two_below_it_together() -> None:
+    sums = [small + middle for small, middle in itertools.pairwise(CAR_SIZES)]
+
+    assert sums[:-1] == list(CAR_SIZES[2:])
+
+
+def test_a_car_already_the_biggest_size_grows_no_more() -> None:
+    size = bigger(CAR_SIZES[-2], 3)
+
+    assert size == CAR_SIZES[-1]
 
 
 def test_electric_engines_burn_less_a_car_than_steam_and_light_engines_half_as_much() -> None:
