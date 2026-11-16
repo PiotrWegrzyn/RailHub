@@ -5,7 +5,7 @@ from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
 from railroads.sim.economy import Satisfaction
 from railroads.sim.game import Game
-from railroads.sim.goods import Good, Need, bonus_of, needs_of
+from railroads.sim.goods import Good, Need, bonus_of
 from railroads.sim.grids import Cell, HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule, Points
@@ -48,9 +48,10 @@ def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded(
         for need, amount in bonus_of(BuildingKind.HOUSE, 1850).items()
     }
     got = {flow.good: (flow.done, flow.wanted) for flow in house.got}
+    bonus_got = {flow.good: (flow.done, flow.wanted) for flow in house.bonus_got}
     assert got[Need.FOOD] == (pytest.approx(4.5), 30.0)
     assert got[Need.HEATING] == (0.0, 9.0)
-    assert got[Need.BEER] == (0.0, 3.0)
+    assert bonus_got[Need.BEER] == (0.0, 3.0)
     assert house.satisfaction == "content"
     assert farm.makes == [(Good.WHEAT, 5)]
     assert [(flow.good, flow.done, flow.wanted) for flow in farm.gave] == [
@@ -83,8 +84,9 @@ def test_a_tenement_needs_food_common_goods_and_heating_and_takes_the_rest_as_bo
     tenement = details.buildings[0]
     assert tenement.needs == [(Need.FOOD, 60), (Need.COMMON, 60), (Need.HEATING, 20)]
     assert dict(tenement.bonus) == bonus_of(BuildingKind.TENEMENT, 1850)
-    assert {flow.good for flow in tenement.got} == set(needs_of(BuildingKind.TENEMENT, 1850))
-    assert all(flow.done == 0.0 for flow in tenement.got)
+    assert {flow.good for flow in tenement.got} == {Need.FOOD, Need.COMMON, Need.HEATING}
+    assert {flow.good for flow in tenement.bonus_got} == set(bonus_of(BuildingKind.TENEMENT, 1850))
+    assert all(flow.done == 0.0 for flow in [*tenement.got, *tenement.bonus_got])
 
 
 def test_a_factory_without_lumber_makes_none_of_the_most_it_could() -> None:
@@ -171,3 +173,14 @@ def test_cells_described_by_turns_are_each_worked_out_once(
         recently_described(growth, (5, 4))
 
     assert worked == [(5, 5), (5, 4)]
+
+
+def test_a_bakery_must_get_wheat_and_shows_refined_sugar_as_a_bonus() -> None:
+    constructions = Constructions(make_map())
+    constructions.build(Building((5, 5), BuildingKind.BAKERY))
+    growth = Growth(constructions, GrowthRule(trades=True, ladders=()))
+
+    (bakery,) = describe(growth, (5, 5)).buildings
+
+    assert [flow.good for flow in bakery.got] == [Need.WHEAT]
+    assert [flow.good for flow in bakery.bonus_got] == [Need.REFINED_SUGAR]

@@ -1,11 +1,12 @@
 """The panel that opens when a cell is clicked: its land, its points, and every building on it with
-what it makes, demands and takes as bonus goods, and how last month's trade went for it."""
+what it makes, demands and takes as bonus goods, and how last month's trade went for it, what it
+must get apart from the bonus goods and boosts it can do without."""
 
 import time
 import weakref
 from collections import Counter
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 import numpy.typing as npt
@@ -16,7 +17,7 @@ from imgui_bundle import imgui
 from railroads.sim.constructions import Building, BuildingKind, Construction, Station, Track
 from railroads.sim.economy import Satisfaction, Trade
 from railroads.sim.finance import dollars
-from railroads.sim.goods import RECIPES, Good, Need, bonus_of, demands_of, makes_of
+from railroads.sim.goods import RECIPES, Good, Need, bonus_of, boosts_of, demands_of, makes_of
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
@@ -60,6 +61,8 @@ class BuildingRow:
     price: float | None = None
     # Its satisfaction last month, past 1 with bonus goods; None where it does not trade.
     percent: float | None = None
+    # How the bonus goods and boosts it can do without went; `got` holds what it must get.
+    bonus_got: list[Flow] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -124,12 +127,16 @@ def describe(
     rows = []
     for kind, count in kinds.items():
         got: list[Flow] = []
+        bonus_got: list[Flow] = []
         gave: list[Flow] = []
         stock: list[tuple[Need, float]] = []
         mood = "-"
         percent = None
         if trade is not None and position is not None and kind in trade.got:
-            got = _per_good(trade.goods_got, kind, position)
+            extra = {**bonus_of(kind, growth.year), **boosts_of(kind, growth.year)}
+            flows = _per_good(trade.goods_got, kind, position)
+            got = [flow for flow in flows if flow.good not in extra]
+            bonus_got = [flow for flow in flows if flow.good in extra]
             if kind in RECIPES:
                 stock = _stock(growth, kind, flat)
             gave = _per_good(trade.goods_gave, kind, position, makes_of(kind, growth.year), count)
@@ -151,6 +158,7 @@ def describe(
                 int(growth.owners.owned(kind)[cell]),
                 growth.owners.price_to_buy(kind),
                 percent,
+                bonus_got,
             )
         )
     return HexDetails(
@@ -218,11 +226,12 @@ def draw_hex_details(details: HexDetails) -> BuildingKind | None:
             | imgui.TableFlags_.row_bg.value
             | imgui.TableFlags_.sizing_fixed_fit.value
         )
-        if imgui.begin_table("buildings", 6, flags):
+        if imgui.begin_table("buildings", 7, flags):
             headings = (
                 "Building",
                 "#",
                 "Needs: got of needed",
+                "Bonus: got of wanted",
                 "Makes: gave of made",
                 "Mood",
                 "Yours",
@@ -243,6 +252,8 @@ def draw_hex_details(details: HexDetails) -> BuildingKind | None:
                     for need, amount in row.stock:
                         imgui.same_line(0, 8)
                         good_amount(need, f"{amount:.0f}")
+                imgui.table_next_column()
+                _draw_flows(row.bonus_got)
                 imgui.table_next_column()
                 _draw_flows(row.gave)
                 imgui.table_next_column()
