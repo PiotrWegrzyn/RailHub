@@ -689,7 +689,10 @@ engines from 1900 on Superheaters.
 | Maglev | express | 2040 | Express trains (passengers), Magnetic levitation (modern) | maglev | 500 km/h | 13 s | 11 + dining car | $2,100,000 | $26,250 |
 
 Electric engines run only on electrified track, and the maglev only on maglev track, which can be
-laid once it is on sale. A train's engine is chosen when it is bought.
+laid once it is on sale. A train's engine is chosen when it is bought. It can be upgraded later from the
+Trains window to any newer engine of its line on sale, keeping its name, stops and cars, for the new
+engine's price less half the old one's, which is what selling it would give. The same menu upgrades
+every train with that old engine at once, as many as the cash allows, in the order they were bought.
 Every train sets off from a stand, from a stop or after letting another train by, and picks up
 speed evenly until it runs at full speed after its engine's time to full speed, in seconds of play
 at normal speed.

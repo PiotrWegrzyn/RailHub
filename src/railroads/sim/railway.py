@@ -176,6 +176,44 @@ class Railway:
         self.trains.append(train)
         return train
 
+    def engine_upgrades(self, train: Train) -> list[str]:
+        """The engines a train's engine can be swapped for: those on sale now of its line, newer
+        than it."""
+        engine = ENGINES[train.engine]
+        return [
+            name
+            for name in self.engines()
+            if ENGINES[name].line == engine.line and ENGINES[name].year > engine.year
+        ]
+
+    @staticmethod
+    def swap_price(train: Train, engine: str) -> float:
+        """What swapping a train's engine for another costs: the new one's price, less what the
+        old one sells for."""
+        return ENGINES[engine].price - ENGINES[train.engine].price * TRAIN_RESALE
+
+    def swap_engine(self, train: Train, engine: str) -> bool:
+        """Swaps a train's engine for a newer one of its line, keeping its name, stops and cars;
+        False if it can't be swapped for that one or there isn't the cash."""
+        if engine not in self.engine_upgrades(train):
+            return False
+        price = self.swap_price(train, engine)
+        if not self.finances.can_afford(price):
+            return False
+        self.finances.spend(price, "trains")
+        train.engine = engine
+        most = self.most_cars(train)
+        for stop in train.stops:
+            del stop.cars[most:]
+        return True
+
+    def swap_all_engines(self, old: str, engine: str) -> int:
+        """Swaps the engine of every train running an `old` one for `engine`, in the order they
+        were bought, while the cash lasts; returns how many were swapped."""
+        return sum(
+            self.swap_engine(train, engine) for train in list(self.trains) if train.engine == old
+        )
+
     def sell(self, train: Train) -> None:
         self.trains.remove(train)
         self.finances.earn(ENGINES[train.engine].price * TRAIN_RESALE, "trains")

@@ -4,7 +4,7 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Constructions
-from railroads.sim.finance import CAR_TRIP_PRICE
+from railroads.sim.finance import CAR_TRIP_PRICE, TRAIN_RESALE
 from railroads.sim.goods import Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
@@ -359,3 +359,66 @@ def test_a_node_that_opens_engines_says_which_and_from_when() -> None:
     text = describe(node)
 
     assert text == "opens express engines (from 1858)"
+
+
+def planets_on_the_line(railway: Railway, count: int) -> list[Train]:
+    railway.year = 1850
+    trains = [railway.buy("planet") for _ in range(count)]
+    for train in trains:
+        assert train is not None
+        train.stops = [Stop(WEST, [Good.COAL, Good.MAIL]), Stop(EAST, [Good.WHEAT])]
+    railway.year = 1856
+    return [train for train in trains if train is not None]
+
+
+def test_a_train_can_swap_its_engine_only_for_a_newer_one_of_its_line_on_sale() -> None:
+    railway = knowing(line(), "boilers")
+    (train,) = planets_on_the_line(railway, 1)
+
+    options = railway.engine_upgrades(train)
+
+    assert options == ["american"]
+
+
+def test_an_engine_swap_costs_the_new_engine_less_half_the_old_and_keeps_the_route() -> None:
+    railway = line()
+    (train,) = planets_on_the_line(railway, 1)
+    stops = [(stop.cell, list(stop.cars)) for stop in train.stops]
+    cash = railway.finances.cash
+
+    swapped = railway.swap_engine(train, "american")
+
+    assert swapped
+    assert train.engine == "american"
+    assert train.name == "Steam engine 1"
+    assert [(stop.cell, stop.cars) for stop in train.stops] == stops
+    price = ENGINES["american"].price - ENGINES["planet"].price * TRAIN_RESALE
+    assert railway.finances.cash == pytest.approx(cash - price)
+
+
+def test_no_engine_swap_without_the_cash_or_for_an_engine_not_on_offer() -> None:
+    railway = line()
+    (train,) = planets_on_the_line(railway, 1)
+    railway.finances.cash = railway.swap_price(train, "american") - 1
+
+    poor = railway.swap_engine(train, "american")
+    railway.finances.cash = 10_000_000.0
+    older = railway.swap_engine(train, "tank")
+
+    assert not poor and not older
+    assert train.engine == "planet"
+
+
+def test_a_mass_upgrade_swaps_every_train_with_the_old_engine_as_far_as_the_cash_goes() -> None:
+    railway = line()
+    planets = planets_on_the_line(railway, 3)
+    railway.year = 1850
+    tank = railway.buy("tank")
+    railway.year = 1856
+    railway.finances.cash = 2.5 * railway.swap_price(planets[0], "american")
+
+    swapped = railway.swap_all_engines("planet", "american")
+
+    assert swapped == 2
+    assert [train.engine for train in planets] == ["american", "american", "planet"]
+    assert tank is not None and tank.engine == "tank"
