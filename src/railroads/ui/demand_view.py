@@ -31,6 +31,7 @@ def draw_demand(demand: StationDemand) -> None:
         return
     left = imgui.get_cursor_pos_x()
     per_row = max(1, int(imgui.get_content_region_avail().x // NEED_WIDTH))
+    colors = coin_colors()
     for index, need in enumerate(wanted):
         record = demand.record(need)
         next_good_slot(index, left, per_row)
@@ -40,13 +41,15 @@ def draw_demand(demand: StationDemand) -> None:
         imgui.same_line(0, 3)
         imgui.text(f"{record.left:.0f}")
         imgui.same_line(0, 4)
-        _draw_coins(coins_for(record.share))
+        _draw_coins(coins_for(record.share), colors)
         imgui.end_group()
         if imgui.is_item_hovered():
             _demand_tooltip(demand, need, record)
 
 
-def _draw_coins(lit: int) -> None:
+def _draw_coins(lit: int, colors: tuple[int, int, int, int]) -> None:
+    """The coins of a need, in the colours of coin_colors."""
+    gold, rim, shine, border = colors
     width = COIN_STEP * (COINS - 1) + COIN_SIZE
     height = imgui.get_frame_height()
     imgui.dummy((width, height))
@@ -56,13 +59,21 @@ def _draw_coins(lit: int) -> None:
     for coin in range(COINS):
         center = (low.x + radius + coin * COIN_STEP, low.y + height / 2)
         if coin < lit:
-            draw_list.add_circle_filled(center, radius, color_u32(BRASS))
-            draw_list.add_circle(center, radius, color_u32(BRASS_DARK), 0, 1.2)
-            draw_list.add_circle_filled(
-                (center[0] - 1.2, center[1] - 1.2), radius * 0.35, color_u32((1, 0.9, 0.6, 0.8))
-            )
+            draw_list.add_circle_filled(center, radius, gold)
+            draw_list.add_circle(center, radius, rim, 0, 1.2)
+            draw_list.add_circle_filled((center[0] - 1.2, center[1] - 1.2), radius * 0.35, shine)
         else:
-            draw_list.add_circle(center, radius - 0.5, color_u32(BORDER), 0, 1.0)
+            draw_list.add_circle(center, radius - 0.5, border, 0, 1.0)
+
+
+def coin_colors() -> tuple[int, int, int, int]:
+    """A lit coin's gold, rim and shine, and an unlit one's border, as the style has them now."""
+    return (
+        color_u32(BRASS),
+        color_u32(BRASS_DARK),
+        color_u32((1, 0.9, 0.6, 0.8)),
+        color_u32(BORDER),
+    )
 
 
 def _demand_tooltip(demand: StationDemand, need: Need, record: DemandRecord) -> None:

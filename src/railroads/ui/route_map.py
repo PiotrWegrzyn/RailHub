@@ -311,8 +311,8 @@ class RouteMap:
         # The train the map was last framed on, to frame the next one chosen.
         self._framed: str | None = None
         self._dragged = False
-        # The track's points on the map, kept until track changes (_track_points).
-        self._track: tuple[int, np.ndarray, np.ndarray] | None = None
+        # The track as lines on the map and their boxes, kept until track changes (_track_lines).
+        self._track: tuple[int, list[tuple[np.ndarray, bool]], np.ndarray] | None = None
 
     def frame(self, railway: Railway, train: Train, map_size: Vec2, panel: Panel) -> None:
         """Centres the map on the train's stops, close enough to show them all."""
@@ -457,28 +457,31 @@ class RouteMap:
         return spots
 
     def _draw_track(self, draw_list: imgui.ImDrawList, railway: Railway, frame: MapFrame) -> None:
-        points, double = self._track_points(railway)
-        if not len(points):
+        lines, boxes = self._track_lines(railway)
+        if not lines:
             return
         panel = frame.panel
-        screen = (points - frame.origin) * frame.scale + (panel.left, panel.top)
-        low, high = screen.min(axis=1), screen.max(axis=1)
+        scale, (left, top) = frame.scale, frame.origin
+        low = (boxes[:, :2] - frame.origin) * scale + (panel.left, panel.top)
+        high = (boxes[:, 2:] - frame.origin) * scale + (panel.left, panel.top)
         seen = (
             (high[:, 0] >= panel.left)
             & (low[:, 0] <= panel.right)
             & (high[:, 1] >= panel.top)
             & (low[:, 1] <= panel.bottom)
         )
-        width = min(max(frame.scale * 0.18, 1.0), 4.0)
+        width = min(max(scale * 0.18, 1.0), 4.0)
         color = color_u32(TRACK)
-        for piece, wide in zip(screen[seen].tolist(), double[seen].tolist(), strict=True):
+        for index in np.flatnonzero(seen).tolist():
+            points, wide = lines[index]
+            screen = ((points - (left, top)) * scale + (panel.left, panel.top)).tolist()
             draw_list.add_polyline(
-                [imgui.ImVec2(x, y) for x, y in piece], color, width * (1.8 if wide else 1.0), 0
+                [imgui.ImVec2(x, y) for x, y in screen], color, width * (1.8 if wide else 1.0), 0
             )
 
-    def _track_points(self, railway: Railway) -> tuple[np.ndarray, np.ndarray]:
-        """Each piece of track as its three points on the map, from end to middle to end, and
-        whether it is double, worked out again only when track has changed."""
+    def _track_lines(self, railway: Railway) -> tuple[list[tuple[np.ndarray, bool]], np.ndarray]:
+        """The track as lines on the map (track_lines), with the box round each, worked out
+        again only when track has changed."""
         version = railway.constructions.railway_version
         if self._track is None or self._track[0] != version:
             grid = railway.constructions.tile_map.grid
@@ -489,8 +492,12 @@ class RouteMap:
                 center = np.asarray(grid.center(*piece.cell), dtype=float)
                 start, end = (offsets[point] for point in piece.ends)
                 points[index] = (center + start, center, center + end)
-            double = np.array([piece.width == TrackWidth.DOUBLE for piece in pieces], dtype=bool)
-            self._track = (version, points, double)
+            double = [piece.width == TrackWidth.DOUBLE for piece in pieces]
+            lines = track_lines(points, double)
+            boxes = np.array([(*line.min(axis=0), *line.max(axis=0)) for line, _ in lines]).reshape(
+                -1, 4
+            )
+            self._track = (version, lines, boxes)
         return self._track[1], self._track[2]
 
     def _draw_stations(
@@ -591,6 +598,54 @@ def _summary_row(
     if more:
         imgui.same_line(0, 8)
         imgui.text_disabled(f"+{more}")
+
+
+def track_lines(pieces: np.ndarray, double: list[bool]) -> list[tuple[np.ndarray, bool]]:
+    """Pieces of track, each as its three points from end to middle to end, joined into as few
+    lines as they make, so the map draws a line where it drew many pieces: a line runs on
+    through a point where it meets just one other piece of the same width. Each line comes as
+    its points and whether it is double."""
+    ends: dict[tuple[float, float, bool], list[int]] = {}
+
+    def key(index: int, side: int) -> tuple[float, float, bool]:
+        x, y = pieces[index, 0 if side == 0 else 2]
+        return round(float(x), 4), round(float(y), 4), double[index]
+
+    for index in range(len(pieces)):
+        for side in (0, 1):
+            ends.setdefault(key(index, side), []).append(index)
+    used = [False] * len(pieces)
+
+    def onward(index: int, side: int) -> tuple[int, int] | None:
+        meeting = ends[key(index, side)]
+        if len(meeting) != 2:
+            return None
+        other = meeting[0] if meeting[1] == index else meeting[1]
+        if other == index or used[other]:
+            return None
+        return other, 0 if key(other, 0) == key(index, side) else 1
+
+    def walk(index: int, side: int) -> list[list[float]]:
+        """The points of the pieces a line runs on through, out of a piece's end at `side`."""
+        found = []
+        while (step := onward(index, side)) is not None:
+            index, entry = step
+            used[index] = True
+            run = pieces[index].tolist()
+            found.extend(run[1:] if entry == 0 else run[::-1][1:])
+            side = 1 - entry
+        return found
+
+    lines = []
+    for first in range(len(pieces)):
+        if used[first]:
+            continue
+        used[first] = True
+        ahead = walk(first, 1)
+        behind = walk(first, 0)
+        points = behind[::-1] + pieces[first].tolist() + ahead
+        lines.append((np.array(points), double[first]))
+    return lines
 
 
 def add_stop(train: Train, station: Cell) -> None:

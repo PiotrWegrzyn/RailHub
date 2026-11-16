@@ -1,7 +1,13 @@
 import pytest
 
-from railroads.sim.demand import PASSED_ALONG_PAY, StationDemand, capacity_of, price_of
-from railroads.sim.goods import Good, Need
+from railroads.sim.demand import (
+    DEMAND_PER_NEED,
+    PASSED_ALONG_PAY,
+    StationDemand,
+    capacity_of,
+    price_of,
+)
+from railroads.sim.goods import FITS, Good, Need
 
 
 def test_demand_capacity_is_twice_what_the_buildings_need() -> None:
@@ -106,3 +112,15 @@ def test_loads_of_one_good_share_the_demand_left_for_it() -> None:
     first, second = demand.worth([(Good.COAL, 30.0), (Good.COAL, 30.0)])
 
     assert 0 < second < first
+
+
+def test_a_good_is_wanted_as_much_as_all_the_needs_it_meets_together() -> None:
+    demand = StationDemand()
+    demand.capacity = {need: 10.0 * (index + 1) for index, need in enumerate(Need)}
+
+    wanted = {good: demand.monthly_want(good) for good in Good}
+
+    assert wanted == {
+        good: sum(c for need, c in demand.capacity.items() if good in FITS[need]) / DEMAND_PER_NEED
+        for good in Good
+    }

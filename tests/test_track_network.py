@@ -65,3 +65,14 @@ def test_a_railway_saved_before_ways_and_held_trains_were_kept_still_runs() -> N
 
     assert train.status == "Running"
     assert railway.position(train) is not None
+
+
+def test_where_track_leads_out_of_every_cell_is_found_at_once_as_one_by_one() -> None:
+    _, railway = joined_stations()
+    grid = railway.constructions.tile_map.grid
+
+    railway.route((6, 3), (6, 20))
+
+    found = railway.network._exits_to
+    assert found
+    assert all(grid.track_exit(cell, point) == exit for (cell, point), exit in found.items())

@@ -154,3 +154,26 @@ def test_an_engines_figures_show_what_it_costs_a_month_to_run() -> None:
     figures = dict(engine_figures(engine))
 
     assert figures["Running cost"] == f"{dollars(engine.running)} a month"
+
+
+def test_stop_cards_scrolled_out_of_sight_are_not_drawn(
+    gui: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3) if index % 2 else (6, 20)) for index in range(12)]
+    window = TrainsWindow(open=True, chosen=train.name)
+    draw_frames(window, railway, 3)
+    drawn: list[int] = []
+    card = TrainsWindow._draw_stop
+
+    def counted(self: TrainsWindow, *args: object) -> bool:
+        drawn.append(1)
+        return card(self, *args)
+
+    monkeypatch.setattr(TrainsWindow, "_draw_stop", counted)
+
+    draw_frames(window, railway, 1)
+
+    assert 0 < len(drawn) < len(train.stops)

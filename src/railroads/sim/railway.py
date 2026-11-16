@@ -40,7 +40,7 @@ import numpy.typing as npt
 from railroads.places import StationNames
 from railroads.sim.calls import StationCalls
 from railroads.sim.clock import SECONDS_PER_MONTH, START_YEAR
-from railroads.sim.constructions import Constructions, Track, TrackWidth
+from railroads.sim.constructions import Constructions
 from railroads.sim.demand import PASSED_ALONG_PAY, StationDemand
 from railroads.sim.economy import COLLECTION_RADIUS, DELIVERY_RADIUS
 from railroads.sim.facilities import (
@@ -507,7 +507,8 @@ class Railway:
         running = [train for train in self.trains if len(train.path) >= 2]
         if not running:
             return
-        rank = {id(train): self._right_of_way(train) for train in running}
+        bought = {id(train): index for index, train in enumerate(self.trains)}
+        rank = {id(train): _right_of_way(train, bought[id(train)]) for train in running}
         running.sort(key=lambda train: rank[id(train)])
         bodies = [self.network.body(train, MEET_STEP) for train in running]
         met = self._met(bodies)
@@ -553,12 +554,6 @@ class Railway:
                 met[j].append(i)
         return met
 
-    def _right_of_way(self, train: Train) -> tuple[float, float, int]:
-        """What decides which of two trains that meet goes first, the smaller first: having
-        stood longest letting others by on the way, then the better engine, then being bought
-        first."""
-        return -train.waited, -ENGINES[train.engine].speed, self.trains.index(train)
-
     def _in_the_way(
         self,
         one: list[tuple[Point, Point, Point]],
@@ -577,21 +572,20 @@ class Railway:
         """Whether two trains can pass each other here: within a station, or on double track
         going opposite ways."""
         (_, way, middle), (_, other_way, other_middle) = one, other
-        cells = [self._cell_at(middle), self._cell_at(other_middle)]
-        if all(self.constructions.station_at(cell) is not None for cell in cells):
+        in_station, double = self.network.passing(middle)
+        other_in_station, other_double = self.network.passing(other_middle)
+        if in_station and other_in_station:
             return True
         opposite = way[0] * other_way[0] + way[1] * other_way[1] < 0
-        return opposite and all(
-            any(
-                isinstance(piece, Track) and piece.width == TrackWidth.DOUBLE
-                for piece in self.constructions.at(cell)
-            )
-            for cell in cells
-        )
-
-    def _cell_at(self, point: Point) -> Cell:
-        return self.network.cell_at(point)
+        return opposite and double and other_double
 
     def position(self, train: Train, back: float = 0.0) -> tuple[Point, Point] | None:
         """Where the train is on the map, and which way it faces (TrackNetwork.position)."""
         return self.network.position(train, back)
+
+
+def _right_of_way(train: Train, bought: int) -> tuple[float, float, int]:
+    """What decides which of two trains that meet goes first, the smaller first: having stood
+    longest letting others by on the way, then the better engine, then being bought first
+    (`bought` is its place among the trains)."""
+    return -train.waited, -ENGINES[train.engine].speed, bought
