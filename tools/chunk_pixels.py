@@ -24,6 +24,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
+from fingerprint import towns
 
 from railroads.newgame import MapChoice, Settings, allowed_start_year, make_game
 from railroads.saves import SavedGame, Saves
@@ -31,7 +32,6 @@ from railroads.sim.clock import HISTORY_START
 from railroads.sim.constructions import Building, BuildingKind, Track, TrackWidth
 from railroads.sim.grids import Cell
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
-from railroads.sim.ladders import Points
 from railroads.sim.tilemap import Relief, Terrain
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.biomes import Biome
@@ -65,19 +65,6 @@ def build_game(cache: Path | None) -> SavedGame:
     return saved
 
 
-def towns(saved: SavedGame, count: int) -> list[Cell]:
-    """The most crowded cells, each at least 8 cells from the others."""
-    people = saved.game.growth.points(Points.POPULATION)
-    picked: list[Cell] = []
-    for flat in np.argsort(people, axis=None, kind="stable")[::-1].tolist():
-        row, col = divmod(flat, people.shape[1])
-        if all(abs(row - r) + abs(col - c) >= 8 for r, c in picked):
-            picked.append((row, col))
-        if len(picked) == count:
-            break
-    return picked
-
-
 def highest(saved: SavedGame) -> Cell:
     heights = saved.game.tile_map.height_m
     row, col = np.unravel_index(np.argmax(heights), heights.shape)
@@ -90,7 +77,7 @@ def lay_track(saved: SavedGame) -> list[Cell]:
     through a tunnel; returns the cells track runs through."""
     game = saved.game
     game.finances.cash = CASH
-    big = towns(saved, 6)
+    big = towns(saved.game.growth, 6, "stable")
     peak = highest(saved)
     near_peak = min(big, key=lambda cell: abs(cell[0] - peak[0]) + abs(cell[1] - peak[1]))
     for cell in big:
@@ -147,7 +134,7 @@ def pick_chunks(world: PixelWorld, saved: SavedGame, track: list[Cell]) -> dict[
     biomes = world.ground.biomes
     across, down = world.projection.chunks
     chunks: dict[str, tuple[int, int]] = {}
-    for index, town in enumerate(towns(saved, 3)):
+    for index, town in enumerate(towns(saved.game.growth, 3, "stable")):
         chunks[f"town {index}"] = chunk_of(world, town)
     peak = highest(saved)
     cx, cy = chunk_of(world, peak)
@@ -216,7 +203,7 @@ def extras(world: PixelWorld, saved: SavedGame) -> Iterator[tuple[str, np.ndarra
     plane points round the highest ground and the ground showing at pixels there."""
     grid = world.tile_map.grid
     peak = highest(saved)
-    town = towns(saved, 1)[0]
+    town = towns(saved.game.growth, 1, "stable")[0]
     for name, cell in (("peak", peak), ("town", town)):
         steps = grid.track_steps()
         ends = (0, len(steps) // 2)
