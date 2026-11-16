@@ -445,7 +445,7 @@ class Stop:
     cell: Cell
     cars: list[Cargo] = field(default_factory=list)
     # Whether the train waits here, up to WAIT_MONTHS, for its cars to fill.
-    wait_for_load: bool = True
+    wait_for_load: bool = False
 
     def add_car(self, cargo: Cargo, most: int = MAX_CARS) -> bool:
         if len(self.cars) >= most:
@@ -472,6 +472,9 @@ class Train:
     loaded_at: Cell | None = None
     path: list[Point] = field(default_factory=list)
     speeds: list[float] = field(default_factory=list)
+    # How far along the path each of its points lies, with the path it was worked out for
+    # (TrackNetwork.ends).
+    path_ends: tuple[list[Point], list[float]] | None = None
     along: float = 0.0
     status: str = "Waiting for stops"
     engine: str = FIRST_ENGINE
@@ -485,6 +488,9 @@ class Train:
     # its sand, this month (railroads.sim.facilities).
     fuelled: bool = False
     sanded: bool = False
+    # Whether it stands at its first stop until the player is done setting it up, so it does not
+    # set off empty with half a route.
+    held: bool = False
 
     @property
     def load(self) -> dict[Good, float]:

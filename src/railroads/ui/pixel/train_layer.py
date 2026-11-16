@@ -12,7 +12,9 @@ from dataclasses import dataclass
 from typing import Protocol
 
 import numpy as np
+import numpy.typing as npt
 from imgui_bundle import hello_imgui, imgui
+from PIL import Image
 
 from railroads.sim.constructions import Track
 from railroads.sim.railway import Railway
@@ -32,6 +34,8 @@ from railroads.ui.pixel.trains import (
     train_sprites,
     turned,
 )
+
+type Pixels = npt.NDArray[np.uint8]
 from railroads.ui.pixel.world import PixelWorld
 
 SMOKE = (0.88, 0.88, 0.9)
@@ -72,13 +76,20 @@ class TrainLayer:
         )
         factor = self._blown_up_by(scale * density)
         per_pixel = scale / DETAIL
-        found = []
+        seen = []
         for train in railway.trains:
             for look, back in self._parts(train):
                 placed = railway.position(train, back)
-                if placed is not None and not self.world.underground(*placed[0]):
-                    shift = self.lanes.sideways(train.path, train.along - back)
-                    found.append((placed, shift, look))
+                if placed is not None:
+                    seen.append((train, back, look, placed))
+        hidden = self.world.underground_all(
+            [placed[0][0] for *_, placed in seen], [placed[0][1] for *_, placed in seen]
+        )
+        found = []
+        for (train, back, look, placed), under in zip(seen, hidden, strict=True):
+            if not under:
+                shift = self.lanes.sideways(train.path, train.along - back)
+                found.append((placed, shift, look))
         parts = []
         if found:
             xs = np.array([placed[0][0] for placed, _, _ in found])
@@ -112,7 +123,8 @@ class TrainLayer:
         self._let_go(drawn)
         self._smoke(draw_list, railway, origin, scale)
 
-    def _parts(self, train: Train) -> list[tuple[object, float]]:
+    @staticmethod
+    def _parts(train: Train) -> list[tuple[object, float]]:
         """Each part of the train and how far its middle is behind the train's front, in cells."""
         model = ENGINES[train.engine]
         parts: list[tuple[object, float]] = [((Look.ENGINE, train.engine), model.half)]
@@ -137,11 +149,7 @@ class TrainLayer:
         """Puffs of smoke rising from each chimney and drifting back over its train. The ground
         under every chimney and where every puff lies in the picture are worked out for all the
         trains at once: on hills a lift takes nearly as long for one point as for many."""
-        chimneys = [
-            chimney
-            for train in railway.trains
-            if (chimney := self._chimney(railway, train)) is not None
-        ]
+        chimneys = self._chimneys(railway)
         if not chimneys:
             return
         projection = self.world.projection
@@ -172,19 +180,30 @@ class TrainLayer:
             color = imgui.color_convert_float4_to_u32(imgui.ImVec4(*SMOKE, alpha))
             draw_list.add_circle_filled((sx, sy), radius, color)
 
-    def _chimney(self, railway: Railway, train: Train) -> _Chimney | None:
-        """Where a train's chimney is on the map, if it has one and is on the map."""
-        model = ENGINES[train.engine]
-        if model.chimney is None:
-            return None
-        back = (model.half - model.chimney[0]) * SCALE
-        placed = railway.position(train, back)
-        if placed is None or self.world.underground(*placed[0]):
-            return None
-        (x, y), (dx, dy) = placed
-        shift = self.lanes.sideways(train.path, train.along - back)
-        phase = (train.along * 6.0) % 1.0
-        return _Chimney(x, y, dx, dy, shift, model.chimney[1] * SCALE, phase)
+    def _chimneys(self, railway: Railway) -> list[_Chimney]:
+        """Where each train's chimney is on the map, for those that have one in the open."""
+        seen = []
+        for train in railway.trains:
+            model = ENGINES[train.engine]
+            if model.chimney is None:
+                continue
+            back = (model.half - model.chimney[0]) * SCALE
+            placed = railway.position(train, back)
+            if placed is not None:
+                seen.append((train, back, placed))
+        hidden = self.world.underground_all(
+            [placed[0][0] for *_, placed in seen], [placed[0][1] for *_, placed in seen]
+        )
+        chimneys = []
+        for (train, back, ((x, y), (dx, dy))), under in zip(seen, hidden, strict=True):
+            if under:
+                continue
+            model = ENGINES[train.engine]
+            assert model.chimney is not None
+            shift = self.lanes.sideways(train.path, train.along - back)
+            phase = (train.along * 6.0) % 1.0
+            chimneys.append(_Chimney(x, y, dx, dy, shift, model.chimney[1] * SCALE, phase))
+        return chimneys
 
     def _blown_up_by(self, device_scale: int) -> int:
         """How many times each way the pictures are blown up to show crisp at this many device
@@ -394,3 +413,37 @@ class Lanes:
 def _point(steps: np.ndarray, dx: float, dy: float) -> int:
     """The track point this far from a cell's middle lies at."""
     return int(np.argmin(np.hypot(steps[:, 0] / 2 - dx, steps[:, 1] / 2 - dy)))
+
+
+# Which way on the screen an engine shown on its own faces: to the right and a little down, so
+# its side and a bit of its front show.
+SHOWN_FACING = (0.95, 0.3)
+
+
+def engine_picture(sprites: TrainSprites, matrix: npt.NDArray[np.float64], engine: str) -> Pixels:
+    """An engine with its tender, as the map draws it, facing SHOWN_FACING: RGBA at the size of
+    the sprite sheet."""
+    facing = np.array(SHOWN_FACING) / math.hypot(*SHOWN_FACING)
+
+    def on_screen(heading: float) -> float:
+        way = matrix @ (math.cos(heading), math.sin(heading))
+        return float(way @ facing / (np.hypot(*way) or 1.0))
+
+    heading = max((2 * math.pi * k / HEADINGS for k in range(HEADINGS)), key=on_screen)
+    ahead = matrix @ (math.cos(heading), math.sin(heading)) * DETAIL
+    placed = []
+    for look, back in TrainLayer._parts(Train("", engine=engine)):
+        x, y, w, h, anchor_x, anchor_y = sprites.place(look, heading)
+        left = -ahead[0] * back - anchor_x
+        top = -ahead[1] * back - anchor_y
+        placed.append((-ahead[1] * back, top, left, sprites.image[y : y + h, x : x + w]))
+    low_x = math.floor(min(left for _, _, left, _ in placed))
+    low_y = math.floor(min(top for _, top, _, _ in placed))
+    high_x = math.ceil(max(left + p.shape[1] for _, _, left, p in placed))
+    high_y = math.ceil(max(top + p.shape[0] for _, top, _, p in placed))
+    canvas = Image.new("RGBA", (high_x - low_x, high_y - low_y), (0, 0, 0, 0))
+    for _, top, left, pixels in sorted(placed, key=lambda part: part[0]):
+        part = Image.fromarray(np.ascontiguousarray(pixels), "RGBA")
+        spot = (round(left) - low_x, round(top) - low_y)
+        canvas.alpha_composite(part, spot)
+    return np.asarray(canvas).copy()

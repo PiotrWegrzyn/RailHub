@@ -35,6 +35,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 import numpy as np
+import numpy.typing as npt
 
 from railroads.places import StationNames
 from railroads.sim.calls import StationCalls
@@ -190,6 +191,11 @@ class Railway:
             train.stops = [Stop(stop.cell) for stop in route_of.stops]
         self.trains.append(train)
         return train
+
+    def let_go(self) -> None:
+        """Lets every held train set off (Train.held)."""
+        for train in self.trains:
+            train.held = False
 
     def engine_upgrades(self, train: Train) -> list[str]:
         """The engines a train's engine can be swapped for: those on sale now of its line, newer
@@ -435,6 +441,9 @@ class Railway:
             train.status = "Needs two stops"
             train.path = []
             return
+        if train.held and not train.path:
+            train.status = "Sets off once the Buy a train window is closed"
+            return
         if not train.path:
             leaving = train.stops[(train.heading - 1) % len(train.stops)]
             if not train.called:
@@ -480,7 +489,7 @@ class Railway:
             speed *= ENGINE_SHED_SPEED
         train.along += months * CELLS_PER_MONTH * self.network.speed_at(train) * train.pull * speed
         train.status = "Running"
-        if train.along >= self.network.length(train.path):
+        if train.along >= self.network.length(train):
             self.calls.arrive(train, train.stops[train.heading % len(train.stops)])
             train.arrivals += 1
             train.heading = (train.heading + 1) % len(train.stops)
@@ -521,10 +530,12 @@ class Railway:
         met somewhere they can't pass each other."""
         met: list[list[int]] = [[] for _ in bodies]
         boxes = []
+        points = []
         for body in bodies:
             xs = [at[0] for at, _, _ in body]
             ys = [at[1] for at, _, _ in body]
             boxes.append((min(xs), min(ys), max(xs), max(ys)) if body else None)
+            points.append(np.array([at for at, _, _ in body]))
         reach = MEET_DISTANCE
         for i, j in itertools.combinations(range(len(bodies)), 2):
             one, other = boxes[i], boxes[j]
@@ -537,7 +548,7 @@ class Railway:
                 or other[1] - reach > one[3]
             ):
                 continue
-            if self._in_the_way(bodies[i], bodies[j]):
+            if self._in_the_way(bodies[i], bodies[j], points[i], points[j]):
                 met[i].append(j)
                 met[j].append(i)
         return met
@@ -552,11 +563,11 @@ class Railway:
         self,
         one: list[tuple[Point, Point, Point]],
         other: list[tuple[Point, Point, Point]],
+        a: npt.NDArray[np.float64],
+        b: npt.NDArray[np.float64],
     ) -> bool:
-        """Whether two running trains, as points along them (TrackNetwork.body), have met
-        somewhere they can't pass each other."""
-        a = np.array([at for at, _, _ in one])
-        b = np.array([at for at, _, _ in other])
+        """Whether two running trains, as points along them (TrackNetwork.body) and those
+        points as arrays, have met somewhere they can't pass each other."""
         close = np.argwhere(
             np.hypot(*(a[:, None, :] - b[None, :, :]).transpose(2, 0, 1)) < MEET_DISTANCE
         )

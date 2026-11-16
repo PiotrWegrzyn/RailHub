@@ -3,6 +3,7 @@ train takes from one station to another with the speed on each stretch, and wher
 its way. Trains pass through stations, which join track only by their two ends, and may turn round
 in them."""
 
+import bisect
 import heapq
 import itertools
 import math
@@ -14,10 +15,18 @@ from railroads.sim.grids import Cell
 from railroads.sim.track_rules import track_rules_for
 from railroads.sim.trains import Point, Train
 
+# A route: the points along it and the speed on each stretch between them.
+type Way = tuple[list[Point], list[float]]
+
 
 class TrackNetwork:
     # The cell under each point on the map asked about, kept as they never change.
     _cells: dict[Point, Cell] | None = None
+    # The routes found since track or stations last changed, by their ends and track kind, and
+    # where track leaving each cell by each point runs into, as the grid never changes. Kept on
+    # the class until first used, so games saved without them load.
+    _routes: tuple[int, dict[tuple, Way | None]] = (-1, {})
+    _exits_to: dict[tuple[Cell, int], tuple[Cell, int]] | None = None
 
     def __init__(self, constructions: Constructions) -> None:
         self.constructions = constructions
@@ -47,7 +56,7 @@ class TrackNetwork:
         while frontier:
             cell, entry = frontier.pop()
             for exit_point in self._exits(cell, entry):
-                nxt, nxt_entry = grid.track_exit(cell, exit_point)
+                nxt, nxt_entry = self._track_exit(cell, exit_point)
                 if not grid.contains(*nxt) or not self._joins(nxt, nxt_entry):
                     continue
                 if nxt in stations and nxt != start:
@@ -59,34 +68,47 @@ class TrackNetwork:
 
     def route(
         self, start: Cell, end: Cell, electric: bool = False, maglev: bool = False
-    ) -> tuple[list[Point], list[float]] | None:
+    ) -> Way | None:
         """The way along laid track, only electrified track if `electric`, only maglev track if
-        `maglev` and never maglev track if not, from one station to
-        another, as points on the map and the speed on each stretch between them; None without
-        track joining them. Trains pass through stations on the way, which join track only by
-        their two ends, and may turn round in them."""
+        `maglev` and never maglev track if not, from one station to another, as points on the
+        map and the speed on each stretch between them; None without track joining them. Trains
+        pass through stations on the way, which join track only by their two ends, and may turn
+        round in them. A way is found once until track or stations change, and is shared by the
+        trains that take it, which must not change it."""
+        version = self.constructions.railway_version
+        if self._routes[0] != version:
+            self._routes = (version, {})
+        found = self._routes[1]
+        key = (start, end, electric, maglev)
+        if key not in found:
+            found[key] = self._find_way(start, end, electric, maglev)
+        return found[key]
+
+    def _find_way(self, start: Cell, end: Cell, electric: bool, maglev: bool) -> Way | None:
         grid = self.constructions.tile_map.grid
-        steps = grid.track_steps()
+        lengths = [float(math.hypot(*step)) for step in grid.track_steps()]
         counter = itertools.count()
-        frontier: list[tuple[float, int, Cell, int | None, tuple]] = [
-            (0.0, next(counter), start, None, ())
+        # Each step taken: the step before it (-1 for none), the cell and the point left by.
+        taken: list[tuple[int, Cell, int]] = []
+        frontier: list[tuple[float, int, Cell, int | None, int]] = [
+            (0.0, next(counter), start, None, -1)
         ]
         seen: set[tuple[Cell, int | None]] = set()
         while frontier:
-            cost, _, cell, entry, trail = heapq.heappop(frontier)
-            if cell == end and trail:
-                return self._way(trail, (cell, entry or 0))
+            cost, _, cell, entry, last = heapq.heappop(frontier)
+            if cell == end and last >= 0:
+                return self._way(_trail(taken, last), (cell, entry or 0))
             if (cell, entry) in seen:
                 continue
             seen.add((cell, entry))
             for exit_point in self._exits(cell, entry, electric, maglev):
-                nxt, nxt_entry = grid.track_exit(cell, exit_point)
+                nxt, nxt_entry = self._track_exit(cell, exit_point)
                 if not grid.contains(*nxt) or not self._joins(nxt, nxt_entry):
                     continue
-                length = float(math.hypot(*steps[exit_point]))
+                taken.append((last, cell, exit_point))
                 heapq.heappush(
                     frontier,
-                    (cost + length, next(counter), nxt, nxt_entry, (*trail, (cell, exit_point))),
+                    (cost + lengths[exit_point], next(counter), nxt, nxt_entry, len(taken) - 1),
                 )
         return None
 
@@ -109,6 +131,15 @@ class TrackNetwork:
             and piece.maglev == maglev
         ]
 
+    def _track_exit(self, cell: Cell, point: int) -> tuple[Cell, int]:
+        if self._exits_to is None:
+            self._exits_to = {}
+        key = (cell, point)
+        found = self._exits_to.get(key)
+        if found is None:
+            found = self._exits_to[key] = self.constructions.tile_map.grid.track_exit(cell, point)
+        return found
+
     def _joins(self, cell: Cell, entry: int) -> bool:
         """Whether a train coming in by `entry` can go on from this cell: by one of a station's
         ends, or onto track that starts there."""
@@ -116,7 +147,7 @@ class TrackNetwork:
             return entry in self.constructions.station_ends(cell)
         return any(isinstance(b, Track) and entry in b.ends for b in self.constructions.at(cell))
 
-    def _way(self, trail: tuple, arrival: tuple[Cell, int]) -> tuple[list[Point], list[float]]:
+    def _way(self, trail: list[tuple[Cell, int]], arrival: tuple[Cell, int]) -> Way:
         grid = self.constructions.tile_map.grid
         steps = grid.track_steps()
         start_cell = trail[0][0]
@@ -146,24 +177,17 @@ class TrackNetwork:
         it faces there, while it runs; None for a point still inside the station it left."""
         if len(train.path) < 2 or train.along - back < 0:
             return None
-        left = train.along - back
-        for a, b in itertools.pairwise(train.path):
-            length = math.dist(a, b)
-            if left <= length or b == train.path[-1]:
-                share = min(1.0, left / length) if length else 0.0
-                at = (a[0] + (b[0] - a[0]) * share, a[1] + (b[1] - a[1]) * share)
-                return at, (b[0] - a[0], b[1] - a[1])
-            left -= length
-        return None
+        return _placed(train.path, self.ends(train), train.along - back)
 
     def speed_at(self, train: Train) -> float:
-        left = train.along
-        for (a, b), speed in zip(itertools.pairwise(train.path), train.speeds, strict=False):
-            length = math.dist(a, b)
-            if left <= length:
-                return speed
-            left -= length
-        return 1.0
+        path = train.path
+        if len(path) < 2:
+            return 1.0
+        ends = self.ends(train)
+        if train.along > ends[-1]:
+            return 1.0
+        index = _stretch_at(ends, train.along)
+        return train.speeds[index] if index < len(train.speeds) else 1.0
 
     def cell_at(self, point: Point) -> Cell:
         """The cell a point on the map lies in."""
@@ -176,37 +200,66 @@ class TrackNetwork:
             cell = self._cells[point] = (int(row), int(col))
         return cell
 
-    @staticmethod
-    def body(train: Train, step: float) -> list[tuple[Point, Point, Point]]:
+    def body(self, train: Train, step: float) -> list[tuple[Point, Point, Point]]:
         """Points along the running train from its front back to its tail, `step` cells
         apart, leaving out what is still inside the station it left: each point, which way the
         train faces there, and the middle of the stretch of track it is on."""
         front = train.along
         tail = max(0.0, front - train.length)
-        if len(train.path) < 2 or front <= 0:
+        path = train.path
+        if len(path) < 2 or front <= 0:
             return []
+        ends = self.ends(train)
         count = int((front - tail) / step) + 1
-        wanted = [front - step * k for k in range(count)]
-        wanted.reverse()
         found: list[tuple[Point, Point, Point]] = []
-        start = 0.0
-        index = 0
-        last = len(train.path) - 2
-        for number, (a, b) in enumerate(itertools.pairwise(train.path)):
-            length = math.dist(a, b)
-            end = start + length
-            while index < len(wanted) and (wanted[index] <= end or number == last):
-                share = min(1.0, (wanted[index] - start) / length) if length else 0.0
-                at = (a[0] + (b[0] - a[0]) * share, a[1] + (b[1] - a[1]) * share)
-                middle = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
-                found.append((at, (b[0] - a[0], b[1] - a[1]), middle))
-                index += 1
-            if index >= len(wanted):
-                break
-            start = end
-        found.reverse()
+        for k in range(count):
+            wanted = front - step * k
+            index = _stretch_at(ends, wanted)
+            a, b = path[index], path[index + 1]
+            length = ends[index + 1] - ends[index]
+            share = min(1.0, (wanted - ends[index]) / length) if length else 0.0
+            at = (a[0] + (b[0] - a[0]) * share, a[1] + (b[1] - a[1]) * share)
+            middle = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+            found.append((at, (b[0] - a[0], b[1] - a[1]), middle))
         return found
 
+    def length(self, train: Train) -> float:
+        """How long the way the train is on is."""
+        return self.ends(train)[-1] if train.path else 0.0
+
     @staticmethod
-    def length(path: list[Point]) -> float:
-        return sum(math.dist(a, b) for a, b in itertools.pairwise(path))
+    def ends(train: Train) -> list[float]:
+        """How far along the train's path each of its points lies, worked out once for each
+        path: trains ask every frame."""
+        kept = train.path_ends
+        if kept is not None and kept[0] is train.path:
+            return kept[1]
+        path = train.path
+        ends = [0.0, *itertools.accumulate(math.dist(a, b) for a, b in itertools.pairwise(path))]
+        train.path_ends = (path, ends)
+        return ends
+
+
+def _trail(taken: list[tuple[int, Cell, int]], last: int) -> list[tuple[Cell, int]]:
+    """The steps of a way found, from the first to `last`."""
+    trail = []
+    while last >= 0:
+        before, cell, exit_point = taken[last]
+        trail.append((cell, exit_point))
+        last = before
+    trail.reverse()
+    return trail
+
+
+def _stretch_at(ends: list[float], along: float) -> int:
+    """The stretch of a path, by the index of the point it starts at, that holds the point
+    `along` into it; the last stretch for points past its end."""
+    return min(max(bisect.bisect_left(ends, along) - 1, 0), len(ends) - 2)
+
+
+def _placed(path: list[Point], ends: list[float], along: float) -> tuple[Point, Point]:
+    index = _stretch_at(ends, along)
+    a, b = path[index], path[index + 1]
+    length = ends[index + 1] - ends[index]
+    share = min(1.0, (along - ends[index]) / length) if length else 0.0
+    return (a[0] + (b[0] - a[0]) * share, a[1] + (b[1] - a[1]) * share), (b[0] - a[0], b[1] - a[1])

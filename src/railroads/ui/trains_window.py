@@ -6,6 +6,7 @@ The chosen train's engine can be upgraded to a newer one of its line, alone or w
 running the same engine."""
 
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from imgui_bundle import icons_fontawesome_4 as fa
@@ -14,8 +15,10 @@ from imgui_bundle import imgui
 from railroads.sim.demand import StationDemand
 from railroads.sim.finance import TRAIN_RESALE, dollars
 from railroads.sim.goods import GENERAL_GOODS, General, Good
+from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, Engine, Kind, Stop, Train
+from railroads.ui.buy_train import BuyScreen, EnginePicture
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at
 from railroads.ui.station_offers import Offer, Supplies, goods_to_load
@@ -37,6 +40,8 @@ WINDOW_SIZE = (980.0, 500.0)
 SMALLEST_WINDOW = (900.0, 440.0)
 WINDOW_TOP = 96.0
 LIST_WIDTH = 190.0
+# How tall each train's row in the list is.
+ROW_HEIGHT = 40.0
 # The share of the space beside the list of trains the map takes.
 MAP_SHARE = 0.45
 # Where a stop card's rows start, after their labels.
@@ -54,6 +59,14 @@ class TrainsWindow:
     # WORTH_EVERY seconds, by train name: when, and per car.
     _worth: dict[str, tuple[float, list[float]]] = field(default_factory=dict)
     map: RouteMap = field(default_factory=RouteMap)
+    # The screen trains are bought on, and the map on it for the route of a train just bought.
+    buy: BuyScreen = field(default_factory=BuyScreen)
+    buy_map: RouteMap = field(default_factory=RouteMap)
+    # The map of the train drawn now, which shows where a good hovered on its stop cards is wanted.
+    _shown_map: RouteMap = field(default_factory=RouteMap)
+    # What each stop's station has to send on each month, worked out at most every WORTH_EVERY
+    # seconds, by station: when, and the goods.
+    _supplied: dict[Cell, tuple[float, Mapping[Good, float]]] = field(default_factory=dict)
 
     def worth(self, railway: Railway, train: Train) -> list[float]:
         """What each of the train's cars would earn at its destination now, kept for a moment
@@ -65,7 +78,27 @@ class TrainsWindow:
             self._worth[train.name] = kept
         return kept[1]
 
-    def draw(self, railway: Railway, supplies: Supplies, ground: GroundPicture) -> None:
+    def supplied(self, supplies: Supplies, station: Cell) -> Mapping[Good, float]:
+        """What a station has to send on each month, kept for a moment as it changes only
+        monthly and the stop cards ask every frame."""
+        now = time.monotonic()
+        kept = self._supplied.get(station)
+        if kept is None or now - kept[0] > WORTH_EVERY:
+            kept = (now, supplies(station))
+            self._supplied[station] = kept
+        return kept[1]
+
+    def draw(
+        self,
+        railway: Railway,
+        supplies: Supplies,
+        ground: GroundPicture,
+        picture: EnginePicture,
+    ) -> None:
+        if not self.open:
+            self.buy.open = False
+        if not self.buy.open:
+            railway.let_go()
         if not self.open:
             return
         display = imgui.get_io().display_size
@@ -83,67 +116,65 @@ class TrainsWindow:
             if train is None:
                 _centered_hint("Buy a train, then give it two stations joined by track.")
             else:
-                self._draw_train(railway, train, supplies, ground)
+                self._draw_train(railway, train, supplies, ground, self.map)
             imgui.end_child()
         imgui.end()
-
-    def _engine_choice(self, railway: Railway, name: str, shown: Train | None) -> None:
-        engine = ENGINES[name]
-        affordable = railway.finances.can_afford(engine.price)
-        imgui.begin_disabled(not affordable)
-        label = f"{engine.title}  {dollars(engine.price)}##{name}"
-        if imgui.selectable(label, False)[0]:
-            bought = railway.buy(name, route_of=shown)
-            if bought is not None:
-                self.chosen = bought.name
-        imgui.end_disabled()
-        if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-            money = "" if affordable else "\nNot enough money"
-            imgui.set_tooltip(f"{engine_summary(engine)}{money}")
+        bought = self.buy.draw(
+            railway,
+            engines_by_kind(railway.engines()),
+            engine_summary,
+            picture,
+            lambda shown: self._draw_train(railway, shown, supplies, ground, self.buy_map),
+        )
+        if bought is not None:
+            self.chosen = bought
 
     def _draw_list(self, railway: Railway) -> Train | None:
+        """The Buy a train button, always at the top, over the list of trains, which scrolls on
+        its own; only the trains in sight are drawn."""
         imgui.begin_child("list", (LIST_WIDTH, 0), imgui.ChildFlags_.borders.value)
         if imgui.button(f"{fa.ICON_FA_PLUS}  Buy a train", (-1, 0)):
-            imgui.open_popup("buy train")
-        if imgui.begin_popup("buy train"):
-            shown = next((t for t in railway.trains if t.name == self.chosen), None)
-            if shown is not None and shown.stops:
-                imgui.text_disabled(f"Calls at the stops of {shown.name}, with no cars yet")
-            imgui.text_disabled("Buy a train with")
-            for kind, names in engines_by_kind(railway.engines()):
-                imgui.separator_text(kind.value.capitalize())
-                for name in names:
-                    self._engine_choice(railway, name, shown)
-            imgui.end_popup()
+            self.buy.open_for(next((t for t in railway.trains if t.name == self.chosen), None))
         imgui.spacing()
-        chosen = None
-        for train in railway.trains:
-            picked = train.name == self.chosen
-            if imgui.selectable(f"##{train.name}", picked, 0, (0, 40))[0]:
-                self.chosen = train.name
-            low = imgui.get_item_rect_min()
-            draw_list = imgui.get_window_draw_list()
-            draw_list.add_text(
-                (low.x + 6, low.y + 3), imgui.get_color_u32(imgui.Col_.text), train.name
-            )
-            status_color = imgui.get_color_u32(imgui.ImVec4(*TEXT_DIM))
-            draw_list.add_text((low.x + 6, low.y + 21), status_color, train.status)
-            worth = sum(self.worth(railway, train))
-            if worth >= 0.5:
-                money = dollars(worth)
-                right = imgui.get_item_rect_max().x - 6 - imgui.calc_text_size(money).x
-                draw_list.add_text((right, low.y + 3), color_u32(BRASS), money)
-                if imgui.is_item_hovered():
-                    imgui.set_tooltip(f"Its cargo is worth about {money} where it is going")
-            if picked:
-                chosen = train
+        imgui.begin_child("rows", (0, 0))
+        trains = railway.trains
+        clipper = imgui.ListClipper()
+        clipper.begin(len(trains))
+        while clipper.step():
+            for index in range(clipper.display_start, clipper.display_end):
+                self._draw_row(railway, trains[index])
+        clipper.end()
         imgui.end_child()
-        if chosen is None and railway.trains and self.chosen is None:
-            self.chosen = railway.trains[0].name
+        imgui.end_child()
+        chosen = next((t for t in trains if t.name == self.chosen), None)
+        if chosen is None and trains and self.chosen is None:
+            self.chosen = trains[0].name
         return chosen
 
+    def _draw_row(self, railway: Railway, train: Train) -> None:
+        picked = train.name == self.chosen
+        if imgui.selectable(f"##{train.name}", picked, 0, (0, ROW_HEIGHT))[0]:
+            self.chosen = train.name
+        low = imgui.get_item_rect_min()
+        draw_list = imgui.get_window_draw_list()
+        draw_list.add_text((low.x + 6, low.y + 3), imgui.get_color_u32(imgui.Col_.text), train.name)
+        status_color = imgui.get_color_u32(imgui.ImVec4(*TEXT_DIM))
+        draw_list.add_text((low.x + 6, low.y + 21), status_color, train.status)
+        worth = sum(self.worth(railway, train))
+        if worth >= 0.5:
+            money = dollars(worth)
+            right = imgui.get_item_rect_max().x - 6 - imgui.calc_text_size(money).x
+            draw_list.add_text((right, low.y + 3), color_u32(BRASS), money)
+            if imgui.is_item_hovered():
+                imgui.set_tooltip(f"Its cargo is worth about {money} where it is going")
+
     def _draw_train(
-        self, railway: Railway, train: Train, supplies: Supplies, ground: GroundPicture
+        self,
+        railway: Railway,
+        train: Train,
+        supplies: Supplies,
+        ground: GroundPicture,
+        route_map: RouteMap,
     ) -> None:
         imgui.push_style_color(imgui.Col_.text, imgui.ImVec4(*BRASS))
         imgui.text(train.name)
@@ -194,7 +225,8 @@ class TrainsWindow:
             imgui.same_line()
             imgui.text_disabled(f"at {onward}")
         imgui.spacing()
-        self.map.good = None
+        route_map.good = None
+        self._shown_map = route_map
         map_width = imgui.get_content_region_avail().x * MAP_SHARE
         imgui.begin_child("route", (-map_width, 0))
         imgui.text_disabled("Route")
@@ -202,7 +234,7 @@ class TrainsWindow:
         imgui.end_child()
         imgui.same_line()
         imgui.begin_child("map", (0, 0), imgui.ChildFlags_.borders.value)
-        self.map.draw(railway, train, ground, supplies)
+        route_map.draw(railway, train, ground, supplies)
         imgui.end_child()
 
     def _draw_stops(self, railway: Railway, train: Train, supplies: Supplies) -> None:
@@ -305,7 +337,7 @@ class TrainsWindow:
                 tooltip = f"{cargo.value} car of {size:.0f} - click to remove"
             removed = car_chip(f"car{car_index}", cargo, tooltip=tooltip)
             if imgui.is_item_hovered() and isinstance(cargo, Good):
-                self.map.good = cargo
+                self._shown_map.good = cargo
             if removed:
                 stop.cars.pop(car_index)
                 train.cars_changed(index)
@@ -333,7 +365,7 @@ class TrainsWindow:
         imgui.same_line(CARD_LABEL)
         offers = [
             offer
-            for offer in goods_to_load(railway, stop.cell, supplies(stop.cell))
+            for offer in goods_to_load(railway, stop.cell, self.supplied(supplies, stop.cell))
             if railway.can_carry(train, offer.good)
         ]
         here = {offer.good for offer in offers}
@@ -368,7 +400,7 @@ class TrainsWindow:
                 stop.add_car(offer.good, most)
                 train.cars_changed(index)
             if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-                self.map.good = offer.good
+                self._shown_map.good = offer.good
             imgui.end_disabled()
         for number, general in enumerate(generals, start=len(offers)):
             if number % per_row:

@@ -62,7 +62,7 @@ from railroads.ui.pixel.layer import PixelLayer
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.track_preview import TrackPreview
-from railroads.ui.pixel.train_layer import TrainLayer
+from railroads.ui.pixel.train_layer import TrainLayer, engine_picture
 from railroads.ui.pixel.world import PixelWorld
 from railroads.ui.route_map import soften, soften_steps
 from railroads.ui.search import BuildingSearch
@@ -156,6 +156,9 @@ class MapView:
         self._pictures: GroundPictures | None = None
         self._pixels: PixelLayer | None = None
         self._trains: TrainLayer | None = None
+        # Each engine's picture for the buy screen, by engine and how many times it is blown up:
+        # its texture and its size in art pixels.
+        self._engine_pictures: dict[tuple[str, int], tuple[hello_imgui.TextureGpu, Vec2]] = {}
         self._preview: TrackPreview | None = None
         self._textures: dict[bool, hello_imgui.TextureGpu] = {}
         # Which of those the frame drawn last showed, the ones a month paints again in its colours.
@@ -225,7 +228,10 @@ class MapView:
         self.build.maglev_open = self.railway.maglev_open
         self.build.draw(*self._map_rect)
         self.build.trains.draw(
-            self.railway, self.growth.station_trade.supplies, self._ground_picture
+            self.railway,
+            self.growth.station_trade.supplies,
+            self._ground_picture,
+            self._engine_picture,
         )
         self.build.stations.draw(self.railway, self.look_at, self.open_station)
         self.station_window.draw(
@@ -584,6 +590,18 @@ class MapView:
         if self._trains is None:
             self._trains = TrainLayer(self._pixel_layer().world)
         return self._trains
+
+    def _engine_picture(self, engine: str, times: int) -> tuple[imgui.ImTextureRef, Vec2]:
+        """An engine as the map draws it, blown up `times` times each way, for the buy screen."""
+        kept = self._engine_pictures.get((engine, times))
+        if kept is None:
+            layer = self._train_layer()
+            pixels = engine_picture(layer.sprites, layer.world.projection.matrix, engine)
+            big = np.repeat(np.repeat(pixels, times, axis=0), times, axis=1)
+            texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
+            kept = (texture, (float(pixels.shape[1]), float(pixels.shape[0])))
+            self._engine_pictures[(engine, times)] = kept
+        return imgui.ImTextureRef(kept[0].texture_id()), kept[1]
 
     def _track_preview(self) -> TrackPreview:
         if self._preview is None:
