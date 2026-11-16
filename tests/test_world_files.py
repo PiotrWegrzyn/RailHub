@@ -3,7 +3,7 @@ import pytest
 
 from builders import MemoryFiles
 from railroads.mapgen.sources import Shape
-from railroads.mapgen.terrain_tiles import OPEN_SEA_M, TILE_SIZE, world_lonlat
+from railroads.mapgen.terrain_tiles import OPEN_SEA_M, TILE_SIZE, pack_tile, world_lonlat
 from railroads.mapgen.world import WorldLand
 from railroads.mapgen.world_files import (
     INDEX_FILE,
@@ -11,7 +11,6 @@ from railroads.mapgen.world_files import (
     World,
     WorldIndex,
     bytes_from_user_defined,
-    pack_tile,
     read_shapes,
     shapes_file,
     squares_over,

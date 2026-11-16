@@ -1,18 +1,12 @@
 """Where a new game starts: a random spot in the world that is mostly land."""
 
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
 
-from railroads.mapgen.area import MapArea
-from railroads.mapgen.sources import Shape
 from railroads.sim.geo import KM_PER_DEGREE_LAT, Bounds
-from railroads.sim.grids import SquareGrid
-
-# Land is measured on a coarse grid, which is plenty to tell sea from land at country size.
-LAND_CHECK_KM_PER_CELL = 20.0
 
 
 @dataclass(frozen=True)
@@ -61,8 +55,3 @@ def pick_start_bounds(
         if region.contains(bounds) and land_share_of(bounds) >= region.min_land_share:
             return bounds
     raise ValueError("found no spot in the start region with enough land")
-
-
-def land_share(bounds: Bounds, water: Sequence[Shape]) -> float:
-    grid = SquareGrid.covering(bounds.width_km, bounds.height_km, LAND_CHECK_KM_PER_CELL)
-    return 1.0 - float(MapArea.of(bounds, grid).cover(water).mean())

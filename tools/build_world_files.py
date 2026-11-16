@@ -20,13 +20,12 @@ from railroads.mapgen import world_files
 from railroads.mapgen.area import clip_ring
 from railroads.mapgen.presets import NaturalEarth
 from railroads.mapgen.sources import Shape
-from railroads.mapgen.terrain_tiles import ElevationDatabase
+from railroads.mapgen.terrain_tiles import ElevationDatabase, pack_tile
 from railroads.mapgen.world_files import (
     SQUARE_DEG,
     SQUARE_OVERLAP_DEG,
     SquareShapes,
     WorldIndex,
-    pack_tile,
     places_file,
     shapes_file,
     square_bounds,
@@ -159,11 +158,8 @@ def main() -> None:
     out = world_files.WORLD_DIR
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir()
-    database = ElevationDatabase(data / "elevation.sqlite")
-    try:
+    with ElevationDatabase(data / "elevation.sqlite") as database:
         tiles = write_tiles(database, out)
-    finally:
-        database.close()
     print(f"{len(tiles)} elevation tiles, {size_mb(out / 'elevation'):.1f} MB")
     first_row = int((90.0 - HIGHEST_LAT) // SQUARE_DEG)
     last_row = int((90.0 - LOWEST_LAT) // SQUARE_DEG) - 1

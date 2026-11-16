@@ -1,15 +1,23 @@
 import numpy as np
 import pytest
 
+from railroads.mapgen.area import MapArea
 from railroads.mapgen.sources import Shape
-from railroads.mapgen.start import StartRegion, land_share, pick_start_bounds
+from railroads.mapgen.start import StartRegion, pick_start_bounds
+from railroads.mapgen.world import LAND_CHECK_KM_PER_CELL
 from railroads.sim.geo import Bounds
+from railroads.sim.grids import SquareGrid
 
 REGION = StartRegion(west=0.0, east=20.0, south=0.0, north=10.0, min_land_share=0.9)
 WEST_HALF_SEA = Shape(
     "polygon", (np.array([(-1.0, -1.0), (10.0, -1.0), (10.0, 11.0), (-1.0, 11.0)]),)
 )
 ALL_SEA = Shape("polygon", (np.array([(-1.0, -1.0), (21.0, -1.0), (21.0, 11.0), (-1.0, 11.0)]),))
+
+
+def land_share(bounds: Bounds, water: list[Shape]) -> float:
+    grid = SquareGrid.covering(bounds.width_km, bounds.height_km, LAND_CHECK_KM_PER_CELL)
+    return 1.0 - float(MapArea.of(bounds, grid).cover(water).mean())
 
 
 def pick(seed: int, water: list[Shape]) -> Bounds:
