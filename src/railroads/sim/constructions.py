@@ -133,6 +133,86 @@ class BuildingKind(Enum):
     TAVERN = "tavern"
     DEPARTMENT_STORE = "department store"
     HOTEL = "hotel"
+    BIG_STEEL_MILL = "big steel mill"
+    MEGA_STEEL_MILL = "mega steel mill"
+    BIG_COKE_PLANT = "big coke plant"
+    MEGA_COKE_PLANT = "mega coke plant"
+    BIG_POTTER = "big potter"
+    MEGA_POTTER = "mega potter"
+    BIG_TILE_WORKS = "big tile works"
+    MEGA_TILE_WORKS = "mega tile works"
+    BIG_FOUNDRY = "big foundry"
+    MEGA_FOUNDRY = "mega foundry"
+    BIG_DAIRY = "big dairy"
+    MEGA_DAIRY = "mega dairy"
+    BIG_SAUSAGE_MAKER = "big sausage maker"
+    MEGA_SAUSAGE_MAKER = "mega sausage maker"
+    BIG_CARPET_WEAVER = "big carpet weaver"
+    MEGA_CARPET_WEAVER = "mega carpet weaver"
+    BIG_CLOCK_MAKER = "big clock maker"
+    MEGA_CLOCK_MAKER = "mega clock maker"
+    BIG_MIRROR_MAKER = "big mirror maker"
+    MEGA_MIRROR_MAKER = "mega mirror maker"
+    BIG_GUN_FACTORY = "big gun factory"
+    MEGA_GUN_FACTORY = "mega gun factory"
+    BIG_TANK_FACTORY = "big tank factory"
+    MEGA_TANK_FACTORY = "mega tank factory"
+    BIG_PLANE_FACTORY = "big aircraft factory"
+    MEGA_PLANE_FACTORY = "mega aircraft factory"
+    BIG_FOOD_PLANT = "big cannery"
+    MEGA_FOOD_PLANT = "mega cannery"
+    BIG_BAKERY = "big bakery"
+    MEGA_BAKERY = "mega bakery"
+    BIG_TEXTILE_MILL = "big textile mill"
+    MEGA_TEXTILE_MILL = "mega textile mill"
+    BIG_FURNITURE_MAKER = "big furniture maker"
+    MEGA_FURNITURE_MAKER = "mega furniture maker"
+    BIG_TOOL_WORKS = "big tool works"
+    MEGA_TOOL_WORKS = "mega tool works"
+    BIG_BARREL_MAKER = "big barrel maker"
+    MEGA_BARREL_MAKER = "mega barrel maker"
+    BIG_WINERY = "big winery"
+    MEGA_WINERY = "mega winery"
+    BIG_REFINERY = "big refinery"
+    MEGA_REFINERY = "mega refinery"
+    BIG_CHEMICAL_WORKS = "big chemical works"
+    MEGA_CHEMICAL_WORKS = "mega chemical works"
+    BIG_ELECTRONICS_PLANT = "big electronics plant"
+    MEGA_ELECTRONICS_PLANT = "mega electronics plant"
+    BIG_CAR_FACTORY = "big car factory"
+    MEGA_CAR_FACTORY = "mega car factory"
+    BIG_MACHINE_WORKS = "big machine works"
+    MEGA_MACHINE_WORKS = "mega machine works"
+    BIG_BRICKWORKS = "big brickworks"
+    MEGA_BRICKWORKS = "mega brickworks"
+    BIG_CEMENT_WORKS = "big cement works"
+    MEGA_CEMENT_WORKS = "mega cement works"
+    BIG_GLASSWORKS = "big glassworks"
+    MEGA_GLASSWORKS = "mega glassworks"
+    BIG_BREWERY = "big brewery"
+    MEGA_BREWERY = "mega brewery"
+    BIG_DISTILLERY = "big distillery"
+    MEGA_DISTILLERY = "mega distillery"
+    BIG_TANNERY = "big tannery"
+    MEGA_TANNERY = "mega tannery"
+    BIG_MEAT_FACTORY = "big butcher"
+    MEGA_MEAT_FACTORY = "mega butcher"
+    BIG_SHOE_FACTORY = "big shoe factory"
+    MEGA_SHOE_FACTORY = "mega shoe factory"
+    BIG_PLASTICS_WORKS = "big plastics works"
+    MEGA_PLASTICS_WORKS = "mega plastics works"
+    BIG_APPLIANCE_FACTORY = "big appliance factory"
+    MEGA_APPLIANCE_FACTORY = "mega appliance factory"
+    BIG_PAPER_MILL = "big paper mill"
+    MEGA_PAPER_MILL = "mega paper mill"
+    BIG_PRINTING_WORKS = "big printing works"
+    MEGA_PRINTING_WORKS = "mega printing works"
+    BIG_SUGAR_REFINERY = "big sugar refinery"
+    MEGA_SUGAR_REFINERY = "mega sugar refinery"
+    BIG_GASWORKS = "big gasworks"
+    MEGA_GASWORKS = "mega gasworks"
+    BIG_PORCELAIN_WORKS = "big porcelain works"
+    MEGA_PORCELAIN_WORKS = "mega porcelain works"
 
     @classmethod
     def _missing_(cls, value: object) -> BuildingKind | None:
@@ -297,6 +377,23 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
         )
     },
 }
+
+# Works that merge as they gather: two of a kind in a neighbourhood become its big one, and two
+# big ones its mega one (railroads.sim.ladders). The factory line merges its own way.
+MERGED: dict[BuildingKind, tuple[BuildingKind, BuildingKind]] = {
+    BuildingKind[kind.name.removeprefix("BIG_")]: (kind, BuildingKind["MEGA_" + kind.name[4:]])
+    for kind in BuildingKind
+    if kind.name.startswith("BIG_") and kind != BuildingKind.BIG_FACTORY
+}
+
+# What each big or mega works grew from.
+GREW_FROM: dict[BuildingKind, BuildingKind] = {
+    grown: kind for kind, kinds in MERGED.items() for grown in kinds
+}
+
+for _grown, _kind in GREW_FROM.items():
+    BUILDING_RULES[_grown] = BUILDING_RULES[_kind]
+
 STATION_RELIEF = _OFF_MOUNTAINS
 
 

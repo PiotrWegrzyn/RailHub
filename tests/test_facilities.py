@@ -1,7 +1,7 @@
 import pytest
 from test_railway import joined_stations
 
-from railroads.sim.facilities import COAL_A_MONTH, ENGINE_SHED_SPEED, Facility
+from railroads.sim.facilities import COAL_A_MONTH, ENGINE_SHED_SPEED, WAREHOUSE_ROOM, Facility
 from railroads.sim.finance import ENGINE_SHED_PRICE
 from railroads.sim.goods import Good, Need
 from railroads.sim.trains import Stop
@@ -58,3 +58,26 @@ def test_a_station_whose_engine_shed_lacks_coal_wants_it() -> None:
     short = growth.station_trade.short_of(STATION)
 
     assert short[Need.COAL] == pytest.approx(COAL_A_MONTH)
+
+
+def test_a_working_post_office_makes_mail_delivered_there_pay_half_as_much_again() -> None:
+    _, railway = joined_stations()
+    railway.build_facility(STATION, Facility.POST_OFFICE)
+    railway.station_goods(STATION).stockpile[Good.PAPER] = 50.0
+    railway.turn_month({})
+
+    factors = (railway.facility_pay(STATION, Good.MAIL), railway.facility_pay(STATION, Good.COAL))
+
+    assert factors == (pytest.approx(1.5), 1.0)
+
+
+def test_a_working_warehouse_gives_every_good_more_room() -> None:
+    _, railway = joined_stations()
+    before = railway.station_goods(STATION).limit
+    railway.build_facility(STATION, Facility.WAREHOUSE)
+    railway.station_goods(STATION).stockpile[Good.BRICKS] = 50.0
+    railway.turn_month({})
+
+    after = railway.station_goods(STATION).limit
+
+    assert after == pytest.approx(before + WAREHOUSE_ROOM)

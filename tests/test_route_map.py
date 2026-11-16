@@ -5,6 +5,7 @@ import pytest
 from imgui_bundle import hello_imgui, imgui
 from test_railway import joined_stations
 
+from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.demand import DEMAND_PER_NEED
 from railroads.sim.goods import Good, Need
 from railroads.sim.steps import finish
@@ -342,3 +343,15 @@ def test_the_map_draws_centred_on_the_trains_stops_with_a_good_marked(context: N
     grid = railway.constructions.tile_map.grid
     (x0, y0), (x1, y1) = grid.center(6, 3), grid.center(6, 20)
     assert route_map.focus == pytest.approx(((x0 + x1) / 2, (y0 + y1) / 2))
+
+
+def test_a_station_whose_buildings_lack_nothing_wants_nothing() -> None:
+    growth, railway = joined_stations()
+    growth.build(Building((6, 21), BuildingKind.CATTLE_RANCH))
+    railway.station_goods((6, 20)).stockpile[Good.WHEAT] = 500.0
+    growth.trade_goods()
+
+    summary = summary_of(railway, (6, 20), {})
+
+    assert railway.station_demand((6, 20)).capacity[Need.WHEAT] > 0
+    assert summary.wants == []

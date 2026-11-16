@@ -21,6 +21,7 @@ def test_a_house_demands_food_and_heating_and_takes_small_comforts_as_bonus() ->
         Need.SHOES,
         Need.GLASS,
         Need.CASTINGS,
+        Need.LIMESTONE,
     }
 
 

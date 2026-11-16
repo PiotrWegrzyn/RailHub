@@ -238,7 +238,7 @@ class Summary:
 
 def summary_of(railway: Railway, station: Cell, made: Mapping[Good, float]) -> Summary:
     trade = railway.station_trade
-    if trade is not None and trade.short_of(station):
+    if trade is not None and trade.has_traded:
         left = list(trade.short_of(station).items())
     else:
         demand = railway.station_demand(station)

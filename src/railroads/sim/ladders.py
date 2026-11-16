@@ -28,9 +28,10 @@ from types import MappingProxyType
 import numpy as np
 import numpy.typing as npt
 
-from railroads.sim.constructions import BuildingKind
+from railroads.sim.constructions import MERGED, BuildingKind
 from railroads.sim.economy import Neighbourhoods
 from railroads.sim.forests import FORESTS, ForestRule
+from railroads.sim.goods import RECIPES, merging
 from railroads.sim.points import Points
 from railroads.sim.tilemap import Deposit, Relief, Temperature, Terrain, TileMap, Vegetation
 
@@ -74,7 +75,7 @@ JEWELLERS_APART = 10
 # month.
 PASSENGERS_PER_POINT: Mapping[Points, int] = MappingProxyType(
     {
-        Points.POPULATION: 2,
+        Points.POPULATION: 1,
         Points.FOOD: 5,
         Points.TIMBER: 5,
         Points.ORE: 10,
@@ -87,115 +88,125 @@ PASSENGERS_PER_POINT: Mapping[Points, int] = MappingProxyType(
     }
 )
 
+_POINTS: dict[BuildingKind, tuple[Points, int]] = {
+    BuildingKind.HOUSE: (Points.POPULATION, 1),
+    BuildingKind.TENEMENT: (Points.POPULATION, 6),
+    BuildingKind.FLATS: (Points.POPULATION, 18),
+    BuildingKind.FARM: (Points.FOOD, 1),
+    BuildingKind.ORCHARD: (Points.FOOD, 1),
+    BuildingKind.DATE_PALMS: (Points.FOOD, 1),
+    BuildingKind.ORANGE_FARM: (Points.FOOD, 1),
+    BuildingKind.BANANAS: (Points.FOOD, 1),
+    BuildingKind.SUGAR: (Points.FOOD, 1),
+    BuildingKind.MINE: (Points.ORE, 1),
+    BuildingKind.LUMBER_MILL: (Points.TIMBER, 1),
+    BuildingKind.PORT: (Points.TRADE, 1),
+    BuildingKind.FACTORY: (Points.INDUSTRY, 1),
+    BuildingKind.BIG_FACTORY: (Points.INDUSTRY, 3),
+    BuildingKind.MEGA_FACTORY: (Points.INDUSTRY, 9),
+    BuildingKind.FOOD_PLANT: (Points.INDUSTRY, 2),
+    BuildingKind.BAKERY: (Points.INDUSTRY, 1),
+    BuildingKind.STEEL_MILL: (Points.INDUSTRY, 3),
+    BuildingKind.SHIPYARD: (Points.INDUSTRY, 3),
+    BuildingKind.FISHERY: (Points.FOOD, 1),
+    BuildingKind.SHEEP_FARM: (Points.FOOD, 1),
+    BuildingKind.COTTON_FIELD: (Points.FOOD, 1),
+    BuildingKind.VINEYARD: (Points.FOOD, 1),
+    BuildingKind.COFFEE_PLANTATION: (Points.FOOD, 1),
+    BuildingKind.RUBBER_PLANTATION: (Points.FOOD, 1),
+    BuildingKind.IRON_MINE: (Points.ORE, 1),
+    BuildingKind.COPPER_MINE: (Points.ORE, 1),
+    BuildingKind.GOLD_MINE: (Points.ORE, 1),
+    BuildingKind.DIAMOND_MINE: (Points.ORE, 1),
+    BuildingKind.OIL_WELL: (Points.ORE, 1),
+    BuildingKind.SALT_WORKS: (Points.ORE, 1),
+    BuildingKind.TEXTILE_MILL: (Points.INDUSTRY, 2),
+    BuildingKind.FURNITURE_MAKER: (Points.INDUSTRY, 2),
+    BuildingKind.TOOL_WORKS: (Points.INDUSTRY, 2),
+    BuildingKind.WINERY: (Points.INDUSTRY, 2),
+    BuildingKind.REFINERY: (Points.INDUSTRY, 3),
+    BuildingKind.CHEMICAL_WORKS: (Points.INDUSTRY, 3),
+    BuildingKind.ELECTRONICS_PLANT: (Points.INDUSTRY, 3),
+    BuildingKind.CAR_FACTORY: (Points.INDUSTRY, 5),
+    BuildingKind.GUN_FACTORY: (Points.INDUSTRY, 3),
+    BuildingKind.TANK_FACTORY: (Points.INDUSTRY, 5),
+    BuildingKind.PLANE_FACTORY: (Points.INDUSTRY, 5),
+    BuildingKind.OUTPOST: (Points.MILITARY, 3),
+    BuildingKind.BASE: (Points.MILITARY, 9),
+    BuildingKind.HEADQUARTERS: (Points.MILITARY, 27),
+    BuildingKind.AIRPORT: (Points.AIR, 1),
+    BuildingKind.BARREL_MAKER: (Points.INDUSTRY, 2),
+    BuildingKind.BEEKEEPER: (Points.FOOD, 1),
+    BuildingKind.INCENSE_GROVE: (Points.FOOD, 1),
+    BuildingKind.CHURCH: (Points.WORSHIP, 5),
+    BuildingKind.BASILICA: (Points.WORSHIP, 20),
+    BuildingKind.CATHEDRAL: (Points.WORSHIP, 50),
+    BuildingKind.ST_PAULS: (Points.WORSHIP, 2137),
+    BuildingKind.CAR_DEALER: (Points.CORPORATE, 1),
+    BuildingKind.JEWELLER: (Points.CORPORATE, 1),
+    BuildingKind.SKYSCRAPER: (Points.CORPORATE, 10),
+    BuildingKind.CLAY_PIT: (Points.ORE, 1),
+    BuildingKind.LIMESTONE_QUARRY: (Points.ORE, 1),
+    BuildingKind.SAND_PIT: (Points.ORE, 1),
+    BuildingKind.POTATO_FARM: (Points.FOOD, 1),
+    BuildingKind.CATTLE_RANCH: (Points.FOOD, 1),
+    BuildingKind.PIG_FARM: (Points.FOOD, 1),
+    BuildingKind.CHICKEN_FARM: (Points.FOOD, 1),
+    BuildingKind.GASWORKS: (Points.INDUSTRY, 1),
+    BuildingKind.COKE_PLANT: (Points.INDUSTRY, 2),
+    BuildingKind.POTTER: (Points.INDUSTRY, 1),
+    BuildingKind.TILE_WORKS: (Points.INDUSTRY, 1),
+    BuildingKind.FOUNDRY: (Points.INDUSTRY, 2),
+    BuildingKind.DAIRY: (Points.INDUSTRY, 1),
+    BuildingKind.SAUSAGE_MAKER: (Points.INDUSTRY, 1),
+    BuildingKind.CARPET_WEAVER: (Points.CORPORATE, 2),
+    BuildingKind.CLOCK_MAKER: (Points.CORPORATE, 2),
+    BuildingKind.MIRROR_MAKER: (Points.CORPORATE, 2),
+    BuildingKind.MANOR: (Points.CORPORATE, 8),
+    BuildingKind.THEATRE: (Points.CORPORATE, 5),
+    BuildingKind.HOSPITAL: (Points.CORPORATE, 5),
+    BuildingKind.RAILWAY_WORKS: (Points.INDUSTRY, 20),
+    BuildingKind.FLAX_FIELD: (Points.FOOD, 1),
+    BuildingKind.HOP_GARDEN: (Points.FOOD, 1),
+    BuildingKind.MACHINE_WORKS: (Points.INDUSTRY, 3),
+    BuildingKind.BRICKWORKS: (Points.INDUSTRY, 2),
+    BuildingKind.CEMENT_WORKS: (Points.INDUSTRY, 2),
+    BuildingKind.GLASSWORKS: (Points.INDUSTRY, 2),
+    BuildingKind.BREWERY: (Points.INDUSTRY, 2),
+    BuildingKind.DISTILLERY: (Points.INDUSTRY, 2),
+    BuildingKind.TANNERY: (Points.INDUSTRY, 2),
+    BuildingKind.SHOE_FACTORY: (Points.INDUSTRY, 2),
+    BuildingKind.PLASTICS_WORKS: (Points.INDUSTRY, 3),
+    BuildingKind.APPLIANCE_FACTORY: (Points.INDUSTRY, 3),
+    BuildingKind.PAPER_MILL: (Points.INDUSTRY, 2),
+    BuildingKind.PRINTING_WORKS: (Points.INDUSTRY, 2),
+    BuildingKind.SUGAR_REFINERY: (Points.INDUSTRY, 2),
+    BuildingKind.PORCELAIN_WORKS: (Points.INDUSTRY, 2),
+    BuildingKind.MEAT_FACTORY: (Points.INDUSTRY, 2),
+    BuildingKind.POWER_PLANT: (Points.INDUSTRY, 5),
+    BuildingKind.SPACE_CENTER: (Points.CORPORATE, 25),
+    BuildingKind.PEAR_HQ: (Points.CORPORATE, 50),
+    BuildingKind.ROYAL_PALACE: (Points.CORPORATE, 15),
+    BuildingKind.SALT_CATHEDRAL: (Points.WORSHIP, 200),
+    BuildingKind.SPA_RESORT: (Points.CORPORATE, 15),
+    BuildingKind.WORLDS_FAIR: (Points.CORPORATE, 50),
+    BuildingKind.FILM_STUDIO: (Points.CORPORATE, 10),
+    BuildingKind.AMUSEMENT_PARK: (Points.CORPORATE, 40),
+    BuildingKind.OLYMPIC_STADIUM: (Points.CORPORATE, 100),
+    BuildingKind.TAVERN: (Points.CORPORATE, 1),
+    BuildingKind.DEPARTMENT_STORE: (Points.CORPORATE, 3),
+    BuildingKind.HOTEL: (Points.CORPORATE, 5),
+}
+
+# A big works gives the points of the works merged into it, and a mega one of the big ones.
 POINTS: Mapping[BuildingKind, tuple[Points, int]] = MappingProxyType(
     {
-        BuildingKind.HOUSE: (Points.POPULATION, 1),
-        BuildingKind.TENEMENT: (Points.POPULATION, 6),
-        BuildingKind.FLATS: (Points.POPULATION, 18),
-        BuildingKind.FARM: (Points.FOOD, 1),
-        BuildingKind.ORCHARD: (Points.FOOD, 1),
-        BuildingKind.DATE_PALMS: (Points.FOOD, 1),
-        BuildingKind.ORANGE_FARM: (Points.FOOD, 1),
-        BuildingKind.BANANAS: (Points.FOOD, 1),
-        BuildingKind.SUGAR: (Points.FOOD, 1),
-        BuildingKind.MINE: (Points.ORE, 1),
-        BuildingKind.LUMBER_MILL: (Points.TIMBER, 1),
-        BuildingKind.PORT: (Points.TRADE, 1),
-        BuildingKind.FACTORY: (Points.INDUSTRY, 1),
-        BuildingKind.BIG_FACTORY: (Points.INDUSTRY, 3),
-        BuildingKind.MEGA_FACTORY: (Points.INDUSTRY, 9),
-        BuildingKind.FOOD_PLANT: (Points.INDUSTRY, 2),
-        BuildingKind.BAKERY: (Points.INDUSTRY, 1),
-        BuildingKind.STEEL_MILL: (Points.INDUSTRY, 3),
-        BuildingKind.SHIPYARD: (Points.INDUSTRY, 3),
-        BuildingKind.FISHERY: (Points.FOOD, 1),
-        BuildingKind.SHEEP_FARM: (Points.FOOD, 1),
-        BuildingKind.COTTON_FIELD: (Points.FOOD, 1),
-        BuildingKind.VINEYARD: (Points.FOOD, 1),
-        BuildingKind.COFFEE_PLANTATION: (Points.FOOD, 1),
-        BuildingKind.RUBBER_PLANTATION: (Points.FOOD, 1),
-        BuildingKind.IRON_MINE: (Points.ORE, 1),
-        BuildingKind.COPPER_MINE: (Points.ORE, 1),
-        BuildingKind.GOLD_MINE: (Points.ORE, 1),
-        BuildingKind.DIAMOND_MINE: (Points.ORE, 1),
-        BuildingKind.OIL_WELL: (Points.ORE, 1),
-        BuildingKind.SALT_WORKS: (Points.ORE, 1),
-        BuildingKind.TEXTILE_MILL: (Points.INDUSTRY, 2),
-        BuildingKind.FURNITURE_MAKER: (Points.INDUSTRY, 2),
-        BuildingKind.TOOL_WORKS: (Points.INDUSTRY, 2),
-        BuildingKind.WINERY: (Points.INDUSTRY, 2),
-        BuildingKind.REFINERY: (Points.INDUSTRY, 3),
-        BuildingKind.CHEMICAL_WORKS: (Points.INDUSTRY, 3),
-        BuildingKind.ELECTRONICS_PLANT: (Points.INDUSTRY, 3),
-        BuildingKind.CAR_FACTORY: (Points.INDUSTRY, 5),
-        BuildingKind.GUN_FACTORY: (Points.INDUSTRY, 3),
-        BuildingKind.TANK_FACTORY: (Points.INDUSTRY, 5),
-        BuildingKind.PLANE_FACTORY: (Points.INDUSTRY, 5),
-        BuildingKind.OUTPOST: (Points.MILITARY, 3),
-        BuildingKind.BASE: (Points.MILITARY, 9),
-        BuildingKind.HEADQUARTERS: (Points.MILITARY, 27),
-        BuildingKind.AIRPORT: (Points.AIR, 1),
-        BuildingKind.BARREL_MAKER: (Points.INDUSTRY, 2),
-        BuildingKind.BEEKEEPER: (Points.FOOD, 1),
-        BuildingKind.INCENSE_GROVE: (Points.FOOD, 1),
-        BuildingKind.CHURCH: (Points.WORSHIP, 5),
-        BuildingKind.BASILICA: (Points.WORSHIP, 20),
-        BuildingKind.CATHEDRAL: (Points.WORSHIP, 50),
-        BuildingKind.ST_PAULS: (Points.WORSHIP, 2137),
-        BuildingKind.CAR_DEALER: (Points.CORPORATE, 1),
-        BuildingKind.JEWELLER: (Points.CORPORATE, 1),
-        BuildingKind.SKYSCRAPER: (Points.CORPORATE, 10),
-        BuildingKind.CLAY_PIT: (Points.ORE, 1),
-        BuildingKind.LIMESTONE_QUARRY: (Points.ORE, 1),
-        BuildingKind.SAND_PIT: (Points.ORE, 1),
-        BuildingKind.POTATO_FARM: (Points.FOOD, 1),
-        BuildingKind.CATTLE_RANCH: (Points.FOOD, 1),
-        BuildingKind.PIG_FARM: (Points.FOOD, 1),
-        BuildingKind.CHICKEN_FARM: (Points.FOOD, 1),
-        BuildingKind.GASWORKS: (Points.INDUSTRY, 1),
-        BuildingKind.COKE_PLANT: (Points.INDUSTRY, 2),
-        BuildingKind.POTTER: (Points.INDUSTRY, 1),
-        BuildingKind.TILE_WORKS: (Points.INDUSTRY, 1),
-        BuildingKind.FOUNDRY: (Points.INDUSTRY, 2),
-        BuildingKind.DAIRY: (Points.INDUSTRY, 1),
-        BuildingKind.SAUSAGE_MAKER: (Points.INDUSTRY, 1),
-        BuildingKind.CARPET_WEAVER: (Points.CORPORATE, 2),
-        BuildingKind.CLOCK_MAKER: (Points.CORPORATE, 2),
-        BuildingKind.MIRROR_MAKER: (Points.CORPORATE, 2),
-        BuildingKind.MANOR: (Points.CORPORATE, 8),
-        BuildingKind.THEATRE: (Points.CORPORATE, 5),
-        BuildingKind.HOSPITAL: (Points.CORPORATE, 5),
-        BuildingKind.RAILWAY_WORKS: (Points.INDUSTRY, 20),
-        BuildingKind.FLAX_FIELD: (Points.FOOD, 1),
-        BuildingKind.HOP_GARDEN: (Points.FOOD, 1),
-        BuildingKind.MACHINE_WORKS: (Points.INDUSTRY, 3),
-        BuildingKind.BRICKWORKS: (Points.INDUSTRY, 2),
-        BuildingKind.CEMENT_WORKS: (Points.INDUSTRY, 2),
-        BuildingKind.GLASSWORKS: (Points.INDUSTRY, 2),
-        BuildingKind.BREWERY: (Points.INDUSTRY, 2),
-        BuildingKind.DISTILLERY: (Points.INDUSTRY, 2),
-        BuildingKind.TANNERY: (Points.INDUSTRY, 2),
-        BuildingKind.SHOE_FACTORY: (Points.INDUSTRY, 2),
-        BuildingKind.PLASTICS_WORKS: (Points.INDUSTRY, 3),
-        BuildingKind.APPLIANCE_FACTORY: (Points.INDUSTRY, 3),
-        BuildingKind.PAPER_MILL: (Points.INDUSTRY, 2),
-        BuildingKind.PRINTING_WORKS: (Points.INDUSTRY, 2),
-        BuildingKind.SUGAR_REFINERY: (Points.INDUSTRY, 2),
-        BuildingKind.PORCELAIN_WORKS: (Points.INDUSTRY, 2),
-        BuildingKind.MEAT_FACTORY: (Points.INDUSTRY, 2),
-        BuildingKind.POWER_PLANT: (Points.INDUSTRY, 5),
-        BuildingKind.SPACE_CENTER: (Points.CORPORATE, 25),
-        BuildingKind.PEAR_HQ: (Points.CORPORATE, 50),
-        BuildingKind.ROYAL_PALACE: (Points.CORPORATE, 15),
-        BuildingKind.SALT_CATHEDRAL: (Points.WORSHIP, 200),
-        BuildingKind.SPA_RESORT: (Points.CORPORATE, 15),
-        BuildingKind.WORLDS_FAIR: (Points.CORPORATE, 50),
-        BuildingKind.FILM_STUDIO: (Points.CORPORATE, 10),
-        BuildingKind.AMUSEMENT_PARK: (Points.CORPORATE, 40),
-        BuildingKind.OLYMPIC_STADIUM: (Points.CORPORATE, 100),
-        BuildingKind.TAVERN: (Points.CORPORATE, 1),
-        BuildingKind.DEPARTMENT_STORE: (Points.CORPORATE, 3),
-        BuildingKind.HOTEL: (Points.CORPORATE, 5),
+        **_POINTS,
+        **{
+            grown: (_POINTS[kind][0], _POINTS[kind][1] * merging(RECIPES[kind]) ** step)
+            for kind, sizes in MERGED.items()
+            for step, grown in enumerate(sizes, start=1)
+        },
     }
 )
 
@@ -350,6 +361,24 @@ class Ladder:
     @property
     def name(self) -> str:
         return self.kinds[0].value
+
+
+def _merges(ladder: Ladder) -> Ladder:
+    """A works ladder whose works merge as they gather (railroads.sim.constructions.MERGED): so
+    many of a kind in a neighbourhood become its big one, and as many big ones its mega one."""
+    kind = ladder.kinds[0]
+    sizes = MERGED.get(kind)
+    if sizes is None:
+        return ladder
+    needed = merging(RECIPES[kind])
+    big, _ = sizes
+    most_nearby = ladder.most_nearby
+    return replace(
+        ladder,
+        kinds=(kind, *sizes),
+        merges={kind: Merge(needed, needed), big: Merge(needed, needed)},
+        most_nearby=None if most_nearby is None else max(most_nearby, needed),
+    )
 
 
 # Built land: towns and the factories that follow them.
@@ -540,34 +569,38 @@ FACTORIES = Ladder(
 
 # Canneries can the fruit of nearby orchards, palms, plantations and sugar fields with steel, and
 # gather among other industry.
-FOOD_PLANTS = Ladder(
-    kinds=(BuildingKind.FOOD_PLANT,),
-    land=FACTORY_LAND,
-    base_chance=0.000000015,
-    chance_per_doubling={
-        Points.FOOD: 0.00000026,
-        Points.POPULATION: 0.000000003,
-        Points.INDUSTRY: 0.00000076,
-    },
-    needs={Points.FOOD: 1},
-    most_per_cell=1,
-    most_nearby=6,
-    from_year=1810,
+FOOD_PLANTS = _merges(
+    Ladder(
+        kinds=(BuildingKind.FOOD_PLANT,),
+        land=FACTORY_LAND,
+        base_chance=0.000000015,
+        chance_per_doubling={
+            Points.FOOD: 0.00000026,
+            Points.POPULATION: 0.000000003,
+            Points.INDUSTRY: 0.00000076,
+        },
+        needs={Points.FOOD: 1},
+        most_per_cell=1,
+        most_nearby=6,
+        from_year=1810,
+    )
 )
 
 # Steel mills make steel from iron ore and coal, near mines and among other industry.
-STEEL_MILLS = Ladder(
-    kinds=(BuildingKind.STEEL_MILL,),
-    land=Land(
-        vegetation={Vegetation.FOREST: 0.2},
-        relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
-        water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.2, Terrain.SEA: 1.2},
-    ),
-    base_chance=0.000000056,
-    chance_per_doubling={Points.ORE: 0.000007, Points.INDUSTRY: 0.00000042},
-    most_per_cell=1,
-    most_nearby=2,
-    from_year=1855,
+STEEL_MILLS = _merges(
+    Ladder(
+        kinds=(BuildingKind.STEEL_MILL,),
+        land=Land(
+            vegetation={Vegetation.FOREST: 0.2},
+            relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
+            water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.2, Terrain.SEA: 1.2},
+        ),
+        base_chance=0.000000056,
+        chance_per_doubling={Points.ORE: 0.000007, Points.INDUSTRY: 0.00000042},
+        most_per_cell=1,
+        most_nearby=2,
+        from_year=1855,
+    )
 )
 
 # Shipyards build on the water beside a port, among industry that feeds them.
@@ -609,16 +642,18 @@ def _works(
 ) -> Ladder:
     """A works that opens anywhere by chance, a little likelier where people and industry are,
     whether or not its inputs are near."""
-    return Ladder(
-        kinds=(kind,),
-        land=FACTORY_LAND,
-        base_chance=base,
-        chance_per_doubling=chances,
-        needs=needs,
-        most_per_cell=1,
-        most_nearby=2,
-        from_year=from_year,
-        land_cells_each=land_cells_each,
+    return _merges(
+        Ladder(
+            kinds=(kind,),
+            land=FACTORY_LAND,
+            base_chance=base,
+            chance_per_doubling=chances,
+            needs=needs,
+            most_per_cell=1,
+            most_nearby=2,
+            from_year=from_year,
+            land_cells_each=land_cells_each,
+        )
     )
 
 
@@ -689,31 +724,39 @@ BEEKEEPERS = Ladder(
     most_nearby=1,
 )
 
-# Bakeries bake the wheat brought to them into bread, one to a neighbourhood, in towns.
 # Gasworks make town gas out of coal from 1820, one to a town, the likelier the more people live
 # around (railroads.sim.growth.SPAWN_BY_PEOPLE).
-GASWORKS = Ladder(
-    kinds=(BuildingKind.GASWORKS,),
-    land=FACTORY_LAND,
-    base_chance=0.000001,
-    chance_per_doubling={Points.POPULATION: 0.000001},
-    most_per_cell=1,
-    most_nearby=1,
-    from_year=1820,
+GASWORKS = _merges(
+    Ladder(
+        kinds=(BuildingKind.GASWORKS,),
+        land=FACTORY_LAND,
+        base_chance=0.000001,
+        chance_per_doubling={Points.POPULATION: 0.000001},
+        most_per_cell=1,
+        most_nearby=1,
+        from_year=1820,
+    )
 )
 
-BAKERIES = Ladder(
+# Bakeries and the other makers of food are what towns grow on: they open once FOOD_TOWN people
+# live in the neighbourhood, and readily.
+FOOD_TOWN = 4
+
+_BAKERY = Ladder(
     kinds=(BuildingKind.BAKERY,),
     land=TOWN_LAND,
-    base_chance=0.000008,
+    base_chance=0.0001,
     chance_per_doubling={Points.POPULATION: 0.000001},
+    needs={Points.POPULATION: FOOD_TOWN},
     most_per_cell=1,
     most_nearby=1,
 )
 
+BAKERIES = _merges(_BAKERY)
+
 # Butchers open in towns from 1850, the likelier the more people live around, like bakeries.
-BUTCHERS = replace(
-    BAKERIES, kinds=(BuildingKind.MEAT_FACTORY,), base_chance=0.000004, from_year=1850
+BUTCHERS = _merges(
+    replace(_BAKERY, kinds=(BuildingKind.MEAT_FACTORY,), base_chance=0.00005, from_year=1850)
 )
 
 # Town crafts that come up, like bakeries, the likelier the more people live around: potters and
@@ -726,38 +769,42 @@ LUXURY_TOWN = 20
 def _town_craft(
     kind: BuildingKind, share: float, from_year: int = 0, least_people: int = 0
 ) -> Ladder:
-    return Ladder(
-        kinds=(kind,),
-        land=TOWN_LAND,
-        base_chance=CRAFT_BASE * share,
-        chance_per_doubling={Points.POPULATION: 0.000001},
-        needs={Points.POPULATION: least_people} if least_people else {},
-        most_per_cell=1,
-        most_nearby=1,
-        from_year=from_year,
+    return _merges(
+        Ladder(
+            kinds=(kind,),
+            land=TOWN_LAND,
+            base_chance=CRAFT_BASE * share,
+            chance_per_doubling={Points.POPULATION: 0.000001},
+            needs={Points.POPULATION: least_people} if least_people else {},
+            most_per_cell=1,
+            most_nearby=1,
+            from_year=from_year,
+        )
     )
 
 
 TOWN_CRAFTS = (
     _town_craft(BuildingKind.POTTER, 1.0),
-    _town_craft(BuildingKind.DAIRY, 1.0),
+    _town_craft(BuildingKind.DAIRY, 12.5, least_people=FOOD_TOWN),
     _town_craft(BuildingKind.TILE_WORKS, 0.5),
     _town_craft(BuildingKind.FOUNDRY, 0.5, 1800),
-    _town_craft(BuildingKind.SAUSAGE_MAKER, 0.5, 1850),
+    _town_craft(BuildingKind.SAUSAGE_MAKER, 6.25, 1850, FOOD_TOWN),
     _town_craft(BuildingKind.CARPET_WEAVER, 0.1, 1700, LUXURY_TOWN),
     _town_craft(BuildingKind.CLOCK_MAKER, 0.1, 1880, LUXURY_TOWN),
     _town_craft(BuildingKind.MIRROR_MAKER, 0.1, 1700, LUXURY_TOWN),
 )
 
 # Coke plants bake coal into coke for the steel mills from 1850, drawn to industry.
-COKE_PLANTS = Ladder(
-    kinds=(BuildingKind.COKE_PLANT,),
-    land=FACTORY_LAND,
-    base_chance=0.0000002,
-    chance_per_doubling={Points.INDUSTRY: 0.0000004},
-    most_per_cell=1,
-    most_nearby=2,
-    from_year=1850,
+COKE_PLANTS = _merges(
+    Ladder(
+        kinds=(BuildingKind.COKE_PLANT,),
+        land=FACTORY_LAND,
+        base_chance=0.0000002,
+        chance_per_doubling={Points.INDUSTRY: 0.0000004},
+        most_per_cell=1,
+        most_nearby=2,
+        from_year=1850,
+    )
 )
 
 # Buildings that only buy: manors in towns of MANOR_TOWN people, theatres in towns of

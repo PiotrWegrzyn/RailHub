@@ -175,11 +175,11 @@ def test_incense_lies_in_only_a_handful_of_cells(seed: int) -> None:
     assert int((layer == Deposit.INCENSE).sum()) <= 12
 
 
-def test_a_house_is_one_population_and_two_travellers_and_wants_food_heat_and_small_comforts() -> (
+def test_a_house_is_one_population_and_one_traveller_and_wants_food_heat_and_small_comforts() -> (
     None
 ):
     assert POINTS[BuildingKind.HOUSE] == (Points.POPULATION, 1)
-    assert PASSENGERS_PER_POINT[Points.POPULATION] == 2
+    assert PASSENGERS_PER_POINT[Points.POPULATION] == 1
     assert NEEDS[BuildingKind.HOUSE] == {
         Need.FOOD: 10,
         Need.HEATING: 1,
@@ -194,6 +194,7 @@ def test_a_house_is_one_population_and_two_travellers_and_wants_food_heat_and_sm
         Need.SHOES: 0.5,
         Need.GLASS: 0.2,
         Need.CASTINGS: 0.2,
+        Need.LIMESTONE: 0.5,
     }
 
 

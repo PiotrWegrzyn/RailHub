@@ -8,6 +8,7 @@ from railroads.sim.economy import Economy, StationOrder
 from railroads.sim.finance import (
     CAR_TRIP_PRICE,
     STATION_UPKEEP,
+    STORAGE_GROWTH,
     STORAGE_PRICE,
     TRACK_UPKEEP,
     TRAIN_PRICE,
@@ -204,7 +205,7 @@ def test_a_station_gathers_what_a_farm_makes() -> None:
 
     trade = economy.trade(counts, {(6, 12): StationOrder({}, 100.0)})
 
-    assert trade.gathered[(6, 12)][Good.WHEAT] == pytest.approx(10.0)
+    assert trade.gathered[(6, 12)][Good.WHEAT] == pytest.approx(5.0)
 
 
 def test_cars_slow_a_train_and_full_cars_slow_it_more() -> None:
@@ -373,8 +374,9 @@ def test_station_demand_is_twice_the_needs_of_buildings_in_its_inner_ring() -> N
         Need.SHOES: 12.0,
         Need.GLASS: pytest.approx(4.8),
         Need.CASTINGS: pytest.approx(4.8),
-        Need.PASSENGERS: 48.0,
-        Need.MAIL: 8.0,
+        Need.LIMESTONE: 12.0,
+        Need.PASSENGERS: 24.0,
+        Need.MAIL: 4.0,
     }
     assert demand.record(Need.FOOD).left == pytest.approx(240.0)
 
@@ -403,9 +405,9 @@ def test_stations_send_passengers_by_the_points_around_them_and_a_fifth_as_much_
 
     goods = railway.station_goods((6, 20))
     demand = railway.station_demand((6, 20))
-    assert goods.stockpile[Good.PASSENGERS] == 2 * 2 + 10 + 5
+    assert goods.stockpile[Good.PASSENGERS] == 2 + 10 + 5
     assert goods.stockpile[Good.MAIL] == 3
-    assert demand.capacity[Need.PASSENGERS] == 2 * 19
+    assert demand.capacity[Need.PASSENGERS] == 2 * 17
 
 
 def test_waiting_passengers_have_their_own_room_and_leave_freight_its_stockpile() -> None:
@@ -467,7 +469,18 @@ def test_each_storage_upgrade_adds_to_each_good_and_to_the_waiting_room() -> Non
 
     goods = railway.station_goods((6, 20))
     assert (goods.limit, goods.waiting_limit) == (500.0 + 2 * 250, WAITING + 1000)
-    assert railway.finances.cash == cash - 2 * STORAGE_PRICE
+    assert railway.finances.cash == cash - STORAGE_PRICE * (1 + STORAGE_GROWTH)
+
+
+def test_each_storage_upgrade_costs_twice_the_one_before() -> None:
+    _, railway = joined_stations()
+    prices = []
+
+    for _ in range(3):
+        prices.append(railway.storage_price((6, 20)))
+        railway.add_storage((6, 20))
+
+    assert prices == [STORAGE_PRICE, 2 * STORAGE_PRICE, 4 * STORAGE_PRICE]
 
 
 def test_a_raised_station_gathers_from_further_away() -> None:
@@ -771,7 +784,7 @@ def test_a_town_eats_its_own_farms_food_the_month_it_is_made_and_only_the_rest_w
 
     food, _ = food_and_heating(growth, (6, 21))
     assert food == pytest.approx(10.0)
-    assert railway.station_goods((6, 20)).stockpile[Good.WHEAT] == pytest.approx(4 * 10 - 10.0)
+    assert railway.station_goods((6, 20)).stockpile[Good.WHEAT] == pytest.approx(4 * 5 - 10.0)
 
 
 def test_coal_mined_near_a_station_heats_its_own_houses_before_waiting_for_trains() -> None:

@@ -11,7 +11,7 @@ import numpy.typing as npt
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.sim.constructions import BuildingKind
+from railroads.sim.constructions import GREW_FROM, MERGED, BuildingKind
 from railroads.sim.goods import FITS, MAKES, NEEDS
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
@@ -36,12 +36,18 @@ def goods_of(kind: BuildingKind) -> frozenset[str]:
     return frozenset(made | wanted | meeting)
 
 
+def _alphabetical(kind: BuildingKind) -> tuple[str, int]:
+    base = GREW_FROM.get(kind, kind)
+    return base.value, (base, *MERGED.get(base, ())).index(kind)
+
+
 def kinds_matching(query: str) -> list[BuildingKind]:
     """The kinds of building a search finds: those named by it first, then those trading a good
-    named by it, each in alphabetical order."""
+    named by it, each in alphabetical order with big and mega works after the works they grew
+    from."""
     words = query.lower().split()
     named, trading = [], []
-    for kind in sorted(BuildingKind, key=lambda k: k.value):
+    for kind in sorted(BuildingKind, key=_alphabetical):
         name = kind.value.lower()
         if all(word in name for word in words):
             named.append(kind)

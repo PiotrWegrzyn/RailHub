@@ -2,11 +2,13 @@ import numpy as np
 import pytest
 
 from builders import flat_map
+from railroads.sim import economy as economy_module
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Economy, Satisfaction, StationOrder, levels_of, served_multipliers
-from railroads.sim.goods import Good, Need, makes_of, needs_of
+from railroads.sim.goods import PIPELINE, Good, Need, makes_of, needs_of
 from railroads.sim.grids import HexGrid
 from railroads.sim.ladders import LUMBER_MILLS, MINES
+from railroads.sim.steps import finish
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 
 STATION = (8, 10)
@@ -53,7 +55,7 @@ def eaten_at(economy: Economy, trade: object, cell: tuple[int, int]) -> float:
     return float(eaten[position(trade, economy, cell)])
 
 
-@pytest.mark.parametrize(("house", "eaten"), [((8, 4), 10.0), ((8, 5), 9.0), ((8, 8), 6.0)])
+@pytest.mark.parametrize(("house", "eaten"), [((8, 4), 5.0), ((8, 5), 4.5), ((8, 8), 3.0)])
 def test_without_a_station_a_farm_sells_to_a_house_losing_a_tenth_for_every_cell_between(
     house: tuple[int, int], eaten: float
 ) -> None:
@@ -77,12 +79,12 @@ def test_nothing_a_farm_sells_reaches_ten_cells_away() -> None:
     assert level_at(economy, trade, (8, 4), BuildingKind.FARM) == Satisfaction.UNSATISFIED
 
 
-def test_a_farm_feeds_the_nearer_house_first_and_the_farther_one_what_is_left() -> None:
+def test_farms_feed_the_nearer_house_first_and_the_farther_one_what_is_left() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     placed = counts(
         tile_map,
-        ((8, 4), BuildingKind.FARM, 2),
+        ((8, 4), BuildingKind.FARM, 4),
         ((8, 5), BuildingKind.HOUSE, 1),
         ((8, 7), BuildingKind.HOUSE, 1),
     )
@@ -113,7 +115,7 @@ def test_a_station_gathers_before_buildings_nearby_buy() -> None:
         placed, {STATION: StationOrder({}, 100.0, delivery=0, kept=frozenset(Good))}
     )
 
-    assert trade.gathered[STATION] == {Good.WHEAT: 10.0}
+    assert trade.gathered[STATION] == {Good.WHEAT: 5.0}
     assert eaten_at(economy, trade, (6, 4)) == 0.0
 
 
@@ -213,16 +215,16 @@ def test_inputs_wait_in_a_stockpile_of_three_hundred_until_the_other_input_comes
     assert economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][flat(economy, (8, 8))] == 300.0
 
 
-def test_ten_fruit_and_ten_steel_make_twenty_five_cans() -> None:
+def test_nine_fruit_and_three_steel_make_thirty_cans() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
-    economy.stock[(BuildingKind.FOOD_PLANT, Need.FRUIT)][flat(economy, (8, 8))] = 10.0
-    economy.stock[(BuildingKind.FOOD_PLANT, Need.STEEL)][flat(economy, (8, 8))] = 10.0
+    economy.stock[(BuildingKind.FOOD_PLANT, Need.FRUIT)][flat(economy, (8, 8))] = 9.0
+    economy.stock[(BuildingKind.FOOD_PLANT, Need.STEEL)][flat(economy, (8, 8))] = 3.0
     placed = counts(tile_map, ((8, 8), BuildingKind.FOOD_PLANT, 1))
 
     trade = economy.trade(placed, {STATION: StationOrder({}, 100.0)})
 
-    assert trade.gathered[STATION][Good.CANS] == pytest.approx(25.0)
+    assert trade.gathered[STATION][Good.CANS] == pytest.approx(30.0)
     assert economy.stock[(BuildingKind.FOOD_PLANT, Need.FRUIT)][flat(economy, (8, 8))] == 0.0
 
 
@@ -276,14 +278,14 @@ def test_a_station_counts_what_it_passes_along_from_its_stockpile_by_need() -> N
     assert trade.handed_for[STATION] == {}
 
 
-def test_a_bakery_bakes_each_unit_of_wheat_into_two_of_bread() -> None:
+def test_a_bakery_bakes_each_unit_of_wheat_into_two_and_a_half_of_bread() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 8), BuildingKind.BAKERY, 1))
 
     trade = economy.trade(placed, holding(100.0, WHEAT=5.0))
 
-    assert trade.gathered[STATION][Good.BREAD] == pytest.approx(10.0)
+    assert trade.gathered[STATION][Good.BREAD] == pytest.approx(12.5)
     assert economy.stock[(BuildingKind.BAKERY, Need.WHEAT)][flat(economy, (8, 8))] == 0.0
 
 
@@ -296,7 +298,7 @@ def test_bakeries_take_their_wheat_before_houses_eat_it_and_bread_feeds_houses()
 
     baked_for_the_house = 5.0 / 0.9
     assert economy.stock[(BuildingKind.BAKERY, Need.WHEAT)][flat(economy, (8, 8))] == pytest.approx(
-        3.0 - baked_for_the_house / 2
+        3.0 - baked_for_the_house * 0.4
     )
     assert eaten_at(economy, trade, (8, 9)) == pytest.approx(10.0)
     assert trade.supplied_for[STATION][(Need.FOOD, Good.BREAD)] == 5.0
@@ -318,12 +320,12 @@ def test_a_big_factory_works_on_steel_alone_until_copper_comes_in_1880(
     )
 
 
-def test_farms_want_machinery_only_from_1920() -> None:
+def test_farms_want_limestone_always_and_machinery_only_from_1920() -> None:
     before = needs_of(BuildingKind.FARM, 1919)
     after = needs_of(BuildingKind.FARM, 1920)
 
-    assert before == {}
-    assert after == {Need.MACHINERY: 1}
+    assert before == {Need.LIMESTONE: 2}
+    assert after == {Need.MACHINERY: 1, Need.LIMESTONE: 2}
 
 
 @pytest.mark.parametrize(
@@ -332,9 +334,11 @@ def test_farms_want_machinery_only_from_1920() -> None:
         (BuildingKind.BRICKWORKS, {"CLAY": 10.0}, Good.BRICKS, 20.0),
         (BuildingKind.BRICKWORKS, {"CLAY": 10.0, "COAL": 5.0}, Good.BRICKS, 40.0),
         (BuildingKind.TANNERY, {"CATTLE": 10.0}, Good.LEATHER, 20.0),
-        (BuildingKind.SHOE_FACTORY, {"LEATHER": 10.0}, Good.SHOES, 20.0),
+        (BuildingKind.SHOE_FACTORY, {"LEATHER": 10.0}, Good.SHOES, 5.0),
         (BuildingKind.GLASSWORKS, {"SAND": 10.0}, Good.GLASS, 20.0),
-        (BuildingKind.GLASSWORKS, {"SAND": 10.0, "COAL": 5.0}, Good.GLASS, 40.0),
+        (BuildingKind.GLASSWORKS, {"SAND": 10.0, "COAL": 5.0}, Good.GLASS, 30.0),
+        (BuildingKind.GLASSWORKS, {"SAND": 10.0, "COAL": 5.0, "LIMESTONE": 5.0}, Good.GLASS, 40.0),
+        (BuildingKind.TANNERY, {"CATTLE": 10.0, "LIMESTONE": 5.0}, Good.LEATHER, 40.0),
         (BuildingKind.PRINTING_WORKS, {"PAPER": 4.0}, Good.NEWSPAPERS, 80.0),
     ],
 )
@@ -405,41 +409,41 @@ def test_flax_spins_into_clothes_like_wool_and_cotton() -> None:
 
     trade = economy.trade(placed, holding(100.0, FLAX=10.0))
 
-    assert trade.gathered[STATION][Good.CLOTHES] == pytest.approx(10.0)
+    assert trade.gathered[STATION][Good.CLOTHES] == pytest.approx(4.0)
 
 
 @pytest.mark.parametrize("animal", ["CATTLE", "PIGS", "CHICKENS", "SHEEP"])
-def test_a_butcher_turns_each_animal_into_two_of_meat(animal: str) -> None:
+def test_a_butcher_turns_each_animal_into_two_and_a_half_of_meat(animal: str) -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 8), BuildingKind.MEAT_FACTORY, 1))
 
     trade = economy.trade(placed, holding(100.0, **{animal: 10.0}))
 
-    assert trade.gathered[STATION][Good.MEAT] == pytest.approx(20.0)
+    assert trade.gathered[STATION][Good.MEAT] == pytest.approx(25.0)
 
 
 @pytest.mark.parametrize(
     ("kind", "held", "made", "most", "need", "left"),
     [
-        (BuildingKind.BAKERY, {"WHEAT": 80.0}, Good.BREAD, 100.0, Need.WHEAT, 30.0),
-        (BuildingKind.MEAT_FACTORY, {"CATTLE": 80.0}, Good.MEAT, 100.0, Need.ANIMALS, 30.0),
-        (BuildingKind.DAIRY, {"MILK": 80.0}, Good.DAIRY, 100.0, Need.MILK, 30.0),
+        (BuildingKind.BAKERY, {"WHEAT": 80.0}, Good.BREAD, 120.0, Need.WHEAT, 32.0),
+        (BuildingKind.MEAT_FACTORY, {"CATTLE": 80.0}, Good.MEAT, 120.0, Need.ANIMALS, 32.0),
+        (BuildingKind.DAIRY, {"MILK": 80.0}, Good.DAIRY, 120.0, Need.MILK, 32.0),
         (
             BuildingKind.FOOD_PLANT,
             {"APPLES": 130.0, "STEEL": 80.0},
             Good.CANS,
-            250.0,
+            300.0,
             Need.FRUIT,
-            30.0,
+            40.0,
         ),
         (
             BuildingKind.SAUSAGE_MAKER,
             {"MEAT": 130.0, "SALT": 80.0},
             Good.SAUSAGES,
-            200.0,
+            240.0,
             Need.MEAT,
-            30.0,
+            34.0,
         ),
     ],
 )
@@ -631,3 +635,33 @@ def test_gasworks_make_town_gas_out_of_coal() -> None:
     trade = economy.trade(placed, holding(1000.0, COAL=50.0))
 
     assert trade.gathered[STATION][Good.GAS] == pytest.approx(100.0)
+
+
+def test_a_station_hands_what_it_gathered_back_to_the_buildings_it_gathers_from() -> None:
+    tile_map = make_map(size=24)
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 13), BuildingKind.FARM, 1), ((8, 14), BuildingKind.HOUSE, 1))
+
+    trade = economy.trade(placed, {STATION: StationOrder({}, 100.0)})
+
+    assert eaten_at(economy, trade, (8, 14)) == pytest.approx(5.0)
+    assert trade.supplied_for[STATION] == {(Need.FOOD, Good.WHEAT): pytest.approx(5.0)}
+
+
+def test_food_taken_at_a_station_after_its_need_was_served_counts_for_the_next_month(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(economy_module, "STEP_SECONDS", -1.0)
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
+    steps = economy.trade_steps(placed)
+    needs = [step for step in PIPELINE if isinstance(step, Need)]
+    for _ in range(needs.index(Need.FOOD) + 1):
+        next(steps)
+    late = {(BuildingKind.HOUSE, Need.FOOD): {flat(economy, (8, 9)): 4.0}}
+    economy.taken = late
+
+    finish(steps)
+
+    assert economy.taken == late

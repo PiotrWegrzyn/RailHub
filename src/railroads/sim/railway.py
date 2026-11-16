@@ -41,15 +41,22 @@ from railroads.sim.clock import SECONDS_PER_MONTH, START_YEAR
 from railroads.sim.constructions import Constructions, Track, TrackWidth
 from railroads.sim.demand import PASSED_ALONG_PAY, StationDemand
 from railroads.sim.economy import COLLECTION_RADIUS, DELIVERY_RADIUS
-from railroads.sim.facilities import ENGINE_SHED_SPEED, SAND_TOWER_PICKUP, Facility, supply
+from railroads.sim.facilities import (
+    ENGINE_SHED_SPEED,
+    SAND_TOWER_PICKUP,
+    WAREHOUSE_ROOM,
+    Facility,
+    pay_factor,
+    supply,
+)
 from railroads.sim.facilities import PRICES as FACILITY_PRICES
 from railroads.sim.finance import (
     CAR_TRIP_PRICE,
     LEVEL_PRICES,
     STATION_UPKEEP,
-    STORAGE_PRICE,
     TRAIN_RESALE,
     Finances,
+    storage_price,
     track_upkeep,
 )
 from railroads.sim.goods import TRAVELLERS, Good, Need
@@ -219,6 +226,8 @@ class Railway:
     def station_goods(self, station: Cell) -> StationGoods:
         goods = self.goods.setdefault(station, StationGoods())
         goods.extra_room = self.research.bonus(Effect.STORAGE)
+        if Facility.WAREHOUSE in self.working_at(station):
+            goods.extra_room += WAREHOUSE_ROOM
         goods.extra_waiting = self.research.bonus(Effect.WAITING)
         return goods
 
@@ -263,12 +272,16 @@ class Railway:
     def pay_for(self, station: Cell, need: Need, good: Good, amount: float) -> None:
         """Pays for cargo trains brought that the buildings around a station took."""
         earned = self.station_demand(station).pay(need, good, amount) * self.price_factor(good)
-        self.finances.earn(earned, "cargo")
+        self.finances.earn(earned * self.facility_pay(station, good), "cargo")
 
     def pay_for_passing(self, station: Cell, need: Need, good: Good, amount: float) -> None:
         """Pays for goods a station gathered itself and passed along to the buildings around it."""
         earned = self.station_demand(station).pay(need, good, amount, PASSED_ALONG_PAY)
-        self.finances.earn(earned, "goods passed along")
+        self.finances.earn(earned * self.facility_pay(station, good), "goods passed along")
+
+    def facility_pay(self, station: Cell, good: Good) -> float:
+        """How many times as much a good delivered at a station pays with its facilities."""
+        return pay_factor(self.working_at(station), good)
 
     def connected(self) -> set[Cell]:
         """The stations that track joins to at least one other station."""
@@ -327,12 +340,17 @@ class Railway:
             if station in self.goods
         }
 
+    def storage_price(self, station: Cell) -> float:
+        """What the station's next storage upgrade costs."""
+        return storage_price(self.station_goods(station).storage)
+
     def add_storage(self, station: Cell) -> bool:
         """Adds STORAGE_STEP of each good to the station's stockpile and WAITING_STEP to its waiting
         room, if there is the cash."""
-        if not self.finances.can_afford(STORAGE_PRICE):
+        price = self.storage_price(station)
+        if not self.finances.can_afford(price):
             return False
-        self.finances.spend(STORAGE_PRICE, "station upgrades")
+        self.finances.spend(price, "station upgrades")
         self.station_goods(station).storage += 1
         return True
 
