@@ -31,7 +31,7 @@ DANGER = (0.62, 0.2, 0.16, 1.0)
 DANGER_HOVER = (0.78, 0.27, 0.2, 1.0)
 OVERLAY = (0.08, 0.07, 0.06, 0.72)
 # How each satisfaction reads in lists of buildings.
-MOODS: dict[str, tuple[float, float, float, float]] = {
+MOODS: dict[str, Rgba] = {
     "thriving": (0.5, 0.84, 0.42, 1.0),
     "content": (0.95, 0.8, 0.38, 1.0),
     "unsatisfied": (0.9, 0.45, 0.38, 1.0),
@@ -131,6 +131,27 @@ ICON_TEXTURE_SCALE = 8
 GOOD_ITEM_WIDTH = 78.0
 # Room the monthly summary cards take along the right edge of the map; windows open beside it.
 CARDS_WIDTH = 278.0
+# Where windows open: big ones just under the top bar, and a cell's or station's details down the
+# left side of the map.
+WINDOW_TOP = 56.0
+SIDE_WINDOW_POS = (16.0, 96.0)
+
+# Panels laid over the map: no title or border, sized to what they hold, and never taking the
+# keyboard or a saved place.
+OVERLAY_FLAGS = (
+    imgui.WindowFlags_.no_decoration.value
+    | imgui.WindowFlags_.always_auto_resize.value
+    | imgui.WindowFlags_.no_saved_settings.value
+    | imgui.WindowFlags_.no_focus_on_appearing.value
+    | imgui.WindowFlags_.no_nav.value
+)
+# Long lists in tables: striped rows under headers that stay put while the rows scroll.
+LIST_TABLE_FLAGS = (
+    imgui.TableFlags_.row_bg.value
+    | imgui.TableFlags_.borders_inner_h.value
+    | imgui.TableFlags_.scroll_y.value
+    | imgui.TableFlags_.sizing_fixed_fit.value
+)
 
 
 def apply_theme() -> None:
@@ -204,6 +225,17 @@ def color_u32(rgba: Rgba) -> int:
     return imgui.get_color_u32(imgui.ImVec4(*rgba))
 
 
+def rgba_u32(rgba: Rgba) -> int:
+    """A colour packed for a draw list as it is, leaving out the style's alpha."""
+    return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))
+
+
+def tip(text: str) -> None:
+    """Shows `text` while the last item is hovered."""
+    if imgui.is_item_hovered():
+        imgui.set_tooltip(text)
+
+
 def toggle_button(
     label: str, on: bool, tooltip: str = "", size: tuple[float, float] = (0, 0)
 ) -> bool:
@@ -215,8 +247,8 @@ def toggle_button(
     clicked = imgui.button(label, size)
     if on:
         imgui.pop_style_color(3)
-    if tooltip and imgui.is_item_hovered():
-        imgui.set_tooltip(tooltip)
+    if tooltip:
+        tip(tooltip)
     return clicked
 
 
@@ -272,8 +304,7 @@ def good_icon(good: Good | Need, *, framed: bool = False, size: float = ICON_SIZ
     imgui.dummy((size, height))
     low = imgui.get_item_rect_min()
     draw_good_icon(imgui.get_window_draw_list(), good, (low.x, low.y + (height - size) / 2), size)
-    if imgui.is_item_hovered():
-        imgui.set_tooltip(good.value)
+    tip(good.value)
 
 
 def good_amount(good: Good | Need, amount: str, *, framed: bool = False) -> None:

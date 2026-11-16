@@ -23,17 +23,17 @@ from railroads.sim.grids import Cell
 from railroads.sim.railway import MAX_LEVEL, Railway
 from railroads.sim.station_goods import STORAGE_STEP, WAITING_STEP, StationGoods
 from railroads.ui.demand_view import draw_demand
-from railroads.ui.stations_window import stock_bar
+from railroads.ui.stations_window import look_at_button, stock_bar
 from railroads.ui.theme import (
     BRASS,
-    BRASS_DARK,
+    SIDE_WINDOW_POS,
     good_icon,
     goods_inline,
     next_good_slot,
     rows_that_fit,
+    tip,
 )
 
-WINDOW_POS = (16.0, 96.0)
 WINDOW_WIDTH = 460.0
 LABEL_WIDTH = 140.0
 
@@ -61,7 +61,7 @@ class StationWindow:
         if station not in railway.stations():
             self.station = None
             return
-        imgui.set_next_window_pos(WINDOW_POS, imgui.Cond_.first_use_ever.value)
+        imgui.set_next_window_pos(SIDE_WINDOW_POS, imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size_constraints((WINDOW_WIDTH, 0), (WINDOW_WIDTH, 2000))
         name = railway.name_of(station)
         flags = imgui.WindowFlags_.always_auto_resize.value
@@ -109,16 +109,11 @@ class StationWindow:
         imgui.same_line()
         imgui.text_disabled(f"hands out within {delivery} cells, gathers within {collection}")
         imgui.same_line()
-        if imgui.small_button(fa.ICON_FA_CROSSHAIRS):
-            look_at(station)
-        if imgui.is_item_hovered():
-            imgui.set_tooltip("Look at this station")
+        look_at_button(station, look_at)
         imgui.separator()
         imgui.text_disabled("Stockpile")
         imgui.same_line(LABEL_WIDTH)
-        imgui.push_style_color(imgui.Col_.plot_histogram, imgui.ImVec4(*BRASS_DARK))
-        imgui.progress_bar(*stock_bar(goods, (-1, 0)))
-        imgui.pop_style_color()
+        stock_bar(goods, (-1, 0))
         freight = {g: a for g, a in goods.stockpile.items() if g not in TRAVELLERS}
         waiting = {g: a for g, a in goods.stockpile.items() if g in TRAVELLERS}
         for label, held, empty in (
@@ -178,8 +173,7 @@ def _draw_facilities(railway: Railway, station: Cell) -> None:
         if facility in built:
             state = "working" if facility in working else f"idle: needs {amount:.0f} {good.value}"
             imgui.text(f"{facility.value.capitalize()}: {state}")
-            if imgui.is_item_hovered():
-                imgui.set_tooltip(f"Uses {amount:.0f} {good.value} a month; {effect}")
+            tip(f"Uses {amount:.0f} {good.value} a month; {effect}")
             continue
         price = FACILITY_PRICES[facility]
         label = f"{fa.ICON_FA_PLUS}  {facility.value.capitalize()}: uses {amount:.0f} {good.value} a month, {effect}  {dollars(price)}"

@@ -213,9 +213,8 @@ class Railway:
         if engine not in self.engines():
             return None
         price = ENGINES[engine].price
-        if not self.finances.can_afford(price):
+        if not self.finances.pay(price, "trains"):
             return None
-        self.finances.spend(price, "trains")
         self._bought += 1
         train = Train(f"{TRAIN_NAMES[ENGINES[engine].power]} {self._bought}", engine=engine)
         if route_of is not None:
@@ -250,9 +249,8 @@ class Railway:
         if engine not in self.engine_upgrades(train):
             return False
         price = self.swap_price(train, engine)
-        if not self.finances.can_afford(price):
+        if not self.finances.pay(price, "trains"):
             return False
-        self.finances.spend(price, "trains")
         train.engine = engine
         most = self.most_cars(train)
         for stop in train.stops:
@@ -445,9 +443,8 @@ class Railway:
     def upgrade(self, station: Cell) -> bool:
         """Raises the station a level, if it can go higher and there is the cash for it."""
         price = self.upgrade_price(station)
-        if price is None or not self.finances.can_afford(price):
+        if price is None or not self.finances.pay(price, "station upgrades"):
             return False
-        self.finances.spend(price, "station upgrades")
         self.levels[station] = self.level(station) + 1
         self.station_goods(station).level_steps += LEVEL_STORAGE_STEPS
         return True
@@ -474,9 +471,10 @@ class Railway:
         """Puts up a facility beside a station, if it has none of the kind and there is the cash;
         it works from the month after, given what it uses."""
         price = FACILITY_PRICES[facility]
-        if facility in self.facilities_at(station) or not self.finances.can_afford(price):
+        if facility in self.facilities_at(station) or not self.finances.pay(
+            price, "station upgrades"
+        ):
             return False
-        self.finances.spend(price, "station upgrades")
         if self.facilities is None:
             self.facilities = {}
         self.facilities.setdefault(station, set()).add(facility)
@@ -498,9 +496,8 @@ class Railway:
         """Adds STORAGE_STEP of each good to the station's stockpile and WAITING_STEP to its waiting
         room, if there is the cash."""
         price = self.storage_price(station)
-        if not self.finances.can_afford(price):
+        if not self.finances.pay(price, "station upgrades"):
             return False
-        self.finances.spend(price, "station upgrades")
         self.station_goods(station).storage += 1
         return True
 

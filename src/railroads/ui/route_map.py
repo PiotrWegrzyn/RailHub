@@ -27,7 +27,15 @@ from railroads.sim.trains import Stop, Train
 from railroads.ui.iso_camera import Vec2
 from railroads.ui.minimap import Panel
 from railroads.ui.station_offers import Offer, Supplies, goods_to_load
-from railroads.ui.theme import BRASS, color_u32, draw_good_icon, good_amount, good_icon
+from railroads.ui.theme import (
+    BRASS,
+    Rgba,
+    color_u32,
+    draw_good_icon,
+    good_amount,
+    good_icon,
+    tip,
+)
 
 # How many times as close as the whole map the map can show.
 MOST_ZOOM = 24.0
@@ -61,7 +69,6 @@ DIMMED = (0.0, 0.0, 0.0, 0.35)
 NEEDED = (0.95, 0.27, 0.22, 1.0)
 MADE = (0.35, 0.65, 1.0, 1.0)
 
-type Rgba = tuple[float, float, float, float]
 
 # Needs homes everywhere have: food, common goods and heating, which many goods meet, and the
 # passengers and mail every station both sends and wants. Any other need is a special one.
@@ -393,13 +400,11 @@ class RouteMap:
         steps = 0
         if imgui.small_button(f"{fa.ICON_FA_SEARCH_PLUS}##zoom in"):
             steps = 2
-        if imgui.is_item_hovered():
-            imgui.set_tooltip("Zoom in, or turn the wheel over the map")
+        tip("Zoom in, or turn the wheel over the map")
         imgui.same_line(0, 3)
         if imgui.small_button(f"{fa.ICON_FA_SEARCH_MINUS}##zoom out"):
             steps = -2
-        if imgui.is_item_hovered():
-            imgui.set_tooltip("Zoom out; drag the map to move it")
+        tip("Zoom out; drag the map to move it")
         imgui.same_line(0, 10)
         if self.good is None:
             imgui.text_disabled("Click a station to add it")
@@ -582,7 +587,7 @@ class RouteMap:
 
 def _summary_row(
     title: str,
-    rgba: tuple[float, float, float, float],
+    rgba: Rgba,
     items: list[tuple[Need, float]] | list[tuple[Good, float]],
     more: int,
 ) -> None:
@@ -663,9 +668,7 @@ def _toward(start: Vec2, end: Vec2, length: float) -> Vec2:
     return start[0] + dx / distance * length, start[1] + dy / distance * length
 
 
-def _label(
-    draw_list: imgui.ImDrawList, at: Vec2, text: str, rgba: tuple[float, float, float, float]
-) -> None:
+def _label(draw_list: imgui.ImDrawList, at: Vec2, text: str, rgba: Rgba) -> None:
     x, y = at
     draw_list.add_text((x + 1, y + 1), color_u32(LABEL_SHADOW), text)
     draw_list.add_text((x, y), color_u32(rgba), text)

@@ -11,7 +11,7 @@ change to draw_model's maths needs the same change here.
 """
 
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
@@ -23,6 +23,7 @@ from PIL import Image, ImageDraw
 
 from railroads.sim.goods import Good
 from railroads.ui.iso_camera import TILT
+from railroads.ui.pixel import train_parts as parts
 from railroads.ui.pixel.art import Sprite
 from railroads.ui.pixel.models import (
     CYLINDER_SIDES,
@@ -32,7 +33,9 @@ from railroads.ui.pixel.models import (
     Face,
     Model,
     _outline,
+    decals,
     shade,
+    without_fine,
 )
 from railroads.ui.pixel.projection import FloatArray, IntArray
 
@@ -142,7 +145,12 @@ TANKS: dict[Good, RGB] = {
     Good.FUEL: (190, 170, 60),
     Good.GAS: (200, 206, 214),
     Good.MILK: (240, 240, 236),
+    Good.JUICE: (236, 150, 40),
 }
+# Vans for animals, with slatted sides they show through, and refrigerated vans with ice hatches
+# on the roof.
+LIVESTOCK = frozenset({Good.CATTLE, Good.PIGS, Good.SHEEP, Good.CHICKENS})
+REEFERS = frozenset({Good.MEAT, Good.FISH, Good.DAIRY, Good.SAUSAGES, Good.EGGS})
 MOGUL_GREEN: RGB = (38, 86, 56)
 MOGUL_ROOF: RGB = (24, 54, 36)
 MAROON: RGB = (118, 30, 40)
@@ -191,6 +199,17 @@ def engine() -> Model:
     m.panel((-0.24, -0.12), (0.16, 0.23), 0.0855, WINDOW)
     m.box((-h - 0.02, -0.04), (-0.095, 0.095), (0.26, 0.285), ROOF_RED)
     m.panel((-h + 0.01, -0.07), (0.065, 0.08), 0.0856, BRASS)
+    _hand_steam(
+        m,
+        h,
+        (0.2, 0.05, -0.1),
+        0.04,
+        ((-0.26, 0.03),),
+        (-0.08, h - 0.06, 0.14, 0.075),
+        (-h, -0.06),
+        BRASS,
+        SMOKEBOX,
+    )
     return m
 
 
@@ -201,8 +220,51 @@ def tender() -> Model:
     m.wheels([0.13, -0.13], 0.035, FRAME, 0.075)
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.2), CAB_RED)
     m.panel((-h + 0.02, h - 0.02), (0.08, 0.095), 0.0805, BRASS)
-    m.box((-h + 0.03, h - 0.03), (-0.065, 0.065), (0.2, 0.23), COAL)
+    with m.coarse():
+        m.box((-h + 0.03, h - 0.03), (-0.065, 0.065), (0.2, 0.23), COAL)
+    _hand_tender(m, h, (0.13, -0.13), 0.2)
     return m
+
+
+def _hand_steam(
+    m: Model,
+    half: float,
+    drivers: tuple[float, ...],
+    driver: float,
+    small: tuple[tuple[float, float], ...],
+    boiler: tuple[float, float, float, float],
+    cab: tuple[float, float],
+    trim: RGB,
+    door: RGB,
+) -> None:
+    """The fine details of the hand-built steam engines: spoked wheels, a smokebox door, a
+    handrail along the `boiler` (from, to, height of its middle, radius), framed cab windows
+    over `cab` (from, to), lamps and buffers."""
+    for u in drivers:
+        parts.spoked_wheel(m, u, driver, 0.075, WHEEL_RED, weight=True)
+    for u, size in small:
+        parts.spoked_wheel(m, u, size, 0.075, FRAME, spokes=6)
+    start, end, z, r = boiler
+    with m.fine():
+        parts.front_ring(m, end + 0.0006, z, r * 0.62, door)
+        parts.front_ring(m, end + 0.0012, z, 0.008, BRASS, 0.0, 8)
+    parts.handrail(m, (start + 0.02, end - 0.04), z + r * 0.55, r + 0.008, STEEL)
+    parts.window_frames(m, (cab[0] + 0.03, cab[0] + 0.1), (0.17, 0.235), 0.0857, trim, WINDOW, 2)
+    for v in (-0.045, 0.045):
+        parts.lamp(m, half + 0.0006, 0.07, v)
+    parts.buffers(m, half, 0.03, beam=None)
+
+
+def _hand_tender(m: Model, half: float, wheels: tuple[float, ...], top: float) -> None:
+    """The fine details of the hand-built tenders: spoked wheels behind axle boxes, coal in
+    lumps, buffers, a tail lamp and a ladder at the back."""
+    for u in wheels:
+        parts.spoked_wheel(m, u, 0.035, 0.075, FRAME)
+        parts.axle_box(m, u, 0.035, 0.088)
+    parts.lumps(m, (-half + 0.04, half - 0.04), (-0.06, 0.06), top + 0.012, COAL, 0.022, 0.025)
+    parts.buffers(m, -half, 0.047)
+    parts.lamp(m, -half - 0.013, top - 0.04, 0.05, parts.TAIL_LAMP, 0.01)
+    parts.end_ladder(m, -half, (0.07, top - 0.01))
 
 
 def _bands(m: Model, positions: tuple[float, ...], radius: float, z: float, color: RGB) -> None:
@@ -247,6 +309,17 @@ def mogul() -> Model:
     m.panel((-0.3, -0.17), (0.17, 0.24), 0.0885, WINDOW)
     m.box((-h - 0.02, -0.1), (-0.098, 0.098), (0.28, 0.3), MOGUL_ROOF)
     m.panel((-h + 0.01, -0.13), (0.08, 0.095), 0.0886, BRASS)
+    _hand_steam(
+        m,
+        h,
+        (0.17, 0.05, -0.07),
+        0.045,
+        ((h - 0.09, 0.03),),
+        (-0.14, h - 0.07, 0.155, 0.08),
+        (-h, -0.12),
+        BRASS,
+        SMOKEBOX,
+    )
     return m
 
 
@@ -257,8 +330,10 @@ def mogul_tender() -> Model:
     m.wheels([0.17, 0.0, -0.17], 0.035, FRAME, 0.075)
     m.box((-h, h), (-0.085, 0.085), (0.06, 0.22), MOGUL_GREEN)
     m.panel((-h + 0.02, h - 0.02), (0.09, 0.105), 0.0855, BRASS)
-    m.box((-h + 0.03, h - 0.03), (-0.07, 0.07), (0.22, 0.25), COAL)
-    m.box((-0.12, 0.12), (-0.05, 0.05), (0.25, 0.27), COAL)
+    with m.coarse():
+        m.box((-h + 0.03, h - 0.03), (-0.07, 0.07), (0.22, 0.25), COAL)
+        m.box((-0.12, 0.12), (-0.05, 0.05), (0.25, 0.27), COAL)
+    _hand_tender(m, h, (0.17, 0.0, -0.17), 0.22)
     return m
 
 
@@ -287,6 +362,17 @@ def pacific() -> Model:
     m.panel((-0.38, -0.22), (0.19, 0.26), 0.0905, WINDOW)
     m.panel((-h + 0.01, -0.15), (0.1, 0.115), 0.0906, BRASS)
     m.box((-h - 0.02, -0.12), (-0.1, 0.1), (0.3, 0.32), MAROON_ROOF)
+    _hand_steam(
+        m,
+        h,
+        (0.15, 0.01, -0.13),
+        0.058,
+        ((h - 0.08, 0.03), (h - 0.16, 0.03), (-0.31, 0.032)),
+        (-0.16, h - 0.07, 0.17, 0.088),
+        (-h, -0.14),
+        BRASS,
+        SMOKEBOX,
+    )
     return m
 
 
@@ -298,8 +384,10 @@ def pacific_tender() -> Model:
     m.box((-h, h), (-0.09, 0.09), (0.065, 0.24), MAROON)
     m.panel((-h + 0.02, h - 0.02), (0.1, 0.115), 0.0905, BRASS)
     m.panel((-h + 0.02, h - 0.02), (0.21, 0.222), 0.0905, BRASS)
-    m.box((-h + 0.03, h - 0.08), (-0.075, 0.075), (0.24, 0.27), COAL)
-    m.box((-0.14, 0.1), (-0.05, 0.05), (0.27, 0.29), COAL)
+    with m.coarse():
+        m.box((-h + 0.03, h - 0.08), (-0.075, 0.075), (0.24, 0.27), COAL)
+        m.box((-0.14, 0.1), (-0.05, 0.05), (0.27, 0.29), COAL)
+    _hand_tender(m, h, (0.2, 0.0, -0.2), 0.24)
     return m
 
 
@@ -323,8 +411,31 @@ def boxcab() -> Model:
         m.panel((u, u + 0.03), (0.1, 0.25), 0.0855, shade(BOXCAB_BROWN, 0.72))
     for u in (-0.12, -0.04, 0.04):
         m.panel((u, u + 0.06), (0.15, 0.22), 0.0855, shade(BOXCAB_BROWN, 0.82))
-    _pantograph(m, 0.0, 0.285)
+    with m.coarse():
+        _pantograph(m, 0.0, 0.285)
+    parts.pantograph(m, 0.0, 0.285, PANTOGRAPH)
+    _hand_electric(m, h, (-0.2, 0.2), 0.07, 0.285)
+    parts.louvres(m, (-0.12, 0.1), (0.1, 0.14), 0.0857, BOXCAB_BROWN, 5)
+    parts.rivets(m, (-h + 0.01, h - 0.01), 0.262, 0.0857, shade(BOXCAB_BROWN, 0.7), 14)
+    for end in (h, -h):
+        parts.buffers(m, end, 0.08, beam=FRAME)
     return m
+
+
+def _hand_electric(
+    m: Model, half: float, bogies: tuple[float, ...], span: float, roof: float
+) -> None:
+    """The fine details of the hand-built electrics: bogies with axle boxes and solid wheels,
+    lamps at both ends and a cable along the roof."""
+    for c in bogies:
+        for u in (c - span, c + span):
+            parts.disc_wheel(m, u, 0.035, 0.075, FRAME)
+        parts.bogie_frame(m, c, span + 0.05, 0.045, 0.088)
+    for end in (half, -half):
+        for v in (-0.05, 0.05):
+            parts.lamp(m, end + (0.0006 if end > 0 else -0.0006), 0.12, v, parts.LAMP, 0.01)
+    with m.fine():
+        m.box((-half + 0.05, half - 0.05), (0.03, 0.036), (roof, roof + 0.006), parts.BRIGHT)
 
 
 def express() -> Model:
@@ -349,7 +460,15 @@ def express() -> Model:
         b = (root + (tip - root) * 0.6 + out, 0.27 + (0.13 - 0.27) * 0.6 + 0.004)
         m.slope(a, b, (-0.065, 0.065), WINDOW)
     for u in (-0.18, 0.18):
-        _pantograph(m, u, 0.285)
+        with m.coarse():
+            _pantograph(m, u, 0.285)
+        parts.pantograph(m, u, 0.285, PANTOGRAPH, raised=u > 0)
+    _hand_electric(m, h, (-0.26, 0.26), 0.055, 0.285)
+    with m.fine():
+        for v in (0.0857, -0.0857):
+            parts.plate(m, (-body, body), (0.09, 0.098), v, EXPRESS_WHITE)
+    for end in (h, -h):
+        parts.coupler(m, end, 0.05)
     return m
 
 
@@ -456,7 +575,27 @@ class Pioneer:
         if self.slanted:
             (front, size), *_ = self.wheels
             _slant(m, (-h + 0.12, z + 0.04), (front, size), 0.03, 0.09, self.boiler)
+        self._fine(m, z, top)
         return m
+
+    def _fine(self, m: Model, z: float, top: float) -> None:
+        """Spoked wheels, hoops round the boiler, the chimney's dark mouth, the firehole door
+        at the back and the grain of a wooden frame."""
+        h, r = self.half, self.radius
+        for u, size in self.wheels:
+            parts.spoked_wheel(m, u, size, 0.075, self.wheel, spokes=6)
+        start = -h + 0.07 + (0.08 if self.firebox is not None else 0.0)
+        with m.fine():
+            for k in range(1, 4):
+                at = start + (h - 0.02 - start) * k / 4
+                m.cylinder_along((at - 0.004, at + 0.004), r + 0.003, z, shade(self.boiler, 0.7))
+            u = self.chimney[0]
+            parts.roof_plate(
+                m, (u - 0.018, u + 0.018), (-0.018, 0.018), self.chimney_top + 0.0006, COAL
+            )
+            parts.front_ring(m, -h + 0.07 - 0.0006, z - r * 0.3, r * 0.35, BLACK_IRON, 0.0, 10)
+        if self.frame == WOOD:
+            parts.lines(m, (-h, h), (0.045, 0.075), 0.0656, shade(WOOD, 0.7), 1)
 
     def _beams(self, m: Model, z: float, top: float) -> None:
         """Puffing Billy's cylinders standing at the boiler's sides, working beams pivoted at the
@@ -540,7 +679,69 @@ class Steam:
             self._tanks(m, cab_front, front, top)
         else:
             self._cab(m, -h, cab_front, top + (0.04 if self.shroud else 0.05))
+        self._fine(m, front, top)
         return m
+
+    def _fine(self, m: Model, front: float, top: float) -> None:
+        """Spoked wheels, rods and valve gear, the smokebox door, lamps and buffers, rails and
+        pipes along the boiler and the cab's windows and steps."""
+        h, r, z = self.half, self.radius, self.middle
+        cab_front = -h + self.cab
+        for group in self.drivers:
+            for u in group:
+                parts.spoked_wheel(m, u, self.driver, 0.075, self.wheel, weight=True)
+            c = max(group) + self.driver + 0.045
+            d = self.driver
+            crank = (group[len(group) // 2] + d * 0.45, d - d * 0.25)
+            with m.fine():
+                for v in (0.101, -0.101):
+                    parts.bar(
+                        m, (c - 0.035, d + 0.005), (c - 0.035 - 0.07, d + 0.005), 0.006, v, STEEL
+                    )
+                    parts.bar(m, (c - 0.08, d + 0.004), crank, 0.012, v * 1.04, STEEL)
+                    parts.bar(m, (c - 0.02, d + 0.03), (c - 0.09, d - 0.02), 0.005, v * 1.06, BRASS)
+                m.box((c - 0.03, c + 0.03), (-0.085, 0.085), (d + 0.03, d + 0.05), self.smokebox)
+        for u in (*self.leading, *self.trailing):
+            parts.spoked_wheel(m, u, 0.03, 0.075, FRAME, spokes=6)
+        if self.shroud is None:
+            with m.fine():
+                parts.front_ring(
+                    m, front + 0.0006, z, min(r * 0.62, 0.05), shade(self.smokebox, 1.25)
+                )
+                parts.front_ring(m, front + 0.0012, z, 0.008, BRASS, 0.0, 8)
+                parts.front_plate(m, front + 0.0012, (-0.02, 0.02), (z - 0.045, z - 0.03), BRASS)
+            parts.handrail(m, (cab_front + 0.02, front - 0.06), z + r * 0.55, r + 0.008, STEEL)
+            parts.rivets(m, (cab_front, front - 0.04), 0.087, 0.0956, shade(FRAME, 1.8), 10)
+            with m.fine():
+                for v in (0.096, -0.096):
+                    parts.plate(m, (cab_front, front), (0.081, 0.087), v * 1.005, self.trim)
+                u = cab_front + 0.04
+                m.cylinder_up(u, 0.008, (top - 0.006, top + 0.03), BRASS)
+                m.cylinder_up(u + 0.025, 0.008, (top - 0.006, top + 0.03), BRASS)
+                m.cylinder_up(u - 0.015, 0.005, (top + 0.04, top + 0.075), BRASS)
+                m.box((u - 0.022, u - 0.008), (-0.004, 0.004), (top - 0.005, top + 0.04), BRASS)
+                u, high = self.chimney
+                parts.roof_plate(m, (u - 0.02, u + 0.02), (-0.02, 0.02), high + 0.0006, COAL)
+                for at in (cab_front + 0.12, (cab_front + front) / 2 - 0.02):
+                    m.cylinder_along((at - 0.005, at + 0.005), r + 0.004, z, self.trim)
+        else:
+            with m.fine():
+                parts.front_ring(m, h + 0.0206, 0.05, 0.016, parts.LAMP, 0.0, 10)
+        if self.cowcatcher is None:
+            parts.buffers(m, h, 0.045, beam=None)
+            parts.lamp(m, h + 0.003, 0.09, 0.045)
+            parts.lamp(m, h + 0.003, 0.09, -0.045)
+        else:
+            with m.fine():
+                for k in range(5):
+                    v = -0.06 + 0.03 * k
+                    m.slope(
+                        (front + 0.004, 0.07),
+                        (h + 0.028, 0.012),
+                        (v - 0.004, v + 0.004),
+                        shade(self.cowcatcher, 0.75),
+                    )
+        parts.buffers(m, -h, 0.05, beam=FRAME)
 
     def _boiler(self, m: Model, front: float, top: float) -> None:
         r, z = self.radius, self.middle
@@ -595,12 +796,44 @@ class Steam:
             0.0925,
             shade(self.body, 0.85),
         )
+        with m.fine():
+            for v in (0.0926, -0.0926):
+                parts.plate(
+                    m, (cab_front + 0.02, front - 0.14), (z - 0.03, z - 0.024), v, self.trim
+                )
+                parts.plate(
+                    m, (cab_front + 0.02, front - 0.14), (z + 0.009, z + 0.015), v, self.trim
+                )
+            m.cylinder_up(front - 0.15, 0.012, (z + 0.035, z + 0.045), BRASS)
+            parts.lumps(m, (-h + 0.015, bunker - 0.01), (-0.07, 0.07), top - 0.01, COAL)
 
     def _cab(self, m: Model, back: float, front: float, high: float) -> None:
         color = self.cab_color or self.body
         m.box((back, front), (-0.09, 0.09), (0.08, high), color)
         m.panel((back + 0.03, front - 0.03), (high - 0.1, high - 0.035), 0.0905, WINDOW)
         m.box((back - 0.02, front + 0.02), (-0.1, 0.1), (high, high + 0.02), self.roof)
+        window = (back + 0.03, front - 0.03)
+        parts.window_frames(m, window, (high - 0.1, high - 0.035), 0.0906, self.trim, WINDOW, 2)
+        with m.fine():
+            for v in (0.0906, -0.0906):
+                parts.plate(m, (back + 0.01, front - 0.01), (0.1, 0.106), v, self.trim)
+                parts.plate(m, (back + 0.01, back + 0.016), (0.1, high - 0.01), v, self.trim)
+                parts.plate(m, (front - 0.016, front - 0.01), (0.1, high - 0.01), v, self.trim)
+                parts.plate(
+                    m, (back + 0.03, front - 0.03), (0.13, 0.15), v * 1.0003, shade(color, 0.85)
+                )
+            for v in (-0.055, 0.055):
+                parts.front_ring(m, front + 0.0006, high - 0.05, 0.02, self.trim, v, 12)
+                parts.front_ring(m, front + 0.0012, high - 0.05, 0.015, WINDOW, v, 12)
+            for v in ((0.09, 0.104), (-0.104, -0.09)):
+                m.box((back + 0.02, back + 0.05), v, (0.04, 0.046), FRAME)
+            for v in (-0.1, 0.1):
+                m.box(
+                    (back - 0.005, front + 0.005),
+                    (v - 0.003, v + 0.003),
+                    (high + 0.02, high + 0.026),
+                    shade(self.roof, 1.3),
+                )
 
 
 @dataclass(frozen=True)
@@ -642,9 +875,60 @@ class Tender:
             )
             m.box((0.07, h - 0.02), (-w + 0.015, w - 0.015), (top, top + 0.035), self.load)
         else:
-            m.box((-h + 0.03, h - 0.03), (-w + 0.015, w - 0.015), (top, top + 0.03), self.load)
-            m.box((-0.5 * h, 0.5 * h), (-0.05, 0.05), (top + 0.03, top + 0.05), self.load)
+            with m.coarse():
+                m.box((-h + 0.03, h - 0.03), (-w + 0.015, w - 0.015), (top, top + 0.03), self.load)
+                m.box((-0.5 * h, 0.5 * h), (-0.05, 0.05), (top + 0.03, top + 0.05), self.load)
+        self._fine(m)
         return m
+
+    def _fine(self, m: Model) -> None:
+        """Spoked wheels behind axle boxes, rivets and lining, steps, the lumps of the load, a
+        water hatch, and buffers, a lamp and a ladder at the back."""
+        h, w, top = self.half, self.width, self.top
+        for u in self.wheels:
+            parts.spoked_wheel(m, u, 0.035, 0.075, FRAME, spokes=8)
+            parts.axle_box(m, u, 0.035, 0.088)
+        parts.rivets(m, (-h, h), top - 0.008, w + 0.0006, shade(self.body, 0.7), 12)
+        with m.fine():
+            for v in ((w, w + 0.012), (-w - 0.012, -w)):
+                m.box((h - 0.03, h - 0.005), v, (0.03, 0.036), FRAME)
+                m.box((h - 0.03, h - 0.005), v, (0.045, 0.051), FRAME)
+        if self.shroud:
+            return
+        if self.barrel is not None:
+            with m.fine():
+                for u in (-h + 0.05, -h + 0.12, 0.02):
+                    m.cylinder_along((u - 0.004, u + 0.004), 0.05, top + 0.048, BLACK_IRON)
+            return
+        load = (-h + 0.03, h - 0.03), (-w + 0.015, w - 0.015)
+        with m.fine():
+            m.box(*load, (top, top + 0.012), shade(self.load, 0.8))
+        if self.load == LOG:
+            _logs(m, (-h + 0.035, h - 0.035), top + 0.012, w - 0.015, 0.011)
+        else:
+            parts.lumps(m, *load, top + 0.012, self.load, 0.022, 0.03)
+        with m.fine():
+            m.box((-h + 0.035, -h + 0.075), (-0.03, 0.03), (top, top + 0.02), shade(self.body, 0.8))
+            m.cylinder_up(-h + 0.055, 0.016, (top + 0.02, top + 0.028), BLACK_IRON)
+        parts.buffers(m, -h, 0.047)
+        parts.lamp(m, -h - 0.013, top - 0.04, 0.05, parts.TAIL_LAMP, 0.01)
+        parts.end_ladder(m, -h, (0.07, top - 0.01))
+
+
+def _logs(m: Model, u: tuple[float, float], z: float, half: float, radius: float) -> None:
+    """Logs piled lying along the track from height `z`, rows narrowing up a pyramid."""
+    with m.fine():
+        count = max(1, round(half / radius))
+        for row in range(count):
+            many = count - row
+            for k in range(many):
+                v = (k - (many - 1) / 2) * 2 * radius
+                start = len(m.faces)
+                m.cylinder_along(u, radius, z + radius * (1 + 1.7 * row), LOG, LOG_END)
+                m.faces[start:] = [
+                    Face([(c[0], c[1] + v, c[2]) for c in f.corners], f.color, f.normal)
+                    for f in m.faces[start:]
+                ]
 
 
 def _running_gear(m: Model, half: float, bogies: tuple[float, ...], axles: int) -> None:
@@ -697,11 +981,200 @@ class Unit:
             _running_gear(m, h, self.bogies, self.axles)
         roof = self._hood(m) if self.hood else self._shell(m)
         for u in self.pantographs:
-            _pantograph(m, u, roof)
+            with m.coarse():
+                _pantograph(m, u, roof)
+            parts.pantograph(m, u, roof, PANTOGRAPH)
         for k in range(0 if self.hood else self.vents):
             u = (k - (self.vents - 1) / 2) * 0.12
             m.box((u - 0.04, u + 0.04), (-0.05, 0.05), (roof, roof + 0.012), shade(self.roof, 0.7))
+            parts.roof_fan(m, u, roof + 0.012, 0.03, shade(self.roof, 0.9))
+        self._fine(m, roof)
         return m
+
+    @property
+    def diesel(self) -> bool:
+        return not self.pantographs and not self.floats
+
+    def _fine(self, m: Model, roof: float) -> None:
+        """Bogies with axle boxes and solid wheels, a fuel tank under a diesel, buffers and
+        lamps at the ends, handrails and steps by the cab doors, grilles along the sides, and
+        roof gear: insulators and cable on an electric, exhaust stacks on a diesel."""
+        h, top = self.half, self.top
+        if self.floats:
+            self._floating(m)
+            return
+        span = 0.0375 * (self.axles - 1)
+        for c in self.bogies:
+            for k in range(self.axles):
+                parts.disc_wheel(m, c - span + 0.075 * k, 0.032, 0.075, FRAME)
+            parts.bogie_frame(m, c, span + 0.045, 0.045, 0.088)
+        if self.diesel and len(self.bogies) > 1:
+            inner = min(self.bogies) + span + 0.06, max(self.bogies) - span - 0.06
+            with m.fine():
+                m.box(inner, (-0.06, 0.06), (0.04, 0.072), shade(FRAME, 1.3))
+                for v in (0.0606, -0.0606):
+                    parts.plate(
+                        m, (inner[0] + 0.02, inner[0] + 0.035), (0.05, 0.062), v, shade(FRAME, 2.2)
+                    )
+        ends = (h, -h) if self.both or self.hood else (h,)
+        for end in ends:
+            out = 1.0 if end > 0 else -1.0
+            if self.nose < 0.08:
+                parts.buffers(m, end, 0.072, beam=shade(FRAME, 1.4) if not self.hood else None)
+            parts.coupler(m, end, 0.06 if self.nose >= 0.08 else 0.04)
+            tip = self.tip if self.nose else top - 0.09
+            for v in (-0.05, 0.05):
+                parts.lamp(
+                    m, end + out * 0.0006, max(0.11, min(tip, 0.14)) - 0.01, v, parts.LAMP, 0.01
+                )
+        if not self.both and not self.hood:
+            for v in (-0.05, 0.05):
+                parts.lamp(m, -h - 0.012, 0.13, v, parts.TAIL_LAMP, 0.009)
+        if self.hood:
+            self._hood_fine(m)
+            return
+        front = h - self.nose
+        back = -front if self.both else -h
+        floor = 0.09
+        for root in [front, back][: 2 if self.both else 1]:
+            out = 1.0 if root > 0 else -1.0
+            door = root - out * 0.11
+            with m.fine():
+                for v in (0.0857, -0.0857):
+                    parts.plate(
+                        m,
+                        (door - 0.022, door + 0.022),
+                        (floor + 0.045, top - 0.015),
+                        v,
+                        shade(self.body, 0.75),
+                    )
+                    parts.plate(
+                        m,
+                        (door - 0.016, door + 0.016),
+                        (floor + 0.045, top - 0.03),
+                        v * 1.007,
+                        self.body,
+                    )
+                    parts.plate(
+                        m,
+                        (door - 0.012, door + 0.012),
+                        (top - 0.08, top - 0.04),
+                        v * 1.014,
+                        self.glass,
+                    )
+                    parts.plate(
+                        m, (door + 0.026, door + 0.03), (floor + 0.05, top - 0.04), v, parts.BRIGHT
+                    )
+                    m.box(
+                        (door - 0.02, door + 0.02),
+                        tuple(sorted((v, v * 1.15))),
+                        (0.03, 0.036),
+                        FRAME,
+                    )
+        if self.diesel and not self.windows:
+            middle = (back + front) / 2
+            parts.louvres(
+                m, (middle - 0.1, middle + 0.06), (top - 0.12, top - 0.04), 0.0858, self.body, 6
+            )
+            if self.vents:
+                parts.stack(m, middle + 0.12, (roof, roof + 0.02), 0.012, shade(self.roof, 0.6))
+        elif not self.windows:
+            parts.louvres(
+                m,
+                (back + 0.18, front - 0.18),
+                (top - 0.09, top - 0.045),
+                0.0858,
+                self.body,
+                8,
+                upright=True,
+            )
+        if self.pantographs:
+            with m.fine():
+                low, high = min(self.pantographs), max(self.pantographs)
+                m.box((low - 0.06, high + 0.06), (0.03, 0.036), (roof, roof + 0.006), parts.BRIGHT)
+                for u in (
+                    (low + 0.1, high - 0.1) if high - low > 0.25 else ((low + high) / 2 + 0.12,)
+                ):
+                    m.box(
+                        (u - 0.04, u + 0.04),
+                        (-0.05, 0.05),
+                        (roof, roof + 0.022),
+                        shade(self.roof, 0.85),
+                    )
+                    parts.lines(
+                        m,
+                        (u - 0.04, u + 0.04),
+                        (roof, roof + 0.022),
+                        0.0506,
+                        shade(self.roof, 0.6),
+                        2,
+                    )
+        else:
+            with m.fine():
+                for u in (front - 0.05,):
+                    m.box((u - 0.008, u + 0.008), (-0.03, 0.03), (roof, roof + 0.012), parts.BRIGHT)
+
+    def _hood_fine(self, m: Model) -> None:
+        """A hood unit's railings along its walkways, steps at the corners, louvres and grilles
+        down the hood and exhaust stacks on it."""
+        h, top = self.half, self.top
+        cab = (h - 0.22, h - 0.1)
+        parts.handrail(m, (-h + 0.01, h - 0.01), 0.15, 0.084, self.stripe, posts=6)
+        with m.fine():
+            for u in (h - 0.025, -h + 0.025):
+                for v in ((0.09, 0.1), (-0.1, -0.09)):
+                    m.box((u - 0.02, u + 0.02), v, (0.04, 0.046), FRAME)
+                    m.box((u - 0.02, u + 0.02), v, (0.065, 0.071), FRAME)
+        parts.louvres(
+            m, (-h + 0.03, -h + 0.13), (0.12, top - 0.035), 0.0556, self.body, 6, upright=True
+        )
+        parts.louvres(m, (-h + 0.18, cab[0] - 0.04), (0.16, top - 0.04), 0.0556, self.body, 4)
+        with m.fine():
+            parts.front_plate(
+                m, -h + 0.0206, (-0.04, 0.04), (0.11, top - 0.04), shade(self.body, 0.4)
+            )
+            for k in range(5):
+                v = -0.032 + 0.016 * k
+                parts.front_plate(
+                    m, -h + 0.0212, (v - 0.003, v + 0.003), (0.11, top - 0.04), self.body
+                )
+        for u in (cab[0] - 0.08, cab[0] - 0.15):
+            parts.stack(m, u, (top - 0.025, top), 0.01, shade(FRAME, 1.2))
+        with m.fine():
+            m.box(
+                (cab[0] + 0.04, cab[0] + 0.07),
+                (-0.008, 0.008),
+                (top + 0.012, top + 0.03),
+                parts.BRIGHT,
+            )
+            parts.front_plate(
+                m, cab[1] + 0.0046, (-0.05, -0.01), (top - 0.065, top - 0.025), WINDOW
+            )
+            parts.front_plate(m, cab[1] + 0.0046, (0.01, 0.05), (top - 0.065, top - 0.025), WINDOW)
+
+    def _floating(self, m: Model) -> None:
+        """A maglev's lit band of windows, its doors, a light strip down the skirt and lights in
+        its nose."""
+        h, top = self.half, self.top
+        front = h - self.nose
+        with m.fine():
+            for v in (0.0857, -0.0857):
+                parts.plate(m, (-h + 0.04, front), (0.045, 0.052), v, (120, 230, 240))
+                for u in (-h + 0.18, front - 0.12):
+                    parts.plate(
+                        m, (u - 0.02, u + 0.02), (0.06, top - 0.02), v, shade(self.body, 0.82)
+                    )
+                    parts.plate(
+                        m, (u - 0.014, u + 0.014), (top - 0.08, top - 0.035), v * 1.007, self.glass
+                    )
+            for v in (-0.04, 0.04):
+                parts.front_ring(m, h + 0.0006, self.tip * 0.7, 0.008, parts.LAMP, v, 8)
+            m.box(
+                (-h + 0.06, front - 0.06),
+                (-0.03, 0.03),
+                (top + 0.015, top + 0.022),
+                shade(self.roof, 0.85),
+            )
 
     def _shell(self, m: Model) -> float:
         h, top = self.half, self.top
@@ -813,13 +1286,26 @@ def car(good: Good, full: bool) -> Model:
     m.box((-h, h), (-0.07, 0.07), (0.035, 0.06), FRAME)
     m.wheels([h - 0.07, -h + 0.07], 0.035, FRAME, 0.075)
     _body_of(good)(m, good, full)
+    _underframe(m)
     return m
+
+
+def _underframe(m: Model) -> None:
+    """A car's solid wheels behind axle boxes and springs, and buffers at both ends."""
+    h = CAR_HALF
+    for u in (h - 0.07, -h + 0.07):
+        parts.disc_wheel(m, u, 0.035, 0.075, FRAME)
+        parts.axle_box(m, u, 0.035, 0.088)
+    for end in (h, -h):
+        parts.buffers(m, end, 0.048, beam=None)
 
 
 type CarBody = Callable[[Model, Good, bool], None]
 
 
 def _body_of(good: Good) -> CarBody:
+    if good in LIVESTOCK:
+        return _stock_car
     if good in VANS:
         return _van
     if good in HOPPERS:
@@ -840,8 +1326,83 @@ def _van(m: Model, good: Good, full: bool) -> None:
     body, stripe = VANS[good]
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
     m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), ROOF_GREY)
-    m.panel((-0.06, 0.06), (0.07, 0.22), 0.0805, shade(body, 0.7) if full else WINDOW)
+    with m.coarse():
+        m.panel((-0.06, 0.06), (0.07, 0.22), 0.0805, shade(body, 0.7) if full else WINDOW)
     m.panel((-h + 0.01, h - 0.01), (0.2, 0.215), 0.0806, stripe)
+    _van_fine(m, body, stripe, full)
+    if good in REEFERS:
+        with m.fine():
+            for u in (-h + 0.04, h - 0.04):
+                for v in (-0.045, 0.045):
+                    m.box(
+                        (u - 0.022, u + 0.022),
+                        (v - 0.022, v + 0.022),
+                        (0.26, 0.268),
+                        shade(body, 0.9),
+                    )
+
+
+def _van_fine(m: Model, body: RGB, stripe: RGB, full: bool) -> None:
+    """A van's planked sides, its sliding door on rails, open on its load of crates in the
+    good's colours when full and shut when empty, a ladder and a brake wheel at the ends and
+    ribs over the roof."""
+    h = CAR_HALF
+    parts.lines(m, (-h + 0.01, h - 0.01), (0.07, 0.195), 0.0805, shade(body, 0.8), 9, upright=True)
+    with m.fine():
+        for v in (0.0806, -0.0806):
+            parts.plate(m, (-0.08, 0.1), (0.222, 0.228), v, FRAME)
+            parts.plate(m, (-0.08, 0.1), (0.064, 0.07), v, FRAME)
+            if full:
+                parts.plate(m, (-0.06, 0.04), (0.072, 0.218), v, shade(body, 0.3))
+                for k, (a, b) in enumerate(((-0.055, -0.02), (-0.015, 0.035))):
+                    for z0, z1, tint in ((0.075, 0.13, stripe), (0.135, 0.18, shade(stripe, 0.8))):
+                        out = v * (1.004 + 0.002 * k)
+                        parts.plate(m, (a, b), (z0, z1), out, tint if k else shade(tint, 0.9))
+                door = (0.04, 0.1)
+            else:
+                door = (-0.06, 0.06)
+            out = v * 1.012
+            parts.plate(m, door, (0.072, 0.218), out, shade(body, 0.85))
+            parts.plate(m, (door[0] + 0.004, door[1] - 0.004), (0.14, 0.15), out * 1.003, FRAME)
+            parts.plate(m, (-h + 0.02, -h + 0.07), (0.15, 0.19), v * 1.004, stripe)
+            parts.plate(m, (-h + 0.028, -h + 0.062), (0.158, 0.182), v * 1.008, shade(stripe, 0.6))
+    parts.end_ladder(m, h, (0.07, 0.235))
+    parts.brake_wheel(m, -h, 0.2)
+    with m.fine():
+        for k in range(5):
+            u = -h + 0.02 + k * (2 * h - 0.04) / 4
+            m.box((u - 0.004, u + 0.004), (-0.088, 0.088), (0.26, 0.264), shade(ROOF_GREY, 0.85))
+
+
+def _stock_car(m: Model, good: Good, full: bool) -> None:
+    """A van for animals with slatted sides: the animals show through the gaps."""
+    h = CAR_HALF
+    body, animal = VANS[good]
+    m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
+    m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), ROOF_GREY)
+    with m.coarse():
+        m.panel((-h + 0.02, h - 0.02), (0.14, 0.2), 0.0805, animal if full else WINDOW)
+    with m.fine():
+        for v in (0.0806, -0.0806):
+            parts.plate(m, (-h + 0.012, h - 0.012), (0.07, 0.228), v, shade(body, 0.3))
+            if full:
+                for k in range(5):
+                    u = -h + 0.04 + k * (2 * h - 0.08) / 4
+                    high = 0.15 if good == Good.CHICKENS else 0.19
+                    parts.plate(m, (u - 0.025, u + 0.025), (0.09, high), v * 1.003, animal)
+                    parts.plate(
+                        m,
+                        (u + 0.012, u + 0.03),
+                        (high - 0.03, high + 0.012),
+                        v * 1.006,
+                        shade(animal, 0.85),
+                    )
+            for k in range(6):
+                z = 0.08 + k * 0.026
+                parts.plate(m, (-h + 0.012, h - 0.012), (z, z + 0.013), v * 1.01, body)
+            for u in (-h + 0.012, -0.004, h - 0.022):
+                parts.plate(m, (u, u + 0.012), (0.07, 0.228), v * 1.012, shade(body, 0.8))
+    parts.brake_wheel(m, -h, 0.2)
 
 
 def _hopper(m: Model, good: Good, full: bool) -> None:
@@ -850,8 +1411,26 @@ def _hopper(m: Model, good: Good, full: bool) -> None:
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.19), body)
     m.panel((-h + 0.02, h - 0.02), (0.08, 0.17), 0.0805, shade(body, 0.85))
     if full:
-        m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.19, 0.22), load)
-        m.box((-0.1, 0.1), (-0.05, 0.05), (0.22, 0.24), load)
+        with m.coarse():
+            m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.19, 0.22), load)
+            m.box((-0.1, 0.1), (-0.05, 0.05), (0.22, 0.24), load)
+    _open_top(m, body, load if full else None, 0.19)
+
+
+def _open_top(m: Model, body: RGB, load: RGB | None, top: float) -> None:
+    """An open wagon's ribbed sides, its rim, a ladder at one end and a brake wheel at the
+    other, and its load heaped in lumps when it carries one."""
+    h = CAR_HALF
+    parts.ribs(m, (-h + 0.01, h - 0.01), (0.062, top), 0.0805, shade(body, 1.15), 6)
+    with m.fine():
+        for v in (0.0806, -0.0806):
+            parts.plate(m, (-h, h), (top - 0.012, top), v, shade(body, 1.2))
+    parts.end_ladder(m, h, (0.07, top))
+    parts.brake_wheel(m, -h, top - 0.02)
+    if load is not None:
+        with m.fine():
+            m.box((-h + 0.012, h - 0.012), (-0.072, 0.072), (top - 0.03, top), shade(load, 0.75))
+        parts.lumps(m, (-h + 0.015, h - 0.015), (-0.07, 0.07), top, load, 0.024, 0.04)
 
 
 def _heap(m: Model, good: Good, full: bool) -> None:
@@ -859,15 +1438,115 @@ def _heap(m: Model, good: Good, full: bool) -> None:
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.13), DECK)
     m.panel((-h + 0.02, h - 0.02), (0.075, 0.12), 0.0805, shade(DECK, 0.8))
     if full:
-        m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.13, 0.17), HEAPS[good])
-        m.box((-0.13, 0.13), (-0.05, 0.05), (0.17, 0.2), HEAPS[good])
+        with m.coarse():
+            m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.13, 0.17), HEAPS[good])
+            m.box((-0.13, 0.13), (-0.05, 0.05), (0.17, 0.2), HEAPS[good])
+    parts.lines(m, (-h + 0.02, h - 0.02), (0.075, 0.12), 0.0806, shade(DECK, 0.6), 2)
+    parts.ribs(m, (-h + 0.01, h - 0.01), (0.062, 0.13), 0.0805, shade(DECK, 0.7), 4)
+    parts.brake_wheel(m, -h, 0.12)
+    if full:
+        HEAP_LOADS.get(good, _lumped)(m, HEAPS[good])
+
+
+def _lumped(m: Model, color: RGB) -> None:
+    """A load heaped in lumps: potatoes, coke."""
+    h = CAR_HALF
+    parts.lumps(m, (-h + 0.02, h - 0.02), (-0.07, 0.07), 0.13, color, 0.024, 0.04)
+
+
+def _bales(m: Model, color: RGB) -> None:
+    """Bales tied with bands, two layers: wool, cotton, flax, hops."""
+    with m.fine():
+        for row, z in enumerate((0.13, 0.172)):
+            us = (-0.15, -0.05, 0.05, 0.15) if row == 0 else (-0.1, 0.0, 0.1)
+            for u in us:
+                for v in ((-0.068, -0.003), (0.003, 0.068)) if row == 0 else ((-0.035, 0.035),):
+                    m.box((u - 0.045, u + 0.045), v, (z, z + 0.04), shade(color, 1.0 - 0.06 * row))
+                    m.box(
+                        (u - 0.006, u + 0.006),
+                        (v[0] - 0.001, v[1] + 0.001),
+                        (z - 0.001, z + 0.041),
+                        shade(color, 0.6),
+                    )
+
+
+def _barrels(m: Model, color: RGB) -> None:
+    """Barrels lying across the wagon, hooped in iron."""
+    with m.fine():
+        for u in (-0.17, -0.085, 0.0, 0.085, 0.17):
+            for v in (-0.035, 0.035):
+                start = len(m.faces)
+                m.cylinder_up(0.0, 0.032, (0.13, 0.205), color)
+                m.cylinder_up(0.0, 0.034, (0.145, 0.152), BLACK_IRON)
+                m.cylinder_up(0.0, 0.034, (0.183, 0.19), BLACK_IRON)
+                m.faces[start:] = [
+                    Face([(c[0] + u, c[1] + v, c[2]) for c in f.corners], f.color, f.normal)
+                    for f in m.faces[start:]
+                ]
+
+
+def _bricks(m: Model, color: RGB) -> None:
+    """Bricks stacked on pallets, the courses showing."""
+    with m.fine():
+        for u in (-0.12, 0.12):
+            m.box((u - 0.1, u + 0.1), (-0.07, 0.07), (0.13, 0.14), DECK)
+            m.box((u - 0.09, u + 0.09), (-0.065, 0.065), (0.14, 0.21), color)
+            for k in range(1, 4):
+                z = 0.14 + 0.07 * k / 4
+                for v in (0.0656, -0.0656):
+                    parts.plate(
+                        m, (u - 0.09, u + 0.09), (z - 0.002, z + 0.002), v, shade(color, 0.7)
+                    )
+
+
+def _crated(m: Model, color: RGB) -> None:
+    """Machines lashed down under sheets, dark straps over them."""
+    with m.fine():
+        m.box((-0.18, 0.02), (-0.065, 0.065), (0.13, 0.2), color)
+        m.box((-0.12, -0.02), (-0.04, 0.04), (0.2, 0.23), shade(color, 0.85))
+        m.box((0.06, 0.2), (-0.055, 0.055), (0.13, 0.18), shade(color, 1.15))
+        m.cylinder_along((0.07, 0.19), 0.02, 0.2, STEEL)
+        for u in (-0.15, -0.05, 0.12):
+            m.box(
+                (u - 0.005, u + 0.005),
+                (-0.068, 0.068),
+                (0.13, 0.233 if u < 0 else 0.183),
+                BLACK_IRON,
+            )
+
+
+def _tubs(m: Model, color: RGB) -> None:
+    """Grapes heaped in tubs."""
+    with m.fine():
+        for u in (-0.16, -0.055, 0.055, 0.16):
+            for v in (-0.04, 0.04):
+                start = len(m.faces)
+                m.cylinder_up(0.0, 0.036, (0.13, 0.18), WOOD)
+                m.cylinder_up(0.0, 0.03, (0.18, 0.195), color)
+                m.faces[start:] = [
+                    Face([(c[0] + u, c[1] + v, c[2]) for c in f.corners], f.color, f.normal)
+                    for f in m.faces[start:]
+                ]
 
 
 def _tank(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
+    color = TANKS[good]
     m.box((-h, h), (-0.07, 0.07), (0.06, 0.085), DECK)
-    m.cylinder_along((-h + 0.01, h - 0.01), 0.08, 0.165, TANKS[good])
-    m.cylinder_up(0.0, 0.025, (0.24, 0.27), TANKS[good])
+    m.cylinder_along((-h + 0.01, h - 0.01), 0.08, 0.165, color)
+    m.cylinder_up(0.0, 0.025, (0.24, 0.27), color)
+    with m.fine():
+        for u in (-h + 0.06, h - 0.06):
+            m.cylinder_along((u - 0.005, u + 0.005), 0.083, 0.165, shade(color, 0.7))
+        m.box((-0.06, 0.06), (-0.04, 0.04), (0.242, 0.246), STEEL)
+        m.cylinder_up(0.0, 0.01, (0.27, 0.285), shade(color, 0.6))
+        for v in (0.084, -0.084):
+            parts.plate(m, (-0.11, -0.05), (0.13, 0.17), v, (240, 240, 236))
+            parts.plate(m, (-0.1, -0.06), (0.137, 0.163), v * 1.005, shade(color, 0.8))
+        for v in (-0.09, 0.09):
+            m.box((-h + 0.01, h - 0.01), (v - 0.004, v + 0.004), (0.085, 0.09), STEEL)
+    parts.ladder(m, 0.06, (0.085, 0.24), 0.083)
+    parts.brake_wheel(m, -h, 0.12)
 
 
 def _deck(m: Model) -> None:
@@ -877,10 +1556,28 @@ def _deck(m: Model) -> None:
 
 def _car_carrier(m: Model, good: Good, full: bool) -> None:
     _deck(m)
+    _stakes(m)
     if full:
         for u in (-0.12, 0.12):
             m.box((u - 0.09, u + 0.09), (-0.05, 0.05), (0.095, 0.14), AUTO_BODY)
             m.box((u - 0.05, u + 0.05), (-0.045, 0.045), (0.14, 0.18), WINDOW)
+            with m.fine():
+                m.box((u - 0.05, u + 0.05), (-0.046, 0.046), (0.176, 0.182), AUTO_BODY)
+                for at in (u - 0.055, u + 0.055):
+                    for v in (0.05, -0.05):
+                        parts.ring(m, at, 0.1, 0.018, v * 1.01, BLACK_IRON, 10)
+                        parts.ring(m, at, 0.1, 0.008, v * 1.02, STEEL, 8)
+                parts.front_plate(m, u + 0.0906, (-0.04, -0.025), (0.12, 0.13), parts.LAMP)
+                parts.front_plate(m, u + 0.0906, (0.025, 0.04), (0.12, 0.13), parts.LAMP)
+
+
+def _stakes(m: Model) -> None:
+    """Stakes standing up along a flat wagon's sides."""
+    h = CAR_HALF
+    with m.fine():
+        for u in (-h + 0.02, 0.0, h - 0.02):
+            for v in ((0.074, 0.082), (-0.082, -0.074)):
+                m.box((u - 0.004, u + 0.004), v, (0.085, 0.13), FRAME)
 
 
 def _tank_carrier(m: Model, good: Good, full: bool) -> None:
@@ -889,6 +1586,12 @@ def _tank_carrier(m: Model, good: Good, full: bool) -> None:
         m.box((-0.2, 0.2), (-0.07, 0.07), (0.085, 0.15), TANK_HULL)
         m.box((-0.08, 0.08), (-0.05, 0.05), (0.15, 0.2), shade(TANK_HULL, 0.85))
         m.box((0.08, 0.26), (-0.012, 0.012), (0.165, 0.185), shade(TANK_HULL, 0.6))
+        with m.fine():
+            for v in (0.0706, -0.0706):
+                parts.plate(m, (-0.2, 0.2), (0.085, 0.125), v, shade(TANK_HULL, 0.45))
+                for u in (-0.15, -0.075, 0.0, 0.075, 0.15):
+                    parts.ring(m, u, 0.104, 0.018, v * 1.01, shade(TANK_HULL, 0.8), 10)
+            m.cylinder_up(-0.04, 0.012, (0.2, 0.215), shade(TANK_HULL, 0.7))
 
 
 def _plane_carrier(m: Model, good: Good, full: bool) -> None:
@@ -897,6 +1600,20 @@ def _plane_carrier(m: Model, good: Good, full: bool) -> None:
         m.box((-0.24, 0.24), (-0.03, 0.03), (0.09, 0.15), PLANE_BODY)
         m.box((-0.05, 0.05), (-0.085, 0.085), (0.12, 0.135), shade(PLANE_BODY, 0.85))
         m.box((-0.24, -0.17), (-0.012, 0.012), (0.15, 0.2), shade(PLANE_BODY, 0.75))
+        with m.fine():
+            for v in (0.0306, -0.0306):
+                for k in range(6):
+                    u = -0.14 + k * 0.045
+                    parts.plate(m, (u - 0.008, u + 0.008), (0.125, 0.138), v, WINDOW)
+                parts.plate(m, (0.18, 0.225), (0.125, 0.142), v, WINDOW)
+                parts.plate(m, (-0.24, 0.24), (0.105, 0.11), v * 1.003, EXPRESS_BLUE)
+            for v in (-0.06, 0.06):
+                start = len(m.faces)
+                m.cylinder_along((-0.03, 0.03), 0.014, 0.112, shade(PLANE_BODY, 0.7))
+                m.faces[start:] = [
+                    Face([(c[0], c[1] + v, c[2]) for c in f.corners], f.color, f.normal)
+                    for f in m.faces[start:]
+                ]
 
 
 def _boxcar(m: Model, good: Good, full: bool) -> None:
@@ -910,10 +1627,13 @@ def _boxcar(m: Model, good: Good, full: bool) -> None:
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
     m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), roof)
     door = shade(body, 0.7) if full else WINDOW
-    m.panel((-0.06, 0.06), (0.07, 0.22), 0.0805, door)
+    with m.coarse():
+        m.panel((-0.06, 0.06), (0.07, 0.22), 0.0805, door)
     m.panel((-h + 0.01, h - 0.01), (0.07, 0.085), 0.0806, shade(body, 0.75))
+    stripe = {Good.CANS: CANS_STRIPE, Good.BANANAS: (110, 150, 50), Good.BREAD: (236, 200, 140)}
     if good == Good.CANS:
         m.panel((-h + 0.01, h - 0.01), (0.2, 0.215), 0.0806, CANS_STRIPE)
+    _van_fine(m, body, stripe.get(good, (190, 150, 100)), full)
 
 
 def _grain_hopper(m: Model, good: Good, full: bool) -> None:
@@ -923,22 +1643,50 @@ def _grain_hopper(m: Model, good: Good, full: bool) -> None:
     m.panel((-h + 0.02, h - 0.02), (0.08, 0.18), 0.0805, shade(body, 0.85))
     if good == Good.SUGAR:
         m.box((-h + 0.01, h - 0.01), (-0.07, 0.07), (0.2, 0.235), shade(body, 0.95))
-    elif full:
-        m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.2, 0.22), GRAIN)
-        m.box((-0.12, 0.12), (-0.05, 0.05), (0.22, 0.24), GRAIN)
+        with m.fine():
+            for u in (-0.15, -0.05, 0.05, 0.15):
+                m.box((u - 0.025, u + 0.025), (-0.025, 0.025), (0.235, 0.243), shade(body, 0.75))
+        parts.ribs(m, (-h + 0.01, h - 0.01), (0.062, 0.2), 0.0805, shade(body, 0.9), 6)
+        parts.end_ladder(m, h, (0.07, 0.235))
+        return
+    if full:
+        with m.coarse():
+            m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.2, 0.22), GRAIN)
+            m.box((-0.12, 0.12), (-0.05, 0.05), (0.22, 0.24), GRAIN)
+    _open_top(m, body, GRAIN if full else None, 0.2)
 
 
 def _fruit_wagon(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.13), DECK)
     m.panel((-h + 0.02, h - 0.02), (0.075, 0.12), 0.0805, shade(DECK, 0.8))
+    parts.lines(m, (-h + 0.02, h - 0.02), (0.075, 0.12), 0.0806, shade(DECK, 0.6), 2)
+    parts.brake_wheel(m, -h, 0.12)
     if full:
         fruit = {Good.APPLES: APPLE, Good.DATES: DATE, Good.ORANGES: ORANGE}[good]
-        m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.13, 0.16), fruit)
-        m.box((-0.13, 0.13), (-0.05, 0.05), (0.16, 0.18), fruit)
-        if good == Good.APPLES:
-            for u in (-0.15, -0.05, 0.06, 0.14):
-                m.box((u - 0.012, u + 0.012), (-0.04, -0.02), (0.16, 0.175), APPLE_LIGHT)
+        with m.coarse():
+            m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.13, 0.16), fruit)
+            m.box((-0.13, 0.13), (-0.05, 0.05), (0.16, 0.18), fruit)
+            if good == Good.APPLES:
+                for u in (-0.15, -0.05, 0.06, 0.14):
+                    m.box((u - 0.012, u + 0.012), (-0.04, -0.02), (0.16, 0.175), APPLE_LIGHT)
+        with m.fine():
+            for row, z in enumerate((0.13, 0.172)):
+                for u in (-0.165, -0.055, 0.055, 0.165) if row == 0 else (-0.11, 0.0, 0.11):
+                    for v in ((-0.068, -0.003), (0.003, 0.068)):
+                        m.box((u - 0.05, u + 0.05), v, (z, z + 0.04), shade(WOOD, 1.1 - 0.1 * row))
+                        m.box(
+                            (u - 0.044, u + 0.044),
+                            (v[0] + 0.006, v[1] - 0.006),
+                            (z + 0.04, z + 0.046),
+                            fruit,
+                        )
+                        m.box(
+                            (u - 0.03, u + 0.0),
+                            (v[0] + 0.012, v[1] - 0.03),
+                            (z + 0.046, z + 0.05),
+                            shade(fruit, 1.3),
+                        )
 
 
 def _coal_hopper(m: Model, good: Good, full: bool) -> None:
@@ -946,8 +1694,10 @@ def _coal_hopper(m: Model, good: Good, full: bool) -> None:
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.19), HOPPER)
     m.panel((-h + 0.02, h - 0.02), (0.08, 0.17), 0.0805, shade(HOPPER, 0.85))
     if full:
-        m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.19, 0.22), COAL)
-        m.box((-0.1, 0.1), (-0.05, 0.05), (0.22, 0.24), COAL)
+        with m.coarse():
+            m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.19, 0.22), COAL)
+            m.box((-0.1, 0.1), (-0.05, 0.05), (0.22, 0.24), COAL)
+    _open_top(m, HOPPER, (52, 52, 56) if full else None, 0.19)
 
 
 def _log_wagon(m: Model, good: Good, full: bool) -> None:
@@ -956,13 +1706,20 @@ def _log_wagon(m: Model, good: Good, full: bool) -> None:
     for u in (-h + 0.005, h - 0.025):
         m.box((u, u + 0.02), (-0.08, 0.08), (0.085, 0.2), FRAME)
     if full:
-        for row, z in enumerate((0.115, 0.17)):
-            for v in (-0.045, 0.0, 0.045)[: 3 - row]:
-                m.cylinder_along((-h + 0.03, h - 0.03), 0.026, z, LOG, LOG_END)
-                m.faces[-CYLINDER_SIDES - 2 :] = [
-                    Face([(c[0], c[1] + v, c[2]) for c in f.corners], f.color, f.normal)
-                    for f in m.faces[-CYLINDER_SIDES - 2 :]
-                ]
+        with m.coarse():
+            for row, z in enumerate((0.115, 0.17)):
+                for v in (-0.045, 0.0, 0.045)[: 3 - row]:
+                    m.cylinder_along((-h + 0.03, h - 0.03), 0.026, z, LOG, LOG_END)
+                    m.faces[-CYLINDER_SIDES - 2 :] = [
+                        Face([(c[0], c[1] + v, c[2]) for c in f.corners], f.color, f.normal)
+                        for f in m.faces[-CYLINDER_SIDES - 2 :]
+                    ]
+        _logs(m, (-h + 0.03, h - 0.03), 0.085, 0.07, 0.0175)
+        with m.fine():
+            for u in (-0.08, 0.08):
+                m.cylinder_along((u - 0.004, u + 0.004), 0.004, 0.2, BLACK_IRON)
+                for v in (0.074, -0.074):
+                    parts.plate(m, (u - 0.003, u + 0.003), (0.09, 0.2), v, BLACK_IRON)
 
 
 def _coach(m: Model, good: Good, full: bool) -> None:
@@ -972,9 +1729,38 @@ def _coach(m: Model, good: Good, full: bool) -> None:
     m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.25, 0.265), ROOF_GREY)
     m.panel((-h + 0.01, h - 0.01), (0.105, 0.122), 0.0805, COACH_BAND)
     window = LIT_WINDOW if full else WINDOW
-    for u in (-0.17, -0.085, 0.0, 0.085, 0.17):
-        m.panel((u - 0.03, u + 0.03), (0.135, 0.195), 0.0806, window)
+    with m.coarse():
+        for u in (-0.17, -0.085, 0.0, 0.085, 0.17):
+            m.panel((u - 0.03, u + 0.03), (0.135, 0.195), 0.0806, window)
     m.panel((-h + 0.01, h - 0.01), (0.07, 0.085), 0.0806, shade(COACH, 0.75))
+    for u in (-0.12, -0.04, 0.04, 0.12):
+        parts.window_frames(m, (u - 0.032, u + 0.032), (0.133, 0.197), 0.0806, COACH_BAND, window)
+    _coach_fine(m, COACH, COACH_BAND, window)
+
+
+def _coach_fine(m: Model, body: RGB, band: RGB, window: RGB) -> None:
+    """A coach's doors at both ends with drop lights, handles and steps under them, lining,
+    vents along the roof and gangways at the ends."""
+    h = CAR_HALF
+    with m.fine():
+        for v in (0.0806, -0.0806):
+            for u in (-h + 0.035, h - 0.035):
+                parts.plate(m, (u - 0.022, u + 0.022), (0.066, 0.222), v, shade(body, 0.7))
+                parts.plate(m, (u - 0.018, u + 0.018), (0.07, 0.218), v * 1.004, body)
+                parts.plate(m, (u - 0.012, u + 0.012), (0.15, 0.198), v * 1.008, window)
+                parts.plate(m, (u + 0.01, u + 0.016), (0.12, 0.13), v * 1.008, BRASS)
+                m.box((u - 0.018, u + 0.018), tuple(sorted((v, v * 1.15))), (0.042, 0.048), FRAME)
+            parts.plate(m, (-h + 0.06, h - 0.06), (0.204, 0.208), v, band)
+        for u in (-0.12, 0.0, 0.12):
+            m.cylinder_up(u, 0.012, (0.265, 0.278), shade(ROOF_GREY, 0.75))
+        for end in (h, -h):
+            out = 1.0 if end > 0 else -1.0
+            m.box(
+                tuple(sorted((end, end + out * 0.012))),
+                (-0.045, 0.045),
+                (0.08, 0.22),
+                shade(FRAME, 1.6),
+            )
 
 
 def dining() -> Model:
@@ -991,9 +1777,15 @@ def dining() -> Model:
     m.box((-h + 0.025, -h + 0.055), (-0.015, 0.015), (0.25, 0.3), BLACK_IRON)
     for u in (-0.03, 0.06, 0.15):
         m.panel((u - 0.035, u + 0.035), (0.14, 0.2), 0.0806, LIT_WINDOW)
+        parts.window_frames(m, (u - 0.035, u + 0.035), (0.14, 0.2), 0.0806, DINER, LIT_WINDOW, 2)
     for u in (-0.2, -0.15):
         m.panel((u - 0.015, u + 0.015), (0.17, 0.2), 0.0806, WINDOW)
     m.panel((-h + 0.01, h - 0.01), (0.07, 0.085), 0.0806, shade(DINER, 0.75))
+    with m.fine():
+        for v in (0.0806, -0.0806):
+            parts.plate(m, (-h + 0.01, h - 0.01), (0.125, 0.129), v, BRASS)
+            parts.plate(m, (-h + 0.01, h - 0.01), (0.211, 0.215), v, BRASS)
+    _underframe(m)
     return m
 
 
@@ -1006,15 +1798,30 @@ def _mail_van(m: Model, good: Good, full: bool) -> None:
     m.panel((-0.05, 0.05), (0.07, 0.19), 0.0806, door)
     m.panel((-h + 0.03, -h + 0.08), (0.15, 0.19), 0.0806, WINDOW)
     m.panel((h - 0.08, h - 0.03), (0.15, 0.19), 0.0806, WINDOW)
+    with m.fine():
+        for v in (0.0806, -0.0806):
+            for u in (-h + 0.055, h - 0.055):
+                parts.plate(m, (u - 0.02, u + 0.02), (0.165, 0.169), v * 1.004, MAIL_VAN)
+            parts.plate(m, (0.065, 0.135), (0.1, 0.15), v, (236, 228, 200))
+            parts.bar(m, (0.065, 0.15), (0.1, 0.122), 0.005, v * 1.004, shade(MAIL_VAN, 0.8))
+            parts.bar(m, (0.135, 0.15), (0.1, 0.122), 0.005, v * 1.004, shade(MAIL_VAN, 0.8))
+            parts.plate(m, (-0.046, 0.046), (0.125, 0.13), v * 1.004, BRASS)
 
 
 def _steel_wagon(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
     _deck(m)
+    _stakes(m)
     if full:
+        with m.fine():
+            for u in (-0.15, 0.0, 0.15):
+                m.box((u - 0.012, u + 0.012), (-0.07, 0.07), (0.085, 0.095), WOOD)
         for v in (-0.04, 0.04):
-            m.box((-h + 0.03, h - 0.03), (v - 0.03, v + 0.03), (0.085, 0.12), STEEL)
-        m.box((-h + 0.05, h - 0.05), (-0.03, 0.03), (0.12, 0.155), STEEL)
+            m.box((-h + 0.03, h - 0.03), (v - 0.03, v + 0.03), (0.095, 0.13), STEEL)
+            parts.lines(
+                m, (-h + 0.03, h - 0.03), (0.095, 0.13), abs(v) + 0.0306, shade(STEEL, 0.75), 1
+            )
+        m.box((-h + 0.05, h - 0.05), (-0.03, 0.03), (0.13, 0.165), STEEL)
 
 
 # The body of each car that is not a van, hopper, heap or tank (VANS, HOPPERS, HEAPS, TANKS).
@@ -1036,6 +1843,17 @@ CAR_BODIES: dict[Good, CarBody] = {
     Good.PASSENGERS: _coach,
     Good.MAIL: _mail_van,
     Good.STEEL: _steel_wagon,
+}
+# The load of each heap wagon (HEAPS) when it is drawn fine, lumps where none is given.
+HEAP_LOADS: dict[Good, Callable[[Model, RGB], None]] = {
+    Good.WOOL: _bales,
+    Good.COTTON: _bales,
+    Good.FLAX: _bales,
+    Good.HOPS: _bales,
+    Good.BARRELS: _barrels,
+    Good.BRICKS: _bricks,
+    Good.MACHINERY: _crated,
+    Good.GRAPES: _tubs,
 }
 
 
@@ -1499,10 +2317,11 @@ class _Faces:
     starts: list[int]
     shades: list[list[RGB]]
     groups: list[tuple[IntArray, IntArray]]
+    decals: list[tuple[int, int]]
 
     @classmethod
-    def of(cls, model: Model) -> Self:
-        faces = model.faces
+    def of(cls, model: Model, fine: bool = False) -> Self:
+        faces = [face for face in model.faces if face.drawn(fine)]
         counts = np.array([len(face.corners) for face in faces])
         starts = np.concatenate([[0], np.cumsum(counts)])
         groups = []
@@ -1520,6 +2339,7 @@ class _Faces:
             starts=starts.tolist(),
             shades=[shaded[face.color] for face in faces],
             groups=groups,
+            decals=decals(faces) if fine else [],
         )
 
     def means(self, values: FloatArray) -> FloatArray:
@@ -1530,11 +2350,13 @@ class _Faces:
         return means
 
 
-def _pictures(model: Model, sight: _Sight) -> list[Sprite]:
-    """The model running each of the HEADINGS headings, drawn as models.draw_model draws it but
-    without the outline."""
-    faces = _Faces.of(model)
-    return [_picture(faces, sight, 2 * math.pi * index / HEADINGS) for index in range(HEADINGS)]
+def _pictures(
+    model: Model, sight: _Sight, fine: bool = False, indices: Iterable[int] = range(HEADINGS)
+) -> list[Sprite]:
+    """The model running each of the HEADINGS headings, or those of them given, drawn as
+    models.draw_model draws it but without the outline."""
+    faces = _Faces.of(model, fine)
+    return [_picture(faces, sight, 2 * math.pi * index / HEADINGS) for index in indices]
 
 
 def _picture(faces: _Faces, sight: _Sight, heading: float) -> Sprite:
@@ -1546,6 +2368,8 @@ def _picture(faces: _Faces, sight: _Sight, heading: float) -> Sprite:
     lit = np.clip(_along(normals, sight.light), 0, 1)
     levels = np.minimum(len(SHADES) - 1, (lit * len(SHADES)).astype(np.int64)).tolist()
     depth = faces.means(_along(corners, sight.view))
+    for index, under in faces.decals:
+        depth[index] = depth[under] + 1e-6
     order = np.flatnonzero(shown)[np.argsort(depth[shown], kind="stable")].tolist()
     xs, ys = sight.on_picture(corners)
     on = np.repeat(shown, faces.counts)
@@ -1584,6 +2408,23 @@ class TrainSprites:
         return self.places[(look, turned(heading))]
 
 
+def fine_pictures(
+    matrix_key: tuple[float, float, float, float],
+    look: object,
+    times: int,
+    indices: Iterable[int] = range(HEADINGS),
+) -> list[Sprite]:
+    """A look every way round, or running the headings given, `times` as many pixels each way
+    as on the sheet, with its fine details and an outline about half as wide as the sheet's
+    blown up: for the close zooms, whose pictures would otherwise be the sheet's blown up."""
+    matrix = np.array(matrix_key, dtype=np.float64).reshape(2, 2)
+    sight = _Sight.of(matrix, DETAIL * SCALE * times)
+    pictures = _pictures(MODELS[look](), sight, fine=True, indices=indices)
+    for picture in pictures:
+        _outline(picture.image, max(1, times // 2))
+    return pictures
+
+
 def turned(heading: float) -> int:
     """Which of the HEADINGS pictures of a look runs closest to `heading` radians."""
     return round(heading / (2 * math.pi) * HEADINGS) % HEADINGS
@@ -1597,10 +2438,12 @@ def train_sprites(matrix_key: tuple[float, float, float, float]) -> TrainSprites
     keeps an empty margin round its model, so every outline pixel lands where draw_model puts it."""
     matrix = np.array(matrix_key, dtype=np.float64).reshape(2, 2)
     sight = _Sight.of(matrix, DETAIL * SCALE)
+    with without_fine():
+        models = {look: make() for look, make in MODELS.items()}
     sprites = {
         (look, index): sprite
-        for look, make in MODELS.items()
-        for index, sprite in enumerate(_pictures(make(), sight))
+        for look, model in models.items()
+        for index, sprite in enumerate(_pictures(model, sight))
     }
     area = sum(sprite.image.size[0] * (sprite.image.size[1] + 1) for sprite in sprites.values())
     width = math.ceil(math.sqrt(area * 1.15) / 64) * 64

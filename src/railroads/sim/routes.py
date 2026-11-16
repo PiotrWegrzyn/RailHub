@@ -29,7 +29,12 @@ from railroads.sim.constructions import (
     Track,
     TrackWidth,
 )
-from railroads.sim.demolition import clearing, clearing_price, station_site_price
+from railroads.sim.demolition import (
+    clearing,
+    clearing_price,
+    remove_platforms,
+    station_site_price,
+)
 from railroads.sim.finance import track_price
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.growth import Growth
@@ -247,16 +252,6 @@ def add_platform(
     constructions.remove(built)
     constructions.build(Station(cell, built.ends, station))
     return changed
-
-
-def remove_platforms(constructions: Constructions, station: Cell) -> set[Cell]:
-    """Takes down every platform added to a station; returns their cells."""
-    cells = set(constructions.platforms(station))
-    for cell in cells:
-        built = constructions.station_at(cell)
-        if built is not None:
-            constructions.remove(built)
-    return cells
 
 
 def move_station(

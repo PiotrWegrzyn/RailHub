@@ -13,10 +13,9 @@ from railroads.sim.finance import dollars
 from railroads.sim.goods import FITS, GOOD_YEARS, MAKES, NEED_YEARS, NEEDS, Good, Need
 from railroads.sim.ladders import LADDERS, PASSENGERS_PER_POINT, POINTS, Points
 from railroads.ui.search import goods_of
-from railroads.ui.theme import BRASS, good_amount, good_icon
+from railroads.ui.theme import BRASS, LIST_TABLE_FLAGS, WINDOW_TOP, good_amount, good_icon, tip
 
 WINDOW_SIZE = (860.0, 600.0)
-WINDOW_TOP = 56.0
 
 
 @dataclass(frozen=True)
@@ -119,7 +118,7 @@ class HelpWindow:
         return all(any(word in name.lower() for name in names) for word in words)
 
     def _draw_buildings(self) -> None:
-        if not imgui.begin_table("all buildings", 6, _TABLE_FLAGS):
+        if not imgui.begin_table("all buildings", 6, LIST_TABLE_FLAGS):
             return
         imgui.table_setup_scroll_freeze(0, 1)
         imgui.table_setup_column("Building")
@@ -154,7 +153,7 @@ class HelpWindow:
         imgui.end_table()
 
     def _draw_goods(self) -> None:
-        if not imgui.begin_table("all goods", 5, _TABLE_FLAGS):
+        if not imgui.begin_table("all goods", 5, LIST_TABLE_FLAGS):
             return
         imgui.table_setup_scroll_freeze(0, 1)
         imgui.table_setup_column("Good")
@@ -182,12 +181,6 @@ class HelpWindow:
         imgui.end_table()
 
 
-_TABLE_FLAGS = (
-    imgui.TableFlags_.row_bg.value
-    | imgui.TableFlags_.borders_inner_h.value
-    | imgui.TableFlags_.scroll_y.value
-    | imgui.TableFlags_.sizing_fixed_fit.value
-)
 _NO_MAKER = {Good.PASSENGERS: "every building", Good.MAIL: "every building"}
 _NO_BUYER = {Good.PASSENGERS: "every building", Good.MAIL: "every building"}
 
@@ -211,5 +204,4 @@ def _draw_wants(row: BuildingHelp) -> None:
         if year:
             imgui.same_line(0, 2)
             imgui.text_disabled(f"({year})")
-            if imgui.is_item_hovered():
-                imgui.set_tooltip(f"Wanted from {year}")
+            tip(f"Wanted from {year}")

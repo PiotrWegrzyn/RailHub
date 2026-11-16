@@ -7,6 +7,7 @@ trains going opposite ways pass on different tracks."""
 import bisect
 import itertools
 import math
+import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Protocol
@@ -32,6 +33,7 @@ from railroads.ui.pixel.trains import (
     SCALE,
     Look,
     TrainSprites,
+    fine_pictures,
     train_sprites,
     turned,
 )
@@ -43,10 +45,12 @@ SMOKE = (0.88, 0.88, 0.9)
 # The biggest texture made for trains on each side: many graphics cards and browsers take no
 # bigger, and draw a bigger one black.
 MAX_TEXTURE = 4096
-# How wide a page of one look's pictures is before it is blown up, in sheet pixels, and how many
-# bytes the pages blown up for the zoom shown may take before those not drawn lately are let go.
+# How wide a page of one look's pictures is at the least, in sheet pixels, how many bytes the
+# pages drawn for the zoom shown may take before those not drawn lately are let go, and how long a
+# frame may spend drawing pages: a look whose page is not drawn yet shows from the sheet meanwhile.
 PAGE_WIDTH = 512
 PAGES_BUDGET = 128 * 1024 * 1024
+PAGES_TIME = 0.006
 PUFFS = 5
 
 
@@ -58,8 +62,10 @@ class TrainLayer:
     def __init__(self, world: PixelWorld) -> None:
         self.world = world
         matrix = world.projection.matrix.ravel()
-        self.sprites: TrainSprites = train_sprites(tuple(float(v) for v in matrix))
+        self._matrix = tuple(float(v) for v in matrix)
+        self.sprites: TrainSprites = train_sprites(self._matrix)
         self._sheet: Texture | None = None
+        self._paging_until = 0.0
         self._factor = 1
         self._pages: OrderedDict[object, _Page] = OrderedDict()
         self.lanes = Lanes(world.track)
@@ -77,6 +83,7 @@ class TrainLayer:
         )
         factor = self._blown_up_by(scale * density)
         per_pixel = scale / DETAIL
+        snap = DETAIL * factor
         in_sight = self._in_sight(railway, origin, scale)
         seen = []
         for train in in_sight:
@@ -99,26 +106,27 @@ class TrainLayer:
             ax, ay = projection.to_pixels(xs, ys)
             ay = ay - self.world.elevation.lift(xs, ys)
             for k, (((_, _), (dx, dy)), shift, look) in enumerate(found):
-                sx = origin[0] + round((float(ax[k]) + shift[0]) * DETAIL) * per_pixel
-                sy = origin[1] + round((float(ay[k]) + shift[1]) * DETAIL) * per_pixel
+                sx = origin[0] + round((float(ax[k]) + shift[0]) * snap) * scale / snap
+                sy = origin[1] + round((float(ay[k]) + shift[1]) * snap) * scale / snap
                 parts.append((sy, sx, look, math.atan2(dy, dx)))
         parts.sort(key=lambda part: part[0])
         drawn: set[object] = set()
+        self._paging_until = time.perf_counter() + PAGES_TIME
         for sy, sx, look, heading in parts:
-            px, py, w, h, anchor_x, anchor_y = self.sprites.place(look, heading)
-            if factor == 1:
-                texture, (width, height) = self._whole_sheet(), self._sheet_size()
+            page = None if factor == 1 else self._page(look, factor)
+            if page is None:
+                px, py, w, h, anchor_x, anchor_y = self.sprites.place(look, heading)
+                texture, (width, height), per = self._whole_sheet(), self._sheet_size(), per_pixel
             else:
-                page = self._page(look, factor)
-                texture, (width, height) = page.texture, page.size
-                px, py = page.spots[turned(heading)]
+                px, py, w, h, anchor_x, anchor_y = page.spots[turned(heading)]
+                texture, (width, height), per = page.texture, page.size, per_pixel / factor
                 drawn.add(look)
-            left = sx - anchor_x * per_pixel
-            top = sy - anchor_y * per_pixel
+            left = sx - anchor_x * per
+            top = sy - anchor_y * per
             draw_list.add_image(
                 imgui.ImTextureRef(texture.texture_id()),
                 (left, top),
-                (left + w * per_pixel, top + h * per_pixel),
+                (left + w * per, top + h * per),
                 (px / width, py / height),
                 ((px + w) / width, (py + h) / height),
             )
@@ -234,9 +242,10 @@ class TrainLayer:
         return chimneys
 
     def _blown_up_by(self, device_scale: int) -> int:
-        """How many times each way the pictures are blown up to show crisp at this many device
-        pixels per art pixel: imgui samples every texture smoothly, so a texture must hold a
-        texel for every device pixel. Pages blown up for another zoom are let go of."""
+        """How many times as fine as the sheet each way the pictures are drawn to show crisp at
+        this many device pixels per art pixel: imgui samples every texture smoothly, so a
+        texture must hold a texel for every device pixel. Pages for another zoom are let go
+        of."""
         factor = max(1, min(device_scale // DETAIL, MAX_TEXTURE // PAGE_WIDTH))
         if factor != self._factor:
             self._pages.clear()
@@ -254,31 +263,34 @@ class TrainLayer:
             self._sheet = hello_imgui.create_texture_gpu_from_rgba_data(image)
         return self._sheet
 
-    def _page(self, look: object, factor: int) -> _Page:
-        """A texture of one look's pictures every way round, blown up `factor` times each way.
-        Only the looks on screen are blown up: the whole sheet blown up for the closest zoom on
-        a sharp screen is too big a texture for many graphics cards, which draw it black."""
+    def _page(self, look: object, factor: int) -> _Page | None:
+        """A texture of one look's pictures every way round, drawn `factor` times as fine as the
+        sheet with their fine details, or None while this frame has spent its PAGES_TIME. Only
+        the looks on screen get one: the whole sheet that fine on a sharp screen is too big a
+        texture for many graphics cards, which draw it black."""
         page = self._pages.get(look)
         if page is not None:
             self._pages.move_to_end(look)
             return page
-        boxes = [self.sprites.places[(look, index)] for index in range(HEADINGS)]
-        width = max(PAGE_WIDTH, *(box[2] for box in boxes))
+        if time.perf_counter() > self._paging_until:
+            return None
+        pictures = fine_pictures(self._matrix, look, factor)
+        width = max(PAGE_WIDTH * factor, *(p.image.size[0] for p in pictures))
         spots = {}
         x = y = row = 0
-        for index, (_, _, w, h, _, _) in enumerate(boxes):
+        for index, picture in enumerate(pictures):
+            w, h = picture.image.size
             if x + w > width:
                 x, y, row = 0, y + row + 1, 0
-            spots[index] = (x, y)
+            spots[index] = (x, y, w, h, *picture.anchor)
             x += w + 1
             row = max(row, h)
         pixels = np.zeros((y + row, width, 4), dtype=np.uint8)
-        for index, (px, py, w, h, _, _) in enumerate(boxes):
-            x, y = spots[index]
-            pixels[y : y + h, x : x + w] = self.sprites.image[py : py + h, px : px + w]
-        big = np.repeat(np.repeat(pixels, factor, axis=0), factor, axis=1)
-        texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
-        page = self._pages[look] = _Page(texture, (width, pixels.shape[0]), spots, big.nbytes)
+        for index, picture in enumerate(pictures):
+            x, y, w, h, _, _ = spots[index]
+            pixels[y : y + h, x : x + w] = np.asarray(picture.image)
+        texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(pixels))
+        page = self._pages[look] = _Page(texture, (width, pixels.shape[0]), spots, pixels.nbytes)
         return page
 
     def _let_go(self, drawn: set[object]) -> None:
@@ -293,12 +305,12 @@ class TrainLayer:
 
 @dataclass(frozen=True)
 class _Page:
-    """One look's pictures every way round on a texture of their own: the texture, its size
-    before it was blown up, where each picture lies on it before then, and its bytes."""
+    """One look's pictures every way round on a texture of their own: the texture, its size,
+    each picture's x, y, width, height and anchor on it, and its bytes."""
 
     texture: Texture
     size: tuple[int, int]
-    spots: dict[int, tuple[int, int]]
+    spots: dict[int, tuple[int, int, int, int, int, int]]
     bytes: int
 
 
@@ -448,9 +460,11 @@ def _point(steps: np.ndarray, dx: float, dy: float) -> int:
 SHOWN_FACING = (0.95, 0.3)
 
 
-def engine_picture(sprites: TrainSprites, matrix: npt.NDArray[np.float64], engine: str) -> Pixels:
+def engine_picture(
+    sprites: TrainSprites, matrix: npt.NDArray[np.float64], engine: str, times: int = 1
+) -> Pixels:
     """An engine with its tender, as the map draws it, facing SHOWN_FACING: RGBA at the size of
-    the sprite sheet."""
+    the sprite sheet, or `times` as many pixels each way with its fine details."""
     facing = np.array(SHOWN_FACING) / math.hypot(*SHOWN_FACING)
 
     def on_screen(heading: float) -> float:
@@ -458,13 +472,20 @@ def engine_picture(sprites: TrainSprites, matrix: npt.NDArray[np.float64], engin
         return float(way @ facing / (np.hypot(*way) or 1.0))
 
     heading = max((2 * math.pi * k / HEADINGS for k in range(HEADINGS)), key=on_screen)
-    ahead = matrix @ (math.cos(heading), math.sin(heading)) * DETAIL
+    ahead = matrix @ (math.cos(heading), math.sin(heading)) * DETAIL * times
+    key = tuple(float(v) for v in matrix.ravel())
     placed = []
     for look, back in TrainLayer._parts(Train("", engine=engine)):
-        x, y, w, h, anchor_x, anchor_y = sprites.place(look, heading)
+        if times == 1:
+            x, y, w, h, anchor_x, anchor_y = sprites.place(look, heading)
+            pixels = sprites.image[y : y + h, x : x + w]
+        else:
+            (picture,) = fine_pictures(key, look, times, [turned(heading)])
+            pixels = np.asarray(picture.image)
+            anchor_x, anchor_y = picture.anchor
         left = -ahead[0] * back - anchor_x
         top = -ahead[1] * back - anchor_y
-        placed.append((-ahead[1] * back, top, left, sprites.image[y : y + h, x : x + w]))
+        placed.append((-ahead[1] * back, top, left, pixels))
     low_x = math.floor(min(left for _, _, left, _ in placed))
     low_y = math.floor(min(top for _, top, _, _ in placed))
     high_x = math.ceil(max(left + p.shape[1] for _, _, left, p in placed))

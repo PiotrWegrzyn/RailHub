@@ -16,6 +16,7 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.saves import SUFFIX, SaveError, Saves
+from railroads.ui.theme import tip
 
 IN_BROWSER = sys.platform == "emscripten"
 
@@ -156,8 +157,7 @@ def draw_file_buttons(
     imgui.same_line()
     if imgui.button(f"{fa.ICON_FA_UPLOAD}  Import file", (half, 0)):
         files.pick()
-    if imgui.is_item_hovered():
-        imgui.set_tooltip("Add a save file exported from the game online or offline.")
+    tip("Add a save file exported from the game online or offline.")
     try:
         for picked in files.poll():
             name = saves.bring_in(picked.name, picked.data)
