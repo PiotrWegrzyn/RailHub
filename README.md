@@ -840,8 +840,8 @@ with nothing being built it opens the details of a cell: its land, points, and e
 with what it makes and needs and what it got and gave last month. Clicking a station, left or
 right, opens the station instead: its level and reach, its stockpile, waiting passengers and mail, demand and
 the trains that call there, with its reach shaded on the map. There it can be raised a level,
-$100,000 to level 2 and $500,000 to level 3, each level handing goods out and gathering them one
-cell further (3 and 5 cells, then 4 and 6), and given more storage, $10,000 for each 250 more of
+up to level 5 (see the money above), each level handing goods out and gathering them one
+cell further (from 1 and 4 cells up to 5 and 8), and given more storage, $10,000 for each 250 more of
 every good and 500 more passengers and mail. Each tree is drawn as a tree: every node in a row
 by how many nodes it builds on, under the first of them, with a line from each node it needs,
 bright once that one is taken.
