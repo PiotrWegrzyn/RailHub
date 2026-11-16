@@ -59,11 +59,14 @@ def storage_price(upgrades: int) -> float:
 def track_price(piece: Track, tile: Tile) -> float:
     """What laying this piece of track in this cell costs."""
     price = TRACK_PRICE * track_rules_for(tile, piece.bed).price_factor
-    if piece.electric:
-        price += ELECTRIC_TRACK_PRICE
-    if piece.maglev:
-        price += MAGLEV_TRACK_PRICE
-    return price * (DOUBLE_TRACK_FACTOR if piece.width == TrackWidth.DOUBLE else 1.0)
+    return _dressed(price, piece, ELECTRIC_TRACK_PRICE, MAGLEV_TRACK_PRICE)
+
+
+def _dressed(base: float, piece: Track, electric: float, maglev: float) -> float:
+    """A piece's base cost with what its wires or guideway add, the whole doubled up for double
+    track."""
+    cost = base + (electric if piece.electric else 0.0) + (maglev if piece.maglev else 0.0)
+    return cost * (DOUBLE_TRACK_FACTOR if piece.width == TrackWidth.DOUBLE else 1.0)
 
 
 def track_upkeep(pieces: Iterable[Track]) -> float:
@@ -71,9 +74,7 @@ def track_upkeep(pieces: Iterable[Track]) -> float:
     dearest piece in it."""
     dearest: dict[tuple[int, int], float] = {}
     for piece in pieces:
-        upkeep = TRACK_UPKEEP + (ELECTRIC_TRACK_UPKEEP if piece.electric else 0.0)
-        upkeep += MAGLEV_TRACK_UPKEEP if piece.maglev else 0.0
-        upkeep *= DOUBLE_TRACK_FACTOR if piece.width == TrackWidth.DOUBLE else 1.0
+        upkeep = _dressed(TRACK_UPKEEP, piece, ELECTRIC_TRACK_UPKEEP, MAGLEV_TRACK_UPKEEP)
         dearest[piece.cell] = max(upkeep, dearest.get(piece.cell, 0.0))
     return sum(dearest.values())
 
