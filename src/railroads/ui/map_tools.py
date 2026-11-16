@@ -2,6 +2,7 @@
 laying track, bulldozing and moving stations through the game (railroads.sim.game), the price
 note for the cell under the pointer, and the planned track shown once the pointer rests."""
 
+import time
 from typing import TYPE_CHECKING
 
 from imgui_bundle import imgui
@@ -10,7 +11,8 @@ from railroads.sim.constructions import Track
 from railroads.sim.demolition import bulldoze_price, station_site_price
 from railroads.sim.finance import STATION_PRICE, dollars
 from railroads.sim.grids import Cell
-from railroads.sim.routes import Route, plan_route, route_price, station_way
+from railroads.sim.routes import Route, plan_route_steps, route_price, station_way
+from railroads.sim.steps import Steps, finish
 from railroads.ui.build_menu import Tool
 
 if TYPE_CHECKING:
@@ -18,6 +20,23 @@ if TYPE_CHECKING:
 
 # How long the pointer must rest on a cell, in seconds, before the track planned to it is shown.
 PREVIEW_REST_S = 0.12
+# How long planning the previewed track may take of each frame, in seconds; a long route is
+# planned over several frames rather than stalling one.
+PREVIEW_STEP_S = 0.006
+_UNFINISHED = object()
+
+
+def _work_on[T](steps: Steps[T], seconds: float) -> T | object:
+    """Takes steps for about `seconds`, at least one; returns what they came to, or
+    _UNFINISHED."""
+    until = time.perf_counter() + seconds
+    while True:
+        try:
+            next(steps)
+        except StopIteration as done:
+            return done.value
+        if time.perf_counter() >= until:
+            return _UNFINISHED
 
 
 class MapTools:
@@ -27,6 +46,9 @@ class MapTools:
         # is worked out only once it stops there.
         self._resting_on: Cell | None = None
         self._resting_since = 0.0
+        # The track being planned to the cell the pointer rests on, a few steps a frame, and
+        # what it is planned for (_track_wanted).
+        self._planning: tuple[tuple[object, ...], Steps[Route | None]] | None = None
 
     def click(self, cell: Cell) -> None:
         view = self._view
@@ -52,7 +74,7 @@ class MapTools:
                     build.track_from = cell
                     build.say("Now click where the track goes.")
                     return
-                planned = build.preview if build.preview_for == self._track_wanted(cell) else None
+                planned = self._planned(cell)
                 done = game.lay_track(
                     build.track_from,
                     cell,
@@ -175,6 +197,17 @@ class MapTools:
             + ". Q turns it."
         )
 
+    def _planned(self, cell: Cell) -> Route | None:
+        """The route already planned, or being planned, for track to `cell` as the tool lays it
+        now, if there is one."""
+        build, wanted = self._view.build, self._track_wanted(cell)
+        if build.preview_for == wanted:
+            return build.preview
+        if self._planning is not None and self._planning[0] == wanted:
+            steps, self._planning = self._planning[1], None
+            return finish(steps)
+        return None
+
     def _track_wanted(self, cell: Cell) -> tuple[object, ...]:
         """What track from where it starts to `cell` would be planned for, so a route planned
         for the same is laid as it is."""
@@ -203,16 +236,20 @@ class MapTools:
                 self._resting_on, self._resting_since = cell, now
             if now - self._resting_since < PREVIEW_REST_S:
                 return
-            build.preview_to = cell
-            build.preview_for = self._track_wanted(cell)
-            build.preview = plan_route(
-                constructions,
-                build.track_from,
-                cell,
-                build.track_width,
-                build.electric,
-                build.maglev,
-            )
-            build.preview_price = (
-                None if build.preview is None else route_price(constructions, build.preview)
-            )
+            wanted = self._track_wanted(cell)
+            if self._planning is None or self._planning[0] != wanted:
+                steps = plan_route_steps(
+                    constructions,
+                    build.track_from,
+                    cell,
+                    build.track_width,
+                    build.electric,
+                    build.maglev,
+                )
+                self._planning = wanted, steps
+            route = _work_on(self._planning[1], PREVIEW_STEP_S)
+            if route is _UNFINISHED:
+                return
+            self._planning = None
+            build.preview_to, build.preview_for, build.preview = cell, wanted, route
+            build.preview_price = None if route is None else route_price(constructions, route)

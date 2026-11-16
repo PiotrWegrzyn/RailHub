@@ -601,8 +601,9 @@ def slow_writer(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_a_month_that_ends_while_an_autosave_is_written_is_autosaved_after_it(
-    context: None, tmp_path: Path, slow_writer: None
+    context: None, tmp_path: Path, slow_writer: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(app_module, "AUTOSAVE_GAP_S", 0.0)
     app = made_app()
     app.saves = Saves(tmp_path)
     app.clock.seconds = app.clock.seconds_per_month - 0.001
@@ -642,6 +643,7 @@ def test_an_autosave_due_while_another_month_is_half_done_waits_for_that_month(
 ) -> None:
     writer = HeldWriter()
     monkeypatch.setattr(app_module, "WRITER", writer)
+    monkeypatch.setattr(app_module, "AUTOSAVE_GAP_S", 0.0)
     app = made_app()
     app.saves = Saves(tmp_path)
     app.autosave()
@@ -741,3 +743,25 @@ def test_the_yolo_button_starts_a_random_place_with_the_other_settings_kept(
 
     assert settings.map == MapChoice.WORLD
     assert (settings.seed, settings.start_year) == (42, 1900)
+
+
+def test_months_ending_soon_after_an_autosave_are_saved_once_the_gap_has_passed(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    now = [1000.0]
+    monkeypatch.setattr(app_module.time, "monotonic", lambda: now[0])
+    app = made_app()
+    app.saves = Saves(tmp_path)
+    for _ in range(3):
+        app.clock.seconds = app.clock.seconds_per_month - 0.001
+        frames_until_the_month_is_done(app)
+        frame(app)
+        app._finish_writing()
+    saved_soon = [info.name for info in app.saves.listing()]
+    now[0] += app_module.AUTOSAVE_GAP_S
+
+    frame(app)
+    app._finish_writing()
+
+    assert saved_soon == ["autosave 1"]
+    assert app.saves.load("autosave 1").clock.date == app.clock.date

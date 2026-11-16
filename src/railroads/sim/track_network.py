@@ -35,6 +35,9 @@ class TrackNetwork:
     # For each point on the map asked about, whether it lies in a station and on double track,
     # with the railway version found for.
     _passing: tuple[int, dict[Point, tuple[bool, bool]]] = (-1, {})
+    # How long each way found is, by its ends and track kind as in _routes, with the railway
+    # version found for: a train that can't set off asks every frame.
+    _lengths: tuple[int, dict[tuple, float]] = (-1, {})
 
     def __init__(self, constructions: Constructions) -> None:
         self.constructions = constructions
@@ -96,6 +99,23 @@ class TrackNetwork:
         if key not in found:
             found[key] = self._find_way(start, end, electric, maglev)
         return found[key]
+
+    def route_length(
+        self, start: Cell, end: Cell, electric: bool = False, maglev: bool = False
+    ) -> float | None:
+        """How long the way route finds is, in cells; None without one."""
+        way = self.route(start, end, electric, maglev)
+        if way is None:
+            return None
+        version = self.constructions.railway_version
+        if self._lengths[0] != version:
+            self._lengths = (version, {})
+        lengths = self._lengths[1]
+        key = (start, end, electric, maglev)
+        length = lengths.get(key)
+        if length is None:
+            length = lengths[key] = sum(math.dist(a, b) for a, b in itertools.pairwise(way[0]))
+        return length
 
     def _find_way(self, start: Cell, end: Cell, electric: bool, maglev: bool) -> Way | None:
         self._find_exits()

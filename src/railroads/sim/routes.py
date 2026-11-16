@@ -34,6 +34,7 @@ from railroads.sim.finance import track_price
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
+from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Relief, Terrain, Tile
 from railroads.sim.track_rules import TrackBed, track_rules_for
 
@@ -48,6 +49,9 @@ REUSE_COST = 0.5
 # What each bend costs the planner, against a cell of new track on open flat land, so that
 # routes run straight and turn seldom instead of zigzagging.
 BEND_COST = 0.6
+# How many states the search takes off its frontier between the steps of plan_route_steps: about
+# a millisecond's work on a desktop.
+PLAN_STEP = 256
 
 # The planner numbers cells row by row with this many cells of border round the map, so that a
 # step from any cell on it, through a corner too, lands on a numbered cell.
@@ -123,9 +127,23 @@ def plan_route(
 ) -> Route | None:
     """The cheapest track of this width, electric, maglev or neither, from `start` to `end`, or
     None if there is no way."""
+    return finish(plan_route_steps(constructions, start, end, width, electric, maglev))
+
+
+def plan_route_steps(
+    constructions: Constructions,
+    start: Cell,
+    end: Cell,
+    width: TrackWidth = TrackWidth.SINGLE,
+    electric: bool = False,
+    maglev: bool = False,
+) -> Steps[Route | None]:
+    """plan_route in steps of about PLAN_STEP cells searched, which a caller can spread over
+    frames; the constructions mustn't change between them."""
     if start == end:
         return None
-    return _Planner(constructions, start, end, width, electric and not maglev, maglev).plan()
+    planner = _Planner(constructions, start, end, width, electric and not maglev, maglev)
+    return (yield from planner.plan())
 
 
 def route_price(constructions: Constructions, route: Route) -> float:
@@ -374,7 +392,7 @@ class _Planner:
         self._leaving = [None] * numbered
         self._grounds = [None] * numbered
 
-    def plan(self) -> Route | None:
+    def plan(self) -> Steps[Route | None]:
         constructions = self.constructions
         grid = constructions.tile_map.grid
         if not (grid.contains(*self.start) and grid.contains(*self.end)):
@@ -396,12 +414,14 @@ class _Planner:
             if point not in seeds
         }
         joins = [] if _is_station(constructions, self.end) else self._joins(self.end)
-        route = self._search([*(seeds or [None]), *sorted(along)], joins, along)
+        route = yield from self._search([*(seeds or [None]), *sorted(along)], joins, along)
         if route is None and (joins or (seeds and not start_station)):
-            route = self._search([*self._ways_out] or [None], [], set())
+            route = yield from self._search([*self._ways_out] or [None], [], set())
         return route
 
-    def _search(self, seeds: list[int | None], joins: list[int], along: set[int]) -> Route | None:
+    def _search(
+        self, seeds: list[int | None], joins: list[int], along: set[int]
+    ) -> Steps[Route | None]:
         """A* over cells and the point track came into them by. `seeds` are the points the
         first piece may start from (None for anywhere); from those in `along` it can only run
         along track already laid. The last piece must lead out by one of `joins` (with none,
@@ -420,11 +440,15 @@ class _Planner:
         known = best.get
         came: dict[int, int] = {}
         done = bytearray(len(to_end) << 4)
+        searched = 0
         while frontier:
             key = pop(frontier)[2]
             if done[key]:
                 continue
             done[key] = 1
+            searched += 1
+            if searched % PLAN_STEP == 0:
+                yield
             index, entry = key >> 4, key & 15
             if index == end:
                 assert entry != _ANYWHERE
