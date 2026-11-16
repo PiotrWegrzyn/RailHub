@@ -1,7 +1,7 @@
 """Shows trains as pixel art over the pixel map: each engine, tender and car drawn from the train
 sprite sheet (railroads.ui.pixel.trains), turned to the track, lined up on the map's own art
 pixels and lifted with the ground where hills and mountains rise, with puffs of smoke from the
-chimney. On double track each train rides the track on its right, as the track art draws it, so
+chimney, and out of sight in tunnels. On double track each train rides the track on its right, as the track art draws it, so
 trains going opposite ways pass on different tracks."""
 
 import bisect
@@ -76,7 +76,7 @@ class TrainLayer:
         for train in railway.trains:
             for look, back in self._parts(train):
                 placed = railway.position(train, back)
-                if placed is not None:
+                if placed is not None and not self.world.underground(*placed[0]):
                     shift = self.lanes.sideways(train.path, train.along - back)
                     found.append((placed, shift, look))
         parts = []
@@ -179,7 +179,7 @@ class TrainLayer:
             return None
         back = (model.half - model.chimney[0]) * SCALE
         placed = railway.position(train, back)
-        if placed is None:
+        if placed is None or self.world.underground(*placed[0]):
             return None
         (x, y), (dx, dy) = placed
         shift = self.lanes.sideways(train.path, train.along - back)

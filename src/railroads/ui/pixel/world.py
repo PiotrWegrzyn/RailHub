@@ -22,6 +22,7 @@ import numpy.typing as npt
 from railroads.sim.constructions import Constructions, Track
 from railroads.sim.grids import Cell
 from railroads.sim.tilemap import Relief, TileMap
+from railroads.sim.track_rules import TrackBed
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
 from railroads.ui.pixel.ground import (
     APRON,
@@ -69,6 +70,10 @@ class PixelWorld:
         self.station_levels: Mapping[Cell, int] = {} if station_levels is None else station_levels
         # The height of every point, which raises hills and mountains (railroads.ui.pixel.relief).
         self.elevation = Elevation(tile_map, self.projection)
+        # The track (railroads.ui.pixel.track_art), with the ground graded under it.
+        self.track = TrackArt(tile_map, constructions, self.projection, self.elevation)
+        self._graded_version = -1
+        self._grade()
         self.scenery = Scenery.of(
             tile_map,
             constructions,
@@ -77,10 +82,9 @@ class PixelWorld:
             self.station_levels,
             elevation=self.elevation,
         )
-        # The ground and the track over it (railroads.ui.pixel.ground, railroads.ui.pixel.track_art).
+        # The ground under the track (railroads.ui.pixel.ground).
         self.ground = Ground(tile_map, constructions, self.projection, angle_deg, self.elevation)
         self._shade_trees()
-        self.track = TrackArt(tile_map, constructions, self.projection, self.elevation)
         # Every piece of track, kept until track or stations change.
         self._pieces: list[Track] = []
         self._pieces_version = -1
@@ -114,6 +118,7 @@ class PixelWorld:
     def buildings_changed(self, cells: Iterable[Cell]) -> set[tuple[int, int]]:
         """Puts the ground and scenery up again after buildings or forests changed in `cells`;
         returns the chunks that look different now."""
+        self._grade()
         self.ground.refresh()
         self.scenery = Scenery.of(
             self.tile_map,
@@ -126,6 +131,20 @@ class PixelWorld:
         self._shade_trees()
         self.buildings_version += 1
         return self._chunks_around(cells)
+
+    def _grade(self) -> None:
+        """Grades the ground under the track through hills and mountains (Elevation.grade), if
+        track or stations changed since it last was."""
+        version = self.constructions.railway_version
+        if version == self._graded_version:
+            return
+        beds = []
+        for line in self.track.beds():
+            mountains, hills = self.elevation.shares(*line)
+            if (mountains > 0).any() or (hills > 0).any():
+                beds.append(line)
+        self.elevation.grade(beds)
+        self._graded_version = version
 
     def _shade_trees(self) -> None:
         """Tells the ground where trees stand, so the grass round them lies in their shade."""
@@ -184,6 +203,17 @@ class PixelWorld:
                     chunks.add((cx, cy))
         return chunks
 
+    def underground(self, x: float, y: float) -> bool:
+        """Whether a plane point lies in a tunnel: in a mountain cell its track tunnels through,
+        where trains go out of sight until they come out of a portal."""
+        grid = self.tile_map.grid
+        row, col = (int(v) for v in grid.cell_at(x, y))
+        if not grid.contains(row, col) or self.tile_map.relief[row, col] != Relief.MOUNTAINS:
+            return False
+        return any(
+            piece.bed == TrackBed.TUNNEL for piece in self.constructions.track_at((row, col))
+        )
+
     def rises(self, chunk_x: int, chunk_y: int) -> bool:
         """Whether any hills or mountains rise in a chunk, or in the ground below it that it
         shows lifted."""
@@ -205,6 +235,7 @@ class PixelWorld:
         and slower. With `over_ground` a chunk where nothing rises leaves its ground out, clear
         but for the shade of trees, to be laid over ground the graphics card draws
         (railroads.ui.pixel.ground_shader)."""
+        self._grade()
         if fine_relief and resolution > 1:
             return self._render_fine(chunk_x, chunk_y, resolution)
         if over_ground and not self.rises(chunk_x, chunk_y):
