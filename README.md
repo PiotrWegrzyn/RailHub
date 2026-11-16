@@ -647,10 +647,15 @@ wires go. Every fuel's price, from the year it comes in (coal 1804, electricity 
 price: the coal or diesel fuel the map's buildings need and the player's trains bought last
 month against what the player's stations hand out to those buildings and a quarter of what the
 map's mines or refineries can make, measured against the first month of play, the price moving a
-quarter of the way to where they put it each month. Electricity costs twice as much while the
-map's power plants get none of their fuel, less as they get it; a power plant the player buys,
-for $2,000,000, makes 3,000 units a month at full fuel, which their trains use first at a fifth of
-the price. The Reports window's Fuel tab charts every fuel's price over the years and shows what
+quarter of the way to where they put it each month. Electricity always has a sensible price, $5
+a unit, which moves a little, between 0.7 and 1.5 times that, with supply against demand: it is
+wanted by the player's electric and maglev trains and by the map's homes and factories, 10 units a
+month for each of their points times the share of them electrified, none in 1880 rising evenly
+to all in 2030 (they only pull the price and need no power delivered), and made by the map's
+power plants, 3,000 units a month each at full fuel, and by the world around, which makes what
+the buildings want, so the price rests at its base without trains or plants. A power plant the
+player buys, for $2,000,000, counts among the map's, and their trains use what it makes first, at
+a fifth of the price. The Reports window's Fuel tab charts every fuel's price over the years and shows what
 moved it last month and what the trains bought. Each line
 has a job. Light engines are cheap to buy and run and up to speed in 3 seconds or less, but pull
 two or three cars slowly, and a load slows them half as much again as the Planet: for short lines

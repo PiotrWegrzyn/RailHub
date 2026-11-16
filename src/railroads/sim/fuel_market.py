@@ -8,10 +8,17 @@ month; they are supplied by what the player's stations hand out to those buildin
 NATURAL_SUPPLY of what the map's mines and refineries can make, by the world around. How hard
 demand pulls against supply is measured against the first month of play, so a map with little
 coal starts at the same price as one with much, and the price moves each month FOLLOW of the way
-to where demand and supply put it, so it changes smoothly. Electricity costs ELECTRICITY_SHORT times
-as much while the map's power plants get none of their fuel, less as they get more of it; power
-plants the player owns make POWER_PLANT_OUTPUT a month at full fuel, which their trains use first
-at OWN_POWER_SHARE of the price.
+to where demand and supply put it, so it changes smoothly.
+
+Electricity always has a sensible price, BASE_PRICE, which moves a little, between
+ELECTRICITY_LEAST and ELECTRICITY_MOST of it, with supply against demand. It is wanted by the
+player's electric and maglev trains and by the map's homes and factories, ELECTRICITY_PER_POINT for
+each of their points times the share of them electrified, which grows by year from ELECTRIFICATION
+to ELECTRIFIED; the buildings only pull the price, they need no power delivered. It is made by the
+map's power plants, POWER_PLANT_OUTPUT a month each at full fuel and less on less, and the world
+around makes what the buildings want, so without trains and plants the price rests at its base.
+Power plants the player owns are counted among the map's, and their trains use what those make
+first, at OWN_POWER_SHARE of the price.
 """
 
 from collections.abc import Mapping
@@ -24,6 +31,7 @@ import numpy as np
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Trade
 from railroads.sim.goods import FITS, Good, Need, price_of
+from railroads.sim.goods import NEEDS as BUILDING_NEEDS
 from railroads.sim.trains import Power
 
 
@@ -64,7 +72,11 @@ ELASTICITY = 0.5
 LEAST_FACTOR = 0.4
 MOST_FACTOR = 4.0
 FOLLOW = 0.25
-ELECTRICITY_SHORT = 2.0
+ELECTRICITY_LEAST = 0.7
+ELECTRICITY_MOST = 1.5
+ELECTRICITY_PER_POINT = 10.0
+# Homes and factories are electrified bit by bit, from none in the first year to all in the second.
+ELECTRIFICATION = (1880, 2030)
 POWER_PLANT_OUTPUT = 3_000.0
 OWN_POWER_SHARE = 0.2
 # Fuel bought anywhere but out of a station's stockpile costs this much more.
@@ -102,11 +114,23 @@ class Signals:
     own_power: float = 0.0
 
 
-def signals_of(trade: Trade, owned_plants: np.ndarray | None = None) -> dict[Fuel, Signals]:
+def electrified(year: int) -> float:
+    """The share of the map's homes and factories that use electricity in a year."""
+    first, last = ELECTRIFICATION
+    return min(1.0, max(0.0, (year - first) / (last - first)))
+
+
+def signals_of(
+    trade: Trade,
+    owned_plants: np.ndarray | None = None,
+    points: float = 0.0,
+    year: int = OPENS[Fuel.ELECTRICITY],
+) -> dict[Fuel, Signals]:
     """What a month's trade says about each fuel: what the buildings needed of it, what the
     player's stations handed out of it to them and what the map's makers of it could make; for
-    electricity what share of their fuel the map's power plants got and what the ones the player
-    owns (a count per cell, on the map's grid) made."""
+    electricity what the map's homes and factories, worth `points` together, want of it in a
+    year, what the map's power plants made and what share of their fuel they got, and what the
+    ones the player owns (a count per cell, on the map's grid) made."""
     signals = {}
     for fuel, good in GOOD_OF.items():
         needs = NEEDS[fuel]
@@ -125,14 +149,17 @@ def signals_of(trade: Trade, owned_plants: np.ndarray | None = None) -> dict[Fue
         )
         signals[fuel] = Signals(wanted, handed, NATURAL_SUPPLY * makers)
     got, want = trade.goods_got.get((BuildingKind.POWER_PLANT, Need.BOILER_FUEL), (None, None))
-    fed, own = 0.0, 0.0
+    fed, own, made = 0.0, 0.0, 0.0
     if got is not None and want is not None and float(want.sum()) > 0:
         fed = min(1.0, float(got.sum()) / float(want.sum()))
+        per_plant = BUILDING_NEEDS[BuildingKind.POWER_PLANT][Need.BOILER_FUEL]
+        made = POWER_PLANT_OUTPUT * float(np.minimum(got, want).sum()) / per_plant
         if owned_plants is not None:
             share = np.where(want > 0, np.minimum(1.0, got / np.where(want > 0, want, 1.0)), 0.0)
             counts = np.asarray(owned_plants).ravel()[trade.cells]
             own = POWER_PLANT_OUTPUT * float((counts * share).sum())
-    signals[Fuel.ELECTRICITY] = Signals(plants_fed=fed, own_power=own)
+    homes = ELECTRICITY_PER_POINT * points * electrified(year)
+    signals[Fuel.ELECTRICITY] = Signals(homes, made, homes, fed, own)
     return signals
 
 
@@ -195,8 +222,11 @@ class FuelMarket:
                 self._reset(fuel, trains)
                 continue
             if fuel == Fuel.ELECTRICITY:
-                target = 1.0 + (ELECTRICITY_SHORT - 1.0) * (1.0 - got.plants_fed)
-                pull = first = 1.0
+                demand = got.buildings + trains
+                supply = got.network + got.natural
+                pull = demand / supply if supply > 0 else ELECTRICITY_MOST
+                first = 1.0
+                target = min(ELECTRICITY_MOST, max(ELECTRICITY_LEAST, pull**ELASTICITY))
             else:
                 demand = got.buildings + trains
                 supply = max(got.network + got.natural, 1e-6)

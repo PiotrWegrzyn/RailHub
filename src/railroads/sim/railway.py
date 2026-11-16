@@ -301,10 +301,11 @@ class Railway:
         cost = self.fuel.buy(fuel, amount, stocked, self.fuel_markup())
         self.finances.spend(cost * self._upkeep(), fuel.value)
 
-    def fuel_month(self, trade: Trade) -> None:
-        """Closes the fuel market's month with what this month's trade said about it."""
+    def fuel_month(self, trade: Trade, points: float = 0.0) -> None:
+        """Closes the fuel market's month with what this month's trade said about it, and the
+        points of the map's homes and factories, which want electricity."""
         owned = None if self.owners is None else self.owners.owned(BuildingKind.POWER_PLANT)
-        self.fuel.month(self.year, signals_of(trade, owned))
+        self.fuel.month(self.year, signals_of(trade, owned, points, self.year))
 
     def car_capacity(
         self, good: Good, engine: str | None = None, general: General | None = None

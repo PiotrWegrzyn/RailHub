@@ -38,7 +38,7 @@ from railroads.sim.goods import (
     price_of,
 )
 from railroads.sim.grids import Cell, Within, flat_within_any
-from railroads.sim.ladders import PASSENGERS_PER_POINT
+from railroads.sim.ladders import PASSENGERS_PER_POINT, Points
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.tech import GOOD_TREES, Tree
 from railroads.sim.trains import CAR_CAPACITY, MAX_CARS
@@ -99,7 +99,7 @@ class StationTrade:
             goods = railway.station_goods(station)
             for good, amount in supplied.items():
                 goods.stockpile[good] = max(0.0, goods.stockpile.get(good, 0.0) - amount)
-        railway.fuel_month(trade)
+        railway.fuel_month(trade, self._powered_points())
         capacity = {}
         stations = railway.stations()
         for station, counts in zip(stations, self._ring_counts(stations), strict=True):
@@ -263,6 +263,16 @@ class StationTrade:
         return self._travellers(
             {kind: int(count.ravel()[cells].sum()) for kind, count in counts.items()}
         )
+
+    def _powered_points(self) -> float:
+        """The points of every home and factory on the map, which want electricity."""
+        growth = self._growth
+        total = 0.0
+        for kind, count in growth.counts.items():
+            points, value = growth.rule.points[kind]
+            if points in (Points.POPULATION, Points.INDUSTRY):
+                total += float(count.sum()) * value
+        return total
 
     def _ring_counts(self, stations: list[Cell]) -> list[dict[BuildingKind, int]]:
         """How many buildings of each kind stand in each station's inner ring. The rings are laid
