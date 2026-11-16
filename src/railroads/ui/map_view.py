@@ -68,12 +68,9 @@ from railroads.ui.route_map import soften, soften_steps
 from railroads.ui.search import BuildingSearch
 from railroads.ui.station_window import StationWindow
 from railroads.ui.summaries_panel import SummariesPanel
-from railroads.ui.theme import (
-    BRASS,
-)
+from railroads.ui.theme import BRASS, SIDE_WINDOW_POS, rgba_u32
 
 BACKGROUND_COLOR = (0.08, 0.09, 0.11, 1.0)
-DETAILS_POS = (16.0, 96.0)
 DETAILS_SIZE = (680.0, 340.0)
 # Stepping to a building found zooms in at least this far, so it can be seen.
 VISIT_ZOOM = 4
@@ -100,10 +97,6 @@ LOOKS: dict[GridKind, GridLook] = {
     "square": GridLook(-45.0, math.sqrt(2), baked_lines_from=None, drawn_lines_from=16),
     "hex": GridLook(0.0, 1.0, baked_lines_from=8, drawn_lines_from=24),
 }
-
-
-def _color(rgba: tuple[float, float, float, float]) -> int:
-    return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))
 
 
 @cache
@@ -285,7 +278,7 @@ class MapView:
     def _draw_details(self) -> None:
         if self.selected is None:
             return
-        imgui.set_next_window_pos(DETAILS_POS, imgui.Cond_.first_use_ever.value)
+        imgui.set_next_window_pos(SIDE_WINDOW_POS, imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size(DETAILS_SIZE, imgui.Cond_.first_use_ever.value)
         expanded, still_open = imgui.begin("Hex details", True)
         if expanded:
@@ -450,7 +443,7 @@ class MapView:
 
         draw_list = imgui.get_window_draw_list()
         draw_list.push_clip_rect(top_left, bottom_right, True)
-        draw_list.add_rect_filled(top_left, bottom_right, _color(BACKGROUND_COLOR))
+        draw_list.add_rect_filled(top_left, bottom_right, rgba_u32(BACKGROUND_COLOR))
         if self.camera.pixel_scale:
             shaded = self._draw_shaded_ground(draw_list, center, top_left, bottom_right)
             if not shaded:

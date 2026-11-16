@@ -9,10 +9,9 @@ from imgui_bundle import imgui
 from railroads.sim.finance import dollars
 from railroads.sim.tech import NODES, TREES, Effect, Node, Research, Tree, xp_for
 from railroads.sim.trains import ENGINES
-from railroads.ui.theme import BRASS
+from railroads.ui.theme import BRASS, WINDOW_TOP
 
 WINDOW_SIZE = (940.0, 560.0)
-WINDOW_TOP = 56.0
 NODE_SIZE = (170.0, 44.0)
 # The space between nodes side by side, and between rows.
 NODE_GAP = (14.0, 34.0)

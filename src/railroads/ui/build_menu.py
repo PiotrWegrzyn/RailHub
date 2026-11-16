@@ -39,7 +39,16 @@ from railroads.sim.tilemap import Relief
 from railroads.sim.track_rules import BRIDGE_RULES, RELIEF_RULES, TUNNEL_RULES, TrackBed
 from railroads.ui.iso_camera import IsoCamera, Vec2
 from railroads.ui.stations_window import StationsWindow
-from railroads.ui.theme import BORDER, BRASS, GOOD_COLORS, color_u32, toggle_button
+from railroads.ui.theme import (
+    BORDER,
+    BRASS,
+    GOOD_COLORS,
+    OVERLAY_FLAGS,
+    Rgba,
+    color_u32,
+    rgba_u32,
+    toggle_button,
+)
 from railroads.ui.trains_window import TrainsWindow
 
 BALLAST = (0.36, 0.3, 0.24, 1.0)
@@ -60,7 +69,6 @@ SHARED_FILL = (0.82, 0.86, 0.82, 0.6)
 STATION_FILL = (0.27, 0.35, 0.8, 0.85)
 CELL_LINE = (0.25, 0.22, 0.2, 0.5)
 COLLECTION_RING = (0.4, 0.6, 1.0, 0.95)
-type Rgba = tuple[float, float, float, float]
 
 ENGINE = (0.14, 0.15, 0.17, 1.0)
 CAB = (0.62, 0.14, 0.1, 1.0)
@@ -93,6 +101,11 @@ class Tool(Enum):
     MOVE_STATION = "Move station"
     ADD_PLATFORM = "Add platform"
 
+
+# The tools that place a station or a platform, which Q turns.
+STATION_TOOLS = frozenset((Tool.STATION, Tool.MOVE_STATION, Tool.ADD_PLATFORM))
+# The tools that note what they would cost in the cell under the mouse.
+PRICED_TOOLS = STATION_TOOLS | {Tool.BULLDOZE}
 
 HILLS_PRICE = TRACK_PRICE * RELIEF_RULES[Relief.HILLS].price_factor
 BRIDGE_PRICE = TRACK_PRICE * BRIDGE_RULES.price_factor
@@ -197,14 +210,7 @@ class BuildMenu:
         imgui.set_next_window_pos(
             (x, bottom_right[1] - BAR_MARGIN), imgui.Cond_.always.value, (0.5, 1.0)
         )
-        flags = (
-            imgui.WindowFlags_.no_decoration.value
-            | imgui.WindowFlags_.always_auto_resize.value
-            | imgui.WindowFlags_.no_move.value
-            | imgui.WindowFlags_.no_saved_settings.value
-            | imgui.WindowFlags_.no_focus_on_appearing.value
-            | imgui.WindowFlags_.no_nav.value
-        )
+        flags = OVERLAY_FLAGS | imgui.WindowFlags_.no_move.value
         imgui.push_style_var(imgui.StyleVar_.window_rounding.value, 12.0)
         imgui.push_style_var(imgui.StyleVar_.window_padding.value, imgui.ImVec2(10, 8))
         imgui.begin("##build bar", flags=flags)
@@ -269,12 +275,7 @@ class BuildMenu:
             imgui.text_disabled(HINTS[self.tool])
         if self.tool == Tool.TRACK and self.preview is not None and self.preview_price is not None:
             imgui.text_colored(imgui.ImVec4(*BRASS), f"This track: {dollars(self.preview_price)}")
-        if self.hover_note and self.tool in (
-            Tool.STATION,
-            Tool.BULLDOZE,
-            Tool.MOVE_STATION,
-            Tool.ADD_PLATFORM,
-        ):
+        if self.hover_note and self.tool in PRICED_TOOLS:
             imgui.text_colored(imgui.ImVec4(*BRASS), self.hover_note)
         imgui.pop_text_wrap_pos()
         imgui.spacing()
@@ -365,8 +366,8 @@ class _Box:
 
 
 def _fill(draw_list: imgui.ImDrawList, quad: list[imgui.ImVec2], color: Rgba) -> None:
-    draw_list.add_quad_filled(*quad, _color(color))
-    draw_list.add_quad(*quad, _color(OUTLINE), 1.0)
+    draw_list.add_quad_filled(*quad, rgba_u32(color))
+    draw_list.add_quad(*quad, rgba_u32(OUTLINE), 1.0)
 
 
 def _draw_engine(draw_list: imgui.ImDrawList, box: _Box) -> None:
@@ -374,9 +375,9 @@ def _draw_engine(draw_list: imgui.ImDrawList, box: _Box) -> None:
     _fill(draw_list, box.quad(half, -half, CAR_WIDTH * 0.55), ENGINE)
     _fill(draw_list, box.quad(-half * 0.25, -half, CAR_WIDTH * 0.7), CAB)
     chimney = box.point(half * 0.65)
-    draw_list.add_circle_filled(chimney, max(1.5, box.scale * 0.035), _color(OUTLINE))
+    draw_list.add_circle_filled(chimney, max(1.5, box.scale * 0.035), rgba_u32(OUTLINE))
     draw_list.add_circle_filled(
-        box.point(half * 0.65 + 0.06, 0.05), max(1.5, box.scale * 0.03), _color(SMOKE)
+        box.point(half * 0.65 + 0.06, 0.05), max(1.5, box.scale * 0.03), rgba_u32(SMOKE)
     )
 
 
@@ -392,12 +393,12 @@ def _draw_car(draw_list: imgui.ImDrawList, box: _Box, good: Good, full: bool) ->
             for side in (-0.3, 0.0, 0.3):
                 a = box.point(half * 0.9, CAR_WIDTH * side)
                 b = box.point(-half * 0.9, CAR_WIDTH * side)
-                draw_list.add_line(a, b, _color(load), max(1.5, box.scale * 0.03))
+                draw_list.add_line(a, b, rgba_u32(load), max(1.5, box.scale * 0.03))
         case Good.GOODS:
             _fill(draw_list, box.quad(half * 0.9, -half * 0.9, CAR_WIDTH * 0.5), load)
         case _:
             draw_list.add_quad_filled(
-                *box.quad(half * 0.8, -half * 0.8, CAR_WIDTH * 0.4), _color(load)
+                *box.quad(half * 0.8, -half * 0.8, CAR_WIDTH * 0.4), rgba_u32(load)
             )
 
 
@@ -446,10 +447,10 @@ def draw_station_reach(
     for corners, fill in hexes:
         polygon = points[start : start + len(corners)]
         start += len(corners)
-        draw_list.add_convex_poly_filled(polygon, _color(fill))
-        draw_list.add_polyline(polygon, _color(CELL_LINE), 1.0, imgui.ImDrawFlags_.closed.value)
+        draw_list.add_convex_poly_filled(polygon, rgba_u32(fill))
+        draw_list.add_polyline(polygon, rgba_u32(CELL_LINE), 1.0, imgui.ImDrawFlags_.closed.value)
     for a, b in itertools.batched(points[start:], 2, strict=True):
-        draw_list.add_line(a, b, _color(COLLECTION_RING), 2.5)
+        draw_list.add_line(a, b, rgba_u32(COLLECTION_RING), 2.5)
 
 
 @lru_cache(maxsize=64)
@@ -493,7 +494,7 @@ def draw_track(
         (piece, _piece_points(piece, constructions, camera, center))
         for piece in (laid if planned is None else planned)
     ]
-    shade = _color if planned is None else _greyed
+    shade = rgba_u32 if planned is None else _greyed
     for piece, points in pieces:
         bed = width * (1.6 + (1.4 if piece.width == TrackWidth.DOUBLE else 0.0))
         if piece.bed == TrackBed.BRIDGE:
@@ -520,12 +521,12 @@ def draw_track(
             draw_list.add_polyline(lifted, shade(WIRE), max(1.0, width * 0.35), 0)
 
 
-def _greyed(rgba: tuple[float, float, float, float]) -> int:
+def _greyed(rgba: Rgba) -> int:
     """A colour faded to a see-through grey, for track not laid yet."""
     r, g, b, a = rgba
     light = 0.3 * r + 0.59 * g + 0.11 * b
     grey = 0.4 * light + 0.6 * PLANNED_GREY
-    return _color((grey, grey, grey, a * PLANNED_OPACITY))
+    return rgba_u32((grey, grey, grey, a * PLANNED_OPACITY))
 
 
 def _piece_points(
@@ -556,7 +557,3 @@ def _parallel(points: list[imgui.ImVec2], side: float) -> list[imgui.ImVec2]:
         dot = (mx * before[0] + my * before[1]) or 1.0
         moved.append(imgui.ImVec2(point.x + mx / dot * side, point.y + my / dot * side))
     return moved
-
-
-def _color(rgba: tuple[float, float, float, float]) -> int:
-    return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))

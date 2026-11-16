@@ -13,10 +13,9 @@ from railroads.sim.finance import Finances, dollars
 from railroads.sim.fuel_market import Fuel, FuelMarket, FuelMonth, electrified
 from railroads.sim.goods import Good
 from railroads.sim.stats import History
-from railroads.ui.theme import GOOD_COLORS
+from railroads.ui.theme import GOOD_COLORS, WINDOW_TOP
 
 WINDOW_SIZE = (720.0, 640.0)
-WINDOW_TOP = 56.0
 PLOT_HEIGHT = 180.0
 BAR_WIDTH = 0.8
 GOODS_COLORMAP = "Goods"

@@ -20,7 +20,7 @@ from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
 from railroads.sim.finance import START_CASH, dollars
 from railroads.ui.save_files import BrowserFiles, DesktopFiles, draw_file_buttons, save_files
 from railroads.ui.saves_window import draw_save_list
-from railroads.ui.theme import BRASS, GONE
+from railroads.ui.theme import BRASS, GONE, tip
 from railroads.version import VERSION
 
 MENU_WIDTH = 460.0
@@ -204,8 +204,7 @@ class MainMenu:
         imgui.same_line(0, 4)
         if imgui.button(fa.ICON_FA_RANDOM, (36, 0)):
             self.seed = random_seed()
-        if imgui.is_item_hovered():
-            imgui.set_tooltip("A new random seed")
+        tip("A new random seed")
         imgui.text_disabled("The same seed and map grow the same towns.")
         imgui.spacing()
         imgui.text("Play begins in")

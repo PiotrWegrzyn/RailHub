@@ -20,9 +20,16 @@ from railroads.ui.hex_details import mood_text, recently_described
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS, IsoCamera, Vec2
 from railroads.ui.minimap import MinimapLayout
 from railroads.ui.search import BuildingSearch, pulse
-from railroads.ui.theme import MOODS, OVERLAY, TEXT, color_u32, good_icon
-
-type Rgba = tuple[float, float, float, float]
+from railroads.ui.theme import (
+    MOODS,
+    OVERLAY,
+    OVERLAY_FLAGS,
+    TEXT,
+    Rgba,
+    color_u32,
+    good_icon,
+    rgba_u32,
+)
 
 GRID_COLOR = (0.0, 0.0, 0.0, 0.25)
 HOVER_COLOR = (1.0, 1.0, 1.0, 0.9)
@@ -46,10 +53,6 @@ HOVER_ICON = 16.0
 _HEX_EDGE_ANGLES = np.radians([150, 210, 270, 330])
 
 
-def color(rgba: Rgba) -> int:
-    return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))
-
-
 def draw_outline(
     draw_list: imgui.ImDrawList,
     camera: IsoCamera,
@@ -59,7 +62,7 @@ def draw_outline(
     rgba: Rgba = HOVER_COLOR,
 ) -> None:
     points = [imgui.ImVec2(*camera.to_screen(x, y, center)) for x, y in grid.corners(*cell)]
-    draw_list.add_polyline(points, color(rgba), 2.0, imgui.ImDrawFlags_.closed.value)
+    draw_list.add_polyline(points, rgba_u32(rgba), 2.0, imgui.ImDrawFlags_.closed.value)
 
 
 def visible_area(
@@ -92,7 +95,7 @@ def _draw_square_lines(
     r0, r1 = max(0, math.floor(y0)), min(grid.rows, math.ceil(y1))
     if c0 >= c1 or r0 >= r1:
         return
-    line = color(GRID_COLOR)
+    line = rgba_u32(GRID_COLOR)
     to_screen = camera.to_screen
     for x in range(c0, c1 + 1):
         draw_list.add_line(to_screen(x, r0, center), to_screen(x, r1, center), line)
@@ -116,7 +119,7 @@ def _draw_hex_lines(
     px = cx[:, None] + HEX_RADIUS * np.cos(_HEX_EDGE_ANGLES)
     py = cy[:, None] + HEX_RADIUS * np.sin(_HEX_EDGE_ANGLES)
     sx, sy = camera.to_screen(px, py, center)
-    line = color(GRID_COLOR)
+    line = rgba_u32(GRID_COLOR)
     for points in np.stack([sx, sy], axis=2).tolist():
         draw_list.add_polyline([imgui.ImVec2(x, y) for x, y in points], line, 1.0, 0)
 
@@ -147,7 +150,7 @@ def draw_compass(draw_list: imgui.ImDrawList, camera: IsoCamera, anchor: Vec2) -
     dx, dy = north[0] - here[0], north[1] - here[1]
     length = math.hypot(dx, dy)
     dx, dy = dx / length, dy / length
-    line = color(COMPASS_COLOR)
+    line = rgba_u32(COMPASS_COLOR)
     tip = (anchor[0] + dx * 14, anchor[1] + dy * 14)
     draw_list.add_line((anchor[0] - dx * 14, anchor[1] - dy * 14), tip, line, 2.0)
     draw_list.add_triangle_filled(
@@ -185,7 +188,7 @@ def draw_found(
         for index in on_screen[:: max(1, on_screen.size // MOST_OUTLINES)].tolist():
             draw_outline(draw_list, camera, grid, center, search.cells[index], FOUND_COLOR)
     else:
-        mark = color(FOUND_COLOR)
+        mark = rgba_u32(FOUND_COLOR)
         shown = on_screen[:: max(1, on_screen.size // MOST_FOUND_MARKS)]
         for x, y in zip(sx[shown].tolist(), sy[shown].tolist(), strict=True):
             draw_list.add_rect_filled((x - 2, y - 2), (x + 2, y + 2), mark)
@@ -204,7 +207,7 @@ def _draw_visited(
         (float(x), tip),
         (float(x) - 10, tip - 16),
         (float(x) + 10, tip - 16),
-        color(FOUND_COLOR),
+        rgba_u32(FOUND_COLOR),
     )
 
 
@@ -216,7 +219,7 @@ def draw_found_on_overview(
         return
     step = max(1, len(search.cells) // MOST_MINIMAP_MARKS)
     xs, ys = grid.center(search.rows[::step], search.cols[::step])
-    mark = color(FOUND_COLOR)
+    mark = rgba_u32(FOUND_COLOR)
     sx, sy = minimap.overview_point(xs, ys)
     for x, y in zip(sx.tolist(), sy.tolist(), strict=True):
         if panel.contains(x, y):
@@ -296,14 +299,7 @@ def draw_hovered_buildings(
         return
     imgui.set_next_window_pos(top_left)
     imgui.set_next_window_bg_alpha(OVERLAY[3])
-    flags = (
-        imgui.WindowFlags_.no_decoration.value
-        | imgui.WindowFlags_.always_auto_resize.value
-        | imgui.WindowFlags_.no_saved_settings.value
-        | imgui.WindowFlags_.no_focus_on_appearing.value
-        | imgui.WindowFlags_.no_nav.value
-        | imgui.WindowFlags_.no_inputs.value
-    )
+    flags = OVERLAY_FLAGS | imgui.WindowFlags_.no_inputs.value
     if imgui.begin("##hovered buildings", None, flags):
         for row in rows:
             imgui.text(row.name if row.count == 1 else f"{row.name} x{row.count}")
