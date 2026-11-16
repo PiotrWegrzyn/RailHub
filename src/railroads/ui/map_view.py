@@ -58,7 +58,7 @@ from railroads.ui.pixel.ground_shader import (
     screen_of,
     view_of,
 )
-from railroads.ui.pixel.layer import PixelLayer, blown_up_texture
+from railroads.ui.pixel.layer import PixelLayer
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.track_preview import TrackPreview
@@ -592,13 +592,14 @@ class MapView:
         return self._trains
 
     def _engine_picture(self, engine: str, times: int) -> tuple[imgui.ImTextureRef, Vec2]:
-        """An engine as the map draws it, blown up `times` times each way, for the buy screen."""
+        """An engine as the map draws it, drawn `times` times as fine each way with its fine
+        details, for the buy screen, and its size in the sheet's pixels."""
         kept = self._engine_pictures.get((engine, times))
         if kept is None:
             layer = self._train_layer()
-            pixels = engine_picture(layer.sprites, layer.world.projection.matrix, engine)
-            texture = blown_up_texture(pixels, times)
-            kept = (texture, (float(pixels.shape[1]), float(pixels.shape[0])))
+            pixels = engine_picture(layer.sprites, layer.world.projection.matrix, engine, times)
+            texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(pixels))
+            kept = (texture, (pixels.shape[1] / times, pixels.shape[0] / times))
             self._engine_pictures[(engine, times)] = kept
         return imgui.ImTextureRef(kept[0].texture_id()), kept[1]
 

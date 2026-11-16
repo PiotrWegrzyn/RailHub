@@ -8,10 +8,11 @@ from builders import flat_map
 from railroads.sim.constructions import Constructions
 from railroads.sim.game import Game
 from railroads.sim.grids import HexGrid
-from railroads.sim.trains import Stop
+from railroads.sim.trains import Stop, Train
 from railroads.ui import map_view
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
 from railroads.ui.map_view import MapView
+from railroads.ui.pixel import train_layer
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.train_layer import TrainLayer
 
@@ -198,3 +199,51 @@ def test_up_close_a_train_far_off_the_screen_is_not_drawn(
 
     imgui.end_frame()
     assert parted == [near.name]
+
+
+def train_up_close() -> tuple[MapView, Train]:
+    view = railway_seen_in_pixel_art()
+    train = view.railway.buy()
+    assert train is not None
+    train.stops = [Stop((10, 6)), Stop((10, 16))]
+    view.time_passed(0.1)
+    view.camera.zoom_level = len(ZOOM_CELL_WIDTHS) - 1
+    imgui.get_io().display_framebuffer_scale = imgui.ImVec2(2, 2)
+    return view, train
+
+
+def test_up_close_the_pictures_are_drawn_as_many_times_as_fine_as_the_sheet(
+    context: None,
+) -> None:
+    view, train = train_up_close()
+    layer = TrainLayer(view._pixel_layer().world)
+    imgui.new_frame()
+
+    layer.draw(imgui.get_foreground_draw_list(), view.railway, view.camera, (640.0, 400.0))
+
+    imgui.end_frame()
+    look, _ = layer._parts(train)[0]
+    _, _, width, _, _, _ = layer.sprites.places[(look, 0)]
+    _, _, fine_width, _, _, _ = layer._pages[look].spots[0]
+    assert 3.5 * width < fine_width < 4.5 * width
+
+
+def test_up_close_looks_not_drawn_fine_in_a_frames_time_show_from_the_sheet_till_later(
+    context: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    view, train = train_up_close()
+    layer = TrainLayer(view._pixel_layer().world)
+    monkeypatch.setattr(train_layer, "PAGES_TIME", -1.0)
+    imgui.new_frame()
+    layer.draw(imgui.get_foreground_draw_list(), view.railway, view.camera, (640.0, 400.0))
+    imgui.end_frame()
+    pages_in_no_time = len(layer._pages)
+    monkeypatch.setattr(train_layer, "PAGES_TIME", 1.0)
+    imgui.new_frame()
+
+    layer.draw(imgui.get_foreground_draw_list(), view.railway, view.camera, (640.0, 400.0))
+
+    imgui.end_frame()
+    assert pages_in_no_time == 0
+    assert layer._sheet is not None
+    assert len(layer._pages) == len({look for look, _ in layer._parts(train)})
