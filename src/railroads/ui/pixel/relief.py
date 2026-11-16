@@ -174,10 +174,7 @@ class Elevation:
     def __init__(self, tile_map: TileMap, projection: PixelProjection) -> None:
         self.projection = projection
         grid = tile_map.grid
-        width, height = grid.size()
-        ys, xs = np.mgrid[0 : math.ceil(height * STEPS), 0 : math.ceil(width * STEPS)]
-        rows, cols = grid.cell_at((xs + 0.5) / STEPS, (ys + 0.5) / STEPS)
-        rows, cols = np.clip(rows, 0, grid.rows - 1), np.clip(cols, 0, grid.cols - 1)
+        rows, cols = grid.raster_cells(STEPS)
         land = tile_map.terrain[rows, cols] == Terrain.LAND
         relief = tile_map.relief[rows, cols]
         heights = np.where(land, tile_map.height_m[rows, cols], 0).astype(np.float32)
