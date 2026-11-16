@@ -9,6 +9,8 @@ from PIL import Image, ImageDraw
 type RGB = tuple[int, int, int]
 
 type Point = tuple[float, float]
+# The four corners of a box's top: left, front, right and back (Painter.box).
+type Top = tuple[Point, Point, Point, Point]
 
 SHADOW = (0, 0, 0, 72)
 
@@ -186,7 +188,7 @@ class Painter:
 
     def box(
         self, x: float, y: float, half_width: float, height: float, wall: RGB, roof: RGB | None
-    ) -> tuple[Point, Point, Point, Point]:
+    ) -> Top:
         """A block standing on a 2:1 diamond centred at (x, y): walls lit on the left, shaded on
         the right, and a flat top in the roof colour if one is given. Returns the top corners:
         left, front, right and back."""
@@ -204,7 +206,7 @@ class Painter:
         height: float,
         wall: RGB,
         roof: RGB | None,
-    ) -> tuple[Point, Point, Point, Point]:
+    ) -> Top:
         """Like `box`, but on an oblong footprint centred at (x, y): its lit wall spans `length`
         pixels across and its shaded wall `depth`."""
         front = (x + (length - depth) / 2, y + (length + depth) / 4)
@@ -222,7 +224,7 @@ class Painter:
         h: float,
         wall: RGB,
         roof: RGB | None,
-    ) -> tuple[Point, Point, Point, Point]:
+    ) -> Top:
         def up(p: Point) -> Point:
             return p[0], p[1] - h
 

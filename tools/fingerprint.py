@@ -11,6 +11,7 @@ import contextlib
 import hashlib
 import io
 from collections.abc import Callable
+from typing import Literal
 
 import numpy as np
 
@@ -21,6 +22,7 @@ from railroads.sim.constructions import BuildingKind, Station
 from railroads.sim.game import Game, place_names
 from railroads.sim.goods import Good
 from railroads.sim.grids import Cell
+from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
 from railroads.sim.novelties import Novelties
 from railroads.sim.routes import plan_route
@@ -42,16 +44,19 @@ def digest(value: object) -> str:
     return hashlib.sha256(data).hexdigest()[:16]
 
 
-def towns(view: MapView, count: int) -> list[Cell]:
-    """The most crowded cells, each at least 8 cells from the others."""
-    people = view.growth.points(Points.POPULATION)
+def towns(
+    growth: Growth, count: int, sort: Literal["quicksort", "stable"] = "quicksort"
+) -> list[Cell]:
+    """The most crowded cells, each at least 8 cells from the others; `sort` decides the order
+    of cells as crowded as each other."""
+    people = growth.points(Points.POPULATION)
     picked: list[Cell] = []
-    for flat in np.argsort(people, axis=None)[::-1].tolist():
-        cell = divmod(flat, people.shape[1])
-        if all(abs(cell[0] - r) + abs(cell[1] - c) >= 8 for r, c in picked):
-            picked.append((int(cell[0]), int(cell[1])))
+    for flat in np.argsort(people, axis=None, kind=sort)[::-1].tolist():
+        row, col = divmod(flat, people.shape[1])
+        if all(abs(row - r) + abs(col - c) >= 8 for r, c in picked):
+            picked.append((row, col))
         if len(picked) == count:
-            return picked
+            break
     return picked
 
 
@@ -89,7 +94,7 @@ def main() -> None:
             view.tools.click(cell)
 
     view.railway.finances.cash = 5_000_000.0
-    a, b, c = towns(view, 3)
+    a, b, c = towns(view.growth, 3)
     click(Tool.STATION, a, b, c, a)
     click(Tool.TRACK, a, b, c)
     train = view.railway.buy()

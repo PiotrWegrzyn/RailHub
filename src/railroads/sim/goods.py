@@ -947,9 +947,6 @@ PIPELINE: tuple[Need | BuildingKind, ...] = tuple(
     )
 )
 
-# Inputs that are food as well: what is left of them is gathered with the food.
-FOOD_INPUTS = (Need.WHEAT, Need.POTATOES, Need.SUGAR, Need.FRUIT)
-
 
 @cache
 def makes_of(kind: BuildingKind, year: int) -> Mapping[Good, float]:

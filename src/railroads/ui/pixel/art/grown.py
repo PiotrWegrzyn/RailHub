@@ -3,7 +3,7 @@ side by side in one yard, a mega works three round a tall chimney with a water t
 
 from collections.abc import Callable
 
-from railroads.ui.pixel.art.industry import _chimney, _smoke
+from railroads.ui.pixel.art.industry import _smoking_chimney
 from railroads.ui.pixel.art.painter import BRICK, METAL, Painter, Sprite, drawn_at, fineness, shade
 
 # Where each building of a grown works stands, as shares of one building's width across and down
@@ -55,8 +55,9 @@ def _back_of_mega(p: Painter, w: float, h: float, spots: list[tuple[float, float
     back = min(y for _, y in spots)
     foot = back - h * 0.25
     tall = min(h * 0.9, CHIMNEY_MOST)
-    _chimney(p, -0.04 * w, foot, foot - tall, shade(BRICK, 0.9))
-    _smoke(p, -0.04 * w + 0.5, foot - tall - 2, (214, 214, 218), 3)
+    _smoking_chimney(
+        p, -0.04 * w, foot, foot - tall, shade(BRICK, 0.9), smoke=(214, 214, 218), close=True
+    )
     x, y = 0.12 * w, back - h * 0.1
     legs = h * 0.55
     for dx in (-2, 2):

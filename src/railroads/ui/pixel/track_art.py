@@ -20,12 +20,12 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from railroads.sim.constructions import Constructions, Track, TrackWidth
-from railroads.sim.grids import Cell
+from railroads.sim.grids import Cell, FloatArray
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
 from railroads.ui.pixel.art.painter import PLATFORM, PLATFORM_EDGE
-from railroads.ui.pixel.projection import RGB, FloatArray, Path, PixelProjection, Point
+from railroads.ui.pixel.projection import RGB, Path, PixelProjection, Point
 from railroads.ui.pixel.relief import MOST_LIFT, Elevation
 
 # Track, in cells of the picture's width, the same whichever way it runs: how wide the dark bank

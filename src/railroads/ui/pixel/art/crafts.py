@@ -1,7 +1,7 @@
 """Town crafts and the town's grand buildings: coke plants, potters, tile works, foundries,
 sausage makers, the makers of luxury goods, manors, theatres and hospitals."""
 
-from railroads.ui.pixel.art.homes import DOOR, _chimney_on, _foot, _tiles, _window
+from railroads.ui.pixel.art.homes import _chimney_on, _foot
 from railroads.ui.pixel.art.painter import (
     BRICK,
     GLASS,
@@ -13,7 +13,7 @@ from railroads.ui.pixel.art.painter import (
     Sprite,
     shade,
 )
-from railroads.ui.pixel.art.parts import _heap, _on_wall, _patch
+from railroads.ui.pixel.art.parts import DOOR, _heap, _on_wall, _patch, _tiles, _window
 
 ROOF: RGB = (150, 70, 52)
 MOLTEN: RGB = (240, 128, 36)

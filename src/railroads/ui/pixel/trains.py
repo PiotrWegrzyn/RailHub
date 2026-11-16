@@ -22,6 +22,7 @@ import numpy.typing as npt
 from PIL import Image, ImageDraw
 
 from railroads.sim.goods import Good
+from railroads.sim.grids import FloatArray, IntArray
 from railroads.ui.iso_camera import TILT
 from railroads.ui.pixel import train_parts as parts
 from railroads.ui.pixel.art import Sprite
@@ -37,7 +38,6 @@ from railroads.ui.pixel.models import (
     shade,
     without_fine,
 )
-from railroads.ui.pixel.projection import FloatArray, IntArray
 
 type Points = tuple[FloatArray, FloatArray, FloatArray]
 

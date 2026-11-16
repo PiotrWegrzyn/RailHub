@@ -14,6 +14,7 @@ from PIL import Image
 from railroads.sim.goods import General, Good, Need
 from railroads.sim.trains import car_size
 from railroads.ui.pixel.good_icons import ICON_PIXELS, ICONS_INDEX, ICONS_PNG
+from railroads.ui.pixel.layer import blown_up_texture
 
 type Rgba = tuple[float, float, float, float]
 
@@ -271,15 +272,12 @@ class IconAtlas:
 def _icon_atlas() -> IconAtlas:
     with Image.open(ICONS_PNG) as sheet:
         rgba = np.asarray(sheet.convert("RGBA"), dtype=np.uint8)
-    big = np.repeat(np.repeat(rgba, ICON_TEXTURE_SCALE, axis=0), ICON_TEXTURE_SCALE, axis=1)
     height, width = rgba.shape[:2]
     places = {
         name: ((x / width, y / height), ((x + ICON_PIXELS) / width, (y + ICON_PIXELS) / height))
         for name, (x, y) in json.loads(ICONS_INDEX.read_text()).items()
     }
-    return IconAtlas(
-        hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big)), places
-    )
+    return IconAtlas(blown_up_texture(rgba, ICON_TEXTURE_SCALE), places)
 
 
 def draw_good_icon(
@@ -323,11 +321,7 @@ def car_chip(
 ) -> bool:
     """A car drawn as a small upright chip with its good's icon, filled from the bottom by its
     load out of its capacity when one is given; returns whether it was clicked."""
-    clicked = imgui.invisible_button(key, CHIP_SIZE)
-    low = imgui.get_item_rect_min()
-    high = imgui.get_item_rect_max()
-    draw_list = imgui.get_window_draw_list()
-    draw_list.add_rect_filled(low, high, color_u32(CAR_EMPTY), 3.0)
+    clicked, draw_list, low, high = _chip(key)
     if load is not None:
         size = capacity or (car_size(good) if isinstance(good, Good) else 0.0)
         share = max(0.0, min(1.0, load / size)) if size else 0.0
@@ -336,24 +330,33 @@ def car_chip(
             draw_list.add_rect_filled((low.x, top), high, color_u32(CAR_LOADED), 3.0)
     icon_x = low.x + (CHIP_SIZE[0] - CHIP_ICON) / 2
     draw_good_icon(draw_list, good, (icon_x, low.y + (CHIP_SIZE[1] - CHIP_ICON) / 2), CHIP_ICON)
-    hovered = imgui.is_item_hovered()
-    edge = BRASS if hovered else (0.0, 0.0, 0.0, 0.6)
-    draw_list.add_rect(low, high, color_u32(edge), 3.0, 1.5 if hovered else 1.0)
-    if tooltip and hovered:
-        imgui.set_tooltip(tooltip)
+    _chip_edge(draw_list, low, high, tooltip)
     return clicked
 
 
 def dining_chip(key: str, tooltip: str = "") -> None:
     """An express's dining car as a chip like car_chip's, with a cup on it."""
-    imgui.invisible_button(key, CHIP_SIZE)
+    _, draw_list, low, high = _chip(key)
+    size = imgui.calc_text_size(fa.ICON_FA_COFFEE)
+    corner = (low.x + (high.x - low.x - size.x) / 2, low.y + (high.y - low.y - size.y) / 2)
+    draw_list.add_text(corner, color_u32(BRASS), fa.ICON_FA_COFFEE)
+    _chip_edge(draw_list, low, high, tooltip)
+
+
+def _chip(key: str) -> tuple[bool, imgui.ImDrawList, imgui.ImVec2, imgui.ImVec2]:
+    """An empty car chip's button and back; whether it was clicked, and where it was drawn."""
+    clicked = imgui.invisible_button(key, CHIP_SIZE)
     low = imgui.get_item_rect_min()
     high = imgui.get_item_rect_max()
     draw_list = imgui.get_window_draw_list()
     draw_list.add_rect_filled(low, high, color_u32(CAR_EMPTY), 3.0)
-    size = imgui.calc_text_size(fa.ICON_FA_COFFEE)
-    corner = (low.x + (high.x - low.x - size.x) / 2, low.y + (high.y - low.y - size.y) / 2)
-    draw_list.add_text(corner, color_u32(BRASS), fa.ICON_FA_COFFEE)
+    return clicked, draw_list, low, high
+
+
+def _chip_edge(
+    draw_list: imgui.ImDrawList, low: imgui.ImVec2, high: imgui.ImVec2, tooltip: str
+) -> None:
+    """A car chip's edge, lit in brass and showing the tooltip while hovered."""
     hovered = imgui.is_item_hovered()
     edge = BRASS if hovered else (0.0, 0.0, 0.0, 0.6)
     draw_list.add_rect(low, high, color_u32(edge), 3.0, 1.5 if hovered else 1.0)

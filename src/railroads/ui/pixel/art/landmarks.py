@@ -25,45 +25,28 @@ from railroads.ui.pixel.art.painter import (
     shade,
 )
 from railroads.ui.pixel.art.parts import (
+    _band,
     _cross,
     _flag,
     _gable_across,
     _heap,
     _iso,
     _on_wall,
+    _pale_plinth,
     _patch,
     _plate,
     _portal,
+    _tiles,
     _turned,
     _vault,
     _windows,
 )
-
-type Top = tuple[Point, Point, Point, Point]
 
 LAMP: RGB = (250, 236, 170)
 
 PAVING: RGB = (196, 190, 176)
 
 GRAVEL: RGB = (214, 206, 176)
-
-
-def _plinth(p: Painter, top: Top, height: float, wall: RGB, depth: float = 0.8) -> None:
-    """A darker band along the foot of a box's two front walls."""
-    left, front, right, _ = top
-    _patch(p, left, front, (0, 1), (height - depth, height), shade(wall, 0.7))
-    _patch(p, front, right, (0, 1), (height - depth, height), shade(wall, 0.52))
-
-
-def _tiles(p: Painter, top: Top, rise: float, roof: RGB, rows: tuple[float, ...] = (0.5,)) -> None:
-    """Rows of tiles across the lit side of a gable roof (Painter.gable)."""
-    left, front, right, back = top
-    ridge_back = ((left[0] + back[0]) / 2, (left[1] + back[1]) / 2 - rise)
-    ridge_front = ((front[0] + right[0]) / 2, (front[1] + right[1]) / 2 - rise)
-    for f in rows:
-        a = (left[0] + (ridge_back[0] - left[0]) * f, left[1] + (ridge_back[1] - left[1]) * f)
-        b = (front[0] + (ridge_front[0] - front[0]) * f, front[1] + (ridge_front[1] - front[1]) * f)
-        p.line([a, b], shade(roof, 0.8))
 
 
 def _lamp(p: Painter, x: float, y: float, height: float = 5) -> None:
@@ -139,7 +122,7 @@ def space_center() -> Sprite:
     _plate(p, (184, 182, 176))
     p.line([_iso(0, 0, -2, 4), _iso(0, 0, 5, 4)], (150, 148, 142))
     vab = p.hall(*_iso(0, 0, -6, 4), 8, 8, 22, (224, 226, 230), (178, 182, 190))
-    _plinth(p, vab, 22, (224, 226, 230))
+    _pale_plinth(p, vab, 22, (224, 226, 230))
     _foot(p, vab, 22)
     _patch(p, vab[0], vab[1], (0.3, 0.7), (3, 22), (70, 74, 84))
     for drop in (7, 12, 17):
@@ -179,7 +162,7 @@ def space_center() -> Sprite:
     p.line([(px - 2, py - 14), (px + 2, py - 14)], (40, 40, 46))
     p.line([(px - 2, py - 22), (px + 2, py - 22)], (40, 40, 46))
     control = p.hall(*_iso(0, 0, 0, -6), 13, 5, 4, (204, 208, 214), (150, 156, 166))
-    _plinth(p, control, 4, (204, 208, 214), 0.6)
+    _pale_plinth(p, control, 4, (204, 208, 214), 0.6)
     _patch(p, control[0], control[1], (0.05, 0.95), (1, 2.5), (90, 150, 196))
     _patch(p, control[0], control[1], (0.58, 0.68), (1.4, 4), DOORWAY)
     _foot(p, control, 4)
@@ -276,7 +259,7 @@ def royal_palace() -> Sprite:
         p.point(start[0] - 0.5, start[1] - 4.5, CROSS)
     wall, roof = (236, 214, 160), (96, 106, 126)
     wing = p.hall(*_iso(0, 0, 0, 6), 21, 5, 7, wall, None)
-    _plinth(p, wing, 7, wall)
+    _pale_plinth(p, wing, 7, wall)
     _foot(p, wing, 7)
     _windows(
         p,
@@ -288,7 +271,7 @@ def royal_palace() -> Sprite:
         arch=shade(wall, 0.75),
     )
     p.gable(wing, 3, roof, wall)
-    _tiles(p, wing, 3, roof)
+    _tiles(p, wing, 3, roof, (0.5,))
     for t in (0.2, 0.8):
         x, y = _on_wall(wing[0], wing[1], t, 0)
         x, y = x + 2.5, y - 3
@@ -301,12 +284,12 @@ def royal_palace() -> Sprite:
         pavilion = p.hall(*_iso(0, 0, u, 4.5), 3.5, 7, 9, wall, None)
         _windows(p, pavilion[0], pavilion[1], (0.5,), (1.5, 4.5), 2)
         _windows(p, pavilion[1], pavilion[2], (0.3, 0.7), (1.5, 4.5), 2, shade(WINDOW, 0.75))
-        _plinth(p, pavilion, 9, wall)
+        _pale_plinth(p, pavilion, 9, wall)
         _foot(p, pavilion, 9)
         p.gable(pavilion, 3, roof, wall)
     centre = p.hall(*_iso(0, 0, 0, 2.5), 6, 3, 9, shade(wall, 1.04), None)
     _windows(p, centre[0], centre[1], (0.25, 0.5, 0.75), (1.5, 4.5), 2)
-    _plinth(p, centre, 9, wall)
+    _pale_plinth(p, centre, 9, wall)
     _foot(p, centre, 9)
     _portal(p, centre[0], centre[1], (0.38, 0.62), 9, 2)
     near, far = _on_wall(centre[0], centre[1], 0.3, 9), _on_wall(centre[0], centre[1], 0.7, 9)
@@ -348,7 +331,7 @@ def salt_cathedral() -> Sprite:
             [_on_wall(house[1], house[2], t, 0.5), _on_wall(house[1], house[2], t, 6)],
             shade(timber, 0.66),
         )
-    _plinth(p, house, 6, STONE, 1)
+    _pale_plinth(p, house, 6, STONE, 1)
     _foot(p, house, 6)
     _windows(p, house[0], house[1], (0.15, 0.35, 0.8), (2,), 2, (240, 220, 150))
     _portal(p, house[0], house[1], (0.5, 0.66), 6, 3)
@@ -374,7 +357,7 @@ def salt_cathedral() -> Sprite:
     _worn(p, (cx - 3, cy - 4), (cx, cy - 2.5), (0.3, 0.7), 4, 3.5, GRAVEL)
     chapel = p.box(cx, cy, 3, 4, WHITEWASH, None)
     p.gable(chapel, 3, CHURCH_ROOF, WHITEWASH)
-    _plinth(p, chapel, 4, WHITEWASH, 0.6)
+    _pale_plinth(p, chapel, 4, WHITEWASH, 0.6)
     _foot(p, chapel, 4)
     _portal(p, chapel[0], chapel[1], (0.35, 0.65), 4, 2)
     p.point(*_on_wall(chapel[1], chapel[2], 0.5, 1.5), (62, 78, 132))
@@ -395,7 +378,7 @@ def spa_resort() -> Sprite:
         _tree(p, *_iso(0, 0, u, v))
     cream = (242, 234, 216)
     house = p.hall(*_iso(0, 0, 0, 6.5), 16, 6, 8, cream, None)
-    _plinth(p, house, 8, cream, 0.8)
+    _pale_plinth(p, house, 8, cream, 0.8)
     _foot(p, house, 8)
     _windows(
         p, house[0], house[1], tuple(k / 9 for k in range(1, 9)), (2,), 3, arch=shade(cream, 0.8)
@@ -450,19 +433,19 @@ def worlds_fair() -> Sprite:
             shade(iron, 0.8),
         )
     for a, b in ((main[0], main[1]), (main[1], main[2])):
-        p.line([_on_wall(a, b, 0, 4), _on_wall(a, b, 1, 4)], iron)
-    _plinth(p, main, 8, STONE, 1)
+        _band(p, a, b, 4, iron)
+    _pale_plinth(p, main, 8, STONE, 1)
     _foot(p, main, 8)
     _vault(p, main, 5, roof, wall, (0.15, 0.3, 0.7, 0.85), iron)
     centre = p.hall(0, 0, 7, 12, 13, wall, None)
-    _plinth(p, centre, 13, STONE, 1)
+    _pale_plinth(p, centre, 13, STONE, 1)
     _foot(p, centre, 13)
     for k in range(1, 4):
         p.line(
             [_on_wall(centre[0], centre[1], k / 4, 0.5), _on_wall(centre[0], centre[1], k / 4, 13)],
             iron,
         )
-    p.line([_on_wall(centre[0], centre[1], 0, 6), _on_wall(centre[0], centre[1], 1, 6)], iron)
+    _band(p, centre[0], centre[1], 6, iron)
     _vault(p, centre, 6, roof, wall, (0.25, 0.5, 0.75), iron)
     _portal(p, centre[0], centre[1], (0.3, 0.7), 13, 5)
     _doorstep(p, centre[0], centre[1], (0.25, 0.75), 13, (226, 222, 212))
@@ -491,10 +474,10 @@ def film_studio() -> Sprite:
     stage, paint = (218, 206, 180), (60, 56, 60)
     for (u, v), length, depth, height, number in (((6.5, 6), 8, 8, 9, 2), ((-4, 5), 12, 9, 11, 1)):
         top = p.hall(*_iso(0, 0, u, v), length, depth, height, stage, None)
-        _plinth(p, top, height, stage)
+        _pale_plinth(p, top, height, stage)
         _foot(p, top, height)
         p.gable(top, 3, (120, 116, 112), stage)
-        _tiles(p, top, 3, (120, 116, 112))
+        _tiles(p, top, 3, (120, 116, 112), (0.5,))
         x, y = _on_wall(top[0], top[1], 0.5, 2.5)
         p.rect(x - 3, y - 1, x + 3, y + 6, (240, 236, 226))
         _digit(p, x - 1, y, number, paint)

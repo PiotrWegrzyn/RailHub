@@ -17,9 +17,10 @@ from typing import ClassVar, Literal, Self
 import numpy as np
 import numpy.typing as npt
 
+from railroads.sim.geo import Coord
+
 type Cell = tuple[int, int]
 type GridKind = Literal["square", "hex"]
-type Coord = float | npt.NDArray[np.float64]
 type Index = int | npt.NDArray[np.int64]
 FloatArray = npt.NDArray[np.float64]
 IntArray = npt.NDArray[np.int64]
@@ -71,6 +72,19 @@ class Grid(ABC):
     @abstractmethod
     def cell_at(self, x: Coord, y: Coord) -> tuple[Index, Index]:
         """The cell under each point; it can lie outside the grid."""
+
+    def cell_on_map(self, x: Coord, y: Coord) -> tuple[Index, Index]:
+        """The cell under each point, kept on the grid: a point beyond an edge takes the row or
+        column of that edge."""
+        rows, cols = self.cell_at(x, y)
+        return np.clip(rows, 0, self.rows - 1), np.clip(cols, 0, self.cols - 1)
+
+    def raster_cells(self, steps: int) -> tuple[Index, Index]:
+        """The cell under the middle of each point of a raster `steps` points to a cell unit
+        over the whole grid (cell_on_map)."""
+        width, height = self.size()
+        ys, xs = np.mgrid[0 : math.ceil(height * steps), 0 : math.ceil(width * steps)]
+        return self.cell_on_map((xs + 0.5) / steps, (ys + 0.5) / steps)
 
     @abstractmethod
     def neighbours(self, row: int, col: int) -> list[Cell]:

@@ -5,14 +5,12 @@ yard beside it."""
 
 from railroads.ui.pixel.art.industry import (
     _bed,
-    _chimney,
     _door,
     _footing,
-    _plinth,
     _ring,
     _roof_rows,
     _sack,
-    _smoke,
+    _smoking_chimney,
     _track,
     _window,
 )
@@ -24,9 +22,10 @@ from railroads.ui.pixel.art.painter import (
     Painter,
     Point,
     Sprite,
+    Top,
     shade,
 )
-from railroads.ui.pixel.art.parts import _cow, _fence, _on_wall, _paddock, _patch
+from railroads.ui.pixel.art.parts import _cow, _fence, _on_wall, _paddock, _patch, _plinth
 
 CRUST: RGB = (236, 180, 96)
 BAKERY_ROOF: RGB = (172, 66, 46)
@@ -40,8 +39,6 @@ DAIRY_BLUE: RGB = (58, 104, 178)
 CHURN: RGB = (204, 208, 216)
 HIDE: RGB = (242, 240, 234)
 PATCH: RGB = (40, 36, 36)
-
-type Top = tuple[Point, Point, Point, Point]
 
 
 def _awning(p: Painter, a: Point, b: Point, span: tuple[float, float], drop: float) -> None:
@@ -118,8 +115,7 @@ def bakery() -> Sprite:
     _window(p, front, right, (0.3, 0.65), 2, shade(WINDOW, 0.85))
     p.gable(top, 5, BAKERY_ROOF, CRUST)
     _roof_rows(p, top, 5, BAKERY_ROOF)
-    _chimney(p, -1, -12, -19, BRICK)
-    _smoke(p, -0.5, -21, SMOKE, 3)
+    _smoking_chimney(p, -1, -12, -19, smoke=SMOKE, close=True)
     _loaf_sign(p, *_on_wall(left, front, 0.02, 1.5))
     _oven(p, 8, 3, 3)
     _flour(p, -7, 3.5, 2)
@@ -143,8 +139,7 @@ def big_bakery() -> Sprite:
     p.gable(top, 5, BAKERY_ROOF, CRUST)
     _roof_rows(p, top, 5, BAKERY_ROOF)
     for x, foot_y in ((-6, -16), (2, -12)):
-        _chimney(p, x, foot_y, foot_y - 8, BRICK)
-        _smoke(p, x + 0.5, foot_y - 10, SMOKE, 3)
+        _smoking_chimney(p, x, foot_y, foot_y - 8, smoke=SMOKE, close=True)
     _gable_sign(p, -2, -14)
     _oven(p, 12, 5, 3)
     _flour(p, -13, 3, 3)
@@ -174,8 +169,7 @@ def mega_bakery() -> Sprite:
     p.gable(top, 6, BAKERY_ROOF, CRUST)
     _roof_rows(p, top, 6, BAKERY_ROOF, (0.25, 0.5, 0.75))
     for x, foot_y in ((-14, -20), (-6, -16), (2, -12)):
-        _chimney(p, x, foot_y, foot_y - 9, BRICK)
-        _smoke(p, x + 0.5, foot_y - 11, SMOKE, 3)
+        _smoking_chimney(p, x, foot_y, foot_y - 9, smoke=SMOKE, close=True)
     _gable_sign(p, 6, -10)
     _flour(p, -20, 3, 4)
     _flour(p, 6, 10, 3)

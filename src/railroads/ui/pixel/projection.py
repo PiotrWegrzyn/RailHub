@@ -7,7 +7,7 @@ from typing import Self
 import numpy as np
 import numpy.typing as npt
 
-from railroads.sim.grids import Grid
+from railroads.sim.grids import FloatArray, Grid
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 
 CHUNK = 256
@@ -24,12 +24,6 @@ type Point = tuple[float, float]
 
 
 type Path = list[Point]
-
-
-FloatArray = npt.NDArray[np.float64]
-
-
-IntArray = npt.NDArray[np.int64]
 
 
 Rgba = npt.NDArray[np.uint8]

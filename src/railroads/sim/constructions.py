@@ -431,6 +431,10 @@ class Track:
     def space(self) -> int:
         return int(self.width)
 
+    def other_end(self, point: int) -> int:
+        """The end of the piece away from `point`, one of its ends."""
+        return self.ends[1] if self.ends[0] == point else self.ends[0]
+
 
 @dataclass(frozen=True, slots=True)
 class Station:
@@ -544,6 +548,9 @@ class Constructions:
 
     def at(self, cell: Cell) -> tuple[Construction, ...]:
         return tuple(self._cells.get(cell, ()))
+
+    def buildings_at(self, cell: Cell) -> list[Building]:
+        return [built for built in self._cells.get(cell, ()) if isinstance(built, Building)]
 
     def track_at(self, cell: Cell) -> tuple[Track, ...]:
         return tuple(built for built in self._cells.get(cell, ()) if isinstance(built, Track))

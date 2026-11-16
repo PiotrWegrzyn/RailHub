@@ -20,7 +20,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import Constructions, Track
-from railroads.sim.grids import Cell
+from railroads.sim.grids import Cell, FloatArray, IntArray
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
@@ -36,7 +36,7 @@ from railroads.ui.pixel.ground import (
     glow_strength,
 )
 from railroads.ui.pixel.lattice import Lattice
-from railroads.ui.pixel.projection import CHUNK, FloatArray, IntArray, PixelProjection, Rgba
+from railroads.ui.pixel.projection import CHUNK, PixelProjection, Rgba
 from railroads.ui.pixel.relief import MOST_LIFT, Elevation, lighting, raise_picture, raycast
 from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
 from railroads.ui.pixel.sheet import FINE, SpriteSheet

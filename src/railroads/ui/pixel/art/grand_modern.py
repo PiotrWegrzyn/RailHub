@@ -9,21 +9,20 @@ import math
 import numpy as np
 
 from railroads.ui.pixel.art.industry import (
-    _band,
+    GLAZING,
     _bed,
     _car,
-    _chimney,
     _door,
     _drum,
     _footing,
     _oil,
     _plane,
-    _plinth,
     _puddle,
     _ring,
     _sack,
     _sawtooth,
     _smoke,
+    _smoking_chimney,
     _stains,
     _tank_vehicle,
     _track,
@@ -41,20 +40,22 @@ from railroads.ui.pixel.art.painter import (
     Painter,
     Point,
     Sprite,
+    Top,
     shade,
 )
 from railroads.ui.pixel.art.parts import (
+    _band,
+    _bands,
     _flag,
     _iso,
     _on_wall,
     _patch,
     _plate,
+    _plinth,
     _turned,
     _vault,
     _windows,
 )
-
-type Top = tuple[Point, Point, Point, Point]
 
 COLUMN: RGB = (176, 178, 184)
 TANK_WHITE: RGB = (224, 226, 228)
@@ -463,8 +464,7 @@ def _plastics_hall(
     left, front, right, _ = top
     _plinth(p, top, height, PLASTIC_WHITE)
     _stains(p, front, right, height, (0.15, 0.85), shade(PLASTIC_WHITE, 0.6), 1.2)
-    _band(p, left, front, 1, PLASTIC_RED)
-    _band(p, front, right, 1, shade(PLASTIC_RED, 0.8))
+    _bands(p, left, front, right, 1, PLASTIC_RED, shade(PLASTIC_RED, 0.8))
     spans = tuple((k + 0.5) / 8 for k in range(8))
     _windows(p, left, front, spans[: 8 - 2 * doors], (2.5,), 1, shade(PLASTIC_BLUE, 0.8))
     for k in range(doors):
@@ -716,8 +716,7 @@ def mega_electronics_plant() -> Sprite:
             [_on_wall(front, right, t, 0), _on_wall(front, right, t, 34)], shade(TOWER_GLASS, 0.9)
         )
     for drop in range(5, 34, 3):
-        _band(p, left, front, drop, shade(TOWER_GLASS, 0.85))
-        _band(p, front, right, drop, shade(TOWER_GLASS, 0.66))
+        _bands(p, left, front, right, drop, shade(TOWER_GLASS, 0.85), shade(TOWER_GLASS, 0.66))
     _patch(p, left, front, (0, 1), (0, 2.5), EL_WALL)
     _patch(p, front, right, (0, 1), (0, 2.5), shade(EL_WALL, 0.78))
     _patch(p, left, front, (0.25, 0.75), (0.6, 1.9), EL_ACCENT)
@@ -786,8 +785,7 @@ def _appliance_hall(
     left, front, right, _ = top
     _plinth(p, top, height, AP_WALL)
     _stains(p, front, right, height, (0.2, 0.5, 0.8), shade(AP_WALL, 0.62), 1.2)
-    _band(p, left, front, 1, AP_STRIPE)
-    _band(p, front, right, 1, shade(AP_STRIPE, 0.8))
+    _bands(p, left, front, right, 1, AP_STRIPE, shade(AP_STRIPE, 0.8))
     p.line([left, front, right], shade(AP_WALL, 1.12))
     return top
 
@@ -800,7 +798,7 @@ def _white_good(p: Painter, x: float, y: float, tall: float, washer: bool) -> No
         p.blob(cx - 1, cy - 1, cx + 1, cy + 1, (64, 88, 118))
         p.point(cx - 0.5, cy - 0.5, (150, 176, 200))
     else:
-        p.line([_on_wall(box[0], box[1], 0, 2), _on_wall(box[0], box[1], 1, 2)], shade(GOODS, 0.55))
+        _band(p, box[0], box[1], 2, shade(GOODS, 0.55))
         p.point(*_on_wall(box[0], box[1], 0.85, 3.5), shade(GOODS, 0.5))
 
 
@@ -1040,7 +1038,6 @@ GUN_STEEL: RGB = (92, 96, 104)
 GUN_OLIVE: RGB = (96, 102, 70)
 AMMO: RGB = (140, 122, 80)
 EARTH: RGB = (130, 108, 76)
-GLAZING: RGB = (160, 196, 218)
 WINDOW_DARK: RGB = (58, 70, 92)
 CRANE: RGB = (214, 168, 52)
 
@@ -1052,8 +1049,7 @@ def _gun_hall(p: Painter, x: float, y: float, length: float, depth: float, heigh
     left, front, right, back = top
     _plinth(p, top, height, GUN_WALL)
     _stains(p, left, front, height, (0.06, 0.3, 0.62, 0.88), shade(GUN_WALL, 0.6))
-    _band(p, left, front, 1, shade(GUN_WALL, 1.15))
-    _band(p, front, right, 1, shade(GUN_WALL, 0.9))
+    _bands(p, left, front, right, 1, shade(GUN_WALL, 1.15), shade(GUN_WALL, 0.9))
     spans = tuple(0.08 + k * 0.1 for k in range(9))
     _windows(p, left, front, spans, (2.5,), 2, WINDOW_DARK, shade(GUN_WALL, 1.25))
     _windows(p, left, front, spans, (height - 3.2,), 1, shade(GUN_WALL, 1.15))
@@ -1148,8 +1144,7 @@ def big_gun_factory() -> Sprite:
     p.polygon(yard, (140, 130, 104))
     p.shadow(19, 5)
     for x, tall in ((-10, 26), (0, 20)):
-        _chimney(p, x, -10, -10 - tall, shade(BRICK, 0.8))
-        _smoke(p, x + 1, -13 - tall, (150, 148, 150), 3)
+        _smoking_chimney(p, x, -10, -10 - tall, shade(BRICK, 0.8))
     _gun_shop(p, 7, -8, 13, 7, 11)
     top = _gun_hall(p, -4, 1, 17, 9, 8)
     left, front, _, _ = top
@@ -1174,8 +1169,7 @@ def mega_gun_factory() -> Sprite:
         p.line([_iso(0, 0, 0, v), _iso(0, 0, 10, v)], shade(EARTH, 0.82))
     for k, u in enumerate((-12, -7, -2)):
         x, y = _iso(0, 0, u, 13)
-        _chimney(p, x, y, y - 32 + 2 * k, shade(BRICK, 0.8))
-        _smoke(p, x + 1, y - 35 + 2 * k, (150, 148, 150), 3)
+        _smoking_chimney(p, x, y, y - 32 + 2 * k, shade(BRICK, 0.8))
     _gun_shop(p, *_iso(0, 0, -1, 8), 22, 9, 15)
     gx, gy = _iso(0, 0, 11, 3)
     for dv in (-3.5, 3.5):
@@ -1229,8 +1223,8 @@ def _armoured_hall(
     roof = shade(OLIVE, 0.72)
     top = p.hall(x, y, length, depth, height, wall, roof)
     for a, b in ((top[0], top[1]), (top[1], top[2])):
-        p.line([_on_wall(a, b, 0, 1), _on_wall(a, b, 1, 1)], shade(OLIVE, 1.3))
-        p.line([_on_wall(a, b, 0, height - 1), _on_wall(a, b, 1, height - 1)], shade(OLIVE, 0.7))
+        _band(p, a, b, 1, shade(OLIVE, 1.3))
+        _band(p, a, b, height - 1, shade(OLIVE, 0.7))
         slits = max(3, round(math.dist(a, b) / 3))
         for k in range(1, slits):
             t = k / slits
@@ -1285,8 +1279,7 @@ def big_tank_factory() -> Sprite:
     _plate(p, TANK_YARD, 24)
     for u in (4, 9):
         x, y = _iso(0, 0, u, 12)
-        _chimney(p, x, y, y - 22, shade(BRICK, 0.8))
-        _smoke(p, x + 1, y - 25, (150, 148, 150), 2)
+        _smoking_chimney(p, x, y, y - 22, shade(BRICK, 0.8), puffs=2)
     _proving_ground(p, -2, 12, -12, -1)
     under = shade(TANK_YARD, 0.76)
     halls = (((0, 9.5), 22, 5, 8, 0.95), ((-6.5, 2.5), 11, 7, 7, 1.0), ((5.5, 3.5), 9, 5, 6, 0.9))
@@ -1315,8 +1308,7 @@ def mega_tank_factory() -> Sprite:
     _plate(p, TANK_YARD, 29)
     for k, u in enumerate((0, 5, 10)):
         x, y = _iso(0, 0, u, 14)
-        _chimney(p, x, y, y - 26 + 2 * k, shade(BRICK, 0.8))
-        _smoke(p, x + 1, y - 29 + 2 * k, (150, 148, 150), 3)
+        _smoking_chimney(p, x, y, y - 26 + 2 * k, shade(BRICK, 0.8))
     _proving_ground(p, -1, 14.5, -14.5, 0.5)
     under = shade(TANK_YARD, 0.76)
     halls = (((0.5, 11.5), 27, 5, 9, 0.95), ((-8, 4.5), 12, 8, 8, 1.0), ((7, 5.5), 13, 5, 7, 0.9))

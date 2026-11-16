@@ -2,17 +2,15 @@
 clock towers with gilded domes, halls of mirrors under a glass dome, and steelworks of blast
 furnaces and converters throwing fire."""
 
+from railroads.ui.pixel.art.grand_fire import WHITE_HOT
 from railroads.ui.pixel.art.industry import (
-    _band,
     _bed,
-    _chimney,
     _door,
     _footing,
-    _plinth,
     _ring,
     _roof_rows,
     _sawtooth,
-    _smoke,
+    _smoking_chimney,
     _spill,
     _stains,
     _window,
@@ -26,11 +24,19 @@ from railroads.ui.pixel.art.painter import (
     Painter,
     Point,
     Sprite,
+    Top,
     shade,
 )
-from railroads.ui.pixel.art.parts import _heap, _on_wall, _patch, _turned, _windows
-
-type Top = tuple[Point, Point, Point, Point]
+from railroads.ui.pixel.art.parts import (
+    _band,
+    _bands,
+    _heap,
+    _on_wall,
+    _patch,
+    _plinth,
+    _turned,
+    _windows,
+)
 
 STONE_WALL: RGB = (228, 216, 188)
 GREEN: RGB = (40, 90, 60)
@@ -49,9 +55,7 @@ RUST: RGB = (130, 76, 56)
 STOVE: RGB = (140, 138, 144)
 CINDER: RGB = (58, 54, 56)
 MOLTEN: RGB = (246, 132, 36)
-WHITE_HOT: RGB = (255, 226, 120)
 ORE: RGB = (150, 76, 54)
-SMOKE: RGB = (150, 148, 150)
 
 
 def _clock_face(p: Painter, x: float, y: float, r: float) -> None:
@@ -73,8 +77,7 @@ def _clock_tower(p: Painter, x: float, y: float, half: float, tall: float, face:
     for a, b in ((left, front), (front, right)):
         cx, cy = _on_wall(a, b, 0.5, face + 1.4)
         _clock_face(p, cx, cy, face)
-    _band(p, left, front, 0.6, GREEN)
-    _band(p, front, right, 0.6, shade(GREEN, 0.8))
+    _bands(p, left, front, right, 0.6, GREEN, shade(GREEN, 0.8))
     apex = (front[0], (left[1] + right[1]) / 2 - tall * 0.45)
     p.polygon([left, front, apex], VERDIGRIS, shade(VERDIGRIS, 0.6))
     p.polygon([front, right, apex], shade(VERDIGRIS, 0.75), shade(VERDIGRIS, 0.5))
@@ -131,8 +134,7 @@ def mega_clock_maker() -> Sprite:
     for drop in (1.6, 5.2, 8.6):
         _windows(p, left, front, spans, (drop,), 2, shade(WINDOW, 1.1), shade(STONE_WALL, 1.1))
     _windows(p, front, right, (0.25, 0.5, 0.75), (1.6, 5.2, 8.6), 2, shade(WINDOW, 0.85))
-    _band(p, left, front, 0.6, GREEN)
-    _band(p, front, right, 0.6, shade(GREEN, 0.8))
+    _bands(p, left, front, right, 0.6, GREEN, shade(GREEN, 0.8))
     p.gable(top, 5, SLATE, STONE_WALL)
     _roof_rows(p, top, 5, SLATE, (0.25, 0.5, 0.75))
     gx, gy = _on_wall(foot[0], foot[1], 0.42, 0)
@@ -199,8 +201,7 @@ def big_mirror_maker() -> Sprite:
         _mirror_window(p, left, front, t, 0.06, (2, 7.2))
     _door(p, left, front, (0.86, 0.96), 4.5, 9, GILT)
     _mirror_window(p, front, right, 0.5, 0.15, (2, 6.5))
-    _band(p, left, front, 0.6, GILT)
-    _band(p, front, right, 0.6, shade(GILT, 0.8))
+    _bands(p, left, front, right, 0.6, GILT, shade(GILT, 0.8))
     p.gable(top, 4, SLATE, MIRROR_WALL)
     _roof_rows(p, top, 4, SLATE)
     for x, y in ((-12, 5), (-9, 6.5), (2, 8)):
@@ -232,8 +233,7 @@ def mega_mirror_maker() -> Sprite:
             )
     for t in (0.3, 0.7):
         _mirror_window(p, front, right, t, 0.1, (2.4, 9.5))
-    _band(p, left, front, 0.6, GILT)
-    _band(p, front, right, 0.6, shade(GILT, 0.8))
+    _bands(p, left, front, right, 0.6, GILT, shade(GILT, 0.8))
     p.gable(top, 5, SLATE, MIRROR_WALL)
     _roof_rows(p, top, 5, SLATE, (0.25, 0.5, 0.75))
     dx, dy = _on_wall(left, right, 0.5, -3.5)
@@ -322,8 +322,7 @@ def big_steel_mill() -> Sprite:
         _stove(p, x, y, 18)
     for x, y in ((-4, -6), (4, -7)):
         _blast_furnace(p, x, y, 22)
-    _chimney(p, -10, -6, -34, shade(BRICK, 0.75))
-    _smoke(p, -9.5, -36, SMOKE, 4)
+    _smoking_chimney(p, -10, -6, -34, shade(BRICK, 0.75), puffs=4, close=True)
     top = _casting_hall(p, 2, 1, 18, 8, 7)
     p.gable(top, 3, (60, 58, 62), IRON)
     _heap(p, -15, 4, 3, 3, ORE)
@@ -345,8 +344,7 @@ def mega_steel_mill() -> Sprite:
     _spill(p, -21, 6, 3.5, ORE)
     p.shadow(23, 6)
     for k, x in enumerate((-14, -6, 2, 10)):
-        _chimney(p, x, -14 + k, -48 + k, shade(BRICK, 0.72))
-        _smoke(p, x + 0.5, -50 + k, SMOKE, 4)
+        _smoking_chimney(p, x, -14 + k, -48 + k, shade(BRICK, 0.72), puffs=4, close=True)
     for x, y in ((14, -12), (17, -10.5), (20, -9), (23, -7.5)):
         _stove(p, x, y, 20)
     for x, y in ((-10, -8), (-2, -9), (6, -10)):

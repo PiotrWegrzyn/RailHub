@@ -14,16 +14,14 @@ import numpy.typing as npt
 
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Satisfaction
-from railroads.sim.grids import Grid
+from railroads.sim.grids import FloatArray, Grid, IntArray
 from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.building_spots import Plot, plots_of
-from railroads.ui.pixel.lattice import Lattice
+from railroads.ui.pixel.lattice import BoolArray, Lattice
 from railroads.ui.pixel.noise import noise, table_hash
-from railroads.ui.pixel.projection import CHUNK, RGB, FloatArray, IntArray, PixelProjection
+from railroads.ui.pixel.projection import CHUNK, RGB, PixelProjection
 from railroads.ui.pixel.relief import Elevation, Raised, mountain_cover, sample, smooth
-
-type BoolArray = npt.NDArray[np.bool_]
 
 # Ground is worked out this far past a chunk's edges, so shores meet across chunks.
 APRON = 2
@@ -572,8 +570,7 @@ class Ground:
             r, c, _ = points.cells(*block)
         else:
             x, y = self.projection.to_plane(left + (fx + 0.5) / k, top + (fy + 0.5) / k)
-            r, c = grid.cell_at(x, y)
-            r, c = np.clip(r, 0, grid.rows - 1), np.clip(c, 0, grid.cols - 1)
+            r, c = grid.cell_on_map(x, y)
         ix = np.broadcast_to(left * k + fx, shape)
         iy = np.broadcast_to(top * k + fy, shape)
         return x, y, r * grid.cols + c, ix, iy
@@ -750,8 +747,7 @@ class Ground:
             x, y = x[unsure], y[unsure]
             around = np.zeros(x.shape, dtype=np.float32)
             for dx, dy in AROUND:
-                sr, sc = grid.cell_at(x + dx, y + dy)
-                sr, sc = np.clip(sr, 0, grid.rows - 1), np.clip(sc, 0, grid.cols - 1)
+                sr, sc = grid.cell_on_map(x + dx, y + dy)
                 around += self._woods[sr, sc]
             around /= len(AROUND)
             share[unsure] = around
@@ -822,12 +818,8 @@ class Ground:
         """How many shades lighter (or darker, below 0) the ground is where it faces towards (or
         away from) the light, on a raster RELIEF_STEPS_PER_CELL steps per cell. Water is level."""
         grid = self.tile_map.grid
-        width, height = grid.size()
         steps = RELIEF_STEPS_PER_CELL
-        ys, xs = np.mgrid[0 : math.ceil(height * steps), 0 : math.ceil(width * steps)]
-        rows, cols = grid.cell_at((xs + 0.5) / steps, (ys + 0.5) / steps)
-        rows = np.clip(rows, 0, grid.rows - 1)
-        cols = np.clip(cols, 0, grid.cols - 1)
+        rows, cols = grid.raster_cells(steps)
         heights = self.tile_map.height_m[rows, cols].astype(np.float64)
         water = self.tile_map.terrain[rows, cols] != Terrain.LAND
         heights = smooth(heights, round(RELIEF_SMOOTHING_CELLS * steps))

@@ -49,7 +49,7 @@ class Room:
         constructions = growth.constructions
         changed: set[Cell] = set()
         while constructions.space_left(cell) < units:
-            here = [b for b in constructions.at(cell) if isinstance(b, Building)]
+            here = constructions.buildings_at(cell)
             if not here:
                 break
             victim = leaving_order(here, growth.rule.points)[0]

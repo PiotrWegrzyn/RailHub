@@ -7,19 +7,20 @@ cones lit at their mouths and gasworks of great gasholders in iron guide frames.
 import itertools
 import math
 
+from railroads.ui.pixel.art.crafts import MOLTEN
 from railroads.ui.pixel.art.industry import (
-    _band,
+    SMOKE,
+    SOIL,
     _bed,
-    _chimney,
     _crate,
     _door,
     _footing,
     _on_roof,
-    _plinth,
     _ring,
     _roof_rows,
     _sack,
     _smoke,
+    _smoking_chimney,
     _spill,
     _stains,
     _track,
@@ -36,18 +37,24 @@ from railroads.ui.pixel.art.painter import (
     Painter,
     Point,
     Sprite,
+    Top,
     shade,
 )
-from railroads.ui.pixel.art.parts import _heap, _on_wall, _patch, _turned, _vault, _windows
+from railroads.ui.pixel.art.parts import (
+    _band,
+    _bands,
+    _heap,
+    _on_wall,
+    _patch,
+    _plinth,
+    _turned,
+    _vault,
+    _windows,
+)
 
-type Top = tuple[Point, Point, Point, Point]
-
-SMOKE: RGB = (150, 148, 150)
 STEAM: RGB = (238, 238, 242)
-MOLTEN: RGB = (240, 128, 36)
 WHITE_HOT: RGB = (255, 226, 120)
 IRON: RGB = (66, 62, 64)
-SOIL: RGB = (78, 74, 52)
 BALLAST: RGB = (126, 118, 106)
 RAIL: RGB = (92, 92, 100)
 WAGON: RGB = (104, 74, 54)
@@ -147,7 +154,7 @@ def _battery(
     for k in range(doors):
         bx, by = _on_wall(back, right, (k + 0.5) / doors, 0)
         p.line([(bx, by), (bx, by - 2.4)], IRON)
-    p.line([_on_wall(back, right, 0, -2.6), _on_wall(back, right, 1, -2.6)], shade(IRON, 1.4))
+    _band(p, back, right, -2.6, shade(IRON, 1.4))
     return top
 
 
@@ -204,8 +211,7 @@ def big_coke_plant() -> Sprite:
     them, a timber quench tower pouring steam, two tall chimneys smoking and a heap of grey coke."""
     p = Painter(54, 64, (27, 52))
     for x, foot, tip in ((-8, -16, -40), (9, -11, -35)):
-        _chimney(p, x, foot, tip, shade(BRICK, 0.85))
-        _smoke(p, x + 0.5, tip - 2, SMOKE, 3)
+        _smoking_chimney(p, x, foot, tip, shade(BRICK, 0.85), close=True)
     p.shadow(22, 6)
     _quench_tower(p, 19, -5, 3.5, 17, 4, -0.8)
     back = _battery(p, 2, -8, 24, 6, 8, (), 6)
@@ -229,8 +235,7 @@ def mega_coke_plant() -> Sprite:
     three tall chimneys smoking, coke wagons and a great heap of coke."""
     p = Painter(64, 80, (31, 62))
     for x, foot, tip in ((-19, -20, -50), (-4, -14, -48), (12, -7, -44)):
-        _chimney(p, x, foot, tip, shade(BRICK, 0.82))
-        _smoke(p, x + 0.5, tip - 2, SMOKE, 3)
+        _smoking_chimney(p, x, foot, tip, shade(BRICK, 0.82), close=True)
     for x, y, half, tall in ((2, -16, 2.2, 16), (6, -14, 1.6, 20), (-9, -18, 1.6, 14)):
         _column(p, x, y, half, tall, TANK)
     p.shadow(28, 7)
@@ -245,8 +250,7 @@ def mega_coke_plant() -> Sprite:
     tower = p.box(-0.5, -7.5, 4, 20, CONCRETE, shade(CONCRETE, 1.1))
     tl, tf, tr, _ = tower
     _windows(p, tl, tf, (0.3, 0.7), (3, 8), 2, WINDOW)
-    _band(p, tl, tf, 13, shade(CONCRETE, 0.75))
-    _band(p, tf, tr, 13, shade(CONCRETE, 0.6))
+    _bands(p, tl, tf, tr, 13, shade(CONCRETE, 0.75), shade(CONCRETE, 0.6))
     _patch(p, tl, tf, (0.25, 0.75), (16, 20), OVEN_DOOR)
     _quench_tower(p, 26, 1, 4, 22, 5, -1.2)
     two = _battery(p, 12, 4.5, 18, 7, 6, (1, 4), 6)
@@ -351,8 +355,7 @@ def big_foundry() -> Sprite:
     tall iron cupolas throwing sparks beside a charging deck, molten iron running from their tap
     into a ladle, glowing moulds in a bed of sand, castings laid out and a chimney smoking."""
     p = Painter(52, 58, (25, 46))
-    _chimney(p, -11, -12, -35, shade(BRICK, 0.7))
-    _smoke(p, -10.5, -37, SMOKE, 3)
+    _smoking_chimney(p, -11, -12, -35, shade(BRICK, 0.7), close=True)
     p.shadow(20, 5)
     foot = _footing(-3, -1, 20, 8)
     _bed(p, foot, SOIL)
@@ -398,8 +401,7 @@ def mega_foundry() -> Sprite:
     flywheel and pig iron laid out, two chimneys smoking and a wagon of castings on the siding."""
     p = Painter(64, 72, (31, 56))
     for x, foot, tip in ((-15, -17, -45), (-3, -14, -42)):
-        _chimney(p, x, foot, tip, shade(BRICK, 0.7))
-        _smoke(p, x + 0.5, tip - 2, SMOKE, 3)
+        _smoking_chimney(p, x, foot, tip, shade(BRICK, 0.7), close=True)
     p.shadow(27, 6)
     foot = _footing(-4, 0, 28, 10)
     _bed(p, foot, SOIL)
@@ -521,8 +523,7 @@ def big_gasworks() -> Sprite:
     beside it, a long brick retort house with its retort mouths glowing and a louvred vent on its
     ridge, a tall chimney smoking, a coal wagon on the siding and a heap of coal."""
     p = Painter(54, 56, (27, 44))
-    _chimney(p, -18, -8, -32, shade(BRICK, 0.9))
-    _smoke(p, -17.5, -34, SMOKE, 3)
+    _smoking_chimney(p, -18, -8, -32, shade(BRICK, 0.9), close=True)
     p.shadow(22, 5)
     _gasholder(p, 8, -5, 8.5, 20, 12)
     _gasholder(p, 19, 3.5, 5, 12, 5)
@@ -546,8 +547,7 @@ def mega_gasworks() -> Sprite:
     and coke."""
     p = Painter(64, 74, (31, 54))
     for x, foot, tip in ((-25, -4, -38), (-17, -8, -42)):
-        _chimney(p, x, foot, tip, shade(BRICK, 0.9))
-        _smoke(p, x + 0.5, tip - 2, SMOKE, 3)
+        _smoking_chimney(p, x, foot, tip, shade(BRICK, 0.9), close=True)
     p.shadow(28, 6)
     _gasholder(p, -4, -12, 9, 26, 18, 2)
     _gasholder(p, 15, -5, 10, 26, 10, 2)
@@ -739,8 +739,7 @@ def _tile_stack(p: Painter, x: float, y: float, rows: int = 3) -> None:
     top = p.hall(x, y, 3, 2.4, 0.9 * rows, TILE, shade(TILE, 1.25))
     left, front, right, _ = top
     for row in range(1, rows):
-        _band(p, left, front, 0.9 * row, GLAZE)
-        _band(p, front, right, 0.9 * row, shade(GLAZE, 0.8))
+        _bands(p, left, front, right, 0.9 * row, GLAZE, shade(GLAZE, 0.8))
 
 
 def _checker(
@@ -882,7 +881,7 @@ def _plank(p: Painter, x: float, y: float, length: float, pots: int) -> None:
         px, py = _on_wall(a, b, t, 0)
         p.line([(px - 0.6, py), (px, py - 2)], shade(TIMBER, 0.7))
         p.line([(px + 0.6, py), (px, py - 2)], shade(TIMBER, 0.7))
-    p.line([_on_wall(a, b, 0, -2), _on_wall(a, b, 1, -2)], TIMBER)
+    _band(p, a, b, -2, TIMBER)
     for k in range(pots):
         px, py = _on_wall(a, b, (k + 0.5) / pots, -2.2)
         p.ellipse(px - 0.9, py - 2, px + 0.9, py, POT)
@@ -987,7 +986,7 @@ def _ware_racks(p: Painter, x: float, y: float, length: float, rows: int = 2) ->
         p.line([(px, py), (px, py - 3 * rows - 1)], FRAME)
     for r in range(rows):
         d = -1 - 3 * r
-        p.line([_on_wall(a, b, 0, d), _on_wall(a, b, 1, d)], FRAME)
+        _band(p, a, b, d, FRAME)
         items = max(3, round(length / 2))
         for k in range(items):
             px, py = _on_wall(a, b, (k + 0.5) / items, d - 0.4)
@@ -1114,7 +1113,7 @@ def _brick_stack(p: Painter, x: float, y: float, length: float = 4) -> None:
     """A stack of new red bricks on (x, y), their courses and joints showing."""
     stack = p.hall(x, y, length, 3, 3, BRICK, shade(BRICK, 1.25))
     for a, b in ((stack[0], stack[1]), (stack[1], stack[2])):
-        p.line([_on_wall(a, b, 0, 1.5), _on_wall(a, b, 1, 1.5)], shade(BRICK, 1.3))
+        _band(p, a, b, 1.5, shade(BRICK, 1.3))
         for t in (0.25, 0.5, 0.75):
             d = (0, 1.5) if t == 0.5 else (1.5, 3)
             p.line([_on_wall(a, b, t, d[0]), _on_wall(a, b, t, d[1])], shade(BRICK, 0.7))
@@ -1137,8 +1136,7 @@ def _long_kiln(p: Painter, x: float, y: float, length: float, depth: float, chim
     height = 6
     top = p.hall(x, y, length, depth, height, HOFFMANN, None)
     left, front, right, _ = top
-    _band(p, left, front, 0.8, shade(HOFFMANN, 0.7))
-    _band(p, front, right, 0.8, shade(HOFFMANN, 0.55))
+    _bands(p, left, front, right, 0.8, shade(HOFFMANN, 0.7), shade(HOFFMANN, 0.55))
     steps = max(3, round(length / 4))
     _firing_doors(p, left, front, tuple((k + 0.5) / steps for k in range(steps)), height)
     _firing_doors(p, front, right, (0.35, 0.65), height)
@@ -1146,8 +1144,7 @@ def _long_kiln(p: Painter, x: float, y: float, length: float, depth: float, chim
     for along in (0.15, 0.35, 0.65, 0.85):
         p.point(*_on_roof(top, 2.5, along, 0.5), (60, 54, 54))
     cx, cy = _mid(_mid(top[0], top[3]), _mid(top[1], top[2]))
-    _chimney(p, cx, cy - 2, y - chimney, shade(BRICK, 0.9))
-    _smoke(p, cx + 1, y - chimney - 3, SMOKE, 3)
+    _smoking_chimney(p, cx, cy - 2, y - chimney, shade(BRICK, 0.9))
     return top
 
 
@@ -1166,8 +1163,7 @@ def _round_kiln(p: Painter, x: float, y: float, r: float, chimney: float) -> Non
     for k in range(6):
         a = 0.4 + k * 0.5
         p.point(x + (r - 1) * math.cos(a), y - 7.5 + (r - 1) / 2 * math.sin(a), (60, 54, 54))
-    _chimney(p, x, y - 8, y - chimney, shade(BRICK, 0.9))
-    _smoke(p, x + 1, y - chimney - 3, SMOKE, 3)
+    _smoking_chimney(p, x, y - 8, y - chimney, shade(BRICK, 0.9))
 
 
 def _clay_heap(p: Painter, x: float, y: float, half: float) -> None:
@@ -1255,7 +1251,7 @@ def _preheater(p: Painter, x: float, y: float, half: float, tall: float) -> Top:
     storeys = round(tall / 5)
     for k in range(1, storeys + 1):
         drop = tall * k / (storeys + 0.4)
-        p.line([_on_wall(left, front, 0, drop), _on_wall(left, front, 1, drop)], shade(CEMENT, 0.6))
+        _band(p, left, front, drop, shade(CEMENT, 0.6))
         p.point(*_on_wall(left, front, 0.5, drop - 2.5), WINDOW)
         p.point(*_on_wall(front, right, 0.5, drop - 2.5), shade(WINDOW, 0.8))
     _plinth(p, tower, tall, grey)
@@ -1338,8 +1334,7 @@ def mega_cement_works() -> Sprite:
     p = Painter(64, 80, (31, 60))
     p.polygon([(-30, 2), (-10, -20), (26, -16), (31, 6), (8, 18.5), (-22, 15)], CEMENT_GROUND)
     p.shadow(27, 7)
-    _chimney(p, 25, -8, -46, shade(CEMENT, 0.85))
-    _smoke(p, 25.5, -48, CEMENT_DUST, 3)
+    _smoking_chimney(p, 25, -8, -46, shade(CEMENT, 0.85), smoke=CEMENT_DUST, close=True)
     _preheater(p, 18, -10, 4, 27)
     _preheater(p, 10, -13, 4, 31)
     for k in range(6):

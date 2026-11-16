@@ -9,8 +9,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.geo import Bounds, Coord
-
-FloatArray = npt.NDArray[np.float64]
+from railroads.sim.grids import FloatArray
 
 
 class Elevation(Protocol):

@@ -5,13 +5,12 @@ Inputs in data/raw/ (download commands in README.md): Natural Earth ne_10m_ocean
 Run with: uv run python tools/build_world_map.py
 """
 
-from pathlib import Path
+from build_poland_map import RAW
 
 from railroads import maps
 from railroads.mapgen.presets import NaturalEarth
 from railroads.mapgen.world import WorldLand
 
-RAW = Path(__file__).resolve().parent.parent / "data" / "raw"
 DEGREES_PER_CELL = 0.25
 
 
