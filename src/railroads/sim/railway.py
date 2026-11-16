@@ -375,7 +375,7 @@ class Railway:
             train.path = []
             return
         if train.held and not train.path:
-            train.status = "Sets off once the trains window is closed"
+            train.status = "Sets off once the Buy a train window is closed"
             return
         if not train.path:
             leaving = train.stops[(train.heading - 1) % len(train.stops)]
