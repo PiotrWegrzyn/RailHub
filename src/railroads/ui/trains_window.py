@@ -62,6 +62,9 @@ class TrainsWindow:
     # The screen trains are bought on, and the map on it for the route of a train just bought.
     buy: BuyScreen = field(default_factory=BuyScreen)
     buy_map: RouteMap = field(default_factory=RouteMap)
+    # How tall each stop card was last drawn, by train, stop and width: a card out of sight
+    # only takes up its room.
+    _card_heights: dict[tuple[str, int, int], float] = field(default_factory=dict)
     # The map of the train drawn now, which shows where a good hovered on its stop cards is wanted.
     _shown_map: RouteMap = field(default_factory=RouteMap)
     # What each stop's station has to send on each month, worked out at most every WORTH_EVERY
@@ -240,13 +243,24 @@ class TrainsWindow:
     def _draw_stops(self, railway: Railway, train: Train, supplies: Supplies) -> None:
         stops = len(train.stops)
         current = train.heading % stops if stops and train.path else (train.heading - 1)
+        width = imgui.get_content_region_avail().x
         for index, stop in enumerate(list(train.stops)):
+            key = (train.name, index, round(width))
+            low = imgui.get_cursor_screen_pos()
+            height = self._card_heights.get(key)
+            if height is not None and not imgui.is_rect_visible(
+                low, (low.x + width, low.y + height)
+            ):
+                imgui.dummy((width, height))
+                continue
             imgui.push_id(index)
             here = stops > 1 and index == current % stops
             removed = self._draw_stop(railway, train, index, stop, here, supplies)
             imgui.pop_id()
             if removed:
+                self._card_heights.clear()
                 break
+            self._card_heights[key] = imgui.get_item_rect_size().y
         choices = [s for s in railway.stations() if can_stop_at(train, s)]
         if not choices:
             imgui.text_disabled("Build stations to give it stops.")

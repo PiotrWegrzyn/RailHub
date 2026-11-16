@@ -21,6 +21,10 @@ from railroads.sim.goods import FITS, Good, Need, price_of
 DEMAND_PER_NEED = 2.0
 MONTHS_REMEMBERED = 3
 PASSED_ALONG_PAY = 0.3
+# The needs each good meets, the other way round from FITS.
+NEEDS_MET: dict[Good, tuple[Need, ...]] = {
+    good: tuple(need for need, goods in FITS.items() if good in goods) for good in Good
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,8 +58,8 @@ class StationDemand:
 
     def monthly_want(self, good: Good) -> float:
         """How much of a good the buildings around could use in a month."""
-        wants = (amount for need, amount in self.capacity.items() if good in FITS[need])
-        return sum(wants) / DEMAND_PER_NEED
+        capacity = self.capacity
+        return sum(capacity.get(need, 0.0) for need in NEEDS_MET[good]) / DEMAND_PER_NEED
 
     def deliver(self, good: Good, amount: float) -> float:
         """Takes in passengers or mail getting off; returns what they earned, each at the share

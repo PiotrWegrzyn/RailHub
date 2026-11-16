@@ -34,6 +34,7 @@ from railroads.ui.route_map import (
     soften_steps,
     station_at,
     summary_of,
+    track_lines,
 )
 from railroads.ui.station_offers import Offer
 
@@ -355,3 +356,30 @@ def test_a_station_whose_buildings_lack_nothing_wants_nothing() -> None:
 
     assert railway.station_demand((6, 20)).capacity[Need.WHEAT] > 0
     assert summary.wants == []
+
+
+def test_track_pieces_end_to_end_are_drawn_as_one_line_in_order() -> None:
+    pieces = np.array([[[1.0, 0.0], [1.5, 0.0], [2.0, 0.0]], [[0.0, 0.0], [0.5, 0.0], [1.0, 0.0]]])
+
+    lines = track_lines(pieces, [False, False])
+
+    assert len(lines) == 1
+    points, double = lines[0]
+    assert points[:, 0].tolist() == [0.0, 0.5, 1.0, 1.5, 2.0]
+    assert not double
+
+
+def test_track_splits_into_lines_where_three_pieces_meet_or_its_width_changes() -> None:
+    meeting = np.array(
+        [
+            [[0.0, 0.0], [0.5, 0.0], [1.0, 0.0]],
+            [[1.0, 0.0], [1.5, 0.0], [2.0, 0.0]],
+            [[1.0, 0.0], [1.0, 0.5], [1.0, 1.0]],
+            [[2.0, 0.0], [2.5, 0.0], [3.0, 0.0]],
+        ]
+    )
+
+    lines = track_lines(meeting, [False, False, False, True])
+
+    assert len(lines) == 4
+    assert [double for _, double in lines].count(True) == 1

@@ -167,3 +167,33 @@ def test_up_close_only_the_looks_on_screen_are_blown_up(
     looks = {look for look, _ in layer._parts(train)}
     assert len(made) == len(looks)
     assert sum(made) < 64 * 1024 * 1024
+
+
+def test_up_close_a_train_far_off_the_screen_is_not_drawn(
+    context: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    game = Game(Constructions(flat_map(grid=HexGrid(rows=20, cols=44, km_per_cell=2.0))))
+    game.finances.cash = 1_000_000.0
+    for cell in ((10, 4), (10, 38)):
+        game.build_station(cell)
+    game.lay_track((10, 4), (10, 38))
+    view = MapView(game)
+    near, far = view.railway.buy(), view.railway.buy()
+    assert near is not None and far is not None
+    near.stops = [Stop((10, 4)), Stop((10, 38))]
+    far.stops = [Stop((10, 38)), Stop((10, 4))]
+    view.time_passed(0.1)
+    view.camera.zoom_level = len(ZOOM_CELL_WIDTHS) - 1
+    view.look_at((10, 5))
+    layer = TrainLayer(view._pixel_layer().world)
+    parted: list[str] = []
+    parts = TrainLayer._parts
+    monkeypatch.setattr(
+        TrainLayer, "_parts", staticmethod(lambda train: parted.append(train.name) or parts(train))
+    )
+    imgui.new_frame()
+
+    layer.draw(imgui.get_foreground_draw_list(), view.railway, view.camera, (640.0, 400.0))
+
+    imgui.end_frame()
+    assert parted == [near.name]

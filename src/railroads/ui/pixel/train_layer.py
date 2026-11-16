@@ -21,6 +21,7 @@ from railroads.sim.railway import Railway
 from railroads.sim.trains import Point, Train
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, IsoCamera, Vec2
 from railroads.ui.pixel.models import HEIGHT_PER_WIDTH
+from railroads.ui.pixel.relief import MOST_LIFT
 from railroads.ui.pixel.track_art import BEND, TrackArt
 from railroads.ui.pixel.trains import (
     CAR_HALF,
@@ -76,8 +77,9 @@ class TrainLayer:
         )
         factor = self._blown_up_by(scale * density)
         per_pixel = scale / DETAIL
+        in_sight = self._in_sight(railway, origin, scale)
         seen = []
-        for train in railway.trains:
+        for train in in_sight:
             for look, back in self._parts(train):
                 placed = railway.position(train, back)
                 if placed is not None:
@@ -121,7 +123,7 @@ class TrainLayer:
                 ((px + w) / width, (py + h) / height),
             )
         self._let_go(drawn)
-        self._smoke(draw_list, railway, origin, scale)
+        self._smoke(draw_list, railway, in_sight, origin, scale)
 
     @staticmethod
     def _parts(train: Train) -> list[tuple[object, float]]:
@@ -139,17 +141,42 @@ class TrainLayer:
             back += CAR_HALF
         return [(look, middle * SCALE) for look, middle in parts]
 
+    def _in_sight(self, railway: Railway, origin: tuple[int, int], scale: int) -> list[Train]:
+        """The running trains whose front is close enough to the screen for some of the train
+        to show: a train reaches at most its length, and the ground's lift, from its front."""
+        fronts = []
+        for train in railway.trains:
+            placed = railway.position(train)
+            if placed is not None:
+                fronts.append((train, placed[0]))
+        if not fronts:
+            return []
+        projection = self.world.projection
+        ax, ay = projection.to_pixels(
+            np.array([at[0] for _, at in fronts]), np.array([at[1] for _, at in fronts])
+        )
+        per_cell = float(np.abs(projection.matrix).sum(axis=0).max()) * scale
+        size = imgui.get_io().display_size
+        found = []
+        for (train, _), x, y in zip(fronts, ax.tolist(), ay.tolist(), strict=True):
+            reach = (train.length + 2) * per_cell + MOST_LIFT * scale
+            sx, sy = origin[0] + x * scale, origin[1] + y * scale
+            if -reach <= sx <= size.x + reach and -reach <= sy <= size.y + reach:
+                found.append(train)
+        return found
+
     def _smoke(
         self,
         draw_list: imgui.ImDrawList,
         railway: Railway,
+        trains: list[Train],
         origin: tuple[int, int],
         scale: int,
     ) -> None:
         """Puffs of smoke rising from each chimney and drifting back over its train. The ground
         under every chimney and where every puff lies in the picture are worked out for all the
         trains at once: on hills a lift takes nearly as long for one point as for many."""
-        chimneys = self._chimneys(railway)
+        chimneys = self._chimneys(railway, trains)
         if not chimneys:
             return
         projection = self.world.projection
@@ -180,10 +207,11 @@ class TrainLayer:
             color = imgui.color_convert_float4_to_u32(imgui.ImVec4(*SMOKE, alpha))
             draw_list.add_circle_filled((sx, sy), radius, color)
 
-    def _chimneys(self, railway: Railway) -> list[_Chimney]:
-        """Where each train's chimney is on the map, for those that have one in the open."""
+    def _chimneys(self, railway: Railway, trains: list[Train]) -> list[_Chimney]:
+        """Where each of these trains' chimney is on the map, for those that have one in the
+        open."""
         seen = []
-        for train in railway.trains:
+        for train in trains:
             model = ENGINES[train.engine]
             if model.chimney is None:
                 continue

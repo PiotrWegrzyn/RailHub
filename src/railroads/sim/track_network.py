@@ -10,7 +10,7 @@ import math
 
 import numpy as np
 
-from railroads.sim.constructions import Constructions, Station, Track
+from railroads.sim.constructions import Constructions, Station, Track, TrackWidth
 from railroads.sim.grids import Cell
 from railroads.sim.track_rules import track_rules_for
 from railroads.sim.trains import Point, Train
@@ -27,6 +27,11 @@ class TrackNetwork:
     # the class until first used, so games saved without them load.
     _routes: tuple[int, dict[tuple, Way | None]] = (-1, {})
     _exits_to: dict[tuple[Cell, int], tuple[Cell, int]] | None = None
+    # The railway version the exits of every cell with track or a station were last found for.
+    _exits_for: int = -1
+    # For each point on the map asked about, whether it lies in a station and on double track,
+    # with the railway version found for.
+    _passing: tuple[int, dict[Point, tuple[bool, bool]]] = (-1, {})
 
     def __init__(self, constructions: Constructions) -> None:
         self.constructions = constructions
@@ -85,6 +90,7 @@ class TrackNetwork:
         return found[key]
 
     def _find_way(self, start: Cell, end: Cell, electric: bool, maglev: bool) -> Way | None:
+        self._find_exits()
         grid = self.constructions.tile_map.grid
         lengths = [float(math.hypot(*step)) for step in grid.track_steps()]
         counter = itertools.count()
@@ -130,6 +136,37 @@ class TrackNetwork:
             and (not electric or piece.electric)
             and piece.maglev == maglev
         ]
+
+    def _find_exits(self) -> None:
+        """Where track leaving each cell with track or a station by each point runs into, for
+        all of them at once (Grid.track_exit): one at a time is slow, and finding a way asks
+        for thousands."""
+        version = self.constructions.railway_version
+        if self._exits_for == version:
+            return
+        if self._exits_to is None:
+            self._exits_to = {}
+        self._exits_for = version
+        cells = sorted(
+            {*self.constructions.stations(), *(p.cell for p in self.constructions.track())}
+            - {cell for cell, point in self._exits_to if point == 0}
+        )
+        if not cells:
+            return
+        grid = self.constructions.tile_map.grid
+        steps = grid.track_steps()
+        count = len(steps)
+        rows, cols = np.array(cells).T
+        cx, cy = grid.center(rows, cols)
+        to_rows, to_cols = grid.cell_at(
+            np.asarray(cx)[:, None] + steps[None, :, 0], np.asarray(cy)[:, None] + steps[None, :, 1]
+        )
+        for cell, row, col in zip(cells, to_rows.tolist(), to_cols.tolist(), strict=True):
+            for point in range(count):
+                self._exits_to[(cell, point)] = (
+                    (row[point], col[point]),
+                    (point + count // 2) % count,
+                )
 
     def _track_exit(self, cell: Cell, point: int) -> tuple[Cell, int]:
         if self._exits_to is None:
@@ -188,6 +225,24 @@ class TrackNetwork:
             return 1.0
         index = _stretch_at(ends, train.along)
         return train.speeds[index] if index < len(train.speeds) else 1.0
+
+    def passing(self, point: Point) -> tuple[bool, bool]:
+        """Whether a point on the map lies in a station, and whether on double track: where
+        trains can pass each other. Kept until track or stations change, as trains that meet
+        ask every frame."""
+        version = self.constructions.railway_version
+        if self._passing[0] != version:
+            self._passing = (version, {})
+        found = self._passing[1]
+        kept = found.get(point)
+        if kept is None:
+            cell = self.cell_at(point)
+            built = self.constructions.at(cell)
+            kept = found[point] = (
+                self.constructions.station_at(cell) is not None,
+                any(isinstance(b, Track) and b.width == TrackWidth.DOUBLE for b in built),
+            )
+        return kept
 
     def cell_at(self, point: Point) -> Cell:
         """The cell a point on the map lies in."""

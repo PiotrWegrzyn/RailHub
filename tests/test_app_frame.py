@@ -1,3 +1,4 @@
+import gc
 from collections.abc import Callable, Iterator
 from concurrent.futures import Executor, Future
 from pathlib import Path
@@ -280,6 +281,23 @@ def test_a_game_loaded_from_the_menu_comes_back_as_it_was_saved(
     assert loaded.clock == app.clock
     assert loaded.view.camera.zoom_level == 2
     assert loaded.saves is saves
+
+
+def test_a_game_loaded_is_set_aside_from_the_garbage_collector(
+    context: None, tmp_path: Path
+) -> None:
+    saves = Saves(tmp_path)
+    saves.save("Earlier", made_app().saved())
+    shell = Shell(saves)
+    shell.load("Earlier")
+    assert shell._task is not None
+    shell._task.result()
+
+    shell_frame(shell)
+
+    assert shell.app is not None
+    assert gc.get_freeze_count() > 0
+    gc.unfreeze()
 
 
 def test_a_save_that_fails_to_load_stays_in_the_menu_with_why(

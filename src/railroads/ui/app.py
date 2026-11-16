@@ -1,4 +1,5 @@
 import argparse
+import gc
 import sys
 import time
 from collections.abc import Callable
@@ -408,6 +409,7 @@ class Shell:
         if self.app is not None:
             self.app.finish_autosave()
         self.app = app
+        freeze_garbage()
         if self._new_game_on is not None:
             size = imgui.get_io().display_size
             # The see-through background as it shows over the black behind every window.
@@ -500,6 +502,16 @@ def settings_from(args: argparse.Namespace) -> Settings | None:
         start_year=allowed_start_year(HISTORY_START + years),
         stand_in_years=0 if args.simulate is None else args.simulate,
     )
+
+
+def freeze_garbage() -> None:
+    """Sets the objects of a game just begun or loaded, and those of the menu and the program,
+    aside from Python's garbage collector: they last as long as the game, and a full collection
+    walking them all stalls a frame for tens of milliseconds. What was set aside for a game left
+    is let back in first, so it can go."""
+    gc.unfreeze()
+    gc.collect()
+    gc.freeze()
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
