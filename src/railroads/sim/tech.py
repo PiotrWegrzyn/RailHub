@@ -47,7 +47,7 @@ class Effect(Enum):
     SPEED = "train speed"
     # Trains pull this many more cars.
     PULL = "cars per train"
-    # Stations, track, car trips and running engines cost this share less.
+    # Stations, track, car trips and the fuel engines burn cost this share less.
     UPKEEP = "upkeep"
     # The player's buildings count this share more towards growth around them.
     GROWTH = "growth"
@@ -58,6 +58,9 @@ class Effect(Enum):
     # Each bonus good a building gets all of adds this much more to its satisfaction
     # (railroads.sim.economy).
     BONUS_GOODS = "per bonus good"
+    # Fuel bought anywhere but out of a station's stockpile costs this much less over the market
+    # price (railroads.sim.fuel_market).
+    FUEL_MARKUP = "retail fuel markup"
     # Opens the engines (railroads.sim.trains) that need it, once their year has come, or a
     # general car (GENERAL_CARS).
     UNLOCK = "unlocks"
@@ -199,6 +202,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("books", "Double-entry books", E.DISCOUNT, 0.1),
             _n("investors", "Investors", E.SHARE, 0.05, everywhere=True),
             _n("chains", "Chain stores", E.DISCOUNT, 0.1, "books"),
+            _n("regular_customer", "Regular customer", E.FUEL_MARKUP, 0.25, "books"),
             _n("advertising", "Advertising", E.PRICE, 0.05, "investors", everywhere=True),
             _n("holding", "Holding company", E.SHARE, 0.05, "investors", everywhere=True),
             _n("takeovers", "Hostile takeovers", E.DISCOUNT, 0.15, "chains"),

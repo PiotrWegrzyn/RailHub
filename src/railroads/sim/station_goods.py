@@ -31,6 +31,9 @@ class StationGoods:
     # Room tech adds to every station's stockpile and waiting room (railroads.sim.tech).
     extra_room: float = 0.0
     extra_waiting: float = 0.0
+    # The storage steps raising the station's level has added, which don't make bought storage
+    # dearer.
+    level_steps: int = 0
     # Goods kept for trains, which the station doesn't hand out to the buildings around it. A
     # frozenset, so saves from before it existed load with none kept.
     kept: frozenset[Good] = frozenset()
@@ -38,12 +41,12 @@ class StationGoods:
     @property
     def limit(self) -> float:
         """The most of each kind of freight the station holds."""
-        return STOCKPILE + STORAGE_STEP * self.storage + self.extra_room
+        return STOCKPILE + STORAGE_STEP * (self.storage + self.level_steps) + self.extra_room
 
     @property
     def waiting_limit(self) -> float:
         """The most passengers, and the most mail, that wait here."""
-        return WAITING + WAITING_STEP * self.storage + self.extra_waiting
+        return WAITING + WAITING_STEP * (self.storage + self.level_steps) + self.extra_waiting
 
     def held(self, good: Good) -> float:
         """How much of a good the station holds, gathered and brought together."""

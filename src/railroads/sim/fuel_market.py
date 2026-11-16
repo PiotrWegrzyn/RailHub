@@ -1,0 +1,238 @@
+"""The market for what engines burn: coal for steam, diesel fuel for diesels and electricity for
+electric and maglev engines (railroads.sim.railway buys it as trains set off).
+
+Every fuel's price rises with inflation, compounding every year from when it came in, and moves
+with what the map wants of it against what it gets, a tug of war. Coal and diesel fuel are wanted
+by the buildings that need them and by the player's trains, which wanted what they bought last
+month; they are supplied by what the player's stations hand out to those buildings, and a little,
+NATURAL_SUPPLY of what the map's mines and refineries can make, by the world around. How hard
+demand pulls against supply is measured against the first month of play, so a map with little
+coal starts at the same price as one with much, and the price moves each month FOLLOW of the way
+to where demand and supply put it, so it changes smoothly. Electricity costs ELECTRICITY_SHORT times
+as much while the map's power plants get none of their fuel, less as they get more of it; power
+plants the player owns make POWER_PLANT_OUTPUT a month at full fuel, which their trains use first
+at OWN_POWER_SHARE of the price.
+"""
+
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from enum import Enum
+from types import MappingProxyType
+
+import numpy as np
+
+from railroads.sim.constructions import BuildingKind
+from railroads.sim.economy import Trade
+from railroads.sim.goods import FITS, Good, Need, price_of
+from railroads.sim.trains import Power
+
+
+class Fuel(Enum):
+    COAL = "coal"
+    DIESEL = "diesel fuel"
+    ELECTRICITY = "electricity"
+
+
+FUEL_OF: Mapping[Power, Fuel] = MappingProxyType(
+    {
+        Power.STEAM: Fuel.COAL,
+        Power.DIESEL: Fuel.DIESEL,
+        Power.ELECTRIC: Fuel.ELECTRICITY,
+        Power.MAGLEV: Fuel.ELECTRICITY,
+    }
+)
+# The good a fuel is, which trains can take from a station's stockpile; electricity is no good.
+GOOD_OF: Mapping[Fuel, Good] = MappingProxyType({Fuel.COAL: Good.COAL, Fuel.DIESEL: Good.FUEL})
+# What a unit of each fuel costs at first, and the year it came in, from which its price rises by
+# INFLATION a year, compounded.
+BASE_PRICE: Mapping[Fuel, float] = MappingProxyType(
+    {Fuel.COAL: price_of(Good.COAL), Fuel.DIESEL: price_of(Good.FUEL), Fuel.ELECTRICITY: 5.0}
+)
+OPENS: Mapping[Fuel, int] = MappingProxyType(
+    {Fuel.COAL: 1840, Fuel.DIESEL: 1935, Fuel.ELECTRICITY: 1925}
+)
+INFLATION: Mapping[Fuel, float] = MappingProxyType(
+    {Fuel.COAL: 0.02, Fuel.DIESEL: 0.015, Fuel.ELECTRICITY: 0.01}
+)
+# The buildings' needs each good fuel meets.
+NEEDS: Mapping[Fuel, frozenset[Need]] = MappingProxyType(
+    {
+        fuel: frozenset(need for need, goods in FITS.items() if good in goods)
+        for fuel, good in GOOD_OF.items()
+    }
+)
+NATURAL_SUPPLY = 0.25
+# How strongly the price follows demand against supply: the share it rises by is this power of
+# how many times as hard demand pulls as in the first month; and the least and most that makes.
+ELASTICITY = 0.5
+LEAST_FACTOR = 0.4
+MOST_FACTOR = 4.0
+FOLLOW = 0.25
+ELECTRICITY_SHORT = 2.0
+POWER_PLANT_OUTPUT = 3_000.0
+OWN_POWER_SHARE = 0.2
+# Fuel bought anywhere but out of a station's stockpile costs this much more.
+RETAIL_MARKUP = 0.5
+
+
+@dataclass(frozen=True, slots=True)
+class FuelMonth:
+    """One month of a fuel's market: the year, its price, how much of it inflation makes, what
+    the buildings and the player's trains wanted, what the player's stations handed out and the
+    world supplied, how hard demand pulled against supply then and in the first month, and for
+    electricity what share of their fuel the map's power plants got and what the player's own
+    made."""
+
+    year: int
+    price: float
+    inflation: float
+    buildings: float = 0.0
+    trains: float = 0.0
+    network: float = 0.0
+    natural: float = 0.0
+    pull: float = 1.0
+    first_pull: float = 1.0
+    plants_fed: float = 0.0
+    own_power: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class Signals:
+    """What moved a fuel's market this month (FuelMonth)."""
+
+    buildings: float = 0.0
+    network: float = 0.0
+    natural: float = 0.0
+    plants_fed: float = 0.0
+    own_power: float = 0.0
+
+
+def inflation(fuel: Fuel, year: int) -> float:
+    """How many times its first price inflation has made a fuel by a year."""
+    return float((1.0 + INFLATION[fuel]) ** max(0, year - OPENS[fuel]))
+
+
+def signals_of(trade: Trade, owned_plants: np.ndarray | None = None) -> dict[Fuel, Signals]:
+    """What a month's trade says about each fuel: what the buildings needed of it, what the
+    player's stations handed out of it to them and what the map's makers of it could make; for
+    electricity what share of their fuel the map's power plants got and what the ones the player
+    owns (a count per cell, on the map's grid) made."""
+    signals = {}
+    for fuel, good in GOOD_OF.items():
+        needs = NEEDS[fuel]
+        wanted = sum(
+            float(want.sum()) for (_, need), (_, want) in trade.goods_got.items() if need in needs
+        )
+        handed = sum(
+            amount
+            for by_station in (trade.handed_for, trade.supplied_for)
+            for station in by_station.values()
+            for (need, given), amount in station.items()
+            if given == good and need in needs
+        )
+        makers = sum(
+            float(most.sum()) for (_, made), (_, most) in trade.goods_gave.items() if made == good
+        )
+        signals[fuel] = Signals(wanted, handed, NATURAL_SUPPLY * makers)
+    got, want = trade.goods_got.get((BuildingKind.POWER_PLANT, Need.BOILER_FUEL), (None, None))
+    fed, own = 0.0, 0.0
+    if got is not None and want is not None and float(want.sum()) > 0:
+        fed = min(1.0, float(got.sum()) / float(want.sum()))
+        if owned_plants is not None:
+            share = np.where(want > 0, np.minimum(1.0, got / np.where(want > 0, want, 1.0)), 0.0)
+            counts = np.asarray(owned_plants).ravel()[trade.cells]
+            own = POWER_PLANT_OUTPUT * float((counts * share).sum())
+    signals[Fuel.ELECTRICITY] = Signals(plants_fed=fed, own_power=own)
+    return signals
+
+
+@dataclass
+class FuelMarket:
+    """Every fuel's price now, its months so far, and what the player's trains bought of it this
+    month."""
+
+    # Where demand and supply have moved each fuel's price, as a factor of its inflated price.
+    factor: dict[Fuel, float] = field(default_factory=lambda: dict.fromkeys(Fuel, 1.0))
+    first_pull: dict[Fuel, float] = field(default_factory=dict)
+    history: dict[Fuel, list[FuelMonth]] = field(default_factory=lambda: {f: [] for f in Fuel})
+    # This month: how much the trains bought, out of stations' stockpiles and at retail, and
+    # what it cost; and what is left of the player's own power plants' electricity.
+    from_stations: dict[Fuel, float] = field(default_factory=lambda: dict.fromkeys(Fuel, 0.0))
+    at_retail: dict[Fuel, float] = field(default_factory=lambda: dict.fromkeys(Fuel, 0.0))
+    spent: dict[Fuel, float] = field(default_factory=lambda: dict.fromkeys(Fuel, 0.0))
+    own_power: float = 0.0
+    # What the trains bought last month.
+    last_bought: dict[Fuel, float] = field(default_factory=lambda: dict.fromkeys(Fuel, 0.0))
+
+    def price(self, fuel: Fuel, year: int) -> float:
+        """What a unit of a fuel costs on the market now."""
+        return BASE_PRICE[fuel] * inflation(fuel, year) * self.factor[fuel]
+
+    def bought(self, fuel: Fuel) -> float:
+        return self.from_stations[fuel] + self.at_retail[fuel]
+
+    def buy(
+        self, fuel: Fuel, amount: float, year: int, from_station: float = 0.0, markup: float = 0.0
+    ) -> float:
+        """What `amount` of a fuel costs a train setting off: `from_station` of it out of the
+        station's stockpile at the market price, electricity from the player's own power plants
+        first at OWN_POWER_SHARE of it, and the rest at retail, `markup` more."""
+        price = self.price(fuel, year)
+        cost = 0.0
+        if fuel == Fuel.ELECTRICITY:
+            own = min(amount, self.own_power)
+            self.own_power -= own
+            cost += own * price * OWN_POWER_SHARE
+            self.from_stations[fuel] += own
+            rest = amount - own
+            cost += rest * price
+            self.at_retail[fuel] += rest
+        else:
+            station = min(amount, from_station)
+            cost += station * price + (amount - station) * price * (1.0 + markup)
+            self.from_stations[fuel] += station
+            self.at_retail[fuel] += amount - station
+        self.spent[fuel] += cost
+        return cost
+
+    def month(self, year: int, signals: Mapping[Fuel, Signals]) -> None:
+        """Closes a month: moves each fuel's price with what its demand and supply were, keeps the
+        month in its history and starts the next."""
+        for fuel in Fuel:
+            got = signals.get(fuel, Signals())
+            trains = self.bought(fuel)
+            if year < OPENS[fuel]:
+                self._reset(fuel, trains)
+                continue
+            if fuel == Fuel.ELECTRICITY:
+                target = 1.0 + (ELECTRICITY_SHORT - 1.0) * (1.0 - got.plants_fed)
+                pull = first = 1.0
+            else:
+                demand = got.buildings + trains
+                supply = max(got.network + got.natural, 1e-6)
+                pull = demand / supply if demand > 0 else 0.0
+                first = self.first_pull.setdefault(fuel, pull if pull > 0 else 1.0)
+                ratio = pull / first if first > 0 else 1.0
+                target = min(MOST_FACTOR, max(LEAST_FACTOR, ratio**ELASTICITY))
+            self.factor[fuel] += FOLLOW * (target - self.factor[fuel])
+            self.history[fuel].append(
+                FuelMonth(
+                    year,
+                    self.price(fuel, year),
+                    inflation(fuel, year),
+                    got.buildings,
+                    trains,
+                    got.network,
+                    got.natural,
+                    pull,
+                    first,
+                    got.plants_fed,
+                    got.own_power,
+                )
+            )
+            self._reset(fuel, trains)
+        self.own_power = signals.get(Fuel.ELECTRICITY, Signals()).own_power
+
+    def _reset(self, fuel: Fuel, trains: float) -> None:
+        self.last_bought[fuel] = trains
+        self.from_stations[fuel] = self.at_retail[fuel] = self.spent[fuel] = 0.0

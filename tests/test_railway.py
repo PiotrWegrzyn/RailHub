@@ -18,7 +18,7 @@ from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import CELLS_PER_MONTH, Railway
 from railroads.sim.routes import build_station, lay_route, plan_route, route_price
-from railroads.sim.station_goods import STOCKPILE, WAITING, StationGoods
+from railroads.sim.station_goods import STOCKPILE, STORAGE_STEP, WAITING, StationGoods
 from railroads.sim.trains import BULK_CAR, CAR_CAPACITY, ENGINES, MAX_CARS, SMALL_CAR, Car, Stop
 
 
@@ -66,7 +66,7 @@ def test_a_new_train_leaves_its_first_stop_with_that_stops_cars_full() -> None:
         (Good.STEEL, 25.0),
         (Good.CATTLE, 25.0),
         (Good.OIL, 50.0),
-        (Good.COAL, 150.0),
+        (Good.IRON, 150.0),
         (Good.WHEAT, 150.0),
     ],
 )
@@ -145,12 +145,12 @@ def test_each_car_fills_with_its_own_good_from_the_stockpile() -> None:
     _, railway = joined_stations()
     train = railway.buy()
     train.stops = [Stop((6, 3), [Good.LUMBER, Good.LUMBER, Good.WHEAT]), Stop((6, 20))]
-    railway.station_goods((6, 3)).stockpile.update({Good.LUMBER: BULK_CAR + 20.0, Good.COAL: 150.0})
+    railway.station_goods((6, 3)).stockpile.update({Good.LUMBER: BULK_CAR + 20.0, Good.IRON: 150.0})
 
     railway.run(0.01)
 
     assert [car.load for car in train.cars] == [BULK_CAR, 20.0, 0.0]
-    assert railway.station_goods((6, 3)).stockpile == {Good.LUMBER: 0.0, Good.COAL: 150.0}
+    assert railway.station_goods((6, 3)).stockpile == {Good.LUMBER: 0.0, Good.IRON: 150.0}
 
 
 def test_a_stop_sends_at_most_six_cars() -> None:
@@ -358,7 +358,7 @@ def test_each_month_stations_and_track_cost_their_upkeep() -> None:
 
     railway.turn_month({})
 
-    assert railway.finances.cash == cash - 2 * STATION_UPKEEP - len(track) * TRACK_UPKEEP
+    assert railway.finances.cash == cash - 2 * STATION_UPKEEP[0] - len(track) * TRACK_UPKEEP
 
 
 def test_station_demand_is_twice_the_needs_of_buildings_in_its_inner_ring() -> None:
@@ -441,23 +441,47 @@ def test_passengers_pay_on_arrival_and_go_on_their_way() -> None:
     assert Good.PASSENGERS not in railway.station_goods((6, 20)).brought
 
 
-def test_raising_a_station_costs_100k_then_500k_and_widens_its_reach() -> None:
+def test_a_station_rises_through_five_levels_for_50k_250k_1_5m_and_10m_each_reaching_further() -> (
+    None
+):
     _, railway = joined_stations()
-    railway.finances.cash = 700_000.0
+    railway.finances.cash = 12_000_000.0
 
     reaches = [railway.reach((6, 20))]
-    for _ in range(3):
+    for _ in range(5):
         railway.upgrade((6, 20))
         reaches.append(railway.reach((6, 20)))
 
-    assert reaches == [(2, 4), (3, 5), (4, 6), (4, 6)]
-    assert railway.finances.cash == 100_000.0
+    assert reaches == [(1, 4), (2, 5), (3, 6), (4, 7), (5, 8), (5, 8)]
+    assert railway.finances.cash == 12_000_000.0 - 11_800_000.0
     assert railway.upgrade_price((6, 20)) is None
+
+
+def test_each_level_adds_as_much_room_as_two_storage_upgrades_without_making_them_dearer() -> None:
+    _, railway = joined_stations()
+    goods = railway.station_goods((6, 20))
+    before, price = goods.limit, railway.storage_price((6, 20))
+
+    railway.upgrade((6, 20))
+
+    assert goods.limit == before + 2 * STORAGE_STEP
+    assert railway.storage_price((6, 20)) == price
+
+
+def test_station_upkeep_doubles_each_level_and_rises_two_percent_a_year() -> None:
+    _, railway = joined_stations()
+    railway.first_year = 1850
+    railway.year = 1852
+    railway.levels[(6, 20)] = 3
+
+    upkeep = railway.station_upkeep((6, 3)), railway.station_upkeep((6, 20))
+
+    assert upkeep == (pytest.approx(1000 * 1.02**2), pytest.approx(4000 * 1.02**2))
 
 
 def test_without_the_cash_a_station_stays_as_it_is() -> None:
     _, railway = joined_stations()
-    railway.finances.cash = 99_999.0
+    railway.finances.cash = 49_999.0
 
     raised = railway.upgrade((6, 20))
 

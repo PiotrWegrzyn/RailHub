@@ -144,7 +144,7 @@ def test_rails_laid_along_a_guideway_leave_it_a_guideway() -> None:
 
 
 def test_maglev_track_opens_with_the_maglev_engine() -> None:
-    early = maglev_game(2030, "express_trains", "maglev")
+    early = maglev_game(2029, "express_trains", "maglev")
     unlearned = maglev_game(2040, "express_trains")
     ready = maglev_game(2040, "express_trains", "maglev")
 
@@ -155,7 +155,7 @@ def test_maglev_track_opens_with_the_maglev_engine() -> None:
 
 
 def test_maglev_track_cannot_be_laid_before_it_opens() -> None:
-    game = maglev_game(2030, "express_trains", "maglev")
+    game = maglev_game(2029, "express_trains", "maglev")
     cash = game.finances.cash
 
     done = game.lay_track(WEST, (6, 9), maglev=True)
@@ -205,4 +205,4 @@ def test_magnetic_levitation_says_what_it_opens() -> None:
 
     text = describe(node)
 
-    assert text == "opens maglev track and trains (from 2040)"
+    assert text == "opens maglev track and trains (from 2030)"

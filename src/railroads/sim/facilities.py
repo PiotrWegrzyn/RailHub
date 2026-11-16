@@ -6,9 +6,7 @@
   time;
 - a post office, a refreshment room, a market hall and cattle pens make what is delivered at the
   station pay more (PAYS_MORE): mail, passengers, food and livestock;
-- a warehouse adds WAREHOUSE_ROOM to the room for every kind of freight;
-- a power station burns POWER_STATION_COAL of coal and makes every electric and maglev engine
-  cheaper to run (railroads.sim.running_costs), wherever it runs.
+- a warehouse adds WAREHOUSE_ROOM to the room for every kind of freight.
 
 Each takes its good at the start of every month from what the station holds, gathered or brought,
 kept for trains or not, and works that month only if it got all of it."""
@@ -22,7 +20,6 @@ from railroads.sim.finance import (
     ENGINE_SHED_PRICE,
     MARKET_HALL_PRICE,
     POST_OFFICE_PRICE,
-    POWER_STATION_PRICE,
     REFRESHMENT_ROOM_PRICE,
     SAND_TOWER_PRICE,
     WAREHOUSE_PRICE,
@@ -35,7 +32,6 @@ SAND_TOWER_PICKUP = 0.5
 COAL_A_MONTH = 50.0
 SAND_A_MONTH = 15.0
 WAREHOUSE_ROOM = 500.0
-POWER_STATION_COAL = 400.0
 
 
 class Facility(Enum):
@@ -46,7 +42,6 @@ class Facility(Enum):
     MARKET_HALL = "market hall"
     CATTLE_PENS = "cattle pens"
     WAREHOUSE = "warehouse"
-    POWER_STATION = "power station"
 
 
 # What each facility uses a month, how much of it, and what it costs to put up.
@@ -59,7 +54,6 @@ USES: Mapping[Facility, tuple[Good, float]] = MappingProxyType(
         Facility.MARKET_HALL: (Good.LUMBER, 20.0),
         Facility.CATTLE_PENS: (Good.WHEAT, 30.0),
         Facility.WAREHOUSE: (Good.BRICKS, 20.0),
-        Facility.POWER_STATION: (Good.COAL, POWER_STATION_COAL),
     }
 )
 PRICES: Mapping[Facility, float] = MappingProxyType(
@@ -71,7 +65,6 @@ PRICES: Mapping[Facility, float] = MappingProxyType(
         Facility.MARKET_HALL: MARKET_HALL_PRICE,
         Facility.CATTLE_PENS: CATTLE_PENS_PRICE,
         Facility.WAREHOUSE: WAREHOUSE_PRICE,
-        Facility.POWER_STATION: POWER_STATION_PRICE,
     }
 )
 

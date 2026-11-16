@@ -157,7 +157,7 @@ def test_a_light_engine_costs_far_less_to_run_and_is_quicker_off_the_mark_than_a
 
     general = of_its_day(light, Kind.GENERAL)
 
-    assert light.running < general.running
+    assert light.burn < general.burn
     assert light.pickup < general.pickup / 2
     assert light.cars < general.cars
 
@@ -322,25 +322,13 @@ def test_grain_ore_apples_and_other_bulk_goods_go_three_times_as_much_to_a_car(g
     assert size == 3 * car_size(Good.MAIL)
 
 
-def test_every_engine_costs_its_running_cost_each_month() -> None:
-    railway = line()
-    railway.buy("planet")
-    railway.buy("tank")
+def test_electric_engines_burn_less_a_car_than_steam_and_light_engines_half_as_much() -> None:
+    planet, boxcab, tank = (ENGINES[name] for name in ("planet", "boxcab", "tank"))
 
-    railway.turn_month({})
+    per_car = [engine.burn / engine.hauls for engine in (planet, boxcab, tank)]
 
-    running = railway.running_cost("planet") + railway.running_cost("tank")
-    assert railway.finances.month["running trains"] == pytest.approx(-running)
-    assert railway.running_cost("planet") > ENGINES["planet"].running
-
-
-def test_steam_costs_the_most_to_run_for_its_price_and_electric_the_least() -> None:
-    steam, diesel, electric = (ENGINES[name] for name in ("pacific", "mixed_diesel", "boxcab"))
-
-    shares = [engine.running / engine.price for engine in (steam, diesel, electric)]
-
-    assert shares == sorted(shares, reverse=True)
-    assert len(set(shares)) == 3
+    assert per_car[1] < per_car[0]
+    assert per_car[2] == pytest.approx(per_car[0] / 2)
 
 
 def test_trains_are_named_by_what_drives_them() -> None:
@@ -369,7 +357,8 @@ def test_an_express_tells_it_takes_only_passengers_and_has_a_dining_car() -> Non
     summary = engine_summary(ENGINES["bullet"])
 
     assert "210 km/h" in summary
-    assert "$368 a month to run" in summary
+    assert "Burns 1.1 electricity a cell" in summary
+    assert "As far as the wires go" in summary
     assert "6 coaches and a dining car" in summary
     assert "Passengers only, paying 20% more" in summary
     assert "electrified track only" in summary

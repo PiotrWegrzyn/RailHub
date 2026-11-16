@@ -20,8 +20,8 @@ from railroads.sim.tech import TREES, tree_of
 
 STATIONS_AT_START = 5
 STATIONS_PER_DECADE = 2
-# A station raised one level reaches a step further than a new one: three cells out.
-STATION_LEVEL = 2
+# A station raised two levels reaches three cells out.
+STATION_LEVEL = 3
 THRIVING_PART = 1 / 3
 CONTENT_PART = 1 / 2
 CONTENT_SHARE = 0.5

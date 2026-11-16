@@ -93,6 +93,7 @@ class StationTrade:
             goods = railway.station_goods(station)
             for good, amount in supplied.items():
                 goods.stockpile[good] = max(0.0, goods.stockpile.get(good, 0.0) - amount)
+        railway.fuel_month(trade)
         capacity = {}
         stations = railway.stations()
         for station, counts in zip(stations, self._ring_counts(stations), strict=True):

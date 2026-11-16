@@ -9,6 +9,7 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.sim.finance import dollars
+from railroads.sim.fuel_market import FUEL_OF
 from railroads.sim.railway import Railway
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, MAGLEV_FARE, Engine, Kind, Train
 from railroads.ui.iso_camera import Vec2
@@ -105,7 +106,7 @@ class BuyScreen:
         if imgui.selectable(f"{engine.title}##{name}", self.engine == name)[0]:
             self.engine = name
         if imgui.is_item_hovered():
-            imgui.set_tooltip(summary(engine, railway.running_cost(name)))
+            imgui.set_tooltip(summary(engine, railway.fuel_cost(name)))
         price = dollars(engine.price)
         affordable = railway.finances.can_afford(engine.price)
         right = imgui.get_item_rect_max().x - imgui.calc_text_size(price).x - 4
@@ -120,7 +121,7 @@ class BuyScreen:
         imgui.text(engine.title)
         imgui.pop_style_color()
         imgui.separator()
-        for label, value in engine_figures(engine, railway.running_cost(name)):
+        for label, value in engine_figures(engine, railway.fuel_cost(name)):
             imgui.text_disabled(label)
             imgui.same_line(FIGURES_LABEL)
             imgui.text(value)
@@ -178,9 +179,22 @@ class BuyScreen:
         draw_route(train)
 
 
-def engine_figures(engine: Engine, running: float | None = None) -> list[tuple[str, str]]:
-    """What an engine can do, as labels and values for its table on the screen, with what it
-    costs to run a month now if given."""
+def fuel_use(engine: Engine, per_cell: float | None = None) -> str:
+    """How much fuel an engine burns a cell, and what that costs now if given."""
+    text = f"{engine.burn:.2g} {FUEL_OF[engine.power].value} a cell"
+    return text if per_cell is None else f"{text}, about {dollars(per_cell)} a cell now"
+
+
+def engine_range(engine: Engine) -> str:
+    """How far an engine runs on the fuel it takes on setting off."""
+    if engine.tank:
+        return f"{engine.tank:.0f} cells between stops"
+    return "As far as the wires go" if engine.electric else "As far as the guideway goes"
+
+
+def engine_figures(engine: Engine, per_cell: float | None = None) -> list[tuple[str, str]]:
+    """What an engine can do, as labels and values for its table on the screen, with what its
+    fuel for a cell costs now if given."""
     cars = f"{engine.cars} coaches and a dining car" if engine.express else f"{engine.cars} cars"
     figures = [
         ("Built from", str(engine.year)),
@@ -189,7 +203,8 @@ def engine_figures(engine: Engine, running: float | None = None) -> list[tuple[s
         ("Pulls up to", cars),
         ("Up to speed in", f"{engine.pickup:g} s"),
         ("Price", dollars(engine.price)),
-        ("Running cost", f"{dollars(engine.running if running is None else running)} a month"),
+        ("Burns", fuel_use(engine, per_cell)),
+        ("Range", engine_range(engine)),
     ]
     if engine.car_size > 1.0:
         figures.append(("Cars", f"Hold {engine.car_size - 1:.0%} more"))

@@ -8,14 +8,18 @@ fills those from the station's stockpile and from freight the buildings around i
 for. Freight remembers where it came from: it earns money only when buildings at another station
 take it, and back at its own station it just returns to the stockpile. Stations deal with the buildings around them once a month, when goods
 are shared out (railroads.sim.economy): they hand what trains brought to buildings within
-DELIVERY_RADIUS cells, and take every spare good made within COLLECTION_RADIUS cells into their
-stockpile, up to STOCKPILE of each good. Each level a station is raised to widens both by a cell,
-and each storage upgrade adds STORAGE_STEP of each good to its stockpile and WAITING_STEP to its
-waiting passengers and mail.
+FIRST_REACH cells, and take every spare good made within COLLECTION_RADIUS cells into their
+stockpile, up to STOCKPILE of each good. Each of the MAX_LEVEL levels a station is raised to
+widens both by a cell and adds LEVEL_STORAGE_STEPS storage upgrades' worth of room, and each
+storage upgrade adds STORAGE_STEP of each good to its stockpile and WAITING_STEP to its waiting
+passengers and mail. Every month each station costs its level's upkeep, the same for every
+station, rising every year.
 
 Cargo earns money by the demand around the station that hands it out (railroads.sim.demand). Trains
 cost their engine's price, every car CAR_TRIP_PRICE each time a train leaves a stop with it, and every
-month each engine costs its running cost (railroads.sim.running_costs) and stations and track their upkeep
+month stations and track cost their upkeep. Each train buys the fuel it burns on the way to its
+next stop as it sets off (railroads.sim.fuel_market), and can't set off for a stop further than
+its fuel takes it
 (railroads.sim.finance).
 
 Trains set off from a stand and pick up speed over their engine's pickup time. Trains that meet
@@ -31,6 +35,7 @@ train does calling at a station in railroads.sim.calls; Railway owns them all an
 """
 
 import itertools
+import math
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
@@ -40,9 +45,9 @@ import numpy.typing as npt
 from railroads.places import StationNames
 from railroads.sim.calls import StationCalls
 from railroads.sim.clock import SECONDS_PER_MONTH, START_YEAR
-from railroads.sim.constructions import Constructions
+from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.demand import PASSED_ALONG_PAY, StationDemand
-from railroads.sim.economy import COLLECTION_RADIUS, DELIVERY_RADIUS
+from railroads.sim.economy import COLLECTION_RADIUS, Trade
 from railroads.sim.facilities import (
     ENGINE_SHED_SPEED,
     SAND_TOWER_PICKUP,
@@ -56,14 +61,15 @@ from railroads.sim.finance import (
     CAR_TRIP_PRICE,
     LEVEL_PRICES,
     STATION_UPKEEP,
+    STATION_UPKEEP_RISE,
     TRAIN_RESALE,
     Finances,
     storage_price,
     track_upkeep,
 )
+from railroads.sim.fuel_market import FUEL_OF, GOOD_OF, RETAIL_MARKUP, Fuel, FuelMarket, signals_of
 from railroads.sim.goods import TRAVELLERS, General, Good, Need
 from railroads.sim.grids import Cell
-from railroads.sim.running_costs import Business, running_cost
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
 from railroads.sim.tech import GENERAL_CARS, GOOD_TREES, Effect, Research
@@ -99,6 +105,10 @@ CELLS_PER_MONTH = 30.0
 MEET_STEP = 0.2
 MEET_DISTANCE = 0.2
 MAX_LEVEL = 1 + len(LEVEL_PRICES)
+# How many cells out a new station hands goods out to; and how many storage upgrades' worth of
+# room each level a station is raised adds.
+FIRST_REACH = 1
+LEVEL_STORAGE_STEPS = 2
 # Upkeep never falls below this share of its full cost, however much tech cuts it.
 LEAST_UPKEEP = 0.5
 
@@ -134,11 +144,14 @@ class Railway:
         self.demand: dict[Cell, StationDemand] = {}
         self.levels: dict[Cell, int] = {}
         self.year = START_YEAR
+        # The year play began, from which station upkeep rises.
+        self.first_year = START_YEAR
         self._bought = 0
         # What the player has learned (railroads.sim.tech).
         self.research = Research()
         # What each year ended with and the cars delivered in it (railroads.sim.stats).
         self.history = History()
+        self.fuel = FuelMarket()
         # The way along the track, and what trains do calling at stations
         # (railroads.sim.track_network, railroads.sim.calls).
         self.network = TrackNetwork(constructions)
@@ -253,24 +266,41 @@ class Railway:
         """How many cars a train's engine pulls, with what tech adds."""
         return ENGINES[train.engine].cars + int(self.research.bonus(Effect.PULL))
 
-    def business(self) -> Business:
-        """What of the player's business makes their engines cheaper to run now."""
-        owned = 0 if self.owners is None else self.owners.count()
-        delivered = sum(
-            cars
-            for year in self.history.delivered.values()
-            for good, cars in year.items()
-            if good not in TRAVELLERS
-        )
-        power_stations = sum(
-            Facility.POWER_STATION in working for working in (self.supplied or {}).values()
-        )
-        return Business(owned, delivered, power_stations)
+    def fuel_markup(self) -> float:
+        """How much more fuel costs bought anywhere but out of a station's stockpile, with the
+        player's tech."""
+        return max(0.0, RETAIL_MARKUP - self.research.bonus(Effect.FUEL_MARKUP))
 
-    def running_cost(self, engine: str) -> float:
-        """What an engine costs to run a month now: its fuel's price this year, less what the
-        player's business and tech take off."""
-        return running_cost(ENGINES[engine], self.year, self.business()) * self._upkeep()
+    def fuel_cost(self, engine: str, cells: float = 1.0) -> float:
+        """What an engine's fuel for `cells` costs bought at retail now, the dearest it comes."""
+        burnt = ENGINES[engine]
+        fuel = FUEL_OF[burnt.power]
+        markup = 0.0 if fuel == Fuel.ELECTRICITY else self.fuel_markup()
+        price = self.fuel.price(fuel, self.year) * (1.0 + markup)
+        return burnt.burn * cells * price * self._upkeep()
+
+    def _take_fuel(self, train: Train, station: Cell, cells: float) -> None:
+        """Buys what a train setting off burns on the way to its next stop: coal or diesel fuel
+        out of the station's stockpile first, at the market price, the rest at retail."""
+        engine = ENGINES[train.engine]
+        fuel = FUEL_OF[engine.power]
+        amount = engine.burn * cells
+        if amount <= 0:
+            return
+        good = GOOD_OF.get(fuel)
+        stocked = 0.0
+        if good is not None:
+            stockpile = self.station_goods(station).stockpile
+            stocked = min(amount, stockpile.get(good, 0.0))
+            if stocked > 0:
+                stockpile[good] -= stocked
+        cost = self.fuel.buy(fuel, amount, self.year, stocked, self.fuel_markup())
+        self.finances.spend(cost * self._upkeep(), fuel.value)
+
+    def fuel_month(self, trade: Trade) -> None:
+        """Closes the fuel market's month with what this month's trade said about it."""
+        owned = None if self.owners is None else self.owners.owned(BuildingKind.POWER_PLANT)
+        self.fuel.month(self.year, signals_of(trade, owned))
 
     def car_capacity(
         self, good: Good, engine: str | None = None, general: General | None = None
@@ -386,8 +416,9 @@ class Railway:
 
     @staticmethod
     def reach_at(level: int) -> tuple[int, int]:
-        """How many cells out a station of this level hands goods out to, and gathers them from."""
-        return DELIVERY_RADIUS + level - 1, COLLECTION_RADIUS + level - 1
+        """How many cells out a station of this level hands goods out to, a cell at the first
+        level, and gathers them from; each level a cell further."""
+        return FIRST_REACH + level - 1, COLLECTION_RADIUS + level - 1
 
     def upgrade_price(self, station: Cell) -> float | None:
         """What raising the station a level costs; None at the top level."""
@@ -401,7 +432,13 @@ class Railway:
             return False
         self.finances.spend(price, "station upgrades")
         self.levels[station] = self.level(station) + 1
+        self.station_goods(station).level_steps += LEVEL_STORAGE_STEPS
         return True
+
+    def station_upkeep(self, station: Cell) -> float:
+        """What a station costs to keep a month this year, by its level, before tech cuts it."""
+        rise = (1.0 + STATION_UPKEEP_RISE) ** max(0, self.year - self.first_year)
+        return STATION_UPKEEP[self.level(station) - 1] * rise
 
     def facilities_at(self, station: Cell) -> set[Facility]:
         return (self.facilities or {}).get(station, set())
@@ -448,18 +485,17 @@ class Railway:
         self,
         capacity: Mapping[Cell, Mapping[Good, float]],
     ) -> None:
-        """Starts a new month: each station's demand for it, from its capacity, the running cost
-        of the engines and the upkeep of stations and track."""
+        """Starts a new month: each station's demand for it, from its capacity, and the upkeep
+        of stations and track."""
         for station in self.stations():
             self.station_demand(station).turn_month(capacity.get(station, {}))
         self._supply_facilities()
         self.finances.close_month(self.year)
         track = self.constructions.track()
         upkeep = self._upkeep()
-        self.finances.spend(STATION_UPKEEP * len(self.stations()) * upkeep, "station upkeep")
+        stations = sum(self.station_upkeep(station) for station in self.stations())
+        self.finances.spend(stations * upkeep, "station upkeep")
         self.finances.spend(track_upkeep(track) * upkeep, "track upkeep")
-        running = sum(self.running_cost(train.engine) for train in self.trains)
-        self.finances.spend(running, "running trains")
 
     def run(self, months: float) -> None:
         """Moves every train on by this many months, then has trains that met give way."""
@@ -507,6 +543,13 @@ class Railway:
                     else "No track to its next stop"
                 )
                 return
+            leg = sum(math.dist(a, b) for a, b in itertools.pairwise(way[0]))
+            if engine.tank and leg > engine.tank + 1e-9:
+                train.status = (
+                    f"Next stop {leg:.0f} cells away; it carries fuel for {engine.tank:.0f}"
+                )
+                return
+            self._take_fuel(train, here, leg)
             train.path, train.speeds = way
             train.along = 0.0
             train.pace = 0.0

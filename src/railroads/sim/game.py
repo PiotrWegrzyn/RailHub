@@ -62,6 +62,7 @@ class Game:
         self.growth = Growth(constructions, start_year=start_year, history=history)
         self.railway = Railway(constructions, names=names)
         self.railway.year = start_year
+        self.railway.first_year = start_year
         self.railway.history = self.growth.history
         self.growth.railway = self.railway
         self.railway.station_trade = self.growth.station_trade

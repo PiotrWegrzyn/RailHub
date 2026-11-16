@@ -32,6 +32,7 @@ PERCENT_EFFECTS = frozenset(
         Effect.GROWTH,
         Effect.COACHES,
         Effect.BONUS_GOODS,
+        Effect.FUEL_MARKUP,
     }
 )
 
@@ -109,7 +110,7 @@ def describe(node: Node) -> str:
         years = [engine.year for engine in ENGINES.values() if node.key in engine.needs]
         return f"opens {node.opens} (from {min(years)})" if years else f"opens {node.opens}"
     if node.effect in PERCENT_EFFECTS:
-        sign = "-" if node.effect in (Effect.UPKEEP, Effect.DISCOUNT) else "+"
+        sign = "-" if node.effect in (Effect.UPKEEP, Effect.DISCOUNT, Effect.FUEL_MARKUP) else "+"
         reach = ", everywhere" if node.everywhere else ""
         return f"{node.effect.value} {sign}{node.amount:.0%}{reach}"
     unit = " cars" if node.effect == Effect.PULL else ""

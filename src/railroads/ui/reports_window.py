@@ -10,6 +10,7 @@ import numpy as np
 from imgui_bundle import imgui, implot
 
 from railroads.sim.finance import Finances, dollars
+from railroads.sim.fuel_market import Fuel, FuelMarket, FuelMonth
 from railroads.sim.goods import Good
 from railroads.sim.stats import History
 from railroads.ui.theme import GOOD_COLORS
@@ -105,6 +106,85 @@ def _draw_books(finances: Finances, year: int) -> None:
     imgui.spacing()
 
 
+def price_line(months: list[FuelMonth]) -> tuple[list[float], list[float]]:
+    """A fuel's price month by month, as years with the months as twelfths of them, and prices."""
+    xs, seen = [], {}
+    for month in months:
+        xs.append(month.year + seen.get(month.year, 0) / 12)
+        seen[month.year] = seen.get(month.year, 0) + 1
+    return xs, [month.price for month in months]
+
+
+def fuel_breakdown(fuel: Fuel, month: FuelMonth) -> list[tuple[str, str]]:
+    """What moved a fuel's price in a month, as labels and values."""
+    rows = [
+        (
+            "Price",
+            f"{dollars(month.price)} a unit" if month.price >= 1 else f"${month.price:.2f} a unit",
+        ),
+        ("Inflation since it came in", f"x{month.inflation:.2f}"),
+    ]
+    if fuel == Fuel.ELECTRICITY:
+        rows += [
+            ("Fuel the map's power plants got", f"{month.plants_fed:.0%}"),
+            ("Made by your power plants", f"{month.own_power:,.0f}"),
+            ("Your trains used", f"{month.trains:,.0f}"),
+        ]
+        return rows
+    demand, supply = month.buildings + month.trains, month.network + month.natural
+    rows += [
+        ("Wanted by buildings", f"{month.buildings:,.0f}"),
+        ("Bought by your trains", f"{month.trains:,.0f}"),
+        ("Handed out by your stations", f"{month.network:,.0f}"),
+        ("From the world around", f"{month.natural:,.0f}"),
+        ("Demand against supply", f"{demand:,.0f} / {supply:,.0f}"),
+        (
+            "Against the first month",
+            f"x{month.pull / month.first_pull:.2f}" if month.first_pull else "-",
+        ),
+    ]
+    return rows
+
+
+def _draw_fuel(market: FuelMarket) -> None:
+    """Each fuel's price over the years, what moved it last month, and what the trains bought of
+    it this month."""
+    opened = [fuel for fuel in Fuel if market.history[fuel]]
+    if not opened:
+        imgui.text_disabled("Fuel prices start after the first month")
+        return
+    imgui.text("Fuel prices, a unit")
+    if implot.begin_plot("##fuel prices", (-1.0, PLOT_HEIGHT * 1.4)):
+        flags = implot.AxisFlags_.auto_fit.value
+        implot.setup_axes("", "$", flags, flags)
+        implot.setup_axis_format(implot.ImAxis_.x1.value, "%.0f")
+        for fuel in opened:
+            xs, ys = price_line(market.history[fuel])
+            implot.plot_line(
+                fuel.value.capitalize(),
+                np.array(xs, dtype=np.float64),
+                np.array(ys, dtype=np.float64),
+            )
+        implot.end_plot()
+    for fuel in opened:
+        imgui.separator_text(fuel.value.capitalize())
+        last = market.history[fuel][-1]
+        if imgui.begin_table(f"fuel {fuel.name}", 2):
+            for label, value in fuel_breakdown(fuel, last):
+                imgui.table_next_row()
+                imgui.table_next_column()
+                imgui.text_disabled(label)
+                imgui.table_next_column()
+                imgui.text(value)
+            imgui.end_table()
+        imgui.text(
+            f"Your trains this month: {market.bought(fuel):,.0f} "
+            f"({market.from_stations[fuel]:,.0f} at the market price"
+            f"{'' if fuel == Fuel.ELECTRICITY else ' from stations'}), "
+            f"{dollars(market.spent[fuel])}; last month {market.last_bought[fuel]:,.0f}"
+        )
+
+
 class ReportsWindow:
     def __init__(self) -> None:
         self.open = False
@@ -116,19 +196,26 @@ class ReportsWindow:
         stations: int,
         population: int,
         finances: Finances | None = None,
+        fuel: FuelMarket | None = None,
     ) -> None:
         if not self.open:
             return
         imgui.set_next_window_pos((60.0, WINDOW_TOP), imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
         expanded, self.open = imgui.begin("Reports", self.open)
-        if expanded:
-            shown = report(history, year, stations, population)
-            if finances is not None:
-                _draw_books(finances, year)
-            self._draw_deliveries(shown)
-            self._draw_line("Stations owned", "stations", shown.years, shown.stations)
-            self._draw_line("Population", "population", shown.years, shown.population)
+        if expanded and imgui.begin_tab_bar("reports"):
+            if imgui.begin_tab_item("Overview")[0]:
+                shown = report(history, year, stations, population)
+                if finances is not None:
+                    _draw_books(finances, year)
+                self._draw_deliveries(shown)
+                self._draw_line("Stations owned", "stations", shown.years, shown.stations)
+                self._draw_line("Population", "population", shown.years, shown.population)
+                imgui.end_tab_item()
+            if fuel is not None and imgui.begin_tab_item("Fuel")[0]:
+                _draw_fuel(fuel)
+                imgui.end_tab_item()
+            imgui.end_tab_bar()
         imgui.end()
 
     def _draw_deliveries(self, shown: Report) -> None:

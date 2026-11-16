@@ -124,7 +124,7 @@ def test_stations_stand_on_free_cells_beside_the_houses() -> None:
 
     assert player.railway.stations() == player.stations
     assert player.stations[0] != (20, 20)
-    assert player.railway.level(player.stations[0]) == 2
+    assert player.railway.level(player.stations[0]) == 3
 
 
 def test_served_cells_show_the_satisfaction_drawn_for_them() -> None:

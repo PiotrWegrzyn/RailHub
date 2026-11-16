@@ -185,6 +185,7 @@ class App:
                 len(railway.stations()),
                 growth.population(),
                 railway.finances,
+                railway.fuel,
             )
         self._draw_saves()
         typing = imgui.get_io().want_text_input

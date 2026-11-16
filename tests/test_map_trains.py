@@ -180,6 +180,7 @@ def test_up_close_a_train_far_off_the_screen_is_not_drawn(
     view = MapView(game)
     near, far = view.railway.buy(), view.railway.buy()
     assert near is not None and far is not None
+    near.engine = far.engine = "mixed_diesel"
     near.stops = [Stop((10, 4)), Stop((10, 38))]
     far.stops = [Stop((10, 38)), Stop((10, 4))]
     view.time_passed(0.1)

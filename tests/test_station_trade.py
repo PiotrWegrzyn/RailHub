@@ -14,6 +14,7 @@ def close_stations() -> tuple[Growth, Railway]:
     build_station(growth, (6, 10))
     build_station(growth, (6, 13))
     railway = Railway(constructions)
+    railway.levels = {(6, 10): 2, (6, 13): 2}
     growth.railway = railway
     return growth, railway
 
@@ -43,7 +44,7 @@ def test_a_raised_station_counts_the_buildings_in_its_wider_ring() -> None:
     put_up(growth, (6, 7), 4)
     growth.trade_goods()
     before = railway.station_demand((6, 10)).capacity.get(Need.PASSENGERS)
-    railway.levels[(6, 10)] = 2
+    railway.levels[(6, 10)] = 3
 
     growth.trade_goods()
 

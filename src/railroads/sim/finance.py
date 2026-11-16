@@ -28,19 +28,21 @@ TRAIN_RESALE = 0.5
 CAR_TRIP_PRICE = 40.0
 # What raising a station to level 2, and then to level 3, costs; and the first storage upgrade,
 # each one after costing STORAGE_GROWTH times the one before (storage_price).
-LEVEL_PRICES = (100_000.0, 500_000.0)
+LEVEL_PRICES = (50_000.0, 250_000.0, 1_500_000.0, 10_000_000.0)
 STORAGE_PRICE = 10_000.0
 STORAGE_GROWTH = 2.0
 # What each facility at a station costs (railroads.sim.facilities).
 ENGINE_SHED_PRICE = 40_000.0
-POWER_STATION_PRICE = 3_000_000.0
 SAND_TOWER_PRICE = 25_000.0
 POST_OFFICE_PRICE = 30_000.0
 REFRESHMENT_ROOM_PRICE = 30_000.0
 MARKET_HALL_PRICE = 50_000.0
 CATTLE_PENS_PRICE = 35_000.0
 WAREHOUSE_PRICE = 60_000.0
-STATION_UPKEEP = 200.0
+# What a station of each level costs to keep a month, every station alike, rising by
+# STATION_UPKEEP_RISE a year, compounded, from the year play began.
+STATION_UPKEEP = (1_000.0, 2_000.0, 4_000.0, 8_000.0, 16_000.0)
+STATION_UPKEEP_RISE = 0.02
 # Every cell of track costs TRACK_UPKEEP a month, ELECTRIC_TRACK_UPKEEP more where it is
 # electric, MAGLEV_TRACK_UPKEEP more where it is maglev, and DOUBLE_TRACK_FACTOR as much where
 # it is double.
