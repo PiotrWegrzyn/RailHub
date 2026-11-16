@@ -14,8 +14,9 @@ and each storage upgrade adds STORAGE_STEP of each good to its stockpile and WAI
 waiting passengers and mail.
 
 Cargo earns money by the demand around the station that hands it out (railroads.sim.demand). Trains
-cost TRAIN_PRICE, every car CAR_TRIP_PRICE each time a train leaves a stop with it, and every
-month stations and track cost their upkeep (railroads.sim.finance).
+cost their engine's price, every car CAR_TRIP_PRICE each time a train leaves a stop with it, and every
+month each engine costs its running cost and stations and track their upkeep
+(railroads.sim.finance).
 
 Trains set off from a stand and pick up speed over their engine's pickup time. Trains that meet
 on the line, ahead of or against each other or where lines cross, can't run through each other
@@ -87,7 +88,7 @@ TRAIN_NAMES = {
     Power.MAGLEV: "Maglev",
 }
 # How far a train runs in a month, in cells, on flat ground.
-CELLS_PER_MONTH = 60.0
+CELLS_PER_MONTH = 30.0
 # Trains meet where points along them, MEET_STEP cells apart, come within MEET_DISTANCE cells.
 MEET_STEP = 0.2
 MEET_DISTANCE = 0.2
@@ -181,6 +182,44 @@ class Railway:
             train.stops = [Stop(stop.cell) for stop in route_of.stops]
         self.trains.append(train)
         return train
+
+    def engine_upgrades(self, train: Train) -> list[str]:
+        """The engines a train's engine can be swapped for: those on sale now of its line, newer
+        than it."""
+        engine = ENGINES[train.engine]
+        return [
+            name
+            for name in self.engines()
+            if ENGINES[name].line == engine.line and ENGINES[name].year > engine.year
+        ]
+
+    @staticmethod
+    def swap_price(train: Train, engine: str) -> float:
+        """What swapping a train's engine for another costs: the new one's price, less what the
+        old one sells for."""
+        return ENGINES[engine].price - ENGINES[train.engine].price * TRAIN_RESALE
+
+    def swap_engine(self, train: Train, engine: str) -> bool:
+        """Swaps a train's engine for a newer one of its line, keeping its name, stops and cars;
+        False if it can't be swapped for that one or there isn't the cash."""
+        if engine not in self.engine_upgrades(train):
+            return False
+        price = self.swap_price(train, engine)
+        if not self.finances.can_afford(price):
+            return False
+        self.finances.spend(price, "trains")
+        train.engine = engine
+        most = self.most_cars(train)
+        for stop in train.stops:
+            del stop.cars[most:]
+        return True
+
+    def swap_all_engines(self, old: str, engine: str) -> int:
+        """Swaps the engine of every train running an `old` one for `engine`, in the order they
+        were bought, while the cash lasts; returns how many were swapped."""
+        return sum(
+            self.swap_engine(train, engine) for train in list(self.trains) if train.engine == old
+        )
 
     def sell(self, train: Train) -> None:
         self.trains.remove(train)
@@ -358,8 +397,8 @@ class Railway:
         self,
         capacity: Mapping[Cell, Mapping[Good, float]],
     ) -> None:
-        """Starts a new month: each station's demand for it, from its capacity, and the upkeep
-        of stations and track."""
+        """Starts a new month: each station's demand for it, from its capacity, the running cost
+        of the engines and the upkeep of stations and track."""
         for station in self.stations():
             self.station_demand(station).turn_month(capacity.get(station, {}))
         self._supply_facilities()
@@ -368,6 +407,8 @@ class Railway:
         upkeep = self._upkeep()
         self.finances.spend(STATION_UPKEEP * len(self.stations()) * upkeep, "station upkeep")
         self.finances.spend(track_upkeep(track) * upkeep, "track upkeep")
+        running = sum(ENGINES[train.engine].running for train in self.trains)
+        self.finances.spend(running * upkeep, "running trains")
 
     def run(self, months: float) -> None:
         """Moves every train on by this many months, then has trains that met give way."""
