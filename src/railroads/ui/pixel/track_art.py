@@ -352,7 +352,7 @@ class TrackArt:
             for piece in self.constructions.track()
             if piece.bed == TrackBed.GROUND
         ]
-        for cell in self.constructions.stations():
+        for cell in self.constructions.every_station_cell():
             piece = self.station_piece(cell)
             laid.append(self._laid(piece, station_side(self.projection, self._steps, piece.ends)))
         return [each.line for each in laid]
@@ -586,11 +586,11 @@ class TrackArt:
         return lifts.tolist()
 
     def _through_stations(self, near: tuple[int, int, int, int]) -> list[_Laid]:
-        """The track through each station near the area, straight between its two ends with
-        its platform beside it: double where double track comes in, electric where electric
-        track comes in at both ends, maglev where only maglev track comes in."""
+        """The track through each station and added platform near the area, straight between its
+        two ends with its platform beside it: double where double track comes in, electric where
+        electric track comes in at both ends, maglev where only maglev track comes in."""
         laid = []
-        for cell in self.constructions.stations():
+        for cell in self.constructions.every_station_cell():
             if not self._near(cell, near):
                 continue
             piece = self.station_piece(cell)

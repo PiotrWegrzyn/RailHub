@@ -1,5 +1,6 @@
-"""Stations at each level: drawn in the pixel style for squares, and as small models turned
-along their track for hexes."""
+"""Stations at each level, and the platforms added to the biggest: drawn in the pixel style for
+squares, and as small models turned along their track for hexes. On squares, levels 4 and 5 look
+like level 3 and a platform like a country station."""
 
 import math
 from collections.abc import Callable
@@ -257,6 +258,61 @@ def grand_station() -> Model:
     return m
 
 
+def junction_station() -> Model:
+    """A junction station: a long three-storey house between two clock towers under pointed
+    roofs, and a long glass train shed on iron posts over the platform."""
+    m = Model()
+    _house(m, 0.38, 0.095, 0.32, 3)
+    for u in (-0.32, 0.32):
+        m.box((u - 0.05, u + 0.05), (-0.05, 0.05), (0.0, 0.58), STATION_WALL)
+        m.panel((u - 0.025, u + 0.025), (0.45, 0.5), 0.0505, CLOCK)
+        m.spire(u, 0.06, (0.58, 0.76), STATION_ROOF)
+    m.roof((-0.44, 0.44), (0.095, 0.25), (0.19, 0.27), GLASS, IRON)
+    for k in range(9):
+        u = -0.42 + k * 0.84 / 8
+        m.box((u - 0.006, u + 0.006), (0.237, 0.249), (0.0, 0.19), IRON)
+    for u in (-0.46, 0.46):
+        _board(m, u, 0.17)
+    return m
+
+
+def central_station() -> Model:
+    """A central station: a grand four-storey house with a tall clock tower in its middle and a
+    tower at either end, all under pointed roofs, and a high glass train shed over the
+    platform, stepped down at both ends."""
+    m = Model()
+    _house(m, 0.42, 0.1, 0.38, 3)
+    m.box((-0.07, 0.07), (-0.07, 0.07), (0.0, 0.74), STATION_WALL)
+    m.panel((-0.035, 0.035), (0.58, 0.65), 0.0705, CLOCK)
+    m.spire(0.0, 0.08, (0.74, 0.98), STATION_ROOF)
+    for u in (-0.36, 0.36):
+        m.box((u - 0.045, u + 0.045), (-0.045, 0.045), (0.0, 0.52), STATION_WALL)
+        m.spire(u, 0.055, (0.52, 0.66), STATION_ROOF)
+    m.roof((-0.3, 0.3), (0.1, 0.27), (0.22, 0.32), GLASS, IRON)
+    for low, high in ((-0.46, -0.3), (0.3, 0.46)):
+        m.roof((low, high), (0.1, 0.25), (0.17, 0.24), GLASS, IRON)
+    for k in range(11):
+        u = -0.44 + k * 0.88 / 10
+        m.box((u - 0.006, u + 0.006), (0.25, 0.262), (0.0, 0.17), IRON)
+    for u in (-0.2, 0.2):
+        _board(m, u, 0.3)
+    return m
+
+
+def island_platform() -> Model:
+    """A platform added to a station: a stone island under a long canopy on a row of posts down
+    its middle, with a name board at one end and no house."""
+    m = Model()
+    stone = (176, 170, 158)
+    m.box((-0.4, 0.4), (-0.07, 0.07), (0.0, 0.03), stone)
+    m.box((-0.33, 0.33), (-0.09, 0.09), (0.13, 0.145), STATION_ROOF)
+    for k in range(6):
+        u = -0.3 + k * 0.6 / 5
+        m.box((u - 0.006, u + 0.006), (-0.006, 0.006), (0.03, 0.13), POST)
+    _board(m, -0.37, 0.0)
+    return m
+
+
 def turned(build: Callable[[], Model], line: str) -> Callable[[], Sprite]:
     """The sprite of a station house built by `build`, turned along track running `line`."""
 
@@ -273,6 +329,9 @@ TURNED_STATIONS = {
         ("station", country_station),
         ("station_2", town_station),
         ("station_3", grand_station),
+        ("station_4", junction_station),
+        ("station_5", central_station),
+        ("platform", island_platform),
     )
     for line in TURNED_LINES
 }

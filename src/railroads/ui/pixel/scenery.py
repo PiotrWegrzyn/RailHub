@@ -161,14 +161,14 @@ for _grown, _kind in GREW_FROM.items():
     BUILDING_SPRITES[_grown] = f"{_grown.name.split('_')[0].lower()}_{BUILDING_SPRITES[_kind]}"
 
 
-# The highest level a station has a look of its own for; higher ones look like it.
-LAST_STATION_LOOK = 3
+def platform_sprite(line: str | None = None) -> str:
+    """The sprite of a platform added to a station, turned like station_sprite."""
+    return "platform" if line is None else f"platform_{line}"
 
 
 def station_sprite(level: int, line: str | None = None) -> str:
     """The sprite of a station raised to a level, turned along track running `line` on the
     screen (railroads.ui.pixel.track_art.station_line) if it is given."""
-    level = min(level, LAST_STATION_LOOK)
     name = "station" if level <= 1 else f"station_{level}"
     return name if line is None else f"{name}_{line}"
 
@@ -233,12 +233,12 @@ class Scenery:
                 np.array(
                     [
                         sheet.index(
-                            station_sprite(
-                                levels.get(cell, 1),
-                                station_line(constructions, cell) if turned else None,
-                            )
+                            station_sprite(levels.get(cell, 1), line)
+                            if constructions.main_station(cell) == cell
+                            else platform_sprite(line)
                         )
                         for cell in stations
+                        for line in [station_line(constructions, cell) if turned else None]
                     ]
                 )
             )

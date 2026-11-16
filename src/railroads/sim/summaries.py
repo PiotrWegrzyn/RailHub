@@ -9,7 +9,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.grids import Cell, Grid, flat_within
+from railroads.sim.grids import Cell, Grid, flat_within_any
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,19 +40,22 @@ class Reach:
 
     def __init__(self, grid: Grid) -> None:
         self.grid = grid
-        self._stations: tuple[tuple[Cell, int], ...] = ()
+        self._stations: tuple[tuple[Cell, int, tuple[Cell, ...]], ...] = ()
         self._cells: dict[Cell, tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]]] = {}
 
     def of(
-        self, stations: list[Cell], radius: Callable[[Cell], int]
+        self,
+        stations: list[Cell],
+        radius: Callable[[Cell], int],
+        platforms: Callable[[Cell], list[Cell]] = lambda _: [],
     ) -> dict[Cell, tuple[npt.NDArray[np.intp], ...]]:
-        """Each station's cells within `radius` of it."""
-        key = tuple((station, radius(station)) for station in stations)
+        """Each station's cells within `radius` of it or any of its `platforms`."""
+        key = tuple((station, radius(station), tuple(platforms(station))) for station in stations)
         if key != self._stations:
             self._stations = key
             self._cells = {}
-            for station, steps in key:
-                flat = flat_within(self.grid, station, steps).cells
+            for station, steps, added in key:
+                flat = flat_within_any(self.grid, (station, *added), steps).cells
                 self._cells[station] = np.divmod(flat, self.grid.cols)
         return self._cells  # type: ignore[return-value]
 

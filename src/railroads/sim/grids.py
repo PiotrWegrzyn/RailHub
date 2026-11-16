@@ -335,3 +335,23 @@ def flat_within(grid: Grid, cell: Cell, steps: int) -> Within:
     cells.setflags(write=False)
     away.setflags(write=False)
     return Within(cells, away)
+
+
+@lru_cache(maxsize=WITHIN_KEPT)
+def flat_within_any(grid: Grid, cells: tuple[Cell, ...], steps: int) -> Within:
+    """The cells at most some steps from any of these cells, as flat_within, each as many steps
+    away as from the nearest of them: the reach of a station with more platforms."""
+    if len(cells) == 1:
+        return flat_within(grid, cells[0], steps)
+    parts = [flat_within(grid, cell, steps) for cell in cells]
+    found = np.concatenate([part.cells for part in parts])
+    away = np.concatenate([part.steps for part in parts])
+    order = np.lexsort((away, found))
+    found, away = found[order], away[order]
+    first = np.concatenate(([True], found[1:] != found[:-1]))
+    found, away = found[first], away[first]
+    nearest = np.argsort(away, kind="stable")
+    found, away = found[nearest], away[nearest]
+    found.setflags(write=False)
+    away.setflags(write=False)
+    return Within(found, away)

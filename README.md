@@ -767,7 +767,10 @@ beside the station or its other platforms, with its own way through that Q turns
 the cell costs, and the station window offers it again until it is built. Lines then come into the
 station from more sides; trains cross between platforms beside each other inside the station, reach
 it at whichever platform their way comes to first and set off again from there. Platforms go with
-their station when it is bulldozed or moved; levels 4 and 5 look like level 3 for now. Every month each station costs
+their station when it is bulldozed or moved. A station hands goods out and gathers them around
+every platform as well as its own cell. Level 4 is drawn as a junction station between two clock
+towers under a long glass shed, level 5 as a central station with a tall clock tower and three
+sheds, and an added platform as a stone island under a long canopy. Every month each station costs
 $1,000 in upkeep at the first level, $2,000, $4,000, $8,000 and $16,000 at the next, rising 2% a
 year, compounded, from the year play began, and each cell of track $2,
 $40 more where it is electric, $60 more where it is maglev, and 1.8 times as much where it is double, charged once a cell for

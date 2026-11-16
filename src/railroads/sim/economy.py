@@ -58,7 +58,7 @@ from railroads.sim.goods import (
     makes_of,
     needs_of,
 )
-from railroads.sim.grids import Cell, Grid, flat_within
+from railroads.sim.grids import Cell, Grid, flat_within_any
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import TileMap
 
@@ -167,6 +167,8 @@ class StationOrder:
     stockpile: Mapping[Good, float] = field(default_factory=dict)
     # Goods kept for trains: none of them is handed out around it, brought or gathered.
     kept: frozenset[Good] = frozenset()
+    # The platforms added to it, whose cells it reaches out from as well as its own.
+    platforms: tuple[Cell, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -286,11 +288,15 @@ class Economy:
         return _Month(self, counts, stations or {}, cells).run_steps()
 
     def _around(
-        self, station: Cell, cells: npt.NDArray[np.intp], radius: float
+        self,
+        station: Cell,
+        cells: npt.NDArray[np.intp],
+        radius: float,
+        platforms: tuple[Cell, ...] = (),
     ) -> tuple[npt.NDArray[np.intp], FloatCells]:
-        """The traded cells within `radius` steps of a station, as positions among `cells`,
-        nearest first, and how many steps away each is."""
-        within = flat_within(self.tile_map.grid, station, int(radius))
+        """The traded cells within `radius` steps of a station or any of its platforms, as
+        positions among `cells`, nearest first, and how many steps away each is."""
+        within = flat_within_any(self.tile_map.grid, (station, *platforms), int(radius))
         if not cells.size:
             return cells, np.zeros(0)
         flat = within.cells
@@ -425,8 +431,8 @@ class _Month:
         }
         self.reach = {
             station: (
-                economy._around(station, cells, order.delivery),
-                economy._around(station, cells, order.collection),
+                economy._around(station, cells, order.delivery, order.platforms),
+                economy._around(station, cells, order.collection, order.platforms),
             )
             for station, order in stations.items()
         }
