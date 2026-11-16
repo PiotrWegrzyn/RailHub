@@ -156,6 +156,26 @@ class Game:
         finances.spend(price, "demolition")
         return Done(f"Cleared for {dollars(price)}.", changed, ok=True)
 
+    def add_platform(self, station: Cell, cell: Cell, ends: tuple[int, int] | None = None) -> Done:
+        """Adds a platform to a station raised high enough, in a cell beside it, for what
+        clearing the cell costs."""
+        if self.railway.platforms_left(station) <= 0:
+            return Done("Raise the station to level 4 or 5 for another platform.")
+        site = station_site_price(self.constructions, cell)
+        if site is None:
+            return Done("A platform can't go there.")
+        if not self.finances.can_afford(site):
+            return Done(
+                f"Clearing it costs {dollars(site)}; you have {dollars(self.finances.cash)}."
+            )
+        changed = routes.add_platform(self.growth, station, cell, ends)
+        if not changed:
+            return Done("A platform goes in a free cell beside the station.")
+        if site:
+            self.finances.spend(site, "demolition")
+        price = f" for {dollars(site)}" if site else ""
+        return Done(f"Platform added{price}.", changed, ok=True)
+
     def move_station(self, old: Cell, new: Cell, ends: tuple[int, int] | None = None) -> Done:
         """Moves a station, its track running between `ends` in its new cell, keeping its
         trains, name and goods but not its upgrades."""

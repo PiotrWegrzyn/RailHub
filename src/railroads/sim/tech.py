@@ -61,6 +61,8 @@ class Effect(Enum):
     # Fuel bought anywhere but out of a station's stockpile costs this much less over the market
     # price (railroads.sim.fuel_market).
     FUEL_MARKUP = "retail fuel markup"
+    # Every car holds this many sizes more (railroads.sim.trains.CAR_SIZES).
+    CAR_SIZE = "car size"
     # Opens the engines (railroads.sim.trains) that need it, once their year has come, or a
     # general car (GENERAL_CARS).
     UNLOCK = "unlocks"
@@ -133,6 +135,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
                 opens="steam engines from 1900 on",
             ),
             _n("drawbars", "Heavy drawbars", E.PULL, 1, "couplings"),
+            _n("bogie_wagons", "Bogie wagons", E.CAR_SIZE, 1, "drawbars"),
             _n("rolling", "Rolling mills", E.PRODUCTION, 0.2, "open_hearth"),
             _n("streamlining", "Streamlining", E.SPEED, 0.1, "superheaters"),
             _n("works_trust", "Engineering trust", E.SHARE, 0.1, "cartel", "rolling"),

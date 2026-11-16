@@ -84,6 +84,7 @@ from railroads.sim.trains import (
     Power,
     Stop,
     Train,
+    bigger,
     car_size,
     general_car_size,
 )
@@ -109,6 +110,9 @@ MAX_LEVEL = 1 + len(LEVEL_PRICES)
 # room each level a station is raised adds.
 FIRST_REACH = 1
 LEVEL_STORAGE_STEPS = 2
+# From this level up, each level lets a station have one more platform beside it, with its own way
+# through, so lines come in from more sides.
+PLATFORM_LEVEL = 4
 # Upkeep never falls below this share of its full cost, however much tech cuts it.
 LEAST_UPKEEP = 0.5
 
@@ -306,10 +310,13 @@ class Railway:
         self, good: Good, engine: str | None = None, general: General | None = None
     ) -> float:
         """How much of a good one car carries, a general car of a kind (general_car_size) or
-        one for the good alone: coaches and mail vans more with tech, and every car pulled by a
-        diesel engine more (Engine.car_size)."""
+        one for the good alone: sizes up with tech (Effect.CAR_SIZE) and behind newer engines
+        (Engine.car_levels), and coaches and mail vans more with tech."""
         base = car_size(good) if general is None else general_car_size(general, good)
-        size = base * (1.0 if engine is None else ENGINES[engine].car_size)
+        levels = int(self.research.bonus(Effect.CAR_SIZE))
+        if engine is not None:
+            levels += ENGINES[engine].car_levels
+        size = bigger(base, levels)
         if good in TRAVELLERS:
             return size * (1.0 + self.research.bonus(Effect.COACHES))
         return size
@@ -435,6 +442,12 @@ class Railway:
         self.station_goods(station).level_steps += LEVEL_STORAGE_STEPS
         return True
 
+    def platforms_left(self, station: Cell) -> int:
+        """How many more platforms the station can have added: one for each level from
+        PLATFORM_LEVEL up, less those it has."""
+        allowed = max(0, self.level(station) - PLATFORM_LEVEL + 1)
+        return max(0, allowed - len(self.constructions.platforms(station)))
+
     def station_upkeep(self, station: Cell) -> float:
         """What a station costs to keep a month this year, by its level, before tech cuts it."""
         rise = (1.0 + STATION_UPKEEP_RISE) ** max(0, self.year - self.first_year)
@@ -531,7 +544,10 @@ class Railway:
                     train.waiting -= months
                     train.status = f"Loading at {leaving.cell[0]}, {leaving.cell[1]}"
                     return
-            here, there = leaving.cell, train.stops[train.heading % len(train.stops)].cell
+            here = leaving.cell
+            if train.platform in self.constructions.platforms(leaving.cell):
+                here = train.platform
+            there = train.stops[train.heading % len(train.stops)].cell
             engine = ENGINES[train.engine]
             way = self.route(here, there, engine.electric, engine.maglev)
             if way is None:
@@ -570,6 +586,7 @@ class Railway:
         train.along += months * CELLS_PER_MONTH * self.network.speed_at(train) * train.pull * speed
         train.status = "Running"
         if train.along >= self.network.length(train):
+            train.platform = self.network.cell_at(train.path[-1])
             self.calls.arrive(train, train.stops[train.heading % len(train.stops)])
             train.arrivals += 1
             train.heading = (train.heading + 1) % len(train.stops)

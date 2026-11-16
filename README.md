@@ -633,8 +633,8 @@ needs, to the trees those goods belong to.
 Engines (`railroads.sim.trains`) come in lines. Pioneers, from the first steam engine on rails in
 1804, each a little better than the one before, lead up to the Planet of 1840, the engine the game
 is balanced around: three cars at 30 km/h for $10,000. Each newer engine of a line costs about
-three times the one before it. Early steam engines are very slow and pull few cars; diesels pull
-cars that hold half as much again, and electrics run fastest. Engines burn fuel
+three times the one before it. Early steam engines are very slow and pull few cars; diesels,
+electrics and the maglev pull cars a size bigger, and electrics run fastest. Engines burn fuel
 (`railroads.sim.fuel_market`): steam coal, diesels diesel fuel, electrics and the maglev
 electricity, a set amount a cell for each car they are built to pull, light engines half as much.
 A train buys the fuel for the way to its next stop as it sets off: coal or diesel fuel out of the
@@ -761,7 +761,13 @@ double, $750 electric and $1,350 double and electric; maglev track $4,000 a cell
 wires. A station costs $15,000 and the Planet $10,000, which
 sells back for half. Stations rise through five levels, for $50,000, $250,000, $1,500,000 and
 $10,000,000: a new one hands goods out a cell around it, and each level a cell further, gathers
-them a cell further and adds as much room as two storage upgrades. Every month each station costs
+them a cell further and adds as much room as two storage upgrades. At level 4 a station gets a
+second platform and at level 5 a third: raising it there asks where the new one goes, in a free cell
+beside the station or its other platforms, with its own way through that Q turns, for what clearing
+the cell costs, and the station window offers it again until it is built. Lines then come into the
+station from more sides; trains cross between platforms beside each other inside the station, reach
+it at whichever platform their way comes to first and set off again from there. Platforms go with
+their station when it is bulldozed or moved; levels 4 and 5 look like level 3 for now. Every month each station costs
 $1,000 in upkeep at the first level, $2,000, $4,000, $8,000 and $16,000 at the next, rising 2% a
 year, compounded, from the year play began, and each cell of track $2,
 $40 more where it is electric, $60 more where it is maglev, and 1.8 times as much where it is double, charged once a cell for

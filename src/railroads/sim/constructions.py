@@ -431,10 +431,14 @@ class Station:
     """Fills its whole cell. Its own track runs straight through the cell between `ends`, two
     opposite track points, and other track joins it only there: its way in and its way out. It
     keeps that way however track is laid round it later; with `ends` None its track runs
-    across, from the first track point to the one opposite (Constructions.station_ends)."""
+    across, from the first track point to the one opposite (Constructions.station_ends). A station
+    raised high enough gets more platforms in cells beside it, each a Station of its own with
+    `main` the cell of the station it belongs to, and its own way through, so lines come in from
+    more sides."""
 
     cell: Cell
     ends: tuple[int, int] | None = None
+    main: Cell | None = None
 
     @property
     def space(self) -> int:
@@ -467,6 +471,8 @@ class Constructions:
         # Where the stations stand and track runs, kept apart so the railway never looks through
         # every building for them, and a count that goes up whenever either changes.
         self._stations: set[Cell] = set()
+        # The platforms added to each station, by the station's cell.
+        self._platforms: dict[Cell, set[Cell]] = {}
         self._track: dict[Cell, int] = {}
         self.railway_version = 0
 
@@ -481,6 +487,25 @@ class Constructions:
     def stations(self) -> list[Cell]:
         """Every station's cell, in order."""
         return sorted(self._stations)
+
+    def platforms(self, station: Cell) -> list[Cell]:
+        """The platforms added to a station, in order, without its own cell."""
+        return sorted(self._platforms.get(station, ()))
+
+    def station_cells(self, station: Cell) -> list[Cell]:
+        """Every cell of a station: its own, then its added platforms."""
+        return [station, *self.platforms(station)]
+
+    def main_station(self, cell: Cell) -> Cell | None:
+        """The station a cell belongs to, as the station itself or one of its platforms."""
+        station = self.station_at(cell)
+        if station is None:
+            return None
+        return station.cell if station.main is None else station.main
+
+    def every_station_cell(self) -> list[Cell]:
+        """Every cell a station or a platform of one fills."""
+        return sorted({*self._stations, *(c for cells in self._platforms.values() for c in cells)})
 
     def station_at(self, cell: Cell) -> Station | None:
         """The station in the cell, if there is one."""
@@ -567,11 +592,18 @@ class Constructions:
 
     def _index(self, construction: Construction, change: int) -> None:
         match construction:
-            case Station():
+            case Station(main=None):
                 if change > 0:
                     self._stations.add(construction.cell)
                 else:
                     self._stations.discard(construction.cell)
+            case Station(main=main) if main is not None:
+                if change > 0:
+                    self._platforms.setdefault(main, set()).add(construction.cell)
+                else:
+                    self._platforms.get(main, set()).discard(construction.cell)
+                    if not self._platforms.get(main):
+                        self._platforms.pop(main, None)
             case Track():
                 left = self._track.get(construction.cell, 0) + change
                 if left > 0:

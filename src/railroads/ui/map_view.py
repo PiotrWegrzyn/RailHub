@@ -240,6 +240,7 @@ class MapView:
             self.growth.station_trade.measure_demand,
             self.tools.start_moving,
             self.growth.station_trade.supplies,
+            self.tools.start_adding_platform,
         )
         self.summaries.draw(*self._map_rect, self.look_at, self.railway.name_of)
         self.search.draw(self.growth, self.visit, self._view_center)
@@ -490,15 +491,13 @@ class MapView:
             )
         if self.hovered is not None:
             draw_outline(draw_list, marks, self.tile_map.grid, center, self.hovered)
-            hovering_station = any(
-                isinstance(built, Station) for built in self.constructions.at(self.hovered)
-            )
-            if self.build.tool == Tool.STATION or hovering_station:
+            hovered_station = self.constructions.main_station(self.hovered)
+            if self.build.tool == Tool.STATION or hovered_station is not None:
                 stations = self.railway.stations() if self.build.tool == Tool.STATION else []
                 draw_station_reach(
                     draw_list,
                     self.tile_map.grid,
-                    self.hovered,
+                    self.hovered if hovered_station is None else hovered_station,
                     stations,
                     marks,
                     center,

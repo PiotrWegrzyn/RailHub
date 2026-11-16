@@ -113,6 +113,8 @@ def describe(node: Node) -> str:
         sign = "-" if node.effect in (Effect.UPKEEP, Effect.DISCOUNT, Effect.FUEL_MARKUP) else "+"
         reach = ", everywhere" if node.everywhere else ""
         return f"{node.effect.value} {sign}{node.amount:.0%}{reach}"
+    if node.effect == Effect.CAR_SIZE:
+        return f"every car {node.amount:g} size bigger"
     unit = " cars" if node.effect == Effect.PULL else ""
     return f"{node.effect.value} +{node.amount:g}{unit}"
 
