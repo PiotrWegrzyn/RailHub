@@ -35,7 +35,6 @@ train does calling at a station in railroads.sim.calls; Railway owns them all an
 """
 
 import itertools
-import math
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
@@ -567,7 +566,8 @@ class Railway:
                     else "No track to its next stop"
                 )
                 return
-            leg = sum(math.dist(a, b) for a, b in itertools.pairwise(way[0]))
+            leg = self.network.route_length(here, there, engine.electric, engine.maglev)
+            assert leg is not None
             if engine.tank and leg > engine.tank + 1e-9:
                 train.status = (
                     f"Next stop {leg:.0f} cells away; it carries fuel for {engine.tank:.0f}"

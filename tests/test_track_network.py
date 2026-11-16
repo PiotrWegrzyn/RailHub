@@ -1,3 +1,6 @@
+import itertools
+import math
+
 import pytest
 from test_railway import joined_stations
 
@@ -76,3 +79,18 @@ def test_where_track_leads_out_of_every_cell_is_found_at_once_as_one_by_one() ->
     found = railway.network._exits_to
     assert found
     assert all(grid.track_exit(cell, point) == exit for (cell, point), exit in found.items())
+
+
+def test_a_routes_length_is_the_length_of_its_way_and_is_kept_until_track_changes() -> None:
+    _, railway = joined_stations()
+    network = railway.network
+    way = network.route((6, 3), (6, 20))
+    assert way is not None
+    points = way[0]
+
+    length = network.route_length((6, 3), (6, 20))
+    points.append((points[-1][0] + 5.0, points[-1][1]))
+    kept = network.route_length((6, 3), (6, 20))
+
+    assert length == pytest.approx(sum(math.dist(a, b) for a, b in itertools.pairwise(points[:-1])))
+    assert kept == length

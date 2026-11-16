@@ -4,6 +4,7 @@ trains and stations windows; and drawing the track, routes, station reach and fa
 import itertools
 import math
 import time
+import weakref
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
@@ -31,7 +32,7 @@ from railroads.sim.finance import (
     dollars,
 )
 from railroads.sim.goods import Good
-from railroads.sim.grids import Cell, Grid
+from railroads.sim.grids import Cell, FloatArray, Grid
 from railroads.sim.ladders import Points
 from railroads.sim.railway import Railway
 from railroads.sim.routes import Route
@@ -493,12 +494,19 @@ def draw_track(
     thicker the closer the view. All the beds go down before any rail, so pieces that meet in a
     cell make one junction or crossing."""
     width = max(1.5, camera.cell_width / 10)
-    laid = constructions.track()
-    pieces = [
-        (piece, _piece_points(piece, constructions, camera, center))
-        for piece in (laid if planned is None else planned)
-    ]
-    shade = rgba_u32 if planned is None else _greyed
+    if planned is None:
+        laid, plane = _laid_track(constructions)
+    else:
+        laid, plane = planned, _track_plane(planned, constructions.tile_map.grid)
+    pieces = _on_screen(laid, plane, camera, center, width * 4)
+    colors: dict[tuple[float, float, float, float], int] = {}
+
+    def shade(rgba: tuple[float, float, float, float]) -> int:
+        color = colors.get(rgba)
+        if color is None:
+            color = colors[rgba] = rgba_u32(rgba) if planned is None else _greyed(rgba)
+        return color
+
     for piece, points in pieces:
         bed = width * (1.6 + (1.4 if piece.width == TrackWidth.DOUBLE else 0.0))
         if piece.bed == TrackBed.BRIDGE:
@@ -533,16 +541,56 @@ def _greyed(rgba: Rgba) -> int:
     return rgba_u32((grey, grey, grey, a * PLANNED_OPACITY))
 
 
-def _piece_points(
-    piece: Track, constructions: Constructions, camera: IsoCamera, center: Vec2
-) -> list[imgui.ImVec2]:
-    grid = constructions.tile_map.grid
-    cx, cy = grid.center(*piece.cell)
-    # Halfway along each step, where the piece meets the one in the next cell.
+# The laid track of each Constructions and where its pieces run on the map, kept until the
+# railway changes.
+_LAID: weakref.WeakKeyDictionary[Constructions, tuple[int, list[Track], FloatArray]] = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _laid_track(constructions: Constructions) -> tuple[list[Track], FloatArray]:
+    kept = _LAID.get(constructions)
+    if kept is None or kept[0] != constructions.railway_version:
+        laid = list(constructions.track())
+        kept = (
+            constructions.railway_version,
+            laid,
+            _track_plane(laid, constructions.tile_map.grid),
+        )
+        _LAID[constructions] = kept
+    return kept[1], kept[2]
+
+
+def _track_plane(pieces: list[Track], grid: Grid) -> FloatArray:
+    """Where each piece runs on the map, as an (n, 3, 2) array: from halfway along the step into
+    the cell it comes from, where it meets the piece there, through the cell's centre to halfway
+    along the step to the cell it leads to."""
+    if not pieces:
+        return np.zeros((0, 3, 2))
+    rows, cols = np.array([piece.cell for piece in pieces]).T
+    centers = np.stack(grid.center(rows, cols), axis=-1)
     offsets = grid.track_steps() / 2
-    start, end = (offsets[point] for point in piece.ends)
-    plane = [(cx + start[0], cy + start[1]), (cx, cy), (cx + end[0], cy + end[1])]
-    return [imgui.ImVec2(*camera.to_screen(x, y, center)) for x, y in plane]
+    ends = np.array([piece.ends for piece in pieces])
+    return np.stack([centers + offsets[ends[:, 0]], centers, centers + offsets[ends[:, 1]]], 1)
+
+
+def _on_screen(
+    pieces: list[Track], plane: FloatArray, camera: IsoCamera, center: Vec2, margin: float
+) -> list[tuple[Track, list[imgui.ImVec2]]]:
+    """The pieces that show on the screen, each with its line's points on it."""
+    xs, ys = camera.to_screen(plane[..., 0], plane[..., 1], center)
+    display = imgui.get_io().display_size
+    shown = (
+        (xs.max(axis=1) >= -margin)
+        & (xs.min(axis=1) <= display.x + margin)
+        & (ys.max(axis=1) >= -margin)
+        & (ys.min(axis=1) <= display.y + margin)
+    )
+    indices = np.flatnonzero(shown).tolist()
+    return [
+        (pieces[index], [imgui.ImVec2(x, y) for x, y in zip(row_x, row_y, strict=True)])
+        for index, row_x, row_y in zip(indices, xs[shown].tolist(), ys[shown].tolist(), strict=True)
+    ]
 
 
 def _parallel(points: list[imgui.ImVec2], side: float) -> list[imgui.ImVec2]:

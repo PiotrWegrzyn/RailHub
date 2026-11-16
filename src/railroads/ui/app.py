@@ -51,6 +51,9 @@ WINDOW_SIZE = (1280.0, 800.0)
 # each frame spending about WRITING_SECONDS on it: steps until that much has passed, one at least.
 WRITER = worker("saves")
 WRITING_SECONDS = 0.004
+# The least time between autosaves, in seconds of play: pickling the game stalls a frame, which at
+# the highest speed would come every few seconds.
+AUTOSAVE_GAP_S = 60.0
 
 
 class App:
@@ -78,6 +81,7 @@ class App:
         self._notice_until = 0.0
         self._autosaving: Future[object] | None = None
         self._autosave_due = False
+        self._autosaved_at = -AUTOSAVE_GAP_S
         # Kept between autosaves, which are written one at a time.
         self._autosave_memory = ReusedMemory()
         # The month being done a step a frame, if one is.
@@ -218,17 +222,21 @@ class App:
         written."""
         if self.saves is None or self._autosaving is not None:
             return
+        self._autosaved_at = time.monotonic()
         taken = snapshot(self.saved(), self._autosave_memory)
         if isinstance(WRITER, FrameWorker):
             self._autosaving = WRITER.submit_steps(self.saves.autosave_steps(taken))
         else:
             self._autosaving = WRITER.submit(self.saves.autosave, taken)
 
-    def _start_due_autosave(self) -> None:
-        """Starts the autosave a month asked for once the last one is written and no month is
-        half done, so a month that ends while an autosave is still being written is saved after
-        it rather than not at all."""
+    def _start_due_autosave(self, right_away: bool = False) -> None:
+        """Starts the autosave a month asked for once the last one is written, no month is half
+        done and, unless `right_away`, AUTOSAVE_GAP_S have passed since the last, so a month
+        that ends while an autosave is still being written is saved after it rather than not
+        at all."""
         if self._autosave_due and self._autosaving is None and self._turning is None:
+            if time.monotonic() - self._autosaved_at < AUTOSAVE_GAP_S and not right_away:
+                return
             self._autosave_due = False
             self.autosave()
 
@@ -240,7 +248,7 @@ class App:
             self._turning = None
             self._autosave_due = True
         self._finish_writing()
-        self._start_due_autosave()
+        self._start_due_autosave(right_away=True)
         self._finish_writing()
 
     def _finish_writing(self) -> None:

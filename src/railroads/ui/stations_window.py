@@ -2,7 +2,7 @@
 goods trains brought waiting to be handed out."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
@@ -22,6 +22,7 @@ from railroads.ui.trains_window import WINDOW_SIZE as TRAINS_SIZE
 from railroads.ui.trains_window import WINDOW_TOP as TRAINS_TOP
 
 WINDOW_SIZE = (860.0, 180.0)
+ROW_HEIGHT = 28.0
 GAP = 12.0
 
 
@@ -45,6 +46,9 @@ def look_at_button(station: Cell, look_at: Callable[[Cell], None]) -> None:
 @dataclass
 class StationsWindow:
     open: bool = False
+    # How tall each station's row came out when last drawn, so a row out of sight takes its room
+    # without being drawn.
+    _heights: dict[Cell, float] = field(default_factory=dict)
 
     def draw(
         self,
@@ -71,8 +75,8 @@ class StationsWindow:
                 self._draw_table(railway, stations, look_at, open_station)
         imgui.end()
 
-    @staticmethod
     def _draw_table(
+        self,
         railway: Railway,
         stations: list[Cell],
         look_at: Callable[[Cell], None],
@@ -89,23 +93,41 @@ class StationsWindow:
         imgui.table_setup_column("")
         imgui.table_headers_row()
         for station in stations:
-            goods = railway.station_goods(station)
-            imgui.push_id(str(station))
-            imgui.table_next_row(0, 28)
+            height = self._heights.get(station, ROW_HEIGHT)
+            imgui.table_next_row(0, height)
             imgui.table_next_column()
-            imgui.align_text_to_frame_padding()
-            if imgui.selectable(railway.name_of(station), False)[0]:
-                open_station(station)
-            tip("Open this station's details")
-            imgui.table_next_column()
-            stock_bar(goods, (110, 0))
-            imgui.table_next_column()
-            goods_inline(goods.stockpile, "empty")
-            imgui.table_next_column()
-            goods_inline(goods.brought, "nothing")
-            imgui.table_next_column()
-            draw_demand(railway.station_demand(station))
-            imgui.table_next_column()
-            look_at_button(station, look_at)
-            imgui.pop_id()
+            if imgui.is_rect_visible((1.0, height)):
+                self._heights[station] = self._draw_row(railway, station, look_at, open_station)
         imgui.end_table()
+
+    @staticmethod
+    def _draw_row(
+        railway: Railway,
+        station: Cell,
+        look_at: Callable[[Cell], None],
+        open_station: Callable[[Cell], None],
+    ) -> float:
+        """Draws a station's row; returns how tall it came out."""
+        top = imgui.get_cursor_screen_pos().y
+        bottom = top + ROW_HEIGHT
+        goods = railway.station_goods(station)
+        imgui.push_id(str(station))
+        imgui.align_text_to_frame_padding()
+        if imgui.selectable(railway.name_of(station), False)[0]:
+            open_station(station)
+        tip("Open this station's details")
+        imgui.table_next_column()
+        stock_bar(goods, (110, 0))
+        imgui.table_next_column()
+        goods_inline(goods.stockpile, "empty")
+        bottom = max(bottom, imgui.get_item_rect_max().y)
+        imgui.table_next_column()
+        goods_inline(goods.brought, "nothing")
+        bottom = max(bottom, imgui.get_item_rect_max().y)
+        imgui.table_next_column()
+        draw_demand(railway.station_demand(station))
+        bottom = max(bottom, imgui.get_item_rect_max().y)
+        imgui.table_next_column()
+        look_at_button(station, look_at)
+        imgui.pop_id()
+        return bottom - top
