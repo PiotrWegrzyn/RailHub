@@ -400,8 +400,9 @@ GROWN_SCALE = {"big": 1.2, "mega": 1.4}
 GROWN_WIDTH = {"big": 38, "mega": 44}
 
 for _kind in MERGED:
-    for _size in GROWN_SCALE:
-        SPRITES.setdefault(f"{_size}_{_kind.name.lower()}", SPRITES[_kind.name.lower()])
+    if _kind.name.lower() in SPRITES:
+        for _size in GROWN_SCALE:
+            SPRITES.setdefault(f"{_size}_{_kind.name.lower()}", SPRITES[_kind.name.lower()])
 
 
 def shrink(sprite: Sprite, factor: float) -> Sprite:

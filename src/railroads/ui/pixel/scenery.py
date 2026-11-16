@@ -157,8 +157,8 @@ BUILDING_SPRITES = {
 }
 
 # Big and mega works have sprites of their own (railroads.ui.pixel.art.GROWN_SCALE).
-for _grown in GREW_FROM:
-    BUILDING_SPRITES[_grown] = _grown.name.lower()
+for _grown, _kind in GREW_FROM.items():
+    BUILDING_SPRITES[_grown] = f"{_grown.name.split('_')[0].lower()}_{BUILDING_SPRITES[_kind]}"
 
 
 def station_sprite(level: int, line: str | None = None) -> str:
