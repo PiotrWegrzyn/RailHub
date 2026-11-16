@@ -282,6 +282,8 @@ class StationTrade:
         """The passengers and mail these many buildings of each kind send, and want, in a month."""
         passengers = 0
         for kind, count in counts.items():
+            if not count:
+                continue
             points, value = self._growth.rule.points[kind]
             passengers += PASSENGERS_PER_POINT.get(points, 0) * value * count
         return {
@@ -294,11 +296,11 @@ class StationTrade:
         year = self._growth.year
         needs: dict[Need, float] = {}
         for kind in NEEDS:
-            if kind not in counts:
+            count = counts.get(kind)
+            if not count:
                 continue
-            count = float(counts[kind])
             for need, amount in needs_of(kind, year).items():
-                needs[need] = needs.get(need, 0.0) + count * amount
+                needs[need] = needs.get(need, 0.0) + float(count) * amount
         return needs
 
     def update_reach(self) -> None:

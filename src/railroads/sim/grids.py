@@ -143,7 +143,11 @@ class Grid(ABC):
         return points
 
     def track_ends(self) -> tuple[int, ...]:
-        """The track points track may leave a cell by: every one."""
+        """The track points track may leave a cell by."""
+        return _track_ends(self)
+
+    def _find_track_ends(self) -> tuple[int, ...]:
+        """Every track point."""
         return tuple(range(len(self.track_steps())))
 
     def track_exit(self, cell: Cell, point: int) -> tuple[Cell, int]:
@@ -164,6 +168,9 @@ class Grid(ABC):
     def track_turn(self, start: int, end: int) -> float:
         """How many degrees track bends going into a cell at one track point and out at
         another."""
+        return _track_turn(self, start, end)
+
+    def _find_track_turn(self, start: int, end: int) -> float:
         points = self.track_points()
         heading_in = -points[start] / np.linalg.norm(points[start])
         heading_out = points[end] / np.linalg.norm(points[end])
@@ -288,7 +295,7 @@ class HexGrid(Grid):
         angles = np.radians(np.arange(0, 360, 60))
         return np.column_stack([np.cos(angles), np.sin(angles)])
 
-    def track_ends(self) -> tuple[int, ...]:
+    def _find_track_ends(self) -> tuple[int, ...]:
         """The middle of every edge, and the top and bottom corners, through which track runs
         straight up and down along the edge between two cells: eight directions in all."""
         steps = self.track_steps()
@@ -347,3 +354,13 @@ def flat_within_any(grid: Grid, cells: tuple[Cell, ...], steps: int) -> Within:
     found.setflags(write=False)
     away.setflags(write=False)
     return Within(found, away)
+
+
+@lru_cache(maxsize=64)
+def _track_ends(grid: Grid) -> tuple[int, ...]:
+    return grid._find_track_ends()
+
+
+@lru_cache(maxsize=4096)
+def _track_turn(grid: Grid, start: int, end: int) -> float:
+    return grid._find_track_turn(start, end)

@@ -95,7 +95,7 @@ class Game:
             if self.stand_in is None:
                 changed = yield from self.growth.month_steps(rng)
             else:
-                changed = self.stand_in.month(rng)
+                changed = yield from self.stand_in.month_steps(rng)
         return Month(changed, summarize(date, self.growth.rule.points, reach, changes))
 
     def simulate(self, years: int, rng: np.random.Generator) -> None:
@@ -127,10 +127,17 @@ class Game:
         width: TrackWidth = TrackWidth.SINGLE,
         electric: bool = False,
         maglev: bool = False,
+        planned: routes.Route | None = None,
     ) -> Done:
+        """Lays track from `start` to `end`: the route `planned` for it already, if it was
+        planned with these choices since anything was last built, else the cheapest."""
         if maglev and not self.railway.maglev_open:
             return Done("Maglev track needs Magnetic levitation and a maglev engine on sale.")
-        route = routes.plan_route(self.constructions, start, end, width, electric, maglev)
+        route = (
+            planned
+            if planned is not None
+            else routes.plan_route(self.constructions, start, end, width, electric, maglev)
+        )
         if route is None:
             return Done("No way for track to get there.")
         laid = len(route.changes(self.constructions))

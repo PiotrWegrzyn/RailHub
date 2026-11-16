@@ -481,6 +481,8 @@ class Constructions:
         self._platforms: dict[Cell, set[Cell]] = {}
         self._track: dict[Cell, int] = {}
         self.railway_version = 0
+        # A count that goes up whenever anything is built or removed.
+        self.version = 0
 
     def __iter__(self) -> Iterator[Construction]:
         for built in self._cells.values():
@@ -585,6 +587,7 @@ class Constructions:
         if (problem := self.why_not(construction)) is not None:
             raise CannotBuild(problem)
         self._cells.setdefault(construction.cell, []).append(construction)
+        self.version += 1
         self._index(construction, 1)
 
     def remove(self, construction: Construction) -> None:
@@ -594,6 +597,7 @@ class Constructions:
         built.remove(construction)
         if not built:
             del self._cells[construction.cell]
+        self.version += 1
         self._index(construction, -1)
 
     def _index(self, construction: Construction, change: int) -> None:

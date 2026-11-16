@@ -103,6 +103,21 @@ def _bed_on(tile: Tile) -> TrackBed | None:
     return TrackBed.TUNNEL if tile.relief == Relief.MOUNTAINS else TrackBed.GROUND
 
 
+def _ground_of(tile: Tile) -> _Ground:
+    """The bed track takes in a cell of this tile, the beds it could take as bits, and what new
+    track costs a unit of length there, None where none can go. It hangs on the tile's terrain
+    and relief alone."""
+    bed = _bed_on(tile)
+    takes = sum(1 << other for other in TrackBed if track_rules_for(tile, other).can_build)
+    buildable = bed is not None and takes >> bed & 1
+    factor = track_rules_for(tile, bed).cost_factor if buildable else None
+    return bed, takes, factor
+
+
+# _ground_of by the terrain and relief of the tile, as numbered in a TileMap.
+_GROUNDS: dict[tuple[int, int], _Ground] = {}
+
+
 def plan_route(
     constructions: Constructions,
     start: Cell,
@@ -526,15 +541,12 @@ class _Planner:
         ground = self._grounds[index]
         if ground is None:
             cell = self._cell(index)
-            if self.constructions.tile_map.grid.contains(*cell):
-                tile = self.constructions.tile_map.tile(cell)
-                bed = _bed_on(tile)
-                takes = sum(
-                    1 << other for other in TrackBed if track_rules_for(tile, other).can_build
-                )
-                buildable = bed is not None and takes >> bed & 1
-                factor = track_rules_for(tile, bed).cost_factor if buildable else None
-                ground = (bed, takes, factor)
+            tile_map = self.constructions.tile_map
+            if tile_map.grid.contains(*cell):
+                land = (int(tile_map.terrain[cell]), int(tile_map.relief[cell]))
+                ground = _GROUNDS.get(land)
+                if ground is None:
+                    ground = _GROUNDS[land] = _ground_of(tile_map.tile(cell))
             else:
                 ground = (None, 0, None)
             self._grounds[index] = ground

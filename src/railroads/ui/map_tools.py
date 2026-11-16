@@ -52,8 +52,14 @@ class MapTools:
                     build.track_from = cell
                     build.say("Now click where the track goes.")
                     return
+                planned = build.preview if build.preview_for == self._track_wanted(cell) else None
                 done = game.lay_track(
-                    build.track_from, cell, build.track_width, build.electric, build.maglev
+                    build.track_from,
+                    cell,
+                    build.track_width,
+                    build.electric,
+                    build.maglev,
+                    planned,
                 )
                 if not self._said(done):
                     return
@@ -165,6 +171,19 @@ class MapTools:
             + ". Q turns it."
         )
 
+    def _track_wanted(self, cell: Cell) -> tuple[object, ...]:
+        """What track from where it starts to `cell` would be planned for, so a route planned
+        for the same is laid as it is."""
+        build = self._view.build
+        return (
+            build.track_from,
+            cell,
+            build.track_width,
+            build.electric,
+            build.maglev,
+            self._view.constructions.version,
+        )
+
     def update_preview(self, cell: Cell | None) -> None:
         build, constructions = self._view.build, self._view.constructions
         if build.tool in STATION_TOOLS and cell is not None:
@@ -181,6 +200,7 @@ class MapTools:
             if now - self._resting_since < PREVIEW_REST_S:
                 return
             build.preview_to = cell
+            build.preview_for = self._track_wanted(cell)
             build.preview = plan_route(
                 constructions,
                 build.track_from,
