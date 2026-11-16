@@ -47,7 +47,7 @@ class Effect(Enum):
     SPEED = "train speed"
     # Trains pull this many more cars.
     PULL = "cars per train"
-    # Stations, track and car trips cost this share less to keep.
+    # Stations, track, car trips and running engines cost this share less.
     UPKEEP = "upkeep"
     # The player's buildings count this share more towards growth around them.
     GROWTH = "growth"

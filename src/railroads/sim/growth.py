@@ -49,7 +49,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.clock import START_YEAR
-from railroads.sim.constructions import ONE_OFFS, Building, BuildingKind, Constructions
+from railroads.sim.constructions import MERGED, ONE_OFFS, Building, BuildingKind, Constructions
 from railroads.sim.economy import (
     BONUS_PER_GOOD,
     Economy,
@@ -201,6 +201,7 @@ HARD_CRAFTS = frozenset(
         BuildingKind.MIRROR_MAKER,
     }
 )
+HARD_CRAFTS = HARD_CRAFTS | {grown for kind in HARD_CRAFTS for grown in MERGED[kind]}
 
 
 def dies_after(kind: BuildingKind) -> int:
@@ -734,7 +735,7 @@ class Growth:
         first = ladder.kinds[0]
         if (
             ladder.land_cells_each is not None
-            and self._counts[first].sum() >= self._land_cells // ladder.land_cells_each
+            and self._as_many_as_first(ladder) >= self._land_cells // ladder.land_cells_each
         ):
             return set()
         if not self.ladder_allows(ladder, cell) or self._not_open(ladder, cell, rng):
@@ -747,6 +748,17 @@ class Growth:
         self.constructions.build(new)
         self.add(cell, first, 1)
         return {cell}
+
+    def _as_many_as_first(self, ladder: Ladder) -> int:
+        """How many of a ladder's first kind its buildings on the map stand for, counting each
+        merged one as all those merged into it."""
+        stands_for = 1
+        total = 0
+        for kind in ladder.kinds:
+            total += stands_for * int(self._counts[kind].sum())
+            merge = ladder.merges.get(kind)
+            stands_for *= merge.pulled_down if merge is not None else 1
+        return total
 
     def _not_open(self, ladder: Ladder, cell: Cell, rng: np.random.Generator) -> bool:
         """Whether a turn on flat grassland that is not empty falls through, as all but one in

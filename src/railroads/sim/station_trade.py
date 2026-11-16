@@ -19,9 +19,9 @@ from railroads.sim.demand import capacity_of
 from railroads.sim.economy import (
     COLLECTION_RADIUS,
     DELIVERY_RADIUS,
-    INPUT_STOCK,
     StationOrder,
     Trade,
+    input_stock,
 )
 from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.goods import (
@@ -138,7 +138,7 @@ class StationTrade:
                 for cell, n in zip(cells[here > 0].tolist(), here[here > 0].tolist(), strict=True):
                     if recipe is not None:
                         stock = economy.stock[(kind, need)]
-                        want = INPUT_STOCK * n - stock[cell]
+                        want = input_stock(kind) * n - stock[cell]
                     else:
                         taken = economy.taken.setdefault((kind, need), {})
                         want = n * NEEDS[kind][need] - taken.get(cell, 0.0)
@@ -172,6 +172,11 @@ class StationTrade:
             railway.pay_for_passing(station, need, good, stocked)
             given += stocked
         return given
+
+    @property
+    def has_traded(self) -> bool:
+        """Whether the buildings have had a month's trade yet, so what they are short of is known."""
+        return self._growth.trade is not None
 
     def short_of(self, station: Cell) -> dict[Need, float]:
         """What the buildings a station hands goods out to are still short of this month, need by

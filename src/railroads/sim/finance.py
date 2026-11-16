@@ -21,17 +21,24 @@ ELECTRIC_TRACK_PRICE = 450.0
 MAGLEV_TRACK_PRICE = 4_000.0
 DOUBLE_TRACK_FACTOR = 1.8
 STATION_PRICE = 15_000.0
-TRAIN_PRICE = 5_000.0
+TRAIN_PRICE = 15_000.0
 # What selling a train gives back, as a share of its price.
 TRAIN_RESALE = 0.5
 # What each car costs every time a train leaves a stop with it.
-CAR_TRIP_PRICE = 20.0
-# What raising a station to level 2, and then to level 3, costs; and each 50 more storage.
+CAR_TRIP_PRICE = 40.0
+# What raising a station to level 2, and then to level 3, costs; and the first storage upgrade,
+# each one after costing STORAGE_GROWTH times the one before (storage_price).
 LEVEL_PRICES = (100_000.0, 500_000.0)
 STORAGE_PRICE = 10_000.0
-# What an engine shed and a sand tower at a station cost.
+STORAGE_GROWTH = 2.0
+# What each facility at a station costs (railroads.sim.facilities).
 ENGINE_SHED_PRICE = 40_000.0
 SAND_TOWER_PRICE = 25_000.0
+POST_OFFICE_PRICE = 30_000.0
+REFRESHMENT_ROOM_PRICE = 30_000.0
+MARKET_HALL_PRICE = 50_000.0
+CATTLE_PENS_PRICE = 35_000.0
+WAREHOUSE_PRICE = 60_000.0
 STATION_UPKEEP = 200.0
 # Every cell of track costs TRACK_UPKEEP a month, ELECTRIC_TRACK_UPKEEP more where it is
 # electric, MAGLEV_TRACK_UPKEEP more where it is maglev, and DOUBLE_TRACK_FACTOR as much where
@@ -39,6 +46,11 @@ STATION_UPKEEP = 200.0
 TRACK_UPKEEP = 2.0
 ELECTRIC_TRACK_UPKEEP = 3.0
 MAGLEV_TRACK_UPKEEP = 25.0
+
+
+def storage_price(upgrades: int) -> float:
+    """What the next storage upgrade costs a station that has had this many."""
+    return STORAGE_PRICE * STORAGE_GROWTH**upgrades
 
 
 def track_price(piece: Track, tile: Tile) -> float:

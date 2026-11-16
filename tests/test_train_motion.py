@@ -7,7 +7,7 @@ from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import CELLS_PER_MONTH, Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
-from railroads.sim.trains import ENGINES, Stop, Train
+from railroads.sim.trains import ENGINES, Kind, Stop, Train
 
 WEST, EAST = (6, 3), (6, 20)
 FRAME = 1 / 60 / SECONDS_PER_MONTH
@@ -39,15 +39,17 @@ def run_until(railway: Railway, done, seconds: float = 600.0) -> None:
             return
 
 
-def test_the_planet_takes_ten_seconds_to_full_speed_and_later_engines_less() -> None:
+def test_light_engines_get_going_quickest_and_heavy_and_express_ones_slowest() -> None:
     planet = ENGINES["planet"]
 
-    later = [engine.pickup for engine in ENGINES.values() if engine.year > planet.year]
-    earlier = [engine.pickup for engine in ENGINES.values() if engine.year < planet.year]
+    pickups = {
+        kind: [engine.pickup for engine in ENGINES.values() if engine.kind == kind] for kind in Kind
+    }
 
-    assert planet.pickup == 10.0
-    assert all(pickup <= planet.pickup for pickup in later)
-    assert all(pickup > planet.pickup for pickup in earlier)
+    assert planet.pickup == 12.0
+    assert max(pickups[Kind.LIGHT]) <= 3.0
+    assert min(pickups[Kind.HEAVY] + pickups[Kind.EXPRESS]) > planet.pickup
+    assert all(pickup > planet.pickup for pickup in pickups[Kind.PIONEER])
 
 
 def test_a_train_sets_off_slowly_and_reaches_full_speed_after_its_pickup_time() -> None:
@@ -157,7 +159,7 @@ def test_trains_going_opposite_ways_on_double_track_pass_without_stopping() -> N
     second = running(railway, "Second", EAST, WEST)
     stopped = []
 
-    for _ in range(60 * 60):
+    for _ in range(120 * 60):
         railway.run(FRAME)
         stopped += [train.name for train in railway.trains if train.giving_way]
         if first.arrivals and second.arrivals:

@@ -14,8 +14,9 @@ and each storage upgrade adds STORAGE_STEP of each good to its stockpile and WAI
 waiting passengers and mail.
 
 Cargo earns money by the demand around the station that hands it out (railroads.sim.demand). Trains
-cost TRAIN_PRICE, every car CAR_TRIP_PRICE each time a train leaves a stop with it, and every
-month stations and track cost their upkeep (railroads.sim.finance).
+cost their engine's price, every car CAR_TRIP_PRICE each time a train leaves a stop with it, and every
+month each engine costs its running cost and stations and track their upkeep
+(railroads.sim.finance).
 
 Trains set off from a stand and pick up speed over their engine's pickup time. Trains that meet
 on the line, ahead of or against each other or where lines cross, can't run through each other
@@ -42,15 +43,22 @@ from railroads.sim.clock import SECONDS_PER_MONTH, START_YEAR
 from railroads.sim.constructions import Constructions, Track, TrackWidth
 from railroads.sim.demand import PASSED_ALONG_PAY, StationDemand
 from railroads.sim.economy import COLLECTION_RADIUS, DELIVERY_RADIUS
-from railroads.sim.facilities import ENGINE_SHED_SPEED, SAND_TOWER_PICKUP, Facility, supply
+from railroads.sim.facilities import (
+    ENGINE_SHED_SPEED,
+    SAND_TOWER_PICKUP,
+    WAREHOUSE_ROOM,
+    Facility,
+    pay_factor,
+    supply,
+)
 from railroads.sim.facilities import PRICES as FACILITY_PRICES
 from railroads.sim.finance import (
     CAR_TRIP_PRICE,
     LEVEL_PRICES,
     STATION_UPKEEP,
-    STORAGE_PRICE,
     TRAIN_RESALE,
     Finances,
+    storage_price,
     track_upkeep,
 )
 from railroads.sim.goods import TRAVELLERS, Good, Need
@@ -81,7 +89,7 @@ TRAIN_NAMES = {
     Power.MAGLEV: "Maglev",
 }
 # How far a train runs in a month, in cells, on flat ground.
-CELLS_PER_MONTH = 60.0
+CELLS_PER_MONTH = 30.0
 # Trains meet where points along them, MEET_STEP cells apart, come within MEET_DISTANCE cells.
 MEET_STEP = 0.2
 MEET_DISTANCE = 0.2
@@ -181,6 +189,44 @@ class Railway:
         for train in self.trains:
             train.held = False
 
+    def engine_upgrades(self, train: Train) -> list[str]:
+        """The engines a train's engine can be swapped for: those on sale now of its line, newer
+        than it."""
+        engine = ENGINES[train.engine]
+        return [
+            name
+            for name in self.engines()
+            if ENGINES[name].line == engine.line and ENGINES[name].year > engine.year
+        ]
+
+    @staticmethod
+    def swap_price(train: Train, engine: str) -> float:
+        """What swapping a train's engine for another costs: the new one's price, less what the
+        old one sells for."""
+        return ENGINES[engine].price - ENGINES[train.engine].price * TRAIN_RESALE
+
+    def swap_engine(self, train: Train, engine: str) -> bool:
+        """Swaps a train's engine for a newer one of its line, keeping its name, stops and cars;
+        False if it can't be swapped for that one or there isn't the cash."""
+        if engine not in self.engine_upgrades(train):
+            return False
+        price = self.swap_price(train, engine)
+        if not self.finances.can_afford(price):
+            return False
+        self.finances.spend(price, "trains")
+        train.engine = engine
+        most = self.most_cars(train)
+        for stop in train.stops:
+            del stop.cars[most:]
+        return True
+
+    def swap_all_engines(self, old: str, engine: str) -> int:
+        """Swaps the engine of every train running an `old` one for `engine`, in the order they
+        were bought, while the cash lasts; returns how many were swapped."""
+        return sum(
+            self.swap_engine(train, engine) for train in list(self.trains) if train.engine == old
+        )
+
     def sell(self, train: Train) -> None:
         self.trains.remove(train)
         self.finances.earn(ENGINES[train.engine].price * TRAIN_RESALE, "trains")
@@ -225,6 +271,8 @@ class Railway:
     def station_goods(self, station: Cell) -> StationGoods:
         goods = self.goods.setdefault(station, StationGoods())
         goods.extra_room = self.research.bonus(Effect.STORAGE)
+        if Facility.WAREHOUSE in self.working_at(station):
+            goods.extra_room += WAREHOUSE_ROOM
         goods.extra_waiting = self.research.bonus(Effect.WAITING)
         return goods
 
@@ -269,12 +317,16 @@ class Railway:
     def pay_for(self, station: Cell, need: Need, good: Good, amount: float) -> None:
         """Pays for cargo trains brought that the buildings around a station took."""
         earned = self.station_demand(station).pay(need, good, amount) * self.price_factor(good)
-        self.finances.earn(earned, "cargo")
+        self.finances.earn(earned * self.facility_pay(station, good), "cargo")
 
     def pay_for_passing(self, station: Cell, need: Need, good: Good, amount: float) -> None:
         """Pays for goods a station gathered itself and passed along to the buildings around it."""
         earned = self.station_demand(station).pay(need, good, amount, PASSED_ALONG_PAY)
-        self.finances.earn(earned, "goods passed along")
+        self.finances.earn(earned * self.facility_pay(station, good), "goods passed along")
+
+    def facility_pay(self, station: Cell, good: Good) -> float:
+        """How many times as much a good delivered at a station pays with its facilities."""
+        return pay_factor(self.working_at(station), good)
 
     def connected(self) -> set[Cell]:
         """The stations that track joins to at least one other station."""
@@ -333,12 +385,17 @@ class Railway:
             if station in self.goods
         }
 
+    def storage_price(self, station: Cell) -> float:
+        """What the station's next storage upgrade costs."""
+        return storage_price(self.station_goods(station).storage)
+
     def add_storage(self, station: Cell) -> bool:
         """Adds STORAGE_STEP of each good to the station's stockpile and WAITING_STEP to its waiting
         room, if there is the cash."""
-        if not self.finances.can_afford(STORAGE_PRICE):
+        price = self.storage_price(station)
+        if not self.finances.can_afford(price):
             return False
-        self.finances.spend(STORAGE_PRICE, "station upgrades")
+        self.finances.spend(price, "station upgrades")
         self.station_goods(station).storage += 1
         return True
 
@@ -346,8 +403,8 @@ class Railway:
         self,
         capacity: Mapping[Cell, Mapping[Good, float]],
     ) -> None:
-        """Starts a new month: each station's demand for it, from its capacity, and the upkeep
-        of stations and track."""
+        """Starts a new month: each station's demand for it, from its capacity, the running cost
+        of the engines and the upkeep of stations and track."""
         for station in self.stations():
             self.station_demand(station).turn_month(capacity.get(station, {}))
         self._supply_facilities()
@@ -356,6 +413,8 @@ class Railway:
         upkeep = self._upkeep()
         self.finances.spend(STATION_UPKEEP * len(self.stations()) * upkeep, "station upkeep")
         self.finances.spend(track_upkeep(track) * upkeep, "track upkeep")
+        running = sum(ENGINES[train.engine].running for train in self.trains)
+        self.finances.spend(running * upkeep, "running trains")
 
     def run(self, months: float) -> None:
         """Moves every train on by this many months, then has trains that met give way."""

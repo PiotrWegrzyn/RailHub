@@ -1,7 +1,9 @@
 """The trains window: every train in a list on the left; the chosen one's cars and route on the
 right, a card for each stop with the cars it pulls on to the next, the goods made or waiting there
 to click into cars, those the next stop wants outlined, and what the next stop wants; and beside the
-cards a map to add stops on, which marks where a hovered good is wanted (railroads.ui.route_map)."""
+cards a map to add stops on, which marks where a hovered good is wanted (railroads.ui.route_map).
+The chosen train's engine can be upgraded to a newer one of its line, alone or with every train
+running the same engine."""
 
 import time
 from collections.abc import Mapping
@@ -180,7 +182,9 @@ class TrainsWindow:
         imgui.same_line()
         imgui.text_disabled(f"{ENGINES[train.engine].title} - {train.status}")
         width = imgui.get_content_region_avail().x
-        imgui.same_line(max(0.0, imgui.get_cursor_pos_x() + width - 90))
+        imgui.same_line(max(0.0, imgui.get_cursor_pos_x() + width - 210))
+        upgrade_button(railway, train)
+        imgui.same_line()
         sold = danger_button(f"{fa.ICON_FA_TRASH}  Sell")
         if imgui.is_item_hovered():
             imgui.set_tooltip(f"Sell it for {dollars(ENGINES[train.engine].price * TRAIN_RESALE)}")
@@ -188,6 +192,7 @@ class TrainsWindow:
             railway.sell(train)
             self.chosen = None
             return
+        upgrade_menu(railway, train)
         imgui.separator()
         imgui.align_text_to_frame_padding()
         imgui.text_disabled("Pulling")
@@ -392,6 +397,54 @@ class TrainsWindow:
             imgui.end_disabled()
 
 
+def upgrade_button(railway: Railway, train: Train) -> None:
+    """A button opening the menu of engines the train's engine can be swapped for, greyed out
+    when there are none."""
+    options = railway.engine_upgrades(train)
+    imgui.begin_disabled(not options)
+    if imgui.button(f"{fa.ICON_FA_ARROW_UP}  Upgrade"):
+        imgui.open_popup("upgrade engine")
+    imgui.end_disabled()
+    if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
+        imgui.set_tooltip(
+            "Swap its engine for a newer one, keeping its stops and cars;\n"
+            "the old engine goes towards the price at half what it cost"
+            if options
+            else "No newer engine of its line is on sale"
+        )
+
+
+def upgrade_menu(railway: Railway, train: Train) -> None:
+    """The menu the upgrade button opens: each newer engine for this train, and for every train
+    with the same old engine at once."""
+    if not imgui.begin_popup("upgrade engine"):
+        return
+    old = ENGINES[train.engine]
+    alike = [t for t in railway.trains if t.engine == train.engine]
+    for name in railway.engine_upgrades(train):
+        engine = ENGINES[name]
+        imgui.separator_text(engine.title)
+        price = railway.swap_price(train, name)
+        imgui.begin_disabled(not railway.finances.can_afford(price))
+        if imgui.selectable(f"This train  {dollars(price)}##one{name}", False)[0]:
+            railway.swap_engine(train, name)
+        imgui.end_disabled()
+        if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
+            imgui.set_tooltip(engine_summary(engine))
+        if len(alike) > 1:
+            total = sum(railway.swap_price(t, name) for t in alike)
+            imgui.begin_disabled(not railway.finances.can_afford(price))
+            label = f"All {len(alike)} trains with a {old.title}  {dollars(total)}##all{name}"
+            if imgui.selectable(label, False)[0]:
+                railway.swap_all_engines(train.engine, name)
+            imgui.end_disabled()
+            if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
+                imgui.set_tooltip(
+                    f"{engine_summary(engine)}\nAs many as the cash allows, in the order bought"
+                )
+    imgui.end_popup()
+
+
 def engines_by_kind(names: list[str]) -> list[tuple[Kind, list[str]]]:
     """Engines grouped by what they are for, in the order of Kind, each group newest first."""
     groups = [
@@ -410,6 +463,7 @@ def engine_summary(engine: Engine) -> str:
     lines = [
         f"{engine.year}, {engine.power.value}: {engine.kmh:.0f} km/h, pulls up to {cars}",
         f"Up to speed in {engine.pickup:g} s",
+        f"Costs {dollars(engine.running)} a month to run",
     ]
     if engine.express:
         lines.append(f"Passengers only, paying {EXPRESS_FARE - 1:.0%} more")

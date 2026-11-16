@@ -9,7 +9,7 @@ from typing import Self
 
 import numpy as np
 
-from railroads.sim.constructions import BuildingKind, Constructions
+from railroads.sim.constructions import GREW_FROM, BuildingKind, Constructions
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.ui.biomes import Biome, biome_grid
@@ -153,6 +153,10 @@ BUILDING_SPRITES = {
     BuildingKind.DEPARTMENT_STORE: "department_store",
     BuildingKind.HOTEL: "hotel",
 }
+
+# Big and mega works look like the works they grew from.
+for _grown, _kind in GREW_FROM.items():
+    BUILDING_SPRITES[_grown] = BUILDING_SPRITES[_kind]
 
 
 def station_sprite(level: int, line: str | None = None) -> str:

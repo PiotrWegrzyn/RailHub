@@ -22,12 +22,12 @@ more with, as barrels for a brewery, wheat for animals and lumber for mines.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from functools import cache
 from types import MappingProxyType
 
-from railroads.sim.constructions import BuildingKind
+from railroads.sim.constructions import MERGED, BuildingKind
 
 
 class Good(Enum):
@@ -274,33 +274,33 @@ CARGO_PRICE = 20.0
 
 PRICES: Mapping[Good, float] = MappingProxyType(
     {
-        Good.WHEAT: 6,
-        Good.APPLES: 8,
-        Good.BANANAS: 8,
-        Good.DATES: 8,
-        Good.ORANGES: 8,
-        Good.SUGAR: 8,
-        Good.FISH: 8,
-        Good.CANS: 40,
-        Good.BREAD: 8,
+        Good.WHEAT: 3,
+        Good.APPLES: 4,
+        Good.BANANAS: 4,
+        Good.DATES: 4,
+        Good.ORANGES: 4,
+        Good.SUGAR: 4,
+        Good.FISH: 4,
+        Good.CANS: 20,
+        Good.BREAD: 4,
         Good.CLAY: 5,
         Good.LIMESTONE: 5,
         Good.SAND: 4,
-        Good.POTATOES: 6,
-        Good.CATTLE: 20,
-        Good.PIGS: 14,
-        Good.CHICKENS: 5,
-        Good.EGGS: 4,
+        Good.POTATOES: 3,
+        Good.CATTLE: 10,
+        Good.PIGS: 7,
+        Good.CHICKENS: 3,
+        Good.EGGS: 2,
         Good.COKE: 14,
-        Good.MILK: 6,
-        Good.DAIRY: 18,
+        Good.MILK: 3,
+        Good.DAIRY: 9,
         Good.POTS: 10,
         Good.STOVE_TILES: 25,
         Good.CASTINGS: 30,
-        Good.SAUSAGES: 28,
+        Good.SAUSAGES: 14,
         Good.LUXURIES: 300,
-        Good.SHEEP: 15,
-        Good.MEAT: 16,
+        Good.SHEEP: 8,
+        Good.MEAT: 8,
         Good.FLAX: 12,
         Good.HOPS: 10,
         Good.MACHINERY: 180,
@@ -310,7 +310,7 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.BEER: 15,
         Good.VODKA: 30,
         Good.LEATHER: 25,
-        Good.SHOES: 35,
+        Good.SHOES: 100,
         Good.PLASTICS: 40,
         Good.APPLIANCES: 300,
         Good.PAPER: 20,
@@ -332,12 +332,12 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.FUEL: 20,
         Good.GAS: 10,
         Good.CHEMICALS: 25,
-        Good.FURNITURE: 28,
-        Good.CLOTHES: 30,
+        Good.FURNITURE: 60,
+        Good.CLOTHES: 70,
         Good.TOOLS: 160,
         Good.GOODS: 120,
         Good.WINE: 40,
-        Good.HONEY: 12,
+        Good.HONEY: 6,
         Good.BARRELS: 15,
         Good.WAX: 30,
         Good.INCENSE: 300,
@@ -407,88 +407,130 @@ def _inputs(recipe: Recipe, year: int) -> Mapping[Need, float]:
 # times this.
 BOOST_MOST = 1.0
 
+# How many works of a kind merge into the next size up (railroads.sim.constructions.MERGED):
+# makers of food three, others two; and how much more than they made apart the merged one makes.
+MERGING = 2
+FOOD_MERGING = 3
+MERGE_BONUS = 1.25
+
+
+def merging(recipe: Recipe) -> int:
+    """How many works making by this recipe merge into one the next size up."""
+    return FOOD_MERGING if recipe.makes in FOODS else MERGING
+
+
+def _with_merged(recipes: dict[BuildingKind, Recipe]) -> dict[BuildingKind, Recipe]:
+    """The recipes with those of every big and mega works: the same inputs a unit, making as
+    much as the works merged into it, and MERGE_BONUS more with each size."""
+    merged = dict(recipes)
+    for kind, sizes in MERGED.items():
+        recipe = recipes[kind]
+        for step, grown in enumerate(sizes, start=1):
+            most = recipe.most * (merging(recipe) * MERGE_BONUS) ** step
+            merged[grown] = replace(recipe, most=most)
+    return merged
+
+
 RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
-    {
-        BuildingKind.STEEL_MILL: Recipe(
-            Good.STEEL, 100, {Need.IRON: 2.5, Need.COAL: 2.5}, {Need.COKE: 0.25}
-        ),
-        BuildingKind.COKE_PLANT: Recipe(Good.COKE, 100, {Need.COAL: 1.0}),
-        BuildingKind.POTTER: Recipe(Good.POTS, 40, {Need.CLAY: 0.5}),
-        BuildingKind.TILE_WORKS: Recipe(Good.STOVE_TILES, 30, {Need.CLAY: 0.5, Need.SAND: 0.25}),
-        BuildingKind.FOUNDRY: Recipe(Good.CASTINGS, 40, {Need.IRON: 0.5, Need.SAND: 0.25}),
-        BuildingKind.DAIRY: Recipe(Good.DAIRY, 100, {Need.MILK: 0.5}),
-        BuildingKind.SAUSAGE_MAKER: Recipe(Good.SAUSAGES, 200, {Need.MEAT: 0.5, Need.SALT: 0.25}),
-        BuildingKind.CARPET_WEAVER: Recipe(Good.LUXURIES, 5, {Need.FIBRE: 4.0}),
-        BuildingKind.CLOCK_MAKER: Recipe(Good.LUXURIES, 5, {Need.COPPER: 2.0, Need.GLASS: 1.0}),
-        BuildingKind.MIRROR_MAKER: Recipe(Good.LUXURIES, 5, {Need.GLASS: 2.0, Need.GOLD: 0.1}),
-        BuildingKind.GUN_FACTORY: Recipe(Good.GUNS, 100, {Need.STEEL: 0.5, Need.LUMBER: 0.25}),
-        BuildingKind.TANK_FACTORY: Recipe(Good.TANKS, 20, {Need.STEEL: 6, Need.FUEL: 2}),
-        BuildingKind.PLANE_FACTORY: Recipe(
-            Good.PLANES, 20, {Need.STEEL: 3, Need.COPPER: 1, Need.FUEL: 1, Need.ELECTRONICS: 1}
-        ),
-        BuildingKind.FOOD_PLANT: Recipe(Good.CANS, 250, {Need.FRUIT: 0.4, Need.STEEL: 0.2}),
-        BuildingKind.BAKERY: Recipe(Good.BREAD, 100, {Need.WHEAT: 0.5}),
-        BuildingKind.FACTORY: Recipe(Good.GOODS, 30, {Need.LUMBER: 1 / 3, Need.STEEL: 1 / 3}),
-        BuildingKind.BIG_FACTORY: Recipe(Good.GOODS, 90, {Need.STEEL: 1 / 3, Need.COPPER: 1 / 3}),
-        BuildingKind.MEGA_FACTORY: Recipe(
-            Good.GOODS, 270, {Need.STEEL: 1 / 3, Need.COPPER: 1 / 6, Need.MACHINERY: 1 / 6}
-        ),
-        BuildingKind.SHIPYARD: Recipe(Good.GOODS, 30, {Need.STEEL: 2 / 3, Need.LUMBER: 1 / 3}),
-        BuildingKind.TEXTILE_MILL: Recipe(Good.CLOTHES, 100, {Need.FIBRE: 1.0}),
-        BuildingKind.FURNITURE_MAKER: Recipe(Good.FURNITURE, 60, {Need.LUMBER: 1.0}),
-        BuildingKind.TOOL_WORKS: Recipe(Good.TOOLS, 80, {Need.STEEL: 1.0}),
-        BuildingKind.BARREL_MAKER: Recipe(Good.BARRELS, 40, {Need.LUMBER: 0.5}),
-        BuildingKind.WINERY: Recipe(Good.WINE, 80, {Need.GRAPES: 1.0}, {Need.BARRELS: 0.5}),
-        BuildingKind.REFINERY: Recipe(Good.FUEL, 300, {Need.OIL: 0.5}),
-        BuildingKind.CHEMICAL_WORKS: Recipe(
-            Good.CHEMICALS, 100, {Need.SALT: 0.5, Need.BOILER_FUEL: 0.5}
-        ),
-        BuildingKind.ELECTRONICS_PLANT: Recipe(
-            Good.ELECTRONICS, 50, {Need.COPPER: 1.0, Need.CHEMICALS: 1.0}
-        ),
-        BuildingKind.CAR_FACTORY: Recipe(Good.CARS, 20, {Need.STEEL: 5.0, Need.FUEL: 2.0}),
-        BuildingKind.MACHINE_WORKS: Recipe(Good.MACHINERY, 40, {Need.STEEL: 1.0, Need.COPPER: 0.5}),
-        BuildingKind.BRICKWORKS: Recipe(Good.BRICKS, 100, {Need.CLAY: 0.5}, {Need.COAL: 0.25}),
-        BuildingKind.CEMENT_WORKS: Recipe(
-            Good.CEMENT, 100, {Need.LIMESTONE: 0.5}, {Need.COAL: 0.25}
-        ),
-        BuildingKind.GLASSWORKS: Recipe(Good.GLASS, 60, {Need.SAND: 0.5}, {Need.COAL: 0.25}),
-        BuildingKind.BREWERY: Recipe(Good.BEER, 160, {Need.HOPS: 0.25}, {Need.BARRELS: 0.1}),
-        BuildingKind.DISTILLERY: Recipe(Good.VODKA, 40, {Need.POTATOES: 0.5}, {Need.GLASS: 0.1}),
-        BuildingKind.TANNERY: Recipe(Good.LEATHER, 40, {Need.LIVESTOCK: 0.5}),
-        BuildingKind.MEAT_FACTORY: Recipe(Good.MEAT, 100, {Need.ANIMALS: 0.5}),
-        BuildingKind.SHOE_FACTORY: Recipe(Good.SHOES, 60, {Need.LEATHER: 0.5}),
-        BuildingKind.PLASTICS_WORKS: Recipe(
-            Good.PLASTICS, 100, {Need.OIL: 0.5, Need.CHEMICALS: 0.5}
-        ),
-        BuildingKind.APPLIANCE_FACTORY: Recipe(
-            Good.APPLIANCES,
-            30,
-            {Need.STEEL: 1.0, Need.COPPER: 0.5, Need.PLASTICS: 0.5, Need.ELECTRONICS: 0.25},
-        ),
-        BuildingKind.PAPER_MILL: Recipe(Good.PAPER, 100, {Need.LUMBER: 0.5, Need.CHEMICALS: 0.25}),
-        BuildingKind.PRINTING_WORKS: Recipe(Good.NEWSPAPERS, 3000, {Need.PAPER: 0.05}),
-        BuildingKind.SUGAR_REFINERY: Recipe(
-            Good.REFINED_SUGAR, 60, {Need.SUGAR: 0.5}, {Need.COAL: 0.1}
-        ),
-        BuildingKind.GASWORKS: Recipe(Good.GAS, 200, {Need.COAL: 0.5}),
-        BuildingKind.PORCELAIN_WORKS: Recipe(
-            Good.PORCELAIN, 30, {Need.CLAY: 0.5}, {Need.COAL: 0.25}
-        ),
-    }
+    _with_merged(
+        {
+            BuildingKind.STEEL_MILL: Recipe(
+                Good.STEEL, 100, {Need.IRON: 2.5, Need.COAL: 2.5}, {Need.COKE: 0.25}
+            ),
+            BuildingKind.COKE_PLANT: Recipe(Good.COKE, 100, {Need.COAL: 1.0}),
+            BuildingKind.POTTER: Recipe(Good.POTS, 40, {Need.CLAY: 0.5}),
+            BuildingKind.TILE_WORKS: Recipe(
+                Good.STOVE_TILES, 30, {Need.CLAY: 0.5, Need.SAND: 0.25}
+            ),
+            BuildingKind.FOUNDRY: Recipe(Good.CASTINGS, 40, {Need.IRON: 0.5, Need.SAND: 0.25}),
+            BuildingKind.DAIRY: Recipe(Good.DAIRY, 120, {Need.MILK: 0.4}),
+            BuildingKind.SAUSAGE_MAKER: Recipe(
+                Good.SAUSAGES, 240, {Need.MEAT: 0.4, Need.SALT: 0.2}
+            ),
+            BuildingKind.CARPET_WEAVER: Recipe(Good.LUXURIES, 5, {Need.FIBRE: 4.0}),
+            BuildingKind.CLOCK_MAKER: Recipe(Good.LUXURIES, 5, {Need.COPPER: 2.0, Need.GLASS: 1.0}),
+            BuildingKind.MIRROR_MAKER: Recipe(Good.LUXURIES, 5, {Need.GLASS: 2.0, Need.GOLD: 0.1}),
+            BuildingKind.GUN_FACTORY: Recipe(Good.GUNS, 100, {Need.STEEL: 0.5, Need.LUMBER: 0.25}),
+            BuildingKind.TANK_FACTORY: Recipe(Good.TANKS, 20, {Need.STEEL: 6, Need.FUEL: 2}),
+            BuildingKind.PLANE_FACTORY: Recipe(
+                Good.PLANES, 20, {Need.STEEL: 3, Need.COPPER: 1, Need.FUEL: 1, Need.ELECTRONICS: 1}
+            ),
+            BuildingKind.FOOD_PLANT: Recipe(Good.CANS, 300, {Need.FRUIT: 0.3, Need.STEEL: 0.1}),
+            BuildingKind.BAKERY: Recipe(Good.BREAD, 120, {Need.WHEAT: 0.4}),
+            BuildingKind.FACTORY: Recipe(Good.GOODS, 30, {Need.LUMBER: 1 / 3, Need.STEEL: 1 / 3}),
+            BuildingKind.BIG_FACTORY: Recipe(
+                Good.GOODS, 90, {Need.STEEL: 1 / 3, Need.COPPER: 1 / 3}
+            ),
+            BuildingKind.MEGA_FACTORY: Recipe(
+                Good.GOODS, 270, {Need.STEEL: 1 / 3, Need.COPPER: 1 / 6, Need.MACHINERY: 1 / 6}
+            ),
+            BuildingKind.SHIPYARD: Recipe(Good.GOODS, 30, {Need.STEEL: 2 / 3, Need.LUMBER: 1 / 3}),
+            BuildingKind.TEXTILE_MILL: Recipe(Good.CLOTHES, 40, {Need.FIBRE: 2.5}),
+            BuildingKind.FURNITURE_MAKER: Recipe(Good.FURNITURE, 20, {Need.LUMBER: 4.0}),
+            BuildingKind.TOOL_WORKS: Recipe(Good.TOOLS, 80, {Need.STEEL: 1.0}),
+            BuildingKind.BARREL_MAKER: Recipe(Good.BARRELS, 40, {Need.LUMBER: 0.5}),
+            BuildingKind.WINERY: Recipe(Good.WINE, 80, {Need.GRAPES: 1.0}, {Need.BARRELS: 0.5}),
+            BuildingKind.REFINERY: Recipe(Good.FUEL, 300, {Need.OIL: 0.5}),
+            BuildingKind.CHEMICAL_WORKS: Recipe(
+                Good.CHEMICALS, 100, {Need.SALT: 0.5, Need.BOILER_FUEL: 0.5}
+            ),
+            BuildingKind.ELECTRONICS_PLANT: Recipe(
+                Good.ELECTRONICS, 50, {Need.COPPER: 1.0, Need.CHEMICALS: 1.0}
+            ),
+            BuildingKind.CAR_FACTORY: Recipe(Good.CARS, 20, {Need.STEEL: 5.0, Need.FUEL: 2.0}),
+            BuildingKind.MACHINE_WORKS: Recipe(
+                Good.MACHINERY, 40, {Need.STEEL: 1.0, Need.COPPER: 0.5}
+            ),
+            BuildingKind.BRICKWORKS: Recipe(Good.BRICKS, 100, {Need.CLAY: 0.5}, {Need.COAL: 0.25}),
+            BuildingKind.CEMENT_WORKS: Recipe(
+                Good.CEMENT, 100, {Need.LIMESTONE: 0.5}, {Need.COAL: 0.25}
+            ),
+            BuildingKind.GLASSWORKS: Recipe(
+                Good.GLASS, 60, {Need.SAND: 0.5}, {Need.COAL: 0.25, Need.LIMESTONE: 0.25}
+            ),
+            BuildingKind.BREWERY: Recipe(Good.BEER, 160, {Need.HOPS: 0.25}, {Need.BARRELS: 0.1}),
+            BuildingKind.DISTILLERY: Recipe(
+                Good.VODKA, 40, {Need.POTATOES: 0.5}, {Need.GLASS: 0.1}
+            ),
+            BuildingKind.TANNERY: Recipe(
+                Good.LEATHER, 40, {Need.LIVESTOCK: 0.5}, {Need.LIMESTONE: 0.25}
+            ),
+            BuildingKind.MEAT_FACTORY: Recipe(Good.MEAT, 120, {Need.ANIMALS: 0.4}),
+            BuildingKind.SHOE_FACTORY: Recipe(Good.SHOES, 20, {Need.LEATHER: 2.0}),
+            BuildingKind.PLASTICS_WORKS: Recipe(
+                Good.PLASTICS, 100, {Need.OIL: 0.5, Need.CHEMICALS: 0.5}
+            ),
+            BuildingKind.APPLIANCE_FACTORY: Recipe(
+                Good.APPLIANCES,
+                30,
+                {Need.STEEL: 1.0, Need.COPPER: 0.5, Need.PLASTICS: 0.5, Need.ELECTRONICS: 0.25},
+            ),
+            BuildingKind.PAPER_MILL: Recipe(
+                Good.PAPER, 100, {Need.LUMBER: 0.5, Need.CHEMICALS: 0.25}
+            ),
+            BuildingKind.PRINTING_WORKS: Recipe(Good.NEWSPAPERS, 3000, {Need.PAPER: 0.05}),
+            BuildingKind.SUGAR_REFINERY: Recipe(
+                Good.REFINED_SUGAR, 60, {Need.SUGAR: 0.5}, {Need.COAL: 0.1, Need.LIMESTONE: 0.1}
+            ),
+            BuildingKind.GASWORKS: Recipe(Good.GAS, 200, {Need.COAL: 0.5}),
+            BuildingKind.PORCELAIN_WORKS: Recipe(
+                Good.PORCELAIN, 30, {Need.CLAY: 0.5}, {Need.COAL: 0.25}
+            ),
+        }
+    )
 )
 
 # The most each building makes in a month: raw goods from the land, and what processors make
 # with all the inputs they need.
 MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
     {
-        BuildingKind.FARM: {Good.WHEAT: 10},
-        BuildingKind.ORCHARD: {Good.APPLES: 10},
-        BuildingKind.DATE_PALMS: {Good.DATES: 12},
-        BuildingKind.ORANGE_FARM: {Good.ORANGES: 12},
-        BuildingKind.BANANAS: {Good.BANANAS: 18},
-        BuildingKind.SUGAR: {Good.SUGAR: 16},
-        BuildingKind.FISHERY: {Good.FISH: 16},
+        BuildingKind.FARM: {Good.WHEAT: 5},
+        BuildingKind.ORCHARD: {Good.APPLES: 5},
+        BuildingKind.DATE_PALMS: {Good.DATES: 6},
+        BuildingKind.ORANGE_FARM: {Good.ORANGES: 6},
+        BuildingKind.BANANAS: {Good.BANANAS: 8},
+        BuildingKind.SUGAR: {Good.SUGAR: 8},
+        BuildingKind.FISHERY: {Good.FISH: 8},
         BuildingKind.MINE: {Good.COAL: 100},
         BuildingKind.LUMBER_MILL: {Good.LUMBER: 20},
         BuildingKind.PORT: {Good.GOODS: 20, Good.OIL: 50, Good.GAS: 50},
@@ -503,15 +545,15 @@ MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
         BuildingKind.VINEYARD: {Good.GRAPES: 60},
         BuildingKind.COFFEE_PLANTATION: {Good.COFFEE: 60},
         BuildingKind.RUBBER_PLANTATION: {Good.RUBBER: 60},
-        BuildingKind.BEEKEEPER: {Good.HONEY: 4, Good.WAX: 10},
+        BuildingKind.BEEKEEPER: {Good.HONEY: 2, Good.WAX: 10},
         BuildingKind.INCENSE_GROVE: {Good.INCENSE: 30},
         BuildingKind.CLAY_PIT: {Good.CLAY: 60},
         BuildingKind.LIMESTONE_QUARRY: {Good.LIMESTONE: 60},
         BuildingKind.SAND_PIT: {Good.SAND: 60},
-        BuildingKind.POTATO_FARM: {Good.POTATOES: 24},
+        BuildingKind.POTATO_FARM: {Good.POTATOES: 10},
         BuildingKind.CATTLE_RANCH: {Good.CATTLE: 10, Good.MILK: 20},
         BuildingKind.PIG_FARM: {Good.PIGS: 12},
-        BuildingKind.CHICKEN_FARM: {Good.CHICKENS: 20, Good.EGGS: 40},
+        BuildingKind.CHICKEN_FARM: {Good.CHICKENS: 20, Good.EGGS: 15},
         BuildingKind.FLAX_FIELD: {Good.FLAX: 60},
         BuildingKind.HOP_GARDEN: {Good.HOPS: 40},
         BuildingKind.SALT_CATHEDRAL: {Good.SALT: 200},
@@ -537,6 +579,7 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.SHOES: 0.5,
             Need.GLASS: 0.2,
             Need.CASTINGS: 0.2,
+            Need.LIMESTONE: 0.5,
         },
         BuildingKind.MANOR: {
             Need.FOOD: 100,
@@ -554,46 +597,47 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         },
         BuildingKind.TENEMENT: {
             Need.FOOD: 60,
-            Need.SALT: 2,
+            Need.SALT: 10,
             Need.GOODS: 20,
-            Need.COFFEE: 2,
-            Need.CLOTHES: 3,
-            Need.FURNITURE: 2,
+            Need.COFFEE: 10,
+            Need.CLOTHES: 10,
+            Need.FURNITURE: 10,
             Need.TOOLS: 10,
-            Need.BEER: 3,
-            Need.VODKA: 1,
-            Need.SHOES: 2,
-            Need.BRICKS: 5,
-            Need.REFINED_SUGAR: 2,
-            Need.NEWSPAPERS: 3,
+            Need.BEER: 10,
+            Need.VODKA: 10,
+            Need.SHOES: 10,
+            Need.BRICKS: 10,
+            Need.REFINED_SUGAR: 10,
+            Need.NEWSPAPERS: 10,
             Need.HEATING: 3,
-            Need.POTS: 1,
-            Need.STOVE_TILES: 1,
-            Need.CASTINGS: 1,
-            Need.LUXURIES: 0.2,
+            Need.POTS: 10,
+            Need.STOVE_TILES: 10,
+            Need.CASTINGS: 10,
+            Need.LIMESTONE: 10,
+            Need.LUXURIES: 1,
         },
         BuildingKind.FLATS: {
             Need.FOOD: 180,
-            Need.SALT: 4,
+            Need.SALT: 30,
             Need.GOODS: 40,
-            Need.COFFEE: 4,
+            Need.COFFEE: 30,
             Need.CLOTHES: 30,
-            Need.FURNITURE: 20,
+            Need.FURNITURE: 30,
             Need.TOOLS: 10,
-            Need.FUEL: 5,
-            Need.CARS: 1,
-            Need.BEER: 4,
-            Need.VODKA: 2,
-            Need.SHOES: 5,
-            Need.BRICKS: 5,
-            Need.CEMENT: 5,
-            Need.GLASS: 5,
-            Need.NEWSPAPERS: 5,
-            Need.APPLIANCES: 1,
-            Need.REFINED_SUGAR: 4,
+            Need.FUEL: 30,
+            Need.CARS: 3,
+            Need.BEER: 30,
+            Need.VODKA: 30,
+            Need.SHOES: 30,
+            Need.BRICKS: 30,
+            Need.CEMENT: 30,
+            Need.GLASS: 30,
+            Need.NEWSPAPERS: 30,
+            Need.APPLIANCES: 5,
+            Need.REFINED_SUGAR: 30,
             Need.HEATING: 5,
-            Need.STOVE_TILES: 2,
-            Need.LUXURIES: 0.5,
+            Need.STOVE_TILES: 30,
+            Need.LUXURIES: 3,
         },
         BuildingKind.SKYSCRAPER: {
             Need.GOODS: 30,
@@ -611,7 +655,7 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.PORCELAIN: 2,
             Need.LUXURIES: 2,
         },
-        BuildingKind.FARM: {Need.MACHINERY: 1},
+        BuildingKind.FARM: {Need.MACHINERY: 1, Need.LIMESTONE: 2},
         BuildingKind.MINE: {Need.LUMBER: 20},
         BuildingKind.RAILWAY_WORKS: {Need.STEEL: 200},
         BuildingKind.POWER_PLANT: {Need.BOILER_FUEL: 200},
@@ -673,7 +717,7 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
 
 # The month's trade, a step at a time: a need is shared out, a kind of processor makes what it
 # can. Inputs come before what is made from them, and the processors of food before houses.
-PIPELINE: tuple[Need | BuildingKind, ...] = (
+_PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.LUMBER,
     Need.COAL,
     BuildingKind.GASWORKS,
@@ -781,6 +825,13 @@ PIPELINE: tuple[Need | BuildingKind, ...] = (
     BuildingKind.SHIPYARD,
     Need.GOODS,
 )
+PIPELINE: tuple[Need | BuildingKind, ...] = tuple(
+    kind
+    for step in _PIPELINE
+    for kind in (
+        (step, *MERGED[step]) if isinstance(step, BuildingKind) and step in MERGED else (step,)
+    )
+)
 
 # Inputs that are food as well: what is left of them is gathered with the food.
 FOOD_INPUTS = (Need.WHEAT, Need.POTATOES, Need.SUGAR, Need.FRUIT)
@@ -820,6 +871,7 @@ BONUS_NEEDS = frozenset(
         Need.FURNITURE,
         Need.WHEAT,
         Need.LUMBER,
+        Need.LIMESTONE,
     }
 )
 

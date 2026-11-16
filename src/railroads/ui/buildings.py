@@ -8,7 +8,7 @@ from functools import cache
 import numpy as np
 from imgui_bundle import imgui
 
-from railroads.sim.constructions import BuildingKind
+from railroads.sim.constructions import MERGED, BuildingKind
 from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.iso_camera import IsoCamera, Vec2
 
@@ -123,6 +123,13 @@ DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.DEPARTMENT_STORE: ((232, 200, 110), 0.16),
     BuildingKind.HOTEL: ((200, 70, 90), 0.16),
 }
+
+# A big works shows in its own colour a little darker and larger, a mega one more so.
+for _kind, _sizes in MERGED.items():
+    _color, _size = DOTS[_kind]
+    for _step, _grown in enumerate(_sizes, start=1):
+        _darker = tuple(int(c * (1 - 0.12 * _step)) for c in _color)
+        DOTS[_grown] = ((_darker[0], _darker[1], _darker[2]), _size * (1 + 0.25 * _step))
 
 
 def draw_building_dots(

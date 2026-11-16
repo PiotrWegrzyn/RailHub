@@ -8,10 +8,16 @@ from dataclasses import dataclass
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.sim.facilities import ENGINE_SHED_SPEED, SAND_TOWER_PICKUP, Facility
+from railroads.sim.facilities import (
+    ENGINE_SHED_SPEED,
+    PAYS_MORE,
+    SAND_TOWER_PICKUP,
+    WAREHOUSE_ROOM,
+    Facility,
+)
 from railroads.sim.facilities import PRICES as FACILITY_PRICES
 from railroads.sim.facilities import USES as FACILITY_USES
-from railroads.sim.finance import STATION_PRICE, STORAGE_PRICE, dollars
+from railroads.sim.finance import STATION_PRICE, dollars
 from railroads.sim.goods import TRAVELLERS, Good
 from railroads.sim.grids import Cell
 from railroads.sim.railway import MAX_LEVEL, Railway
@@ -127,8 +133,9 @@ class StationWindow:
                 station
             ):
                 upgraded(station)
-        storage = f"{fa.ICON_FA_PLUS}  Storage +{STORAGE_STEP} of each good, +{WAITING_STEP} passengers and mail  {dollars(STORAGE_PRICE)}"
-        if _priced_button(storage, railway.finances.can_afford(STORAGE_PRICE)):
+        storage_price = railway.storage_price(station)
+        storage = f"{fa.ICON_FA_PLUS}  Storage +{STORAGE_STEP} of each good, +{WAITING_STEP} passengers and mail  {dollars(storage_price)}"
+        if _priced_button(storage, railway.finances.can_afford(storage_price)):
             railway.add_storage(station)
         _draw_facilities(railway, station)
 
@@ -136,6 +143,11 @@ class StationWindow:
 FACILITY_EFFECTS = {
     Facility.ENGINE_SHED: f"trains leaving here run {ENGINE_SHED_SPEED - 1:.0%} faster",
     Facility.SAND_TOWER: f"trains leaving here pick up speed {1 / SAND_TOWER_PICKUP:.0f} times as fast",
+    Facility.POST_OFFICE: f"mail delivered here pays {PAYS_MORE[Facility.POST_OFFICE][1] - 1:.0%} more",
+    Facility.REFRESHMENT_ROOM: f"passengers arriving here pay {PAYS_MORE[Facility.REFRESHMENT_ROOM][1] - 1:.0%} more",
+    Facility.MARKET_HALL: f"food delivered here pays {PAYS_MORE[Facility.MARKET_HALL][1] - 1:.0%} more",
+    Facility.CATTLE_PENS: f"livestock delivered here pays {PAYS_MORE[Facility.CATTLE_PENS][1] - 1:.0%} more",
+    Facility.WAREHOUSE: f"+{WAREHOUSE_ROOM:.0f} room for each good",
 }
 
 
