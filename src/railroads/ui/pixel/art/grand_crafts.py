@@ -47,6 +47,7 @@ from railroads.ui.pixel.art.industry import (
 from railroads.ui.pixel.art.painter import (
     BRICK,
     GLASS,
+    RGB,
     VERDIGRIS,
     WINDOW,
     Painter,
@@ -67,8 +68,6 @@ from railroads.ui.pixel.art.parts import (
     _turned,
     _windows,
 )
-
-type RGB = tuple[int, int, int]
 
 MILL_WALL: RGB = (206, 164, 92)
 MILL_ROOF: RGB = (80, 76, 84)

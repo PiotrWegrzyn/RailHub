@@ -22,13 +22,12 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
+from railroads.sim.grids import FloatArray
 from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.ui.iso_camera import TILT
 from railroads.ui.pixel.lattice import Lattice
-from railroads.ui.pixel.noise import noise, ridged
-from railroads.ui.pixel.projection import FloatArray, PixelProjection
-
-Floats = npt.NDArray[np.float32]
+from railroads.ui.pixel.noise import Floats, noise, ridged
+from railroads.ui.pixel.projection import PixelProjection
 
 # Heights are kept on a raster this many steps per cell, smoothed over SMOOTHING steps, and the
 # valley floor under them over VALLEY_SMOOTHING steps.

@@ -10,12 +10,12 @@ from typing import Self
 import numpy as np
 
 from railroads.sim.constructions import GREW_FROM, BuildingKind, Constructions
-from railroads.sim.grids import Cell, Grid
+from railroads.sim.grids import Cell, FloatArray, Grid, IntArray
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.pixel.ground import FIELD_KINDS
-from railroads.ui.pixel.projection import FloatArray, IntArray, PixelProjection, hash01
+from railroads.ui.pixel.projection import PixelProjection, hash01
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.track_art import station_house, station_line

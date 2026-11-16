@@ -22,9 +22,7 @@ from railroads.sim.constructions import (
     Construction,
     Constructions,
 )
-from railroads.sim.grids import Cell
-
-FloatArray = npt.NDArray[np.float64]
+from railroads.sim.grids import Cell, FloatArray
 
 SLOT_RADIUS = 0.3
 # How far from its cell's middle a farmstead stands at the back of the field filling its cell,

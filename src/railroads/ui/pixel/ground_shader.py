@@ -31,11 +31,12 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
+from railroads.sim.grids import FloatArray
 from railroads.sim.tilemap import Deposit, TileMap
 from railroads.ui.biomes import Biome
 from railroads.ui.pixel import ground as cpu
 from railroads.ui.pixel.noise import _TABLE, TABLE_SIZE
-from railroads.ui.pixel.projection import FloatArray, PixelProjection
+from railroads.ui.pixel.projection import PixelProjection
 
 if sys.platform == "emscripten":
     from railroads.ui.pixel import webgl as GL

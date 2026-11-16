@@ -14,16 +14,14 @@ import numpy.typing as npt
 
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Satisfaction
-from railroads.sim.grids import Grid
+from railroads.sim.grids import FloatArray, Grid, IntArray
 from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.building_spots import Plot, plots_of
-from railroads.ui.pixel.lattice import Lattice
+from railroads.ui.pixel.lattice import BoolArray, Lattice
 from railroads.ui.pixel.noise import noise, table_hash
-from railroads.ui.pixel.projection import CHUNK, RGB, FloatArray, IntArray, PixelProjection
+from railroads.ui.pixel.projection import CHUNK, RGB, PixelProjection
 from railroads.ui.pixel.relief import Elevation, Raised, mountain_cover, sample, smooth
-
-type BoolArray = npt.NDArray[np.bool_]
 
 # Ground is worked out this far past a chunk's edges, so shores meet across chunks.
 APRON = 2

@@ -14,8 +14,8 @@ from functools import cached_property
 import numpy as np
 import numpy.typing as npt
 
-from railroads.sim.grids import Grid
-from railroads.ui.pixel.projection import FloatArray, IntArray, PixelProjection
+from railroads.sim.grids import FloatArray, Grid, IntArray
+from railroads.ui.pixel.projection import PixelProjection
 
 type BoolArray = npt.NDArray[np.bool_]
 type Block = tuple[slice, slice]

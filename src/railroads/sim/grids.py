@@ -17,9 +17,10 @@ from typing import ClassVar, Literal, Self
 import numpy as np
 import numpy.typing as npt
 
+from railroads.sim.geo import Coord
+
 type Cell = tuple[int, int]
 type GridKind = Literal["square", "hex"]
-type Coord = float | npt.NDArray[np.float64]
 type Index = int | npt.NDArray[np.int64]
 FloatArray = npt.NDArray[np.float64]
 IntArray = npt.NDArray[np.int64]

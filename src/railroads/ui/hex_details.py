@@ -10,12 +10,10 @@ from dataclasses import dataclass, field, replace
 
 import numpy as np
 import numpy.typing as npt
-
-FloatCells = npt.NDArray[np.float64]
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import Building, BuildingKind, Construction, Station, Track
-from railroads.sim.economy import Satisfaction, Trade
+from railroads.sim.economy import FloatCells, Satisfaction, Trade
 from railroads.sim.finance import dollars
 from railroads.sim.goods import RECIPES, Good, Need, bonus_of, boosts_of, demands_of, makes_of
 from railroads.sim.grids import Cell

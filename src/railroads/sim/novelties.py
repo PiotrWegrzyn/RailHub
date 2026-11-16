@@ -19,7 +19,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import Building, BuildingKind
-from railroads.sim.grids import Cell
+from railroads.sim.grids import BoolGrid, Cell
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
 from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
@@ -56,7 +56,6 @@ SPACE_CENTER_TRIES = 200
 FILM_TOWN = 150
 FAIR_TOWN = 100
 
-BoolGrid = npt.NDArray[np.bool_]
 Placer = Callable[[Growth, BuildingKind, np.random.Generator], Cell | None]
 
 
