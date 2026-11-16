@@ -30,6 +30,11 @@ change to the counts goes through add, so it can also log them (log_changes): a 
 (railroads.sim.summaries) is worked out from the log instead of comparing the counts before and
 after.
 
+Once a year every ladder that has opened and stands below its least on the map (least_of) gets
+one more of its first kind, in its likeliest cell: at least one of everything that opens in some
+year, and of the key buildings (KEY_BUILDINGS) at least KEY_LEAST on a map of KEY_LAND_CELLS land
+cells, more or fewer by the land, put on any land they could stand on where none is likely.
+
 Forests come and go as well (railroads.sim.forests): people, industry and above all lumber mills
 clear them, they spread onto open grassland beside them, and the land weighs again wherever they
 changed.
@@ -205,6 +210,16 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
 # and those around one that gets some of it that share as much faster.
 LIVELY_GROWTH = 0.5
 VENUES = (BuildingKind.TAVERN, BuildingKind.CLUB, BuildingKind.FILLING_STATION)
+
+# Kinds every map keeps at least KEY_LEAST of on KEY_LAND_CELLS land cells, in proportion to its
+# land, once open: the only makers of what whole chains run on.
+KEY_BUILDINGS = frozenset({BuildingKind.OIL_WELL, BuildingKind.REFINERY})
+KEY_LEAST = 3
+KEY_LAND_CELLS = 120_000
+# How many of a ladder's likeliest cells a top-up tries, and how many cells anywhere when none is
+# likely at all.
+LIKELIEST_TRIED = 20
+ANYWHERE_TRIED = 200
 
 # How long buildings last starving: homes, and everything else.
 HOMES_DIE_AFTER_MONTHS = 10 * 12
@@ -658,6 +673,7 @@ class Growth:
             changed |= self.novelties.year(self, rng)
         if reached(12):
             changed |= build_power_plants(self)
+            changed |= self._top_up(rng)
         every = self.rule.forests_every_months
         if self.rule.forests is not None and reached(every):
             changed |= change_forests(self, self.rule.forests, every, rng)
@@ -789,6 +805,65 @@ class Growth:
         self.constructions.build(new)
         self.add(cell, first, 1)
         return {cell}
+
+    def least_of(self, ladder: Ladder) -> int:
+        """The fewest of a ladder's first kind the map keeps once it has opened: KEY_LEAST for
+        the land of a key building, one of anything that opens in some year, else none."""
+        kind = ladder.kinds[0]
+        if kind in KEY_BUILDINGS:
+            return max(1, round(KEY_LEAST * self._land_cells / KEY_LAND_CELLS))
+        return 1 if ladder.from_year > 0 and kind not in ONE_OFFS else 0
+
+    def _top_up(self, rng: np.random.Generator) -> set[Cell]:
+        """Puts up one more of the first kind of every opened ladder below its least, in its
+        likeliest cell; returns the cells that changed."""
+        changed: set[Cell] = set()
+        for place in self._places:
+            ladder = place.ladder
+            if ladder.from_year > self.year:
+                continue
+            if self._as_many_as_first(ladder) >= self.least_of(ladder):
+                continue
+            cell = self._likeliest(place, rng)
+            if cell is None:
+                continue
+            kind = ladder.kinds[0]
+            self.constructions.build(Building(cell, kind))
+            self.add(cell, kind, 1)
+            changed.add(cell)
+        return changed
+
+    def _likeliest(self, place: _Place, rng: np.random.Generator) -> Cell | None:
+        """The cell a ladder's next building is likeliest in that it can go up in; for a key
+        building where none is likely, any cell it could stand on, picked at random."""
+        ladder = place.ladder
+        cells = place.cells[place.chances[place.cells] > 0]
+        if cells.size and (ladder.needs or ladder.crowded_at is not None):
+            cells = cells[self._meets_needs(place, cells)]
+        best = cells[np.argsort(place.chances[cells])[::-1][:LIKELIEST_TRIED]]
+        for index in best.tolist():
+            cell = divmod(index, self._grid.cols)
+            if self._fits(ladder, cell):
+                return cell
+        if ladder.kinds[0] not in KEY_BUILDINGS:
+            return None
+        anywhere = place.cells if place.cells.size else np.arange(self._grid.rows * self._grid.cols)
+        for index in rng.choice(anywhere, min(ANYWHERE_TRIED, anywhere.size), replace=False):
+            cell = divmod(int(index), self._grid.cols)
+            if self.constructions.tile_map.terrain[cell] == Terrain.LAND and self._fits(
+                ladder, cell
+            ):
+                return cell
+        return None
+
+    def _fits(self, ladder: Ladder, cell: Cell) -> bool:
+        """Whether one more of a ladder's first kind can go up in a cell as it stands."""
+        new = Building(cell, ladder.kinds[0])
+        return (
+            self.ladder_allows(ladder, cell)
+            and self.constructions.site_problem(new) is None
+            and new.space <= self.constructions.space_left(cell)
+        )
 
     def _as_many_as_first(self, ladder: Ladder) -> int:
         """How many of a ladder's first kind its buildings on the map stand for, counting each

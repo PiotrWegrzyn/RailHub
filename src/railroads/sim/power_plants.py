@@ -1,7 +1,8 @@
 """Power plants (railroads.sim.growth puts them up once a year): coal ones from the first, diesel
 and gas ones later, each burning its fuel and making electricity for the map
 (railroads.sim.fuel_market). Whenever the plants standing would make less than the map's
-electrified homes and factories want, one more goes up, at most one a year: by whichever of the
+electrified homes and factories want, one more goes up, at most one a year, the first of each kind
+as soon as it opens: by whichever of the
 TOWNS biggest towns with none within PLANT_APART cells has the most fuel made within FUEL_REACH
 cells of it, burning that fuel; by the biggest of them, burning coal, where none has any."""
 
@@ -69,6 +70,9 @@ def build_power_plants(growth: Growth) -> set[Cell]:
     if not opened:
         return set()
     standing = plants(growth)
+    missing = [kind for kind in opened if not growth.counts[kind].any()]
+    if missing:
+        return _first_of(growth, missing[0], standing)
     if float(standing.sum()) * POWER_PLANT_OUTPUT >= electricity_wanted(growth):
         return set()
     towns = _towns_without_plant(growth, standing)
@@ -85,6 +89,22 @@ def build_power_plants(growth: Growth) -> set[Cell]:
     made, _, town, kind = best
     if made <= 0:
         town, kind = towns[0], BuildingKind.POWER_PLANT
+    cell = _nearest_free(growth, kind, town)
+    if cell is None:
+        return set()
+    growth.build(Building(cell, kind))
+    return {cell}
+
+
+def _first_of(growth: Growth, kind: BuildingKind, standing: np.ndarray) -> set[Cell]:
+    """Puts up the map's first plant of a kind by whichever of the biggest towns has the most of
+    its fuel made near it; returns the cells that changed."""
+    towns = _towns_without_plant(growth, standing) or _towns_without_plant(
+        growth, np.zeros_like(standing)
+    )
+    if not towns:
+        return set()
+    town = max(towns, key=lambda found: _fuel_near(growth, found, kind))
     cell = _nearest_free(growth, kind, town)
     if cell is None:
         return set()

@@ -578,7 +578,7 @@ FOOD_PLANTS = _merges(
     Ladder(
         kinds=(BuildingKind.FOOD_PLANT,),
         land=FACTORY_LAND,
-        base_chance=0.000000015,
+        base_chance=0.0000002,
         chance_per_doubling={
             Points.FOOD: 0.00000026,
             Points.POPULATION: 0.000000003,
@@ -767,7 +767,7 @@ BUTCHERS = _merges(
 # Town crafts that come up, like bakeries, the likelier the more people live around: potters and
 # dairies as often as other crafts; tile works, foundries and sausage makers, which need two
 # inputs and make goods worth more, half as often; the makers of luxury goods only in towns of
-# LUXURY_TOWN people or more, and seldom.
+# LUXURY_TOWN people or more, half as often as potters.
 LUXURY_TOWN = 20
 
 
@@ -795,9 +795,9 @@ TOWN_CRAFTS = (
     _town_craft(BuildingKind.FOUNDRY, 0.5, 1800),
     _town_craft(BuildingKind.SAUSAGE_MAKER, 6.25, 1850, FOOD_TOWN),
     _town_craft(BuildingKind.JUICE_WORKS, 5.0, 1870, FOOD_TOWN),
-    _town_craft(BuildingKind.CARPET_WEAVER, 0.1, 1700, LUXURY_TOWN),
-    _town_craft(BuildingKind.CLOCK_MAKER, 0.1, 1880, LUXURY_TOWN),
-    _town_craft(BuildingKind.MIRROR_MAKER, 0.1, 1700, LUXURY_TOWN),
+    _town_craft(BuildingKind.CARPET_WEAVER, 0.5, 1700, LUXURY_TOWN),
+    _town_craft(BuildingKind.CLOCK_MAKER, 0.5, 1880, LUXURY_TOWN),
+    _town_craft(BuildingKind.MIRROR_MAKER, 0.5, 1700, LUXURY_TOWN),
 )
 
 # Coke plants bake coal into coke for the steel mills from 1850, drawn to industry.
@@ -1020,10 +1020,10 @@ WORKS = (
     _works(BuildingKind.DISTILLERY, {POP: 8e-10, Points.FOOD: 3e-9}, {}, 1600, base=CRAFT_BASE),
     _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
     _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {}, 1850, base=1e-8),
-    _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=1e-8),
-    _works(BuildingKind.PRINTING_WORKS, {POP: 1.5e-9, IND: 3e-9}, {}, 1600, PRINTING_CELLS, 1e-8),
+    _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=2e-7),
+    _works(BuildingKind.PRINTING_WORKS, {POP: 1.5e-9, IND: 3e-9}, {}, 1600, PRINTING_CELLS, 2e-7),
     _works(BuildingKind.SUGAR_REFINERY, {IND: 6e-9, Points.FOOD: 3e-9}, {}, 1800, base=CRAFT_BASE),
-    _works(BuildingKind.PORCELAIN_WORKS, {POP: 4e-10, Points.ORE: 6e-9}, {}, 1710, 30_000, 1e-8),
+    _works(BuildingKind.PORCELAIN_WORKS, {POP: 4e-10, Points.ORE: 6e-9}, {}, 1710, 30_000, 2e-7),
     _works(BuildingKind.MACHINE_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 1870, base=2e-6),
     _works(BuildingKind.CEMENT_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {}, 1880, 20_000, 2e-8),
     _works(BuildingKind.PLASTICS_WORKS, {IND: 4e-7}, {}, 1950, 30_000, 2e-8),
