@@ -184,6 +184,8 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.PORCELAIN_WORKS: (Points.INDUSTRY, 2),
     BuildingKind.MEAT_FACTORY: (Points.INDUSTRY, 2),
     BuildingKind.POWER_PLANT: (Points.INDUSTRY, 5),
+    BuildingKind.DIESEL_POWER_PLANT: (Points.INDUSTRY, 4),
+    BuildingKind.GAS_POWER_PLANT: (Points.INDUSTRY, 4),
     BuildingKind.SPACE_CENTER: (Points.CORPORATE, 25),
     BuildingKind.PEAR_HQ: (Points.CORPORATE, 50),
     BuildingKind.ROYAL_PALACE: (Points.CORPORATE, 15),
@@ -981,19 +983,6 @@ DEPARTMENT_STORES = Ladder(
     land_cells_each=10_000,
 )
 
-# Power plants burn coal, oil or gas by the big towns from 1900, a few to a map, and draw
-# industry around them.
-POWER_PLANTS = Ladder(
-    kinds=(BuildingKind.POWER_PLANT,),
-    land=FACTORY_LAND,
-    chance_per_doubling={Points.POPULATION: 0.00005},
-    needs={Points.POPULATION: 40},
-    most_per_cell=1,
-    apart=6,
-    from_year=1882,
-    land_cells_each=15_000,
-)
-
 HOTELS = replace(
     DEPARTMENT_STORES,
     kinds=(BuildingKind.HOTEL,),
@@ -1098,7 +1087,6 @@ LADDERS = (
     FILLING_STATIONS,
     DEPARTMENT_STORES,
     HOTELS,
-    POWER_PLANTS,
 )
 
 

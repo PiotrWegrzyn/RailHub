@@ -1,6 +1,7 @@
 from builders import flat_map
 from railroads.sim.constructions import Constructions
 from railroads.sim.demolition import bulldoze
+from railroads.sim.grids import flat_within_any
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
@@ -96,3 +97,31 @@ def test_bulldozing_a_station_takes_its_platforms_down_with_it() -> None:
     assert platform in changed
     assert growth.constructions.station_at(platform) is None
     assert growth.constructions.platforms(HUB) == []
+
+
+def test_a_station_hands_goods_out_around_its_platforms_too() -> None:
+    growth, railway = junction()
+    platform = platform_cell(growth)
+    assert add_platform(growth, HUB, platform) is not None
+    railway.levels[HUB] = 1
+    beyond = next(
+        cell for cell in growth.grid.within(platform, 1) if cell not in growth.grid.within(HUB, 1)
+    )
+
+    ring = growth.station_trade.inner_ring(HUB)
+
+    reached = {divmod(int(index), growth.grid.cols) for index in ring}
+    assert beyond in reached
+    assert set(growth.grid.within(HUB, 1)) <= reached
+
+
+def test_the_reach_of_a_station_with_platforms_counts_each_cell_from_the_nearest() -> None:
+    growth, _ = junction()
+    platform = platform_cell(growth)
+
+    within = flat_within_any(growth.grid, (HUB, platform), 2)
+
+    steps = dict(zip(within.cells.tolist(), within.steps.tolist(), strict=True))
+    flat = growth.grid.cols * platform[0] + platform[1]
+    assert steps[flat] == 0.0
+    assert len(steps) == len(set(within.cells.tolist()))

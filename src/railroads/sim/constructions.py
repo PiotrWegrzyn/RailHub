@@ -121,6 +121,8 @@ class BuildingKind(Enum):
     PORCELAIN_WORKS = "porcelain works"
     MEAT_FACTORY = "butcher"
     POWER_PLANT = "power plant"
+    DIESEL_POWER_PLANT = "diesel power plant"
+    GAS_POWER_PLANT = "gas power plant"
     SPACE_CENTER = "space center"
     PEAR_HQ = "Pear Company headquarters"
     ROYAL_PALACE = "royal palace"
@@ -317,6 +319,8 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
         kind: BuildingRules(relief=_OFF_MOUNTAINS, space=CELL_SPACE)
         for kind in (
             BuildingKind.POWER_PLANT,
+            BuildingKind.DIESEL_POWER_PLANT,
+            BuildingKind.GAS_POWER_PLANT,
             BuildingKind.REFINERY,
             BuildingKind.CAR_FACTORY,
             BuildingKind.TANK_FACTORY,

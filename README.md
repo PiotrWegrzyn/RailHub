@@ -308,7 +308,7 @@ of every kind in its neighbourhood (the cell and the six around it):
 | Ore | mine, clay pit, limestone quarry, sand pit 1 |
 | Timber | lumber mill 1 |
 | Trade | port 1 |
-| Industry | factory 1, big factory 3, mega factory 9, cannery 2, steel mill 3, shipyard 3, machine works, plastics works, appliance factory 3, power plant 5, other works 2 |
+| Industry | factory 1, big factory 3, mega factory 9, cannery 2, steel mill 3, shipyard 3, machine works, plastics works, appliance factory 3, coal power plant 5, diesel and gas power plants 4, other works 2 |
 | Corporate | tavern 1, department store 3, hotel 5, skyscraper 10 |
 | Worship | church 5, basilica 20, cathedral 50, St. Paul cathedral 2137 |
 
@@ -471,7 +471,9 @@ bakery a station can reach is worth having.
 | Tavern | | 20 beer, 10 vodka |
 | Department store (1880) | | 20 clothes, 20 shoes, 10 furniture, 5 porcelain, 10 appliances (from 1950) |
 | Hotel (1900) | | 80 food, 10 wine, 10 beer, 10 newspapers |
-| Power plant (1900) | | 200 boiler fuel |
+| Coal power plant (1882) | | 200 coal |
+| Diesel power plant (1905) | | 100 diesel fuel |
+| Gas power plant (1930) | | 150 gas |
 | Farm, from 1920 | | 1 machinery |
 
 Steel mills, canneries, factories, shipyards and every works are processors: each keeps a stockpile of up to
@@ -486,8 +488,8 @@ of bread, which sells for $8 against wheat's $6. An input that does not exist ye
 a recipe until its year: a big factory works on steel alone until copper comes in 1880, and a mega
 factory needs machinery only from 1870. Breweries take their wheat with the bakeries, distilleries
 their potatoes and sugar refineries their sugar before houses eat what is left. Homes burn
-lumber, coal or (from 1950) gas for heating, and power plants and chemical works burn coal, oil or
-gas as boiler fuel; a station hands out the dearest of them first, as it does for every need. Cattle ranches
+lumber, coal or (from 1950) gas for heating, chemical works burn coal, oil or gas as boiler fuel,
+and coal, diesel and gas power plants burn coal, diesel fuel and gas; a station hands out the dearest of them first, as it does for every need. Cattle ranches
 and sheep farms eat a lot of wheat, alongside the bakeries and breweries, and their cattle and
 sheep go to tanneries and meat factories; meat feeds houses like any food.
 
@@ -546,9 +548,13 @@ Other works open anywhere by chance, a little likelier where people and industry
 or not their inputs are near, so their inputs usually have to be brought from far away. No
 factory, mill or works needs people nearby. Jewellers appear only in the bigger towns (20
 population points nearby) and car dealers only in big cities (120), and a map holds only a few:
-one jeweller per 26,000 land cells, one car dealer per 16,000. Power plants open from 1900 where
-at least 40 population points live nearby, 6 hexes apart and one per 15,000 land cells, and
-count as 5 industry points, so factories gather around them. A map has only a few printing
+one jeweller per 26,000 land cells, one car dealer per 16,000. Power plants go up as the map
+wants electricity (`railroads.sim.power_plants`): coal ones from 1882, diesel ones from 1905 and
+gas ones from 1930. Once a year, if the plants standing would make less than the electrified homes
+and factories want, one more goes up, by whichever of the 12 biggest towns with no plant within 6
+cells has the most of a plant's fuel made within 10 cells, burning that fuel, or by the biggest of
+them burning coal where none has any. Coal plants count as 5 industry points and the others as 4,
+so factories gather around them. A map has only a few printing
 works too, one per 40,000 land cells, each printing 3,000 newspapers a month for every home
 around. Jewellers also keep at least 10
 hexes from one another, so they spread over the towns rather than clumping in one. Chemical works, refineries, car factories and electronics plants are capped the same way.
@@ -642,15 +648,19 @@ station's stockpile at the market price, the rest at retail, 50% dearer, or 25% 
 customer node of the commerce tree. Coal and diesel engines carry only so much, so a train can't
 set off for a stop further than its range: the first steam engines run only 4 to 12 cells, the
 Planet 20, and lines need stations to take on fuel along the way; electrics run as far as the
-wires go. Every fuel's price rises with inflation, compounded every year (coal 2% a year from
-1840, diesel fuel 1.5% from 1935, electricity 1% from 1925), and in a tug of war between demand
-and supply: the coal or diesel fuel the map's buildings need and the player's trains bought last
+wires go. Every fuel's price, from the year it comes in (coal 1804, electricity 1925, diesel fuel
+1935), moves only in a tug of war between demand and supply, between 0.4 and 4 times its first
+price: the coal or diesel fuel the map's buildings need and the player's trains bought last
 month against what the player's stations hand out to those buildings and a quarter of what the
 map's mines or refineries can make, measured against the first month of play, the price moving a
-quarter of the way to where they put it each month. Electricity costs twice as much while the
-map's power plants get none of their fuel, less as they get it; a power plant the player buys,
-for $2,000,000, makes 3,000 units a month at full fuel, which their trains use first at a fifth of
-the price. The Reports window's Fuel tab charts every fuel's price over the years and shows what
+quarter of the way to where they put it each month. Electricity always has a sensible price, $5
+a unit, which moves a little, between 0.7 and 1.5 times that, with supply against demand: it is
+wanted by the player's electric and maglev trains and by the map's homes and factories, 10 units a
+month for each of their points times the share of them electrified, none in 1880 rising evenly
+to all in 2030 (they only pull the price and need no power delivered), and made by the map's
+coal, diesel and gas power plants, 3,000 units a month each at full fuel and less on less, so
+bringing them their fuel makes electricity cheaper. A power plant of any kind the player buys, for $2,000,000, counts among the map's, and their trains use what it makes first, at
+a fifth of the price. The Reports window's Fuel tab charts every fuel's price over the years and shows what
 moved it last month and what the trains bought. Each line
 has a job. Light engines are cheap to buy and run and up to speed in 3 seconds or less, but pull
 two or three cars slowly, and a load slows them half as much again as the Planet: for short lines
@@ -767,7 +777,10 @@ beside the station or its other platforms, with its own way through that Q turns
 the cell costs, and the station window offers it again until it is built. Lines then come into the
 station from more sides; trains cross between platforms beside each other inside the station, reach
 it at whichever platform their way comes to first and set off again from there. Platforms go with
-their station when it is bulldozed or moved; levels 4 and 5 look like level 3 for now. Every month each station costs
+their station when it is bulldozed or moved. A station hands goods out and gathers them around
+every platform as well as its own cell. Level 4 is drawn as a junction station between two clock
+towers under a long glass shed, level 5 as a central station with a tall clock tower and three
+sheds, and an added platform as a stone island under a long canopy. Every month each station costs
 $1,000 in upkeep at the first level, $2,000, $4,000, $8,000 and $16,000 at the next, rising 2% a
 year, compounded, from the year play began, and each cell of track $2,
 $40 more where it is electric, $60 more where it is maglev, and 1.8 times as much where it is double, charged once a cell for

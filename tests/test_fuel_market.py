@@ -6,14 +6,16 @@ from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.economy import Trade
 from railroads.sim.fuel_market import (
     BASE_PRICE,
-    ELECTRICITY_SHORT,
+    ELECTRICITY_LEAST,
+    ELECTRICITY_MOST,
+    ELECTRICITY_PER_POINT,
     OWN_POWER_SHARE,
     POWER_PLANT_OUTPUT,
     RETAIL_MARKUP,
     Fuel,
     FuelMarket,
     Signals,
-    inflation,
+    electrified,
     signals_of,
 )
 from railroads.sim.goods import Good, Need
@@ -50,10 +52,13 @@ def set_off(railway: Railway, engine: str = "planet") -> float:
     return -railway.finances.month["coal"]
 
 
-def test_fuel_prices_rise_every_year_compounded() -> None:
-    years = [inflation(Fuel.COAL, year) for year in (1840, 1841, 1842)]
+def test_fuel_prices_stay_put_over_the_years_without_market_pressure() -> None:
+    market = FuelMarket()
 
-    assert years == [1.0, pytest.approx(1.02), pytest.approx(1.02**2)]
+    for year in (1850, 1900, 1950):
+        market.month(year, {Fuel.COAL: Signals(buildings=1000.0, natural=1000.0)})
+
+    assert {month.price for month in market.history[Fuel.COAL]} == {BASE_PRICE[Fuel.COAL]}
 
 
 def test_a_train_setting_off_buys_the_coal_for_its_way_at_retail_without_coal_at_the_station() -> (
@@ -64,7 +69,7 @@ def test_a_train_setting_off_buys_the_coal_for_its_way_at_retail_without_coal_at
     paid = set_off(railway)
 
     leg = 17.0
-    price = BASE_PRICE[Fuel.COAL] * inflation(Fuel.COAL, 1850) * (1 + RETAIL_MARKUP)
+    price = BASE_PRICE[Fuel.COAL] * (1 + RETAIL_MARKUP)
     assert paid == pytest.approx(ENGINES["planet"].burn * leg * price, rel=0.05)
 
 
@@ -103,7 +108,7 @@ def test_a_train_cannot_set_off_for_a_stop_further_than_its_fuel_takes_it() -> N
 def test_more_demand_against_supply_than_in_the_first_month_raises_the_price_bit_by_bit() -> None:
     market = FuelMarket()
     market.month(1850, {Fuel.COAL: Signals(buildings=1000.0, natural=1000.0)})
-    first = market.price(Fuel.COAL, 1850)
+    first = market.price(Fuel.COAL)
 
     for _ in range(3):
         market.month(1850, {Fuel.COAL: Signals(buildings=4000.0, natural=1000.0)})
@@ -125,7 +130,7 @@ def test_coal_handed_out_by_the_players_stations_brings_the_price_down() -> None
 
 def test_the_coal_trains_buy_counts_towards_next_months_demand() -> None:
     market = FuelMarket()
-    market.buy(Fuel.COAL, 250.0, 1850)
+    market.buy(Fuel.COAL, 250.0)
 
     market.month(1850, {Fuel.COAL: Signals(buildings=1000.0, natural=1000.0)})
 
@@ -133,23 +138,54 @@ def test_the_coal_trains_buy_counts_towards_next_months_demand() -> None:
     assert market.last_bought[Fuel.COAL] == 250.0
 
 
-def test_electricity_is_dear_until_the_maps_power_plants_get_their_fuel() -> None:
-    starved, fed = FuelMarket(), FuelMarket()
+def test_electricity_rests_at_its_base_price_with_no_trains_or_plants() -> None:
+    market = FuelMarket()
 
     for _ in range(40):
-        starved.month(1950, {Fuel.ELECTRICITY: Signals(plants_fed=0.0)})
-        fed.month(1950, {Fuel.ELECTRICITY: Signals(plants_fed=1.0)})
+        market.month(1950, {Fuel.ELECTRICITY: Signals(buildings=5000.0, natural=5000.0)})
 
-    assert starved.factor[Fuel.ELECTRICITY] == pytest.approx(ELECTRICITY_SHORT, rel=1e-3)
-    assert fed.factor[Fuel.ELECTRICITY] == pytest.approx(1.0)
+    assert market.price(Fuel.ELECTRICITY) == pytest.approx(BASE_PRICE[Fuel.ELECTRICITY])
+
+
+def test_electric_trains_raise_the_price_and_power_plants_lower_it_but_only_a_little() -> None:
+    busy, powered = FuelMarket(), FuelMarket()
+
+    for _ in range(60):
+        busy.buy(Fuel.ELECTRICITY, 50_000.0)
+        busy.month(1950, {Fuel.ELECTRICITY: Signals(buildings=5000.0, natural=5000.0)})
+        powered.month(
+            1950, {Fuel.ELECTRICITY: Signals(buildings=5000.0, network=50_000.0, natural=5000.0)}
+        )
+
+    base = BASE_PRICE[Fuel.ELECTRICITY]
+    assert busy.price(Fuel.ELECTRICITY) == pytest.approx(ELECTRICITY_MOST * base, rel=1e-3)
+    assert powered.price(Fuel.ELECTRICITY) == pytest.approx(ELECTRICITY_LEAST * base, rel=1e-3)
+
+
+@pytest.mark.parametrize(("year", "share"), [(1850, 0.0), (1880, 0.0), (1955, 0.5), (2030, 1.0)])
+def test_homes_and_factories_are_electrified_bit_by_bit_and_all_by_2030(
+    year: int, share: float
+) -> None:
+    electrified_now = electrified(year)
+
+    assert electrified_now == pytest.approx(share)
+
+
+def test_homes_and_factories_want_electricity_by_their_points_and_how_far_electrified() -> None:
+    trade = Trade(np.array([0]), {}, {}, {}, {})
+
+    signals = signals_of(trade, None, 1000.0, 1955)
+
+    assert signals[Fuel.ELECTRICITY].buildings == pytest.approx(ELECTRICITY_PER_POINT * 1000 * 0.5)
+    assert signals[Fuel.ELECTRICITY].natural == 0.0
 
 
 def test_electricity_from_the_players_own_power_plants_costs_a_fifth() -> None:
     market = FuelMarket()
     market.month(1950, {Fuel.ELECTRICITY: Signals(plants_fed=1.0, own_power=100.0)})
-    price = market.price(Fuel.ELECTRICITY, 1950)
+    price = market.price(Fuel.ELECTRICITY)
 
-    cost = market.buy(Fuel.ELECTRICITY, 150.0, 1950)
+    cost = market.buy(Fuel.ELECTRICITY, 150.0)
 
     assert cost == pytest.approx(100.0 * price * OWN_POWER_SHARE + 50.0 * price)
     assert market.own_power == 0.0
@@ -158,17 +194,18 @@ def test_electricity_from_the_players_own_power_plants_costs_a_fifth() -> None:
 def test_a_fed_power_plant_the_player_owns_makes_electricity_and_others_do_not() -> None:
     cells = np.array([0, 1])
     got = {
-        (BuildingKind.POWER_PLANT, Need.BOILER_FUEL): (
+        (BuildingKind.POWER_PLANT, Need.COAL): (
             np.array([200.0, 200.0]),
             np.array([200.0, 200.0]),
         )
     }
     trade = Trade(cells, {}, {}, {}, {}, goods_got=got)
-    owned = np.array([[1, 0]])
+    owned = {BuildingKind.POWER_PLANT: np.array([[1, 0]])}
 
     signals = signals_of(trade, owned)
 
     assert signals[Fuel.ELECTRICITY].own_power == pytest.approx(POWER_PLANT_OUTPUT)
+    assert signals[Fuel.ELECTRICITY].network == pytest.approx(2 * POWER_PLANT_OUTPUT)
     assert signals[Fuel.ELECTRICITY].plants_fed == pytest.approx(1.0)
 
 

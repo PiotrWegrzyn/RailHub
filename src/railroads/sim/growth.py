@@ -74,6 +74,7 @@ from railroads.sim.ladders import (
     Points,
 )
 from railroads.sim.ownership import Owners
+from railroads.sim.power_plants import build_power_plants
 from railroads.sim.railway import Railway
 from railroads.sim.room import Room
 from railroads.sim.station_trade import StationTrade
@@ -655,6 +656,8 @@ class Growth:
             yield
         if self.novelties is not None and reached(12):
             changed |= self.novelties.year(self, rng)
+        if reached(12):
+            changed |= build_power_plants(self)
         every = self.rule.forests_every_months
         if self.rule.forests is not None and reached(every):
             changed |= change_forests(self, self.rule.forests, every, rng)

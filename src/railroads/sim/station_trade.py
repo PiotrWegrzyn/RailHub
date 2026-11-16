@@ -37,8 +37,9 @@ from railroads.sim.goods import (
     needs_of,
     price_of,
 )
-from railroads.sim.grids import Cell, flat_within
+from railroads.sim.grids import Cell, Within, flat_within_any
 from railroads.sim.ladders import PASSENGERS_PER_POINT
+from railroads.sim.power_plants import powered_points
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.tech import GOOD_TREES, Tree
 from railroads.sim.trains import CAR_CAPACITY, MAX_CARS
@@ -73,7 +74,13 @@ class StationTrade:
             delivery, collection = railway.reach(station)
             freight = {g: a for g, a in goods.stockpile.items() if g not in TRAVELLERS}
             orders[station] = StationOrder(
-                dict(goods.brought), goods.limit, delivery, collection, freight, goods.kept
+                dict(goods.brought),
+                goods.limit,
+                delivery,
+                collection,
+                freight,
+                goods.kept,
+                tuple(self._growth.constructions.platforms(station)),
             )
         return orders
 
@@ -93,7 +100,7 @@ class StationTrade:
             goods = railway.station_goods(station)
             for good, amount in supplied.items():
                 goods.stockpile[good] = max(0.0, goods.stockpile.get(good, 0.0) - amount)
-        railway.fuel_month(trade)
+        railway.fuel_month(trade, powered_points(self._growth))
         capacity = {}
         stations = railway.stations()
         for station, counts in zip(stations, self._ring_counts(stations), strict=True):
@@ -122,7 +129,7 @@ class StationTrade:
         goods = railway.station_goods(station)
         if good in goods.kept:
             return
-        within = flat_within(growth.grid, station, railway.reach(station)[0])
+        within = self._within(station, railway.reach(station)[0])
         cells = within.cells[np.argsort(within.steps, kind="stable")]
         economy, year = growth.economy, growth.year
         if economy.taken is None:
@@ -222,7 +229,12 @@ class StationTrade:
         written to."""
         railway = self._growth.railway
         radius = DELIVERY_RADIUS if railway is None else railway.reach(station)[0]
-        return flat_within(self._growth.grid, station, radius).cells
+        return self._within(station, radius).cells
+
+    def _within(self, station: Cell, radius: int) -> Within:
+        """The cells within `radius` of a station or any of its platforms."""
+        cells = tuple(self._growth.constructions.station_cells(station))
+        return flat_within_any(self._growth.grid, cells, radius)
 
     def supplies(self, station: Cell) -> dict[Good, float]:
         """What the station has to send on each month: the goods buildings make within the
@@ -230,7 +242,7 @@ class StationTrade:
         the buildings it hands out to send."""
         railway = self._growth.railway
         radius = COLLECTION_RADIUS if railway is None else railway.reach(station)[1]
-        cells = flat_within(self._growth.grid, station, radius).cells
+        cells = self._within(station, radius).cells
         made: dict[Good, float] = {}
         for kind, count in self._growth.counts.items():
             n = float(count.ravel()[cells].sum())

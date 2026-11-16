@@ -10,7 +10,7 @@ import numpy as np
 from imgui_bundle import imgui, implot
 
 from railroads.sim.finance import Finances, dollars
-from railroads.sim.fuel_market import Fuel, FuelMarket, FuelMonth
+from railroads.sim.fuel_market import Fuel, FuelMarket, FuelMonth, electrified
 from railroads.sim.goods import Good
 from railroads.sim.stats import History
 from railroads.ui.theme import GOOD_COLORS
@@ -122,13 +122,18 @@ def fuel_breakdown(fuel: Fuel, month: FuelMonth) -> list[tuple[str, str]]:
             "Price",
             f"{dollars(month.price)} a unit" if month.price >= 1 else f"${month.price:.2f} a unit",
         ),
-        ("Inflation since it came in", f"x{month.inflation:.2f}"),
     ]
     if fuel == Fuel.ELECTRICITY:
+        demand, supply = month.buildings + month.trains, month.network + month.natural
         rows += [
-            ("Fuel the map's power plants got", f"{month.plants_fed:.0%}"),
-            ("Made by your power plants", f"{month.own_power:,.0f}"),
-            ("Your trains used", f"{month.trains:,.0f}"),
+            ("Homes and factories electrified", f"{electrified(month.year):.0%}"),
+            ("Wanted by them", f"{month.buildings:,.0f}"),
+            ("Used by your trains", f"{month.trains:,.0f}"),
+            ("Made by the map's power plants", f"{month.network:,.0f}"),
+            ("Fuel those plants got", f"{month.plants_fed:.0%}"),
+            ("Of it by your own plants", f"{month.own_power:,.0f}"),
+            ("From the world around", f"{month.natural:,.0f}"),
+            ("Demand against supply", f"{demand:,.0f} / {supply:,.0f}"),
         ]
         return rows
     demand, supply = month.buildings + month.trains, month.network + month.natural

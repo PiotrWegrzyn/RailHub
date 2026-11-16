@@ -88,7 +88,9 @@ class Game:
         """The month in a few steps, which a caller can spread over frames; nothing else may
         change the game between them."""
         railway = self.railway
-        reach = self._reach.of(railway.stations(), lambda s: railway.reach(s)[1])
+        reach = self._reach.of(
+            railway.stations(), lambda s: railway.reach(s)[1], self.constructions.platforms
+        )
         with self.growth.log_changes() as changes:
             if self.stand_in is None:
                 changed = yield from self.growth.month_steps(rng)

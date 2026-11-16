@@ -410,8 +410,10 @@ def draw_station_reach(
     camera: IsoCamera,
     center: Vec2,
     reach: Callable[[Cell], tuple[int, int]],
+    platforms: Callable[[Cell], list[Cell]] = lambda _: [],
 ) -> None:
-    """Shades the cells stations reach, cell by cell as in Civilization: every station's area
+    """Shades the cells stations reach, from their own cells and their `platforms`, cell by
+    cell as in Civilization: every station's area
     where it hands goods out, the focused one (being placed, under the mouse or open) in its own
     colour, cells two stations share in grey, the border of where the focused station gathers
     goods, and the stations' own cells in solid blue. `reach` says how far each station hands
@@ -420,8 +422,9 @@ def draw_station_reach(
     owners: dict[Cell, set[Cell]] = {}
     shown = {*stations, focus}
     for station in shown:
-        for cell in grid.within(station, reach(station)[0]):
-            owners.setdefault(cell, set()).add(station)
+        for own in (station, *platforms(station)):
+            for cell in grid.within(own, reach(station)[0]):
+                owners.setdefault(cell, set()).add(station)
     hexes = [
         (
             grid.corners(*cell),
@@ -429,8 +432,12 @@ def draw_station_reach(
         )
         for cell, by in owners.items()
     ]
-    hexes += [(grid.corners(*station), STATION_FILL) for station in shown]
-    border = _reach_border(grid, focus, reach(focus)[1])
+    hexes += [
+        (grid.corners(*own), STATION_FILL)
+        for station in shown
+        for own in (station, *platforms(station))
+    ]
+    border = _reach_border(grid, (focus, *platforms(focus)), reach(focus)[1])
     plane = [corner for corners, _ in hexes for corner in corners]
     plane += [end for edge in border for end in edge]
     xs, ys = (np.array(values, dtype=np.float64) for values in zip(*plane, strict=True))
@@ -448,11 +455,11 @@ def draw_station_reach(
 
 @lru_cache(maxsize=64)
 def _reach_border(
-    grid: Grid, station: Cell, steps: int
+    grid: Grid, cells: tuple[Cell, ...], steps: int
 ) -> tuple[tuple[tuple[float, float], tuple[float, float]], ...]:
-    """The border of the cells within `steps` of a station, worked out once: an open station
-    window draws it every frame, and finding it takes hundreds of lookups."""
-    return tuple(_border(grid, set(grid.within(station, steps))))
+    """The border of the cells within `steps` of a station's cells, worked out once: an open
+    station window draws it every frame, and finding it takes hundreds of lookups."""
+    return tuple(_border(grid, {near for cell in cells for near in grid.within(cell, steps)}))
 
 
 def _border(grid: Grid, cells: set[Cell]) -> list[tuple[tuple[float, float], tuple[float, float]]]:

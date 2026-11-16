@@ -502,6 +502,7 @@ class MapView:
                     marks,
                     center,
                     self.railway.reach,
+                    self.constructions.platforms,
                 )
         opened = self.station_window.station
         if (
@@ -516,7 +517,14 @@ class MapView:
             and self.build.tool != Tool.STATION
         ):
             draw_station_reach(
-                draw_list, self.tile_map.grid, opened, [], marks, center, self.railway.reach
+                draw_list,
+                self.tile_map.grid,
+                opened,
+                [],
+                marks,
+                center,
+                self.railway.reach,
+                self.constructions.platforms,
             )
         if self.selected is not None:
             draw_outline(
