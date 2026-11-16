@@ -97,7 +97,15 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
                 E.UNLOCK,
                 0.0,
                 "stalls",
-                opens="general food cars, taking whichever food pays best",
+                opens="general food cars, taking whichever grown food pays best",
+            ),
+            _n(
+                "provision_vans",
+                "Provision vans",
+                E.UNLOCK,
+                0.0,
+                "mixed_vans",
+                opens="general processed food cars of 25, taking whichever pays best",
             ),
             _n("bread", "Branded bread", E.PRICE, 0.1, "stalls"),
             _n("fertiliser", "Fertiliser", E.PRODUCTION, 0.2, "rotation"),
@@ -323,7 +331,11 @@ SHOPS = frozenset(
 
 # The node that opens each general car (railroads.sim.trains).
 GENERAL_CARS: Mapping[General, str] = MappingProxyType(
-    {General.FOOD: "mixed_vans", General.COMMON: "parcel_vans"}
+    {
+        General.FOOD: "mixed_vans",
+        General.PROCESSED_FOOD: "provision_vans",
+        General.COMMON: "parcel_vans",
+    }
 )
 
 

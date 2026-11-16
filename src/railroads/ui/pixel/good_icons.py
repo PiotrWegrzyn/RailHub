@@ -1003,11 +1003,21 @@ def _crate(p: Painter) -> None:
 
 
 def general_food() -> Sprite:
-    """A crate heaped with a loaf, an apple and a fish."""
+    """A crate heaped with an ear of wheat, an apple and a fish."""
     p = _canvas()
-    p.ellipse(-7, -6, 1, -1, (212, 150, 76))
-    p.ellipse(0, -7, 6, -1, (212, 42, 58))
+    p.line([(-6, 0), (-4, -8)], (232, 190, 86))
+    p.ellipse(-3, -7, 3, -1, (212, 42, 58))
     p.polygon([(2, -3), (8, -5), (8, -1)], (110, 170, 200))
+    _crate(p)
+    return p.sprite()
+
+
+def general_processed_food() -> Sprite:
+    """A crate heaped with a loaf, a tin and a bottle of juice."""
+    p = _canvas()
+    p.ellipse(-8, -5, -1, -1, (212, 150, 76))
+    p.rect(0, -6, 3, -1, (176, 184, 196))
+    p.rect(4, -8, 7, -1, (244, 152, 40))
     _crate(p)
     return p.sprite()
 
@@ -1097,6 +1107,7 @@ ICONS: dict[str, Callable[[], Sprite]] = {
     "common goods": common_goods,
     "juice": juice,
     "general food": general_food,
+    "general processed food": general_processed_food,
     "general common goods": general_common_goods,
     "pigs": pigs,
     "chickens": chickens,

@@ -88,7 +88,7 @@ class StationCalls:
         railway = self._railway
         if isinstance(cargo, General):
             good = GENERAL_GOODS[cargo][0]
-            return Car(good, capacity=railway.car_capacity(good, engine), general=cargo)
+            return Car(good, capacity=railway.car_capacity(good, engine, cargo), general=cargo)
         return Car(cargo, capacity=railway.car_capacity(cargo, engine))
 
     def _swap_cars(
@@ -162,7 +162,7 @@ class StationCalls:
         demand = None if destination is None else self._railway.station_demand(destination)
         best: tuple[float, float, Good] | None = None
         for good in GENERAL_GOODS[car.general]:
-            capacity = self._railway.car_capacity(good, train.engine)
+            capacity = self._railway.car_capacity(good, train.engine, car.general)
             amount = min(capacity, self.spare(stop, good))
             if amount <= 1e-9:
                 continue
@@ -173,4 +173,4 @@ class StationCalls:
                 best = (worth, amount, good)
         if best is not None:
             car.good = best[2]
-            car.capacity = self._railway.car_capacity(best[2], train.engine)
+            car.capacity = self._railway.car_capacity(best[2], train.engine, car.general)

@@ -206,16 +206,25 @@ COMMON_GOODS = (
 )
 
 
+# Food made from other goods; the rest of the food is grown, caught or gathered.
+PROCESSED_FOODS = (Good.CANS, Good.BREAD, Good.MEAT, Good.DAIRY, Good.SAUSAGES, Good.JUICE)
+
+
 class General(Enum):
     """A car for a whole kind of goods (railroads.sim.trains), which takes whichever of them pays
     best where the train goes next."""
 
     FOOD = "general food"
+    PROCESSED_FOOD = "general processed food"
     COMMON = "general common goods"
 
 
 GENERAL_GOODS: Mapping[General, tuple[Good, ...]] = MappingProxyType(
-    {General.FOOD: FOODS, General.COMMON: COMMON_GOODS}
+    {
+        General.FOOD: tuple(good for good in FOODS if good not in PROCESSED_FOODS),
+        General.PROCESSED_FOOD: PROCESSED_FOODS,
+        General.COMMON: COMMON_GOODS,
+    }
 )
 
 # The goods that meet each need.
