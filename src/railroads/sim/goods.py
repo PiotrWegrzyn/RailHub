@@ -105,6 +105,7 @@ class Good(Enum):
     CASTINGS = "castings"
     SAUSAGES = "sausages"
     LUXURIES = "luxury goods"
+    JUICE = "juice"
     PASSENGERS = "passengers"
     MAIL = "mail"
 
@@ -191,6 +192,7 @@ FOODS = (
     Good.EGGS,
     Good.DAIRY,
     Good.SAUSAGES,
+    Good.JUICE,
 )
 
 # Everyday things for the home: any of them meets a home's need for common goods.
@@ -323,6 +325,7 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.STOVE_TILES: 25,
         Good.CASTINGS: 30,
         Good.SAUSAGES: 14,
+        Good.JUICE: 20,
         Good.LUXURIES: 300,
         Good.SHEEP: 8,
         Good.MEAT: 8,
@@ -395,21 +398,59 @@ HANDED_OUT: Mapping[Need, tuple[Good, ...]] = MappingProxyType(
 TRAVELLERS = (Good.PASSENGERS, Good.MAIL)
 
 
+# How much more a building makes with all of what boosts it (boosts_of): its share of its boosts
+# times this, unless its recipe says otherwise.
+BOOST_MOST = 1.0
+
+
 @dataclass(frozen=True, slots=True)
 class Recipe:
     """What a processor makes, the most of it one building makes in a month, and how much of
-    each input every unit of it takes; and the inputs it can do without that make it make up to
-    BOOST_MOST more (boosts), and how much of each every unit it makes takes for that."""
+    each input every unit of it takes; the inputs it can do without that make it make up to
+    boost_most more (boosts), and how much of each every unit it makes takes for that; and the
+    inputs another can stand in for (swaps), with how many times as much every unit of the
+    other inputs makes with it: plastic for glass at a juice works makes twice the juice from
+    the same fruit."""
 
     makes: Good
     most: float
     per_unit: Mapping[Need, float]
     boosts: Mapping[Need, float] = field(default_factory=dict)
+    swaps: Mapping[Need, tuple[Need, float]] = field(default_factory=dict)
+    boost_most: float = BOOST_MOST
 
     def inputs(self, year: int) -> Mapping[Need, float]:
         """What every unit takes in a given year: an input whose need starts later is left out
         until then."""
         return _inputs(self, year)
+
+    def swaps_in(self, year: int) -> dict[Need, tuple[Need, float]]:
+        """The swaps of inputs there are in a given year: both needs must have started."""
+        inputs = self.inputs(year)
+        return {
+            need: (swap, times)
+            for need, (swap, times) in self.swaps.items()
+            if need in inputs and NEED_YEARS.get(swap, 0) <= year
+        }
+
+    def takes(self, year: int) -> set[Need]:
+        """Every input it takes in a given year, those that stand in for others included."""
+        return set(self.inputs(year)) | {swap for swap, _ in self.swaps_in(year).values()}
+
+    @property
+    def every_need(self) -> set[Need]:
+        """Every need it ever takes in: inputs, boosts and the inputs standing in for others."""
+        return {*self.per_unit, *self.boosts, *(swap for swap, _ in self.swaps.values())}
+
+    def needs(self) -> dict[Need, float]:
+        """What one building takes in a month to make the most it can: of an input another can
+        stand in for, as much of either."""
+        needs = {
+            need: self.most * amount for need, amount in {**self.per_unit, **self.boosts}.items()
+        }
+        for need, (swap, times) in self.swaps.items():
+            needs[swap] = self.most * self.per_unit[need] / times
+        return needs
 
 
 _RECIPE_INPUTS: dict[tuple[int, int], tuple[Recipe, Mapping[Need, float]]] = {}
@@ -427,10 +468,6 @@ def _inputs(recipe: Recipe, year: int) -> Mapping[Need, float]:
         kept = _RECIPE_INPUTS[(id(recipe), year)] = (recipe, MappingProxyType(inputs))
     return kept[1]
 
-
-# How much more a building makes with all of what boosts it (boosts_of): its share of its boosts
-# times this.
-BOOST_MOST = 1.0
 
 # How many works of a kind merge into the next size up (railroads.sim.constructions.MERGED):
 # makers of food three, others two; and how much more than they made apart the merged one makes.
@@ -481,7 +518,17 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
                 Good.PLANES, 20, {Need.STEEL: 3, Need.COPPER: 1, Need.FUEL: 1, Need.ELECTRONICS: 1}
             ),
             BuildingKind.FOOD_PLANT: Recipe(Good.CANS, 300, {Need.FRUIT: 0.3, Need.STEEL: 0.1}),
-            BuildingKind.BAKERY: Recipe(Good.BREAD, 120, {Need.WHEAT: 0.4}),
+            BuildingKind.BAKERY: Recipe(
+                Good.BREAD, 120, {Need.WHEAT: 0.4}, {Need.REFINED_SUGAR: 0.05}, boost_most=0.5
+            ),
+            BuildingKind.JUICE_WORKS: Recipe(
+                Good.JUICE,
+                100,
+                {Need.FRUIT: 0.5, Need.GLASS: 0.5},
+                {Need.REFINED_SUGAR: 0.1},
+                swaps={Need.GLASS: (Need.PLASTICS, 2.0)},
+                boost_most=0.5,
+            ),
             BuildingKind.FACTORY: Recipe(Good.GOODS, 30, {Need.LUMBER: 1 / 3, Need.STEEL: 1 / 3}),
             BuildingKind.BIG_FACTORY: Recipe(
                 Good.GOODS, 90, {Need.STEEL: 1 / 3, Need.COPPER: 1 / 3}
@@ -720,13 +767,7 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.BASILICA: {Need.WAX: 30, Need.INCENSE: 20},
         BuildingKind.CATHEDRAL: {Need.WAX: 60, Need.INCENSE: 40},
         BuildingKind.ST_PAULS: {Need.WAX: 200, Need.INCENSE: 120},
-        **{
-            kind: {
-                need: recipe.most * amount
-                for need, amount in {**recipe.per_unit, **recipe.boosts}.items()
-            }
-            for kind, recipe in RECIPES.items()
-        },
+        **{kind: recipe.needs() for kind, recipe in RECIPES.items()},
     }
 )
 
@@ -817,7 +858,6 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     BuildingKind.PLANE_FACTORY,
     Need.PLANES,
     Need.HEATING,
-    BuildingKind.BAKERY,
     BuildingKind.BREWERY,
     Need.BEER,
     Need.POTATOES,
@@ -826,6 +866,7 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.SUGAR,
     BuildingKind.SUGAR_REFINERY,
     Need.REFINED_SUGAR,
+    BuildingKind.BAKERY,
     Need.ANIMALS,
     BuildingKind.MEAT_FACTORY,
     Need.MEAT,
@@ -834,6 +875,7 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     BuildingKind.DAIRY,
     Need.FRUIT,
     BuildingKind.FOOD_PLANT,
+    BuildingKind.JUICE_WORKS,
     Need.FOOD,
     BuildingKind.FACTORY,
     BuildingKind.BIG_FACTORY,

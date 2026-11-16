@@ -246,6 +246,7 @@ _GOODS: Mapping[Tree, tuple[Good, ...]] = {
         Good.MILK,
         Good.DAIRY,
         Good.SAUSAGES,
+        Good.JUICE,
         Good.GRAPES,
         Good.WINE,
         Good.COFFEE,

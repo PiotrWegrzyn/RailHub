@@ -152,6 +152,7 @@ BUILDING_SPRITES = {
     BuildingKind.TAVERN: "tavern",
     BuildingKind.DEPARTMENT_STORE: "department_store",
     BuildingKind.HOTEL: "hotel",
+    BuildingKind.JUICE_WORKS: "winery",
 }
 
 # Big and mega works look like the works they grew from.

@@ -122,6 +122,7 @@ DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.TAVERN: ((196, 130, 56), 0.1),
     BuildingKind.DEPARTMENT_STORE: ((232, 200, 110), 0.16),
     BuildingKind.HOTEL: ((200, 70, 90), 0.16),
+    BuildingKind.JUICE_WORKS: ((236, 150, 40), 0.1),
 }
 
 # A big works shows in its own colour a little darker and larger, a mega one more so.

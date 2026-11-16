@@ -196,6 +196,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.TAVERN: (Points.CORPORATE, 1),
     BuildingKind.DEPARTMENT_STORE: (Points.CORPORATE, 3),
     BuildingKind.HOTEL: (Points.CORPORATE, 5),
+    BuildingKind.JUICE_WORKS: (Points.INDUSTRY, 1),
 }
 
 # A big works gives the points of the works merged into it, and a mega one of the big ones.
@@ -789,6 +790,7 @@ TOWN_CRAFTS = (
     _town_craft(BuildingKind.TILE_WORKS, 0.5),
     _town_craft(BuildingKind.FOUNDRY, 0.5, 1800),
     _town_craft(BuildingKind.SAUSAGE_MAKER, 6.25, 1850, FOOD_TOWN),
+    _town_craft(BuildingKind.JUICE_WORKS, 5.0, 1870, FOOD_TOWN),
     _town_craft(BuildingKind.CARPET_WEAVER, 0.1, 1700, LUXURY_TOWN),
     _town_craft(BuildingKind.CLOCK_MAKER, 0.1, 1880, LUXURY_TOWN),
     _town_craft(BuildingKind.MIRROR_MAKER, 0.1, 1700, LUXURY_TOWN),

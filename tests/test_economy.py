@@ -678,3 +678,49 @@ def test_any_common_good_meets_a_homes_need_for_common_goods(good: str) -> None:
     got, wanted = trade.goods_got[(BuildingKind.HOUSE, Need.COMMON)]
     at = position(trade, economy, (8, 9))
     assert got[at] == wanted[at] == 5.0
+
+
+@pytest.mark.parametrize(
+    ("held", "juice"),
+    [
+        ({"APPLES": 1.0, "GLASS": 1.0}, 2.0),
+        ({"APPLES": 1.0, "PLASTICS": 1.0}, 4.0),
+        ({"APPLES": 1.0, "GLASS": 1.0, "REFINED_SUGAR": 5.0}, 3.0),
+        ({"APPLES": 1.0, "PLASTICS": 1.0, "REFINED_SUGAR": 5.0}, 6.0),
+    ],
+)
+def test_a_juice_works_bottles_fruit_in_glass_twice_as_far_in_plastic_and_more_with_sugar(
+    held: dict[str, float], juice: float
+) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    economy.year = 1960
+    placed = counts(tile_map, ((8, 8), BuildingKind.JUICE_WORKS, 1))
+
+    trade = economy.trade(placed, holding(100.0, **held))
+
+    assert trade.gathered[STATION][Good.JUICE] == pytest.approx(juice)
+
+
+def test_plastic_bottles_only_once_there_is_plastic_in_1950() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    economy.year = 1949
+    placed = counts(tile_map, ((8, 8), BuildingKind.JUICE_WORKS, 1))
+
+    trade = economy.trade(placed, holding(100.0, APPLES=1.0, PLASTICS=1.0))
+
+    assert trade.gathered[STATION].get(Good.JUICE, 0.0) == 0.0
+
+
+@pytest.mark.parametrize(("sugar", "bread"), [(0.0, 12.5), (1.0, 18.75)])
+def test_refined_sugar_lets_a_bakery_bake_half_as_much_bread_again(
+    sugar: float, bread: float
+) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 8), BuildingKind.BAKERY, 1))
+
+    trade = economy.trade(placed, holding(100.0, WHEAT=5.0, REFINED_SUGAR=sugar))
+
+    assert trade.gathered[STATION][Good.BREAD] == pytest.approx(bread)

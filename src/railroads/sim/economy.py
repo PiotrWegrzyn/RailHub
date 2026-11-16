@@ -262,7 +262,7 @@ class Economy:
         self.stock: dict[tuple[BuildingKind, Need], FloatCells] = {
             (kind, need): np.zeros(self.cells)
             for kind, recipe in RECIPES.items()
-            for need in {**recipe.per_unit, **recipe.boosts}
+            for need in recipe.every_need
         }
 
     def trade(
@@ -367,7 +367,7 @@ class _Month:
         self.zero = np.zeros(cells.size)
         self.priority = economy.levels[cells]
         for kind, recipe in RECIPES.items():
-            for need in {**recipe.per_unit, **recipe.boosts}:
+            for need in recipe.every_need:
                 economy.stock.setdefault((kind, need), np.zeros(economy.cells))
         self.stock = {
             (kind, need): np.minimum(
@@ -400,7 +400,7 @@ class _Month:
                 self.offered[good] += self.count[kind] * amount
         # Per kind of processor, what it makes from its inputs alone, and the share it has of each
         # of its boosts; per kind making goods from the land, the share it has of its boosts.
-        self.boosted: dict[BuildingKind, tuple[FloatCells, dict[Need, FloatCells]]] = {}
+        self.uses: dict[BuildingKind, dict[Need, FloatCells]] = {}
         self.raw_boost: dict[BuildingKind, FloatCells] = {}
         self.received: dict[tuple[BuildingKind, Need], FloatCells] = {}
         self.brought = {station: dict(order.brought) for station, order in stations.items()}
@@ -452,9 +452,7 @@ class _Month:
         for kind, n in self.count.items():
             recipe = RECIPES.get(kind)
             year = self.economy.year
-            if recipe is not None and (
-                need in recipe.inputs(year) or need in boosts_of(kind, year)
-            ):
+            if recipe is not None and (need in recipe.takes(year) or need in boosts_of(kind, year)):
                 wants[kind] = np.maximum(input_stock(kind) * n - self.stock[(kind, need)], 0.0)
             elif recipe is None and need in needs_of(kind, self.economy.year):
                 wants[kind] = n * NEEDS[kind][need]
@@ -631,14 +629,37 @@ class _Month:
 
     def _produce(self, kind: BuildingKind) -> None:
         """Offers what a kind of processor could make from its stockpile: what its inputs allow,
-        and up to BOOST_MOST more by the share it has of its boosts."""
+        the inputs standing in for others first as they make the most, and up to the recipe's
+        boost_most more by the share it has of its boosts. Keeps how much of each input all of
+        that takes."""
         if kind not in self.count:
             return
         recipe = RECIPES[kind]
-        can = self.count[kind] * recipe.most
-        for need, per_unit in recipe.inputs(self.economy.year).items():
-            can = np.minimum(can, self.stock[(kind, need)] / per_unit)
-        boosts = boosts_of(kind, self.economy.year)
+        year = self.economy.year
+        inputs = recipe.inputs(year)
+        room = self.count[kind] * recipe.most
+        left = {need: self.stock[(kind, need)].copy() for need in inputs}
+        uses = {need: self.zero.copy() for need in recipe.takes(year)}
+        can = self.zero.copy()
+        for swapped, (swap, times) in recipe.swaps_in(year).items():
+            made = room.copy()
+            for need, per_unit in inputs.items():
+                held = self.stock[(kind, swap)] if need == swapped else left[need]
+                made = np.minimum(made, held / (per_unit / times))
+            for need, per_unit in inputs.items():
+                taken = made * per_unit / times
+                uses[swap if need == swapped else need] += taken
+                if need != swapped:
+                    left[need] -= taken
+            can += made
+            room = room - made
+        plain = room
+        for need, per_unit in inputs.items():
+            plain = np.minimum(plain, left[need] / per_unit)
+        for need, per_unit in inputs.items():
+            uses[need] += plain * per_unit
+        can += plain
+        boosts = boosts_of(kind, year)
         if boosts:
             shares = {
                 need: np.minimum(
@@ -648,8 +669,10 @@ class _Month:
                 * (can > 0)
                 for need in boosts
             }
-            self.boosted[kind] = (can, shares)
-            can = can * (1.0 + BOOST_MOST * sum(shares.values()) / len(shares))
+            for need, share in shares.items():
+                uses[need] = can * share * recipe.boosts[need]
+            can = can * (1.0 + recipe.boost_most * sum(shares.values()) / len(shares))
+        self.uses[kind] = uses
         self.offers[(kind, recipe.makes)] = can
         self.offered[recipe.makes] += can
 
@@ -690,12 +713,7 @@ class _Month:
             recipe = RECIPES.get(kind)
             if recipe is not None:
                 went = np.where(offer > 0, sent / np.where(offer > 0, offer, 1.0), 0.0)
-                base, shares = self.boosted.get(kind, (offer, {}))
-                used = {
-                    **{need: base * per for need, per in recipe.inputs(self.economy.year).items()},
-                    **{need: base * share * recipe.boosts[need] for need, share in shares.items()},
-                }
-                for need, amount in used.items():
+                for need, amount in self.uses.get(kind, {}).items():
                     key = (kind, need)
                     self.stock[key] = np.maximum(self.stock[key] - went * amount, 0.0)
         for key, stock in self.economy.stock.items():

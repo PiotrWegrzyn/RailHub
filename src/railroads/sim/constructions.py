@@ -133,6 +133,9 @@ class BuildingKind(Enum):
     TAVERN = "tavern"
     DEPARTMENT_STORE = "department store"
     HOTEL = "hotel"
+    JUICE_WORKS = "juice works"
+    BIG_JUICE_WORKS = "big juice works"
+    MEGA_JUICE_WORKS = "mega juice works"
     BIG_STEEL_MILL = "big steel mill"
     MEGA_STEEL_MILL = "mega steel mill"
     BIG_COKE_PLANT = "big coke plant"
@@ -374,6 +377,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.SUGAR_REFINERY,
             BuildingKind.PORCELAIN_WORKS,
             BuildingKind.MEAT_FACTORY,
+            BuildingKind.JUICE_WORKS,
         )
     },
 }

@@ -1025,6 +1025,17 @@ def general_common_goods() -> Sprite:
     return p.sprite()
 
 
+def juice() -> Sprite:
+    """A bottle of orange juice with a green cap."""
+    p = _canvas()
+    glass: RGB = (214, 232, 236)
+    p.rect(-2, -8, 2, -5, (70, 150, 70))
+    p.rect(-4, -5, 4, 7, glass)
+    p.rect(-3, -2, 3, 6, (244, 152, 40))
+    p.line([(-3, -1), (3, -1)], (255, 196, 92))
+    return p.sprite()
+
+
 ICONS: dict[str, Callable[[], Sprite]] = {
     "wheat": wheat,
     "apples": apples,
@@ -1084,6 +1095,7 @@ ICONS: dict[str, Callable[[], Sprite]] = {
     "sausages": sausages,
     "luxury goods": luxuries,
     "common goods": common_goods,
+    "juice": juice,
     "general food": general_food,
     "general common goods": general_common_goods,
     "pigs": pigs,
