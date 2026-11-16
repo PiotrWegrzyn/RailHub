@@ -5,6 +5,7 @@ from imgui_bundle import hello_imgui, imgui
 from test_app_frame import FakeTexture
 from test_railway import joined_stations
 
+from railroads.sim.finance import dollars
 from railroads.sim.goods import Good
 from railroads.sim.railway import Railway
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, Stop, Train
@@ -145,3 +146,11 @@ def test_an_express_shows_its_dining_car_and_dearer_fares_among_its_figures() ->
 
     assert pulls.endswith("coaches and a dining car")
     assert fares == f"Passengers only, paying {EXPRESS_FARE - 1:.0%} more"
+
+
+def test_an_engines_figures_show_what_it_costs_a_month_to_run() -> None:
+    engine = ENGINES["bullet"]
+
+    figures = dict(engine_figures(engine))
+
+    assert figures["Running cost"] == f"{dollars(engine.running)} a month"

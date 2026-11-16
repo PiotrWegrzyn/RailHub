@@ -188,6 +188,7 @@ def engine_figures(engine: Engine) -> list[tuple[str, str]]:
         ("Pulls up to", cars),
         ("Up to speed in", f"{engine.pickup:g} s"),
         ("Price", dollars(engine.price)),
+        ("Running cost", f"{dollars(engine.running)} a month"),
     ]
     if engine.express:
         figures.append(("Fares", f"Passengers only, paying {EXPRESS_FARE - 1:.0%} more"))
