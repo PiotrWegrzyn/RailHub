@@ -19,7 +19,6 @@ from railroads.ui.pixel.art.crafts import (
     carpet_weaver,
     clock_maker,
     coke_plant,
-    dairy,
     foundry,
     hospital,
     manor,
@@ -50,7 +49,6 @@ from railroads.ui.pixel.art.farms import (
 from railroads.ui.pixel.art.homes import flats, house, skyscraper, tenement
 from railroads.ui.pixel.art.industry import (
     appliance_factory,
-    bakery,
     barrel_maker,
     big_factory,
     brewery,
@@ -123,6 +121,14 @@ from railroads.ui.pixel.art.painter import (
     drawn_at,
     shade,
 )
+from railroads.ui.pixel.art.provisions import (
+    bakery,
+    big_bakery,
+    big_dairy,
+    dairy,
+    mega_bakery,
+    mega_dairy,
+)
 from railroads.ui.pixel.art.stations import TURNED_STATIONS, station, station_2, station_3
 
 __all__ = [
@@ -142,8 +148,8 @@ HOMES = ("house", "tenement", "flats")
 
 HOME_SCALE = 0.59
 
-# A farm's barn, an orchard's cottage and a bakery stand a touch bigger than a house.
-FARMSTEADS = ("farm", "orchard", "orange_farm", "bakery")
+# A farm's barn and an orchard's cottage stand a touch bigger than a house.
+FARMSTEADS = ("farm", "orchard", "orange_farm")
 
 FARMSTEAD_SCALE = 0.585
 
@@ -199,12 +205,16 @@ BUILDINGS = (
     "skyscraper",
     "food_plant",
     "bakery",
+    "big_bakery",
+    "mega_bakery",
     "gasworks",
     "coke_plant",
     "potter",
     "tile_works",
     "foundry",
     "dairy",
+    "big_dairy",
+    "mega_dairy",
     "sausage_maker",
     "carpet_weaver",
     "clock_maker",
@@ -322,12 +332,16 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     **TURNED_STATIONS,
     "food_plant": food_plant,
     "bakery": bakery,
+    "big_bakery": big_bakery,
+    "mega_bakery": mega_bakery,
     "gasworks": gasworks,
     "coke_plant": coke_plant,
     "potter": potter,
     "tile_works": tile_works,
     "foundry": foundry,
     "dairy": dairy,
+    "big_dairy": big_dairy,
+    "mega_dairy": mega_dairy,
     "sausage_maker": sausage_maker,
     "carpet_weaver": carpet_weaver,
     "clock_maker": clock_maker,

@@ -475,43 +475,6 @@ def barrel_maker() -> Sprite:
     return p.sprite()
 
 
-def bakery() -> Sprite:
-    """A baker's house with a shop window of loaves under a striped red awning, a brick oven
-    chimney, a loaf hung over the door, a swept path worn to its door and a sack of flour by its
-    wall with flour spilt round it."""
-    p = Painter(18, 22, (8, 17))
-    foot = _footing(0, 0, 6, 6)
-    _bed(p, foot, margin=1)
-    p.shadow(7, 2.5)
-    _track(p, foot[0], foot[1], (0.64, 0.9), 2, (176, 160, 128), ruts=False)
-    wall, roof, loaf = (232, 214, 176), (150, 72, 52), (196, 128, 58)
-    top = p.box(0, 0, 6, 5, wall, None)
-    left, front, right, _ = top
-    _plinth(p, top, 5, wall)
-    _stains(p, front, right, 5, (0.2, 0.8), shade(wall, 0.6), 1.2)
-    _patch(p, left, front, (0.08, 0.5), (2.2, 3.8), (238, 204, 132))
-    for t in (0.16, 0.29, 0.42):
-        p.point(*_on_wall(left, front, t, 3), loaf)
-    _patch(p, left, front, (0.04, 0.54), (1, 2), (178, 52, 46))
-    for t in (0.12, 0.29, 0.46):
-        p.line([_on_wall(left, front, t, 1), _on_wall(left, front, t, 1.8)], (240, 228, 214))
-    _door(p, left, front, (0.66, 0.88), 1.6, 5, DOOR)
-    _window(p, front, right, (0.35, 0.65), 1.6, shade(WINDOW, 0.8))
-    p.gable(top, 4, roof, wall)
-    _roof_rows(p, top, 4, roof)
-    p.rect(2, -13, 4, -6, BRICK)
-    p.line([(2, -11), (4, -11)], shade(BRICK, 1.3))
-    p.rect(1.5, -14, 4.5, -13, shade(BRICK, 0.6))
-    for x, y, r in ((3, -15, 1.2), (4, -16.5, 1.4)):
-        p.blob(x - r, y - r, x + r, y + r, (224, 222, 226))
-    p.line([(-4.5, -7), (-4.5, -6)], (60, 56, 54))
-    p.ellipse(-6, -6, -3, -4, loaf)
-    p.line([(-5, -5), (-4, -5.5)], shade(loaf, 1.3))
-    p.blob(3, 3, 7, 4.6, (226, 220, 204))
-    _sack(p, 4.5, 3.5, (220, 206, 176))
-    return p.sprite()
-
-
 def food_plant() -> Sprite:
     """A cannery: a pale hall under a green roof with a row of windows, a loading door with cart
     ruts worn out from it, a red label for a sign and crates of tins, beside two round banded

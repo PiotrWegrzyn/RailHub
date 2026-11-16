@@ -5,6 +5,7 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import (
+    MERGED,
     Building,
     BuildingKind,
     Constructions,
@@ -25,6 +26,7 @@ from railroads.ui.pixel.layer import resolution_for
 from railroads.ui.pixel.noise import noise, table_hash
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection, hash01
 from railroads.ui.pixel.relief import MOST_LIFT, raycast
+from railroads.ui.pixel.scenery import BUILDING_SPRITES
 from railroads.ui.pixel.sheet import FINE, SHEET_INDEX, SpriteSheet
 from railroads.ui.pixel.track_art import RAIL
 from railroads.ui.pixel.track_preview import ghost
@@ -259,6 +261,28 @@ def test_every_building_gets_its_sprite(sheet: SpriteSheet) -> None:
     assert sum(name.startswith("house_") for name in names) == 3
     assert names.count("lumber_mill") == 1
     assert names.count("farm") == 1
+
+
+@pytest.mark.parametrize("small", [BuildingKind.BAKERY, BuildingKind.DAIRY])
+def test_big_and_mega_bakeries_and_dairies_stand_out_bigger_than_the_one_they_grew_from(
+    sheet: SpriteSheet, small: BuildingKind
+) -> None:
+    big, mega = MERGED[small]
+
+    widths = [sheet.sizes[sheet.index(BUILDING_SPRITES[kind]), 0] for kind in (small, big, mega)]
+
+    assert widths[0] < widths[1] < widths[2]
+
+
+@pytest.mark.parametrize("kind", [BuildingKind.BAKERY, BuildingKind.DAIRY])
+def test_bakeries_and_dairies_stand_bigger_than_a_house(
+    sheet: SpriteSheet, kind: BuildingKind
+) -> None:
+    house = sheet.sizes[sheet.variants("house")].max(axis=0)
+
+    size = sheet.sizes[sheet.index(BUILDING_SPRITES[kind])]
+
+    assert (size > house).all()
 
 
 def test_chunks_are_drawn_the_same_every_time(sheet: SpriteSheet) -> None:

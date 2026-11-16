@@ -158,6 +158,14 @@ BUILDING_SPRITES = {
 for _grown, _kind in GREW_FROM.items():
     BUILDING_SPRITES[_grown] = BUILDING_SPRITES[_kind]
 
+# But big and mega bakeries and dairies have sprites of their own.
+BUILDING_SPRITES |= {
+    BuildingKind.BIG_BAKERY: "big_bakery",
+    BuildingKind.MEGA_BAKERY: "mega_bakery",
+    BuildingKind.BIG_DAIRY: "big_dairy",
+    BuildingKind.MEGA_DAIRY: "mega_dairy",
+}
+
 
 def station_sprite(level: int, line: str | None = None) -> str:
     """The sprite of a station raised to a level, turned along track running `line` on the

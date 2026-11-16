@@ -1,5 +1,5 @@
 """Town crafts and the town's grand buildings: coke plants, potters, tile works, foundries,
-dairies, sausage makers, the makers of luxury goods, manors, theatres and hospitals."""
+sausage makers, the makers of luxury goods, manors, theatres and hospitals."""
 
 from railroads.ui.pixel.art.homes import DOOR, _chimney_on, _foot, _tiles, _window
 from railroads.ui.pixel.art.painter import (
@@ -98,19 +98,6 @@ def foundry() -> Sprite:
     p.blob(-12, 3, -4, 6, (214, 196, 146))
     for x in (-10, -7):
         p.ellipse(x - 1.2, 3.4, x + 1.2, 5.4, (74, 76, 82))
-    return p.sprite()
-
-
-def dairy() -> Sprite:
-    """A whitewashed dairy with a blue door, milk churns lined up on a bench and a cheese wheel
-    in the window."""
-    p = Painter(24, 20, (11, 15))
-    p.shadow(9, 2.5)
-    _shop(p, -2, 0, WHITEWASH, SLATE, (90, 130, 190))
-    for x in (5, 7, 9):
-        p.rect(x - 0.8, 1, x + 0.8, 4, (196, 200, 206))
-        p.point(x, 0.6, shade((196, 200, 206), 0.6))
-    p.ellipse(-10, 2, -6, 5, (238, 200, 90))
     return p.sprite()
 
 
