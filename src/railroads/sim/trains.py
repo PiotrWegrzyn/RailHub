@@ -394,6 +394,9 @@ class Train:
     loaded_at: Cell | None = None
     path: list[Point] = field(default_factory=list)
     speeds: list[float] = field(default_factory=list)
+    # How far along the path each of its points lies, with the path it was worked out for
+    # (TrackNetwork.ends).
+    path_ends: tuple[list[Point], list[float]] | None = None
     along: float = 0.0
     status: str = "Waiting for stops"
     engine: str = FIRST_ENGINE

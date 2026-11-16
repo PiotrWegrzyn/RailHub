@@ -311,6 +311,8 @@ class RouteMap:
         # The train the map was last framed on, to frame the next one chosen.
         self._framed: str | None = None
         self._dragged = False
+        # The track's points on the map, kept until track changes (_track_points).
+        self._track: tuple[int, np.ndarray, np.ndarray] | None = None
 
     def frame(self, railway: Railway, train: Train, map_size: Vec2, panel: Panel) -> None:
         """Centres the map on the train's stops, close enough to show them all."""
@@ -454,22 +456,42 @@ class RouteMap:
             spots[station] = frame.to_screen(float(x), float(y))
         return spots
 
-    @staticmethod
-    def _draw_track(draw_list: imgui.ImDrawList, railway: Railway, frame: MapFrame) -> None:
-        grid = railway.constructions.tile_map.grid
-        offsets = grid.track_steps() / 2
+    def _draw_track(self, draw_list: imgui.ImDrawList, railway: Railway, frame: MapFrame) -> None:
+        points, double = self._track_points(railway)
+        if not len(points):
+            return
+        panel = frame.panel
+        screen = (points - frame.origin) * frame.scale + (panel.left, panel.top)
+        low, high = screen.min(axis=1), screen.max(axis=1)
+        seen = (
+            (high[:, 0] >= panel.left)
+            & (low[:, 0] <= panel.right)
+            & (high[:, 1] >= panel.top)
+            & (low[:, 1] <= panel.bottom)
+        )
         width = min(max(frame.scale * 0.18, 1.0), 4.0)
         color = color_u32(TRACK)
-        for piece in railway.constructions.track():
-            cx, cy = grid.center(*piece.cell)
-            start, end = (offsets[point] for point in piece.ends)
-            points = [
-                imgui.ImVec2(*frame.to_screen(cx + start[0], cy + start[1])),
-                imgui.ImVec2(*frame.to_screen(cx, cy)),
-                imgui.ImVec2(*frame.to_screen(cx + end[0], cy + end[1])),
-            ]
-            double = 1.8 if piece.width == TrackWidth.DOUBLE else 1.0
-            draw_list.add_polyline(points, color, width * double, 0)
+        for piece, wide in zip(screen[seen].tolist(), double[seen].tolist(), strict=True):
+            draw_list.add_polyline(
+                [imgui.ImVec2(x, y) for x, y in piece], color, width * (1.8 if wide else 1.0), 0
+            )
+
+    def _track_points(self, railway: Railway) -> tuple[np.ndarray, np.ndarray]:
+        """Each piece of track as its three points on the map, from end to middle to end, and
+        whether it is double, worked out again only when track has changed."""
+        version = railway.constructions.railway_version
+        if self._track is None or self._track[0] != version:
+            grid = railway.constructions.tile_map.grid
+            offsets = grid.track_steps() / 2
+            pieces = railway.constructions.track()
+            points = np.zeros((len(pieces), 3, 2))
+            for index, piece in enumerate(pieces):
+                center = np.asarray(grid.center(*piece.cell), dtype=float)
+                start, end = (offsets[point] for point in piece.ends)
+                points[index] = (center + start, center, center + end)
+            double = np.array([piece.width == TrackWidth.DOUBLE for piece in pieces], dtype=bool)
+            self._track = (version, points, double)
+        return self._track[1], self._track[2]
 
     def _draw_stations(
         self,

@@ -413,7 +413,7 @@ class Railway:
             speed *= ENGINE_SHED_SPEED
         train.along += months * CELLS_PER_MONTH * self.network.speed_at(train) * train.pull * speed
         train.status = "Running"
-        if train.along >= self.network.length(train.path):
+        if train.along >= self.network.length(train):
             self.calls.arrive(train, train.stops[train.heading % len(train.stops)])
             train.arrivals += 1
             train.heading = (train.heading + 1) % len(train.stops)
