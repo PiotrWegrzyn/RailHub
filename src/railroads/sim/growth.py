@@ -40,7 +40,7 @@ every few minutes.
 
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import pairwise
 from types import MappingProxyType
 from typing import TYPE_CHECKING
@@ -130,6 +130,7 @@ SPAWN_BY_PEOPLE = frozenset(
         BuildingKind.MEAT_FACTORY,
         BuildingKind.TAVERN,
         BuildingKind.CLUB,
+        BuildingKind.FILLING_STATION,
         BuildingKind.GASWORKS,
         BuildingKind.BREWERY,
         BuildingKind.BRICKWORKS,
@@ -154,6 +155,11 @@ SPAWN_BY_PEOPLE = frozenset(
         BuildingKind.HOSPITAL,
     }
 )
+# Kinds that come up near other points instead: refineries by the oil wells and mines (ore) and
+# the ports (trade) around them.
+SPAWN_NEAR: Mapping[BuildingKind, Mapping[Points, float]] = MappingProxyType(
+    {BuildingKind.REFINERY: {Points.ORE: 1.0, Points.TRADE: 2.0}}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,7 +172,9 @@ class Breeding:
     own: Points
     drawn_by: Mapping[Points, float]
     per_doubling: float
-    spawn_by_people: bool = False
+    # The points nearby the spawn chance counts once for each of, by how much each counts; empty
+    # where it does not depend on what is nearby.
+    spawn_by: Mapping[Points, float] = field(default_factory=dict)
 
 
 _BREEDINGS: dict[tuple[int, int], tuple[Ladder, Mapping, Breeding]] = {}
@@ -185,16 +193,17 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
         spawn_scale = FOOD_SPAWN_SCALE if own == Points.FOOD else SPAWN_SCALE
         spawn = spawn_scale * (ladder.base_chance or per_doubling)
         per_doubling = per_doubling * LAND_BREEDING_SCALE if own in FROM_THE_LAND else SERVED_GROWTH
-    by_people = ladder.kinds[0] in SPAWN_BY_PEOPLE
-    breeding = Breeding(spawn, own, DRAWN_BY.get(own, {own: 1.0}), per_doubling, by_people)
+    kind = ladder.kinds[0]
+    spawn_by = SPAWN_NEAR.get(kind, {Points.POPULATION: 1.0} if kind in SPAWN_BY_PEOPLE else {})
+    breeding = Breeding(spawn, own, DRAWN_BY.get(own, {own: 1.0}), per_doubling, spawn_by)
     _BREEDINGS[(id(ladder), id(points))] = (ladder, points, breeding)
     return breeding
 
 
-# The homes around a tavern or club that gets all its drink grow this much faster, and those
-# around one that gets some of it that share as much faster.
+# The homes around a tavern, club or filling station that gets all it needs grow this much faster,
+# and those around one that gets some of it that share as much faster.
 LIVELY_GROWTH = 0.5
-VENUES = (BuildingKind.TAVERN, BuildingKind.CLUB)
+VENUES = (BuildingKind.TAVERN, BuildingKind.CLUB, BuildingKind.FILLING_STATION)
 
 # How long buildings last starving: homes, and everything else.
 HOMES_DIE_AFTER_MONTHS = 10 * 12
@@ -457,8 +466,8 @@ class Growth:
                     self._reckon(place, cells)
 
     def _lively(self, trade: Trade) -> FloatGrid:
-        """How lively each traded cell is: the best share of their drink that the taverns and
-        clubs in its neighbourhood got."""
+        """How lively each traded cell is: the best share of what they need that the venues in
+        its neighbourhood got."""
         size = self._grid.rows * self._grid.cols
         poured = np.zeros(size + 1)
         for kind in VENUES:
@@ -546,8 +555,11 @@ class Growth:
         """Works out the ladder's chances in these cells afresh."""
         breeding = self._breeding(place)
         raw = np.full(cells.size, breeding.spawn)
-        if breeding.spawn_by_people:
-            raw = raw * self._nearby[Points.POPULATION].ravel()[cells]
+        if breeding.spawn_by:
+            raw = raw * sum(
+                weight * self._nearby[points].ravel()[cells]
+                for points, weight in breeding.spawn_by.items()
+            )
         if breeding.per_doubling:
             served = self._served[breeding.own][cells]
             if served.any():
@@ -908,7 +920,7 @@ class Growth:
         for place in self._places:
             breeding = self._breeding(place)
             drawn = points in breeding.drawn_by and served[breeding.own]
-            if not drawn and not (breeding.spawn_by_people and points == Points.POPULATION):
+            if not drawn and points not in breeding.spawn_by:
                 continue
             self._reckon(place, flat)
             if how_many > 0:

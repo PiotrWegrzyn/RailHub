@@ -320,12 +320,12 @@ def test_a_big_factory_works_on_steel_alone_until_copper_comes_in_1880(
     )
 
 
-def test_farms_want_limestone_always_and_machinery_only_from_1920() -> None:
+def test_farms_want_limestone_always_and_machinery_and_diesel_only_from_1920() -> None:
     before = needs_of(BuildingKind.FARM, 1919)
     after = needs_of(BuildingKind.FARM, 1920)
 
     assert before == {Need.LIMESTONE: 2}
-    assert after == {Need.MACHINERY: 1, Need.LIMESTONE: 2}
+    assert after == {Need.MACHINERY: 1, Need.LIMESTONE: 2, Need.FUEL: 2}
 
 
 @pytest.mark.parametrize(

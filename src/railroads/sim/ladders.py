@@ -195,6 +195,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.OLYMPIC_STADIUM: (Points.CORPORATE, 100),
     BuildingKind.TAVERN: (Points.CORPORATE, 1),
     BuildingKind.CLUB: (Points.CORPORATE, 3),
+    BuildingKind.FILLING_STATION: (Points.CORPORATE, 1),
     BuildingKind.DEPARTMENT_STORE: (Points.CORPORATE, 3),
     BuildingKind.HOTEL: (Points.CORPORATE, 5),
     BuildingKind.JUICE_WORKS: (Points.INDUSTRY, 1),
@@ -962,6 +963,12 @@ CLUBS = replace(
     from_year=1900,
 )
 
+# Filling stations open in towns once motor cars come, as often as taverns.
+FILLING_STATION_YEAR = 1920
+FILLING_STATIONS = replace(
+    TAVERNS, kinds=(BuildingKind.FILLING_STATION,), from_year=FILLING_STATION_YEAR
+)
+
 # Department stores and hotels open in big towns, spaced out, a few to a map.
 DEPARTMENT_STORES = Ladder(
     kinds=(BuildingKind.DEPARTMENT_STORE,),
@@ -1013,7 +1020,7 @@ WORKS = (
     ),
     _works(BuildingKind.TOOL_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 1870, base=2e-6),
     _works(BuildingKind.CHEMICAL_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {}, 1880, 20_000, 2e-8),
-    _works(BuildingKind.REFINERY, {IND: 4e-7, Points.ORE: 1e-6}, {}, 1856, 30_000, 2e-8),
+    _works(BuildingKind.REFINERY, {IND: 4e-7, Points.ORE: 1e-6}, {}, 1856, 10_000, 1e-6),
     _works(BuildingKind.CAR_FACTORY, {IND: 6e-7}, {IND: 6}, 1930, 40_000, 2e-6),
     _works(BuildingKind.ELECTRONICS_PLANT, {POP: 2.5e-8, IND: 4e-7}, {}, 1960, 30_000, 2e-8),
     _works(BuildingKind.PLANE_FACTORY, {POP: 2.5e-8, IND: 6e-7}, {IND: 6}, 1935, 40_000, 2e-6),
@@ -1088,6 +1095,7 @@ LADDERS = (
     SAND_PITS,
     TAVERNS,
     CLUBS,
+    FILLING_STATIONS,
     DEPARTMENT_STORES,
     HOTELS,
     POWER_PLANTS,
