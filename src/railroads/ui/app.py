@@ -177,8 +177,13 @@ class App:
         self.tech.draw(self.view.railway.research)
         if self.reports.open:
             growth = self.view.growth
+            railway = self.view.railway
             self.reports.draw(
-                growth.history, growth.year, len(self.view.railway.stations()), growth.population()
+                growth.history,
+                growth.year,
+                len(railway.stations()),
+                growth.population(),
+                railway.finances,
             )
         self._draw_saves()
         typing = imgui.get_io().want_text_input

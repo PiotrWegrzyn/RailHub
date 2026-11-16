@@ -632,19 +632,28 @@ needs, to the trees those goods belong to.
 
 Engines (`railroads.sim.trains`) come in lines. Pioneers, from the first steam engine on rails in
 1804, each a little better than the one before, lead up to the Planet of 1840, the engine the game
-is balanced around: five cars at 60 km/h for $45,000 and $450 a month to run. Every engine costs a
-share of its price to run each month: steam 1%, diesel 0.65%, electric and maglev 0.4%. Each line
+is balanced around: three cars at 30 km/h for $10,000. Each newer engine of a line costs about
+three times the one before it. Early steam engines are very slow and pull few cars; diesels pull
+cars that hold half as much again, and electrics run fastest. Every engine costs fuel to run each
+month (`railroads.sim.running_costs`): $60 a car it is built to pull at 60 km/h for steam and
+diesel, $15 for electric and $40 for the maglev, half that for light engines, more the faster it
+runs. Coal gets 4% of its first price dearer every year from 1840, diesel oil 1% a year from 1935
+and electricity 0.5% a year from 1925, so steam is cheap to run at first and dear in the end. Each
+building the player owns takes 0.5% off, up to 20%, and every hundred cars of freight their trains
+have delivered 1%, up to 20%; each working power station put up beside a station ($3,000,000,
+burning 400 coal a month) takes 15% off electric and maglev engines, up to 60%. Each line
 has a job. Light engines are cheap to buy and run and up to speed in 3 seconds or less, but pull
-three or four cars slowly, and a load slows them half as much again as the Planet: for short lines
-with many stops. Heavy freight engines, a few years after 1850, pull twice the cars of the general
-engine of their day or more, and a load slows them half as much as the Planet, but they run
+two or three cars slowly, and a load slows them half as much again as the Planet: for short lines
+with many stops. Heavy freight engines, a few years after 1850, pull more cars than the general
+engine of their day, and a load slows them half as much as the Planet, but they run
 slowly, take 18 to 30 seconds to get up to speed and cost a lot to run: for bulk goods. Express
 engines run far faster but take longest to get going and cost the most, so they pay on long
-lines; they carry only passengers, who pay 20% more on them, and always lead with a dining car
+lines; they carry only passengers, who pay 20% more on them and eleven times as much on the
+maglev, and always lead with a dining car
 that carries nothing but weighs and costs its trips like any other car. In an 1850 game a better
 engine comes every few years: the Goods engine in 1853, the American in 1856, the Single-driver
 express in 1858. From then on
-each line gets better engines, up to a 500 km/h maglev and diesels pulling 40 cars by 2040. An
+each line gets better engines, up to a 500 km/h maglev and diesels pulling 24 cars by 2040. An
 engine is sold only until a newer one of its line, running on the same track, can be bought: an
 electric never ends the sale of a steam or diesel engine, nor the maglev that of the fastest
 electric. Engines built to pull more cars are
@@ -654,39 +663,39 @@ boilers, express Express trains, diesels Diesel engines, electrics Electric trac
 fast ones, Thyristor control, the maglev Magnetic levitation (after Thyristor control), and steam
 engines from 1900 on Superheaters.
 
-| Engine | Class | From | Needs | Power | Speed | To full speed | Cars | Price | To run a month |
+| Engine | Class | From | Needs | Power | Speed | To full speed | Cars | Price | To run a month at first |
 |---|---|---|---|---|---|---|---|---|---|
-| Penydarren steam wagon | pioneer | 1804 |  | steam | 18 km/h | 14 s | 1 | $4,500 | $45 |
-| Catch Me Who Can | pioneer | 1808 |  | steam | 27 km/h | 13 s | 1 | $7,200 | $72 |
-| Salamanca | pioneer | 1812 |  | steam | 24 km/h | 13 s | 2 | $10,800 | $108 |
-| Puffing Billy | pioneer | 1815 |  | steam | 30 km/h | 13 s | 2 | $13,500 | $135 |
-| Locomotion | pioneer | 1820 |  | steam | 36 km/h | 13 s | 3 | $22,500 | $225 |
-| Rocket | pioneer | 1826 |  | steam | 48 km/h | 13 s | 3 | $31,500 | $315 |
-| Lion | pioneer | 1834 |  | steam | 51 km/h | 13 s | 4 | $36,000 | $360 |
-| Planet steam engine | general | 1840 |  | steam | 60 km/h | 12 s | 5 | $45,000 | $450 |
-| Tank engine | light | 1840 |  | steam | 45 km/h | 3 s | 3 | $13,500 | $135 |
-| Goods engine | heavy freight | 1853 | Heavy boilers (metals) | steam | 36 km/h | 30 s | 10 | $72,000 | $720 |
-| American 4-4-0 | general | 1856 |  | steam | 72 km/h | 11 s | 6 | $81,000 | $810 |
-| Single-driver express | express | 1858 | Express trains (passengers) | steam | 108 km/h | 25 s | 4 + dining car | $126,000 | $1,260 |
-| Light tank engine | light | 1862 |  | steam | 54 km/h | 3 s | 3 | $22,500 | $225 |
-| Mogul freight engine | heavy freight | 1865 | Heavy boilers (metals) | steam | 42 km/h | 28 s | 12 | $99,000 | $990 |
-| Atlantic express | express | 1900 | Express trains (passengers), Superheaters (metals) | steam | 132 km/h | 22 s | 5 + dining car | $270,000 | $2,700 |
-| Mallet articulated | heavy freight | 1905 | Heavy boilers (metals), Superheaters (metals) | steam | 45 km/h | 25 s | 16 | $198,000 | $1,980 |
-| Pacific engine | general | 1910 | Superheaters (metals) | steam | 90 km/h | 9 s | 8 | $162,000 | $1,620 |
-| Boxcab electric | general | 1925 | Electric traction (modern) | electric | 90 km/h | 6 s | 9 | $270,000 | $1,080 |
-| Railbus | light | 1935 | Diesel engines (fuel) | diesel | 78 km/h | 2 s | 3 | $72,000 | $468 |
-| Streamliner | express | 1935 | Express trains (passengers), Superheaters (metals) | steam | 168 km/h | 20 s | 6 + dining car | $540,000 | $5,400 |
-| Big articulated | heavy freight | 1940 | Heavy boilers (metals), Superheaters (metals) | steam | 51 km/h | 22 s | 20 | $405,000 | $4,050 |
-| Mixed-traffic diesel | general | 1950 | Diesel engines (fuel) | diesel | 108 km/h | 7 s | 9 | $360,000 | $2,340 |
-| Heavy diesel | heavy freight | 1960 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 60 km/h | 18 s | 24 | $630,000 | $4,095 |
-| Bullet train | express | 1964 | Express trains (passengers), Thyristor control (modern) | electric | 240 km/h | 15 s | 7 + dining car | $1,350,000 | $5,400 |
-| Universal electric | general | 1965 | Thyristor control (modern) | electric | 132 km/h | 5 s | 10 | $630,000 | $2,520 |
-| Sprinter unit | light | 1985 | Diesel engines (fuel) | diesel | 114 km/h | 2 s | 4 | $162,000 | $1,053 |
-| High-speed electric | express | 1990 | Express trains (passengers), Thyristor control (modern) | electric | 300 km/h | 14 s | 9 + dining car | $2,700,000 | $10,800 |
-| Twin-unit diesel | heavy freight | 1995 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 66 km/h | 18 s | 30 | $1,260,000 | $8,190 |
-| Modern electric | general | 2000 | Thyristor control (modern) | electric | 168 km/h | 4 s | 12 | $1,080,000 | $4,320 |
-| Super-heavy diesel | heavy freight | 2040 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 72 km/h | 20 s | 40 | $2,700,000 | $17,550 |
-| Maglev | express | 2040 | Express trains (passengers), Magnetic levitation (modern) | maglev | 500 km/h | 13 s | 11 + dining car | $6,300,000 | $25,200 |
+| Penydarren steam wagon | pioneer | 1804 |  | steam | 9 km/h | 14 s | 1 | $1,000 | $9 |
+| Catch Me Who Can | pioneer | 1808 |  | steam | 12 km/h | 13 s | 1 | $1,500 | $12 |
+| Salamanca | pioneer | 1812 |  | steam | 12 km/h | 13 s | 1 | $2,000 | $12 |
+| Puffing Billy | pioneer | 1815 |  | steam | 15 km/h | 13 s | 1 | $2,500 | $15 |
+| Locomotion | pioneer | 1820 |  | steam | 18 km/h | 13 s | 2 | $4,000 | $36 |
+| Rocket | pioneer | 1826 |  | steam | 24 km/h | 13 s | 2 | $6,000 | $48 |
+| Lion | pioneer | 1834 |  | steam | 27 km/h | 13 s | 2 | $8,000 | $54 |
+| Planet steam engine | general | 1840 |  | steam | 30 km/h | 12 s | 3 | $10,000 | $90 |
+| Tank engine | light | 1840 |  | steam | 24 km/h | 3 s | 2 | $3,000 | $24 |
+| Goods engine | heavy freight | 1853 | Heavy boilers (metals) | steam | 21 km/h | 30 s | 4 | $15,000 | $84 |
+| American 4-4-0 | general | 1856 |  | steam | 42 km/h | 11 s | 4 | $30,000 | $168 |
+| Single-driver express | express | 1858 | Express trains (passengers) | steam | 60 km/h | 25 s | 3 + dining car | $40,000 | $240 |
+| Light tank engine | light | 1862 |  | steam | 33 km/h | 3 s | 2 | $9,000 | $33 |
+| Mogul freight engine | heavy freight | 1865 | Heavy boilers (metals) | steam | 27 km/h | 28 s | 6 | $45,000 | $162 |
+| Atlantic express | express | 1900 | Express trains (passengers), Superheaters (metals) | steam | 90 km/h | 22 s | 4 + dining car | $120,000 | $450 |
+| Mallet articulated | heavy freight | 1905 | Heavy boilers (metals), Superheaters (metals) | steam | 36 km/h | 25 s | 8 | $135,000 | $288 |
+| Pacific engine | general | 1910 | Superheaters (metals) | steam | 60 km/h | 9 s | 5 | $90,000 | $300 |
+| Boxcab electric | general | 1925 | Electric traction (modern) | electric | 96 km/h | 6 s | 5 | $270,000 | $120 |
+| Railbus | light | 1935 | Diesel engines (fuel) | diesel | 60 km/h | 2 s | 3 | $27,000 | $90 |
+| Streamliner | express | 1935 | Express trains (passengers), Superheaters (metals) | steam | 138 km/h | 20 s | 5 + dining car | $360,000 | $828 |
+| Big articulated | heavy freight | 1940 | Heavy boilers (metals), Superheaters (metals) | steam | 42 km/h | 22 s | 10 | $405,000 | $420 |
+| Mixed-traffic diesel | general | 1950 | Diesel engines (fuel) | diesel | 78 km/h | 7 s | 6 | $800,000 | $468 |
+| Heavy diesel | heavy freight | 1960 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 54 km/h | 18 s | 12 | $1,200,000 | $648 |
+| Bullet train | express | 1964 | Express trains (passengers), Thyristor control (modern) | electric | 210 km/h | 15 s | 6 + dining car | $1,100,000 | $368 |
+| Universal electric | general | 1965 | Thyristor control (modern) | electric | 144 km/h | 5 s | 7 | $2,400,000 | $252 |
+| Sprinter unit | light | 1985 | Diesel engines (fuel) | diesel | 96 km/h | 2 s | 3 | $81,000 | $144 |
+| High-speed electric | express | 1990 | Express trains (passengers), Thyristor control (modern) | electric | 300 km/h | 14 s | 8 + dining car | $3,200,000 | $675 |
+| Twin-unit diesel | heavy freight | 1995 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 60 km/h | 18 s | 16 | $3,600,000 | $960 |
+| Modern electric | general | 2000 | Thyristor control (modern) | electric | 192 km/h | 4 s | 8 | $7,200,000 | $384 |
+| Super-heavy diesel | heavy freight | 2040 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 66 km/h | 20 s | 24 | $10,800,000 | $1,584 |
+| Maglev | express | 2040 | Express trains (passengers), Magnetic levitation (modern) | maglev | 500 km/h | 13 s | 10 + dining car | $10,000,000 | $3,667 |
 
 Electric engines run only on electrified track, and the maglev only on maglev track, which can be
 laid once it is on sale. A train's engine is chosen when it is bought. It can be upgraded later from the
@@ -739,11 +748,11 @@ A game starts with $80,000 (`railroads.sim.finance`). Track costs $300 a cell on
 in hills, $10,000 a cell of bridge and $20,000 a cell of tunnel; electric track $450 a cell more,
 and double track 1.8 times as much as single, wires included, so a cell on the flat costs $540
 double, $750 electric and $1,350 double and electric; maglev track $4,000 a cell more, with no
-wires. A station costs $15,000 and the Planet $45,000, which
-sells back for half, and costs $450 a month to run. Every month each station costs $200 in upkeep and each cell of track $2,
-$3 more where it is electric, $25 more where it is maglev, and 1.8 times as much where it is double, charged once a cell for
+wires. A station costs $15,000 and the Planet $10,000, which
+sells back for half. Every month each station costs $200 in upkeep and each cell of track $2,
+$40 more where it is electric, $60 more where it is maglev, and 1.8 times as much where it is double, charged once a cell for
 the dearest track in it (`track_upkeep`). Building needs the cash for it, but upkeep is charged
-anyway and can run into debt. The top bar shows the cash, with this month's and last month's books on hover, and the
+anyway and can run into debt. The top bar shows the cash, with this month's and last month's books on hover, the Reports window last year's and this year's books by what the money went on, and the
 build bar shows what the track under the mouse would cost. Route planning still weighs hills,
 bridges and tunnels lightly, so it stays quick; click a point in between to steer track round a
 river.

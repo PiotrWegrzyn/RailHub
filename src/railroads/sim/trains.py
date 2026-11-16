@@ -144,21 +144,26 @@ class Power(Enum):
     MAGLEV = "maglev"
 
 
-# Speed 1, the Planet's, stands for this many km/h.
+# Speed 1 stands for this many km/h.
 KMH_PER_SPEED = 60.0
 # How much a load slows an engine of a kind, against the Planet: light engines the most, heavy
 # freight engines half as much.
 LOAD_DRAG = {Kind.LIGHT: 1.5, Kind.HEAVY: 0.5}
-# Passengers on an express pay this much more.
+# Passengers on an express pay this much more, and on a maglev MAGLEV_FARE times as much.
 EXPRESS_FARE = 1.2
-# What an engine costs to run each month, as a share of its price: coal-fired steam the most,
-# electric engines, which need wired track, the least.
-RUNNING_SHARE = {
-    Power.STEAM: 0.01,
-    Power.DIESEL: 0.0065,
-    Power.ELECTRIC: 0.004,
-    Power.MAGLEV: 0.004,
+MAGLEV_FARE = 11.0
+# What each car an engine is built to pull costs to run a month, at speed 1, by what drives it,
+# before fuel gets dearer (railroads.sim.running_costs): electric engines, which need wired track,
+# the least. Light engines cost LIGHT_RUNNING of that.
+RUN_PER_CAR = {
+    Power.STEAM: 60.0,
+    Power.DIESEL: 60.0,
+    Power.ELECTRIC: 15.0,
+    Power.MAGLEV: 40.0,
 }
+LIGHT_RUNNING = 0.5
+# Diesel engines pull heavier cars, which hold this many times as much.
+CAR_SIZE_FACTOR = {Power.DIESEL: 1.5}
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,8 +199,15 @@ class Engine:
 
     @property
     def running(self) -> float:
-        """What it costs to run each month, before tech cuts upkeep."""
-        return self.price * RUNNING_SHARE[self.power]
+        """What it costs to run each month at first, before fuel gets dearer and tech cuts
+        upkeep: by the cars it is built to pull and its speed."""
+        light = LIGHT_RUNNING if self.kind == Kind.LIGHT else 1.0
+        return RUN_PER_CAR[self.power] * self.hauls * self.speed * light
+
+    @property
+    def car_size(self) -> float:
+        """How many times as much its cars hold."""
+        return CAR_SIZE_FACTOR.get(self.power, 1.0)
 
     @property
     def kmh(self) -> float:
@@ -229,69 +241,48 @@ DIESEL, ELECTRIC, MAGLEV = Power.DIESEL, Power.ELECTRIC, Power.MAGLEV
 BOILERS, SUPERHEATED = ("boilers",), ("superheaters",)
 EXPRESS_TECH = ("express_trains",)
 ENGINES: dict[str, Engine] = {
-    "penydarren": Engine("Penydarren steam wagon", 1804, 0.3, 1, 4_500.0, P, pickup=14.0),
-    "catch_me": Engine("Catch Me Who Can", 1808, 0.45, 1, 7_200.0, P, pickup=13.0),
-    "salamanca": Engine("Salamanca", 1812, 0.4, 2, 10_800.0, P, pickup=13.0),
-    "puffing_billy": Engine("Puffing Billy", 1815, 0.5, 2, 13_500.0, P, pickup=13.0),
-    "locomotion": Engine("Locomotion", 1820, 0.6, 3, 22_500.0, P, pickup=13.0),
-    "rocket": Engine("Rocket", 1826, 0.8, 3, 31_500.0, P, pickup=13.0),
-    "lion": Engine("Lion", 1834, 0.85, 4, 36_000.0, P, pickup=13.0),
-    "planet": Engine("Planet steam engine", 1840, 1.0, MAX_CARS, TRAIN_PRICE, G, pickup=12.0),
-    "tank": Engine("Tank engine", 1840, 0.75, 3, 13_500.0, L, pickup=3.0),
-    "goods": Engine("Goods engine", 1853, 0.6, 10, 72_000.0, H, pickup=30.0, needs=BOILERS),
-    "american": Engine("American 4-4-0", 1856, 1.2, 6, 81_000.0, G, pickup=11.0),
+    "penydarren": Engine("Penydarren steam wagon", 1804, 0.15, 1, 1_000.0, P, pickup=14.0),
+    "catch_me": Engine("Catch Me Who Can", 1808, 0.2, 1, 1_500.0, P, pickup=13.0),
+    "salamanca": Engine("Salamanca", 1812, 0.2, 1, 2_000.0, P, pickup=13.0),
+    "puffing_billy": Engine("Puffing Billy", 1815, 0.25, 1, 2_500.0, P, pickup=13.0),
+    "locomotion": Engine("Locomotion", 1820, 0.3, 2, 4_000.0, P, pickup=13.0),
+    "rocket": Engine("Rocket", 1826, 0.4, 2, 6_000.0, P, pickup=13.0),
+    "lion": Engine("Lion", 1834, 0.45, 2, 8_000.0, P, pickup=13.0),
+    "planet": Engine("Planet steam engine", 1840, 0.5, 3, TRAIN_PRICE, G, pickup=12.0),
+    "tank": Engine("Tank engine", 1840, 0.4, 2, 3_000.0, L, pickup=3.0),
+    "goods": Engine("Goods engine", 1853, 0.35, 4, 15_000.0, H, pickup=30.0, needs=BOILERS),
+    "american": Engine("American 4-4-0", 1856, 0.7, 4, 30_000.0, G, pickup=11.0),
     "single": Engine(
-        "Single-driver express", 1858, 1.8, 4, 126_000.0, X, pickup=25.0, needs=EXPRESS_TECH
+        "Single-driver express", 1858, 1.0, 3, 40_000.0, X, pickup=25.0, needs=EXPRESS_TECH
     ),
-    "light_tank": Engine("Light tank engine", 1862, 0.9, 3, 22_500.0, L, pickup=3.0),
-    "mogul": Engine("Mogul freight engine", 1865, 0.7, 12, 99_000.0, H, pickup=28.0, needs=BOILERS),
+    "light_tank": Engine("Light tank engine", 1862, 0.55, 2, 9_000.0, L, pickup=3.0),
+    "mogul": Engine("Mogul freight engine", 1865, 0.45, 6, 45_000.0, H, pickup=28.0, needs=BOILERS),
     "atlantic": Engine(
-        "Atlantic express",
-        1900,
-        2.2,
-        5,
-        270_000.0,
-        X,
-        pickup=22.0,
-        needs=EXPRESS_TECH + SUPERHEATED,
+        "Atlantic express", 1900, 1.5, 4, 120_000.0, X, pickup=22.0, needs=EXPRESS_TECH + SUPERHEATED
     ),
     "mallet": Engine(
-        "Mallet articulated",
-        1905,
-        0.75,
-        16,
-        198_000.0,
-        H,
-        pickup=25.0,
-        needs=BOILERS + SUPERHEATED,
+        "Mallet articulated", 1905, 0.6, 8, 135_000.0, H, pickup=25.0, needs=BOILERS + SUPERHEATED
     ),
-    "pacific": Engine("Pacific engine", 1910, 1.5, 8, 162_000.0, G, pickup=9.0, needs=SUPERHEATED),
+    "pacific": Engine("Pacific engine", 1910, 1.0, 5, 90_000.0, G, pickup=9.0, needs=SUPERHEATED),
     "boxcab": Engine(
-        "Boxcab electric", 1925, 1.5, 9, 270_000.0, G, ELECTRIC, pickup=6.0, needs=("traction",)
+        "Boxcab electric", 1925, 1.6, 5, 270_000.0, G, ELECTRIC, pickup=6.0, needs=("traction",)
     ),
-    "railbus": Engine("Railbus", 1935, 1.3, 3, 72_000.0, L, DIESEL, pickup=2.0, needs=("diesel",)),
+    "railbus": Engine("Railbus", 1935, 1.0, 3, 27_000.0, L, DIESEL, pickup=2.0, needs=("diesel",)),
     "streamliner": Engine(
-        "Streamliner",
-        1935,
-        2.8,
-        6,
-        540_000.0,
-        X,
-        pickup=20.0,
-        needs=EXPRESS_TECH + SUPERHEATED,
+        "Streamliner", 1935, 2.3, 5, 360_000.0, X, pickup=20.0, needs=EXPRESS_TECH + SUPERHEATED
     ),
     "big_boy": Engine(
-        "Big articulated", 1940, 0.85, 20, 405_000.0, H, pickup=22.0, needs=BOILERS + SUPERHEATED
+        "Big articulated", 1940, 0.7, 10, 405_000.0, H, pickup=22.0, needs=BOILERS + SUPERHEATED
     ),
     "mixed_diesel": Engine(
-        "Mixed-traffic diesel", 1950, 1.8, 9, 360_000.0, G, DIESEL, pickup=7.0, needs=("diesel",)
+        "Mixed-traffic diesel", 1950, 1.3, 6, 800_000.0, G, DIESEL, pickup=7.0, needs=("diesel",)
     ),
     "heavy_diesel": Engine(
         "Heavy diesel",
         1960,
-        1.0,
-        24,
-        630_000.0,
+        0.9,
+        12,
+        1_200_000.0,
         H,
         DIESEL,
         pickup=18.0,
@@ -300,9 +291,9 @@ ENGINES: dict[str, Engine] = {
     "bullet": Engine(
         "Bullet train",
         1964,
-        4.0,
-        7,
-        1_350_000.0,
+        3.5,
+        6,
+        1_100_000.0,
         X,
         ELECTRIC,
         pickup=15.0,
@@ -311,23 +302,23 @@ ENGINES: dict[str, Engine] = {
     "express": Engine(
         "Universal electric",
         1965,
-        2.2,
-        10,
-        630_000.0,
+        2.4,
+        7,
+        2_400_000.0,
         G,
         ELECTRIC,
         pickup=5.0,
         needs=("thyristors",),
     ),
     "sprinter": Engine(
-        "Sprinter unit", 1985, 1.9, 4, 162_000.0, L, DIESEL, pickup=2.0, needs=("diesel",)
+        "Sprinter unit", 1985, 1.6, 3, 81_000.0, L, DIESEL, pickup=2.0, needs=("diesel",)
     ),
     "high_speed": Engine(
         "High-speed electric",
         1990,
         5.0,
-        9,
-        2_700_000.0,
+        8,
+        3_200_000.0,
         X,
         ELECTRIC,
         pickup=14.0,
@@ -336,31 +327,23 @@ ENGINES: dict[str, Engine] = {
     "twin_diesel": Engine(
         "Twin-unit diesel",
         1995,
-        1.1,
-        30,
-        1_260_000.0,
+        1.0,
+        16,
+        3_600_000.0,
         H,
         DIESEL,
         pickup=18.0,
         needs=BOILERS + ("diesel",),
     ),
     "modern_electric": Engine(
-        "Modern electric",
-        2000,
-        2.8,
-        12,
-        1_080_000.0,
-        G,
-        ELECTRIC,
-        pickup=4.0,
-        needs=("thyristors",),
+        "Modern electric", 2000, 3.2, 8, 7_200_000.0, G, ELECTRIC, pickup=4.0, needs=("thyristors",)
     ),
     "super_diesel": Engine(
         "Super-heavy diesel",
         2040,
-        1.2,
-        40,
-        2_700_000.0,
+        1.1,
+        24,
+        10_800_000.0,
         H,
         DIESEL,
         pickup=20.0,
@@ -370,8 +353,8 @@ ENGINES: dict[str, Engine] = {
         "Maglev",
         2040,
         500.0 / KMH_PER_SPEED,
-        11,
-        6_300_000.0,
+        10,
+        10_000_000.0,
         X,
         MAGLEV,
         pickup=13.0,

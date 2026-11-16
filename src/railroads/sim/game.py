@@ -65,6 +65,7 @@ class Game:
         self.railway.history = self.growth.history
         self.growth.railway = self.railway
         self.railway.station_trade = self.growth.station_trade
+        self.railway.owners = self.growth.owners
         # Plays in the player's place in a simulated game (railroads.sim.autoplay).
         self.stand_in: StandInPlayer | None = None
         self._reach = Reach(self.tile_map.grid)

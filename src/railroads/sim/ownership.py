@@ -42,6 +42,10 @@ class Owners:
         """How many buildings of a kind the player owns in each cell."""
         return self._owned.get(kind, np.zeros(self._growth.grid.shape, dtype=np.int64))
 
+    def count(self) -> int:
+        """How many buildings the player owns in all."""
+        return sum(int(grid.sum()) for grid in self._owned.values())
+
     def kinds(self) -> list[BuildingKind]:
         """The kinds of building the player owns any of."""
         return [kind for kind, grid in self._owned.items() if grid.any()]

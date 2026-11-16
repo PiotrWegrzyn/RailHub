@@ -15,7 +15,6 @@ from railroads.sim.trains import (
     ENGINES,
     EXPRESS_FARE,
     FULL_LOAD,
-    MAX_CARS,
     Car,
     Engine,
     Kind,
@@ -83,9 +82,10 @@ def test_in_1850_only_a_cheap_small_engine_and_the_planet_are_for_sale() -> None
 
     assert sorted(engines) == ["planet", "tank"]
     tank, planet = ENGINES["tank"], ENGINES["planet"]
-    assert (tank.cars, planet.cars) == (3, MAX_CARS)
-    assert tank.price < planet.price
-    assert tank.speed < planet.speed == 1.0
+    assert (tank.cars, planet.cars) == (2, 3)
+    assert tank.price < planet.price == 10_000.0
+    assert tank.speed < planet.speed
+    assert planet.kmh == pytest.approx(30.0)
 
 
 def test_every_engine_before_the_planet_is_worse_and_cheaper() -> None:
@@ -100,14 +100,36 @@ def test_every_engine_before_the_planet_is_worse_and_cheaper() -> None:
 
 
 @pytest.mark.parametrize("kind", [Kind.LIGHT, Kind.GENERAL, Kind.HEAVY, Kind.EXPRESS])
-def test_each_class_only_gets_better_over_time(kind: Kind) -> None:
+def test_each_class_only_gets_better_over_time_on_the_same_power(kind: Kind) -> None:
     engines = [ENGINES[name] for name in by_year(kind)]
 
-    pairs = list(itertools.pairwise(engines))
+    pairs = [
+        (old, new) for old, new in itertools.combinations(engines, 2) if old.power == new.power
+    ]
 
     assert len(engines) >= 4
     assert all(new.speed >= old.speed and new.cars >= old.cars for old, new in pairs)
     assert all(new.speed > old.speed or new.cars > old.cars for old, new in pairs)
+
+
+@pytest.mark.parametrize("kind", [Kind.LIGHT, Kind.GENERAL, Kind.HEAVY, Kind.EXPRESS])
+def test_each_engine_of_a_class_costs_about_three_times_the_one_before(kind: Kind) -> None:
+    prices = [ENGINES[name].price for name in by_year(kind)]
+
+    steps = [new / old for old, new in itertools.pairwise(prices)]
+
+    assert all(2.5 <= step <= 3.5 for step in steps)
+
+
+def test_electric_engines_run_faster_than_diesels_and_diesels_cars_hold_half_as_much_again() -> (
+    None
+):
+    diesel, electric = ENGINES["mixed_diesel"], ENGINES["express"]
+
+    sizes = diesel.car_size, electric.car_size
+
+    assert electric.speed > diesel.speed
+    assert sizes == (1.5, 1.0)
 
 
 def of_its_day(engine: Engine, kind: Kind) -> Engine:
@@ -115,14 +137,14 @@ def of_its_day(engine: Engine, kind: Kind) -> Engine:
 
 
 @pytest.mark.parametrize("name", by_year(Kind.HEAVY))
-def test_a_heavy_freight_engine_pulls_twice_the_cars_of_a_general_one_of_its_day_slower(
+def test_a_heavy_freight_engine_pulls_more_cars_than_a_general_one_of_its_day_slower(
     name: str,
 ) -> None:
     heavy = ENGINES[name]
 
     general = of_its_day(heavy, Kind.GENERAL)
 
-    assert heavy.cars >= 2 * general.cars
+    assert heavy.cars > general.cars
     assert heavy.speed < general.speed
     assert heavy.pickup > 2 * general.pickup
 
@@ -135,7 +157,7 @@ def test_a_light_engine_costs_far_less_to_run_and_is_quicker_off_the_mark_than_a
 
     general = of_its_day(light, Kind.GENERAL)
 
-    assert light.running < general.running / 2
+    assert light.running < general.running
     assert light.pickup < general.pickup / 2
     assert light.cars < general.cars
 
@@ -175,14 +197,14 @@ def test_the_specialised_classes_come_soon_after_1850_and_need_their_tech() -> N
     assert not {"goods", "single"} & set(without.engines())
 
 
-def test_the_game_ends_with_a_500_kmh_maglev_and_a_diesel_pulling_forty_cars() -> None:
+def test_the_game_ends_with_a_500_kmh_maglev_and_a_diesel_pulling_twenty_four_cars() -> None:
     railway = knowing(line(), *EVERY_NODE)
     railway.year = 2040
 
     engines = {name: ENGINES[name] for name in railway.engines()}
 
     assert any(e.maglev and e.kmh == pytest.approx(500.0) for e in engines.values())
-    assert any(e.power.value == "diesel" and e.cars == 40 for e in engines.values())
+    assert any(e.power.value == "diesel" and e.cars == 24 for e in engines.values())
 
 
 def test_a_newer_engine_of_the_same_line_takes_the_older_ones_place_on_sale() -> None:
@@ -277,7 +299,7 @@ def test_a_full_train_as_long_as_its_engine_is_built_for_slows_a_light_one_most_
     None
 ):
     light = full_train("tank", ENGINES["tank"].cars)
-    planet = full_train("planet", MAX_CARS)
+    planet = full_train("planet", ENGINES["planet"].cars)
 
     heavy = full_train("goods", ENGINES["goods"].cars)
 
@@ -307,9 +329,9 @@ def test_every_engine_costs_its_running_cost_each_month() -> None:
 
     railway.turn_month({})
 
-    running = ENGINES["planet"].running + ENGINES["tank"].running
+    running = railway.running_cost("planet") + railway.running_cost("tank")
     assert railway.finances.month["running trains"] == pytest.approx(-running)
-    assert ENGINES["planet"].running >= ENGINES["planet"].price / 100
+    assert railway.running_cost("planet") > ENGINES["planet"].running
 
 
 def test_steam_costs_the_most_to_run_for_its_price_and_electric_the_least() -> None:
@@ -346,9 +368,9 @@ def test_the_buy_menu_groups_engines_by_class_newest_first() -> None:
 def test_an_express_tells_it_takes_only_passengers_and_has_a_dining_car() -> None:
     summary = engine_summary(ENGINES["bullet"])
 
-    assert "240 km/h" in summary
-    assert "$5,400 a month to run" in summary
-    assert "7 coaches and a dining car" in summary
+    assert "210 km/h" in summary
+    assert "$368 a month to run" in summary
+    assert "6 coaches and a dining car" in summary
     assert "Passengers only, paying 20% more" in summary
     assert "electrified track only" in summary
 

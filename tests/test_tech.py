@@ -140,7 +140,7 @@ def test_a_mogul_pulls_more_cars_and_steel_couplings_one_more() -> None:
     assert train is not None
     assert railway.most_cars(train) == ENGINES["mogul"].cars + 1
     stop = Stop((6, 3))
-    assert all(stop.add_car(Good.COAL, railway.most_cars(train)) for _ in range(13))
+    assert all(stop.add_car(Good.COAL, railway.most_cars(train)) for _ in range(7))
     assert not stop.add_car(Good.COAL, railway.most_cars(train))
 
 
@@ -218,7 +218,7 @@ def test_electric_engines_find_a_way_only_along_electrified_track() -> None:
     assert railway.route((6, 3), (6, 20)) is not None
 
 
-def test_electrified_track_costs_more_upkeep_than_plain_track() -> None:
+def test_electrified_track_costs_twenty_one_times_the_upkeep_of_plain_track() -> None:
     plain, wired = Constructions(flat_map()), Constructions(flat_map())
     for constructions, electric in ((plain, False), (wired, True)):
         growth = Growth(constructions, GrowthRule(trades=False))
@@ -231,7 +231,7 @@ def test_electrified_track_costs_more_upkeep_than_plain_track() -> None:
         railway.turn_month({})
 
     paid = [-railway.finances.month["track upkeep"] for railway in railways]
-    assert paid[1] == pytest.approx(2.5 * paid[0])
+    assert paid[1] == pytest.approx(21 * paid[0])
 
 
 def test_fine_living_makes_each_bonus_good_worth_ten_points_more_satisfaction() -> None:

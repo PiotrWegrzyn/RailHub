@@ -10,7 +10,7 @@ from imgui_bundle import imgui
 
 from railroads.sim.finance import dollars
 from railroads.sim.railway import Railway
-from railroads.sim.trains import ENGINES, EXPRESS_FARE, Engine, Kind, Train
+from railroads.sim.trains import ENGINES, EXPRESS_FARE, MAGLEV_FARE, Engine, Kind, Train
 from railroads.ui.iso_camera import Vec2
 from railroads.ui.theme import BRASS, TEXT_DIM, color_u32
 
@@ -30,7 +30,7 @@ type EnginePicture = Callable[[str, int], tuple[imgui.ImTextureRef, Vec2]]
 type DrawRoute = Callable[[Train], None]
 # The engines on sale grouped by what they are for, and an engine's tooltip.
 type EngineGroups = list[tuple[Kind, list[str]]]
-type Summary = Callable[[Engine], str]
+type Summary = Callable[[Engine, float], str]
 
 
 @dataclass
@@ -105,7 +105,7 @@ class BuyScreen:
         if imgui.selectable(f"{engine.title}##{name}", self.engine == name)[0]:
             self.engine = name
         if imgui.is_item_hovered():
-            imgui.set_tooltip(summary(engine))
+            imgui.set_tooltip(summary(engine, railway.running_cost(name)))
         price = dollars(engine.price)
         affordable = railway.finances.can_afford(engine.price)
         right = imgui.get_item_rect_max().x - imgui.calc_text_size(price).x - 4
@@ -120,7 +120,7 @@ class BuyScreen:
         imgui.text(engine.title)
         imgui.pop_style_color()
         imgui.separator()
-        for label, value in engine_figures(engine):
+        for label, value in engine_figures(engine, railway.running_cost(name)):
             imgui.text_disabled(label)
             imgui.same_line(FIGURES_LABEL)
             imgui.text(value)
@@ -178,8 +178,9 @@ class BuyScreen:
         draw_route(train)
 
 
-def engine_figures(engine: Engine) -> list[tuple[str, str]]:
-    """What an engine can do, as labels and values for its table on the screen."""
+def engine_figures(engine: Engine, running: float | None = None) -> list[tuple[str, str]]:
+    """What an engine can do, as labels and values for its table on the screen, with what it
+    costs to run a month now if given."""
     cars = f"{engine.cars} coaches and a dining car" if engine.express else f"{engine.cars} cars"
     figures = [
         ("Built from", str(engine.year)),
@@ -188,10 +189,13 @@ def engine_figures(engine: Engine) -> list[tuple[str, str]]:
         ("Pulls up to", cars),
         ("Up to speed in", f"{engine.pickup:g} s"),
         ("Price", dollars(engine.price)),
-        ("Running cost", f"{dollars(engine.running)} a month"),
+        ("Running cost", f"{dollars(engine.running if running is None else running)} a month"),
     ]
+    if engine.car_size > 1.0:
+        figures.append(("Cars", f"Hold {engine.car_size - 1:.0%} more"))
     if engine.express:
-        figures.append(("Fares", f"Passengers only, paying {EXPRESS_FARE - 1:.0%} more"))
+        fare = MAGLEV_FARE if engine.maglev else EXPRESS_FARE
+        figures.append(("Fares", f"Passengers only, paying {fare - 1:.0%} more"))
     if engine.electric:
         figures.append(("Runs on", "Electrified track only"))
     if engine.maglev:

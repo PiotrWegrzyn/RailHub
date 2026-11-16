@@ -15,7 +15,7 @@ waiting passengers and mail.
 
 Cargo earns money by the demand around the station that hands it out (railroads.sim.demand). Trains
 cost their engine's price, every car CAR_TRIP_PRICE each time a train leaves a stop with it, and every
-month each engine costs its running cost and stations and track their upkeep
+month each engine costs its running cost (railroads.sim.running_costs) and stations and track their upkeep
 (railroads.sim.finance).
 
 Trains set off from a stand and pick up speed over their engine's pickup time. Trains that meet
@@ -63,6 +63,7 @@ from railroads.sim.finance import (
 )
 from railroads.sim.goods import TRAVELLERS, General, Good, Need
 from railroads.sim.grids import Cell
+from railroads.sim.running_costs import Business, running_cost
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
 from railroads.sim.tech import GENERAL_CARS, GOOD_TREES, Effect, Research
@@ -71,6 +72,7 @@ from railroads.sim.trains import (
     ENGINES,
     EXPRESS_FARE,
     FIRST_ENGINE,
+    MAGLEV_FARE,
     Cargo,
     Point,
     Power,
@@ -80,6 +82,7 @@ from railroads.sim.trains import (
 )
 
 if TYPE_CHECKING:
+    from railroads.sim.ownership import Owners
     from railroads.sim.station_trade import StationTrade
 
 # What new trains are called, by what drives them, before the number they were bought as.
@@ -109,6 +112,9 @@ class Railway:
     # (railroads.sim.facilities). None in older saves, which have none.
     facilities: dict[Cell, set[Facility]] | None = None
     supplied: dict[Cell, set[Facility]] | None = None
+    # The buildings the player owns (railroads.sim.ownership), which make running engines a
+    # little cheaper; set by the game, None until then.
+    owners: Owners | None = None
 
     def __init__(
         self,
@@ -246,11 +252,32 @@ class Railway:
         """How many cars a train's engine pulls, with what tech adds."""
         return ENGINES[train.engine].cars + int(self.research.bonus(Effect.PULL))
 
-    def car_capacity(self, good: Good) -> float:
-        """How much of a good one car carries: coaches and mail vans more with tech."""
+    def business(self) -> Business:
+        """What of the player's business makes their engines cheaper to run now."""
+        owned = 0 if self.owners is None else self.owners.count()
+        delivered = sum(
+            cars
+            for year in self.history.delivered.values()
+            for good, cars in year.items()
+            if good not in TRAVELLERS
+        )
+        power_stations = sum(
+            Facility.POWER_STATION in working for working in (self.supplied or {}).values()
+        )
+        return Business(owned, delivered, power_stations)
+
+    def running_cost(self, engine: str) -> float:
+        """What an engine costs to run a month now: its fuel's price this year, less what the
+        player's business and tech take off."""
+        return running_cost(ENGINES[engine], self.year, self.business()) * self._upkeep()
+
+    def car_capacity(self, good: Good, engine: str | None = None) -> float:
+        """How much of a good one car carries: coaches and mail vans more with tech, and every
+        car pulled by a diesel engine more (Engine.car_size)."""
+        size = car_size(good) * (1.0 if engine is None else ENGINES[engine].car_size)
         if good in TRAVELLERS:
-            return car_size(good) * (1.0 + self.research.bonus(Effect.COACHES))
-        return car_size(good)
+            return size * (1.0 + self.research.bonus(Effect.COACHES))
+        return size
 
     def _upkeep(self) -> float:
         return max(LEAST_UPKEEP, 1.0 - self.research.bonus(Effect.UPKEEP))
@@ -317,8 +344,10 @@ class Railway:
 
     @staticmethod
     def fare_factor(train: Train) -> float:
-        """How much more passengers on this train pay: EXPRESS_FARE on an express."""
-        return EXPRESS_FARE if ENGINES[train.engine].express else 1.0
+        """How much more passengers on this train pay: MAGLEV_FARE on a maglev, EXPRESS_FARE on
+        another express."""
+        engine = ENGINES[train.engine]
+        return MAGLEV_FARE if engine.maglev else EXPRESS_FARE if engine.express else 1.0
 
     def hand_out_now(self, station: Cell, good: Good) -> None:
         """Lets the buildings around a station take a good that has just reached it."""
@@ -419,13 +448,13 @@ class Railway:
         for station in self.stations():
             self.station_demand(station).turn_month(capacity.get(station, {}))
         self._supply_facilities()
-        self.finances.close_month()
+        self.finances.close_month(self.year)
         track = self.constructions.track()
         upkeep = self._upkeep()
         self.finances.spend(STATION_UPKEEP * len(self.stations()) * upkeep, "station upkeep")
         self.finances.spend(track_upkeep(track) * upkeep, "track upkeep")
-        running = sum(ENGINES[train.engine].running for train in self.trains)
-        self.finances.spend(running * upkeep, "running trains")
+        running = sum(self.running_cost(train.engine) for train in self.trains)
+        self.finances.spend(running, "running trains")
 
     def run(self, months: float) -> None:
         """Moves every train on by this many months, then has trains that met give way."""

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 from imgui_bundle import imgui, implot
 
+from railroads.sim.finance import Finances, dollars
 from railroads.sim.goods import Good
 from railroads.sim.stats import History
 from railroads.ui.theme import GOOD_COLORS
@@ -66,11 +67,56 @@ def _goods_colormap() -> implot.Colormap:
     return implot.add_colormap(GOODS_COLORMAP, colors, qual=True)
 
 
+def books_by_year(finances: Finances, year: int) -> list[tuple[str, float, float]]:
+    """What money went in and out on, last year and this year so far: costs first, the dearest
+    at the top, then income, the biggest first."""
+    last, now = finances.year_books(year - 1), finances.year_books(year)
+    rows = [(what, last.get(what, 0.0), now.get(what, 0.0)) for what in {*last, *now}]
+    return sorted(rows, key=lambda row: (row[1] + row[2] >= 0, abs(row[1] + row[2]) * -1))
+
+
+def _draw_books(finances: Finances, year: int) -> None:
+    """A table of what money went in and out on, last year and this year so far."""
+    rows = books_by_year(finances, year)
+    imgui.text("Money in and out, by year")
+    if not rows or not imgui.begin_table("books", 3, imgui.TableFlags_.row_bg.value):
+        imgui.text_disabled("Nothing yet")
+        return
+    imgui.table_setup_column("")
+    imgui.table_setup_column(str(year - 1))
+    imgui.table_setup_column(f"{year} so far")
+    imgui.table_headers_row()
+    totals = [0.0, 0.0]
+    for what, last, now in rows:
+        imgui.table_next_row()
+        imgui.table_next_column()
+        imgui.text(what.capitalize())
+        for index, amount in enumerate((last, now)):
+            totals[index] += amount
+            imgui.table_next_column()
+            imgui.text(dollars(amount) if amount else "")
+    imgui.table_next_row()
+    imgui.table_next_column()
+    imgui.text("Profit")
+    for amount in totals:
+        imgui.table_next_column()
+        imgui.text(dollars(amount))
+    imgui.end_table()
+    imgui.spacing()
+
+
 class ReportsWindow:
     def __init__(self) -> None:
         self.open = False
 
-    def draw(self, history: History, year: int, stations: int, population: int) -> None:
+    def draw(
+        self,
+        history: History,
+        year: int,
+        stations: int,
+        population: int,
+        finances: Finances | None = None,
+    ) -> None:
         if not self.open:
             return
         imgui.set_next_window_pos((60.0, WINDOW_TOP), imgui.Cond_.first_use_ever.value)
@@ -78,6 +124,8 @@ class ReportsWindow:
         expanded, self.open = imgui.begin("Reports", self.open)
         if expanded:
             shown = report(history, year, stations, population)
+            if finances is not None:
+                _draw_books(finances, year)
             self._draw_deliveries(shown)
             self._draw_line("Stations owned", "stations", shown.years, shown.stations)
             self._draw_line("Population", "population", shown.years, shown.population)

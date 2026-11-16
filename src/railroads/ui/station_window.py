@@ -21,6 +21,7 @@ from railroads.sim.finance import STATION_PRICE, dollars
 from railroads.sim.goods import TRAVELLERS, Good
 from railroads.sim.grids import Cell
 from railroads.sim.railway import MAX_LEVEL, Railway
+from railroads.sim.running_costs import MOST_POWER_STATION_CUT, POWER_STATION_CUT
 from railroads.sim.station_goods import STORAGE_STEP, WAITING_STEP, StationGoods
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.stations_window import stock_bar
@@ -148,6 +149,7 @@ FACILITY_EFFECTS = {
     Facility.MARKET_HALL: f"food delivered here pays {PAYS_MORE[Facility.MARKET_HALL][1] - 1:.0%} more",
     Facility.CATTLE_PENS: f"livestock delivered here pays {PAYS_MORE[Facility.CATTLE_PENS][1] - 1:.0%} more",
     Facility.WAREHOUSE: f"+{WAREHOUSE_ROOM:.0f} room for each good",
+    Facility.POWER_STATION: f"electric and maglev engines everywhere cost {POWER_STATION_CUT:.0%} less to run, up to {MOST_POWER_STATION_CUT:.0%}",
 }
 
 

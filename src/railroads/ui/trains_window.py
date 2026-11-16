@@ -17,7 +17,7 @@ from railroads.sim.finance import TRAIN_RESALE, dollars
 from railroads.sim.goods import GENERAL_GOODS, General, Good
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
-from railroads.sim.trains import ENGINES, EXPRESS_FARE, Engine, Kind, Stop, Train
+from railroads.sim.trains import ENGINES, EXPRESS_FARE, MAGLEV_FARE, Engine, Kind, Stop, Train
 from railroads.ui.buy_train import BuyScreen, EnginePicture
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at
@@ -333,7 +333,7 @@ class TrainsWindow:
                     " - click to remove"
                 )
             else:
-                size = railway.car_capacity(cargo)
+                size = railway.car_capacity(cargo, train.engine)
                 tooltip = f"{cargo.value} car of {size:.0f} - click to remove"
             removed = car_chip(f"car{car_index}", cargo, tooltip=tooltip)
             if imgui.is_item_hovered() and isinstance(cargo, Good):
@@ -452,7 +452,7 @@ def upgrade_menu(railway: Railway, train: Train) -> None:
             railway.swap_engine(train, name)
         imgui.end_disabled()
         if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-            imgui.set_tooltip(engine_summary(engine))
+            imgui.set_tooltip(engine_summary(engine, railway.running_cost(name)))
         if len(alike) > 1:
             total = sum(railway.swap_price(t, name) for t in alike)
             imgui.begin_disabled(not railway.finances.can_afford(price))
@@ -465,7 +465,8 @@ def upgrade_menu(railway: Railway, train: Train) -> None:
             imgui.end_disabled()
             if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
                 imgui.set_tooltip(
-                    f"{engine_summary(engine)}\nAs many as the cash allows, in the order bought"
+                    f"{engine_summary(engine, railway.running_cost(name))}\n"
+                    "As many as the cash allows, in the order bought"
                 )
     imgui.end_popup()
 
@@ -482,16 +483,20 @@ def engines_by_kind(names: list[str]) -> list[tuple[Kind, list[str]]]:
     return [(kind, group) for kind, group in groups if group]
 
 
-def engine_summary(engine: Engine) -> str:
-    """An engine's speed, cars and what it runs on, for its tooltip."""
+def engine_summary(engine: Engine, running: float | None = None) -> str:
+    """An engine's speed, cars and what it runs on, for its tooltip, with what it costs to run a
+    month now if given."""
     cars = f"{engine.cars} coaches and a dining car" if engine.express else f"{engine.cars} cars"
     lines = [
         f"{engine.year}, {engine.power.value}: {engine.kmh:.0f} km/h, pulls up to {cars}",
         f"Up to speed in {engine.pickup:g} s",
-        f"Costs {dollars(engine.running)} a month to run",
+        f"Costs {dollars(engine.running if running is None else running)} a month to run",
     ]
+    if engine.car_size > 1.0:
+        lines.append(f"Its cars hold {engine.car_size - 1:.0%} more")
     if engine.express:
-        lines.append(f"Passengers only, paying {EXPRESS_FARE - 1:.0%} more")
+        fare = MAGLEV_FARE if engine.maglev else EXPRESS_FARE
+        lines.append(f"Passengers only, paying {fare - 1:.0%} more")
     if engine.electric:
         lines.append("Runs on electrified track only")
     if engine.maglev:

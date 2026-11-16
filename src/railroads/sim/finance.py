@@ -21,7 +21,7 @@ ELECTRIC_TRACK_PRICE = 450.0
 MAGLEV_TRACK_PRICE = 4_000.0
 DOUBLE_TRACK_FACTOR = 1.8
 STATION_PRICE = 15_000.0
-TRAIN_PRICE = 45_000.0
+TRAIN_PRICE = 10_000.0
 # What selling a train gives back, as a share of its price.
 TRAIN_RESALE = 0.5
 # What each car costs every time a train leaves a stop with it.
@@ -33,6 +33,7 @@ STORAGE_PRICE = 10_000.0
 STORAGE_GROWTH = 2.0
 # What each facility at a station costs (railroads.sim.facilities).
 ENGINE_SHED_PRICE = 40_000.0
+POWER_STATION_PRICE = 3_000_000.0
 SAND_TOWER_PRICE = 25_000.0
 POST_OFFICE_PRICE = 30_000.0
 REFRESHMENT_ROOM_PRICE = 30_000.0
@@ -44,8 +45,8 @@ STATION_UPKEEP = 200.0
 # electric, MAGLEV_TRACK_UPKEEP more where it is maglev, and DOUBLE_TRACK_FACTOR as much where
 # it is double.
 TRACK_UPKEEP = 2.0
-ELECTRIC_TRACK_UPKEEP = 3.0
-MAGLEV_TRACK_UPKEEP = 25.0
+ELECTRIC_TRACK_UPKEEP = 40.0
+MAGLEV_TRACK_UPKEEP = 60.0
 
 
 def storage_price(upgrades: int) -> float:
@@ -81,6 +82,10 @@ class Finances:
     # Money in (above 0) and out (below 0) this month and last month, by what it was for.
     month: dict[str, float] = field(default_factory=lambda: defaultdict(float))
     last_month: dict[str, float] = field(default_factory=dict)
+    # Each year's money in and out, by what it was for, as months close; and the year of the
+    # month on the books now, None until the first month closes.
+    years: dict[int, dict[str, float]] = field(default_factory=dict)
+    books_year: int | None = None
 
     def can_afford(self, price: float) -> bool:
         return price <= self.cash + 1e-9
@@ -93,10 +98,27 @@ class Finances:
         self.cash += amount
         self.month[what] += amount
 
-    def close_month(self) -> None:
-        """Starts a new month in the ledger."""
+    def close_month(self, year: int | None = None) -> None:
+        """Starts a new month in the ledger, in `year` if given, adding the month just ended to
+        its year's books."""
+        filed = self.books_year if self.books_year is not None else year
+        if filed is not None:
+            books = self.years.setdefault(filed, {})
+            for what, amount in self.month.items():
+                books[what] = books.get(what, 0.0) + amount
+        if year is not None:
+            self.books_year = year
         self.last_month = dict(self.month)
         self.month = defaultdict(float)
+
+    def year_books(self, year: int) -> dict[str, float]:
+        """A year's money in and out by what it was for, with this month's if it is on the
+        books now."""
+        books = dict(self.years.get(year, {}))
+        if year == self.books_year or (self.books_year is None and year not in self.years):
+            for what, amount in self.month.items():
+                books[what] = books.get(what, 0.0) + amount
+        return books
 
     @property
     def profit(self) -> float:

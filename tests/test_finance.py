@@ -69,4 +69,4 @@ def test_each_cell_of_track_pays_upkeep_once_for_its_dearest_piece() -> None:
 
     upkeep = track_upkeep(pieces)
 
-    assert upkeep == pytest.approx(2 + 3.6 + 9)
+    assert upkeep == pytest.approx(2 + 3.6 + 1.8 * 42)

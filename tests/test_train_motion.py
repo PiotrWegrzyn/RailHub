@@ -65,7 +65,8 @@ def test_a_train_sets_off_slowly_and_reaches_full_speed_after_its_pickup_time() 
 
     assert halfway == pytest.approx(0.5)
     assert train.pace == pytest.approx(1.0)
-    assert train.along == pytest.approx(0.5 * pickup * CELLS_PER_MONTH, rel=1e-3)
+    speed = ENGINES["planet"].speed
+    assert train.along == pytest.approx(0.5 * pickup * CELLS_PER_MONTH * speed, rel=1e-3)
 
 
 def test_how_far_a_train_gets_does_not_depend_on_the_frame_rate() -> None:
@@ -159,7 +160,7 @@ def test_trains_going_opposite_ways_on_double_track_pass_without_stopping() -> N
     second = running(railway, "Second", EAST, WEST)
     stopped = []
 
-    for _ in range(120 * 60):
+    for _ in range(240 * 60):
         railway.run(FRAME)
         stopped += [train.name for train in railway.trains if train.giving_way]
         if first.arrivals and second.arrivals:
@@ -175,7 +176,7 @@ def test_many_trains_on_one_line_all_keep_getting_through() -> None:
         start, end = (WEST, EAST) if number % 2 else (EAST, WEST)
         running(railway, f"Train {number}", start, end)
 
-    for _ in range(int(3 / FRAME / 10)):
+    for _ in range(int(6 / FRAME / 10)):
         railway.run(10 * FRAME)
 
     assert all(train.arrivals >= 2 for train in railway.trains)
