@@ -84,6 +84,7 @@ from railroads.sim.trains import (
     Power,
     Stop,
     Train,
+    bigger,
     car_size,
     general_car_size,
 )
@@ -306,10 +307,13 @@ class Railway:
         self, good: Good, engine: str | None = None, general: General | None = None
     ) -> float:
         """How much of a good one car carries, a general car of a kind (general_car_size) or
-        one for the good alone: coaches and mail vans more with tech, and every car pulled by a
-        diesel engine more (Engine.car_size)."""
+        one for the good alone: sizes up with tech (Effect.CAR_SIZE) and behind newer engines
+        (Engine.car_levels), and coaches and mail vans more with tech."""
         base = car_size(good) if general is None else general_car_size(general, good)
-        size = base * (1.0 if engine is None else ENGINES[engine].car_size)
+        levels = int(self.research.bonus(Effect.CAR_SIZE))
+        if engine is not None:
+            levels += ENGINES[engine].car_levels
+        size = bigger(base, levels)
         if good in TRAVELLERS:
             return size * (1.0 + self.research.bonus(Effect.COACHES))
         return size

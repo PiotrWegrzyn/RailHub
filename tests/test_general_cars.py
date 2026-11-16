@@ -4,7 +4,7 @@ from test_railway import joined_stations
 from railroads.sim.goods import General, Good, Need
 from railroads.sim.railway import Railway
 from railroads.sim.tech import GENERAL_CARS, NODES
-from railroads.sim.trains import Stop, Train
+from railroads.sim.trains import MEDIUM_CAR, Stop, Train
 
 HERE, THERE = (6, 3), (6, 20)
 
@@ -78,7 +78,8 @@ def test_a_general_processed_food_car_carries_less_and_takes_no_grown_food() -> 
 
     (car,) = train.cars
     assert car.good == Good.BREAD
-    assert car.capacity == pytest.approx(railway.car_capacity(Good.BREAD, train.engine) / 2)
+    assert car.capacity == pytest.approx(MEDIUM_CAR)
+    assert car.capacity < railway.car_capacity(Good.BREAD, train.engine)
 
 
 def test_the_processed_food_car_is_the_next_tech_after_the_food_car() -> None:

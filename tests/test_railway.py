@@ -62,15 +62,15 @@ def test_a_new_train_leaves_its_first_stop_with_that_stops_cars_full() -> None:
 @pytest.mark.parametrize(
     ("good", "load"),
     [
-        (Good.GOLD, 10.0),
-        (Good.STEEL, 25.0),
-        (Good.CATTLE, 25.0),
-        (Good.OIL, 50.0),
-        (Good.IRON, 150.0),
-        (Good.WHEAT, 150.0),
+        (Good.GOLD, 8.0),
+        (Good.STEEL, 21.0),
+        (Good.CATTLE, 21.0),
+        (Good.OIL, 55.0),
+        (Good.IRON, 144.0),
+        (Good.WHEAT, 144.0),
     ],
 )
-def test_a_car_holds_ten_of_precious_goods_twenty_five_of_heavy_ones_150_of_bulk_and_50_else(
+def test_a_car_holds_8_of_precious_goods_21_of_heavy_ones_144_of_bulk_and_55_else(
     good: Good, load: float
 ) -> None:
     _, railway = joined_stations()
@@ -138,7 +138,7 @@ def test_at_the_next_stop_it_unloads_and_takes_that_stops_cars() -> None:
 
     assert train.heading == 0
     assert railway.station_goods((6, 20)).brought[Good.WHEAT] == BULK_CAR
-    assert [(car.good, car.load) for car in train.cars] == [(Good.OIL, 50.0), (Good.OIL, 50.0)]
+    assert [(car.good, car.load) for car in train.cars] == [(Good.OIL, 55.0), (Good.OIL, 55.0)]
 
 
 def test_each_car_fills_with_its_own_good_from_the_stockpile() -> None:
