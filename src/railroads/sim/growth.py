@@ -124,6 +124,8 @@ SPAWN_BY_PEOPLE = frozenset(
     {
         BuildingKind.BAKERY,
         BuildingKind.MEAT_FACTORY,
+        BuildingKind.TAVERN,
+        BuildingKind.CLUB,
         BuildingKind.GASWORKS,
         BuildingKind.BREWERY,
         BuildingKind.BRICKWORKS,
@@ -185,6 +187,11 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
     _BREEDINGS[(id(ladder), id(points))] = (ladder, points, breeding)
     return breeding
 
+
+# The homes around a tavern or club that gets all its drink grow this much faster, and those
+# around one that gets some of it that share as much faster.
+LIVELY_GROWTH = 0.5
+VENUES = (BuildingKind.TAVERN, BuildingKind.CLUB)
 
 # How long buildings last starving: homes, and everything else.
 HOMES_DIE_AFTER_MONTHS = 10 * 12
@@ -430,6 +437,7 @@ class Growth:
             if boost:
                 count += boost * self.owners.owned(kind).ravel()[trade.cells]
             served[points] += served_multipliers(share) * value * count
+        served[Points.POPULATION] *= 1.0 + LIVELY_GROWTH * self._lively(trade)
         emptied = np.setdiff1d(self._traded, trade.cells, assume_unique=True)
         self._traded = trade.cells
         for points, here in served.items():
@@ -444,6 +452,19 @@ class Growth:
             for place in self._places:
                 if self._breeding(place).own == points:
                     self._reckon(place, cells)
+
+    def _lively(self, trade: Trade) -> FloatGrid:
+        """How lively each traded cell is: the best share of their drink that the taverns and
+        clubs in its neighbourhood got."""
+        size = self._grid.rows * self._grid.cols
+        poured = np.zeros(size + 1)
+        for kind in VENUES:
+            if kind in trade.got:
+                share = np.minimum(trade.share((kind,), empty=0.0), 1.0)
+                here = poured[trade.cells]
+                poured[trade.cells] = np.maximum(here, share)
+        near = self.economy.neighbourhoods.index[:, trade.cells]
+        return np.maximum(poured[trade.cells], poured[near].max(axis=0))
 
     @property
     def year(self) -> int:

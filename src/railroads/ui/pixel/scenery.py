@@ -150,6 +150,7 @@ BUILDING_SPRITES = {
     BuildingKind.AMUSEMENT_PARK: "amusement_park",
     BuildingKind.OLYMPIC_STADIUM: "olympic_stadium",
     BuildingKind.TAVERN: "tavern",
+    BuildingKind.CLUB: "tavern",
     BuildingKind.DEPARTMENT_STORE: "department_store",
     BuildingKind.HOTEL: "hotel",
     BuildingKind.JUICE_WORKS: "winery",

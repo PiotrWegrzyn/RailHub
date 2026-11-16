@@ -321,6 +321,7 @@ GOOD_TREES: Mapping[Good, Tree] = MappingProxyType(
 SHOPS = frozenset(
     {
         BuildingKind.TAVERN,
+        BuildingKind.CLUB,
         BuildingKind.DEPARTMENT_STORE,
         BuildingKind.HOTEL,
         BuildingKind.JEWELLER,

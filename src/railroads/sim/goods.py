@@ -752,7 +752,8 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.PIG_FARM: {Need.WHEAT: 60},
         BuildingKind.CHICKEN_FARM: {Need.WHEAT: 30},
         BuildingKind.SHEEP_FARM: {Need.WHEAT: 90},
-        BuildingKind.TAVERN: {Need.BEER: 20, Need.VODKA: 10},
+        BuildingKind.TAVERN: {Need.BEER: 60, Need.VODKA: 30},
+        BuildingKind.CLUB: {Need.BEER: 200, Need.VODKA: 150},
         BuildingKind.DEPARTMENT_STORE: {
             Need.CLOTHES: 20,
             Need.SHOES: 20,

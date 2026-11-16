@@ -229,6 +229,7 @@ def test_only_mines_and_town_buildings_can_be_built_in_mountains() -> None:
         BuildingKind.BIG_BAKERY,
         BuildingKind.MEGA_BAKERY,
         BuildingKind.TAVERN,
+        BuildingKind.CLUB,
         BuildingKind.DEPARTMENT_STORE,
         BuildingKind.HOTEL,
         BuildingKind.LIMESTONE_QUARRY,

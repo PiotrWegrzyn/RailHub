@@ -194,6 +194,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.AMUSEMENT_PARK: (Points.CORPORATE, 40),
     BuildingKind.OLYMPIC_STADIUM: (Points.CORPORATE, 100),
     BuildingKind.TAVERN: (Points.CORPORATE, 1),
+    BuildingKind.CLUB: (Points.CORPORATE, 3),
     BuildingKind.DEPARTMENT_STORE: (Points.CORPORATE, 3),
     BuildingKind.HOTEL: (Points.CORPORATE, 5),
     BuildingKind.JUICE_WORKS: (Points.INDUSTRY, 1),
@@ -938,15 +939,27 @@ SAND_PITS = Ladder(
     most_nearby=2,
 )
 
-# Taverns serve beer and vodka, one to a neighbourhood, from the smallest towns.
+# Taverns pour a lot of beer and vodka, one to a neighbourhood, and come up as readily as
+# bakeries; from 1900 clubs pour far more in towns of CLUB_TOWN people. Either one, getting its
+# drink, makes the homes around it grow faster (railroads.sim.growth.LIVELY_GROWTH).
+CLUB_TOWN = 30
+
 TAVERNS = Ladder(
     kinds=(BuildingKind.TAVERN,),
     land=TOWN_LAND,
-    base_chance=0.00000001,
-    chance_per_doubling={Points.POPULATION: 0.000004},
-    needs={Points.POPULATION: 3},
+    base_chance=0.0001,
+    chance_per_doubling={Points.POPULATION: 0.000001},
+    needs={Points.POPULATION: FOOD_TOWN},
     most_per_cell=1,
     most_nearby=1,
+)
+
+CLUBS = replace(
+    TAVERNS,
+    kinds=(BuildingKind.CLUB,),
+    base_chance=0.00005,
+    needs={Points.POPULATION: CLUB_TOWN},
+    from_year=1900,
 )
 
 # Department stores and hotels open in big towns, spaced out, a few to a map.
@@ -1074,6 +1087,7 @@ LADDERS = (
     LIMESTONE_QUARRIES,
     SAND_PITS,
     TAVERNS,
+    CLUBS,
     DEPARTMENT_STORES,
     HOTELS,
     POWER_PLANTS,
