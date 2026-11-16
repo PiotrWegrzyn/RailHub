@@ -42,14 +42,14 @@ def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded(
     (house,) = details.buildings
     assert house.name == "house"
     assert house.count == 3
-    assert house.needs == [(Need.FOOD, 30), (Need.HEATING, 3)]
+    assert house.needs == [(Need.FOOD, 30), (Need.HEATING, 9), (Need.COMMON, 15)]
     assert dict(house.bonus) == {
         need: pytest.approx(3 * amount)
         for need, amount in bonus_of(BuildingKind.HOUSE, 1850).items()
     }
     got = {flow.good: (flow.done, flow.wanted) for flow in house.got}
     assert got[Need.FOOD] == (pytest.approx(4.5), 30.0)
-    assert got[Need.HEATING] == (0.0, 3.0)
+    assert got[Need.HEATING] == (0.0, 9.0)
     assert got[Need.BEER] == (0.0, 3.0)
     assert house.satisfaction == "content"
     assert farm.makes == [(Good.WHEAT, 5)]
@@ -73,7 +73,7 @@ def test_details_of_an_empty_cell_show_its_land_and_nearby_points() -> None:
     assert details.title.startswith("Cell 5, 6")
 
 
-def test_a_tenement_needs_only_food_and_heating_and_takes_the_rest_as_bonus_goods() -> None:
+def test_a_tenement_needs_food_common_goods_and_heating_and_takes_the_rest_as_bonus_goods() -> None:
     constructions = Constructions(make_map())
     constructions.build(Building((5, 5), BuildingKind.TENEMENT))
     growth = Growth(constructions)
@@ -81,7 +81,7 @@ def test_a_tenement_needs_only_food_and_heating_and_takes_the_rest_as_bonus_good
     details = describe(growth, (5, 5))
 
     tenement = details.buildings[0]
-    assert tenement.needs == [(Need.FOOD, 60), (Need.HEATING, 3)]
+    assert tenement.needs == [(Need.FOOD, 60), (Need.COMMON, 60), (Need.HEATING, 20)]
     assert dict(tenement.bonus) == bonus_of(BuildingKind.TENEMENT, 1850)
     assert {flow.good for flow in tenement.got} == set(needs_of(BuildingKind.TENEMENT, 1850))
     assert all(flow.done == 0.0 for flow in tenement.got)

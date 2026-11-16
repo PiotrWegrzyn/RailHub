@@ -521,7 +521,7 @@ def test_houses_heat_with_lumber_or_coal(fuel: str) -> None:
     trade = economy.trade(placed, holding(**{fuel: 5.0}))
 
     burned, _ = trade.goods_got[(BuildingKind.HOUSE, Need.HEATING)]
-    assert burned[position(trade, economy, (8, 9))] == 1.0
+    assert burned[position(trade, economy, (8, 9))] == 3.0
 
 
 @pytest.mark.parametrize(
@@ -548,12 +548,12 @@ def test_a_power_plant_burns_coal_oil_or_gas() -> None:
     assert needed[at] == 200.0
 
 
-def test_bonus_goods_raise_a_fed_and_warm_house_past_full_satisfaction() -> None:
+def test_bonus_goods_raise_a_fed_warm_and_furnished_house_past_full_satisfaction() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
 
-    trade = economy.trade(placed, holding(FISH=10.0, COAL=1.0, BEER=1.0, NEWSPAPERS=0.5))
+    trade = economy.trade(placed, holding(FISH=10.0, COAL=3.0, POTS=5.0, BEER=1.0, NEWSPAPERS=0.5))
 
     share = trade.share((BuildingKind.HOUSE,))[position(trade, economy, (8, 9))]
     assert share == pytest.approx(1.45)
@@ -677,4 +677,4 @@ def test_any_common_good_meets_a_homes_need_for_common_goods(good: str) -> None:
 
     got, wanted = trade.goods_got[(BuildingKind.HOUSE, Need.COMMON)]
     at = position(trade, economy, (8, 9))
-    assert got[at] == wanted[at] == 3.0
+    assert got[at] == wanted[at] == 5.0

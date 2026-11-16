@@ -13,7 +13,7 @@ big factories steel and copper, mega factories steel, copper and machinery. An i
 starts later is left out of a recipe until its year.
 
 What a building needs is split in two. Its demands (demands_of) are what it must get to be
-satisfied; a home's are only food and heating (HOMES). Its bonus goods (bonus_of, from BONUS_NEEDS) it can do without, but each one it gets
+satisfied; a home's are food, common goods and heating (HOMES). Its bonus goods (bonus_of, from BONUS_NEEDS) it can do without, but each one it gets
 raises its satisfaction above what its demands give (railroads.sim.economy). Processors have no
 bonus goods: their inputs make what they make. A building that makes nothing whose every need is
 a bonus good keeps them all as demands, since getting them is what it is there for. A building
@@ -592,10 +592,10 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
     {
         BuildingKind.HOUSE: {
             Need.FOOD: 10,
-            Need.HEATING: 1,
+            Need.HEATING: 3,
             Need.BEER: 1,
             Need.NEWSPAPERS: 1,
-            Need.COMMON: 3,
+            Need.COMMON: 5,
             Need.VODKA: 0.5,
             Need.REFINED_SUGAR: 0.5,
             Need.BRICKS: 0.5,
@@ -626,31 +626,33 @@ NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.BEER: 10,
             Need.VODKA: 10,
             Need.BRICKS: 10,
+            Need.GLASS: 10,
+            Need.CEMENT: 10,
             Need.REFINED_SUGAR: 10,
             Need.NEWSPAPERS: 10,
-            Need.HEATING: 3,
+            Need.HEATING: 20,
             Need.LIMESTONE: 10,
             Need.LUXURIES: 1,
         },
         BuildingKind.FLATS: {
-            Need.FOOD: 180,
+            Need.FOOD: 200,
             Need.SALT: 30,
             Need.GOODS: 40,
             Need.COFFEE: 30,
-            Need.COMMON: 120,
+            Need.COMMON: 300,
             Need.TOOLS: 10,
             Need.FUEL: 30,
             Need.CARS: 3,
             Need.BEER: 30,
             Need.VODKA: 30,
-            Need.BRICKS: 30,
-            Need.CEMENT: 30,
-            Need.GLASS: 30,
+            Need.BRICKS: 50,
+            Need.CEMENT: 50,
+            Need.GLASS: 50,
             Need.NEWSPAPERS: 30,
             Need.APPLIANCES: 5,
             Need.REFINED_SUGAR: 30,
-            Need.HEATING: 5,
-            Need.LUXURIES: 3,
+            Need.HEATING: 80,
+            Need.LUXURIES: 5,
         },
         BuildingKind.SKYSCRAPER: {
             Need.GOODS: 30,
@@ -919,15 +921,16 @@ def boosts_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
     )
 
 
-# Homes need only food and heating to live; everything else they want is a bonus good.
+# Homes need food, common goods and heating to live, more of each the bigger they grow; everything
+# else they want is a bonus good.
 HOMES = frozenset({BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS})
-HOME_DEMANDS = frozenset({Need.FOOD, Need.HEATING})
+HOME_DEMANDS = frozenset({Need.FOOD, Need.COMMON, Need.HEATING})
 
 
 @cache
 def bonus_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
     """The bonus goods among what a kind of building needs in a month in a given year: for homes
-    all but food and heating; those of buildings that make goods boost what they make instead
+    all but food, common goods and heating; those of buildings that make goods boost what they make instead
     (boosts_of)."""
     needs = needs_of(kind, year)
     if kind in HOMES:
