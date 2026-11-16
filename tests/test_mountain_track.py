@@ -136,6 +136,24 @@ def test_trains_go_out_of_sight_only_inside_a_tunnel(sheet: SpriteSheet) -> None
     assert not in_untouched_mountains
 
 
+def test_many_points_are_found_in_or_out_of_tunnels_at_once_as_one_by_one(
+    sheet: SpriteSheet,
+) -> None:
+    world = world_with(
+        sheet,
+        Track((ROW, 6), (WEST, EAST), TrackWidth.DOUBLE),
+        Track((ROW, 7), (WEST, EAST), TrackWidth.DOUBLE, TrackBed.TUNNEL),
+    )
+    grid = world.tile_map.grid
+    points = [grid.center(row, col) for row in (ROW, ROW + 3) for col in range(4, 10)]
+    xs, ys = [float(x) for x, _ in points], [float(y) for _, y in points]
+
+    together = world.underground_all(xs, ys)
+
+    assert together == [world.underground(x, y) for x, y in zip(xs, ys, strict=True)]
+    assert any(together)
+
+
 def test_track_lifted_up_the_picture_keeps_each_side_where_it_lay_flat() -> None:
     down_the_picture = [(10.0, 0.0), (10.0, 10.0), (10.0, 20.0), (10.0, 30.0)]
     climbing_faster = [0.0, 25.0, 50.0, 75.0]

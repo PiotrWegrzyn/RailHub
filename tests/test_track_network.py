@@ -2,7 +2,7 @@ import pytest
 from test_railway import joined_stations
 
 from railroads.sim.constructions import Track
-from railroads.sim.trains import Train
+from railroads.sim.trains import Stop, Train
 
 
 def test_a_way_once_found_is_shared_by_every_train_taking_it() -> None:
@@ -48,3 +48,20 @@ def test_a_trains_body_runs_from_its_front_back_to_its_tail() -> None:
     assert len(points) == count
     assert points[0] == pytest.approx((4.0, 1.0))
     assert points[-1] == pytest.approx(railway.position(train, back=step * (count - 1))[0])
+
+
+def test_a_railway_saved_before_ways_and_held_trains_were_kept_still_runs() -> None:
+    _, railway = joined_stations()
+    railway.route((6, 3), (6, 20))
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3)), Stop((6, 20))]
+    for name in ("_routes", "_exits_to"):
+        vars(railway.network).pop(name, None)
+    for name in ("held", "path_ends"):
+        vars(train).pop(name, None)
+
+    railway.run(0.1)
+
+    assert train.status == "Running"
+    assert railway.position(train) is not None

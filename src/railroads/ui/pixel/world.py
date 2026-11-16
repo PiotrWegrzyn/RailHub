@@ -52,6 +52,9 @@ HIDDEN_BEYOND = 2.0
 class PixelWorld:
     """Draws chunks of one map as pixel art."""
 
+    # The mountain cells track tunnels through, with the railway version they were found for.
+    _tunnels: tuple[int, frozenset[Cell]] = (-1, frozenset())
+
     def __init__(
         self,
         tile_map: TileMap,
@@ -213,6 +216,27 @@ class PixelWorld:
         return any(
             piece.bed == TrackBed.TUNNEL for piece in self.constructions.track_at((row, col))
         )
+
+    def underground_all(self, xs: list[float], ys: list[float]) -> list[bool]:
+        """Whether each of many plane points lies in a tunnel (underground), all found at once,
+        as trains ask for every engine and car each frame."""
+        tunnels = self._tunnel_cells()
+        if not tunnels or not xs:
+            return [False] * len(xs)
+        rows, cols = self.tile_map.grid.cell_at(np.array(xs), np.array(ys))
+        return [cell in tunnels for cell in zip(rows.tolist(), cols.tolist(), strict=True)]
+
+    def _tunnel_cells(self) -> frozenset[Cell]:
+        version = self.constructions.railway_version
+        if self._tunnels[0] != version:
+            relief = self.tile_map.relief
+            cells = frozenset(
+                piece.cell
+                for piece in self._track_pieces()
+                if piece.bed == TrackBed.TUNNEL and relief[piece.cell] == Relief.MOUNTAINS
+            )
+            self._tunnels = (version, cells)
+        return self._tunnels[1]
 
     def rises(self, chunk_x: int, chunk_y: int) -> bool:
         """Whether any hills or mountains rise in a chunk, or in the ground below it that it

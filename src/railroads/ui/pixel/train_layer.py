@@ -76,13 +76,20 @@ class TrainLayer:
         )
         factor = self._blown_up_by(scale * density)
         per_pixel = scale / DETAIL
-        found = []
+        seen = []
         for train in railway.trains:
             for look, back in self._parts(train):
                 placed = railway.position(train, back)
-                if placed is not None and not self.world.underground(*placed[0]):
-                    shift = self.lanes.sideways(train.path, train.along - back)
-                    found.append((placed, shift, look))
+                if placed is not None:
+                    seen.append((train, back, look, placed))
+        hidden = self.world.underground_all(
+            [placed[0][0] for *_, placed in seen], [placed[0][1] for *_, placed in seen]
+        )
+        found = []
+        for (train, back, look, placed), under in zip(seen, hidden, strict=True):
+            if not under:
+                shift = self.lanes.sideways(train.path, train.along - back)
+                found.append((placed, shift, look))
         parts = []
         if found:
             xs = np.array([placed[0][0] for placed, _, _ in found])
@@ -142,11 +149,7 @@ class TrainLayer:
         """Puffs of smoke rising from each chimney and drifting back over its train. The ground
         under every chimney and where every puff lies in the picture are worked out for all the
         trains at once: on hills a lift takes nearly as long for one point as for many."""
-        chimneys = [
-            chimney
-            for train in railway.trains
-            if (chimney := self._chimney(railway, train)) is not None
-        ]
+        chimneys = self._chimneys(railway)
         if not chimneys:
             return
         projection = self.world.projection
@@ -177,19 +180,30 @@ class TrainLayer:
             color = imgui.color_convert_float4_to_u32(imgui.ImVec4(*SMOKE, alpha))
             draw_list.add_circle_filled((sx, sy), radius, color)
 
-    def _chimney(self, railway: Railway, train: Train) -> _Chimney | None:
-        """Where a train's chimney is on the map, if it has one and is on the map."""
-        model = ENGINES[train.engine]
-        if model.chimney is None:
-            return None
-        back = (model.half - model.chimney[0]) * SCALE
-        placed = railway.position(train, back)
-        if placed is None or self.world.underground(*placed[0]):
-            return None
-        (x, y), (dx, dy) = placed
-        shift = self.lanes.sideways(train.path, train.along - back)
-        phase = (train.along * 6.0) % 1.0
-        return _Chimney(x, y, dx, dy, shift, model.chimney[1] * SCALE, phase)
+    def _chimneys(self, railway: Railway) -> list[_Chimney]:
+        """Where each train's chimney is on the map, for those that have one in the open."""
+        seen = []
+        for train in railway.trains:
+            model = ENGINES[train.engine]
+            if model.chimney is None:
+                continue
+            back = (model.half - model.chimney[0]) * SCALE
+            placed = railway.position(train, back)
+            if placed is not None:
+                seen.append((train, back, placed))
+        hidden = self.world.underground_all(
+            [placed[0][0] for *_, placed in seen], [placed[0][1] for *_, placed in seen]
+        )
+        chimneys = []
+        for (train, back, ((x, y), (dx, dy))), under in zip(seen, hidden, strict=True):
+            if under:
+                continue
+            model = ENGINES[train.engine]
+            assert model.chimney is not None
+            shift = self.lanes.sideways(train.path, train.along - back)
+            phase = (train.along * 6.0) % 1.0
+            chimneys.append(_Chimney(x, y, dx, dy, shift, model.chimney[1] * SCALE, phase))
+        return chimneys
 
     def _blown_up_by(self, device_scale: int) -> int:
         """How many times each way the pictures are blown up to show crisp at this many device

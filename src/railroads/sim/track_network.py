@@ -22,14 +22,15 @@ type Way = tuple[list[Point], list[float]]
 class TrackNetwork:
     # The cell under each point on the map asked about, kept as they never change.
     _cells: dict[Point, Cell] | None = None
+    # The routes found since track or stations last changed, by their ends and track kind, and
+    # where track leaving each cell by each point runs into, as the grid never changes. Kept on
+    # the class until first used, so games saved without them load.
+    _routes: tuple[int, dict[tuple, Way | None]] = (-1, {})
+    _exits_to: dict[tuple[Cell, int], tuple[Cell, int]] | None = None
 
     def __init__(self, constructions: Constructions) -> None:
         self.constructions = constructions
         self._connected: tuple[int, set[Cell]] | None = None
-        # The routes found since track or stations last changed, by their ends and track kind.
-        self._routes: tuple[int, dict[tuple, Way | None]] = (-1, {})
-        # Where track leaving each cell by each point runs into, as the grid never changes.
-        self._exits_to: dict[tuple[Cell, int], tuple[Cell, int]] = {}
 
     def connected(self) -> set[Cell]:
         """The stations that track joins to at least one other station, worked out again only
@@ -131,6 +132,8 @@ class TrackNetwork:
         ]
 
     def _track_exit(self, cell: Cell, point: int) -> tuple[Cell, int]:
+        if self._exits_to is None:
+            self._exits_to = {}
         key = (cell, point)
         found = self._exits_to.get(key)
         if found is None:
