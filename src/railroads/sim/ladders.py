@@ -197,6 +197,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.OLYMPIC_STADIUM: (Points.CORPORATE, 100),
     BuildingKind.TAVERN: (Points.CORPORATE, 1),
     BuildingKind.CLUB: (Points.CORPORATE, 3),
+    BuildingKind.FILLING_STATION: (Points.CORPORATE, 1),
     BuildingKind.DEPARTMENT_STORE: (Points.CORPORATE, 3),
     BuildingKind.HOTEL: (Points.CORPORATE, 5),
     BuildingKind.JUICE_WORKS: (Points.INDUSTRY, 1),
@@ -405,8 +406,8 @@ FACTORY_LAND = Land(
 TOWNS = Ladder(
     kinds=(BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS),
     land=TOWN_LAND,
-    base_chance=0.0000008,
-    chance_per_doubling={Points.POPULATION: 0.000017},
+    base_chance=0.000001,
+    chance_per_doubling={Points.POPULATION: 0.00003},
     merges={
         BuildingKind.HOUSE: Merge(needed=16, pulled_down=6),
         BuildingKind.TENEMENT: Merge(needed=5, pulled_down=3),
@@ -577,7 +578,7 @@ FOOD_PLANTS = _merges(
     Ladder(
         kinds=(BuildingKind.FOOD_PLANT,),
         land=FACTORY_LAND,
-        base_chance=0.000000015,
+        base_chance=0.0000002,
         chance_per_doubling={
             Points.FOOD: 0.00000026,
             Points.POPULATION: 0.000000003,
@@ -599,7 +600,7 @@ STEEL_MILLS = _merges(
             relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
             water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.2, Terrain.SEA: 1.2},
         ),
-        base_chance=0.000000056,
+        base_chance=0.00000004,
         chance_per_doubling={Points.ORE: 0.000007, Points.INDUSTRY: 0.00000042},
         most_per_cell=1,
         most_nearby=2,
@@ -749,7 +750,7 @@ FOOD_TOWN = 4
 _BAKERY = Ladder(
     kinds=(BuildingKind.BAKERY,),
     land=TOWN_LAND,
-    base_chance=0.0001,
+    base_chance=0.00005,
     chance_per_doubling={Points.POPULATION: 0.000001},
     needs={Points.POPULATION: FOOD_TOWN},
     most_per_cell=1,
@@ -766,7 +767,7 @@ BUTCHERS = _merges(
 # Town crafts that come up, like bakeries, the likelier the more people live around: potters and
 # dairies as often as other crafts; tile works, foundries and sausage makers, which need two
 # inputs and make goods worth more, half as often; the makers of luxury goods only in towns of
-# LUXURY_TOWN people or more, and seldom.
+# LUXURY_TOWN people or more, half as often as potters.
 LUXURY_TOWN = 20
 
 
@@ -794,9 +795,9 @@ TOWN_CRAFTS = (
     _town_craft(BuildingKind.FOUNDRY, 0.5, 1800),
     _town_craft(BuildingKind.SAUSAGE_MAKER, 6.25, 1850, FOOD_TOWN),
     _town_craft(BuildingKind.JUICE_WORKS, 5.0, 1870, FOOD_TOWN),
-    _town_craft(BuildingKind.CARPET_WEAVER, 0.1, 1700, LUXURY_TOWN),
-    _town_craft(BuildingKind.CLOCK_MAKER, 0.1, 1880, LUXURY_TOWN),
-    _town_craft(BuildingKind.MIRROR_MAKER, 0.1, 1700, LUXURY_TOWN),
+    _town_craft(BuildingKind.CARPET_WEAVER, 0.5, 1700, LUXURY_TOWN),
+    _town_craft(BuildingKind.CLOCK_MAKER, 0.5, 1880, LUXURY_TOWN),
+    _town_craft(BuildingKind.MIRROR_MAKER, 0.5, 1700, LUXURY_TOWN),
 )
 
 # Coke plants bake coal into coke for the steel mills from 1850, drawn to industry.
@@ -949,7 +950,7 @@ CLUB_TOWN = 30
 TAVERNS = Ladder(
     kinds=(BuildingKind.TAVERN,),
     land=TOWN_LAND,
-    base_chance=0.0001,
+    base_chance=0.00005,
     chance_per_doubling={Points.POPULATION: 0.000001},
     needs={Points.POPULATION: FOOD_TOWN},
     most_per_cell=1,
@@ -962,6 +963,12 @@ CLUBS = replace(
     base_chance=0.00005,
     needs={Points.POPULATION: CLUB_TOWN},
     from_year=1900,
+)
+
+# Filling stations open in towns once motor cars come, as often as taverns.
+FILLING_STATION_YEAR = 1920
+FILLING_STATIONS = replace(
+    TAVERNS, kinds=(BuildingKind.FILLING_STATION,), from_year=FILLING_STATION_YEAR
 )
 
 # Department stores and hotels open in big towns, spaced out, a few to a map.
@@ -1002,7 +1009,7 @@ WORKS = (
     ),
     _works(BuildingKind.TOOL_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 1870, base=2e-6),
     _works(BuildingKind.CHEMICAL_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {}, 1880, 20_000, 2e-8),
-    _works(BuildingKind.REFINERY, {IND: 4e-7, Points.ORE: 1e-6}, {}, 1856, 30_000, 2e-8),
+    _works(BuildingKind.REFINERY, {IND: 4e-7, Points.ORE: 1e-6}, {}, 1856, 10_000, 1e-6),
     _works(BuildingKind.CAR_FACTORY, {IND: 6e-7}, {IND: 6}, 1930, 40_000, 2e-6),
     _works(BuildingKind.ELECTRONICS_PLANT, {POP: 2.5e-8, IND: 4e-7}, {}, 1960, 30_000, 2e-8),
     _works(BuildingKind.PLANE_FACTORY, {POP: 2.5e-8, IND: 6e-7}, {IND: 6}, 1935, 40_000, 2e-6),
@@ -1013,10 +1020,10 @@ WORKS = (
     _works(BuildingKind.DISTILLERY, {POP: 8e-10, Points.FOOD: 3e-9}, {}, 1600, base=CRAFT_BASE),
     _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
     _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {}, 1850, base=1e-8),
-    _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=1e-8),
-    _works(BuildingKind.PRINTING_WORKS, {POP: 1.5e-9, IND: 3e-9}, {}, 1600, PRINTING_CELLS, 1e-8),
+    _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=2e-7),
+    _works(BuildingKind.PRINTING_WORKS, {POP: 1.5e-9, IND: 3e-9}, {}, 1600, PRINTING_CELLS, 2e-7),
     _works(BuildingKind.SUGAR_REFINERY, {IND: 6e-9, Points.FOOD: 3e-9}, {}, 1800, base=CRAFT_BASE),
-    _works(BuildingKind.PORCELAIN_WORKS, {POP: 4e-10, Points.ORE: 6e-9}, {}, 1710, 30_000, 1e-8),
+    _works(BuildingKind.PORCELAIN_WORKS, {POP: 4e-10, Points.ORE: 6e-9}, {}, 1710, 30_000, 2e-7),
     _works(BuildingKind.MACHINE_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 1870, base=2e-6),
     _works(BuildingKind.CEMENT_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {}, 1880, 20_000, 2e-8),
     _works(BuildingKind.PLASTICS_WORKS, {IND: 4e-7}, {}, 1950, 30_000, 2e-8),
@@ -1077,6 +1084,7 @@ LADDERS = (
     SAND_PITS,
     TAVERNS,
     CLUBS,
+    FILLING_STATIONS,
     DEPARTMENT_STORES,
     HOTELS,
 )
