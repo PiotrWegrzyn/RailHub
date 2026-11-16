@@ -128,12 +128,7 @@ class WorkerPainter:
         queue.now = max(queue.now, now)
         if self._taken(key):
             return
-        job = queue.jobs.get(key)
-        if job is None:
-            queue.jobs[key] = _Job(work, urgent, now)
-        else:
-            job.wanted = now
-            job.urgent = job.urgent or urgent
+        queue.ask(key, work, urgent, now)
         self._give_out()
 
     def waiting(self) -> int:
@@ -152,11 +147,7 @@ class WorkerPainter:
 
     def work_once(self, now: float) -> None:
         """Paints the most wanted chunk on the calling frame; for while no worker paints."""
-        queue = self._queue
-        queue.now = max(queue.now, now)
-        taken = queue.next()
-        if taken is not None:
-            queue.run(*taken)
+        self._queue.work_once(now)
 
     def heard(self, message: Message) -> None:
         """Takes in a message from a worker (Workers.poll)."""

@@ -147,14 +147,7 @@ class PixelLayer:
     ) -> bool:
         """Draws the chunks on screen; returns whether all of them were ready. With
         `ground_below`, the ground already shows where a chunk is missing."""
-        camera_pixel = self.world.projection.to_pixels(camera.center_x, camera.center_y)
-        placement = ChunkPlacement.of(
-            self.world.projection,
-            (float(camera_pixel[0]), float(camera_pixel[1])),
-            camera.pixel_scale,
-            center,
-            clip,
-        )
+        placement = self._placement(camera, center, clip)
         density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
         scale = placement.scale * density
         resolution = resolution_for(scale, self.world.resolutions)
@@ -195,19 +188,25 @@ class PixelLayer:
     ) -> None:
         """Draws the chunks this view would show, at most PREPARED_CHUNKS of them, on the calling
         thread, so they are ready for the first frame; for a game being loaded."""
+        placement = self._placement(camera, center, clip)
+        resolution = resolution_for(placement.scale * density, self.world.resolutions)
+        for chunk in placement.chunks[:PREPARED_CHUNKS]:
+            drawn = (*chunk, resolution)
+            if drawn not in self._chunks:
+                self._chunks[drawn] = self.world.render(*drawn)
+
+    def _placement(
+        self, camera: IsoCamera, center: Vec2, clip: tuple[Vec2, Vec2]
+    ) -> ChunkPlacement:
+        """Where the chunks lie on screen in this view."""
         camera_pixel = self.world.projection.to_pixels(camera.center_x, camera.center_y)
-        placement = ChunkPlacement.of(
+        return ChunkPlacement.of(
             self.world.projection,
             (float(camera_pixel[0]), float(camera_pixel[1])),
             camera.pixel_scale,
             center,
             clip,
         )
-        resolution = resolution_for(placement.scale * density, self.world.resolutions)
-        for chunk in placement.chunks[:PREPARED_CHUNKS]:
-            drawn = (*chunk, resolution)
-            if drawn not in self._chunks:
-                self._chunks[drawn] = self.world.render(*drawn)
 
     def _moved(self, camera: IsoCamera, now: float, pointer: tuple = ()) -> bool:
         """Whether chunks drawn on frames must wait because the view or the mouse (`pointer`:

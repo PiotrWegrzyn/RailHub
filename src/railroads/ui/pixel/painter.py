@@ -52,6 +52,24 @@ class _Queue:
             self.busy = taken[0]
         return taken
 
+    def ask(self, key: Hashable, work: Callable[[], object], urgent: bool, now: float) -> bool:
+        """Adds a job, or wants one already waiting again; whether it was new."""
+        job = self.jobs.get(key)
+        if job is None:
+            self.jobs[key] = _Job(work, urgent, now)
+            return True
+        job.wanted = now
+        job.urgent = job.urgent or urgent
+        return False
+
+    def work_once(self, now: float) -> None:
+        """Does the most wanted job on the calling thread."""
+        with self.lock:
+            self.now = max(self.now, now)
+            taken = self.next()
+        if taken is not None:
+            self.run(*taken)
+
     def run(self, key: Hashable, job: _Job) -> None:
         try:
             result, error = job.work(), None
@@ -92,13 +110,8 @@ class Painter:
             queue.now = max(queue.now, now)
             if key == queue.busy or any(key == done[0] for done in queue.done):
                 return
-            job = queue.jobs.get(key)
-            if job is None:
-                queue.jobs[key] = _Job(work, urgent, now)
+            if queue.ask(key, work, urgent, now):
                 queue.lock.notify()
-            else:
-                job.wanted = now
-                job.urgent = job.urgent or urgent
 
     def waiting(self) -> int:
         with self._queue.lock:
@@ -112,12 +125,7 @@ class Painter:
 
     def work_once(self, now: float) -> None:
         """Does the most wanted drawing on the calling thread; only where there is no thread."""
-        queue = self._queue
-        with queue.lock:
-            queue.now = max(queue.now, now)
-            taken = queue.next()
-        if taken is not None:
-            queue.run(*taken)
+        self._queue.work_once(now)
 
 
 def _stop(queue: _Queue) -> None:
