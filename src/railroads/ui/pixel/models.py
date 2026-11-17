@@ -61,16 +61,21 @@ def without_fine() -> Iterator[None]:
 @dataclass(frozen=True)
 class Face:
     """A flat face of a model; a `fine` one is a small detail drawn only when the model is drawn
-    big enough to show it, and a `coarse` one stands in for fine ones when it is not."""
+    big enough to show it, a `finest` one only when it is drawn bigger still, at the closest
+    zooms, and a `coarse` one stands in for fine ones when it is not."""
 
     corners: list[Vec3]
     color: RGB
     normal: Vec3
     fine: bool = False
     coarse: bool = False
+    finest: bool = False
 
-    def drawn(self, fine: bool) -> bool:
-        """Whether the face is drawn when the model is drawn with its fine details or not."""
+    def drawn(self, fine: bool, finest: bool = False) -> bool:
+        """Whether the face is drawn when the model is drawn with its fine details or not, and
+        with its finest ones or not."""
+        if self.finest and not finest:
+            return False
         return not self.coarse if fine else not self.fine
 
 
@@ -103,6 +108,14 @@ class Model:
         finally:
             self.within_fine -= 1
         self.faces[start:] = [replace(face, fine=True) for face in self.faces[start:]]
+
+    @contextmanager
+    def finest(self) -> Iterator[None]:
+        """Marks every face added within as a fine detail drawn only at the closest zooms."""
+        start = len(self.faces)
+        with self.fine():
+            yield
+        self.faces[start:] = [replace(face, finest=True) for face in self.faces[start:]]
 
     @contextmanager
     def coarse(self) -> Iterator[None]:

@@ -44,6 +44,9 @@ from railroads.ui.pixel.models import (
 type Points = tuple[FloatArray, FloatArray, FloatArray]
 
 HEADINGS = 24
+# How many times as fine as the sheet close-up pictures must be drawn to show the finest details:
+# valve gear, pipes, grab irons and the like, which only clutter a smaller picture.
+FINEST_FROM = 6
 DETAIL = 2
 # Trains are modelled in cells and drawn this much smaller, to sit on the narrow track.
 SCALE = 0.8
@@ -647,7 +650,88 @@ class Steam:
         else:
             self._cab(m, -h, cab_front, top + (0.04 if self.shroud else 0.05))
         self._fine(m, front, top)
+        if keeping_fine():
+            with m.finest():
+                self._finest(m, front, top)
         return m
+
+    def _finest(self, m: Model, front: float, top: float) -> None:
+        """What shows only at the closest zooms: the valve gear and brake blocks by the driving
+        wheels, sand pipes down to the rails, steam pipes from the smokebox to the cylinders, a
+        feed pipe and clack valves on the boiler, the smokebox door's dart and hinges, a whistle,
+        grab irons by the cab and the reversing rod along the running plate."""
+        h, r, z = self.half, self.radius, self.middle
+        cab_front = -h + self.cab
+        d = self.driver
+        dark = shade(FRAME, 1.4)
+        for group in self.drivers:
+            c = max(group) + d + 0.045
+            link = c - 0.13
+            for v in (0.104, -0.104):
+                parts.bar(m, (link, d), (link, d + 0.05), 0.009, v, dark)
+                parts.bar(m, (link, d + 0.04), (c - 0.04, d + 0.035), 0.005, v * 1.01, STEEL)
+                parts.bar(m, (c - 0.045, d - 0.012), (c - 0.045, d + 0.04), 0.005, v * 1.02, STEEL)
+                crank = group[len(group) // 2]
+                parts.bar(m, (crank + d * 0.3, d + d * 0.2), (link, d + 0.004), 0.005, v, STEEL)
+                if self.cab and not self.tanks:
+                    parts.bar(m, (cab_front + 0.01, 0.097), (link, d + 0.05), 0.004, v, STEEL)
+            for u in group:
+                for v in (0.076, -0.076):
+                    m.box(
+                        (u - d - 0.009, u - d + 0.003),
+                        (v - 0.008, v + 0.008),
+                        (d * 0.6, d * 1.4),
+                        dark,
+                    )
+            lead = max(group)
+            for v in (0.092, -0.092):
+                parts.bar(m, (lead + d * 0.8, 0.08), (lead + d + 0.004, 0.012), 0.004, v, dark)
+        if self.shroud is not None:
+            return
+        for side in (1.0, -1.0):
+            c = max(self.drivers[0]) + d + 0.045
+            parts.bar(
+                m,
+                (front - 0.07, z - r * 0.3),
+                (c + 0.01, d + 0.05),
+                0.016,
+                side * (r + 0.008),
+                self.smokebox,
+            )
+            begin = len(m.faces)
+            m.cylinder_along((cab_front + 0.02, front - 0.13), 0.0045, z - r * 0.35, COPPER)
+            m.move(begin, 0.0, side * (r * 0.94 + 0.004))
+            m.box(
+                (front - 0.16, front - 0.142),
+                tuple(sorted((side * r * 0.9, side * (r + 0.008)))),
+                (z + r * 0.05, z + r * 0.3),
+                BRASS,
+            )
+        parts.front_plate(m, front + 0.0018, (-0.03, 0.03), (z - 0.003, z + 0.003), STEEL)
+        parts.front_plate(m, front + 0.0018, (-0.003, 0.003), (z - 0.03, z + 0.03), STEEL)
+        for at in (z - r * 0.4, z + r * 0.4):
+            parts.front_plate(
+                m,
+                front + 0.0016,
+                (-r * 0.75, -r * 0.05),
+                (at - 0.004, at + 0.004),
+                shade(self.smokebox, 0.7),
+            )
+        if self.open_cab or self.tanks:
+            return
+        m.cylinder_up(cab_front + 0.012, 0.005, (top - 0.004, top + 0.045), BRASS)
+        m.cylinder_up(cab_front + 0.012, 0.009, (top + 0.04, top + 0.052), BRASS)
+        high = top + 0.05
+        for v in (0.0916, -0.0916):
+            parts.bar(
+                m,
+                (cab_front - 0.012, 0.1),
+                (cab_front - 0.012, high - 0.03),
+                0.004,
+                v,
+                parts.BRIGHT,
+            )
+            m.box((cab_front + 0.02, cab_front + 0.06), (v * 0.8, v * 0.88), (0.09, 0.105), dark)
 
     def _fine(self, m: Model, front: float, top: float) -> None:
         """Spoked wheels, rods and valve gear, the smokebox door, lamps and buffers, rails and
@@ -923,7 +1007,31 @@ class Tender:
                 m.box((-h + 0.03, h - 0.03), (-w + 0.015, w - 0.015), (top, top + 0.03), self.load)
                 m.box((-0.5 * h, 0.5 * h), (-0.05, 0.05), (top + 0.03, top + 0.05), self.load)
         self._fine(m)
+        if keeping_fine() and not self.shroud:
+            with m.finest():
+                self._finest(m)
         return m
+
+    def _finest(self, m: Model) -> None:
+        """What shows only at the closest zooms: grab irons at the front corners, a handbrake
+        column and a tool box up front, and the brake blocks at the wheels."""
+        h, w, top = self.half, self.width, self.top
+        for v in (w + 0.0012, -w - 0.0012):
+            parts.bar(m, (h - 0.012, 0.08), (h - 0.012, top - 0.01), 0.004, v, parts.BRIGHT)
+        if self.barrel is None and self.tank is None and not self.slats:
+            m.cylinder_up(h - 0.025, 0.006, (top - 0.03, top + 0.03), BLACK_IRON)
+            m.cylinder_up(h - 0.025, 0.012, (top + 0.03, top + 0.034), BLACK_IRON)
+            m.box(
+                (h - 0.05, h - 0.03),
+                (-w + 0.01, -w + 0.05),
+                (top, top + 0.016),
+                shade(self.body, 0.8),
+            )
+        for u in self.wheels:
+            for v in (0.076, -0.076):
+                m.box(
+                    (u - 0.044, u - 0.034), (v - 0.007, v + 0.007), (0.02, 0.05), shade(FRAME, 1.4)
+                )
 
     def _slatted(self, m: Model) -> None:
         """An open wagon of the first years: a flat bed with low sides of posts and rails, a
@@ -1080,7 +1188,43 @@ class Unit:
             m.box((u - 0.04, u + 0.04), (-0.05, 0.05), (roof, roof + 0.012), shade(self.roof, 0.7))
             parts.roof_fan(m, u, roof + 0.012, 0.03, shade(self.roof, 0.9))
         self._fine(m, roof)
+        if keeping_fine() and not self.floats:
+            with m.finest():
+                self._finest(m, roof)
         return m
+
+    def _finest(self, m: Model, roof: float) -> None:
+        """What shows only at the closest zooms: brake blocks and coil springs on the bogies,
+        sand boxes ahead of the wheels, grab rails at the ends and horns on the roof."""
+        h = self.half
+        span = 0.0375 * (self.axles - 1)
+        dark = shade(FRAME, 1.4)
+        for c in self.bogies:
+            for k in range(self.axles):
+                u = c - span + 0.075 * k
+                for v in (0.076, -0.076):
+                    m.box((u + 0.031, u + 0.04), (v - 0.007, v + 0.007), (0.016, 0.05), dark)
+            for u in (c - span - 0.035, c + span + 0.035):
+                for v in (0.09, -0.09):
+                    for k in range(4):
+                        low = 0.05 + 0.006 * k
+                        m.box(
+                            (u - 0.008, u + 0.008),
+                            (v - 0.003, v + 0.003),
+                            (low, low + 0.003),
+                            STEEL,
+                        )
+        for end in (h, -h) if self.both or self.hood else (h,):
+            out = 1.0 if end > 0 else -1.0
+            for v in (0.07, -0.07):
+                parts.front_plate(
+                    m, end + out * 0.0024, (v - 0.003, v + 0.003), (0.1, 0.16), parts.BRIGHT
+                )
+        u = h - (0.16 if self.hood else self.nose + 0.06)
+        for k, v in enumerate((-0.012, 0.0, 0.012)):
+            begin = len(m.faces)
+            m.cylinder_along((u - 0.02 - 0.006 * k, u + 0.005), 0.004, roof + 0.012, parts.BRIGHT)
+            m.move(begin, 0.0, v)
 
     @property
     def diesel(self) -> bool:
@@ -1385,7 +1529,32 @@ def car(good: Good, full: bool) -> Model:
     m.wheels([h - 0.07, -h + 0.07], 0.035, FRAME, 0.075)
     _body_of(good)(m, good, full)
     _underframe(m)
+    if keeping_fine():
+        with m.finest():
+            _car_finest(m)
     return m
+
+
+def _car_finest(m: Model) -> None:
+    """What shows on a car only at the closest zooms: brake blocks at the wheels, and grab irons
+    and steps at its corners."""
+    h = CAR_HALF
+    dark = shade(FRAME, 1.4)
+    for u in (h - 0.07, -h + 0.07):
+        for v in (0.076, -0.076):
+            m.box((u + 0.034, u + 0.043), (v - 0.007, v + 0.007), (0.016, 0.05), dark)
+    for end in (h, -h):
+        out = 1.0 if end > 0 else -1.0
+        for v in (0.0815, -0.0815):
+            parts.bar(
+                m, (end - out * 0.012, 0.075), (end - out * 0.012, 0.13), 0.004, v, parts.BRIGHT
+            )
+            m.box(
+                tuple(sorted((end - out * 0.03, end - out * 0.005))),
+                (v * 0.95, v * 1.12),
+                (0.03, 0.035),
+                dark,
+            )
 
 
 def _underframe(m: Model) -> None:
@@ -2513,8 +2682,8 @@ class _Faces:
     lows: FloatArray | None = None
 
     @classmethod
-    def of(cls, model: Model, fine: bool = False) -> Self:
-        faces = [face for face in model.faces if face.drawn(fine)]
+    def of(cls, model: Model, fine: bool = False, finest: bool = False) -> Self:
+        faces = [face for face in model.faces if face.drawn(fine, finest)]
         counts = np.array([len(face.corners) for face in faces])
         starts = np.concatenate([[0], np.cumsum(counts)])
         groups = []
@@ -2625,7 +2794,7 @@ class FinePainter:
     ) -> None:
         matrix = np.array(matrix_key, dtype=np.float64).reshape(2, 2)
         self._sight = _Sight.of(matrix, DETAIL * SCALE * times)
-        self._faces = _Faces.of(MODELS[look](), fine=True)
+        self._faces = _Faces.of(MODELS[look](), fine=True, finest=times >= FINEST_FROM)
         self._outline = max(1, times // 2)
 
     def picture(self, index: int) -> Sprite:

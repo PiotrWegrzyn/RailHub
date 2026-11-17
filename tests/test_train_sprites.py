@@ -201,3 +201,14 @@ def test_every_full_car_carries_more_than_a_bare_frame(good: Good) -> None:
     assert len([face for face in full.faces if not face.fine]) > len(
         [face for face in frame.faces if not face.fine]
     )
+
+
+@pytest.mark.parametrize("look", [(Look.ENGINE, "pacific"), (Look.ENGINE, "heavy_diesel")])
+def test_the_finest_details_show_only_at_the_closest_zooms(look: tuple[Look, str]) -> None:
+    model = MODELS[look]()
+
+    finest = [face for face in model.faces if face.finest]
+
+    assert finest
+    assert all(face.fine and not face.drawn(True) for face in finest)
+    assert all(face.drawn(True, finest=True) for face in finest)
