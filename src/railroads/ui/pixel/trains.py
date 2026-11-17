@@ -177,6 +177,9 @@ LINING: RGB = (222, 222, 212)
 GRAPHITE: RGB = (196, 198, 204)
 BRUNSWICK: RGB = (34, 52, 42)
 OCHRE: RGB = (176, 136, 62)
+RED_OXIDE: RGB = (112, 60, 46)
+BARE_IRON: RGB = (104, 104, 108)
+ROCKET_YELLOW: RGB = (196, 158, 70)
 
 # Sizes in cells: how far apart the engine and cars sit, and their half lengths.
 CAR_HALF = 0.24
@@ -1856,19 +1859,19 @@ ENGINES: dict[str, EngineModel] = {
     "salamanca": _entry(
         Pioneer(
             0.27,
-            (58, 58, 64),
-            WOOD,
+            RED_OXIDE,
+            FRAME,
             ((0.14, 0.045), (-0.14, 0.045)),
             uprights=(-0.04, 0.08),
             crossheads=True,
             rack=True,
         ),
-        Tender(0.16, WOOD, (0.08, -0.08), top=0.11, trim=None),
+        Tender(0.16, (92, 70, 50), (0.08, -0.08), top=0.11, trim=None),
     ),
     "puffing_billy": _entry(
         Pioneer(
             0.3,
-            (56, 56, 62),
+            BARE_IRON,
             WOOD,
             ((0.16, 0.05), (-0.12, 0.05)),
             chimney_top=0.5,
@@ -1879,8 +1882,8 @@ ENGINES: dict[str, EngineModel] = {
     "locomotion": _entry(
         Pioneer(
             0.3,
-            (58, 96, 66),
-            WOOD,
+            BLACK_IRON,
+            FRAME,
             ((0.16, 0.05), (-0.04, 0.05), (-0.2, 0.05)),
             BRASS,
             rods=True,
@@ -1892,17 +1895,17 @@ ENGINES: dict[str, EngineModel] = {
     "rocket": _entry(
         Pioneer(
             0.3,
-            (234, 192, 44),
-            (234, 192, 44),
+            ROCKET_YELLOW,
+            ROCKET_YELLOW,
             ((0.14, 0.072), (-0.18, 0.04)),
-            (236, 234, 224),
-            chimney_color=(236, 234, 224),
+            (220, 216, 204),
+            chimney_color=(220, 216, 204),
             chimney_top=0.46,
             radius=0.06,
             slanted=True,
             firebox=COPPER,
         ),
-        Tender(0.16, (234, 192, 44), (0.08, -0.08), top=0.11, trim=None, barrel=(236, 234, 224)),
+        Tender(0.16, ROCKET_YELLOW, (0.08, -0.08), top=0.11, trim=None, barrel=(206, 200, 186)),
     ),
     "lion": _entry(
         Pioneer(
