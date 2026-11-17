@@ -26,20 +26,22 @@ A deliberate break of the order (stations before local trade) fails three of the
 - **Owned buildings earn on local hand-outs.** `Owners.pay` pays the player's share of all of
   `trade.goods_gave`, so an owned farm beside houses earns with no station at all. The comment on
   `OWNER_SHARE` and `test_ownership::test_the_player_earns_half_of_what_their_farm_sells_to_a_joined_station`
-  say "sells to their stations". Decide which is meant.
-- **`StationTrade.supplies` counts everything made in reach**, not the leftovers, so the trains
-  window's "about N a month" overstates what a station gathers (`test_train_offers`).
-- **Two hand-out orders.** A month's trade hands station goods to the least satisfied first, then
-  the nearest (`Economy._hand_out`); `hand_out_now` on arrival goes by nearest only. No test pins
-  either.
+  say "sells to their stations". Decided: they keep earning on hand-outs, at a price that should
+  follow last quarter's satisfaction; whose satisfaction and how far the price moves are still
+  open.
+- **done: `StationTrade.supplies` counted everything made in reach.** Each station now keeps
+  what it was given over the last three months (`StationGoods.last_quarter`), and the trains
+  window, route map and station tooltip show that.
+- **done: two hand-out orders.** Goods off a train now go to the least satisfied first, then the
+  nearest, as in a month's trade (`test_hand_out_now`).
 - **Track moves buildings.** The principle says track goes round buildings and never moves them;
-  `lay_route` clears room and the planner only prices buildings
-  (`test_routes::test_laying_track_moves_buildings_aside_or_pulls_down_the_lowest`).
-- **Food makers merge in threes** (`FOOD_MERGING = 3`); the principle says two of a kind make a big
-  one (`test_merged_works`). Fix the code or the principle.
-- **Help window years.** `building_help` reads `NEED_YEARS` only, so it shows farm machinery from
-  1870 and fuel from 1910, while `needs_of` starts both in 1920 (`KIND_NEED_YEARS`).
-- **A works with no inputs dies one month early** (359 trades, not 360; `test_deposits`).
+  `lay_route` clears room. Being fixed in another session.
+- **done: merging.** Food makers merge in threes and the other works in twos; the principle now
+  says so. The factory line (factory, big, mega) still merges in threes.
+- **done: help window years.** `goods.need_year` gives each building's own year for a need, which
+  `needs_of` and the help both use.
+- **Not a bug: works dying "a month early".** `Growth(...)` trades once as it is made, so the
+  359th call was the 360th starving month; `test_deposits` now counts it.
 - **77 of 78 `art.MODELS` are never drawn**; only `test_close_scenery::test_every_model_can_be_drawn`
   touches them.
 - **`engine_summary` and `engine_figures`** build the same strings twice (trains window, buy screen).
