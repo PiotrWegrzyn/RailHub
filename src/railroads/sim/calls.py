@@ -68,8 +68,30 @@ class StationCalls:
         train.fuelled = Facility.ENGINE_SHED in working
         train.sanded = Facility.SAND_TOWER in working
         self.load(train, stop)
-        if stop.wait_for_load and train.cars and not train.full:
+        if stop.wait_for_load and train.cars and not self.loaded(train, stop):
             train.waiting = WAIT_MONTHS
+
+    def next_cell(self, train: Train, stop: Stop) -> Cell | None:
+        """Where the train goes on to from a stop: the stop after it."""
+        index = next((i for i, other in enumerate(train.stops) if other is stop), None)
+        if index is None or len(train.stops) < 2:
+            return None
+        return train.stops[(index + 1) % len(train.stops)].cell
+
+    def boards(self, train: Train, stop: Stop, good: Good) -> bool:
+        """Whether a good boards at a stop: passengers and mail don't when the next stop
+        belongs to the same town (railroads.sim.towns)."""
+        if good not in TRAVELLERS:
+            return True
+        onward = self.next_cell(train, stop)
+        return onward is None or not self._railway.same_town(stop.cell, onward)
+
+    def loaded(self, train: Train, stop: Stop) -> bool:
+        """Whether every car that can be filled at a stop is full."""
+        return all(
+            car.dining or car.load >= car.capacity - 1e-9 or not self.boards(train, stop, car.good)
+            for car in train.cars
+        )
 
     def _next_cars(self, cars: list[Car], wanted: list[Cargo], engine: str) -> list[Car]:
         """The cars for the next leg: each keeps what the fullest car of its cargo still holds,
@@ -135,6 +157,8 @@ class StationCalls:
                 continue
             if car.general is not None and car.load <= 1e-9:
                 self.pick_load(train, stop, car)
+            if not self.boards(train, stop, car.good):
+                continue
             take = min(car.capacity - car.load, goods.stockpile.get(car.good, 0.0))
             if take > 0:
                 car.fill({stop.cell: take})

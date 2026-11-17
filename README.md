@@ -530,8 +530,8 @@ goods apart, with each building's satisfaction as a percentage.
 Satisfaction goes wherever it counts with no ceiling: a building at 145% counts its points as
 served 14.5 times over towards growth, against 10 at 100%. A building is unsatisfied at 0%,
 thriving from 100% and content between; the ground under content and thriving buildings has a
-warm glow, and the status bar names the hovered cell's satisfaction. Holding Shift over the map
-tints the land under every building that trades by how satisfied the least satisfied building in
+warm glow, and the status bar names the hovered cell's satisfaction. Holding Shift over the map,
+or turning on the Satisfaction lens above the minimap, tints the land under every building that trades by how satisfied the least satisfied building in
 its cell is: green from 100%, yellow from 50%, orange below that and red at 0%; buildings that
 neither need nor make anything get no tint. The Fine living node of the
 commerce tree makes each bonus good worth 40% instead of 30%, a placeholder until bonus goods get
@@ -855,6 +855,16 @@ for a month: those no train took are gone when the next month's come. They ride
 in passenger coaches and mail vans of 50 each and earn money where they get off just like cargo,
 by the demand there, which only trains use up; they then go on their way rather than waiting to
 be handed out.
+
+Every cell whose buildings send passengers belongs to a town (railroads.sim.towns). A cell takes
+its town when its first such building goes up: the town sending the most passengers within 2 cells,
+or a new one, so towns spread as they grow and a lone farm or house starts its own. It keeps that
+town while it stands. A station belongs to the town sending the most passengers from its inner
+ring, worked out when it is built and again every year, and its window shows the town's colour and
+any other station of yours in it. Passengers and mail never board for a stop in the station's own
+town, so two stations in one town can't carry them to each other for pay; a train waiting for a
+full load doesn't wait for them. The Towns lens above the minimap tints every town's land its own
+colour.
 
 The build bar along the bottom of the map chooses what a left click builds (keys 1 and 2): a station (what stands in the cell moves to a
 cell next to it, or comes down when it cannot move; built on a line, it takes the line's way and

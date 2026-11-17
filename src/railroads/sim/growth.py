@@ -83,6 +83,7 @@ from railroads.sim.ladders import (
     GROWTH,
     LADDERS,
     MILITARY,
+    PASSENGERS_PER_POINT,
     TOWNS,
     Cells,
     FloatGrid,
@@ -102,6 +103,7 @@ from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tech import Effect
 from railroads.sim.tilemap import Relief, Terrain, Vegetation
+from railroads.sim.towns import Towns
 
 if TYPE_CHECKING:
     from railroads.sim.novelties import Novelties
@@ -371,6 +373,8 @@ class Growth:
                 self._counts[built.kind][built.cell] += 1
         # How many buildings of any kind stand in each cell.
         self._occupied = sum(self._counts.values(), start=np.zeros(grid.shape, dtype=np.int64))
+        self.towns = Towns(grid)
+        self.towns.settle(self.sending())
         # The cells last month's trade was worked out on.
         self._traded = np.zeros(0, dtype=np.intp)
         rows, cols = grid.neighbour_index_grids()
@@ -820,6 +824,16 @@ class Growth:
                 total += value * count
         return total
 
+    def sending(self) -> FloatGrid:
+        """The passengers each cell's buildings send a month."""
+        total = np.zeros(self._grid.shape, dtype=np.float64)
+        for kind, count in self._counts.items():
+            given, value = self.rule.points[kind]
+            per = PASSENGERS_PER_POINT.get(given, 0) * value
+            if per:
+                total += per * count
+        return total
+
     def population(self) -> int:
         """The population points of the whole map."""
         return sum(
@@ -1187,6 +1201,9 @@ class Growth:
         if starving is not None and kind in starving and not self._counts[kind][cell]:
             starving[kind][:, cell[0] * self._grid.cols + cell[1]] = 0
         points, value = self.rule.points[kind]
+        sends = PASSENGERS_PER_POINT.get(points, 0) * value * how_many
+        if sends:
+            self.towns.add(cell, float(sends))
         here = cell[0] * self._grid.cols + cell[1]
         around = self._near[:, here]
         flat = np.concatenate(([here], around[around < self._near.shape[1]]))

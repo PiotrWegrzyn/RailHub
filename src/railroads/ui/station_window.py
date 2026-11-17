@@ -30,8 +30,10 @@ from railroads.ui.theme import (
     good_icon,
     goods_inline,
     next_good_slot,
+    rgba_u32,
     rows_that_fit,
     tip,
+    town_tint,
 )
 
 WINDOW_WIDTH = 460.0
@@ -137,6 +139,7 @@ class StationWindow:
         imgui.text_disabled("Trains calling")
         imgui.same_line(LABEL_WIDTH)
         imgui.text(", ".join(calling) if calling else "none")
+        _draw_town(railway, station)
         imgui.separator()
         price = railway.upgrade_price(station)
         if price is None:
@@ -223,3 +226,31 @@ def _priced_button(label: str, affordable: bool, detail: str = "") -> bool:
         if lines:
             imgui.set_tooltip("\n".join(lines))
     return clicked
+
+
+def _draw_town(railway: Railway, station: Cell) -> None:
+    """The town the station belongs to, in its colour on the Towns lens, and the stations of the
+    player's in the same town, which passengers and mail don't travel between."""
+    imgui.text_disabled("Town")
+    imgui.same_line(LABEL_WIDTH)
+    town = railway.town_of(station)
+    if not town:
+        imgui.text("none: nobody here sends passengers")
+        return
+    low = imgui.get_cursor_screen_pos()
+    side = imgui.get_text_line_height()
+    imgui.get_window_draw_list().add_rect_filled(
+        low, (low.x + side, low.y + side), rgba_u32(town_tint(town, 1.0)), 3.0
+    )
+    imgui.dummy((side, side))
+    imgui.same_line()
+    others = [
+        railway.name_of(other)
+        for other in railway.stations()
+        if other != station and railway.town_of(other) == town
+    ]
+    imgui.text(f"shared with {', '.join(others)}" if others else "its own")
+    tip(
+        "Passengers and mail only board for a stop in another town, so two stations in one "
+        "town can't carry them to each other"
+    )

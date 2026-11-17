@@ -17,6 +17,7 @@ from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, Grid
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
 from railroads.sim.tilemap import Relief, TileMap
+from railroads.sim.towns import Towns
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.biomes import biome_of
 from railroads.ui.build_menu import reach_border
@@ -33,6 +34,7 @@ from railroads.ui.theme import (
     color_u32,
     good_icon,
     rgba_u32,
+    town_tint,
 )
 
 GRID_COLOR = (0.0, 0.0, 0.0, 0.25)
@@ -51,6 +53,7 @@ HALF_SATISFIED_TINT = (0.95, 0.88, 0.15, 0.5)
 LITTLE_SATISFIED_TINT = (1.0, 0.5, 0.1, 0.5)
 UNSATISFIED_TINT = (0.9, 0.12, 0.1, 0.5)
 MOODS_LEGEND = "Satisfaction: green 100%, yellow 50%+, orange under 50%, red nothing."
+TOWNS_LEGEND = "Towns: each colour is one town; passengers and mail only travel between towns."
 # From this cell width the tint fills each cell's hexagon; further out it is a square.
 TINT_HEXES_FROM = 8
 # From this cell width, buildings found are outlined; further out each is a small square.
@@ -402,6 +405,13 @@ def least_satisfied(
         given = assumed[cells]
         shares = np.where(np.isnan(given), shares, given)
     return cells, shares
+
+
+def town_cells(towns: Towns) -> tuple[npt.NDArray[np.intp], list[int]]:
+    """The flat cells that belong to a town, and each one's packed town colour."""
+    cells = np.flatnonzero((towns.town.ravel() > 0) & (towns.sending.ravel() > 0))
+    colors = [rgba_u32(town_tint(town)) for town in towns.town.ravel()[cells].tolist()]
+    return cells, colors
 
 
 def mood_tint(share: float) -> Rgba:

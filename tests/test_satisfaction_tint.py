@@ -1,8 +1,13 @@
+import colorsys
+import itertools
+
 import numpy as np
 import pytest
 
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Trade
+from railroads.sim.grids import SquareGrid
+from railroads.sim.towns import Towns
 from railroads.ui.map_overlays import (
     HALF_SATISFIED_TINT,
     LITTLE_SATISFIED_TINT,
@@ -10,7 +15,9 @@ from railroads.ui.map_overlays import (
     UNSATISFIED_TINT,
     least_satisfied,
     mood_tint,
+    town_cells,
 )
+from railroads.ui.theme import town_tint
 
 HOUSE, FARM = BuildingKind.HOUSE, BuildingKind.FARM
 
@@ -83,3 +90,21 @@ def test_an_assumed_share_stands_in_for_the_trade_where_given() -> None:
 
     assert cells.tolist() == [3, 7, 9]
     assert shares.tolist() == [1.0, 0.5, 0.7]
+
+
+def test_the_town_lens_tints_each_town_one_colour_and_leaves_land_without_a_town() -> None:
+    towns = Towns(SquareGrid(rows=8, cols=8, km_per_cell=2.0))
+    towns.add((1, 1), 1.0)
+    towns.add((1, 2), 1.0)
+    towns.add((6, 6), 1.0)
+
+    cells, colors = town_cells(towns)
+
+    assert cells.tolist() == [1 * 8 + 1, 1 * 8 + 2, 6 * 8 + 6]
+    assert colors[0] == colors[1] != colors[2]
+
+
+def test_neighbouring_town_numbers_get_unlike_colours() -> None:
+    hues = [colorsys.rgb_to_hsv(*town_tint(town)[:3])[0] for town in (1, 2, 3)]
+
+    assert min(abs(a - b) for a, b in itertools.combinations(hues, 2)) > 0.1

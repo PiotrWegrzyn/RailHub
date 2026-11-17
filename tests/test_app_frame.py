@@ -27,7 +27,7 @@ from railroads.ui.build_menu import Tool
 from railroads.ui.ground import GroundPictures
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
 from railroads.ui.main_menu import MENU_WIDTH, MainMenu, Page
-from railroads.ui.map_view import VISIT_ZOOM, MapView
+from railroads.ui.map_view import VISIT_ZOOM, Lens, MapView
 from railroads.ui.route_map import soften
 from railroads.ui.web_setup import PageSetup
 from railroads.ui.workers import FrameWorker
@@ -102,6 +102,18 @@ def test_every_window_draws_at_every_zoom(context: None, zoom: int) -> None:
         frame(app)
 
     assert app.view.camera.zoom_level == zoom
+
+
+@pytest.mark.parametrize("lens", list(Lens))
+def test_the_map_draws_with_each_lens_on(context: None, lens: Lens) -> None:
+    app = made_app()
+    app.view.lens = lens
+    app.view.look_at((10, 10))
+
+    for _ in range(3):
+        frame(app)
+
+    assert app.view.lens == lens
 
 
 @pytest.fixture

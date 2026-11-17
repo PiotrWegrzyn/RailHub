@@ -4,11 +4,13 @@ compass and the minimap go over both."""
 
 import math
 from dataclasses import dataclass
+from enum import Enum
 from functools import cache
 
 import numpy as np
 import numpy.typing as npt
 from imgui_bundle import hello_imgui, imgui
+from imgui_bundle import icons_fontawesome_4 as fa
 
 from railroads import maps
 from railroads.mapgen.world import WorldLand
@@ -40,6 +42,7 @@ from railroads.ui.map_input import MapInput
 from railroads.ui.map_overlays import (
     MOODS_LEGEND,
     SELECTED_COLOR,
+    TOWNS_LEGEND,
     consumers_in_reach,
     draw_compass,
     draw_found,
@@ -54,6 +57,7 @@ from railroads.ui.map_overlays import (
     least_satisfied,
     mood_tint,
     status_text,
+    town_cells,
     visible_area,
 )
 from railroads.ui.map_tools import MapTools
@@ -76,7 +80,7 @@ from railroads.ui.route_map import soften, soften_steps
 from railroads.ui.search import BuildingSearch
 from railroads.ui.station_window import StationWindow
 from railroads.ui.summaries_panel import SummariesPanel
-from railroads.ui.theme import BRASS, SIDE_WINDOW_POS, rgba_u32
+from railroads.ui.theme import BRASS, OVERLAY_FLAGS, SIDE_WINDOW_POS, rgba_u32, toggle_button
 
 BACKGROUND_COLOR = (0.08, 0.09, 0.11, 1.0)
 DETAILS_SIZE = (680.0, 340.0)
@@ -86,6 +90,15 @@ VISIT_ZOOM = 4
 LIGHT_ON_SCREEN = (-1.0, -1.0)
 # Population points a cell needs to show as a town on the minimap.
 MINIMAP_TOWN_POINTS = 12
+# How far above the minimap, or the map's corner without one, the lens buttons sit.
+LENS_GAP = 8.0
+
+
+class Lens(Enum):
+    """What the map can be tinted by: how satisfied buildings are, or which town they are in."""
+
+    SATISFACTION = "satisfaction"
+    TOWNS = "towns"
 
 
 @dataclass(frozen=True)
@@ -189,6 +202,12 @@ class MapView:
         # The cells Shift tints by how satisfied their buildings are, their packed colours, and
         # the month's trade and buildings they were worked out for.
         self._moods: tuple[tuple[Trade | None, int], npt.NDArray[np.intp], list[int]] | None = None
+        # The lens turned on above the minimap, if any, and the town tints with the buildings
+        # they were worked out for.
+        self.lens: Lens | None = None
+        self._towns: tuple[int, npt.NDArray[np.intp], list[int]] | None = None
+        # The top of the minimap on screen, which the lens buttons sit above.
+        self._minimap_top: float | None = None
         self.build = BuildMenu()
         # What came of the last Buy pressed in the hex details.
         self._bought = ""
@@ -234,6 +253,7 @@ class MapView:
         self._draw_details()
         self.build.maglev_open = self.railway.maglev_open
         self.build.draw(*self._map_rect)
+        self._draw_lenses()
         self.build.trains.draw(
             self.railway,
             self.growth.station_trade.supplies,
@@ -453,6 +473,11 @@ class MapView:
             if shown or world_shown
             else None
         )
+        self._minimap_top = (
+            None
+            if minimap is None
+            else min(panel.top for panel in (minimap.overview, minimap.world) if panel is not None)
+        )
         self.input.handle_mouse(center, minimap)
 
         draw_list = imgui.get_window_draw_list()
@@ -487,16 +512,16 @@ class MapView:
                     draw_list, self.constructions, self.camera, center, self.build.preview.pieces
                 )
         marks = self._marks_camera()
-        if self._showing_moods():
-            cells, colors = self._mood_tints()
+        tints = (
+            self._mood_tints()
+            if self._showing_moods()
+            else self._town_tints()
+            if self.lens == Lens.TOWNS
+            else None
+        )
+        if tints is not None:
             draw_moods(
-                draw_list,
-                marks,
-                self.tile_map.grid,
-                center,
-                (top_left, bottom_right),
-                cells,
-                colors,
+                draw_list, marks, self.tile_map.grid, center, (top_left, bottom_right), *tints
             )
         if self.build.track_from is not None:
             draw_outline(
@@ -590,11 +615,44 @@ class MapView:
             self._consumers = key, consumers_in_reach(self.constructions, cell, self.growth.year)
         return self._consumers[1]
 
-    @staticmethod
-    def _showing_moods() -> bool:
-        """Whether Shift is held to tint the land by how satisfied buildings are, not while typing."""
+    def _draw_lenses(self) -> None:
+        """Buttons over the bottom-right corner of the map, above the minimap, that turn a lens
+        on or off: one at a time."""
+        _, (right, bottom) = self._map_rect
+        top = self._minimap_top if self._minimap_top is not None else bottom
+        imgui.set_next_window_pos(
+            (right - LENS_GAP, top - LENS_GAP), imgui.Cond_.always.value, (1.0, 1.0)
+        )
+        imgui.begin("##lenses", flags=OVERLAY_FLAGS | imgui.WindowFlags_.no_move.value)
+        for lens, label, tooltip in (
+            (
+                Lens.SATISFACTION,
+                f"{fa.ICON_FA_SMILE}  Satisfaction",
+                "Tint the land by how satisfied its buildings are (or hold Shift)",
+            ),
+            (
+                Lens.TOWNS,
+                f"{fa.ICON_FA_USERS}  Towns",
+                "Tint the land by town; passengers and mail only travel between towns",
+            ),
+        ):
+            if lens != Lens.SATISFACTION:
+                imgui.same_line()
+            if toggle_button(label, self.lens == lens, tooltip):
+                self.lens = None if self.lens == lens else lens
+        imgui.end()
+
+    def _showing_moods(self) -> bool:
+        """Whether the satisfaction lens is on, or Shift is held for it, not while typing."""
         io = imgui.get_io()
-        return io.key_shift and not io.want_text_input
+        return self.lens == Lens.SATISFACTION or (io.key_shift and not io.want_text_input)
+
+    def _town_tints(self) -> tuple[npt.NDArray[np.intp], list[int]]:
+        """town_cells, worked out again only once the buildings changed."""
+        version = self.constructions.version
+        if self._towns is None or self._towns[0] != version:
+            self._towns = (version, *town_cells(self.growth.towns))
+        return self._towns[1], self._towns[2]
 
     def _mood_tints(self) -> tuple[npt.NDArray[np.intp], list[int]]:
         """least_satisfied's cells and their tints, worked out again only once the month's trade
@@ -638,6 +696,8 @@ class MapView:
         )
         if self._showing_moods():
             text = f"{text} {MOODS_LEGEND}"
+        elif self.lens == Lens.TOWNS:
+            text = f"{text} {TOWNS_LEGEND}"
         below = draw_status(draw_list, top_left, bottom_right, text)
         if self.hovered is not None and not over_minimap:
             draw_hovered_buildings(self.growth, self.hovered, below, self._satisfaction)

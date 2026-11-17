@@ -186,9 +186,26 @@ class Railway:
         # (railroads.sim.track_network, railroads.sim.calls).
         self.network = TrackNetwork(constructions)
         self.calls = StationCalls(self)
+        # Each station's town (railroads.sim.towns) and the year it was worked out in.
+        self._towns: dict[Cell, tuple[int, int]] = {}
 
     def stations(self) -> list[Cell]:
         return self.constructions.stations()
+
+    def town_of(self, station: Cell) -> int:
+        """The town a station belongs to, 0 for none: worked out the first time it is asked
+        for after the station is built, and again each year."""
+        kept = self._towns.get(station)
+        if kept is None or kept[1] != self.year:
+            town = 0 if self.station_trade is None else self.station_trade.town_of(station)
+            kept = self._towns[station] = (town, self.year)
+        return kept[0]
+
+    def same_town(self, station: Cell, other: Cell) -> bool:
+        """Whether two stations belong to the same town, so passengers and mail don't travel
+        between them."""
+        town = self.town_of(station)
+        return town != 0 and town == self.town_of(other)
 
     @property
     def maglev_open(self) -> bool:
@@ -600,7 +617,7 @@ class Railway:
                 train.waiting = 0.0
             if train.waiting > 0:
                 self.calls.load(train, leaving)
-                if train.full:
+                if self.calls.loaded(train, leaving):
                     train.waiting = 0.0
                 else:
                     train.waiting -= months
