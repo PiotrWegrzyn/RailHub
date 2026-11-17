@@ -378,7 +378,7 @@ def industry_trade(tile_map: TileMap, cell: tuple[int, int]) -> Trade:
 
 
 @pytest.mark.parametrize(("people", "industry"), [(0, 0), (6, 0), (0, 1)])
-def test_a_served_factory_breeds_by_the_people_and_the_industry_around_it(
+def test_a_served_factory_breeds_by_the_people_and_half_as_much_again_the_industry_around_it(
     people: int, industry: int
 ) -> None:
     tile_map = make_map()
@@ -395,7 +395,7 @@ def test_a_served_factory_breeds_by_the_people_and_the_industry_around_it(
 
     growth._count_served(industry_trade(tile_map, (5, 5)))
 
-    drawing = people + value + industry * growth.rule.points[BuildingKind.STEEL_MILL][1]
+    drawing = people + 1.5 * (value + industry * growth.rule.points[BuildingKind.STEEL_MILL][1])
     raised = (breeding.spawn + breeding.per_doubling * value) * np.log2(1 + drawing)
     assert points == Points.INDUSTRY
     assert growth.chances(FACTORIES)[5, 5] == pytest.approx(
