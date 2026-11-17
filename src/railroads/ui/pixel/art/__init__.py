@@ -16,12 +16,15 @@ from PIL import Image
 
 from railroads.sim.constructions import BUILDING_RULES, MERGED, BuildingKind
 from railroads.ui.pixel.art import (
+    built_farms,
     built_homes,
+    built_works,
     grand_crafts,
     grand_fire,
     grand_food,
     grand_modern,
 )
+from railroads.ui.pixel.art.built import modelled
 from railroads.ui.pixel.art.built_homes import home
 from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_pauls
 from railroads.ui.pixel.art.commerce import airport, department_store, hotel, port, shop, tavern
@@ -533,6 +536,14 @@ CLOSE_MODELS: dict[str, Callable[[], Sprite]] = {
     },
     **{f"flats_{i}": home(lambda w=w: built_homes.flats(w)) for i, w in enumerate(FLAT_WALLS)},
     "skyscraper": home(built_homes.skyscraper),
+    "farm": modelled(built_farms.farm),
+    "orchard": modelled(built_farms.orchard),
+    "orange_farm": modelled(lambda: built_farms.orchard([(244, 142, 36)])),
+    "potato_farm": modelled(built_farms.potato_farm),
+    "bakery": modelled(built_works.bakery),
+    "lumber_mill": modelled(built_works.lumber_mill),
+    "distillery": modelled(built_works.distillery),
+    "tavern": modelled(built_works.tavern),
 }
 
 
