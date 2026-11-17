@@ -90,7 +90,7 @@ def test_a_mega_works_gives_the_points_of_all_the_works_merged_into_it() -> None
 
     points, mega = POINTS[BuildingKind.MEGA_BAKERY]
 
-    assert points == Points.INDUSTRY
+    assert points == Points.FOOD
     assert mega == small * FOOD_MERGING**2
 
 

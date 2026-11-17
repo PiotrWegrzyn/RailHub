@@ -8,6 +8,7 @@ from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Trade
 from railroads.sim.grids import Cell, HexGrid
 from railroads.sim.growth import (
+    SERVED_GROWTH,
     SPAWN_SCALE,
     UNDYING,
     WORKS_SPAWN_SCALE,
@@ -739,3 +740,14 @@ def test_gasworks_come_up_by_industry_and_dairies_are_drawn_by_people_twice() ->
     assert gas.spawn_by == {Points.INDUSTRY: 1.0}
     assert gas.shunned_by == {Points.POPULATION: 1.0}
     assert milk.drawn_by == {Points.POPULATION: 2.0, Points.INDUSTRY: 2.0}
+
+
+def test_bakeries_give_food_points_but_come_up_and_breed_like_works() -> None:
+    (sausages,) = [ladder for ladder in LADDERS if ladder.kinds[0] == BuildingKind.SAUSAGE_MAKER]
+
+    bread = breeding_of(BAKERIES, POINTS)
+    sausage = breeding_of(sausages, POINTS)
+
+    assert (bread.own, sausage.own) == (Points.FOOD, Points.FOOD)
+    assert bread.spawn == pytest.approx(BAKERIES.base_chance * SPAWN_SCALE)
+    assert bread.per_doubling == sausage.per_doubling == SERVED_GROWTH

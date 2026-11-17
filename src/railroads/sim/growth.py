@@ -234,13 +234,15 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
         return kept[2]
     own = points[ladder.kinds[0]][0]
     per_doubling = sum(ladder.chance_per_doubling.values())
+    kind = ladder.kinds[0]
+    # Bakers and sausage makers give food points but work up what others grow.
+    from_the_land = own in FROM_THE_LAND and kind not in RECIPES
     if own == Points.POPULATION or not per_doubling:
         spawn = ladder.base_chance
     else:
-        spawn_scale = FOOD_SPAWN_SCALE if own == Points.FOOD else SPAWN_SCALE
+        spawn_scale = FOOD_SPAWN_SCALE if from_the_land and own == Points.FOOD else SPAWN_SCALE
         spawn = spawn_scale * (ladder.base_chance or per_doubling)
-        per_doubling = per_doubling * LAND_BREEDING_SCALE if own in FROM_THE_LAND else SERVED_GROWTH
-    kind = ladder.kinds[0]
+        per_doubling = per_doubling * LAND_BREEDING_SCALE if from_the_land else SERVED_GROWTH
     if kind in SPAWN_ANYWHERE:
         spawn *= WORKS_SPAWN_SCALE
     spawn_by = SPAWN_NEAR.get(kind, {Points.POPULATION: 1.0} if kind in SPAWN_BY_PEOPLE else {})
