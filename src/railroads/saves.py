@@ -2,7 +2,9 @@
 player's data folder and read back exactly as they were.
 
 A save is a header line naming the format and saying what is in it, then the game pickled and
-compressed. The header is read on its own to list saves without loading them. Bump SAVE_FORMAT
+compressed: the game's biggest parts pickled one after another, a step each, then the game itself,
+which points back at them (snapshot_steps), so taking a snapshot can be spread over frames. The
+header is read on its own to list saves without loading them. Bump SAVE_FORMAT
 whenever a change to the simulation's classes would make an older save load wrong, so that it is
 refused with a clear message instead.
 
@@ -12,6 +14,7 @@ Named saves are the player's; AUTOSAVES more are written in turn at the start of
 no thread to write it on to spread over frames.
 """
 
+import io
 import json
 import os
 import pickle
@@ -182,8 +185,19 @@ def snapshot(saved: SavedGame, memory: ReusedMemory | None = None) -> Snapshot:
     """The game pickled now, into `memory` if given, which then mustn't be used again until the
     snapshot has been written. It is pickled before anything is copied, so the copy goes into
     memory of the size it needs."""
+    return finish(snapshot_steps(saved, memory))
+
+
+def snapshot_steps(saved: SavedGame, memory: ReusedMemory | None = None) -> Steps[Snapshot]:
+    """snapshot in steps a caller can spread over frames, nothing changing the game between
+    them: one pickler pickles each of the game's biggest parts (Game.big_parts) in a step of its
+    own, then the game, which only points back at what it pickled already."""
     pieces = _Pieces()
-    _Pickler(pieces, protocol=pickle.HIGHEST_PROTOCOL).dump(saved)
+    pickler = _Pickler(pieces, protocol=pickle.HIGHEST_PROTOCOL)
+    for part in saved.game.big_parts():
+        pickler.dump(part)
+        yield
+    pickler.dump(saved)
     data: Buffer
     if memory is None:
         data = b"".join(pieces.parts)
@@ -196,6 +210,23 @@ def snapshot(saved: SavedGame, memory: ReusedMemory | None = None) -> Snapshot:
         "saved_at": datetime.now().isoformat(timespec="seconds"),
     }
     return Snapshot(header, data)
+
+
+def unpickled(data: Buffer) -> object:
+    """What a snapshot pickled: the last of the things in it, the game."""
+    return finish(unpickled_steps(data))
+
+
+def unpickled_steps(data: Buffer) -> Steps[object]:
+    """unpickled a thing a step, the parts first and the game last."""
+    stream = io.BytesIO(data)
+    end = stream.getbuffer().nbytes
+    unpickler = pickle.Unpickler(stream)
+    loaded = unpickler.load()
+    while stream.tell() < end:
+        yield
+        loaded = unpickler.load()
+    return loaded
 
 
 def compressed(data: Buffer, step: int | None = None) -> Steps[bytes]:
@@ -362,7 +393,7 @@ class Saves:
             file.readline()
             packed = file.read()
         try:
-            saved = pickle.loads(zlib.decompress(packed))
+            saved = unpickled(zlib.decompress(packed))
         except (zlib.error, pickle.UnpicklingError, EOFError) as error:
             raise SaveError(f"'{name}' is damaged and can't be loaded.") from error
         except (AttributeError, ImportError, TypeError, ValueError) as error:

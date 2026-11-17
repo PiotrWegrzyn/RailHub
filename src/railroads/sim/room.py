@@ -93,7 +93,7 @@ class Room:
                 continue
             if ladder is not None:
                 flat = np.array([np.ravel_multi_index(near, grid.shape)])
-                land = ladder.land.weights(constructions.tile_map, flat, growth.near)
+                land = growth.land(ladder.land, flat)
                 if land[0] <= 0:
                     continue
             growth.build(moved)
@@ -125,7 +125,7 @@ class Room:
         steps = np.array([step for _, step in reached])
         rows, cols = zip(*(near for near, _ in reached), strict=True)
         flat = np.ravel_multi_index((rows, cols), grid.shape)
-        land = ladder.land.weights(constructions.tile_map, flat, growth.near)
+        land = growth.land(ladder.land, flat)
         first = ladder.kinds[0]
         suits = rng.random(steps.size) ** (1.0 / np.maximum(land, 1e-12))
         order = np.lexsort((-suits, steps)) if nearest_first else np.argsort(-suits)
@@ -152,7 +152,7 @@ class Room:
         reached = sorted(growth.grid.within(cell, HOMES_STEPS).items(), key=lambda item: item[1])
         for near, _ in reached:
             house = Building(near, BuildingKind.HOUSE)
-            if TOWN_LAND.weights(constructions.tile_map, self._flat([near]), growth.near)[0] <= 0:
+            if growth.land(TOWN_LAND, self._flat([near]))[0] <= 0:
                 continue
             while homes and constructions.why_not(house) is None:
                 constructions.build(house)

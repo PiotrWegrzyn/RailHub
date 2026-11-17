@@ -611,10 +611,12 @@ class MapView:
     def prepare(self, size: Vec2, density: int, chunks: bool = True) -> None:
         """Builds what the map needs before its first frame, in a window of `size` screen pixels
         with `density` device pixels to each, so that work can run while a game loads: the
-        ground picture and its softened copy for the trains window, the pixel world, the trains'
-        sprites and, with `chunks`, the chunks the first frame shows. Nothing here touches the
-        graphics card."""
+        ground picture with and without grid lines and its softened copy for the trains window,
+        the pixel world, the trains' sprites and, with `chunks`, the chunks the first frame
+        shows. Nothing here touches the graphics card."""
         self._soft = (self._ground_version, soften(self._plain_picture()))
+        light = self.camera.map_direction(*LIGHT_ON_SCREEN)
+        self._ground_pictures().picture(self._ground_colors(), light, True)
         layer = self._pixel_layer()
         if self.railway.trains:
             self._train_layer()

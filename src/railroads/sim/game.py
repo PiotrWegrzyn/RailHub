@@ -75,6 +75,11 @@ class Game:
     def finances(self) -> Finances:
         return self.railway.finances
 
+    def big_parts(self) -> list[object]:
+        """What of the game takes longest to pickle, in parts a save pickles one at a time before
+        the rest (railroads.saves.snapshot_steps)."""
+        return [self.constructions, *self.growth.big_parts()]
+
     def time_passed(self, months: float) -> None:
         """Moves the trains on by this much of a month."""
         self.railway.run(months)

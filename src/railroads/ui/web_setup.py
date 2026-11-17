@@ -22,7 +22,7 @@ from typing import Any, Protocol
 import numpy as np
 
 from railroads.newgame import Settings, make_game
-from railroads.saves import SavedGame, snapshot
+from railroads.saves import SavedGame, snapshot, unpickled_steps
 from railroads.sim.steps import Steps
 
 if sys.platform == "emscripten":
@@ -60,7 +60,7 @@ def grow(
 
 def unpacked(compressed: np.ndarray, size: int) -> Steps[SavedGame]:
     """The game a worker grew, from its compressed pickle of `size` bytes, uncompressed a few
-    megabytes a step and unpickled in the last."""
+    megabytes a step and unpickled a part a step after that."""
     pickled = bytearray(size)
     view = memoryview(pickled)
     at = 0
@@ -75,7 +75,8 @@ def unpacked(compressed: np.ndarray, size: int) -> Steps[SavedGame]:
             yield
     tail = unpacking.flush()
     view[at : at + len(tail)] = tail
-    return pickle.loads(pickled)
+    yield
+    return (yield from unpickled_steps(pickled))
 
 
 class Page(Protocol):

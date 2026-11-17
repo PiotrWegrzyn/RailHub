@@ -7,7 +7,8 @@ Buildings breed (breeding_of): a cell's chance of another of a ladder's kinds is
 
 where base is the ladder's base chance, served the points the buildings of its own kind of points
 give in the cell times their satisfaction (railroads.sim.economy), and drawing the points around
-the cell that draw it, each times its weight: four times the people for houses, food and people
+the cell that draw it, each times its weight: six times the people and twice the industry for
+houses, food and people
 for food, people and industry for industry, mines, mills and ports, and twice the people for
 shops, inns and churches. So the base chance holds anywhere the land allows, good surroundings
 raise it even where none of the kind stands yet, and what is satisfied breeds far faster. A building that comes up in a cell
@@ -55,6 +56,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import numpy as np
+import numpy.ma  # np.unique loads it on first use, which would stall the first month.
 import numpy.typing as npt
 
 from railroads.sim.clock import START_YEAR
@@ -88,6 +90,7 @@ from railroads.sim.ladders import (
     Ladder,
     Land,
     Points,
+    Surroundings,
 )
 from railroads.sim.ownership import Owners
 from railroads.sim.power_plants import build_power_plants
@@ -122,7 +125,7 @@ INDUSTRIAL = {Points.POPULATION: 1.0, Points.INDUSTRY: 1.0}
 SOCIAL = {Points.POPULATION: 2.0}
 DRAWN_BY: Mapping[Points, Mapping[Points, float]] = MappingProxyType(
     {
-        Points.POPULATION: {Points.POPULATION: 4.0},
+        Points.POPULATION: {Points.POPULATION: 6.0, Points.INDUSTRY: 2.0},
         Points.FOOD: {Points.FOOD: 1.0, Points.POPULATION: 1.0},
         Points.ORE: INDUSTRIAL,
         Points.TIMBER: INDUSTRIAL,
@@ -319,7 +322,15 @@ class _Touched:
 
 
 # The arrays Growth._stack lays out, left out of saves and laid out again as a game loads.
-_STACKED = ("_chances", "_lands", "_nearby_all", "_served_all", "_touched")
+_STACKED = (
+    "_chances",
+    "_lands",
+    "_nearby_all",
+    "_served_all",
+    "_points_row",
+    "_touched",
+    "_land_of",
+)
 
 
 class Growth:
@@ -370,10 +381,11 @@ class Growth:
         everywhere = np.arange(grid.rows * grid.cols)
         # Ladders growing on the same land share its weights, and the cells it allows.
         lands: dict[int, tuple[Land, FloatGrid, Cells]] = {}
+        surroundings = Surroundings(tile_map, everywhere, self._near)
         for ladder in rule.ladders:
             shared = lands.get(id(ladder.land))
             if shared is None or shared[0] is not ladder.land:
-                weights = ladder.land.weights(tile_map, everywhere, self._near)
+                weights = ladder.land.weights_in(surroundings)
                 shared = lands[id(ladder.land)] = (
                     ladder.land,
                     weights,
@@ -382,8 +394,8 @@ class Growth:
             _, land, cells = shared
             self._places.append(_Place(ladder, cells, land, np.empty(0)))
         self._stack()
+        self._reckon_everywhere()
         for place in self._places:
-            self._reckon(place, everywhere)
             place.highest = float(place.chances.max())
         # The cells whose forest came or went in the last month.
         self.forests_changed: set[Cell] = set()
@@ -418,9 +430,7 @@ class Growth:
     def __setstate__(self, state: dict[str, object]) -> None:
         self.__dict__.update(state)
         self._stack()
-        everywhere = np.arange(self._grid.rows * self._grid.cols)
-        for place in self._places:
-            self._reckon(place, everywhere)
+        self._reckon_everywhere()
 
     def _stack(self) -> None:
         """Lays every ladder's chances, every land's weights and every kind of points nearby and
@@ -441,11 +451,16 @@ class Growth:
         for row, place in enumerate(self._places):
             place.land = views[place_lands[row]]
             place.chances = self._chances[row]
+        kept: dict[int, tuple[Land, FloatGrid]] = {}
+        for place in self._places:
+            kept.setdefault(id(place.ladder.land), (place.ladder.land, place.land))
+        self._land_of = tuple(kept.values())
         kinds = list(Points)
         self._nearby_all = np.stack([self._nearby[points] for points in kinds]).reshape(
             len(kinds), size
         )
         self._served_all = np.stack([self._served[points] for points in kinds])
+        self._points_row = {points: at for at, points in enumerate(kinds)}
         for at, points in enumerate(kinds):
             self._nearby[points] = self._nearby_all[at].reshape(self._grid.shape)
             self._served[points] = self._served_all[at]
@@ -490,6 +505,17 @@ class Growth:
                 shunned_weights=shunned_weights,
             )
 
+    def big_parts(self) -> list[object]:
+        """What of the growth takes longest to pickle (railroads.sim.game.Game.big_parts)."""
+        return [
+            self._counts,
+            self.economy,
+            self.trade,
+            self._starving,
+            [place.land for place in self._places],
+            [place.cells for place in self._places],
+        ]
+
     def trade_goods(self) -> set[Cell]:
         """Pulls down farms that towns have crowded out, lets stations hand out a month of goods,
         raises buildings with enough people around them and counts what the served buildings add
@@ -497,7 +523,8 @@ class Growth:
         return finish(self._trade_steps())
 
     def _trade_steps(self) -> Steps[set[Cell]]:
-        """trade_goods, pausing once the economy has traded."""
+        """trade_goods in steps: before and as the economy trades, and between the parts of
+        settling what it traded."""
         changed = self._crowd_out()
         self.economy.year = self.year
         self.economy.bonus_per_good = BONUS_PER_GOOD + (
@@ -505,6 +532,7 @@ class Growth:
         )
         if self.railway is not None:
             self.railway.station_trade = self.station_trade
+        yield
         self.trade = yield from self.economy.trade_steps(
             self.owners.working_counts(),
             self.station_trade.orders(),
@@ -517,9 +545,10 @@ class Growth:
         yield
         changed |= self._die_out(self.trade)
         changed |= self._raise_buildings()
+        yield
         self._count_served(self.trade)
-        for place in self._places:
-            place.highest = float(place.chances.max())
+        for place, highest in zip(self._places, self._chances.max(axis=1).tolist(), strict=True):
+            place.highest = highest
         return changed
 
     def starving(self, trade: Trade, kind: BuildingKind) -> npt.NDArray[np.int64]:
@@ -714,6 +743,39 @@ class Growth:
             )
         place.chances[cells] = raw * place.land[cells]
 
+    def _reckon_everywhere(self) -> None:
+        """Works out every ladder's chances in every cell afresh, as _reckon does, the doublings
+        of what draws them once for all the ladders drawn alike."""
+        doublings: dict[tuple[tuple[Points, float], ...], FloatGrid] = {}
+        for place in self._places:
+            breeding = self._breeding(place)
+            drawn_by = tuple(breeding.drawn_by.items())
+            if drawn_by not in doublings:
+                drawing = sum(weight * self._nearby[points].ravel() for points, weight in drawn_by)
+                doublings[drawn_by] = np.log2(1 + drawing)
+            served = self._served[breeding.own]
+            raw = (
+                breeding.spawn
+                + (breeding.spawn + breeding.per_doubling * served) * doublings[drawn_by]
+            )
+            if breeding.shunned_by:
+                raw = raw / (
+                    1.0
+                    + sum(
+                        weight * self._nearby[points].ravel()
+                        for points, weight in breeding.shunned_by.items()
+                    )
+                )
+            place.chances[:] = raw * place.land
+
+    def land(self, land: Land, cells: npt.NDArray[np.intp]) -> FloatGrid:
+        """The weights of these flat cells for a land (railroads.sim.ladders.Land.weights), as
+        kept up to date for the ladders growing on it."""
+        for kept, weights in self._land_of:
+            if kept is land:
+                return weights[cells]
+        return land.weights(self.constructions.tile_map, cells, self._near)
+
     def satisfaction(self) -> npt.NDArray[np.int8]:
         """How satisfied each cell's buildings are on the whole, or -1 where none trade."""
         if self.trade is None:
@@ -841,10 +903,14 @@ class Growth:
         for place in self._places:
             if place.ladder.land.on_vegetation:
                 sharing.setdefault(id(place.land), []).append(place)
+        surroundings: dict[bool, Surroundings] = {}
         for places in sharing.values():
             first = places[0]
-            touched = beside if first.ladder.land.on_forest_nearby else own
-            land = first.ladder.land.weights(tile_map, touched, self._near)
+            nearby = first.ladder.land.on_forest_nearby
+            touched = beside if nearby else own
+            if nearby not in surroundings:
+                surroundings[nearby] = Surroundings(tile_map, touched, self._near)
+            land = first.ladder.land.weights_in(surroundings[nearby])
             differs = land != first.land[touched]
             if not differs.any():
                 continue
@@ -1117,18 +1183,17 @@ class Growth:
         if starving is not None and kind in starving and not self._counts[kind][cell]:
             starving[kind][:, cell[0] * self._grid.cols + cell[1]] = 0
         points, value = self.rule.points[kind]
-        neighbourhood = [cell, *self._grid.neighbours(*cell)]
-        rows, cols = zip(*neighbourhood, strict=True)
-        self._nearby[points][rows, cols] += how_many * value
-        flat = np.ravel_multi_index((rows, cols), self._grid.shape)
+        here = cell[0] * self._grid.cols + cell[1]
+        around = self._near[:, here]
+        flat = np.concatenate(([here], around[around < self._near.shape[1]]))
+        self._nearby_all[self._points_row[points], flat] += how_many * value
         touched = self._touched[points]
         if not touched.places:
             return
         chances = self._reckon_touched(touched, flat)
         if how_many > 0:
             for place, most in zip(touched.places, chances.max(axis=1).tolist(), strict=True):
-                if most > place.highest:
-                    place.highest = most
+                place.highest = max(place.highest, most)
 
     def _reckon_touched(self, touched: _Touched, cells: npt.NDArray[np.intp]) -> FloatGrid:
         """Works out the chances of all the touched places in these cells afresh, as _reckon

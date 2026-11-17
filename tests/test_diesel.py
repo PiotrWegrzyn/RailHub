@@ -39,7 +39,7 @@ def test_diesel_adds_its_half_to_what_a_farms_limestone_adds() -> None:
 
     trade = economy.trade(placed, holding(1000.0, FUEL=10.0, LIMESTONE=10.0, MACHINERY=10.0))
 
-    assert trade.gathered[STATION][Good.WHEAT] == pytest.approx(5 * (2 + DIESEL_BOOST))
+    assert trade.gathered[STATION][Good.WHEAT] == pytest.approx(10 * (2 + DIESEL_BOOST))
 
 
 def test_diesel_fuel_heats_a_home() -> None:

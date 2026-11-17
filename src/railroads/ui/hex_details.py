@@ -295,8 +295,10 @@ def _deposit_note(tile_map: TileMap, cell: Cell) -> str:
 
 def _stock(growth: Growth, kind: BuildingKind, flat: int) -> list[tuple[Need, float]]:
     """What a kind of processor holds of each input, waiting to be used."""
+    stockpiles = growth.economy.stock
     return [
-        (need, float(growth.economy.stock[(kind, need)][flat])) for need in RECIPES[kind].per_unit
+        (need, float(stockpiles[(kind, need)][flat]) if (kind, need) in stockpiles else 0.0)
+        for need in RECIPES[kind].per_unit
     ]
 
 

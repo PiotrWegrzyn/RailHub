@@ -23,6 +23,7 @@ neighbourhood, so farms and ports keep their distance.
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
+from functools import cached_property
 from types import MappingProxyType
 
 import numpy as np
@@ -272,44 +273,116 @@ class Land:
     ) -> FloatGrid:
         """The weight of every cell as a grid, or of the given flat cells alone. `near` holds
         every cell's neighbours as flat indices, one past the last cell for off the map."""
+        weight = self.weights_in(Surroundings(tile_map, cells, near))
+        return weight.reshape(tile_map.grid.shape) if cells is None else weight
+
+    def weights_in(self, around: Surroundings) -> FloatGrid:
+        """The weight of the cells whose surroundings these are, in their order."""
+        vegetation_weights, relief_weights, temperature_weights, water = self._tables()
+        is_water = around.is_water
+        best = np.where(is_water, water[around.terrain_around], 0.0).max(axis=0)
+        by_water = np.where(around.by_water, best, water[Terrain.LAND])
+        weight = (
+            vegetation_weights[around.vegetation]
+            * relief_weights[around.relief]
+            * temperature_weights[around.temperature]
+            * by_water
+        )
+        weight = weight * np.where(around.beside_mountains, self.beside_mountains, 1.0)
+        if self.forest_edge:
+            weight = weight * around.beside_open_flat
+        if self.least_forest_nearby:
+            weight = weight * (around.forests >= self.least_forest_nearby)
+        if self.deposit is not None:
+            deposits = around.deposits
+            on_it = deposits is not None and deposits == self.deposit
+            weight = weight * on_it
+        weight = weight * np.where(around.open_flat_grass, self.open_field, 1.0)
+        return np.where(around.land, weight, 0.0)
+
+
+class Surroundings:
+    """What lands weigh (Land.weights_in) in some flat cells of a map, or all of them, and around
+    them: worked out once, as asked for, for any number of lands. `near` holds every cell's
+    neighbours as flat indices, one past the last cell for off the map."""
+
+    def __init__(
+        self,
+        tile_map: TileMap,
+        cells: npt.NDArray[np.intp] | None = None,
+        near: Cells | None = None,
+    ) -> None:
         size = tile_map.grid.rows * tile_map.grid.cols
         if near is None:
             near = Neighbourhoods(tile_map.grid).index
-        chosen = np.arange(size) if cells is None else cells
-        terrain = tile_map.terrain.ravel()
-        vegetation = tile_map.vegetation.ravel()
-        relief = tile_map.relief.ravel()
-        around = near[:, chosen]
-        real = around < size
-        around = np.where(real, around, 0)
-        vegetation_weights, relief_weights, temperature_weights, water = self._tables()
-        terrain_around = terrain[around]
-        is_water = real & (terrain_around != Terrain.LAND)
-        best = np.where(is_water, water[terrain_around], 0.0).max(axis=0)
-        by_water = np.where(is_water.any(axis=0), best, water[Terrain.LAND])
-        weight = (
-            vegetation_weights[vegetation[chosen]]
-            * relief_weights[relief[chosen]]
-            * temperature_weights[tile_map.temperature.ravel()[chosen]]
-            * by_water
+        self.tile_map = tile_map
+        self.chosen = np.arange(size) if cells is None else cells
+        self._terrain = tile_map.terrain.ravel()
+        self._vegetation = tile_map.vegetation.ravel()
+        self._relief = tile_map.relief.ravel()
+        around = near[:, self.chosen]
+        self.real = around < size
+        self.around = np.where(self.real, around, 0)
+
+    @cached_property
+    def terrain_around(self) -> npt.NDArray[np.uint8]:
+        return self._terrain[self.around]
+
+    @cached_property
+    def is_water(self) -> npt.NDArray[np.bool_]:
+        return self.real & (self.terrain_around != Terrain.LAND)
+
+    @cached_property
+    def by_water(self) -> npt.NDArray[np.bool_]:
+        return self.is_water.any(axis=0)
+
+    @cached_property
+    def vegetation(self) -> npt.NDArray[np.uint8]:
+        return self._vegetation[self.chosen]
+
+    @cached_property
+    def relief(self) -> npt.NDArray[np.uint8]:
+        return self._relief[self.chosen]
+
+    @cached_property
+    def temperature(self) -> npt.NDArray[np.uint8]:
+        return self.tile_map.temperature.ravel()[self.chosen]
+
+    @cached_property
+    def beside_mountains(self) -> npt.NDArray[np.bool_]:
+        beside = self.real & (self._relief[self.around] == Relief.MOUNTAINS)
+        return beside.any(axis=0)
+
+    @cached_property
+    def forest_around(self) -> npt.NDArray[np.bool_]:
+        return self.real & (self._vegetation[self.around] == Vegetation.FOREST) & ~self.is_water
+
+    @cached_property
+    def beside_open_flat(self) -> npt.NDArray[np.bool_]:
+        open_flat = (
+            self.real
+            & ~self.is_water
+            & ~self.forest_around
+            & (self._relief[self.around] == Relief.FLAT)
         )
-        beside = real & (relief[around] == Relief.MOUNTAINS)
-        weight = weight * np.where(beside.any(axis=0), self.beside_mountains, 1.0)
-        forest_around = real & (vegetation[around] == Vegetation.FOREST) & ~is_water
-        if self.forest_edge:
-            open_flat = real & ~is_water & ~forest_around & (relief[around] == Relief.FLAT)
-            weight = weight * open_flat.any(axis=0)
-        if self.least_forest_nearby:
-            forests = forest_around.sum(axis=0) + (vegetation[chosen] == Vegetation.FOREST)
-            weight = weight * (forests >= self.least_forest_nearby)
-        if self.deposit is not None:
-            deposits = tile_map.deposits
-            on_it = deposits is not None and deposits.ravel()[chosen] == self.deposit
-            weight = weight * on_it
-        open_flat_grass = (relief[chosen] == Relief.FLAT) & (vegetation[chosen] == Vegetation.GRASS)
-        weight = weight * np.where(open_flat_grass, self.open_field, 1.0)
-        weight = np.where(terrain[chosen] == Terrain.LAND, weight, 0.0)
-        return weight.reshape(tile_map.grid.shape) if cells is None else weight
+        return open_flat.any(axis=0)
+
+    @cached_property
+    def forests(self) -> npt.NDArray[np.int64]:
+        return self.forest_around.sum(axis=0) + (self.vegetation == Vegetation.FOREST)
+
+    @cached_property
+    def deposits(self) -> npt.NDArray[np.uint8] | None:
+        deposits = self.tile_map.deposits
+        return None if deposits is None else deposits.ravel()[self.chosen]
+
+    @cached_property
+    def open_flat_grass(self) -> npt.NDArray[np.bool_]:
+        return (self.relief == Relief.FLAT) & (self.vegetation == Vegetation.GRASS)
+
+    @cached_property
+    def land(self) -> npt.NDArray[np.bool_]:
+        return self._terrain[self.chosen] == Terrain.LAND
 
 
 @dataclass(frozen=True, slots=True)
@@ -750,7 +823,7 @@ FOOD_TOWN = 3
 _BAKERY = Ladder(
     kinds=(BuildingKind.BAKERY,),
     land=TOWN_LAND,
-    base_chance=0.000001,
+    base_chance=0.0000005,
     chance_per_doubling={Points.POPULATION: 0.000001},
     most_per_cell=1,
     most_nearby=1,
@@ -1024,14 +1097,14 @@ WORKS = (
         BuildingKind.BREWERY,
         {POP: 1.5e-9, Points.FOOD: 3e-9},
         {POP: FOOD_TOWN},
-        base=CRAFT_BASE * IN_TOWNS_ONLY,
+        base=CRAFT_BASE * IN_TOWNS_ONLY / 2,
     ),
     _works(
         BuildingKind.DISTILLERY,
         {POP: 8e-10, Points.FOOD: 3e-9},
         {POP: FOOD_TOWN},
         1600,
-        base=CRAFT_BASE * IN_TOWNS_ONLY,
+        base=CRAFT_BASE * IN_TOWNS_ONLY / 2,
     ),
     _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
     _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {POP: 3}, 1850, base=5e-8),

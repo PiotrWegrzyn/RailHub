@@ -156,13 +156,13 @@ def test_the_game_autosaves_as_a_month_begins(context: None, tmp_path: Path) -> 
 def frames_until_the_month_is_done(app: App) -> int:
     frames = 1
     frame(app)
-    while app._turning is not None and frames < 20:
+    while app._turning is not None and frames < 100:
         frame(app)
         frames += 1
     return frames
 
 
-def test_a_month_is_done_over_a_few_frames_and_saved_on_the_frame_after(
+def test_a_month_is_done_over_a_few_frames_and_its_autosave_taken_in_its_last_ones(
     context: None, tmp_path: Path
 ) -> None:
     app = made_app()
@@ -171,14 +171,13 @@ def test_a_month_is_done_over_a_few_frames_and_saved_on_the_frame_after(
 
     frames = frames_until_the_month_is_done(app)
     started_with_the_month = app._autosaving is not None
-    frame(app)
-    started_after = app._autosaving is not None
     app.finish_autosave()
 
-    assert frames > 1
-    assert not started_with_the_month
-    assert started_after
+    assert frames > len(app.game.big_parts())
+    assert started_with_the_month
+    assert not app._autosave_due
     assert [info.name for info in app.saves.listing()] == ["autosave 1"]
+    assert app.saves.load("autosave 1").clock.date == app.clock.date
 
 
 def test_the_clock_and_trains_wait_while_a_month_is_half_done(context: None) -> None:
