@@ -407,7 +407,7 @@ TOWNS = Ladder(
     kinds=(BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS),
     land=TOWN_LAND,
     base_chance=0.000004,
-    chance_per_doubling={Points.POPULATION: 0.00002},
+    chance_per_doubling={Points.POPULATION: 0.0002},
     merges={
         BuildingKind.HOUSE: Merge(needed=16, pulled_down=6),
         BuildingKind.TENEMENT: Merge(needed=5, pulled_down=3),

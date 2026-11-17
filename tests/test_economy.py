@@ -4,7 +4,7 @@ import pytest
 from builders import flat_map
 from railroads.sim import economy as economy_module
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.economy import Economy, Satisfaction, StationOrder, levels_of, served_multipliers
+from railroads.sim.economy import Economy, Satisfaction, StationOrder, levels_of
 from railroads.sim.goods import PIPELINE, Good, Need, makes_of, needs_of
 from railroads.sim.grids import HexGrid
 from railroads.sim.ladders import LUMBER_MILLS, MINES
@@ -593,14 +593,6 @@ def test_each_bonus_good_counts_what_the_economy_is_told_it_is_worth() -> None:
     assert trade.share((BuildingKind.HOUSE,))[position(trade, economy, (8, 9))] == pytest.approx(
         0.4
     )
-
-
-def test_growth_counts_satisfaction_past_full_without_a_ceiling() -> None:
-    share = np.array([0.5, 1.0, 1.45])
-
-    multipliers = served_multipliers(share)
-
-    assert multipliers.tolist() == pytest.approx([5.0, 10.0, 14.5])
 
 
 def test_a_station_full_of_one_good_still_gathers_another() -> None:

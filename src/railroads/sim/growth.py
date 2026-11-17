@@ -3,7 +3,7 @@ railroads.sim.ladders: towns, farms, orchards, mines, lumber mills, ports and ev
 
 Buildings breed (breeding_of): a cell's chance of another of a ladder's kinds is its spawn chance,
 the same everywhere the land allows, plus what every building of the kind of points the ladder's
-buildings give adds there by how satisfied it is (MOST_SERVED times its points at 100%,
+buildings give adds there by how satisfied it is (its points times its satisfaction,
 railroads.sim.economy), times the doublings of the points around the cell that draw it: four times
 the people for houses, food and people for food, people and industry for industry, mines, mills
 and ports, and twice the people for shops, inns and churches. So towns and districts draw
@@ -68,7 +68,6 @@ from railroads.sim.economy import (
     FloatCells,
     Trade,
     levels_of,
-    served_multipliers,
 )
 from railroads.sim.forests import change_forests
 from railroads.sim.goods import HOMES, MAKES, RECIPES
@@ -113,9 +112,9 @@ FOOD_SPAWN_SCALE = 3.75
 # that grow on being served; the homes' own chance per doubling is theirs. What grows from the land
 # (FROM_THE_LAND), whose served buildings would otherwise feed ever more homes that draw ever more
 # of them, adds its own chance per doubling times LAND_BREEDING_SCALE instead.
-SERVED_GROWTH = 0.00001
+SERVED_GROWTH = 0.0001
 FROM_THE_LAND = frozenset({Points.FOOD, Points.ORE, Points.TIMBER})
-LAND_BREEDING_SCALE = 0.02
+LAND_BREEDING_SCALE = 0.2
 # The points around a cell that draw a ladder's buildings, and how much each counts, by the kind
 # of points they give.
 INDUSTRIAL = {Points.POPULATION: 1.0, Points.INDUSTRY: 1.0}
@@ -527,7 +526,7 @@ class Growth:
             boost = self.owners.boost(kind, Effect.GROWTH)
             if boost:
                 count += boost * self.owners.owned(kind).ravel()[trade.cells]
-            served[points] += served_multipliers(share) * value * count
+            served[points] += np.maximum(share, 0.0) * value * count
         served[Points.POPULATION] *= 1.0 + LIVELY_GROWTH * self._lively(trade)
         emptied = np.setdiff1d(self._traded, trade.cells, assume_unique=True)
         self._traded = trade.cells

@@ -383,7 +383,7 @@ def test_a_served_factory_breeds_by_the_people_and_the_industry_around_it(
     growth._count_served(industry_trade(tile_map, (5, 5)))
 
     drawing = people + value + industry * growth.rule.points[BuildingKind.STEEL_MILL][1]
-    bred = breeding.per_doubling * 10 * value * np.log2(1 + drawing)
+    bred = breeding.per_doubling * value * np.log2(1 + drawing)
     assert points == Points.INDUSTRY
     assert growth.chances(FACTORIES)[5, 5] == pytest.approx(
         (breeding.spawn + bred) * FACTORIES.land.weights(tile_map)[5, 5]
@@ -591,7 +591,7 @@ def houses_trade(tile_map: TileMap, cell: tuple[int, int], got: float, needed: f
     return Trade(cells, {house: np.array([got])}, {house: np.array([needed])}, nothing, nothing)
 
 
-@pytest.mark.parametrize(("got", "multiplier"), [(0.0, 0), (0.5, 2.5), (1.0, 5), (2.0, 10)])
+@pytest.mark.parametrize(("got", "multiplier"), [(0.0, 0), (0.5, 0.25), (1.0, 0.5), (2.0, 1.0)])
 def test_served_buildings_add_their_points_by_the_share_they_are_served_to_their_own_cell(
     got: float, multiplier: float
 ) -> None:
@@ -637,7 +637,7 @@ def test_a_served_house_breeds_faster_the_more_people_live_around_it(around: int
     growth._count_served(houses_trade(tile_map, (5, 5), 2.0, 2.0))
 
     per_doubling = TOWNS.chance_per_doubling[Points.POPULATION]
-    bred = 10 * per_doubling * np.log2(1 + 4 * (1 + around))
+    bred = per_doubling * np.log2(1 + 4 * (1 + around))
     assert growth.chances(TOWNS)[5, 5] == pytest.approx(TOWNS.base_chance + bred)
 
 

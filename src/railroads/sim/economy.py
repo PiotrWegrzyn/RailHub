@@ -28,8 +28,8 @@ whose stockpile holds one input but not the other is unsatisfied however full it
 BONUS_PER_GOOD for each of its bonus goods (railroads.sim.goods) it got all of, and that share of
 it for part: a house fed and warmed that also got all its beer and half its newspapers is at 145%.
 It is unsatisfied at nothing, thriving from 100% and content between. Its satisfaction adds to the
-chances of more growing in its cell, MOST_SERVED times its points at 100% and that much more above
-it (served_multipliers).
+chances of more growing in its cell, its points times its satisfaction, with no ceiling above
+100%.
 """
 
 import time
@@ -95,10 +95,6 @@ def input_stock(kind: BuildingKind) -> float:
     return INPUT_STOCK * RECIPES[kind].most / RECIPES[GREW_FROM.get(kind, kind)].most
 
 
-# How many times over a building that gets all it needs and gives away all it makes counts its
-# points towards more growing in its own cell, on top of the plain points every building gives
-# its neighbourhood; one that manages part of it counts that share of this.
-MOST_SERVED = 10.0
 # How much each bonus good a building gets all of adds to its satisfaction.
 BONUS_PER_GOOD = 0.3
 
@@ -109,11 +105,6 @@ def levels_of(share: FloatCells) -> npt.NDArray[np.int8]:
     levels[share <= 0.0] = Satisfaction.UNSATISFIED
     levels[share >= 1.0 - 1e-9] = Satisfaction.THRIVING
     return levels
-
-
-def served_multipliers(share: FloatCells) -> FloatCells:
-    """How many times over buildings count their points as served, for their satisfaction."""
-    return MOST_SERVED * np.maximum(share, 0.0)
 
 
 class Neighbourhoods:
