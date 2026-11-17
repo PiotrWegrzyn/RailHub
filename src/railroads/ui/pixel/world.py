@@ -40,7 +40,14 @@ from railroads.ui.pixel.ground import (
 from railroads.ui.pixel.ground_texture import textured
 from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.projection import CHUNK, PixelProjection, Rgba
-from railroads.ui.pixel.relief import MOST_LIFT, Elevation, lighting, raise_picture, raycast
+from railroads.ui.pixel.relief import (
+    MOST_LIFT,
+    Elevation,
+    crossings,
+    lighting,
+    raise_picture,
+    raycast,
+)
 from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
 from railroads.ui.pixel.sheet import FINE, SpriteSheet
 from railroads.ui.pixel.track_art import TrackArt
@@ -344,7 +351,7 @@ class PixelWorld:
         if offset is None:
             self._lay_track(canvas, left, top, resolution)
         else:
-            canvas = raise_picture(canvas, offset, resolution)
+            canvas = raise_picture(canvas, offset, resolution, crossings(raised.lift, offset))
             if resolution > 1:
                 textured(canvas, left, top, resolution)
             self._lay_lifted_track(canvas, left, top, resolution, offset, resolution)
@@ -460,7 +467,7 @@ class PixelWorld:
             lambda layer, kk, on: self.ground.canopy(layer, left, top, kk, shown=on, points=points),
             False,
         )
-        canvas = raise_picture(canvas, offset, 1)
+        canvas = raise_picture(canvas, offset, 1, crossings(raised.lift, offset))
         textured(canvas, left, top, k)
         self._lay_lifted_track(canvas, left, top, k, offset / k)
         self._stand_scenery(canvas, left, top, k)

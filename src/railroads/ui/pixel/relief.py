@@ -510,11 +510,36 @@ def raycast(lift: Floats, rows: int, cols: int) -> npt.NDArray[np.int64]:
     return offset.astype(np.int64)
 
 
+def crossings(lift: Floats, offset: npt.NDArray[np.int64]) -> FloatArray:
+    """Where between the row `offset` below each pixel and the row after it the raised ground
+    passes exactly through the pixel, from 0 at the first to 1 at the next. A slope facing the
+    viewer steeply spreads each row over several pixels, which blend from one row to the next
+    by this rather than standing in bands."""
+    rows, cols = offset.shape
+    at = np.arange(rows)[:, None] + offset
+    across = np.arange(cols)[None, :]
+    last = lift.shape[0] - 1
+    here = lift[np.minimum(at, last), across] - offset
+    drop = here - (lift[np.minimum(at + 1, last), across] - offset - 1)
+    share = np.divide(here, drop, out=np.zeros(offset.shape), where=drop > 0)
+    return np.clip(share, 0.0, 1.0)
+
+
 def raise_picture(
-    picture: FloatArray, offset: npt.NDArray[np.int64], resolution: int
+    picture: FloatArray,
+    offset: npt.NDArray[np.int64],
+    resolution: int,
+    between: FloatArray | None = None,
 ) -> FloatArray:
     """The picture as seen with its ground lifted: each pixel taken from the rows `offset` art
-    pixels below it, `picture` holding `resolution` pixels for every art pixel and enough rows."""
+    pixels below it, `picture` holding `resolution` pixels for every art pixel and enough rows;
+    with `between` (crossings), blended that far towards the art pixel after."""
+    if between is not None:
+        near = raise_picture(picture, offset, resolution)
+        far = raise_picture(picture, offset + 1, resolution)
+        share = np.repeat(np.repeat(between, resolution, axis=0), resolution, axis=1)
+        share = share.reshape(share.shape + (1,) * (picture.ndim - 2)).astype(picture.dtype)
+        return near + (far - near) * share
     k = resolution
     rows, cols = offset.shape[0] * k, offset.shape[1] * k
     art_rows, art_cols = offset.shape
