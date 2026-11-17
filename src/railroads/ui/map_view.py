@@ -597,7 +597,7 @@ class MapView:
 
     def _train_layer(self) -> TrainLayer:
         if self._trains is None:
-            self._trains = TrainLayer(self._pixel_layer().world)
+            self._trains = TrainLayer(self._pixel_layer().world, self.railway.trains)
         return self._trains
 
     def _engine_picture(self, engine: str, times: int) -> tuple[imgui.ImTextureRef, Vec2]:
@@ -623,30 +623,45 @@ class MapView:
         ground picture with and without grid lines and its softened copy for the trains window,
         the pixel world, the trains' sprites and, with `chunks`, the chunks the first frame
         shows. Nothing here touches the graphics card."""
-        self._soft = (self._ground_version, soften(self._plain_picture()))
+        finish(self.prepare_steps(size, density, chunks))
+
+    def prepare_steps(self, size: Vec2, density: int, chunks: bool = True) -> Steps[None]:
+        """prepare a part at a time, for a page to go on drawing frames between them."""
+        plain = self._plain_picture()
+        yield
+        self._soft = (self._ground_version, (yield from soften_steps(plain)))
         light = self.camera.map_direction(*LIGHT_ON_SCREEN)
         self._ground_pictures().picture(self._ground_colors(), light, True)
+        yield
+        if self._pixels is None:
+            yield from self._pixel_layer_steps()
         layer = self._pixel_layer()
         if self.railway.trains:
+            yield
             self._train_layer()
         if chunks and self.camera.pixel_scale:
+            yield
             center = (size[0] / 2, size[1] / 2)
             layer.prepare(self.camera, center, ((0.0, 0.0), size), density)
 
     def _pixel_layer(self) -> PixelLayer:
         if self._pixels is None:
-            world = PixelWorld(
-                self.tile_map,
-                self.constructions,
-                _sprite_sheet(),
-                self._look.angle_deg,
-                self._look.cell_units,
-                fine=_fine_sprite_sheet(),
-                station_levels=self.railway.levels,
-            )
-            world.satisfaction = self._satisfaction.copy()
-            self._pixels = PixelLayer(world)
+            finish(self._pixel_layer_steps())
+        assert self._pixels is not None
         return self._pixels
+
+    def _pixel_layer_steps(self) -> Steps[None]:
+        world = yield from PixelWorld.built(
+            self.tile_map,
+            self.constructions,
+            _sprite_sheet(),
+            self._look.angle_deg,
+            self._look.cell_units,
+            fine=_fine_sprite_sheet(),
+            station_levels=self.railway.levels,
+        )
+        world.satisfaction = self._satisfaction.copy()
+        self._pixels = PixelLayer(world)
 
     def simulate(self, years: int, rng: np.random.Generator) -> None:
         """Lets a stand-in player build stations and serve the towns for `years`, printing the

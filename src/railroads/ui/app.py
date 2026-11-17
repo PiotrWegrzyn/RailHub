@@ -398,7 +398,7 @@ class Shell:
             if new_game_on is not None:
                 app.view.visit_biggest_town()
             yield
-            app.view.prepare(size, density, chunks)
+            yield from app.view.prepare_steps(size, density, chunks)
             return app
 
         self._task = submit_steps(self._executor, prepared)

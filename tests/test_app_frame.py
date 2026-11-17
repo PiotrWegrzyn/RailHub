@@ -529,6 +529,23 @@ def test_a_month_that_changes_colours_paints_the_overview_again_within_its_steps
     assert set(app.view._textures) == shown
 
 
+def test_the_map_is_prepared_a_part_at_a_time_ending_as_prepared_at_once(context: None) -> None:
+    stepped = made_app()
+    at_once = made_app()
+
+    steps = sum(1 for _ in stepped.view.prepare_steps((1280.0, 800.0), 1, chunks=False))
+    at_once.view.prepare((1280.0, 800.0), 1, chunks=False)
+
+    assert steps > 4
+    assert stepped.view._soft is not None
+    assert at_once.view._soft is not None
+    assert np.array_equal(stepped.view._soft[1], at_once.view._soft[1])
+    assert stepped.view._pixels is not None
+    assert stepped.view._pixels.world.ground.biomes.tolist() == (
+        at_once.view._pixel_layer().world.ground.biomes.tolist()
+    )
+
+
 def test_the_trains_window_map_is_softened_anew_a_step_a_frame_once_colours_change(
     context: None,
 ) -> None:

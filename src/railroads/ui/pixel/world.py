@@ -21,6 +21,7 @@ import numpy.typing as npt
 
 from railroads.sim.constructions import Constructions, Track
 from railroads.sim.grids import Cell, FloatArray, IntArray
+from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
@@ -69,6 +70,38 @@ class PixelWorld:
         fine: SpriteSheet | None = None,
         station_levels: Mapping[Cell, int] | None = None,
     ) -> None:
+        finish(
+            self._build(tile_map, constructions, sheet, angle_deg, cell_units, fine, station_levels)
+        )
+
+    @classmethod
+    def built(
+        cls,
+        tile_map: TileMap,
+        constructions: Constructions,
+        sheet: SpriteSheet,
+        angle_deg: float,
+        cell_units: float,
+        fine: SpriteSheet | None = None,
+        station_levels: Mapping[Cell, int] | None = None,
+    ) -> Steps[Self]:
+        """The world made a part at a time, for a page to go on drawing frames between them."""
+        world = cls.__new__(cls)
+        yield from world._build(
+            tile_map, constructions, sheet, angle_deg, cell_units, fine, station_levels
+        )
+        return world
+
+    def _build(
+        self,
+        tile_map: TileMap,
+        constructions: Constructions,
+        sheet: SpriteSheet,
+        angle_deg: float,
+        cell_units: float,
+        fine: SpriteSheet | None,
+        station_levels: Mapping[Cell, int] | None,
+    ) -> Steps[None]:
         self.tile_map = tile_map
         self.constructions = constructions
         self.sheet = sheet
@@ -77,10 +110,12 @@ class PixelWorld:
         self.station_levels: Mapping[Cell, int] = {} if station_levels is None else station_levels
         # The height of every point, which raises hills and mountains (railroads.ui.pixel.relief).
         self.elevation = Elevation(tile_map, self.projection)
+        yield
         # The track (railroads.ui.pixel.track_art), with the ground graded under it.
         self.track = TrackArt(tile_map, constructions, self.projection, self.elevation)
         self._graded_version = -1
         self._grade()
+        yield
         self.scenery = Scenery.of(
             tile_map,
             constructions,
@@ -89,8 +124,10 @@ class PixelWorld:
             self.station_levels,
             elevation=self.elevation,
         )
+        yield
         # The ground under the track (railroads.ui.pixel.ground).
         self.ground = Ground(tile_map, constructions, self.projection, angle_deg, self.elevation)
+        yield
         self._shade_trees()
         # Every piece of track, kept until track or stations change.
         self._pieces: list[Track] = []

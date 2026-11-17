@@ -11,11 +11,13 @@ from railroads.sim.grids import HexGrid
 from railroads.ui.map_view import LOOKS, GridLook
 from railroads.ui.pixel.models import SHADES, Model, draw_model, shade, without_fine
 from railroads.ui.pixel.projection import PixelProjection
+from railroads.ui.pixel.train_layer import MAX_TEXTURE
 from railroads.ui.pixel.trains import (
     DETAIL,
     HEADINGS,
     MODELS,
     SCALE,
+    GrownTrainSprites,
     Look,
     TrainSprites,
     fine_pictures,
@@ -39,7 +41,9 @@ def projection() -> PixelProjection:
     return PixelProjection.of(HexGrid(rows=10, cols=10, km_per_cell=2.0), 0.0, 1.0)
 
 
-def picture(sprites: TrainSprites, look: object, index: int) -> npt.NDArray[np.uint8]:
+def picture(
+    sprites: TrainSprites | GrownTrainSprites, look: object, index: int
+) -> npt.NDArray[np.uint8]:
     x, y, width, height, _, _ = sprites.places[(look, index)]
     return sprites.image[y : y + height, x : x + width]
 
@@ -212,3 +216,48 @@ def test_the_finest_details_show_only_at_the_closest_zooms(look: tuple[Look, str
     assert finest
     assert all(face.fine and not face.drawn(True) for face in finest)
     assert all(face.drawn(True, finest=True) for face in finest)
+
+
+def test_looks_drawn_as_they_are_wanted_are_the_sheets_pictures() -> None:
+    key = tuple(float(v) for v in projection().matrix.ravel())
+    sheet = train_sprites(key)
+    looks = list(EVERY_KIND_OF_FACE.values())
+
+    grown = GrownTrainSprites(key, looks)
+
+    for look in looks:
+        for index in range(HEADINGS):
+            assert np.array_equal(picture(grown, look, index), picture(sheet, look, index))
+            assert grown.places[(look, index)][4:] == sheet.places[(look, index)][4:]
+
+
+def test_only_the_looks_given_are_drawn_up_front() -> None:
+    key = tuple(float(v) for v in projection().matrix.ravel())
+
+    grown = GrownTrainSprites(key, [(Look.ENGINE, "planet")])
+
+    assert {look for look, _ in grown.places} == {(Look.ENGINE, "planet")}
+
+
+def test_a_look_is_drawn_when_it_is_first_placed() -> None:
+    key = tuple(float(v) for v in projection().matrix.ravel())
+    grown = GrownTrainSprites(key)
+
+    x, y, width, height, _, _ = grown.place((Good.COAL, True), 0.0)
+
+    assert grown.has((Good.COAL, True))
+    assert y + height <= grown.height
+    assert grown.image[y : y + height, x : x + width, 3].any()
+
+
+def test_looks_are_drawn_ahead_only_while_there_is_time() -> None:
+    key = tuple(float(v) for v in projection().matrix.ravel())
+    none_ahead = GrownTrainSprites(key)
+    all_ahead = GrownTrainSprites(key)
+
+    none_ahead.draw_ahead(0.0)
+    all_ahead.draw_ahead(math.inf)
+
+    assert not none_ahead.places
+    assert {look for look, _ in all_ahead.places} == set(MODELS)
+    assert all_ahead.height <= MAX_TEXTURE
