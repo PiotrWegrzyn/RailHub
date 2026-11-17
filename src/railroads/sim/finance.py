@@ -97,6 +97,9 @@ class Finances:
     # month on the books now, None until the first month closes.
     years: dict[int, dict[str, float]] = field(default_factory=dict)
     books_year: int | None = None
+    # Each month's money in and out as months close: its year, its month in that year from 0,
+    # and what it went on.
+    months: list[tuple[int, int, dict[str, float]]] = field(default_factory=list)
 
     def can_afford(self, price: float) -> bool:
         return price <= self.cash + 1e-9
@@ -124,10 +127,31 @@ class Finances:
             books = self.years.setdefault(filed, {})
             for what, amount in self.month.items():
                 books[what] = books.get(what, 0.0) + amount
+            self.months.append((filed, self._month_number(filed), dict(self.month)))
         if year is not None:
             self.books_year = year
         self.last_month = dict(self.month)
         self.month = defaultdict(float)
+
+    def _month_number(self, year: int) -> int:
+        """Which month of `year` the month on the books now is, from 0."""
+        if self.months and self.months[-1][0] == year:
+            return self.months[-1][1] + 1
+        return 0
+
+    def periods(self, length: int, year: int) -> list[tuple[int, int, dict[str, float]]]:
+        """Money in and out over every period of `length` months (1, 3 or 12) so far, oldest
+        first: its year, which of that year's periods it is from 0, and what it went on. The last
+        holds the month on the books now, in `year` until a month has closed."""
+        found: dict[tuple[int, int], dict[str, float]] = {}
+        filed = [*self.months]
+        now = self.books_year if self.books_year is not None else year
+        filed.append((now, self._month_number(now), self.month))
+        for at, month, books in filed:
+            period = found.setdefault((at, month // length), {})
+            for what, amount in books.items():
+                period[what] = period.get(what, 0.0) + amount
+        return [(at, index, books) for (at, index), books in sorted(found.items())]
 
     def year_books(self, year: int) -> dict[str, float]:
         """A year's money in and out by what it was for, with this month's if it is on the

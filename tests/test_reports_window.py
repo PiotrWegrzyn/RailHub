@@ -3,9 +3,10 @@ from collections.abc import Iterator
 import pytest
 from imgui_bundle import imgui, implot
 
+from railroads.sim.finance import Finances
 from railroads.sim.goods import Good
 from railroads.sim.stats import History
-from railroads.ui.reports_window import ReportsWindow, report
+from railroads.ui.reports_window import ReportsWindow, books_rows, period_name, profits, report
 
 
 @pytest.fixture
@@ -74,3 +75,61 @@ def test_the_window_draws_its_charts(frame: None, history: History) -> None:
 
     assert window.open
     assert (implot.get_colormap_index("Goods") != -1) == bool(history.delivered)
+
+
+def months_of_books() -> Finances:
+    finances = Finances()
+    for month in range(14):
+        finances.earn(100.0, "cargo")
+        finances.spend(10.0 * month, "car trips")
+        finances.close_month(1850 if month < 11 else 1851)
+    finances.earn(50.0, "cargo")
+    return finances
+
+
+@pytest.mark.parametrize(
+    ("length", "count", "last"),
+    [(1, 15, (1851, 2, 50.0)), (3, 5, (1851, 0, 250.0)), (12, 2, (1851, 0, 250.0))],
+)
+def test_the_books_add_up_over_months_quarters_or_years_with_the_month_on_the_books_last(
+    length: int, count: int, last: tuple[int, int, float]
+) -> None:
+    finances = months_of_books()
+
+    periods = finances.periods(length, 1851)
+
+    assert len(periods) == count
+    year, index, books = periods[-1]
+    assert (year, index, books["cargo"]) == last
+
+
+def test_each_period_is_named_by_its_month_quarter_or_year() -> None:
+    names = [period_name(1851, 2, 1), period_name(1851, 2, 3), period_name(1851, 0, 12)]
+
+    assert names == ["Mar 1851", "Q3 1851", "1851"]
+
+
+def test_profit_is_what_came_in_less_what_went_out_at_the_start_of_each_period() -> None:
+    periods = [(1850, 0, {"cargo": 300.0, "car trips": -100.0}), (1850, 1, {"track": -50.0})]
+
+    starts, amounts = profits(periods, 3)
+
+    assert starts == [1850.0, 1850.25]
+    assert amounts == [200.0, -50.0]
+
+
+def test_the_books_list_costs_first_then_income() -> None:
+    rows = books_rows({"cargo": 500.0, "track": -20.0}, {"cargo": 100.0, "trains": -900.0})
+
+    assert [what for what, _, _ in rows] == ["trains", "track", "cargo"]
+
+
+@pytest.mark.parametrize("length", [1, 3, 12])
+def test_the_window_draws_the_books_and_profit_for_each_period(frame: None, length: int) -> None:
+    window = ReportsWindow()
+    window.open = True
+    window.period = length
+
+    window.draw(made_history(), 1851, 4, 150, finances=months_of_books())
+
+    assert window.period == length

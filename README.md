@@ -779,10 +779,13 @@ engine with the engine table above, its Wikipedia links clickable.
 
 ### Reports
 
-The chart button in the top right corner (or G) opens the reports. The first chart shows the cars
+The chart button in the top right corner (or G) opens the reports. At the top, Monthly, Quarterly
+and Yearly pick how the money is shown: a table of what it went in and out on in the last period and
+the one under way, and a chart of every period's profit, brass above nothing and red below. The next
+chart shows the cars
 delivered each year as stacked bars, one colour per good. A car counts as delivered when it leaves
 its load at a station other than the one it was loaded at. The other charts show the stations you
-had at the end of each year and the population of the whole map. The population chart goes back to
+had at the end of each year since play began and the population of the whole map. The population chart goes back to
 the year history starts, 850. The year under way shows as it stands so far. The charts can be
 zoomed and dragged, and double-clicking one fits it again (railroads.sim.stats,
 railroads.ui.reports_window).
@@ -817,7 +820,7 @@ $150 in upkeep at the first level, $400, $1,200, $3,500 and $9,000 at the next, 
 year, compounded, from the year play began, and each cell of track $2,
 $40 more where it is electric, $60 more where it is maglev, and 1.8 times as much where it is double, charged once a cell for
 the dearest track in it (`track_upkeep`). Building needs the cash for it, but upkeep is charged
-anyway and can run into debt. The top bar shows the cash, with this month's and last month's books on hover, the Reports window last year's and this year's books by what the money went on, and the
+anyway and can run into debt. The top bar shows the cash, with this month's and last month's books on hover, the Reports window the last and this month's, quarter's or year's books by what the money went on, and the
 build bar shows what the track under the mouse would cost. Route planning still weighs hills,
 bridges and tunnels lightly, so it stays quick; click a point in between to steer track round a
 river.

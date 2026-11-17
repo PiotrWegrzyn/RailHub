@@ -73,42 +73,35 @@ def _goods_colormap() -> implot.Colormap:
     return implot.add_colormap(GOODS_COLORMAP, colors, qual=True)
 
 
-def books_by_year(finances: Finances, year: int) -> list[tuple[str, float, float]]:
-    """What money went in and out on, last year and this year so far: costs first, the dearest
-    at the top, then income, the biggest first."""
-    last, now = finances.year_books(year - 1), finances.year_books(year)
-    rows = [(what, last.get(what, 0.0), now.get(what, 0.0)) for what in {*last, *now}]
+# The lengths the books can be shown over, in months, and what each is called.
+PERIODS = {1: "Monthly", 3: "Quarterly", 12: "Yearly"}
+MONTH_NAMES = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+PROFIT = (0.86, 0.66, 0.32, 1.0)
+LOSS = (0.92, 0.46, 0.36, 1.0)
+
+
+def period_name(year: int, index: int, length: int) -> str:
+    """What a period of `length` months is called: Mar 1851, Q1 1851 or 1851."""
+    if length == 1:
+        return f"{MONTH_NAMES[index]} {year}"
+    if length == 3:
+        return f"Q{index + 1} {year}"
+    return str(year)
+
+
+def books_rows(before: dict[str, float], now: dict[str, float]) -> list[tuple[str, float, float]]:
+    """What money went in and out on, in the period before and this one so far: costs first,
+    the dearest at the top, then income, the biggest first."""
+    rows = [(what, before.get(what, 0.0), now.get(what, 0.0)) for what in {*before, *now}]
     return sorted(rows, key=lambda row: (row[1] + row[2] >= 0, abs(row[1] + row[2]) * -1))
 
 
-def _draw_books(finances: Finances, year: int) -> None:
-    """A table of what money went in and out on, last year and this year so far."""
-    rows = books_by_year(finances, year)
-    imgui.text("Money in and out, by year")
-    if not rows or not imgui.begin_table("books", 3, imgui.TableFlags_.row_bg.value):
-        imgui.text_disabled("Nothing yet")
-        return
-    imgui.table_setup_column("")
-    imgui.table_setup_column(str(year - 1))
-    imgui.table_setup_column(f"{year} so far")
-    imgui.table_headers_row()
-    totals = [0.0, 0.0]
-    for what, last, now in rows:
-        imgui.table_next_row()
-        imgui.table_next_column()
-        imgui.text(what.capitalize())
-        for index, amount in enumerate((last, now)):
-            totals[index] += amount
-            imgui.table_next_column()
-            imgui.text(dollars(amount) if amount else "")
-    imgui.table_next_row()
-    imgui.table_next_column()
-    imgui.text("Profit")
-    for amount in totals:
-        imgui.table_next_column()
-        imgui.text(dollars(amount))
-    imgui.end_table()
-    imgui.spacing()
+def profits(
+    periods: list[tuple[int, int, dict[str, float]]], length: int
+) -> tuple[list[float], list[float]]:
+    """Each period's profit, placed at its start as years with months as twelfths of them."""
+    starts = [year + index * length / 12 for year, index, _ in periods]
+    return starts, [sum(books.values()) for _, _, books in periods]
 
 
 def price_line(months: list[FuelMonth]) -> tuple[list[float], list[float]]:
@@ -206,6 +199,73 @@ def _draw_fuel(market: FuelMarket) -> None:
 class ReportsWindow:
     def __init__(self) -> None:
         self.open = False
+        # How many months the books are shown over: 1, 3 or 12.
+        self.period = 12
+
+    def _draw_books(self, finances: Finances, year: int) -> None:
+        """Buttons to show the books by month, quarter or year; a table of what money went in
+        and out on, in the period before and this one so far; and each period's profit."""
+        for length, name in PERIODS.items():
+            if length != 1:
+                imgui.same_line()
+            if imgui.radio_button(name, self.period == length):
+                self.period = length
+        periods = finances.periods(self.period, year)
+        now = periods[-1]
+        before = periods[-2] if len(periods) > 1 else None
+        imgui.text("Money in and out")
+        rows = books_rows({} if before is None else before[2], now[2])
+        if rows and imgui.begin_table("books", 3, imgui.TableFlags_.row_bg.value):
+            imgui.table_setup_column("")
+            imgui.table_setup_column(
+                "" if before is None else period_name(before[0], before[1], self.period)
+            )
+            imgui.table_setup_column(f"{period_name(now[0], now[1], self.period)} so far")
+            imgui.table_headers_row()
+            totals = [0.0, 0.0]
+            for what, last, current in rows:
+                imgui.table_next_row()
+                imgui.table_next_column()
+                imgui.text(what.capitalize())
+                for index, amount in enumerate((last, current)):
+                    totals[index] += amount
+                    imgui.table_next_column()
+                    imgui.text(dollars(amount) if amount else "")
+            imgui.table_next_row()
+            imgui.table_next_column()
+            imgui.text("Profit")
+            for amount in totals:
+                imgui.table_next_column()
+                imgui.text(dollars(amount))
+            imgui.end_table()
+        else:
+            imgui.text_disabled("Nothing yet")
+        imgui.spacing()
+        self._draw_profits(periods)
+
+    def _draw_profits(self, periods: list[tuple[int, int, dict[str, float]]]) -> None:
+        """Each period's profit as a bar, brass above nothing and red below."""
+        imgui.text(f"Profit, {PERIODS[self.period].lower()}")
+        if not _begin_year_plot("##profit", PLOT_HEIGHT, "$"):
+            return
+        starts, amounts = profits(periods, self.period)
+        xs = np.array(starts, dtype=np.float64) + self.period / 24
+        ys = np.array(amounts, dtype=np.float64)
+        width = self.period / 12 * BAR_WIDTH
+        for name, colour, shown in (
+            ("Profit", PROFIT, np.where(ys >= 0, ys, 0.0)),
+            ("Loss", LOSS, np.where(ys < 0, ys, 0.0)),
+        ):
+            implot.plot_bars(
+                name,
+                xs,
+                shown,
+                width,
+                implot.Spec(
+                    fill_color=imgui.ImVec4(*colour), flags=implot.ItemFlags_.no_legend.value
+                ),
+            )
+        implot.end_plot()
 
     def draw(
         self,
@@ -226,7 +286,7 @@ class ReportsWindow:
             if imgui.begin_tab_item("Overview")[0]:
                 shown = report(history, year, stations, population, begun)
                 if finances is not None:
-                    _draw_books(finances, year)
+                    self._draw_books(finances, year)
                 self._draw_deliveries(shown)
                 self._draw_line("Stations owned", "stations", shown.station_years, shown.stations)
                 self._draw_line("Population", "population", shown.years, shown.population)
