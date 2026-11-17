@@ -64,6 +64,7 @@ def made_app() -> App:
     game.finances.cash = 1_000_000.0
     for _ in range(4):
         game.growth.build(Building((10, 10), BuildingKind.HOUSE))
+    game.growth.build(Building((10, 11), BuildingKind.FARM))
     for cell in ((10, 6), (10, 16)):
         game.build_station(cell)
     game.lay_track((10, 6), (10, 16))
@@ -73,7 +74,7 @@ def made_app() -> App:
     app = App(MapView(game))
     app.help.open = app.tech.open = app.reports.open = True
     app.view.build.trains.open = True
-    app.view.selected = (10, 10)
+    app.view.selected = (10, 11)
     app.view.station_window.station = (10, 6)
     app.view.build.choose(Tool.TRACK)
     app.view.build.track_from = (10, 6)

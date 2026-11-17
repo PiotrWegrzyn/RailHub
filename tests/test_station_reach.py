@@ -7,7 +7,7 @@ from builders import flat_map
 from railroads.sim.constructions import Constructions
 from railroads.sim.game import Game
 from railroads.sim.grids import HexGrid
-from railroads.ui.build_menu import _reach_border, draw_station_reach
+from railroads.ui.build_menu import draw_station_reach, reach_border
 from railroads.ui.map_view import MapView
 from railroads.ui.pixel.relief import Elevation
 
@@ -31,7 +31,7 @@ class DrawList:
 def test_the_border_of_a_stations_reach_runs_round_the_outside_of_its_cells() -> None:
     station = (10, 10)
 
-    border = _reach_border(GRID, (station,), 1)
+    border = reach_border(GRID, (station,), 1)
 
     middle = GRID.center(*station)
     nearest = min(math.dist(middle, a) for a, _ in border)
@@ -40,9 +40,9 @@ def test_the_border_of_a_stations_reach_runs_round_the_outside_of_its_cells() ->
 
 
 def test_the_border_of_a_stations_reach_is_worked_out_once() -> None:
-    first = _reach_border(GRID, ((4, 5),), 2)
+    first = reach_border(GRID, ((4, 5),), 2)
 
-    again = _reach_border(GRID, ((4, 5),), 2)
+    again = reach_border(GRID, ((4, 5),), 2)
 
     assert again is first
 

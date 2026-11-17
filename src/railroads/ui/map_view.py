@@ -37,10 +37,12 @@ from railroads.ui.iso_camera import IsoCamera, Vec2
 from railroads.ui.map_input import MapInput
 from railroads.ui.map_overlays import (
     SELECTED_COLOR,
+    consumers_in_reach,
     draw_compass,
     draw_found,
     draw_found_on_overview,
     draw_grid_lines,
+    draw_hand_out,
     draw_hovered_buildings,
     draw_outline,
     draw_station_names,
@@ -175,6 +177,9 @@ class MapView:
         self._under: tuple[tuple[float, float], tuple[float, float]] | None = None
         # The cell whose details are open, picked by clicking without dragging.
         self.selected: Cell | None = None
+        # The buildings that take what the selected cell makes, and the cell, buildings and year
+        # they were found for.
+        self._consumers: tuple[tuple[Cell, int, int], tuple[Cell, ...]] | None = None
         self.build = BuildMenu()
         # What came of the last Buy pressed in the hex details.
         self._bought = ""
@@ -520,6 +525,11 @@ class MapView:
                 self.constructions.platforms,
             )
         if self.selected is not None:
+            consumers = self._consumers_of(self.selected)
+            if consumers:
+                draw_hand_out(
+                    draw_list, marks, self.tile_map.grid, center, self.selected, consumers
+                )
             draw_outline(
                 draw_list, marks, self.tile_map.grid, center, self.selected, SELECTED_COLOR
             )
@@ -551,6 +561,14 @@ class MapView:
             visible = visible_area(self.camera, center, top_left, bottom_right)
             draw_grid_lines(draw_list, self.camera, self.tile_map.grid, center, visible)
         draw_building_dots(draw_list, self.camera, center, (top_left, bottom_right), self._spots)
+
+    def _consumers_of(self, cell: Cell) -> tuple[Cell, ...]:
+        """consumers_in_reach of the cell, found again only once its buildings or the year
+        changed: the hex details are drawn every frame."""
+        key = (cell, self.constructions.version, self.growth.year)
+        if self._consumers is None or self._consumers[0] != key:
+            self._consumers = key, consumers_in_reach(self.constructions, cell, self.growth.year)
+        return self._consumers[1]
 
     def _marks_camera(self) -> IsoCamera | OnGround:
         """The camera marks on the map are drawn with: lifted onto raised ground in pixel art."""

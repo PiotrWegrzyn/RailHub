@@ -883,7 +883,9 @@ mouse is over one, the cells it hands goods out to (2 steps away) are shaded ora
 other stations pink, cells two stations share grey and the stations themselves blue, with a blue
 line round the cells it gathers from (3 steps). A right click cancels whatever is being built;
 with nothing being built it opens the details of a cell: its land, points, and every building
-with what it makes and needs and what it got and gave last month. Clicking a station, left or
+with what it makes and needs and what it got and gave last month. While they are open, the map
+draws a gold border round how far the cell's goods go on their own (6 cells) and shades in green
+the cells in it with a building that needs any of them. Clicking a station, left or
 right, opens the station instead: its level and reach, its stockpile, waiting passengers and mail, demand and
 the trains that call there, with its reach shaded on the map. There it can be raised a level,
 up to level 5 (see the money above), each level handing goods out and gathering them one

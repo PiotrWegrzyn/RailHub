@@ -2,6 +2,7 @@
 the buildings a search found, the status strip saying what is under the pointer and the card of
 the hovered cell's buildings."""
 
+import itertools
 import math
 from collections import Counter
 
@@ -9,13 +10,15 @@ import numpy as np
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import Building, Construction, Constructions, Station, Track
-from railroads.sim.economy import Satisfaction
+from railroads.sim.economy import LOCAL_REACH, Satisfaction
+from railroads.sim.goods import HANDED_OUT, makes_of, needs_of
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, Grid
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.biomes import biome_of
+from railroads.ui.build_menu import reach_border
 from railroads.ui.hex_details import mood_text, recently_described
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS, IsoCamera, Vec2
 from railroads.ui.minimap import MinimapLayout
@@ -36,6 +39,10 @@ HOVER_COLOR = (1.0, 1.0, 1.0, 0.9)
 SELECTED_COLOR = (1.0, 0.85, 0.2, 1.0)
 COMPASS_COLOR = (1.0, 1.0, 1.0, 0.85)
 FOUND_COLOR = (0.3, 0.95, 1.0, 1.0)
+# The selected cell's hand-out range and the buildings in it that take what it makes.
+HAND_OUT_RING = (1.0, 0.85, 0.3, 0.95)
+CONSUMER_FILL = (0.25, 0.85, 0.3, 0.35)
+CONSUMER_LINE = (0.3, 0.95, 0.35, 0.95)
 # From this cell width, buildings found are outlined; further out each is a small square.
 OUTLINE_FOUND_FROM = 16
 MOST_OUTLINES = 1500
@@ -315,3 +322,55 @@ def draw_hovered_buildings(
                     imgui.same_line(0, 2)
                     good_icon(good, size=HOVER_ICON)
     imgui.end()
+
+
+def consumers_in_reach(constructions: Constructions, cell: Cell, year: int) -> tuple[Cell, ...]:
+    """The cells within LOCAL_REACH of `cell` that have a building needing a good the buildings
+    in `cell` make: where those goods can go on their own (railroads.sim.economy)."""
+    made = {
+        good
+        for building in constructions.buildings_at(cell)
+        for good in makes_of(building.kind, year)
+    }
+    needs = {need for need, goods in HANDED_OUT.items() if made.intersection(goods)}
+    if not needs:
+        return ()
+    return tuple(
+        near
+        for near in constructions.tile_map.grid.within(cell, LOCAL_REACH)
+        if any(
+            needs.intersection(needs_of(building.kind, year))
+            for building in constructions.buildings_at(near)
+        )
+    )
+
+
+def draw_hand_out(
+    draw_list: imgui.ImDrawList,
+    camera: IsoCamera,
+    grid: Grid,
+    center: Vec2,
+    cell: Cell,
+    consumers: tuple[Cell, ...],
+) -> None:
+    """The border of how far the goods made in `cell` go on their own, and the cells in it whose
+    buildings take any of them in green."""
+    hexes = [grid.corners(*near) for near in consumers]
+    border = reach_border(grid, (cell,), LOCAL_REACH)
+    plane = [corner for corners in hexes for corner in corners]
+    plane += [end for edge in border for end in edge]
+    if not plane:
+        return
+    xs, ys = (np.array(values, dtype=np.float64) for values in zip(*plane, strict=True))
+    sx, sy = camera.to_screen(xs, ys, center)
+    points = [imgui.ImVec2(x, y) for x, y in zip(sx.tolist(), sy.tolist(), strict=True)]
+    start = 0
+    for corners in hexes:
+        polygon = points[start : start + len(corners)]
+        start += len(corners)
+        draw_list.add_convex_poly_filled(polygon, rgba_u32(CONSUMER_FILL))
+        draw_list.add_polyline(
+            polygon, rgba_u32(CONSUMER_LINE), 2.0, imgui.ImDrawFlags_.closed.value
+        )
+    for a, b in itertools.batched(points[start:], 2, strict=True):
+        draw_list.add_line(a, b, rgba_u32(HAND_OUT_RING), 2.5)
