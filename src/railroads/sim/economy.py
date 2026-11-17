@@ -33,6 +33,7 @@ chances of more growing in its cell, its points times its satisfaction, with no 
 """
 
 import time
+import weakref
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from enum import IntEnum
@@ -166,6 +167,11 @@ class StationOrder:
     platforms: tuple[Cell, ...] = ()
 
 
+# What Trade.share works out, by the trade's id and kinds, while the trade lasts: a trade is
+# saved with the game, so it keeps none of it itself.
+_SHARES: dict[int, dict[tuple[BuildingKind, ...], tuple[FloatCells, npt.NDArray[np.bool_]]]] = {}
+
+
 @dataclass(frozen=True)
 class Trade:
     """One month of trade on the cells with buildings (`cells`, flat indices): per kind of
@@ -216,6 +222,19 @@ class Trade:
         """The satisfaction of each cell's buildings of these kinds, from 0 up and past 1 with
         bonus goods. Where kinds share a cell, each counts by how much it wants; cells where they
         want nothing get `empty`."""
+        share, wanting = self._shares(kinds)
+        return np.where(wanting, share, empty)
+
+    def _shares(self, kinds: tuple[BuildingKind, ...]) -> tuple[FloatCells, npt.NDArray[np.bool_]]:
+        """share before cells that want nothing get theirs, and those that want anything,
+        worked out once for each trade and kinds and kept in _SHARES while the trade lasts."""
+        kept = _SHARES.get(id(self))
+        if kept is None:
+            kept = _SHARES[id(self)] = {}
+            weakref.finalize(self, _SHARES.pop, id(self), None)
+        found = kept.get(kinds)
+        if found is not None:
+            return found
         total, weight = np.zeros(self.cells.size), np.zeros(self.cells.size)
         for kind in kinds:
             if kind not in self.got:
@@ -227,7 +246,9 @@ class Trade:
                 own = own + self.bonus_per_good * self.bonus[kind]
             total += wanted * own
             weight += wanted
-        return np.where(weight > 0, total / np.where(weight > 0, weight, 1.0), empty)
+        wanting = weight > 0
+        found = kept[kinds] = (total / np.where(wanting, weight, 1.0), wanting)
+        return found
 
     def levels(self, kinds: tuple[BuildingKind, ...] | None = None) -> npt.NDArray[np.int8]:
         """Satisfaction of each cell's buildings of these kinds, or of all of them; cells with
@@ -622,10 +643,10 @@ class _Month:
         padded, offsets = self._padded()
         rows, cols = np.divmod(self.cells[sellers], grid.cols)
         at = (rows + _PAD) * (grid.cols + 2 * _PAD) + cols + _PAD
-        reached = at[:, None] + np.where((rows % 2 == 1)[:, None], offsets[1], offsets[0])
+        reached = at + np.where(rows % 2 == 1, offsets[1][:, None], offsets[0][:, None])
         buyers = padded[reached]
-        step, seller = np.nonzero((buyers >= 0).T)
-        found = (sellers[seller], buyers[seller, step], np.searchsorted(step, rings.starts))
+        step, seller = np.nonzero(buyers >= 0)
+        found = (sellers[seller], buyers[step, seller], np.searchsorted(step, rings.starts))
         self.pairs[good] = found
         return found
 
@@ -645,16 +666,17 @@ class _Month:
 
     def _gather(self, good: Good) -> None:
         """Lets every station take spare units of a good buildings made into its stockpile, where
-        they can be handed out at once."""
+        they can be handed out at once. Where nothing is on offer or a station has no room, it
+        takes nothing."""
+        offered = self.offered[good]
+        if not offered.any():
+            return
         for station in self.stations:
+            room = self.room[station][good]
+            if room <= 0:
+                continue
             _, far = self.reach[station]
-            taken = self.economy._gather(
-                self.room[station][good],
-                far,
-                self.offered[good],
-                self.offered[good],
-                self.sold[good],
-            )
+            taken = self.economy._gather(room, far, offered, offered, self.sold[good])
             if taken > 0:
                 self.gathered[station][good] = self.gathered[station].get(good, 0.0) + taken
                 self.room[station][good] -= taken
@@ -710,11 +732,16 @@ class _Month:
         self.offers[(kind, recipe.makes)] = can
         self.offered[recipe.makes] += can
 
-    def _given(self, offer: FloatCells, good: Good, went: FloatCells) -> FloatCells:
-        """How much of an offer went, at the share of all the good on offer that went."""
+    def _went(self, good: Good) -> tuple[FloatCells, FloatCells]:
+        """The share of all of a good on offer that went, and that reached a buyer, in each
+        cell."""
         offered = self.offered[good]
-        share = np.where(offered > 0, went / np.where(offered > 0, offered, 1.0), 0.0)
-        return offer * np.minimum(share, 1.0)
+        on_offer = offered > 0
+        whole = np.where(on_offer, offered, 1.0)
+        sold = self.sold[good]
+        went = np.where(on_offer, sold / whole, 0.0)
+        reached = np.where(on_offer, (sold - self.lost[good]) / whole, 0.0)
+        return np.minimum(went, 1.0), np.minimum(reached, 1.0)
 
     def _settle(self) -> Steps[Trade]:
         """Counts what every building got and gave, uses up the inputs of what the processors
@@ -737,9 +764,13 @@ class _Month:
             got[kind] += np.minimum(received, wanted)
             needed[kind] += wanted
         goods_gave = {}
+        shares: dict[Good, tuple[FloatCells, FloatCells]] = {}
         for (kind, good), offer in self.offers.items():
-            sent = self._given(offer, good, self.sold[good])
-            given = self._given(offer, good, self.sold[good] - self.lost[good])
+            if good not in shares:
+                shares[good] = self._went(good)
+            went_share, reached_share = shares[good]
+            sent = offer * went_share
+            given = offer * reached_share
             most = self.count[kind] * MAKES[kind][good]
             goods_gave[(kind, good)] = (given, most)
             gave[kind] += given
