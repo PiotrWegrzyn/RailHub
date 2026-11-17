@@ -373,10 +373,23 @@ BLOW_UP = """out vec4 colour;
 uniform vec2 origin;
 uniform float scale;
 uniform ivec2 art_origin;
+uniform int blend;
 uniform highp sampler2D art;
 void main() {
-    ivec2 at = ivec2(floor((gl_FragCoord.xy - origin) / scale)) - art_origin;
-    colour = texelFetch(art, at, 0);
+    vec2 p = (gl_FragCoord.xy - origin) / scale;
+    if (blend == 0) {
+        colour = texelFetch(art, ivec2(floor(p)) - art_origin, 0);
+        return;
+    }
+    vec2 q = p - 0.5;
+    vec2 f = fract(q);
+    ivec2 last = textureSize(art, 0) - 1;
+    ivec2 at = ivec2(floor(q)) - art_origin;
+    vec4 a = texelFetch(art, clamp(at, ivec2(0), last), 0);
+    vec4 b = texelFetch(art, clamp(at + ivec2(1, 0), ivec2(0), last), 0);
+    vec4 c = texelFetch(art, clamp(at + ivec2(0, 1), ivec2(0), last), 0);
+    vec4 d = texelFetch(art, clamp(at + ivec2(1, 1), ivec2(0), last), 0);
+    colour = mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 """
 
@@ -693,7 +706,7 @@ class GroundShader:
         self._art = _Target()
         self._screen = _Target()
         self._drawn: tuple[View, int] | None = None
-        self._shown: tuple[View, Screen, int] | None = None
+        self._shown: tuple[View, Screen, int, bool] | None = None
         self.cells_version = -1
         self._chunks = GL.glGenFramebuffers(1)
 
@@ -737,16 +750,18 @@ class GroundShader:
             self._drawn = (view, self.cells_version)
         return self._art.texture
 
-    def picture(self, view: View, screen: Screen) -> int:
-        """The texture holding the ground's art pixels in `view` blown up for `screen`, drawn
-        again only if either or the cells changed since."""
+    def picture(self, view: View, screen: Screen, blend: bool = False) -> int:
+        """The texture holding the ground's art pixels in `view` blown up for `screen`, each a
+        crisp square, or with `blend` blended between their middles, as the ground is up close;
+        drawn again only if any of these or the cells changed since."""
         art = self.art(view)
-        shown = (view, screen, self.cells_version)
+        shown = (view, screen, self.cells_version, blend)
         if self._screen.fit(screen.width, screen.height) or self._shown != shown:
             uniforms = {
                 "origin": ("2f", screen.origin),
                 "scale": ("1f", (screen.scale,)),
                 "art_origin": ("2i", (view.left, view.top)),
+                "blend": ("1i", (int(blend),)),
                 "art": ("1i", (0,)),
             }
             self._run(self._screen, self._blow_up, uniforms, (art,))
@@ -784,6 +799,7 @@ class GroundShader:
             "origin": ("2f", (0.0, 0.0)),
             "scale": ("1f", (float(times),)),
             "art_origin": ("2i", (0, 0)),
+            "blend": ("1i", (0,)),
             "art": ("1i", (0,)),
         }
         self._run(_Into(self._chunks, size), self._blow_up, uniforms, (small,))

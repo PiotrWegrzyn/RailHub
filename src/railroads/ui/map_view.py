@@ -58,7 +58,7 @@ from railroads.ui.pixel.ground_shader import (
     screen_of,
     view_of,
 )
-from railroads.ui.pixel.layer import PixelLayer
+from railroads.ui.pixel.layer import CLOSE_FROM, PixelLayer
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.scenery_layer import SceneryLayer
 from railroads.ui.pixel.sheet import SpriteSheet
@@ -708,7 +708,8 @@ class MapView:
         size = (bottom_right[0] - top_left[0], bottom_right[1] - top_left[1])
         density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
         view = view_of(origin, scale, top_left, size)
-        texture = shader.picture(view, screen_of(origin, scale, top_left, size, density))
+        screen = screen_of(origin, scale, top_left, size, density)
+        texture = shader.picture(view, screen, blend=scale >= CLOSE_FROM)
         draw_list.add_image(imgui.ImTextureRef(texture), top_left, bottom_right)
         free_textures()
         return True

@@ -324,7 +324,8 @@ class PixelWorld:
         # ground, MOST_LIFT rows past the chunk, which is as far as any pixel shows.
         rows = CHUNK if offset is None else CHUNK + min(int(offset.max()) + 1, MOST_LIFT)
         rgb, alpha = self.ground.render(left, top, rows, raised, points)
-        canvas = _blown_up(rgb / 255, alpha, resolution)
+        blow = _smoothly_blown_up if resolution == CLOSE else _blown_up
+        canvas = blow(rgb / 255, alpha, resolution)
         lit = None if raised is None else lighting(raised.top(rows))
         self.ground.fields(canvas, left, top, resolution, lit, points=points)
         self.ground.yards(canvas, left, top, resolution)
@@ -377,7 +378,7 @@ class PixelWorld:
         rows = -(-(CHUNK * k + int(offset.max()) + 1) // k)
         points = self._points(left, top, rows)
         rgb, alpha = self.ground.render(left, top, rows, points=points)
-        sown = _blown_up(rgb / 255, alpha, k)
+        sown = (_smoothly_blown_up if k == CLOSE else _blown_up)(rgb / 255, alpha, k)
         alpha = sown[..., 3].copy()
         self.ground.fields(sown, left, top, k)
         self.ground.yards(sown, left, top, k)
@@ -593,6 +594,23 @@ def _blown_up(rgb: FloatArray, alpha: FloatArray, k: int) -> FloatArray:
     """RGB and its alpha as one RGBA picture, each pixel blown up to `k` by `k`."""
     picture = np.concatenate([rgb, alpha[..., None]], axis=-1)
     return picture if k == 1 else picture.repeat(k, axis=0).repeat(k, axis=1)
+
+
+def _smoothly_blown_up(rgb: FloatArray, alpha: FloatArray, k: int) -> FloatArray:
+    """RGB and its alpha as one RGBA picture `k` times as big each way, blended between the
+    middles of its pixels instead of each blown up to a square: the ground up close."""
+    picture = np.concatenate([rgb, alpha[..., None]], axis=-1)
+    for axis in (0, 1):
+        n = picture.shape[axis]
+        at = np.clip((np.arange(n * k) + 0.5) / k - 0.5, 0, n - 1)
+        low = np.floor(at).astype(np.intp)
+        high = np.minimum(low + 1, n - 1)
+        share = (at - low).reshape([-1 if a == axis else 1 for a in range(3)])
+        picture = (
+            np.take(picture, low, axis=axis) * (1 - share)
+            + np.take(picture, high, axis=axis) * share
+        )
+    return picture
 
 
 def _finished(canvas: FloatArray) -> Rgba:

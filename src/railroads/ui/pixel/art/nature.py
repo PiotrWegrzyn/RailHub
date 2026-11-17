@@ -151,10 +151,16 @@ def _standing(
     return p.sprite()
 
 
+def _drawn_at() -> int:
+    """How many pixels a tree is drawn at for every art pixel before it is shrunk to the
+    fineness asked: DRAWN_AT, or as many as that fineness for trees drawn bigger up close."""
+    return max(DRAWN_AT, math.ceil(fineness()))
+
+
 def leafy(colors: tuple[RGB, RGB, RGB], seed: int = 0, height: float = 9.0) -> Sprite:
     """A leafy tree like an oak: a broad crown of lit clusters of leaves on a short trunk, its
     branches reaching up into it and showing in the shade between the clusters."""
-    k = DRAWN_AT
+    k = _drawn_at()
     rng = np.random.default_rng(seed)
     width = height * rng.uniform(1.15, 1.4)
     crown, solid, inside, middles, cx, cy = _heap(
@@ -203,7 +209,9 @@ def pine(colors: tuple[RGB, RGB, RGB], seed: int = 0, height: float = 13.0) -> S
     """A spruce: a dark cone of drooping, jagged tiers lit on its left, a little taller or
     broader from tree to tree."""
     rng = np.random.default_rng(seed)
-    return _spruce(colors, seed, height * rng.uniform(0.75, 0.95), DRAWN_AT, rng.uniform(0.5, 0.62))
+    return _spruce(
+        colors, seed, height * rng.uniform(0.75, 0.95), _drawn_at(), rng.uniform(0.5, 0.62)
+    )
 
 
 def _spruce(

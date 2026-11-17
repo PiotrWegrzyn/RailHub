@@ -6,10 +6,12 @@ from test_pixel_world import make_world
 
 from railroads.ui.pixel.art import SPRITES, close_sprite, draw_sheet, fine_sprite
 from railroads.ui.pixel.art.built import HEADING, PROJECTION
+from railroads.ui.pixel.art.nature import DRAWN_AT, _drawn_at
+from railroads.ui.pixel.art.painter import drawn_at
 from railroads.ui.pixel.layer import CLOSE_FROM, chunk_resolution
 from railroads.ui.pixel.models import Model, draw_model
 from railroads.ui.pixel.sheet import SpriteSheet
-from railroads.ui.pixel.world import CLOSE
+from railroads.ui.pixel.world import CLOSE, _smoothly_blown_up
 
 AWNING = (200, 30, 40)
 
@@ -95,3 +97,22 @@ def test_with_the_depth_test_a_part_standing_out_of_a_big_wall_shows_in_front_of
     pixels = np.asarray(image)[..., :3].reshape(-1, 3)
     reds = (pixels[:, 0] > 120) & (pixels[:, 1] < 60) & (pixels[:, 2] < 70)
     assert reds.any()
+
+
+def test_up_close_the_ground_is_blended_between_its_pixels_not_blown_up_to_squares() -> None:
+    rgb = np.array([[[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]])
+    alpha = np.ones((1, 2))
+
+    blended = _smoothly_blown_up(rgb, alpha, 4)
+
+    assert blended.shape == (4, 8, 4)
+    assert ((blended[0, :, 0] > 0.05) & (blended[0, :, 0] < 0.95)).any()
+    assert (np.diff(blended[0, :, 0]) >= 0).all()
+
+
+@pytest.mark.parametrize(("fineness", "expected"), [(1, DRAWN_AT), (2, DRAWN_AT), (16, 16)])
+def test_trees_are_drawn_as_fine_as_they_are_shown_up_close(fineness: int, expected: int) -> None:
+    with drawn_at(fineness):
+        found = _drawn_at()
+
+    assert found == expected
