@@ -177,6 +177,8 @@ vec3 natural(vec2 p, vec4 around) {
 vec2 wound(vec2 q) {
     float wx = q.x + @WARP@ * 2.0 * (@W_7_211@ - 0.5) + @WARP_FINE@ * 2.0 * (@W_2_213@ - 0.5);
     float wy = q.y + @WARP@ * 2.0 * (@W_7_212@ - 0.5) + @WARP_FINE@ * 2.0 * (@W_2_214@ - 0.5);
+    wx += @WARP_BROAD@ * 2.0 * (@W_18_215@ - 0.5);
+    wy += @WARP_BROAD@ * 2.0 * (@W_18_216@ - 0.5);
     return vec2(wx, wy);
 }
 
@@ -407,6 +409,9 @@ def fragment_source() -> str:
         "FOOT_TINT": _vec3(cpu.FOOT_TINT),
         "WARP": _number(cpu.WARP),
         "WARP_FINE": _number(cpu.WARP_FINE),
+        "WARP_BROAD": _number(cpu.WARP_BROAD),
+        "W_18_215": _noise(1.8, 215, "q"),
+        "W_18_216": _noise(1.8, 216, "q"),
     }
     source = FRAGMENT
     for name, value in names.items():

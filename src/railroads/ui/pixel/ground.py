@@ -179,9 +179,11 @@ FOOT_SHADE = 0.45
 FOOT_TINT = SHADOW_TINT * 0.8
 # Biomes and mountains on land meet along a winding line instead of the cells' edges: each pixel
 # takes the biome and mountains of the cell under a point near it, pushed by noise up to WARP
-# cells (WARP_FINE more on a smaller scale), unless that cell is water.
+# cells, WARP_FINE more on a smaller scale and WARP_BROAD more on a broader one, unless that
+# cell is water. Together they push a point less than two rings of cells away.
 WARP = 0.32
 WARP_FINE = 0.12
+WARP_BROAD = 0.3
 
 
 # Land whose buildings are content or thriving is washed with a warm glow: how strongly, by
@@ -385,11 +387,11 @@ class Ground:
     def refresh(self) -> None:
         """Works out the biomes and fields again after buildings or forests changed."""
         self._biomes = biome_grid(self.tile_map)
-        # Cells with another biome or mountains among the cells round them, whose pixels may
-        # take them.
+        # Cells with another biome or mountains within two rings of cells round them, whose
+        # pixels may take them: those unlike a cell round them, and those beside such a cell.
         kind = self._biomes * 2 + (self.tile_map.relief == Relief.MOUNTAINS)
-        there = kind.ravel()[self._round]
-        self._mixed = self._off_round | (there != kind).any(axis=0)
+        unlike = self._off_round | (kind.ravel()[self._round] != kind).any(axis=0)
+        self._mixed = unlike | unlike.ravel()[self._round].any(axis=0)
         built = np.zeros(self.tile_map.grid.shape, dtype=bool)
         woodland = np.zeros(self.tile_map.grid.shape, dtype=bool)
         for construction in self.constructions:
@@ -1253,13 +1255,14 @@ def _rolling(x: Floats, y: Floats) -> Floats:
 
 
 def _wound(x: Floats, y: Floats) -> tuple[Floats, Floats]:
-    """Points pushed by noise up to WARP and WARP_FINE cells, for biomes' winding borders."""
-    wx = (
-        x + WARP * 2 * (noise(x, y, 0.7, 211) - 0.5) + WARP_FINE * 2 * (noise(x, y, 0.2, 213) - 0.5)
-    )
-    wy = (
-        y + WARP * 2 * (noise(x, y, 0.7, 212) - 0.5) + WARP_FINE * 2 * (noise(x, y, 0.2, 214) - 0.5)
-    )
+    """Points pushed by noise up to WARP, WARP_FINE and WARP_BROAD cells, for biomes' winding
+    borders."""
+    wx = x + WARP * 2 * (noise(x, y, 0.7, 211) - 0.5)
+    wx += WARP_FINE * 2 * (noise(x, y, 0.2, 213) - 0.5)
+    wx += WARP_BROAD * 2 * (noise(x, y, 1.8, 215) - 0.5)
+    wy = y + WARP * 2 * (noise(x, y, 0.7, 212) - 0.5)
+    wy += WARP_FINE * 2 * (noise(x, y, 0.2, 214) - 0.5)
+    wy += WARP_BROAD * 2 * (noise(x, y, 1.8, 216) - 0.5)
     return wx, wy
 
 
