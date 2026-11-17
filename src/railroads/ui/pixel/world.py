@@ -37,6 +37,7 @@ from railroads.ui.pixel.ground import (
     art_pixels,
     glow_strength,
 )
+from railroads.ui.pixel.ground_texture import textured
 from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.projection import CHUNK, PixelProjection, Rgba
 from railroads.ui.pixel.relief import MOST_LIFT, Elevation, lighting, raise_picture, raycast
@@ -324,8 +325,7 @@ class PixelWorld:
         # ground, MOST_LIFT rows past the chunk, which is as far as any pixel shows.
         rows = CHUNK if offset is None else CHUNK + min(int(offset.max()) + 1, MOST_LIFT)
         rgb, alpha = self.ground.render(left, top, rows, raised, points)
-        blow = _smoothly_blown_up if resolution == CLOSE else _blown_up
-        canvas = blow(rgb / 255, alpha, resolution)
+        canvas = _ground_blown_up(rgb / 255, alpha, resolution, left, top)
         lit = None if raised is None else lighting(raised.top(rows))
         self.ground.fields(canvas, left, top, resolution, lit, points=points)
         self.ground.yards(canvas, left, top, resolution)
@@ -378,7 +378,7 @@ class PixelWorld:
         rows = -(-(CHUNK * k + int(offset.max()) + 1) // k)
         points = self._points(left, top, rows)
         rgb, alpha = self.ground.render(left, top, rows, points=points)
-        sown = (_smoothly_blown_up if k == CLOSE else _blown_up)(rgb / 255, alpha, k)
+        sown = _ground_blown_up(rgb / 255, alpha, k, left, top)
         alpha = sown[..., 3].copy()
         self.ground.fields(sown, left, top, k)
         self.ground.yards(sown, left, top, k)
@@ -594,6 +594,17 @@ def _blown_up(rgb: FloatArray, alpha: FloatArray, k: int) -> FloatArray:
     """RGB and its alpha as one RGBA picture, each pixel blown up to `k` by `k`."""
     picture = np.concatenate([rgb, alpha[..., None]], axis=-1)
     return picture if k == 1 else picture.repeat(k, axis=0).repeat(k, axis=1)
+
+
+def _ground_blown_up(rgb: FloatArray, alpha: FloatArray, k: int, left: int, top: int) -> FloatArray:
+    """The ground's RGB and alpha as one RGBA picture `k` pixels for every art pixel from
+    (`left`, `top`): blown up to squares at 1, otherwise blended between its pixels and laid
+    with the ground's texture (railroads.ui.pixel.ground_texture), as the ground shader draws."""
+    if k == 1:
+        return _blown_up(rgb, alpha, k)
+    picture = _smoothly_blown_up(rgb, alpha, k)
+    textured(picture, left, top, k)
+    return picture
 
 
 def _smoothly_blown_up(rgb: FloatArray, alpha: FloatArray, k: int) -> FloatArray:

@@ -375,6 +375,41 @@ uniform float scale;
 uniform ivec2 art_origin;
 uniform int blend;
 uniform highp sampler2D art;
+float hash(vec2 q) {
+    return fract(sin(q.x * 127.1 + q.y * 311.7) * 43758.5453);
+}
+float layer(vec2 p, vec3 wave) {
+    vec2 q = p * wave.xy + wave.z;
+    vec2 period = 64.0 * wave.xy;
+    vec2 i = floor(q);
+    vec2 t = q - i;
+    t = t * t * (3.0 - 2.0 * t);
+    vec2 i0 = mod(i, period);
+    vec2 i1 = mod(i + 1.0, period);
+    float top = mix(hash(i0), hash(vec2(i1.x, i0.y)), t.x);
+    float bottom = mix(hash(vec2(i0.x, i1.y)), hash(i1), t.x);
+    return mix(top, bottom, t.y);
+}
+vec3 textured(vec3 rgb, vec2 p) {
+    float green = rgb.g - max(rgb.r, rgb.b);
+    float wet = rgb.b - max(rgb.r, rgb.g);
+    vec3 tufts = vec3(1.5, 1.5, 0.0);
+    float grain = layer(p, vec3(4.0, 4.0, 0.0));
+    float bump = layer(p + vec2(0.3, 0.0), tufts) - layer(p - vec2(0.3, 0.0), tufts);
+    float light = clamp(1.0 - bump * 0.5, 0.78, 1.22);
+    float shade_by = (0.76 + 0.1 * grain + 0.14 * layer(p, tufts) + 0.1 * layer(p, vec3(0.625, 0.625, 0.0)))
+        * (1.0 + 0.12 * smoothstep(0.75, 0.9, layer(p, vec3(3.5, 3.5, 41.0))));
+    float factor = shade_by * light;
+    if (green > 0.0) {
+        factor *= 1.0 - 0.2 * smoothstep(0.62, 0.8, layer(p, vec3(5.0, 1.125, 17.0)));
+    } else {
+        factor = 1.0 + (factor - 1.0) * 0.7;
+    }
+    if (wet > 0.02) {
+        factor = 1.0 + (factor - 1.0) * 0.25;
+    }
+    return clamp(rgb * factor, 0.0, 1.0);
+}
 void main() {
     vec2 p = (gl_FragCoord.xy - origin) / scale;
     if (blend == 0) {
@@ -390,6 +425,7 @@ void main() {
     vec4 c = texelFetch(art, clamp(at + ivec2(0, 1), ivec2(0), last), 0);
     vec4 d = texelFetch(art, clamp(at + ivec2(1, 1), ivec2(0), last), 0);
     colour = mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    colour.rgb = textured(colour.rgb, p);
 }
 """
 

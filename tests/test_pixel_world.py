@@ -642,7 +642,7 @@ def test_the_fine_sheet_holds_the_same_sprites_twice_as_big_on_the_same_spots(
     assert np.abs(fine_sheet.anchors - FINE * sheet.anchors).max() <= 2
 
 
-def test_a_fine_chunk_keeps_the_ground_and_draws_what_stands_on_it_finer(
+def test_a_fine_chunk_keeps_the_grounds_colours_textured_and_draws_what_stands_on_it_finer(
     sheet: SpriteSheet, fine_sheet: SpriteSheet
 ) -> None:
     tile_map = make_tile_map()
@@ -660,7 +660,10 @@ def test_a_fine_chunk_keeps_the_ground_and_draws_what_stands_on_it_finer(
     blown_up = coarse.repeat(FINE, axis=0).repeat(FINE, axis=1)
     assert world.resolutions == (1, FINE)
     assert fine.shape == (CHUNK * FINE, CHUNK * FINE, 4)
-    assert (world.render(0, 1, FINE) == bare.repeat(FINE, axis=0).repeat(FINE, axis=1)).all()
+    fine_bare = world.render(0, 1, FINE).astype(float)
+    bare_blown = bare.repeat(FINE, axis=0).repeat(FINE, axis=1).astype(float)
+    assert abs(fine_bare[..., :3].mean() - bare_blown[..., :3].mean()) < 0.08 * 255
+    assert (fine_bare != bare_blown).any()
     assert (fine != blown_up).any(axis=-1).sum() > 100
 
 
