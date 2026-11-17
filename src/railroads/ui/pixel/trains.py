@@ -36,6 +36,7 @@ from railroads.ui.pixel.models import (
     decals,
     fine_shades,
     halfway,
+    keeping_fine,
     shade,
     without_fine,
 )
@@ -185,6 +186,43 @@ CAR_HALF = 0.24
 BOXCAB_HALF = 0.36
 EXPRESS_HALF = 0.42
 COUPLING = 0.04
+
+
+PLANK_SHADES = (1.0, 0.8, 0.93, 0.74, 0.97, 0.85, 0.9, 0.78)
+
+
+def _planks(m: Model, u: tuple[float, float], radius: float, z: float, color: RGB) -> None:
+    """Up close, the boards lagging a boiler: strips along it round its upper part, each a shade
+    of its own, with a dark seam between each two."""
+    if not keeping_fine():
+        return
+    u0, u1 = u
+    count = 14
+    first, last = -0.15 * math.pi, 1.15 * math.pi
+    step = (last - first) / count
+    seam = shade(color, 0.5)
+    with m.fine():
+        for k in range(count):
+            a, b = first + step * k, first + step * (k + 1)
+            middle = (a + b) / 2
+            normal = (0.0, math.cos(middle), math.sin(middle))
+            out = radius + 0.0012
+            corners = [
+                (u0, out * math.cos(a), z + out * math.sin(a)),
+                (u0, out * math.cos(b), z + out * math.sin(b)),
+                (u1, out * math.cos(b), z + out * math.sin(b)),
+                (u1, out * math.cos(a), z + out * math.sin(a)),
+            ]
+            m.faces.append(Face(corners[::-1], shade(color, PLANK_SHADES[k % 8]), normal))
+            line = radius + 0.0018
+            gap = step * 0.12
+            corners = [
+                (u0, line * math.cos(b - gap), z + line * math.sin(b - gap)),
+                (u0, line * math.cos(b + gap), z + line * math.sin(b + gap)),
+                (u1, line * math.cos(b + gap), z + line * math.sin(b + gap)),
+                (u1, line * math.cos(b - gap), z + line * math.sin(b - gap)),
+            ]
+            m.faces.append(Face(corners[::-1], seam, (0.0, math.cos(b), math.sin(b))))
 
 
 def _bands(m: Model, positions: tuple[float, ...], radius: float, z: float, color: RGB) -> None:
@@ -495,18 +533,7 @@ class Pioneer:
         if self.frame in (WOOD, OAK):
             parts.lines(m, (-h, h), (0.045, 0.075), 0.0656, shade(self.frame, 0.7), 1)
         if self.boiler in (LAGGING, OAK):
-            with m.fine():
-                for k in range(10):
-                    angle = math.pi * (0.1 + 0.08 * k)
-                    for side in (1.0, -1.0):
-                        v = side * (r + 0.0015) * math.cos(angle)
-                        high = z + (r + 0.0015) * math.sin(angle)
-                        m.box(
-                            (start, end),
-                            (v - 0.0008, v + 0.0008),
-                            (high - 0.0008, high + 0.0008),
-                            shade(self.boiler, 0.72),
-                        )
+            _planks(m, (start, end), r, z, self.boiler)
 
     def _tubes(self, m: Model, u: tuple[float, float], z: float, color: RGB) -> None:
         """The Rocket's boiler as the museum shows it, cut open along the top: black inside, with
@@ -704,6 +731,8 @@ class Steam:
             start = cab_front + 0.07
             m.cylinder_along((cab_front - 0.01, start), r + 0.006, z + 0.006, self.firebox)
         m.cylinder_along((start, back), r, z, self.body)
+        if self.body == LAGGING:
+            _planks(m, (start, back), r, z, self.body)
         m.cylinder_along((back, front - 0.03), r + 0.003, z, self.smokebox, self.smokebox)
         with m.coarse():
             m.box((front - 0.03, front), (-0.065, 0.065), (0.08, z + 0.05), self.smokebox)
