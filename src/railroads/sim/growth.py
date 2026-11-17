@@ -502,7 +502,8 @@ class Growth:
         return finish(self._trade_steps())
 
     def _trade_steps(self) -> Steps[set[Cell]]:
-        """trade_goods, pausing once the economy has traded."""
+        """trade_goods in steps: before and as the economy trades, and between the parts of
+        settling what it traded."""
         changed = self._crowd_out()
         self.economy.year = self.year
         self.economy.bonus_per_good = BONUS_PER_GOOD + (
@@ -510,6 +511,7 @@ class Growth:
         )
         if self.railway is not None:
             self.railway.station_trade = self.station_trade
+        yield
         self.trade = yield from self.economy.trade_steps(
             self.owners.working_counts(),
             self.station_trade.orders(),
@@ -522,6 +524,7 @@ class Growth:
         yield
         changed |= self._die_out(self.trade)
         changed |= self._raise_buildings()
+        yield
         self._count_served(self.trade)
         for place, highest in zip(self._places, self._chances.max(axis=1).tolist(), strict=True):
             place.highest = highest

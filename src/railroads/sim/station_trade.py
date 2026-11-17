@@ -122,6 +122,7 @@ class StationTrade:
         for station, handed_for in trade.handed_for.items():
             for (need, good), amount in handed_for.items():
                 railway.pay_for(station, need, good, amount)
+        yield
         for station, supplied_for in trade.supplied_for.items():
             for (need, good), amount in supplied_for.items():
                 railway.pay_for_passing(station, need, good, amount)

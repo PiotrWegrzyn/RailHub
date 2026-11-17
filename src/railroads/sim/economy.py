@@ -468,7 +468,7 @@ class _Month:
             if time.perf_counter() - paused > STEP_SECONDS:
                 yield
                 paused = time.perf_counter()
-        return self._settle()
+        return (yield from self._settle())
 
     def _wants(self, need: Need) -> dict[BuildingKind, FloatCells]:
         """What each kind wants of a need: consumers what they use in a month, processors the
@@ -716,9 +716,9 @@ class _Month:
         share = np.where(offered > 0, went / np.where(offered > 0, offered, 1.0), 0.0)
         return offer * np.minimum(share, 1.0)
 
-    def _settle(self) -> Trade:
+    def _settle(self) -> Steps[Trade]:
         """Counts what every building got and gave, uses up the inputs of what the processors
-        made, and keeps their stockpiles for next month."""
+        made, and keeps their stockpiles for next month, pausing once between."""
         got = {k: self.zero.copy() for k in self.count}
         needed = {k: self.zero.copy() for k in self.count}
         gave = {k: self.zero.copy() for k in self.count}
@@ -750,6 +750,7 @@ class _Month:
                 for need, amount in self.uses.get(kind, {}).items():
                     key = (kind, need)
                     self.stock[key] = np.maximum(self.stock[key] - went * amount, 0.0)
+        yield
         blank = self.economy.blank
         for key, stock in self.economy.stock.items():
             held = self.stock[key]

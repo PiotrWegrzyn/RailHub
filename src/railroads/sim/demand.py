@@ -100,8 +100,11 @@ class StationDemand:
                 else 0.0
             )
             earned += price * unit * share * rate
-            self._use(need, unit)
-            months = self.used[need]
+            if not months:
+                months = self.used.setdefault(need, [0.0])
+                if not months:
+                    months.append(0.0)
+            months[-1] += unit
             left -= unit
         return earned
 
