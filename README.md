@@ -572,7 +572,7 @@ Every map gets 1 to 3 hidden patches of military ground, 10 to 18 cells each and
 around, though slowly enough that a map has only 2 or 3 headquarters by 2050. Three outposts in
 a neighbourhood become a base and three bases a headquarters. They are
 judged on what they get like any other building, so a garrison that is kept supplied grows far
-faster than one left alone. Each military point sends and wants 20 passengers and 4 pieces of mail
+faster than one left alone, though one left without supplies never dies out. Each military point sends and wants 20 passengers and 4 pieces of mail
 (outpost 3, base 9, headquarters 27), as much as a small town. Cars are wanted from 1930, planes from 1935 by bases and
 headquarters, tanks from 1940 by headquarters.
 

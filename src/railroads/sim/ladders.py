@@ -769,6 +769,9 @@ BUTCHERS = _merges(
 # inputs and make goods worth more, half as often; the makers of luxury goods only in towns of
 # LUXURY_TOWN people or more, half as often as potters.
 LUXURY_TOWN = 20
+# Potters, brewers and distillers open only in towns of FOOD_TOWN people, where they are this many
+# times likelier than before, so the map keeps about as many of them.
+IN_TOWNS_ONLY = 6.0
 
 
 def _town_craft(
@@ -789,7 +792,7 @@ def _town_craft(
 
 
 TOWN_CRAFTS = (
-    _town_craft(BuildingKind.POTTER, 1.0),
+    _town_craft(BuildingKind.POTTER, IN_TOWNS_ONLY, least_people=FOOD_TOWN),
     _town_craft(BuildingKind.DAIRY, 12.5, least_people=FOOD_TOWN),
     _town_craft(BuildingKind.TILE_WORKS, 0.5),
     _town_craft(BuildingKind.FOUNDRY, 0.5, 1800),
@@ -1016,8 +1019,19 @@ WORKS = (
     _works(BuildingKind.TANK_FACTORY, {IND: 6e-7}, {IND: 6}, 1940, 40_000, 2e-6),
     _works(BuildingKind.BRICKWORKS, {POP: 1e-9, Points.ORE: 1.2e-8}, {}, base=CRAFT_BASE),
     _works(BuildingKind.GLASSWORKS, {POP: 4e-10, IND: 6e-9, Points.ORE: 6e-9}, {}, base=CRAFT_BASE),
-    _works(BuildingKind.BREWERY, {POP: 1.5e-9, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
-    _works(BuildingKind.DISTILLERY, {POP: 8e-10, Points.FOOD: 3e-9}, {}, 1600, base=CRAFT_BASE),
+    _works(
+        BuildingKind.BREWERY,
+        {POP: 1.5e-9, Points.FOOD: 3e-9},
+        {POP: FOOD_TOWN},
+        base=CRAFT_BASE * IN_TOWNS_ONLY,
+    ),
+    _works(
+        BuildingKind.DISTILLERY,
+        {POP: 8e-10, Points.FOOD: 3e-9},
+        {POP: FOOD_TOWN},
+        1600,
+        base=CRAFT_BASE * IN_TOWNS_ONLY,
+    ),
     _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
     _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {}, 1850, base=1e-8),
     _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=2e-7),
