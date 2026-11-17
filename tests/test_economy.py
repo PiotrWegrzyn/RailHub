@@ -55,7 +55,7 @@ def eaten_at(economy: Economy, trade: object, cell: tuple[int, int]) -> float:
     return float(eaten[position(trade, economy, cell)])
 
 
-@pytest.mark.parametrize(("house", "eaten"), [((8, 4), 5.0), ((8, 5), 4.5), ((8, 8), 3.0)])
+@pytest.mark.parametrize(("house", "eaten"), [((8, 4), 10.0), ((8, 5), 9.0), ((8, 8), 6.0)])
 def test_without_a_station_a_farm_sells_to_a_house_losing_a_tenth_for_every_cell_between(
     house: tuple[int, int], eaten: float
 ) -> None:
@@ -84,7 +84,7 @@ def test_farms_feed_the_nearer_house_first_and_the_farther_one_what_is_left() ->
     economy = Economy(tile_map)
     placed = counts(
         tile_map,
-        ((8, 4), BuildingKind.FARM, 4),
+        ((8, 4), BuildingKind.FARM, 2),
         ((8, 5), BuildingKind.HOUSE, 1),
         ((8, 7), BuildingKind.HOUSE, 1),
     )
@@ -115,7 +115,7 @@ def test_a_station_gathers_before_buildings_nearby_buy() -> None:
         placed, {STATION: StationOrder({}, 100.0, delivery=0, kept=frozenset(Good))}
     )
 
-    assert trade.gathered[STATION] == {Good.WHEAT: 5.0}
+    assert trade.gathered[STATION] == {Good.WHEAT: 10.0}
     assert eaten_at(economy, trade, (6, 4)) == 0.0
 
 
@@ -646,8 +646,8 @@ def test_a_station_hands_what_it_gathered_back_to_the_buildings_it_gathers_from(
 
     trade = economy.trade(placed, {STATION: StationOrder({}, 100.0)})
 
-    assert eaten_at(economy, trade, (8, 14)) == pytest.approx(5.0)
-    assert trade.supplied_for[STATION] == {(Need.FOOD, Good.WHEAT): pytest.approx(5.0)}
+    assert eaten_at(economy, trade, (8, 14)) == pytest.approx(10.0)
+    assert trade.supplied_for[STATION] == {(Need.FOOD, Good.WHEAT): pytest.approx(10.0)}
 
 
 def test_food_taken_at_a_station_after_its_need_was_served_counts_for_the_next_month(
