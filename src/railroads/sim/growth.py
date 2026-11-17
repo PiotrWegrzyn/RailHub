@@ -7,7 +7,8 @@ Buildings breed (breeding_of): a cell's chance of another of a ladder's kinds is
 
 where base is the ladder's base chance, served the points the buildings of its own kind of points
 give in the cell times their satisfaction (railroads.sim.economy), and drawing the points around
-the cell that draw it, each times its weight: four times the people for houses, food and people
+the cell that draw it, each times its weight: six times the people and twice the industry for
+houses, food and people
 for food, people and industry for industry, mines, mills and ports, and twice the people for
 shops, inns and churches. So the base chance holds anywhere the land allows, good surroundings
 raise it even where none of the kind stands yet, and what is satisfied breeds far faster. A building that comes up in a cell
@@ -122,7 +123,7 @@ INDUSTRIAL = {Points.POPULATION: 1.0, Points.INDUSTRY: 1.0}
 SOCIAL = {Points.POPULATION: 2.0}
 DRAWN_BY: Mapping[Points, Mapping[Points, float]] = MappingProxyType(
     {
-        Points.POPULATION: {Points.POPULATION: 4.0},
+        Points.POPULATION: {Points.POPULATION: 6.0, Points.INDUSTRY: 2.0},
         Points.FOOD: {Points.FOOD: 1.0, Points.POPULATION: 1.0},
         Points.ORE: INDUSTRIAL,
         Points.TIMBER: INDUSTRIAL,
