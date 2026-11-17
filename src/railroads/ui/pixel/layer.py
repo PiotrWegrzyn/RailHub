@@ -191,7 +191,8 @@ class PixelLayer:
                 if texture is None:
                     continue
             self._refine(drawn, now)
-            self._textures.move_to_end(key)
+            if key in self._textures:
+                self._textures.move_to_end(key)
             top_left, bottom_right = placement.screen_rect(chunk)
             draw_list.add_image(imgui.ImTextureRef(texture.texture_id()), top_left, bottom_right)
         while len(self._textures) > 1 and self._texture_bytes() > TEXTURE_BUDGET:
