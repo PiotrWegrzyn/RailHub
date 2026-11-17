@@ -11,7 +11,7 @@ from imgui_bundle import imgui
 from railroads.sim.constructions import BUILDING_RULES, BuildingKind
 from railroads.sim.demand import price_of
 from railroads.sim.finance import dollars
-from railroads.sim.goods import FITS, GOOD_YEARS, MAKES, NEED_YEARS, NEEDS, Good, Need
+from railroads.sim.goods import FITS, GOOD_YEARS, MAKES, NEEDS, Good, Need, need_year
 from railroads.sim.ladders import LADDERS, PASSENGERS_PER_POINT, POINTS, Points
 from railroads.sim.tech import NODES, Tree, path_to
 from railroads.sim.trains import ENGINES, Engine, successor
@@ -77,7 +77,7 @@ def building_help() -> tuple[BuildingHelp, ...]:
             POINTS[kind][0],
             tuple(MAKES.get(kind, {}).items()),
             tuple(
-                (need, amount, NEED_YEARS.get(need, 0))
+                (need, amount, need_year(kind, need))
                 for need, amount in NEEDS.get(kind, {}).items()
             ),
             PASSENGERS_PER_POINT[POINTS[kind][0]] * POINTS[kind][1],

@@ -18,6 +18,8 @@ The ideas every rule of the game should follow.
   two cells away, and so on down to 10% from ten cells away.
 - Only what is left after that goes to a station within reach; stations never take a good the
   buildings around could have used.
+- A station hands out what trains bring to the least satisfied buildings first, then the nearest,
+  so the starving are fed before they die out.
 - The player earns only when buildings take goods out of the player's stations. Goods handed out
   on their own earn nothing, so the money comes from what the player adds to the local economy:
   a station is an investment.
@@ -54,7 +56,8 @@ The ideas every rule of the game should follow.
   bonus.
 - A bonus input raises output but never replaces the main input.
 - Hard chains, with many inputs, make few but valuable goods.
-- Works grow by merging: two of a kind become a big one, two big ones a mega one.
+- Works grow by merging: three food makers of a kind become a big one and three big ones a mega
+  one; the harder processors merge two at a time.
 - Venues, such as taverns and clubs, make the homes around them grow faster.
 - A train can always unload; goods are used up the moment they arrive.
 - Buyers are hard to satisfy in full: demand is bigger than supply, so bringing more always pays.

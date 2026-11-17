@@ -987,6 +987,12 @@ BONUS_NEEDS = frozenset(
 )
 
 
+def need_year(kind: BuildingKind, need: Need) -> int:
+    """The year a kind of building starts to need something: once there is any of it, and its
+    own year for that need if it has one."""
+    return max(NEED_YEARS.get(need, 0), KIND_NEED_YEARS.get((kind, need), 0))
+
+
 @cache
 def needs_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
     """What a kind of building needs in a month in a given year."""
@@ -994,7 +1000,7 @@ def needs_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
         {
             need: amount
             for need, amount in NEEDS.get(kind, {}).items()
-            if NEED_YEARS.get(need, 0) <= year and KIND_NEED_YEARS.get((kind, need), 0) <= year
+            if need_year(kind, need) <= year
         }
     )
 

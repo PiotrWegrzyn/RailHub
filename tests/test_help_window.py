@@ -1,7 +1,7 @@
 import pytest
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.goods import Good, Need
+from railroads.sim.goods import KIND_NEED_YEARS, Good, Need, needs_of
 from railroads.sim.tech import Tree
 from railroads.sim.trains import ENGINES
 from railroads.ui.help_window import building_help, engine_help, good_help
@@ -134,3 +134,15 @@ def test_only_the_super_heavy_diesel_is_drawn_after_no_real_engine() -> None:
     own = [row.name for row in engine_help() if not row.origins]
 
     assert own == ["super_diesel"]
+
+
+def test_the_help_says_when_a_farm_starts_needing_what_only_farms_need_later() -> None:
+    wants = {need: year for need, _, year in row_of(BuildingKind.FARM).wants}
+
+    assert all(
+        needs_of(BuildingKind.FARM, year - 1).get(need) is None
+        and needs_of(BuildingKind.FARM, year).get(need) is not None
+        for need, year in wants.items()
+        if year
+    )
+    assert wants[Need.MACHINERY] == KIND_NEED_YEARS[(BuildingKind.FARM, Need.MACHINERY)]

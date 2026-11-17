@@ -137,17 +137,18 @@ def test_needs_start_in_their_year() -> None:
     assert after[Need.FUEL] == 30
 
 
-def test_works_with_nothing_to_work_from_close_only_after_thirty_years() -> None:
+def test_works_with_nothing_to_work_from_close_after_exactly_thirty_years_starving() -> None:
     constructions = Constructions(make_map(40, False))
     constructions.build(Building((20, 20), BuildingKind.TEXTILE_MILL))
     growth = Growth(constructions, GrowthRule(ladders=(), forests=None))
     standing = []
 
-    for months in (dies_after(BuildingKind.TEXTILE_MILL) - 12, 12):
+    for months in (dies_after(BuildingKind.TEXTILE_MILL) - 2, 1):
         for _ in range(months):
             growth.trade_goods()
         standing.append(int(growth.count(BuildingKind.TEXTILE_MILL).sum()))
 
+    assert growth.died_out == 1
     assert standing == [1, 0]
 
 
