@@ -1,7 +1,7 @@
-"""Making room on the map (railroads.sim.growth keeps one Room): clearing a cell for track or a
-station, putting up a building that found no room in its own cell nearby, housing people a
-skyscraper pulled their flats down on, and putting up again the player's buildings that growth
-pulled down.
+"""Making room on the map (railroads.sim.growth keeps one Room): clearing a cell for track, a
+station or a merged works, putting up a building that found no room in its own cell nearby,
+housing people a skyscraper pulled their flats down on, and putting up again the player's
+buildings that growth pulled down.
 
 A building that finds no room in its cell goes up in the nearest cell within SPILL_STEPS that has
 the room and land for it and that its ladder's caps allow, chosen among cells equally near at
@@ -41,10 +41,10 @@ class Room:
         self._growth = growth
 
     def clear(self, cell: Cell, units: int, avoid: frozenset[Cell] = frozenset()) -> set[Cell]:
-        """Makes `units` of room in the cell for track or a station, the smallest buildings first
-        (railroads.sim.demolition prices them in the same order): each moves to a cell next to it
-        with room for it (never into `avoid`) if it can, and otherwise comes down. Returns the
-        cells whose buildings changed."""
+        """Makes `units` of room in the cell for track, a station or a merged works, the smallest
+        buildings first (railroads.sim.demolition prices them in the same order): each moves to a
+        cell next to it with room for it (never into `avoid`) if it can, and otherwise comes down.
+        Returns the cells whose buildings changed."""
         growth = self._growth
         constructions = growth.constructions
         changed: set[Cell] = set()

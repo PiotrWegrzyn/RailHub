@@ -7,7 +7,7 @@ biggest works and the novelties, and factories, canneries and mills take three.
 """
 
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum, IntEnum
 
 from railroads.sim.grids import Cell
@@ -403,8 +403,15 @@ GREW_FROM: dict[BuildingKind, BuildingKind] = {
     grown: kind for kind, kinds in MERGED.items() for grown in kinds
 }
 
+# How much of a cell big and mega works take at least: half of it, and two thirds.
+BIG_SPACE = CELL_SPACE // 2
+MEGA_SPACE = CELL_SPACE * 2 // 3
+
 for _grown, _kind in GREW_FROM.items():
-    BUILDING_RULES[_grown] = BUILDING_RULES[_kind]
+    _least = BIG_SPACE if _grown.name.startswith("BIG_") else MEGA_SPACE
+    BUILDING_RULES[_grown] = replace(
+        BUILDING_RULES[_kind], space=max(_least, BUILDING_RULES[_kind].space)
+    )
 
 STATION_RELIEF = _OFF_MOUNTAINS
 

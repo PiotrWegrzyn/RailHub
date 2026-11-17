@@ -107,6 +107,16 @@ SLATE: RGB = (78, 84, 98)
 VERDIGRIS: RGB = (98, 150, 132)
 
 
+# How tall chimneys and stacks stand against the height they are drawn for, so they hide less of
+# the buildings behind them on the map.
+CHIMNEY_SHARE = 0.6
+
+
+def chimney_top(foot: float, top: float) -> float:
+    """Where a chimney drawn from `foot` up to `top` ends, lowered by CHIMNEY_SHARE."""
+    return foot - (foot - top) * CHIMNEY_SHARE
+
+
 def shade(color: RGB, factor: float) -> RGB:
     r, g, b = color
     return (min(255, round(r * factor)), min(255, round(g * factor)), min(255, round(b * factor)))

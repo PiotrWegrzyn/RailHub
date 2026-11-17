@@ -8,6 +8,7 @@ from railroads.sim.growth import Growth
 from railroads.sim.ladders import BAKERIES, LADDERS, POINTS, WORKS, Points
 
 TEXTILE_MILLS = next(ladder for ladder in WORKS if ladder.kinds[0] == BuildingKind.TEXTILE_MILL)
+GLASSWORKS = next(ladder for ladder in WORKS if ladder.kinds[0] == BuildingKind.GLASSWORKS)
 
 
 def test_two_textile_mills_in_a_neighbourhood_merge_into_a_big_one() -> None:
@@ -37,6 +38,22 @@ def test_two_big_textile_mills_merge_into_a_mega_one() -> None:
 
     assert growth.count(BuildingKind.MEGA_TEXTILE_MILL)[5, 5] == 1
     assert growth.count(BuildingKind.BIG_TEXTILE_MILL).sum() == 0
+
+
+def test_works_merging_into_a_big_one_move_the_houses_it_needs_room_from_next_door() -> None:
+    tile_map = make_map()
+    constructions = Constructions(tile_map)
+    neighbour = tile_map.grid.neighbours(5, 5)[0]
+    build(constructions, (5, 5), BuildingKind.GLASSWORKS, 1)
+    build(constructions, (5, 5), BuildingKind.HOUSE, 5)
+    build(constructions, neighbour, BuildingKind.GLASSWORKS, 1)
+    growth = Growth(constructions)
+
+    growth._turn((5, 5), GLASSWORKS, np.random.default_rng(0))
+
+    assert growth.count(BuildingKind.BIG_GLASSWORKS)[5, 5] == 1
+    assert growth.count(BuildingKind.HOUSE)[5, 5] == 3
+    assert growth.count(BuildingKind.HOUSE).sum() == 5
 
 
 @pytest.mark.parametrize(("bakeries", "merged"), [(2, 0), (3, 1)])

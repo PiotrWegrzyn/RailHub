@@ -8,6 +8,7 @@ from railroads.ui.pixel.art.painter import (
     BARREL,
     BRICK,
     CAR_COLOURS,
+    CHIMNEY_SHARE,
     COPPER,
     DOORWAY,
     GLASS,
@@ -21,6 +22,7 @@ from railroads.ui.pixel.art.painter import (
     Point,
     Sprite,
     Top,
+    chimney_top,
     shade,
 )
 from railroads.ui.pixel.art.parts import (
@@ -51,6 +53,8 @@ EARTH: RGB = (150, 128, 90)
 
 SOIL: RGB = (78, 74, 52)
 SMOKE: RGB = (150, 148, 150)
+# The most puffs of smoke rising from anything.
+MOST_PUFFS = 2
 FRAME: RGB = (104, 76, 50)
 JOINER_WALL: RGB = (176, 134, 88)
 CHAIR: RGB = (156, 62, 44)
@@ -80,8 +84,8 @@ def factory() -> Sprite:
     _door(p, front, right, (0.2, 0.5), 2.5, 6, DOORWAY, shade(BRICK, 1.3))
     _window(p, front, right, (0.7, 0.85), 2.2, shade(WINDOW, 0.8))
     _sawtooth(p, top, 2, 2.5, METAL, (170, 200, 214), BRICK)
-    _stack(p, 3, -6, -16, shade(BRICK, 0.8))
-    _smoke(p, 4.5, -18, (214, 214, 218), 2)
+    cap = _stack(p, 3, -6, -16, shade(BRICK, 0.8))
+    _smoke(p, 4.5, cap - 2, (214, 214, 218), 2)
     for x, y in ((7.5, 1.2), (9, 0.4)):
         _crate(p, x, y)
     return p.sprite()
@@ -109,10 +113,9 @@ def big_factory() -> Sprite:
     _door(p, front, right, (0.15, 0.45), 3.5, 8, DOORWAY, shade(BRICK, 1.3))
     _sawtooth(p, top, 3, 3, METAL, (170, 200, 214), BRICK)
     for x in (-6, 4):
-        _stack(p, x, -9, -24, shade(BRICK, 0.8))
-    for i, (x, y, r) in enumerate(
-        [(-5, -27, 2), (-3, -30, 2.5), (0, -32, 3), (5, -27, 2), (7, -30, 2.5)]
-    ):
+        cap = _stack(p, x, -9, -24, shade(BRICK, 0.8))
+    for i, (x, y, r) in enumerate([(-5, -27, 2), (-3, -30, 2.5), (5, -27, 2), (7, -30, 2.5)]):
+        y += cap + 24
         p.blob(x - r, y - r, x + r, y + r, (226, 226, 230) if i % 2 else (204, 204, 210))
     _heap(p, -9, 5, 2.5, 2, (48, 46, 50))
     _oil(p, 8.5, 5.4, 1.2)
@@ -176,9 +179,10 @@ def _sawtooth(
         p.line([near_up, far_up], glass)
 
 
-def _chimney(p: Painter, x: float, foot: float, top: float, colour: RGB = BRICK) -> None:
+def _chimney(p: Painter, x: float, foot: float, top: float, colour: RGB = BRICK) -> float:
     """A round brick chimney narrowing to a dark cap, with a light band under the cap and a dark
-    one halfway down."""
+    one halfway down, lowered (chimney_top); returns where its cap is."""
+    top = chimney_top(foot, top)
     p.polygon(
         [(x - 2, foot), (x - 1, top), (x + 1, top), (x + 2, foot)], colour, shade(colour, 0.6)
     )
@@ -187,10 +191,12 @@ def _chimney(p: Painter, x: float, foot: float, top: float, colour: RGB = BRICK)
         half = 1 + (y - top) / (foot - top)
         p.line([(x - half, y), (x + half, y)], tone)
     p.rect(x - 2, top - 1, x + 2, top, shade(colour, 0.7))
+    return top
 
 
 def _smoke(p: Painter, x: float, y: float, colour: RGB = SMOKE, puffs: int = 3) -> None:
-    for i in range(puffs):
+    """Puffs of smoke rising to the right from (x, y), at most MOST_PUFFS of them."""
+    for i in range(min(puffs, MOST_PUFFS)):
         r = 1.5 + 0.6 * i
         cx, cy = x + 1.5 * i, y - 2.5 * i
         p.blob(cx - r, cy - r, cx + r, cy + r, colour if i % 2 else shade(colour, 0.86))
@@ -208,7 +214,7 @@ def _smoking_chimney(
 ) -> None:
     """A chimney (_chimney) with smoke rising from its cap, puffing from right over it if `close`
     and a little higher and further right otherwise."""
-    _chimney(p, x, foot, top, colour)
+    top = _chimney(p, x, foot, top, colour)
     if close:
         _smoke(p, x + 0.5, top - 2, smoke, puffs)
     else:
@@ -305,12 +311,15 @@ def _pipe(p: Painter, x: float, y: float, tall: float, colour: RGB = (70, 66, 64
     p.line([(x - 1, y - tall), (x + 1, y - tall)], shade(colour, 0.6))
 
 
-def _stack(p: Painter, x: float, foot: float, top: float, colour: RGB) -> None:
-    """A square stack two wide from `foot` up to `top`, with a light band under a dark cap."""
+def _stack(p: Painter, x: float, foot: float, top: float, colour: RGB) -> float:
+    """A square stack two wide from `foot` up to `top`, with a light band under a dark cap,
+    lowered (chimney_top); returns where its cap is."""
+    top = chimney_top(foot, top)
     p.rect(x, top, x + 2, foot, colour)
     p.line([(x, top + 2), (x + 2, top + 2)], (220, 220, 214))
     p.line([(x, (top + foot) / 2), (x + 2, (top + foot) / 2)], shade(colour, 0.65))
     p.rect(x - 0.5, top - 1, x + 2.5, top, shade(colour, 0.6))
+    return top
 
 
 def _crate(p: Painter, x: float, y: float, colour: RGB = (150, 112, 74)) -> None:
@@ -541,8 +550,9 @@ def steel_mill() -> Sprite:
     p.rect(10.5, -15, 12.5, -13, (110, 106, 110))
     p.rect(-9, -12, -6, -2, (238, 132, 40))
     p.point(-8, -10, (255, 214, 120))
-    _stack(p, -3, -9, -30, shade(BRICK, 0.7))
-    for i, (x, y, r) in enumerate([(-2, -33, 2), (0, -36, 3), (3, -39, 3.5)]):
+    cap = _stack(p, -3, -9, -30, shade(BRICK, 0.7))
+    for i, (x, y, r) in enumerate([(-2, -33, 2), (0, -36, 3)]):
+        y += cap + 30
         p.blob(x - r, y - r, x + r, y + r, (150, 148, 150) if i % 2 else (124, 122, 126))
     for gx, gy in ((-9.5, 3.4), (-8, 4.4)):
         p.point(gx, gy, (226, 120, 44))
@@ -658,11 +668,14 @@ def _anvil(p: Painter, cx: float, cy: float, s: float = 1) -> None:
     p.line([(cx - 2 * s, cy - s), (cx + 1 * s, cy - s)], (110, 110, 120))
 
 
-def _forge_stack(p: Painter, x: float, foot: float, top: float) -> None:
+def _forge_stack(p: Painter, x: float, foot: float, top: float) -> float:
+    """A dark forge stack glowing at its cap, lowered (chimney_top); returns where its cap is."""
+    top = chimney_top(foot, top)
     p.rect(x - 1, top, x + 1, foot, (74, 58, 52))
     p.line([(x - 1, top + 2), (x + 1, top + 2)], (200, 190, 180))
     p.rect(x - 1.5, top - 1, x + 1.5, top, (50, 40, 36))
     p.point(x, top - 1, (255, 170, 60))
+    return top
 
 
 def _pagoda(p: Painter, x: float, y: float, size: float = 1) -> None:
@@ -759,8 +772,8 @@ def tool_works() -> Sprite:
     _windows(p, front, right, (0.3, 0.7), (3,), 1, (240, 150, 60), shade(wall, 1.5))
     p.gable(top, 4, roof, wall)
     _roof_rows(p, top, 4, roof)
-    _forge_stack(p, 0, -10, -17)
-    _smoke(p, 1, -21, (96, 94, 98))
+    cap = _forge_stack(p, 0, -10, -17)
+    _smoke(p, 1, cap - 4, (96, 94, 98))
     _heap(p, -9, 5, 3, 2.5, (48, 46, 50))
     p.point(-10, 3.5, (104, 104, 116))
     _puddle(p, 4, 4.6, 2.2)
@@ -1193,11 +1206,12 @@ def distillery() -> Sprite:
     _track(p, foot[0], foot[1], (0.48, 0.68), 3.5)
     _puddle(p, 9, 7.5, 1.6)
     slate = STILL_SLATE
-    p.rect(3, -33, 4, -4, (150, 80, 60))
-    for y in (-31, -20):
+    cap = chimney_top(-4, -33)
+    p.rect(3, cap, 4, -4, (150, 80, 60))
+    for y in (cap + 2, (cap - 4) / 2):
         p.line([(3, y), (4, y)], (230, 228, 222))
-    p.rect(2.5, -34, 4.5, -33, (90, 52, 42))
-    _smoke(p, 4, -36, (190, 190, 194), 2)
+    p.rect(2.5, cap - 1, 4.5, cap, (90, 52, 42))
+    _smoke(p, 4, cap - 3, (190, 190, 194), 2)
     top = p.hall(-4, -1, 12, 7, 6, WHITEWASH, None)
     left, front, right, _ = top
     _patch(p, left, front, (0, 1), (5, 6), STONE)
@@ -1543,12 +1557,13 @@ def sugar_refinery() -> Sprite:
     _track(p, foot[0], foot[1], (0.53, 0.77), 3.5)
     wall = (232, 226, 210)
     lintel = shade(wall, 1.1)
-    stack = p.box(8, -3, 2, 34, shade(BRICK, 0.95), (60, 52, 50))
+    tall = 34 * CHIMNEY_SHARE
+    stack = p.box(8, -3, 2, tall, shade(BRICK, 0.95), (60, 52, 50))
     for a, b in ((stack[0], stack[1]), (stack[1], stack[2])):
         p.line([_on_wall(a, b, 0, 2), _on_wall(a, b, 1, 2)], (220, 220, 214))
-        _band(p, a, b, 14, shade(wall, 0.65))
-        _band(p, a, b, 33, shade(wall, 0.6))
-    _smoke(p, 9, -40, puffs=4)
+        _band(p, a, b, tall * 0.4, shade(wall, 0.65))
+        _band(p, a, b, tall - 1, shade(wall, 0.6))
+    _smoke(p, 9, -9 - tall, puffs=4)
     top = p.box(-3, 0, 8, 18, wall, (92, 86, 94))
     left, front, right, _ = top
     _plinth(p, top, 18, wall)

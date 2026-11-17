@@ -30,6 +30,7 @@ from railroads.ui.pixel.art.industry import (
 from railroads.ui.pixel.art.painter import (
     BARREL,
     BRICK,
+    CHIMNEY_SHARE,
     COPPER,
     DOORWAY,
     METAL,
@@ -42,6 +43,7 @@ from railroads.ui.pixel.art.painter import (
     Point,
     Sprite,
     Top,
+    chimney_top,
     shade,
 )
 from railroads.ui.pixel.art.parts import (
@@ -378,8 +380,8 @@ def big_brewery() -> Sprite:
     _kiln(p, 15, -7, 4, 11)
     top = _brewhouse(p, -6, -1, 18, 9)
     x, y = _on_roof(top, 4.5, 0.3, 0.85)
-    _stack(p, x - 1, y, y - 6, BRICK)
-    _smoke(p, x + 0.5, y - 8, STEAM, 2)
+    cap = _stack(p, x - 1, y, y - 6, BRICK)
+    _smoke(p, x + 0.5, cap - 2, STEAM, 2)
     tower = _brew_tower(p, 8, 4, 5, 19)
     tl, tf, tr, _ = tower
     _copper_dome(p, tf[0], (tl[1] + tr[1]) / 2, 5.2)
@@ -486,7 +488,8 @@ def _warehouse(p: Painter, x: float, y: float, length: float, height: float) -> 
 
 
 def _thin_stack(p: Painter, x: float, foot: float, top: float) -> None:
-    """A tall thin brick stack banded in white, smoking."""
+    """A tall thin brick stack banded in white, smoking, lowered (chimney_top)."""
+    top = chimney_top(foot, top)
     colour = (150, 80, 60)
     p.rect(x, top, x + 1.6, foot, colour)
     for f in (0.06, 0.4):
@@ -743,7 +746,8 @@ SUGAR_PAPER: RGB = (70, 100, 180)
 
 def _square_stack(p: Painter, x: float, y: float, half: float, tall: float) -> None:
     """A tall square brick chimney standing on (x, y), banded white near its top and dark lower
-    down, smoking."""
+    down, smoking, lowered (CHIMNEY_SHARE)."""
+    tall *= CHIMNEY_SHARE
     stack = p.box(x, y, half, tall, shade(BRICK, 0.95), (60, 52, 50))
     for a, b in ((stack[0], stack[1]), (stack[1], stack[2])):
         for drop, colour in ((2, (220, 220, 214)), (tall * 0.4, shade(SUGAR_WALL, 0.65))):

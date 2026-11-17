@@ -10,11 +10,11 @@ several families share are in parts. This module lists them all (SPRITES) and pa
 """
 
 from collections.abc import Callable
-from functools import partial
+from functools import cache, partial
 
 from PIL import Image
 
-from railroads.sim.constructions import MERGED
+from railroads.sim.constructions import BUILDING_RULES, MERGED, BuildingKind
 from railroads.ui.pixel.art import grand_crafts, grand_fire, grand_food, grand_modern
 from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_pauls
 from railroads.ui.pixel.art.commerce import airport, department_store, hotel, port, shop, tavern
@@ -458,15 +458,51 @@ def shrink(sprite: Sprite, factor: float) -> Sprite:
     return Sprite(small, (round(ax * factor), round(ay * factor)))
 
 
-def _scale_of(name: str) -> float:
+# How wide a works may be drawn at most, in pixels, so it stands inside its cell, which is about
+# 25 pixels across: by how much of the cell it takes (railroads.sim.constructions.BUILDING_RULES),
+# and for big and mega works by their size, a mega one as wide as the cell.
+MOST_WIDTH = {1: 20, 2: 20, 3: 22, 4: 23, 5: 23, 6: 23}
+GROWN_MOST_WIDTH = {"big": 25, "mega": 26}
+# How much smaller a works is tried again when shrinking it pixel by pixel left it too wide.
+SHRINK_STEP = 0.98
+
+
+def _base_scale(name: str) -> float:
     size, _, base = name.partition("_")
     if size in GROWN_WIDTH and name not in BUILDINGS and base in SPRITES:
-        return _scale_of(base)
+        return _base_scale(base)
     if name.startswith(HOMES):
         return HOME_SCALE
     if name in FARMSTEADS:
         return FARMSTEAD_SCALE
     return BUILDING_SCALE if name.startswith(BUILDINGS) else 1.0
+
+
+@cache
+def _full_size(name: str) -> Sprite:
+    with drawn_at(1):
+        return SPRITES[name]()
+
+
+def _width(sprite: Sprite) -> int:
+    """How many pixels wide a sprite is, from its leftmost painted pixel to its rightmost."""
+    box = sprite.image.getchannel("A").getbbox()
+    return 1 if box is None else box[2] - box[0]
+
+
+def _scale_of(name: str) -> float:
+    """How big a sprite is drawn on the map: its kind's scale, and smaller still if that would
+    make a works wider than MOST_WIDTH lets it be."""
+    scale = _base_scale(name)
+    kind = BuildingKind.__members__.get(name.upper())
+    if kind is None or name in FARMSTEADS:
+        return scale
+    most = GROWN_MOST_WIDTH.get(name.partition("_")[0], MOST_WIDTH[BUILDING_RULES[kind].space])
+    full = _full_size(name)
+    scale = min(scale, most / _width(full))
+    while _width(shrink(full, scale)) > most:
+        scale *= SHRINK_STEP
+    return scale
 
 
 def fine_sprite(name: str, resolution: int) -> Sprite:

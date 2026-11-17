@@ -39,6 +39,17 @@ ROCK_CHANCE = 0.4
 TREE_SPREAD = 0.4
 
 
+# How far a building's foot may reach past the edge of its cell, in pixels, and how far along
+# the way from where it stands to the cell's middle it is moved in turn until it fits.
+CELL_SLACK = 1.0
+FIT_STEPS = np.linspace(0.0, 1.0, 6)
+# How opaque a sprite's pixel must be to count as part of what it shows.
+FOOT_ALPHA = 0.1
+# How far above its anchor, in pixels, a sprite's column of pixels may end and still stand on the
+# ground.
+GROUND_REACH = 3
+
+
 # Buildings drawn in one of several looks, picked by sprite name prefix; others by one name.
 VARIED_SPRITES = {
     BuildingKind.HOUSE: "house",
@@ -247,20 +258,30 @@ class Scenery:
             )
         spots = BuildingSpots.of(constructions, frozenset(FIELD_KINDS))
         looks = {kind: sheet.variants(name) for kind, name in VARIED_SPRITES.items()}
+        built_looks = np.array(
+            [
+                looks[kind][variant % len(looks[kind])]
+                if kind in looks
+                else sheet.index(BUILDING_SPRITES[kind])
+                for kind, variant in zip(spots.kinds, spots.variants, strict=True)
+            ],
+            dtype=np.int64,
+        )
+        before = sum(len(x) for x in xs)
         xs.append(np.asarray(spots.x, dtype=np.float64))
         ys.append(np.asarray(spots.y, dtype=np.float64))
-        sprites.append(
-            np.array(
-                [
-                    looks[kind][variant % len(looks[kind])]
-                    if kind in looks
-                    else sheet.index(BUILDING_SPRITES[kind])
-                    for kind, variant in zip(spots.kinds, spots.variants, strict=True)
-                ],
-                dtype=np.int64,
-            )
-        )
+        sprites.append(built_looks)
         px, py = projection.to_pixels(np.concatenate(xs), np.concatenate(ys))
+        fitted = np.flatnonzero(~np.isin(spots.kinds, list(FIELD_KINDS)))
+        if fitted.size:
+            px[before + fitted], py[before + fitted] = _inside_cells(
+                grid,
+                projection,
+                sheet,
+                spots.x[fitted],
+                spots.y[fitted],
+                built_looks[fitted],
+            )
         px, py = np.rint(px).astype(np.int64), np.rint(py).astype(np.int64)
         sprite = np.concatenate(sprites).astype(np.int64)
         lift = np.zeros(px.shape, dtype=np.int64)
@@ -272,6 +293,57 @@ class Scenery:
 
     def __len__(self) -> int:
         return len(self.x)
+
+
+def _inside_cells(
+    grid: Grid,
+    projection: PixelProjection,
+    sheet: SpriteSheet,
+    x: FloatArray,
+    y: FloatArray,
+    sprite: IntArray,
+) -> tuple[FloatArray, FloatArray]:
+    """Where in the picture buildings standing at (x, y) on the map are drawn so the foot of each
+    stays inside its cell (_feet): moved no further than it must towards the middle of its cell,
+    and all the way if even there it does not fit."""
+    rows, cols = grid.cell_at(x, y)
+    px, py = projection.to_pixels(x, y)
+    cx, cy = projection.to_pixels(*grid.center(rows, cols))
+    middle = np.array(projection.to_pixels(*grid.center(0, 0)))
+    corners = np.array([projection.to_pixels(*c) for c in grid.corners(0, 0)]) - middle
+    outward = np.roll(corners, -1, axis=0) - corners
+    outward = np.stack([outward[:, 1], -outward[:, 0]], axis=1)
+    outward /= np.linalg.norm(outward, axis=1, keepdims=True)
+    outward *= np.sign(np.einsum("ij,ij->i", outward, corners))[:, None]
+    reach = np.einsum("ij,ij->i", outward, corners) + CELL_SLACK
+    unique, which = np.unique(sprite, return_inverse=True)
+    feet = _feet(sheet, unique)[which]
+    away = np.stack([px - cx, py - cy], axis=1)
+    kept = np.zeros(len(px))
+    for share in FIT_STEPS:
+        points = feet + (away * share)[:, None, :]
+        fits = (np.einsum("npj,ej->npe", points, outward) <= reach).all(axis=(1, 2))
+        kept[fits] = share
+    return cx + away[:, 0] * kept, cy + away[:, 1] * kept
+
+
+def _feet(sheet: SpriteSheet, sprites: IntArray) -> FloatArray:
+    """Where each sprite meets the ground at its left and right ends and at its lowest, in
+    pixels from its anchor: of the columns of pixels reaching down to within GROUND_REACH of the
+    anchor, so smoke and chimneys do not count."""
+    feet = np.zeros((len(sprites), 3, 2))
+    for i, index in enumerate(sprites.tolist()):
+        painted = sheet.pixels[index][..., 3] > FOOT_ALPHA
+        lowest = painted.shape[0] - 1 - np.argmax(painted[::-1], axis=0)
+        reaching = painted.any(axis=0) & (lowest >= sheet.anchors[index][1] - GROUND_REACH)
+        columns = np.flatnonzero(reaching)
+        if not columns.size:
+            continue
+        bottom = columns[np.argmax(lowest[columns])]
+        feet[i] = [
+            (column, lowest[column]) for column in (columns[0], columns[-1], bottom)
+        ] - sheet.anchors[index]
+    return feet
 
 
 def _station_houses(

@@ -54,7 +54,14 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.clock import START_YEAR
-from railroads.sim.constructions import MERGED, ONE_OFFS, Building, BuildingKind, Constructions
+from railroads.sim.constructions import (
+    GREW_FROM,
+    MERGED,
+    ONE_OFFS,
+    Building,
+    BuildingKind,
+    Constructions,
+)
 from railroads.sim.economy import (
     BONUS_PER_GOOD,
     Economy,
@@ -952,7 +959,8 @@ class Growth:
     ) -> set[Cell] | None:
         """Pulls down so many of each kind in the neighbourhood, the cell's own first and then
         from the fullest cells, and puts up a building of the new kind in the cell; None, and
-        nothing pulled down, if there are too few or it would not fit."""
+        nothing pulled down, if there are too few or it would not fit. A big or mega works moves
+        the cell's other buildings out of its way (railroads.sim.room) if it must."""
         new = Building(cell, new_kind)
         if self.constructions.site_problem(new) is not None:
             return None
@@ -969,7 +977,12 @@ class Growth:
                 wanted -= take
                 if not wanted:
                     break
-        freed = sum(take * Building(cell, kind).space for near, kind, take in plan if near == cell)
+        if new_kind in GREW_FROM:
+            freed = sum(building.space for building in self.constructions.buildings_at(cell))
+        else:
+            freed = sum(
+                take * Building(cell, kind).space for near, kind, take in plan if near == cell
+            )
         if new.space > self.constructions.space_left(cell) + freed:
             return None
         owned = 0
@@ -978,12 +991,13 @@ class Growth:
             for _ in range(take):
                 self.constructions.remove(Building(near, kind))
             self.add(near, kind, -take)
+        moved = self.room.clear(cell, new.space)
         self.constructions.build(new)
         self.add(cell, new_kind, 1)
         if owned:
             self.owners.own(cell, new_kind)
         self.station_trade.reward(cell, new_kind)
-        return {cell} | {near for near, _, _ in plan}
+        return {cell} | {near for near, _, _ in plan} | moved
 
     @contextmanager
     def log_changes(self) -> Iterator[Mapping[tuple[Cell, BuildingKind], int]]:
