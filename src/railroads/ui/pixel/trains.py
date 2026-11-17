@@ -1980,7 +1980,6 @@ ENGINES: dict[str, EngineModel] = {
             column=OAK,
             back_end=BLACK_IRON,
         ),
-        Tender(0.16, OAK, (0.08, -0.08), top=0.11, trim=None, wheel=STEEL),
     ),
     "puffing_billy": _entry(
         Pioneer(

@@ -693,7 +693,7 @@ own pixel art.
 
 | Engine | Class | On sale | Tech to take | Power | Speed | To full speed | Cars | Price | Burns a cell | Range | Drawn after |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Penydarren steam wagon | pioneer | 1804–1808 (then the Catch Me Who Can) |  | steam | 9 km/h | 14 s | 1 | $1,000 | 0.25 coal | 4 cells | [Penydarren locomotive, 1804](https://en.wikipedia.org/wiki/Penydarren_(locomotive)) |
+| Penydarren steam wagon | pioneer | 1804–1808 (then the Catch Me Who Can) |  | steam | 15 km/h | 14 s | 1 | $1,000 | 0.25 coal | 4 cells | [Penydarren locomotive, 1804](https://en.wikipedia.org/wiki/Penydarren_(locomotive)) |
 | Catch Me Who Can | pioneer | 1808–1812 (then the Salamanca) |  | steam | 12 km/h | 13 s | 1 | $1,500 | 0.25 coal | 5 cells | [Catch Me Who Can, 1808](https://en.wikipedia.org/wiki/Catch_Me_Who_Can) |
 | Salamanca | pioneer | 1812–1815 (then the Puffing Billy) |  | steam | 12 km/h | 13 s | 1 | $2,000 | 0.25 coal | 6 cells | [Salamanca, 1812](https://en.wikipedia.org/wiki/Salamanca_(locomotive)) |
 | Puffing Billy | pioneer | 1815–1820 (then the Locomotion) |  | steam | 15 km/h | 13 s | 1 | $2,500 | 0.25 coal | 7 cells | [Puffing Billy, 1813](https://en.wikipedia.org/wiki/Puffing_Billy_(locomotive)) |

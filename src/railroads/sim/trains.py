@@ -266,7 +266,7 @@ BOILERS, SUPERHEATED = ("boilers",), ("superheaters",)
 EXPRESS_TECH = ("express_trains",)
 ENGINES: dict[str, Engine] = {
     "penydarren": Engine(
-        "Penydarren steam wagon", 1804, 0.15, 1, 1_000.0, P, pickup=14.0, tank=4.0
+        "Penydarren steam wagon", 1804, 0.25, 1, 1_000.0, P, pickup=14.0, tank=4.0
     ),
     "catch_me": Engine("Catch Me Who Can", 1808, 0.2, 1, 1_500.0, P, pickup=13.0, tank=5.0),
     "salamanca": Engine("Salamanca", 1812, 0.2, 1, 2_000.0, P, pickup=13.0, tank=6.0),
