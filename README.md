@@ -804,13 +804,13 @@ river.
 
 Freight earns money when the buildings around a station take it, by the demand there
 (`railroads.sim.demand`). Each month a station's capacity for a need is twice what the buildings
-in its inner area need of it. What they use up is everything the station hands them; the demand
-left is the capacity less that use averaged over the last 3 months. Each unit taken earns its
-price times the share of demand left and uses up demand itself, so a town nobody feeds pays the
-full price, one supplied in full every month a little over half, and flooding one drives the price
-down for up to three months. Goods a station gathered itself and passes along to the buildings
-around it use up demand the same way and earn 30% of what a train delivery would have. The
-Stations window shows the share of demand left for each need.
+in its inner area were left short of after the goods buildings around hand out on their own. What
+they use up is everything the station hands them; the demand left is the capacity less that use
+averaged over the last 3 months. Each unit taken earns its price times the share of demand left
+and uses up demand itself, so a town nobody feeds pays the full price, one supplied in full every
+month a little over half, and flooding one drives the price down for up to three months. A town
+its own farms already feed wants no food at all. The Stations window shows the share of demand
+left for each need.
 
 | Price | Goods |
 |---|---|
@@ -923,12 +923,15 @@ for free: when two meet on the line, head on, one catching up with another, or w
 one of them stops where it is until the other has gone by, then sets off again from a stand. The
 train that has stood longest letting others by since its last stop goes first, so none waits for
 ever, then the better engine, then the train bought first. Within stations, and on double track
-for trains going opposite ways, trains pass each other without stopping. Once a month each station that track joins to another station hands what trains brought
-to buildings within 2 cells, unsatisfied first, then content, nearest first, then what it gathered
-before, for 30% of the price, and takes every spare good that buildings made within 3 cells into
-its stockpile, which counts as selling them. So a station is a market for its own area: a mine in
-its reach feeds a steel mill in its reach a month later, without a train. A station on its own,
-with no track to another, does nothing. A station holds up to 500 of each good, what trains brought and what it gathered together, so
+for trains going opposite ways, trains pass each other without stopping. Each month buildings first hand out what they make on their own,
+everywhere on the map, the nearest first, up to 10 cells away: nothing is lost on the way, but a
+building can take less of a maker's month the further it is, all of it from the same cell or the
+next, 90% from two cells away and so on down to 10% from ten. Then each station that track joins
+to another station hands what trains brought to buildings within its reach (1 cell at the first
+level), unsatisfied first, then content, nearest first, and takes the spare goods no building took
+that buildings made within 3 cells into its stockpile, for trains; it never hands those out around
+it, and goods handed out on their own earn the player nothing. A station on its own, with no track
+to another, does nothing. A station holds up to 500 of each good, what trains brought and what it gathered together, so
 one good piling up never blocks the others; a train unloads only what fits and keeps the rest aboard if its next leg pulls a car for that good,
 otherwise the rest is lost. Goods a train brought beyond what the area can use in a month can be
 loaded onto another train, so hubs can pass freight along. Freight remembers where it came from:

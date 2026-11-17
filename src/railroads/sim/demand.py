@@ -2,15 +2,14 @@
 
 Demand is kept by need (railroads.sim.goods.Need): food, fruit, coal and so on. Every month a
 station's capacity for each need is DEMAND_PER_NEED times what the buildings in its inner ring
-need of it. Demand left is the capacity less what was used up of it, averaged over the last
+were left short of after the goods buildings hand out on their own (railroads.sim.economy).
+Demand left is the capacity less what was used up of it, averaged over the last
 MONTHS_REMEMBERED months, so a flood of cargo lowers the price for a few months before it climbs
 back.
 
-Freight trains brought earns its price (railroads.sim.goods.price_of) times the share
-of demand left when buildings take it, and uses that need up. Goods a station gathered itself and
-passes along to the buildings around it use up demand the same way, and earn PASSED_ALONG_PAY of
-what a train delivery would have earned. Passengers and mail earn the same as they get off,
-against the need they meet.
+Freight trains brought earns its price (railroads.sim.goods.price_of) times the share of demand
+left when buildings take it, and uses that need up. Passengers and mail earn the same as they get
+off, against the need they meet.
 """
 
 from collections.abc import Mapping
@@ -20,7 +19,6 @@ from railroads.sim.goods import FITS, Good, Need, price_of
 
 DEMAND_PER_NEED = 2.0
 MONTHS_REMEMBERED = 3
-PASSED_ALONG_PAY = 0.3
 # The needs each good meets, the other way round from FITS.
 NEEDS_MET: dict[Good, tuple[Need, ...]] = {
     good: tuple(need for need, goods in FITS.items() if good in goods) for good in Good

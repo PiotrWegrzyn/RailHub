@@ -68,7 +68,7 @@ def served_house(filling_station: bool) -> float:
     growth.build(Building((6, 21), BuildingKind.HOUSE))
     if filling_station:
         growth.build(Building((5, 20), BuildingKind.FILLING_STATION))
-    railway.station_goods((6, 20)).stockpile.update(
+    railway.station_goods((6, 20)).brought.update(
         {Good.BREAD: 100.0, Good.COAL: 100.0, Good.POTS: 100.0, Good.FUEL: 500.0}
     )
     growth.trade_goods()

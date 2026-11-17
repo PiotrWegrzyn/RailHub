@@ -164,8 +164,7 @@ def signals_of(
         )
         handed = sum(
             amount
-            for by_station in (trade.handed_for, trade.supplied_for)
-            for station in by_station.values()
+            for station in trade.handed_for.values()
             for (need, given), amount in station.items()
             if given == good and need in needs
         )

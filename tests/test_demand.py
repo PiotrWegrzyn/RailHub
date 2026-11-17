@@ -2,7 +2,6 @@ import pytest
 
 from railroads.sim.demand import (
     DEMAND_PER_NEED,
-    PASSED_ALONG_PAY,
     StationDemand,
     capacity_of,
     price_of,
@@ -22,17 +21,6 @@ def test_the_first_unit_to_a_town_nobody_feeds_earns_the_full_price() -> None:
     earned = demand.deliver(Good.WHEAT, 1.0)
 
     assert earned == pytest.approx(price_of(Good.WHEAT))
-
-
-def test_goods_passed_along_earn_a_share_of_a_delivery_and_use_up_as_much_demand() -> None:
-    delivered = StationDemand(capacity={Need.FOOD: 20.0})
-    passed = StationDemand(capacity={Need.FOOD: 20.0})
-
-    full = delivered.pay(Need.FOOD, Good.WHEAT, 5.0)
-    share = passed.pay(Need.FOOD, Good.WHEAT, 5.0, PASSED_ALONG_PAY)
-
-    assert share == pytest.approx(PASSED_ALONG_PAY * full)
-    assert passed.record(Need.FOOD).left == delivered.record(Need.FOOD).left
 
 
 def test_each_unit_earns_at_the_share_of_demand_left_as_it_is_taken() -> None:

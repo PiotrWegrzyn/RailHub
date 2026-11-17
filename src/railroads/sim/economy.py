@@ -4,19 +4,19 @@ how satisfied that leaves each kind of building in each cell.
 Each processor keeps a stockpile of up to INPUT_STOCK of every input for every building, taking in
 what reaches it even while it waits for another input, and works from it.
 
-Stations come first (railroads.sim.railway), those joined by track to another station. Before a
-need is met, a station takes every spare unit of the goods meeting it that buildings made within
-its collection radius into its stockpile, while it has room for that good. It then hands what
-trains brought to buildings within its delivery radius, unsatisfied ones first, then content ones,
-nearest first, and then its stockpile, freshly gathered goods included, to the buildings within its
-collection radius: what it gathers from around it, it hands back to those around it that need it.
-Goods the player keeps for trains at a station (StationOrder.kept) are not handed out at all,
-brought or gathered.
+Buildings hand out what they make on their own first, everywhere on the map (LOCAL_REACH): every
+cell's spare goods go first to the buildings in the same cell, then to those one cell away, and so
+on outwards up to LOCAL_REACH cells. Nothing is lost on the way, but a cell further away can take
+less of a seller's month (reach_share): all of it from the same cell or the next, TAKEN_PER_STEP
+less for every cell beyond. Buildings the same distance from a seller share what it has by how much
+they still want.
 
-What stations leave, buildings sell on their own (LOCAL_REACH): every cell's spare goods go first
-to the buildings in the same cell, then to those one cell away, and so on outwards, and each cell
-of the way loses LOSS_PER_STEP of what was sent, so at LOCAL_REACH cells nothing arrives. Buildings
-the same distance from a seller share what it has by how much they still want.
+Stations come after (railroads.sim.railway), those joined by track to another station: each hands
+what trains brought to buildings within its delivery radius still short of a need, unsatisfied
+ones first, then content ones, nearest first, unless the player keeps the good for trains there
+(StationOrder.kept). Once every need has been met, each station takes the spare goods no building
+took that buildings made within its collection radius into its stockpile, while it has room, for
+trains to carry away; it never hands them out around it.
 
 Nothing is made that has nowhere to go: a processor uses up only the inputs for what left it; the
 rest waits in its stockpile. Needs are handed out in the order of PIPELINE, so the inputs of a
@@ -46,7 +46,6 @@ from railroads.sim.clock import START_YEAR
 from railroads.sim.constructions import GREW_FROM, BuildingKind
 from railroads.sim.goods import (
     BOOST_MOST,
-    FITS,
     HANDED_OUT,
     LAND_BOOST_MOST,
     MAKES,
@@ -77,13 +76,19 @@ DELIVERY_RADIUS = 2
 
 COLLECTION_RADIUS = 3
 
-# How many cells away buildings sell their goods on their own, and the share of what was sent that
-# each cell of the way loses: at LOCAL_REACH cells nothing arrives.
+# How many cells away buildings hand out their goods on their own, and how much less of a seller's
+# month a cell can take for every cell beyond the next one: 10% of it from LOCAL_REACH cells away.
 LOCAL_REACH = 10
-# The cells of -1 around the map that let _Month._pairs look LOCAL_REACH - 1 cells out from any
-# cell without checking for the edge.
-_PAD = LOCAL_REACH - 1
-LOSS_PER_STEP = 0.1
+TAKEN_PER_STEP = 0.1
+# The cells of -1 around the map that let _Month._pairs look LOCAL_REACH cells out from any cell
+# without checking for the edge.
+_PAD = LOCAL_REACH
+
+
+def reach_share(away: int) -> float:
+    """The most of a seller's month a cell `away` cells from it can take."""
+    return min(1.0, 1.0 - TAKEN_PER_STEP * (away - 1))
+
 
 # About how long a month's trade works before it pauses for the next frame.
 STEP_SECONDS = 0.008
@@ -125,8 +130,8 @@ class Neighbourhoods:
 
 @dataclass(frozen=True, slots=True, eq=False)
 class Rings:
-    """The steps to every cell fewer than LOCAL_REACH cells away, nearest first, as row and
-    column steps for even rows and for odd rows, and where each distance starts among them."""
+    """The steps to every cell up to LOCAL_REACH cells away, nearest first, as row and column
+    steps for even rows and for odd rows, and where each distance starts among them."""
 
     rows: tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]]
     cols: tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]]
@@ -135,7 +140,7 @@ class Rings:
 
 @cache
 def rings_of(grid: Grid) -> Rings:
-    reach = LOCAL_REACH - 1
+    reach = LOCAL_REACH
     middle = 2 * reach + 2
     roomy = replace(grid, rows=2 * middle + 2, cols=2 * middle + 2)
     rows, cols, away = [], [], None
@@ -145,7 +150,7 @@ def rings_of(grid: Grid) -> Rings:
         cols.append(np.array([c - middle for (_, c), _ in steps], dtype=np.intp))
         away = np.array([d for _, d in steps], dtype=np.intp)
     assert away is not None
-    starts = np.searchsorted(away, np.arange(LOCAL_REACH + 1))
+    starts = np.searchsorted(away, np.arange(LOCAL_REACH + 2))
     return Rings((rows[0], rows[1]), (cols[0], cols[1]), starts)
 
 
@@ -159,9 +164,9 @@ class StationOrder:
     # How many cells out it hands goods out to, and gathers them from.
     delivery: int = DELIVERY_RADIUS
     collection: int = COLLECTION_RADIUS
-    # Freight it gathered before, which it also hands out to the buildings around it.
+    # Freight it gathered before, which takes up its room.
     stockpile: Mapping[Good, float] = field(default_factory=dict)
-    # Goods kept for trains: none of them is handed out around it, brought or gathered.
+    # Goods kept for trains: none of what trains brought of them is handed out around it.
     kept: frozenset[Good] = frozenset()
     # The platforms added to it, whose cells it reaches out from as well as its own.
     platforms: tuple[Cell, ...] = ()
@@ -197,9 +202,6 @@ class Trade:
     )
     # Per station, how much of what trains brought it handed out, by need and good.
     handed_for: Mapping[Cell, Mapping[tuple[Need, Good], float]] = field(default_factory=dict)
-    # Per station, the goods it handed out of its own stockpile, and how much of them by need.
-    supplied: Mapping[Cell, Mapping[Good, float]] = field(default_factory=dict)
-    supplied_for: Mapping[Cell, Mapping[tuple[Need, Good], float]] = field(default_factory=dict)
     bonus: Mapping[BuildingKind, FloatCells] = field(default_factory=dict)
     # What each bonus good a building gets all of adds to its satisfaction, with the player's tech.
     bonus_per_good: float = BONUS_PER_GOOD
@@ -422,9 +424,7 @@ class _Month:
         self.offers: dict[tuple[BuildingKind, Good], FloatCells] = {}
         self.offered = {good: self.zero.copy() for good in Good}
         self.sold = {good: self.zero.copy() for good in Good}
-        # Of what sellers sent to buildings nearby, what was lost on the way, and per need what
-        # buildings got that way.
-        self.lost = {good: self.zero.copy() for good in Good}
+        # Per need, what buildings got of it from sellers nearby rather than stations.
         self.local: dict[Need, FloatCells] = {}
         # Where each traded cell stands among them, -1 for the rest, and per good the pairs of
         # sellers and buyers near enough to trade.
@@ -447,11 +447,6 @@ class _Month:
         self.raw_boost: dict[BuildingKind, FloatCells] = {}
         self.received: dict[tuple[BuildingKind, Need], FloatCells] = {}
         self.brought = {station: dict(order.brought) for station, order in stations.items()}
-        self.stockpiled = {station: dict(order.stockpile) for station, order in stations.items()}
-        self.supplied: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
-        self.supplied_for: dict[Cell, dict[tuple[Need, Good], float]] = {
-            station: {} for station in stations
-        }
         self.handed: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
         self.handed_for: dict[Cell, dict[tuple[Need, Good], float]] = {
             station: {} for station in stations
@@ -492,12 +487,12 @@ class _Month:
             if isinstance(step, BuildingKind):
                 self._produce(step)
                 continue
-            for good in FITS[step]:
-                self._gather(good)
             self._serve(step)
             if time.perf_counter() - paused > STEP_SECONDS:
                 yield
                 paused = time.perf_counter()
+        for good in Good:
+            self._gather(good)
         return (yield from self._settle())
 
     def _wants(self, need: Need) -> dict[BuildingKind, FloatCells]:
@@ -523,10 +518,10 @@ class _Month:
         return taken
 
     def _serve(self, need: Need) -> None:
-        """Lets stations hand out the goods meeting a need, the most valuable first: of each
-        good what trains brought within their delivery radius, then their stockpile within their
-        collection radius, unless the good is kept for trains. Buildings want only what they did
-        not take already this month."""
+        """Lets the goods meeting a need reach the buildings wanting it, the most valuable first:
+        first what buildings hand out on their own, then what trains brought to stations, within
+        their delivery radius, unless the good is kept for trains. Buildings want only what they
+        did not take already this month."""
         wants = self._wants(need)
         if not wants:
             return
@@ -537,30 +532,22 @@ class _Month:
             wants[kind] = np.maximum(wants[kind] - taken, 0.0)
         demand = sum(wants.values(), start=self.zero.copy())
         received = self.zero.copy()
-        for station in self.stations:
-            near, far = self.reach[station]
-            for good in HANDED_OUT[need]:
-                if good in self.stations[station].kept:
-                    continue
-                brought = self.brought[station].get(good, 0.0)
-                if brought > 0:
-                    given = self.economy._hand_out(brought, near, demand, received, self.priority)
-                    self.brought[station][good] = brought - given
-                    self.handed[station][good] = self.handed[station].get(good, 0.0) + given
-                    handed_for = self.handed_for[station]
-                    handed_for[(need, good)] = handed_for.get((need, good), 0.0) + given
-                held = self.stockpiled[station].get(good, 0.0)
-                if held <= 0:
-                    continue
-                given = self.economy._hand_out(held, far, demand, received, self.priority)
-                self.stockpiled[station][good] = held - given
-                self.supplied[station][good] = self.supplied[station].get(good, 0.0) + given
-                supplied_for = self.supplied_for[station]
-                supplied_for[(need, good)] = supplied_for.get((need, good), 0.0) + given
-        from_stations = received.copy()
         for good in HANDED_OUT[need]:
             self._sell_nearby(good, demand, received)
-        self.local[need] = received - from_stations
+        self.local[need] = received.copy()
+        for station in self.stations:
+            near, _ = self.reach[station]
+            for good in HANDED_OUT[need]:
+                brought = self.brought[station].get(good, 0.0)
+                if brought <= 0 or good in self.stations[station].kept:
+                    continue
+                given = self.economy._hand_out(brought, near, demand, received, self.priority)
+                if given <= 0:
+                    continue
+                self.brought[station][good] = brought - given
+                self.handed[station][good] = self.handed[station].get(good, 0.0) + given
+                handed_for = self.handed_for[station]
+                handed_for[(need, good)] = handed_for.get((need, good), 0.0) + given
         met = np.where(demand > 0, received / np.where(demand > 0, demand, 1.0), 0.0)
         for kind, want in wants.items():
             got = met * want
@@ -606,8 +593,9 @@ class _Month:
             self.offered[good] = self.offered[good] + more
 
     def _sell_nearby(self, good: Good, demand: FloatCells, received: FloatCells) -> None:
-        """Lets the cells with spare goods sell them to the buildings still short of them, the
-        nearest first, losing LOSS_PER_STEP of what is sent for every cell of the way."""
+        """Lets the cells with spare goods hand them out to the buildings still short of them, the
+        nearest first, each cell taking from a seller at most its reach_share of the seller's
+        month."""
         spare = np.maximum(self.offered[good] - self.sold[good], 0.0)
         left = demand - received
         if not (spare > 1e-9).any() or not (left > 1e-9).any():
@@ -615,9 +603,8 @@ class _Month:
         sellers, buyers, starts = self._pairs(good)
         size = self.cells.size
         remaining = spare.copy()
-        lost = self.zero.copy()
-        for away in range(LOCAL_REACH):
-            keep = 1.0 - LOSS_PER_STEP * away
+        month = self.offered[good]
+        for away in range(LOCAL_REACH + 1):
             ring = slice(starts[away], starts[away + 1])
             seller, buyer = sellers[ring], buyers[ring]
             wanting = left[buyer]
@@ -626,22 +613,19 @@ class _Month:
                 continue
             seller, buyer, wanting = seller[live], buyer[live], wanting[live]
             share = wanting / np.bincount(seller, wanting, minlength=size)[seller]
-            sent = remaining[seller] * share
-            arriving = np.bincount(buyer, sent * keep, minlength=size)[buyer]
-            taken = np.minimum(1.0, left[buyer] / arriving)
-            sent *= taken
+            sent = np.minimum(remaining[seller] * share, month[seller] * reach_share(away))
+            arriving = np.bincount(buyer, sent, minlength=size)[buyer]
+            sent *= np.minimum(1.0, left[buyer] / arriving)
             remaining -= np.bincount(seller, sent, minlength=size)
-            lost += np.bincount(seller, sent * (1.0 - keep), minlength=size)
-            left -= np.bincount(buyer, sent * keep, minlength=size)
+            left -= np.bincount(buyer, sent, minlength=size)
             if remaining.max() <= 1e-9 or left.max() <= 1e-9:
                 break
         self.sold[good] += spare - remaining
-        self.lost[good] += lost
         received[:] = demand - left
 
     def _pairs(self, good: Good) -> tuple[npt.NDArray[np.intp], ...]:
-        """Every cell making a good with every traded cell fewer than LOCAL_REACH cells from it,
-        as positions among the traded cells, the nearest pairs first, and where the pairs of
+        """Every cell making a good with every traded cell up to LOCAL_REACH cells from it, as
+        positions among the traded cells, the nearest pairs first, and where the pairs of
         each distance start among them."""
         known = self.pairs.get(good)
         if known is not None:
@@ -661,8 +645,8 @@ class _Month:
 
     def _padded(self) -> tuple[npt.NDArray[np.intp], tuple[npt.NDArray[np.intp], ...]]:
         """Where each traded cell stands among them on the map with _PAD cells of -1 around it,
-        as flat indices, and the flat steps on it to every cell fewer than LOCAL_REACH cells away
-        from a cell on an even and an odd row, nearest first."""
+        as flat indices, and the flat steps on it to every cell up to LOCAL_REACH cells away from
+        a cell on an even and an odd row, nearest first."""
         if self.padded is None:
             grid = self.economy.tile_map.grid
             rings = rings_of(grid)
@@ -674,9 +658,9 @@ class _Month:
         return self.padded
 
     def _gather(self, good: Good) -> None:
-        """Lets every station take spare units of a good buildings made into its stockpile, where
-        they can be handed out at once. Where nothing is on offer or a station has no room, it
-        takes nothing."""
+        """Lets every station take the spare units of a good no building took into its
+        stockpile, for trains. Where nothing is left or a station has no room, it takes
+        nothing."""
         offered = self.offered[good]
         if not offered.any():
             return
@@ -689,8 +673,6 @@ class _Month:
             if taken > 0:
                 self.gathered[station][good] = self.gathered[station].get(good, 0.0) + taken
                 self.room[station][good] -= taken
-                stockpiled = self.stockpiled[station]
-                stockpiled[good] = stockpiled.get(good, 0.0) + taken
 
     def _produce(self, kind: BuildingKind) -> None:
         """Offers what a kind of processor could make from its stockpile: what its inputs allow,
@@ -741,16 +723,13 @@ class _Month:
         self.offers[(kind, recipe.makes)] = can
         self.offered[recipe.makes] += can
 
-    def _went(self, good: Good) -> tuple[FloatCells, FloatCells]:
-        """The share of all of a good on offer that went, and that reached a buyer, in each
+    def _went(self, good: Good) -> FloatCells:
+        """The share of all of a good on offer that went, to buildings or stations, in each
         cell."""
         offered = self.offered[good]
         on_offer = offered > 0
-        whole = np.where(on_offer, offered, 1.0)
-        sold = self.sold[good]
-        went = np.where(on_offer, sold / whole, 0.0)
-        reached = np.where(on_offer, (sold - self.lost[good]) / whole, 0.0)
-        return np.minimum(went, 1.0), np.minimum(reached, 1.0)
+        went = np.where(on_offer, self.sold[good] / np.where(on_offer, offered, 1.0), 0.0)
+        return np.minimum(went, 1.0)
 
     def _settle(self) -> Steps[Trade]:
         """Counts what every building got and gave, uses up the inputs of what the processors
@@ -773,13 +752,11 @@ class _Month:
             got[kind] += np.minimum(received, wanted)
             needed[kind] += wanted
         goods_gave = {}
-        shares: dict[Good, tuple[FloatCells, FloatCells]] = {}
+        shares: dict[Good, FloatCells] = {}
         for (kind, good), offer in self.offers.items():
             if good not in shares:
                 shares[good] = self._went(good)
-            went_share, reached_share = shares[good]
-            sent = offer * went_share
-            given = offer * reached_share
+            sent = given = offer * shares[good]
             most = self.count[kind] * MAKES[kind][good]
             goods_gave[(kind, good)] = (given, most)
             gave[kind] += given
@@ -811,8 +788,6 @@ class _Month:
             goods_got,
             goods_gave,
             self.handed_for,
-            self.supplied,
-            self.supplied_for,
             bonus,
             self.economy.bonus_per_good,
             self.local,

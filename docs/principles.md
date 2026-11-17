@@ -12,9 +12,17 @@ The ideas every rule of the game should follow.
 
 ## The rules that follow from them
 
-- Buildings sell what they make to the buildings around them on their own, up to ten cells away,
-  each cell of the way losing a tenth of what was sent, the nearest first. Stations take and hand
-  out first.
+- Buildings hand out what they make to the buildings around them on their own, everywhere on the
+  map, the nearest first, up to ten cells away. Nothing is lost on the way, but the further a buyer
+  is, the less of the maker's month it can take: all of it from the same cell or the next, 90% from
+  two cells away, and so on down to 10% from ten cells away.
+- Only what is left after that goes to a station within reach; stations never take a good the
+  buildings around could have used.
+- The player earns only when buildings take goods out of the player's stations. Goods handed out
+  on their own earn nothing, so the money comes from what the player adds to the local economy:
+  a station is an investment.
+- The demand at a station counts only what the buildings around it were left short of after the
+  goods handed out on their own.
 - Buildings come up at their base chance anywhere the land allows, and breed by how satisfied they
   are, the more the more of what draws them stands around.
 - Producers of what the land gives never starve to death; fields go only when a town grows over
@@ -54,8 +62,15 @@ The ideas every rule of the game should follow.
 - Local needs come first: a station does not take away a good the place it was made is short of.
 - Goods are handed out from the most valuable to the cheapest: meat before wheat.
 - Only what went over the player's track earns money. A station earns nothing unless track joins
-  it to another station; goods it gathered itself and hands to the buildings around it earn 30% of
-  what a train delivery would have.
+  it to another station.
+- Prices are not meant to be realistic: they reward doing something hard. Hauling food and raw
+  goods pays little, about enough for the stations and track; passengers and processed goods pay
+  the most, since most of their demand and people exist because of the player's network. Every
+  further stage of a chain pays more. What a building earns a month at full output matters more
+  than the price of a unit.
+- What trains pay to burn coal, wood or diesel is priced apart from what hauling that good pays.
+- Every car costs something each time it leaves a stop, loaded or not, more the bigger it is, so
+  short, well-managed trains pay.
 - Every price is a tug of war: demand, the player's own included, against supply, measured against
   the map's starting state so every map is fair.
 - Fuel bought out of the player's own stations is cheaper than at retail, and technology narrows
