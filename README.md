@@ -887,7 +887,7 @@ with it. A new train
 starts at its first stop. The window shows what the train pulls
 now. The Stations window shows every station's stockpile and the goods waiting to be handed out
 there, with a button to look at the station; clicking a name opens the station. Trains
-(`railroads.sim.railway`) run along the track at 30 cells a month on the flat at 60 km/h, slower on
+(`railroads.sim.railway`) run along the track at 40 cells a month on the flat at 60 km/h, slower on
 hills, and each car slows them: an empty car weighs 1, a full one 2 and a full bulk car 4, and
 every unit of weight costs 8%
 of a Planet's speed, so five full cars still run at a little over half of it; engines built for

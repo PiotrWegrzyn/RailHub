@@ -177,8 +177,7 @@ LINING: RGB = (222, 222, 212)
 GRAPHITE: RGB = (196, 198, 204)
 BRUNSWICK: RGB = (34, 52, 42)
 OCHRE: RGB = (176, 136, 62)
-RED_OXIDE: RGB = (112, 60, 46)
-BARE_IRON: RGB = (104, 104, 108)
+OAK: RGB = (178, 98, 42)
 ROCKET_YELLOW: RGB = (236, 196, 32)
 
 # Sizes in cells: how far apart the engine and cars sit, and their half lengths.
@@ -377,6 +376,12 @@ class Pioneer:
     crown: bool = False
     tyre: RGB = parts.TYRE
     flue: float = 0.017
+    hoop_count: int = 3
+    upright: RGB = BRASS
+    column: RGB | None = None
+    back_end: RGB | None = None
+    spokes: int = 6
+    tubes: RGB | None = None
 
     @property
     def chimney(self) -> tuple[float, float]:
@@ -395,11 +400,14 @@ class Pioneer:
             _side_rods(m, (min(us), max(us)), self.wheels[0][1])
         start = -h + 0.07
         if self.firebox is not None:
-            m.box((start, start + 0.08), (-r, r), (0.075, top + 0.01), self.firebox)
+            high = top + 0.01 if self.haystack else top - 0.015
+            m.box((start, start + 0.08), (-r, r), (0.075, high), self.firebox)
             if self.haystack:
                 m.spire(start + 0.04, r, (top + 0.01, top + 0.07), self.firebox)
             start += 0.08
         m.cylinder_along((start, h - 0.02), r, z, self.boiler, shade(self.boiler, 0.8))
+        if self.tubes is not None:
+            self._tubes(m, (start + 0.01, h - 0.1), z, self.tubes)
         if self.front is not None:
             m.cylinder_along((h - 0.1, h - 0.015), r + 0.004, z, self.front, self.front)
             m.box((h - 0.1, h - 0.03), (-r * 0.7, r * 0.7), (0.06, z), self.front)
@@ -412,8 +420,21 @@ class Pioneer:
             (self.chimney_top - 0.025, self.chimney_top),
             self.chimney_color,
         )
+        if self.back_end is not None:
+            m.cylinder_along((start, start + 0.03), r + 0.004, z, self.back_end, self.back_end)
+        if self.column is not None and self.uprights:
+            middle = sum(self.uprights) / len(self.uprights)
+            m.box(
+                (middle - 0.03, middle + 0.03), (-0.03, 0.03), (top - 0.01, top + 0.1), self.column
+            )
+            m.box(
+                (middle - 0.014, middle + 0.014),
+                (-0.014, 0.014),
+                (top + 0.1, self.chimney_top - 0.02),
+                self.column,
+            )
         for u in self.uprights:
-            m.cylinder_up(u, 0.024, (top - 0.01, top + 0.06), BRASS)
+            m.cylinder_up(u, 0.024, (top - 0.01, top + 0.06), self.upright)
             if self.crossheads:
                 m.box(
                     (u - 0.008, u + 0.008), (-0.095, 0.095), (top + 0.06, top + 0.072), BLACK_IRON
@@ -441,14 +462,20 @@ class Pioneer:
         h, r = self.half, self.radius
         for u, size in self.wheels:
             parts.spoked_wheel(
-                m, u, size, 0.075, self.wheel, spokes=12 if size > 0.06 else 6, tyre=self.tyre
+                m,
+                u,
+                size,
+                0.075,
+                self.wheel,
+                spokes=12 if size > 0.06 else self.spokes,
+                tyre=self.tyre,
             )
         start = -h + 0.07 + (0.08 if self.firebox is not None else 0.0)
         end = h - (0.1 if self.front is not None else 0.02)
         hoops = self.hoops or shade(self.boiler, 0.7)
         with m.fine():
-            for k in range(1, 4):
-                at = start + (end - start) * k / 4
+            for k in range(1, self.hoop_count + 1):
+                at = start + (end - start) * k / (self.hoop_count + 1)
                 m.cylinder_along((at - 0.004, at + 0.004), r + 0.003, z, hoops)
             u = self.chimney[0]
             if self.crown:
@@ -465,8 +492,31 @@ class Pioneer:
                 m, (u - mouth, u + mouth), (-mouth, mouth), self.chimney_top + 0.0006, COAL
             )
             parts.front_ring(m, -h + 0.07 - 0.0006, z - r * 0.3, r * 0.35, BLACK_IRON, 0.0, 10)
-        if self.frame == WOOD:
-            parts.lines(m, (-h, h), (0.045, 0.075), 0.0656, shade(WOOD, 0.7), 1)
+        if self.frame in (WOOD, OAK):
+            parts.lines(m, (-h, h), (0.045, 0.075), 0.0656, shade(self.frame, 0.7), 1)
+        if self.boiler in (LAGGING, OAK):
+            with m.fine():
+                for k in range(10):
+                    angle = math.pi * (0.1 + 0.08 * k)
+                    for side in (1.0, -1.0):
+                        v = side * (r + 0.0015) * math.cos(angle)
+                        high = z + (r + 0.0015) * math.sin(angle)
+                        m.box(
+                            (start, end),
+                            (v - 0.0008, v + 0.0008),
+                            (high - 0.0008, high + 0.0008),
+                            shade(self.boiler, 0.72),
+                        )
+
+    def _tubes(self, m: Model, u: tuple[float, float], z: float, color: RGB) -> None:
+        """The Rocket's boiler as the museum shows it, cut open along the top: black inside, with
+        the copper fire tubes running through it."""
+        r = self.radius
+        m.box(u, (-r * 0.8, r * 0.8), (z + r * 0.5, z + r + 0.008), BLACK_IRON)
+        with m.fine():
+            for k in range(5):
+                v = r * 0.6 * (k - 2) / 2
+                m.box(u, (v - 0.003, v + 0.003), (z + r + 0.008, z + r + 0.012), color)
 
     def _beams(self, m: Model, z: float, top: float) -> None:
         """Puffing Billy's cylinders standing at the boiler's sides, working beams pivoted at the
@@ -808,13 +858,18 @@ class Tender:
     width: float = 0.085
     wheel: RGB = FRAME
     tyre: RGB = parts.TYRE
+    tank: RGB | None = None
+    slats: bool = False
 
     def model(self) -> Model:
         m = Model()
         h, w, top = self.half, self.width, self.top
         m.box((-h, h), (-0.07, 0.07), (0.035, 0.06), FRAME)
         m.wheels(list(self.wheels), 0.035, self.wheel, 0.075)
-        m.box((-h, h), (-w, w), (0.06, top), self.body)
+        if self.slats:
+            self._slatted(m)
+        else:
+            m.box((-h, h), (-w, w), (0.06, top), self.body)
         if self.trim is not None:
             low, high = self.trim_z or (top - 0.035, top - 0.022)
             m.panel((-h + 0.02, h - 0.02), (low, high), w + 0.0005, self.trim)
@@ -825,17 +880,41 @@ class Tender:
                 (top, top + 0.02),
                 shade(self.body, 0.85),
             )
+        elif self.tank is not None:
+            m.box((-h + 0.02, 0.06), (-w + 0.01, w - 0.01), (top, top + 0.09), self.tank)
+            m.box((0.08, h - 0.02), (-w + 0.015, w - 0.015), (top, top + 0.03), self.load)
         elif self.barrel is not None:
             m.cylinder_along(
                 (-h + 0.02, 0.05), 0.048, top + 0.048, self.barrel, shade(self.barrel, 0.75)
             )
-            m.box((0.07, h - 0.02), (-w + 0.015, w - 0.015), (top, top + 0.035), self.load)
+            if not self.slats:
+                m.box((0.07, h - 0.02), (-w + 0.015, w - 0.015), (top, top + 0.035), self.load)
         else:
             with m.coarse():
                 m.box((-h + 0.03, h - 0.03), (-w + 0.015, w - 0.015), (top, top + 0.03), self.load)
                 m.box((-0.5 * h, 0.5 * h), (-0.05, 0.05), (top + 0.03, top + 0.05), self.load)
         self._fine(m)
         return m
+
+    def _slatted(self, m: Model) -> None:
+        """An open wagon of the first years: a flat bed with low sides of posts and rails, a
+        solid box far out."""
+        h, w, top = self.half, self.width, self.top
+        with m.coarse():
+            m.box((-h, h), (-w, w), (0.06, top), self.body)
+        with m.fine():
+            m.box((-h, h), (-w, w), (0.06, 0.08), self.body)
+            m.box((-h + 0.01, h - 0.01), (-w + 0.01, w - 0.01), (0.08, top - 0.014), FRAME)
+            for v in (w - 0.008, -w):
+                m.box((-h, h), (v, v + 0.008), (top - 0.012, top), self.body)
+                m.box((-h, h), (v, v + 0.008), (0.08, 0.088), self.body)
+                posts = round(2 * h / 0.06)
+                for k in range(posts + 1):
+                    u = -h + 0.006 + (2 * h - 0.012) * k / posts
+                    m.box((u - 0.006, u + 0.006), (v, v + 0.008), (0.08, top), self.body)
+            for u in (h - 0.008, -h):
+                m.box((u, u + 0.008), (-w, w), (top - 0.012, top), self.body)
+                m.box((u, u + 0.008), (-w, w), (0.08, 0.088), self.body)
 
     def _fine(self, m: Model) -> None:
         """Spoked wheels behind axle boxes, rivets and lining, steps, the lumps of the load, a
@@ -850,6 +929,9 @@ class Tender:
                 m.box((h - 0.03, h - 0.005), v, (0.03, 0.036), FRAME)
                 m.box((h - 0.03, h - 0.005), v, (0.045, 0.051), FRAME)
         if self.shroud:
+            return
+        if self.tank is not None:
+            parts.rivets(m, (-h + 0.02, 0.06), top + 0.08, w - 0.0094, shade(self.tank, 1.6), 6)
             return
         if self.barrel is not None:
             with m.fine():
@@ -1885,25 +1967,36 @@ ENGINES: dict[str, EngineModel] = {
     "salamanca": _entry(
         Pioneer(
             0.27,
-            RED_OXIDE,
-            FRAME,
+            OAK,
+            OAK,
             ((0.14, 0.045), (-0.14, 0.045)),
+            STEEL,
             uprights=(-0.04, 0.08),
             crossheads=True,
             rack=True,
+            hoops=BLACK_IRON,
+            hoop_count=6,
+            upright=OAK,
+            column=OAK,
+            back_end=BLACK_IRON,
         ),
-        Tender(0.16, (92, 70, 50), (0.08, -0.08), top=0.11, trim=None),
+        Tender(0.16, OAK, (0.08, -0.08), top=0.11, trim=None, wheel=STEEL),
     ),
     "puffing_billy": _entry(
         Pioneer(
             0.3,
-            BARE_IRON,
+            LAGGING,
             WOOD,
             ((0.16, 0.05), (-0.12, 0.05)),
+            BLACK_IRON,
             chimney_top=0.5,
             beams=True,
+            hoops=BLACK_IRON,
+            hoop_count=5,
+            back_end=BLACK_IRON,
+            spokes=8,
         ),
-        Tender(0.17, WOOD, (0.09, -0.09), top=0.11, trim=None, barrel=(110, 74, 44)),
+        Tender(0.17, WOOD, (0.09, -0.09), top=0.11, trim=None, tank=BLACK_IRON, wheel=BLACK_IRON),
     ),
     "locomotion": _entry(
         Pioneer(
@@ -1930,10 +2023,11 @@ ENGINES: dict[str, EngineModel] = {
             flue=0.026,
             radius=0.06,
             slanted=True,
-            firebox=COPPER,
+            firebox=BLACK_IRON,
             front=BLACK_IRON,
             hoops=BLACK_IRON,
             crown=True,
+            tubes=COPPER,
             tyre=(46, 44, 44),
         ),
         Tender(
@@ -1944,6 +2038,7 @@ ENGINES: dict[str, EngineModel] = {
             trim=None,
             barrel=ROCKET_YELLOW,
             wheel=ROCKET_YELLOW,
+            slats=True,
             tyre=(46, 44, 44),
         ),
     ),

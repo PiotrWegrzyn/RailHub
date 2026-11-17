@@ -108,7 +108,7 @@ TRAIN_NAMES = {
     Power.MAGLEV: "Maglev",
 }
 # How far a train runs in a month, in cells, on flat ground.
-CELLS_PER_MONTH = 30.0
+CELLS_PER_MONTH = 40.0
 # Trains meet where points along them, MEET_STEP cells apart, come within MEET_DISTANCE cells.
 MEET_STEP = 0.2
 MEET_DISTANCE = 0.2
