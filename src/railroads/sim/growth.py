@@ -394,8 +394,8 @@ class Growth:
             _, land, cells = shared
             self._places.append(_Place(ladder, cells, land, np.empty(0)))
         self._stack()
+        self._reckon_everywhere()
         for place in self._places:
-            self._reckon(place, everywhere)
             place.highest = float(place.chances.max())
         # The cells whose forest came or went in the last month.
         self.forests_changed: set[Cell] = set()
@@ -430,9 +430,7 @@ class Growth:
     def __setstate__(self, state: dict[str, object]) -> None:
         self.__dict__.update(state)
         self._stack()
-        everywhere = np.arange(self._grid.rows * self._grid.cols)
-        for place in self._places:
-            self._reckon(place, everywhere)
+        self._reckon_everywhere()
 
     def _stack(self) -> None:
         """Lays every ladder's chances, every land's weights and every kind of points nearby and
@@ -506,6 +504,17 @@ class Growth:
                 shunned_by=shunned_by,
                 shunned_weights=shunned_weights,
             )
+
+    def big_parts(self) -> list[object]:
+        """What of the growth takes longest to pickle (railroads.sim.game.Game.big_parts)."""
+        return [
+            self._counts,
+            self.economy,
+            self.trade,
+            self._starving,
+            [place.land for place in self._places],
+            [place.cells for place in self._places],
+        ]
 
     def trade_goods(self) -> set[Cell]:
         """Pulls down farms that towns have crowded out, lets stations hand out a month of goods,
@@ -733,6 +742,31 @@ class Growth:
                 )
             )
         place.chances[cells] = raw * place.land[cells]
+
+    def _reckon_everywhere(self) -> None:
+        """Works out every ladder's chances in every cell afresh, as _reckon does, the doublings
+        of what draws them once for all the ladders drawn alike."""
+        doublings: dict[tuple[tuple[Points, float], ...], FloatGrid] = {}
+        for place in self._places:
+            breeding = self._breeding(place)
+            drawn_by = tuple(breeding.drawn_by.items())
+            if drawn_by not in doublings:
+                drawing = sum(weight * self._nearby[points].ravel() for points, weight in drawn_by)
+                doublings[drawn_by] = np.log2(1 + drawing)
+            served = self._served[breeding.own]
+            raw = (
+                breeding.spawn
+                + (breeding.spawn + breeding.per_doubling * served) * doublings[drawn_by]
+            )
+            if breeding.shunned_by:
+                raw = raw / (
+                    1.0
+                    + sum(
+                        weight * self._nearby[points].ravel()
+                        for points, weight in breeding.shunned_by.items()
+                    )
+                )
+            place.chances[:] = raw * place.land
 
     def land(self, land: Land, cells: npt.NDArray[np.intp]) -> FloatGrid:
         """The weights of these flat cells for a land (railroads.sim.ladders.Land.weights), as
