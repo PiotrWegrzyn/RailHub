@@ -90,10 +90,18 @@ class StationDemand:
         price = price_of(good)
         earned = 0.0
         left = amount
+        capacity = self.capacity.get(need, 0.0)
+        months = self.used.get(need, ())
         while left > 1e-9:
             unit = min(1.0, left)
-            earned += price * unit * self._share(need) * rate
+            share = (
+                max(0.0, capacity - sum(months) / MONTHS_REMEMBERED) / capacity
+                if capacity > 0
+                else 0.0
+            )
+            earned += price * unit * share * rate
             self._use(need, unit)
+            months = self.used[need]
             left -= unit
         return earned
 
