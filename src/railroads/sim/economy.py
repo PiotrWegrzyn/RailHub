@@ -79,6 +79,9 @@ COLLECTION_RADIUS = 4
 # How many cells away buildings sell their goods on their own, and the share of what was sent that
 # each cell of the way loses: at LOCAL_REACH cells nothing arrives.
 LOCAL_REACH = 10
+# The cells of -1 around the map that let _Month._pairs look LOCAL_REACH - 1 cells out from any
+# cell without checking for the edge.
+_PAD = LOCAL_REACH - 1
 LOSS_PER_STEP = 0.1
 
 # About how long a month's trade works before it pauses for the next frame.
@@ -258,6 +261,9 @@ class Economy:
             for kind, recipe in RECIPES.items()
             for need in recipe.every_need
         }
+        # The stockpiles the last trade left empty everywhere, which no station has filled since
+        # (railroads.sim.station_trade), so the next trade need not look at them.
+        self.blank: set[tuple[BuildingKind, Need]] = set()
 
     def trade(
         self,
@@ -341,6 +347,16 @@ class Economy:
         return take
 
 
+@cache
+def _wanted(kind: BuildingKind, year: int) -> frozenset[Need]:
+    """The needs a kind wants in a given year: what a processor takes in or is boosted by, and
+    what the rest need."""
+    recipe = RECIPES.get(kind)
+    if recipe is None:
+        return frozenset(needs_of(kind, year))
+    return frozenset(recipe.takes(year)) | frozenset(boosts_of(kind, year))
+
+
 class _Month:
     """One month of trade on the cells with buildings, worked out need by need in the order of
     the chain: what each building is offered, takes in, makes and gives away."""
@@ -363,6 +379,7 @@ class _Month:
         self.cells = cells
         in_cells = ((k, n[cells]) for k, n in flat.items())
         self.count = {k: n.astype(np.float64) for k, n in in_cells if n.any()}
+        self.wanted = {kind: _wanted(kind, economy.year) for kind in self.count}
         self.zero = np.zeros(cells.size)
         self.priority = economy.levels[cells]
         for kind, recipe in RECIPES.items():
@@ -384,6 +401,7 @@ class _Month:
         self.position = np.full(economy.cells, -1, dtype=np.intp)
         self.position[cells] = np.arange(cells.size)
         self.pairs: dict[Good, tuple[npt.NDArray[np.intp], ...]] = {}
+        self.padded: tuple[npt.NDArray[np.intp], tuple[npt.NDArray[np.intp], ...]] | None = None
         # What buildings had taken as goods reached their station when their need was served:
         # what they take after that, while the month's trade is still going, counts for the next.
         self.counted: dict[tuple[BuildingKind, Need], dict[int, float]] = {}
@@ -430,7 +448,9 @@ class _Month:
         yield
         economy, cells = self.economy, self.cells
         self.stock = {
-            (kind, need): np.minimum(
+            (kind, need): np.zeros(cells.size)
+            if (kind, need) in economy.blank
+            else np.minimum(
                 economy.stock[(kind, need)][cells],
                 input_stock(kind) * self.count.get(kind, self.zero),
             )
@@ -455,11 +475,11 @@ class _Month:
         room left in their stockpile."""
         wants = {}
         for kind, n in self.count.items():
-            recipe = RECIPES.get(kind)
-            year = self.economy.year
-            if recipe is not None and (need in recipe.takes(year) or need in boosts_of(kind, year)):
+            if need not in self.wanted[kind]:
+                continue
+            if kind in RECIPES:
                 wants[kind] = np.maximum(input_stock(kind) * n - self.stock[(kind, need)], 0.0)
-            elif recipe is None and need in needs_of(kind, self.economy.year):
+            else:
                 wants[kind] = n * NEEDS[kind][need]
         return wants
 
@@ -599,22 +619,29 @@ class _Month:
         grid = self.economy.tile_map.grid
         rings = rings_of(grid)
         sellers = np.flatnonzero(self.offered[good] > 0)
+        padded, offsets = self._padded()
         rows, cols = np.divmod(self.cells[sellers], grid.cols)
-        odd = (rows % 2 == 1)[:, None]
-        reached_rows = rows[:, None] + np.where(odd, rings.rows[1], rings.rows[0])
-        reached_cols = cols[:, None] + np.where(odd, rings.cols[1], rings.cols[0])
-        inside = (
-            (reached_rows >= 0)
-            & (reached_rows < grid.rows)
-            & (reached_cols >= 0)
-            & (reached_cols < grid.cols)
-        )
-        flat = np.where(inside, reached_rows * grid.cols + reached_cols, 0)
-        buyers = np.where(inside, self.position[flat], -1)
+        at = (rows + _PAD) * (grid.cols + 2 * _PAD) + cols + _PAD
+        reached = at[:, None] + np.where((rows % 2 == 1)[:, None], offsets[1], offsets[0])
+        buyers = padded[reached]
         step, seller = np.nonzero((buyers >= 0).T)
         found = (sellers[seller], buyers[seller, step], np.searchsorted(step, rings.starts))
         self.pairs[good] = found
         return found
+
+    def _padded(self) -> tuple[npt.NDArray[np.intp], tuple[npt.NDArray[np.intp], ...]]:
+        """Where each traded cell stands among them on the map with _PAD cells of -1 around it,
+        as flat indices, and the flat steps on it to every cell fewer than LOCAL_REACH cells away
+        from a cell on an even and an odd row, nearest first."""
+        if self.padded is None:
+            grid = self.economy.tile_map.grid
+            rings = rings_of(grid)
+            width = grid.cols + 2 * _PAD
+            padded = np.full((grid.rows + 2 * _PAD, width), -1, dtype=np.intp)
+            padded[_PAD:-_PAD, _PAD:-_PAD] = self.position.reshape(grid.shape)
+            offsets = tuple(rings.rows[odd] * width + rings.cols[odd] for odd in (0, 1))
+            self.padded = (padded.ravel(), offsets)
+        return self.padded
 
     def _gather(self, good: Good) -> None:
         """Lets every station take spare units of a good buildings made into its stockpile, where
@@ -723,9 +750,17 @@ class _Month:
                 for need, amount in self.uses.get(kind, {}).items():
                     key = (kind, need)
                     self.stock[key] = np.maximum(self.stock[key] - went * amount, 0.0)
+        blank = self.economy.blank
         for key, stock in self.economy.stock.items():
+            held = self.stock[key]
+            if not held.any():
+                if key not in blank:
+                    stock[:] = 0.0
+                    blank.add(key)
+                continue
             stock[:] = 0.0
-            stock[self.cells] = self.stock[key]
+            stock[self.cells] = held
+            blank.discard(key)
         self.economy.taken = self._taken_since_served()
         trade = Trade(
             self.cells,

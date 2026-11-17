@@ -317,7 +317,7 @@ class _Touched:
 
 
 # The arrays Growth._stack lays out, left out of saves and laid out again as a game loads.
-_STACKED = ("_chances", "_lands", "_nearby_all", "_served_all", "_touched")
+_STACKED = ("_chances", "_lands", "_nearby_all", "_served_all", "_touched", "_land_of")
 
 
 class Growth:
@@ -439,6 +439,10 @@ class Growth:
         for row, place in enumerate(self._places):
             place.land = views[place_lands[row]]
             place.chances = self._chances[row]
+        kept: dict[int, tuple[Land, FloatGrid]] = {}
+        for place in self._places:
+            kept.setdefault(id(place.ladder.land), (place.ladder.land, place.land))
+        self._land_of = tuple(kept.values())
         kinds = list(Points)
         self._nearby_all = np.stack([self._nearby[points] for points in kinds]).reshape(
             len(kinds), size
@@ -711,6 +715,14 @@ class Growth:
                 )
             )
         place.chances[cells] = raw * place.land[cells]
+
+    def land(self, land: Land, cells: npt.NDArray[np.intp]) -> FloatGrid:
+        """The weights of these flat cells for a land (railroads.sim.ladders.Land.weights), as
+        kept up to date for the ladders growing on it."""
+        for kept, weights in self._land_of:
+            if kept is land:
+                return weights[cells]
+        return land.weights(self.constructions.tile_map, cells, self._near)
 
     def satisfaction(self) -> npt.NDArray[np.int8]:
         """How satisfied each cell's buildings are on the whole, or -1 where none trade."""
@@ -1125,8 +1137,7 @@ class Growth:
         chances = self._reckon_touched(touched, flat)
         if how_many > 0:
             for place, most in zip(touched.places, chances.max(axis=1).tolist(), strict=True):
-                if most > place.highest:
-                    place.highest = most
+                place.highest = max(place.highest, most)
 
     def _reckon_touched(self, touched: _Touched, cells: npt.NDArray[np.intp]) -> FloatGrid:
         """Works out the chances of all the touched places in these cells afresh, as _reckon
