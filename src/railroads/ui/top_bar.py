@@ -53,7 +53,9 @@ def draw_top_bar(app: App) -> None:
     if toggle_button(fa.ICON_FA_FLASK, app.tech.open, "Tech trees (R)", size):
         app.tech.open = not app.tech.open
     imgui.same_line(0, 4)
-    if toggle_button(fa.ICON_FA_QUESTION_CIRCLE, app.help.open, "Buildings and goods (H)", size):
+    if toggle_button(
+        fa.ICON_FA_QUESTION_CIRCLE, app.help.open, "Buildings, goods and engines (H)", size
+    ):
         app.help.open = not app.help.open
     if app.saves is not None:
         imgui.same_line(0, 4)

@@ -6,9 +6,9 @@ The ideas every rule of the game should follow.
    mills appear more often where the land suits them, and stand for as long as the land is theirs.
 2. **Producers decide where consumers can survive.** Homes, shops and works live where what they
    need is made within reach, and die out where it is not.
-3. **The player earns by adding value to the economy, filling the gaps in its markets.** Trains
-   pay for bringing goods to where they are missing, and what they bring makes the places they
-   serve grow.
+3. **The player is rewarded for making people and industry more satisfied by building efficient
+   flows of goods.** Trains pay for bringing goods to where they are missing, filling the gaps in
+   the markets, and what they bring makes the places they serve grow.
 
 ## The rules that follow from them
 

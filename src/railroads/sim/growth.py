@@ -21,8 +21,8 @@ kind of building in each cell unsatisfied, content or thriving, and pays the pla
 buildings they own (railroads.sim.ownership). Each building in a cell counts on its own: of ten
 houses with food for two, two are fed and eight starve. Buildings that starve on end are pulled
 down, as many as starved all that while, the player's too: homes after HOMES_DIE_AFTER_MONTHS,
-processors and the rest after DIE_AFTER_MONTHS. Producers of what the land gives never starve to
-death (UNDYING); fields go only when a town grows over them (crowded_at).
+processors and the rest after DIE_AFTER_MONTHS. Producers of what the land gives and soldiers
+never starve to death (UNDYING); fields go only when a town grows over them (crowded_at).
 
 Growth keeps the tally the other parts share: how many of each kind stand in each cell (counts),
 the points around each cell (nearby) and every ladder's chances, all kept up to date by add. Every
@@ -76,6 +76,7 @@ from railroads.sim.grids import Cell, Grid
 from railroads.sim.ladders import (
     GROWTH,
     LADDERS,
+    MILITARY,
     TOWNS,
     Cells,
     FloatGrid,
@@ -146,18 +147,9 @@ SPAWN_BY_PEOPLE = frozenset(
         BuildingKind.FILLING_STATION,
         BuildingKind.GASWORKS,
         BuildingKind.BREWERY,
-        BuildingKind.BRICKWORKS,
-        BuildingKind.TEXTILE_MILL,
-        BuildingKind.GLASSWORKS,
-        BuildingKind.TANNERY,
         BuildingKind.DISTILLERY,
-        BuildingKind.WINERY,
-        BuildingKind.FURNITURE_MAKER,
-        BuildingKind.SUGAR_REFINERY,
         BuildingKind.POTTER,
         BuildingKind.DAIRY,
-        BuildingKind.TILE_WORKS,
-        BuildingKind.FOUNDRY,
         BuildingKind.SAUSAGE_MAKER,
         BuildingKind.JUICE_WORKS,
         BuildingKind.CARPET_WEAVER,
@@ -168,6 +160,22 @@ SPAWN_BY_PEOPLE = frozenset(
         BuildingKind.HOSPITAL,
     }
 )
+# Works that come up anywhere their land allows, like the rest of industry, instead of where people
+# live: their spawn chance times WORKS_SPAWN_SCALE, so that the map keeps about as many of them.
+SPAWN_ANYWHERE = frozenset(
+    {
+        BuildingKind.BRICKWORKS,
+        BuildingKind.TEXTILE_MILL,
+        BuildingKind.GLASSWORKS,
+        BuildingKind.TANNERY,
+        BuildingKind.WINERY,
+        BuildingKind.FURNITURE_MAKER,
+        BuildingKind.SUGAR_REFINERY,
+        BuildingKind.TILE_WORKS,
+        BuildingKind.FOUNDRY,
+    }
+)
+WORKS_SPAWN_SCALE = 0.2
 # Kinds that come up near other points instead: refineries by the oil wells and mines (ore) and
 # the ports (trade) around them.
 SPAWN_NEAR: Mapping[BuildingKind, Mapping[Points, float]] = MappingProxyType(
@@ -207,6 +215,8 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
         spawn = spawn_scale * (ladder.base_chance or per_doubling)
         per_doubling = per_doubling * LAND_BREEDING_SCALE if own in FROM_THE_LAND else SERVED_GROWTH
     kind = ladder.kinds[0]
+    if kind in SPAWN_ANYWHERE:
+        spawn *= WORKS_SPAWN_SCALE
     spawn_by = SPAWN_NEAR.get(kind, {Points.POPULATION: 1.0} if kind in SPAWN_BY_PEOPLE else {})
     breeding = Breeding(spawn, own, DRAWN_BY.get(own, {own: 1.0}), per_doubling, spawn_by)
     _BREEDINGS[(id(ladder), id(points))] = (ladder, points, breeding)
@@ -257,8 +267,10 @@ def dies_after(kind: BuildingKind) -> int:
 
 # Producers of what the land gives, which stand idle with nobody to sell to rather than dying out:
 # the land decides where they are, and so how many people and what industry it can keep; and the
-# one-off buildings, which wait for what they need however long it takes.
-UNDYING = frozenset(kind for kind in MAKES if kind not in RECIPES) | ONE_OFFS
+# one-off buildings and the soldiers, which wait for what they need however long it takes.
+UNDYING = (
+    frozenset(kind for kind in MAKES if kind not in RECIPES) | ONE_OFFS | frozenset(MILITARY.kinds)
+)
 
 
 def _allowed(cells: Cells, opened: Cells, land: FloatGrid) -> Cells:

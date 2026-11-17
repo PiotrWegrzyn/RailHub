@@ -37,6 +37,7 @@ from railroads.ui.biomes import Biome
 from railroads.ui.pixel import ground as cpu
 from railroads.ui.pixel.noise import _TABLE, TABLE_SIZE
 from railroads.ui.pixel.projection import PixelProjection
+from railroads.ui.pixel.relief import LIGHT
 
 if sys.platform == "emscripten":
     from railroads.ui.pixel import webgl as GL
@@ -140,15 +141,45 @@ float noise(vec2 p, float inv, float off_u, float off_v) {
     return top * (1.0 - fv) + bottom * fv;
 }
 
-float slope_light(vec2 p) {
+vec4 surroundings(vec2 p) {
     vec2 at = clamp(p * @STEPS@ - 0.5, vec2(0.0), vec2(light_size - 1));
     ivec2 corner = min(ivec2(at), light_size - 2);
     vec2 t = at - vec2(corner);
-    float a = texelFetch(light, corner, 0).r;
-    float b = texelFetch(light, corner + ivec2(1, 0), 0).r;
-    float c = texelFetch(light, corner + ivec2(0, 1), 0).r;
-    float d = texelFetch(light, corner + ivec2(1, 1), 0).r;
+    vec4 a = texelFetch(light, corner, 0);
+    vec4 b = texelFetch(light, corner + ivec2(1, 0), 0);
+    vec4 c = texelFetch(light, corner + ivec2(0, 1), 0);
+    vec4 d = texelFetch(light, corner + ivec2(1, 1), 0);
     return mix(a, b, t.x) * (1.0 - t.y) + mix(c, d, t.x) * t.y;
+}
+
+float rolling(vec2 q) {
+    return @R_16_301@ + 0.45 * @R_55_302@ + 0.12 * @R_18_303@;
+}
+
+vec3 natural(vec2 p, vec4 around) {
+    float here = rolling(p);
+    float e = @ROLL_STEP@;
+    float gx = (rolling(vec2(p.x + e, p.y)) - here) / e;
+    float gy = (rolling(vec2(p.x, p.y + e)) - here) / e;
+    float facing = -(gx * @LIGHT_X@ + gy * @LIGHT_Y@);
+    float deep = @ROLL_LEAST@ + (@ROLL_MOST@ - @ROLL_LEAST@) * @N_25_306@;
+    float roll = clamp(1.0 + @ROLL_LIGHT@ * deep * facing, @ROLL_LOW@, @ROLL_HIGH@);
+    float region = @N_3_305@ * 2.0 - 1.0;
+    vec3 plains = region < 0.0 ? @GREENER_PLAINS@ : @DRIER_PLAINS@;
+    float lush = clamp(around.g * @WET_GAIN@, 0.0, 1.0) * @LUSH@;
+    float foot = clamp(around.b * @FOOT_GAIN@, 0.0, 1.0) * @FOOT_SHADE@;
+    vec3 tint = 1.0 + (plains - 1.0) * (abs(region) * @PLAINS_TINT@);
+    tint *= 1.0 + (@LUSH_TINT@ - 1.0) * lush;
+    tint *= 1.0 + (@FOOT_TINT@ - 1.0) * foot;
+    return tint * roll;
+}
+
+vec2 wound(vec2 q) {
+    float wx = q.x + @WARP@ * 2.0 * (@W_7_211@ - 0.5) + @WARP_FINE@ * 2.0 * (@W_2_213@ - 0.5);
+    float wy = q.y + @WARP@ * 2.0 * (@W_7_212@ - 0.5) + @WARP_FINE@ * 2.0 * (@W_2_214@ - 0.5);
+    wx += @WARP_BROAD@ * 2.0 * (@W_18_215@ - 0.5);
+    wy += @WARP_BROAD@ * 2.0 * (@W_18_216@ - 0.5);
+    return vec2(wx, wy);
 }
 
 vec3 ramp(float t, vec3 c0, vec3 c1, vec3 c2) {
@@ -199,7 +230,12 @@ void main() {
     uvec4 info = cell_info(cell);
     uint biome = info.r;
     bool water = is_water(biome);
-    float lit = slope_light(p);
+    if (!water) {
+        uint warped = cell_info(cell_at(wound(p))).r;
+        if (!is_water(warped)) biome = warped;
+    }
+    vec4 around = surroundings(p);
+    float lit = around.r;
     float value = 1.45 + 1.6 * (@N_24_41@ - 0.5) + 0.8 * (@N_75_42@ - 0.5);
     value += 0.45 * (@N_22_43@ - 0.5) + 0.45 * BAYER[fmod(iy, 4) * 4 + fmod(ix, 4)];
     value += lit + @HILL_LIFT@ * float(info.b);
@@ -219,6 +255,9 @@ void main() {
         if (tuft) {
             rgb = RAMPS[int(biome) * 4 + max(shade - 1, 0)] * 0.92;
         }
+    }
+    if (!water) {
+        rgb *= natural(p, around);
     }
     if (water) {
         if (!water_at(art + ivec2(1, 0)) || !water_at(art - ivec2(1, 0))
@@ -279,12 +318,12 @@ def _vec3(rgb: object) -> str:
     return f"vec3({_number(r)}, {_number(g)}, {_number(b)})"
 
 
-def _noise(scale: float, seed: int) -> str:
-    """The call for railroads.ui.pixel.noise.noise at `scale` and `seed`, with its numbers worked
-    out in float32 as there."""
+def _noise(scale: float, seed: int, at: str = "p") -> str:
+    """The call for railroads.ui.pixel.noise.noise at point `at`, `scale` and `seed`, with its
+    numbers worked out in float32 as there."""
     inverse = np.float32(1 / scale)
     off_u, off_v = np.float32(seed * 37.1 + 500.0), np.float32(seed * 11.3 + 500.0)
-    return f"noise(p, {_number(inverse)}, {_number(off_u)}, {_number(off_v)})"
+    return f"noise({at}, {_number(inverse)}, {_number(off_u)}, {_number(off_v)})"
 
 
 def _bits(biomes: tuple[Biome, ...]) -> int:
@@ -342,6 +381,37 @@ def fragment_source() -> str:
         "N_45_82": _noise(0.45, 82),
         "N_03_86": _noise(0.03, 86),
         "N_5_91": _noise(0.5, 91),
+        "R_16_301": _noise(1.6, 301, "q"),
+        "R_55_302": _noise(0.55, 302, "q"),
+        "R_18_303": _noise(0.18, 303, "q"),
+        "W_7_211": _noise(0.7, 211, "q"),
+        "W_7_212": _noise(0.7, 212, "q"),
+        "W_2_213": _noise(0.2, 213, "q"),
+        "W_2_214": _noise(0.2, 214, "q"),
+        "ROLL_STEP": _number(cpu.ROLL_STEP),
+        "N_25_306": _noise(cpu.ROLL_SPAN, 306),
+        "N_3_305": _noise(cpu.PLAINS_SPAN, 305),
+        "ROLL_LEAST": _number(cpu.ROLL_LEAST),
+        "ROLL_MOST": _number(cpu.ROLL_MOST),
+        "GREENER_PLAINS": _vec3(cpu.GREENER_PLAINS),
+        "DRIER_PLAINS": _vec3(cpu.DRIER_PLAINS),
+        "PLAINS_TINT": _number(cpu.PLAINS_TINT),
+        "LIGHT_X": _number(LIGHT[0]),
+        "LIGHT_Y": _number(LIGHT[1]),
+        "ROLL_LIGHT": _number(cpu.ROLL_LIGHT),
+        "ROLL_LOW": _number(cpu.ROLL_RANGE[0]),
+        "ROLL_HIGH": _number(cpu.ROLL_RANGE[1]),
+        "WET_GAIN": _number(cpu.WET_GAIN),
+        "FOOT_GAIN": _number(cpu.FOOT_GAIN),
+        "LUSH": _number(cpu.LUSH),
+        "FOOT_SHADE": _number(cpu.FOOT_SHADE),
+        "LUSH_TINT": _vec3(cpu.LUSH_TINT),
+        "FOOT_TINT": _vec3(cpu.FOOT_TINT),
+        "WARP": _number(cpu.WARP),
+        "WARP_FINE": _number(cpu.WARP_FINE),
+        "WARP_BROAD": _number(cpu.WARP_BROAD),
+        "W_18_215": _noise(1.8, 215, "q"),
+        "W_18_216": _noise(1.8, 216, "q"),
     }
     source = FRAGMENT
     for name, value in names.items():
@@ -492,7 +562,7 @@ class _Target:
 
 class GroundShader:
     """The compiled shaders, what they read on the graphics card (the cells, the slopes' light
-    and the noise table), the art pixels last drawn and the picture last blown up from them."""
+    with the water and mountains round the ground, and the noise table), the art pixels last drawn and the picture last blown up from them."""
 
     def __init__(
         self,
@@ -504,7 +574,7 @@ class GroundShader:
         self._ground, self._blow_up = programs
         self._projection = projection
         self._shape = tile_map.grid.shape
-        self._light_shape = light.shape
+        self._light_shape = light.shape[:2]
         self._vao = GL.glGenVertexArrays(1)
         self._buffer = GL.glGenBuffers(1)
         GL.glBindVertexArray(self._vao)
@@ -528,8 +598,8 @@ class GroundShader:
     def make(
         cls, projection: PixelProjection, tile_map: TileMap, light: FloatArray
     ) -> GroundShader | None:
-        """The shaders for this map, whose slopes catch `light` (Ground's raster of it), or None
-        where OpenGL can't run them."""
+        """The shaders for this map, whose ground is lit and coloured by `light` (Ground.shading),
+        or None where OpenGL can't run them."""
         if GL is None:
             return None
         try:
@@ -682,11 +752,13 @@ def _texture() -> int:
 
 
 def _floats(values: npt.NDArray[np.floating]) -> int:
-    """A texture of one float per texel, read with texelFetch."""
+    """A texture of one float per texel, or four where `values` has four to a place, read with
+    texelFetch."""
     texture = _texture()
     data = np.ascontiguousarray(values, dtype=np.float32)
-    rows, cols = data.shape
-    GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_R32F, cols, rows, 0, GL.GL_RED, GL.GL_FLOAT, data)
+    rows, cols = data.shape[:2]
+    internal, form = (GL.GL_RGBA32F, GL.GL_RGBA) if data.ndim == 3 else (GL.GL_R32F, GL.GL_RED)
+    GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, internal, cols, rows, 0, form, GL.GL_FLOAT, data)
     return texture
 
 

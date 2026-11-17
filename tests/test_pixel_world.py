@@ -15,12 +15,12 @@ from railroads.sim.constructions import (
 )
 from railroads.sim.economy import Satisfaction
 from railroads.sim.grids import Cell, Grid, HexGrid, SquareGrid
-from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 from railroads.ui.pixel import track_art
 from railroads.ui.pixel.art import SPRITES, draw_sheet
 from railroads.ui.pixel.art.stations import TURNED_LINES
-from railroads.ui.pixel.ground import AROUND, CROWN_GAP, _depths, _nearest_crown
+from railroads.ui.pixel.ground import AROUND, CROWN_GAP, _depths, _tallest_crown, crown_radii
 from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.layer import resolution_for
 from railroads.ui.pixel.noise import noise, table_hash
@@ -785,35 +785,99 @@ def test_woods_cover_what_the_cells_round_each_pixel_say_without_looking_at_all(
         assert np.array_equal(woods, expected)
 
 
-def nearest_crown_by_hashing(px: np.ndarray, py: np.ndarray, gap: float) -> tuple:
+def tallest_crown_by_hashing(px: np.ndarray, py: np.ndarray, gap: float) -> tuple:
     cx, cy = np.floor(px / gap).astype(np.int64), np.floor(py / gap).astype(np.int64)
-    best = np.full(px.shape, np.inf, dtype=np.float32)
+    best = np.full(px.shape, -np.inf, dtype=np.float32)
     best_dx, best_dy = np.zeros(px.shape, np.float32), np.zeros(px.shape, np.float32)
+    best_radius = np.zeros(px.shape, np.float32)
     best_x, best_y = cx.copy(), cy.copy()
     for ox in (-1, 0, 1):
         for oy in (-1, 0, 1):
             gx, gy = cx + ox, cy + oy
             jx = (gx + 0.15 + 0.7 * table_hash(gx, gy, 51)) * gap
             jy = (gy + 0.15 + 0.7 * table_hash(gx, gy, 52)) * gap
+            radius = crown_radii(gx, gy, jx, jy)
             dx, dy = (px - jx).astype(np.float32), (py - jy).astype(np.float32)
-            distance = dx * dx + dy * dy
-            closer = distance < best
-            best = np.where(closer, distance, best)
-            best_dx, best_dy = np.where(closer, dx, best_dx), np.where(closer, dy, best_dy)
-            best_x, best_y = np.where(closer, gx, best_x), np.where(closer, gy, best_y)
-    return np.sqrt(best), best_dx, best_dy, best_x, best_y
+            height = 1 - (dx * dx + dy * dy) / (radius * radius)
+            higher = height > best
+            best = np.where(higher, height, best)
+            best_dx, best_dy = np.where(higher, dx, best_dx), np.where(higher, dy, best_dy)
+            best_radius = np.where(higher, radius, best_radius)
+            best_x, best_y = np.where(higher, gx, best_x), np.where(higher, gy, best_y)
+    return best, best_dx, best_dy, best_radius, best_x, best_y
 
 
-def test_the_nearest_crown_is_the_one_found_by_hashing_the_squares_round_each_point() -> None:
+def test_the_tallest_crown_is_the_one_found_by_hashing_the_squares_round_each_point() -> None:
     rng = np.random.default_rng(8)
     px = np.floor(rng.uniform(-300, 900, 20_000)) + 0.5
     py = np.floor(rng.uniform(-50, 700, 20_000)) + 0.5
 
-    found = _nearest_crown(px, py, CROWN_GAP)
+    found = _tallest_crown(px, py, CROWN_GAP)
 
-    for value, expected in zip(found, nearest_crown_by_hashing(px, py, CROWN_GAP), strict=True):
+    for value, expected in zip(found, tallest_crown_by_hashing(px, py, CROWN_GAP), strict=True):
         assert value.dtype == expected.dtype
         assert np.array_equal(value, expected)
+
+
+def test_woods_drawn_finer_are_worked_out_at_every_pixel_not_every_art_pixel(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet, houses=0)
+    px, py = world.projection.to_pixels(*world.tile_map.grid.center(3, 9))
+    left, top = int(px) - 32, int(py) - 32
+    canvas = np.zeros((64 * FINE, 64 * FINE, 4))
+    canvas[..., 3] = 1.0
+
+    world.ground.canopy(canvas, left, top, FINE)
+
+    blocks = canvas.reshape(64, FINE, 64, FINE, 4)
+    uneven = (blocks != blocks[:, :1, :, :1]).any(axis=(1, 3, 4))
+    assert uneven.sum() > 64 * 64 // 4
+
+
+def desert_beside_grassland() -> TileMap:
+    grid = HexGrid(rows=12, cols=12, km_per_cell=2.0)
+    temperature = np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8)
+    vegetation = np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8)
+    temperature[:, 6:] = Temperature.HOT
+    vegetation[:, 6:] = Vegetation.BARREN
+    return flat_map(grid=grid, temperature=temperature, vegetation=vegetation)
+
+
+def test_biomes_meet_along_a_winding_line_not_along_the_cells_edges(sheet: SpriteSheet) -> None:
+    tile_map = desert_beside_grassland()
+    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    x, y = world.projection.to_plane(
+        np.arange(CHUNK)[None, :] + 0.5, np.arange(CHUNK)[:, None] + 0.5
+    )
+    _, cols = tile_map.grid.cell_on_map(x, y)
+    on_map = tile_map.grid.contains(*tile_map.grid.cell_at(x, y))
+
+    rgb, _ = world.ground.render(0, 0, CHUNK)
+
+    sandy = rgb[..., 0] > rgb[..., 1]
+    grassland = on_map & (cols < 6)
+    assert world.ground.biomes[0, 0] != world.ground.biomes[0, 11]
+    assert (sandy & grassland & (cols == 5)).sum() > 50
+    assert (~sandy & on_map & (cols == 6)).sum() > 50
+    assert sandy[grassland & (cols < 4)].mean() < 0.01
+
+
+def test_land_near_water_is_greener_than_land_far_from_it(sheet: SpriteSheet) -> None:
+    tile_map = make_tile_map()
+    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    x, y = world.projection.to_plane(
+        np.arange(CHUNK)[None, :] + 0.5, np.arange(CHUNK)[:, None] + 0.5
+    )
+    rows, cols = tile_map.grid.cell_on_map(x, y)
+    on_map = tile_map.grid.contains(*tile_map.grid.cell_at(x, y))
+
+    rgb, _ = world.ground.render(0, 0, CHUNK)
+
+    green = rgb[..., 1] / np.maximum(rgb[..., 0], 1)
+    by_the_sea = on_map & (cols == 1) & (rows >= 8)
+    inland = on_map & (cols == 4) & (rows >= 8)
+    assert np.median(green[by_the_sea]) > 1.05 * np.median(green[inland])
 
 
 def test_a_chunk_showing_ground_lifted_as_far_as_ground_goes_is_drawn(

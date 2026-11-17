@@ -335,7 +335,8 @@ class PixelWorld:
         rgb = sown[..., :3] * 255
         x, y = fine.plane(left, top, CHUNK, rows)
         r, c, _ = fine.cells(left, top, CHUNK, rows)
-        rocky = self.tile_map.relief[r, c] == Relief.MOUNTAINS
+        wr, wc = self.ground.winding(x, y, r, c)
+        rocky = self.tile_map.relief[wr, wc] == Relief.MOUNTAINS
         self.elevation.colour(rgb, raised.top(rows * k), x, y, rocky)
         rgb = np.clip(rgb, 0, 255) * alpha[..., None]
         canvas = np.concatenate([rgb / 255, alpha[..., None]], axis=-1)

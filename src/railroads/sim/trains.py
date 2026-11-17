@@ -458,6 +458,13 @@ ENGINES: dict[str, Engine] = {
 FIRST_ENGINE = "planet"
 
 
+def successor(name: str) -> str | None:
+    """The first newer engine that ends an engine's sale (Engine.replaces) once it can be
+    bought; None for the last of its line."""
+    newer = [other for other in ENGINES if ENGINES[other].replaces(ENGINES[name])]
+    return min(newer, key=lambda other: ENGINES[other].year, default=None)
+
+
 type Point = tuple[float, float]
 
 
