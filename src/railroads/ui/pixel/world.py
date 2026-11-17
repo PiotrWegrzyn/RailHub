@@ -30,6 +30,7 @@ from railroads.ui.pixel.ground import (
     FIELD_KINDS,
     IN_THE_WOODS,
     MILL_CLEARING,
+    OVERHANG,
     YARD_REACH,
     Ground,
     art_pixels,
@@ -292,13 +293,13 @@ class PixelWorld:
         """The plane points and cells of the art pixels a chunk's layers work out from: CHUNK
         across and `rows` down from (`left`, `top`), with the ground's apron round them and room
         above and to the left for the shadows of woods."""
-        before = max(APRON, CANOPY_REACH)
+        before = max(APRON, CANOPY_REACH + OVERHANG)
         return Lattice(
             self.projection,
             left - before,
             top - before,
-            CHUNK + before + APRON,
-            rows + before + APRON,
+            CHUNK + before * 2,
+            rows + before * 2,
             grid=self.tile_map.grid,
         )
 

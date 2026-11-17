@@ -8,6 +8,7 @@ and coloured by railroads.ui.pixel.relief. Textures come from noise over the map
 each pixel's place, so chunks meet without seams and look the same each time they are drawn."""
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -337,6 +338,33 @@ EDGE_SHADOW = 0.28
 # How far right and down of the crowns their shadow falls, in art pixels.
 SHADOW_REACH = (2, 3)
 SHADOW_COLOUR = np.array((18, 26, 46), dtype=np.float32)
+# Drawn two or more pixels to an art pixel, woods show more: broadleaved crowns heaped from
+# clumps of leaves about CLUMP_GAP art pixels apart, CLUMP_SIZE of that wide, each lit on its
+# own by CLUMP_LIGHT, their outline scalloped by CLUMP_EDGE, with dark hollows between them where
+# the crown is lower than HOLLOWS, showing BRANCHES branches; conifers as stars of CONIFER_POINTS
+# drooping points, CONIFER_SLIM as wide as a broadleaved crown, in CONIFER_TIERS tiers. Crowns
+# reach up to OVERHANG art pixels past the woods' edge on their own round outline, the trunks of
+# the front row show below them, TRUNK_LENGTH art pixels long, and their shadow fades at its
+# edge.
+CLUMP_GAP = 1.5
+CLUMP_SIZE = (0.62, 0.3)
+CLUMP_LIGHT = 0.5
+CLUMP_EDGE = 0.35
+HOLLOWS = 0.4
+HOLLOW_DARK = 0.5
+BRANCHES = 6
+BRANCH_WIDTH = 0.28
+BRANCH = np.array((74, 58, 40), dtype=np.float32)
+CONIFER_POINTS = 9
+CONIFER_SLIM = 1.05
+CONIFER_TIERS = 3.0
+OVERHANG = 3
+TRUNK_LENGTH = (1.0, 1.4)
+TRUNK_HALF = 0.5
+TRUNK_BELOW = 5
+TRUNK_BARK = np.array((88, 66, 46), dtype=np.float32)
+SHADOW_SOFT = 3.0
+FLOOR_FROM = 0.8
 # How mountainous ground may be before woods give way to the mountain's own bare slopes, and how
 # far below that a bound on it (Elevation.most) must stay to show none of the woods are bare.
 BARE_ABOVE = 0.3
@@ -894,11 +922,14 @@ class Ground:
         art pixel, RGB from 0 to 1 multiplied by its alpha: a roof of lit crowns, the dark side
         of the trees along its lower edge and their shadow on the ground beside them, worked out
         at every pixel of the picture like the mountains, so they are as smooth as the picture is
-        fine, where the picture shows the map, as `fields` says. `points` may hold the plane
-        points and cells of the art pixels already."""
+        fine, where the picture shows the map, as `fields` says. Finer than an art pixel to a
+        pixel, crowns show their clumps of leaves and reach past the woods' edge, and the front
+        row its trunks. `points` may hold the plane points and cells of the art pixels already."""
         rows, cols = canvas.shape[0] // k, canvas.shape[1] // k
-        reach = CANOPY_REACH
-        block = (left - reach, top - reach, cols + reach + 1, rows + reach + 2)
+        fine = k > 1
+        reach = CANOPY_REACH + (OVERHANG if fine else 0)
+        after = (reach, reach) if fine else (1, 2)
+        block = (left - reach, top - reach, cols + reach + after[0], rows + reach + after[1])
         points = _lattice(points, self.projection, self.tile_map.grid, block)
         r, c, _ = points.cells(*block)
         if not (self._woods[r.min() : r.max() + 2, c.min() : c.max() + 2] > 0).any():
@@ -910,26 +941,30 @@ class Ground:
             x, y = points.plane(*block)
             woods[woods] = self.elevation.mountainous(x[woods], y[woods]) < BARE_ABOVE
 
-        def shifted(down: int, across: int) -> BoolArray:
-            return woods[reach + down : reach + down + rows, reach + across : reach + across + cols]
+        def shifted(grid: BoolArray, down: int, across: int) -> BoolArray:
+            return grid[reach + down : reach + down + rows, reach + across : reach + across + cols]
 
-        shadow = shifted(-SHADOW_REACH[1], -SHADOW_REACH[0])
-        side = shifted(0, 0) & ~(shifted(1, 0) & shifted(2, 0))
+        near = _spread(woods, OVERHANG, OVERHANG + 3) if fine else woods
+        shadow = shifted(near, -SHADOW_REACH[1], -SHADOW_REACH[0])
+        side = shifted(woods, 0, 0) & ~(shifted(woods, 1, 0) & shifted(woods, 2, 0))
         # Inside the woods the floor shows between crowns; at their edge, the ground does.
-        inner = shifted(-1, 0) & shifted(1, 0) & shifted(0, -1) & shifted(0, 1)
-        rooted = woods
-        woods = shifted(0, 0)
+        inner = (
+            shifted(woods, -1, 0)
+            & shifted(woods, 1, 0)
+            & shifted(woods, 0, -1)
+            & shifted(woods, 0, 1)
+        )
+        over = shifted(near, 0, 0)
         if k > 1:
-            woods, shadow, side, inner = (
-                np.repeat(np.repeat(a, k, 0), k, 1) for a in (woods, shadow, side, inner)
-            )
+            over, shadow, side = (np.repeat(np.repeat(a, k, 0), k, 1) for a in (over, shadow, side))
+            inner = _rounded(woods[reach - 2 : reach + rows + 2, reach - 2 : reach + cols + 2], k)
         shown = _on_map(canvas, shown)
-        painted = np.zeros(woods.shape, dtype=bool)
-        down, across = np.nonzero(woods & shown)
+        painted = np.zeros(over.shape, dtype=bool)
+        down, across = np.nonzero(over & shown)
         if len(down):
-            edges = (side, inner, rooted)
+            edges = (side, inner, woods)
             self._crowns(canvas, painted, down, across, (left, top, k), points, block, edges)
-        self._cast_shadow(canvas, shadow & shown & ~painted, left, top, k)
+        self._cast_shadow(canvas, shadow & shown & ~painted, (left, top, k), block, woods)
 
     def _crowns(
         self,
@@ -950,10 +985,31 @@ class Ground:
         woods show, and the ground between them."""
         side, inner, rooted = edges
         left, top, k = place
-        reach = CANOPY_REACH
-        r, c, _ = points.cells(*block)
-        art_down, art_across = down // k + reach, across // k + reach
+        fine = k > 1
+        reach = left - block[0]
         px, py = left + (across + 0.5) / k, top + (down + 0.5) / k
+        height, dx, dy, radius, gx, gy = _tallest_crown(px, py, CROWN_GAP)
+        foot_x = np.floor(px - dx).astype(np.int64) - block[0]
+        foot_y = np.floor(py - dy).astype(np.int64) - block[1]
+        foot_x = np.clip(foot_x, 0, rooted.shape[1] - 1)
+        foot_y = np.clip(foot_y, 0, rooted.shape[0] - 1)
+        # Crowns rise by their lumps up to LUMPS / 2 and their clumps up to CLUMP_EDGE * 0.7.
+        lowest = -(LUMPS / 2 + CLUMP_EDGE) if fine else -LUMPS / 2
+        inside = inner[down, across]
+        keep = inside | ((height > lowest) & rooted[foot_y, foot_x])
+        art_down, art_across = down // k + reach, across // k + reach
+        if fine:
+            hidden = ~keep & _below(rooted, TRUNK_BELOW)[art_down, art_across]
+            trunk, bark = _trunks(px[hidden], py[hidden], rooted, block)
+            hidden = np.flatnonzero(hidden)[trunk]
+            canvas[down[hidden], across[hidden], :3] = bark[trunk] / 255
+            canvas[down[hidden], across[hidden], 3] = 1.0
+            painted[down[hidden], across[hidden]] = True
+        down, across, px, py, inside = down[keep], across[keep], px[keep], py[keep], inside[keep]
+        height, dx, dy, radius, gx, gy = (a[keep] for a in (height, dx, dy, radius, gx, gy))
+        foot_x, foot_y = foot_x[keep], foot_y[keep]
+        art_down, art_across = art_down[keep], art_across[keep]
+        r, c, _ = points.cells(*block)
         if k == 1:
             x, y = points.plane(*block)
             x, y = x[art_down, art_across], y[art_down, art_across]
@@ -961,14 +1017,14 @@ class Ground:
             x, y = self.projection.to_plane(px, py)
         fx, fy = x.astype(np.float32), y.astype(np.float32)
         biomes = self._biomes[r[art_down, art_across], c[art_down, art_across]]
-        height, dx, dy, radius, gx, gy = _tallest_crown(px, py, CROWN_GAP)
         grain = noise(fx, fy, LEAF_GRAIN, 68) - 0.5
         height += LUMPS * grain
         conifers = np.where(biomes == Biome.TAIGA, 0.9, 0.0)
         broadleaved = (biomes != Biome.TAIGA) & (biomes != Biome.JUNGLE)
         stands = noise(fx[broadleaved], fy[broadleaved], CONIFER_STANDS, 64)
         conifers[broadleaved] = 0.05 + 0.85 * np.clip((stands - 0.5) * 4 + 0.5, 0, 1)
-        conifer = (table_hash(gx, gy, 63) < conifers)[:, None]
+        is_conifer = table_hash(gx, gy, 63) < conifers
+        conifer = is_conifer[:, None]
         tone = table_hash(gx, gy, 66)[:, None] * CROWN_TONES
         first = np.where(conifer, CONIFER_CROWNS[0], LEAFY_CROWNS[0])
         crowns = first + (np.where(conifer, CONIFER_CROWNS[1], LEAFY_CROWNS[1]) - first) * tone
@@ -978,6 +1034,10 @@ class Ground:
         towards = (dx * CROWN_LIGHT[0] + dy * CROWN_LIGHT[1]) / radius * CROWN_ROUND
         up = np.sqrt(np.clip(1 - (1 - height) * CROWN_ROUND**2, 0, 1))
         facing = towards + up * CROWN_LIGHT[2]
+        solid = height > 0
+        if fine:
+            detail = _crown_detail(px, py, dx, dy, radius, height, is_conifer, gx, gy)
+            solid, facing, hollow, branch, depth, height = detail
         facing += self._swell(fx, fy) + CROWN_SLOPES * sample(
             self._relief_light, x * RELIEF_STEPS_PER_CELL, y * RELIEF_STEPS_PER_CELL
         )
@@ -987,42 +1047,63 @@ class Ground:
         deep = CROWN_DEPTH + (1 - CROWN_DEPTH) * np.sqrt(np.clip(height * 2, 0, 1))
         rim = np.where(height < CROWN_RIM[0], CROWN_RIM[1], 1.0)
         shine = 1 + np.clip(s - CROWN_SHINE[0], 0, 1) * CROWN_SHINE[1] * 5
-        edge = side[down, across]
+        if fine:
+            rim = np.where(height < CROWN_RIM[0], (1 + CROWN_RIM[1]) / 2, 1.0) * depth
+            behind = np.clip(
+                foot_y + np.ceil(radius * 0.7).astype(np.int64), 0, rooted.shape[0] - 1
+            )
+            front = ~rooted[behind, foot_x]
+            edge = np.where(front, np.clip(dy / radius * 1.5 + 0.3, 0, 1), np.float32(0))
+        else:
+            edge = side[down, across].astype(np.float32)
         cool = np.maximum(dark, edge)
-        light = lit * (1 - dark * 0.35) * deep * rim * shine * np.where(edge, WOODS_SIDE, 1)
+        light = lit * (1 - dark * 0.35) * deep * rim * shine * (1 - (1 - WOODS_SIDE) * edge)
         leaves = crowns * np.maximum(light, CROWN_DARKEST)[:, None]
         leaves *= 1 - (cool * 0.6)[:, None] * (1 - SHADOW_TINT)
-        gap = height <= 0
+        if fine:
+            leaves[hollow] *= HOLLOW_DARK
+            bark = BRANCH * (0.8 + 0.3 * np.clip(s[branch], 0, 1))[:, None]
+            leaves[branch] = bark * (1 - 0.5 * (1 - SHADOW_TINT))
+        gap = ~solid
         undergrowth = 0.8 + 0.4 * noise(fx[gap], fy[gap], LEAF_GRAIN * 1.5, 73)
         leaves[gap] = WOODS_FLOOR * undergrowth[:, None]
-        foot_x = np.floor(px - dx).astype(np.int64) - block[0]
-        foot_y = np.floor(py - dy).astype(np.int64) - block[1]
-        foot_x = np.clip(foot_x, 0, rooted.shape[1] - 1)
-        foot_y = np.clip(foot_y, 0, rooted.shape[0] - 1)
-        inside = inner[down, across]
-        shows = inside | (~gap & rooted[foot_y, foot_x])
+        shows = inside | solid
         down, across = down[shows], across[shows]
         canvas[down, across, :3] = leaves[shows] / 255
         canvas[down, across, 3] = 1.0
         painted[down, across] = True
 
     def _cast_shadow(
-        self, canvas: FloatArray, under: BoolArray, left: int, top: int, k: int
+        self,
+        canvas: FloatArray,
+        under: BoolArray,
+        place: tuple[int, int, int],
+        block: tuple[int, int, int, int],
+        rooted: BoolArray,
     ) -> None:
         """Lays the woods' shadow over the pixels `under` woods SHADOW_REACH art pixels up and
-        to the left of them, where a crown stands there, so it takes the crowns' round shapes."""
+        to the left of them, where a crown stands there, so it takes the crowns' round shapes;
+        finer than an art pixel to a pixel, only of crowns standing in the woods, fading out at
+        its edge."""
+        left, top, k = place
         down, across = np.nonzero(under)
         if not len(down):
             return
-        height, *_ = _tallest_crown(
-            left + (across + 0.5) / k - SHADOW_REACH[0],
-            top + (down + 0.5) / k - SHADOW_REACH[1],
-            CROWN_GAP,
-        )
-        down, across = down[height > 0], across[height > 0]
+        px = left + (across + 0.5) / k - SHADOW_REACH[0]
+        py = top + (down + 0.5) / k - SHADOW_REACH[1]
+        height, dx, dy, *_ = _tallest_crown(px, py, CROWN_GAP)
+        if k > 1:
+            foot_x = np.clip(np.floor(px - dx).astype(np.int64) - block[0], 0, rooted.shape[1] - 1)
+            foot_y = np.clip(np.floor(py - dy).astype(np.int64) - block[1], 0, rooted.shape[0] - 1)
+            strength = np.clip(height * SHADOW_SOFT, 0, 1) * rooted[foot_y, foot_x]
+        else:
+            strength = (height > 0).astype(np.float32)
+        cast = strength > 0
+        down, across, strength = down[cast], across[cast], strength[cast] * EDGE_SHADOW
         shaded = canvas[down, across]
-        shaded[:, :3] = shaded[:, :3] * (1 - EDGE_SHADOW) + SHADOW_COLOUR / 255 * EDGE_SHADOW
-        shaded[:, 3] = shaded[:, 3] * (1 - EDGE_SHADOW) + EDGE_SHADOW
+        s = strength[:, None]
+        shaded[:, :3] = shaded[:, :3] * (1 - s) + SHADOW_COLOUR / 255 * s
+        shaded[:, 3] = shaded[:, 3] * (1 - strength) + strength
         canvas[down, across] = shaded
 
     def _swell(self, x: Floats, y: Floats) -> Floats:
@@ -1386,6 +1467,164 @@ def crown_radii(gx: IntArray, gy: IntArray, jx: FloatArray, jy: FloatArray) -> F
     return np.where(gone, np.float32(0.01), size * age).astype(np.float32)
 
 
+def _rounded(woods: BoolArray, k: int) -> BoolArray:
+    """Which pixels, `k` to an art pixel, lie well inside the woods of these art pixels, by a
+    rounded outline instead of the art pixels' steps; the art pixels hold two more each way."""
+    rows, cols = woods.shape
+    filled = np.pad(woods.astype(np.float32), 1, mode="edge")
+    blurred = sum(
+        filled[1 + dy : 1 + dy + rows, 1 + dx : 1 + dx + cols]
+        for dy in (-1, 0, 1)
+        for dx in (-1, 0, 1)
+    ) / np.float32(9)
+
+    def between(count: int) -> tuple[IntArray, IntArray, FloatArray]:
+        at = (np.arange(2 * k, (count - 2) * k) + 0.5) / k - 0.5
+        first = np.clip(np.floor(at).astype(np.int64), 0, count - 2)
+        return first, first + 1, (at - first).astype(np.float32)
+
+    r0, r1, tr = between(rows)
+    c0, c1, tc = between(cols)
+    upper = blurred[r0][:, c0] * (1 - tc) + blurred[r0][:, c1] * tc
+    lower = blurred[r1][:, c0] * (1 - tc) + blurred[r1][:, c1] * tc
+    return upper * (1 - tr[:, None]) + lower * tr[:, None] > FLOOR_FROM
+
+
+def _spread(woods: BoolArray, around: int, below: int) -> BoolArray:
+    """The art pixels within `around` art pixels of the woods, and up to `below` below them."""
+    near = woods.copy()
+    for _ in range(around):
+        grown = near.copy()
+        grown[1:] |= near[:-1]
+        grown[:-1] |= near[1:]
+        grown[:, 1:] |= near[:, :-1]
+        grown[:, :-1] |= near[:, 1:]
+        near = grown
+    spread = near.copy()
+    for step in range(1, below - around + 1):
+        spread[step:] |= near[:-step]
+    return spread
+
+
+def _below(woods: BoolArray, rows: int) -> BoolArray:
+    """The art pixels outside the woods with woods up to `rows` rows above them."""
+    above = np.zeros_like(woods)
+    for step in range(1, rows + 1):
+        above[step:] |= woods[:-step]
+    return above & ~woods
+
+
+def _crown_detail(
+    px: FloatArray,
+    py: FloatArray,
+    dx: Floats,
+    dy: Floats,
+    radius: Floats,
+    height: Floats,
+    conifer: BoolArray,
+    gx: IntArray,
+    gy: IntArray,
+) -> tuple[BoolArray, Floats, BoolArray, BoolArray, Floats, Floats]:
+    """What a crown shows at picture points finer than art pixels, given the crown standing
+    highest over them: where it is solid, how much it faces CROWN_LIGHT, where its hollows and
+    the branches in them show, how deep in its shade it lies and how high it stands. Broadleaved
+    crowns are heaped from clumps of leaves, each lit on its own; conifers are stars of drooping
+    points in tiers."""
+    light = CROWN_LIGHT
+    solid = np.zeros(px.shape, dtype=bool)
+    facing = np.zeros(px.shape, dtype=np.float32)
+    hollow = np.zeros(px.shape, dtype=bool)
+    branch = np.zeros(px.shape, dtype=bool)
+    depth = np.ones(px.shape, dtype=np.float32)
+    leafy = np.flatnonzero(~conifer & (height > -CLUMP_EDGE * 0.7))
+    height = np.maximum(height, np.float32(0.01)).astype(np.float32)
+    grain = table_hash(np.floor(px * 4).astype(np.int64), np.floor(py * 4).astype(np.int64), 59)
+    if leafy.size:
+        lx, ly, lh, lr = dx[leafy], dy[leafy], height[leafy], radius[leafy]
+        clump, cdx, cdy, cr, *_ = _tallest_dome(px[leafy], py[leafy], CLUMP_GAP, 151, clump_radii)
+        bump = np.sqrt(np.clip(clump, 0, 1))
+        crown_up = np.sqrt(np.clip(1 - (1 - lh) * CROWN_ROUND**2, 0, 1))
+        crown_facing = (lx * light[0] + ly * light[1]) / lr * CROWN_ROUND + crown_up * light[2]
+        clump_facing = (cdx * light[0] + cdy * light[1]) / cr + bump * light[2]
+        facing[leafy] = (
+            (1 - CLUMP_LIGHT) * crown_facing
+            + CLUMP_LIGHT * clump_facing
+            + 0.05 * (grain[leafy] - 0.5)
+        )
+        whole = lh + CLUMP_EDGE * (np.clip(clump, -0.6, 1) - 0.3) > 0
+        solid[leafy] = whole
+        depth[leafy] = 0.82 + 0.18 * bump
+        holes = whole & (clump < (HOLLOWS - lh) * 0.9)
+        hollow[leafy] = holes
+        at = leafy[holes]
+        if at.size:
+            hx, hy = dx[at], dy[at]
+            twist = table_hash(gx[at], gy[at], 57)
+            turn = np.arctan2(hy, hx) / np.float32(2 * math.pi)
+            ray = (np.round(turn * BRANCHES + twist) - twist) * np.float32(2 * math.pi / BRANCHES)
+            branch[at] = np.abs(hx * np.sin(ray) - hy * np.cos(ray)) < BRANCH_WIDTH
+    needles = np.flatnonzero(conifer)
+    if needles.size:
+        nx, ny = dx[needles], dy[needles]
+        d = np.hypot(nx, ny) + np.float32(1e-6)
+        points = np.arctan2(ny, nx) / np.float32(2 * math.pi) * CONIFER_POINTS
+        points += table_hash(gx[needles], gy[needles], 58)
+        notch = np.abs(points - np.round(points)) * 2
+        cone = d / (radius[needles] * CONIFER_SLIM * (1 - 0.25 * notch))
+        tier = (cone * CONIFER_TIERS) % 1
+        facing[needles] = (
+            (nx * light[0] + ny * light[1]) / d * 0.75
+            + 0.66 * light[2]
+            + 0.3 * (0.4 - tier)
+            + 0.16 * (grain[needles] - 0.5)
+        )
+        solid[needles] = cone < 1
+        depth[needles] = 0.92 - 0.12 * tier
+        height[needles] = 1 - cone
+    return solid, facing, hollow, branch, depth, height
+
+
+def _trunks(
+    px: FloatArray, py: FloatArray, rooted: BoolArray, block: tuple[int, int, int, int]
+) -> tuple[BoolArray, FloatArray]:
+    """Which of these picture points show the trunk of a tree in the front row of the woods,
+    below its crown, and the colour of its bark there, lit on its left; `rooted` says which art
+    pixels of the block the woods cover."""
+    on = np.zeros(px.shape, dtype=bool)
+    bark = np.zeros((*px.shape, 3), dtype=np.float32)
+    if not px.size:
+        return on, bark
+    rows, cols = rooted.shape
+    cx, cy = np.floor(px / CROWN_GAP).astype(np.int64), np.floor(py / CROWN_GAP).astype(np.int64)
+    first_x, first_y = int(cx.min()) - 1, int(cy.min()) - 2
+    gx = np.arange(first_x, int(cx.max()) + 2)[None, :]
+    gy = np.arange(first_y, int(cy.max()) + 1)[:, None]
+    jx, jy = crown_spot(gx, gy, CROWN_GAP)
+    radius = crown_radii(gx, gy, jx, jy)
+    fx = np.clip(np.floor(jx).astype(np.int64) - block[0], 0, cols - 1)
+    fy = np.clip(np.floor(jy).astype(np.int64) - block[1], 0, rows - 1)
+    behind = np.clip(fy + np.ceil(radius * 0.7).astype(np.int64), 0, rows - 1)
+    front = (rooted[fy, fx] & ~rooted[behind, fx] & (radius > 0.5)).ravel()
+    length = (TRUNK_LENGTH[0] + TRUNK_LENGTH[1] * table_hash(gx, gy, 59)).ravel()
+    jx, jy, radius = jx.ravel(), jy.ravel(), radius.ravel()
+    width = gx.shape[1]
+    home = (cy - first_y) * width + (cx - first_x)
+    for ox in (-1, 0, 1):
+        for oy in (-2, -1, 0):
+            square = home + (oy * width + ox)
+            off = px - jx[square]
+            reach = py - jy[square]
+            here = front[square] & (np.abs(off) < TRUNK_HALF) & (reach > radius[square] * 0.55)
+            here &= reach < radius[square] + length[square]
+            if not here.any():
+                continue
+            out = np.clip((reach[here] - radius[square][here]) / length[square][here], 0, 1)
+            shade = np.where(off[here] < 0, 1.15, 0.8) * (0.55 + 0.45 * out)
+            bark[here] = TRUNK_BARK * shade[:, None]
+            on |= here
+    return on, bark
+
+
 def _tallest_crown(
     px: FloatArray, py: FloatArray, gap: float
 ) -> tuple[FloatArray, FloatArray, FloatArray, FloatArray, IntArray, IntArray]:
@@ -1395,13 +1634,36 @@ def _tallest_crown(
     lies from its middle, how wide it is and which square it stands in. Where the crown of every
     square round the points stands is worked out once a square; ties go to the square met
     first, going down each column of the three by three round a point's own."""
+    return _tallest_dome(px, py, gap, 51, crown_radii)
+
+
+def crown_spot(gx: IntArray, gy: IntArray, gap: float, seed: int = 51) -> tuple[Floats, Floats]:
+    """Where in the squares `gx`, `gy`, `gap` pixels a side, a crown (or a clump of leaves, by
+    its own `seed`) stands."""
+    jx = (gx + 0.15 + 0.7 * table_hash(gx, gy, seed)) * gap
+    jy = (gy + 0.15 + 0.7 * table_hash(gx, gy, seed + 1)) * gap
+    return jx, jy
+
+
+def clump_radii(gx: IntArray, gy: IntArray, jx: FloatArray, jy: FloatArray) -> Floats:
+    """How wide the clumps of leaves of the squares `gx`, `gy` are."""
+    size = CLUMP_SIZE[0] + CLUMP_SIZE[1] * table_hash(gx, gy, 155)
+    return (CLUMP_GAP * size).astype(np.float32)
+
+
+def _tallest_dome(
+    px: FloatArray,
+    py: FloatArray,
+    gap: float,
+    seed: int,
+    radii_of: Callable[[IntArray, IntArray, FloatArray, FloatArray], Floats],
+) -> tuple[FloatArray, FloatArray, FloatArray, FloatArray, IntArray, IntArray]:
     cx, cy = np.floor(px / gap).astype(np.int64), np.floor(py / gap).astype(np.int64)
     first_x, first_y = int(cx.min()) - 1, int(cy.min()) - 1
     gx = np.arange(first_x, int(cx.max()) + 2)[None, :]
     gy = np.arange(first_y, int(cy.max()) + 2)[:, None]
-    jx = (gx + 0.15 + 0.7 * table_hash(gx, gy, 51)) * gap
-    jy = (gy + 0.15 + 0.7 * table_hash(gx, gy, 52)) * gap
-    radii = crown_radii(gx, gy, jx, jy).ravel()
+    jx, jy = crown_spot(gx, gy, gap, seed)
+    radii = radii_of(gx, gy, jx, jy).ravel()
     jx, jy = jx.ravel(), jy.ravel()
     width = gx.shape[1]
     home = (cy - first_y) * width + (cx - first_x)

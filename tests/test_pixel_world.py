@@ -835,6 +835,26 @@ def test_woods_drawn_finer_are_worked_out_at_every_pixel_not_every_art_pixel(
     assert uneven.sum() > 64 * 64 // 4
 
 
+def test_woods_drawn_finer_reach_past_their_edge_with_crowns_and_trunks(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet, houses=0)
+    px, py = world.projection.to_pixels(*world.tile_map.grid.center(8, 9))
+    left, top = int(px) - 32, int(py) - 32
+    coarse = np.ones((64, 64, 4))
+    fine = np.ones((64 * FINE, 64 * FINE, 4))
+
+    world.ground.canopy(coarse, left, top, 1)
+    world.ground.canopy(fine, left, top, FINE)
+
+    coarse_wooded = (coarse[..., :3] < 1).any(axis=-1)
+    fine_wooded = (fine[..., :3] < 1).any(axis=-1).reshape(64, FINE, 64, FINE).any(axis=(1, 3))
+    painted = fine[(fine[..., :3] < 1).any(axis=-1), :3]
+    brown = (painted[:, 0] > painted[:, 1] + 0.04) & (painted[:, 1] > painted[:, 2])
+    assert (fine_wooded & ~coarse_wooded).sum() > 20
+    assert brown.sum() > 10
+
+
 def desert_beside_grassland() -> TileMap:
     grid = HexGrid(rows=12, cols=12, km_per_cell=2.0)
     temperature = np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8)
