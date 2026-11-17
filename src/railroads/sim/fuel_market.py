@@ -1,8 +1,9 @@
-"""The market for what engines burn: coal for steam, diesel fuel for diesels and electricity for
-electric and maglev engines (railroads.sim.railway buys it as trains set off).
+"""The market for what engines burn: coal for steam, wood for the American wood burners, diesel
+fuel for diesels and electricity for electric and maglev engines (railroads.sim.railway buys it as
+trains set off).
 
 Every fuel's price, from the year it comes in, moves only with what the map wants of it against
-what it gets, a tug of war. Coal and diesel fuel are wanted
+what it gets, a tug of war. Coal, wood and diesel fuel are wanted
 by the buildings that need them and by the player's trains, which wanted what they bought last
 month; they are supplied by what the player's stations hand out to those buildings, and a little,
 NATURAL_SUPPLY of what the map's mines and refineries can make, by the world around. How hard
@@ -32,11 +33,12 @@ from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Trade
 from railroads.sim.goods import FITS, Good, Need, price_of
 from railroads.sim.goods import NEEDS as BUILDING_NEEDS
-from railroads.sim.trains import Power
+from railroads.sim.trains import Engine, Power
 
 
 class Fuel(Enum):
     COAL = "coal"
+    WOOD = "wood"
     DIESEL = "diesel fuel"
     ELECTRICITY = "electricity"
 
@@ -49,8 +51,17 @@ FUEL_OF: Mapping[Power, Fuel] = MappingProxyType(
         Power.MAGLEV: Fuel.ELECTRICITY,
     }
 )
+
+
+def fuel_of(engine: Engine) -> Fuel:
+    """What an engine burns: wood for a wood burner, otherwise what its power takes."""
+    return Fuel.WOOD if engine.wood else FUEL_OF[engine.power]
+
+
 # The good a fuel is, which trains can take from a station's stockpile; electricity is no good.
-GOOD_OF: Mapping[Fuel, Good] = MappingProxyType({Fuel.COAL: Good.COAL, Fuel.DIESEL: Good.FUEL})
+GOOD_OF: Mapping[Fuel, Good] = MappingProxyType(
+    {Fuel.COAL: Good.COAL, Fuel.WOOD: Good.LUMBER, Fuel.DIESEL: Good.FUEL}
+)
 # Each kind of power plant and what it burns.
 PLANT_FUEL: Mapping[BuildingKind, Need] = MappingProxyType(
     {
@@ -61,10 +72,15 @@ PLANT_FUEL: Mapping[BuildingKind, Need] = MappingProxyType(
 )
 # What a unit of each fuel costs at first, and the year its market opens.
 BASE_PRICE: Mapping[Fuel, float] = MappingProxyType(
-    {Fuel.COAL: price_of(Good.COAL), Fuel.DIESEL: price_of(Good.FUEL), Fuel.ELECTRICITY: 5.0}
+    {
+        Fuel.COAL: price_of(Good.COAL),
+        Fuel.WOOD: price_of(Good.LUMBER),
+        Fuel.DIESEL: price_of(Good.FUEL),
+        Fuel.ELECTRICITY: 5.0,
+    }
 )
 OPENS: Mapping[Fuel, int] = MappingProxyType(
-    {Fuel.COAL: 1804, Fuel.DIESEL: 1935, Fuel.ELECTRICITY: 1925}
+    {Fuel.COAL: 1804, Fuel.WOOD: 1804, Fuel.DIESEL: 1935, Fuel.ELECTRICITY: 1925}
 )
 # The buildings' needs each good fuel meets.
 NEEDS: Mapping[Fuel, frozenset[Need]] = MappingProxyType(

@@ -67,12 +67,12 @@ from railroads.sim.finance import (
     track_upkeep,
 )
 from railroads.sim.fuel_market import (
-    FUEL_OF,
     GOOD_OF,
     PLANT_FUEL,
     RETAIL_MARKUP,
     Fuel,
     FuelMarket,
+    fuel_of,
     signals_of,
 )
 from railroads.sim.goods import TRAVELLERS, General, Good, Need
@@ -283,16 +283,16 @@ class Railway:
     def fuel_cost(self, engine: str, cells: float = 1.0) -> float:
         """What an engine's fuel for `cells` costs bought at retail now, the dearest it comes."""
         burnt = ENGINES[engine]
-        fuel = FUEL_OF[burnt.power]
+        fuel = fuel_of(burnt)
         markup = 0.0 if fuel == Fuel.ELECTRICITY else self.fuel_markup()
         price = self.fuel.price(fuel) * (1.0 + markup)
         return burnt.burn * cells * price * self._upkeep()
 
     def _take_fuel(self, train: Train, station: Cell, cells: float) -> None:
-        """Buys what a train setting off burns on the way to its next stop: coal or diesel fuel
-        out of the station's stockpile first, at the market price, the rest at retail."""
+        """Buys what a train setting off burns on the way to its next stop: coal, wood (lumber) or
+        diesel fuel out of the station's stockpile first, at the market price, the rest at retail."""
         engine = ENGINES[train.engine]
-        fuel = FUEL_OF[engine.power]
+        fuel = fuel_of(engine)
         amount = engine.burn * cells
         if amount <= 0:
             return

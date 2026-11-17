@@ -206,6 +206,9 @@ class Engine:
     # only call at stops that near each other; 0 for electric and maglev engines, which run as
     # far as the wires or guideway go.
     tank: float = 0.0
+    # Whether it burns wood (lumber) instead of coal, as American engines did while forests
+    # were near and coal far.
+    wood: bool = False
 
     @property
     def electric(self) -> bool:
@@ -276,7 +279,9 @@ ENGINES: dict[str, Engine] = {
     "goods": Engine(
         "Goods engine", 1853, 0.35, 4, 15_000.0, H, pickup=30.0, tank=20.0, needs=BOILERS
     ),
-    "american": Engine("American 4-4-0", 1856, 0.7, 4, 30_000.0, G, pickup=11.0, tank=25.0),
+    "american": Engine(
+        "American 4-4-0", 1856, 0.7, 4, 30_000.0, G, pickup=11.0, tank=25.0, wood=True
+    ),
     "single": Engine(
         "Single-driver express",
         1858,

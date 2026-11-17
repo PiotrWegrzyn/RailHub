@@ -9,7 +9,7 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.sim.finance import dollars
-from railroads.sim.fuel_market import FUEL_OF
+from railroads.sim.fuel_market import fuel_of
 from railroads.sim.railway import Railway
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, MAGLEV_FARE, Engine, Kind, Train
 from railroads.ui.iso_camera import Vec2
@@ -181,7 +181,7 @@ class BuyScreen:
 
 def fuel_use(engine: Engine, per_cell: float | None = None) -> str:
     """How much fuel an engine burns a cell, and what that costs now if given."""
-    text = f"{engine.burn:.2g} {FUEL_OF[engine.power].value} a cell"
+    text = f"{engine.burn:.2g} {fuel_of(engine).value} a cell"
     return text if per_cell is None else f"{text}, about {dollars(per_cell)} a cell now"
 
 

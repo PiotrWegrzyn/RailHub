@@ -16,6 +16,7 @@ from railroads.sim.fuel_market import (
     FuelMarket,
     Signals,
     electrified,
+    fuel_of,
     signals_of,
 )
 from railroads.sim.goods import Good, Need
@@ -44,12 +45,12 @@ def line(year: int = 1850) -> Railway:
     return railway
 
 
-def set_off(railway: Railway, engine: str = "planet") -> float:
+def set_off(railway: Railway, engine: str = "planet", fuel: Fuel = Fuel.COAL) -> float:
     train = railway.buy(engine)
     assert train is not None
     train.stops = [Stop(WEST, wait_for_load=False), Stop(EAST, wait_for_load=False)]
     railway.run(0.001)
-    return -railway.finances.month["coal"]
+    return -railway.finances.month.get(fuel.value, 0.0)
 
 
 def test_fuel_prices_stay_put_over_the_years_without_market_pressure() -> None:
@@ -81,6 +82,29 @@ def test_coal_out_of_the_stations_stockpile_costs_only_the_market_price() -> Non
 
     assert paid[1] == pytest.approx(paid[0] / (1 + RETAIL_MARKUP))
     assert stocked.station_goods(WEST).stockpile[Good.COAL] < 100.0
+
+
+def test_the_american_burns_wood_taking_lumber_out_of_the_stations_stockpile() -> None:
+    railway = line(1860)
+    railway.station_goods(WEST).stockpile[Good.LUMBER] = 100.0
+
+    wood = set_off(railway, "american", Fuel.WOOD)
+
+    assert wood > 0
+    assert railway.finances.month.get(Fuel.COAL.value, 0.0) == 0
+    assert railway.station_goods(WEST).stockpile[Good.LUMBER] < 100.0
+
+
+@pytest.mark.parametrize(
+    ("engine", "fuel"),
+    [("planet", Fuel.COAL), ("american", Fuel.WOOD), ("heavy_diesel", Fuel.DIESEL)],
+)
+def test_each_engine_burns_its_own_fuel(engine: str, fuel: Fuel) -> None:
+    burnt = ENGINES[engine]
+
+    found = fuel_of(burnt)
+
+    assert found == fuel
 
 
 def test_the_regular_customer_node_cuts_the_retail_markup_to_a_quarter() -> None:

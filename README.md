@@ -646,14 +646,14 @@ Engines (`railroads.sim.trains`) come in lines. Pioneers, from the first steam e
 is balanced around: three cars at 30 km/h for $10,000. Each newer engine of a line costs about
 three times the one before it. Early steam engines are very slow and pull few cars; diesels,
 electrics and the maglev pull cars a size bigger, and electrics run fastest. Engines burn fuel
-(`railroads.sim.fuel_market`): steam coal, diesels diesel fuel, electrics and the maglev
-electricity, a set amount a cell for each car they are built to pull, light engines half as much.
-A train buys the fuel for the way to its next stop as it sets off: coal or diesel fuel out of the
+(`railroads.sim.fuel_market`): steam coal, except the American 4-4-0, which burns wood
+(lumber) as the real ones did, diesels diesel fuel, electrics and the maglev electricity, a set amount a cell for each car they are built to pull, light engines half as much.
+A train buys the fuel for the way to its next stop as it sets off: coal, lumber or diesel fuel out of the
 station's stockpile at the market price, the rest at retail, 50% dearer, or 25% with the Regular
 customer node of the commerce tree. Coal and diesel engines carry only so much, so a train can't
 set off for a stop further than its range: the first steam engines run only 4 to 12 cells, the
 Planet 20, and lines need stations to take on fuel along the way; electrics run as far as the
-wires go. Every fuel's price, from the year it comes in (coal 1804, electricity 1925, diesel fuel
+wires go. Every fuel's price, from the year it comes in (coal and wood 1804, electricity 1925, diesel fuel
 1935), moves only in a tug of war between demand and supply, between 0.4 and 4 times its first
 price: the coal or diesel fuel the map's buildings need and the player's trains bought last
 month against what the player's stations hand out to those buildings and a quarter of what the
@@ -703,7 +703,7 @@ own pixel art.
 | Planet steam engine | general | 1840–1856 (then the American 4-4-0) |  | steam | 30 km/h | 12 s | 3 | $10,000 | 0.75 coal | 20 cells | [Planet, 1830](https://en.wikipedia.org/wiki/Planet_(locomotive)) |
 | Tank engine | light | 1840–1862 (then the Light tank engine) |  | steam | 24 km/h | 3 s | 2 | $3,000 | 0.25 coal | 12 cells | [Tank locomotive (type)](https://en.wikipedia.org/wiki/Tank_locomotive) |
 | Goods engine | heavy freight | 1853–1865 (then the Mogul freight engine) | metals and machines: Heavy boilers | steam | 21 km/h | 30 s | 4 | $15,000 | 1 coal | 20 cells | [0-6-0 goods engine (type)](https://en.wikipedia.org/wiki/0-6-0) |
-| American 4-4-0 | general | 1856–1910 (then the Pacific engine) |  | steam | 42 km/h | 11 s | 4 | $30,000 | 1 coal | 25 cells | [4-4-0 American (type)](https://en.wikipedia.org/wiki/4-4-0), [The General, 1855](https://en.wikipedia.org/wiki/The_General_(locomotive)) |
+| American 4-4-0 | general | 1856–1910 (then the Pacific engine) |  | steam | 42 km/h | 11 s | 4 | $30,000 | 1 wood | 25 cells | [4-4-0 American (type)](https://en.wikipedia.org/wiki/4-4-0), [The General, 1855](https://en.wikipedia.org/wiki/The_General_(locomotive)) |
 | Single-driver express | express | 1858–1900 (then the Atlantic express) | passengers and mail: Timetables → Dining cars → Express trains | steam | 60 km/h | 25 s | 3 + dining car | $40,000 | 1 coal | 30 cells | [GNR Stirling 4-2-2, 1870](https://en.wikipedia.org/wiki/GNR_Stirling_4-2-2) |
 | Light tank engine | light | 1862–1935 (then the Railbus) |  | steam | 33 km/h | 3 s | 2 | $9,000 | 0.25 coal | 16 cells | [0-6-2 tank engine (type)](https://en.wikipedia.org/wiki/0-6-2) |
 | Mogul freight engine | heavy freight | 1865–1905 (then the Mallet articulated) | metals and machines: Heavy boilers | steam | 27 km/h | 28 s | 6 | $45,000 | 1.5 coal | 30 cells | [2-6-0 Mogul (type)](https://en.wikipedia.org/wiki/2-6-0) |
