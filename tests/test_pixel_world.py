@@ -993,3 +993,20 @@ def test_a_field_fades_into_the_ground_at_its_edge_instead_of_lying_on_it(
     cover = canvas[..., 3]
     assert (cover > 0.99).sum() > 50
     assert ((cover > 0.05) & (cover < 0.95)).sum() > 20
+
+
+def test_water_is_lighter_by_the_shore_than_far_out(sheet: SpriteSheet) -> None:
+    grid = HexGrid(rows=12, cols=16, km_per_cell=2.0)
+    terrain = np.full(grid.shape, Terrain.LAND, dtype=np.uint8)
+    terrain[:, :10] = Terrain.SEA
+    tile_map = flat_map(grid=grid, terrain=terrain)
+    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    x, y = world.projection.to_plane(
+        np.arange(CHUNK * 2)[None, :] + 0.5, np.arange(CHUNK)[:, None] + 0.5
+    )
+    _, cols = tile_map.grid.cell_on_map(x, y)
+
+    rgb = np.concatenate([world.ground.render(left, 0, CHUNK)[0] for left in (0, CHUNK)], axis=1)
+
+    brightness = rgb.sum(axis=-1)
+    assert brightness[cols == 9].mean() > 1.2 * brightness[(cols >= 3) & (cols <= 5)].mean()
