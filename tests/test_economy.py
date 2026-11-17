@@ -630,16 +630,28 @@ def test_bonus_goods_raise_a_fed_warm_and_furnished_house_past_full_satisfaction
     assert level_at(economy, trade, (8, 9), BuildingKind.HOUSE) == Satisfaction.THRIVING
 
 
-def test_a_house_that_only_gets_its_beer_is_content_at_thirty_percent() -> None:
+@pytest.mark.parametrize("given", [{"BEER": 1.0}, {"LUMBER": 3.0}, {"COAL": 3.0, "BEER": 1.0}])
+def test_a_house_that_gets_no_food_is_unsatisfied_whatever_else_it_gets(given: dict) -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
 
-    trade = economy.trade(placed, holding(BEER=1.0))
+    trade = economy.trade(placed, holding(**given))
 
     share = trade.share((BuildingKind.HOUSE,))[position(trade, economy, (8, 9))]
-    assert share == pytest.approx(0.3)
-    assert level_at(economy, trade, (8, 9), BuildingKind.HOUSE) == Satisfaction.CONTENT
+    assert share == 0.0
+    assert level_at(economy, trade, (8, 9), BuildingKind.HOUSE) == Satisfaction.UNSATISFIED
+
+
+def test_a_house_with_a_little_food_counts_its_warmth_and_beer_too() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
+
+    trade = economy.trade(placed, holding(FISH=1.0, COAL=3.0, BEER=1.0))
+
+    share = trade.share((BuildingKind.HOUSE,))[position(trade, economy, (8, 9))]
+    assert share == pytest.approx(4 / 18 + 0.3)
 
 
 def test_each_bonus_good_counts_what_the_economy_is_told_it_is_worth() -> None:
@@ -648,10 +660,10 @@ def test_each_bonus_good_counts_what_the_economy_is_told_it_is_worth() -> None:
     economy.bonus_per_good = 0.4
     placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
 
-    trade = economy.trade(placed, holding(BEER=1.0))
+    trade = economy.trade(placed, holding(FISH=10.0, COAL=3.0, POTS=5.0, BEER=1.0))
 
     assert trade.share((BuildingKind.HOUSE,))[position(trade, economy, (8, 9))] == pytest.approx(
-        0.4
+        1.4
     )
 
 

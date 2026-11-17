@@ -27,7 +27,9 @@ reached a buyer; a processor's is only the share of all it could make that reach
 whose stockpile holds one input but not the other is unsatisfied however full it is, plus
 BONUS_PER_GOOD for each of its bonus goods (railroads.sim.goods) it got all of, and that share of
 it for part: a house fed and warmed that also got all its beer and half its newspapers is at 145%.
-It is unsatisfied at nothing, thriving from 100% and content between. Its satisfaction adds to the
+Food is a must for homes: one that got none is unsatisfied whatever else it got, so homes can't
+live on firewood or beer alone. A building is unsatisfied at nothing, thriving from 100% and
+content between. Its satisfaction adds to the
 chances of more growing in its cell, its points times its satisfaction, with no ceiling above
 100%.
 """
@@ -47,6 +49,7 @@ from railroads.sim.constructions import GREW_FROM, BuildingKind
 from railroads.sim.goods import (
     BOOST_MOST,
     HANDED_OUT,
+    HOMES,
     LAND_BOOST_MOST,
     MAKES,
     NEEDS,
@@ -752,6 +755,14 @@ class _Month:
                 continue
             got[kind] += np.minimum(received, wanted)
             needed[kind] += wanted
+        for kind in HOMES:
+            if kind not in self.count or Need.FOOD not in NEEDS.get(kind, {}):
+                continue
+            food = self.received.get((kind, Need.FOOD), self.zero)
+            hungry = (self.count[kind] > 0) & (food <= 0)
+            got[kind] = np.where(hungry, 0.0, got[kind])
+            if kind in bonus:
+                bonus[kind] = np.where(hungry, 0.0, bonus[kind])
         goods_gave = {}
         shares: dict[Good, FloatCells] = {}
         for (kind, good), offer in self.offers.items():

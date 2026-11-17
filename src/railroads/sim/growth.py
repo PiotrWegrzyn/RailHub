@@ -26,7 +26,7 @@ Every TRADE_EVERY_MONTHS the stations hand out their goods and buildings sell to
 kind of building in each cell unsatisfied, content or thriving, and pays the player for the
 buildings they own (railroads.sim.ownership). What a cell's buildings of a kind get is shared
 equally among them: of ten houses with food for two, each gets a fifth of what it wants, and they
-starve only when nothing arrives. Buildings that starve on end are pulled down, the player's too: homes after HOMES_DIE_AFTER_MONTHS,
+starve only when nothing arrives, or, for homes, no food (railroads.sim.economy). Buildings that starve on end are pulled down, the player's too: homes after HOMES_DIE_AFTER_MONTHS,
 processors and the rest after DIE_AFTER_MONTHS. Producers of what the land gives and soldiers
 never starve to death (UNDYING); fields go only when a town grows over them (crowded_at).
 
