@@ -3,11 +3,12 @@ railroads.sim.ladders: towns, farms, orchards, mines, lumber mills, ports and ev
 
 Buildings breed (breeding_of): a cell's chance of another of a ladder's kinds is
 
-    base + (base + BREEDING_TIMES x base x served) x log2(1 + drawing)
+    base + (base + pull x served) x log2(1 + drawing)
 
-where base is the ladder's base chance, served the points the buildings of its own kind of points
-give in the cell times their satisfaction (railroads.sim.economy), and drawing the points around
-the cell that draw it, each times its weight: six times the people and twice the industry for
+where base is the ladder's base chance, pull BREEDING_TIMES x base, or for homes the town
+ladder's own chance per doubling of people, so few homes come up alone while towns still grow;
+served the points the buildings of its own kind of points give in the cell times their
+satisfaction (railroads.sim.economy), and drawing the points around the cell that draw it, each times its weight: six times the people and twice the industry for
 houses, food and people
 for food, people and industry for industry, mines, mills and ports, and twice the people for
 shops, inns and churches. So the base chance holds anywhere the land allows, good surroundings
@@ -117,7 +118,7 @@ SPAWN_SCALE = 1.0
 FOOD_SPAWN_SCALE = 3.75
 FROM_THE_LAND = frozenset({Points.FOOD, Points.ORE, Points.TIMBER})
 # How many times its base chance each served point of a ladder's own kind in a cell adds there,
-# per doubling of what draws it.
+# per doubling of what draws it; homes take theirs from the town ladder instead.
 BREEDING_TIMES = 30.0
 # The points around a cell that draw a ladder's buildings, and how much each counts, by the kind
 # of points they give.
@@ -219,7 +220,10 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
         spawn *= WORKS_SPAWN_SCALE
     drawn_by = DRAWN_BY_KIND.get(kind) or DRAWN_BY.get(own, {own: 1.0})
     shunned_by = SHUNNED_BY.get(kind, {})
-    breeding = Breeding(spawn, own, drawn_by, BREEDING_TIMES * spawn, shunned_by)
+    # Homes are pulled to towns by their own chance per doubling, apart from their base chance,
+    # so few come up alone while towns still grow.
+    pull = per_doubling if own == Points.POPULATION else BREEDING_TIMES * spawn
+    breeding = Breeding(spawn, own, drawn_by, pull, shunned_by)
     _BREEDINGS[(id(ladder), id(points))] = (ladder, points, breeding)
     return breeding
 
