@@ -12,7 +12,7 @@ own module (railroads.ui.pixel.ground, track_art, scenery and projection); this 
 together from them.
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Self
 
@@ -327,9 +327,18 @@ class PixelWorld:
         rgb, alpha = self.ground.render(left, top, rows, raised, points)
         canvas = _ground_blown_up(rgb / 255, alpha, resolution, left, top)
         lit = None if raised is None else lighting(raised.top(rows))
-        self.ground.fields(canvas, left, top, resolution, lit, points=points)
-        self.ground.yards(canvas, left, top, resolution)
-        self.ground.canopy(canvas, left, top, resolution, points=points)
+        self._surfaces(
+            canvas,
+            left,
+            top,
+            resolution,
+            None,
+            lambda layer, k, shown: (
+                self.ground.fields(layer, left, top, k, lit, shown=shown, points=points),
+                self.ground.yards(layer, left, top, k, shown=shown),
+                self.ground.canopy(layer, left, top, k, shown=shown, points=points),
+            ),
+        )
         if offset is None:
             self._lay_track(canvas, left, top, resolution)
         else:
@@ -337,6 +346,33 @@ class PixelWorld:
             self._lay_lifted_track(canvas, left, top, resolution, offset, resolution)
         self._stand_scenery(canvas, left, top, resolution)
         return _finished(canvas)
+
+    def _surfaces(
+        self,
+        canvas: FloatArray,
+        left: int,
+        top: int,
+        k: int,
+        shown: npt.NDArray[np.bool_] | None,
+        paint: Callable[[FloatArray, int, npt.NDArray[np.bool_]], object],
+    ) -> None:
+        """Lays what `paint` draws over the ground, fields, yards and woods, onto `canvas`, `k`
+        pixels to an art pixel, where it shows the map (`shown`, or wherever it isn't clear).
+        Above 1 they are drawn at no more than FINE, blended between their pixels up to `k` and
+        laid with the ground's texture (railroads.ui.pixel.ground_texture), so they read as the
+        same lit surface as the ground under them."""
+        on = canvas[..., 3] > 0 if shown is None else shown
+        if k == 1:
+            paint(canvas, 1, on)
+            return
+        drawn = min(k, FINE)
+        step = k // drawn
+        layer = np.zeros((canvas.shape[0] // step, canvas.shape[1] // step, 4))
+        paint(layer, drawn, on[::step, ::step])
+        if step > 1:
+            layer = _smoothly_blown_up(layer[..., :3], layer[..., 3], step)
+        textured(layer, left, top, k)
+        canvas[...] = layer + canvas * (1 - layer[..., 3:])
 
     def _points(self, left: int, top: int, rows: int) -> Lattice:
         """The plane points and cells of the art pixels a chunk's layers work out from: CHUNK
@@ -359,9 +395,18 @@ class PixelWorld:
         shown = inside.repeat(k, axis=0).repeat(k, axis=1)
         canvas = np.zeros((CHUNK * k, CHUNK * k, 4), dtype=np.float64)
         art_pixels(canvas, k)[..., 3] = shade[:, None, :, None]
-        self.ground.fields(canvas, left, top, k, shown=shown, points=points)
-        self.ground.yards(canvas, left, top, k, shown=shown)
-        self.ground.canopy(canvas, left, top, k, shown=shown, points=points)
+        self._surfaces(
+            canvas,
+            left,
+            top,
+            k,
+            shown,
+            lambda layer, kk, on: (
+                self.ground.fields(layer, left, top, kk, shown=on, points=points),
+                self.ground.yards(layer, left, top, kk, shown=on),
+                self.ground.canopy(layer, left, top, kk, shown=on, points=points),
+            ),
+        )
         self._lay_track(canvas, left, top, k, shown=shown)
         self._stand_scenery(canvas, left, top, k)
         return _finished(canvas)
@@ -380,8 +425,17 @@ class PixelWorld:
         rgb, alpha = self.ground.render(left, top, rows, points=points)
         sown = _ground_blown_up(rgb / 255, alpha, k, left, top)
         alpha = sown[..., 3].copy()
-        self.ground.fields(sown, left, top, k)
-        self.ground.yards(sown, left, top, k)
+        self._surfaces(
+            sown,
+            left,
+            top,
+            k,
+            None,
+            lambda layer, kk, on: (
+                self.ground.fields(layer, left, top, kk, shown=on),
+                self.ground.yards(layer, left, top, kk, shown=on),
+            ),
+        )
         rgb = sown[..., :3] * 255
         x, y = fine.plane(left, top, CHUNK, rows)
         r, c, _ = fine.cells(left, top, CHUNK, rows)
@@ -390,7 +444,14 @@ class PixelWorld:
         self.elevation.colour(rgb, raised.top(rows * k), x, y, rocky)
         rgb = np.clip(rgb, 0, 255) * alpha[..., None]
         canvas = np.concatenate([rgb / 255, alpha[..., None]], axis=-1)
-        self.ground.canopy(canvas, left, top, k, points=points)
+        self._surfaces(
+            canvas,
+            left,
+            top,
+            k,
+            None,
+            lambda layer, kk, on: self.ground.canopy(layer, left, top, kk, shown=on, points=points),
+        )
         canvas = raise_picture(canvas, offset, 1)
         self._lay_lifted_track(canvas, left, top, k, offset / k)
         self._stand_scenery(canvas, left, top, k)
