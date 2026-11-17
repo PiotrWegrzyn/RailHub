@@ -260,3 +260,47 @@ Not done, worth considering:
 - Autosaves still scan a map-sized count array for each of ~190 kinds of building, most of them
   never on the map. Keeping counts only for kinds on the map, as the stockpiles now are, would
   make saves and months cheaper still, but touches much of the growth code.
+
+## Loading and sprites (17 November, versions 0.4.20 and 0.4.21)
+
+The question was whether drawing every sprite before a game shows is what makes loading slow.
+Measured with every part of loading timed (same machine and headless Chrome as above):
+
+| Browser, new game (Poland 1850, seed 1), click to first game frame | seconds |
+|---|---|
+| Setup worker's Python starting (overlaps the menu in normal play) | ~2.2 |
+| Growing the towns, 850 → 1850 | ~20.2 |
+| Unpacking the grown game | 0.3 |
+| Map preparation: ground, relief, scenery, ground pictures | ~1.3 |
+| Loading both building sprite sheets (drawn ahead into PNGs at build time) | 0.07 |
+
+Building sprites are drawn when the site is built, not in the browser, so loading only reads
+them: 0.3% of a new game's load. The one set of pictures drawn whole at load was the train sheet,
+every look of every engine and car of every era (201 looks, 24 headings each), built when a game
+with trains loads, or, in a new game, on the first buy.
+
+| | before | after |
+|---|---|---|
+| Browser, 1950 save, load to first game frame | 3.54 s | 2.40 s |
+| Browser, 1950 save, longest frame while loading | 2,688 ms | 351 ms |
+| Browser, new game, longest frame after the towns arrive | 1,333 ms | ~280 ms |
+| Browser, new game, click to first game frame | 24.3 s | 23.3–24.8 s (unchanged) |
+| Desktop, 1950 save, load to first game frame | 2.06 s | 1.59 s |
+| Desktop, 1850 save, load to first game frame | 2.07 s | 1.48 s |
+| Train sheet drawn while loading a save (browser / desktop) | 0.82 s / 0.53 s | 0.07 s / 0.03 s |
+
+What changed:
+
+- **Train looks are drawn as they are wanted** (`trains.GrownTrainSprites`): a game loads with
+  only the looks of the trains it has. A look not on the sheet yet is drawn when a train or the buy
+  screen first wants it (about 2.5 ms on desktop, 5 ms in the browser), and frames that show
+  trains draw the rest ahead within the time they already allow for close-up pages. The sheet goes
+  to the graphics card again only when a frame needs a look missing from it. Each look's pictures
+  are exactly those of the old sheet, outline included (checked pixel for pixel for all 201 looks).
+- **The map is prepared a part at a time** (`MapView.prepare_steps`, `PixelWorld.built`), so the
+  waiting screen keeps moving in the browser instead of freezing for one long frame.
+
+The whole wait for a new game is still the towns growing: about 20 of the 23 seconds. The
+remaining loading frames of 200–350 ms in the browser are single parts of the preparation
+(relief, scenery, ground, grading the track bed, the zoomed-out picture), each one piece of work
+that would have to be split inside itself.
