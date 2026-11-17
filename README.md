@@ -819,7 +819,8 @@ Stations also send and want passengers and mail. Every month each building in a 
 ring sends passengers by its points, the same number it wants to receive: 1 per population point,
 5 per food or timber point, 10 per ore, industry or trade point and 20 per corporate point. A fifth
 as many pieces of mail go with them, rounded down for the station as a whole. Up to 100
-passengers and 100 pieces of mail wait at a station, apart from the freight stockpile. They ride
+passengers and 100 pieces of mail wait at a station, apart from the freight stockpile, and only
+for a month: those no train took are gone when the next month's come. They ride
 in passenger coaches and mail vans of 50 each and earn money where they get off just like cargo,
 by the demand there, which only trains use up; they then go on their way rather than waiting to
 be handed out.
