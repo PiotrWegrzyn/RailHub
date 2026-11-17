@@ -44,6 +44,10 @@ Query parameters:
         #landing .needs { margin: 6px 0 0; color: #888; font-size: 13px; }
         #landing .others { margin: 8px 0 0; font-size: 13px; color: #888; }
         #landing a { color: #dba852; }
+        #landing .mac-help { margin: 10px 0 0; color: #aaa; font-size: 13px; text-align: left; }
+        #landing .mac-help summary { color: #dba852; text-align: center; cursor: pointer; }
+        #landing .mac-help ol { margin: 8px 0 0; padding-left: 20px; }
+        #landing .mac-help li { margin: 4px 0; }
         #landing .fine { margin: 28px 0 0; color: #777; font-size: 12px; }
     </style>
 </head>
@@ -56,6 +60,18 @@ Query parameters:
         <p class="slow">Too slow? Download and play outside the browser</p>
         <a class="download" id="download"></a>
         <p class="needs" id="needs"></p>
+        <details class="mac-help" id="mac-help" hidden>
+            <summary>How to open it on a Mac</summary>
+            <ol>
+                <li>Open the downloaded RailHub-macOS.zip (Safari unpacks it for you) and drag
+                    RailHub to Applications.</li>
+                <li>Double-click RailHub. The first time, macOS says it can't check the app, because
+                    it isn't from the App Store. Click Done.</li>
+                <li>Open System Settings, then Privacy &amp; Security, scroll down and click
+                    Open Anyway next to RailHub. Confirm with your password.</li>
+                <li>From then on RailHub opens like any other app.</li>
+            </ol>
+        </details>
         <p class="others" id="others"></p>
         <p class="fine">Saves work in both: in Load game, Export file, then Import file in the other.</p>
     </div>
@@ -148,10 +164,14 @@ Query parameters:
         download.dataset.file = file;
         download.textContent = "Download for " + system;
         document.getElementById("needs").textContent = needs;
+        const macHelp = document.getElementById("mac-help");
+        macHelp.hidden = system !== "macOS";
         const others = Object.keys(DOWNLOADS).filter(name => name !== system);
         document.getElementById("others").innerHTML = "Also for " + others.map(name =>
             `<a href="${RELEASES + DOWNLOADS[name][0]}" data-file="${DOWNLOADS[name][0]}">${name}</a>`
         ).join(" and ");
+        document.querySelector('#others a[data-file="RailHub-macOS.zip"]')
+            ?.addEventListener("click", () => { macHelp.hidden = false; });
         linkNewestBuilds();
         const landing = document.getElementById("landing");
         landing.hidden = false;
