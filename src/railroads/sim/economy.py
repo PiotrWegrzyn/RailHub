@@ -348,7 +348,7 @@ class Economy:
 
 
 @cache
-def _wanted(kind: BuildingKind, year: int) -> frozenset[Need]:
+def wants_of(kind: BuildingKind, year: int) -> frozenset[Need]:
     """The needs a kind wants in a given year: what a processor takes in or is boosted by, and
     what the rest need."""
     recipe = RECIPES.get(kind)
@@ -379,7 +379,7 @@ class _Month:
         self.cells = cells
         in_cells = ((k, n[cells]) for k, n in flat.items())
         self.count = {k: n.astype(np.float64) for k, n in in_cells if n.any()}
-        self.wanted = {kind: _wanted(kind, economy.year) for kind in self.count}
+        self.wanted = {kind: wants_of(kind, economy.year) for kind in self.count}
         self.zero = np.zeros(cells.size)
         self.priority = economy.levels[cells]
         for kind, recipe in RECIPES.items():

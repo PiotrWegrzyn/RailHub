@@ -523,8 +523,8 @@ class Growth:
         changed |= self._die_out(self.trade)
         changed |= self._raise_buildings()
         self._count_served(self.trade)
-        for place in self._places:
-            place.highest = float(place.chances.max())
+        for place, highest in zip(self._places, self._chances.max(axis=1).tolist(), strict=True):
+            place.highest = highest
         return changed
 
     def starving(self, trade: Trade, kind: BuildingKind) -> npt.NDArray[np.int64]:

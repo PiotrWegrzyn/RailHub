@@ -22,6 +22,7 @@ from railroads.sim.economy import (
     StationOrder,
     Trade,
     input_stock,
+    wants_of,
 )
 from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.goods import (
@@ -32,7 +33,6 @@ from railroads.sim.goods import (
     TRAVELLERS,
     Good,
     Need,
-    boosts_of,
     makes_of,
     needs_of,
     price_of,
@@ -144,12 +144,9 @@ class StationTrade:
             economy.taken = {}
         for need in MEETS[good]:
             for kind, count in growth.counts.items():
-                recipe = RECIPES.get(kind)
-                if recipe is not None:
-                    if need not in recipe.takes(year) and need not in boosts_of(kind, year):
-                        continue
-                elif need not in needs_of(kind, year):
+                if need not in wants_of(kind, year):
                     continue
+                recipe = RECIPES.get(kind)
                 here = count.ravel()[cells]
                 for cell, n in zip(cells[here > 0].tolist(), here[here > 0].tolist(), strict=True):
                     if recipe is not None:
