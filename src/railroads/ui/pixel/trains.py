@@ -159,6 +159,8 @@ MAROON_ROOF: RGB = (70, 20, 26)
 BOXCAB_BROWN: RGB = (122, 74, 42)
 EXPRESS_BLUE: RGB = (36, 78, 168)
 EXPRESS_WHITE: RGB = (230, 232, 236)
+TEE_RED: RGB = (128, 30, 42)
+TEE_BEIGE: RGB = (214, 198, 156)
 PANTOGRAPH: RGB = (60, 60, 66)
 AUTO_BODY: RGB = (176, 44, 60)
 TANK_HULL: RGB = (88, 100, 60)
@@ -173,6 +175,8 @@ TENDER_GREEN: RGB = (50, 84, 58)
 APPLE_GREEN: RGB = (82, 136, 62)
 LINING: RGB = (222, 222, 212)
 GRAPHITE: RGB = (196, 198, 204)
+BRUNSWICK: RGB = (34, 52, 42)
+OCHRE: RGB = (176, 136, 62)
 
 # Sizes in cells: how far apart the engine and cars sit, and their half lengths.
 CAR_HALF = 0.24
@@ -284,17 +288,17 @@ def express() -> Model:
     for u in (-0.26, 0.26):
         m.box((u - 0.1, u + 0.1), (-0.065, 0.065), (0.03, 0.07), FRAME)
         m.wheels([u - 0.055, u + 0.055], 0.035, FRAME, 0.075)
-    m.box((-body, body), (-0.085, 0.085), (0.07, 0.27), EXPRESS_BLUE)
-    m.panel((-body, body), (0.17, 0.25), 0.0855, EXPRESS_WHITE)
+    m.box((-body, body), (-0.085, 0.085), (0.07, 0.27), TEE_RED)
+    m.panel((-body, body), (0.1, 0.15), 0.0855, TEE_BEIGE)
     for u in (-0.2, -0.1, 0.0, 0.1, 0.2):
         m.panel((u - 0.03, u + 0.03), (0.19, 0.23), 0.0856, WINDOW)
     _roof(m, (-body, body), 0.085, (0.27, 0.285), ROOF_GREY)
     for tip in (h, -h):
         root = body if tip > 0 else -body
         with m.coarse():
-            m.nose((root, tip), (0.07, 0.13, 0.27), 0.085, EXPRESS_BLUE)
+            m.nose((root, tip), (0.07, 0.13, 0.27), 0.085, TEE_RED)
         with m.fine():
-            m.snout((root, tip), (0.07, 0.13, 0.27), 0.085, EXPRESS_BLUE)
+            m.snout((root, tip), (0.07, 0.13, 0.27), 0.085, TEE_RED)
         out = 0.004 if tip > 0 else -0.004
         a = (root + out, 0.27 + 0.004)
         b = (root + (tip - root) * 0.6 + out, 0.27 + (0.13 - 0.27) * 0.6 + 0.004)
@@ -306,7 +310,7 @@ def express() -> Model:
     _hand_electric(m, h, (-0.26, 0.26), 0.055, 0.285)
     with m.fine():
         for v in (0.0857, -0.0857):
-            parts.plate(m, (-body, body), (0.09, 0.098), v, EXPRESS_WHITE)
+            parts.plate(m, (-body, body), (0.09, 0.098), v, shade(TEE_BEIGE, 0.8))
     for end in (h, -h):
         parts.coupler(m, end, 0.05)
     return m
@@ -1841,7 +1845,7 @@ ENGINES: dict[str, EngineModel] = {
     "catch_me": _entry(
         Pioneer(
             0.25,
-            (58, 82, 130),
+            (44, 62, 98),
             FRAME,
             ((0.12, 0.05), (-0.1, 0.05)),
             WHEEL_RED,
@@ -1852,7 +1856,7 @@ ENGINES: dict[str, EngineModel] = {
     "salamanca": _entry(
         Pioneer(
             0.27,
-            COPPER,
+            (58, 58, 64),
             WOOD,
             ((0.14, 0.045), (-0.14, 0.045)),
             uprights=(-0.04, 0.08),
@@ -1940,11 +1944,11 @@ ENGINES: dict[str, EngineModel] = {
     "tank": _entry(
         Steam(
             0.3,
-            (192, 148, 58),
-            (120, 92, 40),
+            OCHRE,
+            (104, 78, 40),
             ((0.11, -0.03),),
             0.045,
-            (192, 148, 58),
+            OCHRE,
             radius=0.068,
             cab=0.2,
             domes=(0.02,),
@@ -2023,11 +2027,11 @@ ENGINES: dict[str, EngineModel] = {
     "light_tank": _entry(
         Steam(
             0.4,
-            (44, 66, 112),
-            (26, 40, 70),
+            (40, 56, 92),
+            (26, 36, 60),
             ((0.17, 0.06, -0.05),),
             0.048,
-            (44, 66, 112),
+            (40, 56, 92),
             trailing=(-0.29,),
             radius=0.078,
             cab=0.24,
@@ -2037,17 +2041,22 @@ ENGINES: dict[str, EngineModel] = {
     "atlantic": _entry(
         Steam(
             0.44,
-            (72, 112, 172),
-            (40, 64, 104),
+            BRUNSWICK,
+            BRUNSWICK,
             ((0.08, -0.08),),
             0.066,
-            (72, 112, 172),
+            BRUNSWICK,
             leading=(0.35, 0.26),
             trailing=(-0.28,),
             radius=0.086,
+            trim=(150, 128, 70),
+            smokebox=BLACK_IRON,
             domes=(0.02,),
+            dome_color=BRUNSWICK,
+            beam=BLACK_IRON,
+            headlight=BLACK_IRON,
         ),
-        Tender(0.28, (72, 112, 172), (0.19, 0.0, -0.19), top=0.23),
+        Tender(0.28, BRUNSWICK, (0.19, 0.0, -0.19), top=0.23, trim=None),
     ),
     "mallet": _entry(
         Steam(
@@ -2176,7 +2185,7 @@ ENGINES: dict[str, EngineModel] = {
         )
     ),
     "heavy_diesel": _entry(
-        Unit(0.48, (222, 112, 34), (40, 40, 44), (0.29, -0.29), axles=3, hood=True, vents=4)
+        Unit(0.48, (214, 170, 52), (150, 36, 36), (0.29, -0.29), axles=3, hood=True, vents=4)
     ),
     "bullet": _entry(
         Unit(
