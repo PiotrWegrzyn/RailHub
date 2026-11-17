@@ -255,8 +255,8 @@ trains: up close each engine and car is drawn from its 3D model as fine as the s
     the autosave starts on the frame after the turn, or once the last one is written if it still is.
 - `railroads.ui.map_view`: the map view, which owns the layers and the order they draw in. Beside it:
   `map_input` (mouse and keys), `map_tools` (what clicks do with each build tool), `map_overlays`
-  (outlines, grid lines, station names, compass, search marks, the status strip and hover card)
-  and `top_bar`.
+  (outlines, grid lines, station names, compass, search marks, the status strip, hover card and
+  the Shift satisfaction tint) and `top_bar`.
 - `railroads.ui.minimap`: the world with the map marked on it, from a quarter-degree picture of
   the world's land baked into `src/railroads/maps/world-land.npz`, next to the whole map.
 
@@ -530,7 +530,10 @@ goods apart, with each building's satisfaction as a percentage.
 Satisfaction goes wherever it counts with no ceiling: a building at 145% counts its points as
 served 14.5 times over towards growth, against 10 at 100%. A building is unsatisfied at 0%,
 thriving from 100% and content between; the ground under content and thriving buildings has a
-warm glow, and the status bar names the hovered cell's satisfaction. The Fine living node of the
+warm glow, and the status bar names the hovered cell's satisfaction. Holding Shift over the map
+tints the land under every building that trades by how satisfied the least satisfied building in
+its cell is: green from 100%, yellow from 50%, orange below that and red at 0%; buildings that
+neither need nor make anything get no tint. The Fine living node of the
 commerce tree makes each bonus good worth 40% instead of 30%, a placeholder until bonus goods get
 tech of their own.
 
