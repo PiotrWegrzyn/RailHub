@@ -9,7 +9,14 @@ from railroads.sim.goods import Good
 from railroads.sim.railway import Railway
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, Car, Stop, Train
 from railroads.ui.buy_train import engine_figures
-from railroads.ui.trains_window import ROW_CAR_SIZES, TrainsWindow, carried_in, row_car_size
+from railroads.ui.trains_window import (
+    ROW_CAR,
+    ROW_CAR_GAP,
+    ROW_CAR_LINES,
+    TrainsWindow,
+    carried_in,
+    row_cars,
+)
 
 
 def train_calling_at(*stops: Stop) -> Train:
@@ -34,24 +41,26 @@ def test_the_first_stop_offers_what_the_train_brings_back_from_the_last() -> Non
     assert carried == [Good.WHEAT]
 
 
-def test_a_short_train_shows_its_cars_largest_in_the_list() -> None:
-    sizes = row_car_size(4, 160.0)
+def test_a_short_train_shows_its_cars_full_size_on_one_line_of_the_list() -> None:
+    car_width, per_line = row_cars(4, 160.0)
 
-    assert sizes == ROW_CAR_SIZES[0]
-
-
-def test_a_sixteen_car_train_fits_its_row_at_the_smallest_size() -> None:
-    car_width, _, gap = row_car_size(16, 160.0)
-
-    assert (car_width, gap) == ROW_CAR_SIZES[-1][::2]
-    assert 16 * (car_width + gap) - gap <= 160.0
+    assert car_width == ROW_CAR
+    assert per_line >= 4
 
 
-def test_cars_too_many_for_the_smallest_size_are_narrowed_to_fit_the_row() -> None:
-    car_width, _, gap = row_car_size(25, 160.0)
+def test_a_twenty_four_car_train_shows_its_cars_full_size_over_three_lines() -> None:
+    car_width, per_line = row_cars(24, 160.0)
 
-    assert car_width < ROW_CAR_SIZES[-1][0]
-    assert 25 * (car_width + gap) - gap == pytest.approx(160.0)
+    assert car_width == ROW_CAR
+    assert per_line * ROW_CAR_LINES >= 24
+
+
+def test_cars_too_many_for_three_lines_are_narrowed_to_fit_them() -> None:
+    car_width, per_line = row_cars(40, 160.0)
+
+    assert car_width < ROW_CAR
+    assert per_line * ROW_CAR_LINES >= 40
+    assert per_line * (car_width + ROW_CAR_GAP) - ROW_CAR_GAP == pytest.approx(160.0)
 
 
 def test_the_list_draws_a_long_express_with_its_dining_car(gui: None) -> None:

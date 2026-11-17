@@ -41,12 +41,13 @@ WINDOW_SIZE = (980.0, 500.0)
 SMALLEST_WINDOW = (900.0, 440.0)
 WINDOW_TOP = 96.0
 LIST_WIDTH = 190.0
-# How tall each train's row in the list is.
-ROW_HEIGHT = 58.0
-# The sizes the cars in a train's row are drawn at, largest first, with the gap between them:
-# the largest that fits the whole train in the row is used, and a train too long for even the
-# smallest has its cars narrowed to fit.
-ROW_CAR_SIZES = ((16.0, 16.0, 2.0), (11.0, 14.0, 1.5), (8.0, 12.0, 1.0))
+# Where the cars start in a train's row in the list, under its name and status.
+ROW_CARS_TOP = 39.0
+# The size of a car in a train's row, and the gap between cars and between their lines.
+ROW_CAR = 16.0
+ROW_CAR_GAP = 2.0
+# The most lines a train's cars take in its row; a train too long for them has its cars narrowed.
+ROW_CAR_LINES = 3
 # The share of the space beside the list of trains the map takes.
 MAP_SHARE = 0.45
 # Where a stop card's rows start, after their labels.
@@ -146,12 +147,8 @@ class TrainsWindow:
         imgui.spacing()
         imgui.begin_child("rows", (0, 0))
         trains = railway.trains
-        clipper = imgui.ListClipper()
-        clipper.begin(len(trains))
-        while clipper.step():
-            for index in range(clipper.display_start, clipper.display_end):
-                self._draw_row(railway, trains[index])
-        clipper.end()
+        for train in trains:
+            self._draw_row(railway, train)
         imgui.end_child()
         imgui.end_child()
         chosen = next((t for t in trains if t.name == self.chosen), None)
@@ -160,8 +157,17 @@ class TrainsWindow:
         return chosen
 
     def _draw_row(self, railway: Railway, train: Train) -> None:
+        """A train's row: its name, status and cargo's worth over its cars, in up to
+        ROW_CAR_LINES lines; a row out of sight only takes up its room."""
+        width = imgui.get_content_region_avail().x
+        car_width, per_line = row_cars(len(train.cars), width - 12)
+        lines = -(-len(train.cars) // per_line)
+        height = ROW_CARS_TOP + lines * (ROW_CAR + ROW_CAR_GAP) + 1
+        if not imgui.is_rect_visible((width, height)):
+            imgui.dummy((width, height))
+            return
         picked = train.name == self.chosen
-        if imgui.selectable(f"##{train.name}", picked, 0, (0, ROW_HEIGHT))[0]:
+        if imgui.selectable(f"##{train.name}", picked, 0, (0, height))[0]:
             self.chosen = train.name
         low = imgui.get_item_rect_min()
         draw_list = imgui.get_window_draw_list()
@@ -175,14 +181,13 @@ class TrainsWindow:
             draw_list.add_text((right, low.y + 3), color_u32(BRASS), money)
             if imgui.is_item_hovered():
                 imgui.set_tooltip(f"Its cargo is worth about {money} where it is going")
-        width = imgui.get_item_rect_max().x - low.x - 12
-        car_width, car_height, gap = row_car_size(len(train.cars), width)
-        top = low.y + 39 + (16 - car_height) / 2
         for index, car in enumerate(train.cars):
-            left = low.x + 6 + index * (car_width + gap)
+            line, place = divmod(index, per_line)
+            left = low.x + 6 + place * (car_width + ROW_CAR_GAP)
+            top = low.y + ROW_CARS_TOP + line * (ROW_CAR + ROW_CAR_GAP)
             good = None if car.dining else car.good
             draw_small_car(
-                draw_list, good, car.load, car.capacity, (left, top), (car_width, car_height)
+                draw_list, good, car.load, car.capacity, (left, top), (car_width, ROW_CAR)
             )
 
     def _draw_train(
@@ -533,14 +538,14 @@ def engine_summary(engine: Engine, per_cell: float | None = None) -> str:
     return "\n".join(lines)
 
 
-def row_car_size(cars: int, width: float) -> tuple[float, float, float]:
-    """The width, height and gap a train's cars are drawn at in its row of the list: the largest
-    of ROW_CAR_SIZES that fits them all in the width, or the smallest narrowed to fit."""
-    for car_width, car_height, gap in ROW_CAR_SIZES:
-        if cars * (car_width + gap) - gap <= width:
-            return car_width, car_height, gap
-    _, car_height, gap = ROW_CAR_SIZES[-1]
-    return max(1.0, (width + gap) / cars - gap), car_height, gap
+def row_cars(cars: int, width: float) -> tuple[float, int]:
+    """How wide a train's cars are drawn in its row of the list, and how many go on a line of
+    that width: ROW_CAR wide over up to ROW_CAR_LINES lines, or narrowed to fit in them."""
+    per_line = max(1, int((width + ROW_CAR_GAP) // (ROW_CAR + ROW_CAR_GAP)))
+    if cars <= per_line * ROW_CAR_LINES:
+        return ROW_CAR, per_line
+    per_line = -(-cars // ROW_CAR_LINES)
+    return max(1.0, (width + ROW_CAR_GAP) / per_line - ROW_CAR_GAP), per_line
 
 
 def carried_in(train: Train, index: int) -> list[Good]:
