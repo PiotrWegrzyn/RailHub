@@ -638,13 +638,13 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
 # with all the inputs they need.
 MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
     {
-        BuildingKind.FARM: {Good.WHEAT: 5},
-        BuildingKind.ORCHARD: {Good.APPLES: 5},
-        BuildingKind.DATE_PALMS: {Good.DATES: 6},
-        BuildingKind.ORANGE_FARM: {Good.ORANGES: 6},
-        BuildingKind.BANANAS: {Good.BANANAS: 8},
-        BuildingKind.SUGAR: {Good.SUGAR: 8},
-        BuildingKind.FISHERY: {Good.FISH: 8},
+        BuildingKind.FARM: {Good.WHEAT: 10},
+        BuildingKind.ORCHARD: {Good.APPLES: 10},
+        BuildingKind.DATE_PALMS: {Good.DATES: 10},
+        BuildingKind.ORANGE_FARM: {Good.ORANGES: 10},
+        BuildingKind.BANANAS: {Good.BANANAS: 10},
+        BuildingKind.SUGAR: {Good.SUGAR: 10},
+        BuildingKind.FISHERY: {Good.FISH: 10},
         BuildingKind.MINE: {Good.COAL: 100},
         BuildingKind.LUMBER_MILL: {Good.LUMBER: 20},
         BuildingKind.PORT: {Good.GOODS: 20, Good.OIL: 50, Good.GAS: 50},

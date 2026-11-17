@@ -15,6 +15,7 @@ from railroads.ui.map_view import MapView
 from railroads.ui.pixel import train_layer
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.train_layer import TrainLayer
+from railroads.ui.pixel.trains import HEADINGS
 
 
 class FakeTexture:
@@ -154,6 +155,7 @@ def test_up_close_only_the_looks_on_screen_are_blown_up(
     view.camera.zoom_level = len(ZOOM_CELL_WIDTHS) - 1
     imgui.get_io().display_framebuffer_scale = imgui.ImVec2(2, 2)
     layer = TrainLayer(view._pixel_layer().world)
+    monkeypatch.setattr(train_layer, "PAGES_TIME", 10.0)
     made: list[int] = []
     monkeypatch.setattr(
         hello_imgui,
@@ -213,10 +215,11 @@ def train_up_close() -> tuple[MapView, Train]:
 
 
 def test_up_close_the_pictures_are_drawn_as_many_times_as_fine_as_the_sheet(
-    context: None,
+    context: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     view, train = train_up_close()
     layer = TrainLayer(view._pixel_layer().world)
+    monkeypatch.setattr(train_layer, "PAGES_TIME", 10.0)
     imgui.new_frame()
 
     layer.draw(imgui.get_foreground_draw_list(), view.railway, view.camera, (640.0, 400.0))
@@ -247,3 +250,36 @@ def test_up_close_looks_not_drawn_fine_in_a_frames_time_show_from_the_sheet_till
     assert pages_in_no_time == 0
     assert layer._sheet is not None
     assert len(layer._pages) == len({look for look, _ in layer._parts(train)})
+
+
+class Clock:
+    def __init__(self, step: float) -> None:
+        self.now, self.step = 0.0, step
+
+    def perf_counter(self) -> float:
+        self.now += self.step
+        return self.now
+
+
+def test_up_close_a_page_is_drawn_a_few_pictures_a_frame(
+    context: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    view, train = train_up_close()
+    layer = TrainLayer(view._pixel_layer().world)
+    monkeypatch.setattr(train_layer, "time", Clock(train_layer.PAGES_TIME / 3))
+    looks = {look for look, _ in layer._parts(train)}
+
+    def frame() -> None:
+        imgui.new_frame()
+        layer.draw(imgui.get_foreground_draw_list(), view.railway, view.camera, (640.0, 400.0))
+        imgui.end_frame()
+
+    frame()
+    after_one = len(layer._pages), sum(len(done) for _, done in layer._painting.values())
+    for _ in range(HEADINGS * len(looks)):
+        frame()
+
+    assert after_one[0] == 0
+    assert 0 < after_one[1] < HEADINGS
+    assert set(layer._pages) == looks
+    assert not layer._painting

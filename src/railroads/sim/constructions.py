@@ -343,12 +343,12 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     BuildingKind.COPPER_MINE: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.GOLD_MINE: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.DIAMOND_MINE: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.SALT_WORKS: BuildingRules(relief=frozenset(Relief)),
     **{
         kind: BuildingRules(relief=_OFF_MOUNTAINS)
         for kind in (
             BuildingKind.FISHERY,
             BuildingKind.OIL_WELL,
-            BuildingKind.SALT_WORKS,
             BuildingKind.FURNITURE_MAKER,
             BuildingKind.TOOL_WORKS,
             BuildingKind.WINERY,

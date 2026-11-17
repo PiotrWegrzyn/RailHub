@@ -13,6 +13,7 @@ from railroads.ui.pixel.models import RGB, Face, Model, keeping_fine, shade
 IRON: RGB = (40, 40, 46)
 STEEL: RGB = (150, 166, 186)
 BRIGHT: RGB = (214, 218, 224)
+TYRE: RGB = (170, 172, 178)
 BUFFER_BEAM: RGB = (168, 42, 34)
 LAMP: RGB = (246, 226, 150)
 TAIL_LAMP: RGB = (210, 40, 36)
@@ -123,8 +124,9 @@ def spoked_wheel(
         for side in both(v + 0.012):
             out = _side(side)
             z = radius
-            ring(m, u, z, radius * 0.98, side + out * LAYER, color, 16)
-            ring(m, u, z, radius * 0.8, side + out * 2 * LAYER, shade(color, 0.5), 16)
+            ring(m, u, z, radius * 0.98, side + out * LAYER, TYRE, 24)
+            ring(m, u, z, radius * 0.88, side + out * 1.5 * LAYER, color, 24)
+            ring(m, u, z, radius * 0.8, side + out * 2 * LAYER, shade(color, 0.45), 24)
             for k in range(spokes):
                 angle = 2 * math.pi * (k + 0.5) / spokes
                 end = (u + radius * 0.8 * math.cos(angle), z + radius * 0.8 * math.sin(angle))
