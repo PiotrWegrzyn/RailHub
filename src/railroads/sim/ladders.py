@@ -478,7 +478,7 @@ FACTORY_LAND = Land(
 TOWNS = Ladder(
     kinds=(BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS),
     land=TOWN_LAND,
-    base_chance=0.000004,
+    base_chance=0.0000018,
     chance_per_doubling={Points.POPULATION: 0.0002},
     merges={
         BuildingKind.HOUSE: Merge(needed=6, pulled_down=6),
