@@ -22,7 +22,8 @@ The ideas every rule of the game should follow.
   so the starving are fed before they die out.
 - The player earns only when buildings take goods out of the player's stations. Goods handed out
   on their own earn nothing, so the money comes from what the player adds to the local economy:
-  a station is an investment.
+  a station is an investment. The one exception is a building the player owns: it pays the
+  player their share of everything it sells, whether handed out on its own or taken by a station.
 - The demand at a station counts only what the buildings around it were left short of after the
   goods handed out on their own.
 - Buildings come up at their base chance anywhere the land allows, and breed by how satisfied they

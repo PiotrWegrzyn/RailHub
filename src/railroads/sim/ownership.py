@@ -25,8 +25,8 @@ from railroads.sim.tech import SHOPS, Effect, Tree, tree_of
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth
 
-# The player's share of what a building they own sells to their stations, and what it costs to
-# buy: this many years of that share at full output.
+# The player's share of what a building they own sells, handed out around it or taken by a
+# station, and what it costs to buy: this many years of that share at full output.
 OWNER_SHARE = 0.5
 PAYBACK_YEARS = 5
 # However much tech cuts the price of buildings, they cost at least this share of it.

@@ -26,7 +26,7 @@ A deliberate break of the order (stations before local trade) fails three of the
 - **Owned buildings earn on local hand-outs.** `Owners.pay` pays the player's share of all of
   `trade.goods_gave`, so an owned farm beside houses earns with no station at all. The comment on
   `OWNER_SHARE` and `test_ownership::test_the_player_earns_half_of_what_their_farm_sells_to_a_joined_station`
-  say "sells to their stations". Decided: they keep earning on hand-outs, at a price that should
+  say "sells to their stations". Decided: they keep earning on hand-outs (confirmed by the user), at a price that should
   follow last quarter's satisfaction; whose satisfaction and how far the price moves are still
   open.
 - **done: `StationTrade.supplies` counted everything made in reach.** Each station now keeps
