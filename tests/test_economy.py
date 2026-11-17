@@ -75,7 +75,7 @@ def test_nothing_a_farm_sells_reaches_ten_cells_away() -> None:
 
     trade = economy.trade(placed)
 
-    assert eaten_at(economy, trade, (8, 14)) == 0.0
+    assert eaten_at(economy, trade, (8, 13)) == 0.0
     assert level_at(economy, trade, (8, 4), BuildingKind.FARM) == Satisfaction.UNSATISFIED
 
 
@@ -642,11 +642,11 @@ def test_gasworks_make_town_gas_out_of_coal() -> None:
 def test_a_station_hands_what_it_gathered_back_to_the_buildings_it_gathers_from() -> None:
     tile_map = make_map(size=24)
     economy = Economy(tile_map)
-    placed = counts(tile_map, ((8, 13), BuildingKind.FARM, 1), ((8, 14), BuildingKind.HOUSE, 1))
+    placed = counts(tile_map, ((8, 12), BuildingKind.FARM, 1), ((8, 13), BuildingKind.HOUSE, 1))
 
     trade = economy.trade(placed, {STATION: StationOrder({}, 100.0)})
 
-    assert eaten_at(economy, trade, (8, 14)) == pytest.approx(10.0)
+    assert eaten_at(economy, trade, (8, 13)) == pytest.approx(10.0)
     assert trade.supplied_for[STATION] == {(Need.FOOD, Good.WHEAT): pytest.approx(10.0)}
 
 

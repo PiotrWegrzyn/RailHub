@@ -792,7 +792,7 @@ their station when it is bulldozed or moved. A station hands goods out and gathe
 every platform as well as its own cell. Level 4 is drawn as a junction station between two clock
 towers under a long glass shed, level 5 as a central station with a tall clock tower and three
 sheds, and an added platform as a stone island under a long canopy. Every month each station costs
-$1,000 in upkeep at the first level, $2,000, $4,000, $8,000 and $16,000 at the next, rising 2% a
+$150 in upkeep at the first level, $400, $1,200, $3,500 and $9,000 at the next, rising 2% a
 year, compounded, from the year play began, and each cell of track $2,
 $40 more where it is electric, $60 more where it is maglev, and 1.8 times as much where it is double, charged once a cell for
 the dearest track in it (`track_upkeep`). Building needs the cash for it, but upkeep is charged
@@ -813,11 +813,11 @@ Stations window shows the share of demand left for each need.
 
 | Price | Goods |
 |---|---|
-| $4-8 | sand 4, clay 5, limestone 5, potatoes 6, wheat, apples, bananas, dates, sugar, fish, bread, coal, lumber, salt, bricks 8 |
-| $9-15 | iron ore, grapes, wool, gas 10, hops 10, newspapers 10, oil, cotton, flax 12, cement 12, copper, cans, refined sugar 14, beer 15, paper 15 |
-| $15-35 | sheep 15, meat 16, steel, cattle 20, glass 20, rubber, fuel, coffee, chemicals, leather 25, plastics 25, furniture, clothes, tools, goods, vodka 30, shoes 35 |
-| $40-150 | wine, machinery 60, porcelain 60, electronics 120, appliances 150 |
-| $800, $2,000, $5,000 | gold, diamonds, cars |
+| $2-10 | bread 4, eggs 4, chickens 6, milk 6, potatoes 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, sugar 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, lumber 10, newspapers 10, pots 10 |
+| $11-20 | cement 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, beer 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, wool 20 |
+| $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, stove tiles 25, copper 28, castings 30, vodka 30, wax 30, plastics 40, rubber 40, wine 40 |
+| $41-200 | coffee 50, furniture 60, porcelain 60, clothes 70, steel 80, shoes 100, electronics 120, goods 120, guns 150, tools 160, machinery 180 |
+| $300 and up | appliances 300, incense 300, luxury goods 300, gold 800, diamonds 2,000, cars 5,000, tanks 8,000, planes 12,000 |
 
 Passengers pay $10 and mail $25, as they get off the train. A good is worth nothing where no
 building wants it.
@@ -866,13 +866,13 @@ track along it turns its rails into a guideway; rails laid along a guideway leav
 track runs straight on across its cell. While placing a station, and when the
 mouse is over one, the cells it hands goods out to (2 steps away) are shaded orange, the areas of
 other stations pink, cells two stations share grey and the stations themselves blue, with a blue
-line round the cells it gathers from (4 steps). A right click cancels whatever is being built;
+line round the cells it gathers from (3 steps). A right click cancels whatever is being built;
 with nothing being built it opens the details of a cell: its land, points, and every building
 with what it makes and needs and what it got and gave last month. Clicking a station, left or
 right, opens the station instead: its level and reach, its stockpile, waiting passengers and mail, demand and
 the trains that call there, with its reach shaded on the map. There it can be raised a level,
 up to level 5 (see the money above), each level handing goods out and gathering them one
-cell further (from 1 and 4 cells up to 5 and 8), and given more storage, $10,000 for each 250 more of
+cell further (from 1 and 3 cells up to 5 and 7), and given more storage, $10,000 for each 250 more of
 every good and 500 more passengers and mail. Each tree is drawn as a tree: every node in a row
 by how many nodes it builds on, under the first of them, with a line from each node it needs,
 bright once that one is taken.
@@ -884,8 +884,9 @@ stations. Each stop has its own
 cars, up to 5, which the train pulls when it leaves that stop for the next, so the way out and the
 way back can carry different goods; each car is for one good and holds 50 of it, or 150 of bulk
 goods (grain, potatoes, fruit, sugar, grapes, coal, iron ore, sand, clay, limestone, salt and
-lumber), so a food car carries only food. Every car costs $40 each time the train leaves a stop
-with it. A new train
+lumber), so a food car carries only food. Every car costs $15, and $1 more for every 10 it holds,
+each time the train leaves a stop with it, loaded or not: a bulk car of 144 costs $29 a trip, a
+dining car $15. A new train
 starts at its first stop. The window shows what the train pulls
 now. The Stations window shows every station's stockpile and the goods waiting to be handed out
 there, with a button to look at the station; clicking a name opens the station. Trains
@@ -923,7 +924,7 @@ train that has stood longest letting others by since its last stop goes first, s
 ever, then the better engine, then the train bought first. Within stations, and on double track
 for trains going opposite ways, trains pass each other without stopping. Once a month each station that track joins to another station hands what trains brought
 to buildings within 2 cells, unsatisfied first, then content, nearest first, then what it gathered
-before, for 30% of the price, and takes every spare good that buildings made within 4 cells into
+before, for 30% of the price, and takes every spare good that buildings made within 3 cells into
 its stockpile, which counts as selling them. So a station is a market for its own area: a mine in
 its reach feeds a steel mill in its reach a month later, without a train. A station on its own,
 with no track to another, does nothing. A station holds up to 500 of each good, what trains brought and what it gathered together, so
@@ -934,7 +935,7 @@ it pays only when buildings at another station take it, and back at its own stat
 returns to the stockpile, so shuttling goods around earns nothing.
 
 Buildings grow as each month turns over. Whenever that changes something within reach of a
-station (4 cells), a card for the month appears along the right edge of the map
+station (3 cells), a card for the month appears along the right edge of the map
 (`railroads.sim.summaries`): how many buildings went up and came down near how many stations.
 Clicking a card opens what changed, station by station, and outlines those cells on the map;
 a right click dismisses it. The newest five cards show.
