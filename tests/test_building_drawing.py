@@ -17,7 +17,7 @@ from railroads.ui.iso_camera import IsoCamera
 
 
 def make_constructions(grid_type: type[Grid] = HexGrid) -> Constructions:
-    grid = grid_type(rows=12, cols=12, km_per_cell=2.0)
+    grid = grid_type(rows=16, cols=16, km_per_cell=2.0)
     terrain = np.full(grid.shape, Terrain.LAND, dtype=np.uint8)
     terrain[:, 0] = Terrain.SEA
     tile_map = TileMap(
@@ -48,7 +48,7 @@ def make_constructions(grid_type: type[Grid] = HexGrid) -> Constructions:
     constructions.build(Building((4, 1), BuildingKind.SHIPYARD))
     placed = {built.kind for built in constructions if isinstance(built, Building)}
     missing = [kind for kind in BuildingKind if kind not in placed]
-    room = [(r, c) for r in range(12) for c in range(1, 12)]
+    room = [(r, c) for r in range(16) for c in range(1, 16) if not (6 <= r <= 8 and 4 <= c <= 9)]
     for kind in missing:
         constructions.build(
             next(

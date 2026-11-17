@@ -26,13 +26,14 @@ from railroads.ui.pixel.layer import resolution_for
 from railroads.ui.pixel.noise import noise, table_hash
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection, hash01
 from railroads.ui.pixel.relief import MOST_LIFT, raycast
-from railroads.ui.pixel.scenery import BUILDING_SPRITES
+from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
 from railroads.ui.pixel.sheet import FINE, SHEET_INDEX, SpriteSheet
 from railroads.ui.pixel.track_art import RAIL
 from railroads.ui.pixel.track_preview import ghost
 from railroads.ui.pixel.world import PixelWorld
 
 LOOKS = {HexGrid: (0.0, 1.0), SquareGrid: (-45.0, float(np.sqrt(2)))}
+GAME_LOOK = (-45.0, float(np.sqrt(2)))
 
 
 @pytest.fixture(scope="module")
@@ -263,6 +264,11 @@ def test_every_building_gets_its_sprite(sheet: SpriteSheet) -> None:
     assert names.count("farm") == 1
 
 
+def painted_width(sheet: SpriteSheet, name: str) -> int:
+    columns = np.flatnonzero((sheet.pixels[sheet.index(name)][..., 3] > 0.1).any(axis=0))
+    return int(columns[-1] - columns[0] + 1)
+
+
 @pytest.mark.parametrize("small", list(MERGED))
 def test_big_and_mega_works_have_sprites_of_their_own_no_smaller_than_the_one_they_grew_from(
     sheet: SpriteSheet, small: BuildingKind
@@ -270,11 +276,42 @@ def test_big_and_mega_works_have_sprites_of_their_own_no_smaller_than_the_one_th
     big, mega = MERGED[small]
 
     names = [BUILDING_SPRITES[kind] for kind in (small, big, mega)]
-    widths = [sheet.sizes[sheet.index(name), 0] for name in names]
+    widths = [painted_width(sheet, name) for name in names]
 
     assert len(set(names)) == 3
     assert widths[0] <= widths[1] <= widths[2]
     assert widths[0] < widths[2]
+
+
+def test_no_works_is_drawn_wider_than_a_cell(sheet: SpriteSheet) -> None:
+    names = set(BUILDING_SPRITES.values())
+
+    widths = [painted_width(sheet, name) for name in names]
+
+    assert max(widths) <= 26
+
+
+def test_a_mega_works_sharing_its_cell_stands_with_its_foot_inside_the_cell(
+    sheet: SpriteSheet,
+) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    for _ in range(2):
+        constructions.build(Building((10, 4), BuildingKind.HOUSE))
+    constructions.build(Building((10, 4), BuildingKind.MEGA_TEXTILE_MILL))
+    projection = PixelProjection.of(tile_map.grid, *GAME_LOOK)
+    mega = sheet.index(BUILDING_SPRITES[BuildingKind.MEGA_TEXTILE_MILL])
+
+    scenery = Scenery.of(tile_map, constructions, projection, sheet)
+
+    at = int(np.flatnonzero(scenery.sprite == mega)[0])
+    painted = sheet.pixels[mega][..., 3] > 0.1
+    lowest = painted.shape[0] - 1 - np.argmax(painted[::-1], axis=0)
+    ax, ay = sheet.anchors[mega]
+    on_ground = np.flatnonzero(painted.any(axis=0) & (lowest >= ay - 3))
+    corners = np.array([projection.to_pixels(*c) for c in tile_map.grid.corners(10, 4)])
+    assert scenery.x[at] - ax + on_ground.min() >= corners[:, 0].min() - 1
+    assert scenery.x[at] - ax + on_ground.max() <= corners[:, 0].max() + 1
 
 
 @pytest.mark.parametrize("kind", [BuildingKind.BAKERY, BuildingKind.DAIRY])

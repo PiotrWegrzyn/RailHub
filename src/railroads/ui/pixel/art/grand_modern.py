@@ -30,6 +30,7 @@ from railroads.ui.pixel.art.industry import (
 from railroads.ui.pixel.art.painter import (
     BRICK,
     CAR_COLOURS,
+    CHIMNEY_SHARE,
     DOORWAY,
     GLASS,
     LEAVES,
@@ -447,7 +448,9 @@ def _silo(p: Painter, x: float, y: float, r: float, tall: float, cap: RGB) -> No
 
 
 def _plastic_stack(p: Painter, x: float, y: float, tall: float) -> None:
-    """A tall white stack standing on (x, y) with red bands under a dark cap."""
+    """A tall white stack standing on (x, y) with red bands under a dark cap, lowered
+    (CHIMNEY_SHARE)."""
+    tall *= CHIMNEY_SHARE
     p.rect(x - 1, y - tall, x + 1, y, PLASTIC_WHITE)
     for d in (2, 5):
         p.line([(x - 1, y - tall + d), (x + 1, y - tall + d)], PLASTIC_RED)
