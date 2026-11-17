@@ -315,21 +315,35 @@ def test_sixteen_houses_nearby_let_six_make_way_for_a_tenement_the_cells_own_fir
     assert growth.nearby()[5, 5] == 16
 
 
-def test_fifteen_houses_nearby_are_not_enough_to_merge() -> None:
+def test_five_houses_nearby_are_not_enough_to_merge() -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
     neighbours = tile_map.grid.neighbours(5, 5)
     build(constructions, (5, 5), BuildingKind.HOUSE, 2)
-    for near in neighbours[:2]:
-        build(constructions, near, BuildingKind.HOUSE, 6)
-    build(constructions, neighbours[2], BuildingKind.HOUSE, 1)
+    build(constructions, neighbours[0], BuildingKind.HOUSE, 2)
+    build(constructions, neighbours[1], BuildingKind.HOUSE, 1)
     growth = Growth(constructions)
 
     changed = growth._turn((5, 5), TOWNS, np.random.default_rng(0))
 
     assert changed <= {(5, 5), *neighbours}
-    assert growth.count(BuildingKind.HOUSE).sum() == 16
+    assert growth.count(BuildingKind.HOUSE).sum() == 6
     assert growth.count(BuildingKind.TENEMENT).sum() == 0
+
+
+def test_six_houses_in_a_cell_and_its_neighbours_merge_into_a_tenement() -> None:
+    tile_map = make_map()
+    constructions = Constructions(tile_map)
+    neighbours = tile_map.grid.neighbours(5, 5)
+    build(constructions, (5, 5), BuildingKind.HOUSE, 2)
+    for near in neighbours[:4]:
+        build(constructions, near, BuildingKind.HOUSE, 1)
+    growth = Growth(constructions)
+
+    growth._turn((5, 5), TOWNS, np.random.default_rng(0))
+
+    assert growth.count(BuildingKind.HOUSE).sum() == 0
+    assert growth.count(BuildingKind.TENEMENT)[5, 5] == 1
 
 
 def test_five_tenements_nearby_make_flats_before_houses_merge() -> None:
@@ -564,9 +578,10 @@ def test_a_house_with_no_room_in_its_cell_spills_into_a_cell_next_to_it() -> Non
     tile_map = make_map()
     constructions = Constructions(tile_map)
     build(constructions, (5, 5), BuildingKind.HOUSE, 6)
-    growth = Growth(constructions, only(TOWNS))
+    unmerged = replace(TOWNS, merges={})
+    growth = Growth(constructions, only(unmerged))
 
-    changed = growth._turn((5, 5), TOWNS, np.random.default_rng(0))
+    changed = growth._turn((5, 5), unmerged, np.random.default_rng(0))
 
     assert len(changed) == 1
     assert changed <= set(tile_map.grid.neighbours(5, 5))

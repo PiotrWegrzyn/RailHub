@@ -866,13 +866,13 @@ track along it turns its rails into a guideway; rails laid along a guideway leav
 track runs straight on across its cell. While placing a station, and when the
 mouse is over one, the cells it hands goods out to (2 steps away) are shaded orange, the areas of
 other stations pink, cells two stations share grey and the stations themselves blue, with a blue
-line round the cells it gathers from (4 steps). A right click cancels whatever is being built;
+line round the cells it gathers from (3 steps). A right click cancels whatever is being built;
 with nothing being built it opens the details of a cell: its land, points, and every building
 with what it makes and needs and what it got and gave last month. Clicking a station, left or
 right, opens the station instead: its level and reach, its stockpile, waiting passengers and mail, demand and
 the trains that call there, with its reach shaded on the map. There it can be raised a level,
 up to level 5 (see the money above), each level handing goods out and gathering them one
-cell further (from 1 and 4 cells up to 5 and 8), and given more storage, $10,000 for each 250 more of
+cell further (from 1 and 3 cells up to 5 and 7), and given more storage, $10,000 for each 250 more of
 every good and 500 more passengers and mail. Each tree is drawn as a tree: every node in a row
 by how many nodes it builds on, under the first of them, with a line from each node it needs,
 bright once that one is taken.
@@ -923,7 +923,7 @@ train that has stood longest letting others by since its last stop goes first, s
 ever, then the better engine, then the train bought first. Within stations, and on double track
 for trains going opposite ways, trains pass each other without stopping. Once a month each station that track joins to another station hands what trains brought
 to buildings within 2 cells, unsatisfied first, then content, nearest first, then what it gathered
-before, for 30% of the price, and takes every spare good that buildings made within 4 cells into
+before, for 30% of the price, and takes every spare good that buildings made within 3 cells into
 its stockpile, which counts as selling them. So a station is a market for its own area: a mine in
 its reach feeds a steel mill in its reach a month later, without a train. A station on its own,
 with no track to another, does nothing. A station holds up to 500 of each good, what trains brought and what it gathered together, so
@@ -934,7 +934,7 @@ it pays only when buildings at another station take it, and back at its own stat
 returns to the stockpile, so shuttling goods around earns nothing.
 
 Buildings grow as each month turns over. Whenever that changes something within reach of a
-station (4 cells), a card for the month appears along the right edge of the map
+station (3 cells), a card for the month appears along the right edge of the map
 (`railroads.sim.summaries`): how many buildings went up and came down near how many stations.
 Clicking a card opens what changed, station by station, and outlines those cells on the map;
 a right click dismisses it. The newest five cards show.

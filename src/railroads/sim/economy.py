@@ -75,7 +75,7 @@ class Satisfaction(IntEnum):
 
 DELIVERY_RADIUS = 2
 
-COLLECTION_RADIUS = 4
+COLLECTION_RADIUS = 3
 
 # How many cells away buildings sell their goods on their own, and the share of what was sent that
 # each cell of the way loses: at LOCAL_REACH cells nothing arrives.

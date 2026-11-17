@@ -463,7 +463,7 @@ def test_a_station_rises_through_five_levels_for_50k_250k_1_5m_and_10m_each_reac
         railway.upgrade((6, 20))
         reaches.append(railway.reach((6, 20)))
 
-    assert reaches == [(1, 4), (2, 5), (3, 6), (4, 7), (5, 8), (5, 8)]
+    assert reaches == [(1, 3), (2, 4), (3, 5), (4, 6), (5, 7), (5, 7)]
     assert railway.finances.cash == 12_000_000.0 - 11_800_000.0
     assert railway.upgrade_price((6, 20)) is None
 
@@ -525,7 +525,7 @@ def test_each_storage_upgrade_costs_twice_the_one_before() -> None:
 
 def test_a_raised_station_gathers_from_further_away() -> None:
     growth, railway = joined_stations()
-    growth.build(Building((6, 25), BuildingKind.LUMBER_MILL))
+    growth.build(Building((6, 24), BuildingKind.LUMBER_MILL))
     growth.trade_goods()
     before = railway.station_goods((6, 20)).stockpile.get(Good.LUMBER, 0.0)
     railway.finances.cash = 100_000.0
@@ -550,7 +550,7 @@ def test_every_car_costs_twenty_each_time_the_train_sets_off() -> None:
 
 def test_a_mine_in_reach_feeds_a_steel_mill_in_reach_through_the_station_the_same_month() -> None:
     growth, railway = joined_stations()
-    for cell, kind in [((6, 24), BuildingKind.MINE), ((6, 21), BuildingKind.STEEL_MILL)]:
+    for cell, kind in [((6, 23), BuildingKind.MINE), ((6, 21), BuildingKind.STEEL_MILL)]:
         growth.build(Building(cell, kind))
 
     growth.trade_goods()
@@ -818,7 +818,7 @@ def food_and_heating(growth: Growth, cell: tuple[int, int]) -> tuple[float, floa
 
 def test_a_town_eats_its_own_farms_food_the_month_it_is_made_and_only_the_rest_waits() -> None:
     growth, railway = joined_stations()
-    for cell in ((5, 22), (5, 23), (6, 23), (6, 24)):
+    for cell in ((5, 22), (6, 22), (6, 23), (7, 22)):
         growth.build(Building(cell, BuildingKind.FARM))
     growth.build(Building((6, 21), BuildingKind.HOUSE))
 
@@ -831,7 +831,7 @@ def test_a_town_eats_its_own_farms_food_the_month_it_is_made_and_only_the_rest_w
 
 def test_coal_mined_near_a_station_heats_its_own_houses_before_waiting_for_trains() -> None:
     growth, railway = joined_stations()
-    growth.build(Building((6, 24), BuildingKind.MINE))
+    growth.build(Building((6, 23), BuildingKind.MINE))
     growth.build(Building((6, 21), BuildingKind.HOUSE))
 
     growth.trade_goods()
@@ -843,7 +843,7 @@ def test_coal_mined_near_a_station_heats_its_own_houses_before_waiting_for_train
 
 def test_a_good_kept_for_trains_is_not_handed_out_around_the_station() -> None:
     growth, railway = joined_stations()
-    growth.build(Building((6, 24), BuildingKind.MINE))
+    growth.build(Building((6, 23), BuildingKind.MINE))
     growth.build(Building((6, 21), BuildingKind.HOUSE))
     railway.station_goods((6, 20)).keep_for_trains(Good.COAL)
 
@@ -856,7 +856,7 @@ def test_a_good_kept_for_trains_is_not_handed_out_around_the_station() -> None:
 
 def test_a_good_let_go_again_is_handed_out_around_the_station() -> None:
     growth, railway = joined_stations()
-    growth.build(Building((6, 24), BuildingKind.MINE))
+    growth.build(Building((6, 23), BuildingKind.MINE))
     growth.build(Building((6, 21), BuildingKind.HOUSE))
     goods = railway.station_goods((6, 20))
     goods.keep_for_trains(Good.COAL)
@@ -871,7 +871,7 @@ def test_a_good_let_go_again_is_handed_out_around_the_station() -> None:
 
 def test_a_station_saved_before_goods_could_be_kept_for_trains_keeps_none() -> None:
     growth, railway = joined_stations()
-    growth.build(Building((6, 24), BuildingKind.MINE))
+    growth.build(Building((6, 23), BuildingKind.MINE))
     goods = railway.station_goods((6, 20))
     goods.__dict__.pop("kept", None)
 
