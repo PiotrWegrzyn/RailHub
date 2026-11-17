@@ -380,18 +380,20 @@ def blob(
     )
 
 
-def cone(m: Model, u: float, v: float, radius: float, height: float, color: RGB) -> None:
-    """A heap standing on (u, v): a cone `radius` round and `height` high."""
+def cone(
+    m: Model, u: float, v: float, radius: float, height: float, color: RGB, base: float = 0.0
+) -> None:
+    """A heap standing on (u, v): a cone `radius` round and `height` high, its foot `base` up."""
     sides = 10
-    apex = (u, v, height)
+    apex = (u, v, base + height)
     slant = math.hypot(radius, height) or 1.0
     for k in range(sides):
         a0, a1 = 2 * math.pi * k / sides, 2 * math.pi * (k + 1) / sides
         mid = (a0 + a1) / 2
         normal = (height / slant * math.cos(mid), height / slant * math.sin(mid), radius / slant)
         corners = [
-            (u + radius * math.cos(a0), v + radius * math.sin(a0), 0.0),
-            (u + radius * math.cos(a1), v + radius * math.sin(a1), 0.0),
+            (u + radius * math.cos(a0), v + radius * math.sin(a0), base),
+            (u + radius * math.cos(a1), v + radius * math.sin(a1), base),
             apex,
         ]
         m.faces.append(Face(corners, color, normal))
