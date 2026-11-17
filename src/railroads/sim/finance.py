@@ -24,8 +24,11 @@ STATION_PRICE = 15_000.0
 TRAIN_PRICE = 10_000.0
 # What selling a train gives back, as a share of its price.
 TRAIN_RESALE = 0.5
-# What each car costs every time a train leaves a stop with it.
-CAR_TRIP_PRICE = 40.0
+# What each car costs every time a train leaves a stop with it, loaded or not: CAR_TRIP_PRICE,
+# and CAR_PLACE_PRICE more for every CAR_PLACES it holds.
+CAR_TRIP_PRICE = 15.0
+CAR_PLACE_PRICE = 1.0
+CAR_PLACES = 10
 # What raising a station to level 2, and then to level 3, costs; and the first storage upgrade,
 # each one after costing STORAGE_GROWTH times the one before (storage_price).
 LEVEL_PRICES = (50_000.0, 250_000.0, 1_500_000.0, 10_000_000.0)
@@ -41,7 +44,7 @@ CATTLE_PENS_PRICE = 35_000.0
 WAREHOUSE_PRICE = 60_000.0
 # What a station of each level costs to keep a month, every station alike, rising by
 # STATION_UPKEEP_RISE a year, compounded, from the year play began.
-STATION_UPKEEP = (1_000.0, 2_000.0, 4_000.0, 8_000.0, 16_000.0)
+STATION_UPKEEP = (150.0, 400.0, 1_200.0, 3_500.0, 9_000.0)
 STATION_UPKEEP_RISE = 0.02
 # Every cell of track costs TRACK_UPKEEP a month, ELECTRIC_TRACK_UPKEEP more where it is
 # electric, MAGLEV_TRACK_UPKEEP more where it is maglev, and DOUBLE_TRACK_FACTOR as much where
@@ -49,6 +52,11 @@ STATION_UPKEEP_RISE = 0.02
 TRACK_UPKEEP = 2.0
 ELECTRIC_TRACK_UPKEEP = 40.0
 MAGLEV_TRACK_UPKEEP = 60.0
+
+
+def car_trip_price(places: float) -> float:
+    """What a car holding this much costs each time a train leaves a stop with it."""
+    return CAR_TRIP_PRICE + CAR_PLACE_PRICE * (int(places) // CAR_PLACES)
 
 
 def storage_price(upgrades: int) -> float:

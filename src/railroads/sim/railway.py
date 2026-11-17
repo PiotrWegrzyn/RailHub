@@ -16,7 +16,7 @@ passengers and mail. Every month each station costs its level's upkeep, the same
 station, rising every year.
 
 Cargo earns money by the demand around the station that hands it out (railroads.sim.demand). Trains
-cost their engine's price, every car CAR_TRIP_PRICE each time a train leaves a stop with it, and every
+cost their engine's price, every car car_trip_price by its size each time a train leaves a stop with it, and every
 month stations and track cost their upkeep. Each train buys the fuel it burns on the way to its
 next stop as it sets off (railroads.sim.fuel_market), and can't set off for a stop further than
 its fuel takes it
@@ -57,12 +57,12 @@ from railroads.sim.facilities import (
 )
 from railroads.sim.facilities import PRICES as FACILITY_PRICES
 from railroads.sim.finance import (
-    CAR_TRIP_PRICE,
     LEVEL_PRICES,
     STATION_UPKEEP,
     STATION_UPKEEP_RISE,
     TRAIN_RESALE,
     Finances,
+    car_trip_price,
     storage_price,
     track_upkeep,
 )
@@ -579,7 +579,8 @@ class Railway:
             train.pace = 0.0
             train.status = "Running"
             if train.cars:
-                trips = CAR_TRIP_PRICE * len(train.cars) * self._upkeep()
+                places = (0.0 if car.dining else car.capacity for car in train.cars)
+                trips = sum(map(car_trip_price, places)) * self._upkeep()
                 self.finances.spend(trips, "car trips")
         if train.giving_way:
             train.status = f"Giving way to {train.giving_way}"

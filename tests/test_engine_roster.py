@@ -274,7 +274,7 @@ def test_an_express_pays_a_car_trip_for_its_dining_car() -> None:
 
     railway.run(0.001)
 
-    assert railway.finances.month["car trips"] == pytest.approx(-2 * CAR_TRIP_PRICE)
+    assert railway.finances.month["car trips"] == pytest.approx(-(CAR_TRIP_PRICE + 20))
 
 
 def test_passengers_on_an_express_pay_more() -> None:

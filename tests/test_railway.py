@@ -479,7 +479,7 @@ def test_each_level_adds_as_much_room_as_two_storage_upgrades_without_making_the
     assert railway.storage_price((6, 20)) == price
 
 
-def test_station_upkeep_doubles_each_level_and_rises_two_percent_a_year() -> None:
+def test_station_upkeep_grows_with_each_level_and_rises_two_percent_a_year() -> None:
     _, railway = joined_stations()
     railway.first_year = 1850
     railway.year = 1852
@@ -487,7 +487,7 @@ def test_station_upkeep_doubles_each_level_and_rises_two_percent_a_year() -> Non
 
     upkeep = railway.station_upkeep((6, 3)), railway.station_upkeep((6, 20))
 
-    assert upkeep == (pytest.approx(1000 * 1.02**2), pytest.approx(4000 * 1.02**2))
+    assert upkeep == (pytest.approx(150 * 1.02**2), pytest.approx(1200 * 1.02**2))
 
 
 def test_without_the_cash_a_station_stays_as_it_is() -> None:
@@ -537,7 +537,9 @@ def test_a_raised_station_gathers_from_further_away() -> None:
     assert railway.station_goods((6, 20)).stockpile[Good.LUMBER] == pytest.approx(20.0)
 
 
-def test_every_car_costs_twenty_each_time_the_train_sets_off() -> None:
+def test_every_car_costs_fifteen_and_a_dollar_for_every_ten_it_holds_each_time_it_sets_off() -> (
+    None
+):
     _, railway = joined_stations()
     train = railway.buy()
     assert train is not None
@@ -545,7 +547,7 @@ def test_every_car_costs_twenty_each_time_the_train_sets_off() -> None:
 
     railway.run(0.01)
 
-    assert railway.finances.month["car trips"] == -2 * CAR_TRIP_PRICE
+    assert railway.finances.month["car trips"] == -2 * (CAR_TRIP_PRICE + 14)
 
 
 def test_a_mine_in_reach_feeds_a_steel_mill_in_reach_through_the_station_the_same_month() -> None:
