@@ -295,6 +295,31 @@ class _Place:
     highest: float = 0.0
 
 
+@dataclass(frozen=True, slots=True, eq=False)
+class _Touched:
+    """The places whose chances one kind of points changes, laid out to work out all their
+    chances in a few cells at once (Growth._reckon_touched), the same sums in the same order as
+    Growth._reckon: their rows in the stacked chances and lands, the points they draw and shun
+    as rows of the stacked points with their weights (0 for a slot a place doesn't use), their
+    own kind of points, base chance and what each served point adds."""
+
+    places: tuple[_Place, ...]
+    rows: npt.NDArray[np.intp]
+    lands: npt.NDArray[np.intp]
+    own: npt.NDArray[np.intp]
+    spawn: FloatGrid
+    per_doubling: FloatGrid
+    drawn_by: npt.NDArray[np.intp]
+    drawn_weights: FloatGrid
+    shunning: npt.NDArray[np.intp]
+    shunned_by: npt.NDArray[np.intp]
+    shunned_weights: FloatGrid
+
+
+# The arrays Growth._stack lays out, left out of saves and laid out again as a game loads.
+_STACKED = ("_chances", "_lands", "_nearby_all", "_served_all", "_touched")
+
+
 class Growth:
     """The grown buildings on one map, counted per cell, and the rule that grows them."""
 
@@ -353,10 +378,11 @@ class Growth:
                     np.flatnonzero(weights > 0),
                 )
             _, land, cells = shared
-            place = _Place(ladder, cells, land, np.zeros(land.size))
+            self._places.append(_Place(ladder, cells, land, np.empty(0)))
+        self._stack()
+        for place in self._places:
             self._reckon(place, everywhere)
             place.highest = float(place.chances.max())
-            self._places.append(place)
         # The cells whose forest came or went in the last month.
         self.forests_changed: set[Cell] = set()
         self.trade: Trade | None = None
@@ -382,15 +408,85 @@ class Growth:
         are worked out afresh from the rest as it loads (__setstate__) and would make over a
         quarter of a save."""
         state = dict(self.__dict__)
+        for stacked in _STACKED:
+            del state[stacked]
         state["_places"] = [replace(place, chances=np.empty(0)) for place in self._places]
         return state
 
     def __setstate__(self, state: dict[str, object]) -> None:
         self.__dict__.update(state)
+        self._stack()
         everywhere = np.arange(self._grid.rows * self._grid.cols)
         for place in self._places:
-            place.chances = np.zeros(place.land.size)
             self._reckon(place, everywhere)
+
+    def _stack(self) -> None:
+        """Lays every ladder's chances, every land's weights and every kind of points nearby and
+        served out as rows of one array each, the places and the dicts keeping views of their
+        rows, so a building's points can change the chances of every ladder they touch at once
+        (_reckon_touched)."""
+        size = self._grid.rows * self._grid.cols
+        self._chances = np.zeros((len(self._places), size))
+        land_rows: dict[int, int] = {}
+        lands: list[FloatGrid] = []
+        for place in self._places:
+            if id(place.land) not in land_rows:
+                land_rows[id(place.land)] = len(lands)
+                lands.append(place.land)
+        place_lands = [land_rows[id(place.land)] for place in self._places]
+        self._lands = np.stack(lands) if lands else np.zeros((0, size))
+        views = list(self._lands)
+        for row, place in enumerate(self._places):
+            place.land = views[place_lands[row]]
+            place.chances = self._chances[row]
+        kinds = list(Points)
+        self._nearby_all = np.stack([self._nearby[points] for points in kinds]).reshape(
+            len(kinds), size
+        )
+        self._served_all = np.stack([self._served[points] for points in kinds])
+        for at, points in enumerate(kinds):
+            self._nearby[points] = self._nearby_all[at].reshape(self._grid.shape)
+            self._served[points] = self._served_all[at]
+        breedings = [self._breeding(place) for place in self._places]
+        drawn_slots = max((len(b.drawn_by) for b in breedings), default=1)
+        shunned_slots = max((len(b.shunned_by) for b in breedings), default=1) or 1
+        self._touched = {}
+        for points in kinds:
+            picked = [
+                row
+                for row, b in enumerate(breedings)
+                if points in b.drawn_by or points in b.shunned_by
+            ]
+            drawn_by = np.zeros((len(picked), drawn_slots), dtype=np.intp)
+            drawn_weights = np.zeros((len(picked), drawn_slots))
+            shunned_by = np.zeros((len(picked), shunned_slots), dtype=np.intp)
+            shunned_weights = np.zeros((len(picked), shunned_slots))
+            for at, row in enumerate(picked):
+                b = breedings[row]
+                for slot, (drawn, weight) in enumerate(b.drawn_by.items()):
+                    drawn_by[at, slot] = kinds.index(drawn)
+                    drawn_weights[at, slot] = weight
+                for slot, (shunned, weight) in enumerate(b.shunned_by.items()):
+                    shunned_by[at, slot] = kinds.index(shunned)
+                    shunned_weights[at, slot] = weight
+            self._touched[points] = _Touched(
+                places=tuple(self._places[row] for row in picked),
+                rows=np.array(picked, dtype=np.intp),
+                lands=np.array([place_lands[row] for row in picked], dtype=np.intp),
+                own=np.array([kinds.index(breedings[row].own) for row in picked], dtype=np.intp),
+                spawn=np.array([[breedings[row].spawn] for row in picked]).reshape(-1, 1),
+                per_doubling=np.array([[breedings[row].per_doubling] for row in picked]).reshape(
+                    -1, 1
+                ),
+                drawn_by=drawn_by,
+                drawn_weights=drawn_weights,
+                shunning=np.array(
+                    [at for at, row in enumerate(picked) if breedings[row].shunned_by],
+                    dtype=np.intp,
+                ),
+                shunned_by=shunned_by,
+                shunned_weights=shunned_weights,
+            )
 
     def trade_goods(self) -> set[Cell]:
         """Pulls down farms that towns have crowded out, lets stations hand out a month of goods,
@@ -1023,13 +1119,37 @@ class Growth:
         rows, cols = zip(*neighbourhood, strict=True)
         self._nearby[points][rows, cols] += how_many * value
         flat = np.ravel_multi_index((rows, cols), self._grid.shape)
-        for place in self._places:
-            breeding = self._breeding(place)
-            if points not in breeding.drawn_by and points not in breeding.shunned_by:
-                continue
-            self._reckon(place, flat)
-            if how_many > 0:
-                place.highest = max(place.highest, float(place.chances[flat].max()))
+        touched = self._touched[points]
+        if not touched.places:
+            return
+        chances = self._reckon_touched(touched, flat)
+        if how_many > 0:
+            for place, most in zip(touched.places, chances.max(axis=1).tolist(), strict=True):
+                if most > place.highest:
+                    place.highest = most
+
+    def _reckon_touched(self, touched: _Touched, cells: npt.NDArray[np.intp]) -> FloatGrid:
+        """Works out the chances of all the touched places in these cells afresh, as _reckon
+        does each, and returns them, a row for each place."""
+        nearby = self._nearby_all[:, cells]
+        weights = touched.drawn_weights
+        drawing = weights[:, :1] * nearby[touched.drawn_by[:, 0]]
+        for slot in range(1, weights.shape[1]):
+            drawing = drawing + weights[:, slot : slot + 1] * nearby[touched.drawn_by[:, slot]]
+        served = self._served_all[touched.own[:, None], cells]
+        doublings = np.log2(1 + drawing)
+        raw = touched.spawn + (touched.spawn + touched.per_doubling * served) * doublings
+        if touched.shunning.size:
+            at = touched.shunning
+            weights = touched.shunned_weights[at]
+            shunned_by = touched.shunned_by[at]
+            shunned = weights[:, :1] * nearby[shunned_by[:, 0]]
+            for slot in range(1, weights.shape[1]):
+                shunned = shunned + weights[:, slot : slot + 1] * nearby[shunned_by[:, slot]]
+            raw[at] = raw[at] / (1.0 + shunned)
+        chances = raw * self._lands[touched.lands[:, None], cells]
+        self._chances[touched.rows[:, None], cells] = chances
+        return chances
 
     @staticmethod
     def _neighbourhood_sum(values: IntGrid, rows: IntGrid, cols: IntGrid) -> IntGrid:
