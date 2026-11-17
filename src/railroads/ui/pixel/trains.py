@@ -168,6 +168,11 @@ DINER: RGB = (98, 58, 40)
 DINER_CREAM: RGB = (232, 218, 178)
 WOOD: RGB = (128, 88, 54)
 COPPER: RGB = (184, 108, 58)
+LAGGING: RGB = (142, 90, 50)
+TENDER_GREEN: RGB = (50, 84, 58)
+APPLE_GREEN: RGB = (82, 136, 62)
+LINING: RGB = (222, 222, 212)
+GRAPHITE: RGB = (196, 198, 204)
 
 # Sizes in cells: how far apart the engine and cars sit, and their half lengths.
 CAR_HALF = 0.24
@@ -450,7 +455,8 @@ class Steam:
     cylinders for an articulated engine, small wheels ahead and behind, and a boiler with a
     smokebox, chimney and domes. A tank engine carries its water in tanks along the boiler and its
     coal in a bunker behind the cab instead of a tender; a streamlined one is cased in a smooth
-    shroud with stripes along it."""
+    shroud with stripes along it. The first engines stand open behind the boiler, with only a
+    footplate and a rail where later ones have a cab."""
 
     half: float
     body: RGB
@@ -469,10 +475,20 @@ class Steam:
     stack: float = 0.09
     balloon: bool = False
     cowcatcher: RGB | None = None
-    headlight: bool = False
+    headlight: RGB | None = None
     deflectors: bool = False
     tanks: bool = False
     shroud: RGB | None = None
+    open_cab: bool = False
+    beam: RGB = CAB_RED
+    lead: float = 0.03
+    dome: tuple[float, float] = (0.03, 0.055)
+    dome_color: RGB | None = None
+    bands: int = 1
+    smokebox_length: float = 0.08
+    cylinder: RGB | None = None
+    firebox: RGB | None = None
+    sand: bool = True
 
     @property
     def middle(self) -> float:
@@ -485,7 +501,7 @@ class Steam:
         front = self.half - 0.04
         if self.shroud is not None:
             return front - 0.145, top + 0.025
-        return front - 0.07 - (0.03 if self.headlight else 0.0), top + self.stack
+        return front - 0.07 - (0.03 if self.headlight is not None else 0.0), top + self.stack
 
     def model(self) -> Model:
         m = Model()
@@ -493,7 +509,7 @@ class Steam:
         front, top = h - 0.04, z + r
         cab_front = -h + self.cab
         m.box((-h, front), (-0.07, 0.07), (0.035, 0.08), FRAME)
-        m.wheels([*self.leading, *self.trailing], 0.03, FRAME, 0.075)
+        m.wheels([*self.leading, *self.trailing], self.lead, FRAME, 0.075)
         for group in self.drivers:
             m.wheels(list(group), self.driver, self.wheel, 0.075)
             if len(group) > 1:
@@ -512,12 +528,14 @@ class Steam:
             m.nose((front, h + 0.03), (0.0, 0.012, 0.075), 0.075, self.cowcatcher)
         else:
             with m.coarse():
-                m.box((front, h), (-0.085, 0.085), (0.01, 0.075), CAB_RED)
+                m.box((front, h), (-0.085, 0.085), (0.01, 0.075), self.beam)
             with m.fine():
-                m.box((front, h), (-0.095, 0.095), (0.045, 0.085), CAB_RED)
+                m.box((front, h), (-0.095, 0.095), (0.045, 0.085), self.beam)
                 m.box((front, front + 0.012), (-0.06, 0.06), (0.02, 0.045), FRAME)
         if self.tanks:
             self._tanks(m, cab_front, front, top)
+        elif self.open_cab:
+            self._footplate(m, -h, cab_front)
         else:
             self._cab(m, -h, cab_front, top + (0.04 if self.shroud else 0.05))
         self._fine(m, front, top)
@@ -542,7 +560,7 @@ class Steam:
                     parts.bar(m, (c - 0.08, d + 0.004), crank, 0.012, v * 1.04, STEEL)
                     parts.bar(m, (c - 0.02, d + 0.03), (c - 0.09, d - 0.02), 0.005, v * 1.06, BRASS)
         for u in (*self.leading, *self.trailing):
-            parts.spoked_wheel(m, u, 0.03, 0.075, FRAME, spokes=6)
+            parts.spoked_wheel(m, u, self.lead, 0.075, FRAME, spokes=6 if self.lead < 0.04 else 10)
         if self.shroud is None:
             with m.fine():
                 parts.front_ring(
@@ -555,15 +573,16 @@ class Steam:
             with m.fine():
                 for v in (0.096, -0.096):
                     parts.plate(m, (cab_front, front), (0.081, 0.087), v * 1.005, self.trim)
-                u = cab_front + 0.04
+                u = cab_front + (0.11 if self.firebox else 0.04)
                 m.cylinder_up(u, 0.008, (top - 0.006, top + 0.03), BRASS)
                 m.cylinder_up(u + 0.025, 0.008, (top - 0.006, top + 0.03), BRASS)
                 m.cylinder_up(u - 0.015, 0.005, (top + 0.04, top + 0.075), BRASS)
                 m.box((u - 0.022, u - 0.008), (-0.004, 0.004), (top - 0.005, top + 0.04), BRASS)
                 u, high = self.chimney
                 parts.roof_plate(m, (u - 0.02, u + 0.02), (-0.02, 0.02), high + 0.0006, COAL)
-                for at in (cab_front + 0.12, (cab_front + front) / 2 - 0.02):
-                    m.cylinder_along((at - 0.005, at + 0.005), r + 0.004, z, self.trim)
+                if self.bands == 1:
+                    for at in (cab_front + 0.12, (cab_front + front) / 2 - 0.02):
+                        m.cylinder_along((at - 0.005, at + 0.005), r + 0.004, z, self.trim)
         else:
             with m.fine():
                 parts.front_ring(m, h + 0.0206, 0.05, 0.016, parts.LAMP, 0.0, 10)
@@ -586,38 +605,42 @@ class Steam:
     def _cylinders(self, m: Model, c: float, d: float) -> None:
         """Up close, a round steam cylinder on each side ahead of the driving wheels, a steam
         chest on top of it, and a saddle across between them."""
+        color = self.cylinder or self.smokebox
         with m.fine():
             for v in (0.088, -0.088):
                 start = len(m.faces)
-                m.cylinder_along(
-                    (c - 0.04, c + 0.04), 0.03, d + 0.005, self.smokebox, shade(self.smokebox, 1.35)
-                )
+                m.cylinder_along((c - 0.04, c + 0.04), 0.03, d + 0.005, color, shade(color, 1.35))
                 m.move(start, 0.0, v)
-                m.box(
-                    (c - 0.032, c + 0.032),
-                    (v - 0.018, v + 0.018),
-                    (d + 0.03, d + 0.052),
-                    self.smokebox,
-                )
+                m.box((c - 0.032, c + 0.032), (v - 0.018, v + 0.018), (d + 0.03, d + 0.052), color)
             m.box((c - 0.03, c + 0.03), (-0.06, 0.06), (d - 0.01, 0.08), self.smokebox)
 
     def _boiler(self, m: Model, front: float, top: float) -> None:
         r, z = self.radius, self.middle
         cab_front = -self.half + self.cab
-        m.cylinder_along((cab_front - 0.01, front - 0.11), r, z, self.body)
-        m.cylinder_along((front - 0.11, front - 0.03), r + 0.003, z, self.smokebox, self.smokebox)
+        back = front - 0.03 - self.smokebox_length
+        start = cab_front - 0.01
+        if self.firebox is not None:
+            start = cab_front + 0.07
+            m.cylinder_along((cab_front - 0.01, start), r + 0.006, z + 0.006, self.firebox)
+        m.cylinder_along((start, back), r, z, self.body)
+        m.cylinder_along((back, front - 0.03), r + 0.003, z, self.smokebox, self.smokebox)
         with m.coarse():
             m.box((front - 0.03, front), (-0.065, 0.065), (0.08, z + 0.05), self.smokebox)
         with m.fine():
             m.cylinder_along(
                 (front - 0.035, front), r + 0.003, z, self.smokebox, shade(self.smokebox, 0.85)
             )
-            m.box((front - 0.11, front - 0.02), (-0.05, 0.05), (0.08, z - r * 0.6), self.smokebox)
-        _bands(m, (cab_front + 0.05,), r, z, self.trim)
+            m.box((back, front - 0.02), (-0.05, 0.05), (0.08, z - r * 0.6), self.smokebox)
+        if self.bands == 1:
+            _bands(m, (start + 0.06,), r, z, self.trim)
+        else:
+            step = (back - start - 0.04) / (self.bands - 1)
+            _bands(m, tuple(start + 0.02 + step * k for k in range(self.bands)), r, z, self.trim)
+        radius, height = self.dome
         for u in self.domes:
-            _dome(m, u, 0.03, top - 0.01, 0.055, self.trim)
+            _dome(m, u, radius, top - 0.01, height, self.dome_color or self.trim)
         u, high = self.chimney
-        if self.domes and u - self.domes[0] > 0.15:
+        if self.sand and self.domes and u - self.domes[0] > 0.15:
             with m.fine():
                 _dome(m, (u + self.domes[0]) / 2 - 0.01, 0.022, top - 0.01, 0.04, self.body)
         if self.balloon:
@@ -644,12 +667,12 @@ class Steam:
                 m.cylinder_up(u, 0.036, (top - 0.012, top + 0.006), BLACK_IRON)
                 m.cylinder_up(u, 0.03, (high - 0.015, high - 0.006), BLACK_IRON)
                 m.cylinder_up(u, 0.035, (high - 0.006, high), BLACK_IRON)
-        if self.headlight:
+        if self.headlight is not None:
             m.box(
                 (front - 0.045, front - 0.005),
                 (-0.025, 0.025),
                 (top - 0.005, top + 0.045),
-                BLACK_IRON,
+                self.headlight,
             )
             m.box((front - 0.005, front), (-0.016, 0.016), (top + 0.005, top + 0.035), LIT_WINDOW)
         if self.deflectors:
@@ -693,6 +716,22 @@ class Steam:
                 )
             m.cylinder_up(front - 0.15, 0.012, (z + 0.035, z + 0.045), BRASS)
             parts.lumps(m, (-h + 0.015, bunker - 0.01), (-0.07, 0.07), top - 0.01, COAL)
+
+    def _footplate(self, m: Model, back: float, front: float) -> None:
+        """An open footplate behind the boiler: a floor, and up close a rail round it on posts."""
+        m.box((back, front), (-0.095, 0.095), (0.08, 0.09), FRAME)
+        with m.fine():
+            rail = 0.17
+            for v in (0.088, -0.088):
+                for u in (back + 0.008, (back + front) / 2):
+                    m.box((u - 0.004, u + 0.004), (v - 0.004, v + 0.004), (0.09, rail), BLACK_IRON)
+                m.box(
+                    (back + 0.004, front - 0.01),
+                    (v - 0.003, v + 0.003),
+                    (rail, rail + 0.006),
+                    BLACK_IRON,
+                )
+            m.box((back + 0.004, back + 0.012), (-0.088, 0.088), (rail, rail + 0.006), BLACK_IRON)
 
     def _cab(self, m: Model, back: float, front: float, high: float) -> None:
         color = self.cab_color or self.body
@@ -1875,19 +1914,28 @@ ENGINES: dict[str, EngineModel] = {
     ),
     "planet": _entry(
         Steam(
-            0.36,
+            0.34,
+            LAGGING,
             BLACK_IRON,
-            ROOF_RED,
-            ((0.2, 0.05, -0.1),),
-            0.04,
-            WHEEL_RED,
-            trailing=(-0.26,),
-            radius=0.075,
-            cab=0.3,
-            cab_color=CAB_RED,
-            domes=(0.08, 0.0),
+            ((-0.16,),),
+            0.075,
+            BLACK_IRON,
+            leading=(0.17,),
+            radius=0.07,
+            cab=0.13,
+            trim=BRASS,
+            smokebox=BLACK_IRON,
+            domes=(-0.17,),
+            dome=(0.036, 0.085),
+            stack=0.23,
+            open_cab=True,
+            beam=BLACK_IRON,
+            lead=0.048,
+            bands=5,
+            firebox=BLACK_IRON,
+            sand=False,
         ),
-        Tender(0.22, CAB_RED, (0.13, -0.13), top=0.2, width=0.08),
+        Tender(0.2, TENDER_GREEN, (0.11, -0.11), top=0.16, trim=None, width=0.08),
     ),
     "tank": _entry(
         Steam(
@@ -1936,20 +1984,24 @@ ENGINES: dict[str, EngineModel] = {
     "american": _entry(
         Steam(
             0.4,
-            (88, 106, 120),
+            BLACK_IRON,
             ROOF_RED,
             ((0.04, -0.11),),
-            0.055,
+            0.06,
             WHEEL_RED,
             leading=(0.27, 0.19),
-            radius=0.07,
+            radius=0.068,
             cab=0.2,
             cab_color=CAB_RED,
-            domes=(0.08, -0.04),
-            stack=0.11,
+            smokebox=BLACK_IRON,
+            domes=(0.08, -0.06),
+            stack=0.14,
             balloon=True,
             cowcatcher=CAB_RED,
-            headlight=True,
+            headlight=CAB_RED,
+            beam=CAB_RED,
+            bands=4,
+            cylinder=BRASS,
         ),
         Tender(0.24, CAB_RED, (0.17, 0.09, -0.09, -0.17), top=0.19, load=LOG),
     ),
@@ -1960,7 +2012,7 @@ ENGINES: dict[str, EngineModel] = {
             MOGUL_ROOF,
             ((0.17, 0.05, -0.07),),
             0.045,
-            WHEEL_RED,
+            MOGUL_GREEN,
             leading=(0.33,),
             radius=0.08,
             cab=0.3,
@@ -1975,7 +2027,7 @@ ENGINES: dict[str, EngineModel] = {
             (26, 40, 70),
             ((0.17, 0.06, -0.05),),
             0.048,
-            WHEEL_RED,
+            (44, 66, 112),
             trailing=(-0.29,),
             radius=0.078,
             cab=0.24,
@@ -2000,35 +2052,43 @@ ENGINES: dict[str, EngineModel] = {
     "mallet": _entry(
         Steam(
             0.52,
-            (86, 70, 54),
-            (52, 42, 32),
+            BLACK_IRON,
+            BLACK_IRON,
             ((0.27, 0.18, 0.09), (-0.07, -0.16, -0.25)),
             0.042,
-            WHEEL_RED,
+            BLACK_IRON,
             leading=(0.43,),
             trailing=(-0.37,),
             radius=0.086,
+            trim=(70, 70, 76),
+            smokebox=(84, 84, 92),
             domes=(0.0, -0.14),
+            dome_color=BLACK_IRON,
             stack=0.07,
+            beam=BLACK_IRON,
+            headlight=BLACK_IRON,
         ),
-        Tender(0.28, (86, 70, 54), (0.2, 0.12, -0.12, -0.2), top=0.24, trim=None),
+        Tender(0.28, BLACK_IRON, (0.2, 0.12, -0.12, -0.2), top=0.24, trim=None),
     ),
     "pacific": _entry(
         Steam(
             0.46,
-            MAROON,
-            MAROON_ROOF,
+            APPLE_GREEN,
+            BLACK_IRON,
             ((0.15, 0.01, -0.13),),
             0.058,
-            MAROON,
+            APPLE_GREEN,
             leading=(0.38, 0.3),
             trailing=(-0.31,),
             radius=0.088,
             cab=0.32,
+            trim=LINING,
+            smokebox=BLACK_IRON,
             domes=(0.05,),
+            dome_color=APPLE_GREEN,
             deflectors=True,
         ),
-        Tender(0.3, MAROON, (0.2, 0.0, -0.2), top=0.24, width=0.09),
+        Tender(0.3, APPLE_GREEN, (0.2, 0.0, -0.2), top=0.24, trim=LINING, width=0.09),
     ),
     "boxcab": EngineModel(boxcab, BOXCAB_HALF),
     "railbus": _entry(
@@ -2072,24 +2132,29 @@ ENGINES: dict[str, EngineModel] = {
     "big_boy": _entry(
         Steam(
             0.6,
-            (50, 50, 56),
-            (30, 30, 34),
+            BLACK_IRON,
+            BLACK_IRON,
             ((0.3, 0.21, 0.12, 0.03), (-0.145, -0.235, -0.325, -0.415)),
             0.045,
-            (128, 128, 136),
+            BLACK_IRON,
             leading=(0.53, 0.45),
             trailing=(-0.5,),
             radius=0.098,
-            smokebox=(108, 108, 116),
-            trim=(108, 108, 116),
+            smokebox=GRAPHITE,
+            smokebox_length=0.26,
+            trim=(64, 64, 70),
             domes=(0.08, -0.08),
+            dome=(0.04, 0.045),
+            dome_color=BLACK_IRON,
             stack=0.06,
-            cowcatcher=(108, 108, 116),
-            headlight=True,
+            cowcatcher=BLACK_IRON,
+            headlight=BLACK_IRON,
+            cylinder=BLACK_IRON,
+            beam=BLACK_IRON,
         ),
         Tender(
             0.36,
-            (50, 50, 56),
+            BLACK_IRON,
             (0.28, 0.19, 0.1, -0.1, -0.19, -0.28),
             top=0.26,
             trim=None,

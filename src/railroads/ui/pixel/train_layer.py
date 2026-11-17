@@ -43,7 +43,9 @@ from railroads.ui.pixel.trains import (
 type Pixels = npt.NDArray[np.uint8]
 from railroads.ui.pixel.world import PixelWorld
 
-SMOKE = (0.88, 0.88, 0.9)
+# Coal smoke leaves the chimney dark and thins out paler as it drifts back.
+SMOKE = (0.22, 0.21, 0.21)
+THIN_SMOKE = (0.6, 0.6, 0.62)
 # The biggest texture made for trains on each side: many graphics cards and browsers take no
 # bigger, and draw a bigger one black.
 MAX_TEXTURE = 4096
@@ -216,7 +218,10 @@ class TrainLayer:
             sy = origin[1] + (y + shift[1] - float(lifts[index]) - rise) * scale
             radius = (1.5 + age * 4.0) * SCALE * scale
             alpha = 0.75 * (1 - age)
-            color = imgui.color_convert_float4_to_u32(imgui.ImVec4(*SMOKE, alpha))
+            shade = (
+                dark + (thin - dark) * age for dark, thin in zip(SMOKE, THIN_SMOKE, strict=True)
+            )
+            color = imgui.color_convert_float4_to_u32(imgui.ImVec4(*shade, alpha))
             draw_list.add_circle_filled((sx, sy), radius, color)
 
     def _chimneys(self, railway: Railway, trains: list[Train]) -> list[_Chimney]:
