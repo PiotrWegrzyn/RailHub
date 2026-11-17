@@ -322,12 +322,7 @@ def car_chip(
     """A car drawn as a small upright chip with its good's icon, filled from the bottom by its
     load out of its capacity when one is given; returns whether it was clicked."""
     clicked, draw_list, low, high = _chip(key)
-    if load is not None:
-        size = capacity or (car_size(good) if isinstance(good, Good) else 0.0)
-        share = max(0.0, min(1.0, load / size)) if size else 0.0
-        if share > 0:
-            top = high.y - (high.y - low.y) * share
-            draw_list.add_rect_filled((low.x, top), high, color_u32(CAR_LOADED), 3.0)
+    _draw_load(draw_list, good, load, capacity, low, high, 3.0)
     icon_x = low.x + (CHIP_SIZE[0] - CHIP_ICON) / 2
     draw_good_icon(draw_list, good, (icon_x, low.y + (CHIP_SIZE[1] - CHIP_ICON) / 2), CHIP_ICON)
     _chip_edge(draw_list, low, high, tooltip)
@@ -337,10 +332,63 @@ def car_chip(
 def dining_chip(key: str, tooltip: str = "") -> None:
     """An express's dining car as a chip like car_chip's, with a cup on it."""
     _, draw_list, low, high = _chip(key)
-    size = imgui.calc_text_size(fa.ICON_FA_COFFEE)
-    corner = (low.x + (high.x - low.x - size.x) / 2, low.y + (high.y - low.y - size.y) / 2)
-    draw_list.add_text(corner, color_u32(BRASS), fa.ICON_FA_COFFEE)
+    _draw_cup(draw_list, low, high, imgui.get_font_size())
     _chip_edge(draw_list, low, high, tooltip)
+
+
+def draw_small_car(
+    draw_list: imgui.ImDrawList,
+    good: Good | General | None,
+    load: float,
+    capacity: float,
+    top_left: tuple[float, float],
+    size: tuple[float, float],
+) -> None:
+    """A car as a small chip drawn at a place on the screen, like car_chip's but not clickable;
+    no good is a dining car."""
+    low = imgui.ImVec2(*top_left)
+    high = imgui.ImVec2(top_left[0] + size[0], top_left[1] + size[1])
+    rounding = min(3.0, size[0] / 5)
+    draw_list.add_rect_filled(low, high, color_u32(CAR_EMPTY), rounding)
+    icon = min(size[0], size[1]) * 0.85
+    if good is None:
+        _draw_cup(draw_list, low, high, icon)
+    else:
+        _draw_load(draw_list, good, load, capacity, low, high, rounding)
+        corner = (low.x + (size[0] - icon) / 2, low.y + (size[1] - icon) / 2)
+        draw_good_icon(draw_list, good, corner, icon)
+    draw_list.add_rect(low, high, color_u32((0.0, 0.0, 0.0, 0.6)), rounding)
+
+
+def _draw_load(
+    draw_list: imgui.ImDrawList,
+    good: Good | General,
+    load: float | None,
+    capacity: float | None,
+    low: imgui.ImVec2,
+    high: imgui.ImVec2,
+    rounding: float,
+) -> None:
+    """A car's load, filling it from the bottom by its share of the car's capacity."""
+    if load is None:
+        return
+    size = capacity or (car_size(good) if isinstance(good, Good) else 0.0)
+    share = max(0.0, min(1.0, load / size)) if size else 0.0
+    if share > 0:
+        top = high.y - (high.y - low.y) * share
+        draw_list.add_rect_filled((low.x, top), high, color_u32(CAR_LOADED), rounding)
+
+
+def _draw_cup(
+    draw_list: imgui.ImDrawList, low: imgui.ImVec2, high: imgui.ImVec2, font_size: float
+) -> None:
+    """A dining car's cup, centred on its chip."""
+    font = imgui.get_font()
+    scale = font_size / imgui.get_font_size()
+    size = imgui.calc_text_size(fa.ICON_FA_COFFEE)
+    width, height = size.x * scale, size.y * scale
+    corner = (low.x + (high.x - low.x - width) / 2, low.y + (high.y - low.y - height) / 2)
+    draw_list.add_text(font, font_size, corner, color_u32(BRASS), fa.ICON_FA_COFFEE)
 
 
 def _chip(key: str) -> tuple[bool, imgui.ImDrawList, imgui.ImVec2, imgui.ImVec2]:

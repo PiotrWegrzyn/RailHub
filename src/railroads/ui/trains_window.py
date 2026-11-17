@@ -31,6 +31,7 @@ from railroads.ui.theme import (
     color_u32,
     danger_button,
     dining_chip,
+    draw_small_car,
     empty_car_slot,
     offer_chip,
 )
@@ -41,7 +42,11 @@ SMALLEST_WINDOW = (900.0, 440.0)
 WINDOW_TOP = 96.0
 LIST_WIDTH = 190.0
 # How tall each train's row in the list is.
-ROW_HEIGHT = 40.0
+ROW_HEIGHT = 58.0
+# The sizes the cars in a train's row are drawn at, largest first, with the gap between them:
+# the largest that fits the whole train in the row is used, and a train too long for even the
+# smallest has its cars narrowed to fit.
+ROW_CAR_SIZES = ((16.0, 16.0, 2.0), (11.0, 14.0, 1.5), (8.0, 12.0, 1.0))
 # The share of the space beside the list of trains the map takes.
 MAP_SHARE = 0.45
 # Where a stop card's rows start, after their labels.
@@ -170,6 +175,15 @@ class TrainsWindow:
             draw_list.add_text((right, low.y + 3), color_u32(BRASS), money)
             if imgui.is_item_hovered():
                 imgui.set_tooltip(f"Its cargo is worth about {money} where it is going")
+        width = imgui.get_item_rect_max().x - low.x - 12
+        car_width, car_height, gap = row_car_size(len(train.cars), width)
+        top = low.y + 39 + (16 - car_height) / 2
+        for index, car in enumerate(train.cars):
+            left = low.x + 6 + index * (car_width + gap)
+            good = None if car.dining else car.good
+            draw_small_car(
+                draw_list, good, car.load, car.capacity, (left, top), (car_width, car_height)
+            )
 
     def _draw_train(
         self,
@@ -517,6 +531,16 @@ def engine_summary(engine: Engine, per_cell: float | None = None) -> str:
     if engine.maglev:
         lines.append("Runs on maglev track only")
     return "\n".join(lines)
+
+
+def row_car_size(cars: int, width: float) -> tuple[float, float, float]:
+    """The width, height and gap a train's cars are drawn at in its row of the list: the largest
+    of ROW_CAR_SIZES that fits them all in the width, or the smallest narrowed to fit."""
+    for car_width, car_height, gap in ROW_CAR_SIZES:
+        if cars * (car_width + gap) - gap <= width:
+            return car_width, car_height, gap
+    _, car_height, gap = ROW_CAR_SIZES[-1]
+    return max(1.0, (width + gap) / cars - gap), car_height, gap
 
 
 def carried_in(train: Train, index: int) -> list[Good]:
