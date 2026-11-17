@@ -8,14 +8,12 @@ Windows or Linux from the [latest release](https://github.com/PiotrWegrzyn/RailH
 On a Mac (Apple Silicon, macOS 14 or newer):
 1. Download `RailHub-macOS.zip` and open it (Safari unpacks it for you), then drag RailHub to
    Applications.
-2. Double-click RailHub. The first time, macOS says it can't check the app, because it isn't
-   from the App Store. Click Done.
-3. Open System Settings, then Privacy & Security, scroll down and click Open Anyway next to
-   RailHub. Confirm with your password.
-4. From then on RailHub opens like any other app.
-
-To skip steps 2 and 3, run `xattr -dr com.apple.quarantine /Applications/RailHub.app` in
-Terminal once.
+2. RailHub isn't from the App Store, so macOS blocks it at first. Open Terminal (in
+   Applications, Utilities), paste this line and press Return:
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/RailHub.app
+   ```
+3. Double-click RailHub. From then on it opens like any other app.
 
 Run the game from the source:
 

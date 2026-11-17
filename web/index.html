@@ -48,6 +48,8 @@ Query parameters:
         #landing .mac-help summary { color: #dba852; text-align: center; cursor: pointer; }
         #landing .mac-help ol { margin: 8px 0 0; padding-left: 20px; }
         #landing .mac-help li { margin: 4px 0; }
+        #landing .mac-help code { display: block; margin: 6px 0; padding: 6px 8px; background: #2a2622;
+                   color: #dba852; border-radius: 4px; user-select: all; overflow-wrap: anywhere; }
         #landing .fine { margin: 28px 0 0; color: #777; font-size: 12px; }
     </style>
 </head>
@@ -65,11 +67,10 @@ Query parameters:
             <ol>
                 <li>Open the downloaded RailHub-macOS.zip (Safari unpacks it for you) and drag
                     RailHub to Applications.</li>
-                <li>Double-click RailHub. The first time, macOS says it can't check the app, because
-                    it isn't from the App Store. Click Done.</li>
-                <li>Open System Settings, then Privacy &amp; Security, scroll down and click
-                    Open Anyway next to RailHub. Confirm with your password.</li>
-                <li>From then on RailHub opens like any other app.</li>
+                <li>RailHub isn't from the App Store, so macOS blocks it at first. Open Terminal
+                    (in Applications, Utilities), paste this line and press Return:
+                    <code>xattr -dr com.apple.quarantine /Applications/RailHub.app</code></li>
+                <li>Double-click RailHub. From then on it opens like any other app.</li>
             </ol>
         </details>
         <p class="others" id="others"></p>
