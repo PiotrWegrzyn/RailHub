@@ -1,8 +1,9 @@
 """The ground of the pixel map drawn by the graphics card: a shader works out every screen pixel
 from the art pixel under it the way railroads.ui.pixel.ground does on the CPU (Ground.render):
-which hex cell it lies in, the cell's biome and its ramp of shades picked by noise, meadows and
-savanna grass with blades and flowers, tufts, rippled water with sandy shores and foam, the light
-on the slopes, the glow where buildings are served and the signs of deposits. The noise reads the
+which hex cell it lies in, the cell's biome and its ramp of shades picked by noise, meadows,
+savanna, tundra and desert with blades, flowers and dunes, tufts, water deep or shallow with
+waves and glints and soft sandy shores, the light on the slopes, the glow where buildings are
+served and the signs of deposits. The noise reads the
 same table of random numbers as the CPU's, so both draw the same ground.
 
 It draws one pixel per art pixel over the part of the map on screen, then blows that up into a
@@ -192,8 +193,12 @@ vec3 grass(vec2 p, int ix, int iy, float lit, int kind_of_grass) {
     float rarity;
     if (kind_of_grass == 0) {
         @MEADOW_RAMPS@
-    } else {
+    } else if (kind_of_grass == 1) {
         @SAVANNA_RAMPS@
+    } else if (kind_of_grass == 2) {
+        @TUNDRA_RAMPS@
+    } else {
+        @DESERT_RAMPS@
     }
     float kind = @N_55_81@ + 0.25 * (@N_15_85@ - 0.5);
     float t = 0.5 + 0.36 * (@N_24_41@ - 0.5) + 0.14 * (@N_4_42@ - 0.5) + lit / 3.0;
@@ -215,6 +220,82 @@ vec3 grass(vec2 p, int ix, int iy, float lit, int kind_of_grass) {
 
 bool water_at(ivec2 art) {
     return is_water(cell_info(cell_at(plane(art))).r);
+}
+
+bool land_at(ivec2 art) {
+    return !water_at(art);
+}
+
+float dune_height(vec2 q) {
+    vec2 s = vec2(q.x + 0.3 * @D_8_311@, q.y);
+    float n = 1.0 - abs(2.0 * @D_45_312@ - 1.0);
+    return n * n + 0.3 * @D_15_313@;
+}
+
+float dunes(vec2 p) {
+    float e = @DUNE_STEP@;
+    float here = dune_height(p);
+    float gx = (dune_height(vec2(p.x + e, p.y)) - here) / e;
+    float gy = (dune_height(vec2(p.x, p.y + e)) - here) / e;
+    return -(gx * @LIGHT_X@ + gy * @LIGHT_Y@) * @DUNE_LIGHT@;
+}
+
+float waves(vec2 q) {
+    return @V_1_401@ + 0.5 * @V_045_402@;
+}
+
+vec3 water_colour(vec2 p, int ix, int iy, float share) {
+    float depth = clamp((share - @DEPTH_FROM@) / @DEPTH_SPAN@, 0.0, 1.0);
+    vec3 rgb = depth < 0.5
+        ? @SHALLOW@ + (@OPEN_WATER@ - @SHALLOW@) * (depth * 2.0)
+        : @OPEN_WATER@ + (@DEEP_WATER@ - @OPEN_WATER@) * (depth * 2.0 - 1.0);
+    float e = @WAVE_STEP@;
+    float here = waves(p);
+    float gx = (waves(vec2(p.x + e, p.y)) - here) / e;
+    float gy = (waves(vec2(p.x, p.y + e)) - here) / e;
+    float facing = -(gx * @LIGHT_X@ + gy * @LIGHT_Y@) * @WAVE_LIGHT@;
+    rgb *= clamp(1.0 + facing, @WAVE_LOW@, @WAVE_HIGH@);
+    if (facing > @SPARKLE_FACING@ && hash(ix, iy, 403) > @SPARKLE_ABOVE@) {
+        rgb = rgb * (1.0 - @SPARKLE_MIX@) + @SPARKLE@ * @SPARKLE_MIX@;
+    }
+    return rgb;
+}
+
+bool beside_land(ivec2 art) {
+    return land_at(art + ivec2(1, 0)) || land_at(art - ivec2(1, 0))
+        || land_at(art + ivec2(0, 1)) || land_at(art - ivec2(0, 1));
+}
+
+bool beside_water(ivec2 art) {
+    return water_at(art + ivec2(1, 0)) || water_at(art - ivec2(1, 0))
+        || water_at(art + ivec2(0, 1)) || water_at(art - ivec2(0, 1));
+}
+
+vec3 shore(vec3 rgb, ivec2 art, bool water) {
+    if (water) {
+        if (beside_land(art)) {
+            return rgb * (1.0 - @SHORE_NEAR@) + @SHORE_WATER@ * @SHORE_NEAR@;
+        }
+        if (land_at(art + ivec2(2, 0)) || land_at(art - ivec2(2, 0))
+                || land_at(art + ivec2(0, 2)) || land_at(art - ivec2(0, 2))) {
+            rgb = rgb * (1.0 - @SHORE_FAR@) + @SHORE_WATER@ * @SHORE_FAR@;
+        }
+        if (land_at(art - ivec2(1, 1)) || land_at(art - ivec2(1, 2))
+                || land_at(art - ivec2(2, 2))) {
+            rgb *= @BANK_SHADE@;
+        }
+        return rgb;
+    }
+    if (beside_water(art)) {
+        return rgb * (1.0 - @BEACH_NEAR@) + @SAND@ * @BEACH_NEAR@;
+    }
+    if (water_at(art + ivec2(2, 0)) || water_at(art - ivec2(2, 0))
+            || water_at(art + ivec2(0, 2)) || water_at(art - ivec2(0, 2))
+            || water_at(art + ivec2(1, 1)) || water_at(art - ivec2(1, 1))
+            || water_at(art + ivec2(1, -1)) || water_at(art - ivec2(1, -1))) {
+        return rgb * (1.0 - @BEACH_FAR@) + @SAND@ * @BEACH_FAR@;
+    }
+    return rgb;
 }
 
 void main() {
@@ -239,17 +320,19 @@ void main() {
     float value = 1.45 + 1.6 * (@N_24_41@ - 0.5) + 0.8 * (@N_75_42@ - 0.5);
     value += 0.45 * (@N_22_43@ - 0.5) + 0.45 * BAYER[fmod(iy, 4) * 4 + fmod(ix, 4)];
     value += lit + @HILL_LIFT@ * float(info.b);
-    if (water) {
-        bool ripple = hash(fdiv(ix, 3), iy, 13) > 0.94;
-        value = ripple ? 3.0 : 1.3 + 0.6 * (hash(ix, iy, 11) - 0.5);
-    }
     int shade = int(clamp(roundEven(value), 0.0, 3.0));
     vec3 rgb = RAMPS[int(biome) * 4 + shade];
-    if (!water && in_set(biome, @MEADOWS@u)) {
+    if (water) {
+        rgb = water_colour(p, ix, iy, around.g);
+    } else if (in_set(biome, @MEADOWS@u)) {
         rgb = grass(p, ix, iy, lit, 0);
-    } else if (!water && biome == @SAVANNA@u) {
+    } else if (biome == @SAVANNA@u) {
         rgb = grass(p, ix, iy, lit, 1);
-    } else if (!water && in_set(biome, @GRASSY@u)) {
+    } else if (biome == @TUNDRA@u) {
+        rgb = grass(p, ix, iy, lit, 2);
+    } else if (biome == @DESERT@u) {
+        rgb = grass(p, ix, iy, lit + dunes(p), 3);
+    } else if (in_set(biome, @GRASSY@u)) {
         bool tuft = hash(fdiv(ix, 6), fdiv(iy, 6), 51) > @TUFT_ABOVE@
             && ((TUFT_ROWS[fmod(iy, 6)] >> fmod(ix, 6)) & 1) != 0;
         if (tuft) {
@@ -259,16 +342,7 @@ void main() {
     if (!water) {
         rgb *= natural(p, around);
     }
-    if (water) {
-        if (!water_at(art + ivec2(1, 0)) || !water_at(art - ivec2(1, 0))
-                || !water_at(art + ivec2(0, 1)) || !water_at(art - ivec2(0, 1))) {
-            rgb = @FOAM@;
-        }
-    } else if (water_at(art + ivec2(1, 0)) || water_at(art - ivec2(1, 0))
-            || water_at(art + ivec2(0, 1)) || water_at(art - ivec2(0, 1))
-            || water_at(art + ivec2(2, 0)) || water_at(art - ivec2(2, 0))) {
-        rgb = @SAND@;
-    }
+    rgb = shore(rgb, art, water);
     if (!water) {
         float glow = float(info.a) / @GLOW_STEPS@;
         rgb = rgb * (1.0 - glow) + @GLOW@ * glow;
@@ -362,7 +436,36 @@ def fragment_source() -> str:
         "GRASSY": str(_bits(cpu.GRASSY)),
         "SAVANNA": str(int(Biome.SAVANNA)),
         "TUFT_ABOVE": _number(1 - cpu.TUFT_SHARE),
-        "FOAM": _vec3(cpu.FOAM),
+        "TUNDRA_RAMPS": _grass_ramps("tundra"),
+        "DESERT_RAMPS": _grass_ramps("desert"),
+        "TUNDRA": str(int(Biome.TUNDRA)),
+        "DESERT": str(int(Biome.DESERT)),
+        "D_8_311": _noise(0.8, 311, "q"),
+        "D_45_312": _noise(0.45, 312, "s"),
+        "D_15_313": _noise(0.15, 313, "q"),
+        "DUNE_STEP": _number(cpu.DUNE_STEP),
+        "DUNE_LIGHT": _number(cpu.DUNE_LIGHT),
+        "V_1_401": _noise(0.1, 401, "q"),
+        "V_045_402": _noise(0.045, 402, "q"),
+        "DEPTH_FROM": _number(cpu.DEPTH_FROM),
+        "DEPTH_SPAN": _number(cpu.DEPTH_SPAN),
+        "SHALLOW": _vec3(cpu.SHALLOW),
+        "OPEN_WATER": _vec3(cpu.OPEN_WATER),
+        "DEEP_WATER": _vec3(cpu.DEEP_WATER),
+        "WAVE_STEP": _number(cpu.WAVE_STEP),
+        "WAVE_LIGHT": _number(cpu.WAVE_LIGHT),
+        "WAVE_LOW": _number(cpu.WAVE_RANGE[0]),
+        "WAVE_HIGH": _number(cpu.WAVE_RANGE[1]),
+        "SPARKLE_FACING": _number(cpu.SPARKLE_FACING),
+        "SPARKLE_ABOVE": _number(1 - cpu.SPARKLE_SHARE),
+        "SPARKLE_MIX": _number(cpu.SPARKLE_MIX),
+        "SPARKLE": _vec3(cpu.SPARKLE),
+        "SHORE_WATER": _vec3(cpu.SHORE_WATER),
+        "SHORE_NEAR": _number(cpu.SHORE_MIX[0]),
+        "SHORE_FAR": _number(cpu.SHORE_MIX[1]),
+        "BANK_SHADE": _vec3(cpu.BANK_SHADE),
+        "BEACH_NEAR": _number(cpu.BEACH[0]),
+        "BEACH_FAR": _number(cpu.BEACH[1]),
         "SAND": _vec3(cpu.SAND),
         "GLOW_STEPS": _number(GLOW_STEPS),
         "GLOW": _vec3(cpu.GLOW),

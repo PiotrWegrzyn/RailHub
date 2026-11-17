@@ -1,10 +1,11 @@
 """The ground of the pixel map, worked out at one pixel per art pixel: broad soft patches of a few
-shades per biome with tufts of grass, sandy shores, rippled water, slopes lit from the top left by
-the land's real heights, a warm glow where buildings are served, small signs of deposits (sheep
-grazing wool land, rocks showing their ore elsewhere), fields of crops behind hedges under farms
-and rows of trees under orchards. Hills and mountains are raised, lit and coloured by
-railroads.ui.pixel.relief. Textures come from noise over the map's plane and from each pixel's
-place, so chunks meet without seams and look the same each time they are drawn."""
+shades per biome, meadow, savanna, tundra and desert blended from their own kinds of ground,
+water shallow by the shore and deep away from it with lit waves, soft sandy shores, slopes lit from
+the top left by the land's real heights, a warm glow where buildings are served, small signs of
+deposits (sheep grazing wool land, rocks showing their ore elsewhere), fields of crops ploughed
+into the ground under farms and rows of trees under orchards. Hills and mountains are raised, lit
+and coloured by railroads.ui.pixel.relief. Textures come from noise over the map's plane and from
+each pixel's place, so chunks meet without seams and look the same each time they are drawn."""
 
 import math
 from dataclasses import dataclass
@@ -19,7 +20,7 @@ from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.building_spots import Plot, plots_of
 from railroads.ui.pixel.lattice import BoolArray, Lattice
-from railroads.ui.pixel.noise import Floats, noise, table_hash
+from railroads.ui.pixel.noise import Floats, noise, ridged, table_hash
 from railroads.ui.pixel.projection import CHUNK, RGB, PixelProjection
 from railroads.ui.pixel.relief import (
     LIGHT,
@@ -60,7 +61,36 @@ WATER = (Biome.SEA, Biome.LAKE, Biome.RIVER)
 SAND: RGB = (200, 184, 128)
 
 
-FOAM: RGB = (110, 150, 200)
+# Water is lit like the land: shallow and light by the shore, deeper and darker away from it,
+# by how much water lies round it (Ground._surroundings) from DEPTH_FROM to DEPTH_FROM and
+# DEPTH_SPAN more; low waves brighten or darken it by WAVE_LIGHT a unit of slope towards LIGHT,
+# within WAVE_RANGE, and a SPARKLE_SHARE of the pixels on waves facing it more than
+# SPARKLE_FACING glint, SPARKLE_MIX of the way to SPARKLE.
+SHALLOW = np.array((64, 128, 146), dtype=np.float32)
+OPEN_WATER = np.array((38, 86, 134), dtype=np.float32)
+DEEP_WATER = np.array((24, 56, 104), dtype=np.float32)
+DEPTH_FROM = 0.45
+DEPTH_SPAN = 0.5
+WAVE_LIGHT = 0.012
+WAVE_RANGE = (0.82, 1.2)
+WAVE_STEP = 0.01
+SPARKLE = np.array((206, 224, 232), dtype=np.float32)
+SPARKLE_FACING = 0.17
+SPARKLE_SHARE = 0.15
+SPARKLE_MIX = 0.55
+# Shores are soft: sand covers the land BEACH[0] fully beside the water and BEACH[1] a pixel
+# further, the water is SHORE_MIX of the way to SHORE_WATER beside the land and a pixel
+# further, and the bank shades the water below and right of it by BANK_SHADE.
+BEACH = (0.8, 0.4)
+SHORE_WATER = np.array((110, 160, 168), dtype=np.float32)
+SHORE_MIX = (0.6, 0.25)
+BANK_SHADE = SHADOW_TINT * 0.85
+# The pixels round a pixel that a shore looks at: beside it, a pixel further, and up and left of
+# it for the bank's shade, as (down, across) steps back to them.
+BESIDE = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+FURTHER = [(0, 2), (0, -2), (2, 0), (-2, 0), (1, 1), (-1, -1), (1, -1), (-1, 1)]
+WATER_FURTHER = [(0, 2), (0, -2), (2, 0), (-2, 0)]
+UP_LEFT = [(1, 1), (2, 1), (2, 2)]
 
 
 FIELD_STRIPES = 9
@@ -237,11 +267,24 @@ DRY = ((0.0, (98, 115, 57)), (0.5, (127, 142, 75)), (1.0, (159, 168, 100)))
 GOLDEN = ((0.0, (137, 126, 71)), (0.5, (178, 167, 100)), (1.0, (208, 201, 138)))
 DAMP = ((0.0, (121, 118, 64)), (0.5, (155, 152, 87)), (1.0, (188, 186, 119)))
 EARTH = ((0.0, (124, 97, 67)), (0.5, (156, 127, 90)), (1.0, (186, 162, 120)))
+# Tundra is drawn the same way as moss, brownish heath and pale lichen, and desert as sand,
+# rippled sand and reddish gravel, lit along its dunes.
+MOSS = ((0.0, (80, 92, 60)), (0.5, (112, 122, 82)), (1.0, (146, 152, 110)))
+HEATH = ((0.0, (86, 80, 58)), (0.5, (118, 108, 78)), (1.0, (150, 140, 106)))
+LICHEN = ((0.0, (106, 110, 98)), (0.5, (142, 146, 132)), (1.0, (178, 182, 168)))
+SAND_FLAT = ((0.0, (166, 140, 98)), (0.5, (202, 178, 130)), (1.0, (228, 210, 162)))
+SAND_RIPPLED = ((0.0, (150, 122, 84)), (0.5, (186, 158, 112)), (1.0, (216, 192, 146)))
+GRAVEL = ((0.0, (128, 98, 74)), (0.5, (160, 126, 96)), (1.0, (190, 158, 124)))
 # Each grassland, and how rare wild flowers are in it (1 for none).
 GRASSES = {
     "meadow": (PASTURE, ROUGH, DRY, 0.997),
     "savanna": (GOLDEN, DAMP, EARTH, 1.0),
+    "tundra": (MOSS, HEATH, LICHEN, 0.998),
+    "desert": (SAND_FLAT, SAND_RIPPLED, GRAVEL, 1.0),
 }
+# Dunes in the desert catch the light this much more for the way they face it.
+DUNE_LIGHT = 0.11
+DUNE_STEP = 0.02
 # The colours of wild flowers in meadows.
 FLOWERS = np.array([(244, 240, 232), (246, 214, 80), (196, 130, 210), (226, 90, 70)], np.float32)
 # Woods are drawn as a canopy seen from above (Ground.canopy), lit the way the mountains are
@@ -440,8 +483,9 @@ class Ground:
         `raised` is the raised ground over at least these pixels, if any rises there; `points`
         may hold their plane points and cells already, and those of the APRON round them.
 
-        Each pixel is coloured by the one kind of ground it shows: water, meadow, savanna or
-        the plain ramp of its biome, each worked out only at its own pixels. Where raised ground
+        Each pixel is coloured by the one kind of ground it shows: water, one of the GRASSES
+        (meadow, savanna, tundra or desert) or the plain ramp of its biome, each worked out only
+        at its own pixels. Where raised ground
         takes the mountains' colours fully (relief.mountain_cover), its own colour is not
         worked out at all."""
         a = APRON
@@ -459,13 +503,11 @@ class Ground:
         seen = np.ones(x.shape, dtype=bool)
         if raised is not None:
             seen = mountain_cover(raised.mountains[:rows], rocky) < 1
-        meadow = _MEADOW[biomes] & ~wet
-        savanna = (biomes == Biome.SAVANNA) & ~wet
-        plain = ~(wet | meadow | savanna) & seen
-        meadow &= seen
-        savanna &= seen
         dry = ~wet
-        lit = meadow | savanna | plain
+        grasses = {kind: _GRASSES[kind][biomes] & dry & seen for kind in GRASSES}
+        grassy = np.logical_or.reduce(list(grasses.values()))
+        plain = dry & seen & ~grassy
+        lit = grassy | plain
         light = np.zeros(x.shape, dtype=np.float64)
         light[lit] = sample(
             self._relief_light, x[lit] * RELIEF_STEPS_PER_CELL, y[lit] * RELIEF_STEPS_PER_CELL
@@ -474,10 +516,8 @@ class Ground:
         shade = np.zeros(x.shape, dtype=np.int64)
         down, across = np.nonzero(wet & seen)
         if len(down):
-            ix, iy = left + across, top + down
-            ripple = table_hash(ix // 3, iy, 13) > 0.94
-            calm = 1.3 + 0.6 * (table_hash(ix, iy, 11) - 0.5)
-            shade[down, across] = np.clip(np.rint(np.where(ripple, 3, calm)), 0, 3).astype(np.int64)
+            open_water = (down, across)
+            rgb[open_water] = self._water(x[open_water], y[open_water], left + across, top + down)
         down, across = np.nonzero(plain)
         if len(down):
             ix, iy = left + across, top + down
@@ -487,11 +527,13 @@ class Ground:
             value += 0.45 * (noise(fx, fy, 0.22, 43) - 0.5) + 0.45 * BAYER[iy % 4, ix % 4]
             value += light[plain] + HILL_LIFT * self._hills[r[plain], c[plain]]
             shade[plain] = np.clip(np.rint(value), 0, 3).astype(np.int64)
-        ramped = (wet & seen) | plain
-        rgb[ramped] = self.ramps[biomes[ramped], shade[ramped]]
-        if meadow.any() or savanna.any():
+        rgb[plain] = self.ramps[biomes[plain], shade[plain]]
+        desert = grasses["desert"]
+        if desert.any():
+            light[desert] += _dunes(x[desert], y[desert])
+        if grassy.any():
             shaded = self._tree_shade(left, top, x.shape)
-            for grass, kind in ((meadow, "meadow"), (savanna, "savanna")):
+            for kind, grass in grasses.items():
                 down, across = np.nonzero(grass)
                 if not len(down):
                     continue
@@ -510,10 +552,7 @@ class Ground:
         land = lit & dry
         if land.any():
             rgb[land] *= self._natural(x[land], y[land])
-        near_water = _near(water, a, rows, [(0, 1), (0, -1), (1, 0), (-1, 0), (0, 2), (0, -2)])
-        near_land = _near(~water, a, rows, [(0, 1), (0, -1), (1, 0), (-1, 0)])
-        rgb[~wet & near_water & inside] = SAND
-        rgb[wet & near_land & inside] = FOAM
+        self._shores(rgb, water, rows, inside)
         # Ground that does not glow keeps its colour exactly, so only glowing ground is blended.
         strength = glow_strength(self.satisfaction[r, c])
         glowing = (strength > 0) & dry
@@ -526,6 +565,47 @@ class Ground:
         if raised is not None:
             self.elevation.colour(rgb, raised.top(rows), x, y, rocky)
         return np.clip(rgb, 0, 255) * alpha[..., None], alpha
+
+    def _water(self, x: FloatArray, y: FloatArray, ix: IntArray, iy: IntArray) -> FloatArray:
+        """The colour of water at plane points `x`, `y`, art pixels `ix`, `iy`: shallow or deep
+        by how much water lies round it, lit on its waves, with a few glints."""
+        at = Blend.at(self._wet.shape, x * RELIEF_STEPS_PER_CELL, y * RELIEF_STEPS_PER_CELL)
+        depth = np.clip((at.read(self._wet) - DEPTH_FROM) / DEPTH_SPAN, 0, 1)[:, None]
+        colour = np.where(
+            depth < 0.5,
+            SHALLOW + (OPEN_WATER - SHALLOW) * (depth * 2),
+            OPEN_WATER + (DEEP_WATER - OPEN_WATER) * (depth * 2 - 1),
+        )
+        fx, fy = x.astype(np.float32), y.astype(np.float32)
+        e = np.float32(WAVE_STEP)
+        here = _waves(fx, fy)
+        gx = (_waves(fx + e, fy) - here) / e
+        gy = (_waves(fx, fy + e) - here) / e
+        facing = -(gx * np.float32(LIGHT[0]) + gy * np.float32(LIGHT[1])) * np.float32(WAVE_LIGHT)
+        colour = colour * np.clip(1 + facing, *WAVE_RANGE)[:, None]
+        glint = (facing > SPARKLE_FACING) & (table_hash(ix, iy, 403) > 1 - SPARKLE_SHARE)
+        colour[glint] = colour[glint] * (1 - SPARKLE_MIX) + SPARKLE * SPARKLE_MIX
+        return colour.astype(np.float32)
+
+    def _shores(self, rgb: FloatArray, water: BoolArray, rows: int, inside: BoolArray) -> None:
+        """Softens the shores of a block of `rows` by CHUNK pixels: sand fading into the land
+        beside water, light shallows fading into the water beside land and the bank's shade on
+        the water below it; `water` holds where water is over the APRON round the block."""
+        a = APRON
+        wet = water[a : a + rows, a : a + CHUNK]
+        land = ~water
+        sand = np.array(SAND, dtype=np.float32)
+        beside = _near(water, a, rows, BESIDE)
+        beach = ~wet & ~beside & _near(water, a, rows, FURTHER) & inside
+        rgb[beach] = rgb[beach] * (1 - BEACH[1]) + sand * BEACH[1]
+        beach = ~wet & beside & inside
+        rgb[beach] = rgb[beach] * (1 - BEACH[0]) + sand * BEACH[0]
+        beside = _near(land, a, rows, BESIDE) & wet & inside
+        rgb[beside] = rgb[beside] * (1 - SHORE_MIX[0]) + SHORE_WATER * SHORE_MIX[0]
+        further = _near(land, a, rows, WATER_FURTHER) & wet & inside & ~beside
+        rgb[further] = rgb[further] * (1 - SHORE_MIX[1]) + SHORE_WATER * SHORE_MIX[1]
+        shaded = _near(land, a, rows, UP_LEFT) & wet & inside & ~beside
+        rgb[shaded] *= BANK_SHADE
 
     def winding(
         self, x: FloatArray, y: FloatArray, r: IntArray, c: IntArray
@@ -1340,6 +1420,27 @@ def _tallest_crown(
     return best, dx, dy, radii[tallest], tallest % width + first_x, tallest // width + first_y
 
 
+def _dunes(x: FloatArray, y: FloatArray) -> Floats:
+    """How much more desert at these points faces the light for the dunes it lies in."""
+    fx, fy = np.asarray(x, np.float32), np.asarray(y, np.float32)
+    e = np.float32(DUNE_STEP)
+    here = _dune_height(fx, fy)
+    gx = (_dune_height(fx + e, fy) - here) / e
+    gy = (_dune_height(fx, fy + e) - here) / e
+    return -(gx * np.float32(LIGHT[0]) + gy * np.float32(LIGHT[1])) * np.float32(DUNE_LIGHT)
+
+
+def _dune_height(x: Floats, y: Floats) -> Floats:
+    """How high the desert's dunes rise at these points: crests winding across it."""
+    bent = x + np.float32(0.3) * noise(x, y, 0.8, 311)
+    return ridged(bent, y, 0.45, 312) + np.float32(0.3) * noise(x, y, 0.15, 313)
+
+
+def _waves(x: Floats, y: Floats) -> Floats:
+    """How high the low waves on water rise at these points."""
+    return noise(x, y, 0.1, 401) + np.float32(0.5) * noise(x, y, 0.045, 402)
+
+
 def _rolling(x: Floats, y: Floats) -> Floats:
     """How high the low swells of the plains rise at these points."""
     return noise(x, y, 1.6, 301) + 0.45 * noise(x, y, 0.55, 302) + 0.12 * noise(x, y, 0.18, 303)
@@ -1467,4 +1568,10 @@ def _round(grid: Grid) -> FloatArray:
 _WATER = _biome_table(WATER)
 _MEADOW = _biome_table(MEADOWS)
 _GRASSY = _biome_table(GRASSY)
-_GRASS = _biome_table((*MEADOWS, Biome.SAVANNA))
+_GRASSES = {
+    "meadow": _MEADOW,
+    "savanna": _biome_table((Biome.SAVANNA,)),
+    "tundra": _biome_table((Biome.TUNDRA,)),
+    "desert": _biome_table((Biome.DESERT,)),
+}
+_GRASS = np.logical_or.reduce(list(_GRASSES.values()))
