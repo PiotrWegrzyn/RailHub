@@ -192,8 +192,8 @@ def test_where_the_graphics_card_blows_textures_up_only_its_own_pixels_go_up() -
     asked: list[tuple[np.ndarray, int]] = []
     layer.blow_up = lambda pixels, times: asked.append((pixels, times)) or FakeTexture()
 
-    layer._upload(mountains, 4)
-    layer._upload(mountains, 2)
+    layer._upload(mountains, 4, 2)
+    layer._upload(mountains, 2, 2)
 
     [(pixels, times)] = asked
     assert times == 2

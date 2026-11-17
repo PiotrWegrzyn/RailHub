@@ -15,7 +15,14 @@ from functools import cache, partial
 from PIL import Image
 
 from railroads.sim.constructions import BUILDING_RULES, MERGED, BuildingKind
-from railroads.ui.pixel.art import grand_crafts, grand_fire, grand_food, grand_modern
+from railroads.ui.pixel.art import (
+    built_homes,
+    grand_crafts,
+    grand_fire,
+    grand_food,
+    grand_modern,
+)
+from railroads.ui.pixel.art.built_homes import home
 from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_pauls
 from railroads.ui.pixel.art.commerce import airport, department_store, hotel, port, shop, tavern
 from railroads.ui.pixel.art.crafts import (
@@ -149,6 +156,7 @@ __all__ = [
     "SPRITES",
     "Painter",
     "Sprite",
+    "close_sprite",
     "draw_sheet",
     "drawn_at",
     "fine_sprite",
@@ -510,6 +518,29 @@ def fine_sprite(name: str, resolution: int) -> Sprite:
     map."""
     with drawn_at(_scale_of(name) * resolution):
         return SPRITES[name]()
+
+
+# Buildings drawn up close from 3D models (railroads.ui.pixel.art.built) built to look like their
+# painted sprites, which stay on the sheet; up close they show finer detail and smooth edges.
+CLOSE_MODELS: dict[str, Callable[[], Sprite]] = {
+    **{
+        f"house_{i}": home(lambda w=WALLS[i % 3], r=ROOFS[i % 4]: built_homes.house(w, r))
+        for i in range(12)
+    },
+    **{
+        f"tenement_{i}": home(lambda w=w, r=TENEMENT_ROOFS[i % 2]: built_homes.tenement(w, r))
+        for i, w in enumerate(TENEMENT_WALLS)
+    },
+    **{f"flats_{i}": home(lambda w=w: built_homes.flats(w)) for i, w in enumerate(FLAT_WALLS)},
+    "skyscraper": home(built_homes.skyscraper),
+}
+
+
+def close_sprite(name: str, pixels: int) -> Sprite:
+    """A sprite drawn `pixels` pixels for every art pixel of the map, for close views: from its
+    model if it has one, otherwise its painted sprite drawn that much finer."""
+    with drawn_at(_scale_of(name) * pixels):
+        return CLOSE_MODELS.get(name, SPRITES[name])()
 
 
 def draw_sheet(padding: int = 1, resolution: int = 1) -> tuple[Image.Image, dict[str, list[int]]]:

@@ -35,7 +35,7 @@ from railroads.ui.pixel.copies import ChunkJob
 from railroads.ui.pixel.painter import Painter
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, Rgba
 from railroads.ui.pixel.web_painter import WorkerPainter, page_workers
-from railroads.ui.pixel.world import PixelWorld
+from railroads.ui.pixel.world import CLOSE, PixelWorld
 from railroads.ui.workers import threads_start
 
 # Time a frame may spend turning drawn chunks into textures; at least one is always made.
@@ -48,6 +48,10 @@ SETTLE_S = 0.3
 CHUNK_BUDGET = 128 * 1024 * 1024
 # Most bytes of chunk textures kept on the graphics card; the least recently shown go first.
 TEXTURE_BUDGET = 512 * 1024 * 1024
+# From how many screen pixels per art pixel the view is close: chunks are drawn CLOSE times finer
+# without what stands on the ground, which railroads.ui.pixel.scenery_layer draws over them as
+# fine as the screen.
+CLOSE_FROM = 4
 
 type ChunkKey = tuple[int, int]
 
@@ -62,6 +66,16 @@ def resolution_for(screen_pixels: int, resolutions: tuple[int, ...]) -> int:
     """The finest resolution a chunk can be drawn at that blows up evenly to `screen_pixels`
     for every art pixel."""
     return max(r for r in resolutions if screen_pixels % r == 0)
+
+
+def chunk_resolution(pixel_scale: int, density: int, resolutions: tuple[int, ...]) -> int:
+    """The resolution chunks are drawn at for a view `pixel_scale` screen points per art pixel on
+    a screen `density` pixels per point: CLOSE when the view is close and that blows up evenly,
+    otherwise the finest of `resolutions` that does."""
+    screen_pixels = pixel_scale * density
+    if pixel_scale >= CLOSE_FROM and screen_pixels % CLOSE == 0:
+        return CLOSE
+    return resolution_for(screen_pixels, resolutions)
 
 
 def painter_for(world: PixelWorld, threads: bool | None = None) -> Painter | WorkerPainter:
@@ -150,7 +164,7 @@ class PixelLayer:
         placement = self._placement(camera, center, clip)
         density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
         scale = placement.scale * density
-        resolution = resolution_for(scale, self.world.resolutions)
+        resolution = chunk_resolution(placement.scale, density, self.world.resolutions)
         self.take_drawn()
         now = time.perf_counter()
         io = imgui.get_io()
@@ -165,7 +179,7 @@ class PixelLayer:
             if texture is None or key in self._stale:
                 late = uploaded and time.perf_counter() - now > UPLOAD_BUDGET_S
                 if drawn in self._chunks and not late:
-                    texture = self._upload(chunk, scale)
+                    texture = self._upload(chunk, scale, resolution)
                     self._stale.discard(key)
                     uploaded = True
                 else:
@@ -189,7 +203,7 @@ class PixelLayer:
         """Draws the chunks this view would show, at most PREPARED_CHUNKS of them, on the calling
         thread, so they are ready for the first frame; for a game being loaded."""
         placement = self._placement(camera, center, clip)
-        resolution = resolution_for(placement.scale * density, self.world.resolutions)
+        resolution = chunk_resolution(placement.scale, density, self.world.resolutions)
         for chunk in placement.chunks[:PREPARED_CHUNKS]:
             drawn = (*chunk, resolution)
             if drawn not in self._chunks:
@@ -247,8 +261,7 @@ class PixelLayer:
     def _texture_bytes(self) -> int:
         return sum((CHUNK * key[2]) ** 2 * 4 for key in self._textures)
 
-    def _upload(self, chunk: ChunkKey, scale: int) -> Texture:
-        resolution = resolution_for(scale, self.world.resolutions)
+    def _upload(self, chunk: ChunkKey, scale: int, resolution: int) -> Texture:
         drawn = (*chunk, resolution)
         pixels = self._chunks[drawn]
         self._chunks.move_to_end(drawn)

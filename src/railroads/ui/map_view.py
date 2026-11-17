@@ -60,6 +60,7 @@ from railroads.ui.pixel.ground_shader import (
 )
 from railroads.ui.pixel.layer import PixelLayer
 from railroads.ui.pixel.relief import Elevation
+from railroads.ui.pixel.scenery_layer import SceneryLayer
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.track_preview import TrackPreview
 from railroads.ui.pixel.train_layer import TrainLayer, engine_picture
@@ -149,6 +150,7 @@ class MapView:
         self._pictures: GroundPictures | None = None
         self._pixels: PixelLayer | None = None
         self._trains: TrainLayer | None = None
+        self._scenery: SceneryLayer | None = None
         # Each engine's picture for the buy screen, by engine and how many times it is blown up:
         # its texture and its size in art pixels.
         self._engine_pictures: dict[tuple[str, int], tuple[hello_imgui.TextureGpu, Vec2]] = {}
@@ -460,6 +462,7 @@ class MapView:
         else:
             self._draw_smooth_map(draw_list, center, top_left, bottom_right)
         if self.camera.pixel_scale:
+            self._scenery_layer().draw(draw_list, self.camera, center)
             if self.railway.trains:
                 self._train_layer().draw(draw_list, self.railway, self.camera, center)
         else:
@@ -585,6 +588,12 @@ class MapView:
         below = draw_status(draw_list, top_left, bottom_right, text)
         if self.hovered is not None and not over_minimap:
             draw_hovered_buildings(self.growth, self.hovered, below, self._satisfaction)
+
+    def _scenery_layer(self) -> SceneryLayer:
+        world = self._pixel_layer().world
+        if self._scenery is None or self._scenery.world is not world:
+            self._scenery = SceneryLayer(world)
+        return self._scenery
 
     def _train_layer(self) -> TrainLayer:
         if self._trains is None:

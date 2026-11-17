@@ -32,6 +32,9 @@ CYLINDER_SIDES = 10
 # SHINE where they face halfway between the light and the viewer, and faces low down LOW_DARK
 # darker, in the shade of the body above, fading out by LOW_HEIGHT above the rails.
 FINE_CYLINDER_SIDES = 24
+# How much nearer a face drawn later may be counted than one drawn before it at the same pixel,
+# in cells: faces meeting at an edge, or lying flat on one another, show the later one.
+DEPTH_SLACK = 1e-4
 # How far up close a body's top edges are rounded over, and in how many steps.
 BODY_ROUND = 0.014
 BODY_ARC = 3
@@ -677,11 +680,15 @@ def draw_model(
     matrix: npt.NDArray[np.float64],
     pixels: float = 1.0,
     fine: bool = False,
+    light_from: tuple[float, float] = (-1.0, -1.0),
+    depth_test: bool = False,
 ) -> tuple[Image.Image, tuple[int, int]]:
     """The model seen turned `heading` radians round from the map's x axis, with the map's
     plane-to-art-pixel matrix, `pixels` picture pixels for every art pixel a model cell would
-    take, with its fine details if `fine`: shaded, outlined, and where its origin lands in the
-    picture."""
+    take, with its fine details if `fine`, lit from the way `light_from` on the screen: shaded,
+    outlined, and where its origin lands in the picture. Faces are drawn back to front; with
+    `depth_test` each pixel shows whichever face is nearest there, so a part standing out of a
+    big wall, like a cornice or an awning, shows in front of it."""
     scale = matrix * pixels
     cos, sin = math.cos(heading), math.sin(heading)
     up = float(np.hypot(*scale[:, 0])) * HEIGHT_PER_WIDTH
@@ -689,7 +696,7 @@ def draw_model(
     towards = np.linalg.solve(matrix, np.array([0.0, 1.0]))
     towards = towards / np.hypot(*towards)
     view = np.array([towards[0] * TILT, towards[1] * TILT, HEIGHT_PER_WIDTH])
-    light_plane = np.linalg.solve(matrix, np.array([-1.0, -1.0]))
+    light_plane = np.linalg.solve(matrix, np.array(light_from))
     light_plane = light_plane / np.hypot(*light_plane)
     light = np.array([*light_plane * 0.6, 0.8])
 
@@ -725,20 +732,63 @@ def draw_model(
             color = (rgb[0], rgb[1], rgb[2])
         else:
             color = shade(face.color, SHADES[min(len(SHADES) - 1, int(lit * len(SHADES)))])
-        drawn.append((depth, [to_screen(p) for p in points], color))
+        near = [float(np.array(p) @ view) for p in points]
+        drawn.append((depth, [to_screen(p) for p in points], color, near))
     drawn.sort(key=lambda item: item[0])
-    xs = [x for _, pts, _ in drawn for x, _ in pts]
-    ys = [y for _, pts, _ in drawn for _, y in pts]
+    xs = [x for _, pts, _, _ in drawn for x, _ in pts]
+    ys = [y for _, pts, _, _ in drawn for _, y in pts]
     pad = max(2, round(2 * pixels))
     left, top = math.floor(min(xs)) - pad, math.floor(min(ys)) - pad
     edge = pad + max(1, round(pixels))
     width, height = math.ceil(max(xs)) - left + edge, math.ceil(max(ys)) - top + edge
-    image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    paint = ImageDraw.Draw(image)
-    for _, points, color in drawn:
-        paint.polygon([(x - left, y - top) for x, y in points], fill=(*color, 255))
+    if depth_test:
+        image = _depth_tested(
+            [
+                ([(x - left, y - top) for x, y in points], color, near)
+                for _, points, color, near in drawn
+            ],
+            (width, height),
+        )
+    else:
+        image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        paint = ImageDraw.Draw(image)
+        for _, points, color, _ in drawn:
+            paint.polygon([(x - left, y - top) for x, y in points], fill=(*color, 255))
     _outline(image)
     return image, (-left, -top)
+
+
+def _depth_tested(
+    faces: list[tuple[list[tuple[float, float]], RGB, list[float]]], size: tuple[int, int]
+) -> Image.Image:
+    """Faces, each its corners on the picture, its colour and how near the viewer each corner
+    is, drawn so each pixel shows the nearest face there: how near is worked out over each face
+    from its corners, as it is flat."""
+    width, height = size
+    nearest = np.full((height, width), -np.inf)
+    pixels = np.zeros((height, width, 4), dtype=np.uint8)
+    for points, color, near in faces:
+        xs = np.array([x for x, _ in points])
+        ys = np.array([y for _, y in points])
+        x0, y0 = max(0, math.floor(xs.min())), max(0, math.floor(ys.min()))
+        x1, y1 = min(width - 1, math.ceil(xs.max())), min(height - 1, math.ceil(ys.max()))
+        if x1 < x0 or y1 < y0:
+            continue
+        mask_image = Image.new("L", (x1 - x0 + 1, y1 - y0 + 1), 0)
+        ImageDraw.Draw(mask_image).polygon([(x - x0, y - y0) for x, y in points], fill=1)
+        mask = np.asarray(mask_image, dtype=bool)
+        if not mask.any():
+            continue
+        plane, *_ = np.linalg.lstsq(
+            np.column_stack([xs, ys, np.ones(len(points))]), np.array(near), rcond=None
+        )
+        grid_y, grid_x = np.mgrid[y0 : y1 + 1, x0 : x1 + 1]
+        depth = plane[0] * (grid_x + 0.5) + plane[1] * (grid_y + 0.5) + plane[2]
+        region = nearest[y0 : y1 + 1, x0 : x1 + 1]
+        wins = mask & (depth >= region - DEPTH_SLACK)
+        region[wins] = depth[wins]
+        pixels[y0 : y1 + 1, x0 : x1 + 1][wins] = (*color, 255)
+    return Image.fromarray(pixels)
 
 
 def _outline(image: Image.Image, width: int = 1) -> None:

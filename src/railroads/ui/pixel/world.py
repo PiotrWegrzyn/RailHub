@@ -45,6 +45,9 @@ from railroads.ui.pixel.track_art import TrackArt
 
 # How far in art pixels a sprite can reach from where it stands.
 SPRITE_REACH = 48
+# The resolution chunks are drawn at in close views: without what stands on the ground, which
+# railroads.ui.pixel.scenery_layer draws over them as fine as the screen.
+CLOSE = 4
 # How many art pixels further down the map than track the ground showing where it is drawn may
 # lie before the track counts as hidden behind it: the track's own width over gentle slopes.
 HIDDEN_BEYOND = 2.0
@@ -113,6 +116,14 @@ class PixelWorld:
     def satisfaction(self, levels: npt.NDArray[np.int8]) -> None:
         self.ground.satisfaction = levels
         self.satisfaction_version += 1
+
+    def sprite(self, index: int) -> tuple[int, npt.NDArray[np.float32], tuple[int, int]]:
+        """A sprite as the finest sheet holds it: that sheet's resolution, the sprite's RGBA
+        pixels from 0 to 1 and its anchor."""
+        resolution = max(self._sprites)
+        sprites = self._sprites[resolution]
+        anchor = sprites.anchors[index]
+        return resolution, sprites.pixels[index], (int(anchor[0]), int(anchor[1]))
 
     @property
     def resolutions(self) -> tuple[int, ...]:
@@ -405,6 +416,8 @@ class PixelWorld:
         under[..., :3] = under[..., :3] * (1 - alpha) + part[..., :3] * alpha
 
     def _stand_scenery(self, canvas: FloatArray, left: int, top: int, resolution: int) -> None:
+        if resolution == CLOSE:
+            return
         scenery, drawn, k = self.scenery, self._sprites[resolution], resolution
         x0 = (scenery.x - left) * k - drawn.anchors[scenery.sprite, 0]
         y0 = (scenery.y - scenery.lift - top) * k - drawn.anchors[scenery.sprite, 1]
