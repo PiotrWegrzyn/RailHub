@@ -149,10 +149,11 @@ where a property comes from.
 
 The UI draws the map from those properties alone, always from the same direction, with north
 up. The three furthest zoom levels show
-the map as one smooth picture; the six closest show it as pixel art, at 1, 2, 3, 4, 6 and 8
-screen pixels per art pixel. The two closest are there for the trains: up close each engine and
-car is drawn from its 3D model as fine as the screen, with rounded bodies, so it shows more detail
-the closer the view.
+the map as one smooth picture; the five closest show it as pixel art, at 1, 2, 3, 4 and 6
+screen pixels per art pixel. The ground under it is blended between its pixels and laid with a
+lit texture of grass and earth (`railroads.ui.pixel.ground_texture`), fields and woods too, so it
+reads as one surface at every zoom, while buildings stay pixel art. The closest is there for the
+trains: up close each engine and car is drawn from its 3D model as fine as the screen.
 
 - `railroads.ui.biomes`: every cell is a biome picked from terrain, relief, temperature and
   vegetation. Water is always water, mountains are grey rock or snow, hot and barren is desert,

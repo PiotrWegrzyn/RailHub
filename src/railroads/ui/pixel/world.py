@@ -47,8 +47,8 @@ from railroads.ui.pixel.track_art import TrackArt
 
 # How far in art pixels a sprite can reach from where it stands.
 SPRITE_REACH = 48
-# The resolution chunks are drawn at in close views: without what stands on the ground, which
-# railroads.ui.pixel.scenery_layer draws over them as fine as the screen.
+# The resolution chunks are drawn at in close views: the ground, fields and woods that fine, and
+# what stands on the ground as its pixel art from the finest sheet, each pixel blown up to a square.
 CLOSE = 4
 # How many art pixels further down the map than track the ground showing where it is drawn may
 # lie before the track counts as hidden behind it: the track's own width over gentle slopes.
@@ -515,16 +515,19 @@ class PixelWorld:
         under[..., :3] = under[..., :3] * (1 - alpha) + part[..., :3] * alpha
 
     def _stand_scenery(self, canvas: FloatArray, left: int, top: int, resolution: int) -> None:
-        if resolution == CLOSE:
-            return
-        scenery, drawn, k = self.scenery, self._sprites[resolution], resolution
-        x0 = (scenery.x - left) * k - drawn.anchors[scenery.sprite, 0]
-        y0 = (scenery.y - scenery.lift - top) * k - drawn.anchors[scenery.sprite, 1]
-        w, h = drawn.sizes[scenery.sprite, 0], drawn.sizes[scenery.sprite, 1]
+        sheet = resolution if resolution in self._sprites else max(self._sprites)
+        times = resolution // sheet
+        scenery, drawn, k = self.scenery, self._sprites[sheet], resolution
+        x0 = (scenery.x - left) * k - drawn.anchors[scenery.sprite, 0] * times
+        y0 = (scenery.y - scenery.lift - top) * k - drawn.anchors[scenery.sprite, 1] * times
+        w, h = drawn.sizes[scenery.sprite, 0] * times, drawn.sizes[scenery.sprite, 1] * times
         span = CHUNK * k
         overlapping = (x0 < span) & (x0 + w > 0) & (y0 < span) & (y0 + h > 0)
         for i in np.flatnonzero(overlapping).tolist():
-            _blend(canvas, drawn.premultiplied[int(scenery.sprite[i])], int(x0[i]), int(y0[i]))
+            pixels = drawn.premultiplied[int(scenery.sprite[i])]
+            if times > 1:
+                pixels = pixels.repeat(times, axis=0).repeat(times, axis=1)
+            _blend(canvas, pixels, int(x0[i]), int(y0[i]))
 
     def planned_track(
         self, pieces: list[Track], left: int, top: int, width: int, height: int, resolution: int

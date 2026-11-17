@@ -163,7 +163,6 @@ __all__ = [
     "SPRITES",
     "Painter",
     "Sprite",
-    "close_sprite",
     "draw_sheet",
     "drawn_at",
     "fine_sprite",
@@ -514,7 +513,10 @@ MODELS: dict[str, Callable[[], Sprite]] = {
     "barrel_maker": modelled(built_batch4.barrel_maker),
     "coke_plant": modelled(built_batch4.coke_plant),
 }
-SPRITES |= MODELS
+# The kinds drawn from their models: buildings are pixel art, but for the gasworks, whose painted
+# gasholder gave way to its brick rotunda. Every other model stays to hand for a 3D look.
+DRAWN_FROM_MODELS = ("gasworks",)
+SPRITES |= {name: MODELS[name] for name in DRAWN_FROM_MODELS}
 
 # Big and mega works drawn as buildings of their own, by trade.
 for _module in (grand_fire, grand_food, grand_crafts, grand_modern):
@@ -604,12 +606,6 @@ def fine_sprite(name: str, resolution: int) -> Sprite:
         return SPRITES[name]()
 
 
-def close_sprite(name: str, pixels: int) -> Sprite:
-    """A sprite drawn `pixels` pixels for every art pixel of the map, for close views: as fine as
-    the screen shows it."""
-    return fine_sprite(name, pixels)
-
-
 def draw_sheet(padding: int = 1, resolution: int = 1) -> tuple[Image.Image, dict[str, list[int]]]:
     """Every sprite packed in rows on one sheet, and where each sits: x, y, width, height and its
     anchor inside it. Buildings other than stations are drawn at BUILDING_SCALE, houses,
@@ -620,7 +616,7 @@ def draw_sheet(padding: int = 1, resolution: int = 1) -> tuple[Image.Image, dict
     if resolution == 1:
         sprites = {
             name: shrink(fine_sprite(name, 2), 0.5)
-            if name in MODELS
+            if name in DRAWN_FROM_MODELS
             else shrink(draw(), _scale_of(name))
             for name, draw in SPRITES.items()
         }

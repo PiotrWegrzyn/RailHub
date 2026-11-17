@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from test_pixel_world import make_world
 
-from railroads.ui.pixel.art import SPRITES, _scale_of, close_sprite, draw_sheet, fine_sprite, homes
+from railroads.ui.pixel.art import MODELS, _scale_of, draw_sheet, fine_sprite, homes, industry
 from railroads.ui.pixel.art.built import HEADING, PROJECTION
 from railroads.ui.pixel.art.nature import DRAWN_AT, _drawn_at
 from railroads.ui.pixel.art.painter import ROOFS, WALLS, drawn_at
@@ -42,52 +42,6 @@ def test_close_views_draw_chunks_close_where_that_blows_up_evenly(
     assert found == expected
 
 
-def test_close_chunks_leave_out_what_stands_on_the_ground(sheet: SpriteSheet) -> None:
-    world = make_world(sheet)
-    bare = make_world(sheet)
-    bare.scenery = replace(
-        bare.scenery,
-        x=bare.scenery.x[:0],
-        y=bare.scenery.y[:0],
-        sprite=bare.scenery.sprite[:0],
-        lift=bare.scenery.lift[:0],
-    )
-    across, down = world.projection.chunks
-    chunks = [(x, y) for x in range(across) for y in range(down)]
-
-    plain = [(world.render(*c) != bare.render(*c)).any() for c in chunks]
-    close = [(world.render(*c, CLOSE) != bare.render(*c, CLOSE)).any() for c in chunks]
-
-    assert any(plain)
-    assert not any(close)
-
-
-def test_a_home_is_drawn_from_its_model_at_every_zoom_about_as_big_as_it_was_painted() -> None:
-    with drawn_at(_scale_of("house_0") * 8):
-        painted = homes.house(WALLS[0], ROOFS[0])
-
-    found = [fine_sprite("house_0", pixels) for pixels in (2, 8)]
-
-    assert found[1].image.tobytes() != painted.image.tobytes()
-    assert abs(found[1].image.width - painted.image.width) <= 0.2 * painted.image.width
-    assert close_sprite("house_0", 2).image.tobytes() == found[0].image.tobytes()
-
-
-def test_up_close_a_building_without_a_model_is_its_painted_sprite_drawn_finer() -> None:
-    painted = fine_sprite("factory", 8)
-
-    found = close_sprite("factory", 8)
-
-    assert found.image.tobytes() == painted.image.tobytes()
-    assert found.anchor == painted.anchor
-
-
-def test_every_sprite_can_be_drawn_up_close() -> None:
-    drawn = {name: close_sprite(name, 4) for name in SPRITES}
-
-    assert all(sprite.image.width > 0 for sprite in drawn.values())
-
-
 def test_with_the_depth_test_a_part_standing_out_of_a_big_wall_shows_in_front_of_it() -> None:
     model = Model()
     model.box((-0.3, 0.3), (-0.05, 0.05), (0.0, 0.6), (200, 200, 200))
@@ -118,3 +72,40 @@ def test_trees_are_drawn_as_fine_as_they_are_shown_up_close(fineness: int, expec
         found = _drawn_at()
 
     assert found == expected
+
+
+def test_close_chunks_stand_buildings_as_their_pixel_art_blown_up(sheet: SpriteSheet) -> None:
+    world = make_world(sheet)
+    bare = make_world(sheet)
+    bare.scenery = replace(
+        bare.scenery,
+        x=bare.scenery.x[:0],
+        y=bare.scenery.y[:0],
+        sprite=bare.scenery.sprite[:0],
+        lift=bare.scenery.lift[:0],
+    )
+    across, down = world.projection.chunks
+    chunks = [(x, y) for x in range(across) for y in range(down)]
+
+    close = [(world.render(*c, CLOSE) != bare.render(*c, CLOSE)).any() for c in chunks]
+
+    assert any(close)
+
+
+def test_homes_are_their_painted_pixel_art_and_the_gasworks_its_model() -> None:
+    with drawn_at(_scale_of("house_0") * 4):
+        painted_house = homes.house(WALLS[0], ROOFS[0])
+    with drawn_at(_scale_of("gasworks") * 4):
+        painted_gasworks = industry.gasworks()
+
+    house, gasworks = fine_sprite("house_0", 4), fine_sprite("gasworks", 4)
+
+    assert house.image.tobytes() == painted_house.image.tobytes()
+    assert gasworks.image.tobytes() != painted_gasworks.image.tobytes()
+
+
+def test_every_model_can_be_drawn() -> None:
+    with drawn_at(2):
+        drawn = {name: build() for name, build in MODELS.items()}
+
+    assert all(sprite.image.width > 0 for sprite in drawn.values())

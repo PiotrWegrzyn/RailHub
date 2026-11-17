@@ -48,9 +48,8 @@ SETTLE_S = 0.3
 CHUNK_BUDGET = 128 * 1024 * 1024
 # Most bytes of chunk textures kept on the graphics card; the least recently shown go first.
 TEXTURE_BUDGET = 512 * 1024 * 1024
-# From how many screen pixels per art pixel the view is close: chunks are drawn CLOSE times finer
-# without what stands on the ground, which railroads.ui.pixel.scenery_layer draws over them as
-# fine as the screen.
+# From how many screen points per art pixel the view is close: chunks are drawn CLOSE times finer,
+# so the ground, fields and woods keep their texture fine (PixelWorld.render).
 CLOSE_FROM = 4
 
 type ChunkKey = tuple[int, int]
