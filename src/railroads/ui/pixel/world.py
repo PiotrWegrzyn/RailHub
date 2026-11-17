@@ -325,7 +325,8 @@ class PixelWorld:
         # ground, MOST_LIFT rows past the chunk, which is as far as any pixel shows.
         rows = CHUNK if offset is None else CHUNK + min(int(offset.max()) + 1, MOST_LIFT)
         rgb, alpha = self.ground.render(left, top, rows, raised, points)
-        canvas = _ground_blown_up(rgb / 255, alpha, resolution, left, top)
+        flat = offset is None
+        canvas = _ground_blown_up(rgb / 255, alpha, resolution, left, top, flat)
         lit = None if raised is None else lighting(raised.top(rows))
         self._surfaces(
             canvas,
@@ -338,11 +339,14 @@ class PixelWorld:
                 self.ground.yards(layer, left, top, k, shown=shown),
                 self.ground.canopy(layer, left, top, k, shown=shown, points=points),
             ),
+            flat,
         )
         if offset is None:
             self._lay_track(canvas, left, top, resolution)
         else:
             canvas = raise_picture(canvas, offset, resolution)
+            if resolution > 1:
+                textured(canvas, left, top, resolution)
             self._lay_lifted_track(canvas, left, top, resolution, offset, resolution)
         self._stand_scenery(canvas, left, top, resolution)
         return _finished(canvas)
@@ -355,6 +359,7 @@ class PixelWorld:
         k: int,
         shown: npt.NDArray[np.bool_] | None,
         paint: Callable[[FloatArray, int, npt.NDArray[np.bool_]], object],
+        texture: bool = True,
     ) -> None:
         """Lays what `paint` draws over the ground, fields, yards and woods, onto `canvas`, `k`
         pixels to an art pixel, where it shows the map (`shown`, or wherever it isn't clear).
@@ -371,7 +376,8 @@ class PixelWorld:
         paint(layer, drawn, on[::step, ::step])
         if step > 1:
             layer = _smoothly_blown_up(layer[..., :3], layer[..., 3], step)
-        textured(layer, left, top, k)
+        if texture:
+            textured(layer, left, top, k)
         canvas[...] = layer + canvas * (1 - layer[..., 3:])
 
     def _points(self, left: int, top: int, rows: int) -> Lattice:
@@ -423,7 +429,7 @@ class PixelWorld:
         rows = -(-(CHUNK * k + int(offset.max()) + 1) // k)
         points = self._points(left, top, rows)
         rgb, alpha = self.ground.render(left, top, rows, points=points)
-        sown = _ground_blown_up(rgb / 255, alpha, k, left, top)
+        sown = _ground_blown_up(rgb / 255, alpha, k, left, top, False)
         alpha = sown[..., 3].copy()
         self._surfaces(
             sown,
@@ -435,6 +441,7 @@ class PixelWorld:
                 self.ground.fields(layer, left, top, kk, shown=on),
                 self.ground.yards(layer, left, top, kk, shown=on),
             ),
+            False,
         )
         rgb = sown[..., :3] * 255
         x, y = fine.plane(left, top, CHUNK, rows)
@@ -451,8 +458,10 @@ class PixelWorld:
             k,
             None,
             lambda layer, kk, on: self.ground.canopy(layer, left, top, kk, shown=on, points=points),
+            False,
         )
         canvas = raise_picture(canvas, offset, 1)
+        textured(canvas, left, top, k)
         self._lay_lifted_track(canvas, left, top, k, offset / k)
         self._stand_scenery(canvas, left, top, k)
         return _finished(canvas)
@@ -660,14 +669,19 @@ def _blown_up(rgb: FloatArray, alpha: FloatArray, k: int) -> FloatArray:
     return picture if k == 1 else picture.repeat(k, axis=0).repeat(k, axis=1)
 
 
-def _ground_blown_up(rgb: FloatArray, alpha: FloatArray, k: int, left: int, top: int) -> FloatArray:
+def _ground_blown_up(
+    rgb: FloatArray, alpha: FloatArray, k: int, left: int, top: int, texture: bool = True
+) -> FloatArray:
     """The ground's RGB and alpha as one RGBA picture `k` pixels for every art pixel from
-    (`left`, `top`): blown up to squares at 1, otherwise blended between its pixels and laid
-    with the ground's texture (railroads.ui.pixel.ground_texture), as the ground shader draws."""
+    (`left`, `top`): blown up to squares at 1, otherwise blended between its pixels and, with
+    `texture`, laid with the ground's texture (railroads.ui.pixel.ground_texture), as the ground
+    shader draws. Raised ground is laid with it only once it is raised, so climbing slopes don't
+    stretch it into streaks."""
     if k == 1:
         return _blown_up(rgb, alpha, k)
     picture = _smoothly_blown_up(rgb, alpha, k)
-    textured(picture, left, top, k)
+    if texture:
+        textured(picture, left, top, k)
     return picture
 
 

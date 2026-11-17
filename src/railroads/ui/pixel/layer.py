@@ -34,6 +34,7 @@ from railroads.ui.iso_camera import IsoCamera, Vec2
 from railroads.ui.pixel.copies import ChunkJob
 from railroads.ui.pixel.painter import Painter
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, Rgba
+from railroads.ui.pixel.sheet import FINE
 from railroads.ui.pixel.web_painter import WorkerPainter, page_workers
 from railroads.ui.pixel.world import CLOSE, PixelWorld
 from railroads.ui.workers import threads_start
@@ -173,17 +174,20 @@ class PixelLayer:
         complete = True
         for chunk in middle_out(placement, center):
             key = (*chunk, scale)
-            drawn = (*chunk, resolution)
+            fine = self._resolution_of(chunk, resolution)
+            drawn = (*chunk, fine)
             texture = self._textures.get(key)
             if texture is None or key in self._stale:
                 late = uploaded and time.perf_counter() - now > UPLOAD_BUDGET_S
                 if drawn in self._chunks and not late:
-                    texture = self._upload(chunk, scale, resolution)
+                    texture = self._upload(chunk, scale, fine)
                     self._stale.discard(key)
                     uploaded = True
                 else:
                     complete = False
                     self._ask(drawn, now)
+                if texture is None:
+                    texture = self._shown_before(chunk)
                 if texture is None:
                     continue
             self._refine(drawn, now)
@@ -204,9 +208,28 @@ class PixelLayer:
         placement = self._placement(camera, center, clip)
         resolution = chunk_resolution(placement.scale, density, self.world.resolutions)
         for chunk in placement.chunks[:PREPARED_CHUNKS]:
-            drawn = (*chunk, resolution)
+            drawn = (*chunk, self._resolution_of(chunk, resolution))
             if drawn not in self._chunks:
                 self._chunks[drawn] = self.world.render(*drawn)
+
+    def _resolution_of(self, chunk: ChunkKey, resolution: int) -> int:
+        """The resolution a chunk is drawn at in a view drawing chunks at `resolution`: in a close
+        view, where hills or mountains rise, no finer than FINE, whose raised ground is several
+        times quicker to draw and blown up looks as smooth."""
+        if resolution != CLOSE:
+            return resolution
+        rises = self._rises.get(chunk)
+        if rises is None:
+            rises = self._rises[chunk] = self.world.rises(*chunk)
+        return FINE if rises else resolution
+
+    def _shown_before(self, chunk: ChunkKey) -> Texture | None:
+        """The texture a chunk was last shown with at another zoom, to show stretched until it
+        is drawn for this one, rather than the bare ground beneath."""
+        for key in reversed(self._textures):
+            if key[:2] == chunk:
+                return self._textures[key]
+        return None
 
     def _placement(
         self, camera: IsoCamera, center: Vec2, clip: tuple[Vec2, Vec2]
