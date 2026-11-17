@@ -4,9 +4,9 @@ railroads.sim.ladders: towns, farms, orchards, mines, lumber mills, ports and ev
 Buildings breed (breeding_of): a cell's chance of another of a ladder's kinds is its spawn chance,
 the same everywhere the land allows, plus what every building of the kind of points the ladder's
 buildings give adds there by how satisfied it is (MOST_SERVED times its points at 100%,
-railroads.sim.economy), times the doublings of the points around the cell that draw it: twice the
-people for houses, food and people for food, people and twice the industry for industry, mines,
-mills and ports, and twice the people for shops, inns and churches. So towns and districts draw
+railroads.sim.economy), times the doublings of the points around the cell that draw it: four times
+the people for houses, food and people for food, people and industry for industry, mines, mills
+and ports, and twice the people for shops, inns and churches. So towns and districts draw
 more the bigger they are, and only what is satisfied breeds. A building that finds no room in its
 cell spills over into a cell nearby (railroads.sim.room).
 
@@ -118,11 +118,11 @@ FROM_THE_LAND = frozenset({Points.FOOD, Points.ORE, Points.TIMBER})
 LAND_BREEDING_SCALE = 0.02
 # The points around a cell that draw a ladder's buildings, and how much each counts, by the kind
 # of points they give.
-INDUSTRIAL = {Points.POPULATION: 1.0, Points.INDUSTRY: 2.0}
+INDUSTRIAL = {Points.POPULATION: 1.0, Points.INDUSTRY: 1.0}
 SOCIAL = {Points.POPULATION: 2.0}
 DRAWN_BY: Mapping[Points, Mapping[Points, float]] = MappingProxyType(
     {
-        Points.POPULATION: {Points.POPULATION: 3.0},
+        Points.POPULATION: {Points.POPULATION: 4.0},
         Points.FOOD: {Points.FOOD: 1.0, Points.POPULATION: 1.0},
         Points.ORE: INDUSTRIAL,
         Points.TIMBER: INDUSTRIAL,
@@ -188,10 +188,10 @@ SPAWN_NEAR: Mapping[BuildingKind, Mapping[Points, float]] = MappingProxyType(
 # times its weight, so heavy works stay out of towns.
 DRAWN_BY_KIND: Mapping[BuildingKind, Mapping[Points, float]] = MappingProxyType(
     {
-        BuildingKind.CHEMICAL_WORKS: {Points.INDUSTRY: 3.0},
-        BuildingKind.CEMENT_WORKS: {Points.INDUSTRY: 3.0},
-        BuildingKind.GASWORKS: {Points.INDUSTRY: 2.0},
-        BuildingKind.DAIRY: {Points.POPULATION: 2.0, Points.INDUSTRY: 2.0},
+        BuildingKind.CHEMICAL_WORKS: {Points.INDUSTRY: 1.5},
+        BuildingKind.CEMENT_WORKS: {Points.INDUSTRY: 1.5},
+        BuildingKind.GASWORKS: {Points.INDUSTRY: 1.0},
+        BuildingKind.DAIRY: {Points.POPULATION: 2.0, Points.INDUSTRY: 1.0},
     }
 )
 SHUNNED_BY: Mapping[BuildingKind, Mapping[Points, float]] = MappingProxyType(

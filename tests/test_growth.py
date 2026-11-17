@@ -365,7 +365,7 @@ def industry_trade(tile_map: TileMap, cell: tuple[int, int]) -> Trade:
 
 
 @pytest.mark.parametrize(("people", "industry"), [(0, 0), (6, 0), (0, 1)])
-def test_a_served_factory_breeds_by_the_people_and_twice_the_industry_around_it(
+def test_a_served_factory_breeds_by_the_people_and_the_industry_around_it(
     people: int, industry: int
 ) -> None:
     tile_map = make_map()
@@ -382,7 +382,7 @@ def test_a_served_factory_breeds_by_the_people_and_twice_the_industry_around_it(
 
     growth._count_served(industry_trade(tile_map, (5, 5)))
 
-    drawing = people + 2 * (value + industry * growth.rule.points[BuildingKind.STEEL_MILL][1])
+    drawing = people + value + industry * growth.rule.points[BuildingKind.STEEL_MILL][1]
     bred = breeding.per_doubling * 10 * value * np.log2(1 + drawing)
     assert points == Points.INDUSTRY
     assert growth.chances(FACTORIES)[5, 5] == pytest.approx(
@@ -606,7 +606,7 @@ def test_served_buildings_add_their_points_by_the_share_they_are_served_to_their
 
     chances = growth.chances(TOWNS)
     per_doubling = TOWNS.chance_per_doubling[Points.POPULATION]
-    bred = multiplier * 4 * per_doubling * np.log2(1 + 3 * 4)
+    bred = multiplier * 4 * per_doubling * np.log2(1 + 4 * 4)
     assert chances[5, 5] == pytest.approx(TOWNS.base_chance + bred)
     assert chances[neighbour] == pytest.approx(neighbour_before)
 
@@ -637,7 +637,7 @@ def test_a_served_house_breeds_faster_the_more_people_live_around_it(around: int
     growth._count_served(houses_trade(tile_map, (5, 5), 2.0, 2.0))
 
     per_doubling = TOWNS.chance_per_doubling[Points.POPULATION]
-    bred = 10 * per_doubling * np.log2(1 + 3 * (1 + around))
+    bred = 10 * per_doubling * np.log2(1 + 4 * (1 + around))
     assert growth.chances(TOWNS)[5, 5] == pytest.approx(TOWNS.base_chance + bred)
 
 
@@ -739,7 +739,7 @@ def test_gasworks_come_up_by_industry_and_dairies_are_drawn_by_people_twice() ->
 
     assert gas.spawn_by == {Points.INDUSTRY: 1.0}
     assert gas.shunned_by == {Points.POPULATION: 1.0}
-    assert milk.drawn_by == {Points.POPULATION: 2.0, Points.INDUSTRY: 2.0}
+    assert milk.drawn_by == {Points.POPULATION: 2.0, Points.INDUSTRY: 1.0}
 
 
 def test_bakeries_give_food_points_but_come_up_and_breed_like_works() -> None:
