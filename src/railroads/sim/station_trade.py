@@ -102,10 +102,6 @@ class StationTrade:
             goods = railway.station_goods(station)
             for good, amount in gathered.items():
                 goods.stockpile[good] = goods.stockpile.get(good, 0.0) + amount
-        for station, supplied in trade.supplied.items():
-            goods = railway.station_goods(station)
-            for good, amount in supplied.items():
-                goods.stockpile[good] = max(0.0, goods.stockpile.get(good, 0.0) - amount)
         railway.fuel_month(trade, powered_points(self._growth))
         yield
         capacity = {}
@@ -115,23 +111,40 @@ class StationTrade:
             goods = railway.station_goods(station)
             for good, amount in travellers.items():
                 goods.board(good, amount)
-            capacity[station] = capacity_of(self._needs(counts) | as_needs(travellers))
+            needs = self._short_after_local(station, self._needs(counts), trade)
+            capacity[station] = capacity_of(needs | as_needs(travellers))
         railway.year = self._growth.year
         railway.turn_month(capacity)
         yield
         for station, handed_for in trade.handed_for.items():
             for (need, good), amount in handed_for.items():
                 railway.pay_for(station, need, good, amount)
-        yield
-        for station, supplied_for in trade.supplied_for.items():
-            for (need, good), amount in supplied_for.items():
-                railway.pay_for_passing(station, need, good, amount)
+
+    def _short_after_local(
+        self, station: Cell, needs: dict[Need, float], trade: Trade | None
+    ) -> dict[Need, float]:
+        """What the buildings a station hands goods out to need, less what they got this month
+        from the goods buildings around handed out on their own."""
+        if trade is None or not trade.cells.size or not trade.local:
+            return needs
+        ring = self.inner_ring(station)
+        positions = np.searchsorted(trade.cells, ring)
+        inside = (positions < trade.cells.size) & (
+            trade.cells[np.minimum(positions, trade.cells.size - 1)] == ring
+        )
+        positions = positions[inside]
+        short = {}
+        for need, amount in needs.items():
+            local = trade.local.get(need)
+            got = float(local[positions].sum()) if local is not None else 0.0
+            short[need] = max(0.0, amount - got)
+        return short
 
     def hand_out_now(self, station: Cell, good: Good) -> None:
-        """Hands a good that has just reached a station to the buildings around it that still
-        want it this month, the nearest first, at once, unless the good is kept for trains: what
-        trains brought, then the stockpile. Each takes up to what it needs in a month, less what
-        it took already; a processor up to the room in its stockpile. They pay as they take."""
+        """Hands a good trains have just brought to a station to the buildings around it that
+        still want it this month, the nearest first, at once, unless the good is kept for trains.
+        Each takes up to what it needs in a month, less what it took already; a processor up to
+        the room in its stockpile. They pay as they take."""
         growth, railway = self._growth, self._growth.railway
         if railway is None or good in TRAVELLERS:
             return
@@ -163,29 +176,21 @@ class StationTrade:
                         stock[cell] += given
                     else:
                         taken[cell] = taken.get(cell, 0.0) + given
-                    if not goods.held(good):
+                    if goods.brought.get(good, 0.0) <= 0:
                         return
 
     def _give(
         self, station: Cell, goods: StationGoods, need: Need, good: Good, want: float
     ) -> float:
-        """Gives up to `want` of a good from a station, first of what trains brought, then of its
-        stockpile, and pays for it; returns how much went."""
+        """Gives up to `want` of a good trains brought to a station, and pays for it; returns how
+        much went."""
         railway = self._growth.railway
         assert railway is not None
-        given = 0.0
-        brought = min(want, goods.brought.get(good, 0.0))
-        if brought > 0:
-            goods.release(good, brought)
-            railway.pay_for(station, need, good, brought)
-            given += brought
-        held = goods.stockpile.get(good, 0.0)
-        stocked = min(want - given, held)
-        if stocked > 0:
-            goods.stockpile[good] = held - stocked
-            railway.pay_for_passing(station, need, good, stocked)
-            given += stocked
-        return given
+        given = min(want, goods.brought.get(good, 0.0))
+        if given > 0:
+            goods.release(good, given)
+            railway.pay_for(station, need, good, given)
+        return max(given, 0.0)
 
     @property
     def has_traded(self) -> bool:
@@ -227,7 +232,8 @@ class StationTrade:
         railway = self._growth.railway
         if railway is not None:
             (counts,) = self._ring_counts([station])
-            needs = self._needs(counts) | as_needs(self._travellers(counts))
+            needs = self._short_after_local(station, self._needs(counts), self._growth.trade)
+            needs |= as_needs(self._travellers(counts))
             railway.station_demand(station).capacity = capacity_of(needs)
 
     def inner_ring(self, station: Cell) -> npt.NDArray[np.intp]:

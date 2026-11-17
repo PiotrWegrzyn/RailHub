@@ -45,7 +45,7 @@ from railroads.places import StationNames
 from railroads.sim.calls import StationCalls
 from railroads.sim.clock import SECONDS_PER_MONTH, START_YEAR
 from railroads.sim.constructions import Constructions
-from railroads.sim.demand import PASSED_ALONG_PAY, StationDemand
+from railroads.sim.demand import StationDemand
 from railroads.sim.economy import COLLECTION_RADIUS, Trade
 from railroads.sim.facilities import (
     ENGINE_SHED_SPEED,
@@ -408,11 +408,6 @@ class Railway:
         """Pays for cargo trains brought that the buildings around a station took."""
         earned = self.station_demand(station).pay(need, good, amount) * self.price_factor(good)
         self.finances.earn(earned * self.facility_pay(station, good), "cargo")
-
-    def pay_for_passing(self, station: Cell, need: Need, good: Good, amount: float) -> None:
-        """Pays for goods a station gathered itself and passed along to the buildings around it."""
-        earned = self.station_demand(station).pay(need, good, amount, PASSED_ALONG_PAY)
-        self.finances.earn(earned * self.facility_pay(station, good), "goods passed along")
 
     def facility_pay(self, station: Cell, good: Good) -> float:
         """How many times as much a good delivered at a station pays with its facilities."""

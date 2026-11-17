@@ -349,7 +349,7 @@ def test_the_map_draws_centred_on_the_trains_stops_with_a_good_marked(context: N
 def test_a_station_whose_buildings_lack_nothing_wants_nothing() -> None:
     growth, railway = joined_stations()
     growth.build(Building((6, 21), BuildingKind.CATTLE_RANCH))
-    railway.station_goods((6, 20)).stockpile[Good.WHEAT] = 500.0
+    railway.station_goods((6, 20)).brought[Good.WHEAT] = 500.0
     growth.trade_goods()
 
     summary = summary_of(railway, (6, 20), {})

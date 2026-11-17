@@ -4,7 +4,7 @@ import pytest
 from builders import flat_map
 from railroads.mapgen.deposits import GARRISON_SIZE, GARRISONS, place_deposits
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.economy import Economy, StationOrder
+from railroads.sim.economy import Economy
 from railroads.sim.goods import Good, Need, needs_of
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import AIRPORTS, MILITARY, ORANGE_FARMS
@@ -100,7 +100,7 @@ def test_what_the_military_wants_goes_by_rank_and_era(
     assert (need in needs) is wanted
 
 
-def test_a_gun_factory_arms_an_outpost_through_the_station_between_them() -> None:
+def test_a_gun_factory_arms_an_outpost_next_to_it_on_its_own() -> None:
     tile_map = make_map(12)
     economy = Economy(tile_map)
     flat = int(np.ravel_multi_index((5, 5), tile_map.grid.shape))
@@ -111,9 +111,8 @@ def test_a_gun_factory_arms_an_outpost_through_the_station_between_them() -> Non
     outposts = np.zeros(tile_map.grid.shape, dtype=np.int64)
     outposts[tile_map.grid.neighbours(5, 5)[0]] = 1
     placed = {BuildingKind.GUN_FACTORY: factories, BuildingKind.OUTPOST: outposts}
-    gathered = economy.trade(placed, {(5, 6): StationOrder({}, 100.0)}).gathered[(5, 6)]
 
-    trade = economy.trade(placed, {(5, 6): StationOrder({}, 0.0, stockpile=dict(gathered))})
+    trade = economy.trade(placed)
 
     got, _ = trade.goods_got[(BuildingKind.OUTPOST, Need.GUNS)]
     assert got.sum() == 60.0
