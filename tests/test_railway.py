@@ -12,6 +12,7 @@ from railroads.sim.finance import (
     STORAGE_PRICE,
     TRACK_UPKEEP,
     TRAIN_PRICE,
+    car_trip_price,
 )
 from railroads.sim.goods import Good, Need, needs_of
 from railroads.sim.growth import Growth
@@ -99,16 +100,16 @@ def test_a_train_waits_at_its_stop_until_new_goods_fill_its_cars() -> None:
     assert train.status == "Running"
 
 
-def test_a_train_gives_up_waiting_after_a_month() -> None:
+def test_a_train_waiting_for_a_full_load_waits_however_long_its_cars_take_to_fill() -> None:
     _, railway = joined_stations()
     train = railway.buy()
     train.stops = [Stop((6, 3), [Good.WHEAT], wait_for_load=True), Stop((6, 20))]
 
-    for _ in range(12):
+    for _ in range(120):
         railway.run(0.1)
 
-    assert train.status == "Running"
-    assert train.cars[0].load == 0.0
+    assert train.status == "Loading at 6, 3"
+    assert train.path == []
 
 
 def test_a_train_stops_waiting_as_soon_as_its_stop_no_longer_waits_for_a_full_load() -> None:
@@ -867,3 +868,33 @@ def test_a_held_train_stands_at_its_first_stop_until_let_go() -> None:
     assert stood
     assert train.path
     assert train.status == "Running"
+
+
+def test_a_rides_bill_takes_the_fuel_and_every_cars_trip_off_what_its_cargo_earns() -> None:
+    _, railway = joined_stations()
+    railway.station_goods((6, 3)).stockpile[Good.WHEAT] = BULK_CAR
+    train = railway.buy()
+    train.stops = [Stop((6, 3), [Good.WHEAT, Good.WHEAT]), Stop((6, 20))]
+    railway.run(0.001)
+    cells = railway.network.route_length((6, 3), (6, 20))
+    assert cells is not None
+
+    ride = railway.ride(train, [300.0, 0.0])
+
+    assert ride is not None
+    assert ride.cells == pytest.approx(cells, rel=0.05)
+    assert (ride.loaded, ride.empty) == (1, 1)
+    assert ride.fuel == pytest.approx(railway.fuel_cost(train.engine, ride.cells))
+    assert ride.loaded_cars == pytest.approx(car_trip_price(train.cars[0].capacity))
+    assert ride.empty_cars == pytest.approx(car_trip_price(train.cars[0].capacity))
+    assert ride.net == pytest.approx(300.0 - ride.fuel - 2 * car_trip_price(train.cars[0].capacity))
+
+
+def test_a_train_with_one_stop_has_no_ride() -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    train.stops = [Stop((6, 3))]
+
+    ride = railway.ride(train)
+
+    assert ride is None

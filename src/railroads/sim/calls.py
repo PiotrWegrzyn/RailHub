@@ -1,11 +1,12 @@
 """A train calling at a station (railroads.sim.railway): it unloads every car, freight into the
 station and passengers and mail paid for there, swaps them for the stop's cars and fills those, and
-waits up to WAIT_MONTHS for them to fill if the stop says so. An empty general car takes the good
+waits until they are full if the stop says so. An empty general car takes the good
 of its kind that would earn the most at the next stop (pick_load). Freight from this station goes back
 in its stockpile for nothing; the rest waits as goods brought. The buildings around the station
 take what they still want of it at once (railroads.sim.station_trade), and the rest is handed out
 with the month's trade."""
 
+import math
 from typing import TYPE_CHECKING
 
 from railroads.sim.constructions import Station
@@ -16,7 +17,7 @@ from railroads.sim.station_goods import StationGoods
 from railroads.sim.tech import Tree
 from railroads.sim.trains import ENGINES, Car, Cargo, Parcels, Stop, Train
 
-WAIT_MONTHS = 1.0
+WAIT_MONTHS = math.inf
 
 if TYPE_CHECKING:
     from railroads.sim.railway import Railway

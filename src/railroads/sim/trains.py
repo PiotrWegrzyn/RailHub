@@ -531,7 +531,7 @@ class Stop:
 
     cell: Cell
     cars: list[Cargo] = field(default_factory=list)
-    # Whether the train waits here, up to WAIT_MONTHS, for its cars to fill.
+    # Whether the train waits here until its cars are full.
     wait_for_load: bool = False
 
     def add_car(self, cargo: Cargo, most: int = MAX_CARS) -> bool:

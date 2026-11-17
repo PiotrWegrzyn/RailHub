@@ -931,7 +931,7 @@ electric track. Maglev track is a pale concrete beam with darker edges and a gro
 middle instead of rails and sleepers, and a station shows it where only maglev track comes in.
 
 At each stop a train unloads its cars, takes on that stop's cars and fills them from the station's
-stockpile. Unless the stop says not to, it waits there up to a month for its cars to fill, topping
+stockpile. If the stop says to wait for a full load, it waits there until its cars are full, topping
 them up as the station gathers more. Trains run through stations on the way that are not among their
 stops, and can turn round in any station, but not on open track. Each time a train sets off it takes
 the shortest way to its next stop over all the track there is. Trains can't run through each other

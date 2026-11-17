@@ -16,7 +16,7 @@ from railroads.sim.demand import StationDemand
 from railroads.sim.finance import TRAIN_RESALE, dollars
 from railroads.sim.goods import GENERAL_GOODS, General, Good
 from railroads.sim.grids import Cell
-from railroads.sim.railway import Railway
+from railroads.sim.railway import Railway, Ride
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, MAGLEV_FARE, Engine, Kind, Stop, Train
 from railroads.ui.buy_train import BuyScreen, EnginePicture, engine_range, fuel_use
 from railroads.ui.demand_view import draw_demand
@@ -25,6 +25,7 @@ from railroads.ui.station_offers import Offer, Supplies, goods_to_load
 from railroads.ui.theme import (
     BRASS,
     CARDS_WIDTH,
+    GONE,
     OFFER_SIZE,
     TEXT_DIM,
     car_chip,
@@ -64,6 +65,7 @@ class TrainsWindow:
     # What each train's cars would earn at its destination, worked out at most every
     # WORTH_EVERY seconds, by train name: when, and per car.
     _worth: dict[str, tuple[float, list[float]]] = field(default_factory=dict)
+    _rides: dict[str, tuple[float, Ride | None]] = field(default_factory=dict)
     map: RouteMap = field(default_factory=RouteMap)
     # The screen trains are bought on, and the map on it for the route of a train just bought.
     buy: BuyScreen = field(default_factory=BuyScreen)
@@ -85,6 +87,15 @@ class TrainsWindow:
         if kept is None or now - kept[0] > WORTH_EVERY or len(kept[1]) != len(train.cars):
             kept = (now, railway.cargo_worth(train))
             self._worth[train.name] = kept
+        return kept[1]
+
+    def ride(self, railway: Railway, train: Train) -> Ride | None:
+        """What the train's ride to its next stop earns and costs, kept like its cars' worth."""
+        now = time.monotonic()
+        kept = self._rides.get(train.name)
+        if kept is None or now - kept[0] > WORTH_EVERY:
+            kept = (now, railway.ride(train, self.worth(railway, train)))
+            self._rides[train.name] = kept
         return kept[1]
 
     def supplied(self, supplies: Supplies, station: Cell) -> Mapping[Good, float]:
@@ -174,13 +185,14 @@ class TrainsWindow:
         draw_list.add_text((low.x + 6, low.y + 3), imgui.get_color_u32(imgui.Col_.text), train.name)
         status_color = imgui.get_color_u32(imgui.ImVec4(*TEXT_DIM))
         draw_list.add_text((low.x + 6, low.y + 21), status_color, train.status)
-        worth = sum(self.worth(railway, train))
-        if worth >= 0.5:
-            money = dollars(worth)
+        ride = self.ride(railway, train)
+        if ride is not None:
+            money = dollars(ride.net)
             right = imgui.get_item_rect_max().x - 6 - imgui.calc_text_size(money).x
-            draw_list.add_text((right, low.y + 3), color_u32(BRASS), money)
+            colour = BRASS if ride.net >= 0 else GONE
+            draw_list.add_text((right, low.y + 3), color_u32(colour), money)
             if imgui.is_item_hovered():
-                imgui.set_tooltip(f"Its cargo is worth about {money} where it is going")
+                imgui.set_tooltip(f"What this ride earns after its costs\n\n{ride_lines(ride)}")
         for index, car in enumerate(train.cars):
             line, place = divmod(index, per_line)
             left = low.x + 6 + place * (car_width + ROW_CAR_GAP)
@@ -246,6 +258,9 @@ class TrainsWindow:
                 )
             imgui.same_line()
             imgui.text_disabled(f"at {onward}")
+        ride = railway.ride(train, worths)
+        if ride is not None:
+            self._draw_ride(railway, ride, onward)
         imgui.spacing()
         route_map.good = None
         self._shown_map = route_map
@@ -258,6 +273,32 @@ class TrainsWindow:
         imgui.begin_child("map", (0, 0), imgui.ChildFlags_.borders.value)
         route_map.draw(railway, train, ground, supplies)
         imgui.end_child()
+
+    @staticmethod
+    def _draw_ride(railway: Railway, ride: Ride, onward: str) -> None:
+        """The ride to the next stop as a bill: what the cargo earns there, less the fuel for
+        the way and the trips of its loaded and empty cars; and the network's monthly upkeep."""
+        imgui.text_disabled(f"Ride to {onward}, {ride.cells:.0f} cells")
+        if imgui.begin_table("ride", 2, imgui.TableFlags_.sizing_fixed_fit.value):
+            for label, amount, tip in ride_rows(ride):
+                imgui.table_next_row()
+                imgui.table_next_column()
+                imgui.text_disabled(label)
+                if tip and imgui.is_item_hovered():
+                    imgui.set_tooltip(tip)
+                imgui.table_next_column()
+                colour = BRASS if amount >= 0 else GONE
+                imgui.text_colored(imgui.ImVec4(*colour), signed(amount))
+            imgui.end_table()
+        stations, track = railway.network_upkeep()
+        imgui.text_disabled(
+            f"Upkeep for the whole network: stations {dollars(stations)}, "
+            f"track {dollars(track)} a month"
+        )
+        if imgui.is_item_hovered():
+            imgui.set_tooltip(
+                "Paid every month whether trains run or not; not counted in any one ride"
+            )
 
     def _draw_stops(self, railway: Railway, train: Train, supplies: Supplies) -> None:
         stops = len(train.stops)
@@ -568,3 +609,41 @@ def _centered_hint(text: str) -> None:
         )
     )
     imgui.text_disabled(text)
+
+
+def signed(amount: float) -> str:
+    """Money earned with a plus, money paid with a minus."""
+    return f"+{dollars(amount)}" if amount >= 0.5 else dollars(amount)
+
+
+def ride_rows(ride: Ride) -> list[tuple[str, float, str]]:
+    """A ride's bill, a line at a time: what it is for, how much, earned or paid, and what it
+    means."""
+    return [
+        (
+            "Cargo",
+            ride.cargo,
+            "What its cargo would earn if it were unloaded there now, at the demand left there",
+        ),
+        (
+            f"Fuel for {ride.cells:.0f} cells",
+            -ride.fuel,
+            "Bought as it sets off, at retail; fuel the station has in stock comes cheaper",
+        ),
+        (
+            f"{ride.loaded} loaded cars",
+            -ride.loaded_cars,
+            "Every car costs its trip each time the train leaves a stop with it",
+        ),
+        (
+            f"{ride.empty} empty cars",
+            -ride.empty_cars,
+            "Empty cars cost their trip too: take only the cars the stop can fill",
+        ),
+        ("Ride earns", ride.net, ""),
+    ]
+
+
+def ride_lines(ride: Ride) -> str:
+    """A ride's bill as lines of text."""
+    return "\n".join(f"{label}: {signed(amount)}" for label, amount, _ in ride_rows(ride))

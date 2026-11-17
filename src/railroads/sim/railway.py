@@ -36,6 +36,7 @@ train does calling at a station in railroads.sim.calls; Railway owns them all an
 
 import itertools
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -122,6 +123,24 @@ LEVEL_STORAGE_STEPS = 2
 PLATFORM_LEVEL = 4
 # Upkeep never falls below this share of its full cost, however much tech cuts it.
 LEAST_UPKEEP = 0.5
+
+
+@dataclass(frozen=True, slots=True)
+class Ride:
+    """What a train's ride to its next stop earns and costs: its cargo's worth there now, the fuel
+    for the way, and what its loaded and its empty cars cost to take along."""
+
+    cells: float
+    cargo: float
+    fuel: float
+    loaded_cars: float
+    empty_cars: float
+    loaded: int
+    empty: int
+
+    @property
+    def net(self) -> float:
+        return self.cargo - self.fuel - self.loaded_cars - self.empty_cars
 
 
 class Railway:
@@ -391,6 +410,44 @@ class Railway:
             amount * self.price_factor(car.good) * self.fare_factor(train)
             for amount, car in zip(earned, train.cars, strict=True)
         ]
+
+    def ride(self, train: Train, worth: list[float] | None = None) -> Ride | None:
+        """What the train's ride to its next stop earns and costs: the one it is on, or the one it
+        sets off on next. Fuel is priced at retail, the dearest it comes; `worth` is its cars'
+        cargo_worth if already known."""
+        destination = self.destination(train)
+        if destination is None:
+            return None
+        engine = ENGINES[train.engine]
+        if train.path:
+            cells = self.network.length(train)
+        else:
+            here = train.stops[(train.heading - 1) % len(train.stops)].cell
+            if train.platform in self.constructions.platforms(here):
+                here = train.platform
+            leg = self.network.route_length(here, destination, engine.electric, engine.maglev)
+            if leg is None:
+                return None
+            cells = leg
+        upkeep = self._upkeep()
+        loaded = [car for car in train.cars if not car.dining and car.load >= 0.5]
+        empty = [car for car in train.cars if car.dining or car.load < 0.5]
+        return Ride(
+            cells=cells,
+            cargo=sum(self.cargo_worth(train) if worth is None else worth),
+            fuel=self.fuel_cost(train.engine, cells),
+            loaded_cars=sum(car_trip_price(car.capacity) for car in loaded) * upkeep,
+            empty_cars=sum(car_trip_price(0.0 if car.dining else car.capacity) for car in empty)
+            * upkeep,
+            loaded=len(loaded),
+            empty=len(empty),
+        )
+
+    def network_upkeep(self) -> tuple[float, float]:
+        """What all the player's stations and all their track cost a month now."""
+        upkeep = self._upkeep()
+        stations = sum(self.station_upkeep(station) for station in self.stations())
+        return stations * upkeep, track_upkeep(self.constructions.track()) * upkeep
 
     @staticmethod
     def fare_factor(train: Train) -> float:
