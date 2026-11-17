@@ -182,6 +182,22 @@ def _bands(m: Model, positions: tuple[float, ...], radius: float, z: float, colo
         m.cylinder_along((u - 0.006, u + 0.006), radius + 0.003, z, color)
 
 
+def _roof(
+    m: Model,
+    u: tuple[float, float],
+    half: float,
+    z: tuple[float, float],
+    color: RGB,
+    crown: float | None = None,
+) -> None:
+    """A roof over `u`, `half` either side of the middle: a flat slab from `z[0]` to `z[1]` far
+    out, arched up to `crown` (a little over the slab unless given) up close."""
+    with m.coarse():
+        m.box(u, (-half, half), z, color)
+    with m.fine():
+        m.vault(u, half, (z[0] + 0.006, crown or z[1] + 0.008), color)
+
+
 def _dome(m: Model, u: float, radius: float, base: float, height: float, color: RGB) -> None:
     """A dome standing on a boiler: a short drum with a rounded top."""
     drum = base + height * 0.45
@@ -217,7 +233,7 @@ def boxcab() -> Model:
         m.wheels([u - 0.07, u + 0.07], 0.035, FRAME, 0.075)
     m.box((-h, h), (-0.075, 0.075), (0.07, 0.09), FRAME)
     m.box((-h + 0.01, h - 0.01), (-0.085, 0.085), (0.09, 0.27), BOXCAB_BROWN)
-    m.box((-h, h), (-0.09, 0.09), (0.27, 0.285), ROOF_GREY)
+    _roof(m, (-h, h), 0.09, (0.27, 0.285), ROOF_GREY)
     for end in (h - 0.01, -h + 0.01):
         for v in ((-0.065, -0.012), (0.012, 0.065)):
             m.box((end - 0.004, end + 0.004), v, (0.18, 0.24), WINDOW)
@@ -267,10 +283,13 @@ def express() -> Model:
     m.panel((-body, body), (0.17, 0.25), 0.0855, EXPRESS_WHITE)
     for u in (-0.2, -0.1, 0.0, 0.1, 0.2):
         m.panel((u - 0.03, u + 0.03), (0.19, 0.23), 0.0856, WINDOW)
-    m.box((-body, body), (-0.08, 0.08), (0.27, 0.285), ROOF_GREY)
+    _roof(m, (-body, body), 0.085, (0.27, 0.285), ROOF_GREY)
     for tip in (h, -h):
         root = body if tip > 0 else -body
-        m.nose((root, tip), (0.07, 0.13, 0.27), 0.085, EXPRESS_BLUE)
+        with m.coarse():
+            m.nose((root, tip), (0.07, 0.13, 0.27), 0.085, EXPRESS_BLUE)
+        with m.fine():
+            m.snout((root, tip), (0.07, 0.13, 0.27), 0.085, EXPRESS_BLUE)
         out = 0.004 if tip > 0 else -0.004
         a = (root + out, 0.27 + 0.004)
         b = (root + (tip - root) * 0.6 + out, 0.27 + (0.13 - 0.27) * 0.6 + 0.004)
@@ -642,7 +661,10 @@ class Steam:
         cab_front = -h + self.cab
         nose = front - 0.12
         m.box((cab_front, nose), (-0.092, 0.092), (0.07, top + 0.015), self.body)
-        m.nose((nose, h + 0.02), (0.02, 0.09, top + 0.015), 0.092, self.body)
+        with m.coarse():
+            m.nose((nose, h + 0.02), (0.02, 0.09, top + 0.015), 0.092, self.body)
+        with m.fine():
+            m.snout((nose, h + 0.02), (0.07, 0.09, top + 0.015), 0.092, self.body)
         for low in (z + 0.012, top - 0.035):
             m.panel((cab_front, nose), (low, low + 0.012), 0.0925, stripe)
         u, high = self.chimney
@@ -1070,7 +1092,7 @@ class Unit:
         skirt = floor + 0.04
         m.box((back, front), (-0.085, 0.085), (floor, skirt), self.stripe)
         m.box((back, front), (-0.085, 0.085), (skirt, top), self.body)
-        m.box((back, front), (-0.08, 0.08), (top, top + 0.015), self.roof)
+        _roof(m, (back, front), 0.085, (top, top + 0.015), self.roof)
         if self.band is not None:
             m.panel((back, front), (top - 0.09, top - 0.03), 0.0855, self.band)
         for k in range(self.windows):
@@ -1107,8 +1129,11 @@ class Unit:
         if self.nose > 0.1:
             bend = root + (end - root) * 0.6
             high = top - (top - self.tip) * 0.35
-            m.nose((root, bend), (floor, high, top), 0.085, color)
-            m.nose((bend, end), (floor, self.tip, high), 0.085, color)
+            with m.coarse():
+                m.nose((root, bend), (floor, high, top), 0.085, color)
+                m.nose((bend, end), (floor, self.tip, high), 0.085, color)
+            with m.fine():
+                m.snout((root, end), (floor, self.tip, top), 0.085, color, WINDOW)
             reach = 0.08
             fall = (top - high) * reach / abs(bend - root)
         else:
@@ -1117,7 +1142,11 @@ class Unit:
             fall = (top - self.tip) * 0.6
         a = (root + out * 0.004, top + 0.004)
         b = (root + out * (reach + 0.004), top - fall + 0.004)
-        m.slope(a, b, (-0.065, 0.065), WINDOW)
+        if self.nose > 0.1:
+            with m.coarse():
+                m.slope(a, b, (-0.065, 0.065), WINDOW)
+        else:
+            m.slope(a, b, (-0.065, 0.065), WINDOW)
 
     def _hood(self, m: Model) -> float:
         h, top = self.half, self.top
@@ -1125,7 +1154,7 @@ class Unit:
         m.box((-h, h), (-0.09, 0.09), (0.09, 0.1), FRAME)
         m.box((h - 0.1, h - 0.01), (-0.05, 0.05), (0.1, top - 0.08), self.body)
         m.box(cab, (-0.085, 0.085), (0.1, top), self.body)
-        m.box((cab[0] - 0.01, cab[1] + 0.01), (-0.09, 0.09), (top, top + 0.012), self.roof)
+        _roof(m, (cab[0] - 0.01, cab[1] + 0.01), 0.09, (top, top + 0.012), self.roof)
         m.box((cab[1] - 0.004, cab[1] + 0.004), (-0.07, 0.07), (top - 0.07, top - 0.02), WINDOW)
         m.panel((cab[0] + 0.02, cab[1] - 0.02), (top - 0.07, top - 0.02), 0.0855, WINDOW)
         m.box((-h + 0.02, cab[0]), (-0.055, 0.055), (0.1, top - 0.025), self.body)
@@ -1211,7 +1240,7 @@ def _van(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
     body, stripe = VANS[good]
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
-    m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), ROOF_GREY)
+    _roof(m, (-h - 0.01, h + 0.01), 0.088, (0.24, 0.26), ROOF_GREY)
     with m.coarse():
         m.panel((-0.06, 0.06), (0.07, 0.22), 0.0805, shade(body, 0.7) if full else WINDOW)
     m.panel((-h + 0.01, h - 0.01), (0.2, 0.215), 0.0806, stripe)
@@ -1265,7 +1294,7 @@ def _stock_car(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
     body, animal = VANS[good]
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
-    m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), ROOF_GREY)
+    _roof(m, (-h - 0.01, h + 0.01), 0.088, (0.24, 0.26), ROOF_GREY)
     with m.coarse():
         m.panel((-h + 0.02, h - 0.02), (0.14, 0.2), 0.0805, animal if full else WINDOW)
     with m.fine():
@@ -1502,7 +1531,7 @@ def _boxcar(m: Model, good: Good, full: bool) -> None:
         Good.BREAD: (BREAD_VAN, (236, 226, 204)),
     }[good]
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
-    m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), roof)
+    _roof(m, (-h - 0.01, h + 0.01), 0.088, (0.24, 0.26), roof)
     door = shade(body, 0.7) if full else WINDOW
     with m.coarse():
         m.panel((-0.06, 0.06), (0.07, 0.22), 0.0805, door)
@@ -1519,8 +1548,10 @@ def _grain_hopper(m: Model, good: Good, full: bool) -> None:
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.2), body)
     m.panel((-h + 0.02, h - 0.02), (0.08, 0.18), 0.0805, shade(body, 0.85))
     if good == Good.SUGAR:
-        m.box((-h + 0.01, h - 0.01), (-0.07, 0.07), (0.2, 0.235), shade(body, 0.95))
+        with m.coarse():
+            m.box((-h + 0.01, h - 0.01), (-0.07, 0.07), (0.2, 0.235), shade(body, 0.95))
         with m.fine():
+            m.vault((-h + 0.005, h - 0.005), 0.08, (0.2, 0.237), shade(body, 0.95))
             for u in (-0.15, -0.05, 0.05, 0.15):
                 m.box((u - 0.025, u + 0.025), (-0.025, 0.025), (0.235, 0.243), shade(body, 0.75))
         parts.ribs(m, (-h + 0.01, h - 0.01), (0.062, 0.2), 0.0805, shade(body, 0.9), 6)
@@ -1600,8 +1631,9 @@ def _log_wagon(m: Model, good: Good, full: bool) -> None:
 def _coach(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.23), COACH)
-    m.box((-h - 0.01, h + 0.01), (-0.086, 0.086), (0.23, 0.25), ROOF_GREY)
-    m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.25, 0.265), ROOF_GREY)
+    _roof(m, (-h - 0.01, h + 0.01), 0.086, (0.23, 0.25), ROOF_GREY, 0.275)
+    with m.coarse():
+        m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.25, 0.265), ROOF_GREY)
     m.panel((-h + 0.01, h - 0.01), (0.105, 0.122), 0.0805, COACH_BAND)
     window = LIT_WINDOW if full else WINDOW
     with m.coarse():
@@ -1647,7 +1679,7 @@ def dining() -> Model:
     m.wheels([h - 0.07, -h + 0.07], 0.035, FRAME, 0.075)
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.23), DINER)
     m.panel((-h + 0.01, h - 0.01), (0.125, 0.215), 0.0805, DINER_CREAM)
-    m.box((-h - 0.01, h + 0.01), (-0.086, 0.086), (0.23, 0.25), ROOF_GREY)
+    _roof(m, (-h - 0.01, h + 0.01), 0.086, (0.23, 0.25), ROOF_GREY)
     m.box((-h + 0.08, h - 0.02), (-0.045, 0.045), (0.25, 0.27), shade(ROOF_GREY, 0.8))
     m.box((-h + 0.025, -h + 0.055), (-0.015, 0.015), (0.25, 0.3), BLACK_IRON)
     for u in (-0.03, 0.06, 0.15):
@@ -1667,7 +1699,7 @@ def dining() -> Model:
 def _mail_van(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
     m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), MAIL_VAN)
-    m.box((-h - 0.01, h + 0.01), (-0.088, 0.088), (0.24, 0.26), ROOF_GREY)
+    _roof(m, (-h - 0.01, h + 0.01), 0.088, (0.24, 0.26), ROOF_GREY)
     m.panel((-h + 0.01, h - 0.01), (0.2, 0.215), 0.0805, BRASS)
     door = shade(MAIL_VAN, 0.7) if full else WINDOW
     m.panel((-0.05, 0.05), (0.07, 0.19), 0.0806, door)
@@ -2307,12 +2339,14 @@ def _picture(faces: _Faces, sight: _Sight, heading: float) -> Sprite:
     paint = ImageDraw.Draw(image)
     px, py = (xs - left).tolist(), (ys - top).tolist()
     if faces.colors is not None and faces.lows is not None:
-        colors = fine_shades(faces.colors, lit, _along(normals, sight.shine), faces.lows)
+        shine = _along(normals, sight.shine)
+        rgbs = fine_shades(faces.colors[order], lit[order], shine[order], faces.lows[order])
+        colors = [(r, g, b, 255) for r, g, b in rgbs]
     else:
-        colors = [faces.shades[f][level] for f, level in enumerate(levels)]
-    for f in order:
+        colors = [(*faces.shades[f][levels[f]], 255) for f in order]
+    for f, color in zip(order, colors, strict=True):
         span = slice(faces.starts[f], faces.starts[f + 1])
-        paint.polygon(list(zip(px[span], py[span], strict=True)), fill=(*colors[f], 255))
+        paint.polygon(list(zip(px[span], py[span], strict=True)), fill=color)
     return Sprite(image, (-left, -top))
 
 
@@ -2340,21 +2374,36 @@ class TrainSprites:
         return self.places[(look, turned(heading))]
 
 
+class FinePainter:
+    """Draws a look's pictures `times` as many pixels each way as on the sheet, with its fine
+    details and an outline about half as wide as the sheet's blown up, one heading at a time: for
+    the close zooms, whose pictures would otherwise be the sheet's blown up. Its model and faces
+    are made once, when it is made."""
+
+    def __init__(
+        self, matrix_key: tuple[float, float, float, float], look: object, times: int
+    ) -> None:
+        matrix = np.array(matrix_key, dtype=np.float64).reshape(2, 2)
+        self._sight = _Sight.of(matrix, DETAIL * SCALE * times)
+        self._faces = _Faces.of(MODELS[look](), fine=True)
+        self._outline = max(1, times // 2)
+
+    def picture(self, index: int) -> Sprite:
+        """The look running heading `index` of HEADINGS."""
+        picture = _picture(self._faces, self._sight, 2 * math.pi * index / HEADINGS)
+        _outline(picture.image, self._outline)
+        return picture
+
+
 def fine_pictures(
     matrix_key: tuple[float, float, float, float],
     look: object,
     times: int,
     indices: Iterable[int] = range(HEADINGS),
 ) -> list[Sprite]:
-    """A look every way round, or running the headings given, `times` as many pixels each way
-    as on the sheet, with its fine details and an outline about half as wide as the sheet's
-    blown up: for the close zooms, whose pictures would otherwise be the sheet's blown up."""
-    matrix = np.array(matrix_key, dtype=np.float64).reshape(2, 2)
-    sight = _Sight.of(matrix, DETAIL * SCALE * times)
-    pictures = _pictures(MODELS[look](), sight, fine=True, indices=indices)
-    for picture in pictures:
-        _outline(picture.image, max(1, times // 2))
-    return pictures
+    """A look every way round, or running the headings given, drawn by a FinePainter."""
+    painter = FinePainter(matrix_key, look, times)
+    return [painter.picture(index) for index in indices]
 
 
 def turned(heading: float) -> int:

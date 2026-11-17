@@ -21,6 +21,7 @@ from railroads.sim.constructions import Track
 from railroads.sim.railway import Railway
 from railroads.sim.trains import Point, Train
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, IsoCamera, Vec2
+from railroads.ui.pixel.art import Sprite
 from railroads.ui.pixel.models import HEIGHT_PER_WIDTH
 from railroads.ui.pixel.relief import MOST_LIFT
 from railroads.ui.pixel.track_art import BEND, TrackArt
@@ -31,6 +32,7 @@ from railroads.ui.pixel.trains import (
     ENGINES,
     HEADINGS,
     SCALE,
+    FinePainter,
     Look,
     TrainSprites,
     fine_pictures,
@@ -68,6 +70,8 @@ class TrainLayer:
         self._paging_until = 0.0
         self._factor = 1
         self._pages: OrderedDict[object, _Page] = OrderedDict()
+        # Pages being drawn a few pictures a frame: each look's painter and pictures so far.
+        self._painting: dict[object, tuple[FinePainter, list[Sprite]]] = {}
         self.lanes = Lanes(world.track)
 
     def draw(
@@ -249,6 +253,7 @@ class TrainLayer:
         factor = max(1, min(device_scale // DETAIL, MAX_TEXTURE // PAGE_WIDTH))
         if factor != self._factor:
             self._pages.clear()
+            self._painting.clear()
             self._factor = factor
         return factor
 
@@ -265,16 +270,24 @@ class TrainLayer:
 
     def _page(self, look: object, factor: int) -> _Page | None:
         """A texture of one look's pictures every way round, drawn `factor` times as fine as the
-        sheet with their fine details, or None while this frame has spent its PAGES_TIME. Only
-        the looks on screen get one: the whole sheet that fine on a sharp screen is too big a
-        texture for many graphics cards, which draw it black."""
+        sheet with their fine details, or None until it is drawn: a few pictures each frame,
+        while the frame has not spent its PAGES_TIME. Only the looks on screen get one: the
+        whole sheet that fine on a sharp screen is too big a texture for many graphics cards,
+        which draw it black."""
         page = self._pages.get(look)
         if page is not None:
             self._pages.move_to_end(look)
             return page
         if time.perf_counter() > self._paging_until:
             return None
-        pictures = fine_pictures(self._matrix, look, factor)
+        if look not in self._painting:
+            self._painting[look] = (FinePainter(self._matrix, look, factor), [])
+        painter, pictures = self._painting[look]
+        while len(pictures) < HEADINGS and time.perf_counter() <= self._paging_until:
+            pictures.append(painter.picture(len(pictures)))
+        if len(pictures) < HEADINGS:
+            return None
+        del self._painting[look]
         width = max(PAGE_WIDTH * factor, *(p.image.size[0] for p in pictures))
         spots = {}
         x = y = row = 0

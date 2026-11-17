@@ -356,6 +356,63 @@ class Model:
             Face([(u0, v1, eaves), (u0, v0, eaves), (u0, middle, ridge)], ends, (-1, 0, 0)),
         ]
 
+    def snout(
+        self,
+        u: tuple[float, float],
+        z: tuple[float, float, float],
+        v: float,
+        color: RGB,
+        glass: RGB | None = None,
+    ) -> None:
+        """A rounded streamlined end, the smooth form of `nose`: from `u[0]` out to its tip at
+        `u[1]`, `v` either side of the middle at its root and narrowing a little, its floor at
+        `z[0]` and its top curving down from `z[2]` at the root to `z[1]` at the tip, its upper
+        edges rounded across; with a windscreen of `glass` over the top near the root."""
+        if self.skipping:
+            return
+        (u0, u1), (floor, tip, top) = u, z
+        steps, arc = 8, 6
+        sections = []
+        for k in range(steps + 1):
+            t = k / steps
+            high = tip + (top - tip) * math.sqrt(max(0.0, 1 - t**2))
+            half = v * (1 - 0.5 * t**2)
+            shoulder = floor + (high - floor) * 0.55
+            rise = high - shoulder
+            profile = [(half, floor), (half, shoulder)]
+            profile += [
+                (half * math.cos(math.pi * j / arc), shoulder + rise * math.sin(math.pi * j / arc))
+                for j in range(1, arc)
+            ]
+            profile += [(-half, shoulder), (-half, floor)]
+            sections.append((u0 + (u1 - u0) * t, profile))
+        self.loft(sections, color)
+        if glass is None:
+            return
+        screen = [
+            (at, [(a, b + 0.003) for a, b in profile[2 : 2 + arc - 1]])
+            for at, profile in sections[1:4]
+        ]
+        self.loft(screen, glass)
+        self.faces.pop()
+
+    def loft(self, sections: list[tuple[float, list[tuple[float, float]]]], color: RGB) -> None:
+        """A skin through cross sections along the track, each a `u` and the same number of
+        (v, z) points round it, closed off at the last section."""
+        if self.skipping:
+            return
+        for (ua, pa), (ub, pb) in itertools.pairwise(sections):
+            middle = sum(z for _, z in pa + pb) / len(pa + pb)
+            for (va0, za0), (va1, za1), (vb0, zb0), (vb1, zb1) in zip(
+                pa, pa[1:], pb, pb[1:], strict=False
+            ):
+                corners = [(ua, va0, za0), (ua, va1, za1), (ub, vb1, zb1), (ub, vb0, zb0)]
+                normal = _normal(corners, ((ua + ub) / 2, 0.0, middle))
+                self.faces.append(Face(corners, color, normal))
+        last_u, last = sections[-1]
+        out = 1.0 if last_u > sections[0][0] else -1.0
+        self.faces.append(Face([(last_u, a, b) for a, b in last], color, (out, 0.0, 0.0)))
+
     def cap(self, u: float, radius: float, z: tuple[float, float], color: RGB) -> None:
         """A rounded top standing on a circle `radius` round (`u`, 0) at `z[0]`, rising to
         `z[1]` in the middle, like the top of a dome."""
@@ -452,6 +509,20 @@ class Model:
         ]
 
 
+def _normal(corners: list[Vec3], inside: Vec3) -> Vec3:
+    """The way out of a flat face, away from a point inside the shape it bounds."""
+    a, b, d = (np.array(c, dtype=np.float64) for c in (corners[0], corners[1], corners[3]))
+    normal = np.cross(b - a, d - a)
+    length = float(np.linalg.norm(normal))
+    if length == 0:
+        return (0.0, 0.0, 1.0)
+    normal = normal / length
+    centre = np.mean(np.array(corners, dtype=np.float64), axis=0)
+    if float(normal @ (centre - np.array(inside))) < 0:
+        normal = -normal
+    return (float(normal[0]), float(normal[1]), float(normal[2]))
+
+
 # How far out of a flat face a fine detail may lie and still count as lying on it.
 ON_FACE = 0.006
 
@@ -460,7 +531,7 @@ def decals(faces: list[Face]) -> list[tuple[int, int]]:
     """Each fine detail lying flat on a bigger face, square to an axis, and the face it lies on:
     it is painted straight after that face, however far back the middles of the two lie, so it
     is never hidden under it. Each comes after the face it lies on if that is one of them."""
-    flat: dict[tuple[int, float], list[tuple[int, float, npt.NDArray[np.float64]]]] = {}
+    flat: dict[tuple[int, float], list[tuple[int, float, list[float]]]] = {}
     for index, face in enumerate(faces):
         axes = [k for k in range(3) if abs(face.normal[k]) > 1 - 1e-9]
         if not axes:
@@ -471,21 +542,29 @@ def decals(faces: list[Face]) -> list[tuple[int, int]]:
             continue
         side = float(np.sign(face.normal[axis]))
         others = [k for k in range(3) if k != axis]
-        box = np.concatenate([corners[:, others].min(axis=0), corners[:, others].max(axis=0)])
+        box = [*corners[:, others].min(axis=0).tolist(), *corners[:, others].max(axis=0).tolist()]
         flat.setdefault((axis, side), []).append((index, side * float(corners[0, axis]), box))
     found = []
     for group in flat.values():
+        outs = np.array([out for _, out, _ in group])
+        by_out = np.argsort(outs, kind="stable")
+        sorted_outs = outs[by_out]
         for index, out, box in group:
             if not faces[index].fine:
                 continue
             area = (box[2] - box[0]) * (box[3] - box[1])
             best = None
-            for other, under, around in group:
+            low = int(np.searchsorted(sorted_outs, out - ON_FACE - 1e-12, "left"))
+            high = int(np.searchsorted(sorted_outs, out, "right"))
+            for position in sorted(by_out[low:high].tolist()):
+                other, under, around = group[position]
                 if other == index or not 0 <= out - under <= ON_FACE:
                     continue
                 if (
-                    not (around[:2] <= box[:2] + 1e-6).all()
-                    or not (around[2:] >= box[2:] - 1e-6).all()
+                    around[0] > box[0] + 1e-6
+                    or around[1] > box[1] + 1e-6
+                    or around[2] < box[2] - 1e-6
+                    or around[3] < box[3] - 1e-6
                 ):
                     continue
                 size = (around[2] - around[0]) * (around[3] - around[1])
@@ -508,7 +587,7 @@ def fine_shades(
     lit: npt.NDArray[np.float64],
     shine: npt.NDArray[np.float64],
     low: npt.NDArray[np.float64],
-) -> list[RGB]:
+) -> list[list[int]]:
     """Faces' colours shaded close up: by how much each faces the light (`lit`, 0 to 1) and the
     way halfway between the light and the viewer (`shine`), and how high its middle is (`low`)."""
     level = np.floor(lit * (FINE_SHADES - 1) + 0.5) / (FINE_SHADES - 1)
@@ -516,7 +595,7 @@ def fine_shades(
     factor = factor * (1 - LOW_DARK * np.clip(1 - low / LOW_HEIGHT, 0, 1))
     glint = SHINE * np.clip(shine, 0, 1) ** SHINE_POWER
     rgb = np.clip(np.rint(colors * factor[:, None] + 255 * glint[:, None]), 0, 255)
-    return [(int(r), int(g), int(b)) for r, g, b in rgb.astype(np.int64)]
+    return rgb.astype(np.int64).tolist()
 
 
 def halfway(light: npt.NDArray[np.float64], view: npt.NDArray[np.float64]):
@@ -570,12 +649,13 @@ def draw_model(
         lit = float(np.clip(normal @ light, 0, 1))
         if fine:
             low = float(np.mean([c[2] for c in face.corners]))
-            (color,) = fine_shades(
+            (rgb,) = fine_shades(
                 np.array([face.color], dtype=np.float64),
                 np.array([lit]),
                 np.array([float(normal @ shine_way)]),
                 np.array([low]),
             )
+            color = (rgb[0], rgb[1], rgb[2])
         else:
             color = shade(face.color, SHADES[min(len(SHADES) - 1, int(lit * len(SHADES)))])
         drawn.append((depth, [to_screen(p) for p in points], color))
