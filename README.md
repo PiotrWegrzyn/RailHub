@@ -681,41 +681,44 @@ slowed less by each, in proportion, and then light ones half as much again and h
 as much. Some lines and kinds of power need a tech node: heavy freight Heavy
 boilers, express Express trains, diesels Diesel engines, electrics Electric traction or, for the
 fast ones, Thyristor control, the maglev Magnetic levitation (after Thyristor control), and steam
-engines from 1900 on Superheaters.
+engines from 1900 on Superheaters. The table gives every node on the way to an engine, in the
+order they can be taken in each tree, the years it is on sale and the newer engine that ends its
+sale, and the real engines it is drawn after (`railroads.ui.engine_origins`); the pictures are our
+own pixel art.
 
-| Engine | Class | From | Needs | Power | Speed | To full speed | Cars | Price | Burns a cell | Range |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Penydarren steam wagon | pioneer | 1804 |  | steam | 9 km/h | 14 s | 1 | $1,000 | 0.25 coal | 4 cells |
-| Catch Me Who Can | pioneer | 1808 |  | steam | 12 km/h | 13 s | 1 | $1,500 | 0.25 coal | 5 cells |
-| Salamanca | pioneer | 1812 |  | steam | 12 km/h | 13 s | 1 | $2,000 | 0.25 coal | 6 cells |
-| Puffing Billy | pioneer | 1815 |  | steam | 15 km/h | 13 s | 1 | $2,500 | 0.25 coal | 7 cells |
-| Locomotion | pioneer | 1820 |  | steam | 18 km/h | 13 s | 2 | $4,000 | 0.5 coal | 8 cells |
-| Rocket | pioneer | 1826 |  | steam | 24 km/h | 13 s | 2 | $6,000 | 0.5 coal | 10 cells |
-| Lion | pioneer | 1834 |  | steam | 27 km/h | 13 s | 2 | $8,000 | 0.5 coal | 12 cells |
-| Planet steam engine | general | 1840 |  | steam | 30 km/h | 12 s | 3 | $10,000 | 0.75 coal | 20 cells |
-| Tank engine | light | 1840 |  | steam | 24 km/h | 3 s | 2 | $3,000 | 0.25 coal | 12 cells |
-| Goods engine | heavy freight | 1853 | Heavy boilers (metals) | steam | 21 km/h | 30 s | 4 | $15,000 | 1 coal | 20 cells |
-| American 4-4-0 | general | 1856 |  | steam | 42 km/h | 11 s | 4 | $30,000 | 1 coal | 25 cells |
-| Single-driver express | express | 1858 | Express trains (passengers) | steam | 60 km/h | 25 s | 3 + dining car | $40,000 | 1 coal | 30 cells |
-| Light tank engine | light | 1862 |  | steam | 33 km/h | 3 s | 2 | $9,000 | 0.25 coal | 16 cells |
-| Mogul freight engine | heavy freight | 1865 | Heavy boilers (metals) | steam | 27 km/h | 28 s | 6 | $45,000 | 1.5 coal | 30 cells |
-| Atlantic express | express | 1900 | Express trains (passengers), Superheaters (metals) | steam | 90 km/h | 22 s | 4 + dining car | $120,000 | 1.2 coal | 50 cells |
-| Mallet articulated | heavy freight | 1905 | Heavy boilers (metals), Superheaters (metals) | steam | 36 km/h | 25 s | 8 | $135,000 | 2 coal | 50 cells |
-| Pacific engine | general | 1910 | Superheaters (metals) | steam | 60 km/h | 9 s | 5 | $90,000 | 1.2 coal | 50 cells |
-| Boxcab electric | general | 1925 | Electric traction (modern) | electric | 96 km/h | 6 s | 5 | $270,000 | 0.75 electricity | - |
-| Railbus | light | 1935 | Diesel engines (fuel) | diesel | 60 km/h | 2 s | 3 | $27,000 | 0.15 diesel fuel | 60 cells |
-| Streamliner | express | 1935 | Express trains (passengers), Superheaters (metals) | steam | 138 km/h | 20 s | 5 + dining car | $360,000 | 1.5 coal | 60 cells |
-| Big articulated | heavy freight | 1940 | Heavy boilers (metals), Superheaters (metals) | steam | 42 km/h | 22 s | 10 | $405,000 | 2.5 coal | 60 cells |
-| Mixed-traffic diesel | general | 1950 | Diesel engines (fuel) | diesel | 78 km/h | 7 s | 6 | $800,000 | 0.6 diesel fuel | 100 cells |
-| Heavy diesel | heavy freight | 1960 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 54 km/h | 18 s | 12 | $1,200,000 | 1.2 diesel fuel | 100 cells |
-| Bullet train | express | 1964 | Express trains (passengers), Thyristor control (modern) | electric | 210 km/h | 15 s | 6 + dining car | $1,100,000 | 1.1 electricity | - |
-| Universal electric | general | 1965 | Thyristor control (modern) | electric | 144 km/h | 5 s | 7 | $2,400,000 | 1.1 electricity | - |
-| Sprinter unit | light | 1985 | Diesel engines (fuel) | diesel | 96 km/h | 2 s | 3 | $81,000 | 0.15 diesel fuel | 100 cells |
-| High-speed electric | express | 1990 | Express trains (passengers), Thyristor control (modern) | electric | 300 km/h | 14 s | 8 + dining car | $3,200,000 | 1.3 electricity | - |
-| Twin-unit diesel | heavy freight | 1995 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 60 km/h | 18 s | 16 | $3,600,000 | 1.6 diesel fuel | 150 cells |
-| Modern electric | general | 2000 | Thyristor control (modern) | electric | 192 km/h | 4 s | 8 | $7,200,000 | 1.2 electricity | - |
-| Maglev | express | 2030 | Express trains (passengers), Magnetic levitation (modern) | maglev | 500 km/h | 13 s | 10 + dining car | $10,000,000 | 4.4 electricity | - |
-| Super-heavy diesel | heavy freight | 2040 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 66 km/h | 20 s | 24 | $10,800,000 | 2.4 diesel fuel | 200 cells |
+| Engine | Class | On sale | Tech to take | Power | Speed | To full speed | Cars | Price | Burns a cell | Range | Drawn after |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Penydarren steam wagon | pioneer | 1804–1808 (then the Catch Me Who Can) |  | steam | 9 km/h | 14 s | 1 | $1,000 | 0.25 coal | 4 cells | [Penydarren locomotive, 1804](https://en.wikipedia.org/wiki/Penydarren_(locomotive)) |
+| Catch Me Who Can | pioneer | 1808–1812 (then the Salamanca) |  | steam | 12 km/h | 13 s | 1 | $1,500 | 0.25 coal | 5 cells | [Catch Me Who Can, 1808](https://en.wikipedia.org/wiki/Catch_Me_Who_Can) |
+| Salamanca | pioneer | 1812–1815 (then the Puffing Billy) |  | steam | 12 km/h | 13 s | 1 | $2,000 | 0.25 coal | 6 cells | [Salamanca, 1812](https://en.wikipedia.org/wiki/Salamanca_(locomotive)) |
+| Puffing Billy | pioneer | 1815–1820 (then the Locomotion) |  | steam | 15 km/h | 13 s | 1 | $2,500 | 0.25 coal | 7 cells | [Puffing Billy, 1813](https://en.wikipedia.org/wiki/Puffing_Billy_(locomotive)) |
+| Locomotion | pioneer | 1820–1826 (then the Rocket) |  | steam | 18 km/h | 13 s | 2 | $4,000 | 0.5 coal | 8 cells | [Locomotion No. 1, 1825](https://en.wikipedia.org/wiki/Locomotion_No._1) |
+| Rocket | pioneer | 1826–1834 (then the Lion) |  | steam | 24 km/h | 13 s | 2 | $6,000 | 0.5 coal | 10 cells | [Stephenson's Rocket, 1829](https://en.wikipedia.org/wiki/Stephenson%27s_Rocket) |
+| Lion | pioneer | 1834–1840 (then the Planet steam engine) |  | steam | 27 km/h | 13 s | 2 | $8,000 | 0.5 coal | 12 cells | [LMR 57 Lion, 1838](https://en.wikipedia.org/wiki/LMR_57_Lion) |
+| Planet steam engine | general | 1840–1856 (then the American 4-4-0) |  | steam | 30 km/h | 12 s | 3 | $10,000 | 0.75 coal | 20 cells | [Planet, 1830](https://en.wikipedia.org/wiki/Planet_(locomotive)) |
+| Tank engine | light | 1840–1862 (then the Light tank engine) |  | steam | 24 km/h | 3 s | 2 | $3,000 | 0.25 coal | 12 cells | [Tank locomotive (type)](https://en.wikipedia.org/wiki/Tank_locomotive) |
+| Goods engine | heavy freight | 1853–1865 (then the Mogul freight engine) | metals and machines: Heavy boilers | steam | 21 km/h | 30 s | 4 | $15,000 | 1 coal | 20 cells | [0-6-0 goods engine (type)](https://en.wikipedia.org/wiki/0-6-0) |
+| American 4-4-0 | general | 1856–1910 (then the Pacific engine) |  | steam | 42 km/h | 11 s | 4 | $30,000 | 1 coal | 25 cells | [4-4-0 American (type)](https://en.wikipedia.org/wiki/4-4-0), [The General, 1855](https://en.wikipedia.org/wiki/The_General_(locomotive)) |
+| Single-driver express | express | 1858–1900 (then the Atlantic express) | passengers and mail: Timetables → Dining cars → Express trains | steam | 60 km/h | 25 s | 3 + dining car | $40,000 | 1 coal | 30 cells | [GNR Stirling 4-2-2, 1870](https://en.wikipedia.org/wiki/GNR_Stirling_4-2-2) |
+| Light tank engine | light | 1862–1935 (then the Railbus) |  | steam | 33 km/h | 3 s | 2 | $9,000 | 0.25 coal | 16 cells | [0-6-2 tank engine (type)](https://en.wikipedia.org/wiki/0-6-2) |
+| Mogul freight engine | heavy freight | 1865–1905 (then the Mallet articulated) | metals and machines: Heavy boilers | steam | 27 km/h | 28 s | 6 | $45,000 | 1.5 coal | 30 cells | [2-6-0 Mogul (type)](https://en.wikipedia.org/wiki/2-6-0) |
+| Atlantic express | express | 1900–1935 (then the Streamliner) | passengers and mail: Timetables → Dining cars → Express trains; metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 90 km/h | 22 s | 4 + dining car | $120,000 | 1.2 coal | 50 cells | [4-4-2 Atlantic (type)](https://en.wikipedia.org/wiki/4-4-2_(locomotive)) |
+| Mallet articulated | heavy freight | 1905–1940 (then the Big articulated) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 36 km/h | 25 s | 8 | $135,000 | 2 coal | 50 cells | [Mallet locomotive (type)](https://en.wikipedia.org/wiki/Mallet_locomotive) |
+| Pacific engine | general | 1910–1950 (then the Mixed-traffic diesel) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 60 km/h | 9 s | 5 | $90,000 | 1.2 coal | 50 cells | [4-6-2 Pacific (type)](https://en.wikipedia.org/wiki/4-6-2) |
+| Boxcab electric | general | 1925–1965 (then the Universal electric) | modern industry: Telegraph signals → Electric traction | electric | 96 km/h | 6 s | 5 | $270,000 | 0.75 electricity | - | [Boxcab electric (type)](https://en.wikipedia.org/wiki/Boxcab) |
+| Railbus | light | 1935–1985 (then the Sprinter unit) | fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 60 km/h | 2 s | 3 | $27,000 | 0.15 diesel fuel | 60 cells | [Railbus (type)](https://en.wikipedia.org/wiki/Railbus), [Uerdingen railbus](https://en.wikipedia.org/wiki/Uerdingen_railbus) |
+| Streamliner | express | 1935 on | passengers and mail: Timetables → Dining cars → Express trains; metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 138 km/h | 20 s | 5 + dining car | $360,000 | 1.5 coal | 60 cells | [Streamliner (type)](https://en.wikipedia.org/wiki/Streamliner), [LNER Class A4](https://en.wikipedia.org/wiki/LNER_Class_A4) |
+| Big articulated | heavy freight | 1940–1960 (then the Heavy diesel) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 42 km/h | 22 s | 10 | $405,000 | 2.5 coal | 60 cells | [Union Pacific Big Boy, 1941](https://en.wikipedia.org/wiki/Union_Pacific_Big_Boy) |
+| Mixed-traffic diesel | general | 1950 on | fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 78 km/h | 7 s | 6 | $800,000 | 0.6 diesel fuel | 100 cells | [EMD F7](https://en.wikipedia.org/wiki/EMD_F7) |
+| Heavy diesel | heavy freight | 1960–1995 (then the Twin-unit diesel) | metals and machines: Heavy boilers; fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 54 km/h | 18 s | 12 | $1,200,000 | 1.2 diesel fuel | 100 cells | [EMD SD40-2](https://en.wikipedia.org/wiki/EMD_SD40-2) |
+| Bullet train | express | 1964–1990 (then the High-speed electric) | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 210 km/h | 15 s | 6 + dining car | $1,100,000 | 1.1 electricity | - | [0 Series Shinkansen, 1964](https://en.wikipedia.org/wiki/0_Series_Shinkansen) |
+| Universal electric | general | 1965–2000 (then the Modern electric) | modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 144 km/h | 5 s | 7 | $2,400,000 | 1.1 electricity | - | [DB Class 103](https://en.wikipedia.org/wiki/DB_Class_103) |
+| Sprinter unit | light | 1985 on | fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 96 km/h | 2 s | 3 | $81,000 | 0.15 diesel fuel | 100 cells | [British Rail Class 150](https://en.wikipedia.org/wiki/British_Rail_Class_150) |
+| High-speed electric | express | 1990 on | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 300 km/h | 14 s | 8 + dining car | $3,200,000 | 1.3 electricity | - | [ICE 1](https://en.wikipedia.org/wiki/ICE_1) |
+| Twin-unit diesel | heavy freight | 1995–2040 (then the Super-heavy diesel) | metals and machines: Heavy boilers; fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 60 km/h | 18 s | 16 | $3,600,000 | 1.6 diesel fuel | 150 cells | [GE Dash 9-44CW](https://en.wikipedia.org/wiki/GE_Dash_9-44CW) |
+| Modern electric | general | 2000 on | modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 192 km/h | 4 s | 8 | $7,200,000 | 1.2 electricity | - | [DB Class 101](https://en.wikipedia.org/wiki/DB_Class_101) |
+| Maglev | express | 2030 on | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control → Magnetic levitation | maglev | 500 km/h | 13 s | 10 + dining car | $10,000,000 | 4.4 electricity | - | [Transrapid](https://en.wikipedia.org/wiki/Transrapid), [SCMaglev L0 Series](https://en.wikipedia.org/wiki/L0_Series) |
+| Super-heavy diesel | heavy freight | 2040 on | metals and machines: Heavy boilers; fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 66 km/h | 20 s | 24 | $10,800,000 | 2.4 diesel fuel | 200 cells | our own design |
 
 Electric engines run only on electrified track, and the maglev only on maglev track, which can be
 laid once it is on sale. A train's engine is chosen when it is bought. It can be upgraded later from the
@@ -743,7 +746,8 @@ The search button in the top bar (or F) opens a list of every kind of building; 
 name, or a good it makes or wants. Picking one outlines every one on the map and marks them on the
 overview, and the arrow buttons or the left and right keys step from one to the next, nearest the
 view first. The help button in the top right corner (or H) lists every building with what it makes
-and wants in a month, and every good with its base price and who makes and wants it.
+and wants in a month, every good with its base price and who makes and wants it, and every
+engine with the engine table above, its Wikipedia links clickable.
 
 ### Reports
 

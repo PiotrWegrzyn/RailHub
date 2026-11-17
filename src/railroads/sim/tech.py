@@ -357,6 +357,22 @@ def tree_of(kind: BuildingKind) -> Tree | None:
     return GOOD_TREES[next(iter(makes))] if makes else None
 
 
+def path_to(keys: tuple[str, ...]) -> tuple[str, ...]:
+    """Every node to take to have some, each after the nodes it requires."""
+    path: list[str] = []
+
+    def visit(key: str) -> None:
+        if key in path:
+            return
+        for need in NODES[key][1].requires:
+            visit(need)
+        path.append(key)
+
+    for key in keys:
+        visit(key)
+    return tuple(path)
+
+
 def xp_for(level: int) -> float:
     """The experience a tree needs in all to reach a level."""
     return FIRST_LEVEL * (LEVEL_GROWTH**level - 1) / (LEVEL_GROWTH - 1)
