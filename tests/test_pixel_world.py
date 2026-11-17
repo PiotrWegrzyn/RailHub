@@ -314,6 +314,79 @@ def test_a_mega_works_sharing_its_cell_stands_with_its_foot_inside_the_cell(
     assert scenery.x[at] - ax + on_ground.max() <= corners[:, 0].max() + 1
 
 
+def track_hidden(world: PixelWorld, sheet: SpriteSheet, building: int) -> int:
+    """How many pixels of the track drawn into the world one building in its scenery covers."""
+    width, height = world.projection.size
+    track = world.track.layer(world.constructions.track(), 0, 0, width, height, 1)[..., 3] > 0.5
+    index = int(world.scenery.sprite[building])
+    ax, ay = sheet.anchors[index]
+    left, top = world.scenery.x[building] - ax, world.scenery.y[building] - ay
+    painted = sheet.pixels[index][..., 3] > 0.5
+    rows, columns = np.nonzero(painted)
+    return int(track[rows + top, columns + left].sum())
+
+
+@pytest.mark.parametrize("ends", [(0, 6), (2, 8), (4, 10), (0, 4)])
+def test_buildings_in_a_cell_with_track_stand_off_the_track(
+    sheet: SpriteSheet, ends: tuple[int, int]
+) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    for _ in range(3):
+        constructions.build(Building((10, 4), BuildingKind.HOUSE))
+    constructions.build(Building((10, 4), BuildingKind.BRICKWORKS))
+    constructions.build(Track((10, 4), ends))
+
+    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+
+    buildings = np.flatnonzero(
+        np.isin(world.scenery.sprite, [*sheet.variants("house"), sheet.index("brickworks")])
+    )
+    assert len(buildings) == 4
+    assert [track_hidden(world, sheet, int(i)) for i in buildings] == [0] * 4
+    assert not world.scenery.under_track.any()
+
+
+def test_a_building_with_no_room_clear_of_the_track_is_drawn_under_it(sheet: SpriteSheet) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    constructions.build(Building((10, 4), BuildingKind.BIG_FACTORY))
+    for ends in [(0, 6), (2, 8), (4, 10)]:
+        constructions.build(Track((10, 4), ends))
+    factory = sheet.index(BUILDING_SPRITES[BuildingKind.BIG_FACTORY])
+
+    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+
+    at = int(np.flatnonzero(world.scenery.sprite == factory)[0])
+    assert world.scenery.under_track[at]
+    assert world.scenery.under_track.sum() == 1
+    chunk_x, chunk_y = world.scenery.x[at] // CHUNK, world.scenery.y[at] // CHUNK
+    left, top = chunk_x * CHUNK, chunk_y * CHUNK
+    drawn = world.render(chunk_x, chunk_y)
+    track = world.track.layer(constructions.track(), left, top, CHUNK, CHUNK, 1)
+    ax, ay = sheet.anchors[factory]
+    rows, columns = np.nonzero(sheet.pixels[factory][..., 3] > 0.5)
+    rows, columns = rows + world.scenery.y[at] - ay - top, columns + world.scenery.x[at] - ax - left
+    solid = track[rows, columns, 3] == 1
+    assert solid.sum() > 0
+    shown = np.rint(track[rows, columns, :3][solid] * 255)
+    assert np.abs(drawn[rows, columns, :3][solid] - shown).max() <= 1
+
+
+def test_laying_track_through_a_town_moves_its_buildings_off_it(sheet: SpriteSheet) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    for _ in range(4):
+        constructions.build(Building((10, 4), BuildingKind.HOUSE))
+    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+    constructions.build(Track((10, 4), (2, 8)))
+
+    world.buildings_changed([(10, 4)])
+
+    houses = np.flatnonzero(np.isin(world.scenery.sprite, sheet.variants("house")))
+    assert [track_hidden(world, sheet, int(i)) for i in houses] == [0] * 4
+
+
 @pytest.mark.parametrize("kind", [BuildingKind.BAKERY, BuildingKind.DAIRY])
 def test_bakeries_and_dairies_stand_bigger_than_a_house(
     sheet: SpriteSheet, kind: BuildingKind

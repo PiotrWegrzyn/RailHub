@@ -83,6 +83,7 @@ def test_close_chunks_stand_buildings_as_their_pixel_art_blown_up(sheet: SpriteS
         y=bare.scenery.y[:0],
         sprite=bare.scenery.sprite[:0],
         lift=bare.scenery.lift[:0],
+        under_track=bare.scenery.under_track[:0],
     )
     across, down = world.projection.chunks
     chunks = [(x, y) for x in range(across) for y in range(down)]

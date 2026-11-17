@@ -349,11 +349,13 @@ class PixelWorld:
             flat,
         )
         if offset is None:
+            self._stand_scenery(canvas, left, top, resolution, under_track=True)
             self._lay_track(canvas, left, top, resolution)
         else:
             canvas = raise_picture(canvas, offset, resolution, crossings(raised.lift, offset))
             if resolution > 1:
                 textured(canvas, left, top, resolution)
+            self._stand_scenery(canvas, left, top, resolution, under_track=True)
             self._lay_lifted_track(canvas, left, top, resolution, offset, resolution)
         self._stand_scenery(canvas, left, top, resolution)
         return _finished(canvas)
@@ -420,6 +422,7 @@ class PixelWorld:
                 self.ground.canopy(layer, left, top, kk, shown=on, points=points),
             ),
         )
+        self._stand_scenery(canvas, left, top, k, under_track=True)
         self._lay_track(canvas, left, top, k, shown=shown)
         self._stand_scenery(canvas, left, top, k)
         return _finished(canvas)
@@ -469,6 +472,7 @@ class PixelWorld:
         )
         canvas = raise_picture(canvas, offset, 1, crossings(raised.lift, offset))
         textured(canvas, left, top, k)
+        self._stand_scenery(canvas, left, top, k, under_track=True)
         self._lay_lifted_track(canvas, left, top, k, offset / k)
         self._stand_scenery(canvas, left, top, k)
         return _finished(canvas)
@@ -530,7 +534,12 @@ class PixelWorld:
         alpha = part[..., 3:] * shown[..., None]
         under[..., :3] = under[..., :3] * (1 - alpha) + part[..., :3] * alpha
 
-    def _stand_scenery(self, canvas: FloatArray, left: int, top: int, resolution: int) -> None:
+    def _stand_scenery(
+        self, canvas: FloatArray, left: int, top: int, resolution: int, under_track: bool = False
+    ) -> None:
+        """Stands what stands on the ground in the chunk on it, back to front: with
+        `under_track` only what is drawn under the track (Scenery.under_track), and otherwise the
+        rest."""
         sheet = resolution if resolution in self._sprites else max(self._sprites)
         times = resolution // sheet
         scenery, drawn, k = self.scenery, self._sprites[sheet], resolution
@@ -539,6 +548,7 @@ class PixelWorld:
         w, h = drawn.sizes[scenery.sprite, 0] * times, drawn.sizes[scenery.sprite, 1] * times
         span = CHUNK * k
         overlapping = (x0 < span) & (x0 + w > 0) & (y0 < span) & (y0 + h > 0)
+        overlapping &= scenery.under_track == under_track
         for i in np.flatnonzero(overlapping).tolist():
             pixels = drawn.premultiplied[int(scenery.sprite[i])]
             if times > 1:
