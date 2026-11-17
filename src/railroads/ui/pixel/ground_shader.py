@@ -162,10 +162,15 @@ vec3 natural(vec2 p, vec4 around) {
     float gx = (rolling(vec2(p.x + e, p.y)) - here) / e;
     float gy = (rolling(vec2(p.x, p.y + e)) - here) / e;
     float facing = -(gx * @LIGHT_X@ + gy * @LIGHT_Y@);
-    float roll = clamp(1.0 + @ROLL_LIGHT@ * facing, @ROLL_LOW@, @ROLL_HIGH@);
+    float deep = @ROLL_LEAST@ + (@ROLL_MOST@ - @ROLL_LEAST@) * @N_25_306@;
+    float roll = clamp(1.0 + @ROLL_LIGHT@ * deep * facing, @ROLL_LOW@, @ROLL_HIGH@);
+    float region = @N_3_305@ * 2.0 - 1.0;
+    vec3 plains = region < 0.0 ? @GREENER_PLAINS@ : @DRIER_PLAINS@;
     float lush = clamp(around.g * @WET_GAIN@, 0.0, 1.0) * @LUSH@;
     float foot = clamp(around.b * @FOOT_GAIN@, 0.0, 1.0) * @FOOT_SHADE@;
-    vec3 tint = (1.0 + (@LUSH_TINT@ - 1.0) * lush) * (1.0 + (@FOOT_TINT@ - 1.0) * foot);
+    vec3 tint = 1.0 + (plains - 1.0) * (abs(region) * @PLAINS_TINT@);
+    tint *= 1.0 + (@LUSH_TINT@ - 1.0) * lush;
+    tint *= 1.0 + (@FOOT_TINT@ - 1.0) * foot;
     return tint * roll;
 }
 
@@ -382,6 +387,13 @@ def fragment_source() -> str:
         "W_2_213": _noise(0.2, 213, "q"),
         "W_2_214": _noise(0.2, 214, "q"),
         "ROLL_STEP": _number(cpu.ROLL_STEP),
+        "N_25_306": _noise(cpu.ROLL_SPAN, 306),
+        "N_3_305": _noise(cpu.PLAINS_SPAN, 305),
+        "ROLL_LEAST": _number(cpu.ROLL_LEAST),
+        "ROLL_MOST": _number(cpu.ROLL_MOST),
+        "GREENER_PLAINS": _vec3(cpu.GREENER_PLAINS),
+        "DRIER_PLAINS": _vec3(cpu.DRIER_PLAINS),
+        "PLAINS_TINT": _number(cpu.PLAINS_TINT),
         "LIGHT_X": _number(LIGHT[0]),
         "LIGHT_Y": _number(LIGHT[1]),
         "ROLL_LIGHT": _number(cpu.ROLL_LIGHT),

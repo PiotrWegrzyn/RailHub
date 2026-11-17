@@ -158,6 +158,15 @@ MAX_SLOPE_SHADES = 1.5
 # the water and the mountains reach, in cells, how strongly near they count, and how much
 # greener and darker they make the ground at the most.
 ROLL_LIGHT = 0.14
+# The plains differ from place to place too: their swells are low in some and deeper in others,
+# from ROLL_LEAST to ROLL_MOST times ROLL_LIGHT over ROLL_SPAN cells, and their grass is drier or
+# greener over PLAINS_SPAN cells, by up to these tints.
+ROLL_SPAN = 2.5
+ROLL_LEAST, ROLL_MOST = 0.3, 1.7
+PLAINS_SPAN = 3.0
+DRIER_PLAINS = np.array((1.06, 1.02, 0.88), dtype=np.float32)
+GREENER_PLAINS = np.array((0.92, 1.0, 0.94), dtype=np.float32)
+PLAINS_TINT = 0.6
 ROLL_RANGE = (0.72, 1.24)
 ROLL_STEP = 0.04
 WET_REACH = 1.5
@@ -168,9 +177,9 @@ LUSH = 0.4
 LUSH_TINT = np.array((0.72, 1.0, 0.7), dtype=np.float32)
 FOOT_SHADE = 0.45
 FOOT_TINT = SHADOW_TINT * 0.8
-# Biomes on land meet along a winding line instead of the cells' edges: each pixel takes the
-# biome of the cell under a point near it, pushed by noise up to WARP cells (WARP_FINE more on
-# a smaller scale), unless that cell is water.
+# Biomes and mountains on land meet along a winding line instead of the cells' edges: each pixel
+# takes the biome and mountains of the cell under a point near it, pushed by noise up to WARP
+# cells (WARP_FINE more on a smaller scale), unless that cell is water.
 WARP = 0.32
 WARP_FINE = 0.12
 
@@ -238,7 +247,21 @@ CROWN_SIZE = (2.2, 1.8)
 CROWN_LIGHT = np.array((-0.75, -0.5, 0.6)) / math.hypot(0.75, 0.5, 0.6)
 CANOPY_SWELL = 0.7
 CANOPY_SWELL_SIZE = 0.6
-CROWN_SLOPES = 0.06
+CROWN_SLOPES = 0.15
+# Woods differ from stand to stand, so no two look alike: old stands of big crowns grown into
+# each other and young ones of small crowns with gaps between (by noise over STAND_SPAN art
+# pixels, crowns from YOUNG to OLD times their size), thin patches where up to THINNED of the
+# crowns are missing (over THIN_SPAN art pixels), stands of conifers among broadleaved trees
+# (over CONIFER_STANDS cells), and their greens turning darker or more golden over REGION_SPAN
+# cells, by these tints.
+STAND_SPAN = 110.0
+YOUNG, OLD = 0.7, 1.25
+THIN_SPAN = 70.0
+THINNED = 0.7
+CONIFER_STANDS = 1.3
+REGION_SPAN = 2.2
+DARK_GREENS = np.array((0.8, 0.9, 0.94), dtype=np.float32)
+GOLDEN_GREENS = np.array((1.14, 1.06, 0.84), dtype=np.float32)
 # How far round towards their rims crowns curve, how dark the hollows between them are and
 # how fine the grain of their leaves.
 CROWN_ROUND = 0.9
@@ -250,7 +273,7 @@ CROWN_TONES = 0.5
 CANOPY_REACH = 4
 CONIFER_CROWNS = np.array([(58, 86, 58), (64, 90, 56)], dtype=np.float32)
 LEAFY_CROWNS = np.array([(80, 108, 54), (90, 114, 56)], dtype=np.float32)
-WOODS_FLOOR = np.array((26, 38, 30), dtype=np.float32)
+WOODS_FLOOR = np.array((54, 70, 40), dtype=np.float32)
 WOODS_SIDE = 0.55
 EDGE_SHADOW = 0.28
 SHADOW_COLOUR = np.array((18, 26, 46), dtype=np.float32)
@@ -362,9 +385,11 @@ class Ground:
     def refresh(self) -> None:
         """Works out the biomes and fields again after buildings or forests changed."""
         self._biomes = biome_grid(self.tile_map)
-        # Cells with another biome among the cells round them, whose pixels may take it.
-        there = self._biomes.ravel()[self._round]
-        self._mixed = self._off_round | (there != self._biomes).any(axis=0)
+        # Cells with another biome or mountains among the cells round them, whose pixels may
+        # take them.
+        kind = self._biomes * 2 + (self.tile_map.relief == Relief.MOUNTAINS)
+        there = kind.ravel()[self._round]
+        self._mixed = self._off_round | (there != kind).any(axis=0)
         built = np.zeros(self.tile_map.grid.shape, dtype=bool)
         woodland = np.zeros(self.tile_map.grid.shape, dtype=bool)
         for construction in self.constructions:
@@ -410,10 +435,10 @@ class Ground:
         # Only shores look at the apron: the colours are worked out inside it.
         inner = (slice(a, a + rows), slice(a, a + CHUNK))
         r, c, inside, wet = r[inner], c[inner], inside[inner], water[inner]
-        biomes = self._biomes[r, c]
         x, y = points.plane(left, top, CHUNK, rows)
-        rocky = self.tile_map.relief[r, c] == Relief.MOUNTAINS
-        self._wind_borders(biomes, x, y, self._mixed[r, c] & ~wet)
+        wr, wc = self.winding(x, y, r, c)
+        biomes = self._biomes[wr, wc]
+        rocky = self.tile_map.relief[wr, wc] == Relief.MOUNTAINS
         seen = np.ones(x.shape, dtype=bool)
         if raised is not None:
             seen = mountain_cover(raised.mountains[:rows], rocky) < 1
@@ -485,19 +510,23 @@ class Ground:
             self.elevation.colour(rgb, raised.top(rows), x, y, rocky)
         return np.clip(rgb, 0, 255) * alpha[..., None], alpha
 
-    def _wind_borders(
-        self, biomes: npt.NDArray[np.integer], x: FloatArray, y: FloatArray, near: BoolArray
-    ) -> None:
-        """Gives the pixels `near` another biome the biome of the cell under a point pushed by
-        noise (WARP), where that cell is not water."""
+    def winding(
+        self, x: FloatArray, y: FloatArray, r: IntArray, c: IntArray
+    ) -> tuple[IntArray, IntArray]:
+        """The cells pixels at plane points `x`, `y` in cells `r`, `c` take their biome and
+        mountains from, so biomes and mountains meet along a winding line: their own cells, but
+        for land near another biome or mountains, the cell under a point pushed by noise (WARP),
+        where that cell is not water."""
+        near = self._mixed[r, c] & ~_WATER[self._biomes[r, c]]
         if not near.any():
-            return
-        grid = self.tile_map.grid
+            return r, c
         fx, fy = x[near].astype(np.float32), y[near].astype(np.float32)
-        wx, wy = _wound(fx, fy)
-        wr, wc = grid.cell_on_map(wx, wy)
-        warped = self._biomes[wr, wc]
-        biomes[near] = np.where(_WATER[warped], biomes[near], warped)
+        pr, pc = self.tile_map.grid.cell_on_map(*_wound(fx, fy))
+        keep = _WATER[self._biomes[pr, pc]]
+        wr, wc = r.copy(), c.copy()
+        wr[near] = np.where(keep, r[near], pr)
+        wc[near] = np.where(keep, c[near], pc)
+        return wr, wc
 
     def _natural(self, x: FloatArray, y: FloatArray) -> FloatArray:
         """How much each colour of plain land at these points is multiplied by for the light on
@@ -508,11 +537,15 @@ class Ground:
         gx = (_rolling(fx + e, fy) - here) / e
         gy = (_rolling(fx, fy + e) - here) / e
         facing = -(gx * np.float32(LIGHT[0]) + gy * np.float32(LIGHT[1]))
-        roll = np.clip(1 + ROLL_LIGHT * facing, *ROLL_RANGE)
+        deep = ROLL_LEAST + (ROLL_MOST - ROLL_LEAST) * noise(fx, fy, ROLL_SPAN, 306)
+        roll = np.clip(1 + ROLL_LIGHT * deep * facing, *ROLL_RANGE)
+        region = noise(fx, fy, PLAINS_SPAN, 305) * 2 - 1
+        plains = np.where((region < 0)[:, None], GREENER_PLAINS, DRIER_PLAINS)
         at = Blend.at(self._wet.shape, x * RELIEF_STEPS_PER_CELL, y * RELIEF_STEPS_PER_CELL)
         lush = np.clip(at.read(self._wet) * WET_GAIN, 0, 1) * LUSH
         foot = np.clip(at.read(self._foot) * FOOT_GAIN, 0, 1) * FOOT_SHADE
-        tint = 1 + (LUSH_TINT - 1) * lush[:, None]
+        tint = 1 + (plains - 1) * (np.abs(region) * PLAINS_TINT)[:, None]
+        tint *= 1 + (LUSH_TINT - 1) * lush[:, None]
         tint *= 1 + (FOOT_TINT - 1) * foot[:, None]
         return (tint * roll[:, None]).astype(np.float32)
 
@@ -809,12 +842,15 @@ class Ground:
         height += LUMPS * grain
         conifers = np.where(biomes == Biome.TAIGA, 0.9, 0.0)
         broadleaved = (biomes != Biome.TAIGA) & (biomes != Biome.JUNGLE)
-        conifers[broadleaved] = 0.2 + 0.6 * noise(fx[broadleaved], fy[broadleaved], 1.1, 64)
+        stands = noise(fx[broadleaved], fy[broadleaved], CONIFER_STANDS, 64)
+        conifers[broadleaved] = 0.05 + 0.85 * np.clip((stands - 0.5) * 4 + 0.5, 0, 1)
         conifer = (table_hash(gx, gy, 63) < conifers)[:, None]
         tone = table_hash(gx, gy, 66)[:, None] * CROWN_TONES
         first = np.where(conifer, CONIFER_CROWNS[0], LEAFY_CROWNS[0])
         crowns = first + (np.where(conifer, CONIFER_CROWNS[1], LEAFY_CROWNS[1]) - first) * tone
         crowns *= (0.9 + 0.2 * noise(fx, fy, 0.9, 65))[:, None]
+        region = noise(fx, fy, REGION_SPAN, 72)[:, None] * 2 - 1
+        crowns *= 1 + (np.where(region < 0, DARK_GREENS, GOLDEN_GREENS) - 1) * np.abs(region)
         towards = (dx * CROWN_LIGHT[0] + dy * CROWN_LIGHT[1]) / radius * CROWN_ROUND
         up = np.sqrt(np.clip(1 - (1 - height) * CROWN_ROUND**2, 0, 1))
         facing = towards + up * CROWN_LIGHT[2]
@@ -1166,11 +1202,22 @@ def art_pixels(picture: FloatArray, k: int) -> FloatArray:
     return picture.reshape(rows, k, cols, k, picture.shape[2], copy=False)
 
 
+def crown_radii(gx: IntArray, gy: IntArray, jx: FloatArray, jy: FloatArray) -> Floats:
+    """How wide the crowns of the squares `gx`, `gy` standing at picture points `jx`, `jy`
+    are: CROWN_SIZE, grown from YOUNG to OLD with the age of their stand, and none at all where
+    a thin patch leaves them out."""
+    size = CROWN_SIZE[0] + CROWN_SIZE[1] * table_hash(gx, gy, 53)
+    age = YOUNG + (OLD - YOUNG) * noise(jx, jy, STAND_SPAN, 70)
+    thin = np.clip((noise(jx, jy, THIN_SPAN, 71) - 0.62) * 2.2, 0, THINNED)
+    gone = table_hash(gx, gy, 54) < thin
+    return np.where(gone, np.float32(0.01), size * age).astype(np.float32)
+
+
 def _tallest_crown(
     px: FloatArray, py: FloatArray, gap: float
 ) -> tuple[FloatArray, FloatArray, FloatArray, FloatArray, IntArray, IntArray]:
     """The crown standing highest over each picture point, crowns standing one to a square `gap`
-    pixels a side at a random spot in it, each a dome CROWN_SIZE across: how high it stands
+    pixels a side at a random spot in it, each a dome as wide as crown_radii says: how high it stands
     there as a share of its top (below 0 where no crown covers the point), which way the point
     lies from its middle, how wide it is and which square it stands in. Where the crown of every
     square round the points stands is worked out once a square; ties go to the square met
@@ -1179,9 +1226,10 @@ def _tallest_crown(
     first_x, first_y = int(cx.min()) - 1, int(cy.min()) - 1
     gx = np.arange(first_x, int(cx.max()) + 2)[None, :]
     gy = np.arange(first_y, int(cy.max()) + 2)[:, None]
-    jx = ((gx + 0.15 + 0.7 * table_hash(gx, gy, 51)) * gap).ravel()
-    jy = ((gy + 0.15 + 0.7 * table_hash(gx, gy, 52)) * gap).ravel()
-    radii = (CROWN_SIZE[0] + CROWN_SIZE[1] * table_hash(gx, gy, 53)).ravel().astype(np.float32)
+    jx = (gx + 0.15 + 0.7 * table_hash(gx, gy, 51)) * gap
+    jy = (gy + 0.15 + 0.7 * table_hash(gx, gy, 52)) * gap
+    radii = crown_radii(gx, gy, jx, jy).ravel()
+    jx, jy = jx.ravel(), jy.ravel()
     width = gx.shape[1]
     home = (cy - first_y) * width + (cx - first_x)
     best = np.full(px.shape, -np.inf, dtype=np.float32)

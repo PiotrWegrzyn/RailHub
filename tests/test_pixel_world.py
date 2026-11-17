@@ -20,7 +20,7 @@ from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 from railroads.ui.pixel import track_art
 from railroads.ui.pixel.art import SPRITES, draw_sheet
 from railroads.ui.pixel.art.stations import TURNED_LINES
-from railroads.ui.pixel.ground import AROUND, CROWN_GAP, CROWN_SIZE, _depths, _tallest_crown
+from railroads.ui.pixel.ground import AROUND, CROWN_GAP, _depths, _tallest_crown, crown_radii
 from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.layer import resolution_for
 from railroads.ui.pixel.noise import noise, table_hash
@@ -759,7 +759,7 @@ def tallest_crown_by_hashing(px: np.ndarray, py: np.ndarray, gap: float) -> tupl
             gx, gy = cx + ox, cy + oy
             jx = (gx + 0.15 + 0.7 * table_hash(gx, gy, 51)) * gap
             jy = (gy + 0.15 + 0.7 * table_hash(gx, gy, 52)) * gap
-            radius = (CROWN_SIZE[0] + CROWN_SIZE[1] * table_hash(gx, gy, 53)).astype(np.float32)
+            radius = crown_radii(gx, gy, jx, jy)
             dx, dy = (px - jx).astype(np.float32), (py - jy).astype(np.float32)
             height = 1 - (dx * dx + dy * dy) / (radius * radius)
             higher = height > best
