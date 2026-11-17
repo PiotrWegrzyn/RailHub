@@ -205,8 +205,16 @@ WHEAT = np.array((218, 184, 86), dtype=np.float32)
 WHEAT_DARK = np.array((200, 166, 72), dtype=np.float32)
 WHEAT_LIGHT = np.array((238, 210, 116), dtype=np.float32)
 WHEAT_EARS = np.array((170, 134, 54), dtype=np.float32)
-HEDGE = np.array((64, 104, 42), dtype=np.float32)
-HEADLAND = np.array((150, 140, 96), dtype=np.float32)
+# Fields are ploughed into the ground rather than laid on it: their colours are
+# FIELD_SATURATION as strong, and they fade into the grass over FIELD_FEATHER art pixels at an
+# edge frayed by noise FIELD_FRAY art pixels deep over FIELD_FRAY_SIZE cells. A grove's own
+# ground covers the grass GROVE_FLOOR fully, and its trees' shadows GROVE_SHADOW.
+FIELD_SATURATION = 0.88
+FIELD_FEATHER = 2
+FIELD_FRAY = 2.0
+FIELD_FRAY_SIZE = 0.08
+GROVE_FLOOR = 0.45
+GROVE_SHADOW = 0.4
 
 
 # A tuft of grass in a 6 by 6 block: three blades, in a TUFT_SHARE of the blocks on grassy land.
@@ -643,7 +651,7 @@ class Ground:
         bottom = max(patch[0].stop for _, patch, _, _ in jobs)
         right = max(patch[1].stop for _, patch, _, _ in jobs)
         paint = np.empty((bottom - down, right - across, 3), dtype=np.float32)
-        painted = np.zeros(paint.shape[:2], dtype=bool)
+        painted = np.zeros(paint.shape[:2], dtype=np.float32)
         # Each patch works out the plane points and cells of its own pixels, unless patches
         # overlap so much that working them out once over the box round all of them is less.
         boxes = {(p[0].start, p[0].stop, p[1].start, p[1].stop) for _, p, _, _ in jobs}
@@ -662,9 +670,10 @@ class Ground:
                 )
             args = (paint[place], *worked[box])
             if grove is None:
-                painted[place] |= self._sow(*args, plot, crop, k)
+                cover = self._sow(*args, plot, crop, k)
             else:
-                painted[place] |= self._plant(*args, plot, grove)
+                cover = self._plant(*args, plot, grove, k)
+            np.maximum(painted[place], cover, out=painted[place])
         top_row, left_col = max(down, a * k), max(across, a * k)
         bottom_row, right_col = min(bottom, (a + rows) * k), min(right, (a + CHUNK) * k)
         if top_row >= bottom_row or left_col >= right_col:
@@ -679,10 +688,12 @@ class Ground:
             slice(left_col - a * k, right_col - a * k),
         )
         under = canvas[region]
-        laid = painted[inside] & (under[..., 3] > 0 if shown is None else shown[region])
+        cover = painted[inside]
+        laid = (cover > 0) & (under[..., 3] > 0 if shown is None else shown[region])
         if not laid.any():
             return
         colour = inner[laid]
+        cover = cover[laid][:, None]
         if lit is not None:
             art_rows, art_cols = np.nonzero(laid)
             art_rows, art_cols = (
@@ -690,8 +701,8 @@ class Ground:
                 (art_cols + region[1].start) // k,
             )
             colour = colour * lit[art_rows, art_cols][:, None]
-        under[laid, :3] = np.clip(colour, 0, 255) / 255
-        under[laid, 3] = 1.0
+        under[laid, :3] = under[laid, :3] * (1 - cover) + np.clip(colour, 0, 255) / 255 * cover
+        under[laid, 3:] = under[laid, 3:] * (1 - cover) + cover
 
     def _patch_points(
         self,
@@ -1084,25 +1095,28 @@ class Ground:
         plot: Plot,
         crop: BuildingKind | None,
         k: int = 1,
-    ) -> BoolArray:
+    ) -> FloatArray:
         """Lays a field of crops in rows over the half of a cell a farm or crop takes up, `k`
-        pixels to an art pixel: a farm grows wheat, other crops grow in rows. Plants are
-        lit on the side towards the light and shaded on the other, the soil between rows is
-        darker in the furrow, a strip of bare headland runs round inside a lumpy hedge.
-        Returns which pixels the field covers."""
+        pixels to an art pixel, ploughed into the ground rather than laid on it: a farm grows
+        wheat, other crops grow in rows, lit on the side towards the light, with darker soil in
+        the furrows, the whole lit and tinted like the plains round it (_natural) and fading
+        into the grass at a frayed edge. Returns how fully each pixel of the block the field
+        covers."""
         grid = self.tile_map.grid
         row, col = plot.cell
         fx, fy = grid.center(row, col)
         field = (cells == row * grid.cols + col) & plot.covers(x - fx, y - fy)
+        cover = np.zeros(field.shape, dtype=np.float32)
         if not field.any():
-            return field
+            return cover
         pick = row * 7 + col * 13
         across, along = (x - fx, y - fy) if pick % 2 else (y - fy, x - fx)
         u, w = across[field] * FIELD_STRIPES, along[field] * FIELD_STRIPES
-        line = np.floor(u).astype(np.int64)
-        fu = u - line
         px, py = ix[field], iy[field]
         grain = (table_hash(px, py, 71) - 0.5)[:, None]
+        gx, gy = x[field].astype(np.float32), y[field].astype(np.float32)
+        line = np.floor(u).astype(np.int64)
+        fu = u - line
         out = np.empty((u.size, 3), dtype=np.float32)
         if crop is None:
             out[:] = np.where((line % 2 == 0)[:, None], WHEAT, WHEAT_DARK)
@@ -1126,16 +1140,19 @@ class Ground:
             out[bush & (fu > 0.66)] = plant * 0.7
             leaf = bush & (table_hash(px, py, 82) > 0.86)
             out[leaf] = light * 1.08
-        depth = _depths(field, 2 * k)
-        hedge = depth < k
-        headland = (depth >= k) & (depth < 2 * k)
-        lumps = 0.78 + 0.4 * table_hash(px[hedge] // (2 * k), py[hedge] // (2 * k), 91)
-        out[headland] = HEADLAND * (1 + 0.16 * grain[headland])
-        out[hedge] = HEDGE * lumps[:, None]
-        dark = (hedge & ~np.roll(field, -k, 0)[field]) if k > 1 else np.zeros_like(hedge)
-        out[dark] *= 0.72
+        grey = out.mean(axis=1, keepdims=True)
+        out = grey + (out - grey) * FIELD_SATURATION
+        out *= self._natural(x[field], y[field])
         rgb[field] = out
-        return field
+        cover[field] = self._feathered(field, gx, gy, k)
+        return cover
+
+    def _feathered(self, field: BoolArray, x: Floats, y: Floats, k: int) -> FloatArray:
+        """How fully each pixel of a field covers the ground, from 0 at its frayed edge up to
+        1 FIELD_FEATHER art pixels in, in the order of the field's pixels."""
+        depth = _depths(field, FIELD_FEATHER * k).astype(np.float32)
+        fray = (noise(x, y, FIELD_FRAY_SIZE, 74) - 0.5) * FIELD_FRAY * k
+        return np.clip((depth + 0.5 + fray) / (FIELD_FEATHER * k), 0, 1)
 
     def _plant(
         self,
@@ -1147,16 +1164,20 @@ class Ground:
         iy: IntArray,
         plot: Plot,
         grove: Grove,
-    ) -> BoolArray:
+        k: int = 1,
+    ) -> FloatArray:
         """Lays a grove of trees in rows over the half of a cell an orchard, date palms or
         plantation takes up: each crown lit on the side towards the light, with its shadow on
-        the ground beside it, and some bearing fruit. Returns which pixels the grove covers."""
+        the ground beside it, and some bearing fruit, over ground of the grove's own colour
+        laid thinly over the grass, the whole lit and tinted like the plains round it. Returns
+        how fully each pixel of the block the grove covers."""
         grid = self.tile_map.grid
         row, col = plot.cell
         fx, fy = grid.center(row, col)
         ground = (cells == row * grid.cols + col) & plot.covers(x - fx, y - fy)
+        cover = np.zeros(ground.shape, dtype=np.float32)
         if not ground.any():
-            return ground
+            return cover
         u = (x[ground] - fx) * grove.rows + 0.5
         v = (y[ground] - fy) * grove.rows + 0.5
         du, dv = u - np.round(u), v - np.round(v)
@@ -1165,19 +1186,26 @@ class Ground:
         grain = 1 + 0.12 * (table_hash(px, py, 23) - 0.5)
         floor = np.array(grove.ground, dtype=np.float32)
         colors = (floor * grain[:, None]).astype(np.float32)
+        gx, gy = x[ground].astype(np.float32), y[ground].astype(np.float32)
+        fade = self._feathered(ground, gx, gy, k)
+        here = fade * GROVE_FLOOR
         shadow = np.hypot(du - 0.12, dv - 0.1) < grove.crown
-        colors[shadow] *= 0.74
+        colors[shadow] = SHADOW_COLOUR
+        here[shadow] = fade[shadow] * GROVE_SHADOW
         tree = near < grove.crown
         leaves = np.array(grove.tree, dtype=np.float32)
         towards = -(du + dv) / max(grove.crown, 1e-6)
         lit = np.clip(0.82 + 0.3 * towards, 0.62, 1.22)
         colors[tree] = np.clip(leaves * (lit[tree] * grain[tree])[:, None], 0, 255)
+        here[tree] = np.minimum(fade[tree] * 3, 1)
         fruit = tree & (table_hash(px, py, 21) > 0.82)
         pick = (table_hash(px, py, 22) * len(grove.fruit)).astype(np.int64)
         for index, color in enumerate(grove.fruit):
             colors[fruit & (pick == index)] = color
+        colors *= self._natural(x[ground], y[ground])
         rgb[ground] = colors
-        return ground
+        cover[ground] = here
+        return cover
 
 
 def _depths(field: BoolArray, most: int) -> npt.NDArray[np.int16]:

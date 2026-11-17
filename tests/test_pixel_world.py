@@ -936,3 +936,23 @@ def test_depths_into_a_field_are_those_of_shrinking_it_with_wrapping_edges(
         depths = _depths(field, 4)
 
         assert np.array_equal(depths, depths_by_rolling(field, 4))
+
+
+@pytest.mark.parametrize("kind", [BuildingKind.FARM, BuildingKind.ORCHARD])
+def test_a_field_fades_into_the_ground_at_its_edge_instead_of_lying_on_it(
+    sheet: SpriteSheet, kind: BuildingKind
+) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    constructions.build(Building((12, 3), kind))
+    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+    px, py = world.projection.to_pixels(*tile_map.grid.center(12, 3))
+    left, top = int(px) - 32, int(py) - 32
+    canvas = np.zeros((64, 64, 4))
+    shown = np.ones((64, 64), dtype=bool)
+
+    world.ground.fields(canvas, left, top, 1, shown=shown)
+
+    cover = canvas[..., 3]
+    assert (cover > 0.99).sum() > 50
+    assert ((cover > 0.05) & (cover < 0.95)).sum() > 20
