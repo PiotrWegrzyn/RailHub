@@ -1,5 +1,6 @@
 """Trees and rocks. A tree's crown is a heap of small lit lumps of leaves inside a ragged outline,
-darker deep inside and underneath, each lump its own shade of green, with a fine leafy grain:
+darker deep inside and underneath and cool in its shade like the mountains
+(railroads.ui.pixel.relief), each lump its own shade of green, with a fine leafy grain:
 leafy trees spread wide on a short trunk with branches, and pines are spruces, narrow cones of
 jagged tiers."""
 
@@ -18,6 +19,7 @@ from railroads.ui.pixel.art.painter import (
     shade,
 )
 from railroads.ui.pixel.noise import table_hash
+from railroads.ui.pixel.relief import SHADOW_TINT
 
 F32 = np.float32
 # Where the light comes from, as a direction out of the picture: from the top left.
@@ -77,11 +79,18 @@ def _heap(
         mid + (high - mid) * np.clip((level - 0.5) / 0.5, 0, 1)[..., None],
     )
     color = color * (1 + 0.1 * tint[..., None])
+    color = _cooled(color, level)
     edge = solid & ~(
         np.roll(solid, 1, 0) & np.roll(solid, -1, 0) & np.roll(solid, 1, 1) & np.roll(solid, -1, 1)
     )
     color = np.where(edge[..., None], color * 0.8, color)
     return color, solid, cx, cy
+
+
+def _cooled(color: np.ndarray, level: np.ndarray) -> np.ndarray:
+    """Leaves tinted cool where they lie in shade, as the mountains' shaded slopes are."""
+    dark = np.clip((0.45 - level) * 2, 0, 1)[..., None]
+    return color * (1 - dark * (1 - SHADOW_TINT) * 0.6)
 
 
 def _standing(
@@ -175,6 +184,7 @@ def _spruce(
         dark + (mid - dark) * (level / 0.5)[..., None],
         mid + (high - mid) * ((level - 0.5) / 0.5)[..., None],
     )
+    crown = _cooled(crown, level)
     total = rows + k
     stem = np.zeros((total, cols), bool)
     stem[rows - 2 : total, int(cx) - k // 2 : int(cx) + k // 2 + 1] = True

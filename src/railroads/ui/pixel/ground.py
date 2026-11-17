@@ -19,9 +19,18 @@ from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.building_spots import Plot, plots_of
 from railroads.ui.pixel.lattice import BoolArray, Lattice
-from railroads.ui.pixel.noise import noise, table_hash
+from railroads.ui.pixel.noise import Floats, noise, table_hash
 from railroads.ui.pixel.projection import CHUNK, RGB, PixelProjection
-from railroads.ui.pixel.relief import Elevation, Raised, mountain_cover, sample, smooth
+from railroads.ui.pixel.relief import (
+    LIGHT,
+    SHADOW_TINT,
+    Blend,
+    Elevation,
+    Raised,
+    mountain_cover,
+    sample,
+    smooth,
+)
 
 # Ground is worked out this far past a chunk's edges, so shores meet across chunks.
 APRON = 2
@@ -32,16 +41,16 @@ RAMPS: dict[Biome, list[RGB]] = {
     Biome.SEA: [(26, 56, 110), (34, 72, 136), (44, 90, 160), (110, 150, 200)],
     Biome.LAKE: [(30, 70, 130), (40, 88, 156), (52, 106, 178), (120, 164, 214)],
     Biome.RIVER: [(30, 70, 130), (40, 88, 156), (52, 106, 178), (120, 164, 214)],
-    Biome.SNOW: [(176, 188, 204), (206, 214, 226), (228, 234, 242), (250, 252, 255)],
-    Biome.TUNDRA: [(130, 132, 100), (150, 152, 116), (168, 170, 132), (188, 190, 152)],
-    Biome.TAIGA: [(36, 64, 44), (46, 78, 54), (58, 92, 64), (76, 110, 80)],
-    Biome.BADLANDS: [(150, 126, 88), (170, 146, 104), (188, 164, 120), (206, 184, 140)],
-    Biome.GRASSLAND: [(70, 116, 42), (88, 138, 50), (106, 156, 58), (134, 178, 74)],
-    Biome.FOREST: [(36, 70, 30), (46, 86, 36), (58, 102, 42), (76, 120, 50)],
-    Biome.DESERT: [(186, 156, 98), (206, 176, 114), (222, 194, 132), (238, 214, 156)],
-    Biome.SAVANNA: [(150, 144, 70), (170, 162, 82), (188, 180, 96), (206, 198, 116)],
-    Biome.JUNGLE: [(22, 70, 32), (30, 86, 40), (40, 102, 48), (56, 120, 60)],
-    Biome.MOUNTAIN: [(86, 84, 82), (110, 106, 100), (136, 132, 124), (172, 168, 158)],
+    Biome.SNOW: [(174, 186, 188), (202, 212, 210), (223, 232, 226), (243, 250, 239)],
+    Biome.TUNDRA: [(124, 128, 99), (143, 147, 115), (160, 165, 130), (180, 185, 149)],
+    Biome.TAIGA: [(38, 59, 42), (48, 72, 52), (60, 86, 62), (77, 103, 77)],
+    Biome.BADLANDS: [(138, 124, 91), (157, 143, 107), (175, 161, 122), (192, 180, 141)],
+    Biome.GRASSLAND: [(69, 105, 48), (86, 125, 57), (103, 142, 66), (129, 164, 83)],
+    Biome.FOREST: [(37, 63, 32), (47, 77, 39), (59, 92, 46), (75, 109, 55)],
+    Biome.DESERT: [(171, 152, 104), (190, 171, 120), (205, 189, 136), (222, 209, 158)],
+    Biome.SAVANNA: [(138, 137, 78), (157, 154, 91), (174, 172, 105), (192, 190, 123)],
+    Biome.JUNGLE: [(26, 62, 32), (35, 76, 41), (45, 91, 49), (60, 108, 61)],
+    Biome.MOUNTAIN: [(83, 83, 78), (106, 105, 95), (131, 130, 118), (165, 166, 150)],
 }
 
 
@@ -143,6 +152,29 @@ SLOPE_LIGHT = 16.0
 MAX_SLOPE_SHADES = 1.5
 
 
+# Plains are lit and coloured like the mountains beside them (railroads.ui.pixel.relief): they
+# roll in low swells that catch the light from LIGHT, brightening or darkening by up to
+# ROLL_RANGE, are greener near water and lie in a cool shade at the mountains' foot. How far
+# the water and the mountains reach, in cells, how strongly near they count, and how much
+# greener and darker they make the ground at the most.
+ROLL_LIGHT = 0.14
+ROLL_RANGE = (0.72, 1.24)
+ROLL_STEP = 0.04
+WET_REACH = 1.5
+FOOT_REACH = 2.5
+WET_GAIN = 2.5
+FOOT_GAIN = 2.2
+LUSH = 0.4
+LUSH_TINT = np.array((0.72, 1.0, 0.7), dtype=np.float32)
+FOOT_SHADE = 0.45
+FOOT_TINT = SHADOW_TINT * 0.8
+# Biomes on land meet along a winding line instead of the cells' edges: each pixel takes the
+# biome of the cell under a point near it, pushed by noise up to WARP cells (WARP_FINE more on
+# a smaller scale), unless that cell is water.
+WARP = 0.32
+WARP_FINE = 0.12
+
+
 # Land whose buildings are content or thriving is washed with a warm glow: how strongly, by
 # their satisfaction.
 GLOW: RGB = (255, 214, 110)
@@ -178,14 +210,14 @@ GRASSY = (Biome.GRASSLAND, Biome.SAVANNA, Biome.TUNDRA, Biome.FOREST, Biome.TAIG
 MEADOWS = (Biome.GRASSLAND, Biome.MOUNTAIN, Biome.FOREST, Biome.TAIGA, Biome.JUNGLE)
 # Meadows are smooth grass of three kinds side by side, each a ramp of colours from shaded to lit:
 # short pasture, darker rough grass whose blades show, and dry yellowing patches.
-PASTURE = ((0.0, (62, 106, 36)), (0.5, (94, 146, 54)), (1.0, (140, 180, 80)))
-ROUGH = ((0.0, (54, 94, 34)), (0.5, (80, 126, 46)), (1.0, (120, 160, 66)))
-DRY = ((0.0, (104, 124, 50)), (0.5, (136, 152, 66)), (1.0, (170, 178, 92)))
+PASTURE = ((0.0, (62, 95, 42)), (0.5, (92, 132, 62)), (1.0, (134, 166, 88)))
+ROUGH = ((0.0, (54, 84, 38)), (0.5, (79, 114, 53)), (1.0, (115, 147, 74)))
+DRY = ((0.0, (98, 115, 57)), (0.5, (127, 142, 75)), (1.0, (159, 168, 100)))
 # Savanna is drawn the same way in its own three kinds: golden grass, greener grass where it is
 # damper, and patches of bare red earth.
-GOLDEN = ((0.0, (150, 132, 62)), (0.5, (194, 174, 90)), (1.0, (224, 208, 132)))
-DAMP = ((0.0, (132, 124, 56)), (0.5, (168, 160, 78)), (1.0, (202, 194, 112)))
-EARTH = ((0.0, (138, 98, 62)), (0.5, (172, 128, 84)), (1.0, (202, 164, 116)))
+GOLDEN = ((0.0, (137, 126, 71)), (0.5, (178, 167, 100)), (1.0, (208, 201, 138)))
+DAMP = ((0.0, (121, 118, 64)), (0.5, (155, 152, 87)), (1.0, (188, 186, 119)))
+EARTH = ((0.0, (124, 97, 67)), (0.5, (156, 127, 90)), (1.0, (186, 162, 120)))
 # Each grassland, and how rare wild flowers are in it (1 for none).
 GRASSES = {
     "meadow": (PASTURE, ROUGH, DRY, 0.997),
@@ -193,18 +225,35 @@ GRASSES = {
 }
 # The colours of wild flowers in meadows.
 FLOWERS = np.array([(244, 240, 232), (246, 214, 80), (196, 130, 210), (226, 90, 70)], np.float32)
-# Woods are drawn as a canopy seen from above (Ground.canopy): crowns about CROWN_GAP art pixels
-# apart, each lit on the side towards the light, conifers in their own darker greens, over a dark
-# floor showing between them. Their edge follows the forest cells but frays, curving round
-# clearings where something is built, and they throw a shadow on the ground beside them.
+# Woods are drawn as a canopy seen from above (Ground.canopy), lit the way the mountains are
+# (railroads.ui.pixel.relief): crowns about CROWN_GAP art pixels apart, each a dome CROWN_SIZE
+# art pixels across at most, conifers in their own darker greens, the roof they make rolling
+# gently in broad swells, the whole brightened on slopes facing CROWN_LIGHT and tinted cool in
+# its shade. Their edge follows the forest cells but frays, curving round clearings where
+# something is built; their lower edge shows the dark side of the trees, and they throw a cool
+# shadow on the ground beside them.
 WOODS = (Biome.FOREST, Biome.TAIGA, Biome.JUNGLE)
-CROWN_GAP = 3.1
+CROWN_GAP = 4.4
+CROWN_SIZE = (2.2, 1.8)
+CROWN_LIGHT = np.array((-0.75, -0.5, 0.6)) / math.hypot(0.75, 0.5, 0.6)
+CANOPY_SWELL = 0.7
+CANOPY_SWELL_SIZE = 0.6
+CROWN_SLOPES = 0.06
+# How far round towards their rims crowns curve, how dark the hollows between them are and
+# how fine the grain of their leaves.
+CROWN_ROUND = 0.9
+CROWN_DEPTH = 0.7
+LEAF_GRAIN = 0.04
+LUMPS = 0.5
+CROWN_TONES = 0.5
 # How many art pixels above and left of a block the woods are worked out, for their shadow.
 CANOPY_REACH = 4
-CONIFER_CROWNS = np.array([(22, 48, 34), (32, 66, 44), (52, 92, 58)], dtype=np.float32)
-LEAFY_CROWNS = np.array([(38, 76, 30), (62, 112, 40), (106, 152, 58)], dtype=np.float32)
-WOODS_FLOOR = np.array((30, 52, 28), dtype=np.float32) * 0.7
-EDGE_SHADOW = 0.75
+CONIFER_CROWNS = np.array([(58, 86, 58), (64, 90, 56)], dtype=np.float32)
+LEAFY_CROWNS = np.array([(80, 108, 54), (90, 114, 56)], dtype=np.float32)
+WOODS_FLOOR = np.array((26, 38, 30), dtype=np.float32)
+WOODS_SIDE = 0.55
+EDGE_SHADOW = 0.28
+SHADOW_COLOUR = np.array((18, 26, 46), dtype=np.float32)
 # How mountainous ground may be before woods give way to the mountain's own bare slopes, and how
 # far below that a bound on it (Elevation.most) must stay to show none of the woods are bare.
 BARE_ABOVE = 0.3
@@ -289,6 +338,7 @@ class Ground:
         self.satisfaction = np.full(tile_map.grid.shape, -1, dtype=np.int8)
         self._hills = land & (tile_map.relief == Relief.HILLS)
         self._relief_light = self._light_slopes(angle_deg)
+        self._wet, self._foot = self._surroundings()
         # Where trees stand in the picture, which shade the grass round them, and where buildings
         # stand, what ground lies round each and how far it reaches, both set by the world.
         self.trees: tuple[FloatArray, FloatArray] = (np.zeros(0), np.zeros(0))
@@ -312,6 +362,9 @@ class Ground:
     def refresh(self) -> None:
         """Works out the biomes and fields again after buildings or forests changed."""
         self._biomes = biome_grid(self.tile_map)
+        # Cells with another biome among the cells round them, whose pixels may take it.
+        there = self._biomes.ravel()[self._round]
+        self._mixed = self._off_round | (there != self._biomes).any(axis=0)
         built = np.zeros(self.tile_map.grid.shape, dtype=bool)
         woodland = np.zeros(self.tile_map.grid.shape, dtype=bool)
         for construction in self.constructions:
@@ -360,6 +413,7 @@ class Ground:
         biomes = self._biomes[r, c]
         x, y = points.plane(left, top, CHUNK, rows)
         rocky = self.tile_map.relief[r, c] == Relief.MOUNTAINS
+        self._wind_borders(biomes, x, y, self._mixed[r, c] & ~wet)
         seen = np.ones(x.shape, dtype=bool)
         if raised is not None:
             seen = mountain_cover(raised.mountains[:rows], rocky) < 1
@@ -411,6 +465,9 @@ class Ground:
             down, across = down[tuft], across[tuft]
             lower = np.maximum(shade[down, across] - 1, 0)
             rgb[down, across] = self.ramps[biomes[down, across], lower] * 0.92
+        land = lit & dry
+        if land.any():
+            rgb[land] *= self._natural(x[land], y[land])
         near_water = _near(water, a, rows, [(0, 1), (0, -1), (1, 0), (-1, 0), (0, 2), (0, -2)])
         near_land = _near(~water, a, rows, [(0, 1), (0, -1), (1, 0), (-1, 0)])
         rgb[~wet & near_water & inside] = SAND
@@ -428,6 +485,56 @@ class Ground:
             self.elevation.colour(rgb, raised.top(rows), x, y, rocky)
         return np.clip(rgb, 0, 255) * alpha[..., None], alpha
 
+    def _wind_borders(
+        self, biomes: npt.NDArray[np.integer], x: FloatArray, y: FloatArray, near: BoolArray
+    ) -> None:
+        """Gives the pixels `near` another biome the biome of the cell under a point pushed by
+        noise (WARP), where that cell is not water."""
+        if not near.any():
+            return
+        grid = self.tile_map.grid
+        fx, fy = x[near].astype(np.float32), y[near].astype(np.float32)
+        wx, wy = _wound(fx, fy)
+        wr, wc = grid.cell_on_map(wx, wy)
+        warped = self._biomes[wr, wc]
+        biomes[near] = np.where(_WATER[warped], biomes[near], warped)
+
+    def _natural(self, x: FloatArray, y: FloatArray) -> FloatArray:
+        """How much each colour of plain land at these points is multiplied by for the light on
+        its swells, the water and the mountains near it."""
+        fx, fy = x.astype(np.float32), y.astype(np.float32)
+        here = _rolling(fx, fy)
+        e = np.float32(ROLL_STEP)
+        gx = (_rolling(fx + e, fy) - here) / e
+        gy = (_rolling(fx, fy + e) - here) / e
+        facing = -(gx * np.float32(LIGHT[0]) + gy * np.float32(LIGHT[1]))
+        roll = np.clip(1 + ROLL_LIGHT * facing, *ROLL_RANGE)
+        at = Blend.at(self._wet.shape, x * RELIEF_STEPS_PER_CELL, y * RELIEF_STEPS_PER_CELL)
+        lush = np.clip(at.read(self._wet) * WET_GAIN, 0, 1) * LUSH
+        foot = np.clip(at.read(self._foot) * FOOT_GAIN, 0, 1) * FOOT_SHADE
+        tint = 1 + (LUSH_TINT - 1) * lush[:, None]
+        tint *= 1 + (FOOT_TINT - 1) * foot[:, None]
+        return (tint * roll[:, None]).astype(np.float32)
+
+    def _surroundings(self) -> tuple[FloatArray, FloatArray]:
+        """How much water and how many mountains lie round the ground, from 0 to 1, over
+        WET_REACH and FOOT_REACH, on the raster of the slopes' light."""
+        grid = self.tile_map.grid
+        steps = RELIEF_STEPS_PER_CELL
+        rows, cols = grid.raster_cells(steps)
+        water = (self.tile_map.terrain[rows, cols] != Terrain.LAND).astype(np.float64)
+        mountains = (self.tile_map.relief[rows, cols] == Relief.MOUNTAINS).astype(np.float64)
+        wet = smooth(water, round(WET_REACH * steps)).astype(np.float32)
+        foot = smooth(mountains, round(FOOT_REACH * steps)).astype(np.float32)
+        return wet, foot
+
+    @property
+    def shading(self) -> FloatArray:
+        """The slopes' light, how much water and how many mountains lie round the ground
+        (`_surroundings`) and nothing, four to each step of their raster, for the graphics card."""
+        light = self._relief_light.astype(np.float32)
+        return np.stack([light, self._wet, self._foot, np.zeros_like(light)], axis=-1)
+
     @property
     def biomes(self) -> npt.NDArray[np.integer]:
         """Each cell's biome."""
@@ -437,11 +544,6 @@ class Ground:
     def hills(self) -> BoolArray:
         """Where land is hilly."""
         return self._hills
-
-    @property
-    def slopes_light(self) -> FloatArray:
-        """How many shades lighter or darker the slopes are, RELIEF_STEPS_PER_CELL steps a cell."""
-        return self._relief_light
 
     def under(
         self, left: int, top: int, rows: int, points: Lattice | None = None
@@ -656,13 +758,14 @@ class Ground:
         points: Lattice | None = None,
     ) -> None:
         """Paints the woods over a picture of the ground from (`left`, `top`), `k` pixels to an
-        art pixel, RGB from 0 to 1 multiplied by its alpha: a roof of lit crowns with the dark
-        floor between them, and their shadow on the ground beside them, worked out an art pixel
-        at a time like the rest of the ground, where the picture shows the map, as `fields`
-        says. `points` may hold the plane points and cells of the art pixels already."""
+        art pixel, RGB from 0 to 1 multiplied by its alpha: a roof of lit crowns, the dark side
+        of the trees along its lower edge and their shadow on the ground beside them, worked out
+        at every pixel of the picture like the mountains, so they are as smooth as the picture is
+        fine, where the picture shows the map, as `fields` says. `points` may hold the plane
+        points and cells of the art pixels already."""
         rows, cols = canvas.shape[0] // k, canvas.shape[1] // k
         reach = CANOPY_REACH
-        block = (left - reach, top - reach, cols + reach, rows + reach)
+        block = (left - reach, top - reach, cols + reach, rows + reach + 2)
         points = _lattice(points, self.projection, self.tile_map.grid, block)
         r, c, _ = points.cells(*block)
         if not (self._woods[r.min() : r.max() + 2, c.min() : c.max() + 2] > 0).any():
@@ -674,36 +777,69 @@ class Ground:
             x, y = points.plane(*block)
             woods[woods] = self.elevation.mountainous(x[woods], y[woods]) < BARE_ABOVE
         shadow = woods[: rows + reach - 3, : cols + reach - 2]
-        shadow = shadow[reach - 3 :, reach - 2 :] & ~woods[reach:, reach:]
-        woods = woods[reach:, reach:]
-        shown = canvas[::k, ::k, 3] > 0 if shown is None else shown[::k, ::k]
-        blocks = art_pixels(canvas, k)
+        shadow = shadow[reach - 3 :, reach - 2 :] & ~woods[reach : reach + rows, reach:]
+        below = ~woods[reach + 1 : reach + 1 + rows, reach:] | ~woods[reach + 2 :, reach:]
+        woods = woods[reach : reach + rows, reach:]
+        side = below & woods
+        if k > 1:
+            woods, shadow, side = (
+                np.repeat(np.repeat(a, k, 0), k, 1) for a in (woods, shadow, side)
+            )
+        shown = _on_map(canvas, shown)
         down, across = np.nonzero(shadow & shown)
         if len(down):
-            shaded = blocks[down, :, across]
-            shaded[..., :3] *= EDGE_SHADOW
-            shaded[..., 3] = shaded[..., 3] * EDGE_SHADOW + (1 - EDGE_SHADOW)
-            blocks[down, :, across] = shaded
+            shaded = canvas[down, across]
+            shaded[:, :3] = shaded[:, :3] * (1 - EDGE_SHADOW) + SHADOW_COLOUR / 255 * EDGE_SHADOW
+            shaded[:, 3] = shaded[:, 3] * (1 - EDGE_SHADOW) + EDGE_SHADOW
+            canvas[down, across] = shaded
         down, across = np.nonzero(woods & shown)
         if not len(down):
             return
-        x, y = points.plane(*block)
-        x, y = x[down + reach, across + reach], y[down + reach, across + reach]
+        art_down, art_across = down // k + reach, across // k + reach
+        px, py = left + (across + 0.5) / k, top + (down + 0.5) / k
+        if k == 1:
+            x, y = points.plane(*block)
+            x, y = x[art_down, art_across], y[art_down, art_across]
+        else:
+            x, y = self.projection.to_plane(px, py)
         fx, fy = x.astype(np.float32), y.astype(np.float32)
-        biomes = self._biomes[r[down + reach, across + reach], c[down + reach, across + reach]]
-        d, dx, dy, gx, gy = _nearest_crown(left + across + 0.5, top + down + 0.5, CROWN_GAP)
-        radius = 1.25 + 0.75 * table_hash(gx, gy, 53)
+        biomes = self._biomes[r[art_down, art_across], c[art_down, art_across]]
+        height, dx, dy, radius, gx, gy = _tallest_crown(px, py, CROWN_GAP)
+        grain = noise(fx, fy, LEAF_GRAIN, 68) - 0.5
+        height += LUMPS * grain
         conifers = np.where(biomes == Biome.TAIGA, 0.9, 0.0)
         broadleaved = (biomes != Biome.TAIGA) & (biomes != Biome.JUNGLE)
         conifers[broadleaved] = 0.2 + 0.6 * noise(fx[broadleaved], fy[broadleaved], 1.1, 64)
-        conifer = table_hash(gx, gy, 63) < conifers
-        towards = (-dx * 0.7 - dy * 0.7) / np.maximum(radius, 0.1)
-        part = np.where(towards > 0.25, 2, np.where(towards < -0.45, 0, 1))
-        leaves = np.where(conifer[:, None], CONIFER_CROWNS[part], LEAFY_CROWNS[part])
-        leaves *= (0.88 + 0.28 * noise(fx, fy, 0.9, 65))[:, None]
-        colour = np.where((d < radius)[:, None], leaves, WOODS_FLOOR) / 255
-        blocks[down, :, across, :, :3] = colour[:, None, None, :]
-        blocks[down, :, across, :, 3] = 1.0
+        conifer = (table_hash(gx, gy, 63) < conifers)[:, None]
+        tone = table_hash(gx, gy, 66)[:, None] * CROWN_TONES
+        first = np.where(conifer, CONIFER_CROWNS[0], LEAFY_CROWNS[0])
+        crowns = first + (np.where(conifer, CONIFER_CROWNS[1], LEAFY_CROWNS[1]) - first) * tone
+        crowns *= (0.9 + 0.2 * noise(fx, fy, 0.9, 65))[:, None]
+        towards = (dx * CROWN_LIGHT[0] + dy * CROWN_LIGHT[1]) / radius * CROWN_ROUND
+        up = np.sqrt(np.clip(1 - (1 - height) * CROWN_ROUND**2, 0, 1))
+        facing = towards + up * CROWN_LIGHT[2]
+        facing += self._swell(fx, fy) + CROWN_SLOPES * sample(
+            self._relief_light, x * RELIEF_STEPS_PER_CELL, y * RELIEF_STEPS_PER_CELL
+        )
+        s = np.clip(facing, 0, 1).astype(np.float32)
+        lit = np.clip(1 + 1.3 * (s - np.float32(CROWN_LIGHT[2])), 0.5, 1.35)
+        dark = np.clip((0.45 - s) * 2, 0, 1)
+        deep = CROWN_DEPTH + (1 - CROWN_DEPTH) * np.sqrt(np.clip(height * 2, 0, 1))
+        leaves = crowns * (lit * (1 - dark * 0.35) * deep)[:, None]
+        leaves *= 1 - (dark * 0.6)[:, None] * (1 - SHADOW_TINT)
+        leaves[height <= 0] = WOODS_FLOOR
+        edge = side[down, across]
+        leaves[edge] *= WOODS_SIDE * SHADOW_TINT
+        canvas[down, across, :3] = leaves / 255
+        canvas[down, across, 3] = 1.0
+
+    def _swell(self, x: Floats, y: Floats) -> Floats:
+        """How much more the woods' roof faces CROWN_LIGHT for the broad swells it rolls in."""
+        e = np.float32(0.05)
+        here = noise(x, y, CANOPY_SWELL_SIZE, 67)
+        gx = (noise(x + e, y, CANOPY_SWELL_SIZE, 67) - here) / e
+        gy = (noise(x, y + e, CANOPY_SWELL_SIZE, 67) - here) / e
+        return -(gx * CROWN_LIGHT[0] + gy * CROWN_LIGHT[1]) * CANOPY_SWELL * CANOPY_SWELL_SIZE
 
     def _clear_round_mills(self, woods: BoolArray, block: tuple[int, int, int, int]) -> None:
         """Takes the woods out of the clearing round each lumber mill in the block, an oval
@@ -1030,11 +1166,13 @@ def art_pixels(picture: FloatArray, k: int) -> FloatArray:
     return picture.reshape(rows, k, cols, k, picture.shape[2], copy=False)
 
 
-def _nearest_crown(
+def _tallest_crown(
     px: FloatArray, py: FloatArray, gap: float
-) -> tuple[FloatArray, FloatArray, FloatArray, IntArray, IntArray]:
-    """The nearest crown to each picture point, crowns standing one to a square `gap` pixels a
-    side at a random spot in it: how far, which way, and which square. Where the crown of every
+) -> tuple[FloatArray, FloatArray, FloatArray, FloatArray, IntArray, IntArray]:
+    """The crown standing highest over each picture point, crowns standing one to a square `gap`
+    pixels a side at a random spot in it, each a dome CROWN_SIZE across: how high it stands
+    there as a share of its top (below 0 where no crown covers the point), which way the point
+    lies from its middle, how wide it is and which square it stands in. Where the crown of every
     square round the points stands is worked out once a square; ties go to the square met
     first, going down each column of the three by three round a point's own."""
     cx, cy = np.floor(px / gap).astype(np.int64), np.floor(py / gap).astype(np.int64)
@@ -1043,22 +1181,38 @@ def _nearest_crown(
     gy = np.arange(first_y, int(cy.max()) + 2)[:, None]
     jx = ((gx + 0.15 + 0.7 * table_hash(gx, gy, 51)) * gap).ravel()
     jy = ((gy + 0.15 + 0.7 * table_hash(gx, gy, 52)) * gap).ravel()
+    radii = (CROWN_SIZE[0] + CROWN_SIZE[1] * table_hash(gx, gy, 53)).ravel().astype(np.float32)
     width = gx.shape[1]
     home = (cy - first_y) * width + (cx - first_x)
-    best = np.full(px.shape, np.inf, dtype=np.float32)
-    nearest = home.copy()
+    best = np.full(px.shape, -np.inf, dtype=np.float32)
+    tallest = home.copy()
     for ox in (-1, 0, 1):
         for oy in (-1, 0, 1):
             square = home + (oy * width + ox)
             dx, dy = (px - jx[square]).astype(np.float32), (py - jy[square]).astype(np.float32)
-            dx *= dx
-            dy *= dy
-            dx += dy
-            closer = dx < best
-            np.copyto(best, dx, where=closer)
-            np.copyto(nearest, square, where=closer)
-    dx, dy = (px - jx[nearest]).astype(np.float32), (py - jy[nearest]).astype(np.float32)
-    return np.sqrt(best), dx, dy, nearest % width + first_x, nearest // width + first_y
+            radius = radii[square]
+            height = 1 - (dx * dx + dy * dy) / (radius * radius)
+            higher = height > best
+            np.copyto(best, height, where=higher)
+            np.copyto(tallest, square, where=higher)
+    dx, dy = (px - jx[tallest]).astype(np.float32), (py - jy[tallest]).astype(np.float32)
+    return best, dx, dy, radii[tallest], tallest % width + first_x, tallest // width + first_y
+
+
+def _rolling(x: Floats, y: Floats) -> Floats:
+    """How high the low swells of the plains rise at these points."""
+    return noise(x, y, 1.6, 301) + 0.45 * noise(x, y, 0.55, 302) + 0.12 * noise(x, y, 0.18, 303)
+
+
+def _wound(x: Floats, y: Floats) -> tuple[Floats, Floats]:
+    """Points pushed by noise up to WARP and WARP_FINE cells, for biomes' winding borders."""
+    wx = (
+        x + WARP * 2 * (noise(x, y, 0.7, 211) - 0.5) + WARP_FINE * 2 * (noise(x, y, 0.2, 213) - 0.5)
+    )
+    wy = (
+        y + WARP * 2 * (noise(x, y, 0.7, 212) - 0.5) + WARP_FINE * 2 * (noise(x, y, 0.2, 214) - 0.5)
+    )
+    return wx, wy
 
 
 def _ramp(t: FloatArray, stops: tuple[tuple[float, RGB], ...]) -> FloatArray:
