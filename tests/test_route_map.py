@@ -8,6 +8,7 @@ from test_railway import joined_stations
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.demand import DEMAND_PER_NEED
 from railroads.sim.goods import Good, Need
+from railroads.sim.station_goods import QUARTER
 from railroads.sim.steps import finish
 from railroads.sim.trains import Stop
 from railroads.ui.minimap import Panel
@@ -108,7 +109,7 @@ def test_mail_wanted_and_sent_at_a_station_is_a_general_need_and_made_there() ->
 def test_a_supplier_wanting_a_little_of_its_good_takes_the_lightest_shade_of_both() -> None:
     _, railway = joined_stations()
     railway.station_demand((6, 3)).capacity = {Need.FOOD: 30.0}
-    made = {(6, 3): Offer(Good.APPLES, 115.0, 15.0)}
+    made = {(6, 3): Offer(Good.APPLES, 115.0, LEAST_MADE + 5)}
 
     shades = marks_at(railway, Good.APPLES, made)[(6, 3)].shades()
 
@@ -147,7 +148,7 @@ def test_a_marks_shade_darkens_at_each_threshold(amount: float, shade: int) -> N
 
 
 def test_a_station_gets_a_shade_for_each_kind_of_mark_it_has() -> None:
-    mark = Marks(general=200.0, special=10.0, made=50.0)
+    mark = Marks(general=200.0, special=10.0, made=QUARTER * SHADE_FROM[0])
 
     shades = mark.shades()
 
@@ -161,7 +162,7 @@ def test_a_good_is_made_where_buildings_around_make_it_or_where_it_waits() -> No
 
     found = made_at(railway, Good.COAL, made.__getitem__)
 
-    assert {station: (o.made, o.waiting) for station, o in found.items()} == {
+    assert {station: (o.gathered, o.waiting) for station, o in found.items()} == {
         (6, 3): (30.0, 0.0),
         (6, 20): (0.0, 12.0),
     }

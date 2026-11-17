@@ -111,6 +111,8 @@ class StationTrade:
             goods = railway.station_goods(station)
             for good, amount in travellers.items():
                 goods.board(good, amount)
+            got = dict(trade.gathered.get(station, {}))
+            goods.count_month(got | {good: goods.stockpile[good] for good in travellers})
             needs = self._short_after_local(station, self._needs(counts), trade)
             capacity[station] = capacity_of(needs | as_needs(travellers))
         railway.year = self._growth.year
@@ -142,9 +144,10 @@ class StationTrade:
 
     def hand_out_now(self, station: Cell, good: Good) -> None:
         """Hands a good trains have just brought to a station to the buildings around it that
-        still want it this month, the nearest first, at once, unless the good is kept for trains.
-        Each takes up to what it needs in a month, less what it took already; a processor up to
-        the room in its stockpile. They pay as they take."""
+        still want it this month, at once, unless the good is kept for trains: the least
+        satisfied last month first, so they don't die out, and then the nearest, as in a month's
+        trade. Each takes up to what it needs in a month, less what it took already; a processor
+        up to the room in its stockpile. They pay as they take."""
         growth, railway = self._growth, self._growth.railway
         if railway is None or good in TRAVELLERS:
             return
@@ -152,17 +155,23 @@ class StationTrade:
         if good in goods.kept:
             return
         within = self._within(station, railway.reach(station)[0])
-        cells = within.cells[np.argsort(within.steps, kind="stable")]
         economy, year = growth.economy, growth.year
+        order = np.lexsort((within.steps, economy.levels[within.cells]))
+        cells = within.cells[order].tolist()
         if economy.taken is None:
             economy.taken = {}
         for need in MEETS[good]:
-            for kind, count in growth.counts.items():
-                if need not in wants_of(kind, year):
-                    continue
-                recipe = RECIPES.get(kind)
-                here = count.ravel()[cells]
-                for cell, n in zip(cells[here > 0].tolist(), here[here > 0].tolist(), strict=True):
+            wanting = [
+                (kind, count.ravel())
+                for kind, count in growth.counts.items()
+                if need in wants_of(kind, year)
+            ]
+            for cell in cells:
+                for kind, count in wanting:
+                    n = int(count[cell])
+                    if n <= 0:
+                        continue
+                    recipe = RECIPES.get(kind)
                     if recipe is not None:
                         stock = economy.stock[(kind, need)]
                         want = input_stock(kind) * n - stock[cell]
@@ -249,26 +258,25 @@ class StationTrade:
         return flat_within_any(self._growth.grid, cells, radius)
 
     def supplies(self, station: Cell) -> dict[Good, float]:
-        """What the station has to send on each month: the goods buildings make within the
-        cells it gathers from, the most each processor there makes, and the passengers and mail
-        the buildings it hands out to send."""
+        """What the station has to send on: each good made within the cells it gathers from, and
+        the passengers and mail the buildings it hands out to send, with how much of each came
+        to it over the last quarter, which is only what the buildings around left over."""
         railway = self._growth.railway
         radius = COLLECTION_RADIUS if railway is None else railway.reach(station)[1]
         cells = self._within(station, radius).cells
-        made: dict[Good, float] = {}
+        made: set[Good] = set()
         for kind, count in self._growth.counts.items():
-            n = float(count.ravel()[cells].sum())
-            if n <= 0:
+            if count.ravel()[cells].sum() <= 0:
                 continue
-            goods = dict(makes_of(kind, self._growth.year))
+            made |= set(makes_of(kind, self._growth.year))
             if kind in RECIPES:
-                goods[RECIPES[kind].makes] = RECIPES[kind].most
-            for good, amount in goods.items():
-                made[good] = made.get(good, 0.0) + n * amount
+                made.add(RECIPES[kind].makes)
         for good, amount in self.travellers_in(self.inner_ring(station)).items():
             if amount > 0:
-                made[good] = amount
-        return made
+                made.add(good)
+        got = {} if railway is None else railway.station_goods(station).last_quarter()
+        made |= {good for good, amount in got.items() if amount > 0}
+        return {good: got.get(good, 0.0) for good in made}
 
     def travellers_in(self, cells: npt.NDArray[np.intp]) -> dict[Good, float]:
         """The passengers and mail the buildings in these cells send, and want, in a month."""

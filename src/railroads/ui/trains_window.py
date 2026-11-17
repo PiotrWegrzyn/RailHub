@@ -413,7 +413,7 @@ class TrainsWindow:
             return
         most = railway.most_cars(train)
         full = len(stop.cars) >= most
-        offers.sort(key=lambda o: (-(demand.monthly_want(o.good) > 0), -o.waiting, -o.made))
+        offers.sort(key=lambda o: (-(demand.monthly_want(o.good) > 0), -o.waiting, -o.gathered))
         left = imgui.get_cursor_pos_x()
         per_row = max(1, int(imgui.get_content_region_avail().x // (OFFER_SIZE[0] + 4)))
         for number, offer in enumerate(offers):
@@ -423,7 +423,8 @@ class TrainsWindow:
                 imgui.set_cursor_pos_x(left)
             wanted = demand.monthly_want(offer.good) > 0
             tip = (
-                f"{offer.good.value}: {offer.waiting:.0f} waiting, about {offer.made:.0f} a month"
+                f"{offer.good.value}: {offer.waiting:.0f} waiting, "
+                f"{offer.gathered:.0f} given to the station in the last quarter"
                 + (" - comes in on this train" if offer.good in carried else "")
                 + (" - wanted at the next stop" if wanted else "")
                 + ("\nThe train is full: remove a car first" if full else "\nClick to add a car")

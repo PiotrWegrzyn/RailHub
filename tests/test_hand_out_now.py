@@ -1,8 +1,10 @@
+import numpy as np
 import pytest
 from test_railway import joined_stations
 
 from railroads.sim.constructions import Building, BuildingKind
-from railroads.sim.goods import Good, Need
+from railroads.sim.economy import Satisfaction
+from railroads.sim.goods import Good, Need, needs_of
 
 STATION = (6, 20)
 
@@ -83,3 +85,22 @@ def test_a_train_can_leave_diamonds_nobody_around_wants_for_another_train_to_tak
     growth.trade_goods()
 
     assert railway.station_goods(STATION).brought[Good.DIAMONDS] == pytest.approx(10.0)
+
+
+def test_goods_a_train_brings_go_to_the_least_satisfied_building_first() -> None:
+    growth, railway = joined_stations()
+    railway.levels[STATION] = 2
+    shape = growth.constructions.tile_map.grid.shape
+    fed, hungry = (6, 21), (6, 22)
+    for cell in (fed, hungry):
+        growth.build(Building(cell, BuildingKind.HOUSE))
+    growth.economy.levels[np.ravel_multi_index(fed, shape)] = Satisfaction.THRIVING
+    growth.economy.levels[np.ravel_multi_index(hungry, shape)] = Satisfaction.UNSATISFIED
+    house_food = needs_of(BuildingKind.HOUSE, growth.year)[Need.FOOD]
+    bring(railway, Good.BREAD, house_food)
+
+    growth.station_trade.hand_out_now(STATION, Good.BREAD)
+
+    assert growth.economy.taken is not None
+    taken = growth.economy.taken[(BuildingKind.HOUSE, Need.FOOD)]
+    assert taken == {np.ravel_multi_index(hungry, shape): pytest.approx(house_food)}

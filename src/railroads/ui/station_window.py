@@ -186,7 +186,7 @@ def _draw_kept(goods: StationGoods, made: Mapping[Good, float]) -> None:
     keep it for trains instead of handing it to the buildings around the station."""
     held = {g for g in {*goods.stockpile, *goods.brought} if goods.held(g) > 0}
     shown = sorted(
-        {g for g, amount in made.items() if amount > 0} | held - set(TRAVELLERS) | goods.kept,
+        set(made) | held - set(TRAVELLERS) | goods.kept,
         key=lambda g: g.value,
     )
     if not shown:

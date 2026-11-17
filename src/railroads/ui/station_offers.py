@@ -7,7 +7,8 @@ from railroads.sim.goods import GOOD_YEARS, Good
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
 
-# What a station has to send on each month, good by good (railroads.sim.station_trade).
+# The goods a station has to send on, each with how much came to it over the last quarter
+# (railroads.sim.station_trade).
 type Supplies = Callable[[Cell], Mapping[Good, float]]
 
 
@@ -15,17 +16,18 @@ type Supplies = Callable[[Cell], Mapping[Good, float]]
 class Offer:
     good: Good
     waiting: float
-    made: float
+    # How much of it came to the station over the last quarter.
+    gathered: float
 
 
-def goods_to_load(railway: Railway, station: Cell, made: Mapping[Good, float]) -> list[Offer]:
+def goods_to_load(railway: Railway, station: Cell, supplied: Mapping[Good, float]) -> list[Offer]:
     """The goods a train can take on at a station: what is made around it and what waits
     there, gathered or brought by other trains, leaving out goods not yet invented."""
     goods = railway.station_goods(station)
     waiting = {g: goods.stockpile.get(g, 0.0) + goods.brought.get(g, 0.0) for g in Good}
-    known = {g for g, a in made.items() if a > 0} | {g for g, a in waiting.items() if a >= 0.5}
+    known = set(supplied) | {g for g, a in waiting.items() if a >= 0.5}
     return [
-        Offer(good, waiting[good], made.get(good, 0.0))
+        Offer(good, waiting[good], supplied.get(good, 0.0))
         for good in Good
         if good in known and GOOD_YEARS.get(good, 0) <= railway.year
     ]
