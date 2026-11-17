@@ -750,7 +750,7 @@ FOOD_TOWN = 3
 _BAKERY = Ladder(
     kinds=(BuildingKind.BAKERY,),
     land=TOWN_LAND,
-    base_chance=0.00005,
+    base_chance=0.00001,
     chance_per_doubling={Points.POPULATION: 0.000001},
     needs={Points.POPULATION: FOOD_TOWN},
     most_per_cell=1,
@@ -761,7 +761,7 @@ BAKERIES = _merges(_BAKERY)
 
 # Butchers open in towns from 1850, the likelier the more people live around, like bakeries.
 BUTCHERS = _merges(
-    replace(_BAKERY, kinds=(BuildingKind.MEAT_FACTORY,), base_chance=0.00005, from_year=1850)
+    replace(_BAKERY, kinds=(BuildingKind.MEAT_FACTORY,), base_chance=0.00001, from_year=1850)
 )
 
 # Town crafts that come up, like bakeries, the likelier the more people live around: potters and
@@ -792,8 +792,8 @@ def _town_craft(
 
 
 TOWN_CRAFTS = (
-    _town_craft(BuildingKind.POTTER, IN_TOWNS_ONLY, least_people=FOOD_TOWN),
-    _town_craft(BuildingKind.DAIRY, 12.5, least_people=FOOD_TOWN),
+    _town_craft(BuildingKind.POTTER, IN_TOWNS_ONLY / 3, least_people=FOOD_TOWN),
+    _town_craft(BuildingKind.DAIRY, 2.5, least_people=FOOD_TOWN),
     _town_craft(BuildingKind.TILE_WORKS, 0.5),
     _town_craft(BuildingKind.FOUNDRY, 0.5, 1800),
     _town_craft(BuildingKind.SAUSAGE_MAKER, 6.25, 1850, FOOD_TOWN),
@@ -953,7 +953,7 @@ CLUB_TOWN = 30
 TAVERNS = Ladder(
     kinds=(BuildingKind.TAVERN,),
     land=TOWN_LAND,
-    base_chance=0.00005,
+    base_chance=0.00001,
     chance_per_doubling={Points.POPULATION: 0.000001},
     needs={Points.POPULATION: FOOD_TOWN},
     most_per_cell=1,
