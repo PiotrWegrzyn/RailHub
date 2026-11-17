@@ -86,22 +86,31 @@ def test_the_players_own_buildings_die_out_too() -> None:
     assert growth.counts[BuildingKind.HOUSE].sum() == 0
 
 
-def test_of_four_houses_beside_one_farm_three_starve() -> None:
+def test_four_houses_beside_one_farm_share_its_food_and_none_starve() -> None:
     growth = standing(*[((5, 5), BuildingKind.HOUSE)] * 4, ((5, 6), BuildingKind.FARM))
     assert growth.trade is not None
 
     starving = growth.starving(growth.trade, BuildingKind.HOUSE)
 
-    assert starving.tolist() == [3, 0]
+    assert starving.tolist() == [0, 0]
 
 
-def test_houses_starving_for_ten_years_die_and_the_fed_one_stays() -> None:
+def test_houses_sharing_a_farm_all_stay_after_ten_years() -> None:
     growth = standing(*[((5, 5), BuildingKind.HOUSE)] * 4, ((5, 6), BuildingKind.FARM))
 
     run(growth, HOMES_DIE_AFTER_MONTHS)
 
-    assert growth.counts[BuildingKind.HOUSE][5, 5] == 1
-    assert growth.died_out == 3
+    assert growth.counts[BuildingKind.HOUSE][5, 5] == 4
+    assert growth.died_out == 0
+
+
+def test_houses_with_nothing_all_die_out_together() -> None:
+    growth = standing(*[((5, 5), BuildingKind.HOUSE)] * 4)
+
+    run(growth, HOMES_DIE_AFTER_MONTHS)
+
+    assert growth.counts[BuildingKind.HOUSE].sum() == 0
+    assert growth.died_out == 4
 
 
 def test_a_house_the_stand_in_player_serves_does_not_starve() -> None:

@@ -18,9 +18,9 @@ cells with room for them.
 Every TRADE_EVERY_MONTHS the stations hand out their goods and buildings sell to each other
 (railroads.sim.economy, settled with the railway by railroads.sim.station_trade), which leaves each
 kind of building in each cell unsatisfied, content or thriving, and pays the player for the
-buildings they own (railroads.sim.ownership). Each building in a cell counts on its own: of ten
-houses with food for two, two are fed and eight starve. Buildings that starve on end are pulled
-down, as many as starved all that while, the player's too: homes after HOMES_DIE_AFTER_MONTHS,
+buildings they own (railroads.sim.ownership). What a cell's buildings of a kind get is shared
+equally among them: of ten houses with food for two, each gets a fifth of what it wants, and they
+starve only when nothing arrives. Buildings that starve on end are pulled down, the player's too: homes after HOMES_DIE_AFTER_MONTHS,
 processors and the rest after DIE_AFTER_MONTHS. Producers of what the land gives and soldiers
 never starve to death (UNDYING); fields go only when a town grows over them (crowded_at).
 
@@ -459,8 +459,8 @@ class Growth:
         return changed
 
     def starving(self, trade: Trade, kind: BuildingKind) -> npt.NDArray[np.int64]:
-        """How many buildings of a kind starve in each cell traded on: those left over once the
-        share of what they all want that they got is handed to as few of them as it can. In a
+        """How many buildings of a kind starve in each cell traded on: what arrives is shared
+        equally among them, so they starve all together, and only when none of it arrives. In a
         simulated game, cells the stand-in serves have the share it assumes."""
         count = self._counts[kind].ravel()[trade.cells]
         wanted = trade.needed[kind] + trade.could_make[kind]
@@ -468,9 +468,7 @@ class Growth:
         if self.assumed_shares is not None:
             assumed = self.assumed_shares[trade.cells]
             share = np.where(np.isnan(assumed), share, assumed)
-        share = np.clip(share, 0.0, 1.0)
-        served = np.ceil(share * count - 1e-9).astype(np.int64)
-        return np.where(wanted > 0, np.maximum(count - served, 0), 0)
+        return np.where((wanted > 0) & (share <= 0.0), count, 0)
 
     def _die_out(self, trade: Trade) -> set[Cell]:
         """Counts the months buildings of each kind have starved in each cell, and pulls down as
