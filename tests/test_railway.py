@@ -529,8 +529,10 @@ def test_a_mine_feeds_a_steel_mill_two_cells_off_and_the_station_gathers_the_res
     growth.trade_goods()
 
     mill = np.ravel_multi_index((6, 21), growth.constructions.tile_map.grid.shape)
-    assert growth.economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][mill] == pytest.approx(90.0)
-    assert railway.station_goods((6, 20)).stockpile[Good.COAL] == pytest.approx(10.0)
+    assert growth.economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][mill] == pytest.approx(
+        100 * 5 / 6
+    )
+    assert railway.station_goods((6, 20)).stockpile[Good.COAL] == pytest.approx(100 / 6)
 
 
 def test_a_train_unloads_only_what_fits_and_keeps_the_rest_aboard() -> None:

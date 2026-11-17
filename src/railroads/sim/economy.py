@@ -77,9 +77,10 @@ DELIVERY_RADIUS = 2
 COLLECTION_RADIUS = 3
 
 # How many cells away buildings hand out their goods on their own, and how much less of a seller's
-# month a cell can take for every cell beyond the next one: 10% of it from LOCAL_REACH cells away.
-LOCAL_REACH = 10
-TAKEN_PER_STEP = 0.1
+# month a cell can take for every cell beyond the next one, so a cell LOCAL_REACH cells away takes
+# one such step of it.
+LOCAL_REACH = 6
+TAKEN_PER_STEP = 1 / LOCAL_REACH
 # The cells of -1 around the map that let _Month._pairs look LOCAL_REACH cells out from any cell
 # without checking for the edge.
 _PAD = LOCAL_REACH

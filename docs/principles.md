@@ -13,9 +13,9 @@ The ideas every rule of the game should follow.
 ## The rules that follow from them
 
 - Buildings hand out what they make to the buildings around them on their own, everywhere on the
-  map, the nearest first, up to ten cells away. Nothing is lost on the way, but the further a buyer
-  is, the less of the maker's month it can take: all of it from the same cell or the next, 90% from
-  two cells away, and so on down to 10% from ten cells away.
+  map, the nearest first, up to six cells away. Nothing is lost on the way, but the further a buyer
+  is, the less of the maker's month it can take: all of it from the same cell or the next, five
+  sixths from two cells away, and so on down to one sixth from six cells away.
 - Only what is left after that goes to a station within reach; stations never take a good the
   buildings around could have used.
 - A station hands out what trains bring to the least satisfied buildings first, then the nearest,

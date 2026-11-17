@@ -65,9 +65,9 @@ def eaten_at(economy: Economy, trade: object, cell: tuple[int, int]) -> float:
 
 
 @pytest.mark.parametrize(
-    ("house", "share"), [((8, 4), 1.0), ((8, 5), 1.0), ((8, 6), 0.9), ((8, 8), 0.7)]
+    ("house", "share"), [((8, 4), 1.0), ((8, 5), 1.0), ((8, 6), 5 / 6), ((8, 8), 3 / 6)]
 )
-def test_a_house_takes_a_tenth_less_of_a_farms_month_for_every_cell_beyond_the_next(
+def test_a_house_takes_a_sixth_less_of_a_farms_month_for_every_cell_beyond_the_next(
     house: tuple[int, int], share: float
 ) -> None:
     tile_map = make_map()
@@ -79,8 +79,8 @@ def test_a_house_takes_a_tenth_less_of_a_farms_month_for_every_cell_beyond_the_n
     assert eaten_at(economy, trade, house) == pytest.approx(share * FARM_MONTH)
 
 
-@pytest.mark.parametrize(("house", "share"), [((8, 14), 0.1), ((8, 15), 0.0)])
-def test_a_house_ten_cells_from_a_farm_takes_a_tenth_of_its_month_and_one_further_none(
+@pytest.mark.parametrize(("house", "share"), [((8, 10), 1 / 6), ((8, 11), 0.0)])
+def test_a_house_six_cells_from_a_farm_takes_a_sixth_of_its_month_and_one_further_none(
     house: tuple[int, int], share: float
 ) -> None:
     tile_map = make_map(size=24)
@@ -99,13 +99,13 @@ def test_farms_feed_the_nearer_house_first_and_the_farther_one_only_its_share() 
         tile_map,
         ((8, 4), BuildingKind.FARM, 2),
         ((8, 5), BuildingKind.HOUSE, 1),
-        ((8, 13), BuildingKind.HOUSE, 1),
+        ((8, 9), BuildingKind.HOUSE, 1),
     )
 
     trade = economy.trade(placed)
 
     assert eaten_at(economy, trade, (8, 5)) == pytest.approx(HOUSE_FOOD)
-    assert eaten_at(economy, trade, (8, 13)) == pytest.approx(0.2 * 2 * FARM_MONTH)
+    assert eaten_at(economy, trade, (8, 9)) == pytest.approx(2 / 6 * 2 * FARM_MONTH)
 
 
 def test_nothing_a_farm_hands_out_is_lost_on_the_way() -> None:
@@ -166,7 +166,7 @@ def test_a_farm_is_as_satisfied_as_the_share_of_its_wheat_that_was_taken() -> No
     trade = economy.trade(placed)
 
     share = trade.share((BuildingKind.FARM,))[position(trade, economy, (8, 4))]
-    assert share == pytest.approx(0.9)
+    assert share == pytest.approx(5 / 6)
 
 
 def test_a_station_gathers_only_what_the_buildings_around_left() -> None:

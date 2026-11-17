@@ -939,10 +939,10 @@ one of them stops where it is until the other has gone by, then sets off again f
 train that has stood longest letting others by since its last stop goes first, so none waits for
 ever, then the better engine, then the train bought first. Within stations, and on double track
 for trains going opposite ways, trains pass each other without stopping. Each month buildings first hand out what they make on their own,
-everywhere on the map, the nearest first, up to 10 cells away: nothing is lost on the way, but a
+everywhere on the map, the nearest first, up to 6 cells away: nothing is lost on the way, but a
 building can take less of a maker's month the further it is, all of it from the same cell or the
-next, 90% from two cells away and so on down to 10% from ten. Then each station that track joins
-to another station hands what trains brought to buildings within its reach (1 cell at the first
+next, five sixths from two cells away and so on down to one sixth from six. Then each station that
+track joins to another station hands what trains brought to buildings within its reach (1 cell at the first
 level), unsatisfied first, then content, nearest first, and takes the spare goods no building took
 that buildings made within 3 cells into its stockpile, for trains; it never hands those out around
 it, and goods handed out on their own earn the player nothing. A station on its own, with no track
