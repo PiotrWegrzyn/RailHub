@@ -11,6 +11,7 @@ change to draw_model's maths needs the same change here.
 """
 
 import math
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from enum import Enum
@@ -2851,3 +2852,84 @@ def train_sprites(matrix_key: tuple[float, float, float, float]) -> TrainSprites
         sheet.paste(sprite.image, places[key][:2])
     _outline(sheet)
     return TrainSprites(np.asarray(sheet).copy(), places)
+
+
+@cache
+def _far_sight(matrix_key: tuple[float, float, float, float]) -> _Sight:
+    return _Sight.of(np.array(matrix_key, dtype=np.float64).reshape(2, 2), DETAIL * SCALE)
+
+
+def far_pictures(matrix_key: tuple[float, float, float, float], look: object) -> list[Sprite]:
+    """A look every way round as train_sprites puts it on its sheet, each with its own outline,
+    which is the sheet's: the margin round each model keeps outlines apart."""
+    with without_fine():
+        model = MODELS[look]()
+    pictures = _pictures(model, _far_sight(matrix_key))
+    for picture in pictures:
+        _outline(picture.image)
+    return pictures
+
+
+# How wide the sheet of looks drawn as they are wanted is, in pixels: as wide as train_sprites'
+# sheet of every look or so, which keeps it within MAX_TEXTURE tall.
+GROWN_WIDTH = 2432
+
+
+class GrownTrainSprites:
+    """Looks of engines and cars packed into one picture as train_sprites packs them, each drawn
+    only once it is first wanted or, a few at a time, ahead of being wanted: drawing every look
+    at once would hold up loading a game."""
+
+    def __init__(
+        self, matrix_key: tuple[float, float, float, float], looks: Iterable[object] = ()
+    ) -> None:
+        self._matrix_key = matrix_key
+        self.image = np.zeros((0, GROWN_WIDTH, 4), dtype=np.uint8)
+        self.places: dict[tuple[object, int], tuple[int, int, int, int, int, int]] = {}
+        # Where the next picture goes, and how tall the row it goes in is so far.
+        self._x = self._y = self._row = 0
+        self._ahead = iter(MODELS)
+        for look in looks:
+            self.draw(look)
+
+    @property
+    def height(self) -> int:
+        """How many rows of the picture hold looks."""
+        return self._y + self._row
+
+    def has(self, look: object) -> bool:
+        return (look, 0) in self.places
+
+    def place(self, look: object, heading: float) -> tuple[int, int, int, int, int, int]:
+        """x, y, width, height and anchor of the look running closest to `heading` radians,
+        drawing the look first if it is not drawn yet."""
+        self.draw(look)
+        return self.places[(look, turned(heading))]
+
+    def draw(self, look: object) -> None:
+        """Draws a look on the picture unless it is there already."""
+        if self.has(look):
+            return
+        for index, picture in enumerate(far_pictures(self._matrix_key, look)):
+            w, h = picture.image.size
+            if self._x + w > GROWN_WIDTH:
+                self._x, self._y, self._row = 0, self._y + self._row + 1, 0
+            if self._y + h > len(self.image):
+                grown = np.zeros(
+                    (max(len(self.image) + 512, self._y + h), GROWN_WIDTH, 4), np.uint8
+                )
+                grown[: len(self.image)] = self.image
+                self.image = grown
+            self.image[self._y : self._y + h, self._x : self._x + w] = np.asarray(picture.image)
+            self.places[(look, index)] = (self._x, self._y, w, h, *picture.anchor)
+            self._x += w + 1
+            self._row = max(self._row, h)
+
+    def draw_ahead(self, until: float) -> None:
+        """Draws looks not wanted yet, one after another while time.perf_counter() is before
+        `until`."""
+        while time.perf_counter() < until:
+            look = next(self._ahead, None)
+            if look is None:
+                return
+            self.draw(look)

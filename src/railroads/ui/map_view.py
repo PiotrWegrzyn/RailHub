@@ -588,7 +588,7 @@ class MapView:
 
     def _train_layer(self) -> TrainLayer:
         if self._trains is None:
-            self._trains = TrainLayer(self._pixel_layer().world)
+            self._trains = TrainLayer(self._pixel_layer().world, self.railway.trains)
         return self._trains
 
     def _engine_picture(self, engine: str, times: int) -> tuple[imgui.ImTextureRef, Vec2]:

@@ -9,6 +9,7 @@ import itertools
 import math
 import time
 from collections import OrderedDict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -33,10 +34,10 @@ from railroads.ui.pixel.trains import (
     HEADINGS,
     SCALE,
     FinePainter,
+    GrownTrainSprites,
     Look,
     TrainSprites,
     fine_pictures,
-    train_sprites,
     turned,
 )
 
@@ -63,12 +64,18 @@ class Texture(Protocol):
 
 
 class TrainLayer:
-    def __init__(self, world: PixelWorld) -> None:
+    def __init__(self, world: PixelWorld, trains: Iterable[Train] = ()) -> None:
+        """A layer drawing trains on `world`, with the looks of `trains` drawn up front and the
+        others drawn as they are wanted or as frames have time to spare."""
         self.world = world
         matrix = world.projection.matrix.ravel()
         self._matrix = tuple(float(v) for v in matrix)
-        self.sprites: TrainSprites = train_sprites(self._matrix)
+        looks = (look for train in trains for look, _ in self._parts(train))
+        self.sprites = GrownTrainSprites(self._matrix, looks)
+        # The sheet's texture, its size and the looks on it.
         self._sheet: Texture | None = None
+        self._sheet_shape = (0, 0)
+        self._sheet_looks: set[object] = set()
         self._paging_until = 0.0
         self._factor = 1
         self._pages: OrderedDict[object, _Page] = OrderedDict()
@@ -116,13 +123,20 @@ class TrainLayer:
                 sy = origin[1] + round((float(ay[k]) + shift[1]) * snap) * scale / snap
                 parts.append((sy, sx, look, math.atan2(dy, dx)))
         parts.sort(key=lambda part: part[0])
+        wanted = {look for _, _, look, _ in parts}
+        for look in wanted:
+            self.sprites.draw(look)
         drawn: set[object] = set()
         self._paging_until = time.perf_counter() + PAGES_TIME
         for sy, sx, look, heading in parts:
             page = None if factor == 1 else self._page(look, factor)
             if page is None:
                 px, py, w, h, anchor_x, anchor_y = self.sprites.place(look, heading)
-                texture, (width, height), per = self._whole_sheet(), self._sheet_size(), per_pixel
+                texture, (width, height), per = (
+                    self._whole_sheet(wanted),
+                    self._sheet_shape,
+                    per_pixel,
+                )
             else:
                 px, py, w, h, anchor_x, anchor_y = page.spots[turned(heading)]
                 texture, (width, height), per = page.texture, page.size, per_pixel / factor
@@ -138,6 +152,7 @@ class TrainLayer:
             )
         self._let_go(drawn)
         self._smoke(draw_list, railway, in_sight, origin, scale)
+        self.sprites.draw_ahead(self._paging_until)
 
     @staticmethod
     def _parts(train: Train) -> list[tuple[object, float]]:
@@ -262,15 +277,14 @@ class TrainLayer:
             self._factor = factor
         return factor
 
-    def _sheet_size(self) -> tuple[int, int]:
-        height, width = self.sprites.image.shape[:2]
-        return width, height
-
-    def _whole_sheet(self) -> Texture:
-        """The whole sprite sheet at its own size, for zooms that need it no bigger."""
-        if self._sheet is None:
-            image = np.ascontiguousarray(self.sprites.image)
+    def _whole_sheet(self, wanted: set[object]) -> Texture:
+        """The sprite sheet at its own size, for zooms that need it no bigger, made again with
+        every look drawn so far once it lacks one of those `wanted`."""
+        if self._sheet is None or not wanted <= self._sheet_looks:
+            image = np.ascontiguousarray(self.sprites.image[: self.sprites.height])
             self._sheet = hello_imgui.create_texture_gpu_from_rgba_data(image)
+            self._sheet_shape = (image.shape[1], image.shape[0])
+            self._sheet_looks = {look for look, _ in self.sprites.places}
         return self._sheet
 
     def _page(self, look: object, factor: int) -> _Page | None:
@@ -479,7 +493,10 @@ SHOWN_FACING = (0.95, 0.3)
 
 
 def engine_picture(
-    sprites: TrainSprites, matrix: npt.NDArray[np.float64], engine: str, times: int = 1
+    sprites: TrainSprites | GrownTrainSprites,
+    matrix: npt.NDArray[np.float64],
+    engine: str,
+    times: int = 1,
 ) -> Pixels:
     """An engine with its tender, as the map draws it, facing SHOWN_FACING: RGBA at the size of
     the sprite sheet, or `times` as many pixels each way with its fine details."""
