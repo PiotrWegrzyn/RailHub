@@ -90,6 +90,7 @@ from railroads.sim.ladders import (
     Ladder,
     Land,
     Points,
+    Surroundings,
 )
 from railroads.sim.ownership import Owners
 from railroads.sim.power_plants import build_power_plants
@@ -321,7 +322,15 @@ class _Touched:
 
 
 # The arrays Growth._stack lays out, left out of saves and laid out again as a game loads.
-_STACKED = ("_chances", "_lands", "_nearby_all", "_served_all", "_touched", "_land_of")
+_STACKED = (
+    "_chances",
+    "_lands",
+    "_nearby_all",
+    "_served_all",
+    "_points_row",
+    "_touched",
+    "_land_of",
+)
 
 
 class Growth:
@@ -372,10 +381,11 @@ class Growth:
         everywhere = np.arange(grid.rows * grid.cols)
         # Ladders growing on the same land share its weights, and the cells it allows.
         lands: dict[int, tuple[Land, FloatGrid, Cells]] = {}
+        surroundings = Surroundings(tile_map, everywhere, self._near)
         for ladder in rule.ladders:
             shared = lands.get(id(ladder.land))
             if shared is None or shared[0] is not ladder.land:
-                weights = ladder.land.weights(tile_map, everywhere, self._near)
+                weights = ladder.land.weights_in(surroundings)
                 shared = lands[id(ladder.land)] = (
                     ladder.land,
                     weights,
@@ -452,6 +462,7 @@ class Growth:
             len(kinds), size
         )
         self._served_all = np.stack([self._served[points] for points in kinds])
+        self._points_row = {points: at for at, points in enumerate(kinds)}
         for at, points in enumerate(kinds):
             self._nearby[points] = self._nearby_all[at].reshape(self._grid.shape)
             self._served[points] = self._served_all[at]
@@ -858,10 +869,14 @@ class Growth:
         for place in self._places:
             if place.ladder.land.on_vegetation:
                 sharing.setdefault(id(place.land), []).append(place)
+        surroundings: dict[bool, Surroundings] = {}
         for places in sharing.values():
             first = places[0]
-            touched = beside if first.ladder.land.on_forest_nearby else own
-            land = first.ladder.land.weights(tile_map, touched, self._near)
+            nearby = first.ladder.land.on_forest_nearby
+            touched = beside if nearby else own
+            if nearby not in surroundings:
+                surroundings[nearby] = Surroundings(tile_map, touched, self._near)
+            land = first.ladder.land.weights_in(surroundings[nearby])
             differs = land != first.land[touched]
             if not differs.any():
                 continue
@@ -1134,10 +1149,10 @@ class Growth:
         if starving is not None and kind in starving and not self._counts[kind][cell]:
             starving[kind][:, cell[0] * self._grid.cols + cell[1]] = 0
         points, value = self.rule.points[kind]
-        neighbourhood = [cell, *self._grid.neighbours(*cell)]
-        rows, cols = zip(*neighbourhood, strict=True)
-        self._nearby[points][rows, cols] += how_many * value
-        flat = np.ravel_multi_index((rows, cols), self._grid.shape)
+        here = cell[0] * self._grid.cols + cell[1]
+        around = self._near[:, here]
+        flat = np.concatenate(([here], around[around < self._near.shape[1]]))
+        self._nearby_all[self._points_row[points], flat] += how_many * value
         touched = self._touched[points]
         if not touched.places:
             return
