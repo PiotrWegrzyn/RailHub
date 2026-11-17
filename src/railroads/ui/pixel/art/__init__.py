@@ -16,6 +16,7 @@ from PIL import Image
 
 from railroads.sim.constructions import BUILDING_RULES, MERGED, BuildingKind
 from railroads.ui.pixel.art import (
+    built_batch1,
     built_farms,
     built_homes,
     built_works,
@@ -458,6 +459,18 @@ MODELS: dict[str, Callable[[], Sprite]] = {
     "distillery": modelled(built_works.distillery),
     "tavern": modelled(built_works.tavern),
     "gasworks": modelled(built_works.gasworks),
+    "sausage_maker": modelled(built_batch1.sausage_maker),
+    "chicken_farm": modelled(built_batch1.chicken_farm),
+    "cattle_ranch": modelled(built_batch1.cattle_ranch),
+    "meat_factory": modelled(built_batch1.meat_factory),
+    "pig_farm": modelled(built_batch1.pig_farm),
+    "brewery": modelled(built_batch1.brewery),
+    "dairy": modelled(built_batch1.dairy),
+    "mine": modelled(built_batch1.mine),
+    "iron_mine": modelled(lambda: built_batch1.shaft_mine((104, 72, 62), (176, 98, 70))),
+    "copper_mine": modelled(lambda: built_batch1.shaft_mine((96, 84, 66), (206, 130, 76))),
+    "gold_mine": modelled(lambda: built_batch1.shaft_mine((88, 78, 62), (255, 214, 60))),
+    "diamond_mine": modelled(lambda: built_batch1.shaft_mine((58, 60, 72), (190, 238, 255))),
 }
 SPRITES |= MODELS
 

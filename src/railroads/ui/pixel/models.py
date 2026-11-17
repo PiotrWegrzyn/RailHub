@@ -92,6 +92,8 @@ class Model:
         self.skipping = False
         # How many fine blocks the faces added now are within.
         self.within_fine = 0
+        # The footprints, u by v, of what stands as buildings, where they cast their shadow.
+        self.footprints: list[tuple[tuple[float, float], tuple[float, float]]] = []
 
     @contextmanager
     def fine(self) -> Iterator[None]:

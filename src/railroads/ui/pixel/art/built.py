@@ -12,6 +12,7 @@ import math
 from collections.abc import Callable
 from dataclasses import replace
 
+import numpy as np
 from PIL import Image, ImageDraw
 
 from railroads.sim.grids import HexGrid
@@ -106,6 +107,10 @@ def _stretched(model: Model, across: float, up: float) -> Model:
     if across == 1.0 and up == 1.0:
         return model
     stretched = Model()
+    stretched.footprints = [
+        ((u0 * across, u1 * across), (v0 * across, v1 * across))
+        for (u0, u1), (v0, v1) in model.footprints
+    ]
     for face in model.faces:
         nu, nv, nz = face.normal[0] / across, face.normal[1] / across, face.normal[2] / up
         length = math.sqrt(nu * nu + nv * nv + nz * nz) or 1.0
@@ -122,9 +127,13 @@ def _stretched(model: Model, across: float, up: float) -> Model:
 def _shadowed(sprite: Sprite, model: Model, pixels: float) -> Sprite:
     """The sprite with a soft dark shadow on the ground under it, reaching out to the lower right
     away from the light, as the painted buildings have."""
-    standing = [face for face in model.faces if max(c[2] for c in face.corners) > TALL_ENOUGH]
-    us = [c[0] for face in standing for c in face.corners]
-    vs = [c[1] for face in standing for c in face.corners]
+    if model.footprints:
+        us = [u for (u0, u1), _ in model.footprints for u in (u0, u1)]
+        vs = [v for _, (v0, v1) in model.footprints for v in (v0, v1)]
+    else:
+        standing = [face for face in model.faces if max(c[2] for c in face.corners) > TALL_ENOUGH]
+        us = [c[0] for face in standing for c in face.corners]
+        vs = [c[1] for face in standing for c in face.corners]
     if not us:
         return sprite
     reach = max(max(us) - min(us), max(vs) - min(vs))
@@ -156,6 +165,7 @@ def walls(
 ) -> None:
     """Walls round `u` by `v` up to `height`, on a low plinth of `plinth` if given, with a dark
     line of earth along their feet up close."""
+    m.footprints.append((u, v))
     low = 0.0
     if plinth is not None:
         m.box(u, v, (0.0, 0.014), plinth)
@@ -592,3 +602,81 @@ def barrel(m: Model, u: float, v: float, radius: float, height: float, color: RG
                 shade(color, 0.55),
             )
         dome(m, u, v, radius * 0.98, (height, height + 0.002), shade(color, 0.8))
+
+
+def strut(
+    m: Model,
+    a: tuple[float, float, float],
+    b: tuple[float, float, float],
+    thick: float,
+    color: RGB,
+) -> None:
+    """A square beam `thick` across from point `a` to point `b`: a frame's leg or brace, a pole."""
+    d = np.array(b, dtype=np.float64) - np.array(a, dtype=np.float64)
+    length = float(np.linalg.norm(d)) or 1.0
+    d /= length
+    side = np.cross(d, (0.0, 0.0, 1.0))
+    if np.linalg.norm(side) < 1e-6:
+        side = np.array((1.0, 0.0, 0.0))
+    side /= np.linalg.norm(side)
+    up = np.cross(side, d)
+    half = thick / 2
+    corners = [
+        np.array(a) + (s * side + t * up) * half for s, t in ((-1, -1), (1, -1), (1, 1), (-1, 1))
+    ]
+    far = [c + d * length for c in corners]
+    for k in range(4):
+        quad = [corners[k], corners[(k + 1) % 4], far[(k + 1) % 4], far[k]]
+        middle = (corners[k] + corners[(k + 1) % 4]) / 2 - np.array(a)
+        normal = middle / (np.linalg.norm(middle) or 1.0)
+        m.faces.append(
+            Face([tuple(float(x) for x in c) for c in quad], color, tuple(float(x) for x in normal))
+        )
+    for cap, sign in ((corners, -1.0), (far, 1.0)):
+        m.faces.append(
+            Face(
+                [tuple(float(x) for x in c) for c in cap], color, tuple(float(x) for x in d * sign)
+            )
+        )
+
+
+def arch_window(
+    m: Model,
+    u: tuple[float, float],
+    z: tuple[float, float],
+    v: float,
+    glass: RGB,
+    lintel: RGB | None = None,
+) -> None:
+    """A round-arched window on the long wall `v` out, from `z[0]` up to the springing of its
+    arch at `z[1]`, with up close a lighter brick arch over it."""
+    (u0, u1), (z0, z1) = u, z
+    half = (u1 - u0) / 2
+    middle = u0 + half
+
+    def arch(grow: float) -> list[tuple[float, float, float]]:
+        points = [(u0 - grow, v, z0), (u1 + grow, v, z0)]
+        points += [
+            (
+                middle + (half + grow) * math.cos(math.pi * k / 8),
+                v,
+                z1 + (half + grow) * math.sin(math.pi * k / 8),
+            )
+            for k in range(9)
+        ]
+        return points
+
+    normal = (0.0, 1.0 if v >= 0 else -1.0, 0.0)
+    if lintel is not None:
+        with m.fine():
+            m.faces.append(
+                Face([(a, v + normal[1] * 0.0004, c) for a, _, c in arch(0.003)], lintel, normal)
+            )
+    m.faces.append(Face([(a, v + normal[1] * 0.0008, c) for a, _, c in arch(0.0)], glass, normal))
+
+
+def paddock(m: Model, x: float, y: float, half: float) -> None:
+    """A fenced square patch of ground centred on the painted sprite's (x, y)."""
+    corners = [(x - half, y), (x, y - half / 2), (x + half, y), (x, y + half / 2)]
+    for a, b in zip(corners, corners[1:] + corners[:1], strict=True):
+        fence(m, a, b)
