@@ -984,7 +984,7 @@ CLAY_PITS = Ladder(
     land=Land(
         vegetation={Vegetation.FOREST: 0.3},
         relief={Relief.HILLS: 0.3, Relief.MOUNTAINS: 0.0},
-        water={Terrain.LAND: 0.1, Terrain.RIVER: 3.0, Terrain.LAKE: 1.5},
+        water={Terrain.LAND: 0.1, Terrain.RIVER: 4.0, Terrain.LAKE: 2.0},
     ),
     base_chance=0.00000006,
     chance_per_doubling={Points.POPULATION: 0.0000001, Points.ORE: 0.0000002},
@@ -1009,7 +1009,7 @@ SAND_PITS = Ladder(
     land=Land(
         vegetation={Vegetation.BARREN: 3.0, Vegetation.FOREST: 0.3},
         relief={Relief.HILLS: 0.3, Relief.MOUNTAINS: 0.0},
-        water={Terrain.LAND: 0.1, Terrain.SEA: 4.0, Terrain.RIVER: 2.0, Terrain.LAKE: 2.0},
+        water={Terrain.LAND: 0.1, Terrain.SEA: 4.0, Terrain.RIVER: 3.0, Terrain.LAKE: 2.0},
     ),
     base_chance=0.000000075,
     chance_per_doubling={Points.ORE: 0.00000015},
