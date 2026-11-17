@@ -682,13 +682,15 @@ def draw_model(
     fine: bool = False,
     light_from: tuple[float, float] = (-1.0, -1.0),
     depth_test: bool = False,
+    outline: bool = True,
 ) -> tuple[Image.Image, tuple[int, int]]:
     """The model seen turned `heading` radians round from the map's x axis, with the map's
     plane-to-art-pixel matrix, `pixels` picture pixels for every art pixel a model cell would
     take, with its fine details if `fine`, lit from the way `light_from` on the screen: shaded,
     outlined, and where its origin lands in the picture. Faces are drawn back to front; with
     `depth_test` each pixel shows whichever face is nearest there, so a part standing out of a
-    big wall, like a cornice or an awning, shows in front of it."""
+    big wall, like a cornice or an awning, shows in front of it. Without `outline` it is left
+    without its dark rim, as patches lying on the ground are."""
     scale = matrix * pixels
     cos, sin = math.cos(heading), math.sin(heading)
     up = float(np.hypot(*scale[:, 0])) * HEIGHT_PER_WIDTH
@@ -754,7 +756,8 @@ def draw_model(
         paint = ImageDraw.Draw(image)
         for _, points, color, _ in drawn:
             paint.polygon([(x - left, y - top) for x, y in points], fill=(*color, 255))
-    _outline(image)
+    if outline:
+        _outline(image)
     return image, (-left, -top)
 
 

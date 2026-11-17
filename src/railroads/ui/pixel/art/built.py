@@ -33,6 +33,8 @@ FINE_FROM = 1.5
 LIGHT_FROM = (-1.0, 0.45)
 # How high a part must stand to cast a shadow: patches of earth on the ground cast none.
 TALL_ENOUGH = 0.02
+# How high a flat patch may lie and still count as lying on the ground.
+GROUND_HIGH = 0.002
 
 SOIL: RGB = (74, 64, 46)
 SILL: RGB = (226, 222, 210)
@@ -57,18 +59,45 @@ def modelled(
     def draw() -> Sprite:
         pixels = fineness()
         model = _stretched(build(), across, up)
-        image, anchor = draw_model(
-            model,
-            HEADING,
-            PROJECTION.matrix,
-            pixels,
-            fine=pixels >= FINE_FROM,
-            light_from=LIGHT_FROM,
-            depth_test=True,
-        )
-        return _shadowed(Sprite(image, anchor), model, pixels * shadow)
+        ground, standing = Model(), Model()
+        for face in model.faces:
+            (ground if _lying(face) else standing).faces.append(face)
+        sprites = [
+            Sprite(
+                *draw_model(
+                    part,
+                    HEADING,
+                    PROJECTION.matrix,
+                    pixels,
+                    fine=pixels >= FINE_FROM,
+                    light_from=LIGHT_FROM,
+                    depth_test=True,
+                    outline=part is standing,
+                )
+            )
+            for part in (ground, standing)
+            if part.faces
+        ]
+        return _shadowed(_stacked(sprites), model, pixels * shadow)
 
     return draw
+
+
+def _lying(face: Face) -> bool:
+    """Whether a face is a patch lying flat on the ground, which is drawn without an outline."""
+    return face.normal[2] > 0.99 and max(corner[2] for corner in face.corners) < GROUND_HIGH
+
+
+def _stacked(sprites: list[Sprite]) -> Sprite:
+    """Sprites laid one over another in order, their anchors on the same spot."""
+    left = max(sprite.anchor[0] for sprite in sprites)
+    top = max(sprite.anchor[1] for sprite in sprites)
+    right = max(sprite.image.width - sprite.anchor[0] for sprite in sprites)
+    bottom = max(sprite.image.height - sprite.anchor[1] for sprite in sprites)
+    image = Image.new("RGBA", (left + right, top + bottom), (0, 0, 0, 0))
+    for sprite in sprites:
+        image.alpha_composite(sprite.image, (left - sprite.anchor[0], top - sprite.anchor[1]))
+    return Sprite(image, (left, top))
 
 
 def _stretched(model: Model, across: float, up: float) -> Model:
@@ -263,7 +292,7 @@ def chimney(
         shade(color, 0.6),
     )
     with m.fine():
-        m.cylinder_up(u, half * 0.45, (top + 0.005, top + 0.012), (150, 84, 58))
+        upright(m, u, v, half * 0.45, (top + 0.005, top + 0.012), (150, 84, 58))
 
 
 def cornice(

@@ -4,10 +4,10 @@ import numpy as np
 import pytest
 from test_pixel_world import make_world
 
-from railroads.ui.pixel.art import SPRITES, close_sprite, draw_sheet, fine_sprite
+from railroads.ui.pixel.art import SPRITES, _scale_of, close_sprite, draw_sheet, fine_sprite, homes
 from railroads.ui.pixel.art.built import HEADING, PROJECTION
 from railroads.ui.pixel.art.nature import DRAWN_AT, _drawn_at
-from railroads.ui.pixel.art.painter import drawn_at
+from railroads.ui.pixel.art.painter import ROOFS, WALLS, drawn_at
 from railroads.ui.pixel.layer import CLOSE_FROM, chunk_resolution
 from railroads.ui.pixel.models import Model, draw_model
 from railroads.ui.pixel.sheet import SpriteSheet
@@ -62,13 +62,15 @@ def test_close_chunks_leave_out_what_stands_on_the_ground(sheet: SpriteSheet) ->
     assert not any(close)
 
 
-def test_up_close_a_home_is_drawn_from_its_model_about_as_big_as_its_painted_sprite() -> None:
-    painted = fine_sprite("house_0", 8)
+def test_a_home_is_drawn_from_its_model_at_every_zoom_about_as_big_as_it_was_painted() -> None:
+    with drawn_at(_scale_of("house_0") * 8):
+        painted = homes.house(WALLS[0], ROOFS[0])
 
-    modelled = close_sprite("house_0", 8)
+    found = [fine_sprite("house_0", pixels) for pixels in (2, 8)]
 
-    assert modelled.image.tobytes() != painted.image.tobytes()
-    assert abs(modelled.image.width - painted.image.width) <= 0.2 * painted.image.width
+    assert found[1].image.tobytes() != painted.image.tobytes()
+    assert abs(found[1].image.width - painted.image.width) <= 0.2 * painted.image.width
+    assert close_sprite("house_0", 2).image.tobytes() == found[0].image.tobytes()
 
 
 def test_up_close_a_building_without_a_model_is_its_painted_sprite_drawn_finer() -> None:

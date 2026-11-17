@@ -435,6 +435,32 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "olympic_stadium": olympic_stadium,
 }
 
+# Buildings drawn from 3D models (railroads.ui.pixel.art.built) at every zoom, shaped and coloured
+# like the painted sprites they took the place of: on the sheet small, and up close as fine as the
+# screen with their fine details.
+MODELS: dict[str, Callable[[], Sprite]] = {
+    **{
+        f"house_{i}": home(lambda w=WALLS[i % 3], r=ROOFS[i % 4]: built_homes.house(w, r))
+        for i in range(12)
+    },
+    **{
+        f"tenement_{i}": home(lambda w=w, r=TENEMENT_ROOFS[i % 2]: built_homes.tenement(w, r))
+        for i, w in enumerate(TENEMENT_WALLS)
+    },
+    **{f"flats_{i}": home(lambda w=w: built_homes.flats(w)) for i, w in enumerate(FLAT_WALLS)},
+    "skyscraper": home(built_homes.skyscraper),
+    "farm": modelled(built_farms.farm),
+    "orchard": modelled(built_farms.orchard),
+    "orange_farm": modelled(lambda: built_farms.orchard([(244, 142, 36)])),
+    "potato_farm": modelled(built_farms.potato_farm),
+    "bakery": modelled(built_works.bakery),
+    "lumber_mill": modelled(built_works.lumber_mill),
+    "distillery": modelled(built_works.distillery),
+    "tavern": modelled(built_works.tavern),
+    "gasworks": modelled(built_works.gasworks),
+}
+SPRITES |= MODELS
+
 # Big and mega works drawn as buildings of their own, by trade.
 for _module in (grand_fire, grand_food, grand_crafts, grand_modern):
     SPRITES |= {
@@ -523,35 +549,10 @@ def fine_sprite(name: str, resolution: int) -> Sprite:
         return SPRITES[name]()
 
 
-# Buildings drawn up close from 3D models (railroads.ui.pixel.art.built) built to look like their
-# painted sprites, which stay on the sheet; up close they show finer detail and smooth edges.
-CLOSE_MODELS: dict[str, Callable[[], Sprite]] = {
-    **{
-        f"house_{i}": home(lambda w=WALLS[i % 3], r=ROOFS[i % 4]: built_homes.house(w, r))
-        for i in range(12)
-    },
-    **{
-        f"tenement_{i}": home(lambda w=w, r=TENEMENT_ROOFS[i % 2]: built_homes.tenement(w, r))
-        for i, w in enumerate(TENEMENT_WALLS)
-    },
-    **{f"flats_{i}": home(lambda w=w: built_homes.flats(w)) for i, w in enumerate(FLAT_WALLS)},
-    "skyscraper": home(built_homes.skyscraper),
-    "farm": modelled(built_farms.farm),
-    "orchard": modelled(built_farms.orchard),
-    "orange_farm": modelled(lambda: built_farms.orchard([(244, 142, 36)])),
-    "potato_farm": modelled(built_farms.potato_farm),
-    "bakery": modelled(built_works.bakery),
-    "lumber_mill": modelled(built_works.lumber_mill),
-    "distillery": modelled(built_works.distillery),
-    "tavern": modelled(built_works.tavern),
-}
-
-
 def close_sprite(name: str, pixels: int) -> Sprite:
-    """A sprite drawn `pixels` pixels for every art pixel of the map, for close views: from its
-    model if it has one, otherwise its painted sprite drawn that much finer."""
-    with drawn_at(_scale_of(name) * pixels):
-        return CLOSE_MODELS.get(name, SPRITES[name])()
+    """A sprite drawn `pixels` pixels for every art pixel of the map, for close views: as fine as
+    the screen shows it."""
+    return fine_sprite(name, pixels)
 
 
 def draw_sheet(padding: int = 1, resolution: int = 1) -> tuple[Image.Image, dict[str, list[int]]]:
@@ -559,9 +560,15 @@ def draw_sheet(padding: int = 1, resolution: int = 1) -> tuple[Image.Image, dict
     anchor inside it. Buildings other than stations are drawn at BUILDING_SCALE, houses,
     tenements and flats at HOME_SCALE, and farms and orchards at FARMSTEAD_SCALE. At a
     resolution above 1 each sprite is drawn that many times finer (fine_sprite) rather than
-    shrunk from its full size."""
+    shrunk from its full size; one drawn from a model is shrunk from its drawing at 2, so both
+    sheets hold it alike."""
     if resolution == 1:
-        sprites = {name: shrink(draw(), _scale_of(name)) for name, draw in SPRITES.items()}
+        sprites = {
+            name: shrink(fine_sprite(name, 2), 0.5)
+            if name in MODELS
+            else shrink(draw(), _scale_of(name))
+            for name, draw in SPRITES.items()
+        }
     else:
         sprites = {name: fine_sprite(name, resolution) for name in SPRITES}
     width = 128 * resolution
