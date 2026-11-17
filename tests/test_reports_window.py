@@ -46,6 +46,17 @@ def test_the_report_runs_from_the_first_delivery_to_this_year_with_today_last() 
     assert shown.population == [100, 120, 150]
 
 
+def test_stations_owned_start_the_year_play_began_while_population_goes_back_further() -> None:
+    history = made_history()
+
+    shown = report(history, 1903, stations=4, population=150, begun=1902)
+
+    assert shown.station_years == [1902, 1903]
+    assert shown.stations == [2, 4]
+    assert shown.years == [1901, 1902, 1903]
+    assert shown.population == [100, 120, 150]
+
+
 def test_with_nothing_delivered_the_report_holds_only_this_year() -> None:
     shown = report(History(), 1850, stations=0, population=10)
 

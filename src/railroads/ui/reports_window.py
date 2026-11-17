@@ -29,14 +29,19 @@ class Report:
     delivery_years: list[int]
     goods: list[Good]
     cars: np.ndarray
-    # The years the stations and population are known for, ending with this one.
+    # The years the population is known for, ending with this one, and the stations owned in
+    # those of them since play began.
     years: list[int]
     stations: list[int]
     population: list[int]
+    station_years: list[int]
 
 
-def report(history: History, year: int, stations: int, population: int) -> Report:
-    """What the reports show in `year`, with the stations and population standing now."""
+def report(
+    history: History, year: int, stations: int, population: int, begun: int | None = None
+) -> Report:
+    """What the reports show in `year`, with the stations and population standing now; the
+    stations only from `begun`, the year play began, as there were none before."""
     delivered = {y: cars for y, cars in history.delivered.items() if y <= year}
     first = min(delivered, default=year)
     delivery_years = list(range(first, year + 1))
@@ -53,8 +58,9 @@ def report(history: History, year: int, stations: int, population: int) -> Repor
         goods,
         cars,
         years,
-        [known[y][0] for y in years],
+        [known[y][0] for y in years if begun is None or y >= begun],
         [known[y][1] for y in years],
+        [y for y in years if begun is None or y >= begun],
     )
 
 
@@ -207,6 +213,7 @@ class ReportsWindow:
         year: int,
         stations: int,
         population: int,
+        begun: int | None = None,
         finances: Finances | None = None,
         fuel: FuelMarket | None = None,
     ) -> None:
@@ -217,11 +224,11 @@ class ReportsWindow:
         expanded, self.open = imgui.begin("Reports", self.open)
         if expanded and imgui.begin_tab_bar("reports"):
             if imgui.begin_tab_item("Overview")[0]:
-                shown = report(history, year, stations, population)
+                shown = report(history, year, stations, population, begun)
                 if finances is not None:
                     _draw_books(finances, year)
                 self._draw_deliveries(shown)
-                self._draw_line("Stations owned", "stations", shown.years, shown.stations)
+                self._draw_line("Stations owned", "stations", shown.station_years, shown.stations)
                 self._draw_line("Population", "population", shown.years, shown.population)
                 imgui.end_tab_item()
             if fuel is not None and imgui.begin_tab_item("Fuel")[0]:
