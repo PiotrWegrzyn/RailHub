@@ -56,6 +56,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import numpy as np
+import numpy.ma  # np.unique loads it on first use, which would stall the first month.
 import numpy.typing as npt
 
 from railroads.sim.clock import START_YEAR

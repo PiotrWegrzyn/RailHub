@@ -495,6 +495,25 @@ class Constructions:
         # A count that goes up whenever anything is built or removed.
         self.version = 0
 
+    def __getstate__(self) -> dict[str, object]:
+        """What a saved game keeps of what is built: each building as its kind alone, in its
+        cell's list, which pickles many times faster than the buildings themselves."""
+        state = dict(self.__dict__)
+        state["_cells"] = {
+            cell: [built.kind if type(built) is Building else built for built in here]
+            for cell, here in self._cells.items()
+        }
+        return state
+
+    def __setstate__(self, state: dict[str, object]) -> None:
+        self.__dict__.update(state)
+        self._cells = {
+            cell: [
+                Building(cell, built) if type(built) is BuildingKind else built for built in here
+            ]
+            for cell, here in self._cells.items()
+        }
+
     def __iter__(self) -> Iterator[Construction]:
         for built in self._cells.values():
             yield from built
