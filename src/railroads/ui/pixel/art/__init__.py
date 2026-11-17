@@ -18,6 +18,7 @@ from railroads.sim.constructions import BUILDING_RULES, MERGED, BuildingKind
 from railroads.ui.pixel.art import (
     built_batch1,
     built_batch2,
+    built_batch3,
     built_farms,
     built_homes,
     built_works,
@@ -485,6 +486,20 @@ MODELS: dict[str, Callable[[], Sprite]] = {
     "furniture_maker": modelled(built_batch2.furniture_maker),
     "flax_field": modelled(built_batch2.flax_field),
     "sugar": modelled(built_batch2.sugar),
+    "factory": modelled(built_batch3.factory),
+    "textile_mill": modelled(built_batch3.textile_mill),
+    "tool_works": modelled(built_batch3.tool_works),
+    "tannery": modelled(built_batch3.tannery),
+    "foundry": modelled(built_batch3.foundry),
+    "tile_works": modelled(built_batch3.tile_works),
+    "clay_pit": modelled(built_batch3.clay_pit),
+    "sand_pit": modelled(built_batch3.sand_pit),
+    "limestone_quarry": modelled(built_batch3.limestone_quarry),
+    "glassworks": modelled(built_batch3.glassworks),
+    "brickworks": modelled(built_batch3.brickworks),
+    "machine_works": modelled(built_batch3.machine_works),
+    "steel_mill": modelled(built_batch3.steel_mill),
+    "cement_works": modelled(built_batch3.cement_works),
 }
 SPRITES |= MODELS
 

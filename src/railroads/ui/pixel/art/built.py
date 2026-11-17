@@ -682,3 +682,186 @@ def paddock(m: Model, x: float, y: float, half: float) -> None:
     corners = [(x - half, y), (x, y - half / 2), (x + half, y), (x, y + half / 2)]
     for a, b in zip(corners, corners[1:] + corners[:1], strict=True):
         fence(m, a, b)
+
+
+def lathe(
+    m: Model,
+    u: float,
+    v: float,
+    profile: list[tuple[float, float]],
+    color: RGB,
+    cap: RGB | None = None,
+    sides: int = 16,
+) -> None:
+    """A round thing on an upright axis at (u, v), like a tank, a kiln or a cone: `profile`
+    gives its radius at each height from its foot up; closed with a flat top in `cap` if given."""
+    for (z0, r0), (z1, r1) in itertools.pairwise(profile):
+        slope = math.atan2(r0 - r1, z1 - z0) if z1 != z0 else math.pi / 2
+        for k in range(sides):
+            a0, a1 = 2 * math.pi * k / sides, 2 * math.pi * (k + 1) / sides
+            mid = (a0 + a1) / 2
+            normal = (
+                math.cos(mid) * math.cos(slope),
+                math.sin(mid) * math.cos(slope),
+                math.sin(slope),
+            )
+            corners = [
+                (u + r0 * math.cos(a0), v + r0 * math.sin(a0), z0),
+                (u + r0 * math.cos(a1), v + r0 * math.sin(a1), z0),
+                (u + r1 * math.cos(a1), v + r1 * math.sin(a1), z1),
+                (u + r1 * math.cos(a0), v + r1 * math.sin(a0), z1),
+            ]
+            if r1 < 1e-6:
+                corners = corners[:3]
+            m.faces.append(Face(corners, color, normal))
+    if cap is not None:
+        z, r = profile[-1]
+        m.faces.append(
+            Face(
+                [
+                    (
+                        u + r * math.cos(2 * math.pi * k / sides),
+                        v + r * math.sin(2 * math.pi * k / sides),
+                        z,
+                    )
+                    for k in range(sides)
+                ],
+                cap,
+                (0.0, 0.0, 1.0),
+            )
+        )
+
+
+def turned(
+    m: Model,
+    x: float,
+    y: float,
+    profile: list[tuple[float, float]],
+    color: RGB,
+    cap: RGB | None = None,
+) -> None:
+    """The painted sprite's _turned round thing at (x, y): `profile` gives its half-width in
+    pixels at each height in pixels from its foot up."""
+    u, v = spot(x, y)
+    lathe(m, u, v, [(tall(h), wide(r)) for h, r in profile], color, cap)
+
+
+def stack(
+    m: Model, x: float, foot: float, top: float, color: RGB, width: float = 2, puffs: int = 0
+) -> float:
+    """The painted sprite's chimney stack drawn from `foot` up to `top` at x (lowered as the
+    painted ones are), standing on the ground behind; returns how high its cap is."""
+    from railroads.ui.pixel.art.painter import chimney_top
+
+    u, v = spot(x + width / 2, foot)
+    high = tall(foot - chimney_top(foot, top))
+    half = wide(width) / 2
+    m.box((u - half, u + half), (v - half, v + half), (0.0, high), color)
+    m.box(
+        (u - half - 0.002, u + half + 0.002),
+        (v - half - 0.002, v + half + 0.002),
+        (high, high + 0.006),
+        shade(color, 0.6),
+    )
+    if puffs:
+        smoke(m, u, v, high + 0.006, puffs)
+    return high
+
+
+def sawtooth(
+    m: Model,
+    u: tuple[float, float],
+    v: tuple[float, float],
+    high: float,
+    teeth: int,
+    rise: float,
+    roof: RGB,
+    glass: RGB,
+    wall: RGB,
+) -> None:
+    """A sawtooth roof over walls `u` by `v` from `high`: `teeth` ridges across it, each sloping
+    down towards the front from a strip of glazing along its crest."""
+    (u0, u1), (v0, v1) = u, v
+    step = (u1 - u0) / teeth
+    slant = math.hypot(step, rise) or 1.0
+    for k in range(teeth):
+        a, b = u0 + step * k, u0 + step * (k + 1)
+        m.faces.append(
+            Face(
+                [(a, v0, high + rise), (b, v0, high), (b, v1, high), (a, v1, high + rise)],
+                roof,
+                (rise / slant, 0.0, step / slant),
+            )
+        )
+        m.faces.append(
+            Face(
+                [(a, v0, high), (a, v0, high + rise), (a, v1, high + rise), (a, v1, high)],
+                glass,
+                (-1.0, 0.0, 0.0),
+            )
+        )
+        for side, out in ((v0, -1.0), (v1, 1.0)):
+            m.faces.append(
+                Face(
+                    [(a, side, high), (b, side, high), (a, side, high + rise)],
+                    wall,
+                    (0.0, out, 0.0),
+                )
+            )
+
+
+def heap(m: Model, x: float, y: float, half: float, height: float, color: RGB) -> None:
+    """The painted sprite's heap at (x, y), `half` pixels across and `height` high."""
+    u, v = spot(x, y)
+    cone(m, u, v, wide(half), tall(height), color)
+
+
+def roofed_hall(
+    m: Model,
+    u: tuple[float, float],
+    v: tuple[float, float],
+    height: float,
+    wall: RGB,
+    roof: RGB | None,
+    rise: float = 0,
+    flat: RGB | None = None,
+) -> float:
+    """Walls `u` by `v` `height` pixels high on a plinth, under a gable roof `rise` pixels high if
+    `roof` is given, or a flat roof in `flat`; returns how high the walls stand."""
+    high = tall(height)
+    footing(m, u, v)
+    walls(m, u, v, high, wall)
+    plinth(m, u, v, tall(0.9), shade(wall, 0.72))
+    if roof is not None and rise:
+        gable_roof(m, u, v, (high, high + tall(rise)), roof, wall)
+    elif flat is not None:
+        flat_roof(m, u, v, high, flat, wall)
+    return high
+
+
+def windows_at(
+    m: Model,
+    u: tuple[float, float],
+    v: tuple[float, float],
+    height: float,
+    spans: tuple[float, ...],
+    drops: tuple[float, ...],
+    size: float,
+    glass: RGB = WINDOW,
+    lintel: RGB | None = None,
+    ends: tuple[float, ...] = (),
+) -> None:
+    """Windows as the painted sprites' _windows place them: centred `spans` of the way along the
+    lit wall, `drops` pixels below the top of a wall `height` pixels high, `size` pixels tall,
+    round-arched with a `lintel` if given; and at `ends` along the end wall too."""
+    for drop in drops:
+        z0, z1 = below(height, drop, size)
+        for t in spans:
+            span = (along(u, t - 0.05), along(u, t + 0.05))
+            if lintel is not None:
+                arch_window(m, span, (z0, z1 - (span[1] - span[0]) / 2), v[1], glass, lintel)
+            else:
+                window(m, span, (z0, z1), v[1], glass)
+        for t in ends:
+            across_ = sorted((across(v, t - 0.07), across(v, t + 0.07)))
+            end_window(m, u[1], (across_[0], across_[1]), (z0, z1), shade(glass, 0.8))
