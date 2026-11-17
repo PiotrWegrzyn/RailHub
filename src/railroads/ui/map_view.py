@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from functools import cache
 
 import numpy as np
+import numpy.typing as npt
 from imgui_bundle import hello_imgui, imgui
 
 from railroads import maps
@@ -15,6 +16,7 @@ from railroads.sim.constructions import (
     Constructions,
     Station,
 )
+from railroads.sim.economy import Trade
 from railroads.sim.game import Game
 from railroads.sim.geo import Coord
 from railroads.sim.grids import Cell, GridKind
@@ -36,6 +38,7 @@ from railroads.ui.hex_details import draw_hex_details, recently_described
 from railroads.ui.iso_camera import IsoCamera, Vec2
 from railroads.ui.map_input import MapInput
 from railroads.ui.map_overlays import (
+    MOODS_LEGEND,
     SELECTED_COLOR,
     consumers_in_reach,
     draw_compass,
@@ -44,9 +47,12 @@ from railroads.ui.map_overlays import (
     draw_grid_lines,
     draw_hand_out,
     draw_hovered_buildings,
+    draw_moods,
     draw_outline,
     draw_station_names,
     draw_status,
+    least_satisfied,
+    mood_tint,
     status_text,
     visible_area,
 )
@@ -180,6 +186,9 @@ class MapView:
         # The buildings that take what the selected cell makes, and the cell, buildings and year
         # they were found for.
         self._consumers: tuple[tuple[Cell, int, int], tuple[Cell, ...]] | None = None
+        # The cells Shift tints by how satisfied their buildings are, their packed colours, and
+        # the month's trade and buildings they were worked out for.
+        self._moods: tuple[tuple[Trade | None, int], npt.NDArray[np.intp], list[int]] | None = None
         self.build = BuildMenu()
         # What came of the last Buy pressed in the hex details.
         self._bought = ""
@@ -478,6 +487,17 @@ class MapView:
                     draw_list, self.constructions, self.camera, center, self.build.preview.pieces
                 )
         marks = self._marks_camera()
+        if self._showing_moods():
+            cells, colors = self._mood_tints()
+            draw_moods(
+                draw_list,
+                marks,
+                self.tile_map.grid,
+                center,
+                (top_left, bottom_right),
+                cells,
+                colors,
+            )
         if self.build.track_from is not None:
             draw_outline(
                 draw_list,
@@ -570,6 +590,22 @@ class MapView:
             self._consumers = key, consumers_in_reach(self.constructions, cell, self.growth.year)
         return self._consumers[1]
 
+    @staticmethod
+    def _showing_moods() -> bool:
+        """Whether Shift is held to tint the land by how satisfied buildings are, not while typing."""
+        io = imgui.get_io()
+        return io.key_shift and not io.want_text_input
+
+    def _mood_tints(self) -> tuple[npt.NDArray[np.intp], list[int]]:
+        """least_satisfied's cells and their tints, worked out again only once the month's trade
+        or the buildings changed."""
+        key = (self.growth.trade, self.constructions.version)
+        if self._moods is None or self._moods[0][0] is not key[0] or self._moods[0][1] != key[1]:
+            cells, shares = least_satisfied(self.growth.trade, self.growth.assumed_shares)
+            colors = [rgba_u32(mood_tint(share)) for share in shares.tolist()]
+            self._moods = key, cells, colors
+        return self._moods[1], self._moods[2]
+
     def _marks_camera(self) -> IsoCamera | OnGround:
         """The camera marks on the map are drawn with: lifted onto raised ground in pixel art."""
         if not self.camera.pixel_scale:
@@ -600,6 +636,8 @@ class MapView:
             self.hovered,
             over_minimap,
         )
+        if self._showing_moods():
+            text = f"{text} {MOODS_LEGEND}"
         below = draw_status(draw_list, top_left, bottom_right, text)
         if self.hovered is not None and not over_minimap:
             draw_hovered_buildings(self.growth, self.hovered, below, self._satisfaction)
