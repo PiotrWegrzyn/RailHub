@@ -61,7 +61,11 @@ def test_no_church_opens_within_four_hexes_of_another(
 
     growth._turn(cell, CHURCHES, np.random.default_rng(0))
 
-    assert (Building(cell, BuildingKind.CHURCH) in constructions.at(cell)) is opens
+    nearby = [cell, *grid.neighbours(*cell)]
+    assert (
+        any(Building(near, BuildingKind.CHURCH) in constructions.at(near) for near in nearby)
+        is opens
+    )
 
 
 @pytest.mark.parametrize(

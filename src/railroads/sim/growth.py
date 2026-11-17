@@ -7,8 +7,9 @@ buildings give adds there by how satisfied it is (its points times its satisfact
 railroads.sim.economy), times the doublings of the points around the cell that draw it: four times
 the people for houses, food and people for food, people and industry for industry, mines, mills
 and ports, and twice the people for shops, inns and churches. So towns and districts draw
-more the bigger they are, and only what is satisfied breeds. A building that finds no room in its
-cell spills over into a cell nearby (railroads.sim.room).
+more the bigger they are, and only what is satisfied breeds. A building that comes up in a cell
+goes up in it or a random cell next to it, and one that finds no room there spills over further
+(railroads.sim.room).
 
 On town turns, a neighbourhood with SKYSCRAPER_PEOPLE population and SKYSCRAPER_FLATS blocks of
 flats may put up a skyscraper, SKYSCRAPER_CHANCE of the time: a business centre that pulls down the
@@ -859,7 +860,6 @@ class Growth:
             merged = self._replace(cell, neighbourhood, [(small, merge.pulled_down)], big)
             if merged is not None:
                 return merged
-        first = ladder.kinds[0]
         if (
             ladder.land_cells_each is not None
             and self._as_many_as_first(ladder) >= self._land_cells // ladder.land_cells_each
@@ -867,14 +867,7 @@ class Growth:
             return set()
         if not self.ladder_allows(ladder, cell) or self._not_open(ladder, cell, rng):
             return set()
-        new = Building(cell, first)
-        if self.constructions.site_problem(new) is not None:
-            return set()
-        if new.space > self.constructions.space_left(cell):
-            return self.room.spill(cell, ladder, rng)
-        self.constructions.build(new)
-        self.add(cell, first, 1)
-        return {cell}
+        return self.room.scatter(cell, ladder, rng)
 
     def least_of(self, ladder: Ladder) -> int:
         """The fewest of a ladder's first kind the map keeps once it has opened: KEY_LEAST for

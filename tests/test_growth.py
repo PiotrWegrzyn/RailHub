@@ -177,17 +177,16 @@ def test_a_ladder_has_no_chance_until_the_neighbourhood_holds_what_it_needs() ->
     assert with_food[5, 5] > 0
 
 
-def test_a_sure_month_puts_a_house_on_every_land_cell() -> None:
+def test_a_sure_month_puts_up_a_house_for_every_land_cell_and_none_on_the_sea() -> None:
     constructions = Constructions(make_map())
     sure = replace(TOWNS, base_chance=50.0, merges={})
     growth = Growth(constructions, only(sure))
 
-    changed = growth.month(np.random.default_rng(1))
+    growth.month(np.random.default_rng(1))
 
     houses = growth.count(BuildingKind.HOUSE)
-    assert houses[:, 1:].min() == 1
+    assert houses.sum() == 12 * 11
     assert houses[:, 0].max() == 0
-    assert len(changed) == 12 * 11
 
 
 def test_small_chances_are_drawn_as_often_as_they_should_be() -> None:
@@ -202,15 +201,28 @@ def test_small_chances_are_drawn_as_often_as_they_should_be() -> None:
     assert turns == pytest.approx(expected, rel=0.05)
 
 
-def test_a_farm_fills_its_cell_and_the_next_one_spills_next_door() -> None:
+def test_farms_coming_up_in_a_cell_go_up_in_it_or_next_door() -> None:
     tile_map = make_map()
     growth = Growth(Constructions(tile_map), only(PLAIN_FARMS))
+    nearby = {(5, 5), *tile_map.grid.neighbours(5, 5)}
 
     first, second = [growth._turn((5, 5), PLAIN_FARMS, np.random.default_rng(0)) for _ in range(2)]
 
-    assert first == {(5, 5)}
-    assert second <= set(tile_map.grid.neighbours(5, 5))
+    assert first | second <= nearby
     assert growth.count(BuildingKind.FARM).sum() == 2
+
+
+def test_houses_coming_up_in_one_cell_spread_over_it_and_its_neighbours() -> None:
+    tile_map = make_map()
+    plain = replace(TOWNS, merges={})
+    growth = Growth(Constructions(tile_map), only(plain))
+    rng = np.random.default_rng(0)
+    nearby = {(5, 5), *tile_map.grid.neighbours(5, 5)}
+
+    changed = set().union(*[growth._turn((5, 5), plain, rng) for _ in range(12)])
+
+    assert changed <= nearby
+    assert len(changed) > 3
 
 
 @pytest.mark.parametrize(("houses", "pulled_down"), [(7, False), (8, True)])
@@ -314,7 +326,7 @@ def test_fifteen_houses_nearby_are_not_enough_to_merge() -> None:
 
     changed = growth._turn((5, 5), TOWNS, np.random.default_rng(0))
 
-    assert changed == {(5, 5)}
+    assert changed <= {(5, 5), *neighbours}
     assert growth.count(BuildingKind.HOUSE).sum() == 16
     assert growth.count(BuildingKind.TENEMENT).sum() == 0
 
@@ -472,7 +484,8 @@ def test_farms_never_merge_or_raise_skyscrapers() -> None:
 
     changed = growth._turn((5, 5), PLAIN_FARMS, np.random.default_rng(0))
 
-    assert changed == {(5, 5)}
+    assert changed <= {(5, 5), *constructions.tile_map.grid.neighbours(5, 5)}
+    assert growth.count(BuildingKind.FARM).sum() == 1
     assert growth.count(BuildingKind.SKYSCRAPER).sum() == 0
 
 

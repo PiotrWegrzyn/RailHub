@@ -3,9 +3,10 @@ station or a merged works, putting up a building that found no room in its own c
 housing people a skyscraper pulled their flats down on, and putting up again the player's
 buildings that growth pulled down.
 
-A building that finds no room in its cell goes up in the nearest cell within SPILL_STEPS that has
-the room and land for it and that its ladder's caps allow, chosen among cells equally near at
-random by how well their land suits it. People rehoused go into the nearest cells within
+A building that comes up in a cell goes up in it or a cell next to it, picked at random by how
+well their land suits it (scatter). One that finds no room there goes up in the nearest cell
+within SPILL_STEPS that has the room and land for it and that its ladder's caps allow, chosen
+among cells equally near at random by how well their land suits it. People rehoused go into the nearest cells within
 HOMES_STEPS with room, and the player's buildings go up again within RELOCATE_STEPS.
 """
 
@@ -100,24 +101,39 @@ class Room:
             return {near}
         return set()
 
+    def scatter(self, cell: Cell, ladder: Ladder, rng: np.random.Generator) -> set[Cell]:
+        """Puts up the ladder's first kind that came up in this cell in it or a cell next to
+        it, picked at random by how well their land suits it, or, where none of them will take
+        it, in the nearest cell further off that will (spill); returns the cell it went up in, if
+        it found one."""
+        return self._put_near(cell, ladder, rng, 1, nearest_first=False) or self.spill(
+            cell, ladder, rng
+        )
+
     def spill(self, cell: Cell, ladder: Ladder, rng: np.random.Generator) -> set[Cell]:
-        """Puts up the ladder's first kind in the nearest cell that will take it, picked among
-        cells equally near at random by how well their land suits it; returns the cell it went up
-        in, if it found one."""
+        """Puts up the ladder's first kind in the nearest cell but this one that will take it,
+        picked among cells equally near at random by how well their land suits it; returns the
+        cell it went up in, if it found one."""
+        return self._put_near(cell, ladder, rng, SPILL_STEPS, nearest_first=True)
+
+    def _put_near(
+        self, cell: Cell, ladder: Ladder, rng: np.random.Generator, most: int, nearest_first: bool
+    ) -> set[Cell]:
         growth = self._growth
         constructions, grid = growth.constructions, growth.grid
-        reached = [(near, steps) for near, steps in grid.within(cell, SPILL_STEPS).items()]
+        reached = [(near, steps) for near, steps in grid.within(cell, most).items()]
         steps = np.array([step for _, step in reached])
         rows, cols = zip(*(near for near, _ in reached), strict=True)
         flat = np.ravel_multi_index((rows, cols), grid.shape)
         land = ladder.land.weights(constructions.tile_map, flat, growth.near)
         first = ladder.kinds[0]
         suits = rng.random(steps.size) ** (1.0 / np.maximum(land, 1e-12))
-        for index in np.lexsort((-suits, steps)).tolist():
+        order = np.lexsort((-suits, steps)) if nearest_first else np.argsort(-suits)
+        for index in order.tolist():
             near = reached[index][0]
             new = Building(near, first)
             if (
-                near != cell
+                (near != cell or not nearest_first)
                 and land[index] > 0
                 and constructions.why_not(new) is None
                 and growth.ladder_allows(ladder, near)
