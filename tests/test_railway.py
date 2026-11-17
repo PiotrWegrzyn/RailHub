@@ -419,11 +419,22 @@ def test_waiting_passengers_have_their_own_room_and_leave_freight_its_stockpile(
     goods = StationGoods()
     goods.stockpile[Good.COAL] = 40.0
 
-    goods.board(Good.PASSENGERS, 70.0)
-    goods.board(Good.PASSENGERS, 70.0)
+    goods.board(Good.PASSENGERS, 170.0)
 
     assert goods.stockpile[Good.PASSENGERS] == WAITING
     assert goods.fullest == (Good.COAL, 40.0)
+
+
+def test_last_months_passengers_and_mail_give_way_to_this_months() -> None:
+    goods = StationGoods()
+    goods.board(Good.PASSENGERS, 70.0)
+    goods.board(Good.MAIL, 14.0)
+
+    goods.board(Good.PASSENGERS, 30.0)
+    goods.board(Good.MAIL, 6.0)
+
+    assert goods.stockpile[Good.PASSENGERS] == 30.0
+    assert goods.stockpile[Good.MAIL] == 6.0
 
 
 def test_passengers_pay_on_arrival_and_go_on_their_way() -> None:
