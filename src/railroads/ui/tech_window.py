@@ -103,8 +103,32 @@ def describe(node: Node) -> str:
         return f"{node.effect.value} {sign}{node.amount:.0%}{reach}"
     if node.effect == Effect.CAR_SIZE:
         return f"every car {node.amount:g} size bigger"
-    unit = " cars" if node.effect == Effect.PULL else ""
-    return f"{node.effect.value} +{node.amount:g}{unit}"
+    return f"{node.effect.value} +{node.amount:g}"
+
+
+def explain(tree: Tree, node: Node) -> str:
+    """What a node does, in a sentence: whose buildings or goods it reaches and how."""
+    owned = "Every building you own" if node.everywhere else f"Every {tree.value} building you own"
+    load = "Every load" if node.everywhere else f"Every load of {tree.value}"
+    amount = f"{node.amount:.0%}"
+    sentences = {
+        Effect.PRODUCTION: f"{owned} makes and takes in {amount} more.",
+        Effect.SHARE: f"{owned} pays you a share {amount} bigger of what it sells.",
+        Effect.PRICE: f"{load} earns {amount} more.",
+        Effect.STORAGE: f"Every station's stockpile holds {node.amount:g} more goods.",
+        Effect.DISCOUNT: f"Buildings cost {amount} less to buy.",
+        Effect.SPEED: f"Every train runs {amount} faster.",
+        Effect.PULL: f"Every train pulls {node.amount:g} more car.",
+        Effect.UPKEEP: f"Stations, track, car trips and fuel cost {amount} less.",
+        Effect.GROWTH: f"{owned} counts {amount} more towards growth around it.",
+        Effect.COACHES: f"Passenger coaches and mail vans carry {amount} more.",
+        Effect.WAITING: f"Every station holds {node.amount:g} more passengers and mail.",
+        Effect.BONUS_GOODS: f"Each bonus good adds {amount} more satisfaction.",
+        Effect.FUEL_MARKUP: f"Fuel bought outside your stations costs {amount} less over market.",
+        Effect.CAR_SIZE: f"Every car holds {node.amount:g} size more.",
+        Effect.UNLOCK: f"O{describe(node)[1:]}.",
+    }
+    return sentences[node.effect]
 
 
 class TechWindow:
@@ -168,7 +192,7 @@ class TechWindow:
             )
         for node in TREES[tree]:
             imgui.set_cursor_screen_pos(corner(node.key))
-            self._draw_node(research, node)
+            self._draw_node(research, tree, node)
         columns = max(column for column, _ in spots.values()) + 1
         rows = max(row for _, row in spots.values()) + 1
         imgui.set_cursor_screen_pos(origin)
@@ -176,7 +200,7 @@ class TechWindow:
         imgui.end_child()
 
     @staticmethod
-    def _draw_node(research: Research, node: Node) -> None:
+    def _draw_node(research: Research, tree: Tree, node: Node) -> None:
         taken = node.key in research.taken
         can = research.can_take(node.key)
         color = TAKEN if taken else OPEN if can else SHUT
@@ -189,7 +213,7 @@ class TechWindow:
             imgui.pop_style_var()
         imgui.pop_style_color()
         if imgui.is_item_hovered():
-            text = f"{node.name}: {describe(node)}"
+            text = f"{node.name}: {explain(tree, node)}"
             if node.requires:
                 text += "\nNeeds " + ", ".join(NODES[key][1].name for key in node.requires)
             imgui.set_tooltip(text)

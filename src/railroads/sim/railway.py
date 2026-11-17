@@ -462,9 +462,12 @@ class Railway:
             self.station_trade.hand_out_now(station, good)
 
     def pay_for(self, station: Cell, need: Need, good: Good, amount: float) -> None:
-        """Pays for cargo trains brought that the buildings around a station took."""
+        """Pays for cargo trains brought that the buildings around a station took, which is also
+        experience in the good's tree."""
         earned = self.station_demand(station).pay(need, good, amount) * self.price_factor(good)
-        self.finances.earn(earned * self.facility_pay(station, good), "cargo")
+        earned *= self.facility_pay(station, good)
+        self.finances.earn(earned, "cargo")
+        self.research.earn(GOOD_TREES[good], earned)
 
     def facility_pay(self, station: Cell, good: Good) -> float:
         """How many times as much a good delivered at a station pays with its facilities."""

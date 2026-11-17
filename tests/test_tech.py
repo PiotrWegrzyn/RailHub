@@ -3,6 +3,7 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
+from railroads.sim.economy import Trade
 from railroads.sim.finance import ELECTRIC_TRACK_UPKEEP, TRACK_UPKEEP
 from railroads.sim.goods import Good, Need, price_of
 from railroads.sim.growth import Growth
@@ -23,7 +24,7 @@ from railroads.sim.tech import (
     xp_for,
 )
 from railroads.sim.trains import ENGINES, Stop
-from railroads.ui.tech_window import layout, links
+from railroads.ui.tech_window import describe, explain, layout, links
 
 
 def joined() -> Growth:
@@ -284,3 +285,54 @@ def test_the_tech_window_links_every_node_to_each_it_needs_and_hangs_it_under_th
         if hanging:
             middle = sum(spots[key][0] for key in hanging) / len(hanging)
             assert spots[node.key][0] == pytest.approx(middle)
+
+
+def test_freight_taken_out_of_a_station_earns_experience_in_its_goods_tree() -> None:
+    railway = joined().railway
+    railway.station_demand((6, 20)).capacity = {Need.FOOD: 100.0}
+
+    railway.pay_for((6, 20), Need.FOOD, Good.WHEAT, 10.0)
+
+    earned = railway.finances.month["cargo"]
+    assert earned > 0
+    assert railway.research.xp[Tree.FOOD] == pytest.approx(earned)
+    assert railway.research.xp[Tree.METALS] == 0.0
+
+
+def test_commerce_experience_counts_only_what_shops_got_out_of_the_stations() -> None:
+    growth = joined()
+    assert growth.railway is not None
+    cells = np.array([0, 1])
+    trade = Trade(
+        cells,
+        {},
+        {},
+        {},
+        {},
+        goods_got={(BuildingKind.TAVERN, Need.BEER): (np.array([10.0, 10.0]), np.full(2, 60.0))},
+        local={Need.BEER: np.array([10.0, 4.0])},
+    )
+
+    growth.owners.pay(trade)
+
+    assert growth.railway.research.xp[Tree.COMMERCE] == pytest.approx(6 * price_of(Good.BEER))
+
+
+def test_production_and_share_nodes_say_they_reach_only_owned_buildings() -> None:
+    seed, investors = NODES["seed"][1], NODES["investors"][1]
+
+    food = explain(Tree.FOOD, seed)
+    everywhere = explain(Tree.COMMERCE, investors)
+
+    assert food == "Every food and drink building you own makes and takes in 10% more."
+    assert everywhere.startswith("Every building you own pays you")
+
+
+def test_a_node_adding_cars_names_them_once_and_every_unlock_its_first_year() -> None:
+    couplings, boilers = NODES["couplings"][1], NODES["boilers"][1]
+
+    cars = describe(couplings)
+    engines = describe(boilers)
+
+    assert cars == "cars per train +1"
+    assert engines == "opens heavy freight engines (from 1853)"

@@ -645,16 +645,19 @@ forest is gone, anything cleared for track) goes up again as theirs in the neare
 land allows, and one that merges into a bigger building (three factories into a big factory)
 makes the bigger one theirs.
 
-The tech window (R, or the flask in the top bar) has seven trees, 8 to 13 nodes each
-(`railroads.sim.tech`). Every tree gains experience in dollars: food and drink, metals and
-machines, fuel and minerals, craft and textiles and modern industry from what the player's own
-buildings of that kind earn them; commerce from what the shops around their stations take;
-passengers and mail from what passengers and mail pay as they get off. The first level needs
+The tech window (R, or the flask in the top bar) has seven trees, 10 to 15 nodes each
+(`railroads.sim.tech`). Every tree gains experience in dollars, from what the player adds:
+food and drink, metals and machines, fuel and minerals, craft and textiles, modern industry and
+commerce from what cargo of their goods earns as buildings take it out of the player's stations,
+and from what the player's own buildings of that kind earn them; commerce also from what shops
+take out of the player's stations; passengers and mail from what passengers and mail pay as they
+get off. Goods handed out by buildings on their own give no experience. The first level needs
 $50,000 and each next one 1.6 times as much as the one before; each level gives a point to spend
-on a node whose requirements are taken. Nodes raise the production and the owner's share of the
-player's buildings of their tree, what that tree's cargo earns, station storage and waiting rooms,
-speed, cars per train and coach capacity, cut upkeep and the price of buildings, make the
-player's buildings count more towards growth around them, and open engines.
+on a node whose requirements are taken. Nodes raise the production, owner's share and weight
+towards growth of the buildings of their tree the player owns, what that tree's cargo earns,
+station storage and waiting rooms, speed, cars per train, car sizes and coach capacity, what each
+bonus good adds to satisfaction, cut upkeep, retail fuel and the price of buildings, and open
+engines and general cars. Hovering a node says in a sentence what it does.
 
 A building in reach of a station rising a rank (two stars for a tenement or big factory, three
 for flats or a mega factory, four for a skyscraper) gives experience as if a train full of its
