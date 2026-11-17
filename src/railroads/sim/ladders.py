@@ -745,7 +745,7 @@ GASWORKS = _merges(
 
 # Bakeries and the other makers of food are what towns grow on: they open once FOOD_TOWN people
 # live in the neighbourhood, and readily.
-FOOD_TOWN = 4
+FOOD_TOWN = 3
 
 _BAKERY = Ladder(
     kinds=(BuildingKind.BAKERY,),

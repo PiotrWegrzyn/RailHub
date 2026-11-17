@@ -34,6 +34,6 @@ def test_a_tavern_with_all_its_drink_makes_the_homes_around_it_grow_half_as_fast
     assert lively == pytest.approx(alone * (1 + LIVELY_GROWTH))
 
 
-def test_taverns_open_from_four_people_and_clubs_in_big_towns_from_1900() -> None:
-    assert TAVERNS.needs == {Points.POPULATION: 4}
+def test_taverns_open_from_three_people_and_clubs_in_big_towns_from_1900() -> None:
+    assert TAVERNS.needs == {Points.POPULATION: 3}
     assert (CLUBS.needs, CLUBS.from_year) == ({Points.POPULATION: 30}, 1900)

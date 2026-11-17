@@ -670,8 +670,8 @@ def test_growing_years_at_a_step_still_closes_every_year() -> None:
     assert sorted(growth.history.population) == list(range(850, 860))
 
 
-@pytest.mark.parametrize(("houses", "times"), [(0, 0), (3, 0), (4, 4), (6, 6)])
-def test_a_bakery_opens_from_four_people_around_and_is_as_likely_as_they_are_many(
+@pytest.mark.parametrize(("houses", "times"), [(0, 0), (2, 0), (3, 3), (6, 6)])
+def test_a_bakery_opens_from_three_people_around_and_is_as_likely_as_they_are_many(
     houses: int, times: int
 ) -> None:
     tile_map = make_map()
