@@ -7,16 +7,25 @@ from builders import flat_map, layer
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Trade
 from railroads.sim.grids import Cell, HexGrid
-from railroads.sim.growth import SPAWN_SCALE, Growth, _allowed, breeding_of
+from railroads.sim.growth import (
+    SPAWN_SCALE,
+    UNDYING,
+    WORKS_SPAWN_SCALE,
+    Growth,
+    _allowed,
+    breeding_of,
+)
 from railroads.sim.ladders import (
     BAKERIES,
     FACTORIES,
     FARMS,
     FOOD_PLANTS,
+    FOOD_TOWN,
     LADDERS,
     LUMBER_MILLS,
     MINES,
     OPEN_FIELD,
+    POINTS,
     PORTS,
     SHIPYARDS,
     TOWN_LAND,
@@ -675,3 +684,31 @@ def test_a_bakery_opens_from_four_people_around_and_is_as_likely_as_they_are_man
     chance = growth.chances(BAKERIES)[5, 5]
 
     assert chance == pytest.approx(BAKERIES.base_chance * SPAWN_SCALE * times * land)
+
+
+def test_glassworks_come_up_anywhere_at_a_fifth_of_their_chance_and_bakeries_by_people() -> None:
+    (glassworks,) = [ladder for ladder in LADDERS if ladder.kinds[0] == BuildingKind.GLASSWORKS]
+    unscaled = breeding_of(replace(glassworks, kinds=(BuildingKind.BREWERY,)), POINTS)
+
+    glass = breeding_of(glassworks, POINTS)
+    bread = breeding_of(BAKERIES, POINTS)
+
+    assert glass.spawn_by == {}
+    assert glass.spawn == pytest.approx(unscaled.spawn * WORKS_SPAWN_SCALE)
+    assert bread.spawn_by == {Points.POPULATION: 1.0}
+
+
+def test_brewers_distillers_and_potters_need_a_town_around_them() -> None:
+    kinds = (BuildingKind.BREWERY, BuildingKind.DISTILLERY, BuildingKind.POTTER)
+
+    needs = [ladder.needs for ladder in LADDERS if ladder.kinds[0] in kinds]
+
+    assert needs == [{Points.POPULATION: FOOD_TOWN}] * 3
+
+
+def test_soldiers_never_starve_to_death() -> None:
+    soldiers = {BuildingKind.OUTPOST, BuildingKind.BASE, BuildingKind.HEADQUARTERS}
+
+    undying = soldiers & UNDYING
+
+    assert undying == soldiers
