@@ -8,10 +8,9 @@ from imgui_bundle import imgui
 
 from railroads.saves import SaveInfo, Saves, name_problem
 from railroads.ui.save_files import BrowserFiles, DesktopFiles, draw_file_buttons, save_files
-from railroads.ui.theme import BRASS, GONE
+from railroads.ui.theme import BRASS, GONE, WINDOW_TOP
 
 WINDOW_SIZE = (560.0, 420.0)
-WINDOW_TOP = 56.0
 LIST_HEIGHT = 240.0
 
 

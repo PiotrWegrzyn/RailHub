@@ -1,7 +1,8 @@
 """What a station holds: goods trains brought, waiting to be handed out, and its stockpile of spare
 goods from around it and passengers and mail waiting for trains. The station holds up to STOCKPILE
 of each kind of freight, gathered and brought together, so one good piling up leaves the others
-their room, and WAITING passengers and mail. Each storage upgrade adds STORAGE_STEP to every kind of
+their room, and WAITING passengers and mail, who wait only a month before the next month's come
+in their place. Each storage upgrade adds STORAGE_STEP to every kind of
 freight and WAITING_STEP to the passengers and mail."""
 
 from dataclasses import dataclass, field
@@ -31,6 +32,9 @@ class StationGoods:
     # Room tech adds to every station's stockpile and waiting room (railroads.sim.tech).
     extra_room: float = 0.0
     extra_waiting: float = 0.0
+    # The storage steps raising the station's level has added, which don't make bought storage
+    # dearer.
+    level_steps: int = 0
     # Goods kept for trains, which the station doesn't hand out to the buildings around it. A
     # frozenset, so saves from before it existed load with none kept.
     kept: frozenset[Good] = frozenset()
@@ -38,12 +42,12 @@ class StationGoods:
     @property
     def limit(self) -> float:
         """The most of each kind of freight the station holds."""
-        return STOCKPILE + STORAGE_STEP * self.storage + self.extra_room
+        return STOCKPILE + STORAGE_STEP * (self.storage + self.level_steps) + self.extra_room
 
     @property
     def waiting_limit(self) -> float:
         """The most passengers, and the most mail, that wait here."""
-        return WAITING + WAITING_STEP * self.storage + self.extra_waiting
+        return WAITING + WAITING_STEP * (self.storage + self.level_steps) + self.extra_waiting
 
     def held(self, good: Good) -> float:
         """How much of a good the station holds, gathered and brought together."""
@@ -82,5 +86,6 @@ class StationGoods:
         self.kept = self.kept | {good} if kept else self.kept - {good}
 
     def board(self, good: Good, amount: float) -> None:
-        """Lets passengers or mail come to the station to wait, up to its waiting limit."""
-        self.stockpile[good] = min(self.waiting_limit, self.stockpile.get(good, 0.0) + amount)
+        """Lets the month's passengers or mail come to the station to wait, up to its waiting
+        limit, in place of last month's: those no train took have gone their own way."""
+        self.stockpile[good] = min(self.waiting_limit, amount)

@@ -13,6 +13,7 @@ import zlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Self
 
 import numpy as np
 import numpy.typing as npt
@@ -80,6 +81,16 @@ class TileElevation:
         return x - first_x * TILE_SIZE - 0.5, y - first_y * TILE_SIZE - 0.5
 
 
+def pack_tile(heights: HeightTile, level: int = 9) -> bytes:
+    """A tile's heights as zlib-packed 16-bit metres."""
+    return zlib.compress(heights.astype("<i2").tobytes(), level)
+
+
+def unpack_tile(data: bytes) -> HeightTile:
+    heights = np.frombuffer(zlib.decompress(data), dtype="<i2")
+    return heights.reshape(TILE_SIZE, TILE_SIZE).astype(np.int16)
+
+
 class ElevationDatabase:
     """Terrain tiles of one zoom level in SQLite, each stored as zlib-packed 16-bit metres."""
 
@@ -94,8 +105,14 @@ class ElevationDatabase:
     def close(self) -> None:
         self._db.close()
 
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
+
     def put(self, x: int, y: int, heights: HeightTile) -> None:
-        packed = zlib.compress(heights.astype("<i2").tobytes())
+        packed = pack_tile(heights, zlib.Z_DEFAULT_COMPRESSION)
         self._db.execute(
             "INSERT OR REPLACE INTO tiles VALUES (?, ?, ?, ?)", (self.zoom, x, y, packed)
         )
@@ -105,10 +122,7 @@ class ElevationDatabase:
         row = self._db.execute(
             "SELECT heights FROM tiles WHERE z = ? AND x = ? AND y = ?", (self.zoom, x, y)
         ).fetchone()
-        if row is None:
-            return None
-        heights = np.frombuffer(zlib.decompress(row[0]), dtype="<i2")
-        return heights.reshape(TILE_SIZE, TILE_SIZE).astype(np.int16)
+        return None if row is None else unpack_tile(row[0])
 
     def stored(self) -> set[tuple[int, int]]:
         rows = self._db.execute("SELECT x, y FROM tiles WHERE z = ?", (self.zoom,)).fetchall()

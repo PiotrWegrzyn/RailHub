@@ -9,21 +9,23 @@ from PIL import Image, ImageDraw
 type RGB = tuple[int, int, int]
 
 type Point = tuple[float, float]
+# The four corners of a box's top: left, front, right and back (Painter.box).
+type Top = tuple[Point, Point, Point, Point]
 
 SHADOW = (0, 0, 0, 72)
 
 TRUNK: RGB = (88, 60, 38)
 
 PINES: list[tuple[RGB, RGB, RGB]] = [
-    ((22, 54, 34), (34, 78, 46), (56, 104, 60)),
-    ((26, 60, 30), (40, 86, 40), (66, 114, 56)),
-    ((20, 50, 42), (30, 72, 58), (50, 98, 78)),
+    ((25, 49, 33), (38, 71, 45), (59, 95, 60)),
+    ((28, 54, 30), (43, 77, 41), (67, 104, 58)),
+    ((24, 46, 38), (35, 66, 53), (55, 91, 73)),
 ]
 
 LEAVES: list[tuple[RGB, RGB, RGB]] = [
-    ((34, 78, 32), (54, 108, 44), (86, 140, 60)),
-    ((44, 88, 28), (70, 120, 40), (106, 154, 58)),
-    ((66, 92, 28), (96, 124, 40), (136, 158, 62)),
+    ((37, 69, 34), (56, 97, 47), (86, 127, 65)),
+    ((45, 78, 33), (70, 108, 47), (103, 140, 66)),
+    ((63, 83, 35), (91, 113, 49), (128, 146, 72)),
 ]
 
 WALLS: list[RGB] = [(226, 214, 190), (210, 176, 146), (232, 228, 218)]
@@ -105,6 +107,16 @@ SLATE: RGB = (78, 84, 98)
 VERDIGRIS: RGB = (98, 150, 132)
 
 
+# How tall chimneys and stacks stand against the height they are drawn for, so they hide less of
+# the buildings behind them on the map.
+CHIMNEY_SHARE = 0.6
+
+
+def chimney_top(foot: float, top: float) -> float:
+    """Where a chimney drawn from `foot` up to `top` ends, lowered by CHIMNEY_SHARE."""
+    return foot - (foot - top) * CHIMNEY_SHARE
+
+
 def shade(color: RGB, factor: float) -> RGB:
     r, g, b = color
     return (min(255, round(r * factor)), min(255, round(g * factor)), min(255, round(b * factor)))
@@ -140,7 +152,7 @@ def fineness() -> float:
 class Painter:
     """Draws on one sprite's canvas, with the anchor at (0, 0), at the fineness of drawn_at."""
 
-    def __init__(self, width: int, height: int, anchor: tuple[int, int]) -> None:
+    def __init__(self, width: float, height: float, anchor: tuple[float, float]) -> None:
         k = self._k = _fineness
         self.image = Image.new("RGBA", (round(width * k), round(height * k)), (0, 0, 0, 0))
         self.anchor = (round(anchor[0] * k), round(anchor[1] * k))
@@ -186,7 +198,7 @@ class Painter:
 
     def box(
         self, x: float, y: float, half_width: float, height: float, wall: RGB, roof: RGB | None
-    ) -> tuple[Point, Point, Point, Point]:
+    ) -> Top:
         """A block standing on a 2:1 diamond centred at (x, y): walls lit on the left, shaded on
         the right, and a flat top in the roof colour if one is given. Returns the top corners:
         left, front, right and back."""
@@ -204,7 +216,7 @@ class Painter:
         height: float,
         wall: RGB,
         roof: RGB | None,
-    ) -> tuple[Point, Point, Point, Point]:
+    ) -> Top:
         """Like `box`, but on an oblong footprint centred at (x, y): its lit wall spans `length`
         pixels across and its shaded wall `depth`."""
         front = (x + (length - depth) / 2, y + (length + depth) / 4)
@@ -222,7 +234,7 @@ class Painter:
         h: float,
         wall: RGB,
         roof: RGB | None,
-    ) -> tuple[Point, Point, Point, Point]:
+    ) -> Top:
         def up(p: Point) -> Point:
             return p[0], p[1] - h
 

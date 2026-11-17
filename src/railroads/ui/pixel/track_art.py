@@ -1,14 +1,16 @@
 """Track drawn into the pixel map, built upright on the screen so it keeps one width and look
 whichever way it runs: a dark bank round a gravel bed, dark sleepers lying square to the rails
 and two light rails, the same on both sides, with a faint shadow round it. Over water it runs on
-a timber deck with railings, where it goes into mountains a dark portal opens, and over electric
-track masts hold wires. Through a station it runs straight between the station's two ends, past
-a platform on the station's side.
+a timber deck with railings, and over electric track masts hold wires. A tunnel is out of sight
+but for a stone portal where it comes out of the mountains facing the viewer. Through a station it
+runs straight between the station's two ends, past a platform on the station's side.
 
 Each layer is drawn several times finer than it is shown and averaged down, so its edges and
-rails come out smooth instead of stepped. Where hills and mountains rise, track is drawn lifted
-with the ground point by point, so it climbs smoothly, and the lift of every pixel it covers is
-kept, so the map can hide it behind raised ground in front of it (railroads.ui.pixel.world)."""
+rails come out smooth instead of stepped. Where hills and mountains rise, track is laid out flat
+and then lifted with the ground point by point, on the bed graded for it (Elevation.grade), so it
+climbs smoothly and keeps its tracks apart however steep the climb, and the lift of every pixel
+it covers is kept, so the map can hide it behind raised ground in front of it
+(railroads.ui.pixel.world)."""
 
 import itertools
 import math
@@ -18,12 +20,12 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from railroads.sim.constructions import Constructions, Track, TrackWidth
-from railroads.sim.grids import Cell
+from railroads.sim.grids import Cell, FloatArray
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
 from railroads.ui.pixel.art.painter import PLATFORM, PLATFORM_EDGE
-from railroads.ui.pixel.projection import RGB, FloatArray, Path, PixelProjection, Point
+from railroads.ui.pixel.projection import RGB, Path, PixelProjection, Point
 from railroads.ui.pixel.relief import MOST_LIFT, Elevation
 
 # Track, in cells of the picture's width, the same whichever way it runs: how wide the dark bank
@@ -39,6 +41,12 @@ SLEEPER_WIDTH = 0.026
 SLEEPER_GAP = 0.05
 BRIDGE_WIDTH = 0.24
 PORTAL = 0.24
+# How tall a tunnel portal stands, in cells; how narrow it looks from the side, as a share of its
+# width seen from the front; and how far its track may run away from the viewer into it, as the
+# share of the way up the picture, for it to be seen.
+PORTAL_HEIGHT = 0.26
+PORTAL_NARROWEST = 0.6
+PORTAL_FACING = 0.5
 SHADOW_REACH = 0.03
 DOUBLE_SPACING = 0.22
 BEND = 0.2
@@ -78,6 +86,8 @@ BRIDGE_DECK: RGB = (126, 86, 50)
 BRIDGE_SHADOW: RGB = (62, 42, 26)
 RAILING: RGB = (70, 48, 30)
 PORTAL_STONE: RGB = (118, 112, 104)
+PORTAL_LIT: RGB = (168, 160, 148)
+PORTAL_EDGE: RGB = (58, 54, 50)
 PORTAL_DARK: RGB = (20, 18, 18)
 MAST: RGB = (96, 96, 104)
 GUIDEWAY: RGB = (196, 194, 188)
@@ -86,14 +96,18 @@ GUIDEWAY_GROOVE: RGB = (70, 72, 80)
 WIRE: RGB = (40, 40, 46)
 
 
-def _lay_guideway(paint: ImageDraw.ImageDraw, lanes: list[Path], cell: float, line: int) -> None:
+def _lay_guideway(
+    paint: ImageDraw.ImageDraw, lanes: list[Path], lifts: list[float], cell: float, line: int
+) -> None:
     """Maglev track: a pale concrete beam with darker edges and a groove down its middle where
     rails and sleepers would be."""
     for lane in lanes:
-        paint.polygon(_strip(lane, GUIDEWAY_WIDTH / 2 * cell), fill=(*GUIDEWAY_EDGE, 255))
+        edge = _raised_strip(lane, lifts, GUIDEWAY_WIDTH / 2 * cell)
+        paint.polygon(edge, fill=(*GUIDEWAY_EDGE, 255))
         inner = (GUIDEWAY_WIDTH / 2 - GUIDEWAY_RIM) * cell
-        paint.polygon(_strip(lane, inner), fill=(*GUIDEWAY, 255))
-        paint.line(lane, fill=(*GUIDEWAY_GROOVE, 255), width=line, joint="curve")
+        paint.polygon(_raised_strip(lane, lifts, inner), fill=(*GUIDEWAY, 255))
+        groove = _raised(lane, lifts)
+        paint.line(groove, fill=(*GUIDEWAY_GROOVE, 255), width=line, joint="curve")
 
 
 def _offset(path: Path, side: float | list[float]) -> Path:
@@ -117,11 +131,16 @@ def _offset(path: Path, side: float | list[float]) -> Path:
     return moved
 
 
-def _strip(path: Path, left: float, right: float | None = None) -> Path:
-    """The outline of a strip along the path, from `left` to its left out to `right` (by
-    default as far to its right)."""
+def _raised(path: Path, lifts: list[float]) -> Path:
+    """The path with each of its points lifted up the picture by its own lift."""
+    return [(x, y - lift) for (x, y), lift in zip(path, lifts, strict=True)]
+
+
+def _raised_strip(path: Path, lifts: list[float], left: float, right: float | None = None) -> Path:
+    """`_strip` laid out flat along the path and then lifted point by point, so it keeps to the
+    same side of the path however steeply the lifts carry it up or down the picture."""
     right = -left if right is None else right
-    return _offset(path, left) + _offset(path, right)[::-1]
+    return _raised(_offset(path, left), lifts) + _raised(_offset(path, right), lifts)[::-1]
 
 
 def _bend(start: Point, middle: Point, end: Point, matrix: FloatArray, radius: float) -> Path:
@@ -189,15 +208,18 @@ def _point_at(path: Path, lengths: list[float], along: float) -> tuple[Point, Po
     raise ValueError("A path needs two points")
 
 
-def _sleepers(lane: Path, cell: float) -> list[Path]:
-    """The sleepers under one track on the screen, evenly along it, each lying square to the
-    way it runs there; `cell` is a cell's width in the picture's pixels."""
+def _sleepers(lane: Path, lifts: list[float], cell: float) -> list[Path]:
+    """The sleepers under one track on the screen, evenly along it as it lies flat, each lying
+    square to the way it runs there and lifted with it; `cell` is a cell's width in the
+    picture's pixels."""
     lengths = _lengths(lane)
     count = max(1, round(lengths[-1] / (SLEEPER_GAP * cell)))
     half_width, half_length = SLEEPER_WIDTH * cell / 2, SLEEPER_LENGTH * cell / 2
     sleepers = []
     for k in range(count):
-        (x, y), (ux, uy) = _point_at(lane, lengths, (k + 0.5) * lengths[-1] / count)
+        middle = (k + 0.5) * lengths[-1] / count
+        (x, y), (ux, uy) = _point_at(lane, lengths, middle)
+        y -= float(np.interp(middle, lengths, lifts))
         along, across = (ux * half_width, uy * half_width), (-uy * half_length, ux * half_length)
         sleepers.append(
             [
@@ -300,6 +322,7 @@ class TrackArt:
         self._placed: dict[tuple[Track, Point | None], FloatArray] = {}
         self._lifts: dict[tuple[Track, Point | None], FloatArray] = {}
         self._shapes_version = -1
+        self._grades = -1
         # The middle of each cell in the picture, and the steps to the cells track leaves
         # each cell for, which never change.
         self._centres: dict[Cell, tuple[float, float]] = {}
@@ -309,11 +332,30 @@ class TrackArt:
             self._planned.setdefault(piece.cell, []).append(piece)
 
     def _keep_current(self) -> None:
-        """Forgets what was kept about pieces of track before track or stations last changed."""
+        """Forgets what was kept about pieces of track before track or stations last changed,
+        and how far they lift before the ground was last graded for track."""
         if self._shapes_version != self.constructions.railway_version:
             self._shapes.clear()
             self._forget_laid()
             self._shapes_version = self.constructions.railway_version
+        grades = 0 if self.elevation is None else self.elevation.grades
+        if grades != self._grades:
+            self._lifts.clear()
+            self._grades = grades
+
+    def beds(self) -> list[FloatArray]:
+        """The middle line through the plane of all track laid on the ground, through stations
+        too, as a row of x and a row of y each, for the ground to be graded under
+        (Elevation.grade)."""
+        laid = [
+            self._laid(piece)
+            for piece in self.constructions.track()
+            if piece.bed == TrackBed.GROUND
+        ]
+        for cell in self.constructions.every_station_cell():
+            piece = self.station_piece(cell)
+            laid.append(self._laid(piece, station_side(self.projection, self._steps, piece.ends)))
+        return [each.line for each in laid]
 
     def _forget_laid(self) -> None:
         """Forgets the pieces laid out, where they land in the picture and how far they lift."""
@@ -407,62 +449,65 @@ class TrackArt:
         def screen(each: _Laid) -> tuple[Path, list[float]]:
             xs, ys = self._placed_line(each)
             lifts = self._lifted_line(each) if raise_up else [0.0] * len(xs)
-            on_screen = [
-                ((x - left) * s, (y - lift - top) * s)
-                for x, y, lift in zip(xs, ys, lifts, strict=True)
-            ]
-            return on_screen, lifts
+            flat = [((x - left) * s, (y - top) * s) for x, y in zip(xs, ys, strict=True)]
+            return flat, [lift * s for lift in lifts]
 
+        # Everything is laid out flat on the picture and lifted only then, point by point, so
+        # tracks keep their sides and widths on the steepest climbs.
         drawn = []
         for each in laid:
             line, lifts = screen(each)
             lanes = [_offset(line, [side * cell for side in sides]) for sides in each.sides]
-            drawn.append((each, line, lanes))
+            drawn.append((each, line, lanes, lifts))
             if raise_up:
                 self._measure(measure, each, line, lanes, lifts, cell, s)
         ground = [item for item in drawn if item[0].piece.bed != TrackBed.TUNNEL]
-        for each, _, lanes in ground:
+        for each, _, lanes, lifts in ground:
             half = (BRIDGE_WIDTH if each.piece.bed == TrackBed.BRIDGE else BANK) / 2
             for lane in lanes:
-                shade.polygon(_strip(lane, (half + SHADOW_REACH) * cell), fill=255)
-        for each, _, lanes in drawn:
+                shade.polygon(_raised_strip(lane, lifts, (half + SHADOW_REACH) * cell), fill=255)
+        for each, _, lanes, lifts in drawn:
             if each.piece.bed == TrackBed.BRIDGE:
-                self._lay_deck(paint, lanes, cell, s)
-        for each, _, lanes in ground:
+                self._lay_deck(paint, lanes, lifts, cell, s)
+        for each, _, lanes, lifts in ground:
             if each.piece.bed == TrackBed.GROUND:
                 for lane in lanes:
-                    paint.polygon(_strip(lane, BANK / 2 * cell), fill=(*BANK_EDGE, 255))
-        for each, line, lanes in ground:
+                    bank = _raised_strip(lane, lifts, BANK / 2 * cell)
+                    paint.polygon(bank, fill=(*BANK_EDGE, 255))
+        for each, line, lanes, lifts in ground:
             if each.platform is not None:
-                self._lay_platform(paint, line, lanes, each.platform, cell, s)
+                self._lay_platform(paint, line, lanes, lifts, each.platform, cell, s)
         railed = [item for item in ground if not item[0].piece.maglev]
-        for each, _, lanes in railed:
+        for each, _, lanes, lifts in railed:
             if each.piece.bed == TrackBed.GROUND:
                 for lane in lanes:
-                    paint.polygon(_strip(lane, TRACK_BED / 2 * cell), fill=(*GRAVEL, 255))
-        for each, line, lanes in drawn:
-            if each.piece.bed == TrackBed.TUNNEL:
-                self._lay_portals(paint, each, line, lanes, cell)
-        for each, _, lanes in ground:
+                    bed = _raised_strip(lane, lifts, TRACK_BED / 2 * cell)
+                    paint.polygon(bed, fill=(*GRAVEL, 255))
+        for each, _, lanes, lifts in ground:
             if each.piece.maglev:
-                _lay_guideway(paint, lanes, cell, smoothing)
-        for _, _, lanes in railed:
+                _lay_guideway(paint, lanes, lifts, cell, smoothing)
+        for _, _, lanes, lifts in railed:
             for lane in lanes:
-                for sleeper in _sleepers(lane, cell):
+                for sleeper in _sleepers(lane, lifts, cell):
                     paint.polygon(sleeper, fill=(*SLEEPER, 255))
         rail = smoothing
-        for _, _, lanes in railed:
-            for lane in lanes:
-                for side in (-GAUGE / 2 * cell, GAUGE / 2 * cell):
-                    rail_line = _offset(lane, side)
-                    paint.line(rail_line, fill=(*RAIL_UNDER, 255), width=2 * rail, joint="curve")
-        for _, _, lanes in railed:
-            for lane in lanes:
-                for side in (-GAUGE / 2 * cell, GAUGE / 2 * cell):
-                    paint.line(_offset(lane, side), fill=(*RAIL, 255), width=rail, joint="curve")
-        for each, line, lanes in ground:
+        rails = [
+            _raised(_offset(lane, side), lifts)
+            for _, _, lanes, lifts in railed
+            for lane in lanes
+            for side in (-GAUGE / 2 * cell, GAUGE / 2 * cell)
+        ]
+        for rail_line in rails:
+            paint.line(rail_line, fill=(*RAIL_UNDER, 255), width=2 * rail, joint="curve")
+        for rail_line in rails:
+            paint.line(rail_line, fill=(*RAIL, 255), width=rail, joint="curve")
+        for each, line, lanes, lifts in drawn:
+            if each.piece.bed == TrackBed.TUNNEL:
+                for portal in self._portals(each, line, lanes, lifts, cell):
+                    _lay_portal(paint, portal, s)
+        for each, line, lanes, lifts in ground:
             if each.piece.electric:
-                self._hang_wires(paint, line, lanes, cell, s)
+                self._hang_wires(paint, line, lanes, lifts, cell, s)
         return _averaged(picture, shadow, smoothing), _highest(heights, smoothing)
 
     def _measure(
@@ -475,9 +520,13 @@ class TrackArt:
         cell: float,
         s: int,
     ) -> None:
-        """Marks how far each stretch of the piece is lifted over every pixel it can cover,
-        masts and wires too."""
-        half = (max(BANK, BRIDGE_WIDTH, PORTAL) / 2 + _lane_spread(lanes) + SHADOW_REACH) * cell
+        """Marks how far each stretch of the piece is lifted, in art pixels, over every pixel it
+        can cover, masts and wires too; of a tunnel only its portals."""
+        if laid.piece.bed == TrackBed.TUNNEL:
+            for portal in self._portals(laid, line, lanes, lifts, cell):
+                measure.polygon(_arch(portal, s), fill=portal.lift / s)
+            return
+        half = (max(BANK, BRIDGE_WIDTH) / 2 + _lane_spread(lanes) + SHADOW_REACH) * cell
         rises = (0, (MAST_HEIGHT + 1) * s) if laid.piece.electric else (0,)
         if laid.piece.electric:
             half += MAST_SIDE * cell
@@ -485,8 +534,8 @@ class TrackArt:
             itertools.pairwise(line), itertools.pairwise(lifts), strict=True
         ):
             for rise in rises:
-                stretch = _strip([(a[0], a[1] - rise), (b[0], b[1] - rise)], half)
-                measure.polygon(stretch, fill=(la + lb) / 2)
+                stretch = _raised_strip([a, b], [la + rise, lb + rise], half)
+                measure.polygon(stretch, fill=(la + lb) / 2 / s)
 
     def _near(self, cell: Cell, near: tuple[int, int, int, int]) -> bool:
         centre = self._centres.get(cell)
@@ -537,11 +586,11 @@ class TrackArt:
         return lifts.tolist()
 
     def _through_stations(self, near: tuple[int, int, int, int]) -> list[_Laid]:
-        """The track through each station near the area, straight between its two ends with
-        its platform beside it: double where double track comes in, electric where electric
-        track comes in at both ends, maglev where only maglev track comes in."""
+        """The track through each station and added platform near the area, straight between its
+        two ends with its platform beside it: double where double track comes in, electric where
+        electric track comes in at both ends, maglev where only maglev track comes in."""
         laid = []
-        for cell in self.constructions.stations():
+        for cell in self.constructions.every_station_cell():
             if not self._near(cell, near):
                 continue
             piece = self.station_piece(cell)
@@ -646,20 +695,30 @@ class TrackArt:
         joined = [other for other in self._track_at(beyond) if entry in other.ends]
         return not joined or any(other.width == TrackWidth.DOUBLE for other in joined)
 
-    def _lay_deck(self, paint: ImageDraw.ImageDraw, lanes: list[Path], cell: float, s: int) -> None:
+    def _lay_deck(
+        self,
+        paint: ImageDraw.ImageDraw,
+        lanes: list[Path],
+        lifts: list[float],
+        cell: float,
+        s: int,
+    ) -> None:
         """A timber deck under the tracks with a railing along each side."""
         spread = (_lane_spread(lanes) + BRIDGE_WIDTH / 2) * cell
         middle = lanes[0] if len(lanes) == 1 else _middle(lanes)
-        paint.polygon(_strip(middle, spread + 0.03 * cell), fill=(*BRIDGE_SHADOW, 255))
-        paint.polygon(_strip(middle, spread), fill=(*BRIDGE_DECK, 255))
+        deck = _raised_strip(middle, lifts, spread + 0.03 * cell)
+        paint.polygon(deck, fill=(*BRIDGE_SHADOW, 255))
+        paint.polygon(_raised_strip(middle, lifts, spread), fill=(*BRIDGE_DECK, 255))
         for side in (-spread, spread):
-            paint.line(_offset(middle, side), fill=(*RAILING, 255), width=s, joint="curve")
+            railing = _raised(_offset(middle, side), lifts)
+            paint.line(railing, fill=(*RAILING, 255), width=s, joint="curve")
 
     def _lay_platform(
         self,
         paint: ImageDraw.ImageDraw,
         line: Path,
         lanes: list[Path],
+        lifts: list[float],
         side: Point,
         cell: float,
         s: int,
@@ -671,42 +730,59 @@ class TrackArt:
         sign = 1.0 if nx * side[0] + ny * side[1] > 0 else -1.0
         near = (_lane_spread(lanes) + BANK / 2) * cell
         far = near + PLATFORM_WIDTH * cell
-        paint.polygon(_strip(line, sign * near, sign * far), fill=(*PLATFORM, 255))
-        paint.line(_offset(line, sign * (near + s / 2)), fill=(*PLATFORM_EDGE, 255), width=s)
+        platform = _raised_strip(line, lifts, sign * near, sign * far)
+        paint.polygon(platform, fill=(*PLATFORM, 255))
+        edge = _raised(_offset(line, sign * (near + s / 2)), lifts)
+        paint.line(edge, fill=(*PLATFORM_EDGE, 255), width=s)
 
-    def _lay_portals(
-        self, paint: ImageDraw.ImageDraw, laid: _Laid, line: Path, lanes: list[Path], cell: float
-    ) -> None:
-        """A dark arch where the tunnel meets track out in the open."""
+    def _portals(
+        self, laid: _Laid, line: Path, lanes: list[Path], lifts: list[float], cell: float
+    ) -> list[_Portal]:
+        """The portals of a tunnel piece, at each end where it comes out of the mountains, that
+        face the viewer enough to be seen: those facing away open behind the hill in front."""
         grid = self.tile_map.grid
         piece = laid.piece
-        middle = line[len(line) // 2]
-        half = (PORTAL / 2 + _lane_spread(lanes)) * cell
-        for point, end in zip(piece.ends, (line[0], line[-1]), strict=True):
+        mx, my = line[len(line) // 2]
+        width = (PORTAL / 2 + _lane_spread(lanes)) * cell
+        portals = []
+        for point, index in zip(piece.ends, (0, -1), strict=True):
             beyond, _ = grid.track_exit(piece.cell, point)
             if not grid.contains(*beyond) or self.tile_map.relief[beyond] == Relief.MOUNTAINS:
                 continue
-            inner = (
-                middle[0] + (end[0] - middle[0]) * 0.6,
-                middle[1] + (end[1] - middle[1]) * 0.6,
-            )
-            mouth = [inner, end]
-            paint.polygon(_strip(mouth, half + 0.03 * cell), fill=(*PORTAL_STONE, 255))
-            paint.polygon(_strip(mouth, half), fill=(*PORTAL_DARK, 255))
+            ex, ey = line[index]
+            length = math.hypot(ex - mx, ey - my) or 1.0
+            ux, uy = (ex - mx) / length, (ey - my) / length
+            if uy < -PORTAL_FACING:
+                continue
+            # The portal stands on the near edge of the track's end, as wide as the track is
+            # across the picture there.
+            base = (ex, ey - lifts[index] + abs(ux) * width)
+            half = width * (PORTAL_NARROWEST + (1 - PORTAL_NARROWEST) * abs(uy))
+            portals.append(_Portal(base, half, PORTAL_HEIGHT * cell, lifts[index]))
+        return portals
 
     def _hang_wires(
-        self, paint: ImageDraw.ImageDraw, line: Path, lanes: list[Path], cell: float, s: int
+        self,
+        paint: ImageDraw.ImageDraw,
+        line: Path,
+        lanes: list[Path],
+        lifts: list[float],
+        cell: float,
+        s: int,
     ) -> None:
         """A wire over each track, and masts at even steps along the piece on the far side of
         it from the viewer, each with an arm reaching over the track to hold the wires."""
         lengths = _lengths(line)
         count = max(1, round(lengths[-1] / (MAST_GAP * cell)))
         for lane in lanes:
-            wire = [(x, y - WIRE_HEIGHT * s) for x, y in lane]
+            wire = [
+                (x, y - lift - WIRE_HEIGHT * s) for (x, y), lift in zip(lane, lifts, strict=True)
+            ]
             paint.line(wire, fill=(*WIRE, 255), width=s)
         for k in range(count):
             along = (k + 0.5) * lengths[-1] / count
             _, (ux, uy) = _point_at(line, lengths, along)
+            lift = float(np.interp(along, lengths, lifts))
             far = (-uy, ux) if ux < 0 else (uy, -ux)
             overs = []
             for lane in lanes:
@@ -715,10 +791,44 @@ class TrackArt:
                 overs.append(over)
             overs.sort(key=lambda over: over[0] * far[0] + over[1] * far[1])
             near, back = overs[0], overs[-1]
-            bx, by = back[0] + far[0] * MAST_SIDE * cell, back[1] + far[1] * MAST_SIDE * cell
+            near = (near[0], near[1] - lift)
+            bx, by = back[0] + far[0] * MAST_SIDE * cell, back[1] + far[1] * MAST_SIDE * cell - lift
             top = (bx, by - MAST_HEIGHT * s)
             paint.line([(bx, by), top], fill=(*MAST, 255), width=s)
             paint.line([top, (near[0], near[1] - WIRE_HEIGHT * s)], fill=(*MAST, 255), width=s)
+
+
+@dataclass(frozen=True)
+class _Portal:
+    """A tunnel portal as drawn: the middle of its foot in the picture, its half width and its
+    height in the picture's pixels, and how far it is lifted with the track."""
+
+    base: Point
+    half: float
+    height: float
+    lift: float
+
+
+def _arch(portal: _Portal, s: int, inset: float = 0.0) -> Path:
+    """The outline of a portal standing upright, straight sides under a round top, or of the
+    opening `inset` pixels inside it."""
+    (x, y), half, height = portal.base, portal.half - inset, portal.height - inset
+    round_by = min(half, height * 0.6)
+    shoulder = y - (height - round_by)
+    top = [
+        (x + half * math.cos(angle), shoulder - round_by * math.sin(angle))
+        for angle in (math.pi * (1 - k / 8) for k in range(9))
+    ]
+    return [(x - half, y), *top, (x + half, y)]
+
+
+def _lay_portal(paint: ImageDraw.ImageDraw, portal: _Portal, s: int) -> None:
+    """A stone arch round a dark opening, lit along its top."""
+    stone = max(portal.half * 0.3, float(s))
+    outline = _arch(portal, s)
+    paint.polygon(outline, fill=(*PORTAL_STONE, 255), outline=(*PORTAL_EDGE, 255), width=s)
+    paint.line(outline[1:-1], fill=(*PORTAL_LIT, 255), width=s)
+    paint.polygon(_arch(portal, s, stone), fill=(*PORTAL_DARK, 255))
 
 
 def _lane_spread(lanes: list[Path]) -> float:

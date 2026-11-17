@@ -17,7 +17,7 @@ from railroads.ui.iso_camera import IsoCamera
 
 
 def make_constructions(grid_type: type[Grid] = HexGrid) -> Constructions:
-    grid = grid_type(rows=12, cols=12, km_per_cell=2.0)
+    grid = grid_type(rows=16, cols=16, km_per_cell=2.0)
     terrain = np.full(grid.shape, Terrain.LAND, dtype=np.uint8)
     terrain[:, 0] = Terrain.SEA
     tile_map = TileMap(
@@ -48,7 +48,7 @@ def make_constructions(grid_type: type[Grid] = HexGrid) -> Constructions:
     constructions.build(Building((4, 1), BuildingKind.SHIPYARD))
     placed = {built.kind for built in constructions if isinstance(built, Building)}
     missing = [kind for kind in BuildingKind if kind not in placed]
-    room = [(r, c) for r in range(12) for c in range(1, 12)]
+    room = [(r, c) for r in range(16) for c in range(1, 16) if not (6 <= r <= 8 and 4 <= c <= 9)]
     for kind in missing:
         constructions.build(
             next(
@@ -206,3 +206,32 @@ def test_spots_are_worked_out_again_only_in_cells_that_changed(
     assert unchanged == []
     assert worked_out == [(7, 7)]
     assert spots.kinds[-1] == BuildingKind.HOUSE
+
+
+def test_zoomed_out_only_track_on_the_screen_is_drawn(draw_list: imgui.ImDrawList) -> None:
+    near = drawn_track_vertices(draw_list, Track((6, 5), (0, 6)))
+    constructions = Constructions(make_constructions().tile_map)
+    constructions.build(Track((6, 5), (0, 6)))
+    constructions.build(Track((1, 2), (0, 6)))
+    camera = IsoCamera(center_x=6.0, center_y=5.0, angle_deg=0.0, cell_units=1.0)
+    camera.zoom_level = 4
+    imgui.get_io().display_size = imgui.ImVec2(200, 120)
+    before = draw_list.vtx_buffer.size()
+
+    draw_track(draw_list, constructions, camera, (100.0, 60.0))
+
+    assert draw_list.vtx_buffer.size() - before == near
+
+
+def test_zoomed_out_track_is_drawn_anew_once_more_is_laid(draw_list: imgui.ImDrawList) -> None:
+    constructions = Constructions(make_constructions().tile_map)
+    constructions.build(Track((6, 5), (0, 6)))
+    camera = IsoCamera(center_x=6.0, center_y=5.0, angle_deg=0.0, cell_units=1.0)
+    camera.zoom_level = 2
+    draw_track(draw_list, constructions, camera, (640.0, 400.0))
+    once = draw_list.vtx_buffer.size()
+    constructions.build(Track((7, 5), (0, 6)))
+
+    draw_track(draw_list, constructions, camera, (640.0, 400.0))
+
+    assert draw_list.vtx_buffer.size() - once == 2 * once

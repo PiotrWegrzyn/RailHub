@@ -13,12 +13,13 @@ each by the biggest town no other stands near.
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import Building, BuildingKind
-from railroads.sim.grids import Cell
+from railroads.sim.grids import BoolGrid, Cell
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
 from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
@@ -31,11 +32,20 @@ YEARLY_CHANCE = 0.15
 OLYMPIC_CHANCE = 0.05
 MOST_OLYMPIC_CHANCE = 0.5
 # The real Summer Games, without the cancelled ones of 1916, 1940 and 1944 and with Tokyo's a year
-# late, then every four years to the end of play.
-OLYMPIC_YEARS = frozenset(
+# late; from FUTURE_OLYMPICS on, every four years for ever (olympic_year).
+PAST_OLYMPIC_YEARS = frozenset(
     [1896, 1900, 1904, 1908, 1912, *range(1920, 1937, 4), *range(1948, 2017, 4), 2021]
-    + list(range(2024, 2050, 4))
 )
+FUTURE_OLYMPICS = 2024
+
+
+def olympic_year(year: int) -> bool:
+    """Whether Summer Games are held in a year."""
+    if year >= FUTURE_OLYMPICS:
+        return (year - FUTURE_OLYMPICS) % 4 == 0
+    return year in PAST_OLYMPIC_YEARS
+
+
 # How far from its town a novelty looks for a free hex, and how far apart host towns must be.
 TOWN_STEPS = 8
 HOSTS_APART = 10
@@ -46,7 +56,6 @@ SPACE_CENTER_TRIES = 200
 FILM_TOWN = 150
 FAIR_TOWN = 100
 
-BoolGrid = npt.NDArray[np.bool_]
 Placer = Callable[[Growth, BuildingKind, np.random.Generator], Cell | None]
 
 
@@ -65,9 +74,14 @@ def _free(growth: Growth, kind: BuildingKind, cell: Cell) -> bool:
 def _town(growth: Growth, least: int = 1) -> Cell | None:
     """The cell with the most people around it, if that many."""
     near = growth.nearby(Points.POPULATION)
-    best = np.unravel_index(int(np.argmax(near)), near.shape)
-    cell = (int(best[0]), int(best[1]))
+    cell = _highest(near)
     return cell if near[cell] >= least else None
+
+
+def _highest(values: npt.NDArray[Any]) -> Cell:
+    """The cell of the highest value, the first of them if several."""
+    best = np.unravel_index(int(np.argmax(values)), values.shape)
+    return int(best[0]), int(best[1])
 
 
 def _nearest_free(growth: Growth, kind: BuildingKind, centre: Cell) -> Cell | None:
@@ -76,6 +90,26 @@ def _nearest_free(growth: Growth, kind: BuildingKind, centre: Cell) -> Cell | No
         if _free(growth, kind, cell):
             return cell
     return None
+
+
+def _by_biggest_town(
+    growth: Growth, kind: BuildingKind, away_from: list[Cell]
+) -> tuple[Cell, Cell] | None:
+    """Builds the kind as near as it can to the biggest town more than HOSTS_APART steps from
+    each of `away_from`; the town and the building's cell, or None if there was none."""
+    grid = growth.constructions.tile_map.grid
+    near = growth.nearby(Points.POPULATION).astype(np.float64)
+    for spot in away_from:
+        for cell in grid.within(spot, HOSTS_APART):
+            near[cell] = -1
+    town = _highest(near)
+    if near[town] <= 0:
+        return None
+    cell = _nearest_free(growth, kind, town)
+    if cell is None:
+        return None
+    growth.build(Building(cell, kind))
+    return town, cell
 
 
 def _pick(
@@ -125,8 +159,7 @@ def place_pear_hq(growth: Growth, kind: BuildingKind, rng: np.random.Generator) 
     if not towers.any():
         return None
     near = np.where(towers, growth.nearby(Points.POPULATION), -1)
-    best = np.unravel_index(int(np.argmax(near)), near.shape)
-    return _nearest_free(growth, kind, (int(best[0]), int(best[1])))
+    return _nearest_free(growth, kind, _highest(near))
 
 
 def place_royal_palace(growth: Growth, kind: BuildingKind, rng: np.random.Generator) -> Cell | None:
@@ -226,7 +259,7 @@ class Novelties:
                 growth.build(Building(cell, novelty.kind))
                 self.built.add(novelty.kind)
                 changed.add(cell)
-        if year in OLYMPIC_YEARS and rng.random() < self.olympic_chance:
+        if olympic_year(year) and rng.random() < self.olympic_chance:
             changed |= self._host(growth)
         works = getattr(self, "works", [])
         wanted = getattr(self, "railway_works", 0)
@@ -236,37 +269,17 @@ class Novelties:
 
     def _railway_works(self, growth: Growth, works: list[Cell]) -> set[Cell]:
         """Puts railway works by the biggest town with none near it yet."""
-        grid = growth.constructions.tile_map.grid
-        near = growth.nearby(Points.POPULATION).astype(np.float64)
-        for standing in works:
-            for cell in grid.within(standing, HOSTS_APART):
-                near[cell] = -1
-        best = np.unravel_index(int(np.argmax(near)), near.shape)
-        town = (int(best[0]), int(best[1]))
-        if near[town] <= 0:
+        built = _by_biggest_town(growth, BuildingKind.RAILWAY_WORKS, works)
+        if built is None:
             return set()
-        cell = _nearest_free(growth, BuildingKind.RAILWAY_WORKS, town)
-        if cell is None:
-            return set()
-        growth.build(Building(cell, BuildingKind.RAILWAY_WORKS))
-        works.append(cell)
+        works.append(built[1])
         self.works = works
-        return {cell}
+        return {built[1]}
 
     def _host(self, growth: Growth) -> set[Cell]:
         """Puts a stadium in the biggest town far enough from every earlier host."""
-        grid = growth.constructions.tile_map.grid
-        near = growth.nearby(Points.POPULATION).astype(np.float64)
-        for host in self.hosts:
-            for cell in grid.within(host, HOSTS_APART):
-                near[cell] = -1
-        best = np.unravel_index(int(np.argmax(near)), near.shape)
-        town = (int(best[0]), int(best[1]))
-        if near[town] <= 0:
+        built = _by_biggest_town(growth, BuildingKind.OLYMPIC_STADIUM, self.hosts)
+        if built is None:
             return set()
-        cell = _nearest_free(growth, BuildingKind.OLYMPIC_STADIUM, town)
-        if cell is None:
-            return set()
-        growth.build(Building(cell, BuildingKind.OLYMPIC_STADIUM))
-        self.hosts.append(town)
-        return {cell}
+        self.hosts.append(built[0])
+        return {built[1]}

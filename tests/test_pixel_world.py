@@ -5,6 +5,7 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import (
+    MERGED,
     Building,
     BuildingKind,
     Constructions,
@@ -14,23 +15,25 @@ from railroads.sim.constructions import (
 )
 from railroads.sim.economy import Satisfaction
 from railroads.sim.grids import Cell, Grid, HexGrid, SquareGrid
-from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 from railroads.ui.pixel import track_art
 from railroads.ui.pixel.art import SPRITES, draw_sheet
 from railroads.ui.pixel.art.stations import TURNED_LINES
-from railroads.ui.pixel.ground import AROUND, CROWN_GAP, _depths, _nearest_crown
+from railroads.ui.pixel.ground import AROUND, CROWN_GAP, _depths, _tallest_crown, crown_radii
 from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.layer import resolution_for
 from railroads.ui.pixel.noise import noise, table_hash
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection, hash01
 from railroads.ui.pixel.relief import MOST_LIFT, raycast
+from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
 from railroads.ui.pixel.sheet import FINE, SHEET_INDEX, SpriteSheet
 from railroads.ui.pixel.track_art import RAIL
 from railroads.ui.pixel.track_preview import ghost
 from railroads.ui.pixel.world import PixelWorld
 
 LOOKS = {HexGrid: (0.0, 1.0), SquareGrid: (-45.0, float(np.sqrt(2)))}
+GAME_LOOK = (-45.0, float(np.sqrt(2)))
 
 
 @pytest.fixture(scope="module")
@@ -259,6 +262,67 @@ def test_every_building_gets_its_sprite(sheet: SpriteSheet) -> None:
     assert sum(name.startswith("house_") for name in names) == 3
     assert names.count("lumber_mill") == 1
     assert names.count("farm") == 1
+
+
+def painted_width(sheet: SpriteSheet, name: str) -> int:
+    columns = np.flatnonzero((sheet.pixels[sheet.index(name)][..., 3] > 0.1).any(axis=0))
+    return int(columns[-1] - columns[0] + 1)
+
+
+@pytest.mark.parametrize("small", list(MERGED))
+def test_big_and_mega_works_have_sprites_of_their_own_no_smaller_than_the_one_they_grew_from(
+    sheet: SpriteSheet, small: BuildingKind
+) -> None:
+    big, mega = MERGED[small]
+
+    names = [BUILDING_SPRITES[kind] for kind in (small, big, mega)]
+    widths = [painted_width(sheet, name) for name in names]
+
+    assert len(set(names)) == 3
+    assert widths[0] <= widths[1] <= widths[2]
+    assert widths[0] < widths[2]
+
+
+def test_no_works_is_drawn_wider_than_a_cell(sheet: SpriteSheet) -> None:
+    names = set(BUILDING_SPRITES.values())
+
+    widths = [painted_width(sheet, name) for name in names]
+
+    assert max(widths) <= 26
+
+
+def test_a_mega_works_sharing_its_cell_stands_with_its_foot_inside_the_cell(
+    sheet: SpriteSheet,
+) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    for _ in range(2):
+        constructions.build(Building((10, 4), BuildingKind.HOUSE))
+    constructions.build(Building((10, 4), BuildingKind.MEGA_TEXTILE_MILL))
+    projection = PixelProjection.of(tile_map.grid, *GAME_LOOK)
+    mega = sheet.index(BUILDING_SPRITES[BuildingKind.MEGA_TEXTILE_MILL])
+
+    scenery = Scenery.of(tile_map, constructions, projection, sheet)
+
+    at = int(np.flatnonzero(scenery.sprite == mega)[0])
+    painted = sheet.pixels[mega][..., 3] > 0.1
+    lowest = painted.shape[0] - 1 - np.argmax(painted[::-1], axis=0)
+    ax, ay = sheet.anchors[mega]
+    on_ground = np.flatnonzero(painted.any(axis=0) & (lowest >= ay - 3))
+    corners = np.array([projection.to_pixels(*c) for c in tile_map.grid.corners(10, 4)])
+    assert scenery.x[at] - ax + on_ground.min() >= corners[:, 0].min() - 1
+    assert scenery.x[at] - ax + on_ground.max() <= corners[:, 0].max() + 1
+
+
+@pytest.mark.parametrize("kind", [BuildingKind.BAKERY, BuildingKind.DAIRY])
+def test_bakeries_and_dairies_stand_bigger_than_a_house(
+    sheet: SpriteSheet, kind: BuildingKind
+) -> None:
+    house = sheet.sizes[sheet.variants("house")].max(axis=0)
+
+    size = sheet.sizes[sheet.index(BUILDING_SPRITES[kind])]
+
+    assert (size > house).all()
 
 
 def test_chunks_are_drawn_the_same_every_time(sheet: SpriteSheet) -> None:
@@ -578,7 +642,7 @@ def test_the_fine_sheet_holds_the_same_sprites_twice_as_big_on_the_same_spots(
     assert np.abs(fine_sheet.anchors - FINE * sheet.anchors).max() <= 2
 
 
-def test_a_fine_chunk_keeps_the_ground_and_draws_what_stands_on_it_finer(
+def test_a_fine_chunk_keeps_the_grounds_colours_textured_and_draws_what_stands_on_it_finer(
     sheet: SpriteSheet, fine_sheet: SpriteSheet
 ) -> None:
     tile_map = make_tile_map()
@@ -596,7 +660,10 @@ def test_a_fine_chunk_keeps_the_ground_and_draws_what_stands_on_it_finer(
     blown_up = coarse.repeat(FINE, axis=0).repeat(FINE, axis=1)
     assert world.resolutions == (1, FINE)
     assert fine.shape == (CHUNK * FINE, CHUNK * FINE, 4)
-    assert (world.render(0, 1, FINE) == bare.repeat(FINE, axis=0).repeat(FINE, axis=1)).all()
+    fine_bare = world.render(0, 1, FINE).astype(float)
+    bare_blown = bare.repeat(FINE, axis=0).repeat(FINE, axis=1).astype(float)
+    assert abs(fine_bare[..., :3].mean() - bare_blown[..., :3].mean()) < 0.08 * 255
+    assert (fine_bare != bare_blown).any()
     assert (fine != blown_up).any(axis=-1).sum() > 100
 
 
@@ -721,35 +788,119 @@ def test_woods_cover_what_the_cells_round_each_pixel_say_without_looking_at_all(
         assert np.array_equal(woods, expected)
 
 
-def nearest_crown_by_hashing(px: np.ndarray, py: np.ndarray, gap: float) -> tuple:
+def tallest_crown_by_hashing(px: np.ndarray, py: np.ndarray, gap: float) -> tuple:
     cx, cy = np.floor(px / gap).astype(np.int64), np.floor(py / gap).astype(np.int64)
-    best = np.full(px.shape, np.inf, dtype=np.float32)
+    best = np.full(px.shape, -np.inf, dtype=np.float32)
     best_dx, best_dy = np.zeros(px.shape, np.float32), np.zeros(px.shape, np.float32)
+    best_radius = np.zeros(px.shape, np.float32)
     best_x, best_y = cx.copy(), cy.copy()
     for ox in (-1, 0, 1):
         for oy in (-1, 0, 1):
             gx, gy = cx + ox, cy + oy
             jx = (gx + 0.15 + 0.7 * table_hash(gx, gy, 51)) * gap
             jy = (gy + 0.15 + 0.7 * table_hash(gx, gy, 52)) * gap
+            radius = crown_radii(gx, gy, jx, jy)
             dx, dy = (px - jx).astype(np.float32), (py - jy).astype(np.float32)
-            distance = dx * dx + dy * dy
-            closer = distance < best
-            best = np.where(closer, distance, best)
-            best_dx, best_dy = np.where(closer, dx, best_dx), np.where(closer, dy, best_dy)
-            best_x, best_y = np.where(closer, gx, best_x), np.where(closer, gy, best_y)
-    return np.sqrt(best), best_dx, best_dy, best_x, best_y
+            height = 1 - (dx * dx + dy * dy) / (radius * radius)
+            higher = height > best
+            best = np.where(higher, height, best)
+            best_dx, best_dy = np.where(higher, dx, best_dx), np.where(higher, dy, best_dy)
+            best_radius = np.where(higher, radius, best_radius)
+            best_x, best_y = np.where(higher, gx, best_x), np.where(higher, gy, best_y)
+    return best, best_dx, best_dy, best_radius, best_x, best_y
 
 
-def test_the_nearest_crown_is_the_one_found_by_hashing_the_squares_round_each_point() -> None:
+def test_the_tallest_crown_is_the_one_found_by_hashing_the_squares_round_each_point() -> None:
     rng = np.random.default_rng(8)
     px = np.floor(rng.uniform(-300, 900, 20_000)) + 0.5
     py = np.floor(rng.uniform(-50, 700, 20_000)) + 0.5
 
-    found = _nearest_crown(px, py, CROWN_GAP)
+    found = _tallest_crown(px, py, CROWN_GAP)
 
-    for value, expected in zip(found, nearest_crown_by_hashing(px, py, CROWN_GAP), strict=True):
+    for value, expected in zip(found, tallest_crown_by_hashing(px, py, CROWN_GAP), strict=True):
         assert value.dtype == expected.dtype
         assert np.array_equal(value, expected)
+
+
+def test_woods_drawn_finer_are_worked_out_at_every_pixel_not_every_art_pixel(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet, houses=0)
+    px, py = world.projection.to_pixels(*world.tile_map.grid.center(3, 9))
+    left, top = int(px) - 32, int(py) - 32
+    canvas = np.zeros((64 * FINE, 64 * FINE, 4))
+    canvas[..., 3] = 1.0
+
+    world.ground.canopy(canvas, left, top, FINE)
+
+    blocks = canvas.reshape(64, FINE, 64, FINE, 4)
+    uneven = (blocks != blocks[:, :1, :, :1]).any(axis=(1, 3, 4))
+    assert uneven.sum() > 64 * 64 // 4
+
+
+def test_woods_drawn_finer_reach_past_their_edge_with_crowns_and_trunks(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet, houses=0)
+    px, py = world.projection.to_pixels(*world.tile_map.grid.center(8, 9))
+    left, top = int(px) - 32, int(py) - 32
+    coarse = np.ones((64, 64, 4))
+    fine = np.ones((64 * FINE, 64 * FINE, 4))
+
+    world.ground.canopy(coarse, left, top, 1)
+    world.ground.canopy(fine, left, top, FINE)
+
+    coarse_wooded = (coarse[..., :3] < 1).any(axis=-1)
+    fine_wooded = (fine[..., :3] < 1).any(axis=-1).reshape(64, FINE, 64, FINE).any(axis=(1, 3))
+    painted = fine[(fine[..., :3] < 1).any(axis=-1), :3]
+    brown = (painted[:, 0] > painted[:, 1] + 0.04) & (painted[:, 1] > painted[:, 2])
+    assert (fine_wooded & ~coarse_wooded).sum() > 20
+    assert brown.sum() > 10
+
+
+def desert_beside_grassland() -> TileMap:
+    grid = HexGrid(rows=12, cols=12, km_per_cell=2.0)
+    temperature = np.full(grid.shape, Temperature.NORMAL, dtype=np.uint8)
+    vegetation = np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8)
+    temperature[:, 6:] = Temperature.HOT
+    vegetation[:, 6:] = Vegetation.BARREN
+    return flat_map(grid=grid, temperature=temperature, vegetation=vegetation)
+
+
+def test_biomes_meet_along_a_winding_line_not_along_the_cells_edges(sheet: SpriteSheet) -> None:
+    tile_map = desert_beside_grassland()
+    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    x, y = world.projection.to_plane(
+        np.arange(CHUNK)[None, :] + 0.5, np.arange(CHUNK)[:, None] + 0.5
+    )
+    _, cols = tile_map.grid.cell_on_map(x, y)
+    on_map = tile_map.grid.contains(*tile_map.grid.cell_at(x, y))
+
+    rgb, _ = world.ground.render(0, 0, CHUNK)
+
+    sandy = rgb[..., 0] > rgb[..., 1]
+    grassland = on_map & (cols < 6)
+    assert world.ground.biomes[0, 0] != world.ground.biomes[0, 11]
+    assert (sandy & grassland & (cols == 5)).sum() > 50
+    assert (~sandy & on_map & (cols == 6)).sum() > 50
+    assert sandy[grassland & (cols < 4)].mean() < 0.01
+
+
+def test_land_near_water_is_greener_than_land_far_from_it(sheet: SpriteSheet) -> None:
+    tile_map = make_tile_map()
+    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    x, y = world.projection.to_plane(
+        np.arange(CHUNK)[None, :] + 0.5, np.arange(CHUNK)[:, None] + 0.5
+    )
+    rows, cols = tile_map.grid.cell_on_map(x, y)
+    on_map = tile_map.grid.contains(*tile_map.grid.cell_at(x, y))
+
+    rgb, _ = world.ground.render(0, 0, CHUNK)
+
+    green = rgb[..., 1] / np.maximum(rgb[..., 0], 1)
+    by_the_sea = on_map & (cols == 1) & (rows >= 8)
+    inland = on_map & (cols == 4) & (rows >= 8)
+    assert np.median(green[by_the_sea]) > 1.05 * np.median(green[inland])
 
 
 def test_a_chunk_showing_ground_lifted_as_far_as_ground_goes_is_drawn(
@@ -845,3 +996,40 @@ def test_depths_into_a_field_are_those_of_shrinking_it_with_wrapping_edges(
         depths = _depths(field, 4)
 
         assert np.array_equal(depths, depths_by_rolling(field, 4))
+
+
+@pytest.mark.parametrize("kind", [BuildingKind.FARM, BuildingKind.ORCHARD])
+def test_a_field_fades_into_the_ground_at_its_edge_instead_of_lying_on_it(
+    sheet: SpriteSheet, kind: BuildingKind
+) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    constructions.build(Building((12, 3), kind))
+    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+    px, py = world.projection.to_pixels(*tile_map.grid.center(12, 3))
+    left, top = int(px) - 32, int(py) - 32
+    canvas = np.zeros((64, 64, 4))
+    shown = np.ones((64, 64), dtype=bool)
+
+    world.ground.fields(canvas, left, top, 1, shown=shown)
+
+    cover = canvas[..., 3]
+    assert (cover > 0.99).sum() > 50
+    assert ((cover > 0.05) & (cover < 0.95)).sum() > 20
+
+
+def test_water_is_lighter_by_the_shore_than_far_out(sheet: SpriteSheet) -> None:
+    grid = HexGrid(rows=12, cols=16, km_per_cell=2.0)
+    terrain = np.full(grid.shape, Terrain.LAND, dtype=np.uint8)
+    terrain[:, :10] = Terrain.SEA
+    tile_map = flat_map(grid=grid, terrain=terrain)
+    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    x, y = world.projection.to_plane(
+        np.arange(CHUNK * 2)[None, :] + 0.5, np.arange(CHUNK)[:, None] + 0.5
+    )
+    _, cols = tile_map.grid.cell_on_map(x, y)
+
+    rgb = np.concatenate([world.ground.render(left, 0, CHUNK)[0] for left in (0, CHUNK)], axis=1)
+
+    brightness = rgb.sum(axis=-1)
+    assert brightness[cols == 9].mean() > 1.2 * brightness[(cols >= 3) & (cols <= 5)].mean()

@@ -14,6 +14,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
+from build_poland_map import RAW
 from PIL import Image
 
 from railroads.mapgen.area import MapArea
@@ -27,7 +28,7 @@ from railroads.mapgen.terrain_tiles import (
     decode_terrarium,
     world_pixel,
 )
-from railroads.newgame import DATA_DIR, ELEVATION_DB, START_REGION
+from railroads.newgame import ELEVATION_DB, START_REGION
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import SquareGrid
 
@@ -71,23 +72,22 @@ def fetch_tile(x: int, y: int) -> HeightTile:
 
 
 def main() -> None:
-    wanted = land_tiles(NaturalEarth.load(DATA_DIR / "raw"))
-    database = ElevationDatabase(ELEVATION_DB)
-    missing = sorted(wanted - database.stored())
-    print(f"{len(wanted)} tiles hold land, {len(missing)} still to download")
-    failed = 0
-    with ThreadPoolExecutor(DOWNLOADS_AT_ONCE) as pool:
-        downloads = {pool.submit(fetch_tile, x, y): (x, y) for x, y in missing}
-        for done, download in enumerate(as_completed(downloads), start=1):
-            x, y = downloads[download]
-            try:
-                database.put(x, y, download.result())
-            except OSError as error:
-                failed += 1
-                print(f"tile {x}/{y} failed: {error}")
-            if done % 100 == 0 or done == len(missing):
-                print(f"{done}/{len(missing)} tiles", flush=True)
-    database.close()
+    wanted = land_tiles(NaturalEarth.load(RAW))
+    with ElevationDatabase(ELEVATION_DB) as database:
+        missing = sorted(wanted - database.stored())
+        print(f"{len(wanted)} tiles hold land, {len(missing)} still to download")
+        failed = 0
+        with ThreadPoolExecutor(DOWNLOADS_AT_ONCE) as pool:
+            downloads = {pool.submit(fetch_tile, x, y): (x, y) for x, y in missing}
+            for done, download in enumerate(as_completed(downloads), start=1):
+                x, y = downloads[download]
+                try:
+                    database.put(x, y, download.result())
+                except OSError as error:
+                    failed += 1
+                    print(f"tile {x}/{y} failed: {error}")
+                if done % 100 == 0 or done == len(missing):
+                    print(f"{done}/{len(missing)} tiles", flush=True)
     print(f"{ELEVATION_DB} is {ELEVATION_DB.stat().st_size / 1e6:.0f} MB")
     if failed:
         raise SystemExit(f"{failed} tiles failed; run the tool again to retry them")

@@ -8,7 +8,7 @@ from functools import cache
 import numpy as np
 from imgui_bundle import imgui
 
-from railroads.sim.constructions import BuildingKind
+from railroads.sim.constructions import MERGED, BuildingKind
 from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.iso_camera import IsoCamera, Vec2
 
@@ -110,6 +110,8 @@ DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.PORCELAIN_WORKS: ((96, 136, 214), 0.14),
     BuildingKind.MEAT_FACTORY: ((176, 70, 64), 0.14),
     BuildingKind.POWER_PLANT: ((120, 120, 132), 0.18),
+    BuildingKind.DIESEL_POWER_PLANT: ((150, 120, 96), 0.18),
+    BuildingKind.GAS_POWER_PLANT: ((150, 170, 160), 0.18),
     BuildingKind.SPACE_CENTER: ((236, 238, 244), 0.26),
     BuildingKind.PEAR_HQ: ((200, 220, 230), 0.28),
     BuildingKind.ROYAL_PALACE: ((240, 214, 150), 0.28),
@@ -120,9 +122,19 @@ DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.AMUSEMENT_PARK: ((240, 120, 160), 0.24),
     BuildingKind.OLYMPIC_STADIUM: ((220, 90, 70), 0.3),
     BuildingKind.TAVERN: ((196, 130, 56), 0.1),
+    BuildingKind.CLUB: ((150, 60, 130), 0.12),
+    BuildingKind.FILLING_STATION: ((230, 200, 60), 0.12),
     BuildingKind.DEPARTMENT_STORE: ((232, 200, 110), 0.16),
     BuildingKind.HOTEL: ((200, 70, 90), 0.16),
+    BuildingKind.JUICE_WORKS: ((236, 150, 40), 0.1),
 }
+
+# A big works shows in its own colour a little darker and larger, a mega one more so.
+for _kind, _sizes in MERGED.items():
+    _color, _size = DOTS[_kind]
+    for _step, _grown in enumerate(_sizes, start=1):
+        _darker = tuple(int(c * (1 - 0.12 * _step)) for c in _color)
+        DOTS[_grown] = ((_darker[0], _darker[1], _darker[2]), _size * (1 + 0.25 * _step))
 
 
 def draw_building_dots(

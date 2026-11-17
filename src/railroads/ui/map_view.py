@@ -62,18 +62,15 @@ from railroads.ui.pixel.layer import PixelLayer
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.track_preview import TrackPreview
-from railroads.ui.pixel.train_layer import TrainLayer
+from railroads.ui.pixel.train_layer import TrainLayer, engine_picture
 from railroads.ui.pixel.world import PixelWorld
 from railroads.ui.route_map import soften, soften_steps
 from railroads.ui.search import BuildingSearch
 from railroads.ui.station_window import StationWindow
 from railroads.ui.summaries_panel import SummariesPanel
-from railroads.ui.theme import (
-    BRASS,
-)
+from railroads.ui.theme import BRASS, SIDE_WINDOW_POS, rgba_u32
 
 BACKGROUND_COLOR = (0.08, 0.09, 0.11, 1.0)
-DETAILS_POS = (16.0, 96.0)
 DETAILS_SIZE = (680.0, 340.0)
 # Stepping to a building found zooms in at least this far, so it can be seen.
 VISIT_ZOOM = 4
@@ -100,10 +97,6 @@ LOOKS: dict[GridKind, GridLook] = {
     "square": GridLook(-45.0, math.sqrt(2), baked_lines_from=None, drawn_lines_from=16),
     "hex": GridLook(0.0, 1.0, baked_lines_from=8, drawn_lines_from=24),
 }
-
-
-def _color(rgba: tuple[float, float, float, float]) -> int:
-    return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))
 
 
 @cache
@@ -156,6 +149,9 @@ class MapView:
         self._pictures: GroundPictures | None = None
         self._pixels: PixelLayer | None = None
         self._trains: TrainLayer | None = None
+        # Each engine's picture for the buy screen, by engine and how many times it is blown up:
+        # its texture and its size in art pixels.
+        self._engine_pictures: dict[tuple[str, int], tuple[hello_imgui.TextureGpu, Vec2]] = {}
         self._preview: TrackPreview | None = None
         self._textures: dict[bool, hello_imgui.TextureGpu] = {}
         # Which of those the frame drawn last showed, the ones a month paints again in its colours.
@@ -225,7 +221,10 @@ class MapView:
         self.build.maglev_open = self.railway.maglev_open
         self.build.draw(*self._map_rect)
         self.build.trains.draw(
-            self.railway, self.growth.station_trade.supplies, self._ground_picture
+            self.railway,
+            self.growth.station_trade.supplies,
+            self._ground_picture,
+            self._engine_picture,
         )
         self.build.stations.draw(self.railway, self.look_at, self.open_station)
         self.station_window.draw(
@@ -234,6 +233,7 @@ class MapView:
             self.growth.station_trade.measure_demand,
             self.tools.start_moving,
             self.growth.station_trade.supplies,
+            self.tools.start_adding_platform,
         )
         self.summaries.draw(*self._map_rect, self.look_at, self.railway.name_of)
         self.search.draw(self.growth, self.visit, self._view_center)
@@ -278,7 +278,7 @@ class MapView:
     def _draw_details(self) -> None:
         if self.selected is None:
             return
-        imgui.set_next_window_pos(DETAILS_POS, imgui.Cond_.first_use_ever.value)
+        imgui.set_next_window_pos(SIDE_WINDOW_POS, imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size(DETAILS_SIZE, imgui.Cond_.first_use_ever.value)
         expanded, still_open = imgui.begin("Hex details", True)
         if expanded:
@@ -443,7 +443,7 @@ class MapView:
 
         draw_list = imgui.get_window_draw_list()
         draw_list.push_clip_rect(top_left, bottom_right, True)
-        draw_list.add_rect_filled(top_left, bottom_right, _color(BACKGROUND_COLOR))
+        draw_list.add_rect_filled(top_left, bottom_right, rgba_u32(BACKGROUND_COLOR))
         if self.camera.pixel_scale:
             shaded = self._draw_shaded_ground(draw_list, center, top_left, bottom_right)
             if not shaded:
@@ -484,19 +484,18 @@ class MapView:
             )
         if self.hovered is not None:
             draw_outline(draw_list, marks, self.tile_map.grid, center, self.hovered)
-            hovering_station = any(
-                isinstance(built, Station) for built in self.constructions.at(self.hovered)
-            )
-            if self.build.tool == Tool.STATION or hovering_station:
+            hovered_station = self.constructions.main_station(self.hovered)
+            if self.build.tool == Tool.STATION or hovered_station is not None:
                 stations = self.railway.stations() if self.build.tool == Tool.STATION else []
                 draw_station_reach(
                     draw_list,
                     self.tile_map.grid,
-                    self.hovered,
+                    self.hovered if hovered_station is None else hovered_station,
                     stations,
                     marks,
                     center,
                     self.railway.reach,
+                    self.constructions.platforms,
                 )
         opened = self.station_window.station
         if (
@@ -511,7 +510,14 @@ class MapView:
             and self.build.tool != Tool.STATION
         ):
             draw_station_reach(
-                draw_list, self.tile_map.grid, opened, [], marks, center, self.railway.reach
+                draw_list,
+                self.tile_map.grid,
+                opened,
+                [],
+                marks,
+                center,
+                self.railway.reach,
+                self.constructions.platforms,
             )
         if self.selected is not None:
             draw_outline(
@@ -582,8 +588,20 @@ class MapView:
 
     def _train_layer(self) -> TrainLayer:
         if self._trains is None:
-            self._trains = TrainLayer(self._pixel_layer().world)
+            self._trains = TrainLayer(self._pixel_layer().world, self.railway.trains)
         return self._trains
+
+    def _engine_picture(self, engine: str, times: int) -> tuple[imgui.ImTextureRef, Vec2]:
+        """An engine as the map draws it, drawn `times` times as fine each way with its fine
+        details, for the buy screen, and its size in the sheet's pixels."""
+        kept = self._engine_pictures.get((engine, times))
+        if kept is None:
+            layer = self._train_layer()
+            pixels = engine_picture(layer.sprites, layer.world.projection.matrix, engine, times)
+            texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(pixels))
+            kept = (texture, (pixels.shape[1] / times, pixels.shape[0] / times))
+            self._engine_pictures[(engine, times)] = kept
+        return imgui.ImTextureRef(kept[0].texture_id()), kept[1]
 
     def _track_preview(self) -> TrackPreview:
         if self._preview is None:
@@ -593,31 +611,48 @@ class MapView:
     def prepare(self, size: Vec2, density: int, chunks: bool = True) -> None:
         """Builds what the map needs before its first frame, in a window of `size` screen pixels
         with `density` device pixels to each, so that work can run while a game loads: the
-        ground picture and its softened copy for the trains window, the pixel world, the trains'
-        sprites and, with `chunks`, the chunks the first frame shows. Nothing here touches the
-        graphics card."""
-        self._soft = (self._ground_version, soften(self._plain_picture()))
+        ground picture with and without grid lines and its softened copy for the trains window,
+        the pixel world, the trains' sprites and, with `chunks`, the chunks the first frame
+        shows. Nothing here touches the graphics card."""
+        finish(self.prepare_steps(size, density, chunks))
+
+    def prepare_steps(self, size: Vec2, density: int, chunks: bool = True) -> Steps[None]:
+        """prepare a part at a time, for a page to go on drawing frames between them."""
+        plain = self._plain_picture()
+        yield
+        self._soft = (self._ground_version, (yield from soften_steps(plain)))
+        light = self.camera.map_direction(*LIGHT_ON_SCREEN)
+        self._ground_pictures().picture(self._ground_colors(), light, True)
+        yield
+        if self._pixels is None:
+            yield from self._pixel_layer_steps()
         layer = self._pixel_layer()
         if self.railway.trains:
+            yield
             self._train_layer()
         if chunks and self.camera.pixel_scale:
+            yield
             center = (size[0] / 2, size[1] / 2)
             layer.prepare(self.camera, center, ((0.0, 0.0), size), density)
 
     def _pixel_layer(self) -> PixelLayer:
         if self._pixels is None:
-            world = PixelWorld(
-                self.tile_map,
-                self.constructions,
-                _sprite_sheet(),
-                self._look.angle_deg,
-                self._look.cell_units,
-                fine=_fine_sprite_sheet(),
-                station_levels=self.railway.levels,
-            )
-            world.satisfaction = self._satisfaction.copy()
-            self._pixels = PixelLayer(world)
+            finish(self._pixel_layer_steps())
+        assert self._pixels is not None
         return self._pixels
+
+    def _pixel_layer_steps(self) -> Steps[None]:
+        world = yield from PixelWorld.built(
+            self.tile_map,
+            self.constructions,
+            _sprite_sheet(),
+            self._look.angle_deg,
+            self._look.cell_units,
+            fine=_fine_sprite_sheet(),
+            station_levels=self.railway.levels,
+        )
+        world.satisfaction = self._satisfaction.copy()
+        self._pixels = PixelLayer(world)
 
     def simulate(self, years: int, rng: np.random.Generator) -> None:
         """Lets a stand-in player build stations and serve the towns for `years`, printing the
@@ -664,7 +699,8 @@ class MapView:
         size = (bottom_right[0] - top_left[0], bottom_right[1] - top_left[1])
         density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
         view = view_of(origin, scale, top_left, size)
-        texture = shader.picture(view, screen_of(origin, scale, top_left, size, density))
+        screen = screen_of(origin, scale, top_left, size, density)
+        texture = shader.picture(view, screen, blend=True)
         draw_list.add_image(imgui.ImTextureRef(texture), top_left, bottom_right)
         free_textures()
         return True
@@ -676,7 +712,7 @@ class MapView:
             if hello_imgui.is_using_hello_imgui():
                 world = self._pixel_layer().world
                 self._shader = GroundShader.make(
-                    world.projection, self.tile_map, world.ground.slopes_light
+                    world.projection, self.tile_map, world.ground.shading
                 )
         return self._shader
 

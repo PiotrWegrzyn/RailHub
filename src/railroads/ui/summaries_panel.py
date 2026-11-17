@@ -11,12 +11,14 @@ from imgui_bundle import imgui
 from railroads.sim.grids import Cell
 from railroads.sim.summaries import MonthSummary
 from railroads.ui.iso_camera import Vec2
+from railroads.ui.stations_window import look_at_button
 from railroads.ui.theme import (
     BORDER,
     BRASS,
     CARDS_WIDTH,
     GONE,
     GROWN,
+    OVERLAY_FLAGS,
     PANEL,
     TEXT,
     TEXT_DIM,
@@ -71,12 +73,8 @@ class SummariesPanel:
             (bottom_right[0] - 12, top_left[1] + CARDS_TOP), imgui.Cond_.always.value, (1.0, 0.0)
         )
         flags = (
-            imgui.WindowFlags_.no_decoration.value
-            | imgui.WindowFlags_.always_auto_resize.value
+            OVERLAY_FLAGS
             | imgui.WindowFlags_.no_move.value
-            | imgui.WindowFlags_.no_saved_settings.value
-            | imgui.WindowFlags_.no_focus_on_appearing.value
-            | imgui.WindowFlags_.no_nav.value
             | imgui.WindowFlags_.no_background.value
         )
         imgui.push_style_var(imgui.StyleVar_.window_padding.value, imgui.ImVec2(0, 0))
@@ -148,10 +146,7 @@ class SummariesPanel:
                 imgui.align_text_to_frame_padding()
                 imgui.text(name_of(station.station))
                 imgui.same_line()
-                if imgui.small_button(fa.ICON_FA_CROSSHAIRS):
-                    look_at(station.station)
-                if imgui.is_item_hovered():
-                    imgui.set_tooltip("Look at this station")
+                look_at_button(station.station, look_at)
                 for kind, count in sorted(station.changes.items(), key=lambda kc: -kc[1]):
                     color = GROWN if count > 0 else GONE
                     imgui.text_colored(imgui.ImVec4(*color), f"   {count:+d}")

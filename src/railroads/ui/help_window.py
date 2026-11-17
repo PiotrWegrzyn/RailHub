@@ -1,5 +1,6 @@
-"""The help window: every building with what it makes and wants in a month, and every good with
-what it earns and who makes and wants it."""
+"""The help window: every building with what it makes and wants in a month, every good with
+what it earns and who makes and wants it, and every engine with what it can do, when and with
+which tech it is sold, and the real engines it is drawn after."""
 
 from dataclasses import dataclass
 from functools import cache
@@ -12,11 +13,21 @@ from railroads.sim.demand import price_of
 from railroads.sim.finance import dollars
 from railroads.sim.goods import FITS, GOOD_YEARS, MAKES, NEED_YEARS, NEEDS, Good, Need
 from railroads.sim.ladders import LADDERS, PASSENGERS_PER_POINT, POINTS, Points
+from railroads.sim.tech import NODES, Tree, path_to
+from railroads.sim.trains import ENGINES, Engine, successor
+from railroads.ui.buy_train import fuel_use
+from railroads.ui.engine_origins import origins
 from railroads.ui.search import goods_of
-from railroads.ui.theme import BRASS, good_amount, good_icon
+from railroads.ui.theme import BRASS, LIST_TABLE_FLAGS, WINDOW_TOP, good_amount, good_icon, tip
 
 WINDOW_SIZE = (860.0, 600.0)
-WINDOW_TOP = 56.0
+ENGINES_NOTE = (
+    "An engine is sold from its year once its tech is taken, until a newer one of its line comes."
+    " Tech is taken in the tech window (R): every level a tree reaches gives a point for one node"
+    " whose requirements are taken. A tree levels up from what the railway's own buildings of its"
+    " kind earn; passengers and mail from the fares. Engines are drawn after real ones, linked to"
+    " their Wikipedia pages."
+)
 
 
 @dataclass(frozen=True)
@@ -38,6 +49,18 @@ class GoodHelp:
     from_year: int
     made_by: tuple[str, ...]
     wanted_by: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class EngineHelp:
+    name: str
+    engine: Engine
+    # The year its sale ends and the engine that ends it, if one does.
+    sold_until: tuple[int, str] | None
+    # The nodes to take for it in each tree, each after those it requires.
+    tech: tuple[tuple[Tree, tuple[str, ...]], ...]
+    # The real engines it is drawn after, as names and Wikipedia links.
+    origins: tuple[tuple[str, str], ...]
 
 
 def _opening_year(kind: BuildingKind) -> int:
@@ -85,6 +108,32 @@ def good_help() -> tuple[GoodHelp, ...]:
     return tuple(rows)
 
 
+def _tech_path(engine: Engine) -> tuple[tuple[Tree, tuple[str, ...]], ...]:
+    path = path_to(engine.needs)
+    trees = dict.fromkeys(NODES[key][0] for key in path)
+    return tuple(
+        (tree, tuple(NODES[key][1].name for key in path if NODES[key][0] == tree)) for tree in trees
+    )
+
+
+@cache
+def engine_help() -> tuple[EngineHelp, ...]:
+    """Every engine by the year it is first sold; worked out once."""
+    rows = []
+    for name, engine in sorted(ENGINES.items(), key=lambda item: item[1].year):
+        newer = successor(name)
+        rows.append(
+            EngineHelp(
+                name,
+                engine,
+                (ENGINES[newer].year, ENGINES[newer].title) if newer else None,
+                _tech_path(engine),
+                origins(name),
+            )
+        )
+    return tuple(rows)
+
+
 @dataclass
 class HelpWindow:
     open: bool = False
@@ -98,11 +147,11 @@ class HelpWindow:
             (display.x / 2, WINDOW_TOP), imgui.Cond_.first_use_ever.value, (0.5, 0.0)
         )
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
-        title = f"{fa.ICON_FA_QUESTION_CIRCLE}  Buildings and goods###help"
+        title = f"{fa.ICON_FA_QUESTION_CIRCLE}  Buildings, goods and engines###help"
         expanded, self.open = imgui.begin(title, self.open)
         if expanded:
             imgui.set_next_item_width(-1)
-            hint = f"{fa.ICON_FA_SEARCH}  Filter by building or good"
+            hint = f"{fa.ICON_FA_SEARCH}  Filter by building, good or engine"
             _, self.query = imgui.input_text_with_hint("##help filter", hint, self.query)
             if imgui.begin_tab_bar("help tabs"):
                 if imgui.begin_tab_item("Buildings")[0]:
@@ -110,6 +159,9 @@ class HelpWindow:
                     imgui.end_tab_item()
                 if imgui.begin_tab_item("Goods")[0]:
                     self._draw_goods()
+                    imgui.end_tab_item()
+                if imgui.begin_tab_item("Engines")[0]:
+                    self._draw_engines()
                     imgui.end_tab_item()
                 imgui.end_tab_bar()
         imgui.end()
@@ -119,7 +171,7 @@ class HelpWindow:
         return all(any(word in name.lower() for name in names) for word in words)
 
     def _draw_buildings(self) -> None:
-        if not imgui.begin_table("all buildings", 6, _TABLE_FLAGS):
+        if not imgui.begin_table("all buildings", 6, LIST_TABLE_FLAGS):
             return
         imgui.table_setup_scroll_freeze(0, 1)
         imgui.table_setup_column("Building")
@@ -154,7 +206,7 @@ class HelpWindow:
         imgui.end_table()
 
     def _draw_goods(self) -> None:
-        if not imgui.begin_table("all goods", 5, _TABLE_FLAGS):
+        if not imgui.begin_table("all goods", 5, LIST_TABLE_FLAGS):
             return
         imgui.table_setup_scroll_freeze(0, 1)
         imgui.table_setup_column("Good")
@@ -181,13 +233,74 @@ class HelpWindow:
             imgui.text_wrapped(", ".join(row.wanted_by) or _NO_BUYER.get(row.good, "-"))
         imgui.end_table()
 
+    def _draw_engines(self) -> None:
+        imgui.text_wrapped(ENGINES_NOTE)
+        if not imgui.begin_table("all engines", 9, LIST_TABLE_FLAGS):
+            return
+        imgui.table_setup_scroll_freeze(1, 1)
+        imgui.table_setup_column("Engine")
+        imgui.table_setup_column("On sale")
+        imgui.table_setup_column("Tech to take", imgui.TableColumnFlags_.width_stretch.value, 1.2)
+        imgui.table_setup_column("Speed")
+        imgui.table_setup_column("Cars")
+        imgui.table_setup_column("Price")
+        imgui.table_setup_column("Burns a cell")
+        imgui.table_setup_column("Range")
+        imgui.table_setup_column("Drawn after", imgui.TableColumnFlags_.width_stretch.value, 1.0)
+        imgui.table_headers_row()
+        for row in engine_help():
+            engine = row.engine
+            names = (engine.title, engine.kind.value, engine.power.value)
+            if not self._shown(*names, *(name for name, _ in row.origins)):
+                continue
+            imgui.table_next_row()
+            imgui.table_next_column()
+            imgui.text(engine.title)
+            imgui.text_disabled(f"{engine.kind.value}, {engine.power.value}")
+            imgui.table_next_column()
+            _draw_sale(row)
+            imgui.table_next_column()
+            _draw_tech(row)
+            imgui.table_next_column()
+            imgui.text(f"{engine.kmh:.0f} km/h")
+            imgui.text_disabled(f"full in {engine.pickup:g} s")
+            imgui.table_next_column()
+            imgui.text(f"{engine.cars} + dining" if engine.express else str(engine.cars))
+            imgui.table_next_column()
+            imgui.text(dollars(engine.price))
+            imgui.table_next_column()
+            imgui.text(fuel_use(engine).removesuffix(" a cell"))
+            imgui.table_next_column()
+            imgui.text(f"{engine.tank:.0f} cells" if engine.tank else "no limit")
+            imgui.table_next_column()
+            _draw_origins(row)
+        imgui.end_table()
 
-_TABLE_FLAGS = (
-    imgui.TableFlags_.row_bg.value
-    | imgui.TableFlags_.borders_inner_h.value
-    | imgui.TableFlags_.scroll_y.value
-    | imgui.TableFlags_.sizing_fixed_fit.value
-)
+
+def _draw_sale(row: EngineHelp) -> None:
+    if row.sold_until is None:
+        imgui.text(f"{row.engine.year} on")
+        return
+    year, title = row.sold_until
+    imgui.text(f"{row.engine.year}-{year}")
+    tip(f"Sold until the {title} can be bought")
+
+
+def _draw_tech(row: EngineHelp) -> None:
+    if not row.tech:
+        imgui.text_disabled("none")
+    for tree, nodes in row.tech:
+        imgui.text_wrapped(f"{tree.value.capitalize()}: {' > '.join(nodes)}")
+
+
+def _draw_origins(row: EngineHelp) -> None:
+    if not row.origins:
+        imgui.text_disabled("our own design")
+    for name, url in row.origins:
+        imgui.text_link_open_url(name, url)
+        tip(f"{name}\n{url}")
+
+
 _NO_MAKER = {Good.PASSENGERS: "every building", Good.MAIL: "every building"}
 _NO_BUYER = {Good.PASSENGERS: "every building", Good.MAIL: "every building"}
 
@@ -211,5 +324,4 @@ def _draw_wants(row: BuildingHelp) -> None:
         if year:
             imgui.same_line(0, 2)
             imgui.text_disabled(f"({year})")
-            if imgui.is_item_hovered():
-                imgui.set_tooltip(f"Wanted from {year}")
+            tip(f"Wanted from {year}")

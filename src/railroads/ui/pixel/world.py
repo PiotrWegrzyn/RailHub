@@ -12,7 +12,7 @@ own module (railroads.ui.pixel.ground, track_art, scenery and projection); this 
 together from them.
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Self
 
@@ -20,8 +20,10 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import Constructions, Track
-from railroads.sim.grids import Cell
+from railroads.sim.grids import Cell, FloatArray, IntArray
+from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Relief, TileMap
+from railroads.sim.track_rules import TrackBed
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
 from railroads.ui.pixel.ground import (
     APRON,
@@ -29,13 +31,15 @@ from railroads.ui.pixel.ground import (
     FIELD_KINDS,
     IN_THE_WOODS,
     MILL_CLEARING,
+    OVERHANG,
     YARD_REACH,
     Ground,
     art_pixels,
     glow_strength,
 )
+from railroads.ui.pixel.ground_texture import textured
 from railroads.ui.pixel.lattice import Lattice
-from railroads.ui.pixel.projection import CHUNK, FloatArray, IntArray, PixelProjection, Rgba
+from railroads.ui.pixel.projection import CHUNK, PixelProjection, Rgba
 from railroads.ui.pixel.relief import MOST_LIFT, Elevation, lighting, raise_picture, raycast
 from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
 from railroads.ui.pixel.sheet import FINE, SpriteSheet
@@ -43,6 +47,9 @@ from railroads.ui.pixel.track_art import TrackArt
 
 # How far in art pixels a sprite can reach from where it stands.
 SPRITE_REACH = 48
+# The resolution chunks are drawn at in close views: the ground, fields and woods that fine, and
+# what stands on the ground as its pixel art from the finest sheet, each pixel blown up to a square.
+CLOSE = 4
 # How many art pixels further down the map than track the ground showing where it is drawn may
 # lie before the track counts as hidden behind it: the track's own width over gentle slopes.
 HIDDEN_BEYOND = 2.0
@@ -50,6 +57,9 @@ HIDDEN_BEYOND = 2.0
 
 class PixelWorld:
     """Draws chunks of one map as pixel art."""
+
+    # The mountain cells track tunnels through, with the railway version they were found for.
+    _tunnels: tuple[int, frozenset[Cell]] = (-1, frozenset())
 
     def __init__(
         self,
@@ -61,6 +71,38 @@ class PixelWorld:
         fine: SpriteSheet | None = None,
         station_levels: Mapping[Cell, int] | None = None,
     ) -> None:
+        finish(
+            self._build(tile_map, constructions, sheet, angle_deg, cell_units, fine, station_levels)
+        )
+
+    @classmethod
+    def built(
+        cls,
+        tile_map: TileMap,
+        constructions: Constructions,
+        sheet: SpriteSheet,
+        angle_deg: float,
+        cell_units: float,
+        fine: SpriteSheet | None = None,
+        station_levels: Mapping[Cell, int] | None = None,
+    ) -> Steps[Self]:
+        """The world made a part at a time, for a page to go on drawing frames between them."""
+        world = cls.__new__(cls)
+        yield from world._build(
+            tile_map, constructions, sheet, angle_deg, cell_units, fine, station_levels
+        )
+        return world
+
+    def _build(
+        self,
+        tile_map: TileMap,
+        constructions: Constructions,
+        sheet: SpriteSheet,
+        angle_deg: float,
+        cell_units: float,
+        fine: SpriteSheet | None,
+        station_levels: Mapping[Cell, int] | None,
+    ) -> Steps[None]:
         self.tile_map = tile_map
         self.constructions = constructions
         self.sheet = sheet
@@ -69,6 +111,12 @@ class PixelWorld:
         self.station_levels: Mapping[Cell, int] = {} if station_levels is None else station_levels
         # The height of every point, which raises hills and mountains (railroads.ui.pixel.relief).
         self.elevation = Elevation(tile_map, self.projection)
+        yield
+        # The track (railroads.ui.pixel.track_art), with the ground graded under it.
+        self.track = TrackArt(tile_map, constructions, self.projection, self.elevation)
+        self._graded_version = -1
+        self._grade()
+        yield
         self.scenery = Scenery.of(
             tile_map,
             constructions,
@@ -77,10 +125,11 @@ class PixelWorld:
             self.station_levels,
             elevation=self.elevation,
         )
-        # The ground and the track over it (railroads.ui.pixel.ground, railroads.ui.pixel.track_art).
+        yield
+        # The ground under the track (railroads.ui.pixel.ground).
         self.ground = Ground(tile_map, constructions, self.projection, angle_deg, self.elevation)
+        yield
         self._shade_trees()
-        self.track = TrackArt(tile_map, constructions, self.projection, self.elevation)
         # Every piece of track, kept until track or stations change.
         self._pieces: list[Track] = []
         self._pieces_version = -1
@@ -106,6 +155,14 @@ class PixelWorld:
         self.ground.satisfaction = levels
         self.satisfaction_version += 1
 
+    def sprite(self, index: int) -> tuple[int, npt.NDArray[np.float32], tuple[int, int]]:
+        """A sprite as the finest sheet holds it: that sheet's resolution, the sprite's RGBA
+        pixels from 0 to 1 and its anchor."""
+        resolution = max(self._sprites)
+        sprites = self._sprites[resolution]
+        anchor = sprites.anchors[index]
+        return resolution, sprites.pixels[index], (int(anchor[0]), int(anchor[1]))
+
     @property
     def resolutions(self) -> tuple[int, ...]:
         """The resolutions chunks can be drawn at, in pixels per art pixel."""
@@ -114,6 +171,7 @@ class PixelWorld:
     def buildings_changed(self, cells: Iterable[Cell]) -> set[tuple[int, int]]:
         """Puts the ground and scenery up again after buildings or forests changed in `cells`;
         returns the chunks that look different now."""
+        self._grade()
         self.ground.refresh()
         self.scenery = Scenery.of(
             self.tile_map,
@@ -126,6 +184,20 @@ class PixelWorld:
         self._shade_trees()
         self.buildings_version += 1
         return self._chunks_around(cells)
+
+    def _grade(self) -> None:
+        """Grades the ground under the track through hills and mountains (Elevation.grade), if
+        track or stations changed since it last was."""
+        version = self.constructions.railway_version
+        if version == self._graded_version:
+            return
+        beds = []
+        for line in self.track.beds():
+            mountains, hills = self.elevation.shares(*line)
+            if (mountains > 0).any() or (hills > 0).any():
+                beds.append(line)
+        self.elevation.grade(beds)
+        self._graded_version = version
 
     def _shade_trees(self) -> None:
         """Tells the ground where trees stand, so the grass round them lies in their shade."""
@@ -184,6 +256,38 @@ class PixelWorld:
                     chunks.add((cx, cy))
         return chunks
 
+    def underground(self, x: float, y: float) -> bool:
+        """Whether a plane point lies in a tunnel: in a mountain cell its track tunnels through,
+        where trains go out of sight until they come out of a portal."""
+        grid = self.tile_map.grid
+        row, col = (int(v) for v in grid.cell_at(x, y))
+        if not grid.contains(row, col) or self.tile_map.relief[row, col] != Relief.MOUNTAINS:
+            return False
+        return any(
+            piece.bed == TrackBed.TUNNEL for piece in self.constructions.track_at((row, col))
+        )
+
+    def underground_all(self, xs: list[float], ys: list[float]) -> list[bool]:
+        """Whether each of many plane points lies in a tunnel (underground), all found at once,
+        as trains ask for every engine and car each frame."""
+        tunnels = self._tunnel_cells()
+        if not tunnels or not xs:
+            return [False] * len(xs)
+        rows, cols = self.tile_map.grid.cell_at(np.array(xs), np.array(ys))
+        return [cell in tunnels for cell in zip(rows.tolist(), cols.tolist(), strict=True)]
+
+    def _tunnel_cells(self) -> frozenset[Cell]:
+        version = self.constructions.railway_version
+        if self._tunnels[0] != version:
+            relief = self.tile_map.relief
+            cells = frozenset(
+                piece.cell
+                for piece in self._track_pieces()
+                if piece.bed == TrackBed.TUNNEL and relief[piece.cell] == Relief.MOUNTAINS
+            )
+            self._tunnels = (version, cells)
+        return self._tunnels[1]
+
     def rises(self, chunk_x: int, chunk_y: int) -> bool:
         """Whether any hills or mountains rise in a chunk, or in the ground below it that it
         shows lifted."""
@@ -205,6 +309,7 @@ class PixelWorld:
         and slower. With `over_ground` a chunk where nothing rises leaves its ground out, clear
         but for the shade of trees, to be laid over ground the graphics card draws
         (railroads.ui.pixel.ground_shader)."""
+        self._grade()
         if fine_relief and resolution > 1:
             return self._render_fine(chunk_x, chunk_y, resolution)
         if over_ground and not self.rises(chunk_x, chunk_y):
@@ -220,30 +325,72 @@ class PixelWorld:
         # ground, MOST_LIFT rows past the chunk, which is as far as any pixel shows.
         rows = CHUNK if offset is None else CHUNK + min(int(offset.max()) + 1, MOST_LIFT)
         rgb, alpha = self.ground.render(left, top, rows, raised, points)
-        canvas = _blown_up(rgb / 255, alpha, resolution)
+        flat = offset is None
+        canvas = _ground_blown_up(rgb / 255, alpha, resolution, left, top, flat)
         lit = None if raised is None else lighting(raised.top(rows))
-        self.ground.fields(canvas, left, top, resolution, lit, points=points)
-        self.ground.yards(canvas, left, top, resolution)
-        self.ground.canopy(canvas, left, top, resolution, points=points)
+        self._surfaces(
+            canvas,
+            left,
+            top,
+            resolution,
+            None,
+            lambda layer, k, shown: (
+                self.ground.fields(layer, left, top, k, lit, shown=shown, points=points),
+                self.ground.yards(layer, left, top, k, shown=shown),
+                self.ground.canopy(layer, left, top, k, shown=shown, points=points),
+            ),
+            flat,
+        )
         if offset is None:
             self._lay_track(canvas, left, top, resolution)
         else:
             canvas = raise_picture(canvas, offset, resolution)
+            if resolution > 1:
+                textured(canvas, left, top, resolution)
             self._lay_lifted_track(canvas, left, top, resolution, offset, resolution)
         self._stand_scenery(canvas, left, top, resolution)
         return _finished(canvas)
+
+    def _surfaces(
+        self,
+        canvas: FloatArray,
+        left: int,
+        top: int,
+        k: int,
+        shown: npt.NDArray[np.bool_] | None,
+        paint: Callable[[FloatArray, int, npt.NDArray[np.bool_]], object],
+        texture: bool = True,
+    ) -> None:
+        """Lays what `paint` draws over the ground, fields, yards and woods, onto `canvas`, `k`
+        pixels to an art pixel, where it shows the map (`shown`, or wherever it isn't clear).
+        Above 1 they are drawn at no more than FINE, blended between their pixels up to `k` and
+        laid with the ground's texture (railroads.ui.pixel.ground_texture), so they read as the
+        same lit surface as the ground under them."""
+        on = canvas[..., 3] > 0 if shown is None else shown
+        if k == 1:
+            paint(canvas, 1, on)
+            return
+        drawn = min(k, FINE)
+        step = k // drawn
+        layer = np.zeros((canvas.shape[0] // step, canvas.shape[1] // step, 4))
+        paint(layer, drawn, on[::step, ::step])
+        if step > 1:
+            layer = _smoothly_blown_up(layer[..., :3], layer[..., 3], step)
+        if texture:
+            textured(layer, left, top, k)
+        canvas[...] = layer + canvas * (1 - layer[..., 3:])
 
     def _points(self, left: int, top: int, rows: int) -> Lattice:
         """The plane points and cells of the art pixels a chunk's layers work out from: CHUNK
         across and `rows` down from (`left`, `top`), with the ground's apron round them and room
         above and to the left for the shadows of woods."""
-        before = max(APRON, CANOPY_REACH)
+        before = max(APRON, CANOPY_REACH + OVERHANG)
         return Lattice(
             self.projection,
             left - before,
             top - before,
-            CHUNK + before + APRON,
-            rows + before + APRON,
+            CHUNK + before * 2,
+            rows + before * 2,
             grid=self.tile_map.grid,
         )
 
@@ -254,9 +401,18 @@ class PixelWorld:
         shown = inside.repeat(k, axis=0).repeat(k, axis=1)
         canvas = np.zeros((CHUNK * k, CHUNK * k, 4), dtype=np.float64)
         art_pixels(canvas, k)[..., 3] = shade[:, None, :, None]
-        self.ground.fields(canvas, left, top, k, shown=shown, points=points)
-        self.ground.yards(canvas, left, top, k, shown=shown)
-        self.ground.canopy(canvas, left, top, k, shown=shown, points=points)
+        self._surfaces(
+            canvas,
+            left,
+            top,
+            k,
+            shown,
+            lambda layer, kk, on: (
+                self.ground.fields(layer, left, top, kk, shown=on, points=points),
+                self.ground.yards(layer, left, top, kk, shown=on),
+                self.ground.canopy(layer, left, top, kk, shown=on, points=points),
+            ),
+        )
         self._lay_track(canvas, left, top, k, shown=shown)
         self._stand_scenery(canvas, left, top, k)
         return _finished(canvas)
@@ -273,19 +429,39 @@ class PixelWorld:
         rows = -(-(CHUNK * k + int(offset.max()) + 1) // k)
         points = self._points(left, top, rows)
         rgb, alpha = self.ground.render(left, top, rows, points=points)
-        sown = _blown_up(rgb / 255, alpha, k)
+        sown = _ground_blown_up(rgb / 255, alpha, k, left, top, False)
         alpha = sown[..., 3].copy()
-        self.ground.fields(sown, left, top, k)
-        self.ground.yards(sown, left, top, k)
+        self._surfaces(
+            sown,
+            left,
+            top,
+            k,
+            None,
+            lambda layer, kk, on: (
+                self.ground.fields(layer, left, top, kk, shown=on),
+                self.ground.yards(layer, left, top, kk, shown=on),
+            ),
+            False,
+        )
         rgb = sown[..., :3] * 255
         x, y = fine.plane(left, top, CHUNK, rows)
         r, c, _ = fine.cells(left, top, CHUNK, rows)
-        rocky = self.tile_map.relief[r, c] == Relief.MOUNTAINS
+        wr, wc = self.ground.winding(x, y, r, c)
+        rocky = self.tile_map.relief[wr, wc] == Relief.MOUNTAINS
         self.elevation.colour(rgb, raised.top(rows * k), x, y, rocky)
         rgb = np.clip(rgb, 0, 255) * alpha[..., None]
         canvas = np.concatenate([rgb / 255, alpha[..., None]], axis=-1)
-        self.ground.canopy(canvas, left, top, k, points=points)
+        self._surfaces(
+            canvas,
+            left,
+            top,
+            k,
+            None,
+            lambda layer, kk, on: self.ground.canopy(layer, left, top, kk, shown=on, points=points),
+            False,
+        )
         canvas = raise_picture(canvas, offset, 1)
+        textured(canvas, left, top, k)
         self._lay_lifted_track(canvas, left, top, k, offset / k)
         self._stand_scenery(canvas, left, top, k)
         return _finished(canvas)
@@ -348,14 +524,19 @@ class PixelWorld:
         under[..., :3] = under[..., :3] * (1 - alpha) + part[..., :3] * alpha
 
     def _stand_scenery(self, canvas: FloatArray, left: int, top: int, resolution: int) -> None:
-        scenery, drawn, k = self.scenery, self._sprites[resolution], resolution
-        x0 = (scenery.x - left) * k - drawn.anchors[scenery.sprite, 0]
-        y0 = (scenery.y - scenery.lift - top) * k - drawn.anchors[scenery.sprite, 1]
-        w, h = drawn.sizes[scenery.sprite, 0], drawn.sizes[scenery.sprite, 1]
+        sheet = resolution if resolution in self._sprites else max(self._sprites)
+        times = resolution // sheet
+        scenery, drawn, k = self.scenery, self._sprites[sheet], resolution
+        x0 = (scenery.x - left) * k - drawn.anchors[scenery.sprite, 0] * times
+        y0 = (scenery.y - scenery.lift - top) * k - drawn.anchors[scenery.sprite, 1] * times
+        w, h = drawn.sizes[scenery.sprite, 0] * times, drawn.sizes[scenery.sprite, 1] * times
         span = CHUNK * k
         overlapping = (x0 < span) & (x0 + w > 0) & (y0 < span) & (y0 + h > 0)
         for i in np.flatnonzero(overlapping).tolist():
-            _blend(canvas, drawn.premultiplied[int(scenery.sprite[i])], int(x0[i]), int(y0[i]))
+            pixels = drawn.premultiplied[int(scenery.sprite[i])]
+            if times > 1:
+                pixels = pixels.repeat(times, axis=0).repeat(times, axis=1)
+            _blend(canvas, pixels, int(x0[i]), int(y0[i]))
 
     def planned_track(
         self, pieces: list[Track], left: int, top: int, width: int, height: int, resolution: int
@@ -486,6 +667,39 @@ def _blown_up(rgb: FloatArray, alpha: FloatArray, k: int) -> FloatArray:
     """RGB and its alpha as one RGBA picture, each pixel blown up to `k` by `k`."""
     picture = np.concatenate([rgb, alpha[..., None]], axis=-1)
     return picture if k == 1 else picture.repeat(k, axis=0).repeat(k, axis=1)
+
+
+def _ground_blown_up(
+    rgb: FloatArray, alpha: FloatArray, k: int, left: int, top: int, texture: bool = True
+) -> FloatArray:
+    """The ground's RGB and alpha as one RGBA picture `k` pixels for every art pixel from
+    (`left`, `top`): blown up to squares at 1, otherwise blended between its pixels and, with
+    `texture`, laid with the ground's texture (railroads.ui.pixel.ground_texture), as the ground
+    shader draws. Raised ground is laid with it only once it is raised, so climbing slopes don't
+    stretch it into streaks."""
+    if k == 1:
+        return _blown_up(rgb, alpha, k)
+    picture = _smoothly_blown_up(rgb, alpha, k)
+    if texture:
+        textured(picture, left, top, k)
+    return picture
+
+
+def _smoothly_blown_up(rgb: FloatArray, alpha: FloatArray, k: int) -> FloatArray:
+    """RGB and its alpha as one RGBA picture `k` times as big each way, blended between the
+    middles of its pixels instead of each blown up to a square: the ground up close."""
+    picture = np.concatenate([rgb, alpha[..., None]], axis=-1)
+    for axis in (0, 1):
+        n = picture.shape[axis]
+        at = np.clip((np.arange(n * k) + 0.5) / k - 0.5, 0, n - 1)
+        low = np.floor(at).astype(np.intp)
+        high = np.minimum(low + 1, n - 1)
+        share = (at - low).reshape([-1 if a == axis else 1 for a in range(3)])
+        picture = (
+            np.take(picture, low, axis=axis) * (1 - share)
+            + np.take(picture, high, axis=axis) * share
+        )
+    return picture
 
 
 def _finished(canvas: FloatArray) -> Rgba:

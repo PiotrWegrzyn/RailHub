@@ -22,6 +22,8 @@ from railroads.saves import (
     imported_name,
     name_problem,
     snapshot,
+    snapshot_steps,
+    unpickled_steps,
 )
 from railroads.sim.clock import GameClock
 from railroads.sim.constructions import Building, BuildingKind, Constructions
@@ -325,15 +327,78 @@ def test_older_autosaves_stay_put_until_the_new_one_is_written(tmp_path: Path) -
     assert saves.load("autosave 2").clock.date == earlier.clock.date
 
 
-def test_a_snapshot_is_the_game_pickled_as_ever() -> None:
+def test_a_snapshot_is_the_games_big_parts_pickled_then_the_game() -> None:
     saved = played_game()
     plain = BytesIO()
-    _Pickler(plain, protocol=pickle.HIGHEST_PROTOCOL).dump(saved)
+    pickler = _Pickler(plain, protocol=pickle.HIGHEST_PROTOCOL)
+    for part in saved.game.big_parts():
+        pickler.dump(part)
+    pickler.dump(saved)
 
     joined = bytes(snapshot(saved).data)
     held = bytes(snapshot(saved, ReusedMemory()).data)
 
     assert joined == held == plain.getvalue()
+
+
+def test_a_snapshot_taken_in_steps_takes_a_step_for_each_big_part() -> None:
+    saved = played_game()
+    steps = snapshot_steps(saved)
+
+    taken = sum(1 for _ in steps)
+
+    assert taken == len(saved.game.big_parts())
+
+
+def test_a_snapshot_unpickles_as_the_game_a_part_at_a_time() -> None:
+    saved = played_game()
+    data = bytes(snapshot(saved).data)
+    steps = unpickled_steps(data)
+
+    taken = 0
+    try:
+        while True:
+            next(steps)
+            taken += 1
+    except StopIteration as done:
+        loaded = done.value
+
+    assert taken == len(saved.game.big_parts())
+    assert differences(saved, loaded) == []
+
+
+def pickled(value: object) -> bytes:
+    out = BytesIO()
+    _Pickler(out, protocol=pickle.HIGHEST_PROTOCOL).dump(value)
+    return out.getvalue()
+
+
+def test_a_big_array_of_zeros_is_saved_as_its_shape_alone() -> None:
+    blank = np.zeros((300, 400), dtype=np.int64)
+    used = blank.copy()
+    used[7, 9] = 3
+
+    data = pickled({"blank": blank, "again": blank, "used": used})
+
+    loaded = pickle.loads(data)
+    assert len(data) < used.nbytes + 1024
+    assert loaded["blank"] is loaded["again"]
+    assert loaded["blank"].dtype == np.int64
+    assert np.array_equal(loaded["blank"], blank)
+    assert np.array_equal(loaded["used"], used)
+
+
+def test_a_big_array_of_few_values_is_saved_as_their_places_and_loads_bit_for_bit() -> None:
+    sparse = np.zeros((300, 400))
+    sparse[3, 5], sparse[7, 9], sparse[200, 0] = 2.5, np.nan, -0.0
+    dense = np.arange(300 * 400, dtype=np.float64).reshape(300, 400)
+
+    data = pickled({"sparse": sparse, "dense": dense})
+
+    loaded = pickle.loads(data)
+    assert len(data) < dense.nbytes + sparse.nbytes // 10
+    assert loaded["sparse"].tobytes() == sparse.tobytes()
+    assert loaded["dense"].tobytes() == dense.tobytes()
 
 
 def test_a_save_exported_from_one_folder_loads_after_being_brought_into_another(

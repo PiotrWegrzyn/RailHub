@@ -208,7 +208,7 @@ def test_a_port_needs_water_next_to_it() -> None:
     assert inland == "A port needs water next to it"
 
 
-def test_only_mines_and_town_buildings_can_be_built_in_mountains() -> None:
+def test_only_mines_salt_works_and_town_buildings_can_be_built_in_mountains() -> None:
     constructions = Constructions(make_map("m"))
 
     allowed = {
@@ -221,12 +221,17 @@ def test_only_mines_and_town_buildings_can_be_built_in_mountains() -> None:
         BuildingKind.COPPER_MINE,
         BuildingKind.GOLD_MINE,
         BuildingKind.DIAMOND_MINE,
+        BuildingKind.SALT_WORKS,
         BuildingKind.HOUSE,
         BuildingKind.TENEMENT,
         BuildingKind.FLATS,
         BuildingKind.SKYSCRAPER,
         BuildingKind.BAKERY,
+        BuildingKind.BIG_BAKERY,
+        BuildingKind.MEGA_BAKERY,
         BuildingKind.TAVERN,
+        BuildingKind.CLUB,
+        BuildingKind.FILLING_STATION,
         BuildingKind.DEPARTMENT_STORE,
         BuildingKind.HOTEL,
         BuildingKind.LIMESTONE_QUARRY,
@@ -282,3 +287,23 @@ def test_a_cell_is_electrified_when_all_its_track_is_electric() -> None:
     assert constructions.electrified((2, 2), (6, 0))
     assert not constructions.electrified((2, 2), (3, 9))
     assert not constructions.electrified((2, 3))
+
+
+@pytest.mark.parametrize(
+    ("kind", "space"),
+    [
+        (BuildingKind.BIG_GLASSWORKS, 3),
+        (BuildingKind.MEGA_GLASSWORKS, 4),
+        (BuildingKind.BIG_TEXTILE_MILL, 3),
+        (BuildingKind.MEGA_TEXTILE_MILL, 4),
+        (BuildingKind.MEGA_REFINERY, 6),
+    ],
+)
+def test_big_works_take_half_a_cell_and_mega_works_two_thirds_or_all_their_works_took(
+    kind: BuildingKind, space: int
+) -> None:
+    building = Building((0, 0), kind)
+
+    taken = building.space
+
+    assert taken == space

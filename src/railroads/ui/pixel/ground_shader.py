@@ -1,8 +1,9 @@
 """The ground of the pixel map drawn by the graphics card: a shader works out every screen pixel
 from the art pixel under it the way railroads.ui.pixel.ground does on the CPU (Ground.render):
-which hex cell it lies in, the cell's biome and its ramp of shades picked by noise, meadows and
-savanna grass with blades and flowers, tufts, rippled water with sandy shores and foam, the light
-on the slopes, the glow where buildings are served and the signs of deposits. The noise reads the
+which hex cell it lies in, the cell's biome and its ramp of shades picked by noise, meadows,
+savanna, tundra and desert with blades, flowers and dunes, tufts, water deep or shallow with
+waves and glints and soft sandy shores, the light on the slopes, the glow where buildings are
+served and the signs of deposits. The noise reads the
 same table of random numbers as the CPU's, so both draw the same ground.
 
 It draws one pixel per art pixel over the part of the map on screen, then blows that up into a
@@ -31,11 +32,13 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
+from railroads.sim.grids import FloatArray
 from railroads.sim.tilemap import Deposit, TileMap
 from railroads.ui.biomes import Biome
 from railroads.ui.pixel import ground as cpu
 from railroads.ui.pixel.noise import _TABLE, TABLE_SIZE
-from railroads.ui.pixel.projection import FloatArray, PixelProjection
+from railroads.ui.pixel.projection import PixelProjection
+from railroads.ui.pixel.relief import LIGHT
 
 if sys.platform == "emscripten":
     from railroads.ui.pixel import webgl as GL
@@ -139,15 +142,45 @@ float noise(vec2 p, float inv, float off_u, float off_v) {
     return top * (1.0 - fv) + bottom * fv;
 }
 
-float slope_light(vec2 p) {
+vec4 surroundings(vec2 p) {
     vec2 at = clamp(p * @STEPS@ - 0.5, vec2(0.0), vec2(light_size - 1));
     ivec2 corner = min(ivec2(at), light_size - 2);
     vec2 t = at - vec2(corner);
-    float a = texelFetch(light, corner, 0).r;
-    float b = texelFetch(light, corner + ivec2(1, 0), 0).r;
-    float c = texelFetch(light, corner + ivec2(0, 1), 0).r;
-    float d = texelFetch(light, corner + ivec2(1, 1), 0).r;
+    vec4 a = texelFetch(light, corner, 0);
+    vec4 b = texelFetch(light, corner + ivec2(1, 0), 0);
+    vec4 c = texelFetch(light, corner + ivec2(0, 1), 0);
+    vec4 d = texelFetch(light, corner + ivec2(1, 1), 0);
     return mix(a, b, t.x) * (1.0 - t.y) + mix(c, d, t.x) * t.y;
+}
+
+float rolling(vec2 q) {
+    return @R_16_301@ + 0.45 * @R_55_302@ + 0.12 * @R_18_303@;
+}
+
+vec3 natural(vec2 p, vec4 around) {
+    float here = rolling(p);
+    float e = @ROLL_STEP@;
+    float gx = (rolling(vec2(p.x + e, p.y)) - here) / e;
+    float gy = (rolling(vec2(p.x, p.y + e)) - here) / e;
+    float facing = -(gx * @LIGHT_X@ + gy * @LIGHT_Y@);
+    float deep = @ROLL_LEAST@ + (@ROLL_MOST@ - @ROLL_LEAST@) * @N_25_306@;
+    float roll = clamp(1.0 + @ROLL_LIGHT@ * deep * facing, @ROLL_LOW@, @ROLL_HIGH@);
+    float region = @N_3_305@ * 2.0 - 1.0;
+    vec3 plains = region < 0.0 ? @GREENER_PLAINS@ : @DRIER_PLAINS@;
+    float lush = clamp(around.g * @WET_GAIN@, 0.0, 1.0) * @LUSH@;
+    float foot = clamp(around.b * @FOOT_GAIN@, 0.0, 1.0) * @FOOT_SHADE@;
+    vec3 tint = 1.0 + (plains - 1.0) * (abs(region) * @PLAINS_TINT@);
+    tint *= 1.0 + (@LUSH_TINT@ - 1.0) * lush;
+    tint *= 1.0 + (@FOOT_TINT@ - 1.0) * foot;
+    return tint * roll;
+}
+
+vec2 wound(vec2 q) {
+    float wx = q.x + @WARP@ * 2.0 * (@W_7_211@ - 0.5) + @WARP_FINE@ * 2.0 * (@W_2_213@ - 0.5);
+    float wy = q.y + @WARP@ * 2.0 * (@W_7_212@ - 0.5) + @WARP_FINE@ * 2.0 * (@W_2_214@ - 0.5);
+    wx += @WARP_BROAD@ * 2.0 * (@W_18_215@ - 0.5);
+    wy += @WARP_BROAD@ * 2.0 * (@W_18_216@ - 0.5);
+    return vec2(wx, wy);
 }
 
 vec3 ramp(float t, vec3 c0, vec3 c1, vec3 c2) {
@@ -160,8 +193,12 @@ vec3 grass(vec2 p, int ix, int iy, float lit, int kind_of_grass) {
     float rarity;
     if (kind_of_grass == 0) {
         @MEADOW_RAMPS@
-    } else {
+    } else if (kind_of_grass == 1) {
         @SAVANNA_RAMPS@
+    } else if (kind_of_grass == 2) {
+        @TUNDRA_RAMPS@
+    } else {
+        @DESERT_RAMPS@
     }
     float kind = @N_55_81@ + 0.25 * (@N_15_85@ - 0.5);
     float t = 0.5 + 0.36 * (@N_24_41@ - 0.5) + 0.14 * (@N_4_42@ - 0.5) + lit / 3.0;
@@ -185,6 +222,82 @@ bool water_at(ivec2 art) {
     return is_water(cell_info(cell_at(plane(art))).r);
 }
 
+bool land_at(ivec2 art) {
+    return !water_at(art);
+}
+
+float dune_height(vec2 q) {
+    vec2 s = vec2(q.x + 0.3 * @D_8_311@, q.y);
+    float n = 1.0 - abs(2.0 * @D_45_312@ - 1.0);
+    return n * n + 0.3 * @D_15_313@;
+}
+
+float dunes(vec2 p) {
+    float e = @DUNE_STEP@;
+    float here = dune_height(p);
+    float gx = (dune_height(vec2(p.x + e, p.y)) - here) / e;
+    float gy = (dune_height(vec2(p.x, p.y + e)) - here) / e;
+    return -(gx * @LIGHT_X@ + gy * @LIGHT_Y@) * @DUNE_LIGHT@;
+}
+
+float waves(vec2 q) {
+    return @V_1_401@ + 0.5 * @V_045_402@;
+}
+
+vec3 water_colour(vec2 p, int ix, int iy, float share) {
+    float depth = clamp((share - @DEPTH_FROM@) / @DEPTH_SPAN@, 0.0, 1.0);
+    vec3 rgb = depth < 0.5
+        ? @SHALLOW@ + (@OPEN_WATER@ - @SHALLOW@) * (depth * 2.0)
+        : @OPEN_WATER@ + (@DEEP_WATER@ - @OPEN_WATER@) * (depth * 2.0 - 1.0);
+    float e = @WAVE_STEP@;
+    float here = waves(p);
+    float gx = (waves(vec2(p.x + e, p.y)) - here) / e;
+    float gy = (waves(vec2(p.x, p.y + e)) - here) / e;
+    float facing = -(gx * @LIGHT_X@ + gy * @LIGHT_Y@) * @WAVE_LIGHT@;
+    rgb *= clamp(1.0 + facing, @WAVE_LOW@, @WAVE_HIGH@);
+    if (facing > @SPARKLE_FACING@ && hash(ix, iy, 403) > @SPARKLE_ABOVE@) {
+        rgb = rgb * (1.0 - @SPARKLE_MIX@) + @SPARKLE@ * @SPARKLE_MIX@;
+    }
+    return rgb;
+}
+
+bool beside_land(ivec2 art) {
+    return land_at(art + ivec2(1, 0)) || land_at(art - ivec2(1, 0))
+        || land_at(art + ivec2(0, 1)) || land_at(art - ivec2(0, 1));
+}
+
+bool beside_water(ivec2 art) {
+    return water_at(art + ivec2(1, 0)) || water_at(art - ivec2(1, 0))
+        || water_at(art + ivec2(0, 1)) || water_at(art - ivec2(0, 1));
+}
+
+vec3 shore(vec3 rgb, ivec2 art, bool water) {
+    if (water) {
+        if (beside_land(art)) {
+            return rgb * (1.0 - @SHORE_NEAR@) + @SHORE_WATER@ * @SHORE_NEAR@;
+        }
+        if (land_at(art + ivec2(2, 0)) || land_at(art - ivec2(2, 0))
+                || land_at(art + ivec2(0, 2)) || land_at(art - ivec2(0, 2))) {
+            rgb = rgb * (1.0 - @SHORE_FAR@) + @SHORE_WATER@ * @SHORE_FAR@;
+        }
+        if (land_at(art - ivec2(1, 1)) || land_at(art - ivec2(1, 2))
+                || land_at(art - ivec2(2, 2))) {
+            rgb *= @BANK_SHADE@;
+        }
+        return rgb;
+    }
+    if (beside_water(art)) {
+        return rgb * (1.0 - @BEACH_NEAR@) + @SAND@ * @BEACH_NEAR@;
+    }
+    if (water_at(art + ivec2(2, 0)) || water_at(art - ivec2(2, 0))
+            || water_at(art + ivec2(0, 2)) || water_at(art - ivec2(0, 2))
+            || water_at(art + ivec2(1, 1)) || water_at(art - ivec2(1, 1))
+            || water_at(art + ivec2(1, -1)) || water_at(art - ivec2(1, -1))) {
+        return rgb * (1.0 - @BEACH_FAR@) + @SAND@ * @BEACH_FAR@;
+    }
+    return rgb;
+}
+
 void main() {
     // The texture's first row is the picture's top row, as imgui shows it.
     ivec2 art = ivec2(floor(gl_FragCoord.xy)) + art_origin;
@@ -198,37 +311,38 @@ void main() {
     uvec4 info = cell_info(cell);
     uint biome = info.r;
     bool water = is_water(biome);
-    float lit = slope_light(p);
+    if (!water) {
+        uint warped = cell_info(cell_at(wound(p))).r;
+        if (!is_water(warped)) biome = warped;
+    }
+    vec4 around = surroundings(p);
+    float lit = around.r;
     float value = 1.45 + 1.6 * (@N_24_41@ - 0.5) + 0.8 * (@N_75_42@ - 0.5);
     value += 0.45 * (@N_22_43@ - 0.5) + 0.45 * BAYER[fmod(iy, 4) * 4 + fmod(ix, 4)];
     value += lit + @HILL_LIFT@ * float(info.b);
-    if (water) {
-        bool ripple = hash(fdiv(ix, 3), iy, 13) > 0.94;
-        value = ripple ? 3.0 : 1.3 + 0.6 * (hash(ix, iy, 11) - 0.5);
-    }
     int shade = int(clamp(roundEven(value), 0.0, 3.0));
     vec3 rgb = RAMPS[int(biome) * 4 + shade];
-    if (!water && in_set(biome, @MEADOWS@u)) {
+    if (water) {
+        rgb = water_colour(p, ix, iy, around.g);
+    } else if (in_set(biome, @MEADOWS@u)) {
         rgb = grass(p, ix, iy, lit, 0);
-    } else if (!water && biome == @SAVANNA@u) {
+    } else if (biome == @SAVANNA@u) {
         rgb = grass(p, ix, iy, lit, 1);
-    } else if (!water && in_set(biome, @GRASSY@u)) {
+    } else if (biome == @TUNDRA@u) {
+        rgb = grass(p, ix, iy, lit, 2);
+    } else if (biome == @DESERT@u) {
+        rgb = grass(p, ix, iy, lit + dunes(p), 3);
+    } else if (in_set(biome, @GRASSY@u)) {
         bool tuft = hash(fdiv(ix, 6), fdiv(iy, 6), 51) > @TUFT_ABOVE@
             && ((TUFT_ROWS[fmod(iy, 6)] >> fmod(ix, 6)) & 1) != 0;
         if (tuft) {
             rgb = RAMPS[int(biome) * 4 + max(shade - 1, 0)] * 0.92;
         }
     }
-    if (water) {
-        if (!water_at(art + ivec2(1, 0)) || !water_at(art - ivec2(1, 0))
-                || !water_at(art + ivec2(0, 1)) || !water_at(art - ivec2(0, 1))) {
-            rgb = @FOAM@;
-        }
-    } else if (water_at(art + ivec2(1, 0)) || water_at(art - ivec2(1, 0))
-            || water_at(art + ivec2(0, 1)) || water_at(art - ivec2(0, 1))
-            || water_at(art + ivec2(2, 0)) || water_at(art - ivec2(2, 0))) {
-        rgb = @SAND@;
+    if (!water) {
+        rgb *= natural(p, around);
     }
+    rgb = shore(rgb, art, water);
     if (!water) {
         float glow = float(info.a) / @GLOW_STEPS@;
         rgb = rgb * (1.0 - glow) + @GLOW@ * glow;
@@ -259,10 +373,59 @@ BLOW_UP = """out vec4 colour;
 uniform vec2 origin;
 uniform float scale;
 uniform ivec2 art_origin;
+uniform int blend;
 uniform highp sampler2D art;
+float hash(vec2 q) {
+    return fract(sin(q.x * 127.1 + q.y * 311.7) * 43758.5453);
+}
+float layer(vec2 p, vec3 wave) {
+    vec2 q = p * wave.xy + wave.z;
+    vec2 period = 64.0 * wave.xy;
+    vec2 i = floor(q);
+    vec2 t = q - i;
+    t = t * t * (3.0 - 2.0 * t);
+    vec2 i0 = mod(i, period);
+    vec2 i1 = mod(i + 1.0, period);
+    float top = mix(hash(i0), hash(vec2(i1.x, i0.y)), t.x);
+    float bottom = mix(hash(vec2(i0.x, i1.y)), hash(i1), t.x);
+    return mix(top, bottom, t.y);
+}
+vec3 textured(vec3 rgb, vec2 p) {
+    float green = rgb.g - max(rgb.r, rgb.b);
+    float wet = rgb.b - max(rgb.r, rgb.g);
+    vec3 tufts = vec3(1.5, 1.5, 0.0);
+    float grain = layer(p, vec3(4.0, 4.0, 0.0));
+    float bump = layer(p + vec2(0.3, 0.0), tufts) - layer(p - vec2(0.3, 0.0), tufts);
+    float light = clamp(1.0 - bump * 0.5, 0.78, 1.22);
+    float shade_by = (0.76 + 0.1 * grain + 0.14 * layer(p, tufts) + 0.1 * layer(p, vec3(0.625, 0.625, 0.0)))
+        * (1.0 + 0.12 * smoothstep(0.75, 0.9, layer(p, vec3(3.5, 3.5, 41.0))));
+    float factor = shade_by * light;
+    if (green > 0.0) {
+        factor *= 1.0 - 0.2 * smoothstep(0.62, 0.8, layer(p, vec3(5.0, 1.125, 17.0)));
+    } else {
+        factor = 1.0 + (factor - 1.0) * 0.7;
+    }
+    if (wet > 0.02) {
+        factor = 1.0 + (factor - 1.0) * 0.25;
+    }
+    return clamp(rgb * factor, 0.0, 1.0);
+}
 void main() {
-    ivec2 at = ivec2(floor((gl_FragCoord.xy - origin) / scale)) - art_origin;
-    colour = texelFetch(art, at, 0);
+    vec2 p = (gl_FragCoord.xy - origin) / scale;
+    if (blend == 0) {
+        colour = texelFetch(art, ivec2(floor(p)) - art_origin, 0);
+        return;
+    }
+    vec2 q = p - 0.5;
+    vec2 f = fract(q);
+    ivec2 last = textureSize(art, 0) - 1;
+    ivec2 at = ivec2(floor(q)) - art_origin;
+    vec4 a = texelFetch(art, clamp(at, ivec2(0), last), 0);
+    vec4 b = texelFetch(art, clamp(at + ivec2(1, 0), ivec2(0), last), 0);
+    vec4 c = texelFetch(art, clamp(at + ivec2(0, 1), ivec2(0), last), 0);
+    vec4 d = texelFetch(art, clamp(at + ivec2(1, 1), ivec2(0), last), 0);
+    colour = mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    colour.rgb = textured(colour.rgb, p);
 }
 """
 
@@ -278,12 +441,12 @@ def _vec3(rgb: object) -> str:
     return f"vec3({_number(r)}, {_number(g)}, {_number(b)})"
 
 
-def _noise(scale: float, seed: int) -> str:
-    """The call for railroads.ui.pixel.noise.noise at `scale` and `seed`, with its numbers worked
-    out in float32 as there."""
+def _noise(scale: float, seed: int, at: str = "p") -> str:
+    """The call for railroads.ui.pixel.noise.noise at point `at`, `scale` and `seed`, with its
+    numbers worked out in float32 as there."""
     inverse = np.float32(1 / scale)
     off_u, off_v = np.float32(seed * 37.1 + 500.0), np.float32(seed * 11.3 + 500.0)
-    return f"noise(p, {_number(inverse)}, {_number(off_u)}, {_number(off_v)})"
+    return f"noise({at}, {_number(inverse)}, {_number(off_u)}, {_number(off_v)})"
 
 
 def _bits(biomes: tuple[Biome, ...]) -> int:
@@ -322,7 +485,36 @@ def fragment_source() -> str:
         "GRASSY": str(_bits(cpu.GRASSY)),
         "SAVANNA": str(int(Biome.SAVANNA)),
         "TUFT_ABOVE": _number(1 - cpu.TUFT_SHARE),
-        "FOAM": _vec3(cpu.FOAM),
+        "TUNDRA_RAMPS": _grass_ramps("tundra"),
+        "DESERT_RAMPS": _grass_ramps("desert"),
+        "TUNDRA": str(int(Biome.TUNDRA)),
+        "DESERT": str(int(Biome.DESERT)),
+        "D_8_311": _noise(0.8, 311, "q"),
+        "D_45_312": _noise(0.45, 312, "s"),
+        "D_15_313": _noise(0.15, 313, "q"),
+        "DUNE_STEP": _number(cpu.DUNE_STEP),
+        "DUNE_LIGHT": _number(cpu.DUNE_LIGHT),
+        "V_1_401": _noise(0.1, 401, "q"),
+        "V_045_402": _noise(0.045, 402, "q"),
+        "DEPTH_FROM": _number(cpu.DEPTH_FROM),
+        "DEPTH_SPAN": _number(cpu.DEPTH_SPAN),
+        "SHALLOW": _vec3(cpu.SHALLOW),
+        "OPEN_WATER": _vec3(cpu.OPEN_WATER),
+        "DEEP_WATER": _vec3(cpu.DEEP_WATER),
+        "WAVE_STEP": _number(cpu.WAVE_STEP),
+        "WAVE_LIGHT": _number(cpu.WAVE_LIGHT),
+        "WAVE_LOW": _number(cpu.WAVE_RANGE[0]),
+        "WAVE_HIGH": _number(cpu.WAVE_RANGE[1]),
+        "SPARKLE_FACING": _number(cpu.SPARKLE_FACING),
+        "SPARKLE_ABOVE": _number(1 - cpu.SPARKLE_SHARE),
+        "SPARKLE_MIX": _number(cpu.SPARKLE_MIX),
+        "SPARKLE": _vec3(cpu.SPARKLE),
+        "SHORE_WATER": _vec3(cpu.SHORE_WATER),
+        "SHORE_NEAR": _number(cpu.SHORE_MIX[0]),
+        "SHORE_FAR": _number(cpu.SHORE_MIX[1]),
+        "BANK_SHADE": _vec3(cpu.BANK_SHADE),
+        "BEACH_NEAR": _number(cpu.BEACH[0]),
+        "BEACH_FAR": _number(cpu.BEACH[1]),
         "SAND": _vec3(cpu.SAND),
         "GLOW_STEPS": _number(GLOW_STEPS),
         "GLOW": _vec3(cpu.GLOW),
@@ -341,6 +533,37 @@ def fragment_source() -> str:
         "N_45_82": _noise(0.45, 82),
         "N_03_86": _noise(0.03, 86),
         "N_5_91": _noise(0.5, 91),
+        "R_16_301": _noise(1.6, 301, "q"),
+        "R_55_302": _noise(0.55, 302, "q"),
+        "R_18_303": _noise(0.18, 303, "q"),
+        "W_7_211": _noise(0.7, 211, "q"),
+        "W_7_212": _noise(0.7, 212, "q"),
+        "W_2_213": _noise(0.2, 213, "q"),
+        "W_2_214": _noise(0.2, 214, "q"),
+        "ROLL_STEP": _number(cpu.ROLL_STEP),
+        "N_25_306": _noise(cpu.ROLL_SPAN, 306),
+        "N_3_305": _noise(cpu.PLAINS_SPAN, 305),
+        "ROLL_LEAST": _number(cpu.ROLL_LEAST),
+        "ROLL_MOST": _number(cpu.ROLL_MOST),
+        "GREENER_PLAINS": _vec3(cpu.GREENER_PLAINS),
+        "DRIER_PLAINS": _vec3(cpu.DRIER_PLAINS),
+        "PLAINS_TINT": _number(cpu.PLAINS_TINT),
+        "LIGHT_X": _number(LIGHT[0]),
+        "LIGHT_Y": _number(LIGHT[1]),
+        "ROLL_LIGHT": _number(cpu.ROLL_LIGHT),
+        "ROLL_LOW": _number(cpu.ROLL_RANGE[0]),
+        "ROLL_HIGH": _number(cpu.ROLL_RANGE[1]),
+        "WET_GAIN": _number(cpu.WET_GAIN),
+        "FOOT_GAIN": _number(cpu.FOOT_GAIN),
+        "LUSH": _number(cpu.LUSH),
+        "FOOT_SHADE": _number(cpu.FOOT_SHADE),
+        "LUSH_TINT": _vec3(cpu.LUSH_TINT),
+        "FOOT_TINT": _vec3(cpu.FOOT_TINT),
+        "WARP": _number(cpu.WARP),
+        "WARP_FINE": _number(cpu.WARP_FINE),
+        "WARP_BROAD": _number(cpu.WARP_BROAD),
+        "W_18_215": _noise(1.8, 215, "q"),
+        "W_18_216": _noise(1.8, 216, "q"),
     }
     source = FRAGMENT
     for name, value in names.items():
@@ -491,7 +714,7 @@ class _Target:
 
 class GroundShader:
     """The compiled shaders, what they read on the graphics card (the cells, the slopes' light
-    and the noise table), the art pixels last drawn and the picture last blown up from them."""
+    with the water and mountains round the ground, and the noise table), the art pixels last drawn and the picture last blown up from them."""
 
     def __init__(
         self,
@@ -503,7 +726,7 @@ class GroundShader:
         self._ground, self._blow_up = programs
         self._projection = projection
         self._shape = tile_map.grid.shape
-        self._light_shape = light.shape
+        self._light_shape = light.shape[:2]
         self._vao = GL.glGenVertexArrays(1)
         self._buffer = GL.glGenBuffers(1)
         GL.glBindVertexArray(self._vao)
@@ -519,7 +742,7 @@ class GroundShader:
         self._art = _Target()
         self._screen = _Target()
         self._drawn: tuple[View, int] | None = None
-        self._shown: tuple[View, Screen, int] | None = None
+        self._shown: tuple[View, Screen, int, bool] | None = None
         self.cells_version = -1
         self._chunks = GL.glGenFramebuffers(1)
 
@@ -527,8 +750,8 @@ class GroundShader:
     def make(
         cls, projection: PixelProjection, tile_map: TileMap, light: FloatArray
     ) -> GroundShader | None:
-        """The shaders for this map, whose slopes catch `light` (Ground's raster of it), or None
-        where OpenGL can't run them."""
+        """The shaders for this map, whose ground is lit and coloured by `light` (Ground.shading),
+        or None where OpenGL can't run them."""
         if GL is None:
             return None
         try:
@@ -563,16 +786,18 @@ class GroundShader:
             self._drawn = (view, self.cells_version)
         return self._art.texture
 
-    def picture(self, view: View, screen: Screen) -> int:
-        """The texture holding the ground's art pixels in `view` blown up for `screen`, drawn
-        again only if either or the cells changed since."""
+    def picture(self, view: View, screen: Screen, blend: bool = False) -> int:
+        """The texture holding the ground's art pixels in `view` blown up for `screen`, each a
+        crisp square, or with `blend` blended between their middles, as the ground is up close;
+        drawn again only if any of these or the cells changed since."""
         art = self.art(view)
-        shown = (view, screen, self.cells_version)
+        shown = (view, screen, self.cells_version, blend)
         if self._screen.fit(screen.width, screen.height) or self._shown != shown:
             uniforms = {
                 "origin": ("2f", screen.origin),
                 "scale": ("1f", (screen.scale,)),
                 "art_origin": ("2i", (view.left, view.top)),
+                "blend": ("1i", (int(blend),)),
                 "art": ("1i", (0,)),
             }
             self._run(self._screen, self._blow_up, uniforms, (art,))
@@ -610,6 +835,7 @@ class GroundShader:
             "origin": ("2f", (0.0, 0.0)),
             "scale": ("1f", (float(times),)),
             "art_origin": ("2i", (0, 0)),
+            "blend": ("1i", (0,)),
             "art": ("1i", (0,)),
         }
         self._run(_Into(self._chunks, size), self._blow_up, uniforms, (small,))
@@ -681,11 +907,13 @@ def _texture() -> int:
 
 
 def _floats(values: npt.NDArray[np.floating]) -> int:
-    """A texture of one float per texel, read with texelFetch."""
+    """A texture of one float per texel, or four where `values` has four to a place, read with
+    texelFetch."""
     texture = _texture()
     data = np.ascontiguousarray(values, dtype=np.float32)
-    rows, cols = data.shape
-    GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_R32F, cols, rows, 0, GL.GL_RED, GL.GL_FLOAT, data)
+    rows, cols = data.shape[:2]
+    internal, form = (GL.GL_RGBA32F, GL.GL_RGBA) if data.ndim == 3 else (GL.GL_R32F, GL.GL_RED)
+    GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, internal, cols, rows, 0, form, GL.GL_FLOAT, data)
     return texture
 
 

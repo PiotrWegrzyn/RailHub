@@ -8,26 +8,32 @@ from dataclasses import dataclass
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.sim.facilities import ENGINE_SHED_SPEED, SAND_TOWER_PICKUP, Facility
+from railroads.sim.facilities import (
+    ENGINE_SHED_SPEED,
+    PAYS_MORE,
+    SAND_TOWER_PICKUP,
+    WAREHOUSE_ROOM,
+    Facility,
+)
 from railroads.sim.facilities import PRICES as FACILITY_PRICES
 from railroads.sim.facilities import USES as FACILITY_USES
-from railroads.sim.finance import STATION_PRICE, STORAGE_PRICE, dollars
+from railroads.sim.finance import STATION_PRICE, dollars
 from railroads.sim.goods import TRAVELLERS, Good
 from railroads.sim.grids import Cell
 from railroads.sim.railway import MAX_LEVEL, Railway
 from railroads.sim.station_goods import STORAGE_STEP, WAITING_STEP, StationGoods
 from railroads.ui.demand_view import draw_demand
-from railroads.ui.stations_window import stock_bar
+from railroads.ui.stations_window import look_at_button, stock_bar
 from railroads.ui.theme import (
     BRASS,
-    BRASS_DARK,
+    SIDE_WINDOW_POS,
     good_icon,
     goods_inline,
     next_good_slot,
     rows_that_fit,
+    tip,
 )
 
-WINDOW_POS = (16.0, 96.0)
 WINDOW_WIDTH = 460.0
 LABEL_WIDTH = 140.0
 
@@ -44,21 +50,40 @@ class StationWindow:
         upgraded: Callable[[Cell], None],
         move: Callable[[Cell], None] = lambda _: None,
         supplies: Callable[[Cell], Mapping[Good, float]] = lambda _: {},
+        add_platform: Callable[[Cell], None] = lambda _: None,
     ) -> None:
-        """`supplies` says what the buildings around a station make (StationTrade.supplies)."""
+        """`supplies` says what the buildings around a station make (StationTrade.supplies);
+        `add_platform` lets the player choose where a platform goes, which raising a station to
+        a level that allows one does at once."""
         station = self.station
         if station is None:
             return
         if station not in railway.stations():
             self.station = None
             return
-        imgui.set_next_window_pos(WINDOW_POS, imgui.Cond_.first_use_ever.value)
+        imgui.set_next_window_pos(SIDE_WINDOW_POS, imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size_constraints((WINDOW_WIDTH, 0), (WINDOW_WIDTH, 2000))
         name = railway.name_of(station)
         flags = imgui.WindowFlags_.always_auto_resize.value
         expanded, still_open = imgui.begin(f"{fa.ICON_FA_BUILDING}  {name}###station", True, flags)
         if expanded:
-            self._draw_body(railway, station, look_at, upgraded, supplies)
+
+            def raised(cell: Cell) -> None:
+                upgraded(cell)
+                if railway.platforms_left(cell):
+                    add_platform(cell)
+
+            self._draw_body(railway, station, look_at, raised, supplies)
+            left = railway.platforms_left(station)
+            if left:
+                label = f"{fa.ICON_FA_PLUS}  Add a platform beside it ({left} to add)"
+                if imgui.button(label):
+                    add_platform(station)
+                if imgui.is_item_hovered():
+                    imgui.set_tooltip(
+                        "Its own way through lets lines come in from another side;\n"
+                        "trains cross to it inside the station"
+                    )
             label = (
                 f"{fa.ICON_FA_ARROWS_ALT}  Move it, keeping its trains  {dollars(STATION_PRICE)}+"
             )
@@ -84,16 +109,11 @@ class StationWindow:
         imgui.same_line()
         imgui.text_disabled(f"hands out within {delivery} cells, gathers within {collection}")
         imgui.same_line()
-        if imgui.small_button(fa.ICON_FA_CROSSHAIRS):
-            look_at(station)
-        if imgui.is_item_hovered():
-            imgui.set_tooltip("Look at this station")
+        look_at_button(station, look_at)
         imgui.separator()
         imgui.text_disabled("Stockpile")
         imgui.same_line(LABEL_WIDTH)
-        imgui.push_style_color(imgui.Col_.plot_histogram, imgui.ImVec4(*BRASS_DARK))
-        imgui.progress_bar(*stock_bar(goods, (-1, 0)))
-        imgui.pop_style_color()
+        stock_bar(goods, (-1, 0))
         freight = {g: a for g, a in goods.stockpile.items() if g not in TRAVELLERS}
         waiting = {g: a for g, a in goods.stockpile.items() if g in TRAVELLERS}
         for label, held, empty in (
@@ -127,8 +147,9 @@ class StationWindow:
                 station
             ):
                 upgraded(station)
-        storage = f"{fa.ICON_FA_PLUS}  Storage +{STORAGE_STEP} of each good, +{WAITING_STEP} passengers and mail  {dollars(STORAGE_PRICE)}"
-        if _priced_button(storage, railway.finances.can_afford(STORAGE_PRICE)):
+        storage_price = railway.storage_price(station)
+        storage = f"{fa.ICON_FA_PLUS}  Storage +{STORAGE_STEP} of each good, +{WAITING_STEP} passengers and mail  {dollars(storage_price)}"
+        if _priced_button(storage, railway.finances.can_afford(storage_price)):
             railway.add_storage(station)
         _draw_facilities(railway, station)
 
@@ -136,6 +157,11 @@ class StationWindow:
 FACILITY_EFFECTS = {
     Facility.ENGINE_SHED: f"trains leaving here run {ENGINE_SHED_SPEED - 1:.0%} faster",
     Facility.SAND_TOWER: f"trains leaving here pick up speed {1 / SAND_TOWER_PICKUP:.0f} times as fast",
+    Facility.POST_OFFICE: f"mail delivered here pays {PAYS_MORE[Facility.POST_OFFICE][1] - 1:.0%} more",
+    Facility.REFRESHMENT_ROOM: f"passengers arriving here pay {PAYS_MORE[Facility.REFRESHMENT_ROOM][1] - 1:.0%} more",
+    Facility.MARKET_HALL: f"food delivered here pays {PAYS_MORE[Facility.MARKET_HALL][1] - 1:.0%} more",
+    Facility.CATTLE_PENS: f"livestock delivered here pays {PAYS_MORE[Facility.CATTLE_PENS][1] - 1:.0%} more",
+    Facility.WAREHOUSE: f"+{WAREHOUSE_ROOM:.0f} room for each good",
 }
 
 
@@ -147,8 +173,7 @@ def _draw_facilities(railway: Railway, station: Cell) -> None:
         if facility in built:
             state = "working" if facility in working else f"idle: needs {amount:.0f} {good.value}"
             imgui.text(f"{facility.value.capitalize()}: {state}")
-            if imgui.is_item_hovered():
-                imgui.set_tooltip(f"Uses {amount:.0f} {good.value} a month; {effect}")
+            tip(f"Uses {amount:.0f} {good.value} a month; {effect}")
             continue
         price = FACILITY_PRICES[facility]
         label = f"{fa.ICON_FA_PLUS}  {facility.value.capitalize()}: uses {amount:.0f} {good.value} a month, {effect}  {dollars(price)}"

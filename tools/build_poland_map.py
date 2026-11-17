@@ -8,7 +8,6 @@ Run with: uv run python tools/build_poland_map.py
 """
 
 from collections import Counter
-from pathlib import Path
 
 from railroads import maps
 from railroads.mapgen.generate import generate_map
@@ -18,11 +17,12 @@ from railroads.mapgen.presets import (
     NaturalEarth,
     real_world_strategies,
 )
-from railroads.mapgen.sources import ElevationGrid
+from railroads.mapgen.sources import Elevation, ElevationGrid
+from railroads.newgame import DATA_DIR
 from railroads.sim.grids import HexGrid
 from railroads.sim.tilemap import LAYERS, Temperature, Terrain, TileMap, Vegetation
 
-RAW = Path(__file__).resolve().parent.parent / "data" / "raw"
+RAW = DATA_DIR / "raw"
 POLAND = maps.start_map("poland")
 KM_PER_CELL = 2.0
 SEED = 7
@@ -40,17 +40,27 @@ def summary(tile_map: TileMap) -> str:
     return "; ".join(parts)
 
 
-def main() -> None:
-    elevation = ElevationGrid.from_erddap_csv(RAW / "etopo_poland.csv")
-    strategies = real_world_strategies(NaturalEarth.load(RAW), elevation, SEED)
-    assert POLAND is not None
-    bounds = POLAND.bounds
+def bake(
+    start: maps.StartMap, world: NaturalEarth, elevation: Elevation, elevation_source: str
+) -> None:
+    """Bakes a start map from the elevation and Natural Earth data and says what it holds."""
+    bounds = start.bounds
+    strategies = real_world_strategies(world, elevation, SEED)
     grid = HexGrid.covering(bounds.width_km, bounds.height_km, KM_PER_CELL)
-    sources = (ETOPO_SOURCE, NATURAL_EARTH_SOURCE)
-    tile_map = generate_map("Poland", bounds, grid, strategies, sources)
-    path = maps.map_file("poland", "hex")
+    sources = (elevation_source, NATURAL_EARTH_SOURCE)
+    tile_map = generate_map(start.title, bounds, grid, strategies, sources)
+    path = maps.map_file(start.key, "hex")
     tile_map.save(path)
-    print(f"wrote {path.name}: {grid.rows} x {grid.cols} hex cells; {summary(tile_map)}")
+    print(
+        f"wrote {path.name} ({path.stat().st_size / 1000:.0f} KB): "
+        f"{grid.cols} x {grid.rows} hex cells; {summary(tile_map)}"
+    )
+
+
+def main() -> None:
+    assert POLAND is not None
+    elevation = ElevationGrid.from_erddap_csv(RAW / "etopo_poland.csv")
+    bake(POLAND, NaturalEarth.load(RAW), elevation, ETOPO_SOURCE)
 
 
 if __name__ == "__main__":

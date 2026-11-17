@@ -1,6 +1,7 @@
 """A train calling at a station (railroads.sim.railway): it unloads every car, freight into the
 station and passengers and mail paid for there, swaps them for the stop's cars and fills those, and
-waits up to WAIT_MONTHS for them to fill if the stop says so. Freight from this station goes back
+waits up to WAIT_MONTHS for them to fill if the stop says so. An empty general car takes the good
+of its kind that would earn the most at the next stop (pick_load). Freight from this station goes back
 in its stockpile for nothing; the rest waits as goods brought. The buildings around the station
 take what they still want of it at once (railroads.sim.station_trade), and the rest is handed out
 with the month's trade."""
@@ -9,11 +10,11 @@ from typing import TYPE_CHECKING
 
 from railroads.sim.constructions import Station
 from railroads.sim.facilities import Facility
-from railroads.sim.goods import TRAVELLERS, Good
+from railroads.sim.goods import GENERAL_GOODS, TRAVELLERS, General, Good
 from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.tech import Tree
-from railroads.sim.trains import ENGINES, Car, Parcels, Stop, Train
+from railroads.sim.trains import ENGINES, Car, Cargo, Parcels, Stop, Train
 
 WAIT_MONTHS = 1.0
 
@@ -35,7 +36,7 @@ class StationCalls:
         wanted = [good for good in stop.cars if self._railway.can_carry(train, good)]
         aboard = [car for car in train.cars if not car.dining]
         if train.loaded_at == stop.cell:
-            aboard = self._swap_cars(aboard, wanted, goods, stop.cell)
+            aboard = self._swap_cars(aboard, wanted, goods, stop.cell, train.engine)
         else:
             demand = self._railway.station_demand(stop.cell)
             for car in train.cars:
@@ -46,6 +47,7 @@ class StationCalls:
                         demand.deliver(car.good, car.load)
                         * self._railway.price_factor(car.good)
                         * self._railway.fare_factor(train)
+                        * self._railway.facility_pay(stop.cell, car.good)
                     )
                     self._railway.finances.earn(earned, car.good.value)
                     self._railway.research.earn(Tree.PASSENGERS, earned)
@@ -57,7 +59,7 @@ class StationCalls:
                     self._store(goods, stop.cell, car.good, car.empty(unloaded))
                     self._railway.history.deliver(self._railway.year, car.good)
                     self._railway.hand_out_now(stop.cell, car.good)
-            aboard = self._next_cars(aboard, wanted)
+            aboard = self._next_cars(aboard, wanted, train.engine)
         dining = [Car(Good.PASSENGERS, dining=True)] if ENGINES[train.engine].express else []
         train.cars = dining + aboard
         train.loaded_at = stop.cell
@@ -68,35 +70,46 @@ class StationCalls:
         if stop.wait_for_load and train.cars and not train.full:
             train.waiting = WAIT_MONTHS
 
-    def _next_cars(self, cars: list[Car], wanted: list[Good]) -> list[Car]:
-        """The cars for the next leg: each keeps what the fullest car of its good still holds,
+    def _next_cars(self, cars: list[Car], wanted: list[Cargo], engine: str) -> list[Car]:
+        """The cars for the next leg: each keeps what the fullest car of its cargo still holds,
         freight that did not fit into the station; anything else left aboard is lost."""
+        return self._match_cars(cars, wanted, engine)[0]
+
+    def _match_cars(
+        self, cars: list[Car], wanted: list[Cargo], engine: str
+    ) -> tuple[list[Car], list[Car]]:
+        """The wanted cars, each the fullest car of its cargo or else a new one, and the cars
+        left over."""
         left = sorted(cars, key=lambda car: -car.load)
         kept = []
-        for good in wanted:
-            car = next((car for car in left if car.good == good), None)
+        for cargo in wanted:
+            car = next((car for car in left if car.cargo == cargo), None)
             if car is None:
-                kept.append(Car(good, capacity=self._railway.car_capacity(good)))
+                kept.append(self._new_car(cargo, engine))
             else:
                 left.remove(car)
                 kept.append(car)
-        return kept
+        return kept, left
+
+    def _new_car(self, cargo: Cargo, engine: str) -> Car:
+        railway = self._railway
+        if isinstance(cargo, General):
+            good = GENERAL_GOODS[cargo][0]
+            return Car(good, capacity=railway.car_capacity(good, engine, cargo), general=cargo)
+        return Car(cargo, capacity=railway.car_capacity(cargo, engine))
 
     def _swap_cars(
-        self, cars: list[Car], wanted: list[Good], goods: StationGoods, station: Cell
+        self,
+        cars: list[Car],
+        wanted: list[Cargo],
+        goods: StationGoods,
+        station: Cell,
+        engine: str,
     ) -> list[Car]:
         """Swaps a train's cars for the wanted ones at the station that filled them: each wanted
-        car keeps the fullest car of its good, and what dropped cars held goes back into the
+        car keeps the fullest car of its cargo, and what dropped cars held goes back into the
         stockpile."""
-        left = sorted(cars, key=lambda car: -car.load)
-        kept = []
-        for good in wanted:
-            car = next((car for car in left if car.good == good), None)
-            if car is None:
-                kept.append(Car(good, capacity=self._railway.car_capacity(good)))
-            else:
-                left.remove(car)
-                kept.append(car)
+        kept, left = self._match_cars(cars, wanted, engine)
         for car in left:
             if car.load > 0:
                 self._store(goods, station, car.good, car.empty(car.load))
@@ -119,6 +132,8 @@ class StationCalls:
         for car in train.cars:
             if car.dining:
                 continue
+            if car.general is not None and car.load <= 1e-9:
+                self.pick_load(train, stop, car)
             take = min(car.capacity - car.load, goods.stockpile.get(car.good, 0.0))
             if take > 0:
                 car.fill({stop.cell: take})
@@ -128,3 +143,33 @@ class StationCalls:
             transfer = min(car.capacity - car.load, spare)
             if transfer > 0:
                 car.fill(goods.release(car.good, transfer))
+
+    def spare(self, stop: Stop, good: Good) -> float:
+        """How much of a good a car can take at a stop: its stockpile, and what trains brought
+        that the buildings around it have no use for this month."""
+        goods = self._railway.station_goods(stop.cell)
+        brought = goods.brought.get(good, 0.0)
+        brought -= self._railway.station_demand(stop.cell).monthly_want(good)
+        return goods.stockpile.get(good, 0.0) + max(0.0, brought)
+
+    def pick_load(self, train: Train, stop: Stop, car: Car) -> None:
+        """Sets an empty general car to the good of its kind that a full car of would earn the
+        most at the train's next stop; if none would earn anything there, the one there is most
+        of here."""
+        assert car.general is not None
+        destination = self._railway.destination(train)
+        demand = None if destination is None else self._railway.station_demand(destination)
+        best: tuple[float, float, Good] | None = None
+        for good in GENERAL_GOODS[car.general]:
+            capacity = self._railway.car_capacity(good, train.engine, car.general)
+            amount = min(capacity, self.spare(stop, good))
+            if amount <= 1e-9:
+                continue
+            worth = 0.0
+            if demand is not None and destination != stop.cell:
+                worth = demand.worth([(good, amount)])[0] * self._railway.price_factor(good)
+            if best is None or (worth, amount) > best[:2]:
+                best = (worth, amount, good)
+        if best is not None:
+            car.good = best[2]
+            car.capacity = self._railway.car_capacity(best[2], train.engine, car.general)

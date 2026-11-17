@@ -71,7 +71,7 @@ uv run railroads --years 1100
 ```
 
 grows them for 1,100 years instead, so play begins in 1950 with a century more growth behind it
-and the clock showing 1950; play always ends in 2050. A shorter history begins play earlier, but
+and the clock showing 1950; play can begin no later than 2049 and runs on past 2050 for ever. A shorter history begins play earlier, but
 not before 1804: `--years` below 954 is refused, and 1,000 years, beginning in 1850, is suggested.
 
 ```bash
@@ -149,8 +149,11 @@ where a property comes from.
 
 The UI draws the map from those properties alone, always from the same direction, with north
 up. The three furthest zoom levels show
-the map as one smooth picture; the four closest show it as pixel art, at 1, 2, 3 and 4 screen
-pixels per art pixel.
+the map as one smooth picture; the five closest show it as pixel art, at 1, 2, 3, 4 and 6
+screen pixels per art pixel. The ground under it is blended between its pixels and laid with a
+lit texture of grass and earth (`railroads.ui.pixel.ground_texture`), fields and woods too, so it
+reads as one surface at every zoom, while buildings stay pixel art. The closest is there for the
+trains: up close each engine and car is drawn from its 3D model as fine as the screen.
 
 - `railroads.ui.biomes`: every cell is a biome picked from terrain, relief, temperature and
   vegetation. Water is always water, mountains are grey rock or snow, hot and barren is desert,
@@ -308,7 +311,7 @@ of every kind in its neighbourhood (the cell and the six around it):
 | Ore | mine, clay pit, limestone quarry, sand pit 1 |
 | Timber | lumber mill 1 |
 | Trade | port 1 |
-| Industry | factory 1, big factory 3, mega factory 9, cannery 2, steel mill 3, shipyard 3, machine works, plastics works, appliance factory 3, power plant 5, other works 2 |
+| Industry | factory 1, big factory 3, mega factory 9, cannery 2, steel mill 3, shipyard 3, machine works, plastics works, appliance factory 3, coal power plant 5, diesel and gas power plants 4, other works 2 |
 | Corporate | tavern 1, department store 3, hotel 5, skyscraper 10 |
 | Worship | church 5, basilica 20, cathedral 50, St. Paul cathedral 2137 |
 
@@ -471,7 +474,9 @@ bakery a station can reach is worth having.
 | Tavern | | 20 beer, 10 vodka |
 | Department store (1880) | | 20 clothes, 20 shoes, 10 furniture, 5 porcelain, 10 appliances (from 1950) |
 | Hotel (1900) | | 80 food, 10 wine, 10 beer, 10 newspapers |
-| Power plant (1900) | | 200 boiler fuel |
+| Coal power plant (1882) | | 200 coal |
+| Diesel power plant (1905) | | 100 diesel fuel |
+| Gas power plant (1930) | | 150 gas |
 | Farm, from 1920 | | 1 machinery |
 
 Steel mills, canneries, factories, shipyards and every works are processors: each keeps a stockpile of up to
@@ -486,8 +491,8 @@ of bread, which sells for $8 against wheat's $6. An input that does not exist ye
 a recipe until its year: a big factory works on steel alone until copper comes in 1880, and a mega
 factory needs machinery only from 1870. Breweries take their wheat with the bakeries, distilleries
 their potatoes and sugar refineries their sugar before houses eat what is left. Homes burn
-lumber, coal or (from 1950) gas for heating, and power plants and chemical works burn coal, oil or
-gas as boiler fuel; a station hands out the dearest of them first, as it does for every need. Cattle ranches
+lumber, coal or (from 1950) gas for heating, chemical works burn coal, oil or gas as boiler fuel,
+and coal, diesel and gas power plants burn coal, diesel fuel and gas; a station hands out the dearest of them first, as it does for every need. Cattle ranches
 and sheep farms eat a lot of wheat, alongside the bakeries and breweries, and their cattle and
 sheep go to tanneries and meat factories; meat feeds houses like any food.
 
@@ -532,7 +537,8 @@ neighbourhood, a little likelier the more people live around.
 
 Every new map gets deposits from its own geography and seed (`railroads.mapgen.deposits`), shown
 as coloured specks on the ground and named in the hex details: iron ore, copper, gold and diamonds
-in mountains and the hills beside them; oil and salt on inland plains; fish on shores; wool on
+in mountains and the hills beside them; oil on inland plains; salt on sea coasts, hills and
+mountains; fish on shores; wool on
 grassy hills; grapes on mild hills; cotton on hot plains; coffee on hot hills; rubber in hot
 forest; and, very rarely, incense on any land off the mountains. A map gets a number of clusters for its land, spread apart, closer together where little
 land allows them; those that do not fit are left out, and a map without the land for a resource
@@ -543,12 +549,20 @@ deposits give are bonus goods to the buildings that use them as they are, such a
 coffee for homes or incense for churches, and demands to the processors that work them up.
 
 Other works open anywhere by chance, a little likelier where people and industry are, whether
-or not their inputs are near, so their inputs usually have to be brought from far away. No
-factory, mill or works needs people nearby. Jewellers appear only in the bigger towns (20
+or not their inputs are near, so their inputs usually have to be brought from far away. Only
+the town food makers, brewers, distillers and potters need 3 people nearby, and shoe factories
+too. Chemical, cement, plastics, appliance and electronics works need 3 industry points nearby.
+Steel mills, chemical works, cement works and gasworks keep out of towns: their chance is divided
+by one plus the people around them. Gasworks come up by industry, and chemical and cement works
+are drawn by industry alone. Jewellers appear only in the bigger towns (25
 population points nearby) and car dealers only in big cities (120), and a map holds only a few:
-one jeweller per 26,000 land cells, one car dealer per 16,000. Power plants open from 1900 where
-at least 40 population points live nearby, 6 hexes apart and one per 15,000 land cells, and
-count as 5 industry points, so factories gather around them. A map has only a few printing
+one jeweller per 26,000 land cells, one car dealer per 16,000. Power plants go up as the map
+wants electricity (`railroads.sim.power_plants`): coal ones from 1882, diesel ones from 1905 and
+gas ones from 1930. Once a year, if the plants standing would make less than the electrified homes
+and factories want, one more goes up, by whichever of the 12 biggest towns with no plant within 6
+cells has the most of a plant's fuel made within 10 cells, burning that fuel, or by the biggest of
+them burning coal where none has any. Coal plants count as 5 industry points and the others as 4,
+so factories gather around them. A map has only a few printing
 works too, one per 40,000 land cells, each printing 3,000 newspapers a month for every home
 around. Jewellers also keep at least 10
 hexes from one another, so they spread over the towns rather than clumping in one. Chemical works, refineries, car factories and electronics plants are capped the same way.
@@ -566,7 +580,7 @@ Every map gets 1 to 3 hidden patches of military ground, 10 to 18 cells each and
 around, though slowly enough that a map has only 2 or 3 headquarters by 2050. Three outposts in
 a neighbourhood become a base and three bases a headquarters. They are
 judged on what they get like any other building, so a garrison that is kept supplied grows far
-faster than one left alone. Each military point sends and wants 20 passengers and 4 pieces of mail
+faster than one left alone, though one left without supplies never dies out. Each military point sends and wants 20 passengers and 4 pieces of mail
 (outpost 3, base 9, headquarters 27), as much as a small town. Cars are wanted from 1930, planes from 1935 by bases and
 headquarters, tanks from 1940 by headquarters.
 
@@ -631,57 +645,95 @@ goods, 250 units, had been delivered for every star: for what it makes, or the m
 needs, to the trees those goods belong to.
 
 Engines (`railroads.sim.trains`) come in lines. Pioneers, from the first steam engine on rails in
-1804, each a little better than the one before, lead up to the Planet of 1850, the engine the game
-is balanced around: five cars at 60 km/h for $5,000. Beside it come cheap light engines that pull
-fewer cars, and soon after heavy freight engines, slower but pulling two more cars, and express
-engines, fast and dear, that carry only passengers, who pay 20% more on them, and always lead with
-a dining car that carries nothing but weighs and costs its trips like any other car. From then on
-each line gets better engines, up to a 500 km/h maglev and diesels pulling 40 cars by 2040. An
+1804, each a little better than the one before, lead up to the Planet of 1840, the engine the game
+is balanced around: three cars at 30 km/h for $10,000. Each newer engine of a line costs about
+three times the one before it. Early steam engines are very slow and pull few cars; diesels,
+electrics and the maglev pull cars a size bigger, and electrics run fastest. Engines burn fuel
+(`railroads.sim.fuel_market`): steam coal, except the American 4-4-0, which burns wood
+(lumber) as the real ones did, diesels diesel fuel, electrics and the maglev electricity, a set amount a cell for each car they are built to pull, light engines half as much.
+A train buys the fuel for the way to its next stop as it sets off: coal, lumber or diesel fuel out of the
+station's stockpile at the market price, the rest at retail, 50% dearer, or 25% with the Regular
+customer node of the commerce tree. Coal and diesel engines carry only so much, so a train can't
+set off for a stop further than its range: the first steam engines run only 4 to 12 cells, the
+Planet 20, and lines need stations to take on fuel along the way; electrics run as far as the
+wires go. Every fuel's price, from the year it comes in (coal and wood 1804, electricity 1925, diesel fuel
+1935), moves only in a tug of war between demand and supply, between 0.4 and 4 times its first
+price ($7 a unit for coal and wood, $20 for diesel fuel, apart from what hauling them pays): the coal or diesel fuel the map's buildings need and the player's trains bought last
+month against what the player's stations hand out to those buildings and a quarter of what the
+map's mines or refineries can make, measured against the first month of play, the price moving a
+quarter of the way to where they put it each month. Electricity always has a sensible price, $5
+a unit, which moves a little, between 0.7 and 1.5 times that, with supply against demand: it is
+wanted by the player's electric and maglev trains and by the map's homes and factories, 10 units a
+month for each of their points times the share of them electrified, none in 1880 rising evenly
+to all in 2030 (they only pull the price and need no power delivered), and made by the map's
+coal, diesel and gas power plants, 3,000 units a month each at full fuel and less on less, so
+bringing them their fuel makes electricity cheaper. A power plant of any kind the player buys, for $2,000,000, counts among the map's, and their trains use what it makes first, at
+a fifth of the price. The Reports window's Fuel tab charts every fuel's price over the years and shows what
+moved it last month and what the trains bought. Each line
+has a job. Light engines are cheap to buy and run and up to speed in 3 seconds or less, but pull
+two or three cars slowly, and a load slows them half as much again as the Planet: for short lines
+with many stops. Heavy freight engines, a few years after 1850, pull more cars than the general
+engine of their day, and a load slows them half as much as the Planet, but they run
+slowly, take 18 to 30 seconds to get up to speed and cost a lot to run: for bulk goods. Express
+engines run far faster but take longest to get going and cost the most, so they pay on long
+lines; they carry only passengers, who pay 20% more on them and eleven times as much on the
+maglev, and always lead with a dining car
+that carries nothing but weighs and costs its trips like any other car. In an 1850 game a better
+engine comes every few years: the Goods engine in 1853, the American in 1856, the Single-driver
+express in 1858. From then on
+each line gets better engines, up to a 500 km/h maglev and diesels pulling 24 cars by 2040. An
 engine is sold only until a newer one of its line, running on the same track, can be bought: an
 electric never ends the sale of a steam or diesel engine, nor the maglev that of the fastest
 electric. Engines built to pull more cars are
-slowed less by each: a full train as long as its engine is built for slows it as much as five
-full cars slow the Planet. Some lines and kinds of power need a tech node: heavy freight Heavy
+slowed less by each, in proportion, and then light ones half as much again and heavy ones half
+as much. Some lines and kinds of power need a tech node: heavy freight Heavy
 boilers, express Express trains, diesels Diesel engines, electrics Electric traction or, for the
 fast ones, Thyristor control, the maglev Magnetic levitation (after Thyristor control), and steam
-engines from 1900 on Superheaters.
+engines from 1900 on Superheaters. The table gives every node on the way to an engine, in the
+order they can be taken in each tree, the years it is on sale and the newer engine that ends its
+sale, and the real engines it is drawn after (`railroads.ui.engine_origins`); the pictures are our
+own pixel art.
 
-| Engine | Class | From | Needs | Power | Speed | To full speed | Cars | Price |
-|---|---|---|---|---|---|---|---|---|
-| Penydarren steam wagon | pioneer | 1804 |  | steam | 18 km/h | 14 s | 1 | $500 |
-| Catch Me Who Can | pioneer | 1808 |  | steam | 27 km/h | 13 s | 1 | $800 |
-| Salamanca | pioneer | 1812 |  | steam | 24 km/h | 13 s | 2 | $1,200 |
-| Puffing Billy | pioneer | 1813 |  | steam | 30 km/h | 12 s | 2 | $1,500 |
-| Locomotion | pioneer | 1825 |  | steam | 36 km/h | 12 s | 3 | $2,500 |
-| Rocket | pioneer | 1829 |  | steam | 48 km/h | 11 s | 3 | $3,500 |
-| Lion | pioneer | 1838 |  | steam | 51 km/h | 11 s | 4 | $4,000 |
-| Planet steam engine | general | 1850 |  | steam | 60 km/h | 10 s | 5 | $5,000 |
-| Tank engine | light | 1850 |  | steam | 42 km/h | 9 s | 3 | $2,000 |
-| Goods engine | heavy freight | 1865 | Heavy boilers (metals) | steam | 48 km/h | 10 s | 7 | $7,000 |
-| Single-driver express | express | 1865 | Express trains (passengers) | steam | 90 km/h | 8 s | 4 + dining car | $12,000 |
-| American 4-4-0 | general | 1870 |  | steam | 69 km/h | 9 s | 6 | $8,000 |
-| Mogul freight engine | heavy freight | 1880 | Heavy boilers (metals) | steam | 54 km/h | 8 s | 8 | $11,000 |
-| Light tank engine | light | 1895 |  | steam | 54 km/h | 8 s | 4 | $4,000 |
-| Atlantic express | express | 1900 | Express trains (passengers), Superheaters (metals) | steam | 108 km/h | 6 s | 5 + dining car | $25,000 |
-| Mallet articulated | heavy freight | 1905 | Heavy boilers (metals), Superheaters (metals) | steam | 57 km/h | 8 s | 10 | $22,000 |
-| Pacific engine | general | 1910 | Superheaters (metals) | steam | 84 km/h | 6 s | 7 | $16,000 |
-| Boxcab electric | general | 1925 | Electric traction (modern) | electric | 84 km/h | 4 s | 8 | $30,000 |
-| Railbus | light | 1935 | Diesel engines (fuel) | diesel | 78 km/h | 5 s | 4 | $9,000 |
-| Streamliner | express | 1935 | Express trains (passengers), Superheaters (metals) | steam | 138 km/h | 5 s | 6 + dining car | $60,000 |
-| Big articulated | heavy freight | 1940 | Heavy boilers (metals), Superheaters (metals) | steam | 66 km/h | 7 s | 12 | $45,000 |
-| Mixed-traffic diesel | general | 1950 | Diesel engines (fuel) | diesel | 108 km/h | 4 s | 8 | $40,000 |
-| Heavy diesel | heavy freight | 1960 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 78 km/h | 5 s | 14 | $70,000 |
-| Bullet train | express | 1964 | Express trains (passengers), Thyristor control (modern) | electric | 210 km/h | 3 s | 7 + dining car | $150,000 |
-| Universal electric | general | 1965 | Thyristor control (modern) | electric | 132 km/h | 3 s | 10 | $70,000 |
-| Sprinter unit | light | 1985 | Diesel engines (fuel) | diesel | 120 km/h | 3 s | 5 | $18,000 |
-| High-speed electric | express | 1990 | Express trains (passengers), Thyristor control (modern) | electric | 300 km/h | 2.5 s | 9 + dining car | $300,000 |
-| Twin-unit diesel | heavy freight | 1995 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 84 km/h | 5 s | 20 | $140,000 |
-| Modern electric | general | 2000 | Thyristor control (modern) | electric | 180 km/h | 2.5 s | 12 | $120,000 |
-| Super-heavy diesel | heavy freight | 2040 | Heavy boilers (metals), Diesel engines (fuel) | diesel | 90 km/h | 6 s | 40 | $300,000 |
-| Maglev | express | 2040 | Express trains (passengers), Magnetic levitation (modern) | maglev | 500 km/h | 2 s | 11 + dining car | $700,000 |
+| Engine | Class | On sale | Tech to take | Power | Speed | To full speed | Cars | Price | Burns a cell | Range | Drawn after |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Penydarren steam wagon | pioneer | 1804–1808 (then the Catch Me Who Can) |  | steam | 15 km/h | 14 s | 1 | $1,000 | 0.25 coal | 4 cells | [Penydarren locomotive, 1804](https://en.wikipedia.org/wiki/Penydarren_(locomotive)) |
+| Catch Me Who Can | pioneer | 1808–1812 (then the Salamanca) |  | steam | 12 km/h | 13 s | 1 | $1,500 | 0.25 coal | 5 cells | [Catch Me Who Can, 1808](https://en.wikipedia.org/wiki/Catch_Me_Who_Can) |
+| Salamanca | pioneer | 1812–1815 (then the Puffing Billy) |  | steam | 12 km/h | 13 s | 1 | $2,000 | 0.25 coal | 6 cells | [Salamanca, 1812](https://en.wikipedia.org/wiki/Salamanca_(locomotive)) |
+| Puffing Billy | pioneer | 1815–1820 (then the Locomotion) |  | steam | 15 km/h | 13 s | 1 | $2,500 | 0.25 coal | 7 cells | [Puffing Billy, 1813](https://en.wikipedia.org/wiki/Puffing_Billy_(locomotive)) |
+| Locomotion | pioneer | 1820–1826 (then the Rocket) |  | steam | 18 km/h | 13 s | 2 | $4,000 | 0.5 coal | 8 cells | [Locomotion No. 1, 1825](https://en.wikipedia.org/wiki/Locomotion_No._1) |
+| Rocket | pioneer | 1826–1834 (then the Lion) |  | steam | 24 km/h | 13 s | 2 | $6,000 | 0.5 coal | 10 cells | [Stephenson's Rocket, 1829](https://en.wikipedia.org/wiki/Stephenson%27s_Rocket) |
+| Lion | pioneer | 1834–1840 (then the Planet steam engine) |  | steam | 27 km/h | 13 s | 2 | $8,000 | 0.5 coal | 12 cells | [LMR 57 Lion, 1838](https://en.wikipedia.org/wiki/LMR_57_Lion) |
+| Planet steam engine | general | 1840–1856 (then the American 4-4-0) |  | steam | 30 km/h | 12 s | 3 | $10,000 | 0.75 coal | 20 cells | [Planet, 1830](https://en.wikipedia.org/wiki/Planet_(locomotive)) |
+| Tank engine | light | 1840–1862 (then the Light tank engine) |  | steam | 24 km/h | 3 s | 2 | $3,000 | 0.25 coal | 12 cells | [Tank locomotive (type)](https://en.wikipedia.org/wiki/Tank_locomotive) |
+| Goods engine | heavy freight | 1853–1865 (then the Mogul freight engine) | metals and machines: Heavy boilers | steam | 21 km/h | 30 s | 4 | $15,000 | 1 coal | 20 cells | [0-6-0 goods engine (type)](https://en.wikipedia.org/wiki/0-6-0) |
+| American 4-4-0 | general | 1856–1910 (then the Pacific engine) |  | steam | 42 km/h | 11 s | 4 | $30,000 | 1 wood | 25 cells | [4-4-0 American (type)](https://en.wikipedia.org/wiki/4-4-0), [The General, 1855](https://en.wikipedia.org/wiki/The_General_(locomotive)) |
+| Single-driver express | express | 1858–1900 (then the Atlantic express) | passengers and mail: Timetables → Dining cars → Express trains | steam | 60 km/h | 25 s | 3 + dining car | $40,000 | 1 coal | 30 cells | [GNR Stirling 4-2-2, 1870](https://en.wikipedia.org/wiki/GNR_Stirling_4-2-2) |
+| Light tank engine | light | 1862–1935 (then the Railbus) |  | steam | 33 km/h | 3 s | 2 | $9,000 | 0.25 coal | 16 cells | [0-6-2 tank engine (type)](https://en.wikipedia.org/wiki/0-6-2) |
+| Mogul freight engine | heavy freight | 1865–1905 (then the Mallet articulated) | metals and machines: Heavy boilers | steam | 27 km/h | 28 s | 6 | $45,000 | 1.5 coal | 30 cells | [2-6-0 Mogul (type)](https://en.wikipedia.org/wiki/2-6-0) |
+| Atlantic express | express | 1900–1935 (then the Streamliner) | passengers and mail: Timetables → Dining cars → Express trains; metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 90 km/h | 22 s | 4 + dining car | $120,000 | 1.2 coal | 50 cells | [4-4-2 Atlantic (type)](https://en.wikipedia.org/wiki/4-4-2_(locomotive)) |
+| Mallet articulated | heavy freight | 1905–1940 (then the Big articulated) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 36 km/h | 25 s | 8 | $135,000 | 2 coal | 50 cells | [Mallet locomotive (type)](https://en.wikipedia.org/wiki/Mallet_locomotive) |
+| Pacific engine | general | 1910–1950 (then the Mixed-traffic diesel) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 60 km/h | 9 s | 5 | $90,000 | 1.2 coal | 50 cells | [4-6-2 Pacific (type)](https://en.wikipedia.org/wiki/4-6-2) |
+| Boxcab electric | general | 1925–1965 (then the Universal electric) | modern industry: Telegraph signals → Electric traction | electric | 96 km/h | 6 s | 5 | $270,000 | 0.75 electricity | - | [Boxcab electric (type)](https://en.wikipedia.org/wiki/Boxcab) |
+| Railbus | light | 1935–1985 (then the Sprinter unit) | fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 60 km/h | 2 s | 3 | $27,000 | 0.15 diesel fuel | 60 cells | [Railbus (type)](https://en.wikipedia.org/wiki/Railbus), [Uerdingen railbus](https://en.wikipedia.org/wiki/Uerdingen_railbus) |
+| Streamliner | express | 1935 on | passengers and mail: Timetables → Dining cars → Express trains; metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 138 km/h | 20 s | 5 + dining car | $360,000 | 1.5 coal | 60 cells | [Streamliner (type)](https://en.wikipedia.org/wiki/Streamliner), [LNER Class A4](https://en.wikipedia.org/wiki/LNER_Class_A4) |
+| Big articulated | heavy freight | 1940–1960 (then the Heavy diesel) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 42 km/h | 22 s | 10 | $405,000 | 2.5 coal | 60 cells | [Union Pacific Big Boy, 1941](https://en.wikipedia.org/wiki/Union_Pacific_Big_Boy) |
+| Mixed-traffic diesel | general | 1950 on | fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 78 km/h | 7 s | 6 | $800,000 | 0.6 diesel fuel | 100 cells | [EMD F7](https://en.wikipedia.org/wiki/EMD_F7) |
+| Heavy diesel | heavy freight | 1960–1995 (then the Twin-unit diesel) | metals and machines: Heavy boilers; fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 54 km/h | 18 s | 12 | $1,200,000 | 1.2 diesel fuel | 100 cells | [EMD SD40-2](https://en.wikipedia.org/wiki/EMD_SD40-2) |
+| Bullet train | express | 1964–1990 (then the High-speed electric) | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 210 km/h | 15 s | 6 + dining car | $1,100,000 | 1.1 electricity | - | [0 Series Shinkansen, 1964](https://en.wikipedia.org/wiki/0_Series_Shinkansen) |
+| Universal electric | general | 1965–2000 (then the Modern electric) | modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 144 km/h | 5 s | 7 | $2,400,000 | 1.1 electricity | - | [DB Class 103](https://en.wikipedia.org/wiki/DB_Class_103) |
+| Sprinter unit | light | 1985 on | fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 96 km/h | 2 s | 3 | $81,000 | 0.15 diesel fuel | 100 cells | [British Rail Class 150](https://en.wikipedia.org/wiki/British_Rail_Class_150) |
+| High-speed electric | express | 1990 on | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 300 km/h | 14 s | 8 + dining car | $3,200,000 | 1.3 electricity | - | [ICE 1](https://en.wikipedia.org/wiki/ICE_1) |
+| Twin-unit diesel | heavy freight | 1995–2040 (then the Super-heavy diesel) | metals and machines: Heavy boilers; fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 60 km/h | 18 s | 16 | $3,600,000 | 1.6 diesel fuel | 150 cells | [GE Dash 9-44CW](https://en.wikipedia.org/wiki/GE_Dash_9-44CW) |
+| Modern electric | general | 2000 on | modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 192 km/h | 4 s | 8 | $7,200,000 | 1.2 electricity | - | [DB Class 101](https://en.wikipedia.org/wiki/DB_Class_101) |
+| Maglev | express | 2030 on | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control → Magnetic levitation | maglev | 500 km/h | 13 s | 10 + dining car | $10,000,000 | 4.4 electricity | - | [Transrapid](https://en.wikipedia.org/wiki/Transrapid), [SCMaglev L0 Series](https://en.wikipedia.org/wiki/L0_Series) |
+| Super-heavy diesel | heavy freight | 2040 on | metals and machines: Heavy boilers; fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 66 km/h | 20 s | 24 | $10,800,000 | 2.4 diesel fuel | 200 cells | our own design |
 
 Electric engines run only on electrified track, and the maglev only on maglev track, which can be
-laid once it is on sale. A train's engine is chosen when it is bought.
+laid once it is on sale. A train's engine is chosen when it is bought. It can be upgraded later from the
+Trains window to any newer engine of its line on sale, keeping its name, stops and cars, for the new
+engine's price less half the old one's, which is what selling it would give. The same menu upgrades
+every train of that line with an older engine at once, and no other, as many as the cash allows,
+in the order they were bought.
 Every train sets off from a stand, from a stop or after letting another train by, and picks up
 speed evenly until it runs at full speed after its engine's time to full speed, in seconds of play
 at normal speed.
@@ -702,7 +754,8 @@ The search button in the top bar (or F) opens a list of every kind of building; 
 name, or a good it makes or wants. Picking one outlines every one on the map and marks them on the
 overview, and the arrow buttons or the left and right keys step from one to the next, nearest the
 view first. The help button in the top right corner (or H) lists every building with what it makes
-and wants in a month, and every good with its base price and who makes and wants it.
+and wants in a month, every good with its base price and who makes and wants it, and every
+engine with the engine table above, its Wikipedia links clickable.
 
 ### Reports
 
@@ -727,32 +780,45 @@ A game starts with $80,000 (`railroads.sim.finance`). Track costs $300 a cell on
 in hills, $10,000 a cell of bridge and $20,000 a cell of tunnel; electric track $450 a cell more,
 and double track 1.8 times as much as single, wires included, so a cell on the flat costs $540
 double, $750 electric and $1,350 double and electric; maglev track $4,000 a cell more, with no
-wires. A station costs $15,000 and a steam engine $5,000, which
-sells back for half. Every month each station costs $200 in upkeep and each cell of track $2,
-$3 more where it is electric, $25 more where it is maglev, and 1.8 times as much where it is double, charged once a cell for
+wires. A station costs $15,000 and the Planet $10,000, which
+sells back for half. Stations rise through five levels, for $50,000, $250,000, $1,500,000 and
+$10,000,000: a new one hands goods out a cell around it, and each level a cell further, gathers
+them a cell further and adds as much room as two storage upgrades. At level 4 a station gets a
+second platform and at level 5 a third: raising it there asks where the new one goes, in a free cell
+beside the station or its other platforms, with its own way through that Q turns, for what clearing
+the cell costs, and the station window offers it again until it is built. Lines then come into the
+station from more sides; trains cross between platforms beside each other inside the station, reach
+it at whichever platform their way comes to first and set off again from there. Platforms go with
+their station when it is bulldozed or moved. A station hands goods out and gathers them around
+every platform as well as its own cell. Level 4 is drawn as a junction station between two clock
+towers under a long glass shed, level 5 as a central station with a tall clock tower and three
+sheds, and an added platform as a stone island under a long canopy. Every month each station costs
+$150 in upkeep at the first level, $400, $1,200, $3,500 and $9,000 at the next, rising 2% a
+year, compounded, from the year play began, and each cell of track $2,
+$40 more where it is electric, $60 more where it is maglev, and 1.8 times as much where it is double, charged once a cell for
 the dearest track in it (`track_upkeep`). Building needs the cash for it, but upkeep is charged
-anyway and can run into debt. The top bar shows the cash, with this month's and last month's books on hover, and the
+anyway and can run into debt. The top bar shows the cash, with this month's and last month's books on hover, the Reports window last year's and this year's books by what the money went on, and the
 build bar shows what the track under the mouse would cost. Route planning still weighs hills,
 bridges and tunnels lightly, so it stays quick; click a point in between to steer track round a
 river.
 
 Freight earns money when the buildings around a station take it, by the demand there
 (`railroads.sim.demand`). Each month a station's capacity for a need is twice what the buildings
-in its inner area need of it. What they use up is everything the station hands them; the demand
-left is the capacity less that use averaged over the last 3 months. Each unit taken earns its
-price times the share of demand left and uses up demand itself, so a town nobody feeds pays the
-full price, one supplied in full every month a little over half, and flooding one drives the price
-down for up to three months. Goods a station gathered itself and passes along to the buildings
-around it use up demand the same way and earn 30% of what a train delivery would have. The
-Stations window shows the share of demand left for each need.
+in its inner area were left short of after the goods buildings around hand out on their own. What
+they use up is everything the station hands them; the demand left is the capacity less that use
+averaged over the last 3 months. Each unit taken earns its price times the share of demand left
+and uses up demand itself, so a town nobody feeds pays the full price, one supplied in full every
+month a little over half, and flooding one drives the price down for up to three months. A town
+its own farms already feed wants no food at all. The Stations window shows the share of demand
+left for each need.
 
 | Price | Goods |
 |---|---|
-| $4-8 | sand 4, clay 5, limestone 5, potatoes 6, wheat, apples, bananas, dates, sugar, fish, bread, coal, lumber, salt, bricks 8 |
-| $9-15 | iron ore, grapes, wool, gas 10, hops 10, newspapers 10, oil, cotton, flax 12, cement 12, copper, cans, refined sugar 14, beer 15, paper 15 |
-| $15-35 | sheep 15, meat 16, steel, cattle 20, glass 20, rubber, fuel, coffee, chemicals, leather 25, plastics 25, furniture, clothes, tools, goods, vodka 30, shoes 35 |
-| $40-150 | wine, machinery 60, porcelain 60, electronics 120, appliances 150 |
-| $800, $2,000, $5,000 | gold, diamonds, cars |
+| $2-10 | eggs 4, bread 6, chickens 6, milk 6, potatoes 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, sugar 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, lumber 10, newspapers 10, pots 10 |
+| $11-20 | cement 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, beer 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, wool 20 |
+| $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, stove tiles 25, copper 28, castings 30, vodka 30, wax 30, plastics 40, rubber 40, wine 40 |
+| $41-200 | coffee 50, furniture 60, porcelain 60, clothes 70, steel 80, shoes 100, electronics 120, goods 120, guns 150, tools 160, machinery 180 |
+| $300 and up | appliances 300, incense 300, luxury goods 300, gold 800, diamonds 2,000, cars 5,000, tanks 8,000, planes 12,000 |
 
 Passengers pay $10 and mail $25, as they get off the train. A good is worth nothing where no
 building wants it.
@@ -761,7 +827,8 @@ Stations also send and want passengers and mail. Every month each building in a 
 ring sends passengers by its points, the same number it wants to receive: 1 per population point,
 5 per food or timber point, 10 per ore, industry or trade point and 20 per corporate point. A fifth
 as many pieces of mail go with them, rounded down for the station as a whole. Up to 100
-passengers and 100 pieces of mail wait at a station, apart from the freight stockpile. They ride
+passengers and 100 pieces of mail wait at a station, apart from the freight stockpile, and only
+for a month: those no train took are gone when the next month's come. They ride
 in passenger coaches and mail vans of 50 each and earn money where they get off just like cargo,
 by the demand there, which only trains use up; they then go on their way rather than waiting to
 be handed out.
@@ -800,27 +867,33 @@ track along it turns its rails into a guideway; rails laid along a guideway leav
 track runs straight on across its cell. While placing a station, and when the
 mouse is over one, the cells it hands goods out to (2 steps away) are shaded orange, the areas of
 other stations pink, cells two stations share grey and the stations themselves blue, with a blue
-line round the cells it gathers from (4 steps). A right click cancels whatever is being built;
+line round the cells it gathers from (3 steps). A right click cancels whatever is being built;
 with nothing being built it opens the details of a cell: its land, points, and every building
 with what it makes and needs and what it got and gave last month. Clicking a station, left or
 right, opens the station instead: its level and reach, its stockpile, waiting passengers and mail, demand and
 the trains that call there, with its reach shaded on the map. There it can be raised a level,
-$100,000 to level 2 and $500,000 to level 3, each level handing goods out and gathering them one
-cell further (3 and 5 cells, then 4 and 6), and given more storage, $10,000 for each 250 more of
-every good and 500 more passengers and mail.
+up to level 5 (see the money above), each level handing goods out and gathering them one
+cell further (from 1 and 3 cells up to 5 and 7), and given more storage, $10,000 for each 250 more of
+every good and 500 more passengers and mail. Each tree is drawn as a tree: every node in a row
+by how many nodes it builds on, under the first of them, with a line from each node it needs,
+bright once that one is taken.
 
 The bar also opens the Trains window (T) and the Stations window (S). The Trains window lists
 the trains on the left and shows the chosen one on the right: what it pulls, each car filled by
 its load, and its route as a table of stops. It buys a steam engine and sets its stops from the
 stations. Each stop has its own
 cars, up to 5, which the train pulls when it leaves that stop for the next, so the way out and the
-way back can carry different goods; each car is for one good and holds 50 of it, so a food car
-carries only food. Every car costs $20 each time the train leaves a stop with it. A new train
+way back can carry different goods; each car is for one good and holds 50 of it, or 150 of bulk
+goods (grain, potatoes, fruit, sugar, grapes, coal, iron ore, sand, clay, limestone, salt and
+lumber), so a food car carries only food. Every car costs $15, and $1 more for every 10 it holds,
+each time the train leaves a stop with it, loaded or not: a bulk car of 144 costs $29 a trip, a
+dining car $15. A new train
 starts at its first stop. The window shows what the train pulls
 now. The Stations window shows every station's stockpile and the goods waiting to be handed out
 there, with a button to look at the station; clicking a name opens the station. Trains
-(`railroads.sim.railway`) run along the track at 60 cells a month on the flat, slower on hills,
-and each car slows them: an empty car weighs 1, a full one 2, and every unit of weight costs 8%
+(`railroads.sim.railway`) run along the track at 40 cells a month on the flat at 60 km/h, slower on
+hills, and each car slows them: an empty car weighs 1, a full one 2 and a full bulk car 4, and
+every unit of weight costs 8%
 of a Planet's speed, so five full cars still run at a little over half of it; engines built for
 more cars lose less per unit, in proportion. On the pixel map
 (`railroads.ui.pixel.trains`) a steam engine with its tender leads the cars, each drawn as pixel
@@ -850,12 +923,15 @@ for free: when two meet on the line, head on, one catching up with another, or w
 one of them stops where it is until the other has gone by, then sets off again from a stand. The
 train that has stood longest letting others by since its last stop goes first, so none waits for
 ever, then the better engine, then the train bought first. Within stations, and on double track
-for trains going opposite ways, trains pass each other without stopping. Once a month each station that track joins to another station hands what trains brought
-to buildings within 2 cells, unsatisfied first, then content, nearest first, then what it gathered
-before, for 30% of the price, and takes every spare good that buildings made within 4 cells into
-its stockpile, which counts as selling them. So a station is a market for its own area: a mine in
-its reach feeds a steel mill in its reach a month later, without a train. A station on its own,
-with no track to another, does nothing. A station holds up to 500 of each good, what trains brought and what it gathered together, so
+for trains going opposite ways, trains pass each other without stopping. Each month buildings first hand out what they make on their own,
+everywhere on the map, the nearest first, up to 10 cells away: nothing is lost on the way, but a
+building can take less of a maker's month the further it is, all of it from the same cell or the
+next, 90% from two cells away and so on down to 10% from ten. Then each station that track joins
+to another station hands what trains brought to buildings within its reach (1 cell at the first
+level), unsatisfied first, then content, nearest first, and takes the spare goods no building took
+that buildings made within 3 cells into its stockpile, for trains; it never hands those out around
+it, and goods handed out on their own earn the player nothing. A station on its own, with no track
+to another, does nothing. A station holds up to 500 of each good, what trains brought and what it gathered together, so
 one good piling up never blocks the others; a train unloads only what fits and keeps the rest aboard if its next leg pulls a car for that good,
 otherwise the rest is lost. Goods a train brought beyond what the area can use in a month can be
 loaded onto another train, so hubs can pass freight along. Freight remembers where it came from:
@@ -863,7 +939,7 @@ it pays only when buildings at another station take it, and back at its own stat
 returns to the stockpile, so shuttling goods around earns nothing.
 
 Buildings grow as each month turns over. Whenever that changes something within reach of a
-station (4 cells), a card for the month appears along the right edge of the map
+station (3 cells), a card for the month appears along the right edge of the map
 (`railroads.sim.summaries`): how many buildings went up and came down near how many stations.
 Clicking a card opens what changed, station by station, and outlines those cells on the map;
 a right click dismisses it. The newest five cards show.
@@ -879,8 +955,9 @@ month costs about as much as what grows in it.
 
 A new map grows for a thousand years before play starts, from 850 (`--years` changes that);
 `railroads.mapgen.seeding` runs it. In play the calendar (`railroads.sim.clock`) runs from
-January of the year the history reached, 1850 after a thousand years, to January 2050, a month
-every two and a half minutes: a hundred hours at normal speed from 1850. The map keeps growing each month.
+January of the year the history reached, 1850 after a thousand years, and on for ever, a month
+every two and a half minutes: a hundred hours at normal speed from 1850 to 2050. Summer Games
+come every four years from 2024 on. The map keeps growing each month.
 
 ## Map data
 

@@ -25,7 +25,7 @@ def test_the_books_keep_this_month_and_last_by_what_money_was_for() -> None:
 
     assert finances.cash == pytest.approx(START_CASH - 15_000 + 200 - 100)
     assert finances.last_month == {"stations": -15_000, "cargo": 200}
-    assert finances.profit == -100
+    assert finances.month == {"station upkeep": -100}
 
 
 def test_spending_past_the_cash_runs_into_debt_but_cannot_be_afforded() -> None:
@@ -69,4 +69,4 @@ def test_each_cell_of_track_pays_upkeep_once_for_its_dearest_piece() -> None:
 
     upkeep = track_upkeep(pieces)
 
-    assert upkeep == pytest.approx(2 + 3.6 + 9)
+    assert upkeep == pytest.approx(2 + 3.6 + 1.8 * 42)

@@ -7,7 +7,7 @@ biggest works and the novelties, and factories, canneries and mills take three.
 """
 
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum, IntEnum
 
 from railroads.sim.grids import Cell
@@ -121,6 +121,8 @@ class BuildingKind(Enum):
     PORCELAIN_WORKS = "porcelain works"
     MEAT_FACTORY = "butcher"
     POWER_PLANT = "power plant"
+    DIESEL_POWER_PLANT = "diesel power plant"
+    GAS_POWER_PLANT = "gas power plant"
     SPACE_CENTER = "space center"
     PEAR_HQ = "Pear Company headquarters"
     ROYAL_PALACE = "royal palace"
@@ -133,6 +135,91 @@ class BuildingKind(Enum):
     TAVERN = "tavern"
     DEPARTMENT_STORE = "department store"
     HOTEL = "hotel"
+    CLUB = "club"
+    FILLING_STATION = "filling station"
+    JUICE_WORKS = "juice works"
+    BIG_JUICE_WORKS = "big juice works"
+    MEGA_JUICE_WORKS = "mega juice works"
+    BIG_STEEL_MILL = "big steel mill"
+    MEGA_STEEL_MILL = "mega steel mill"
+    BIG_COKE_PLANT = "big coke plant"
+    MEGA_COKE_PLANT = "mega coke plant"
+    BIG_POTTER = "big potter"
+    MEGA_POTTER = "mega potter"
+    BIG_TILE_WORKS = "big tile works"
+    MEGA_TILE_WORKS = "mega tile works"
+    BIG_FOUNDRY = "big foundry"
+    MEGA_FOUNDRY = "mega foundry"
+    BIG_DAIRY = "big dairy"
+    MEGA_DAIRY = "mega dairy"
+    BIG_SAUSAGE_MAKER = "big sausage maker"
+    MEGA_SAUSAGE_MAKER = "mega sausage maker"
+    BIG_CARPET_WEAVER = "big carpet weaver"
+    MEGA_CARPET_WEAVER = "mega carpet weaver"
+    BIG_CLOCK_MAKER = "big clock maker"
+    MEGA_CLOCK_MAKER = "mega clock maker"
+    BIG_MIRROR_MAKER = "big mirror maker"
+    MEGA_MIRROR_MAKER = "mega mirror maker"
+    BIG_GUN_FACTORY = "big gun factory"
+    MEGA_GUN_FACTORY = "mega gun factory"
+    BIG_TANK_FACTORY = "big tank factory"
+    MEGA_TANK_FACTORY = "mega tank factory"
+    BIG_PLANE_FACTORY = "big aircraft factory"
+    MEGA_PLANE_FACTORY = "mega aircraft factory"
+    BIG_FOOD_PLANT = "big cannery"
+    MEGA_FOOD_PLANT = "mega cannery"
+    BIG_BAKERY = "big bakery"
+    MEGA_BAKERY = "mega bakery"
+    BIG_TEXTILE_MILL = "big textile mill"
+    MEGA_TEXTILE_MILL = "mega textile mill"
+    BIG_FURNITURE_MAKER = "big furniture maker"
+    MEGA_FURNITURE_MAKER = "mega furniture maker"
+    BIG_TOOL_WORKS = "big tool works"
+    MEGA_TOOL_WORKS = "mega tool works"
+    BIG_BARREL_MAKER = "big barrel maker"
+    MEGA_BARREL_MAKER = "mega barrel maker"
+    BIG_WINERY = "big winery"
+    MEGA_WINERY = "mega winery"
+    BIG_REFINERY = "big refinery"
+    MEGA_REFINERY = "mega refinery"
+    BIG_CHEMICAL_WORKS = "big chemical works"
+    MEGA_CHEMICAL_WORKS = "mega chemical works"
+    BIG_ELECTRONICS_PLANT = "big electronics plant"
+    MEGA_ELECTRONICS_PLANT = "mega electronics plant"
+    BIG_CAR_FACTORY = "big car factory"
+    MEGA_CAR_FACTORY = "mega car factory"
+    BIG_MACHINE_WORKS = "big machine works"
+    MEGA_MACHINE_WORKS = "mega machine works"
+    BIG_BRICKWORKS = "big brickworks"
+    MEGA_BRICKWORKS = "mega brickworks"
+    BIG_CEMENT_WORKS = "big cement works"
+    MEGA_CEMENT_WORKS = "mega cement works"
+    BIG_GLASSWORKS = "big glassworks"
+    MEGA_GLASSWORKS = "mega glassworks"
+    BIG_BREWERY = "big brewery"
+    MEGA_BREWERY = "mega brewery"
+    BIG_DISTILLERY = "big distillery"
+    MEGA_DISTILLERY = "mega distillery"
+    BIG_TANNERY = "big tannery"
+    MEGA_TANNERY = "mega tannery"
+    BIG_MEAT_FACTORY = "big butcher"
+    MEGA_MEAT_FACTORY = "mega butcher"
+    BIG_SHOE_FACTORY = "big shoe factory"
+    MEGA_SHOE_FACTORY = "mega shoe factory"
+    BIG_PLASTICS_WORKS = "big plastics works"
+    MEGA_PLASTICS_WORKS = "mega plastics works"
+    BIG_APPLIANCE_FACTORY = "big appliance factory"
+    MEGA_APPLIANCE_FACTORY = "mega appliance factory"
+    BIG_PAPER_MILL = "big paper mill"
+    MEGA_PAPER_MILL = "mega paper mill"
+    BIG_PRINTING_WORKS = "big printing works"
+    MEGA_PRINTING_WORKS = "mega printing works"
+    BIG_SUGAR_REFINERY = "big sugar refinery"
+    MEGA_SUGAR_REFINERY = "mega sugar refinery"
+    BIG_GASWORKS = "big gasworks"
+    MEGA_GASWORKS = "mega gasworks"
+    BIG_PORCELAIN_WORKS = "big porcelain works"
+    MEGA_PORCELAIN_WORKS = "mega porcelain works"
 
     @classmethod
     def _missing_(cls, value: object) -> BuildingKind | None:
@@ -222,6 +309,8 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     BuildingKind.FOOD_PLANT: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.BAKERY: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.TAVERN: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.CLUB: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.FILLING_STATION: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.DEPARTMENT_STORE: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.HOTEL: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.LIMESTONE_QUARRY: BuildingRules(relief=frozenset(Relief)),
@@ -230,6 +319,8 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
         kind: BuildingRules(relief=_OFF_MOUNTAINS, space=CELL_SPACE)
         for kind in (
             BuildingKind.POWER_PLANT,
+            BuildingKind.DIESEL_POWER_PLANT,
+            BuildingKind.GAS_POWER_PLANT,
             BuildingKind.REFINERY,
             BuildingKind.CAR_FACTORY,
             BuildingKind.TANK_FACTORY,
@@ -252,12 +343,12 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     BuildingKind.COPPER_MINE: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.GOLD_MINE: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.DIAMOND_MINE: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.SALT_WORKS: BuildingRules(relief=frozenset(Relief)),
     **{
         kind: BuildingRules(relief=_OFF_MOUNTAINS)
         for kind in (
             BuildingKind.FISHERY,
             BuildingKind.OIL_WELL,
-            BuildingKind.SALT_WORKS,
             BuildingKind.FURNITURE_MAKER,
             BuildingKind.TOOL_WORKS,
             BuildingKind.WINERY,
@@ -294,9 +385,34 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.SUGAR_REFINERY,
             BuildingKind.PORCELAIN_WORKS,
             BuildingKind.MEAT_FACTORY,
+            BuildingKind.JUICE_WORKS,
         )
     },
 }
+
+# Works that merge as they gather: two of a kind in a neighbourhood become its big one, and two
+# big ones its mega one (railroads.sim.ladders). The factory line merges its own way.
+MERGED: dict[BuildingKind, tuple[BuildingKind, BuildingKind]] = {
+    BuildingKind[kind.name.removeprefix("BIG_")]: (kind, BuildingKind["MEGA_" + kind.name[4:]])
+    for kind in BuildingKind
+    if kind.name.startswith("BIG_") and kind != BuildingKind.BIG_FACTORY
+}
+
+# What each big or mega works grew from.
+GREW_FROM: dict[BuildingKind, BuildingKind] = {
+    grown: kind for kind, kinds in MERGED.items() for grown in kinds
+}
+
+# How much of a cell big and mega works take at least: half of it, and two thirds.
+BIG_SPACE = CELL_SPACE // 2
+MEGA_SPACE = CELL_SPACE * 2 // 3
+
+for _grown, _kind in GREW_FROM.items():
+    _least = BIG_SPACE if _grown.name.startswith("BIG_") else MEGA_SPACE
+    BUILDING_RULES[_grown] = replace(
+        BUILDING_RULES[_kind], space=max(_least, BUILDING_RULES[_kind].space)
+    )
+
 STATION_RELIEF = _OFF_MOUNTAINS
 
 
@@ -322,16 +438,24 @@ class Track:
     def space(self) -> int:
         return int(self.width)
 
+    def other_end(self, point: int) -> int:
+        """The end of the piece away from `point`, one of its ends."""
+        return self.ends[1] if self.ends[0] == point else self.ends[0]
+
 
 @dataclass(frozen=True, slots=True)
 class Station:
     """Fills its whole cell. Its own track runs straight through the cell between `ends`, two
     opposite track points, and other track joins it only there: its way in and its way out. It
     keeps that way however track is laid round it later; with `ends` None its track runs
-    across, from the first track point to the one opposite (Constructions.station_ends)."""
+    across, from the first track point to the one opposite (Constructions.station_ends). A station
+    raised high enough gets more platforms in cells beside it, each a Station of its own with
+    `main` the cell of the station it belongs to, and its own way through, so lines come in from
+    more sides."""
 
     cell: Cell
     ends: tuple[int, int] | None = None
+    main: Cell | None = None
 
     @property
     def space(self) -> int:
@@ -364,8 +488,31 @@ class Constructions:
         # Where the stations stand and track runs, kept apart so the railway never looks through
         # every building for them, and a count that goes up whenever either changes.
         self._stations: set[Cell] = set()
+        # The platforms added to each station, by the station's cell.
+        self._platforms: dict[Cell, set[Cell]] = {}
         self._track: dict[Cell, int] = {}
         self.railway_version = 0
+        # A count that goes up whenever anything is built or removed.
+        self.version = 0
+
+    def __getstate__(self) -> dict[str, object]:
+        """What a saved game keeps of what is built: each building as its kind alone, in its
+        cell's list, which pickles many times faster than the buildings themselves."""
+        state = dict(self.__dict__)
+        state["_cells"] = {
+            cell: [built.kind if type(built) is Building else built for built in here]
+            for cell, here in self._cells.items()
+        }
+        return state
+
+    def __setstate__(self, state: dict[str, object]) -> None:
+        self.__dict__.update(state)
+        self._cells = {
+            cell: [
+                Building(cell, built) if type(built) is BuildingKind else built for built in here
+            ]
+            for cell, here in self._cells.items()
+        }
 
     def __iter__(self) -> Iterator[Construction]:
         for built in self._cells.values():
@@ -378,6 +525,25 @@ class Constructions:
     def stations(self) -> list[Cell]:
         """Every station's cell, in order."""
         return sorted(self._stations)
+
+    def platforms(self, station: Cell) -> list[Cell]:
+        """The platforms added to a station, in order, without its own cell."""
+        return sorted(self._platforms.get(station, ()))
+
+    def station_cells(self, station: Cell) -> list[Cell]:
+        """Every cell of a station: its own, then its added platforms."""
+        return [station, *self.platforms(station)]
+
+    def main_station(self, cell: Cell) -> Cell | None:
+        """The station a cell belongs to, as the station itself or one of its platforms."""
+        station = self.station_at(cell)
+        if station is None:
+            return None
+        return station.cell if station.main is None else station.main
+
+    def every_station_cell(self) -> list[Cell]:
+        """Every cell a station or a platform of one fills."""
+        return sorted({*self._stations, *(c for cells in self._platforms.values() for c in cells)})
 
     def station_at(self, cell: Cell) -> Station | None:
         """The station in the cell, if there is one."""
@@ -408,6 +574,9 @@ class Constructions:
 
     def at(self, cell: Cell) -> tuple[Construction, ...]:
         return tuple(self._cells.get(cell, ()))
+
+    def buildings_at(self, cell: Cell) -> list[Building]:
+        return [built for built in self._cells.get(cell, ()) if isinstance(built, Building)]
 
     def track_at(self, cell: Cell) -> tuple[Track, ...]:
         return tuple(built for built in self._cells.get(cell, ()) if isinstance(built, Track))
@@ -451,6 +620,7 @@ class Constructions:
         if (problem := self.why_not(construction)) is not None:
             raise CannotBuild(problem)
         self._cells.setdefault(construction.cell, []).append(construction)
+        self.version += 1
         self._index(construction, 1)
 
     def remove(self, construction: Construction) -> None:
@@ -460,15 +630,23 @@ class Constructions:
         built.remove(construction)
         if not built:
             del self._cells[construction.cell]
+        self.version += 1
         self._index(construction, -1)
 
     def _index(self, construction: Construction, change: int) -> None:
         match construction:
-            case Station():
+            case Station(main=None):
                 if change > 0:
                     self._stations.add(construction.cell)
                 else:
                     self._stations.discard(construction.cell)
+            case Station(main=main) if main is not None:
+                if change > 0:
+                    self._platforms.setdefault(main, set()).add(construction.cell)
+                else:
+                    self._platforms.get(main, set()).discard(construction.cell)
+                    if not self._platforms.get(main):
+                        self._platforms.pop(main, None)
             case Track():
                 left = self._track.get(construction.cell, 0) + change
                 if left > 0:
@@ -478,10 +656,6 @@ class Constructions:
             case _:
                 return
         self.railway_version += 1
-
-    def track_problem(self, track: Track) -> str | None:
-        """Why this track cannot be laid, leaving aside the room already taken."""
-        return self._track_problem(track)
 
     def site_problem(self, building: Building) -> str | None:
         """Why the building cannot stand in its cell, leaving aside the room already taken."""

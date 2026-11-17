@@ -981,6 +981,71 @@ def boiler_fuel() -> Sprite:
     return p.sprite()
 
 
+def common_goods() -> Sprite:
+    """A boot standing by a clay pot, under a folded shirt."""
+    p = _canvas()
+    boot: RGB = (124, 72, 44)
+    p.polygon([(-8, -1), (-4, -1), (-4, 4), (-1, 5), (-1, 7), (-8, 7)], boot, shade(boot, 0.5))
+    clay: RGB = (176, 104, 70)
+    p.ellipse(1, 0, 8, 7, clay)
+    p.line([(2, 2), (7, 2)], shade(clay, 0.7))
+    cloth: RGB = (222, 122, 178)
+    p.rect(-5, -7, 5, -2, cloth)
+    p.line([(-5, -5), (5, -5)], shade(cloth, 0.75))
+    return p.sprite()
+
+
+def _crate(p: Painter) -> None:
+    p.rect(-8, -1, 8, 7, WOOD)
+    for x in (-3, 3):
+        p.line([(x, -1), (x, 7)], shade(WOOD, 0.7))
+    p.line([(-8, 3), (8, 3)], shade(WOOD, 0.7))
+
+
+def general_food() -> Sprite:
+    """A crate heaped with an ear of wheat, an apple and a fish."""
+    p = _canvas()
+    p.line([(-6, 0), (-4, -8)], (232, 190, 86))
+    p.ellipse(-3, -7, 3, -1, (212, 42, 58))
+    p.polygon([(2, -3), (8, -5), (8, -1)], (110, 170, 200))
+    _crate(p)
+    return p.sprite()
+
+
+def general_processed_food() -> Sprite:
+    """A crate heaped with a loaf, a tin and a bottle of juice."""
+    p = _canvas()
+    p.ellipse(-8, -5, -1, -1, (212, 150, 76))
+    p.rect(0, -6, 3, -1, (176, 184, 196))
+    p.rect(4, -8, 7, -1, (244, 152, 40))
+    _crate(p)
+    return p.sprite()
+
+
+def general_common_goods() -> Sprite:
+    """A brown paper parcel tied up with string."""
+    p = _canvas()
+    paper: RGB = (196, 160, 112)
+    p.rect(-8, -5, 8, 7, paper)
+    string: RGB = (236, 226, 196)
+    p.line([(0, -5), (0, 7)], string)
+    p.line([(-8, 1), (8, 1)], string)
+    p.ellipse(-3, -8, 0, -5, string)
+    p.ellipse(0, -8, 3, -5, string)
+    return p.sprite()
+
+
+def juice() -> Sprite:
+    """A bottle of orange juice with a green cap."""
+    p = _canvas()
+    glass: RGB = (214, 232, 236)
+    p.rect(-2, -8, 2, -5, (70, 150, 70))
+    p.rect(-4, -5, 4, 7, glass)
+    p.rect(-3, -2, 3, 6, (244, 152, 40))
+    p.line([(-3, -1), (3, -1)], (255, 196, 92))
+    return p.sprite()
+
+
 ICONS: dict[str, Callable[[], Sprite]] = {
     "wheat": wheat,
     "apples": apples,
@@ -1039,6 +1104,11 @@ ICONS: dict[str, Callable[[], Sprite]] = {
     "castings": castings,
     "sausages": sausages,
     "luxury goods": luxuries,
+    "common goods": common_goods,
+    "juice": juice,
+    "general food": general_food,
+    "general processed food": general_processed_food,
+    "general common goods": general_common_goods,
     "pigs": pigs,
     "chickens": chickens,
     "eggs": eggs,

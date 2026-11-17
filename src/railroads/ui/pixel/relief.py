@@ -10,21 +10,24 @@ Raised ground is lit by its slopes from LIGHT, low in the top left, and coloured
 above the valley and its steepness: green foothills, bare rock above the treeline, and snow above a
 wavy snowline, broken by ribs of rock on steep slopes. All of it is worked out at one pixel per art
 pixel and blown up with the rest of the ground.
+
+Under track the ground is graded into a bed level with the ground round it smoothed out, so track
+climbs evenly instead of over every crag, cutting into ridges and banked over hollows.
 """
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
 
+from railroads.sim.grids import FloatArray
 from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.ui.iso_camera import TILT
 from railroads.ui.pixel.lattice import Lattice
-from railroads.ui.pixel.noise import noise, ridged
-from railroads.ui.pixel.projection import FloatArray, PixelProjection
-
-Floats = npt.NDArray[np.float32]
+from railroads.ui.pixel.noise import Floats, noise, ridged
+from railroads.ui.pixel.projection import PixelProjection
 
 # Heights are kept on a raster this many steps per cell, smoothed over SMOOTHING steps, and the
 # valley floor under them over VALLEY_SMOOTHING steps.
@@ -65,6 +68,12 @@ TREELINE = 300.0
 TREELINE_SPREAD = 160.0
 SNOWLINE = 950.0
 SNOWLINE_SPREAD = 260.0
+# The bed graded under track through hills and mountains: level with the ground round it smoothed
+# over BED_SMOOTHING steps, all the way out to BED_FLAT cells either side of the track's middle and
+# blending back into the ground by BED_EDGE.
+BED_FLAT = 0.3
+BED_EDGE = 0.65
+BED_SMOOTHING = 4
 
 
 def smooth(values: FloatArray, radius: int) -> FloatArray:
@@ -164,10 +173,7 @@ class Elevation:
     def __init__(self, tile_map: TileMap, projection: PixelProjection) -> None:
         self.projection = projection
         grid = tile_map.grid
-        width, height = grid.size()
-        ys, xs = np.mgrid[0 : math.ceil(height * STEPS), 0 : math.ceil(width * STEPS)]
-        rows, cols = grid.cell_at((xs + 0.5) / STEPS, (ys + 0.5) / STEPS)
-        rows, cols = np.clip(rows, 0, grid.rows - 1), np.clip(cols, 0, grid.cols - 1)
+        rows, cols = grid.raster_cells(STEPS)
         land = tile_map.terrain[rows, cols] == Terrain.LAND
         relief = tile_map.relief[rows, cols]
         heights = np.where(land, tile_map.height_m[rows, cols], 0).astype(np.float32)
@@ -181,6 +187,10 @@ class Elevation:
         self._metres_per_pixel = grid.km_per_cell * 1000 / float(np.hypot(*projection.matrix[:, 0]))
         self._metres_per_unit = grid.km_per_cell * 1000
         self._lifts: dict[tuple[float, float], float] = {}
+        # How fully the ground at each step is graded into a bed for track, and the bed's rise
+        # there times that share (`grade`), or None where no track is.
+        self._bed: tuple[Floats, Floats] | None = None
+        self.grades = 0
 
     def shares(self, x: FloatArray, y: FloatArray) -> tuple[Floats, Floats]:
         """How mountainous and how hilly the ground is at plane points, from 0 to 1."""
@@ -228,9 +238,15 @@ class Elevation:
         return self._rise(x, y, Blend.at(self._base.shape, x * STEPS, y * STEPS))
 
     def _rise(
-        self, x: FloatArray, y: FloatArray, at: Blend, valley: FloatArray | None = None
+        self,
+        x: FloatArray,
+        y: FloatArray,
+        at: Blend,
+        valley: FloatArray | None = None,
+        graded: bool = True,
     ) -> tuple[Floats, Floats, Floats]:
-        """`rise` at points `at` blends, with the valley floor there if it is read already."""
+        """`rise` at points `at` blends, with the valley floor there if it is read already, and
+        with the beds graded for track unless not `graded`."""
         m, h = self._shares(at)
         rise = np.zeros(m.shape, dtype=np.float32)
         raised = (m > 0) | (h > 0)
@@ -254,8 +270,57 @@ class Elevation:
                 fx, fy = rx[rolling].astype(np.float32), ry[rolling].astype(np.float32)
                 ground = 0.6 * noise(fx, fy, 0.9, 4) + 0.4 * noise(fx, fy, 0.35, 5)
                 lifted[rolling] += rolls[rolling] * ground
+            if graded and self._bed is not None:
+                share, bed = self._bed
+                bedded = there.read(share)
+                lifted = lifted * (1 - bedded) + there.read(bed)
             rise[raised] = lifted
         return rise, m, h
+
+    def grade(self, lines: Sequence[FloatArray]) -> None:
+        """Grades a bed for track along these lines through the plane, each a row of x and a
+        row of y with points no more than a raster step apart: level with the ground round it
+        smoothed out, so track climbs hills and mountains evenly instead of over every crag,
+        and fully so out to BED_FLAT cells from the line, blending back into the ground by
+        BED_EDGE, where it leaves cuttings and banks. Only ground that rises is graded; the bed
+        takes the place of any graded before."""
+        shape = self._base.shape
+        share = np.zeros(shape, dtype=np.float32)
+        points = [line for line in lines if line.shape[1]]
+        if points:
+            x, y = np.concatenate(points, axis=1)
+            _mark_bed(share, x * STEPS - 0.5, y * STEPS - 0.5)
+        laid = share > 0
+        if not laid.any():
+            self._graded(None)
+            return
+        rows, cols = np.nonzero(laid)
+        reach = 2 * BED_SMOOTHING + 1
+        top, left = max(int(rows.min()) - reach, 0), max(int(cols.min()) - reach, 0)
+        bottom = min(int(rows.max()) + reach + 1, shape[0])
+        right = min(int(cols.max()) + reach + 1, shape[1])
+        box = (slice(top, bottom), slice(left, right))
+        under = laid[box]
+        # The bed at each step is the ground's rise smoothed over the steps round it, which is
+        # worked out only at the steps that smoothing reaches from the bed.
+        reached = smooth(under.astype(np.float32), BED_SMOOTHING) > 1e-6
+        ry, rx = np.nonzero(reached)
+        px, py = (rx + left + 0.5) / STEPS, (ry + top + 0.5) / STEPS
+        rise = np.zeros(under.shape, dtype=np.float32)
+        rise[ry, rx], _, _ = self._rise(
+            px, py, Blend.at(shape, px * STEPS, py * STEPS), None, False
+        )
+        smoothed = smooth(rise, BED_SMOOTHING).astype(np.float32)
+        bed = np.zeros(shape, dtype=np.float32)
+        bed[box] = np.where(under, smoothed, 0) * share[box]
+        self._graded((share, bed))
+
+    def _graded(self, bed: tuple[Floats, Floats] | None) -> None:
+        """Takes up a new bed for track, counting it in `grades` only once it is in place, so
+        whatever keeps lifts worked out under the old one knows to forget them."""
+        self._bed = bed
+        self._lifts.clear()
+        self.grades += 1
 
     def to_lift(self, rise: Floats) -> Floats:
         """How many art pixels ground that rises so many metres is lifted in the picture."""
@@ -395,6 +460,21 @@ def mountain_cover(mountains: Floats, rocky: npt.NDArray[np.bool_]) -> Floats:
     as far as it is mountainous, and fully on mountain cells (`rocky`) once their mountains start
     to rise. Where it is 1 the ground's own colour does not show at all."""
     return np.maximum(mountains, rocky * np.clip(mountains * 3, 0, 1))
+
+
+def _mark_bed(share: Floats, x: FloatArray, y: FloatArray) -> None:
+    """Marks in `share` how fully each step is graded for track through these raster positions:
+    fully out to BED_FLAT cells from the nearest, then less and less out to BED_EDGE."""
+    height, width = share.shape
+    reach = math.ceil(BED_EDGE * STEPS)
+    cx, cy = np.rint(x).astype(np.int64), np.rint(y).astype(np.int64)
+    for dy in range(-reach, reach + 1):
+        for dx in range(-reach, reach + 1):
+            sx, sy = cx + dx, cy + dy
+            away = np.hypot(sx - x, sy - y) / STEPS
+            graded = np.clip((BED_EDGE - away) / (BED_EDGE - BED_FLAT), 0, 1).astype(np.float32)
+            on = (graded > 0) & (sx >= 0) & (sx < width) & (sy >= 0) & (sy < height)
+            np.maximum.at(share, (sy[on], sx[on]), graded[on])
 
 
 def _ridges(x: FloatArray, y: FloatArray) -> FloatArray:

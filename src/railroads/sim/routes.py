@@ -29,11 +29,17 @@ from railroads.sim.constructions import (
     Track,
     TrackWidth,
 )
-from railroads.sim.demolition import clearing, clearing_price, station_site_price
+from railroads.sim.demolition import (
+    clearing,
+    clearing_price,
+    remove_platforms,
+    station_site_price,
+)
 from railroads.sim.finance import track_price
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
+from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Relief, Terrain, Tile
 from railroads.sim.track_rules import TrackBed, track_rules_for
 
@@ -48,6 +54,9 @@ REUSE_COST = 0.5
 # What each bend costs the planner, against a cell of new track on open flat land, so that
 # routes run straight and turn seldom instead of zigzagging.
 BEND_COST = 0.6
+# How many states the search takes off its frontier between the steps of plan_route_steps: about
+# a millisecond's work on a desktop.
+PLAN_STEP = 256
 
 # The planner numbers cells row by row with this many cells of border round the map, so that a
 # step from any cell on it, through a corner too, lands on a numbered cell.
@@ -98,6 +107,21 @@ def _bed_on(tile: Tile) -> TrackBed | None:
     return TrackBed.TUNNEL if tile.relief == Relief.MOUNTAINS else TrackBed.GROUND
 
 
+def _ground_of(tile: Tile) -> _Ground:
+    """The bed track takes in a cell of this tile, the beds it could take as bits, and what new
+    track costs a unit of length there, None where none can go. It hangs on the tile's terrain
+    and relief alone."""
+    bed = _bed_on(tile)
+    takes = sum(1 << other for other in TrackBed if track_rules_for(tile, other).can_build)
+    buildable = bed is not None and takes >> bed & 1
+    factor = track_rules_for(tile, bed).cost_factor if buildable else None
+    return bed, takes, factor
+
+
+# _ground_of by the terrain and relief of the tile, as numbered in a TileMap.
+_GROUNDS: dict[tuple[int, int], _Ground] = {}
+
+
 def plan_route(
     constructions: Constructions,
     start: Cell,
@@ -108,9 +132,23 @@ def plan_route(
 ) -> Route | None:
     """The cheapest track of this width, electric, maglev or neither, from `start` to `end`, or
     None if there is no way."""
+    return finish(plan_route_steps(constructions, start, end, width, electric, maglev))
+
+
+def plan_route_steps(
+    constructions: Constructions,
+    start: Cell,
+    end: Cell,
+    width: TrackWidth = TrackWidth.SINGLE,
+    electric: bool = False,
+    maglev: bool = False,
+) -> Steps[Route | None]:
+    """plan_route in steps of about PLAN_STEP cells searched, which a caller can spread over
+    frames; the constructions mustn't change between them."""
     if start == end:
         return None
-    return _Planner(constructions, start, end, width, electric and not maglev, maglev).plan()
+    planner = _Planner(constructions, start, end, width, electric and not maglev, maglev)
+    return (yield from planner.plan())
 
 
 def route_price(constructions: Constructions, route: Route) -> float:
@@ -192,6 +230,30 @@ def build_station(
     return changed | {cell}
 
 
+def add_platform(
+    growth: Growth, station: Cell, cell: Cell, ends: tuple[int, int] | None = None
+) -> set[Cell] | None:
+    """Adds a platform to a station in a cell beside it or beside one of its platforms, its
+    track running between `ends`, clearing the cell as a new station would; None if it cannot go
+    there."""
+    constructions = growth.constructions
+    if constructions.station_at(station) is None or constructions.main_station(station) != station:
+        return None
+    beside = {
+        near for own in constructions.station_cells(station) for near in growth.grid.within(own, 1)
+    }
+    if cell not in beside:
+        return None
+    changed = build_station(growth, cell, ends)
+    if changed is None:
+        return None
+    built = constructions.station_at(cell)
+    assert built is not None
+    constructions.remove(built)
+    constructions.build(Station(cell, built.ends, station))
+    return changed
+
+
 def move_station(
     growth: Growth, railway: Railway, old: Cell, new: Cell, ends: tuple[int, int] | None = None
 ) -> set[Cell] | None:
@@ -201,7 +263,7 @@ def move_station(
     go there."""
     constructions = growth.constructions
     station = constructions.station_at(old)
-    if new == old or station is None:
+    if new == old or station is None or station.main is not None:
         return None
     if station_site_price(constructions, new) is None:
         return None
@@ -210,8 +272,9 @@ def move_station(
     if changed is None:
         constructions.build(station)
         return None
+    platforms = remove_platforms(constructions, old)
     railway.moved(old, new)
-    return changed | {old}
+    return changed | {old} | platforms
 
 
 @dataclass(frozen=True, slots=True)
@@ -324,7 +387,7 @@ class _Planner:
         self._leaving = [None] * numbered
         self._grounds = [None] * numbered
 
-    def plan(self) -> Route | None:
+    def plan(self) -> Steps[Route | None]:
         constructions = self.constructions
         grid = constructions.tile_map.grid
         if not (grid.contains(*self.start) and grid.contains(*self.end)):
@@ -346,12 +409,14 @@ class _Planner:
             if point not in seeds
         }
         joins = [] if _is_station(constructions, self.end) else self._joins(self.end)
-        route = self._search([*(seeds or [None]), *sorted(along)], joins, along)
+        route = yield from self._search([*(seeds or [None]), *sorted(along)], joins, along)
         if route is None and (joins or (seeds and not start_station)):
-            route = self._search([*self._ways_out] or [None], [], set())
+            route = yield from self._search([*self._ways_out] or [None], [], set())
         return route
 
-    def _search(self, seeds: list[int | None], joins: list[int], along: set[int]) -> Route | None:
+    def _search(
+        self, seeds: list[int | None], joins: list[int], along: set[int]
+    ) -> Steps[Route | None]:
         """A* over cells and the point track came into them by. `seeds` are the points the
         first piece may start from (None for anywhere); from those in `along` it can only run
         along track already laid. The last piece must lead out by one of `joins` (with none,
@@ -370,11 +435,15 @@ class _Planner:
         known = best.get
         came: dict[int, int] = {}
         done = bytearray(len(to_end) << 4)
+        searched = 0
         while frontier:
             key = pop(frontier)[2]
             if done[key]:
                 continue
             done[key] = 1
+            searched += 1
+            if searched % PLAN_STEP == 0:
+                yield
             index, entry = key >> 4, key & 15
             if index == end:
                 assert entry != _ANYWHERE
@@ -496,15 +565,12 @@ class _Planner:
         ground = self._grounds[index]
         if ground is None:
             cell = self._cell(index)
-            if self.constructions.tile_map.grid.contains(*cell):
-                tile = self.constructions.tile_map.tile(cell)
-                bed = _bed_on(tile)
-                takes = sum(
-                    1 << other for other in TrackBed if track_rules_for(tile, other).can_build
-                )
-                buildable = bed is not None and takes >> bed & 1
-                factor = track_rules_for(tile, bed).cost_factor if buildable else None
-                ground = (bed, takes, factor)
+            tile_map = self.constructions.tile_map
+            if tile_map.grid.contains(*cell):
+                land = (int(tile_map.terrain[cell]), int(tile_map.relief[cell]))
+                ground = _GROUNDS.get(land)
+                if ground is None:
+                    ground = _GROUNDS[land] = _ground_of(tile_map.tile(cell))
             else:
                 ground = (None, 0, None)
             self._grounds[index] = ground
@@ -574,7 +640,7 @@ class _Planner:
         comes in, if there is one."""
         for piece in self.constructions.track_at(self.end):
             if entry in piece.ends:
-                return piece.ends[1] if piece.ends[0] == entry else piece.ends[0]
+                return piece.other_end(entry)
         return None
 
     def _route(self, came: dict[int, int], key: int, cost: float, join: int | None) -> Route:
@@ -654,7 +720,7 @@ def _dead_end(
     for piece in pieces:
         if joined not in piece.ends or piece.ends == ends:
             continue
-        loose = piece.ends[1] if piece.ends[0] == joined else piece.ends[0]
+        loose = piece.other_end(joined)
         shared = any(loose in other.ends for other in pieces if other is not piece)
         if not shared and not _leads_on(constructions, cell, loose):
             return piece

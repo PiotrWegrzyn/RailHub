@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
-from imgui_bundle import hello_imgui
+from imgui_bundle import hello_imgui, imgui
 from test_elevation import world_over_mountains
 
 from railroads.sim.grids import SquareGrid
@@ -192,10 +192,35 @@ def test_where_the_graphics_card_blows_textures_up_only_its_own_pixels_go_up() -
     asked: list[tuple[np.ndarray, int]] = []
     layer.blow_up = lambda pixels, times: asked.append((pixels, times)) or FakeTexture()
 
-    layer._upload(mountains, 4)
-    layer._upload(mountains, 2)
+    layer._upload(mountains, 4, 2)
+    layer._upload(mountains, 2, 2)
 
     [(pixels, times)] = asked
     assert times == 2
     assert pixels is layer._chunks[(*mountains, 2)]
     assert set(layer._textures) == {(*mountains, 4), (*mountains, 2)}
+
+
+def test_zooming_in_shows_a_chunks_last_picture_until_it_is_drawn_for_the_new_zoom() -> None:
+    gui = imgui.create_context()
+    io = imgui.get_io()
+    io.display_size = imgui.ImVec2(1280, 800)
+    io.backend_flags |= imgui.BackendFlags_.renderer_has_textures.value
+    world, mountains, _ = world_over_mountains()
+    layer = PixelLayer(world, threads=False)
+    center = world.projection.to_plane(*((np.array(mountains) + 0.5) * CHUNK))
+    camera = SimpleNamespace(center_x=float(center[0]), center_y=float(center[1]), pixel_scale=1)
+    clip = ((0.0, 0.0), (1280.0, 800.0))
+    drawn_now(layer, (*mountains, 1))
+    imgui.new_frame()
+    layer.draw(imgui.get_foreground_draw_list(), camera, (640.0, 400.0), clip)
+    imgui.end_frame()
+    camera.pixel_scale = 4
+
+    imgui.new_frame()
+    complete = layer.draw(imgui.get_foreground_draw_list(), camera, (640.0, 400.0), clip)
+    imgui.end_frame()
+
+    imgui.destroy_context(gui)
+    assert not complete
+    assert layer._shown_before(mountains) is not None

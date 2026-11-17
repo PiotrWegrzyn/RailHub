@@ -134,7 +134,7 @@ def test_needs_start_in_their_year() -> None:
     after = needs_of(BuildingKind.FLATS, 1910)
 
     assert Need.FUEL not in before
-    assert after[Need.FUEL] == 5
+    assert after[Need.FUEL] == 30
 
 
 def test_works_with_nothing_to_work_from_stay_open() -> None:
@@ -153,7 +153,7 @@ def test_flats_want_a_car_from_1930() -> None:
     after = needs_of(BuildingKind.FLATS, 1930)
 
     assert Need.CARS not in before
-    assert after[Need.CARS] == 1
+    assert after[Need.CARS] == 3
 
 
 @pytest.mark.parametrize(("gap", "opens"), [(6, False), (12, True)])

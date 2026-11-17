@@ -7,18 +7,29 @@ from builders import flat_map, layer
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Trade
 from railroads.sim.grids import Cell, HexGrid
-from railroads.sim.growth import SPAWN_SCALE, Growth, _allowed, breeding_of
+from railroads.sim.growth import (
+    BREEDING_TIMES,
+    SPAWN_SCALE,
+    UNDYING,
+    WORKS_SPAWN_SCALE,
+    Growth,
+    _allowed,
+    breeding_of,
+)
 from railroads.sim.ladders import (
     BAKERIES,
     FACTORIES,
     FARMS,
     FOOD_PLANTS,
+    FOOD_TOWN,
     LADDERS,
     LUMBER_MILLS,
     MINES,
     OPEN_FIELD,
+    POINTS,
     PORTS,
     SHIPYARDS,
+    STEEL_MILLS,
     TOWN_LAND,
     TOWNS,
     GrowthRule,
@@ -129,7 +140,7 @@ def test_mines_are_likelier_in_mountains_than_on_the_flat() -> None:
     assert weights[5, -1] > 50 * weights[5, 5]
 
 
-def test_houses_nobody_serves_leave_every_cell_at_the_base_chance_of_a_house() -> None:
+def test_houses_nobody_serves_leave_the_base_chance_raised_by_the_people_around() -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
     build(constructions, (5, 5), BuildingKind.HOUSE, 2)
@@ -138,8 +149,9 @@ def test_houses_nobody_serves_leave_every_cell_at_the_base_chance_of_a_house() -
 
     chances = Growth(constructions, NO_TRADE).chances(TOWNS)
 
-    for cell in ((5, 5), neighbour, (5, 8), (8, 3)):
-        assert chances[cell] == pytest.approx(TOWNS.base_chance)
+    for cell, people in (((5, 5), 2), (neighbour, 2), ((5, 8), 0), ((8, 3), 18)):
+        drawn = TOWNS.base_chance * (1 + np.log2(1 + 6 * people))
+        assert chances[cell] == pytest.approx(drawn)
 
 
 def test_chances_follow_buildings_as_they_come_and_go() -> None:
@@ -166,17 +178,16 @@ def test_a_ladder_has_no_chance_until_the_neighbourhood_holds_what_it_needs() ->
     assert with_food[5, 5] > 0
 
 
-def test_a_sure_month_puts_a_house_on_every_land_cell() -> None:
+def test_a_sure_month_puts_up_a_house_for_every_land_cell_and_none_on_the_sea() -> None:
     constructions = Constructions(make_map())
     sure = replace(TOWNS, base_chance=50.0, merges={})
     growth = Growth(constructions, only(sure))
 
-    changed = growth.month(np.random.default_rng(1))
+    growth.month(np.random.default_rng(1))
 
     houses = growth.count(BuildingKind.HOUSE)
-    assert houses[:, 1:].min() == 1
+    assert houses.sum() == 12 * 11
     assert houses[:, 0].max() == 0
-    assert len(changed) == 12 * 11
 
 
 def test_small_chances_are_drawn_as_often_as_they_should_be() -> None:
@@ -191,15 +202,28 @@ def test_small_chances_are_drawn_as_often_as_they_should_be() -> None:
     assert turns == pytest.approx(expected, rel=0.05)
 
 
-def test_a_farm_fills_its_cell_and_the_next_one_spills_next_door() -> None:
+def test_farms_coming_up_in_a_cell_go_up_in_it_or_next_door() -> None:
     tile_map = make_map()
     growth = Growth(Constructions(tile_map), only(PLAIN_FARMS))
+    nearby = {(5, 5), *tile_map.grid.neighbours(5, 5)}
 
     first, second = [growth._turn((5, 5), PLAIN_FARMS, np.random.default_rng(0)) for _ in range(2)]
 
-    assert first == {(5, 5)}
-    assert second <= set(tile_map.grid.neighbours(5, 5))
+    assert first | second <= nearby
     assert growth.count(BuildingKind.FARM).sum() == 2
+
+
+def test_houses_coming_up_in_one_cell_spread_over_it_and_its_neighbours() -> None:
+    tile_map = make_map()
+    plain = replace(TOWNS, merges={})
+    growth = Growth(Constructions(tile_map), only(plain))
+    rng = np.random.default_rng(0)
+    nearby = {(5, 5), *tile_map.grid.neighbours(5, 5)}
+
+    changed = set().union(*[growth._turn((5, 5), plain, rng) for _ in range(12)])
+
+    assert changed <= nearby
+    assert len(changed) > 3
 
 
 @pytest.mark.parametrize(("houses", "pulled_down"), [(7, False), (8, True)])
@@ -291,21 +315,35 @@ def test_sixteen_houses_nearby_let_six_make_way_for_a_tenement_the_cells_own_fir
     assert growth.nearby()[5, 5] == 16
 
 
-def test_fifteen_houses_nearby_are_not_enough_to_merge() -> None:
+def test_five_houses_nearby_are_not_enough_to_merge() -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
     neighbours = tile_map.grid.neighbours(5, 5)
     build(constructions, (5, 5), BuildingKind.HOUSE, 2)
-    for near in neighbours[:2]:
-        build(constructions, near, BuildingKind.HOUSE, 6)
-    build(constructions, neighbours[2], BuildingKind.HOUSE, 1)
+    build(constructions, neighbours[0], BuildingKind.HOUSE, 2)
+    build(constructions, neighbours[1], BuildingKind.HOUSE, 1)
     growth = Growth(constructions)
 
     changed = growth._turn((5, 5), TOWNS, np.random.default_rng(0))
 
-    assert changed == {(5, 5)}
-    assert growth.count(BuildingKind.HOUSE).sum() == 16
+    assert changed <= {(5, 5), *neighbours}
+    assert growth.count(BuildingKind.HOUSE).sum() == 6
     assert growth.count(BuildingKind.TENEMENT).sum() == 0
+
+
+def test_six_houses_in_a_cell_and_its_neighbours_merge_into_a_tenement() -> None:
+    tile_map = make_map()
+    constructions = Constructions(tile_map)
+    neighbours = tile_map.grid.neighbours(5, 5)
+    build(constructions, (5, 5), BuildingKind.HOUSE, 2)
+    for near in neighbours[:4]:
+        build(constructions, near, BuildingKind.HOUSE, 1)
+    growth = Growth(constructions)
+
+    growth._turn((5, 5), TOWNS, np.random.default_rng(0))
+
+    assert growth.count(BuildingKind.HOUSE).sum() == 0
+    assert growth.count(BuildingKind.TENEMENT)[5, 5] == 1
 
 
 def test_five_tenements_nearby_make_flats_before_houses_merge() -> None:
@@ -354,7 +392,7 @@ def industry_trade(tile_map: TileMap, cell: tuple[int, int]) -> Trade:
 
 
 @pytest.mark.parametrize(("people", "industry"), [(0, 0), (6, 0), (0, 1)])
-def test_a_served_factory_breeds_by_the_people_and_twice_the_industry_around_it(
+def test_a_served_factory_breeds_by_the_people_and_half_as_much_again_the_industry_around_it(
     people: int, industry: int
 ) -> None:
     tile_map = make_map()
@@ -371,11 +409,11 @@ def test_a_served_factory_breeds_by_the_people_and_twice_the_industry_around_it(
 
     growth._count_served(industry_trade(tile_map, (5, 5)))
 
-    drawing = people + 2 * (value + industry * growth.rule.points[BuildingKind.STEEL_MILL][1])
-    bred = breeding.per_doubling * 10 * value * np.log2(1 + drawing)
+    drawing = people + 1.5 * (value + industry * growth.rule.points[BuildingKind.STEEL_MILL][1])
+    raised = (breeding.spawn + breeding.per_doubling * value) * np.log2(1 + drawing)
     assert points == Points.INDUSTRY
     assert growth.chances(FACTORIES)[5, 5] == pytest.approx(
-        (breeding.spawn + bred) * FACTORIES.land.weights(tile_map)[5, 5]
+        (breeding.spawn + raised) * FACTORIES.land.weights(tile_map)[5, 5]
     )
 
 
@@ -461,7 +499,8 @@ def test_farms_never_merge_or_raise_skyscrapers() -> None:
 
     changed = growth._turn((5, 5), PLAIN_FARMS, np.random.default_rng(0))
 
-    assert changed == {(5, 5)}
+    assert changed <= {(5, 5), *constructions.tile_map.grid.neighbours(5, 5)}
+    assert growth.count(BuildingKind.FARM).sum() == 1
     assert growth.count(BuildingKind.SKYSCRAPER).sum() == 0
 
 
@@ -539,9 +578,10 @@ def test_a_house_with_no_room_in_its_cell_spills_into_a_cell_next_to_it() -> Non
     tile_map = make_map()
     constructions = Constructions(tile_map)
     build(constructions, (5, 5), BuildingKind.HOUSE, 6)
-    growth = Growth(constructions, only(TOWNS))
+    unmerged = replace(TOWNS, merges={})
+    growth = Growth(constructions, only(unmerged))
 
-    changed = growth._turn((5, 5), TOWNS, np.random.default_rng(0))
+    changed = growth._turn((5, 5), unmerged, np.random.default_rng(0))
 
     assert len(changed) == 1
     assert changed <= set(tile_map.grid.neighbours(5, 5))
@@ -580,7 +620,7 @@ def houses_trade(tile_map: TileMap, cell: tuple[int, int], got: float, needed: f
     return Trade(cells, {house: np.array([got])}, {house: np.array([needed])}, nothing, nothing)
 
 
-@pytest.mark.parametrize(("got", "multiplier"), [(0.0, 0), (0.5, 2.5), (1.0, 5), (2.0, 10)])
+@pytest.mark.parametrize(("got", "multiplier"), [(0.0, 0), (0.5, 0.25), (1.0, 0.5), (2.0, 1.0)])
 def test_served_buildings_add_their_points_by_the_share_they_are_served_to_their_own_cell(
     got: float, multiplier: float
 ) -> None:
@@ -594,9 +634,9 @@ def test_served_buildings_add_their_points_by_the_share_they_are_served_to_their
     growth._count_served(houses_trade(tile_map, (5, 5), got, 2.0))
 
     chances = growth.chances(TOWNS)
-    per_doubling = TOWNS.chance_per_doubling[Points.POPULATION]
-    bred = multiplier * 4 * per_doubling * np.log2(1 + 4 * 4)
-    assert chances[5, 5] == pytest.approx(TOWNS.base_chance + bred)
+    base = TOWNS.base_chance
+    raised = (base + BREEDING_TIMES * base * multiplier * 4) * np.log2(1 + 6 * 4)
+    assert chances[5, 5] == pytest.approx(base + raised)
     assert chances[neighbour] == pytest.approx(neighbour_before)
 
 
@@ -625,9 +665,9 @@ def test_a_served_house_breeds_faster_the_more_people_live_around_it(around: int
 
     growth._count_served(houses_trade(tile_map, (5, 5), 2.0, 2.0))
 
-    per_doubling = TOWNS.chance_per_doubling[Points.POPULATION]
-    bred = 10 * per_doubling * np.log2(1 + 4 * (1 + around))
-    assert growth.chances(TOWNS)[5, 5] == pytest.approx(TOWNS.base_chance + bred)
+    base = TOWNS.base_chance
+    raised = (base + BREEDING_TIMES * base) * np.log2(1 + 6 * (1 + around))
+    assert growth.chances(TOWNS)[5, 5] == pytest.approx(base + raised)
 
 
 def test_a_cell_closed_and_opened_again_is_allowed_only_once() -> None:
@@ -661,8 +701,8 @@ def test_growing_years_at_a_step_still_closes_every_year() -> None:
     assert sorted(growth.history.population) == list(range(850, 860))
 
 
-@pytest.mark.parametrize(("houses", "times"), [(0, 0), (2, 2), (6, 6)])
-def test_a_bakery_is_as_likely_as_the_people_around_it(houses: int, times: int) -> None:
+@pytest.mark.parametrize("houses", [0, 1, 3, 6])
+def test_a_bakery_is_likelier_by_every_doubling_of_the_people_around(houses: int) -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
     if houses:
@@ -672,4 +712,68 @@ def test_a_bakery_is_as_likely_as_the_people_around_it(houses: int, times: int) 
 
     chance = growth.chances(BAKERIES)[5, 5]
 
-    assert chance == pytest.approx(BAKERIES.base_chance * SPAWN_SCALE * times * land)
+    drawn = 1 + np.log2(1 + houses)
+    assert chance == pytest.approx(BAKERIES.base_chance * SPAWN_SCALE * drawn * land)
+
+
+def test_glassworks_come_up_at_a_fifth_of_their_chance() -> None:
+    (glassworks,) = [ladder for ladder in LADDERS if ladder.kinds[0] == BuildingKind.GLASSWORKS]
+    unscaled = breeding_of(replace(glassworks, kinds=(BuildingKind.BREWERY,)), POINTS)
+
+    glass = breeding_of(glassworks, POINTS)
+
+    assert glass.spawn == pytest.approx(unscaled.spawn * WORKS_SPAWN_SCALE)
+
+
+def test_brewers_distillers_and_potters_need_a_town_around_them() -> None:
+    kinds = (BuildingKind.BREWERY, BuildingKind.DISTILLERY, BuildingKind.POTTER)
+
+    needs = [ladder.needs for ladder in LADDERS if ladder.kinds[0] in kinds]
+
+    assert needs == [{Points.POPULATION: FOOD_TOWN}] * 3
+
+
+def test_soldiers_never_starve_to_death() -> None:
+    soldiers = {BuildingKind.OUTPOST, BuildingKind.BASE, BuildingKind.HEADQUARTERS}
+
+    undying = soldiers & UNDYING
+
+    assert undying == soldiers
+
+
+@pytest.mark.parametrize("houses", [1, 4])
+def test_a_steel_mill_is_drawn_by_people_but_as_many_times_less_likely_as_one_plus_them(
+    houses: int,
+) -> None:
+    tile_map = make_map()
+    alone = Growth(Constructions(tile_map), NO_TRADE).chances(STEEL_MILLS)[5, 5]
+    constructions = Constructions(tile_map)
+    build(constructions, (5, 5), BuildingKind.HOUSE, houses)
+
+    crowded = Growth(constructions, NO_TRADE).chances(STEEL_MILLS)[5, 5]
+
+    assert crowded == pytest.approx(alone * (1 + np.log2(1 + houses)) / (1 + houses))
+
+
+def test_gasworks_are_drawn_by_industry_and_dairies_by_people_twice() -> None:
+    (gasworks,) = [ladder for ladder in LADDERS if ladder.kinds[0] == BuildingKind.GASWORKS]
+    (dairies,) = [ladder for ladder in LADDERS if ladder.kinds[0] == BuildingKind.DAIRY]
+
+    gas = breeding_of(gasworks, POINTS)
+    milk = breeding_of(dairies, POINTS)
+
+    assert gas.drawn_by == {Points.INDUSTRY: 1.0}
+    assert gas.shunned_by == {Points.POPULATION: 1.0}
+    assert milk.drawn_by == {Points.POPULATION: 2.0, Points.INDUSTRY: 1.0}
+
+
+def test_bakeries_give_food_points_but_come_up_and_breed_like_works() -> None:
+    (sausages,) = [ladder for ladder in LADDERS if ladder.kinds[0] == BuildingKind.SAUSAGE_MAKER]
+
+    bread = breeding_of(BAKERIES, POINTS)
+    sausage = breeding_of(sausages, POINTS)
+
+    assert (bread.own, sausage.own) == (Points.FOOD, Points.FOOD)
+    assert bread.spawn == pytest.approx(BAKERIES.base_chance * SPAWN_SCALE)
+    assert bread.per_doubling == pytest.approx(BREEDING_TIMES * bread.spawn)
+    assert sausage.per_doubling == pytest.approx(BREEDING_TIMES * sausage.spawn)

@@ -1,3 +1,4 @@
+import gc
 from collections.abc import Callable, Iterator
 from concurrent.futures import Executor, Future
 from pathlib import Path
@@ -122,21 +123,14 @@ def test_frames_may_slow_down_while_trains_wait_at_their_stations(
     context: None, refreshes: list[None]
 ) -> None:
     app = made_app()
-    app.game.railway.trains[0].stops = [Stop((10, 6), [Good.COAL]), Stop((10, 16))]
+    app.game.railway.trains[0].stops = [
+        Stop((10, 6), [Good.COAL], wait_for_load=True),
+        Stop((10, 16)),
+    ]
 
     frame(app)
 
     assert not app.game.railway.trains[0].path
-    assert refreshes == []
-
-
-def test_frames_may_slow_down_once_the_game_is_over(context: None, refreshes: list[None]) -> None:
-    app = made_app()
-    app.clock.months += app.clock.months_left
-
-    frame(app)
-
-    assert app.game.railway.trains[0].path
     assert refreshes == []
 
 
@@ -162,13 +156,13 @@ def test_the_game_autosaves_as_a_month_begins(context: None, tmp_path: Path) -> 
 def frames_until_the_month_is_done(app: App) -> int:
     frames = 1
     frame(app)
-    while app._turning is not None and frames < 20:
+    while app._turning is not None and frames < 100:
         frame(app)
         frames += 1
     return frames
 
 
-def test_a_month_is_done_over_a_few_frames_and_saved_on_the_frame_after(
+def test_a_month_is_done_over_a_few_frames_and_its_autosave_taken_in_its_last_ones(
     context: None, tmp_path: Path
 ) -> None:
     app = made_app()
@@ -177,14 +171,13 @@ def test_a_month_is_done_over_a_few_frames_and_saved_on_the_frame_after(
 
     frames = frames_until_the_month_is_done(app)
     started_with_the_month = app._autosaving is not None
-    frame(app)
-    started_after = app._autosaving is not None
     app.finish_autosave()
 
-    assert frames > 1
-    assert not started_with_the_month
-    assert started_after
+    assert frames > len(app.game.big_parts())
+    assert started_with_the_month
+    assert not app._autosave_due
     assert [info.name for info in app.saves.listing()] == ["autosave 1"]
+    assert app.saves.load("autosave 1").clock.date == app.clock.date
 
 
 def test_the_clock_and_trains_wait_while_a_month_is_half_done(context: None) -> None:
@@ -277,6 +270,23 @@ def test_a_game_loaded_from_the_menu_comes_back_as_it_was_saved(
     assert loaded.clock == app.clock
     assert loaded.view.camera.zoom_level == 2
     assert loaded.saves is saves
+
+
+def test_a_game_loaded_is_set_aside_from_the_garbage_collector(
+    context: None, tmp_path: Path
+) -> None:
+    saves = Saves(tmp_path)
+    saves.save("Earlier", made_app().saved())
+    shell = Shell(saves)
+    shell.load("Earlier")
+    assert shell._task is not None
+    shell._task.result()
+
+    shell_frame(shell)
+
+    assert shell.app is not None
+    assert gc.get_freeze_count() > 0
+    gc.unfreeze()
 
 
 def test_a_save_that_fails_to_load_stays_in_the_menu_with_why(
@@ -519,6 +529,23 @@ def test_a_month_that_changes_colours_paints_the_overview_again_within_its_steps
     assert set(app.view._textures) == shown
 
 
+def test_the_map_is_prepared_a_part_at_a_time_ending_as_prepared_at_once(context: None) -> None:
+    stepped = made_app()
+    at_once = made_app()
+
+    steps = sum(1 for _ in stepped.view.prepare_steps((1280.0, 800.0), 1, chunks=False))
+    at_once.view.prepare((1280.0, 800.0), 1, chunks=False)
+
+    assert steps > 4
+    assert stepped.view._soft is not None
+    assert at_once.view._soft is not None
+    assert np.array_equal(stepped.view._soft[1], at_once.view._soft[1])
+    assert stepped.view._pixels is not None
+    assert stepped.view._pixels.world.ground.biomes.tolist() == (
+        at_once.view._pixel_layer().world.ground.biomes.tolist()
+    )
+
+
 def test_the_trains_window_map_is_softened_anew_a_step_a_frame_once_colours_change(
     context: None,
 ) -> None:
@@ -590,8 +617,9 @@ def slow_writer(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_a_month_that_ends_while_an_autosave_is_written_is_autosaved_after_it(
-    context: None, tmp_path: Path, slow_writer: None
+    context: None, tmp_path: Path, slow_writer: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(app_module, "AUTOSAVE_GAP_S", 0.0)
     app = made_app()
     app.saves = Saves(tmp_path)
     app.clock.seconds = app.clock.seconds_per_month - 0.001
@@ -631,6 +659,7 @@ def test_an_autosave_due_while_another_month_is_half_done_waits_for_that_month(
 ) -> None:
     writer = HeldWriter()
     monkeypatch.setattr(app_module, "WRITER", writer)
+    monkeypatch.setattr(app_module, "AUTOSAVE_GAP_S", 0.0)
     app = made_app()
     app.saves = Saves(tmp_path)
     app.autosave()
@@ -730,3 +759,25 @@ def test_the_yolo_button_starts_a_random_place_with_the_other_settings_kept(
 
     assert settings.map == MapChoice.WORLD
     assert (settings.seed, settings.start_year) == (42, 1900)
+
+
+def test_months_ending_soon_after_an_autosave_are_saved_once_the_gap_has_passed(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    now = [1000.0]
+    monkeypatch.setattr(app_module.time, "monotonic", lambda: now[0])
+    app = made_app()
+    app.saves = Saves(tmp_path)
+    for _ in range(3):
+        app.clock.seconds = app.clock.seconds_per_month - 0.001
+        frames_until_the_month_is_done(app)
+        frame(app)
+        app._finish_writing()
+    saved_soon = [info.name for info in app.saves.listing()]
+    now[0] += app_module.AUTOSAVE_GAP_S
+
+    frame(app)
+    app._finish_writing()
+
+    assert saved_soon == ["autosave 1"]
+    assert app.saves.load("autosave 1").clock.date == app.clock.date

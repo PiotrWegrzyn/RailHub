@@ -1,14 +1,13 @@
 """Where map points land in the big picture of the pixel map, in art pixels, and where the picture's chunks sit on screen."""
 
 import math
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Self
 
 import numpy as np
 import numpy.typing as npt
 
-from railroads.sim.grids import Grid
+from railroads.sim.grids import FloatArray, Grid
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 
 CHUNK = 256
@@ -25,15 +24,6 @@ type Point = tuple[float, float]
 
 
 type Path = list[Point]
-
-
-type ToArt = Callable[[Path], Path]
-
-
-FloatArray = npt.NDArray[np.float64]
-
-
-IntArray = npt.NDArray[np.int64]
 
 
 Rgba = npt.NDArray[np.uint8]

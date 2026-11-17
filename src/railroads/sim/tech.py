@@ -14,7 +14,7 @@ from enum import Enum
 from types import MappingProxyType
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.goods import MAKES, Good
+from railroads.sim.goods import MAKES, General, Good
 
 # Dollars of experience a tree needs for its first level; each next level needs LEVEL_GROWTH
 # times as much as the one before.
@@ -47,7 +47,7 @@ class Effect(Enum):
     SPEED = "train speed"
     # Trains pull this many more cars.
     PULL = "cars per train"
-    # Stations, track and car trips cost this share less to keep.
+    # Stations, track, car trips and the fuel engines burn cost this share less.
     UPKEEP = "upkeep"
     # The player's buildings count this share more towards growth around them.
     GROWTH = "growth"
@@ -58,7 +58,13 @@ class Effect(Enum):
     # Each bonus good a building gets all of adds this much more to its satisfaction
     # (railroads.sim.economy).
     BONUS_GOODS = "per bonus good"
-    # Opens the engines (railroads.sim.trains) that need it, once their year has come.
+    # Fuel bought anywhere but out of a station's stockpile costs this much less over the market
+    # price (railroads.sim.fuel_market).
+    FUEL_MARKUP = "retail fuel markup"
+    # Every car holds this many sizes more (railroads.sim.trains.CAR_SIZES).
+    CAR_SIZE = "car size"
+    # Opens the engines (railroads.sim.trains) that need it, once their year has come, or a
+    # general car (GENERAL_CARS).
     UNLOCK = "unlocks"
 
 
@@ -90,6 +96,22 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("villages", "Thriving villages", E.GROWTH, 0.5, "rotation"),
             _n("cold", "Cold stores", E.STORAGE, 300, "silos"),
             _n("coop", "Farmers' cooperative", E.SHARE, 0.05, "stalls"),
+            _n(
+                "mixed_vans",
+                "Mixed food vans",
+                E.UNLOCK,
+                0.0,
+                "stalls",
+                opens="general food cars, taking whichever grown food pays best",
+            ),
+            _n(
+                "provision_vans",
+                "Provision vans",
+                E.UNLOCK,
+                0.0,
+                "mixed_vans",
+                opens="general processed food cars of 25, taking whichever pays best",
+            ),
             _n("bread", "Branded bread", E.PRICE, 0.1, "stalls"),
             _n("fertiliser", "Fertiliser", E.PRODUCTION, 0.2, "rotation"),
             _n("reefers", "Refrigerated vans", E.PRICE, 0.1, "cold", "bread"),
@@ -113,6 +135,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
                 opens="steam engines from 1900 on",
             ),
             _n("drawbars", "Heavy drawbars", E.PULL, 1, "couplings"),
+            _n("bogie_wagons", "Bogie wagons", E.CAR_SIZE, 1, "drawbars"),
             _n("rolling", "Rolling mills", E.PRODUCTION, 0.2, "open_hearth"),
             _n("streamlining", "Streamlining", E.SPEED, 0.1, "superheaters"),
             _n("works_trust", "Engineering trust", E.SHARE, 0.1, "cartel", "rolling"),
@@ -139,6 +162,14 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("spinning", "Spinning mules", E.PRODUCTION, 0.15, "looms"),
             _n("workshops", "Model workshops", E.GROWTH, 0.5, "spinning"),
             _n("fashion", "Fashion houses", E.PRICE, 0.15, "patterns"),
+            _n(
+                "parcel_vans",
+                "Parcel vans",
+                E.UNLOCK,
+                0.0,
+                "patterns",
+                opens="general common goods cars, taking whichever pays best",
+            ),
             _n("mills_trust", "Mill owners' trust", E.SHARE, 0.05, "spinning"),
             _n("synthetics", "Synthetic dyes", E.PRODUCTION, 0.2, "spinning"),
             _n("couture", "Couture", E.SHARE, 0.1, "fashion", "mills_trust"),
@@ -174,6 +205,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("books", "Double-entry books", E.DISCOUNT, 0.1),
             _n("investors", "Investors", E.SHARE, 0.05, everywhere=True),
             _n("chains", "Chain stores", E.DISCOUNT, 0.1, "books"),
+            _n("regular_customer", "Regular customer", E.FUEL_MARKUP, 0.25, "books"),
             _n("advertising", "Advertising", E.PRICE, 0.05, "investors", everywhere=True),
             _n("holding", "Holding company", E.SHARE, 0.05, "investors", everywhere=True),
             _n("takeovers", "Hostile takeovers", E.DISCOUNT, 0.15, "chains"),
@@ -229,6 +261,7 @@ _GOODS: Mapping[Tree, tuple[Good, ...]] = {
         Good.MILK,
         Good.DAIRY,
         Good.SAUSAGES,
+        Good.JUICE,
         Good.GRAPES,
         Good.WINE,
         Good.COFFEE,
@@ -295,10 +328,22 @@ GOOD_TREES: Mapping[Good, Tree] = MappingProxyType(
 SHOPS = frozenset(
     {
         BuildingKind.TAVERN,
+        BuildingKind.CLUB,
+        BuildingKind.FILLING_STATION,
         BuildingKind.DEPARTMENT_STORE,
         BuildingKind.HOTEL,
         BuildingKind.JEWELLER,
         BuildingKind.CAR_DEALER,
+    }
+)
+
+
+# The node that opens each general car (railroads.sim.trains).
+GENERAL_CARS: Mapping[General, str] = MappingProxyType(
+    {
+        General.FOOD: "mixed_vans",
+        General.PROCESSED_FOOD: "provision_vans",
+        General.COMMON: "parcel_vans",
     }
 )
 
@@ -310,6 +355,22 @@ def tree_of(kind: BuildingKind) -> Tree | None:
         return Tree.COMMERCE
     makes = MAKES.get(kind)
     return GOOD_TREES[next(iter(makes))] if makes else None
+
+
+def path_to(keys: tuple[str, ...]) -> tuple[str, ...]:
+    """Every node to take to have some, each after the nodes it requires."""
+    path: list[str] = []
+
+    def visit(key: str) -> None:
+        if key in path:
+            return
+        for need in NODES[key][1].requires:
+            visit(need)
+        path.append(key)
+
+    for key in keys:
+        visit(key)
+    return tuple(path)
 
 
 def xp_for(level: int) -> float:

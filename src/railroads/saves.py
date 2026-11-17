@@ -2,7 +2,9 @@
 player's data folder and read back exactly as they were.
 
 A save is a header line naming the format and saying what is in it, then the game pickled and
-compressed. The header is read on its own to list saves without loading them. Bump SAVE_FORMAT
+compressed: the game's biggest parts pickled one after another, a step each, then the game itself,
+which points back at them (snapshot_steps), so taking a snapshot can be spread over frames. The
+header is read on its own to list saves without loading them. Bump SAVE_FORMAT
 whenever a change to the simulation's classes would make an older save load wrong, so that it is
 refused with a clear message instead.
 
@@ -12,6 +14,7 @@ Named saves are the player's; AUTOSAVES more are written in turn at the start of
 no thread to write it on to spread over frames.
 """
 
+import io
 import json
 import os
 import pickle
@@ -26,6 +29,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+import numpy.typing as npt
 
 from railroads.sim.clock import GameClock
 from railroads.sim.game import Game
@@ -47,6 +51,11 @@ NAME_PATTERN = re.compile(r"[\w ,.'()-]+")
 COMPRESS_STEP = 1 << 17
 # The compression saves use: fast, and the games' many empty arrays shrink to almost nothing.
 LEVEL = 1
+# Arrays at least this big are saved as their shape alone if they hold only zeros, and as the
+# places of their other values and those values if that is less than half as big: the game keeps
+# hundreds, a cell's worth for every kind of building and every input, most of them for kinds not
+# on the map or standing in a few cells, which made most of a save before it was compressed.
+SPARSE_BYTES = 1 << 12
 
 
 def user_data_dir() -> Path:
@@ -112,7 +121,25 @@ class _Pickler(pickle.Pickler):
     def reducer_override(self, obj: object) -> Any:
         if type(obj) is MappingProxyType:
             return _frozen, (dict(obj),)
+        if type(obj) is np.ndarray and obj.nbytes >= SPARSE_BYTES and obj.itemsize in (1, 2, 4, 8):
+            flat = obj.reshape(-1)
+            held = flat.view(f"u{obj.itemsize}") != 0
+            count = np.count_nonzero(held)
+            if count == 0:
+                return np.zeros, (obj.shape, obj.dtype)
+            if count * (obj.itemsize + 1) < obj.nbytes // 2:
+                return _spread, (obj.shape, obj.dtype, np.packbits(held), flat[held])
         return NotImplemented
+
+
+def _spread(
+    shape: tuple[int, ...], dtype: np.dtype[Any], held: npt.NDArray[np.uint8], values: Any
+) -> npt.NDArray[Any]:
+    """An array of zeros but for `values`, in the places whose bits `held` sets."""
+    spread = np.zeros(shape, dtype)
+    flat = spread.reshape(-1)
+    flat[np.unpackbits(held, count=flat.size).view(bool)] = values
+    return spread
 
 
 class _Pieces:
@@ -158,8 +185,19 @@ def snapshot(saved: SavedGame, memory: ReusedMemory | None = None) -> Snapshot:
     """The game pickled now, into `memory` if given, which then mustn't be used again until the
     snapshot has been written. It is pickled before anything is copied, so the copy goes into
     memory of the size it needs."""
+    return finish(snapshot_steps(saved, memory))
+
+
+def snapshot_steps(saved: SavedGame, memory: ReusedMemory | None = None) -> Steps[Snapshot]:
+    """snapshot in steps a caller can spread over frames, nothing changing the game between
+    them: one pickler pickles each of the game's biggest parts (Game.big_parts) in a step of its
+    own, then the game, which only points back at what it pickled already."""
     pieces = _Pieces()
-    _Pickler(pieces, protocol=pickle.HIGHEST_PROTOCOL).dump(saved)
+    pickler = _Pickler(pieces, protocol=pickle.HIGHEST_PROTOCOL)
+    for part in saved.game.big_parts():
+        pickler.dump(part)
+        yield
+    pickler.dump(saved)
     data: Buffer
     if memory is None:
         data = b"".join(pieces.parts)
@@ -172,6 +210,23 @@ def snapshot(saved: SavedGame, memory: ReusedMemory | None = None) -> Snapshot:
         "saved_at": datetime.now().isoformat(timespec="seconds"),
     }
     return Snapshot(header, data)
+
+
+def unpickled(data: Buffer) -> object:
+    """What a snapshot pickled: the last of the things in it, the game."""
+    return finish(unpickled_steps(data))
+
+
+def unpickled_steps(data: Buffer) -> Steps[object]:
+    """unpickled a thing a step, the parts first and the game last."""
+    stream = io.BytesIO(data)
+    end = stream.getbuffer().nbytes
+    unpickler = pickle.Unpickler(stream)
+    loaded = unpickler.load()
+    while stream.tell() < end:
+        yield
+        loaded = unpickler.load()
+    return loaded
 
 
 def compressed(data: Buffer, step: int | None = None) -> Steps[bytes]:
@@ -298,14 +353,19 @@ class Saves:
         """Writes a save's header and its compressed game, through a file of its own so a save
         cut short leaves the old one as it was."""
         line = json.dumps(header).encode() + b"\n"
+        self._write_whole(path, MAGIC + line + data, "The game couldn't be saved")
+        return path
+
+    def _write_whole(self, path: Path, data: bytes, failed: str) -> None:
+        """Writes the file through one of its own, so a write cut short leaves the old file as
+        it was; a failure is a SaveError starting with `failed`."""
         try:
             self.folder.mkdir(parents=True, exist_ok=True)
             partial = path.with_suffix(".partial")
-            partial.write_bytes(MAGIC + line + data)
+            partial.write_bytes(data)
             partial.replace(path)
         except OSError as error:
-            raise SaveError(f"The game couldn't be saved: {error.strerror or error}.") from error
-        return path
+            raise SaveError(f"{failed}: {error.strerror or error}.") from error
 
     def export(self, name: str) -> bytes:
         """The save's file as it is, to keep or carry to the game elsewhere."""
@@ -320,14 +380,7 @@ class Saves:
         line = data[len(MAGIC) :].split(b"\n", 1)[0]
         _header(data[: len(MAGIC)], line, Path(file_name).stem)
         name = imported_name(file_name, self.exists)
-        path = self.path(name)
-        try:
-            self.folder.mkdir(parents=True, exist_ok=True)
-            partial = path.with_suffix(".partial")
-            partial.write_bytes(data)
-            partial.replace(path)
-        except OSError as error:
-            raise SaveError(f"The save couldn't be added: {error.strerror or error}.") from error
+        self._write_whole(self.path(name), data, "The save couldn't be added")
         return name
 
     def load(self, name: str) -> SavedGame:
@@ -340,7 +393,7 @@ class Saves:
             file.readline()
             packed = file.read()
         try:
-            saved = pickle.loads(zlib.decompress(packed))
+            saved = unpickled(zlib.decompress(packed))
         except (zlib.error, pickle.UnpicklingError, EOFError) as error:
             raise SaveError(f"'{name}' is damaged and can't be loaded.") from error
         except (AttributeError, ImportError, TypeError, ValueError) as error:

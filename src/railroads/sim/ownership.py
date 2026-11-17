@@ -2,7 +2,9 @@
 each cell, what buying one costs, and the share of what they sell that the player is paid.
 
 A building costs PAYBACK_YEARS of its owner's share at full output, OWNER_SHARE of what it sells,
-less what the player's tech takes off, down to MOST_DISCOUNT of the price. Tech in a building's
+less what the player's tech takes off, down to MOST_DISCOUNT of the price; a power plant of any kind, which
+sells nothing but makes cheap electricity for the player's trains (railroads.sim.fuel_market),
+costs POWER_PLANT_PRICE. Tech in a building's
 tree can raise the share it pays and how many buildings' worth it makes. When buildings leave a
 cell, the player's go last.
 """
@@ -29,6 +31,10 @@ OWNER_SHARE = 0.5
 PAYBACK_YEARS = 5
 # However much tech cuts the price of buildings, they cost at least this share of it.
 MOST_DISCOUNT = 0.5
+POWER_PLANT_PRICE = 2_000_000.0
+POWER_PLANTS = frozenset(
+    {BuildingKind.POWER_PLANT, BuildingKind.DIESEL_POWER_PLANT, BuildingKind.GAS_POWER_PLANT}
+)
 
 
 class Owners:
@@ -41,6 +47,10 @@ class Owners:
     def owned(self, kind: BuildingKind) -> IntGrid:
         """How many buildings of a kind the player owns in each cell."""
         return self._owned.get(kind, np.zeros(self._growth.grid.shape, dtype=np.int64))
+
+    def count(self) -> int:
+        """How many buildings the player owns in all."""
+        return sum(int(grid.sum()) for grid in self._owned.values())
 
     def kinds(self) -> list[BuildingKind]:
         """The kinds of building the player owns any of."""
@@ -65,13 +75,18 @@ class Owners:
     def price_to_buy(self, kind: BuildingKind) -> float | None:
         """What one building of a kind costs the player; None for what cannot be bought."""
         growth = self._growth
-        makes = makes_of(kind, growth.year)
-        if not makes or kind not in growth.counts:
+        if kind not in growth.counts:
             return None
-        month = sum(amount * price_of(good) for good, amount in makes.items())
         railway = growth.railway
         discount = 0.0 if railway is None else railway.research.bonus(Effect.DISCOUNT)
-        return 12 * PAYBACK_YEARS * OWNER_SHARE * month * max(MOST_DISCOUNT, 1.0 - discount)
+        kept = max(MOST_DISCOUNT, 1.0 - discount)
+        if kind in POWER_PLANTS:
+            return POWER_PLANT_PRICE * kept
+        makes = makes_of(kind, growth.year)
+        if not makes:
+            return None
+        month = sum(amount * price_of(good) for good, amount in makes.items())
+        return 12 * PAYBACK_YEARS * OWNER_SHARE * month * kept
 
     def buy(self, cell: Cell, kind: BuildingKind) -> str | None:
         """Buys one building of a kind in a cell; why not, if it cannot be bought."""
@@ -81,9 +96,8 @@ class Owners:
         if self.owned(kind)[cell] >= self._growth.counts[kind][cell]:
             return f"You already own every {kind.value} here"
         railway = self._growth.railway
-        if railway is None or not railway.finances.can_afford(price):
+        if railway is None or not railway.finances.pay(price, "buildings bought"):
             return "Not enough cash"
-        railway.finances.spend(price, "buildings bought")
         self.own(cell, kind)
         return None
 

@@ -8,7 +8,7 @@ from railroads.ui.pixel.art.painter import (
     BARREL,
     BRICK,
     CAR_COLOURS,
-    CLOTH,
+    CHIMNEY_SHARE,
     COPPER,
     DOORWAY,
     GLASS,
@@ -21,9 +21,15 @@ from railroads.ui.pixel.art.painter import (
     Painter,
     Point,
     Sprite,
+    Top,
+    chimney_top,
     shade,
 )
 from railroads.ui.pixel.art.parts import (
+    DOOR,
+    SILL,
+    _band,
+    _bands,
     _barrel,
     _cow,
     _fence,
@@ -34,20 +40,27 @@ from railroads.ui.pixel.art.parts import (
     _paddock,
     _patch,
     _plate,
+    _plinth,
+    _ridge,
     _turned,
     _vault,
     _windows,
 )
-
-DOOR: RGB = (104, 66, 44)
-
-SILL: RGB = (240, 236, 226)
 
 GLAZING: RGB = (160, 196, 218)
 
 EARTH: RGB = (150, 128, 90)
 
 SOIL: RGB = (78, 74, 52)
+SMOKE: RGB = (150, 148, 150)
+# The most puffs of smoke rising from anything.
+MOST_PUFFS = 2
+FRAME: RGB = (104, 76, 50)
+JOINER_WALL: RGB = (176, 134, 88)
+CHAIR: RGB = (156, 62, 44)
+BUNDLE: RGB = (236, 234, 224)
+ANVIL: RGB = (40, 40, 46)
+STILL_SLATE: RGB = (68, 72, 82)
 
 OIL: RGB = (62, 60, 62)
 
@@ -71,8 +84,8 @@ def factory() -> Sprite:
     _door(p, front, right, (0.2, 0.5), 2.5, 6, DOORWAY, shade(BRICK, 1.3))
     _window(p, front, right, (0.7, 0.85), 2.2, shade(WINDOW, 0.8))
     _sawtooth(p, top, 2, 2.5, METAL, (170, 200, 214), BRICK)
-    _stack(p, 3, -6, -16, shade(BRICK, 0.8))
-    _smoke(p, 4.5, -18, (214, 214, 218), 2)
+    cap = _stack(p, 3, -6, -16, shade(BRICK, 0.8))
+    _smoke(p, 4.5, cap - 2, (214, 214, 218), 2)
     for x, y in ((7.5, 1.2), (9, 0.4)):
         _crate(p, x, y)
     return p.sprite()
@@ -100,10 +113,9 @@ def big_factory() -> Sprite:
     _door(p, front, right, (0.15, 0.45), 3.5, 8, DOORWAY, shade(BRICK, 1.3))
     _sawtooth(p, top, 3, 3, METAL, (170, 200, 214), BRICK)
     for x in (-6, 4):
-        _stack(p, x, -9, -24, shade(BRICK, 0.8))
-    for i, (x, y, r) in enumerate(
-        [(-5, -27, 2), (-3, -30, 2.5), (0, -32, 3), (5, -27, 2), (7, -30, 2.5)]
-    ):
+        cap = _stack(p, x, -9, -24, shade(BRICK, 0.8))
+    for i, (x, y, r) in enumerate([(-5, -27, 2), (-3, -30, 2.5), (5, -27, 2), (7, -30, 2.5)]):
+        y += cap + 24
         p.blob(x - r, y - r, x + r, y + r, (226, 226, 230) if i % 2 else (204, 204, 210))
     _heap(p, -9, 5, 2.5, 2, (48, 46, 50))
     _oil(p, 8.5, 5.4, 1.2)
@@ -124,8 +136,7 @@ def works(wall: RGB, roof: RGB, sign: RGB, stacks: int) -> Sprite:
     _plinth(p, top, 8, wall)
     _stains(p, left, front, 8, (0.06, 0.3, 0.62, 0.88), shade(wall, 0.6))
     _stains(p, front, right, 8, (0.55, 0.85), shade(wall, 0.48))
-    _band(p, left, front, 1, shade(wall, 1.15))
-    _band(p, front, right, 1, shade(wall, 0.9))
+    _bands(p, left, front, right, 1, shade(wall, 1.15), shade(wall, 0.9))
     spans = tuple(0.5 + k * 0.1 for k in range(5))
     _windows(p, left, front, spans, (2.5,), 2, WINDOW, shade(wall, 1.25))
     _windows(p, left, front, spans, (4.8,), 1, shade(wall, 1.15))
@@ -140,8 +151,7 @@ def works(wall: RGB, roof: RGB, sign: RGB, stacks: int) -> Sprite:
     p.line([(-8, -4), (-5, -3.5)], (240, 240, 236))
     for k in range(stacks):
         x = 3 + 4 * k
-        _chimney(p, x, -9, -23, shade(BRICK, 0.8))
-        _smoke(p, x + 1, -26, (150, 148, 150), 2)
+        _smoking_chimney(p, x, -9, -23, shade(BRICK, 0.8), puffs=2)
     for x, y in ((9, 6.5), (11, 5.5)):
         _crate(p, x, y)
     _oil(p, 4.5, 5.5, 1.2)
@@ -150,7 +160,7 @@ def works(wall: RGB, roof: RGB, sign: RGB, stacks: int) -> Sprite:
 
 def _sawtooth(
     p: Painter,
-    top: tuple[Point, Point, Point, Point],
+    top: Top,
     teeth: int,
     rise: float,
     roof: RGB,
@@ -169,9 +179,10 @@ def _sawtooth(
         p.line([near_up, far_up], glass)
 
 
-def _chimney(p: Painter, x: float, foot: float, top: float, colour: RGB = BRICK) -> None:
+def _chimney(p: Painter, x: float, foot: float, top: float, colour: RGB = BRICK) -> float:
     """A round brick chimney narrowing to a dark cap, with a light band under the cap and a dark
-    one halfway down."""
+    one halfway down, lowered (chimney_top); returns where its cap is."""
+    top = chimney_top(foot, top)
     p.polygon(
         [(x - 2, foot), (x - 1, top), (x + 1, top), (x + 2, foot)], colour, shade(colour, 0.6)
     )
@@ -180,13 +191,34 @@ def _chimney(p: Painter, x: float, foot: float, top: float, colour: RGB = BRICK)
         half = 1 + (y - top) / (foot - top)
         p.line([(x - half, y), (x + half, y)], tone)
     p.rect(x - 2, top - 1, x + 2, top, shade(colour, 0.7))
+    return top
 
 
-def _smoke(p: Painter, x: float, y: float, colour: RGB = (150, 148, 150), puffs: int = 3) -> None:
-    for i in range(puffs):
+def _smoke(p: Painter, x: float, y: float, colour: RGB = SMOKE, puffs: int = 3) -> None:
+    """Puffs of smoke rising to the right from (x, y), at most MOST_PUFFS of them."""
+    for i in range(min(puffs, MOST_PUFFS)):
         r = 1.5 + 0.6 * i
         cx, cy = x + 1.5 * i, y - 2.5 * i
         p.blob(cx - r, cy - r, cx + r, cy + r, colour if i % 2 else shade(colour, 0.86))
+
+
+def _smoking_chimney(
+    p: Painter,
+    x: float,
+    foot: float,
+    top: float,
+    colour: RGB = BRICK,
+    smoke: RGB = SMOKE,
+    puffs: int = 3,
+    close: bool = False,
+) -> None:
+    """A chimney (_chimney) with smoke rising from its cap, puffing from right over it if `close`
+    and a little higher and further right otherwise."""
+    top = _chimney(p, x, foot, top, colour)
+    if close:
+        _smoke(p, x + 0.5, top - 2, smoke, puffs)
+    else:
+        _smoke(p, x + 1, top - 3, smoke, puffs)
 
 
 def _gear(p: Painter, x: float, y: float, radius: float, colour: RGB) -> None:
@@ -196,24 +228,6 @@ def _gear(p: Painter, x: float, y: float, radius: float, colour: RGB) -> None:
         p.blob(tx - 1, ty - 1, tx + 1, ty + 1, shade(colour, 0.8))
     p.ellipse(x - radius, y - radius, x + radius, y + radius, colour)
     p.blob(x - 1, y - 1, x + 1, y + 1, shade(colour, 0.45))
-
-
-def _bale(p: Painter, x: float, y: float, colour: RGB) -> None:
-    p.box(x, y, 2, 2, colour, shade(colour, 1.15))
-
-
-def _plinth(
-    p: Painter, top: tuple[Point, Point, Point, Point], height: float, wall: RGB, tall: float = 0.8
-) -> None:
-    """A darker band along the foot of a block's lit and shaded walls, `height` below its top."""
-    left, front, right, _ = top
-    _patch(p, left, front, (0, 1), (height - tall, height), shade(wall, 0.7))
-    _patch(p, front, right, (0, 1), (height - tall, height), shade(wall, 0.55))
-
-
-def _band(p: Painter, a: Point, b: Point, drop: float, colour: RGB) -> None:
-    """A line right along the wall under the edge from `a` to `b`, `drop` down it."""
-    p.line([_on_wall(a, b, 0, drop), _on_wall(a, b, 1, drop)], colour)
 
 
 def _window(
@@ -249,16 +263,7 @@ def _door(
         p.line([_on_wall(a, b, span[0], drop - 0.6), _on_wall(a, b, span[1], drop - 0.6)], lintel)
 
 
-def _ridge(top: tuple[Point, Point, Point, Point], rise: float) -> tuple[Point, Point]:
-    """The back and front ends of the ridge of a gable `rise` high on a box's top (Painter.gable)."""
-    left, front, right, back = top
-    return (
-        ((left[0] + back[0]) / 2, (left[1] + back[1]) / 2 - rise),
-        ((front[0] + right[0]) / 2, (front[1] + right[1]) / 2 - rise),
-    )
-
-
-def _on_roof(top: tuple[Point, Point, Point, Point], rise: float, along: float, up: float) -> Point:
+def _on_roof(top: Top, rise: float, along: float, up: float) -> Point:
     """The point on the lit side of a gable roof `along` of the way from its back to its front and
     `up` of the way from its eave to its ridge."""
     left, front, _, _ = top
@@ -270,7 +275,7 @@ def _on_roof(top: tuple[Point, Point, Point, Point], rise: float, along: float, 
 
 def _roof_rows(
     p: Painter,
-    top: tuple[Point, Point, Point, Point],
+    top: Top,
     rise: float,
     roof: RGB,
     rows: tuple[float, ...] = (0.34, 0.68),
@@ -282,7 +287,7 @@ def _roof_rows(
 
 def _skylight(
     p: Painter,
-    top: tuple[Point, Point, Point, Point],
+    top: Top,
     rise: float,
     span: tuple[float, float] = (0.1, 0.9),
 ) -> None:
@@ -306,12 +311,15 @@ def _pipe(p: Painter, x: float, y: float, tall: float, colour: RGB = (70, 66, 64
     p.line([(x - 1, y - tall), (x + 1, y - tall)], shade(colour, 0.6))
 
 
-def _stack(p: Painter, x: float, foot: float, top: float, colour: RGB) -> None:
-    """A square stack two wide from `foot` up to `top`, with a light band under a dark cap."""
+def _stack(p: Painter, x: float, foot: float, top: float, colour: RGB) -> float:
+    """A square stack two wide from `foot` up to `top`, with a light band under a dark cap,
+    lowered (chimney_top); returns where its cap is."""
+    top = chimney_top(foot, top)
     p.rect(x, top, x + 2, foot, colour)
     p.line([(x, top + 2), (x + 2, top + 2)], (220, 220, 214))
     p.line([(x, (top + foot) / 2), (x + 2, (top + foot) / 2)], shade(colour, 0.65))
     p.rect(x - 0.5, top - 1, x + 2.5, top, shade(colour, 0.6))
+    return top
 
 
 def _crate(p: Painter, x: float, y: float, colour: RGB = (150, 112, 74)) -> None:
@@ -349,7 +357,7 @@ def _lengths(p: Painter, x: float, y: float, colour: RGB, rows: int = 2) -> None
             p.point(*_on_wall(front, right, t, drop - 0.5), shade(colour, 0.45))
 
 
-def _footing(x: float, y: float, length: float, depth: float) -> tuple[Point, Point, Point, Point]:
+def _footing(x: float, y: float, length: float, depth: float) -> Top:
     """The left, front, right and back corners on the ground of a block that Painter.hall raises at
     (x, y) with the same `length` and `depth`; a box of half width s has both s."""
     front = (x + (length - depth) / 2, y + (length + depth) / 4)
@@ -358,9 +366,7 @@ def _footing(x: float, y: float, length: float, depth: float) -> tuple[Point, Po
     return left, front, right, (left[0] + depth, left[1] - depth / 2)
 
 
-def _bed(
-    p: Painter, foot: tuple[Point, Point, Point, Point], colour: RGB = SOIL, margin: float = 1.2
-) -> None:
+def _bed(p: Painter, foot: Top, colour: RGB = SOIL, margin: float = 1.2) -> None:
     """Darker ground hugging a block's foot `margin` out past its walls, so that it stands in the
     ground rather than on it; drawn before the block."""
     left, front, right, back = foot
@@ -475,43 +481,6 @@ def barrel_maker() -> Sprite:
     return p.sprite()
 
 
-def bakery() -> Sprite:
-    """A baker's house with a shop window of loaves under a striped red awning, a brick oven
-    chimney, a loaf hung over the door, a swept path worn to its door and a sack of flour by its
-    wall with flour spilt round it."""
-    p = Painter(18, 22, (8, 17))
-    foot = _footing(0, 0, 6, 6)
-    _bed(p, foot, margin=1)
-    p.shadow(7, 2.5)
-    _track(p, foot[0], foot[1], (0.64, 0.9), 2, (176, 160, 128), ruts=False)
-    wall, roof, loaf = (232, 214, 176), (150, 72, 52), (196, 128, 58)
-    top = p.box(0, 0, 6, 5, wall, None)
-    left, front, right, _ = top
-    _plinth(p, top, 5, wall)
-    _stains(p, front, right, 5, (0.2, 0.8), shade(wall, 0.6), 1.2)
-    _patch(p, left, front, (0.08, 0.5), (2.2, 3.8), (238, 204, 132))
-    for t in (0.16, 0.29, 0.42):
-        p.point(*_on_wall(left, front, t, 3), loaf)
-    _patch(p, left, front, (0.04, 0.54), (1, 2), (178, 52, 46))
-    for t in (0.12, 0.29, 0.46):
-        p.line([_on_wall(left, front, t, 1), _on_wall(left, front, t, 1.8)], (240, 228, 214))
-    _door(p, left, front, (0.66, 0.88), 1.6, 5, DOOR)
-    _window(p, front, right, (0.35, 0.65), 1.6, shade(WINDOW, 0.8))
-    p.gable(top, 4, roof, wall)
-    _roof_rows(p, top, 4, roof)
-    p.rect(2, -13, 4, -6, BRICK)
-    p.line([(2, -11), (4, -11)], shade(BRICK, 1.3))
-    p.rect(1.5, -14, 4.5, -13, shade(BRICK, 0.6))
-    for x, y, r in ((3, -15, 1.2), (4, -16.5, 1.4)):
-        p.blob(x - r, y - r, x + r, y + r, (224, 222, 226))
-    p.line([(-4.5, -7), (-4.5, -6)], (60, 56, 54))
-    p.ellipse(-6, -6, -3, -4, loaf)
-    p.line([(-5, -5), (-4, -5.5)], shade(loaf, 1.3))
-    p.blob(3, 3, 7, 4.6, (226, 220, 204))
-    _sack(p, 4.5, 3.5, (220, 206, 176))
-    return p.sprite()
-
-
 def food_plant() -> Sprite:
     """A cannery: a pale hall under a green roof with a row of windows, a loading door with cart
     ruts worn out from it, a red label for a sign and crates of tins, beside two round banded
@@ -581,8 +550,9 @@ def steel_mill() -> Sprite:
     p.rect(10.5, -15, 12.5, -13, (110, 106, 110))
     p.rect(-9, -12, -6, -2, (238, 132, 40))
     p.point(-8, -10, (255, 214, 120))
-    _stack(p, -3, -9, -30, shade(BRICK, 0.7))
-    for i, (x, y, r) in enumerate([(-2, -33, 2), (0, -36, 3), (3, -39, 3.5)]):
+    cap = _stack(p, -3, -9, -30, shade(BRICK, 0.7))
+    for i, (x, y, r) in enumerate([(-2, -33, 2), (0, -36, 3)]):
+        y += cap + 30
         p.blob(x - r, y - r, x + r, y + r, (150, 148, 150) if i % 2 else (124, 122, 126))
     for gx, gy in ((-9.5, 3.4), (-8, 4.4)):
         p.point(gx, gy, (226, 120, 44))
@@ -593,26 +563,24 @@ def steel_mill() -> Sprite:
 
 
 def textile_mill() -> Sprite:
-    """A red-brick cotton mill of Łódź: a long block of storeys with rows of small arched windows
+    """A yellow-brick cotton mill of Łódź: a long block of storeys with rows of small arched windows
     over a dark plinth stained by the damp, a drainpipe and a cornice, a sawtooth weaving shed at
     its end, a tall banded round chimney, cart tracks worn out of both doors and bales of cloth
     by the door."""
-    p = Painter(37, 55, (17, 44))
-    wall, roof = (178, 78, 58), (80, 76, 84)
+    p = Painter(41, 55, (21, 44))
+    wall, roof = (206, 164, 92), (80, 76, 84)
     mill_foot, shed_foot = _footing(-4, -1, 14, 8), _footing(7, 4.5, 8, 8)
     _bed(p, mill_foot)
     _bed(p, shed_foot)
     p.shadow(15, 5, reach=4)
     _track(p, mill_foot[0], mill_foot[1], (0.68, 0.84), 3.5)
     _track(p, shed_foot[1], shed_foot[2], (0.4, 0.75), 3)
-    _chimney(p, 11, 0, -32, shade(wall, 0.92))
-    _smoke(p, 12, -35)
+    _smoking_chimney(p, 11, 0, -32, shade(wall, 0.92))
     top = p.hall(-4, -1, 14, 8, 15, wall, roof)
     left, front, right, _ = top
     _plinth(p, top, 15, wall)
     _stains(p, left, front, 15, (0.05, 0.24, 0.44, 0.94), shade(wall, 0.6), 2)
-    p.line([_on_wall(left, front, 0, 1), _on_wall(left, front, 1, 1)], shade(wall, 1.2))
-    p.line([_on_wall(front, right, 0, 1), _on_wall(front, right, 1, 1)], shade(wall, 0.95))
+    _bands(p, left, front, right, 1, shade(wall, 1.2), shade(wall, 0.95))
     p.line([left, front, right], shade(roof, 1.3))
     lintel = shade(wall, 1.3)
     _windows(p, left, front, (0.1, 0.3, 0.5, 0.7, 0.9), (3.5, 7, 10.5), 2, arch=lintel)
@@ -627,9 +595,112 @@ def textile_mill() -> Sprite:
     _door(p, shed[1], shed[2], (0.4, 0.75), 2, 5, (60, 44, 36), shade(wall, 1.1))
     _sawtooth(p, shed, 3, 4, (104, 100, 108), (160, 196, 218), wall)
     _windows(p, shed[0], shed[1], (0.2, 0.5, 0.8), (2.5,), 1, arch=lintel)
-    for x, y, colour in ((-10, 6, CLOTH[0]), (-6.5, 7.5, CLOTH[1]), (-10, 4, CLOTH[2])):
-        _bale(p, x, y, colour)
+    _spool(p, *_on_wall(left, front, 0.36, 3))
+    _drying_cloth(p, (-20, 1.5), (-6, 8.5), 8)
     return p.sprite()
+
+
+DYES: list[RGB] = [(206, 52, 50), (56, 98, 200), (238, 196, 56), (64, 158, 90), (150, 70, 170)]
+
+
+def _spool(p: Painter, x: float, y: float) -> None:
+    """A big cotton reel hung on a wall at (x, y) as a mill's sign, wound with red thread."""
+    p.line([(x, y - 1), (x, y + 1)], (60, 56, 54))
+    p.rect(x - 2.2, y + 1, x + 2.2, y + 1.8, (226, 200, 150))
+    p.rect(x - 1.5, y + 1.8, x + 1.5, y + 4.8, DYES[0])
+    p.line([(x - 1.5, y + 2.8), (x + 1.5, y + 2.8)], shade(DYES[0], 1.3))
+    p.rect(x - 2.2, y + 4.8, x + 2.2, y + 5.6, (226, 200, 150))
+
+
+def _drying_cloth(p: Painter, a: Point, b: Point, height: float) -> None:
+    """A rack of dyed cloth hung out to dry: a pole on two posts from `a` to `b` on the ground,
+    `height` up, with lengths of cloth in every dye hanging from it."""
+    post = (110, 84, 60)
+    for x, y in (a, b):
+        p.line([(x, y), (x, y - height)], post)
+    p.line([(a[0], a[1] - height), (b[0], b[1] - height)], shade(post, 1.2))
+    pieces = 5
+    for k in range(pieces):
+        t0, t1 = (k + 0.1) / pieces, (k + 0.9) / pieces
+        top0, top1 = _on_wall(a, b, t0, -height + 0.4), _on_wall(a, b, t1, -height + 0.4)
+        drop = height - 1.6 - 0.8 * (k % 2)
+        colour = DYES[k % len(DYES)]
+        p.polygon(
+            [top0, top1, (top1[0], top1[1] + drop), (top0[0], top0[1] + drop)],
+            colour,
+            shade(colour, 0.7),
+        )
+        p.line([top0, (top0[0], top0[1] + drop)], shade(colour, 1.25))
+
+
+def _hide_frame(p: Painter, x: float, y: float, hide: RGB) -> None:
+    """A hide stretched to dry on a wooden frame standing on (x, y), dripping on the ground."""
+    p.blob(x + 0.5, y - 0.5, x + 4, y + 1, (100, 108, 60))
+    p.line([(x, y), (x, y - 7)], FRAME)
+    p.line([(x + 4, y - 1), (x + 4, y - 8)], FRAME)
+    p.line([(x, y - 7), (x + 4, y - 8)], FRAME)
+    p.polygon(
+        [(x + 1, y - 6), (x + 3, y - 7), (x + 3.5, y - 2), (x + 2, y - 1.5), (x + 0.5, y - 1)],
+        hide,
+        shade(hide, 0.65),
+    )
+    p.line([(x + 1, y - 6), (x + 3, y - 7)], FRAME)
+
+
+def _chair(p: Painter, x0: float, y0: float, s: float, colour: RGB = CHAIR) -> None:
+    """A chair seen side on, standing on (x0, y0), `s` times the size of the small sign."""
+    pts = ((0, 0), (0, -7), (1, -7), (1, -3), (5, -3), (5, 0), (4, 0), (4, -2), (1, -2), (1, 0))
+    p.polygon([(x0 + dx * s, y0 + dy * s) for dx, dy in pts], colour)
+    p.line([(x0 + 1 * s, y0 - 3 * s), (x0 + 5 * s, y0 - 3 * s)], shade(colour, 1.35))
+
+
+def _plank_walls(p: Painter, top: Top, height: float) -> None:
+    left, front, right, _ = top
+    for drop in range(2, int(height), 2):
+        _bands(p, left, front, right, drop, shade(JOINER_WALL, 0.86), shade(JOINER_WALL, 0.68))
+    _plinth(p, top, height, JOINER_WALL)
+    _stains(p, front, right, height, (0.2, 0.55, 0.9), shade(JOINER_WALL, 0.55), 1.4)
+
+
+def _anvil(p: Painter, cx: float, cy: float, s: float = 1) -> None:
+    pts = ((-3, -1), (2, -1), (2, 0), (1, 0), (1, 1), (2, 2), (-2, 2), (-1, 1), (-1, 0), (-2, 0))
+    p.polygon([(cx + dx * s, cy + dy * s) for dx, dy in pts], ANVIL)
+    p.line([(cx - 2 * s, cy - s), (cx + 1 * s, cy - s)], (110, 110, 120))
+
+
+def _forge_stack(p: Painter, x: float, foot: float, top: float) -> float:
+    """A dark forge stack glowing at its cap, lowered (chimney_top); returns where its cap is."""
+    top = chimney_top(foot, top)
+    p.rect(x - 1, top, x + 1, foot, (74, 58, 52))
+    p.line([(x - 1, top + 2), (x + 1, top + 2)], (200, 190, 180))
+    p.rect(x - 1.5, top - 1, x + 1.5, top, (50, 40, 36))
+    p.point(x, top - 1, (255, 170, 60))
+    return top
+
+
+def _pagoda(p: Painter, x: float, y: float, size: float = 1) -> None:
+    """A whitewashed kiln vent on a roof at (x, y) under a flared slate pagoda cap."""
+    s = size
+    p.rect(x - 1.5 * s, y - 2 * s, x + 1.5 * s, y + 0.5, WHITEWASH)
+    p.line([(x - s, y - s), (x + s, y - s)], shade(WHITEWASH, 0.6))
+    p.polygon(
+        [
+            (x - 3 * s, y - 1.5 * s),
+            (x - s, y - 3 * s),
+            (x, y - 5 * s),
+            (x + s, y - 3 * s),
+            (x + 3 * s, y - 1.5 * s),
+        ],
+        STILL_SLATE,
+        shade(STILL_SLATE, 0.6),
+    )
+    p.point(x, y - 6 * s, (60, 60, 64))
+
+
+def _bundle(p: Painter, x: float, y: float) -> None:
+    """A bundle of papers tied with string, standing on (x, y)."""
+    bundle = p.box(x, y, 2, 1.6, BUNDLE, shade(BUNDLE, 1.04))
+    p.line([bundle[1], (bundle[1][0], bundle[1][1] + 1.6)], (150, 110, 80))
 
 
 def furniture_maker() -> Sprite:
@@ -642,7 +713,7 @@ def furniture_maker() -> Sprite:
     p.blob(1, -2, 15, 4, SOIL)
     p.shadow(12, 3.5)
     _track(p, foot[0], foot[1], (0.45, 0.82), 3)
-    wall, board, roof = (176, 134, 88), (226, 190, 134), (98, 74, 58)
+    wall, board, roof = JOINER_WALL, (226, 190, 134), (98, 74, 58)
     for x, y, h in ((9, -3, 6), (7, 2, 4)):
         for t in (0.15, 0.85):
             bx, by = _on_wall(*_footing(x, y, 8, 3)[:2], t, 0)
@@ -650,47 +721,19 @@ def furniture_maker() -> Sprite:
         stack = p.hall(x, y - 0.8, 8, 3, h, board, shade(board, 1.12))
         gap = shade(board, 0.5)
         for drop in range(2, h, 2):
-            p.line(
-                [_on_wall(stack[0], stack[1], 0, drop), _on_wall(stack[0], stack[1], 1, drop)], gap
-            )
-            p.line(
-                [_on_wall(stack[1], stack[2], 0, drop), _on_wall(stack[1], stack[2], 1, drop)], gap
-            )
+            _band(p, stack[0], stack[1], drop, gap)
+            _band(p, stack[1], stack[2], drop, gap)
         p.point(*_on_wall(stack[1], stack[2], 0.5, h - 1), shade(board, 0.7))
     top = p.box(-4, 0, 7, 6, wall, None)
     left, front, right, _ = top
-    for drop in (2, 4):
-        _band(p, left, front, drop, shade(wall, 0.86))
-        _band(p, front, right, drop, shade(wall, 0.68))
-    _plinth(p, top, 6, wall)
-    _stains(p, front, right, 6, (0.2, 0.55, 0.9), shade(wall, 0.55), 1.4)
+    _plank_walls(p, top, 6)
     _window(p, left, front, (0.1, 0.32), 1.8)
     _door(p, left, front, (0.45, 0.82), 1.8, 6, (56, 40, 30), shade(wall, 1.3))
     p.line([_on_wall(left, front, 0.635, 1.9), _on_wall(left, front, 0.635, 6)], (88, 64, 44))
     _window(p, front, right, (0.3, 0.6), 1.8, shade(WINDOW, 0.8))
     p.gable(top, 4, roof, wall)
     _roof_rows(p, top, 4, roof)
-    chair = (156, 62, 44)
-    x0, y0 = -6, -10
-    p.polygon(
-        [
-            (x0 + dx, y0 + dy)
-            for dx, dy in (
-                (0, 0),
-                (0, -7),
-                (1, -7),
-                (1, -3),
-                (5, -3),
-                (5, 0),
-                (4, 0),
-                (4, -2),
-                (1, -2),
-                (1, 0),
-            )
-        ],
-        chair,
-    )
-    p.line([(x0 + 1, y0 - 3), (x0 + 5, y0 - 3)], shade(chair, 1.35))
+    _chair(p, -6, -10, 1)
     sawdust = (222, 196, 140)
     p.blob(-12.5, 6.5, -6.5, 8.5, sawdust)
     p.point(-11, 7, shade(sawdust, 1.1))
@@ -725,34 +768,12 @@ def tool_works() -> Sprite:
         p.line([_on_wall(left, front, t, 1.9), _on_wall(left, front, t, 7)], shade(wall, 0.6))
     _patch(p, left, front, (0.03, 0.47), (0.5, 6), (214, 202, 176))
     _patch(p, left, front, (0.03, 0.47), (5.2, 6), shade((214, 202, 176), 0.8))
-    cx, cy = _on_wall(left, front, 0.25, 3.5)
-    p.polygon(
-        [
-            (cx + dx, cy + dy)
-            for dx, dy in (
-                (-3, -1),
-                (2, -1),
-                (2, 0),
-                (1, 0),
-                (1, 1),
-                (2, 2),
-                (-2, 2),
-                (-1, 1),
-                (-1, 0),
-                (-2, 0),
-            )
-        ],
-        (40, 40, 46),
-    )
-    p.line([(cx - 2, cy - 1), (cx + 1, cy - 1)], (110, 110, 120))
+    _anvil(p, *_on_wall(left, front, 0.25, 3.5))
     _windows(p, front, right, (0.3, 0.7), (3,), 1, (240, 150, 60), shade(wall, 1.5))
     p.gable(top, 4, roof, wall)
     _roof_rows(p, top, 4, roof)
-    p.rect(-1, -17, 1, -10, (74, 58, 52))
-    p.line([(-1, -15), (1, -15)], (200, 190, 180))
-    p.rect(-1.5, -18, 1.5, -17, (50, 40, 36))
-    p.point(0, -18, (255, 170, 60))
-    _smoke(p, 1, -21, (96, 94, 98))
+    cap = _forge_stack(p, 0, -10, -17)
+    _smoke(p, 1, cap - 4, (96, 94, 98))
     _heap(p, -9, 5, 3, 2.5, (48, 46, 50))
     p.point(-10, 3.5, (104, 104, 116))
     _puddle(p, 4, 4.6, 2.2)
@@ -892,8 +913,7 @@ def electronics_plant() -> Sprite:
     top = p.hall(0, 0, 15, 9, 8, wall, (172, 180, 190))
     left, front, right, _ = top
     _plinth(p, top, 8, wall)
-    _band(p, left, front, 7.9, (120, 124, 128))
-    _band(p, front, right, 7.9, (104, 108, 112))
+    _bands(p, left, front, right, 7.9, (120, 124, 128), (104, 108, 112))
     for d0, d1 in ((1.5, 3), (4.5, 6.5)):
         _patch(p, left, front, (0.04, 0.96), (d0, d1), glass)
         _patch(p, front, right, (0.06, 0.94), (d0, d1), shade(glass, 0.72))
@@ -942,8 +962,7 @@ def machine_works() -> Sprite:
     _plinth(p, top, 10, BRICK)
     _stains(p, left, front, 10, (0.04, 0.21, 0.39, 0.57, 0.73), shade(BRICK, 0.62), 2)
     _stains(p, front, right, 10, (0.2, 0.8), shade(BRICK, 0.5), 2)
-    _band(p, left, front, 1, lintel)
-    _band(p, front, right, 1, shade(BRICK, 1.05))
+    _bands(p, left, front, right, 1, lintel, shade(BRICK, 1.05))
     _windows(p, left, front, (0.12, 0.3, 0.48, 0.66), (2.5,), 5, arch=lintel)
     _windows(p, left, front, (0.12, 0.3, 0.48, 0.66), (8,), 1, shade(BRICK, 1.15))
     p.line([_on_wall(left, front, 0.76, 1.4), _on_wall(left, front, 0.76, 9.6)], (74, 64, 62))
@@ -993,13 +1012,12 @@ def brickworks() -> Sprite:
     _turned(p, x, y - 6, [(0, r + 1), (3, r - 4)], (96, 86, 86), cap=(118, 106, 104))
     for a in (0.5, 1.2, 1.9, 2.6):
         p.point(x + (r - 1) * math.cos(a), y - 7.5 + (r - 1) / 2 * math.sin(a), (60, 54, 54))
-    _chimney(p, x, y - 8, y - 35, shade(BRICK, 0.9))
-    _smoke(p, x + 1, y - 38, puffs=2)
+    _smoking_chimney(p, x, y - 8, y - 35, shade(BRICK, 0.9), puffs=2)
     _heap(p, -12, 7, 3, 2.5, (176, 122, 86))
     for bx, by in ((13, 2), (8.5, 5.5)):
         stack = p.hall(bx, by, 4, 3, 3, BRICK, shade(BRICK, 1.25))
         for a, b in ((stack[0], stack[1]), (stack[1], stack[2])):
-            p.line([_on_wall(a, b, 0, 1.5), _on_wall(a, b, 1, 1.5)], shade(BRICK, 1.3))
+            _band(p, a, b, 1.5, shade(BRICK, 1.3))
             p.line([_on_wall(a, b, 0.5, 0), _on_wall(a, b, 0.5, 1.5)], shade(BRICK, 0.7))
             p.line([_on_wall(a, b, 0.25, 1.5), _on_wall(a, b, 0.25, 3)], shade(BRICK, 0.7))
             p.line([_on_wall(a, b, 0.75, 1.5), _on_wall(a, b, 0.75, 3)], shade(BRICK, 0.7))
@@ -1020,10 +1038,7 @@ def cement_works() -> Sprite:
     _track(p, (4, 5), (13, 0.5), (0.25, 0.7), 4, shade(ground, 0.84))
     tower = p.box(9, -6, 3.5, 22, shade(grey, 0.9), shade(grey, 0.75))
     for drop in (4, 9, 14, 19):
-        p.line(
-            [_on_wall(tower[0], tower[1], 0, drop), _on_wall(tower[0], tower[1], 1, drop)],
-            shade(grey, 0.6),
-        )
+        _band(p, tower[0], tower[1], drop, shade(grey, 0.6))
         p.point(*_on_wall(tower[0], tower[1], 0.5, drop - 2.5), WINDOW)
         p.point(*_on_wall(tower[1], tower[2], 0.5, drop - 2.5), shade(WINDOW, 0.8))
     _plinth(p, tower, 22, shade(grey, 0.9))
@@ -1190,12 +1205,13 @@ def distillery() -> Sprite:
     p.shadow(13, 4)
     _track(p, foot[0], foot[1], (0.48, 0.68), 3.5)
     _puddle(p, 9, 7.5, 1.6)
-    slate = (68, 72, 82)
-    p.rect(3, -33, 4, -4, (150, 80, 60))
-    for y in (-31, -20):
+    slate = STILL_SLATE
+    cap = chimney_top(-4, -33)
+    p.rect(3, cap, 4, -4, (150, 80, 60))
+    for y in (cap + 2, (cap - 4) / 2):
         p.line([(3, y), (4, y)], (230, 228, 222))
-    p.rect(2.5, -34, 4.5, -33, (90, 52, 42))
-    _smoke(p, 4, -36, (190, 190, 194), 2)
+    p.rect(2.5, cap - 1, 4.5, cap, (90, 52, 42))
+    _smoke(p, 4, cap - 3, (190, 190, 194), 2)
     top = p.hall(-4, -1, 12, 7, 6, WHITEWASH, None)
     left, front, right, _ = top
     _patch(p, left, front, (0, 1), (5, 6), STONE)
@@ -1211,15 +1227,7 @@ def distillery() -> Sprite:
     _windows(p, front, right, (0.5,), (2,), 2, (44, 46, 52))
     p.gable(top, 4, slate, WHITEWASH)
     _roof_rows(p, top, 4, slate, (0.5,))
-    vx, vy = _on_roof(top, 4, 0.35, 1)
-    p.rect(vx - 1.5, vy - 2, vx + 1.5, vy + 0.5, WHITEWASH)
-    p.line([(vx - 1, vy - 1), (vx + 1, vy - 1)], shade(WHITEWASH, 0.6))
-    p.polygon(
-        [(vx - 3, vy - 1.5), (vx - 1, vy - 3), (vx, vy - 5), (vx + 1, vy - 3), (vx + 3, vy - 1.5)],
-        slate,
-        shade(slate, 0.6),
-    )
-    p.point(vx, vy - 6, (60, 60, 64))
+    _pagoda(p, *_on_roof(top, 4, 0.35, 1))
     _turned(p, 8, 5, [(0, 3), (2, 4), (4, 3.5), (6, 1.5), (7, 1)], COPPER)
     p.blob(5, -1, 7, 2, shade(COPPER, 1.3))
     _ring(p, 8, 2, 3.6, shade(COPPER, 0.7))
@@ -1272,19 +1280,8 @@ def tannery() -> Sprite:
     p.blob(-5, 4.5, -1, 6.5, (96, 66, 40))
     p.point(-4, 5, (140, 100, 62))
     _heap(p, -12, 7, 3, 2.5, (140, 92, 58))
-    frame = (104, 76, 50)
     for k, hide in enumerate(((198, 150, 100), (162, 108, 68), (214, 180, 130))):
-        x, y = 2 + 4 * k, 6 - 2 * k
-        p.blob(x + 0.5, y - 0.5, x + 4, y + 1, (100, 108, 60))
-        p.line([(x, y), (x, y - 7)], frame)
-        p.line([(x + 4, y - 1), (x + 4, y - 8)], frame)
-        p.line([(x, y - 7), (x + 4, y - 8)], frame)
-        p.polygon(
-            [(x + 1, y - 6), (x + 3, y - 7), (x + 3.5, y - 2), (x + 2, y - 1.5), (x + 0.5, y - 1)],
-            hide,
-            shade(hide, 0.65),
-        )
-        p.line([(x + 1, y - 6), (x + 3, y - 7)], frame)
+        _hide_frame(p, 2 + 4 * k, 6 - 2 * k, hide)
     return p.sprite()
 
 
@@ -1312,8 +1309,7 @@ def shoe_factory() -> Sprite:
     _plinth(p, top, 4 * floors, wall)
     _stains(p, front, right, 4 * floors, (0.15, 0.5, 0.85), shade(wall, 0.58), 1.5)
     for f in range(1, floors):
-        _band(p, left, front, 4 * f - 0.5, shade(wall, 1.15))
-        _band(p, front, right, 4 * f - 0.5, shade(wall, 0.85))
+        _bands(p, left, front, right, 4 * f - 0.5, shade(wall, 1.15), shade(wall, 0.85))
     for f in range(floors - 1):
         for t in (0.3, 0.7):
             _window(p, left, front, (t - 0.07, t + 0.07), 1.2 + 4 * f, tall=1.6)
@@ -1375,7 +1371,7 @@ def plastics_works() -> Sprite:
     left, front, right, _ = top
     _plinth(p, top, 5, white)
     _stains(p, front, right, 5, (0.15, 0.85), shade(white, 0.6), 1.2)
-    p.line([_on_wall(left, front, 0, 1), _on_wall(left, front, 1, 1)], red)
+    _band(p, left, front, 1, red)
     _windows(p, left, front, (0.25, 0.5, 0.75), (2.5,), 1, shade(blue, 0.8))
     _door(p, front, right, (0.3, 0.65), 2, 5, (70, 74, 84))
     for drop in (3, 4):
@@ -1412,8 +1408,7 @@ def appliance_factory() -> Sprite:
     left, front, right, back = top
     _plinth(p, top, 7, wall)
     _stains(p, front, right, 7, (0.2, 0.5, 0.8), shade(wall, 0.62), 1.2)
-    p.line([_on_wall(left, front, 0, 1), _on_wall(left, front, 1, 1)], stripe)
-    p.line([_on_wall(front, right, 0, 1), _on_wall(front, right, 1, 1)], shade(stripe, 0.8))
+    _bands(p, left, front, right, 1, stripe, shade(stripe, 0.8))
     p.line([left, front, right], shade(wall, 1.12))
     door = (170, 174, 180)
     _patch(p, left, front, (0.55, 0.88), (2.5, 7), door)
@@ -1447,10 +1442,7 @@ def appliance_factory() -> Sprite:
             p.blob(cx - 1, cy - 1, cx + 1, cy + 1, (64, 88, 118))
             p.point(cx - 0.5, cy - 0.5, (150, 176, 200))
         else:
-            p.line(
-                [_on_wall(crate[0], crate[1], 0, 2), _on_wall(crate[0], crate[1], 1, 2)],
-                shade(white, 0.55),
-            )
+            _band(p, crate[0], crate[1], 2, shade(white, 0.55))
             p.point(*_on_wall(crate[0], crate[1], 0.85, 3.5), shade(white, 0.5))
     return p.sprite()
 
@@ -1470,8 +1462,7 @@ def paper_mill() -> Sprite:
     p.blob(12, 4, 18, 8, (120, 96, 66))
     p.shadow(11, 4)
     _track(p, foot[1], foot[2], (0.4, 0.65), 4)
-    _chimney(p, 8, -4, -30)
-    _smoke(p, 9, -33)
+    _smoking_chimney(p, 8, -4, -30)
     wall, roof = (192, 168, 136), (100, 86, 80)
     top = p.hall(-1, -3, 12, 8, 9, wall, None)
     left, front, right, _ = top
@@ -1530,10 +1521,9 @@ def printing_works() -> Sprite:
     lintel = shade(wall, 1.12)
     _plinth(p, top, 12, wall)
     _stains(p, front, right, 12, (0.12, 0.38, 0.62, 0.88), shade(wall, 0.56), 1.5)
-    p.line([_on_wall(left, front, 0, 1), _on_wall(left, front, 1, 1)], lintel)
+    _band(p, left, front, 1, lintel)
     p.line([left, front, right], shade((110, 106, 116), 1.3))
-    _band(p, left, front, 7, shade(wall, 0.85))
-    _band(p, front, right, 7, shade(wall, 0.68))
+    _bands(p, left, front, right, 7, shade(wall, 0.85), shade(wall, 0.68))
     _windows(p, left, front, (0.2, 0.45, 0.7, 0.9), (2.5,), 4, arch=shade(wall, 0.75))
     _windows(p, left, front, (0.2, 0.45, 0.9), (8,), 3)
     _door(p, left, front, (0.58, 0.8), 8.5, 12, (70, 56, 48), shade(wall, 0.75))
@@ -1547,15 +1537,13 @@ def printing_works() -> Sprite:
     p.rect(-5, -21, -2, -19, (150, 150, 160))
     for y in (-21, -19):
         p.line([(0, y), (5, y)], (150, 150, 160))
-    paper = (236, 234, 224)
     for x, y, lift in ((6.5, 6, 0), (6.5, 6, 1.6), (10, 4.5, 0)):
-        bundle = p.box(x, y - lift, 2, 1.6, paper, shade(paper, 1.04))
-        p.line([bundle[1], (bundle[1][0], bundle[1][1] + 1.6)], (150, 110, 80))
+        _bundle(p, x, y - lift)
     return p.sprite()
 
 
 def sugar_refinery() -> Sprite:
-    """A tall brick refinery over a dark plinth stained by the damp, with rows of arched windows
+    """A tall refinery rendered sugar white over a dark plinth stained by the damp, with rows of arched windows
     and a cornice, a big banded square chimney, a cart track worn out of its door past a heap of
     sugar beet spreading over the ground, and white sacks and sugar loaves in blue paper at its
     foot."""
@@ -1567,21 +1555,21 @@ def sugar_refinery() -> Sprite:
     _spill(p, -12, 6, 2.5, beet)
     p.shadow(13, 4, reach=5)
     _track(p, foot[0], foot[1], (0.53, 0.77), 3.5)
-    wall = (184, 110, 74)
-    lintel = shade(wall, 1.25)
-    stack = p.box(8, -3, 2, 34, shade(wall, 0.9), (60, 52, 50))
+    wall = (232, 226, 210)
+    lintel = shade(wall, 1.1)
+    tall = 34 * CHIMNEY_SHARE
+    stack = p.box(8, -3, 2, tall, shade(BRICK, 0.95), (60, 52, 50))
     for a, b in ((stack[0], stack[1]), (stack[1], stack[2])):
         p.line([_on_wall(a, b, 0, 2), _on_wall(a, b, 1, 2)], (220, 220, 214))
-        p.line([_on_wall(a, b, 0, 14), _on_wall(a, b, 1, 14)], shade(wall, 0.65))
-        p.line([_on_wall(a, b, 0, 33), _on_wall(a, b, 1, 33)], shade(wall, 0.6))
-    _smoke(p, 9, -40, puffs=4)
+        _band(p, a, b, tall * 0.4, shade(wall, 0.65))
+        _band(p, a, b, tall - 1, shade(wall, 0.6))
+    _smoke(p, 9, -9 - tall, puffs=4)
     top = p.box(-3, 0, 8, 18, wall, (92, 86, 94))
     left, front, right, _ = top
     _plinth(p, top, 18, wall)
     _stains(p, left, front, 18, (0.08, 0.33, 0.85), shade(wall, 0.6), 2)
     _stains(p, front, right, 18, (0.15, 0.5, 0.85), shade(wall, 0.5), 2)
-    _band(p, left, front, 0.8, lintel)
-    _band(p, front, right, 0.8, shade(wall, 0.95))
+    _bands(p, left, front, right, 0.8, lintel, shade(wall, 0.95))
     p.line([left, front, right], shade((92, 86, 94), 1.3))
     _windows(p, left, front, (0.2, 0.45, 0.7, 0.92), (2.5, 6, 9.5, 13), 2, arch=lintel)
     _windows(p, left, front, (0.2, 0.92), (15.5,), 1)
@@ -1944,10 +1932,8 @@ def tank_factory() -> Sprite:
     ):
         top = p.hall(*_iso(0, 0, u, v), length, depth, height, shade(olive, tone), roof)
         for a, b in ((top[0], top[1]), (top[1], top[2])):
-            p.line([_on_wall(a, b, 0, 1), _on_wall(a, b, 1, 1)], shade(olive, 1.3))
-            p.line(
-                [_on_wall(a, b, 0, height - 1), _on_wall(a, b, 1, height - 1)], shade(olive, 0.7)
-            )
+            _band(p, a, b, 1, shade(olive, 1.3))
+            _band(p, a, b, height - 1, shade(olive, 0.7))
             for k in range(1, 6):
                 t = k / 6
                 p.line([_on_wall(a, b, t - 0.04, 2.5), _on_wall(a, b, t + 0.04, 2.5)], (34, 36, 30))
@@ -1983,8 +1969,7 @@ def mega_factory() -> Sprite:
     _puddle(p, *_iso(0, 0, 3, -9), 1.3)
     for u in (-9, -4, 1, 6):
         x, y = _iso(0, 0, u, 10)
-        _chimney(p, x, y - 4, y - 30, shade(BRICK, 0.8))
-        _smoke(p, x + 1, y - 33, (214, 214, 218))
+        _smoking_chimney(p, x, y - 4, y - 30, shade(BRICK, 0.8), smoke=(214, 214, 218))
     lintel = shade(BRICK, 1.3)
     for v, height, tone in ((6, 8, 0.9), (0, 9, 1.0), (-6, 7, 1.08)):
         wall = shade(BRICK, tone)
@@ -2080,8 +2065,7 @@ def power_plant() -> Sprite:
     _spill(p, cx, cy, 5, (48, 46, 50))
     _puddle(p, *_iso(0, 0, -8.5, -2), 1.3)
     cx, cy = _iso(0, 0, -9, 9)
-    _chimney(p, cx, cy - 4, cy - 38, shade(BRICK, 0.9))
-    _smoke(p, cx + 1, cy - 41, (124, 122, 126))
+    _smoking_chimney(p, cx, cy - 4, cy - 38, shade(BRICK, 0.9), smoke=(124, 122, 126))
     _cooling_tower(p, *_iso(0, 0, -2, 9.5))
     _pylon(p, *_iso(0, 0, -8, -8), -4)
     tx, ty = _iso(0, 0, -4.5, -6)
@@ -2101,8 +2085,7 @@ def power_plant() -> Sprite:
     left, front, right, _ = top
     window = (88, 112, 140)
     _plinth(p, top, 12, BRICK)
-    _band(p, left, front, 1, shade(BRICK, 1.3))
-    _band(p, front, right, 1, shade(BRICK, 1.05))
+    _bands(p, left, front, right, 1, shade(BRICK, 1.3), shade(BRICK, 1.05))
     _windows(p, left, front, (0.12, 0.3, 0.48, 0.66), (2.5,), 7, window, shade(BRICK, 1.3))
     _door(p, left, front, (0.8, 0.94), 7, 12, (58, 48, 44), shade(BRICK, 1.3))
     _windows(p, front, right, (0.3, 0.7), (2.5,), 7, shade(window, 0.8), shade(BRICK, 1.2))
@@ -2120,6 +2103,69 @@ def power_plant() -> Sprite:
     _heap(p, hx, hy, 5, 5, (48, 46, 50))
     for dx, dy in ((-2, -2), (0, -3), (2, -1), (-1, 0)):
         p.point(hx + dx, hy + dy, (104, 104, 116))
+    return p.sprite()
+
+
+def diesel_power_plant() -> Sprite:
+    """A diesel power station filling its cell: a long low engine hall in pale render with a row
+    of short exhaust stacks along its roof, white fuel tanks with stairs up their sides on a pad
+    behind, a transformer and a pylon carrying power lines away."""
+    p = Painter(50, 58, (24, 46))
+    plate = (164, 160, 152)
+    _plate(p, plate)
+    white = (224, 222, 216)
+    for u, v in ((-8, 7), (-2, 8.5), (4, 9)):
+        x, y = _iso(0, 0, u, v)
+        _turned(p, x, y, [(0, 3.2), (5, 3.2)], white, cap=shade(white, 1.08))
+        p.line([(x - 3, y - 0.5), (x - 0.5, y - 5)], shade(white, 0.62))
+    _pylon(p, *_iso(0, 0, -8, -8), -4)
+    wall = (206, 196, 176)
+    top = p.hall(*_iso(0, 0, -1, -1), 16, 6, 8, wall, None)
+    left, front, right, _ = top
+    _plinth(p, top, 8, shade(wall, 0.7))
+    _windows(
+        p, left, front, (0.15, 0.32, 0.5, 0.68, 0.85), (2.5,), 4, (88, 112, 140), shade(wall, 1.1)
+    )
+    _windows(p, front, right, (0.5,), (2.5,), 4, (70, 90, 112), shade(wall, 1.0))
+    p.gable(top, 2.5, (96, 92, 96), wall)
+    stack = (86, 84, 90)
+    for t in (0.2, 0.4, 0.6, 0.8):
+        x, y = _on_wall(left, front, t, -2)
+        p.line([(x + 2, y), (x + 2, y - 7)], stack)
+        p.line([(x + 3, y), (x + 3, y - 7)], shade(stack, 1.3))
+    _smoke(p, *_on_wall(left, front, 0.4, -10), (120, 118, 122), 2)
+    return p.sprite()
+
+
+def gas_power_plant() -> Sprite:
+    """A gas power station filling its cell: a modern turbine hall clad in grey-green panels, two
+    slim steel stacks, a round gas holder banded in green, a transformer yard and a pylon carrying
+    power lines away."""
+    p = Painter(50, 64, (24, 52))
+    plate = (166, 168, 162)
+    _plate(p, plate)
+    holder = (110, 140, 120)
+    x, y = _iso(0, 0, 6, 8)
+    _turned(p, x, y, [(0, 5.5), (12, 5.5), (13.5, 4.2)], holder)
+    for ring in (3, 6, 9):
+        p.line([(x - 6, y - ring), (x + 6, y - ring)], shade(holder, 0.7))
+    steel = (176, 180, 186)
+    for u in (-9, -6):
+        sx, sy = _iso(0, 0, u, 8)
+        p.line([(sx, sy), (sx, sy - 34)], shade(steel, 0.75))
+        p.line([(sx + 1, sy), (sx + 1, sy - 34)], steel)
+        p.line([(sx, sy - 31), (sx + 1, sy - 31)], (206, 60, 50))
+    _pylon(p, *_iso(0, 0, -8, -8), -4)
+    tx, ty = _iso(0, 0, 5, -7)
+    grey = (120, 126, 120)
+    p.box(tx, ty, 2, 2.5, grey, shade(grey, 1.15))
+    clad = (150, 170, 160)
+    top = p.hall(*_iso(0, 0, -2, -0.5), 13, 7, 11, clad, None)
+    left, front, right, _ = top
+    _plinth(p, top, 11, shade(clad, 0.7))
+    _bands(p, left, front, right, 7, shade(clad, 1.2), shade(clad, 1.05))
+    _windows(p, left, front, (0.2, 0.4, 0.6, 0.8), (2.5,), 3, (88, 112, 140), shade(clad, 1.2))
+    p.gable(top, 2, (100, 112, 108), clad)
     return p.sprite()
 
 
@@ -2234,12 +2280,24 @@ def railway_works() -> Sprite:
         _patch(p, left, front, (f - 0.07, f + 0.07), (2, 7), DOORWAY)
     p.rect(12, -22, 13.6, -6, shade(BRICK, 0.9))
     p.line([(12, -23), (13.6, -23)], shade(BRICK, 0.5))
-    engine = (40, 44, 48)
-    p.rect(-14, 2, -8, 5, engine)
-    p.rect(-9, 0, -7, 5, engine)
-    p.rect(-14, 0.6, -13, 2, engine)
-    p.point(-12, 5.5, (150, 40, 36))
-    p.point(-9.5, 5.5, (150, 40, 36))
-    for x in (2, 7):
-        p.rect(x, 4, x + 4, 6.5, (120, 64, 44))
+    _locomotive(p, -12, 6)
+    for x in (3, 8):
+        p.rect(x, 3.5, x + 4, 6.5, (120, 64, 44))
+        p.point(x + 1, 7, (40, 40, 44))
+        p.point(x + 3, 7, (40, 40, 44))
     return p.sprite()
+
+
+def _locomotive(p: Painter, x: float, y: float) -> None:
+    """A green steam locomotive with red wheels and a tall black funnel, standing on (x, y)."""
+    green, black, red = (48, 120, 72), (36, 38, 42), (190, 48, 40)
+    p.rect(x - 4, y - 5, x + 3, y - 2, green)
+    p.line([(x - 4, y - 4.4), (x + 3, y - 4.4)], shade(green, 1.4))
+    p.rect(x + 2, y - 7.5, x + 5.5, y - 2, shade(green, 0.85))
+    p.rect(x + 2.6, y - 6.8, x + 4.8, y - 5.4, WINDOW)
+    p.rect(x - 3.6, y - 8, x - 2.2, y - 5, black)
+    p.rect(x - 4.4, y - 8.8, x - 1.4, y - 8, black)
+    p.rect(x - 5, y - 2, x + 5.5, y - 1.2, black)
+    p.line([(x - 5.4, y - 2.6), (x - 5.4, y - 1)], red)
+    for wx in (x - 2.5, x, x + 3.2):
+        p.ellipse(wx - 1.1, y - 1.8, wx + 1.1, y + 0.4, red)

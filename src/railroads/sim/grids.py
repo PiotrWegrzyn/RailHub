@@ -17,9 +17,10 @@ from typing import ClassVar, Literal, Self
 import numpy as np
 import numpy.typing as npt
 
+from railroads.sim.geo import Coord
+
 type Cell = tuple[int, int]
 type GridKind = Literal["square", "hex"]
-type Coord = float | npt.NDArray[np.float64]
 type Index = int | npt.NDArray[np.int64]
 FloatArray = npt.NDArray[np.float64]
 IntArray = npt.NDArray[np.int64]
@@ -42,12 +43,8 @@ class Grid(ABC):
     km_per_cell: float
 
     kind: ClassVar[GridKind]
-    # How many equal turns of the view bring the grid back onto itself.
-    symmetry: ClassVar[int]
     # How far out a cell's corner is, as a share of the way to the cell beyond that corner.
     corner_share: ClassVar[float]
-    # Area of one cell, in square cell units.
-    cell_area: ClassVar[float]
 
     @classmethod
     @abstractmethod
@@ -75,6 +72,19 @@ class Grid(ABC):
     @abstractmethod
     def cell_at(self, x: Coord, y: Coord) -> tuple[Index, Index]:
         """The cell under each point; it can lie outside the grid."""
+
+    def cell_on_map(self, x: Coord, y: Coord) -> tuple[Index, Index]:
+        """The cell under each point, kept on the grid: a point beyond an edge takes the row or
+        column of that edge."""
+        rows, cols = self.cell_at(x, y)
+        return np.clip(rows, 0, self.rows - 1), np.clip(cols, 0, self.cols - 1)
+
+    def raster_cells(self, steps: int) -> tuple[Index, Index]:
+        """The cell under the middle of each point of a raster `steps` points to a cell unit
+        over the whole grid (cell_on_map)."""
+        width, height = self.size()
+        ys, xs = np.mgrid[0 : math.ceil(height * steps), 0 : math.ceil(width * steps)]
+        return self.cell_on_map((xs + 0.5) / steps, (ys + 0.5) / steps)
 
     @abstractmethod
     def neighbours(self, row: int, col: int) -> list[Cell]:
@@ -147,7 +157,11 @@ class Grid(ABC):
         return points
 
     def track_ends(self) -> tuple[int, ...]:
-        """The track points track may leave a cell by: every one."""
+        """The track points track may leave a cell by."""
+        return _track_ends(self)
+
+    def _find_track_ends(self) -> tuple[int, ...]:
+        """Every track point."""
         return tuple(range(len(self.track_steps())))
 
     def track_exit(self, cell: Cell, point: int) -> tuple[Cell, int]:
@@ -168,6 +182,9 @@ class Grid(ABC):
     def track_turn(self, start: int, end: int) -> float:
         """How many degrees track bends going into a cell at one track point and out at
         another."""
+        return _track_turn(self, start, end)
+
+    def _find_track_turn(self, start: int, end: int) -> float:
         points = self.track_points()
         heading_in = -points[start] / np.linalg.norm(points[start])
         heading_out = points[end] / np.linalg.norm(points[end])
@@ -177,9 +194,7 @@ class Grid(ABC):
 @dataclass(frozen=True, slots=True)
 class SquareGrid(Grid):
     kind: ClassVar[GridKind] = "square"
-    symmetry: ClassVar[int] = 4
     corner_share: ClassVar[float] = 1 / 2
-    cell_area: ClassVar[float] = 1.0
 
     @classmethod
     def covering(cls, width_km: float, height_km: float, km_per_cell: float) -> Self:
@@ -234,9 +249,7 @@ class HexGrid(Grid):
     """Hexagons with a point at the top, laid in rows; odd rows sit half a cell further east."""
 
     kind: ClassVar[GridKind] = "hex"
-    symmetry: ClassVar[int] = 6
     corner_share: ClassVar[float] = 1 / 3
-    cell_area: ClassVar[float] = math.sqrt(3) / 2
 
     @classmethod
     def covering(cls, width_km: float, height_km: float, km_per_cell: float) -> Self:
@@ -296,7 +309,7 @@ class HexGrid(Grid):
         angles = np.radians(np.arange(0, 360, 60))
         return np.column_stack([np.cos(angles), np.sin(angles)])
 
-    def track_ends(self) -> tuple[int, ...]:
+    def _find_track_ends(self) -> tuple[int, ...]:
         """The middle of every edge, and the top and bottom corners, through which track runs
         straight up and down along the edge between two cells: eight directions in all."""
         steps = self.track_steps()
@@ -335,3 +348,33 @@ def flat_within(grid: Grid, cell: Cell, steps: int) -> Within:
     cells.setflags(write=False)
     away.setflags(write=False)
     return Within(cells, away)
+
+
+@lru_cache(maxsize=WITHIN_KEPT)
+def flat_within_any(grid: Grid, cells: tuple[Cell, ...], steps: int) -> Within:
+    """The cells at most some steps from any of these cells, as flat_within, each as many steps
+    away as from the nearest of them: the reach of a station with more platforms."""
+    if len(cells) == 1:
+        return flat_within(grid, cells[0], steps)
+    parts = [flat_within(grid, cell, steps) for cell in cells]
+    found = np.concatenate([part.cells for part in parts])
+    away = np.concatenate([part.steps for part in parts])
+    order = np.lexsort((away, found))
+    found, away = found[order], away[order]
+    first = np.concatenate(([True], found[1:] != found[:-1]))
+    found, away = found[first], away[first]
+    nearest = np.argsort(away, kind="stable")
+    found, away = found[nearest], away[nearest]
+    found.setflags(write=False)
+    away.setflags(write=False)
+    return Within(found, away)
+
+
+@lru_cache(maxsize=64)
+def _track_ends(grid: Grid) -> tuple[int, ...]:
+    return grid._find_track_ends()
+
+
+@lru_cache(maxsize=4096)
+def _track_turn(grid: Grid, start: int, end: int) -> float:
+    return grid._find_track_turn(start, end)

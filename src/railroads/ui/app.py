@@ -1,4 +1,5 @@
 import argparse
+import gc
 import sys
 import time
 from collections.abc import Callable
@@ -15,7 +16,15 @@ from railroads.newgame import (
     allowed_start_year,
     make_game_steps,
 )
-from railroads.saves import ReusedMemory, SavedGame, SaveError, Saves, snapshot
+from railroads.saves import (
+    ReusedMemory,
+    SavedGame,
+    SaveError,
+    Saves,
+    Snapshot,
+    snapshot,
+    snapshot_steps,
+)
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
 from railroads.sim.game import Game
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
@@ -50,6 +59,9 @@ WINDOW_SIZE = (1280.0, 800.0)
 # each frame spending about WRITING_SECONDS on it: steps until that much has passed, one at least.
 WRITER = worker("saves")
 WRITING_SECONDS = 0.004
+# The least time between autosaves, in seconds of play: pickling the game stalls a frame, which at
+# the highest speed would come every few seconds.
+AUTOSAVE_GAP_S = 60.0
 
 
 class App:
@@ -77,10 +89,11 @@ class App:
         self._notice_until = 0.0
         self._autosaving: Future[object] | None = None
         self._autosave_due = False
+        self._autosaved_at = -AUTOSAVE_GAP_S
         # Kept between autosaves, which are written one at a time.
         self._autosave_memory = ReusedMemory()
-        # The month being done a step a frame, if one is.
-        self._turning: Steps[None] | None = None
+        # The month being done a step a frame, if one is, and whether it autosaved at its end.
+        self._turning: Steps[bool] | None = None
         # What the player asked to leave this game for: a save to load, or the main menu.
         self.load_wanted: str | None = None
         self.menu_wanted = False
@@ -158,17 +171,25 @@ class App:
             self._turning = self._months(dates)
             self._turn_once()
 
-    def _months(self, dates: list[str]) -> Steps[None]:
+    def _months(self, dates: list[str]) -> Steps[bool]:
+        """The months' steps and, if an autosave can start once they end, its snapshot's steps
+        while the game still waits; returns whether it started one."""
         for date in dates:
             yield from self.view.month_steps(self.rng, date)
+        if not self._can_autosave() or time.monotonic() - self._autosaved_at < AUTOSAVE_GAP_S:
+            return False
+        yield
+        self._autosaved_at = time.monotonic()
+        self._write_autosave((yield from snapshot_steps(self.saved(), self._autosave_memory)))
+        return True
 
     def _turn_once(self) -> None:
         assert self._turning is not None
         try:
             next(self._turning)
-        except StopIteration:
+        except StopIteration as done:
             self._turning = None
-            self._autosave_due = True
+            self._autosave_due = not done.value
 
     def _draw(self) -> None:
         draw_top_bar(self)
@@ -177,8 +198,14 @@ class App:
         self.tech.draw(self.view.railway.research)
         if self.reports.open:
             growth = self.view.growth
+            railway = self.view.railway
             self.reports.draw(
-                growth.history, growth.year, len(self.view.railway.stations()), growth.population()
+                growth.history,
+                growth.year,
+                len(railway.stations()),
+                growth.population(),
+                railway.finances,
+                railway.fuel,
             )
         self._draw_saves()
         typing = imgui.get_io().want_text_input
@@ -195,8 +222,6 @@ class App:
         """Has the next frame drawn at full speed while a train runs. A few seconds after the
         last input hello_imgui slows to 10 frames a second to save power, and running trains
         would move in jumps while the player only watches."""
-        if self.clock.finished:
-            return
         if any(train.path and not train.giving_way for train in self.view.railway.trains):
             hello_imgui.request_refresh()
 
@@ -211,19 +236,29 @@ class App:
     def autosave(self) -> None:
         """Starts writing the game as the newest autosave, unless the last one is still being
         written."""
-        if self.saves is None or self._autosaving is not None:
+        if not self._can_autosave():
             return
-        taken = snapshot(self.saved(), self._autosave_memory)
+        self._autosaved_at = time.monotonic()
+        self._write_autosave(snapshot(self.saved(), self._autosave_memory))
+
+    def _can_autosave(self) -> bool:
+        return self.saves is not None and self._autosaving is None
+
+    def _write_autosave(self, taken: Snapshot) -> None:
+        assert self.saves is not None
         if isinstance(WRITER, FrameWorker):
             self._autosaving = WRITER.submit_steps(self.saves.autosave_steps(taken))
         else:
             self._autosaving = WRITER.submit(self.saves.autosave, taken)
 
-    def _start_due_autosave(self) -> None:
-        """Starts the autosave a month asked for once the last one is written and no month is
-        half done, so a month that ends while an autosave is still being written is saved after
-        it rather than not at all."""
+    def _start_due_autosave(self, right_away: bool = False) -> None:
+        """Starts the autosave a month asked for once the last one is written, no month is half
+        done and, unless `right_away`, AUTOSAVE_GAP_S have passed since the last, so a month
+        that ends while an autosave is still being written is saved after it rather than not
+        at all."""
         if self._autosave_due and self._autosaving is None and self._turning is None:
+            if time.monotonic() - self._autosaved_at < AUTOSAVE_GAP_S and not right_away:
+                return
             self._autosave_due = False
             self.autosave()
 
@@ -231,11 +266,11 @@ class App:
         """Finishes a month being done, then waits for the autosave being written and for one
         that is due."""
         if self._turning is not None:
-            finish(self._turning)
+            autosaved = finish(self._turning)
             self._turning = None
-            self._autosave_due = True
+            self._autosave_due = not autosaved
         self._finish_writing()
-        self._start_due_autosave()
+        self._start_due_autosave(right_away=True)
         self._finish_writing()
 
     def _finish_writing(self) -> None:
@@ -363,7 +398,7 @@ class Shell:
             if new_game_on is not None:
                 app.view.visit_biggest_town()
             yield
-            app.view.prepare(size, density, chunks)
+            yield from app.view.prepare_steps(size, density, chunks)
             return app
 
         self._task = submit_steps(self._executor, prepared)
@@ -403,6 +438,7 @@ class Shell:
         if self.app is not None:
             self.app.finish_autosave()
         self.app = app
+        freeze_garbage()
         if self._new_game_on is not None:
             size = imgui.get_io().display_size
             # The see-through background as it shows over the black behind every window.
@@ -495,6 +531,16 @@ def settings_from(args: argparse.Namespace) -> Settings | None:
         start_year=allowed_start_year(HISTORY_START + years),
         stand_in_years=0 if args.simulate is None else args.simulate,
     )
+
+
+def freeze_garbage() -> None:
+    """Sets the objects of a game just begun or loaded, and those of the menu and the program,
+    aside from Python's garbage collector: they last as long as the game, and a full collection
+    walking them all stalls a frame for tens of milliseconds. What was set aside for a game left
+    is let back in first, so it can go."""
+    gc.unfreeze()
+    gc.collect()
+    gc.freeze()
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

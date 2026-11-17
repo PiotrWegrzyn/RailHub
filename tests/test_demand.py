@@ -1,7 +1,12 @@
 import pytest
 
-from railroads.sim.demand import PASSED_ALONG_PAY, StationDemand, capacity_of, price_of
-from railroads.sim.goods import Good, Need
+from railroads.sim.demand import (
+    DEMAND_PER_NEED,
+    StationDemand,
+    capacity_of,
+    price_of,
+)
+from railroads.sim.goods import FITS, Good, Need
 
 
 def test_demand_capacity_is_twice_what_the_buildings_need() -> None:
@@ -16,17 +21,6 @@ def test_the_first_unit_to_a_town_nobody_feeds_earns_the_full_price() -> None:
     earned = demand.deliver(Good.WHEAT, 1.0)
 
     assert earned == pytest.approx(price_of(Good.WHEAT))
-
-
-def test_goods_passed_along_earn_a_share_of_a_delivery_and_use_up_as_much_demand() -> None:
-    delivered = StationDemand(capacity={Need.FOOD: 20.0})
-    passed = StationDemand(capacity={Need.FOOD: 20.0})
-
-    full = delivered.pay(Need.FOOD, Good.WHEAT, 5.0)
-    share = passed.pay(Need.FOOD, Good.WHEAT, 5.0, PASSED_ALONG_PAY)
-
-    assert share == pytest.approx(PASSED_ALONG_PAY * full)
-    assert passed.record(Need.FOOD).left == delivered.record(Need.FOOD).left
 
 
 def test_each_unit_earns_at_the_share_of_demand_left_as_it_is_taken() -> None:
@@ -106,3 +100,15 @@ def test_loads_of_one_good_share_the_demand_left_for_it() -> None:
     first, second = demand.worth([(Good.COAL, 30.0), (Good.COAL, 30.0)])
 
     assert 0 < second < first
+
+
+def test_a_good_is_wanted_as_much_as_all_the_needs_it_meets_together() -> None:
+    demand = StationDemand()
+    demand.capacity = {need: 10.0 * (index + 1) for index, need in enumerate(Need)}
+
+    wanted = {good: demand.monthly_want(good) for good in Good}
+
+    assert wanted == {
+        good: sum(c for need, c in demand.capacity.items() if good in FITS[need]) / DEMAND_PER_NEED
+        for good in Good
+    }

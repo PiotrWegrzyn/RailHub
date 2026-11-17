@@ -34,8 +34,9 @@ from railroads.ui.iso_camera import IsoCamera, Vec2
 from railroads.ui.pixel.copies import ChunkJob
 from railroads.ui.pixel.painter import Painter
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, Rgba
+from railroads.ui.pixel.sheet import FINE
 from railroads.ui.pixel.web_painter import WorkerPainter, page_workers
-from railroads.ui.pixel.world import PixelWorld
+from railroads.ui.pixel.world import CLOSE, PixelWorld
 from railroads.ui.workers import threads_start
 
 # Time a frame may spend turning drawn chunks into textures; at least one is always made.
@@ -48,6 +49,9 @@ SETTLE_S = 0.3
 CHUNK_BUDGET = 128 * 1024 * 1024
 # Most bytes of chunk textures kept on the graphics card; the least recently shown go first.
 TEXTURE_BUDGET = 512 * 1024 * 1024
+# From how many screen points per art pixel the view is close: chunks are drawn CLOSE times finer,
+# so the ground, fields and woods keep their texture fine (PixelWorld.render).
+CLOSE_FROM = 4
 
 type ChunkKey = tuple[int, int]
 
@@ -62,6 +66,16 @@ def resolution_for(screen_pixels: int, resolutions: tuple[int, ...]) -> int:
     """The finest resolution a chunk can be drawn at that blows up evenly to `screen_pixels`
     for every art pixel."""
     return max(r for r in resolutions if screen_pixels % r == 0)
+
+
+def chunk_resolution(pixel_scale: int, density: int, resolutions: tuple[int, ...]) -> int:
+    """The resolution chunks are drawn at for a view `pixel_scale` screen points per art pixel on
+    a screen `density` pixels per point: CLOSE when the view is close and that blows up evenly,
+    otherwise the finest of `resolutions` that does."""
+    screen_pixels = pixel_scale * density
+    if pixel_scale >= CLOSE_FROM and screen_pixels % CLOSE == 0:
+        return CLOSE
+    return resolution_for(screen_pixels, resolutions)
 
 
 def painter_for(world: PixelWorld, threads: bool | None = None) -> Painter | WorkerPainter:
@@ -147,17 +161,10 @@ class PixelLayer:
     ) -> bool:
         """Draws the chunks on screen; returns whether all of them were ready. With
         `ground_below`, the ground already shows where a chunk is missing."""
-        camera_pixel = self.world.projection.to_pixels(camera.center_x, camera.center_y)
-        placement = ChunkPlacement.of(
-            self.world.projection,
-            (float(camera_pixel[0]), float(camera_pixel[1])),
-            camera.pixel_scale,
-            center,
-            clip,
-        )
+        placement = self._placement(camera, center, clip)
         density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
         scale = placement.scale * density
-        resolution = resolution_for(scale, self.world.resolutions)
+        resolution = chunk_resolution(placement.scale, density, self.world.resolutions)
         self.take_drawn()
         now = time.perf_counter()
         io = imgui.get_io()
@@ -167,21 +174,25 @@ class PixelLayer:
         complete = True
         for chunk in middle_out(placement, center):
             key = (*chunk, scale)
-            drawn = (*chunk, resolution)
+            fine = self._resolution_of(chunk, resolution)
+            drawn = (*chunk, fine)
             texture = self._textures.get(key)
             if texture is None or key in self._stale:
                 late = uploaded and time.perf_counter() - now > UPLOAD_BUDGET_S
                 if drawn in self._chunks and not late:
-                    texture = self._upload(chunk, scale)
+                    texture = self._upload(chunk, scale, fine)
                     self._stale.discard(key)
                     uploaded = True
                 else:
                     complete = False
                     self._ask(drawn, now)
                 if texture is None:
+                    texture = self._shown_before(chunk)
+                if texture is None:
                     continue
             self._refine(drawn, now)
-            self._textures.move_to_end(key)
+            if key in self._textures:
+                self._textures.move_to_end(key)
             top_left, bottom_right = placement.screen_rect(chunk)
             draw_list.add_image(imgui.ImTextureRef(texture.texture_id()), top_left, bottom_right)
         while len(self._textures) > 1 and self._texture_bytes() > TEXTURE_BUDGET:
@@ -195,19 +206,44 @@ class PixelLayer:
     ) -> None:
         """Draws the chunks this view would show, at most PREPARED_CHUNKS of them, on the calling
         thread, so they are ready for the first frame; for a game being loaded."""
+        placement = self._placement(camera, center, clip)
+        resolution = chunk_resolution(placement.scale, density, self.world.resolutions)
+        for chunk in placement.chunks[:PREPARED_CHUNKS]:
+            drawn = (*chunk, self._resolution_of(chunk, resolution))
+            if drawn not in self._chunks:
+                self._chunks[drawn] = self.world.render(*drawn)
+
+    def _resolution_of(self, chunk: ChunkKey, resolution: int) -> int:
+        """The resolution a chunk is drawn at in a view drawing chunks at `resolution`: in a close
+        view, where hills or mountains rise, no finer than FINE, whose raised ground is several
+        times quicker to draw and blown up looks as smooth."""
+        if resolution != CLOSE:
+            return resolution
+        rises = self._rises.get(chunk)
+        if rises is None:
+            rises = self._rises[chunk] = self.world.rises(*chunk)
+        return FINE if rises else resolution
+
+    def _shown_before(self, chunk: ChunkKey) -> Texture | None:
+        """The texture a chunk was last shown with at another zoom, to show stretched until it
+        is drawn for this one, rather than the bare ground beneath."""
+        for key in reversed(self._textures):
+            if key[:2] == chunk:
+                return self._textures[key]
+        return None
+
+    def _placement(
+        self, camera: IsoCamera, center: Vec2, clip: tuple[Vec2, Vec2]
+    ) -> ChunkPlacement:
+        """Where the chunks lie on screen in this view."""
         camera_pixel = self.world.projection.to_pixels(camera.center_x, camera.center_y)
-        placement = ChunkPlacement.of(
+        return ChunkPlacement.of(
             self.world.projection,
             (float(camera_pixel[0]), float(camera_pixel[1])),
             camera.pixel_scale,
             center,
             clip,
         )
-        resolution = resolution_for(placement.scale * density, self.world.resolutions)
-        for chunk in placement.chunks[:PREPARED_CHUNKS]:
-            drawn = (*chunk, resolution)
-            if drawn not in self._chunks:
-                self._chunks[drawn] = self.world.render(*drawn)
 
     def _moved(self, camera: IsoCamera, now: float, pointer: tuple = ()) -> bool:
         """Whether chunks drawn on frames must wait because the view or the mouse (`pointer`:
@@ -248,8 +284,7 @@ class PixelLayer:
     def _texture_bytes(self) -> int:
         return sum((CHUNK * key[2]) ** 2 * 4 for key in self._textures)
 
-    def _upload(self, chunk: ChunkKey, scale: int) -> Texture:
-        resolution = resolution_for(scale, self.world.resolutions)
+    def _upload(self, chunk: ChunkKey, scale: int, resolution: int) -> Texture:
         drawn = (*chunk, resolution)
         pixels = self._chunks[drawn]
         self._chunks.move_to_end(drawn)
@@ -258,8 +293,7 @@ class PixelLayer:
         if times > 1 and self.blow_up is not None:
             texture = self.blow_up(pixels, times)
         else:
-            big = blown_up(pixels, times)
-            texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big))
+            texture = blown_up_texture(pixels, times)
         self._textures[(*chunk, scale)] = texture
         return texture
 
@@ -272,6 +306,13 @@ def blown_up(pixels: Rgba, times: int) -> Rgba:
     if times == 1:
         return pixels
     return np.repeat(np.repeat(pixels, times, axis=0), times, axis=1)
+
+
+def blown_up_texture(pixels: Rgba, times: int) -> hello_imgui.TextureGpu:
+    """A texture of the pixels, each repeated `times` times each way (blown_up)."""
+    return hello_imgui.create_texture_gpu_from_rgba_data(
+        np.ascontiguousarray(blown_up(pixels, times))
+    )
 
 
 def middle_out(placement: ChunkPlacement, center: Vec2) -> list[ChunkKey]:

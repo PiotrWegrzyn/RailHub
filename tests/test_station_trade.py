@@ -14,6 +14,7 @@ def close_stations() -> tuple[Growth, Railway]:
     build_station(growth, (6, 10))
     build_station(growth, (6, 13))
     railway = Railway(constructions)
+    railway.levels = {(6, 10): 2, (6, 13): 2}
     growth.railway = railway
     return growth, railway
 
@@ -35,7 +36,7 @@ def test_stations_whose_rings_overlap_each_count_every_building_in_their_own_rin
         station: railway.station_demand(station).capacity[Need.PASSENGERS]
         for station in railway.stations()
     }
-    assert passengers == {(6, 10): DEMAND_PER_NEED * 6, (6, 13): DEMAND_PER_NEED * 10}
+    assert passengers == {(6, 10): DEMAND_PER_NEED * 3, (6, 13): DEMAND_PER_NEED * 5}
 
 
 def test_a_raised_station_counts_the_buildings_in_its_wider_ring() -> None:
@@ -43,12 +44,12 @@ def test_a_raised_station_counts_the_buildings_in_its_wider_ring() -> None:
     put_up(growth, (6, 7), 4)
     growth.trade_goods()
     before = railway.station_demand((6, 10)).capacity.get(Need.PASSENGERS)
-    railway.levels[(6, 10)] = 2
+    railway.levels[(6, 10)] = 3
 
     growth.trade_goods()
 
     assert before is None
-    assert railway.station_demand((6, 10)).capacity[Need.PASSENGERS] == DEMAND_PER_NEED * 8
+    assert railway.station_demand((6, 10)).capacity[Need.PASSENGERS] == DEMAND_PER_NEED * 4
 
 
 def test_the_cells_in_reach_are_every_cell_any_station_hands_goods_out_to() -> None:

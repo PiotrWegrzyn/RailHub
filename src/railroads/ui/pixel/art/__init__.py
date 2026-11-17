@@ -10,16 +10,32 @@ several families share are in parts. This module lists them all (SPRITES) and pa
 """
 
 from collections.abc import Callable
+from functools import cache, partial
 
 from PIL import Image
 
+from railroads.sim.constructions import BUILDING_RULES, MERGED, BuildingKind
+from railroads.ui.pixel.art import (
+    built_batch1,
+    built_batch2,
+    built_batch3,
+    built_batch4,
+    built_farms,
+    built_homes,
+    built_works,
+    grand_crafts,
+    grand_fire,
+    grand_food,
+    grand_modern,
+)
+from railroads.ui.pixel.art.built import modelled
+from railroads.ui.pixel.art.built_homes import home
 from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_pauls
 from railroads.ui.pixel.art.commerce import airport, department_store, hotel, port, shop, tavern
 from railroads.ui.pixel.art.crafts import (
     carpet_weaver,
     clock_maker,
     coke_plant,
-    dairy,
     foundry,
     hospital,
     manor,
@@ -47,10 +63,10 @@ from railroads.ui.pixel.art.farms import (
     potato_farm,
     sugar,
 )
+from railroads.ui.pixel.art.grown import grown
 from railroads.ui.pixel.art.homes import flats, house, skyscraper, tenement
 from railroads.ui.pixel.art.industry import (
     appliance_factory,
-    bakery,
     barrel_maker,
     big_factory,
     brewery,
@@ -58,11 +74,13 @@ from railroads.ui.pixel.art.industry import (
     car_factory,
     cement_works,
     chemical_works,
+    diesel_power_plant,
     distillery,
     electronics_plant,
     factory,
     food_plant,
     furniture_maker,
+    gas_power_plant,
     gasworks,
     glassworks,
     machine_works,
@@ -123,6 +141,22 @@ from railroads.ui.pixel.art.painter import (
     drawn_at,
     shade,
 )
+from railroads.ui.pixel.art.provisions import (
+    bakery,
+    big_bakery,
+    big_dairy,
+    dairy,
+    mega_bakery,
+    mega_dairy,
+)
+from railroads.ui.pixel.art.showpieces import (
+    big_clock_maker,
+    big_mirror_maker,
+    big_steel_mill,
+    mega_clock_maker,
+    mega_mirror_maker,
+    mega_steel_mill,
+)
 from railroads.ui.pixel.art.stations import TURNED_STATIONS, station, station_2, station_3
 
 __all__ = [
@@ -142,8 +176,8 @@ HOMES = ("house", "tenement", "flats")
 
 HOME_SCALE = 0.59
 
-# A farm's barn, an orchard's cottage and a bakery stand a touch bigger than a house.
-FARMSTEADS = ("farm", "orchard", "orange_farm", "bakery")
+# A farm's barn and an orchard's cottage stand a touch bigger than a house.
+FARMSTEADS = ("farm", "orchard", "orange_farm")
 
 FARMSTEAD_SCALE = 0.585
 
@@ -199,21 +233,31 @@ BUILDINGS = (
     "skyscraper",
     "food_plant",
     "bakery",
+    "big_bakery",
+    "mega_bakery",
     "gasworks",
     "coke_plant",
     "potter",
     "tile_works",
     "foundry",
     "dairy",
+    "big_dairy",
+    "mega_dairy",
     "sausage_maker",
     "carpet_weaver",
     "clock_maker",
+    "big_clock_maker",
+    "mega_clock_maker",
     "mirror_maker",
+    "big_mirror_maker",
+    "mega_mirror_maker",
     "manor",
     "theatre",
     "hospital",
     "railway_works",
     "steel_mill",
+    "big_steel_mill",
+    "mega_steel_mill",
     "shipyard",
     "mine",
     "lumber_mill",
@@ -246,6 +290,8 @@ BUILDINGS = (
     "hotel",
     "meat_factory",
     "power_plant",
+    "diesel_power_plant",
+    "gas_power_plant",
     "space_center",
     "pear_hq",
     "royal_palace",
@@ -319,24 +365,37 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "station": station,
     "station_2": station_2,
     "station_3": station_3,
+    "station_4": station_3,
+    "station_5": station_3,
+    "platform": station,
     **TURNED_STATIONS,
     "food_plant": food_plant,
     "bakery": bakery,
+    "big_bakery": big_bakery,
+    "mega_bakery": mega_bakery,
     "gasworks": gasworks,
     "coke_plant": coke_plant,
     "potter": potter,
     "tile_works": tile_works,
     "foundry": foundry,
     "dairy": dairy,
+    "big_dairy": big_dairy,
+    "mega_dairy": mega_dairy,
     "sausage_maker": sausage_maker,
     "carpet_weaver": carpet_weaver,
     "clock_maker": clock_maker,
+    "big_clock_maker": big_clock_maker,
+    "mega_clock_maker": mega_clock_maker,
     "mirror_maker": mirror_maker,
+    "big_mirror_maker": big_mirror_maker,
+    "mega_mirror_maker": mega_mirror_maker,
     "manor": manor,
     "theatre": theatre,
     "hospital": hospital,
     "railway_works": railway_works,
     "steel_mill": steel_mill,
+    "big_steel_mill": big_steel_mill,
+    "mega_steel_mill": mega_steel_mill,
     "shipyard": shipyard,
     "clay_pit": clay_pit,
     "limestone_quarry": limestone_quarry,
@@ -366,6 +425,8 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "hotel": hotel,
     "meat_factory": meat_factory,
     "power_plant": power_plant,
+    "diesel_power_plant": diesel_power_plant,
+    "gas_power_plant": gas_power_plant,
     "space_center": space_center,
     "pear_hq": pear_hq,
     "royal_palace": royal_palace,
@@ -376,6 +437,108 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "amusement_park": amusement_park,
     "olympic_stadium": olympic_stadium,
 }
+
+# Buildings drawn from 3D models (railroads.ui.pixel.art.built) at every zoom, shaped and coloured
+# like the painted sprites they took the place of: on the sheet small, and up close as fine as the
+# screen with their fine details.
+MODELS: dict[str, Callable[[], Sprite]] = {
+    **{
+        f"house_{i}": home(lambda w=WALLS[i % 3], r=ROOFS[i % 4]: built_homes.house(w, r))
+        for i in range(12)
+    },
+    **{
+        f"tenement_{i}": home(lambda w=w, r=TENEMENT_ROOFS[i % 2]: built_homes.tenement(w, r))
+        for i, w in enumerate(TENEMENT_WALLS)
+    },
+    **{f"flats_{i}": home(lambda w=w: built_homes.flats(w)) for i, w in enumerate(FLAT_WALLS)},
+    "skyscraper": home(built_homes.skyscraper),
+    "farm": modelled(built_farms.farm),
+    "orchard": modelled(built_farms.orchard),
+    "orange_farm": modelled(lambda: built_farms.orchard([(244, 142, 36)])),
+    "potato_farm": modelled(built_farms.potato_farm),
+    "bakery": modelled(built_works.bakery),
+    "lumber_mill": modelled(built_works.lumber_mill),
+    "distillery": modelled(built_works.distillery),
+    "tavern": modelled(built_works.tavern),
+    "gasworks": modelled(built_works.gasworks),
+    "sausage_maker": modelled(built_batch1.sausage_maker),
+    "chicken_farm": modelled(built_batch1.chicken_farm),
+    "cattle_ranch": modelled(built_batch1.cattle_ranch),
+    "meat_factory": modelled(built_batch1.meat_factory),
+    "pig_farm": modelled(built_batch1.pig_farm),
+    "brewery": modelled(built_batch1.brewery),
+    "dairy": modelled(built_batch1.dairy),
+    "mine": modelled(built_batch1.mine),
+    "iron_mine": modelled(lambda: built_batch1.shaft_mine((104, 72, 62), (176, 98, 70))),
+    "copper_mine": modelled(lambda: built_batch1.shaft_mine((96, 84, 66), (206, 130, 76))),
+    "gold_mine": modelled(lambda: built_batch1.shaft_mine((88, 78, 62), (255, 214, 60))),
+    "diamond_mine": modelled(lambda: built_batch1.shaft_mine((58, 60, 72), (190, 238, 255))),
+    "winery": modelled(built_batch2.winery),
+    "car_dealer": modelled(
+        lambda: built_batch2.shop((226, 224, 218), (236, 80, 132), (60, 90, 170))
+    ),
+    "jeweller": modelled(lambda: built_batch2.shop((70, 62, 84), (232, 190, 70), (190, 238, 255))),
+    "fishery": modelled(built_batch2.fishery),
+    "hop_garden": modelled(built_batch2.hop_garden),
+    "beekeeper": modelled(built_batch2.beekeeper),
+    "potter": modelled(built_batch2.potter),
+    "sugar_refinery": modelled(built_batch2.sugar_refinery),
+    "furniture_maker": modelled(built_batch2.furniture_maker),
+    "flax_field": modelled(built_batch2.flax_field),
+    "sugar": modelled(built_batch2.sugar),
+    "factory": modelled(built_batch3.factory),
+    "textile_mill": modelled(built_batch3.textile_mill),
+    "tool_works": modelled(built_batch3.tool_works),
+    "tannery": modelled(built_batch3.tannery),
+    "foundry": modelled(built_batch3.foundry),
+    "tile_works": modelled(built_batch3.tile_works),
+    "clay_pit": modelled(built_batch3.clay_pit),
+    "sand_pit": modelled(built_batch3.sand_pit),
+    "limestone_quarry": modelled(built_batch3.limestone_quarry),
+    "glassworks": modelled(built_batch3.glassworks),
+    "brickworks": modelled(built_batch3.brickworks),
+    "machine_works": modelled(built_batch3.machine_works),
+    "steel_mill": modelled(built_batch3.steel_mill),
+    "cement_works": modelled(built_batch3.cement_works),
+    "shoe_factory": modelled(built_batch4.shoe_factory),
+    "plastics_works": modelled(built_batch4.plastics_works),
+    "appliance_factory": modelled(built_batch4.appliance_factory),
+    "paper_mill": modelled(built_batch4.paper_mill),
+    "printing_works": modelled(built_batch4.printing_works),
+    "porcelain_works": modelled(built_batch4.porcelain_works),
+    "refinery": modelled(built_batch4.refinery),
+    "chemical_works": modelled(built_batch4.chemical_works),
+    "electronics_plant": modelled(built_batch4.electronics_plant),
+    "car_factory": modelled(built_batch4.car_factory),
+    "barrel_maker": modelled(built_batch4.barrel_maker),
+    "coke_plant": modelled(built_batch4.coke_plant),
+}
+# The kinds drawn from their models: buildings are pixel art, but for the gasworks, whose painted
+# gasholder gave way to its brick rotunda. Every other model stays to hand for a 3D look.
+DRAWN_FROM_MODELS = ("gasworks",)
+SPRITES |= {name: MODELS[name] for name in DRAWN_FROM_MODELS}
+
+# Big and mega works drawn as buildings of their own, by trade.
+for _module in (grand_fire, grand_food, grand_crafts, grand_modern):
+    SPRITES |= {
+        name: draw
+        for name, draw in vars(_module).items()
+        if name.startswith(("big_", "mega_")) and callable(draw)
+    }
+
+# Works merge into big and mega ones (railroads.sim.constructions.MERGED): unless they have
+# sprites of their own, a big works is two of the buildings of the works it grew from and a mega
+# works three (railroads.ui.pixel.art.grown), no wider on the map than GROWN_WIDTH pixels.
+GROWN_WIDTH = {"big": 38, "mega": 46}
+
+for _kind in MERGED:
+    _base = _kind.name.lower()
+    if _base in SPRITES:
+        for _size, _most in GROWN_WIDTH.items():
+            SPRITES.setdefault(
+                f"{_size}_{_base}",
+                partial(grown, SPRITES[_base], _size, _most / BUILDING_SCALE),
+            )
 
 
 def shrink(sprite: Sprite, factor: float) -> Sprite:
@@ -389,12 +552,51 @@ def shrink(sprite: Sprite, factor: float) -> Sprite:
     return Sprite(small, (round(ax * factor), round(ay * factor)))
 
 
-def _scale_of(name: str) -> float:
+# How wide a works may be drawn at most, in pixels, so it stands inside its cell, which is about
+# 25 pixels across: by how much of the cell it takes (railroads.sim.constructions.BUILDING_RULES),
+# and for big and mega works by their size, a mega one as wide as the cell.
+MOST_WIDTH = {1: 20, 2: 20, 3: 22, 4: 23, 5: 23, 6: 23}
+GROWN_MOST_WIDTH = {"big": 25, "mega": 26}
+# How much smaller a works is tried again when shrinking it pixel by pixel left it too wide.
+SHRINK_STEP = 0.98
+
+
+def _base_scale(name: str) -> float:
+    size, _, base = name.partition("_")
+    if size in GROWN_WIDTH and name not in BUILDINGS and base in SPRITES:
+        return _base_scale(base)
     if name.startswith(HOMES):
         return HOME_SCALE
     if name in FARMSTEADS:
         return FARMSTEAD_SCALE
     return BUILDING_SCALE if name.startswith(BUILDINGS) else 1.0
+
+
+@cache
+def _full_size(name: str) -> Sprite:
+    with drawn_at(1):
+        return SPRITES[name]()
+
+
+def _width(sprite: Sprite) -> int:
+    """How many pixels wide a sprite is, from its leftmost painted pixel to its rightmost."""
+    box = sprite.image.getchannel("A").getbbox()
+    return 1 if box is None else box[2] - box[0]
+
+
+def _scale_of(name: str) -> float:
+    """How big a sprite is drawn on the map: its kind's scale, and smaller still if that would
+    make a works wider than MOST_WIDTH lets it be."""
+    scale = _base_scale(name)
+    kind = BuildingKind.__members__.get(name.upper())
+    if kind is None or name in FARMSTEADS:
+        return scale
+    most = GROWN_MOST_WIDTH.get(name.partition("_")[0], MOST_WIDTH[BUILDING_RULES[kind].space])
+    full = _full_size(name)
+    scale = min(scale, most / _width(full))
+    while _width(shrink(full, scale)) > most:
+        scale *= SHRINK_STEP
+    return scale
 
 
 def fine_sprite(name: str, resolution: int) -> Sprite:
@@ -409,9 +611,15 @@ def draw_sheet(padding: int = 1, resolution: int = 1) -> tuple[Image.Image, dict
     anchor inside it. Buildings other than stations are drawn at BUILDING_SCALE, houses,
     tenements and flats at HOME_SCALE, and farms and orchards at FARMSTEAD_SCALE. At a
     resolution above 1 each sprite is drawn that many times finer (fine_sprite) rather than
-    shrunk from its full size."""
+    shrunk from its full size; one drawn from a model is shrunk from its drawing at 2, so both
+    sheets hold it alike."""
     if resolution == 1:
-        sprites = {name: shrink(draw(), _scale_of(name)) for name, draw in SPRITES.items()}
+        sprites = {
+            name: shrink(fine_sprite(name, 2), 0.5)
+            if name in DRAWN_FROM_MODELS
+            else shrink(draw(), _scale_of(name))
+            for name, draw in SPRITES.items()
+        }
     else:
         sprites = {name: fine_sprite(name, resolution) for name in SPRITES}
     width = 128 * resolution

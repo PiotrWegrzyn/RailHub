@@ -13,7 +13,6 @@ folder, downloads each one from world/ beside its page when it is first needed."
 
 import io
 import sys
-import zlib
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from functools import cache, cached_property
@@ -26,10 +25,10 @@ import numpy.typing as npt
 from railroads.mapgen.presets import NaturalEarth
 from railroads.mapgen.sources import Shape
 from railroads.mapgen.terrain_tiles import (
-    TILE_SIZE,
     HeightTile,
     TileElevation,
     elevation_from_tiles,
+    unpack_tile,
 )
 from railroads.sim.geo import Bounds
 
@@ -208,15 +207,6 @@ def shapes_file(col: int, row: int) -> str:
 
 def places_file(col: int, row: int) -> str:
     return f"places/{col}_{row}.npz"
-
-
-def pack_tile(heights: HeightTile) -> bytes:
-    return zlib.compress(heights.astype("<i2").tobytes(), 9)
-
-
-def unpack_tile(data: bytes) -> HeightTile:
-    heights = np.frombuffer(zlib.decompress(data), dtype="<i2")
-    return heights.reshape(TILE_SIZE, TILE_SIZE).astype(np.int16)
 
 
 def square_of(lon: float, lat: float) -> tuple[int, int]:

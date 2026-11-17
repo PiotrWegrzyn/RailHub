@@ -7,7 +7,7 @@ from railroads.sim.grids import HexGrid
 from railroads.sim.trains import ENGINES as ROSTER
 from railroads.sim.trains import Car, Power, Train
 from railroads.ui.pixel.projection import PixelProjection
-from railroads.ui.pixel.train_layer import TrainLayer
+from railroads.ui.pixel.train_layer import TrainLayer, engine_picture
 from railroads.ui.pixel.trains import ENGINES, MODELS, Look, train_sprites
 
 
@@ -73,3 +73,29 @@ def test_the_dining_car_is_on_the_sheet_and_unlike_a_coach() -> None:
 
     assert Look.DINING in MODELS
     assert dining.shape != coach.shape or not np.array_equal(dining, coach)
+
+
+def test_an_engine_is_pictured_on_its_own_with_its_tender_behind_it() -> None:
+    projection = PixelProjection.of(HexGrid(rows=10, cols=10, km_per_cell=2.0), 0.0, 1.0)
+    sprites = train_sprites(sheet_key())
+    name = next(name for name, model in ENGINES.items() if model.tender is not None)
+    _, _, engine_width, _, _, _ = sprites.place((Look.ENGINE, name), 0.0)
+
+    pixels = engine_picture(sprites, projection.matrix, name)
+
+    assert pixels.shape[2] == 4
+    assert pixels[..., 3].any()
+    assert pixels.shape[1] > engine_width
+
+
+def test_an_engine_pictured_finer_is_as_many_times_as_big_with_more_colours() -> None:
+    projection = PixelProjection.of(HexGrid(rows=10, cols=10, km_per_cell=2.0), 0.0, 1.0)
+    sprites = train_sprites(sheet_key())
+    coarse = engine_picture(sprites, projection.matrix, "pacific")
+
+    fine = engine_picture(sprites, projection.matrix, "pacific", 3)
+
+    assert 2.5 * coarse.shape[1] < fine.shape[1] < 3.5 * coarse.shape[1]
+    assert len(np.unique(fine.reshape(-1, 4), axis=0)) > len(
+        np.unique(coarse.reshape(-1, 4), axis=0)
+    )

@@ -11,9 +11,10 @@ from imgui_bundle import hello_imgui, imgui
 from imgui_bundle import icons_fontawesome_4 as fa
 from PIL import Image
 
-from railroads.sim.goods import Good, Need
+from railroads.sim.goods import General, Good, Need
 from railroads.sim.trains import car_size
 from railroads.ui.pixel.good_icons import ICON_PIXELS, ICONS_INDEX, ICONS_PNG
+from railroads.ui.pixel.layer import blown_up_texture
 
 type Rgba = tuple[float, float, float, float]
 
@@ -31,7 +32,7 @@ DANGER = (0.62, 0.2, 0.16, 1.0)
 DANGER_HOVER = (0.78, 0.27, 0.2, 1.0)
 OVERLAY = (0.08, 0.07, 0.06, 0.72)
 # How each satisfaction reads in lists of buildings.
-MOODS: dict[str, tuple[float, float, float, float]] = {
+MOODS: dict[str, Rgba] = {
     "thriving": (0.5, 0.84, 0.42, 1.0),
     "content": (0.95, 0.8, 0.38, 1.0),
     "unsatisfied": (0.9, 0.45, 0.38, 1.0),
@@ -116,6 +117,7 @@ GOOD_COLORS: Mapping[Good, Rgba] = {
     Good.STOVE_TILES: (0.35, 0.55, 0.75, 1.0),
     Good.CASTINGS: (0.4, 0.4, 0.44, 1.0),
     Good.SAUSAGES: (0.7, 0.3, 0.24, 1.0),
+    Good.JUICE: (0.96, 0.6, 0.16, 1.0),
     Good.LUXURIES: (0.6, 0.3, 0.65, 1.0),
 }
 CAR_EMPTY = (0.17, 0.15, 0.13, 1.0)
@@ -130,6 +132,27 @@ ICON_TEXTURE_SCALE = 8
 GOOD_ITEM_WIDTH = 78.0
 # Room the monthly summary cards take along the right edge of the map; windows open beside it.
 CARDS_WIDTH = 278.0
+# Where windows open: big ones just under the top bar, and a cell's or station's details down the
+# left side of the map.
+WINDOW_TOP = 56.0
+SIDE_WINDOW_POS = (16.0, 96.0)
+
+# Panels laid over the map: no title or border, sized to what they hold, and never taking the
+# keyboard or a saved place.
+OVERLAY_FLAGS = (
+    imgui.WindowFlags_.no_decoration.value
+    | imgui.WindowFlags_.always_auto_resize.value
+    | imgui.WindowFlags_.no_saved_settings.value
+    | imgui.WindowFlags_.no_focus_on_appearing.value
+    | imgui.WindowFlags_.no_nav.value
+)
+# Long lists in tables: striped rows under headers that stay put while the rows scroll.
+LIST_TABLE_FLAGS = (
+    imgui.TableFlags_.row_bg.value
+    | imgui.TableFlags_.borders_inner_h.value
+    | imgui.TableFlags_.scroll_y.value
+    | imgui.TableFlags_.sizing_fixed_fit.value
+)
 
 
 def apply_theme() -> None:
@@ -203,6 +226,17 @@ def color_u32(rgba: Rgba) -> int:
     return imgui.get_color_u32(imgui.ImVec4(*rgba))
 
 
+def rgba_u32(rgba: Rgba) -> int:
+    """A colour packed for a draw list as it is, leaving out the style's alpha."""
+    return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))
+
+
+def tip(text: str) -> None:
+    """Shows `text` while the last item is hovered."""
+    if imgui.is_item_hovered():
+        imgui.set_tooltip(text)
+
+
 def toggle_button(
     label: str, on: bool, tooltip: str = "", size: tuple[float, float] = (0, 0)
 ) -> bool:
@@ -214,8 +248,8 @@ def toggle_button(
     clicked = imgui.button(label, size)
     if on:
         imgui.pop_style_color(3)
-    if tooltip and imgui.is_item_hovered():
-        imgui.set_tooltip(tooltip)
+    if tooltip:
+        tip(tooltip)
     return clicked
 
 
@@ -238,20 +272,17 @@ class IconAtlas:
 def _icon_atlas() -> IconAtlas:
     with Image.open(ICONS_PNG) as sheet:
         rgba = np.asarray(sheet.convert("RGBA"), dtype=np.uint8)
-    big = np.repeat(np.repeat(rgba, ICON_TEXTURE_SCALE, axis=0), ICON_TEXTURE_SCALE, axis=1)
     height, width = rgba.shape[:2]
     places = {
         name: ((x / width, y / height), ((x + ICON_PIXELS) / width, (y + ICON_PIXELS) / height))
         for name, (x, y) in json.loads(ICONS_INDEX.read_text()).items()
     }
-    return IconAtlas(
-        hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(big)), places
-    )
+    return IconAtlas(blown_up_texture(rgba, ICON_TEXTURE_SCALE), places)
 
 
 def draw_good_icon(
     draw_list: imgui.ImDrawList,
-    good: Good | Need,
+    good: Good | Need | General,
     top_left: tuple[float, float],
     size: float = ICON_SIZE,
 ) -> None:
@@ -271,8 +302,7 @@ def good_icon(good: Good | Need, *, framed: bool = False, size: float = ICON_SIZ
     imgui.dummy((size, height))
     low = imgui.get_item_rect_min()
     draw_good_icon(imgui.get_window_draw_list(), good, (low.x, low.y + (height - size) / 2), size)
-    if imgui.is_item_hovered():
-        imgui.set_tooltip(good.value)
+    tip(good.value)
 
 
 def good_amount(good: Good | Need, amount: str, *, framed: bool = False) -> None:
@@ -284,43 +314,97 @@ def good_amount(good: Good | Need, amount: str, *, framed: bool = False) -> None
 
 def car_chip(
     key: str,
-    good: Good,
+    good: Good | General,
     load: float | None = None,
     tooltip: str = "",
     capacity: float | None = None,
 ) -> bool:
     """A car drawn as a small upright chip with its good's icon, filled from the bottom by its
     load out of its capacity when one is given; returns whether it was clicked."""
-    clicked = imgui.invisible_button(key, CHIP_SIZE)
-    low = imgui.get_item_rect_min()
-    high = imgui.get_item_rect_max()
-    draw_list = imgui.get_window_draw_list()
-    draw_list.add_rect_filled(low, high, color_u32(CAR_EMPTY), 3.0)
-    if load is not None:
-        share = max(0.0, min(1.0, load / (capacity or car_size(good))))
-        if share > 0:
-            top = high.y - (high.y - low.y) * share
-            draw_list.add_rect_filled((low.x, top), high, color_u32(CAR_LOADED), 3.0)
+    clicked, draw_list, low, high = _chip(key)
+    _draw_load(draw_list, good, load, capacity, low, high, 3.0)
     icon_x = low.x + (CHIP_SIZE[0] - CHIP_ICON) / 2
     draw_good_icon(draw_list, good, (icon_x, low.y + (CHIP_SIZE[1] - CHIP_ICON) / 2), CHIP_ICON)
-    hovered = imgui.is_item_hovered()
-    edge = BRASS if hovered else (0.0, 0.0, 0.0, 0.6)
-    draw_list.add_rect(low, high, color_u32(edge), 3.0, 1.5 if hovered else 1.0)
-    if tooltip and hovered:
-        imgui.set_tooltip(tooltip)
+    _chip_edge(draw_list, low, high, tooltip)
     return clicked
 
 
 def dining_chip(key: str, tooltip: str = "") -> None:
     """An express's dining car as a chip like car_chip's, with a cup on it."""
-    imgui.invisible_button(key, CHIP_SIZE)
+    _, draw_list, low, high = _chip(key)
+    _draw_cup(draw_list, low, high, imgui.get_font_size())
+    _chip_edge(draw_list, low, high, tooltip)
+
+
+def draw_small_car(
+    draw_list: imgui.ImDrawList,
+    good: Good | General | None,
+    load: float,
+    capacity: float,
+    top_left: tuple[float, float],
+    size: tuple[float, float],
+) -> None:
+    """A car as a small chip drawn at a place on the screen, like car_chip's but not clickable;
+    no good is a dining car."""
+    low = imgui.ImVec2(*top_left)
+    high = imgui.ImVec2(top_left[0] + size[0], top_left[1] + size[1])
+    rounding = min(3.0, size[0] / 5)
+    draw_list.add_rect_filled(low, high, color_u32(CAR_EMPTY), rounding)
+    icon = min(size[0], size[1]) * 0.85
+    if good is None:
+        _draw_cup(draw_list, low, high, icon)
+    else:
+        _draw_load(draw_list, good, load, capacity, low, high, rounding)
+        corner = (low.x + (size[0] - icon) / 2, low.y + (size[1] - icon) / 2)
+        draw_good_icon(draw_list, good, corner, icon)
+    draw_list.add_rect(low, high, color_u32((0.0, 0.0, 0.0, 0.6)), rounding)
+
+
+def _draw_load(
+    draw_list: imgui.ImDrawList,
+    good: Good | General,
+    load: float | None,
+    capacity: float | None,
+    low: imgui.ImVec2,
+    high: imgui.ImVec2,
+    rounding: float,
+) -> None:
+    """A car's load, filling it from the bottom by its share of the car's capacity."""
+    if load is None:
+        return
+    size = capacity or (car_size(good) if isinstance(good, Good) else 0.0)
+    share = max(0.0, min(1.0, load / size)) if size else 0.0
+    if share > 0:
+        top = high.y - (high.y - low.y) * share
+        draw_list.add_rect_filled((low.x, top), high, color_u32(CAR_LOADED), rounding)
+
+
+def _draw_cup(
+    draw_list: imgui.ImDrawList, low: imgui.ImVec2, high: imgui.ImVec2, font_size: float
+) -> None:
+    """A dining car's cup, centred on its chip."""
+    font = imgui.get_font()
+    scale = font_size / imgui.get_font_size()
+    size = imgui.calc_text_size(fa.ICON_FA_COFFEE)
+    width, height = size.x * scale, size.y * scale
+    corner = (low.x + (high.x - low.x - width) / 2, low.y + (high.y - low.y - height) / 2)
+    draw_list.add_text(font, font_size, corner, color_u32(BRASS), fa.ICON_FA_COFFEE)
+
+
+def _chip(key: str) -> tuple[bool, imgui.ImDrawList, imgui.ImVec2, imgui.ImVec2]:
+    """An empty car chip's button and back; whether it was clicked, and where it was drawn."""
+    clicked = imgui.invisible_button(key, CHIP_SIZE)
     low = imgui.get_item_rect_min()
     high = imgui.get_item_rect_max()
     draw_list = imgui.get_window_draw_list()
     draw_list.add_rect_filled(low, high, color_u32(CAR_EMPTY), 3.0)
-    size = imgui.calc_text_size(fa.ICON_FA_COFFEE)
-    corner = (low.x + (high.x - low.x - size.x) / 2, low.y + (high.y - low.y - size.y) / 2)
-    draw_list.add_text(corner, color_u32(BRASS), fa.ICON_FA_COFFEE)
+    return clicked, draw_list, low, high
+
+
+def _chip_edge(
+    draw_list: imgui.ImDrawList, low: imgui.ImVec2, high: imgui.ImVec2, tooltip: str
+) -> None:
+    """A car chip's edge, lit in brass and showing the tooltip while hovered."""
     hovered = imgui.is_item_hovered()
     edge = BRASS if hovered else (0.0, 0.0, 0.0, 0.6)
     draw_list.add_rect(low, high, color_u32(edge), 3.0, 1.5 if hovered else 1.0)
@@ -341,7 +425,7 @@ def empty_car_slot() -> None:
     draw_list.add_rect(low, high, color_u32(BORDER), 3.0, 1.0)
 
 
-def offer_chip(key: str, good: Good, amount: str, wanted: bool, tooltip: str) -> bool:
+def offer_chip(key: str, good: Good | General, amount: str, wanted: bool, tooltip: str) -> bool:
     """A good to load, as a wide chip with its icon and how much of it waits, outlined in brass
     when the next stop wants it; returns whether it was clicked."""
     clicked = imgui.invisible_button(key, OFFER_SIZE)

@@ -136,6 +136,26 @@ def _repeat_east(strip: Pixels, width_px: int) -> Pixels:
     return np.tile(strip, (1, repeats))[:, :width_px]
 
 
+def _in_boxes(
+    pixels: npt.NDArray[np.int32], width: int, boxes: list[tuple[int, int, int, int]]
+) -> npt.NDArray[np.intp]:
+    """Where among `pixels`, flat indices in order on a picture `width` pixels wide, those in
+    any of the boxes (top, bottom, left and right) lie, once for each box they lie in."""
+    top, bottom, left, right = np.array(boxes, dtype=np.int32).T
+    heights = bottom - top
+    box = np.repeat(np.arange(len(boxes)), heights)
+    row = (
+        top[box]
+        + np.arange(box.size, dtype=np.int32)
+        - np.repeat(np.cumsum(heights) - heights, heights)
+    )
+    starts = row * np.int32(width)
+    low = np.searchsorted(pixels, starts + left[box])
+    high = np.searchsorted(pixels, starts + right[box])
+    lengths = high - low
+    return np.repeat(low - (np.cumsum(lengths) - lengths), lengths) + np.arange(lengths.sum())
+
+
 @dataclass(frozen=True)
 class _Painted:
     """A ground picture without grid lines, and the colours and light it was painted in."""
@@ -155,8 +175,8 @@ class GroundPictures:
     found once; the pixels near an edge, which grid lines darken, are found the first time lines
     are wanted. The last picture without lines is kept with the colours and light it was painted
     in: while those stay the same it is handed out again, and the picture with lines starts from a
-    copy of it. Given the grid, a picture whose colours changed in a few cells is touched up in
-    place where those cells lie."""
+    copy of it, then is kept beside it. Given the grid, pictures whose colours changed in a few
+    cells are touched up in place where those cells lie."""
 
     def __init__(
         self, layout: GroundLayout, relief: npt.NDArray[np.uint8], grid: Grid | None = None
@@ -171,26 +191,36 @@ class GroundPictures:
         self._raised_direction = layout.edge_direction.ravel()[self._raised]
         self._raised_fade = 1 - layout.edge_distance.ravel()[self._raised] / width
         self._plain: _Painted | None = None
+        # The kept picture without lines with lines added, and the boxes, as top, bottom, left
+        # and right, where that picture was touched up since, for this one to follow when next
+        # wanted.
+        self._lined: Pixels | None = None
+        self._unlined: list[tuple[int, int, int, int]] = []
 
     def picture(
         self, colors: Pixels, light_from: tuple[float, float], with_lines: bool = False
     ) -> Pixels:
         """The picture's RGBA pixels for these cell colours, raised edges lit from `light_from`
-        (a direction on the map); pixels off the map stay clear. A picture without lines is the
-        one kept, so it must not be changed."""
+        (a direction on the map); pixels off the map stay clear. The pictures are the ones kept,
+        so they must not be changed."""
         plain = self._plain
         if plain is None or not plain.shows(colors, light_from):
             changed = self._changed_cells(plain, colors, light_from)
             if changed is None:
                 self._plain = _Painted(colors.copy(), light_from, self._paint(colors, light_from))
+                self._lined = None
             else:
-                self._touch_up(plain.rgba, changed, colors, light_from)
+                self._unlined += self._touch_up(plain.rgba, changed, colors, light_from)
                 plain.colors[...] = colors
         if not with_lines:
             return self._plain.rgba
-        lined = self._plain.rgba.copy()
-        self._add_lines(lined)
-        return lined
+        if self._lined is None or len(self._unlined) > TOUCH_UP_CELLS:
+            self._lined = self._plain.rgba.copy()
+            self._add_lines(self._lined)
+        elif self._unlined:
+            self._touch_up_lines(self._lined, self._plain.rgba, self._unlined)
+        self._unlined = []
+        return self._lined
 
     def _paint(self, colors: Pixels, light_from: tuple[float, float]) -> Pixels:
         """Every pixel in its cell's colour, gathered as one 32-bit number, and the raised edges
@@ -234,8 +264,9 @@ class GroundPictures:
         changed: npt.NDArray[np.intp],
         colors: Pixels,
         light_from: tuple[float, float],
-    ) -> None:
-        """Paints again the pixels of the changed cells, looking only in a box round each."""
+    ) -> list[tuple[int, int, int, int]]:
+        """Paints again the pixels of the changed cells, looking only in a box round each;
+        returns the boxes, as top, bottom, left and right."""
         assert self._grid is not None
         cells = self.layout.cells
         height, width = cells.shape
@@ -244,6 +275,7 @@ class GroundPictures:
         centers_x, centers_y = self._grid.center(rows, cols)
         flat = rgba.reshape(-1, 4)
         shaded: list[npt.NDArray[np.intp]] = []
+        boxes: list[tuple[int, int, int, int]] = []
         for cell, cx, cy in zip(
             changed.tolist(), np.ravel(centers_x), np.ravel(centers_y), strict=True
         ):
@@ -253,6 +285,7 @@ class GroundPictures:
             bottom = min(height, math.ceil((cy + 1) * PIXELS_PER_CELL))
             if left >= right or top >= bottom:
                 continue
+            boxes.append((top, bottom, left, right))
             window = rgba[top:bottom, left:right]
             window[cells[top:bottom, left:right] == cell] = flat_colors[cell]
             starts = np.arange(top, bottom) * width
@@ -262,17 +295,30 @@ class GroundPictures:
             if len(near):
                 shaded.append(near[cells.ravel()[self._raised[near]] == cell])
         if not shaded:
-            return
+            return boxes
         which = np.concatenate(shaded)
         at = self._raised[which]
         base = flat_colors[cells.ravel()[at], :3]
         lifted = base * self._shade(light_from, which)[:, None]
         flat[at, :3] = np.clip(lifted, 0, 255).astype(np.uint8)
+        return boxes
 
-    def _add_lines(self, rgba: Pixels) -> None:
+    def _touch_up_lines(
+        self, lined: Pixels, plain: Pixels, boxes: list[tuple[int, int, int, int]]
+    ) -> None:
+        """Makes the picture with lines the picture without them with lines added again, where
+        the boxes the picture without them was touched up in lie: elsewhere neither changed."""
+        for top, bottom, left, right in boxes:
+            lined[top:bottom, left:right] = plain[top:bottom, left:right]
+        line_pixels, _ = self._line_pixels
+        self._add_lines(lined, np.unique(_in_boxes(line_pixels, plain.shape[1], boxes)))
+
+    def _add_lines(self, rgba: Pixels, which: npt.NDArray[np.intp] | None = None) -> None:
         """Darkens the pixels near an edge as baked grid lines do, each channel looked up in
-        LINE_SHADES."""
+        LINE_SHADES: all of them, or those `which` picks."""
         at, shade_rows = self._line_pixels
+        if which is not None:
+            at, shade_rows = at[which], shade_rows[which]
         packed = rgba.reshape(-1).view(np.uint32)
         near = packed[at].view(np.uint8).reshape(-1, 4)
         for channel in range(3):

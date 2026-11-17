@@ -22,6 +22,7 @@ from railroads.sim.tech import (
     xp_for,
 )
 from railroads.sim.trains import ENGINES, Stop
+from railroads.ui.tech_window import layout, links
 
 
 def joined() -> Growth:
@@ -117,11 +118,11 @@ def test_market_stalls_raise_what_food_cargo_earns() -> None:
 
 def test_the_mogul_can_be_bought_only_once_its_tech_and_year_have_come() -> None:
     railway = joined().railway
-    railway.year = 1879
+    railway.year = 1864
     railway.research = learned(Tree.METALS, "boilers")
     early = railway.engines()
 
-    railway.year = 1880
+    railway.year = 1865
 
     assert "mogul" not in early
     assert "mogul" in railway.engines()
@@ -130,7 +131,7 @@ def test_the_mogul_can_be_bought_only_once_its_tech_and_year_have_come() -> None
 
 def test_a_mogul_pulls_more_cars_and_steel_couplings_one_more() -> None:
     railway = joined().railway
-    railway.year = 1880
+    railway.year = 1865
     railway.research = learned(Tree.METALS, "boilers", "bessemer", "couplings")
     railway.finances.earn(100_000.0, "test")
 
@@ -139,8 +140,21 @@ def test_a_mogul_pulls_more_cars_and_steel_couplings_one_more() -> None:
     assert train is not None
     assert railway.most_cars(train) == ENGINES["mogul"].cars + 1
     stop = Stop((6, 3))
-    assert all(stop.add_car(Good.COAL, railway.most_cars(train)) for _ in range(9))
+    assert all(stop.add_car(Good.COAL, railway.most_cars(train)) for _ in range(7))
     assert not stop.add_car(Good.COAL, railway.most_cars(train))
+
+
+def test_a_diesel_engine_and_bogie_wagons_each_put_a_car_one_fibonacci_size_up() -> None:
+    railway, upgraded = joined().railway, joined().railway
+    upgraded.research = learned(Tree.METALS, "bessemer", "couplings", "drawbars", "bogie_wagons")
+
+    sizes = [
+        each.car_capacity(Good.OIL, engine)
+        for each in (railway, upgraded)
+        for engine in ("planet", "mixed_diesel")
+    ]
+
+    assert sizes == [55.0, 89.0, 89.0, 144.0]
 
 
 def test_bogie_coaches_carry_more_passengers_but_freight_cars_stay_the_same() -> None:
@@ -148,10 +162,10 @@ def test_bogie_coaches_carry_more_passengers_but_freight_cars_stay_the_same() ->
     railway.research = learned(Tree.PASSENGERS, "coaches")
 
     coach = railway.car_capacity(Good.PASSENGERS)
-    wagon = railway.car_capacity(Good.COAL)
+    wagon = railway.car_capacity(Good.OIL)
 
-    assert coach == pytest.approx(60.0)
-    assert wagon == pytest.approx(50.0)
+    assert coach == pytest.approx(66.0)
+    assert wagon == pytest.approx(55.0)
 
 
 def test_every_building_that_makes_something_has_a_tree_and_shops_are_commerce() -> None:
@@ -217,7 +231,7 @@ def test_electric_engines_find_a_way_only_along_electrified_track() -> None:
     assert railway.route((6, 3), (6, 20)) is not None
 
 
-def test_electrified_track_costs_more_upkeep_than_plain_track() -> None:
+def test_electrified_track_costs_twenty_one_times_the_upkeep_of_plain_track() -> None:
     plain, wired = Constructions(flat_map()), Constructions(flat_map())
     for constructions, electric in ((plain, False), (wired, True)):
         growth = Growth(constructions, GrowthRule(trades=False))
@@ -230,7 +244,7 @@ def test_electrified_track_costs_more_upkeep_than_plain_track() -> None:
         railway.turn_month({})
 
     paid = [-railway.finances.month["track upkeep"] for railway in railways]
-    assert paid[1] == pytest.approx(2.5 * paid[0])
+    assert paid[1] == pytest.approx(21 * paid[0])
 
 
 def test_fine_living_makes_each_bonus_good_worth_ten_points_more_satisfaction() -> None:
@@ -243,3 +257,29 @@ def test_fine_living_makes_each_bonus_good_worth_ten_points_more_satisfaction() 
     assert growth.economy.bonus_per_good == pytest.approx(0.4)
     assert growth.trade is not None
     assert growth.trade.bonus_per_good == pytest.approx(0.4)
+
+
+@pytest.mark.parametrize("tree", list(Tree))
+def test_the_tech_window_draws_every_node_below_the_nodes_it_needs_each_on_its_own_spot(
+    tree: Tree,
+) -> None:
+    spots = layout(tree)
+
+    assert len(set(spots.values())) == len(spots) == len(TREES[tree])
+    assert all(spots[need][1] < spots[key][1] for need, key in links(tree))
+
+
+@pytest.mark.parametrize("tree", list(Tree))
+def test_the_tech_window_links_every_node_to_each_it_needs_and_hangs_it_under_the_first(
+    tree: Tree,
+) -> None:
+    spots = layout(tree)
+
+    drawn = links(tree)
+
+    assert len(drawn) == sum(len(node.requires) for node in TREES[tree])
+    for node in TREES[tree]:
+        hanging = [n.key for n in TREES[tree] if n.requires[:1] == (node.key,)]
+        if hanging:
+            middle = sum(spots[key][0] for key in hanging) / len(hanging)
+            assert spots[node.key][0] == pytest.approx(middle)

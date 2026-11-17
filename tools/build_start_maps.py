@@ -10,29 +10,13 @@ Run with: uv run python tools/build_start_maps.py [key ...]   (all but Poland wi
 
 import sys
 
-from build_poland_map import KM_PER_CELL, RAW, SEED, summary
+from build_poland_map import RAW, bake
 
 from railroads import maps
-from railroads.mapgen.generate import generate_map
-from railroads.mapgen.presets import NATURAL_EARTH_SOURCE, NaturalEarth, real_world_strategies
+from railroads.mapgen.presets import NaturalEarth
 from railroads.mapgen.terrain_tiles import SOURCE as TERRAIN_TILES_SOURCE
 from railroads.mapgen.terrain_tiles import ElevationDatabase
 from railroads.newgame import ELEVATION_DB
-from railroads.sim.grids import HexGrid
-
-
-def bake(start: maps.StartMap, world: NaturalEarth, database: ElevationDatabase) -> None:
-    bounds = start.bounds
-    strategies = real_world_strategies(world, database.elevation_for(bounds), SEED)
-    grid = HexGrid.covering(bounds.width_km, bounds.height_km, KM_PER_CELL)
-    sources = (TERRAIN_TILES_SOURCE, NATURAL_EARTH_SOURCE)
-    tile_map = generate_map(start.title, bounds, grid, strategies, sources)
-    path = maps.map_file(start.key, "hex")
-    tile_map.save(path)
-    print(
-        f"wrote {path.name} ({path.stat().st_size / 1000:.0f} KB): "
-        f"{grid.cols} x {grid.rows} hex cells; {summary(tile_map)}"
-    )
 
 
 def main(keys: list[str]) -> None:
@@ -41,12 +25,9 @@ def main(keys: list[str]) -> None:
     if unknown:
         raise SystemExit(f"no start map {', '.join(sorted(unknown))} to bake here")
     world = NaturalEarth.load(RAW)
-    database = ElevationDatabase(ELEVATION_DB)
-    try:
+    with ElevationDatabase(ELEVATION_DB) as database:
         for start in wanted:
-            bake(start, world, database)
-    finally:
-        database.close()
+            bake(start, world, database.elevation_for(start.bounds), TERRAIN_TILES_SOURCE)
 
 
 if __name__ == "__main__":

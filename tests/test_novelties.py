@@ -8,9 +8,9 @@ from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.novelties import (
     NOVELTIES,
-    OLYMPIC_YEARS,
     Novelties,
     Novelty,
+    olympic_year,
     place_space_center,
 )
 from railroads.sim.tilemap import Deposit, TileMap
@@ -55,7 +55,8 @@ def test_the_chance_of_hosting_the_games_grows_with_the_land(size: int, chance: 
 
 
 @pytest.mark.parametrize(
-    ("year", "hosts"), [(1916, False), (1920, True), (2021, True), (2022, False)]
+    ("year", "hosts"),
+    [(1916, False), (1920, True), (2021, True), (2022, False), (2100, True), (2101, False)],
 )
 def test_stadiums_go_up_only_in_real_summer_games_years(year: int, hosts: bool) -> None:
     growth = grown(year, {(20, 20): BuildingKind.HOUSE})
@@ -64,7 +65,7 @@ def test_stadiums_go_up_only_in_real_summer_games_years(year: int, hosts: bool) 
     novelties.year(growth, np.random.default_rng(0))
 
     assert bool(built(growth, BuildingKind.OLYMPIC_STADIUM)) == hosts
-    assert (year in OLYMPIC_YEARS) == hosts
+    assert olympic_year(year) == hosts
 
 
 def test_each_games_goes_to_the_biggest_town_that_has_not_hosted_yet() -> None:

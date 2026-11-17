@@ -60,7 +60,7 @@ def clearing(constructions: Constructions, cell: Cell, units: int) -> list[Build
     """The buildings that must leave the cell for `units` of room, in the order they go; None if
     one of them cannot be taken down."""
     room = constructions.space_left(cell)
-    here = [b for b in constructions.at(cell) if isinstance(b, Building)]
+    here = constructions.buildings_at(cell)
     leaving = []
     for building in leaving_order(here):
         if room >= units:
@@ -85,7 +85,7 @@ def station_site_price(constructions: Constructions, cell: Cell) -> float | None
     free; None where one cannot be taken down."""
     track = sum(piece.space for piece in constructions.track_at(cell))
     room = constructions.space_left(cell) + track
-    here = [b for b in constructions.at(cell) if isinstance(b, Building)]
+    here = constructions.buildings_at(cell)
     if room >= CELL_SPACE:
         return 0.0
     if any(b.kind in UNIQUE for b in here):
@@ -116,13 +116,25 @@ def bulldoze(growth: Growth, cell: Cell) -> set[Cell]:
     """Takes down everything in the cell that can be, buildings the player owns too; returns
     the cells that changed."""
     constructions = growth.constructions
-    taken = False
+    taken: set[Cell] = set()
     for built in constructions.at(cell):
         if isinstance(built, Building):
             if built.kind in UNIQUE:
                 continue
             growth.take_down(built)
         else:
+            if isinstance(built, Station) and built.main is None:
+                taken |= remove_platforms(constructions, cell)
             constructions.remove(built)
-        taken = True
-    return {cell} if taken else set()
+        taken.add(cell)
+    return taken
+
+
+def remove_platforms(constructions: Constructions, station: Cell) -> set[Cell]:
+    """Takes down every platform added to a station; returns their cells."""
+    cells = set(constructions.platforms(station))
+    for cell in cells:
+        platform = constructions.station_at(cell)
+        if platform is not None:
+            constructions.remove(platform)
+    return cells

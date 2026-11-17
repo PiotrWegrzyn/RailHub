@@ -16,12 +16,13 @@ from railroads.sim.grids import Cell, Grid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
 from railroads.sim.railway import Railway
+from railroads.sim.steps import Steps, finish
 from railroads.sim.tech import TREES, tree_of
 
 STATIONS_AT_START = 5
 STATIONS_PER_DECADE = 2
-# A station raised one level reaches a step further than a new one: three cells out.
-STATION_LEVEL = 2
+# A station raised two levels reaches three cells out.
+STATION_LEVEL = 3
 THRIVING_PART = 1 / 3
 CONTENT_PART = 1 / 2
 CONTENT_SHARE = 0.5
@@ -117,7 +118,11 @@ class StandInPlayer:
         """Grows one month, earning what the player's buildings would at the share of service
         their cells get; each year buys buildings and spends its points, and each decade
         builds new stations. Returns the cells whose buildings or stations changed."""
-        changed = self.growth.month(rng)
+        return finish(self.month_steps(rng))
+
+    def month_steps(self, rng: np.random.Generator) -> Steps[set[Cell]]:
+        """month in the steps of the growth's month, which a caller can spread over frames."""
+        changed = yield from self.growth.month_steps(rng)
         self.months += 1
         self._earn()
         if self.months % 12 == 0:

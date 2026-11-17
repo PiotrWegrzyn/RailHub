@@ -23,14 +23,16 @@ neighbourhood, so farms and ports keep their distance.
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
+from functools import cached_property
 from types import MappingProxyType
 
 import numpy as np
 import numpy.typing as npt
 
-from railroads.sim.constructions import BuildingKind
+from railroads.sim.constructions import MERGED, BuildingKind
 from railroads.sim.economy import Neighbourhoods
 from railroads.sim.forests import FORESTS, ForestRule
+from railroads.sim.goods import RECIPES, merging
 from railroads.sim.points import Points
 from railroads.sim.tilemap import Deposit, Relief, Temperature, Terrain, TileMap, Vegetation
 
@@ -54,8 +56,7 @@ SKYSCRAPER_PEOPLE = 150
 
 SKYSCRAPER_CHANCE = 0.005
 
-# The chance every person around adds to a town craft coming up: breweries, brickworks, mills and
-# the like (railroads.sim.growth.SPAWN_BY_PEOPLE).
+# The base chance of a town craft coming up: breweries, brickworks, mills and the like.
 CRAFT_BASE = 0.000002
 
 # Factories gather into districts: industry nearby draws more of them only from this many points,
@@ -74,7 +75,7 @@ JEWELLERS_APART = 10
 # month.
 PASSENGERS_PER_POINT: Mapping[Points, int] = MappingProxyType(
     {
-        Points.POPULATION: 2,
+        Points.POPULATION: 1,
         Points.FOOD: 5,
         Points.TIMBER: 5,
         Points.ORE: 10,
@@ -87,115 +88,130 @@ PASSENGERS_PER_POINT: Mapping[Points, int] = MappingProxyType(
     }
 )
 
+_POINTS: dict[BuildingKind, tuple[Points, int]] = {
+    BuildingKind.HOUSE: (Points.POPULATION, 1),
+    BuildingKind.TENEMENT: (Points.POPULATION, 6),
+    BuildingKind.FLATS: (Points.POPULATION, 18),
+    BuildingKind.FARM: (Points.FOOD, 1),
+    BuildingKind.ORCHARD: (Points.FOOD, 1),
+    BuildingKind.DATE_PALMS: (Points.FOOD, 1),
+    BuildingKind.ORANGE_FARM: (Points.FOOD, 1),
+    BuildingKind.BANANAS: (Points.FOOD, 1),
+    BuildingKind.SUGAR: (Points.FOOD, 1),
+    BuildingKind.MINE: (Points.ORE, 1),
+    BuildingKind.LUMBER_MILL: (Points.TIMBER, 1),
+    BuildingKind.PORT: (Points.TRADE, 1),
+    BuildingKind.FACTORY: (Points.INDUSTRY, 1),
+    BuildingKind.BIG_FACTORY: (Points.INDUSTRY, 3),
+    BuildingKind.MEGA_FACTORY: (Points.INDUSTRY, 9),
+    BuildingKind.FOOD_PLANT: (Points.INDUSTRY, 2),
+    BuildingKind.BAKERY: (Points.FOOD, 1),
+    BuildingKind.STEEL_MILL: (Points.INDUSTRY, 3),
+    BuildingKind.SHIPYARD: (Points.INDUSTRY, 3),
+    BuildingKind.FISHERY: (Points.FOOD, 1),
+    BuildingKind.SHEEP_FARM: (Points.FOOD, 1),
+    BuildingKind.COTTON_FIELD: (Points.FOOD, 1),
+    BuildingKind.VINEYARD: (Points.FOOD, 1),
+    BuildingKind.COFFEE_PLANTATION: (Points.FOOD, 1),
+    BuildingKind.RUBBER_PLANTATION: (Points.FOOD, 1),
+    BuildingKind.IRON_MINE: (Points.ORE, 1),
+    BuildingKind.COPPER_MINE: (Points.ORE, 1),
+    BuildingKind.GOLD_MINE: (Points.ORE, 1),
+    BuildingKind.DIAMOND_MINE: (Points.ORE, 1),
+    BuildingKind.OIL_WELL: (Points.ORE, 1),
+    BuildingKind.SALT_WORKS: (Points.ORE, 1),
+    BuildingKind.TEXTILE_MILL: (Points.INDUSTRY, 2),
+    BuildingKind.FURNITURE_MAKER: (Points.INDUSTRY, 2),
+    BuildingKind.TOOL_WORKS: (Points.INDUSTRY, 2),
+    BuildingKind.WINERY: (Points.INDUSTRY, 2),
+    BuildingKind.REFINERY: (Points.INDUSTRY, 3),
+    BuildingKind.CHEMICAL_WORKS: (Points.INDUSTRY, 3),
+    BuildingKind.ELECTRONICS_PLANT: (Points.INDUSTRY, 3),
+    BuildingKind.CAR_FACTORY: (Points.INDUSTRY, 5),
+    BuildingKind.GUN_FACTORY: (Points.INDUSTRY, 3),
+    BuildingKind.TANK_FACTORY: (Points.INDUSTRY, 5),
+    BuildingKind.PLANE_FACTORY: (Points.INDUSTRY, 5),
+    BuildingKind.OUTPOST: (Points.MILITARY, 3),
+    BuildingKind.BASE: (Points.MILITARY, 9),
+    BuildingKind.HEADQUARTERS: (Points.MILITARY, 27),
+    BuildingKind.AIRPORT: (Points.AIR, 1),
+    BuildingKind.BARREL_MAKER: (Points.INDUSTRY, 2),
+    BuildingKind.BEEKEEPER: (Points.FOOD, 1),
+    BuildingKind.INCENSE_GROVE: (Points.FOOD, 1),
+    BuildingKind.CHURCH: (Points.WORSHIP, 5),
+    BuildingKind.BASILICA: (Points.WORSHIP, 20),
+    BuildingKind.CATHEDRAL: (Points.WORSHIP, 50),
+    BuildingKind.ST_PAULS: (Points.WORSHIP, 2137),
+    BuildingKind.CAR_DEALER: (Points.CORPORATE, 1),
+    BuildingKind.JEWELLER: (Points.CORPORATE, 1),
+    BuildingKind.SKYSCRAPER: (Points.CORPORATE, 10),
+    BuildingKind.CLAY_PIT: (Points.ORE, 1),
+    BuildingKind.LIMESTONE_QUARRY: (Points.ORE, 1),
+    BuildingKind.SAND_PIT: (Points.ORE, 1),
+    BuildingKind.POTATO_FARM: (Points.FOOD, 1),
+    BuildingKind.CATTLE_RANCH: (Points.FOOD, 1),
+    BuildingKind.PIG_FARM: (Points.FOOD, 1),
+    BuildingKind.CHICKEN_FARM: (Points.FOOD, 1),
+    BuildingKind.GASWORKS: (Points.INDUSTRY, 1),
+    BuildingKind.COKE_PLANT: (Points.INDUSTRY, 2),
+    BuildingKind.POTTER: (Points.INDUSTRY, 1),
+    BuildingKind.TILE_WORKS: (Points.INDUSTRY, 1),
+    BuildingKind.FOUNDRY: (Points.INDUSTRY, 2),
+    BuildingKind.DAIRY: (Points.INDUSTRY, 1),
+    BuildingKind.SAUSAGE_MAKER: (Points.FOOD, 1),
+    BuildingKind.CARPET_WEAVER: (Points.CORPORATE, 2),
+    BuildingKind.CLOCK_MAKER: (Points.CORPORATE, 2),
+    BuildingKind.MIRROR_MAKER: (Points.CORPORATE, 2),
+    BuildingKind.MANOR: (Points.CORPORATE, 8),
+    BuildingKind.THEATRE: (Points.CORPORATE, 5),
+    BuildingKind.HOSPITAL: (Points.CORPORATE, 5),
+    BuildingKind.RAILWAY_WORKS: (Points.INDUSTRY, 20),
+    BuildingKind.FLAX_FIELD: (Points.FOOD, 1),
+    BuildingKind.HOP_GARDEN: (Points.FOOD, 1),
+    BuildingKind.MACHINE_WORKS: (Points.INDUSTRY, 3),
+    BuildingKind.BRICKWORKS: (Points.INDUSTRY, 2),
+    BuildingKind.CEMENT_WORKS: (Points.INDUSTRY, 2),
+    BuildingKind.GLASSWORKS: (Points.INDUSTRY, 2),
+    BuildingKind.BREWERY: (Points.INDUSTRY, 1),
+    BuildingKind.DISTILLERY: (Points.INDUSTRY, 1),
+    BuildingKind.TANNERY: (Points.INDUSTRY, 2),
+    BuildingKind.SHOE_FACTORY: (Points.INDUSTRY, 2),
+    BuildingKind.PLASTICS_WORKS: (Points.INDUSTRY, 3),
+    BuildingKind.APPLIANCE_FACTORY: (Points.INDUSTRY, 3),
+    BuildingKind.PAPER_MILL: (Points.INDUSTRY, 2),
+    BuildingKind.PRINTING_WORKS: (Points.INDUSTRY, 2),
+    BuildingKind.SUGAR_REFINERY: (Points.INDUSTRY, 2),
+    BuildingKind.PORCELAIN_WORKS: (Points.INDUSTRY, 2),
+    BuildingKind.MEAT_FACTORY: (Points.INDUSTRY, 1),
+    BuildingKind.POWER_PLANT: (Points.INDUSTRY, 5),
+    BuildingKind.DIESEL_POWER_PLANT: (Points.INDUSTRY, 4),
+    BuildingKind.GAS_POWER_PLANT: (Points.INDUSTRY, 4),
+    BuildingKind.SPACE_CENTER: (Points.CORPORATE, 25),
+    BuildingKind.PEAR_HQ: (Points.CORPORATE, 50),
+    BuildingKind.ROYAL_PALACE: (Points.CORPORATE, 15),
+    BuildingKind.SALT_CATHEDRAL: (Points.WORSHIP, 200),
+    BuildingKind.SPA_RESORT: (Points.CORPORATE, 15),
+    BuildingKind.WORLDS_FAIR: (Points.CORPORATE, 50),
+    BuildingKind.FILM_STUDIO: (Points.CORPORATE, 10),
+    BuildingKind.AMUSEMENT_PARK: (Points.CORPORATE, 40),
+    BuildingKind.OLYMPIC_STADIUM: (Points.CORPORATE, 100),
+    BuildingKind.TAVERN: (Points.CORPORATE, 1),
+    BuildingKind.CLUB: (Points.CORPORATE, 3),
+    BuildingKind.FILLING_STATION: (Points.CORPORATE, 1),
+    BuildingKind.DEPARTMENT_STORE: (Points.CORPORATE, 3),
+    BuildingKind.HOTEL: (Points.CORPORATE, 5),
+    BuildingKind.JUICE_WORKS: (Points.INDUSTRY, 1),
+}
+
+# A big works gives the points of the works merged into it, and a mega one of the big ones.
 POINTS: Mapping[BuildingKind, tuple[Points, int]] = MappingProxyType(
     {
-        BuildingKind.HOUSE: (Points.POPULATION, 1),
-        BuildingKind.TENEMENT: (Points.POPULATION, 6),
-        BuildingKind.FLATS: (Points.POPULATION, 18),
-        BuildingKind.FARM: (Points.FOOD, 1),
-        BuildingKind.ORCHARD: (Points.FOOD, 1),
-        BuildingKind.DATE_PALMS: (Points.FOOD, 1),
-        BuildingKind.ORANGE_FARM: (Points.FOOD, 1),
-        BuildingKind.BANANAS: (Points.FOOD, 1),
-        BuildingKind.SUGAR: (Points.FOOD, 1),
-        BuildingKind.MINE: (Points.ORE, 1),
-        BuildingKind.LUMBER_MILL: (Points.TIMBER, 1),
-        BuildingKind.PORT: (Points.TRADE, 1),
-        BuildingKind.FACTORY: (Points.INDUSTRY, 1),
-        BuildingKind.BIG_FACTORY: (Points.INDUSTRY, 3),
-        BuildingKind.MEGA_FACTORY: (Points.INDUSTRY, 9),
-        BuildingKind.FOOD_PLANT: (Points.INDUSTRY, 2),
-        BuildingKind.BAKERY: (Points.INDUSTRY, 1),
-        BuildingKind.STEEL_MILL: (Points.INDUSTRY, 3),
-        BuildingKind.SHIPYARD: (Points.INDUSTRY, 3),
-        BuildingKind.FISHERY: (Points.FOOD, 1),
-        BuildingKind.SHEEP_FARM: (Points.FOOD, 1),
-        BuildingKind.COTTON_FIELD: (Points.FOOD, 1),
-        BuildingKind.VINEYARD: (Points.FOOD, 1),
-        BuildingKind.COFFEE_PLANTATION: (Points.FOOD, 1),
-        BuildingKind.RUBBER_PLANTATION: (Points.FOOD, 1),
-        BuildingKind.IRON_MINE: (Points.ORE, 1),
-        BuildingKind.COPPER_MINE: (Points.ORE, 1),
-        BuildingKind.GOLD_MINE: (Points.ORE, 1),
-        BuildingKind.DIAMOND_MINE: (Points.ORE, 1),
-        BuildingKind.OIL_WELL: (Points.ORE, 1),
-        BuildingKind.SALT_WORKS: (Points.ORE, 1),
-        BuildingKind.TEXTILE_MILL: (Points.INDUSTRY, 2),
-        BuildingKind.FURNITURE_MAKER: (Points.INDUSTRY, 2),
-        BuildingKind.TOOL_WORKS: (Points.INDUSTRY, 2),
-        BuildingKind.WINERY: (Points.INDUSTRY, 2),
-        BuildingKind.REFINERY: (Points.INDUSTRY, 3),
-        BuildingKind.CHEMICAL_WORKS: (Points.INDUSTRY, 3),
-        BuildingKind.ELECTRONICS_PLANT: (Points.INDUSTRY, 3),
-        BuildingKind.CAR_FACTORY: (Points.INDUSTRY, 5),
-        BuildingKind.GUN_FACTORY: (Points.INDUSTRY, 3),
-        BuildingKind.TANK_FACTORY: (Points.INDUSTRY, 5),
-        BuildingKind.PLANE_FACTORY: (Points.INDUSTRY, 5),
-        BuildingKind.OUTPOST: (Points.MILITARY, 3),
-        BuildingKind.BASE: (Points.MILITARY, 9),
-        BuildingKind.HEADQUARTERS: (Points.MILITARY, 27),
-        BuildingKind.AIRPORT: (Points.AIR, 1),
-        BuildingKind.BARREL_MAKER: (Points.INDUSTRY, 2),
-        BuildingKind.BEEKEEPER: (Points.FOOD, 1),
-        BuildingKind.INCENSE_GROVE: (Points.FOOD, 1),
-        BuildingKind.CHURCH: (Points.WORSHIP, 5),
-        BuildingKind.BASILICA: (Points.WORSHIP, 20),
-        BuildingKind.CATHEDRAL: (Points.WORSHIP, 50),
-        BuildingKind.ST_PAULS: (Points.WORSHIP, 2137),
-        BuildingKind.CAR_DEALER: (Points.CORPORATE, 1),
-        BuildingKind.JEWELLER: (Points.CORPORATE, 1),
-        BuildingKind.SKYSCRAPER: (Points.CORPORATE, 10),
-        BuildingKind.CLAY_PIT: (Points.ORE, 1),
-        BuildingKind.LIMESTONE_QUARRY: (Points.ORE, 1),
-        BuildingKind.SAND_PIT: (Points.ORE, 1),
-        BuildingKind.POTATO_FARM: (Points.FOOD, 1),
-        BuildingKind.CATTLE_RANCH: (Points.FOOD, 1),
-        BuildingKind.PIG_FARM: (Points.FOOD, 1),
-        BuildingKind.CHICKEN_FARM: (Points.FOOD, 1),
-        BuildingKind.GASWORKS: (Points.INDUSTRY, 1),
-        BuildingKind.COKE_PLANT: (Points.INDUSTRY, 2),
-        BuildingKind.POTTER: (Points.INDUSTRY, 1),
-        BuildingKind.TILE_WORKS: (Points.INDUSTRY, 1),
-        BuildingKind.FOUNDRY: (Points.INDUSTRY, 2),
-        BuildingKind.DAIRY: (Points.INDUSTRY, 1),
-        BuildingKind.SAUSAGE_MAKER: (Points.INDUSTRY, 1),
-        BuildingKind.CARPET_WEAVER: (Points.CORPORATE, 2),
-        BuildingKind.CLOCK_MAKER: (Points.CORPORATE, 2),
-        BuildingKind.MIRROR_MAKER: (Points.CORPORATE, 2),
-        BuildingKind.MANOR: (Points.CORPORATE, 8),
-        BuildingKind.THEATRE: (Points.CORPORATE, 5),
-        BuildingKind.HOSPITAL: (Points.CORPORATE, 5),
-        BuildingKind.RAILWAY_WORKS: (Points.INDUSTRY, 20),
-        BuildingKind.FLAX_FIELD: (Points.FOOD, 1),
-        BuildingKind.HOP_GARDEN: (Points.FOOD, 1),
-        BuildingKind.MACHINE_WORKS: (Points.INDUSTRY, 3),
-        BuildingKind.BRICKWORKS: (Points.INDUSTRY, 2),
-        BuildingKind.CEMENT_WORKS: (Points.INDUSTRY, 2),
-        BuildingKind.GLASSWORKS: (Points.INDUSTRY, 2),
-        BuildingKind.BREWERY: (Points.INDUSTRY, 2),
-        BuildingKind.DISTILLERY: (Points.INDUSTRY, 2),
-        BuildingKind.TANNERY: (Points.INDUSTRY, 2),
-        BuildingKind.SHOE_FACTORY: (Points.INDUSTRY, 2),
-        BuildingKind.PLASTICS_WORKS: (Points.INDUSTRY, 3),
-        BuildingKind.APPLIANCE_FACTORY: (Points.INDUSTRY, 3),
-        BuildingKind.PAPER_MILL: (Points.INDUSTRY, 2),
-        BuildingKind.PRINTING_WORKS: (Points.INDUSTRY, 2),
-        BuildingKind.SUGAR_REFINERY: (Points.INDUSTRY, 2),
-        BuildingKind.PORCELAIN_WORKS: (Points.INDUSTRY, 2),
-        BuildingKind.MEAT_FACTORY: (Points.INDUSTRY, 2),
-        BuildingKind.POWER_PLANT: (Points.INDUSTRY, 5),
-        BuildingKind.SPACE_CENTER: (Points.CORPORATE, 25),
-        BuildingKind.PEAR_HQ: (Points.CORPORATE, 50),
-        BuildingKind.ROYAL_PALACE: (Points.CORPORATE, 15),
-        BuildingKind.SALT_CATHEDRAL: (Points.WORSHIP, 200),
-        BuildingKind.SPA_RESORT: (Points.CORPORATE, 15),
-        BuildingKind.WORLDS_FAIR: (Points.CORPORATE, 50),
-        BuildingKind.FILM_STUDIO: (Points.CORPORATE, 10),
-        BuildingKind.AMUSEMENT_PARK: (Points.CORPORATE, 40),
-        BuildingKind.OLYMPIC_STADIUM: (Points.CORPORATE, 100),
-        BuildingKind.TAVERN: (Points.CORPORATE, 1),
-        BuildingKind.DEPARTMENT_STORE: (Points.CORPORATE, 3),
-        BuildingKind.HOTEL: (Points.CORPORATE, 5),
+        **_POINTS,
+        **{
+            grown: (_POINTS[kind][0], _POINTS[kind][1] * merging(RECIPES[kind]) ** step)
+            for kind, sizes in MERGED.items()
+            for step, grown in enumerate(sizes, start=1)
+        },
     }
 )
 
@@ -257,44 +273,116 @@ class Land:
     ) -> FloatGrid:
         """The weight of every cell as a grid, or of the given flat cells alone. `near` holds
         every cell's neighbours as flat indices, one past the last cell for off the map."""
+        weight = self.weights_in(Surroundings(tile_map, cells, near))
+        return weight.reshape(tile_map.grid.shape) if cells is None else weight
+
+    def weights_in(self, around: Surroundings) -> FloatGrid:
+        """The weight of the cells whose surroundings these are, in their order."""
+        vegetation_weights, relief_weights, temperature_weights, water = self._tables()
+        is_water = around.is_water
+        best = np.where(is_water, water[around.terrain_around], 0.0).max(axis=0)
+        by_water = np.where(around.by_water, best, water[Terrain.LAND])
+        weight = (
+            vegetation_weights[around.vegetation]
+            * relief_weights[around.relief]
+            * temperature_weights[around.temperature]
+            * by_water
+        )
+        weight = weight * np.where(around.beside_mountains, self.beside_mountains, 1.0)
+        if self.forest_edge:
+            weight = weight * around.beside_open_flat
+        if self.least_forest_nearby:
+            weight = weight * (around.forests >= self.least_forest_nearby)
+        if self.deposit is not None:
+            deposits = around.deposits
+            on_it = deposits is not None and deposits == self.deposit
+            weight = weight * on_it
+        weight = weight * np.where(around.open_flat_grass, self.open_field, 1.0)
+        return np.where(around.land, weight, 0.0)
+
+
+class Surroundings:
+    """What lands weigh (Land.weights_in) in some flat cells of a map, or all of them, and around
+    them: worked out once, as asked for, for any number of lands. `near` holds every cell's
+    neighbours as flat indices, one past the last cell for off the map."""
+
+    def __init__(
+        self,
+        tile_map: TileMap,
+        cells: npt.NDArray[np.intp] | None = None,
+        near: Cells | None = None,
+    ) -> None:
         size = tile_map.grid.rows * tile_map.grid.cols
         if near is None:
             near = Neighbourhoods(tile_map.grid).index
-        chosen = np.arange(size) if cells is None else cells
-        terrain = tile_map.terrain.ravel()
-        vegetation = tile_map.vegetation.ravel()
-        relief = tile_map.relief.ravel()
-        around = near[:, chosen]
-        real = around < size
-        around = np.where(real, around, 0)
-        vegetation_weights, relief_weights, temperature_weights, water = self._tables()
-        terrain_around = terrain[around]
-        is_water = real & (terrain_around != Terrain.LAND)
-        best = np.where(is_water, water[terrain_around], 0.0).max(axis=0)
-        by_water = np.where(is_water.any(axis=0), best, water[Terrain.LAND])
-        weight = (
-            vegetation_weights[vegetation[chosen]]
-            * relief_weights[relief[chosen]]
-            * temperature_weights[tile_map.temperature.ravel()[chosen]]
-            * by_water
+        self.tile_map = tile_map
+        self.chosen = np.arange(size) if cells is None else cells
+        self._terrain = tile_map.terrain.ravel()
+        self._vegetation = tile_map.vegetation.ravel()
+        self._relief = tile_map.relief.ravel()
+        around = near[:, self.chosen]
+        self.real = around < size
+        self.around = np.where(self.real, around, 0)
+
+    @cached_property
+    def terrain_around(self) -> npt.NDArray[np.uint8]:
+        return self._terrain[self.around]
+
+    @cached_property
+    def is_water(self) -> npt.NDArray[np.bool_]:
+        return self.real & (self.terrain_around != Terrain.LAND)
+
+    @cached_property
+    def by_water(self) -> npt.NDArray[np.bool_]:
+        return self.is_water.any(axis=0)
+
+    @cached_property
+    def vegetation(self) -> npt.NDArray[np.uint8]:
+        return self._vegetation[self.chosen]
+
+    @cached_property
+    def relief(self) -> npt.NDArray[np.uint8]:
+        return self._relief[self.chosen]
+
+    @cached_property
+    def temperature(self) -> npt.NDArray[np.uint8]:
+        return self.tile_map.temperature.ravel()[self.chosen]
+
+    @cached_property
+    def beside_mountains(self) -> npt.NDArray[np.bool_]:
+        beside = self.real & (self._relief[self.around] == Relief.MOUNTAINS)
+        return beside.any(axis=0)
+
+    @cached_property
+    def forest_around(self) -> npt.NDArray[np.bool_]:
+        return self.real & (self._vegetation[self.around] == Vegetation.FOREST) & ~self.is_water
+
+    @cached_property
+    def beside_open_flat(self) -> npt.NDArray[np.bool_]:
+        open_flat = (
+            self.real
+            & ~self.is_water
+            & ~self.forest_around
+            & (self._relief[self.around] == Relief.FLAT)
         )
-        beside = real & (relief[around] == Relief.MOUNTAINS)
-        weight = weight * np.where(beside.any(axis=0), self.beside_mountains, 1.0)
-        forest_around = real & (vegetation[around] == Vegetation.FOREST) & ~is_water
-        if self.forest_edge:
-            open_flat = real & ~is_water & ~forest_around & (relief[around] == Relief.FLAT)
-            weight = weight * open_flat.any(axis=0)
-        if self.least_forest_nearby:
-            forests = forest_around.sum(axis=0) + (vegetation[chosen] == Vegetation.FOREST)
-            weight = weight * (forests >= self.least_forest_nearby)
-        if self.deposit is not None:
-            deposits = tile_map.deposits
-            on_it = deposits is not None and deposits.ravel()[chosen] == self.deposit
-            weight = weight * on_it
-        open_flat_grass = (relief[chosen] == Relief.FLAT) & (vegetation[chosen] == Vegetation.GRASS)
-        weight = weight * np.where(open_flat_grass, self.open_field, 1.0)
-        weight = np.where(terrain[chosen] == Terrain.LAND, weight, 0.0)
-        return weight.reshape(tile_map.grid.shape) if cells is None else weight
+        return open_flat.any(axis=0)
+
+    @cached_property
+    def forests(self) -> npt.NDArray[np.int64]:
+        return self.forest_around.sum(axis=0) + (self.vegetation == Vegetation.FOREST)
+
+    @cached_property
+    def deposits(self) -> npt.NDArray[np.uint8] | None:
+        deposits = self.tile_map.deposits
+        return None if deposits is None else deposits.ravel()[self.chosen]
+
+    @cached_property
+    def open_flat_grass(self) -> npt.NDArray[np.bool_]:
+        return (self.relief == Relief.FLAT) & (self.vegetation == Vegetation.GRASS)
+
+    @cached_property
+    def land(self) -> npt.NDArray[np.bool_]:
+        return self._terrain[self.chosen] == Terrain.LAND
 
 
 @dataclass(frozen=True, slots=True)
@@ -352,6 +440,24 @@ class Ladder:
         return self.kinds[0].value
 
 
+def _merges(ladder: Ladder) -> Ladder:
+    """A works ladder whose works merge as they gather (railroads.sim.constructions.MERGED): so
+    many of a kind in a neighbourhood become its big one, and as many big ones its mega one."""
+    kind = ladder.kinds[0]
+    sizes = MERGED.get(kind)
+    if sizes is None:
+        return ladder
+    needed = merging(RECIPES[kind])
+    big, _ = sizes
+    most_nearby = ladder.most_nearby
+    return replace(
+        ladder,
+        kinds=(kind, *sizes),
+        merges={kind: Merge(needed, needed), big: Merge(needed, needed)},
+        most_nearby=None if most_nearby is None else max(most_nearby, needed),
+    )
+
+
 # Built land: towns and the factories that follow them.
 # People settle by water, and few clear a forest to live in it. A house on its own draws no
 # more; two or more nearby start a town.
@@ -372,10 +478,10 @@ FACTORY_LAND = Land(
 TOWNS = Ladder(
     kinds=(BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS),
     land=TOWN_LAND,
-    base_chance=0.0000008,
-    chance_per_doubling={Points.POPULATION: 0.000017},
+    base_chance=0.0000018,
+    chance_per_doubling={Points.POPULATION: 0.0002},
     merges={
-        BuildingKind.HOUSE: Merge(needed=16, pulled_down=6),
+        BuildingKind.HOUSE: Merge(needed=6, pulled_down=6),
         BuildingKind.TENEMENT: Merge(needed=5, pulled_down=3),
     },
     skyscrapers=True,
@@ -391,7 +497,7 @@ FARMS = Ladder(
         vegetation={Vegetation.BARREN: 0.1, Vegetation.FOREST: 0.02},
         relief={Relief.HILLS: 0.25, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.2, Temperature.HOT: 0.6},
-        water={Terrain.RIVER: 5.0, Terrain.LAKE: 5.0, Terrain.SEA: 2.0},
+        water={Terrain.RIVER: 4.0, Terrain.LAKE: 4.0, Terrain.SEA: 2.0},
         open_field=OPEN_FIELD,
     ),
     base_chance=0.0000000373,
@@ -540,34 +646,38 @@ FACTORIES = Ladder(
 
 # Canneries can the fruit of nearby orchards, palms, plantations and sugar fields with steel, and
 # gather among other industry.
-FOOD_PLANTS = Ladder(
-    kinds=(BuildingKind.FOOD_PLANT,),
-    land=FACTORY_LAND,
-    base_chance=0.000000015,
-    chance_per_doubling={
-        Points.FOOD: 0.00000026,
-        Points.POPULATION: 0.000000003,
-        Points.INDUSTRY: 0.00000076,
-    },
-    needs={Points.FOOD: 1},
-    most_per_cell=1,
-    most_nearby=6,
-    from_year=1810,
+FOOD_PLANTS = _merges(
+    Ladder(
+        kinds=(BuildingKind.FOOD_PLANT,),
+        land=FACTORY_LAND,
+        base_chance=0.0000002,
+        chance_per_doubling={
+            Points.FOOD: 0.00000026,
+            Points.POPULATION: 0.000000003,
+            Points.INDUSTRY: 0.00000076,
+        },
+        needs={Points.FOOD: 1},
+        most_per_cell=1,
+        most_nearby=6,
+        from_year=1810,
+    )
 )
 
 # Steel mills make steel from iron ore and coal, near mines and among other industry.
-STEEL_MILLS = Ladder(
-    kinds=(BuildingKind.STEEL_MILL,),
-    land=Land(
-        vegetation={Vegetation.FOREST: 0.2},
-        relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
-        water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.2, Terrain.SEA: 1.2},
-    ),
-    base_chance=0.000000056,
-    chance_per_doubling={Points.ORE: 0.000007, Points.INDUSTRY: 0.00000042},
-    most_per_cell=1,
-    most_nearby=2,
-    from_year=1855,
+STEEL_MILLS = _merges(
+    Ladder(
+        kinds=(BuildingKind.STEEL_MILL,),
+        land=Land(
+            vegetation={Vegetation.FOREST: 0.2},
+            relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
+            water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.2, Terrain.SEA: 1.2},
+        ),
+        base_chance=0.0000004,
+        chance_per_doubling={Points.ORE: 0.000007, Points.INDUSTRY: 0.00000042},
+        most_per_cell=1,
+        most_nearby=2,
+        from_year=1855,
+    )
 )
 
 # Shipyards build on the water beside a port, among industry that feeds them.
@@ -609,16 +719,18 @@ def _works(
 ) -> Ladder:
     """A works that opens anywhere by chance, a little likelier where people and industry are,
     whether or not its inputs are near."""
-    return Ladder(
-        kinds=(kind,),
-        land=FACTORY_LAND,
-        base_chance=base,
-        chance_per_doubling=chances,
-        needs=needs,
-        most_per_cell=1,
-        most_nearby=2,
-        from_year=from_year,
-        land_cells_each=land_cells_each,
+    return _merges(
+        Ladder(
+            kinds=(kind,),
+            land=FACTORY_LAND,
+            base_chance=base,
+            chance_per_doubling=chances,
+            needs=needs,
+            most_per_cell=1,
+            most_nearby=2,
+            from_year=from_year,
+            land_cells_each=land_cells_each,
+        )
     )
 
 
@@ -689,75 +801,91 @@ BEEKEEPERS = Ladder(
     most_nearby=1,
 )
 
-# Bakeries bake the wheat brought to them into bread, one to a neighbourhood, in towns.
-# Gasworks make town gas out of coal from 1820, one to a town, the likelier the more people live
-# around (railroads.sim.growth.SPAWN_BY_PEOPLE).
-GASWORKS = Ladder(
-    kinds=(BuildingKind.GASWORKS,),
-    land=FACTORY_LAND,
-    base_chance=0.000001,
-    chance_per_doubling={Points.POPULATION: 0.000001},
-    most_per_cell=1,
-    most_nearby=1,
-    from_year=1820,
+# Gasworks make town gas out of coal from 1820, one to a town, the likelier the more industry is
+# around.
+GASWORKS = _merges(
+    Ladder(
+        kinds=(BuildingKind.GASWORKS,),
+        land=FACTORY_LAND,
+        base_chance=0.000001,
+        chance_per_doubling={Points.POPULATION: 0.000001},
+        most_per_cell=1,
+        most_nearby=1,
+        from_year=1820,
+    )
 )
 
-BAKERIES = Ladder(
+# Taverns, filling stations, brewers, distillers and potters open once FOOD_TOWN people live in
+# the neighbourhood. Bakeries and the other makers of food are what towns grow on: they open
+# wherever people live, the likelier the more of them.
+FOOD_TOWN = 3
+
+_BAKERY = Ladder(
     kinds=(BuildingKind.BAKERY,),
     land=TOWN_LAND,
-    base_chance=0.000008,
+    base_chance=0.0000005,
     chance_per_doubling={Points.POPULATION: 0.000001},
     most_per_cell=1,
     most_nearby=1,
 )
 
+BAKERIES = _merges(_BAKERY)
+
 # Butchers open in towns from 1850, the likelier the more people live around, like bakeries.
-BUTCHERS = replace(
-    BAKERIES, kinds=(BuildingKind.MEAT_FACTORY,), base_chance=0.000004, from_year=1850
+BUTCHERS = _merges(
+    replace(_BAKERY, kinds=(BuildingKind.MEAT_FACTORY,), base_chance=0.000001, from_year=1850)
 )
 
 # Town crafts that come up, like bakeries, the likelier the more people live around: potters and
 # dairies as often as other crafts; tile works, foundries and sausage makers, which need two
 # inputs and make goods worth more, half as often; the makers of luxury goods only in towns of
-# LUXURY_TOWN people or more, and seldom.
+# LUXURY_TOWN people or more, half as often as potters.
 LUXURY_TOWN = 20
+# Potters, brewers and distillers open only in towns of FOOD_TOWN people, where they are this many
+# times likelier than before, so the map keeps about as many of them.
+IN_TOWNS_ONLY = 6.0
 
 
 def _town_craft(
     kind: BuildingKind, share: float, from_year: int = 0, least_people: int = 0
 ) -> Ladder:
-    return Ladder(
-        kinds=(kind,),
-        land=TOWN_LAND,
-        base_chance=CRAFT_BASE * share,
-        chance_per_doubling={Points.POPULATION: 0.000001},
-        needs={Points.POPULATION: least_people} if least_people else {},
-        most_per_cell=1,
-        most_nearby=1,
-        from_year=from_year,
+    return _merges(
+        Ladder(
+            kinds=(kind,),
+            land=TOWN_LAND,
+            base_chance=CRAFT_BASE * share,
+            chance_per_doubling={Points.POPULATION: 0.000001},
+            needs={Points.POPULATION: least_people} if least_people else {},
+            most_per_cell=1,
+            most_nearby=1,
+            from_year=from_year,
+        )
     )
 
 
 TOWN_CRAFTS = (
-    _town_craft(BuildingKind.POTTER, 1.0),
-    _town_craft(BuildingKind.DAIRY, 1.0),
+    _town_craft(BuildingKind.POTTER, IN_TOWNS_ONLY / 3, least_people=FOOD_TOWN),
+    _town_craft(BuildingKind.DAIRY, 0.25),
     _town_craft(BuildingKind.TILE_WORKS, 0.5),
     _town_craft(BuildingKind.FOUNDRY, 0.5, 1800),
-    _town_craft(BuildingKind.SAUSAGE_MAKER, 0.5, 1850),
-    _town_craft(BuildingKind.CARPET_WEAVER, 0.1, 1700, LUXURY_TOWN),
-    _town_craft(BuildingKind.CLOCK_MAKER, 0.1, 1880, LUXURY_TOWN),
-    _town_craft(BuildingKind.MIRROR_MAKER, 0.1, 1700, LUXURY_TOWN),
+    _town_craft(BuildingKind.SAUSAGE_MAKER, 0.625, 1850),
+    _town_craft(BuildingKind.JUICE_WORKS, 0.5, 1870),
+    _town_craft(BuildingKind.CARPET_WEAVER, 0.5, 1700, LUXURY_TOWN),
+    _town_craft(BuildingKind.CLOCK_MAKER, 0.5, 1880, LUXURY_TOWN),
+    _town_craft(BuildingKind.MIRROR_MAKER, 0.5, 1700, LUXURY_TOWN),
 )
 
 # Coke plants bake coal into coke for the steel mills from 1850, drawn to industry.
-COKE_PLANTS = Ladder(
-    kinds=(BuildingKind.COKE_PLANT,),
-    land=FACTORY_LAND,
-    base_chance=0.0000002,
-    chance_per_doubling={Points.INDUSTRY: 0.0000004},
-    most_per_cell=1,
-    most_nearby=2,
-    from_year=1850,
+COKE_PLANTS = _merges(
+    Ladder(
+        kinds=(BuildingKind.COKE_PLANT,),
+        land=FACTORY_LAND,
+        base_chance=0.0000002,
+        chance_per_doubling={Points.INDUSTRY: 0.0000004},
+        most_per_cell=1,
+        most_nearby=2,
+        from_year=1850,
+    )
 )
 
 # Buildings that only buy: manors in towns of MANOR_TOWN people, theatres in towns of
@@ -856,7 +984,7 @@ CLAY_PITS = Ladder(
     land=Land(
         vegetation={Vegetation.FOREST: 0.3},
         relief={Relief.HILLS: 0.3, Relief.MOUNTAINS: 0.0},
-        water={Terrain.LAND: 0.1, Terrain.RIVER: 3.0, Terrain.LAKE: 1.5},
+        water={Terrain.LAND: 0.1, Terrain.RIVER: 4.0, Terrain.LAKE: 2.0},
     ),
     base_chance=0.00000006,
     chance_per_doubling={Points.POPULATION: 0.0000001, Points.ORE: 0.0000002},
@@ -881,7 +1009,7 @@ SAND_PITS = Ladder(
     land=Land(
         vegetation={Vegetation.BARREN: 3.0, Vegetation.FOREST: 0.3},
         relief={Relief.HILLS: 0.3, Relief.MOUNTAINS: 0.0},
-        water={Terrain.LAND: 0.1, Terrain.SEA: 4.0, Terrain.RIVER: 2.0, Terrain.LAKE: 2.0},
+        water={Terrain.LAND: 0.1, Terrain.SEA: 4.0, Terrain.RIVER: 3.0, Terrain.LAKE: 2.0},
     ),
     base_chance=0.000000075,
     chance_per_doubling={Points.ORE: 0.00000015},
@@ -889,15 +1017,33 @@ SAND_PITS = Ladder(
     most_nearby=2,
 )
 
-# Taverns serve beer and vodka, one to a neighbourhood, from the smallest towns.
+# Taverns pour a lot of beer and vodka, one to a neighbourhood, and come up as readily as
+# bakeries; from 1900 clubs pour far more in towns of CLUB_TOWN people. Either one, getting its
+# drink, makes the homes around it grow faster (railroads.sim.growth.LIVELY_GROWTH).
+CLUB_TOWN = 30
+
 TAVERNS = Ladder(
     kinds=(BuildingKind.TAVERN,),
     land=TOWN_LAND,
-    base_chance=0.00000001,
-    chance_per_doubling={Points.POPULATION: 0.000004},
-    needs={Points.POPULATION: 3},
+    base_chance=0.00001,
+    chance_per_doubling={Points.POPULATION: 0.000001},
+    needs={Points.POPULATION: FOOD_TOWN},
     most_per_cell=1,
     most_nearby=1,
+)
+
+CLUBS = replace(
+    TAVERNS,
+    kinds=(BuildingKind.CLUB,),
+    base_chance=0.00005,
+    needs={Points.POPULATION: CLUB_TOWN},
+    from_year=1900,
+)
+
+# Filling stations open in towns once motor cars come, as often as taverns.
+FILLING_STATION_YEAR = 1920
+FILLING_STATIONS = replace(
+    TAVERNS, kinds=(BuildingKind.FILLING_STATION,), from_year=FILLING_STATION_YEAR
 )
 
 # Department stores and hotels open in big towns, spaced out, a few to a map.
@@ -910,19 +1056,6 @@ DEPARTMENT_STORES = Ladder(
     apart=6,
     from_year=1880,
     land_cells_each=10_000,
-)
-
-# Power plants burn coal, oil or gas by the big towns from 1900, a few to a map, and draw
-# industry around them.
-POWER_PLANTS = Ladder(
-    kinds=(BuildingKind.POWER_PLANT,),
-    land=FACTORY_LAND,
-    chance_per_doubling={Points.POPULATION: 0.00005},
-    needs={Points.POPULATION: 40},
-    most_per_cell=1,
-    apart=6,
-    from_year=1882,
-    land_cells_each=15_000,
 )
 
 HOTELS = replace(
@@ -947,29 +1080,42 @@ WORKS = (
         BuildingKind.BARREL_MAKER,
         {POP: 4e-10, IND: 6e-9, Points.TIMBER: 6e-8},
         {},
-        base=1e-8,
+        base=5e-8,
     ),
     _works(BuildingKind.TOOL_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 1870, base=2e-6),
-    _works(BuildingKind.CHEMICAL_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {}, 1880, 20_000, 2e-8),
-    _works(BuildingKind.REFINERY, {IND: 4e-7, Points.ORE: 1e-6}, {}, 1856, 30_000, 2e-8),
-    _works(BuildingKind.CAR_FACTORY, {IND: 6e-7}, {IND: 6}, 1930, 40_000, 2e-6),
-    _works(BuildingKind.ELECTRONICS_PLANT, {POP: 2.5e-8, IND: 4e-7}, {}, 1960, 30_000, 2e-8),
-    _works(BuildingKind.PLANE_FACTORY, {POP: 2.5e-8, IND: 6e-7}, {IND: 6}, 1935, 40_000, 2e-6),
-    _works(BuildingKind.TANK_FACTORY, {IND: 6e-7}, {IND: 6}, 1940, 40_000, 2e-6),
+    _works(
+        BuildingKind.CHEMICAL_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {IND: 3}, 1880, 20_000, 4e-7
+    ),
+    _works(BuildingKind.REFINERY, {IND: 4e-7, Points.ORE: 1e-6}, {}, 1856, 10_000, 1e-6),
+    _works(BuildingKind.CAR_FACTORY, {IND: 6e-7}, {IND: 6}, 1930, 40_000, 4e-6),
+    _works(BuildingKind.ELECTRONICS_PLANT, {POP: 2.5e-8, IND: 4e-7}, {IND: 3}, 1960, 30_000, 4e-7),
+    _works(BuildingKind.PLANE_FACTORY, {POP: 2.5e-8, IND: 6e-7}, {IND: 6}, 1935, 40_000, 1e-5),
+    _works(BuildingKind.TANK_FACTORY, {IND: 6e-7}, {IND: 6}, 1940, 40_000, 1e-5),
     _works(BuildingKind.BRICKWORKS, {POP: 1e-9, Points.ORE: 1.2e-8}, {}, base=CRAFT_BASE),
     _works(BuildingKind.GLASSWORKS, {POP: 4e-10, IND: 6e-9, Points.ORE: 6e-9}, {}, base=CRAFT_BASE),
-    _works(BuildingKind.BREWERY, {POP: 1.5e-9, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
-    _works(BuildingKind.DISTILLERY, {POP: 8e-10, Points.FOOD: 3e-9}, {}, 1600, base=CRAFT_BASE),
+    _works(
+        BuildingKind.BREWERY,
+        {POP: 1.5e-9, Points.FOOD: 3e-9},
+        {POP: FOOD_TOWN},
+        base=CRAFT_BASE * IN_TOWNS_ONLY / 2,
+    ),
+    _works(
+        BuildingKind.DISTILLERY,
+        {POP: 8e-10, Points.FOOD: 3e-9},
+        {POP: FOOD_TOWN},
+        1600,
+        base=CRAFT_BASE * IN_TOWNS_ONLY / 2,
+    ),
     _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
-    _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {}, 1850, base=1e-8),
-    _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=1e-8),
-    _works(BuildingKind.PRINTING_WORKS, {POP: 1.5e-9, IND: 3e-9}, {}, 1600, PRINTING_CELLS, 1e-8),
+    _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {POP: 3}, 1850, base=5e-8),
+    _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=2e-7),
+    _works(BuildingKind.PRINTING_WORKS, {POP: 1.5e-9, IND: 3e-9}, {}, 1600, PRINTING_CELLS, 2e-7),
     _works(BuildingKind.SUGAR_REFINERY, {IND: 6e-9, Points.FOOD: 3e-9}, {}, 1800, base=CRAFT_BASE),
-    _works(BuildingKind.PORCELAIN_WORKS, {POP: 4e-10, Points.ORE: 6e-9}, {}, 1710, 30_000, 1e-8),
+    _works(BuildingKind.PORCELAIN_WORKS, {POP: 4e-10, Points.ORE: 6e-9}, {}, 1710, 30_000, 2e-7),
     _works(BuildingKind.MACHINE_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 1870, base=2e-6),
-    _works(BuildingKind.CEMENT_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {}, 1880, 20_000, 2e-8),
-    _works(BuildingKind.PLASTICS_WORKS, {IND: 4e-7}, {}, 1950, 30_000, 2e-8),
-    _works(BuildingKind.APPLIANCE_FACTORY, {POP: 2.5e-8, IND: 4e-7}, {}, 1950, 30_000, 2e-8),
+    _works(BuildingKind.CEMENT_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {IND: 3}, 1880, 20_000, 4e-7),
+    _works(BuildingKind.PLASTICS_WORKS, {IND: 4e-7}, {IND: 3}, 1950, 30_000, 4e-7),
+    _works(BuildingKind.APPLIANCE_FACTORY, {POP: 2.5e-8, IND: 4e-7}, {IND: 3}, 1950, 30_000, 4e-7),
 )
 
 # The only source of guns when play begins.
@@ -979,7 +1125,7 @@ AIRPORTS = _works(BuildingKind.AIRPORT, {POP: 0.000001}, {POP: 80}, 1920, 20_000
 
 # Buyers found only in big cities, a handful to a map, each far from the others.
 JEWELLERS = replace(
-    _works(BuildingKind.JEWELLER, {POP: 0.00005}, {POP: 20}, land_cells_each=26_000),
+    _works(BuildingKind.JEWELLER, {POP: 0.00005}, {POP: 25}, land_cells_each=26_000),
     apart=JEWELLERS_APART,
 )
 
@@ -1025,9 +1171,10 @@ LADDERS = (
     LIMESTONE_QUARRIES,
     SAND_PITS,
     TAVERNS,
+    CLUBS,
+    FILLING_STATIONS,
     DEPARTMENT_STORES,
     HOTELS,
-    POWER_PLANTS,
 )
 
 

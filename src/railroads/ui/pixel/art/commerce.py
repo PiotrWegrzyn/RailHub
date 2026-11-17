@@ -16,42 +16,24 @@ from railroads.ui.pixel.art.painter import (
     Sprite,
     shade,
 )
-from railroads.ui.pixel.art.parts import _flag, _on_wall, _patch, _turned, _windows
+from railroads.ui.pixel.art.parts import (
+    DOOR,
+    LIT,
+    SILL,
+    _band,
+    _flag,
+    _on_wall,
+    _pale_plinth,
+    _patch,
+    _tiles,
+    _turned,
+    _window,
+    _windows,
+)
 
-DOOR: RGB = (104, 66, 44)
-SILL: RGB = (240, 236, 226)
-LIT: RGB = (236, 206, 120)
 PAVING: RGB = (190, 184, 170)
 POST: RGB = (52, 50, 54)
 LEAF: RGB = (60, 112, 48)
-
-type Top = tuple[Point, Point, Point, Point]
-
-
-def _plinth(p: Painter, top: Top, height: float, wall: RGB, depth: float = 0.8) -> None:
-    """A darker band along the foot of a box's two front walls."""
-    left, front, right, _ = top
-    _patch(p, left, front, (0, 1), (height - depth, height), shade(wall, 0.7))
-    _patch(p, front, right, (0, 1), (height - depth, height), shade(wall, 0.52))
-
-
-def _window(
-    p: Painter, a: Point, b: Point, span: tuple[float, float], drop: float, fill: RGB = WINDOW
-) -> None:
-    """A window with a light sill under it on the wall under the edge from `a` to `b`."""
-    _patch(p, a, b, span, (drop, drop + 1.2), fill)
-    p.line([_on_wall(a, b, span[0], drop + 1.5), _on_wall(a, b, span[1], drop + 1.5)], SILL)
-
-
-def _tiles(p: Painter, top: Top, rise: float, roof: RGB) -> None:
-    """Rows of tiles across the lit side of a gable roof (Painter.gable)."""
-    left, front, right, back = top
-    ridge_back = ((left[0] + back[0]) / 2, (left[1] + back[1]) / 2 - rise)
-    ridge_front = ((front[0] + right[0]) / 2, (front[1] + right[1]) / 2 - rise)
-    for f in (0.34, 0.68):
-        a = (left[0] + (ridge_back[0] - left[0]) * f, left[1] + (ridge_back[1] - left[1]) * f)
-        b = (front[0] + (ridge_front[0] - front[0]) * f, front[1] + (ridge_front[1] - front[1]) * f)
-        p.line([a, b], shade(roof, 0.8))
 
 
 def _crate(p: Painter, x: float, y: float) -> None:
@@ -87,14 +69,6 @@ def _bush(p: Painter, x: float, y: float, size: float = 1.6) -> None:
     p.point(x - size * 0.5, y - 1.2 * size, shade(LEAF, 1.35))
 
 
-def _bench(p: Painter, x: float, y: float, colour: RGB = TIMBER) -> None:
-    """A bench along a lit wall, its left foot at (x, y)."""
-    p.line([(x, y - 1.5), (x + 2.5, y - 0.25)], colour)
-    p.line([(x, y - 2.5), (x, y - 1.5)], shade(colour, 0.8))
-    for dx in (0, 2.5):
-        p.line([(x + dx, y + dx / 2 - 1.5), (x + dx, y + dx / 2)], shade(colour, 0.55))
-
-
 def port() -> Sprite:
     """A paved quay with bollards along its edge, a warehouse with a big cargo door under a tiled
     roof, crates, and a crane with a cab and a counterweight lifting a load."""
@@ -112,7 +86,7 @@ def port() -> Sprite:
     p.polygon([(-10, 0), (-4, 3), (-5.5, 5.5), (-11.5, 2.5)], shade(STONE, 0.86))
     top = p.box(-4, 0, 6, 6, wall, None)
     left, front, right, _ = top
-    _plinth(p, top, 6, wall)
+    _pale_plinth(p, top, 6, wall)
     _foot(p, top, 6)
     _patch(p, left, front, (0.38, 0.78), (2.2, 6), DOOR)
     p.line([_on_wall(left, front, 0.58, 2.6), _on_wall(left, front, 0.58, 6)], shade(DOOR, 0.7))
@@ -156,10 +130,10 @@ def shop(wall: RGB, awning: RGB, goods: RGB) -> Sprite:
     _worn(p, (-8, -height), (0, 4 - height), (-0.05, 1.05), height, 2.5, PAVING)
     top = p.box(0, 0, 8, height, wall, shade(wall, 0.7))
     left, front, right, _ = top
-    _plinth(p, top, height, wall)
+    _pale_plinth(p, top, height, wall)
     _foot(p, top, height)
     for a, b, tone in ((left, front, 1.15), (front, right, 0.88)):
-        p.line([_on_wall(a, b, 0, 0.6), _on_wall(a, b, 1, 0.6)], shade(wall, tone))
+        _band(p, a, b, 0.6, shade(wall, tone))
     glazing = WINDOW if sum(wall) > 300 else LIT
     for span in ((0.14, 0.34), (0.56, 0.76)):
         _patch(p, left, front, span, (1.6, 3.6), glazing)
@@ -170,7 +144,7 @@ def shop(wall: RGB, awning: RGB, goods: RGB) -> Sprite:
     _patch(p, left, front, (0, 1), (4.6, 6.6), awning)
     for t in (0.2, 0.4, 0.6, 0.8):
         p.line([_on_wall(left, front, t, 4.8), _on_wall(left, front, t, 6.4)], SILL)
-    p.line([_on_wall(left, front, 0, 6.8), _on_wall(left, front, 1, 6.8)], shade(awning, 0.6))
+    _band(p, left, front, 6.8, shade(awning, 0.6))
     _patch(p, left, front, (0.06, 0.62), (7.6, 11), glazing)
     for t in (0.16, 0.42):
         p.line([_on_wall(left, front, t, 9.8), _on_wall(left, front, t + 0.1, 9.8)], goods)
@@ -200,7 +174,7 @@ def airport() -> Sprite:
     hangar = (208, 210, 212)
     top = p.box(-5, -2, 7, 7, hangar, (146, 150, 158))
     left, front, right, _ = top
-    _plinth(p, top, 7, hangar, 0.6)
+    _pale_plinth(p, top, 7, hangar, 0.6)
     _foot(p, top, 7)
     _patch(p, left, front, (0.15, 0.85), (2.2, 7), (120, 124, 132))
     for t in (0.32, 0.5, 0.68):
@@ -258,9 +232,9 @@ def tavern() -> Sprite:
     for a, b in ((left, front), (front, right)):
         for t in (0, 0.5, 1):
             p.line([_on_wall(a, b, t, 0), _on_wall(a, b, t, 7)], beam)
-        p.line([_on_wall(a, b, 0, 3.5), _on_wall(a, b, 1, 3.5)], beam)
+        _band(p, a, b, 3.5, beam)
         p.line([_on_wall(a, b, 0, 0.5), _on_wall(a, b, 0.5, 3.5)], beam)
-    _plinth(p, top, 7, STONE, 1)
+    _pale_plinth(p, top, 7, STONE, 1)
     _patch(p, left, front, (0.1, 0.38), (4.4, 5.8), LIT)
     p.line([_on_wall(left, front, 0.24, 4.4), _on_wall(left, front, 0.24, 5.8)], beam)
     _patch(p, left, front, (0.66, 0.88), (1.2, 2.6), WINDOW)
@@ -301,12 +275,12 @@ def department_store() -> Sprite:
     for t in (0.36, 0.64):
         p.line([_on_wall(front, right, t, 9), _on_wall(front, right, t, 12)], shade(wall, 0.65))
     _patch(p, left, front, (0.4, 0.56), (9.4, 12.2), DOORWAY)
-    _plinth(p, top, 13, wall, 0.8)
+    _pale_plinth(p, top, 13, wall, 0.8)
     _foot(p, top, 13)
     _doorstep(p, left, front, (0.36, 0.6), 13, shade(PAVING, 1.1))
     for a, b in ((left, front), (front, right)):
-        p.line([_on_wall(a, b, 0, 1), _on_wall(a, b, 1, 1)], shade(wall, 1.12))
-        p.line([_on_wall(a, b, 0, 8), _on_wall(a, b, 1, 8)], shade(wall, 0.7))
+        _band(p, a, b, 1, shade(wall, 1.12))
+        _band(p, a, b, 8, shade(wall, 0.7))
     sign = (196, 156, 60)
     _patch(p, left, front, (0.32, 0.64), (7.6, 8.6), sign)
     _windows(p, left, front, (0.12, 0.3, 0.48, 0.66), (2.5, 5.5), 2, arch=shade(wall, 0.72))
@@ -346,10 +320,10 @@ def hotel() -> Sprite:
     left, front, right, _ = top
     _patch(p, left, front, (0, 1), (18.6, height), shade(wall, 0.88))
     _patch(p, front, right, (0, 1), (18.6, height), shade(wall, 0.68))
-    _plinth(p, top, height, wall, 0.8)
+    _pale_plinth(p, top, height, wall, 0.8)
     for a, b, tone in ((left, front, 0.75), (front, right, 0.58)):
         for drop in (19.8, 21):
-            p.line([_on_wall(a, b, 0, drop), _on_wall(a, b, 1, drop)], shade(wall, tone))
+            _band(p, a, b, drop, shade(wall, tone))
     lit_spots = {(0.45, 5), (0.92, 11), (0.2, 14), (0.7, 2)}
     for drop in tuple(2 + 3 * f for f in range(6)):
         for t in (0.2, 0.45, 0.7, 0.92):
@@ -366,8 +340,8 @@ def hotel() -> Sprite:
     )
     _windows(p, front, right, (0.5,), (19.5,), 1.5, shade(LIT, 0.75))
     for a, b, tone in ((left, front, 1.15), (front, right, 0.9)):
-        p.line([_on_wall(a, b, 0, 0.6), _on_wall(a, b, 1, 0.6)], shade(wall, tone))
-        p.line([_on_wall(a, b, 0, 18.4), _on_wall(a, b, 1, 18.4)], shade(wall, tone))
+        _band(p, a, b, 0.6, shade(wall, tone))
+        _band(p, a, b, 18.4, shade(wall, tone))
     p.box(0, -height, s - 1, 3, slate, shade(slate, 0.8))
     for x in (-3, 0, 3):
         p.point(x, -height - 1 + abs(x) * 0.5, (236, 214, 140))

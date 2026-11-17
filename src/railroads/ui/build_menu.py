@@ -4,6 +4,7 @@ trains and stations windows; and drawing the track, routes, station reach and fa
 import itertools
 import math
 import time
+import weakref
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
@@ -31,7 +32,7 @@ from railroads.sim.finance import (
     dollars,
 )
 from railroads.sim.goods import Good
-from railroads.sim.grids import Cell, Grid
+from railroads.sim.grids import Cell, FloatArray, Grid
 from railroads.sim.ladders import Points
 from railroads.sim.railway import Railway
 from railroads.sim.routes import Route
@@ -39,7 +40,16 @@ from railroads.sim.tilemap import Relief
 from railroads.sim.track_rules import BRIDGE_RULES, RELIEF_RULES, TUNNEL_RULES, TrackBed
 from railroads.ui.iso_camera import IsoCamera, Vec2
 from railroads.ui.stations_window import StationsWindow
-from railroads.ui.theme import BORDER, BRASS, GOOD_COLORS, color_u32, toggle_button
+from railroads.ui.theme import (
+    BORDER,
+    BRASS,
+    GOOD_COLORS,
+    OVERLAY_FLAGS,
+    Rgba,
+    color_u32,
+    rgba_u32,
+    toggle_button,
+)
 from railroads.ui.trains_window import TrainsWindow
 
 BALLAST = (0.36, 0.3, 0.24, 1.0)
@@ -60,8 +70,6 @@ SHARED_FILL = (0.82, 0.86, 0.82, 0.6)
 STATION_FILL = (0.27, 0.35, 0.8, 0.85)
 CELL_LINE = (0.25, 0.22, 0.2, 0.5)
 COLLECTION_RING = (0.4, 0.6, 1.0, 0.95)
-BLOCKED = (0.95, 0.3, 0.25, 0.9)
-type Rgba = tuple[float, float, float, float]
 
 ENGINE = (0.14, 0.15, 0.17, 1.0)
 CAB = (0.62, 0.14, 0.1, 1.0)
@@ -92,7 +100,13 @@ class Tool(Enum):
     TRACK = "Track"
     BULLDOZE = "Bulldoze"
     MOVE_STATION = "Move station"
+    ADD_PLATFORM = "Add platform"
 
+
+# The tools that place a station or a platform, which Q turns.
+STATION_TOOLS = frozenset((Tool.STATION, Tool.MOVE_STATION, Tool.ADD_PLATFORM))
+# The tools that note what they would cost in the cell under the mouse.
+PRICED_TOOLS = STATION_TOOLS | {Tool.BULLDOZE}
 
 HILLS_PRICE = TRACK_PRICE * RELIEF_RULES[Relief.HILLS].price_factor
 BRIDGE_PRICE = TRACK_PRICE * BRIDGE_RULES.price_factor
@@ -118,6 +132,10 @@ HINTS = {
         f"{dollars(DEMOLITION_PER_POINT[Points.INDUSTRY])}, a skyscraper "
         f"{dollars(SKYSCRAPER_DEMOLITION)}; track a quarter of its price, a station "
         f"{dollars(STATION_REMOVAL)}. One-off buildings stay. Right click cancels."
+    ),
+    Tool.ADD_PLATFORM: (
+        "Click a free cell beside the station for its new platform; Q turns its track. Clearing "
+        "the cell costs what the buildings there cost to take down. Right click cancels."
     ),
     Tool.MOVE_STATION: (
         f"Click where the station goes: {dollars(STATION_PRICE)} and clearing the cell. Its trains, "
@@ -168,6 +186,9 @@ class BuildMenu:
     # The route to the cell under the mouse, worked out when that cell changes.
     preview: Route | None = None
     preview_to: Cell | None = None
+    # What the previewed route was planned for: where it runs, the track it lays and the
+    # constructions' version then.
+    preview_for: tuple[object, ...] = ()
     message: str = ""
     message_at: float = -MESSAGE_SECONDS
     # What the previewed track would cost.
@@ -193,14 +214,7 @@ class BuildMenu:
         imgui.set_next_window_pos(
             (x, bottom_right[1] - BAR_MARGIN), imgui.Cond_.always.value, (0.5, 1.0)
         )
-        flags = (
-            imgui.WindowFlags_.no_decoration.value
-            | imgui.WindowFlags_.always_auto_resize.value
-            | imgui.WindowFlags_.no_move.value
-            | imgui.WindowFlags_.no_saved_settings.value
-            | imgui.WindowFlags_.no_focus_on_appearing.value
-            | imgui.WindowFlags_.no_nav.value
-        )
+        flags = OVERLAY_FLAGS | imgui.WindowFlags_.no_move.value
         imgui.push_style_var(imgui.StyleVar_.window_rounding.value, 12.0)
         imgui.push_style_var(imgui.StyleVar_.window_padding.value, imgui.ImVec2(10, 8))
         imgui.begin("##build bar", flags=flags)
@@ -265,7 +279,7 @@ class BuildMenu:
             imgui.text_disabled(HINTS[self.tool])
         if self.tool == Tool.TRACK and self.preview is not None and self.preview_price is not None:
             imgui.text_colored(imgui.ImVec4(*BRASS), f"This track: {dollars(self.preview_price)}")
-        if self.hover_note and self.tool in (Tool.STATION, Tool.BULLDOZE, Tool.MOVE_STATION):
+        if self.hover_note and self.tool in PRICED_TOOLS:
             imgui.text_colored(imgui.ImVec4(*BRASS), self.hover_note)
         imgui.pop_text_wrap_pos()
         imgui.spacing()
@@ -286,6 +300,7 @@ class BuildMenu:
         self.track_from = None
         self.preview = None
         self.preview_to = None
+        self.preview_for = ()
         self.preview_price = None
 
 
@@ -356,8 +371,8 @@ class _Box:
 
 
 def _fill(draw_list: imgui.ImDrawList, quad: list[imgui.ImVec2], color: Rgba) -> None:
-    draw_list.add_quad_filled(*quad, _color(color))
-    draw_list.add_quad(*quad, _color(OUTLINE), 1.0)
+    draw_list.add_quad_filled(*quad, rgba_u32(color))
+    draw_list.add_quad(*quad, rgba_u32(OUTLINE), 1.0)
 
 
 def _draw_engine(draw_list: imgui.ImDrawList, box: _Box) -> None:
@@ -365,9 +380,9 @@ def _draw_engine(draw_list: imgui.ImDrawList, box: _Box) -> None:
     _fill(draw_list, box.quad(half, -half, CAR_WIDTH * 0.55), ENGINE)
     _fill(draw_list, box.quad(-half * 0.25, -half, CAR_WIDTH * 0.7), CAB)
     chimney = box.point(half * 0.65)
-    draw_list.add_circle_filled(chimney, max(1.5, box.scale * 0.035), _color(OUTLINE))
+    draw_list.add_circle_filled(chimney, max(1.5, box.scale * 0.035), rgba_u32(OUTLINE))
     draw_list.add_circle_filled(
-        box.point(half * 0.65 + 0.06, 0.05), max(1.5, box.scale * 0.03), _color(SMOKE)
+        box.point(half * 0.65 + 0.06, 0.05), max(1.5, box.scale * 0.03), rgba_u32(SMOKE)
     )
 
 
@@ -383,12 +398,12 @@ def _draw_car(draw_list: imgui.ImDrawList, box: _Box, good: Good, full: bool) ->
             for side in (-0.3, 0.0, 0.3):
                 a = box.point(half * 0.9, CAR_WIDTH * side)
                 b = box.point(-half * 0.9, CAR_WIDTH * side)
-                draw_list.add_line(a, b, _color(load), max(1.5, box.scale * 0.03))
+                draw_list.add_line(a, b, rgba_u32(load), max(1.5, box.scale * 0.03))
         case Good.GOODS:
             _fill(draw_list, box.quad(half * 0.9, -half * 0.9, CAR_WIDTH * 0.5), load)
         case _:
             draw_list.add_quad_filled(
-                *box.quad(half * 0.8, -half * 0.8, CAR_WIDTH * 0.4), _color(load)
+                *box.quad(half * 0.8, -half * 0.8, CAR_WIDTH * 0.4), rgba_u32(load)
             )
 
 
@@ -400,8 +415,10 @@ def draw_station_reach(
     camera: IsoCamera,
     center: Vec2,
     reach: Callable[[Cell], tuple[int, int]],
+    platforms: Callable[[Cell], list[Cell]] = lambda _: [],
 ) -> None:
-    """Shades the cells stations reach, cell by cell as in Civilization: every station's area
+    """Shades the cells stations reach, from their own cells and their `platforms`, cell by
+    cell as in Civilization: every station's area
     where it hands goods out, the focused one (being placed, under the mouse or open) in its own
     colour, cells two stations share in grey, the border of where the focused station gathers
     goods, and the stations' own cells in solid blue. `reach` says how far each station hands
@@ -410,8 +427,9 @@ def draw_station_reach(
     owners: dict[Cell, set[Cell]] = {}
     shown = {*stations, focus}
     for station in shown:
-        for cell in grid.within(station, reach(station)[0]):
-            owners.setdefault(cell, set()).add(station)
+        for own in (station, *platforms(station)):
+            for cell in grid.within(own, reach(station)[0]):
+                owners.setdefault(cell, set()).add(station)
     hexes = [
         (
             grid.corners(*cell),
@@ -419,8 +437,12 @@ def draw_station_reach(
         )
         for cell, by in owners.items()
     ]
-    hexes += [(grid.corners(*station), STATION_FILL) for station in shown]
-    border = _reach_border(grid, focus, reach(focus)[1])
+    hexes += [
+        (grid.corners(*own), STATION_FILL)
+        for station in shown
+        for own in (station, *platforms(station))
+    ]
+    border = _reach_border(grid, (focus, *platforms(focus)), reach(focus)[1])
     plane = [corner for corners, _ in hexes for corner in corners]
     plane += [end for edge in border for end in edge]
     xs, ys = (np.array(values, dtype=np.float64) for values in zip(*plane, strict=True))
@@ -430,19 +452,19 @@ def draw_station_reach(
     for corners, fill in hexes:
         polygon = points[start : start + len(corners)]
         start += len(corners)
-        draw_list.add_convex_poly_filled(polygon, _color(fill))
-        draw_list.add_polyline(polygon, _color(CELL_LINE), 1.0, imgui.ImDrawFlags_.closed.value)
+        draw_list.add_convex_poly_filled(polygon, rgba_u32(fill))
+        draw_list.add_polyline(polygon, rgba_u32(CELL_LINE), 1.0, imgui.ImDrawFlags_.closed.value)
     for a, b in itertools.batched(points[start:], 2, strict=True):
-        draw_list.add_line(a, b, _color(COLLECTION_RING), 2.5)
+        draw_list.add_line(a, b, rgba_u32(COLLECTION_RING), 2.5)
 
 
 @lru_cache(maxsize=64)
 def _reach_border(
-    grid: Grid, station: Cell, steps: int
+    grid: Grid, cells: tuple[Cell, ...], steps: int
 ) -> tuple[tuple[tuple[float, float], tuple[float, float]], ...]:
-    """The border of the cells within `steps` of a station, worked out once: an open station
-    window draws it every frame, and finding it takes hundreds of lookups."""
-    return tuple(_border(grid, set(grid.within(station, steps))))
+    """The border of the cells within `steps` of a station's cells, worked out once: an open
+    station window draws it every frame, and finding it takes hundreds of lookups."""
+    return tuple(_border(grid, {near for cell in cells for near in grid.within(cell, steps)}))
 
 
 def _border(grid: Grid, cells: set[Cell]) -> list[tuple[tuple[float, float], tuple[float, float]]]:
@@ -472,12 +494,19 @@ def draw_track(
     thicker the closer the view. All the beds go down before any rail, so pieces that meet in a
     cell make one junction or crossing."""
     width = max(1.5, camera.cell_width / 10)
-    laid = constructions.track()
-    pieces = [
-        (piece, _piece_points(piece, constructions, camera, center))
-        for piece in (laid if planned is None else planned)
-    ]
-    shade = _color if planned is None else _greyed
+    if planned is None:
+        laid, plane = _laid_track(constructions)
+    else:
+        laid, plane = planned, _track_plane(planned, constructions.tile_map.grid)
+    pieces = _on_screen(laid, plane, camera, center, width * 4)
+    colors: dict[tuple[float, float, float, float], int] = {}
+
+    def shade(rgba: tuple[float, float, float, float]) -> int:
+        color = colors.get(rgba)
+        if color is None:
+            color = colors[rgba] = rgba_u32(rgba) if planned is None else _greyed(rgba)
+        return color
+
     for piece, points in pieces:
         bed = width * (1.6 + (1.4 if piece.width == TrackWidth.DOUBLE else 0.0))
         if piece.bed == TrackBed.BRIDGE:
@@ -504,24 +533,64 @@ def draw_track(
             draw_list.add_polyline(lifted, shade(WIRE), max(1.0, width * 0.35), 0)
 
 
-def _greyed(rgba: tuple[float, float, float, float]) -> int:
+def _greyed(rgba: Rgba) -> int:
     """A colour faded to a see-through grey, for track not laid yet."""
     r, g, b, a = rgba
     light = 0.3 * r + 0.59 * g + 0.11 * b
     grey = 0.4 * light + 0.6 * PLANNED_GREY
-    return _color((grey, grey, grey, a * PLANNED_OPACITY))
+    return rgba_u32((grey, grey, grey, a * PLANNED_OPACITY))
 
 
-def _piece_points(
-    piece: Track, constructions: Constructions, camera: IsoCamera, center: Vec2
-) -> list[imgui.ImVec2]:
-    grid = constructions.tile_map.grid
-    cx, cy = grid.center(*piece.cell)
-    # Halfway along each step, where the piece meets the one in the next cell.
+# The laid track of each Constructions and where its pieces run on the map, kept until the
+# railway changes.
+_LAID: weakref.WeakKeyDictionary[Constructions, tuple[int, list[Track], FloatArray]] = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _laid_track(constructions: Constructions) -> tuple[list[Track], FloatArray]:
+    kept = _LAID.get(constructions)
+    if kept is None or kept[0] != constructions.railway_version:
+        laid = list(constructions.track())
+        kept = (
+            constructions.railway_version,
+            laid,
+            _track_plane(laid, constructions.tile_map.grid),
+        )
+        _LAID[constructions] = kept
+    return kept[1], kept[2]
+
+
+def _track_plane(pieces: list[Track], grid: Grid) -> FloatArray:
+    """Where each piece runs on the map, as an (n, 3, 2) array: from halfway along the step into
+    the cell it comes from, where it meets the piece there, through the cell's centre to halfway
+    along the step to the cell it leads to."""
+    if not pieces:
+        return np.zeros((0, 3, 2))
+    rows, cols = np.array([piece.cell for piece in pieces]).T
+    centers = np.stack(grid.center(rows, cols), axis=-1)
     offsets = grid.track_steps() / 2
-    start, end = (offsets[point] for point in piece.ends)
-    plane = [(cx + start[0], cy + start[1]), (cx, cy), (cx + end[0], cy + end[1])]
-    return [imgui.ImVec2(*camera.to_screen(x, y, center)) for x, y in plane]
+    ends = np.array([piece.ends for piece in pieces])
+    return np.stack([centers + offsets[ends[:, 0]], centers, centers + offsets[ends[:, 1]]], 1)
+
+
+def _on_screen(
+    pieces: list[Track], plane: FloatArray, camera: IsoCamera, center: Vec2, margin: float
+) -> list[tuple[Track, list[imgui.ImVec2]]]:
+    """The pieces that show on the screen, each with its line's points on it."""
+    xs, ys = camera.to_screen(plane[..., 0], plane[..., 1], center)
+    display = imgui.get_io().display_size
+    shown = (
+        (xs.max(axis=1) >= -margin)
+        & (xs.min(axis=1) <= display.x + margin)
+        & (ys.max(axis=1) >= -margin)
+        & (ys.min(axis=1) <= display.y + margin)
+    )
+    indices = np.flatnonzero(shown).tolist()
+    return [
+        (pieces[index], [imgui.ImVec2(x, y) for x, y in zip(row_x, row_y, strict=True)])
+        for index, row_x, row_y in zip(indices, xs[shown].tolist(), ys[shown].tolist(), strict=True)
+    ]
 
 
 def _parallel(points: list[imgui.ImVec2], side: float) -> list[imgui.ImVec2]:
@@ -540,7 +609,3 @@ def _parallel(points: list[imgui.ImVec2], side: float) -> list[imgui.ImVec2]:
         dot = (mx * before[0] + my * before[1]) or 1.0
         moved.append(imgui.ImVec2(point.x + mx / dot * side, point.y + my / dot * side))
     return moved
-
-
-def _color(rgba: tuple[float, float, float, float]) -> int:
-    return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))

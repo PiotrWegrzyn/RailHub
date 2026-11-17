@@ -19,9 +19,10 @@ from railroads.sim.demand import capacity_of
 from railroads.sim.economy import (
     COLLECTION_RADIUS,
     DELIVERY_RADIUS,
-    INPUT_STOCK,
     StationOrder,
     Trade,
+    input_stock,
+    wants_of,
 )
 from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.goods import (
@@ -32,14 +33,15 @@ from railroads.sim.goods import (
     TRAVELLERS,
     Good,
     Need,
-    boosts_of,
     makes_of,
     needs_of,
     price_of,
 )
-from railroads.sim.grids import Cell, flat_within
+from railroads.sim.grids import Cell, Within, flat_within_any
 from railroads.sim.ladders import PASSENGERS_PER_POINT
+from railroads.sim.power_plants import powered_points
 from railroads.sim.station_goods import StationGoods
+from railroads.sim.steps import Steps, finish
 from railroads.sim.tech import GOOD_TREES, Tree
 from railroads.sim.trains import CAR_CAPACITY, MAX_CARS
 
@@ -73,11 +75,22 @@ class StationTrade:
             delivery, collection = railway.reach(station)
             freight = {g: a for g, a in goods.stockpile.items() if g not in TRAVELLERS}
             orders[station] = StationOrder(
-                dict(goods.brought), goods.limit, delivery, collection, freight, goods.kept
+                dict(goods.brought),
+                goods.limit,
+                delivery,
+                collection,
+                freight,
+                goods.kept,
+                tuple(self._growth.constructions.platforms(station)),
             )
         return orders
 
     def settle(self, trade: Trade) -> None:
+        finish(self.settle_steps(trade))
+
+    def settle_steps(self, trade: Trade) -> Steps[None]:
+        """settle in a few steps, which a caller can spread over frames; nothing else may change
+        the game between them."""
         railway = self._growth.railway
         if railway is None:
             return
@@ -89,10 +102,8 @@ class StationTrade:
             goods = railway.station_goods(station)
             for good, amount in gathered.items():
                 goods.stockpile[good] = goods.stockpile.get(good, 0.0) + amount
-        for station, supplied in trade.supplied.items():
-            goods = railway.station_goods(station)
-            for good, amount in supplied.items():
-                goods.stockpile[good] = max(0.0, goods.stockpile.get(good, 0.0) - amount)
+        railway.fuel_month(trade, powered_points(self._growth))
+        yield
         capacity = {}
         stations = railway.stations()
         for station, counts in zip(stations, self._ring_counts(stations), strict=True):
@@ -100,45 +111,61 @@ class StationTrade:
             goods = railway.station_goods(station)
             for good, amount in travellers.items():
                 goods.board(good, amount)
-            capacity[station] = capacity_of(self._needs(counts) | as_needs(travellers))
+            needs = self._short_after_local(station, self._needs(counts), trade)
+            capacity[station] = capacity_of(needs | as_needs(travellers))
         railway.year = self._growth.year
         railway.turn_month(capacity)
+        yield
         for station, handed_for in trade.handed_for.items():
             for (need, good), amount in handed_for.items():
                 railway.pay_for(station, need, good, amount)
-        for station, supplied_for in trade.supplied_for.items():
-            for (need, good), amount in supplied_for.items():
-                railway.pay_for_passing(station, need, good, amount)
+
+    def _short_after_local(
+        self, station: Cell, needs: dict[Need, float], trade: Trade | None
+    ) -> dict[Need, float]:
+        """What the buildings a station hands goods out to need, less what they got this month
+        from the goods buildings around handed out on their own."""
+        if trade is None or not trade.cells.size or not trade.local:
+            return needs
+        ring = self.inner_ring(station)
+        positions = np.searchsorted(trade.cells, ring)
+        inside = (positions < trade.cells.size) & (
+            trade.cells[np.minimum(positions, trade.cells.size - 1)] == ring
+        )
+        positions = positions[inside]
+        short = {}
+        for need, amount in needs.items():
+            local = trade.local.get(need)
+            got = float(local[positions].sum()) if local is not None else 0.0
+            short[need] = max(0.0, amount - got)
+        return short
 
     def hand_out_now(self, station: Cell, good: Good) -> None:
-        """Hands a good that has just reached a station to the buildings around it that still
-        want it this month, the nearest first, at once, unless the good is kept for trains: what
-        trains brought, then the stockpile. Each takes up to what it needs in a month, less what
-        it took already; a processor up to the room in its stockpile. They pay as they take."""
+        """Hands a good trains have just brought to a station to the buildings around it that
+        still want it this month, the nearest first, at once, unless the good is kept for trains.
+        Each takes up to what it needs in a month, less what it took already; a processor up to
+        the room in its stockpile. They pay as they take."""
         growth, railway = self._growth, self._growth.railway
         if railway is None or good in TRAVELLERS:
             return
         goods = railway.station_goods(station)
         if good in goods.kept:
             return
-        within = flat_within(growth.grid, station, railway.reach(station)[0])
+        within = self._within(station, railway.reach(station)[0])
         cells = within.cells[np.argsort(within.steps, kind="stable")]
         economy, year = growth.economy, growth.year
         if economy.taken is None:
             economy.taken = {}
         for need in MEETS[good]:
             for kind, count in growth.counts.items():
-                recipe = RECIPES.get(kind)
-                if recipe is not None:
-                    if need not in recipe.inputs(year) and need not in boosts_of(kind, year):
-                        continue
-                elif need not in needs_of(kind, year):
+                if need not in wants_of(kind, year):
                     continue
+                recipe = RECIPES.get(kind)
                 here = count.ravel()[cells]
                 for cell, n in zip(cells[here > 0].tolist(), here[here > 0].tolist(), strict=True):
                     if recipe is not None:
                         stock = economy.stock[(kind, need)]
-                        want = INPUT_STOCK * n - stock[cell]
+                        want = input_stock(kind) * n - stock[cell]
                     else:
                         taken = economy.taken.setdefault((kind, need), {})
                         want = n * NEEDS[kind][need] - taken.get(cell, 0.0)
@@ -149,29 +176,26 @@ class StationTrade:
                         stock[cell] += given
                     else:
                         taken[cell] = taken.get(cell, 0.0) + given
-                    if not goods.held(good):
+                    if goods.brought.get(good, 0.0) <= 0:
                         return
 
     def _give(
         self, station: Cell, goods: StationGoods, need: Need, good: Good, want: float
     ) -> float:
-        """Gives up to `want` of a good from a station, first of what trains brought, then of its
-        stockpile, and pays for it; returns how much went."""
+        """Gives up to `want` of a good trains brought to a station, and pays for it; returns how
+        much went."""
         railway = self._growth.railway
         assert railway is not None
-        given = 0.0
-        brought = min(want, goods.brought.get(good, 0.0))
-        if brought > 0:
-            goods.release(good, brought)
-            railway.pay_for(station, need, good, brought)
-            given += brought
-        held = goods.stockpile.get(good, 0.0)
-        stocked = min(want - given, held)
-        if stocked > 0:
-            goods.stockpile[good] = held - stocked
-            railway.pay_for_passing(station, need, good, stocked)
-            given += stocked
-        return given
+        given = min(want, goods.brought.get(good, 0.0))
+        if given > 0:
+            goods.release(good, given)
+            railway.pay_for(station, need, good, given)
+        return max(given, 0.0)
+
+    @property
+    def has_traded(self) -> bool:
+        """Whether the buildings have had a month's trade yet, so what they are short of is known."""
+        return self._growth.trade is not None
 
     def short_of(self, station: Cell) -> dict[Need, float]:
         """What the buildings a station hands goods out to are still short of this month, need by
@@ -208,7 +232,8 @@ class StationTrade:
         railway = self._growth.railway
         if railway is not None:
             (counts,) = self._ring_counts([station])
-            needs = self._needs(counts) | as_needs(self._travellers(counts))
+            needs = self._short_after_local(station, self._needs(counts), self._growth.trade)
+            needs |= as_needs(self._travellers(counts))
             railway.station_demand(station).capacity = capacity_of(needs)
 
     def inner_ring(self, station: Cell) -> npt.NDArray[np.intp]:
@@ -216,7 +241,12 @@ class StationTrade:
         written to."""
         railway = self._growth.railway
         radius = DELIVERY_RADIUS if railway is None else railway.reach(station)[0]
-        return flat_within(self._growth.grid, station, radius).cells
+        return self._within(station, radius).cells
+
+    def _within(self, station: Cell, radius: int) -> Within:
+        """The cells within `radius` of a station or any of its platforms."""
+        cells = tuple(self._growth.constructions.station_cells(station))
+        return flat_within_any(self._growth.grid, cells, radius)
 
     def supplies(self, station: Cell) -> dict[Good, float]:
         """What the station has to send on each month: the goods buildings make within the
@@ -224,7 +254,7 @@ class StationTrade:
         the buildings it hands out to send."""
         railway = self._growth.railway
         radius = COLLECTION_RADIUS if railway is None else railway.reach(station)[1]
-        cells = flat_within(self._growth.grid, station, radius).cells
+        cells = self._within(station, radius).cells
         made: dict[Good, float] = {}
         for kind, count in self._growth.counts.items():
             n = float(count.ravel()[cells].sum())
@@ -264,6 +294,8 @@ class StationTrade:
         """The passengers and mail these many buildings of each kind send, and want, in a month."""
         passengers = 0
         for kind, count in counts.items():
+            if not count:
+                continue
             points, value = self._growth.rule.points[kind]
             passengers += PASSENGERS_PER_POINT.get(points, 0) * value * count
         return {
@@ -276,11 +308,11 @@ class StationTrade:
         year = self._growth.year
         needs: dict[Need, float] = {}
         for kind in NEEDS:
-            if kind not in counts:
+            count = counts.get(kind)
+            if not count:
                 continue
-            count = float(counts[kind])
             for need, amount in needs_of(kind, year).items():
-                needs[need] = needs.get(need, 0.0) + count * amount
+                needs[need] = needs.get(need, 0.0) + float(count) * amount
         return needs
 
     def update_reach(self) -> None:

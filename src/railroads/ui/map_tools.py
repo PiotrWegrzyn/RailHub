@@ -2,22 +2,42 @@
 laying track, bulldozing and moving stations through the game (railroads.sim.game), the price
 note for the cell under the pointer, and the planned track shown once the pointer rests."""
 
+import time
 from typing import TYPE_CHECKING
 
 from imgui_bundle import imgui
 
-from railroads.sim.constructions import Station, Track
+from railroads.sim.constructions import Track
 from railroads.sim.demolition import bulldoze_price, station_site_price
 from railroads.sim.finance import STATION_PRICE, dollars
 from railroads.sim.grids import Cell
-from railroads.sim.routes import Route, plan_route, route_price, station_way
-from railroads.ui.build_menu import Tool
+from railroads.sim.routes import Route, plan_route_steps, route_price, station_way
+from railroads.sim.steps import Steps, finish
+from railroads.ui.build_menu import PRICED_TOOLS, STATION_TOOLS, Tool
 
 if TYPE_CHECKING:
+    from railroads.sim.game import Done
     from railroads.ui.map_view import MapView
 
 # How long the pointer must rest on a cell, in seconds, before the track planned to it is shown.
 PREVIEW_REST_S = 0.12
+# How long planning the previewed track may take of each frame, in seconds; a long route is
+# planned over several frames rather than stalling one.
+PREVIEW_STEP_S = 0.006
+_UNFINISHED = object()
+
+
+def _work_on[T](steps: Steps[T], seconds: float) -> T | object:
+    """Takes steps for about `seconds`, at least one; returns what they came to, or
+    _UNFINISHED."""
+    until = time.perf_counter() + seconds
+    while True:
+        try:
+            next(steps)
+        except StopIteration as done:
+            return done.value
+        if time.perf_counter() >= until:
+            return _UNFINISHED
 
 
 class MapTools:
@@ -27,43 +47,57 @@ class MapTools:
         # is worked out only once it stops there.
         self._resting_on: Cell | None = None
         self._resting_since = 0.0
+        # The track being planned to the cell the pointer rests on, a few steps a frame, and
+        # what it is planned for (_track_wanted).
+        self._planning: tuple[tuple[object, ...], Steps[Route | None]] | None = None
 
     def click(self, cell: Cell) -> None:
         view = self._view
         build, game = view.build, view.game
         match build.tool:
             case Tool.NONE:
-                if any(isinstance(built, Station) for built in view.constructions.at(cell)):
-                    view.open_station(cell)
+                station = view.constructions.main_station(cell)
+                if station is not None:
+                    view.open_station(station)
             case Tool.STATION:
                 done = game.build_station(cell, self.station_ends(cell))
-                build.say(done.message)
-                if done.ok:
+                if self._said(done):
                     view.buildings_changed(done.changed)
             case Tool.BULLDOZE:
                 self._bulldoze(cell)
             case Tool.MOVE_STATION:
                 self._move_station(cell)
+            case Tool.ADD_PLATFORM:
+                self._add_platform(cell)
             case Tool.TRACK:
                 if build.track_from is None:
                     build.track_from = cell
                     build.say("Now click where the track goes.")
                     return
+                planned = self._planned(cell)
                 done = game.lay_track(
-                    build.track_from, cell, build.track_width, build.electric, build.maglev
+                    build.track_from,
+                    cell,
+                    build.track_width,
+                    build.electric,
+                    build.maglev,
+                    planned,
                 )
-                build.say(done.message)
-                if not done.ok:
+                if not self._said(done):
                     return
                 view.buildings_changed(done.changed)
                 build.track_from = cell
                 build.preview, build.preview_to = None, None
 
+    def _said(self, done: Done) -> bool:
+        """Tells the player how a build went; whether it was done."""
+        self._view.build.say(done.message)
+        return done.ok
+
     def _bulldoze(self, cell: Cell) -> None:
         view = self._view
         done = view.game.bulldoze(cell)
-        view.build.say(done.message)
-        if not done.ok:
+        if not self._said(done):
             return
         if view.station_window.station == cell:
             view.station_window.station = None
@@ -76,12 +110,33 @@ class MapTools:
             build.say("The station can't go there.")
             return
         done = view.game.move_station(build.moving, cell, self.station_ends(cell))
-        build.say(done.message)
-        if not done.ok:
+        if not self._said(done):
             return
         build.choose(Tool.NONE)
         view.station_window.station = cell
         view.buildings_changed(done.changed)
+
+    def _add_platform(self, cell: Cell) -> None:
+        view = self._view
+        build = view.build
+        if build.moving is None:
+            return
+        station = build.moving
+        done = view.game.add_platform(station, cell, self.station_ends(cell))
+        if not self._said(done):
+            return
+        view.buildings_changed(done.changed)
+        if view.railway.platforms_left(station):
+            build.say(f"{done.message} Click where the next one goes.")
+            return
+        build.choose(Tool.NONE)
+
+    def start_adding_platform(self, station: Cell) -> None:
+        """Lets the next click choose where a station's new platform goes."""
+        build = self._view.build
+        build.choose(Tool.ADD_PLATFORM)
+        build.moving = station
+        build.say("Click a free cell beside the station for its new platform; Q turns it.")
 
     def start_moving(self, station: Cell) -> None:
         """Lets the next click choose where a station goes."""
@@ -115,7 +170,7 @@ class MapTools:
     def update_hover_note(self, cell: Cell | None) -> None:
         """What the chosen tool would cost in the cell under the mouse."""
         build, constructions = self._view.build, self._view.constructions
-        if cell is None or build.tool not in (Tool.STATION, Tool.BULLDOZE, Tool.MOVE_STATION):
+        if cell is None or build.tool not in PRICED_TOOLS:
             build.hover_note = ""
             return
         if build.tool == Tool.BULLDOZE:
@@ -123,6 +178,13 @@ class MapTools:
             build.hover_note = "" if price is None else f"Clearing this cell: {dollars(price)}"
             return
         site = station_site_price(constructions, cell)
+        if build.tool == Tool.ADD_PLATFORM:
+            build.hover_note = (
+                "A platform can't go here"
+                if site is None
+                else f"New platform here: {dollars(site)}. Q turns it."
+            )
+            return
         build.hover_note = (
             "A station can't go here"
             if site is None
@@ -131,9 +193,33 @@ class MapTools:
             + ". Q turns it."
         )
 
+    def _planned(self, cell: Cell) -> Route | None:
+        """The route already planned, or being planned, for track to `cell` as the tool lays it
+        now, if there is one."""
+        build, wanted = self._view.build, self._track_wanted(cell)
+        if build.preview_for == wanted:
+            return build.preview
+        if self._planning is not None and self._planning[0] == wanted:
+            steps, self._planning = self._planning[1], None
+            return finish(steps)
+        return None
+
+    def _track_wanted(self, cell: Cell) -> tuple[object, ...]:
+        """What track from where it starts to `cell` would be planned for, so a route planned
+        for the same is laid as it is."""
+        build = self._view.build
+        return (
+            build.track_from,
+            cell,
+            build.track_width,
+            build.electric,
+            build.maglev,
+            self._view.constructions.version,
+        )
+
     def update_preview(self, cell: Cell | None) -> None:
         build, constructions = self._view.build, self._view.constructions
-        if build.tool in (Tool.STATION, Tool.MOVE_STATION) and cell is not None:
+        if build.tool in STATION_TOOLS and cell is not None:
             build.preview = Route([cell], [Track(cell, self.station_ends(cell))], 0.0)
             build.preview_to, build.preview_price = cell, None
             return
@@ -146,15 +232,20 @@ class MapTools:
                 self._resting_on, self._resting_since = cell, now
             if now - self._resting_since < PREVIEW_REST_S:
                 return
-            build.preview_to = cell
-            build.preview = plan_route(
-                constructions,
-                build.track_from,
-                cell,
-                build.track_width,
-                build.electric,
-                build.maglev,
-            )
-            build.preview_price = (
-                None if build.preview is None else route_price(constructions, build.preview)
-            )
+            wanted = self._track_wanted(cell)
+            if self._planning is None or self._planning[0] != wanted:
+                steps = plan_route_steps(
+                    constructions,
+                    build.track_from,
+                    cell,
+                    build.track_width,
+                    build.electric,
+                    build.maglev,
+                )
+                self._planning = wanted, steps
+            route = _work_on(self._planning[1], PREVIEW_STEP_S)
+            if route is _UNFINISHED:
+                return
+            self._planning = None
+            build.preview_to, build.preview_for, build.preview = cell, wanted, route
+            build.preview_price = None if route is None else route_price(constructions, route)

@@ -10,7 +10,7 @@ from imgui_bundle import imgui
 
 from railroads.sim.clock import SPEEDS
 from railroads.sim.finance import Finances, dollars
-from railroads.ui.theme import BRASS, GONE, GROWN, danger_button, toggle_button
+from railroads.ui.theme import BRASS, GONE, GROWN, danger_button, tip, toggle_button
 
 if TYPE_CHECKING:
     from railroads.ui.app import App
@@ -53,7 +53,9 @@ def draw_top_bar(app: App) -> None:
     if toggle_button(fa.ICON_FA_FLASK, app.tech.open, "Tech trees (R)", size):
         app.tech.open = not app.tech.open
     imgui.same_line(0, 4)
-    if toggle_button(fa.ICON_FA_QUESTION_CIRCLE, app.help.open, "Buildings and goods (H)", size):
+    if toggle_button(
+        fa.ICON_FA_QUESTION_CIRCLE, app.help.open, "Buildings, goods and engines (H)", size
+    ):
         app.help.open = not app.help.open
     if app.saves is not None:
         imgui.same_line(0, 4)
@@ -105,13 +107,11 @@ def draw_view_controls(view: MapView) -> None:
     camera, minimap = view.camera, view.minimap
     if imgui.button(f"{fa.ICON_FA_SEARCH_MINUS}"):
         camera.zoom(-1, (0, 0), (0, 0))
-    if imgui.is_item_hovered():
-        imgui.set_tooltip("Zoom out (-)")
+    tip("Zoom out (-)")
     imgui.same_line(0, 4)
     if imgui.button(f"{fa.ICON_FA_SEARCH_PLUS}"):
         camera.zoom(1, (0, 0), (0, 0))
-    if imgui.is_item_hovered():
-        imgui.set_tooltip("Zoom in (+)")
+    tip("Zoom in (+)")
     imgui.same_line()
     if toggle_button(f"{fa.ICON_FA_MAP}", minimap.shown, "Map overview (M)"):
         minimap.shown = not minimap.shown

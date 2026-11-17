@@ -11,15 +11,14 @@ import numpy.typing as npt
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.sim.constructions import BuildingKind
+from railroads.sim.constructions import GREW_FROM, MERGED, BuildingKind
 from railroads.sim.goods import FITS, MAKES, NEEDS
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.ui.iso_camera import Vec2
-from railroads.ui.theme import TEXT, TEXT_DIM, color_u32, draw_good_icon
+from railroads.ui.theme import SIDE_WINDOW_POS, TEXT, TEXT_DIM, color_u32, draw_good_icon
 
 WINDOW_SIZE = (360.0, 440.0)
-WINDOW_POS = (16.0, 96.0)
 ROW_HEIGHT = 24.0
 ROW_ICON = 18.0
 FOOTER_HEIGHT = 92.0
@@ -36,12 +35,18 @@ def goods_of(kind: BuildingKind) -> frozenset[str]:
     return frozenset(made | wanted | meeting)
 
 
+def _alphabetical(kind: BuildingKind) -> tuple[str, int]:
+    base = GREW_FROM.get(kind, kind)
+    return base.value, (base, *MERGED.get(base, ())).index(kind)
+
+
 def kinds_matching(query: str) -> list[BuildingKind]:
     """The kinds of building a search finds: those named by it first, then those trading a good
-    named by it, each in alphabetical order."""
+    named by it, each in alphabetical order with big and mega works after the works they grew
+    from."""
     words = query.lower().split()
     named, trading = [], []
-    for kind in sorted(BuildingKind, key=lambda k: k.value):
+    for kind in sorted(BuildingKind, key=_alphabetical):
         name = kind.value.lower()
         if all(word in name for word in words):
             named.append(kind)
@@ -130,7 +135,7 @@ class BuildingSearch:
         """The window, if it is open: `visit` shows a cell and `around` is the view's centre."""
         if not self.open:
             return
-        imgui.set_next_window_pos(WINDOW_POS, imgui.Cond_.first_use_ever.value)
+        imgui.set_next_window_pos(SIDE_WINDOW_POS, imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
         expanded, still_open = imgui.begin(f"{fa.ICON_FA_SEARCH}  Find buildings###find", True)
         if expanded:
