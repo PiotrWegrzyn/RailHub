@@ -19,6 +19,7 @@ from railroads.ui.pixel.art import (
     built_batch1,
     built_batch2,
     built_batch3,
+    built_batch4,
     built_farms,
     built_homes,
     built_works,
@@ -500,6 +501,18 @@ MODELS: dict[str, Callable[[], Sprite]] = {
     "machine_works": modelled(built_batch3.machine_works),
     "steel_mill": modelled(built_batch3.steel_mill),
     "cement_works": modelled(built_batch3.cement_works),
+    "shoe_factory": modelled(built_batch4.shoe_factory),
+    "plastics_works": modelled(built_batch4.plastics_works),
+    "appliance_factory": modelled(built_batch4.appliance_factory),
+    "paper_mill": modelled(built_batch4.paper_mill),
+    "printing_works": modelled(built_batch4.printing_works),
+    "porcelain_works": modelled(built_batch4.porcelain_works),
+    "refinery": modelled(built_batch4.refinery),
+    "chemical_works": modelled(built_batch4.chemical_works),
+    "electronics_plant": modelled(built_batch4.electronics_plant),
+    "car_factory": modelled(built_batch4.car_factory),
+    "barrel_maker": modelled(built_batch4.barrel_maker),
+    "coke_plant": modelled(built_batch4.coke_plant),
 }
 SPRITES |= MODELS
 
