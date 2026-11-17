@@ -589,8 +589,9 @@ that good exists.
 ### The military
 
 Every map gets 1 to 3 hidden patches of military ground, 10 to 18 cells each and far apart
-(`Deposit.GARRISON`), and outposts open from 1800 only there, faster the more military points are
-around, though slowly enough that a map has only 2 or 3 headquarters by 2050. Three outposts in
+(`Deposit.GARRISON`), and outposts open from 1800 only there. A game that begins after 1800 starts
+with one base and two outposts on each patch (`muster_garrisons` in `src/railroads/mapgen/seeding.py`);
+more outposts come slowly in play, a little faster the more military points are around. Three outposts in
 a neighbourhood become a base and three bases a headquarters. They are
 judged on what they get like any other building, so a garrison that is kept supplied grows far
 faster than one left alone, though one left without supplies never dies out. Each military point sends and wants 20 passengers and 4 pieces of mail

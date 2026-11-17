@@ -753,12 +753,13 @@ RESOURCES = (
 
 POP, IND = Points.POPULATION, Points.INDUSTRY
 
-# Soldiers: only on the few patches of military ground a map was given, where they build up fast.
+# Soldiers: only on the few patches of military ground a map was given, each of which starts play
+# with one base and two outposts (railroads.mapgen.seeding.muster_garrisons) and grows slowly.
 MILITARY = Ladder(
     kinds=(BuildingKind.OUTPOST, BuildingKind.BASE, BuildingKind.HEADQUARTERS),
     land=Land(deposit=Deposit.GARRISON),
-    base_chance=0.00045,
-    chance_per_doubling={Points.MILITARY: 0.00006},
+    base_chance=0.00015,
+    chance_per_doubling={Points.MILITARY: 0.00002},
     merges={
         BuildingKind.OUTPOST: Merge(needed=3, pulled_down=3),
         BuildingKind.BASE: Merge(needed=3, pulled_down=3),

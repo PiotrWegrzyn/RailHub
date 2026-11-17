@@ -5,6 +5,7 @@ import pytest
 
 from builders import flat_map
 from railroads.mapgen.deposits import GARRISON_SIZE, GARRISONS, place_deposits
+from railroads.mapgen.seeding import muster_garrisons
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Economy
 from railroads.sim.goods import Good, Need, needs_of
@@ -59,6 +60,35 @@ def test_outposts_do_not_open_before_1800() -> None:
     growth.run(600, np.random.default_rng(1))
 
     assert count(constructions, BuildingKind.OUTPOST) == 0
+
+
+def military_on(constructions: Constructions, cells: set[tuple[int, int]]) -> list[BuildingKind]:
+    return sorted(
+        (b.kind for b in constructions if isinstance(b, Building) and b.cell in cells),
+        key=lambda kind: kind.name,
+    )
+
+
+def test_each_patch_of_military_ground_starts_play_with_one_base_and_two_outposts() -> None:
+    first = {(5, 5), (5, 6), (6, 5), (6, 6)}
+    second = {(30, 30), (30, 31), (31, 30), (31, 31)}
+    constructions = Constructions(make_map(deposits=garrison_at(*first, *second)))
+    for _ in range(3):
+        constructions.build(Building((5, 5), BuildingKind.BASE))
+
+    muster_garrisons(constructions, 1850, np.random.default_rng(0))
+
+    wanted = [BuildingKind.BASE, BuildingKind.OUTPOST, BuildingKind.OUTPOST]
+    assert military_on(constructions, first) == wanted
+    assert military_on(constructions, second) == wanted
+
+
+def test_no_military_is_mustered_when_play_begins_before_1800() -> None:
+    constructions = Constructions(make_map(deposits=garrison_at((5, 5), (5, 6))))
+
+    muster_garrisons(constructions, 1750, np.random.default_rng(0))
+
+    assert military_on(constructions, {(5, 5), (5, 6)}) == []
 
 
 @pytest.mark.parametrize(
