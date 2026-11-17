@@ -424,7 +424,7 @@ FARMS = Ladder(
         vegetation={Vegetation.BARREN: 0.1, Vegetation.FOREST: 0.02},
         relief={Relief.HILLS: 0.25, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.2, Temperature.HOT: 0.6},
-        water={Terrain.RIVER: 6.5, Terrain.LAKE: 5.0, Terrain.SEA: 2.0},
+        water={Terrain.RIVER: 4.0, Terrain.LAKE: 4.0, Terrain.SEA: 2.0},
         open_field=OPEN_FIELD,
     ),
     base_chance=0.0000000373,

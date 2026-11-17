@@ -158,6 +158,8 @@ DRAWN_BY_KIND: Mapping[BuildingKind, Mapping[Points, float]] = MappingProxyType(
     {
         BuildingKind.REFINERY: {Points.ORE: 1.0, Points.TRADE: 2.0},
         BuildingKind.FACTORY: {Points.POPULATION: 1.0, Points.INDUSTRY: 1.5},
+        BuildingKind.BAKERY: {Points.POPULATION: 1.0},
+        BuildingKind.SAUSAGE_MAKER: {Points.POPULATION: 1.0},
         BuildingKind.CHEMICAL_WORKS: {Points.INDUSTRY: 1.5},
         BuildingKind.CEMENT_WORKS: {Points.INDUSTRY: 1.5},
         BuildingKind.GASWORKS: {Points.INDUSTRY: 1.0},

@@ -534,7 +534,8 @@ neighbourhood, a little likelier the more people live around.
 
 Every new map gets deposits from its own geography and seed (`railroads.mapgen.deposits`), shown
 as coloured specks on the ground and named in the hex details: iron ore, copper, gold and diamonds
-in mountains and the hills beside them; oil and salt on inland plains; fish on shores; wool on
+in mountains and the hills beside them; oil on inland plains; salt on sea coasts, hills and
+mountains; fish on shores; wool on
 grassy hills; grapes on mild hills; cotton on hot plains; coffee on hot hills; rubber in hot
 forest; and, very rarely, incense on any land off the mountains. A map gets a number of clusters for its land, spread apart, closer together where little
 land allows them; those that do not fit are left out, and a map without the land for a resource

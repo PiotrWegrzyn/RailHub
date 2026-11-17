@@ -60,6 +60,7 @@ def allowed_land(tile_map: TileMap) -> dict[Deposit, Mask]:
     hills = land & (relief == Relief.HILLS)
     rocky = mountains | (hills & mountains[rows, cols].any(axis=0))
     by_water = (~land)[rows, cols].any(axis=0)
+    by_sea = land & (tile_map.terrain == Terrain.SEA)[rows, cols].any(axis=0)
     plains = land & (relief != Relief.MOUNTAINS) & ~by_water
     hot = temperature == Temperature.HOT
     open_land = vegetation != Vegetation.FOREST
@@ -69,7 +70,7 @@ def allowed_land(tile_map: TileMap) -> dict[Deposit, Mask]:
         Deposit.GOLD: rocky,
         Deposit.DIAMONDS: rocky,
         Deposit.OIL: plains,
-        Deposit.SALT: plains,
+        Deposit.SALT: by_sea | mountains | hills,
         Deposit.FISH: land & by_water & (relief != Relief.MOUNTAINS),
         Deposit.WOOL: hills & (vegetation == Vegetation.GRASS),
         Deposit.GRAPES: hills & (temperature == Temperature.NORMAL) & open_land,
