@@ -281,7 +281,7 @@ def boxcab() -> Model:
         m.box((u - 0.12, u + 0.12), (-0.065, 0.065), (0.03, 0.07), FRAME)
         m.wheels([u - 0.07, u + 0.07], 0.035, FRAME, 0.075)
     m.box((-h, h), (-0.075, 0.075), (0.07, 0.09), FRAME)
-    m.box((-h + 0.01, h - 0.01), (-0.085, 0.085), (0.09, 0.27), BOXCAB_BROWN)
+    m.body((-h + 0.01, h - 0.01), (-0.085, 0.085), (0.09, 0.27), BOXCAB_BROWN)
     _roof(m, (-h, h), 0.09, (0.27, 0.285), ROOF_GREY)
     for end in (h - 0.01, -h + 0.01):
         for v in ((-0.065, -0.012), (0.012, 0.065)):
@@ -328,7 +328,7 @@ def express() -> Model:
     for u in (-0.26, 0.26):
         m.box((u - 0.1, u + 0.1), (-0.065, 0.065), (0.03, 0.07), FRAME)
         m.wheels([u - 0.055, u + 0.055], 0.035, FRAME, 0.075)
-    m.box((-body, body), (-0.085, 0.085), (0.07, 0.27), TEE_RED)
+    m.body((-body, body), (-0.085, 0.085), (0.07, 0.27), TEE_RED)
     m.panel((-body, body), (0.1, 0.15), 0.0855, TEE_BEIGE)
     for u in (-0.2, -0.1, 0.0, 0.1, 0.2):
         m.panel((u - 0.03, u + 0.03), (0.19, 0.23), 0.0856, WINDOW)
@@ -806,10 +806,10 @@ class Steam:
     def _tanks(self, m: Model, cab_front: float, front: float, top: float) -> None:
         h, z = self.half, self.middle
         bunker = -h + 0.07
-        m.box((-h, bunker), (-0.088, 0.088), (0.08, top - 0.03), self.body)
+        m.body((-h, bunker), (-0.088, 0.088), (0.08, top - 0.03), self.body)
         m.box((-h + 0.01, bunker - 0.005), (-0.075, 0.075), (top - 0.03, top - 0.01), COAL)
         self._cab(m, bunker, cab_front, top + 0.05)
-        m.box((cab_front, front - 0.12), (-0.092, 0.092), (0.08, z + 0.035), self.body)
+        m.body((cab_front, front - 0.12), (-0.092, 0.092), (0.08, z + 0.035), self.body)
         m.panel(
             (cab_front + 0.015, front - 0.135),
             (z - 0.035, z + 0.02),
@@ -845,7 +845,7 @@ class Steam:
 
     def _cab(self, m: Model, back: float, front: float, high: float) -> None:
         color = self.cab_color or self.body
-        m.box((back, front), (-0.09, 0.09), (0.08, high), color)
+        m.body((back, front), (-0.09, 0.09), (0.08, high), color)
         m.panel((back + 0.03, front - 0.03), (high - 0.1, high - 0.035), 0.0905, WINDOW)
         with m.coarse():
             m.box((back - 0.02, front + 0.02), (-0.1, 0.1), (high, high + 0.02), self.roof)
@@ -898,7 +898,7 @@ class Tender:
         if self.slats:
             self._slatted(m)
         else:
-            m.box((-h, h), (-w, w), (0.06, top), self.body)
+            m.body((-h, h), (-w, w), (0.06, top), self.body)
         if self.trim is not None:
             low, high = self.trim_z or (top - 0.035, top - 0.022)
             m.panel((-h + 0.02, h - 0.02), (low, high), w + 0.0005, self.trim)
@@ -1274,7 +1274,7 @@ class Unit:
         back = -front if self.both else -h
         skirt = floor + 0.04
         m.box((back, front), (-0.085, 0.085), (floor, skirt), self.stripe)
-        m.box((back, front), (-0.085, 0.085), (skirt, top), self.body)
+        m.body((back, front), (-0.085, 0.085), (skirt, top), self.body)
         _roof(m, (back, front), 0.085, (top, top + 0.015), self.roof)
         if self.band is not None:
             m.panel((back, front), (top - 0.09, top - 0.03), 0.0855, self.band)
@@ -1335,12 +1335,12 @@ class Unit:
         h, top = self.half, self.top
         cab = (h - 0.22, h - 0.1)
         m.box((-h, h), (-0.09, 0.09), (0.09, 0.1), FRAME)
-        m.box((h - 0.1, h - 0.01), (-0.05, 0.05), (0.1, top - 0.08), self.body)
-        m.box(cab, (-0.085, 0.085), (0.1, top), self.body)
+        m.body((h - 0.1, h - 0.01), (-0.05, 0.05), (0.1, top - 0.08), self.body)
+        m.body(cab, (-0.085, 0.085), (0.1, top), self.body)
         _roof(m, (cab[0] - 0.01, cab[1] + 0.01), 0.09, (top, top + 0.012), self.roof)
         m.box((cab[1] - 0.004, cab[1] + 0.004), (-0.07, 0.07), (top - 0.07, top - 0.02), WINDOW)
         m.panel((cab[0] + 0.02, cab[1] - 0.02), (top - 0.07, top - 0.02), 0.0855, WINDOW)
-        m.box((-h + 0.02, cab[0]), (-0.055, 0.055), (0.1, top - 0.025), self.body)
+        m.body((-h + 0.02, cab[0]), (-0.055, 0.055), (0.1, top - 0.025), self.body)
         m.panel((-h + 0.02, cab[0]), (top - 0.08, top - 0.055), 0.0555, self.stripe)
         m.panel((h - 0.1, h - 0.01), (0.15, 0.17), 0.0505, self.stripe)
         for k in range(self.vents):
@@ -1422,7 +1422,7 @@ def _bare(m: Model, good: Good, full: bool) -> None:
 def _van(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
     body, stripe = VANS[good]
-    m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
+    m.body((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
     _roof(m, (-h - 0.01, h + 0.01), 0.088, (0.24, 0.26), ROOF_GREY)
     with m.coarse():
         m.panel((-0.06, 0.06), (0.07, 0.22), 0.0805, shade(body, 0.7) if full else WINDOW)
@@ -1476,7 +1476,7 @@ def _stock_car(m: Model, good: Good, full: bool) -> None:
     """A van for animals with slatted sides: the animals show through the gaps."""
     h = CAR_HALF
     body, animal = VANS[good]
-    m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
+    m.body((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
     _roof(m, (-h - 0.01, h + 0.01), 0.088, (0.24, 0.26), ROOF_GREY)
     with m.coarse():
         m.panel((-h + 0.02, h - 0.02), (0.14, 0.2), 0.0805, animal if full else WINDOW)
@@ -1506,7 +1506,7 @@ def _stock_car(m: Model, good: Good, full: bool) -> None:
 def _hopper(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
     body, load = HOPPERS[good]
-    m.box((-h, h), (-0.08, 0.08), (0.06, 0.19), body)
+    m.body((-h, h), (-0.08, 0.08), (0.06, 0.19), body)
     m.panel((-h + 0.02, h - 0.02), (0.08, 0.17), 0.0805, shade(body, 0.85))
     if full:
         with m.coarse():
@@ -1713,7 +1713,7 @@ def _boxcar(m: Model, good: Good, full: bool) -> None:
         Good.BANANAS: (BANANA_VAN, (240, 236, 220)),
         Good.BREAD: (BREAD_VAN, (236, 226, 204)),
     }[good]
-    m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
+    m.body((-h, h), (-0.08, 0.08), (0.06, 0.24), body)
     _roof(m, (-h - 0.01, h + 0.01), 0.088, (0.24, 0.26), roof)
     door = shade(body, 0.7) if full else WINDOW
     with m.coarse():
@@ -1728,7 +1728,7 @@ def _boxcar(m: Model, good: Good, full: bool) -> None:
 def _grain_hopper(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
     body = GRAIN_HOPPER if good == Good.WHEAT else SUGAR_HOPPER
-    m.box((-h, h), (-0.08, 0.08), (0.06, 0.2), body)
+    m.body((-h, h), (-0.08, 0.08), (0.06, 0.2), body)
     m.panel((-h + 0.02, h - 0.02), (0.08, 0.18), 0.0805, shade(body, 0.85))
     if good == Good.SUGAR:
         with m.coarse():
@@ -1782,7 +1782,7 @@ def _fruit_wagon(m: Model, good: Good, full: bool) -> None:
 
 def _coal_hopper(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
-    m.box((-h, h), (-0.08, 0.08), (0.06, 0.19), HOPPER)
+    m.body((-h, h), (-0.08, 0.08), (0.06, 0.19), HOPPER)
     m.panel((-h + 0.02, h - 0.02), (0.08, 0.17), 0.0805, shade(HOPPER, 0.85))
     if full:
         with m.coarse():
@@ -1813,7 +1813,7 @@ def _log_wagon(m: Model, good: Good, full: bool) -> None:
 
 def _coach(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
-    m.box((-h, h), (-0.08, 0.08), (0.06, 0.23), COACH)
+    m.body((-h, h), (-0.08, 0.08), (0.06, 0.23), COACH)
     _roof(m, (-h - 0.01, h + 0.01), 0.086, (0.23, 0.25), ROOF_GREY, 0.275)
     with m.coarse():
         m.box((-h + 0.02, h - 0.02), (-0.07, 0.07), (0.25, 0.265), ROOF_GREY)
@@ -1860,7 +1860,7 @@ def dining() -> Model:
     h = CAR_HALF
     m.box((-h, h), (-0.07, 0.07), (0.035, 0.06), FRAME)
     m.wheels([h - 0.07, -h + 0.07], 0.035, FRAME, 0.075)
-    m.box((-h, h), (-0.08, 0.08), (0.06, 0.23), DINER)
+    m.body((-h, h), (-0.08, 0.08), (0.06, 0.23), DINER)
     m.panel((-h + 0.01, h - 0.01), (0.125, 0.215), 0.0805, DINER_CREAM)
     _roof(m, (-h - 0.01, h + 0.01), 0.086, (0.23, 0.25), ROOF_GREY)
     m.box((-h + 0.08, h - 0.02), (-0.045, 0.045), (0.25, 0.27), shade(ROOF_GREY, 0.8))
@@ -1881,7 +1881,7 @@ def dining() -> Model:
 
 def _mail_van(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
-    m.box((-h, h), (-0.08, 0.08), (0.06, 0.24), MAIL_VAN)
+    m.body((-h, h), (-0.08, 0.08), (0.06, 0.24), MAIL_VAN)
     _roof(m, (-h - 0.01, h + 0.01), 0.088, (0.24, 0.26), ROOF_GREY)
     m.panel((-h + 0.01, h - 0.01), (0.2, 0.215), 0.0805, BRASS)
     door = shade(MAIL_VAN, 0.7) if full else WINDOW

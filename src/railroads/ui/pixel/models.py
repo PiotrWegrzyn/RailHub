@@ -32,6 +32,9 @@ CYLINDER_SIDES = 10
 # SHINE where they face halfway between the light and the viewer, and faces low down LOW_DARK
 # darker, in the shade of the body above, fading out by LOW_HEIGHT above the rails.
 FINE_CYLINDER_SIDES = 24
+# How far up close a body's top edges are rounded over, and in how many steps.
+BODY_ROUND = 0.014
+BODY_ARC = 3
 FINE_SHADES = 24
 FINE_DARK, FINE_LIGHT = 0.62, 1.1
 SHINE, SHINE_POWER = 0.4, 24
@@ -144,6 +147,43 @@ class Model:
             Face([(u0, v1, z0), (u0, v1, z1), (u1, v1, z1), (u1, v1, z0)], color, (0, 1, 0)),
             Face([(u0, v0, z0), (u1, v0, z0), (u1, v0, z1), (u0, v0, z1)], color, (0, -1, 0)),
         ]
+
+    def body(
+        self,
+        u: tuple[float, float],
+        v: tuple[float, float],
+        z: tuple[float, float],
+        color: RGB,
+        round: float = BODY_ROUND,
+    ) -> None:
+        """A box far out; up close the same box with its top edges rounded `round` over and its
+        upright corners and ends' top edges cut back a little, like a pressed or planked body."""
+        if self.skipping:
+            return
+        with self.coarse():
+            self.box(u, v, z, color)
+        if not _KEEP_FINE[-1]:
+            return
+        (u0, u1), (v0, v1), (z0, z1) = u, v, z
+        r = min(round, (v1 - v0) / 3, (z1 - z0) / 3)
+        cut = min(r * 0.6, (u1 - u0) / 6)
+        middle = ((u0 + u1) / 2, (v0 + v1) / 2, (z0 + z1) / 2)
+        sections = [
+            (u0, _rounded_section(v0 + cut, v1 - cut, z0, z1 - cut, r)),
+            (u0 + cut, _rounded_section(v0, v1, z0, z1, r)),
+            (u1 - cut, _rounded_section(v0, v1, z0, z1, r)),
+            (u1, _rounded_section(v0 + cut, v1 - cut, z0, z1 - cut, r)),
+        ]
+        with self.fine():
+            for (ua, pa), (ub, pb) in itertools.pairwise(sections):
+                for (va0, za0), (va1, za1), (vb0, zb0), (vb1, zb1) in zip(
+                    pa, pa[1:], pb, pb[1:], strict=False
+                ):
+                    corners = [(ua, va0, za0), (ua, va1, za1), (ub, vb1, zb1), (ub, vb0, zb0)]
+                    self.faces.append(Face(corners, color, _normal(corners, middle)))
+            for end, out in ((u0, -1.0), (u1, 1.0)):
+                points = next(points for at, points in sections if at == end)
+                self.faces.append(Face([(end, a, b) for a, b in points], color, (out, 0.0, 0.0)))
 
     def panel(self, u: tuple[float, float], z: tuple[float, float], v: float, color: RGB) -> None:
         """A flat patch on both sides of the model, `v` out from its middle: windows, doors."""
@@ -507,6 +547,20 @@ class Model:
             Face([(u + half, half, base), (u + half, -half, base), apex], color, (a, 0, b)),
             Face([(u - half, -half, base), (u - half, half, base), apex], color, (-a, 0, b)),
         ]
+
+
+def _rounded_section(
+    v0: float, v1: float, z0: float, z1: float, r: float
+) -> list[tuple[float, float]]:
+    """A box's cross-section as (v, z) points from its bottom left corner up over its rounded
+    top and down to its bottom right corner."""
+    points = [(v0, z0)]
+    for centre_v, start in ((v0 + r, math.pi), (v1 - r, math.pi / 2)):
+        for k in range(BODY_ARC + 1):
+            angle = start - math.pi / 2 * k / BODY_ARC
+            points.append((centre_v + r * math.cos(angle), z1 - r + r * math.sin(angle)))
+    points.append((v1, z0))
+    return points
 
 
 def _normal(corners: list[Vec3], inside: Vec3) -> Vec3:

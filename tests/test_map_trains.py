@@ -15,7 +15,7 @@ from railroads.ui.map_view import MapView
 from railroads.ui.pixel import train_layer
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.train_layer import TrainLayer
-from railroads.ui.pixel.trains import HEADINGS
+from railroads.ui.pixel.trains import DETAIL, HEADINGS
 
 
 class FakeTexture:
@@ -228,7 +228,8 @@ def test_up_close_the_pictures_are_drawn_as_many_times_as_fine_as_the_sheet(
     look, _ = layer._parts(train)[0]
     _, _, width, _, _, _ = layer.sprites.places[(look, 0)]
     _, _, fine_width, _, _, _ = layer._pages[look].spots[0]
-    assert 3.5 * width < fine_width < 4.5 * width
+    times = view.camera.pixel_scale * 2 // DETAIL
+    assert (times - 0.5) * width < fine_width < (times + 0.5) * width
 
 
 def test_up_close_looks_not_drawn_fine_in_a_frames_time_show_from_the_sheet_till_later(
