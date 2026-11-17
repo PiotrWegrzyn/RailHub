@@ -28,6 +28,7 @@ from railroads.sim.ladders import (
     POINTS,
     PORTS,
     SHIPYARDS,
+    STEEL_MILLS,
     TOWN_LAND,
     TOWNS,
     GrowthRule,
@@ -604,7 +605,7 @@ def test_served_buildings_add_their_points_by_the_share_they_are_served_to_their
 
     chances = growth.chances(TOWNS)
     per_doubling = TOWNS.chance_per_doubling[Points.POPULATION]
-    bred = multiplier * 4 * per_doubling * np.log2(1 + 4 * 4)
+    bred = multiplier * 4 * per_doubling * np.log2(1 + 3 * 4)
     assert chances[5, 5] == pytest.approx(TOWNS.base_chance + bred)
     assert chances[neighbour] == pytest.approx(neighbour_before)
 
@@ -635,7 +636,7 @@ def test_a_served_house_breeds_faster_the_more_people_live_around_it(around: int
     growth._count_served(houses_trade(tile_map, (5, 5), 2.0, 2.0))
 
     per_doubling = TOWNS.chance_per_doubling[Points.POPULATION]
-    bred = 10 * per_doubling * np.log2(1 + 4 * (1 + around))
+    bred = 10 * per_doubling * np.log2(1 + 3 * (1 + around))
     assert growth.chances(TOWNS)[5, 5] == pytest.approx(TOWNS.base_chance + bred)
 
 
@@ -712,3 +713,29 @@ def test_soldiers_never_starve_to_death() -> None:
     undying = soldiers & UNDYING
 
     assert undying == soldiers
+
+
+@pytest.mark.parametrize("houses", [1, 4])
+def test_a_steel_mill_is_as_many_times_less_likely_as_one_plus_the_people_around(
+    houses: int,
+) -> None:
+    tile_map = make_map()
+    alone = Growth(Constructions(tile_map), NO_TRADE).chances(STEEL_MILLS)[5, 5]
+    constructions = Constructions(tile_map)
+    build(constructions, (5, 5), BuildingKind.HOUSE, houses)
+
+    crowded = Growth(constructions, NO_TRADE).chances(STEEL_MILLS)[5, 5]
+
+    assert crowded == pytest.approx(alone / (1 + houses))
+
+
+def test_gasworks_come_up_by_industry_and_dairies_are_drawn_by_people_twice() -> None:
+    (gasworks,) = [ladder for ladder in LADDERS if ladder.kinds[0] == BuildingKind.GASWORKS]
+    (dairies,) = [ladder for ladder in LADDERS if ladder.kinds[0] == BuildingKind.DAIRY]
+
+    gas = breeding_of(gasworks, POINTS)
+    milk = breeding_of(dairies, POINTS)
+
+    assert gas.spawn_by == {Points.INDUSTRY: 1.0}
+    assert gas.shunned_by == {Points.POPULATION: 1.0}
+    assert milk.drawn_by == {Points.POPULATION: 2.0, Points.INDUSTRY: 2.0}

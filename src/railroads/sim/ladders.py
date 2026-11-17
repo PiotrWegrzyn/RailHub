@@ -407,7 +407,7 @@ TOWNS = Ladder(
     kinds=(BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS),
     land=TOWN_LAND,
     base_chance=0.000001,
-    chance_per_doubling={Points.POPULATION: 0.00003},
+    chance_per_doubling={Points.POPULATION: 0.00002},
     merges={
         BuildingKind.HOUSE: Merge(needed=16, pulled_down=6),
         BuildingKind.TENEMENT: Merge(needed=5, pulled_down=3),
@@ -600,7 +600,7 @@ STEEL_MILLS = _merges(
             relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
             water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.2, Terrain.SEA: 1.2},
         ),
-        base_chance=0.00000004,
+        base_chance=0.0000004,
         chance_per_doubling={Points.ORE: 0.000007, Points.INDUSTRY: 0.00000042},
         most_per_cell=1,
         most_nearby=2,
@@ -1008,15 +1008,17 @@ WORKS = (
         BuildingKind.BARREL_MAKER,
         {POP: 4e-10, IND: 6e-9, Points.TIMBER: 6e-8},
         {},
-        base=1e-8,
+        base=5e-8,
     ),
     _works(BuildingKind.TOOL_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 1870, base=2e-6),
-    _works(BuildingKind.CHEMICAL_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {}, 1880, 20_000, 2e-8),
+    _works(
+        BuildingKind.CHEMICAL_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {IND: 3}, 1880, 20_000, 4e-7
+    ),
     _works(BuildingKind.REFINERY, {IND: 4e-7, Points.ORE: 1e-6}, {}, 1856, 10_000, 1e-6),
-    _works(BuildingKind.CAR_FACTORY, {IND: 6e-7}, {IND: 6}, 1930, 40_000, 2e-6),
-    _works(BuildingKind.ELECTRONICS_PLANT, {POP: 2.5e-8, IND: 4e-7}, {}, 1960, 30_000, 2e-8),
-    _works(BuildingKind.PLANE_FACTORY, {POP: 2.5e-8, IND: 6e-7}, {IND: 6}, 1935, 40_000, 2e-6),
-    _works(BuildingKind.TANK_FACTORY, {IND: 6e-7}, {IND: 6}, 1940, 40_000, 2e-6),
+    _works(BuildingKind.CAR_FACTORY, {IND: 6e-7}, {IND: 6}, 1930, 40_000, 4e-6),
+    _works(BuildingKind.ELECTRONICS_PLANT, {POP: 2.5e-8, IND: 4e-7}, {IND: 3}, 1960, 30_000, 4e-7),
+    _works(BuildingKind.PLANE_FACTORY, {POP: 2.5e-8, IND: 6e-7}, {IND: 6}, 1935, 40_000, 1e-5),
+    _works(BuildingKind.TANK_FACTORY, {IND: 6e-7}, {IND: 6}, 1940, 40_000, 1e-5),
     _works(BuildingKind.BRICKWORKS, {POP: 1e-9, Points.ORE: 1.2e-8}, {}, base=CRAFT_BASE),
     _works(BuildingKind.GLASSWORKS, {POP: 4e-10, IND: 6e-9, Points.ORE: 6e-9}, {}, base=CRAFT_BASE),
     _works(
@@ -1033,15 +1035,15 @@ WORKS = (
         base=CRAFT_BASE * IN_TOWNS_ONLY,
     ),
     _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
-    _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {}, 1850, base=1e-8),
+    _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {POP: 3}, 1850, base=5e-8),
     _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=2e-7),
     _works(BuildingKind.PRINTING_WORKS, {POP: 1.5e-9, IND: 3e-9}, {}, 1600, PRINTING_CELLS, 2e-7),
     _works(BuildingKind.SUGAR_REFINERY, {IND: 6e-9, Points.FOOD: 3e-9}, {}, 1800, base=CRAFT_BASE),
     _works(BuildingKind.PORCELAIN_WORKS, {POP: 4e-10, Points.ORE: 6e-9}, {}, 1710, 30_000, 2e-7),
     _works(BuildingKind.MACHINE_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 1870, base=2e-6),
-    _works(BuildingKind.CEMENT_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {}, 1880, 20_000, 2e-8),
-    _works(BuildingKind.PLASTICS_WORKS, {IND: 4e-7}, {}, 1950, 30_000, 2e-8),
-    _works(BuildingKind.APPLIANCE_FACTORY, {POP: 2.5e-8, IND: 4e-7}, {}, 1950, 30_000, 2e-8),
+    _works(BuildingKind.CEMENT_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {IND: 3}, 1880, 20_000, 4e-7),
+    _works(BuildingKind.PLASTICS_WORKS, {IND: 4e-7}, {IND: 3}, 1950, 30_000, 4e-7),
+    _works(BuildingKind.APPLIANCE_FACTORY, {POP: 2.5e-8, IND: 4e-7}, {IND: 3}, 1950, 30_000, 4e-7),
 )
 
 # The only source of guns when play begins.
@@ -1051,7 +1053,7 @@ AIRPORTS = _works(BuildingKind.AIRPORT, {POP: 0.000001}, {POP: 80}, 1920, 20_000
 
 # Buyers found only in big cities, a handful to a map, each far from the others.
 JEWELLERS = replace(
-    _works(BuildingKind.JEWELLER, {POP: 0.00005}, {POP: 20}, land_cells_each=26_000),
+    _works(BuildingKind.JEWELLER, {POP: 0.00005}, {POP: 25}, land_cells_each=26_000),
     apart=JEWELLERS_APART,
 )
 

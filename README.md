@@ -545,8 +545,12 @@ deposits give are bonus goods to the buildings that use them as they are, such a
 coffee for homes or incense for churches, and demands to the processors that work them up.
 
 Other works open anywhere by chance, a little likelier where people and industry are, whether
-or not their inputs are near, so their inputs usually have to be brought from far away. No
-factory, mill or works needs people nearby. Jewellers appear only in the bigger towns (20
+or not their inputs are near, so their inputs usually have to be brought from far away. Only
+the town food makers, brewers, distillers and potters need 3 people nearby, and shoe factories
+too. Chemical, cement, plastics, appliance and electronics works need 3 industry points nearby.
+Steel mills, chemical works, cement works and gasworks keep out of towns: their chance is divided
+by one plus the people around them. Gasworks come up by industry, and chemical and cement works
+are drawn by industry alone. Jewellers appear only in the bigger towns (25
 population points nearby) and car dealers only in big cities (120), and a map holds only a few:
 one jeweller per 26,000 land cells, one car dealer per 16,000. Power plants go up as the map
 wants electricity (`railroads.sim.power_plants`): coal ones from 1882, diesel ones from 1905 and
