@@ -73,7 +73,7 @@ def test_goods_buildings_hand_out_on_their_own_by_a_station_earn_the_player_noth
     growth.trade_goods()
 
     assert railway.finances.month["cargo"] == 0.0
-    assert railway.station_goods((6, 20)).stockpile.get(Good.WHEAT, 0.0) == pytest.approx(0.0)
+    assert railway.station_goods((6, 20)).stockpile.get(Good.WHEAT, 0.0) == pytest.approx(10 * 8 / 21)
 
 
 def food_wanted_with_a_farm_at(farm: tuple[int, int] | None) -> float:

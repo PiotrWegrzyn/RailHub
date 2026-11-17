@@ -7,9 +7,9 @@ what reaches it even while it waits for another input, and works from it.
 Buildings hand out what they make on their own first, everywhere on the map (LOCAL_REACH): every
 cell's spare goods go first to the buildings in the same cell, then to those one cell away, and so
 on outwards up to LOCAL_REACH cells. Nothing is lost on the way, but a cell further away can take
-less of a seller's month (reach_share): all of it from the same cell or the next, TAKEN_PER_STEP
-less for every cell beyond. Buildings the same distance from a seller share what it has by how much
-they still want.
+less of a seller's month (reach_share): all of it from the same cell, then 13, 8, 5, 3, 2 and 1
+twenty-firsts of it from one to six cells away (REACH_SHARES). Buildings the same distance from a
+seller share what it has by how much they still want.
 
 Stations come after (railroads.sim.railway), those joined by track to another station: each hands
 what trains brought to buildings within its delivery radius still short of a need, unsatisfied
@@ -79,11 +79,11 @@ DELIVERY_RADIUS = 2
 
 COLLECTION_RADIUS = 3
 
-# How many cells away buildings hand out their goods on their own, and how much less of a seller's
-# month a cell can take for every cell beyond the next one, so a cell LOCAL_REACH cells away takes
-# one such step of it.
-LOCAL_REACH = 6
-TAKEN_PER_STEP = 1 / LOCAL_REACH
+# The most of a seller's month a cell can take, by how many cells away from it it is: all of it in
+# the seller's own cell, then falling by the Fibonacci numbers, 13, 8, 5, 3, 2 and 1 twenty-firsts,
+# and nothing from LOCAL_REACH + 1 cells away.
+REACH_SHARES = (21 / 21, 13 / 21, 8 / 21, 5 / 21, 3 / 21, 2 / 21, 1 / 21)
+LOCAL_REACH = len(REACH_SHARES) - 1
 # The cells of -1 around the map that let _Month._pairs look LOCAL_REACH cells out from any cell
 # without checking for the edge.
 _PAD = LOCAL_REACH
@@ -91,7 +91,7 @@ _PAD = LOCAL_REACH
 
 def reach_share(away: int) -> float:
     """The most of a seller's month a cell `away` cells from it can take."""
-    return min(1.0, 1.0 - TAKEN_PER_STEP * (away - 1))
+    return REACH_SHARES[away] if 0 <= away <= LOCAL_REACH else 0.0
 
 
 # About how long a month's trade works before it pauses for the next frame.

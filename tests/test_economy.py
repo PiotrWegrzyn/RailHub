@@ -65,9 +65,9 @@ def eaten_at(economy: Economy, trade: object, cell: tuple[int, int]) -> float:
 
 
 @pytest.mark.parametrize(
-    ("house", "share"), [((8, 4), 1.0), ((8, 5), 1.0), ((8, 6), 5 / 6), ((8, 8), 3 / 6)]
+    ("house", "share"), [((8, 4), 1.0), ((8, 5), 13 / 21), ((8, 6), 8 / 21), ((8, 8), 3 / 21)]
 )
-def test_a_house_takes_a_sixth_less_of_a_farms_month_for_every_cell_beyond_the_next(
+def test_a_house_takes_less_of_a_farms_month_the_further_off_it_is_by_fibonacci_shares(
     house: tuple[int, int], share: float
 ) -> None:
     tile_map = make_map()
@@ -79,8 +79,8 @@ def test_a_house_takes_a_sixth_less_of_a_farms_month_for_every_cell_beyond_the_n
     assert eaten_at(economy, trade, house) == pytest.approx(share * FARM_MONTH)
 
 
-@pytest.mark.parametrize(("house", "share"), [((8, 10), 1 / 6), ((8, 11), 0.0)])
-def test_a_house_six_cells_from_a_farm_takes_a_sixth_of_its_month_and_one_further_none(
+@pytest.mark.parametrize(("house", "share"), [((8, 10), 1 / 21), ((8, 11), 0.0)])
+def test_a_house_six_cells_from_a_farm_takes_a_21st_of_its_month_and_one_further_none(
     house: tuple[int, int], share: float
 ) -> None:
     tile_map = make_map(size=24)
@@ -105,7 +105,7 @@ def test_farms_feed_the_nearer_house_first_and_the_farther_one_only_its_share() 
     trade = economy.trade(placed)
 
     assert eaten_at(economy, trade, (8, 5)) == pytest.approx(HOUSE_FOOD)
-    assert eaten_at(economy, trade, (8, 9)) == pytest.approx(2 / 6 * 2 * FARM_MONTH)
+    assert eaten_at(economy, trade, (8, 9)) == pytest.approx(2 / 21 * 2 * FARM_MONTH)
 
 
 def test_nothing_a_farm_hands_out_is_lost_on_the_way() -> None:
@@ -125,7 +125,7 @@ def test_buildings_hand_out_their_own_goods_before_a_station_hands_out_what_trai
 ):
     tile_map = make_map()
     economy = Economy(tile_map)
-    placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1), ((8, 8), BuildingKind.FARM, 1))
+    placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1), ((8, 9), BuildingKind.FARM, 1))
 
     trade = economy.trade(placed, holding(BREAD=20.0))
 
@@ -137,7 +137,7 @@ def test_buildings_hand_out_their_own_goods_before_a_station_hands_out_what_trai
 def test_a_station_hands_out_only_what_the_buildings_around_left_short() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
-    placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 2), ((8, 8), BuildingKind.FARM, 1))
+    placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 2), ((8, 9), BuildingKind.FARM, 1))
 
     trade = economy.trade(placed, holding(BREAD=50.0))
 
@@ -166,7 +166,7 @@ def test_a_farm_is_as_satisfied_as_the_share_of_its_wheat_that_was_taken() -> No
     trade = economy.trade(placed)
 
     share = trade.share((BuildingKind.FARM,))[position(trade, economy, (8, 4))]
-    assert share == pytest.approx(5 / 6)
+    assert share == pytest.approx(8 / 21)
 
 
 def test_a_station_gathers_only_what_the_buildings_around_left() -> None:
@@ -347,13 +347,13 @@ def test_a_bakery_bakes_each_unit_of_wheat_into_two_and_a_half_of_bread() -> Non
     trade = economy.trade(placed, holding(100.0, WHEAT=5.0))
 
     assert trade.gathered[STATION][Good.BREAD] == pytest.approx(12.5)
-    assert economy.stock[(BuildingKind.BAKERY, Need.WHEAT)][flat(economy, (8, 8))] == 0.0
+    assert economy.stock[(BuildingKind.BAKERY, Need.WHEAT)][flat(economy, (8, 9))] == 0.0
 
 
 def test_bakeries_take_their_wheat_before_houses_eat_it_and_bread_feeds_houses() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
-    placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1), ((8, 8), BuildingKind.BAKERY, 1))
+    placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1), ((8, 9), BuildingKind.BAKERY, 1))
 
     trade = economy.trade(placed, holding(WHEAT=3.0, BREAD=5.0))
 
