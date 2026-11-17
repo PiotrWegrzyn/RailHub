@@ -3,11 +3,11 @@ import pytest
 
 from builders import flat_map
 from railroads.mapgen.deposits import place_deposits
-from railroads.sim.constructions import BUILDING_RULES, Building, BuildingKind, Constructions
+from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Economy, StationOrder
 from railroads.sim.goods import NEEDS, Good, Need
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import CHURCHES, FARMS, ORCHARDS, PASSENGERS_PER_POINT, POINTS, Points
+from railroads.sim.ladders import CHURCHES, FARMS, ORCHARDS
 from railroads.sim.tilemap import Deposit, Relief, TileMap
 
 RANKS = (
@@ -92,7 +92,7 @@ def test_churches_rise_with_the_people_around_them(
     assert count(constructions, small) == int(not rises)
 
 
-def test_only_the_first_cathedral_to_reach_four_hundred_becomes_st_pauls() -> None:
+def test_only_the_most_crowded_cathedral_becomes_st_pauls() -> None:
     constructions = Constructions(make_map())
     for cell, people in (((10, 10), 400), ((30, 30), 420)):
         constructions.build(Building(cell, BuildingKind.CATHEDRAL))
@@ -115,7 +115,7 @@ def test_only_the_first_cathedral_to_reach_four_hundred_becomes_st_pauls() -> No
         (BuildingKind.ST_PAULS, 2137),
     ],
 )
-def test_churches_send_and_want_their_congregation(kind: BuildingKind, people: int) -> None:
+def test_churches_send_their_congregation_as_passengers(kind: BuildingKind, people: int) -> None:
     constructions = Constructions(make_map())
     constructions.build(Building((5, 5), kind))
     growth = Growth(constructions)
@@ -177,48 +177,6 @@ def test_incense_lies_in_only_a_handful_of_cells(seed: int) -> None:
     layer = place_deposits(make_map(400), np.random.default_rng(seed))
 
     assert int((layer == Deposit.INCENSE).sum()) <= 12
-
-
-def test_a_house_is_one_population_and_one_traveller_and_wants_food_heat_and_small_comforts() -> (
-    None
-):
-    assert POINTS[BuildingKind.HOUSE] == (Points.POPULATION, 1)
-    assert PASSENGERS_PER_POINT[Points.POPULATION] == 1
-    assert NEEDS[BuildingKind.HOUSE] == {
-        Need.FOOD: 10,
-        Need.HEATING: 3,
-        Need.BEER: 1,
-        Need.NEWSPAPERS: 1,
-        Need.COMMON: 5,
-        Need.VODKA: 0.5,
-        Need.REFINED_SUGAR: 0.5,
-        Need.BRICKS: 0.5,
-        Need.GLASS: 0.2,
-        Need.LIMESTONE: 0.5,
-    }
-
-
-@pytest.mark.parametrize(
-    ("kind", "space"),
-    [
-        (BuildingKind.HOUSE, 1),
-        (BuildingKind.TENEMENT, 1),
-        (BuildingKind.FLATS, 1),
-        (BuildingKind.FARM, 6),
-        (BuildingKind.ORCHARD, 6),
-        (BuildingKind.SUGAR, 6),
-        (BuildingKind.VINEYARD, 6),
-        (BuildingKind.FACTORY, 3),
-        (BuildingKind.BIG_FACTORY, 3),
-        (BuildingKind.MEGA_FACTORY, 6),
-        (BuildingKind.FOOD_PLANT, 3),
-        (BuildingKind.STEEL_MILL, 3),
-        (BuildingKind.LUMBER_MILL, 3),
-        (BuildingKind.TEXTILE_MILL, 3),
-    ],
-)
-def test_buildings_take_up_their_share_of_a_cell(kind: BuildingKind, space: int) -> None:
-    assert BUILDING_RULES[kind].space == space
 
 
 def test_hills_favour_orchards_over_farms() -> None:

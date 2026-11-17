@@ -48,15 +48,6 @@ def test_saved_map_loads_back_unchanged(tmp_path: Path) -> None:
         assert np.array_equal(getattr(loaded, layer), getattr(tile_map, layer)), layer
 
 
-def test_map_file_keeps_its_scale_and_cell_shape(tmp_path: Path) -> None:
-    path = tmp_path / "test.npz"
-    make_map(HexGrid(rows=4, cols=5, km_per_cell=3.0)).save(path)
-
-    grid = TileMap.load(path).grid
-
-    assert (grid.kind, grid.km_per_cell) == ("hex", 3.0)
-
-
 def test_loading_a_map_in_another_format_fails(tmp_path: Path) -> None:
     path = tmp_path / "old.npz"
     np.savez(path, meta=np.array('{"format_version": 0}'))

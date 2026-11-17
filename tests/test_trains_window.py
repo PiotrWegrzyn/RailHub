@@ -63,7 +63,7 @@ def test_cars_too_many_for_three_lines_are_narrowed_to_fit_them() -> None:
     assert per_line * (car_width + ROW_CAR_GAP) - ROW_CAR_GAP == pytest.approx(160.0)
 
 
-def test_the_list_draws_a_long_express_with_its_dining_car(gui: None) -> None:
+def test_the_list_draws_a_twenty_five_car_train_led_by_a_dining_car(gui: None) -> None:
     _, railway = joined_stations()
     railway.finances.cash = 1e9
     railway.buy()

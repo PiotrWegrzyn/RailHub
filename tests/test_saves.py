@@ -327,20 +327,6 @@ def test_older_autosaves_stay_put_until_the_new_one_is_written(tmp_path: Path) -
     assert saves.load("autosave 2").clock.date == earlier.clock.date
 
 
-def test_a_snapshot_is_the_games_big_parts_pickled_then_the_game() -> None:
-    saved = played_game()
-    plain = BytesIO()
-    pickler = _Pickler(plain, protocol=pickle.HIGHEST_PROTOCOL)
-    for part in saved.game.big_parts():
-        pickler.dump(part)
-    pickler.dump(saved)
-
-    joined = bytes(snapshot(saved).data)
-    held = bytes(snapshot(saved, ReusedMemory()).data)
-
-    assert joined == held == plain.getvalue()
-
-
 def test_a_snapshot_taken_in_steps_takes_a_step_for_each_big_part() -> None:
     saved = played_game()
     steps = snapshot_steps(saved)

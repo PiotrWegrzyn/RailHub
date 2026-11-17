@@ -5,22 +5,7 @@ from railroads.sim.goods import FITS, Need, bonus_of, demands_of, makes_of, need
 from railroads.sim.ladders import LADDERS
 
 
-def test_a_house_demands_food_common_goods_and_heating_and_takes_small_comforts_as_bonus() -> None:
-    demands, bonus = demands_of(BuildingKind.HOUSE, 1900), bonus_of(BuildingKind.HOUSE, 1900)
-
-    assert set(demands) == {Need.FOOD, Need.COMMON, Need.HEATING}
-    assert set(bonus) == {
-        Need.BEER,
-        Need.NEWSPAPERS,
-        Need.VODKA,
-        Need.REFINED_SUGAR,
-        Need.BRICKS,
-        Need.GLASS,
-        Need.LIMESTONE,
-    }
-
-
-def test_a_processor_demands_every_input_even_a_special_resource() -> None:
+def test_a_processor_takes_no_bonus_goods_and_demands_its_special_resource() -> None:
     bonus = bonus_of(BuildingKind.STEEL_MILL, 1900)
 
     assert bonus == {}

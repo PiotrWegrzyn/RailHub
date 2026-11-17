@@ -29,7 +29,7 @@ def test_a_building_that_opens_in_some_year_goes_up_once_that_year_comes() -> No
     assert standing(growth, BuildingKind.FILLING_STATION) == 1
 
 
-def test_one_that_opens_later_goes_up_only_then() -> None:
+def test_a_building_does_not_go_up_before_the_year_it_opens() -> None:
     growth = grown(1900, FILLING_STATIONS, houses=6)
 
     growth.run(12, np.random.default_rng(1))

@@ -329,7 +329,7 @@ def context(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     imgui.destroy_context(gui)
 
 
-def test_the_map_draws_centred_on_the_trains_stops_with_a_good_marked(context: None) -> None:
+def test_the_map_centres_on_the_trains_stops(context: None) -> None:
     _, railway = joined_stations()
     railway.station_demand((6, 3)).capacity = {Need.COAL: 40.0}
     train = railway.buy()

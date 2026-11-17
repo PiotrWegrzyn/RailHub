@@ -4,7 +4,7 @@ from test_railway import joined_stations
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.goods import Good
 from railroads.sim.growth import LIVELY_GROWTH, Growth
-from railroads.sim.ladders import CLUBS, TAVERNS, Points
+from railroads.sim.ladders import Points
 
 STATION, HOUSE, TAVERN = (6, 20), (6, 21), (5, 20)
 
@@ -32,8 +32,3 @@ def test_a_tavern_with_all_its_drink_makes_the_homes_around_it_grow_half_as_fast
 
     assert alone > 0
     assert lively == pytest.approx(alone * (1 + LIVELY_GROWTH))
-
-
-def test_taverns_open_from_three_people_and_clubs_in_big_towns_from_1900() -> None:
-    assert TAVERNS.needs == {Points.POPULATION: 3}
-    assert (CLUBS.needs, CLUBS.from_year) == ({Points.POPULATION: 30}, 1900)

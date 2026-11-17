@@ -1,7 +1,10 @@
+import pytest
+from test_railway import joined_stations
+
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.demand import DEMAND_PER_NEED
-from railroads.sim.goods import Need
+from railroads.sim.goods import Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
@@ -60,3 +63,31 @@ def test_the_cells_in_reach_are_every_cell_any_station_hands_goods_out_to() -> N
 
     reached = set(grid.within((6, 10), 2)) | set(grid.within((6, 13), 2))
     assert growth.station_trade.in_reach == reached
+
+
+def test_goods_buildings_hand_out_on_their_own_by_a_station_earn_the_player_nothing() -> None:
+    growth, railway = joined_stations()
+    growth.build(Building((6, 21), BuildingKind.HOUSE))
+    growth.build(Building((6, 22), BuildingKind.FARM))
+
+    growth.trade_goods()
+
+    assert railway.finances.month["cargo"] == 0.0
+    assert railway.station_goods((6, 20)).stockpile.get(Good.WHEAT, 0.0) == pytest.approx(0.0)
+
+
+def food_wanted_with_a_farm_at(farm: tuple[int, int] | None) -> float:
+    growth, railway = joined_stations()
+    growth.build(Building((6, 21), BuildingKind.HOUSE))
+    if farm is not None:
+        growth.build(Building(farm, BuildingKind.FARM))
+    growth.trade_goods()
+    return railway.station_demand((6, 20)).capacity.get(Need.FOOD, 0.0)
+
+
+def test_a_station_wants_more_food_the_less_the_farms_around_could_hand_its_houses() -> None:
+    farms = [(6, 22), (6, 25), None]
+
+    wanted = [food_wanted_with_a_farm_at(farm) for farm in farms]
+
+    assert wanted[0] < wanted[1] < wanted[2]

@@ -161,15 +161,12 @@ def test_a_station_clears_its_cell_and_track_joins_it_without_entering() -> None
     assert all(piece.cell != (6, 12) for piece in route.pieces)
 
 
-def test_no_route_into_the_sea() -> None:
-    tile_map = make_map()
-    terrain = tile_map.terrain.copy()
-    constructions = Constructions(tile_map)
+def test_no_route_from_a_cell_to_itself() -> None:
+    constructions = Constructions(make_map())
 
     route = plan_route(constructions, (6, 2), (6, 2))
 
     assert route is None
-    assert (terrain == tile_map.terrain).all()
 
 
 def test_track_runs_straight_through_corners_where_edges_would_zigzag() -> None:

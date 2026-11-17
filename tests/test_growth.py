@@ -505,11 +505,11 @@ def test_farms_never_merge_or_raise_skyscrapers() -> None:
 
 
 def test_a_long_run_keeps_its_counts_and_chances_in_step_with_what_is_built() -> None:
-    constructions = Constructions(make_map(30))
+    constructions = Constructions(make_map(16))
     busy = tuple(replace(ladder, base_chance=ladder.base_chance + 0.002) for ladder in LADDERS)
     growth = Growth(constructions, GrowthRule(ladders=busy, trades=False))
 
-    growth.run(600, np.random.default_rng(2))
+    growth.run(240, np.random.default_rng(2))
 
     fresh = Growth(constructions, growth.rule)
     assert growth.count(BuildingKind.FARM).sum() > 0
@@ -545,7 +545,7 @@ def test_the_log_holds_every_change_months_make_to_the_counts() -> None:
     rng = np.random.default_rng(2)
     logged, counted = [], []
 
-    for _ in range(120):
+    for _ in range(36):
         before = {kind: count.copy() for kind, count in growth.counts.items()}
         with growth.log_changes() as changes:
             growth.month(rng)

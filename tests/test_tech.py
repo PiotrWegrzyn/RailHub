@@ -3,6 +3,7 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
+from railroads.sim.finance import ELECTRIC_TRACK_UPKEEP, TRACK_UPKEEP
 from railroads.sim.goods import Good, Need, price_of
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import TOWNS, GrowthRule
@@ -231,7 +232,7 @@ def test_electric_engines_find_a_way_only_along_electrified_track() -> None:
     assert railway.route((6, 3), (6, 20)) is not None
 
 
-def test_electrified_track_costs_twenty_one_times_the_upkeep_of_plain_track() -> None:
+def test_electrified_track_costs_its_extra_upkeep_a_cell() -> None:
     plain, wired = Constructions(flat_map()), Constructions(flat_map())
     for constructions, electric in ((plain, False), (wired, True)):
         growth = Growth(constructions, GrowthRule(trades=False))
@@ -244,7 +245,7 @@ def test_electrified_track_costs_twenty_one_times_the_upkeep_of_plain_track() ->
         railway.turn_month({})
 
     paid = [-railway.finances.month["track upkeep"] for railway in railways]
-    assert paid[1] == pytest.approx(21 * paid[0])
+    assert paid[1] == pytest.approx(paid[0] * (TRACK_UPKEEP + ELECTRIC_TRACK_UPKEEP) / TRACK_UPKEEP)
 
 
 def test_fine_living_makes_each_bonus_good_worth_ten_points_more_satisfaction() -> None:

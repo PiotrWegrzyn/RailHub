@@ -93,7 +93,7 @@ def test_the_first_plant_of_a_kind_goes_up_by_the_town_making_most_of_its_fuel(
     assert abs(row - 30) <= PLACE_STEPS and abs(col - 30) <= PLACE_STEPS
 
 
-def test_a_plant_of_every_open_kind_goes_up_one_a_year_whatever_the_map_wants() -> None:
+def test_the_first_plant_of_every_open_kind_goes_up_whatever_the_map_wants() -> None:
     growth = town(2030)
 
     for _ in range(10):

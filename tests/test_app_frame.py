@@ -141,18 +141,6 @@ def shell_frame(shell: Shell) -> None:
     imgui.render()
 
 
-def test_the_game_autosaves_as_a_month_begins(context: None, tmp_path: Path) -> None:
-    app = made_app()
-    app.saves = Saves(tmp_path)
-    app.clock.seconds = app.clock.seconds_per_month - 0.001
-
-    frame(app)
-    app.finish_autosave()
-
-    assert app.saves.load("autosave 1").clock.date == app.clock.date
-    assert app.notice == "Autosaved"
-
-
 def frames_until_the_month_is_done(app: App) -> int:
     frames = 1
     frame(app)
@@ -178,6 +166,7 @@ def test_a_month_is_done_over_a_few_frames_and_its_autosave_taken_in_its_last_on
     assert not app._autosave_due
     assert [info.name for info in app.saves.listing()] == ["autosave 1"]
     assert app.saves.load("autosave 1").clock.date == app.clock.date
+    assert app.notice == "Autosaved"
 
 
 def test_the_clock_and_trains_wait_while_a_month_is_half_done(context: None) -> None:
@@ -203,7 +192,7 @@ def test_no_autosave_is_written_while_the_month_goes_on(context: None, tmp_path:
     assert app.saves.listing() == []
 
 
-def test_the_saves_window_draws_both_tabs(context: None, tmp_path: Path) -> None:
+def test_the_saves_window_lists_the_saves_on_disk_once_shown(context: None, tmp_path: Path) -> None:
     app = made_app()
     app.saves = Saves(tmp_path)
     app.saves.save("Earlier", app.saved())

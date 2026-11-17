@@ -38,16 +38,16 @@ def test_food_taken_at_once_is_not_handed_out_again_and_counts_for_the_month() -
     assert railway.station_goods(STATION).brought[Good.BREAD] == pytest.approx(40.0)
 
 
-def test_goods_kept_for_trains_stay_in_the_stockpile() -> None:
+def test_freight_a_station_gathered_is_never_handed_out_at_once() -> None:
     growth, railway = joined_stations()
     growth.build(Building((6, 21), BuildingKind.HOUSE))
     goods = railway.station_goods(STATION)
     goods.stockpile[Good.WHEAT] = 30.0
-    goods.keep_for_trains(Good.WHEAT)
 
     growth.station_trade.hand_out_now(STATION, Good.WHEAT)
 
     assert goods.stockpile[Good.WHEAT] == 30.0
+    assert railway.finances.month["cargo"] == 0.0
 
 
 def test_goods_trains_brought_but_kept_for_trains_are_not_handed_out_either() -> None:

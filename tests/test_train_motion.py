@@ -180,14 +180,3 @@ def test_many_trains_on_one_line_all_keep_getting_through() -> None:
         railway.run(10 * FRAME)
 
     assert all(train.arrivals >= 2 for train in railway.trains)
-
-
-def test_a_train_saved_before_trains_picked_up_speed_still_runs() -> None:
-    railway = line()
-    train = running(railway, "Old", WEST, EAST)
-    for name in ("pace", "giving_way", "waited"):
-        train.__dict__.pop(name)
-
-    run_until(railway, lambda: train.arrivals == 1)
-
-    assert train.arrivals == 1

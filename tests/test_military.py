@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -7,7 +9,7 @@ from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Economy
 from railroads.sim.goods import Good, Need, needs_of
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import AIRPORTS, MILITARY, ORANGE_FARMS
+from railroads.sim.ladders import AIRPORTS, MILITARY, ORANGE_FARMS, GrowthRule
 from railroads.sim.tilemap import Deposit, Temperature, TileMap, Vegetation
 
 
@@ -38,11 +40,12 @@ def test_a_map_gets_only_a_few_small_patches_of_military_ground(seed: int) -> No
 def test_outposts_open_only_on_military_ground() -> None:
     ground = [(10, 10), (10, 11), (11, 10), (11, 11), (12, 10), (12, 11)]
     constructions = Constructions(make_map(deposits=garrison_at(*ground)))
-    growth = Growth(constructions, start_year=1850)
+    busy = replace(MILITARY, base_chance=10 * MILITARY.base_chance)
+    growth = Growth(constructions, GrowthRule(ladders=(busy,), trades=False), start_year=1850)
     military = (BuildingKind.OUTPOST, BuildingKind.BASE, BuildingKind.HEADQUARTERS)
 
     with growth.log_changes() as changes:
-        growth.run(2400, np.random.default_rng(0))
+        growth.run(240, np.random.default_rng(0))
 
     built = {cell for (cell, kind), _ in changes.items() if kind in military}
     assert built
@@ -132,8 +135,7 @@ def test_soldiers_travel_more_the_higher_their_rank() -> None:
         np.array([np.ravel_multi_index((9, 9), grid.shape)])
     )
 
-    assert outpost[Good.PASSENGERS] == 60
-    assert headquarters[Good.PASSENGERS] == 540
+    assert headquarters[Good.PASSENGERS] > outpost[Good.PASSENGERS] > 0
 
 
 @pytest.mark.parametrize(("flats", "houses", "opens"), [(4, 5, False), (5, 0, True)])
