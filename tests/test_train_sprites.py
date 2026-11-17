@@ -26,7 +26,7 @@ from railroads.ui.pixel.trains import (
 # noses and logs moved across their car. On the tank wagon some faces lie equally far back, so
 # which is painted last hangs on their depths being summed exactly as draw_model sums them.
 EVERY_KIND_OF_FACE = {
-    "planet": Look.ENGINE,
+    "planet": (Look.ENGINE, "planet"),
     "express": (Look.ENGINE, "express"),
     "pacific tender": (Look.TENDER, "pacific"),
     "lumber": (Good.LUMBER, True),
@@ -93,8 +93,8 @@ def test_the_sheet_holds_the_pictures_draw_model_draws(look: object, grid_look: 
 def test_the_nearest_heading_is_picked() -> None:
     sprites = train_sprites(tuple(float(v) for v in projection().matrix.ravel()))
 
-    east = sprites.place(Look.ENGINE, 0.01)
-    almost_east = sprites.place(Look.ENGINE, 2 * math.pi - 0.01)
+    east = sprites.place((Look.ENGINE, "planet"), 0.01)
+    almost_east = sprites.place((Look.ENGINE, "planet"), 2 * math.pi - 0.01)
 
     assert east == almost_east
 
@@ -136,6 +136,10 @@ def colours(image: Image.Image) -> set[tuple[int, ...]]:
     return {tuple(c) for c in np.asarray(image)[..., :3].reshape(-1, 3).tolist()}
 
 
+def reds(image: Image.Image) -> set[tuple[int, ...]]:
+    return {(r, g, b) for r, g, b in colours(image) if r > 2 * (g + b) + 40}
+
+
 def low_plate(model: Model) -> None:
     with model.fine():
         model.panel((-0.18, 0.18), (0.01, 0.05), 0.0806, (250, 0, 0))
@@ -143,23 +147,21 @@ def low_plate(model: Model) -> None:
 
 def test_a_fine_detail_is_drawn_only_when_the_model_is_drawn_fine() -> None:
     model = boxed(low_plate)
-    red = {shade((250, 0, 0), level) for level in SHADES}
 
     far, _ = draw_model(model, 0.3, projection().matrix, 4.0)
     near, _ = draw_model(model, 0.3, projection().matrix, 4.0, fine=True)
 
-    assert not red & colours(far)
-    assert red & colours(near)
+    assert not reds(far)
+    assert reds(near)
 
 
 def test_a_fine_detail_low_on_a_tall_side_is_painted_over_that_side() -> None:
     model = boxed(low_plate)
-    red = {shade((250, 0, 0), level) for level in SHADES}
 
     for heading in (0.3, 1.9, 3.4, 5.0):
         near, _ = draw_model(model, heading, projection().matrix, 4.0, fine=True)
 
-        assert red & colours(near)
+        assert reds(near)
 
 
 def test_a_coarse_face_stands_in_only_far_out() -> None:
@@ -196,4 +198,6 @@ def test_every_full_car_carries_more_than_a_bare_frame(good: Good) -> None:
 
     full = MODELS[(good, True)]()
 
-    assert len([face for face in full.faces if not face.fine]) > len(frame.faces)
+    assert len([face for face in full.faces if not face.fine]) > len(
+        [face for face in frame.faces if not face.fine]
+    )
