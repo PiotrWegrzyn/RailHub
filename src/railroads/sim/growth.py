@@ -1,13 +1,16 @@
 """The map grows by itself, a month at a time, like a cellular automaton, by the ladders of
 railroads.sim.ladders: towns, farms, orchards, mines, lumber mills, ports and every kind of works.
 
-Buildings breed (breeding_of): a cell's chance of another of a ladder's kinds is its spawn chance,
-the same everywhere the land allows, plus what every building of the kind of points the ladder's
-buildings give adds there by how satisfied it is (its points times its satisfaction,
-railroads.sim.economy), times the doublings of the points around the cell that draw it: four times
-the people for houses, food and people for food, people and industry for industry, mines, mills
-and ports, and twice the people for shops, inns and churches. So towns and districts draw
-more the bigger they are, and only what is satisfied breeds. A building that comes up in a cell
+Buildings breed (breeding_of): a cell's chance of another of a ladder's kinds is
+
+    base + (base + BREEDING_TIMES x base x served) x log2(1 + drawing)
+
+where base is the ladder's base chance, served the points the buildings of its own kind of points
+give in the cell times their satisfaction (railroads.sim.economy), and drawing the points around
+the cell that draw it, each times its weight: four times the people for houses, food and people
+for food, people and industry for industry, mines, mills and ports, and twice the people for
+shops, inns and churches. So the base chance holds anywhere the land allows, good surroundings
+raise it even where none of the kind stands yet, and what is satisfied breeds far faster. A building that comes up in a cell
 goes up in it or a random cell next to it, and one that finds no room there spills over further
 (railroads.sim.room).
 
@@ -105,17 +108,14 @@ SKYSCRAPER_HOMES = 10
 # Above this chance, a ladder draws for every cell instead of thinning.
 THINNING_UP_TO = 0.05
 SKYSCRAPER_STARS = 4
-# For every ladder but the homes': its spawn chance, its base chance or, where it has none, its
-# chance per doubling, times this; food springs up far more readily.
+# For every ladder but the homes': its base chance, its base chance or, where it has none, its
+# chance per doubling, times this; food from the land springs up far more readily.
 SPAWN_SCALE = 1.0
 FOOD_SPAWN_SCALE = 3.75
-# What the served points of every ladder but the homes' add per doubling, the same for all of them
-# that grow on being served; the homes' own chance per doubling is theirs. What grows from the land
-# (FROM_THE_LAND), whose served buildings would otherwise feed ever more homes that draw ever more
-# of them, adds its own chance per doubling times LAND_BREEDING_SCALE instead.
-SERVED_GROWTH = 0.0001
 FROM_THE_LAND = frozenset({Points.FOOD, Points.ORE, Points.TIMBER})
-LAND_BREEDING_SCALE = 0.2
+# How many times its base chance each served point of a ladder's own kind in a cell adds there,
+# per doubling of what draws it.
+BREEDING_TIMES = 30.0
 # The points around a cell that draw a ladder's buildings, and how much each counts, by the kind
 # of points they give.
 INDUSTRIAL = {Points.POPULATION: 1.0, Points.INDUSTRY: 1.0}
@@ -135,32 +135,7 @@ DRAWN_BY: Mapping[Points, Mapping[Points, float]] = MappingProxyType(
     }
 )
 
-
-# Kinds that come up where people live: their spawn chance counts once for every population
-# point in the neighbourhood, and nowhere without any.
-SPAWN_BY_PEOPLE = frozenset(
-    {
-        BuildingKind.BAKERY,
-        BuildingKind.MEAT_FACTORY,
-        BuildingKind.TAVERN,
-        BuildingKind.CLUB,
-        BuildingKind.FILLING_STATION,
-        BuildingKind.BREWERY,
-        BuildingKind.DISTILLERY,
-        BuildingKind.POTTER,
-        BuildingKind.DAIRY,
-        BuildingKind.SAUSAGE_MAKER,
-        BuildingKind.JUICE_WORKS,
-        BuildingKind.CARPET_WEAVER,
-        BuildingKind.CLOCK_MAKER,
-        BuildingKind.MIRROR_MAKER,
-        BuildingKind.MANOR,
-        BuildingKind.THEATRE,
-        BuildingKind.HOSPITAL,
-    }
-)
-# Works that come up anywhere their land allows, like the rest of industry, instead of where people
-# live: their spawn chance times WORKS_SPAWN_SCALE, so that the map keeps about as many of them.
+# Works whose base chance is scaled by WORKS_SPAWN_SCALE.
 SPAWN_ANYWHERE = frozenset(
     {
         BuildingKind.BRICKWORKS,
@@ -175,19 +150,13 @@ SPAWN_ANYWHERE = frozenset(
     }
 )
 WORKS_SPAWN_SCALE = 0.2
-# Kinds that come up near other points instead: refineries by the oil wells and mines (ore) and
-# the ports (trade) around them, gasworks by industry.
-SPAWN_NEAR: Mapping[BuildingKind, Mapping[Points, float]] = MappingProxyType(
-    {
-        BuildingKind.REFINERY: {Points.ORE: 1.0, Points.TRADE: 2.0},
-        BuildingKind.GASWORKS: {Points.INDUSTRY: 1.0},
-    }
-)
-# Kinds drawn by other points than the rest of their kind of points, and kinds that keep away
+# Kinds drawn by other points than the rest of their kind of points (refineries by the oil wells
+# and mines and the ports around them), and kinds that keep away
 # from some: their whole chance is divided by one plus the points they shun around them, each
 # times its weight, so heavy works stay out of towns.
 DRAWN_BY_KIND: Mapping[BuildingKind, Mapping[Points, float]] = MappingProxyType(
     {
+        BuildingKind.REFINERY: {Points.ORE: 1.0, Points.TRADE: 2.0},
         BuildingKind.CHEMICAL_WORKS: {Points.INDUSTRY: 1.5},
         BuildingKind.CEMENT_WORKS: {Points.INDUSTRY: 1.5},
         BuildingKind.GASWORKS: {Points.INDUSTRY: 1.0},
@@ -210,17 +179,14 @@ SHUNNED_BY: Mapping[BuildingKind, Mapping[Points, float]] = MappingProxyType(
 
 @dataclass(frozen=True, slots=True)
 class Breeding:
-    """How a ladder's buildings come up: the chance anywhere its land allows, the kind of points
-    its buildings give, which points around draw them and how much, and what each served point
-    adds per doubling of those."""
+    """How a ladder's buildings come up: its base chance, the kind of points its buildings give,
+    which points around draw them and how much, and what each served point adds per doubling of
+    those."""
 
     spawn: float
     own: Points
     drawn_by: Mapping[Points, float]
     per_doubling: float
-    # The points nearby the spawn chance counts once for each of, by how much each counts; empty
-    # where it does not depend on what is nearby.
-    spawn_by: Mapping[Points, float] = field(default_factory=dict)
     # The points nearby that its whole chance is divided by, one plus each times its weight.
     shunned_by: Mapping[Points, float] = field(default_factory=dict)
 
@@ -243,13 +209,11 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
     else:
         spawn_scale = FOOD_SPAWN_SCALE if from_the_land and own == Points.FOOD else SPAWN_SCALE
         spawn = spawn_scale * (ladder.base_chance or per_doubling)
-        per_doubling = per_doubling * LAND_BREEDING_SCALE if from_the_land else SERVED_GROWTH
     if kind in SPAWN_ANYWHERE:
         spawn *= WORKS_SPAWN_SCALE
-    spawn_by = SPAWN_NEAR.get(kind, {Points.POPULATION: 1.0} if kind in SPAWN_BY_PEOPLE else {})
     drawn_by = DRAWN_BY_KIND.get(kind) or DRAWN_BY.get(own, {own: 1.0})
     shunned_by = SHUNNED_BY.get(kind, {})
-    breeding = Breeding(spawn, own, drawn_by, per_doubling, spawn_by, shunned_by)
+    breeding = Breeding(spawn, own, drawn_by, BREEDING_TIMES * spawn, shunned_by)
     _BREEDINGS[(id(ladder), id(points))] = (ladder, points, breeding)
     return breeding
 
@@ -634,20 +598,13 @@ class Growth:
     def _reckon(self, place: _Place, cells: npt.NDArray[np.intp]) -> None:
         """Works out the ladder's chances in these cells afresh."""
         breeding = self._breeding(place)
-        raw = np.full(cells.size, breeding.spawn)
-        if breeding.spawn_by:
-            raw = raw * sum(
-                weight * self._nearby[points].ravel()[cells]
-                for points, weight in breeding.spawn_by.items()
-            )
-        if breeding.per_doubling:
-            served = self._served[breeding.own][cells]
-            if served.any():
-                drawing = sum(
-                    weight * self._nearby[points].ravel()[cells]
-                    for points, weight in breeding.drawn_by.items()
-                )
-                raw = raw + breeding.per_doubling * served * np.log2(1 + drawing)
+        drawing = sum(
+            weight * self._nearby[points].ravel()[cells]
+            for points, weight in breeding.drawn_by.items()
+        )
+        served = self._served[breeding.own][cells]
+        doublings = np.log2(1 + drawing)
+        raw = breeding.spawn + (breeding.spawn + breeding.per_doubling * served) * doublings
         if breeding.shunned_by:
             raw = raw / (
                 1.0
@@ -1065,11 +1022,9 @@ class Growth:
         rows, cols = zip(*neighbourhood, strict=True)
         self._nearby[points][rows, cols] += how_many * value
         flat = np.ravel_multi_index((rows, cols), self._grid.shape)
-        served = {own: bool(self._served[own][flat].any()) for own in Points}
         for place in self._places:
             breeding = self._breeding(place)
-            drawn = points in breeding.drawn_by and served[breeding.own]
-            if not drawn and points not in breeding.spawn_by and points not in breeding.shunned_by:
+            if points not in breeding.drawn_by and points not in breeding.shunned_by:
                 continue
             self._reckon(place, flat)
             if how_many > 0:

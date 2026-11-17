@@ -55,8 +55,7 @@ SKYSCRAPER_PEOPLE = 150
 
 SKYSCRAPER_CHANCE = 0.005
 
-# The chance every person around adds to a town craft coming up: breweries, brickworks, mills and
-# the like (railroads.sim.growth.SPAWN_BY_PEOPLE).
+# The base chance of a town craft coming up: breweries, brickworks, mills and the like.
 CRAFT_BASE = 0.000002
 
 # Factories gather into districts: industry nearby draws more of them only from this many points,
@@ -729,8 +728,8 @@ BEEKEEPERS = Ladder(
     most_nearby=1,
 )
 
-# Gasworks make town gas out of coal from 1820, one to a town, the likelier the more people live
-# around (railroads.sim.growth.SPAWN_BY_PEOPLE).
+# Gasworks make town gas out of coal from 1820, one to a town, the likelier the more industry is
+# around.
 GASWORKS = _merges(
     Ladder(
         kinds=(BuildingKind.GASWORKS,),
@@ -743,16 +742,16 @@ GASWORKS = _merges(
     )
 )
 
-# Bakeries and the other makers of food are what towns grow on: they open once FOOD_TOWN people
-# live in the neighbourhood, and readily.
+# Taverns, filling stations, brewers, distillers and potters open once FOOD_TOWN people live in
+# the neighbourhood. Bakeries and the other makers of food are what towns grow on: they open
+# wherever people live, the likelier the more of them.
 FOOD_TOWN = 3
 
 _BAKERY = Ladder(
     kinds=(BuildingKind.BAKERY,),
     land=TOWN_LAND,
-    base_chance=0.00001,
+    base_chance=0.000001,
     chance_per_doubling={Points.POPULATION: 0.000001},
-    needs={Points.POPULATION: FOOD_TOWN},
     most_per_cell=1,
     most_nearby=1,
 )
@@ -761,7 +760,7 @@ BAKERIES = _merges(_BAKERY)
 
 # Butchers open in towns from 1850, the likelier the more people live around, like bakeries.
 BUTCHERS = _merges(
-    replace(_BAKERY, kinds=(BuildingKind.MEAT_FACTORY,), base_chance=0.00001, from_year=1850)
+    replace(_BAKERY, kinds=(BuildingKind.MEAT_FACTORY,), base_chance=0.000001, from_year=1850)
 )
 
 # Town crafts that come up, like bakeries, the likelier the more people live around: potters and
@@ -793,11 +792,11 @@ def _town_craft(
 
 TOWN_CRAFTS = (
     _town_craft(BuildingKind.POTTER, IN_TOWNS_ONLY / 3, least_people=FOOD_TOWN),
-    _town_craft(BuildingKind.DAIRY, 2.5, least_people=FOOD_TOWN),
+    _town_craft(BuildingKind.DAIRY, 0.25),
     _town_craft(BuildingKind.TILE_WORKS, 0.5),
     _town_craft(BuildingKind.FOUNDRY, 0.5, 1800),
-    _town_craft(BuildingKind.SAUSAGE_MAKER, 6.25, 1850, FOOD_TOWN),
-    _town_craft(BuildingKind.JUICE_WORKS, 5.0, 1870, FOOD_TOWN),
+    _town_craft(BuildingKind.SAUSAGE_MAKER, 0.625, 1850),
+    _town_craft(BuildingKind.JUICE_WORKS, 0.5, 1870),
     _town_craft(BuildingKind.CARPET_WEAVER, 0.5, 1700, LUXURY_TOWN),
     _town_craft(BuildingKind.CLOCK_MAKER, 0.5, 1880, LUXURY_TOWN),
     _town_craft(BuildingKind.MIRROR_MAKER, 0.5, 1700, LUXURY_TOWN),

@@ -88,7 +88,7 @@ def test_refineries_come_up_near_ore_and_ports_and_filling_stations_from_1920() 
     (refineries,) = [ladder for ladder in WORKS if ladder.kinds[0] == BuildingKind.REFINERY]
     breeding = breeding_of(refineries, POINTS)
 
-    near = breeding.spawn_by
+    near = breeding.drawn_by
 
     assert near == {Points.ORE: 1.0, Points.TRADE: 2.0}
     assert FILLING_STATIONS.from_year == 1920
