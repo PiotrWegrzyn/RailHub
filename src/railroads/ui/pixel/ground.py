@@ -264,20 +264,27 @@ CONIFER_STANDS = 1.3
 REGION_SPAN = 2.2
 DARK_GREENS = np.array((0.8, 0.9, 0.94), dtype=np.float32)
 GOLDEN_GREENS = np.array((1.14, 1.06, 0.84), dtype=np.float32)
-# How far round towards their rims crowns curve, how dark the hollows between them are and
-# how fine the grain of their leaves.
+# How far round towards their rims crowns curve, how dark the hollows between them are, how
+# fine the grain of their leaves, how far in from its edge a crown shows a dark rim and how
+# dark, and from where and how much brighter the tops catching the light most are.
 CROWN_ROUND = 0.9
-CROWN_DEPTH = 0.7
+CROWN_DEPTH = 0.5
 LEAF_GRAIN = 0.04
 LUMPS = 0.5
+CROWN_RIM = (0.2, 0.7)
+CROWN_SHINE = (0.85, 0.3)
+# The darkest crowns get, as a share of their colour in full light.
+CROWN_DARKEST = 0.32
 CROWN_TONES = 0.5
 # How many art pixels above and left of a block the woods are worked out, for their shadow.
 CANOPY_REACH = 4
 CONIFER_CROWNS = np.array([(58, 86, 58), (64, 90, 56)], dtype=np.float32)
 LEAFY_CROWNS = np.array([(80, 108, 54), (90, 114, 56)], dtype=np.float32)
 WOODS_FLOOR = np.array((54, 70, 40), dtype=np.float32)
-WOODS_SIDE = 0.55
+WOODS_SIDE = 0.7
 EDGE_SHADOW = 0.28
+# How far right and down of the crowns their shadow falls, in art pixels.
+SHADOW_REACH = (2, 3)
 SHADOW_COLOUR = np.array((18, 26, 46), dtype=np.float32)
 # How mountainous ground may be before woods give way to the mountain's own bare slopes, and how
 # far below that a bound on it (Elevation.most) must stay to show none of the woods are bare.
@@ -800,7 +807,7 @@ class Ground:
         points and cells of the art pixels already."""
         rows, cols = canvas.shape[0] // k, canvas.shape[1] // k
         reach = CANOPY_REACH
-        block = (left - reach, top - reach, cols + reach, rows + reach + 2)
+        block = (left - reach, top - reach, cols + reach + 1, rows + reach + 2)
         points = _lattice(points, self.projection, self.tile_map.grid, block)
         r, c, _ = points.cells(*block)
         if not (self._woods[r.min() : r.max() + 2, c.min() : c.max() + 2] > 0).any():
@@ -811,25 +818,49 @@ class Ground:
         if woods.any() and self.elevation.most(*block)[0] >= BARE_ABOVE - BARE_MARGIN:
             x, y = points.plane(*block)
             woods[woods] = self.elevation.mountainous(x[woods], y[woods]) < BARE_ABOVE
-        shadow = woods[: rows + reach - 3, : cols + reach - 2]
-        shadow = shadow[reach - 3 :, reach - 2 :] & ~woods[reach : reach + rows, reach:]
-        below = ~woods[reach + 1 : reach + 1 + rows, reach:] | ~woods[reach + 2 :, reach:]
-        woods = woods[reach : reach + rows, reach:]
-        side = below & woods
+
+        def shifted(down: int, across: int) -> BoolArray:
+            return woods[reach + down : reach + down + rows, reach + across : reach + across + cols]
+
+        shadow = shifted(-SHADOW_REACH[1], -SHADOW_REACH[0])
+        side = shifted(0, 0) & ~(shifted(1, 0) & shifted(2, 0))
+        # Inside the woods the floor shows between crowns; at their edge, the ground does.
+        inner = shifted(-1, 0) & shifted(1, 0) & shifted(0, -1) & shifted(0, 1)
+        rooted = woods
+        woods = shifted(0, 0)
         if k > 1:
-            woods, shadow, side = (
-                np.repeat(np.repeat(a, k, 0), k, 1) for a in (woods, shadow, side)
+            woods, shadow, side, inner = (
+                np.repeat(np.repeat(a, k, 0), k, 1) for a in (woods, shadow, side, inner)
             )
         shown = _on_map(canvas, shown)
-        down, across = np.nonzero(shadow & shown)
-        if len(down):
-            shaded = canvas[down, across]
-            shaded[:, :3] = shaded[:, :3] * (1 - EDGE_SHADOW) + SHADOW_COLOUR / 255 * EDGE_SHADOW
-            shaded[:, 3] = shaded[:, 3] * (1 - EDGE_SHADOW) + EDGE_SHADOW
-            canvas[down, across] = shaded
+        painted = np.zeros(woods.shape, dtype=bool)
         down, across = np.nonzero(woods & shown)
-        if not len(down):
-            return
+        if len(down):
+            edges = (side, inner, rooted)
+            self._crowns(canvas, painted, down, across, (left, top, k), points, block, edges)
+        self._cast_shadow(canvas, shadow & shown & ~painted, left, top, k)
+
+    def _crowns(
+        self,
+        canvas: FloatArray,
+        painted: BoolArray,
+        down: IntArray,
+        across: IntArray,
+        place: tuple[int, int, int],
+        points: Lattice,
+        block: tuple[int, int, int, int],
+        edges: tuple[BoolArray, BoolArray, BoolArray],
+    ) -> None:
+        """Paints the crowns over the woods' pixels `down`, `across` of a picture from
+        (`left`, `top`), `k` pixels to an art pixel, and the floor between them inside the woods,
+        marking the pixels painted. `edges` holds which pixels show the dark side of the trees
+        along the woods' lower edge, which lie inside the woods rather than at their edge, and
+        which art pixels of the block the woods cover: at their edge only crowns standing in the
+        woods show, and the ground between them."""
+        side, inner, rooted = edges
+        left, top, k = place
+        reach = CANOPY_REACH
+        r, c, _ = points.cells(*block)
         art_down, art_across = down // k + reach, across // k + reach
         px, py = left + (across + 0.5) / k, top + (down + 0.5) / k
         if k == 1:
@@ -863,13 +894,45 @@ class Ground:
         lit = np.clip(1 + 1.3 * (s - np.float32(CROWN_LIGHT[2])), 0.5, 1.35)
         dark = np.clip((0.45 - s) * 2, 0, 1)
         deep = CROWN_DEPTH + (1 - CROWN_DEPTH) * np.sqrt(np.clip(height * 2, 0, 1))
-        leaves = crowns * (lit * (1 - dark * 0.35) * deep)[:, None]
-        leaves *= 1 - (dark * 0.6)[:, None] * (1 - SHADOW_TINT)
-        leaves[height <= 0] = WOODS_FLOOR
+        rim = np.where(height < CROWN_RIM[0], CROWN_RIM[1], 1.0)
+        shine = 1 + np.clip(s - CROWN_SHINE[0], 0, 1) * CROWN_SHINE[1] * 5
         edge = side[down, across]
-        leaves[edge] *= WOODS_SIDE * SHADOW_TINT
-        canvas[down, across, :3] = leaves / 255
+        cool = np.maximum(dark, edge)
+        light = lit * (1 - dark * 0.35) * deep * rim * shine * np.where(edge, WOODS_SIDE, 1)
+        leaves = crowns * np.maximum(light, CROWN_DARKEST)[:, None]
+        leaves *= 1 - (cool * 0.6)[:, None] * (1 - SHADOW_TINT)
+        gap = height <= 0
+        undergrowth = 0.8 + 0.4 * noise(fx[gap], fy[gap], LEAF_GRAIN * 1.5, 73)
+        leaves[gap] = WOODS_FLOOR * undergrowth[:, None]
+        foot_x = np.floor(px - dx).astype(np.int64) - block[0]
+        foot_y = np.floor(py - dy).astype(np.int64) - block[1]
+        foot_x = np.clip(foot_x, 0, rooted.shape[1] - 1)
+        foot_y = np.clip(foot_y, 0, rooted.shape[0] - 1)
+        inside = inner[down, across]
+        shows = inside | (~gap & rooted[foot_y, foot_x])
+        down, across = down[shows], across[shows]
+        canvas[down, across, :3] = leaves[shows] / 255
         canvas[down, across, 3] = 1.0
+        painted[down, across] = True
+
+    def _cast_shadow(
+        self, canvas: FloatArray, under: BoolArray, left: int, top: int, k: int
+    ) -> None:
+        """Lays the woods' shadow over the pixels `under` woods SHADOW_REACH art pixels up and
+        to the left of them, where a crown stands there, so it takes the crowns' round shapes."""
+        down, across = np.nonzero(under)
+        if not len(down):
+            return
+        height, *_ = _tallest_crown(
+            left + (across + 0.5) / k - SHADOW_REACH[0],
+            top + (down + 0.5) / k - SHADOW_REACH[1],
+            CROWN_GAP,
+        )
+        down, across = down[height > 0], across[height > 0]
+        shaded = canvas[down, across]
+        shaded[:, :3] = shaded[:, :3] * (1 - EDGE_SHADOW) + SHADOW_COLOUR / 255 * EDGE_SHADOW
+        shaded[:, 3] = shaded[:, 3] * (1 - EDGE_SHADOW) + EDGE_SHADOW
+        canvas[down, across] = shaded
 
     def _swell(self, x: Floats, y: Floats) -> Floats:
         """How much more the woods' roof faces CROWN_LIGHT for the broad swells it rolls in."""
