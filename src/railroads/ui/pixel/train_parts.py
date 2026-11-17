@@ -115,6 +115,7 @@ def spoked_wheel(
     hub: RGB = STEEL,
     spokes: int = 8,
     weight: bool = False,
+    tyre: RGB = TYRE,
 ) -> None:
     """The face of a wheel on both sides, over the box models.Model.wheels makes `v` out: a
     rim round spokes, a hub, and for a driving wheel a counterweight between spokes."""
@@ -124,7 +125,7 @@ def spoked_wheel(
         for side in both(v + 0.012):
             out = _side(side)
             z = radius
-            ring(m, u, z, radius * 0.98, side + out * LAYER, TYRE, 24)
+            ring(m, u, z, radius * 0.98, side + out * LAYER, tyre, 24)
             ring(m, u, z, radius * 0.88, side + out * 1.5 * LAYER, color, 24)
             ring(m, u, z, radius * 0.8, side + out * 2 * LAYER, shade(color, 0.45), 24)
             for k in range(spokes):

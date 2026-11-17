@@ -179,7 +179,7 @@ BRUNSWICK: RGB = (34, 52, 42)
 OCHRE: RGB = (176, 136, 62)
 RED_OXIDE: RGB = (112, 60, 46)
 BARE_IRON: RGB = (104, 104, 108)
-ROCKET_YELLOW: RGB = (196, 158, 70)
+ROCKET_YELLOW: RGB = (236, 196, 32)
 
 # Sizes in cells: how far apart the engine and cars sit, and their half lengths.
 CAR_HALF = 0.24
@@ -352,7 +352,8 @@ class Pioneer:
     chimney at the front and wheels given as (u, radius). It may have upright cylinders on the
     boiler with crossheads over them, beams along both sides worked by side cylinders, a flywheel
     or a cog for a rack rail on one side, cylinders slanting down to the front wheels, and a
-    firebox at the back, square or with a domed top."""
+    firebox at the back, square or with a domed top. Its front end may be painted apart from the
+    boiler, and its chimney crowned with a ring of petals."""
 
     half: float
     boiler: RGB
@@ -371,6 +372,11 @@ class Pioneer:
     slanted: bool = False
     firebox: RGB | None = None
     haystack: bool = False
+    front: RGB | None = None
+    hoops: RGB | None = None
+    crown: bool = False
+    tyre: RGB = parts.TYRE
+    flue: float = 0.017
 
     @property
     def chimney(self) -> tuple[float, float]:
@@ -394,11 +400,15 @@ class Pioneer:
                 m.spire(start + 0.04, r, (top + 0.01, top + 0.07), self.firebox)
             start += 0.08
         m.cylinder_along((start, h - 0.02), r, z, self.boiler, shade(self.boiler, 0.8))
+        if self.front is not None:
+            m.cylinder_along((h - 0.1, h - 0.015), r + 0.004, z, self.front, self.front)
+            m.box((h - 0.1, h - 0.03), (-r * 0.7, r * 0.7), (0.06, z), self.front)
         u = self.chimney[0]
-        m.cylinder_up(u, 0.017, (top - 0.01, self.chimney_top - 0.02), self.chimney_color)
+        m.cylinder_up(u, self.flue, (top - 0.01, self.chimney_top - 0.02), self.chimney_color)
+        rim = self.flue + 0.009
         m.box(
-            (u - 0.026, u + 0.026),
-            (-0.026, 0.026),
+            (u - rim, u + rim),
+            (-rim, rim),
             (self.chimney_top - 0.025, self.chimney_top),
             self.chimney_color,
         )
@@ -421,7 +431,7 @@ class Pioneer:
                 _disc(m, 0.0, 0.065, 0.065, v, STEEL, teeth=True)
         if self.slanted:
             (front, size), *_ = self.wheels
-            _slant(m, (-h + 0.12, z + 0.04), (front, size), 0.03, 0.09, self.boiler)
+            _slant(m, (-h + 0.12, z + 0.04), (front, size), 0.03, 0.09, self.front or self.boiler)
         self._fine(m, z, top)
         return m
 
@@ -430,15 +440,29 @@ class Pioneer:
         at the back and the grain of a wooden frame."""
         h, r = self.half, self.radius
         for u, size in self.wheels:
-            parts.spoked_wheel(m, u, size, 0.075, self.wheel, spokes=6)
+            parts.spoked_wheel(
+                m, u, size, 0.075, self.wheel, spokes=12 if size > 0.06 else 6, tyre=self.tyre
+            )
         start = -h + 0.07 + (0.08 if self.firebox is not None else 0.0)
+        end = h - (0.1 if self.front is not None else 0.02)
+        hoops = self.hoops or shade(self.boiler, 0.7)
         with m.fine():
             for k in range(1, 4):
-                at = start + (h - 0.02 - start) * k / 4
-                m.cylinder_along((at - 0.004, at + 0.004), r + 0.003, z, shade(self.boiler, 0.7))
+                at = start + (end - start) * k / 4
+                m.cylinder_along((at - 0.004, at + 0.004), r + 0.003, z, hoops)
             u = self.chimney[0]
+            if self.crown:
+                for k in range(8):
+                    angle = 2 * math.pi * k / 8
+                    begin = len(m.faces)
+                    m.spire(
+                        u, 0.006, (self.chimney_top, self.chimney_top + 0.03), self.chimney_color
+                    )
+                    reach = self.flue + 0.005
+                    m.move(begin, reach * math.cos(angle), reach * math.sin(angle))
+            mouth = self.flue + 0.001
             parts.roof_plate(
-                m, (u - 0.018, u + 0.018), (-0.018, 0.018), self.chimney_top + 0.0006, COAL
+                m, (u - mouth, u + mouth), (-mouth, mouth), self.chimney_top + 0.0006, COAL
             )
             parts.front_ring(m, -h + 0.07 - 0.0006, z - r * 0.3, r * 0.35, BLACK_IRON, 0.0, 10)
         if self.frame == WOOD:
@@ -782,12 +806,14 @@ class Tender:
     barrel: RGB | None = None
     shroud: bool = False
     width: float = 0.085
+    wheel: RGB = FRAME
+    tyre: RGB = parts.TYRE
 
     def model(self) -> Model:
         m = Model()
         h, w, top = self.half, self.width, self.top
         m.box((-h, h), (-0.07, 0.07), (0.035, 0.06), FRAME)
-        m.wheels(list(self.wheels), 0.035, FRAME, 0.075)
+        m.wheels(list(self.wheels), 0.035, self.wheel, 0.075)
         m.box((-h, h), (-w, w), (0.06, top), self.body)
         if self.trim is not None:
             low, high = self.trim_z or (top - 0.035, top - 0.022)
@@ -816,7 +842,7 @@ class Tender:
         water hatch, and buffers, a lamp and a ladder at the back."""
         h, w, top = self.half, self.width, self.top
         for u in self.wheels:
-            parts.spoked_wheel(m, u, 0.035, 0.075, FRAME, spokes=8)
+            parts.spoked_wheel(m, u, 0.035, 0.075, self.wheel, spokes=8, tyre=self.tyre)
             parts.axle_box(m, u, 0.035, 0.088)
         parts.rivets(m, (-h, h), top - 0.008, w + 0.0006, shade(self.body, 0.7), 12)
         with m.fine():
@@ -1896,16 +1922,30 @@ ENGINES: dict[str, EngineModel] = {
         Pioneer(
             0.3,
             ROCKET_YELLOW,
+            FRAME,
+            ((0.14, 0.075), (-0.18, 0.042)),
             ROCKET_YELLOW,
-            ((0.14, 0.072), (-0.18, 0.04)),
-            (220, 216, 204),
-            chimney_color=(220, 216, 204),
-            chimney_top=0.46,
+            chimney_color=(250, 250, 246),
+            chimney_top=0.56,
+            flue=0.026,
             radius=0.06,
             slanted=True,
             firebox=COPPER,
+            front=BLACK_IRON,
+            hoops=BLACK_IRON,
+            crown=True,
+            tyre=(46, 44, 44),
         ),
-        Tender(0.16, ROCKET_YELLOW, (0.08, -0.08), top=0.11, trim=None, barrel=(206, 200, 186)),
+        Tender(
+            0.16,
+            ROCKET_YELLOW,
+            (0.08, -0.08),
+            top=0.11,
+            trim=None,
+            barrel=ROCKET_YELLOW,
+            wheel=ROCKET_YELLOW,
+            tyre=(46, 44, 44),
+        ),
     ),
     "lion": _entry(
         Pioneer(
