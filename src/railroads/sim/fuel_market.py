@@ -31,7 +31,7 @@ import numpy as np
 
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Trade
-from railroads.sim.goods import FITS, Good, Need, price_of
+from railroads.sim.goods import FITS, Good, Need
 from railroads.sim.goods import NEEDS as BUILDING_NEEDS
 from railroads.sim.trains import Engine, Power
 
@@ -70,12 +70,13 @@ PLANT_FUEL: Mapping[BuildingKind, Need] = MappingProxyType(
         BuildingKind.GAS_POWER_PLANT: Need.GAS,
     }
 )
-# What a unit of each fuel costs at first, and the year its market opens.
+# What a unit of each fuel costs at first, and the year its market opens. These are what trains pay
+# to burn it, apart from what hauling the same good earns (railroads.sim.goods.PRICES).
 BASE_PRICE: Mapping[Fuel, float] = MappingProxyType(
     {
-        Fuel.COAL: price_of(Good.COAL),
-        Fuel.WOOD: price_of(Good.LUMBER),
-        Fuel.DIESEL: price_of(Good.FUEL),
+        Fuel.COAL: 7.0,
+        Fuel.WOOD: 7.0,
+        Fuel.DIESEL: 20.0,
         Fuel.ELECTRICITY: 5.0,
     }
 )

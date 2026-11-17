@@ -351,7 +351,7 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.SUGAR: 8,
         Good.FISH: 8,
         Good.CANS: 20,
-        Good.BREAD: 4,
+        Good.BREAD: 6,
         Good.CLAY: 10,
         Good.LIMESTONE: 10,
         Good.SAND: 8,

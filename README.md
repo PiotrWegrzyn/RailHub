@@ -658,7 +658,7 @@ set off for a stop further than its range: the first steam engines run only 4 to
 Planet 20, and lines need stations to take on fuel along the way; electrics run as far as the
 wires go. Every fuel's price, from the year it comes in (coal and wood 1804, electricity 1925, diesel fuel
 1935), moves only in a tug of war between demand and supply, between 0.4 and 4 times its first
-price: the coal or diesel fuel the map's buildings need and the player's trains bought last
+price ($7 a unit for coal and wood, $20 for diesel fuel, apart from what hauling them pays): the coal or diesel fuel the map's buildings need and the player's trains bought last
 month against what the player's stations hand out to those buildings and a quarter of what the
 map's mines or refineries can make, measured against the first month of play, the price moving a
 quarter of the way to where they put it each month. Electricity always has a sensible price, $5
@@ -814,7 +814,7 @@ Stations window shows the share of demand left for each need.
 
 | Price | Goods |
 |---|---|
-| $2-10 | bread 4, eggs 4, chickens 6, milk 6, potatoes 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, sugar 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, lumber 10, newspapers 10, pots 10 |
+| $2-10 | eggs 4, bread 6, chickens 6, milk 6, potatoes 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, sugar 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, lumber 10, newspapers 10, pots 10 |
 | $11-20 | cement 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, beer 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, wool 20 |
 | $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, stove tiles 25, copper 28, castings 30, vodka 30, wax 30, plastics 40, rubber 40, wine 40 |
 | $41-200 | coffee 50, furniture 60, porcelain 60, clothes 70, steel 80, shoes 100, electronics 120, goods 120, guns 150, tools 160, machinery 180 |
