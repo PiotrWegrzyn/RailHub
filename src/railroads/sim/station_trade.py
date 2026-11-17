@@ -161,7 +161,6 @@ class StationTrade:
                         continue
                     if recipe is not None:
                         stock[cell] += given
-                        economy.blank.discard((kind, need))
                     else:
                         taken[cell] = taken.get(cell, 0.0) + given
                     if not goods.held(good):

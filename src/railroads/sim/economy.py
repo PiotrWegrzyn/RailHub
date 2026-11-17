@@ -256,6 +256,26 @@ class Trade:
         return levels_of(self.share(kinds if kinds is not None else tuple(self.needed)))
 
 
+# Every processor's kind and each input it ever takes in.
+STOCKPILES = tuple(
+    (kind, need) for kind, recipe in RECIPES.items() for need in Need if need in recipe.every_need
+)
+
+
+class Stockpiles(dict[tuple[BuildingKind, Need], FloatCells]):
+    """What the processors of each kind in each cell hold of each input: a map-sized array for
+    each kind and input some of them hold, and none for the rest, which holds nothing anywhere:
+    asked for, it gets an empty one."""
+
+    def __init__(self, cells: int) -> None:
+        super().__init__()
+        self.cells = cells
+
+    def __missing__(self, key: tuple[BuildingKind, Need]) -> FloatCells:
+        stock = self[key] = np.zeros(self.cells)
+        return stock
+
+
 class Economy:
     """Lets stations hand goods out on one map each month, on the cells with buildings that
     trade, and keeps every processor's stockpile of inputs from month to month."""
@@ -277,14 +297,7 @@ class Economy:
         self.year = START_YEAR
         self.bonus_per_good = BONUS_PER_GOOD
         # What the processors of each kind in each cell hold of each input.
-        self.stock: dict[tuple[BuildingKind, Need], FloatCells] = {
-            (kind, need): np.zeros(self.cells)
-            for kind, recipe in RECIPES.items()
-            for need in recipe.every_need
-        }
-        # The stockpiles the last trade left empty everywhere, which no station has filled since
-        # (railroads.sim.station_trade), so the next trade need not look at them.
-        self.blank: set[tuple[BuildingKind, Need]] = set()
+        self.stock = Stockpiles(self.cells)
 
     def trade(
         self,
@@ -403,10 +416,6 @@ class _Month:
         self.wanted = {kind: wants_of(kind, economy.year) for kind in self.count}
         self.zero = np.zeros(cells.size)
         self.priority = economy.levels[cells]
-        for kind, recipe in RECIPES.items():
-            for need in recipe.every_need:
-                if (kind, need) not in economy.stock:
-                    economy.stock[(kind, need)] = np.zeros(economy.cells)
         # What each kind of processor holds of each input, worked out as the trade begins.
         self.stock: dict[tuple[BuildingKind, Need], FloatCells] = {}
         # What buildings offer of each good, by kind and in all, and how much of it went.
@@ -469,13 +478,13 @@ class _Month:
         yield
         economy, cells = self.economy, self.cells
         self.stock = {
-            (kind, need): np.zeros(cells.size)
-            if (kind, need) in economy.blank
-            else np.minimum(
+            (kind, need): np.minimum(
                 economy.stock[(kind, need)][cells],
                 input_stock(kind) * self.count.get(kind, self.zero),
             )
-            for kind, need in economy.stock
+            if (kind, need) in economy.stock
+            else np.zeros(cells.size)
+            for kind, need in STOCKPILES
         }
         yield
         paused = time.perf_counter()
@@ -782,17 +791,14 @@ class _Month:
                     key = (kind, need)
                     self.stock[key] = np.maximum(self.stock[key] - went * amount, 0.0)
         yield
-        blank = self.economy.blank
-        for key, stock in self.economy.stock.items():
-            held = self.stock[key]
+        stockpiles = self.economy.stock
+        for key, held in self.stock.items():
             if not held.any():
-                if key not in blank:
-                    stock[:] = 0.0
-                    blank.add(key)
+                stockpiles.pop(key, None)
                 continue
+            stock = stockpiles[key]
             stock[:] = 0.0
             stock[self.cells] = held
-            blank.discard(key)
         self.economy.taken = self._taken_since_served()
         trade = Trade(
             self.cells,
