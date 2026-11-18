@@ -102,7 +102,7 @@ from railroads.sim.station_trade import StationTrade
 from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tech import Effect
-from railroads.sim.tilemap import Relief, Terrain, Vegetation
+from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 from railroads.sim.towns import Towns
 
 if TYPE_CHECKING:
@@ -280,6 +280,14 @@ UNDYING = (
 )
 
 
+def _unlocked(tile_map: TileMap, cells: Cells, weights: FloatGrid) -> FloatGrid:
+    """A land's weights of these flat cells, none on land the player has not bought
+    (railroads.sim.lots), where nothing grows."""
+    if tile_map.locked is None:
+        return weights
+    return np.where(tile_map.locked.ravel()[cells], 0.0, weights)
+
+
 def _allowed(cells: Cells, opened: Cells, land: FloatGrid) -> Cells:
     """The cells a ladder may grow in once these have opened to it, in order. Cells that closed
     stay in until they are a tenth of the rest, harmless with no chance to grow there."""
@@ -393,7 +401,7 @@ class Growth:
         for ladder in rule.ladders:
             shared = lands.get(id(ladder.land))
             if shared is None or shared[0] is not ladder.land:
-                weights = ladder.land.weights_in(surroundings)
+                weights = _unlocked(tile_map, everywhere, ladder.land.weights_in(surroundings))
                 shared = lands[id(ladder.land)] = (
                     ladder.land,
                     weights,
@@ -930,7 +938,7 @@ class Growth:
             touched = beside if nearby else own
             if nearby not in surroundings:
                 surroundings[nearby] = Surroundings(tile_map, touched, self._near)
-            land = first.ladder.land.weights_in(surroundings[nearby])
+            land = _unlocked(tile_map, touched, first.ladder.land.weights_in(surroundings[nearby]))
             differs = land != first.land[touched]
             if not differs.any():
                 continue
@@ -1053,7 +1061,7 @@ class Growth:
                 return cell
         if ladder.kinds[0] not in KEY_BUILDINGS:
             return None
-        anywhere = place.cells if place.cells.size else np.arange(self._grid.rows * self._grid.cols)
+        anywhere = place.cells if place.cells.size else self._open_cells()
         for index in rng.choice(anywhere, min(ANYWHERE_TRIED, anywhere.size), replace=False):
             cell = divmod(int(index), self._grid.cols)
             if self.constructions.tile_map.terrain[cell] == Terrain.LAND and self._fits(
@@ -1061,6 +1069,13 @@ class Growth:
             ):
                 return cell
         return None
+
+    def _open_cells(self) -> Cells:
+        """Every cell not locked (railroads.sim.lots)."""
+        locked = self.constructions.tile_map.locked
+        if locked is None:
+            return np.arange(self._grid.rows * self._grid.cols)
+        return np.flatnonzero(~locked)
 
     def _fits(self, ladder: Ladder, cell: Cell) -> bool:
         """Whether one more of a ladder's first kind can go up in a cell as it stands."""

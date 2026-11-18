@@ -480,6 +480,10 @@ class CannotBuild(ValueError):
     pass
 
 
+# Why nothing can be built on land the player has not bought (railroads.sim.lots).
+LOCKED = "That land isn't yours: buy it first"
+
+
 class Constructions:
     """Everything built on one map, kept per cell, and the rules for building more."""
 
@@ -604,6 +608,8 @@ class Constructions:
         cell = construction.cell
         if not self.tile_map.grid.contains(*cell):
             return "That is off the map"
+        if self.tile_map.is_locked(cell):
+            return LOCKED
         match construction:
             case Track():
                 problem = self._track_problem(construction)
@@ -675,8 +681,11 @@ class Constructions:
         if (problem := self._bed_problem(track.cell, track.bed)) is not None:
             return problem
         for point in track.ends:
-            if not grid.contains(*grid.track_exit(track.cell, point)[0]):
+            beyond = grid.track_exit(track.cell, point)[0]
+            if not grid.contains(*beyond):
                 return "Track cannot run off the map"
+            if self.tile_map.is_locked(beyond):
+                return LOCKED
             for side in grid.track_flanks(track.cell, point):
                 if self._bed_problem(side, track.bed) is not None:
                     return "Track through a corner needs the cells on both sides to take it"
@@ -687,6 +696,8 @@ class Constructions:
     def _bed_problem(self, cell: Cell, bed: TrackBed) -> str | None:
         if not self.tile_map.grid.contains(*cell):
             return "That is off the map"
+        if self.tile_map.is_locked(cell):
+            return LOCKED
         tile = self.tile_map.tile(cell)
         if track_rules_for(tile, bed).can_build:
             return None
