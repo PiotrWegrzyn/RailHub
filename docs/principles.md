@@ -125,7 +125,8 @@ The ideas every rule of the game should follow.
 
 ## Building
 
-- Track goes round buildings: never under them, and it never moves them.
+- Track goes round buildings: never under them, and it never moves them. No building ever moves
+  to another hex: one in the way comes down.
 - Anything can be demolished, at a price: a house costs little, a factory a lot, and unique
   buildings cannot be removed.
 

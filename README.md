@@ -702,11 +702,11 @@ twice at 200%, and shares sell at the price they buy at, so raising a building's
 raises what its shares fetch; shares can be sold only five years after they were bought, so the
 way to earn on them is to buy into a building that struggles and make it work. Tech cuts the price of shares by up to half, and production tech
 makes the player's part bigger. Every cell where the player owns shares flies the flag of their
-company, The Trains Corp. Growth never takes a
-building from its owner: one it pulls down (a farm crowded out by a town, a lumber mill whose
-forest is gone, anything cleared for track) goes up again as theirs in the nearest cell its
-land allows, and one that merges into a bigger building (three factories into a big factory)
-makes the bigger one theirs.
+company, The Trains Corp. A building never moves to another hex: one pulled down (a farm
+crowded out by a town, a lumber mill whose forest is gone, anything cleared for track, a station
+or a merged works) comes down for good, the player's shares in it with it, and one that merges
+into a bigger building (three factories into a big factory) passes its shares on to the bigger
+one.
 
 The tech window (R, or the flask in the top bar) has seven trees, 10 to 15 nodes each
 (`railroads.sim.tech`). Every tree gains experience in dollars only from deliveries: food and

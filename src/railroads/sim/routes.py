@@ -185,7 +185,6 @@ def route_price(constructions: Constructions, route: Route) -> float:
 def lay_route(growth: Growth, route: Route) -> set[Cell]:
     """Lays the planned track, making room for it as it goes; returns the cells that changed."""
     constructions = growth.constructions
-    avoid = frozenset(route.cells)
     changed: set[Cell] = set()
     for cell, ends in route.turns.items():
         station = constructions.station_at(cell)
@@ -197,7 +196,7 @@ def lay_route(growth: Growth, route: Route) -> set[Cell]:
         replacing = old is not None and old in constructions.at(piece.cell)
         if replacing:
             constructions.remove(old)
-        changed |= growth.room.clear(piece.cell, piece.space, avoid)
+        changed |= growth.room.clear(piece.cell, piece.space)
         if constructions.why_not(piece) is None:
             constructions.build(piece)
             changed.add(piece.cell)
@@ -248,7 +247,7 @@ def build_station(
         return None
     for piece in constructions.track_at(cell):
         constructions.remove(piece)
-    changed = growth.room.clear(cell, station.space, frozenset({cell}))
+    changed = growth.room.clear(cell, station.space)
     constructions.build(station)
     return changed | {cell}
 

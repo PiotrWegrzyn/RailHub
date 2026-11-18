@@ -94,7 +94,7 @@ from railroads.sim.ladders import (
     Points,
     Surroundings,
 )
-from railroads.sim.ownership import SHARES, Owners
+from railroads.sim.ownership import Owners
 from railroads.sim.power_plants import build_power_plants
 from railroads.sim.railway import Railway
 from railroads.sim.room import Room
@@ -732,15 +732,11 @@ class Growth:
                 continue
             for row, col in np.argwhere((fields > 0) & (people >= most)).tolist():
                 gone = int(fields[row, col])
-                owned = self.owners.lose((row, col), kind, gone)
+                self.owners.lose((row, col), kind, gone)
                 for _ in range(gone):
                     self.constructions.remove(Building((row, col), kind))
                 self.add((row, col), kind, -gone)
                 changed.add((row, col))
-                while owned > 0:
-                    moved = min(SHARES, owned)
-                    changed |= self.room.relocate(Building((row, col), kind), moved)
-                    owned -= moved
         return changed
 
     def _breeding(self, place: _Place) -> Breeding:

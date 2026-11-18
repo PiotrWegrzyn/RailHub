@@ -109,7 +109,7 @@ def test_track_goes_round_a_farm_rather_than_moving_it() -> None:
     assert (6, 8) not in route.cells
 
 
-def test_laying_track_moves_buildings_aside_or_pulls_down_the_lowest() -> None:
+def test_laying_track_pulls_down_the_lowest_building_and_moves_none() -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
     for _ in range(5):
@@ -124,8 +124,8 @@ def test_laying_track_moves_buildings_aside_or_pulls_down_the_lowest() -> None:
         1 for b in constructions if isinstance(b, Building) and b.kind == BuildingKind.HOUSE
     )
     assert constructions.space_left((6, 5)) == 1
-    assert houses_here == 4 and houses == 5
-    assert len(changed) == 2
+    assert houses_here == 4 and houses == 4
+    assert changed == {(6, 5)}
 
 
 def test_with_nowhere_to_move_the_lowest_building_comes_down() -> None:
@@ -146,7 +146,7 @@ def test_with_nowhere_to_move_the_lowest_building_comes_down() -> None:
     assert growth.count(BuildingKind.HOUSE).sum() == 0
 
 
-def test_a_station_clears_its_cell_and_track_joins_it_without_entering() -> None:
+def test_a_station_pulls_down_what_stands_in_its_cell_and_track_joins_it_without_entering() -> None:
     constructions = Constructions(make_map())
     for _ in range(3):
         constructions.build(Building((6, 12), BuildingKind.HOUSE))
@@ -156,7 +156,7 @@ def test_a_station_clears_its_cell_and_track_joins_it_without_entering() -> None
     route = plan_route(constructions, (6, 2), (6, 12))
 
     assert constructions.station_at((6, 12)) is not None
-    assert growth.count(BuildingKind.HOUSE).sum() == 3
+    assert growth.count(BuildingKind.HOUSE).sum() == 0
     assert route is not None
     assert all(piece.cell != (6, 12) for piece in route.pieces)
 

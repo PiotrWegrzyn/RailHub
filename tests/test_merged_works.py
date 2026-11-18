@@ -40,7 +40,7 @@ def test_two_big_textile_mills_merge_into_a_mega_one() -> None:
     assert growth.count(BuildingKind.BIG_TEXTILE_MILL).sum() == 0
 
 
-def test_works_merging_into_a_big_one_move_the_houses_it_needs_room_from_next_door() -> None:
+def test_works_merging_into_a_big_one_pull_down_the_houses_it_needs_room_from() -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
     neighbour = tile_map.grid.neighbours(5, 5)[0]
@@ -53,7 +53,7 @@ def test_works_merging_into_a_big_one_move_the_houses_it_needs_room_from_next_do
 
     assert growth.count(BuildingKind.BIG_GLASSWORKS)[5, 5] == 1
     assert growth.count(BuildingKind.HOUSE)[5, 5] == 3
-    assert growth.count(BuildingKind.HOUSE).sum() == 5
+    assert growth.count(BuildingKind.HOUSE).sum() == 3
 
 
 @pytest.mark.parametrize(("bakeries", "merged"), [(2, 0), (3, 1)])

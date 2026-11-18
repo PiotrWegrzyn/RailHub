@@ -128,7 +128,7 @@ def test_an_owned_farm_far_from_any_station_pays_the_player_nothing() -> None:
     assert not any(growth.railway.finances.month.values())
 
 
-def test_a_crowded_out_farm_of_the_players_goes_up_again_nearby_and_stays_theirs() -> None:
+def test_a_crowded_out_farm_of_the_players_comes_down_with_their_shares() -> None:
     growth = grown(((5, 5), BuildingKind.FARM))
     growth.owners.own((5, 5), BuildingKind.FARM)
     neighbours = growth.constructions.tile_map.grid.neighbours(5, 5)
@@ -137,10 +137,8 @@ def test_a_crowded_out_farm_of_the_players_goes_up_again_nearby_and_stays_theirs
 
     growth._crowd_out()
 
-    owned = growth.owners.owned(BuildingKind.FARM)
-    assert growth.count(BuildingKind.FARM)[5, 5] == 0
-    assert owned.sum() == 1
-    assert growth.count(BuildingKind.FARM)[tuple(np.argwhere(owned)[0])] == 1
+    assert growth.count(BuildingKind.FARM).sum() == 0
+    assert growth.owners.shares(BuildingKind.FARM).sum() == 0
 
 
 def test_factories_merging_into_a_big_one_hand_their_owner_their_part_of_it() -> None:
