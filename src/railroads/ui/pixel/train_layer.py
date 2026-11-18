@@ -500,7 +500,20 @@ def engine_picture(
 ) -> Pixels:
     """An engine with its tender, as the map draws it, facing SHOWN_FACING: RGBA at the size of
     the sprite sheet, or `times` as many pixels each way with its fine details."""
-    facing = np.array(SHOWN_FACING) / math.hypot(*SHOWN_FACING)
+    return train_picture(sprites, matrix, Train("", engine=engine), times)
+
+
+def train_picture(
+    sprites: TrainSprites | GrownTrainSprites,
+    matrix: npt.NDArray[np.float64],
+    train: Train,
+    times: int = 1,
+    shown_facing: tuple[float, float] = SHOWN_FACING,
+) -> Pixels:
+    """A whole train, its engine, tender and cars, as the map draws it, facing `shown_facing` on
+    the screen: RGBA at the size of the sprite sheet, or `times` as many pixels each way with its
+    fine details."""
+    facing = np.array(shown_facing) / math.hypot(*shown_facing)
 
     def on_screen(heading: float) -> float:
         way = matrix @ (math.cos(heading), math.sin(heading))
@@ -510,7 +523,7 @@ def engine_picture(
     ahead = matrix @ (math.cos(heading), math.sin(heading)) * DETAIL * times
     key = tuple(float(v) for v in matrix.ravel())
     placed = []
-    for look, back in TrainLayer._parts(Train("", engine=engine)):
+    for look, back in TrainLayer._parts(train):
         if times == 1:
             x, y, w, h, anchor_x, anchor_y = sprites.place(look, heading)
             pixels = sprites.image[y : y + h, x : x + w]

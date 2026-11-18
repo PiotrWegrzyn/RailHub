@@ -30,7 +30,7 @@ from railroads.ui.build_menu import Tool
 from railroads.ui.ground import GroundPictures
 from railroads.ui.history_pictures import opening_center
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
-from railroads.ui.main_menu import MENU_WIDTH, MainMenu, Page
+from railroads.ui.main_menu import MENU_WIDTH, PANEL_PAD, MainMenu, Page
 from railroads.ui.map_view import VISIT_ZOOM, Lens, MapView
 from railroads.ui.route_map import soften
 from railroads.ui.waiting_screen import WORK
@@ -247,7 +247,7 @@ def test_every_page_of_the_main_menu_draws(context: None, tmp_path: Path, page: 
 def test_the_menu_draws_nothing_past_its_buttons(context: None, tmp_path: Path, page: Page) -> None:
     menu = MainMenu(Saves(tmp_path))
     menu.go_to(page)
-    left = (1280 - MENU_WIDTH) / 2
+    left = (1280 - MENU_WIDTH) / 2 - PANEL_PAD
 
     for _ in range(3):
         imgui.new_frame()
@@ -259,7 +259,7 @@ def test_the_menu_draws_nothing_past_its_buttons(context: None, tmp_path: Path, 
         imgui.render()
 
     clips = [cmd.clip_rect for drawn in imgui.get_draw_data().cmd_lists for cmd in drawn.cmd_buffer]
-    assert (left, left + MENU_WIDTH) in [(clip.x, clip.z) for clip in clips]
+    assert (left, left + MENU_WIDTH + 2 * PANEL_PAD) in [(clip.x, clip.z) for clip in clips]
 
 
 def test_a_game_loaded_from_the_menu_comes_back_as_it_was_saved(

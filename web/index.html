@@ -39,7 +39,14 @@ Query parameters:
         #landing button:hover { background: #e8bb68; }
         #landing .status { min-height: 1.2em; margin: 8px 0 6px; color: #888; font-size: 13px; }
         #landing .tip { min-height: 1.2em; margin: 0 0 30px; color: #6f6a62; font-size: 13px; }
-        #landing .slow { margin: 0 0 10px; }
+        #landing .get { position: absolute; top: 16px; right: 16px; width: min(260px, calc(100% - 32px));
+                   text-align: center; font-size: 13px; }
+        #landing .get .download { padding: 8px; font-size: 14px; }
+        @media (max-width: 640px) {
+            #landing { flex-direction: column; }
+            #landing .get { position: static; margin-top: 24px; }
+        }
+        #landing .slow { margin: 0 0 8px; }
         #landing .download { background: #2a2622; color: #dba852; }
         #landing .download:hover { background: #35302a; }
         #landing .needs { margin: 6px 0 0; color: #888; font-size: 13px; }
@@ -51,7 +58,7 @@ Query parameters:
         #landing .mac-help li { margin: 4px 0; }
         #landing .mac-help code { display: block; margin: 6px 0; padding: 6px 8px; background: #2a2622;
                    color: #dba852; border-radius: 4px; user-select: all; overflow-wrap: anywhere; }
-        #landing .fine { margin: 28px 0 0; color: #777; font-size: 12px; }
+        #landing .fine { margin: 12px 0 0; color: #777; font-size: 11px; }
     </style>
 </head>
 <body>
@@ -61,6 +68,8 @@ Query parameters:
         <button id="play">Play online</button>
         <p class="status" id="landing-status">Turning cogs (0%)...</p>
         <p class="tip" id="landing-tip"></p>
+    </div>
+    <div class="get">
         <p class="slow">Too slow? Download and play outside the browser</p>
         <a class="download" id="download"></a>
         <p class="needs" id="needs"></p>
