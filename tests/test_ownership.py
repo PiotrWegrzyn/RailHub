@@ -68,14 +68,14 @@ def joined_with_owned_farm(*houses: tuple[int, int]) -> Growth:
     return growth
 
 
-def test_a_station_hands_out_the_players_share_of_their_farm_and_it_pays_as_a_delivery() -> None:
+def test_a_station_hands_out_the_players_share_of_their_farm_and_files_its_pay_as_owned() -> None:
     growth = joined_with_owned_farm((6, 21), (6, 21), (6, 21))
 
     growth.trade_goods()
 
     assert growth.trade.handed[(6, 20)][Good.WHEAT] == pytest.approx(10 * OWNER_SHARE)
-    assert growth.railway.finances.month["cargo"] > 0
-    assert growth.railway.finances.month.get("owned buildings", 0.0) == 0.0
+    assert growth.railway.finances.month["owned buildings"] > 0
+    assert growth.railway.finances.month.get("cargo", 0.0) == 0.0
 
 
 def test_an_owned_farm_far_from_any_station_pays_the_player_nothing() -> None:

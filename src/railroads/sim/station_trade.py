@@ -102,10 +102,15 @@ class StationTrade:
             goods = railway.station_goods(station)
             for good, amount in owned.items():
                 goods.bring(good, {station: amount})
+        # The share of what each station handed out of a good that the player's own buildings made.
+        owned_share: dict[tuple[Cell, Good], float] = {}
         for station, handed in trade.handed.items():
             goods = railway.station_goods(station)
             for good, amount in handed.items():
-                goods.release(good, amount)
+                parcels = goods.release(good, amount)
+                total = sum(parcels.values())
+                if total > 0 and parcels.get(station):
+                    owned_share[(station, good)] = parcels[station] / total
         for station, gathered in trade.gathered.items():
             goods = railway.station_goods(station)
             for good, amount in gathered.items():
@@ -128,7 +133,11 @@ class StationTrade:
         yield
         for station, handed_for in trade.handed_for.items():
             for (need, good), amount in handed_for.items():
-                railway.pay_for(station, need, good, amount)
+                owned = owned_share.get((station, good), 0.0)
+                if owned > 0:
+                    railway.pay_for(station, need, good, amount * owned, "owned buildings")
+                if owned < 1:
+                    railway.pay_for(station, need, good, amount * (1 - owned))
 
     def _short_after_local(
         self, station: Cell, needs: dict[Need, float], trade: Trade | None

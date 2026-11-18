@@ -484,12 +484,15 @@ class Railway:
         if self.station_trade is not None:
             self.station_trade.hand_out_now(station, good)
 
-    def pay_for(self, station: Cell, need: Need, good: Good, amount: float) -> None:
+    def pay_for(
+        self, station: Cell, need: Need, good: Good, amount: float, what: str = "cargo"
+    ) -> None:
         """Pays for cargo trains brought that the buildings around a station took, which is also
-        experience in the good's tree."""
+        experience in the good's tree, filed as `what`: cargo, or the player's share of what
+        their own buildings made, handed out as if a train had brought it."""
         earned = self.station_demand(station).pay(need, good, amount) * self.price_factor(good)
         earned *= self.facility_pay(station, good)
-        self.finances.earn(earned, "cargo")
+        self.finances.earn(earned, what)
         self.research.earn(GOOD_TREES[good], earned)
 
     def facility_pay(self, station: Cell, good: Good) -> float:
