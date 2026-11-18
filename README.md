@@ -24,10 +24,14 @@ uv run railroads
 It opens on the main menu: start a new game, play the tutorial, load a saved one, or quit.
 
 The tutorial (`railroads.tutorial`) is a premade game that is the same for every player: a small
-map drawn by hand, not grown from a seed (`railroads.tutorial.place`), 32 by 32 hexes in 1850
-with the usual $80,000. Ashford is a farming village with more wheat than it eats, Brookby a town
-of houses and tenements with no farm near; a coal mine and a lumber mill stand in the hills and
-the forest, and the land around is for sale in lots like any game's. Its months grow from a
+map made for it, not grown from a seed (`railroads.tutorial.place`), the honeycomb of seven lots
+in the middle of its place, in 1850 with the usual $80,000. Its hills, mountains, forests and lakes
+take ragged shapes from smooth noise of fixed random numbers, and two rivers wind down to the
+south, none across the line between the towns. Ashford is a farming village of a few houses, a
+bakery and a church among fields that thin out towards their edge, with more wheat than it eats;
+Brookby a market town of houses and tenements round a free cell, thinning out at its edge, with
+no field near. A coal mine in the hills and a lumber mill in the forest each have a hamlet, and
+the land around is for sale in lots like any game's. Its months grow from a
 fixed seed, so they play out the same too. A window walks the player through it a step at a time
 (`railroads.tutorial.steps`): each explains something, frames in brass what to click, on the map
 or in the windows (`railroads.ui.spotlight`), and Next waits until it is done, which can be
@@ -692,8 +696,8 @@ Shares of any building that makes something can be bought and sold from the hex 
 mines, mills, works and factories, but no homes, shops, churches or military. Every building is
 1,000 shares, traded 100 at a time, and 100 shares are a tenth of what it makes. A bought
 building pays nothing of its own: the player's part of what it makes goes into the stations
-around it before anything is handed out, sold to the player's company at the market price as it
-goes in, and then pays freight like any cargo when a train carries it to another station and
+around it before anything is handed out, and the stations buy it from the player at the market
+price as it goes in; it then pays freight like any cargo when a train carries it to another station and
 buildings there take it; what the station hands out around it carries no freight. A building
 with no station near pays nothing. A station hands what it has to the player's own buildings before anyone else's,
 however far within its reach they stand. A whole building costs ten years of all it makes at full output when it

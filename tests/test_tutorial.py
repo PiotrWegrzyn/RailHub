@@ -9,7 +9,7 @@ from test_app_frame import context, frame, shell_frame
 from railroads.land import buy_lot_steps
 from railroads.saves import SavedGame, Saves
 from railroads.sim.constructions import Building, BuildingKind
-from railroads.sim.finance import START_CASH
+from railroads.sim.finance import START_CASH, TRACK_PRICE
 from railroads.sim.game import Game
 from railroads.sim.goods import Good
 from railroads.sim.steps import finish
@@ -102,6 +102,17 @@ def test_the_tutorial_plays_its_first_year_the_same_every_time() -> None:
             saved.game.month(saved.rng)
 
     assert built(first) == built(second)
+
+
+def test_the_line_between_the_towns_crosses_only_flat_open_land() -> None:
+    game = with_stations()
+    cash = game.finances.cash
+
+    done = game.lay_track(ASHFORD_STATION, BROOKBY_STATION)
+
+    assert done.ok
+    laid = BROOKBY_STATION[1] - ASHFORD_STATION[1] - 1
+    assert cash - game.finances.cash == pytest.approx(laid * TRACK_PRICE)
 
 
 def test_the_tutorial_names_its_stations_after_its_own_towns() -> None:

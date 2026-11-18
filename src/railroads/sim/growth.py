@@ -292,7 +292,9 @@ def _unlocked(tile_map: TileMap, cells: Cells, weights: FloatGrid) -> FloatGrid:
 def _allowed(cells: Cells, opened: Cells, land: FloatGrid) -> Cells:
     """The cells a ladder may grow in once these have opened to it, in order. Cells that closed
     stay in until they are a tenth of the rest, harmless with no chance to grow there."""
-    if opened.size:
+    if opened.size and not cells.size:
+        cells = opened
+    elif opened.size:
         at = np.searchsorted(cells, opened)
         listed = (at < cells.size) & (cells[np.minimum(at, cells.size - 1)] == opened)
         cells = np.insert(cells, at[~listed], opened[~listed])

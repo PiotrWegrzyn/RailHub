@@ -25,8 +25,8 @@ The ideas every rule of the game should follow.
   on their own earn nothing, so the money comes from what the player adds to the local economy:
   a station is an investment. The player can buy shares of buildings, a thousand to a building,
   priced by how satisfied the building was over the last quarter. Their part of what it makes goes
-  into the stations around it first, before anything is handed out, sold to the player at the
-  market price as it goes in. Trains earn freight, a fifth of the market price, for what they
+  into the stations around it first, before anything is handed out, and the stations buy it from
+  the player at the market price as it goes in. Trains earn freight, a fifth of the market price, for what they
   bring that buildings take, more the less satisfied the building that took it was.
 - The demand at a station counts only what the buildings around it were left short of after the
   goods handed out on their own.

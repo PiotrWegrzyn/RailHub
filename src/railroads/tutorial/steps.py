@@ -110,7 +110,7 @@ STEPS: tuple[Step, ...] = (
                 "It is 1850. Towns grow on their own, but only as well as they are supplied. Your "
                 "trains bring them what they lack: they pay you for it, and the towns grow faster."
             ),
-            "This map is the same for everyone. Drag it to look around and scroll to zoom.",
+            "Drag the map to look around and scroll to zoom in and out.",
         ),
     ),
     Step(
@@ -269,9 +269,9 @@ STEPS: tuple[Step, ...] = (
                 "it was last quarter."
             ),
             (
-                "Your part of what it makes goes into your stations around it first, sold to you at "
-                "the market price, and pays freight when a train delivers it. With no station near "
-                "it pays nothing."
+                "Your part of what it makes goes into your stations around it first, and they buy "
+                "it from you at the market price. Freight comes on top when a train delivers it. "
+                "With no station near it pays nothing."
             ),
         ),
         "Right-click the marked farm, press Shares, then Buy.",

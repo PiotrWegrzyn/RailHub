@@ -56,38 +56,70 @@ ASHFORD_STATION = on_map((16, 8))
 BROOKBY_STATION = BROOKBY
 # The farm whose details and shares the tutorial points at.
 SHOWN_FARM = on_map((17, 8))
-# How far out from its station Ashford's farms and Brookby's houses reach.
-FARMS_REACH = 4
-TOWN_REACH = 2
 # The cells left free between the two stations, for the track.
 LINE = frozenset(
     (ASHFORD_STATION[0], col) for col in range(ASHFORD_STATION[1] + 1, BROOKBY_STATION[1])
 )
+# How far out from its station Ashford's fields reach, and Brookby's houses.
+FARMS_REACH = 5
+TOWN_REACH = 3
+# The chance a cell that far out from its station is built up: fields thin out towards the
+# edge of the farmland and houses towards the edge of the town, so neither ends in a clean ring.
+FIELD_CHANCE = (1.0, 1.0, 0.95, 0.85, 0.6, 0.35)
+HOUSE_CHANCE = (1.0, 1.0, 0.8, 0.4)
+# A field is left out where this many people live around it, as growth would pull it down.
+CROWDED_FIELD = 8
+# The random numbers that pick which cells are built up, the same every time.
+LAYOUT_SEED = 1066
+# Where the mine, the lumber mill and the hamlets beside them stand, on the drawn square.
+MINE = (5, 6)
+MILL = (6, 24)
 
 H, T, F = BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FARM
 
 
+def _grid() -> HexGrid:
+    return HexGrid(rows=MAP_ROWS, cols=MAP_COLS, km_per_cell=KM_PER_CELL)
+
+
 def _layout() -> dict[Cell, tuple[BuildingKind, ...]]:
-    """Ashford: a farming village, a few houses and a bakery among fields that make more food
-    than it eats. Brookby: houses and tenements round a free cell, with no farm near enough to
-    feed them, so they want the food trains bring. A coal mine in the hills and a lumber mill
-    in the forest."""
-    grid = HexGrid(rows=MAP_ROWS, cols=MAP_COLS, km_per_cell=KM_PER_CELL)
-    layout: dict[Cell, tuple[BuildingKind, ...]] = {
-        on_map((14, 7)): (H, H),
+    """Ashford: a farming village of a few houses, a bakery and a church, among fields that make
+    more food than it eats. Brookby: a market town of houses and tenements round a free cell,
+    thinning out at its edges, with no fields near enough to feed it, so it wants the food
+    trains bring. A coal mine in the hills and a lumber mill in the forest, each with a hamlet."""
+    grid = _grid()
+    rng = np.random.default_rng(LAYOUT_SEED)
+    village = {
+        on_map((14, 7)): (H, H, BuildingKind.CHURCH),
+        on_map((13, 7)): (H, H),
         on_map((14, 8)): (H, BuildingKind.BAKERY),
+        on_map((13, 6)): (H,),
     }
+    layout: dict[Cell, tuple[BuildingKind, ...]] = dict(village)
+    people = {cell: kinds.count(H) for cell, kinds in village.items()}
     for cell, steps in sorted(grid.within(ASHFORD_STATION, FARMS_REACH).items()):
-        if steps and cell not in layout and cell not in LINE:
+        if not steps or cell in layout or cell in LINE or rng.random() >= FIELD_CHANCE[steps]:
+            continue
+        around = sum(people.get(near, 0) for near in [cell, *grid.neighbours(*cell)])
+        if around < CROWDED_FIELD:
             layout[cell] = (F,)
     town = sorted(grid.within(BROOKBY_STATION, TOWN_REACH).items())
+    tenements = 0
     for cell, steps in town:
-        if steps and cell not in LINE:
-            layout[cell] = (H, H, H) if steps == 1 else (H, H)
-    for cell in [cell for cell, steps in town if steps == 1][:3]:
-        layout[cell] = (T, H, H)
-    layout[on_map((5, 6))] = (BuildingKind.MINE,)
-    layout[on_map((6, 24))] = (BuildingKind.LUMBER_MILL,)
+        if not steps or cell in LINE or rng.random() >= HOUSE_CHANCE[steps]:
+            continue
+        houses = int(rng.integers(4 - steps, 6 - steps))
+        if steps == 1 and tenements < 3:
+            tenements += 1
+            layout[cell] = (T,) + (H,) * (houses - 1)
+        else:
+            layout[cell] = (H,) * houses
+    church = next(cell for cell, steps in town if steps == 2 and cell in layout)
+    layout[church] = (BuildingKind.CHURCH,) + layout[church][1:]
+    layout[on_map(MINE)] = (BuildingKind.MINE,)
+    layout[on_map((6, 7))] = (H, H)
+    layout[on_map(MILL)] = (BuildingKind.LUMBER_MILL,)
+    layout[on_map((7, 23))] = (H,)
     return layout
 
 
@@ -107,6 +139,70 @@ def on_place(cell: Cell) -> Cell:
     return cell[0] + MAP_TOP, cell[1] + MAP_LEFT
 
 
+# The land is drawn from smooth noise of fixed random numbers, so it has the ragged shapes of real
+# land and is the same every time: hills where one layer is high, mountains where it is higher
+# still and far from the towns, forest and lakes where two others are, and gentle rises in the
+# flat land from a fourth. Each layer is the seed's offset and the size of its features, in cells.
+NOISE_SEED = 1850
+NOISE = ((0, 9.0), (1, 6.0), (2, 8.0), (3, 4.0))
+HILLS_ABOVE = 0.68
+MOUNTAINS_ABOVE = 0.82
+MOUNTAINS_AWAY = 11.0
+FOREST_ABOVE = 0.62
+LAKES_ABOVE = 0.86
+# A lake south of the line between the towns, on the drawn square; and the rivers, each from a
+# cell of the drawn square down to the bottom of the place, swaying by so many cells every so
+# many rows: one out of the lake, and one past Brookby to the east, from the top of the place.
+LAKE = (24, 16)
+RIVERS = (((26, 16), 2.0, 3.5), ((-SQUARE_TOP, 29), 1.6, 4.5))
+
+
+def _noise(shape: tuple[int, int], seed: int, size: float) -> np.ndarray:
+    """Smooth noise from 0 to 1 with features about `size` cells across."""
+    rng = np.random.default_rng(seed)
+    coarse = rng.random((int(shape[0] / size) + 2, int(shape[1] / size) + 2))
+
+    def smooth(n: int) -> tuple[np.ndarray, np.ndarray]:
+        at = np.arange(n) / size
+        whole = at.astype(int)
+        part = at - whole
+        return whole, part * part * (3 - 2 * part)
+
+    (row, down), (col, across) = smooth(shape[0]), smooth(shape[1])
+    top = coarse[row][:, col] * (1 - across) + coarse[row][:, col + 1] * across
+    bottom = coarse[row + 1][:, col] * (1 - across) + coarse[row + 1][:, col + 1] * across
+    return top * (1 - down[:, None]) + bottom * down[:, None]
+
+
+def _drawn(cell: Cell) -> Cell:
+    """The cell of the drawn square a cell of the game's map is."""
+    return cell[0] - SQUARE_TOP + MAP_TOP, cell[1] - SQUARE_LEFT + MAP_LEFT
+
+
+def _between(grid: HexGrid, west: Cell, east: Cell) -> np.ndarray:
+    """The place's cells along the row between two cells of the drawn square, and a row either
+    side."""
+    rows, cols = np.indices(grid.shape)
+    row = west[0] + SQUARE_TOP
+    return (
+        (abs(rows - row) <= 1) & (cols >= west[1] + SQUARE_LEFT) & (cols <= east[1] + SQUARE_LEFT)
+    )
+
+
+def _river(course: tuple[Cell, float, float]) -> np.ndarray:
+    """The place's cells a river runs through, from its source on the drawn square down to the
+    bottom of the place, swaying from side to side."""
+    (row, col), sway, every = course
+    river = np.zeros((PLACE_SIZE, PLACE_SIZE), dtype=bool)
+    last = None
+    for place_row in range(row + SQUARE_TOP, PLACE_SIZE):
+        at = round(col + SQUARE_LEFT + sway * np.sin((place_row - row - SQUARE_TOP) / every))
+        low, high = (at, at) if last is None else (min(last, at), max(last, at))
+        river[place_row, max(low, 0) : min(high, PLACE_SIZE - 1) + 1] = True
+        last = at
+    return river
+
+
 def place_map() -> TileMap:
     """The whole place: the square the game starts on and the land for sale around it."""
     grid = HexGrid(rows=PLACE_SIZE, cols=PLACE_SIZE, km_per_cell=KM_PER_CELL)
@@ -120,37 +216,43 @@ def place_map() -> TileMap:
         north=CENTER_LAT + half_lat,
     )
     shape = grid.shape
-    rows, cols = np.indices(shape)
-    terrain = np.full(shape, Terrain.LAND, dtype=np.uint8)
-    vegetation = np.full(shape, Vegetation.GRASS, dtype=np.uint8)
-    relief = np.full(shape, Relief.FLAT, dtype=np.uint8)
-    height = np.full(shape, 80, dtype=np.int16)
+    xs, ys = grid.centers()
 
-    def square(top: int, left: int, bottom: int, right: int) -> np.ndarray:
-        """Square cells from (top, left) to (bottom, right), both included, on the place."""
-        return (
-            (rows >= top + SQUARE_TOP)
-            & (rows <= bottom + SQUARE_TOP)
-            & (cols >= left + SQUARE_LEFT)
-            & (cols <= right + SQUARE_LEFT)
-        )
+    def blob(cell: Cell, radius: float, wobble: np.ndarray) -> np.ndarray:
+        """The cells within about `radius` of a cell of the drawn square, its edge ragged."""
+        x, y = grid.center(cell[0] + SQUARE_TOP, cell[1] + SQUARE_LEFT)
+        return np.hypot(xs - x, ys - y) < radius * (0.75 + 0.5 * wobble)
 
-    hills = square(1, 1, 8, 11) | square(-14, -14, -4, 6) | square(36, 30, 44, 44)
-    relief[hills] = Relief.HILLS
-    height[hills] = 260
-    forest = (
-        square(1, 21, 9, 31)
-        | square(-12, 18, -2, 40)
-        | square(10, 36, 26, 46)
-        | square(34, -14, 46, 4)
+    rugged, wooded, wet, gentle = (_noise(shape, NOISE_SEED + n, size) for n, size in NOISE)
+    towns = (
+        blob(_drawn(ASHFORD_STATION), FARMS_REACH + 1.5, np.full(shape, 0.5))
+        | blob(_drawn(BROOKBY_STATION), TOWN_REACH + 1.5, np.full(shape, 0.5))
+        | _between(grid, _drawn(ASHFORD_STATION), _drawn(BROOKBY_STATION))
     )
-    vegetation[forest] = Vegetation.FOREST
-    lake = square(22, 12, 25, 17) | square(-10, -10, -6, -4)
-    terrain[lake] = Terrain.LAKE
-    river = (cols == 14 + SQUARE_LEFT) & (rows >= 26 + SQUARE_TOP)
-    terrain[river] = Terrain.RIVER
-    vegetation[terrain != Terrain.LAND] = Vegetation.BARREN
-    height[terrain != Terrain.LAND] = 70
+    far = ~(
+        blob(_drawn(ASHFORD_STATION), MOUNTAINS_AWAY, np.full(shape, 0.5))
+        | blob(_drawn(BROOKBY_STATION), MOUNTAINS_AWAY, np.full(shape, 0.5))
+    )
+    hills = ((rugged > HILLS_ABOVE) | blob(MINE, 3.5, rugged)) & ~towns
+    mountains = (rugged > MOUNTAINS_ABOVE) & far
+    relief = np.where(mountains, Relief.MOUNTAINS, np.where(hills, Relief.HILLS, Relief.FLAT))
+    height = (
+        60
+        + 50 * gentle
+        + np.where(hills | mountains, 120 + 900 * np.maximum(rugged - 0.5, 0.05), 0)
+    )
+    forest = ((wooded > FOREST_ABOVE) | blob(MILL, 3.5, wooded)) & ~towns
+    terrain = np.full(shape, Terrain.LAND)
+    terrain[(blob(LAKE, 3.0, wet) | ((wet > LAKES_ABOVE) & far)) & ~towns] = Terrain.LAKE
+    for course in RIVERS:
+        terrain[_river(course)] = Terrain.RIVER
+    water = terrain != Terrain.LAND
+    relief[water] = Relief.FLAT
+    height[water] = 50
+    vegetation = np.where(forest & ~water, Vegetation.FOREST, Vegetation.GRASS)
+    vegetation[water] = Vegetation.BARREN
+    terrain, vegetation, relief = (a.astype(np.uint8) for a in (terrain, vegetation, relief))
+    height = height.astype(np.int16)
     return TileMap(
         name="Tutorial",
         grid=grid,

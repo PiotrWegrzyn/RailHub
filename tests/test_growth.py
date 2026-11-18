@@ -681,6 +681,14 @@ def test_a_cell_closed_and_opened_again_is_allowed_only_once() -> None:
     assert allowed.tolist() == [2, 5, 6, 9]
 
 
+def test_cells_opened_to_a_ladder_that_had_none_are_all_allowed() -> None:
+    land = np.array([0.0, 1, 0, 1])
+
+    allowed = _allowed(np.array([], dtype=np.intp), np.array([1, 3]), land)
+
+    assert allowed.tolist() == [1, 3]
+
+
 def test_over_many_months_a_cell_takes_its_chance_times_the_months_of_turns() -> None:
     growth = Growth(Constructions(make_map()), NO_TRADE)
     place = growth._places[0]
