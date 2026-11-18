@@ -37,13 +37,15 @@ DRAG_PER_CAR = 0.08
 # Cars come in sizes up the Fibonacci numbers, each holding about 1.6 times the one before; an
 # engine (CAR_LEVELS) or tech (railroads.sim.tech.Effect.CAR_SIZE) moves a car that many sizes up.
 CAR_SIZES = (5.0, 8.0, 13.0, 21.0, 34.0, 55.0, 89.0, 144.0, 233.0, 377.0, 610.0)
-SMALL_CAR = 8.0
-MEDIUM_CAR = 21.0
-CAR_CAPACITY = 55.0
+SMALL_CAR = 5.0
+MEDIUM_CAR = 13.0
+CAR_CAPACITY = 34.0
+# Passengers ride a size up from other goods.
+PASSENGER_CAR = 55.0
 # Bulk goods, dug or grown in great amounts, go BULK_CAR to a car, and a full bulk car weighs as
 # much as BULK_CAR / CAR_CAPACITY full cars of anything else, so only heavy engines pull a long
 # train of them at a fair speed.
-BULK_CAR = 144.0
+BULK_CAR = 89.0
 BULK_CAR_GOODS = frozenset(
     {
         Good.WHEAT,
@@ -63,7 +65,7 @@ BULK_CAR_GOODS = frozenset(
         Good.LUMBER,
     }
 )
-# Goods carried in small or medium cars; everything else goes CAR_CAPACITY to a car.
+# Goods carried in small or medium cars; everything else but passengers goes CAR_CAPACITY to a car.
 SMALL_CAR_GOODS = frozenset(
     {
         Good.GOLD,
@@ -112,6 +114,8 @@ def heft(good: Good) -> float:
 
 def car_size(good: Good) -> float:
     """How much of a good one car carries, before what tech adds to coaches."""
+    if good == Good.PASSENGERS:
+        return PASSENGER_CAR
     if good in BULK_CAR_GOODS:
         return BULK_CAR
     if good in SMALL_CAR_GOODS:

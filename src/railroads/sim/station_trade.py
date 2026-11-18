@@ -46,13 +46,13 @@ from railroads.sim.power_plants import powered_points
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tech import GOOD_TREES, Tree
-from railroads.sim.trains import CAR_CAPACITY, MAX_CARS
+from railroads.sim.trains import MAX_CARS, PASSENGER_CAR
 
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth
 
 MAIL_PER_PASSENGERS = 5
-TRAIN_LOAD = MAX_CARS * CAR_CAPACITY
+TRAIN_LOAD = MAX_CARS * PASSENGER_CAR
 # The needs each good meets, in the order a month's trade hands them out.
 MEETS: dict[Good, tuple[Need, ...]] = {
     good: tuple(step for step in PIPELINE if isinstance(step, Need) and good in FITS[step])

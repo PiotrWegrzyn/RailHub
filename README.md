@@ -920,10 +920,10 @@ the trains on the left and shows the chosen one on the right: what it pulls, eac
 its load, and its route as a table of stops. It buys a steam engine and sets its stops from the
 stations. Each stop has its own
 cars, up to 5, which the train pulls when it leaves that stop for the next, so the way out and the
-way back can carry different goods; each car is for one good and holds 50 of it, or 150 of bulk
-goods (grain, potatoes, fruit, sugar, grapes, coal, iron ore, sand, clay, limestone, salt and
+way back can carry different goods; each car is for one good and holds 34 of it, 5 of precious
+goods, 13 of heavy ones, 55 passengers, or 89 of bulk goods (grain, potatoes, fruit, sugar, grapes, coal, iron ore, sand, clay, limestone, salt and
 lumber), so a food car carries only food. Every car costs $15, and $1 more for every 10 it holds,
-each time the train leaves a stop with it, loaded or not: a bulk car of 144 costs $29 a trip, a
+each time the train leaves a stop with it, loaded or not: a bulk car of 89 costs $23 a trip, a
 dining car $15. A new train
 starts at its first stop. The window shows what the train pulls
 now. The Stations window shows every station's stockpile and the goods waiting to be handed out

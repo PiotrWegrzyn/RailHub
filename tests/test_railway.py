@@ -63,15 +63,16 @@ def test_a_new_train_leaves_its_first_stop_with_that_stops_cars_full() -> None:
 @pytest.mark.parametrize(
     ("good", "load"),
     [
-        (Good.GOLD, 8.0),
-        (Good.STEEL, 21.0),
-        (Good.CATTLE, 21.0),
-        (Good.OIL, 55.0),
-        (Good.IRON, 144.0),
-        (Good.WHEAT, 144.0),
+        (Good.GOLD, 5.0),
+        (Good.STEEL, 13.0),
+        (Good.CATTLE, 13.0),
+        (Good.OIL, 34.0),
+        (Good.IRON, 89.0),
+        (Good.WHEAT, 89.0),
+        (Good.PASSENGERS, 55.0),
     ],
 )
-def test_a_car_holds_8_of_precious_goods_21_of_heavy_ones_144_of_bulk_and_55_else(
+def test_a_car_holds_5_of_precious_goods_13_of_heavy_ones_89_of_bulk_55_passengers_and_34_else(
     good: Good, load: float
 ) -> None:
     _, railway = joined_stations()
@@ -139,7 +140,7 @@ def test_at_the_next_stop_it_unloads_and_takes_that_stops_cars() -> None:
 
     assert train.heading == 0
     assert railway.station_goods((6, 20)).brought[Good.WHEAT] == BULK_CAR
-    assert [(car.good, car.load) for car in train.cars] == [(Good.OIL, 55.0), (Good.OIL, 55.0)]
+    assert [(car.good, car.load) for car in train.cars] == [(Good.OIL, 34.0), (Good.OIL, 34.0)]
 
 
 def test_each_car_fills_with_its_own_good_from_the_stockpile() -> None:
@@ -519,7 +520,7 @@ def test_every_car_costs_fifteen_and_a_dollar_for_every_ten_it_holds_each_time_i
 
     railway.run(0.01)
 
-    assert railway.finances.month["car trips"] == -2 * (CAR_TRIP_PRICE + 14)
+    assert railway.finances.month["car trips"] == -2 * (CAR_TRIP_PRICE + 8)
 
 
 def test_a_mine_feeds_a_steel_mill_two_cells_off_and_the_station_gathers_the_rest() -> None:
@@ -628,7 +629,7 @@ def test_gold_reaches_a_jeweller_through_a_hub_and_pays_the_moment_he_takes_it()
 
     assert railway.station_goods((6, 27)).brought[Good.GOLD] == pytest.approx(0.0)
     assert (
-        5 * price_of(Good.GOLD) < railway.finances.month["cargo"] <= SMALL_CAR * price_of(Good.GOLD)
+        4 * price_of(Good.GOLD) < railway.finances.month["cargo"] <= SMALL_CAR * price_of(Good.GOLD)
     )
 
 
