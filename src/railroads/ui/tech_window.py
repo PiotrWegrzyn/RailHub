@@ -1,26 +1,58 @@
 """The tech window: a tab for every tree with its level, experience and points, and its nodes drawn
-as a tree, to take with a click: each node in a row by how many others it builds on, under the
-nodes it needs, with a line from each of those to it."""
+as a tree of cards, to take with a click: each node in a row by how many others it builds on,
+under the nodes it needs, with a line in right angles from each of those to it. A card shows the
+node's kind on a round badge, glows once taken and is edged in brass while it can be taken."""
 
 from dataclasses import dataclass
 
+from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.sim.finance import dollars
 from railroads.sim.goods import OWNED_BOOSTS
 from railroads.sim.tech import NODES, TREES, Effect, Node, Research, Tree, xp_for
 from railroads.sim.trains import ENGINES
-from railroads.ui.theme import BRASS, WINDOW_TOP
+from railroads.ui.ornate import (
+    BADGE,
+    CARD,
+    CARD_HEAD,
+    EDGE,
+    GLOW,
+    TRACK,
+    bar,
+    frame_rect,
+    ornate_window,
+    section,
+)
+from railroads.ui.theme import BRASS, GROWN, TEXT_DIM, WINDOW_TOP, color_u32
 
 WINDOW_SIZE = (940.0, 560.0)
-NODE_SIZE = (170.0, 44.0)
+NODE_SIZE = (200.0, 58.0)
 # The space between nodes side by side, and between rows.
-NODE_GAP = (14.0, 34.0)
-LINK_WIDTH = 2.0
-TAKEN = (0.36, 0.56, 0.3, 1.0)
-OPEN = (0.3, 0.34, 0.42, 1.0)
-SHUT = (0.18, 0.18, 0.2, 1.0)
-LINK = (0.45, 0.45, 0.5, 1.0)
+NODE_GAP = (16.0, 34.0)
+LINK_WIDTH = 1.5
+LINK = (0.36, 0.28, 0.18, 1.0)
+# The icon on the badge of each kind of node.
+EFFECT_ICONS = {
+    Effect.PRODUCTION: fa.ICON_FA_INDUSTRY,
+    Effect.PRICE: fa.ICON_FA_MONEY_BILL,
+    Effect.STORAGE: fa.ICON_FA_ARCHIVE,
+    Effect.DISCOUNT: fa.ICON_FA_TAG,
+    Effect.SPEED: fa.ICON_FA_TRAIN,
+    Effect.PULL: fa.ICON_FA_LINK,
+    Effect.UPKEEP: fa.ICON_FA_WRENCH,
+    Effect.GROWTH: fa.ICON_FA_LEAF,
+    Effect.COACHES: fa.ICON_FA_USERS,
+    Effect.WAITING: fa.ICON_FA_HOURGLASS_HALF,
+    Effect.BONUS_GOODS: fa.ICON_FA_STAR,
+    Effect.FUEL_MARKUP: fa.ICON_FA_FIRE,
+    Effect.CAR_SIZE: fa.ICON_FA_EXPAND,
+    Effect.UNLOCK: fa.ICON_FA_UNLOCK,
+    Effect.TAKES: fa.ICON_FA_PLUS,
+    Effect.STATION_UPKEEP: fa.ICON_FA_HOME,
+    Effect.FOOD_FUEL: fa.ICON_FA_TRUCK,
+    Effect.TO_COME: fa.ICON_FA_GIFT,
+}
 LOWERING = frozenset(
     {Effect.UPKEEP, Effect.DISCOUNT, Effect.FUEL_MARKUP, Effect.STATION_UPKEEP, Effect.FOOD_FUEL}
 )
@@ -165,30 +197,36 @@ class TechWindow:
             return
         imgui.set_next_window_pos((40.0, WINDOW_TOP), imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
-        expanded, self.open = imgui.begin("Tech", self.open)
-        if expanded and imgui.begin_tab_bar("trees"):
-            for tree in Tree:
-                done = progress(research, tree)
-                label = f"{tree.value.capitalize()} {done.level}"
-                if done.points:
-                    label += f" (+{done.points})"
-                if imgui.begin_tab_item(f"{label}###{tree.name}")[0]:
-                    self._draw_tree(research, tree, done)
-                    imgui.end_tab_item()
-            imgui.end_tab_bar()
-        imgui.end()
+        with ornate_window("Tech", "tech") as (expanded, still_open):
+            if expanded and imgui.begin_tab_bar("trees"):
+                for tree in Tree:
+                    done = progress(research, tree)
+                    label = f"{tree.value.capitalize()} {done.level}"
+                    if done.points:
+                        label += f" (+{done.points})"
+                    if imgui.begin_tab_item(f"{label}###{tree.name}")[0]:
+                        self._draw_tree(research, tree, done)
+                        imgui.end_tab_item()
+                imgui.end_tab_bar()
+        self.open = still_open
 
     def _draw_tree(self, research: Research, tree: Tree, done: TreeProgress) -> None:
+        section(f"{tree.value} tree")
+        width = imgui.get_content_region_avail().x
         imgui.text_colored(imgui.ImVec4(*BRASS), f"Level {done.level}")
         imgui.same_line(0, 16)
-        imgui.text(f"{done.points} point{'s' if done.points != 1 else ''} to spend")
+        points = f"{done.points} point{'s' if done.points != 1 else ''} to spend"
+        if done.points:
+            imgui.text_colored(imgui.ImVec4(*GROWN), points)
+        else:
+            imgui.text_disabled(points)
+        imgui.same_line(0, 16)
         share = (done.xp - done.floor) / max(done.next - done.floor, 1.0)
-        imgui.progress_bar(
-            min(max(share, 0.0), 1.0),
-            (-1.0, 0.0),
-            f"{dollars(done.xp)} of {dollars(done.next)} for level {done.level + 1}",
+        imgui.text_disabled(
+            f"{dollars(done.xp)} of {dollars(done.next)} for level {done.level + 1}"
         )
-        imgui.separator()
+        bar(share, BRASS, width, 6.0)
+        imgui.spacing()
         imgui.begin_child("tree", (0, 0), 0, imgui.WindowFlags_.horizontal_scrollbar.value)
         spots = layout(tree)
         origin = imgui.get_cursor_screen_pos()
@@ -203,17 +241,11 @@ class TechWindow:
         for need, key in links(tree):
             top_x, top_y = corner(need)
             low_x, low_y = corner(key)
-            start = imgui.ImVec2(top_x + width / 2, top_y + height)
-            end = imgui.ImVec2(low_x + width / 2, low_y)
-            bend = (end.y - start.y) / 2
-            color = BRASS if need in research.taken else LINK
-            draw_list.add_bezier_cubic(
-                start,
-                imgui.ImVec2(start.x, start.y + bend),
-                imgui.ImVec2(end.x, end.y - bend),
-                end,
-                imgui.get_color_u32(imgui.ImVec4(*color)),
-                LINK_WIDTH,
+            _draw_link(
+                draw_list,
+                (top_x + width / 2, top_y + height),
+                (low_x + width / 2, low_y),
+                need in research.taken,
             )
         for node in TREES[tree]:
             imgui.set_cursor_screen_pos(corner(node.key))
@@ -226,19 +258,56 @@ class TechWindow:
 
     @staticmethod
     def _draw_node(research: Research, tree: Tree, node: Node) -> None:
+        """A node as a card: a round badge with its kind's icon, its name and what it does,
+        glowing once taken, edged in brass while it can be taken and dim while it cannot."""
         taken = node.key in research.taken
         can = research.can_take(node.key)
-        color = TAKEN if taken else OPEN if can else SHUT
-        imgui.push_style_color(imgui.Col_.button.value, imgui.ImVec4(*color))
-        if not can and not taken:
-            imgui.push_style_var(imgui.StyleVar_.alpha.value, 0.6)
-        if imgui.button(f"{node.name}\n{describe(node)}##{node.key}", NODE_SIZE) and can:
+        if imgui.invisible_button(f"##{node.key}", NODE_SIZE) and can:
             research.take(node.key)
-        if not can and not taken:
-            imgui.pop_style_var()
-        imgui.pop_style_color()
-        if imgui.is_item_hovered():
+        hovered = imgui.is_item_hovered()
+        low, high = imgui.get_item_rect_min(), imgui.get_item_rect_max()
+        draw_list = imgui.get_window_draw_list()
+        draw_list.add_rect_filled(low, high, color_u32(CARD_HEAD if hovered else CARD), 6.0)
+        if taken:
+            frame_rect(draw_list, low, high, 6.0, bracket=8.0)
+        else:
+            edge = EDGE if can else (*EDGE[:3], 0.3)
+            draw_list.add_rect(low, high, color_u32(edge), 6.0, thickness=1.5 if can else 1.0)
+        middle = low.y + NODE_SIZE[1] / 2
+        centre = (low.x + 10 + BADGE / 2, middle)
+        draw_list.add_circle_filled(centre, BADGE / 2, color_u32(TRACK))
+        ring = (*GLOW, 0.9 if taken or can else 0.3)
+        draw_list.add_circle(centre, BADGE / 2, color_u32(ring), 0, 1.2)
+        icon = fa.ICON_FA_CHECK if taken else EFFECT_ICONS.get(node.effect, fa.ICON_FA_STAR)
+        if not taken and not can:
+            icon = fa.ICON_FA_LOCK
+        size = imgui.calc_text_size(icon)
+        tint = GROWN if taken else BRASS if can else TEXT_DIM
+        draw_list.add_text((centre[0] - size.x / 2, centre[1] - size.y / 2), color_u32(tint), icon)
+        left = low.x + 18 + BADGE
+        line = imgui.get_text_line_height()
+        title = BRASS if can or taken else TEXT_DIM
+        draw_list.push_clip_rect(low, (high.x - 6, high.y), True)
+        draw_list.add_text((left, middle - line), color_u32(title), node.name)
+        draw_list.add_text((left, middle + 1), color_u32(TEXT_DIM), describe(node))
+        draw_list.pop_clip_rect()
+        if hovered:
             text = f"{node.name}: {explain(tree, node)}"
             if node.requires:
                 text += "\nNeeds " + ", ".join(NODES[key][1].name for key in node.requires)
             imgui.set_tooltip(text)
+
+
+def _draw_link(
+    draw_list: imgui.ImDrawList, start: tuple[float, float], end: tuple[float, float], lit: bool
+) -> None:
+    """A line from a node down to one needing it, in right angles with an arrowhead at its end:
+    brass once the node it comes from is taken."""
+    colour = color_u32((*GLOW, 0.85) if lit else LINK)
+    bend = (start[1] + end[1]) / 2
+    points = [start, (start[0], bend), (end[0], bend), (end[0], end[1] - 4)]
+    draw_list.add_polyline([imgui.ImVec2(*point) for point in points], colour, LINK_WIDTH, 0)
+    tip = 5.0
+    draw_list.add_triangle_filled(
+        (end[0], end[1]), (end[0] - tip, end[1] - tip - 1), (end[0] + tip, end[1] - tip - 1), colour
+    )
