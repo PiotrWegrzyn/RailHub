@@ -446,8 +446,9 @@ class Track:
 @dataclass(frozen=True, slots=True)
 class Station:
     """Fills its whole cell. Its own track runs straight through the cell between `ends`, two
-    opposite track points, and other track joins it only there: its way in and its way out. It
-    keeps that way however track is laid round it later; with `ends` None its track runs
+    opposite track points, and other track joins it only there: its way in and its way out. The
+    first track laid to it turns it (railroads.sim.routes); after that it keeps its way however
+    track is laid round it; with `ends` None its track runs
     across, from the first track point to the one opposite (Constructions.station_ends). A station
     raised high enough gets more platforms in cells beside it, each a Station of its own with
     `main` the cell of the station it belongs to, and its own way through, so lines come in from

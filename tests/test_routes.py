@@ -381,10 +381,12 @@ def test_a_station_built_on_a_line_takes_the_place_of_its_track_and_keeps_it_joi
     assert Railway(constructions).route((6, 2), (6, 14)) is not None
 
 
-def test_track_from_the_side_comes_round_into_a_station_by_one_of_its_ends() -> None:
+def test_track_from_the_side_comes_round_into_a_joined_station_by_one_of_its_ends() -> None:
     constructions = Constructions(make_map())
     growth = Growth(constructions, NO_TRADE)
     build_station(growth, (6, 10), (3, 9))
+    build_station(growth, (2, 10))
+    laid(constructions, (2, 10), (6, 10))
 
     route = plan_route(constructions, (6, 2), (6, 10))
 
@@ -395,10 +397,54 @@ def test_track_from_the_side_comes_round_into_a_station_by_one_of_its_ends() -> 
     assert any(cell == (6, 10) and entry in (3, 9) for cell, entry in into)
 
 
-def test_track_leaves_a_station_straight_out_of_one_of_its_ends() -> None:
+def test_track_into_the_side_of_a_station_no_track_joins_turns_the_station() -> None:
+    constructions = Constructions(make_map())
+    growth = Growth(constructions, NO_TRADE)
+    build_station(growth, (6, 10), (3, 9))
+    route = plan_route(constructions, (6, 2), (6, 10))
+    assert route is not None
+
+    lay_route(growth, route)
+
+    assert constructions.station_ends((6, 10)) == (0, 6)
+    assert dead_ends(constructions) == [((6, 2), 6)]
+
+
+def test_track_ending_against_the_side_of_a_station_no_track_joins_turns_it_to_join() -> None:
+    constructions = Constructions(make_map())
+    growth = Growth(constructions, NO_TRADE)
+    build_station(growth, (6, 8))
+    build_station(growth, (10, 10))
+    route = plan_route(constructions, (10, 10), (7, 8))
+    assert route is not None
+
+    lay_route(growth, route)
+
+    assert constructions.station_ends((6, 8)) == (2, 8)
+    assert Railway(constructions).route((10, 10), (6, 8)) is not None
+
+
+def test_track_ending_against_the_side_of_a_joined_station_runs_on_into_an_end() -> None:
+    constructions = Constructions(make_map())
+    growth = Growth(constructions, NO_TRADE)
+    build_station(growth, (6, 8))
+    build_station(growth, (6, 2))
+    build_station(growth, (10, 10))
+    laid(constructions, (6, 2), (6, 8))
+
+    laid(constructions, (10, 10), (7, 8))
+
+    assert constructions.station_ends((6, 8)) == (0, 6)
+    assert dead_ends(constructions) == []
+    assert Railway(constructions).route((10, 10), (6, 8)) is not None
+
+
+def test_track_leaves_a_joined_station_straight_out_of_one_of_its_ends() -> None:
     constructions = Constructions(make_map())
     growth = Growth(constructions, NO_TRADE)
     build_station(growth, (6, 4), (3, 9))
+    build_station(growth, (2, 4))
+    laid(constructions, (2, 4), (6, 4))
 
     route = plan_route(constructions, (6, 4), (6, 14))
 

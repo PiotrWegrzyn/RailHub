@@ -125,8 +125,10 @@ The ideas every rule of the game should follow.
   down. On a hex it leaves through the middle of one of the six edges into the neighbour, or
   through the top or bottom corner, running along the edge between the two cells beside it into
   the cell beyond. A piece of track turns at most 60°. A station's track runs straight along one
-  of the four axes, set when it is built and never changed; other track joins it only at its two
-  ends.
+  of the four axes. A station is built turned towards track that points into its cell, and while
+  no track joins it, the first track laid to it turns it to come in straight, from its side too.
+  Once track joins it, its way never changes and other track joins it only at its two ends: track
+  laid against its side runs on round into one of them.
 - Track is dark and distinct, the same width whichever way it runs, and readable at every zoom. On
   hills and mountains it rises with the ground on a smoothed bed, with no spikes at bends.
 - Of what is underground, only the entrances are drawn: tunnel portals.

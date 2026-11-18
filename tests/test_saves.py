@@ -36,8 +36,9 @@ def played_game(months: int = 3) -> SavedGame:
     game.finances.cash = 1_000_000.0
     for _ in range(4):
         game.growth.build(Building((8, 15), BuildingKind.HOUSE))
-    game.build_station((8, 6), (3, 9))
+    game.build_station((8, 6))
     game.build_station((8, 24))
+    game.build_station((2, 2), (3, 9))
     game.lay_track((8, 6), (8, 24))
     train = game.railway.buy()
     assert train is not None
@@ -104,7 +105,7 @@ def test_a_loaded_game_is_the_game_saved(tmp_path: Path) -> None:
     loaded = saves.load("My railway")
 
     assert differences(saved, loaded) == []
-    assert loaded.game.constructions.station_ends((8, 6)) == (3, 9)
+    assert loaded.game.constructions.station_ends((2, 2)) == (3, 9)
     assert loaded.game.railway.trains[0].stops == saved.game.railway.trains[0].stops
     assert loaded.clock == saved.clock
     assert loaded.camera == (4.5, 6.0, 2)
