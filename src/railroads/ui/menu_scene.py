@@ -19,9 +19,9 @@ from railroads.ui.theme import color_u32
 
 # How the map's projection looks at trains here: straight from the side, tilted as the map is.
 MATRIX = np.array([[32.0, 0.0], [0.0, 16.0]])
-# Each track: how far down the screen it lies, how finely its trains are drawn and how fast they
-# run, in pixels a second; the farthest first.
-TRACKS = ((0.62, 2, 34.0), (0.75, 3, 52.0), (0.9, 4, 76.0))
+# Each track: how far down the screen it lies, how finely its trains are drawn, how fast they run,
+# in pixels a second, and how brightly they are lit, the far ones darker; the farthest first.
+TRACKS = ((0.64, 1, 18.0, 0.55), (0.685, 1, 24.0, 0.75), (0.735, 1, 32.0, 1.0))
 GOODS = (
     Good.WHEAT,
     Good.COAL,
@@ -96,7 +96,7 @@ class MenuScene:
         draw_list.add_rect_filled((low.x, horizon), high, color_u32(GROUND))
         draw_list.add_line((low.x, horizon), (high.x, horizon), color_u32((*GLOW, 0.5)), 1.0)
         started = False
-        for track, (down, times, speed) in enumerate(TRACKS):
+        for track, (down, times, speed, light) in enumerate(TRACKS):
             rail_y = low.y + height * down
             _draw_rails(draw_list, low.x, high.x, rail_y, times)
             runner = self._runners.get(track)
@@ -108,7 +108,7 @@ class MenuScene:
                 else:
                     continue
             runner.x += runner.way * speed * seconds
-            self._draw_runner(draw_list, runner, rail_y, seconds)
+            self._draw_runner(draw_list, runner, rail_y, seconds, light)
             far_right = runner.x > high.x + 40
             gone = far_right if runner.way > 0 else runner.x + runner.size[0] < low.x - 40
             if gone:
@@ -136,7 +136,12 @@ class MenuScene:
         return _Runner(texture, size, x, way, ENGINES[engine].power == Power.STEAM, foot)
 
     def _draw_runner(
-        self, draw_list: imgui.ImDrawList, runner: _Runner, rail_y: float, seconds: float
+        self,
+        draw_list: imgui.ImDrawList,
+        runner: _Runner,
+        rail_y: float,
+        seconds: float,
+        light: float,
     ) -> None:
         width, height = runner.size
         top = rail_y - height + runner.foot + 1
@@ -144,6 +149,9 @@ class MenuScene:
             imgui.ImTextureRef(runner.texture.texture_id()),
             (runner.x, top),
             (runner.x + width, top + height),
+            (0.0, 0.0),
+            (1.0, 1.0),
+            color_u32((light, light, light, 1.0)),
         )
         if runner.steam:
             runner.since_puff += seconds
