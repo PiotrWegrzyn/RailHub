@@ -646,6 +646,10 @@ class _Month:
         for good in HANDED_OUT[need]:
             self._sell_nearby(good, demand, received)
         self.local[need] = received.copy()
+        mine = self._owned_short(wants, demand, received)
+        if mine is not None:
+            for good in HANDED_OUT[need]:
+                self._hand_out(need, good, received + mine, received)
         for good in HANDED_OUT[need]:
             self._hand_out(need, good, demand, received)
         met = np.where(demand > 0, received / np.where(demand > 0, demand, 1.0), 0.0)
@@ -658,6 +662,19 @@ class _Month:
                 self.stock[key] = self.stock[key] + got
             else:
                 self._boost_from_land(kind, need, got)
+
+    def _owned_short(
+        self, wants: dict[BuildingKind, FloatCells], demand: FloatCells, received: FloatCells
+    ) -> FloatCells | None:
+        """What the player's own buildings in each cell are still short of a need after the
+        goods handed out on their own, which the stations hand them before anyone else; None
+        if they own none that want it."""
+        owned = [kind for kind in wants if kind in self.owned]
+        if not owned:
+            return None
+        want = sum((wants[kind] * self._owned_part(kind) for kind in owned), start=self.zero)
+        met = np.where(demand > 0, received / np.where(demand > 0, demand, 1.0), 0.0)
+        return want * (1.0 - met)
 
     def _hand_out(self, need: Need, good: Good, demand: FloatCells, received: FloatCells) -> None:
         """Lets every station hand out what trains brought of a good to the buildings within its

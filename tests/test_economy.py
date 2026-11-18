@@ -900,3 +900,21 @@ def test_a_tavern_takes_any_alcohol_and_food_only_as_a_bonus(drink: str) -> None
 
     share = trade.share((BuildingKind.TAVERN,))[position(trade, economy, (8, 9))]
     assert share == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(("owned_at", "fed_at"), [(None, (8, 9)), ((8, 7), (8, 7))])
+def test_a_station_hands_out_to_the_players_own_buildings_before_nearer_ones(
+    owned_at: tuple[int, int] | None, fed_at: tuple[int, int]
+) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.BAKERY, 1), ((8, 7), BuildingKind.BAKERY, 1))
+    mine = np.zeros(tile_map.grid.shape)
+    if owned_at is not None:
+        mine[owned_at] = 1.0
+    owners = {BuildingKind.BAKERY: OwnedShare(mine.ravel(), 1.0)}
+
+    trade = economy.trade(placed, holding(WHEAT=50.0), owned=owners)
+
+    got, _ = trade.goods_got[(BuildingKind.BAKERY, Need.WHEAT)]
+    assert got[position(trade, economy, fed_at)] == pytest.approx(50.0)

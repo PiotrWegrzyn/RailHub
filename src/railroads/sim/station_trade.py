@@ -176,14 +176,13 @@ class StationTrade:
             if not wants:
                 continue
             demand = sum(wants.values(), start=np.zeros(cells.size))
-            short = demand.copy()
-            distribute(
-                np.zeros(cells.size, dtype=np.intp),
-                np.arange(cells.size),
-                bounds,
-                np.array([have], dtype=np.float64),
-                short,
-            )
+            left = np.array([have], dtype=np.float64)
+            sellers, buyers = np.zeros(cells.size, dtype=np.intp), np.arange(cells.size)
+            mine = self._owned_wants(cells, wants)
+            short = mine.copy()
+            distribute(sellers, buyers, bounds, left, short)
+            short = demand - (mine - short)
+            distribute(sellers, buyers, bounds, left, short)
             got = demand - short
             if self._give(station, goods, need, good, float(got.sum())) <= 0:
                 continue
@@ -197,6 +196,20 @@ class StationTrade:
                     else:
                         taken = economy.taken.setdefault((kind, need), {})
                         taken[cell] = taken.get(cell, 0.0) + float(took[at])
+
+    def _owned_wants(
+        self, cells: npt.NDArray[np.intp], wants: dict[BuildingKind, FloatCells]
+    ) -> FloatCells:
+        """The part of these wants that is the player's own buildings', which a station hands
+        out before anyone else's."""
+        growth = self._growth
+        mine = np.zeros(cells.size)
+        for kind, want in wants.items():
+            owned = growth.owners.owned(kind).ravel()[cells]
+            if owned.any():
+                count = growth.counts[kind].ravel()[cells]
+                mine += want * np.minimum(owned / np.maximum(count, 1), 1.0)
+        return mine
 
     def _wants_at(self, cells: npt.NDArray[np.intp], need: Need) -> dict[BuildingKind, FloatCells]:
         """What each kind of building in these cells still wants of a need this month: up to
