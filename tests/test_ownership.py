@@ -20,13 +20,13 @@ def grown(*placed: tuple[tuple[int, int], BuildingKind]) -> Growth:
     return growth
 
 
-def half_satisfied(growth: Growth, satisfaction: float = 0.5) -> Growth:
+def satisfied(growth: Growth, satisfaction: float = 1.0) -> Growth:
     growth.economy.months = [np.full(growth.economy.cells, satisfaction) for _ in range(3)]
     return growth
 
 
 def test_a_lot_of_shares_costs_its_part_of_payback_years_of_all_a_building_makes() -> None:
-    growth = half_satisfied(grown(((5, 5), BuildingKind.FARM)))
+    growth = satisfied(grown(((5, 5), BuildingKind.FARM)))
     cash = growth.railway.finances.cash
 
     problem = growth.owners.buy((5, 5), BuildingKind.FARM)
@@ -39,7 +39,7 @@ def test_a_lot_of_shares_costs_its_part_of_payback_years_of_all_a_building_makes
 
 @pytest.mark.parametrize(
     ("satisfaction", "factor"),
-    [(0.0, 2 / 3), (0.25, 5 / 6), (0.5, 1.0), (1.0, 1.5), (2.0, 2.0), (3.0, 2.0)],
+    [(0.0, 2 / 3), (0.5, 5 / 6), (1.0, 1.0), (1.5, 7 / 6), (2.0, 4 / 3), (3.0, 4 / 3)],
 )
 def test_shares_cost_more_the_more_satisfied_the_building_was_over_the_quarter(
     satisfaction: float, factor: float
@@ -50,10 +50,10 @@ def test_shares_cost_more_the_more_satisfied_the_building_was_over_the_quarter(
 
 
 def test_shares_sell_at_their_price_now_so_a_building_satisfied_since_earns_more() -> None:
-    growth = half_satisfied(grown(((5, 5), BuildingKind.FARM)))
+    growth = satisfied(grown(((5, 5), BuildingKind.FARM)), 0.0)
     growth.owners.buy((5, 5), BuildingKind.FARM)
     paid = -growth.railway.finances.month["shares bought"]
-    half_satisfied(growth, 1.0)
+    satisfied(growth, 1.0)
 
     growth.owners.sell((5, 5), BuildingKind.FARM)
 

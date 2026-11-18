@@ -6,7 +6,7 @@ own: the player's part of what it makes, by their shares, goes into the stations
 before anything is handed out, as if a train had brought it, so the stations hand it out to the
 buildings in their reach and it pays as a delivery does (railroads.sim.economy,
 railroads.sim.station_trade). A whole building costs PAYBACK_YEARS of all it makes at full
-output at half satisfaction, from two thirds of that with none to twice that at 200%
+output at full satisfaction, from two thirds of that with none to four thirds at 200%
 (PRICE_BY_SATISFACTION), by how satisfied its cell was over the last quarter, less what the
 player's tech takes off, down to MOST_DISCOUNT of the price; shares sell at the price they buy
 at. A power plant of any kind, which makes cheap electricity for the player's trains
@@ -34,12 +34,12 @@ if TYPE_CHECKING:
 # their part of what it makes, which goes to the stations around before anything is handed out.
 SHARES = 1000
 LOT = 100
-# What a whole building costs at half satisfaction: this many years of all it makes at full
+# What a whole building costs at full satisfaction: this many years of all it makes at full
 # output, at its goods' market prices, so its shares pay a tenth of their price back a year.
 PAYBACK_YEARS = 10
-# What a building's price is worth, times its price at half satisfaction, at each satisfaction
+# What a building's price is worth, times its price at full satisfaction, at each satisfaction
 # over the last quarter, in between in a straight line.
-PRICE_BY_SATISFACTION = ((0.0, 2 / 3), (0.5, 1.0), (1.0, 1.5), (2.0, 2.0))
+PRICE_BY_SATISFACTION = ((0.0, 2 / 3), (1.0, 1.0), (2.0, 4 / 3))
 # Every whole building the player owns adds this much to the experience its tree gets from
 # deliveries for each of its points, and the shares of one their part of that.
 EXPERIENCE_PER_POINT = 0.01
@@ -54,7 +54,7 @@ POWER_PLANTS = frozenset(
 
 
 def satisfaction_price(satisfaction: float) -> float:
-    """How many times its price at half satisfaction a building costs at this satisfaction."""
+    """How many times its price at full satisfaction a building costs at this satisfaction."""
     points, factors = zip(*PRICE_BY_SATISFACTION, strict=True)
     return float(np.interp(satisfaction, points, factors))
 
@@ -101,7 +101,7 @@ class Owners:
         return added
 
     def price_to_buy(self, kind: BuildingKind) -> float | None:
-        """What a whole building of a kind costs at half satisfaction, with the player's tech;
+        """What a whole building of a kind costs at full satisfaction, with the player's tech;
         None for what cannot be bought."""
         growth = self._growth
         if kind not in growth.counts:

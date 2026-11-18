@@ -38,7 +38,7 @@ TIPS = (
     "Passengers only ride between stations of different towns.",
     "Taverns and clubs take any alcohol: beer, wine or vodka.",
     "Hover a category's icon to see what goods are in it.",
-    "A well fed building's shares are worth up to twice as much.",
+    "A thriving building's shares are worth up to twice a starving one's.",
 )
 
 # The falling hexes: their size, when the cracks show and the first falls, how much later the
