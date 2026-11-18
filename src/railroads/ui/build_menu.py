@@ -31,10 +31,8 @@ from railroads.sim.finance import (
     TRACK_UPKEEP,
     dollars,
 )
-from railroads.sim.goods import Good
 from railroads.sim.grids import Cell, FloatArray, Grid
 from railroads.sim.ladders import Points
-from railroads.sim.railway import Railway
 from railroads.sim.routes import Route
 from railroads.sim.tilemap import Relief
 from railroads.sim.track_rules import BRIDGE_RULES, RELIEF_RULES, TUNNEL_RULES, TrackBed
@@ -44,7 +42,6 @@ from railroads.ui.spotlight import spot
 from railroads.ui.stations_window import StationsWindow
 from railroads.ui.theme import (
     BRASS,
-    GOOD_COLORS,
     OVERLAY_FLAGS,
     Rgba,
     rgba_u32,
@@ -71,21 +68,6 @@ STATION_FILL = (0.27, 0.35, 0.8, 0.85)
 CELL_LINE = (0.25, 0.22, 0.2, 0.5)
 COLLECTION_RING = (0.4, 0.6, 1.0, 0.95)
 
-ENGINE = (0.14, 0.15, 0.17, 1.0)
-CAB = (0.62, 0.14, 0.1, 1.0)
-SMOKE = (0.85, 0.85, 0.88, 0.9)
-# What each car looks like empty, and the colour of what it carries.
-CAR_COLORS: dict[Good, Rgba] = dict(GOOD_COLORS)
-CAR_BODIES: dict[Good, Rgba] = {
-    good: (r * 0.55, g * 0.55, b * 0.55, 1.0) for good, (r, g, b, _) in GOOD_COLORS.items()
-}
-# Sizes in cells: how far apart the engine and each car are drawn, how long and wide they are,
-# and the gap between cars.
-CAR_SPACING = 0.36
-CAR_LENGTH = 0.34
-CAR_WIDTH = 0.16
-CAR_GAP = 0.02
-OUTLINE = (0.05, 0.05, 0.05, 1.0)
 # How far above the bottom of the map the build bar floats, how wide its hints run, and how long
 # a message stays up, in seconds.
 BAR_MARGIN = 16.0
@@ -317,97 +299,6 @@ class BuildMenu:
 def _vertical_rule() -> None:
     """A brass diamond between groups of buttons."""
     diamond(BUTTON_HEIGHT)
-
-
-def draw_trains(
-    draw_list: imgui.ImDrawList, railway: Railway, camera: IsoCamera, center: Vec2
-) -> None:
-    """Draws each running train along the track: the engine in front, then its cars, each a box
-    turned to the track and shaped by its good; empty cars show their bare bodies."""
-    for train in railway.trains:
-        parts: list[Good | None] = [None, *(car.good for car in train.cars)]
-        loads = [1.0, *(car.load for car in train.cars)]
-        for index in reversed(range(len(parts))):
-            placed = railway.position(train, back=index * CAR_SPACING)
-            if placed is None:
-                continue
-            (x, y), (dx, dy) = placed
-            length = math.hypot(dx, dy) or 1.0
-            box = _Box(x, y, dx / length, dy / length, camera, center)
-            if parts[index] is None:
-                _draw_engine(draw_list, box)
-            else:
-                _draw_car(draw_list, box, parts[index], loads[index] > 0)  # type: ignore[arg-type]
-
-
-@dataclass(frozen=True)
-class _Box:
-    """A spot on the track and the way it runs, for drawing shapes along it in screen space."""
-
-    x: float
-    y: float
-    ux: float
-    uy: float
-    camera: IsoCamera
-    center: Vec2
-
-    def quad(self, front: float, back: float, half_width: float) -> list[imgui.ImVec2]:
-        """The corners of a box from `back` to `front` along the track (cells from this spot,
-        forward positive), `half_width` cells either side."""
-        sx, sy = -self.uy * half_width, self.ux * half_width
-        corners = [
-            (self.x + self.ux * front + sx, self.y + self.uy * front + sy),
-            (self.x + self.ux * front - sx, self.y + self.uy * front - sy),
-            (self.x + self.ux * back - sx, self.y + self.uy * back - sy),
-            (self.x + self.ux * back + sx, self.y + self.uy * back + sy),
-        ]
-        return [imgui.ImVec2(*self.camera.to_screen(px, py, self.center)) for px, py in corners]
-
-    def point(self, along: float, side: float = 0.0) -> imgui.ImVec2:
-        px = self.x + self.ux * along - self.uy * side
-        py = self.y + self.uy * along + self.ux * side
-        return imgui.ImVec2(*self.camera.to_screen(px, py, self.center))
-
-    @property
-    def scale(self) -> float:
-        return self.camera.cell_width
-
-
-def _fill(draw_list: imgui.ImDrawList, quad: list[imgui.ImVec2], color: Rgba) -> None:
-    draw_list.add_quad_filled(*quad, rgba_u32(color))
-    draw_list.add_quad(*quad, rgba_u32(OUTLINE), 1.0)
-
-
-def _draw_engine(draw_list: imgui.ImDrawList, box: _Box) -> None:
-    half = CAR_LENGTH / 2
-    _fill(draw_list, box.quad(half, -half, CAR_WIDTH * 0.55), ENGINE)
-    _fill(draw_list, box.quad(-half * 0.25, -half, CAR_WIDTH * 0.7), CAB)
-    chimney = box.point(half * 0.65)
-    draw_list.add_circle_filled(chimney, max(1.5, box.scale * 0.035), rgba_u32(OUTLINE))
-    draw_list.add_circle_filled(
-        box.point(half * 0.65 + 0.06, 0.05), max(1.5, box.scale * 0.03), rgba_u32(SMOKE)
-    )
-
-
-def _draw_car(draw_list: imgui.ImDrawList, box: _Box, good: Good, full: bool) -> None:
-    half = CAR_LENGTH / 2 - CAR_GAP
-    body = CAR_BODIES[good]
-    _fill(draw_list, box.quad(half, -half, CAR_WIDTH * 0.6), body)
-    if not full:
-        return
-    load = CAR_COLORS[good]
-    match good:
-        case Good.LUMBER | Good.STEEL:
-            for side in (-0.3, 0.0, 0.3):
-                a = box.point(half * 0.9, CAR_WIDTH * side)
-                b = box.point(-half * 0.9, CAR_WIDTH * side)
-                draw_list.add_line(a, b, rgba_u32(load), max(1.5, box.scale * 0.03))
-        case Good.GOODS:
-            _fill(draw_list, box.quad(half * 0.9, -half * 0.9, CAR_WIDTH * 0.5), load)
-        case _:
-            draw_list.add_quad_filled(
-                *box.quad(half * 0.8, -half * 0.8, CAR_WIDTH * 0.4), rgba_u32(load)
-            )
 
 
 def draw_station_reach(

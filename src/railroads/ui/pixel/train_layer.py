@@ -51,7 +51,7 @@ THIN_SMOKE = (0.6, 0.6, 0.62)
 # bigger, and draw a bigger one black.
 MAX_TEXTURE = 4096
 # How wide a page of one look's pictures is at the least, in sheet pixels, how many bytes the
-# pages drawn for the zoom shown may take before those not drawn lately are let go, and how long a
+# pages, of every zoom shown, may take before those not drawn lately are let go, and how long a
 # frame may spend drawing pages: a look whose page is not drawn yet shows from the sheet meanwhile.
 PAGE_WIDTH = 512
 PAGES_BUDGET = 128 * 1024 * 1024
@@ -77,24 +77,25 @@ class TrainLayer:
         self._sheet_shape = (0, 0)
         self._sheet_looks: set[object] = set()
         self._paging_until = 0.0
-        self._factor = 1
-        self._pages: OrderedDict[object, _Page] = OrderedDict()
+        # Each look's pages by how many times as fine as the sheet they are drawn, kept for every
+        # zoom shown, so coming back to a zoom shows them at once.
+        self._pages: OrderedDict[tuple[object, int], _Page] = OrderedDict()
         # Pages being drawn a few pictures a frame: each look's painter and pictures so far.
-        self._painting: dict[object, tuple[FinePainter, list[Sprite]]] = {}
+        self._painting: dict[tuple[object, int], tuple[FinePainter, list[Sprite]]] = {}
         self.lanes = Lanes(world.track)
 
     def draw(
         self, draw_list: imgui.ImDrawList, railway: Railway, camera: IsoCamera, center: Vec2
     ) -> None:
         projection = self.world.projection
-        scale = camera.pixel_scale
+        scale = camera.pixel_scale or camera.cell_width / PIXEL_CELL_WIDTH
         density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
         camera_pixel = projection.to_pixels(camera.center_x, camera.center_y)
         origin = (
             round(center[0] - float(camera_pixel[0]) * scale),
             round(center[1] - float(camera_pixel[1]) * scale),
         )
-        factor = self._blown_up_by(scale * density)
+        factor = self._blown_up_by(int(scale * density))
         per_pixel = scale / DETAIL
         snap = DETAIL * factor
         in_sight = self._in_sight(railway, origin, scale)
@@ -126,10 +127,10 @@ class TrainLayer:
         wanted = {look for _, _, look, _ in parts}
         for look in wanted:
             self.sprites.draw(look)
-        drawn: set[object] = set()
+        drawn: set[tuple[object, int]] = set()
         self._paging_until = time.perf_counter() + PAGES_TIME
         for sy, sx, look, heading in parts:
-            page = None if factor == 1 else self._page(look, factor)
+            page, fine = (None, factor) if factor == 1 else self._page_or_nearest(look, factor)
             if page is None:
                 px, py, w, h, anchor_x, anchor_y = self.sprites.place(look, heading)
                 texture, (width, height), per = (
@@ -139,8 +140,8 @@ class TrainLayer:
                 )
             else:
                 px, py, w, h, anchor_x, anchor_y = page.spots[turned(heading)]
-                texture, (width, height), per = page.texture, page.size, per_pixel / factor
-                drawn.add(look)
+                texture, (width, height), per = page.texture, page.size, per_pixel / fine
+                drawn.add((look, fine))
             left = sx - anchor_x * per
             top = sy - anchor_y * per
             draw_list.add_image(
@@ -170,7 +171,7 @@ class TrainLayer:
             back += CAR_HALF
         return [(look, middle * SCALE) for look, middle in parts]
 
-    def _in_sight(self, railway: Railway, origin: tuple[int, int], scale: int) -> list[Train]:
+    def _in_sight(self, railway: Railway, origin: tuple[int, int], scale: float) -> list[Train]:
         """The running trains whose front is close enough to the screen for some of the train
         to show: a train reaches at most its length, and the ground's lift, from its front."""
         fronts = []
@@ -200,7 +201,7 @@ class TrainLayer:
         railway: Railway,
         trains: list[Train],
         origin: tuple[int, int],
-        scale: int,
+        scale: float,
     ) -> None:
         """Puffs of smoke rising from each chimney and drifting back over its train. The ground
         under every chimney and where every puff lies in the picture are worked out for all the
@@ -268,14 +269,21 @@ class TrainLayer:
     def _blown_up_by(self, device_scale: int) -> int:
         """How many times as fine as the sheet each way the pictures are drawn to show crisp at
         this many device pixels per art pixel: imgui samples every texture smoothly, so a
-        texture must hold a texel for every device pixel. Pages for another zoom are let go
-        of."""
-        factor = max(1, min(device_scale // DETAIL, MAX_TEXTURE // PAGE_WIDTH))
-        if factor != self._factor:
-            self._pages.clear()
-            self._painting.clear()
-            self._factor = factor
-        return factor
+        texture must hold a texel for every device pixel. Pages for other zooms are kept."""
+        return max(1, min(device_scale // DETAIL, MAX_TEXTURE // PAGE_WIDTH))
+
+    def _page_or_nearest(self, look: object, factor: int) -> tuple[_Page | None, int]:
+        """A look's page as fine as this zoom wants, or while it is drawn the page of the
+        nearest zoom that has one, and how fine it is; None, with nothing drawn yet."""
+        page = self._page(look, factor)
+        if page is not None:
+            return page, factor
+        kept = [fine for kept_look, fine in self._pages if kept_look == look]
+        if not kept:
+            return None, factor
+        fine = min(kept, key=lambda each: (abs(each - factor), -each))
+        self._pages.move_to_end((look, fine))
+        return self._pages[(look, fine)], fine
 
     def _whole_sheet(self, wanted: set[object]) -> Texture:
         """The sprite sheet at its own size, for zooms that need it no bigger, made again with
@@ -293,20 +301,21 @@ class TrainLayer:
         while the frame has not spent its PAGES_TIME. Only the looks on screen get one: the
         whole sheet that fine on a sharp screen is too big a texture for many graphics cards,
         which draw it black."""
-        page = self._pages.get(look)
+        key = (look, factor)
+        page = self._pages.get(key)
         if page is not None:
-            self._pages.move_to_end(look)
+            self._pages.move_to_end(key)
             return page
         if time.perf_counter() > self._paging_until:
             return None
-        if look not in self._painting:
-            self._painting[look] = (FinePainter(self._matrix, look, factor), [])
-        painter, pictures = self._painting[look]
+        if key not in self._painting:
+            self._painting[key] = (FinePainter(self._matrix, look, factor), [])
+        painter, pictures = self._painting[key]
         while len(pictures) < HEADINGS and time.perf_counter() <= self._paging_until:
             pictures.append(painter.picture(len(pictures)))
         if len(pictures) < HEADINGS:
             return None
-        del self._painting[look]
+        del self._painting[key]
         width = max(PAGE_WIDTH * factor, *(p.image.size[0] for p in pictures))
         spots = {}
         x = y = row = 0
@@ -322,17 +331,18 @@ class TrainLayer:
             x, y, w, h, _, _ = spots[index]
             pixels[y : y + h, x : x + w] = np.asarray(picture.image)
         texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(pixels))
-        page = self._pages[look] = _Page(texture, (width, pixels.shape[0]), spots, pixels.nbytes)
+        page = self._pages[key] = _Page(texture, (width, pixels.shape[0]), spots, pixels.nbytes)
         return page
 
-    def _let_go(self, drawn: set[object]) -> None:
-        """Lets go of the pages not drawn lately while they take more than PAGES_BUDGET."""
+    def _let_go(self, drawn: set[tuple[object, int]]) -> None:
+        """Lets go of the pages not drawn lately, of any zoom, while they take more than
+        PAGES_BUDGET."""
         held = sum(page.bytes for page in self._pages.values())
-        for look in list(self._pages):
+        for key in list(self._pages):
             if held <= PAGES_BUDGET:
                 break
-            if look not in drawn:
-                held -= self._pages.pop(look).bytes
+            if key not in drawn:
+                held -= self._pages.pop(key).bytes
 
 
 @dataclass(frozen=True)

@@ -30,7 +30,6 @@ from railroads.ui.build_menu import (
     Tool,
     draw_station_reach,
     draw_track,
-    draw_trains,
 )
 from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.buildings import draw_building_dots
@@ -536,7 +535,8 @@ class MapView:
                 self._train_layer().draw(draw_list, self.railway, self.camera, center)
         else:
             draw_track(draw_list, self.constructions, self.camera, center)
-            draw_trains(draw_list, self.railway, self.camera, center)
+            if self.railway.trains:
+                self._train_layer().draw(draw_list, self.railway, self.camera, center)
         if self.build.preview is not None:
             if self.camera.pixel_scale:
                 self._track_preview().draw(draw_list, self.build.preview, self.camera, center)

@@ -268,9 +268,9 @@ def test_up_close_the_pictures_are_drawn_as_many_times_as_fine_as_the_sheet(
 
     imgui.end_frame()
     look, _ = layer._parts(train)[0]
-    _, _, width, _, _, _ = layer.sprites.places[(look, 0)]
-    _, _, fine_width, _, _, _ = layer._pages[look].spots[0]
     times = view.camera.pixel_scale * 2 // DETAIL
+    _, _, width, _, _, _ = layer.sprites.places[(look, 0)]
+    _, _, fine_width, _, _, _ = layer._pages[(look, times)].spots[0]
     assert (times - 0.5) * width < fine_width < (times + 0.5) * width
 
 
@@ -324,5 +324,39 @@ def test_up_close_a_page_is_drawn_a_few_pictures_a_frame(
 
     assert after_one[0] == 0
     assert 0 < after_one[1] < HEADINGS
-    assert set(layer._pages) == looks
+    times = view.camera.pixel_scale * 2 // DETAIL
+    assert set(layer._pages) == {(look, times) for look in looks}
     assert not layer._painting
+
+
+def test_up_close_the_pages_of_a_zoom_left_are_kept_for_coming_back_to_it(
+    context: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    view, train = train_up_close()
+    layer = TrainLayer(view._pixel_layer().world)
+    monkeypatch.setattr(train_layer, "PAGES_TIME", 10.0)
+    first = view.camera.pixel_scale * 2 // DETAIL
+    imgui.new_frame()
+    layer.draw(imgui.get_foreground_draw_list(), view.railway, view.camera, (640.0, 400.0))
+    imgui.end_frame()
+    view.camera.zoom_level -= 1
+
+    imgui.new_frame()
+    layer.draw(imgui.get_foreground_draw_list(), view.railway, view.camera, (640.0, 400.0))
+    imgui.end_frame()
+
+    look, _ = layer._parts(train)[0]
+    assert (look, first) in layer._pages
+
+
+def test_zoomed_out_past_the_pixel_art_trains_still_show_their_pictures(context: None) -> None:
+    view, _ = train_up_close()
+    layer = TrainLayer(view._pixel_layer().world)
+    while view.camera.pixel_scale:
+        view.camera.zoom_level -= 1
+    imgui.new_frame()
+
+    layer.draw(imgui.get_foreground_draw_list(), view.railway, view.camera, (640.0, 400.0))
+
+    imgui.end_frame()
+    assert layer._sheet is not None
