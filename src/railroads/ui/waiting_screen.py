@@ -27,6 +27,20 @@ WORK = (
 )
 WORK_SECONDS = 2.5
 
+# A tip shown under the waiting screen's lines, one picked for each wait.
+TIPS = (
+    "Hexagons are bestagons!",
+    "Stations hand out to your own buildings first.",
+    "Freight pays up to three times more where buildings go short.",
+    "Your own buildings sell to your station at the market price.",
+    "Buy shares cheap where a building starves, then feed it.",
+    "Short trains of full cars pay best: every car costs a trip.",
+    "Passengers only ride between stations of different towns.",
+    "A train can't leave for a stop further than its fuel takes it.",
+    "Hover a category's icon to see what goods are in it.",
+    "Farms take limestone and machinery once you own them and know how.",
+)
+
 # The falling hexes: their size, when the cracks show and the first falls, how much later the
 # outermost falls than the middle one, and how hard they fall (pixels a second squared).
 HEX_RADIUS = 40.0
@@ -39,6 +53,11 @@ CRACK_COLOUR = (0.0, 0.0, 0.0, 0.55)
 LONGEST_STEP = 0.1
 # A hexagon's corners (_hexagon) as the two quads either side of its middle.
 HALVES = ((0, 1, 2, 3), (3, 4, 5, 0))
+
+
+def tip_for(rng: np.random.Generator) -> str:
+    """A tip for one wait."""
+    return TIPS[int(rng.integers(len(TIPS)))]
 
 
 def waiting_line(seconds: float, random_place: bool) -> str:

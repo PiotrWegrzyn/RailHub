@@ -4,9 +4,11 @@ import pytest
 from railroads.ui.waiting_screen import (
     HEX_RADIUS,
     JOKE_SECONDS,
+    TIPS,
     WORK,
     WORK_SECONDS,
     Pieces,
+    tip_for,
     waiting_line,
 )
 
@@ -57,3 +59,11 @@ def test_the_hexes_hold_still_at_first_and_all_fall_out_of_sight() -> None:
     assert not turn.any()
     assert not pieces.gone(0.5, 600)
     assert pieces.gone(3.0, 600)
+
+
+def test_there_are_ten_tips_and_one_of_them_says_hexagons_are_bestagons() -> None:
+    tips = {tip_for(np.random.default_rng(seed)) for seed in range(200)}
+
+    assert len(TIPS) == 10
+    assert tips == set(TIPS)
+    assert "Hexagons are bestagons!" in TIPS

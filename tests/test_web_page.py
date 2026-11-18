@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from railroads.ui.waiting_screen import TIPS
+
 PAGE = Path(__file__).resolve().parents[1] / "web" / "index.html"
 
 
@@ -27,3 +29,11 @@ def test_the_page_says_ready_in_place_of_the_work_once_it_has_loaded() -> None:
     ready = 'reached >= 100 ? "Ready"' in page
 
     assert ready
+
+
+def test_the_landing_page_offers_the_same_tips_as_the_game() -> None:
+    page = PAGE.read_text()
+
+    missing = [tip for tip in TIPS if f'"{tip}"' not in page]
+
+    assert missing == []

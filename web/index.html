@@ -37,7 +37,8 @@ Query parameters:
                    cursor: pointer; text-decoration: none; }
         #landing button { background: #dba852; color: #1c1a17; font-weight: 600; }
         #landing button:hover { background: #e8bb68; }
-        #landing .status { min-height: 1.2em; margin: 8px 0 36px; color: #888; font-size: 13px; }
+        #landing .status { min-height: 1.2em; margin: 8px 0 6px; color: #888; font-size: 13px; }
+        #landing .tip { min-height: 1.2em; margin: 0 0 30px; color: #6f6a62; font-size: 13px; }
         #landing .slow { margin: 0 0 10px; }
         #landing .download { background: #2a2622; color: #dba852; }
         #landing .download:hover { background: #35302a; }
@@ -59,6 +60,7 @@ Query parameters:
         <h1>RailHub</h1>
         <button id="play">Play online</button>
         <p class="status" id="landing-status">Turning cogs (0%)...</p>
+        <p class="tip" id="landing-tip"></p>
         <p class="slow">Too slow? Download and play outside the browser</p>
         <a class="download" id="download"></a>
         <p class="needs" id="needs"></p>
@@ -107,6 +109,21 @@ Query parameters:
         "Handing out bread",
     ];
     const WORK_MS = 2500;
+    // A tip under it, one picked for each visit; the same tips as railroads.ui.waiting_screen.TIPS.
+    const TIPS = [
+        "Hexagons are bestagons!",
+        "Stations hand out to your own buildings first.",
+        "Freight pays up to three times more where buildings go short.",
+        "Your own buildings sell to your station at the market price.",
+        "Buy shares cheap where a building starves, then feed it.",
+        "Short trains of full cars pay best: every car costs a trip.",
+        "Passengers only ride between stations of different towns.",
+        "A train can't leave for a stop further than its fuel takes it.",
+        "Hover a category's icon to see what goods are in it.",
+        "Farms take limestone and machinery once you own them and know how.",
+    ];
+    document.getElementById("landing-tip").textContent =
+        "Tip: " + TIPS[Math.floor(Math.random() * TIPS.length)];
     let reached = 0;
     function showProgress() {
         let bytes = 0;

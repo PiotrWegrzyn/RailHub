@@ -51,7 +51,7 @@ from railroads.ui.saves_window import SavesWindow
 from railroads.ui.tech_window import TechWindow
 from railroads.ui.theme import BRASS, apply_theme
 from railroads.ui.top_bar import draw_top_bar
-from railroads.ui.waiting_screen import Label, Shatter, waiting_line
+from railroads.ui.waiting_screen import Label, Shatter, tip_for, waiting_line
 from railroads.ui.web_setup import page_setup
 from railroads.ui.workers import FRAME_SECONDS, FrameWorker, submit_steps, worker
 
@@ -353,6 +353,7 @@ class Shell:
         self._pictured = False
         self._began = 0.0
         self._labels: list[Label] = []
+        self._tip = ""
         self._shatter: Shatter | None = None
         # The pictures of a new map's history, kept until the screen has broken up, and the size
         # in points of the window they are drawn for.
@@ -434,6 +435,7 @@ class Shell:
         self._pictured = pictured
         self._began = time.monotonic()
         self._shatter = None
+        self._tip = tip_for(np.random.default_rng())
         self._progress = ""
         self._done = None
         self._frame_seconds = FRAME_SECONDS
@@ -573,6 +575,13 @@ class Shell:
                 Label(corner.x, corner.y, WAITING_WIDTH * self._done, bar_height,
                       imgui.get_color_u32(imgui.Col_.plot_histogram.value)),
             ]  # fmt: skip
+        if self._tip:
+            self._labels.append(
+                self._text(
+                    f"Tip: {self._tip}",
+                    imgui.get_style_color_vec4(imgui.Col_.text_disabled.value),
+                )
+            )
         imgui.end_group()
         if year is not None:
             draw_list.channels_set_current(0)
