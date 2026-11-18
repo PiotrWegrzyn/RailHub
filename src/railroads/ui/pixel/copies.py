@@ -24,8 +24,8 @@ type Drawing = tuple[int, int, int, bool, bool, bool]
 @dataclass(frozen=True)
 class ChunkJob:
     """A chunk to paint (PixelWorld.render): where, at what resolution, with its raised ground
-    worked out finely or not, over ground the graphics card draws or not, and with its woods or
-    without, which the graphics card then draws. Called, the world paints it."""
+    worked out finely or not, over ground the graphics card draws or not, and with what lies
+    on its ground or without, which the graphics card then draws. Called, the world paints it."""
 
     world: PixelWorld = field(repr=False, compare=False)
     chunk_x: int
@@ -33,7 +33,7 @@ class ChunkJob:
     resolution: int
     fine_relief: bool = False
     over_ground: bool = False
-    woods: bool = True
+    surfaces: bool = True
 
     def __call__(self) -> Rgba:
         return self.world.render(*self.drawing)
@@ -47,7 +47,7 @@ class ChunkJob:
             self.resolution,
             self.fine_relief,
             self.over_ground,
-            self.woods,
+            self.surfaces,
         )
 
 

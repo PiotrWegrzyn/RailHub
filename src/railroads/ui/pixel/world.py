@@ -307,7 +307,7 @@ class PixelWorld:
         resolution: int = 1,
         fine_relief: bool = False,
         over_ground: bool = False,
-        woods: bool = True,
+        surfaces: bool = True,
     ) -> Rgba:
         """One chunk as RGBA pixels, `resolution` of them for every art pixel each way; off the
         map it is clear. Above 1 the ground is blown up and the track and everything standing
@@ -317,15 +317,16 @@ class PixelWorld:
         and slower. With `over_ground` the chunk leaves its ground out, clear but for the shade
         of trees, to be laid over ground the graphics card draws and raises
         (railroads.ui.pixel.ground_shader); what lies on raised ground is raised with it. Over
-        ground, without `woods` the chunk leaves out the woods and the shade of trees too, which
-        the graphics card lays under it (GroundShader.dress)."""
+        ground, without `surfaces` the chunk leaves out what lies on the ground too, the shade of
+        trees, fields, yards and woods, which the graphics card lays under it
+        (GroundShader.dress)."""
         self._grade()
         if fine_relief and resolution > 1:
             return self._render_fine(chunk_x, chunk_y, resolution)
         if over_ground:
             if self.rises(chunk_x, chunk_y):
-                return self._render_over_raised(chunk_x, chunk_y, resolution, woods)
-            return self._render_over_ground(chunk_x, chunk_y, resolution, woods)
+                return self._render_over_raised(chunk_x, chunk_y, resolution, surfaces)
+            return self._render_over_ground(chunk_x, chunk_y, resolution, surfaces)
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
         may_rise = self.elevation.may_rise(left, top, CHUNK, CHUNK + MOST_LIFT)
         points = self._points(left, top, CHUNK + MOST_LIFT + 1 if may_rise else CHUNK)
@@ -408,32 +409,39 @@ class PixelWorld:
             grid=self.tile_map.grid,
         )
 
-    def _render_over_ground(self, chunk_x: int, chunk_y: int, k: int, woods: bool = True) -> Rgba:
+    def _render_over_ground(
+        self, chunk_x: int, chunk_y: int, k: int, surfaces: bool = True
+    ) -> Rgba:
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
         points = self._points(left, top, CHUNK)
-        shown, canvas = self._over(left, top, CHUNK, k, points, woods)
-        self._surfaces_over(canvas, left, top, k, shown, points, woods)
+        shown, canvas = self._over(left, top, CHUNK, k, points, surfaces)
+        if surfaces:
+            self._surfaces_over(canvas, left, top, k, shown, points)
         self._stand_scenery(canvas, left, top, k, under_track=True)
         self._lay_track(canvas, left, top, k, shown=shown)
         self._stand_scenery(canvas, left, top, k)
         return _finished(canvas)
 
-    def _render_over_raised(self, chunk_x: int, chunk_y: int, k: int, woods: bool = True) -> Rgba:
+    def _render_over_raised(
+        self, chunk_x: int, chunk_y: int, k: int, surfaces: bool = True
+    ) -> Rgba:
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
         points = self._points(left, top, CHUNK + MOST_LIFT + 1)
         raised = self.elevation.area(left, top, CHUNK, CHUNK + MOST_LIFT, points=points)
         if raised is None:
-            return self._render_over_ground(chunk_x, chunk_y, k, woods)
+            return self._render_over_ground(chunk_x, chunk_y, k, surfaces)
         offset = raycast(raised.lift, CHUNK, CHUNK)
         rows = CHUNK + min(int(offset.max()) + 1, MOST_LIFT)
-        shown, canvas = self._over(left, top, rows, k, points, woods)
+        shown, canvas = self._over(left, top, rows, k, points, surfaces)
         lit = lighting(raised.top(rows))
-        self._surfaces_over(canvas, left, top, k, shown, points, woods, lit)
+        if surfaces:
+            self._surfaces_over(canvas, left, top, k, shown, points, lit)
         between = crossings(raised.lift, offset)
         canvas = raise_picture(canvas, offset, k, between)
         on_map = raise_picture(shown[::k, ::k].astype(np.float32), offset, 1, between) > 0
         if k > 1:
-            textured(canvas, left, top, k)
+            if surfaces:
+                textured(canvas, left, top, k)
             on_map = on_map.repeat(k, axis=0).repeat(k, axis=1)
         self._stand_scenery(canvas, left, top, k, under_track=True)
         self._lay_lifted_track(canvas, left, top, k, offset, k, on_map)
@@ -441,13 +449,13 @@ class PixelWorld:
         return _finished(canvas)
 
     def _over(
-        self, left: int, top: int, rows: int, k: int, points: Lattice, woods: bool
+        self, left: int, top: int, rows: int, k: int, points: Lattice, surfaces: bool
     ) -> tuple[npt.NDArray[np.bool_], FloatArray]:
         """Which pixels of a chunk drawn over ground, CHUNK art pixels across and `rows` down
         from (`left`, `top`), `k` pixels to each, lie on the map, and a clear canvas for it,
-        shaded under trees unless the graphics card shades it (without `woods`)."""
+        shaded under trees unless the graphics card shades it (without `surfaces`)."""
         canvas = np.zeros((rows * k, CHUNK * k, 4), dtype=np.float64)
-        if woods:
+        if surfaces:
             inside, shade = self.ground.under(left, top, rows, points)
             art_pixels(canvas, k)[..., 3] = shade[:, None, :, None]
         else:
@@ -462,18 +470,16 @@ class PixelWorld:
         k: int,
         shown: npt.NDArray[np.bool_],
         points: Lattice,
-        woods: bool,
         lit: FloatArray | None = None,
     ) -> None:
-        """Lays fields, yards and, with `woods`, the woods over a chunk drawn over ground; raised
-        (with `lit`), they take the ground's texture once raised with it."""
+        """Lays fields, yards and woods over a chunk drawn over ground; raised (with `lit`), they
+        take the ground's texture once raised with it."""
         ground = self.ground
 
         def paint(layer: FloatArray, kk: int, on: npt.NDArray[np.bool_]) -> None:
             ground.fields(layer, left, top, kk, lit, shown=on, points=points)
             ground.yards(layer, left, top, kk, shown=on)
-            if woods:
-                ground.canopy(layer, left, top, kk, shown=on, points=points)
+            ground.canopy(layer, left, top, kk, shown=on, points=points)
 
         self._surfaces(canvas, left, top, k, shown, paint, lit is None)
 

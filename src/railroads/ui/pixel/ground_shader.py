@@ -70,6 +70,10 @@ GLOW_STEPS = 250
 # The woods are worked out this many art pixels round a chunk, as far as anything in it looks for
 # them: the crowns and shadows of trees standing there, and where crowns reach.
 WOODS_MARGIN = 16
+# How far from a chunk the trees whose shade, and the middles of the cells whose fields, can reach
+# into it lie, in art pixels.
+TREE_SHADE_REACH = 12
+PLOT_REACH = 32
 
 VERTEX = """layout(location = 0) in vec2 corner;
 void main() {
@@ -256,6 +260,55 @@ void main() {
 }
 """
 
+# The light on raised ground (railroads.ui.pixel.relief.lighting): how much the slope at an art
+# pixel faces the light and how steep it is, from the heights of the relief round it, and how much
+# brighter or darker that makes it.
+SUN = """float height_at(ivec2 art) {
+    vec4 raised = texelFetch(relief, art - relief_origin, 0);
+    return raised.w + raised.x;
+}
+
+vec2 sun(ivec2 art) {
+    float per_col = (height_at(art + ivec2(1, 0)) - height_at(art - ivec2(1, 0))) * 0.5;
+    float per_row = (height_at(art + ivec2(0, 1)) - height_at(art - ivec2(0, 1))) * 0.5;
+    float gx = (per_col * slope.x + per_row * slope.y) / metres_per_unit;
+    float gy = (per_col * slope.z + per_row * slope.w) / metres_per_unit;
+    float nz = 1.0 / sqrt(1.0 + gx * gx + gy * gy);
+    float s = clamp((-gx * @LIGHT_X@ - gy * @LIGHT_Y@ + @LIGHT_Z@) * nz, 0.0, 1.0);
+    return vec2(s, 1.0 - nz);
+}
+
+float lit_by(float s, float m, float h) {
+    float lit = clamp(1.0 + 1.3 * (s - @LIGHT_Z@), 0.55, 1.3);
+    return 1.0 + (lit - 1.0) * clamp((m + h) * 4.0, 0.0, 1.0);
+}
+"""
+
+# How the colours of plain land are multiplied for the light on its swells, the water and the
+# mountains near it (Ground._natural); `around` is the raster of `_surroundings` there.
+NATURAL = """float rolling(vec2 q) {
+    return @R_16_301@ + 0.45 * @R_55_302@ + 0.12 * @R_18_303@;
+}
+
+vec3 natural(vec2 p, vec4 around) {
+    float here = rolling(p);
+    float e = @ROLL_STEP@;
+    float gx = (rolling(vec2(p.x + e, p.y)) - here) / e;
+    float gy = (rolling(vec2(p.x, p.y + e)) - here) / e;
+    float facing = -(gx * @LIGHT_X@ + gy * @LIGHT_Y@);
+    float deep = @ROLL_LEAST@ + (@ROLL_MOST@ - @ROLL_LEAST@) * @N_25_306@;
+    float roll = clamp(1.0 + @ROLL_LIGHT@ * deep * facing, @ROLL_LOW@, @ROLL_HIGH@);
+    float region = @N_3_305@ * 2.0 - 1.0;
+    vec3 plains = region < 0.0 ? @GREENER_PLAINS@ : @DRIER_PLAINS@;
+    float lush = clamp(around.g * @WET_GAIN@, 0.0, 1.0) * @LUSH@;
+    float foot = clamp(around.b * @FOOT_GAIN@, 0.0, 1.0) * @FOOT_SHADE@;
+    vec3 tint = 1.0 + (plains - 1.0) * (abs(region) * @PLAINS_TINT@);
+    tint *= 1.0 + (@LUSH_TINT@ - 1.0) * lush;
+    tint *= 1.0 + (@FOOT_TINT@ - 1.0) * foot;
+    return tint * roll;
+}
+"""
+
 FRAGMENT = """out vec4 colour;
 uniform ivec2 art_origin;
 uniform mat2 to_plane;
@@ -304,24 +357,14 @@ float hash(int a, int b, int seed) {
     return tbl(a * 13 + seed * 71, b * 7 + seed * 131);
 }
 
-float height_at(ivec2 art) {
-    vec4 raised = texelFetch(relief, art - relief_origin, 0);
-    return raised.w + raised.x;
-}
-
+@SUN@
 // Raised ground lit and coloured as railroads.ui.pixel.relief.Elevation.colour does: by the
 // light on its slope, and with foothills, bare rock and snow where it is mountainous.
 vec3 raised_colour(vec3 rgb, vec4 raised, ivec2 art, vec2 p, bool rocky) {
     float above = raised.x, m = raised.y, h = raised.z;
-    float per_col = (height_at(art + ivec2(1, 0)) - height_at(art - ivec2(1, 0))) * 0.5;
-    float per_row = (height_at(art + ivec2(0, 1)) - height_at(art - ivec2(0, 1))) * 0.5;
-    float gx = (per_col * slope.x + per_row * slope.y) / metres_per_unit;
-    float gy = (per_col * slope.z + per_row * slope.w) / metres_per_unit;
-    float nz = 1.0 / sqrt(1.0 + gx * gx + gy * gy);
-    float s = clamp((-gx * @LIGHT_X@ - gy * @LIGHT_Y@ + @LIGHT_Z@) * nz, 0.0, 1.0);
-    float st = 1.0 - nz;
-    float lit = clamp(1.0 + 1.3 * (s - @LIGHT_Z@), 0.55, 1.3);
-    lit = 1.0 + (lit - 1.0) * clamp((m + h) * 4.0, 0.0, 1.0);
+    vec2 facing = sun(art);
+    float s = facing.x, st = facing.y;
+    float lit = lit_by(s, m, h);
     rgb *= lit;
     float under = max(m, rocky ? clamp(m * 3.0, 0.0, 1.0) : 0.0);
     if (under <= 0.0) return rgb;
@@ -357,28 +400,7 @@ vec4 surroundings(vec2 p) {
     return mix(a, b, t.x) * (1.0 - t.y) + mix(c, d, t.x) * t.y;
 }
 
-float rolling(vec2 q) {
-    return @R_16_301@ + 0.45 * @R_55_302@ + 0.12 * @R_18_303@;
-}
-
-vec3 natural(vec2 p, vec4 around) {
-    float here = rolling(p);
-    float e = @ROLL_STEP@;
-    float gx = (rolling(vec2(p.x + e, p.y)) - here) / e;
-    float gy = (rolling(vec2(p.x, p.y + e)) - here) / e;
-    float facing = -(gx * @LIGHT_X@ + gy * @LIGHT_Y@);
-    float deep = @ROLL_LEAST@ + (@ROLL_MOST@ - @ROLL_LEAST@) * @N_25_306@;
-    float roll = clamp(1.0 + @ROLL_LIGHT@ * deep * facing, @ROLL_LOW@, @ROLL_HIGH@);
-    float region = @N_3_305@ * 2.0 - 1.0;
-    vec3 plains = region < 0.0 ? @GREENER_PLAINS@ : @DRIER_PLAINS@;
-    float lush = clamp(around.g * @WET_GAIN@, 0.0, 1.0) * @LUSH@;
-    float foot = clamp(around.b * @FOOT_GAIN@, 0.0, 1.0) * @FOOT_SHADE@;
-    vec3 tint = 1.0 + (plains - 1.0) * (abs(region) * @PLAINS_TINT@);
-    tint *= 1.0 + (@LUSH_TINT@ - 1.0) * lush;
-    tint *= 1.0 + (@FOOT_TINT@ - 1.0) * foot;
-    return tint * roll;
-}
-
+@NATURAL@
 vec2 wound(vec2 q) {
     float wx = q.x + @WARP@ * 2.0 * (@W_7_211@ - 0.5) + @WARP_FINE@ * 2.0 * (@W_2_213@ - 0.5);
     float wy = q.y + @WARP@ * 2.0 * (@W_7_212@ - 0.5) + @WARP_FINE@ * 2.0 * (@W_2_214@ - 0.5);
@@ -766,6 +788,178 @@ void main() {
 }
 """
 
+# Fields, groves and the ground round buildings, as Ground.fields and Ground.yards paint them,
+# `k` pixels to an art pixel: the plots near the chunk in `plots`, a column each holding its cell
+# (row, column), the cell's middle on the plane, which way it faces, how wide it spreads and its
+# kind (its place in FIELD_KINDS); the buildings in `yards`, where each stands in the picture,
+# how far its yard reaches and which kind of yard it is.
+FIELDS = """const vec3 CROP_PLANT[@CROP_COUNT@] = vec3[@CROP_COUNT@](@CROP_PLANT@);
+const vec3 CROP_SOIL[@CROP_COUNT@] = vec3[@CROP_COUNT@](@CROP_SOIL@);
+const vec3 GROVE_GROUND[@GROVE_COUNT@] = vec3[@GROVE_COUNT@](@GROVE_GROUND@);
+const vec3 GROVE_TREE[@GROVE_COUNT@] = vec3[@GROVE_COUNT@](@GROVE_TREE@);
+const vec3 GROVE_FRUIT[@FRUIT_COUNT@] = vec3[@FRUIT_COUNT@](@GROVE_FRUIT@);
+const int GROVE_FRUIT_FROM[@GROVE_COUNT@] = int[@GROVE_COUNT@](@GROVE_FRUIT_FROM@);
+const int GROVE_FRUITS[@GROVE_COUNT@] = int[@GROVE_COUNT@](@GROVE_FRUITS@);
+const float GROVE_ROWS[@GROVE_COUNT@] = float[@GROVE_COUNT@](@GROVE_ROWS@);
+const float GROVE_CROWN[@GROVE_COUNT@] = float[@GROVE_COUNT@](@GROVE_CROWN@);
+const vec3 YARD_COLOURS[@YARD_COUNT@] = vec3[@YARD_COUNT@](@YARD_COLOURS@);
+
+bool in_plot(vec2 p, vec4 at, vec4 shape) {
+    if (clamp(cell_at(p), ivec2(0), cells_size - 1) != ivec2(int(at.y), int(at.x))) return false;
+    vec2 off = p - at.zw;
+    return shape.x * off.x + shape.y * off.y >= shape.z * length(off);
+}
+
+// How fully a plot covers the ground at `texel`, from 0 at its frayed edge to 1 FIELD_FEATHER
+// art pixels in (Ground._feathered): how many rings of pixels round it lie in the plot too.
+float feathered(ivec2 texel, vec4 at, vec4 shape, vec2 p) {
+    int most = @FIELD_FEATHER@ * k;
+    int depth = 0;
+    for (int ring = 1; ring <= most; ring++) {
+        bool whole = true;
+        for (int dy = -ring; dy <= ring && whole; dy++) {
+            for (int dx = -ring; dx <= ring; dx++) {
+                if (max(abs(dx), abs(dy)) != ring) continue;
+                vec2 there = vec2(chunk_origin) + (vec2(texel + ivec2(dx, dy)) + 0.5) / float(k);
+                if (!in_plot(to_plane * (there + projection_origin), at, shape)) {
+                    whole = false;
+                    break;
+                }
+            }
+        }
+        if (!whole) break;
+        depth = ring;
+    }
+    float fray = (@N_FRAY@ - 0.5) * @FIELD_FRAY@ * float(k);
+    return clamp((float(depth) + 0.5 + fray) / float(most), 0.0, 1.0);
+}
+
+// A field of crops in rows (Ground._sow): wheat on a farm (`crop` below 0), or another crop.
+vec3 sow(vec2 p, ivec2 pixel, vec4 at, int crop) {
+    int pick = int(at.x) * 7 + int(at.y) * 13;
+    vec2 off = p - at.zw;
+    vec2 rows = pick % 2 != 0 ? off : off.yx;
+    float u = rows.x * @FIELD_STRIPES@, w = rows.y * @FIELD_STRIPES@;
+    float grain = table_hash(pixel.x, pixel.y, 71) - 0.5;
+    float line = floor(u);
+    float fu = u - line;
+    vec3 sown;
+    if (crop < 0) {
+        sown = mod(line, 2.0) == 0.0 ? @WHEAT@ : @WHEAT_DARK@;
+        if (fu < 0.2) sown = @WHEAT_LIGHT@;
+        if (fu > 0.88) sown = @WHEAT_DARK@ * 0.86;
+        sown *= 1.0 + 0.14 * grain;
+        if (table_hash(pixel.x, pixel.y, 72) > 0.72 && fu > 0.3 && fu < 0.85) sown = @WHEAT_EARS@;
+    } else {
+        vec3 plant = CROP_PLANT[crop];
+        vec3 light = min(plant * 1.18, vec3(255.0));
+        sown = CROP_SOIL[crop] * (1.0 + 0.16 * grain);
+        if (fu < 0.12) sown = @SOIL_DARK@;
+        float lump = w * 2.2;
+        bool bushes = table_hash(int(floor(lump)), int(line), 81) > 0.18;
+        if (bushes && length(vec2(fu - 0.5, (lump - floor(lump) - 0.5) * 0.7)) < 0.34) {
+            sown = plant * (1.0 + 0.1 * grain);
+            if (fu < 0.42) sown = light;
+            if (fu > 0.66) sown = plant * 0.7;
+            if (table_hash(pixel.x, pixel.y, 82) > 0.86) sown = light * 1.08;
+        }
+    }
+    float grey = (sown.r + sown.g + sown.b) / 3.0;
+    return grey + (sown - grey) * @FIELD_SATURATION@;
+}
+
+// A grove of trees in rows (Ground._plant), with how fully it covers the ground.
+vec4 plant(vec2 p, ivec2 pixel, vec4 at, int grove, float fade) {
+    vec2 uv = (p - at.zw) * GROVE_ROWS[grove] + 0.5;
+    vec2 d = uv - roundEven(uv);
+    float crown = GROVE_CROWN[grove];
+    float grain = 1.0 + 0.12 * (table_hash(pixel.x, pixel.y, 23) - 0.5);
+    vec3 colour = GROVE_GROUND[grove] * grain;
+    float cover = fade * @GROVE_FLOOR@;
+    if (length(d - vec2(0.12, 0.1)) < crown) {
+        colour = @SHADOW_COLOUR@;
+        cover = fade * @GROVE_SHADOW@;
+    }
+    if (length(d) < crown) {
+        float lit = clamp(0.82 + 0.3 * (-(d.x + d.y) / max(crown, 1e-6)), 0.62, 1.22);
+        colour = clamp(GROVE_TREE[grove] * (lit * grain), 0.0, 255.0);
+        cover = min(fade * 3.0, 1.0);
+        if (table_hash(pixel.x, pixel.y, 21) > 0.82) {
+            int pick = int(table_hash(pixel.x, pixel.y, 22) * float(GROVE_FRUITS[grove]));
+            colour = GROVE_FRUIT[GROVE_FRUIT_FROM[grove] + pick];
+        }
+    }
+    return vec4(colour, cover);
+}
+
+void lay(inout vec4 layer, vec3 colour, float cover) {
+    layer.rgb = layer.rgb * (1.0 - cover) + colour * cover;
+    layer.a = layer.a * (1.0 - cover) + cover;
+}
+
+// Lays the field or grove at picture point `q`, if any, lit by the slope it lies on (`lit`).
+void lay_fields(vec2 q, ivec2 texel, float lit, inout vec4 layer) {
+    vec2 p = to_plane * (q + projection_origin);
+    for (int i = 0; i < plot_count; i++) {
+        vec4 at = texelFetch(plots, ivec2(i, 0), 0);
+        vec4 shape = texelFetch(plots, ivec2(i, 1), 0);
+        if (!in_plot(p, at, shape)) continue;
+        ivec2 pixel = chunk_origin * k + texel;
+        float fade = feathered(texel, at, shape, p);
+        int kind = int(shape.w);
+        vec4 sown = kind < @GROVES_FROM@ ? vec4(sow(p, pixel, at, kind - 1), fade)
+            : plant(p, pixel, at, kind - @GROVES_FROM@, fade);
+        vec3 colour = sown.rgb * natural(p, blended(light, p, @RELIEF_STEPS@)) * lit;
+        if (sown.a > 0.0) lay(layer, clamp(colour, 0.0, 255.0) / 255.0, sown.a);
+        return;
+    }
+}
+
+// Lays the ground round each building near the chunk over `texel` (Ground._yard), worked out
+// from the chunk's corner as there.
+void lay_yards(ivec2 texel, inout vec4 layer) {
+    vec2 f = vec2(texel) + 0.5;
+    for (int i = 0; i < yard_count; i++) {
+        vec4 yard = texelFetch(yards, ivec2(i, 0), 0);
+        vec2 c = (yard.xy - vec2(chunk_origin)) * float(k);
+        float rx = yard.z * float(k), ry = rx / 2.0;
+        ivec2 low = ivec2(int(c.x - rx) - 1, int(c.y - ry) - 1);
+        ivec2 high = ivec2(int(c.x + rx) + 2, int(c.y + ry) + 2);
+        if (any(lessThan(texel, low)) || any(greaterThanEqual(texel, high))) continue;
+        int seed = int(c.x * 7.0 + c.y * 13.0) & 1023;
+        float d = length((f - c) / vec2(rx, ry));
+        float fray = table_hash(texel.x / k, texel.y / k, seed) * 0.35;
+        float cover = clamp((1.0 - d - fray * 0.6) * 4.0, 0.0, 1.0);
+        int kind = int(yard.w);
+        vec3 colour = YARD_COLOURS[kind];
+        if (kind == @COTTAGE@) {
+            colour *= 0.9 + 0.2 * table_hash(texel.x, texel.y, 31);
+            vec2 uv = (f - c) / float(k);
+            if (uv.x > 1.5 && uv.x < 6.5 && uv.y > -3.4 && uv.y < -0.6) {
+                colour = @SOIL@ * 0.95;
+                bool row = mod(floor((uv.y + 3.4) * 1.4), 2.0) == 0.0;
+                if (row && table_hash(texel.x, texel.y, 32) > 0.25) {
+                    colour = @GARDEN_LEAVES@ * (0.9 + 0.3 * table_hash(texel.x, texel.y, 33));
+                }
+                cover = 1.0;
+            }
+        } else if (kind == @PAVED@ || kind == @FLAGSTONES@) {
+            int stone = (kind == @PAVED@ ? 2 : 3) * k;
+            colour *= 0.92 + 0.12 * table_hash(texel.x / stone, texel.y / k, 34);
+            if ((texel.x / stone + texel.y / k) % 3 == 0 && table_hash(texel.x, texel.y, 35) > 0.5) {
+                colour *= 0.88;
+            }
+        } else if (kind == @SPOIL@) {
+            colour *= 0.8 + 0.35 * table_hash(texel.x, texel.y, 38);
+            if (table_hash(texel.x / k, texel.y / k, 39) > 0.9) colour = vec3(150.0, 144.0, 134.0);
+        } else {
+            colour *= 0.86 + 0.24 * table_hash(texel.x, texel.y, 36);
+        }
+        lay(layer, colour / 255.0, cover);
+    }
+}
+"""
+
 # The woods over a chunk, unraised, as Ground.canopy paints them over the shade of trees, `k`
 # pixels to an art pixel (one or FINE): a roof of lit crowns, the dark side of the trees along its
 # lower edge and their shadow on the ground beside them; finer than an art pixel to a pixel,
@@ -782,9 +976,20 @@ uniform highp usampler2D cells;
 uniform highp sampler2D light;
 uniform highp sampler2D wooded;
 uniform highp sampler2D edges;
+uniform highp sampler2D plots;
+uniform int plot_count;
+uniform highp sampler2D yards;
+uniform int yard_count;
+uniform ivec2 relief_origin;
+uniform vec4 slope;
+uniform float metres_per_unit;
+uniform highp sampler2D relief;
 @NOISE@
 @HEX@
 @RASTER@
+@SUN@
+@NATURAL@
+@FIELDS@
 const float TAU = 6.283185307179586;
 const vec3 CROWN_LIGHT = @CROWN_LIGHT@;
 
@@ -1035,6 +1240,9 @@ void main() {
         return;
     }
     vec4 layer = vec4(0.0, 0.0, 0.0, here.g);
+    vec4 raised = texelFetch(relief, art - relief_origin, 0);
+    lay_fields(q, texel, lit_by(sun(art).x, raised.y, raised.z), layer);
+    lay_yards(texel, layer);
     bool painted = false;
     if (edges_at(art).r > 0.5) painted = crowns(q, art, layer);
     if (!painted && edges_at(art - @SHADOW_STEP@).r > 0.5) cast_shadow(q, layer);
@@ -1132,11 +1340,40 @@ def _grass_ramps(name: str) -> str:
     return " ".join(lines)
 
 
+def _shared_names() -> dict[str, str]:
+    """The numbers of the snippets the ground and what lies on it share (SUN, NATURAL)."""
+    return {
+        "R_16_301": _noise(1.6, 301, "q"),
+        "R_55_302": _noise(0.55, 302, "q"),
+        "R_18_303": _noise(0.18, 303, "q"),
+        "ROLL_STEP": _number(cpu.ROLL_STEP),
+        "N_25_306": _noise(cpu.ROLL_SPAN, 306),
+        "N_3_305": _noise(cpu.PLAINS_SPAN, 305),
+        "ROLL_LEAST": _number(cpu.ROLL_LEAST),
+        "ROLL_MOST": _number(cpu.ROLL_MOST),
+        "GREENER_PLAINS": _vec3(cpu.GREENER_PLAINS),
+        "DRIER_PLAINS": _vec3(cpu.DRIER_PLAINS),
+        "PLAINS_TINT": _number(cpu.PLAINS_TINT),
+        "LIGHT_X": _number(LIGHT[0]),
+        "LIGHT_Y": _number(LIGHT[1]),
+        "ROLL_LIGHT": _number(cpu.ROLL_LIGHT),
+        "ROLL_LOW": _number(cpu.ROLL_RANGE[0]),
+        "ROLL_HIGH": _number(cpu.ROLL_RANGE[1]),
+        "WET_GAIN": _number(cpu.WET_GAIN),
+        "FOOT_GAIN": _number(cpu.FOOT_GAIN),
+        "LUSH": _number(cpu.LUSH),
+        "FOOT_SHADE": _number(cpu.FOOT_SHADE),
+        "LUSH_TINT": _vec3(cpu.LUSH_TINT),
+        "FOOT_TINT": _vec3(cpu.FOOT_TINT),
+        "LIGHT_Z": _number(relief.LIGHT[2]),
+    }
+
+
 def fragment_source() -> str:
     """The fragment shader with the CPU ground's tables and numbers written in."""
     ramps = [_vec3(cpu.RAMPS[biome][shade]) for biome in Biome for shade in range(4)]
     tuft_rows = [sum(1 << x for x in range(6) if cpu.TUFT[y, x]) for y in range(6)]
-    names = {
+    names = _shared_names() | {
         "RAMP_COUNT": str(len(ramps)),
         "RAMPS": ", ".join(ramps),
         "BAYER": ", ".join(_number(v) for v in cpu.BAYER.ravel()),
@@ -1201,38 +1438,15 @@ def fragment_source() -> str:
         "N_45_82": _noise(0.45, 82),
         "N_03_86": _noise(0.03, 86),
         "N_5_91": _noise(0.5, 91),
-        "R_16_301": _noise(1.6, 301, "q"),
-        "R_55_302": _noise(0.55, 302, "q"),
-        "R_18_303": _noise(0.18, 303, "q"),
         "W_7_211": _noise(0.7, 211, "q"),
         "W_7_212": _noise(0.7, 212, "q"),
         "W_2_213": _noise(0.2, 213, "q"),
         "W_2_214": _noise(0.2, 214, "q"),
-        "ROLL_STEP": _number(cpu.ROLL_STEP),
-        "N_25_306": _noise(cpu.ROLL_SPAN, 306),
-        "N_3_305": _noise(cpu.PLAINS_SPAN, 305),
-        "ROLL_LEAST": _number(cpu.ROLL_LEAST),
-        "ROLL_MOST": _number(cpu.ROLL_MOST),
-        "GREENER_PLAINS": _vec3(cpu.GREENER_PLAINS),
-        "DRIER_PLAINS": _vec3(cpu.DRIER_PLAINS),
-        "PLAINS_TINT": _number(cpu.PLAINS_TINT),
-        "LIGHT_X": _number(LIGHT[0]),
-        "LIGHT_Y": _number(LIGHT[1]),
-        "ROLL_LIGHT": _number(cpu.ROLL_LIGHT),
-        "ROLL_LOW": _number(cpu.ROLL_RANGE[0]),
-        "ROLL_HIGH": _number(cpu.ROLL_RANGE[1]),
-        "WET_GAIN": _number(cpu.WET_GAIN),
-        "FOOT_GAIN": _number(cpu.FOOT_GAIN),
-        "LUSH": _number(cpu.LUSH),
-        "FOOT_SHADE": _number(cpu.FOOT_SHADE),
-        "LUSH_TINT": _vec3(cpu.LUSH_TINT),
-        "FOOT_TINT": _vec3(cpu.FOOT_TINT),
         "WARP": _number(cpu.WARP),
         "WARP_FINE": _number(cpu.WARP_FINE),
         "WARP_BROAD": _number(cpu.WARP_BROAD),
         "W_18_215": _noise(1.8, 215, "q"),
         "W_18_216": _noise(1.8, 216, "q"),
-        "LIGHT_Z": _number(relief.LIGHT[2]),
         "FOOTHILL": _vec3(relief.FOOTHILL),
         "F_3_13": _noise(0.3, 13),
         "TREELINE": _number(relief.TREELINE),
@@ -1324,75 +1538,126 @@ def edges_source() -> str:
     return _filled(EDGES, {"OVERHANG": str(cpu.OVERHANG), "BELOW": str(cpu.OVERHANG + 3)})
 
 
+def _fields_names() -> dict[str, str]:
+    """The numbers and tables of fields, groves and yards (FIELDS)."""
+    groves = list(cpu.GROVES.values())
+    fruit = [colour for grove in groves for colour in grove.fruit]
+    yards = list(cpu.YARD_COLOURS)
+    return {
+        "CROP_COUNT": str(len(cpu.CROP_ROWS)),
+        "CROP_PLANT": ", ".join(_vec3(plant) for plant, _ in cpu.CROP_ROWS.values()),
+        "CROP_SOIL": ", ".join(
+            _vec3(np.array(ground, np.float32) * 0.8 + cpu.SOIL * 0.2)
+            for _, ground in cpu.CROP_ROWS.values()
+        ),
+        "GROVE_COUNT": str(len(groves)),
+        "GROVE_GROUND": ", ".join(_vec3(grove.ground) for grove in groves),
+        "GROVE_TREE": ", ".join(_vec3(grove.tree) for grove in groves),
+        "FRUIT_COUNT": str(len(fruit)),
+        "GROVE_FRUIT": ", ".join(_vec3(colour) for colour in fruit),
+        "GROVE_FRUIT_FROM": ", ".join(
+            str(sum(len(g.fruit) for g in groves[:i])) for i in range(len(groves))
+        ),
+        "GROVE_FRUITS": ", ".join(str(len(grove.fruit)) for grove in groves),
+        "GROVE_ROWS": ", ".join(_number(grove.rows) for grove in groves),
+        "GROVE_CROWN": ", ".join(_number(grove.crown) for grove in groves),
+        "GROVES_FROM": str(1 + len(cpu.CROP_ROWS)),
+        "YARD_COUNT": str(len(yards)),
+        "YARD_COLOURS": ", ".join(_vec3(colour) for colour in cpu.YARD_COLOURS.values()),
+        "COTTAGE": str(yards.index("cottage")),
+        "PAVED": str(yards.index("paved")),
+        "FLAGSTONES": str(yards.index("flagstones")),
+        "SPOIL": str(yards.index("spoil")),
+        "FIELD_FEATHER": str(cpu.FIELD_FEATHER),
+        "FIELD_FRAY": _number(cpu.FIELD_FRAY),
+        "N_FRAY": _noise(cpu.FIELD_FRAY_SIZE, 74),
+        "FIELD_STRIPES": _number(cpu.FIELD_STRIPES),
+        "FIELD_SATURATION": _number(cpu.FIELD_SATURATION),
+        "WHEAT": _vec3(cpu.WHEAT),
+        "WHEAT_DARK": _vec3(cpu.WHEAT_DARK),
+        "WHEAT_LIGHT": _vec3(cpu.WHEAT_LIGHT),
+        "WHEAT_EARS": _vec3(cpu.WHEAT_EARS),
+        "SOIL": _vec3(cpu.SOIL),
+        "SOIL_DARK": _vec3(cpu.SOIL_DARK),
+        "GROVE_FLOOR": _number(cpu.GROVE_FLOOR),
+        "GROVE_SHADOW": _number(cpu.GROVE_SHADOW),
+        "GARDEN_LEAVES": _vec3(cpu.GARDEN_LEAVES),
+    }
+
+
 def canopy_source() -> str:
     """The shader painting the woods (CANOPY), with Ground.canopy's numbers written in."""
     light = cpu.CROWN_LIGHT
-    names = {
-        "CROWN_LIGHT": f"vec3({_number(light[0])}, {_number(light[1])}, {_number(light[2])})",
-        "CROWN_GAP": _number(cpu.CROWN_GAP),
-        "CROWN_SIZE_0": _number(cpu.CROWN_SIZE[0]),
-        "CROWN_SIZE_1": _number(cpu.CROWN_SIZE[1]),
-        "YOUNG": _number(cpu.YOUNG),
-        "AGE_SPAN": _number(cpu.OLD - cpu.YOUNG),
-        "N_STAND": _noise(cpu.STAND_SPAN, 70, "j"),
-        "N_THIN": _noise(cpu.THIN_SPAN, 71, "j"),
-        "THINNED": _number(cpu.THINNED),
-        "CLUMP_GAP": _number(cpu.CLUMP_GAP),
-        "CLUMP_SIZE_0": _number(cpu.CLUMP_SIZE[0]),
-        "CLUMP_SIZE_1": _number(cpu.CLUMP_SIZE[1]),
-        "TRUNK_LENGTH_0": _number(cpu.TRUNK_LENGTH[0]),
-        "TRUNK_LENGTH_1": _number(cpu.TRUNK_LENGTH[1]),
-        "TRUNK_HALF": _number(cpu.TRUNK_HALF),
-        "TRUNK_BARK": _vec3(cpu.TRUNK_BARK),
-        "TRUNK_BELOW": str(cpu.TRUNK_BELOW),
-        "RELIEF_STEPS": _number(cpu.RELIEF_STEPS_PER_CELL),
-        "N_SWELL": _noise(cpu.CANOPY_SWELL_SIZE, 67),
-        "N_SWELL_X": _noise(cpu.CANOPY_SWELL_SIZE, 67, "p + vec2(0.05, 0.0)"),
-        "N_SWELL_Y": _noise(cpu.CANOPY_SWELL_SIZE, 67, "p + vec2(0.0, 0.05)"),
-        "SWELL": _number(cpu.CANOPY_SWELL * cpu.CANOPY_SWELL_SIZE),
-        "LUMPS": _number(cpu.LUMPS),
-        "CLUMP_EDGE": _number(cpu.CLUMP_EDGE),
-        "FLOOR_FROM": _number(cpu.FLOOR_FROM),
-        "N_GRAIN": _noise(cpu.LEAF_GRAIN, 68),
-        "TAIGA": str(int(Biome.TAIGA)),
-        "JUNGLE": str(int(Biome.JUNGLE)),
-        "N_STANDS": _noise(cpu.CONIFER_STANDS, 64),
-        "CROWN_TONES": _number(cpu.CROWN_TONES),
-        "CONIFER_0": _vec3(cpu.CONIFER_CROWNS[0]),
-        "CONIFER_1": _vec3(cpu.CONIFER_CROWNS[1]),
-        "LEAFY_0": _vec3(cpu.LEAFY_CROWNS[0]),
-        "LEAFY_1": _vec3(cpu.LEAFY_CROWNS[1]),
-        "N_CROWNS": _noise(0.9, 65),
-        "N_REGION": _noise(cpu.REGION_SPAN, 72),
-        "DARK_GREENS": _vec3(cpu.DARK_GREENS),
-        "GOLDEN_GREENS": _vec3(cpu.GOLDEN_GREENS),
-        "CROWN_ROUND": _number(cpu.CROWN_ROUND),
-        "CLUMP_LIGHT": _number(cpu.CLUMP_LIGHT),
-        "HOLLOWS": _number(cpu.HOLLOWS),
-        "BRANCHES": _number(cpu.BRANCHES),
-        "BRANCH_WIDTH": _number(cpu.BRANCH_WIDTH),
-        "CONIFER_POINTS": _number(cpu.CONIFER_POINTS),
-        "CONIFER_SLIM": _number(cpu.CONIFER_SLIM),
-        "CONIFER_TIERS": _number(cpu.CONIFER_TIERS),
-        "CROWN_SLOPES": _number(cpu.CROWN_SLOPES),
-        "CROWN_DEPTH": _number(cpu.CROWN_DEPTH),
-        "CROWN_RIM_0": _number(cpu.CROWN_RIM[0]),
-        "CROWN_RIM_1": _number(cpu.CROWN_RIM[1]),
-        "CROWN_SHINE_0": _number(cpu.CROWN_SHINE[0]),
-        "CROWN_SHINE_1": _number(cpu.CROWN_SHINE[1]),
-        "WOODS_SIDE": _number(cpu.WOODS_SIDE),
-        "CROWN_DARKEST": _number(cpu.CROWN_DARKEST),
-        "SHADOW_TINT": _vec3(relief.SHADOW_TINT),
-        "HOLLOW_DARK": _number(cpu.HOLLOW_DARK),
-        "BRANCH": _vec3(cpu.BRANCH),
-        "WOODS_FLOOR": _vec3(cpu.WOODS_FLOOR),
-        "N_UNDERGROWTH": _noise(cpu.LEAF_GRAIN * 1.5, 73),
-        "SHADOW_REACH": f"vec2({_number(cpu.SHADOW_REACH[0])}, {_number(cpu.SHADOW_REACH[1])})",
-        "SHADOW_STEP": f"ivec2({cpu.SHADOW_REACH[0]}, {cpu.SHADOW_REACH[1]})",
-        "SHADOW_SOFT": _number(cpu.SHADOW_SOFT),
-        "EDGE_SHADOW": _number(cpu.EDGE_SHADOW),
-        "SHADOW_COLOUR": _vec3(cpu.SHADOW_COLOUR),
-    }
+    names = (
+        _shared_names()
+        | _fields_names()
+        | {
+            "CROWN_LIGHT": f"vec3({_number(light[0])}, {_number(light[1])}, {_number(light[2])})",
+            "CROWN_GAP": _number(cpu.CROWN_GAP),
+            "CROWN_SIZE_0": _number(cpu.CROWN_SIZE[0]),
+            "CROWN_SIZE_1": _number(cpu.CROWN_SIZE[1]),
+            "YOUNG": _number(cpu.YOUNG),
+            "AGE_SPAN": _number(cpu.OLD - cpu.YOUNG),
+            "N_STAND": _noise(cpu.STAND_SPAN, 70, "j"),
+            "N_THIN": _noise(cpu.THIN_SPAN, 71, "j"),
+            "THINNED": _number(cpu.THINNED),
+            "CLUMP_GAP": _number(cpu.CLUMP_GAP),
+            "CLUMP_SIZE_0": _number(cpu.CLUMP_SIZE[0]),
+            "CLUMP_SIZE_1": _number(cpu.CLUMP_SIZE[1]),
+            "TRUNK_LENGTH_0": _number(cpu.TRUNK_LENGTH[0]),
+            "TRUNK_LENGTH_1": _number(cpu.TRUNK_LENGTH[1]),
+            "TRUNK_HALF": _number(cpu.TRUNK_HALF),
+            "TRUNK_BARK": _vec3(cpu.TRUNK_BARK),
+            "TRUNK_BELOW": str(cpu.TRUNK_BELOW),
+            "RELIEF_STEPS": _number(cpu.RELIEF_STEPS_PER_CELL),
+            "N_SWELL": _noise(cpu.CANOPY_SWELL_SIZE, 67),
+            "N_SWELL_X": _noise(cpu.CANOPY_SWELL_SIZE, 67, "p + vec2(0.05, 0.0)"),
+            "N_SWELL_Y": _noise(cpu.CANOPY_SWELL_SIZE, 67, "p + vec2(0.0, 0.05)"),
+            "SWELL": _number(cpu.CANOPY_SWELL * cpu.CANOPY_SWELL_SIZE),
+            "LUMPS": _number(cpu.LUMPS),
+            "CLUMP_EDGE": _number(cpu.CLUMP_EDGE),
+            "FLOOR_FROM": _number(cpu.FLOOR_FROM),
+            "N_GRAIN": _noise(cpu.LEAF_GRAIN, 68),
+            "TAIGA": str(int(Biome.TAIGA)),
+            "JUNGLE": str(int(Biome.JUNGLE)),
+            "N_STANDS": _noise(cpu.CONIFER_STANDS, 64),
+            "CROWN_TONES": _number(cpu.CROWN_TONES),
+            "CONIFER_0": _vec3(cpu.CONIFER_CROWNS[0]),
+            "CONIFER_1": _vec3(cpu.CONIFER_CROWNS[1]),
+            "LEAFY_0": _vec3(cpu.LEAFY_CROWNS[0]),
+            "LEAFY_1": _vec3(cpu.LEAFY_CROWNS[1]),
+            "N_CROWNS": _noise(0.9, 65),
+            "N_REGION": _noise(cpu.REGION_SPAN, 72),
+            "DARK_GREENS": _vec3(cpu.DARK_GREENS),
+            "GOLDEN_GREENS": _vec3(cpu.GOLDEN_GREENS),
+            "CROWN_ROUND": _number(cpu.CROWN_ROUND),
+            "CLUMP_LIGHT": _number(cpu.CLUMP_LIGHT),
+            "HOLLOWS": _number(cpu.HOLLOWS),
+            "BRANCHES": _number(cpu.BRANCHES),
+            "BRANCH_WIDTH": _number(cpu.BRANCH_WIDTH),
+            "CONIFER_POINTS": _number(cpu.CONIFER_POINTS),
+            "CONIFER_SLIM": _number(cpu.CONIFER_SLIM),
+            "CONIFER_TIERS": _number(cpu.CONIFER_TIERS),
+            "CROWN_SLOPES": _number(cpu.CROWN_SLOPES),
+            "CROWN_DEPTH": _number(cpu.CROWN_DEPTH),
+            "CROWN_RIM_0": _number(cpu.CROWN_RIM[0]),
+            "CROWN_RIM_1": _number(cpu.CROWN_RIM[1]),
+            "CROWN_SHINE_0": _number(cpu.CROWN_SHINE[0]),
+            "CROWN_SHINE_1": _number(cpu.CROWN_SHINE[1]),
+            "WOODS_SIDE": _number(cpu.WOODS_SIDE),
+            "CROWN_DARKEST": _number(cpu.CROWN_DARKEST),
+            "SHADOW_TINT": _vec3(relief.SHADOW_TINT),
+            "HOLLOW_DARK": _number(cpu.HOLLOW_DARK),
+            "BRANCH": _vec3(cpu.BRANCH),
+            "WOODS_FLOOR": _vec3(cpu.WOODS_FLOOR),
+            "N_UNDERGROWTH": _noise(cpu.LEAF_GRAIN * 1.5, 73),
+            "SHADOW_REACH": f"vec2({_number(cpu.SHADOW_REACH[0])}, {_number(cpu.SHADOW_REACH[1])})",
+            "SHADOW_STEP": f"ivec2({cpu.SHADOW_REACH[0]}, {cpu.SHADOW_REACH[1]})",
+            "SHADOW_SOFT": _number(cpu.SHADOW_SOFT),
+            "EDGE_SHADOW": _number(cpu.EDGE_SHADOW),
+            "SHADOW_COLOUR": _vec3(cpu.SHADOW_COLOUR),
+        }
+    )
     return _filled(CANOPY, names)
 
 
@@ -1410,6 +1675,8 @@ def dress_source() -> str:
 def _filled(source: str, names: dict[str, str]) -> str:
     source = source.replace("@NOISE@", NOISE).replace("@HEX@", HEX)
     source = source.replace("@RASTER@", RASTER).replace("@TEXTURE@", TEXTURE)
+    source = source.replace("@SUN@", SUN).replace("@NATURAL@", NATURAL)
+    source = source.replace("@FIELDS@", FIELDS)
     for name, value in (names | {"MASK": str(TABLE_SIZE - 1)}).items():
         source = source.replace(f"@{name}@", value)
     assert "@" not in source
@@ -1620,9 +1887,11 @@ class GroundShader:
         self.set_bed(None, -1)
         self._chunks = GL.glGenFramebuffers(1)
         self._woodland = _texture()
-        self._trees: tuple[FloatArray, FloatArray] = (np.zeros(0), np.zeros(0))
+        self._trees = np.zeros((0, 2), dtype=np.float32)
         self._clearings = np.zeros((0, 4), dtype=np.float32)
-        self.woods_version: object = None
+        self._plots = np.zeros((0, 10), dtype=np.float32)
+        self._yards = np.zeros((0, 4), dtype=np.float32)
+        self.surfaces_version: object = None
         self._chunk_relief = _Target(floats=True)
         self._wooded = _Target(floats=True)
         self._edges = _Target(floats=True)
@@ -1812,24 +2081,20 @@ class GroundShader:
         GL.glDeleteTextures(1, [small])
         return ChunkTexture(big)
 
-    def set_woods(
-        self,
-        woodland: FloatArray,
-        trees: tuple[FloatArray, FloatArray],
-        clearings: tuple[FloatArray, FloatArray, FloatArray],
-        version: object,
-    ) -> None:
-        """Takes what the woods are drawn from: each cell's say in them and whether it is land
-        (Ground.woodland), where trees stand, whose shade lies on the grass round them, and where
-        lumber mills stand and how far the clearing round each reaches (Ground.clearings)."""
+    def set_surfaces(self, ground: cpu.Ground, version: object) -> None:
+        """Takes what is drawn over the ground from `ground`: each cell's say in the woods and
+        whether it is land, where trees stand, whose shade lies on the grass round them, where
+        lumber mills clear the woods round them, the fields and groves and the buildings' yards."""
         GL.glDeleteTextures(1, [self._woodland])
-        self._woodland = _floats(np.pad(woodland, ((0, 0), (0, 0), (0, 2))))
-        self._trees = trees
-        xs, feet, reaches = (np.asarray(values, dtype=np.float64) for values in clearings)
+        self._woodland = _floats(np.pad(ground.woodland, ((0, 0), (0, 0), (0, 2))))
+        self._trees = np.stack(ground.trees, axis=-1).astype(np.float32).reshape(-1, 2)
+        xs, feet, reaches = (np.asarray(values, dtype=np.float64) for values in ground.clearings)
         ys = feet + cpu.CLEARING_DROP
         seeds = (xs * 7 + ys * 13).astype(np.int64) & 1023
         self._clearings = np.stack([xs, ys, reaches, seeds], axis=-1).astype(np.float32)
-        self.woods_version = version
+        self._plots = ground.plot_table
+        self._yards = ground.yard_table
+        self.surfaces_version = version
 
     def dress(
         self, pixels: npt.NDArray[np.uint8], times: int, chunk: tuple[int, int]
@@ -1858,7 +2123,10 @@ class GroundShader:
         }
         inputs = (self._table, self._rasters, self._beds)
         self._run(self._chunk_relief, self._programs.relief, uniforms, inputs)
-        trees, mills = self._near_woods(woods_origin, self._wooded.size)
+        size = self._wooded.size
+        trees = _near(self._trees, woods_origin, size, TREE_SHADE_REACH)
+        mills = self._clearings
+        mills = _near(mills, woods_origin, size, float(mills[:, 2].max(initial=0.0)) + 1)
         uniforms = plane | {
             "art_origin": ("2i", woods_origin),
             "cells_size": ("2i", (self._shape[1], self._shape[0])),
@@ -1877,19 +2145,27 @@ class GroundShader:
         GL.glDeleteTextures(2, list(listed))
         uniforms = {"fine": ("1i", (int(drawn > 1),)), "wooded": ("1i", (0,))}
         self._run(self._edges, self._programs.edges, uniforms, (self._wooded.texture,))
-        uniforms = plane | {
+        chunk_size = (CHUNK, rows)
+        plots = _near(self._plots, (left, top), chunk_size, PLOT_REACH)[:, 2:]
+        yards = self._yards
+        yards = _near(yards, (left, top), chunk_size, float(yards[:, 2].max(initial=0.0)) + 1)
+        uniforms = self._ground_uniforms(View(left, top, CHUNK, rows)) | {
             "chunk_origin": ("2i", (left, top)),
             "k": ("1i", (drawn,)),
-            "cells_size": ("2i", (self._shape[1], self._shape[0])),
             "woods_origin": ("2i", woods_origin),
-            "table": ("1i", (0,)),
-            "cells": ("1i", (1,)),
-            "light": ("1i", (2,)),
-            "wooded": ("1i", (3,)),
-            "edges": ("1i", (4,)),
+            "relief_origin": ("2i", relief_origin),
+            "plot_count": ("1i", (len(plots),)),
+            "yard_count": ("1i", (len(yards),)),
+            "wooded": ("1i", (4,)),
+            "edges": ("1i", (5,)),
+            "plots": ("1i", (6,)),
+            "yards": ("1i", (7,)),
         }
-        inputs = (self._table, self._cells, self._light, self._wooded.texture, self._edges.texture)
+        listed = (_floats(_columns(plots)), _floats(_row(yards)))
+        textures = (self._wooded.texture, self._edges.texture, *listed)
+        inputs = (self._cells, self._light, self._table, self._chunk_relief.texture, *textures)
         self._run(self._canopy, self._programs.canopy, uniforms, inputs)
+        GL.glDeleteTextures(2, list(listed))
         small, big, size = self._chunk_textures(pixels, times)
         uniforms = {
             "chunk_origin": ("2i", (left, top)),
@@ -1906,22 +2182,6 @@ class GroundShader:
         self._run(_Into(self._chunks, size), self._programs.dress, uniforms, inputs)
         GL.glDeleteTextures(1, [small])
         return ChunkTexture(big)
-
-    def _near_woods(
-        self, origin: tuple[int, int], size: tuple[int, int]
-    ) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
-        """The trees whose shade, and the lumber mills whose clearings, reach art pixels from
-        `origin` of `size`, as (x, y) and (x, y, reach, seed) of each."""
-        left, top = origin
-        right, bottom = left + size[0], top + size[1]
-        xs, ys = self._trees
-        near = (xs > left - 12) & (xs < right + 12) & (ys > top - 6) & (ys < bottom + 6)
-        trees = np.stack([xs[near], ys[near]], axis=-1).astype(np.float32)
-        mills = self._clearings
-        reach = mills[:, 2:3].max() + 1 if len(mills) else 0
-        near = (mills[:, 0] > left - reach) & (mills[:, 0] < right + reach)
-        near &= (mills[:, 1] > top - reach) & (mills[:, 1] < bottom + reach)
-        return trees, mills[near]
 
     def _chunk_textures(self, pixels: npt.NDArray[np.uint8], times: int) -> tuple[int, int, tuple]:
         """A texture of a chunk's pixels, and one `times` as big each way for the chunk's
@@ -2026,6 +2286,26 @@ def _texture() -> int:
     return texture
 
 
+def _near(
+    table: npt.NDArray[np.float32], origin: tuple[int, int], size: tuple[int, int], reach: float
+) -> npt.NDArray[np.float32]:
+    """The rows of `table`, each starting with a place in the picture, within `reach` art pixels
+    of the art pixels from `origin` of `size`."""
+    left, top = origin[0] - reach, origin[1] - reach
+    right, bottom = origin[0] + size[0] + reach, origin[1] + size[1] + reach
+    xs, ys = table[:, 0], table[:, 1]
+    return table[(xs > left) & (xs < right) & (ys > top) & (ys < bottom)]
+
+
+def _columns(values: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+    """Eight values of each of a list as a column of two texels of four floats (at least one
+    column) for a texture."""
+    columns = np.zeros((2, max(len(values), 1), 4), dtype=np.float32)
+    columns[0, : len(values)] = values[:, :4]
+    columns[1, : len(values)] = values[:, 4:]
+    return columns
+
+
 def _row(values: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
     """Values of a list, a few to each, as one row of four floats each (at least one) for a
     texture."""
@@ -2078,7 +2358,7 @@ def _restore(saved: tuple) -> None:
     GL.glViewport(*viewport)
     GL.glUseProgram(program)
     GL.glBindVertexArray(vao)
-    for unit in (5, 4, 3, 2, 1):
+    for unit in range(7, 0, -1):
         GL.glActiveTexture(GL.GL_TEXTURE0 + unit)
         GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
     GL.glActiveTexture(active)

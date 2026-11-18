@@ -710,6 +710,30 @@ class Ground:
         return np.stack([self._woods, self._land.astype(np.float32)], axis=-1)
 
     @property
+    def plot_table(self) -> FloatArray:
+        """Every field and grove, a row each, for the graphics card: where the middle of its
+        cell lies in the picture, its cell's row and column, that middle on the plane, which way
+        the plot faces, how wide it spreads, and its kind as its place in FIELD_KINDS."""
+        grid = self.tile_map.grid
+        rows = []
+        for code, kind in enumerate(FIELD_KINDS):
+            px, py = self._plot_pixels[kind]
+            for plot, x, y in zip(self._plots[kind], px.tolist(), py.tolist(), strict=True):
+                cx, cy = grid.center(*plot.cell)
+                rows.append((x, y, *plot.cell, cx, cy, *plot.facing, plot.spread, code))
+        return np.array(rows, dtype=np.float32).reshape(-1, 10)
+
+    @property
+    def yard_table(self) -> FloatArray:
+        """Every building's yard, a row each, for the graphics card: where the building stands
+        in the picture, how far its yard reaches, and its kind as its place in YARD_COLOURS."""
+        xs, ys, kinds, reaches = self.buildings
+        codes = [list(YARD_COLOURS).index(kind) for kind in kinds.tolist()]
+        return np.stack([xs, ys, reaches, np.array(codes, dtype=np.float32)], axis=-1).astype(
+            np.float32
+        )
+
+    @property
     def mountains(self) -> BoolArray:
         """Where cells are mountains, which take the mountains' colours as they rise."""
         return self.tile_map.relief == Relief.MOUNTAINS

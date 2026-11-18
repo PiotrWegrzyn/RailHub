@@ -207,10 +207,29 @@ def test_a_chunk_over_ground_leaves_its_woods_to_the_graphics_card_when_asked(
     chunk = (int(px) // CHUNK, int(py) // CHUNK)
 
     wooded = world.render(*chunk, over_ground=True)
-    bare = world.render(*chunk, over_ground=True, woods=False)
+    bare = world.render(*chunk, over_ground=True, surfaces=False)
 
     assert (wooded[forest][:, 3] == 255).mean() > 0.9
     assert (bare[forest][:, 3] == 0).mean() > 0.9
+
+
+def test_a_chunk_over_ground_leaves_its_fields_to_the_graphics_card_when_asked(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet, houses=0)
+    px, py = world.projection.to_pixels(*world.tile_map.grid.center(12, 3))
+    chunk = (int(px) // CHUNK, int(py) // CHUNK)
+    field = np.zeros((CHUNK, CHUNK, 4))
+    shown = np.ones((CHUNK, CHUNK), dtype=bool)
+    world.ground.fields(field, chunk[0] * CHUNK, chunk[1] * CHUNK, 1, shown=shown)
+    sown = field[..., 3] > 0.99
+
+    drawn = world.render(*chunk, over_ground=True)
+    bare = world.render(*chunk, over_ground=True, surfaces=False)
+
+    assert sown.sum() > 50
+    assert (drawn[sown][:, 3] == 255).mean() > 0.9
+    assert (bare[sown][:, 3] == 0).mean() > 0.5
 
 
 def canopy_round(world: PixelWorld, cell: Cell) -> tuple[np.ndarray, int, int]:

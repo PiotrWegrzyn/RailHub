@@ -201,7 +201,7 @@ def test_where_the_graphics_card_blows_textures_up_only_its_own_pixels_go_up() -
     assert set(layer._textures) == {(*mountains, 4), (*mountains, 2)}
 
 
-def test_where_the_graphics_card_draws_the_woods_chunks_are_drawn_without_and_laid_over_them() -> (
+def test_where_the_graphics_card_draws_what_lies_on_the_ground_chunks_are_drawn_without_it() -> (
     None
 ):
     world, mountains, _ = world_over_mountains()
@@ -216,7 +216,7 @@ def test_where_the_graphics_card_draws_the_woods_chunks_are_drawn_without_and_la
     [(pixels, times, chunk)] = asked
     assert (times, chunk) == (1, mountains)
     np.testing.assert_array_equal(
-        pixels, world.render(*mountains, 2, over_ground=True, woods=False)
+        pixels, world.render(*mountains, 2, over_ground=True, surfaces=False)
     )
 
 

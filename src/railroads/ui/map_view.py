@@ -791,9 +791,8 @@ class MapView:
                 ground.mountains,
             )
             shader.set_cells(info, self._colors_version)
-        if shader.woods_version != self._colors_version:
-            ground = world.ground
-            shader.set_woods(ground.woodland, ground.trees, ground.clearings, self._colors_version)
+        if shader.surfaces_version != self._colors_version:
+            shader.set_surfaces(world.ground, self._colors_version)
         elevation = world.elevation
         grades = elevation.grades
         if shader.bed_version != grades:
