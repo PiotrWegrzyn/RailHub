@@ -2,8 +2,8 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
-from builders import flat_map
 
+from builders import flat_map
 from railroads.sim.constructions import (
     LOCKED,
     Building,
