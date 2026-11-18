@@ -114,7 +114,8 @@ class MainMenu:
     note: str = ""
     # The trains running behind the menu.
     scene: MenuScene = field(default_factory=MenuScene)
-    # How tall the menu was last drawn, to centre it.
+    # How tall the menu's first page was last drawn: every page hangs from where that one is
+    # centred, so opening a page or a fold only lengthens the menu downwards.
     _height: float = 0.0
     # The folding headings on the new game page that are open.
     _unfolded: set[str] = field(default_factory=set)
@@ -172,7 +173,8 @@ class MainMenu:
         imgui.pop_item_width()
         imgui.end_child()
         imgui.pop_style_color()
-        self._height = imgui.get_item_rect_size().y
+        if self.page == "main" or not self._height:
+            self._height = imgui.get_item_rect_size().y
         frame_rect(
             imgui.get_window_draw_list(),
             imgui.get_item_rect_min(),
