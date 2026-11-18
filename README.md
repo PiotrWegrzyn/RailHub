@@ -490,7 +490,8 @@ bakery a station can reach is worth having.
 | Coal power plant (1882) | | 200 coal |
 | Diesel power plant (1905) | | 100 diesel fuel |
 | Gas power plant (1930) | | 150 gas |
-| Farm, from 1920 | | 1 machinery |
+| Farm you own, with Liming the fields | | 10 limestone, up to 50% more wheat |
+| Farm you own, with Farm machinery | | 5 machinery, up to 200% more wheat |
 
 Steel mills, canneries, factories, shipyards and every works are processors: each keeps a stockpile of up to
 300 of every input for every building, takes in what reaches it even while it waits for another

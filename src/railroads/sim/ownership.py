@@ -115,6 +115,15 @@ class Owners:
         grid[cell] -= owned
         return owned
 
+    def taking(self, kind: BuildingKind, need: Need) -> npt.NDArray[np.float64] | None:
+        """How many buildings of a kind the player owns in each cell, as flat cells counted as
+        they trade, if their tech opened a boost only their own take; None if not."""
+        railway = self._growth.railway
+        grid = self._owned.get(kind)
+        if railway is None or grid is None or need not in railway.research.takes(kind):
+            return None
+        return grid.ravel() * (1.0 + self.boost(kind, Effect.PRODUCTION))
+
     def boost(self, kind: BuildingKind, effect: Effect) -> float:
         """What the player's tech adds, of one effect, to the buildings of a kind they own."""
         tree = tree_of(kind)
@@ -138,10 +147,14 @@ class Owners:
 
     def first_for_stations(self) -> dict[BuildingKind, OwnedShare]:
         """Per kind the player owns any of, how many they own in each cell, as they trade, and
-        their share of it: what goes to the stations around before anything is handed out."""
+        their share of it: what goes to the stations around before anything is handed out. And
+        the boosts only their own take that their tech opened."""
+        railway = self._growth.railway
         return {
             kind: OwnedShare(
-                grid.ravel() * (1.0 + self.boost(kind, Effect.PRODUCTION)), self.share(kind)
+                grid.ravel() * (1.0 + self.boost(kind, Effect.PRODUCTION)),
+                self.share(kind),
+                frozenset() if railway is None else railway.research.takes(kind),
             )
             for kind, grid in self._owned.items()
             if grid.any()
@@ -156,20 +169,9 @@ class Owners:
         if railway is None:
             return
         research = railway.research
-        counts = self._growth.counts
-        for (kind, good), (given, _) in trade.goods_gave.items():
-            grid = self._owned.get(kind)
-            if grid is None:
-                continue
-            owned = grid.ravel()[trade.cells].astype(np.float64)
-            if not owned.any():
-                continue
-            boost = self.boost(kind, Effect.PRODUCTION)
-            count = counts[kind].ravel()[trade.cells] + boost * owned
-            theirs = owned * (1.0 + boost) / np.maximum(count, 1.0)
-            share = OWNER_SHARE + self.boost(kind, Effect.SHARE)
+        for (kind, good), given in trade.owned_gave.items():
             worth = trade.worth.get(good, 1.0)
-            earned = float((given * theirs * worth).sum()) * price_of(good) * share
+            earned = float((given * worth).sum()) * price_of(good) * self.share(kind)
             self.income[kind] = self.income.get(kind, 0.0) + earned
         for kind, earned in self.income.items():
             tree = tree_of(kind)

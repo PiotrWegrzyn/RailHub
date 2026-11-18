@@ -58,6 +58,7 @@ from railroads.sim.goods import (
     LAND_BOOST_MOST,
     MAKES,
     NEEDS,
+    OWNED_BOOSTS,
     PIPELINE,
     RECIPES,
     Good,
@@ -247,6 +248,8 @@ class OwnedShare:
 
     owned: npt.NDArray[np.float64]
     share: float
+    # The boosts only the player's own take (OWNED_BOOSTS) that their tech opened.
+    takes: frozenset[Need] = frozenset()
 
 
 # What Trade.share works out, by the trade's id and kinds, while the trade lasts: a trade is
@@ -288,6 +291,8 @@ class Trade:
     # less satisfied the buildings it was handed out to were over the last quarter, and the
     # price itself for what went to stations. Goods missing here were worth their price.
     worth: Mapping[Good, FloatCells] = field(default_factory=dict)
+    # Per kind and good, what the player's own buildings of it gave away.
+    owned_gave: Mapping[tuple[BuildingKind, Good], FloatCells] = field(default_factory=dict)
 
     def done(self, kinds: tuple[BuildingKind, ...]) -> FloatCells:
         return sum(
@@ -497,8 +502,10 @@ class _Month:
         self.worth_above: dict[Good, FloatCells] = {}
         # What each kind of processor holds of each input, worked out as the trade begins.
         self.stock: dict[tuple[BuildingKind, Need], FloatCells] = {}
-        # What buildings offer of each good, by kind and in all, and how much of it went.
+        # What buildings offer of each good, by kind and in all, and how much of it went; and how
+        # much of each kind's offer the player's own buildings made.
         self.offers: dict[tuple[BuildingKind, Good], FloatCells] = {}
+        self.owned_made: dict[tuple[BuildingKind, Good], FloatCells] = {}
         self.offered = {good: self.zero.copy() for good in Good}
         self.sold = {good: self.zero.copy() for good in Good}
         # Per need, what buildings got of it from sellers nearby rather than stations.
@@ -518,10 +525,13 @@ class _Month:
             for good, amount in makes_of(kind, economy.year).items():
                 self.offers[(kind, good)] = self.count[kind] * amount
                 self.offered[good] += self.count[kind] * amount
+                if kind in self.owned:
+                    self.owned_made[(kind, good)] = (
+                        self._owned_part(kind) * self.count[kind] * amount
+                    )
         # Per kind of processor, what it makes from its inputs alone, and the share it has of each
-        # of its boosts; per kind making goods from the land, the share it has of its boosts.
+        # of its boosts.
         self.uses: dict[BuildingKind, dict[Need, FloatCells]] = {}
-        self.raw_boost: dict[BuildingKind, FloatCells] = {}
         self.received: dict[tuple[BuildingKind, Need], FloatCells] = {}
         self.brought = {station: dict(order.brought) for station, order in stations.items()}
         self.handed: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
@@ -582,8 +592,28 @@ class _Month:
             if kind in RECIPES:
                 wants[kind] = np.maximum(input_stock(kind) * n - self.stock[(kind, need)], 0.0)
             else:
-                wants[kind] = n * NEEDS[kind][need]
+                wants[kind] = self._count_for(kind, need) * NEEDS[kind][need]
         return wants
+
+    def _owned_part(self, kind: BuildingKind) -> FloatCells:
+        """The share of the buildings of a kind in each cell that are the player's, as they
+        trade."""
+        share = self.owned.get(kind)
+        if share is None:
+            return self.zero
+        owned = share.owned[self.cells]
+        count = self.count[kind]
+        return np.minimum(owned / np.where(count > 0, count, 1.0), 1.0)
+
+    def _count_for(self, kind: BuildingKind, need: Need) -> FloatCells:
+        """How many buildings of a kind in each cell want a need: all of them, but for a boost
+        only the player's own take (OWNED_BOOSTS), only theirs, once their tech opens it."""
+        if (kind, need) not in OWNED_BOOSTS:
+            return self.count[kind]
+        share = self.owned.get(kind)
+        if share is None or need not in share.takes:
+            return self.zero
+        return share.owned[self.cells]
 
     def _taken(self, kind: BuildingKind, need: Need) -> FloatCells:
         """What buildings of a kind took of a need this month as goods reached their station."""
@@ -684,20 +714,30 @@ class _Month:
     def _boost_from_land(self, kind: BuildingKind, need: Need, got: FloatCells) -> None:
         """Lets what a kind making goods from the land got of one of its boosts make it make more
         of each of its goods, before any of them is sold: up to its own LAND_BOOST_MOST more, or
-        its part of BOOST_MOST shared with the other boosts."""
+        its part of BOOST_MOST shared with the other boosts; a boost only the player's own take
+        makes only those make up to its OWNED_BOOSTS more, for the player."""
         boosts = boosts_of(kind, self.economy.year)
         if need not in boosts:
             return
-        wanted = self.count[kind] * boosts[need]
+        taking = self._count_for(kind, need)
+        wanted = taking * boosts[need]
         share = np.minimum(got / np.where(wanted > 0, wanted, 1.0), 1.0) * (wanted > 0)
-        shared = [boost for boost in boosts if boost not in LAND_BOOST_MOST]
-        most = LAND_BOOST_MOST.get(need, BOOST_MOST / max(len(shared), 1))
-        before = self.raw_boost.get(kind, self.zero)
-        self.raw_boost[kind] = before + share * most
+        shared = [
+            boost
+            for boost in boosts
+            if boost not in LAND_BOOST_MOST and (kind, boost) not in OWNED_BOOSTS
+        ]
+        most = OWNED_BOOSTS.get(
+            (kind, need), LAND_BOOST_MOST.get(need, BOOST_MOST / max(len(shared), 1))
+        )
+        owned_only = (kind, need) in OWNED_BOOSTS
         for good, amount in makes_of(kind, self.economy.year).items():
-            more = self.count[kind] * amount * most * share
+            more = taking * amount * most * share
             self.offers[(kind, good)] = self.offers[(kind, good)] + more
             self.offered[good] = self.offered[good] + more
+            if kind in self.owned:
+                mine = more if owned_only else more * self._owned_part(kind)
+                self.owned_made[(kind, good)] = self.owned_made.get((kind, good), self.zero) + mine
 
     def _sell_nearby(self, good: Good, demand: FloatCells, received: FloatCells) -> None:
         """Lets the cells with spare goods hand them out to the buildings still short of them, the
@@ -727,12 +767,9 @@ class _Month:
             return
         self.first_gathered.add(good)
         left = self.zero.copy()
-        for (kind, made), offer in self.offers.items():
-            share = self.owned.get(kind)
-            if made != good or share is None:
-                continue
-            owned = share.owned[self.cells]
-            left += offer * share.share * owned / np.maximum(self.count[kind], 1.0)
+        for (kind, made), mine in self.owned_made.items():
+            if made == good:
+                left += mine * self.owned[kind].share
         if not left.any():
             return
         for station in self.stations:
@@ -850,6 +887,8 @@ class _Month:
         self.uses[kind] = uses
         self.offers[(kind, recipe.makes)] = can
         self.offered[recipe.makes] += can
+        if kind in self.owned:
+            self.owned_made[(kind, recipe.makes)] = can * self._owned_part(kind)
 
     def _went(self, good: Good) -> FloatCells:
         """The share of all of a good on offer that went, to buildings or stations, in each
@@ -869,7 +908,7 @@ class _Month:
         bonus: dict[BuildingKind, FloatCells] = {}
         goods_got = {}
         for (kind, need), received in self.received.items():
-            wanted = self.count[kind] * NEEDS[kind][need]
+            wanted = self._count_for(kind, need) * NEEDS[kind][need]
             goods_got[(kind, need)] = (received, wanted)
             if need in bonus_of(kind, self.economy.year):
                 part = np.minimum(received, wanted) / np.where(wanted > 0, wanted, 1.0)
@@ -888,6 +927,7 @@ class _Month:
             if kind in bonus:
                 bonus[kind] = np.where(hungry, 0.0, bonus[kind])
         goods_gave = {}
+        owned_gave: dict[tuple[BuildingKind, Good], FloatCells] = {}
         shares: dict[Good, FloatCells] = {}
         for (kind, good), offer in self.offers.items():
             if good not in shares:
@@ -895,6 +935,11 @@ class _Month:
             sent = given = offer * shares[good]
             most = self.count[kind] * MAKES[kind][good]
             goods_gave[(kind, good)] = (given, most)
+            mine = self.owned_made.get((kind, good))
+            if mine is not None:
+                owned_gave[(kind, good)] = given * np.where(
+                    offer > 0, mine / np.where(offer > 0, offer, 1.0), 0.0
+                )
             gave[kind] += given
             could_make[kind] += most
             recipe = RECIPES.get(kind)
@@ -931,6 +976,7 @@ class _Month:
                 good: 1.0 + above / np.where(self.sold[good] > 0, self.sold[good], 1.0)
                 for good, above in self.worth_above.items()
             },
+            owned_gave,
         )
         self.economy.levels[:] = Satisfaction.UNSATISFIED
         self.economy.levels[self.cells] = trade.levels()

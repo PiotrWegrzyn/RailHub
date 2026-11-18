@@ -145,4 +145,4 @@ def test_the_help_says_when_a_farm_starts_needing_what_only_farms_need_later() -
         for need, year in wants.items()
         if year
     )
-    assert wants[Need.MACHINERY] == KIND_NEED_YEARS[(BuildingKind.FARM, Need.MACHINERY)]
+    assert wants[Need.FUEL] == KIND_NEED_YEARS[(BuildingKind.FARM, Need.FUEL)]

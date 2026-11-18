@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from imgui_bundle import imgui
 
 from railroads.sim.finance import dollars
+from railroads.sim.goods import OWNED_BOOSTS
 from railroads.sim.tech import NODES, TREES, Effect, Node, Research, Tree, xp_for
 from railroads.sim.trains import ENGINES
 from railroads.ui.theme import BRASS, WINDOW_TOP
@@ -101,10 +102,20 @@ def describe(node: Node) -> str:
         sign = "-" if node.effect in (Effect.UPKEEP, Effect.DISCOUNT, Effect.FUEL_MARKUP) else "+"
         reach = ", everywhere" if node.everywhere else ""
         return f"{node.effect.value} {sign}{node.amount:.0%}{reach}"
+    if node.effect == Effect.TAKES and node.takes is not None:
+        return f"your {node.takes[0].value}s take {node.takes[1].value}"
     if node.effect == Effect.CAR_SIZE:
         reach = "every car" if node.everywhere else "its cars"
         return f"{reach} {node.amount:g} size bigger"
     return f"{node.effect.value} +{node.amount:g}"
+
+
+def _takes(node: Node) -> str:
+    if node.takes is None:
+        return ""
+    kind, need = node.takes
+    most = OWNED_BOOSTS[node.takes]
+    return f"Every {kind.value} you own takes {need.value} and makes up to {most:.0%} more with it."
 
 
 def explain(tree: Tree, node: Node) -> str:
@@ -126,9 +137,10 @@ def explain(tree: Tree, node: Node) -> str:
         Effect.WAITING: f"Every station holds {node.amount:g} more passengers and mail.",
         Effect.BONUS_GOODS: f"Each bonus good adds {amount} more satisfaction.",
         Effect.FUEL_MARKUP: f"Fuel bought outside your stations costs {amount} less over market.",
-        Effect.CAR_SIZE: f"{"Every car" if node.everywhere else f"Every car of {tree.value}"} holds "
+        Effect.CAR_SIZE: f"{'Every car' if node.everywhere else f'Every car of {tree.value}'} holds "
         f"{node.amount:g} size more.",
         Effect.UNLOCK: f"O{describe(node)[1:]}.",
+        Effect.TAKES: _takes(node),
     }
     return sentences[node.effect]
 

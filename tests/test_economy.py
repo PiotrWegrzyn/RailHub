@@ -426,12 +426,12 @@ def test_a_big_factory_works_on_steel_alone_until_copper_comes_in_1880(
     )
 
 
-def test_farms_want_limestone_always_and_machinery_and_diesel_only_from_1920() -> None:
+def test_farms_list_limestone_and_machinery_always_and_diesel_only_from_1920() -> None:
     before = needs_of(BuildingKind.FARM, 1919)
     after = needs_of(BuildingKind.FARM, 1920)
 
-    assert before == {Need.LIMESTONE: 2}
-    assert after == {Need.MACHINERY: 1, Need.LIMESTONE: 2, Need.FUEL: 2}
+    assert before == {Need.MACHINERY: 5, Need.LIMESTONE: 10}
+    assert after == {Need.MACHINERY: 5, Need.LIMESTONE: 10, Need.FUEL: 2}
 
 
 @pytest.mark.parametrize(
@@ -860,3 +860,28 @@ def test_a_buyer_starving_over_the_last_quarter_makes_what_it_is_handed_worth_th
     trade = economy.trade(fed)
 
     assert trade.worth[Good.WHEAT][position(trade, economy, (5, 6))] == pytest.approx(SCARCE_WORTH)
+
+
+@pytest.mark.parametrize(
+    ("takes", "owned", "wheat"),
+    [
+        (frozenset(), 1, FARM_MONTH),
+        (frozenset({Need.LIMESTONE}), 0, FARM_MONTH),
+        (frozenset({Need.LIMESTONE}), 1, 1.5 * FARM_MONTH),
+        (frozenset({Need.MACHINERY}), 1, 3.0 * FARM_MONTH),
+        (frozenset({Need.LIMESTONE, Need.MACHINERY}), 1, 3.5 * FARM_MONTH),
+    ],
+)
+def test_only_a_farm_the_player_owns_takes_limestone_and_machinery_once_their_tech_opens_them(
+    takes: frozenset[Need], owned: int, wheat: float
+) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    economy.year = 1900
+    placed = counts(tile_map, (STATION, BuildingKind.FARM, 1))
+    mine = counts(tile_map, (STATION, BuildingKind.FARM, owned))[BuildingKind.FARM].ravel()
+    owners = {BuildingKind.FARM: OwnedShare(mine.astype(np.float64), 0.3, takes)}
+
+    trade = economy.trade(placed, holding(1000.0, LIMESTONE=50.0, MACHINERY=50.0), owned=owners)
+
+    assert trade.gathered[STATION][Good.WHEAT] == pytest.approx(wheat)

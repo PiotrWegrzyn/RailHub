@@ -345,3 +345,15 @@ def test_a_node_adding_cars_names_them_once_and_every_unlock_its_first_year() ->
 
     assert cars == "cars per train +1"
     assert engines == "opens heavy freight engines (from 1853)"
+
+
+def test_liming_and_farm_machinery_make_owned_farms_take_limestone_and_machinery() -> None:
+    research = learned(Tree.FOOD, "seed", "rotation", "liming", "fertiliser", "tractors")
+    before = research.takes(BuildingKind.FARM)
+    research.earn(Tree.FOOD, xp_for(6))
+    research.take("farm_machinery")
+
+    after = research.takes(BuildingKind.FARM)
+
+    assert before == {Need.LIMESTONE}
+    assert after == {Need.LIMESTONE, Need.MACHINERY}

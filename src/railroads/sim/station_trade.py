@@ -31,6 +31,7 @@ from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.goods import (
     FITS,
     NEEDS,
+    OWNED_BOOSTS,
     PIPELINE,
     RECIPES,
     TRAVELLERS,
@@ -116,7 +117,7 @@ class StationTrade:
                 goods.board(good, amount)
             got = dict(trade.gathered.get(station, {}))
             goods.count_month(got | {good: goods.stockpile[good] for good in travellers})
-            needs = self._short_after_local(station, self._needs(counts), trade)
+            needs = self._short_after_local(station, self._needs(counts, station), trade)
             capacity[station] = capacity_of(needs | as_needs(travellers))
         railway.year = self._growth.year
         railway.turn_month(capacity)
@@ -204,6 +205,9 @@ class StationTrade:
             if need not in wants_of(kind, growth.year):
                 continue
             n = count.ravel()[cells].astype(np.float64)
+            if (kind, need) in OWNED_BOOSTS:
+                taking = growth.owners.taking(kind, need)
+                n = np.zeros(cells.size) if taking is None else taking[cells]
             if not n.any():
                 continue
             if kind in RECIPES:
@@ -268,7 +272,7 @@ class StationTrade:
         railway = self._growth.railway
         if railway is not None:
             (counts,) = self._ring_counts([station])
-            needs = self._short_after_local(station, self._needs(counts), self._growth.trade)
+            needs = self._short_after_local(station, self._needs(counts, station), self._growth.trade)
             needs |= as_needs(self._travellers(counts))
             railway.station_demand(station).capacity = capacity_of(needs)
 
@@ -342,16 +346,27 @@ class StationTrade:
             Good.MAIL: float(passengers // MAIL_PER_PASSENGERS),
         }
 
-    def _needs(self, counts: Mapping[BuildingKind, int]) -> dict[Need, float]:
-        """What these many buildings of each kind need in a month."""
+    def _needs(self, counts: Mapping[BuildingKind, int], station: Cell) -> dict[Need, float]:
+        """What these many buildings of each kind around a station need in a month; of a boost
+        only the player's own take (OWNED_BOOSTS), what theirs there take."""
         year = self._growth.year
         needs: dict[Need, float] = {}
+        ring: npt.NDArray[np.intp] | None = None
         for kind in NEEDS:
             count = counts.get(kind)
             if not count:
                 continue
             for need, amount in needs_of(kind, year).items():
-                needs[need] = needs.get(need, 0.0) + float(count) * amount
+                if (kind, need) in OWNED_BOOSTS:
+                    taking = self._growth.owners.taking(kind, need)
+                    if taking is None:
+                        continue
+                    ring = self.inner_ring(station) if ring is None else ring
+                    many = float(taking[ring].sum())
+                else:
+                    many = float(count)
+                if many > 0:
+                    needs[need] = needs.get(need, 0.0) + many * amount
         return needs
 
     def update_reach(self) -> None:

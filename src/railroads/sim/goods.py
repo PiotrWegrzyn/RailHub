@@ -303,10 +303,14 @@ DIESEL_USERS: Mapping[BuildingKind, tuple[float, int]] = MappingProxyType(
 # Boosts of what makes goods from the land that make up to so much more each, whatever else
 # boosts it; its other boosts share BOOST_MOST between them.
 LAND_BOOST_MOST: Mapping[Need, float] = MappingProxyType({Need.FUEL: DIESEL_BOOST})
+# Boosts only the buildings the player owns take, once their tech opens them
+# (railroads.sim.tech.Effect.TAKES), and the most more each makes them make.
+OWNED_BOOSTS: Mapping[tuple[BuildingKind, Need], float] = MappingProxyType(
+    {(BuildingKind.FARM, Need.LIMESTONE): 0.5, (BuildingKind.FARM, Need.MACHINERY): 2.0}
+)
 
 KIND_NEED_YEARS: Mapping[tuple[BuildingKind, Need], int] = MappingProxyType(
     {
-        (BuildingKind.FARM, Need.MACHINERY): 1920,
         **{(kind, Need.FUEL): year for kind, (_, year) in DIESEL_USERS.items()},
     }
 )
@@ -760,7 +764,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.PORCELAIN: 2,
             Need.LUXURIES: 2,
         },
-        BuildingKind.FARM: {Need.MACHINERY: 1, Need.LIMESTONE: 2},
+        BuildingKind.FARM: {Need.MACHINERY: 5, Need.LIMESTONE: 10},
         BuildingKind.MINE: {Need.LUMBER: 20},
         BuildingKind.RAILWAY_WORKS: {Need.STEEL: 200},
         BuildingKind.POWER_PLANT: {Need.COAL: 200},
@@ -1022,7 +1026,7 @@ def boosts_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
         {
             need: amount
             for need, amount in needs_of(kind, year).items()
-            if need in BONUS_NEEDS or need in LAND_BOOST_MOST
+            if need in BONUS_NEEDS or need in LAND_BOOST_MOST or (kind, need) in OWNED_BOOSTS
         }
     )
 

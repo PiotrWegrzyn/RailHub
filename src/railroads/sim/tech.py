@@ -16,7 +16,7 @@ from enum import Enum
 from types import MappingProxyType
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.goods import MAKES, General, Good
+from railroads.sim.goods import MAKES, General, Good, Need
 
 # Dollars of experience a tree needs for its first level, kept low so the first node comes early;
 # the second level needs LEVEL_STEP more and each next one LEVEL_GROWTH times the step before.
@@ -66,6 +66,8 @@ class Effect(Enum):
     FUEL_MARKUP = "retail fuel markup"
     # Every car holds this many sizes more (railroads.sim.trains.CAR_SIZES).
     CAR_SIZE = "car size"
+    # The buildings of a kind the player owns take a good as a boost (railroads.sim.goods.OWNED_BOOSTS).
+    TAKES = "takes"
     # Opens the engines (railroads.sim.trains) that need it, once their year has come, or a
     # general car (GENERAL_CARS).
     UNLOCK = "unlocks"
@@ -82,6 +84,8 @@ class Node:
     opens: str = ""
     # Whether the effect reaches every tree's buildings and goods, not just its own.
     everywhere: bool = False
+    # For TAKES, the kind of building and what it takes.
+    takes: tuple[BuildingKind, Need] | None = None
 
 
 def _n(key: str, name: str, effect: Effect, amount: float = 0.0, *requires: str, **kw) -> Node:
@@ -117,10 +121,26 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
                 opens="general processed food cars of 25, taking whichever pays best",
             ),
             _n("bread", "Branded bread", E.PRICE, 0.1, "stalls"),
+            _n(
+                "liming",
+                "Liming the fields",
+                E.TAKES,
+                0.0,
+                "rotation",
+                takes=(BuildingKind.FARM, Need.LIMESTONE),
+            ),
             _n("fertiliser", "Fertiliser", E.PRODUCTION, 0.25, "rotation"),
             _n("reefers", "Refrigerated vans", E.PRICE, 0.1, "cold", "bread"),
             _n("conglomerate", "Food conglomerate", E.SHARE, 0.05, "coop"),
             _n("tractors", "Mechanised farming", E.PRODUCTION, 0.25, "fertiliser"),
+            _n(
+                "farm_machinery",
+                "Farm machinery",
+                E.TAKES,
+                0.0,
+                "tractors",
+                takes=(BuildingKind.FARM, Need.MACHINERY),
+            ),
             _n("brand", "National brand", E.PRICE, 0.15, "reefers", "conglomerate"),
         ),
         Tree.METALS: (
@@ -418,6 +438,14 @@ class Research:
             return False
         self.taken.add(key)
         return True
+
+    def takes(self, kind: BuildingKind) -> frozenset[Need]:
+        """The boosts the buildings of a kind the player owns take, by the nodes taken."""
+        return frozenset(
+            node.takes[1]
+            for key in self.taken
+            if (node := NODES[key][1]).takes is not None and node.takes[0] == kind
+        )
 
     def bonus(self, effect: Effect, tree: Tree | None = None) -> float:
         """The sum of the taken nodes' effect of a kind: those of one tree and those reaching
