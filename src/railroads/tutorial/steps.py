@@ -77,8 +77,7 @@ def lot_offers(lots: Lots | None) -> list[Cell]:
         return []
     cells = []
     for lot in lots.offers:
-        row, col = lots.cell_of(lot)
-        cells.append((row + lots.rows // 2, col + lots.cols // 2))
+        cells.append(lots.middle_cell(lot))
     return cells
 
 

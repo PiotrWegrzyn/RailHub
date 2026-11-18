@@ -70,8 +70,15 @@ class Lots:
         """The lots of a game starting on the middle of a place's map, the seven it starts on
         holding `share` of its cells."""
         rows, cols = place.grid.shape
-        cells = rows * cols * share / len(START_LOTS)
-        return cls(radius=math.sqrt(cells / 3), middle=(rows // 2 // 2 * 2, cols // 2))
+        return cls(
+            radius=cls.radius_for(rows * cols, share), middle=(rows // 2 // 2 * 2, cols // 2)
+        )
+
+    @staticmethod
+    def radius_for(cells: int, share: float = START_SHARE) -> float:
+        """The radius of lots seven of which hold `share` of a place of so many cells: a lot of
+        radius r holds about 3 r² cells."""
+        return math.sqrt(cells * share / len(START_LOTS) / 3)
 
     def centre(self, lot: Lot) -> Point:
         """A lot's centre on the place's map's plane."""

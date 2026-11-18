@@ -9,18 +9,15 @@ from railroads.sim.clock import GameClock
 from railroads.sim.constructions import Constructions
 from railroads.sim.finance import START_CASH
 from railroads.sim.game import Game
-from railroads.sim.lots import Lots
 from railroads.sim.stats import History
 from railroads.sim.tilemap import Terrain
 from railroads.tutorial.place import (
     ASHFORD,
-    SQUARE_LEFT,
-    SQUARE_SIZE,
-    SQUARE_TOP,
     START_YEAR,
     buildings,
     place_map,
-    square_map,
+    start_lots,
+    start_map,
     station_names,
 )
 from railroads.tutorial.steps import Tutorial
@@ -35,7 +32,7 @@ OPENING_ZOOM = 4
 def make_tutorial() -> SavedGame:
     """A new tutorial game, ready to play."""
     place = place_map()
-    tile_map = square_map(place)
+    tile_map = start_map(place)
     constructions = Constructions(tile_map)
     for building in buildings():
         constructions.build(building)
@@ -43,7 +40,7 @@ def make_tutorial() -> SavedGame:
         constructions, start_year=START_YEAR, history=History(), names=station_names(tile_map)
     )
     game.finances.cash = START_CASH
-    game.lots = Lots.of_square(SQUARE_TOP, SQUARE_LEFT, SQUARE_SIZE, SQUARE_SIZE)
+    game.lots = start_lots()
     game.lots.offer(place.terrain == Terrain.LAND)
     x, y = tile_map.grid.center(*ASHFORD)
     return SavedGame(

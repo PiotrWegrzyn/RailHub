@@ -21,8 +21,9 @@ from railroads.tutorial.place import (
     ASHFORD_STATION,
     BROOKBY_STATION,
     BUILDINGS,
+    MAP_COLS,
+    MAP_ROWS,
     SHOWN_FARM,
-    SQUARE_SIZE,
 )
 from railroads.tutorial.steps import STEPS, Seen, Step, Tutorial
 from railroads.ui.app import App, Shell
@@ -89,7 +90,7 @@ def test_the_tutorial_starts_with_the_buildings_drawn_for_it_and_nothing_grown()
     saved = make_tutorial()
 
     assert built(saved) == drawn
-    assert saved.game.tile_map.grid.shape == (SQUARE_SIZE, SQUARE_SIZE)
+    assert saved.game.tile_map.grid.shape == (MAP_ROWS, MAP_COLS)
     assert saved.game.growth.year == 1850
 
 
@@ -250,7 +251,9 @@ def test_the_land_step_marks_the_middle_of_every_lot_for_sale() -> None:
     cells = step("10. More land").cells(game)
 
     assert len(cells) == len(game.lots.offers)
-    assert all(not game.tile_map.grid.contains(*cell) for cell in cells)
+    assert all(
+        not game.tile_map.grid.contains(*cell) or game.tile_map.is_locked(cell) for cell in cells
+    )
 
 
 def test_a_step_that_only_explains_is_done_at_once() -> None:
