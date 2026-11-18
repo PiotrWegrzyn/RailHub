@@ -28,9 +28,9 @@ map made for it, not grown from a seed (`railroads.tutorial.place`), the honeyco
 in the middle of its place, in 1850 with the usual $80,000. Its hills, mountains, forests and lakes
 take ragged shapes from smooth noise of fixed random numbers, and two rivers wind down to the
 south, none across the line between the towns. Ashford is a farming village of a few houses, a
-bakery and a church among fields that thin out towards their edge, with more wheat than it eats;
-Brookby a market town of houses and tenements round a free cell, thinning out at its edge, with
-no field near. A coal mine in the hills and a lumber mill in the forest each have a hamlet, and
+bakery and a church among some fifteen fields, with more wheat than it eats; Brookby a market
+town of houses and tenements round a free cell, thinning out at its edge, with no field near. A
+coal mine in the foothills of a few peaks and a lumber mill in the forest each have a hamlet, and
 the land around is for sale in lots like any game's. Its months grow from a
 fixed seed, so they play out the same too. A window walks the player through it a step at a time
 (`railroads.tutorial.steps`): each explains something, frames in brass what to click, on the map

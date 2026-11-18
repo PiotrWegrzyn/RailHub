@@ -61,18 +61,20 @@ LINE = frozenset(
     (ASHFORD_STATION[0], col) for col in range(ASHFORD_STATION[1] + 1, BROOKBY_STATION[1])
 )
 # How far out from its station Ashford's fields reach, and Brookby's houses.
-FARMS_REACH = 5
+FARMS_REACH = 3
 TOWN_REACH = 3
 # The chance a cell that far out from its station is built up: fields thin out towards the
 # edge of the farmland and houses towards the edge of the town, so neither ends in a clean ring.
-FIELD_CHANCE = (1.0, 1.0, 0.95, 0.85, 0.6, 0.35)
+FIELD_CHANCE = (1.0, 0.9, 0.65, 0.35)
 HOUSE_CHANCE = (1.0, 1.0, 0.8, 0.4)
 # A field is left out where this many people live around it, as growth would pull it down.
 CROWDED_FIELD = 8
 # The random numbers that pick which cells are built up, the same every time.
 LAYOUT_SEED = 1066
-# Where the mine, the lumber mill and the hamlets beside them stand, on the drawn square.
+# Where the mine, the lumber mill and the hamlets beside them stand, on the drawn square, and
+# the peaks the mine sits under, in the hills at their foot.
 MINE = (5, 6)
+PEAKS = (2, 4)
 MILL = (6, 24)
 
 H, T, F = BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FARM
@@ -86,7 +88,8 @@ def _layout() -> dict[Cell, tuple[BuildingKind, ...]]:
     """Ashford: a farming village of a few houses, a bakery and a church, among fields that make
     more food than it eats. Brookby: a market town of houses and tenements round a free cell,
     thinning out at its edges, with no fields near enough to feed it, so it wants the food
-    trains bring. A coal mine in the hills and a lumber mill in the forest, each with a hamlet."""
+    trains bring. A coal mine in the hills under the peaks and a lumber mill in the forest, each
+    with a hamlet."""
     grid = _grid()
     rng = np.random.default_rng(LAYOUT_SEED)
     village = {
@@ -103,6 +106,7 @@ def _layout() -> dict[Cell, tuple[BuildingKind, ...]]:
         around = sum(people.get(near, 0) for near in [cell, *grid.neighbours(*cell)])
         if around < CROWDED_FIELD:
             layout[cell] = (F,)
+    layout.setdefault(SHOWN_FARM, (F,))
     town = sorted(grid.within(BROOKBY_STATION, TOWN_REACH).items())
     tenements = 0
     for cell, steps in town:
@@ -233,8 +237,8 @@ def place_map() -> TileMap:
         blob(_drawn(ASHFORD_STATION), MOUNTAINS_AWAY, np.full(shape, 0.5))
         | blob(_drawn(BROOKBY_STATION), MOUNTAINS_AWAY, np.full(shape, 0.5))
     )
-    hills = ((rugged > HILLS_ABOVE) | blob(MINE, 3.5, rugged)) & ~towns
-    mountains = (rugged > MOUNTAINS_ABOVE) & far
+    hills = ((rugged > HILLS_ABOVE) | blob(MINE, 4.5, rugged)) & ~towns
+    mountains = ((rugged > MOUNTAINS_ABOVE) & far) | blob(PEAKS, 2.6, rugged)
     relief = np.where(mountains, Relief.MOUNTAINS, np.where(hills, Relief.HILLS, Relief.FLAT))
     height = (
         60
