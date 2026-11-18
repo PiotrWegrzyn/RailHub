@@ -18,14 +18,14 @@ import numpy.typing as npt
 from railroads.ui.pixel.projection import Rgba
 from railroads.ui.pixel.world import PixelWorld
 
-type Drawing = tuple[int, int, int, bool, bool]
+type Drawing = tuple[int, int, int, bool, bool, bool]
 
 
 @dataclass(frozen=True)
 class ChunkJob:
     """A chunk to paint (PixelWorld.render): where, at what resolution, with its raised ground
-    worked out finely or not, and over ground the graphics card draws or not. Called, the world
-    paints it."""
+    worked out finely or not, over ground the graphics card draws or not, and with its woods or
+    without, which the graphics card then draws. Called, the world paints it."""
 
     world: PixelWorld = field(repr=False, compare=False)
     chunk_x: int
@@ -33,6 +33,7 @@ class ChunkJob:
     resolution: int
     fine_relief: bool = False
     over_ground: bool = False
+    woods: bool = True
 
     def __call__(self) -> Rgba:
         return self.world.render(*self.drawing)
@@ -40,7 +41,14 @@ class ChunkJob:
     @property
     def drawing(self) -> Drawing:
         """What a copy of the world needs to paint the same chunk."""
-        return (self.chunk_x, self.chunk_y, self.resolution, self.fine_relief, self.over_ground)
+        return (
+            self.chunk_x,
+            self.chunk_y,
+            self.resolution,
+            self.fine_relief,
+            self.over_ground,
+            self.woods,
+        )
 
 
 def world_message(world: PixelWorld) -> bytes:

@@ -472,6 +472,7 @@ class MapView:
             layer = self._pixel_layer()
             layer.over_ground = shaded
             layer.blow_up = self._shader.blow_up if shaded and self._shader is not None else None
+            layer.dress = self._shader.dress if shaded and self._shader is not None else None
             ready = layer.draw(
                 draw_list, self.camera, center, (top_left, bottom_right), ground_below=shaded
             )
@@ -790,6 +791,9 @@ class MapView:
                 ground.mountains,
             )
             shader.set_cells(info, self._colors_version)
+        if shader.woods_version != self._colors_version:
+            ground = world.ground
+            shader.set_woods(ground.woodland, ground.trees, ground.clearings, self._colors_version)
         elevation = world.elevation
         grades = elevation.grades
         if shader.bed_version != grades:

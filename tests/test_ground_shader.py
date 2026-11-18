@@ -87,6 +87,10 @@ def test_the_raised_ground_shaders_have_every_number_of_the_cpu_relief_written_i
         ground_shader.relief_source(),
         ground_shader.raise_source(),
         ground_shader.tint_source(),
+        ground_shader.woods_source(),
+        ground_shader.edges_source(),
+        ground_shader.canopy_source(),
+        ground_shader.dress_source(),
     ]
 
     assert all("@" not in source for source in sources)

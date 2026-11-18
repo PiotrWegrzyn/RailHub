@@ -704,6 +704,12 @@ class Ground:
         return self._hills
 
     @property
+    def woodland(self) -> FloatArray:
+        """Each cell's say in whether woods cover a point near it and 1 where it is land, as
+        (rows, cols, 2) floats, for the graphics card."""
+        return np.stack([self._woods, self._land.astype(np.float32)], axis=-1)
+
+    @property
     def mountains(self) -> BoolArray:
         """Where cells are mountains, which take the mountains' colours as they rise."""
         return self.tile_map.relief == Relief.MOUNTAINS

@@ -197,6 +197,22 @@ def test_woods_are_drawn_darker_than_meadow_with_crowns_and_floor(sheet: SpriteS
     assert len(np.unique(woods, axis=0)) > 20
 
 
+def test_a_chunk_over_ground_leaves_its_woods_to_the_graphics_card_when_asked(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet, houses=0)
+    _, forest, _ = woods_and_meadow(world)
+    grid = world.tile_map.grid
+    px, py = world.projection.to_pixels(*grid.center(3, 9))
+    chunk = (int(px) // CHUNK, int(py) // CHUNK)
+
+    wooded = world.render(*chunk, over_ground=True)
+    bare = world.render(*chunk, over_ground=True, woods=False)
+
+    assert (wooded[forest][:, 3] == 255).mean() > 0.9
+    assert (bare[forest][:, 3] == 0).mean() > 0.9
+
+
 def canopy_round(world: PixelWorld, cell: Cell) -> tuple[np.ndarray, int, int]:
     grid = world.tile_map.grid
     canvas = np.ones((CHUNK, CHUNK, 4), dtype=np.float32)
