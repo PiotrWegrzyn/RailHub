@@ -1,14 +1,13 @@
 """Towns as colours on the map: every cell whose buildings send passengers (railroads.sim.ladders
 PASSENGERS_PER_POINT) belongs to a town, numbered from 1, 0 for none.
 
-Whenever a building sending passengers goes up, every sending cell within TOWN_REACH of it, its own
+Whenever a building sending passengers goes up, every sending cell next to it (TOWN_REACH), its own
 included, takes the town that sends the most passengers there, or a new town if none does, and
 every other town with a cell there joins it whole. So towns that grow into each other merge, and a
-building on its own starts one. A cell that empties
-leaves its town. A station belongs to the town that sends the most passengers from the cells it
-hands out to, worked out when it is built and every year (railroads.sim.railway). Passengers and
-mail never board for a stop of their own station's town, so two stations in one town can't carry
-them to each other for pay.
+building on its own starts one. A cell that empties leaves its town. A station belongs to the
+town that sends the most passengers from the cells it hands out to, worked out when it is built and
+every year (railroads.sim.railway). Passengers and mail never board for a stop of their own
+station's town, so two stations in one town can't carry them to each other for pay.
 """
 
 import numpy as np
@@ -16,7 +15,7 @@ import numpy.typing as npt
 
 from railroads.sim.grids import Cell, Grid
 
-TOWN_REACH = 2
+TOWN_REACH = 1
 
 
 class Towns:

@@ -13,58 +13,58 @@ from railroads.sim.towns import Towns
 from railroads.sim.trains import Stop
 
 
-def test_a_lone_house_starts_a_town_and_one_two_cells_off_joins_it() -> None:
+def test_a_lone_house_starts_a_town_and_one_next_to_it_joins_it() -> None:
     towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
 
     towns.add((5, 2), 1.0)
-    towns.add((5, 4), 1.0)
-    towns.add((5, 7), 1.0)
+    towns.add((5, 3), 1.0)
+    towns.add((5, 5), 1.0)
 
-    assert towns.town[5, 2] == towns.town[5, 4] != 0
-    assert towns.town[5, 7] not in (0, towns.town[5, 2])
+    assert towns.town[5, 2] == towns.town[5, 3] != 0
+    assert towns.town[5, 5] not in (0, towns.town[5, 2])
 
 
-def test_a_cell_joins_the_town_sending_the_most_passengers_around_it() -> None:
+def test_a_cell_joins_the_town_sending_the_most_passengers_next_to_it() -> None:
     towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
     towns.add((5, 2), 1.0)
-    towns.add((5, 6), 6.0)
+    towns.add((5, 4), 6.0)
 
-    towns.add((5, 4), 1.0)
+    towns.add((5, 3), 1.0)
 
-    assert towns.town[5, 4] == towns.town[5, 6]
+    assert towns.town[5, 3] == towns.town[5, 4]
 
 
-def test_a_building_between_two_towns_paints_its_neighbourhood_the_busier_ones_colour() -> None:
+def test_a_building_between_two_towns_paints_its_neighbours_the_busier_ones_colour() -> None:
     towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
     towns.add((5, 2), 1.0)
-    towns.add((5, 6), 6.0)
+    towns.add((5, 4), 6.0)
 
-    towns.add((5, 4), 1.0)
+    towns.add((5, 3), 1.0)
 
-    assert towns.town[5, 2] == towns.town[5, 4] == towns.town[5, 6]
+    assert towns.town[5, 2] == towns.town[5, 3] == towns.town[5, 4]
 
 
 def test_a_town_outvoted_around_a_new_building_joins_the_winner_whole() -> None:
     towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
     towns.add((5, 0), 1.0)
+    towns.add((5, 1), 1.0)
+    towns.add((5, 3), 6.0)
+
     towns.add((5, 2), 1.0)
-    towns.add((5, 6), 6.0)
+
+    assert towns.town[5, 0] == towns.town[5, 3]
+
+
+def test_a_new_building_leaves_towns_without_a_cell_next_to_it_alone() -> None:
+    towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
+    towns.add((5, 0), 1.0)
+    towns.add((5, 3), 6.0)
+    first = int(towns.town[5, 0])
 
     towns.add((5, 4), 1.0)
 
-    assert towns.town[5, 0] == towns.town[5, 6]
-
-
-def test_a_new_building_leaves_towns_without_a_cell_around_it_alone() -> None:
-    towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
-    towns.add((5, 0), 1.0)
-    towns.add((5, 6), 6.0)
-    first = int(towns.town[5, 0])
-
-    towns.add((5, 8), 1.0)
-
     assert towns.town[5, 0] == first
-    assert towns.town[5, 8] == towns.town[5, 6] != first
+    assert towns.town[5, 4] == towns.town[5, 3] != first
 
 
 def test_a_cell_emptied_leaves_its_town() -> None:
@@ -76,26 +76,26 @@ def test_a_cell_emptied_leaves_its_town() -> None:
     assert towns.town[5, 2] == 0
 
 
-def test_a_cell_emptied_joins_the_town_around_it_when_built_on_again() -> None:
+def test_a_cell_emptied_joins_the_town_next_to_it_when_built_on_again() -> None:
     towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
     towns.add((5, 2), 1.0)
     towns.add((5, 2), -1.0)
-    towns.add((5, 4), 18.0)
+    towns.add((5, 3), 18.0)
 
     towns.add((5, 2), 1.0)
 
-    assert towns.town[5, 2] == towns.town[5, 4]
+    assert towns.town[5, 2] == towns.town[5, 3]
 
 
 def test_the_buildings_standing_at_the_start_are_settled_into_towns_the_busiest_first() -> None:
     towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
     sending = np.zeros((12, 12))
-    sending[5, 2], sending[5, 4], sending[5, 8] = 1.0, 6.0, 1.0
+    sending[5, 3], sending[5, 4], sending[5, 8] = 1.0, 6.0, 1.0
 
     towns.settle(sending)
 
     assert towns.town[5, 4] == 1
-    assert towns.town[5, 2] == 1
+    assert towns.town[5, 3] == 1
     assert towns.town[5, 8] == 2
 
 
@@ -126,7 +126,7 @@ def stations_with_houses(houses: list[tuple[int, int]]) -> tuple[Growth, Railway
     return growth, railway
 
 
-ONE_TOWN = [(5, 3), (5, 5), (5, 7), (5, 9)]
+ONE_TOWN = [(5, column) for column in range(3, 10)]
 TWO_TOWNS = [(5, 3), (5, 9)]
 
 

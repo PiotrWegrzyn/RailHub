@@ -856,10 +856,12 @@ in passenger coaches and mail vans of 50 each and earn money where they get off 
 by the demand there, which only trains use up; they then go on their way rather than waiting to
 be handed out.
 
-Every cell whose buildings send passengers belongs to a town (railroads.sim.towns). A cell takes
-its town when its first such building goes up: the town sending the most passengers within 2 cells,
-or a new one, so towns spread as they grow and a lone farm or house starts its own. It keeps that
-town while it stands. A station belongs to the town sending the most passengers from its inner
+Every cell whose buildings send passengers belongs to a town (railroads.sim.towns). Whenever a
+building sending passengers goes up, its cell and every cell next to it whose buildings send
+passengers take the town sending the most passengers among them, or a new town if none of them has
+one, so a lone farm or house starts its own. Any other town with a cell there joins the winner
+whole, so towns that grow into each other always merge and two towns never touch. A cell that
+empties leaves its town. A station belongs to the town sending the most passengers from its inner
 ring, worked out when it is built and again every year, and its window shows the town's colour and
 any other station of yours in it. Passengers and mail never board for a stop in the station's own
 town, so two stations in one town can't carry them to each other for pay; a train waiting for a

@@ -1,6 +1,6 @@
 """The help window: every building with what it makes and wants in a month, every good with
-what it earns and who makes and wants it, and every engine with what it can do, when and with
-which tech it is sold, and the real engines it is drawn after."""
+what it earns and who makes and wants it, every engine with what it can do, when and with
+which tech it is sold, and the real engines it is drawn after, and how towns work."""
 
 from dataclasses import dataclass
 from functools import cache
@@ -21,6 +21,24 @@ from railroads.ui.search import goods_of
 from railroads.ui.theme import BRASS, LIST_TABLE_FLAGS, WINDOW_TOP, good_amount, good_icon, tip
 
 WINDOW_SIZE = (860.0, 600.0)
+TOWNS_HELP = (
+    (
+        "Every place sending passengers belongs to a town, shown in its own colour on the Towns lens"
+        " above the minimap. When a building goes up, it and every building next to it take the"
+        " colour sending the most passengers among them; a building with no coloured neighbour"
+        " starts a new town. Any other town with a building there joins that colour whole, so towns"
+        " that grow into each other merge and two towns never touch."
+    ),
+    (
+        "A station takes the colour of the town around it when it is built and again every year;"
+        " its window shows the colour and any other station of yours in that town."
+    ),
+    (
+        "Passengers and mail only board for a stop in another town, so two stations in one town"
+        " earn nothing carrying them to each other. A train waiting for a full load doesn't wait for"
+        " them either."
+    ),
+)
 ENGINES_NOTE = (
     "An engine is sold from its year once its tech is taken, until a newer one of its line comes."
     " Tech is taken in the tech window (R): every level a tree reaches gives a point for one node"
@@ -164,6 +182,9 @@ class HelpWindow:
                 if imgui.begin_tab_item("Engines")[0]:
                     self._draw_engines()
                     imgui.end_tab_item()
+                if imgui.begin_tab_item("Towns")[0]:
+                    _draw_towns()
+                    imgui.end_tab_item()
                 imgui.end_tab_bar()
         imgui.end()
 
@@ -276,6 +297,12 @@ class HelpWindow:
             imgui.table_next_column()
             _draw_origins(row)
         imgui.end_table()
+
+
+def _draw_towns() -> None:
+    for paragraph in TOWNS_HELP:
+        imgui.text_wrapped(paragraph)
+        imgui.spacing()
 
 
 def _draw_sale(row: EngineHelp) -> None:
