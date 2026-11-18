@@ -1,17 +1,21 @@
 """The land around the map the player can buy (railroads.sim.lots, railroads.land). Every lot not
-owned is drawn where it lies, past the map's edge or in a gap of it, as the world map shows it,
-so what lies there is no surprise, behind a chain with a padlock, and with its price if it is on
+owned is drawn where it lies, past the map's edge or in a gap of it, with the ground of the
+place's map there (railroads.newgame.place_map): its rivers, lakes, forests, hills and mountains,
+without the buildings, so what lies there is no surprise; or as the world map shows it where the
+place's map isn't known. It lies behind a chain with a padlock, and with its price if it is on
 offer. A click on one asks to confirm buying it."""
 
 import math
 from dataclasses import dataclass
 
-from imgui_bundle import imgui
+import numpy as np
+from imgui_bundle import hello_imgui, imgui
 
 from railroads.sim.finance import Finances, dollars
 from railroads.sim.grids import Grid
 from railroads.sim.lots import Lot, Lots
 from railroads.sim.tilemap import TileMap
+from railroads.ui.ground import cell_colors
 from railroads.ui.iso_camera import IsoCamera, Vec2
 from railroads.ui.theme import BRASS, BRASS_DARK, GONE, OVERLAY, rgba_u32
 
@@ -56,6 +60,31 @@ def world_uv(tile_map: TileMap, point: Vec2) -> Vec2:
     return (float(lon) + 180.0) / 360.0, (90.0 - float(lat)) / 180.0
 
 
+@dataclass(frozen=True)
+class PlacePicture:
+    """The ground of the place's map, a pixel a cell, with a lot of sea round it, and the place's
+    cell its pixel (0, 0) shows."""
+
+    pixels: np.ndarray
+    top: int
+    left: int
+
+    @classmethod
+    def of(cls, place: TileMap, lots: Lots) -> PlacePicture:
+        top, left = -lots.rows, -lots.cols
+        rows, cols = place.grid.rows + 2 * lots.rows, place.grid.cols + 2 * lots.cols
+        pixels = cell_colors(place.window(top, left, rows, cols))
+        return cls(np.ascontiguousarray(pixels), top, left)
+
+    def uvs(self, lots: Lots, lot: Lot) -> list[Vec2]:
+        """Where a lot's corners lie on the picture, in the order of lot_corners."""
+        top, left = lots.place_cell_of(lot)
+        rows, cols = self.pixels.shape[:2]
+        u0, u1 = (left - self.left) / cols, (left + lots.cols - self.left) / cols
+        v0, v1 = (top - self.top) / rows, (top + lots.rows - self.top) / rows
+        return [(u0, v0), (u1, v0), (u1, v1), (u0, v1)]
+
+
 def shown_lots(lots: Lots) -> list[tuple[Lot, bool]]:
     """Every lot not owned to draw, with whether it is on offer: those on offer, and those in the
     map's gaps."""
@@ -79,6 +108,21 @@ class LandOffers:
     hovered: Lot | None = None
     asked: Lot | None = None
     wanted: Lot | None = None
+    # The ground of the place's map, and its texture once made.
+    place: PlacePicture | None = None
+    _texture: hello_imgui.TextureGpu | None = None
+
+    def show_place(self, place: TileMap, lots: Lots) -> None:
+        """Draws the lots with the ground of the place's map from now on."""
+        self.place = PlacePicture.of(place, lots)
+        self._texture = None
+
+    def _place_texture(self) -> imgui.ImTextureRef | None:
+        if self.place is None:
+            return None
+        if self._texture is None:
+            self._texture = hello_imgui.create_texture_gpu_from_rgba_data(self.place.pixels)
+        return imgui.ImTextureRef(self._texture.texture_id())
 
     def hover(self, lots: Lots | None, grid: Grid, point: Vec2 | None) -> None:
         """Notes the lot shown under a point on the map, if any."""
@@ -108,12 +152,16 @@ class LandOffers:
         cash: float,
     ) -> None:
         price = lots.price()
+        ground = self._place_texture()
         for lot, offered in shown_lots(lots):
             plane = lot_corners(tile_map.grid, lots, lot)
             screen = [camera.to_screen(x, y, center) for x, y in plane]
-            uvs = [world_uv(tile_map, point) for point in plane]
+            if ground is None or self.place is None:
+                picture, uvs = world, [world_uv(tile_map, point) for point in plane]
+            else:
+                picture, uvs = ground, self.place.uvs(lots, lot)
             points = [imgui.ImVec2(*point) for point in screen]
-            draw_list.add_image_quad(world, *points, *map(imgui.ImVec2, uvs), rgba_u32(LAND_TINT))
+            draw_list.add_image_quad(picture, *points, *map(imgui.ImVec2, uvs), rgba_u32(LAND_TINT))
             shade = HOVERED_SHADE if lot == self.hovered and offered else SHADE
             draw_list.add_quad_filled(*points, rgba_u32(shade))
             _draw_chain(draw_list, screen)

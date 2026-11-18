@@ -1,9 +1,17 @@
+import numpy as np
 import pytest
 
 from builders import flat_map
 from railroads.sim.grids import HEX_ROW_STEP
 from railroads.sim.lots import Lots
-from railroads.ui.land_offers import LandOffers, lot_corners, lot_under, shown_lots, world_uv
+from railroads.ui.land_offers import (
+    LandOffers,
+    PlacePicture,
+    lot_corners,
+    lot_under,
+    shown_lots,
+    world_uv,
+)
 
 
 def offering_lots() -> Lots:
@@ -75,3 +83,25 @@ def test_a_point_over_no_lot_shown_hovers_none() -> None:
 
     assert land.hovered is None
     assert not land.click(offering_lots())
+
+
+def test_a_lot_is_shown_with_the_ground_of_the_places_map_where_it_lies() -> None:
+    place = flat_map(16, 12)
+    lots = Lots.of_square(top=4, left=3, rows=8, cols=6)
+
+    picture = PlacePicture.of(place, lots)
+    uvs = picture.uvs(lots, (0, -1))
+
+    assert picture.pixels.shape == (16 + 8, 12 + 6, 4)
+    assert (picture.top, picture.left) == (-4, -3)
+    assert uvs[0] == pytest.approx((3 / 18, 8 / 24))
+    assert uvs[2] == pytest.approx((6 / 18, 12 / 24))
+
+
+def test_past_the_places_map_a_lot_shows_sea() -> None:
+    place = flat_map(16, 12)
+    lots = Lots.of_square(top=4, left=3, rows=8, cols=6)
+
+    picture = PlacePicture.of(place, lots)
+
+    assert not np.array_equal(picture.pixels[0, 0], picture.pixels[10, 10])

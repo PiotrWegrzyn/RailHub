@@ -16,6 +16,7 @@ from railroads.newgame import (
     Settings,
     allowed_start_year,
     make_game_steps,
+    place_map,
 )
 from railroads.saves import (
     ReusedMemory,
@@ -118,6 +119,9 @@ class App:
         if saved.camera is not None:
             x, y, zoom = saved.camera
             view.camera.center_x, view.camera.center_y, view.camera.zoom_level = x, y, zoom
+        lots = saved.game.lots
+        if lots is not None and saved.settings is not None:
+            view.land.show_place(place_map(saved.settings), lots)
         return cls(view, saved.title, saved.rng, saved.clock, saves, saved.settings)
 
     @property

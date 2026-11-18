@@ -44,8 +44,9 @@ first with:
   `railroads.land`, `railroads.ui.land_offers`). The starting square splits into two by two
   lots; any lot sharing a side with the player's land and holding some land is for sale, the
   first for $377,000 and each after it for the next Fibonacci number of thousands ($610,000,
-  $987,000, ...). Past the map's edge each lot shows the world map, as the minimap does, behind
-  a chain and a padlock with its price, so what lies there is no surprise. A click asks to
+  $987,000, ...). Past the map's edge each lot shows the ground of the place's map there, its
+  rivers, lakes, forests, hills and mountains without the buildings, dimmed behind a chain and a
+  padlock with its price, so what lies there is no surprise. A click asks to
   confirm; the lot is then cut from the place's map (`newgame.place_map`) and grown on its own
   from 850 to the year it is bought behind the waiting screen, with only a quarter of the
   buildings every map keeps at least one of, picked at random, and each novelty not built yet

@@ -57,8 +57,8 @@ MAP_HELP = (
     (
         "The land around it can be bought a lot at a time. Every lot is a quarter of the land a"
         " game starts on, half as wide and half as tall, and any lot sharing a side with yours is"
-        " for sale: past the map's edge it shows the world map behind a chain and a padlock with"
-        " its price. The first costs $377,000 and each after it the next Fibonacci number of"
+        " for sale: past the map's edge it shows its rivers, forests and mountains, without the"
+        " buildings, behind a chain and a padlock with its price. The first costs $377,000 and each after it the next Fibonacci number of"
         " thousands: $610,000, $987,000 and so on."
     ),
     (
