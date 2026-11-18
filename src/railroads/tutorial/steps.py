@@ -274,7 +274,7 @@ STEPS: tuple[Step, ...] = (
                 "it pays nothing."
             ),
         ),
-        "Right-click the marked farm and press Buy.",
+        "Right-click the marked farm, press Shares, then Buy.",
         lambda game, seen: game.growth.owners.count() > 0,
         lambda game: [SHOWN_FARM],
         ("buy_shares",),

@@ -94,6 +94,7 @@ from railroads.sim.ladders import (
     Points,
     Surroundings,
 )
+from railroads.sim.ledger import Ledger
 from railroads.sim.ownership import Owners
 from railroads.sim.power_plants import build_power_plants
 from railroads.sim.railway import Railway
@@ -426,6 +427,7 @@ class Growth:
         # The buildings the player owns, the stations growth trades with, and the room it makes
         # (railroads.sim.ownership, railroads.sim.station_trade, railroads.sim.room).
         self.owners = Owners(self)
+        self.ledger = Ledger()
         self.station_trade = StationTrade(self)
         self.room = Room(self)
         self._months = 0
@@ -555,6 +557,7 @@ class Growth:
             np.flatnonzero(self._occupied),
             self.owners.first_for_stations(),
         )
+        self.ledger.record(self.trade, max(0, self._months - 1))
         yield
         yield from self.station_trade.settle_steps(self.trade)
         self.station_trade.update_reach()

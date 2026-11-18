@@ -298,6 +298,9 @@ class Trade:
     # Per station, what it handed out by need and good, each unit counted by what it was worth to
     # the building that took it (worth_to): what freight pays for.
     handed_worth: Mapping[Cell, Mapping[tuple[Need, Good], float]] = field(default_factory=dict)
+    # Per kind of building and good, what of the player's share of it each cell sent into the
+    # stations around.
+    owned_sent: Mapping[tuple[BuildingKind, Good], FloatCells] = field(default_factory=dict)
 
     def done(self, kinds: tuple[BuildingKind, ...]) -> FloatCells:
         return sum(
@@ -548,6 +551,7 @@ class _Month:
         }
         self.gathered: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
         self.owned_brought: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
+        self.owned_sent: dict[tuple[BuildingKind, Good], FloatCells] = {}
         self.room = {
             station: {
                 good: max(
@@ -800,11 +804,15 @@ class _Month:
             return
         self.first_gathered.add(good)
         left = self.zero.copy()
+        parts: dict[BuildingKind, FloatCells] = {}
         for (kind, made), mine in self.owned_made.items():
             if made == good:
-                left += mine * self.owned[kind].share
+                part = mine * self.owned[kind].share
+                parts[kind] = parts.get(kind, self.zero) + part
+                left += part
         if not left.any():
             return
+        offered = left.copy()
         for station in self.stations:
             room = self.room[station][good]
             if room <= 0:
@@ -819,6 +827,9 @@ class _Month:
                 owned = self.owned_brought[station]
                 owned[good] = owned.get(good, 0.0) + taken
                 self.room[station][good] -= taken
+        sent = (offered - left) / np.where(offered > 0, offered, 1.0)
+        for kind, part in parts.items():
+            self.owned_sent[(kind, good)] = part * sent
 
     def _pairs(self, good: Good) -> tuple[*_Pairs, tuple[float, ...]]:
         """Every cell making a good with every traded cell up to LOCAL_REACH cells from it, as
@@ -1007,6 +1018,7 @@ class _Month:
             },
             self.owned_brought,
             self.handed_worth,
+            self.owned_sent,
         )
         self.economy.levels[:] = Satisfaction.UNSATISFIED
         self.economy.levels[self.cells] = trade.levels()

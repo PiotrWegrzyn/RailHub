@@ -13,6 +13,7 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from railroads import maps
 from railroads.mapgen.world import WorldLand
 from railroads.sim.constructions import (
+    BuildingKind,
     Constructions,
     Station,
 )
@@ -34,7 +35,7 @@ from railroads.ui.build_menu import (
 from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.buildings import draw_building_dots
 from railroads.ui.ground import GroundLayout, GroundPictures, Pixels, cell_colors
-from railroads.ui.hex_details import draw_hex_details, recently_described
+from railroads.ui.hex_details import HexDetails, draw_hex_details, draw_shares, recently_described
 from railroads.ui.iso_camera import LOOKS, IsoCamera, Vec2
 from railroads.ui.land_offers import LandOffers
 from railroads.ui.map_input import MapInput
@@ -87,7 +88,7 @@ from railroads.ui.summaries_panel import SummariesPanel
 from railroads.ui.theme import BRASS, OVERLAY_FLAGS, SIDE_WINDOW_POS, rgba_u32, toggle_button
 
 BACKGROUND_COLOR = (0.08, 0.09, 0.11, 1.0)
-DETAILS_SIZE = (680.0, 340.0)
+DETAILS_SIZE = (460.0, 420.0)
 # Stepping to a building found zooms in at least this far, so it can be seen.
 VISIT_ZOOM = 4
 # Slopes are lit from the top-left of the screen.
@@ -196,8 +197,10 @@ class MapView:
         # The top of the minimap on screen, which the lens buttons sit above.
         self._minimap_top: float | None = None
         self.build = BuildMenu()
-        # What came of the last Buy pressed in the hex details.
+        # What came of the last Buy or Sell pressed in the shares window, and the kind of building
+        # in the selected cell whose shares it shows, if open.
         self._bought = ""
+        self.shares_of: tuple[Cell, BuildingKind] | None = None
         # The station levels the map shows, to redraw stations raised since.
         self._shown_levels: dict[Cell, int] = dict(self.railway.levels)
         # What the build tools do with clicks, and the mouse and keys (railroads.ui.map_tools,
@@ -307,23 +310,50 @@ class MapView:
         imgui.set_next_window_pos(SIDE_WINDOW_POS, imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size(DETAILS_SIZE, imgui.Cond_.first_use_ever.value)
         expanded, still_open = imgui.begin("Hex details", True)
+        details = recently_described(self.growth, self.selected, self._satisfaction)
         if expanded:
-            details = recently_described(self.growth, self.selected, self._satisfaction)
             pressed = draw_hex_details(details)
             if pressed is not None:
-                kind, buying = pressed
+                self.shares_of = (self.selected, pressed)
+                self._bought = ""
+        imgui.end()
+        if not still_open:
+            self.selected = None
+            self.shares_of = None
+            self._bought = ""
+            return
+        self._draw_shares(details)
+
+    def _draw_shares(self, details: HexDetails) -> None:
+        """The shares window of the kind of building in the selected cell whose Shares button
+        was pressed, beside the details."""
+        cell = self.selected
+        if self.shares_of is None or self.shares_of[0] != cell:
+            self.shares_of = None
+            return
+        row = next((r for r in details.buildings if r.kind == self.shares_of[1]), None)
+        if cell is None or row is None or row.kind is None:
+            self.shares_of = None
+            return
+        imgui.set_next_window_pos(
+            (SIDE_WINDOW_POS[0] + DETAILS_SIZE[0] + 8, SIDE_WINDOW_POS[1]),
+            imgui.Cond_.first_use_ever.value,
+        )
+        expanded, still_open = imgui.begin(
+            "Shares###shares", True, imgui.WindowFlags_.always_auto_resize.value
+        )
+        if expanded:
+            pressed = draw_shares(row, f"{cell[0]}, {cell[1]}")
+            if pressed is not None:
                 owners = self.growth.owners
-                if buying:
-                    said = owners.buy(self.selected, kind)
-                else:
-                    said = owners.sell(self.selected, kind)
-                held = int(owners.shares(kind)[self.selected])
-                self._bought = said or f"You own {held} shares of the {kind.value}s here"
+                said = owners.buy(cell, row.kind) if pressed else owners.sell(cell, row.kind)
+                held = int(owners.shares(row.kind)[cell])
+                self._bought = said or f"You own {held:,} shares of the {row.kind.value}s here"
             if self._bought:
                 imgui.text_disabled(self._bought)
         imgui.end()
         if not still_open:
-            self.selected = None
+            self.shares_of = None
             self._bought = ""
 
     def month_passed(self, rng: np.random.Generator, date: str = "") -> None:

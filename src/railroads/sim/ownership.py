@@ -73,6 +73,11 @@ class Owners:
         """How many shares of the buildings of a kind the player owns in each cell."""
         return self._shares.get(kind, np.zeros(self._growth.grid.shape, dtype=np.int64))
 
+    def total(self, cell: Cell, kind: BuildingKind) -> int:
+        """How many shares the buildings of a kind in a cell are in all, SHARES for each."""
+        counts = self._growth.counts
+        return SHARES * int(counts[kind][cell]) if kind in counts else 0
+
     def owned(self, kind: BuildingKind) -> npt.NDArray[np.float64]:
         """How many buildings' worth of a kind the player owns in each cell, by their shares."""
         return self.shares(kind) / SHARES

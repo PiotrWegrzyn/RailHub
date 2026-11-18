@@ -79,6 +79,9 @@ class TrainsWindow:
     # What each stop's station has to send on each month, worked out at most every WORTH_EVERY
     # seconds, by station: when, and the goods.
     _supplied: dict[Cell, tuple[float, Mapping[Good, float]]] = field(default_factory=dict)
+    # Stop cards the player folded away or opened, by train and stop; the rest are open but for
+    # those with cars set that the train is not heading for or standing at.
+    _folded: dict[tuple[str, int], bool] = field(default_factory=dict)
 
     def worth(self, railway: Railway, train: Train) -> list[float]:
         """What each of the train's cars would earn at its destination now, kept for a moment
@@ -230,14 +233,41 @@ class TrainsWindow:
             return
         upgrade_menu(railway, train)
         imgui.separator()
+        destination = railway.destination(train)
+        onward = "" if destination is None else railway.name_of(destination)
+        worths = self.worth(railway, train)
+        ride = railway.ride(train, worths)
+        if ride is None:
+            self._draw_pulling(railway, train, worths, destination, onward)
+        else:
+            _draw_tiles(railway, ride, onward)
+            if imgui.tree_node_ex(f"The ride's bill and the cars pulled now###bill{train.name}"):
+                self._draw_pulling(railway, train, worths, destination, onward)
+                self._draw_ride(ride, onward)
+                imgui.tree_pop()
+        imgui.spacing()
+        route_map.good = None
+        self._shown_map = route_map
+        map_width = imgui.get_content_region_avail().x * MAP_SHARE
+        imgui.begin_child("route", (-map_width, 0))
+        imgui.text_disabled("Route")
+        self._draw_stops(railway, train, supplies)
+        imgui.end_child()
+        imgui.same_line()
+        imgui.begin_child("map", (0, 0), imgui.ChildFlags_.borders.value)
+        route_map.draw(railway, train, ground, supplies)
+        imgui.end_child()
+
+    @staticmethod
+    def _draw_pulling(
+        railway: Railway, train: Train, worths: list[float], destination: Cell | None, onward: str
+    ) -> None:
+        """The cars the train pulls now, each with its load, and what its cargo is worth."""
         imgui.align_text_to_frame_padding()
         imgui.text_disabled("Pulling")
         if not train.cars:
             imgui.same_line()
             imgui.text_disabled("no cars")
-        destination = railway.destination(train)
-        onward = "" if destination is None else railway.name_of(destination)
-        worths = self.worth(railway, train)
         for index, (car, worth) in enumerate(zip(train.cars, worths, strict=True)):
             imgui.same_line(0, 4 if index else 12)
             if car.dining:
@@ -260,26 +290,11 @@ class TrainsWindow:
                 )
             imgui.same_line()
             imgui.text_disabled(f"at {onward}")
-        ride = railway.ride(train, worths)
-        if ride is not None:
-            self._draw_ride(railway, ride, onward)
-        imgui.spacing()
-        route_map.good = None
-        self._shown_map = route_map
-        map_width = imgui.get_content_region_avail().x * MAP_SHARE
-        imgui.begin_child("route", (-map_width, 0))
-        imgui.text_disabled("Route")
-        self._draw_stops(railway, train, supplies)
-        imgui.end_child()
-        imgui.same_line()
-        imgui.begin_child("map", (0, 0), imgui.ChildFlags_.borders.value)
-        route_map.draw(railway, train, ground, supplies)
-        imgui.end_child()
 
     @staticmethod
-    def _draw_ride(railway: Railway, ride: Ride, onward: str) -> None:
+    def _draw_ride(ride: Ride, onward: str) -> None:
         """The ride to the next stop as a bill: what the cargo earns there, less the fuel for
-        the way and the trips of its loaded and empty cars; and the network's monthly upkeep."""
+        the way and the trips of its loaded and empty cars."""
         imgui.text_disabled(f"Ride to {onward}, {ride.cells:.0f} cells")
         if imgui.begin_table("ride", 2, imgui.TableFlags_.sizing_fixed_fit.value):
             for label, amount, tip in ride_rows(ride):
@@ -292,15 +307,6 @@ class TrainsWindow:
                 colour = BRASS if amount >= 0 else GONE
                 imgui.text_colored(imgui.ImVec4(*colour), signed(amount))
             imgui.end_table()
-        stations, track = railway.network_upkeep()
-        imgui.text_disabled(
-            f"Upkeep for the whole network: stations {dollars(stations)}, "
-            f"track {dollars(track)} a month"
-        )
-        if imgui.is_item_hovered():
-            imgui.set_tooltip(
-                "Paid every month whether trains run or not; not counted in any one ride"
-            )
 
     def _draw_stops(self, railway: Railway, train: Train, supplies: Supplies) -> None:
         stops = len(train.stops)
@@ -354,8 +360,15 @@ class TrainsWindow:
         has to load, and what the next stop wants; returns whether it was removed."""
         flags = imgui.ChildFlags_.borders.value | imgui.ChildFlags_.auto_resize_y.value
         imgui.begin_child("stop", (0, 0), flags)
-        removed = self._draw_stop_head(railway, train, index, stop, here)
-        if not removed:
+        key = (train.name, index)
+        opened = self._folded.get(key, not (stop.cars and not here))
+        removed, toggled = self._draw_stop_head(railway, train, index, stop, here, opened)
+        if toggled:
+            opened = not opened
+            self._folded[key] = opened
+        if removed:
+            self._folded = {k: v for k, v in self._folded.items() if k[0] != train.name}
+        elif opened:
             following = train.stops[(index + 1) % len(train.stops)]
             if len(train.stops) > 1:
                 demand = railway.station_demand(following.cell)
@@ -369,19 +382,31 @@ class TrainsWindow:
         return removed
 
     def _draw_stop_head(
-        self, railway: Railway, train: Train, index: int, stop: Stop, here: bool
-    ) -> bool:
+        self, railway: Railway, train: Train, index: int, stop: Stop, here: bool, opened: bool
+    ) -> tuple[bool, bool]:
+        """A stop card's top line: a button folding the card away or opening it, the stop's
+        number and name, and when folded the cars it sends on; returns whether the stop was
+        removed and whether the card was folded or opened."""
         right = imgui.get_cursor_pos_x() + imgui.get_content_region_avail().x
+        arrow = fa.ICON_FA_CARET_DOWN if opened else fa.ICON_FA_CARET_RIGHT
+        toggled = imgui.small_button(f"{arrow}##fold")
+        if imgui.is_item_hovered():
+            imgui.set_tooltip(
+                "Fold this stop away" if opened else "Show this stop's cars and goods"
+            )
+        imgui.same_line(0, 6)
         imgui.align_text_to_frame_padding()
         imgui.text_disabled(f"{index + 1}")
         imgui.same_line(0, 10)
         name = railway.name_of(stop.cell)
         if here:
             imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_TRAIN}  {name}")
-            imgui.same_line()
-            imgui.text_disabled("heading here" if train.path else "standing here")
+            _note_before("heading here" if train.path else "standing here", right - 190)
         else:
             imgui.text(name)
+        if not opened and len(train.stops) > 1:
+            following = railway.name_of(train.stops[(index + 1) % len(train.stops)].cell)
+            _note_before(f"{len(stop.cars)} cars to {following}", right - 190)
         imgui.same_line(right - 190)
         _, stop.wait_for_load = imgui.checkbox("Wait for full load", stop.wait_for_load)
         if imgui.is_item_hovered():
@@ -390,10 +415,10 @@ class TrainsWindow:
         if imgui.small_button(fa.ICON_FA_TIMES):
             train.stops.pop(index)
             train.restart()
-            return True
+            return True, toggled
         if imgui.is_item_hovered():
             imgui.set_tooltip("Remove this stop")
-        return False
+        return False, toggled
 
     def _draw_cars(
         self, railway: Railway, train: Train, index: int, stop: Stop, onward: str
@@ -652,3 +677,48 @@ def ride_rows(ride: Ride) -> list[tuple[str, float, str]]:
 def ride_lines(ride: Ride) -> str:
     """A ride's bill as lines of text."""
     return "\n".join(f"{label}: {signed(amount)}" for label, amount, _ in ride_rows(ride))
+
+
+def ride_tiles(ride: Ride, onward: str) -> list[tuple[str, float, str]]:
+    """The three figures over a train's route: what its cargo is worth at the next stop, what
+    the ride there costs and what it earns after that."""
+    costs = ride.fuel + ride.loaded_cars + ride.empty_cars
+    return [
+        (f"Cargo worth at {onward}", ride.cargo, ride_rows(ride)[0][2]),
+        (
+            f"Ride costs, {ride.cells:.0f} cells",
+            -costs,
+            "Fuel for the way and the trip of every car, loaded or empty",
+        ),
+        ("This ride earns", ride.net, "What its cargo earns there, less what the ride costs"),
+    ]
+
+
+def _draw_tiles(railway: Railway, ride: Ride, onward: str) -> None:
+    """The ride to the next stop in three tiles side by side, the network's upkeep on hover."""
+    stations, track = railway.network_upkeep()
+    upkeep = (
+        f"\n\nNot counted in any one ride: the whole network's upkeep, stations "
+        f"{dollars(stations)} and track {dollars(track)} a month"
+    )
+    flags = imgui.TableFlags_.sizing_stretch_same.value | imgui.TableFlags_.borders_inner_v.value
+    if not imgui.begin_table("tiles", 3, flags):
+        return
+    imgui.table_next_row()
+    for label, amount, tip in ride_tiles(ride, onward):
+        imgui.table_next_column()
+        imgui.begin_group()
+        imgui.text_disabled(label)
+        colour = BRASS if amount >= 0 else GONE
+        imgui.text_colored(imgui.ImVec4(*colour), signed(amount))
+        imgui.end_group()
+        if imgui.is_item_hovered():
+            imgui.set_tooltip(tip + upkeep)
+    imgui.end_table()
+
+
+def _note_before(note: str, limit: float) -> None:
+    """A dim note on the current line, left out if it would run past `limit`."""
+    imgui.same_line()
+    if imgui.get_cursor_pos_x() + imgui.calc_text_size(note).x < limit - 8:
+        imgui.text_disabled(note)

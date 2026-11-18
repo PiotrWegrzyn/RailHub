@@ -5,7 +5,7 @@ must get apart from the bonus goods and boosts it can do without."""
 import time
 import weakref
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 
 import numpy as np
@@ -19,11 +19,12 @@ from railroads.sim.goods import RECIPES, Good, Need, bonus_of, boosts_of, demand
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
+from railroads.sim.ledger import Takings
 from railroads.sim.ownership import LOT, SHARES
 from railroads.sim.tilemap import Deposit, TileMap
 from railroads.ui.biomes import biome_of
 from railroads.ui.spotlight import spot
-from railroads.ui.theme import good_amount
+from railroads.ui.theme import GONE, GROWN, TEXT_DIM, good_amount
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,16 @@ class BuildingRow:
     # How many of the player's shares may be sold now, and the year the next held back may be.
     sellable: int = 0
     sell_from: int | None = None
+    # How many shares they are in all, SHARES each; what they took in money last year (None
+    # before a whole year of trade) and what they would at the pace of the last quarter.
+    total: int = 0
+    last_year: Takings | None = None
+    forecast: Takings | None = None
+
+    @property
+    def held_back(self) -> int:
+        """How many of the player's shares may not be sold yet."""
+        return self.owned - self.sellable
 
 
 @dataclass(frozen=True)
@@ -79,6 +90,9 @@ class HexDetails:
     buildings: list[BuildingRow]
     others: list[str]
 
+
+# Where the goods of a card's lines start, after their labels.
+CARD_LABEL = 56.0
 
 # How long a cell's description is shown again before it is worked out anew, and how many cells'
 # descriptions are kept: the hovered cell's and the open details' at least. Working one out takes
@@ -165,6 +179,9 @@ def describe(
                 bonus_got,
                 growth.owners.sellable(cell, kind),
                 growth.owners.sellable_from(cell, kind),
+                growth.owners.total(cell, kind),
+                growth.ledger.last_year(kind, flat),
+                growth.ledger.forecast(kind, flat),
             )
         )
     return HexDetails(
@@ -209,81 +226,217 @@ def one_cell(trade: Trade, position: int, kind: BuildingKind) -> Trade:
     )
 
 
-def draw_hex_details(details: HexDetails) -> tuple[BuildingKind, bool] | None:
-    """Draws the details inside the current imgui window; returns the kind of building whose Buy
-    (True) or Sell (False) button was pressed, if any."""
-    bought: tuple[BuildingKind, bool] | None = None
+def draw_hex_details(details: HexDetails) -> BuildingKind | None:
+    """Draws the details inside the current imgui window: the land, its points folded away, and
+    a card for each kind of building with its satisfaction, what it made and got and the
+    player's shares of it; returns the kind whose Shares button was pressed, if any."""
+    shares: BuildingKind | None = None
     imgui.text(details.title)
     imgui.text_disabled(details.land)
-    imgui.text(f"Satisfaction: {details.satisfaction}")
-    imgui.separator()
     if details.points:
-        imgui.text("Points (here / neighbourhood)")
-        for name, here, nearby in details.points:
-            imgui.bullet_text(f"{name}: {here} / {nearby}")
+        summary = ", ".join(f"{name} {here} / {nearby}" for name, here, nearby in details.points)
+        if imgui.tree_node_ex(f"Points: {summary}###points"):
+            imgui.text_disabled("here / neighbourhood")
+            for name, here, nearby in details.points:
+                imgui.bullet_text(f"{name}: {here} / {nearby}")
+            imgui.tree_pop()
     else:
         imgui.text_disabled("No points nearby")
-    imgui.separator()
+    imgui.spacing()
     if not details.buildings and not details.others:
         imgui.text_disabled("Nothing built here")
         return None
-    if details.buildings:
-        flags = (
-            imgui.TableFlags_.borders.value
-            | imgui.TableFlags_.row_bg.value
-            | imgui.TableFlags_.sizing_fixed_fit.value
-        )
-        if imgui.begin_table("buildings", 7, flags):
-            headings = (
-                "Building",
-                "#",
-                "Needs: got of needed",
-                "Bonus: got of wanted",
-                "Makes: gave of made",
-                "Mood",
-                "Yours",
-            )
-            for heading in headings:
-                imgui.table_setup_column(heading)
-            imgui.table_headers_row()
-            for row in details.buildings:
-                imgui.table_next_row()
-                imgui.table_next_column()
-                imgui.text(row.name)
-                imgui.table_next_column()
-                imgui.text(str(row.count))
-                imgui.table_next_column()
-                _draw_flows(row.got)
-                if row.stock:
-                    imgui.text_disabled("in stock")
-                    for need, amount in row.stock:
-                        imgui.same_line(0, 8)
-                        good_amount(need, f"{amount:.0f}")
-                imgui.table_next_column()
-                _draw_flows(row.bonus_got)
-                imgui.table_next_column()
-                _draw_flows(row.gave)
-                imgui.table_next_column()
-                imgui.text(mood_text(row))
-                imgui.table_next_column()
-                if row.price is None:
-                    imgui.text_disabled("-")
-                    continue
-                imgui.text(f"{row.owned} of {SHARES * row.count} shares")
-                if row.owned + LOT <= SHARES * row.count:
-                    if imgui.small_button(f"Buy {LOT} for {dollars(row.price)}##buy{row.name}"):
-                        bought = (row.kind, True)
-                    spot("buy_shares")
-                if not row.sellable and row.sell_from is not None:
-                    imgui.text_disabled(f"sell from {row.sell_from}")
-                elif row.sellable and imgui.small_button(
-                    f"Sell {min(LOT, row.sellable)} for {dollars(row.price * min(LOT, row.sellable) / LOT)}##sell{row.name}"
-                ):
-                    bought = (row.kind, False)
-            imgui.end_table()
+    for row in details.buildings:
+        if _draw_card(row):
+            shares = row.kind
     for other in details.others:
         imgui.bullet_text(other)
-    return bought
+    return shares
+
+
+def _draw_card(row: BuildingRow) -> bool:
+    """One kind of building as a card: its name and count, its satisfaction, what it made and
+    gave away, what it got, and the player's shares with a button opening their window; returns
+    whether that was pressed."""
+    pressed = False
+    flags = imgui.ChildFlags_.borders.value | imgui.ChildFlags_.auto_resize_y.value
+    imgui.begin_child(f"card{row.name}", (0, 0), flags)
+    right = imgui.get_cursor_pos_x() + imgui.get_content_region_avail().x
+    imgui.text(f"{row.name.capitalize()} x {row.count}")
+    mood = mood_text(row)
+    imgui.same_line(right - imgui.calc_text_size(mood).x)
+    imgui.text_colored(imgui.ImVec4(*mood_colour(row)), mood)
+    _draw_line("Made", row.gave, "given away of made")
+    if row.needs or row.got:
+        _draw_line("Got", row.got, "got of needed")
+    if row.bonus_got:
+        _draw_line("Bonus", row.bonus_got, "got of wanted")
+    if row.stock:
+        imgui.text_disabled("In stock")
+        for need, amount in row.stock:
+            imgui.same_line(0, 8)
+            good_amount(need, f"{amount:.0f}")
+    if row.price is None:
+        imgui.text_disabled("Not for sale")
+    else:
+        imgui.align_text_to_frame_padding()
+        if row.owned:
+            imgui.text(f"Yours: {row.owned:,} of {row.total:,} shares")
+        else:
+            imgui.text_disabled(f"{row.total:,} shares, none yours")
+        label = "Shares"
+        imgui.same_line(
+            right - imgui.calc_text_size(label).x - 2 * imgui.get_style().frame_padding.x
+        )
+        pressed = imgui.small_button(f"{label}##shares{row.name}")
+        spot("buy_shares")
+    imgui.end_child()
+    return pressed
+
+
+def _draw_line(label: str, flows: list[Flow], meaning: str) -> None:
+    """A line of a card: what it is about, then each good's icon and how it went."""
+    imgui.text_disabled(label)
+    if imgui.is_item_hovered():
+        imgui.set_tooltip(f"Last month: {meaning}")
+    if not flows:
+        imgui.same_line(CARD_LABEL)
+        imgui.text_disabled("-")
+    for index, flow in enumerate(flows):
+        imgui.same_line(CARD_LABEL if not index else 0, 0 if not index else 12)
+        good_amount(flow.good, flow.text)
+
+
+def mood_colour(row: BuildingRow) -> tuple[float, float, float, float]:
+    """Green for a satisfied building, red for one that is not, dim where it does not trade."""
+    if row.percent is None:
+        return TEXT_DIM
+    return GONE if row.satisfaction == Satisfaction.UNSATISFIED.name.lower() else GROWN
+
+
+def draw_shares(row: BuildingRow, where: str) -> bool | None:
+    """The shares window's contents for one kind of building in a cell: how many shares there
+    are, the player's, how many they may sell now, the price of LOT and the buttons to buy and
+    sell them, and the buildings' money last year and forecast for the next; returns True if Buy
+    was pressed, False if Sell, None if neither."""
+    pressed: bool | None = None
+    imgui.text(f"{row.name.capitalize()} x {row.count} at {where}")
+    imgui.spacing()
+    table = imgui.TableFlags_.sizing_fixed_fit.value
+    if imgui.begin_table("shares", 2, table):
+        for label, value, tip in share_lines(row):
+            imgui.table_next_row()
+            imgui.table_next_column()
+            imgui.text_disabled(label)
+            if tip and imgui.is_item_hovered():
+                imgui.set_tooltip(tip)
+            imgui.table_next_column()
+            imgui.text(value)
+        imgui.end_table()
+    if row.price is not None:
+        can_buy = row.owned + LOT <= row.total
+        imgui.begin_disabled(not can_buy)
+        if imgui.button(f"Buy {LOT} for {dollars(row.price)}"):
+            pressed = True
+        imgui.end_disabled()
+        spot("buy_shares")
+        imgui.same_line()
+        sold = min(LOT, row.sellable)
+        imgui.begin_disabled(not sold)
+        label = f"Sell {sold or LOT} for {dollars(row.price * (sold or LOT) / LOT)}"
+        if imgui.button(label):
+            pressed = False
+        imgui.end_disabled()
+        if (
+            not sold
+            and row.sell_from is not None
+            and imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value)
+        ):
+            imgui.set_tooltip(f"Shares bought can be sold five years later: from {row.sell_from}")
+    imgui.spacing()
+    imgui.separator_text("Financial results")
+    if imgui.begin_table("results", 3, table):
+        imgui.table_setup_column("")
+        imgui.table_setup_column("Last year")
+        imgui.table_setup_column("Next year")
+        imgui.table_headers_row()
+        for label, last, forecast, tip in result_lines(row):
+            imgui.table_next_row()
+            imgui.table_next_column()
+            if tip:
+                imgui.text_disabled(label)
+            else:
+                imgui.text(label)
+            if tip and imgui.is_item_hovered():
+                imgui.set_tooltip(tip)
+            imgui.table_next_column()
+            imgui.text(last)
+            imgui.table_next_column()
+            imgui.text(forecast)
+        imgui.end_table()
+    return pressed
+
+
+def share_lines(row: BuildingRow) -> list[tuple[str, str, str]]:
+    """The shares window's lines: what each is, its value and what it means."""
+    part = row.owned / row.total if row.total else 0.0
+    lines = [
+        (
+            f"In all ({row.count} x {SHARES:,})",
+            f"{row.total:,}",
+            f"Every building is {SHARES:,} shares, bought and sold {LOT} at a time",
+        ),
+        (
+            "Yours",
+            f"{row.owned:,} ({part:.0%} of what they make)",
+            "Your part of what they make goes into your stations around them first",
+        ),
+        ("Can sell now", f"{row.sellable:,}", "Shares bought can be sold five years later"),
+    ]
+    if row.held_back:
+        lines.append((f"Sellable from {row.sell_from}", f"{row.held_back:,}", ""))
+    if row.price is not None:
+        lines.append(
+            (
+                f"Price of {LOT}",
+                dollars(row.price),
+                "Higher the more satisfied they were over the last quarter",
+            )
+        )
+    return lines
+
+
+def result_lines(row: BuildingRow) -> list[tuple[str, str, str, str]]:
+    """The financial results, a line at a time: what it is, last year's money and the forecast
+    for the next, and what it means."""
+
+    def money(takings: Takings | None, pick: Callable[[Takings], float]) -> str:
+        return "-" if takings is None else dollars(pick(takings))
+
+    def line(label: str, pick: Callable[[Takings], float], tip: str) -> tuple[str, str, str, str]:
+        return label, money(row.last_year, pick), money(row.forecast, pick), tip
+
+    plural = f"The {row.name}" if row.count == 1 else f"All {row.count} {row.name}s"
+    return [
+        line(
+            f"{plural}: sold",
+            lambda t: t.output,
+            "What they sold of what they made, at its market price; next year at the pace of "
+            "the last quarter",
+        ),
+        line(
+            "Yours: sold to stations",
+            lambda t: t.sold,
+            "Your part of what they made that went into your stations, paid at its market price",
+        ),
+        line(
+            "Yours: freight, about",
+            lambda t: t.freight,
+            "About what carrying your part on earns: its freight before what the buyer's "
+            "satisfaction adds",
+        ),
+        line("Yours in all", lambda t: t.yours, ""),
+    ]
 
 
 def _flag_note(growth: Growth, rows: list[BuildingRow]) -> list[str]:
@@ -298,14 +451,6 @@ def mood_text(row: BuildingRow) -> str:
     if row.percent is None:
         return row.satisfaction
     return f"{row.satisfaction} {row.percent:.0%}"
-
-
-def _draw_flows(flows: list[Flow]) -> None:
-    """Each good's icon and how it went, one good to a line."""
-    if not flows:
-        imgui.text_disabled("-")
-    for flow in flows:
-        good_amount(flow.good, flow.text)
 
 
 def _deposit_note(tile_map: TileMap, cell: Cell) -> str:

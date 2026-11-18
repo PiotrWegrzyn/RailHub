@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -9,6 +11,7 @@ from railroads.sim.goods import Good, Need, bonus_of
 from railroads.sim.grids import Cell, HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule, Points
+from railroads.sim.ledger import Takings
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.ui import hex_details
 from railroads.ui.hex_details import (
@@ -18,6 +21,8 @@ from railroads.ui.hex_details import (
     describe,
     mood_text,
     recently_described,
+    result_lines,
+    share_lines,
 )
 
 
@@ -195,3 +200,30 @@ def test_details_say_the_company_flies_its_flag_over_a_building_the_player_owns(
     others = describe(growth, (5, 4)).others
 
     assert others == ["The Trains Corp flies its flag here: you own 300 shares of the farms."]
+
+
+def farms_row(**fields: object) -> BuildingRow:
+    row = BuildingRow("farm", 3, [], [], [], [], [], [], "content", BuildingKind.FARM)
+    return replace(row, **fields)
+
+
+def test_the_shares_window_shows_every_share_the_players_and_those_they_may_sell_now() -> None:
+    row = farms_row(owned=300, price=4320.0, sellable=100, sell_from=1862, total=3000)
+
+    lines = {label: value for label, value, _ in share_lines(row)}
+
+    assert lines["In all (3 x 1,000)"] == "3,000"
+    assert lines["Yours"] == "300 (10% of what they make)"
+    assert lines["Can sell now"] == "100"
+    assert lines["Sellable from 1862"] == "200"
+    assert lines["Price of 100"] == "$4,320"
+
+
+def test_results_show_last_year_and_the_forecast_and_a_dash_before_a_whole_year() -> None:
+    row = farms_row(total=3000, forecast=Takings(4300.0, 430.0, 80.0))
+
+    lines = {label: (last, forecast) for label, last, forecast, _ in result_lines(row)}
+
+    assert lines["All 3 farms: sold"] == ("-", "$4,300")
+    assert lines["Yours: sold to stations"] == ("-", "$430")
+    assert lines["Yours in all"] == ("-", "$510")
