@@ -122,8 +122,8 @@ def change_forests(
         for row, col in (divmod(int(index), cols) for index in closing):
             for _ in range(int(count[row, col])):
                 mill = Building((row, col), BuildingKind.LUMBER_MILL)
-                if growth.take_down(mill):
-                    changed |= growth.room.relocate(mill)
+                if shares := growth.take_down(mill):
+                    changed |= growth.room.relocate(mill, shares)
             changed.add((row, col))
     growth.reweigh_land(changed_cells)
     return changed

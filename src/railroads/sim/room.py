@@ -19,6 +19,7 @@ import numpy.typing as npt
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.grids import Cell
 from railroads.sim.ladders import POINTS, TOWN_LAND, Ladder, Points
+from railroads.sim.ownership import SHARES
 
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth
@@ -62,10 +63,10 @@ class Room:
                 if victim.kind in growth.counts:
                     growth.add(target, victim.kind, 1)
                 if owned:
-                    growth.owners.own(target, victim.kind)
+                    growth.owners.own(target, victim.kind, owned)
                 changed.add(target)
             elif owned:
-                changed |= self.relocate(victim)
+                changed |= self.relocate(victim, owned)
         return changed
 
     def _beside(self, building: Building, avoid: frozenset[Cell]) -> Cell | None:
@@ -78,9 +79,9 @@ class Room:
         ]
         return max(options, key=constructions.space_left, default=None)
 
-    def relocate(self, building: Building) -> set[Cell]:
-        """Puts up again, as the player's, a building of theirs that growth pulled down: in the
-        nearest cell with room and the land its ladder grows on."""
+    def relocate(self, building: Building, shares: int = SHARES) -> set[Cell]:
+        """Puts up again a building growth pulled down that the player owned these shares of,
+        theirs again: in the nearest cell with room and the land its ladder grows on."""
         growth = self._growth
         constructions, grid = growth.constructions, growth.grid
         ladder = next((ld for ld in growth.rule.ladders if building.kind in ld.kinds), None)
@@ -97,7 +98,7 @@ class Room:
                 if land[0] <= 0:
                     continue
             growth.build(moved)
-            growth.owners.own(near, building.kind)
+            growth.owners.own(near, building.kind, shares)
             return {near}
         return set()
 

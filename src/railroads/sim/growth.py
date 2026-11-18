@@ -94,7 +94,7 @@ from railroads.sim.ladders import (
     Points,
     Surroundings,
 )
-from railroads.sim.ownership import Owners
+from railroads.sim.ownership import SHARES, Owners
 from railroads.sim.power_plants import build_power_plants
 from railroads.sim.railway import Railway
 from railroads.sim.room import Room
@@ -695,9 +695,9 @@ class Growth:
                     changed |= self._replace(cell, around, [(small, 1)], big) or set()
         return changed
 
-    def take_down(self, building: Building) -> bool:
-        """Pulls a building down, the player's too; returns whether it was one they owned."""
-        owned = self.owners.lose(building.cell, building.kind, 1) > 0
+    def take_down(self, building: Building) -> int:
+        """Pulls a building down, the player's too; returns how many shares of it they owned."""
+        owned = self.owners.lose(building.cell, building.kind, 1)
         self.constructions.remove(building)
         if building.kind in self._counts:
             self.add(building.cell, building.kind, -1)
@@ -725,8 +725,10 @@ class Growth:
                     self.constructions.remove(Building((row, col), kind))
                 self.add((row, col), kind, -gone)
                 changed.add((row, col))
-                for _ in range(owned):
-                    changed |= self.room.relocate(Building((row, col), kind))
+                while owned > 0:
+                    moved = min(SHARES, owned)
+                    changed |= self.room.relocate(Building((row, col), kind), moved)
+                    owned -= moved
         return changed
 
     def _breeding(self, place: _Place) -> Breeding:
@@ -1177,7 +1179,8 @@ class Growth:
         self.constructions.build(new)
         self.add(cell, new_kind, 1)
         if owned:
-            self.owners.own(cell, new_kind)
+            taken = sum(take for _, _, take in plan)
+            self.owners.own(cell, new_kind, round(owned / max(taken, 1)))
         self.station_trade.reward(cell, new_kind)
         return {cell} | {near for near, _, _ in plan} | moved
 

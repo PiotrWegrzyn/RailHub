@@ -24,7 +24,6 @@ LINK = (0.45, 0.45, 0.5, 1.0)
 PERCENT_EFFECTS = frozenset(
     {
         Effect.PRODUCTION,
-        Effect.SHARE,
         Effect.PRICE,
         Effect.DISCOUNT,
         Effect.SPEED,
@@ -122,13 +121,13 @@ def explain(tree: Tree, node: Node) -> str:
     """What a node does, in a sentence: whose buildings or goods it reaches and how."""
     owned = "Every building you own" if node.everywhere else f"Every {tree.value} building you own"
     load = "Every load" if node.everywhere else f"Every load of {tree.value}"
+    whose = "every building" if node.everywhere else f"every {tree.value} building"
     amount = f"{node.amount:.0%}"
     sentences = {
         Effect.PRODUCTION: f"{owned} makes and takes in {amount} more.",
-        Effect.SHARE: f"{owned} pays you a share {amount} bigger of what it sells.",
         Effect.PRICE: f"{load} earns {amount} more.",
         Effect.STORAGE: f"Every station's stockpile holds {node.amount:g} more goods.",
-        Effect.DISCOUNT: f"Buildings cost {amount} less to buy.",
+        Effect.DISCOUNT: f"Shares of {whose} cost {amount} less.",
         Effect.SPEED: f"Every train runs {amount} faster.",
         Effect.PULL: f"Every train pulls {node.amount:g} more car.",
         Effect.UPKEEP: f"Stations, track, car trips and fuel cost {amount} less.",

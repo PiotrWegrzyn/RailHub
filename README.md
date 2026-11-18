@@ -646,14 +646,18 @@ factories, refineries, power plants and shipyards.
 
 ### Owning buildings and tech
 
-Any building that makes something can be bought from the hex details (Buy): farms, mines, mills,
-works and factories, but no homes, shops, churches or military. A bought building pays nothing
-of its own: the player's share of what it makes, 30% at first, goes into the stations around it before anything is handed out, as if a
-train had brought it, and pays in full as those stations hand it out to the buildings in their
-reach. A building with no station near pays nothing. The commerce tree raises the share to 50%
-for every building and each other tree by 10% more for its own. One costs thirty years of the
-starting share at full output; production tech shortens that. Every cell where
-the player owns a building flies the flag of their company, The Trains Corp. Growth never takes a
+Shares of any building that makes something can be bought and sold from the hex details: farms,
+mines, mills, works and factories, but no homes, shops, churches or military. Every building is
+1,000 shares, traded 100 at a time, and 100 shares are a tenth of what it makes. A bought
+building pays nothing of its own: the player's part of what it makes goes into the stations
+around it before anything is handed out, as if a train had brought it, and pays in full as
+those stations hand it out to the buildings in their reach; a building with no station near pays
+nothing. A whole building costs thirty years of all it makes at full output when it was half
+satisfied over the last quarter, two thirds of that at none, one and a half times at 100% and
+twice at 200%, and shares sell at the price they buy at, so raising a building's satisfaction
+raises what its shares fetch. Tech cuts the price of shares by up to half, and production tech
+makes the player's part bigger. Every cell where the player owns shares flies the flag of their
+company, The Trains Corp. Growth never takes a
 building from its owner: one it pulls down (a farm crowded out by a town, a lumber mill whose
 forest is gone, anything cleared for track) goes up again as theirs in the nearest cell its
 land allows, and one that merges into a bigger building (three factories into a big factory)

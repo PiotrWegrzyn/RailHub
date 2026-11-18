@@ -8,7 +8,6 @@ from railroads.sim.finance import ELECTRIC_TRACK_UPKEEP, TRACK_UPKEEP
 from railroads.sim.goods import Good, Need, price_of
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import TOWNS, GrowthRule
-from railroads.sim.ownership import OWNER_SHARE
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.station_trade import TRAIN_LOAD
@@ -84,7 +83,7 @@ def test_bonuses_add_up_in_their_own_tree_and_from_nodes_that_reach_everywhere()
     research.take("investors")
 
     food = research.bonus(Effect.PRODUCTION, Tree.FOOD)
-    metals = research.bonus(Effect.SHARE, Tree.METALS)
+    metals = research.bonus(Effect.DISCOUNT, Tree.METALS)
 
     assert food == pytest.approx(0.5)
     assert metals == pytest.approx(0.05)
@@ -98,10 +97,7 @@ def test_an_owned_farm_with_better_seed_brings_a_bigger_share_into_the_station()
 
     growth.trade_goods()
 
-    assert growth.trade.owned_brought[(6, 20)][Good.WHEAT] == pytest.approx(10 * 1.25 * OWNER_SHARE)
-    assert growth.trade.gathered[(6, 20)][Good.WHEAT] == pytest.approx(
-        10 * 1.25 * (1 - OWNER_SHARE)
-    )
+    assert growth.trade.owned_brought[(6, 20)][Good.WHEAT] == pytest.approx(10 * 1.25)
 
 
 def test_market_stalls_raise_what_food_cargo_earns() -> None:
@@ -337,14 +333,14 @@ def test_commerce_experience_counts_only_what_shops_got_out_of_the_stations() ->
     assert growth.railway.research.xp[Tree.COMMERCE] == pytest.approx(6 * price_of(Good.BEER))
 
 
-def test_production_and_share_nodes_say_they_reach_only_owned_buildings() -> None:
+def test_production_nodes_reach_owned_buildings_and_discounts_every_share() -> None:
     seed, investors = NODES["seed"][1], NODES["investors"][1]
 
     food = explain(Tree.FOOD, seed)
     everywhere = explain(Tree.COMMERCE, investors)
 
     assert food == "Every food and drink building you own makes and takes in 25% more."
-    assert everywhere.startswith("Every building you own pays you")
+    assert everywhere == "Shares of every building cost 5% less."
 
 
 def test_a_node_adding_cars_names_them_once_and_every_unlock_its_first_year() -> None:

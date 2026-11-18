@@ -38,13 +38,11 @@ class Tree(Enum):
 class Effect(Enum):
     # The player's buildings make, and take in, this share more.
     PRODUCTION = "production"
-    # The player's share of what their buildings sell rises by this much.
-    SHARE = "owner's share"
     # Cargo of the tree's goods earns this share more.
     PRICE = "price"
     # Every station's stockpile holds this many more goods.
     STORAGE = "station storage"
-    # Buildings cost this share less to buy.
+    # Shares of buildings cost this share less to buy.
     DISCOUNT = "purchase discount"
     # Trains run this share faster.
     SPEED = "train speed"
@@ -103,7 +101,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("villages", "Thriving villages", E.GROWTH, 0.5, "rotation"),
             _n("cold", "Cold stores", E.STORAGE, 300, "silos"),
             _n("hoppers", "Grain hoppers", E.CAR_SIZE, 1, "silos"),
-            _n("coop", "Farmers' cooperative", E.SHARE, 0.05, "stalls"),
+            _n("coop", "Farmers' cooperative", E.DISCOUNT, 0.05, "stalls"),
             _n(
                 "mixed_vans",
                 "Mixed food vans",
@@ -131,7 +129,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             ),
             _n("fertiliser", "Fertiliser", E.PRODUCTION, 0.25, "rotation"),
             _n("reefers", "Refrigerated vans", E.PRICE, 0.1, "cold", "bread"),
-            _n("conglomerate", "Food conglomerate", E.SHARE, 0.05, "coop"),
+            _n("conglomerate", "Food conglomerate", E.DISCOUNT, 0.05, "coop"),
             _n("tractors", "Mechanised farming", E.PRODUCTION, 0.25, "fertiliser"),
             _n(
                 "farm_machinery",
@@ -149,7 +147,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("couplings", "Steel couplings", E.PULL, 1, "bessemer"),
             _n("open_hearth", "Open hearth", E.PRODUCTION, 0.25, "bessemer"),
             _n("bearings", "Roller bearings", E.SPEED, 0.05, "boilers"),
-            _n("cartel", "Steel cartel", E.SHARE, 0.05, "open_hearth"),
+            _n("cartel", "Steel cartel", E.DISCOUNT, 0.05, "open_hearth"),
             _n(
                 "superheaters",
                 "Superheaters",
@@ -162,7 +160,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("bogie_wagons", "Bogie wagons", E.CAR_SIZE, 1, "drawbars", everywhere=True),
             _n("rolling", "Rolling mills", E.PRODUCTION, 0.25, "open_hearth"),
             _n("streamlining", "Streamlining", E.SPEED, 0.1, "superheaters"),
-            _n("works_trust", "Engineering trust", E.SHARE, 0.05, "cartel", "rolling"),
+            _n("works_trust", "Engineering trust", E.DISCOUNT, 0.05, "cartel", "rolling"),
             _n("oxygen", "Basic oxygen steel", E.PRODUCTION, 0.25, "rolling"),
         ),
         Tree.FUEL: (
@@ -176,7 +174,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("drilling", "Rotary drilling", E.PRODUCTION, 0.25, "seams"),
             _n("pipelines", "Pipelines", E.STORAGE, 300, "drilling"),
             _n("diesel", "Diesel engines", E.UNLOCK, 0.0, "drilling", opens="diesel engines"),
-            _n("fuel_trust", "Fuel trust", E.SHARE, 0.1, "kilns", "drilling"),
+            _n("fuel_trust", "Fuel trust", E.DISCOUNT, 0.1, "kilns", "drilling"),
             _n("efficiency", "Fuel efficiency", E.UPKEEP, 0.1, "grid"),
         ),
         Tree.CRAFT: (
@@ -194,9 +192,9 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
                 "patterns",
                 opens="general common goods cars, taking whichever pays best",
             ),
-            _n("mills_trust", "Mill owners' trust", E.SHARE, 0.05, "spinning"),
+            _n("mills_trust", "Mill owners' trust", E.DISCOUNT, 0.05, "spinning"),
             _n("synthetics", "Synthetic dyes", E.PRODUCTION, 0.25, "spinning"),
-            _n("couture", "Couture", E.SHARE, 0.05, "fashion", "mills_trust"),
+            _n("couture", "Couture", E.DISCOUNT, 0.05, "fashion", "mills_trust"),
         ),
         Tree.MODERN: (
             _n("labs", "Research labs", E.PRODUCTION, 0.25),
@@ -214,7 +212,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("patents", "Patents", E.PRICE, 0.1, "labs"),
             _n("automation", "Automation", E.PRODUCTION, 0.25, "assembly"),
             _n("thyristors", "Thyristor control", E.UNLOCK, 0.0, "relays", opens="fast electrics"),
-            _n("tech_trust", "Technology giant", E.SHARE, 0.1, "patents", "automation"),
+            _n("tech_trust", "Technology giant", E.DISCOUNT, 0.1, "patents", "automation"),
             _n("computers", "Computer timetables", E.SPEED, 0.1, "thyristors"),
             _n(
                 "maglev",
@@ -226,15 +224,23 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             ),
         ),
         Tree.COMMERCE: (
-            _n("books", "Double-entry books", E.DISCOUNT, 0.1),
-            _n("investors", "Investors", E.SHARE, 0.05, everywhere=True),
-            _n("chains", "Chain stores", E.DISCOUNT, 0.1, "books"),
+            _n("books", "Double-entry books", E.DISCOUNT, 0.1, everywhere=True),
+            _n("investors", "Investors", E.DISCOUNT, 0.05, everywhere=True),
+            _n("chains", "Chain stores", E.DISCOUNT, 0.1, "books", everywhere=True),
             _n("regular_customer", "Regular customer", E.FUEL_MARKUP, 0.25, "books"),
             _n("advertising", "Advertising", E.PRICE, 0.05, "investors", everywhere=True),
-            _n("holding", "Holding company", E.SHARE, 0.05, "investors", everywhere=True),
-            _n("takeovers", "Hostile takeovers", E.DISCOUNT, 0.15, "chains"),
+            _n("holding", "Holding company", E.DISCOUNT, 0.05, "investors", everywhere=True),
+            _n("takeovers", "Hostile takeovers", E.DISCOUNT, 0.15, "chains", everywhere=True),
             _n("brands", "Household brands", E.PRICE, 0.05, "advertising", everywhere=True),
-            _n("empire", "Business empire", E.SHARE, 0.1, "holding", "takeovers", everywhere=True),
+            _n(
+                "empire",
+                "Business empire",
+                E.DISCOUNT,
+                0.1,
+                "holding",
+                "takeovers",
+                everywhere=True,
+            ),
             # TODO: a placeholder until bonus goods get their own, stronger tech interactions,
             # which the user will come back to.
             _n("fine_living", "Fine living", E.BONUS_GOODS, 0.1, "advertising", everywhere=True),

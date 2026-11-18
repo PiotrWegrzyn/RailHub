@@ -190,8 +190,8 @@ def test_details_say_the_company_flies_its_flag_over_a_building_the_player_owns(
     constructions = Constructions(make_map())
     constructions.build(Building((5, 4), BuildingKind.FARM))
     growth = Growth(constructions, GrowthRule(trades=True, ladders=()))
-    growth.owners.own((5, 4), BuildingKind.FARM)
+    growth.owners.own((5, 4), BuildingKind.FARM, 300)
 
     others = describe(growth, (5, 4)).others
 
-    assert others == ["The Trains Corp flies its flag here: you own it."]
+    assert others == ["The Trains Corp flies its flag here: you own 300 shares of the farms."]

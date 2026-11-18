@@ -19,6 +19,7 @@ from railroads.sim.goods import RECIPES, Good, Need, bonus_of, boosts_of, demand
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
+from railroads.sim.ownership import LOT, SHARES
 from railroads.sim.tilemap import Deposit, TileMap
 from railroads.ui.biomes import biome_of
 from railroads.ui.theme import good_amount
@@ -54,7 +55,8 @@ class BuildingRow:
     stock: list[tuple[Need, float]]
     satisfaction: str
     kind: BuildingKind | None = None
-    # How many of them the player owns, and what one more costs; None for what cannot be bought.
+    # How many shares of them the player owns, and what LOT shares cost or fetch now; None for
+    # what cannot be bought.
     owned: int = 0
     price: float | None = None
     # Its satisfaction last month, past 1 with bonus goods; None where it does not trade.
@@ -153,8 +155,8 @@ def describe(
                 stock,
                 mood,
                 kind,
-                int(growth.owners.owned(kind)[cell]),
-                growth.owners.price_to_buy(kind),
+                int(growth.owners.shares(kind)[cell]),
+                growth.owners.lot_price(cell, kind),
                 percent,
                 bonus_got,
             )
@@ -201,10 +203,10 @@ def one_cell(trade: Trade, position: int, kind: BuildingKind) -> Trade:
     )
 
 
-def draw_hex_details(details: HexDetails) -> BuildingKind | None:
+def draw_hex_details(details: HexDetails) -> tuple[BuildingKind, bool] | None:
     """Draws the details inside the current imgui window; returns the kind of building whose Buy
-    button was pressed, if any."""
-    bought = None
+    (True) or Sell (False) button was pressed, if any."""
+    bought: tuple[BuildingKind, bool] | None = None
     imgui.text(details.title)
     imgui.text_disabled(details.land)
     imgui.text(f"Satisfaction: {details.satisfaction}")
@@ -261,11 +263,15 @@ def draw_hex_details(details: HexDetails) -> BuildingKind | None:
                 if row.price is None:
                     imgui.text_disabled("-")
                     continue
-                imgui.text(f"{row.owned} of {row.count}")
-                if row.owned < row.count and imgui.small_button(
-                    f"Buy {dollars(row.price)}##{row.name}"
+                imgui.text(f"{row.owned} of {SHARES * row.count} shares")
+                if row.owned + LOT <= SHARES * row.count and imgui.small_button(
+                    f"Buy {LOT} for {dollars(row.price)}##buy{row.name}"
                 ):
-                    bought = row.kind
+                    bought = (row.kind, True)
+                if row.owned and imgui.small_button(
+                    f"Sell {min(LOT, row.owned)} for {dollars(row.price * min(LOT, row.owned) / LOT)}##sell{row.name}"
+                ):
+                    bought = (row.kind, False)
             imgui.end_table()
     for other in details.others:
         imgui.bullet_text(other)
@@ -273,11 +279,10 @@ def draw_hex_details(details: HexDetails) -> BuildingKind | None:
 
 
 def _flag_note(growth: Growth, rows: list[BuildingRow]) -> list[str]:
-    owned = sum(row.owned for row in rows)
+    owned = [f"{row.owned} shares of the {row.name}s" for row in rows if row.owned]
     if not owned:
         return []
-    whose = "it" if owned == 1 else f"{owned} of them"
-    return [f"{growth.owners.company} flies its flag here: you own {whose}."]
+    return [f"{growth.owners.company} flies its flag here: you own {', '.join(owned)}."]
 
 
 def mood_text(row: BuildingRow) -> str:

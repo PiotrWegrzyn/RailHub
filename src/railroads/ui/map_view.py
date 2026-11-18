@@ -300,11 +300,16 @@ class MapView:
         expanded, still_open = imgui.begin("Hex details", True)
         if expanded:
             details = recently_described(self.growth, self.selected, self._satisfaction)
-            bought = draw_hex_details(details)
-            if bought is not None:
-                self._bought = (
-                    self.growth.owners.buy(self.selected, bought) or f"You own a {bought.value}"
-                )
+            pressed = draw_hex_details(details)
+            if pressed is not None:
+                kind, buying = pressed
+                owners = self.growth.owners
+                if buying:
+                    said = owners.buy(self.selected, kind)
+                else:
+                    said = owners.sell(self.selected, kind)
+                held = int(owners.shares(kind)[self.selected])
+                self._bought = said or f"You own {held} shares of the {kind.value}s here"
             if self._bought:
                 imgui.text_disabled(self._bought)
         imgui.end()

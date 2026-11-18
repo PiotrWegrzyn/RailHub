@@ -6,7 +6,7 @@ from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.goods import Good, price_of
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import FACTORIES, FARMS_CROWDED_OUT, GrowthRule
-from railroads.sim.ownership import OWNER_SHARE, PAYBACK_YEARS
+from railroads.sim.ownership import LOT, PAYBACK_YEARS, SHARES, satisfaction_price
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 
@@ -20,23 +20,56 @@ def grown(*placed: tuple[tuple[int, int], BuildingKind]) -> Growth:
     return growth
 
 
-def test_a_building_costs_payback_years_of_the_players_share_of_what_it_can_make() -> None:
-    growth = grown(((5, 5), BuildingKind.FARM))
+def half_satisfied(growth: Growth, satisfaction: float = 0.5) -> Growth:
+    growth.economy.months = [np.full(growth.economy.cells, satisfaction) for _ in range(3)]
+    return growth
+
+
+def test_a_lot_of_shares_costs_its_part_of_payback_years_of_all_a_building_makes() -> None:
+    growth = half_satisfied(grown(((5, 5), BuildingKind.FARM)))
     cash = growth.railway.finances.cash
 
     problem = growth.owners.buy((5, 5), BuildingKind.FARM)
 
-    price = 12 * PAYBACK_YEARS * OWNER_SHARE * 10 * price_of(Good.WHEAT)
+    price = 12 * PAYBACK_YEARS * 10 * price_of(Good.WHEAT) * LOT / SHARES
     assert problem is None
-    assert growth.owners.owned(BuildingKind.FARM)[5, 5] == 1
+    assert growth.owners.shares(BuildingKind.FARM)[5, 5] == LOT
     assert growth.railway.finances.cash == pytest.approx(cash - price)
+
+
+@pytest.mark.parametrize(
+    ("satisfaction", "factor"),
+    [(0.0, 2 / 3), (0.25, 5 / 6), (0.5, 1.0), (1.0, 1.5), (2.0, 2.0), (3.0, 2.0)],
+)
+def test_shares_cost_more_the_more_satisfied_the_building_was_over_the_quarter(
+    satisfaction: float, factor: float
+) -> None:
+    price = satisfaction_price(satisfaction)
+
+    assert price == pytest.approx(factor)
+
+
+def test_shares_sell_at_their_price_now_so_a_building_satisfied_since_earns_more() -> None:
+    growth = half_satisfied(grown(((5, 5), BuildingKind.FARM)))
+    growth.owners.buy((5, 5), BuildingKind.FARM)
+    paid = -growth.railway.finances.month["shares bought"]
+    half_satisfied(growth, 1.0)
+
+    growth.owners.sell((5, 5), BuildingKind.FARM)
+
+    assert growth.railway.finances.month["shares sold"] == pytest.approx(1.5 * paid)
+    assert growth.owners.shares(BuildingKind.FARM)[5, 5] == 0
 
 
 @pytest.mark.parametrize(
     ("placed", "kind", "problem"),
     [
         ([((5, 5), BuildingKind.HOUSE)], BuildingKind.HOUSE, "A house cannot be bought"),
-        ([((5, 5), BuildingKind.MINE)], BuildingKind.MINE, "You already own every mine here"),
+        (
+            [((5, 5), BuildingKind.MINE)],
+            BuildingKind.MINE,
+            "You already own every share of the mines here",
+        ),
     ],
 )
 def test_homes_cannot_be_bought_nor_more_than_stand_there(
@@ -45,14 +78,14 @@ def test_homes_cannot_be_bought_nor_more_than_stand_there(
     growth = grown(*placed)
     growth.railway.finances.earn(1_000_000.0, "test")
     if kind == BuildingKind.MINE:
-        growth.owners.buy((5, 5), kind)
+        growth.owners.own((5, 5), kind)
 
     said = growth.owners.buy((5, 5), kind)
 
     assert said == problem
 
 
-def joined_with_owned_farm(*houses: tuple[int, int]) -> Growth:
+def joined_with_owned_farm(shares: int, *houses: tuple[int, int]) -> Growth:
     constructions = Constructions(flat_map())
     growth = Growth(constructions, GrowthRule(trades=False))
     build_station(growth, (6, 3))
@@ -64,16 +97,19 @@ def joined_with_owned_farm(*houses: tuple[int, int]) -> Growth:
     growth.build(Building((6, 22), BuildingKind.FARM))
     for cell in houses:
         growth.build(Building(cell, BuildingKind.HOUSE))
-    growth.owners.own((6, 22), BuildingKind.FARM)
+    growth.owners.own((6, 22), BuildingKind.FARM, shares)
     return growth
 
 
-def test_a_station_hands_out_the_players_share_of_their_farm_and_files_its_pay_as_owned() -> None:
-    growth = joined_with_owned_farm((6, 21), (6, 21), (6, 21))
+@pytest.mark.parametrize("shares", [LOT, 3 * LOT, SHARES])
+def test_a_station_hands_out_the_players_part_of_their_farm_and_files_its_pay_as_owned(
+    shares: int,
+) -> None:
+    growth = joined_with_owned_farm(shares, (6, 21), (6, 21), (6, 21))
 
     growth.trade_goods()
 
-    assert growth.trade.handed[(6, 20)][Good.WHEAT] == pytest.approx(10 * OWNER_SHARE)
+    assert growth.trade.handed[(6, 20)][Good.WHEAT] == pytest.approx(10 * shares / SHARES)
     assert growth.railway.finances.month["owned buildings"] > 0
     assert growth.railway.finances.month.get("cargo", 0.0) == 0.0
 
@@ -106,7 +142,7 @@ def test_a_crowded_out_farm_of_the_players_goes_up_again_nearby_and_stays_theirs
     assert growth.count(BuildingKind.FARM)[tuple(np.argwhere(owned)[0])] == 1
 
 
-def test_factories_merging_into_a_big_one_hand_it_to_whoever_owned_one_of_them() -> None:
+def test_factories_merging_into_a_big_one_hand_their_owner_their_part_of_it() -> None:
     growth = grown(
         ((5, 5), BuildingKind.FACTORY),
         ((5, 6), BuildingKind.FACTORY),
@@ -117,7 +153,7 @@ def test_factories_merging_into_a_big_one_hand_it_to_whoever_owned_one_of_them()
     growth._turn((5, 5), FACTORIES, np.random.default_rng(0))
 
     assert growth.count(BuildingKind.BIG_FACTORY)[5, 5] == 1
-    assert growth.owners.owned(BuildingKind.BIG_FACTORY)[5, 5] == 1
+    assert growth.owners.shares(BuildingKind.BIG_FACTORY)[5, 5] == round(SHARES / 3)
     assert growth.owners.owned(BuildingKind.FACTORY).sum() == 0
 
 
