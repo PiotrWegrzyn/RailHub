@@ -8,3 +8,10 @@ Buying lots next to the map is built (README, Maps), but only as far as the map 
 place reaches: a lot with no land on it is never offered. The player asked for no limit at all,
 which needs lots past the place's map made from the world's map data, the way a random place's
 map is (`railroads.mapgen.world_files`).
+
+## A goods market
+
+A market window listing the price of every good in the world and how it changes over time, as
+the fuel market already does for coal, wood and diesel: prices pulled up by demand and down by
+supply. Freight would pay a share of these market prices, and the player's own goods would sell
+at them. Raised on 2026-11-18.
