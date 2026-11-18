@@ -31,7 +31,14 @@ first with:
   `src/railroads/maps/__init__.py`. Each is baked cut to its land, so some are long and thin or
   wide, and all are 2 km a hex; a game starts on the square in the middle of the place, holding a
   quarter of its land (`TileMap.square_middle`), so Poland starts as about 340 by 340 km around
-  its middle. A random place is cut the same way;
+  its middle. A random place is cut the same way. The cut is for speed: every hex grows every
+  month, before play and in it, so setting up a game and running a month both take about as
+  long as the map is big. On an M3 Pro, seed 7, Poland's whole land (131,500 hexes) grows to
+  1850 in 10.0 s and runs a month in 67 ms; half of it (65,700) in 5.6 s and 43 ms; the
+  quarter a game starts on (32,700) in 3.4 s and 24 ms; twice and four times the land take
+  18 s and 118 ms, 34 s and 214 ms. About 1 s and 5 ms of that does not shrink with the map.
+  The browser takes about twice as long. Drawing barely depends on the map's size, as only the
+  chunks in view are drawn. The in-game help explains it under Map;
 - the seed, which picks the start location and grows the same towns again. The menu offers a
   new random one each time the game opens;
 - the year play begins, so how long towns grow from 850 before it: 1850 is suggested, and play
@@ -62,7 +69,8 @@ would make an older save load wrong; a save in another format is then refused wi
 saying so, not a crash. Saves are Python pickles, so only load saves you trust.
 
 Any of the options below skips the menu and starts that game straight away. Without `--poland`
-or `--map`, a game starts at a random, mostly-land spot in the world, on a 537 x 537 km map. The limits for
+or `--map`, a game starts at a random, mostly-land spot in the world, on a 537 x 537 km map, played from the
+square of about 270 x 270 km in its middle. The limits for
 that spot (longitude, latitude, how much land) are `START_REGION` in
 `src/railroads/newgame.py`. Options:
 

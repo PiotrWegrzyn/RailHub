@@ -41,6 +41,9 @@ The ideas every rule of the game should follow.
   connects grow faster.
 - One set of rules for the whole history: the years before play starts run on the same rules as
   play, with no special factors for them.
+- A game starts on the square in the middle of its place, a quarter of its land. Every hex grows
+  every month, so the time to set up a game and to run a month grows with the map; a quarter of
+  the land starts and plays about three times as fast as the whole.
 - Every map gets at least a minimum of each key building. They come up on their own first; if too
   few do, the game adds the missing ones in a random but natural place for them.
 - Every building that is not unique comes up at least once in the year it opens, and then has odds

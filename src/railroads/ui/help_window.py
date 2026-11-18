@@ -1,6 +1,7 @@
 """The help window: every building with what it makes and wants in a month, every good with
 what it earns and who makes and wants it, every engine with what it can do, when and with
-which tech it is sold, and the real engines it is drawn after, and how towns work."""
+which tech it is sold, and the real engines it is drawn after, how towns work and why a game
+starts on a quarter of its place."""
 
 from dataclasses import dataclass
 from functools import cache
@@ -37,6 +38,21 @@ TOWNS_HELP = (
         "Passengers and mail only board for a stop in another town, so two stations in one town"
         " earn nothing carrying them to each other. A train waiting for a full load doesn't wait for"
         " them either."
+    ),
+)
+MAP_HELP = (
+    (
+        "A game starts on the square in the middle of its place, holding a quarter of its land:"
+        " Poland starts as about 340 by 340 km around its middle, and a random place in the world"
+        " as about 270 by 270 km."
+    ),
+    (
+        "Every hex of the map grows every month, from the year 850 before play and all through"
+        " it, so the time to set up a new game and to run each month grows with the map: twice"
+        " the land takes about twice as long. A quarter of the land sets up and runs about three"
+        " times as fast as the whole place: Poland's towns grow to 1850 in about 3 seconds"
+        " instead of 10 on a fast computer, and a month takes about 25 ms instead of 70. In the"
+        " browser both take about twice as long."
     ),
 )
 ENGINES_NOTE = (
@@ -183,7 +199,10 @@ class HelpWindow:
                     self._draw_engines()
                     imgui.end_tab_item()
                 if imgui.begin_tab_item("Towns")[0]:
-                    _draw_towns()
+                    _draw_paragraphs(TOWNS_HELP)
+                    imgui.end_tab_item()
+                if imgui.begin_tab_item("Map")[0]:
+                    _draw_paragraphs(MAP_HELP)
                     imgui.end_tab_item()
                 imgui.end_tab_bar()
         imgui.end()
@@ -299,8 +318,8 @@ class HelpWindow:
         imgui.end_table()
 
 
-def _draw_towns() -> None:
-    for paragraph in TOWNS_HELP:
+def _draw_paragraphs(paragraphs: tuple[str, ...]) -> None:
+    for paragraph in paragraphs:
         imgui.text_wrapped(paragraph)
         imgui.spacing()
 
