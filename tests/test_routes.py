@@ -86,6 +86,22 @@ def test_rivers_are_bridged_and_mountains_tunnelled() -> None:
     assert all(constructions.why_not(piece) is None for piece in route.pieces)
 
 
+def test_track_from_a_station_by_a_river_is_laid_whole_not_through_a_corner_over_water() -> None:
+    grid = HexGrid(rows=12, cols=20, km_per_cell=2.0)
+    terrain = np.full(grid.shape, Terrain.LAND, dtype=np.uint8)
+    terrain[5, 3:5] = Terrain.RIVER
+    constructions = Constructions(flat_map(grid=grid, terrain=terrain))
+    growth = Growth(constructions, NO_TRADE)
+    build_station(growth, (4, 4))
+    build_station(growth, (8, 4))
+    route = plan_route(constructions, (4, 4), (8, 4))
+    assert route is not None
+
+    lay_route(growth, route)
+
+    assert all(piece in constructions.at(piece.cell) for piece in route.pieces)
+
+
 def test_track_keeps_to_empty_land_when_it_can() -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)

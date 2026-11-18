@@ -483,7 +483,11 @@ class _Planner:
             if index == start and key not in came and entry in along:
                 leads = tuple(point for point in leads if runs_on >> point & 1)
             if index == start and key not in came and self._ways_out:
-                leads = tuple(point for point in self._ways_out if point != entry)
+                leads = tuple(
+                    point
+                    for point in exits[_ANYWHERE]
+                    if point in self._ways_out and point != entry
+                )
             so_far = best[key]
             turning = bends[entry]
             for exit_point in leads:
