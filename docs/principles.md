@@ -46,6 +46,13 @@ The ideas every rule of the game should follow.
 - A game starts on the square in the middle of its place, a quarter of its land. Every hex grows
   every month, so the time to set up a game and to run a month grows with the map; a quarter of
   the land starts and plays about three times as fast as the whole.
+- More land is bought a lot at a time, each a quarter of the starting land, at Fibonacci prices
+  that keep a big map hard to get. What lies past the map's edge shows before it is bought, so
+  nothing in it is a surprise.
+- Land bought grows on its own from the start of history to the year it is bought, under the
+  same rules, and arrives as built up as the rest. It gets only a quarter of the buildings every
+  map is sure to have, and the game's novelties come up there at most at a quarter of the chance
+  they had over the years played, from the same pool.
 - Every map gets at least a minimum of each key building. They come up on their own first; if too
   few do, the game adds the missing ones in a random but natural place for them.
 - Every building that is not unique comes up at least once in the year it opens, and then has odds

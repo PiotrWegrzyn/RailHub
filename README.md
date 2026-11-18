@@ -38,7 +38,23 @@ first with:
   quarter a game starts on (32,700) in 3.4 s and 24 ms; twice and four times the land take
   18 s and 118 ms, 34 s and 214 ms. About 1 s and 5 ms of that does not shrink with the map.
   The browser takes about twice as long. Drawing barely depends on the map's size, as only the
-  chunks in view are drawn. The in-game help explains it under Map;
+  chunks in view are drawn. The in-game help explains it under Map.
+
+  The rest of the place can be bought in play, a lot at a time (`railroads.sim.lots`,
+  `railroads.land`, `railroads.ui.land_offers`). The starting square splits into two by two
+  lots; any lot sharing a side with the player's land and holding some land is for sale, the
+  first for $377,000 and each after it for the next Fibonacci number of thousands ($610,000,
+  $987,000, ...). Past the map's edge each lot shows the world map, as the minimap does, behind
+  a chain and a padlock with its price, so what lies there is no surprise. A click asks to
+  confirm; the lot is then cut from the place's map (`newgame.place_map`) and grown on its own
+  from 850 to the year it is bought behind the waiting screen, with only a quarter of the
+  buildings every map keeps at least one of, picked at random, and each novelty not built yet
+  at a quarter of the chance it had over the years played. The game then moves onto the bigger
+  map (`railroads.sim.regrid`): a lot bought above or to the left shifts every cell, and every
+  station, train, stockpile and array moves with it. The map is the smallest rectangle of lots
+  around the player's land; lots in it not bought are locked (`TileMap.locked`), and nothing
+  is built or grows there. A lot takes about 2 s to grow on the desktop and 3 s in the
+  browser, and adds about 5 ms to a month. Lots go only as far as the place's own map;
 - the seed, which picks the start location and grows the same towns again. The menu offers a
   new random one each time the game opens;
 - the year play begins, so how long towns grow from 850 before it: 1850 is suggested, and play

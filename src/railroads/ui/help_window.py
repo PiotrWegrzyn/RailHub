@@ -54,6 +54,21 @@ MAP_HELP = (
         " instead of 10 on a fast computer, and a month takes about 25 ms instead of 70. In the"
         " browser both take about twice as long."
     ),
+    (
+        "The land around it can be bought a lot at a time. Every lot is a quarter of the land a"
+        " game starts on, half as wide and half as tall, and any lot sharing a side with yours is"
+        " for sale: past the map's edge it shows the world map behind a chain and a padlock with"
+        " its price. The first costs $377,000 and each after it the next Fibonacci number of"
+        " thousands: $610,000, $987,000 and so on."
+    ),
+    (
+        "Click a lot and confirm to buy it. It then grows on its own from 850 to this year, as"
+        " the rest of the map did, while the waiting screen shows, and the view opens on it. It"
+        " gets only a quarter of the buildings every map is sure to have, picked at random, and"
+        " each one-off building the game hasn't got yet comes up there at a quarter of the"
+        " chance it had over the years played, at most. Each lot bought makes a month a few"
+        " milliseconds longer."
+    ),
 )
 ENGINES_NOTE = (
     "An engine is sold from its year once its tech is taken, until a newer one of its line comes."
