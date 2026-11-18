@@ -48,7 +48,7 @@ from railroads.ui.saves_window import SavesWindow
 from railroads.ui.tech_window import TechWindow
 from railroads.ui.theme import BRASS, apply_theme
 from railroads.ui.top_bar import draw_top_bar
-from railroads.ui.waiting_screen import Label, Shatter
+from railroads.ui.waiting_screen import Label, Shatter, waiting_line
 from railroads.ui.web_setup import page_setup
 from railroads.ui.workers import FRAME_SECONDS, FrameWorker, submit_steps, worker
 
@@ -344,6 +344,7 @@ class Shell:
         # Whether the work is a new game, and on a random place; when it began; what the waiting
         # screen last showed; and the screen breaking up over a new game just begun.
         self._new_game_on: MapChoice | None = None
+        self._pictured = False
         self._began = 0.0
         self._labels: list[Label] = []
         self._shatter: Shatter | None = None
@@ -367,37 +368,51 @@ class Shell:
         self._done = done
 
     def start(self, settings: Settings) -> None:
-        self._begin("Setting up a new game", lambda: self._new_game(settings), settings.map)
+        self._begin(
+            "Setting up a new game",
+            lambda: self._new_game(settings),
+            settings.map,
+            settings.show_map_growing,
+        )
 
     def _new_game(self, settings: Settings) -> Steps[SavedGame]:
         """A new game, grown in the page's setup worker where there is one, so a browser doesn't
         freeze while its towns grow; grown here where there isn't, or if the worker fails, a few
         steps a frame where the frames grow it."""
-        show = self._show
+        pictured = settings.show_map_growing
+        size = self._window if pictured else None
+        see = self._show.see
         over_ground = ground_shader.GL is not None and hello_imgui.is_using_hello_imgui()
         setup = page_setup()
         if setup is not None:
             # The frames only look for word from the worker and take up what it grew, a step each.
             self._frame_seconds = 0.0
             saved = yield from setup.grow(
-                settings, self.report, self.advance, show.see, self._window, over_ground
+                settings, self.report, self.advance, see, size, over_ground
             )
             self._frame_seconds = FRAME_SECONDS
             if saved is not None:
                 return saved
-        pictures = HistoryPictures(self._window, show.see, over_ground)
+        if not pictured:
+            return (yield from make_game_steps(settings, self.report, self.advance))
+        pictures = HistoryPictures(self._window, see, over_ground)
         return (yield from make_game_steps(settings, self.report, self.advance, pictures))
 
     def load(self, name: str) -> None:
         self._begin(f"Loading '{name}'", lambda: _at_once(lambda: self.saves.load(name)))
 
     def _begin(
-        self, doing: str, work: Callable[[], Steps[SavedGame]], new_game_on: MapChoice | None = None
+        self,
+        doing: str,
+        work: Callable[[], Steps[SavedGame]],
+        new_game_on: MapChoice | None = None,
+        pictured: bool = False,
     ) -> None:
         """Starts the work of setting up or loading a game; `new_game_on` is the map of a new
-        game, None for a game loaded."""
+        game, None for a game loaded, and `pictured` whether its map shows as its towns grow."""
         self._doing = doing
         self._new_game_on = new_game_on
+        self._pictured = pictured
         self._began = time.monotonic()
         self._shatter = None
         self._progress = ""
@@ -417,11 +432,13 @@ class Shell:
             saved = yield from work()
             yield
             app = App.from_saved(saved, self.saves)
-            if new_game_on is not None:
+            if new_game_on is not None and pictured:
                 camera = app.view.camera
                 center = opening_center(app.view.tile_map.grid, size)
                 camera.center_x, camera.center_y = center
                 camera.zoom_level = OPENING_ZOOM
+            elif new_game_on is not None:
+                app.view.visit_biggest_town()
             yield
             yield from app.view.prepare_steps(size, density, chunks)
             return app
@@ -512,7 +529,7 @@ class Shell:
         imgui.begin_group()
         dots = "." * (1 + int(time.monotonic() * 2) % 3)
         self._labels = [
-            self._text(f"{self._doing}{dots:<3}", imgui.ImVec4(*BRASS)),
+            self._text(f"{self._waiting_line()}{dots:<3}", imgui.ImVec4(*BRASS)),
             self._text(
                 self._progress or " ", imgui.get_style_color_vec4(imgui.Col_.text_disabled.value)
             ),
@@ -546,6 +563,14 @@ class Shell:
             self._labels.insert(0, panel)
         draw_list.channels_merge()
         draw_version()
+
+    def _waiting_line(self) -> str:
+        """What the waiting screen is doing: make-believe work for a new game set up without
+        pictures of its map growing."""
+        if self._new_game_on is None or self._pictured:
+            return self._doing
+        random_place = self._new_game_on == MapChoice.WORLD
+        return waiting_line(time.monotonic() - self._began, random_place)
 
     @staticmethod
     def _text(text: str, colour: imgui.ImVec4) -> Label:

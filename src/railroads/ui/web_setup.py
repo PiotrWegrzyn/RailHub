@@ -57,16 +57,20 @@ def grow(
     """In the worker: the game these pickled settings make, ready to hand back, telling `report`
     what it does, `advance` the share of the towns' history grown and `see` where in Python's
     memory each picture of it growing (railroads.ui.history_pictures), pickled, is and how many
-    bytes it takes. The settings come pickled with the size of the pictures and whether they
-    leave the ground to the graphics card."""
+    bytes it takes. The settings come pickled with the size of the pictures, None for none, and
+    whether they leave the ground to the graphics card."""
     wanted, size, over_ground = pickle.loads(settings)
 
     def seen(picture: Picture) -> None:
         pickled = np.frombuffer(pickle.dumps(picture, protocol=pickle.HIGHEST_PROTOCOL), np.uint8)
         see(_address(pickled), pickled.size)
 
-    pictures = HistoryPictures(size, seen, over_ground)
-    snap = snapshot(make_game(wanted, report, advance, pictures))
+    if size is None:
+        snap = snapshot(make_game(wanted, report, advance))
+    else:
+        snap = snapshot(
+            make_game(wanted, report, advance, HistoryPictures(size, seen, over_ground))
+        )
     return Grown(zlib.compress(snap.data, 1), len(snap.data))
 
 
@@ -115,14 +119,14 @@ class PageSetup:
         report: Callable[[str], None],
         advance: Callable[[float], None] = lambda done: None,
         see: Callable[[Picture], None] = lambda picture: None,
-        size: tuple[int, int] = (1280, 800),
+        size: tuple[int, int] | None = None,
         over_ground: bool = False,
     ) -> Steps[SavedGame | None]:
         """The game these settings make, grown in a worker while the frames go on, a step a
         frame, passing on to `report`, `advance` and `see` what the worker says of how far it
-        got and its pictures of the map growing, `size` points big and leaving the ground to the
-        graphics card if `over_ground`; None if the worker failed, for the caller to grow it
-        itself."""
+        got and its pictures of the map growing, `size` points big (none without it) and leaving
+        the ground to the graphics card if `over_ground`; None if the worker failed, for the
+        caller to grow it itself."""
         wanted = (settings, size, over_ground)
         self._page.start(pickle.dumps(wanted, protocol=pickle.HIGHEST_PROTOCOL))
         try:

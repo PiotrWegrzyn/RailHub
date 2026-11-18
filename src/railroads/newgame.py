@@ -80,6 +80,9 @@ class Settings:
     cash: float = START_CASH
     # Years a stand-in player builds and runs the railway before the player takes over.
     stand_in_years: int = 0
+    # Whether the waiting screen shows the map as its towns grow (railroads.ui.history_pictures),
+    # which makes setting it up take longer.
+    show_map_growing: bool = False
 
 
 def allowed_start_year(year: int) -> int:

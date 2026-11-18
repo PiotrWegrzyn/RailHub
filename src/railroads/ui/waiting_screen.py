@@ -1,6 +1,8 @@
-"""The waiting screen of a new game breaking into hexes that fall away to show the game once it is
-ready, each hex carrying the part of the screen it covered: the newest picture of the map growing
-(railroads.ui.history_pictures), or the plain background, and the lines shown over it."""
+"""What the waiting screen shows while a new game is set up without pictures of its map growing
+(railroads.ui.history_pictures): a line of make-believe work that changes every few seconds, opened
+by a joke when the map is a random place. And, once the game is ready, the screen breaking into
+hexes that fall away to show it, each hex carrying the part of the screen it covered: the newest
+picture of the map growing, or the plain background, and the lines shown over it."""
 
 import math
 from dataclasses import dataclass
@@ -8,6 +10,22 @@ from typing import Self
 
 import numpy as np
 from imgui_bundle import imgui
+
+RANDOM_JOKES = ("Random bullshit coming!",)
+JOKE_SECONDS = 5.0
+WORK = (
+    "Turning cogs",
+    "Steaming the engine",
+    "Playing with the hexes",
+    "Pouring water",
+    "Sprinkling sand",
+    "Making people",
+    "Making more people",
+    "Growing them apples",
+    "Shoveling cow shit",
+    "Handing out bread",
+)
+WORK_SECONDS = 2.5
 
 # The falling hexes: their size, when the cracks show and the first falls, how much later the
 # outermost falls than the middle one, and how hard they fall (pixels a second squared).
@@ -21,6 +39,15 @@ CRACK_COLOUR = (0.0, 0.0, 0.0, 0.55)
 LONGEST_STEP = 0.1
 # A hexagon's corners (_hexagon) as the two quads either side of its middle.
 HALVES = ((0, 1, 2, 3), (3, 4, 5, 0))
+
+
+def waiting_line(seconds: float, random_place: bool) -> str:
+    """The line shown `seconds` after a new game began to be set up."""
+    if random_place:
+        if seconds < JOKE_SECONDS * len(RANDOM_JOKES):
+            return RANDOM_JOKES[int(seconds // JOKE_SECONDS)]
+        seconds -= JOKE_SECONDS * len(RANDOM_JOKES)
+    return WORK[int(seconds // WORK_SECONDS) % len(WORK)]
 
 
 @dataclass(frozen=True)

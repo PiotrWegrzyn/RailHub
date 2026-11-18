@@ -85,6 +85,7 @@ class MainMenu:
     start_year: int = START_YEAR
     cash: int = int(START_CASH)
     stand_in_years: int = 0
+    show_map_growing: bool = False
     selected: str | None = None
     listing: list[SaveInfo] = field(default_factory=list)
     # What went wrong with the last game started or loaded, if anything.
@@ -100,6 +101,7 @@ class MainMenu:
             start_year=allowed_start_year(self.start_year),
             cash=float(self.cash),
             stand_in_years=self.stand_in_years,
+            show_map_growing=self.show_map_growing,
         )
 
     def random_settings(self) -> Settings:
@@ -181,6 +183,14 @@ class MainMenu:
         if yolo:
             self.error = ""
             return NewGameChoice(self.random_settings())
+        imgui.spacing()
+        _, self.show_map_growing = imgui.checkbox("Show map generation", self.show_map_growing)
+        imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)
+        imgui.text_colored(
+            imgui.ImVec4(*BRASS),
+            "Shows the map as its towns grow; loading takes about a minute longer.",
+        )
+        imgui.pop_text_wrap_pos()
         imgui.spacing()
         self.start_year = allowed_start_year(self.start_year)
         if imgui.collapsing_header("Advanced options"):

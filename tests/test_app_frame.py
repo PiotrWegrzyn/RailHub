@@ -1,6 +1,7 @@
 import gc
 from collections.abc import Callable, Iterator
 from concurrent.futures import Executor, Future
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -28,10 +29,13 @@ from railroads.ui.ground import GroundPictures
 from railroads.ui.history_pictures import opening_center
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
 from railroads.ui.main_menu import MENU_WIDTH, MainMenu, Page
-from railroads.ui.map_view import Lens, MapView
+from railroads.ui.map_view import VISIT_ZOOM, Lens, MapView
 from railroads.ui.route_map import soften
+from railroads.ui.waiting_screen import WORK
 from railroads.ui.web_setup import PageSetup
 from railroads.ui.workers import FrameWorker
+
+PICTURED = replace(SETTINGS, show_map_growing=True)
 
 
 class FakeTexture:
@@ -740,7 +744,7 @@ def test_a_new_game_opens_on_the_middle_of_the_map_and_stays_there_as_the_waitin
     monkeypatch.setattr(app_module, "page_setup", lambda: None)
     monkeypatch.setattr(app_module, "make_game_steps", grown_on_the_frames(played_game()))
     shell = Shell(Saves(tmp_path))
-    shell.start(SETTINGS)
+    shell.start(PICTURED)
     frames = 0
     while shell.app is None and frames < 20:
         shell_frame(shell)
@@ -758,6 +762,35 @@ def test_a_new_game_opens_on_the_middle_of_the_map_and_stays_there_as_the_waitin
     middle = opening_center(shell.app.view.tile_map.grid, (1280, 800))
     assert (camera.center_x, camera.center_y) == middle
     assert camera.zoom_level == OPENING_ZOOM
+
+
+def test_a_new_game_without_pictures_shows_the_work_and_opens_on_its_biggest_town(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
+    monkeypatch.setattr(app_module, "page_setup", lambda: None)
+    monkeypatch.setattr(
+        app_module, "make_game_steps", grown_on_the_frames(played_game(), (850, 950))
+    )
+    shell = Shell(Saves(tmp_path))
+    shell.start(SETTINGS)
+    frames = 0
+    while shell.app is None and frames < 20:
+        shell_frame(shell)
+        frames += 1
+
+    shown = [label.text for label in shell._labels]
+    while shell._shatter is not None and frames < 400:
+        shell_frame(shell)
+        frames += 1
+
+    assert shell._show.year is None
+    assert shown[0] is not None
+    assert shown[0].startswith(WORK[0])
+    assert shell.app is not None
+    view = shell.app.view
+    assert view.camera.zoom_level >= VISIT_ZOOM
+    assert (view.camera.center_x, view.camera.center_y) == view.tile_map.grid.center(8, 15)
 
 
 def test_the_yolo_button_starts_a_random_place_with_the_other_settings_kept(
@@ -802,7 +835,7 @@ def test_a_new_game_shows_its_map_as_its_towns_grow_and_breaks_up_the_last_pictu
         app_module, "make_game_steps", grown_on_the_frames(played_game(), (850, 900, 950))
     )
     shell = Shell(Saves(tmp_path))
-    shell.start(SETTINGS)
+    shell.start(PICTURED)
     shown: list[int] = []
     frames = 0
     while shell.app is None and frames < 40:
@@ -833,3 +866,14 @@ def test_a_game_the_command_line_asks_for_starts_on_the_first_frame_for_the_wind
     assert not started_before
     assert shell._task is not None
     assert shell._window == (1000, 700)
+
+
+def test_the_menu_starts_games_without_pictures_of_the_map_growing_unless_ticked(
+    tmp_path: Path,
+) -> None:
+    plain = MainMenu(Saves(tmp_path))
+    ticked = MainMenu(Saves(tmp_path), show_map_growing=True)
+
+    settings = (plain.settings(), ticked.settings(), ticked.random_settings())
+
+    assert [each.show_map_growing for each in settings] == [False, True, True]
