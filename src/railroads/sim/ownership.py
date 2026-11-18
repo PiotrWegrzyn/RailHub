@@ -32,6 +32,8 @@ if TYPE_CHECKING:
 # station, and what it costs to buy: this many years of that share at full output.
 OWNER_SHARE = 0.3
 PAYBACK_YEARS = 10
+# The name the player's company trades under, whose flag flies over the buildings it owns.
+COMPANY = "The Trains Corp"
 # However much tech cuts the price of buildings, they cost at least this share of it.
 MOST_DISCOUNT = 0.5
 POWER_PLANT_PRICE = 2_000_000.0
@@ -46,6 +48,7 @@ class Owners:
         self._owned: dict[BuildingKind, IntGrid] = {}
         # What each kind the player owns earned them last month.
         self.income: dict[BuildingKind, float] = {}
+        self.company = COMPANY
 
     def owned(self, kind: BuildingKind) -> IntGrid:
         """How many buildings of a kind the player owns in each cell."""
@@ -54,6 +57,13 @@ class Owners:
     def count(self) -> int:
         """How many buildings the player owns in all."""
         return sum(int(grid.sum()) for grid in self._owned.values())
+
+    def cells(self) -> list[Cell]:
+        """The cells where the player owns any building."""
+        held = np.zeros(self._growth.grid.shape, dtype=bool)
+        for grid in self._owned.values():
+            held |= grid > 0
+        return [(int(row), int(col)) for row, col in np.argwhere(held)]
 
     def kinds(self) -> list[BuildingKind]:
         """The kinds of building the player owns any of."""

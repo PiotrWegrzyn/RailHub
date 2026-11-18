@@ -272,7 +272,9 @@ class StationTrade:
         railway = self._growth.railway
         if railway is not None:
             (counts,) = self._ring_counts([station])
-            needs = self._short_after_local(station, self._needs(counts, station), self._growth.trade)
+            needs = self._short_after_local(
+                station, self._needs(counts, station), self._growth.trade
+            )
             needs |= as_needs(self._travellers(counts))
             railway.station_demand(station).capacity = capacity_of(needs)
 

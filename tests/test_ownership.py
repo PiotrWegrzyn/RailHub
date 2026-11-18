@@ -22,7 +22,7 @@ def grown(*placed: tuple[tuple[int, int], BuildingKind]) -> Growth:
     return growth
 
 
-def test_a_building_costs_five_years_of_the_players_share_of_what_it_can_make() -> None:
+def test_a_building_costs_payback_years_of_the_players_share_of_what_it_can_make() -> None:
     growth = grown(((5, 5), BuildingKind.FARM))
     cash = growth.railway.finances.cash
 
@@ -148,3 +148,12 @@ def test_what_an_owned_farm_sells_to_a_station_pays_its_price_however_short_the_
 
     earned = growth.railway.finances.month["owned buildings"]
     assert earned == pytest.approx(10 * price_of(Good.WHEAT) * OWNER_SHARE)
+
+
+def test_the_company_flies_its_flag_only_over_the_cells_where_it_owns_a_building() -> None:
+    growth = grown(((5, 5), BuildingKind.FARM), ((5, 7), BuildingKind.FARM))
+
+    growth.owners.buy((5, 7), BuildingKind.FARM)
+
+    assert growth.owners.company == "The Trains Corp"
+    assert growth.owners.cells() == [(5, 7)]

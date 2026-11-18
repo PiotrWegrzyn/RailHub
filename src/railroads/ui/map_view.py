@@ -50,6 +50,7 @@ from railroads.ui.map_overlays import (
     draw_hovered_buildings,
     draw_moods,
     draw_outline,
+    draw_owned_flags,
     draw_station_names,
     draw_status,
     least_satisfied,
@@ -568,6 +569,7 @@ class MapView:
         draw_found(
             draw_list, marks, self.tile_map.grid, self.search, center, top_left, bottom_right
         )
+        draw_owned_flags(draw_list, marks, self.tile_map.grid, self.growth.owners, center)
         draw_station_names(draw_list, marks, self.tile_map.grid, self.railway, center)
         draw_compass(draw_list, self.camera, (bottom_right[0] - 36, top_left[1] + 36))
         self._draw_status(draw_list, top_left, bottom_right)

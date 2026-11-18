@@ -15,6 +15,7 @@ from railroads.sim.economy import LOCAL_REACH, FloatCells, Satisfaction, Trade
 from railroads.sim.goods import HANDED_OUT, makes_of, needs_of
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, Grid
 from railroads.sim.growth import Growth
+from railroads.sim.ownership import Owners
 from railroads.sim.railway import Railway
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.towns import Towns
@@ -63,6 +64,14 @@ MOST_FOUND_MARKS = 6000
 MOST_MINIMAP_MARKS = 3000
 # Station names show from this zoom level in, this many cell widths above the station's middle.
 NAMES_FROM_ZOOM = 2
+# The flag over the player's buildings: from how wide a cell it shows, how tall it stands and how
+# far right of the cell's middle, both in cell widths, and its colours.
+FLAGS_FROM_WIDTH = 24.0
+FLAG_HEIGHT = 0.45
+FLAG_RIGHT = 0.3
+FLAG_POLE = (0.15, 0.12, 0.1, 1.0)
+FLAG_CLOTH = (0.14, 0.3, 0.72, 1.0)
+FLAG_STRIPE = (0.93, 0.78, 0.3, 1.0)
 NAME_LIFT = 0.55
 NAME_PADDING = 6.0
 STATUS_MARGIN = 10.0
@@ -162,6 +171,29 @@ def draw_station_names(
             (left, top), (x + size.x / 2 + NAME_PADDING, bottom), color_u32(OVERLAY), 5.0
         )
         draw_list.add_text((x - size.x / 2, top + NAME_PADDING / 2), color_u32(TEXT), name)
+
+
+def draw_owned_flags(
+    draw_list: imgui.ImDrawList, camera: IsoCamera, grid: Grid, owners: Owners, center: Vec2
+) -> None:
+    """A small flag in the company's colours over every cell where the player owns a building,
+    once a cell is FLAGS_FROM_WIDTH pixels wide."""
+    width = camera.cell_width
+    if width < FLAGS_FROM_WIDTH:
+        return
+    pole = rgba_u32(FLAG_POLE)
+    cloth = rgba_u32(FLAG_CLOTH)
+    stripe = rgba_u32(FLAG_STRIPE)
+    height = width * FLAG_HEIGHT
+    for cell in owners.cells():
+        x, y = camera.to_screen(*grid.center(*cell), center)
+        foot = (x + width * FLAG_RIGHT, y)
+        top = (foot[0], y - height)
+        draw_list.add_line(foot, top, pole, max(1.0, width / 40))
+        far = (top[0] + height * 0.6, top[1] + height * 0.35)
+        draw_list.add_rect_filled(top, far, cloth)
+        middle = top[1] + height * 0.35 / 2
+        draw_list.add_line((top[0], middle), (far[0], middle), stripe, max(1.0, height * 0.08))
 
 
 def draw_compass(draw_list: imgui.ImDrawList, camera: IsoCamera, anchor: Vec2) -> None:

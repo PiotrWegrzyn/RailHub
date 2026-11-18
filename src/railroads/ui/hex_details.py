@@ -169,7 +169,8 @@ def describe(
         satisfaction=Satisfaction(level).name.lower() if level >= 0 else "nothing trades here",
         points=points,
         buildings=rows,
-        others=[_other(c, growth) for c in built if not isinstance(c, Building)],
+        others=[_other(c, growth) for c in built if not isinstance(c, Building)]
+        + _flag_note(growth, rows),
     )
 
 
@@ -269,6 +270,14 @@ def draw_hex_details(details: HexDetails) -> BuildingKind | None:
     for other in details.others:
         imgui.bullet_text(other)
     return bought
+
+
+def _flag_note(growth: Growth, rows: list[BuildingRow]) -> list[str]:
+    owned = sum(row.owned for row in rows)
+    if not owned:
+        return []
+    whose = "it" if owned == 1 else f"{owned} of them"
+    return [f"{growth.owners.company} flies its flag here: you own {whose}."]
 
 
 def mood_text(row: BuildingRow) -> str:

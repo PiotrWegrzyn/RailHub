@@ -184,3 +184,14 @@ def test_a_bakery_must_get_wheat_and_shows_refined_sugar_as_a_bonus() -> None:
 
     assert [flow.good for flow in bakery.got] == [Need.WHEAT]
     assert [flow.good for flow in bakery.bonus_got] == [Need.REFINED_SUGAR]
+
+
+def test_details_say_the_company_flies_its_flag_over_a_building_the_player_owns() -> None:
+    constructions = Constructions(make_map())
+    constructions.build(Building((5, 4), BuildingKind.FARM))
+    growth = Growth(constructions, GrowthRule(trades=True, ladders=()))
+    growth.owners.own((5, 4), BuildingKind.FARM)
+
+    others = describe(growth, (5, 4)).others
+
+    assert others == ["The Trains Corp flies its flag here: you own it."]
