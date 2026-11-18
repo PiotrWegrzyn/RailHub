@@ -52,6 +52,20 @@ def seed_steps(
 ) -> Steps[Constructions]:
     """seed_buildings in steps, a pause after each HISTORY_STEP, telling `progress` the share of
     the months grown so far and showing `look` the buildings and the year they have grown to."""
+    grown = yield from seed_growth_steps(tile_map, rng, growth, months, history, progress, look)
+    return grown.constructions
+
+
+def seed_growth_steps(
+    tile_map: TileMap,
+    rng: np.random.Generator,
+    growth: GrowthRule = GROWTH,
+    months: int = MONTHS_BEFORE_PLAY,
+    history: History | None = None,
+    progress: Callable[[float], None] = lambda done: None,
+    look: Callable[[Constructions, int], None] = lambda constructions, year: None,
+) -> Steps[Growth]:
+    """seed_steps, ending with the growth that grew the buildings, its constructions theirs."""
     tile_map = replace(
         tile_map, vegetation=tile_map.vegetation.copy(), deposits=place_deposits(tile_map, rng)
     )
@@ -66,7 +80,7 @@ def seed_steps(
     muster_garrisons(constructions, play_begins(months), rng)
     look(constructions, grown.year)
     progress(1.0)
-    return constructions
+    return grown
 
 
 def muster_garrisons(constructions: Constructions, year: int, rng: np.random.Generator) -> None:

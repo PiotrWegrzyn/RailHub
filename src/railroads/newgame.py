@@ -23,10 +23,11 @@ from railroads.sim.finance import START_CASH
 from railroads.sim.game import Game, place_names
 from railroads.sim.geo import Bounds, describe_lonlat
 from railroads.sim.grids import HexGrid
+from railroads.sim.lots import Lots
 from railroads.sim.novelties import Novelties
 from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
-from railroads.sim.tilemap import TileMap
+from railroads.sim.tilemap import Terrain, TileMap
 
 # The source data the tools build the world's files from (railroads.mapgen.world_files); the game
 # itself reads only those.
@@ -136,6 +137,24 @@ def start_new_game(
     return NewGame(seed, bounds, tile_map)
 
 
+# The maps of the places games were started on, by map and seed (place_map).
+_PLACES: dict[tuple[MapChoice, int], TileMap] = {}
+
+
+def place_map(settings: Settings) -> TileMap:
+    """The whole map of the place a game with these settings plays on, whose middle square the
+    game starts on and whose lots around it the player can buy (railroads.sim.lots): the baked
+    map, or the map of the random place the seed picks, made again when first asked for."""
+    key = (settings.map, settings.seed)
+    if key not in _PLACES:
+        baked = settings.map.start_map
+        if baked is not None:
+            _PLACES[key] = maps.load(baked.key, "hex")
+        else:
+            _PLACES[key] = start_new_game(settings.seed, report=lambda text: None).tile_map
+    return _PLACES[key]
+
+
 def make_game(
     settings: Settings,
     report: Callable[[str], None] = print,
@@ -159,12 +178,15 @@ def make_game_steps(
     seed = settings.seed
     baked = settings.map.start_map
     if baked is not None:
-        tile_map = maps.load(baked.key, "hex").square_middle()
+        place = place_map(settings)
         title = f"{baked.title}, seed {seed}"
     else:
         new = start_new_game(seed, report=report)
-        tile_map = new.tile_map.square_middle()
+        place = new.tile_map
+        _PLACES[(settings.map, seed)] = place
         title = f"Seed {seed}, {new.place}"
+    square = place.middle_square()
+    tile_map = place.window(*square)
     years = settings.start_year - HISTORY_START
     months = years * 12
     begins = play_begins(months)
@@ -180,6 +202,8 @@ def make_game_steps(
     )
     game = Game(seeded, start_year=begins, history=history, names=place_names(seeded.tile_map))
     game.finances.cash = settings.cash
+    game.lots = Lots.of_square(*square)
+    game.lots.offer(place.terrain == Terrain.LAND)
     game.growth.novelties = Novelties.pick(game.tile_map, np.random.default_rng(seed + 3))
     if settings.stand_in_years > 0:
         played = min(settings.stand_in_years, END_YEAR - begins)

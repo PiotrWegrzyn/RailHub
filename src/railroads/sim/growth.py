@@ -1036,6 +1036,8 @@ class Growth:
             ladder = place.ladder
             if ladder.from_year > self.year:
                 continue
+            if self.rule.top_ups is not None and ladder.kinds[0] not in self.rule.top_ups:
+                continue
             if self._as_many_as_first(ladder) >= self.least_of(ladder):
                 continue
             cell = self._likeliest(place, rng)

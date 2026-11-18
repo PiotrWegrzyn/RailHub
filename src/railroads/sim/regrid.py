@@ -97,11 +97,13 @@ def regrid(
     buildings: Iterable[Building] = (),
 ) -> None:
     """Moves the game onto `tile_map`, its old map `rows` down and `cols` right on it, and puts
-    up `buildings` there, already on the new map's cells, as land bought arrives grown."""
+    up `buildings` there, already on the new map's cells, as land bought arrives grown: those
+    that can stand there as the map now is."""
     move = Move(game.tile_map.grid, tile_map.grid, rows, cols)
     _move_constructions(game.constructions, tile_map, move)
     for building in buildings:
-        game.constructions.build(building)
+        if game.constructions.why_not(building) is None:
+            game.constructions.build(building)
     game.tile_map = tile_map
     old = game.growth
     growth = _moved_growth(old, move)

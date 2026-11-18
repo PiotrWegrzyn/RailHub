@@ -1191,6 +1191,10 @@ class GrowthRule:
     # How forests are cleared and spread, if they change at all, and how often.
     forests: ForestRule | None = FORESTS
     forests_every_months: int = 1
+    # The first kinds of the ladders the map keeps at least a few of (Growth.least_of), putting
+    # one up where too few grew; None for every ladder. Land bought keeps a quarter of them
+    # (railroads.land).
+    top_ups: frozenset[BuildingKind] | None = None
 
 
 GROWTH = GrowthRule()

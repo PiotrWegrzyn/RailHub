@@ -21,6 +21,7 @@ from railroads.sim.demolition import bulldoze, bulldoze_price, station_site_pric
 from railroads.sim.finance import STATION_PRICE, Finances, dollars
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
+from railroads.sim.lots import Lots
 from railroads.sim.railway import Railway
 from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
@@ -69,6 +70,9 @@ class Game:
         self.railway.owners = self.growth.owners
         # Plays in the player's place in a simulated game (railroads.sim.autoplay).
         self.stand_in: StandInPlayer | None = None
+        # The land the player owns and can buy around the map (railroads.sim.lots); None for a
+        # game on a map of its own, with nothing around it.
+        self.lots: Lots | None = None
         self._reach = Reach(self.tile_map.grid)
 
     @property

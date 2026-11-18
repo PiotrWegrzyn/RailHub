@@ -46,6 +46,8 @@ class Lots:
     left: int
     owned: set[Lot] = field(default_factory=lambda: {(0, 0), (0, 1), (1, 0), (1, 1)})
     bought: int = 0
+    # The lots on offer, as offer() last found them.
+    offers: list[Lot] = field(default_factory=list)
 
     @classmethod
     def of_square(cls, top: int, left: int, rows: int, cols: int) -> Self:
@@ -104,6 +106,11 @@ class Lots:
         """The lots next to the player's land with at least LEAST_LAND of land, as `land` tells
         it: True for each land cell of the place's map."""
         return [lot for lot in self.next_to() if self.land_share(lot, land) >= LEAST_LAND]
+
+    def offer(self, land: npt.NDArray[np.bool_]) -> None:
+        """Finds the lots on offer (offered) and keeps them, so they are known without the place's
+        map."""
+        self.offers = self.offered(land)
 
     def land_share(self, lot: Lot, land: npt.NDArray[np.bool_]) -> float:
         """The share of a lot's cells that are land on the place's map, none past its edges."""
