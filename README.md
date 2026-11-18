@@ -698,8 +698,9 @@ buildings there take it; what the station hands out around it carries no freight
 with no station near pays nothing. A station hands what it has to the player's own buildings before anyone else's,
 however far within its reach they stand. A whole building costs ten years of all it makes at full output when it
 was fully satisfied over the last quarter, two thirds of that at none and
-four thirds at 200%, and shares sell at the price they buy at, so raising a building's satisfaction
-raises what its shares fetch. Tech cuts the price of shares by up to half, and production tech
+twice at 200%, and shares sell at the price they buy at, so raising a building's satisfaction
+raises what its shares fetch; shares can be sold only five years after they were bought, so the
+way to earn on them is to buy into a building that struggles and make it work. Tech cuts the price of shares by up to half, and production tech
 makes the player's part bigger. Every cell where the player owns shares flies the flag of their
 company, The Trains Corp. Growth never takes a
 building from its owner: one it pulls down (a farm crowded out by a town, a lumber mill whose

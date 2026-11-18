@@ -6,7 +6,7 @@ from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.goods import Good, price_of
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import FACTORIES, FARMS_CROWDED_OUT, GrowthRule
-from railroads.sim.ownership import LOT, PAYBACK_YEARS, SHARES, satisfaction_price
+from railroads.sim.ownership import HOLD_MONTHS, LOT, PAYBACK_YEARS, SHARES, satisfaction_price
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 
@@ -39,7 +39,7 @@ def test_a_lot_of_shares_costs_its_part_of_payback_years_of_all_a_building_makes
 
 @pytest.mark.parametrize(
     ("satisfaction", "factor"),
-    [(0.0, 2 / 3), (0.5, 5 / 6), (1.0, 1.0), (1.5, 7 / 6), (2.0, 4 / 3), (3.0, 4 / 3)],
+    [(0.0, 2 / 3), (0.5, 5 / 6), (1.0, 1.0), (1.5, 1.5), (2.0, 2.0), (3.0, 2.0)],
 )
 def test_shares_cost_more_the_more_satisfied_the_building_was_over_the_quarter(
     satisfaction: float, factor: float
@@ -54,6 +54,7 @@ def test_shares_sell_at_their_price_now_so_a_building_satisfied_since_earns_more
     growth.owners.buy((5, 5), BuildingKind.FARM)
     paid = -growth.railway.finances.month["shares bought"]
     satisfied(growth, 1.0)
+    growth._months += HOLD_MONTHS
 
     growth.owners.sell((5, 5), BuildingKind.FARM)
 
@@ -174,3 +175,16 @@ def test_the_players_farm_sells_its_goods_at_the_market_price_as_they_enter_the_
     sold = growth.railway.finances.month["owned buildings"]
     assert sold == pytest.approx(10 * price_of(Good.WHEAT))
     assert growth.railway.finances.month.get("cargo", 0.0) == 0.0
+
+
+@pytest.mark.parametrize(("months", "said"), [(HOLD_MONTHS - 1, "from 1855"), (HOLD_MONTHS, None)])
+def test_shares_can_be_sold_only_five_years_after_they_were_bought(
+    months: int, said: str | None
+) -> None:
+    growth = satisfied(grown(((5, 5), BuildingKind.FARM)))
+    growth.owners.buy((5, 5), BuildingKind.FARM)
+    growth._months += months
+
+    problem = growth.owners.sell((5, 5), BuildingKind.FARM)
+
+    assert problem is None if said is None else said in str(problem)

@@ -6,7 +6,7 @@ own: the player's part of what it makes, by their shares, goes into the stations
 before anything is handed out, as if a train had brought it, so the stations hand it out to the
 buildings in their reach and it pays as a delivery does (railroads.sim.economy,
 railroads.sim.station_trade). A whole building costs PAYBACK_YEARS of all it makes at full
-output at full satisfaction, from two thirds of that with none to four thirds at 200%
+output at full satisfaction, from two thirds of that with none to twice that at 200%
 (PRICE_BY_SATISFACTION), by how satisfied its cell was over the last quarter, less what the
 player's tech takes off, down to MOST_DISCOUNT of the price; shares sell at the price they buy
 at. A power plant of any kind, which makes cheap electricity for the player's trains
@@ -39,10 +39,12 @@ LOT = 100
 PAYBACK_YEARS = 10
 # What a building's price is worth, times its price at full satisfaction, at each satisfaction
 # over the last quarter, in between in a straight line.
-PRICE_BY_SATISFACTION = ((0.0, 2 / 3), (1.0, 1.0), (2.0, 4 / 3))
+PRICE_BY_SATISFACTION = ((0.0, 2 / 3), (1.0, 1.0), (2.0, 2.0))
 # Every whole building the player owns adds this much to the experience its tree gets from
 # deliveries for each of its points, and the shares of one their part of that.
 EXPERIENCE_PER_POINT = 0.01
+# Shares bought can be sold only this many months later, so they can't be flipped for quick gains.
+HOLD_MONTHS = 60
 # The name the player's company trades under, whose flag flies over the buildings it owns.
 COMPANY = "The Trains Corp"
 # However much tech cuts the price of shares, they cost at least this share of it.
@@ -63,6 +65,8 @@ class Owners:
     def __init__(self, growth: Growth) -> None:
         self._growth = growth
         self._shares: dict[BuildingKind, IntGrid] = {}
+        # Per kind and cell, the shares bought there and the month from which each lot may be sold.
+        self._held: dict[tuple[BuildingKind, Cell], list[tuple[int, int]]] = {}
         self.company = COMPANY
 
     def shares(self, kind: BuildingKind) -> IntGrid:
@@ -142,17 +146,38 @@ class Owners:
         if railway is None or not railway.finances.pay(price, "shares bought"):
             return "Not enough cash"
         self.own(cell, kind, LOT)
+        lots = self._held.setdefault((kind, cell), [])
+        lots.append((self._growth.months + HOLD_MONTHS, LOT))
         return None
+
+    def sellable(self, cell: Cell, kind: BuildingKind) -> int:
+        """How many of the player's shares of a kind in a cell they may sell now: all but those
+        bought less than HOLD_MONTHS ago."""
+        now = self._growth.months
+        locked = sum(shares for until, shares in self._held.get((kind, cell), ()) if until > now)
+        return max(0, int(self.shares(kind)[cell]) - locked)
+
+    def sellable_from(self, cell: Cell, kind: BuildingKind) -> int | None:
+        """The year the next of the player's shares of a kind in a cell they can't sell yet may
+        be sold; None if none are held back."""
+        now = self._growth.months
+        until = [until for until, _ in self._held.get((kind, cell), ()) if until > now]
+        if not until:
+            return None
+        return self._growth.start_year + min(until) // 12
 
     def sell(self, cell: Cell, kind: BuildingKind) -> str | None:
         """Sells LOT shares, or the last few, of a building of a kind in a cell at their price
-        now; why not, if there are none to sell."""
+        now, of those bought at least HOLD_MONTHS ago; why not, if there are none to sell."""
         held = int(self.shares(kind)[cell])
         price = self.lot_price(cell, kind)
         railway = self._growth.railway
         if not held or price is None or railway is None:
             return f"You own no shares of a {kind.value} here"
-        sold = min(LOT, held)
+        free = self.sellable(cell, kind)
+        if not free:
+            return f"These shares can be sold from {self.sellable_from(cell, kind)}"
+        sold = min(LOT, free)
         railway.finances.earn(price * sold / LOT, "shares sold")
         self._shares[kind][cell] -= sold
         return None
@@ -166,7 +191,22 @@ class Owners:
         left = SHARES * max(0, int(self._growth.counts[kind][cell]) - gone)
         lost = max(0, int(grid[cell]) - left)
         grid[cell] -= lost
+        self._hold_at_most(cell, kind, int(grid[cell]))
         return lost
+
+    def _hold_at_most(self, cell: Cell, kind: BuildingKind, shares: int) -> None:
+        """Lets the shares held back in a cell be no more than the player owns there, the newest
+        let go first."""
+        lots = self._held.get((kind, cell))
+        if not lots:
+            return
+        kept: list[tuple[int, int]] = []
+        for until, held in sorted(lots):
+            take = min(held, shares)
+            if take > 0:
+                kept.append((until, take))
+            shares -= take
+        self._held[(kind, cell)] = kept
 
     def taking(self, kind: BuildingKind, need: Need) -> npt.NDArray[np.float64] | None:
         """How many buildings' worth of a kind the player owns in each cell, as flat cells

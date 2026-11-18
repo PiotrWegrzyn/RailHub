@@ -671,6 +671,11 @@ class Growth:
         return self.start_year + self._months // 12
 
     @property
+    def months(self) -> int:
+        """How many months have passed since start_year began."""
+        return self._months
+
+    @property
     def grid(self) -> Grid:
         return self._grid
 

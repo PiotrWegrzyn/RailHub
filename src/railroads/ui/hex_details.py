@@ -64,6 +64,9 @@ class BuildingRow:
     percent: float | None = None
     # How the bonus goods and boosts it can do without went; `got` holds what it must get.
     bonus_got: list[Flow] = field(default_factory=list)
+    # How many of the player's shares may be sold now, and the year the next held back may be.
+    sellable: int = 0
+    sell_from: int | None = None
 
 
 @dataclass(frozen=True)
@@ -160,6 +163,8 @@ def describe(
                 growth.owners.lot_price(cell, kind),
                 percent,
                 bonus_got,
+                growth.owners.sellable(cell, kind),
+                growth.owners.sellable_from(cell, kind),
             )
         )
     return HexDetails(
@@ -269,8 +274,10 @@ def draw_hex_details(details: HexDetails) -> tuple[BuildingKind, bool] | None:
                     if imgui.small_button(f"Buy {LOT} for {dollars(row.price)}##buy{row.name}"):
                         bought = (row.kind, True)
                     spot("buy_shares")
-                if row.owned and imgui.small_button(
-                    f"Sell {min(LOT, row.owned)} for {dollars(row.price * min(LOT, row.owned) / LOT)}##sell{row.name}"
+                if not row.sellable and row.sell_from is not None:
+                    imgui.text_disabled(f"sell from {row.sell_from}")
+                elif row.sellable and imgui.small_button(
+                    f"Sell {min(LOT, row.sellable)} for {dollars(row.price * min(LOT, row.sellable) / LOT)}##sell{row.name}"
                 ):
                     bought = (row.kind, False)
             imgui.end_table()
