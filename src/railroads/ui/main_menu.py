@@ -167,14 +167,10 @@ class MainMenu:
         imgui.text_disabled(map_note(self.map))
         imgui.pop_text_wrap_pos()
         imgui.spacing()
-        left = imgui.get_cursor_pos_x()
-        imgui.align_text_to_frame_padding()
         imgui.text("If you don't like any of these:")
-        imgui.same_line()
         world = world_maps_available()
         imgui.begin_disabled(not world)
-        width = left + MENU_WIDTH - imgui.get_cursor_pos_x()
-        yolo = imgui.button(f"{fa.ICON_FA_RANDOM}  Yolo! random map", (width, 0))
+        yolo = imgui.button(f"{fa.ICON_FA_RANDOM}  Yolo! random map", (MENU_WIDTH, 0))
         imgui.end_disabled()
         if not world and imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
             imgui.set_tooltip(
