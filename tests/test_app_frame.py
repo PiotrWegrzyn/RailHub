@@ -803,7 +803,7 @@ def test_a_new_game_shows_its_map_as_its_towns_grow_and_breaks_up_the_last_pictu
     monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
     monkeypatch.setattr(app_module, "page_setup", lambda: None)
     monkeypatch.setattr(
-        app_module, "make_game_steps", grown_on_the_frames(played_game(), (850, 875, 900))
+        app_module, "make_game_steps", grown_on_the_frames(played_game(), (850, 900, 950))
     )
     shell = Shell(Saves(tmp_path))
     shell.start(SETTINGS)
@@ -815,7 +815,7 @@ def test_a_new_game_shows_its_map_as_its_towns_grow_and_breaks_up_the_last_pictu
             shown.append(shell._texture[0][0])
         frames += 1
 
-    assert shown == [850, 900]
+    assert shown == [850, 950]
     assert shell._shatter is not None
     assert shell._shatter.picture is not None
-    assert "The map in 900" in [label.text for label in shell._shatter.labels]
+    assert "The map in 950" in [label.text for label in shell._shatter.labels]

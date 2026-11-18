@@ -64,7 +64,7 @@ def grows_as(saved: SavedGame) -> Callable[..., SavedGame]:
     ) -> SavedGame:
         report(f"Growing towns for seed {settings.seed}")
         progress(0.5)
-        look(saved.game.constructions, 900)
+        look(saved.game.constructions, 950)
         return saved
 
     return made
@@ -162,4 +162,4 @@ def test_the_page_sees_the_pictures_a_worker_takes_of_the_map_growing(
 
     finish(steps)
 
-    assert seen == [(900, (48, 64, 4))]
+    assert seen == [(950, (48, 64, 4))]

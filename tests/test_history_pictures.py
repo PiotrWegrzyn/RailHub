@@ -29,17 +29,17 @@ def test_the_picture_shows_the_map_in_its_middle_and_the_background_past_its_edg
     assert tuple(picture[400, 500, :3]) != BACKGROUND
 
 
-def test_a_picture_is_taken_every_fifty_years_showing_what_was_built_since() -> None:
+def test_a_picture_is_taken_every_hundred_years_from_850_showing_what_was_built_since() -> None:
     constructions = small_constructions()
     seen: list[tuple[int, Rgba]] = []
     pictures = HistoryPictures((400, 300), lambda year, picture: seen.append((year, picture)))
 
     pictures(constructions, 850)
-    pictures(constructions, 875)
+    pictures(constructions, 900)
     for row in range(4, 8):
         for col in range(4, 8):
             constructions.build(Building((row, col), BuildingKind.HOUSE))
-    pictures(constructions, 900)
+    pictures(constructions, 950)
 
-    assert [year for year, _ in seen] == [850, 900]
+    assert [year for year, _ in seen] == [850, 950]
     assert not np.array_equal(seen[0][1], seen[1][1])

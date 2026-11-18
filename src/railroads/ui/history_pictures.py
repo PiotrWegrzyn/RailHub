@@ -9,13 +9,14 @@ from functools import cache
 
 import numpy as np
 
+from railroads.sim.clock import HISTORY_START
 from railroads.sim.constructions import Constructions
 from railroads.ui.iso_camera import LOOKS
 from railroads.ui.pixel.projection import RGB, ChunkPlacement, Rgba
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.world import PixelWorld
 
-PICTURE_YEARS = 50
+PICTURE_YEARS = 100
 OPENING_SCALE = 1
 BACKGROUND: RGB = (28, 26, 23)
 
@@ -53,7 +54,8 @@ def middle_picture(world: PixelWorld, size: tuple[int, int], background: RGB = B
 
 class HistoryPictures:
     """Looks at a map as its history grows (railroads.mapgen.seeding.seed_steps' `look`) and,
-    every PICTURE_YEARS, tells `seen` the year and a picture of its middle `size` points big."""
+    every PICTURE_YEARS from HISTORY_START, tells `seen` the year and a picture of its middle
+    `size` points big."""
 
     def __init__(
         self,
@@ -65,7 +67,7 @@ class HistoryPictures:
         self._world: PixelWorld | None = None
 
     def __call__(self, constructions: Constructions, year: int) -> None:
-        if year % PICTURE_YEARS:
+        if (year - HISTORY_START) % PICTURE_YEARS:
             return
         world = self._world
         if world is None or world.constructions is not constructions:
