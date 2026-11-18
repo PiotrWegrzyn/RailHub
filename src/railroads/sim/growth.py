@@ -545,6 +545,7 @@ class Growth:
             self.owners.working_counts(),
             self.station_trade.orders(),
             np.flatnonzero(self._occupied),
+            self.owners.first_for_stations(),
         )
         yield
         yield from self.station_trade.settle_steps(self.trade)

@@ -7,8 +7,9 @@ sells nothing but makes cheap electricity for the player's trains (railroads.sim
 costs POWER_PLANT_PRICE. Tech in a building's
 tree can raise the share it pays and how many buildings' worth it makes. What a building hands out
 on its own pays more the less satisfied its buyers were over the last quarter, up to SCARCE_WORTH
-times the price (railroads.sim.economy); what goes to stations pays the price. When buildings
-leave a cell, the player's go last.
+times the price (railroads.sim.economy); what goes to stations pays the price. The player's share
+of what a building they own makes goes to the stations around it first, before it is handed
+out. When buildings leave a cell, the player's go last.
 """
 
 from collections.abc import Mapping
@@ -18,7 +19,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.economy import Trade
+from railroads.sim.economy import OwnedShare, Trade
 from railroads.sim.goods import FITS, Need, makes_of, price_of
 from railroads.sim.grids import Cell
 from railroads.sim.ladders import IntGrid
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
 # The player's share of what a building they own sells, handed out around it or taken by a
 # station, and what it costs to buy: this many years of that share at full output.
 OWNER_SHARE = 0.5
-PAYBACK_YEARS = 5
+PAYBACK_YEARS = 6
 # However much tech cuts the price of buildings, they cost at least this share of it.
 MOST_DISCOUNT = 0.5
 POWER_PLANT_PRICE = 2_000_000.0
@@ -134,6 +135,17 @@ class Owners:
             if boost and grid.any():
                 counts[kind] = counts_now[kind] + boost * grid
         return counts
+
+    def first_for_stations(self) -> dict[BuildingKind, OwnedShare]:
+        """Per kind the player owns any of, how many they own in each cell, as they trade, and
+        their share of it: what goes to the stations around before anything is handed out."""
+        return {
+            kind: OwnedShare(
+                grid.ravel() * (1.0 + self.boost(kind, Effect.PRODUCTION)), self.share(kind)
+            )
+            for kind, grid in self._owned.items()
+            if grid.any()
+        }
 
     def pay(self, trade: Trade) -> None:
         """Pays the player their share of what the buildings they own sold this month, which

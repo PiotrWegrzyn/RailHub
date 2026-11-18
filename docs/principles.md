@@ -26,7 +26,9 @@ The ideas every rule of the game should follow.
   a station is an investment. The one exception is a building the player owns: it pays the
   player their share of everything it sells, whether handed out on its own or taken by a
   station, and what it hands out pays more the less satisfied its buyers were over the last
-  quarter, up to three times the price for buyers who got nothing.
+  quarter, up to three times the price for buyers who got nothing. The player's share of what a
+  building they own makes goes to the stations around it first, before anything is handed out:
+  a reward for buying it.
 - The demand at a station counts only what the buildings around it were left short of after the
   goods handed out on their own.
 - Buildings come up at their base chance anywhere the land allows, and breed by how satisfied they

@@ -17,7 +17,8 @@ nearest first and shared by how much they still want, but taking all they want f
 unless the player keeps the good for trains there (StationOrder.kept). Both go through one
 distribute. Once every need has been met, each station takes the spare goods no building
 took that buildings made within its collection radius into its stockpile, while it has room, for
-trains to carry away; it never hands them out around it.
+trains to carry away; it never hands them out around it. The player's share of what the buildings they
+own make goes to the stations in reach before anything else: before it is handed out around them.
 
 Nothing is made that has nowhere to go: a processor uses up only the inputs for what left it; the
 rest waits in its stockpile. Needs are handed out in the order of PIPELINE, so the inputs of a
@@ -238,6 +239,16 @@ class StationOrder:
     platforms: tuple[Cell, ...] = ()
 
 
+@dataclass(frozen=True)
+class OwnedShare:
+    """The buildings of a kind the player owns in each cell, each counted as many as its
+    production tech makes it, and the player's share of what they make: that part goes to the
+    stations in reach before anything is handed out around them."""
+
+    owned: npt.NDArray[np.float64]
+    share: float
+
+
 # What Trade.share works out, by the trade's id and kinds, while the trade lasts: a trade is
 # saved with the game, so it keeps none of it itself.
 _SHARES: dict[int, dict[tuple[BuildingKind, ...], tuple[FloatCells, npt.NDArray[np.bool_]]]] = {}
@@ -384,20 +395,23 @@ class Economy:
         counts: Mapping[BuildingKind, npt.NDArray[np.int64]],
         stations: Mapping[Cell, StationOrder] | None = None,
         cells: npt.NDArray[np.intp] | None = None,
+        owned: Mapping[BuildingKind, OwnedShare] | None = None,
     ) -> Trade:
         """Lets the stations hand out and gather one month of goods among the buildings counted
         in each cell, and the buildings sell what is left to each other. `cells`, the flat cells
-        with any buildings, saves finding them again."""
-        return finish(self.trade_steps(counts, stations, cells))
+        with any buildings, saves finding them again. `owned`, the player's part of the buildings they own, goes to
+        stations first."""
+        return finish(self.trade_steps(counts, stations, cells, owned))
 
     def trade_steps(
         self,
         counts: Mapping[BuildingKind, npt.NDArray[np.int64]],
         stations: Mapping[Cell, StationOrder] | None = None,
         cells: npt.NDArray[np.intp] | None = None,
+        owned: Mapping[BuildingKind, OwnedShare] | None = None,
     ) -> Steps[Trade]:
         """trade, pausing about every STEP_SECONDS; nothing else may change the game between."""
-        return _Month(self, counts, stations or {}, cells).run_steps()
+        return _Month(self, counts, stations or {}, cells, owned).run_steps()
 
     def _around(
         self,
@@ -459,9 +473,12 @@ class _Month:
         counts: Mapping[BuildingKind, npt.NDArray[np.int64]],
         stations: Mapping[Cell, StationOrder],
         cells: npt.NDArray[np.intp] | None = None,
+        owned: Mapping[BuildingKind, OwnedShare] | None = None,
     ) -> None:
         self.economy = economy
         self.stations = stations
+        self.owned = owned or {}
+        self.first_gathered: set[Good] = set()
         flat = {k: counts[k].ravel() for k in economy.kinds if k in counts}
         if cells is None:
             built = np.zeros(economy.cells, dtype=bool)
@@ -686,6 +703,7 @@ class _Month:
         """Lets the cells with spare goods hand them out to the buildings still short of them, the
         nearest first, each cell taking from a seller at most its reach_share of the seller's
         month."""
+        self._gather_owned(good)
         spare = np.maximum(self.offered[good] - self.sold[good], 0.0)
         left = demand - received
         if not (spare > 1e-9).any() or not (left > 1e-9).any():
@@ -701,6 +719,34 @@ class _Month:
         self.worth_above[good] = self.worth_above.get(good, self.zero) + above
         self.sold[good] += spare - remaining
         received[:] = demand - left
+
+    def _gather_owned(self, good: Good) -> None:
+        """Lets the stations take the player's share of what the buildings they own made of a
+        good, before any of it is handed out around them, while they have room."""
+        if good in self.first_gathered:
+            return
+        self.first_gathered.add(good)
+        left = self.zero.copy()
+        for (kind, made), offer in self.offers.items():
+            share = self.owned.get(kind)
+            if made != good or share is None:
+                continue
+            owned = share.owned[self.cells]
+            left += offer * share.share * owned / np.maximum(self.count[kind], 1.0)
+        if not left.any():
+            return
+        for station in self.stations:
+            room = self.room[station][good]
+            if room <= 0:
+                continue
+            _, far = self.reach[station]
+            took = self.zero.copy()
+            taken = self.economy._gather(room, far, left, left, took)
+            if taken > 0:
+                left -= took
+                self.sold[good] += took
+                self.gathered[station][good] = self.gathered[station].get(good, 0.0) + taken
+                self.room[station][good] -= taken
 
     def _pairs(self, good: Good) -> tuple[*_Pairs, tuple[float, ...]]:
         """Every cell making a good with every traded cell up to LOCAL_REACH cells from it, as

@@ -9,6 +9,7 @@ from railroads.sim.economy import (
     COLLECTION_RADIUS,
     SCARCE_WORTH,
     Economy,
+    OwnedShare,
     Satisfaction,
     StationOrder,
     levels_of,
@@ -205,6 +206,24 @@ def test_a_station_gathers_only_what_the_buildings_around_left() -> None:
     assert eaten_at(economy, trade, (8, 8)) == pytest.approx(HOUSE_FOOD)
     assert trade.gathered[STATION] == {Good.WHEAT: pytest.approx(2 * FARM_MONTH - HOUSE_FOOD)}
     assert trade.handed_for[STATION] == {}
+
+
+@pytest.mark.parametrize(
+    ("share", "gathered"), [(0.0, 0.0), (0.5, 0.5 * FARM_MONTH), (1.0, FARM_MONTH)]
+)
+def test_a_station_takes_the_players_share_of_a_farm_they_own_before_the_houses_around(
+    share: float, gathered: float
+) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.FARM, 1), ((8, 9), BuildingKind.HOUSE, 5))
+    owned = counts(tile_map, ((8, 9), BuildingKind.FARM, 1))[BuildingKind.FARM].ravel()
+    owners = {BuildingKind.FARM: OwnedShare(owned.astype(np.float64), share)}
+
+    trade = economy.trade(placed, {STATION: StationOrder({}, 100.0)}, owned=owners)
+
+    assert trade.gathered[STATION].get(Good.WHEAT, 0.0) == pytest.approx(gathered)
+    assert eaten_at(economy, trade, (8, 9)) == pytest.approx(FARM_MONTH - gathered)
 
 
 @pytest.mark.parametrize(
