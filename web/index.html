@@ -46,7 +46,14 @@ Query parameters:
             #landing { flex-direction: column; }
             #landing .get { position: static; margin-top: 24px; }
         }
-        #landing .slow { margin: 0 0 8px; }
+        #landing .get > summary { list-style: none; cursor: pointer; padding: 8px 12px; background: #0d0c0b;
+                   color: #dba852; border: 1px solid #dba852; border-radius: 6px; font-weight: 600; }
+        #landing .get > summary::-webkit-details-marker { display: none; }
+        #landing .get > summary::after { content: " \25BE"; }
+        #landing .get[open] > summary { border-radius: 6px 6px 0 0; }
+        #landing .get[open] > summary::after { content: " \25B4"; }
+        #landing .get .drop { padding: 10px; background: #0d0c0b; border: 1px solid #dba852;
+                   border-top: 0; border-radius: 0 0 6px 6px; }
         #landing .download { background: #2a2622; color: #dba852; }
         #landing .download:hover { background: #35302a; }
         #landing .needs { margin: 6px 0 0; color: #888; font-size: 13px; }
@@ -69,8 +76,9 @@ Query parameters:
         <p class="status" id="landing-status">Turning cogs (0%)...</p>
         <p class="tip" id="landing-tip"></p>
     </div>
-    <div class="get">
-        <p class="slow">Too slow? Download and play outside the browser</p>
+    <details class="get">
+        <summary>Too slow? Download and play outside the browser</summary>
+        <div class="drop">
         <a class="download" id="download"></a>
         <p class="needs" id="needs"></p>
         <details class="mac-help" id="mac-help" hidden>
@@ -86,7 +94,8 @@ Query parameters:
         </details>
         <p class="others" id="others"></p>
         <p class="fine">Saves work in both: in Load game, Export file, then Import file in the other.</p>
-    </div>
+        </div>
+    </details>
 </div>
 <div id="loader">Turning cogs (0%)...</div>
 <div id="version">v__VERSION__</div>

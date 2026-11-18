@@ -34,7 +34,10 @@ GOODS = (
     Good.GOODS,
     Good.BARRELS,
 )
-MOST_CARS = 6
+# Where the land begins, as a share of the screen from the top.
+HORIZON = TRACKS[0][0] - 0.06
+FEWEST_CARS = 5
+MOST_CARS = 12
 # How long a track stands empty, at most, before another train comes along.
 MOST_WAIT = 6.0
 SKY_LOW = (0.2, 0.11, 0.06, 1.0)
@@ -86,7 +89,7 @@ class MenuScene:
         self._last = now
         draw_list = imgui.get_window_draw_list()
         width, height = high.x - low.x, high.y - low.y
-        horizon = low.y + height * (TRACKS[0][0] - 0.06)
+        horizon = low.y + height * HORIZON
         draw_list.add_rect_filled_multi_color(
             low, (high.x, horizon), *(color_u32(c) for c in (DEEP, DEEP, SKY_LOW, SKY_LOW))
         )
@@ -118,7 +121,8 @@ class MenuScene:
             self._sprites = GrownTrainSprites(tuple(float(v) for v in MATRIX.ravel()))
         engine = self.rng.choice(sorted(ENGINES))
         cars = [
-            Car(self.rng.choice(GOODS), load=1.0) for _ in range(self.rng.randint(2, MOST_CARS))
+            Car(self.rng.choice(GOODS), load=1.0)
+            for _ in range(self.rng.randint(FEWEST_CARS, MOST_CARS))
         ]
         way = self.rng.choice((1, -1))
         pixels = train_picture(

@@ -205,3 +205,9 @@ def page_setup() -> PageSetup | None:
         return None
     page = getattr(js, "railroadsSetup", None)
     return None if page is None else PageSetup(_PageObject(page))
+
+
+def go_back_to_landing() -> None:
+    """Leaves the game in the browser for the page's first screen, the one offering to play
+    online or download the game."""
+    js.location.assign(js.location.pathname)

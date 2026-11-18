@@ -19,6 +19,8 @@ from railroads.ui.ornate import DEEP, frame_rect
 from railroads.ui.theme import color_u32, rgba_u32
 
 # Latitudes the world map shows, north to south; the poles are left out.
+# How far the frame round each map stands out past the map itself.
+FRAME_PAD = 4.0
 WORLD_NORTH = 84.0
 WORLD_SOUTH = -60.0
 WORLD_WIDTH = 300.0
@@ -269,7 +271,7 @@ def view_corners(camera: IsoCamera, center: Vec2, top_left: Vec2, bottom_right: 
 
 def _frame(draw_list: imgui.ImDrawList, panel: Panel) -> None:
     """A dark plate under a map, framed in glowing brass with brackets at its corners."""
-    pad = 4.0
+    pad = FRAME_PAD
     low = imgui.ImVec2(panel.left - pad, panel.top - pad)
     high = imgui.ImVec2(panel.right + pad, panel.bottom + pad)
     draw_list.add_rect_filled(low, high, color_u32(DEEP), 4.0)

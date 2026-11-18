@@ -51,13 +51,14 @@ from railroads.ui.picture_show import PictureShow
 from railroads.ui.pixel import ground_shader
 from railroads.ui.pixel.ground_shader import free_textures
 from railroads.ui.reports_window import ReportsWindow
+from railroads.ui.save_files import IN_BROWSER
 from railroads.ui.saves_window import SavesWindow
 from railroads.ui.tech_window import TechWindow
 from railroads.ui.theme import BRASS, apply_theme
 from railroads.ui.top_bar import draw_top_bar
 from railroads.ui.tutorial_panel import draw_tutorial
 from railroads.ui.waiting_screen import Label, Shatter, tip_for, waiting_line
-from railroads.ui.web_setup import page_setup
+from railroads.ui.web_setup import go_back_to_landing, page_setup
 from railroads.ui.workers import FRAME_SECONDS, FrameWorker, submit_steps, worker
 
 # How long a notice such as "Autosaved" stays in the top bar.
@@ -588,6 +589,8 @@ class Shell:
                 self.start_tutorial()
             case LoadChoice(name):
                 self.load(name)
+            case QuitChoice() if IN_BROWSER:
+                go_back_to_landing()
             case QuitChoice():
                 hello_imgui.get_runner_params().app_shall_exit = True
 

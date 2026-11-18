@@ -19,9 +19,15 @@ from railroads.saves import SaveInfo, Saves
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
 from railroads.sim.finance import START_CASH, dollars
 from railroads.sim.tilemap import START_SHARE
-from railroads.ui.menu_scene import MenuScene
+from railroads.ui.menu_scene import HORIZON, MenuScene
 from railroads.ui.ornate import DEEP, bar_buttons, frame_rect, rule, spaced, spaced_text
-from railroads.ui.save_files import BrowserFiles, DesktopFiles, draw_file_buttons, save_files
+from railroads.ui.save_files import (
+    IN_BROWSER,
+    BrowserFiles,
+    DesktopFiles,
+    draw_file_buttons,
+    save_files,
+)
 from railroads.ui.saves_window import draw_save_list
 from railroads.ui.theme import BRASS, GONE, tip
 from railroads.version import VERSION
@@ -108,6 +114,8 @@ class MainMenu:
     note: str = ""
     # The trains running behind the menu.
     scene: MenuScene = field(default_factory=MenuScene)
+    # How tall the menu was last drawn, to centre it.
+    _height: float = 0.0
 
     def settings(self) -> Settings:
         return Settings(
@@ -136,7 +144,8 @@ class MainMenu:
         width, height = imgui.get_window_size()
         low = imgui.get_window_pos()
         self.scene.draw(low, imgui.ImVec2(low.x + width, low.y + height))
-        imgui.set_cursor_pos(((width - MENU_WIDTH) / 2 - PANEL_PAD, max(24.0, height * 0.08)))
+        top = max(16.0, (height * HORIZON - self._height) / 2)
+        imgui.set_cursor_pos(((width - MENU_WIDTH) / 2 - PANEL_PAD, top))
         # A child window of the menu's width, so headers and lines end where the buttons do.
         imgui.push_style_color(imgui.Col_.child_bg, imgui.ImVec4(*PANEL_BG))
         imgui.push_style_var(imgui.StyleVar_.window_padding, imgui.ImVec2(PANEL_PAD, PANEL_PAD))
@@ -161,6 +170,7 @@ class MainMenu:
         imgui.pop_item_width()
         imgui.end_child()
         imgui.pop_style_color()
+        self._height = imgui.get_item_rect_size().y
         frame_rect(
             imgui.get_window_draw_list(),
             imgui.get_item_rect_min(),
@@ -181,7 +191,10 @@ class MainMenu:
             return TutorialChoice()
         if self._button(f"{fa.ICON_FA_FOLDER_OPEN}  Load game"):
             self.go_to("load")
-        if self._button(f"{fa.ICON_FA_POWER_OFF}  Quit"):
+        quit_label = (
+            f"{fa.ICON_FA_ARROW_LEFT}  Go back" if IN_BROWSER else f"{fa.ICON_FA_POWER_OFF}  Quit"
+        )
+        if self._button(quit_label):
             return QuitChoice()
         return None
 

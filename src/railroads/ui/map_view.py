@@ -63,7 +63,7 @@ from railroads.ui.map_overlays import (
     visible_area,
 )
 from railroads.ui.map_tools import MapTools
-from railroads.ui.minimap import Minimap, MinimapLayout, view_corners
+from railroads.ui.minimap import FRAME_PAD, Minimap, MinimapLayout, view_corners
 from railroads.ui.ornate import DEEP, bar_buttons, frame_window, ornate_window
 from railroads.ui.pixel.ground import GLOW, glow_strength
 from railroads.ui.pixel.ground_shader import (
@@ -198,6 +198,8 @@ class MapView:
         self._towns: tuple[int, npt.NDArray[np.intp], list[int]] | None = None
         # The top of the minimap on screen, which the lens buttons sit above.
         self._minimap_top: float | None = None
+        # The left and right of the map the lens buttons sit over, if one is shown.
+        self._minimap_span: tuple[float, float] | None = None
         self.build = BuildMenu()
         # What came of the last Buy or Sell pressed in the shares window, and the kind of building
         # in the selected cell whose shares it shows, if open.
@@ -500,11 +502,9 @@ class MapView:
             if shown or world_shown
             else None
         )
-        self._minimap_top = (
-            None
-            if minimap is None
-            else min(panel.top for panel in (minimap.overview, minimap.world) if panel is not None)
-        )
+        under = None if minimap is None else minimap.overview or minimap.world
+        self._minimap_top = None if under is None else under.top
+        self._minimap_span = None if under is None else (under.left, under.right)
         self.input.handle_mouse(center, minimap)
 
         draw_list = imgui.get_window_draw_list()
@@ -662,34 +662,61 @@ class MapView:
         on or off: one at a time."""
         _, (right, bottom) = self._map_rect
         top = self._minimap_top if self._minimap_top is not None else bottom
-        imgui.set_next_window_pos(
-            (right - LENS_GAP, top - LENS_GAP), imgui.Cond_.always.value, (1.0, 1.0)
-        )
+        flags = OVERLAY_FLAGS | imgui.WindowFlags_.no_move.value
+        if self._minimap_span is None:
+            imgui.set_next_window_pos(
+                (right - LENS_GAP, top - LENS_GAP), imgui.Cond_.always.value, (1.0, 1.0)
+            )
+        else:
+            left, edge = self._minimap_span
+            imgui.set_next_window_pos(
+                (edge + FRAME_PAD, top - FRAME_PAD - LENS_GAP),
+                imgui.Cond_.always.value,
+                (1.0, 1.0),
+            )
+            height = imgui.get_frame_height() + 2 * imgui.get_style().window_padding.y
+            imgui.set_next_window_size((edge - left + 2 * FRAME_PAD, height))
+            flags &= ~imgui.WindowFlags_.always_auto_resize.value
         imgui.push_style_color(imgui.Col_.window_bg, imgui.ImVec4(*DEEP))
         imgui.push_style_color(imgui.Col_.border, imgui.ImVec4(0, 0, 0, 0))
-        imgui.begin("##lenses", flags=OVERLAY_FLAGS | imgui.WindowFlags_.no_move.value)
+        imgui.begin("##lenses", flags=flags)
         imgui.pop_style_color(2)
         frame_window()
         with bar_buttons():
-            self._draw_lens_buttons()
+            self._draw_lens_buttons(self._minimap_span is not None)
         imgui.end()
 
-    def _draw_lens_buttons(self) -> None:
-        for lens, label, tooltip in (
+    def _draw_lens_buttons(self, fill: bool) -> None:
+        """The lens buttons side by side, sharing the window's width between them if `fill`, and
+        showing only their icons where their names would not fit."""
+        spacing = imgui.get_style().item_spacing.x
+        width = (imgui.get_content_region_avail().x - spacing) / 2 if fill else 0.0
+        buttons = (
             (
                 Lens.SATISFACTION,
-                f"{fa.ICON_FA_SMILE}  Satisfaction",
+                fa.ICON_FA_SMILE,
+                "Satisfaction",
                 "Tint the land by how satisfied its buildings are (or hold Shift)",
             ),
             (
                 Lens.TOWNS,
-                f"{fa.ICON_FA_USERS}  Towns",
+                fa.ICON_FA_USERS,
+                "Towns",
                 "Tint the land by town; passengers and mail only travel between towns",
             ),
-        ):
+        )
+        padding = 2 * imgui.get_style().frame_padding.x
+        named = all(
+            imgui.calc_text_size(f"{icon}  {name}").x + padding <= width or not fill
+            for _, icon, name, _ in buttons
+        )
+        for lens, icon, name, tooltip in buttons:
+            label = f"{icon}  {name}" if named else icon
+            if not named:
+                tooltip = f"{name}: {tooltip}"
             if lens != Lens.SATISFACTION:
                 imgui.same_line()
-            if toggle_button(label, self.lens == lens, tooltip):
+            if toggle_button(label, self.lens == lens, tooltip, (width, 0)):
                 self.lens = None if self.lens == lens else lens
             spot(f"lens:{lens.value}")
 
