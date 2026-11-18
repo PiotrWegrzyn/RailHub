@@ -168,7 +168,38 @@ def test_woods_stand_as_a_canopy_not_trees_and_everything_is_sorted_back_to_fron
     rows, cols = world.tile_map.grid.cell_at(x, y)
     in_forest = world.tile_map.vegetation[rows, cols] == Vegetation.FOREST
     assert not in_forest.any()
-    assert (np.diff(scenery.y) >= 0).all()
+    x, y = world.projection.to_plane(scenery.x, scenery.y)
+    rows, cols = world.tile_map.grid.cell_at(x, y)
+    depth = world.projection.to_pixels(*world.tile_map.grid.center(rows, cols))[1]
+    assert (np.diff(np.round(depth, 6)) >= 0).all()
+
+
+@pytest.mark.parametrize("look", [LOOKS[HexGrid], GAME_LOOK])
+def test_a_station_house_is_drawn_over_the_buildings_in_the_cells_behind_it(
+    sheet: SpriteSheet, look: tuple[float, float]
+) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    station = (10, 4)
+    constructions.build(Station(station))
+    projection = PixelProjection.of(tile_map.grid, *look)
+    station_y = projection.to_pixels(*tile_map.grid.center(*station))[1]
+    behind = [
+        cell
+        for cell in tile_map.grid.within(station, 1)
+        if projection.to_pixels(*tile_map.grid.center(*cell))[1] < station_y - 1e-6
+    ]
+    for cell in behind:
+        for _ in range(4):
+            constructions.build(Building(cell, BuildingKind.HOUSE))
+
+    scenery = Scenery.of(tile_map, constructions, projection, sheet)
+
+    names = [sheet.names[i] for i in scenery.sprite.tolist()]
+    station_house = names.index(next(name for name in names if name.startswith("station")))
+    houses = np.isin(scenery.sprite, sheet.variants("house"))
+    assert (scenery.y[houses] > scenery.y[station_house]).any()
+    assert np.flatnonzero(houses).max() < station_house
 
 
 def woods_and_meadow(world: PixelWorld) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

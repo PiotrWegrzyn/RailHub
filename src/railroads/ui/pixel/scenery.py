@@ -217,10 +217,13 @@ def station_sprite(level: int, line: str | None = None) -> str:
 
 @dataclass(frozen=True)
 class Scenery:
-    """Everything standing on the ground, sorted back to front: where each stands in art pixels,
-    which sprite it is, how many art pixels the ground under it is lifted, and whether it is
-    drawn under the track, as a building that cannot stand clear of the track is, so the track
-    shows over it."""
+    """Everything standing on the ground, sorted back to front: cell by cell, by how far the
+    middle of the cell each stands in lies from the viewer, and within a cell by where it stands,
+    so what stands in a cell nearer the viewer, such as a station house wider than its cell, is
+    drawn over what stands in the cells behind. For each: where it stands in art pixels, which
+    sprite it is, how many art pixels the ground under it is lifted, and whether it is drawn
+    under the track, as a building that cannot stand clear of the track is, so the track shows
+    over it."""
 
     x: IntArray
     y: IntArray
@@ -268,6 +271,7 @@ class Scenery:
         ys.append(y)
         sprites.append(np.full(len(x), sheet.index("rocks")))
         stations = constructions.every_station_cell()
+        station_from = sum(len(x) for x in xs)
         if stations:
             x, y = _station_houses(constructions, projection, stations)
             xs.append(x)
@@ -302,7 +306,15 @@ class Scenery:
         xs.append(np.asarray(spots.x, dtype=np.float64))
         ys.append(np.asarray(spots.y, dtype=np.float64))
         sprites.append(built_looks)
-        px, py = projection.to_pixels(np.concatenate(xs), np.concatenate(ys))
+        mx, my = np.concatenate(xs), np.concatenate(ys)
+        px, py = projection.to_pixels(mx, my)
+        in_rows, in_cols = grid.cell_at(mx, my)
+        in_rows, in_cols = np.array(in_rows, dtype=np.int64), np.array(in_cols, dtype=np.int64)
+        if stations:
+            own = np.array(stations, dtype=np.int64)
+            in_rows[station_from : station_from + len(own)] = own[:, 0]
+            in_cols[station_from : station_from + len(own)] = own[:, 1]
+        depth = projection.to_pixels(*grid.center(in_rows, in_cols))[1]
         fitted = np.flatnonzero(~np.isin(spots.kinds, list(FIELD_KINDS)))
         if fitted.size:
             px[before + fitted], py[before + fitted] = _inside_cells(
@@ -322,7 +334,7 @@ class Scenery:
         if elevation is not None and px.size:
             x, y = projection.to_plane(px, py)
             lift = np.rint(elevation.lift(x, y)).astype(np.int64)
-        order = np.lexsort((px, py))
+        order = np.lexsort((px, py, np.round(depth, 6)))
         return cls(px[order], py[order], sprite[order], lift[order], under[order])
 
     def __len__(self) -> int:
