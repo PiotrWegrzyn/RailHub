@@ -107,7 +107,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("villages", "Thriving villages", E.GROWTH, 0.5, "rotation"),
             _n("cold", "Cold stores", E.STORAGE, 300, "silos"),
             _n("hoppers", "Grain hoppers", E.CAR_SIZE, 1, "silos"),
-            _n("coop", "Farmers' cooperative", E.GROWTH, 0.5, "stalls"),
+            _n("coop", "Farmers' cooperative", E.TO_COME, 0.0, "stalls"),
             _n(
                 "mixed_vans",
                 "Mixed food vans",
