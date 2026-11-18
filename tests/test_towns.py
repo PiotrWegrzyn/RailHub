@@ -34,16 +34,36 @@ def test_a_cell_joins_the_town_sending_the_most_passengers_around_it() -> None:
     assert towns.town[5, 4] == towns.town[5, 6]
 
 
-def test_a_cell_keeps_its_town_while_it_stands() -> None:
+def test_a_building_between_two_towns_paints_its_neighbourhood_the_busier_ones_colour() -> None:
     towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
     towns.add((5, 2), 1.0)
-    first = int(towns.town[5, 2])
-    towns.add((5, 4), 18.0)
+    towns.add((5, 6), 6.0)
 
+    towns.add((5, 4), 1.0)
+
+    assert towns.town[5, 2] == towns.town[5, 4] == towns.town[5, 6]
+
+
+def test_a_building_going_up_leaves_cells_beyond_its_neighbourhood_alone() -> None:
+    towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
+    towns.add((5, 0), 1.0)
+    towns.add((5, 2), 1.0)
+    first = int(towns.town[5, 0])
+    towns.add((5, 6), 6.0)
+
+    towns.add((5, 4), 1.0)
+
+    assert towns.town[5, 0] == first
+    assert towns.town[5, 2] == towns.town[5, 6] != first
+
+
+def test_a_cell_emptied_leaves_its_town() -> None:
+    towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
     towns.add((5, 2), 1.0)
 
-    assert towns.town[5, 2] == first
-    assert towns.sending[5, 2] == 2.0
+    towns.add((5, 2), -1.0)
+
+    assert towns.town[5, 2] == 0
 
 
 def test_a_cell_emptied_joins_the_town_around_it_when_built_on_again() -> None:

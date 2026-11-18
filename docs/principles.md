@@ -49,8 +49,9 @@ The ideas every rule of the game should follow.
 ## Economy
 
 - Most money comes from the needs of grown homes, not from food or passengers.
-- Every place that sends passengers belongs to a town, taken from the town around it when it is
-  built. Stations belong to the town around them, checked every year, and passengers and mail
+- Every place that sends passengers belongs to a town. Whenever one is built, every such place
+  within 2 hexes, the new one included, takes the colour sending the most passengers there, so
+  towns that grow into each other merge. Stations belong to the town around them, checked every year, and passengers and mail
   only travel between stations of different towns.
 - A home that grows wants more of everything: its reward for growing is that it uses more.
 - Towns start from simple local food makers, such as bakeries, not from farms.

@@ -1,13 +1,13 @@
 """Towns as colours on the map: every cell whose buildings send passengers (railroads.sim.ladders
 PASSENGERS_PER_POINT) belongs to a town, numbered from 1, 0 for none.
 
-A cell takes its town when the first building sending passengers goes up in it: the town that sends
-the most passengers within TOWN_REACH cells of it, or a new town if none does, so towns spread as
-they grow and a building on its own starts one. It keeps its town while it stands; one that empties
-picks again when built on. A station belongs to the town that sends the most passengers from the
-cells it hands out to, worked out when it is built and every year (railroads.sim.railway). Passengers
-and mail never board for a stop of their own station's town, so two stations in one town can't
-carry them to each other for pay.
+Whenever a building sending passengers goes up, every sending cell within TOWN_REACH of it, its own
+included, takes the town that sends the most passengers there, or a new town if none does. So
+towns that grow into each other merge, and a building on its own starts one. A cell that empties
+leaves its town. A station belongs to the town that sends the most passengers from the cells it
+hands out to, worked out when it is built and every year (railroads.sim.railway). Passengers and
+mail never board for a stop of their own station's town, so two stations in one town can't carry
+them to each other for pay.
 """
 
 import numpy as np
@@ -28,22 +28,27 @@ class Towns:
 
     def add(self, cell: Cell, passengers: float) -> None:
         """Counts buildings put up (or pulled down, below 0) in a cell that send this many
-        passengers a month more; a cell sending none before joins a town."""
-        if passengers > 0 and self.sending[cell] <= 0:
-            self.town[cell] = self._town_around(cell)
+        passengers a month more; one put up paints the cells around it one town."""
         self.sending[cell] = max(0.0, self.sending[cell] + passengers)
+        if self.sending[cell] <= 0:
+            self.town[cell] = 0
+        elif passengers > 0:
+            self._paint_around(cell)
 
-    def _town_around(self, cell: Cell) -> int:
+    def _paint_around(self, cell: Cell) -> None:
+        around = [near for near in self._grid.within(cell, TOWN_REACH) if self.sending[near] > 0]
         votes: dict[int, float] = {}
-        for near in self._grid.within(cell, TOWN_REACH):
-            town, sending = int(self.town[near]), float(self.sending[near])
-            if near != cell and town and sending > 0:
-                votes[town] = votes.get(town, 0.0) + sending
+        for near in around:
+            town = int(self.town[near])
+            if town:
+                votes[town] = votes.get(town, 0.0) + float(self.sending[near])
         if votes:
-            return max(votes, key=lambda town: (votes[town], -town))
-        town = self._next
-        self._next += 1
-        return town
+            town = max(votes, key=lambda town: (votes[town], -town))
+        else:
+            town = self._next
+            self._next += 1
+        for near in around:
+            self.town[near] = town
 
     def settle(self, sending: npt.NDArray[np.float64]) -> None:
         """Gives every cell sending passengers a town, the busiest first, as if each went up
