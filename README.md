@@ -672,9 +672,10 @@ Shares of any building that makes something can be bought and sold from the hex 
 mines, mills, works and factories, but no homes, shops, churches or military. Every building is
 1,000 shares, traded 100 at a time, and 100 shares are a tenth of what it makes. A bought
 building pays nothing of its own: the player's part of what it makes goes into the stations
-around it before anything is handed out, as if a train had brought it, and pays in full as
-those stations hand it out to the buildings in their reach; a building with no station near pays
-nothing. A station hands what it has to the player's own buildings before anyone else's,
+around it before anything is handed out, sold to the player's company at the market price as it
+goes in, and then pays freight like any cargo when a train carries it to another station and
+buildings there take it; what the station hands out around it carries no freight. A building
+with no station near pays nothing. A station hands what it has to the player's own buildings before anyone else's,
 however far within its reach they stand. A whole building costs thirty years of all it makes at full output when it was half
 satisfied over the last quarter, two thirds of that at none, one and a half times at 100% and
 twice at 200%, and shares sell at the price they buy at, so raising a building's satisfaction
@@ -865,17 +866,17 @@ build bar shows what the track under the mouse would cost. Route planning still 
 bridges and tunnels lightly, so it stays quick; click a point in between to steer track round a
 river.
 
-Freight earns money when the buildings around a station take it, by the demand there
-(`railroads.sim.demand`). Each month a station's capacity for a need is twice what the buildings
-in its inner area were left short of after the goods buildings around hand out on their own. What
-they use up is everything the station hands them; the demand left is the capacity less that use
-averaged over the last 3 months. Each unit taken earns its price times the share of demand left
-and uses up demand itself, so a town nobody feeds pays the full price, one supplied in full every
-month a little over half, and flooding one drives the price down for up to three months. A town
-its own farms already feed wants no food at all. The Stations window shows the share of demand
-left for each need.
+Every good has a market price, five times the figure in the table below. Freight earns a fifth of
+it, the figure in the table, for each unit trains brought that the buildings around a station take,
+times what the unit was worth to the building that took it: the full figure to one satisfied over
+the last quarter, up to three times as much to one that got nothing (`railroads.sim.railway`).
+Each station still keeps its demand (`railroads.sim.demand`): every month its capacity for a need
+is twice what the buildings in its inner area were left short of after the goods buildings around
+hand out on their own, and what they take uses it up, averaged over the last 3 months; passengers
+and mail pay their figure times the share of that demand left. The Stations window shows the
+share of demand left for each need.
 
-| Price | Goods |
+| Freight (a fifth of the market price) | Goods |
 |---|---|
 | $2-10 | eggs 4, bread 6, chickens 6, milk 6, potatoes 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, sugar 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, lumber 10, newspapers 10, pots 10 |
 | $11-20 | cement 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, beer 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, wool 20 |

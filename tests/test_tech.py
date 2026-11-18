@@ -3,7 +3,7 @@ import pytest
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.finance import ELECTRIC_TRACK_UPKEEP, TRACK_UPKEEP
-from railroads.sim.goods import Good, Need, price_of
+from railroads.sim.goods import Good, Need, freight_of
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
@@ -119,7 +119,7 @@ def test_cattle_pay_twice_their_price_when_a_train_delivers_them(good: Good, tim
 
     railway.pay_for((6, 20), Need.ANIMALS, good, 1.0)
 
-    assert railway.finances.month["cargo"] == pytest.approx(times * price_of(good))
+    assert railway.finances.month["cargo"] == pytest.approx(times * freight_of(good))
 
 
 def test_the_mogul_can_be_bought_only_once_its_tech_and_year_have_come() -> None:

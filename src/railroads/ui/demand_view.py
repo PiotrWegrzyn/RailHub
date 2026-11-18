@@ -4,9 +4,9 @@ share and what a unit earns."""
 
 from imgui_bundle import imgui
 
-from railroads.sim.demand import DemandRecord, StationDemand, price_of
+from railroads.sim.demand import DemandRecord, StationDemand
 from railroads.sim.finance import dollars
-from railroads.sim.goods import FITS, Need
+from railroads.sim.goods import FITS, Need, freight_of
 from railroads.ui.theme import BORDER, BRASS, BRASS_DARK, color_u32, good_icon, next_good_slot
 
 COINS = 3
@@ -80,7 +80,7 @@ def _demand_tooltip(demand: StationDemand, need: Need, record: DemandRecord) -> 
     imgui.begin_tooltip()
     imgui.text(f"{need.value}: {record.share:.0%} of demand left")
     imgui.text(f"Takes about {record.left:.0f} more before it pays nothing")
-    price = price_of(FITS[need][0]) * record.share
+    price = freight_of(FITS[need][0]) * record.share
     imgui.text(f"A unit delivered for it now earns {dollars(price)}")
     imgui.text_disabled(f"Met by {', '.join(good.value for good in FITS[need])}")
     last = demand.last_month.get(need)

@@ -4,8 +4,8 @@ import pytest
 from builders import flat_map
 from railroads.mapgen.deposits import allowed_land, place_deposits
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.demand import StationDemand, price_of
-from railroads.sim.goods import MAKES, Good, Need, needs_of
+from railroads.sim.demand import StationDemand
+from railroads.sim.goods import MAKES, Good, Need, freight_of, needs_of
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth, dies_after
 from railroads.sim.ladders import JEWELLERS, RESOURCES, WORKS, GrowthRule
@@ -97,9 +97,9 @@ def test_diamonds_cars_and_gold_are_worth_a_lot_but_only_where_someone_wants_the
 
     earned = wanted.pay(Need.DIAMONDS, Good.DIAMONDS, 1.0)
 
-    assert earned == pytest.approx(price_of(Good.DIAMONDS))
+    assert earned == pytest.approx(freight_of(Good.DIAMONDS))
     assert elsewhere.deliver(Good.DIAMONDS, 1.0) == 0.0
-    assert price_of(Good.CARS) == 5000
+    assert freight_of(Good.CARS) == 5000
 
 
 def test_a_map_only_holds_its_few_jewellers() -> None:

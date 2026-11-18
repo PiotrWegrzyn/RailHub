@@ -10,9 +10,18 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import BUILDING_RULES, BuildingKind
-from railroads.sim.demand import price_of
 from railroads.sim.finance import dollars
-from railroads.sim.goods import FITS, GOOD_YEARS, MAKES, NEEDS, Good, Need, need_year
+from railroads.sim.goods import (
+    FITS,
+    GOOD_YEARS,
+    MAKES,
+    NEEDS,
+    Good,
+    Need,
+    freight_of,
+    need_year,
+    price_of,
+)
 from railroads.sim.ladders import LADDERS, PASSENGERS_PER_POINT, POINTS, Points
 from railroads.sim.tech import NODES, Tree, path_to
 from railroads.sim.trains import ENGINES, Engine, successor
@@ -96,6 +105,7 @@ class BuildingHelp:
 class GoodHelp:
     good: Good
     price: float
+    freight: float
     from_year: int
     made_by: tuple[str, ...]
     wanted_by: tuple[str, ...]
@@ -142,7 +152,7 @@ def building_help() -> tuple[BuildingHelp, ...]:
 
 @cache
 def good_help() -> tuple[GoodHelp, ...]:
-    """Every good, with its price where all the demand for it is left; worked out once."""
+    """Every good, with its market price and what carrying it earns; worked out once."""
     rows = []
     for good in Good:
         needs = {need for need, goods in FITS.items() if good in goods}
@@ -150,6 +160,7 @@ def good_help() -> tuple[GoodHelp, ...]:
             GoodHelp(
                 good,
                 price_of(good),
+                freight_of(good),
                 GOOD_YEARS.get(good, 0),
                 tuple(kind.value for kind, made in MAKES.items() if good in made),
                 tuple(kind.value for kind, wanted in NEEDS.items() if needs & set(wanted)),
@@ -262,11 +273,12 @@ class HelpWindow:
         imgui.end_table()
 
     def _draw_goods(self) -> None:
-        if not imgui.begin_table("all goods", 5, LIST_TABLE_FLAGS):
+        if not imgui.begin_table("all goods", 6, LIST_TABLE_FLAGS):
             return
         imgui.table_setup_scroll_freeze(0, 1)
         imgui.table_setup_column("Good")
-        imgui.table_setup_column("Base price")
+        imgui.table_setup_column("Market price")
+        imgui.table_setup_column("Freight")
         imgui.table_setup_column("Appears")
         imgui.table_setup_column("Made by", imgui.TableColumnFlags_.width_stretch.value, 1.0)
         imgui.table_setup_column("Wanted by", imgui.TableColumnFlags_.width_stretch.value, 1.4)
@@ -281,6 +293,8 @@ class HelpWindow:
             imgui.text(row.good.value)
             imgui.table_next_column()
             imgui.text(dollars(row.price))
+            imgui.table_next_column()
+            imgui.text(dollars(row.freight))
             imgui.table_next_column()
             imgui.text(str(row.from_year) if row.from_year else "always")
             imgui.table_next_column()

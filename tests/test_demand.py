@@ -4,9 +4,8 @@ from railroads.sim.demand import (
     DEMAND_PER_NEED,
     StationDemand,
     capacity_of,
-    price_of,
 )
-from railroads.sim.goods import FITS, Good, Need
+from railroads.sim.goods import FITS, Good, Need, freight_of
 
 
 def test_demand_capacity_is_twice_what_the_buildings_need() -> None:
@@ -20,7 +19,7 @@ def test_the_first_unit_to_a_town_nobody_feeds_earns_the_full_price() -> None:
 
     earned = demand.deliver(Good.WHEAT, 1.0)
 
-    assert earned == pytest.approx(price_of(Good.WHEAT))
+    assert earned == pytest.approx(freight_of(Good.WHEAT))
 
 
 def test_each_unit_earns_at_the_share_of_demand_left_as_it_is_taken() -> None:
@@ -29,7 +28,7 @@ def test_each_unit_earns_at_the_share_of_demand_left_as_it_is_taken() -> None:
     earned = demand.pay(Need.FOOD, Good.WHEAT, 2.5)
 
     shares = [1.0, (4.0 - 1 / 3) / 4.0, (4.0 - 2 / 3) / 4.0]
-    assert earned == pytest.approx(price_of(Good.WHEAT) * (shares[0] + shares[1] + shares[2] / 2))
+    assert earned == pytest.approx(freight_of(Good.WHEAT) * (shares[0] + shares[1] + shares[2] / 2))
     assert demand.used[Need.FOOD] == [2.5]
 
 
@@ -39,7 +38,7 @@ def test_each_unloaded_unit_lowers_the_price_of_the_next() -> None:
     first = demand.deliver(Good.WHEAT, 10.0)
     second = demand.deliver(Good.WHEAT, 10.0)
 
-    assert 0.9 * 10 * price_of(Good.WHEAT) < first < 10 * price_of(Good.WHEAT)
+    assert 0.9 * 10 * freight_of(Good.WHEAT) < first < 10 * freight_of(Good.WHEAT)
     assert second < first
 
 

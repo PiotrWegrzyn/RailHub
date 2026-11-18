@@ -3,8 +3,8 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Track
-from railroads.sim.demand import DEMAND_PER_NEED, StationDemand, price_of
-from railroads.sim.economy import Economy, StationOrder
+from railroads.sim.demand import DEMAND_PER_NEED, StationDemand
+from railroads.sim.economy import SCARCE_WORTH, Economy, StationOrder
 from railroads.sim.finance import (
     CAR_TRIP_PRICE,
     STATION_UPKEEP,
@@ -14,7 +14,7 @@ from railroads.sim.finance import (
     TRAIN_PRICE,
     car_trip_price,
 )
-from railroads.sim.goods import Good, Need, needs_of
+from railroads.sim.goods import Good, Need, freight_of, needs_of
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import CELLS_PER_MONTH, Railway
@@ -339,7 +339,7 @@ def test_cargo_earns_money_only_when_the_buildings_around_take_it() -> None:
     goods = railway.station_goods((6, 20))
     assert on_arrival == 0.0
     assert goods.brought[Good.WHEAT] == pytest.approx(BULK_CAR - 40.0)
-    assert 0.0 < railway.finances.month["cargo"] <= 40 * price_of(Good.WHEAT)
+    assert 0.0 < railway.finances.month["cargo"] <= 40 * freight_of(Good.WHEAT)
 
 
 def test_each_month_stations_and_track_cost_their_upkeep() -> None:
@@ -422,7 +422,7 @@ def test_passengers_pay_on_arrival_and_go_on_their_way() -> None:
     railway.run(0.01)
     railway.run(80 / CELLS_PER_MONTH)
 
-    assert railway.finances.month["passengers"] > 0.95 * 50 * price_of(Good.PASSENGERS)
+    assert railway.finances.month["passengers"] > 0.95 * 50 * freight_of(Good.PASSENGERS)
     assert Good.PASSENGERS not in railway.station_goods((6, 20)).brought
 
 
@@ -630,7 +630,9 @@ def test_gold_reaches_a_jeweller_through_a_hub_and_pays_the_moment_he_takes_it()
 
     assert railway.station_goods((6, 27)).brought[Good.GOLD] == pytest.approx(0.0)
     assert (
-        4 * price_of(Good.GOLD) < railway.finances.month["cargo"] <= SMALL_CAR * price_of(Good.GOLD)
+        4 * freight_of(Good.GOLD)
+        < railway.finances.month["cargo"]
+        <= SMALL_CAR * freight_of(Good.GOLD) * SCARCE_WORTH
     )
 
 

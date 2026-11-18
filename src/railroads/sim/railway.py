@@ -77,7 +77,7 @@ from railroads.sim.fuel_market import (
     fuel_of,
     signals_of,
 )
-from railroads.sim.goods import FOODS, TRAVELLERS, General, Good, Need
+from railroads.sim.goods import FOODS, TRAVELLERS, General, Good, Need, freight_of, price_of
 from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
@@ -499,15 +499,24 @@ class Railway:
             self.station_trade.hand_out_now(station, good)
 
     def pay_for(
-        self, station: Cell, need: Need, good: Good, amount: float, what: str = "cargo"
+        self, station: Cell, need: Need, good: Good, amount: float, worth: float | None = None
     ) -> None:
-        """Pays for cargo trains brought that the buildings around a station took, which is also
-        experience in the good's tree, filed as `what`: cargo, or the player's share of what
-        their own buildings made, handed out as if a train had brought it."""
-        earned = self.station_demand(station).pay(need, good, amount) * self.price_factor(good)
+        """Pays the freight for cargo trains brought that the buildings around a station took,
+        which is also experience in the good's tree: its freight (freight_of) for each unit,
+        times what it was worth to the building that took it (`worth`, the units counted by
+        railroads.sim.economy.worth_to; the units themselves if not given), with tech and the
+        station's facilities. Uses up that much of the station's demand."""
+        self.station_demand(station).use(need, amount)
+        weighed = amount if worth is None else worth
+        earned = freight_of(good) * weighed * self.price_factor(good)
         earned *= self.facility_pay(station, good)
-        self.finances.earn(earned, what)
+        self.finances.earn(earned, "cargo")
         self.learn(GOOD_TREES[good], earned)
+
+    def sell_own(self, good: Good, amount: float) -> None:
+        """Pays the player the market price of what their own buildings brought into a station:
+        their company sold it, and the railway now carries it."""
+        self.finances.earn(price_of(good) * amount, "owned buildings")
 
     def learn(self, tree: Tree, dollars: float) -> None:
         """Counts what a delivery earned as experience in a tree, more for every building of

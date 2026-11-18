@@ -918,3 +918,18 @@ def test_a_station_hands_out_to_the_players_own_buildings_before_nearer_ones(
 
     got, _ = trade.goods_got[(BuildingKind.BAKERY, Need.WHEAT)]
     assert got[position(trade, economy, fed_at)] == pytest.approx(50.0)
+
+
+@pytest.mark.parametrize(("satisfaction", "worth"), [(0.0, SCARCE_WORTH), (0.5, 2.0), (1.0, 1.0)])
+def test_what_a_station_hands_out_is_worth_more_the_less_satisfied_its_buyer_was(
+    satisfaction: float, worth: float
+) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    economy.months = [np.full(economy.cells, satisfaction) for _ in range(QUARTER)]
+    placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
+
+    trade = economy.trade(placed, holding(FISH=5.0))
+
+    handed = trade.handed_for[STATION][(Need.FOOD, Good.FISH)]
+    assert trade.handed_worth[STATION][(Need.FOOD, Good.FISH)] == pytest.approx(worth * handed)

@@ -344,9 +344,12 @@ GOOD_YEARS: Mapping[Good, int] = MappingProxyType(
     }
 )
 
-# What a unit of each good earns where all the demand for it is left (railroads.sim.demand);
-# goods left out earn CARGO_PRICE.
+# What carrying a unit of each good to a building that takes it earns, at full satisfaction
+# (freight_of); goods left out earn CARGO_PRICE. Their market price is MARKET_TIMES as much, and
+# freight FREIGHT_SHARE of that.
 CARGO_PRICE = 20.0
+MARKET_TIMES = 5.0
+FREIGHT_SHARE = 0.2
 
 PRICES: Mapping[Good, float] = MappingProxyType(
     {
@@ -432,8 +435,15 @@ PRICES: Mapping[Good, float] = MappingProxyType(
 
 
 def price_of(good: Good) -> float:
-    """What a unit of a good earns where all the demand for it is left."""
-    return PRICES.get(good, CARGO_PRICE)
+    """A unit of a good's market price: what the player's own buildings sell it to their stations
+    for, MARKET_TIMES its PRICES."""
+    return MARKET_TIMES * PRICES.get(good, CARGO_PRICE)
+
+
+def freight_of(good: Good) -> float:
+    """What carrying a unit of a good to a building that takes it earns: FREIGHT_SHARE of its
+    market price, before what the buyer's satisfaction adds (railroads.sim.economy.worth_to)."""
+    return FREIGHT_SHARE * price_of(good)
 
 
 # The goods meeting each need in the order stations hand them out: the most valuable first, so

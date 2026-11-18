@@ -295,6 +295,9 @@ class Trade:
     # Per station, what it took of the player's share of their own buildings' goods, to hand
     # out as if a train had brought it.
     owned_brought: Mapping[Cell, Mapping[Good, float]] = field(default_factory=dict)
+    # Per station, what it handed out by need and good, each unit counted by what it was worth to
+    # the building that took it (worth_to): what freight pays for.
+    handed_worth: Mapping[Cell, Mapping[tuple[Need, Good], float]] = field(default_factory=dict)
 
     def done(self, kinds: tuple[BuildingKind, ...]) -> FloatCells:
         return sum(
@@ -540,6 +543,9 @@ class _Month:
         self.handed_for: dict[Cell, dict[tuple[Need, Good], float]] = {
             station: {} for station in stations
         }
+        self.handed_worth: dict[Cell, dict[tuple[Need, Good], float]] = {
+            station: {} for station in stations
+        }
         self.gathered: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
         self.owned_brought: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
         self.room = {
@@ -693,12 +699,17 @@ class _Month:
         sellers, buyers, bounds = self._station_pairs()
         left = brought.copy()
         short = demand - received
-        distribute(sellers, buyers, bounds, left, short)
+        went, sent = distribute(sellers, buyers, bounds, left, short)
         received[:] = demand - short
-        for station, before, after in zip(stations, brought, left, strict=True):
+        worth = np.bincount(
+            sellers[went], sent * self.worth_to[buyers[went]], minlength=len(stations)
+        )
+        for station, before, after, weighed in zip(stations, brought, left, worth, strict=True):
             given = float(before - after)
             if given <= 0:
                 continue
+            worths = self.handed_worth[station]
+            worths[(need, good)] = worths.get((need, good), 0.0) + float(weighed)
             self.brought[station][good] = float(after)
             self.handed[station][good] = self.handed[station].get(good, 0.0) + given
             handed_for = self.handed_for[station]
@@ -995,6 +1006,7 @@ class _Month:
                 for good, above in self.worth_above.items()
             },
             self.owned_brought,
+            self.handed_worth,
         )
         self.economy.levels[:] = Satisfaction.UNSATISFIED
         self.economy.levels[self.cells] = trade.levels()

@@ -23,6 +23,7 @@ from railroads.sim.economy import (
     input_stock,
     ring_starts,
     wants_of,
+    worth_to,
 )
 from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.goods import (
@@ -93,7 +94,8 @@ class StationTrade:
             goods = railway.station_goods(station)
             for good, amount in owned.items():
                 goods.bring(good, {station: amount})
-        # The share of what each station handed out of a good that the player's own buildings made.
+        # The share of what each station handed out of a good that never left it: the player's
+        # own buildings' goods, which carry no freight.
         owned_share: dict[tuple[Cell, Good], float] = {}
         for station, handed in trade.handed.items():
             goods = railway.station_goods(station)
@@ -122,13 +124,15 @@ class StationTrade:
         railway.year = self._growth.year
         railway.turn_month(capacity)
         yield
+        for owned in trade.owned_brought.values():
+            for good, amount in owned.items():
+                railway.sell_own(good, amount)
         for station, handed_for in trade.handed_for.items():
+            worths = trade.handed_worth.get(station, {})
             for (need, good), amount in handed_for.items():
-                owned = owned_share.get((station, good), 0.0)
-                if owned > 0:
-                    railway.pay_for(station, need, good, amount * owned, "owned buildings")
-                if owned < 1:
-                    railway.pay_for(station, need, good, amount * (1 - owned))
+                carried = 1.0 - owned_share.get((station, good), 0.0)
+                worth = worths.get((need, good), amount)
+                railway.pay_for(station, need, good, amount * carried, worth * carried)
 
     def _short_after_local(
         self, station: Cell, needs: dict[Need, float], trade: Trade | None
@@ -184,7 +188,10 @@ class StationTrade:
             short = demand - (mine - short)
             distribute(sellers, buyers, bounds, left, short)
             got = demand - short
-            if self._give(station, goods, need, good, float(got.sum())) <= 0:
+            total = float(got.sum())
+            weighed = float((got * worth_to(economy.last_quarter()[cells])).sum())
+            rate = weighed / total if total > 0 else 1.0
+            if self._give(station, goods, need, good, total, rate) <= 0:
                 continue
             met = np.where(demand > 0, got / np.where(demand > 0, demand, 1.0), 0.0)
             for kind, want in wants.items():
@@ -237,16 +244,25 @@ class StationTrade:
         return wants
 
     def _give(
-        self, station: Cell, goods: StationGoods, need: Need, good: Good, want: float
+        self,
+        station: Cell,
+        goods: StationGoods,
+        need: Need,
+        good: Good,
+        want: float,
+        rate: float = 1.0,
     ) -> float:
-        """Gives up to `want` of a good trains brought to a station, and pays for it; returns how
+        """Gives up to `want` of a good trains brought to a station, and pays the freight of what
+        trains carried there, each unit worth `rate` to the buildings that took it; returns how
         much went."""
         railway = self._growth.railway
         assert railway is not None
         given = min(want, goods.brought.get(good, 0.0))
         if given > 0:
-            goods.release(good, given)
-            railway.pay_for(station, need, good, given)
+            parcels = goods.release(good, given)
+            total = sum(parcels.values())
+            carried = given * (1.0 - parcels.get(station, 0.0) / total if total > 0 else 1.0)
+            railway.pay_for(station, need, good, carried, carried * rate)
         return max(given, 0.0)
 
     @property

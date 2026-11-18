@@ -51,11 +51,11 @@ def test_the_help_gives_travellers_space_and_opening_year(
     assert (row.travellers, row.space, row.from_year) == (travellers, space, year)
 
 
-def test_the_help_gives_the_price_of_every_good() -> None:
-    prices = {row.good: row.price for row in good_help()}
+def test_the_help_gives_the_market_price_and_freight_of_every_good() -> None:
+    prices = {row.good: (row.price, row.freight) for row in good_help()}
 
     assert set(prices) == set(Good)
-    assert prices[Good.INCENSE] == 300
+    assert prices[Good.INCENSE] == (pytest.approx(1500), pytest.approx(300))
 
 
 def test_the_help_says_who_makes_and_wants_a_good() -> None:

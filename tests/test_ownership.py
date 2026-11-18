@@ -164,3 +164,13 @@ def test_the_company_flies_its_flag_only_over_the_cells_where_it_owns_a_building
 
     assert growth.owners.company == "The Trains Corp"
     assert growth.owners.cells() == [(5, 7)]
+
+
+def test_the_players_farm_sells_its_goods_at_the_market_price_as_they_enter_the_station() -> None:
+    growth = joined_with_owned_farm(SHARES)
+
+    growth.trade_goods()
+
+    sold = growth.railway.finances.month["owned buildings"]
+    assert sold == pytest.approx(10 * price_of(Good.WHEAT))
+    assert growth.railway.finances.month.get("cargo", 0.0) == 0.0
