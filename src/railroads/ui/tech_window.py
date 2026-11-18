@@ -102,7 +102,8 @@ def describe(node: Node) -> str:
         reach = ", everywhere" if node.everywhere else ""
         return f"{node.effect.value} {sign}{node.amount:.0%}{reach}"
     if node.effect == Effect.CAR_SIZE:
-        return f"every car {node.amount:g} size bigger"
+        reach = "every car" if node.everywhere else "its cars"
+        return f"{reach} {node.amount:g} size bigger"
     return f"{node.effect.value} +{node.amount:g}"
 
 
@@ -125,7 +126,8 @@ def explain(tree: Tree, node: Node) -> str:
         Effect.WAITING: f"Every station holds {node.amount:g} more passengers and mail.",
         Effect.BONUS_GOODS: f"Each bonus good adds {amount} more satisfaction.",
         Effect.FUEL_MARKUP: f"Fuel bought outside your stations costs {amount} less over market.",
-        Effect.CAR_SIZE: f"Every car holds {node.amount:g} size more.",
+        Effect.CAR_SIZE: f"{"Every car" if node.everywhere else f"Every car of {tree.value}"} holds "
+        f"{node.amount:g} size more.",
         Effect.UNLOCK: f"O{describe(node)[1:]}.",
     }
     return sentences[node.effect]

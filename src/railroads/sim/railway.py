@@ -354,10 +354,11 @@ class Railway:
         self, good: Good, engine: str | None = None, general: General | None = None
     ) -> float:
         """How much of a good one car carries, a general car of a kind (general_car_size) or
-        one for the good alone: sizes up with tech (Effect.CAR_SIZE) and behind newer engines
+        one for the good alone: sizes up with its tree's tech (Effect.CAR_SIZE) and behind newer engines
         (Engine.car_levels), and coaches and mail vans more with tech."""
         base = car_size(good) if general is None else general_car_size(general, good)
-        levels = int(self.research.bonus(Effect.CAR_SIZE))
+        tree = GOOD_TREES.get(good)
+        levels = int(self.research.bonus(Effect.CAR_SIZE, tree)) if tree is not None else 0
         if engine is not None:
             levels += ENGINES[engine].car_levels
         size = bigger(base, levels)

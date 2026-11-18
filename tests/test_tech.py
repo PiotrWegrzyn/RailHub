@@ -86,7 +86,7 @@ def test_bonuses_add_up_in_their_own_tree_and_from_nodes_that_reach_everywhere()
     food = research.bonus(Effect.PRODUCTION, Tree.FOOD)
     metals = research.bonus(Effect.SHARE, Tree.METALS)
 
-    assert food == pytest.approx(0.25)
+    assert food == pytest.approx(0.5)
     assert metals == pytest.approx(0.05)
 
 
@@ -99,7 +99,7 @@ def test_an_owned_farm_with_better_seed_sells_more_and_earns_food_experience() -
 
     growth.trade_goods()
 
-    earned = 10 * 1.1 * price_of(Good.WHEAT) * OWNER_SHARE
+    earned = 10 * 1.25 * price_of(Good.WHEAT) * OWNER_SHARE
     assert growth.owners.income[BuildingKind.FARM] == pytest.approx(earned)
     assert growth.railway.research.xp[Tree.FOOD] - before == pytest.approx(earned)
 
@@ -157,6 +157,15 @@ def test_a_diesel_engine_and_bogie_wagons_each_put_a_car_one_fibonacci_size_up()
     ]
 
     assert sizes == [34.0, 55.0, 55.0, 89.0]
+
+
+def test_grain_hoppers_put_only_food_cars_one_size_up() -> None:
+    railway = joined().railway
+    railway.research = learned(Tree.FOOD, "silos", "hoppers")
+
+    sizes = railway.car_capacity(Good.WHEAT), railway.car_capacity(Good.COAL)
+
+    assert sizes == (144.0, 89.0)
 
 
 def test_bogie_coaches_carry_more_passengers_but_freight_cars_stay_the_same() -> None:
@@ -324,7 +333,7 @@ def test_production_and_share_nodes_say_they_reach_only_owned_buildings() -> Non
     food = explain(Tree.FOOD, seed)
     everywhere = explain(Tree.COMMERCE, investors)
 
-    assert food == "Every food and drink building you own makes and takes in 10% more."
+    assert food == "Every food and drink building you own makes and takes in 25% more."
     assert everywhere.startswith("Every building you own pays you")
 
 
