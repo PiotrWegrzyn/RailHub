@@ -40,6 +40,8 @@ SEEDS = 1_000_000
 TITLE_SCALE = 2.0
 # The room round the menu inside its frame, and the panel behind it.
 PANEL_PAD = 20.0
+# How fast the menu grows or shrinks to what it holds: the share of the way a second.
+MENU_EASING = 14.0
 PANEL_BG = (DEEP[0], DEEP[1], DEEP[2], 0.88)
 
 Page = Literal["main", "new", "load"]
@@ -117,6 +119,8 @@ class MainMenu:
     # How tall the menu's first page was last drawn: every page hangs from where that one is
     # centred, so opening a page or a fold only lengthens the menu downwards.
     _height: float = 0.0
+    # How tall the menu is drawn now, growing or shrinking smoothly to what it holds.
+    _shown: float = 0.0
     # The folding headings on the new game page that are open.
     _unfolded: set[str] = field(default_factory=set)
 
@@ -152,11 +156,13 @@ class MainMenu:
         # A child window of the menu's width, so headers and lines end where the buttons do.
         imgui.push_style_color(imgui.Col_.child_bg, imgui.ImVec4(*PANEL_BG))
         imgui.push_style_var(imgui.StyleVar_.window_padding, imgui.ImVec2(PANEL_PAD, PANEL_PAD))
-        flags = (
-            imgui.ChildFlags_.auto_resize_y.value
-            | imgui.ChildFlags_.always_use_window_padding.value
+        flags = imgui.ChildFlags_.always_use_window_padding.value
+        if not self._shown:
+            flags |= imgui.ChildFlags_.auto_resize_y.value
+        no_scroll = (
+            imgui.WindowFlags_.no_scrollbar.value | imgui.WindowFlags_.no_scroll_with_mouse.value
         )
-        imgui.begin_child("##menu", (MENU_WIDTH + 2 * PANEL_PAD, 0), flags)
+        imgui.begin_child("##menu", (MENU_WIDTH + 2 * PANEL_PAD, self._shown), flags, no_scroll)
         imgui.pop_style_var()
         imgui.push_item_width(MENU_WIDTH)
         _draw_title()
@@ -171,10 +177,12 @@ class MainMenu:
                 self.page
             ]()
         imgui.pop_item_width()
+        content = imgui.get_cursor_pos_y() - imgui.get_style().item_spacing.y + PANEL_PAD
         imgui.end_child()
         imgui.pop_style_color()
+        self._shown = grown_towards(self._shown, content, imgui.get_io().delta_time)
         if self.page == "main" or not self._height:
-            self._height = imgui.get_item_rect_size().y
+            self._height = content
         frame_rect(
             imgui.get_window_draw_list(),
             imgui.get_item_rect_min(),
@@ -352,3 +360,13 @@ def _draw_title() -> None:
     rule(draw_list, at.x, left - 14, middle, fade_left=True)
     rule(draw_list, left + wide + 14, at.x + MENU_WIDTH, middle, fade_left=False)
     imgui.dummy((MENU_WIDTH, imgui.get_font_size() * TITLE_SCALE + 4))
+
+
+def grown_towards(shown: float, wanted: float, seconds: float) -> float:
+    """How tall the menu is drawn after `seconds` more of growing or shrinking from `shown`
+    towards `wanted`, a share of the way each moment so it eases in, at `wanted` once within
+    half a pixel; at once when nothing was shown yet."""
+    if not shown:
+        return wanted
+    shown += (wanted - shown) * min(1.0, seconds * MENU_EASING)
+    return wanted if abs(wanted - shown) < 0.5 else shown
