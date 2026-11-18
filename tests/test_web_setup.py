@@ -13,6 +13,7 @@ from railroads.sim.constructions import Constructions
 from railroads.sim.steps import finish
 from railroads.ui import web_setup
 from railroads.ui.web_setup import PageSetup, unpacked
+from railroads.version import VERSION
 
 SETTINGS = Settings(seed=7, map=MapChoice.POLAND, start_year=1850)
 
@@ -21,8 +22,9 @@ class FakePage:
     """A setup worker as the page runs one: it grows the game when told to work and its bytes
     are copied out of Python's memory by their address, as web/painter.js copies them."""
 
-    def __init__(self, fails: bool = False) -> None:
+    def __init__(self, fails: bool = False, version: str = VERSION) -> None:
         self.fails = fails
+        self.version = version
         self.settings: bytes | None = None
         self.inbox: list[dict[str, Any]] = []
         self.stopped = 0
@@ -39,7 +41,9 @@ class FakePage:
         advance = lambda done: self.inbox.append({"kind": "advance", "done": done})
         grown = web_setup.grow(self.settings, report, advance, self.see)
         game = np.frombuffer(ctypes.string_at(grown.address, grown.length), dtype=np.uint8)
-        self.inbox.append({"kind": "grown", "game": game, "size": grown.size})
+        self.inbox.append(
+            {"kind": "grown", "game": game, "size": grown.size, "version": self.version}
+        )
 
     def see(self, address: int, length: int) -> None:
         pixels = np.frombuffer(ctypes.string_at(address, length), dtype=np.uint8)
@@ -110,6 +114,21 @@ def test_a_worker_that_fails_leaves_the_game_to_grow_elsewhere(
 ) -> None:
     monkeypatch.setattr(web_setup, "make_game", grows_as(played_game()))
     page = FakePage(fails=True)
+    steps = PageSetup(page).grow(SETTINGS, print)
+    next(steps)
+    page.work()
+
+    saved = finish(steps)
+
+    assert saved is None
+    assert page.stopped >= 1
+
+
+def test_a_game_grown_by_a_worker_of_another_version_is_left_to_grow_elsewhere(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(web_setup, "make_game", grows_as(played_game()))
+    page = FakePage(version="0.5.47")
     steps = PageSetup(page).grow(SETTINGS, print)
     next(steps)
     page.work()

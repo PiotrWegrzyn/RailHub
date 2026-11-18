@@ -25,6 +25,7 @@ from railroads.newgame import Settings, make_game
 from railroads.saves import SavedGame, snapshot, unpickled_steps
 from railroads.sim.steps import Steps
 from railroads.ui.history_pictures import HistoryPictures, Picture
+from railroads.version import VERSION
 
 if sys.platform == "emscripten":
     import js
@@ -39,13 +40,15 @@ type Message = dict[str, Any]
 
 class Grown:
     """A grown game pickled and compressed, kept until the page has copied its bytes: where they
-    are in Python's memory, how many, and how many the pickle takes once uncompressed."""
+    are in Python's memory, how many, how many the pickle takes once uncompressed, and the
+    version of the game that grew it."""
 
     def __init__(self, compressed: bytes, size: int) -> None:
         self._bytes = np.frombuffer(compressed, dtype=np.uint8)
         self.address = _address(self._bytes)
         self.length = len(compressed)
         self.size = size
+        self.version = VERSION
 
 
 def grow(
@@ -125,8 +128,9 @@ class PageSetup:
         """The game these settings make, grown in a worker while the frames go on, a step a
         frame, passing on to `report`, `advance` and `see` what the worker says of how far it
         got and its pictures of the map growing, `size` points big (none without it) and leaving
-        the ground to the graphics card if `over_ground`; None if the worker failed, for the
-        caller to grow it itself."""
+        the ground to the graphics card if `over_ground`; None if the worker failed or runs
+        another version of the game, as a browser may keep an older web/painter.js for a while
+        after a new one is published, for the caller to grow it itself."""
         wanted = (settings, size, over_ground)
         self._page.start(pickle.dumps(wanted, protocol=pickle.HIGHEST_PROTOCOL))
         try:
@@ -142,6 +146,12 @@ class PageSetup:
                         see(pickle.loads(message["pixels"]))
                     elif kind in ("failed", "dead"):
                         print(f"The towns couldn't grow in a worker: {message.get('error')}")
+                        return None
+                    elif kind == "grown" and message.get("version") != VERSION:
+                        print(
+                            f"The towns grew in a worker of version {message.get('version')},"
+                            f" not {VERSION}"
+                        )
                         return None
                     elif kind == "grown":
                         self._page.stop()

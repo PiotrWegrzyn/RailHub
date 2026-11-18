@@ -25,6 +25,7 @@ import numpy as np
 from railroads.ui.pixel.copies import ChunkJob, Seen, update_message, world_message
 from railroads.ui.pixel.painter import _Job, _Queue
 from railroads.ui.pixel.world import PixelWorld
+from railroads.version import VERSION
 
 if sys.platform == "emscripten":
     import js
@@ -77,9 +78,16 @@ class Workers:
         return next(self._worlds)
 
     def poll(self) -> None:
-        """Takes what the workers sent and hands it to the painter they paint for."""
+        """Takes what the workers sent and hands it to the painter they paint for. A worker
+        running another version of the game, as a browser may keep an older web/painter.js for a
+        while after a new one is published, counts as failed: it could not take this one's
+        world."""
         for message in self.page.take():
             worker, kind = message["worker"], message["kind"]
+            if kind == "ready" and message.get("version") != VERSION:
+                error = f"it runs version {message.get('version')}, not {VERSION}"
+                message = {"worker": worker, "kind": "dead", "error": error}
+                kind = "dead"
             if kind == "ready":
                 self.ready.append(worker)
             elif kind == "dead":
