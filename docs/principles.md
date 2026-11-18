@@ -18,8 +18,9 @@ The ideas every rule of the game should follow.
   cell, then 13, 8, 5, 3, 2 and 1 twenty-firsts of it from one to six cells away.
 - Only what is left after that goes to a station within reach; stations never take a good the
   buildings around could have used.
-- A station hands out what trains bring to the least satisfied buildings first, then the nearest,
-  so the starving are fed before they die out.
+- A station hands out what trains bring the same way buildings hand out their own goods: the
+  nearest first, buildings as near sharing by how short they are, but without the falloff
+  within its delivery reach. Where a starving building stands decides whether it is fed.
 - The player earns only when buildings take goods out of the player's stations. Goods handed out
   on their own earn nothing, so the money comes from what the player adds to the local economy:
   a station is an investment. The one exception is a building the player owns: it pays the

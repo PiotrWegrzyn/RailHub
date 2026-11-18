@@ -147,6 +147,31 @@ def test_a_station_hands_out_only_what_the_buildings_around_left_short() -> None
     }
 
 
+def test_a_station_feeds_the_nearest_house_first_however_satisfied_it_was() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    near, far = (8, 11), (8, 7)
+    placed = counts(tile_map, (near, BuildingKind.HOUSE, 1), (far, BuildingKind.HOUSE, 1))
+    economy.levels[flat(economy, near)] = Satisfaction.THRIVING
+    economy.levels[flat(economy, far)] = Satisfaction.UNSATISFIED
+
+    trade = economy.trade(placed, holding(BREAD=HOUSE_FOOD))
+
+    assert eaten_at(economy, trade, near) == pytest.approx(HOUSE_FOOD)
+    assert eaten_at(economy, trade, far) == 0.0
+
+
+def test_a_station_shares_out_among_houses_as_near_by_how_short_they_are() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 11), BuildingKind.HOUSE, 1), ((8, 9), BuildingKind.HOUSE, 3))
+
+    trade = economy.trade(placed, holding(BREAD=2 * HOUSE_FOOD))
+
+    assert eaten_at(economy, trade, (8, 11)) == pytest.approx(HOUSE_FOOD / 2)
+    assert eaten_at(economy, trade, (8, 9)) == pytest.approx(3 * HOUSE_FOOD / 2)
+
+
 def test_a_station_never_hands_out_the_freight_it_gathered() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)

@@ -12,9 +12,10 @@ twenty-firsts of it from one to six cells away (REACH_SHARES). Buildings the sam
 seller share what it has by how much they still want.
 
 Stations come after (railroads.sim.railway), those joined by track to another station: each hands
-what trains brought to buildings within its delivery radius still short of a need, unsatisfied
-ones first, then content ones, nearest first, unless the player keeps the good for trains there
-(StationOrder.kept). Once every need has been met, each station takes the spare goods no building
+what trains brought to buildings within its delivery radius still short of a need, the same way,
+nearest first and shared by how much they still want, but taking all they want from any distance,
+unless the player keeps the good for trains there (StationOrder.kept). Both go through one
+distribute. Once every need has been met, each station takes the spare goods no building
 took that buildings made within its collection radius into its stockpile, while it has room, for
 trains to carry away; it never hands them out around it.
 
@@ -42,6 +43,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from enum import IntEnum
 from functools import cache
+from itertools import pairwise
 
 import numpy as np
 import numpy.typing as npt
@@ -122,6 +124,57 @@ def worth_to(satisfaction: FloatCells) -> FloatCells:
     return 1.0 + (SCARCE_WORTH - 1.0) * (1.0 - np.clip(satisfaction, 0.0, 1.0))
 
 
+# Sellers and buyers in pairs, in order of how far apart they are, and where each distance starts.
+type _Pairs = tuple[npt.NDArray[np.intp], npt.NDArray[np.intp], tuple[int, ...]]
+
+
+def ring_starts(away: npt.NDArray[np.intp | np.float64]) -> tuple[int, ...]:
+    """Where the pairs of each distance start among pairs in order of how far apart they are, and
+    where the last ends."""
+    return (0, *(np.flatnonzero(np.diff(away)) + 1).tolist(), away.size)
+
+
+def distribute(
+    sellers: npt.NDArray[np.intp],
+    buyers: npt.NDArray[np.intp],
+    bounds: tuple[int, ...],
+    supply: FloatCells,
+    short: FloatCells,
+    falloff: tuple[FloatCells, tuple[float, ...]] | None = None,
+) -> tuple[npt.NDArray[np.intp], FloatCells]:
+    """Hands goods from sellers to buyers, the nearest first: pairs of a seller and a buyer in
+    order of how far apart they are, the pairs of each distance starting at its `bounds`
+    (ring_starts). A seller shares what it has among the buyers at the same distance by how short
+    they are. With a `falloff` of a month per seller and a share per distance, a buyer takes at most
+    that share of the seller's month. Takes what went out of `supply`, per seller, and out of
+    `short`, per buyer; returns the pairs anything went between and how much."""
+    went: list[npt.NDArray[np.intp]] = []
+    amounts: list[FloatCells] = []
+    for ring, (start, end) in enumerate(pairwise(bounds)):
+        seller, buyer = sellers[start:end], buyers[start:end]
+        wanting = short[buyer]
+        live = (wanting > 1e-9) & (supply[seller] > 1e-9)
+        if not live.any():
+            continue
+        seller, buyer, wanting = seller[live], buyer[live], wanting[live]
+        share = wanting / np.bincount(seller, wanting, minlength=supply.size)[seller]
+        sent = supply[seller] * share
+        if falloff is not None:
+            month, shares = falloff
+            sent = np.minimum(sent, month[seller] * shares[ring])
+        arriving = np.bincount(buyer, sent, minlength=short.size)[buyer]
+        sent *= np.minimum(1.0, short[buyer] / np.maximum(arriving, 1e-12))
+        supply -= np.bincount(seller, sent, minlength=supply.size)
+        short -= np.bincount(buyer, sent, minlength=short.size)
+        went.append(np.flatnonzero(live) + start)
+        amounts.append(sent)
+        if supply.max() <= 1e-9 or short.max() <= 1e-9:
+            break
+    if not went:
+        return np.zeros(0, dtype=np.intp), np.zeros(0)
+    return np.concatenate(went), np.concatenate(amounts)
+
+
 def levels_of(share: FloatCells) -> npt.NDArray[np.int8]:
     """Satisfaction for a share of needs met or goods given away."""
     levels = np.full(share.shape, Satisfaction.CONTENT, dtype=np.int8)
@@ -145,11 +198,11 @@ class Neighbourhoods:
 @dataclass(frozen=True, slots=True, eq=False)
 class Rings:
     """The steps to every cell up to LOCAL_REACH cells away, nearest first, as row and column
-    steps for even rows and for odd rows, and where each distance starts among them."""
+    steps for even rows and for odd rows, and how far each step goes."""
 
     rows: tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]]
     cols: tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]]
-    starts: npt.NDArray[np.intp]
+    away: npt.NDArray[np.intp]
 
 
 @cache
@@ -164,8 +217,7 @@ def rings_of(grid: Grid) -> Rings:
         cols.append(np.array([c - middle for (_, c), _ in steps], dtype=np.intp))
         away = np.array([d for _, d in steps], dtype=np.intp)
     assert away is not None
-    starts = np.searchsorted(away, np.arange(LOCAL_REACH + 2))
-    return Rings((rows[0], rows[1]), (cols[0], cols[1]), starts)
+    return Rings((rows[0], rows[1]), (cols[0], cols[1]), away)
 
 
 @dataclass(frozen=True)
@@ -367,28 +419,6 @@ class Economy:
         return positions[order], steps[order]
 
     @staticmethod
-    def _hand_out(
-        amount: float,
-        near: tuple[npt.NDArray[np.intp], FloatCells],
-        demand: FloatCells,
-        received: FloatCells,
-        priority: npt.NDArray[np.int8],
-    ) -> float:
-        """Hands goods out to the cells still short of them, the least satisfied first and then
-        the nearest; returns how much went."""
-        positions, _ = near
-        order = positions[np.argsort(priority[positions], kind="stable")]
-        left = amount
-        for position in order.tolist():
-            if left <= 0:
-                break
-            give = min(left, demand[position] - received[position])
-            if give > 0:
-                received[position] += give
-                left -= give
-        return amount - left
-
-    @staticmethod
     def _gather(
         room: float,
         far: tuple[npt.NDArray[np.intp], FloatCells],
@@ -443,7 +473,7 @@ class _Month:
         self.count = {k: n.astype(np.float64) for k, n in in_cells if n.any()}
         self.wanted = {kind: wants_of(kind, economy.year) for kind in self.count}
         self.zero = np.zeros(cells.size)
-        self.priority = economy.levels[cells]
+        self.station_pairs: _Pairs | None = None
         # What a unit handed out on its own is worth to each cell, times its price, and per good
         # how much more than its price what each cell handed out was worth in all.
         self.worth_to = worth_to(economy.last_quarter()[cells])
@@ -460,7 +490,7 @@ class _Month:
         # sellers and buyers near enough to trade.
         self.position = np.full(economy.cells, -1, dtype=np.intp)
         self.position[cells] = np.arange(cells.size)
-        self.pairs: dict[Good, tuple[npt.NDArray[np.intp], ...]] = {}
+        self.pairs: dict[Good, tuple[*_Pairs, tuple[float, ...]]] = {}
         self.padded: tuple[npt.NDArray[np.intp], tuple[npt.NDArray[np.intp], ...]] | None = None
         # What buildings had taken as goods reached their station when their need was served:
         # what they take after that, while the month's trade is still going, counts for the next.
@@ -565,19 +595,8 @@ class _Month:
         for good in HANDED_OUT[need]:
             self._sell_nearby(good, demand, received)
         self.local[need] = received.copy()
-        for station in self.stations:
-            near, _ = self.reach[station]
-            for good in HANDED_OUT[need]:
-                brought = self.brought[station].get(good, 0.0)
-                if brought <= 0 or good in self.stations[station].kept:
-                    continue
-                given = self.economy._hand_out(brought, near, demand, received, self.priority)
-                if given <= 0:
-                    continue
-                self.brought[station][good] = brought - given
-                self.handed[station][good] = self.handed[station].get(good, 0.0) + given
-                handed_for = self.handed_for[station]
-                handed_for[(need, good)] = handed_for.get((need, good), 0.0) + given
+        for good in HANDED_OUT[need]:
+            self._hand_out(need, good, demand, received)
         met = np.where(demand > 0, received / np.where(demand > 0, demand, 1.0), 0.0)
         for kind, want in wants.items():
             got = met * want
@@ -588,6 +607,47 @@ class _Month:
                 self.stock[key] = self.stock[key] + got
             else:
                 self._boost_from_land(kind, need, got)
+
+    def _hand_out(self, need: Need, good: Good, demand: FloatCells, received: FloatCells) -> None:
+        """Lets every station hand out what trains brought of a good to the buildings within its
+        delivery radius still short of it, the nearest first, unless it keeps the good for
+        trains."""
+        stations = list(self.stations)
+        brought = np.array(
+            [
+                0.0 if good in self.stations[s].kept else self.brought[s].get(good, 0.0)
+                for s in stations
+            ],
+            dtype=np.float64,
+        )
+        if not (brought > 1e-9).any():
+            return
+        sellers, buyers, bounds = self._station_pairs()
+        left = brought.copy()
+        short = demand - received
+        distribute(sellers, buyers, bounds, left, short)
+        received[:] = demand - short
+        for station, before, after in zip(stations, brought, left, strict=True):
+            given = float(before - after)
+            if given <= 0:
+                continue
+            self.brought[station][good] = float(after)
+            self.handed[station][good] = self.handed[station].get(good, 0.0) + given
+            handed_for = self.handed_for[station]
+            handed_for[(need, good)] = handed_for.get((need, good), 0.0) + given
+
+    def _station_pairs(self) -> _Pairs:
+        """Every station, by its place among the stations, with every traded cell within its
+        delivery radius, as positions among the traded cells, the nearest pairs first, and where
+        the pairs of each distance start (ring_starts)."""
+        if self.station_pairs is None:
+            near = [self.reach[station][0] for station in self.stations]
+            sellers = np.repeat(np.arange(len(near)), [cells.size for cells, _ in near])
+            buyers = np.concatenate([cells for cells, _ in near] or [np.zeros(0, np.intp)])
+            away = np.concatenate([steps for _, steps in near] or [np.zeros(0)])
+            order = np.argsort(away, kind="stable")
+            self.station_pairs = (sellers[order], buyers[order], ring_starts(away[order]))
+        return self.station_pairs
 
     def _taken_since_served(self) -> dict[tuple[BuildingKind, Need], dict[int, float]]:
         """What buildings took as goods reached their station after their need was served this
@@ -630,35 +690,22 @@ class _Month:
         left = demand - received
         if not (spare > 1e-9).any() or not (left > 1e-9).any():
             return
-        sellers, buyers, starts = self._pairs(good)
-        size = self.cells.size
+        sellers, buyers, bounds, falloff = self._pairs(good)
         remaining = spare.copy()
-        month = self.offered[good]
-        for away in range(LOCAL_REACH + 1):
-            ring = slice(starts[away], starts[away + 1])
-            seller, buyer = sellers[ring], buyers[ring]
-            wanting = left[buyer]
-            live = (wanting > 1e-9) & (remaining[seller] > 1e-9)
-            if not live.any():
-                continue
-            seller, buyer, wanting = seller[live], buyer[live], wanting[live]
-            share = wanting / np.bincount(seller, wanting, minlength=size)[seller]
-            sent = np.minimum(remaining[seller] * share, month[seller] * reach_share(away))
-            arriving = np.bincount(buyer, sent, minlength=size)[buyer]
-            sent *= np.minimum(1.0, left[buyer] / arriving)
-            remaining -= np.bincount(seller, sent, minlength=size)
-            left -= np.bincount(buyer, sent, minlength=size)
-            above = np.bincount(seller, sent * (self.worth_to[buyer] - 1.0), minlength=size)
-            self.worth_above[good] = self.worth_above.get(good, self.zero) + above
-            if remaining.max() <= 1e-9 or left.max() <= 1e-9:
-                break
+        went, sent = distribute(
+            sellers, buyers, bounds, remaining, left, (self.offered[good], falloff)
+        )
+        above = np.bincount(
+            sellers[went], sent * (self.worth_to[buyers[went]] - 1.0), minlength=self.cells.size
+        )
+        self.worth_above[good] = self.worth_above.get(good, self.zero) + above
         self.sold[good] += spare - remaining
         received[:] = demand - left
 
-    def _pairs(self, good: Good) -> tuple[npt.NDArray[np.intp], ...]:
+    def _pairs(self, good: Good) -> tuple[*_Pairs, tuple[float, ...]]:
         """Every cell making a good with every traded cell up to LOCAL_REACH cells from it, as
-        positions among the traded cells, the nearest pairs first, and where the pairs of
-        each distance start among them."""
+        positions among the traded cells, the nearest pairs first, where the pairs of each
+        distance start (ring_starts) and the reach_share of the seller's month each buyer can take."""
         known = self.pairs.get(good)
         if known is not None:
             return known
@@ -671,7 +718,10 @@ class _Month:
         reached = at + np.where(rows % 2 == 1, offsets[1][:, None], offsets[0][:, None])
         buyers = padded[reached]
         step, seller = np.nonzero(buyers >= 0)
-        found = (sellers[seller], buyers[step, seller], np.searchsorted(step, rings.starts))
+        away = rings.away[step]
+        bounds = ring_starts(away)
+        shares = tuple(REACH_SHARES[int(away[start])] for start in bounds[:-1])
+        found = (sellers[seller], buyers[step, seller], bounds, shares)
         self.pairs[good] = found
         return found
 

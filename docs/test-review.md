@@ -31,8 +31,9 @@ A deliberate break of the order (stations before local trade) fails three of the
 - **done: `StationTrade.supplies` counted everything made in reach.** Each station now keeps
   what it was given over the last three months (`StationGoods.last_quarter`), and the trains
   window, route map and station tooltip show that.
-- **done: two hand-out orders.** Goods off a train now go to the least satisfied first, then the
-  nearest, as in a month's trade (`test_hand_out_now`).
+- **done: two hand-out orders.** Buildings, stations in a month's trade and stations as a train
+  arrives now all hand out through one `economy.distribute`, the nearest first
+  (`test_hand_out_now`, `test_economy::test_a_station_feeds_the_nearest_house_first_however_satisfied_it_was`).
 - **Track moves buildings.** The principle says track goes round buildings and never moves them;
   `lay_route` clears room. Being fixed in another session.
 - **done: merging.** Food makers merge in threes and the other works in twos; the principle now

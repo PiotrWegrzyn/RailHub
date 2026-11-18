@@ -19,9 +19,12 @@ from railroads.sim.demand import capacity_of
 from railroads.sim.economy import (
     COLLECTION_RADIUS,
     DELIVERY_RADIUS,
+    FloatCells,
     StationOrder,
     Trade,
+    distribute,
     input_stock,
+    ring_starts,
     wants_of,
 )
 from railroads.sim.facilities import USES as FACILITY_USES
@@ -144,10 +147,10 @@ class StationTrade:
 
     def hand_out_now(self, station: Cell, good: Good) -> None:
         """Hands a good trains have just brought to a station to the buildings around it that
-        still want it this month, at once, unless the good is kept for trains: the least
-        satisfied last month first, so they don't die out, and then the nearest, as in a month's
-        trade. Each takes up to what it needs in a month, less what it took already; a processor
-        up to the room in its stockpile. They pay as they take."""
+        still want it this month, at once, unless the good is kept for trains: the nearest
+        first, as in a month's trade (railroads.sim.economy.distribute). Each takes up to what it
+        needs in a month, less what it took already; a processor up to the room in its
+        stockpile. They pay as they take."""
         growth, railway = self._growth, self._growth.railway
         if railway is None or good in TRAVELLERS:
             return
@@ -155,38 +158,62 @@ class StationTrade:
         if good in goods.kept:
             return
         within = self._within(station, railway.reach(station)[0])
-        economy, year = growth.economy, growth.year
-        order = np.lexsort((within.steps, economy.levels[within.cells]))
-        cells = within.cells[order].tolist()
+        order = np.argsort(within.steps, kind="stable")
+        cells, bounds = within.cells[order], ring_starts(within.steps[order])
+        economy = growth.economy
         if economy.taken is None:
             economy.taken = {}
         for need in MEETS[good]:
-            wanting = [
-                (kind, count.ravel())
-                for kind, count in growth.counts.items()
-                if need in wants_of(kind, year)
-            ]
-            for cell in cells:
-                for kind, count in wanting:
-                    n = int(count[cell])
-                    if n <= 0:
-                        continue
-                    recipe = RECIPES.get(kind)
-                    if recipe is not None:
-                        stock = economy.stock[(kind, need)]
-                        want = input_stock(kind) * n - stock[cell]
+            have = goods.brought.get(good, 0.0)
+            if have <= 0:
+                return
+            wants = self._wants_at(cells, need)
+            if not wants:
+                continue
+            demand = sum(wants.values(), start=np.zeros(cells.size))
+            short = demand.copy()
+            distribute(
+                np.zeros(cells.size, dtype=np.intp),
+                np.arange(cells.size),
+                bounds,
+                np.array([have], dtype=np.float64),
+                short,
+            )
+            got = demand - short
+            if self._give(station, goods, need, good, float(got.sum())) <= 0:
+                continue
+            met = np.where(demand > 0, got / np.where(demand > 0, demand, 1.0), 0.0)
+            for kind, want in wants.items():
+                took = want * met
+                for at in np.flatnonzero(took > 0).tolist():
+                    cell = int(cells[at])
+                    if kind in RECIPES:
+                        economy.stock[(kind, need)][cell] += took[at]
                     else:
                         taken = economy.taken.setdefault((kind, need), {})
-                        want = n * NEEDS[kind][need] - taken.get(cell, 0.0)
-                    given = self._give(station, goods, need, good, want)
-                    if given <= 0:
-                        continue
-                    if recipe is not None:
-                        stock[cell] += given
-                    else:
-                        taken[cell] = taken.get(cell, 0.0) + given
-                    if goods.brought.get(good, 0.0) <= 0:
-                        return
+                        taken[cell] = taken.get(cell, 0.0) + float(took[at])
+
+    def _wants_at(self, cells: npt.NDArray[np.intp], need: Need) -> dict[BuildingKind, FloatCells]:
+        """What each kind of building in these cells still wants of a need this month: up to
+        what it needs in a month, less what it took already; a processor up to the room in its
+        stockpile."""
+        growth, economy = self._growth, self._growth.economy
+        taken_by = economy.taken or {}
+        wants: dict[BuildingKind, FloatCells] = {}
+        for kind, count in growth.counts.items():
+            if need not in wants_of(kind, growth.year):
+                continue
+            n = count.ravel()[cells].astype(np.float64)
+            if not n.any():
+                continue
+            if kind in RECIPES:
+                want = input_stock(kind) * n - economy.stock[(kind, need)][cells]
+            else:
+                taken = taken_by.get((kind, need), {})
+                had = np.array([taken.get(int(cell), 0.0) for cell in cells.tolist()])
+                want = n * NEEDS[kind][need] - had
+            wants[kind] = np.where(n > 0, np.maximum(want, 0.0), 0.0)
+        return wants
 
     def _give(
         self, station: Cell, goods: StationGoods, need: Need, good: Good, want: float
