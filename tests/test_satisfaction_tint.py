@@ -15,6 +15,7 @@ from railroads.ui.map_overlays import (
     UNSATISFIED_TINT,
     least_satisfied,
     mood_tint,
+    tint_colours,
     town_cells,
 )
 from railroads.ui.theme import town_tint
@@ -108,3 +109,15 @@ def test_neighbouring_town_numbers_get_unlike_colours() -> None:
     hues = [colorsys.rgb_to_hsv(*town_tint(town)[:3])[0] for town in (1, 2, 3)]
 
     assert min(abs(a - b) for a, b in itertools.combinations(hues, 2)) > 0.1
+
+
+def test_tinted_cells_hand_the_graphics_card_their_colours_as_bytes() -> None:
+    cells = np.array([1, 5])
+    colors = [0x80102030, 0xFF000001]
+
+    tints = tint_colours((2, 3), cells, colors)
+
+    assert tints.shape == (2, 3, 4)
+    assert tints[0, 1].tolist() == [0x30, 0x20, 0x10, 0x80]
+    assert tints[1, 2].tolist() == [1, 0, 0, 0xFF]
+    assert tints[0, 0].tolist() == [0, 0, 0, 0]

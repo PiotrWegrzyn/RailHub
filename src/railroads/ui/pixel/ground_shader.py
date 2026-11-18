@@ -92,6 +92,71 @@ float crest(float n) {
 }
 """
 
+HEX = """const float HEX_RADIUS = 0.5773502691896258;
+const float SQRT3 = 1.7320508075688772;
+
+ivec2 cell_at(vec2 p) {
+    float px = p.x - 0.5;
+    float py = p.y - HEX_RADIUS;
+    float q = px - py / SQRT3;
+    float r = py * 2.0 / SQRT3;
+    float s = -q - r;
+    float rq = roundEven(q), rr = roundEven(r), rs = roundEven(s);
+    float eq = abs(rq - q), er = abs(rr - r), es = abs(rs - s);
+    bool fix_q = eq > er && eq > es;
+    bool fix_r = !fix_q && er > es;
+    if (fix_q) rq = -rr - rs;
+    if (fix_r) rr = -rq - rs;
+    int row = int(rr);
+    int col = int(rq) + (row - (row & 1)) / 2;
+    return ivec2(col, row);
+}
+"""
+
+# Each screen pixel of the map tinted by the cell it shows (cells' colours in `tints`): the map
+# point under it where the map is flat (`flat`), or in pixel art the ground raised up to it, as
+# RAISE finds it.
+TINT = """out vec4 colour;
+uniform int lifted;
+uniform mat2 screen_to_plane;
+uniform vec2 plane_origin;
+uniform vec2 origin;
+uniform float scale;
+uniform mat2 to_plane;
+uniform vec2 projection_origin;
+uniform ivec2 relief_origin;
+uniform float metres_per_pixel;
+uniform ivec2 cells_size;
+uniform highp sampler2D tints;
+uniform highp sampler2D relief;
+@HEX@
+float lift_at(ivec2 art) {
+    float rise = texelFetch(relief, art - relief_origin, 0).x;
+    return clamp(rise / metres_per_pixel * @EXAGGERATION@ * @TILT@, 0.0, @MOST_LIFT@);
+}
+
+void main() {
+    vec2 p;
+    if (lifted == 1) {
+        vec2 at = (gl_FragCoord.xy - origin) / scale;
+        ivec2 art = ivec2(floor(at));
+        int offset = 0;
+        for (int d = 1; d <= @MOST_LIFT_ROWS@; d++) {
+            if (floor(lift_at(art + ivec2(0, d))) >= float(d)) offset = d;
+        }
+        p = to_plane * (at + vec2(0.0, float(offset)) + projection_origin);
+    } else {
+        p = screen_to_plane * gl_FragCoord.xy + plane_origin;
+    }
+    ivec2 cell = cell_at(p);
+    if (cell.x < 0 || cell.y < 0 || cell.x >= cells_size.x || cell.y >= cells_size.y) {
+        colour = vec4(0.0);
+        return;
+    }
+    colour = texelFetch(tints, cell, 0);
+}
+"""
+
 # The raised ground of each art pixel from the rasters of railroads.ui.pixel.relief.Elevation, as
 # Elevation._rise works it out: how many metres it rises above its valley, how mountainous and
 # how hilly it is, and the valley floor's height.
@@ -192,8 +257,7 @@ uniform float metres_per_unit;
 uniform highp sampler2D light;
 uniform highp sampler2D relief;
 @NOISE@
-const float HEX_RADIUS = 0.5773502691896258;
-const float SQRT3 = 1.7320508075688772;
+@HEX@
 const vec3 RAMPS[@RAMP_COUNT@] = vec3[@RAMP_COUNT@](@RAMPS@);
 const float BAYER[16] = float[16](@BAYER@);
 const int TUFT_ROWS[6] = int[6](@TUFT_ROWS@);
@@ -206,23 +270,6 @@ int fdiv(int a, int b) {
 
 int fmod(int a, int b) {
     return a - b * fdiv(a, b);
-}
-
-ivec2 cell_at(vec2 p) {
-    float px = p.x - 0.5;
-    float py = p.y - HEX_RADIUS;
-    float q = px - py / SQRT3;
-    float r = py * 2.0 / SQRT3;
-    float s = -q - r;
-    float rq = roundEven(q), rr = roundEven(r), rs = roundEven(s);
-    float eq = abs(rq - q), er = abs(rr - r), es = abs(rs - s);
-    bool fix_q = eq > er && eq > es;
-    bool fix_r = !fix_q && er > es;
-    if (fix_q) rq = -rr - rs;
-    if (fix_r) rr = -rq - rs;
-    int row = int(rr);
-    int col = int(rq) + (row - (row & 1)) / 2;
-    return ivec2(col, row);
 }
 
 vec2 plane(ivec2 art) {
@@ -770,8 +817,19 @@ def raise_source() -> str:
     return _filled(RAISE, names)
 
 
+def tint_source() -> str:
+    """The shader tinting cells (TINT), with Elevation's numbers written in."""
+    names = {
+        "EXAGGERATION": _number(relief.EXAGGERATION),
+        "TILT": _number(TILT),
+        "MOST_LIFT": _number(relief.MOST_LIFT),
+        "MOST_LIFT_ROWS": str(relief.MOST_LIFT),
+    }
+    return _filled(TINT, names)
+
+
 def _filled(source: str, names: dict[str, str]) -> str:
-    source = source.replace("@NOISE@", NOISE)
+    source = source.replace("@NOISE@", NOISE).replace("@HEX@", HEX)
     for name, value in (names | {"MASK": str(TABLE_SIZE - 1)}).items():
         source = source.replace(f"@{name}@", value)
     assert "@" not in source
@@ -923,6 +981,7 @@ class _Programs:
     relief: int
     raised: int
     blow_up: int
+    tint: int
 
 
 class GroundShader:
@@ -966,6 +1025,10 @@ class GroundShader:
         self._lit = _Target(floats=True)
         self._art = _Target()
         self._screen = _Target()
+        self._tinted = _Target()
+        self._tints = _texture()
+        self.tints_version: object = None
+        self._tinted_key: tuple | None = None
         self._drawn: tuple[View, int, int] | None = None
         self._shown: tuple[View, Screen, int, int, bool] | None = None
         self.cells_version = -1
@@ -992,6 +1055,7 @@ class GroundShader:
                 _program(HEADER + VERTEX, HEADER + relief_source()),
                 _program(HEADER + VERTEX, HEADER + raise_source()),
                 _program(HEADER + VERTEX, HEADER + BLOW_UP),
+                _program(HEADER + VERTEX, HEADER + tint_source()),
             )
             shader = cls(programs, projection, shape, light, heights)
             shader._relief.fit(1, 1)
@@ -1028,6 +1092,58 @@ class GroundShader:
             GL.glDeleteTextures(1, [self._beds])
         self._beds = _floats(beds)
         self.bed_version = version
+
+    def set_tints(self, colours: npt.NDArray[np.uint8], version: object) -> None:
+        """Takes each cell's tint as (rows, cols, 4) RGBA bytes, clear where it has none."""
+        GL.glBindTexture(GL.GL_TEXTURE_2D, self._tints)
+        rows, cols = colours.shape[:2]
+        GL.glTexImage2D(
+            GL.GL_TEXTURE_2D,
+            0,
+            GL.GL_RGBA8,
+            cols,
+            rows,
+            0,
+            GL.GL_RGBA,
+            GL.GL_UNSIGNED_BYTE,
+            np.ascontiguousarray(colours),
+        )
+        self.tints_version = version
+
+    def tinted(
+        self,
+        size: tuple[int, int],
+        flat: tuple[float, float, float, float, float, float],
+        raised: tuple[View, Screen] | None = None,
+    ) -> int:
+        """The texture of a map area `size` device pixels big with every pixel tinted by the cell
+        it shows (set_tints): the map point at device pixel (x, y) from its top left corner being
+        (a x + b y + e, c x + d y + f) for `flat` (a, b, c, d, e, f), or, with `raised`, the
+        ground raised up to it where the ground picture of that view and screen shows it."""
+        key = (size, flat, raised, self.tints_version, self.bed_version)
+        if self._tinted.fit(*size) or self._tinted_key != key:
+            a, b, c, d, e, f = flat
+            uniforms = self._plane_uniforms() | {
+                "lifted": ("1i", (int(raised is not None),)),
+                "screen_to_plane": ("m2", (a, c, b, d)),
+                "plane_origin": ("2f", (e, f)),
+                "metres_per_pixel": ("1f", (self._heights.metres_per_pixel,)),
+                "cells_size": ("2i", (self._shape[1], self._shape[0])),
+                "tints": ("1i", (0,)),
+                "relief": ("1i", (1,)),
+            }
+            if raised is not None:
+                view, screen = raised
+                self.art(view)
+                uniforms |= {
+                    "origin": ("2f", screen.origin),
+                    "scale": ("1f", (screen.scale,)),
+                    "relief_origin": ("2i", (view.left - 1, view.top - 1)),
+                }
+            inputs = (self._tints, self._relief.texture)
+            self._run(self._tinted, self._programs.tint, uniforms, inputs)
+            self._tinted_key = key
+        return self._tinted.texture
 
     def art(self, view: View) -> int:
         """The texture holding the ground's art pixels in `view`, one texel each, drawn again

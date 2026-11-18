@@ -425,6 +425,17 @@ def mood_tint(share: float) -> Rgba:
     return UNSATISFIED_TINT
 
 
+def tint_colours(
+    shape: tuple[int, int], cells: npt.NDArray[np.intp], colors: list[int]
+) -> npt.NDArray[np.uint8]:
+    """Each cell's tint as (rows, cols, 4) RGBA bytes from the flat `cells` and their packed
+    colours, clear where a cell has none, for the graphics card to tint them
+    (railroads.ui.pixel.ground_shader.GroundShader.set_tints)."""
+    tints = np.zeros((shape[0] * shape[1], 4), dtype=np.uint8)
+    tints[cells] = np.array(colors, dtype=np.uint32).view(np.uint8).reshape(-1, 4)
+    return tints.reshape(*shape, 4)
+
+
 def draw_moods(
     draw_list: imgui.ImDrawList,
     camera: IsoCamera,

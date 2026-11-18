@@ -83,7 +83,11 @@ def test_a_blown_up_chunk_texture_is_deleted_on_a_frame_after_nothing_holds_it(
 
 
 def test_the_raised_ground_shaders_have_every_number_of_the_cpu_relief_written_in() -> None:
-    sources = [ground_shader.relief_source(), ground_shader.raise_source()]
+    sources = [
+        ground_shader.relief_source(),
+        ground_shader.raise_source(),
+        ground_shader.tint_source(),
+    ]
 
     assert all("@" not in source for source in sources)
     assert "1700.0" in sources[0]

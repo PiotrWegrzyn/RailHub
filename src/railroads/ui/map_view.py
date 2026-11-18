@@ -55,6 +55,7 @@ from railroads.ui.map_overlays import (
     least_satisfied,
     mood_tint,
     status_text,
+    tint_colours,
     town_cells,
     visible_area,
 )
@@ -63,6 +64,8 @@ from railroads.ui.minimap import Minimap, MinimapLayout, view_corners
 from railroads.ui.pixel.ground import GLOW, glow_strength
 from railroads.ui.pixel.ground_shader import (
     GroundShader,
+    Screen,
+    View,
     cell_info,
     free_textures,
     screen_of,
@@ -498,7 +501,9 @@ class MapView:
             if self.lens == Lens.TOWNS
             else None
         )
-        if tints is not None:
+        if tints is not None and not self._draw_shaded_tints(
+            draw_list, center, top_left, bottom_right, *tints
+        ):
             draw_moods(
                 draw_list, marks, self.tile_map.grid, center, (top_left, bottom_right), *tints
             )
@@ -789,8 +794,17 @@ class MapView:
         grades = elevation.grades
         if shader.bed_version != grades:
             shader.set_bed(elevation.bed, grades)
-        projection = world.projection
-        camera_pixel = projection.to_pixels(self.camera.center_x, self.camera.center_y)
+        view, screen = self._shaded_view(center, top_left, bottom_right)
+        texture = shader.picture(view, screen, blend=True)
+        draw_list.add_image(imgui.ImTextureRef(texture), top_left, bottom_right)
+        free_textures()
+        return True
+
+    def _shaded_view(self, center: Vec2, top_left: Vec2, bottom_right: Vec2) -> tuple[View, Screen]:
+        """The art pixels of the pixel map showing in the map area, and where they go on screen."""
+        camera_pixel = self._pixel_layer().world.projection.to_pixels(
+            self.camera.center_x, self.camera.center_y
+        )
         scale = self.camera.pixel_scale
         origin = (
             round(center[0] - float(camera_pixel[0]) * scale),
@@ -798,11 +812,38 @@ class MapView:
         )
         size = (bottom_right[0] - top_left[0], bottom_right[1] - top_left[1])
         density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
-        view = view_of(origin, scale, top_left, size)
-        screen = screen_of(origin, scale, top_left, size, density)
-        texture = shader.picture(view, screen, blend=True)
+        return view_of(origin, scale, top_left, size), screen_of(
+            origin, scale, top_left, size, density
+        )
+
+    def _draw_shaded_tints(
+        self,
+        draw_list: imgui.ImDrawList,
+        center: Vec2,
+        top_left: Vec2,
+        bottom_right: Vec2,
+        cells: npt.NDArray[np.intp],
+        colors: list[int],
+    ) -> bool:
+        """Tints the cells in their packed colours with the shader, each pixel by the cell it
+        shows, if it runs here and the cells are hexagons; returns whether it did."""
+        shader = self._ground_shader() if self.tile_map.grid.kind == "hex" else None
+        if shader is None:
+            return False
+        if shader.tints_version is not colors:
+            shader.set_tints(tint_colours(self.tile_map.grid.shape, cells, colors), colors)
+        density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
+        size = (bottom_right[0] - top_left[0], bottom_right[1] - top_left[1])
+        pixels = (round(size[0] * density), round(size[1] * density))
+        e, f = self.camera.to_plane(top_left[0], top_left[1], center)
+        a, c = self.camera.to_plane(top_left[0] + 1 / density, top_left[1], center)
+        b, d = self.camera.to_plane(top_left[0], top_left[1] + 1 / density, center)
+        flat = (a - e, b - e, c - f, d - f, e, f)
+        raised = None
+        if self.camera.pixel_scale:
+            raised = self._shaded_view(center, top_left, bottom_right)
+        texture = shader.tinted(pixels, flat, raised)
         draw_list.add_image(imgui.ImTextureRef(texture), top_left, bottom_right)
-        free_textures()
         return True
 
     def _ground_shader(self) -> GroundShader | None:
