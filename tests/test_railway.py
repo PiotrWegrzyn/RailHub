@@ -70,6 +70,7 @@ def test_a_new_train_leaves_its_first_stop_with_that_stops_cars_full() -> None:
         (Good.OIL, 34.0),
         (Good.IRON, 89.0),
         (Good.WHEAT, 89.0),
+        (Good.BREAD, 89.0),
         (Good.PASSENGERS, 55.0),
     ],
 )
