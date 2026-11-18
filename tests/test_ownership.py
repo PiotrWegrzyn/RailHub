@@ -45,6 +45,7 @@ def test_homes_cannot_be_bought_nor_more_than_stand_there(
     placed: list, kind: BuildingKind, problem: str
 ) -> None:
     growth = grown(*placed)
+    growth.railway.finances.earn(1_000_000.0, "test")
     if kind == BuildingKind.MINE:
         growth.owners.buy((5, 5), kind)
 

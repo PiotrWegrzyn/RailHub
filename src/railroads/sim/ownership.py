@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 # The player's share of what a building they own sells, handed out around it or taken by a
 # station, and what it costs to buy: this many years of that share at full output.
 OWNER_SHARE = 0.3
-PAYBACK_YEARS = 10
+PAYBACK_YEARS = 30
 # The name the player's company trades under, whose flag flies over the buildings it owns.
 COMPANY = "The Trains Corp"
 # However much tech cuts the price of buildings, they cost at least this share of it.

@@ -639,9 +639,10 @@ factories, refineries, power plants and shipyards.
 ### Owning buildings and tech
 
 Any building that makes something can be bought from the hex details (Buy): farms, mines, mills,
-works and factories, but no homes, shops, churches or military. One costs ten years of the
-player's starting share of what it makes at full output. That share starts at 30% of what it sells; the
-commerce tree raises it to 50% for every building and each other tree by 10% more for its own.
+works and factories, but no homes, shops, churches or military. One costs thirty years of the
+player's starting share of what it makes at full output, ten if it sells to buyers who are short
+and so pay three times the price; production tech shortens that. That share starts at 30% of
+what it sells; the commerce tree raises it to 50% for every building and each other tree by 10% more for its own.
 The stations around a bought building take the player's share of what it makes first, before it
 is handed out around it, so it pays back only if a station takes its goods. Every cell where
 the player owns a building flies the flag of their company, The Trains Corp. Growth never takes a
