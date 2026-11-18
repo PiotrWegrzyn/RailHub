@@ -148,7 +148,7 @@ wheels = [
 
 [[package]]
 name = "railroads"
-version = "0.5.88"
+version = "0.5.89"
 source = { editable = "." }
 dependencies = [
     { name = "imgui-bundle" },
