@@ -107,10 +107,10 @@ def test_the_command_line_still_offers_poland_and_a_random_place(
     assert settings.map == expected
 
 
-def test_the_menu_tells_a_baked_maps_size_and_what_is_on_it() -> None:
+def test_the_menu_tells_the_size_of_the_square_a_game_starts_on_and_what_is_on_it() -> None:
     note = map_note(MapChoice.BRITAIN)
 
-    assert note.startswith("546 × 980 km. ")
+    assert note.startswith("366 × 366 km. ")
     assert "Scotland" in note
 
 

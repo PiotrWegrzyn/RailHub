@@ -1,6 +1,7 @@
 """The menu the game opens on: start a new game with its settings chosen first, load a saved
 one, or quit."""
 
+import math
 import secrets
 from dataclasses import dataclass, field, replace
 from typing import Literal
@@ -18,6 +19,7 @@ from railroads.newgame import (
 from railroads.saves import SaveInfo, Saves
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
 from railroads.sim.finance import START_CASH, dollars
+from railroads.sim.tilemap import START_SHARE
 from railroads.ui.save_files import BrowserFiles, DesktopFiles, draw_file_buttons, save_files
 from railroads.ui.saves_window import draw_save_list
 from railroads.ui.theme import BRASS, GONE, tip
@@ -67,12 +69,18 @@ def random_seed() -> int:
 
 
 def map_note(choice: MapChoice) -> str:
-    """What the menu says under the chosen map: its size and what is on it."""
+    """What the menu says under the chosen map: the size of the square in its middle a game
+    starts on (railroads.sim.tilemap.TileMap.square_middle) and what is on it."""
     baked = choice.start_map
     if baked is None:
         return "A mostly-land spot anywhere in the world, picked by the seed."
     bounds = baked.bounds
-    return f"{bounds.width_km:,.0f} × {bounds.height_km:,.0f} km. {baked.about}"
+    side = min(
+        math.sqrt(bounds.width_km * bounds.height_km * START_SHARE),
+        bounds.width_km,
+        bounds.height_km,
+    )
+    return f"{side:,.0f} × {side:,.0f} km. {baked.about}"
 
 
 @dataclass
