@@ -39,6 +39,7 @@ from railroads.sim.routes import Route
 from railroads.sim.tilemap import Relief
 from railroads.sim.track_rules import BRIDGE_RULES, RELIEF_RULES, TUNNEL_RULES, TrackBed
 from railroads.ui.iso_camera import IsoCamera, Vec2
+from railroads.ui.spotlight import spot
 from railroads.ui.stations_window import StationsWindow
 from railroads.ui.theme import (
     BORDER,
@@ -222,6 +223,7 @@ class BuildMenu:
         for tool, label, tooltip in TOOL_BUTTONS:
             if toggle_button(label, self.tool == tool, tooltip, (0, BUTTON_HEIGHT)):
                 self.choose(Tool.NONE if self.tool == tool else tool)
+            spot(f"tool:{tool.value}")
             imgui.same_line()
         if self.tool == Tool.TRACK:
             self._draw_track_options()
@@ -231,6 +233,7 @@ class BuildMenu:
             f"{fa.ICON_FA_TRAIN}  Trains", self.trains.open, "Your trains (T)", (0, BUTTON_HEIGHT)
         ):
             self.trains.open = not self.trains.open
+        spot("trains")
         imgui.same_line()
         if toggle_button(
             f"{fa.ICON_FA_CUBES}  Stations",

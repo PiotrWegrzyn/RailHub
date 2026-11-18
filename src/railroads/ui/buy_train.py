@@ -13,6 +13,7 @@ from railroads.sim.fuel_market import fuel_of
 from railroads.sim.railway import Railway
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, MAGLEV_FARE, Engine, Kind, Train
 from railroads.ui.iso_camera import Vec2
+from railroads.ui.spotlight import spot
 from railroads.ui.theme import BRASS, TEXT_DIM, color_u32
 
 SCREEN_SIZE = (860.0, 560.0)
@@ -105,6 +106,7 @@ class BuyScreen:
         engine = ENGINES[name]
         if imgui.selectable(f"{engine.title}##{name}", self.engine == name)[0]:
             self.engine = name
+        spot(f"engine:{name}")
         if imgui.is_item_hovered():
             imgui.set_tooltip(summary(engine, railway.fuel_cost(name)))
         price = dollars(engine.price)
@@ -134,6 +136,7 @@ class BuyScreen:
         affordable = railway.finances.can_afford(engine.price)
         imgui.begin_disabled(not affordable)
         clicked = imgui.button(f"{fa.ICON_FA_SHOPPING_CART}  Buy for {dollars(engine.price)}")
+        spot("buy_engine")
         imgui.end_disabled()
         if not affordable:
             imgui.same_line()
@@ -175,6 +178,7 @@ class BuyScreen:
         imgui.same_line()
         if imgui.button("Done"):
             self.open = False
+        spot("done_buying")
         imgui.separator()
         draw_route(train)
 

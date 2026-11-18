@@ -38,6 +38,7 @@ from railroads.sim.summaries import MonthSummary
 
 if TYPE_CHECKING:
     from railroads.newgame import Settings
+    from railroads.tutorial.steps import Tutorial
 
 SAVE_FORMAT = 1
 MAGIC = b"RAILROADS SAVE\n"
@@ -88,6 +89,8 @@ class SavedGame:
     summaries: list[tuple[MonthSummary, bool]] = field(default_factory=list)
     # Where the map was looked at: its centre and zoom level.
     camera: tuple[float, float, int] | None = None
+    # How far the player has got through the tutorial, in a tutorial game.
+    tutorial: Tutorial | None = None
 
 
 @dataclass(frozen=True)

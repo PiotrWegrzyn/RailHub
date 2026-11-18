@@ -21,6 +21,7 @@ from railroads.sim.trains import ENGINES, EXPRESS_FARE, MAGLEV_FARE, Engine, Kin
 from railroads.ui.buy_train import BuyScreen, EnginePicture, engine_range, fuel_use
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at
+from railroads.ui.spotlight import spot
 from railroads.ui.station_offers import Offer, Supplies, goods_to_load
 from railroads.ui.theme import (
     BRASS,
@@ -155,6 +156,7 @@ class TrainsWindow:
         imgui.begin_child("list", (LIST_WIDTH, 0), imgui.ChildFlags_.borders.value)
         if imgui.button(f"{fa.ICON_FA_PLUS}  Buy a train", (-1, 0)):
             self.buy.open_for(next((t for t in railway.trains if t.name == self.chosen), None))
+        spot("buy_train")
         imgui.spacing()
         imgui.begin_child("rows", (0, 0))
         trains = railway.trains
@@ -331,6 +333,8 @@ class TrainsWindow:
                 if imgui.selectable(railway.name_of(station), False)[0]:
                     add_stop(train, station)
             imgui.end_combo()
+        else:
+            spot("add_stop")
         imgui.same_line()
         if len(train.stops) == 1:
             imgui.text_disabled("A train needs a second stop to run.")
@@ -474,6 +478,7 @@ class TrainsWindow:
             if offer_chip(f"offer{number}", offer.good, f"{offer.waiting:.0f}", wanted, tip):
                 stop.add_car(offer.good, most)
                 train.cars_changed(index)
+            spot(f"cargo:{index}:{offer.good.value}")
             if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
                 self._shown_map.good = offer.good
             imgui.end_disabled()
