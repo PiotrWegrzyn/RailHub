@@ -5,7 +5,8 @@ arrays. Tile is the view of one cell with all its properties together.
 """
 
 import json
-from dataclasses import asdict, dataclass
+import math
+from dataclasses import asdict, dataclass, replace
 from enum import IntEnum
 from pathlib import Path
 from typing import Self
@@ -18,6 +19,8 @@ from railroads.sim.grids import GRIDS, Cell, Grid
 
 FORMAT_VERSION = 2
 LAYERS = ("terrain", "vegetation", "temperature", "height_m", "relief")
+# The share of a place's land a new game starts on (TileMap.square_middle).
+START_SHARE = 0.25
 
 
 class Terrain(IntEnum):
@@ -129,6 +132,41 @@ class TileMap:
         km = self.grid.km_per_cell
         lon, lat = self.bounds.to_lonlat(float(x) * km, float(y) * km)
         return float(lon), float(lat)
+
+    def square_middle(self, share: float = START_SHARE) -> Self:
+        """The square in the middle of the map, on the ground, holding this share of its land,
+        or the biggest square the map has room for: its rows start on an even row, so every
+        hex keeps its neighbours, and its bounds move with it, so places stay where they are."""
+        step = float(self.grid.center(1, 0)[1] - self.grid.center(0, 0)[1])
+        side = math.sqrt(self.grid.rows * self.grid.cols * step * share)
+        cols = min(self.grid.cols, max(1, round(side)))
+        rows = min(self.grid.rows, max(1, round(cols / step)))
+        cols = min(cols, max(1, round(rows * step)))
+        top = (self.grid.rows - rows) // 2 // 2 * 2
+        left = (self.grid.cols - cols) // 2
+        x_km, y_km = left * self.grid.km_per_cell, top * step * self.grid.km_per_cell
+        west, north = self.bounds.to_lonlat(x_km, y_km)
+        east, south = self.bounds.to_lonlat(
+            x_km + cols * self.grid.km_per_cell, y_km + rows * step * self.grid.km_per_cell
+        )
+        layers = {
+            layer: getattr(self, layer)[top : top + rows, left : left + cols].copy()
+            for layer in LAYERS
+        }
+        deposits = (
+            None
+            if self.deposits is None
+            else self.deposits[top : top + rows, left : left + cols].copy()
+        )
+        return replace(
+            self,
+            grid=type(self.grid)(rows=rows, cols=cols, km_per_cell=self.grid.km_per_cell),
+            bounds=Bounds(
+                west=float(west), east=float(east), south=float(south), north=float(north)
+            ),
+            deposits=deposits,
+            **layers,
+        )
 
     def save(self, path: Path) -> None:
         meta = {

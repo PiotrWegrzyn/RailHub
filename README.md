@@ -28,9 +28,10 @@ first with:
   Great Britain, Italy (Venice to Rome), Moscow, Constantinople, the Alps, the Norwegian fjords,
   the US Northeast, California, the Colorado Rockies, Central Chile, Japan (Hiroshima to Tokyo),
   China's Yangtze delta and Southeast Australia, listed in `START_MAPS` in
-  `src/railroads/maps/__init__.py`. Each is cut to its land, so some are long and thin or wide
-  rather than square, and all are 2 km a hex, with up to about 160,000 hexes so towns still grow
-  in seconds;
+  `src/railroads/maps/__init__.py`. Each is baked cut to its land, so some are long and thin or
+  wide, and all are 2 km a hex; a game starts on the square in the middle of the place, holding a
+  quarter of its land (`TileMap.square_middle`), so Poland starts as about 340 by 340 km around
+  its middle. A random place is cut the same way;
 - the seed, which picks the start location and grows the same towns again. The menu offers a
   new random one each time the game opens;
 - the year play begins, so how long towns grow from 850 before it: 1850 is suggested, and play
@@ -642,7 +643,8 @@ works and factories, but no homes, shops, churches or military. One costs ten ye
 player's starting share of what it makes at full output. That share starts at 30% of what it sells; the
 commerce tree raises it to 50% for every building and each other tree by 10% more for its own.
 The stations around a bought building take the player's share of what it makes first, before it
-is handed out around it, so it pays back only if a station takes its goods. Growth never takes a
+is handed out around it, so it pays back only if a station takes its goods. Every cell where
+the player owns a building flies the flag of their company, The Trains Corp. Growth never takes a
 building from its owner: one it pulls down (a farm crowded out by a town, a lumber mill whose
 forest is gone, anything cleared for track) goes up again as theirs in the nearest cell its
 land allows, and one that merges into a bigger building (three factories into a big factory)

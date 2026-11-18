@@ -159,11 +159,11 @@ def make_game_steps(
     seed = settings.seed
     baked = settings.map.start_map
     if baked is not None:
-        tile_map = maps.load(baked.key, "hex")
+        tile_map = maps.load(baked.key, "hex").square_middle()
         title = f"{baked.title}, seed {seed}"
     else:
         new = start_new_game(seed, report=report)
-        tile_map = new.tile_map
+        tile_map = new.tile_map.square_middle()
         title = f"Seed {seed}, {new.place}"
     years = settings.start_year - HISTORY_START
     months = years * 12
