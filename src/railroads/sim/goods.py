@@ -191,6 +191,7 @@ FOODS = (
     Good.POTATOES,
     Good.MEAT,
     Good.EGGS,
+    Good.MILK,
     Good.DAIRY,
     Good.SAUSAGES,
     Good.JUICE,
