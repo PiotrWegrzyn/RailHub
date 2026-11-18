@@ -799,7 +799,7 @@ class MapView:
             if hello_imgui.is_using_hello_imgui():
                 world = self._pixel_layer().world
                 self._shader = GroundShader.make(
-                    world.projection, self.tile_map, world.ground.shading
+                    world.projection, self.tile_map.grid.shape, world.ground.shading
                 )
         return self._shader
 

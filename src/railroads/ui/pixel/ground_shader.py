@@ -33,7 +33,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.grids import FloatArray
-from railroads.sim.tilemap import Deposit, TileMap
+from railroads.sim.tilemap import Deposit
 from railroads.ui.biomes import Biome
 from railroads.ui.pixel import ground as cpu
 from railroads.ui.pixel.noise import _TABLE, TABLE_SIZE
@@ -720,12 +720,12 @@ class GroundShader:
         self,
         programs: tuple[int, int],
         projection: PixelProjection,
-        tile_map: TileMap,
+        shape: tuple[int, int],
         light: FloatArray,
     ) -> None:
         self._ground, self._blow_up = programs
         self._projection = projection
-        self._shape = tile_map.grid.shape
+        self._shape = shape
         self._light_shape = light.shape[:2]
         self._vao = GL.glGenVertexArrays(1)
         self._buffer = GL.glGenBuffers(1)
@@ -748,16 +748,16 @@ class GroundShader:
 
     @classmethod
     def make(
-        cls, projection: PixelProjection, tile_map: TileMap, light: FloatArray
+        cls, projection: PixelProjection, shape: tuple[int, int], light: FloatArray
     ) -> GroundShader | None:
-        """The shaders for this map, whose ground is lit and coloured by `light` (Ground.shading),
+        """The shaders for a map of `shape` cells, whose ground is lit and coloured by `light` (Ground.shading),
         or None where OpenGL can't run them."""
         if GL is None:
             return None
         try:
             ground = _program(HEADER + VERTEX, HEADER + fragment_source())
             blow_up = _program(HEADER + VERTEX, HEADER + BLOW_UP)
-            return cls((ground, blow_up), projection, tile_map, light)
+            return cls((ground, blow_up), projection, shape, light)
         except Exception:  # noqa: BLE001 - any GL failure means falling back to the CPU ground
             return None
 

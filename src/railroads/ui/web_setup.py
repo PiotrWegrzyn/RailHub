@@ -24,8 +24,7 @@ import numpy as np
 from railroads.newgame import Settings, make_game
 from railroads.saves import SavedGame, snapshot, unpickled_steps
 from railroads.sim.steps import Steps
-from railroads.ui.history_pictures import HistoryPictures
-from railroads.ui.pixel.projection import Rgba
+from railroads.ui.history_pictures import HistoryPictures, Picture
 
 if sys.platform == "emscripten":
     import js
@@ -53,19 +52,21 @@ def grow(
     settings: bytes,
     report: Callable[[str], None],
     advance: Callable[[float], None] = lambda done: None,
-    see: Callable[[int, int, int, int, int], None] = lambda year, at, length, width, height: None,
+    see: Callable[[int, int], None] = lambda at, length: None,
 ) -> Grown:
     """In the worker: the game these pickled settings make, ready to hand back, telling `report`
-    what it does, `advance` the share of the towns' history grown and `see` the year of each
-    picture of it growing (railroads.ui.history_pictures), where its bytes are and how many,
-    and its width and height. The settings come pickled with the size of the pictures."""
-    wanted, size = pickle.loads(settings)
+    what it does, `advance` the share of the towns' history grown and `see` where in Python's
+    memory each picture of it growing (railroads.ui.history_pictures), pickled, is and how many
+    bytes it takes. The settings come pickled with the size of the pictures and whether they
+    leave the ground to the graphics card."""
+    wanted, size, over_ground = pickle.loads(settings)
 
-    def seen(year: int, picture: Rgba) -> None:
-        height, width = picture.shape[:2]
-        see(year, _address(picture), picture.nbytes, width, height)
+    def seen(picture: Picture) -> None:
+        pickled = np.frombuffer(pickle.dumps(picture, protocol=pickle.HIGHEST_PROTOCOL), np.uint8)
+        see(_address(pickled), pickled.size)
 
-    snap = snapshot(make_game(wanted, report, advance, HistoryPictures(size, seen)))
+    pictures = HistoryPictures(size, seen, over_ground)
+    snap = snapshot(make_game(wanted, report, advance, pictures))
     return Grown(zlib.compress(snap.data, 1), len(snap.data))
 
 
@@ -113,14 +114,16 @@ class PageSetup:
         settings: Settings,
         report: Callable[[str], None],
         advance: Callable[[float], None] = lambda done: None,
-        see: Callable[[int, Rgba], None] = lambda year, picture: None,
+        see: Callable[[Picture], None] = lambda picture: None,
         size: tuple[int, int] = (1280, 800),
+        over_ground: bool = False,
     ) -> Steps[SavedGame | None]:
         """The game these settings make, grown in a worker while the frames go on, a step a
         frame, passing on to `report`, `advance` and `see` what the worker says of how far it
-        got and its pictures, `size` points big, of the map growing; None if the worker failed,
-        for the caller to grow it itself."""
-        wanted = (settings, size)
+        got and its pictures of the map growing, `size` points big and leaving the ground to the
+        graphics card if `over_ground`; None if the worker failed, for the caller to grow it
+        itself."""
+        wanted = (settings, size, over_ground)
         self._page.start(pickle.dumps(wanted, protocol=pickle.HIGHEST_PROTOCOL))
         try:
             while True:
@@ -132,8 +135,7 @@ class PageSetup:
                     elif kind == "advance":
                         advance(message["done"])
                     elif kind == "picture":
-                        shape = (message["height"], message["width"], 4)
-                        see(message["year"], message["pixels"].reshape(shape))
+                        see(pickle.loads(message["pixels"]))
                     elif kind in ("failed", "dead"):
                         print(f"The towns couldn't grow in a worker: {message.get('error')}")
                         return None

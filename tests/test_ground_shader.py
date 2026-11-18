@@ -34,7 +34,7 @@ def test_without_opengl_there_is_no_shader_and_the_map_keeps_its_ground_picture(
     projection = PixelProjection.of(tile_map.grid, look.angle_deg, look.cell_units)
     monkeypatch.setattr(ground_shader, "GL", None)
 
-    shader = GroundShader.make(projection, tile_map, np.zeros((4, 4)))
+    shader = GroundShader.make(projection, tile_map.grid.shape, np.zeros((4, 4)))
 
     assert shader is None
 

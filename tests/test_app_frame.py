@@ -25,6 +25,7 @@ from railroads.ui import web_setup
 from railroads.ui.app import OPENING_ZOOM, App, Shell
 from railroads.ui.build_menu import Tool
 from railroads.ui.ground import GroundPictures
+from railroads.ui.history_pictures import opening_center
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
 from railroads.ui.main_menu import MENU_WIDTH, MainMenu, Page
 from railroads.ui.map_view import Lens, MapView
@@ -754,7 +755,7 @@ def test_a_new_game_opens_on_the_middle_of_the_map_and_stays_there_as_the_waitin
     assert shell._shatter is None
     assert shell.app is not None
     camera = shell.app.view.camera
-    middle = tuple(size / 2 for size in shell.app.view.tile_map.grid.size())
+    middle = opening_center(shell.app.view.tile_map.grid, (1280, 800))
     assert (camera.center_x, camera.center_y) == middle
     assert camera.zoom_level == OPENING_ZOOM
 
@@ -806,11 +807,29 @@ def test_a_new_game_shows_its_map_as_its_towns_grow_and_breaks_up_the_last_pictu
     frames = 0
     while shell.app is None and frames < 40:
         shell_frame(shell)
-        if shell._texture is not None and shell._texture[0][0] not in shown:
-            shown.append(shell._texture[0][0])
+        year = shell._show.year
+        if year is not None and year not in shown:
+            shown.append(year)
         frames += 1
 
     assert shown == [850, 950]
     assert shell._shatter is not None
-    assert shell._shatter.picture is not None
+    assert shell._shatter.pictures
     assert "The map in 950" in [label.text for label in shell._shatter.labels]
+
+
+def test_a_game_the_command_line_asks_for_starts_on_the_first_frame_for_the_windows_size(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
+    monkeypatch.setattr(app_module, "page_setup", lambda: None)
+    monkeypatch.setattr(app_module, "make_game_steps", grown_on_the_frames(played_game()))
+    imgui.get_io().display_size = imgui.ImVec2(1000, 700)
+    shell = Shell(Saves(tmp_path), SETTINGS)
+    started_before = shell._task is not None
+
+    shell_frame(shell)
+
+    assert not started_before
+    assert shell._task is not None
+    assert shell._window == (1000, 700)

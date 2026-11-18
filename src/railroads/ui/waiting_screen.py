@@ -102,11 +102,11 @@ class Shatter:
         colour: int,
         labels: list[Label],
         seed: int = 0,
-        picture: imgui.ImTextureRef | None = None,
+        pictures: list[imgui.ImTextureRef] | None = None,
     ) -> None:
         self.width = width
         self.height = height
-        self.picture = picture
+        self.pictures = pictures or []
         self.colour = colour
         self.pieces = Pieces.covering(width, height, np.random.default_rng(seed))
         self.labels = labels
@@ -130,7 +130,7 @@ class Shatter:
                 continue
             # Filled a pixel bigger than its outline, so no seam shows between hexes in place.
             corners = _hexagon(cx, cy, a, HEX_RADIUS + 1)
-            if self.picture is None:
+            if not self.pictures:
                 draw.add_convex_poly_filled(corners, self.colour)
             else:
                 self._draw_piece(draw, corners, _hexagon(*home, 0.0, HEX_RADIUS + 1))
@@ -153,12 +153,12 @@ class Shatter:
     def _draw_piece(
         self, draw: imgui.ImDrawList, corners: list[imgui.ImVec2], home: list[imgui.ImVec2]
     ) -> None:
-        """Draws a hex with the part of the picture it covered in place: as two quads, the
-        halves of the hexagon above and below its middle."""
-        assert self.picture is not None
+        """Draws a hex with the part of the pictures it covered in place, one over the other: as
+        two quads, the halves of the hexagon above and below its middle."""
         for half in HALVES:
             uv = [imgui.ImVec2(home[i].x / self.width, home[i].y / self.height) for i in half]
-            draw.add_image_quad(self.picture, *(corners[i] for i in half), *uv)
+            for picture in self.pictures:
+                draw.add_image_quad(picture, *(corners[i] for i in half), *uv)
 
 
 def _hexagon(x: float, y: float, turn: float, radius: float) -> list[imgui.ImVec2]:

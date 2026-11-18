@@ -41,11 +41,9 @@ class FakePage:
         game = np.frombuffer(ctypes.string_at(grown.address, grown.length), dtype=np.uint8)
         self.inbox.append({"kind": "grown", "game": game, "size": grown.size})
 
-    def see(self, year: int, address: int, length: int, width: int, height: int) -> None:
+    def see(self, address: int, length: int) -> None:
         pixels = np.frombuffer(ctypes.string_at(address, length), dtype=np.uint8)
-        self.inbox.append(
-            {"kind": "picture", "year": year, "pixels": pixels, "width": width, "height": height}
-        )
+        self.inbox.append({"kind": "picture", "pixels": pixels})
 
     def take(self) -> list[dict[str, Any]]:
         taken, self.inbox = self.inbox, []
@@ -130,7 +128,7 @@ def test_a_grown_game_is_unpacked_a_few_megabytes_a_frame(
     grown = played_game()
     page = FakePage()
     monkeypatch.setattr(web_setup, "make_game", grows_as(grown))
-    page.start(pickle.dumps((SETTINGS, (64, 48))))
+    page.start(pickle.dumps((SETTINGS, (64, 48), False)))
     page.work()
     message = next(m for m in page.take() if m["kind"] == "grown")
     steps = unpacked(message["game"], message["size"])
@@ -155,7 +153,10 @@ def test_the_page_sees_the_pictures_a_worker_takes_of_the_map_growing(
     page = FakePage()
     seen: list[tuple[int, tuple[int, ...]]] = []
     steps = PageSetup(page).grow(
-        SETTINGS, print, see=lambda year, picture: seen.append((year, picture.shape)), size=(64, 48)
+        SETTINGS,
+        print,
+        see=lambda picture: seen.append((picture.year, picture.pixels.shape)),
+        size=(64, 48),
     )
     next(steps)
     page.work()
