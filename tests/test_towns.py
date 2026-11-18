@@ -44,17 +44,27 @@ def test_a_building_between_two_towns_paints_its_neighbourhood_the_busier_ones_c
     assert towns.town[5, 2] == towns.town[5, 4] == towns.town[5, 6]
 
 
-def test_a_building_going_up_leaves_cells_beyond_its_neighbourhood_alone() -> None:
+def test_a_town_outvoted_around_a_new_building_joins_the_winner_whole() -> None:
     towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
     towns.add((5, 0), 1.0)
     towns.add((5, 2), 1.0)
-    first = int(towns.town[5, 0])
     towns.add((5, 6), 6.0)
 
     towns.add((5, 4), 1.0)
 
+    assert towns.town[5, 0] == towns.town[5, 6]
+
+
+def test_a_new_building_leaves_towns_without_a_cell_around_it_alone() -> None:
+    towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
+    towns.add((5, 0), 1.0)
+    towns.add((5, 6), 6.0)
+    first = int(towns.town[5, 0])
+
+    towns.add((5, 8), 1.0)
+
     assert towns.town[5, 0] == first
-    assert towns.town[5, 2] == towns.town[5, 6] != first
+    assert towns.town[5, 8] == towns.town[5, 6] != first
 
 
 def test_a_cell_emptied_leaves_its_town() -> None:

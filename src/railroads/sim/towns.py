@@ -2,8 +2,9 @@
 PASSENGERS_PER_POINT) belongs to a town, numbered from 1, 0 for none.
 
 Whenever a building sending passengers goes up, every sending cell within TOWN_REACH of it, its own
-included, takes the town that sends the most passengers there, or a new town if none does. So
-towns that grow into each other merge, and a building on its own starts one. A cell that empties
+included, takes the town that sends the most passengers there, or a new town if none does, and
+every other town with a cell there joins it whole. So towns that grow into each other merge, and a
+building on its own starts one. A cell that empties
 leaves its town. A station belongs to the town that sends the most passengers from the cells it
 hands out to, worked out when it is built and every year (railroads.sim.railway). Passengers and
 mail never board for a stop of their own station's town, so two stations in one town can't carry
@@ -49,6 +50,9 @@ class Towns:
             self._next += 1
         for near in around:
             self.town[near] = town
+        merged = [other for other in votes if other != town]
+        if merged:
+            self.town[np.isin(self.town, merged)] = town
 
     def settle(self, sending: npt.NDArray[np.float64]) -> None:
         """Gives every cell sending passengers a town, the busiest first, as if each went up
