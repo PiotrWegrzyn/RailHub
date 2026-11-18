@@ -196,7 +196,7 @@ def test_an_engines_figures_show_the_fuel_it_burns_and_how_far_it_runs_between_s
     figures = dict(engine_figures(engine, 1.75))
 
     assert figures["Burns"] == "0.75 coal a cell, about $2 a cell now"
-    assert figures["Range"] == "20 cells between stops"
+    assert figures["Range"] == "21 cells between stops"
 
 
 def test_stop_cards_scrolled_out_of_sight_are_not_drawn(

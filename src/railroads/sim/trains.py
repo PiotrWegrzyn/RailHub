@@ -274,8 +274,8 @@ ENGINES: dict[str, Engine] = {
     "locomotion": Engine("Locomotion", 1820, 0.3, 2, 4_000.0, P, pickup=13.0, tank=8.0),
     "rocket": Engine("Rocket", 1826, 0.4, 2, 6_000.0, P, pickup=13.0, tank=10.0),
     "lion": Engine("Lion", 1834, 0.45, 2, 8_000.0, P, pickup=13.0, tank=12.0),
-    "planet": Engine("Planet steam engine", 1840, 0.5, 3, TRAIN_PRICE, G, pickup=12.0, tank=20.0),
-    "tank": Engine("Tank engine", 1840, 0.4, 2, 3_000.0, L, pickup=3.0, tank=12.0),
+    "planet": Engine("Planet steam engine", 1840, 0.5, 3, TRAIN_PRICE, G, pickup=12.0, tank=21.0),
+    "tank": Engine("Tank engine", 1840, 0.4, 2, 3_000.0, L, pickup=3.0, tank=13.0),
     "goods": Engine(
         "Goods engine", 1853, 0.35, 4, 15_000.0, H, pickup=30.0, tank=20.0, needs=BOILERS
     ),

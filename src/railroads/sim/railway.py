@@ -640,7 +640,7 @@ class Railway:
                 return
             leg = self.network.route_length(here, there, engine.electric, engine.maglev)
             assert leg is not None
-            if engine.tank and leg > engine.tank + 1e-9:
+            if engine.tank and round(leg) > engine.tank:
                 train.status = (
                     f"Next stop {leg:.0f} cells away; it carries fuel for {engine.tank:.0f}"
                 )
