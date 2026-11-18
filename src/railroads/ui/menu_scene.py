@@ -1,7 +1,7 @@
-"""What runs behind the main menu: a dark evening over three tracks one behind another, on which
-trains of every era, drawn as the map draws them, run across the screen, the nearer the bigger
-and faster, steam engines trailing smoke. A train that has left the screen makes way for another,
-its picture drawn on the frame it is wanted, one at a time."""
+"""What runs behind the main menu: a dark evening over a strip of land with three tracks one
+behind another, on which trains of every era, drawn as the map draws them, run across the screen,
+the nearer the faster and brighter, steam engines trailing smoke. A train that has left the
+screen makes way for another, its picture drawn on the frame it is wanted, one at a time."""
 
 import random
 import time
@@ -35,7 +35,9 @@ GOODS = (
     Good.BARRELS,
 )
 # Where the land begins, as a share of the screen from the top.
-HORIZON = TRACKS[0][0] - 0.06
+HORIZON = TRACKS[0][0] - 0.03
+# Where the strip of land under the tracks ends.
+LAND_END = TRACKS[-1][0] + 0.025
 FEWEST_CARS = 5
 MOST_CARS = 12
 # How long a track stands empty, at most, before another train comes along.
@@ -93,8 +95,14 @@ class MenuScene:
         draw_list.add_rect_filled_multi_color(
             low, (high.x, horizon), *(color_u32(c) for c in (DEEP, DEEP, SKY_LOW, SKY_LOW))
         )
-        draw_list.add_rect_filled((low.x, horizon), high, color_u32(GROUND))
-        draw_list.add_line((low.x, horizon), (high.x, horizon), color_u32((*GLOW, 0.5)), 1.0)
+        land_end = low.y + height * LAND_END
+        draw_list.add_rect_filled((low.x, horizon), (high.x, land_end), color_u32(GROUND))
+        draw_list.add_rect_filled_multi_color(
+            (low.x, land_end), high, *(color_u32(c) for c in (SKY_LOW, SKY_LOW, DEEP, DEEP))
+        )
+        edge = color_u32((*GLOW, 0.5))
+        draw_list.add_line((low.x, horizon), (high.x, horizon), edge, 1.0)
+        draw_list.add_line((low.x, land_end), (high.x, land_end), edge, 1.0)
         started = False
         for track, (down, times, speed, light) in enumerate(TRACKS):
             rail_y = low.y + height * down
