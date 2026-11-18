@@ -12,7 +12,7 @@ from imgui_bundle import hello_imgui, imgui
 from imgui_bundle import icons_fontawesome_4 as fa
 from PIL import Image
 
-from railroads.sim.goods import General, Good, Need
+from railroads.sim.goods import FITS, General, Good, Need
 from railroads.sim.trains import car_size
 from railroads.ui.pixel.good_icons import ICON_PIXELS, ICONS_INDEX, ICONS_PNG
 from railroads.ui.pixel.layer import blown_up_texture
@@ -310,13 +310,21 @@ def draw_good_icon(
 
 
 def good_icon(good: Good | Need, *, framed: bool = False, size: float = ICON_SIZE) -> None:
-    """A good's icon, inline and named on hover, centred on the line's text; `framed` is for
-    lines lined up with buttons by align_text_to_frame_padding."""
+    """A good's icon, inline and named on hover with what a category holds, centred on the
+    line's text; `framed` is for lines lined up with buttons by align_text_to_frame_padding."""
     height = imgui.get_frame_height() if framed else imgui.get_text_line_height()
     imgui.dummy((size, height))
     low = imgui.get_item_rect_min()
     draw_good_icon(imgui.get_window_draw_list(), good, (low.x, low.y + (height - size) / 2), size)
-    tip(good.value)
+    tip(icon_name(good))
+
+
+def icon_name(good: Good | Need) -> str:
+    """What hovering a good's icon says: its name, and for a category of goods what is in it."""
+    goods = FITS.get(good, ()) if isinstance(good, Need) else ()
+    if len(goods) > 1:
+        return f"{good.value}: {', '.join(each.value for each in goods)}"
+    return good.value
 
 
 def good_amount(good: Good | Need, amount: str, *, framed: bool = False) -> None:

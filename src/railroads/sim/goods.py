@@ -175,6 +175,7 @@ class Need(Enum):
     CASTINGS = "castings"
     LUXURIES = "luxury goods"
     COMMON = "common goods"
+    ALCOHOL = "alcohol"
     PASSENGERS = "passengers"
     MAIL = "mail"
 
@@ -235,6 +236,7 @@ FITS: Mapping[Need, tuple[Good, ...]] = MappingProxyType(
         Need.FOOD: FOODS,
         Need.COMMON: COMMON_GOODS,
         Need.FRUIT: FRUITS,
+        Need.ALCOHOL: (Good.BEER, Good.WINE, Good.VODKA),
         Need.FIBRE: (Good.WOOL, Good.COTTON, Good.FLAX),
         Need.LIVESTOCK: (Good.CATTLE, Good.SHEEP),
         Need.ANIMALS: (Good.CATTLE, Good.PIGS, Good.CHICKENS, Good.SHEEP),
@@ -792,8 +794,8 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.PIG_FARM: {Need.WHEAT: 60},
         BuildingKind.CHICKEN_FARM: {Need.WHEAT: 30},
         BuildingKind.SHEEP_FARM: {Need.WHEAT: 90},
-        BuildingKind.TAVERN: {Need.BEER: 60, Need.VODKA: 30},
-        BuildingKind.CLUB: {Need.BEER: 200, Need.VODKA: 150},
+        BuildingKind.TAVERN: {Need.ALCOHOL: 90, Need.FOOD: 20},
+        BuildingKind.CLUB: {Need.ALCOHOL: 350, Need.CHEMICALS: 5},
         BuildingKind.DEPARTMENT_STORE: {
             Need.CLOTHES: 20,
             Need.SHOES: 20,
@@ -924,6 +926,7 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.POTATOES,
     BuildingKind.DISTILLERY,
     Need.VODKA,
+    Need.ALCOHOL,
     Need.SUGAR,
     BuildingKind.SUGAR_REFINERY,
     Need.REFINED_SUGAR,
@@ -1037,12 +1040,26 @@ HOMES = frozenset({BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS
 HOME_DEMANDS = frozenset({Need.FOOD, Need.COMMON, Need.HEATING})
 
 
+# Venues need alcohol of any kind; a tavern takes food as a bonus, and a club a little of
+# whatever chemicals it can get.
+VENUE_BONUSES: Mapping[BuildingKind, frozenset[Need]] = MappingProxyType(
+    {
+        BuildingKind.TAVERN: frozenset({Need.FOOD}),
+        BuildingKind.CLUB: frozenset({Need.CHEMICALS}),
+    }
+)
+
+
 @cache
 def bonus_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
     """The bonus goods among what a kind of building needs in a month in a given year: for homes
     all but food, common goods and heating; those of buildings that make goods boost what they make instead
     (boosts_of)."""
     needs = needs_of(kind, year)
+    if kind in VENUE_BONUSES:
+        return MappingProxyType(
+            {need: amount for need, amount in needs.items() if need in VENUE_BONUSES[kind]}
+        )
     if kind in HOMES:
         return MappingProxyType(
             {need: amount for need, amount in needs.items() if need not in HOME_DEMANDS}

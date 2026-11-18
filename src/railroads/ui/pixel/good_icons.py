@@ -757,6 +757,22 @@ def beer() -> Sprite:
     return p.sprite()
 
 
+def alcohol() -> Sprite:
+    p = _canvas()
+    amber: RGB = (232, 166, 44)
+    p.rect(-8, -2, -1, 7, amber)
+    p.line([(-1, 0), (1, 0), (1, 5), (-1, 5)], shade(amber, 0.6))
+    foam: RGB = (250, 248, 238)
+    p.ellipse(-9, -5, -4, -1, foam)
+    p.ellipse(-6, -5, -1, -1, foam)
+    red: RGB = (150, 26, 60)
+    glass: RGB = (214, 228, 236)
+    p.polygon([(2, -7), (8, -7), (7, -2), (3, -2)], red, glass)
+    p.line([(5, -2), (5, 5)], glass)
+    p.line([(3, 6), (7, 6)], glass)
+    return p.sprite()
+
+
 def vodka() -> Sprite:
     p = _canvas()
     clear: RGB = (222, 236, 244)
@@ -1121,6 +1137,7 @@ ICONS: dict[str, Callable[[], Sprite]] = {
     "glass": glass,
     "beer": beer,
     "vodka": vodka,
+    "alcohol": alcohol,
     "leather": leather,
     "shoes": shoes,
     "plastics": plastics,

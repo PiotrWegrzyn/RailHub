@@ -689,7 +689,7 @@ def test_a_house_that_gets_no_food_is_unsatisfied_whatever_else_it_gets(given: d
     assert level_at(economy, trade, (8, 9), BuildingKind.HOUSE) == Satisfaction.UNSATISFIED
 
 
-def test_a_house_with_a_little_food_counts_its_warmth_and_beer_too() -> None:
+def test_a_house_with_a_little_food_gets_its_beer_bonus_only_on_that_little() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
@@ -697,7 +697,7 @@ def test_a_house_with_a_little_food_counts_its_warmth_and_beer_too() -> None:
     trade = economy.trade(placed, holding(FISH=1.0, COAL=3.0, BEER=1.0))
 
     share = trade.share((BuildingKind.HOUSE,))[position(trade, economy, (8, 9))]
-    assert share == pytest.approx(4 / 18 + 0.3)
+    assert share == pytest.approx(4 / 18 * 1.3)
 
 
 def test_each_bonus_good_counts_what_the_economy_is_told_it_is_worth() -> None:
@@ -888,3 +888,15 @@ def test_only_a_farm_the_player_owns_takes_limestone_and_machinery_once_their_te
     gathered = trade.gathered[STATION].get(Good.WHEAT, 0.0)
     brought = trade.owned_brought[STATION].get(Good.WHEAT, 0.0)
     assert gathered + brought == pytest.approx(wheat)
+
+
+@pytest.mark.parametrize("drink", ["BEER", "WINE", "VODKA"])
+def test_a_tavern_takes_any_alcohol_and_food_only_as_a_bonus(drink: str) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.TAVERN, 1))
+
+    trade = economy.trade(placed, holding(**{drink: 90.0}))
+
+    share = trade.share((BuildingKind.TAVERN,))[position(trade, economy, (8, 9))]
+    assert share == pytest.approx(1.0)

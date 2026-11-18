@@ -6,6 +6,7 @@ from PIL import Image
 
 from railroads.sim.goods import Good, Need
 from railroads.ui.pixel.good_icons import ICON_PIXELS, ICONS, ICONS_INDEX, ICONS_PNG
+from railroads.ui.theme import icon_name
 
 
 @pytest.mark.parametrize("good", [*Good, *Need], ids=lambda good: good.value)
@@ -23,3 +24,9 @@ def test_no_two_icons_are_the_same_picture() -> None:
     drawn = [draw().image.tobytes() for draw in ICONS.values()]
 
     assert len(set(drawn)) == len(drawn)
+
+
+def test_hovering_a_category_names_the_goods_in_it() -> None:
+    named = icon_name(Need.ALCOHOL), icon_name(Good.BEER)
+
+    assert named == ("alcohol: beer, wine, vodka", "beer")

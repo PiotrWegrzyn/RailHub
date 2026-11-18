@@ -493,7 +493,8 @@ bakery a station can reach is worth having.
 | Printing works | 3,000 newspapers | 150 paper |
 | Plastics works (1950) | 100 plastics | 50 oil, 50 chemicals |
 | Appliance factory (1950) | 30 appliances | 30 steel, 15 copper, 15 plastics, 8 electronics (from 1960) |
-| Tavern | | 20 beer, 10 vodka |
+| Tavern | | 90 alcohol (beer, wine or vodka); 20 food as a bonus |
+| Club | | 350 alcohol (beer, wine or vodka); 5 chemicals as a bonus |
 | Department store (1880) | | 20 clothes, 20 shoes, 10 furniture, 5 porcelain, 10 appliances (from 1950) |
 | Hotel (1900) | | 80 food, 10 wine, 10 beer, 10 newspapers |
 | Coal power plant (1882) | | 200 coal |
@@ -524,11 +525,15 @@ nothing passes between neighbours by itself, and the land feeds no one.
 
 What a building needs comes in two lists, its demands and its bonus goods. Bonus goods are every
 special resource (iron ore, copper, gold, diamonds, oil, salt, grapes, coffee, rubber, incense)
-and beer, newspapers and furniture; everything else it needs is a demand. A building's
-satisfaction is the share of its demands it got, plus 30% for each bonus good it got all of, and
-that share of 30% for part of one. Demands are counted by amount, so a car matters little next
-to a town's food. A house that gets its food and heating is at 100%, with all its beer at 130%,
-and with half its newspapers on top at 145%; one that gets only its beer is at 30%. A building
+and beer, newspapers and furniture; everything else it needs is a demand. Taverns and clubs need
+alcohol, any of beer, wine and vodka; a tavern takes food as a bonus and a club a little of
+whatever chemicals it can get. Hovering the icon of such a category names what is in it.
+A building's satisfaction is the share of its demands it got, raised by 30% of itself for each bonus good it
+got all of, and that share of 30% for part of one, so bonus goods count only as much as the
+demands are met. Demands are counted by amount, so a car matters little next to a town's food. A
+house that gets its food and heating is at 100%, with all its beer at 130%, and with half its
+newspapers on top at 145%; one only half fed with all its beer is at 65%, and one that gets only
+its beer at 0%. A building
 that makes things counts what it gave away alongside what it got, and processors are judged on
 what they actually make, not on what they could.
 

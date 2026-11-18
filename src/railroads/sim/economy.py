@@ -26,9 +26,10 @@ processor come before what it makes: canneries take their fruit before houses ea
 
 A building's satisfaction is the share of what it demands that it got and of what it makes that
 reached a buyer; a processor's is only the share of all it could make that reached a buyer, so one
-whose stockpile holds one input but not the other is unsatisfied however full it is, plus
-BONUS_PER_GOOD for each of its bonus goods (railroads.sim.goods) it got all of, and that share of
-it for part: a house fed and warmed that also got all its beer and half its newspapers is at 145%.
+whose stockpile holds one input but not the other is unsatisfied however full it is; that is
+raised by BONUS_PER_GOOD of itself for each of its bonus goods (railroads.sim.goods) it got all
+of, and that share of it for part: a house fed and warmed that also got all its beer and half its
+newspapers is at 145%, one only half fed with all its beer at 65%.
 Food is a must for homes: one that got none is unsatisfied whatever else it got, so homes can't
 live on firewood or beer alone. A building is unsatisfied at nothing, thriving from 100% and
 content between. Its satisfaction adds to the
@@ -332,7 +333,7 @@ class Trade:
             done = self.got[kind] + self.gave[kind]
             own = np.where(wanted > 0, done / np.where(wanted > 0, wanted, 1.0), 0.0)
             if kind in self.bonus:
-                own = own + self.bonus_per_good * self.bonus[kind]
+                own = own * (1.0 + self.bonus_per_good * self.bonus[kind])
             total += wanted * own
             weight += wanted
         wanting = weight > 0
