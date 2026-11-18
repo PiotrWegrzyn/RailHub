@@ -29,7 +29,9 @@ BONUS_PER_GOOD for each of its bonus goods (railroads.sim.goods) it got all of, 
 it for part: a house fed and warmed that also got all its beer and half its newspapers is at 145%.
 It is unsatisfied at nothing, thriving from 100% and content between. Its satisfaction adds to the
 chances of more growing in its cell, its points times its satisfaction, with no ceiling above
-100%.
+100%. The economy remembers each cell's satisfaction over the last QUARTER months: what is handed
+out on its own to buyers who were short is worth more (worth_to), which is what the player's own
+buildings are paid by (railroads.sim.ownership).
 """
 
 import time
@@ -42,7 +44,7 @@ from functools import cache
 import numpy as np
 import numpy.typing as npt
 
-from railroads.sim.clock import START_YEAR
+from railroads.sim.clock import QUARTER, START_YEAR
 from railroads.sim.constructions import GREW_FROM, BuildingKind
 from railroads.sim.goods import (
     BOOST_MOST,
@@ -106,6 +108,14 @@ def input_stock(kind: BuildingKind) -> float:
 
 # How much each bonus good a building gets all of adds to its satisfaction.
 BONUS_PER_GOOD = 0.3
+# What a unit handed out on its own is worth, times its price, when its buyers got nothing over
+# the last quarter; it falls evenly to the price itself as they get all they want.
+SCARCE_WORTH = 3.0
+
+
+def worth_to(satisfaction: FloatCells) -> FloatCells:
+    """What a unit handed out on its own is worth, times its price, to buyers this satisfied."""
+    return 1.0 + (SCARCE_WORTH - 1.0) * (1.0 - np.clip(satisfaction, 0.0, 1.0))
 
 
 def levels_of(share: FloatCells) -> npt.NDArray[np.int8]:
@@ -207,6 +217,10 @@ class Trade:
     bonus_per_good: float = BONUS_PER_GOOD
     # Per need, what each cell's buildings got of it from sellers nearby rather than stations.
     local: Mapping[Need, FloatCells] = field(default_factory=dict)
+    # Per good, what a unit that left each cell was worth on average, times its price: more the
+    # less satisfied the buildings it was handed out to were over the last quarter, and the
+    # price itself for what went to stations. Goods missing here were worth their price.
+    worth: Mapping[Good, FloatCells] = field(default_factory=dict)
 
     def done(self, kinds: tuple[BuildingKind, ...]) -> FloatCells:
         return sum(
@@ -300,6 +314,14 @@ class Economy:
         self.bonus_per_good = BONUS_PER_GOOD
         # What the processors of each kind in each cell hold of each input.
         self.stock = Stockpiles(self.cells)
+        # Each cell's satisfaction in each of the last QUARTER months, the latest last.
+        self.months: list[FloatCells] = []
+
+    def last_quarter(self) -> FloatCells:
+        """Each cell's satisfaction over the last quarter, on average; full before any trade."""
+        if not self.months:
+            return np.ones(self.cells)
+        return np.mean(self.months, axis=0)
 
     def trade(
         self,
@@ -418,6 +440,10 @@ class _Month:
         self.wanted = {kind: wants_of(kind, economy.year) for kind in self.count}
         self.zero = np.zeros(cells.size)
         self.priority = economy.levels[cells]
+        # What a unit handed out on its own is worth to each cell, times its price, and per good
+        # how much more than its price what each cell handed out was worth in all.
+        self.worth_to = worth_to(economy.last_quarter()[cells])
+        self.worth_above: dict[Good, FloatCells] = {}
         # What each kind of processor holds of each input, worked out as the trade begins.
         self.stock: dict[tuple[BuildingKind, Need], FloatCells] = {}
         # What buildings offer of each good, by kind and in all, and how much of it went.
@@ -618,6 +644,8 @@ class _Month:
             sent *= np.minimum(1.0, left[buyer] / arriving)
             remaining -= np.bincount(seller, sent, minlength=size)
             left -= np.bincount(buyer, sent, minlength=size)
+            above = np.bincount(seller, sent * (self.worth_to[buyer] - 1.0), minlength=size)
+            self.worth_above[good] = self.worth_above.get(good, self.zero) + above
             if remaining.max() <= 1e-9 or left.max() <= 1e-9:
                 break
         self.sold[good] += spare - remaining
@@ -791,7 +819,14 @@ class _Month:
             bonus,
             self.economy.bonus_per_good,
             self.local,
+            {
+                good: 1.0 + above / np.where(self.sold[good] > 0, self.sold[good], 1.0)
+                for good, above in self.worth_above.items()
+            },
         )
         self.economy.levels[:] = Satisfaction.UNSATISFIED
         self.economy.levels[self.cells] = trade.levels()
+        month = np.ones(self.economy.cells)
+        month[self.cells] = trade.share(tuple(needed))
+        self.economy.months = [*self.economy.months[1 - QUARTER :], month]
         return trade

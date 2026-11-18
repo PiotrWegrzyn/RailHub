@@ -3,10 +3,11 @@ import pytest
 
 from builders import flat_map
 from railroads.sim import economy as economy_module
-from railroads.sim.clock import START_YEAR
+from railroads.sim.clock import QUARTER, START_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import (
     COLLECTION_RADIUS,
+    SCARCE_WORTH,
     Economy,
     Satisfaction,
     StationOrder,
@@ -775,3 +776,31 @@ def test_refined_sugar_lets_a_bakery_bake_half_as_much_bread_again(
     trade = economy.trade(placed, holding(100.0, WHEAT=5.0, REFINED_SUGAR=sugar))
 
     assert trade.gathered[STATION][Good.BREAD] == pytest.approx(bread)
+
+
+def test_a_house_fed_only_this_month_counts_as_a_third_satisfied_over_the_last_quarter() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    alone = counts(tile_map, ((5, 5), BuildingKind.HOUSE, 1))
+    fed = counts(tile_map, ((5, 5), BuildingKind.HOUSE, 1), ((5, 6), BuildingKind.FARM, 1))
+    for _ in range(QUARTER):
+        economy.trade(alone)
+
+    trade = economy.trade(fed)
+
+    house = trade.share((BuildingKind.HOUSE,))[position(trade, economy, (5, 5))]
+    assert house > 0
+    assert economy.last_quarter()[flat(economy, (5, 5))] == pytest.approx(house / QUARTER)
+
+
+def test_a_buyer_starving_over_the_last_quarter_makes_what_it_is_handed_worth_the_most() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    house = counts(tile_map, ((5, 5), BuildingKind.HOUSE, 1))
+    fed = counts(tile_map, ((5, 5), BuildingKind.HOUSE, 1), ((5, 6), BuildingKind.FARM, 1))
+    for _ in range(QUARTER):
+        economy.trade(house)
+
+    trade = economy.trade(fed)
+
+    assert trade.worth[Good.WHEAT][position(trade, economy, (5, 6))] == pytest.approx(SCARCE_WORTH)

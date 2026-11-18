@@ -5,8 +5,10 @@ A building costs PAYBACK_YEARS of its owner's share at full output, OWNER_SHARE 
 less what the player's tech takes off, down to MOST_DISCOUNT of the price; a power plant of any kind, which
 sells nothing but makes cheap electricity for the player's trains (railroads.sim.fuel_market),
 costs POWER_PLANT_PRICE. Tech in a building's
-tree can raise the share it pays and how many buildings' worth it makes. When buildings leave a
-cell, the player's go last.
+tree can raise the share it pays and how many buildings' worth it makes. What a building hands out
+on its own pays more the less satisfied its buyers were over the last quarter, up to SCARCE_WORTH
+times the price (railroads.sim.economy); what goes to stations pays the price. When buildings
+leave a cell, the player's go last.
 """
 
 from collections.abc import Mapping
@@ -25,8 +27,8 @@ from railroads.sim.tech import SHOPS, Effect, Tree, tree_of
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth
 
-# The player's share of what a building they own sells to their stations, and what it costs to
-# buy: this many years of that share at full output.
+# The player's share of what a building they own sells, and what it costs to buy: this many
+# years of that share at full output.
 OWNER_SHARE = 0.5
 PAYBACK_YEARS = 5
 # However much tech cuts the price of buildings, they cost at least this share of it.
@@ -154,7 +156,8 @@ class Owners:
             count = counts[kind].ravel()[trade.cells] + boost * owned
             theirs = owned * (1.0 + boost) / np.maximum(count, 1.0)
             share = OWNER_SHARE + self.boost(kind, Effect.SHARE)
-            earned = float((given * theirs).sum()) * price_of(good) * share
+            worth = trade.worth.get(good, 1.0)
+            earned = float((given * theirs * worth).sum()) * price_of(good) * share
             self.income[kind] = self.income.get(kind, 0.0) + earned
         for kind, earned in self.income.items():
             tree = tree_of(kind)

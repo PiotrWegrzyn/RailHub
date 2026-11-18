@@ -1,9 +1,10 @@
 import pytest
 from test_railway import joined_stations
 
+from railroads.sim.clock import QUARTER
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.goods import TRAVELLERS, Good, makes_of
-from railroads.sim.station_goods import QUARTER, StationGoods
+from railroads.sim.station_goods import StationGoods
 from railroads.ui.station_offers import goods_to_load
 
 

@@ -23,12 +23,11 @@ A deliberate break of the order (stations before local trade) fails three of the
 
 ### Game behaviour that disagrees with the rules (game)
 
-- **Owned buildings earn on local hand-outs.** `Owners.pay` pays the player's share of all of
-  `trade.goods_gave`, so an owned farm beside houses earns with no station at all. The comment on
-  `OWNER_SHARE` and `test_ownership::test_the_player_earns_half_of_what_their_farm_sells_to_a_joined_station`
-  say "sells to their stations". Decided: they keep earning on hand-outs, at a price that should
-  follow last quarter's satisfaction; whose satisfaction and how far the price moves are still
-  open.
+- **done: owned buildings earn on local hand-outs.** `Owners.pay` pays the player's share of all
+  of `trade.goods_gave`. What an owned building hands out on its own is now worth more the less
+  satisfied its buyers were over the last quarter: `economy.worth_to`, from the price at full
+  satisfaction up to `SCARCE_WORTH` (3x) for buyers who got nothing; what goes to stations pays
+  the price. Tests in `test_ownership` and `test_economy`.
 - **done: `StationTrade.supplies` counted everything made in reach.** Each station now keeps
   what it was given over the last three months (`StationGoods.last_quarter`), and the trains
   window, route map and station tooltip show that.
@@ -136,7 +135,7 @@ A deliberate break of the order (stations before local trade) fails three of the
 - open: gold never checked in the diamonds test; printing-works and fishing numbers.
 
 ### test_ownership.py
-- open: rename the farm test once the owner-pay rule is decided (game, above).
+- done: the farm test's name still holds; owner pay on hand-outs has its own tests.
 
 ### test_demolition.py, test_game.py
 - open: prices as `demolition_price(...)` and an order `HOUSE < FARM < FACTORY < ...` instead of

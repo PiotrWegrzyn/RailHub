@@ -2,7 +2,9 @@ import numpy as np
 import pytest
 
 from builders import QUIET, flat_map
+from railroads.sim.clock import QUARTER
 from railroads.sim.constructions import Building, BuildingKind, Constructions
+from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import Good, price_of
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import FACTORIES, FARMS_CROWDED_OUT, GrowthRule
@@ -98,3 +100,51 @@ def test_factories_merging_into_a_big_one_hand_it_to_whoever_owned_one_of_them()
     assert growth.count(BuildingKind.BIG_FACTORY)[5, 5] == 1
     assert growth.owners.owned(BuildingKind.BIG_FACTORY)[5, 5] == 1
     assert growth.owners.owned(BuildingKind.FACTORY).sum() == 0
+
+
+def owned_farm_by_a_house_after_a_quarter_at(satisfaction: float) -> Growth:
+    constructions = Constructions(flat_map())
+    growth = Growth(constructions, GrowthRule(trades=False))
+    growth.railway = Railway(constructions)
+    growth.build(Building((6, 10), BuildingKind.FARM))
+    growth.build(Building((6, 11), BuildingKind.HOUSE))
+    growth.owners.own((6, 10), BuildingKind.FARM)
+    cells = growth.economy.cells
+    growth.economy.months = [np.full(cells, satisfaction) for _ in range(QUARTER)]
+    return growth
+
+
+@pytest.mark.parametrize(("satisfaction", "worth"), [(0.0, SCARCE_WORTH), (0.5, 2.0), (1.4, 1.0)])
+def test_what_an_owned_farm_hands_out_pays_more_the_less_satisfied_its_buyers_were(
+    satisfaction: float, worth: float
+) -> None:
+    satisfied = owned_farm_by_a_house_after_a_quarter_at(1.0)
+    growth = owned_farm_by_a_house_after_a_quarter_at(satisfaction)
+
+    satisfied.trade_goods()
+    growth.trade_goods()
+
+    earned = growth.railway.finances.month["owned buildings"]
+    assert earned > 0
+    assert earned == pytest.approx(worth * satisfied.railway.finances.month["owned buildings"])
+
+
+def test_what_an_owned_farm_sells_to_a_station_pays_its_price_however_short_the_buyers_were() -> (
+    None
+):
+    constructions = Constructions(flat_map())
+    growth = Growth(constructions, GrowthRule(trades=False))
+    build_station(growth, (6, 3))
+    build_station(growth, (6, 20))
+    route = plan_route(constructions, (6, 3), (6, 20))
+    assert route is not None
+    lay_route(growth, route)
+    growth.railway = Railway(constructions)
+    growth.build(Building((6, 22), BuildingKind.FARM))
+    growth.owners.own((6, 22), BuildingKind.FARM)
+    growth.economy.months = [np.zeros(growth.economy.cells) for _ in range(QUARTER)]
+
+    growth.trade_goods()
+
+    earned = growth.railway.finances.month["owned buildings"]
+    assert earned == pytest.approx(10 * price_of(Good.WHEAT) * OWNER_SHARE)

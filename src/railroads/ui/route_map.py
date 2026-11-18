@@ -17,12 +17,12 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 from PIL import Image, ImageFilter
 
+from railroads.sim.clock import QUARTER
 from railroads.sim.constructions import TrackWidth
 from railroads.sim.demand import DEMAND_PER_NEED, StationDemand
 from railroads.sim.goods import FITS, Good, Need
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
-from railroads.sim.station_goods import QUARTER
 from railroads.sim.steps import Steps
 from railroads.sim.trains import Stop, Train
 from railroads.ui.iso_camera import Vec2

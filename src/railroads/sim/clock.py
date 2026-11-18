@@ -8,6 +8,9 @@ at any of SPEEDS.
 from dataclasses import dataclass
 
 SECONDS_PER_MONTH = 150.0
+# Months in a quarter: how long stations remember what came to them and buyers how satisfied
+# they were.
+QUARTER = 3
 START_YEAR = 1850
 # The year every map's history begins: by default a thousand years before play.
 HISTORY_START = 850

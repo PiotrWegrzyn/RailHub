@@ -8,6 +8,7 @@ freight and WAITING_STEP to the passengers and mail."""
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+from railroads.sim.clock import QUARTER
 from railroads.sim.goods import TRAVELLERS, Good
 from railroads.sim.trains import Parcels, take_parcels
 
@@ -17,8 +18,6 @@ WAITING = 100.0
 # What each storage upgrade adds to them.
 STORAGE_STEP = 250
 WAITING_STEP = 500
-# How many months the station remembers what came to it.
-QUARTER = 3
 
 
 @dataclass

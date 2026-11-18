@@ -5,10 +5,10 @@ import pytest
 from imgui_bundle import hello_imgui, imgui
 from test_railway import joined_stations
 
+from railroads.sim.clock import QUARTER
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.demand import DEMAND_PER_NEED
 from railroads.sim.goods import Good, Need
-from railroads.sim.station_goods import QUARTER
 from railroads.sim.steps import finish
 from railroads.sim.trains import Stop
 from railroads.ui.minimap import Panel
