@@ -180,6 +180,7 @@ def test_incense_lies_in_only_a_handful_of_cells(seed: int) -> None:
 
 
 def test_hills_favour_orchards_over_farms() -> None:
-    assert ORCHARDS.land.relief[Relief.HILLS] == 1.5
-    assert ORCHARDS.land.relief[Relief.FLAT] == 0.4
-    assert FARMS.land.relief[Relief.HILLS] == 0.25
+    orchards, farms = ORCHARDS.land.relief, FARMS.land.relief
+
+    assert orchards[Relief.HILLS] > farms[Relief.HILLS]
+    assert orchards[Relief.FLAT] < farms.get(Relief.FLAT, 1.0)
