@@ -1,10 +1,17 @@
 import numpy as np
 import pytest
 
-from railroads.land import buy_lot_steps, lot_middle, offered_lots, quarter_of_top_ups
+from railroads.land import (
+    buy_lot_steps,
+    lot_middle,
+    novelty_chance,
+    offered_lots,
+    quarter_of_top_ups,
+)
 from railroads.newgame import MapChoice, Settings, make_game
 from railroads.saves import SavedGame
 from railroads.sim.constructions import BuildingKind
+from railroads.sim.novelties import YEARLY_CHANCE
 from railroads.sim.steps import finish
 
 SETTINGS = Settings(seed=5, map=MapChoice.POLAND, start_year=1850, cash=2_000_000.0)
@@ -113,3 +120,18 @@ def test_land_bought_keeps_a_quarter_of_the_buildings_the_map_keeps_at_least_one
 def test_a_lot_not_offered_cant_be_bought(started: SavedGame) -> None:
     with pytest.raises(ValueError, match="isn't for sale"):
         finish(buy_lot_steps(started, (7, 7), report=lambda text: None))
+
+
+@pytest.mark.parametrize("years", [1, 10, 100])
+def test_a_novelty_comes_up_in_land_bought_at_a_quarter_of_its_chance_over_the_years_played(
+    years: int,
+) -> None:
+    chance = novelty_chance(years)
+
+    assert chance == pytest.approx((1 - (1 - YEARLY_CHANCE) ** years) / 4)
+    assert chance <= 0.25
+
+
+def test_no_novelty_comes_up_in_land_bought_before_its_era() -> None:
+    assert novelty_chance(0) == 0.0
+    assert novelty_chance(-5) == 0.0

@@ -12,12 +12,14 @@ from test_saves import played_game
 from test_web_setup import SETTINGS, FakePage, grows_as
 
 from builders import flat_map
-from railroads.newgame import MapChoice, Settings
+from railroads.land import lot_middle
+from railroads.newgame import MapChoice, Settings, make_game
 from railroads.saves import SavedGame, Saves
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.game import Game
 from railroads.sim.goods import Good
 from railroads.sim.grids import HexGrid
+from railroads.sim.lots import Lots
 from railroads.sim.steps import Steps
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.sim.trains import Stop
@@ -877,3 +879,43 @@ def test_the_menu_starts_games_without_pictures_of_the_map_growing_unless_ticked
     settings = (plain.settings(), ticked.settings(), ticked.random_settings())
 
     assert [each.show_map_growing for each in settings] == [False, True, True]
+
+
+@pytest.mark.parametrize("zoom", range(len(ZOOM_CELL_WIDTHS)))
+def test_the_land_for_sale_around_the_map_draws_at_every_zoom(context: None, zoom: int) -> None:
+    app = made_app()
+    lots = Lots.of_square(top=0, left=0, rows=20, cols=24)
+    lots.offers = lots.next_to()
+    app.game.lots = lots
+    app.view.land.asked = (0, -1)
+    app.view.camera.zoom_level = zoom
+    app.view.look_at((0, 0))
+
+    for _ in range(3):
+        frame(app)
+
+    assert app.view.land.asked == (0, -1)
+
+
+def test_land_confirmed_is_bought_behind_the_waiting_screen_and_the_view_opens_on_it(
+    context: None, tmp_path: Path
+) -> None:
+    settings = Settings(seed=5, map=MapChoice.POLAND, cash=2_000_000.0)
+    shell = Shell(Saves(tmp_path))
+    shell.app = App.from_saved(make_game(settings, report=lambda _: None), shell.saves)
+    shell.app.view.camera.zoom_level = 3
+    shell.app.view.land.wanted = (0, -1)
+
+    shell_frame(shell)
+    assert shell._task is not None
+    shell._task.result()
+    shell_frame(shell)
+
+    app = shell.app
+    lots = app.game.lots
+    assert lots is not None
+    assert (0, -1) in lots.owned
+    assert app.game.finances.cash == pytest.approx(2_000_000.0 - 377_000.0, abs=1.0)
+    assert app.view.camera.zoom_level == 3
+    x, y = app.game.tile_map.grid.center(*lot_middle(lots, (0, -1)))
+    assert (app.view.camera.center_x, app.view.camera.center_y) == pytest.approx((x, y))

@@ -72,11 +72,14 @@ class IsoCamera:
         self.center_x += before[0] - after[0]
         self.center_y += before[1] - after[1]
 
-    def keep_within(self, width: float, height: float) -> None:
-        """Keeps the centre of the view on a map this wide and high, so panning cannot lose it,
+    def keep_within(
+        self, width: float, height: float, margin: tuple[float, float] = (0.0, 0.0)
+    ) -> None:
+        """Keeps the centre of the view on a map this wide and high, or up to `margin` past its
+        edges (as far as the land around it the player can buy), so panning cannot lose it,
         however long and thin it is."""
-        self.center_x = min(max(self.center_x, 0.0), width)
-        self.center_y = min(max(self.center_y, 0.0), height)
+        self.center_x = min(max(self.center_x, -margin[0]), width + margin[0])
+        self.center_y = min(max(self.center_y, -margin[1]), height + margin[1])
 
     def map_direction(self, screen_dx: float, screen_dy: float) -> Vec2:
         """The direction on the map, as a unit vector, that points that way on screen."""

@@ -9,6 +9,7 @@ import numpy as np
 from imgui_bundle import hello_imgui, imgui, immapp
 
 from railroads import maps
+from railroads.land import buy_lot_steps, lot_middle
 from railroads.newgame import (
     EARLIEST_START_YEAR,
     MapChoice,
@@ -28,6 +29,7 @@ from railroads.saves import (
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
 from railroads.sim.game import Game
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
+from railroads.sim.lots import Lot
 from railroads.sim.steps import Steps, finish
 from railroads.ui.help_window import HelpWindow
 from railroads.ui.history_pictures import HistoryPictures, opening_center
@@ -401,12 +403,25 @@ class Shell:
     def load(self, name: str) -> None:
         self._begin(f"Loading '{name}'", lambda: _at_once(lambda: self.saves.load(name)))
 
+    def buy_land(self, app: App, lot: Lot) -> None:
+        """Buys a lot next to the map (railroads.land), growing it while the waiting screen
+        shows, as a new game's towns grow, then opens the game on the middle of it."""
+        app.finish_autosave()
+        saved = app.saved()
+        zoom = app.view.camera.zoom_level
+        self._begin(
+            "Buying land",
+            lambda: buy_lot_steps(saved, lot, self.report, self.advance),
+            visit=(lot, zoom),
+        )
+
     def _begin(
         self,
         doing: str,
         work: Callable[[], Steps[SavedGame]],
         new_game_on: MapChoice | None = None,
         pictured: bool = False,
+        visit: tuple[Lot, int] | None = None,
     ) -> None:
         """Starts the work of setting up or loading a game; `new_game_on` is the map of a new
         game, None for a game loaded, and `pictured` whether its map shows as its towns grow."""
@@ -439,6 +454,11 @@ class Shell:
                 camera.zoom_level = OPENING_ZOOM
             elif new_game_on is not None:
                 app.view.visit_biggest_town()
+            lots = app.game.lots
+            if visit is not None and lots is not None:
+                lot, zoom = visit
+                app.view.camera.zoom_level = zoom
+                app.view.look_at(lot_middle(lots, lot))
             yield
             yield from app.view.prepare_steps(size, density, chunks)
             return app
@@ -508,6 +528,9 @@ class Shell:
             app.finish_autosave()
             self.app = None
             self.menu.go_to("main")
+        elif app.view.land.wanted is not None:
+            lot, app.view.land.wanted = app.view.land.wanted, None
+            self.buy_land(app, lot)
 
     def _choose(self, choice: object) -> None:
         match choice:

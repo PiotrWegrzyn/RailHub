@@ -36,6 +36,7 @@ from railroads.ui.buildings import draw_building_dots
 from railroads.ui.ground import GroundLayout, GroundPictures, Pixels, cell_colors
 from railroads.ui.hex_details import draw_hex_details, recently_described
 from railroads.ui.iso_camera import LOOKS, IsoCamera, Vec2
+from railroads.ui.land_offers import LandOffers
 from railroads.ui.map_input import MapInput
 from railroads.ui.map_overlays import (
     MOODS_LEGEND,
@@ -204,6 +205,8 @@ class MapView:
         self.summaries = SummariesPanel()
         self.station_window = StationWindow()
         self.search = BuildingSearch()
+        # The land around the map the player can buy (railroads.ui.land_offers).
+        self.land = LandOffers()
 
     @property
     def tile_map(self) -> TileMap:
@@ -254,6 +257,7 @@ class MapView:
         )
         self.summaries.draw(*self._map_rect, self.look_at, self.railway.name_of)
         self.search.draw(self.growth, self.visit, self._view_center)
+        self.land.confirm(self.game.lots, self.game.finances)
 
     def _view_center(self) -> Vec2:
         return self.camera.center_x, self.camera.center_y
@@ -487,6 +491,11 @@ class MapView:
                 hello_imgui.request_refresh()
         else:
             self._draw_smooth_map(draw_list, center, top_left, bottom_right)
+        lots = self.game.lots
+        if lots is not None:
+            world = self.minimap.world_texture()
+            cash = self.game.finances.cash
+            self.land.draw(draw_list, self.camera, center, self.tile_map, lots, world, cash)
         if self.camera.pixel_scale:
             if self.railway.trains:
                 self._train_layer().draw(draw_list, self.railway, self.camera, center)

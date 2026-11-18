@@ -9,6 +9,7 @@ from imgui_bundle import imgui
 from railroads.sim.constructions import Station
 from railroads.ui.build_menu import STATION_TOOLS, Tool
 from railroads.ui.iso_camera import Vec2
+from railroads.ui.land_offers import row_step
 from railroads.ui.minimap import MinimapLayout
 
 if TYPE_CHECKING:
@@ -80,17 +81,26 @@ class MapInput:
             if steps:
                 self._wheel -= steps
                 camera.zoom(steps, (io.mouse_pos.x, io.mouse_pos.y), center)
-        camera.keep_within(*grid.size())
+        lots = view.game.lots
+        margin = (0.0, 0.0) if lots is None else (lots.cols, lots.rows * row_step(grid))
+        camera.keep_within(*grid.size(), margin)
         view.hovered = None
+        on_map = None
         if hovered:
             x, y = view.ground_under(io.mouse_pos.x, io.mouse_pos.y, center)
             row, col = grid.cell_at(x, y)
             cell = int(row), int(col)
-            if grid.contains(*cell):
+            if grid.contains(*cell) and not view.tile_map.is_locked(cell):
                 view.hovered = cell
+            elif not grid.contains(*cell) or view.tile_map.is_locked(cell):
+                on_map = camera.to_plane(io.mouse_pos.x, io.mouse_pos.y, center)
+        view.land.hover(lots, grid, on_map)
         clicked = imgui.is_item_deactivated() and self._dragged < CLICK_SLOP
-        if clicked and self._pressed_on is None and view.hovered is not None:
-            view.tools.click(view.hovered)
+        if clicked and self._pressed_on is None:
+            if view.hovered is not None:
+                view.tools.click(view.hovered)
+            else:
+                view.land.click(lots)
         if imgui.is_item_clicked(imgui.MouseButton_.right.value):
             self._right_click()
         if key_pressed(imgui.Key.escape):

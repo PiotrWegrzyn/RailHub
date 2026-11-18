@@ -114,6 +114,14 @@ def quarter_of_top_ups(rng: np.random.Generator) -> frozenset:
     return frozenset(kinds[index] for index in picked.tolist())
 
 
+def novelty_chance(years: int) -> float:
+    """The chance a novelty not built yet comes up in land bought: NOVELTY_SHARE of the chance
+    it had to come up over `years` played in its era."""
+    if years <= 0:
+        return 0.0
+    return NOVELTY_SHARE * (1 - (1 - YEARLY_CHANCE) ** years)
+
+
 def _grow_novelties(game: Game, grown: Growth, rng: np.random.Generator) -> None:
     """Puts up in the land bought, each at NOVELTY_SHARE of the chance it had over the years
     played, the game's novelties not built yet."""
@@ -125,7 +133,7 @@ def _grow_novelties(game: Game, grown: Growth, rng: np.random.Generator) -> None
         if novelty.kind in novelties.built:
             continue
         years = min(now, novelty.until_year) - max(first, novelty.from_year)
-        if years <= 0 or rng.random() >= NOVELTY_SHARE * (1 - (1 - YEARLY_CHANCE) ** years):
+        if rng.random() >= novelty_chance(years):
             continue
         cell = novelty.place(grown, novelty.kind, rng)
         if cell is not None:
