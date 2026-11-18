@@ -29,7 +29,7 @@ from railroads.ui.save_files import (
     save_files,
 )
 from railroads.ui.saves_window import draw_save_list
-from railroads.ui.theme import BRASS, GONE, tip
+from railroads.ui.theme import BRASS, GONE, TEXT_DIM, color_u32, tip
 from railroads.version import VERSION
 
 MENU_WIDTH = 460.0
@@ -116,6 +116,8 @@ class MainMenu:
     scene: MenuScene = field(default_factory=MenuScene)
     # How tall the menu was last drawn, to centre it.
     _height: float = 0.0
+    # The folding headings on the new game page that are open.
+    _unfolded: set[str] = field(default_factory=set)
 
     def settings(self) -> Settings:
         return Settings(
@@ -183,6 +185,26 @@ class MainMenu:
     def _button(self, label: str) -> bool:
         return imgui.button(label, (MENU_WIDTH, BUTTON_HEIGHT))
 
+    def _fold(self, label: str) -> bool:
+        """A heading the width of the menu, in spaced capitals with a caret and a fading rule,
+        that opens or folds away what follows it; returns whether it is open."""
+        opened = label in self._unfolded
+        height = imgui.get_frame_height()
+        if imgui.invisible_button(f"##fold{label}", (MENU_WIDTH, height)):
+            self._unfolded ^= {label}
+            opened = not opened
+        low = imgui.get_item_rect_min()
+        draw_list = imgui.get_window_draw_list()
+        caret = fa.ICON_FA_CARET_DOWN if opened else fa.ICON_FA_CARET_RIGHT
+        top = low.y + (height - imgui.get_font_size()) / 2
+        colour = BRASS if opened or imgui.is_item_hovered() else TEXT_DIM
+        draw_list.add_text((low.x, top), color_u32(colour), caret)
+        name = label.upper()
+        spaced_text(draw_list, (low.x + 16, top), name, colour, 0.9)
+        end = low.x + 16 + spaced(name, 0.9) + 10
+        rule(draw_list, end, low.x + MENU_WIDTH, low.y + height / 2, fade_left=False)
+        return opened
+
     def _draw_main(self) -> MenuChoice | None:
         if self._button(f"{fa.ICON_FA_PLAY}  New game"):
             self.go_to("new")
@@ -231,12 +253,17 @@ class MainMenu:
         imgui.pop_text_wrap_pos()
         imgui.spacing()
         self.start_year = allowed_start_year(self.start_year)
-        if imgui.collapsing_header("Advanced options"):
+        if self._fold("Advanced options"):
             self._draw_advanced()
-        if imgui.collapsing_header("Cheats"):
+        if self._fold("Cheats"):
             self._draw_cheats()
         imgui.spacing()
-        imgui.separator()
+        at = imgui.get_cursor_screen_pos()
+        middle = at.y + 2
+        draw_list = imgui.get_window_draw_list()
+        rule(draw_list, at.x, at.x + MENU_WIDTH / 2, middle, fade_left=True)
+        rule(draw_list, at.x + MENU_WIDTH / 2, at.x + MENU_WIDTH, middle, fade_left=False)
+        imgui.dummy((MENU_WIDTH, 6))
         if self._button(f"{fa.ICON_FA_PLAY}  Start"):
             self.error = ""
             return NewGameChoice(self.settings())
