@@ -695,8 +695,7 @@ and mail pay as they get off. Every point of the buildings of a tree the player 
 shares, adds 1% to the experience that tree gets. Goods handed out by buildings on their own
 give no experience. The first level needs only $5,000, the second $80,000 more and each next one
 1.6 times the step before; each level gives a point to spend on a node whose requirements are
-taken. Nodes raise the production and weight towards growth of the buildings of their tree the
-player owns, what that tree's cargo earns,
+taken. Nodes raise the production of the buildings of their tree the player owns, what that tree's cargo earns,
 station storage and waiting rooms, speed, cars per train, car sizes and coach capacity, what each
 bonus good adds to satisfaction, cut upkeep, retail fuel and the price of shares, and open
 engines and general cars. Each business tree has four production nodes of +25%, so a bought

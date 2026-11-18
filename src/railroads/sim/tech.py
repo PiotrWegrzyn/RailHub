@@ -104,7 +104,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("silos", "Grain silos", E.STORAGE, 200),
             _n("stalls", "Market stalls", E.PRICE, 0.05, "seed"),
             _n("rotation", "Crop rotation", E.PRODUCTION, 0.25, "seed"),
-            _n("villages", "Thriving villages", E.GROWTH, 0.5, "rotation"),
+            _n("villages", "Thriving villages", E.TO_COME, 0.0, "rotation"),
             _n("cold", "Cold stores", E.STORAGE, 300, "silos"),
             _n("hoppers", "Grain hoppers", E.CAR_SIZE, 1, "silos"),
             _n("coop", "Farmers' cooperative", E.TO_COME, 0.0, "stalls"),
@@ -189,7 +189,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("guilds", "Craft guilds", E.PRICE, 0.05),
             _n("patterns", "Pattern books", E.PRICE, 0.1, "guilds"),
             _n("spinning", "Spinning mules", E.PRODUCTION, 0.25, "looms"),
-            _n("workshops", "Model workshops", E.GROWTH, 0.5, "spinning"),
+            _n("workshops", "Model workshops", E.TO_COME, 0.0, "spinning"),
             _n("fashion", "Fashion houses", E.PRICE, 0.15, "patterns"),
             _n(
                 "parcel_vans",
