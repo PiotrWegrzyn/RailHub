@@ -36,6 +36,7 @@ train does calling at a station in railroads.sim.calls; Railway owns them all an
 
 import itertools
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -124,6 +125,24 @@ PLATFORM_LEVEL = 4
 LEAST_UPKEEP = 0.5
 
 
+@dataclass(frozen=True, slots=True)
+class Ride:
+    """What a train's ride to its next stop earns and costs: its cargo's worth there now, the fuel
+    for the way, and what its loaded and its empty cars cost to take along."""
+
+    cells: float
+    cargo: float
+    fuel: float
+    loaded_cars: float
+    empty_cars: float
+    loaded: int
+    empty: int
+
+    @property
+    def net(self) -> float:
+        return self.cargo - self.fuel - self.loaded_cars - self.empty_cars
+
+
 class Railway:
     """The trains on one map, and the goods held at its stations."""
 
@@ -167,9 +186,26 @@ class Railway:
         # (railroads.sim.track_network, railroads.sim.calls).
         self.network = TrackNetwork(constructions)
         self.calls = StationCalls(self)
+        # Each station's town (railroads.sim.towns) and the year it was worked out in.
+        self._towns: dict[Cell, tuple[int, int]] = {}
 
     def stations(self) -> list[Cell]:
         return self.constructions.stations()
+
+    def town_of(self, station: Cell) -> int:
+        """The town a station belongs to, 0 for none: worked out the first time it is asked
+        for after the station is built, and again each year."""
+        kept = self._towns.get(station)
+        if kept is None or kept[1] != self.year:
+            town = 0 if self.station_trade is None else self.station_trade.town_of(station)
+            kept = self._towns[station] = (town, self.year)
+        return kept[0]
+
+    def same_town(self, station: Cell, other: Cell) -> bool:
+        """Whether two stations belong to the same town, so passengers and mail don't travel
+        between them."""
+        town = self.town_of(station)
+        return town != 0 and town == self.town_of(other)
 
     @property
     def maglev_open(self) -> bool:
@@ -392,6 +428,44 @@ class Railway:
             for amount, car in zip(earned, train.cars, strict=True)
         ]
 
+    def ride(self, train: Train, worth: list[float] | None = None) -> Ride | None:
+        """What the train's ride to its next stop earns and costs: the one it is on, or the one it
+        sets off on next. Fuel is priced at retail, the dearest it comes; `worth` is its cars'
+        cargo_worth if already known."""
+        destination = self.destination(train)
+        if destination is None:
+            return None
+        engine = ENGINES[train.engine]
+        if train.path:
+            cells = self.network.length(train)
+        else:
+            here = train.stops[(train.heading - 1) % len(train.stops)].cell
+            if train.platform in self.constructions.platforms(here):
+                here = train.platform
+            leg = self.network.route_length(here, destination, engine.electric, engine.maglev)
+            if leg is None:
+                return None
+            cells = leg
+        upkeep = self._upkeep()
+        loaded = [car for car in train.cars if not car.dining and car.load >= 0.5]
+        empty = [car for car in train.cars if car.dining or car.load < 0.5]
+        return Ride(
+            cells=cells,
+            cargo=sum(self.cargo_worth(train) if worth is None else worth),
+            fuel=self.fuel_cost(train.engine, cells),
+            loaded_cars=sum(car_trip_price(car.capacity) for car in loaded) * upkeep,
+            empty_cars=sum(car_trip_price(0.0 if car.dining else car.capacity) for car in empty)
+            * upkeep,
+            loaded=len(loaded),
+            empty=len(empty),
+        )
+
+    def network_upkeep(self) -> tuple[float, float]:
+        """What all the player's stations and all their track cost a month now."""
+        upkeep = self._upkeep()
+        stations = sum(self.station_upkeep(station) for station in self.stations())
+        return stations * upkeep, track_upkeep(self.constructions.track()) * upkeep
+
     @staticmethod
     def fare_factor(train: Train) -> float:
         """How much more passengers on this train pay: MAGLEV_FARE on a maglev, EXPRESS_FARE on
@@ -405,9 +479,12 @@ class Railway:
             self.station_trade.hand_out_now(station, good)
 
     def pay_for(self, station: Cell, need: Need, good: Good, amount: float) -> None:
-        """Pays for cargo trains brought that the buildings around a station took."""
+        """Pays for cargo trains brought that the buildings around a station took, which is also
+        experience in the good's tree."""
         earned = self.station_demand(station).pay(need, good, amount) * self.price_factor(good)
-        self.finances.earn(earned * self.facility_pay(station, good), "cargo")
+        earned *= self.facility_pay(station, good)
+        self.finances.earn(earned, "cargo")
+        self.research.earn(GOOD_TREES[good], earned)
 
     def facility_pay(self, station: Cell, good: Good) -> float:
         """How many times as much a good delivered at a station pays with its facilities."""
@@ -540,7 +617,7 @@ class Railway:
                 train.waiting = 0.0
             if train.waiting > 0:
                 self.calls.load(train, leaving)
-                if train.full:
+                if self.calls.loaded(train, leaving):
                     train.waiting = 0.0
                 else:
                     train.waiting -= months

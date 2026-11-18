@@ -19,7 +19,7 @@ import numpy.typing as npt
 
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Trade
-from railroads.sim.goods import FITS, makes_of, price_of
+from railroads.sim.goods import FITS, Need, makes_of, price_of
 from railroads.sim.grids import Cell
 from railroads.sim.ladders import IntGrid
 from railroads.sim.tech import SHOPS, Effect, Tree, tree_of
@@ -27,8 +27,8 @@ from railroads.sim.tech import SHOPS, Effect, Tree, tree_of
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth
 
-# The player's share of what a building they own sells, and what it costs to buy: this many
-# years of that share at full output.
+# The player's share of what a building they own sells, handed out around it or taken by a
+# station, and what it costs to buy: this many years of that share at full output.
 OWNER_SHARE = 0.5
 PAYBACK_YEARS = 5
 # However much tech cuts the price of buildings, they cost at least this share of it.
@@ -137,8 +137,8 @@ class Owners:
 
     def pay(self, trade: Trade) -> None:
         """Pays the player their share of what the buildings they own sold this month, which
-        is also experience in their trees, and counts what shops around the player's stations
-        took as commerce experience."""
+        is also experience in their trees, and counts what shops took out of the player's
+        stations as commerce experience."""
         self.income = {}
         railway = self._growth.railway
         if railway is None:
@@ -168,4 +168,20 @@ class Owners:
             railway.finances.earn(total, "owned buildings")
         for (kind, need), (got, _) in trade.goods_got.items():
             if kind in SHOPS:
-                research.earn(Tree.COMMERCE, float(got.sum()) * price_of(FITS[need][0]))
+                brought = float((got * from_stations(trade, need)).sum())
+                research.earn(Tree.COMMERCE, brought * price_of(FITS[need][0]))
+
+
+def from_stations(trade: Trade, need: Need) -> npt.NDArray[np.float64]:
+    """The share of what each traded cell's buildings got of a need that came out of the
+    player's stations rather than from sellers nearby."""
+    total = sum(
+        (got for (_, wanted), (got, _) in trade.goods_got.items() if wanted == need),
+        start=np.zeros(trade.cells.size),
+    )
+    local = trade.local.get(need)
+    if local is None:
+        return np.ones(trade.cells.size)
+    return np.where(
+        total > 0, np.clip(1.0 - local / np.where(total > 0, total, 1.0), 0.0, 1.0), 0.0
+    )

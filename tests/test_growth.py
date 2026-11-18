@@ -635,7 +635,9 @@ def test_served_buildings_add_their_points_by_the_share_they_are_served_to_their
 
     chances = growth.chances(TOWNS)
     base = TOWNS.base_chance
-    raised = (base + BREEDING_TIMES * base * multiplier * 4) * np.log2(1 + 6 * 4)
+    raised = (base + TOWNS.chance_per_doubling[Points.POPULATION] * multiplier * 4) * np.log2(
+        1 + 6 * 4
+    )
     assert chances[5, 5] == pytest.approx(base + raised)
     assert chances[neighbour] == pytest.approx(neighbour_before)
 
@@ -666,7 +668,7 @@ def test_a_served_house_breeds_faster_the_more_people_live_around_it(around: int
     growth._count_served(houses_trade(tile_map, (5, 5), 2.0, 2.0))
 
     base = TOWNS.base_chance
-    raised = (base + BREEDING_TIMES * base) * np.log2(1 + 6 * (1 + around))
+    raised = (base + TOWNS.chance_per_doubling[Points.POPULATION]) * np.log2(1 + 6 * (1 + around))
     assert growth.chances(TOWNS)[5, 5] == pytest.approx(base + raised)
 
 
@@ -777,3 +779,12 @@ def test_bakeries_give_food_points_but_come_up_and_breed_like_works() -> None:
     assert bread.spawn == pytest.approx(BAKERIES.base_chance * SPAWN_SCALE)
     assert bread.per_doubling == pytest.approx(BREEDING_TIMES * bread.spawn)
     assert sausage.per_doubling == pytest.approx(BREEDING_TIMES * sausage.spawn)
+
+
+def test_homes_are_pulled_to_towns_by_their_own_chance_per_doubling_not_their_base_chance() -> None:
+    towns = breeding_of(TOWNS, POINTS)
+
+    pull = towns.per_doubling
+
+    assert pull == pytest.approx(TOWNS.chance_per_doubling[Points.POPULATION])
+    assert pull != pytest.approx(BREEDING_TIMES * TOWNS.base_chance)

@@ -24,8 +24,9 @@ WINDOW_SIZE = (860.0, 600.0)
 ENGINES_NOTE = (
     "An engine is sold from its year once its tech is taken, until a newer one of its line comes."
     " Tech is taken in the tech window (R): every level a tree reaches gives a point for one node"
-    " whose requirements are taken. A tree levels up from what the railway's own buildings of its"
-    " kind earn; passengers and mail from the fares. Engines are drawn after real ones, linked to"
+    " whose requirements are taken. A tree levels up from what cargo of its goods earns at your"
+    " stations and what your own buildings of its kind earn; passengers and mail from the fares."
+    " Engines are drawn after real ones, linked to"
     " their Wikipedia pages."
 )
 

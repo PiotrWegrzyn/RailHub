@@ -30,8 +30,10 @@ from railroads.ui.theme import (
     good_icon,
     goods_inline,
     next_good_slot,
+    rgba_u32,
     rows_that_fit,
     tip,
+    town_tint,
 )
 
 WINDOW_WIDTH = 460.0
@@ -137,19 +139,21 @@ class StationWindow:
         imgui.text_disabled("Trains calling")
         imgui.same_line(LABEL_WIDTH)
         imgui.text(", ".join(calling) if calling else "none")
+        _draw_town(railway, station)
         imgui.separator()
         price = railway.upgrade_price(station)
         if price is None:
             imgui.text_disabled("At the top level")
         else:
-            label = f"{fa.ICON_FA_ARROW_UP}  Level {level + 1}: hands out within {delivery + 1}, gathers within {collection + 1}  {dollars(price)}"
-            if _priced_button(label, railway.finances.can_afford(price)) and railway.upgrade(
-                station
-            ):
+            label = f"{fa.ICON_FA_ARROW_UP}  Level {level + 1}  {dollars(price)}"
+            detail = f"Hands out within {delivery + 1} cells, gathers within {collection + 1}"
+            affordable = railway.finances.can_afford(price)
+            if _priced_button(label, affordable, detail) and railway.upgrade(station):
                 upgraded(station)
         storage_price = railway.storage_price(station)
-        storage = f"{fa.ICON_FA_PLUS}  Storage +{STORAGE_STEP} of each good, +{WAITING_STEP} passengers and mail  {dollars(storage_price)}"
-        if _priced_button(storage, railway.finances.can_afford(storage_price)):
+        storage = f"{fa.ICON_FA_PLUS}  Storage  {dollars(storage_price)}"
+        detail = f"+{STORAGE_STEP} of each good, +{WAITING_STEP} passengers and mail"
+        if _priced_button(storage, railway.finances.can_afford(storage_price), detail):
             railway.add_storage(station)
         _draw_facilities(railway, station)
 
@@ -176,8 +180,9 @@ def _draw_facilities(railway: Railway, station: Cell) -> None:
             tip(f"Uses {amount:.0f} {good.value} a month; {effect}")
             continue
         price = FACILITY_PRICES[facility]
-        label = f"{fa.ICON_FA_PLUS}  {facility.value.capitalize()}: uses {amount:.0f} {good.value} a month, {effect}  {dollars(price)}"
-        if _priced_button(label, railway.finances.can_afford(price)):
+        label = f"{fa.ICON_FA_PLUS}  {facility.value.capitalize()}  {dollars(price)}"
+        detail = f"Uses {amount:.0f} {good.value} a month; {effect}"
+        if _priced_button(label, railway.finances.can_afford(price), detail):
             railway.build_facility(station, facility)
 
 
@@ -208,10 +213,44 @@ def _draw_kept(goods: StationGoods, made: Mapping[Good, float]) -> None:
         good_icon(good, framed=True)
 
 
-def _priced_button(label: str, affordable: bool) -> bool:
+def _priced_button(label: str, affordable: bool, detail: str = "") -> bool:
+    """A button as wide as the window naming what it buys and its price, with what it does in
+    its tooltip, so it fits however narrow the window is."""
     imgui.begin_disabled(not affordable)
     clicked = imgui.button(label, (-1, 0))
     imgui.end_disabled()
-    if not affordable and imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-        imgui.set_tooltip("Not enough money")
+    if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
+        lines = [detail] if detail else []
+        if not affordable:
+            lines.append("Not enough money")
+        if lines:
+            imgui.set_tooltip("\n".join(lines))
     return clicked
+
+
+def _draw_town(railway: Railway, station: Cell) -> None:
+    """The town the station belongs to, in its colour on the Towns lens, and the stations of the
+    player's in the same town, which passengers and mail don't travel between."""
+    imgui.text_disabled("Town")
+    imgui.same_line(LABEL_WIDTH)
+    town = railway.town_of(station)
+    if not town:
+        imgui.text("none: nobody here sends passengers")
+        return
+    low = imgui.get_cursor_screen_pos()
+    side = imgui.get_text_line_height()
+    imgui.get_window_draw_list().add_rect_filled(
+        low, (low.x + side, low.y + side), rgba_u32(town_tint(town, 1.0)), 3.0
+    )
+    imgui.dummy((side, side))
+    imgui.same_line()
+    others = [
+        railway.name_of(other)
+        for other in railway.stations()
+        if other != station and railway.town_of(other) == town
+    ]
+    imgui.text(f"shared with {', '.join(others)}" if others else "its own")
+    tip(
+        "Passengers and mail only board for a stop in another town, so two stations in one "
+        "town can't carry them to each other"
+    )

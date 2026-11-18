@@ -1,9 +1,11 @@
 """Tech trees: what the player learns by running their business, and the bonuses it brings.
 
-Each tree gains experience in dollars (Research.earn): the business trees from the share of what
-the player's own buildings sell (railroads.sim.growth), passengers and mail from what they pay
-as they get off, commerce from what the shops around the player's stations take, and any tree
-from buildings growing a rank around a station (growth rewards). Every level a tree reaches gives
+Each tree gains experience in dollars (Research.earn): from what the cargo of its goods earns as
+buildings take it out of the player's stations (railroads.sim.railway), passengers and mail
+from what they pay as they get off, the business trees also from the share of what the
+player's own buildings sell (railroads.sim.ownership), commerce also from what shops take out
+of the player's stations, and any tree from buildings growing a rank around a station (growth
+rewards). Every level a tree reaches gives
 one point to spend on one of its nodes, once the nodes it builds on are taken. A node's effect
 adds up with the others of its kind: in its own tree's buildings and goods, or everywhere.
 """
@@ -132,7 +134,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
                 E.UNLOCK,
                 0.0,
                 "bearings",
-                opens="steam engines from 1900 on",
+                opens="newer steam engines",
             ),
             _n("drawbars", "Heavy drawbars", E.PULL, 1, "couplings"),
             _n("bogie_wagons", "Bogie wagons", E.CAR_SIZE, 1, "drawbars"),

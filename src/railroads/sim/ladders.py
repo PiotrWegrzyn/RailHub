@@ -478,8 +478,8 @@ FACTORY_LAND = Land(
 TOWNS = Ladder(
     kinds=(BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS),
     land=TOWN_LAND,
-    base_chance=0.0000018,
-    chance_per_doubling={Points.POPULATION: 0.0002},
+    base_chance=0.0000013,
+    chance_per_doubling={Points.POPULATION: 0.00021},
     merges={
         BuildingKind.HOUSE: Merge(needed=6, pulled_down=6),
         BuildingKind.TENEMENT: Merge(needed=5, pulled_down=3),
@@ -753,12 +753,13 @@ RESOURCES = (
 
 POP, IND = Points.POPULATION, Points.INDUSTRY
 
-# Soldiers: only on the few patches of military ground a map was given, where they build up fast.
+# Soldiers: only on the few patches of military ground a map was given, each of which starts play
+# with one base and two outposts (railroads.mapgen.seeding.muster_garrisons) and grows slowly.
 MILITARY = Ladder(
     kinds=(BuildingKind.OUTPOST, BuildingKind.BASE, BuildingKind.HEADQUARTERS),
     land=Land(deposit=Deposit.GARRISON),
-    base_chance=0.00045,
-    chance_per_doubling={Points.MILITARY: 0.00006},
+    base_chance=0.00015,
+    chance_per_doubling={Points.MILITARY: 0.00002},
     merges={
         BuildingKind.OUTPOST: Merge(needed=3, pulled_down=3),
         BuildingKind.BASE: Merge(needed=3, pulled_down=3),

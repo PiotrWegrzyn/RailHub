@@ -8,14 +8,12 @@ Windows or Linux from the [latest release](https://github.com/PiotrWegrzyn/RailH
 On a Mac (Apple Silicon, macOS 14 or newer):
 1. Download `RailHub-macOS.zip` and open it (Safari unpacks it for you), then drag RailHub to
    Applications.
-2. Double-click RailHub. The first time, macOS says it can't check the app, because it isn't
-   from the App Store. Click Done.
-3. Open System Settings, then Privacy & Security, scroll down and click Open Anyway next to
-   RailHub. Confirm with your password.
-4. From then on RailHub opens like any other app.
-
-To skip steps 2 and 3, run `xattr -dr com.apple.quarantine /Applications/RailHub.app` in
-Terminal once.
+2. RailHub isn't from the App Store, so macOS blocks it at first. Open Terminal (in
+   Applications, Utilities), paste this line and press Return:
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/RailHub.app
+   ```
+3. Double-click RailHub. From then on it opens like any other app.
 
 Run the game from the source:
 
@@ -257,8 +255,8 @@ trains: up close each engine and car is drawn from its 3D model as fine as the s
     the autosave starts on the frame after the turn, or once the last one is written if it still is.
 - `railroads.ui.map_view`: the map view, which owns the layers and the order they draw in. Beside it:
   `map_input` (mouse and keys), `map_tools` (what clicks do with each build tool), `map_overlays`
-  (outlines, grid lines, station names, compass, search marks, the status strip and hover card)
-  and `top_bar`.
+  (outlines, grid lines, station names, compass, search marks, the status strip, hover card and
+  the Shift satisfaction tint) and `top_bar`.
 - `railroads.ui.minimap`: the world with the map marked on it, from a quarter-degree picture of
   the world's land baked into `src/railroads/maps/world-land.npz`, next to the whole map.
 
@@ -532,7 +530,10 @@ goods apart, with each building's satisfaction as a percentage.
 Satisfaction goes wherever it counts with no ceiling: a building at 145% counts its points as
 served 14.5 times over towards growth, against 10 at 100%. A building is unsatisfied at 0%,
 thriving from 100% and content between; the ground under content and thriving buildings has a
-warm glow, and the status bar names the hovered cell's satisfaction. The Fine living node of the
+warm glow, and the status bar names the hovered cell's satisfaction. Holding Shift over the map,
+or turning on the Satisfaction lens above the minimap, tints the land under every building that trades by how satisfied the least satisfied building in
+its cell is: green from 100%, yellow from 50%, orange below that and red at 0%; buildings that
+neither need nor make anything get no tint. The Fine living node of the
 commerce tree makes each bonus good worth 40% instead of 30%, a placeholder until bonus goods get
 tech of their own.
 
@@ -591,8 +592,9 @@ that good exists.
 ### The military
 
 Every map gets 1 to 3 hidden patches of military ground, 10 to 18 cells each and far apart
-(`Deposit.GARRISON`), and outposts open from 1800 only there, faster the more military points are
-around, though slowly enough that a map has only 2 or 3 headquarters by 2050. Three outposts in
+(`Deposit.GARRISON`), and outposts open from 1800 only there. A game that begins after 1800 starts
+with one base and two outposts on each patch (`muster_garrisons` in `src/railroads/mapgen/seeding.py`);
+more outposts come slowly in play, a little faster the more military points are around. Three outposts in
 a neighbourhood become a base and three bases a headquarters. They are
 judged on what they get like any other building, so a garrison that is kept supplied grows far
 faster than one left alone, though one left without supplies never dies out. Each military point sends and wants 20 passengers and 4 pieces of mail
@@ -643,16 +645,19 @@ forest is gone, anything cleared for track) goes up again as theirs in the neare
 land allows, and one that merges into a bigger building (three factories into a big factory)
 makes the bigger one theirs.
 
-The tech window (R, or the flask in the top bar) has seven trees, 8 to 13 nodes each
-(`railroads.sim.tech`). Every tree gains experience in dollars: food and drink, metals and
-machines, fuel and minerals, craft and textiles and modern industry from what the player's own
-buildings of that kind earn them; commerce from what the shops around their stations take;
-passengers and mail from what passengers and mail pay as they get off. The first level needs
+The tech window (R, or the flask in the top bar) has seven trees, 10 to 15 nodes each
+(`railroads.sim.tech`). Every tree gains experience in dollars, from what the player adds:
+food and drink, metals and machines, fuel and minerals, craft and textiles, modern industry and
+commerce from what cargo of their goods earns as buildings take it out of the player's stations,
+and from what the player's own buildings of that kind earn them; commerce also from what shops
+take out of the player's stations; passengers and mail from what passengers and mail pay as they
+get off. Goods handed out by buildings on their own give no experience. The first level needs
 $50,000 and each next one 1.6 times as much as the one before; each level gives a point to spend
-on a node whose requirements are taken. Nodes raise the production and the owner's share of the
-player's buildings of their tree, what that tree's cargo earns, station storage and waiting rooms,
-speed, cars per train and coach capacity, cut upkeep and the price of buildings, make the
-player's buildings count more towards growth around them, and open engines.
+on a node whose requirements are taken. Nodes raise the production, owner's share and weight
+towards growth of the buildings of their tree the player owns, what that tree's cargo earns,
+station storage and waiting rooms, speed, cars per train, car sizes and coach capacity, what each
+bonus good adds to satisfaction, cut upkeep, retail fuel and the price of buildings, and open
+engines and general cars. Hovering a node says in a sentence what it does.
 
 A building in reach of a station rising a rank (two stars for a tenement or big factory, three
 for flats or a mega factory, four for a skyscraper) gives experience as if a train full of its
@@ -774,10 +779,13 @@ engine with the engine table above, its Wikipedia links clickable.
 
 ### Reports
 
-The chart button in the top right corner (or G) opens the reports. The first chart shows the cars
+The chart button in the top right corner (or G) opens the reports. At the top, Monthly, Quarterly
+and Yearly pick how the money is shown: a table of what it went in and out on in the last period and
+the one under way, and a chart of every period's profit, brass above nothing and red below. The next
+chart shows the cars
 delivered each year as stacked bars, one colour per good. A car counts as delivered when it leaves
 its load at a station other than the one it was loaded at. The other charts show the stations you
-had at the end of each year and the population of the whole map. The population chart goes back to
+had at the end of each year since play began and the population of the whole map. The population chart goes back to
 the year history starts, 850. The year under way shows as it stands so far. The charts can be
 zoomed and dragged, and double-clicking one fits it again (railroads.sim.stats,
 railroads.ui.reports_window).
@@ -812,7 +820,7 @@ $150 in upkeep at the first level, $400, $1,200, $3,500 and $9,000 at the next, 
 year, compounded, from the year play began, and each cell of track $2,
 $40 more where it is electric, $60 more where it is maglev, and 1.8 times as much where it is double, charged once a cell for
 the dearest track in it (`track_upkeep`). Building needs the cash for it, but upkeep is charged
-anyway and can run into debt. The top bar shows the cash, with this month's and last month's books on hover, the Reports window last year's and this year's books by what the money went on, and the
+anyway and can run into debt. The top bar shows the cash, with this month's and last month's books on hover, the Reports window the last and this month's, quarter's or year's books by what the money went on, and the
 build bar shows what the track under the mouse would cost. Route planning still weighs hills,
 bridges and tunnels lightly, so it stays quick; click a point in between to steer track round a
 river.
@@ -847,6 +855,16 @@ for a month: those no train took are gone when the next month's come. They ride
 in passenger coaches and mail vans of 50 each and earn money where they get off just like cargo,
 by the demand there, which only trains use up; they then go on their way rather than waiting to
 be handed out.
+
+Every cell whose buildings send passengers belongs to a town (railroads.sim.towns). A cell takes
+its town when its first such building goes up: the town sending the most passengers within 2 cells,
+or a new one, so towns spread as they grow and a lone farm or house starts its own. It keeps that
+town while it stands. A station belongs to the town sending the most passengers from its inner
+ring, worked out when it is built and again every year, and its window shows the town's colour and
+any other station of yours in it. Passengers and mail never board for a stop in the station's own
+town, so two stations in one town can't carry them to each other for pay; a train waiting for a
+full load doesn't wait for them. The Towns lens above the minimap tints every town's land its own
+colour.
 
 The build bar along the bottom of the map chooses what a left click builds (keys 1 and 2): a station (what stands in the cell moves to a
 cell next to it, or comes down when it cannot move; built on a line, it takes the line's way and
@@ -884,7 +902,9 @@ mouse is over one, the cells it hands goods out to (2 steps away) are shaded ora
 other stations pink, cells two stations share grey and the stations themselves blue, with a blue
 line round the cells it gathers from (3 steps). A right click cancels whatever is being built;
 with nothing being built it opens the details of a cell: its land, points, and every building
-with what it makes and needs and what it got and gave last month. Clicking a station, left or
+with what it makes and needs and what it got and gave last month. While they are open, the map
+draws a gold border round how far the cell's goods go on their own (6 cells) and shades in green
+the cells in it with a building that needs any of them. Clicking a station, left or
 right, opens the station instead: its level and reach, its stockpile, waiting passengers and mail, demand and
 the trains that call there, with its reach shaded on the map. There it can be raised a level,
 up to level 5 (see the money above), each level handing goods out and gathering them one
@@ -930,7 +950,7 @@ electric track. Maglev track is a pale concrete beam with darker edges and a gro
 middle instead of rails and sleepers, and a station shows it where only maglev track comes in.
 
 At each stop a train unloads its cars, takes on that stop's cars and fills them from the station's
-stockpile. Unless the stop says not to, it waits there up to a month for its cars to fill, topping
+stockpile. If the stop says to wait for a full load, it waits there until its cars are full, topping
 them up as the station gathers more. Trains run through stations on the way that are not among their
 stops, and can turn round in any station, but not on open track. Each time a train sets off it takes
 the shortest way to its next stop over all the track there is. Trains can't run through each other
@@ -939,10 +959,10 @@ one of them stops where it is until the other has gone by, then sets off again f
 train that has stood longest letting others by since its last stop goes first, so none waits for
 ever, then the better engine, then the train bought first. Within stations, and on double track
 for trains going opposite ways, trains pass each other without stopping. Each month buildings first hand out what they make on their own,
-everywhere on the map, the nearest first, up to 10 cells away: nothing is lost on the way, but a
-building can take less of a maker's month the further it is, all of it from the same cell or the
-next, 90% from two cells away and so on down to 10% from ten. Then each station that track joins
-to another station hands what trains brought to buildings within its reach (1 cell at the first
+everywhere on the map, the nearest first, up to 6 cells away: nothing is lost on the way, but a
+building can take less of a maker's month the further it is, all of it in the same cell, then 13,
+8, 5, 3, 2 and 1 twenty-firsts of it from one to six cells away. Then each station that
+track joins to another station hands what trains brought to buildings within its reach (1 cell at the first
 level), unsatisfied first, then content, nearest first, and takes the spare goods no building took
 that buildings made within 3 cells into its stockpile, for trains; it never hands those out around
 it, and goods handed out on their own earn the player nothing. A station on its own, with no track

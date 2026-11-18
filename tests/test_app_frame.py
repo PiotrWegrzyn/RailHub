@@ -27,7 +27,7 @@ from railroads.ui.build_menu import Tool
 from railroads.ui.ground import GroundPictures
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
 from railroads.ui.main_menu import MENU_WIDTH, MainMenu, Page
-from railroads.ui.map_view import VISIT_ZOOM, MapView
+from railroads.ui.map_view import VISIT_ZOOM, Lens, MapView
 from railroads.ui.route_map import soften
 from railroads.ui.web_setup import PageSetup
 from railroads.ui.workers import FrameWorker
@@ -64,6 +64,7 @@ def made_app() -> App:
     game.finances.cash = 1_000_000.0
     for _ in range(4):
         game.growth.build(Building((10, 10), BuildingKind.HOUSE))
+    game.growth.build(Building((10, 11), BuildingKind.FARM))
     for cell in ((10, 6), (10, 16)):
         game.build_station(cell)
     game.lay_track((10, 6), (10, 16))
@@ -73,7 +74,7 @@ def made_app() -> App:
     app = App(MapView(game))
     app.help.open = app.tech.open = app.reports.open = True
     app.view.build.trains.open = True
-    app.view.selected = (10, 10)
+    app.view.selected = (10, 11)
     app.view.station_window.station = (10, 6)
     app.view.build.choose(Tool.TRACK)
     app.view.build.track_from = (10, 6)
@@ -101,6 +102,18 @@ def test_every_window_draws_at_every_zoom(context: None, zoom: int) -> None:
         frame(app)
 
     assert app.view.camera.zoom_level == zoom
+
+
+@pytest.mark.parametrize("lens", list(Lens))
+def test_the_map_draws_with_each_lens_on(context: None, lens: Lens) -> None:
+    app = made_app()
+    app.view.lens = lens
+    app.view.look_at((10, 10))
+
+    for _ in range(3):
+        frame(app)
+
+    assert app.view.lens == lens
 
 
 @pytest.fixture

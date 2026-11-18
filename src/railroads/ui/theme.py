@@ -1,6 +1,7 @@
 """The look of every window: warm dark panels with brass highlights, and the small widgets the
 windows share (toggle buttons, car chips, good swatches)."""
 
+import colorsys
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -224,6 +225,19 @@ def apply_theme() -> None:
 
 def color_u32(rgba: Rgba) -> int:
     return imgui.get_color_u32(imgui.ImVec4(*rgba))
+
+
+# How strongly the town lens tints each town's land, and the step between towns' hues.
+TOWN_TINT_ALPHA = 0.5
+GOLDEN_ANGLE = 0.381966
+
+
+def town_tint(town: int, alpha: float = TOWN_TINT_ALPHA) -> Rgba:
+    """A town's own colour: hues a golden angle apart, so neighbouring towns, numbered one after
+    another as they come up, look unlike."""
+    hue = (town * GOLDEN_ANGLE) % 1.0
+    red, green, blue = colorsys.hsv_to_rgb(hue, 0.75, 0.95)
+    return (red, green, blue, alpha)
 
 
 def rgba_u32(rgba: Rgba) -> int:

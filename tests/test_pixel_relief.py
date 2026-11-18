@@ -7,7 +7,7 @@ from railroads.sim.grids import Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.projection import PixelProjection
-from railroads.ui.pixel.relief import Blend, Elevation, raise_picture, raycast, sample
+from railroads.ui.pixel.relief import Blend, Elevation, crossings, raise_picture, raycast, sample
 
 LOOKS = {HexGrid: (0.0, 1.0), SquareGrid: (-45.0, float(np.sqrt(2)))}
 
@@ -180,3 +180,26 @@ def test_the_lift_of_a_single_point_is_its_lift_among_many() -> None:
 
     singly = [elevation.lift_at(float(a), float(b)) for a, b in zip(x, y, strict=True)]
     assert singly == lifts.tolist()
+
+
+def test_a_steep_slope_facing_the_viewer_blends_from_row_to_row_instead_of_banding() -> None:
+    lift = np.zeros((40, 1), dtype=np.float32)
+    lift[10:20, 0] = np.linspace(9.0, 0.0, 10)
+    picture = np.arange(40, dtype=np.float64).reshape(40, 1)
+    offset = raycast(lift, 20, 1)
+
+    raised = raise_picture(picture, offset, 1, crossings(lift, offset))
+
+    shown = raised[:10, 0]
+    assert np.all(np.diff(shown) >= 0)
+    assert len(np.unique(shown)) == len(shown)
+
+
+def test_flat_ground_stays_as_it_was_when_blended() -> None:
+    lift = np.zeros((12, 3), dtype=np.float32)
+    picture = np.random.default_rng(5).random((12, 3, 4))
+    offset = raycast(lift, 10, 3)
+
+    raised = raise_picture(picture, offset, 1, crossings(lift, offset))
+
+    assert np.array_equal(raised, picture[:10])

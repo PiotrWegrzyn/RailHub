@@ -204,6 +204,7 @@ class App:
                 growth.year,
                 len(railway.stations()),
                 growth.population(),
+                railway.first_year,
                 railway.finances,
                 railway.fuel,
             )

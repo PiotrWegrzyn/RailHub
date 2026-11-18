@@ -3,11 +3,12 @@ railroads.sim.ladders: towns, farms, orchards, mines, lumber mills, ports and ev
 
 Buildings breed (breeding_of): a cell's chance of another of a ladder's kinds is
 
-    base + (base + BREEDING_TIMES x base x served) x log2(1 + drawing)
+    base + (base + pull x served) x log2(1 + drawing)
 
-where base is the ladder's base chance, served the points the buildings of its own kind of points
-give in the cell times their satisfaction (railroads.sim.economy), and drawing the points around
-the cell that draw it, each times its weight: six times the people and twice the industry for
+where base is the ladder's base chance, pull BREEDING_TIMES x base, or for homes the town
+ladder's own chance per doubling of people, so few homes come up alone while towns still grow;
+served the points the buildings of its own kind of points give in the cell times their
+satisfaction (railroads.sim.economy), and drawing the points around the cell that draw it, each times its weight: six times the people and twice the industry for
 houses, food and people
 for food, people and industry for industry, mines, mills and ports, and twice the people for
 shops, inns and churches. So the base chance holds anywhere the land allows, good surroundings
@@ -25,7 +26,7 @@ Every TRADE_EVERY_MONTHS the stations hand out their goods and buildings sell to
 kind of building in each cell unsatisfied, content or thriving, and pays the player for the
 buildings they own (railroads.sim.ownership). What a cell's buildings of a kind get is shared
 equally among them: of ten houses with food for two, each gets a fifth of what it wants, and they
-starve only when nothing arrives. Buildings that starve on end are pulled down, the player's too: homes after HOMES_DIE_AFTER_MONTHS,
+starve only when nothing arrives, or, for homes, no food (railroads.sim.economy). Buildings that starve on end are pulled down, the player's too: homes after HOMES_DIE_AFTER_MONTHS,
 processors and the rest after DIE_AFTER_MONTHS. Producers of what the land gives and soldiers
 never starve to death (UNDYING); fields go only when a town grows over them (crowded_at).
 
@@ -82,6 +83,7 @@ from railroads.sim.ladders import (
     GROWTH,
     LADDERS,
     MILITARY,
+    PASSENGERS_PER_POINT,
     TOWNS,
     Cells,
     FloatGrid,
@@ -101,6 +103,7 @@ from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tech import Effect
 from railroads.sim.tilemap import Relief, Terrain, Vegetation
+from railroads.sim.towns import Towns
 
 if TYPE_CHECKING:
     from railroads.sim.novelties import Novelties
@@ -117,7 +120,7 @@ SPAWN_SCALE = 1.0
 FOOD_SPAWN_SCALE = 3.75
 FROM_THE_LAND = frozenset({Points.FOOD, Points.ORE, Points.TIMBER})
 # How many times its base chance each served point of a ladder's own kind in a cell adds there,
-# per doubling of what draws it.
+# per doubling of what draws it; homes take theirs from the town ladder instead.
 BREEDING_TIMES = 30.0
 # The points around a cell that draw a ladder's buildings, and how much each counts, by the kind
 # of points they give.
@@ -219,7 +222,10 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
         spawn *= WORKS_SPAWN_SCALE
     drawn_by = DRAWN_BY_KIND.get(kind) or DRAWN_BY.get(own, {own: 1.0})
     shunned_by = SHUNNED_BY.get(kind, {})
-    breeding = Breeding(spawn, own, drawn_by, BREEDING_TIMES * spawn, shunned_by)
+    # Homes are pulled to towns by their own chance per doubling, apart from their base chance,
+    # so few come up alone while towns still grow.
+    pull = per_doubling if own == Points.POPULATION else BREEDING_TIMES * spawn
+    breeding = Breeding(spawn, own, drawn_by, pull, shunned_by)
     _BREEDINGS[(id(ladder), id(points))] = (ladder, points, breeding)
     return breeding
 
@@ -367,6 +373,8 @@ class Growth:
                 self._counts[built.kind][built.cell] += 1
         # How many buildings of any kind stand in each cell.
         self._occupied = sum(self._counts.values(), start=np.zeros(grid.shape, dtype=np.int64))
+        self.towns = Towns(grid)
+        self.towns.settle(self.sending())
         # The cells last month's trade was worked out on.
         self._traded = np.zeros(0, dtype=np.intp)
         rows, cols = grid.neighbour_index_grids()
@@ -816,6 +824,16 @@ class Growth:
                 total += value * count
         return total
 
+    def sending(self) -> FloatGrid:
+        """The passengers each cell's buildings send a month."""
+        total = np.zeros(self._grid.shape, dtype=np.float64)
+        for kind, count in self._counts.items():
+            given, value = self.rule.points[kind]
+            per = PASSENGERS_PER_POINT.get(given, 0) * value
+            if per:
+                total += per * count
+        return total
+
     def population(self) -> int:
         """The population points of the whole map."""
         return sum(
@@ -1183,6 +1201,9 @@ class Growth:
         if starving is not None and kind in starving and not self._counts[kind][cell]:
             starving[kind][:, cell[0] * self._grid.cols + cell[1]] = 0
         points, value = self.rule.points[kind]
+        sends = PASSENGERS_PER_POINT.get(points, 0) * value * how_many
+        if sends:
+            self.towns.add(cell, float(sends))
         here = cell[0] * self._grid.cols + cell[1]
         around = self._near[:, here]
         flat = np.concatenate(([here], around[around < self._near.shape[1]]))

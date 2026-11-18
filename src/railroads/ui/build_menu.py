@@ -442,7 +442,7 @@ def draw_station_reach(
         for station in shown
         for own in (station, *platforms(station))
     ]
-    border = _reach_border(grid, (focus, *platforms(focus)), reach(focus)[1])
+    border = reach_border(grid, (focus, *platforms(focus)), reach(focus)[1])
     plane = [corner for corners, _ in hexes for corner in corners]
     plane += [end for edge in border for end in edge]
     xs, ys = (np.array(values, dtype=np.float64) for values in zip(*plane, strict=True))
@@ -459,7 +459,7 @@ def draw_station_reach(
 
 
 @lru_cache(maxsize=64)
-def _reach_border(
+def reach_border(
     grid: Grid, cells: tuple[Cell, ...], steps: int
 ) -> tuple[tuple[tuple[float, float], tuple[float, float]], ...]:
     """The border of the cells within `steps` of a station's cells, worked out once: an open

@@ -13,17 +13,18 @@ The ideas every rule of the game should follow.
 ## The rules that follow from them
 
 - Buildings hand out what they make to the buildings around them on their own, everywhere on the
-  map, the nearest first, up to ten cells away. Nothing is lost on the way, but the further a buyer
-  is, the less of the maker's month it can take: all of it from the same cell or the next, 90% from
-  two cells away, and so on down to 10% from ten cells away.
+  map, the nearest first, up to six cells away. Nothing is lost on the way, but the further a buyer
+  is, the less of the maker's month it can take, by the Fibonacci numbers: all of it in the same
+  cell, then 13, 8, 5, 3, 2 and 1 twenty-firsts of it from one to six cells away.
 - Only what is left after that goes to a station within reach; stations never take a good the
   buildings around could have used.
 - A station hands out what trains bring to the least satisfied buildings first, then the nearest,
   so the starving are fed before they die out.
 - The player earns only when buildings take goods out of the player's stations. Goods handed out
   on their own earn nothing, so the money comes from what the player adds to the local economy:
-  a station is an investment. Buildings the player owns are the exception: they pay the owner's
-  share of what they hand out too, more the less satisfied their buyers were over the last
+  a station is an investment. The one exception is a building the player owns: it pays the
+  player their share of everything it sells, whether handed out on its own or taken by a
+  station, and what it hands out pays more the less satisfied its buyers were over the last
   quarter, up to three times the price for buyers who got nothing.
 - The demand at a station counts only what the buildings around it were left short of after the
   goods handed out on their own.
@@ -50,6 +51,10 @@ The ideas every rule of the game should follow.
 ## Economy
 
 - Most money comes from the needs of grown homes, not from food or passengers.
+- Every place that sends passengers belongs to a town. Whenever one is built, every such place
+  within 2 hexes, the new one included, takes the colour sending the most passengers there, so
+  towns that grow into each other merge. Stations belong to the town around them, checked every year, and passengers and mail
+  only travel between stations of different towns.
 - A home that grows wants more of everything: its reward for growing is that it uses more.
 - Towns start from simple local food makers, such as bakeries, not from farms.
 - Goods fall into categories of need: food, processed food, common goods and heating. Any kind of

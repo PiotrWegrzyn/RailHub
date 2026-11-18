@@ -245,6 +245,10 @@ class StationTrade:
             needs |= as_needs(self._travellers(counts))
             railway.station_demand(station).capacity = capacity_of(needs)
 
+    def town_of(self, station: Cell) -> int:
+        """The town sending the most passengers from the cells a station hands goods out to."""
+        return self._growth.towns.most_in(self.inner_ring(station))
+
     def inner_ring(self, station: Cell) -> npt.NDArray[np.intp]:
         """The cells a station hands goods out to, as flat indices that are kept and so can't be
         written to."""
