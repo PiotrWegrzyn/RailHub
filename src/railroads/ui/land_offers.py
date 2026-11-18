@@ -6,7 +6,7 @@ place's map isn't known. It lies behind a chain with a padlock, and with its pri
 offer. A click on one asks to confirm buying it."""
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
@@ -99,18 +99,30 @@ class LandOffers:
     _texture: hello_imgui.TextureGpu | None = None
     # The lots shown, with the lots' state they were found for.
     _shown: tuple[tuple[int, int, int], list[tuple[Lot, bool]]] | None = None
+    # Each lot's corners on the game's map and on the place's picture (lot_corners,
+    # PlacePicture.uvs), kept while the lots shown are.
+    _outlines: dict[Lot, tuple[list[Vec2], list[Vec2] | None]] = field(default_factory=dict)
 
     def shown(self, lots: Lots) -> list[tuple[Lot, bool]]:
         """shown_lots, found again only once a lot is bought."""
         key = (id(lots), lots.bought, len(lots.offers))
         if self._shown is None or self._shown[0] != key:
             self._shown = (key, shown_lots(lots))
+            self._outlines = {}
         return self._shown[1]
+
+    def _outline(self, lots: Lots, lot: Lot) -> tuple[list[Vec2], list[Vec2] | None]:
+        outline = self._outlines.get(lot)
+        if outline is None:
+            uvs = None if self.place is None else self.place.uvs(lots, lot)
+            outline = self._outlines[lot] = (lot_corners(lots, lot), uvs)
+        return outline
 
     def show_place(self, place: TileMap, lots: Lots) -> None:
         """Draws the lots with the ground of the place's map from now on."""
         self.place = PlacePicture.of(place, lots)
         self._texture = None
+        self._outlines = {}
 
     def _place_texture(self) -> imgui.ImTextureRef | None:
         if self.place is None:
@@ -148,13 +160,16 @@ class LandOffers:
     ) -> None:
         price = lots.price()
         ground = self._place_texture()
+        low, high = draw_list.get_clip_rect_min(), draw_list.get_clip_rect_max()
+        seen = (low.x - LINK, low.y - LINK, high.x + LINK, high.y + LINK)
+        steel = (rgba_u32(STEEL_DARK), rgba_u32(STEEL))
         for lot, offered in self.shown(lots):
-            plane = lot_corners(lots, lot)
+            plane, place_uvs = self._outline(lots, lot)
             screen = [camera.to_screen(x, y, center) for x, y in plane]
-            if ground is None or self.place is None:
+            if ground is None or place_uvs is None:
                 picture, uvs = world, [world_uv(tile_map, point) for point in plane]
             else:
-                picture, uvs = ground, self.place.uvs(lots, lot)
+                picture, uvs = ground, place_uvs
             points = [imgui.ImVec2(*point) for point in screen]
             corners = [imgui.ImVec2(*uv) for uv in uvs]
             tint = rgba_u32(LAND_TINT)
@@ -173,7 +188,7 @@ class LandOffers:
                 )
             shade = HOVERED_SHADE if lot == self.hovered and offered else SHADE
             draw_list.add_convex_poly_filled(points, rgba_u32(shade))
-            _draw_chain(draw_list, screen)
+            _draw_chain(draw_list, screen, seen, steel)
             middle = (
                 sum(x for x, _ in screen) / len(screen),
                 sum(y for _, y in screen) / len(screen),
@@ -213,23 +228,57 @@ class LandOffers:
         imgui.end_popup()
 
 
-def _draw_chain(draw_list: imgui.ImDrawList, corners: list[Vec2]) -> None:
-    """A chain round the lot: links along each side, every other one seen edge on."""
+def _draw_chain(
+    draw_list: imgui.ImDrawList,
+    corners: list[Vec2],
+    seen: tuple[float, float, float, float],
+    colours: tuple[int, int],
+) -> None:
+    """A chain round the lot: links along each side, every other one seen edge on. Only the links
+    in the box `seen` (left, top, right, bottom) are drawn, each where it lies on its whole side,
+    in a dark and a light colour."""
+    dark, light = colours
     for start, end in zip(corners, corners[1:] + corners[:1], strict=True):
         length = math.dist(start, end)
         if length < LINK:
             continue
+        part = seen_part(start, end, seen)
+        if part is None:
+            continue
         angle = math.atan2(end[1] - start[1], end[0] - start[0])
         links = int(length / (LINK * 0.8))
-        for index in range(links):
+        first = max(0, math.ceil(part[0] * links - 0.5))
+        last = min(links - 1, math.floor(part[1] * links - 0.5))
+        for index in range(first, last + 1):
             share = (index + 0.5) / links
             at = imgui.ImVec2(
                 start[0] + (end[0] - start[0]) * share, start[1] + (end[1] - start[1]) * share
             )
             flat = index % 2 == 1
             radius = imgui.ImVec2(LINK * 0.55, LINK * (0.1 if flat else 0.3))
-            draw_list.add_ellipse(at, radius, rgba_u32(STEEL_DARK), angle, 12, 3.2)
-            draw_list.add_ellipse(at, radius, rgba_u32(STEEL), angle, 12, 1.6)
+            draw_list.add_ellipse(at, radius, dark, angle, 12, 3.2)
+            draw_list.add_ellipse(at, radius, light, angle, 12, 1.6)
+
+
+def seen_part(
+    start: Vec2, end: Vec2, box: tuple[float, float, float, float]
+) -> tuple[float, float] | None:
+    """The shares of the way from `start` to `end` between which the line lies in the box
+    (left, top, right, bottom); None if it misses it."""
+    low, high = 0.0, 1.0
+    for origin, step, near, far in (
+        (start[0], end[0] - start[0], box[0], box[2]),
+        (start[1], end[1] - start[1], box[1], box[3]),
+    ):
+        if step == 0.0:
+            if not near <= origin <= far:
+                return None
+            continue
+        a, b = (near - origin) / step, (far - origin) / step
+        low, high = max(low, min(a, b)), min(high, max(a, b))
+        if low > high:
+            return None
+    return low, high
 
 
 def _draw_padlock(draw_list: imgui.ImDrawList, middle: Vec2, size: float) -> None:

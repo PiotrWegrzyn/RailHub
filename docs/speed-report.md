@@ -355,3 +355,44 @@ What is left of the 131 ms: about 75 ms of work (the trade about half of it, the
 ground pictures most of the rest) and the drawing of 4 frames. Bringing it lower would mean making
 the trade itself cheaper, or putting the scenery up only around the cells that changed instead of
 over the whole map.
+
+## Lag again on 0.5.83 (18 November, the same scene)
+
+The complaint: the browser build lagged badly again, frames as well as months. Measured with the
+same scene as the section above (new game, Poland seed 1, 4 stations, 3 trains, zoom 3 over the
+first station, a month forced every 90 frames), before = staging 0.5.83, after = it with the fixes.
+
+What was found:
+
+- **Every frame drew the chain round each lot for sale link by link** (`ui/land_offers.py`). At
+  zoom 3 a lot's sides run thousands of points across the screen, so each frame drew about
+  10,000 links of two ellipses each, nearly all off screen, and worked every lot's corners out
+  again. This was most of a frame's work in this scene, and had been since land could be bought,
+  which is why the section above measured 13 ms frames in the browser.
+- **The start map is bigger**: the honeycomb of seven lots makes a new game's map 48,697 hexes
+  instead of 31,872, and everything a month does over the whole map (the scenery, the ground's
+  biomes and fields, the towns' growth) grew with it, about 1.5 times.
+- The new ledger of what buildings take in costs about 2.6 ms a month on desktop, half of it
+  shifting each kind's last three months along with `np.roll`.
+
+| | before (0.5.83) | after |
+|---|---|---|
+| Browser: a frame without a month (mean / 95th percentile / worst) | 22.0 / 22.6 / 32.9 ms | 1.8 / 2.0 / 12.2 ms |
+| Browser: trains frozen per month | 228 ms (5–6 frames) | 125 ms (6 frames) |
+| Browser: trains frozen, month with an autosave | 329 ms | 201 ms |
+| Desktop: a frame without a month (mean) | 11.1 ms | 0.9 ms |
+| Desktop: trains frozen per month | 113 ms | 66 ms |
+| Desktop: the ledger's month (`Ledger.record`) | 2.6 ms | 1.7 ms |
+
+What changed (no rule, number or look):
+
+- Only the chain links on screen are drawn (`land_offers.seen_part` clips each side to the
+  screen), each where it lay before on its whole side; the chain's two colours are worked out
+  once a frame; each lot's corners on the map and on the place's picture are kept until a lot is
+  bought or the place's picture changes.
+- The ledger shifts its last three months in place, and finds where cells stand in its books
+  without merging them when it has them all already.
+
+What is left: a month's work is about 110 ms in the browser on the bigger map (the trade, the
+scenery and the ground's fields put up again over the whole map each month the most of it).
+Putting the scenery and fields up only round the cells that changed would be the next step.

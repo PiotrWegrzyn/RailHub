@@ -10,6 +10,7 @@ from railroads.ui.land_offers import (
     PlacePicture,
     lot_corners,
     lot_under,
+    seen_part,
     shown_lots,
     world_uv,
 )
@@ -104,3 +105,27 @@ def test_past_the_places_map_a_lot_shows_sea() -> None:
     assert not np.array_equal(
         picture.pixels[0, 0], picture.pixels[-picture.top + 5, -picture.left + 10]
     )
+
+
+def test_a_side_crossing_the_screen_is_seen_only_where_it_is_on_it() -> None:
+    box = (0.0, 0.0, 100.0, 100.0)
+
+    part = seen_part((-100.0, 50.0), (300.0, 50.0), box)
+
+    assert part == pytest.approx((0.25, 0.5))
+
+
+def test_a_side_off_the_screen_is_not_seen() -> None:
+    box = (0.0, 0.0, 100.0, 100.0)
+
+    part = seen_part((-50.0, 150.0), (200.0, 300.0), box)
+
+    assert part is None
+
+
+def test_a_side_on_the_screen_is_seen_whole() -> None:
+    box = (0.0, 0.0, 100.0, 100.0)
+
+    part = seen_part((10.0, 10.0), (90.0, 60.0), box)
+
+    assert part == (0.0, 1.0)

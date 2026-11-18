@@ -59,6 +59,9 @@ class _Books:
 
     def place(self, cells: npt.NDArray[np.intp]) -> npt.NDArray[np.intp]:
         """Where each of these flat cells stands in the books, making room for those new to them."""
+        at = np.searchsorted(self.cells, cells)
+        if self.cells.size and (self.cells[np.minimum(at, self.cells.size - 1)] == cells).all():
+            return at
         joined = np.union1d(self.cells, cells)
         if joined.size != self.cells.size:
             at = np.searchsorted(joined, self.cells)
@@ -110,12 +113,9 @@ class Ledger:
         self._months += 1
         self._recent_months = min(QUARTER, self._recent_months + 1)
         for books in self._books.values():
-            books.recent = np.roll(books.recent, -1, axis=0)
-            books.recent[-1] = 0.0
-            for name in ("moods", "seen"):
-                rows = np.roll(getattr(books, name), -1, axis=0)
-                rows[-1] = 0.0
-                setattr(books, name, rows)
+            for months in (books.recent, books.moods, books.seen):
+                months[:-1] = months[1:]
+                months[-1] = 0.0
         takings = _takings(trade)
         for kind in takings.keys() | trade.got.keys():
             taken = takings.get(kind)
