@@ -479,7 +479,7 @@ TOWNS = Ladder(
     kinds=(BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS),
     land=TOWN_LAND,
     base_chance=0.0000013,
-    chance_per_doubling={Points.POPULATION: 0.000126},
+    chance_per_doubling={Points.POPULATION: 0.000105},
     merges={
         BuildingKind.HOUSE: Merge(needed=6, pulled_down=6),
         BuildingKind.TENEMENT: Merge(needed=5, pulled_down=3),
@@ -500,8 +500,8 @@ FARMS = Ladder(
         water={Terrain.RIVER: 4.0, Terrain.LAKE: 4.0, Terrain.SEA: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.0000000373,
-    chance_per_doubling={Points.POPULATION: 0.00000672, Points.FOOD: 0.00000028},
+    base_chance=0.00000005595,
+    chance_per_doubling={Points.POPULATION: 0.00001008, Points.FOOD: 0.00000042},
     crowded_at=FARMS_CROWDED_OUT,
 )
 
