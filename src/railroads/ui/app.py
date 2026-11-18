@@ -4,6 +4,7 @@ import sys
 import time
 from collections.abc import Callable
 from concurrent.futures import Future
+from dataclasses import replace
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui, immapp
@@ -29,7 +30,9 @@ from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
 from railroads.sim.game import Game
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
 from railroads.sim.steps import Steps, finish
+from railroads.ui.camera_flight import Flight
 from railroads.ui.help_window import HelpWindow
+from railroads.ui.history_pictures import HistoryPictures
 from railroads.ui.main_menu import (
     LoadChoice,
     MainMenu,
@@ -40,18 +43,28 @@ from railroads.ui.main_menu import (
 )
 from railroads.ui.map_view import MapView
 from railroads.ui.pixel.ground_shader import free_textures
+from railroads.ui.pixel.layer import blown_up_texture
+from railroads.ui.pixel.projection import Rgba
 from railroads.ui.reports_window import ReportsWindow
 from railroads.ui.saves_window import SavesWindow
 from railroads.ui.tech_window import TechWindow
 from railroads.ui.theme import BRASS, apply_theme
 from railroads.ui.top_bar import draw_top_bar
-from railroads.ui.waiting_screen import Label, Shatter, waiting_line
+from railroads.ui.waiting_screen import Label, Shatter
 from railroads.ui.web_setup import page_setup
 from railroads.ui.workers import FRAME_SECONDS, FrameWorker, submit_steps, worker
 
 # How long a notice such as "Autosaved" stays in the top bar.
 NOTICE_SECONDS = 4.0
 WAITING_WIDTH = 320.0
+# The panel the waiting screen's lines sit on over a picture of the map: how far it reaches past
+# them, and its colour.
+PANEL_MARGIN = 12.0
+PANEL_COLOUR = (0.11, 0.1, 0.09, 0.85)
+# A new game opens on the middle of the map at this zoom, and once the waiting screen has fallen
+# away the view flies to its biggest town at TOWN_ZOOM.
+OPENING_ZOOM = 3
+TOWN_ZOOM = 5
 # The window's size when the game opens.
 WINDOW_SIZE = (1280.0, 800.0)
 # Saves are written one at a time, away from the frames, so play doesn't stutter. Where threads
@@ -338,6 +351,15 @@ class Shell:
         self._began = 0.0
         self._labels: list[Label] = []
         self._shatter: Shatter | None = None
+        # The view flying to a new game's biggest town once the screen has broken up.
+        self._flight: Flight | None = None
+        # The newest picture of a new map's history, with its year, sent from wherever its towns
+        # grow; the texture of the one shown, kept until the screen has broken up; and the size
+        # in points and density of the window pictures are drawn for.
+        self._picture: tuple[int, Rgba] | None = None
+        self._texture: tuple[tuple[int, Rgba], hello_imgui.TextureGpu] | None = None
+        self._window = (int(WINDOW_SIZE[0]), int(WINDOW_SIZE[1]))
+        self._density = 1
         # Where the setup runs on the frames, it starts once the waiting screen has shown, and
         # each frame spends about this long on it.
         self._waiting_shown = False
@@ -352,6 +374,9 @@ class Shell:
     def advance(self, done: float) -> None:
         self._done = done
 
+    def see(self, year: int, picture: Rgba) -> None:
+        self._picture = (year, picture)
+
     def start(self, settings: Settings) -> None:
         self._begin("Setting up a new game", lambda: self._new_game(settings), settings.map)
 
@@ -363,11 +388,14 @@ class Shell:
         if setup is not None:
             # The frames only look for word from the worker and take up what it grew, a step each.
             self._frame_seconds = 0.0
-            saved = yield from setup.grow(settings, self.report, self.advance)
+            saved = yield from setup.grow(
+                settings, self.report, self.advance, self.see, self._window
+            )
             self._frame_seconds = FRAME_SECONDS
             if saved is not None:
                 return saved
-        return (yield from make_game_steps(settings, self.report, self.advance))
+        pictures = HistoryPictures(self._window, self.see)
+        return (yield from make_game_steps(settings, self.report, self.advance, pictures))
 
     def load(self, name: str) -> None:
         self._begin(f"Loading '{name}'", lambda: _at_once(lambda: self.saves.load(name)))
@@ -381,6 +409,9 @@ class Shell:
         self._new_game_on = new_game_on
         self._began = time.monotonic()
         self._shatter = None
+        self._flight = None
+        self._picture = None
+        self._texture = None
         self._progress = ""
         self._done = None
         self._frame_seconds = FRAME_SECONDS
@@ -389,6 +420,7 @@ class Shell:
             io = imgui.get_io()
             size = (io.display_size.x, io.display_size.y)
             density = max(1, round(io.display_framebuffer_scale.x))
+        self._window, self._density = (int(size[0]), int(size[1])), density
         # Where frames do the work, the chunks are left to be drawn a frame at a time instead.
         chunks = not isinstance(self._executor, FrameWorker)
 
@@ -396,10 +428,16 @@ class Shell:
             saved = yield from work()
             yield
             app = App.from_saved(saved, self.saves)
+            town = None
             if new_game_on is not None:
-                app.view.visit_biggest_town()
+                camera = app.view.camera
+                width, height = app.view.tile_map.grid.size()
+                camera.center_x, camera.center_y = width / 2, height / 2
+                camera.zoom_level = OPENING_ZOOM
+                x, y = app.view.biggest_town()
+                town = replace(camera, center_x=x, center_y=y, zoom_level=TOWN_ZOOM)
             yield
-            yield from app.view.prepare_steps(size, density, chunks)
+            yield from app.view.prepare_steps(size, density, chunks, town)
             return app
 
         self._task = submit_steps(self._executor, prepared)
@@ -423,8 +461,14 @@ class Shell:
                 self._finish(self._task)
         elif self.app is not None:
             self.app.gui()
-            if self._shatter is not None and not self._shatter.draw(imgui.get_io().delta_time):
+            seconds = imgui.get_io().delta_time
+            camera = self.app.view.camera
+            if self._shatter is not None and not self._shatter.draw(seconds):
                 self._shatter = None
+                self._texture = None
+                self._flight = Flight(camera, self.app.view.biggest_town(), TOWN_ZOOM)
+            elif self._flight is not None and not self._flight.fly(camera, seconds):
+                self._flight = None
             self._follow(self.app)
         else:
             self._choose(self.menu.draw())
@@ -445,7 +489,8 @@ class Shell:
             # The see-through background as it shows over the black behind every window.
             bg = imgui.get_style_color_vec4(imgui.Col_.window_bg.value)
             colour = imgui.get_color_u32(imgui.ImVec4(bg.x * bg.w, bg.y * bg.w, bg.z * bg.w, 1.0))
-            self._shatter = Shatter(size.x, size.y, colour, self._labels)
+            picture = None if self._texture is None else _ref(self._texture[1])
+            self._shatter = Shatter(size.x, size.y, colour, self._labels, picture=picture)
 
     def _failed(self, message: str) -> None:
         if self.app is not None:
@@ -473,19 +518,21 @@ class Shell:
 
     def _draw_waiting(self) -> None:
         width, height = imgui.get_window_size()
+        draw_list = imgui.get_window_draw_list()
+        year = self._draw_picture(draw_list, width, height)
+        draw_list.channels_split(2)
+        draw_list.channels_set_current(1)
         imgui.set_cursor_pos((width / 2 - WAITING_WIDTH / 2, height / 2 - 24))
         imgui.begin_group()
         dots = "." * (1 + int(time.monotonic() * 2) % 3)
-        doing = self._doing
-        if self._new_game_on is not None:
-            random_place = self._new_game_on == MapChoice.WORLD
-            doing = waiting_line(time.monotonic() - self._began, random_place)
         self._labels = [
-            self._text(f"{doing}{dots:<3}", imgui.ImVec4(*BRASS)),
+            self._text(f"{self._doing}{dots:<3}", imgui.ImVec4(*BRASS)),
             self._text(
                 self._progress or " ", imgui.get_style_color_vec4(imgui.Col_.text_disabled.value)
             ),
         ]
+        if year is not None:
+            self._labels.append(self._text(f"The map in {year}", imgui.ImVec4(*BRASS)))
         if self._done is not None:
             corner = imgui.get_cursor_screen_pos()
             imgui.progress_bar(self._done, imgui.ImVec2(WAITING_WIDTH, 0))
@@ -497,7 +544,34 @@ class Shell:
                       imgui.get_color_u32(imgui.Col_.plot_histogram.value)),
             ]  # fmt: skip
         imgui.end_group()
+        if year is not None:
+            draw_list.channels_set_current(0)
+            top_left, bottom_right = imgui.get_item_rect_min(), imgui.get_item_rect_max()
+            panel = Label(
+                top_left.x - PANEL_MARGIN,
+                top_left.y - PANEL_MARGIN,
+                bottom_right.x - top_left.x + 2 * PANEL_MARGIN,
+                bottom_right.y - top_left.y + 2 * PANEL_MARGIN,
+                imgui.get_color_u32(imgui.ImVec4(*PANEL_COLOUR)),
+            )
+            draw_list.add_rect_filled(
+                (panel.x, panel.y), (panel.x + panel.width, panel.y + panel.height), panel.colour
+            )
+            self._labels.insert(0, panel)
+        draw_list.channels_merge()
         draw_version()
+
+    def _draw_picture(self, draw_list: imgui.ImDrawList, width: float, height: float) -> int | None:
+        """Draws the newest picture of a new map's history over the window, if there is one;
+        returns its year."""
+        picture = self._picture
+        if picture is None:
+            return None
+        if self._texture is None or self._texture[0] is not picture:
+            self._texture = (picture, blown_up_texture(picture[1], self._density))
+        corner = imgui.get_window_pos()
+        draw_list.add_image(_ref(self._texture[1]), corner, (corner.x + width, corner.y + height))
+        return picture[0]
 
     @staticmethod
     def _text(text: str, colour: imgui.ImVec4) -> Label:
@@ -506,6 +580,10 @@ class Shell:
         size = imgui.calc_text_size(text)
         imgui.text_colored(colour, text)
         return Label(corner.x, corner.y, size.x, size.y, imgui.get_color_u32(colour), text)
+
+
+def _ref(texture: hello_imgui.TextureGpu) -> imgui.ImTextureRef:
+    return imgui.ImTextureRef(texture.texture_id())
 
 
 def _at_once[T](work: Callable[[], T]) -> Steps[T]:

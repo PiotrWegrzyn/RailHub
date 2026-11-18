@@ -62,6 +62,17 @@ class Towns:
             cell = divmod(index, self._grid.cols)
             self.add(cell, float(sending[cell]))
 
+    def heart_of_biggest(self) -> Cell | None:
+        """The cell sending the most passengers in the town that sends the most; None if no
+        town does."""
+        held = self.town > 0
+        if not held.any():
+            return None
+        totals = np.bincount(self.town[held], weights=self.sending[held])
+        biggest = int(np.argmax(totals))
+        index = int(np.argmax(np.where(self.town == biggest, self.sending, -1.0)))
+        return divmod(index, self._grid.cols)
+
     def most_in(self, cells: npt.NDArray[np.intp]) -> int:
         """The town sending the most passengers from these cells, as flat indices; 0 for none."""
         towns = self.town.ravel()[cells]

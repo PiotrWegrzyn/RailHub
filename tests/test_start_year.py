@@ -35,7 +35,7 @@ def test_a_new_game_wished_to_begin_too_early_begins_in_1804(
     grown: list[int] = []
 
     def quick_growth(
-        tile_map: Any, rng: Any, months: int, history: Any, progress: Any
+        tile_map: Any, rng: Any, months: int, history: Any, progress: Any, look: Any
     ) -> Steps[Constructions]:
         grown.append(months)
         yield

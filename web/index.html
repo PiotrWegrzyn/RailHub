@@ -58,7 +58,7 @@ Query parameters:
     <div class="panel">
         <h1>RailHub</h1>
         <button id="play">Play online</button>
-        <p class="status" id="landing-status">Loading (0%)...</p>
+        <p class="status" id="landing-status">Turning cogs (0%)...</p>
         <p class="slow">Too slow? Download and play outside the browser</p>
         <a class="download" id="download"></a>
         <p class="needs" id="needs"></p>
@@ -77,7 +77,7 @@ Query parameters:
         <p class="fine">Saves work in both: in Load game, Export file, then Import file in the other.</p>
     </div>
 </div>
-<div id="loader">Loading (0%)...</div>
+<div id="loader">Turning cogs (0%)...</div>
 <div id="version">v__VERSION__</div>
 <canvas id="canvas" tabindex="0"></canvas>
 <script>
@@ -91,12 +91,27 @@ Query parameters:
     // How far loading has got: the share of the bytes the page loads at the start that have come
     // (build_site.py counts them), never less than the stage reached, and 100 once it is done.
     const LOAD_BYTES = Number("__LOAD_BYTES__") || 0;
+    // The make-believe work shown with it, a line every WORK_MS.
+    const WORK = [
+        "Turning cogs",
+        "Steaming the engine",
+        "Playing with the hexes",
+        "Pouring water",
+        "Sprinkling sand",
+        "Making people",
+        "Making more people",
+        "Growing them apples",
+        "Shoveling cow shit",
+        "Handing out bread",
+    ];
+    const WORK_MS = 2500;
     let reached = 0;
     function showProgress() {
         let bytes = 0;
         for (const entry of performance.getEntriesByType("resource")) bytes += entry.decodedBodySize;
         const share = LOAD_BYTES ? Math.min(99, Math.round(100 * bytes / LOAD_BYTES)) : 0;
-        const text = `Loading (${Math.max(reached, share)}%)...`;
+        const work = WORK[Math.floor(performance.now() / WORK_MS) % WORK.length];
+        const text = `${work} (${Math.max(reached, share)}%)...`;
         loader.textContent = text;
         landingStatus.textContent = text;
     }

@@ -18,6 +18,7 @@ from railroads.mapgen.start import StartRegion, pick_start_bounds
 from railroads.mapgen.terrain_tiles import SOURCE as TERRAIN_TILES_SOURCE
 from railroads.saves import SavedGame
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
+from railroads.sim.constructions import Constructions
 from railroads.sim.finance import START_CASH
 from railroads.sim.game import Game, place_names
 from railroads.sim.geo import Bounds, describe_lonlat
@@ -136,16 +137,19 @@ def make_game(
     settings: Settings,
     report: Callable[[str], None] = print,
     progress: Callable[[float], None] = lambda done: None,
+    look: Callable[[Constructions, int], None] = lambda constructions, year: None,
 ) -> SavedGame:
     """A new game with these settings, its towns grown and ready to play, beginning in the
-    nearest year play can begin in; `progress` hears the share of the towns' history grown."""
-    return finish(make_game_steps(settings, report, progress))
+    nearest year play can begin in; `progress` hears the share of the towns' history grown and
+    `look` sees the buildings as they grow (railroads.mapgen.seeding.seed_steps)."""
+    return finish(make_game_steps(settings, report, progress, look))
 
 
 def make_game_steps(
     settings: Settings,
     report: Callable[[str], None] = print,
     progress: Callable[[float], None] = lambda done: None,
+    look: Callable[[Constructions, int], None] = lambda constructions, year: None,
 ) -> Steps[SavedGame]:
     """make_game in steps, telling `progress` the share of the towns' history grown so far."""
     settings = replace(settings, start_year=allowed_start_year(settings.start_year))
@@ -164,7 +168,12 @@ def make_game_steps(
     report(f"Generating map from year {HISTORY_START} to {begins}")
     history = History()
     seeded = yield from seed_steps(
-        tile_map, np.random.default_rng(seed), months=months, history=history, progress=progress
+        tile_map,
+        np.random.default_rng(seed),
+        months=months,
+        history=history,
+        progress=progress,
+        look=look,
     )
     game = Game(seeded, start_year=begins, history=history, names=place_names(seeded.tile_map))
     game.finances.cash = settings.cash

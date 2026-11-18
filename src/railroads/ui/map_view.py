@@ -2,8 +2,6 @@
 buildings as dots on top; close up, it is pixel art (see railroads.ui.pixel). The hovered cell, a
 compass and the minimap go over both."""
 
-import math
-from dataclasses import dataclass
 from enum import Enum
 from functools import cache
 
@@ -21,7 +19,7 @@ from railroads.sim.constructions import (
 from railroads.sim.economy import Trade
 from railroads.sim.game import Game
 from railroads.sim.geo import Coord
-from railroads.sim.grids import Cell, GridKind
+from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
 from railroads.sim.steps import Steps, finish
@@ -37,7 +35,7 @@ from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.buildings import draw_building_dots
 from railroads.ui.ground import GroundLayout, GroundPictures, Pixels, cell_colors
 from railroads.ui.hex_details import draw_hex_details, recently_described
-from railroads.ui.iso_camera import IsoCamera, Vec2
+from railroads.ui.iso_camera import LOOKS, IsoCamera, Vec2
 from railroads.ui.map_input import MapInput
 from railroads.ui.map_overlays import (
     MOODS_LEGEND,
@@ -99,25 +97,6 @@ class Lens(Enum):
 
     SATISFACTION = "satisfaction"
     TOWNS = "towns"
-
-
-@dataclass(frozen=True)
-class GridLook:
-    """How a grid sits on screen. Squares are diamonds with north at the top-left, like RT2;
-    hexagons have north up."""
-
-    angle_deg: float
-    cell_units: float
-    # Cell widths in pixels from which the grid shows: first baked into the ground picture, while
-    # there are too many cells to outline one by one, then as sharp lines drawn on top.
-    baked_lines_from: int | None
-    drawn_lines_from: int
-
-
-LOOKS: dict[GridKind, GridLook] = {
-    "square": GridLook(-45.0, math.sqrt(2), baked_lines_from=None, drawn_lines_from=16),
-    "hex": GridLook(0.0, 1.0, baked_lines_from=8, drawn_lines_from=24),
-}
 
 
 @cache
@@ -280,13 +259,14 @@ class MapView:
         self.camera.zoom_level = max(self.camera.zoom_level, VISIT_ZOOM)
         self.look_at(cell)
 
-    def visit_biggest_town(self) -> None:
-        """Takes the view to the cell with the most people around it, and of those to the one with
-        the most people on it."""
-        near = self.growth.nearby()
-        on = np.where(near == near.max(), self.growth.points(), -1)
-        row, col = np.unravel_index(int(np.argmax(on)), on.shape)
-        self.visit((int(row), int(col)))
+    def biggest_town(self) -> Vec2:
+        """Where the busiest cell of the town sending the most passengers lies, or the middle of
+        the view if no town does."""
+        heart = self.growth.towns.heart_of_biggest()
+        if heart is None:
+            return self._view_center()
+        x, y = self.tile_map.grid.center(*heart)
+        return float(x), float(y)
 
     def toggle_search(self) -> None:
         if self.search.open:
@@ -732,8 +712,11 @@ class MapView:
         shows. Nothing here touches the graphics card."""
         finish(self.prepare_steps(size, density, chunks))
 
-    def prepare_steps(self, size: Vec2, density: int, chunks: bool = True) -> Steps[None]:
-        """prepare a part at a time, for a page to go on drawing frames between them."""
+    def prepare_steps(
+        self, size: Vec2, density: int, chunks: bool = True, also: IsoCamera | None = None
+    ) -> Steps[None]:
+        """prepare a part at a time, for a page to go on drawing frames between them; with
+        `also`, the chunks that view shows are drawn too."""
         plain = self._plain_picture()
         yield
         self._soft = (self._ground_version, (yield from soften_steps(plain)))
@@ -746,10 +729,11 @@ class MapView:
         if self.railway.trains:
             yield
             self._train_layer()
-        if chunks and self.camera.pixel_scale:
-            yield
-            center = (size[0] / 2, size[1] / 2)
-            layer.prepare(self.camera, center, ((0.0, 0.0), size), density)
+        center = (size[0] / 2, size[1] / 2)
+        for camera in (self.camera, also):
+            if chunks and camera is not None and camera.pixel_scale:
+                yield
+                layer.prepare(camera, center, ((0.0, 0.0), size), density)
 
     def _pixel_layer(self) -> PixelLayer:
         if self._pixels is None:

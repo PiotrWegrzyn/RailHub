@@ -24,6 +24,8 @@ import numpy as np
 from railroads.newgame import Settings, make_game
 from railroads.saves import SavedGame, snapshot, unpickled_steps
 from railroads.sim.steps import Steps
+from railroads.ui.history_pictures import HistoryPictures
+from railroads.ui.pixel.projection import Rgba
 
 if sys.platform == "emscripten":
     import js
@@ -51,10 +53,19 @@ def grow(
     settings: bytes,
     report: Callable[[str], None],
     advance: Callable[[float], None] = lambda done: None,
+    see: Callable[[int, int, int, int, int], None] = lambda year, at, length, width, height: None,
 ) -> Grown:
     """In the worker: the game these pickled settings make, ready to hand back, telling `report`
-    what it does and `advance` the share of the towns' history grown."""
-    snap = snapshot(make_game(pickle.loads(settings), report, advance))
+    what it does, `advance` the share of the towns' history grown and `see` the year of each
+    picture of it growing (railroads.ui.history_pictures), where its bytes are and how many,
+    and its width and height. The settings come pickled with the size of the pictures."""
+    wanted, size = pickle.loads(settings)
+
+    def seen(year: int, picture: Rgba) -> None:
+        height, width = picture.shape[:2]
+        see(year, _address(picture), picture.nbytes, width, height)
+
+    snap = snapshot(make_game(wanted, report, advance, HistoryPictures(size, seen)))
     return Grown(zlib.compress(snap.data, 1), len(snap.data))
 
 
@@ -102,11 +113,15 @@ class PageSetup:
         settings: Settings,
         report: Callable[[str], None],
         advance: Callable[[float], None] = lambda done: None,
+        see: Callable[[int, Rgba], None] = lambda year, picture: None,
+        size: tuple[int, int] = (1280, 800),
     ) -> Steps[SavedGame | None]:
         """The game these settings make, grown in a worker while the frames go on, a step a
-        frame, passing on to `report` and `advance` what the worker says of how far it got; None
-        if the worker failed, for the caller to grow it itself."""
-        self._page.start(pickle.dumps(settings, protocol=pickle.HIGHEST_PROTOCOL))
+        frame, passing on to `report`, `advance` and `see` what the worker says of how far it
+        got and its pictures, `size` points big, of the map growing; None if the worker failed,
+        for the caller to grow it itself."""
+        wanted = (settings, size)
+        self._page.start(pickle.dumps(wanted, protocol=pickle.HIGHEST_PROTOCOL))
         try:
             while True:
                 yield
@@ -116,6 +131,9 @@ class PageSetup:
                         report(message["text"])
                     elif kind == "advance":
                         advance(message["done"])
+                    elif kind == "picture":
+                        shape = (message["height"], message["width"], 4)
+                        see(message["year"], message["pixels"].reshape(shape))
                     elif kind in ("failed", "dead"):
                         print(f"The towns couldn't grow in a worker: {message.get('error')}")
                         return None
@@ -144,17 +162,19 @@ class _PageObject:
         self._page.stop()
 
     def _taken(self, message: Any) -> Message:
-        game = getattr(message, "game", None)
-        if game is None:
+        """The message as Python's, with the bytes of a grown game or a picture copied in."""
+        name = next((name for name in ("game", "pixels") if hasattr(message, name)), None)
+        if name is None:
             return message.to_py()
-        del message.game
+        buffer = getattr(message, name)
+        delattr(message, name)
         taken: Message = message.to_py()
         try:
-            bytes_ = np.empty(int(game.byteLength), dtype=np.uint8)
-            self._page.copy(game, _address(bytes_))
+            bytes_ = np.empty(int(buffer.byteLength), dtype=np.uint8)
+            self._page.copy(buffer, _address(bytes_))
         except Exception as error:  # noqa: BLE001 - the game is grown on the frames instead
-            return {"kind": "failed", "error": f"its game could not be taken: {error}"}
-        return taken | {"game": bytes_}
+            return {"kind": "failed", "error": f"its {name} could not be taken: {error}"}
+        return taken | {name: bytes_}
 
 
 def _address(array: np.ndarray) -> int:
