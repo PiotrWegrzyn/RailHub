@@ -65,7 +65,8 @@ def test_a_new_train_leaves_its_first_stop_with_that_stops_cars_full() -> None:
     [
         (Good.GOLD, 5.0),
         (Good.STEEL, 13.0),
-        (Good.CATTLE, 13.0),
+        (Good.CATTLE, 21.0),
+        (Good.PIGS, 13.0),
         (Good.OIL, 34.0),
         (Good.IRON, 89.0),
         (Good.WHEAT, 89.0),

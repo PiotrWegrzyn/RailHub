@@ -37,6 +37,7 @@ train does calling at a station in railroads.sim.calls; Railway owns them all an
 import itertools
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -123,6 +124,8 @@ LEVEL_STORAGE_STEPS = 2
 PLATFORM_LEVEL = 4
 # Upkeep never falls below this share of its full cost, however much tech cuts it.
 LEAST_UPKEEP = 0.5
+# Goods that pay this many times their price when a train delivers them: cattle are hard to haul.
+TRANSIT_PAY: Mapping[Good, float] = MappingProxyType({Good.CATTLE: 2.0})
 
 
 @dataclass(frozen=True, slots=True)
@@ -405,8 +408,10 @@ class Railway:
         return self.demand.setdefault(station, StationDemand())
 
     def price_factor(self, good: Good) -> float:
-        """How much more a good earns with the player's tech."""
-        return 1.0 + self.research.bonus(Effect.PRICE, GOOD_TREES[good])
+        """How much more a good earns carried by train: its TRANSIT_PAY, with the player's tech."""
+        return TRANSIT_PAY.get(good, 1.0) * (
+            1.0 + self.research.bonus(Effect.PRICE, GOOD_TREES[good])
+        )
 
     def destination(self, train: Train) -> Cell | None:
         """The stop the cars a train pulls now are taken to: the one it is heading for, or the

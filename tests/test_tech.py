@@ -118,6 +118,16 @@ def test_market_stalls_raise_what_food_cargo_earns() -> None:
     assert railway.finances.month["cargo"] == pytest.approx(1.05 * plain.finances.month["cargo"])
 
 
+@pytest.mark.parametrize(("good", "times"), [(Good.CATTLE, 2.0), (Good.PIGS, 1.0)])
+def test_cattle_pay_twice_their_price_when_a_train_delivers_them(good: Good, times: float) -> None:
+    railway = joined().railway
+    railway.station_demand((6, 20)).capacity = {Need.ANIMALS: 1000.0}
+
+    railway.pay_for((6, 20), Need.ANIMALS, good, 1.0)
+
+    assert railway.finances.month["cargo"] == pytest.approx(times * price_of(good))
+
+
 def test_the_mogul_can_be_bought_only_once_its_tech_and_year_have_come() -> None:
     railway = joined().railway
     railway.year = 1864

@@ -104,6 +104,10 @@ MEDIUM_CAR_GOODS = frozenset(
 )
 
 
+# Goods whose cars are this many sizes up CAR_SIZES from the rest of their kind: cattle ride in
+# roomier cattle cars than the other animals.
+SIZES_UP: Mapping[Good, int] = MappingProxyType({Good.CATTLE: 1})
+
 BULK_HEFT = BULK_CAR / CAR_CAPACITY
 
 
@@ -121,7 +125,7 @@ def car_size(good: Good) -> float:
     if good in SMALL_CAR_GOODS:
         return SMALL_CAR
     if good in MEDIUM_CAR_GOODS:
-        return MEDIUM_CAR
+        return bigger(MEDIUM_CAR, SIZES_UP.get(good, 0))
     return CAR_CAPACITY
 
 
