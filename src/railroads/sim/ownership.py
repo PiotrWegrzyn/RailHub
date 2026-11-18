@@ -35,8 +35,8 @@ if TYPE_CHECKING:
 SHARES = 1000
 LOT = 100
 # What a whole building costs at half satisfaction: this many years of all it makes at full
-# output, at its goods' prices.
-PAYBACK_YEARS = 30
+# output, at its goods' market prices, so its shares pay a tenth of their price back a year.
+PAYBACK_YEARS = 10
 # What a building's price is worth, times its price at half satisfaction, at each satisfaction
 # over the last quarter, in between in a straight line.
 PRICE_BY_SATISFACTION = ((0.0, 2 / 3), (0.5, 1.0), (1.0, 1.5), (2.0, 2.0))

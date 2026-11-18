@@ -696,7 +696,7 @@ around it before anything is handed out, sold to the player's company at the mar
 goes in, and then pays freight like any cargo when a train carries it to another station and
 buildings there take it; what the station hands out around it carries no freight. A building
 with no station near pays nothing. A station hands what it has to the player's own buildings before anyone else's,
-however far within its reach they stand. A whole building costs thirty years of all it makes at full output when it was half
+however far within its reach they stand. A whole building costs ten years of all it makes at full output when it was half
 satisfied over the last quarter, two thirds of that at none, one and a half times at 100% and
 twice at 200%, and shares sell at the price they buy at, so raising a building's satisfaction
 raises what its shares fetch. Tech cuts the price of shares by up to half, and production tech
