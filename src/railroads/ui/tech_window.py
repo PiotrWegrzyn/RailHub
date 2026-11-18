@@ -21,6 +21,9 @@ TAKEN = (0.36, 0.56, 0.3, 1.0)
 OPEN = (0.3, 0.34, 0.42, 1.0)
 SHUT = (0.18, 0.18, 0.2, 1.0)
 LINK = (0.45, 0.45, 0.5, 1.0)
+LOWERING = frozenset(
+    {Effect.UPKEEP, Effect.DISCOUNT, Effect.FUEL_MARKUP, Effect.STATION_UPKEEP, Effect.FOOD_FUEL}
+)
 PERCENT_EFFECTS = frozenset(
     {
         Effect.PRODUCTION,
@@ -32,6 +35,8 @@ PERCENT_EFFECTS = frozenset(
         Effect.COACHES,
         Effect.BONUS_GOODS,
         Effect.FUEL_MARKUP,
+        Effect.STATION_UPKEEP,
+        Effect.FOOD_FUEL,
     }
 )
 
@@ -98,7 +103,7 @@ def describe(node: Node) -> str:
         years = [engine.year for engine in ENGINES.values() if node.key in engine.needs]
         return f"opens {node.opens} (from {min(years)})" if years else f"opens {node.opens}"
     if node.effect in PERCENT_EFFECTS:
-        sign = "-" if node.effect in (Effect.UPKEEP, Effect.DISCOUNT, Effect.FUEL_MARKUP) else "+"
+        sign = "-" if node.effect in LOWERING else "+"
         reach = ", everywhere" if node.everywhere else ""
         return f"{node.effect.value} {sign}{node.amount:.0%}{reach}"
     if node.effect == Effect.TO_COME:
@@ -142,6 +147,10 @@ def explain(tree: Tree, node: Node) -> str:
         f"{node.amount:g} size more.",
         Effect.UNLOCK: f"O{describe(node)[1:]}.",
         Effect.TAKES: _takes(node),
+        Effect.STATION_UPKEEP: f"Every station costs {amount} less to keep.",
+        Effect.FOOD_FUEL: (
+            f"A train pays up to {amount} less for its fuel, in proportion to its cars carrying food."
+        ),
         Effect.TO_COME: "A bonus for the buildings you own, still to be decided; it does nothing yet.",
     }
     return sentences[node.effect]

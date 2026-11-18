@@ -657,7 +657,8 @@ mines, mills, works and factories, but no homes, shops, churches or military. Ev
 building pays nothing of its own: the player's part of what it makes goes into the stations
 around it before anything is handed out, as if a train had brought it, and pays in full as
 those stations hand it out to the buildings in their reach; a building with no station near pays
-nothing. A whole building costs thirty years of all it makes at full output when it was half
+nothing. A station hands what it has to the player's own buildings before anyone else's,
+however far within its reach they stand. A whole building costs thirty years of all it makes at full output when it was half
 satisfied over the last quarter, two thirds of that at none, one and a half times at 100% and
 twice at 200%, and shares sell at the price they buy at, so raising a building's satisfaction
 raises what its shares fetch. Tech cuts the price of shares by up to half, and production tech
@@ -682,8 +683,10 @@ player owns, what that tree's cargo earns,
 station storage and waiting rooms, speed, cars per train, car sizes and coach capacity, what each
 bonus good adds to satisfaction, cut upkeep, retail fuel and the price of shares, and open
 engines and general cars. Each business tree has four production nodes of +25%, so a bought
-building can make twice as much. The nodes that once raised the owner's share hold places for
-bonuses still to be decided and do nothing yet. Hovering a node says in a sentence what it does.
+building can make twice as much. Station shops, in commerce, cut every station's upkeep by 20%;
+Subsidised fuel, deep in the food tree, cuts a train's fuel by up to half, by its share of cars
+carrying food. The other nodes that once raised the owner's share hold places for bonuses still
+to be decided and do nothing yet. Hovering a node says in a sentence what it does.
 
 Engines (`railroads.sim.trains`) come in lines. Pioneers, from the first steam engine on rails in
 1804, each a little better than the one before, lead up to the Planet of 1840, the engine the game

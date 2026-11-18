@@ -66,6 +66,10 @@ class Effect(Enum):
     CAR_SIZE = "car size"
     # The buildings of a kind the player owns take a good as a boost (railroads.sim.goods.OWNED_BOOSTS).
     TAKES = "takes"
+    # Stations cost this share less to keep.
+    STATION_UPKEEP = "station upkeep"
+    # A train pays this share less for its fuel, in proportion to its cars carrying food.
+    FOOD_FUEL = "fuel for food trains"
     # Holds a place in its tree for a bonus still to be decided, and does nothing yet.
     TO_COME = "still to come"
     # Opens the engines (railroads.sim.trains) that need it, once their year has come, or a
@@ -103,7 +107,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("villages", "Thriving villages", E.GROWTH, 0.5, "rotation"),
             _n("cold", "Cold stores", E.STORAGE, 300, "silos"),
             _n("hoppers", "Grain hoppers", E.CAR_SIZE, 1, "silos"),
-            _n("coop", "Farmers' cooperative", E.TO_COME, 0.0, "stalls"),
+            _n("coop", "Farmers' cooperative", E.GROWTH, 0.5, "stalls"),
             _n(
                 "mixed_vans",
                 "Mixed food vans",
@@ -142,6 +146,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
                 takes=(BuildingKind.FARM, Need.MACHINERY),
             ),
             _n("brand", "National brand", E.PRICE, 0.15, "reefers", "conglomerate"),
+            _n("food_fuel", "Subsidised fuel", E.FOOD_FUEL, 0.5, "brand"),
         ),
         Tree.METALS: (
             _n("bessemer", "Bessemer converters", E.PRODUCTION, 0.25),
@@ -227,11 +232,11 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
         ),
         Tree.COMMERCE: (
             _n("books", "Double-entry books", E.DISCOUNT, 0.1, everywhere=True),
-            _n("investors", "Investors", E.TO_COME, 0.0, everywhere=True),
+            _n("station_shops", "Station shops", E.STATION_UPKEEP, 0.2, everywhere=True),
             _n("chains", "Chain stores", E.DISCOUNT, 0.1, "books", everywhere=True),
             _n("regular_customer", "Regular customer", E.FUEL_MARKUP, 0.25, "books"),
-            _n("advertising", "Advertising", E.PRICE, 0.05, "investors", everywhere=True),
-            _n("holding", "Holding company", E.TO_COME, 0.0, "investors", everywhere=True),
+            _n("advertising", "Advertising", E.PRICE, 0.05, "station_shops", everywhere=True),
+            _n("holding", "Holding company", E.TO_COME, 0.0, "station_shops", everywhere=True),
             _n("takeovers", "Hostile takeovers", E.DISCOUNT, 0.15, "chains", everywhere=True),
             _n("brands", "Household brands", E.PRICE, 0.05, "advertising", everywhere=True),
             _n(

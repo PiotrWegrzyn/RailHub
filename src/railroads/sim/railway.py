@@ -77,7 +77,7 @@ from railroads.sim.fuel_market import (
     fuel_of,
     signals_of,
 )
-from railroads.sim.goods import TRAVELLERS, General, Good, Need
+from railroads.sim.goods import FOODS, TRAVELLERS, General, Good, Need
 from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
@@ -343,7 +343,21 @@ class Railway:
             if stocked > 0:
                 stockpile[good] -= stocked
         cost = self.fuel.buy(fuel, amount, stocked, self.fuel_markup())
-        self.finances.spend(cost * self._upkeep(), fuel.value)
+        self.finances.spend(cost * self._upkeep() * self._food_subsidy(train), fuel.value)
+
+    def _food_subsidy(self, train: Train) -> float:
+        """What share of its fuel a train pays with the player's tech: Effect.FOOD_FUEL less
+        for a train of nothing but food, in proportion to its cars carrying food."""
+        subsidy = self.research.bonus(Effect.FOOD_FUEL)
+        if not subsidy or not train.cars:
+            return 1.0
+        food = sum(
+            1
+            for car in train.cars
+            if car.load > 0
+            and (car.good in FOODS or car.general in (General.FOOD, General.PROCESSED_FOOD))
+        )
+        return 1.0 - subsidy * food / len(train.cars)
 
     def fuel_month(self, trade: Trade, points: float = 0.0) -> None:
         """Closes the fuel market's month with what this month's trade said about it, and the
@@ -601,7 +615,8 @@ class Railway:
         track = self.constructions.track()
         upkeep = self._upkeep()
         stations = sum(self.station_upkeep(station) for station in self.stations())
-        self.finances.spend(stations * upkeep, "station upkeep")
+        kept = 1.0 - self.research.bonus(Effect.STATION_UPKEEP)
+        self.finances.spend(stations * upkeep * kept, "station upkeep")
         self.finances.spend(track_upkeep(track) * upkeep, "track upkeep")
 
     def run(self, months: float) -> None:

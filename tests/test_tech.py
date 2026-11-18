@@ -16,10 +16,11 @@ from railroads.sim.tech import (
     Effect,
     Research,
     Tree,
+    path_to,
     tree_of,
     xp_for,
 )
-from railroads.sim.trains import ENGINES, Stop
+from railroads.sim.trains import ENGINES, Car, Stop
 from railroads.ui.tech_window import describe, explain, layout, links
 
 
@@ -230,7 +231,7 @@ def test_electrified_track_costs_its_extra_upkeep_a_cell() -> None:
 def test_fine_living_makes_each_bonus_good_worth_ten_points_more_satisfaction() -> None:
     growth = joined()
     growth.build(Building((6, 22), BuildingKind.HOUSE))
-    growth.railway.research = learned(Tree.COMMERCE, "investors", "advertising", "fine_living")
+    growth.railway.research = learned(Tree.COMMERCE, "station_shops", "advertising", "fine_living")
 
     growth.trade_goods()
 
@@ -325,3 +326,29 @@ def test_each_point_of_an_owned_building_adds_a_percent_to_its_trees_experience(
     expected = 1 + (factor - 1) * points
     xp = growth.railway.research.xp[Tree.FOOD]
     assert xp == pytest.approx(expected * growth.railway.finances.month["cargo"])
+
+
+@pytest.mark.parametrize(("loaded", "share"), [(0, 1.0), (1, 0.75), (2, 0.5)])
+def test_subsidised_fuel_cuts_a_trains_fuel_by_half_its_share_of_food_cars(
+    loaded: int, share: float
+) -> None:
+    railway = joined().railway
+    railway.research = learned(Tree.FOOD, *path_to(("food_fuel",)))
+    train = railway.buy("tank")
+    assert train is not None
+    train.cars = [Car(Good.WHEAT, 10.0 if i < loaded else 0.0) for i in range(2)]
+
+    paid = railway._food_subsidy(train)
+
+    assert paid == pytest.approx(share)
+
+
+def test_station_shops_cut_what_every_station_costs_to_keep() -> None:
+    plain, shops = joined().railway, joined().railway
+    shops.research = learned(Tree.COMMERCE, "station_shops")
+
+    plain.turn_month({})
+    shops.turn_month({})
+
+    cut = shops.finances.month["station upkeep"] / plain.finances.month["station upkeep"]
+    assert cut == pytest.approx(0.8)
