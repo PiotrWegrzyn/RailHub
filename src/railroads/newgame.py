@@ -28,6 +28,7 @@ from railroads.sim.novelties import Novelties
 from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Terrain, TileMap
+from railroads.tutorial import place as tutorial_place
 
 # The source data the tools build the world's files from (railroads.mapgen.world_files); the game
 # itself reads only those.
@@ -63,11 +64,17 @@ class MapChoice(StrEnum):
     EAST_CHINA = "China: the Yangtze delta"
     SOUTHEAST_AUSTRALIA = "Southeast Australia"
     WORLD = "A random place in the world"
+    TUTORIAL = "Tutorial"
 
     @property
     def start_map(self) -> maps.StartMap | None:
         """The baked map this choice plays on, or None for a random place."""
         return maps.start_map(self.value)
+
+    @property
+    def offered(self) -> bool:
+        """Whether the new game page lists it among its maps: the baked maps only."""
+        return self.start_map is not None
 
 
 @dataclass(frozen=True)
@@ -148,7 +155,9 @@ def place_map(settings: Settings) -> TileMap:
     key = (settings.map, settings.seed)
     if key not in _PLACES:
         baked = settings.map.start_map
-        if baked is not None:
+        if settings.map == MapChoice.TUTORIAL:
+            _PLACES[key] = tutorial_place.place_map()
+        elif baked is not None:
             _PLACES[key] = maps.load(baked.key, "hex")
         else:
             _PLACES[key] = start_new_game(settings.seed, report=lambda text: None).tile_map

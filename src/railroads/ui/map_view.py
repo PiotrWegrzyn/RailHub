@@ -81,6 +81,7 @@ from railroads.ui.pixel.train_layer import TrainLayer, engine_picture
 from railroads.ui.pixel.world import PixelWorld
 from railroads.ui.route_map import soften, soften_steps
 from railroads.ui.search import BuildingSearch
+from railroads.ui.spotlight import pulsing_brass, spot
 from railroads.ui.station_window import StationWindow
 from railroads.ui.summaries_panel import SummariesPanel
 from railroads.ui.theme import BRASS, OVERLAY_FLAGS, SIDE_WINDOW_POS, rgba_u32, toggle_button
@@ -95,6 +96,8 @@ LIGHT_ON_SCREEN = (-1.0, -1.0)
 MINIMAP_TOWN_POINTS = 12
 # How far above the minimap, or the map's corner without one, the lens buttons sit.
 LENS_GAP = 8.0
+# How thick the outline is round a cell the tutorial wants clicked.
+SPOT_WIDTH = 4.0
 
 
 class Lens(Enum):
@@ -207,6 +210,8 @@ class MapView:
         self.search = BuildingSearch()
         # The land around the map the player can buy (railroads.ui.land_offers).
         self.land = LandOffers()
+        # The cells the tutorial wants clicked, marked on the map (railroads.ui.spotlight).
+        self.spotlit: list[Cell] = []
 
     @property
     def tile_map(self) -> TileMap:
@@ -580,6 +585,12 @@ class MapView:
             )
         for cell in self.summaries.outlined():
             draw_outline(draw_list, marks, self.tile_map.grid, center, cell, BRASS)
+        for cell in self.spotlit:
+            draw_outline(
+                draw_list, marks, self.tile_map.grid, center, cell, pulsing_brass(), SPOT_WIDTH
+            )
+        if self.spotlit:
+            hello_imgui.request_refresh()
         draw_found(
             draw_list, marks, self.tile_map.grid, self.search, center, top_left, bottom_right
         )
@@ -641,6 +652,7 @@ class MapView:
                 imgui.same_line()
             if toggle_button(label, self.lens == lens, tooltip):
                 self.lens = None if self.lens == lens else lens
+            spot(f"lens:{lens.value}")
         imgui.end()
 
     def _showing_moods(self) -> bool:

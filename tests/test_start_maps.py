@@ -20,13 +20,14 @@ def command_line(**given: object) -> argparse.Namespace:
     return argparse.Namespace(**(args | given))
 
 
-def test_every_baked_map_is_a_menu_choice_and_every_choice_but_a_random_place_is_baked() -> None:
+def test_every_baked_map_is_offered_in_the_menu_and_nothing_else_is() -> None:
     titles = {start.title for start in maps.START_MAPS}
 
-    choices = {choice.value for choice in MapChoice if choice != MapChoice.WORLD}
+    choices = {choice.value for choice in MapChoice if choice.offered}
 
     assert choices == titles
     assert MapChoice.WORLD.start_map is None
+    assert not MapChoice.TUTORIAL.offered
 
 
 @pytest.mark.parametrize("start", maps.START_MAPS, ids=lambda start: start.key)

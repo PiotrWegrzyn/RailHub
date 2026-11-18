@@ -10,6 +10,7 @@ from imgui_bundle import imgui
 
 from railroads.sim.clock import SPEEDS
 from railroads.sim.finance import Finances, dollars
+from railroads.ui.spotlight import spot
 from railroads.ui.theme import BRASS, GONE, GROWN, danger_button, tip, toggle_button
 
 if TYPE_CHECKING:
@@ -52,6 +53,7 @@ def draw_top_bar(app: App) -> None:
     imgui.same_line(0, 4)
     if toggle_button(fa.ICON_FA_FLASK, app.tech.open, "Tech trees (R)", size):
         app.tech.open = not app.tech.open
+    spot("tech")
     imgui.same_line(0, 4)
     if toggle_button(
         fa.ICON_FA_QUESTION_CIRCLE, app.help.open, "Buildings, goods and engines (H)", size

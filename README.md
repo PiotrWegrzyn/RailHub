@@ -21,8 +21,24 @@ Run the game from the source:
 uv run railroads
 ```
 
-It opens on the main menu: start a new game, load a saved one, or quit. A new game is set up
-first with:
+It opens on the main menu: start a new game, play the tutorial, load a saved one, or quit.
+
+The tutorial (`railroads.tutorial`) is a premade game that is the same for every player: a small
+map drawn by hand, not grown from a seed (`railroads.tutorial.place`), 32 by 32 hexes in 1850
+with the usual $80,000. Ashford is a farming village with more wheat than it eats, Brookby a town
+of houses and tenements with no farm near; a coal mine and a lumber mill stand in the hills and
+the forest, and the land around is for sale in lots like any game's. Its months grow from a
+fixed seed, so they play out the same too. A window walks the player through it a step at a time
+(`railroads.tutorial.steps`): each explains something, frames in brass what to click, on the map
+or in the windows (`railroads.ui.spotlight`), and Next waits until it is done, which can be
+skipped. In order: a station at Ashford and one at Brookby, with what a station hands out and
+gathers; track between them; a train with a passenger car and a food car; cars of its own for the
+way back, general cars and hubs; what buildings hand out on their own before stations; the
+Satisfaction lens; the Towns lens and passengers riding only between towns; buying shares of a
+farm; the tech window; fuel, range and the kinds of engine on the buy screen; and buying a lot,
+for which the tutorial gives the money. The progress is saved with the game.
+
+A new game is set up first with:
 - the map: one of the baked maps of real places, or a random place in the world (made from the
   world's map data in `world/`, see Map data). The baked maps are Poland, Germany, France (Paris and the Loire),
   Great Britain, Italy (Bologna and Florence), Moscow, Constantinople, the Alps, the Norwegian fjords,

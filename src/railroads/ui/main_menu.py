@@ -1,5 +1,5 @@
-"""The menu the game opens on: start a new game with its settings chosen first, load a saved
-one, or quit."""
+"""The menu the game opens on: start a new game with its settings chosen first, play the
+tutorial, load a saved one, or quit."""
 
 import math
 import secrets
@@ -46,11 +46,16 @@ class LoadChoice:
 
 
 @dataclass(frozen=True)
+class TutorialChoice:
+    pass
+
+
+@dataclass(frozen=True)
 class QuitChoice:
     pass
 
 
-MenuChoice = NewGameChoice | LoadChoice | QuitChoice
+MenuChoice = NewGameChoice | TutorialChoice | LoadChoice | QuitChoice
 
 
 def draw_version() -> None:
@@ -155,6 +160,9 @@ class MainMenu:
     def _draw_main(self) -> MenuChoice | None:
         if self._button(f"{fa.ICON_FA_PLAY}  New game"):
             self.go_to("new")
+        if self._button(f"{fa.ICON_FA_GRADUATION_CAP}  Tutorial"):
+            self.error = ""
+            return TutorialChoice()
         if self._button(f"{fa.ICON_FA_FOLDER_OPEN}  Load game"):
             self.go_to("load")
         if self._button(f"{fa.ICON_FA_POWER_OFF}  Quit"):
@@ -165,10 +173,7 @@ class MainMenu:
         imgui.text("Map")
         if imgui.begin_combo("##map", self.map.value, imgui.ComboFlags_.height_large.value):
             for choice in MapChoice:
-                if (
-                    choice != MapChoice.WORLD
-                    and imgui.selectable(choice.value, self.map == choice)[0]
-                ):
+                if choice.offered and imgui.selectable(choice.value, self.map == choice)[0]:
                     self.map = choice
             imgui.end_combo()
         imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)

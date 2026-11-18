@@ -22,6 +22,7 @@ from railroads.sim.ladders import Points
 from railroads.sim.ownership import LOT, SHARES
 from railroads.sim.tilemap import Deposit, TileMap
 from railroads.ui.biomes import biome_of
+from railroads.ui.spotlight import spot
 from railroads.ui.theme import good_amount
 
 
@@ -264,10 +265,10 @@ def draw_hex_details(details: HexDetails) -> tuple[BuildingKind, bool] | None:
                     imgui.text_disabled("-")
                     continue
                 imgui.text(f"{row.owned} of {SHARES * row.count} shares")
-                if row.owned + LOT <= SHARES * row.count and imgui.small_button(
-                    f"Buy {LOT} for {dollars(row.price)}##buy{row.name}"
-                ):
-                    bought = (row.kind, True)
+                if row.owned + LOT <= SHARES * row.count:
+                    if imgui.small_button(f"Buy {LOT} for {dollars(row.price)}##buy{row.name}"):
+                        bought = (row.kind, True)
+                    spot("buy_shares")
                 if row.owned and imgui.small_button(
                     f"Sell {min(LOT, row.owned)} for {dollars(row.price * min(LOT, row.owned) / LOT)}##sell{row.name}"
                 ):

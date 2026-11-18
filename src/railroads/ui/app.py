@@ -32,6 +32,9 @@ from railroads.sim.game import Game
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
 from railroads.sim.lots import Lot
 from railroads.sim.steps import Steps, finish
+from railroads.tutorial.game import make_tutorial
+from railroads.tutorial.steps import Seen, Tutorial
+from railroads.ui import spotlight
 from railroads.ui.help_window import HelpWindow
 from railroads.ui.history_pictures import HistoryPictures, opening_center
 from railroads.ui.main_menu import (
@@ -39,6 +42,7 @@ from railroads.ui.main_menu import (
     MainMenu,
     NewGameChoice,
     QuitChoice,
+    TutorialChoice,
     draw_version,
     random_seed,
 )
@@ -51,6 +55,7 @@ from railroads.ui.saves_window import SavesWindow
 from railroads.ui.tech_window import TechWindow
 from railroads.ui.theme import BRASS, apply_theme
 from railroads.ui.top_bar import draw_top_bar
+from railroads.ui.tutorial_panel import draw_tutorial
 from railroads.ui.waiting_screen import Label, Shatter, tip_for, waiting_line
 from railroads.ui.web_setup import page_setup
 from railroads.ui.workers import FRAME_SECONDS, FrameWorker, submit_steps, worker
@@ -85,6 +90,7 @@ class App:
         clock: GameClock | None = None,
         saves: Saves | None = None,
         settings: Settings | None = None,
+        tutorial: Tutorial | None = None,
     ) -> None:
         self.view = view
         self.title = title
@@ -92,6 +98,8 @@ class App:
         self.rng = np.random.default_rng() if rng is None else rng
         self.saves = saves
         self.settings = settings
+        # How far the player has got through the tutorial, in a tutorial game.
+        self.tutorial = tutorial
         self._styled = False
         self.help = HelpWindow()
         self.tech = TechWindow()
@@ -122,7 +130,7 @@ class App:
         lots = saved.game.lots
         if lots is not None and saved.settings is not None:
             view.land.show_place(place_map(saved.settings), lots)
-        return cls(view, saved.title, saved.rng, saved.clock, saves, saved.settings)
+        return cls(view, saved.title, saved.rng, saved.clock, saves, saved.settings, saved.tutorial)
 
     @property
     def game(self) -> Game:
@@ -138,6 +146,7 @@ class App:
             self.settings,
             [(note.summary, note.seen) for note in self.view.summaries.notes],
             (camera.center_x, camera.center_y, camera.zoom_level),
+            self.tutorial,
         )
 
     def tell(self, notice: str) -> None:
@@ -207,6 +216,7 @@ class App:
             self._autosave_due = not done.value
 
     def _draw(self) -> None:
+        self._point_the_way()
         draw_top_bar(self)
         self.view.gui()
         self.help.draw()
@@ -224,6 +234,10 @@ class App:
                 railway.fuel,
             )
         self._draw_saves()
+        if self.tutorial is not None:
+            draw_tutorial(self.tutorial)
+            if self._turning is None:
+                self.tutorial.update(self.game, self.seen())
         typing = imgui.get_io().want_text_input
         if not typing and imgui.is_key_pressed(imgui.Key.h, repeat=False):
             self.help.open = not self.help.open
@@ -233,6 +247,26 @@ class App:
             self.reports.open = not self.reports.open
         if not typing and imgui.is_key_pressed(imgui.Key.f5, repeat=False):
             self.toggle_saves()
+
+    def _point_the_way(self) -> None:
+        """Frames what the tutorial's step wants clicked and marks its cells on the map, until
+        it is done."""
+        tutorial = self.tutorial
+        step = None if tutorial is None or tutorial.done else tutorial.current
+        spotlight.want(() if step is None else step.spots)
+        self.view.spotlit = [] if step is None else step.cells(self.game)
+
+    def seen(self) -> Seen:
+        """What the player has open and turned on, for the tutorial."""
+        view = self.view
+        io = imgui.get_io()
+        moods = io.key_shift and not io.want_text_input
+        return Seen(
+            lens="satisfaction" if moods else None if view.lens is None else view.lens.value,
+            selected=view.selected,
+            tech_open=self.tech.open,
+            buying_train=view.build.trains.buy.open,
+        )
 
     def _keep_trains_smooth(self) -> None:
         """Has the next frame drawn at full speed while a train runs. A few seconds after the
@@ -405,6 +439,10 @@ class Shell:
         pictures = HistoryPictures(self._window, see, over_ground)
         return (yield from make_game_steps(settings, self.report, self.advance, pictures))
 
+    def start_tutorial(self) -> None:
+        """Starts the tutorial's premade game (railroads.tutorial), the same every time."""
+        self._begin("Setting up the tutorial", lambda: _at_once(make_tutorial))
+
     def load(self, name: str) -> None:
         self._begin(f"Loading '{name}'", lambda: _at_once(lambda: self.saves.load(name)))
 
@@ -542,6 +580,8 @@ class Shell:
         match choice:
             case NewGameChoice(settings):
                 self.start(settings)
+            case TutorialChoice():
+                self.start_tutorial()
             case LoadChoice(name):
                 self.load(name)
             case QuitChoice():

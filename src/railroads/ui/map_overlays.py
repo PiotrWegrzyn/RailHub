@@ -89,9 +89,10 @@ def draw_outline(
     center: Vec2,
     cell: Cell,
     rgba: Rgba = HOVER_COLOR,
+    thickness: float = 2.0,
 ) -> None:
     points = [imgui.ImVec2(*camera.to_screen(x, y, center)) for x, y in grid.corners(*cell)]
-    draw_list.add_polyline(points, rgba_u32(rgba), 2.0, imgui.ImDrawFlags_.closed.value)
+    draw_list.add_polyline(points, rgba_u32(rgba), thickness, imgui.ImDrawFlags_.closed.value)
 
 
 def visible_area(
