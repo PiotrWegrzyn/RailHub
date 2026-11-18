@@ -101,6 +101,8 @@ def describe(node: Node) -> str:
         sign = "-" if node.effect in (Effect.UPKEEP, Effect.DISCOUNT, Effect.FUEL_MARKUP) else "+"
         reach = ", everywhere" if node.everywhere else ""
         return f"{node.effect.value} {sign}{node.amount:.0%}{reach}"
+    if node.effect == Effect.TO_COME:
+        return "a bonus still to come"
     if node.effect == Effect.TAKES and node.takes is not None:
         return f"your {node.takes[0].value}s take {node.takes[1].value}"
     if node.effect == Effect.CAR_SIZE:
@@ -140,6 +142,7 @@ def explain(tree: Tree, node: Node) -> str:
         f"{node.amount:g} size more.",
         Effect.UNLOCK: f"O{describe(node)[1:]}.",
         Effect.TAKES: _takes(node),
+        Effect.TO_COME: "A bonus for the buildings you own, still to be decided; it does nothing yet.",
     }
     return sentences[node.effect]
 

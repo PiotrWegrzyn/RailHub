@@ -1,11 +1,8 @@
 """Where growth meets the player's stations (railroads.sim.growth keeps one StationTrade): what
 each station offers the month's trade, settling what it handed out, gathered and was paid for,
-the passengers and mail the buildings around it send, and the experience the player gets when
-buildings rise within its reach.
+the passengers and mail the buildings around it send.
 
-A station sends a piece of mail for every MAIL_PER_PASSENGERS passengers. A building rising in a
-station's reach gives the experience of TRAIN_LOAD units of its goods, a full train of the first
-engine, for each of its stars.
+A station sends a piece of mail for every MAIL_PER_PASSENGERS passengers.
 """
 
 from collections.abc import Mapping
@@ -39,21 +36,17 @@ from railroads.sim.goods import (
     Need,
     makes_of,
     needs_of,
-    price_of,
 )
 from railroads.sim.grids import Cell, Within, flat_within_any
 from railroads.sim.ladders import PASSENGERS_PER_POINT
 from railroads.sim.power_plants import powered_points
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.steps import Steps, finish
-from railroads.sim.tech import GOOD_TREES, Tree
-from railroads.sim.trains import MAX_CARS, PASSENGER_CAR
 
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth
 
 MAIL_PER_PASSENGERS = 5
-TRAIN_LOAD = MAX_CARS * PASSENGER_CAR
 # The needs each good meets, in the order a month's trade hands them out.
 MEETS: dict[Good, tuple[Need, ...]] = {
     good: tuple(step for step in PIPELINE if isinstance(step, Need) and good in FITS[step])
@@ -64,10 +57,8 @@ MEETS: dict[Good, tuple[Need, ...]] = {
 class StationTrade:
     def __init__(self, growth: Growth) -> None:
         self._growth = growth
-        # The cells the player's stations hand goods out to, and the experience growth there
-        # has given since the game began: where, what it became and how much.
+        # The cells the player's stations hand goods out to.
         self.in_reach: set[Cell] = set()
-        self.rewards: list[tuple[Cell, BuildingKind, float]] = []
 
     def orders(self) -> dict[Cell, StationOrder]:
         railway = self._growth.railway
@@ -393,38 +384,6 @@ class StationTrade:
             for station in stations
             for index in self.inner_ring(station).tolist()
         }
-
-    def reward(self, cell: Cell, kind: BuildingKind) -> None:
-        """Gives the player experience when a building in their stations' reach rises: as much
-        as a train full of its goods would earn, for every star it has."""
-        railway = self._growth.railway
-        if railway is None or cell not in self.in_reach:
-            return
-        stars = self._growth.stars(kind)
-        if stars < 2:
-            return
-        gained = 0.0
-        for tree, worth in self._load_worth(kind).items():
-            xp = stars * TRAIN_LOAD * worth
-            railway.research.earn(tree, xp)
-            gained += xp
-        self.rewards.append((cell, kind, gained))
-
-    def _load_worth(self, kind: BuildingKind) -> dict[Tree, float]:
-        """What one unit of a kind's goods is worth to each tree: what it makes, or for those
-        that make nothing, the mix of what they need."""
-        year = self._growth.year
-        makes = makes_of(kind, year)
-        if makes:
-            goods = {good: amount for good, amount in makes.items()}
-        else:
-            goods = {FITS[n][0]: amount for n, amount in needs_of(kind, year).items()}
-        total = sum(goods.values())
-        worth: dict[Tree, float] = {}
-        for good, amount in goods.items():
-            tree = GOOD_TREES[good]
-            worth[tree] = worth.get(tree, 0.0) + amount / total * price_of(good)
-        return worth
 
 
 def as_needs(travellers: dict[Good, float]) -> dict[Need, float]:

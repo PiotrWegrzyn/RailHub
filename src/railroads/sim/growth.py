@@ -549,7 +549,6 @@ class Growth:
         )
         yield
         yield from self.station_trade.settle_steps(self.trade)
-        self.owners.count_commerce(self.trade)
         self.station_trade.update_reach()
         yield
         changed |= self._die_out(self.trade)
@@ -1181,7 +1180,6 @@ class Growth:
         if owned:
             taken = sum(take for _, _, take in plan)
             self.owners.own(cell, new_kind, round(owned / max(taken, 1)))
-        self.station_trade.reward(cell, new_kind)
         return {cell} | {near for near, _, _ in plan} | moved
 
     @contextmanager

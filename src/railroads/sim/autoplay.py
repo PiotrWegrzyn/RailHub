@@ -154,7 +154,7 @@ class StandInPlayer:
                 continue
             self.railway.finances.earn(earned, "cargo")
             if tree is not None:
-                self.railway.research.earn(tree, earned)
+                self.railway.learn(tree, earned)
 
     def _buy(self) -> None:
         """Buys the buildings in its stations' reach that would pay back soonest."""

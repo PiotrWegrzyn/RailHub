@@ -21,11 +21,11 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.economy import OwnedShare, Trade
-from railroads.sim.goods import FITS, Need, makes_of, price_of
+from railroads.sim.economy import OwnedShare
+from railroads.sim.goods import Need, makes_of, price_of
 from railroads.sim.grids import Cell
 from railroads.sim.ladders import IntGrid
-from railroads.sim.tech import SHOPS, Effect, Tree, tree_of
+from railroads.sim.tech import Effect, Tree, tree_of
 
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth
@@ -40,6 +40,9 @@ PAYBACK_YEARS = 30
 # What a building's price is worth, times its price at half satisfaction, at each satisfaction
 # over the last quarter, in between in a straight line.
 PRICE_BY_SATISFACTION = ((0.0, 2 / 3), (0.5, 1.0), (1.0, 1.5), (2.0, 2.0))
+# Every whole building the player owns adds this much to the experience its tree gets from
+# deliveries for each of its points, and the shares of one their part of that.
+EXPERIENCE_PER_POINT = 0.01
 # The name the player's company trades under, whose flag flies over the buildings it owns.
 COMPANY = "The Trains Corp"
 # However much tech cuts the price of shares, they cost at least this share of it.
@@ -210,33 +213,17 @@ class Owners:
             if grid.any()
         }
 
+    def experience_factor(self, tree: Tree) -> float:
+        """How many times what deliveries earn a tree gets as experience: once, and
+        EXPERIENCE_PER_POINT more for each point of the buildings of that tree the player owns,
+        by their shares."""
+        points = self._growth.rule.points
+        owned = sum(
+            points[kind][1] * int(grid.sum()) / SHARES
+            for kind, grid in self._shares.items()
+            if kind in points and tree_of(kind) == tree
+        )
+        return 1.0 + EXPERIENCE_PER_POINT * owned
+
     def _flat(self, cell: Cell) -> int:
         return int(np.ravel_multi_index(cell, self._growth.grid.shape))
-
-    def count_commerce(self, trade: Trade) -> None:
-        """Counts what shops took out of the player's stations as commerce experience. The
-        buildings the player owns pay nothing of their own: their share of what they make goes
-        to the stations around as if a train had brought it, and pays as it is handed out."""
-        railway = self._growth.railway
-        if railway is None:
-            return
-        research = railway.research
-        for (kind, need), (got, _) in trade.goods_got.items():
-            if kind in SHOPS:
-                brought = float((got * from_stations(trade, need)).sum())
-                research.earn(Tree.COMMERCE, brought * price_of(FITS[need][0]))
-
-
-def from_stations(trade: Trade, need: Need) -> npt.NDArray[np.float64]:
-    """The share of what each traded cell's buildings got of a need that came out of the
-    player's stations rather than from sellers nearby."""
-    total = sum(
-        (got for (_, wanted), (got, _) in trade.goods_got.items() if wanted == need),
-        start=np.zeros(trade.cells.size),
-    )
-    local = trade.local.get(need)
-    if local is None:
-        return np.ones(trade.cells.size)
-    return np.where(
-        total > 0, np.clip(1.0 - local / np.where(total > 0, total, 1.0), 0.0, 1.0), 0.0
-    )

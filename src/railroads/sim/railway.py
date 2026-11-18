@@ -81,7 +81,7 @@ from railroads.sim.goods import TRAVELLERS, General, Good, Need
 from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
-from railroads.sim.tech import GENERAL_CARS, GOOD_TREES, Effect, Research
+from railroads.sim.tech import GENERAL_CARS, GOOD_TREES, Effect, Research, Tree
 from railroads.sim.track_network import TrackNetwork
 from railroads.sim.trains import (
     ENGINES,
@@ -493,7 +493,13 @@ class Railway:
         earned = self.station_demand(station).pay(need, good, amount) * self.price_factor(good)
         earned *= self.facility_pay(station, good)
         self.finances.earn(earned, what)
-        self.research.earn(GOOD_TREES[good], earned)
+        self.learn(GOOD_TREES[good], earned)
+
+    def learn(self, tree: Tree, dollars: float) -> None:
+        """Counts what a delivery earned as experience in a tree, more for every building of
+        that tree the player owns shares of (railroads.sim.ownership.Owners.experience_factor)."""
+        factor = 1.0 if self.owners is None else self.owners.experience_factor(tree)
+        self.research.earn(tree, dollars * factor)
 
     def facility_pay(self, station: Cell, good: Good) -> float:
         """How many times as much a good delivered at a station pays with its facilities."""

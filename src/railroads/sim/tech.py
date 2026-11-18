@@ -1,13 +1,13 @@
 """Tech trees: what the player learns by running their business, and the bonuses it brings.
 
-Each tree gains experience in dollars (Research.earn): from what the cargo of its goods earns as
-buildings take it out of the player's stations (railroads.sim.railway), passengers and mail
-from what they pay as they get off, the business trees also from the share of what the
-player's own buildings sell (railroads.sim.ownership), commerce also from what shops take out
-of the player's stations, and any tree from buildings growing a rank around a station (growth
-rewards). Every level a tree reaches gives
-one point to spend on one of its nodes, once the nodes it builds on are taken. A node's effect
-adds up with the others of its kind: in its own tree's buildings and goods, or everywhere.
+Each tree gains experience in dollars (Research.earn) only from deliveries: what the cargo of
+its goods earns as buildings take it out of the player's stations, the share of their own
+buildings' goods included (railroads.sim.railway), and passengers and mail from what they pay
+as they get off. Every point of the buildings of a tree the player owns, by their shares, adds
+1% to what it gets (railroads.sim.ownership.Owners.experience_factor). Every level a tree
+reaches gives one point to spend on one of its nodes, once the nodes it builds on are taken. A
+node's effect adds up with the others of its kind: in its own tree's buildings and goods, or
+everywhere.
 """
 
 from collections.abc import Mapping
@@ -66,6 +66,8 @@ class Effect(Enum):
     CAR_SIZE = "car size"
     # The buildings of a kind the player owns take a good as a boost (railroads.sim.goods.OWNED_BOOSTS).
     TAKES = "takes"
+    # Holds a place in its tree for a bonus still to be decided, and does nothing yet.
+    TO_COME = "still to come"
     # Opens the engines (railroads.sim.trains) that need it, once their year has come, or a
     # general car (GENERAL_CARS).
     UNLOCK = "unlocks"
@@ -101,7 +103,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("villages", "Thriving villages", E.GROWTH, 0.5, "rotation"),
             _n("cold", "Cold stores", E.STORAGE, 300, "silos"),
             _n("hoppers", "Grain hoppers", E.CAR_SIZE, 1, "silos"),
-            _n("coop", "Farmers' cooperative", E.DISCOUNT, 0.05, "stalls"),
+            _n("coop", "Farmers' cooperative", E.TO_COME, 0.0, "stalls"),
             _n(
                 "mixed_vans",
                 "Mixed food vans",
@@ -129,7 +131,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             ),
             _n("fertiliser", "Fertiliser", E.PRODUCTION, 0.25, "rotation"),
             _n("reefers", "Refrigerated vans", E.PRICE, 0.1, "cold", "bread"),
-            _n("conglomerate", "Food conglomerate", E.DISCOUNT, 0.05, "coop"),
+            _n("conglomerate", "Food conglomerate", E.TO_COME, 0.0, "coop"),
             _n("tractors", "Mechanised farming", E.PRODUCTION, 0.25, "fertiliser"),
             _n(
                 "farm_machinery",
@@ -147,7 +149,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("couplings", "Steel couplings", E.PULL, 1, "bessemer"),
             _n("open_hearth", "Open hearth", E.PRODUCTION, 0.25, "bessemer"),
             _n("bearings", "Roller bearings", E.SPEED, 0.05, "boilers"),
-            _n("cartel", "Steel cartel", E.DISCOUNT, 0.05, "open_hearth"),
+            _n("cartel", "Steel cartel", E.TO_COME, 0.0, "open_hearth"),
             _n(
                 "superheaters",
                 "Superheaters",
@@ -160,7 +162,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("bogie_wagons", "Bogie wagons", E.CAR_SIZE, 1, "drawbars", everywhere=True),
             _n("rolling", "Rolling mills", E.PRODUCTION, 0.25, "open_hearth"),
             _n("streamlining", "Streamlining", E.SPEED, 0.1, "superheaters"),
-            _n("works_trust", "Engineering trust", E.DISCOUNT, 0.05, "cartel", "rolling"),
+            _n("works_trust", "Engineering trust", E.TO_COME, 0.0, "cartel", "rolling"),
             _n("oxygen", "Basic oxygen steel", E.PRODUCTION, 0.25, "rolling"),
         ),
         Tree.FUEL: (
@@ -174,7 +176,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("drilling", "Rotary drilling", E.PRODUCTION, 0.25, "seams"),
             _n("pipelines", "Pipelines", E.STORAGE, 300, "drilling"),
             _n("diesel", "Diesel engines", E.UNLOCK, 0.0, "drilling", opens="diesel engines"),
-            _n("fuel_trust", "Fuel trust", E.DISCOUNT, 0.1, "kilns", "drilling"),
+            _n("fuel_trust", "Fuel trust", E.TO_COME, 0.0, "kilns", "drilling"),
             _n("efficiency", "Fuel efficiency", E.UPKEEP, 0.1, "grid"),
         ),
         Tree.CRAFT: (
@@ -192,9 +194,9 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
                 "patterns",
                 opens="general common goods cars, taking whichever pays best",
             ),
-            _n("mills_trust", "Mill owners' trust", E.DISCOUNT, 0.05, "spinning"),
+            _n("mills_trust", "Mill owners' trust", E.TO_COME, 0.0, "spinning"),
             _n("synthetics", "Synthetic dyes", E.PRODUCTION, 0.25, "spinning"),
-            _n("couture", "Couture", E.DISCOUNT, 0.05, "fashion", "mills_trust"),
+            _n("couture", "Couture", E.TO_COME, 0.0, "fashion", "mills_trust"),
         ),
         Tree.MODERN: (
             _n("labs", "Research labs", E.PRODUCTION, 0.25),
@@ -212,7 +214,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             _n("patents", "Patents", E.PRICE, 0.1, "labs"),
             _n("automation", "Automation", E.PRODUCTION, 0.25, "assembly"),
             _n("thyristors", "Thyristor control", E.UNLOCK, 0.0, "relays", opens="fast electrics"),
-            _n("tech_trust", "Technology giant", E.DISCOUNT, 0.1, "patents", "automation"),
+            _n("tech_trust", "Technology giant", E.TO_COME, 0.0, "patents", "automation"),
             _n("computers", "Computer timetables", E.SPEED, 0.1, "thyristors"),
             _n(
                 "maglev",
@@ -225,18 +227,18 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
         ),
         Tree.COMMERCE: (
             _n("books", "Double-entry books", E.DISCOUNT, 0.1, everywhere=True),
-            _n("investors", "Investors", E.DISCOUNT, 0.05, everywhere=True),
+            _n("investors", "Investors", E.TO_COME, 0.0, everywhere=True),
             _n("chains", "Chain stores", E.DISCOUNT, 0.1, "books", everywhere=True),
             _n("regular_customer", "Regular customer", E.FUEL_MARKUP, 0.25, "books"),
             _n("advertising", "Advertising", E.PRICE, 0.05, "investors", everywhere=True),
-            _n("holding", "Holding company", E.DISCOUNT, 0.05, "investors", everywhere=True),
+            _n("holding", "Holding company", E.TO_COME, 0.0, "investors", everywhere=True),
             _n("takeovers", "Hostile takeovers", E.DISCOUNT, 0.15, "chains", everywhere=True),
             _n("brands", "Household brands", E.PRICE, 0.05, "advertising", everywhere=True),
             _n(
                 "empire",
                 "Business empire",
-                E.DISCOUNT,
-                0.1,
+                E.TO_COME,
+                0.0,
                 "holding",
                 "takeovers",
                 everywhere=True,

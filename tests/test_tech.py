@@ -1,16 +1,13 @@
-import numpy as np
 import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.economy import Trade
 from railroads.sim.finance import ELECTRIC_TRACK_UPKEEP, TRACK_UPKEEP
 from railroads.sim.goods import Good, Need, price_of
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import TOWNS, GrowthRule
+from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
-from railroads.sim.station_trade import TRAIN_LOAD
 from railroads.sim.tech import (
     FIRST_LEVEL,
     GOOD_TREES,
@@ -80,13 +77,13 @@ def test_a_node_needs_a_point_and_the_nodes_it_builds_on() -> None:
 def test_bonuses_add_up_in_their_own_tree_and_from_nodes_that_reach_everywhere() -> None:
     research = learned(Tree.FOOD, "seed", "rotation")
     research.earn(Tree.COMMERCE, xp_for(1))
-    research.take("investors")
+    research.take("books")
 
     food = research.bonus(Effect.PRODUCTION, Tree.FOOD)
     metals = research.bonus(Effect.DISCOUNT, Tree.METALS)
 
     assert food == pytest.approx(0.5)
-    assert metals == pytest.approx(0.05)
+    assert metals == pytest.approx(0.1)
 
 
 def test_an_owned_farm_with_better_seed_brings_a_bigger_share_into_the_station() -> None:
@@ -195,40 +192,6 @@ def test_every_building_that_makes_something_has_a_tree_and_shops_are_commerce()
     assert all(NODES[key][0] in Tree for key in NODES)
 
 
-def test_a_tenement_rising_by_a_station_gives_two_trains_worth_of_experience() -> None:
-    growth = joined()
-    grid = growth.constructions.tile_map.grid
-    centre = (5, 20)
-    spots = [centre, *(cell for cell in grid.neighbours(*centre) if cell != (6, 20))]
-    for i in range(16):
-        growth.build(Building(spots[i % len(spots)], BuildingKind.HOUSE))
-    growth.trade_goods()
-    before = sum(growth.railway.research.xp.values())
-
-    growth._turn(centre, TOWNS, np.random.default_rng(0))
-
-    gained = sum(growth.railway.research.xp.values()) - before
-    _, kind, xp = growth.station_trade.rewards[-1]
-    assert kind == BuildingKind.TENEMENT
-    assert gained == pytest.approx(xp) and xp > 0
-    worth = growth.station_trade._load_worth(BuildingKind.TENEMENT)
-    assert xp == pytest.approx(2 * TRAIN_LOAD * sum(worth.values()))
-
-
-def test_nothing_rising_out_of_reach_of_the_stations_gives_experience() -> None:
-    growth = joined()
-    grid = growth.constructions.tile_map.grid
-    spots = [(1, 12), *grid.neighbours(1, 12)]
-    for i in range(16):
-        growth.build(Building(spots[i % len(spots)], BuildingKind.HOUSE))
-    growth.trade_goods()
-
-    growth._turn((1, 12), TOWNS, np.random.default_rng(0))
-
-    assert growth.count(BuildingKind.TENEMENT).sum() == 1
-    assert growth.station_trade.rewards == []
-
-
 def test_electric_engines_find_a_way_only_along_electrified_track() -> None:
     constructions = Constructions(flat_map())
     growth = Growth(constructions, GrowthRule(trades=False))
@@ -314,33 +277,14 @@ def test_freight_taken_out_of_a_station_earns_experience_in_its_goods_tree() -> 
     assert railway.research.xp[Tree.METALS] == 0.0
 
 
-def test_commerce_experience_counts_only_what_shops_got_out_of_the_stations() -> None:
-    growth = joined()
-    assert growth.railway is not None
-    cells = np.array([0, 1])
-    trade = Trade(
-        cells,
-        {},
-        {},
-        {},
-        {},
-        goods_got={(BuildingKind.TAVERN, Need.BEER): (np.array([10.0, 10.0]), np.full(2, 60.0))},
-        local={Need.BEER: np.array([10.0, 4.0])},
-    )
-
-    growth.owners.count_commerce(trade)
-
-    assert growth.railway.research.xp[Tree.COMMERCE] == pytest.approx(6 * price_of(Good.BEER))
-
-
 def test_production_nodes_reach_owned_buildings_and_discounts_every_share() -> None:
-    seed, investors = NODES["seed"][1], NODES["investors"][1]
+    seed, books = NODES["seed"][1], NODES["books"][1]
 
     food = explain(Tree.FOOD, seed)
-    everywhere = explain(Tree.COMMERCE, investors)
+    everywhere = explain(Tree.COMMERCE, books)
 
     assert food == "Every food and drink building you own makes and takes in 25% more."
-    assert everywhere == "Shares of every building cost 5% less."
+    assert everywhere == "Shares of every building cost 10% less."
 
 
 def test_a_node_adding_cars_names_them_once_and_every_unlock_its_first_year() -> None:
@@ -363,3 +307,21 @@ def test_liming_and_farm_machinery_make_owned_farms_take_limestone_and_machinery
 
     assert before == {Need.LIMESTONE}
     assert after == {Need.LIMESTONE, Need.MACHINERY}
+
+
+@pytest.mark.parametrize(("shares", "factor"), [(0, 1.0), (300, 1.003), (1000, 1.01)])
+def test_each_point_of_an_owned_building_adds_a_percent_to_its_trees_experience(
+    shares: int, factor: float
+) -> None:
+    growth = joined()
+    growth.railway.owners = growth.owners
+    growth.build(Building((6, 22), BuildingKind.FARM))
+    growth.owners.own((6, 22), BuildingKind.FARM, shares)
+    growth.railway.station_demand((6, 20)).capacity = {Need.FOOD: 100.0}
+    points = growth.rule.points[BuildingKind.FARM][1]
+
+    growth.railway.pay_for((6, 20), Need.FOOD, Good.WHEAT, 1.0)
+
+    expected = 1 + (factor - 1) * points
+    xp = growth.railway.research.xp[Tree.FOOD]
+    assert xp == pytest.approx(expected * growth.railway.finances.month["cargo"])

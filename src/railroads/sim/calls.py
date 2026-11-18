@@ -51,7 +51,7 @@ class StationCalls:
                         * self._railway.facility_pay(stop.cell, car.good)
                     )
                     self._railway.finances.earn(earned, car.good.value)
-                    self._railway.research.earn(Tree.PASSENGERS, earned)
+                    self._railway.learn(Tree.PASSENGERS, earned)
                     car.empty(car.load)
                     self._railway.history.deliver(self._railway.year, car.good)
                     continue
