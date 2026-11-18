@@ -23,8 +23,9 @@ from railroads.sim.ledger import Takings
 from railroads.sim.ownership import LOT, SHARES
 from railroads.sim.tilemap import Deposit, TileMap
 from railroads.ui.biomes import biome_of
+from railroads.ui.ornate import badge, bar, card, section
 from railroads.ui.spotlight import spot
-from railroads.ui.theme import GONE, GROWN, TEXT_DIM, good_amount
+from railroads.ui.theme import BRASS, GONE, GROWN, TEXT_DIM, good_amount
 
 
 @dataclass(frozen=True)
@@ -93,6 +94,8 @@ class HexDetails:
 
 # Where the goods of a card's lines start, after their labels.
 CARD_LABEL = 56.0
+# How wide the bar after each good on a card's line is.
+FLOW_BAR = 36.0
 
 # How long a cell's description is shown again before it is worked out anew, and how many cells'
 # descriptions are kept: the hovered cell's and the open details' at least. Working one out takes
@@ -259,13 +262,33 @@ def _draw_card(row: BuildingRow) -> bool:
     gave away, what it got, and the player's shares with a button opening their window; returns
     whether that was pressed."""
     pressed = False
-    flags = imgui.ChildFlags_.borders.value | imgui.ChildFlags_.auto_resize_y.value
-    imgui.begin_child(f"card{row.name}", (0, 0), flags)
-    right = imgui.get_cursor_pos_x() + imgui.get_content_region_avail().x
-    imgui.text(f"{row.name.capitalize()} x {row.count}")
+    with card(f"card{row.name}"):
+        pressed = _draw_card_inside(row)
+    imgui.spacing()
+    return pressed
+
+
+def _draw_card_inside(row: BuildingRow) -> bool:
+    pressed = False
+    right = imgui.get_window_width() - imgui.get_style().window_padding.x
+    shown = row.makes[0][0] if row.makes else row.needs[0][0] if row.needs else None
+    badge(shown)
+    imgui.same_line(0, 10)
+    imgui.begin_group()
+    imgui.text_colored(imgui.ImVec4(*BRASS), f"{row.name.capitalize()} x {row.count}")
     mood = mood_text(row)
-    imgui.same_line(right - imgui.calc_text_size(mood).x)
+    imgui.same_line()
+    imgui.set_cursor_pos_x(
+        imgui.get_cursor_pos_x() + imgui.get_content_region_avail().x - imgui.calc_text_size(mood).x
+    )
     imgui.text_colored(imgui.ImVec4(*mood_colour(row)), mood)
+    if row.percent is not None:
+        width = right - imgui.get_cursor_pos_x()
+        bar(row.percent / 2, mood_colour(row), width, 5.0)
+        if imgui.is_item_hovered():
+            imgui.set_tooltip(f"Satisfied {row.percent:.0%} last month, of up to 200%")
+    imgui.end_group()
+    imgui.spacing()
     _draw_line("Made", row.gave, "given away of made")
     if row.needs or row.got:
         _draw_line("Got", row.got, "got of needed")
@@ -290,12 +313,11 @@ def _draw_card(row: BuildingRow) -> bool:
         )
         pressed = imgui.small_button(f"{label}##shares{row.name}")
         spot("buy_shares")
-    imgui.end_child()
     return pressed
 
 
 def _draw_line(label: str, flows: list[Flow], meaning: str) -> None:
-    """A line of a card: what it is about, then each good's icon and how it went."""
+    """A line of a card: what it is about, then each good's icon, how it went and a bar of it."""
     imgui.text_disabled(label)
     if imgui.is_item_hovered():
         imgui.set_tooltip(f"Last month: {meaning}")
@@ -303,8 +325,10 @@ def _draw_line(label: str, flows: list[Flow], meaning: str) -> None:
         imgui.same_line(CARD_LABEL)
         imgui.text_disabled("-")
     for index, flow in enumerate(flows):
-        imgui.same_line(CARD_LABEL if not index else 0, 0 if not index else 12)
+        imgui.same_line(CARD_LABEL if not index else 0, 0 if not index else 14)
         good_amount(flow.good, flow.text)
+        imgui.same_line(0, 6)
+        bar(flow.done / flow.wanted if flow.wanted > 0 else 0.0, BRASS, FLOW_BAR, 4.0)
 
 
 def mood_colour(row: BuildingRow) -> tuple[float, float, float, float]:
@@ -320,8 +344,17 @@ def draw_shares(row: BuildingRow, where: str) -> bool | None:
     sell them, and the buildings' money last year and forecast for the next; returns True if Buy
     was pressed, False if Sell, None if neither."""
     pressed: bool | None = None
-    imgui.text(f"{row.name.capitalize()} x {row.count} at {where}")
-    imgui.spacing()
+    badge(row.makes[0][0] if row.makes else None)
+    imgui.same_line(0, 10)
+    imgui.begin_group()
+    imgui.text_colored(imgui.ImVec4(*BRASS), f"{row.name.capitalize()} x {row.count}")
+    imgui.text_disabled(f"at {where}")
+    imgui.end_group()
+    section("Shares")
+    if row.total:
+        bar(row.owned / row.total, BRASS, imgui.get_content_region_avail().x, 6.0)
+        if imgui.is_item_hovered():
+            imgui.set_tooltip(f"Yours: {row.owned:,} of {row.total:,}")
     table = imgui.TableFlags_.sizing_fixed_fit.value
     if imgui.begin_table("shares", 2, table):
         for label, value, tip in share_lines(row):
@@ -353,26 +386,28 @@ def draw_shares(row: BuildingRow, where: str) -> bool | None:
             and imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value)
         ):
             imgui.set_tooltip(f"Shares bought can be sold five years later: from {row.sell_from}")
-    imgui.spacing()
-    imgui.separator_text("Financial results")
-    if imgui.begin_table("results", 3, table):
+    section("Financial results")
+    if imgui.begin_table("results", 3, table | imgui.TableFlags_.borders_inner_h.value):
         imgui.table_setup_column("")
         imgui.table_setup_column("Last year")
         imgui.table_setup_column("Next year")
-        imgui.table_headers_row()
+        imgui.table_next_row()
+        for heading in ("", "Last year", "Next year"):
+            imgui.table_next_column()
+            imgui.text_disabled(heading)
         for label, last, forecast, tip in result_lines(row):
             imgui.table_next_row()
             imgui.table_next_column()
-            if tip:
-                imgui.text_disabled(label)
-            else:
-                imgui.text(label)
+            colour = TEXT_DIM if tip else BRASS
+            imgui.text_colored(imgui.ImVec4(*colour), label)
             if tip and imgui.is_item_hovered():
                 imgui.set_tooltip(tip)
-            imgui.table_next_column()
-            imgui.text(last)
-            imgui.table_next_column()
-            imgui.text(forecast)
+            for value in (last, forecast):
+                imgui.table_next_column()
+                if tip:
+                    imgui.text(value)
+                else:
+                    imgui.text_colored(imgui.ImVec4(*BRASS), value)
         imgui.end_table()
     return pressed
 

@@ -1,0 +1,237 @@
+"""Ornate window furniture in black, brown and brass, drawn by hand on imgui's draw lists: windows
+with a thin glowing brass edge and corner brackets under a centred, spaced-out title of their own;
+section headings with a fading rule; cards; filled bars; round badges holding a good's icon; and
+tiles for a figure and its label."""
+
+from collections.abc import Iterator
+from contextlib import contextmanager
+
+from imgui_bundle import icons_fontawesome_4 as fa
+from imgui_bundle import imgui
+
+from railroads.sim.goods import Good, Need
+from railroads.ui.theme import BRASS, TEXT_DIM, Rgba, color_u32, draw_good_icon
+
+DEEP = (0.065, 0.05, 0.04, 0.97)
+CARD = (0.12, 0.093, 0.07, 1.0)
+CARD_HEAD = (0.17, 0.125, 0.085, 1.0)
+EDGE = (0.5, 0.36, 0.19, 0.85)
+GLOW = (0.86, 0.6, 0.28)
+TRACK = (0.05, 0.04, 0.03, 1.0)
+# How far the glow round a window reaches, in rings, and how long its corner brackets are.
+GLOW_RINGS = 4
+BRACKET = 14.0
+# The room between the letters of titles and section headings.
+SPACING = 1.6
+TITLE_SCALE = 1.2
+BADGE = 26.0
+
+
+def _fade(colour: tuple[float, float, float], alpha: float) -> int:
+    return color_u32((*colour, alpha))
+
+
+def spaced(text: str, scale: float = 1.0) -> float:
+    """How wide text drawn by spaced_text is."""
+    widths = [imgui.calc_text_size(ch).x * scale for ch in text]
+    return sum(widths) + SPACING * max(len(text) - 1, 0)
+
+
+def spaced_text(
+    draw_list: imgui.ImDrawList,
+    at: tuple[float, float],
+    text: str,
+    colour: Rgba,
+    scale: float = 1.0,
+) -> None:
+    """Text drawn a letter at a time with room between them, as titles are."""
+    size = imgui.get_font_size() * scale
+    font = imgui.get_font()
+    x, y = at
+    for ch in text:
+        draw_list.add_text(font, size, (x, y), color_u32(colour), ch)
+        x += imgui.calc_text_size(ch).x * scale + SPACING
+
+
+@contextmanager
+def ornate_window(title: str, key: str, flags: int = 0) -> Iterator[tuple[bool, bool]]:
+    """A window without imgui's title bar, framed in glowing brass with corner brackets, its
+    title centred over it in spaced capitals and a close cross in its corner; yields whether it
+    is expanded and whether it stays open."""
+    imgui.push_style_color(imgui.Col_.window_bg, imgui.ImVec4(*DEEP))
+    imgui.push_style_color(imgui.Col_.border, imgui.ImVec4(0, 0, 0, 0))
+    imgui.push_style_var(imgui.StyleVar_.window_padding, imgui.ImVec2(16, 12))
+    expanded, _ = imgui.begin(
+        f"{title}###{key}", None, flags | imgui.WindowFlags_.no_title_bar.value
+    )
+    imgui.pop_style_var()
+    imgui.pop_style_color(2)
+    still_open = True
+    try:
+        if expanded:
+            _frame()
+            still_open = _title(title)
+        yield bool(expanded), still_open
+    finally:
+        imgui.end()
+
+
+def _frame() -> None:
+    """The window's glowing brass edge and its corner brackets."""
+    draw_list = imgui.get_window_draw_list()
+    low, size = imgui.get_window_pos(), imgui.get_window_size()
+    high = imgui.ImVec2(low.x + size.x, low.y + size.y)
+    rounding = imgui.get_style().window_rounding
+    draw_list.push_clip_rect_full_screen()
+    for ring in range(GLOW_RINGS, 0, -1):
+        grow = ring * 1.5
+        draw_list.add_rect(
+            (low.x - grow, low.y - grow),
+            (high.x + grow, high.y + grow),
+            _fade(GLOW, 0.07 * (GLOW_RINGS + 1 - ring) / GLOW_RINGS),
+            rounding + grow,
+            thickness=1.5,
+        )
+    draw_list.add_rect(low, high, _fade(GLOW, 0.75), rounding, thickness=1.0)
+    bright = _fade(GLOW, 0.95)
+    inset = 4.0
+    for x, y, dx, dy in (
+        (low.x + inset, low.y + inset, 1, 1),
+        (high.x - inset, low.y + inset, -1, 1),
+        (low.x + inset, high.y - inset, 1, -1),
+        (high.x - inset, high.y - inset, -1, -1),
+    ):
+        draw_list.add_line((x, y), (x + dx * BRACKET, y), bright, 2.0)
+        draw_list.add_line((x, y), (x, y + dy * BRACKET), bright, 2.0)
+    draw_list.pop_clip_rect()
+
+
+def _title(title: str) -> bool:
+    """The window's title centred over it in spaced capitals between fading rules, with a close
+    cross at the right; returns False once the cross is pressed."""
+    draw_list = imgui.get_window_draw_list()
+    text = title.upper()
+    left = imgui.get_cursor_screen_pos()
+    width = imgui.get_content_region_avail().x
+    height = imgui.get_font_size() * TITLE_SCALE
+    wide = spaced(text, TITLE_SCALE)
+    start = left.x + (width - wide) / 2
+    spaced_text(draw_list, (start, left.y), text, BRASS, TITLE_SCALE)
+    middle = left.y + height / 2 + 1
+    rule(draw_list, left.x + 18, start - 10, middle, fade_left=True)
+    rule(draw_list, start + wide + 10, left.x + width - 26, middle, fade_left=False)
+    imgui.dummy((width - 18, height))
+    imgui.same_line(0, 0)
+    imgui.push_style_color(imgui.Col_.button, imgui.ImVec4(0, 0, 0, 0))
+    closed = imgui.small_button(fa.ICON_FA_TIMES)
+    imgui.pop_style_color()
+    imgui.spacing()
+    return not closed
+
+
+def rule(
+    draw_list: imgui.ImDrawList, left: float, right: float, y: float, *, fade_left: bool
+) -> None:
+    """A thin brass rule fading out towards one end."""
+    if right <= left:
+        return
+    solid, clear = _fade(GLOW, 0.8), _fade(GLOW, 0.0)
+    ends = (clear, solid) if fade_left else (solid, clear)
+    draw_list.add_rect_filled_multi_color(
+        (left, y), (right, y + 1), ends[0], ends[1], ends[1], ends[0]
+    )
+
+
+def section(text: str) -> None:
+    """A section heading: small spaced capitals and a rule fading out after them."""
+    imgui.spacing()
+    draw_list = imgui.get_window_draw_list()
+    low = imgui.get_cursor_screen_pos()
+    width = imgui.get_content_region_avail().x
+    label = text.upper()
+    wide = spaced(label, 0.9)
+    spaced_text(draw_list, (low.x, low.y), label, BRASS, 0.9)
+    middle = low.y + imgui.get_font_size() * 0.45 + 1
+    rule(draw_list, low.x + wide + 8, low.x + width, middle, fade_left=False)
+    imgui.dummy((width, imgui.get_font_size()))
+
+
+@contextmanager
+def card(key: str, highlight: bool = False) -> Iterator[None]:
+    """A card: a brown panel with a brass edge, brighter for the one picked."""
+    imgui.push_style_color(imgui.Col_.child_bg, imgui.ImVec4(*CARD))
+    edge = (*GLOW, 0.95) if highlight else EDGE
+    imgui.push_style_color(imgui.Col_.border, imgui.ImVec4(*edge))
+    imgui.push_style_var(imgui.StyleVar_.window_padding, imgui.ImVec2(10, 8))
+    flags = (
+        imgui.ChildFlags_.borders.value
+        | imgui.ChildFlags_.auto_resize_y.value
+        | imgui.ChildFlags_.always_use_window_padding.value
+    )
+    imgui.begin_child(key, (0, 0), flags)
+    try:
+        yield
+    finally:
+        imgui.end_child()
+        imgui.pop_style_var()
+        imgui.pop_style_color(2)
+
+
+def bar(fraction: float, colour: Rgba, width: float, height: float = 6.0) -> None:
+    """A rounded bar filled `fraction` of the way, past 1 drawn full, on the current line."""
+    imgui.dummy((width, imgui.get_text_line_height()))
+    low = imgui.get_item_rect_min()
+    top = low.y + (imgui.get_text_line_height() - height) / 2
+    draw_list = imgui.get_window_draw_list()
+    draw_list.add_rect_filled(
+        (low.x, top), (low.x + width, top + height), color_u32(TRACK), height / 2
+    )
+    filled = width * max(0.0, min(1.0, fraction))
+    if filled >= 1:
+        draw_list.add_rect_filled(
+            (low.x, top), (low.x + filled, top + height), color_u32(colour), height / 2
+        )
+        draw_list.add_line(
+            (low.x + height / 2, top + 1),
+            (low.x + filled - height / 2, top + 1),
+            color_u32((1.0, 0.95, 0.8, 0.25)),
+        )
+    draw_list.add_rect((low.x, top), (low.x + width, top + height), _fade(GLOW, 0.35), height / 2)
+
+
+def badge(good: Good | Need | None) -> None:
+    """A round brass-edged badge holding a good's icon, or a blank one."""
+    imgui.dummy((BADGE, BADGE))
+    low = imgui.get_item_rect_min()
+    centre = (low.x + BADGE / 2, low.y + BADGE / 2)
+    draw_list = imgui.get_window_draw_list()
+    draw_list.add_circle_filled(centre, BADGE / 2, color_u32(TRACK))
+    draw_list.add_circle(centre, BADGE / 2 + 1.5, _fade(GLOW, 0.2), 0, 2.0)
+    draw_list.add_circle(centre, BADGE / 2, _fade(GLOW, 0.85), 0, 1.2)
+    if good is not None:
+        icon = 16.0
+        draw_good_icon(draw_list, good, (centre[0] - icon / 2, centre[1] - icon / 2), icon)
+
+
+def tile(label: str, value: str, colour: Rgba, width: float) -> None:
+    """A tile of a figure: its label small and dim over its value, in a framed brown box."""
+    height = imgui.get_text_line_height() * 2 + 14
+    imgui.dummy((width, height))
+    low, high = imgui.get_item_rect_min(), imgui.get_item_rect_max()
+    draw_list = imgui.get_window_draw_list()
+    draw_list.add_rect_filled(low, high, color_u32(CARD), 5.0)
+    draw_list.add_rect_filled_multi_color(
+        (low.x + 1, low.y + 1),
+        (high.x - 1, low.y + 3),
+        _fade(GLOW, 0.0),
+        _fade(GLOW, 0.5),
+        _fade(GLOW, 0.5),
+        _fade(GLOW, 0.0),
+    )
+    draw_list.add_rect(low, high, color_u32(EDGE), 5.0)
+    draw_list.add_text((low.x + 8, low.y + 6), color_u32(TEXT_DIM), label)
+    font = imgui.get_font()
+    size = imgui.get_font_size() * TITLE_SCALE
+    draw_list.add_text(
+        font, size, (low.x + 8, low.y + 6 + imgui.get_text_line_height()), color_u32(colour), value
+    )

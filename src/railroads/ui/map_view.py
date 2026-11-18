@@ -64,6 +64,7 @@ from railroads.ui.map_overlays import (
 )
 from railroads.ui.map_tools import MapTools
 from railroads.ui.minimap import Minimap, MinimapLayout, view_corners
+from railroads.ui.ornate import ornate_window
 from railroads.ui.pixel.ground import GLOW, glow_strength
 from railroads.ui.pixel.ground_shader import (
     GroundShader,
@@ -89,6 +90,7 @@ from railroads.ui.theme import BRASS, OVERLAY_FLAGS, SIDE_WINDOW_POS, rgba_u32, 
 
 BACKGROUND_COLOR = (0.08, 0.09, 0.11, 1.0)
 DETAILS_SIZE = (460.0, 420.0)
+SHARES_SIZE = (400.0, 400.0)
 # Stepping to a building found zooms in at least this far, so it can be seen.
 VISIT_ZOOM = 4
 # Slopes are lit from the top-left of the screen.
@@ -309,14 +311,13 @@ class MapView:
             return
         imgui.set_next_window_pos(SIDE_WINDOW_POS, imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size(DETAILS_SIZE, imgui.Cond_.first_use_ever.value)
-        expanded, still_open = imgui.begin("Hex details", True)
         details = recently_described(self.growth, self.selected, self._satisfaction)
-        if expanded:
-            pressed = draw_hex_details(details)
-            if pressed is not None:
-                self.shares_of = (self.selected, pressed)
-                self._bought = ""
-        imgui.end()
+        with ornate_window("Hex details", "details") as (expanded, still_open):
+            if expanded:
+                pressed = draw_hex_details(details)
+                if pressed is not None:
+                    self.shares_of = (self.selected, pressed)
+                    self._bought = ""
         if not still_open:
             self.selected = None
             self.shares_of = None
@@ -339,19 +340,18 @@ class MapView:
             (SIDE_WINDOW_POS[0] + DETAILS_SIZE[0] + 8, SIDE_WINDOW_POS[1]),
             imgui.Cond_.first_use_ever.value,
         )
-        expanded, still_open = imgui.begin(
-            "Shares###shares", True, imgui.WindowFlags_.always_auto_resize.value
-        )
-        if expanded:
-            pressed = draw_shares(row, f"{cell[0]}, {cell[1]}")
-            if pressed is not None:
-                owners = self.growth.owners
-                said = owners.buy(cell, row.kind) if pressed else owners.sell(cell, row.kind)
-                held = int(owners.shares(row.kind)[cell])
-                self._bought = said or f"You own {held:,} shares of the {row.kind.value}s here"
-            if self._bought:
-                imgui.text_disabled(self._bought)
-        imgui.end()
+        imgui.set_next_window_size(SHARES_SIZE, imgui.Cond_.first_use_ever.value)
+        with ornate_window("Shares", "shares") as (expanded, still_open):
+            if expanded:
+                pressed = draw_shares(row, f"{cell[0]}, {cell[1]}")
+                if pressed is not None:
+                    owners = self.growth.owners
+                    kind = row.kind
+                    said = owners.buy(cell, kind) if pressed else owners.sell(cell, kind)
+                    held = int(owners.shares(kind)[cell])
+                    self._bought = said or f"You own {held:,} shares of the {kind.value}s here"
+                if self._bought:
+                    imgui.text_disabled(self._bought)
         if not still_open:
             self.shares_of = None
             self._bought = ""

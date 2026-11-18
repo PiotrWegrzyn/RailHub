@@ -20,6 +20,7 @@ from railroads.sim.railway import Railway, Ride
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, MAGLEV_FARE, Engine, Kind, Stop, Train
 from railroads.ui.buy_train import BuyScreen, EnginePicture, engine_range, fuel_use
 from railroads.ui.demand_view import draw_demand
+from railroads.ui.ornate import card, ornate_window, section, tile
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at
 from railroads.ui.spotlight import spot
 from railroads.ui.station_offers import Offer, Supplies, goods_to_load
@@ -132,17 +133,17 @@ class TrainsWindow:
         )
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size_constraints(SMALLEST_WINDOW, (1e6, 1e6))
-        expanded, self.open = imgui.begin(f"{fa.ICON_FA_TRAIN}  Trains###trains", self.open)
-        if expanded:
-            train = self._draw_list(railway)
-            imgui.same_line()
-            imgui.begin_child("train", (0, 0))
-            if train is None:
-                _centered_hint("Buy a train, then give it two stations joined by track.")
-            else:
-                self._draw_train(railway, train, supplies, ground, self.map)
-            imgui.end_child()
-        imgui.end()
+        with ornate_window("Trains", "trains") as (expanded, still_open):
+            if expanded:
+                train = self._draw_list(railway)
+                imgui.same_line()
+                imgui.begin_child("train", (0, 0))
+                if train is None:
+                    _centered_hint("Buy a train, then give it two stations joined by track.")
+                else:
+                    self._draw_train(railway, train, supplies, ground, self.map)
+                imgui.end_child()
+        self.open = still_open
         bought = self.buy.draw(
             railway,
             engines_by_kind(railway.engines()),
@@ -250,7 +251,7 @@ class TrainsWindow:
         self._shown_map = route_map
         map_width = imgui.get_content_region_avail().x * MAP_SHARE
         imgui.begin_child("route", (-map_width, 0))
-        imgui.text_disabled("Route")
+        section("Route")
         self._draw_stops(railway, train, supplies)
         imgui.end_child()
         imgui.same_line()
@@ -358,19 +359,17 @@ class TrainsWindow:
     ) -> bool:
         """One stop as a card: where it is, the cars the train takes on from it, the goods it
         has to load, and what the next stop wants; returns whether it was removed."""
-        flags = imgui.ChildFlags_.borders.value | imgui.ChildFlags_.auto_resize_y.value
-        imgui.begin_child("stop", (0, 0), flags)
-        key = (train.name, index)
-        opened = self._folded.get(key, not (stop.cars and not here))
-        removed, toggled = self._draw_stop_head(railway, train, index, stop, here, opened)
-        if toggled:
-            opened = not opened
-            self._folded[key] = opened
-        if removed:
-            self._folded = {k: v for k, v in self._folded.items() if k[0] != train.name}
-        elif opened:
-            following = train.stops[(index + 1) % len(train.stops)]
-            if len(train.stops) > 1:
+        with card("stop", highlight=here):
+            key = (train.name, index)
+            opened = self._folded.get(key, not (stop.cars and not here))
+            removed, toggled = self._draw_stop_head(railway, train, index, stop, here, opened)
+            if toggled:
+                opened = not opened
+                self._folded[key] = opened
+            if removed:
+                self._folded = {k: v for k, v in self._folded.items() if k[0] != train.name}
+            elif opened and len(train.stops) > 1:
+                following = train.stops[(index + 1) % len(train.stops)]
                 demand = railway.station_demand(following.cell)
                 self._draw_cars(railway, train, index, stop, railway.name_of(following.cell))
                 self._draw_offers(railway, train, index, stop, demand, supplies)
@@ -378,7 +377,6 @@ class TrainsWindow:
                 imgui.text_disabled(f"{railway.name_of(following.cell)} wants")
                 imgui.same_line(CARD_LABEL)
                 draw_demand(demand)
-        imgui.end_child()
         return removed
 
     def _draw_stop_head(
@@ -701,20 +699,14 @@ def _draw_tiles(railway: Railway, ride: Ride, onward: str) -> None:
         f"\n\nNot counted in any one ride: the whole network's upkeep, stations "
         f"{dollars(stations)} and track {dollars(track)} a month"
     )
-    flags = imgui.TableFlags_.sizing_stretch_same.value | imgui.TableFlags_.borders_inner_v.value
-    if not imgui.begin_table("tiles", 3, flags):
-        return
-    imgui.table_next_row()
-    for label, amount, tip in ride_tiles(ride, onward):
-        imgui.table_next_column()
-        imgui.begin_group()
-        imgui.text_disabled(label)
-        colour = BRASS if amount >= 0 else GONE
-        imgui.text_colored(imgui.ImVec4(*colour), signed(amount))
-        imgui.end_group()
+    gap = 8.0
+    width = (imgui.get_content_region_avail().x - 2 * gap) / 3
+    for number, (label, amount, tip) in enumerate(ride_tiles(ride, onward)):
+        if number:
+            imgui.same_line(0, gap)
+        tile(label, signed(amount), BRASS if amount >= 0 else GONE, width)
         if imgui.is_item_hovered():
             imgui.set_tooltip(tip + upkeep)
-    imgui.end_table()
 
 
 def _note_before(note: str, limit: float) -> None:
