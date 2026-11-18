@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 # The player's share of what a building they own sells, handed out around it or taken by a
 # station, and what it costs to buy: this many years of that share at full output.
 OWNER_SHARE = 0.3
-PAYBACK_YEARS = 6
+PAYBACK_YEARS = 10
 # However much tech cuts the price of buildings, they cost at least this share of it.
 MOST_DISCOUNT = 0.5
 POWER_PLANT_PRICE = 2_000_000.0
