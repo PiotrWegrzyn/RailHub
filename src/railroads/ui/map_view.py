@@ -259,15 +259,6 @@ class MapView:
         self.camera.zoom_level = max(self.camera.zoom_level, VISIT_ZOOM)
         self.look_at(cell)
 
-    def biggest_town(self) -> Vec2:
-        """Where the busiest cell of the town sending the most passengers lies, or the middle of
-        the view if no town does."""
-        heart = self.growth.towns.heart_of_biggest()
-        if heart is None:
-            return self._view_center()
-        x, y = self.tile_map.grid.center(*heart)
-        return float(x), float(y)
-
     def toggle_search(self) -> None:
         if self.search.open:
             self.search.close()
@@ -712,11 +703,8 @@ class MapView:
         shows. Nothing here touches the graphics card."""
         finish(self.prepare_steps(size, density, chunks))
 
-    def prepare_steps(
-        self, size: Vec2, density: int, chunks: bool = True, also: IsoCamera | None = None
-    ) -> Steps[None]:
-        """prepare a part at a time, for a page to go on drawing frames between them; with
-        `also`, the chunks that view shows are drawn too."""
+    def prepare_steps(self, size: Vec2, density: int, chunks: bool = True) -> Steps[None]:
+        """prepare a part at a time, for a page to go on drawing frames between them."""
         plain = self._plain_picture()
         yield
         self._soft = (self._ground_version, (yield from soften_steps(plain)))
@@ -729,11 +717,10 @@ class MapView:
         if self.railway.trains:
             yield
             self._train_layer()
-        center = (size[0] / 2, size[1] / 2)
-        for camera in (self.camera, also):
-            if chunks and camera is not None and camera.pixel_scale:
-                yield
-                layer.prepare(camera, center, ((0.0, 0.0), size), density)
+        if chunks and self.camera.pixel_scale:
+            yield
+            center = (size[0] / 2, size[1] / 2)
+            layer.prepare(self.camera, center, ((0.0, 0.0), size), density)
 
     def _pixel_layer(self) -> PixelLayer:
         if self._pixels is None:

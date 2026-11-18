@@ -22,7 +22,7 @@ from railroads.sim.tilemap import Terrain, TileMap
 from railroads.sim.trains import Stop
 from railroads.ui import app as app_module
 from railroads.ui import web_setup
-from railroads.ui.app import OPENING_ZOOM, TOWN_ZOOM, App, Shell
+from railroads.ui.app import OPENING_ZOOM, App, Shell
 from railroads.ui.build_menu import Tool
 from railroads.ui.ground import GroundPictures
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
@@ -732,7 +732,7 @@ def test_without_threads_frames_stay_at_full_speed_while_an_autosave_is_written(
     assert refreshes == []
 
 
-def test_a_new_game_opens_on_the_middle_of_the_map_and_flies_to_its_biggest_town(
+def test_a_new_game_opens_on_the_middle_of_the_map_and_stays_there_as_the_waiting_screen_falls(
     context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
@@ -746,22 +746,17 @@ def test_a_new_game_opens_on_the_middle_of_the_map_and_flies_to_its_biggest_town
         frames += 1
 
     opened = shell._shatter is not None
-    view = shell.app.view if shell.app is not None else None
-    opened_on = None if view is None else (view.camera.center_x, view.camera.center_y)
-    opened_at = None if view is None else view.camera.zoom_level
-    while (shell._shatter or shell._flight) is not None and frames < 600:
+    while shell._shatter is not None and frames < 400:
         shell_frame(shell)
         frames += 1
 
     assert opened
-    assert view is not None
-    assert opened_on == tuple(size / 2 for size in view.tile_map.grid.size())
-    assert opened_at == OPENING_ZOOM
-    assert shell._flight is None
-    assert view.camera.zoom_level == TOWN_ZOOM
-    town = view.growth.towns.heart_of_biggest()
-    assert town is not None
-    assert (view.camera.center_x, view.camera.center_y) == view.tile_map.grid.center(*town)
+    assert shell._shatter is None
+    assert shell.app is not None
+    camera = shell.app.view.camera
+    middle = tuple(size / 2 for size in shell.app.view.tile_map.grid.size())
+    assert (camera.center_x, camera.center_y) == middle
+    assert camera.zoom_level == OPENING_ZOOM
 
 
 def test_the_yolo_button_starts_a_random_place_with_the_other_settings_kept(

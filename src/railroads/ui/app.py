@@ -4,7 +4,6 @@ import sys
 import time
 from collections.abc import Callable
 from concurrent.futures import Future
-from dataclasses import replace
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui, immapp
@@ -30,7 +29,6 @@ from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
 from railroads.sim.game import Game
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
 from railroads.sim.steps import Steps, finish
-from railroads.ui.camera_flight import Flight
 from railroads.ui.help_window import HelpWindow
 from railroads.ui.history_pictures import HistoryPictures
 from railroads.ui.main_menu import (
@@ -61,10 +59,8 @@ WAITING_WIDTH = 320.0
 # them, and its colour.
 PANEL_MARGIN = 12.0
 PANEL_COLOUR = (0.11, 0.1, 0.09, 0.85)
-# A new game opens on the middle of the map at this zoom, and once the waiting screen has fallen
-# away the view flies to its biggest town at TOWN_ZOOM.
+# A new game opens on the middle of the map at this zoom, as the pictures of its history show it.
 OPENING_ZOOM = 3
-TOWN_ZOOM = 5
 # The window's size when the game opens.
 WINDOW_SIZE = (1280.0, 800.0)
 # Saves are written one at a time, away from the frames, so play doesn't stutter. Where threads
@@ -351,8 +347,6 @@ class Shell:
         self._began = 0.0
         self._labels: list[Label] = []
         self._shatter: Shatter | None = None
-        # The view flying to a new game's biggest town once the screen has broken up.
-        self._flight: Flight | None = None
         # The newest picture of a new map's history, with its year, sent from wherever its towns
         # grow; the texture of the one shown, kept until the screen has broken up; and the size
         # in points and density of the window pictures are drawn for.
@@ -409,7 +403,6 @@ class Shell:
         self._new_game_on = new_game_on
         self._began = time.monotonic()
         self._shatter = None
-        self._flight = None
         self._picture = None
         self._texture = None
         self._progress = ""
@@ -428,16 +421,13 @@ class Shell:
             saved = yield from work()
             yield
             app = App.from_saved(saved, self.saves)
-            town = None
             if new_game_on is not None:
                 camera = app.view.camera
                 width, height = app.view.tile_map.grid.size()
                 camera.center_x, camera.center_y = width / 2, height / 2
                 camera.zoom_level = OPENING_ZOOM
-                x, y = app.view.biggest_town()
-                town = replace(camera, center_x=x, center_y=y, zoom_level=TOWN_ZOOM)
             yield
-            yield from app.view.prepare_steps(size, density, chunks, town)
+            yield from app.view.prepare_steps(size, density, chunks)
             return app
 
         self._task = submit_steps(self._executor, prepared)
@@ -461,14 +451,9 @@ class Shell:
                 self._finish(self._task)
         elif self.app is not None:
             self.app.gui()
-            seconds = imgui.get_io().delta_time
-            camera = self.app.view.camera
-            if self._shatter is not None and not self._shatter.draw(seconds):
+            if self._shatter is not None and not self._shatter.draw(imgui.get_io().delta_time):
                 self._shatter = None
                 self._texture = None
-                self._flight = Flight(camera, self.app.view.biggest_town(), TOWN_ZOOM)
-            elif self._flight is not None and not self._flight.fly(camera, seconds):
-                self._flight = None
             self._follow(self.app)
         else:
             self._choose(self.menu.draw())
