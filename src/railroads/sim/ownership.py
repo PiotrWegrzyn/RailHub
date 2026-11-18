@@ -1,15 +1,14 @@
 """The buildings the player owns (railroads.sim.growth keeps one Owners): how many of each kind in
-each cell, what buying one costs, and the share of what they sell that the player is paid.
+each cell, what buying one costs, and the player's share of what they make.
 
-A building costs PAYBACK_YEARS of its owner's share at full output, OWNER_SHARE of what it sells,
-less what the player's tech takes off, down to MOST_DISCOUNT of the price; a power plant of any kind, which
-sells nothing but makes cheap electricity for the player's trains (railroads.sim.fuel_market),
-costs POWER_PLANT_PRICE. Tech in a building's
-tree can raise the share it pays and how many buildings' worth it makes. What a building hands out
-on its own pays more the less satisfied its buyers were over the last quarter, up to SCARCE_WORTH
-times the price (railroads.sim.economy); what goes to stations pays the price. The player's share
-of what a building they own makes goes to the stations around it first, before it is handed
-out. When buildings leave a cell, the player's go last.
+A building pays nothing of its own. The player's share of what it makes, OWNER_SHARE and what tech
+adds, goes into the stations around it before anything is handed out, as if a train had brought
+it, so the stations hand it out to the buildings in their reach and it pays as a delivery does
+(railroads.sim.economy, railroads.sim.station_trade). A building costs PAYBACK_YEARS of that
+share at full output, less what the player's tech takes off, down to MOST_DISCOUNT of the price;
+a power plant of any kind, which makes cheap electricity for the player's trains
+(railroads.sim.fuel_market), costs POWER_PLANT_PRICE. Tech in a building's tree can raise the
+share and how many buildings' worth it makes. When buildings leave a cell, the player's go last.
 """
 
 from collections.abc import Mapping
@@ -46,8 +45,6 @@ class Owners:
     def __init__(self, growth: Growth) -> None:
         self._growth = growth
         self._owned: dict[BuildingKind, IntGrid] = {}
-        # What each kind the player owns earned them last month.
-        self.income: dict[BuildingKind, float] = {}
         self.company = COMPANY
 
     def owned(self, kind: BuildingKind) -> IntGrid:
@@ -170,26 +167,14 @@ class Owners:
             if grid.any()
         }
 
-    def pay(self, trade: Trade) -> None:
-        """Pays the player their share of what the buildings they own sold this month, which
-        is also experience in their trees, and counts what shops took out of the player's
-        stations as commerce experience."""
-        self.income = {}
+    def count_commerce(self, trade: Trade) -> None:
+        """Counts what shops took out of the player's stations as commerce experience. The
+        buildings the player owns pay nothing of their own: their share of what they make goes
+        to the stations around as if a train had brought it, and pays as it is handed out."""
         railway = self._growth.railway
         if railway is None:
             return
         research = railway.research
-        for (kind, good), given in trade.owned_gave.items():
-            worth = trade.worth.get(good, 1.0)
-            earned = float((given * worth).sum()) * price_of(good) * self.share(kind)
-            self.income[kind] = self.income.get(kind, 0.0) + earned
-        for kind, earned in self.income.items():
-            tree = tree_of(kind)
-            if tree is not None:
-                research.earn(tree, earned)
-        total = sum(self.income.values())
-        if total > 0:
-            railway.finances.earn(total, "owned buildings")
         for (kind, need), (got, _) in trade.goods_got.items():
             if kind in SHOPS:
                 brought = float((got * from_stations(trade, need)).sum())

@@ -211,7 +211,7 @@ def test_a_station_gathers_only_what_the_buildings_around_left() -> None:
 @pytest.mark.parametrize(
     ("share", "gathered"), [(0.0, 0.0), (0.5, 0.5 * FARM_MONTH), (1.0, FARM_MONTH)]
 )
-def test_a_station_takes_the_players_share_of_a_farm_they_own_before_the_houses_around(
+def test_a_station_hands_out_the_players_share_of_a_farm_they_own_as_if_a_train_brought_it(
     share: float, gathered: float
 ) -> None:
     tile_map = make_map()
@@ -222,8 +222,9 @@ def test_a_station_takes_the_players_share_of_a_farm_they_own_before_the_houses_
 
     trade = economy.trade(placed, {STATION: StationOrder({}, 100.0)}, owned=owners)
 
-    assert trade.gathered[STATION].get(Good.WHEAT, 0.0) == pytest.approx(gathered)
-    assert eaten_at(economy, trade, (8, 9)) == pytest.approx(FARM_MONTH - gathered)
+    assert trade.owned_brought[STATION].get(Good.WHEAT, 0.0) == pytest.approx(gathered)
+    assert trade.handed[STATION].get(Good.WHEAT, 0.0) == pytest.approx(gathered)
+    assert eaten_at(economy, trade, (8, 9)) == pytest.approx(FARM_MONTH)
 
 
 @pytest.mark.parametrize(
@@ -884,4 +885,6 @@ def test_only_a_farm_the_player_owns_takes_limestone_and_machinery_once_their_te
 
     trade = economy.trade(placed, holding(1000.0, LIMESTONE=50.0, MACHINERY=50.0), owned=owners)
 
-    assert trade.gathered[STATION][Good.WHEAT] == pytest.approx(wheat)
+    gathered = trade.gathered[STATION].get(Good.WHEAT, 0.0)
+    brought = trade.owned_brought[STATION].get(Good.WHEAT, 0.0)
+    assert gathered + brought == pytest.approx(wheat)

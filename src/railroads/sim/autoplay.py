@@ -152,7 +152,7 @@ class StandInPlayer:
             earned = sold * growth.owners.share(kind) * growth.owners.output_factor(kind)
             if earned <= 0:
                 continue
-            self.railway.finances.earn(earned, "owned buildings")
+            self.railway.finances.earn(earned, "cargo")
             if tree is not None:
                 self.railway.research.earn(tree, earned)
 

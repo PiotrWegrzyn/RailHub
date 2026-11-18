@@ -98,6 +98,10 @@ class StationTrade:
         railway = self._growth.railway
         if railway is None:
             return
+        for station, owned in trade.owned_brought.items():
+            goods = railway.station_goods(station)
+            for good, amount in owned.items():
+                goods.bring(good, {station: amount})
         for station, handed in trade.handed.items():
             goods = railway.station_goods(station)
             for good, amount in handed.items():

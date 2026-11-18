@@ -549,7 +549,7 @@ class Growth:
         )
         yield
         yield from self.station_trade.settle_steps(self.trade)
-        self.owners.pay(self.trade)
+        self.owners.count_commerce(self.trade)
         self.station_trade.update_reach()
         yield
         changed |= self._die_out(self.trade)

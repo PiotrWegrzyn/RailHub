@@ -90,18 +90,18 @@ def test_bonuses_add_up_in_their_own_tree_and_from_nodes_that_reach_everywhere()
     assert metals == pytest.approx(0.05)
 
 
-def test_an_owned_farm_with_better_seed_sells_more_and_earns_food_experience() -> None:
+def test_an_owned_farm_with_better_seed_brings_a_bigger_share_into_the_station() -> None:
     growth = joined()
     growth.build(Building((6, 22), BuildingKind.FARM))
     growth.owners.own((6, 22), BuildingKind.FARM)
     growth.railway.research = learned(Tree.FOOD, "seed")
-    before = growth.railway.research.xp[Tree.FOOD]
 
     growth.trade_goods()
 
-    earned = 10 * 1.25 * price_of(Good.WHEAT) * OWNER_SHARE
-    assert growth.owners.income[BuildingKind.FARM] == pytest.approx(earned)
-    assert growth.railway.research.xp[Tree.FOOD] - before == pytest.approx(earned)
+    assert growth.trade.owned_brought[(6, 20)][Good.WHEAT] == pytest.approx(10 * 1.25 * OWNER_SHARE)
+    assert growth.trade.gathered[(6, 20)][Good.WHEAT] == pytest.approx(
+        10 * 1.25 * (1 - OWNER_SHARE)
+    )
 
 
 def test_market_stalls_raise_what_food_cargo_earns() -> None:
@@ -332,7 +332,7 @@ def test_commerce_experience_counts_only_what_shops_got_out_of_the_stations() ->
         local={Need.BEER: np.array([10.0, 4.0])},
     )
 
-    growth.owners.pay(trade)
+    growth.owners.count_commerce(trade)
 
     assert growth.railway.research.xp[Tree.COMMERCE] == pytest.approx(6 * price_of(Good.BEER))
 

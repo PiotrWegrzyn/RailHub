@@ -291,8 +291,9 @@ class Trade:
     # less satisfied the buildings it was handed out to were over the last quarter, and the
     # price itself for what went to stations. Goods missing here were worth their price.
     worth: Mapping[Good, FloatCells] = field(default_factory=dict)
-    # Per kind and good, what the player's own buildings of it gave away.
-    owned_gave: Mapping[tuple[BuildingKind, Good], FloatCells] = field(default_factory=dict)
+    # Per station, what it took of the player's share of their own buildings' goods, to hand
+    # out as if a train had brought it.
+    owned_brought: Mapping[Cell, Mapping[Good, float]] = field(default_factory=dict)
 
     def done(self, kinds: tuple[BuildingKind, ...]) -> FloatCells:
         return sum(
@@ -539,6 +540,7 @@ class _Month:
             station: {} for station in stations
         }
         self.gathered: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
+        self.owned_brought: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
         self.room = {
             station: {
                 good: max(
@@ -579,6 +581,7 @@ class _Month:
                 yield
                 paused = time.perf_counter()
         for good in Good:
+            self._gather_owned(good)
             self._gather(good)
         return (yield from self._settle())
 
@@ -761,8 +764,9 @@ class _Month:
         received[:] = demand - left
 
     def _gather_owned(self, good: Good) -> None:
-        """Lets the stations take the player's share of what the buildings they own made of a
-        good, before any of it is handed out around them, while they have room."""
+        """Brings the player's share of what the buildings they own made of a good into the
+        stations around, while they have room, before any of it is handed out around them: as
+        if a train had brought it, so the stations hand it out and it pays like a delivery."""
         if good in self.first_gathered:
             return
         self.first_gathered.add(good)
@@ -782,7 +786,9 @@ class _Month:
             if taken > 0:
                 left -= took
                 self.sold[good] += took
-                self.gathered[station][good] = self.gathered[station].get(good, 0.0) + taken
+                self.brought[station][good] = self.brought[station].get(good, 0.0) + taken
+                owned = self.owned_brought[station]
+                owned[good] = owned.get(good, 0.0) + taken
                 self.room[station][good] -= taken
 
     def _pairs(self, good: Good) -> tuple[*_Pairs, tuple[float, ...]]:
@@ -927,7 +933,6 @@ class _Month:
             if kind in bonus:
                 bonus[kind] = np.where(hungry, 0.0, bonus[kind])
         goods_gave = {}
-        owned_gave: dict[tuple[BuildingKind, Good], FloatCells] = {}
         shares: dict[Good, FloatCells] = {}
         for (kind, good), offer in self.offers.items():
             if good not in shares:
@@ -935,11 +940,6 @@ class _Month:
             sent = given = offer * shares[good]
             most = self.count[kind] * MAKES[kind][good]
             goods_gave[(kind, good)] = (given, most)
-            mine = self.owned_made.get((kind, good))
-            if mine is not None:
-                owned_gave[(kind, good)] = given * np.where(
-                    offer > 0, mine / np.where(offer > 0, offer, 1.0), 0.0
-                )
             gave[kind] += given
             could_make[kind] += most
             recipe = RECIPES.get(kind)
@@ -976,7 +976,7 @@ class _Month:
                 good: 1.0 + above / np.where(self.sold[good] > 0, self.sold[good], 1.0)
                 for good, above in self.worth_above.items()
             },
-            owned_gave,
+            self.owned_brought,
         )
         self.economy.levels[:] = Satisfaction.UNSATISFIED
         self.economy.levels[self.cells] = trade.levels()
