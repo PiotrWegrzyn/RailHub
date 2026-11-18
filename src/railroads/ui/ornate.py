@@ -78,10 +78,19 @@ def ornate_window(title: str, key: str, flags: int = 0) -> Iterator[tuple[bool, 
 
 def _frame() -> None:
     """The window's glowing brass edge and its corner brackets."""
-    draw_list = imgui.get_window_draw_list()
     low, size = imgui.get_window_pos(), imgui.get_window_size()
     high = imgui.ImVec2(low.x + size.x, low.y + size.y)
-    rounding = imgui.get_style().window_rounding
+    frame_rect(imgui.get_window_draw_list(), low, high, imgui.get_style().window_rounding)
+
+
+def frame_rect(
+    draw_list: imgui.ImDrawList,
+    low: imgui.ImVec2,
+    high: imgui.ImVec2,
+    rounding: float,
+    bracket: float = BRACKET,
+) -> None:
+    """A glowing brass edge round a rectangle on the screen, with brackets at its corners."""
     draw_list.push_clip_rect_full_screen()
     for ring in range(GLOW_RINGS, 0, -1):
         grow = ring * 1.5
@@ -101,8 +110,8 @@ def _frame() -> None:
         (low.x + inset, high.y - inset, 1, -1),
         (high.x - inset, high.y - inset, -1, -1),
     ):
-        draw_list.add_line((x, y), (x + dx * BRACKET, y), bright, 2.0)
-        draw_list.add_line((x, y), (x, y + dy * BRACKET), bright, 2.0)
+        draw_list.add_line((x, y), (x + dx * bracket, y), bright, 2.0)
+        draw_list.add_line((x, y), (x, y + dy * bracket), bright, 2.0)
     draw_list.pop_clip_rect()
 
 
@@ -234,4 +243,55 @@ def tile(label: str, value: str, colour: Rgba, width: float) -> None:
     size = imgui.get_font_size() * TITLE_SCALE
     draw_list.add_text(
         font, size, (low.x + 8, low.y + 6 + imgui.get_text_line_height()), color_u32(colour), value
+    )
+
+
+def frame_window() -> None:
+    """Frames the current window in glowing brass with corner brackets."""
+    _frame()
+
+
+@contextmanager
+def bar_buttons() -> Iterator[None]:
+    """Buttons drawn as dark brown plates with a thin brass edge, as on the bars."""
+    imgui.push_style_color(imgui.Col_.button, imgui.ImVec4(*CARD))
+    imgui.push_style_color(imgui.Col_.button_hovered, imgui.ImVec4(*CARD_HEAD))
+    imgui.push_style_color(imgui.Col_.border, imgui.ImVec4(*EDGE))
+    imgui.push_style_var(imgui.StyleVar_.frame_border_size, 1.0)
+    imgui.push_style_var(imgui.StyleVar_.frame_rounding, 4.0)
+    try:
+        yield
+    finally:
+        imgui.pop_style_var(2)
+        imgui.pop_style_color(3)
+
+
+def diamond(height: float | None = None) -> None:
+    """A small brass diamond between faint upright rules, setting groups of buttons apart."""
+    tall = imgui.get_frame_height() if height is None else height
+    width = 14.0
+    imgui.dummy((width, tall))
+    low = imgui.get_item_rect_min()
+    x, y = low.x + width / 2, low.y + tall / 2
+    draw_list = imgui.get_window_draw_list()
+    draw_list.add_line((x, low.y + 2), (x, y - 6), _fade(GLOW, 0.3))
+    draw_list.add_line((x, y + 6), (x, low.y + tall - 2), _fade(GLOW, 0.3))
+    size = 3.5
+    draw_list.add_quad_filled(
+        (x, y - size), (x + size, y), (x, y + size), (x - size, y), _fade(GLOW, 0.9)
+    )
+
+
+def band(draw_list: imgui.ImDrawList, low: imgui.ImVec2, high: imgui.ImVec2) -> None:
+    """A dark band right across the screen behind a bar, edged below by a glowing rule with a
+    diamond at its middle."""
+    draw_list.add_rect_filled(low, high, color_u32(DEEP))
+    for ring in range(GLOW_RINGS):
+        draw_list.add_line(
+            (low.x, high.y + ring), (high.x, high.y + ring), _fade(GLOW, 0.25 / (ring + 1))
+        )
+    draw_list.add_line((low.x, high.y), (high.x, high.y), _fade(GLOW, 0.8))
+    x, y, size = (low.x + high.x) / 2, high.y, 4.0
+    draw_list.add_quad_filled(
+        (x, y - size), (x + size, y), (x, y + size), (x - size, y), _fade(GLOW, 0.95)
     )

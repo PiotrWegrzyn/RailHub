@@ -64,7 +64,7 @@ from railroads.ui.map_overlays import (
 )
 from railroads.ui.map_tools import MapTools
 from railroads.ui.minimap import Minimap, MinimapLayout, view_corners
-from railroads.ui.ornate import ornate_window
+from railroads.ui.ornate import DEEP, bar_buttons, frame_window, ornate_window
 from railroads.ui.pixel.ground import GLOW, glow_strength
 from railroads.ui.pixel.ground_shader import (
     GroundShader,
@@ -665,7 +665,16 @@ class MapView:
         imgui.set_next_window_pos(
             (right - LENS_GAP, top - LENS_GAP), imgui.Cond_.always.value, (1.0, 1.0)
         )
+        imgui.push_style_color(imgui.Col_.window_bg, imgui.ImVec4(*DEEP))
+        imgui.push_style_color(imgui.Col_.border, imgui.ImVec4(0, 0, 0, 0))
         imgui.begin("##lenses", flags=OVERLAY_FLAGS | imgui.WindowFlags_.no_move.value)
+        imgui.pop_style_color(2)
+        frame_window()
+        with bar_buttons():
+            self._draw_lens_buttons()
+        imgui.end()
+
+    def _draw_lens_buttons(self) -> None:
         for lens, label, tooltip in (
             (
                 Lens.SATISFACTION,
@@ -683,7 +692,6 @@ class MapView:
             if toggle_button(label, self.lens == lens, tooltip):
                 self.lens = None if self.lens == lens else lens
             spot(f"lens:{lens.value}")
-        imgui.end()
 
     def _showing_moods(self) -> bool:
         """Whether the satisfaction lens is on, or Shift is held for it, not while typing."""

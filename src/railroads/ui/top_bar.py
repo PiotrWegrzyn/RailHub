@@ -10,6 +10,7 @@ from imgui_bundle import imgui
 
 from railroads.sim.clock import SPEEDS
 from railroads.sim.finance import Finances, dollars
+from railroads.ui.ornate import band, bar_buttons, diamond, spaced, spaced_text
 from railroads.ui.spotlight import spot
 from railroads.ui.theme import BRASS, GONE, GROWN, danger_button, tip, toggle_button
 
@@ -22,22 +23,49 @@ LEAVE_POPUP = "Leave this game?"
 
 
 def draw_top_bar(app: App) -> None:
+    """The bar on a dark band edged in brass, its groups set apart by diamonds."""
+    draw_list = imgui.get_window_draw_list()
+    top = imgui.get_cursor_screen_pos().y
+    draw_list.channels_split(2)
+    draw_list.channels_set_current(1)
+    with bar_buttons():
+        _draw_top_bar(app)
+    draw_list.channels_set_current(0)
+    pad = imgui.get_style().window_padding.y
+    low = imgui.get_window_pos()
+    bottom = top + imgui.get_frame_height() + pad - 2
+    band(draw_list, low, imgui.ImVec2(low.x + imgui.get_window_width(), bottom))
+    draw_list.channels_merge()
+
+
+def _draw_top_bar(app: App) -> None:
     clock = app.clock
     imgui.align_text_to_frame_padding()
     imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_CLOCK}  {clock.date}")
-    imgui.same_line(0, 16)
+    imgui.same_line(0, 8)
+    diamond()
+    imgui.same_line(0, 8)
     draw_money(app.view.railway.finances)
-    imgui.same_line(0, 16)
+    imgui.same_line(0, 8)
+    diamond()
+    imgui.same_line(0, 8)
     for speed in SPEEDS:
         if toggle_button(f"x{speed}", clock.speed == speed, f"Run {speed} times as fast"):
             clock.speed = speed
         imgui.same_line(0, 2)
-    imgui.same_line(0, 16)
+    imgui.same_line(0, 6)
+    diamond()
+    imgui.same_line(0, 8)
     draw_view_controls(app.view)
     if app.title:
-        imgui.same_line(0, 16)
-        imgui.align_text_to_frame_padding()
-        imgui.text_disabled(app.title)
+        imgui.same_line(0, 8)
+        diamond()
+        imgui.same_line(0, 8)
+        title = app.title.upper()
+        imgui.dummy((spaced(title), imgui.get_frame_height()))
+        at = imgui.get_item_rect_min()
+        text_top = at.y + (imgui.get_frame_height() - imgui.get_font_size()) / 2
+        spaced_text(imgui.get_window_draw_list(), (at.x, text_top), title, BRASS)
     if app.notice:
         imgui.same_line(0, 16)
         imgui.align_text_to_frame_padding()

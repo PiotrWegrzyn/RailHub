@@ -39,15 +39,14 @@ from railroads.sim.routes import Route
 from railroads.sim.tilemap import Relief
 from railroads.sim.track_rules import BRIDGE_RULES, RELIEF_RULES, TUNNEL_RULES, TrackBed
 from railroads.ui.iso_camera import IsoCamera, Vec2
+from railroads.ui.ornate import DEEP, bar_buttons, diamond, frame_window
 from railroads.ui.spotlight import spot
 from railroads.ui.stations_window import StationsWindow
 from railroads.ui.theme import (
-    BORDER,
     BRASS,
     GOOD_COLORS,
     OVERLAY_FLAGS,
     Rgba,
-    color_u32,
     rgba_u32,
     toggle_button,
 )
@@ -218,7 +217,17 @@ class BuildMenu:
         flags = OVERLAY_FLAGS | imgui.WindowFlags_.no_move.value
         imgui.push_style_var(imgui.StyleVar_.window_rounding.value, 12.0)
         imgui.push_style_var(imgui.StyleVar_.window_padding.value, imgui.ImVec2(10, 8))
+        imgui.push_style_color(imgui.Col_.window_bg, imgui.ImVec4(*DEEP))
+        imgui.push_style_color(imgui.Col_.border, imgui.ImVec4(0, 0, 0, 0))
         imgui.begin("##build bar", flags=flags)
+        imgui.pop_style_color(2)
+        frame_window()
+        with bar_buttons():
+            self._draw_bar()
+        imgui.end()
+        imgui.pop_style_var(2)
+
+    def _draw_bar(self) -> None:
         self._draw_hint()
         for tool, label, tooltip in TOOL_BUTTONS:
             if toggle_button(label, self.tool == tool, tooltip, (0, BUTTON_HEIGHT)):
@@ -242,8 +251,6 @@ class BuildMenu:
             (0, BUTTON_HEIGHT),
         ):
             self.stations.open = not self.stations.open
-        imgui.end()
-        imgui.pop_style_var(2)
 
     def _draw_track_options(self) -> None:
         _vertical_rule()
@@ -308,15 +315,8 @@ class BuildMenu:
 
 
 def _vertical_rule() -> None:
-    """A thin upright line between groups of buttons."""
-    position = imgui.get_cursor_screen_pos()
-    imgui.dummy((1, BUTTON_HEIGHT))
-    imgui.get_window_draw_list().add_line(
-        (position.x, position.y + 4),
-        (position.x, position.y + BUTTON_HEIGHT - 4),
-        color_u32(BORDER),
-        1.0,
-    )
+    """A brass diamond between groups of buttons."""
+    diamond(BUTTON_HEIGHT)
 
 
 def draw_trains(
