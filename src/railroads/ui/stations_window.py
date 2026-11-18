@@ -11,6 +11,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
 from railroads.sim.station_goods import StationGoods
 from railroads.ui.demand_view import draw_demand
+from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.theme import (
     BRASS_DARK,
     CARDS_WIDTH,
@@ -64,7 +65,7 @@ class StationsWindow:
             imgui.Cond_.first_use_ever.value,
         )
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
-        expanded, self.open = imgui.begin(f"{fa.ICON_FA_BUILDING}  Stations###stations", self.open)
+        expanded, self.open = begin_ornate(f"{fa.ICON_FA_BUILDING}  Stations###stations")
         if expanded:
             stations = railway.stations()
             if not stations:
@@ -73,7 +74,7 @@ class StationsWindow:
                 )
             else:
                 self._draw_table(railway, stations, look_at, open_station)
-        imgui.end()
+        end_ornate()
 
     def _draw_table(
         self,

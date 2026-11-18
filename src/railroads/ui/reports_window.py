@@ -13,6 +13,7 @@ from railroads.sim.finance import Finances, dollars
 from railroads.sim.fuel_market import Fuel, FuelMarket, FuelMonth, electrified
 from railroads.sim.goods import Good
 from railroads.sim.stats import History
+from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.theme import GOOD_COLORS, WINDOW_TOP
 
 WINDOW_SIZE = (720.0, 640.0)
@@ -281,7 +282,7 @@ class ReportsWindow:
             return
         imgui.set_next_window_pos((60.0, WINDOW_TOP), imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
-        expanded, self.open = imgui.begin("Reports", self.open)
+        expanded, self.open = begin_ornate("Reports")
         if expanded and imgui.begin_tab_bar("reports"):
             if imgui.begin_tab_item("Overview")[0]:
                 shown = report(history, year, stations, population, begun)
@@ -295,7 +296,7 @@ class ReportsWindow:
                 _draw_fuel(fuel)
                 imgui.end_tab_item()
             imgui.end_tab_bar()
-        imgui.end()
+        end_ornate()
 
     def _draw_deliveries(self, shown: Report) -> None:
         imgui.text("Cars delivered, by what they carried")

@@ -27,6 +27,7 @@ from railroads.sim.tech import NODES, Tree, path_to
 from railroads.sim.trains import ENGINES, Engine, successor
 from railroads.ui.buy_train import fuel_use
 from railroads.ui.engine_origins import origins
+from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.search import goods_of
 from railroads.ui.theme import BRASS, LIST_TABLE_FLAGS, WINDOW_TOP, good_amount, good_icon, tip
 
@@ -209,7 +210,7 @@ class HelpWindow:
         )
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
         title = f"{fa.ICON_FA_QUESTION_CIRCLE}  Buildings, goods and engines###help"
-        expanded, self.open = imgui.begin(title, self.open)
+        expanded, self.open = begin_ornate(title)
         if expanded:
             imgui.set_next_item_width(-1)
             hint = f"{fa.ICON_FA_SEARCH}  Filter by building, good or engine"
@@ -231,7 +232,7 @@ class HelpWindow:
                     _draw_paragraphs(MAP_HELP)
                     imgui.end_tab_item()
                 imgui.end_tab_bar()
-        imgui.end()
+        end_ornate()
 
     def _shown(self, *names: str) -> bool:
         words = self.query.lower().split()

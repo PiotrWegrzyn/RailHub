@@ -23,6 +23,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.railway import MAX_LEVEL, Railway
 from railroads.sim.station_goods import STORAGE_STEP, WAITING_STEP, StationGoods
 from railroads.ui.demand_view import draw_demand
+from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.stations_window import look_at_button, stock_bar
 from railroads.ui.theme import (
     BRASS,
@@ -67,7 +68,7 @@ class StationWindow:
         imgui.set_next_window_size_constraints((WINDOW_WIDTH, 0), (WINDOW_WIDTH, 2000))
         name = railway.name_of(station)
         flags = imgui.WindowFlags_.always_auto_resize.value
-        expanded, still_open = imgui.begin(f"{fa.ICON_FA_BUILDING}  {name}###station", True, flags)
+        expanded, still_open = begin_ornate(f"{fa.ICON_FA_BUILDING}  {name}###station", flags)
         if expanded:
 
             def raised(cell: Cell) -> None:
@@ -91,7 +92,7 @@ class StationWindow:
             )
             if _priced_button(label, railway.finances.can_afford(STATION_PRICE)):
                 move(station)
-        imgui.end()
+        end_ornate()
         if not still_open:
             self.station = None
 

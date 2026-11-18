@@ -8,6 +8,7 @@ from imgui_bundle import imgui
 from railroads.tutorial.steps import STEPS, Tutorial
 from railroads.ui import spotlight
 from railroads.ui.buy_train import SCREEN_SIZE as BUY_SCREEN
+from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.theme import BRASS, CARDS_WIDTH, GROWN
 
 # The window sits at first in the column along the right edge that the trains window leaves free,
@@ -30,12 +31,18 @@ def draw_tutorial(tutorial: Tutorial) -> None:
     imgui.set_next_window_pos(
         (display.x - MARGIN, top), imgui.Cond_.first_use_ever.value, (1.0, 0.0)
     )
-    imgui.set_next_window_size((WIDTH, 0), imgui.Cond_.always.value)
+    imgui.set_next_window_size_constraints((WIDTH, 0), (WIDTH, 1e6))
     title = f"{fa.ICON_FA_GRADUATION_CAP}  Tutorial {tutorial.step + 1} of {len(STEPS)}###tutorial"
-    flags = imgui.WindowFlags_.no_collapse.value | imgui.WindowFlags_.no_saved_settings.value
-    expanded, still_open = imgui.begin(title, True, flags)
+    flags = (
+        imgui.WindowFlags_.no_collapse.value
+        | imgui.WindowFlags_.no_saved_settings.value
+        | imgui.WindowFlags_.always_auto_resize.value
+    )
+    expanded, still_open = begin_ornate(title, flags)
     if not imgui.is_popup_open("", imgui.PopupFlags_.any_popup_id.value):
-        imgui.internal.bring_window_to_display_front(imgui.internal.get_current_window())
+        imgui.internal.bring_window_to_display_front(
+            imgui.internal.get_current_window().root_window
+        )
     if expanded:
         imgui.push_text_wrap_pos(0.0)
         imgui.text_colored(imgui.ImVec4(*BRASS), step.title)
@@ -67,6 +74,6 @@ def draw_tutorial(tutorial: Tutorial) -> None:
             imgui.same_line()
             if imgui.small_button("Skip this step"):
                 tutorial.skip()
-    imgui.end()
+    end_ornate()
     if not still_open:
         tutorial.closed = True

@@ -24,6 +24,8 @@ BRACKET = 14.0
 # The room between the letters of titles and section headings.
 SPACING = 1.6
 TITLE_SCALE = 1.2
+# The room at least on each side of a title, for its rules and its close cross.
+TITLE_ROOM = 48.0
 BADGE = 26.0
 
 
@@ -55,25 +57,60 @@ def spaced_text(
 
 @contextmanager
 def ornate_window(title: str, key: str, flags: int = 0) -> Iterator[tuple[bool, bool]]:
-    """A window without imgui's title bar, framed in glowing brass with corner brackets, its
-    title centred over it in spaced capitals and a close cross in its corner; yields whether it
-    is expanded and whether it stays open."""
+    """begin_ornate and end_ornate round what the window holds; yields whether it is expanded
+    and whether it stays open."""
+    shown = begin_ornate(f"{title}###{key}", flags)
+    try:
+        yield shown
+    finally:
+        end_ornate()
+
+
+# The window flags that say how a window scrolls, which its body takes over.
+SCROLL_FLAGS = (
+    imgui.WindowFlags_.horizontal_scrollbar.value
+    | imgui.WindowFlags_.no_scrollbar.value
+    | imgui.WindowFlags_.always_vertical_scrollbar.value
+    | imgui.WindowFlags_.no_scroll_with_mouse.value
+)
+# Whether each ornate window begun and not yet ended opened its body, innermost last.
+_bodies: list[bool] = []
+
+
+def begin_ornate(title: str, flags: int = 0) -> tuple[bool, bool]:
+    """Begins a window without imgui's title bar, framed in glowing brass with corner brackets,
+    its title (the part before any "###", which keys it) centred over it in spaced capitals and a
+    close cross in its corner. Both stay put at the top: what the window holds goes in a body
+    under them, which scrolls on its own. Returns whether it is expanded and whether it stays
+    open; end_ornate ends it."""
+    label, _, key = title.partition("###")
+    key = key or label
     imgui.push_style_color(imgui.Col_.window_bg, imgui.ImVec4(*DEEP))
     imgui.push_style_color(imgui.Col_.border, imgui.ImVec4(0, 0, 0, 0))
     imgui.push_style_var(imgui.StyleVar_.window_padding, imgui.ImVec2(16, 12))
-    expanded, _ = imgui.begin(
-        f"{title}###{key}", None, flags | imgui.WindowFlags_.no_title_bar.value
-    )
+    own = (flags & ~SCROLL_FLAGS) | imgui.WindowFlags_.no_title_bar.value
+    own |= imgui.WindowFlags_.no_scrollbar.value | imgui.WindowFlags_.no_scroll_with_mouse.value
+    expanded, _ = imgui.begin(f"{label}###{key}", None, own)
     imgui.pop_style_var()
     imgui.pop_style_color(2)
     still_open = True
-    try:
-        if expanded:
-            _frame()
-            still_open = _title(title)
-        yield bool(expanded), still_open
-    finally:
-        imgui.end()
+    if expanded:
+        _frame()
+        still_open = _title(label)
+        # A window sizing itself to what it holds keeps the width it is given, and its body
+        # as tall as what is in it.
+        sizes_itself = flags & imgui.WindowFlags_.always_auto_resize.value
+        body = imgui.ChildFlags_.auto_resize_y.value if sizes_itself else 0
+        imgui.begin_child(f"##body{key}", (0, 0), body, flags & SCROLL_FLAGS)
+    _bodies.append(bool(expanded))
+    return bool(expanded), still_open
+
+
+def end_ornate() -> None:
+    """Ends the window begin_ornate began, and its body."""
+    if _bodies.pop():
+        imgui.end_child()
+    imgui.end()
 
 
 def _frame() -> None:
@@ -121,9 +158,9 @@ def _title(title: str) -> bool:
     draw_list = imgui.get_window_draw_list()
     text = title.upper()
     left = imgui.get_cursor_screen_pos()
-    width = imgui.get_content_region_avail().x
     height = imgui.get_font_size() * TITLE_SCALE
     wide = spaced(text, TITLE_SCALE)
+    width = max(imgui.get_content_region_avail().x, wide + 2 * TITLE_ROOM)
     start = left.x + (width - wide) / 2
     spaced_text(draw_list, (start, left.y), text, BRASS, TITLE_SCALE)
     middle = left.y + height / 2 + 1

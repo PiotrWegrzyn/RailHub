@@ -153,6 +153,8 @@ The ideas every rule of the game should follow.
 
 ## Windows
 
+- Every window always shows its title and an X to close it at its top. Both stay put: what the
+  window holds scrolls under them and nothing covers them.
 - A window's main button, such as Buy, is always in view and never scrolls away.
 - Buying opens its own screen with the stats and a big picture of each choice, and what was bought
   is set up on that same screen.
