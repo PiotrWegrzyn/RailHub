@@ -9,6 +9,7 @@ from test_saves import played_game
 
 from railroads.newgame import MapChoice, Settings
 from railroads.saves import SavedGame
+from railroads.sim.constructions import Constructions
 from railroads.sim.steps import finish
 from railroads.ui import web_setup
 from railroads.ui.web_setup import PageSetup, unpacked
@@ -36,9 +37,15 @@ class FakePage:
             return
         report = lambda text: self.inbox.append({"kind": "progress", "text": text})
         advance = lambda done: self.inbox.append({"kind": "advance", "done": done})
-        grown = web_setup.grow(self.settings, report, advance)
+        grown = web_setup.grow(self.settings, report, advance, self.see)
         game = np.frombuffer(ctypes.string_at(grown.address, grown.length), dtype=np.uint8)
         self.inbox.append({"kind": "grown", "game": game, "size": grown.size})
+
+    def see(self, year: int, address: int, length: int, width: int, height: int) -> None:
+        pixels = np.frombuffer(ctypes.string_at(address, length), dtype=np.uint8)
+        self.inbox.append(
+            {"kind": "picture", "year": year, "pixels": pixels, "width": width, "height": height}
+        )
 
     def take(self) -> list[dict[str, Any]]:
         taken, self.inbox = self.inbox, []
@@ -53,9 +60,11 @@ def grows_as(saved: SavedGame) -> Callable[..., SavedGame]:
         settings: Settings,
         report: Callable[[str], None],
         progress: Callable[[float], None] = lambda done: None,
+        look: Callable[[Constructions, int], None] = lambda constructions, year: None,
     ) -> SavedGame:
         report(f"Growing towns for seed {settings.seed}")
         progress(0.5)
+        look(saved.game.constructions, 950)
         return saved
 
     return made
@@ -76,7 +85,7 @@ def test_a_game_grown_in_a_worker_comes_back_as_it_was_grown(
 
     assert saved is not None
     assert progress == ["Growing towns for seed 7"]
-    assert pickle.loads(page.settings or b"") == SETTINGS
+    assert pickle.loads(page.settings or b"")[0] == SETTINGS
     assert saved.clock == grown.clock
     assert saved.game.finances.cash == grown.game.finances.cash
     assert saved.game.railway.stations() == grown.game.railway.stations()
@@ -121,7 +130,7 @@ def test_a_grown_game_is_unpacked_a_few_megabytes_a_frame(
     grown = played_game()
     page = FakePage()
     monkeypatch.setattr(web_setup, "make_game", grows_as(grown))
-    page.start(pickle.dumps(SETTINGS))
+    page.start(pickle.dumps((SETTINGS, (64, 48))))
     page.work()
     message = next(m for m in page.take() if m["kind"] == "grown")
     steps = unpacked(message["game"], message["size"])
@@ -137,3 +146,20 @@ def test_a_grown_game_is_unpacked_a_few_megabytes_a_frame(
 
     assert frames > message["size"] // 4096
     assert saved.game.finances.cash == grown.game.finances.cash
+
+
+def test_the_page_sees_the_pictures_a_worker_takes_of_the_map_growing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(web_setup, "make_game", grows_as(played_game()))
+    page = FakePage()
+    seen: list[tuple[int, tuple[int, ...]]] = []
+    steps = PageSetup(page).grow(
+        SETTINGS, print, see=lambda year, picture: seen.append((year, picture.shape)), size=(64, 48)
+    )
+    next(steps)
+    page.work()
+
+    finish(steps)
+
+    assert seen == [(950, (48, 64, 4))]

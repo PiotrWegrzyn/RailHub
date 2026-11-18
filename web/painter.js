@@ -8,10 +8,11 @@
 // shape, ms} with the pixels' buffer handed over rather than copied, {kind: "failed", world, job,
 // error}, and {kind: "dead", error} if the worker can't go on. Pyodide runs only in module workers.
 // A worker started to grow a new game's towns instead (railroads.ui.web_setup) is sent
-//     {kind: "setup", data}               the game's settings, pickled
-// and answers {kind: "progress", text} and {kind: "advance", done}, the share of the towns'
-// history grown, as the towns grow, then {kind: "grown", game, size} with the game pickled and
-// compressed, or {kind: "failed", error}.
+//     {kind: "setup", data}               the game's settings and the pictures' size, pickled
+// and answers {kind: "progress", text}, {kind: "advance", done}, the share of the towns'
+// history grown, and {kind: "picture", year, pixels, width, height}, a picture of the map
+// (railroads.ui.history_pictures) with its RGBA buffer handed over, as the towns grow, then
+// {kind: "grown", game, size} with the game pickled and compressed, or {kind: "failed", error}.
 import { loadPyodide } from "./pyodide/pyodide.mjs";
 
 const GAME_WHEEL = "wheels/railroads-__VERSION__-py3-none-any.whl";
@@ -82,7 +83,11 @@ function setup({ data }) {
     try {
         const report = text => postMessage({ kind: "progress", text });
         const advance = done => postMessage({ kind: "advance", done });
-        grown = pyodide.pyimport("railroads.ui.web_setup").grow(settings, report, advance);
+        const see = (year, address, length, width, height) => {
+            const pixels = pyodide._module.HEAPU8.slice(address, address + length);
+            postMessage({ kind: "picture", year, pixels: pixels.buffer, width, height }, [pixels.buffer]);
+        };
+        grown = pyodide.pyimport("railroads.ui.web_setup").grow(settings, report, advance, see);
         // Copied by its address in Python's memory, as Pyodide's own copies go wrong past 2 GiB.
         const game = pyodide._module.HEAPU8.slice(grown.address, grown.address + grown.length);
         postMessage({ kind: "grown", game: game.buffer, size: grown.size }, [game.buffer]);

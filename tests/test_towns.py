@@ -44,17 +44,27 @@ def test_a_building_between_two_towns_paints_its_neighbourhood_the_busier_ones_c
     assert towns.town[5, 2] == towns.town[5, 4] == towns.town[5, 6]
 
 
-def test_a_building_going_up_leaves_cells_beyond_its_neighbourhood_alone() -> None:
+def test_a_town_outvoted_around_a_new_building_joins_the_winner_whole() -> None:
     towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
     towns.add((5, 0), 1.0)
     towns.add((5, 2), 1.0)
-    first = int(towns.town[5, 0])
     towns.add((5, 6), 6.0)
 
     towns.add((5, 4), 1.0)
 
+    assert towns.town[5, 0] == towns.town[5, 6]
+
+
+def test_a_new_building_leaves_towns_without_a_cell_around_it_alone() -> None:
+    towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
+    towns.add((5, 0), 1.0)
+    towns.add((5, 6), 6.0)
+    first = int(towns.town[5, 0])
+
+    towns.add((5, 8), 1.0)
+
     assert towns.town[5, 0] == first
-    assert towns.town[5, 2] == towns.town[5, 6] != first
+    assert towns.town[5, 8] == towns.town[5, 6] != first
 
 
 def test_a_cell_emptied_leaves_its_town() -> None:
@@ -144,3 +154,24 @@ def test_a_train_waiting_for_a_full_load_does_not_wait_for_passengers_who_wont_b
 
     assert train.status == "Running"
     assert train.cars[0].load == 0.0
+
+
+def test_the_heart_of_the_biggest_town_is_its_busiest_cell_though_another_town_has_a_busier_one() -> (
+    None
+):
+    towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
+    towns.add((2, 2), 5.0)
+    for cell, sends in (((8, 2), 3.0), ((8, 4), 4.0), ((8, 6), 3.0)):
+        towns.add(cell, sends)
+
+    heart = towns.heart_of_biggest()
+
+    assert heart == (8, 4)
+
+
+def test_a_map_without_towns_has_no_biggest_one() -> None:
+    towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
+
+    heart = towns.heart_of_biggest()
+
+    assert heart is None

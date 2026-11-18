@@ -19,7 +19,7 @@ from railroads.ui.pixel.art.painter import RGB, SHADOW, Sprite, fineness, shade
 from railroads.ui.pixel.models import HEIGHT_PER_WIDTH, Face, Model, draw_model
 from railroads.ui.pixel.projection import PixelProjection
 
-# The hex map's look (railroads.ui.map_view.LOOKS): not turned, a cell wide per cell.
+# The hex map's look (railroads.ui.iso_camera.LOOKS): not turned, a cell wide per cell.
 PROJECTION = PixelProjection.of(HexGrid(rows=1, cols=1, km_per_cell=1.0), 0.0, 1.0)
 # How a building is turned: its u axis runs down to the right of the screen, so its long front
 # wall faces the viewer on the left and its end wall on the right, lit from the top left.

@@ -2,6 +2,7 @@ import math
 from dataclasses import dataclass
 
 from railroads.sim.geo import Coord
+from railroads.sim.grids import GridKind
 
 # On-screen width in pixels of one cell at each zoom level. The furthest levels draw the map as
 # one smooth picture; from PIXEL_CELL_WIDTH on it is pixel art, shown 1 to 6 times as big. The
@@ -91,3 +92,22 @@ class IsoCamera:
         u, v = pixels_x / self._scale, pixels_y / (self._scale * TILT)
         cos, sin = math.cos(self.angle), math.sin(self.angle)
         return cos * u + sin * v, -sin * u + cos * v
+
+
+@dataclass(frozen=True)
+class GridLook:
+    """How a grid sits on screen. Squares are diamonds with north at the top-left, like RT2;
+    hexagons have north up."""
+
+    angle_deg: float
+    cell_units: float
+    # Cell widths in pixels from which the grid shows: first baked into the ground picture, while
+    # there are too many cells to outline one by one, then as sharp lines drawn on top.
+    baked_lines_from: int | None
+    drawn_lines_from: int
+
+
+LOOKS: dict[GridKind, GridLook] = {
+    "square": GridLook(-45.0, math.sqrt(2), baked_lines_from=None, drawn_lines_from=16),
+    "hex": GridLook(0.0, 1.0, baked_lines_from=8, drawn_lines_from=24),
+}

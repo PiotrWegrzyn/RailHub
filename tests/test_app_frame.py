@@ -22,12 +22,12 @@ from railroads.sim.tilemap import Terrain, TileMap
 from railroads.sim.trains import Stop
 from railroads.ui import app as app_module
 from railroads.ui import web_setup
-from railroads.ui.app import App, Shell
+from railroads.ui.app import OPENING_ZOOM, TOWN_ZOOM, App, Shell
 from railroads.ui.build_menu import Tool
 from railroads.ui.ground import GroundPictures
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
 from railroads.ui.main_menu import MENU_WIDTH, MainMenu, Page
-from railroads.ui.map_view import VISIT_ZOOM, Lens, MapView
+from railroads.ui.map_view import Lens, MapView
 from railroads.ui.route_map import soften
 from railroads.ui.web_setup import PageSetup
 from railroads.ui.workers import FrameWorker
@@ -442,14 +442,20 @@ def test_the_waiting_screen_shows_how_far_a_new_game_has_grown(
     assert shell._done == 0.4
 
 
-def grown_on_the_frames(saved: SavedGame) -> Callable[..., Steps[SavedGame]]:
+def grown_on_the_frames(
+    saved: SavedGame, years: tuple[int, ...] = ()
+) -> Callable[..., Steps[SavedGame]]:
     def made(
         settings: Settings,
         report: Callable[[str], None],
         progress: Callable[[float], None] = lambda done: None,
+        look: Callable[[Constructions, int], None] = lambda constructions, year: None,
     ) -> Steps[SavedGame]:
         for done in (0.0, 0.5):
             progress(done)
+            yield
+        for year in years:
+            look(saved.game.constructions, year)
             yield
         progress(1.0)
         return saved
@@ -726,7 +732,7 @@ def test_without_threads_frames_stay_at_full_speed_while_an_autosave_is_written(
     assert refreshes == []
 
 
-def test_a_new_game_opens_on_its_biggest_town_as_the_waiting_screen_falls_away(
+def test_a_new_game_opens_on_the_middle_of_the_map_and_flies_to_its_biggest_town(
     context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
@@ -741,15 +747,21 @@ def test_a_new_game_opens_on_its_biggest_town_as_the_waiting_screen_falls_away(
 
     opened = shell._shatter is not None
     view = shell.app.view if shell.app is not None else None
-    while shell._shatter is not None and frames < 400:
+    opened_on = None if view is None else (view.camera.center_x, view.camera.center_y)
+    opened_at = None if view is None else view.camera.zoom_level
+    while (shell._shatter or shell._flight) is not None and frames < 600:
         shell_frame(shell)
         frames += 1
 
     assert opened
-    assert shell._shatter is None
     assert view is not None
-    assert view.camera.zoom_level >= VISIT_ZOOM
-    assert (view.camera.center_x, view.camera.center_y) == view.tile_map.grid.center(8, 15)
+    assert opened_on == tuple(size / 2 for size in view.tile_map.grid.size())
+    assert opened_at == OPENING_ZOOM
+    assert shell._flight is None
+    assert view.camera.zoom_level == TOWN_ZOOM
+    town = view.growth.towns.heart_of_biggest()
+    assert town is not None
+    assert (view.camera.center_x, view.camera.center_y) == view.tile_map.grid.center(*town)
 
 
 def test_the_yolo_button_starts_a_random_place_with_the_other_settings_kept(
@@ -783,3 +795,27 @@ def test_months_ending_soon_after_an_autosave_are_saved_once_the_gap_has_passed(
 
     assert saved_soon == ["autosave 1"]
     assert app.saves.load("autosave 1").clock.date == app.clock.date
+
+
+def test_a_new_game_shows_its_map_as_its_towns_grow_and_breaks_up_the_last_picture(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
+    monkeypatch.setattr(app_module, "page_setup", lambda: None)
+    monkeypatch.setattr(
+        app_module, "make_game_steps", grown_on_the_frames(played_game(), (850, 900, 950))
+    )
+    shell = Shell(Saves(tmp_path))
+    shell.start(SETTINGS)
+    shown: list[int] = []
+    frames = 0
+    while shell.app is None and frames < 40:
+        shell_frame(shell)
+        if shell._texture is not None and shell._texture[0][0] not in shown:
+            shown.append(shell._texture[0][0])
+        frames += 1
+
+    assert shown == [850, 950]
+    assert shell._shatter is not None
+    assert shell._shatter.picture is not None
+    assert "The map in 950" in [label.text for label in shell._shatter.labels]

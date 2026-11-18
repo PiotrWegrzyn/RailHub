@@ -48,9 +48,10 @@ def seed_steps(
     months: int = MONTHS_BEFORE_PLAY,
     history: History | None = None,
     progress: Callable[[float], None] = lambda done: None,
+    look: Callable[[Constructions, int], None] = lambda constructions, year: None,
 ) -> Steps[Constructions]:
     """seed_buildings in steps, a pause after each HISTORY_STEP, telling `progress` the share of
-    the months grown so far."""
+    the months grown so far and showing `look` the buildings and the year they have grown to."""
     tile_map = replace(
         tile_map, vegetation=tile_map.vegetation.copy(), deposits=place_deposits(tile_map, rng)
     )
@@ -59,9 +60,11 @@ def seed_steps(
     grown = Growth(constructions, rule, start_year=HISTORY_START, history=history)
     for done in range(0, months, HISTORY_STEP):
         progress(done / months if months else 1.0)
+        look(constructions, grown.year)
         yield
         yield from grown.month_steps(rng, min(HISTORY_STEP, months - done))
     muster_garrisons(constructions, play_begins(months), rng)
+    look(constructions, grown.year)
     progress(1.0)
     return constructions
 

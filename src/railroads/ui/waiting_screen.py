@@ -1,6 +1,6 @@
-"""What the waiting screen shows while a new game is set up: a line of make-believe work that
-changes every few seconds, opened by two jokes when the map is a random place; and, once the game
-is ready, the screen breaking into hexes that fall away to show it."""
+"""The waiting screen of a new game breaking into hexes that fall away to show the game once it is
+ready, each hex carrying the part of the screen it covered: the newest picture of the map growing
+(railroads.ui.history_pictures), or the plain background, and the lines shown over it."""
 
 import math
 from dataclasses import dataclass
@@ -8,22 +8,6 @@ from typing import Self
 
 import numpy as np
 from imgui_bundle import imgui
-
-RANDOM_JOKES = ("Random bullshit coming!", "Lerooorryyy jennnnnkinssss")
-JOKE_SECONDS = 5.0
-WORK = (
-    "Turning cogs",
-    "Steaming the engine",
-    "Playing with the hexes",
-    "Pouring water",
-    "Sprinkling sand",
-    "Making people",
-    "Making more people",
-    "Growing them apples",
-    "Shoveling cow shit",
-    "Handing out bread",
-)
-WORK_SECONDS = 2.5
 
 # The falling hexes: their size, when the cracks show and the first falls, how much later the
 # outermost falls than the middle one, and how hard they fall (pixels a second squared).
@@ -35,15 +19,8 @@ GRAVITY = 2600.0
 CRACK_COLOUR = (0.0, 0.0, 0.0, 0.55)
 # The most a frame moves the hexes on, so the slow first frames of a game can't skip their fall.
 LONGEST_STEP = 0.1
-
-
-def waiting_line(seconds: float, random_place: bool) -> str:
-    """The line shown `seconds` after a new game began to be set up."""
-    if random_place:
-        if seconds < JOKE_SECONDS * len(RANDOM_JOKES):
-            return RANDOM_JOKES[int(seconds // JOKE_SECONDS)]
-        seconds -= JOKE_SECONDS * len(RANDOM_JOKES)
-    return WORK[int(seconds // WORK_SECONDS) % len(WORK)]
+# A hexagon's corners (_hexagon) as the two quads either side of its middle.
+HALVES = ((0, 1, 2, 3), (3, 4, 5, 0))
 
 
 @dataclass(frozen=True)
@@ -119,9 +96,17 @@ class Shatter:
     with them."""
 
     def __init__(
-        self, width: float, height: float, colour: int, labels: list[Label], seed: int = 0
+        self,
+        width: float,
+        height: float,
+        colour: int,
+        labels: list[Label],
+        seed: int = 0,
+        picture: imgui.ImTextureRef | None = None,
     ) -> None:
+        self.width = width
         self.height = height
+        self.picture = picture
         self.colour = colour
         self.pieces = Pieces.covering(width, height, np.random.default_rng(seed))
         self.labels = labels
@@ -139,11 +124,16 @@ class Shatter:
             imgui.ImVec4(*CRACK_COLOUR[:3], CRACK_COLOUR[3] * min(self.seconds / CRACK_SECONDS, 1))
         )
         x, y, turn = self.pieces.at(self.seconds)
-        for cx, cy, a in zip(x.tolist(), y.tolist(), turn.tolist(), strict=True):
+        homes = zip(self.pieces.x.tolist(), self.pieces.y.tolist(), strict=True)
+        for cx, cy, a, home in zip(x.tolist(), y.tolist(), turn.tolist(), homes, strict=True):
             if cy - HEX_RADIUS > self.height:
                 continue
             # Filled a pixel bigger than its outline, so no seam shows between hexes in place.
-            draw.add_convex_poly_filled(_hexagon(cx, cy, a, HEX_RADIUS + 1), self.colour)
+            corners = _hexagon(cx, cy, a, HEX_RADIUS + 1)
+            if self.picture is None:
+                draw.add_convex_poly_filled(corners, self.colour)
+            else:
+                self._draw_piece(draw, corners, _hexagon(*home, 0.0, HEX_RADIUS + 1))
             draw.add_polyline(
                 _hexagon(cx, cy, a, HEX_RADIUS),
                 crack,
@@ -159,6 +149,16 @@ class Shatter:
             else:
                 draw.add_text(top_left, label.colour, label.text)
         return True
+
+    def _draw_piece(
+        self, draw: imgui.ImDrawList, corners: list[imgui.ImVec2], home: list[imgui.ImVec2]
+    ) -> None:
+        """Draws a hex with the part of the picture it covered in place: as two quads, the
+        halves of the hexagon above and below its middle."""
+        assert self.picture is not None
+        for half in HALVES:
+            uv = [imgui.ImVec2(home[i].x / self.width, home[i].y / self.height) for i in half]
+            draw.add_image_quad(self.picture, *(corners[i] for i in half), *uv)
 
 
 def _hexagon(x: float, y: float, turn: float, radius: float) -> list[imgui.ImVec2]:
