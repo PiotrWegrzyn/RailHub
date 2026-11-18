@@ -1,6 +1,6 @@
 [project]
 name = "railroads"
-version = "0.5.70"
+version = "0.5.71"
 description = "A mechanics-first railroad tycoon game."
 readme = "README.md"
 authors = [
