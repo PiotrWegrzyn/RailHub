@@ -123,3 +123,16 @@ def test_only_shares_bought_five_years_ago_can_be_sold_now() -> None:
 
     assert sellable == LOT
     assert growth.owners.sellable_from((5, 5), BuildingKind.FARM) == growth.start_year + 6
+
+
+def test_a_buildings_satisfaction_is_its_own_over_the_months_of_the_last_quarter() -> None:
+    growth = joined_with_owned_farm(SHARES)
+    moods = []
+    for _ in range(4):
+        trade_for(growth, 1)
+        position = int(np.searchsorted(growth.trade.cells, flat(growth, FARM)))
+        moods.append(float(growth.trade.share((BuildingKind.FARM,))[position]))
+
+    satisfaction = growth.ledger.satisfaction(BuildingKind.FARM, flat(growth, FARM))
+
+    assert satisfaction == pytest.approx(sum(moods[-3:]) / 3)

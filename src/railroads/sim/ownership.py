@@ -7,11 +7,12 @@ before anything is handed out, as if a train had brought it, so the stations han
 buildings in their reach and it pays as a delivery does (railroads.sim.economy,
 railroads.sim.station_trade). A whole building costs PAYBACK_YEARS of all it makes at full
 output at full satisfaction, from two thirds of that with none to twice that at 200%
-(PRICE_BY_SATISFACTION), by how satisfied its cell was over the last quarter, less what the
-player's tech takes off, down to MOST_DISCOUNT of the price; shares sell at the price they buy
-at. A power plant of any kind, which makes cheap electricity for the player's trains
-(railroads.sim.fuel_market), costs POWER_PLANT_PRICE. Tech in a building's tree can raise how
-many buildings' worth it makes. When buildings leave a cell, the player's shares go last.
+(PRICE_BY_SATISFACTION), by how satisfied the buildings of its kind in its cell were over the
+last quarter (railroads.sim.ledger), less what the player's tech takes off, down to
+MOST_DISCOUNT of the price; shares sell at the price they buy at. A power plant of any kind,
+which makes cheap electricity for the player's trains (railroads.sim.fuel_market), costs
+POWER_PLANT_PRICE. Tech in a building's tree can raise how many buildings' worth it makes. When
+buildings leave a cell, the player's shares go last.
 """
 
 from collections.abc import Mapping
@@ -131,13 +132,14 @@ class Owners:
 
     def lot_price(self, cell: Cell, kind: BuildingKind) -> float | None:
         """What LOT shares of a building of a kind in a cell cost, or fetch, now: by how
-        satisfied the cell was over the last quarter; None for what cannot be bought."""
+        satisfied the buildings of that kind there were over the last quarter, not the rest of
+        the cell; None for what cannot be bought."""
         whole = self.price_to_buy(kind)
         if whole is None:
             return None
         if kind in POWER_PLANTS:
             return whole * LOT / SHARES
-        satisfaction = float(self._growth.economy.last_quarter()[self._flat(cell)])
+        satisfaction = self._growth.ledger.satisfaction(kind, self._flat(cell))
         return whole * LOT / SHARES * satisfaction_price(satisfaction)
 
     def buy(self, cell: Cell, kind: BuildingKind) -> str | None:

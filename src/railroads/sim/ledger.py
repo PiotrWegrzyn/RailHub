@@ -5,7 +5,9 @@ market price for (railroads.sim.station_trade), and about what carrying it on ea
 (railroads.sim.goods.freight_of) before what the buyer's satisfaction adds.
 
 The ledger keeps this year so far, the last year and the last QUARTER months, so a building's
-results show last year's money and a forecast for the next: its last quarter, for a whole year."""
+results show last year's money and a forecast for the next: its last quarter, for a whole year.
+It also keeps how satisfied the buildings of each kind in each cell were in each of those months,
+which their shares are priced by (railroads.sim.ownership)."""
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -51,13 +53,16 @@ class _Books:
     year: npt.NDArray[np.float64] = field(default_factory=lambda: _empty(MEASURES))
     last: npt.NDArray[np.float64] = field(default_factory=lambda: _empty(MEASURES))
     recent: npt.NDArray[np.float64] = field(default_factory=lambda: _empty(QUARTER, MEASURES))
+    # Each of the last QUARTER months, how satisfied the buildings were, and 1 where they traded.
+    moods: npt.NDArray[np.float64] = field(default_factory=lambda: _empty(QUARTER))
+    seen: npt.NDArray[np.float64] = field(default_factory=lambda: _empty(QUARTER))
 
     def place(self, cells: npt.NDArray[np.intp]) -> npt.NDArray[np.intp]:
         """Where each of these flat cells stands in the books, making room for those new to them."""
         joined = np.union1d(self.cells, cells)
         if joined.size != self.cells.size:
             at = np.searchsorted(joined, self.cells)
-            for name in ("year", "last", "recent"):
+            for name in ("year", "last", "recent", "moods", "seen"):
                 old = getattr(self, name)
                 grown = np.zeros((*old.shape[:-1], joined.size))
                 grown[..., at] = old
@@ -72,10 +77,15 @@ class _Books:
     def close_year(self) -> None:
         self.last = self.year
         self.year = np.zeros_like(self.last)
-        kept = (self.last != 0).any(axis=0) | (self.recent != 0).any(axis=(0, 1))
+        kept = (
+            (self.last != 0).any(axis=0)
+            | (self.recent != 0).any(axis=(0, 1))
+            | (self.seen != 0).any(axis=0)
+        )
         self.cells = self.cells[kept]
         self.last, self.year = self.last[:, kept], self.year[:, kept]
         self.recent = self.recent[..., kept]
+        self.moods, self.seen = self.moods[:, kept], self.seen[:, kept]
 
 
 class Ledger:
@@ -102,14 +112,30 @@ class Ledger:
         for books in self._books.values():
             books.recent = np.roll(books.recent, -1, axis=0)
             books.recent[-1] = 0.0
-        for kind, takings in _takings(trade).items():
-            found = (takings != 0).any(axis=0)
+            for name in ("moods", "seen"):
+                rows = np.roll(getattr(books, name), -1, axis=0)
+                rows[-1] = 0.0
+                setattr(books, name, rows)
+        takings = _takings(trade)
+        for kind in takings.keys() | trade.got.keys():
+            taken = takings.get(kind)
+            moods = trade.share((kind,), np.nan) if kind in trade.got else None
+            found = np.zeros(trade.cells.size, dtype=bool)
+            if taken is not None:
+                found |= (taken != 0).any(axis=0)
+            if moods is not None:
+                found |= ~np.isnan(moods)
             if not found.any():
                 continue
             books = self._books.setdefault(kind, _Books())
             at = books.place(trade.cells[found])
-            books.year[:, at] += takings[:, found]
-            books.recent[-1][:, at] = takings[:, found]
+            if taken is not None:
+                books.year[:, at] += taken[:, found]
+                books.recent[-1][:, at] = taken[:, found]
+            if moods is not None:
+                mood = moods[found]
+                books.moods[-1][at] = np.nan_to_num(mood)
+                books.seen[-1][at] = ~np.isnan(mood)
 
     def last_year(self, kind: BuildingKind, flat: int) -> Takings | None:
         """What the buildings of a kind in a flat cell took last year; None if trade did not run
@@ -134,6 +160,16 @@ class Ledger:
             return Takings(0.0, 0.0, 0.0)
         scale = 12 / months
         return Takings(taken.output * scale, taken.sold * scale, taken.freight * scale)
+
+    def satisfaction(self, kind: BuildingKind, flat: int) -> float:
+        """How satisfied the buildings of a kind in a flat cell were over the last quarter, on
+        average over the months they traded; full before they traded at all."""
+        books = self._books.get(kind)
+        at = None if books is None else books.find(flat)
+        if books is None or at is None:
+            return 1.0
+        months = float(books.seen[:, at].sum())
+        return float(books.moods[:, at].sum()) / months if months else 1.0
 
     def _read(
         self,

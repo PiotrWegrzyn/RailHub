@@ -6,6 +6,7 @@ from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.goods import Good, price_of
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import FACTORIES, FARMS_CROWDED_OUT, GrowthRule
+from railroads.sim.ledger import _Books
 from railroads.sim.ownership import HOLD_MONTHS, LOT, PAYBACK_YEARS, SHARES, satisfaction_price
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
@@ -20,8 +21,16 @@ def grown(*placed: tuple[tuple[int, int], BuildingKind]) -> Growth:
     return growth
 
 
-def satisfied(growth: Growth, satisfaction: float = 1.0) -> Growth:
-    growth.economy.months = [np.full(growth.economy.cells, satisfaction) for _ in range(3)]
+def satisfied(
+    growth: Growth,
+    satisfaction: float = 1.0,
+    kind: BuildingKind = BuildingKind.FARM,
+    cell: tuple[int, int] = (5, 5),
+) -> Growth:
+    books = growth.ledger._books.setdefault(kind, _Books())
+    at = books.place(np.array([np.ravel_multi_index(cell, growth.grid.shape)]))
+    books.moods[:, at] = satisfaction
+    books.seen[:, at] = 1.0
     return growth
 
 
@@ -186,3 +195,22 @@ def test_shares_can_be_sold_only_five_years_after_they_were_bought(
     problem = growth.owners.sell((5, 5), BuildingKind.FARM)
 
     assert problem is None if said is None else said in str(problem)
+
+
+def test_shares_are_priced_by_the_buildings_own_satisfaction_not_the_rest_of_the_cell() -> None:
+    growth = satisfied(grown(((5, 5), BuildingKind.FARM)), 1.0)
+    growth.economy.months = [np.zeros(growth.economy.cells) for _ in range(3)]
+
+    price = growth.owners.lot_price((5, 5), BuildingKind.FARM)
+
+    assert price == pytest.approx(12 * PAYBACK_YEARS * 10 * price_of(Good.WHEAT) * LOT / SHARES)
+
+
+def test_a_building_that_never_traded_is_priced_as_fully_satisfied() -> None:
+    growth = grown(((5, 5), BuildingKind.FARM))
+
+    satisfaction = growth.ledger.satisfaction(
+        BuildingKind.FARM, int(np.ravel_multi_index((5, 5), growth.grid.shape))
+    )
+
+    assert satisfaction == 1.0
