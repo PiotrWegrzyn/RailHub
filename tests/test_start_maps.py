@@ -55,7 +55,7 @@ def test_baked_maps_can_be_long_and_thin_either_way() -> None:
 def test_a_start_map_is_found_by_its_key_or_its_menu_title() -> None:
     by_key = maps.start_map("japan")
 
-    by_title = maps.start_map("Japan: Hiroshima to Tokyo")
+    by_title = maps.start_map("Japan: Osaka to Nagoya")
 
     assert by_key is not None and by_key.key == "japan"
     assert by_title is by_key

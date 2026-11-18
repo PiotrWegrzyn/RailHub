@@ -24,9 +24,9 @@ uv run railroads
 It opens on the main menu: start a new game, load a saved one, or quit. A new game is set up
 first with:
 - the map: one of the baked maps of real places, or a random place in the world (made from the
-  world's map data in `world/`, see Map data). The baked maps are Poland, Germany, France (Paris to Lyon),
-  Great Britain, Italy (Venice to Rome), Moscow, Constantinople, the Alps, the Norwegian fjords,
-  the US Northeast, California, the Colorado Rockies, Central Chile, Japan (Hiroshima to Tokyo),
+  world's map data in `world/`, see Map data). The baked maps are Poland, Germany, France (Paris and the Loire),
+  Great Britain, Italy (Bologna and Florence), Moscow, Constantinople, the Alps, the Norwegian fjords,
+  the US Northeast, California, the Colorado Rockies, Central Chile, Japan (Osaka to Nagoya),
   China's Yangtze delta and Southeast Australia, listed in `START_MAPS` in
   `src/railroads/maps/__init__.py`. Each is baked cut to its land, so some are long and thin or
   wide, and all are 2 km a hex; a game starts on the square in the middle of the place, holding a
