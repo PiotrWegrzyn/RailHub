@@ -74,10 +74,10 @@ def _kind(
 ) -> str:
     if fine_relief and resolution > 1:
         kind = "fine raised"
-    elif world.rises(chunk_x, chunk_y):
-        kind = "raised"
     else:
-        kind = "flat over ground" if over_ground else "flat"
+        kind = "raised" if world.rises(chunk_x, chunk_y) else "flat"
+        if over_ground:
+            kind += " over ground"
     return f"{kind} x{resolution}"
 
 

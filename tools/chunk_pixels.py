@@ -3,10 +3,11 @@ change to the drawing code left every pixel as it was. It grows the seeded map o
 years of stand-in play, lays single, double and electric track between its towns and into the
 mountains, then draws chunks of flat land, coast, lakes and rivers, towns, fields, woods, hills and
 mountains, track, bridges, tunnels and stations, the map's edge and beyond it: each at both
-resolutions, plain and over the ground the graphics card draws, and with fine raised ground where
-the land rises. Track being planned, the lift of points on raised ground and the ground showing at
-pixels are saved too. Last, every cell round a flat chunk and a hilly one that will take them is
-filled with fields and groves, crowded far more than any real farmland, and both are drawn again.
+resolutions, plain and over the ground the graphics card draws and raises, and with fine raised
+ground where the land rises. Track being planned, the lift of points on raised ground and the
+ground showing at pixels are saved too. Last, every cell round a flat chunk and a hilly one that
+will take them is filled with fields and groves, crowded far more than any real farmland, and both
+are drawn again.
 
 Run it on the code before a change, then on the code after; the check names every difference:
     uv run python tools/chunk_pixels.py save build/chunks.npz --game build/chunks-game.save
@@ -181,8 +182,8 @@ def pick_chunks(world: PixelWorld, saved: SavedGame, track: list[Cell]) -> dict[
 
 
 def drawings(world: PixelWorld, chunks: dict[str, tuple]) -> Iterator[tuple[str, np.ndarray]]:
-    """Every way each chunk is drawn, by name: plain and over ground at both resolutions where
-    nothing rises, and plain at both resolutions and with fine raised ground where it does."""
+    """Every way each chunk is drawn, by name: plain and over ground at both resolutions, and
+    with fine raised ground where the land rises."""
     seen: set[tuple[int, int]] = set()
     for name, chunk in chunks.items():
         if chunk in seen:
@@ -191,11 +192,10 @@ def drawings(world: PixelWorld, chunks: dict[str, tuple]) -> Iterator[tuple[str,
         label = f"{name} {chunk[0]} {chunk[1]}"
         for k in (1, FINE):
             yield f"{label} x{k}", world.render(*chunk, k)
+        for k in (1, FINE):
+            yield f"{label} over x{k}", world.render(*chunk, k, over_ground=True)
         if world.rises(*chunk):
             yield f"{label} fine x{FINE}", world.render(*chunk, FINE, fine_relief=True)
-        else:
-            for k in (1, FINE):
-                yield f"{label} over x{k}", world.render(*chunk, k, over_ground=True)
 
 
 def extras(world: PixelWorld, saved: SavedGame) -> Iterator[tuple[str, np.ndarray]]:

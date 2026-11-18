@@ -6,6 +6,7 @@ from railroads.ui.map_view import LOOKS
 from railroads.ui.pixel import ground_shader
 from railroads.ui.pixel.ground_shader import ChunkTexture, GroundShader, screen_of, view_of
 from railroads.ui.pixel.projection import PixelProjection
+from railroads.ui.pixel.relief import Elevation
 
 
 def test_the_view_holds_every_art_pixel_showing_in_the_map_area() -> None:
@@ -32,9 +33,10 @@ def test_without_opengl_there_is_no_shader_and_the_map_keeps_its_ground_picture(
     tile_map = flat_map()
     look = LOOKS[tile_map.grid.kind]
     projection = PixelProjection.of(tile_map.grid, look.angle_deg, look.cell_units)
+    heights = Elevation(tile_map, projection).heights
     monkeypatch.setattr(ground_shader, "GL", None)
 
-    shader = GroundShader.make(projection, tile_map.grid.shape, np.zeros((4, 4)))
+    shader = GroundShader.make(projection, tile_map.grid.shape, np.zeros((4, 4)), heights)
 
     assert shader is None
 
@@ -78,3 +80,20 @@ def test_a_blown_up_chunk_texture_is_deleted_on_a_frame_after_nothing_holds_it(
 
     assert gl.deleted == [8]
     assert kept.texture_id() == 7
+
+
+def test_the_raised_ground_shaders_have_every_number_of_the_cpu_relief_written_in() -> None:
+    sources = [ground_shader.relief_source(), ground_shader.raise_source()]
+
+    assert all("@" not in source for source in sources)
+    assert "1700.0" in sources[0]
+
+
+def test_mountain_cells_are_marked_beside_hills_for_the_shader() -> None:
+    biomes = np.array([[7, 0, 0]])
+    hills = np.array([[True, False, False]])
+    mountains = np.array([[False, True, False]])
+
+    info = ground_shader.cell_info(biomes, None, hills, np.zeros((1, 3)), mountains)
+
+    assert info[0, :, 2].tolist() == [1, 2, 0]

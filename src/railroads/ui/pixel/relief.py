@@ -142,6 +142,19 @@ class Blend:
 
 
 @dataclass(frozen=True)
+class Heights:
+    """What the graphics card needs to raise hills and mountains as Elevation does
+    (railroads.ui.pixel.ground_shader): its rasters, STEPS to a cell, of the ground's height, its
+    valley floor, how mountainous it is and how its lone peaks stand, four to a step, and how hilly
+    it is; and how many metres an art pixel and a plane unit span."""
+
+    rasters: Floats
+    hills: Floats
+    metres_per_pixel: float
+    metres_per_unit: float
+
+
+@dataclass(frozen=True)
 class Raised:
     """The raised ground over a block of art pixels: how far each is lifted, how high it rises
     above the valley, how mountainous and how hilly it is, how much light its slope catches and
@@ -191,6 +204,23 @@ class Elevation:
         # there times that share (`grade`), or None where no track is.
         self._bed: tuple[Floats, Floats] | None = None
         self.grades = 0
+
+    @property
+    def heights(self) -> Heights:
+        """The rasters the graphics card raises the ground from, which never change."""
+        rasters = np.stack([self._base, self._valley, self._mountains, self._peaks], axis=-1)
+        return Heights(
+            rasters.astype(np.float32),
+            self._hills,
+            self._metres_per_pixel,
+            self._metres_per_unit,
+        )
+
+    @property
+    def bed(self) -> tuple[Floats, Floats] | None:
+        """How fully each step is graded into a bed for track and the bed's rise there times
+        that share (`grade`), or None where no track is."""
+        return self._bed
 
     def shares(self, x: FloatArray, y: FloatArray) -> tuple[Floats, Floats]:
         """How mountainous and how hilly the ground is at plane points, from 0 to 1."""

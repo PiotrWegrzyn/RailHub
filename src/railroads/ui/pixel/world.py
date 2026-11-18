@@ -313,13 +313,15 @@ class PixelWorld:
         on it are drawn that much finer. Where hills and mountains rise, the ground with its
         track is lifted, so the chunk shows ground from below it too; with `fine_relief` their
         heights, lift and colours are worked out at the full resolution too, which is smoother
-        and slower. With `over_ground` a chunk where nothing rises leaves its ground out, clear
-        but for the shade of trees, to be laid over ground the graphics card draws
-        (railroads.ui.pixel.ground_shader)."""
+        and slower. With `over_ground` the chunk leaves its ground out, clear but for the shade
+        of trees, to be laid over ground the graphics card draws and raises
+        (railroads.ui.pixel.ground_shader); what lies on raised ground is raised with it."""
         self._grade()
         if fine_relief and resolution > 1:
             return self._render_fine(chunk_x, chunk_y, resolution)
-        if over_ground and not self.rises(chunk_x, chunk_y):
+        if over_ground:
+            if self.rises(chunk_x, chunk_y):
+                return self._render_over_raised(chunk_x, chunk_y, resolution)
             return self._render_over_ground(chunk_x, chunk_y, resolution)
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
         may_rise = self.elevation.may_rise(left, top, CHUNK, CHUNK + MOST_LIFT)
@@ -427,6 +429,42 @@ class PixelWorld:
         self._stand_scenery(canvas, left, top, k)
         return _finished(canvas)
 
+    def _render_over_raised(self, chunk_x: int, chunk_y: int, k: int) -> Rgba:
+        left, top = chunk_x * CHUNK, chunk_y * CHUNK
+        points = self._points(left, top, CHUNK + MOST_LIFT + 1)
+        raised = self.elevation.area(left, top, CHUNK, CHUNK + MOST_LIFT, points=points)
+        if raised is None:
+            return self._render_over_ground(chunk_x, chunk_y, k)
+        offset = raycast(raised.lift, CHUNK, CHUNK)
+        rows = CHUNK + min(int(offset.max()) + 1, MOST_LIFT)
+        inside, shade = self.ground.under(left, top, rows, points)
+        shown = inside.repeat(k, axis=0).repeat(k, axis=1)
+        canvas = np.zeros((rows * k, CHUNK * k, 4), dtype=np.float64)
+        art_pixels(canvas, k)[..., 3] = shade[:, None, :, None]
+        lit = lighting(raised.top(rows))
+        self._surfaces(
+            canvas,
+            left,
+            top,
+            k,
+            shown,
+            lambda layer, kk, on: (
+                self.ground.fields(layer, left, top, kk, lit, shown=on, points=points),
+                self.ground.yards(layer, left, top, kk, shown=on),
+                self.ground.canopy(layer, left, top, kk, shown=on, points=points),
+            ),
+        )
+        between = crossings(raised.lift, offset)
+        canvas = raise_picture(canvas, offset, k, between)
+        on_map = raise_picture(inside.astype(np.float32), offset, 1, between) > 0
+        if k > 1:
+            textured(canvas, left, top, k)
+            on_map = on_map.repeat(k, axis=0).repeat(k, axis=1)
+        self._stand_scenery(canvas, left, top, k, under_track=True)
+        self._lay_lifted_track(canvas, left, top, k, offset, k, on_map)
+        self._stand_scenery(canvas, left, top, k)
+        return _finished(canvas)
+
     def _render_fine(self, chunk_x: int, chunk_y: int, k: int) -> Rgba:
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
         fine = Lattice(
@@ -516,10 +554,13 @@ class PixelWorld:
         resolution: int,
         seen: FloatArray,
         blow: int = 1,
+        on_map: npt.NDArray[np.bool_] | None = None,
     ) -> None:
         """Draws the track crossing the chunk over its raised ground, lifted with it, where the
         ground shown, `seen` art pixels further down the map in each pixel (of a picture `blow`
-        times coarser than the chunk's), is not in front of it."""
+        times coarser than the chunk's), is not in front of it, and the picture shows the map:
+        where `on_map`, for a picture of what lies over the ground, or else where it isn't
+        clear."""
         pieces = self._track_pieces()
         if not pieces:
             return
@@ -530,9 +571,12 @@ class PixelWorld:
         part, under = track[box], canvas[box]
         down, across = (np.arange(span.start, span.stop) // blow for span in box)
         seen = seen[down[:, None], across[None, :]]
-        shown = (seen <= lift[box] + HIDDEN_BEYOND) & (under[..., 3] > 0)
+        mapped = under[..., 3] > 0 if on_map is None else on_map[box]
+        shown = (seen <= lift[box] + HIDDEN_BEYOND) & mapped
         alpha = part[..., 3:] * shown[..., None]
         under[..., :3] = under[..., :3] * (1 - alpha) + part[..., :3] * alpha
+        if on_map is not None:
+            under[..., 3:] = under[..., 3:] * (1 - alpha) + alpha
 
     def _stand_scenery(
         self, canvas: FloatArray, left: int, top: int, resolution: int, under_track: bool = False

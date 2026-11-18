@@ -61,14 +61,17 @@ class PictureShow:
             return None
         if not self._shader_tried:
             self._shader_tried = True
-            self._shader = GroundShader.make(ground.projection, ground.shape, ground.shading)
+            self._shader = GroundShader.make(
+                ground.projection, ground.shape, ground.shading, ground.heights
+            )
         shader = self._shader
         if shader is None:
             return None
         if shader.cells_version != picture.year:
             glow = np.zeros(ground.shape, dtype=np.float64)
             shader.set_cells(
-                cell_info(picture.biomes, ground.deposits, ground.hills, glow), picture.year
+                cell_info(picture.biomes, ground.deposits, ground.hills, glow, ground.mountains),
+                picture.year,
             )
         view = view_of(picture.origin, 1, (0.0, 0.0), size)
         screen = screen_of(picture.origin, 1, (0.0, 0.0), size, self.density)

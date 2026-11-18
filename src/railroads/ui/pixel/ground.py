@@ -703,6 +703,11 @@ class Ground:
         """Where land is hilly."""
         return self._hills
 
+    @property
+    def mountains(self) -> BoolArray:
+        """Where cells are mountains, which take the mountains' colours as they rise."""
+        return self.tile_map.relief == Relief.MOUNTAINS
+
     def under(
         self, left: int, top: int, rows: int, points: Lattice | None = None
     ) -> tuple[BoolArray, FloatArray]:

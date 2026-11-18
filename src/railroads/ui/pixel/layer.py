@@ -6,9 +6,10 @@ the frames repeating every pixel and sending the graphics card all of them.
 
 Chunks are drawn away from the frames (railroads.ui.pixel.painter); until a chunk is ready, the
 ground drawn beneath shows where it is missing, and a chunk that changed keeps its old texture.
-Chunks where hills or mountains rise show first as they are quickly drawn, then are drawn again
-with the heights, lift and colours of their raised ground at the full resolution, and the finer
-drawing takes their place once it is ready.
+Chunks where hills or mountains rise show first as they are quickly drawn, over the ground the
+graphics card raises where it can, then are drawn again whole with the heights, lift and colours of
+their raised ground at the full resolution, and the finer drawing takes their place once it is
+ready.
 
 In a browser, where threads cannot start, the page's web workers draw the chunks instead
 (railroads.ui.pixel.web_painter), several at once, and frames carry on meanwhile as with a thread.
@@ -107,8 +108,8 @@ class PixelLayer:
         self._rises: dict[ChunkKey, bool] = {}
         self._view: tuple | None = None
         self._still_since = 0.0
-        # Whether the graphics card draws the ground beneath, so chunks where nothing rises are
-        # drawn without theirs, and what blows textures up on it then, which makes the same
+        # Whether the graphics card draws and raises the ground beneath, so chunks are drawn
+        # without theirs, and what blows textures up on it then, which makes the same
         # texels as blowing them up here (GroundShader.blow_up).
         self.over_ground = False
         self.blow_up: Callable[[Rgba, int], Texture] | None = None

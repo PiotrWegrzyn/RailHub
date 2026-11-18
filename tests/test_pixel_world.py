@@ -1106,3 +1106,23 @@ def test_water_is_lighter_by_the_shore_than_far_out(sheet: SpriteSheet) -> None:
 
     brightness = rgb.sum(axis=-1)
     assert brightness[cols == 9].mean() > 1.2 * brightness[(cols >= 3) & (cols <= 5)].mean()
+
+
+def test_a_raised_chunk_drawn_over_ground_leaves_its_ground_and_lifts_what_lies_on_it(
+    sheet: SpriteSheet,
+) -> None:
+    tile_map = make_tile_map(hills_from_col=4, rise_per_col=150.0, mountains_from_col=8)
+    constructions = Constructions(tile_map)
+    constructions.build(Building((12, 6), BuildingKind.FARM))
+    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+    world.ground.trees = (np.zeros(0), np.zeros(0))
+    assert world.rises(0, 0)
+
+    whole = world.render(0, 0)
+    over = world.render(0, 0, over_ground=True)
+
+    drawn = over[..., 3] == 255
+    assert (over[..., 3] == 0).mean() > 0.5
+    assert drawn.any()
+    difference = np.abs(over[..., :3].astype(int) - whole[..., :3])[drawn]
+    assert np.percentile(difference, 99) <= 2

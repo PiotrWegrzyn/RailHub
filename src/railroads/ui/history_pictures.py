@@ -4,10 +4,10 @@ show: the pixel map as the game shows it at OPENING_SCALE, one art pixel to a sc
 
 They are drawn as the game draws the map where the graphics card draws its ground
 (railroads.ui.pixel.ground_shader): the CPU paints only the fields, woods, track and buildings over
-the ground (PixelWorld.render with `over_ground`), which takes it well under half the time. Each
-picture brings the cells' biomes for the graphics card to draw the ground under it, and the first
-also what of the map's ground never changes. Where the graphics card can't, the pictures are
-painted whole, ground and all.
+the ground, lifted where it rises (PixelWorld.render with `over_ground`), which takes it well
+under half the time. Each picture brings the cells' biomes for the graphics card to draw the
+ground under it, and the first also what of the map's ground never changes. Where the graphics
+card can't, the pictures are painted whole, ground and all.
 
 Nothing here needs imgui, so a web worker growing the towns can draw them too."""
 
@@ -23,6 +23,7 @@ from railroads.sim.constructions import Constructions
 from railroads.sim.grids import FloatArray, Grid
 from railroads.ui.iso_camera import LOOKS
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection, Rgba
+from railroads.ui.pixel.relief import Heights
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.world import PixelWorld
 
@@ -34,13 +35,16 @@ OPENING_SCALE = 1
 class GroundLook:
     """What of a map's ground the graphics card needs that stays as it is through history: where
     map points land in the pixel map, the map's size in cells, each cell's deposit and hills, and
-    the light on its slopes with the water and mountains round it (Ground.shading)."""
+    the light on its slopes with the water and mountains round it (Ground.shading), its mountain
+    cells and the heights its hills and mountains rise to (Elevation.heights)."""
 
     projection: PixelProjection
     shape: tuple[int, int]
     deposits: npt.NDArray[np.integer] | None
     hills: npt.NDArray[np.bool_]
     shading: FloatArray
+    mountains: npt.NDArray[np.bool_]
+    heights: Heights
 
 
 @dataclass(frozen=True)
@@ -74,7 +78,7 @@ def middle_picture(
 ) -> tuple[Rgba, tuple[int, int]]:
     """The middle of the world's map as a new game opens on it (opening_center), filling a window
     of `size` screen points, clear past its edges, and where art pixel (0, 0) lies in it; with
-    `over_ground`, its ground left out where nothing rises."""
+    `over_ground`, its ground left out."""
     width, height = size
     px, py = world.projection.to_pixels(*opening_center(world.tile_map.grid, size))
     placement = ChunkPlacement.of(
@@ -130,6 +134,8 @@ class HistoryPictures:
                 tile_map.deposits,
                 world.ground.hills,
                 world.ground.shading,
+                world.ground.mountains,
+                world.elevation.heights,
             )
         else:
             world.buildings_changed(())

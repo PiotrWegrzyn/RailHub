@@ -3,15 +3,18 @@ from the art pixel under it the way railroads.ui.pixel.ground does on the CPU (G
 which hex cell it lies in, the cell's biome and its ramp of shades picked by noise, meadows,
 savanna, tundra and desert with blades, flowers and dunes, tufts, water deep or shallow with
 waves and glints and soft sandy shores, the light on the slopes, the glow where buildings are
-served and the signs of deposits. The noise reads the
-same table of random numbers as the CPU's, so both draw the same ground.
+served and the signs of deposits. Hills and mountains rise as railroads.ui.pixel.relief raises
+them: the heights worked out from the same rasters, lit by their slopes and coloured with
+foothills, bare rock and snow, then lifted, each art pixel showing the nearest ground below raised
+up to it. The noise reads the same table of random numbers as the CPU's, so both draw the same
+ground.
 
 It draws one pixel per art pixel over the part of the map on screen, then blows that up into a
 texture the size of the map on screen, every art pixel a crisp square, which the map shows like
-any picture under the chunks the CPU draws (railroads.ui.pixel.layer). Chunks where nothing rises are then
-drawn without their ground (PixelWorld.render with `over_ground`), with only the fields, woods,
-track and buildings to lay over it; chunks where hills or mountains rise still bring their own
-lifted ground. A picture is drawn again only when the view or the cells change.
+any picture under the chunks the CPU draws (railroads.ui.pixel.layer). Chunks are then drawn
+without their ground (PixelWorld.render with `over_ground`), with only the fields, woods, track
+and buildings to lay over it, lifted with the ground where it rises. A picture is drawn again only
+when the view, the cells or the bed graded for track change.
 
 The same blowing up makes the chunks' textures where a chunk's pixel covers several screen pixels
 (GroundShader.blow_up): imgui samples every texture smoothly, so a texture must hold a texel for
@@ -20,8 +23,8 @@ would (np.repeat) from an upload a fraction of the size.
 
 On the desktop it reaches OpenGL through PyOpenGL; in the browser build, through the GL that
 imgui draws with there (railroads.ui.pixel.webgl), as WebGL 2. Without either, or if the graphics
-card refuses the shader, GroundShader.make returns None and the map keeps its smooth ground
-picture under whole chunks.
+card refuses the shaders or can't draw into textures of floats, GroundShader.make returns None and
+the map keeps its smooth ground picture under whole chunks.
 """
 
 import ctypes
@@ -35,10 +38,12 @@ import numpy.typing as npt
 from railroads.sim.grids import FloatArray
 from railroads.sim.tilemap import Deposit
 from railroads.ui.biomes import Biome
+from railroads.ui.iso_camera import TILT
 from railroads.ui.pixel import ground as cpu
+from railroads.ui.pixel import relief
 from railroads.ui.pixel.noise import _TABLE, TABLE_SIZE
 from railroads.ui.pixel.projection import PixelProjection
-from railroads.ui.pixel.relief import LIGHT
+from railroads.ui.pixel.relief import LIGHT, Heights
 
 if sys.platform == "emscripten":
     from railroads.ui.pixel import webgl as GL
@@ -60,19 +65,135 @@ void main() {
 }
 """
 
+NOISE = """uniform highp sampler2D table;
+const int MASK = @MASK@;
+
+float tbl(int i, int j) {
+    return texelFetch(table, ivec2(i & MASK, j & MASK), 0).r;
+}
+
+float noise(vec2 p, float inv, float off_u, float off_v) {
+    float u = p.x * inv + off_u;
+    float v = p.y * inv + off_v;
+    float fi = floor(u), fj = floor(v);
+    int i0 = int(fi) & MASK, j0 = int(fj) & MASK;
+    int i1 = (i0 + 1) & MASK, j1 = (j0 + 1) & MASK;
+    float fu = u - fi, fv = v - fj;
+    fu = fu * fu * (3.0 - 2.0 * fu);
+    fv = fv * fv * (3.0 - 2.0 * fv);
+    float top = tbl(i0, j0) * (1.0 - fu) + tbl(i1, j0) * fu;
+    float bottom = tbl(i0, j1) * (1.0 - fu) + tbl(i1, j1) * fu;
+    return top * (1.0 - fv) + bottom * fv;
+}
+
+float crest(float n) {
+    float r = 1.0 - abs(2.0 * n - 1.0);
+    return r * r;
+}
+"""
+
+# The raised ground of each art pixel from the rasters of railroads.ui.pixel.relief.Elevation, as
+# Elevation._rise works it out: how many metres it rises above its valley, how mountainous and
+# how hilly it is, and the valley floor's height.
+RELIEF = """out vec4 colour;
+uniform ivec2 art_origin;
+uniform mat2 to_plane;
+uniform vec2 projection_origin;
+uniform ivec2 raster_size;
+uniform highp sampler2D heights;
+uniform highp sampler2D beds;
+@NOISE@
+float ridges(vec2 p) {
+    vec2 w = vec2(p.x + 0.9 * (@W_25_11@ - 0.5), p.y + 0.9 * (@W_25_12@ - 0.5));
+    float big = crest(@R_26_1@);
+    return 0.55 * big + 0.28 * big * crest(@R_1_2@) + 0.12 * crest(@R_42_3@)
+        + 0.05 * crest(@R_16_6@);
+}
+
+void main() {
+    ivec2 art = ivec2(floor(gl_FragCoord.xy)) + art_origin;
+    vec2 p = to_plane * (vec2(art) + 0.5 + projection_origin);
+    vec2 at = clamp(p * @STEPS@ - 0.5, vec2(0.0), vec2(raster_size - 1));
+    ivec2 corner = min(ivec2(at), raster_size - 2);
+    vec2 t = at - vec2(corner);
+    vec4 a = texelFetch(heights, corner, 0) * (1.0 - t.x)
+        + texelFetch(heights, corner + ivec2(1, 0), 0) * t.x;
+    vec4 b = texelFetch(heights, corner + ivec2(0, 1), 0) * (1.0 - t.x)
+        + texelFetch(heights, corner + ivec2(1, 1), 0) * t.x;
+    vec4 here = a * (1.0 - t.y) + b * t.y;
+    a = texelFetch(beds, corner, 0) * (1.0 - t.x) + texelFetch(beds, corner + ivec2(1, 0), 0) * t.x;
+    b = texelFetch(beds, corner + ivec2(0, 1), 0) * (1.0 - t.x)
+        + texelFetch(beds, corner + ivec2(1, 1), 0) * t.x;
+    vec4 bed = a * (1.0 - t.y) + b * t.y;
+    float m = max(clamp(here.z * @MOUNTAIN_GAIN@ - @MOUNTAIN_FROM@, 0.0, 1.0),
+                  clamp(here.w * @PEAK_GAIN@ - @PEAK_FROM@, 0.0, 1.0));
+    float h = bed.x;
+    float rise = 0.0;
+    if (m > 0.0 || h > 0.0) {
+        rise = clamp(m + h, 0.0, 1.0) * max(here.x - here.y, 0.0) * 0.5;
+        if (m > 0.0) {
+            rise += pow(m, 1.6) * (@MOUNTAIN_FLOOR@ + @MOUNTAIN_RIDGES@ * ridges(p));
+        }
+        float rolls = h * (1.0 - m) * @HILL_ROLL@;
+        if (rolls != 0.0) {
+            rise += rolls * (0.6 * @N_9_4@ + 0.4 * @N_35_5@);
+        }
+        rise = rise * (1.0 - bed.y) + bed.z;
+    }
+    colour = vec4(rise, m, h, here.y);
+}
+"""
+
+# The ground raised as railroads.ui.pixel.relief.raycast and raise_picture raise it: each art
+# pixel shows the furthest ground below it whose lift reaches up to it, blended towards the row
+# after by where the slope passes through it (crossings). Where that ground lies off the map, the
+# ground under the pixel itself shows through, as it does under a chunk raised on the CPU.
+RAISE = """out vec4 colour;
+uniform ivec2 art_origin;
+uniform ivec2 ground_origin;
+uniform ivec2 relief_origin;
+uniform highp sampler2D ground;
+uniform float metres_per_pixel;
+uniform highp sampler2D relief;
+
+float lift_at(ivec2 art) {
+    float rise = texelFetch(relief, art - relief_origin, 0).x;
+    return clamp(rise / metres_per_pixel * @EXAGGERATION@ * @TILT@, 0.0, @MOST_LIFT@);
+}
+
+void main() {
+    ivec2 art = ivec2(floor(gl_FragCoord.xy)) + art_origin;
+    int offset = 0;
+    for (int d = 1; d <= @MOST_LIFT_ROWS@; d++) {
+        if (floor(lift_at(art + ivec2(0, d))) >= float(d)) offset = d;
+    }
+    float here = lift_at(art + ivec2(0, offset)) - float(offset);
+    float drop = here - (lift_at(art + ivec2(0, offset + 1)) - float(offset) - 1.0);
+    float share = drop > 0.0 ? clamp(here / drop, 0.0, 1.0) : 0.0;
+    vec4 near = texelFetch(ground, art + ivec2(0, offset) - ground_origin, 0);
+    vec4 far = texelFetch(ground, art + ivec2(0, offset + 1) - ground_origin, 0);
+    vec4 shown = near + (far - near) * share;
+    vec4 under = texelFetch(ground, art - ground_origin, 0);
+    shown += under * (1.0 - shown.a);
+    colour = shown.a > 0.0 ? vec4(clamp(shown.rgb / shown.a, 0.0, 1.0), shown.a) : vec4(0.0);
+}
+"""
+
 FRAGMENT = """out vec4 colour;
 uniform ivec2 art_origin;
 uniform mat2 to_plane;
 uniform vec2 projection_origin;
 uniform ivec2 cells_size;
 uniform ivec2 light_size;
+uniform ivec2 relief_origin;
 uniform highp usampler2D cells;
+uniform vec4 slope;
+uniform float metres_per_unit;
 uniform highp sampler2D light;
-uniform highp sampler2D table;
-
+uniform highp sampler2D relief;
+@NOISE@
 const float HEX_RADIUS = 0.5773502691896258;
 const float SQRT3 = 1.7320508075688772;
-const int MASK = @MASK@;
 const vec3 RAMPS[@RAMP_COUNT@] = vec3[@RAMP_COUNT@](@RAMPS@);
 const float BAYER[16] = float[16](@BAYER@);
 const int TUFT_ROWS[6] = int[6](@TUFT_ROWS@);
@@ -120,26 +241,50 @@ bool in_set(uint biome, uint set) {
     return ((set >> biome) & 1u) != 0u;
 }
 
-float tbl(int i, int j) {
-    return texelFetch(table, ivec2(i & MASK, j & MASK), 0).r;
-}
-
 float hash(int a, int b, int seed) {
     return tbl(a * 13 + seed * 71, b * 7 + seed * 131);
 }
 
-float noise(vec2 p, float inv, float off_u, float off_v) {
-    float u = p.x * inv + off_u;
-    float v = p.y * inv + off_v;
-    float fi = floor(u), fj = floor(v);
-    int i0 = int(fi) & MASK, j0 = int(fj) & MASK;
-    int i1 = (i0 + 1) & MASK, j1 = (j0 + 1) & MASK;
-    float fu = u - fi, fv = v - fj;
-    fu = fu * fu * (3.0 - 2.0 * fu);
-    fv = fv * fv * (3.0 - 2.0 * fv);
-    float top = tbl(i0, j0) * (1.0 - fu) + tbl(i1, j0) * fu;
-    float bottom = tbl(i0, j1) * (1.0 - fu) + tbl(i1, j1) * fu;
-    return top * (1.0 - fv) + bottom * fv;
+float height_at(ivec2 art) {
+    vec4 raised = texelFetch(relief, art - relief_origin, 0);
+    return raised.w + raised.x;
+}
+
+// Raised ground lit and coloured as railroads.ui.pixel.relief.Elevation.colour does: by the
+// light on its slope, and with foothills, bare rock and snow where it is mountainous.
+vec3 raised_colour(vec3 rgb, vec4 raised, ivec2 art, vec2 p, bool rocky) {
+    float above = raised.x, m = raised.y, h = raised.z;
+    float per_col = (height_at(art + ivec2(1, 0)) - height_at(art - ivec2(1, 0))) * 0.5;
+    float per_row = (height_at(art + ivec2(0, 1)) - height_at(art - ivec2(0, 1))) * 0.5;
+    float gx = (per_col * slope.x + per_row * slope.y) / metres_per_unit;
+    float gy = (per_col * slope.z + per_row * slope.w) / metres_per_unit;
+    float nz = 1.0 / sqrt(1.0 + gx * gx + gy * gy);
+    float s = clamp((-gx * @LIGHT_X@ - gy * @LIGHT_Y@ + @LIGHT_Z@) * nz, 0.0, 1.0);
+    float st = 1.0 - nz;
+    float lit = clamp(1.0 + 1.3 * (s - @LIGHT_Z@), 0.55, 1.3);
+    lit = 1.0 + (lit - 1.0) * clamp((m + h) * 4.0, 0.0, 1.0);
+    rgb *= lit;
+    float under = max(m, rocky ? clamp(m * 3.0, 0.0, 1.0) : 0.0);
+    if (under <= 0.0) return rgb;
+    vec3 col = rgb * (1.0 - under) + @FOOTHILL@ * (0.9 + 0.2 * @F_3_13@) * under * lit;
+    if ((above - @TREELINE@) / 200.0 + st * 1.4 - 0.3 > 0.0) {
+        float treeline = @TREELINE@ + @TREELINE_SPREAD@ * @F_7_8@;
+        float cover = clamp((above - treeline) / 200.0 + st * 1.4 - 0.3, 0.0, 1.0) * m;
+        vec3 rock = @ROCK_DARK@ + (@ROCK_LIT@ - @ROCK_DARK@) * clamp(s * 1.3 - 0.2, 0.0, 1.0);
+        rock *= 0.9 + 0.2 * @F_05_7@;
+        if (st > 0.55) rock *= 0.85;
+        col = col * (1.0 - cover) + rock * cover;
+    }
+    float lying = clamp(1.8 - st * 2.0, 0.0, 1.0);
+    if ((above - (@SNOWLINE@ - 140.0 * (1.0 - s))) / 140.0 > 0.0 && lying > 0.0) {
+        float snowline = @SNOWLINE@ + @SNOWLINE_SPREAD@ * @F_6_9@ - 140.0 * (1.0 - s);
+        float snow = clamp((above - snowline) / 140.0, 0.0, 1.0) * lying * m;
+        if (st > 0.3 && crest(@RIBS@) > 0.55) snow *= 0.25;
+        vec3 white = @SNOW_DARK@ + (@SNOW_LIT@ - @SNOW_DARK@) * clamp(s * 1.5 - 0.35, 0.0, 1.0);
+        col = col * (1.0 - snow) + white * snow;
+    }
+    float dark = clamp((0.45 - s) * 2.0, 0.0, 1.0) * (m + 0.3 * h);
+    return col * (1.0 - dark * (1.0 - @SHADOW_TINT@) * 0.6);
 }
 
 vec4 surroundings(vec2 p) {
@@ -311,15 +456,19 @@ void main() {
     uvec4 info = cell_info(cell);
     uint biome = info.r;
     bool water = is_water(biome);
+    bool rocky = (info.b & 2u) != 0u;
     if (!water) {
-        uint warped = cell_info(cell_at(wound(p))).r;
-        if (!is_water(warped)) biome = warped;
+        uvec4 warped = cell_info(cell_at(wound(p)));
+        if (!is_water(warped.r)) {
+            biome = warped.r;
+            rocky = (warped.b & 2u) != 0u;
+        }
     }
     vec4 around = surroundings(p);
     float lit = around.r;
     float value = 1.45 + 1.6 * (@N_24_41@ - 0.5) + 0.8 * (@N_75_42@ - 0.5);
     value += 0.45 * (@N_22_43@ - 0.5) + 0.45 * BAYER[fmod(iy, 4) * 4 + fmod(ix, 4)];
-    value += lit + @HILL_LIFT@ * float(info.b);
+    value += lit + @HILL_LIFT@ * float(info.b & 1u);
     int shade = int(clamp(roundEven(value), 0.0, 3.0));
     vec3 rgb = RAMPS[int(biome) * 4 + shade];
     if (water) {
@@ -363,6 +512,10 @@ void main() {
             if (lx == 5 && ly == 7) rgb = SPECKS[deposit];
             if (lx >= 4 && lx <= 8 && ly == 9) rgb *= 0.72;
         }
+    }
+    vec4 raised = texelFetch(relief, art - relief_origin, 0);
+    if (raised.y > 0.0 || raised.z > 0.0) {
+        rgb = raised_colour(rgb, raised, art, p, rocky);
     }
     colour = vec4(clamp(rgb, 0.0, 255.0) / 255.0, 1.0);
 }
@@ -468,7 +621,6 @@ def fragment_source() -> str:
     ramps = [_vec3(cpu.RAMPS[biome][shade]) for biome in Biome for shade in range(4)]
     tuft_rows = [sum(1 << x for x in range(6) if cpu.TUFT[y, x]) for y in range(6)]
     names = {
-        "MASK": str(TABLE_SIZE - 1),
         "RAMP_COUNT": str(len(ramps)),
         "RAMPS": ", ".join(ramps),
         "BAYER": ", ".join(_number(v) for v in cpu.BAYER.ravel()),
@@ -564,9 +716,63 @@ def fragment_source() -> str:
         "WARP_BROAD": _number(cpu.WARP_BROAD),
         "W_18_215": _noise(1.8, 215, "q"),
         "W_18_216": _noise(1.8, 216, "q"),
+        "LIGHT_Z": _number(relief.LIGHT[2]),
+        "FOOTHILL": _vec3(relief.FOOTHILL),
+        "F_3_13": _noise(0.3, 13),
+        "TREELINE": _number(relief.TREELINE),
+        "TREELINE_SPREAD": _number(relief.TREELINE_SPREAD),
+        "F_7_8": _noise(0.7, 8),
+        "ROCK_DARK": _vec3(relief.ROCK_DARK),
+        "ROCK_LIT": _vec3(relief.ROCK_LIT),
+        "F_05_7": _noise(0.05, 7),
+        "SNOWLINE": _number(relief.SNOWLINE),
+        "SNOWLINE_SPREAD": _number(relief.SNOWLINE_SPREAD),
+        "F_6_9": _noise(0.6, 9),
+        "RIBS": _noise(0.12, 14, "vec2(p.x * 3.0, p.y * 0.8)"),
+        "SNOW_DARK": _vec3(relief.SNOW_DARK),
+        "SNOW_LIT": _vec3(relief.SNOW_LIT),
+        "SHADOW_TINT": _vec3(relief.SHADOW_TINT),
     }
-    source = FRAGMENT
-    for name, value in names.items():
+    return _filled(FRAGMENT, names)
+
+
+def relief_source() -> str:
+    """The shader working out the raised ground (RELIEF), with Elevation's numbers written in."""
+    names = {
+        "STEPS": _number(relief.STEPS),
+        "MOUNTAIN_GAIN": _number(relief.MOUNTAIN_GAIN),
+        "MOUNTAIN_FROM": _number(relief.MOUNTAIN_FROM),
+        "PEAK_GAIN": _number(relief.PEAK_GAIN),
+        "PEAK_FROM": _number(relief.PEAK_FROM),
+        "MOUNTAIN_FLOOR": _number(relief.MOUNTAIN_FLOOR),
+        "MOUNTAIN_RIDGES": _number(relief.MOUNTAIN_RIDGES),
+        "HILL_ROLL": _number(relief.HILL_ROLL),
+        "W_25_11": _noise(2.5, 11),
+        "W_25_12": _noise(2.5, 12),
+        "R_26_1": _noise(2.6, 1, "w"),
+        "R_1_2": _noise(1.0, 2, "w"),
+        "R_42_3": _noise(0.42, 3, "w"),
+        "R_16_6": _noise(0.16, 6, "w"),
+        "N_9_4": _noise(0.9, 4),
+        "N_35_5": _noise(0.35, 5),
+    }
+    return _filled(RELIEF, names)
+
+
+def raise_source() -> str:
+    """The shader raising the ground (RAISE), with Elevation's numbers written in."""
+    names = {
+        "EXAGGERATION": _number(relief.EXAGGERATION),
+        "TILT": _number(TILT),
+        "MOST_LIFT": _number(relief.MOST_LIFT),
+        "MOST_LIFT_ROWS": str(relief.MOST_LIFT),
+    }
+    return _filled(RAISE, names)
+
+
+def _filled(source: str, names: dict[str, str]) -> str:
+    source = source.replace("@NOISE@", NOISE)
+    for name, value in (names | {"MASK": str(TABLE_SIZE - 1)}).items():
         source = source.replace(f"@{name}@", value)
     assert "@" not in source
     return source
@@ -577,14 +783,17 @@ def cell_info(
     deposits: npt.NDArray[np.integer] | None,
     hills: npt.NDArray[np.bool_],
     glow: FloatArray,
+    mountains: npt.NDArray[np.bool_] | None = None,
 ) -> npt.NDArray[np.uint8]:
     """What the shader needs of each cell, as (rows, cols, 4) bytes: its biome, its deposit, 1 on
-    hills, and how strongly it glows in GLOW_STEPS."""
+    hills and 2 on mountains, and how strongly it glows in GLOW_STEPS."""
     info = np.zeros((*biomes.shape, 4), dtype=np.uint8)
     info[..., 0] = biomes
     if deposits is not None:
         info[..., 1] = deposits
     info[..., 2] = hills
+    if mountains is not None:
+        info[..., 2] |= mountains.astype(np.uint8) << 1
     info[..., 3] = np.rint(np.asarray(glow) * GLOW_STEPS)
     return info
 
@@ -677,12 +886,14 @@ def free_textures() -> None:
 
 
 class _Target:
-    """A texture the shaders draw into, with its framebuffer."""
+    """A texture the shaders draw into, with its framebuffer: of bytes, or of floats where
+    `floats`, for what is worked on before it is shown."""
 
-    def __init__(self) -> None:
+    def __init__(self, floats: bool = False) -> None:
         self.texture = 0
         self.framebuffer = GL.glGenFramebuffers(1)
         self.size = (0, 0)
+        self._form = (GL.GL_RGBA32F, GL.GL_FLOAT) if floats else (GL.GL_RGBA8, GL.GL_UNSIGNED_BYTE)
 
     def fit(self, width: int, height: int) -> bool:
         """Makes the texture this size; returns whether it had to be made anew."""
@@ -691,42 +902,52 @@ class _Target:
         if self.texture:
             GL.glDeleteTextures(1, [self.texture])
         self.texture = _texture()
-        GL.glTexImage2D(
-            GL.GL_TEXTURE_2D,
-            0,
-            GL.GL_RGBA8,
-            width,
-            height,
-            0,
-            GL.GL_RGBA,
-            GL.GL_UNSIGNED_BYTE,
-            None,
-        )
+        internal, kind = self._form
+        GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, internal, width, height, 0, GL.GL_RGBA, kind, None)
         saved = GL.glGetIntegerv(GL.GL_FRAMEBUFFER_BINDING)
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.framebuffer)
         GL.glFramebufferTexture2D(
             GL.GL_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0, GL.GL_TEXTURE_2D, self.texture, 0
         )
+        complete = GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER) == GL.GL_FRAMEBUFFER_COMPLETE
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, int(saved))
+        if not complete:
+            raise RuntimeError("The graphics card can't draw into this texture")
         self.size = (width, height)
         return True
 
 
+@dataclass(frozen=True)
+class _Programs:
+    ground: int
+    relief: int
+    raised: int
+    blow_up: int
+
+
 class GroundShader:
     """The compiled shaders, what they read on the graphics card (the cells, the slopes' light
-    with the water and mountains round the ground, and the noise table), the art pixels last drawn and the picture last blown up from them."""
+    with the water and mountains round the ground, the rasters hills and mountains rise from and
+    the noise table), the art pixels last drawn and the picture last blown up from them.
+
+    The ground in a view is drawn in three passes, each over the whole of it: the raised ground of
+    every art pixel (RELIEF), the ground lit and coloured with it (FRAGMENT), both reaching
+    MOST_LIFT rows and a few more below the view, where ground lifted into it lies, and last the
+    ground raised (RAISE)."""
 
     def __init__(
         self,
-        programs: tuple[int, int],
+        programs: _Programs,
         projection: PixelProjection,
         shape: tuple[int, int],
         light: FloatArray,
+        heights: Heights,
     ) -> None:
-        self._ground, self._blow_up = programs
+        self._programs = programs
         self._projection = projection
         self._shape = shape
         self._light_shape = light.shape[:2]
+        self._heights = heights
         self._vao = GL.glGenVertexArrays(1)
         self._buffer = GL.glGenBuffers(1)
         GL.glBindVertexArray(self._vao)
@@ -739,25 +960,42 @@ class GroundShader:
         self._cells = _texture()
         self._light = _floats(light)
         self._table = _floats(_TABLE)
+        self._rasters = _floats(heights.rasters)
+        self._beds = 0
+        self._relief = _Target(floats=True)
+        self._lit = _Target(floats=True)
         self._art = _Target()
         self._screen = _Target()
-        self._drawn: tuple[View, int] | None = None
-        self._shown: tuple[View, Screen, int, bool] | None = None
+        self._drawn: tuple[View, int, int] | None = None
+        self._shown: tuple[View, Screen, int, int, bool] | None = None
         self.cells_version = -1
+        self.bed_version = -1
+        self.set_bed(None, -1)
         self._chunks = GL.glGenFramebuffers(1)
 
     @classmethod
     def make(
-        cls, projection: PixelProjection, shape: tuple[int, int], light: FloatArray
+        cls,
+        projection: PixelProjection,
+        shape: tuple[int, int],
+        light: FloatArray,
+        heights: Heights,
     ) -> GroundShader | None:
-        """The shaders for a map of `shape` cells, whose ground is lit and coloured by `light` (Ground.shading),
-        or None where OpenGL can't run them."""
+        """The shaders for a map of `shape` cells, whose ground is lit and coloured by `light`
+        (Ground.shading) and raised by `heights` (Elevation.heights), or None where OpenGL can't
+        run them."""
         if GL is None:
             return None
         try:
-            ground = _program(HEADER + VERTEX, HEADER + fragment_source())
-            blow_up = _program(HEADER + VERTEX, HEADER + BLOW_UP)
-            return cls((ground, blow_up), projection, shape, light)
+            programs = _Programs(
+                _program(HEADER + VERTEX, HEADER + fragment_source()),
+                _program(HEADER + VERTEX, HEADER + relief_source()),
+                _program(HEADER + VERTEX, HEADER + raise_source()),
+                _program(HEADER + VERTEX, HEADER + BLOW_UP),
+            )
+            shader = cls(programs, projection, shape, light, heights)
+            shader._relief.fit(1, 1)
+            return shader
         except Exception:  # noqa: BLE001 - any GL failure means falling back to the CPU ground
             return None
 
@@ -778,20 +1016,63 @@ class GroundShader:
         )
         self.cells_version = version
 
+    def set_bed(self, bed: tuple[FloatArray, FloatArray] | None, version: int) -> None:
+        """Takes the bed graded for track (Elevation.bed), or None where no track is, with the
+        number of times the ground has been graded."""
+        hills = self._heights.hills
+        beds = np.zeros((*hills.shape, 4), dtype=np.float32)
+        beds[..., 0] = hills
+        if bed is not None:
+            beds[..., 1], beds[..., 2] = bed
+        if self._beds:
+            GL.glDeleteTextures(1, [self._beds])
+        self._beds = _floats(beds)
+        self.bed_version = version
+
     def art(self, view: View) -> int:
         """The texture holding the ground's art pixels in `view`, one texel each, drawn again
-        only if the view or the cells changed since."""
-        if self._art.fit(view.width, view.height) or self._drawn != (view, self.cells_version):
-            self._run(self._art, self._ground, self._ground_uniforms(view), self._inputs())
-            self._drawn = (view, self.cells_version)
+        only if the view, the cells or the bed for track changed since."""
+        drawn = (view, self.cells_version, self.bed_version)
+        if self._art.fit(view.width, view.height) or self._drawn != drawn:
+            self._draw_raised(view)
+            self._drawn = drawn
         return self._art.texture
+
+    def _draw_raised(self, view: View) -> None:
+        reach = relief.MOST_LIFT + 2
+        relief_origin = (view.left - 1, view.top - 1)
+        self._relief.fit(view.width + 2, view.height + reach + 2)
+        self._lit.fit(view.width, view.height + reach)
+        plane = self._plane_uniforms()
+        rows, cols = self._heights.hills.shape
+        uniforms = plane | {
+            "art_origin": ("2i", relief_origin),
+            "raster_size": ("2i", (cols, rows)),
+            "table": ("1i", (0,)),
+            "heights": ("1i", (1,)),
+            "beds": ("1i", (2,)),
+        }
+        inputs = (self._table, self._rasters, self._beds)
+        self._run(self._relief, self._programs.relief, uniforms, inputs)
+        uniforms = self._ground_uniforms(view) | {"relief_origin": ("2i", relief_origin)}
+        self._run(self._lit, self._programs.ground, uniforms, self._inputs())
+        uniforms = {
+            "art_origin": ("2i", (view.left, view.top)),
+            "ground_origin": ("2i", (view.left, view.top)),
+            "relief_origin": ("2i", relief_origin),
+            "metres_per_pixel": ("1f", (self._heights.metres_per_pixel,)),
+            "ground": ("1i", (0,)),
+            "relief": ("1i", (1,)),
+        }
+        inputs = (self._lit.texture, self._relief.texture)
+        self._run(self._art, self._programs.raised, uniforms, inputs)
 
     def picture(self, view: View, screen: Screen, blend: bool = False) -> int:
         """The texture holding the ground's art pixels in `view` blown up for `screen`, each a
         crisp square, or with `blend` blended between their middles, as the ground is up close;
         drawn again only if any of these or the cells changed since."""
         art = self.art(view)
-        shown = (view, screen, self.cells_version, blend)
+        shown = (view, screen, self.cells_version, self.bed_version, blend)
         if self._screen.fit(screen.width, screen.height) or self._shown != shown:
             uniforms = {
                 "origin": ("2f", screen.origin),
@@ -800,7 +1081,7 @@ class GroundShader:
                 "blend": ("1i", (int(blend),)),
                 "art": ("1i", (0,)),
             }
-            self._run(self._screen, self._blow_up, uniforms, (art,))
+            self._run(self._screen, self._programs.blow_up, uniforms, (art,))
             self._shown = shown
         return self._screen.texture
 
@@ -838,24 +1119,32 @@ class GroundShader:
             "blend": ("1i", (0,)),
             "art": ("1i", (0,)),
         }
-        self._run(_Into(self._chunks, size), self._blow_up, uniforms, (small,))
+        self._run(_Into(self._chunks, size), self._programs.blow_up, uniforms, (small,))
         GL.glDeleteTextures(1, [small])
         return ChunkTexture(big)
 
     def _inputs(self) -> tuple[int, ...]:
-        return self._cells, self._light, self._table
+        return self._cells, self._light, self._table, self._relief.texture
 
-    def _ground_uniforms(self, view: View) -> dict[str, tuple[str, tuple]]:
+    def _plane_uniforms(self) -> dict[str, tuple[str, tuple]]:
         (a, b), (c, d) = np.linalg.inv(self._projection.matrix)
         return {
-            "art_origin": ("2i", (view.left, view.top)),
             "to_plane": ("m2", (a, c, b, d)),
             "projection_origin": ("2f", tuple(map(float, self._projection.origin))),
+        }
+
+    def _ground_uniforms(self, view: View) -> dict[str, tuple[str, tuple]]:
+        (m00, m01), (m10, m11) = self._projection.matrix
+        return self._plane_uniforms() | {
+            "art_origin": ("2i", (view.left, view.top)),
+            "slope": ("4f", (m00, m10, m01, m11)),
+            "metres_per_unit": ("1f", (self._heights.metres_per_unit,)),
             "cells_size": ("2i", (self._shape[1], self._shape[0])),
             "light_size": ("2i", (self._light_shape[1], self._light_shape[0])),
             "cells": ("1i", (0,)),
             "light": ("1i", (1,)),
             "table": ("1i", (2,)),
+            "relief": ("1i", (3,)),
         }
 
     def _run(
@@ -884,6 +1173,8 @@ class GroundShader:
                         GL.glUniform1f(at, *values)
                     case "2f":
                         GL.glUniform2f(at, *values)
+                    case "4f":
+                        GL.glUniform4f(at, *values)
                     case "m2":
                         matrix = np.array(values, np.float32)
                         GL.glUniformMatrix2fv(at, 1, GL.GL_FALSE, matrix)
@@ -950,7 +1241,7 @@ def _restore(saved: tuple) -> None:
     GL.glViewport(*viewport)
     GL.glUseProgram(program)
     GL.glBindVertexArray(vao)
-    for unit in (2, 1):
+    for unit in (3, 2, 1):
         GL.glActiveTexture(GL.GL_TEXTURE0 + unit)
         GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
     GL.glActiveTexture(active)

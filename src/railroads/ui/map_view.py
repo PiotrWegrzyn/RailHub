@@ -782,8 +782,13 @@ class MapView:
                 self.tile_map.deposits,
                 ground.hills,
                 glow_strength(ground.satisfaction),
+                ground.mountains,
             )
             shader.set_cells(info, self._colors_version)
+        elevation = world.elevation
+        grades = elevation.grades
+        if shader.bed_version != grades:
+            shader.set_bed(elevation.bed, grades)
         projection = world.projection
         camera_pixel = projection.to_pixels(self.camera.center_x, self.camera.center_y)
         scale = self.camera.pixel_scale
@@ -807,7 +812,10 @@ class MapView:
             if hello_imgui.is_using_hello_imgui():
                 world = self._pixel_layer().world
                 self._shader = GroundShader.make(
-                    world.projection, self.tile_map.grid.shape, world.ground.shading
+                    world.projection,
+                    self.tile_map.grid.shape,
+                    world.ground.shading,
+                    world.elevation.heights,
                 )
         return self._shader
 
