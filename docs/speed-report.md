@@ -304,3 +304,54 @@ The whole wait for a new game is still the towns growing: about 20 of the 23 sec
 remaining loading frames of 200–350 ms in the browser are single parts of the preparation
 (relief, scenery, ground, grading the track bed, the zoomed-out picture), each one piece of work
 that would have to be split inside itself.
+
+## The monthly freeze (18 November, a new game with 3 trains)
+
+The complaint: in the browser every month froze the game for about half a second, even in a new
+game with 3 trains. Measured on a new game (Poland, seed 1, 1850, the cropped square map) with 4
+stations, track between them and 3 trains, at zoom 3 over the first station, a month forced every
+90 frames, 12 months; same machine and headless Chrome as above. "Freeze" is the time from the frame
+a month begins to the frame it ends: the trains and the clock wait all of it.
+
+What was found: the month itself was not dear. Its work was about 25 ms on desktop (33 ms with the
+map's pictures) and about 76 ms in the browser, much as before the day's economy changes (owned
+shares, worth of what is handed out, experience, taverns, bonus goods). But it came in 17 or 18
+steps and the game gave each step a frame of its own, so a month took 18 frames, each drawing the
+whole map while the trains stood still: about 18 × 14 ms of drawing in the browser on top of the
+work. An autosave month added a frame per part of the save.
+
+| | before | after |
+|---|---|---|
+| Browser: trains frozen per month | 359 ms (18 frames) | 131 ms (4 frames) |
+| Browser: trains frozen, month with an autosave | 581 ms (26 frames) | 207 ms (6 frames) |
+| Browser: longest frame of a month | 41 ms | 42 ms |
+| Desktop: trains frozen per month | 228 ms (17 frames) | 71 ms (3 frames) |
+| Desktop: trains frozen, month with an autosave | 379 ms (25 frames) | 119 ms (4 frames) |
+| Desktop: longest frame of a month | 21 ms | 30 ms |
+| Desktop: scenery put up again after buildings changed | 9.2 ms | 7.9 ms |
+| Desktop: changes pickled for the painting workers | 3.5 ms | 1.7 ms |
+
+A frame without a month takes about 13 ms in the browser and 6.5 ms on desktop in this scene.
+
+What changed (no rule or number; the month computes exactly what it did):
+
+- **A month's steps run several to a frame** (`sim/steps.budgeted`, `MONTH_FRAME_SECONDS` = 16 ms
+  in `ui/app.py`): steps follow one another until 16 ms have gone on them, then the frame is drawn.
+  The autosave's parts after the month go the same way. A frame can take one step longer than
+  the 16 ms, which is why the longest frame grew a little on desktop.
+- **The track near each cell is kept** between months for the scenery (`scenery._track_near`),
+  found again only when the railway changes (`Constructions.railway_version`), and sprites are
+  looked up by name in a dictionary instead of a list.
+- **The painting workers hear of new buildings as kinds**, as saves keep them
+  (`Constructions.__getstate__`), instead of every building pickled as an object.
+- **Putting the scenery up again is split into three steps** (`PixelWorld.buildings_changed_steps`),
+  so the ground, the scenery and the trees' shading can land on different frames.
+
+Tried and dropped: enum hashing showed as the biggest cost in Pyodide's profiler, but a lookup by
+an (enum, enum) key takes 39 ns with the enum's own hash and 37 ns with the object's, so it is the
+profiler's overhead, as on desktop.
+
+What is left of the 131 ms: about 75 ms of work (the trade about half of it, the scenery and the
+ground pictures most of the rest) and the drawing of 4 frames. Bringing it lower would mean making
+the trade itself cheaper, or putting the scenery up only around the cells that changed instead of
+over the whole map.

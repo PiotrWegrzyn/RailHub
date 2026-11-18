@@ -75,7 +75,9 @@ def update_message(world: PixelWorld, seen: Seen) -> bytes | None:
     by one, so a copy that missed some catches up all the same."""
     update: dict[str, object] = {}
     if world.buildings_version != seen.buildings:
-        constructions = vars(world.constructions)
+        # As a save keeps them (Constructions.__getstate__): buildings as their kinds, which pickle
+        # many times faster than the buildings themselves.
+        constructions = world.constructions.__getstate__()
         update["constructions"] = {k: v for k, v in constructions.items() if k != "tile_map"}
         update["vegetation"] = world.tile_map.vegetation
         update["station_levels"] = dict(world.station_levels)
@@ -112,7 +114,7 @@ class WorldCopy:
             # cell from them and is still right is kept (railroads.ui.building_spots).
             state = update["constructions"]
             state["tile_map"] = world.tile_map
-            vars(world.constructions).update(state)
+            world.constructions.__setstate__(state)
             vegetation: npt.NDArray[np.uint8] = update["vegetation"]
             vegetation.setflags(write=False)
             object.__setattr__(world.tile_map, "vegetation", vegetation)

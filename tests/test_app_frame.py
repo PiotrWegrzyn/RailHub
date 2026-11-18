@@ -171,8 +171,9 @@ def frames_until_the_month_is_done(app: App) -> int:
 
 
 def test_a_month_is_done_over_a_few_frames_and_its_autosave_taken_in_its_last_ones(
-    context: None, tmp_path: Path
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(app_module, "MONTH_FRAME_SECONDS", 0.0)
     app = made_app()
     app.saves = Saves(tmp_path)
     app.clock.seconds = app.clock.seconds_per_month - 0.001
@@ -189,7 +190,10 @@ def test_a_month_is_done_over_a_few_frames_and_its_autosave_taken_in_its_last_on
     assert app.notice == "Autosaved"
 
 
-def test_the_clock_and_trains_wait_while_a_month_is_half_done(context: None) -> None:
+def test_the_clock_and_trains_wait_while_a_month_is_half_done(
+    context: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "MONTH_FRAME_SECONDS", 0.0)
     app = made_app()
     app.clock.seconds = app.clock.seconds_per_month - 0.001
     frame(app)
@@ -675,6 +679,7 @@ def test_an_autosave_due_while_another_month_is_half_done_waits_for_that_month(
     writer = HeldWriter()
     monkeypatch.setattr(app_module, "WRITER", writer)
     monkeypatch.setattr(app_module, "AUTOSAVE_GAP_S", 0.0)
+    monkeypatch.setattr(app_module, "MONTH_FRAME_SECONDS", 0.0)
     app = made_app()
     app.saves = Saves(tmp_path)
     app.autosave()

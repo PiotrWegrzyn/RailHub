@@ -364,7 +364,7 @@ class MapView:
             self.search.refresh(self.growth)
         if self._pixels is not None:
             yield
-            chunks = self._pixels.world.buildings_changed(changed)
+            chunks = yield from self._pixels.world.buildings_changed_steps(changed)
             # Copies of the world painting elsewhere hear of the change on a frame of its own;
             # asking for the changed chunks on this one would add that to it.
             yield

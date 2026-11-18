@@ -31,7 +31,7 @@ from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
 from railroads.sim.game import Game
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
 from railroads.sim.lots import Lot
-from railroads.sim.steps import Steps, finish
+from railroads.sim.steps import Steps, budgeted, finish
 from railroads.tutorial.game import make_tutorial
 from railroads.tutorial.steps import Seen, Tutorial
 from railroads.ui import spotlight
@@ -79,6 +79,10 @@ WRITING_SECONDS = 0.004
 # The least time between autosaves, in seconds of play: pickling the game stalls a frame, which at
 # the highest speed would come every few seconds.
 AUTOSAVE_GAP_S = 60.0
+# About how long each frame spends on a month, and the autosave after it, while the trains wait:
+# their steps are run several to a frame, so a month that costs little takes few frames and the
+# trains wait as briefly.
+MONTH_FRAME_SECONDS = 0.016
 
 
 class App:
@@ -192,7 +196,7 @@ class App:
         turned = self.clock.advance(seconds)
         if turned:
             dates = [self.clock.date_of(month) for month in range(first + 1, first + 1 + turned)]
-            self._turning = self._months(dates)
+            self._turning = budgeted(self._months(dates), MONTH_FRAME_SECONDS)
             self._turn_once()
 
     def _months(self, dates: list[str]) -> Steps[bool]:

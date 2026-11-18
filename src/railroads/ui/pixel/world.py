@@ -178,8 +178,13 @@ class PixelWorld:
     def buildings_changed(self, cells: Iterable[Cell]) -> set[tuple[int, int]]:
         """Puts the ground and scenery up again after buildings or forests changed in `cells`;
         returns the chunks that look different now."""
+        return finish(self.buildings_changed_steps(cells))
+
+    def buildings_changed_steps(self, cells: Iterable[Cell]) -> Steps[set[tuple[int, int]]]:
+        """buildings_changed in steps, nothing changing the world between them."""
         self._grade()
         self.ground.refresh()
+        yield
         self.scenery = Scenery.of(
             self.tile_map,
             self.constructions,
@@ -188,6 +193,7 @@ class PixelWorld:
             self.station_levels,
             self.elevation,
         )
+        yield
         self._shade_trees()
         self.buildings_version += 1
         return self._chunks_around(cells)

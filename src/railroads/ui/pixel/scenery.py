@@ -433,9 +433,21 @@ def _off_track(
 _KNOWN: weakref.WeakKeyDictionary[Constructions, dict[Cell, tuple]] = weakref.WeakKeyDictionary()
 
 
+# The track near each cell (_track_near) for each Constructions, with the railway version it was
+# found for.
+_NEAR: weakref.WeakKeyDictionary[Constructions, tuple[int, dict[Cell, tuple]]] = (
+    weakref.WeakKeyDictionary()
+)
+
+
 def _track_near(constructions: Constructions) -> dict[Cell, tuple[tuple[Track, bool], ...]]:
     """The track drawn in or next to each cell, each piece with whether it runs through a
-    station, with its platform beside it. Track in tunnels is out of sight and left out."""
+    station, with its platform beside it. Track in tunnels is out of sight and left out. Found
+    again only once track or stations changed."""
+    version = constructions.railway_version
+    kept = _NEAR.get(constructions)
+    if kept is not None and kept[0] == version:
+        return kept[1]
     grid = constructions.tile_map.grid
     pieces = [(piece, False) for piece in constructions.track() if piece.bed != TrackBed.TUNNEL]
     pieces += [
@@ -446,7 +458,9 @@ def _track_near(constructions: Constructions) -> dict[Cell, tuple[tuple[Track, b
     for piece, station in pieces:
         for cell in (piece.cell, *grid.neighbours(*piece.cell)):
             near.setdefault(cell, []).append((piece, station))
-    return {cell: tuple(found) for cell, found in near.items()}
+    found_near = {cell: tuple(found) for cell, found in near.items()}
+    _NEAR[constructions] = (version, found_near)
+    return found_near
 
 
 def _placed_off_track(
