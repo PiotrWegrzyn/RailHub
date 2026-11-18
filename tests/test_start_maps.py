@@ -9,6 +9,7 @@ from railroads.newgame import EARLIEST_START_YEAR, MapChoice, Settings, make_gam
 from railroads.saves import Saves
 from railroads.sim.constructions import Constructions
 from railroads.sim.grids import HexGrid
+from railroads.sim.lots import Lots
 from railroads.sim.steps import Steps
 from railroads.sim.tilemap import TileMap
 from railroads.ui.app import settings_from
@@ -62,7 +63,7 @@ def test_a_start_map_is_found_by_its_key_or_its_menu_title() -> None:
     assert maps.start_map("atlantis") is None
 
 
-def test_a_game_on_a_long_thin_map_starts_on_the_square_in_its_middle_and_loads_again(
+def test_a_game_on_a_long_thin_map_starts_on_the_honeycomb_in_its_middle_and_loads_again(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def no_growth(tile_map: TileMap, *_: object, **__: object) -> Steps[Constructions]:
@@ -80,10 +81,13 @@ def test_a_game_on_a_long_thin_map_starts_on_the_square_in_its_middle_and_loads_
     assert saved.title == "Central Chile, seed 3"
     assert loaded.title == saved.title
     assert loaded.settings == settings
-    square = maps.load("chile", "hex").square_middle()
-    assert loaded.game.tile_map.grid == square.grid
-    assert loaded.game.tile_map.bounds == square.bounds
-    assert square.bounds.width_km == pytest.approx(square.bounds.height_km, rel=0.02)
+    place = maps.load("chile", "hex")
+    start = place.window(*Lots.around_middle(place).window())
+    locked = loaded.game.tile_map.locked
+    assert loaded.game.tile_map.grid == start.grid
+    assert loaded.game.tile_map.bounds == start.bounds
+    assert locked is not None
+    assert int((~locked).sum()) == pytest.approx(place.grid.rows * place.grid.cols / 4, rel=0.03)
 
 
 def test_the_command_line_picks_a_baked_map_by_its_key() -> None:
@@ -107,10 +111,10 @@ def test_the_command_line_still_offers_poland_and_a_random_place(
     assert settings.map == expected
 
 
-def test_the_menu_tells_the_size_of_the_square_a_game_starts_on_and_what_is_on_it() -> None:
+def test_the_menu_tells_how_much_land_a_game_starts_on_and_what_is_on_it() -> None:
     note = map_note(MapChoice.BRITAIN)
 
-    assert note.startswith("366 × 366 km. ")
+    assert note.startswith("About 134,000 km² to start, in seven hexagonal lots. ")
     assert "Scotland" in note
 
 

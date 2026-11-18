@@ -11,10 +11,12 @@ from railroads.land import (
 from railroads.newgame import MapChoice, Settings, make_game
 from railroads.saves import SavedGame
 from railroads.sim.constructions import BuildingKind
+from railroads.sim.lots import START_LOTS
 from railroads.sim.novelties import YEARLY_CHANCE
 from railroads.sim.steps import finish
 
 SETTINGS = Settings(seed=5, map=MapChoice.POLAND, start_year=1850, cash=2_000_000.0)
+LEFT = (-2, 0)
 
 
 @pytest.fixture(scope="module")
@@ -37,19 +39,21 @@ def bought(started: SavedGame) -> tuple[SavedGame, dict]:
         "price": game.lots.price(),
         "offered": offered_lots(started),
     }
-    saved = finish(buy_lot_steps(started, (0, -1), report=lambda text: None))
+    saved = finish(buy_lot_steps(started, LEFT, report=lambda text: None))
     return saved, before
 
 
-def test_a_new_game_offers_the_eight_lots_around_its_square_with_land(started: SavedGame) -> None:
+def test_a_new_game_offers_the_twelve_lots_around_its_honeycomb_with_land(
+    started: SavedGame,
+) -> None:
     lots = started.game.lots
 
     offered = offered_lots(started)
 
     assert lots is not None
-    assert lots.owned == {(0, 0), (0, 1), (1, 0), (1, 1)}
-    assert 6 <= len(offered) <= 8
-    assert (0, -1) in offered
+    assert lots.owned == set(START_LOTS)
+    assert 9 <= len(offered) <= 12
+    assert LEFT in offered
 
 
 def test_a_lot_bought_is_paid_for_and_widens_the_map(bought: tuple[SavedGame, dict]) -> None:
@@ -63,23 +67,23 @@ def test_a_lot_bought_is_paid_for_and_widens_the_map(bought: tuple[SavedGame, di
     assert game.finances.cash == pytest.approx(before["cash"] - before["price"])
     assert before["price"] == 377_000
     assert lots.price() == 610_000
-    assert (rows, cols) == (before["shape"][0], before["shape"][1] + lots.cols)
+    assert rows == before["shape"][0]
+    assert cols > before["shape"][1]
 
 
-def test_what_stood_on_the_map_moves_right_by_the_lot_bought_on_the_left(
+def test_what_stood_on_the_map_moves_right_by_as_much_as_the_map_widened_on_the_left(
     bought: tuple[SavedGame, dict],
 ) -> None:
     saved, before = bought
-    lots = saved.game.lots
     row, col = before["station"]
+    widened = saved.game.tile_map.grid.cols - before["shape"][1]
 
     stations = saved.game.railway.stations()
 
-    assert lots is not None
-    assert stations == [(row, col + lots.cols)]
+    assert stations == [(row, col + widened)]
 
 
-def test_the_lot_bought_arrives_grown_and_the_lot_beside_it_stays_locked(
+def test_the_lot_bought_arrives_grown_and_the_lots_not_bought_stay_locked(
     bought: tuple[SavedGame, dict],
 ) -> None:
     saved, _ = bought
@@ -87,14 +91,15 @@ def test_the_lot_bought_arrives_grown_and_the_lot_beside_it_stays_locked(
     lots = game.lots
     assert lots is not None
 
+    inside = lots.in_lots(lots.window(), {LEFT})
     houses = game.growth.count(BuildingKind.HOUSE)
     locked = game.tile_map.locked
 
-    assert houses[: lots.rows, : lots.cols].sum() > 0
+    assert houses[inside].sum() > 0
     assert locked is not None
-    assert locked[lots.rows :, : lots.cols].all()
-    assert not locked[: lots.rows].any()
-    assert lot_middle(lots, (0, -1)) == (lots.rows // 2, lots.cols // 2)
+    assert locked.any()
+    assert not locked[inside].any()
+    assert lots.lot_at(*lot_middle(lots, LEFT)) == LEFT
 
 
 def test_the_bought_game_plays_on(bought: tuple[SavedGame, dict]) -> None:

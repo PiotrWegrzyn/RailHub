@@ -9,7 +9,6 @@ from imgui_bundle import imgui
 from railroads.sim.constructions import Station
 from railroads.ui.build_menu import STATION_TOOLS, Tool
 from railroads.ui.iso_camera import Vec2
-from railroads.ui.land_offers import row_step
 from railroads.ui.minimap import MinimapLayout
 
 if TYPE_CHECKING:
@@ -82,7 +81,7 @@ class MapInput:
                 self._wheel -= steps
                 camera.zoom(steps, (io.mouse_pos.x, io.mouse_pos.y), center)
         lots = view.game.lots
-        margin = (0.0, 0.0) if lots is None else (lots.cols, lots.rows * row_step(grid))
+        margin = (0.0, 0.0) if lots is None else (2 * lots.radius, 2 * lots.radius)
         camera.keep_within(*grid.size(), margin)
         view.hovered = None
         on_map = None
@@ -94,7 +93,7 @@ class MapInput:
                 view.hovered = cell
             elif not grid.contains(*cell) or view.tile_map.is_locked(cell):
                 on_map = camera.to_plane(io.mouse_pos.x, io.mouse_pos.y, center)
-        view.land.hover(lots, grid, on_map)
+        view.land.hover(lots, on_map)
         clicked = imgui.is_item_deactivated() and self._dragged < CLICK_SLOP
         if clicked and self._pressed_on is None:
             if view.hovered is not None:

@@ -51,9 +51,9 @@ TOWNS_HELP = (
 )
 MAP_HELP = (
     (
-        "A game starts on the square in the middle of its place, holding a quarter of its land:"
-        " Poland starts as about 340 by 340 km around its middle, and a random place in the world"
-        " as about 270 by 270 km."
+        "A game starts on a honeycomb of seven big hexagons, or lots, in the middle of its place,"
+        " holding a quarter of it: one lot in the middle and six around it, each about 140 km"
+        " across on Poland."
     ),
     (
         "Every hex of the map grows every month, from the year 850 before play and all through"
@@ -64,11 +64,11 @@ MAP_HELP = (
         " browser both take about twice as long."
     ),
     (
-        "The land around it can be bought a lot at a time. Every lot is a quarter of the land a"
-        " game starts on, half as wide and half as tall, and any lot sharing a side with yours is"
-        " for sale: past the map's edge it shows its rivers, forests and mountains, without the"
-        " buildings, behind a chain and a padlock with its price. The first costs $377,000 and each after it the next Fibonacci number of"
-        " thousands: $610,000, $987,000 and so on."
+        "The land around it can be bought a lot at a time, each a seventh of the land a game"
+        " starts on. Any lot sharing a side with yours is for sale, twelve at the start: past the"
+        " map's edge it shows its rivers, forests and mountains, without the buildings, behind a"
+        " chain and a padlock with its price. The first costs $377,000 and each after it the next"
+        " Fibonacci number of thousands: $610,000, $987,000 and so on."
     ),
     (
         "Click a lot and confirm to buy it. It then grows on its own from 850 to this year, as"

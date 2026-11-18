@@ -29,9 +29,10 @@ first with:
   the US Northeast, California, the Colorado Rockies, Central Chile, Japan (Osaka to Nagoya),
   China's Yangtze delta and Southeast Australia, listed in `START_MAPS` in
   `src/railroads/maps/__init__.py`. Each is baked cut to its land, so some are long and thin or
-  wide, and all are 2 km a hex; a game starts on the square in the middle of the place, holding a
-  quarter of its land (`TileMap.square_middle`), so Poland starts as about 340 by 340 km around
-  its middle. A random place is cut the same way. The cut is for speed: every hex grows every
+  wide, and all are 2 km a hex; a game starts on a honeycomb of seven big hexagons, or lots, in
+  the middle of the place, holding a quarter of its cells (`Lots.around_middle`): one lot in
+  the middle and six around it, each about 140 km across on Poland. A random place is cut the
+  same way. The cut is for speed: every hex grows every
   month, before play and in it, so setting up a game and running a month both take about as
   long as the map is big. On an M3 Pro, seed 7, Poland's whole land (131,500 hexes) grows to
   1850 in 10.0 s and runs a month in 67 ms; half of it (65,700) in 5.6 s and 43 ms; the
@@ -41,8 +42,10 @@ first with:
   chunks in view are drawn. The in-game help explains it under Map.
 
   The rest of the place can be bought in play, a lot at a time (`railroads.sim.lots`,
-  `railroads.land`, `railroads.ui.land_offers`). The starting square splits into two by two
-  lots; any lot sharing a side with the player's land and holding some land is for sale, the
+  `railroads.land`, `railroads.ui.land_offers`). Lots are big hexagons on a coarse hex lattice
+  over the place's map, point up like its cells and numbered by axial coordinates, each a
+  seventh of the starting land; a cell belongs to the lot its centre lies in. Any lot sharing a
+  side with the player's land and holding some land is for sale, twelve at the start, the
   first for $377,000 and each after it for the next Fibonacci number of thousands ($610,000,
   $987,000, ...). Past the map's edge each lot shows the ground of the place's map there, its
   rivers, lakes, forests, hills and mountains without the buildings, dimmed behind a chain and a
@@ -52,9 +55,10 @@ first with:
   buildings every map keeps at least one of, picked at random, and each novelty not built yet
   at a quarter of the chance it had over the years played. The game then moves onto the bigger
   map (`railroads.sim.regrid`): a lot bought above or to the left shifts every cell, and every
-  station, train, stockpile and array moves with it. The map is the smallest rectangle of lots
-  around the player's land; lots in it not bought are locked (`TileMap.locked`), and nothing
-  is built or grows there. A lot takes about 2 s to grow on the desktop and 3 s in the
+  station, train, stockpile and array moves with it. The map is the smallest rectangle of cells
+  around the player's lots; its cells in lots not bought, a third of it at the start, are locked
+  (`TileMap.locked`): nothing is built, grows or is routed there, and they cost a month about a
+  fifth of what land in play does. A lot takes about 2 s to grow on the desktop and 3 s in the
   browser, and adds about 5 ms to a month. Lots go only as far as the place's own map;
 - the seed, which picks the start location and grows the same towns again. The menu offers a
   new random one each time the game opens;
@@ -87,7 +91,7 @@ saying so, not a crash. Saves are Python pickles, so only load saves you trust.
 
 Any of the options below skips the menu and starts that game straight away. Without `--poland`
 or `--map`, a game starts at a random, mostly-land spot in the world, on a 537 x 537 km map, played from the
-square of about 270 x 270 km in its middle. The limits for
+honeycomb of seven lots in its middle. The limits for
 that spot (longitude, latitude, how much land) are `START_REGION` in
 `src/railroads/newgame.py`. Options:
 

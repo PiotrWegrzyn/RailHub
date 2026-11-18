@@ -44,8 +44,7 @@ def offered_lots(saved: SavedGame) -> list[Lot]:
 
 def lot_middle(lots: Lots, lot: Lot) -> Cell:
     """The map cell in the middle of a lot."""
-    row, col = lots.cell_of(lot)
-    return row + lots.rows // 2, col + lots.cols // 2
+    return lots.middle_cell(lot)
 
 
 def buy_lot_steps(
@@ -66,8 +65,10 @@ def buy_lot_steps(
     place = place_map(settings)
     year = game.growth.year
     report(f"Growing the land bought from year {HISTORY_START} to {year}")
+    window = lots.window_of({lot})
+    inside = lots.in_lots(window, {lot})
     grown = yield from seed_growth_steps(
-        place.window(*lots.place_cell_of(lot), lots.rows, lots.cols),
+        replace(place.window(*window), locked=~inside),
         saved.rng,
         replace(GROWTH, top_ups=quarter_of_top_ups(saved.rng)),
         months=(year - HISTORY_START) * 12,
@@ -80,8 +81,9 @@ def buy_lot_steps(
     lots.offer(_land(place))
     new = lots.window()
     rows, cols = old[0] - new[0], old[1] - new[1]
-    at = lots.cell_of(lot)
-    tile_map = _joined(place, game.tile_map, (rows, cols), grown.constructions.tile_map, at, lots)
+    at = window[0] - new[0], window[1] - new[1]
+    lot_map = grown.constructions.tile_map
+    tile_map = _joined(place, game.tile_map, (rows, cols), lot_map, at, inside, lots)
     built = [
         Building((building.cell[0] + at[0], building.cell[1] + at[1]), building.kind)
         for building in grown.constructions
@@ -151,19 +153,23 @@ def _joined(
     old_at: Cell,
     lot: TileMap,
     lot_at: Cell,
+    inside: np.ndarray,
     lots: Lots,
 ) -> TileMap:
-    """The map of the place over the lots' window, with the old map at `old_at` and the lot at
-    `lot_at` laid on it as they grew, and the lots not owned locked."""
+    """The map of the place over the lots' window, with the old map at `old_at` and the cells
+    `inside` the lot bought of its map at `lot_at` laid on it as they grew, and the lots not
+    owned locked."""
     base = place.window(*lots.window())
     layers = {layer: getattr(base, layer).copy() for layer in LAYERS}
     deposits = np.zeros(base.grid.shape, dtype=np.uint8)
-    for part, (row, col) in ((old, old_at), (lot, lot_at)):
+    everywhere = np.ones(old.grid.shape, dtype=bool)
+    for part, (row, col), keep in ((old, old_at, everywhere), (lot, lot_at, inside)):
         rows, cols = part.grid.shape
+        area = slice(row, row + rows), slice(col, col + cols)
         for layer in LAYERS:
-            layers[layer][row : row + rows, col : col + cols] = getattr(part, layer)
+            layers[layer][area] = np.where(keep, getattr(part, layer), layers[layer][area])
         if part.deposits is not None:
-            deposits[row : row + rows, col : col + cols] = part.deposits
+            deposits[area] = np.where(keep, part.deposits, deposits[area])
     return replace(
         old,
         grid=base.grid,

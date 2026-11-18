@@ -185,8 +185,8 @@ def make_game_steps(
         place = new.tile_map
         _PLACES[(settings.map, seed)] = place
         title = f"Seed {seed}, {new.place}"
-    square = place.middle_square()
-    tile_map = place.window(*square)
+    lots = Lots.around_middle(place)
+    tile_map = replace(place.window(*lots.window()), locked=lots.locked())
     years = settings.start_year - HISTORY_START
     months = years * 12
     begins = play_begins(months)
@@ -202,8 +202,8 @@ def make_game_steps(
     )
     game = Game(seeded, start_year=begins, history=history, names=place_names(seeded.tile_map))
     game.finances.cash = settings.cash
-    game.lots = Lots.of_square(*square)
-    game.lots.offer(place.terrain == Terrain.LAND)
+    game.lots = lots
+    lots.offer(place.terrain == Terrain.LAND)
     game.growth.novelties = Novelties.pick(game.tile_map, np.random.default_rng(seed + 3))
     if settings.stand_in_years > 0:
         played = min(settings.stand_in_years, END_YEAR - begins)

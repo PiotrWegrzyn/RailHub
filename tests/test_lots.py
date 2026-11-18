@@ -12,57 +12,65 @@ from railroads.sim.constructions import (
     Station,
     Track,
 )
+from railroads.sim.game import Game
 from railroads.sim.growth import Growth
-from railroads.sim.lots import Lots, fibonacci
+from railroads.sim.lots import START_LOTS, Lots, fibonacci
 from railroads.sim.tilemap import TileMap
 
 
 def start_lots() -> Lots:
-    return Lots.of_square(top=8, left=6, rows=8, cols=6)
+    return Lots.around_middle(flat_map(80, 70))
 
 
-def test_a_game_starts_owning_the_four_lots_of_its_square() -> None:
+def test_a_game_starts_owning_a_honeycomb_of_seven_lots_holding_a_quarter_of_the_place() -> None:
     lots = start_lots()
 
+    locked = lots.locked()
+    top, _, rows, cols = lots.window()
+
+    assert lots.owned == set(START_LOTS)
+    assert locked is not None
+    assert int((~locked).sum()) == pytest.approx(80 * 70 / 4, rel=0.03)
+    assert top % 2 == 0
+    assert locked[0, 0] and locked[-1, -1]
+    assert not locked[rows // 2, cols // 2]
+
+
+def test_each_lot_is_a_seventh_of_the_starting_land() -> None:
+    lots = start_lots()
     window = lots.window()
 
-    assert (lots.rows, lots.cols) == (4, 3)
-    assert lots.owned == {(0, 0), (0, 1), (1, 0), (1, 1)}
-    assert window == (8, 6, 8, 6)
-    assert lots.locked() is None
+    sizes = [int(lots.in_lots(window, {lot}).sum()) for lot in sorted(START_LOTS)]
+
+    assert max(sizes) - min(sizes) <= 0.08 * max(sizes)
+    assert sum(sizes) == int((~lots.locked()).sum())
 
 
-def test_a_square_that_doesnt_split_into_even_lots_is_refused() -> None:
-    with pytest.raises(ValueError, match="four even lots"):
-        Lots.of_square(top=0, left=0, rows=6, cols=6)
-
-
-def test_eight_lots_share_a_side_with_the_starting_square() -> None:
+def test_twelve_lots_share_a_side_with_the_starting_honeycomb() -> None:
     lots = start_lots()
 
     around = lots.next_to()
 
-    assert around == [(-1, 0), (-1, 1), (0, -1), (0, 2), (1, -1), (1, 2), (2, 0), (2, 1)]
+    assert len(around) == 12
+    assert all(max(abs(q), abs(r), abs(q + r)) == 2 for q, r in around)
 
 
 def test_only_lots_with_land_are_offered() -> None:
     lots = start_lots()
-    land = np.zeros((24, 18), dtype=bool)
-    land[:, :12] = True
+    land = np.zeros((80, 70), dtype=bool)
+    land[:, :35] = True
 
     offered = lots.offered(land)
 
-    assert (0, 2) not in offered
-    assert (1, 2) not in offered
-    assert (0, -1) in offered
-    assert (-1, 0) in offered
+    assert (-2, 0) in offered
+    assert (2, 0) not in offered
 
 
 def test_a_lot_past_the_places_map_has_no_land() -> None:
     lots = start_lots()
-    land = np.ones((16, 12), dtype=bool)
+    land = np.ones((80, 70), dtype=bool)
 
-    share = lots.land_share((-3, 0), land)
+    share = lots.land_share((9, 0), land)
 
     assert share == 0.0
 
@@ -76,7 +84,7 @@ def test_each_lot_costs_the_next_fibonacci_number_of_thousands() -> None:
     lots = start_lots()
     prices = [lots.price()]
 
-    for lot in ((0, -1), (-1, 0)):
+    for lot in ((-2, 0), (-2, 1)):
         lots.buy(lot)
         prices.append(lots.price())
 
@@ -90,31 +98,28 @@ def test_a_lot_apart_from_the_players_land_cant_be_bought() -> None:
         lots.buy((5, 5))
 
 
-def test_a_lot_bought_to_the_top_left_moves_the_maps_corner_and_locks_the_lot_beside_it() -> None:
+def test_a_lot_bought_to_the_left_widens_the_map_leftwards_from_an_even_row() -> None:
     lots = start_lots()
+    before = lots.window()
 
-    lots.buy((0, -1))
-    lots.buy((-1, -1))
-    locked = lots.locked()
+    lots.buy((-2, 1))
+    after = lots.window()
 
-    assert lots.corner() == (-1, -1)
-    assert lots.window() == (4, 3, 12, 9)
-    assert lots.cell_of((0, 0)) == (4, 3)
-    assert locked is not None
-    assert locked.shape == (12, 9)
-    assert locked[0, 3:].all()
-    assert not locked[0, :3].any()
-    assert not locked[4:8].any()
-    assert locked[8:, :3].all()
+    assert after[1] < before[1]
+    assert after[1] + after[3] == before[1] + before[3]
+    assert after[0] % 2 == 0
+    assert (-2, 1) not in lots.locked_lots()
+    assert lots.lot_at(*lots.middle_cell((-2, 1))) == (-2, 1)
 
 
-def test_a_map_cell_lies_in_the_lot_counted_from_the_maps_corner() -> None:
+def test_the_middle_cell_of_the_map_lies_in_the_middle_lot() -> None:
     lots = start_lots()
-    lots.buy((0, -1))
+    _, _, rows, cols = lots.window()
 
-    lot = lots.lot_at(5, 2)
+    lot = lots.lot_at(*lots.middle_cell((0, 0)))
 
-    assert lot == (1, -1)
+    assert lot == (0, 0)
+    assert lots.lot_at(rows // 2, cols // 2) == (0, 0)
 
 
 def half_locked_map() -> TileMap:
@@ -158,3 +163,24 @@ def test_nothing_grows_on_locked_land() -> None:
     cells = {building.cell for building in constructions if isinstance(building, Building)}
     assert cells
     assert all(col < 10 for _, col in cells)
+
+
+def test_a_station_on_locked_land_is_refused_without_harm() -> None:
+    game = Game(Constructions(half_locked_map()))
+    game.finances.cash = 1_000_000.0
+
+    done = game.build_station((4, 14))
+
+    assert not done.ok
+    assert game.railway.stations() == []
+
+
+def test_track_is_never_planned_through_locked_land() -> None:
+    game = Game(Constructions(half_locked_map()))
+    game.finances.cash = 1_000_000.0
+    game.build_station((4, 2))
+
+    done = game.lay_track((4, 2), (4, 16))
+
+    assert not done.ok
+    assert not any(col >= 10 for _, col in game.constructions._track)

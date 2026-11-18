@@ -12,7 +12,7 @@ import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
 from railroads.sim.finance import Finances, dollars
-from railroads.sim.grids import Grid
+from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP
 from railroads.sim.lots import Lot, Lots
 from railroads.sim.tilemap import TileMap
 from railroads.ui.ground import cell_colors
@@ -33,23 +33,14 @@ LOCK_SHARE = 0.16
 LOCK_SIZE = (18.0, 54.0)
 
 
-def row_step(grid: Grid) -> float:
-    """How far apart rows of cells lie, in the map's cell units."""
-    return float(grid.center(1, 0)[1] - grid.center(0, 0)[1])
+def lot_corners(lots: Lots, lot: Lot) -> list[Vec2]:
+    """A lot's six corners on the game's map, in cell units, clockwise."""
+    return [lots.map_point(corner) for corner in lots.corners(lot)]
 
 
-def lot_corners(grid: Grid, lots: Lots, lot: Lot) -> list[Vec2]:
-    """A lot's corners on the map, in cell units: top-left, top-right, bottom-right, bottom-left."""
-    row, col = lots.cell_of(lot)
-    step = row_step(grid)
-    top, bottom = row * step, (row + lots.rows) * step
-    left, right = float(col), float(col + lots.cols)
-    return [(left, top), (right, top), (right, bottom), (left, bottom)]
-
-
-def lot_under(grid: Grid, lots: Lots, x: float, y: float) -> Lot:
-    """The lot a point on the map in cell units lies in, past the map's edges too."""
-    return lots.lot_at(math.floor(y / row_step(grid)), math.floor(x))
+def lot_under(lots: Lots, x: float, y: float) -> Lot:
+    """The lot a point on the game's map in cell units lies in, past the map's edges too."""
+    return lots.lot_at_point(*lots.place_point((x, y)))
 
 
 def world_uv(tile_map: TileMap, point: Vec2) -> Vec2:
@@ -62,8 +53,8 @@ def world_uv(tile_map: TileMap, point: Vec2) -> Vec2:
 
 @dataclass(frozen=True)
 class PlacePicture:
-    """The ground of the place's map, a pixel a cell, with a lot of sea round it, and the place's
-    cell its pixel (0, 0) shows."""
+    """The ground of the place's map, a pixel a cell, with two lots' width of sea round it, and
+    the place's cell its pixel (0, 0) shows."""
 
     pixels: np.ndarray
     top: int
@@ -71,33 +62,28 @@ class PlacePicture:
 
     @classmethod
     def of(cls, place: TileMap, lots: Lots) -> PlacePicture:
-        top, left = -lots.rows, -lots.cols
-        rows, cols = place.grid.rows + 2 * lots.rows, place.grid.cols + 2 * lots.cols
+        margin = math.ceil(4 * lots.radius) // 2 * 2 + 2
+        top, left = -margin, -margin
+        rows, cols = place.grid.rows + 2 * margin, place.grid.cols + 2 * margin
         pixels = cell_colors(place.window(top, left, rows, cols))
         return cls(np.ascontiguousarray(pixels), top, left)
 
+    def uv(self, point: Vec2) -> Vec2:
+        """Where a point on the place's map's plane lies on the picture."""
+        rows, cols = self.pixels.shape[:2]
+        row = (point[1] - HEX_RADIUS) / HEX_ROW_STEP
+        return (point[0] - self.left) / cols, (row + 0.5 - self.top) / rows
+
     def uvs(self, lots: Lots, lot: Lot) -> list[Vec2]:
         """Where a lot's corners lie on the picture, in the order of lot_corners."""
-        top, left = lots.place_cell_of(lot)
-        rows, cols = self.pixels.shape[:2]
-        u0, u1 = (left - self.left) / cols, (left + lots.cols - self.left) / cols
-        v0, v1 = (top - self.top) / rows, (top + lots.rows - self.top) / rows
-        return [(u0, v0), (u1, v0), (u1, v1), (u0, v1)]
+        return [self.uv(corner) for corner in lots.corners(lot)]
 
 
 def shown_lots(lots: Lots) -> list[tuple[Lot, bool]]:
-    """Every lot not owned to draw, with whether it is on offer: those on offer, and those in the
-    map's gaps."""
-    top, left = lots.corner()
-    tall, wide = lots.span()
-    inside = {
-        (row, col)
-        for row in range(top, top + tall)
-        for col in range(left, left + wide)
-        if (row, col) not in lots.owned
-    }
+    """Every lot not owned to draw, with whether it is on offer: those on offer, and those with
+    cells in the map's gaps."""
     offers = set(lots.offers)
-    return sorted((lot, lot in offers) for lot in inside | offers)
+    return sorted((lot, lot in offers) for lot in offers | set(lots.locked_lots()))
 
 
 @dataclass
@@ -111,6 +97,15 @@ class LandOffers:
     # The ground of the place's map, and its texture once made.
     place: PlacePicture | None = None
     _texture: hello_imgui.TextureGpu | None = None
+    # The lots shown, with the lots' state they were found for.
+    _shown: tuple[tuple[int, int, int], list[tuple[Lot, bool]]] | None = None
+
+    def shown(self, lots: Lots) -> list[tuple[Lot, bool]]:
+        """shown_lots, found again only once a lot is bought."""
+        key = (id(lots), lots.bought, len(lots.offers))
+        if self._shown is None or self._shown[0] != key:
+            self._shown = (key, shown_lots(lots))
+        return self._shown[1]
 
     def show_place(self, place: TileMap, lots: Lots) -> None:
         """Draws the lots with the ground of the place's map from now on."""
@@ -124,13 +119,13 @@ class LandOffers:
             self._texture = hello_imgui.create_texture_gpu_from_rgba_data(self.place.pixels)
         return imgui.ImTextureRef(self._texture.texture_id())
 
-    def hover(self, lots: Lots | None, grid: Grid, point: Vec2 | None) -> None:
+    def hover(self, lots: Lots | None, point: Vec2 | None) -> None:
         """Notes the lot shown under a point on the map, if any."""
         self.hovered = None
         if lots is None or point is None:
             return
-        lot = lot_under(grid, lots, *point)
-        if any(lot == shown for shown, _ in shown_lots(lots)):
+        lot = lot_under(lots, *point)
+        if any(lot == shown for shown, _ in self.shown(lots)):
             self.hovered = lot
 
     def click(self, lots: Lots | None) -> bool:
@@ -153,24 +148,38 @@ class LandOffers:
     ) -> None:
         price = lots.price()
         ground = self._place_texture()
-        for lot, offered in shown_lots(lots):
-            plane = lot_corners(tile_map.grid, lots, lot)
+        for lot, offered in self.shown(lots):
+            plane = lot_corners(lots, lot)
             screen = [camera.to_screen(x, y, center) for x, y in plane]
             if ground is None or self.place is None:
                 picture, uvs = world, [world_uv(tile_map, point) for point in plane]
             else:
                 picture, uvs = ground, self.place.uvs(lots, lot)
             points = [imgui.ImVec2(*point) for point in screen]
-            draw_list.add_image_quad(picture, *points, *map(imgui.ImVec2, uvs), rgba_u32(LAND_TINT))
+            corners = [imgui.ImVec2(*uv) for uv in uvs]
+            tint = rgba_u32(LAND_TINT)
+            for a, b, c, d in ((0, 1, 2, 3), (3, 4, 5, 0)):
+                draw_list.add_image_quad(
+                    picture,
+                    points[a],
+                    points[b],
+                    points[c],
+                    points[d],
+                    corners[a],
+                    corners[b],
+                    corners[c],
+                    corners[d],
+                    tint,
+                )
             shade = HOVERED_SHADE if lot == self.hovered and offered else SHADE
-            draw_list.add_quad_filled(*points, rgba_u32(shade))
+            draw_list.add_convex_poly_filled(points, rgba_u32(shade))
             _draw_chain(draw_list, screen)
             middle = (
-                sum(x for x, _ in screen) / 4,
-                sum(y for _, y in screen) / 4,
+                sum(x for x, _ in screen) / len(screen),
+                sum(y for _, y in screen) / len(screen),
             )
-            side = min(math.dist(screen[0], screen[1]), math.dist(screen[1], screen[2]))
-            size = min(max(side * LOCK_SHARE, LOCK_SIZE[0]), LOCK_SIZE[1])
+            radius = math.dist(middle, screen[0])
+            size = min(max(radius * LOCK_SHARE * 2, LOCK_SIZE[0]), LOCK_SIZE[1])
             _draw_padlock(draw_list, middle, size)
             if offered:
                 _draw_price(draw_list, middle, size, dollars(price), cash >= price)

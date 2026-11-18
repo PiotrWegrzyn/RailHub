@@ -238,6 +238,8 @@ def build_station(
     tile = constructions.tile_map.tile(cell)
     if any(isinstance(b, Station) for b in built) or tile.terrain != Terrain.LAND:
         return None
+    if constructions.tile_map.is_locked(cell):
+        return None
     if station_site_price(constructions, cell) is None:
         return None
     if tile.relief == Relief.MOUNTAINS:
@@ -587,7 +589,7 @@ class _Planner:
         if ground is None:
             cell = self._cell(index)
             tile_map = self.constructions.tile_map
-            if tile_map.grid.contains(*cell):
+            if tile_map.grid.contains(*cell) and not tile_map.is_locked(cell):
                 land = (int(tile_map.terrain[cell]), int(tile_map.relief[cell]))
                 ground = _GROUNDS.get(land)
                 if ground is None:

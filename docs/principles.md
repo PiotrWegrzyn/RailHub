@@ -43,10 +43,10 @@ The ideas every rule of the game should follow.
   connects grow faster.
 - One set of rules for the whole history: the years before play starts run on the same rules as
   play, with no special factors for them.
-- A game starts on the square in the middle of its place, a quarter of its land. Every hex grows
-  every month, so the time to set up a game and to run a month grows with the map; a quarter of
-  the land starts and plays about three times as fast as the whole.
-- More land is bought a lot at a time, each a quarter of the starting land, at Fibonacci prices
+- A game starts on a honeycomb of seven hexagonal lots in the middle of its place, a quarter of its
+  land. Every hex grows every month, so the time to set up a game and to run a month grows with
+  the map; a quarter of the land starts and plays about three times as fast as the whole.
+- More land is bought a lot at a time, each a seventh of the starting land, at Fibonacci prices
   that keep a big map hard to get. What lies past the map's edge shows before it is bought, so
   nothing in it is a surprise.
 - Land bought grows on its own from the start of history to the year it is bought, under the

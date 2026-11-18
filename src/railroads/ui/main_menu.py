@@ -1,7 +1,6 @@
 """The menu the game opens on: start a new game with its settings chosen first, load a saved
 one, or quit."""
 
-import math
 import secrets
 from dataclasses import dataclass, field, replace
 from typing import Literal
@@ -69,18 +68,14 @@ def random_seed() -> int:
 
 
 def map_note(choice: MapChoice) -> str:
-    """What the menu says under the chosen map: the size of the square in its middle a game
-    starts on (railroads.sim.tilemap.TileMap.square_middle) and what is on it."""
+    """What the menu says under the chosen map: how much of it a game starts on, the seven lots
+    in its middle (railroads.sim.lots), and what is on it."""
     baked = choice.start_map
     if baked is None:
         return "A mostly-land spot anywhere in the world, picked by the seed."
     bounds = baked.bounds
-    side = min(
-        math.sqrt(bounds.width_km * bounds.height_km * START_SHARE),
-        bounds.width_km,
-        bounds.height_km,
-    )
-    return f"{side:,.0f} × {side:,.0f} km. {baked.about}"
+    area = round(bounds.width_km * bounds.height_km * START_SHARE, -3)
+    return f"About {area:,.0f} km² to start, in seven hexagonal lots. {baked.about}"
 
 
 @dataclass
