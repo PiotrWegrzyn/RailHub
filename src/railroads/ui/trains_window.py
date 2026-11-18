@@ -16,7 +16,7 @@ from railroads.sim.demand import StationDemand
 from railroads.sim.finance import TRAIN_RESALE, dollars
 from railroads.sim.goods import GENERAL_GOODS, General, Good
 from railroads.sim.grids import Cell
-from railroads.sim.railway import Railway, Ride
+from railroads.sim.railway import NO_WAY_ON, Railway, Ride
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, MAGLEV_FARE, Engine, Kind, Stop, Train
 from railroads.ui.buy_train import BuyScreen, EnginePicture, engine_range, fuel_use
 from railroads.ui.demand_view import draw_demand
@@ -236,6 +236,10 @@ class TrainsWindow:
         imgui.separator()
         destination = railway.destination(train)
         onward = "" if destination is None else railway.name_of(destination)
+        if warning := train_warning(railway, train):
+            imgui.push_text_wrap_pos(0.0)
+            imgui.text_colored(imgui.ImVec4(*GONE), f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {warning}")
+            imgui.pop_text_wrap_pos()
         worths = self.worth(railway, train)
         ride = railway.ride(train, worths)
         if ride is None:
@@ -521,6 +525,15 @@ class TrainsWindow:
                 stop.add_car(general, most)
                 train.cars_changed(index)
             imgui.end_disabled()
+
+
+def train_warning(railway: Railway, train: Train) -> str:
+    """What the train window warns of first: that no track the train can run on reaches its next
+    stop, so it waits where it is; empty when it can go on."""
+    destination = railway.destination(train)
+    if train.status not in NO_WAY_ON or destination is None:
+        return ""
+    return f"{train.status}, {railway.name_of(destination)}: it waits here until track joins them"
 
 
 def upgrade_button(railway: Railway, train: Train) -> None:

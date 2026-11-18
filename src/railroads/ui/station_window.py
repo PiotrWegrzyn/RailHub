@@ -27,6 +27,7 @@ from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.stations_window import look_at_button, stock_bar
 from railroads.ui.theme import (
     BRASS,
+    GONE,
     SIDE_WINDOW_POS,
     good_icon,
     goods_inline,
@@ -38,6 +39,7 @@ from railroads.ui.theme import (
 )
 
 WINDOW_WIDTH = 460.0
+UNJOINED = "Not joined by track to another station: it gathers and hands out nothing"
 LABEL_WIDTH = 140.0
 
 
@@ -113,6 +115,10 @@ class StationWindow:
         imgui.text_disabled(f"hands out within {delivery} cells, gathers within {collection}")
         imgui.same_line()
         look_at_button(station, look_at)
+        if warning := station_warning(railway, station):
+            imgui.push_text_wrap_pos(0.0)
+            imgui.text_colored(imgui.ImVec4(*GONE), f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {warning}")
+            imgui.pop_text_wrap_pos()
         imgui.separator()
         imgui.text_disabled("Stockpile")
         imgui.same_line(LABEL_WIDTH)
@@ -157,6 +163,12 @@ class StationWindow:
         if _priced_button(storage, railway.finances.can_afford(storage_price), detail):
             railway.add_storage(station)
         _draw_facilities(railway, station)
+
+
+def station_warning(railway: Railway, station: Cell) -> str:
+    """What the station window warns of first: that no track joins the station to another, so
+    it does nothing; empty when it is joined."""
+    return "" if railway.joined(station) else UNJOINED
 
 
 FACILITY_EFFECTS = {

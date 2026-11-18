@@ -124,6 +124,11 @@ LEVEL_STORAGE_STEPS = 2
 PLATFORM_LEVEL = 4
 # Upkeep never falls below this share of its full cost, however much tech cuts it.
 LEAST_UPKEEP = 0.5
+# What a train waits with when no track it can run on joins where it stands to its next stop.
+NO_TRACK_ON = "No track to its next stop"
+NO_ELECTRIFIED_TRACK_ON = "No electrified track to its next stop"
+NO_MAGLEV_TRACK_ON = "No maglev track to its next stop"
+NO_WAY_ON = frozenset({NO_TRACK_ON, NO_ELECTRIFIED_TRACK_ON, NO_MAGLEV_TRACK_ON})
 # Goods that pay this many times their price when a train delivers them: cattle are hard to haul.
 TRANSIT_PAY: Mapping[Good, float] = MappingProxyType({Good.CATTLE: 2.0})
 
@@ -532,6 +537,11 @@ class Railway:
         """The stations that track joins to at least one other station."""
         return self.network.connected()
 
+    def joined(self, station: Cell) -> bool:
+        """Whether track joins the station to another, without which it gathers and hands out
+        nothing."""
+        return station in self.network.connected()
+
     def level(self, station: Cell) -> int:
         return self.levels.get(station, 1)
 
@@ -670,11 +680,11 @@ class Railway:
             way = self.route(here, there, engine.electric, engine.maglev)
             if way is None:
                 train.status = (
-                    "No electrified track to its next stop"
+                    NO_ELECTRIFIED_TRACK_ON
                     if engine.electric
-                    else "No maglev track to its next stop"
+                    else NO_MAGLEV_TRACK_ON
                     if engine.maglev
-                    else "No track to its next stop"
+                    else NO_TRACK_ON
                 )
                 return
             leg = self.network.route_length(here, there, engine.electric, engine.maglev)
