@@ -13,7 +13,7 @@ from railroads.sim.events import (
     want_factor,
 )
 from railroads.sim.fuel_market import Fuel, history_factor
-from railroads.sim.goods import Good, Need, boosts_of, makes_of, needs_of
+from railroads.sim.goods import Good, Need, bonus_of, boosts_of, demands_of, makes_of, needs_of
 from railroads.sim.happenings import changes_of
 
 BOUNDS = {start.key: start.bounds for start in START_MAPS}
@@ -146,3 +146,13 @@ def test_events_come_in_the_order_of_their_dates() -> None:
     dates = [(event.year, event.month) for event in EVENTS]
 
     assert dates == sorted(dates)
+
+
+def test_after_electric_light_theatres_and_the_palace_still_take_wax_as_a_bonus() -> None:
+    theatre = bonus_of(BuildingKind.THEATRE, 1900)
+    palace = bonus_of(BuildingKind.ROYAL_PALACE, 1900)
+    church = demands_of(BuildingKind.CHURCH, 1900)
+
+    assert Need.WAX in theatre
+    assert Need.WAX in palace
+    assert Need.WAX in church

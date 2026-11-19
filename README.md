@@ -679,11 +679,11 @@ window (H) lists the same.
 | Clock maker (1880) | 5 luxury goods | 10 copper (from 1880), 5 glass |  |
 | Mirror maker (1700) | 5 luxury goods | 10 glass, 0.5 gold |  |
 | Manor |  | 100 food, 10 heating, 10 wine, 3 luxury goods (from 1700) | 5 furniture |
-| Theatre |  | 10 clothes (from 1780), 5 glass, 5 paper (from 1150) |  |
+| Theatre |  | 10 clothes (from 1780), 5 glass, 5 paper (from 1150) | 5 wax |
 | Hospital (1850) |  | 50 food, 5 heating, 10 chemicals (from 1880), 5 glass |  |
 | Space center |  | 300 electronics (from 1960), 1,000 fuel (from 1910), 300 food |  |
 | Pear Company headquarters |  | 500 electronics (from 1960), 1,000 food |  |
-| Royal palace |  | 200 food, 50 wine, 20 porcelain | 20 furniture |
+| Royal palace |  | 200 food, 50 wine, 20 porcelain | 20 furniture, 20 wax |
 | Spa resort |  | 100 food, 20 wine | 20 beer, 20 newspapers (from 1600) |
 | World's Fair hall |  | 200 goods, 100 glass, 100 steel (from 1855) |  |
 | Film studio |  | 50 chemicals (from 1880), 50 clothes (from 1780), 30 electronics (from 1960) |  |
@@ -863,7 +863,7 @@ and sends only goods the game already has, in vast amounts.
 
 | Novelty | From | Where | Wants each month | Sends |
 |---|---|---|---|---|
-| Royal palace | 1850 | by the biggest town, best on a hill or a river | 200 food, 50 wine, 20 porcelain, 20 furniture | 300 passengers |
+| Royal palace | 1850 | by the biggest town, best on a hill or a river | 200 food, 50 wine, 20 porcelain, 20 furniture, 20 wax | 300 passengers |
 | Salt mine cathedral | 1850 | on a salt deposit | | 200 salt, 200 passengers |
 | Spa resort | 1850 | hills beside a river or lake | 100 food, 20 wine, 20 beer, 20 newspapers | 300 passengers |
 | World's Fair hall | 1880 to 1940 | by the biggest town, once 100 people live there | 200 goods, 100 glass, 100 steel | 1,000 passengers |
@@ -899,7 +899,7 @@ Dated events change what is wanted, made and paid while they last, or for good:
 |---|---|---|
 | 1854 | The telegraph | newspapers wanted +100% |
 | 1873 | The Long Depression | luxuries, furniture and wine -30% for 6 years |
-| 1882 | Electric light | homes stop wanting wax (they took it as a bonus); churches keep it; electricity wanted +20% |
+| 1882 | Electric light | homes stop wanting wax (they took it as a bonus); churches, theatres and the royal palace keep it; electricity wanted +20% |
 | 1914 | The Great War | guns and steel x2, luxuries and wine -40%, passengers +50%, ports take guns, for 5 years |
 | 1920 | Radio | newspapers -15%, electricity wanted +20% |
 | 1929 | The Great Depression | everything but food, common goods and heating -30% for 4 years |

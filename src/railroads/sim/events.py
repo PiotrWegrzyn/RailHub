@@ -120,7 +120,7 @@ EVENTS = (
         1882,
         "Electric light",
         "The first power stations light streets and homes. Homes no longer want wax for "
-        "candles; only churches still burn them.",
+        "candles; churches, theatres and palaces still burn them.",
         wants={Need.WAX: 0.0},
         homes_only=True,
         electricity_use=1.2,

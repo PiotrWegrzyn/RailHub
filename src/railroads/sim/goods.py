@@ -773,7 +773,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.FURNITURE: 5,
             Need.LUXURIES: 3,
         },
-        BuildingKind.THEATRE: {Need.CLOTHES: 10, Need.GLASS: 5, Need.PAPER: 5},
+        BuildingKind.THEATRE: {Need.CLOTHES: 10, Need.GLASS: 5, Need.PAPER: 5, Need.WAX: 5},
         BuildingKind.HOSPITAL: {
             Need.FOOD: 50,
             Need.HEATING: 5,
@@ -856,6 +856,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.WINE: 50,
             Need.PORCELAIN: 20,
             Need.FURNITURE: 20,
+            Need.WAX: 20,
         },
         BuildingKind.SPA_RESORT: {
             Need.FOOD: 100,
@@ -1179,6 +1180,15 @@ VENUE_BONUSES: Mapping[BuildingKind, frozenset[Need]] = MappingProxyType(
     }
 )
 
+# Needs only some kinds of building take as a bonus: theatres and palaces light candles, which
+# churches must have.
+KIND_BONUSES: Mapping[BuildingKind, frozenset[Need]] = MappingProxyType(
+    {
+        BuildingKind.THEATRE: frozenset({Need.WAX}),
+        BuildingKind.ROYAL_PALACE: frozenset({Need.WAX}),
+    }
+)
+
 
 @cache
 def bonus_of(kind: BuildingKind, year: int, east: bool = False) -> Mapping[Need, float]:
@@ -1195,7 +1205,8 @@ def bonus_of(kind: BuildingKind, year: int, east: bool = False) -> Mapping[Need,
         return MappingProxyType(
             {need: amount for need, amount in needs.items() if need not in demands}
         )
-    bonus = {need: amount for need, amount in needs.items() if need in BONUS_NEEDS}
+    extra = KIND_BONUSES.get(kind, frozenset())
+    bonus = {need: amount for need, amount in needs.items() if need in BONUS_NEEDS or need in extra}
     if kind in MAKES or len(bonus) == len(needs):
         return MappingProxyType({})
     return MappingProxyType(bonus)
