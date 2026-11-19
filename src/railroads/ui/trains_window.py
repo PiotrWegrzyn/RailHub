@@ -14,6 +14,7 @@ from imgui_bundle import imgui
 
 from railroads.sim.demand import StationDemand
 from railroads.sim.finance import TRAIN_RESALE, dollars
+from railroads.sim.fuel_market import fuel_of
 from railroads.sim.goods import GENERAL_GOODS, General, Good
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
@@ -495,8 +496,8 @@ def speed_share(railway: Railway, train: Train, tonnes: float) -> float:
 
 
 def draw_tonnage(railway: Railway, train: Train) -> None:
-    """What a train's cars weigh now against the most its engine pulls, and how fast that lets
-    it run."""
+    """What a train's cars weigh now against the most its engine pulls, how fast that lets it
+    run and how much fuel it burns."""
     most = railway.max_pull(train.engine)
     imgui.text_disabled(f"{train.tonnes:.0f} / {most:.0f} t")
     if imgui.is_item_hovered():
@@ -504,6 +505,8 @@ def draw_tonnage(railway: Railway, train: Train) -> None:
             f"What its cars weigh now, against the most its engine pulls;\nit runs at "
             f"{railway.pull(train):.0%} of its top speed, "
             f"{speed_share(railway, train, most):.0%} pulling the most"
+            f"\nIt burns {railway.burn(train):.2g} {fuel_of(ENGINES[train.engine]).value} a cell, "
+            f"{railway.burn(train) / ENGINES[train.engine].burn:.0%} of what it burns half loaded"
         )
 
 

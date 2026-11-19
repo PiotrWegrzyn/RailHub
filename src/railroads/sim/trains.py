@@ -280,6 +280,9 @@ BURN_PER_CAR = {
     Power.MAGLEV: 0.4,
 }
 LIGHT_BURN = 0.5
+# What an engine burns grows with what its cars weigh: BURN_ALONE of its burn with no cars, its
+# burn when they weigh half the most it pulls, and BURN_ALONE + 1 of it when they weigh the most.
+BURN_ALONE = 0.5
 # Diesel, electric and maglev engines pull heavier cars, this many sizes up CAR_SIZES.
 CAR_LEVELS = {Power.DIESEL: 1, Power.ELECTRIC: 1, Power.MAGLEV: 1}
 
@@ -324,7 +327,7 @@ class Engine:
 
     @property
     def burn(self) -> float:
-        """How much fuel it burns a cell."""
+        """How much fuel it burns a cell pulling half the most it can."""
         light = LIGHT_BURN if self.kind == Kind.LIGHT else 1.0
         return BURN_PER_CAR[self.power] * self.hauls * light
 

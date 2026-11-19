@@ -25,7 +25,7 @@ from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.tech import Research
-from railroads.sim.trains import ENGINES, Stop
+from railroads.sim.trains import BULK_CAR, BURN_ALONE, ENGINES, Car, Stop, Train
 
 WEST, EAST = (6, 3), (6, 20)
 
@@ -71,7 +71,7 @@ def test_a_train_setting_off_buys_the_coal_for_its_way_at_retail_without_coal_at
 
     leg = 17.0
     price = BASE_PRICE[Fuel.COAL] * (1 + RETAIL_MARKUP)
-    assert paid == pytest.approx(ENGINES["planet"].burn * leg * price, rel=0.05)
+    assert paid == pytest.approx(ENGINES["planet"].burn * BURN_ALONE * leg * price, rel=0.05)
 
 
 def test_coal_out_of_the_stations_stockpile_costs_only_the_market_price() -> None:
@@ -240,3 +240,43 @@ def test_a_power_plant_can_be_bought_for_two_million() -> None:
     price = growth.owners.price_to_buy(BuildingKind.POWER_PLANT)
 
     assert price == 2_000_000.0
+
+
+def test_a_heavier_train_burns_more_fuel_a_cell() -> None:
+    railway = line()
+    empty = Train("Empty", cars=[Car(Good.COAL)])
+    full = Train("Full", cars=[Car(Good.COAL, BULK_CAR)])
+
+    burns = railway.burn(empty), railway.burn(full)
+
+    assert burns[0] < burns[1]
+
+
+def test_a_train_burns_half_its_engines_fuel_alone_and_half_as_much_again_at_its_most() -> None:
+    railway = line()
+    engine = ENGINES["planet"]
+    alone = Train("Alone")
+    heaviest = Train("Heaviest", cars=[Car(Good.COAL, BULK_CAR) for _ in range(engine.cars)])
+
+    burns = railway.burn(alone), railway.burn(heaviest)
+
+    assert burns == (pytest.approx(0.5 * engine.burn), pytest.approx(1.5 * engine.burn))
+
+
+def wheat_train(wheat_waiting: float) -> Railway:
+    railway = line()
+    railway.station_goods(WEST).stockpile[Good.WHEAT] = wheat_waiting
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop(WEST, [Good.WHEAT] * 3, wait_for_load=False), Stop(EAST)]
+    return railway
+
+
+def test_a_train_setting_off_full_buys_more_coal_than_one_setting_off_empty() -> None:
+    empty, full = wheat_train(0.0), wheat_train(1_000.0)
+
+    empty.run(0.001)
+    full.run(0.001)
+
+    paid = [-railway.finances.month.get(Fuel.COAL.value, 0.0) for railway in (empty, full)]
+    assert 0 < paid[0] < paid[1]

@@ -82,6 +82,7 @@ from railroads.sim.stats import History
 from railroads.sim.tech import GENERAL_CARS, GOOD_TREES, Effect, Research
 from railroads.sim.track_network import TrackNetwork
 from railroads.sim.trains import (
+    BURN_ALONE,
     CAR_GROWTH,
     ENGINES,
     EXPRESS_FARE,
@@ -290,9 +291,16 @@ class Railway:
     def pull(self, train: Train) -> float:
         """How much of its engine's top speed a train makes with its cars behind it: all of it
         with none, losing the engine's SLOWDOWN as their weight nears the most it pulls."""
-        engine = ENGINES[train.engine]
-        share = min(1.0, train.tonnes / self.max_pull(train.engine))
-        return 1.0 - SLOWDOWN[engine.kind] * share
+        return 1.0 - SLOWDOWN[ENGINES[train.engine].kind] * self.load_share(train)
+
+    def load_share(self, train: Train) -> float:
+        """How much of the most its engine pulls a train's cars weigh, at most all of it."""
+        return min(1.0, train.tonnes / self.max_pull(train.engine))
+
+    def burn(self, train: Train) -> float:
+        """How much fuel a train burns a cell with its cars behind it: more the more they weigh
+        (BURN_ALONE)."""
+        return ENGINES[train.engine].burn * (BURN_ALONE + self.load_share(train))
 
     def car_tonnes(self, cargo: Cargo, engine: str) -> float:
         """What a full car for some cargo weighs behind an engine, in tonnes; a general car
@@ -321,7 +329,8 @@ class Railway:
         return max(0.0, RETAIL_MARKUP - self.research.bonus(Effect.FUEL_MARKUP))
 
     def fuel_cost(self, engine: str, cells: float = 1.0) -> float:
-        """What an engine's fuel for `cells` costs bought at retail now, the dearest it comes."""
+        """What an engine's fuel for `cells` costs bought at retail now, the dearest it comes,
+        pulling half the most it can."""
         burnt = ENGINES[engine]
         fuel = fuel_of(burnt)
         markup = 0.0 if fuel == Fuel.ELECTRICITY else self.fuel_markup()
@@ -333,7 +342,7 @@ class Railway:
         diesel fuel out of the station's stockpile first, at the market price, the rest at retail."""
         engine = ENGINES[train.engine]
         fuel = fuel_of(engine)
-        amount = engine.burn * cells
+        amount = self.burn(train) * cells
         if amount <= 0:
             return
         good = GOOD_OF.get(fuel)

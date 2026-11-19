@@ -181,7 +181,7 @@ class BuyScreen:
 
 def fuel_use(engine: Engine, per_cell: float | None = None) -> str:
     """How much fuel an engine burns a cell, and what that costs now if given."""
-    text = f"{engine.burn:.2g} {fuel_of(engine).value} a cell"
+    text = f"{engine.burn:.2g} {fuel_of(engine).value} a cell half loaded"
     return text if per_cell is None else f"{text}, about {dollars(per_cell)} a cell now"
 
 
