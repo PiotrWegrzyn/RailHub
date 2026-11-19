@@ -140,8 +140,9 @@ def describe(node: Node) -> str:
         return f"{node.effect.value} {sign}{node.amount:.0%}{reach}"
     if node.effect == Effect.TO_COME:
         return "a bonus still to come"
-    if node.effect == Effect.TAKES and node.takes is not None:
-        return f"your {node.takes[0].value}s take {node.takes[1].value}"
+    if node.effect == Effect.TAKES and node.takes:
+        kinds = " and ".join(f"{kind.value}s" for kind, _ in node.takes)
+        return f"your {kinds} take {node.takes[0][1].value}"
     if node.effect == Effect.CAR_SIZE:
         reach = "every car" if node.everywhere else "its cars"
         return f"{reach} {node.amount:g} size bigger"
@@ -149,11 +150,11 @@ def describe(node: Node) -> str:
 
 
 def _takes(node: Node) -> str:
-    if node.takes is None:
-        return ""
-    kind, need = node.takes
-    most = OWNED_BOOSTS[node.takes]
-    return f"Every {kind.value} you own takes {need.value} and makes up to {most:.0%} more with it."
+    return " ".join(
+        f"Every {kind.value} you own takes {need.value} and makes up to "
+        f"{OWNED_BOOSTS[(kind, need)]:.0%} more with it."
+        for kind, need in node.takes
+    )
 
 
 def explain(tree: Tree, node: Node) -> str:

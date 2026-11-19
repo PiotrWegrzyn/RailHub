@@ -310,6 +310,15 @@ def test_liming_and_farm_machinery_make_owned_farms_take_limestone_and_machinery
     assert after == {Need.LIMESTONE, Need.MACHINERY}
 
 
+def test_farm_machinery_makes_owned_sheep_farms_take_machinery_too() -> None:
+    research = learned(Tree.FOOD, "seed", "rotation", "liming", "fertiliser", "tractors")
+    research.earn(Tree.FOOD, xp_for(6))
+
+    research.take("farm_machinery")
+
+    assert research.takes(BuildingKind.SHEEP_FARM) == {Need.MACHINERY}
+
+
 @pytest.mark.parametrize(("shares", "factor"), [(0, 1.0), (300, 1.003), (1000, 1.01)])
 def test_each_point_of_an_owned_building_adds_a_percent_to_its_trees_experience(
     shares: int, factor: float

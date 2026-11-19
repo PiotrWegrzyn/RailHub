@@ -88,8 +88,8 @@ class Node:
     opens: str = ""
     # Whether the effect reaches every tree's buildings and goods, not just its own.
     everywhere: bool = False
-    # For TAKES, the kind of building and what it takes.
-    takes: tuple[BuildingKind, Need] | None = None
+    # For TAKES, each kind of building and what it takes.
+    takes: tuple[tuple[BuildingKind, Need], ...] = ()
 
 
 def _n(key: str, name: str, effect: Effect, amount: float = 0.0, *requires: str, **kw) -> Node:
@@ -131,7 +131,7 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
                 E.TAKES,
                 0.0,
                 "rotation",
-                takes=(BuildingKind.FARM, Need.LIMESTONE),
+                takes=((BuildingKind.FARM, Need.LIMESTONE),),
             ),
             _n("fertiliser", "Fertiliser", E.PRODUCTION, 0.25, "rotation"),
             _n("reefers", "Refrigerated vans", E.PRICE, 0.1, "cold", "bread"),
@@ -143,7 +143,10 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
                 E.TAKES,
                 0.0,
                 "tractors",
-                takes=(BuildingKind.FARM, Need.MACHINERY),
+                takes=(
+                    (BuildingKind.FARM, Need.MACHINERY),
+                    (BuildingKind.SHEEP_FARM, Need.MACHINERY),
+                ),
             ),
             _n("brand", "National brand", E.PRICE, 0.15, "reefers", "conglomerate"),
             _n("food_fuel", "Subsidised fuel", E.FOOD_FUEL, 0.5, "brand"),
@@ -464,9 +467,7 @@ class Research:
     def takes(self, kind: BuildingKind) -> frozenset[Need]:
         """The boosts the buildings of a kind the player owns take, by the nodes taken."""
         return frozenset(
-            node.takes[1]
-            for key in self.taken
-            if (node := NODES[key][1]).takes is not None and node.takes[0] == kind
+            need for key in self.taken for taker, need in NODES[key][1].takes if taker == kind
         )
 
     def bonus(self, effect: Effect, tree: Tree | None = None) -> float:

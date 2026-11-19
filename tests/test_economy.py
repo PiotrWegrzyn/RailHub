@@ -936,3 +936,32 @@ def test_what_a_station_hands_out_is_worth_more_the_less_satisfied_its_buyer_was
 
     handed = trade.handed_for[STATION][(Need.FOOD, Good.FISH)]
     assert trade.handed_worth[STATION][(Need.FOOD, Good.FISH)] == pytest.approx(worth * handed)
+
+
+WOOL_MONTH = makes_of(BuildingKind.SHEEP_FARM, 1900)[Good.WOOL]
+
+
+@pytest.mark.parametrize(
+    ("wheat", "takes", "wool"),
+    [
+        (0.0, frozenset(), WOOL_MONTH),
+        (90.0, frozenset(), 2.0 * WOOL_MONTH),
+        (0.0, frozenset({Need.MACHINERY}), 2.0 * WOOL_MONTH),
+        (90.0, frozenset({Need.MACHINERY}), 3.0 * WOOL_MONTH),
+    ],
+)
+def test_wheat_doubles_a_sheep_farms_wool_and_machinery_adds_as_much_again_to_one_the_player_owns(
+    wheat: float, takes: frozenset[Need], wool: float
+) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    economy.year = 1900
+    placed = counts(tile_map, (STATION, BuildingKind.SHEEP_FARM, 1))
+    mine = placed[BuildingKind.SHEEP_FARM].ravel().astype(np.float64)
+    owners = {BuildingKind.SHEEP_FARM: OwnedShare(mine, 0.3, takes)}
+
+    trade = economy.trade(placed, holding(1000.0, WHEAT=wheat, MACHINERY=50.0), owned=owners)
+
+    gathered = trade.gathered[STATION].get(Good.WOOL, 0.0)
+    brought = trade.owned_brought[STATION].get(Good.WOOL, 0.0)
+    assert gathered + brought == pytest.approx(wool)

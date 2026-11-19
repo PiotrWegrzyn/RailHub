@@ -340,7 +340,11 @@ LAND_BOOST_MOST: Mapping[Need, float] = MappingProxyType({Need.FUEL: DIESEL_BOOS
 # Boosts only the buildings the player owns take, once their tech opens them
 # (railroads.sim.tech.Effect.TAKES), and the most more each makes them make.
 OWNED_BOOSTS: Mapping[tuple[BuildingKind, Need], float] = MappingProxyType(
-    {(BuildingKind.FARM, Need.LIMESTONE): 0.5, (BuildingKind.FARM, Need.MACHINERY): 2.0}
+    {
+        (BuildingKind.FARM, Need.LIMESTONE): 0.5,
+        (BuildingKind.FARM, Need.MACHINERY): 2.0,
+        (BuildingKind.SHEEP_FARM, Need.MACHINERY): 1.0,
+    }
 )
 
 KIND_NEED_YEARS: Mapping[tuple[BuildingKind, Need], int] = MappingProxyType(
@@ -720,7 +724,7 @@ MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
         BuildingKind.DIAMOND_MINE: {Good.DIAMONDS: 10},
         BuildingKind.OIL_WELL: {Good.OIL: 150, Good.GAS: 50},
         BuildingKind.SALT_WORKS: {Good.SALT: 60},
-        BuildingKind.SHEEP_FARM: {Good.WOOL: 30, Good.SHEEP: 10},
+        BuildingKind.SHEEP_FARM: {Good.WOOL: 21, Good.SHEEP: 10},
         BuildingKind.COTTON_FIELD: {Good.COTTON: 80},
         BuildingKind.VINEYARD: {Good.GRAPES: 60},
         BuildingKind.COFFEE_PLANTATION: {Good.COFFEE: 60},
@@ -858,7 +862,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.CATTLE_RANCH: {Need.WHEAT: 120},
         BuildingKind.PIG_FARM: {Need.WHEAT: 60},
         BuildingKind.CHICKEN_FARM: {Need.WHEAT: 30},
-        BuildingKind.SHEEP_FARM: {Need.WHEAT: 90},
+        BuildingKind.SHEEP_FARM: {Need.WHEAT: 90, Need.MACHINERY: 5},
         BuildingKind.TAVERN: {Need.ALCOHOL: 22, Need.FOOD: 20},
         BuildingKind.CLUB: {Need.ALCOHOL: 88, Need.CHEMICALS: 5},
         BuildingKind.SUSHI_HUT: {Need.FISH: 60, Need.RICE: 60, Need.SOY_SAUCE: 10},
