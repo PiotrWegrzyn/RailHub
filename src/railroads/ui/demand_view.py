@@ -90,7 +90,7 @@ def demand_lines(need: Need, record: DemandRecord) -> list[str]:
             f"Takes about {record.left:.0f} more before it pays nothing",
             f"Each one getting off now earns {dollars(freight_of(good) * record.share)}",
         ]
-    lines = ["Each unit earns its freight, up to 3x where buildings went short;"]
+    lines = [f"Each unit earns its freight, up to {SCARCE_WORTH:g}x where buildings went short;"]
     lines.append("buildings take the most valuable first:")
     for good in HANDED_OUT[need]:
         low = freight_of(good)

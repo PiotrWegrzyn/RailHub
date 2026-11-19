@@ -74,6 +74,14 @@ MADE = (0.35, 0.65, 1.0, 1.0)
 # Needs homes everywhere have: food, common goods and heating, which many goods meet, and the
 # passengers and mail every station both sends and wants. Any other need is a special one.
 GENERAL_NEEDS = frozenset({Need.FOOD, Need.COMMON, Need.HEATING, Need.PASSENGERS, Need.MAIL})
+
+
+def needs_named(needs: frozenset[Need]) -> str:
+    """The needs by name, in the order Need lists them: "food, heating or mail"."""
+    names = [need.value for need in Need if need in needs]
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} or {names[-1]}"
+
+
 # How much of a good coming to a station over the last quarter marks it as made there.
 LEAST_MADE = 30.0
 # The amounts from which a mark takes its second and third shade: a month for what is wanted,
@@ -420,7 +428,7 @@ class RouteMap:
                 "needed",
                 GENERAL_SHADES,
                 sum(m.general > 0 for m in marks.values()),
-                "Wanted for food or heating",
+                f"Wanted for {needs_named(GENERAL_NEEDS)}",
             ),
             (
                 "special",

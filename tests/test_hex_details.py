@@ -12,6 +12,7 @@ from railroads.sim.grids import Cell, HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule, Points
 from railroads.sim.ledger import Takings
+from railroads.sim.ownership import HOLD_MONTHS
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.ui import hex_details
 from railroads.ui.hex_details import (
@@ -236,3 +237,11 @@ def test_results_show_last_year_and_the_forecast_and_a_dash_before_a_whole_year(
     assert lines["All 3 farms: sold"] == ("-", "$4,300")
     assert lines["Yours: sold to stations"] == ("-", "$430")
     assert lines["Yours in all"] == ("-", "$510")
+
+
+def test_the_shares_window_says_how_many_years_shares_are_held_before_they_can_be_sold() -> None:
+    row = farms_row(owned=100, total=3000)
+
+    tips = {label: tip for label, _, tip in share_lines(row)}
+
+    assert tips["Can sell now"] == f"Shares bought can be sold {HOLD_MONTHS // 12} years later"

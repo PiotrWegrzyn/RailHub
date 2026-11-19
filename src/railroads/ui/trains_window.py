@@ -291,7 +291,7 @@ class TrainsWindow:
                 imgui.set_tooltip(
                     f"What its cargo would earn if it were unloaded at {onward} now, at the "
                     "demand left there.\nFreight is paid as the buildings around take it, and "
-                    f"cargo that came from {onward} earns nothing."
+                    f"cargo that came from {onward} only goes back into its stockpile."
                 )
             imgui.same_line()
             imgui.text_disabled(f"at {onward}")

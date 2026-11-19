@@ -8,7 +8,7 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.sim.clock import END_YEAR
-from railroads.sim.company import CompanyValue, Goal, company_value
+from railroads.sim.company import BOOK_SHARE, CompanyValue, Goal, company_value
 from railroads.sim.finance import dollars
 from railroads.sim.game import Game
 from railroads.ui.theme import BRASS, GONE, GROWN, TEXT_DIM, danger_button
@@ -84,7 +84,9 @@ def _worth_tip(goal: Goal, value: CompanyValue) -> None:
         imgui.text_colored(imgui.ImVec4(*(TEXT_DIM if amount >= 0 else GONE)), f"   {name}")
         imgui.same_line(110)
         imgui.text(dollars(amount))
-    imgui.text_disabled("Stations, track and trains count for half of what they cost today.")
+    imgui.text_disabled(
+        f"Stations, track and trains count for {BOOK_SHARE:.0%} of what they cost today."
+    )
     imgui.separator()
     imgui.text(f"{goal.difficulty.value} target for 1 January {END_YEAR}: {dollars(goal.target)}")
     if goal.met is not None:

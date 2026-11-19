@@ -9,12 +9,14 @@ from functools import cache
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.sim.clock import END_YEAR
-from railroads.sim.company import BANKRUPT_MONTHS, TARGETS, Difficulty
+from railroads.sim.clock import END_YEAR, HISTORY_START
+from railroads.sim.company import BANKRUPT_MONTHS, BOOK_SHARE, TARGETS, Difficulty
 from railroads.sim.constructions import BUILDING_RULES, BuildingKind
+from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.finance import dollars
 from railroads.sim.goods import (
     FITS,
+    FREIGHT_SHARE,
     GOOD_YEARS,
     MAKES,
     NEEDS,
@@ -25,6 +27,8 @@ from railroads.sim.goods import (
     price_of,
 )
 from railroads.sim.ladders import LADDERS, PASSENGERS_PER_POINT, POINTS, Points
+from railroads.sim.lots import FIRST_FIBONACCI, PRICE_UNIT, fibonacci
+from railroads.sim.ownership import EXPERIENCE_PER_POINT
 from railroads.sim.tech import NODES, Tree, path_to
 from railroads.sim.trains import ENGINES, Engine, successor
 from railroads.ui.buy_train import fuel_use
@@ -34,6 +38,13 @@ from railroads.ui.search import goods_of
 from railroads.ui.theme import BRASS, LIST_TABLE_FLAGS, WINDOW_TOP, good_amount, good_icon, tip
 
 WINDOW_SIZE = (860.0, 600.0)
+
+
+def lot_price(bought: int) -> float:
+    """What the next lot costs once this many have been bought (railroads.sim.lots)."""
+    return float(fibonacci(FIRST_FIBONACCI + bought) * PRICE_UNIT)
+
+
 TOWNS_HELP = (
     (
         "Every place sending passengers belongs to a town, shown in its own colour on the Towns lens"
@@ -55,8 +66,8 @@ TOWNS_HELP = (
 GOAL_HELP = (
     (
         "Your company is worth its cash, less any debt, plus the shares you own at what they"
-        " would fetch today, plus half of what your stations, with their levels, storage and"
-        " facilities, your track and your trains would cost today. The top bar shows it against"
+        f" would fetch today, plus {BOOK_SHARE:.0%} of what your stations, with their levels,"
+        " storage and facilities, your track and your trains would cost today. The top bar shows it against"
         " your target, with what it is made of on hover, and the Reports window charts it every"
         " month."
     ),
@@ -81,9 +92,9 @@ MAP_HELP = (
         " across on Poland."
     ),
     (
-        "Every hex of the map grows every month, from the year 850 before play and all through"
-        " it, so the time to set up a new game and to run each month grows with the map: twice"
-        " the land takes about twice as long. A quarter of the land sets up and runs about three"
+        f"Every hex of the map grows every month, from the year {HISTORY_START} before play and"
+        " all through it, so the time to set up a new game and to run each month grows with the"
+        " map: twice the land takes about twice as long. A quarter of the land sets up and runs about three"
         " times as fast as the whole place: Poland's towns grow to 1850 in about 3 seconds"
         " instead of 10 on a fast computer, and a month takes about 25 ms instead of 70. In the"
         " browser both take about twice as long."
@@ -92,12 +103,13 @@ MAP_HELP = (
         "The land around it can be bought a lot at a time, each a seventh of the land a game"
         " starts on. Any lot sharing a side with yours is for sale, twelve at the start: past the"
         " map's edge it shows its rivers, forests and mountains, without the buildings, behind a"
-        " chain and a padlock with its price. The first costs $377,000 and each after it the next"
-        " Fibonacci number of thousands: $610,000, $987,000 and so on."
+        f" chain and a padlock with its price. The first costs {dollars(lot_price(0))} and each"
+        f" after it the next Fibonacci number of thousands: {dollars(lot_price(1))},"
+        f" {dollars(lot_price(2))} and so on."
     ),
     (
-        "Click a lot and confirm to buy it. It then grows on its own from 850 to this year, as"
-        " the rest of the map did, while the waiting screen shows, and the view opens on it. It"
+        f"Click a lot and confirm to buy it. It then grows on its own from {HISTORY_START} to this"
+        " year, as the rest of the map did, while the waiting screen shows, and the view opens on it. It"
         " gets only a quarter of the buildings every map is sure to have, picked at random, and"
         " each one-off building the game hasn't got yet comes up there at a quarter of the"
         " chance it had over the years played, at most. Each lot bought makes a month a few"
@@ -107,10 +119,18 @@ MAP_HELP = (
 ENGINES_NOTE = (
     "An engine is sold from its year once its tech is taken, until a newer one of its line comes."
     " Tech is taken in the tech window (R): every level a tree reaches gives a point for one node"
-    " whose requirements are taken. A tree levels up from what cargo of its goods earns at your"
-    " stations and what your own buildings of its kind earn; passengers and mail from the fares."
-    " Engines are drawn after real ones, linked to"
-    " their Wikipedia pages."
+    " whose requirements are taken. A tree gains experience only from deliveries: what cargo of"
+    " its goods earns as buildings take it out of your stations, and for passengers and mail"
+    " what they pay as they get off. Every point of the buildings of a tree you own adds"
+    f" {EXPERIENCE_PER_POINT:.0%} to it. Engines are drawn after real ones, linked to their"
+    " Wikipedia pages."
+)
+GOODS_NOTE = (
+    f"A good's freight is what carrying a unit of it earns: {FREIGHT_SHARE:.0%} of its market"
+    f" price, up to {SCARCE_WORTH:g} times that to a building that went short over the last"
+    " quarter, paid for everything your stations hand out, what trains brought and what they"
+    " gathered. Passengers and mail pay their freight times the share of demand left where they"
+    " get off. What your own buildings put into your stations is sold to them at the market price."
 )
 
 
@@ -301,6 +321,7 @@ class HelpWindow:
         imgui.end_table()
 
     def _draw_goods(self) -> None:
+        imgui.text_wrapped(GOODS_NOTE)
         if not imgui.begin_table("all goods", 6, LIST_TABLE_FLAGS):
             return
         imgui.table_setup_scroll_freeze(0, 1)

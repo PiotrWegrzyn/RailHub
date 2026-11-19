@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
 
+from railroads.sim.economy import SCARCE_WORTH
+from railroads.sim.ownership import LOT, SHARES
 from railroads.ui.waiting_screen import (
     HEX_RADIUS,
     JOKE_SECONDS,
@@ -61,9 +63,19 @@ def test_the_hexes_hold_still_at_first_and_all_fall_out_of_sight() -> None:
     assert pieces.gone(3.0, 600)
 
 
-def test_there_are_ten_tips_and_one_of_them_says_hexagons_are_bestagons() -> None:
+def test_there_are_twelve_tips_and_one_of_them_says_hexagons_are_bestagons() -> None:
     tips = {tip_for(np.random.default_rng(seed)) for seed in range(200)}
 
-    assert len(TIPS) == 10
+    assert len(TIPS) == 12
     assert tips == set(TIPS)
     assert "Hexagons are bestagons!" in TIPS
+
+
+def test_the_tips_give_the_freight_and_share_figures_the_game_uses() -> None:
+    freight = f"up to {SCARCE_WORTH:g} times as much"
+    shares = f"Every {LOT} shares sell you {LOT / SHARES:.0%}"
+
+    text = " ".join(TIPS)
+
+    assert freight in text
+    assert shares in text

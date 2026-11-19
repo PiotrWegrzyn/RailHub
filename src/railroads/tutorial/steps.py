@@ -8,11 +8,13 @@ moved onto a bigger map by land bought goes on where it was."""
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from railroads.sim.economy import BONUS_PER_GOOD, COLLECTION_RADIUS, LOCAL_REACH, SCARCE_WORTH
 from railroads.sim.finance import TRACK_PRICE, dollars
 from railroads.sim.game import Game
-from railroads.sim.goods import FOODS, Good
+from railroads.sim.goods import FOODS, FREIGHT_SHARE, Good
 from railroads.sim.grids import Cell
 from railroads.sim.lots import FIRST_FIBONACCI, PRICE_UNIT, Lots, fibonacci
+from railroads.sim.ownership import EXPERIENCE_PER_POINT, HOLD_MONTHS, LOT, SHARES
 from railroads.sim.trains import ENGINES, FIRST_ENGINE
 from railroads.tutorial.place import ASHFORD_STATION, BROOKBY_STATION, SHOWN_FARM
 
@@ -118,8 +120,9 @@ STEPS: tuple[Step, ...] = (
         (
             (
                 "A station is where goods meet trains. It hands goods out to the buildings a cell "
-                "around it (shaded orange) and gathers what the buildings within 3 cells have left "
-                "over (the blue line). Each level reaches a cell further."
+                "around it (shaded orange) and gathers what the buildings within "
+                f"{COLLECTION_RADIUS} cells have left over (the blue line). Each level reaches a "
+                "cell further."
             ),
             "A station does nothing on its own: track has to join it to another station.",
         ),
@@ -193,8 +196,7 @@ STEPS: tuple[Step, ...] = (
             (
                 "What a train brings beyond what the buildings around can use in a month stays at "
                 "the station, and another train can take it on from there: a station can be a hub. "
-                "Goods pay only when buildings at a station other than the one they were loaded at "
-                "take them."
+                "Goods taken back to the station they were loaded at only go back into its stock."
             ),
         ),
         "Give Brookby's cars a passenger car too.",
@@ -207,15 +209,16 @@ STEPS: tuple[Step, ...] = (
         (
             (
                 "Every month each building first hands what it makes to the buildings around it, "
-                "the nearest first, up to 6 cells away, and less the further they are."
+                f"the nearest first, up to {LOCAL_REACH} cells away, and less the further they are."
             ),
             (
-                "Only what is left goes into a station within 3 cells. A station then hands what "
-                "trains brought to the buildings in its reach, the least satisfied first."
+                f"Only what is left goes into a station within {COLLECTION_RADIUS} cells. A station "
+                "hands out all it holds, what trains brought and what it gathered, nearest first: "
+                "to your own buildings first, and what buildings must have before any bonus."
             ),
             (
-                "You earn only when buildings take goods out of your stations. Goods handed out "
-                "on their own earn nothing."
+                "You earn freight on every unit buildings take out of your stations. Goods handed "
+                "out on their own earn nothing."
             ),
         ),
         "Right-click the marked farm to see what it makes and what it gave last month.",
@@ -227,15 +230,17 @@ STEPS: tuple[Step, ...] = (
         (
             (
                 "A building's satisfaction is the share of what it needs that it got. Bonus goods, "
-                "such as beer or newspapers, add 30% each on top, as far as its needs are met."
+                f"such as beer or newspapers, add {BONUS_PER_GOOD:.0%} each on top, as far as its "
+                "needs are met."
             ),
             (
-                "Satisfied buildings count about 10 times over towards growth, so the towns you "
-                "serve grow and want more."
+                "The more satisfied buildings are, the faster more of their kind come up around "
+                "them, so the towns you serve grow and want more."
             ),
             (
-                "Freight pays a fifth of a good's market price, up to 3 times that to a building "
-                "that got nothing last quarter. Bring goods where they are missing."
+                f"Freight pays {FREIGHT_SHARE:.0%} of a good's market price, up to {SCARCE_WORTH:g} "
+                "times that to a building that got nothing last quarter. Bring goods where they "
+                "are missing."
             ),
         ),
         "Turn on the Satisfaction lens above the minimap, or hold Shift.",
@@ -265,13 +270,14 @@ STEPS: tuple[Step, ...] = (
         (
             (
                 "You can buy shares of any building that makes something: farms, mines, mills and "
-                "works. A building has 1,000 shares, traded 100 at a time, priced by how satisfied "
-                "it was last quarter."
+                f"works. A building has {SHARES:,} shares, traded {LOT} at a time, priced by how "
+                f"satisfied it was last quarter. They can be sold {HOLD_MONTHS // 12} years after "
+                "they are bought."
             ),
             (
                 "Your part of what it makes goes into your stations around it first, and they buy "
-                "it from you at the market price. Freight comes on top when a train delivers it. "
-                "With no station near it pays nothing."
+                "it from you at the market price. Freight comes on top when buildings take it out "
+                "of a station. With no station near it pays nothing."
             ),
         ),
         "Right-click the marked farm, press Shares, then Buy.",
@@ -283,8 +289,9 @@ STEPS: tuple[Step, ...] = (
         "8. Tech",
         (
             (
-                "Deliveries earn experience for the tree of their goods, and fares for passengers "
-                "and mail. Each point of the buildings you own in a tree adds 1% to it."
+                "Only deliveries earn experience: for the tree of their goods, and fares for "
+                "passengers and mail. Each point of the buildings you own in a tree adds "
+                f"{EXPERIENCE_PER_POINT:.0%} to it."
             ),
             (
                 "Each level gives a point for a node: more output from your buildings, bigger cars, "

@@ -132,14 +132,16 @@ Query parameters:
     const TIPS = [
         "Hexagons are bestagons!",
         "Stations hand out to your own buildings first.",
-        "Freight pays up to three times more where buildings go short.",
-        "Every 100 shares sell you a tenth of a building's output at the market price.",
+        "Freight pays up to 3 times as much where buildings go short.",
+        "Every 100 shares sell you 10% of a building's output at the market price.",
         "Buy shares cheap where a building starves, then feed it.",
         "Short trains of full cars pay best: every car costs a trip.",
         "Passengers only ride between stations of different towns.",
         "Taverns and clubs take any alcohol: beer, wine, vodka or sake.",
         "Hover a category's icon to see what goods are in it.",
-        "A thriving building's shares are worth up to three times a starving one's.",
+        "A thriving building's shares are worth up to 3 times a starving one's.",
+        "A station not joined by track to another gathers and hands out nothing.",
+        "What buildings must have is handed out before anything they take as a bonus.",
     ];
     document.getElementById("landing-tip").textContent =
         "Tip: " + TIPS[Math.floor(Math.random() * TIPS.length)];

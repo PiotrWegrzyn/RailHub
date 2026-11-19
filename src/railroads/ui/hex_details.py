@@ -29,7 +29,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
 from railroads.sim.ledger import Takings
-from railroads.sim.ownership import LOT, SHARES
+from railroads.sim.ownership import HOLD_MONTHS, LOT, SHARES
 from railroads.sim.tilemap import Deposit, TileMap
 from railroads.ui.biomes import biome_of
 from railroads.ui.ornate import badge, bar, card, section
@@ -105,6 +105,8 @@ class HexDetails:
 CARD_LABEL = 56.0
 # How wide the bar after each good on a card's line is.
 FLOW_BAR = 36.0
+# How long the player must hold shares before they may sell them.
+HELD = f"Shares bought can be sold {HOLD_MONTHS // 12} years later"
 
 # How long a cell's description is shown again before it is worked out anew, and how many cells'
 # descriptions are kept: the hovered cell's and the open details' at least. Working one out takes
@@ -309,7 +311,10 @@ def _draw_card_inside(row: BuildingRow) -> bool:
         width = right - imgui.get_cursor_pos_x()
         bar(row.percent / 2, mood_colour(row), width, 5.0)
         if imgui.is_item_hovered():
-            imgui.set_tooltip(f"Satisfied {row.percent:.0%} last month, of up to 200%")
+            imgui.set_tooltip(
+                f"Satisfied {row.percent:.0%} last month: 100% with all it must have, more "
+                "with bonus goods"
+            )
     imgui.end_group()
     imgui.spacing()
     _draw_line("Made", row.gave, "given away of made")
@@ -408,7 +413,7 @@ def draw_shares(row: BuildingRow, where: str) -> bool | None:
             and row.sell_from is not None
             and imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value)
         ):
-            imgui.set_tooltip(f"Shares bought can be sold five years later: from {row.sell_from}")
+            imgui.set_tooltip(f"{HELD}: from {row.sell_from}")
     section("Financial results")
     if imgui.begin_table("results", 3, table | imgui.TableFlags_.borders_inner_h.value):
         imgui.table_setup_column("")
@@ -449,7 +454,7 @@ def share_lines(row: BuildingRow) -> list[tuple[str, str, str]]:
             f"{row.owned:,} ({part:.0%} of what they make)",
             "Your part of what they make goes into your stations around them first",
         ),
-        ("Can sell now", f"{row.sellable:,}", "Shares bought can be sold five years later"),
+        ("Can sell now", f"{row.sellable:,}", HELD),
     ]
     if row.held_back:
         lines.append((f"Sellable from {row.sell_from}", f"{row.held_back:,}", ""))

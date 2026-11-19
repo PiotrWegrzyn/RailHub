@@ -30,6 +30,7 @@ from railroads.ui.route_map import (
     made_at,
     marks_at,
     needed,
+    needs_named,
     shade_of,
     soften,
     soften_steps,
@@ -384,3 +385,11 @@ def test_track_splits_into_lines_where_three_pieces_meet_or_its_width_changes() 
 
     assert len(lines) == 4
     assert [double for _, double in lines].count(True) == 1
+
+
+def test_general_needs_are_named_in_the_order_needs_are_listed_the_last_after_or() -> None:
+    needs = frozenset({Need.MAIL, Need.FOOD, Need.HEATING})
+
+    named = needs_named(needs)
+
+    assert named == "food, heating or mail"

@@ -1,4 +1,4 @@
-"""The mouse and keys on the map view: dragging pans, the wheel and -/+ zoom, a press without a
+"""The mouse and keys on the map view: dragging pans, the wheel zooms, a press without a
 drag is a click for the build tools (railroads.ui.map_tools), a right click picks a cell or
 station or cancels building, and letter keys open windows and choose tools."""
 

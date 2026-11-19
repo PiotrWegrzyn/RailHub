@@ -11,6 +11,10 @@ from typing import Self
 import numpy as np
 from imgui_bundle import imgui
 
+from railroads.sim.economy import SCARCE_WORTH
+from railroads.sim.goods import FITS, Need
+from railroads.sim.ownership import LOT, SHARES, satisfaction_price
+
 RANDOM_JOKES = ("Random bullshit coming!",)
 JOKE_SECONDS = 5.0
 WORK = (
@@ -27,18 +31,23 @@ WORK = (
 )
 WORK_SECONDS = 2.5
 
+*_FIRST_DRINKS, _LAST_DRINK = (good.value for good in FITS[Need.ALCOHOL])
+# How many times a starving building's price a thriving one's shares cost.
+_THRIVING_PRICE = satisfaction_price(2.0) / satisfaction_price(0.0)
 # A tip shown under the waiting screen's lines, one picked for each wait.
 TIPS = (
     "Hexagons are bestagons!",
     "Stations hand out to your own buildings first.",
-    "Freight pays up to three times more where buildings go short.",
-    "Every 100 shares sell you a tenth of a building's output at the market price.",
+    f"Freight pays up to {SCARCE_WORTH:g} times as much where buildings go short.",
+    f"Every {LOT} shares sell you {LOT / SHARES:.0%} of a building's output at the market price.",
     "Buy shares cheap where a building starves, then feed it.",
     "Short trains of full cars pay best: every car costs a trip.",
     "Passengers only ride between stations of different towns.",
-    "Taverns and clubs take any alcohol: beer, wine, vodka or sake.",
+    f"Taverns and clubs take any alcohol: {', '.join(_FIRST_DRINKS)} or {_LAST_DRINK}.",
     "Hover a category's icon to see what goods are in it.",
-    "A thriving building's shares are worth up to three times a starving one's.",
+    f"A thriving building's shares are worth up to {_THRIVING_PRICE:.0f} times a starving one's.",
+    "A station not joined by track to another gathers and hands out nothing.",
+    "What buildings must have is handed out before anything they take as a bonus.",
 )
 
 # The falling hexes: their size, when the cracks show and the first falls, how much later the

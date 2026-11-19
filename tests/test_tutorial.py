@@ -9,9 +9,11 @@ from test_app_frame import context, frame, shell_frame
 from railroads.land import buy_lot_steps
 from railroads.saves import SavedGame, Saves
 from railroads.sim.constructions import Building, BuildingKind
+from railroads.sim.economy import BONUS_PER_GOOD, LOCAL_REACH, SCARCE_WORTH
 from railroads.sim.finance import START_CASH, TRACK_PRICE
 from railroads.sim.game import Game
-from railroads.sim.goods import Good
+from railroads.sim.goods import FREIGHT_SHARE, Good
+from railroads.sim.ownership import EXPERIENCE_PER_POINT, HOLD_MONTHS, LOT, SHARES
 from railroads.sim.steps import finish
 from railroads.sim.tilemap import LAYERS
 from railroads.sim.trains import Stop
@@ -415,3 +417,20 @@ def test_the_tutorial_plays_through_to_the_end_on_the_app_s_frames(context: None
 
     assert tutorial.current is None
     assert tutorial.finished == set(range(1, len(STEPS) - 1))
+
+
+def test_the_tutorial_gives_freight_bonus_goods_shares_and_experience_as_the_game_has_them() -> (
+    None
+):
+    numbers = [
+        f"{FREIGHT_SHARE:.0%} of a good's market price, up to {SCARCE_WORTH:g} times",
+        f"add {BONUS_PER_GOOD:.0%} each",
+        f"{SHARES:,} shares, traded {LOT} at a time",
+        f"sold {HOLD_MONTHS // 12} years after",
+        f"adds {EXPERIENCE_PER_POINT:.0%} to it",
+        f"up to {LOCAL_REACH} cells away",
+    ]
+
+    text = " ".join(" ".join(step.text) for step in STEPS)
+
+    assert [number for number in numbers if number not in text] == []
