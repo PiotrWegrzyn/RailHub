@@ -13,11 +13,12 @@ from railroads.mapgen.streams import (
     write_streams,
 )
 from railroads.mapgen.world_files import World, WorldIndex, square_of, streams_file
-from railroads.sim.constructions import CELL_SPACE, Building, BuildingKind, Constructions
+from railroads.sim.constructions import CELL_SPACE, Building, BuildingKind, Constructions, Track
+from railroads.sim.finance import track_price
 from railroads.sim.grids import HexGrid
 from railroads.sim.ladders import FARMS, TOWN_LAND, Land
-from railroads.sim.tilemap import Terrain, TileMap
-from railroads.sim.track_rules import track_rules_for
+from railroads.sim.tilemap import Relief, Terrain, TileMap
+from railroads.sim.track_rules import RELIEF_RULES, STREAM_FACTOR, track_rules_for
 from railroads.ui.ground import cell_colors
 from railroads.ui.pixel.streams import NONE_NEAR, STEPS, stream_distance, stream_links
 
@@ -28,11 +29,12 @@ def stream_map(
     cells: list[tuple[int, int]],
     terrain: np.ndarray | None = None,
     height_m: np.ndarray | None = None,
+    relief: np.ndarray | None = None,
 ) -> TileMap:
     stream = layer(ROWS, COLS, 0)
     for cell in cells:
         stream[cell] = 1
-    tile_map = flat_map(ROWS, COLS, terrain=terrain, height_m=height_m)
+    tile_map = flat_map(ROWS, COLS, terrain=terrain, height_m=height_m, relief=relief)
     object.__setattr__(tile_map, "stream", stream)
     return tile_map
 
@@ -87,13 +89,28 @@ def test_a_minor_river_takes_no_room_so_a_farm_fills_its_cell() -> None:
     )
 
 
-def test_track_crosses_a_minor_river_as_on_dry_land() -> None:
+def test_track_across_a_minor_river_costs_twice_as_much_without_a_bridge() -> None:
     tile_map = stream_map([(4, 5)])
+    piece = Track((4, 5), (0, 3))
+
+    across = track_price(piece, tile_map.tile((4, 5)))
+
+    assert across == pytest.approx(2 * track_price(piece, tile_map.tile((1, 1))))
+    assert track_rules_for(tile_map.tile((4, 5))).can_build
+
+
+def test_route_planning_shuns_track_across_a_minor_river_as_much_more() -> None:
+    relief = layer(ROWS, COLS, Relief.HILLS)
+    tile_map = stream_map([(4, 5)], relief=relief)
 
     rules = track_rules_for(tile_map.tile((4, 5)))
 
-    assert rules == track_rules_for(tile_map.tile((1, 1)))
-    assert tile_map.tile((4, 5)).stream
+    assert rules.cost_factor == pytest.approx(
+        STREAM_FACTOR * RELIEF_RULES[Relief.HILLS].cost_factor
+    )
+    assert rules.price_factor == pytest.approx(
+        STREAM_FACTOR * RELIEF_RULES[Relief.HILLS].price_factor
+    )
 
 
 def test_a_reach_marks_the_land_cells_it_flows_through_but_not_the_water() -> None:

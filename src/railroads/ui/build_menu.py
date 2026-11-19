@@ -102,7 +102,7 @@ HINTS = {
     ),
     Tool.TRACK: (
         f"Click where track starts, then where it goes; starting or ending on track joins it. "
-        f"{dollars(TRACK_PRICE)} a cell on the flat, {dollars(HILLS_PRICE)} in hills, "
+        f"{dollars(TRACK_PRICE)} a cell on the flat, {dollars(HILLS_PRICE)} in hills, twice that across a minor river, "
         f"{dollars(BRIDGE_PRICE)} a bridge, {dollars(TUNNEL_PRICE)} a tunnel; double track "
         f"{DOUBLE_TRACK_FACTOR:g} times as much, and electric {dollars(ELECTRIC_TRACK_PRICE)} "
         f"a cell more. Laying it along your track widens or electrifies that. Buildings in the way "

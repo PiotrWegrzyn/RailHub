@@ -226,7 +226,8 @@ A map is a grid of hexagon cells (the grids can also be squares, which the game 
 where every cell has the same properties:
 terrain (land, sea, lake, river), vegetation (barren, grass, forest), temperature (cold, normal,
 hot), height in metres and whether a minor river flows through it. A minor river leaves the cell
-land that anything can be built on and track crosses without a bridge, takes no room, and counts
+land that anything can be built on and track crosses without a bridge for twice the price of
+dry land, takes no room, and counts
 as fresh water by a river for what grows there and beside it. Each property is one numpy layer, saved together with the map's scale,
 cell shape, bounds and data sources in one `.npz` file.
 
@@ -368,8 +369,8 @@ Every cell has room for 6 units:
   says so for a piece, and `Constructions.electrified(cell)` for a cell (every piece in it, or
   the piece between two given track points). Or it can be maglev (`Track.maglev`): a concrete
   guideway with no rails or wires, which only maglev engines run on, and they on nothing else.
-- Track lies on the ground, on a bridge over a river or lake (x5 cost), or in a tunnel through
-  mountains (x8 cost).
+- Track lies on the ground (x2 cost across a minor river), on a bridge over a river or lake (x5
+  cost), or in a tunnel through mountains (x8 cost).
 - A station fills its whole cell. Its own track runs straight through it one way (across,
   along either diagonal, or up and down), set when it is built and kept after, whatever track
   is laid round it. Track joins it only at its two ends, its way in and its way out; a line
@@ -1055,7 +1056,7 @@ station with no place that near is called Station 1, Station 2 and so on. Zoomed
 station's name shows on a tag above it.
 
 A game starts with $80,000 (`railroads.sim.finance`). Track costs $300 a cell on the flat, $450
-in hills, $10,000 a cell of bridge and $20,000 a cell of tunnel; electric track $450 a cell more,
+in hills, twice that across a minor river, $10,000 a cell of bridge and $20,000 a cell of tunnel; electric track $450 a cell more,
 and double track 1.8 times as much as single, wires included, so a cell on the flat costs $540
 double, $750 electric and $1,350 double and electric; maglev track $4,000 a cell more, with no
 wires. A station costs $15,000 and the Planet $10,000, which
