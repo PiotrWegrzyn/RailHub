@@ -47,14 +47,18 @@ def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded(
     (house,) = details.buildings
     assert house.name == "house"
     assert house.count == 3
-    assert house.needs == [(Need.FOOD, 60), (Need.HEATING, 9)]
+    assert house.needs == [(Need.FOOD, 30), (Need.HEATING, 9)]
     assert dict(house.bonus) == {
-        need: pytest.approx(3 * amount)
-        for need, amount in bonus_of(BuildingKind.HOUSE, 1850).items()
+        Need.FOOD: 30,
+        **{
+            need: pytest.approx(3 * amount)
+            for need, amount in bonus_of(BuildingKind.HOUSE, 1850).items()
+        },
     }
     got = {flow.good: (flow.done, flow.wanted) for flow in house.got}
     bonus_got = {flow.good: (flow.done, flow.wanted) for flow in house.bonus_got}
-    assert got[Need.FOOD] == (pytest.approx(10 * 13 / 21), 60.0)
+    assert got[Need.FOOD] == (pytest.approx(10 * 13 / 21), 30.0)
+    assert bonus_got[Need.FOOD] == (0.0, 30.0)
     assert got[Need.HEATING] == (0.0, 9.0)
     assert bonus_got[Need.BEER] == (0.0, 3.0)
     assert house.satisfaction == "content"
@@ -79,7 +83,9 @@ def test_details_of_an_empty_cell_show_its_land_and_nearby_points() -> None:
     assert details.title.startswith("Cell 5, 6")
 
 
-def test_a_tenement_needs_food_common_goods_and_heating_and_takes_the_rest_as_bonus_goods() -> None:
+def test_a_tenement_must_have_half_its_food_common_goods_and_heating_and_takes_the_rest_as_bonus() -> (
+    None
+):
     constructions = Constructions(make_map())
     constructions.build(Building((5, 5), BuildingKind.TENEMENT))
     growth = Growth(constructions)
@@ -87,10 +93,13 @@ def test_a_tenement_needs_food_common_goods_and_heating_and_takes_the_rest_as_bo
     details = describe(growth, (5, 5))
 
     tenement = details.buildings[0]
-    assert tenement.needs == [(Need.FOOD, 120), (Need.COMMON, 60), (Need.HEATING, 20)]
-    assert dict(tenement.bonus) == bonus_of(BuildingKind.TENEMENT, 1850)
+    assert tenement.needs == [(Need.FOOD, 60), (Need.COMMON, 60), (Need.HEATING, 20)]
+    assert dict(tenement.bonus) == {Need.FOOD: 60, **bonus_of(BuildingKind.TENEMENT, 1850)}
     assert {flow.good for flow in tenement.got} == {Need.FOOD, Need.COMMON, Need.HEATING}
-    assert {flow.good for flow in tenement.bonus_got} == set(bonus_of(BuildingKind.TENEMENT, 1850))
+    assert {flow.good for flow in tenement.bonus_got} == {
+        Need.FOOD,
+        *bonus_of(BuildingKind.TENEMENT, 1850),
+    }
     assert all(flow.done == 0.0 for flow in [*tenement.got, *tenement.bonus_got])
 
 

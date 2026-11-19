@@ -15,7 +15,16 @@ from imgui_bundle import imgui
 from railroads.sim.constructions import Building, BuildingKind, Construction, Station, Track
 from railroads.sim.economy import FloatCells, Satisfaction, Trade
 from railroads.sim.finance import dollars
-from railroads.sim.goods import RECIPES, Good, Need, bonus_of, boosts_of, demands_of, makes_of
+from railroads.sim.goods import (
+    BONUS_PART,
+    RECIPES,
+    Good,
+    Need,
+    bonus_of,
+    boosts_of,
+    demands_of,
+    makes_of,
+)
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
@@ -158,6 +167,7 @@ def describe(
             flows = _per_good(trade.goods_got, kind, position)
             got = [flow for flow in flows if flow.good not in extra]
             bonus_got = [flow for flow in flows if flow.good in extra]
+            got, bonus_got = _split_bonus_part(kind, count, got, bonus_got)
             if kind in RECIPES:
                 stock = _stock(growth, kind, flat)
             gave = _per_good(trade.goods_gave, kind, position, makes_of(kind, growth.year), count)
@@ -169,8 +179,21 @@ def describe(
                 kind.value,
                 count,
                 [(good, amount * count) for good, amount in makes_of(kind, growth.year).items()],
-                [(need, amount * count) for need, amount in demands_of(kind, growth.year).items()],
-                [(need, amount * count) for need, amount in bonus_of(kind, growth.year).items()],
+                [
+                    (need, (amount - BONUS_PART.get((kind, need), 0.0)) * count)
+                    for need, amount in demands_of(kind, growth.year).items()
+                ],
+                [
+                    *(
+                        (need, extra * count)
+                        for (of, need), extra in BONUS_PART.items()
+                        if of == kind and need in demands_of(kind, growth.year)
+                    ),
+                    *(
+                        (need, amount * count)
+                        for need, amount in bonus_of(kind, growth.year).items()
+                    ),
+                ],
                 got,
                 gave,
                 stock,
@@ -502,6 +525,23 @@ def _stock(growth: Growth, kind: BuildingKind, flat: int) -> list[tuple[Need, fl
         (need, float(stockpiles[(kind, need)][flat]) if (kind, need) in stockpiles else 0.0)
         for need in RECIPES[kind].per_unit
     ]
+
+
+def _split_bonus_part(
+    kind: BuildingKind, count: int, got: list[Flow], bonus_got: list[Flow]
+) -> tuple[list[Flow], list[Flow]]:
+    """Moves the part of a need a kind takes only as a bonus (BONUS_PART), such as a home's second
+    half of food, out of what it must get and into its bonus goods."""
+    must, extras = [], []
+    for flow in got:
+        spare = BONUS_PART.get((kind, flow.good), 0.0) * count  # type: ignore[arg-type]
+        if not spare:
+            must.append(flow)
+            continue
+        wanted = max(flow.wanted - spare, 0.0)
+        must.append(Flow(flow.good, min(flow.done, wanted), wanted))
+        extras.append(Flow(flow.good, min(max(flow.done - wanted, 0.0), spare), spare))
+    return must, extras + bonus_got
 
 
 def _per_good(
