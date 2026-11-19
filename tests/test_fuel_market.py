@@ -4,6 +4,7 @@ import pytest
 from builders import flat_map, layer
 from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.economy import Trade
+from railroads.sim.events import electricity_use
 from railroads.sim.fuel_market import (
     BASE_PRICE,
     ELECTRICITY_LEAST,
@@ -215,7 +216,9 @@ def test_homes_and_factories_want_electricity_by_their_points_and_how_far_electr
 
     signals = signals_of(trade, None, 1000.0, 1955)
 
-    assert signals[Fuel.ELECTRICITY].buildings == pytest.approx(ELECTRICITY_PER_POINT * 1000 * 0.5)
+    assert signals[Fuel.ELECTRICITY].buildings == pytest.approx(
+        ELECTRICITY_PER_POINT * 1000 * 0.5 * electricity_use(1955)
+    )
     assert signals[Fuel.ELECTRICITY].natural == 0.0
 
 

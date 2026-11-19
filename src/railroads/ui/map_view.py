@@ -379,6 +379,8 @@ class MapView:
         changed = month.changed
         if month.summary is not None:
             self.summaries.add(month.summary)
+        for headline in month.headlines:
+            self.summaries.add(headline)
         satisfaction = self.growth.satisfaction()
         moods_changed = not np.array_equal(satisfaction, self._satisfaction)
         self._satisfaction = satisfaction

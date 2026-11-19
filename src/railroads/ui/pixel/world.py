@@ -685,6 +685,7 @@ LANDMARKS = (
     "spa_resort",
     "worlds_fair",
     "pear_hq",
+    "gigafactory",
     "space_center",
     "film_studio",
     "amusement_park",

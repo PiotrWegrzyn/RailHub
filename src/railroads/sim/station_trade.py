@@ -25,6 +25,7 @@ from railroads.sim.economy import (
     wants_of,
     worth_to,
 )
+from railroads.sim.events import travel_factor
 from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.goods import (
     BONUS_PART,
@@ -49,6 +50,8 @@ if TYPE_CHECKING:
     from railroads.sim.growth import Growth
 
 MAIL_PER_PASSENGERS = 5
+# How far from a building the town it stands in is looked for.
+TOWN_NEAR = 2
 # The needs each good meets, in the order a month's trade hands them out.
 MEETS: dict[Good, tuple[Need, ...]] = {
     good: tuple(step for step in PIPELINE if isinstance(step, Need) and good in FITS[step])
@@ -320,7 +323,7 @@ class StationTrade:
             else:
                 taken = taken_by.get((kind, need), {})
                 had = np.array([taken.get(int(cell), 0.0) for cell in cells.tolist()])
-                want = n * NEEDS[kind][need] - had
+                want = n * needs_of(kind, growth.year, economy.east)[need] - had
             short = self._short_last_month(cells, kind, need)
             if short is not None:
                 arrived = self._arrived.get((kind, need), {})
@@ -422,6 +425,12 @@ class StationTrade:
         """The town sending the most passengers from the cells a station hands goods out to."""
         return self._growth.towns.most_in(self.inner_ring(station))
 
+    def town_near(self, cell: Cell) -> int:
+        """The town sending the most passengers from the cells within TOWN_NEAR of a cell."""
+        return self._growth.towns.most_in(
+            flat_within_any(self._growth.grid, (cell,), TOWN_NEAR).cells
+        )
+
     def inner_ring(self, station: Cell) -> npt.NDArray[np.intp]:
         """The cells a station hands goods out to, as flat indices that are kept and so can't be
         written to."""
@@ -476,16 +485,18 @@ class StationTrade:
         return [dict(zip(counts, summed, strict=True)) for summed in zip(*sums, strict=True)]
 
     def _travellers(self, counts: Mapping[BuildingKind, int]) -> dict[Good, float]:
-        """The passengers and mail these many buildings of each kind send, and want, in a month."""
+        """The passengers and mail these many buildings of each kind send, and want, in a month,
+        more or fewer while history makes them travel more or less (railroads.sim.events)."""
         passengers = 0
         for kind, count in counts.items():
             if not count:
                 continue
             points, value = self._growth.rule.points[kind]
             passengers += PASSENGERS_PER_POINT.get(points, 0) * value * count
+        year = self._growth.year
         return {
-            Good.PASSENGERS: float(passengers),
-            Good.MAIL: float(passengers // MAIL_PER_PASSENGERS),
+            Good.PASSENGERS: float(passengers) * travel_factor(Good.PASSENGERS, year),
+            Good.MAIL: float(passengers // MAIL_PER_PASSENGERS) * travel_factor(Good.MAIL, year),
         }
 
     def _needs(self, counts: Mapping[BuildingKind, int], station: Cell) -> dict[Need, float]:
@@ -500,7 +511,7 @@ class StationTrade:
             count = counts.get(kind)
             if not count:
                 continue
-            for need, amount in needs_of(kind, year).items():
+            for need, amount in needs_of(kind, year, self._growth.economy.east).items():
                 if (kind, need) in OWNED_BOOSTS:
                     taking = self._growth.owners.taking(kind, need)
                     if taking is None:

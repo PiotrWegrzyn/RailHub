@@ -101,6 +101,11 @@ The ideas every rule of the game should follow, the most important first.
 - Fuel bought out of the player's own stations is cheaper than at retail, and technology narrows
   the gap.
 - Infrastructure the player owns, such as power plants, has to pay off by making a lot.
+- The world moves through history: every decade people want more of everything, food and heating
+  least, and dated events (wars, crises, inventions) change what is wanted, made and paid. Each
+  one is news the player is told of, with what it changes, so nothing shifts unannounced.
+- History is the same in every game, apart from what happens only in one part of the world, such
+  as the market opening in the old Eastern Bloc in 1989.
 
 ## Trains and technology
 

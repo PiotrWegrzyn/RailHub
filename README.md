@@ -424,11 +424,11 @@ than dry land unless a row names it:
 |---|---|---|---|
 | Houses | 0.0000012 + 0.00011 per doubling of population, from 2 population nearby | | forest x0.3, mountains x0.05, barren x0.5, hills x0.8, cold x0.6, hot x0.8; river x1.5, lake x1.3 |
 | Farms | 0.000000112 + 0.00000672 per doubling of population + 0.00000028 per doubling of food | fewer than 5 population | flat grass x10 while empty; hills x0.25, barren x0.1, forest x0.02, cold x0.2, hot x0.6; river or lake x4; none in mountains |
-| Orchards | 0.000000216 + 0.000000108 per doubling of population + 0.00000216 per doubling of food | | hills x1.5; flat x0.4, hot x1.2, cold x0.05; river or lake x3 |
-| Date palms | 0.000000168 + 0.00000168 per doubling of population + 0.00000126 per doubling of food | | hot desert; river or lake x5 |
-| Banana plantations | as date palms | | hot jungle; river or lake x2 |
-| Orange farms | as date palms | | hot grassland, not desert or jungle; hills x0.7; river or lake x2 |
-| Sugar fields | 0.0000000168 + 0.000000042 per doubling of population + 0.000000168 per doubling of food | | open flat land, not cold; mild x0.6; river x3 |
+| Orchards | 0.000000216 + 0.000000108 per doubling of population + 0.00000216 per doubling of food | fewer than 5 population | hills x1.5; flat x0.4, hot x1.2, cold x0.05; river or lake x3 |
+| Date palms | 0.000000168 + 0.00000168 per doubling of population + 0.00000126 per doubling of food | fewer than 5 population | hot desert; river or lake x5 |
+| Banana plantations | as date palms | fewer than 5 population | hot jungle; river or lake x2 |
+| Orange farms | as date palms | fewer than 5 population | hot grassland, not desert or jungle; hills x0.7; river or lake x2 |
+| Sugar fields | 0.0000000168 + 0.000000042 per doubling of population + 0.000000168 per doubling of food | fewer than 5 population | open flat land, not cold; mild x0.6; river x3 |
 | Mines | 0.000001 + 0.0000014 per doubling of ore | | mountains; hills x0.4, flat x0.01; beside mountains x3 |
 | Lumber mills | 0.000016 + 0.000001 per doubling of population | | forest with at least 4 forest cells in its neighbourhood and flat open land next to it; river x1.5 |
 | Ports | 0.0000008 + 0.000002 per doubling of population | 4 population | next to the sea, or a lake x0.3 |
@@ -439,7 +439,7 @@ than dry land unless a row names it:
 | Potato farms | 0.000000017 + 0.000001 per doubling of population + 0.00000004 of food | fewer than 5 population | cool open plains; hills x0.4; river or lake x2 |
 | Rice paddies | as farms | fewer than 5 population | only within 41° of the equator, north or south (Japan, the Yangtze delta, California, Southeast Australia, the tropics; not Poland, Germany, Britain, France, Moscow or Norway); flat grass x10 while empty; hills x0.8, barren x0.05, hot x1.2; never in mountains, forest or the cold; river or lake x4, but the sea is salty and does it no good |
 | Soy fields | a quarter of potato farms | fewer than 5 population | only in East Asia (95-150°E, 18-50°N: China, Korea, Japan, Manchuria); open plains, hills x0.6; never cold, in mountains or forest; river or lake x2 |
-| Tea plantations | a sixth of orchards | | only in the warm south and east of Asia (65-150°E, 10°S-36°N: India, Ceylon, southern China, Japan, Java); hills x1.5, flat x0.3, forest x0.2; never desert, cold or mountains |
+| Tea plantations | a sixth of orchards | fewer than 5 population | only in the warm south and east of Asia (65-150°E, 10°S-36°N: India, Ceylon, southern China, Japan, Java); hills x1.5, flat x0.3, forest x0.2; never desert, cold or mountains |
 | Cattle ranches | 0.0000000033 + 0.00000018 per doubling of population + 0.000000009 of food | fewer than 5 population | grassland and hills; hot x0.3 |
 | Flax fields | 0.000000006 + 0.0000003 per doubling of population + 0.00000002 of food | fewer than 5 population | cool wet land; river x3, lake x2, away from water x0.3 |
 | Hop gardens | 0.0000000012 + 0.00000012 per doubling of population | fewer than 5 population | open plains and hills; cold x0.3, hot x0.2 |
@@ -489,13 +489,15 @@ needs and recipes of `railroads.sim.goods`. Buildings need *needs*, each met by 
 homes need food, and any food good feeds them one for one; canneries need fruit and bakeries
 wheat. Towns eat a lot, so they are hard to feed in full, and every farm and bakery a station can
 reach is worth having. The table below is written from the game's own figures by
-`tools/readme_tables.py`, as they stand in 2050; the help window (H) lists the same.
+`tools/readme_tables.py`, as they stand before history changes them (see History below): people want
+more every decade, and events such as wars and the internet change what they want. The help
+window (H) lists the same.
 
 <!-- table: buildings -->
 | Building | Makes a month at most | Must get a month | Bonus goods and boosts a month |
 |---|---|---|---|
-| House |  | 10 food, 3 heating | 10 food, 0.5 soy sauce, 1 beer, 1 newspapers (from 1600), 5 common goods, 0.5 vodka (from 1600), 0.5 refined sugar (from 1800), 0.5 bricks, 0.2 glass, 0.5 limestone |
-| Tenement |  | 60 food, 60 common goods, 20 heating | 60 food, 5 soy sauce, 10 salt, 20 goods, 10 hot drinks (from 1700), 10 tools (from 1870), 10 beer, 10 vodka (from 1600), 10 bricks, 10 glass, 10 cement (from 1880), 10 refined sugar (from 1800), 10 newspapers (from 1600), 10 limestone, 1 luxury goods (from 1700) |
+| House |  | 10 food, 3 heating | 10 food, 0.5 soy sauce, 1 beer, 1 newspapers (from 1600), 5 common goods, 0.5 vodka (from 1600), 0.5 refined sugar (from 1800), 0.5 bricks, 0.2 glass, 0.5 limestone, 0.5 wax |
+| Tenement |  | 60 food, 60 common goods, 20 heating | 60 food, 5 soy sauce, 10 salt, 20 goods, 10 hot drinks (from 1700), 10 tools (from 1870), 10 beer, 10 vodka (from 1600), 10 bricks, 10 glass, 10 cement (from 1880), 10 refined sugar (from 1800), 10 newspapers (from 1600), 10 limestone, 1 luxury goods (from 1700), 5 wax |
 | Block of flats |  | 200 food, 300 common goods, 80 heating | 200 food, 15 soy sauce, 30 salt, 40 goods, 30 hot drinks (from 1700), 10 tools (from 1870), 30 fuel (from 1910), 3 cars (from 1930), 30 beer, 30 vodka (from 1600), 50 bricks, 50 cement (from 1880), 50 glass, 30 newspapers (from 1600), 5 appliances (from 1950), 30 refined sugar (from 1800), 5 luxury goods (from 1700) |
 | Farm | 10 wheat |  | 5 machinery (from 1870), 10 limestone, 2 fuel (from 1920) |
 | Orchard | 10 apples |  |  |
@@ -592,6 +594,7 @@ reach is worth having. The table below is written from the game's own figures by
 | Power plant |  | 200 coal (from 1700) |  |
 | Diesel power plant |  | 100 fuel (from 1910) |  |
 | Gas power plant |  | 150 gas |  |
+| Battery gigafactory |  | 300 chemicals (from 1880), 200 electronics (from 1960), 200 steel (from 1855) | 300 copper (from 1880) |
 | Juice works (1870) | 100 juice | 50 fruit, 50 glass, 25 plastics (from 1950) | 10 refined sugar (from 1800) |
 | Big juice works (1870) | 375 juice | 187.5 fruit, 187.5 glass, 93.75 plastics (from 1950) | 37.5 refined sugar (from 1800) |
 | Mega juice works (1870) | 1,406 juice | 703.1 fruit, 703.1 glass, 351.6 plastics (from 1950) | 140.6 refined sugar (from 1800) |
@@ -676,11 +679,11 @@ reach is worth having. The table below is written from the game's own figures by
 | Clock maker (1880) | 5 luxury goods | 10 copper (from 1880), 5 glass |  |
 | Mirror maker (1700) | 5 luxury goods | 10 glass, 0.5 gold |  |
 | Manor |  | 100 food, 10 heating, 10 wine, 3 luxury goods (from 1700) | 5 furniture |
-| Theatre |  | 10 clothes (from 1780), 5 glass, 5 paper (from 1150) |  |
+| Theatre |  | 10 clothes (from 1780), 5 glass, 5 paper (from 1150) | 5 wax |
 | Hospital (1850) |  | 50 food, 5 heating, 10 chemicals (from 1880), 5 glass |  |
 | Space center |  | 300 electronics (from 1960), 1,000 fuel (from 1910), 300 food |  |
 | Pear Company headquarters |  | 500 electronics (from 1960), 1,000 food |  |
-| Royal palace |  | 200 food, 50 wine, 20 porcelain | 20 furniture |
+| Royal palace |  | 200 food, 50 wine, 20 porcelain | 20 furniture, 20 wax |
 | Spa resort |  | 100 food, 20 wine | 20 beer, 20 newspapers (from 1600) |
 | World's Fair hall |  | 200 goods, 100 glass, 100 steel (from 1855) |  |
 | Film studio |  | 50 chemicals (from 1880), 50 clothes (from 1780), 30 electronics (from 1960) |  |
@@ -781,8 +784,10 @@ into a big factory and three of those into a mega factory. On Poland with the st
 that gives about 100 factories and 20 big factories in 1850, and some 280 factories, 40 big and 5
 mega factories by 2050.
 
-Farms with 8 or more population points around them are pulled down, and none grow there, so farms
-ring towns rather than standing in them. On flat grassland farms, orchards, date palms, bananas,
+Farms and every other grower of food (fields, orchards, groves, plantations, vineyards, beekeepers
+and animal farms, but not the works that make food from what they grow, nor fisheries) with 5 or
+more population points around them (a cell and the six beside it) are pulled down, and none grow
+there, so they ring towns rather than standing in them. On flat grassland farms, orchards, date palms, bananas,
 orange farms and sugar fields are ten times as likely, but where anything stands already only
 one turn in ten goes ahead, so they favour empty plains. Bakeries open in towns, one to a
 neighbourhood, a little likelier the more people live around.
@@ -858,7 +863,7 @@ and sends only goods the game already has, in vast amounts.
 
 | Novelty | From | Where | Wants each month | Sends |
 |---|---|---|---|---|
-| Royal palace | 1850 | by the biggest town, best on a hill or a river | 200 food, 50 wine, 20 porcelain, 20 furniture | 300 passengers |
+| Royal palace | 1850 | by the biggest town, best on a hill or a river | 200 food, 50 wine, 20 porcelain, 20 furniture, 20 wax | 300 passengers |
 | Salt mine cathedral | 1850 | on a salt deposit | | 200 salt, 200 passengers |
 | Spa resort | 1850 | hills beside a river or lake | 100 food, 20 wine, 20 beer, 20 newspapers | 300 passengers |
 | World's Fair hall | 1880 to 1940 | by the biggest town, once 100 people live there | 200 goods, 100 glass, 100 steel | 1,000 passengers |
@@ -866,6 +871,7 @@ and sends only goods the game already has, in vast amounts.
 | Amusement park | 1950 | by the biggest town, once 100 people live there | 200 food, 100 beer, 50 fuel | 800 passengers |
 | Space center | 1960 | anywhere on flat land, 20 times likelier within 10 hexes of military ground | 300 electronics, 1,000 fuel, 300 food | 500 passengers |
 | Pear Company headquarters | 1980 | once a skyscraper stands, as near as it can to the one with most people around | 500 electronics, 1,000 food | 1,000 passengers |
+| Battery gigafactory | 2030 | by the biggest town, once 100 people live there | 300 copper, 300 chemicals, 200 electronics, 200 steel | 400 passengers |
 
 Olympic stadiums are apart from the pick. In every real Summer Games year (1896 to 1912, 1920 to
 1936, 1948 to 2016, 2021, then every four years) a map hosts one with a 5% chance on Poland's land,
@@ -875,6 +881,51 @@ and 200 newspapers and sends 2,000 passengers.
 
 Some works are so big that they too fill a whole hex: car, tank and aircraft factories, mega
 factories, refineries, power plants and shipyards.
+
+### History
+
+The world moves on through the game's two hundred years (`railroads.sim.events`, with what it does
+to one map in `railroads.sim.happenings`).
+
+People want more. In 1860, 1870 and every decade after, every building that uses goods up (homes,
+shops, venues, churches, the military and the novelties, but not processors, makers, power plants
+or railway works) wants 10% more of every need than ten years before, and 3% more food and
+heating: by 2050 homes want 6.7 times the goods they wanted in 1850, and 1.8 times the food and
+heating. Each decade brings a news card saying so.
+
+Dated events change what is wanted, made and paid while they last, or for good:
+
+| Year | Event | What changes |
+|---|---|---|
+| 1854 | The telegraph | newspapers wanted +100% |
+| 1873 | The Long Depression | luxuries, furniture and wine -30% for 6 years |
+| 1882 | Electric light | homes stop wanting wax (they took it as a bonus); churches, theatres and the royal palace keep it; electricity wanted +20% |
+| 1914 | The Great War | guns and steel x2, luxuries and wine -40%, passengers +50%, ports take guns, for 5 years |
+| 1920 | Radio | newspapers -15%, electricity wanted +20% |
+| 1929 | The Great Depression | everything but food, common goods and heating -30% for 4 years |
+| 1939 | The Second World War | guns, tanks, planes and steel x2, luxuries, wine and cars -50%, passengers +50%, ports take guns, for 7 years |
+| 1955 | Television | newspapers -50%, appliances +30%, electricity wanted +50% and costs +25% |
+| 1973 | The oil crisis | oil wells make half as much, oil and diesel fuel earn and cost twice as much, for 2 years |
+| May 1981 | The Pope is shot (17:17, 13 May) | passengers getting off in the town of St Paul's earn +300% for 12 months |
+| 1989 | The Iron Curtain falls | on maps of the old Eastern Bloc only: cars, electronics and appliances +30% |
+| 1995 | The internet | newspapers -30%, electronics +30% |
+| September 2001 | September 11 | the two skyscrapers with the most people around are pulled down |
+| April 2005 | John Paul II dies (21:37, 2 April) | passengers getting off in the town of St Paul's earn +500% for 12 months |
+| 2007 | Smartphones | nobody wants newspapers any more; electronics +50% |
+| 2008 | The financial crisis | homes want half the food and a fifth less of everything else, for 2 years |
+| 2020 | The pandemic | passengers -80%, mail +50%, for 3 years |
+| 2030 | Electric cars | fuel -40%, electronics +20% |
+| 2040 | Goodbye to coal | coal power plants burn half as much coal for the same power |
+
+A war does more. The year before it two new patches of military ground go up, each with a base
+and two outposts; while it lasts the military grows 11 times as fast; as it begins two gun
+factories open by the biggest towns, four on a map with no port; and as it ends half the military
+buildings are pulled down.
+
+The player hears of each event in a news card among the monthly summaries, which opens its story
+and what it changes; wars, crises, the pandemic and September 11 also stop the game in a window
+until the player has read them. Goods made for the first time (tools and machinery in 1870, cars
+in 1930, electronics in 1960 and so on) get a card too.
 
 ### Owning buildings and tech
 

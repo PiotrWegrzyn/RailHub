@@ -219,6 +219,7 @@ def make_game_steps(
     game.lots = lots
     lots.offer(place.terrain == Terrain.LAND)
     game.growth.novelties = Novelties.pick(game.tile_map, np.random.default_rng(seed + 3))
+    game.begin_history()
     if settings.stand_in_years > 0:
         played = min(settings.stand_in_years, END_YEAR - begins)
         report(f"Playing {played} years with a stand-in player")

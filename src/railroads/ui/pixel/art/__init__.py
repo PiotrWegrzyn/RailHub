@@ -117,6 +117,7 @@ from railroads.ui.pixel.art.industry import (
 from railroads.ui.pixel.art.landmarks import (
     amusement_park,
     film_studio,
+    gigafactory,
     olympic_stadium,
     pear_hq,
     royal_palace,
@@ -312,6 +313,7 @@ BUILDINGS = (
     "gas_power_plant",
     "space_center",
     "pear_hq",
+    "gigafactory",
     "royal_palace",
     "salt_cathedral",
     "spa_resort",
@@ -456,6 +458,7 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "gas_power_plant": gas_power_plant,
     "space_center": space_center,
     "pear_hq": pear_hq,
+    "gigafactory": gigafactory,
     "royal_palace": royal_palace,
     "salt_cathedral": salt_cathedral,
     "spa_resort": spa_resort,

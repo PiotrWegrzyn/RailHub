@@ -191,6 +191,7 @@ BUILDING_SPRITES = {
     BuildingKind.GAS_POWER_PLANT: "gas_power_plant",
     BuildingKind.SPACE_CENTER: "space_center",
     BuildingKind.PEAR_HQ: "pear_hq",
+    BuildingKind.GIGAFACTORY: "gigafactory",
     BuildingKind.ROYAL_PALACE: "royal_palace",
     BuildingKind.SALT_CATHEDRAL: "salt_cathedral",
     BuildingKind.SPA_RESORT: "spa_resort",

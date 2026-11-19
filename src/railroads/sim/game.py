@@ -16,12 +16,13 @@ from railroads.places import Places, StationNames
 from railroads.sim import routes
 from railroads.sim.autoplay import StandInPlayer, play
 from railroads.sim.clock import START_YEAR
-from railroads.sim.company import Goal, company_value
+from railroads.sim.company import Goal, News, company_value
 from railroads.sim.constructions import Constructions, TrackWidth
 from railroads.sim.demolition import bulldoze, bulldoze_price, station_site_price
 from railroads.sim.finance import STATION_PRICE, Finances, dollars
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
+from railroads.sim.happenings import Happenings, Headline
 from railroads.sim.lots import Lots
 from railroads.sim.railway import Railway
 from railroads.sim.stats import History
@@ -44,6 +45,8 @@ class Month:
 
     changed: set[Cell]
     summary: MonthSummary | None
+    # The news of history it brought (railroads.sim.happenings).
+    headlines: tuple[Headline, ...] = ()
 
 
 def place_names(tile_map: TileMap) -> StationNames:
@@ -78,6 +81,10 @@ class Game:
         self.goal = Goal()
         self._reach = Reach(self.tile_map.grid)
 
+    def begin_history(self) -> None:
+        """Lets history happen to the game from now on (railroads.sim.happenings)."""
+        self.growth.happenings = self.railway.happenings = Happenings()
+
     @property
     def finances(self) -> Finances:
         return self.railway.finances
@@ -111,7 +118,14 @@ class Game:
                 changed = yield from self.stand_in.month_steps(rng)
         growth = self.growth
         self.goal.begin_month(growth.year, growth.months % 12, company_value(railway))
-        return Month(changed, summarize(date, self.growth.rule.points, reach, changes))
+        headlines = () if growth.happenings is None else tuple(growth.happenings.take())
+        self.goal.news += [
+            News(h.title, "\n".join((h.story, "", *h.changes)), bad=True)
+            for h in headlines
+            if h.big
+        ]
+        summary = summarize(date, self.growth.rule.points, reach, changes)
+        return Month(changed, summary, headlines)
 
     def simulate(self, years: int, rng: np.random.Generator) -> None:
         """Lets a stand-in player build stations and serve the towns for `years`, printing the

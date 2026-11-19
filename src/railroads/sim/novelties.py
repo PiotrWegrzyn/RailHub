@@ -92,7 +92,7 @@ def _nearest_free(growth: Growth, kind: BuildingKind, centre: Cell) -> Cell | No
     return None
 
 
-def _by_biggest_town(
+def by_biggest_town(
     growth: Growth, kind: BuildingKind, away_from: list[Cell]
 ) -> tuple[Cell, Cell] | None:
     """Builds the kind as near as it can to the biggest town more than HOSTS_APART steps from
@@ -216,6 +216,7 @@ NOVELTIES = (
     Novelty(BuildingKind.AMUSEMENT_PARK, 1950, ByTown(FAIR_TOWN)),
     Novelty(BuildingKind.SPACE_CENTER, 1960, place_space_center),
     Novelty(BuildingKind.PEAR_HQ, 1980, place_pear_hq),
+    Novelty(BuildingKind.GIGAFACTORY, 2030, ByTown(FAIR_TOWN)),
 )
 
 
@@ -269,7 +270,7 @@ class Novelties:
 
     def _railway_works(self, growth: Growth, works: list[Cell]) -> set[Cell]:
         """Puts railway works by the biggest town with none near it yet."""
-        built = _by_biggest_town(growth, BuildingKind.RAILWAY_WORKS, works)
+        built = by_biggest_town(growth, BuildingKind.RAILWAY_WORKS, works)
         if built is None:
             return set()
         works.append(built[1])
@@ -278,7 +279,7 @@ class Novelties:
 
     def _host(self, growth: Growth) -> set[Cell]:
         """Puts a stadium in the biggest town far enough from every earlier host."""
-        built = _by_biggest_town(growth, BuildingKind.OLYMPIC_STADIUM, self.hosts)
+        built = by_biggest_town(growth, BuildingKind.OLYMPIC_STADIUM, self.hosts)
         if built is None:
             return set()
         self.hosts.append(built[0])

@@ -1,6 +1,8 @@
 """Monthly summaries along the right edge of the map: a card for each month that changed
-something within reach of a station; clicking one opens what was built and pulled down there,
-station by station, and outlines those cells on the map."""
+something within reach of a station, and one for each piece of news history brings
+(railroads.sim.happenings). Clicking a month opens what was built and pulled down there, station
+by station, and outlines those cells on the map; clicking news opens its story and what it
+changes."""
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -9,6 +11,7 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.sim.grids import Cell
+from railroads.sim.happenings import Headline
 from railroads.sim.summaries import MonthSummary
 from railroads.ui.iso_camera import Vec2
 from railroads.ui.ornate import begin_ornate, end_ornate
@@ -37,7 +40,7 @@ WINDOW_MAX_HEIGHT = 520.0
 
 @dataclass
 class Note:
-    summary: MonthSummary
+    summary: MonthSummary | Headline
     seen: bool = False
 
 
@@ -45,15 +48,15 @@ class Note:
 class SummariesPanel:
     notes: list[Note] = field(default_factory=list)
     # The summary whose window is open.
-    open: MonthSummary | None = None
+    open: MonthSummary | Headline | None = None
 
-    def add(self, summary: MonthSummary) -> None:
+    def add(self, summary: MonthSummary | Headline) -> None:
         self.notes.insert(0, Note(summary))
         del self.notes[KEPT:]
 
     def outlined(self) -> tuple[Cell, ...]:
         """The cells to outline on the map: those that changed in the open summary."""
-        if self.open is None:
+        if not isinstance(self.open, MonthSummary):
             return ()
         return tuple(cell for station in self.open.stations for cell in station.cells)
 
@@ -103,21 +106,13 @@ class SummariesPanel:
             draw_list.add_rect_filled(
                 (low.x + 4, low.y + 8), (low.x + 7, high.y - 8), color_u32(BRASS), 2.0
             )
-        stations = len(summary.stations)
-        where = "1 station" if stations == 1 else f"{stations} stations"
+        icon, line = _card_lines(summary)
         draw_list.add_text(
             (low.x + 16, low.y + 7),
             color_u32(BRASS if not note.seen else TEXT),
-            f"{fa.ICON_FA_HOME}  {summary.date}",
+            f"{icon}  {summary.date}",
         )
-        parts = []
-        if summary.built:
-            parts.append(f"{summary.built} built")
-        if summary.pulled_down:
-            parts.append(f"{summary.pulled_down} pulled down")
-        draw_list.add_text(
-            (low.x + 16, low.y + 27), color_u32(TEXT_DIM), f"{', '.join(parts)} near {where}"
-        )
+        draw_list.add_text((low.x + 16, low.y + 27), color_u32(TEXT_DIM), line)
         if hovered:
             imgui.set_tooltip("Click to see what changed; right click to dismiss")
         if clicked:
@@ -136,8 +131,17 @@ class SummariesPanel:
             (display.x - CARDS_WIDTH - 12, 96), imgui.Cond_.appearing.value, (1.0, 0.0)
         )
         imgui.set_next_window_size_constraints((WINDOW_WIDTH, 0), (WINDOW_WIDTH, WINDOW_MAX_HEIGHT))
-        title = f"{fa.ICON_FA_HOME}  {summary.date} near your stations###summary"
         flags = imgui.WindowFlags_.always_auto_resize.value
+        if isinstance(summary, Headline):
+            title = f"{fa.ICON_FA_NEWSPAPER}  {summary.date}: {summary.title}###summary"
+            expanded, still_open = begin_ornate(title, flags)
+            if expanded:
+                _draw_headline(summary)
+            end_ornate()
+            if not still_open:
+                self.open = None
+            return
+        title = f"{fa.ICON_FA_HOME}  {summary.date} near your stations###summary"
         expanded, still_open = begin_ornate(title, flags)
         if expanded:
             imgui.text_disabled("Outlined on the map. What changed within reach of:")
@@ -157,3 +161,27 @@ class SummariesPanel:
         end_ornate()
         if not still_open:
             self.open = None
+
+
+def _card_lines(summary: MonthSummary | Headline) -> tuple[str, str]:
+    """The icon by a card's date, and the line under it."""
+    if isinstance(summary, Headline):
+        return fa.ICON_FA_NEWSPAPER, summary.title
+    stations = len(summary.stations)
+    where = "1 station" if stations == 1 else f"{stations} stations"
+    parts = []
+    if summary.built:
+        parts.append(f"{summary.built} built")
+    if summary.pulled_down:
+        parts.append(f"{summary.pulled_down} pulled down")
+    return fa.ICON_FA_HOME, f"{', '.join(parts)} near {where}"
+
+
+def _draw_headline(headline: Headline) -> None:
+    imgui.push_text_wrap_pos(0.0)
+    imgui.text(headline.story)
+    imgui.pop_text_wrap_pos()
+    if headline.changes:
+        imgui.separator()
+    for line in headline.changes:
+        imgui.bullet_text(line)

@@ -20,6 +20,7 @@ from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.game import Game
 from railroads.sim.goods import Good
 from railroads.sim.grids import HexGrid
+from railroads.sim.happenings import Headline
 from railroads.sim.lots import Lots
 from railroads.sim.steps import Steps
 from railroads.sim.tilemap import Terrain, TileMap
@@ -1024,3 +1025,16 @@ def test_a_train_whose_stop_was_bulldozed_still_draws_runs_and_can_be_rerouted(
 
     assert done.ok
     assert all(stop.cell != (10, 16) for stop in train.stops)
+
+
+def test_a_news_card_and_its_story_draw_beside_the_map(context: None) -> None:
+    app = made_app()
+    headline = Headline("May 1981", "The Pope is shot", "At 17:17 on 13 May...", ("For a year",))
+    app.view.summaries.add(headline)
+    app.view.summaries.open = headline
+
+    for _ in range(3):
+        frame(app)
+
+    assert app.view.summaries.open is headline
+    assert app.view.summaries.outlined() == ()
