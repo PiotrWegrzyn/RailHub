@@ -426,9 +426,9 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.BRICKS: 8,
         Good.CEMENT: 12,
         Good.GLASS: 20,
-        Good.BEER: 15,
-        Good.VODKA: 30,
-        Good.SAKE: 25,
+        Good.BEER: 60,
+        Good.VODKA: 120,
+        Good.SAKE: 100,
         Good.LEATHER: 25,
         Good.SHOES: 100,
         Good.PLASTICS: 40,
@@ -456,7 +456,7 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.CLOTHES: 70,
         Good.TOOLS: 160,
         Good.GOODS: 120,
-        Good.WINE: 40,
+        Good.WINE: 160,
         Good.HONEY: 12,
         Good.BARRELS: 15,
         Good.WAX: 30,
@@ -640,7 +640,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             BuildingKind.FURNITURE_MAKER: Recipe(Good.FURNITURE, 20, {Need.LUMBER: 4.0}),
             BuildingKind.TOOL_WORKS: Recipe(Good.TOOLS, 80, {Need.STEEL: 1.0}),
             BuildingKind.BARREL_MAKER: Recipe(Good.BARRELS, 40, {Need.LUMBER: 0.5}),
-            BuildingKind.WINERY: Recipe(Good.WINE, 80, {Need.GRAPES: 1.0}, {Need.BARRELS: 0.5}),
+            BuildingKind.WINERY: Recipe(Good.WINE, 20, {Need.GRAPES: 4.0}, {Need.BARRELS: 2.0}),
             BuildingKind.REFINERY: Recipe(Good.FUEL, 300, {Need.OIL: 0.5}),
             BuildingKind.CHEMICAL_WORKS: Recipe(
                 Good.CHEMICALS, 100, {Need.SALT: 0.5, Need.BOILER_FUEL: 0.5}
@@ -659,11 +659,11 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             BuildingKind.GLASSWORKS: Recipe(
                 Good.GLASS, 60, {Need.SAND: 0.5}, {Need.COAL: 0.25, Need.LIMESTONE: 0.25}
             ),
-            BuildingKind.BREWERY: Recipe(Good.BEER, 160, {Need.HOPS: 0.25}, {Need.BARRELS: 0.1}),
+            BuildingKind.BREWERY: Recipe(Good.BEER, 40, {Need.HOPS: 1.0}, {Need.BARRELS: 0.4}),
             BuildingKind.DISTILLERY: Recipe(
-                Good.VODKA, 40, {Need.POTATOES: 0.5}, {Need.GLASS: 0.1}
+                Good.VODKA, 10, {Need.POTATOES: 2.0}, {Need.GLASS: 0.4}
             ),
-            BuildingKind.SAKE_BREWERY: Recipe(Good.SAKE, 60, {Need.RICE: 0.5}),
+            BuildingKind.SAKE_BREWERY: Recipe(Good.SAKE, 15, {Need.RICE: 2.0}),
             BuildingKind.SOY_SAUCE_BREWERY: Recipe(
                 Good.SOY_SAUCE, 20, {Need.SOYBEANS: 0.5, Need.WHEAT: 0.5, Need.SALT: 0.2}
             ),
@@ -859,8 +859,8 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.PIG_FARM: {Need.WHEAT: 60},
         BuildingKind.CHICKEN_FARM: {Need.WHEAT: 30},
         BuildingKind.SHEEP_FARM: {Need.WHEAT: 90},
-        BuildingKind.TAVERN: {Need.ALCOHOL: 90, Need.FOOD: 20},
-        BuildingKind.CLUB: {Need.ALCOHOL: 350, Need.CHEMICALS: 5},
+        BuildingKind.TAVERN: {Need.ALCOHOL: 22, Need.FOOD: 20},
+        BuildingKind.CLUB: {Need.ALCOHOL: 88, Need.CHEMICALS: 5},
         BuildingKind.SUSHI_HUT: {Need.FISH: 60, Need.RICE: 60, Need.SOY_SAUCE: 10},
         BuildingKind.DEPARTMENT_STORE: {
             Need.CLOTHES: 20,

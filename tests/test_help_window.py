@@ -34,7 +34,7 @@ def test_the_help_lists_every_building_once() -> None:
 def test_the_help_gives_what_a_building_makes_and_wants_in_a_month() -> None:
     row = row_of(BuildingKind.WINERY)
 
-    assert row.makes == ((Good.WINE, 80),)
+    assert row.makes == ((Good.WINE, 20),)
     assert {need: amount for need, amount, _ in row.wants} == {
         Need.GRAPES: 80.0,
         Need.BARRELS: 40.0,

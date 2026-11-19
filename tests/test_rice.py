@@ -166,7 +166,7 @@ def test_a_sake_brewery_brews_rice_into_sake_that_taverns_pour_as_alcohol() -> N
 
     trade = economy.trade(placed, holding(100.0, RICE=10.0))
 
-    assert trade.gathered[STATION][Good.SAKE] == pytest.approx(20.0)
+    assert trade.gathered[STATION][Good.SAKE] == pytest.approx(5.0)
     assert Good.SAKE in FITS[Need.ALCOHOL]
 
 
@@ -178,4 +178,4 @@ def test_a_tavern_takes_sake_for_its_alcohol() -> None:
     trade = economy.trade(placed, holding(SAKE=200.0))
 
     poured, _ = trade.goods_got[(BuildingKind.TAVERN, Need.ALCOHOL)]
-    assert poured[position(trade, economy, (8, 8))] == pytest.approx(90.0)
+    assert poured[position(trade, economy, (8, 8))] == pytest.approx(22.0)

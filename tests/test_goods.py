@@ -1,7 +1,15 @@
 import pytest
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.goods import FITS, Need, bonus_of, demands_of, makes_of, needs_of
+from railroads.sim.goods import (
+    FITS,
+    RECIPES,
+    Need,
+    bonus_of,
+    demands_of,
+    makes_of,
+    needs_of,
+)
 from railroads.sim.ladders import LADDERS
 
 
@@ -57,3 +65,21 @@ def test_a_house_must_have_only_food_and_heating_and_takes_common_goods_as_a_bon
     assert set(bonus_of(BuildingKind.HOUSE, 2000)) == set(needs_of(BuildingKind.HOUSE, 2000)) - set(
         demands
     )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        kind
+        for kind, recipe in RECIPES.items()
+        if recipe.makes in FITS[Need.ALCOHOL] and not kind.name.startswith(("BIG_", "MEGA_"))
+    ],
+)
+def test_alcohol_is_no_food_so_no_maker_of_it_makes_more_than_it_takes_in(
+    kind: BuildingKind,
+) -> None:
+    recipe = RECIPES[kind]
+
+    per_unit = recipe.per_unit
+
+    assert sum(per_unit.values()) >= 1.0

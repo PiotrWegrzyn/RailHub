@@ -134,7 +134,7 @@ def test_each_rank_of_church_wants_more_wax_and_incense(need: Need) -> None:
 
 
 @pytest.mark.parametrize(
-    ("grapes", "barrels", "wine"), [(30.0, 0.0, 30.0), (0.0, 30.0, 0.0), (30.0, 30.0, 60.0)]
+    ("grapes", "barrels", "wine"), [(40.0, 0.0, 10.0), (0.0, 40.0, 0.0), (40.0, 40.0, 20.0)]
 )
 def test_wine_is_made_of_grapes_and_barrels_make_up_to_twice_as_much(
     grapes: float, barrels: float, wine: float

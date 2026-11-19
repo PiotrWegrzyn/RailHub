@@ -553,7 +553,7 @@ reach is worth having. The table below is written from the game's own figures by
 | Textile mill (1780) | 40 clothes | 100 fibre |  |
 | Furniture maker | 20 furniture | 80 lumber |  |
 | Tool works (1870) | 80 tools | 80 steel (from 1855) |  |
-| Winery | 80 wine | 80 grapes | 40 barrels |
+| Winery | 20 wine | 80 grapes | 40 barrels |
 | Barrel maker | 40 barrels | 20 lumber |  |
 | Refinery (1856) | 300 fuel | 150 oil |  |
 | Chemical works (1880) | 100 chemicals | 50 salt, 50 boiler fuel |  |
@@ -576,9 +576,9 @@ reach is worth having. The table below is written from the game's own figures by
 | Brickworks | 100 bricks | 50 clay | 25 coal (from 1700) |
 | Cement works (1880) | 100 cement | 50 limestone | 25 coal (from 1700) |
 | Glassworks | 60 glass | 30 sand | 15 coal (from 1700), 15 limestone |
-| Brewery | 160 beer | 40 hops | 16 barrels |
-| Distillery (1600) | 40 vodka | 20 potatoes | 4 glass |
-| Sake brewery | 60 sake | 30 rice |  |
+| Brewery | 40 beer | 40 hops | 16 barrels |
+| Distillery (1600) | 10 vodka | 20 potatoes | 4 glass |
+| Sake brewery | 15 sake | 30 rice |  |
 | Tannery | 40 leather | 20 livestock | 10 limestone |
 | Shoe factory (1850) | 20 shoes | 40 leather |  |
 | Plastics works (1950) | 100 plastics | 50 oil, 50 chemicals (from 1880) |  |
@@ -622,8 +622,8 @@ reach is worth having. The table below is written from the game's own figures by
 | Mega tool works (1870) | 500 tools | 500 steel (from 1855) |  |
 | Big barrel maker | 100 barrels | 50 lumber |  |
 | Mega barrel maker | 250 barrels | 125 lumber |  |
-| Big winery | 200 wine | 200 grapes | 100 barrels |
-| Mega winery | 500 wine | 500 grapes | 250 barrels |
+| Big winery | 50 wine | 200 grapes | 100 barrels |
+| Mega winery | 125 wine | 500 grapes | 250 barrels |
 | Big refinery (1856) | 750 fuel | 375 oil |  |
 | Mega refinery (1856) | 1,875 fuel | 937.5 oil |  |
 | Big chemical works (1880) | 250 chemicals | 125 salt, 125 boiler fuel |  |
@@ -640,12 +640,12 @@ reach is worth having. The table below is written from the game's own figures by
 | Mega cement works (1880) | 625 cement | 312.5 limestone | 156.2 coal (from 1700) |
 | Big glassworks | 150 glass | 75 sand | 37.5 coal (from 1700), 37.5 limestone |
 | Mega glassworks | 375 glass | 187.5 sand | 93.75 coal (from 1700), 93.75 limestone |
-| Big brewery | 400 beer | 100 hops | 40 barrels |
-| Mega brewery | 1,000 beer | 250 hops | 100 barrels |
-| Big distillery (1600) | 100 vodka | 50 potatoes | 10 glass |
-| Mega distillery (1600) | 250 vodka | 125 potatoes | 25 glass |
-| Big sake brewery | 150 sake | 75 rice |  |
-| Mega sake brewery | 375 sake | 187.5 rice |  |
+| Big brewery | 100 beer | 100 hops | 40 barrels |
+| Mega brewery | 250 beer | 250 hops | 100 barrels |
+| Big distillery (1600) | 25 vodka | 50 potatoes | 10 glass |
+| Mega distillery (1600) | 62.5 vodka | 125 potatoes | 25 glass |
+| Big sake brewery | 37.5 sake | 75 rice |  |
+| Mega sake brewery | 93.75 sake | 187.5 rice |  |
 | Big soy sauce brewery | 50 soy sauce | 25 soybeans, 25 wheat, 10 salt |  |
 | Mega soy sauce brewery | 125 soy sauce | 62.5 soybeans, 62.5 wheat, 25 salt |  |
 | Big tannery | 100 leather | 50 livestock | 25 limestone |
@@ -685,10 +685,10 @@ reach is worth having. The table below is written from the game's own figures by
 | Film studio |  | 50 chemicals (from 1880), 50 clothes (from 1780), 30 electronics (from 1960) |  |
 | Amusement park |  | 200 food, 50 fuel (from 1910) | 100 beer |
 | Olympic stadium |  | 500 food | 200 beer, 200 newspapers (from 1600) |
-| Tavern |  | 90 alcohol | 20 food |
+| Tavern |  | 22 alcohol | 20 food |
 | Department store (1880) |  | 20 clothes (from 1780), 20 shoes (from 1850), 5 porcelain, 10 appliances (from 1950) | 10 furniture |
 | Hotel (1900) |  | 80 food, 10 wine | 10 beer, 10 newspapers (from 1600) |
-| Club (1900) |  | 350 alcohol | 5 chemicals (from 1880) |
+| Club (1900) |  | 88 alcohol | 5 chemicals (from 1880) |
 | Sushi hut |  | 60 fish, 60 rice | 10 soy sauce |
 | Filling station (1920) |  | 40 fuel (from 1910) |  |
 | Big carpet weaver (1700) | 12.5 luxury goods | 50 fibre |  |
@@ -1095,9 +1095,9 @@ share of demand left for each need.
 | Freight a unit | Goods |
 |---|---|
 | $10 or less | eggs 4, bread 6, chickens 6, milk 6, potatoes 6, rice 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, soybeans 8, sugar 8, tofu 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, lumber 10, miso 10, newspapers 10, pots 10 |
-| $11-20 | cement 12, dried fish 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, beer 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, soy sauce 20, wool 20 |
-| $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, sake 25, stove tiles 25, copper 28, castings 30, vodka 30, wax 30, plastics 40, rubber 40, tea 40, wine 40 |
-| $41-200 | coffee 50, furniture 60, porcelain 60, clothes 70, steel 80, shoes 100, electronics 120, goods 120, guns 150, tools 160, machinery 180 |
+| $11-20 | cement 12, dried fish 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, soy sauce 20, wool 20 |
+| $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, stove tiles 25, copper 28, castings 30, wax 30, plastics 40, rubber 40, tea 40 |
+| $41-200 | coffee 50, beer 60, furniture 60, porcelain 60, clothes 70, steel 80, sake 100, shoes 100, electronics 120, goods 120, vodka 120, guns 150, tools 160, wine 160, machinery 180 |
 | over $200 | appliances 300, incense 300, luxury goods 300, gold 800, diamonds 2,000, cars 5,000, tanks 8,000, planes 1.2e+04 |
 <!-- end table -->
 

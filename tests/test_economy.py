@@ -473,7 +473,7 @@ def test_a_brewery_takes_its_hops_and_its_beer_quenches_houses() -> None:
     assert drunk[position(trade, economy, (8, 9))] == 1.0
 
 
-@pytest.mark.parametrize(("barrels", "beer"), [(0.0, 40.0), (2.0, 60.0), (4.0, 80.0), (9.0, 80.0)])
+@pytest.mark.parametrize(("barrels", "beer"), [(0.0, 10.0), (2.0, 15.0), (4.0, 20.0), (9.0, 20.0)])
 def test_barrels_let_a_brewery_make_up_to_twice_the_beer_from_its_hops(
     barrels: float, beer: float
 ) -> None:
