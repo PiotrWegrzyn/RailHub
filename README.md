@@ -894,8 +894,8 @@ or railway works) wants 10% more of every need than ten years before, and 3% mor
 heating: by 2050 homes want 6.7 times the goods they wanted in 1850, and 1.8 times the food and
 heating. Each decade brings a news card saying so. The land gives more still: farms, mines,
 logging camps and every other maker of what the land gives make 15% more every decade, and 5%
-more of food and heating, 16 and 2.7 times as much by 2050, while every unit earns less (see
-Building and trains).
+more of food and heating, 16 and 2.7 times as much by 2050, while every unit earns less, a fifth
+as much by 2050 (see Building and trains).
 
 Dated events change what is wanted, made and paid while they last, or for good:
 
@@ -1154,9 +1154,8 @@ and mail pay their figure times the share of that demand left. The Stations wind
 share of demand left for each need.
 
 The figures in the table are what goods earn in the 1850s; margins shrink after that
-(`railroads.sim.goods_market`). Every decade a unit earns as much less as people want more of it,
-a tenth less, and 3% less of food and heating, so by 2050 a unit of furniture earns about a
-seventh of what it did in 1850 and a unit of wheat a little over half. On top of that every need
+(`railroads.sim.goods_market`). Every decade a unit of every good, food too, earns 8% less than
+the decade before, so by 1950 it earns 45% of what it did in 1850 and by 2050 a fifth. On top of that every need
 is a market, a tug of war like the one for fuel: what the map's buildings want of it against the
 most the map's makers of its goods could make, measured against the first three years of play in
 which the map makes any of it, when goods earn the table's figures. A need the map makes too
