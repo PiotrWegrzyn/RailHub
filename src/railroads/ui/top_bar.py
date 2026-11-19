@@ -10,6 +10,7 @@ from imgui_bundle import imgui
 
 from railroads.sim.clock import SPEEDS
 from railroads.sim.finance import Finances, dollars
+from railroads.ui.map_input import key_pressed
 from railroads.ui.ornate import band, bar_buttons, diamond, spaced, spaced_text
 from railroads.ui.spotlight import spot
 from railroads.ui.theme import BRASS, GONE, GROWN, danger_button, tip, toggle_button
@@ -40,6 +41,11 @@ def draw_top_bar(app: App) -> None:
 
 def _draw_top_bar(app: App) -> None:
     clock = app.clock
+    if not imgui.get_io().want_text_input:
+        if key_pressed(imgui.Key.minus, imgui.Key.keypad_subtract):
+            clock.faster(-1)
+        if key_pressed(imgui.Key.equal, imgui.Key.keypad_add):
+            clock.faster(1)
     imgui.align_text_to_frame_padding()
     imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_CLOCK}  {clock.date}")
     imgui.same_line(0, 8)
@@ -50,7 +56,9 @@ def _draw_top_bar(app: App) -> None:
     diamond()
     imgui.same_line(0, 8)
     for speed in SPEEDS:
-        if toggle_button(f"x{speed}", clock.speed == speed, f"Run {speed} times as fast"):
+        if toggle_button(
+            f"x{speed}", clock.speed == speed, f"Run {speed} times as fast (- and = change speed)"
+        ):
             clock.speed = speed
         imgui.same_line(0, 2)
     imgui.same_line(0, 6)

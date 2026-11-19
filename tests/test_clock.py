@@ -56,3 +56,16 @@ def test_a_clock_starts_where_the_maps_history_left_off() -> None:
     shown = clock.date
 
     assert shown == "January 1950"
+
+
+@pytest.mark.parametrize(
+    ("speed", "steps", "after"), [(1, 1, 2), (6, 1, 10), (10, 1, 10), (2, -1, 1), (1, -1, 1)]
+)
+def test_the_speed_steps_up_and_down_its_settings_up_to_ten_times(
+    speed: int, steps: int, after: int
+) -> None:
+    clock = GameClock(speed=speed)
+
+    clock.faster(steps)
+
+    assert clock.speed == after

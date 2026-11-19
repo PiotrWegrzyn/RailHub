@@ -127,10 +127,6 @@ class MapInput:
         view = self._view
         if imgui.get_io().want_text_input:
             return
-        if key_pressed(imgui.Key.minus, imgui.Key.keypad_subtract):
-            view.camera.zoom(-1, (0, 0), (0, 0))
-        if key_pressed(imgui.Key.equal, imgui.Key.keypad_add):
-            view.camera.zoom(1, (0, 0), (0, 0))
         if key_pressed(imgui.Key.m):
             view.minimap.shown = not view.minimap.shown
         if key_pressed(imgui.Key.w):
