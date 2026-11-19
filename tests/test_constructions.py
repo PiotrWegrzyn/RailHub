@@ -231,6 +231,7 @@ def test_only_mines_quarries_salt_works_and_town_buildings_can_be_built_in_mount
         BuildingKind.MEGA_BAKERY,
         BuildingKind.TAVERN,
         BuildingKind.CLUB,
+        BuildingKind.SUSHI_HUT,
         BuildingKind.FILLING_STATION,
         BuildingKind.DEPARTMENT_STORE,
         BuildingKind.HOTEL,

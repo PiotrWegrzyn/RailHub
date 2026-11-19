@@ -507,6 +507,22 @@ def potatoes() -> Sprite:
     return p.sprite()
 
 
+def rice() -> Sprite:
+    """A blue-rimmed bowl heaped with white rice, a pair of chopsticks across it."""
+    p = _canvas()
+    grain: RGB = (246, 244, 232)
+    bowl: RGB = (236, 238, 242)
+    p.blob(-7, -5, 7, 2, grain)
+    for x, y in ((-4, -3), (-1, -4), (2, -3), (4, -1), (-2, -1), (1, -1)):
+        p.point(x, y, shade(grain, 0.82))
+    p.polygon([(-8, -1), (8, -1), (5, 6), (-5, 6)], bowl, shade(bowl, 0.6))
+    p.line([(-7, 1), (7, 1)], (64, 104, 178))
+    p.line([(-4, 5), (4, 5)], shade(bowl, 0.78))
+    p.line([(-2, -7), (8, -3)], (150, 92, 50))
+    p.line([(-3, -6), (7, -2)], (120, 70, 38))
+    return p.sprite()
+
+
 def cattle() -> Sprite:
     p = _canvas()
     white: RGB = (240, 238, 232)
@@ -1111,6 +1127,7 @@ ICONS: dict[str, Callable[[], Sprite]] = {
     "limestone": limestone,
     "sand": sand,
     "potatoes": potatoes,
+    "rice": rice,
     "cattle": cattle,
     "coke": coke,
     "milk": milk,

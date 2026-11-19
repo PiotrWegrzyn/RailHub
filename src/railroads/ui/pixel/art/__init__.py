@@ -24,7 +24,15 @@ from railroads.ui.pixel.art import (
 )
 from railroads.ui.pixel.art.built import modelled
 from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_pauls
-from railroads.ui.pixel.art.commerce import airport, department_store, hotel, port, shop, tavern
+from railroads.ui.pixel.art.commerce import (
+    airport,
+    department_store,
+    hotel,
+    port,
+    shop,
+    sushi_hut,
+    tavern,
+)
 from railroads.ui.pixel.art.crafts import (
     carpet_weaver,
     clock_maker,
@@ -54,6 +62,7 @@ from railroads.ui.pixel.art.farms import (
     pig_farm,
     plantation,
     potato_farm,
+    rice_paddy,
     sugar,
 )
 from railroads.ui.pixel.art.grown import grown
@@ -259,6 +268,7 @@ BUILDINGS = (
     "limestone_quarry",
     "sand_pit",
     "potato_farm",
+    "rice_paddy",
     "cattle_ranch",
     "pig_farm",
     "chicken_farm",
@@ -279,6 +289,7 @@ BUILDINGS = (
     "sugar_refinery",
     "porcelain_works",
     "tavern",
+    "sushi_hut",
     "department_store",
     "hotel",
     "meat_factory",
@@ -394,6 +405,7 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "limestone_quarry": limestone_quarry,
     "sand_pit": sand_pit,
     "potato_farm": potato_farm,
+    "rice_paddy": rice_paddy,
     "cattle_ranch": cattle_ranch,
     "pig_farm": pig_farm,
     "chicken_farm": chicken_farm,
@@ -414,6 +426,7 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "sugar_refinery": sugar_refinery,
     "porcelain_works": porcelain_works,
     "tavern": tavern,
+    "sushi_hut": sushi_hut,
     "department_store": department_store,
     "hotel": hotel,
     "meat_factory": meat_factory,

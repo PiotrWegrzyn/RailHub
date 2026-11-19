@@ -1897,7 +1897,7 @@ def _boxcar(m: Model, good: Good, full: bool) -> None:
 
 def _grain_hopper(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
-    body = GRAIN_HOPPER if good == Good.WHEAT else SUGAR_HOPPER
+    body = GRAIN_HOPPER if good in (Good.WHEAT, Good.RICE) else SUGAR_HOPPER
     m.body((-h, h), (-0.08, 0.08), (0.06, 0.2), body)
     m.panel((-h + 0.02, h - 0.02), (0.08, 0.18), 0.0805, shade(body, 0.85))
     if good == Good.SUGAR:
@@ -2095,6 +2095,7 @@ CAR_BODIES: dict[Good, CarBody] = {
     Good.BREAD: _boxcar,
     Good.WHEAT: _grain_hopper,
     Good.SUGAR: _grain_hopper,
+    Good.RICE: _grain_hopper,
     Good.APPLES: _fruit_wagon,
     Good.DATES: _fruit_wagon,
     Good.ORANGES: _fruit_wagon,

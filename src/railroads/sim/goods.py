@@ -4,7 +4,7 @@ needs, what each good earns, and the order a month's trade goes in.
 Buildings need needs (NEEDS), each met by one or more goods (FITS): any food good feeds a house,
 any fruit fills a cannery, wool, cotton or flax a textile mill. Some needs start only in later
 years (NEED_YEARS), a few only for one kind of building (KIND_NEED_YEARS). Farms, orchards, date
-palms, banana plantations, sugar fields and potato farms grow food (MAKES); mines dig coal, lumber
+palms, banana plantations, sugar fields, potato farms and rice paddies grow food (MAKES); mines dig coal, lumber
 mills saw lumber, pits and quarries dig clay, limestone and sand, ports trade goods.
 
 Processors turn their inputs into something else by a recipe (RECIPES): steel mills coal and
@@ -75,6 +75,7 @@ class Good(Enum):
     LIMESTONE = "limestone"
     SAND = "sand"
     POTATOES = "potatoes"
+    RICE = "rice"
     CATTLE = "cattle"
     PIGS = "pigs"
     CHICKENS = "chickens"
@@ -144,6 +145,8 @@ class Need(Enum):
     GOODS = "goods"
     SUGAR = "sugar"
     POTATOES = "potatoes"
+    RICE = "rice"
+    FISH = "fish"
     CLAY = "clay"
     LIMESTONE = "limestone"
     SAND = "sand"
@@ -190,6 +193,7 @@ FOODS = (
     Good.CANS,
     Good.BREAD,
     Good.POTATOES,
+    Good.RICE,
     Good.MEAT,
     Good.EGGS,
     Good.MILK,
@@ -288,6 +292,7 @@ DIESEL_USERS: Mapping[BuildingKind, tuple[float, int]] = MappingProxyType(
     {
         BuildingKind.FARM: (2.0, TRACTOR_YEAR),
         BuildingKind.POTATO_FARM: (2.0, TRACTOR_YEAR),
+        BuildingKind.RICE_PADDY: (2.0, TRACTOR_YEAR),
         BuildingKind.MINE: (10.0, MACHINE_YEAR),
         BuildingKind.IRON_MINE: (10.0, MACHINE_YEAR),
         BuildingKind.COPPER_MINE: (5.0, MACHINE_YEAR),
@@ -366,6 +371,7 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.LIMESTONE: 10,
         Good.SAND: 8,
         Good.POTATOES: 6,
+        Good.RICE: 6,
         Good.CATTLE: 20,
         Good.PIGS: 14,
         Good.CHICKENS: 6,
@@ -682,6 +688,7 @@ MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
         BuildingKind.LIMESTONE_QUARRY: {Good.LIMESTONE: 60},
         BuildingKind.SAND_PIT: {Good.SAND: 60},
         BuildingKind.POTATO_FARM: {Good.POTATOES: 10},
+        BuildingKind.RICE_PADDY: {Good.RICE: 10},
         BuildingKind.CATTLE_RANCH: {Good.CATTLE: 10, Good.MILK: 20},
         BuildingKind.PIG_FARM: {Good.PIGS: 12},
         BuildingKind.CHICKEN_FARM: {Good.CHICKENS: 20, Good.EGGS: 15},
@@ -806,6 +813,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.SHEEP_FARM: {Need.WHEAT: 90},
         BuildingKind.TAVERN: {Need.ALCOHOL: 90, Need.FOOD: 20},
         BuildingKind.CLUB: {Need.ALCOHOL: 350, Need.CHEMICALS: 5},
+        BuildingKind.SUSHI_HUT: {Need.FISH: 60, Need.RICE: 60},
         BuildingKind.DEPARTMENT_STORE: {
             Need.CLOTHES: 20,
             Need.SHOES: 20,
@@ -934,6 +942,8 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     BuildingKind.BREWERY,
     Need.BEER,
     Need.POTATOES,
+    Need.RICE,
+    Need.FISH,
     BuildingKind.DISTILLERY,
     Need.VODKA,
     Need.ALCOHOL,

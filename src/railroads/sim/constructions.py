@@ -86,6 +86,7 @@ class BuildingKind(Enum):
     LIMESTONE_QUARRY = "limestone quarry"
     SAND_PIT = "sand pit"
     POTATO_FARM = "potato farm"
+    RICE_PADDY = "rice paddy"
     CATTLE_RANCH = "cattle ranch"
     PIG_FARM = "pig farm"
     CHICKEN_FARM = "chicken farm"
@@ -136,6 +137,7 @@ class BuildingKind(Enum):
     DEPARTMENT_STORE = "department store"
     HOTEL = "hotel"
     CLUB = "club"
+    SUSHI_HUT = "sushi hut"
     FILLING_STATION = "filling station"
     JUICE_WORKS = "juice works"
     BIG_JUICE_WORKS = "big juice works"
@@ -299,6 +301,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.COFFEE_PLANTATION,
             BuildingKind.RUBBER_PLANTATION,
             BuildingKind.POTATO_FARM,
+            BuildingKind.RICE_PADDY,
             BuildingKind.CATTLE_RANCH,
             BuildingKind.PIG_FARM,
             BuildingKind.CHICKEN_FARM,
@@ -310,6 +313,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     BuildingKind.BAKERY: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.TAVERN: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.CLUB: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.SUSHI_HUT: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.FILLING_STATION: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.DEPARTMENT_STORE: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.HOTEL: BuildingRules(relief=frozenset(Relief)),

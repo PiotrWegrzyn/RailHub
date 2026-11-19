@@ -149,6 +149,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.LIMESTONE_QUARRY: (Points.ORE, 1),
     BuildingKind.SAND_PIT: (Points.ORE, 1),
     BuildingKind.POTATO_FARM: (Points.FOOD, 1),
+    BuildingKind.RICE_PADDY: (Points.FOOD, 1),
     BuildingKind.CATTLE_RANCH: (Points.FOOD, 1),
     BuildingKind.PIG_FARM: (Points.FOOD, 1),
     BuildingKind.CHICKEN_FARM: (Points.FOOD, 1),
@@ -197,6 +198,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.OLYMPIC_STADIUM: (Points.CORPORATE, 100),
     BuildingKind.TAVERN: (Points.CORPORATE, 1),
     BuildingKind.CLUB: (Points.CORPORATE, 3),
+    BuildingKind.SUSHI_HUT: (Points.CORPORATE, 1),
     BuildingKind.FILLING_STATION: (Points.CORPORATE, 1),
     BuildingKind.DEPARTMENT_STORE: (Points.CORPORATE, 3),
     BuildingKind.HOTEL: (Points.CORPORATE, 5),
@@ -236,6 +238,8 @@ class Land:
     least_forest_nearby: int = 0
     # Only on cells over this deposit (railroads.mapgen.deposits).
     deposit: Deposit | None = None
+    # Only within this many degrees of the equator, north or south.
+    most_latitude: float | None = None
     # Flat grassland weighs this much more, but where anything stands already only one turn in
     # this many goes ahead.
     open_field: float = 1.0
@@ -297,6 +301,8 @@ class Land:
             deposits = around.deposits
             on_it = deposits is not None and deposits == self.deposit
             weight = weight * on_it
+        if self.most_latitude is not None:
+            weight = weight * (np.abs(around.latitude) < self.most_latitude)
         weight = weight * np.where(around.open_flat_grass, self.open_field, 1.0)
         return np.where(around.land, weight, 0.0)
 
@@ -379,6 +385,14 @@ class Surroundings:
     @cached_property
     def open_flat_grass(self) -> npt.NDArray[np.bool_]:
         return (self.relief == Relief.FLAT) & (self.vegetation == Vegetation.GRASS)
+
+    @cached_property
+    def latitude(self) -> FloatGrid:
+        rows, cols = np.unravel_index(self.chosen, self.tile_map.grid.shape)
+        x, y = self.tile_map.grid.center(rows, cols)
+        km = self.tile_map.grid.km_per_cell
+        _, lat = self.tile_map.bounds.to_lonlat(np.asarray(x) * km, np.asarray(y) * km)
+        return np.asarray(lat, dtype=np.float64)
 
     @cached_property
     def land(self) -> npt.NDArray[np.bool_]:
@@ -932,6 +946,26 @@ POTATO_FARMS = Ladder(
     from_year=1600,
 )
 
+# Rice grows only in warm lands, within RICE_LATITUDE degrees of the equator, on flat land and in
+# terraces on hills, never in mountains or forest. It wants fresh water: rivers and lakes flood
+# its paddies, but salty sea water does it no good.
+RICE_LATITUDE = 41.0
+
+RICE_PADDIES = Ladder(
+    kinds=(BuildingKind.RICE_PADDY,),
+    land=Land(
+        vegetation={Vegetation.BARREN: 0.05, Vegetation.FOREST: 0.0},
+        relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
+        temperature={Temperature.COLD: 0.0, Temperature.HOT: 1.2},
+        water={Terrain.LAND: 1.0, Terrain.SEA: 1.0, Terrain.RIVER: 4.0, Terrain.LAKE: 4.0},
+        open_field=OPEN_FIELD,
+        most_latitude=RICE_LATITUDE,
+    ),
+    base_chance=9.698e-08,
+    chance_per_doubling={Points.POPULATION: 1.7472e-05, Points.FOOD: 7.28e-07},
+    crowded_at=FARMS_CROWDED_OUT,
+)
+
 # Cattle graze open grassland and hills, away from the heat.
 CATTLE_RANCHES = Ladder(
     kinds=(BuildingKind.CATTLE_RANCH,),
@@ -1039,6 +1073,18 @@ CLUBS = replace(
     base_chance=0.00005,
     needs={Points.POPULATION: CLUB_TOWN},
     from_year=1900,
+)
+
+# Sushi huts serve a lot of fish and rice, one to a neighbourhood, only in towns of SUSHI_TOWN
+# people and only in the lands rice grows in, so none opens where it could never get its rice;
+# fed, they liven the homes around them as taverns do.
+SUSHI_TOWN = 20
+
+SUSHI_HUTS = replace(
+    TAVERNS,
+    kinds=(BuildingKind.SUSHI_HUT,),
+    land=replace(TOWN_LAND, most_latitude=RICE_LATITUDE),
+    needs={Points.POPULATION: SUSHI_TOWN},
 )
 
 # Filling stations open in towns once motor cars come, as often as taverns.
@@ -1163,6 +1209,7 @@ LADDERS = (
     *TOWN_CRAFTS,
     *TOWN_SIGHTS,
     POTATO_FARMS,
+    RICE_PADDIES,
     CATTLE_RANCHES,
     PIG_FARMS,
     CHICKEN_FARMS,
@@ -1173,6 +1220,7 @@ LADDERS = (
     SAND_PITS,
     TAVERNS,
     CLUBS,
+    SUSHI_HUTS,
     FILLING_STATIONS,
     DEPARTMENT_STORES,
     HOTELS,

@@ -87,6 +87,7 @@ GOOD_COLORS: Mapping[Good, Rgba] = {
     Good.LIMESTONE: (0.86, 0.84, 0.76, 1.0),
     Good.SAND: (0.94, 0.86, 0.58, 1.0),
     Good.POTATOES: (0.74, 0.6, 0.38, 1.0),
+    Good.RICE: (0.94, 0.92, 0.82, 1.0),
     Good.CATTLE: (0.5, 0.32, 0.2, 1.0),
     Good.PIGS: (0.9, 0.64, 0.62, 1.0),
     Good.CHICKENS: (0.94, 0.92, 0.86, 1.0),

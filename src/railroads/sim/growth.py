@@ -231,10 +231,15 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
     return breeding
 
 
-# The homes around a tavern, club or filling station that gets all it needs grow this much faster,
-# and those around one that gets some of it that share as much faster.
+# The homes around a tavern, club, sushi hut or filling station that gets all it needs grow this
+# much faster, and those around one that gets some of it that share as much faster.
 LIVELY_GROWTH = 0.5
-VENUES = (BuildingKind.TAVERN, BuildingKind.CLUB, BuildingKind.FILLING_STATION)
+VENUES = (
+    BuildingKind.TAVERN,
+    BuildingKind.CLUB,
+    BuildingKind.SUSHI_HUT,
+    BuildingKind.FILLING_STATION,
+)
 
 # Kinds every map keeps at least KEY_LEAST of on KEY_LAND_CELLS land cells, in proportion to its
 # land, once open: the only makers of what whole chains run on.

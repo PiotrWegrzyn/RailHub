@@ -392,12 +392,12 @@ of every kind in its neighbourhood (the cell and the six around it):
 | Points | Buildings |
 |---|---|
 | Population | house 1, tenement (kamienica) 6, block of flats 18 |
-| Food | farm, orchard, date palms, banana plantation, orange farm, sugar field, potato farm, cattle ranch, flax field, hop garden, beekeeper, incense grove 1 |
+| Food | farm, orchard, date palms, banana plantation, orange farm, sugar field, potato farm, rice paddy, cattle ranch, flax field, hop garden, beekeeper, incense grove 1 |
 | Ore | mine, clay pit, limestone quarry, sand pit 1 |
 | Timber | lumber mill 1 |
 | Trade | port 1 |
 | Industry | factory 1, big factory 3, mega factory 9, cannery 2, steel mill 3, shipyard 3, machine works, plastics works, appliance factory 3, coal power plant 5, diesel and gas power plants 4, other works 2 |
-| Corporate | tavern 1, department store 3, hotel 5, skyscraper 10 |
+| Corporate | tavern 1, sushi hut 1, club 3, department store 3, hotel 5, skyscraper 10 |
 | Worship | church 5, basilica 20, cathedral 50, St. Paul cathedral 2137 |
 
 Each kind of building grows on its own ladder. Every month each cell may take a turn on each
@@ -431,6 +431,7 @@ the cell:
 | Steel mills | 0.00000008 + 0.00001 per doubling of ore + 0.0000006 of industry | | as factories |
 | Shipyards | 0.000005 + 0.000002 per doubling of trade + 0.0000004 of industry | 1 trade | on the water |
 | Potato farms | 0.000000017 + 0.000001 per doubling of population + 0.00000004 of food | fewer than 8 population | cool open plains; hills x0.4; river or lake x2 |
+| Rice paddies | as farms | fewer than 8 population | only within 41° of the equator, north or south (Japan, the Yangtze delta, California, Southeast Australia, the tropics; not Poland, Germany, Britain, France, Moscow or Norway); flat grass x10 while empty; hills x0.8, barren x0.05, hot x1.2; never in mountains, forest or the cold; river or lake x4, but the sea is salty and does it no good |
 | Cattle ranches | 0.0000000033 + 0.00000018 per doubling of population + 0.000000009 of food | fewer than 8 population | grassland and hills; hot x0.3 |
 | Flax fields | 0.000000006 + 0.0000003 per doubling of population + 0.00000002 of food | fewer than 8 population | cool wet land; river x3, lake x2, away from water x0.3 |
 | Hop gardens | 0.0000000012 + 0.00000012 per doubling of population | fewer than 8 population | open plains and hills; cold x0.3, hot x0.2 |
@@ -438,6 +439,7 @@ the cell:
 | Limestone quarries | 0.00000015 + 0.00000015 per doubling of ore | | hills; mountains x0.4, flat x0.02 |
 | Sand pits | 0.000000075 + 0.00000015 per doubling of ore | | by the sea (x4), rivers and lakes (x2), desert x3 |
 | Taverns | 0.00000001 + 0.000004 per doubling of population | 3 population | as houses, one to a neighbourhood |
+| Sushi huts | as taverns | 20 population | as houses, one to a neighbourhood, only where rice grows (within 41° of the equator) |
 | Department stores | 0.00005 per doubling of population, from 1880 | 60 population | as houses, 6 hexes apart, one per 10,000 land cells |
 | Hotels | as department stores, from 1900 | 60 population | as houses, 5 hexes apart, one per 8,000 land cells |
 
@@ -538,6 +540,7 @@ bakery a station can reach is worth having.
 | Shipyard | 30 goods | 20 steel, 10 lumber |
 | Clay pit, limestone quarry, sand pit | 60 clay, 60 limestone, 60 sand | |
 | Potato farm | 12 potatoes (food) | |
+| Rice paddy | 10 rice (food) | |
 | Cattle ranch | 10 cattle | 120 wheat |
 | Flax field | 60 flax (a fibre, like wool and cotton) | |
 | Hop garden | 40 hops | |
@@ -558,6 +561,7 @@ bakery a station can reach is worth having.
 | Appliance factory (1950) | 30 appliances | 30 steel, 15 copper, 15 plastics, 8 electronics (from 1960) |
 | Tavern | | 90 alcohol (beer, wine or vodka); 20 food as a bonus |
 | Club | | 350 alcohol (beer, wine or vodka); 5 chemicals as a bonus |
+| Sushi hut | | 60 fish, 60 rice |
 | Department store (1880) | | 20 clothes, 20 shoes, 10 furniture, 5 porcelain, 10 appliances (from 1950) |
 | Hotel (1900) | | 80 food, 10 wine, 10 beer, 10 newspapers |
 | Coal power plant (1882) | | 200 coal |
@@ -590,7 +594,8 @@ What a building needs comes in two lists, its demands and its bonus goods. Bonus
 special resource (iron ore, copper, gold, diamonds, oil, salt, grapes, coffee, rubber, incense)
 and beer, newspapers and furniture; everything else it needs is a demand. Taverns and clubs need
 alcohol, any of beer, wine and vodka; a tavern takes food as a bonus and a club a little of
-whatever chemicals it can get. Hovering the icon of such a category names what is in it.
+whatever chemicals it can get. Sushi huts need a lot of fish and a lot of rice, both demands, and
+fed, liven the homes around them as taverns do. Hovering the icon of such a category names what is in it.
 A building's satisfaction is the share of its demands it got, raised by 30% of itself for each bonus good it
 got all of, and that share of 30% for part of one, so bonus goods count only as much as the
 demands are met. Demands are counted by amount, so a car matters little next to a town's food. A
@@ -935,7 +940,7 @@ share of demand left for each need.
 
 | Freight (a fifth of the market price) | Goods |
 |---|---|
-| $2-10 | eggs 4, bread 6, chickens 6, milk 6, potatoes 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, sugar 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, lumber 10, newspapers 10, pots 10 |
+| $2-10 | eggs 4, bread 6, chickens 6, milk 6, potatoes 6, rice 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, sugar 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, lumber 10, newspapers 10, pots 10 |
 | $11-20 | cement 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, beer 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, wool 20 |
 | $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, stove tiles 25, copper 28, castings 30, vodka 30, wax 30, plastics 40, rubber 40, wine 40 |
 | $41-200 | coffee 50, furniture 60, porcelain 60, clothes 70, steel 80, shoes 100, electronics 120, goods 120, guns 150, tools 160, machinery 180 |
@@ -1019,7 +1024,7 @@ its load, and its route as a table of stops. It buys a steam engine and sets its
 stations. Each stop has its own
 cars, up to 5, which the train pulls when it leaves that stop for the next, so the way out and the
 way back can carry different goods; each car is for one good and holds 34 of it, 5 of precious
-goods, 13 of heavy ones, 21 cattle (which pay twice their price delivered), 55 passengers, or 89 of bulk goods (grain, bread, potatoes, fruit, sugar, grapes, coal, iron ore, sand, clay, limestone, salt and
+goods, 13 of heavy ones, 21 cattle (which pay twice their price delivered), 55 passengers, or 89 of bulk goods (grain, rice, bread, potatoes, fruit, sugar, grapes, coal, iron ore, sand, clay, limestone, salt and
 lumber), so a food car carries only food. Every car costs $15, and $1 more for every 10 it holds,
 each time the train leaves a stop with it, loaded or not: a bulk car of 89 costs $23 a trip, a
 dining car $15. A new train

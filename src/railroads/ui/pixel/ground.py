@@ -131,6 +131,7 @@ CROP_ROWS: dict[BuildingKind, tuple[RGB, RGB]] = {
     BuildingKind.SUGAR: ((156, 200, 100), (118, 162, 74)),
     BuildingKind.COTTON_FIELD: ((238, 236, 226), (150, 172, 100)),
     BuildingKind.POTATO_FARM: ((150, 120, 80), (96, 140, 64)),
+    BuildingKind.RICE_PADDY: ((112, 184, 72), (104, 150, 170)),
     BuildingKind.FLAX_FIELD: ((140, 166, 226), (130, 160, 90)),
 }
 

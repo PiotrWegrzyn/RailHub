@@ -285,6 +285,7 @@ _GOODS: Mapping[Tree, tuple[Good, ...]] = {
         Good.CANS,
         Good.BREAD,
         Good.POTATOES,
+        Good.RICE,
         Good.CATTLE,
         Good.PIGS,
         Good.CHICKENS,
@@ -366,6 +367,7 @@ SHOPS = frozenset(
     {
         BuildingKind.TAVERN,
         BuildingKind.CLUB,
+        BuildingKind.SUSHI_HUT,
         BuildingKind.FILLING_STATION,
         BuildingKind.DEPARTMENT_STORE,
         BuildingKind.HOTEL,
