@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from imgui_bundle import imgui
 
-from railroads.ui.ornate import begin_ornate, end_ornate
+from railroads.ui.ornate import begin_ornate, end_ornate, keep_in_front
 
 UI = Path(__file__).resolve().parents[1] / "src" / "railroads" / "ui"
 
@@ -78,3 +78,31 @@ def test_every_window_with_a_title_is_begun_with_its_title_and_close_cross_fixed
 
     assert sources.is_dir()
     assert titled == []
+
+
+def draw_side_by_side(focus_big: bool = False) -> None:
+    imgui.new_frame()
+    imgui.set_next_window_pos((0, 0))
+    imgui.set_next_window_size((400, 300))
+    if focus_big:
+        imgui.set_next_window_focus()
+    begin_ornate("Big###big")
+    imgui.text("a big window")
+    end_ornate()
+    imgui.set_next_window_pos((20, 20))
+    imgui.set_next_window_size((200, 150))
+    begin_ornate("Small###small")
+    keep_in_front()
+    imgui.text("a small window kept in front")
+    end_ornate()
+    imgui.end_frame()
+
+
+def test_a_window_kept_in_front_stays_in_front_of_one_clicked_after_it(context: None) -> None:
+    draw_side_by_side()
+    draw_side_by_side(focus_big=True)
+
+    draw_side_by_side()
+
+    order = [window.name for window in imgui.get_current_context().windows]
+    assert order.index("Small###small") > order.index("Big###big")

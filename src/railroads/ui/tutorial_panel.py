@@ -8,7 +8,7 @@ from imgui_bundle import imgui
 from railroads.tutorial.steps import STEPS, Tutorial
 from railroads.ui import spotlight
 from railroads.ui.buy_train import SCREEN_SIZE as BUY_SCREEN
-from railroads.ui.ornate import begin_ornate, end_ornate
+from railroads.ui.ornate import begin_ornate, end_ornate, keep_in_front
 from railroads.ui.theme import BRASS, CARDS_WIDTH, GROWN
 
 # The window sits at first in the column along the right edge that the trains window leaves free,
@@ -39,10 +39,7 @@ def draw_tutorial(tutorial: Tutorial) -> None:
         | imgui.WindowFlags_.always_auto_resize.value
     )
     expanded, still_open = begin_ornate(title, flags)
-    if not imgui.is_popup_open("", imgui.PopupFlags_.any_popup_id.value):
-        imgui.internal.bring_window_to_display_front(
-            imgui.internal.get_current_window().root_window
-        )
+    keep_in_front()
     if expanded:
         imgui.push_text_wrap_pos(0.0)
         imgui.text_colored(imgui.ImVec4(*BRASS), step.title)

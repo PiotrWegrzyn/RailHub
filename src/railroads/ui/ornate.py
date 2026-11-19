@@ -332,3 +332,12 @@ def band(draw_list: imgui.ImDrawList, low: imgui.ImVec2, high: imgui.ImVec2) -> 
     draw_list.add_quad_filled(
         (x, y - size), (x + size, y), (x, y + size), (x - size, y), _fade(GLOW, 0.95)
     )
+
+
+def keep_in_front() -> None:
+    """Keeps the window begun last in front of the others, as a small window looked at beside
+    the big ones is: clicking in a window behind it doesn't hide it. A popup open anywhere
+    stays in front of it."""
+    if imgui.is_popup_open("", imgui.PopupFlags_.any_popup_id.value):
+        return
+    imgui.internal.bring_window_to_display_front(imgui.internal.get_current_window().root_window)

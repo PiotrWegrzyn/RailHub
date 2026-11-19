@@ -373,7 +373,9 @@ class TrainsWindow:
             if removed:
                 self._folded = {k: v for k, v in self._folded.items() if k[0] != train.name}
             elif opened and len(train.stops) > 1:
-                following = train.stops[(index + 1) % len(train.stops)]
+                following = train.stops[train.onward(index)]
+                if self._draw_refuel(railway, stop, following):
+                    return removed
                 demand = railway.station_demand(following.cell)
                 self._draw_cars(railway, train, index, stop, railway.name_of(following.cell))
                 self._draw_offers(railway, train, index, stop, demand, supplies)
@@ -407,12 +409,19 @@ class TrainsWindow:
         else:
             imgui.text(name)
         if not opened and len(train.stops) > 1:
-            following = railway.name_of(train.stops[(index + 1) % len(train.stops)].cell)
-            _note_before(f"{len(stop.cars)} cars to {following}", right - 190)
+            following = railway.name_of(train.stops[train.onward(index)].cell)
+            note = "only refuels" if stop.refuel_only else f"{len(stop.cars)} cars to {following}"
+            _note_before(note, right - 190)
         imgui.same_line(right - 190)
+        imgui.begin_disabled(stop.refuel_only)
         _, stop.wait_for_load = imgui.checkbox("Wait for full load", stop.wait_for_load)
-        if imgui.is_item_hovered():
-            imgui.set_tooltip("Wait here, up to a month, for every car to fill")
+        imgui.end_disabled()
+        if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
+            imgui.set_tooltip(
+                "It only refuels here, so it doesn't wait for a load"
+                if stop.refuel_only
+                else "Wait here, up to a month, for every car to fill"
+            )
         imgui.same_line(right - 22)
         if imgui.small_button(fa.ICON_FA_TIMES):
             train.stops.pop(index)
@@ -421,6 +430,23 @@ class TrainsWindow:
         if imgui.is_item_hovered():
             imgui.set_tooltip("Remove this stop")
         return False, toggled
+
+    @staticmethod
+    def _draw_refuel(railway: Railway, stop: Stop, following: Stop) -> bool:
+        """The checkbox making a stop one the train only refuels at, for a leg longer than its
+        fuel lasts, and what that means; returns whether the stop is one."""
+        _, stop.refuel_only = imgui.checkbox("Only refuel here", stop.refuel_only)
+        if imgui.is_item_hovered():
+            imgui.set_tooltip(
+                "For a way longer than the engine carries fuel for: the train only takes on fuel\n"
+                "here and goes on with its cars, taking its passengers and mail through"
+            )
+        if stop.refuel_only:
+            imgui.text_disabled(
+                f"Unloads and loads nothing here: its cars ride on to "
+                f"{railway.name_of(following.cell)}"
+            )
+        return stop.refuel_only
 
     def _draw_cars(
         self, railway: Railway, train: Train, index: int, stop: Stop, onward: str
@@ -633,10 +659,11 @@ def row_cars(cars: int, width: float) -> tuple[float, int]:
 
 def carried_in(train: Train, index: int) -> list[Good]:
     """The goods a train's cars bring into its stop at `index`: what it takes on at the stop
-    before, so a train can carry them on past a station that has no use for them."""
+    before, past any it only refuels at, so a train can carry them on past a station that has no
+    use for them."""
     if not train.stops:
         return []
-    before = train.stops[(index - 1) % len(train.stops)]
+    before = train.stops[train.before(index)]
     return list(dict.fromkeys(cargo for cargo in before.cars if isinstance(cargo, Good)))
 
 

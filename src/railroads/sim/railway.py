@@ -434,10 +434,13 @@ class Railway:
 
     def destination(self, train: Train) -> Cell | None:
         """The stop the cars a train pulls now are taken to: the one it is heading for, or the
-        next one from the stop it stands at."""
+        next one from the stop it stands at, past any it only refuels at."""
         if len(train.stops) < 2:
             return None
-        return train.stops[train.heading % len(train.stops)].cell
+        heading = train.heading % len(train.stops)
+        if train.stops[heading].refuel_only:
+            heading = train.onward(heading)
+        return train.stops[heading].cell
 
     def cargo_worth(self, train: Train) -> list[float]:
         """What each of a train's cars would earn if it were unloaded at its destination now,
@@ -467,7 +470,8 @@ class Railway:
             here = train.stops[(train.heading - 1) % len(train.stops)].cell
             if train.platform in self.constructions.platforms(here):
                 here = train.platform
-            leg = self.network.route_length(here, destination, engine.electric, engine.maglev)
+            there = train.stops[train.heading % len(train.stops)].cell
+            leg = self.network.route_length(here, there, engine.electric, engine.maglev)
             if leg is None:
                 return None
             cells = leg

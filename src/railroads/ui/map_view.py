@@ -63,7 +63,7 @@ from railroads.ui.map_overlays import (
 )
 from railroads.ui.map_tools import MapTools
 from railroads.ui.minimap import FRAME_PAD, Minimap, MinimapLayout, view_corners
-from railroads.ui.ornate import DEEP, bar_buttons, frame_window, ornate_window
+from railroads.ui.ornate import DEEP, bar_buttons, frame_window, keep_in_front, ornate_window
 from railroads.ui.pixel.ground import GLOW, glow_strength
 from railroads.ui.pixel.ground_shader import (
     GroundShader,
@@ -314,6 +314,7 @@ class MapView:
         imgui.set_next_window_size(DETAILS_SIZE, imgui.Cond_.first_use_ever.value)
         details = recently_described(self.growth, self.selected, self._satisfaction)
         with ornate_window("Hex details", "details") as (expanded, still_open):
+            keep_in_front()
             if expanded:
                 pressed = draw_hex_details(details)
                 if pressed is not None:
@@ -343,6 +344,7 @@ class MapView:
         )
         imgui.set_next_window_size(SHARES_SIZE, imgui.Cond_.first_use_ever.value)
         with ornate_window("Shares", "shares") as (expanded, still_open):
+            keep_in_front()
             if expanded:
                 pressed = draw_shares(row, f"{cell[0]}, {cell[1]}")
                 if pressed is not None:

@@ -542,6 +542,10 @@ class Stop:
     cars: list[Cargo] = field(default_factory=list)
     # Whether the train waits here until its cars are full.
     wait_for_load: bool = False
+    # Whether the train only takes on fuel here, for a leg longer than it carries fuel for: it
+    # unloads and loads nothing and goes on with the cars it came with to the next stop that
+    # isn't one, where its passengers and mail are bound.
+    refuel_only: bool = False
 
     def add_car(self, cargo: Cargo, most: int = MAX_CARS) -> bool:
         if len(self.cars) >= most:
@@ -635,6 +639,27 @@ class Train:
         rising = (1.0 - start) * pickup
         self.pace = 1.0
         return (rising * (start + 1.0) / 2 + months - rising) / months
+
+    def onward(self, index: int) -> int:
+        """Where among its stops the train is next bound after the stop at `index`: the next
+        one that isn't only for refuelling, or simply the next if every other one is."""
+        count = len(self.stops)
+        for step in range(1, count + 1):
+            following = (index + step) % count
+            if not self.stops[following].refuel_only:
+                return following
+        return (index + 1) % count
+
+    def before(self, index: int) -> int:
+        """The stop the cars that reach the stop at `index` were taken on at: the last one
+        before it that isn't only for refuelling, or simply the one before if every other one
+        is."""
+        count = len(self.stops)
+        for step in range(1, count + 1):
+            earlier = (index - step) % count
+            if not self.stops[earlier].refuel_only:
+                return earlier
+        return (index - 1) % count
 
     def restart(self) -> None:
         """Sends the train back to its first stop after its stops change."""
