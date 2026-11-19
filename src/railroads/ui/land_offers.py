@@ -31,6 +31,9 @@ STEEL_DARK = (0.16, 0.16, 0.17, 0.9)
 LINK = 11.0
 LOCK_SHARE = 0.16
 LOCK_SIZE = (18.0, 54.0)
+# How far past a lot's outline its padlock and price tag may reach on screen, in points: a lot
+# drawn smaller than its tag still shows it whole.
+TAG_REACH = 160.0
 
 
 def lot_corners(lots: Lots, lot: Lot) -> list[Vec2]:
@@ -166,6 +169,8 @@ class LandOffers:
         for lot, offered in self.shown(lots):
             plane, place_uvs = self._outline(lots, lot)
             screen = [camera.to_screen(x, y, center) for x, y in plane]
+            if not reaches_box(screen, seen, TAG_REACH):
+                continue
             if ground is None or place_uvs is None:
                 picture, uvs = world, [world_uv(tile_map, point) for point in plane]
             else:
@@ -258,6 +263,18 @@ def _draw_chain(
             radius = imgui.ImVec2(LINK * 0.55, LINK * (0.1 if flat else 0.3))
             draw_list.add_ellipse(at, radius, dark, angle, 12, 3.2)
             draw_list.add_ellipse(at, radius, light, angle, 12, 1.6)
+
+
+def reaches_box(points: list[Vec2], box: tuple[float, float, float, float], reach: float) -> bool:
+    """Whether the box round the points, `reach` larger each way, overlaps the box (left, top,
+    right, bottom)."""
+    xs, ys = [x for x, _ in points], [y for _, y in points]
+    return (
+        min(xs) - reach < box[2]
+        and max(xs) + reach > box[0]
+        and min(ys) - reach < box[3]
+        and max(ys) + reach > box[1]
+    )
 
 
 def seen_part(

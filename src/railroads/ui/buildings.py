@@ -6,6 +6,7 @@ railroads.ui.pixel).
 from functools import cache
 
 import numpy as np
+import numpy.typing as npt
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import MERGED, BuildingKind
@@ -172,6 +173,14 @@ def draw_building_dots(
         draw_list.add_rect_filled(
             (xs[i] - half, ys[i] - half), (xs[i] + half, ys[i] + half), _color(color)
         )
+
+
+def dot_looks(spots: BuildingSpots) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.uint8]]:
+    """Each building's dot size in cells and its RGBA colour, as draw_building_dots draws it."""
+    looks = [DOTS[kind] for kind in spots.kinds]
+    radii = np.array([radius for _, radius in looks], dtype=np.float64)
+    colours = np.array([(*rgb, 255) for rgb, _ in looks], dtype=np.uint8).reshape(-1, 4)
+    return radii, colours
 
 
 @cache

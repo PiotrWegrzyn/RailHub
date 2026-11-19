@@ -58,8 +58,15 @@ def module() -> Any:
     return pyodide_js._module
 
 
+@functools.cache
+def _function(name: str) -> Any:
+    """The exported C function of this name, looked up once: reaching into the page's module
+    takes about as long as the call itself."""
+    return getattr(module(), f"_{name}")
+
+
 def _call(name: str, *args: int) -> Any:
-    return getattr(module(), f"_{name}")(*args)
+    return _function(name)(*args)
 
 
 def address(array: np.ndarray | None) -> int:
@@ -222,3 +229,6 @@ glUniform1i = _forward("glUniform1i")
 glUniform2i = _forward("glUniform2i")
 glUniform4f = _forward("glUniform4f", float)
 glCheckFramebufferStatus = _forward("glCheckFramebufferStatus")
+glClear = _forward("glClear")
+glBlendFunc = _forward("glBlendFunc")
+glClearColor = _forward("glClearColor", float)

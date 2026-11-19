@@ -151,10 +151,12 @@ def _window(map_size: Vec2, zoom: int, focus: Vec2 | None) -> tuple[float, float
 
 
 def world_rgba(world: WorldLand) -> np.ndarray:
-    share = world.land[..., None].astype(np.float64) / 255
+    """The world's picture: each pixel between the sea's colour and the land's by its share of
+    land, looked up from the colour of every share worked out once."""
+    share = np.arange(256, dtype=np.float64)[:, None] / 255
     rgb = np.array(SEA_RGB) * (1 - share) + np.array(LAND_RGB) * share
-    alpha = np.full((*world.land.shape, 1), 255.0)
-    return np.ascontiguousarray(np.concatenate([rgb, alpha], axis=-1).astype(np.uint8))
+    colours = np.concatenate([rgb, np.full((256, 1), 255.0)], axis=-1).astype(np.uint8)
+    return np.ascontiguousarray(colours[world.land])
 
 
 class Minimap:

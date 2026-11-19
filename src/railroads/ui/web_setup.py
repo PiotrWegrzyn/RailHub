@@ -3,12 +3,14 @@ the page doesn't freeze for the twenty-odd seconds that takes and its waiting sc
 how far it got.
 
 The page starts a worker of its own for each new game (web/index.html, web/painter.js) and stops
-it once the game is handed over, so the memory growing took goes with it. The worker makes the
-game (railroads.newgame.make_game), pickles and compresses it as a save holds it (grow) and hands
-back the compressed bytes; the frames then take them up a few megabytes at a time (PageSetup.grow)
-and unpickle the game. Bytes cross between Python and the page by their address in Python's
-memory, as the painting workers' do (railroads.ui.pixel.web_painter), since Pyodide's own
-conversions go wrong once that memory passes 2 GiB.
+it once the game is handed over, so the memory growing took goes with it. While the main menu
+shows, the worker already grows the game it would start (PageSetup.grow_ahead), so a player who
+looks the menu over before pressing Start finds the towns grown or well on the way. The worker
+makes the game (railroads.newgame.make_game), pickles and compresses it as a save holds it (grow)
+and hands back the compressed bytes; the frames then take them up a few megabytes at a time
+(PageSetup.grow) and unpickle the game. Bytes cross between Python and the page by their address
+in Python's memory, as the painting workers' do (railroads.ui.pixel.web_painter), since Pyodide's
+own conversions go wrong once that memory passes 2 GiB.
 
 Nothing here needs imgui, which the worker doesn't load."""
 
@@ -111,10 +113,29 @@ class Page(Protocol):
 
 
 class PageSetup:
-    """New games grown in the page's setup worker."""
+    """New games grown in the page's setup worker, which may start on one before it is asked
+    for, as the main menu shows the settings it would be started with."""
 
     def __init__(self, page: Page) -> None:
         self._page = page
+        # What the worker grows ahead of being asked: the settings, the size of its pictures
+        # (always None) and whether the ground is left to the graphics card, as grow takes them.
+        self.ahead: tuple[Settings, tuple[int, int] | None, bool] | None = None
+
+    def grow_ahead(self, settings: Settings, over_ground: bool = False) -> None:
+        """Starts the worker growing the game these settings make, without pictures, for grow
+        to take up if it is asked for the same; a game grown ahead for other settings is let
+        go."""
+        wanted = (settings, None, over_ground)
+        if self.ahead != wanted:
+            self._page.start(pickle.dumps(wanted, protocol=pickle.HIGHEST_PROTOCOL))
+            self.ahead = wanted
+
+    def stop_ahead(self) -> None:
+        """Stops the worker growing a game nobody asked for yet."""
+        if self.ahead is not None:
+            self._page.stop()
+            self.ahead = None
 
     def grow(
         self,
@@ -132,7 +153,10 @@ class PageSetup:
         another version of the game, as a browser may keep an older web/painter.js for a while
         after a new one is published, for the caller to grow it itself."""
         wanted = (settings, size, over_ground)
-        self._page.start(pickle.dumps(wanted, protocol=pickle.HIGHEST_PROTOCOL))
+        if self.ahead != wanted:
+            self._page.start(pickle.dumps(wanted, protocol=pickle.HIGHEST_PROTOCOL))
+        # Grown ahead, what the worker said of it so far waits to be taken.
+        self.ahead = None
         try:
             while True:
                 yield

@@ -1,4 +1,5 @@
 import gc
+import pickle
 from collections.abc import Callable, Iterator
 from concurrent.futures import Executor, Future
 from dataclasses import replace
@@ -503,6 +504,77 @@ def test_without_threads_a_new_game_grown_by_the_page_worker_fills_the_waiting_b
     assert share == 0.5
     assert shell.app is not None
     assert shell.app.game.finances.cash == grown.game.finances.cash
+
+
+def test_the_menu_has_the_page_worker_grow_the_game_it_would_start_once_its_settings_rest(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "AHEAD_AFTER_S", 0.0)
+    page = FakePage()
+    setup = PageSetup(page)
+    monkeypatch.setattr(app_module, "page_setup", lambda: setup)
+    shell = Shell(Saves(tmp_path))
+
+    shell_frame(shell)
+
+    assert page.started == 1
+    assert pickle.loads(page.settings or b"")[0] == shell.menu.settings()
+
+
+def test_the_menu_grows_nothing_ahead_while_its_settings_keep_changing(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    page = FakePage()
+    monkeypatch.setattr(app_module, "page_setup", lambda: PageSetup(page))
+    shell = Shell(Saves(tmp_path))
+
+    for seed in range(3):
+        shell.menu.seed = seed
+        shell_frame(shell)
+
+    assert page.started == 0
+
+
+def test_starting_the_game_grown_ahead_takes_it_up_without_growing_it_again(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "AHEAD_AFTER_S", 0.0)
+    monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
+    monkeypatch.setattr(app_module, "make_game_steps", never_grown_here)
+    grown = played_game()
+    monkeypatch.setattr(web_setup, "make_game", grows_as(grown))
+    page = FakePage()
+    setup = PageSetup(page)
+    monkeypatch.setattr(app_module, "page_setup", lambda: setup)
+    shell = Shell(Saves(tmp_path))
+    shell_frame(shell)
+    page.work()
+
+    shell.start(shell.menu.settings())
+    frames = 0
+    while shell.app is None and frames < 20:
+        shell_frame(shell)
+        frames += 1
+
+    assert shell.app is not None
+    assert shell.app.game.finances.cash == grown.game.finances.cash
+    assert page.started == 1
+
+
+def test_loading_a_game_stops_the_one_grown_ahead(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "AHEAD_AFTER_S", 0.0)
+    page = FakePage()
+    setup = PageSetup(page)
+    monkeypatch.setattr(app_module, "page_setup", lambda: setup)
+    shell = Shell(Saves(tmp_path))
+    shell_frame(shell)
+
+    shell.load("missing")
+
+    assert page.stopped == 1
+    assert setup.ahead is None
 
 
 def test_without_threads_a_new_game_grows_on_the_frames_when_the_page_worker_fails(

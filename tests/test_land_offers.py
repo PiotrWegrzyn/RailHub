@@ -10,6 +10,7 @@ from railroads.ui.land_offers import (
     PlacePicture,
     lot_corners,
     lot_under,
+    reaches_box,
     seen_part,
     shown_lots,
     world_uv,
@@ -129,3 +130,19 @@ def test_a_side_on_the_screen_is_seen_whole() -> None:
     part = seen_part((10.0, 10.0), (90.0, 60.0), box)
 
     assert part == (0.0, 1.0)
+
+
+def test_a_lot_far_off_the_screen_is_not_drawn() -> None:
+    box = (0.0, 0.0, 100.0, 100.0)
+
+    near = reaches_box([(400.0, 400.0), (500.0, 450.0), (450.0, 500.0)], box, 50.0)
+
+    assert not near
+
+
+def test_a_lot_just_off_the_screen_is_drawn_for_its_tag_to_show() -> None:
+    box = (0.0, 0.0, 100.0, 100.0)
+
+    near = reaches_box([(120.0, 40.0), (160.0, 60.0), (140.0, 80.0)], box, 50.0)
+
+    assert near

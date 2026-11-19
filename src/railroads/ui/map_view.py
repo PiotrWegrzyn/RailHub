@@ -2,6 +2,7 @@
 buildings as dots on top; close up, it is pixel art (see railroads.ui.pixel). The hovered cell, a
 compass and the minimap go over both."""
 
+import math
 from enum import Enum
 from functools import cache
 
@@ -32,7 +33,7 @@ from railroads.ui.build_menu import (
     draw_track,
 )
 from railroads.ui.building_spots import BuildingSpots
-from railroads.ui.buildings import draw_building_dots
+from railroads.ui.buildings import dot_looks, draw_building_dots
 from railroads.ui.ground import GroundLayout, GroundPictures, Pixels, cell_colors
 from railroads.ui.hex_details import HexDetails, draw_hex_details, draw_shares, recently_described
 from railroads.ui.iso_camera import LOOKS, IsoCamera, Vec2
@@ -64,6 +65,7 @@ from railroads.ui.map_overlays import (
 from railroads.ui.map_tools import MapTools
 from railroads.ui.minimap import FRAME_PAD, Minimap, MinimapLayout, view_corners
 from railroads.ui.ornate import DEEP, bar_buttons, frame_window, keep_in_front, ornate_window
+from railroads.ui.pixel.dots_shader import DotShader, dot_vertices
 from railroads.ui.pixel.ground import GLOW, glow_strength
 from railroads.ui.pixel.ground_shader import (
     GroundShader,
@@ -179,6 +181,9 @@ class MapView:
         self._shader: GroundShader | None = None
         self._shader_tried = False
         self._colors_version = 0
+        # The shader drawing the building dots zoomed out, once tried.
+        self._dots: DotShader | None = None
+        self._dots_tried = False
         self.hovered: Cell | None = None
         # The art pixel last looked up under the mouse and the ground point showing there, as the
         # mouse often rests while frames go on.
@@ -649,7 +654,36 @@ class MapView:
         if drawn_lines:
             visible = visible_area(self.camera, center, top_left, bottom_right)
             draw_grid_lines(draw_list, self.camera, self.tile_map.grid, center, visible)
-        draw_building_dots(draw_list, self.camera, center, (top_left, bottom_right), self._spots)
+        if not self._draw_shaded_dots(draw_list, center, top_left, bottom_right):
+            clip = (top_left, bottom_right)
+            draw_building_dots(draw_list, self.camera, center, clip, self._spots)
+
+    def _draw_shaded_dots(
+        self, draw_list: imgui.ImDrawList, center: Vec2, top_left: Vec2, bottom_right: Vec2
+    ) -> bool:
+        """Draws the building dots with the graphics card, if it can here, into a texture laid
+        on whole device pixels; returns whether it did."""
+        shader = self._dot_shader()
+        if shader is None:
+            return False
+        spots = self._spots
+        if shader.dots_version is not spots:
+            shader.set_dots(dot_vertices(spots.x, spots.y, *dot_looks(spots)), spots)
+        density = imgui.get_io().display_framebuffer_scale.x
+        left, top = math.floor(top_left[0] * density), math.floor(top_left[1] * density)
+        right = math.ceil(bottom_right[0] * density)
+        bottom = math.ceil(bottom_right[1] * density)
+        corner = (left / density, top / density)
+        e, f = self.camera.to_screen(0.0, 0.0, center)
+        a, c = self.camera.to_screen(1.0, 0.0, center)
+        b, d = self.camera.to_screen(0.0, 1.0, center)
+        to_screen = (a - e, b - e, c - f, d - f, e - corner[0], f - corner[1])
+        unit = self.camera.cell_width / self.camera.cell_units
+        texture = shader.draw((right - left, bottom - top), density, to_screen, unit)
+        draw_list.add_image(
+            imgui.ImTextureRef(texture), corner, (right / density, bottom / density)
+        )
+        return True
 
     def _consumers_of(self, cell: Cell) -> tuple[Cell, ...]:
         """consumers_in_reach of the cell, found again only once its buildings or the year
@@ -944,6 +978,23 @@ class MapView:
         texture = shader.tinted(pixels, flat, raised)
         draw_list.add_image(imgui.ImTextureRef(texture), top_left, bottom_right)
         return True
+
+    def _dot_shader(self) -> DotShader | None:
+        """The building dots' shader, made the first time the map shows zoomed out in a real
+        window."""
+        if not self._dots_tried:
+            self._dots_tried = True
+            if hello_imgui.is_using_hello_imgui():
+                self._dots = DotShader.make()
+        return self._dots
+
+    def ready_shaders(self) -> None:
+        """Makes the shaders and the world's texture the first frame would, where the game is
+        loaded on the frames of a real window: compiling them takes a frame of its own."""
+        if hello_imgui.is_using_hello_imgui():
+            self._ground_shader()
+            self._dot_shader()
+            self.minimap.world_texture()
 
     def _ground_shader(self) -> GroundShader | None:
         """The ground shader, made the first time the pixel map shows in a real window."""

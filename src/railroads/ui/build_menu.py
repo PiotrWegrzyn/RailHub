@@ -357,8 +357,25 @@ def reach_border(
     grid: Grid, cells: tuple[Cell, ...], steps: int
 ) -> tuple[tuple[tuple[float, float], tuple[float, float]], ...]:
     """The border of the cells within `steps` of a station's cells, worked out once: an open
-    station window draws it every frame, and finding it takes hundreds of lookups."""
-    return tuple(_border(grid, {near for cell in cells for near in grid.within(cell, steps)}))
+    station window draws it every frame, and finding it takes hundreds of lookups. The same
+    shape of cells moved by an even number of rows has the same border moved with it, so a
+    station tool hovering over the map finds each shape's border only once."""
+    near = {near for cell in cells for near in grid.within(cell, steps)}
+    top = min(row for row, _ in near)
+    shift = (top - top % 2, min(col for _, col in near))
+    shape = frozenset((row - shift[0], col - shift[1]) for row, col in near)
+    origin, moved = grid.center(0, 0), grid.center(*shift)
+    dx, dy = float(moved[0] - origin[0]), float(moved[1] - origin[1])
+    return tuple(
+        ((a[0] + dx, a[1] + dy), (b[0] + dx, b[1] + dy)) for a, b in _shape_border(grid, shape)
+    )
+
+
+@lru_cache(maxsize=64)
+def _shape_border(
+    grid: Grid, shape: frozenset[Cell]
+) -> tuple[tuple[tuple[float, float], tuple[float, float]], ...]:
+    return tuple(_border(grid, set(shape)))
 
 
 def _border(grid: Grid, cells: set[Cell]) -> list[tuple[tuple[float, float], tuple[float, float]]]:

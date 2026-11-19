@@ -2288,7 +2288,7 @@ class GroundShader:
             GL.glDisable(GL.GL_SCISSOR_TEST)
             GL.glUseProgram(program)
             for name, (kind, values) in uniforms.items():
-                at = GL.glGetUniformLocation(program, name)
+                at = uniform(program, name)
                 match kind:
                     case "1i":
                         GL.glUniform1i(at, *values)
@@ -2310,6 +2310,20 @@ class GroundShader:
             GL.glDrawArrays(GL.GL_TRIANGLE_STRIP, 0, 4)
         finally:
             _restore(saved)
+
+
+# Where each program's uniforms are, by program and name, found once: a program's uniforms stay
+# where they are, and asking GL each time cost a call per uniform every frame.
+_UNIFORMS: dict[tuple[int, str], int] = {}
+
+
+def uniform(program: int, name: str) -> int:
+    """Where the program's uniform of this name is."""
+    key = (program, name)
+    at = _UNIFORMS.get(key)
+    if at is None:
+        at = _UNIFORMS[key] = int(GL.glGetUniformLocation(program, name))
+    return at
 
 
 def _texture() -> int:

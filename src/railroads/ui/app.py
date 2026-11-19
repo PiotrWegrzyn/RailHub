@@ -85,6 +85,9 @@ AUTOSAVE_GAP_S = 60.0
 # their steps are run several to a frame, so a month that costs little takes few frames and the
 # trains wait as briefly.
 MONTH_FRAME_SECONDS = 0.016
+# In the browser, how long the main menu's settings stay as they are before the page's setup
+# worker starts growing the game they would start, so typing a seed doesn't start one a digit.
+AHEAD_AFTER_S = 1.0
 
 
 class App:
@@ -411,6 +414,9 @@ class Shell:
         # The game the command line asks for, started on the first frame, once the window's size
         # is known.
         self._wanted = start
+        # The menu's settings as last seen and since when they have stayed so.
+        self._menu_settings: Settings | None = None
+        self._menu_since = 0.0
 
     def report(self, progress: str) -> None:
         print(progress)
@@ -434,7 +440,7 @@ class Shell:
         pictured = settings.show_map_growing
         size = self._window if pictured else None
         see = self._show.see
-        over_ground = ground_shader.GL is not None and hello_imgui.is_using_hello_imgui()
+        over_ground = _over_ground()
         setup = page_setup()
         if setup is not None:
             # The frames only look for word from the worker and take up what it grew, a step each.
@@ -516,8 +522,14 @@ class Shell:
                 app.view.look_at(lot_middle(lots, lot))
             yield
             yield from app.view.prepare_steps(size, density, chunks)
+            if not chunks:
+                yield
+                app.view.ready_shaders()
             return app
 
+        setup = page_setup()
+        if new_game_on is None and setup is not None:
+            setup.stop_ahead()
         self._task = submit_steps(self._executor, prepared)
         self._waiting_shown = False
 
@@ -548,6 +560,25 @@ class Shell:
             self._follow(self.app)
         else:
             self._choose(self.menu.draw())
+            if self._task is None:
+                self._grow_ahead()
+
+    def _grow_ahead(self) -> None:
+        """Where the page has a setup worker, has it grow the game the menu would start once
+        the menu's settings have stayed the same for AHEAD_AFTER_S, so Start finds it grown or
+        on the way; not a game whose map is pictured as it grows, which needs the waiting
+        screen."""
+        setup = page_setup()
+        if setup is None:
+            return
+        settings = self.menu.settings()
+        now = time.monotonic()
+        if settings != self._menu_settings:
+            self._menu_settings, self._menu_since = settings, now
+        if settings.show_map_growing:
+            setup.stop_ahead()
+        elif now - self._menu_since >= AHEAD_AFTER_S:
+            setup.grow_ahead(settings, _over_ground())
 
     def _finish(self, task: Future[App]) -> None:
         self._task = None
@@ -668,6 +699,11 @@ class Shell:
         size = imgui.calc_text_size(text)
         imgui.text_colored(colour, text)
         return Label(corner.x, corner.y, size.x, size.y, imgui.get_color_u32(colour), text)
+
+
+def _over_ground() -> bool:
+    """Whether pictures of a new map growing leave the ground to the graphics card."""
+    return ground_shader.GL is not None and hello_imgui.is_using_hello_imgui()
 
 
 def _at_once[T](work: Callable[[], T]) -> Steps[T]:

@@ -28,9 +28,11 @@ class FakePage:
         self.settings: bytes | None = None
         self.inbox: list[dict[str, Any]] = []
         self.stopped = 0
+        self.started = 0
 
     def start(self, settings: bytes) -> None:
         self.settings = settings
+        self.started += 1
 
     def work(self) -> None:
         assert self.settings is not None
@@ -92,6 +94,63 @@ def test_a_game_grown_in_a_worker_comes_back_as_it_was_grown(
     assert saved.game.finances.cash == grown.game.finances.cash
     assert saved.game.railway.stations() == grown.game.railway.stations()
     assert page.stopped >= 1
+
+
+def test_a_game_grown_ahead_is_taken_up_when_asked_for_without_growing_it_again(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    grown = played_game()
+    monkeypatch.setattr(web_setup, "make_game", grows_as(grown))
+    page = FakePage()
+    setup = PageSetup(page)
+    setup.grow_ahead(SETTINGS)
+    page.work()
+
+    saved = finish(setup.grow(SETTINGS, print))
+
+    assert saved is not None
+    assert saved.game.finances.cash == grown.game.finances.cash
+    assert page.started == 1
+    assert setup.ahead is None
+
+
+def test_a_game_asked_for_with_other_settings_than_the_one_grown_ahead_is_grown_anew(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(web_setup, "make_game", grows_as(played_game()))
+    page = FakePage()
+    setup = PageSetup(page)
+    setup.grow_ahead(SETTINGS)
+    other = Settings(seed=8, map=MapChoice.POLAND, start_year=1850)
+
+    steps = setup.grow(other, print)
+    next(steps)
+    page.work()
+    finish(steps)
+
+    assert page.started == 2
+    assert pickle.loads(page.settings or b"")[0] == other
+
+
+def test_growing_the_same_game_ahead_again_leaves_the_worker_at_it() -> None:
+    page = FakePage()
+    setup = PageSetup(page)
+    setup.grow_ahead(SETTINGS)
+
+    setup.grow_ahead(SETTINGS)
+
+    assert page.started == 1
+
+
+def test_a_game_grown_ahead_is_stopped_when_not_wanted() -> None:
+    page = FakePage()
+    setup = PageSetup(page)
+    setup.grow_ahead(SETTINGS)
+
+    setup.stop_ahead()
+
+    assert page.stopped == 1
+    assert setup.ahead is None
 
 
 def test_the_page_hears_how_far_a_worker_has_grown_the_towns(
