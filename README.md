@@ -505,8 +505,8 @@ reach is worth having. The table below is written from the game's own figures by
 | Sugar field | 10 sugar |  |  |
 | Bakery | 120 bread | 48 wheat | 6 refined sugar (from 1800) |
 | Fishery | 10 fish |  | 2 fuel (from 1910) |
-| Sheep farm | 60 wool, 10 sheep |  | 90 wheat |
-| Cotton field | 55 cotton |  |  |
+| Sheep farm | 30 wool, 10 sheep |  | 90 wheat |
+| Cotton field | 80 cotton |  |  |
 | Vineyard | 60 grapes |  |  |
 | Coffee plantation (1700) | 60 coffee |  |  |
 | Rubber plantation (1900) | 60 rubber |  |  |
