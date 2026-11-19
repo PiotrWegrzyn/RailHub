@@ -10,6 +10,7 @@ from railroads.sim.constructions import (
     Track,
     TrackWidth,
 )
+from railroads.sim.finance import TRACK_PRICE
 from railroads.sim.grids import Cell, Grid, HexGrid, SquareGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
@@ -86,6 +87,22 @@ def test_rivers_are_bridged_and_mountains_tunnelled() -> None:
     assert all(constructions.why_not(piece) is None for piece in route.pieces)
 
 
+def test_track_from_a_station_by_a_river_is_laid_whole_not_through_a_corner_over_water() -> None:
+    grid = HexGrid(rows=12, cols=20, km_per_cell=2.0)
+    terrain = np.full(grid.shape, Terrain.LAND, dtype=np.uint8)
+    terrain[5, 3:5] = Terrain.RIVER
+    constructions = Constructions(flat_map(grid=grid, terrain=terrain))
+    growth = Growth(constructions, NO_TRADE)
+    build_station(growth, (4, 4))
+    build_station(growth, (8, 4))
+    route = plan_route(constructions, (4, 4), (8, 4))
+    assert route is not None
+
+    lay_route(growth, route)
+
+    assert all(piece in constructions.at(piece.cell) for piece in route.pieces)
+
+
 def test_track_keeps_to_empty_land_when_it_can() -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
@@ -109,7 +126,7 @@ def test_track_goes_round_a_farm_rather_than_moving_it() -> None:
     assert (6, 8) not in route.cells
 
 
-def test_laying_track_moves_buildings_aside_or_pulls_down_the_lowest() -> None:
+def test_laying_track_pulls_down_the_lowest_building_and_moves_none() -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
     for _ in range(5):
@@ -124,8 +141,8 @@ def test_laying_track_moves_buildings_aside_or_pulls_down_the_lowest() -> None:
         1 for b in constructions if isinstance(b, Building) and b.kind == BuildingKind.HOUSE
     )
     assert constructions.space_left((6, 5)) == 1
-    assert houses_here == 4 and houses == 5
-    assert len(changed) == 2
+    assert houses_here == 4 and houses == 4
+    assert changed == {(6, 5)}
 
 
 def test_with_nowhere_to_move_the_lowest_building_comes_down() -> None:
@@ -146,7 +163,7 @@ def test_with_nowhere_to_move_the_lowest_building_comes_down() -> None:
     assert growth.count(BuildingKind.HOUSE).sum() == 0
 
 
-def test_a_station_clears_its_cell_and_track_joins_it_without_entering() -> None:
+def test_a_station_pulls_down_what_stands_in_its_cell_and_track_joins_it_without_entering() -> None:
     constructions = Constructions(make_map())
     for _ in range(3):
         constructions.build(Building((6, 12), BuildingKind.HOUSE))
@@ -156,20 +173,17 @@ def test_a_station_clears_its_cell_and_track_joins_it_without_entering() -> None
     route = plan_route(constructions, (6, 2), (6, 12))
 
     assert constructions.station_at((6, 12)) is not None
-    assert growth.count(BuildingKind.HOUSE).sum() == 3
+    assert growth.count(BuildingKind.HOUSE).sum() == 0
     assert route is not None
     assert all(piece.cell != (6, 12) for piece in route.pieces)
 
 
-def test_no_route_into_the_sea() -> None:
-    tile_map = make_map()
-    terrain = tile_map.terrain.copy()
-    constructions = Constructions(tile_map)
+def test_no_route_from_a_cell_to_itself() -> None:
+    constructions = Constructions(make_map())
 
     route = plan_route(constructions, (6, 2), (6, 2))
 
     assert route is None
-    assert (terrain == tile_map.terrain).all()
 
 
 def test_track_runs_straight_through_corners_where_edges_would_zigzag() -> None:
@@ -282,7 +296,7 @@ def test_track_laid_on_from_a_dead_end_turns_it_instead_of_leaving_a_stub() -> N
 
     assert constructions.track_at((6, 6)) == (Track((6, 6), (6, 10)),)
     assert len(dead_ends(constructions)) == 2
-    assert price == pytest.approx(300 * (len(route.pieces) - 1))
+    assert price == pytest.approx(TRACK_PRICE * (len(route.pieces) - 1))
 
 
 def test_track_ending_on_a_line_joins_it_so_trains_run_onto_it() -> None:
@@ -314,10 +328,10 @@ def test_track_crossing_a_line_crosses_it_in_one_cell() -> None:
 @pytest.mark.parametrize(
     ("width", "electric", "per_cell"),
     [
-        (TrackWidth.SINGLE, False, 300),
-        (TrackWidth.DOUBLE, False, 540),
-        (TrackWidth.SINGLE, True, 750),
-        (TrackWidth.DOUBLE, True, 1350),
+        (TrackWidth.SINGLE, False, 600),
+        (TrackWidth.DOUBLE, False, 1800),
+        (TrackWidth.SINGLE, True, 3000),
+        (TrackWidth.DOUBLE, True, 9000),
     ],
 )
 def test_double_and_electric_track_cost_more_a_cell(
@@ -344,9 +358,9 @@ def test_electric_track_is_electrified_once_laid() -> None:
 @pytest.mark.parametrize(
     ("width", "electric", "per_cell"),
     [
-        (TrackWidth.DOUBLE, False, 240),
-        (TrackWidth.SINGLE, True, 450),
-        (TrackWidth.DOUBLE, True, 1050),
+        (TrackWidth.DOUBLE, False, 1200),
+        (TrackWidth.SINGLE, True, 2400),
+        (TrackWidth.DOUBLE, True, 8400),
     ],
 )
 def test_laying_along_a_line_widens_or_electrifies_it_without_new_track(
@@ -384,10 +398,12 @@ def test_a_station_built_on_a_line_takes_the_place_of_its_track_and_keeps_it_joi
     assert Railway(constructions).route((6, 2), (6, 14)) is not None
 
 
-def test_track_from_the_side_comes_round_into_a_station_by_one_of_its_ends() -> None:
+def test_track_from_the_side_comes_round_into_a_joined_station_by_one_of_its_ends() -> None:
     constructions = Constructions(make_map())
     growth = Growth(constructions, NO_TRADE)
     build_station(growth, (6, 10), (3, 9))
+    build_station(growth, (2, 10))
+    laid(constructions, (2, 10), (6, 10))
 
     route = plan_route(constructions, (6, 2), (6, 10))
 
@@ -398,10 +414,54 @@ def test_track_from_the_side_comes_round_into_a_station_by_one_of_its_ends() -> 
     assert any(cell == (6, 10) and entry in (3, 9) for cell, entry in into)
 
 
-def test_track_leaves_a_station_straight_out_of_one_of_its_ends() -> None:
+def test_track_into_the_side_of_a_station_no_track_joins_turns_the_station() -> None:
+    constructions = Constructions(make_map())
+    growth = Growth(constructions, NO_TRADE)
+    build_station(growth, (6, 10), (3, 9))
+    route = plan_route(constructions, (6, 2), (6, 10))
+    assert route is not None
+
+    lay_route(growth, route)
+
+    assert constructions.station_ends((6, 10)) == (0, 6)
+    assert dead_ends(constructions) == [((6, 2), 6)]
+
+
+def test_track_ending_against_the_side_of_a_station_no_track_joins_turns_it_to_join() -> None:
+    constructions = Constructions(make_map())
+    growth = Growth(constructions, NO_TRADE)
+    build_station(growth, (6, 8))
+    build_station(growth, (10, 10))
+    route = plan_route(constructions, (10, 10), (7, 8))
+    assert route is not None
+
+    lay_route(growth, route)
+
+    assert constructions.station_ends((6, 8)) == (2, 8)
+    assert Railway(constructions).route((10, 10), (6, 8)) is not None
+
+
+def test_track_ending_against_the_side_of_a_joined_station_runs_on_into_an_end() -> None:
+    constructions = Constructions(make_map())
+    growth = Growth(constructions, NO_TRADE)
+    build_station(growth, (6, 8))
+    build_station(growth, (6, 2))
+    build_station(growth, (10, 10))
+    laid(constructions, (6, 2), (6, 8))
+
+    laid(constructions, (10, 10), (7, 8))
+
+    assert constructions.station_ends((6, 8)) == (0, 6)
+    assert dead_ends(constructions) == []
+    assert Railway(constructions).route((10, 10), (6, 8)) is not None
+
+
+def test_track_leaves_a_joined_station_straight_out_of_one_of_its_ends() -> None:
     constructions = Constructions(make_map())
     growth = Growth(constructions, NO_TRADE)
     build_station(growth, (6, 4), (3, 9))
+    build_station(growth, (2, 4))
+    laid(constructions, (2, 4), (6, 4))
 
     route = plan_route(constructions, (6, 4), (6, 14))
 

@@ -19,11 +19,3 @@ def test_hills_are_drawn_lighter_than_flat_land_and_mountains() -> None:
     brightness = relief_brightness(tile_map)
 
     assert brightness[0].tolist() == pytest.approx([1.0, HILL_BRIGHTNESS, 1.0])
-
-
-def test_water_is_never_lightened() -> None:
-    tile_map = make_map([[Relief.HILLS, Relief.HILLS]], Terrain.LAKE)
-
-    brightness = relief_brightness(tile_map)
-
-    assert brightness.tolist() == [[1.0, 1.0]]

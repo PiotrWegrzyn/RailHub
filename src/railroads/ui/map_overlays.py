@@ -1,21 +1,27 @@
 """What the map view draws over the map: cell outlines and grid lines, station names, the compass,
-the buildings a search found, the status strip saying what is under the pointer and the card of
-the hovered cell's buildings."""
+the buildings a search found, the status strip saying what is under the pointer, the card of
+the hovered cell's buildings and, while Shift is held, how satisfied buildings are."""
 
+import itertools
 import math
 from collections import Counter
 
 import numpy as np
+import numpy.typing as npt
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import Building, Construction, Constructions, Station, Track
-from railroads.sim.economy import Satisfaction
+from railroads.sim.economy import LOCAL_REACH, FloatCells, Satisfaction, Trade
+from railroads.sim.goods import HANDED_OUT, makes_of, needs_of
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, Grid
 from railroads.sim.growth import Growth
+from railroads.sim.ownership import Owners
 from railroads.sim.railway import Railway
 from railroads.sim.tilemap import Relief, TileMap
+from railroads.sim.towns import Towns
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.biomes import biome_of
+from railroads.ui.build_menu import reach_border
 from railroads.ui.hex_details import mood_text, recently_described
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS, IsoCamera, Vec2
 from railroads.ui.minimap import MinimapLayout
@@ -29,6 +35,7 @@ from railroads.ui.theme import (
     color_u32,
     good_icon,
     rgba_u32,
+    town_tint,
 )
 
 GRID_COLOR = (0.0, 0.0, 0.0, 0.25)
@@ -36,6 +43,20 @@ HOVER_COLOR = (1.0, 1.0, 1.0, 0.9)
 SELECTED_COLOR = (1.0, 0.85, 0.2, 1.0)
 COMPASS_COLOR = (1.0, 1.0, 1.0, 0.85)
 FOUND_COLOR = (0.3, 0.95, 1.0, 1.0)
+# The selected cell's hand-out range and the buildings in it that take what it makes.
+HAND_OUT_RING = (1.0, 0.85, 0.3, 0.95)
+CONSUMER_FILL = (0.25, 0.85, 0.3, 0.35)
+CONSUMER_LINE = (0.3, 0.95, 0.35, 0.95)
+# What Shift lays over the land under buildings by how satisfied they are: thriving, at least
+# half way there, short of half and getting nothing at all.
+SATISFIED_TINT = (0.2, 0.85, 0.25, 0.5)
+HALF_SATISFIED_TINT = (0.95, 0.88, 0.15, 0.5)
+LITTLE_SATISFIED_TINT = (1.0, 0.5, 0.1, 0.5)
+UNSATISFIED_TINT = (0.9, 0.12, 0.1, 0.5)
+MOODS_LEGEND = "Satisfaction: green 100%, yellow 50%+, orange under 50%, red nothing."
+TOWNS_LEGEND = "Towns: each colour is one town; passengers and mail only travel between towns."
+# From this cell width the tint fills each cell's hexagon; further out it is a square.
+TINT_HEXES_FROM = 8
 # From this cell width, buildings found are outlined; further out each is a small square.
 OUTLINE_FOUND_FROM = 16
 MOST_OUTLINES = 1500
@@ -43,6 +64,19 @@ MOST_FOUND_MARKS = 6000
 MOST_MINIMAP_MARKS = 3000
 # Station names show from this zoom level in, this many cell widths above the station's middle.
 NAMES_FROM_ZOOM = 2
+# The flag over the player's buildings: from how wide a cell it shows, how tall it stands and how
+# far right of the cell's middle, both in cell widths, and its colours.
+FLAGS_FROM_WIDTH = 24.0
+FLAG_HEIGHT = 0.45
+# Over buildings the player controls (railroads.sim.ownership.CONTROL) the flag stands this many
+# times as tall and waves: its cloth in so many strips, rippling so fast, in radians a second.
+BIG_FLAG = 1.6
+WAVE_STRIPS = 6
+WAVE_SPEED = 4.0
+FLAG_RIGHT = 0.3
+FLAG_POLE = (0.15, 0.12, 0.1, 1.0)
+FLAG_CLOTH = (0.14, 0.3, 0.72, 1.0)
+FLAG_STRIPE = (0.93, 0.78, 0.3, 1.0)
 NAME_LIFT = 0.55
 NAME_PADDING = 6.0
 STATUS_MARGIN = 10.0
@@ -60,9 +94,10 @@ def draw_outline(
     center: Vec2,
     cell: Cell,
     rgba: Rgba = HOVER_COLOR,
+    thickness: float = 2.0,
 ) -> None:
     points = [imgui.ImVec2(*camera.to_screen(x, y, center)) for x, y in grid.corners(*cell)]
-    draw_list.add_polyline(points, rgba_u32(rgba), 2.0, imgui.ImDrawFlags_.closed.value)
+    draw_list.add_polyline(points, rgba_u32(rgba), thickness, imgui.ImDrawFlags_.closed.value)
 
 
 def visible_area(
@@ -142,6 +177,59 @@ def draw_station_names(
             (left, top), (x + size.x / 2 + NAME_PADDING, bottom), color_u32(OVERLAY), 5.0
         )
         draw_list.add_text((x - size.x / 2, top + NAME_PADDING / 2), color_u32(TEXT), name)
+
+
+def draw_owned_flags(
+    draw_list: imgui.ImDrawList, camera: IsoCamera, grid: Grid, owners: Owners, center: Vec2
+) -> None:
+    """A flag in the company's colours over every cell where the player owns a building, once a
+    cell is FLAGS_FROM_WIDTH pixels wide: a small one, or a big waving one where they control
+    the buildings of a kind."""
+    width = camera.cell_width
+    if width < FLAGS_FROM_WIDTH:
+        return
+    colours = rgba_u32(FLAG_POLE), rgba_u32(FLAG_CLOTH), rgba_u32(FLAG_STRIPE)
+    now = imgui.get_time()
+    for cell in owners.cells():
+        x, y = camera.to_screen(*grid.center(*cell), center)
+        big = owners.controls_any(cell)
+        height = width * FLAG_HEIGHT * (BIG_FLAG if big else 1.0)
+        foot = (x + width * FLAG_RIGHT, y)
+        top = (foot[0], y - height)
+        draw_list.add_line(foot, top, colours[0], max(1.0, width / 40))
+        _draw_cloth(draw_list, top, height, colours[1:], now if big else None)
+
+
+def _draw_cloth(
+    draw_list: imgui.ImDrawList,
+    top: Vec2,
+    height: float,
+    colours: tuple[int, int],
+    now: float | None,
+) -> None:
+    """A flag's cloth hanging from the top of its pole, still, or rippling at this time."""
+    cloth, stripe = colours
+    long, deep = height * 0.6, height * 0.35
+    if now is None:
+        far = (top[0] + long, top[1] + deep)
+        draw_list.add_rect_filled(top, far, cloth)
+        middle = top[1] + deep / 2
+        draw_list.add_line((top[0], middle), (far[0], middle), stripe, max(1.0, height * 0.08))
+        return
+    step = long / WAVE_STRIPS
+
+    def lift(index: int) -> float:
+        return math.sin(now * WAVE_SPEED - index * 0.9) * deep * 0.12 * index / WAVE_STRIPS
+
+    for index in range(WAVE_STRIPS):
+        left, right = top[0] + index * step, top[0] + (index + 1) * step
+        near, far = top[1] + lift(index), top[1] + lift(index + 1)
+        draw_list.add_quad_filled(
+            (left, near), (right, far), (right, far + deep), (left, near + deep), cloth
+        )
+        draw_list.add_line(
+            (left, near + deep / 2), (right, far + deep / 2), stripe, max(1.0, height * 0.06)
+        )
 
 
 def draw_compass(draw_list: imgui.ImDrawList, camera: IsoCamera, anchor: Vec2) -> None:
@@ -243,6 +331,7 @@ def status_text(
     tile = tile_map.tile(hovered)
     row, col = hovered
     hills = " hills" if tile.relief == Relief.HILLS else ""
+    hills += " with a minor river" if tile.stream else ""
     built = _built_note(constructions, hovered)
     level = int(satisfaction[row, col])
     mood = f"; {Satisfaction(level).name.lower()}" if level >= 0 else ""
@@ -315,3 +404,137 @@ def draw_hovered_buildings(
                     imgui.same_line(0, 2)
                     good_icon(good, size=HOVER_ICON)
     imgui.end()
+
+
+def consumers_in_reach(constructions: Constructions, cell: Cell, year: int) -> tuple[Cell, ...]:
+    """The cells within LOCAL_REACH of `cell` that have a building needing a good the buildings
+    in `cell` make: where those goods can go on their own (railroads.sim.economy)."""
+    made = {
+        good
+        for building in constructions.buildings_at(cell)
+        for good in makes_of(building.kind, year)
+    }
+    needs = {need for need, goods in HANDED_OUT.items() if made.intersection(goods)}
+    if not needs:
+        return ()
+    return tuple(
+        near
+        for near in constructions.tile_map.grid.within(cell, LOCAL_REACH)
+        if any(
+            needs.intersection(needs_of(building.kind, year))
+            for building in constructions.buildings_at(near)
+        )
+    )
+
+
+def draw_hand_out(
+    draw_list: imgui.ImDrawList,
+    camera: IsoCamera,
+    grid: Grid,
+    center: Vec2,
+    cell: Cell,
+    consumers: tuple[Cell, ...],
+) -> None:
+    """The border of how far the goods made in `cell` go on their own, and the cells in it whose
+    buildings take any of them in green."""
+    hexes = [grid.corners(*near) for near in consumers]
+    border = reach_border(grid, (cell,), LOCAL_REACH)
+    plane = [corner for corners in hexes for corner in corners]
+    plane += [end for edge in border for end in edge]
+    if not plane:
+        return
+    xs, ys = (np.array(values, dtype=np.float64) for values in zip(*plane, strict=True))
+    sx, sy = camera.to_screen(xs, ys, center)
+    points = [imgui.ImVec2(x, y) for x, y in zip(sx.tolist(), sy.tolist(), strict=True)]
+    start = 0
+    for corners in hexes:
+        polygon = points[start : start + len(corners)]
+        start += len(corners)
+        draw_list.add_convex_poly_filled(polygon, rgba_u32(CONSUMER_FILL))
+        draw_list.add_polyline(
+            polygon, rgba_u32(CONSUMER_LINE), 2.0, imgui.ImDrawFlags_.closed.value
+        )
+    for a, b in itertools.batched(points[start:], 2, strict=True):
+        draw_list.add_line(a, b, rgba_u32(HAND_OUT_RING), 2.5)
+
+
+def least_satisfied(
+    trade: Trade | None, assumed: FloatCells | None = None
+) -> tuple[npt.NDArray[np.intp], FloatCells]:
+    """The flat cells whose buildings want anything, and how satisfied the least satisfied kind
+    of building in each is (Trade.share); `assumed` as Growth.assumed_shares, where it is given."""
+    if trade is None:
+        return np.zeros(0, dtype=np.intp), np.zeros(0)
+    least = np.full(trade.cells.size, np.nan)
+    for kind in trade.got:
+        least = np.fmin(least, trade.share((kind,), empty=np.nan))
+    wanting = ~np.isnan(least)
+    cells, shares = trade.cells[wanting], least[wanting]
+    if assumed is not None:
+        given = assumed[cells]
+        shares = np.where(np.isnan(given), shares, given)
+    return cells, shares
+
+
+def town_cells(towns: Towns) -> tuple[npt.NDArray[np.intp], list[int]]:
+    """The flat cells that belong to a town, and each one's packed town colour."""
+    cells = np.flatnonzero((towns.town.ravel() > 0) & (towns.sending.ravel() > 0))
+    colors = [rgba_u32(town_tint(town)) for town in towns.town.ravel()[cells].tolist()]
+    return cells, colors
+
+
+def mood_tint(share: float) -> Rgba:
+    """The tint of a cell whose least satisfied building is at `share`, as levels_of judges it."""
+    if share >= 1.0 - 1e-9:
+        return SATISFIED_TINT
+    if share >= 0.5:
+        return HALF_SATISFIED_TINT
+    if share > 0.0:
+        return LITTLE_SATISFIED_TINT
+    return UNSATISFIED_TINT
+
+
+def tint_colours(
+    shape: tuple[int, int], cells: npt.NDArray[np.intp], colors: list[int]
+) -> npt.NDArray[np.uint8]:
+    """Each cell's tint as (rows, cols, 4) RGBA bytes from the flat `cells` and their packed
+    colours, clear where a cell has none, for the graphics card to tint them
+    (railroads.ui.pixel.ground_shader.GroundShader.set_tints)."""
+    tints = np.zeros((shape[0] * shape[1], 4), dtype=np.uint8)
+    tints[cells] = np.array(colors, dtype=np.uint32).view(np.uint8).reshape(-1, 4)
+    return tints.reshape(*shape, 4)
+
+
+def draw_moods(
+    draw_list: imgui.ImDrawList,
+    camera: IsoCamera,
+    grid: Grid,
+    center: Vec2,
+    clip: tuple[Vec2, Vec2],
+    cells: npt.NDArray[np.intp],
+    colors: list[int],
+) -> None:
+    """Fills each of the flat `cells` on screen in its packed colour: its hexagon, or a square
+    once cells are smaller than TINT_HEXES_FROM. The corners of every cell drawn are put on screen
+    in one go, as in draw_hand_out."""
+    if not cells.size:
+        return
+    width = camera.cell_width
+    cx, cy = grid.center(*np.divmod(cells, grid.cols))
+    sx, sy = camera.to_screen(cx, cy, center)
+    (left, top), (right, bottom) = clip
+    shown = np.flatnonzero(
+        (sx > left - width) & (sx < right + width) & (sy > top - width) & (sy < bottom + width)
+    )
+    if width < TINT_HEXES_FROM:
+        half = max(1.0, width / 2)
+        for i, x, y in zip(shown.tolist(), sx[shown].tolist(), sy[shown].tolist(), strict=True):
+            draw_list.add_rect_filled((x - half, y - half), (x + half, y + half), colors[i])
+        return
+    offsets = np.array(grid.corners(0, 0)) - np.array(grid.center(0, 0))
+    px = np.asarray(cx)[shown, None] + offsets[:, 0]
+    py = np.asarray(cy)[shown, None] + offsets[:, 1]
+    hx, hy = camera.to_screen(px.ravel(), py.ravel(), center)
+    corners = np.stack([hx, hy], axis=1).reshape(shown.size, len(offsets), 2).tolist()
+    for i, polygon in zip(shown.tolist(), corners, strict=True):
+        draw_list.add_convex_poly_filled([imgui.ImVec2(x, y) for x, y in polygon], colors[i])

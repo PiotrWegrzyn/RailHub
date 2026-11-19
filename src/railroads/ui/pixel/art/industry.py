@@ -1240,6 +1240,57 @@ def distillery() -> Sprite:
     return p.sprite()
 
 
+def _straw_cask(p: Painter, x: float, y: float) -> None:
+    """A cask of sake wrapped in straw matting, roped round and marked with a red brand."""
+    straw = (222, 204, 150)
+    p.ellipse(x - 2, y - 5, x + 2, y, straw)
+    p.ellipse(x - 2, y - 5.6, x + 2, y - 4, shade(straw, 1.12))
+    for drop in (1.2, 3.4):
+        p.line([(x - 2, y - drop), (x + 2, y - drop)], shade(straw, 0.6))
+    p.rect(x - 0.8, y - 3, x + 0.6, y - 2, (180, 40, 36))
+
+
+def sake_brewery() -> Sprite:
+    """A long white-plastered storehouse on a dark tiled skirt, under a heavy black tiled roof
+    with a squat chimney, a ball of cedar twigs hung by its door for the new brew, straw-wrapped
+    casks stacked outside and sacks of rice by a cart track worn out of it."""
+    p = Painter(32, 40, (15, 31))
+    foot = _footing(-4, -1, 12, 7)
+    _bed(p, foot)
+    p.shadow(13, 4)
+    _track(p, foot[0], foot[1], (0.52, 0.7), 3.5)
+    plaster = (238, 234, 222)
+    skirt = (70, 72, 80)
+    top = p.hall(-4, -1, 12, 7, 7, plaster, None)
+    left, front, right, _ = top
+    _patch(p, left, front, (0, 1), (4.4, 7), skirt)
+    _patch(p, front, right, (0, 1), (4.4, 7), shade(skirt, 0.78))
+    for a, b in ((left, front), (front, right)):
+        for t in (0.12, 0.3, 0.48, 0.66, 0.84):
+            p.point(*_on_wall(a, b, t, 5.6), shade(skirt, 1.6))
+        _band(p, a, b, 4.4, shade(plaster, 0.7))
+    _windows(p, left, front, (0.2, 0.82), (1.6,), 2, (44, 46, 52))
+    _door(p, left, front, (0.52, 0.7), 2.6, 7, (60, 44, 34), shade(plaster, 0.8))
+    _windows(p, front, right, (0.5,), (1.6,), 2, (44, 46, 52))
+    roof = (52, 54, 62)
+    p.gable(top, 5, roof, plaster)
+    _roof_rows(p, top, 5, roof, (0.3, 0.6, 0.9))
+    x, y = _on_roof(top, 5, 0.3, 0.7)
+    p.rect(x - 1, y - 3, x + 1, y, shade(plaster, 0.85))
+    _smoke(p, x, y - 4, (200, 200, 204), 2)
+    cedar = (96, 112, 52)
+    bx, by = _on_wall(left, front, 0.46, 0.6)
+    p.line([(bx, by - 0.6), (bx, by + 0.6)], (60, 48, 40))
+    p.blob(bx - 1.6, by + 0.4, bx + 1.6, by + 3.4, cedar)
+    p.point(bx - 0.6, by + 1.2, shade(cedar, 1.3))
+    for cx, cy in ((-12, 5), (-9, 6.5), (-10.5, 2)):
+        _straw_cask(p, cx, cy)
+    for sx, sy in ((10, 6), (12.5, 5)):
+        p.ellipse(sx - 1.5, sy - 3, sx + 1.5, sy, (226, 216, 190))
+        p.line([(sx - 0.6, sy - 3), (sx + 0.6, sy - 3)], shade((226, 216, 190), 0.6))
+    return p.sprite()
+
+
 def tannery() -> Sprite:
     """Low tanning sheds with doors, windows, slatted drying lofts and dark plinths, hides
     stretched to dry on wooden frames over drip-stained ground, a pit of tan liquor sunk in a

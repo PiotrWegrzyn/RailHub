@@ -29,17 +29,13 @@ def test_play_begins_no_earlier_than_1804(wished: int, allowed: int) -> None:
     assert year == allowed
 
 
-def test_the_earliest_start_is_1804_and_the_suggested_one_1850() -> None:
-    assert (EARLIEST_START_YEAR, START_YEAR) == (1804, 1850)
-
-
 def test_a_new_game_wished_to_begin_too_early_begins_in_1804(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     grown: list[int] = []
 
     def quick_growth(
-        tile_map: Any, rng: Any, months: int, history: Any, progress: Any
+        tile_map: Any, rng: Any, months: int, history: Any, progress: Any, look: Any
     ) -> Steps[Constructions]:
         grown.append(months)
         yield

@@ -44,7 +44,7 @@ Cells = npt.NDArray[np.intp]
 
 
 # Farms with this many population points around them or more are pulled down, and none grow there.
-FARMS_CROWDED_OUT = 8
+FARMS_CROWDED_OUT = 5
 
 # How much likelier farms, orchards and other fields are on open flat grassland with nothing
 # built on it.
@@ -149,6 +149,12 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.LIMESTONE_QUARRY: (Points.ORE, 1),
     BuildingKind.SAND_PIT: (Points.ORE, 1),
     BuildingKind.POTATO_FARM: (Points.FOOD, 1),
+    BuildingKind.RICE_PADDY: (Points.FOOD, 1),
+    BuildingKind.SOY_FIELD: (Points.FOOD, 1),
+    BuildingKind.TEA_PLANTATION: (Points.FOOD, 1),
+    BuildingKind.TOFU_MAKER: (Points.FOOD, 1),
+    BuildingKind.MISO_MAKER: (Points.FOOD, 1),
+    BuildingKind.FISH_DRYER: (Points.FOOD, 1),
     BuildingKind.CATTLE_RANCH: (Points.FOOD, 1),
     BuildingKind.PIG_FARM: (Points.FOOD, 1),
     BuildingKind.CHICKEN_FARM: (Points.FOOD, 1),
@@ -174,6 +180,8 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.GLASSWORKS: (Points.INDUSTRY, 2),
     BuildingKind.BREWERY: (Points.INDUSTRY, 1),
     BuildingKind.DISTILLERY: (Points.INDUSTRY, 1),
+    BuildingKind.SAKE_BREWERY: (Points.INDUSTRY, 1),
+    BuildingKind.SOY_SAUCE_BREWERY: (Points.INDUSTRY, 1),
     BuildingKind.TANNERY: (Points.INDUSTRY, 2),
     BuildingKind.SHOE_FACTORY: (Points.INDUSTRY, 2),
     BuildingKind.PLASTICS_WORKS: (Points.INDUSTRY, 3),
@@ -197,6 +205,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.OLYMPIC_STADIUM: (Points.CORPORATE, 100),
     BuildingKind.TAVERN: (Points.CORPORATE, 1),
     BuildingKind.CLUB: (Points.CORPORATE, 3),
+    BuildingKind.SUSHI_HUT: (Points.CORPORATE, 1),
     BuildingKind.FILLING_STATION: (Points.CORPORATE, 1),
     BuildingKind.DEPARTMENT_STORE: (Points.CORPORATE, 3),
     BuildingKind.HOTEL: (Points.CORPORATE, 5),
@@ -222,7 +231,9 @@ _LAND_TABLES: dict[int, tuple] = {}
 @dataclass(frozen=True, slots=True)
 class Land:
     """How the land changes a ladder's chances: each weight multiplies them. Water weights go by
-    the best water next to the cell, LAND standing for none; anything left out weighs 1."""
+    the best water next to the cell, LAND standing for none; a minor river through the cell itself
+    counts as a river (Surroundings.on_stream). The sea is salty, so unless a ladder names it, it
+    does no more than dry land; anything else left out weighs 1."""
 
     vegetation: Mapping[Vegetation, float] = field(default_factory=dict)
     relief: Mapping[Relief, float] = field(default_factory=dict)
@@ -236,6 +247,10 @@ class Land:
     least_forest_nearby: int = 0
     # Only on cells over this deposit (railroads.mapgen.deposits).
     deposit: Deposit | None = None
+    # Only within this many degrees of the equator, north or south.
+    most_latitude: float | None = None
+    # Only inside this box of longitude and latitude: west, east, south, north.
+    region: tuple[float, float, float, float] | None = None
     # Flat grassland weighs this much more, but where anything stands already only one turn in
     # this many goes ahead.
     open_field: float = 1.0
@@ -250,6 +265,10 @@ class Land:
         """Whether a cell's weight changes with the forests around it, not just its own."""
         return self.forest_edge or self.least_forest_nearby > 0
 
+    @property
+    def _dry(self) -> float:
+        return self.water.get(Terrain.LAND, 1.0)
+
     def _tables(self) -> tuple[FloatGrid, FloatGrid, FloatGrid, FloatGrid]:
         """The weight of every vegetation, relief, temperature and water, as arrays indexed by
         their values, worked out once for each land."""
@@ -260,7 +279,12 @@ class Land:
                 np.array([self.vegetation.get(v, 1.0) for v in Vegetation]),
                 np.array([self.relief.get(r, 1.0) for r in Relief]),
                 np.array([self.temperature.get(t, 1.0) for t in Temperature]),
-                np.array([self.water.get(t, 1.0) for t in Terrain]),
+                np.array(
+                    [
+                        self.water.get(t, self._dry) if t == Terrain.SEA else self.water.get(t, 1.0)
+                        for t in Terrain
+                    ]
+                ),
             )
             _LAND_TABLES[id(self)] = tables
         return tables[1:]
@@ -279,9 +303,11 @@ class Land:
     def weights_in(self, around: Surroundings) -> FloatGrid:
         """The weight of the cells whose surroundings these are, in their order."""
         vegetation_weights, relief_weights, temperature_weights, water = self._tables()
-        is_water = around.is_water
-        best = np.where(is_water, water[around.terrain_around], 0.0).max(axis=0)
-        by_water = np.where(around.by_water, best, water[Terrain.LAND])
+        wet = around.is_water
+        best = np.where(wet, water[around.terrain_around], 0.0).max(axis=0)
+        own = around.on_stream
+        best = np.where(own, np.maximum(best, water[Terrain.RIVER]), best)
+        by_water = np.where(wet.any(axis=0) | own, best, water[Terrain.LAND])
         weight = (
             vegetation_weights[around.vegetation]
             * relief_weights[around.relief]
@@ -297,6 +323,12 @@ class Land:
             deposits = around.deposits
             on_it = deposits is not None and deposits == self.deposit
             weight = weight * on_it
+        if self.most_latitude is not None:
+            weight = weight * (np.abs(around.latitude) < self.most_latitude)
+        if self.region is not None:
+            west, east, south, north = self.region
+            lon, lat = around.longitude, around.latitude
+            weight = weight * ((lon >= west) & (lon <= east) & (lat >= south) & (lat <= north))
         weight = weight * np.where(around.open_flat_grass, self.open_field, 1.0)
         return np.where(around.land, weight, 0.0)
 
@@ -333,8 +365,10 @@ class Surroundings:
         return self.real & (self.terrain_around != Terrain.LAND)
 
     @cached_property
-    def by_water(self) -> npt.NDArray[np.bool_]:
-        return self.is_water.any(axis=0)
+    def on_stream(self) -> npt.NDArray[np.bool_]:
+        """Whether a minor river flows through the cell itself: fresh water like a river there,
+        though not beside it, so the streams of a delta don't make a whole plain wet."""
+        return self.tile_map.stream.ravel()[self.chosen].astype(bool) & self.land
 
     @cached_property
     def vegetation(self) -> npt.NDArray[np.uint8]:
@@ -379,6 +413,22 @@ class Surroundings:
     @cached_property
     def open_flat_grass(self) -> npt.NDArray[np.bool_]:
         return (self.relief == Relief.FLAT) & (self.vegetation == Vegetation.GRASS)
+
+    @cached_property
+    def _lonlat(self) -> tuple[FloatGrid, FloatGrid]:
+        rows, cols = np.unravel_index(self.chosen, self.tile_map.grid.shape)
+        x, y = self.tile_map.grid.center(rows, cols)
+        km = self.tile_map.grid.km_per_cell
+        lon, lat = self.tile_map.bounds.to_lonlat(np.asarray(x) * km, np.asarray(y) * km)
+        return np.asarray(lon, dtype=np.float64), np.asarray(lat, dtype=np.float64)
+
+    @cached_property
+    def longitude(self) -> FloatGrid:
+        return self._lonlat[0]
+
+    @cached_property
+    def latitude(self) -> FloatGrid:
+        return self._lonlat[1]
 
     @cached_property
     def land(self) -> npt.NDArray[np.bool_]:
@@ -463,14 +513,14 @@ def _merges(ladder: Ladder) -> Ladder:
 # more; two or more nearby start a town.
 TOWN_LAND = Land(
     vegetation={Vegetation.BARREN: 0.5, Vegetation.FOREST: 0.3},
-    relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.05},
+    relief={Relief.HILLS: 1.0, Relief.MOUNTAINS: 0.2},
     temperature={Temperature.COLD: 0.6, Temperature.HOT: 0.8},
-    water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.3, Terrain.SEA: 1.3},
+    water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.3},
 )
 
 FACTORY_LAND = Land(
     vegetation={Vegetation.FOREST: 0.2},
-    relief={Relief.HILLS: 0.5, Relief.MOUNTAINS: 0.0},
+    relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
     temperature={Temperature.COLD: 0.7},
     water={Terrain.RIVER: 1.5, Terrain.SEA: 1.3, Terrain.LAKE: 1.2},
 )
@@ -478,8 +528,8 @@ FACTORY_LAND = Land(
 TOWNS = Ladder(
     kinds=(BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS),
     land=TOWN_LAND,
-    base_chance=0.0000018,
-    chance_per_doubling={Points.POPULATION: 0.0002},
+    base_chance=0.0000013,
+    chance_per_doubling={Points.POPULATION: 0.000084},
     merges={
         BuildingKind.HOUSE: Merge(needed=6, pulled_down=6),
         BuildingKind.TENEMENT: Merge(needed=5, pulled_down=3),
@@ -495,13 +545,13 @@ FARMS = Ladder(
     kinds=(BuildingKind.FARM,),
     land=Land(
         vegetation={Vegetation.BARREN: 0.1, Vegetation.FOREST: 0.02},
-        relief={Relief.HILLS: 0.25, Relief.MOUNTAINS: 0.0},
+        relief={Relief.HILLS: 0.6, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.2, Temperature.HOT: 0.6},
-        water={Terrain.RIVER: 4.0, Terrain.LAKE: 4.0, Terrain.SEA: 2.0},
+        water={Terrain.RIVER: 4.0, Terrain.LAKE: 4.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.0000000373,
-    chance_per_doubling={Points.POPULATION: 0.00000672, Points.FOOD: 0.00000028},
+    base_chance=9.698e-08,
+    chance_per_doubling={Points.POPULATION: 1.7472e-05, Points.FOOD: 7.28e-07},
     crowded_at=FARMS_CROWDED_OUT,
 )
 
@@ -512,11 +562,11 @@ ORCHARDS = Ladder(
         vegetation={Vegetation.BARREN: 0.2, Vegetation.FOREST: 0.1},
         relief={Relief.FLAT: 0.4, Relief.HILLS: 1.5, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.05, Temperature.HOT: 1.2},
-        water={Terrain.RIVER: 3.0, Terrain.LAKE: 3.0, Terrain.SEA: 2.0},
+        water={Terrain.RIVER: 3.0, Terrain.LAKE: 3.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000056,
-    chance_per_doubling={Points.POPULATION: 0.000000108, Points.FOOD: 0.00000216},
+    base_chance=1.12e-07,
+    chance_per_doubling={Points.POPULATION: 2.16e-07, Points.FOOD: 4.32e-06},
 )
 
 # Date palms grow in hot desert, best at an oasis by water.
@@ -524,13 +574,13 @@ DATE_PALMS = Ladder(
     kinds=(BuildingKind.DATE_PALMS,),
     land=Land(
         vegetation={Vegetation.GRASS: 0.2, Vegetation.FOREST: 0.0},
-        relief={Relief.HILLS: 0.4, Relief.MOUNTAINS: 0.0},
+        relief={Relief.HILLS: 0.7, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.0, Temperature.NORMAL: 0.0},
-        water={Terrain.RIVER: 5.0, Terrain.LAKE: 5.0, Terrain.SEA: 2.0},
+        water={Terrain.RIVER: 5.0, Terrain.LAKE: 5.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000168,
-    chance_per_doubling={Points.POPULATION: 0.00000168, Points.FOOD: 0.00000126},
+    base_chance=3.36e-07,
+    chance_per_doubling={Points.POPULATION: 3.36e-06, Points.FOOD: 2.52e-06},
 )
 
 # Bananas grow in the jungle.
@@ -538,13 +588,13 @@ BANANA_PLANTATIONS = Ladder(
     kinds=(BuildingKind.BANANAS,),
     land=Land(
         vegetation={Vegetation.BARREN: 0.0, Vegetation.GRASS: 0.0},
-        relief={Relief.HILLS: 0.5, Relief.MOUNTAINS: 0.0},
+        relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.0, Temperature.NORMAL: 0.0},
-        water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0, Terrain.SEA: 1.5},
+        water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000168,
-    chance_per_doubling={Points.POPULATION: 0.00000168, Points.FOOD: 0.00000126},
+    base_chance=3.36e-07,
+    chance_per_doubling={Points.POPULATION: 3.36e-06, Points.FOOD: 2.52e-06},
 )
 
 # Oranges want hot, green land: not the desert, not the jungle.
@@ -552,13 +602,13 @@ ORANGE_FARMS = Ladder(
     kinds=(BuildingKind.ORANGE_FARM,),
     land=Land(
         vegetation={Vegetation.BARREN: 0.0, Vegetation.FOREST: 0.0},
-        relief={Relief.HILLS: 0.7, Relief.MOUNTAINS: 0.0},
+        relief={Relief.HILLS: 1.0, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.0, Temperature.NORMAL: 0.0},
-        water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0, Terrain.SEA: 1.5},
+        water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000168,
-    chance_per_doubling={Points.POPULATION: 0.00000168, Points.FOOD: 0.00000126},
+    base_chance=3.36e-07,
+    chance_per_doubling={Points.POPULATION: 3.36e-06, Points.FOOD: 2.52e-06},
 )
 
 # Sugar grows on open, flat land wherever it is not cold: beet in mild lands, cane in hot ones.
@@ -566,13 +616,13 @@ SUGAR_FIELDS = Ladder(
     kinds=(BuildingKind.SUGAR,),
     land=Land(
         vegetation={Vegetation.BARREN: 0.05, Vegetation.FOREST: 0.02},
-        relief={Relief.HILLS: 0.3, Relief.MOUNTAINS: 0.0},
+        relief={Relief.HILLS: 0.6, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.0, Temperature.NORMAL: 0.6, Temperature.HOT: 1.0},
-        water={Terrain.RIVER: 3.0, Terrain.LAKE: 2.0, Terrain.SEA: 1.5},
+        water={Terrain.RIVER: 3.0, Terrain.LAKE: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000013,
-    chance_per_doubling={Points.POPULATION: 0.000000042, Points.FOOD: 0.000000168},
+    base_chance=2.6e-08,
+    chance_per_doubling={Points.POPULATION: 8.4e-08, Points.FOOD: 3.36e-07},
 )
 
 # Mines are dug in and beside mountains and in hills, where finding ore draws more digging nearby,
@@ -753,12 +803,13 @@ RESOURCES = (
 
 POP, IND = Points.POPULATION, Points.INDUSTRY
 
-# Soldiers: only on the few patches of military ground a map was given, where they build up fast.
+# Soldiers: only on the few patches of military ground a map was given, each of which starts play
+# with one base and two outposts (railroads.mapgen.seeding.muster_garrisons) and grows slowly.
 MILITARY = Ladder(
     kinds=(BuildingKind.OUTPOST, BuildingKind.BASE, BuildingKind.HEADQUARTERS),
     land=Land(deposit=Deposit.GARRISON),
-    base_chance=0.00045,
-    chance_per_doubling={Points.MILITARY: 0.00006},
+    base_chance=0.00015,
+    chance_per_doubling={Points.MILITARY: 0.00002},
     merges={
         BuildingKind.OUTPOST: Merge(needed=3, pulled_down=3),
         BuildingKind.BASE: Merge(needed=3, pulled_down=3),
@@ -795,8 +846,8 @@ BEEKEEPERS = Ladder(
         relief={Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.1},
     ),
-    base_chance=0.000000008,
-    chance_per_doubling={Points.FOOD: 0.00000008},
+    base_chance=1.04e-08,
+    chance_per_doubling={Points.FOOD: 1.04e-07},
     most_per_cell=1,
     most_nearby=1,
 )
@@ -838,8 +889,9 @@ BUTCHERS = _merges(
 
 # Town crafts that come up, like bakeries, the likelier the more people live around: potters and
 # dairies as often as other crafts; tile works, foundries and sausage makers, which need two
-# inputs and make goods worth more, half as often; the makers of luxury goods only in towns of
-# LUXURY_TOWN people or more, half as often as potters.
+# inputs and make goods worth more, half as often; tofu makers, miso makers and fish drying
+# sheds a quarter as often, and only in towns of FOOD_TOWN people; the makers of luxury goods
+# only in towns of LUXURY_TOWN people or more, half as often as potters.
 LUXURY_TOWN = 20
 # Potters, brewers and distillers open only in towns of FOOD_TOWN people, where they are this many
 # times likelier than before, so the map keeps about as many of them.
@@ -869,6 +921,9 @@ TOWN_CRAFTS = (
     _town_craft(BuildingKind.TILE_WORKS, 0.5),
     _town_craft(BuildingKind.FOUNDRY, 0.5, 1800),
     _town_craft(BuildingKind.SAUSAGE_MAKER, 0.625, 1850),
+    _town_craft(BuildingKind.TOFU_MAKER, 0.25, least_people=FOOD_TOWN),
+    _town_craft(BuildingKind.MISO_MAKER, 0.25, least_people=FOOD_TOWN),
+    _town_craft(BuildingKind.FISH_DRYER, 0.25, least_people=FOOD_TOWN),
     _town_craft(BuildingKind.JUICE_WORKS, 0.5, 1870),
     _town_craft(BuildingKind.CARPET_WEAVER, 0.5, 1700, LUXURY_TOWN),
     _town_craft(BuildingKind.CLOCK_MAKER, 0.5, 1880, LUXURY_TOWN),
@@ -920,15 +975,71 @@ POTATO_FARMS = Ladder(
     kinds=(BuildingKind.POTATO_FARM,),
     land=Land(
         vegetation={Vegetation.BARREN: 0.05, Vegetation.FOREST: 0.02},
-        relief={Relief.HILLS: 0.4, Relief.MOUNTAINS: 0.0},
+        relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.NORMAL: 0.8, Temperature.HOT: 0.05},
         water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000096,
-    chance_per_doubling={Points.POPULATION: 0.000001, Points.FOOD: 0.00000004},
+    base_chance=1.248e-07,
+    chance_per_doubling={Points.POPULATION: 1.3e-06, Points.FOOD: 5.2e-08},
     crowded_at=FARMS_CROWDED_OUT,
     from_year=1600,
+)
+
+# Rice grows only in warm lands, within RICE_LATITUDE degrees of the equator, on flat land and in
+# terraces on hills, never in mountains or forest. It wants fresh water: rivers and lakes flood
+# its paddies, but salty sea water does it no good.
+RICE_LATITUDE = 41.0
+
+RICE_PADDIES = Ladder(
+    kinds=(BuildingKind.RICE_PADDY,),
+    land=Land(
+        vegetation={Vegetation.BARREN: 0.05, Vegetation.FOREST: 0.0},
+        relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
+        temperature={Temperature.COLD: 0.0, Temperature.HOT: 1.2},
+        water={Terrain.LAND: 1.0, Terrain.SEA: 1.0, Terrain.RIVER: 4.0, Terrain.LAKE: 4.0},
+        open_field=OPEN_FIELD,
+        most_latitude=RICE_LATITUDE,
+    ),
+    base_chance=9.698e-08,
+    chance_per_doubling={Points.POPULATION: 1.7472e-05, Points.FOOD: 7.28e-07},
+    crowded_at=FARMS_CROWDED_OUT,
+)
+
+# Soy is grown only in East Asia (SOY_REGION: China, Korea, Japan, Manchuria and the north of
+# Vietnam), on open plains and gentle hills that are not cold, best by rivers and lakes.
+SOY_REGION = (95.0, 150.0, 18.0, 50.0)
+
+SOY_FIELDS = Ladder(
+    kinds=(BuildingKind.SOY_FIELD,),
+    land=Land(
+        vegetation={Vegetation.BARREN: 0.05, Vegetation.FOREST: 0.02},
+        relief={Relief.HILLS: 0.6, Relief.MOUNTAINS: 0.0},
+        temperature={Temperature.COLD: 0.0},
+        water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0},
+        open_field=OPEN_FIELD,
+        region=SOY_REGION,
+    ),
+    base_chance=3.12e-08,
+    chance_per_doubling={Points.POPULATION: 3.25e-07, Points.FOOD: 1.3e-08},
+    crowded_at=FARMS_CROWDED_OUT,
+)
+
+# Tea grows in the warm, wet south and east of Asia (TEA_REGION: India, Ceylon, southern China,
+# Japan, Java), best on hillsides, never in desert, the cold or mountains.
+TEA_REGION = (65.0, 150.0, -10.0, 36.0)
+
+TEA_PLANTATIONS = Ladder(
+    kinds=(BuildingKind.TEA_PLANTATION,),
+    land=Land(
+        vegetation={Vegetation.BARREN: 0.0, Vegetation.FOREST: 0.2},
+        relief={Relief.FLAT: 0.3, Relief.HILLS: 1.5, Relief.MOUNTAINS: 0.0},
+        temperature={Temperature.COLD: 0.0},
+        water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.5},
+        region=TEA_REGION,
+    ),
+    base_chance=1.87e-08,
+    chance_per_doubling={Points.POPULATION: 3.6e-08, Points.FOOD: 3.6e-07},
 )
 
 # Cattle graze open grassland and hills, away from the heat.
@@ -940,13 +1051,13 @@ CATTLE_RANCHES = Ladder(
         temperature={Temperature.HOT: 0.3},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.0000000033,
-    chance_per_doubling={Points.POPULATION: 0.00000018, Points.FOOD: 0.000000009},
+    base_chance=4.29e-09,
+    chance_per_doubling={Points.POPULATION: 2.34e-07, Points.FOOD: 1.17e-08},
     crowded_at=FARMS_CROWDED_OUT,
 )
 
 # Pig farms and chicken farms keep to the same land as cattle; pigs are a little rarer.
-PIG_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.PIG_FARM,), base_chance=0.0000000025)
+PIG_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.PIG_FARM,), base_chance=3.25e-09)
 CHICKEN_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.CHICKEN_FARM,))
 
 # Flax wants cool, wet land by rivers and lakes.
@@ -954,7 +1065,7 @@ FLAX_FIELDS = Ladder(
     kinds=(BuildingKind.FLAX_FIELD,),
     land=Land(
         vegetation={Vegetation.BARREN: 0.0, Vegetation.FOREST: 0.02},
-        relief={Relief.HILLS: 0.3, Relief.MOUNTAINS: 0.0},
+        relief={Relief.HILLS: 0.6, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.NORMAL: 0.6, Temperature.HOT: 0.0},
         water={Terrain.LAND: 0.3, Terrain.RIVER: 3.0, Terrain.LAKE: 2.0},
         open_field=OPEN_FIELD,
@@ -969,7 +1080,7 @@ HOP_GARDENS = Ladder(
     kinds=(BuildingKind.HOP_GARDEN,),
     land=Land(
         vegetation={Vegetation.BARREN: 0.0, Vegetation.FOREST: 0.05},
-        relief={Relief.HILLS: 0.6, Relief.MOUNTAINS: 0.0},
+        relief={Relief.HILLS: 0.9, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.3, Temperature.HOT: 0.2},
         open_field=OPEN_FIELD,
     ),
@@ -1040,6 +1151,24 @@ CLUBS = replace(
     from_year=1900,
 )
 
+# Sushi huts are a rare treat of grown towns: they serve a lot of fish and rice, only in towns of
+# SUSHI_TOWN people, a tenth as readily as taverns, SUSHI_APART cells apart and one per
+# SUSHI_LAND_CELLS land cells at most, and only once fish and rice are got on the map; fed, they
+# liven the homes around them as taverns do.
+SUSHI_TOWN = 20
+SUSHI_APART = 6
+SUSHI_LAND_CELLS = 4_000
+
+SUSHI_HUTS = replace(
+    TAVERNS,
+    kinds=(BuildingKind.SUSHI_HUT,),
+    base_chance=TAVERNS.base_chance / 10,
+    chance_per_doubling={Points.POPULATION: TAVERNS.chance_per_doubling[Points.POPULATION] / 10},
+    needs={Points.POPULATION: SUSHI_TOWN},
+    apart=SUSHI_APART,
+    land_cells_each=SUSHI_LAND_CELLS,
+)
+
 # Filling stations open in towns once motor cars come, as often as taverns.
 FILLING_STATION_YEAR = 1920
 FILLING_STATIONS = replace(
@@ -1064,6 +1193,22 @@ HOTELS = replace(
     apart=5,
     from_year=1900,
     land_cells_each=8_000,
+)
+
+# Sake breweries open in towns as distilleries do, once rice grows on the map.
+SAKE_BREWERIES = _works(
+    BuildingKind.SAKE_BREWERY,
+    {POP: 8e-10, Points.FOOD: 3e-9},
+    {POP: FOOD_TOWN},
+    base=CRAFT_BASE * IN_TOWNS_ONLY / 2,
+)
+
+# Soy sauce breweries open in towns as distilleries do, once soy grows on the map.
+SOY_SAUCE_BREWERIES = _works(
+    BuildingKind.SOY_SAUCE_BREWERY,
+    {POP: 8e-10, Points.FOOD: 3e-9},
+    {POP: FOOD_TOWN},
+    base=CRAFT_BASE * IN_TOWNS_ONLY / 2,
 )
 
 # Works that open by people and industry alone: their inputs must be brought to them.
@@ -1106,6 +1251,8 @@ WORKS = (
         1600,
         base=CRAFT_BASE * IN_TOWNS_ONLY / 2,
     ),
+    SAKE_BREWERIES,
+    SOY_SAUCE_BREWERIES,
     _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
     _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {POP: 3}, 1850, base=5e-8),
     _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=2e-7),
@@ -1162,6 +1309,9 @@ LADDERS = (
     *TOWN_CRAFTS,
     *TOWN_SIGHTS,
     POTATO_FARMS,
+    RICE_PADDIES,
+    SOY_FIELDS,
+    TEA_PLANTATIONS,
     CATTLE_RANCHES,
     PIG_FARMS,
     CHICKEN_FARMS,
@@ -1172,6 +1322,7 @@ LADDERS = (
     SAND_PITS,
     TAVERNS,
     CLUBS,
+    SUSHI_HUTS,
     FILLING_STATIONS,
     DEPARTMENT_STORES,
     HOTELS,
@@ -1190,6 +1341,10 @@ class GrowthRule:
     # How forests are cleared and spread, if they change at all, and how often.
     forests: ForestRule | None = FORESTS
     forests_every_months: int = 1
+    # The first kinds of the ladders the map keeps at least a few of (Growth.least_of), putting
+    # one up where too few grew; None for every ladder. Land bought keeps a quarter of them
+    # (railroads.land).
+    top_ups: frozenset[BuildingKind] | None = None
 
 
 GROWTH = GrowthRule()

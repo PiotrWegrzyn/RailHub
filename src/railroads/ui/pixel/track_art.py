@@ -20,7 +20,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from railroads.sim.constructions import Constructions, Track, TrackWidth
-from railroads.sim.grids import Cell, FloatArray
+from railroads.sim.grids import Cell, FloatArray, Grid
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
@@ -177,6 +177,18 @@ def _bend(start: Point, middle: Point, end: Point, matrix: FloatArray, radius: f
     back = np.linalg.inv(matrix)
     curve = [tuple(float(v) for v in centre + back @ point) for point in seen_curve]
     return [start, *curve, end]
+
+
+def centre_line(
+    grid: Grid, steps: FloatArray, matrix: FloatArray, piece: Track, radius: float
+) -> Path:
+    """The middle of a piece of track through its cell, in the plane: from one of its ends
+    through the cell's centre to the other, rounded off round the centre (_bend), with points no
+    more than STEP apart. `steps` are the grid's track_steps."""
+    cx, cy = (float(v) for v in grid.center(*piece.cell))
+    a, b = (steps[point] / 2 for point in piece.ends)
+    ends = (cx + a[0], cy + a[1]), (cx + b[0], cy + b[1])
+    return _dense(_bend(ends[0], (cx, cy), ends[1], matrix, radius), STEP)
 
 
 def _dense(path: Path, step: float) -> Path:
@@ -552,15 +564,10 @@ class TrackArt:
         kept = self._laid_pieces.get((piece, platform))
         if kept is not None and kept[0] == version:
             return kept[1]
-        grid = self.tile_map.grid
-        steps = self._steps / 2
-        cx, cy = (float(v) for v in grid.center(*piece.cell))
-        a, b = (steps[point] for point in piece.ends)
         reach = max(abs(side) for lane in self._sides_at(piece, [0.0, 0.5, 1.0]) for side in lane)
         bed = BRIDGE_WIDTH if piece.bed == TrackBed.BRIDGE else BANK
         radius = (reach + bed / 2 + SHADOW_REACH) * PIXEL_CELL_WIDTH
-        ends = (cx + a[0], cy + a[1]), (cx + b[0], cy + b[1])
-        line = _dense(_bend(ends[0], (cx, cy), ends[1], self.projection.matrix, radius), STEP)
+        line = centre_line(self.tile_map.grid, self._steps, self.projection.matrix, piece, radius)
         plane = np.array([[x for x, _ in line], [y for _, y in line]])
         laid = _Laid(piece, plane, self._sides(piece, line), platform)
         if len(self._laid_pieces) >= PIECES_KEPT:

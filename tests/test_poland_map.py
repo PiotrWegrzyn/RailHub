@@ -52,12 +52,6 @@ def test_map_covers_poland(poland: TileMap) -> None:
     assert 640 < size_km[1] < 670
 
 
-def test_map_file_keeps_its_scale(poland: TileMap) -> None:
-    km_per_cell = poland.grid.km_per_cell
-
-    assert km_per_cell == 2.0
-
-
 @pytest.mark.parametrize(
     ("place", "lon", "lat", "expected"),
     [

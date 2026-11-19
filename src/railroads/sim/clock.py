@@ -8,11 +8,14 @@ at any of SPEEDS.
 from dataclasses import dataclass
 
 SECONDS_PER_MONTH = 150.0
+# Months in a quarter: how long stations remember what came to them and buyers how satisfied
+# they were.
+QUARTER = 3
 START_YEAR = 1850
 # The year every map's history begins: by default a thousand years before play.
 HISTORY_START = 850
 END_YEAR = 2050
-SPEEDS = (1, 2, 3, 6)
+SPEEDS = (1, 2, 3, 6, 10)
 MONTH_NAMES = (
     "January",
     "February",
@@ -38,6 +41,12 @@ class GameClock:
     speed: int = 1
     # The year play began, which is where the map's history left off.
     first_year: int = START_YEAR
+
+    def faster(self, steps: int) -> None:
+        """Moves the speed this many steps up SPEEDS, or down for steps below 0, staying within
+        them."""
+        at = SPEEDS.index(self.speed) if self.speed in SPEEDS else 0
+        self.speed = SPEEDS[max(0, min(len(SPEEDS) - 1, at + steps))]
 
     def months_in(self, seconds: float) -> float:
         """How much of a month `seconds` of play make at the current speed."""

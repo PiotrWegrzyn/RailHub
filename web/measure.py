@@ -56,9 +56,10 @@ def _timed_render(
     resolution: int = 1,
     fine_relief: bool = False,
     over_ground: bool = False,
+    surfaces: bool = True,
 ):
     before = time.perf_counter()
-    pixels = _plain_render(self, chunk_x, chunk_y, resolution, fine_relief, over_ground)
+    pixels = _plain_render(self, chunk_x, chunk_y, resolution, fine_relief, over_ground, surfaces)
     kind = _kind(self, chunk_x, chunk_y, resolution, fine_relief, over_ground)
     _renders.append((kind, time.perf_counter() - before))
     return pixels
@@ -71,13 +72,15 @@ def _kind(
     resolution: int,
     fine_relief: bool,
     over_ground: bool,
+    surfaces: bool = True,
 ) -> str:
+    del surfaces
     if fine_relief and resolution > 1:
         kind = "fine raised"
-    elif world.rises(chunk_x, chunk_y):
-        kind = "raised"
     else:
-        kind = "flat over ground" if over_ground else "flat"
+        kind = "raised" if world.rises(chunk_x, chunk_y) else "flat"
+        if over_ground:
+            kind += " over ground"
     return f"{kind} x{resolution}"
 
 

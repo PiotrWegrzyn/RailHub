@@ -11,6 +11,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
 from railroads.sim.station_goods import StationGoods
 from railroads.ui.demand_view import draw_demand
+from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.theme import (
     BRASS_DARK,
     CARDS_WIDTH,
@@ -64,7 +65,7 @@ class StationsWindow:
             imgui.Cond_.first_use_ever.value,
         )
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
-        expanded, self.open = imgui.begin(f"{fa.ICON_FA_BUILDING}  Stations###stations", self.open)
+        expanded, self.open = begin_ornate(f"{fa.ICON_FA_BUILDING}  Stations###stations")
         if expanded:
             stations = railway.stations()
             if not stations:
@@ -73,7 +74,7 @@ class StationsWindow:
                 )
             else:
                 self._draw_table(railway, stations, look_at, open_station)
-        imgui.end()
+        end_ornate()
 
     def _draw_table(
         self,
@@ -87,8 +88,8 @@ class StationsWindow:
         imgui.table_setup_scroll_freeze(0, 1)
         imgui.table_setup_column("Station")
         imgui.table_setup_column("Stockpile")
-        imgui.table_setup_column("Waiting for trains", imgui.TableColumnFlags_.width_stretch.value)
-        imgui.table_setup_column("Brought by trains", imgui.TableColumnFlags_.width_stretch.value)
+        imgui.table_setup_column("Goods", imgui.TableColumnFlags_.width_stretch.value)
+        imgui.table_setup_column("Waiting", imgui.TableColumnFlags_.width_stretch.value)
         imgui.table_setup_column("Demand left", imgui.TableColumnFlags_.width_stretch.value)
         imgui.table_setup_column("")
         imgui.table_headers_row()
@@ -119,10 +120,10 @@ class StationsWindow:
         imgui.table_next_column()
         stock_bar(goods, (110, 0))
         imgui.table_next_column()
-        goods_inline(goods.stockpile, "empty")
+        goods_inline(goods.freight(), "empty")
         bottom = max(bottom, imgui.get_item_rect_max().y)
         imgui.table_next_column()
-        goods_inline(goods.brought, "nothing")
+        goods_inline(goods.waiting(), "nobody")
         bottom = max(bottom, imgui.get_item_rect_max().y)
         imgui.table_next_column()
         draw_demand(railway.station_demand(station))

@@ -1,12 +1,16 @@
 import numpy as np
 import pytest
 
+from railroads.sim.economy import SCARCE_WORTH
+from railroads.sim.ownership import LOT, SHARES
 from railroads.ui.waiting_screen import (
     HEX_RADIUS,
     JOKE_SECONDS,
+    TIPS,
     WORK,
     WORK_SECONDS,
     Pieces,
+    tip_for,
     waiting_line,
 )
 
@@ -15,12 +19,11 @@ from railroads.ui.waiting_screen import (
     ("seconds", "line"),
     [
         (0.0, "Random bullshit coming!"),
-        (JOKE_SECONDS + 0.1, "Lerooorryyy jennnnnkinssss"),
-        (2 * JOKE_SECONDS + 0.1, WORK[0]),
-        (2 * JOKE_SECONDS + WORK_SECONDS + 0.1, WORK[1]),
+        (JOKE_SECONDS + 0.1, WORK[0]),
+        (JOKE_SECONDS + WORK_SECONDS + 0.1, WORK[1]),
     ],
 )
-def test_a_random_place_opens_with_the_jokes_then_the_work(seconds: float, line: str) -> None:
+def test_a_random_place_opens_with_the_joke_then_the_work(seconds: float, line: str) -> None:
     shown = waiting_line(seconds, random_place=True)
 
     assert shown == line
@@ -30,6 +33,14 @@ def test_a_ready_made_map_cycles_through_the_work_from_the_start() -> None:
     lines = [waiting_line(n * WORK_SECONDS + 0.1, random_place=False) for n in range(len(WORK) + 1)]
 
     assert lines == [*WORK, WORK[0]]
+
+
+def test_no_line_calls_for_leeroy() -> None:
+    lines = [waiting_line(n * 0.5, random_place=True) for n in range(200)]
+
+    called = any("lero" in line.lower() or "jenkins" in line.lower() for line in lines)
+
+    assert not called
 
 
 def test_the_hexes_cover_the_whole_screen() -> None:
@@ -50,3 +61,21 @@ def test_the_hexes_hold_still_at_first_and_all_fall_out_of_sight() -> None:
     assert not turn.any()
     assert not pieces.gone(0.5, 600)
     assert pieces.gone(3.0, 600)
+
+
+def test_there_are_twelve_tips_and_one_of_them_says_hexagons_are_bestagons() -> None:
+    tips = {tip_for(np.random.default_rng(seed)) for seed in range(200)}
+
+    assert len(TIPS) == 12
+    assert tips == set(TIPS)
+    assert "Hexagons are bestagons!" in TIPS
+
+
+def test_the_tips_give_the_freight_and_share_figures_the_game_uses() -> None:
+    freight = f"up to {SCARCE_WORTH:g} times as much"
+    shares = f"Every {LOT} shares sell you {LOT / SHARES:.0%}"
+
+    text = " ".join(TIPS)
+
+    assert freight in text
+    assert shares in text

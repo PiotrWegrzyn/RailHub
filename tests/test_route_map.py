@@ -5,6 +5,7 @@ import pytest
 from imgui_bundle import hello_imgui, imgui
 from test_railway import joined_stations
 
+from railroads.sim.clock import QUARTER
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.demand import DEMAND_PER_NEED
 from railroads.sim.goods import Good, Need
@@ -29,6 +30,7 @@ from railroads.ui.route_map import (
     made_at,
     marks_at,
     needed,
+    needs_named,
     shade_of,
     soften,
     soften_steps,
@@ -108,7 +110,7 @@ def test_mail_wanted_and_sent_at_a_station_is_a_general_need_and_made_there() ->
 def test_a_supplier_wanting_a_little_of_its_good_takes_the_lightest_shade_of_both() -> None:
     _, railway = joined_stations()
     railway.station_demand((6, 3)).capacity = {Need.FOOD: 30.0}
-    made = {(6, 3): Offer(Good.APPLES, 115.0, 15.0)}
+    made = {(6, 3): Offer(Good.APPLES, 115.0, LEAST_MADE + 5)}
 
     shades = marks_at(railway, Good.APPLES, made)[(6, 3)].shades()
 
@@ -147,7 +149,7 @@ def test_a_marks_shade_darkens_at_each_threshold(amount: float, shade: int) -> N
 
 
 def test_a_station_gets_a_shade_for_each_kind_of_mark_it_has() -> None:
-    mark = Marks(general=200.0, special=10.0, made=50.0)
+    mark = Marks(general=200.0, special=10.0, made=QUARTER * SHADE_FROM[0])
 
     shades = mark.shades()
 
@@ -161,7 +163,7 @@ def test_a_good_is_made_where_buildings_around_make_it_or_where_it_waits() -> No
 
     found = made_at(railway, Good.COAL, made.__getitem__)
 
-    assert {station: (o.made, o.waiting) for station, o in found.items()} == {
+    assert {station: (o.gathered, o.waiting) for station, o in found.items()} == {
         (6, 3): (30.0, 0.0),
         (6, 20): (0.0, 12.0),
     }
@@ -329,7 +331,7 @@ def context(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     imgui.destroy_context(gui)
 
 
-def test_the_map_draws_centred_on_the_trains_stops_with_a_good_marked(context: None) -> None:
+def test_the_map_centres_on_the_trains_stops(context: None) -> None:
     _, railway = joined_stations()
     railway.station_demand((6, 3)).capacity = {Need.COAL: 40.0}
     train = railway.buy()
@@ -383,3 +385,11 @@ def test_track_splits_into_lines_where_three_pieces_meet_or_its_width_changes() 
 
     assert len(lines) == 4
     assert [double for _, double in lines].count(True) == 1
+
+
+def test_general_needs_are_named_in_the_order_needs_are_listed_the_last_after_or() -> None:
+    needs = frozenset({Need.MAIL, Need.FOOD, Need.HEATING})
+
+    named = needs_named(needs)
+
+    assert named == "food, heating or mail"

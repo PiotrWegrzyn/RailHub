@@ -1,6 +1,8 @@
-"""What the waiting screen shows while a new game is set up: a line of make-believe work that
-changes every few seconds, opened by two jokes when the map is a random place; and, once the game
-is ready, the screen breaking into hexes that fall away to show it."""
+"""What the waiting screen shows while a new game is set up without pictures of its map growing
+(railroads.ui.history_pictures): a line of make-believe work that changes every few seconds, opened
+by a joke when the map is a random place. And, once the game is ready, the screen breaking into
+hexes that fall away to show it, each hex carrying the part of the screen it covered: the newest
+picture of the map growing, or the plain background, and the lines shown over it."""
 
 import math
 from dataclasses import dataclass
@@ -9,7 +11,11 @@ from typing import Self
 import numpy as np
 from imgui_bundle import imgui
 
-RANDOM_JOKES = ("Random bullshit coming!", "Lerooorryyy jennnnnkinssss")
+from railroads.sim.economy import SCARCE_WORTH
+from railroads.sim.goods import FITS, Need
+from railroads.sim.ownership import LOT, SHARES, satisfaction_price
+
+RANDOM_JOKES = ("Random bullshit coming!",)
 JOKE_SECONDS = 5.0
 WORK = (
     "Turning cogs",
@@ -25,6 +31,25 @@ WORK = (
 )
 WORK_SECONDS = 2.5
 
+*_FIRST_DRINKS, _LAST_DRINK = (good.value for good in FITS[Need.ALCOHOL])
+# How many times a starving building's price a thriving one's shares cost.
+_THRIVING_PRICE = satisfaction_price(2.0) / satisfaction_price(0.0)
+# A tip shown under the waiting screen's lines, one picked for each wait.
+TIPS = (
+    "Hexagons are bestagons!",
+    "Stations hand out to your own buildings first.",
+    f"Freight pays up to {SCARCE_WORTH:g} times as much where buildings go short.",
+    f"Every {LOT} shares sell you {LOT / SHARES:.0%} of a building's output at the market price.",
+    "Buy shares cheap where a building starves, then feed it.",
+    "Short trains of full cars pay best: every car costs a trip.",
+    "Passengers only ride between stations of different towns.",
+    f"Taverns and clubs take any alcohol: {', '.join(_FIRST_DRINKS)} or {_LAST_DRINK}.",
+    "Hover a category's icon to see what goods are in it.",
+    f"A thriving building's shares are worth up to {_THRIVING_PRICE:.0f} times a starving one's.",
+    "A station not joined by track to another gathers and hands out nothing.",
+    "What buildings must have is handed out before anything they take as a bonus.",
+)
+
 # The falling hexes: their size, when the cracks show and the first falls, how much later the
 # outermost falls than the middle one, and how hard they fall (pixels a second squared).
 HEX_RADIUS = 40.0
@@ -35,6 +60,13 @@ GRAVITY = 2600.0
 CRACK_COLOUR = (0.0, 0.0, 0.0, 0.55)
 # The most a frame moves the hexes on, so the slow first frames of a game can't skip their fall.
 LONGEST_STEP = 0.1
+# A hexagon's corners (_hexagon) as the two quads either side of its middle.
+HALVES = ((0, 1, 2, 3), (3, 4, 5, 0))
+
+
+def tip_for(rng: np.random.Generator) -> str:
+    """A tip for one wait."""
+    return TIPS[int(rng.integers(len(TIPS)))]
 
 
 def waiting_line(seconds: float, random_place: bool) -> str:
@@ -119,9 +151,17 @@ class Shatter:
     with them."""
 
     def __init__(
-        self, width: float, height: float, colour: int, labels: list[Label], seed: int = 0
+        self,
+        width: float,
+        height: float,
+        colour: int,
+        labels: list[Label],
+        seed: int = 0,
+        pictures: list[imgui.ImTextureRef] | None = None,
     ) -> None:
+        self.width = width
         self.height = height
+        self.pictures = pictures or []
         self.colour = colour
         self.pieces = Pieces.covering(width, height, np.random.default_rng(seed))
         self.labels = labels
@@ -139,11 +179,16 @@ class Shatter:
             imgui.ImVec4(*CRACK_COLOUR[:3], CRACK_COLOUR[3] * min(self.seconds / CRACK_SECONDS, 1))
         )
         x, y, turn = self.pieces.at(self.seconds)
-        for cx, cy, a in zip(x.tolist(), y.tolist(), turn.tolist(), strict=True):
+        homes = zip(self.pieces.x.tolist(), self.pieces.y.tolist(), strict=True)
+        for cx, cy, a, home in zip(x.tolist(), y.tolist(), turn.tolist(), homes, strict=True):
             if cy - HEX_RADIUS > self.height:
                 continue
             # Filled a pixel bigger than its outline, so no seam shows between hexes in place.
-            draw.add_convex_poly_filled(_hexagon(cx, cy, a, HEX_RADIUS + 1), self.colour)
+            corners = _hexagon(cx, cy, a, HEX_RADIUS + 1)
+            if not self.pictures:
+                draw.add_convex_poly_filled(corners, self.colour)
+            else:
+                self._draw_piece(draw, corners, _hexagon(*home, 0.0, HEX_RADIUS + 1))
             draw.add_polyline(
                 _hexagon(cx, cy, a, HEX_RADIUS),
                 crack,
@@ -159,6 +204,16 @@ class Shatter:
             else:
                 draw.add_text(top_left, label.colour, label.text)
         return True
+
+    def _draw_piece(
+        self, draw: imgui.ImDrawList, corners: list[imgui.ImVec2], home: list[imgui.ImVec2]
+    ) -> None:
+        """Draws a hex with the part of the pictures it covered in place, one over the other: as
+        two quads, the halves of the hexagon above and below its middle."""
+        for half in HALVES:
+            uv = [imgui.ImVec2(home[i].x / self.width, home[i].y / self.height) for i in half]
+            for picture in self.pictures:
+                draw.add_image_quad(picture, *(corners[i] for i in half), *uv)
 
 
 def _hexagon(x: float, y: float, turn: float, radius: float) -> list[imgui.ImVec2]:

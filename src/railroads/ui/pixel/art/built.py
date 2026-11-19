@@ -12,16 +12,14 @@ import math
 from collections.abc import Callable
 from dataclasses import replace
 
-import numpy as np
 from PIL import Image, ImageDraw
 
 from railroads.sim.grids import HexGrid
-from railroads.ui.pixel import train_parts as parts
 from railroads.ui.pixel.art.painter import RGB, SHADOW, Sprite, fineness, shade
 from railroads.ui.pixel.models import HEIGHT_PER_WIDTH, Face, Model, draw_model
 from railroads.ui.pixel.projection import PixelProjection
 
-# The hex map's look (railroads.ui.map_view.LOOKS): not turned, a cell wide per cell.
+# The hex map's look (railroads.ui.iso_camera.LOOKS): not turned, a cell wide per cell.
 PROJECTION = PixelProjection.of(HexGrid(rows=1, cols=1, km_per_cell=1.0), 0.0, 1.0)
 # How a building is turned: its u axis runs down to the right of the screen, so its long front
 # wall faces the viewer on the left and its end wall on the right, lit from the top left.
@@ -209,18 +207,6 @@ def gable_roof(
         )
 
 
-def flat_roof(
-    m: Model, u: tuple[float, float], v: tuple[float, float], height: float, color: RGB, wall: RGB
-) -> None:
-    """A flat roof at `height` behind a low parapet in the wall's colour."""
-    (u0, u1), (v0, v1) = u, v
-    m.box(u, v, (height, height + 0.004), color)
-    for side in ((v0, v0 + 0.006), (v1 - 0.006, v1)):
-        m.box(u, side, (height, height + 0.014), shade(wall, 0.95))
-    for side in ((u0, u0 + 0.006), (u1 - 0.006, u1)):
-        m.box(side, v, (height, height + 0.014), shade(wall, 0.95))
-
-
 def window(
     m: Model,
     u: tuple[float, float],
@@ -240,28 +226,6 @@ def window(
         for edge in ((u0 - 0.0016, u0), (u1, u1 + 0.0016)):
             m.panel(edge, z, v + 0.0012, frame)
         m.panel(u, (z1, z1 + 0.0016), v + 0.0012, frame)
-
-
-def end_window(
-    m: Model,
-    end: float,
-    v: tuple[float, float],
-    z: tuple[float, float],
-    glass: RGB,
-    frame: RGB = FRAME,
-) -> None:
-    """A window on the end wall at `end`, with a frame, cross bar and sill up close."""
-    out = 1.0 if end > 0 else -1.0
-    parts.front_plate(m, end + out * 0.0006, v, z, glass)
-    if not parts.keeping_fine():
-        return
-    (v0, v1), (z0, z1) = v, z
-    with m.fine():
-        at = end + out * 0.0012
-        parts.front_plate(m, at, (v0 - 0.003, v1 + 0.003), (z0 - 0.004, z0), SILL)
-        mid_v, mid_z = (v0 + v1) / 2, (z0 + z1) / 2
-        parts.front_plate(m, at, (mid_v - 0.0012, mid_v + 0.0012), z, frame)
-        parts.front_plate(m, at, v, (mid_z - 0.0012, mid_z + 0.0012), frame)
 
 
 def door(m: Model, u: tuple[float, float], height: float, v: float, color: RGB = DOOR) -> None:
@@ -520,30 +484,6 @@ def below(height: float, drop: float, size: float) -> tuple[float, float]:
     return tall(height - drop - size), tall(height - drop)
 
 
-def lit_window(
-    m: Model,
-    u: tuple[float, float],
-    v: tuple[float, float],
-    span: tuple[float, float],
-    height: float,
-    drop: float,
-) -> None:
-    window(m, (along(u, span[0]), along(u, span[1])), below(height, drop, 1.2), v[1], WINDOW)
-
-
-def side_window(
-    m: Model,
-    u: tuple[float, float],
-    v: tuple[float, float],
-    span: tuple[float, float],
-    height: float,
-    drop: float,
-) -> None:
-    """A window `span` of the way along the shaded end wall of a block `height` pixels high."""
-    ends = sorted((across(v, span[0]), across(v, span[1])))
-    end_window(m, u[1], (ends[0], ends[1]), below(height, drop, 1.2), shade(WINDOW, 0.8))
-
-
 def log(
     m: Model,
     a: tuple[float, float],
@@ -604,77 +544,6 @@ def barrel(m: Model, u: float, v: float, radius: float, height: float, color: RG
                 shade(color, 0.55),
             )
         dome(m, u, v, radius * 0.98, (height, height + 0.002), shade(color, 0.8))
-
-
-def strut(
-    m: Model,
-    a: tuple[float, float, float],
-    b: tuple[float, float, float],
-    thick: float,
-    color: RGB,
-) -> None:
-    """A square beam `thick` across from point `a` to point `b`: a frame's leg or brace, a pole."""
-    d = np.array(b, dtype=np.float64) - np.array(a, dtype=np.float64)
-    length = float(np.linalg.norm(d)) or 1.0
-    d /= length
-    side = np.cross(d, (0.0, 0.0, 1.0))
-    if np.linalg.norm(side) < 1e-6:
-        side = np.array((1.0, 0.0, 0.0))
-    side /= np.linalg.norm(side)
-    up = np.cross(side, d)
-    half = thick / 2
-    corners = [
-        np.array(a) + (s * side + t * up) * half for s, t in ((-1, -1), (1, -1), (1, 1), (-1, 1))
-    ]
-    far = [c + d * length for c in corners]
-    for k in range(4):
-        quad = [corners[k], corners[(k + 1) % 4], far[(k + 1) % 4], far[k]]
-        middle = (corners[k] + corners[(k + 1) % 4]) / 2 - np.array(a)
-        normal = middle / (np.linalg.norm(middle) or 1.0)
-        m.faces.append(
-            Face([tuple(float(x) for x in c) for c in quad], color, tuple(float(x) for x in normal))
-        )
-    for cap, sign in ((corners, -1.0), (far, 1.0)):
-        m.faces.append(
-            Face(
-                [tuple(float(x) for x in c) for c in cap], color, tuple(float(x) for x in d * sign)
-            )
-        )
-
-
-def arch_window(
-    m: Model,
-    u: tuple[float, float],
-    z: tuple[float, float],
-    v: float,
-    glass: RGB,
-    lintel: RGB | None = None,
-) -> None:
-    """A round-arched window on the long wall `v` out, from `z[0]` up to the springing of its
-    arch at `z[1]`, with up close a lighter brick arch over it."""
-    (u0, u1), (z0, z1) = u, z
-    half = (u1 - u0) / 2
-    middle = u0 + half
-
-    def arch(grow: float) -> list[tuple[float, float, float]]:
-        points = [(u0 - grow, v, z0), (u1 + grow, v, z0)]
-        points += [
-            (
-                middle + (half + grow) * math.cos(math.pi * k / 8),
-                v,
-                z1 + (half + grow) * math.sin(math.pi * k / 8),
-            )
-            for k in range(9)
-        ]
-        return points
-
-    normal = (0.0, 1.0 if v >= 0 else -1.0, 0.0)
-    if lintel is not None:
-        with m.fine():
-            m.faces.append(
-                Face([(a, v + normal[1] * 0.0004, c) for a, _, c in arch(0.003)], lintel, normal)
-            )
-    m.faces.append(Face([(a, v + normal[1] * 0.0008, c) for a, _, c in arch(0.0)], glass, normal))
 
 
 def paddock(m: Model, x: float, y: float, half: float) -> None:
@@ -814,54 +683,3 @@ def heap(m: Model, x: float, y: float, half: float, height: float, color: RGB) -
     """The painted sprite's heap at (x, y), `half` pixels across and `height` high."""
     u, v = spot(x, y)
     cone(m, u, v, wide(half), tall(height), color)
-
-
-def roofed_hall(
-    m: Model,
-    u: tuple[float, float],
-    v: tuple[float, float],
-    height: float,
-    wall: RGB,
-    roof: RGB | None,
-    rise: float = 0,
-    flat: RGB | None = None,
-) -> float:
-    """Walls `u` by `v` `height` pixels high on a plinth, under a gable roof `rise` pixels high if
-    `roof` is given, or a flat roof in `flat`; returns how high the walls stand."""
-    high = tall(height)
-    footing(m, u, v)
-    walls(m, u, v, high, wall)
-    plinth(m, u, v, tall(0.9), shade(wall, 0.72))
-    if roof is not None and rise:
-        gable_roof(m, u, v, (high, high + tall(rise)), roof, wall)
-    elif flat is not None:
-        flat_roof(m, u, v, high, flat, wall)
-    return high
-
-
-def windows_at(
-    m: Model,
-    u: tuple[float, float],
-    v: tuple[float, float],
-    height: float,
-    spans: tuple[float, ...],
-    drops: tuple[float, ...],
-    size: float,
-    glass: RGB = WINDOW,
-    lintel: RGB | None = None,
-    ends: tuple[float, ...] = (),
-) -> None:
-    """Windows as the painted sprites' _windows place them: centred `spans` of the way along the
-    lit wall, `drops` pixels below the top of a wall `height` pixels high, `size` pixels tall,
-    round-arched with a `lintel` if given; and at `ends` along the end wall too."""
-    for drop in drops:
-        z0, z1 = below(height, drop, size)
-        for t in spans:
-            span = (along(u, t - 0.05), along(u, t + 0.05))
-            if lintel is not None:
-                arch_window(m, span, (z0, z1 - (span[1] - span[0]) / 2), v[1], glass, lintel)
-            else:
-                window(m, span, (z0, z1), v[1], glass)
-        for t in ends:
-            across_ = sorted((across(v, t - 0.07), across(v, t + 0.07)))
-            end_window(m, u[1], (across_[0], across_[1]), (z0, z1), shade(glass, 0.8))

@@ -22,7 +22,8 @@ from railroads.sim.demolition import (
 )
 from railroads.sim.finance import (
     DOUBLE_TRACK_FACTOR,
-    ELECTRIC_TRACK_PRICE,
+    DOUBLE_TRACK_UPKEEP_FACTOR,
+    ELECTRIC_TRACK_FACTOR,
     ELECTRIC_TRACK_UPKEEP,
     MAGLEV_TRACK_PRICE,
     MAGLEV_TRACK_UPKEEP,
@@ -31,22 +32,19 @@ from railroads.sim.finance import (
     TRACK_UPKEEP,
     dollars,
 )
-from railroads.sim.goods import Good
 from railroads.sim.grids import Cell, FloatArray, Grid
 from railroads.sim.ladders import Points
-from railroads.sim.railway import Railway
 from railroads.sim.routes import Route
 from railroads.sim.tilemap import Relief
 from railroads.sim.track_rules import BRIDGE_RULES, RELIEF_RULES, TUNNEL_RULES, TrackBed
 from railroads.ui.iso_camera import IsoCamera, Vec2
+from railroads.ui.ornate import DEEP, bar_buttons, diamond, frame_window
+from railroads.ui.spotlight import spot
 from railroads.ui.stations_window import StationsWindow
 from railroads.ui.theme import (
-    BORDER,
     BRASS,
-    GOOD_COLORS,
     OVERLAY_FLAGS,
     Rgba,
-    color_u32,
     rgba_u32,
     toggle_button,
 )
@@ -71,21 +69,6 @@ STATION_FILL = (0.27, 0.35, 0.8, 0.85)
 CELL_LINE = (0.25, 0.22, 0.2, 0.5)
 COLLECTION_RING = (0.4, 0.6, 1.0, 0.95)
 
-ENGINE = (0.14, 0.15, 0.17, 1.0)
-CAB = (0.62, 0.14, 0.1, 1.0)
-SMOKE = (0.85, 0.85, 0.88, 0.9)
-# What each car looks like empty, and the colour of what it carries.
-CAR_COLORS: dict[Good, Rgba] = dict(GOOD_COLORS)
-CAR_BODIES: dict[Good, Rgba] = {
-    good: (r * 0.55, g * 0.55, b * 0.55, 1.0) for good, (r, g, b, _) in GOOD_COLORS.items()
-}
-# Sizes in cells: how far apart the engine and each car are drawn, how long and wide they are,
-# and the gap between cars.
-CAR_SPACING = 0.36
-CAR_LENGTH = 0.34
-CAR_WIDTH = 0.16
-CAR_GAP = 0.02
-OUTLINE = (0.05, 0.05, 0.05, 1.0)
 # How far above the bottom of the map the build bar floats, how wide its hints run, and how long
 # a message stays up, in seconds.
 BAR_MARGIN = 16.0
@@ -120,11 +103,11 @@ HINTS = {
     ),
     Tool.TRACK: (
         f"Click where track starts, then where it goes; starting or ending on track joins it. "
-        f"{dollars(TRACK_PRICE)} a cell on the flat, {dollars(HILLS_PRICE)} in hills, "
-        f"{dollars(BRIDGE_PRICE)} a bridge, {dollars(TUNNEL_PRICE)} a tunnel; double track "
-        f"{DOUBLE_TRACK_FACTOR:g} times as much, and electric {dollars(ELECTRIC_TRACK_PRICE)} "
-        f"a cell more. Laying it along your track widens or electrifies that. Buildings in the way "
-        "cost what taking them down does. Right click cancels."
+        f"{dollars(TRACK_PRICE)} a cell on the flat, {dollars(HILLS_PRICE)} in hills, twice that "
+        f"across a minor river, {dollars(BRIDGE_PRICE)} a bridge, {dollars(TUNNEL_PRICE)} a tunnel; "
+        f"double track {DOUBLE_TRACK_FACTOR:g} times as much, and electric "
+        f"{ELECTRIC_TRACK_FACTOR:g} times as much again. Laying it along your track widens or "
+        "electrifies that. Buildings in the way cost what taking them down does. Right click cancels."
     ),
     Tool.BULLDOZE: (
         f"Click a cell to clear it: homes from {dollars(DEMOLITION_PER_POINT[Points.POPULATION])}, "
@@ -158,14 +141,15 @@ WIDTH_BUTTONS = (
         "Double",
         (
             f"Two tracks side by side: {dollars(TRACK_PRICE * DOUBLE_TRACK_FACTOR)} a cell, "
-            f"${TRACK_UPKEEP * DOUBLE_TRACK_FACTOR:.2f} a month"
+            f"${TRACK_UPKEEP * DOUBLE_TRACK_UPKEEP_FACTOR:.2f} a month"
         ),
     ),
 )
 ELECTRIC_TIP = (
-    f"Wires over the track for electric engines: {dollars(ELECTRIC_TRACK_PRICE)} a cell more, "
-    f"{dollars(ELECTRIC_TRACK_UPKEEP)} a month more ({DOUBLE_TRACK_FACTOR:g} times that on double "
-    "track). Lay it over your track to electrify that."
+    f"Wires over the track for electric engines, once electric engines are on sale: "
+    f"{ELECTRIC_TRACK_FACTOR:g} times the track's price, {dollars(ELECTRIC_TRACK_UPKEEP)} a month "
+    f"more ({DOUBLE_TRACK_UPKEEP_FACTOR:g} times that on double track). Lay it over your track to "
+    "electrify that."
 )
 MAGLEV_TIP = (
     f"A concrete guideway for maglev engines, which run on nothing else, and nothing else runs "
@@ -206,6 +190,8 @@ class BuildMenu:
     maglev: bool = False
     # Whether maglev track can be laid yet (Railway.maglev_open).
     maglev_open: bool = False
+    # Whether electric track can be laid yet (Railway.electric_open).
+    electric_open: bool = False
     trains: TrainsWindow = field(default_factory=TrainsWindow)
     stations: StationsWindow = field(default_factory=StationsWindow)
 
@@ -217,11 +203,22 @@ class BuildMenu:
         flags = OVERLAY_FLAGS | imgui.WindowFlags_.no_move.value
         imgui.push_style_var(imgui.StyleVar_.window_rounding.value, 12.0)
         imgui.push_style_var(imgui.StyleVar_.window_padding.value, imgui.ImVec2(10, 8))
+        imgui.push_style_color(imgui.Col_.window_bg, imgui.ImVec4(*DEEP))
+        imgui.push_style_color(imgui.Col_.border, imgui.ImVec4(0, 0, 0, 0))
         imgui.begin("##build bar", flags=flags)
+        imgui.pop_style_color(2)
+        frame_window()
+        with bar_buttons():
+            self._draw_bar()
+        imgui.end()
+        imgui.pop_style_var(2)
+
+    def _draw_bar(self) -> None:
         self._draw_hint()
         for tool, label, tooltip in TOOL_BUTTONS:
             if toggle_button(label, self.tool == tool, tooltip, (0, BUTTON_HEIGHT)):
                 self.choose(Tool.NONE if self.tool == tool else tool)
+            spot(f"tool:{tool.value}")
             imgui.same_line()
         if self.tool == Tool.TRACK:
             self._draw_track_options()
@@ -231,6 +228,7 @@ class BuildMenu:
             f"{fa.ICON_FA_TRAIN}  Trains", self.trains.open, "Your trains (T)", (0, BUTTON_HEIGHT)
         ):
             self.trains.open = not self.trains.open
+        spot("trains")
         imgui.same_line()
         if toggle_button(
             f"{fa.ICON_FA_CUBES}  Stations",
@@ -239,8 +237,6 @@ class BuildMenu:
             (0, BUTTON_HEIGHT),
         ):
             self.stations.open = not self.stations.open
-        imgui.end()
-        imgui.pop_style_var(2)
 
     def _draw_track_options(self) -> None:
         _vertical_rule()
@@ -249,10 +245,13 @@ class BuildMenu:
             if toggle_button(label, self.track_width == width, tooltip, (0, BUTTON_HEIGHT)):
                 self.lay(width, self.electric, self.maglev)
             imgui.same_line()
-        label = f"{fa.ICON_FA_BOLT}  Electric"
-        if toggle_button(label, self.electric, ELECTRIC_TIP, (0, BUTTON_HEIGHT)):
-            self.lay(self.track_width, not self.electric)
-        imgui.same_line()
+        if self.electric_open:
+            label = f"{fa.ICON_FA_BOLT}  Electric"
+            if toggle_button(label, self.electric, ELECTRIC_TIP, (0, BUTTON_HEIGHT)):
+                self.lay(self.track_width, not self.electric)
+            imgui.same_line()
+        elif self.electric:
+            self.lay(self.track_width, False, self.maglev)
         if not self.maglev_open:
             if self.maglev:
                 self.lay(self.track_width, self.electric)
@@ -305,106 +304,8 @@ class BuildMenu:
 
 
 def _vertical_rule() -> None:
-    """A thin upright line between groups of buttons."""
-    position = imgui.get_cursor_screen_pos()
-    imgui.dummy((1, BUTTON_HEIGHT))
-    imgui.get_window_draw_list().add_line(
-        (position.x, position.y + 4),
-        (position.x, position.y + BUTTON_HEIGHT - 4),
-        color_u32(BORDER),
-        1.0,
-    )
-
-
-def draw_trains(
-    draw_list: imgui.ImDrawList, railway: Railway, camera: IsoCamera, center: Vec2
-) -> None:
-    """Draws each running train along the track: the engine in front, then its cars, each a box
-    turned to the track and shaped by its good; empty cars show their bare bodies."""
-    for train in railway.trains:
-        parts: list[Good | None] = [None, *(car.good for car in train.cars)]
-        loads = [1.0, *(car.load for car in train.cars)]
-        for index in reversed(range(len(parts))):
-            placed = railway.position(train, back=index * CAR_SPACING)
-            if placed is None:
-                continue
-            (x, y), (dx, dy) = placed
-            length = math.hypot(dx, dy) or 1.0
-            box = _Box(x, y, dx / length, dy / length, camera, center)
-            if parts[index] is None:
-                _draw_engine(draw_list, box)
-            else:
-                _draw_car(draw_list, box, parts[index], loads[index] > 0)  # type: ignore[arg-type]
-
-
-@dataclass(frozen=True)
-class _Box:
-    """A spot on the track and the way it runs, for drawing shapes along it in screen space."""
-
-    x: float
-    y: float
-    ux: float
-    uy: float
-    camera: IsoCamera
-    center: Vec2
-
-    def quad(self, front: float, back: float, half_width: float) -> list[imgui.ImVec2]:
-        """The corners of a box from `back` to `front` along the track (cells from this spot,
-        forward positive), `half_width` cells either side."""
-        sx, sy = -self.uy * half_width, self.ux * half_width
-        corners = [
-            (self.x + self.ux * front + sx, self.y + self.uy * front + sy),
-            (self.x + self.ux * front - sx, self.y + self.uy * front - sy),
-            (self.x + self.ux * back - sx, self.y + self.uy * back - sy),
-            (self.x + self.ux * back + sx, self.y + self.uy * back + sy),
-        ]
-        return [imgui.ImVec2(*self.camera.to_screen(px, py, self.center)) for px, py in corners]
-
-    def point(self, along: float, side: float = 0.0) -> imgui.ImVec2:
-        px = self.x + self.ux * along - self.uy * side
-        py = self.y + self.uy * along + self.ux * side
-        return imgui.ImVec2(*self.camera.to_screen(px, py, self.center))
-
-    @property
-    def scale(self) -> float:
-        return self.camera.cell_width
-
-
-def _fill(draw_list: imgui.ImDrawList, quad: list[imgui.ImVec2], color: Rgba) -> None:
-    draw_list.add_quad_filled(*quad, rgba_u32(color))
-    draw_list.add_quad(*quad, rgba_u32(OUTLINE), 1.0)
-
-
-def _draw_engine(draw_list: imgui.ImDrawList, box: _Box) -> None:
-    half = CAR_LENGTH / 2
-    _fill(draw_list, box.quad(half, -half, CAR_WIDTH * 0.55), ENGINE)
-    _fill(draw_list, box.quad(-half * 0.25, -half, CAR_WIDTH * 0.7), CAB)
-    chimney = box.point(half * 0.65)
-    draw_list.add_circle_filled(chimney, max(1.5, box.scale * 0.035), rgba_u32(OUTLINE))
-    draw_list.add_circle_filled(
-        box.point(half * 0.65 + 0.06, 0.05), max(1.5, box.scale * 0.03), rgba_u32(SMOKE)
-    )
-
-
-def _draw_car(draw_list: imgui.ImDrawList, box: _Box, good: Good, full: bool) -> None:
-    half = CAR_LENGTH / 2 - CAR_GAP
-    body = CAR_BODIES[good]
-    _fill(draw_list, box.quad(half, -half, CAR_WIDTH * 0.6), body)
-    if not full:
-        return
-    load = CAR_COLORS[good]
-    match good:
-        case Good.LUMBER | Good.STEEL:
-            for side in (-0.3, 0.0, 0.3):
-                a = box.point(half * 0.9, CAR_WIDTH * side)
-                b = box.point(-half * 0.9, CAR_WIDTH * side)
-                draw_list.add_line(a, b, rgba_u32(load), max(1.5, box.scale * 0.03))
-        case Good.GOODS:
-            _fill(draw_list, box.quad(half * 0.9, -half * 0.9, CAR_WIDTH * 0.5), load)
-        case _:
-            draw_list.add_quad_filled(
-                *box.quad(half * 0.8, -half * 0.8, CAR_WIDTH * 0.4), rgba_u32(load)
-            )
+    """A brass diamond between groups of buttons."""
+    diamond(BUTTON_HEIGHT)
 
 
 def draw_station_reach(
@@ -442,7 +343,7 @@ def draw_station_reach(
         for station in shown
         for own in (station, *platforms(station))
     ]
-    border = _reach_border(grid, (focus, *platforms(focus)), reach(focus)[1])
+    border = reach_border(grid, (focus, *platforms(focus)), reach(focus)[1])
     plane = [corner for corners, _ in hexes for corner in corners]
     plane += [end for edge in border for end in edge]
     xs, ys = (np.array(values, dtype=np.float64) for values in zip(*plane, strict=True))
@@ -459,12 +360,29 @@ def draw_station_reach(
 
 
 @lru_cache(maxsize=64)
-def _reach_border(
+def reach_border(
     grid: Grid, cells: tuple[Cell, ...], steps: int
 ) -> tuple[tuple[tuple[float, float], tuple[float, float]], ...]:
     """The border of the cells within `steps` of a station's cells, worked out once: an open
-    station window draws it every frame, and finding it takes hundreds of lookups."""
-    return tuple(_border(grid, {near for cell in cells for near in grid.within(cell, steps)}))
+    station window draws it every frame, and finding it takes hundreds of lookups. The same
+    shape of cells moved by an even number of rows has the same border moved with it, so a
+    station tool hovering over the map finds each shape's border only once."""
+    near = {near for cell in cells for near in grid.within(cell, steps)}
+    top = min(row for row, _ in near)
+    shift = (top - top % 2, min(col for _, col in near))
+    shape = frozenset((row - shift[0], col - shift[1]) for row, col in near)
+    origin, moved = grid.center(0, 0), grid.center(*shift)
+    dx, dy = float(moved[0] - origin[0]), float(moved[1] - origin[1])
+    return tuple(
+        ((a[0] + dx, a[1] + dy), (b[0] + dx, b[1] + dy)) for a, b in _shape_border(grid, shape)
+    )
+
+
+@lru_cache(maxsize=64)
+def _shape_border(
+    grid: Grid, shape: frozenset[Cell]
+) -> tuple[tuple[tuple[float, float], tuple[float, float]], ...]:
+    return tuple(_border(grid, set(shape)))
 
 
 def _border(grid: Grid, cells: set[Cell]) -> list[tuple[tuple[float, float], tuple[float, float]]]:

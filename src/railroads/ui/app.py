@@ -9,12 +9,14 @@ import numpy as np
 from imgui_bundle import hello_imgui, imgui, immapp
 
 from railroads import maps
+from railroads.land import buy_lot_steps, lot_middle
 from railroads.newgame import (
     EARLIEST_START_YEAR,
     MapChoice,
     Settings,
     allowed_start_year,
     make_game_steps,
+    place_map,
 )
 from railroads.saves import (
     ReusedMemory,
@@ -28,30 +30,47 @@ from railroads.saves import (
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
 from railroads.sim.game import Game
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
-from railroads.sim.steps import Steps, finish
+from railroads.sim.lots import Lot
+from railroads.sim.steps import Steps, budgeted, finish
+from railroads.tutorial.game import make_tutorial
+from railroads.tutorial.steps import Seen, Tutorial
+from railroads.ui import spotlight
+from railroads.ui.goal_view import draw_goal_news
 from railroads.ui.help_window import HelpWindow
+from railroads.ui.history_pictures import HistoryPictures, opening_center
 from railroads.ui.main_menu import (
     LoadChoice,
     MainMenu,
     NewGameChoice,
     QuitChoice,
+    TutorialChoice,
     draw_version,
     random_seed,
 )
 from railroads.ui.map_view import MapView
+from railroads.ui.picture_show import PictureShow
+from railroads.ui.pixel import ground_shader
 from railroads.ui.pixel.ground_shader import free_textures
 from railroads.ui.reports_window import ReportsWindow
+from railroads.ui.save_files import IN_BROWSER
 from railroads.ui.saves_window import SavesWindow
 from railroads.ui.tech_window import TechWindow
 from railroads.ui.theme import BRASS, apply_theme
 from railroads.ui.top_bar import draw_top_bar
-from railroads.ui.waiting_screen import Label, Shatter, waiting_line
-from railroads.ui.web_setup import page_setup
+from railroads.ui.tutorial_panel import draw_tutorial
+from railroads.ui.waiting_screen import Label, Shatter, tip_for, waiting_line
+from railroads.ui.web_setup import go_back_to_landing, page_setup
 from railroads.ui.workers import FRAME_SECONDS, FrameWorker, submit_steps, worker
 
 # How long a notice such as "Autosaved" stays in the top bar.
 NOTICE_SECONDS = 4.0
 WAITING_WIDTH = 320.0
+# The panel the waiting screen's lines sit on over a picture of the map: how far it reaches past
+# them, and its colour.
+PANEL_MARGIN = 12.0
+PANEL_COLOUR = (0.11, 0.1, 0.09, 0.85)
+# A new game opens on the middle of the map at this zoom, as the pictures of its history show it.
+OPENING_ZOOM = 3
 # The window's size when the game opens.
 WINDOW_SIZE = (1280.0, 800.0)
 # Saves are written one at a time, away from the frames, so play doesn't stutter. Where threads
@@ -62,6 +81,13 @@ WRITING_SECONDS = 0.004
 # The least time between autosaves, in seconds of play: pickling the game stalls a frame, which at
 # the highest speed would come every few seconds.
 AUTOSAVE_GAP_S = 60.0
+# About how long each frame spends on a month, and the autosave after it, while the trains wait:
+# their steps are run several to a frame, so a month that costs little takes few frames and the
+# trains wait as briefly.
+MONTH_FRAME_SECONDS = 0.016
+# In the browser, how long the main menu's settings stay as they are before the page's setup
+# worker starts growing the game they would start, so typing a seed doesn't start one a digit.
+AHEAD_AFTER_S = 1.0
 
 
 class App:
@@ -73,6 +99,7 @@ class App:
         clock: GameClock | None = None,
         saves: Saves | None = None,
         settings: Settings | None = None,
+        tutorial: Tutorial | None = None,
     ) -> None:
         self.view = view
         self.title = title
@@ -80,6 +107,8 @@ class App:
         self.rng = np.random.default_rng() if rng is None else rng
         self.saves = saves
         self.settings = settings
+        # How far the player has got through the tutorial, in a tutorial game.
+        self.tutorial = tutorial
         self._styled = False
         self.help = HelpWindow()
         self.tech = TechWindow()
@@ -107,7 +136,10 @@ class App:
         if saved.camera is not None:
             x, y, zoom = saved.camera
             view.camera.center_x, view.camera.center_y, view.camera.zoom_level = x, y, zoom
-        return cls(view, saved.title, saved.rng, saved.clock, saves, saved.settings)
+        lots = saved.game.lots
+        if lots is not None and saved.settings is not None:
+            view.land.show_place(place_map(saved.settings), lots)
+        return cls(view, saved.title, saved.rng, saved.clock, saves, saved.settings, saved.tutorial)
 
     @property
     def game(self) -> Game:
@@ -123,6 +155,7 @@ class App:
             self.settings,
             [(note.summary, note.seen) for note in self.view.summaries.notes],
             (camera.center_x, camera.center_y, camera.zoom_level),
+            self.tutorial,
         )
 
     def tell(self, notice: str) -> None:
@@ -139,10 +172,13 @@ class App:
         if isinstance(WRITER, FrameWorker):
             WRITER.work_once(WRITING_SECONDS)
         self._check_autosave()
-        if self._turning is None:
-            self._let_time_pass(imgui.get_io().delta_time)
-        else:
+        goal = self.game.goal
+        if self._turning is not None:
             self._turn_once()
+        elif goal.bankrupt is None and not goal.news:
+            # Time waits while the player reads news of the target or bankruptcy.
+            goal.watch(self.game.finances.cash)
+            self._let_time_pass(imgui.get_io().delta_time)
         busy = self._turning is not None
         # While a month is half done nothing may change the game, so every control is off for
         # those few frames, without greying out.
@@ -168,7 +204,7 @@ class App:
         turned = self.clock.advance(seconds)
         if turned:
             dates = [self.clock.date_of(month) for month in range(first + 1, first + 1 + turned)]
-            self._turning = self._months(dates)
+            self._turning = budgeted(self._months(dates), MONTH_FRAME_SECONDS)
             self._turn_once()
 
     def _months(self, dates: list[str]) -> Steps[bool]:
@@ -192,6 +228,7 @@ class App:
             self._autosave_due = not done.value
 
     def _draw(self) -> None:
+        self._point_the_way()
         draw_top_bar(self)
         self.view.gui()
         self.help.draw()
@@ -204,10 +241,17 @@ class App:
                 growth.year,
                 len(railway.stations()),
                 growth.population(),
+                railway.first_year,
                 railway.finances,
                 railway.fuel,
+                self.game.goal,
             )
         self._draw_saves()
+        draw_goal_news(self)
+        if self.tutorial is not None:
+            draw_tutorial(self.tutorial)
+            if self._turning is None:
+                self.tutorial.update(self.game, self.seen())
         typing = imgui.get_io().want_text_input
         if not typing and imgui.is_key_pressed(imgui.Key.h, repeat=False):
             self.help.open = not self.help.open
@@ -217,6 +261,26 @@ class App:
             self.reports.open = not self.reports.open
         if not typing and imgui.is_key_pressed(imgui.Key.f5, repeat=False):
             self.toggle_saves()
+
+    def _point_the_way(self) -> None:
+        """Frames what the tutorial's step wants clicked and marks its cells on the map, until
+        it is done."""
+        tutorial = self.tutorial
+        step = None if tutorial is None or tutorial.done else tutorial.current
+        spotlight.want(() if step is None else step.spots)
+        self.view.spotlit = [] if step is None else step.cells(self.game)
+
+    def seen(self) -> Seen:
+        """What the player has open and turned on, for the tutorial."""
+        view = self.view
+        io = imgui.get_io()
+        moods = io.key_shift and not io.want_text_input
+        return Seen(
+            lens="satisfaction" if moods else None if view.lens is None else view.lens.value,
+            selected=view.selected,
+            tech_open=self.tech.open,
+            buying_train=view.build.trains.buy.open,
+        )
 
     def _keep_trains_smooth(self) -> None:
         """Has the next frame drawn at full speed while a train runs. A few seconds after the
@@ -334,15 +398,25 @@ class Shell:
         # Whether the work is a new game, and on a random place; when it began; what the waiting
         # screen last showed; and the screen breaking up over a new game just begun.
         self._new_game_on: MapChoice | None = None
+        self._pictured = False
         self._began = 0.0
         self._labels: list[Label] = []
+        self._tip = ""
         self._shatter: Shatter | None = None
+        # The pictures of a new map's history, kept until the screen has broken up, and the size
+        # in points of the window they are drawn for.
+        self._show = PictureShow()
+        self._window = (int(WINDOW_SIZE[0]), int(WINDOW_SIZE[1]))
         # Where the setup runs on the frames, it starts once the waiting screen has shown, and
         # each frame spends about this long on it.
         self._waiting_shown = False
         self._frame_seconds = FRAME_SECONDS
-        if start is not None:
-            self.start(start)
+        # The game the command line asks for, started on the first frame, once the window's size
+        # is known.
+        self._wanted = start
+        # The menu's settings as last seen and since when they have stayed so.
+        self._menu_settings: Settings | None = None
+        self._menu_since = 0.0
 
     def report(self, progress: str) -> None:
         print(progress)
@@ -352,34 +426,71 @@ class Shell:
         self._done = done
 
     def start(self, settings: Settings) -> None:
-        self._begin("Setting up a new game", lambda: self._new_game(settings), settings.map)
+        self._begin(
+            "Setting up a new game",
+            lambda: self._new_game(settings),
+            settings.map,
+            settings.show_map_growing,
+        )
 
     def _new_game(self, settings: Settings) -> Steps[SavedGame]:
         """A new game, grown in the page's setup worker where there is one, so a browser doesn't
         freeze while its towns grow; grown here where there isn't, or if the worker fails, a few
         steps a frame where the frames grow it."""
+        pictured = settings.show_map_growing
+        size = self._window if pictured else None
+        see = self._show.see
+        over_ground = _over_ground()
         setup = page_setup()
         if setup is not None:
             # The frames only look for word from the worker and take up what it grew, a step each.
             self._frame_seconds = 0.0
-            saved = yield from setup.grow(settings, self.report, self.advance)
+            saved = yield from setup.grow(
+                settings, self.report, self.advance, see, size, over_ground
+            )
             self._frame_seconds = FRAME_SECONDS
             if saved is not None:
                 return saved
-        return (yield from make_game_steps(settings, self.report, self.advance))
+        if not pictured:
+            return (yield from make_game_steps(settings, self.report, self.advance))
+        pictures = HistoryPictures(self._window, see, over_ground)
+        return (yield from make_game_steps(settings, self.report, self.advance, pictures))
+
+    def start_tutorial(self) -> None:
+        """Starts the tutorial's premade game (railroads.tutorial), the same every time."""
+        self._begin("Setting up the tutorial", lambda: _at_once(make_tutorial))
 
     def load(self, name: str) -> None:
         self._begin(f"Loading '{name}'", lambda: _at_once(lambda: self.saves.load(name)))
 
+    def buy_land(self, app: App, lot: Lot) -> None:
+        """Buys a lot next to the map (railroads.land), growing it while the waiting screen
+        shows, as a new game's towns grow, then opens the game on the middle of it."""
+        app.finish_autosave()
+        saved = app.saved()
+        zoom = app.view.camera.zoom_level
+        self._begin(
+            "Buying land",
+            lambda: buy_lot_steps(saved, lot, self.report, self.advance),
+            visit=(lot, zoom),
+        )
+
     def _begin(
-        self, doing: str, work: Callable[[], Steps[SavedGame]], new_game_on: MapChoice | None = None
+        self,
+        doing: str,
+        work: Callable[[], Steps[SavedGame]],
+        new_game_on: MapChoice | None = None,
+        pictured: bool = False,
+        visit: tuple[Lot, int] | None = None,
     ) -> None:
         """Starts the work of setting up or loading a game; `new_game_on` is the map of a new
-        game, None for a game loaded."""
+        game, None for a game loaded, and `pictured` whether its map shows as its towns grow."""
         self._doing = doing
         self._new_game_on = new_game_on
+        self._pictured = pictured
         self._began = time.monotonic()
         self._shatter = None
+        self._tip = tip_for(np.random.default_rng())
         self._progress = ""
         self._done = None
         self._frame_seconds = FRAME_SECONDS
@@ -388,6 +499,8 @@ class Shell:
             io = imgui.get_io()
             size = (io.display_size.x, io.display_size.y)
             density = max(1, round(io.display_framebuffer_scale.x))
+        self._window = (int(size[0]), int(size[1]))
+        self._show = PictureShow(density)
         # Where frames do the work, the chunks are left to be drawn a frame at a time instead.
         chunks = not isinstance(self._executor, FrameWorker)
 
@@ -395,12 +508,28 @@ class Shell:
             saved = yield from work()
             yield
             app = App.from_saved(saved, self.saves)
-            if new_game_on is not None:
+            if new_game_on is not None and pictured:
+                camera = app.view.camera
+                center = opening_center(app.view.tile_map.grid, size)
+                camera.center_x, camera.center_y = center
+                camera.zoom_level = OPENING_ZOOM
+            elif new_game_on is not None:
                 app.view.visit_biggest_town()
+            lots = app.game.lots
+            if visit is not None and lots is not None:
+                lot, zoom = visit
+                app.view.camera.zoom_level = zoom
+                app.view.look_at(lot_middle(lots, lot))
             yield
             yield from app.view.prepare_steps(size, density, chunks)
+            if not chunks:
+                yield
+                app.view.ready_shaders()
             return app
 
+        setup = page_setup()
+        if new_game_on is None and setup is not None:
+            setup.stop_ahead()
         self._task = submit_steps(self._executor, prepared)
         self._waiting_shown = False
 
@@ -408,6 +537,9 @@ class Shell:
         if not self._styled:
             apply_theme()
             self._styled = True
+        if self._wanted is not None:
+            self.start(self._wanted)
+            self._wanted = None
         # Chunk textures of a game left behind are deleted here, as the menu or a game shown
         # zoomed out draws none that would delete them.
         free_textures()
@@ -424,9 +556,29 @@ class Shell:
             self.app.gui()
             if self._shatter is not None and not self._shatter.draw(imgui.get_io().delta_time):
                 self._shatter = None
+                self._show = PictureShow()
             self._follow(self.app)
         else:
             self._choose(self.menu.draw())
+            if self._task is None:
+                self._grow_ahead()
+
+    def _grow_ahead(self) -> None:
+        """Where the page has a setup worker, has it grow the game the menu would start once
+        the menu's settings have stayed the same for AHEAD_AFTER_S, so Start finds it grown or
+        on the way; not a game whose map is pictured as it grows, which needs the waiting
+        screen."""
+        setup = page_setup()
+        if setup is None:
+            return
+        settings = self.menu.settings()
+        now = time.monotonic()
+        if settings != self._menu_settings:
+            self._menu_settings, self._menu_since = settings, now
+        if settings.show_map_growing:
+            setup.stop_ahead()
+        elif now - self._menu_since >= AHEAD_AFTER_S:
+            setup.grow_ahead(settings, _over_ground())
 
     def _finish(self, task: Future[App]) -> None:
         self._task = None
@@ -444,7 +596,9 @@ class Shell:
             # The see-through background as it shows over the black behind every window.
             bg = imgui.get_style_color_vec4(imgui.Col_.window_bg.value)
             colour = imgui.get_color_u32(imgui.ImVec4(bg.x * bg.w, bg.y * bg.w, bg.z * bg.w, 1.0))
-            self._shatter = Shatter(size.x, size.y, colour, self._labels)
+            self._shatter = Shatter(
+                size.x, size.y, colour, self._labels, pictures=self._show.textures
+            )
 
     def _failed(self, message: str) -> None:
         if self.app is not None:
@@ -460,31 +614,41 @@ class Shell:
             app.finish_autosave()
             self.app = None
             self.menu.go_to("main")
+        elif app.view.land.wanted is not None:
+            lot, app.view.land.wanted = app.view.land.wanted, None
+            self.buy_land(app, lot)
 
     def _choose(self, choice: object) -> None:
         match choice:
             case NewGameChoice(settings):
                 self.start(settings)
+            case TutorialChoice():
+                self.start_tutorial()
             case LoadChoice(name):
                 self.load(name)
+            case QuitChoice() if IN_BROWSER:
+                go_back_to_landing()
             case QuitChoice():
                 hello_imgui.get_runner_params().app_shall_exit = True
 
     def _draw_waiting(self) -> None:
         width, height = imgui.get_window_size()
+        draw_list = imgui.get_window_draw_list()
+        self._show.draw(draw_list, imgui.get_window_pos(), (width, height))
+        year = self._show.year
+        draw_list.channels_split(2)
+        draw_list.channels_set_current(1)
         imgui.set_cursor_pos((width / 2 - WAITING_WIDTH / 2, height / 2 - 24))
         imgui.begin_group()
         dots = "." * (1 + int(time.monotonic() * 2) % 3)
-        doing = self._doing
-        if self._new_game_on is not None:
-            random_place = self._new_game_on == MapChoice.WORLD
-            doing = waiting_line(time.monotonic() - self._began, random_place)
         self._labels = [
-            self._text(f"{doing}{dots:<3}", imgui.ImVec4(*BRASS)),
+            self._text(f"{self._waiting_line()}{dots:<3}", imgui.ImVec4(*BRASS)),
             self._text(
                 self._progress or " ", imgui.get_style_color_vec4(imgui.Col_.text_disabled.value)
             ),
         ]
+        if year is not None:
+            self._labels.append(self._text(f"The map in {year}", imgui.ImVec4(*BRASS)))
         if self._done is not None:
             corner = imgui.get_cursor_screen_pos()
             imgui.progress_bar(self._done, imgui.ImVec2(WAITING_WIDTH, 0))
@@ -495,8 +659,38 @@ class Shell:
                 Label(corner.x, corner.y, WAITING_WIDTH * self._done, bar_height,
                       imgui.get_color_u32(imgui.Col_.plot_histogram.value)),
             ]  # fmt: skip
+        if self._tip:
+            self._labels.append(
+                self._text(
+                    f"Tip: {self._tip}",
+                    imgui.get_style_color_vec4(imgui.Col_.text_disabled.value),
+                )
+            )
         imgui.end_group()
+        if year is not None:
+            draw_list.channels_set_current(0)
+            top_left, bottom_right = imgui.get_item_rect_min(), imgui.get_item_rect_max()
+            panel = Label(
+                top_left.x - PANEL_MARGIN,
+                top_left.y - PANEL_MARGIN,
+                bottom_right.x - top_left.x + 2 * PANEL_MARGIN,
+                bottom_right.y - top_left.y + 2 * PANEL_MARGIN,
+                imgui.get_color_u32(imgui.ImVec4(*PANEL_COLOUR)),
+            )
+            draw_list.add_rect_filled(
+                (panel.x, panel.y), (panel.x + panel.width, panel.y + panel.height), panel.colour
+            )
+            self._labels.insert(0, panel)
+        draw_list.channels_merge()
         draw_version()
+
+    def _waiting_line(self) -> str:
+        """What the waiting screen is doing: make-believe work for a new game set up without
+        pictures of its map growing."""
+        if self._new_game_on is None or self._pictured:
+            return self._doing
+        random_place = self._new_game_on == MapChoice.WORLD
+        return waiting_line(time.monotonic() - self._began, random_place)
 
     @staticmethod
     def _text(text: str, colour: imgui.ImVec4) -> Label:
@@ -505,6 +699,11 @@ class Shell:
         size = imgui.calc_text_size(text)
         imgui.text_colored(colour, text)
         return Label(corner.x, corner.y, size.x, size.y, imgui.get_color_u32(colour), text)
+
+
+def _over_ground() -> bool:
+    """Whether pictures of a new map growing leave the ground to the graphics card."""
+    return ground_shader.GL is not None and hello_imgui.is_using_hello_imgui()
 
 
 def _at_once[T](work: Callable[[], T]) -> Steps[T]:

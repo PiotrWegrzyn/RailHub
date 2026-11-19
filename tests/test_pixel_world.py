@@ -168,7 +168,38 @@ def test_woods_stand_as_a_canopy_not_trees_and_everything_is_sorted_back_to_fron
     rows, cols = world.tile_map.grid.cell_at(x, y)
     in_forest = world.tile_map.vegetation[rows, cols] == Vegetation.FOREST
     assert not in_forest.any()
-    assert (np.diff(scenery.y) >= 0).all()
+    x, y = world.projection.to_plane(scenery.x, scenery.y)
+    rows, cols = world.tile_map.grid.cell_at(x, y)
+    depth = world.projection.to_pixels(*world.tile_map.grid.center(rows, cols))[1]
+    assert (np.diff(np.round(depth, 6)) >= 0).all()
+
+
+@pytest.mark.parametrize("look", [LOOKS[HexGrid], GAME_LOOK])
+def test_a_station_house_is_drawn_over_the_buildings_in_the_cells_behind_it(
+    sheet: SpriteSheet, look: tuple[float, float]
+) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    station = (10, 4)
+    constructions.build(Station(station))
+    projection = PixelProjection.of(tile_map.grid, *look)
+    station_y = projection.to_pixels(*tile_map.grid.center(*station))[1]
+    behind = [
+        cell
+        for cell in tile_map.grid.within(station, 1)
+        if projection.to_pixels(*tile_map.grid.center(*cell))[1] < station_y - 1e-6
+    ]
+    for cell in behind:
+        for _ in range(4):
+            constructions.build(Building(cell, BuildingKind.HOUSE))
+
+    scenery = Scenery.of(tile_map, constructions, projection, sheet)
+
+    names = [sheet.names[i] for i in scenery.sprite.tolist()]
+    station_house = names.index(next(name for name in names if name.startswith("station")))
+    houses = np.isin(scenery.sprite, sheet.variants("house"))
+    assert (scenery.y[houses] > scenery.y[station_house]).any()
+    assert np.flatnonzero(houses).max() < station_house
 
 
 def woods_and_meadow(world: PixelWorld) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -195,6 +226,41 @@ def test_woods_are_drawn_darker_than_meadow_with_crowns_and_floor(sheet: SpriteS
     grass = picture[meadow][:, :3].astype(int)
     assert woods.sum(axis=1).mean() < 0.75 * grass.sum(axis=1).mean()
     assert len(np.unique(woods, axis=0)) > 20
+
+
+def test_a_chunk_over_ground_leaves_its_woods_to_the_graphics_card_when_asked(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet, houses=0)
+    _, forest, _ = woods_and_meadow(world)
+    grid = world.tile_map.grid
+    px, py = world.projection.to_pixels(*grid.center(3, 9))
+    chunk = (int(px) // CHUNK, int(py) // CHUNK)
+
+    wooded = world.render(*chunk, over_ground=True)
+    bare = world.render(*chunk, over_ground=True, surfaces=False)
+
+    assert (wooded[forest][:, 3] == 255).mean() > 0.9
+    assert (bare[forest][:, 3] == 0).mean() > 0.9
+
+
+def test_a_chunk_over_ground_leaves_its_fields_to_the_graphics_card_when_asked(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet, houses=0)
+    px, py = world.projection.to_pixels(*world.tile_map.grid.center(12, 3))
+    chunk = (int(px) // CHUNK, int(py) // CHUNK)
+    field = np.zeros((CHUNK, CHUNK, 4))
+    shown = np.ones((CHUNK, CHUNK), dtype=bool)
+    world.ground.fields(field, chunk[0] * CHUNK, chunk[1] * CHUNK, 1, shown=shown)
+    sown = field[..., 3] > 0.99
+
+    drawn = world.render(*chunk, over_ground=True)
+    bare = world.render(*chunk, over_ground=True, surfaces=False)
+
+    assert sown.sum() > 50
+    assert (drawn[sown][:, 3] == 255).mean() > 0.9
+    assert (bare[sown][:, 3] == 0).mean() > 0.5
 
 
 def canopy_round(world: PixelWorld, cell: Cell) -> tuple[np.ndarray, int, int]:
@@ -312,6 +378,79 @@ def test_a_mega_works_sharing_its_cell_stands_with_its_foot_inside_the_cell(
     corners = np.array([projection.to_pixels(*c) for c in tile_map.grid.corners(10, 4)])
     assert scenery.x[at] - ax + on_ground.min() >= corners[:, 0].min() - 1
     assert scenery.x[at] - ax + on_ground.max() <= corners[:, 0].max() + 1
+
+
+def track_hidden(world: PixelWorld, sheet: SpriteSheet, building: int) -> int:
+    """How many pixels of the track drawn into the world one building in its scenery covers."""
+    width, height = world.projection.size
+    track = world.track.layer(world.constructions.track(), 0, 0, width, height, 1)[..., 3] > 0.5
+    index = int(world.scenery.sprite[building])
+    ax, ay = sheet.anchors[index]
+    left, top = world.scenery.x[building] - ax, world.scenery.y[building] - ay
+    painted = sheet.pixels[index][..., 3] > 0.5
+    rows, columns = np.nonzero(painted)
+    return int(track[rows + top, columns + left].sum())
+
+
+@pytest.mark.parametrize("ends", [(0, 6), (2, 8), (4, 10), (0, 4)])
+def test_buildings_in_a_cell_with_track_stand_off_the_track(
+    sheet: SpriteSheet, ends: tuple[int, int]
+) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    for _ in range(3):
+        constructions.build(Building((10, 4), BuildingKind.HOUSE))
+    constructions.build(Building((10, 4), BuildingKind.BRICKWORKS))
+    constructions.build(Track((10, 4), ends))
+
+    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+
+    buildings = np.flatnonzero(
+        np.isin(world.scenery.sprite, [*sheet.variants("house"), sheet.index("brickworks")])
+    )
+    assert len(buildings) == 4
+    assert [track_hidden(world, sheet, int(i)) for i in buildings] == [0] * 4
+    assert not world.scenery.under_track.any()
+
+
+def test_a_building_with_no_room_clear_of_the_track_is_drawn_under_it(sheet: SpriteSheet) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    constructions.build(Building((10, 4), BuildingKind.BIG_FACTORY))
+    for ends in [(0, 6), (2, 8), (4, 10)]:
+        constructions.build(Track((10, 4), ends))
+    factory = sheet.index(BUILDING_SPRITES[BuildingKind.BIG_FACTORY])
+
+    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+
+    at = int(np.flatnonzero(world.scenery.sprite == factory)[0])
+    assert world.scenery.under_track[at]
+    assert world.scenery.under_track.sum() == 1
+    chunk_x, chunk_y = world.scenery.x[at] // CHUNK, world.scenery.y[at] // CHUNK
+    left, top = chunk_x * CHUNK, chunk_y * CHUNK
+    drawn = world.render(chunk_x, chunk_y)
+    track = world.track.layer(constructions.track(), left, top, CHUNK, CHUNK, 1)
+    ax, ay = sheet.anchors[factory]
+    rows, columns = np.nonzero(sheet.pixels[factory][..., 3] > 0.5)
+    rows, columns = rows + world.scenery.y[at] - ay - top, columns + world.scenery.x[at] - ax - left
+    solid = track[rows, columns, 3] == 1
+    assert solid.sum() > 0
+    shown = np.rint(track[rows, columns, :3][solid] * 255)
+    assert np.abs(drawn[rows, columns, :3][solid] - shown).max() <= 1
+
+
+def test_laying_track_through_a_town_moves_its_buildings_off_it(sheet: SpriteSheet) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    for _ in range(4):
+        constructions.build(Building((10, 4), BuildingKind.HOUSE))
+    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+    constructions.build(Track((10, 4), (2, 8)))
+
+    world.buildings_changed([(10, 4)])
+
+    houses = np.flatnonzero(np.isin(world.scenery.sprite, sheet.variants("house")))
+    assert [track_hidden(world, sheet, int(i)) for i in houses] == [0] * 4
 
 
 @pytest.mark.parametrize("kind", [BuildingKind.BAKERY, BuildingKind.DAIRY])
@@ -1033,3 +1172,23 @@ def test_water_is_lighter_by_the_shore_than_far_out(sheet: SpriteSheet) -> None:
 
     brightness = rgb.sum(axis=-1)
     assert brightness[cols == 9].mean() > 1.2 * brightness[(cols >= 3) & (cols <= 5)].mean()
+
+
+def test_a_raised_chunk_drawn_over_ground_leaves_its_ground_and_lifts_what_lies_on_it(
+    sheet: SpriteSheet,
+) -> None:
+    tile_map = make_tile_map(hills_from_col=4, rise_per_col=150.0, mountains_from_col=8)
+    constructions = Constructions(tile_map)
+    constructions.build(Building((12, 6), BuildingKind.FARM))
+    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+    world.ground.trees = (np.zeros(0), np.zeros(0))
+    assert world.rises(0, 0)
+
+    whole = world.render(0, 0)
+    over = world.render(0, 0, over_ground=True)
+
+    drawn = over[..., 3] == 255
+    assert (over[..., 3] == 0).mean() > 0.5
+    assert drawn.any()
+    difference = np.abs(over[..., :3].astype(int) - whole[..., :3])[drawn]
+    assert np.percentile(difference, 99) <= 2

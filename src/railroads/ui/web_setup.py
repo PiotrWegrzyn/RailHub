@@ -3,12 +3,14 @@ the page doesn't freeze for the twenty-odd seconds that takes and its waiting sc
 how far it got.
 
 The page starts a worker of its own for each new game (web/index.html, web/painter.js) and stops
-it once the game is handed over, so the memory growing took goes with it. The worker makes the
-game (railroads.newgame.make_game), pickles and compresses it as a save holds it (grow) and hands
-back the compressed bytes; the frames then take them up a few megabytes at a time (PageSetup.grow)
-and unpickle the game. Bytes cross between Python and the page by their address in Python's
-memory, as the painting workers' do (railroads.ui.pixel.web_painter), since Pyodide's own
-conversions go wrong once that memory passes 2 GiB.
+it once the game is handed over, so the memory growing took goes with it. While the main menu
+shows, the worker already grows the game it would start (PageSetup.grow_ahead), so a player who
+looks the menu over before pressing Start finds the towns grown or well on the way. The worker
+makes the game (railroads.newgame.make_game), pickles and compresses it as a save holds it (grow)
+and hands back the compressed bytes; the frames then take them up a few megabytes at a time
+(PageSetup.grow) and unpickle the game. Bytes cross between Python and the page by their address
+in Python's memory, as the painting workers' do (railroads.ui.pixel.web_painter), since Pyodide's
+own conversions go wrong once that memory passes 2 GiB.
 
 Nothing here needs imgui, which the worker doesn't load."""
 
@@ -24,6 +26,8 @@ import numpy as np
 from railroads.newgame import Settings, make_game
 from railroads.saves import SavedGame, snapshot, unpickled_steps
 from railroads.sim.steps import Steps
+from railroads.ui.history_pictures import HistoryPictures, Picture
+from railroads.version import VERSION
 
 if sys.platform == "emscripten":
     import js
@@ -38,23 +42,40 @@ type Message = dict[str, Any]
 
 class Grown:
     """A grown game pickled and compressed, kept until the page has copied its bytes: where they
-    are in Python's memory, how many, and how many the pickle takes once uncompressed."""
+    are in Python's memory, how many, how many the pickle takes once uncompressed, and the
+    version of the game that grew it."""
 
     def __init__(self, compressed: bytes, size: int) -> None:
         self._bytes = np.frombuffer(compressed, dtype=np.uint8)
         self.address = _address(self._bytes)
         self.length = len(compressed)
         self.size = size
+        self.version = VERSION
 
 
 def grow(
     settings: bytes,
     report: Callable[[str], None],
     advance: Callable[[float], None] = lambda done: None,
+    see: Callable[[int, int], None] = lambda at, length: None,
 ) -> Grown:
     """In the worker: the game these pickled settings make, ready to hand back, telling `report`
-    what it does and `advance` the share of the towns' history grown."""
-    snap = snapshot(make_game(pickle.loads(settings), report, advance))
+    what it does, `advance` the share of the towns' history grown and `see` where in Python's
+    memory each picture of it growing (railroads.ui.history_pictures), pickled, is and how many
+    bytes it takes. The settings come pickled with the size of the pictures, None for none, and
+    whether they leave the ground to the graphics card."""
+    wanted, size, over_ground = pickle.loads(settings)
+
+    def seen(picture: Picture) -> None:
+        pickled = np.frombuffer(pickle.dumps(picture, protocol=pickle.HIGHEST_PROTOCOL), np.uint8)
+        see(_address(pickled), pickled.size)
+
+    if size is None:
+        snap = snapshot(make_game(wanted, report, advance))
+    else:
+        snap = snapshot(
+            make_game(wanted, report, advance, HistoryPictures(size, seen, over_ground))
+        )
     return Grown(zlib.compress(snap.data, 1), len(snap.data))
 
 
@@ -92,21 +113,50 @@ class Page(Protocol):
 
 
 class PageSetup:
-    """New games grown in the page's setup worker."""
+    """New games grown in the page's setup worker, which may start on one before it is asked
+    for, as the main menu shows the settings it would be started with."""
 
     def __init__(self, page: Page) -> None:
         self._page = page
+        # What the worker grows ahead of being asked: the settings, the size of its pictures
+        # (always None) and whether the ground is left to the graphics card, as grow takes them.
+        self.ahead: tuple[Settings, tuple[int, int] | None, bool] | None = None
+
+    def grow_ahead(self, settings: Settings, over_ground: bool = False) -> None:
+        """Starts the worker growing the game these settings make, without pictures, for grow
+        to take up if it is asked for the same; a game grown ahead for other settings is let
+        go."""
+        wanted = (settings, None, over_ground)
+        if self.ahead != wanted:
+            self._page.start(pickle.dumps(wanted, protocol=pickle.HIGHEST_PROTOCOL))
+            self.ahead = wanted
+
+    def stop_ahead(self) -> None:
+        """Stops the worker growing a game nobody asked for yet."""
+        if self.ahead is not None:
+            self._page.stop()
+            self.ahead = None
 
     def grow(
         self,
         settings: Settings,
         report: Callable[[str], None],
         advance: Callable[[float], None] = lambda done: None,
+        see: Callable[[Picture], None] = lambda picture: None,
+        size: tuple[int, int] | None = None,
+        over_ground: bool = False,
     ) -> Steps[SavedGame | None]:
         """The game these settings make, grown in a worker while the frames go on, a step a
-        frame, passing on to `report` and `advance` what the worker says of how far it got; None
-        if the worker failed, for the caller to grow it itself."""
-        self._page.start(pickle.dumps(settings, protocol=pickle.HIGHEST_PROTOCOL))
+        frame, passing on to `report`, `advance` and `see` what the worker says of how far it
+        got and its pictures of the map growing, `size` points big (none without it) and leaving
+        the ground to the graphics card if `over_ground`; None if the worker failed or runs
+        another version of the game, as a browser may keep an older web/painter.js for a while
+        after a new one is published, for the caller to grow it itself."""
+        wanted = (settings, size, over_ground)
+        if self.ahead != wanted:
+            self._page.start(pickle.dumps(wanted, protocol=pickle.HIGHEST_PROTOCOL))
+        # Grown ahead, what the worker said of it so far waits to be taken.
+        self.ahead = None
         try:
             while True:
                 yield
@@ -116,8 +166,16 @@ class PageSetup:
                         report(message["text"])
                     elif kind == "advance":
                         advance(message["done"])
+                    elif kind == "picture":
+                        see(pickle.loads(message["pixels"]))
                     elif kind in ("failed", "dead"):
                         print(f"The towns couldn't grow in a worker: {message.get('error')}")
+                        return None
+                    elif kind == "grown" and message.get("version") != VERSION:
+                        print(
+                            f"The towns grew in a worker of version {message.get('version')},"
+                            f" not {VERSION}"
+                        )
                         return None
                     elif kind == "grown":
                         self._page.stop()
@@ -144,17 +202,19 @@ class _PageObject:
         self._page.stop()
 
     def _taken(self, message: Any) -> Message:
-        game = getattr(message, "game", None)
-        if game is None:
+        """The message as Python's, with the bytes of a grown game or a picture copied in."""
+        name = next((name for name in ("game", "pixels") if hasattr(message, name)), None)
+        if name is None:
             return message.to_py()
-        del message.game
+        buffer = getattr(message, name)
+        delattr(message, name)
         taken: Message = message.to_py()
         try:
-            bytes_ = np.empty(int(game.byteLength), dtype=np.uint8)
-            self._page.copy(game, _address(bytes_))
+            bytes_ = np.empty(int(buffer.byteLength), dtype=np.uint8)
+            self._page.copy(buffer, _address(bytes_))
         except Exception as error:  # noqa: BLE001 - the game is grown on the frames instead
-            return {"kind": "failed", "error": f"its game could not be taken: {error}"}
-        return taken | {"game": bytes_}
+            return {"kind": "failed", "error": f"its {name} could not be taken: {error}"}
+        return taken | {name: bytes_}
 
 
 def _address(array: np.ndarray) -> int:
@@ -169,3 +229,9 @@ def page_setup() -> PageSetup | None:
         return None
     page = getattr(js, "railroadsSetup", None)
     return None if page is None else PageSetup(_PageObject(page))
+
+
+def go_back_to_landing() -> None:
+    """Leaves the game in the browser for the page's first screen, the one offering to play
+    online or download the game."""
+    js.location.assign(js.location.pathname)

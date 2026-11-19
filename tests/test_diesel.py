@@ -32,14 +32,14 @@ def test_an_iron_mine_with_its_diesel_digs_half_as_much_again_from_1920() -> Non
     assert too_early == pytest.approx(without)
 
 
-def test_diesel_adds_its_half_to_what_a_farms_limestone_adds() -> None:
+def test_diesel_adds_its_half_to_a_farm_that_takes_no_limestone_or_machinery_unless_owned() -> None:
     economy = Economy(make_map())
     economy.year = 1950
     placed = counts(economy.tile_map, (MINE, BuildingKind.FARM, 1))
 
     trade = economy.trade(placed, holding(1000.0, FUEL=10.0, LIMESTONE=10.0, MACHINERY=10.0))
 
-    assert trade.gathered[STATION][Good.WHEAT] == pytest.approx(10 * (2 + DIESEL_BOOST))
+    assert trade.gathered[STATION][Good.WHEAT] == pytest.approx(10 * (1 + DIESEL_BOOST))
 
 
 def test_diesel_fuel_heats_a_home() -> None:

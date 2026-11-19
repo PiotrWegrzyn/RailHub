@@ -83,13 +83,14 @@ def test_close_chunks_stand_buildings_as_their_pixel_art_blown_up(sheet: SpriteS
         y=bare.scenery.y[:0],
         sprite=bare.scenery.sprite[:0],
         lift=bare.scenery.lift[:0],
+        under_track=bare.scenery.under_track[:0],
     )
     across, down = world.projection.chunks
     chunks = [(x, y) for x in range(across) for y in range(down)]
 
-    close = [(world.render(*c, CLOSE) != bare.render(*c, CLOSE)).any() for c in chunks]
+    close = any((world.render(*c, CLOSE) != bare.render(*c, CLOSE)).any() for c in chunks)
 
-    assert any(close)
+    assert close
 
 
 def test_homes_are_their_painted_pixel_art_and_the_gasworks_its_model() -> None:

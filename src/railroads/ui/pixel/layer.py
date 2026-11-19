@@ -6,9 +6,14 @@ the frames repeating every pixel and sending the graphics card all of them.
 
 Chunks are drawn away from the frames (railroads.ui.pixel.painter); until a chunk is ready, the
 ground drawn beneath shows where it is missing, and a chunk that changed keeps its old texture.
-Chunks where hills or mountains rise show first as they are quickly drawn, then are drawn again
-with the heights, lift and colours of their raised ground at the full resolution, and the finer
-drawing takes their place once it is ready.
+Where the ground shader runs, it also draws what lies on the ground under the chunks as their
+textures are made, the shade of trees, fields, yards and woods, and chunks are drawn without
+them, in a third of the time or less.
+
+Chunks where hills or mountains rise show first as they are quickly drawn, over the ground the
+graphics card raises where it can, then are drawn again whole with the heights, lift and colours of
+their raised ground at the full resolution, and the finer drawing takes their place once it is
+ready.
 
 In a browser, where threads cannot start, the page's web workers draw the chunks instead
 (railroads.ui.pixel.web_painter), several at once, and frames carry on meanwhile as with a thread.
@@ -107,11 +112,15 @@ class PixelLayer:
         self._rises: dict[ChunkKey, bool] = {}
         self._view: tuple | None = None
         self._still_since = 0.0
-        # Whether the graphics card draws the ground beneath, so chunks where nothing rises are
-        # drawn without theirs, and what blows textures up on it then, which makes the same
+        # Whether the graphics card draws and raises the ground beneath, so chunks are drawn
+        # without theirs, and what blows textures up on it then, which makes the same
         # texels as blowing them up here (GroundShader.blow_up).
         self.over_ground = False
         self.blow_up: Callable[[Rgba, int], Texture] | None = None
+        # What lays chunks over what lies on the ground on the graphics card, where it draws
+        # that, so chunks are drawn without it (GroundShader.dress), and which drawn chunks were.
+        self.dress: Callable[[Rgba, int, ChunkKey], Texture] | None = None
+        self._bare: set[tuple[int, int, int]] = set()
 
     def refresh(self, chunks: set[ChunkKey]) -> None:
         """Draws these chunks again next time they show, keeping their old textures on screen
@@ -134,7 +143,7 @@ class PixelLayer:
         """Keeps the chunks the painter has finished, unless they changed since they were asked
         for; returns them."""
         taken: set[ChunkKey] = set()
-        for (fine, drawn, refreshes), pixels, error in self._painter.finished():
+        for (fine, drawn, refreshes, surfaces), pixels, error in self._painter.finished():
             chunk = drawn[:2]
             if error is not None or refreshes != self._refreshes.get(chunk, 0):
                 continue
@@ -144,6 +153,10 @@ class PixelLayer:
             elif drawn in self._chunks:
                 continue
             self._chunks[drawn] = pixels
+            if surfaces:
+                self._bare.discard(drawn)
+            else:
+                self._bare.add(drawn)
             taken.add(chunk)
         while len(self._chunks) > 1 and self._chunk_bytes() > CHUNK_BUDGET:
             # A chunk drawn finely and let go is drawn quickly when it shows again, and so is
@@ -212,6 +225,7 @@ class PixelLayer:
             drawn = (*chunk, self._resolution_of(chunk, resolution))
             if drawn not in self._chunks:
                 self._chunks[drawn] = self.world.render(*drawn)
+                self._bare.discard(drawn)
 
     def _resolution_of(self, chunk: ChunkKey, resolution: int) -> int:
         """The resolution a chunk is drawn at in a view drawing chunks at `resolution`: in a close
@@ -258,8 +272,9 @@ class PixelLayer:
         if drawn in self._chunks:
             return
         refreshes = self._refreshes.get(drawn[:2], 0)
-        work = ChunkJob(self.world, *drawn, over_ground=self.over_ground)
-        self._painter.want((False, drawn, refreshes), work, True, now)
+        surfaces = self.dress is None
+        work = ChunkJob(self.world, *drawn, over_ground=self.over_ground, surfaces=surfaces)
+        self._painter.want((False, drawn, refreshes, surfaces), work, True, now)
 
     def _refine(self, drawn: tuple[int, int, int], now: float) -> None:
         """Asks for a chunk to be drawn again with fine raised ground, if it has any and is not
@@ -276,7 +291,7 @@ class PixelLayer:
             return
         refreshes = self._refreshes.get(drawn[:2], 0)
         work = ChunkJob(self.world, *drawn, fine_relief=True)
-        self._painter.want((True, drawn, refreshes), work, False, now)
+        self._painter.want((True, drawn, refreshes, True), work, False, now)
 
     def _chunk_bytes(self) -> int:
         return sum(pixels.nbytes for pixels in self._chunks.values())
@@ -290,7 +305,9 @@ class PixelLayer:
         self._chunks.move_to_end(drawn)
         times = scale // resolution
         texture: Texture
-        if times > 1 and self.blow_up is not None:
+        if drawn in self._bare and self.dress is not None:
+            texture = self.dress(pixels, times, chunk)
+        elif times > 1 and self.blow_up is not None:
             texture = self.blow_up(pixels, times)
         else:
             texture = blown_up_texture(pixels, times)

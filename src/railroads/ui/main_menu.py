@@ -1,5 +1,5 @@
-"""The menu the game opens on: start a new game with its settings chosen first, load a saved
-one, or quit."""
+"""The menu the game opens on: start a new game with its settings chosen first, play the
+tutorial, load a saved one, or quit."""
 
 import secrets
 from dataclasses import dataclass, field, replace
@@ -17,10 +17,20 @@ from railroads.newgame import (
 )
 from railroads.saves import SaveInfo, Saves
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
+from railroads.sim.company import BANKRUPT_MONTHS, TARGETS, Difficulty
 from railroads.sim.finance import START_CASH, dollars
-from railroads.ui.save_files import BrowserFiles, DesktopFiles, draw_file_buttons, save_files
+from railroads.sim.tilemap import START_SHARE
+from railroads.ui.menu_scene import HORIZON, MenuScene
+from railroads.ui.ornate import DEEP, bar_buttons, frame_rect, rule, spaced, spaced_text
+from railroads.ui.save_files import (
+    IN_BROWSER,
+    BrowserFiles,
+    DesktopFiles,
+    draw_file_buttons,
+    save_files,
+)
 from railroads.ui.saves_window import draw_save_list
-from railroads.ui.theme import BRASS, GONE, tip
+from railroads.ui.theme import BRASS, GONE, TEXT_DIM, color_u32, tip
 from railroads.version import VERSION
 
 MENU_WIDTH = 460.0
@@ -29,6 +39,11 @@ CASH_STEP = 10_000
 MOST_CASH = 10_000_000
 SEEDS = 1_000_000
 TITLE_SCALE = 2.0
+# The room round the menu inside its frame, and the panel behind it.
+PANEL_PAD = 20.0
+# How fast the menu grows or shrinks to what it holds: the share of the way a second.
+MENU_EASING = 14.0
+PANEL_BG = (DEEP[0], DEEP[1], DEEP[2], 0.88)
 
 Page = Literal["main", "new", "load"]
 
@@ -44,11 +59,16 @@ class LoadChoice:
 
 
 @dataclass(frozen=True)
+class TutorialChoice:
+    pass
+
+
+@dataclass(frozen=True)
 class QuitChoice:
     pass
 
 
-MenuChoice = NewGameChoice | LoadChoice | QuitChoice
+MenuChoice = NewGameChoice | TutorialChoice | LoadChoice | QuitChoice
 
 
 def draw_version() -> None:
@@ -67,12 +87,14 @@ def random_seed() -> int:
 
 
 def map_note(choice: MapChoice) -> str:
-    """What the menu says under the chosen map: its size and what is on it."""
+    """What the menu says under the chosen map: how much of it a game starts on, the seven lots
+    in its middle (railroads.sim.lots), and what is on it."""
     baked = choice.start_map
     if baked is None:
         return "A mostly-land spot anywhere in the world, picked by the seed."
     bounds = baked.bounds
-    return f"{bounds.width_km:,.0f} × {bounds.height_km:,.0f} km. {baked.about}"
+    area = round(bounds.width_km * bounds.height_km * START_SHARE, -3)
+    return f"About {area:,.0f} km² to start, in seven hexagonal lots. {baked.about}"
 
 
 @dataclass
@@ -85,6 +107,8 @@ class MainMenu:
     start_year: int = START_YEAR
     cash: int = int(START_CASH)
     stand_in_years: int = 0
+    difficulty: Difficulty = Difficulty.NORMAL
+    show_map_growing: bool = False
     selected: str | None = None
     listing: list[SaveInfo] = field(default_factory=list)
     # What went wrong with the last game started or loaded, if anything.
@@ -92,6 +116,15 @@ class MainMenu:
     files: BrowserFiles | DesktopFiles = field(default_factory=save_files)
     # What came of the last save file exported or imported.
     note: str = ""
+    # The trains running behind the menu.
+    scene: MenuScene = field(default_factory=MenuScene)
+    # How tall the menu's first page was last drawn: every page hangs from where that one is
+    # centred, so opening a page or a fold only lengthens the menu downwards.
+    _height: float = 0.0
+    # How tall the menu is drawn now, growing or shrinking smoothly to what it holds.
+    _shown: float = 0.0
+    # The folding headings on the new game page that are open.
+    _unfolded: set[str] = field(default_factory=set)
 
     def settings(self) -> Settings:
         return Settings(
@@ -100,6 +133,8 @@ class MainMenu:
             start_year=allowed_start_year(self.start_year),
             cash=float(self.cash),
             stand_in_years=self.stand_in_years,
+            difficulty=self.difficulty,
+            show_map_growing=self.show_map_growing,
         )
 
     def random_settings(self) -> Settings:
@@ -117,37 +152,84 @@ class MainMenu:
         """Draws the menu centred in the current window, which in the game is the full-screen
         one, so nothing left over from play can stand in front of it."""
         width, height = imgui.get_window_size()
-        imgui.set_cursor_pos(((width - MENU_WIDTH) / 2, max(24.0, height * 0.12)))
+        low = imgui.get_window_pos()
+        self.scene.draw(low, imgui.ImVec2(low.x + width, low.y + height))
+        top = max(16.0, (height * HORIZON - self._height) / 2)
+        imgui.set_cursor_pos(((width - MENU_WIDTH) / 2 - PANEL_PAD, top))
         # A child window of the menu's width, so headers and lines end where the buttons do.
-        imgui.begin_child("##menu", (MENU_WIDTH, 0), imgui.ChildFlags_.auto_resize_y.value)
+        imgui.push_style_color(imgui.Col_.child_bg, imgui.ImVec4(*PANEL_BG))
+        imgui.push_style_var(imgui.StyleVar_.window_padding, imgui.ImVec2(PANEL_PAD, PANEL_PAD))
+        flags = imgui.ChildFlags_.always_use_window_padding.value
+        if not self._shown:
+            flags |= imgui.ChildFlags_.auto_resize_y.value
+        no_scroll = (
+            imgui.WindowFlags_.no_scrollbar.value | imgui.WindowFlags_.no_scroll_with_mouse.value
+        )
+        imgui.begin_child("##menu", (MENU_WIDTH + 2 * PANEL_PAD, self._shown), flags, no_scroll)
+        imgui.pop_style_var()
         imgui.push_item_width(MENU_WIDTH)
-        imgui.push_font(None, imgui.get_style().font_size_base * TITLE_SCALE)
-        imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_TRAIN}  RailHub")
-        imgui.pop_font()
+        _draw_title()
         imgui.spacing()
         if self.error:
             imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)
             imgui.text_colored(imgui.ImVec4(*GONE), self.error)
             imgui.pop_text_wrap_pos()
-        imgui.separator()
         imgui.spacing()
-        choice = {"main": self._draw_main, "new": self._draw_new, "load": self._draw_load}[
-            self.page
-        ]()
+        with bar_buttons():
+            choice = {"main": self._draw_main, "new": self._draw_new, "load": self._draw_load}[
+                self.page
+            ]()
         imgui.pop_item_width()
+        content = imgui.get_cursor_pos_y() - imgui.get_style().item_spacing.y + PANEL_PAD
         imgui.end_child()
+        imgui.pop_style_color()
+        self._shown = grown_towards(self._shown, content, imgui.get_io().delta_time)
+        if self.page == "main" or not self._height:
+            self._height = content
+        frame_rect(
+            imgui.get_window_draw_list(),
+            imgui.get_item_rect_min(),
+            imgui.get_item_rect_max(),
+            imgui.get_style().child_rounding,
+        )
         draw_version()
         return choice
 
     def _button(self, label: str) -> bool:
         return imgui.button(label, (MENU_WIDTH, BUTTON_HEIGHT))
 
+    def _fold(self, label: str) -> bool:
+        """A heading the width of the menu, in spaced capitals with a caret and a fading rule,
+        that opens or folds away what follows it; returns whether it is open."""
+        opened = label in self._unfolded
+        height = imgui.get_frame_height()
+        if imgui.invisible_button(f"##fold{label}", (MENU_WIDTH, height)):
+            self._unfolded ^= {label}
+            opened = not opened
+        low = imgui.get_item_rect_min()
+        draw_list = imgui.get_window_draw_list()
+        caret = fa.ICON_FA_CARET_DOWN if opened else fa.ICON_FA_CARET_RIGHT
+        top = low.y + (height - imgui.get_font_size()) / 2
+        colour = BRASS if opened or imgui.is_item_hovered() else TEXT_DIM
+        draw_list.add_text((low.x, top), color_u32(colour), caret)
+        name = label.upper()
+        spaced_text(draw_list, (low.x + 16, top), name, colour, 0.9)
+        end = low.x + 16 + spaced(name, 0.9) + 10
+        rule(draw_list, end, low.x + MENU_WIDTH, low.y + height / 2, fade_left=False)
+        return opened
+
     def _draw_main(self) -> MenuChoice | None:
         if self._button(f"{fa.ICON_FA_PLAY}  New game"):
             self.go_to("new")
+        if self._button(f"{fa.ICON_FA_GRADUATION_CAP}  Tutorial"):
+            self.error = ""
+            return TutorialChoice()
         if self._button(f"{fa.ICON_FA_FOLDER_OPEN}  Load game"):
             self.go_to("load")
-        if self._button(f"{fa.ICON_FA_POWER_OFF}  Quit"):
+        quit_label = (
+            f"{fa.ICON_FA_ARROW_LEFT}  Go back" if IN_BROWSER else f"{fa.ICON_FA_POWER_OFF}  Quit"
+        )
+        if self._button(quit_label):
             return QuitChoice()
         return None
 
@@ -155,24 +237,17 @@ class MainMenu:
         imgui.text("Map")
         if imgui.begin_combo("##map", self.map.value, imgui.ComboFlags_.height_large.value):
             for choice in MapChoice:
-                if (
-                    choice != MapChoice.WORLD
-                    and imgui.selectable(choice.value, self.map == choice)[0]
-                ):
+                if choice.offered and imgui.selectable(choice.value, self.map == choice)[0]:
                     self.map = choice
             imgui.end_combo()
         imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)
         imgui.text_disabled(map_note(self.map))
         imgui.pop_text_wrap_pos()
         imgui.spacing()
-        left = imgui.get_cursor_pos_x()
-        imgui.align_text_to_frame_padding()
         imgui.text("If you don't like any of these:")
-        imgui.same_line()
         world = world_maps_available()
         imgui.begin_disabled(not world)
-        width = left + MENU_WIDTH - imgui.get_cursor_pos_x()
-        yolo = imgui.button(f"{fa.ICON_FA_RANDOM}  Yolo! random map", (width, 0))
+        yolo = imgui.button(f"{fa.ICON_FA_RANDOM}  Yolo! random map", (MENU_WIDTH, 0))
         imgui.end_disabled()
         if not world and imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
             imgui.set_tooltip(
@@ -182,19 +257,49 @@ class MainMenu:
             self.error = ""
             return NewGameChoice(self.random_settings())
         imgui.spacing()
+        _, self.show_map_growing = imgui.checkbox("Show map generation", self.show_map_growing)
+        imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)
+        imgui.text_colored(
+            imgui.ImVec4(*BRASS),
+            "Shows the map as its towns grow; loading takes about a minute longer.",
+        )
+        imgui.pop_text_wrap_pos()
+        imgui.spacing()
+        self._draw_difficulty()
+        imgui.spacing()
         self.start_year = allowed_start_year(self.start_year)
-        if imgui.collapsing_header("Advanced options"):
+        if self._fold("Advanced options"):
             self._draw_advanced()
-        if imgui.collapsing_header("Cheats"):
+        if self._fold("Cheats"):
             self._draw_cheats()
         imgui.spacing()
-        imgui.separator()
+        at = imgui.get_cursor_screen_pos()
+        middle = at.y + 2
+        draw_list = imgui.get_window_draw_list()
+        rule(draw_list, at.x, at.x + MENU_WIDTH / 2, middle, fade_left=True)
+        rule(draw_list, at.x + MENU_WIDTH / 2, at.x + MENU_WIDTH, middle, fade_left=False)
+        imgui.dummy((MENU_WIDTH, 6))
         if self._button(f"{fa.ICON_FA_PLAY}  Start"):
             self.error = ""
             return NewGameChoice(self.settings())
         if self._button("Back"):
             self.go_to("main")
         return None
+
+    def _draw_difficulty(self) -> None:
+        imgui.text("Difficulty")
+        for index, difficulty in enumerate(Difficulty):
+            if index:
+                imgui.same_line()
+            if imgui.radio_button(difficulty.value, self.difficulty == difficulty):
+                self.difficulty = difficulty
+        imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)
+        imgui.text_disabled(
+            f"Your company must be worth {dollars(TARGETS[self.difficulty])} on 1 January "
+            f"{END_YEAR}. Cash below nothing for {BANKRUPT_MONTHS} months in a row ends the game."
+        )
+        imgui.pop_text_wrap_pos()
+        imgui.spacing()
 
     def _draw_advanced(self) -> None:
         imgui.text("Seed")
@@ -261,3 +366,27 @@ class MainMenu:
             self.error = ""
             return LoadChoice(self.selected)
         return None
+
+
+def _draw_title() -> None:
+    """The game's name in big spaced capitals between fading rules."""
+    draw_list = imgui.get_window_draw_list()
+    at = imgui.get_cursor_screen_pos()
+    name = "RAILHUB"
+    wide = spaced(name, TITLE_SCALE)
+    left = at.x + (MENU_WIDTH - wide) / 2
+    spaced_text(draw_list, (left, at.y), name, BRASS, TITLE_SCALE)
+    middle = at.y + imgui.get_font_size() * TITLE_SCALE / 2
+    rule(draw_list, at.x, left - 14, middle, fade_left=True)
+    rule(draw_list, left + wide + 14, at.x + MENU_WIDTH, middle, fade_left=False)
+    imgui.dummy((MENU_WIDTH, imgui.get_font_size() * TITLE_SCALE + 4))
+
+
+def grown_towards(shown: float, wanted: float, seconds: float) -> float:
+    """How tall the menu is drawn after `seconds` more of growing or shrinking from `shown`
+    towards `wanted`, a share of the way each moment so it eases in, at `wanted` once within
+    half a pixel; at once when nothing was shown yet."""
+    if not shown:
+        return wanted
+    shown += (wanted - shown) * min(1.0, seconds * MENU_EASING)
+    return wanted if abs(wanted - shown) < 0.5 else shown

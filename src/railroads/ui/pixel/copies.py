@@ -18,14 +18,14 @@ import numpy.typing as npt
 from railroads.ui.pixel.projection import Rgba
 from railroads.ui.pixel.world import PixelWorld
 
-type Drawing = tuple[int, int, int, bool, bool]
+type Drawing = tuple[int, int, int, bool, bool, bool]
 
 
 @dataclass(frozen=True)
 class ChunkJob:
     """A chunk to paint (PixelWorld.render): where, at what resolution, with its raised ground
-    worked out finely or not, and over ground the graphics card draws or not. Called, the world
-    paints it."""
+    worked out finely or not, over ground the graphics card draws or not, and with what lies
+    on its ground or without, which the graphics card then draws. Called, the world paints it."""
 
     world: PixelWorld = field(repr=False, compare=False)
     chunk_x: int
@@ -33,6 +33,7 @@ class ChunkJob:
     resolution: int
     fine_relief: bool = False
     over_ground: bool = False
+    surfaces: bool = True
 
     def __call__(self) -> Rgba:
         return self.world.render(*self.drawing)
@@ -40,7 +41,14 @@ class ChunkJob:
     @property
     def drawing(self) -> Drawing:
         """What a copy of the world needs to paint the same chunk."""
-        return (self.chunk_x, self.chunk_y, self.resolution, self.fine_relief, self.over_ground)
+        return (
+            self.chunk_x,
+            self.chunk_y,
+            self.resolution,
+            self.fine_relief,
+            self.over_ground,
+            self.surfaces,
+        )
 
 
 def world_message(world: PixelWorld) -> bytes:
@@ -67,7 +75,9 @@ def update_message(world: PixelWorld, seen: Seen) -> bytes | None:
     by one, so a copy that missed some catches up all the same."""
     update: dict[str, object] = {}
     if world.buildings_version != seen.buildings:
-        constructions = vars(world.constructions)
+        # As a save keeps them (Constructions.__getstate__): buildings as their kinds, which pickle
+        # many times faster than the buildings themselves.
+        constructions = world.constructions.__getstate__()
         update["constructions"] = {k: v for k, v in constructions.items() if k != "tile_map"}
         update["vegetation"] = world.tile_map.vegetation
         update["station_levels"] = dict(world.station_levels)
@@ -104,7 +114,7 @@ class WorldCopy:
             # cell from them and is still right is kept (railroads.ui.building_spots).
             state = update["constructions"]
             state["tile_map"] = world.tile_map
-            vars(world.constructions).update(state)
+            world.constructions.__setstate__(state)
             vegetation: npt.NDArray[np.uint8] = update["vegetation"]
             vegetation.setflags(write=False)
             object.__setattr__(world.tile_map, "vegetation", vegetation)

@@ -11,6 +11,7 @@ from railroads.sim.ladders import FILLING_STATIONS, RESOURCES, TOWNS, WORKS, Gro
 
 def grown(year: int, *ladders, houses: int = 0) -> Growth:
     constructions = Constructions(flat_map(20, 20))
+    constructions.build(Building((2, 2), BuildingKind.REFINERY))
     for _ in range(houses):
         constructions.build(Building((10, 10), BuildingKind.HOUSE))
     rule = GrowthRule(trades=False, ladders=ladders, forests=None)
@@ -29,7 +30,7 @@ def test_a_building_that_opens_in_some_year_goes_up_once_that_year_comes() -> No
     assert standing(growth, BuildingKind.FILLING_STATION) == 1
 
 
-def test_one_that_opens_later_goes_up_only_then() -> None:
+def test_a_building_does_not_go_up_before_the_year_it_opens() -> None:
     growth = grown(1900, FILLING_STATIONS, houses=6)
 
     growth.run(12, np.random.default_rng(1))

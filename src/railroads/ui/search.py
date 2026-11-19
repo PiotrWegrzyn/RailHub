@@ -16,6 +16,7 @@ from railroads.sim.goods import FITS, MAKES, NEEDS
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.ui.iso_camera import Vec2
+from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.theme import SIDE_WINDOW_POS, TEXT, TEXT_DIM, color_u32, draw_good_icon
 
 WINDOW_SIZE = (360.0, 440.0)
@@ -137,13 +138,13 @@ class BuildingSearch:
             return
         imgui.set_next_window_pos(SIDE_WINDOW_POS, imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
-        expanded, still_open = imgui.begin(f"{fa.ICON_FA_SEARCH}  Find buildings###find", True)
+        expanded, still_open = begin_ornate(f"{fa.ICON_FA_SEARCH}  Find buildings###find")
         if expanded:
             self._draw_query(growth, around)
             self._draw_results(growth, around)
             if self.kind is not None:
                 self._draw_stepper(visit)
-        imgui.end()
+        end_ornate()
         if not still_open:
             self.close()
 

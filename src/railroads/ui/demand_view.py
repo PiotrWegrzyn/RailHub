@@ -4,9 +4,10 @@ share and what a unit earns."""
 
 from imgui_bundle import imgui
 
-from railroads.sim.demand import DemandRecord, StationDemand, price_of
+from railroads.sim.demand import DemandRecord, StationDemand
+from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.finance import dollars
-from railroads.sim.goods import FITS, Need
+from railroads.sim.goods import FITS, HANDED_OUT, TRAVELLERS, Need, freight_of
 from railroads.ui.theme import BORDER, BRASS, BRASS_DARK, color_u32, good_icon, next_good_slot
 
 COINS = 3
@@ -76,13 +77,32 @@ def coin_colors() -> tuple[int, int, int, int]:
     )
 
 
+TRAVELLER_NEEDS = frozenset(Need(good.value) for good in TRAVELLERS)
+
+
+def demand_lines(need: Need, record: DemandRecord) -> list[str]:
+    """What a unit delivered for a need earns, good by good. Passengers and mail pay their freight
+    times the share of demand left; goods pay their freight, up to SCARCE_WORTH times as much to a
+    building that went short, and buildings take the most valuable goods first."""
+    if need in TRAVELLER_NEEDS:
+        good = FITS[need][0]
+        return [
+            f"Takes about {record.left:.0f} more before it pays nothing",
+            f"Each one getting off now earns {dollars(freight_of(good) * record.share)}",
+        ]
+    lines = [f"Each unit earns its freight, up to {SCARCE_WORTH:g}x where buildings went short;"]
+    lines.append("buildings take the most valuable first:")
+    for good in HANDED_OUT[need]:
+        low = freight_of(good)
+        lines.append(f"  {good.value} {dollars(low)} to {dollars(low * SCARCE_WORTH)}")
+    return lines
+
+
 def _demand_tooltip(demand: StationDemand, need: Need, record: DemandRecord) -> None:
     imgui.begin_tooltip()
     imgui.text(f"{need.value}: {record.share:.0%} of demand left")
-    imgui.text(f"Takes about {record.left:.0f} more before it pays nothing")
-    price = price_of(FITS[need][0]) * record.share
-    imgui.text(f"A unit delivered for it now earns {dollars(price)}")
-    imgui.text_disabled(f"Met by {', '.join(good.value for good in FITS[need])}")
+    for line in demand_lines(need, record):
+        imgui.text(line)
     last = demand.last_month.get(need)
     if last is not None:
         imgui.text_disabled(f"Last month ended with {last.share:.0%} left")

@@ -15,17 +15,22 @@ from railroads.mapgen.generate import generate_map
 from railroads.mapgen.presets import NATURAL_EARTH_SOURCE, real_world_strategies
 from railroads.mapgen.seeding import play_begins, seed_steps
 from railroads.mapgen.start import StartRegion, pick_start_bounds
+from railroads.mapgen.streams import HYDRORIVERS_SOURCE
 from railroads.mapgen.terrain_tiles import SOURCE as TERRAIN_TILES_SOURCE
 from railroads.saves import SavedGame
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
+from railroads.sim.company import Difficulty, Goal
+from railroads.sim.constructions import Constructions
 from railroads.sim.finance import START_CASH
 from railroads.sim.game import Game, place_names
 from railroads.sim.geo import Bounds, describe_lonlat
 from railroads.sim.grids import HexGrid
+from railroads.sim.lots import Lots
 from railroads.sim.novelties import Novelties
 from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
-from railroads.sim.tilemap import TileMap
+from railroads.sim.tilemap import Terrain, TileMap
+from railroads.tutorial import place as tutorial_place
 
 # The source data the tools build the world's files from (railroads.mapgen.world_files); the game
 # itself reads only those.
@@ -46,9 +51,9 @@ class MapChoice(StrEnum):
 
     POLAND = "Poland"
     GERMANY = "Germany"
-    FRANCE = "France: Paris to Lyon"
+    FRANCE = "France: Paris and the Loire"
     BRITAIN = "Great Britain"
-    ITALY = "Italy: Venice to Rome"
+    ITALY = "Italy: Bologna and Florence"
     MOSCOW = "Moscow"
     CONSTANTINOPLE = "Constantinople"
     ALPS = "The Alps"
@@ -57,15 +62,21 @@ class MapChoice(StrEnum):
     CALIFORNIA = "California"
     COLORADO = "Colorado Rockies"
     CHILE = "Central Chile"
-    JAPAN = "Japan: Hiroshima to Tokyo"
+    JAPAN = "Japan: Osaka to Nagoya"
     EAST_CHINA = "China: the Yangtze delta"
     SOUTHEAST_AUSTRALIA = "Southeast Australia"
     WORLD = "A random place in the world"
+    TUTORIAL = "Tutorial"
 
     @property
     def start_map(self) -> maps.StartMap | None:
         """The baked map this choice plays on, or None for a random place."""
         return maps.start_map(self.value)
+
+    @property
+    def offered(self) -> bool:
+        """Whether the new game page lists it among its maps: the baked maps only."""
+        return self.start_map is not None
 
 
 @dataclass(frozen=True)
@@ -79,6 +90,11 @@ class Settings:
     cash: float = START_CASH
     # Years a stand-in player builds and runs the railway before the player takes over.
     stand_in_years: int = 0
+    # Which target the company is set for 1 January of END_YEAR (railroads.sim.company).
+    difficulty: Difficulty = Difficulty.NORMAL
+    # Whether the waiting screen shows the map as its towns grow (railroads.ui.history_pictures),
+    # which makes setting it up take longer.
+    show_map_growing: bool = False
 
 
 def allowed_start_year(year: int) -> int:
@@ -120,54 +136,88 @@ def start_new_game(
     report("Loading the land there")
     shapes = world.natural_earth(bounds)
     elevation = world.elevation_for(bounds)
-    strategies = real_world_strategies(shapes, elevation, seed)
+    strategies = real_world_strategies(shapes, elevation, seed, world.streams(bounds))
     report("Building the map")
     tile_map = generate_map(
         f"Seed {seed}",
         bounds,
         HexGrid.covering(bounds.width_km, bounds.height_km, KM_PER_CELL),
         strategies,
-        (TERRAIN_TILES_SOURCE, NATURAL_EARTH_SOURCE),
+        (TERRAIN_TILES_SOURCE, NATURAL_EARTH_SOURCE, HYDRORIVERS_SOURCE),
     )
     return NewGame(seed, bounds, tile_map)
+
+
+# The maps of the places games were started on, by map and seed (place_map).
+_PLACES: dict[tuple[MapChoice, int], TileMap] = {}
+
+
+def place_map(settings: Settings) -> TileMap:
+    """The whole map of the place a game with these settings plays on, whose middle square the
+    game starts on and whose lots around it the player can buy (railroads.sim.lots): the baked
+    map, or the map of the random place the seed picks, made again when first asked for."""
+    key = (settings.map, settings.seed)
+    if key not in _PLACES:
+        baked = settings.map.start_map
+        if settings.map == MapChoice.TUTORIAL:
+            _PLACES[key] = tutorial_place.place_map()
+        elif baked is not None:
+            _PLACES[key] = maps.load(baked.key, "hex")
+        else:
+            _PLACES[key] = start_new_game(settings.seed, report=lambda text: None).tile_map
+    return _PLACES[key]
 
 
 def make_game(
     settings: Settings,
     report: Callable[[str], None] = print,
     progress: Callable[[float], None] = lambda done: None,
+    look: Callable[[Constructions, int], None] = lambda constructions, year: None,
 ) -> SavedGame:
     """A new game with these settings, its towns grown and ready to play, beginning in the
-    nearest year play can begin in; `progress` hears the share of the towns' history grown."""
-    return finish(make_game_steps(settings, report, progress))
+    nearest year play can begin in; `progress` hears the share of the towns' history grown and
+    `look` sees the buildings as they grow (railroads.mapgen.seeding.seed_steps)."""
+    return finish(make_game_steps(settings, report, progress, look))
 
 
 def make_game_steps(
     settings: Settings,
     report: Callable[[str], None] = print,
     progress: Callable[[float], None] = lambda done: None,
+    look: Callable[[Constructions, int], None] = lambda constructions, year: None,
 ) -> Steps[SavedGame]:
     """make_game in steps, telling `progress` the share of the towns' history grown so far."""
     settings = replace(settings, start_year=allowed_start_year(settings.start_year))
     seed = settings.seed
     baked = settings.map.start_map
     if baked is not None:
-        tile_map = maps.load(baked.key, "hex")
+        place = place_map(settings)
         title = f"{baked.title}, seed {seed}"
     else:
         new = start_new_game(seed, report=report)
-        tile_map = new.tile_map
+        place = new.tile_map
+        _PLACES[(settings.map, seed)] = place
         title = f"Seed {seed}, {new.place}"
+    lots = Lots.around_middle(place)
+    tile_map = replace(place.window(*lots.window()), locked=lots.locked())
     years = settings.start_year - HISTORY_START
     months = years * 12
     begins = play_begins(months)
     report(f"Generating map from year {HISTORY_START} to {begins}")
     history = History()
     seeded = yield from seed_steps(
-        tile_map, np.random.default_rng(seed), months=months, history=history, progress=progress
+        tile_map,
+        np.random.default_rng(seed),
+        months=months,
+        history=history,
+        progress=progress,
+        look=look,
     )
     game = Game(seeded, start_year=begins, history=history, names=place_names(seeded.tile_map))
     game.finances.cash = settings.cash
+    game.goal = Goal(settings.difficulty)
+    game.lots = lots
+    lots.offer(place.terrain == Terrain.LAND)
     game.growth.novelties = Novelties.pick(game.tile_map, np.random.default_rng(seed + 3))
     if settings.stand_in_years > 0:
         played = min(settings.stand_in_years, END_YEAR - begins)

@@ -8,7 +8,7 @@ from PIL import Image
 
 from railroads.sim.goods import Good
 from railroads.sim.grids import HexGrid
-from railroads.ui.map_view import LOOKS, GridLook
+from railroads.ui.iso_camera import LOOKS, GridLook
 from railroads.ui.pixel.models import SHADES, Model, draw_model, shade, without_fine
 from railroads.ui.pixel.projection import PixelProjection
 from railroads.ui.pixel.train_layer import MAX_TEXTURE

@@ -33,7 +33,7 @@ def test_an_engine_shed_works_a_month_only_on_a_months_coal(coal: float, works: 
     assert left == pytest.approx(0.0 if works else coal)
 
 
-def test_a_train_leaving_a_working_engine_shed_runs_faster() -> None:
+def test_a_fuelled_train_runs_faster_by_the_engine_shed_speed() -> None:
     _, railway = joined_stations()
     railway.finances.earn(1_000_000.0, "test")
     plain, fuelled = railway.buy(), railway.buy()

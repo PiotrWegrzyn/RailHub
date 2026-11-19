@@ -54,5 +54,6 @@ def small_map(tile_map: TileMap, size: int = SANDBOX_SIZE) -> TileMap:
         temperature=tile_map.temperature[rows, cols].copy(),
         height_m=tile_map.height_m[rows, cols].copy(),
         relief=tile_map.relief[rows, cols].copy(),
+        stream=tile_map.stream[rows, cols].copy(),
         deposits=None,
     )

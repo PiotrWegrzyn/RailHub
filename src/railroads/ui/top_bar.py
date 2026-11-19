@@ -1,7 +1,7 @@
-"""The bar along the top of the window: the date and the money, the game speeds, the view's
-buttons (zoom, the two minimaps and the search), the map's title and any notice such as an
-autosave, and the buttons opening the reports, the tech trees, the help, the saves and the main
-menu."""
+"""The bar along the top of the window: the date, the money, the company's worth against its
+target and any countdown to bankruptcy, the game speeds, the view's buttons (zoom, the two
+minimaps and the search), the map's title and any notice such as an autosave, and the buttons
+opening the reports, the tech trees, the help, the saves and the main menu."""
 
 from typing import TYPE_CHECKING
 
@@ -10,6 +10,10 @@ from imgui_bundle import imgui
 
 from railroads.sim.clock import SPEEDS
 from railroads.sim.finance import Finances, dollars
+from railroads.ui.goal_view import draw_worth
+from railroads.ui.map_input import key_pressed
+from railroads.ui.ornate import band, bar_buttons, diamond, spaced, spaced_text
+from railroads.ui.spotlight import spot
 from railroads.ui.theme import BRASS, GONE, GROWN, danger_button, tip, toggle_button
 
 if TYPE_CHECKING:
@@ -21,37 +25,76 @@ LEAVE_POPUP = "Leave this game?"
 
 
 def draw_top_bar(app: App) -> None:
+    """The bar on a dark band edged in brass, its groups set apart by diamonds."""
+    draw_list = imgui.get_window_draw_list()
+    top = imgui.get_cursor_screen_pos().y
+    draw_list.channels_split(2)
+    draw_list.channels_set_current(1)
+    with bar_buttons():
+        _draw_top_bar(app)
+    draw_list.channels_set_current(0)
+    pad = imgui.get_style().window_padding.y
+    low = imgui.get_window_pos()
+    bottom = top + imgui.get_frame_height() + pad - 2
+    band(draw_list, low, imgui.ImVec2(low.x + imgui.get_window_width(), bottom))
+    draw_list.channels_merge()
+
+
+def _draw_top_bar(app: App) -> None:
     clock = app.clock
+    if not imgui.get_io().want_text_input:
+        if key_pressed(imgui.Key.minus, imgui.Key.keypad_subtract):
+            clock.faster(-1)
+        if key_pressed(imgui.Key.equal, imgui.Key.keypad_add):
+            clock.faster(1)
     imgui.align_text_to_frame_padding()
     imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_CLOCK}  {clock.date}")
-    imgui.same_line(0, 16)
+    imgui.same_line(0, 8)
+    diamond()
+    imgui.same_line(0, 8)
     draw_money(app.view.railway.finances)
-    imgui.same_line(0, 16)
+    imgui.same_line(0, 8)
+    diamond()
+    imgui.same_line(0, 8)
+    draw_worth(app.game)
+    imgui.same_line(0, 8)
+    diamond()
+    imgui.same_line(0, 8)
     for speed in SPEEDS:
-        if toggle_button(f"x{speed}", clock.speed == speed, f"Run {speed} times as fast"):
+        if toggle_button(
+            f"x{speed}", clock.speed == speed, f"Run {speed} times as fast (- and = change speed)"
+        ):
             clock.speed = speed
         imgui.same_line(0, 2)
-    imgui.same_line(0, 16)
+    imgui.same_line(0, 6)
+    diamond()
+    imgui.same_line(0, 8)
     draw_view_controls(app.view)
-    if app.title:
-        imgui.same_line(0, 16)
-        imgui.align_text_to_frame_padding()
-        imgui.text_disabled(app.title)
+    padding = imgui.get_style().window_padding.x
+    buttons = 5 if app.saves is not None else 3
+    right = imgui.get_window_width() - padding - buttons * WINDOW_BUTTON_WIDTH - (buttons - 1) * 4
+    title = app.title.upper()
+    imgui.same_line(0, 8)
+    room = right - imgui.get_cursor_pos_x() - 24
+    if app.title and spaced(title) <= room:
+        diamond()
+        imgui.same_line(0, 8)
+        imgui.dummy((spaced(title), imgui.get_frame_height()))
+        at = imgui.get_item_rect_min()
+        text_top = at.y + (imgui.get_frame_height() - imgui.get_font_size()) / 2
+        spaced_text(imgui.get_window_draw_list(), (at.x, text_top), title, BRASS)
     if app.notice:
         imgui.same_line(0, 16)
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*GROWN), app.notice)
-    padding = imgui.get_style().window_padding.x
-    buttons = 5 if app.saves is not None else 3
-    imgui.same_line(
-        imgui.get_window_width() - padding - buttons * WINDOW_BUTTON_WIDTH - (buttons - 1) * 4
-    )
+    imgui.same_line(right)
     size = (WINDOW_BUTTON_WIDTH, 0)
     if toggle_button(fa.ICON_FA_CHART_BAR, app.reports.open, "Reports (G)", size):
         app.reports.open = not app.reports.open
     imgui.same_line(0, 4)
     if toggle_button(fa.ICON_FA_FLASK, app.tech.open, "Tech trees (R)", size):
         app.tech.open = not app.tech.open
+    spot("tech")
     imgui.same_line(0, 4)
     if toggle_button(
         fa.ICON_FA_QUESTION_CIRCLE, app.help.open, "Buildings, goods and engines (H)", size
@@ -107,11 +150,11 @@ def draw_view_controls(view: MapView) -> None:
     camera, minimap = view.camera, view.minimap
     if imgui.button(f"{fa.ICON_FA_SEARCH_MINUS}"):
         camera.zoom(-1, (0, 0), (0, 0))
-    tip("Zoom out (-)")
+    tip("Zoom out, or turn the wheel over the map")
     imgui.same_line(0, 4)
     if imgui.button(f"{fa.ICON_FA_SEARCH_PLUS}"):
         camera.zoom(1, (0, 0), (0, 0))
-    tip("Zoom in (+)")
+    tip("Zoom in, or turn the wheel over the map")
     imgui.same_line()
     if toggle_button(f"{fa.ICON_FA_MAP}", minimap.shown, "Map overview (M)"):
         minimap.shown = not minimap.shown

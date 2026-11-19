@@ -12,14 +12,14 @@ from railroads.sim.constructions import Track, TrackWidth
 from railroads.sim.tilemap import Tile
 from railroads.sim.track_rules import track_rules_for
 
-START_CASH = 80_000.0
+START_CASH = 100_000.0
 # Track costs TRACK_PRICE per cell times its bed's cost factor (railroads.sim.track_rules), and
-# electrifying it ELECTRIC_TRACK_PRICE more, or making it a maglev guideway MAGLEV_TRACK_PRICE
-# more; double track costs DOUBLE_TRACK_FACTOR as much.
-TRACK_PRICE = 300.0
-ELECTRIC_TRACK_PRICE = 450.0
+# electric track ELECTRIC_TRACK_FACTOR times that, or a maglev guideway MAGLEV_TRACK_PRICE more;
+# double track costs DOUBLE_TRACK_FACTOR as much.
+TRACK_PRICE = 600.0
+ELECTRIC_TRACK_FACTOR = 5.0
 MAGLEV_TRACK_PRICE = 4_000.0
-DOUBLE_TRACK_FACTOR = 1.8
+DOUBLE_TRACK_FACTOR = 3.0
 STATION_PRICE = 15_000.0
 TRAIN_PRICE = 10_000.0
 # What selling a train gives back, as a share of its price.
@@ -47,9 +47,10 @@ WAREHOUSE_PRICE = 60_000.0
 STATION_UPKEEP = (150.0, 400.0, 1_200.0, 3_500.0, 9_000.0)
 STATION_UPKEEP_RISE = 0.02
 # Every cell of track costs TRACK_UPKEEP a month, ELECTRIC_TRACK_UPKEEP more where it is
-# electric, MAGLEV_TRACK_UPKEEP more where it is maglev, and DOUBLE_TRACK_FACTOR as much where
-# it is double.
+# electric, MAGLEV_TRACK_UPKEEP more where it is maglev, and DOUBLE_TRACK_UPKEEP_FACTOR as much
+# where it is double.
 TRACK_UPKEEP = 2.0
+DOUBLE_TRACK_UPKEEP_FACTOR = 1.8
 ELECTRIC_TRACK_UPKEEP = 40.0
 MAGLEV_TRACK_UPKEEP = 60.0
 
@@ -67,14 +68,17 @@ def storage_price(upgrades: int) -> float:
 def track_price(piece: Track, tile: Tile) -> float:
     """What laying this piece of track in this cell costs."""
     price = TRACK_PRICE * track_rules_for(tile, piece.bed).price_factor
-    return _dressed(price, piece, ELECTRIC_TRACK_PRICE, MAGLEV_TRACK_PRICE)
+    price *= ELECTRIC_TRACK_FACTOR if piece.electric else 1.0
+    return _dressed(price, piece, 0.0, MAGLEV_TRACK_PRICE)
 
 
-def _dressed(base: float, piece: Track, electric: float, maglev: float) -> float:
+def _dressed(
+    base: float, piece: Track, electric: float, maglev: float, double: float = DOUBLE_TRACK_FACTOR
+) -> float:
     """A piece's base cost with what its wires or guideway add, the whole doubled up for double
     track."""
     cost = base + (electric if piece.electric else 0.0) + (maglev if piece.maglev else 0.0)
-    return cost * (DOUBLE_TRACK_FACTOR if piece.width == TrackWidth.DOUBLE else 1.0)
+    return cost * (double if piece.width == TrackWidth.DOUBLE else 1.0)
 
 
 def track_upkeep(pieces: Iterable[Track]) -> float:
@@ -82,7 +86,13 @@ def track_upkeep(pieces: Iterable[Track]) -> float:
     dearest piece in it."""
     dearest: dict[tuple[int, int], float] = {}
     for piece in pieces:
-        upkeep = _dressed(TRACK_UPKEEP, piece, ELECTRIC_TRACK_UPKEEP, MAGLEV_TRACK_UPKEEP)
+        upkeep = _dressed(
+            TRACK_UPKEEP,
+            piece,
+            ELECTRIC_TRACK_UPKEEP,
+            MAGLEV_TRACK_UPKEEP,
+            DOUBLE_TRACK_UPKEEP_FACTOR,
+        )
         dearest[piece.cell] = max(upkeep, dearest.get(piece.cell, 0.0))
     return sum(dearest.values())
 
@@ -97,6 +107,9 @@ class Finances:
     # month on the books now, None until the first month closes.
     years: dict[int, dict[str, float]] = field(default_factory=dict)
     books_year: int | None = None
+    # Each month's money in and out as months close: its year, its month in that year from 0,
+    # and what it went on.
+    months: list[tuple[int, int, dict[str, float]]] = field(default_factory=list)
 
     def can_afford(self, price: float) -> bool:
         return price <= self.cash + 1e-9
@@ -124,10 +137,31 @@ class Finances:
             books = self.years.setdefault(filed, {})
             for what, amount in self.month.items():
                 books[what] = books.get(what, 0.0) + amount
+            self.months.append((filed, self._month_number(filed), dict(self.month)))
         if year is not None:
             self.books_year = year
         self.last_month = dict(self.month)
         self.month = defaultdict(float)
+
+    def _month_number(self, year: int) -> int:
+        """Which month of `year` the month on the books now is, from 0."""
+        if self.months and self.months[-1][0] == year:
+            return self.months[-1][1] + 1
+        return 0
+
+    def periods(self, length: int, year: int) -> list[tuple[int, int, dict[str, float]]]:
+        """Money in and out over every period of `length` months (1, 3 or 12) so far, oldest
+        first: its year, which of that year's periods it is from 0, and what it went on. The last
+        holds the month on the books now, in `year` until a month has closed."""
+        found: dict[tuple[int, int], dict[str, float]] = {}
+        filed = [*self.months]
+        now = self.books_year if self.books_year is not None else year
+        filed.append((now, self._month_number(now), self.month))
+        for at, month, books in filed:
+            period = found.setdefault((at, month // length), {})
+            for what, amount in books.items():
+                period[what] = period.get(what, 0.0) + amount
+        return [(at, index, books) for (at, index), books in sorted(found.items())]
 
     def year_books(self, year: int) -> dict[str, float]:
         """A year's money in and out by what it was for, with this month's if it is on the

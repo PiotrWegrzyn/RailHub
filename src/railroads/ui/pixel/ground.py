@@ -16,7 +16,7 @@ import numpy.typing as npt
 
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Satisfaction
-from railroads.sim.grids import FloatArray, Grid, IntArray
+from railroads.sim.grids import FloatArray, Grid, HexGrid, IntArray
 from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.building_spots import Plot, plots_of
@@ -32,6 +32,14 @@ from railroads.ui.pixel.relief import (
     mountain_cover,
     sample,
     smooth,
+)
+from railroads.ui.pixel.streams import (
+    BANK_WIDTH,
+    HALF_WIDTH,
+    STREAM_BANK,
+    STREAM_WATER,
+    stream_distance,
+    stream_links,
 )
 
 # Ground is worked out this far past a chunk's edges, so shores meet across chunks.
@@ -123,6 +131,7 @@ GROVES: dict[BuildingKind, Grove] = {
     BuildingKind.PIG_FARM: Grove((140, 150, 90), (120, 92, 60), ((226, 160, 156),), 4, 0.24),
     BuildingKind.CHICKEN_FARM: Grove((150, 176, 90), (196, 170, 110), ((244, 240, 230),), 5, 0.2),
     BuildingKind.HOP_GARDEN: Grove((150, 140, 96), (72, 132, 50), ((170, 214, 110),), 7, 0.34),
+    BuildingKind.TEA_PLANTATION: Grove((128, 150, 80), (56, 120, 52), ((120, 176, 80),), 6, 0.3),
 }
 
 
@@ -131,6 +140,8 @@ CROP_ROWS: dict[BuildingKind, tuple[RGB, RGB]] = {
     BuildingKind.SUGAR: ((156, 200, 100), (118, 162, 74)),
     BuildingKind.COTTON_FIELD: ((238, 236, 226), (150, 172, 100)),
     BuildingKind.POTATO_FARM: ((150, 120, 80), (96, 140, 64)),
+    BuildingKind.RICE_PADDY: ((112, 184, 72), (104, 150, 170)),
+    BuildingKind.SOY_FIELD: ((104, 156, 62), (134, 108, 72)),
     BuildingKind.FLAX_FIELD: ((140, 166, 226), (130, 160, 90)),
 }
 
@@ -450,6 +461,8 @@ class Ground:
         self._hills = land & (tile_map.relief == Relief.HILLS)
         self._relief_light = self._light_slopes(angle_deg)
         self._wet, self._foot = self._surroundings()
+        # Each cell's links along the minor rivers through it (railroads.ui.pixel.streams).
+        self._streams = stream_links(tile_map)
         # Where trees stand in the picture, which shade the grass round them, and where buildings
         # stand, what ground lies round each and how far it reaches, both set by the world.
         self.trees: tuple[FloatArray, FloatArray] = (np.zeros(0), np.zeros(0))
@@ -580,6 +593,7 @@ class Ground:
         land = lit & dry
         if land.any():
             rgb[land] *= self._natural(x[land], y[land])
+        self._draw_streams(rgb, x, y, r, c, land, left, top)
         self._shores(rgb, water, rows, inside)
         # Ground that does not glow keeps its colour exactly, so only glowing ground is blended.
         strength = glow_strength(self.satisfaction[r, c])
@@ -593,6 +607,23 @@ class Ground:
         if raised is not None:
             self.elevation.colour(rgb, raised.top(rows), x, y, rocky)
         return np.clip(rgb, 0, 255) * alpha[..., None], alpha
+
+    def _draw_streams(
+        self, rgb: FloatArray, x: FloatArray, y: FloatArray, r: IntArray, c: IntArray,
+        land: BoolArray, left: int, top: int,
+    ) -> None:  # fmt: skip
+        """Draws the minor rivers over the land of a block: water along their lines and darker
+        banks beside it."""
+        grid = self.tile_map.grid
+        if not isinstance(grid, HexGrid) or not (land & (self._streams[r, c] > 0)).any():
+            return
+        gap = stream_distance(self._streams, grid, x, y, r, c)
+        rgb[land & (gap < BANK_WIDTH)] *= STREAM_BANK
+        down, across = np.nonzero(land & (gap < HALF_WIDTH))
+        if len(down):
+            at = (down, across)
+            water = self._water(x[at], y[at], left + across, top + down)
+            rgb[at] = (water + np.array(STREAM_WATER, dtype=np.float32)) / 2
 
     def _water(self, x: FloatArray, y: FloatArray, ix: IntArray, iy: IntArray) -> FloatArray:
         """The colour of water at plane points `x`, `y`, art pixels `ix`, `iy`: shallow or deep
@@ -703,6 +734,46 @@ class Ground:
         """Where land is hilly."""
         return self._hills
 
+    @property
+    def woodland(self) -> FloatArray:
+        """Each cell's say in whether woods cover a point near it and 1 where it is land, as
+        (rows, cols, 2) floats, for the graphics card."""
+        return np.stack([self._woods, self._land.astype(np.float32)], axis=-1)
+
+    @property
+    def plot_table(self) -> FloatArray:
+        """Every field and grove, a row each, for the graphics card: where the middle of its
+        cell lies in the picture, its cell's row and column, that middle on the plane, which way
+        the plot faces, how wide it spreads, and its kind as its place in FIELD_KINDS."""
+        grid = self.tile_map.grid
+        rows = []
+        for code, kind in enumerate(FIELD_KINDS):
+            px, py = self._plot_pixels[kind]
+            for plot, x, y in zip(self._plots[kind], px.tolist(), py.tolist(), strict=True):
+                cx, cy = grid.center(*plot.cell)
+                rows.append((x, y, *plot.cell, cx, cy, *plot.facing, plot.spread, code))
+        return np.array(rows, dtype=np.float32).reshape(-1, 10)
+
+    @property
+    def yard_table(self) -> FloatArray:
+        """Every building's yard, a row each, for the graphics card: where the building stands
+        in the picture, how far its yard reaches, and its kind as its place in YARD_COLOURS."""
+        xs, ys, kinds, reaches = self.buildings
+        codes = [list(YARD_COLOURS).index(kind) for kind in kinds.tolist()]
+        return np.stack([xs, ys, reaches, np.array(codes, dtype=np.float32)], axis=-1).astype(
+            np.float32
+        )
+
+    @property
+    def streams(self) -> npt.NDArray[np.uint8]:
+        """Each cell's links along the minor rivers through it (streams.stream_links)."""
+        return self._streams
+
+    @property
+    def mountains(self) -> BoolArray:
+        """Where cells are mountains, which take the mountains' colours as they rise."""
+        return self.tile_map.relief == Relief.MOUNTAINS
+
     def under(
         self, left: int, top: int, rows: int, points: Lattice | None = None
     ) -> tuple[BoolArray, FloatArray]:
@@ -767,6 +838,9 @@ class Ground:
         if sum((b[1] - b[0]) * (b[3] - b[2]) for b in boxes) > paint.shape[0] * paint.shape[1]:
             shared = self._patch_points((down, bottom, across, right), left - a, top - a, k, points)
         worked: dict[tuple[int, int, int, int], tuple] = {}
+        # Where each patch's pixels lie off the minor rivers and their banks, which fields leave
+        # showing.
+        dry: dict[tuple[int, int, int, int], FloatArray | float] = {}
         for plot, patch, crop, grove in jobs:
             box = (patch[0].start, patch[0].stop, patch[1].start, patch[1].stop)
             place = (slice(box[0] - down, box[1] - down), slice(box[2] - across, box[3] - across))
@@ -781,7 +855,9 @@ class Ground:
                 cover = self._sow(*args, plot, crop, k)
             else:
                 cover = self._plant(*args, plot, grove, k)
-            np.maximum(painted[place], cover, out=painted[place])
+            if box not in dry:
+                dry[box] = self._off_streams(*worked[box][:3])
+            np.maximum(painted[place], cover * dry[box], out=painted[place])
         top_row, left_col = max(down, a * k), max(across, a * k)
         bottom_row, right_col = min(bottom, (a + rows) * k), min(right, (a + CHUNK) * k)
         if top_row >= bottom_row or left_col >= right_col:
@@ -811,6 +887,16 @@ class Ground:
             colour = colour * lit[art_rows, art_cols][:, None]
         under[laid, :3] = under[laid, :3] * (1 - cover) + np.clip(colour, 0, 255) / 255 * cover
         under[laid, 3:] = under[laid, 3:] * (1 - cover) + cover
+
+    def _off_streams(self, x: FloatArray, y: FloatArray, flat: IntArray) -> FloatArray | float:
+        """1 where pixels at plane points `x`, `y` in flat cells `flat` lie off the minor rivers
+        and their banks, 0 on them."""
+        grid = self.tile_map.grid
+        if not isinstance(grid, HexGrid) or not (self._streams.ravel()[flat] > 0).any():
+            return 1.0
+        r, c = np.divmod(flat, grid.cols)
+        gap = stream_distance(self._streams, grid, x, y, r, c)
+        return (gap >= BANK_WIDTH).astype(np.float32)
 
     def _patch_points(
         self,

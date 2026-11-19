@@ -4,10 +4,10 @@ import pytest
 from builders import flat_map
 from railroads.mapgen.deposits import allowed_land, place_deposits
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.demand import StationDemand, price_of
-from railroads.sim.goods import MAKES, Good, Need, needs_of
+from railroads.sim.demand import StationDemand
+from railroads.sim.goods import MAKES, Good, Need, freight_of, needs_of
 from railroads.sim.grids import HexGrid
-from railroads.sim.growth import Growth
+from railroads.sim.growth import Growth, dies_after
 from railroads.sim.ladders import JEWELLERS, RESOURCES, WORKS, GrowthRule
 from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
 
@@ -97,9 +97,9 @@ def test_diamonds_cars_and_gold_are_worth_a_lot_but_only_where_someone_wants_the
 
     earned = wanted.pay(Need.DIAMONDS, Good.DIAMONDS, 1.0)
 
-    assert earned == pytest.approx(price_of(Good.DIAMONDS))
+    assert earned == pytest.approx(freight_of(Good.DIAMONDS))
     assert elsewhere.deliver(Good.DIAMONDS, 1.0) == 0.0
-    assert price_of(Good.CARS) == 5000
+    assert freight_of(Good.CARS) == 5000
 
 
 def test_a_map_only_holds_its_few_jewellers() -> None:
@@ -137,15 +137,19 @@ def test_needs_start_in_their_year() -> None:
     assert after[Need.FUEL] == 30
 
 
-def test_works_with_nothing_to_work_from_stay_open() -> None:
+def test_works_with_nothing_to_work_from_close_after_exactly_thirty_years_starving() -> None:
     constructions = Constructions(make_map(40, False))
     constructions.build(Building((20, 20), BuildingKind.TEXTILE_MILL))
     growth = Growth(constructions, GrowthRule(ladders=(), forests=None))
+    standing = []
 
-    for _ in range(240):
-        growth.trade_goods()
+    for months in (dies_after(BuildingKind.TEXTILE_MILL) - 2, 1):
+        for _ in range(months):
+            growth.trade_goods()
+        standing.append(int(growth.count(BuildingKind.TEXTILE_MILL).sum()))
 
-    assert growth.count(BuildingKind.TEXTILE_MILL).sum() == 1
+    assert growth.died_out == 1
+    assert standing == [1, 0]
 
 
 def test_flats_want_a_car_from_1930() -> None:
@@ -170,6 +174,7 @@ def test_jewellers_keep_far_apart(gap: int, opens: bool) -> None:
 
 def test_a_map_holds_only_a_few_printing_works_each_printing_thousands_of_newspapers() -> None:
     constructions = Constructions(make_map(mountains=False))
+    constructions.build(Building((100, 100), BuildingKind.PAPER_MILL))
     rule = GrowthRule(trades=False, ladders=(PRINTING_WORKS,), forests=None)
     growth = Growth(constructions, rule)
     cap = 160_000 // PRINTING_WORKS.land_cells_each

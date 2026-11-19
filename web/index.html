@@ -37,14 +37,36 @@ Query parameters:
                    cursor: pointer; text-decoration: none; }
         #landing button { background: #dba852; color: #1c1a17; font-weight: 600; }
         #landing button:hover { background: #e8bb68; }
-        #landing .status { min-height: 1.2em; margin: 8px 0 36px; color: #888; font-size: 13px; }
-        #landing .slow { margin: 0 0 10px; }
+        #landing .status { min-height: 1.2em; margin: 8px 0 6px; color: #888; font-size: 13px; }
+        #landing .tip { min-height: 1.2em; margin: 0 0 30px; color: #6f6a62; font-size: 13px; }
+        #landing .get { position: absolute; top: 16px; right: 16px; width: min(260px, calc(100% - 32px));
+                   text-align: center; font-size: 13px; }
+        #landing .get .download { padding: 8px; font-size: 14px; }
+        #landing .get:not([open]) { width: auto; }
+        @media (max-width: 640px) {
+            #landing { flex-direction: column; }
+            #landing .get { position: static; margin-top: 24px; }
+        }
+        #landing .get > summary { list-style: none; cursor: pointer; padding: 8px 12px; background: #0d0c0b;
+                   color: #dba852; border: 1px solid #dba852; border-radius: 6px; font-weight: 600; }
+        #landing .get > summary::-webkit-details-marker { display: none; }
+        #landing .get > summary::after { content: " \25BE"; }
+        #landing .get[open] > summary { border-radius: 6px 6px 0 0; }
+        #landing .get[open] > summary::after { content: " \25B4"; }
+        #landing .get .drop { padding: 10px; background: #0d0c0b; border: 1px solid #dba852;
+                   border-top: 0; border-radius: 0 0 6px 6px; }
         #landing .download { background: #2a2622; color: #dba852; }
         #landing .download:hover { background: #35302a; }
         #landing .needs { margin: 6px 0 0; color: #888; font-size: 13px; }
         #landing .others { margin: 8px 0 0; font-size: 13px; color: #888; }
         #landing a { color: #dba852; }
-        #landing .fine { margin: 28px 0 0; color: #777; font-size: 12px; }
+        #landing .mac-help { margin: 10px 0 0; color: #aaa; font-size: 13px; text-align: left; }
+        #landing .mac-help summary { color: #dba852; text-align: center; cursor: pointer; }
+        #landing .mac-help ol { margin: 8px 0 0; padding-left: 20px; }
+        #landing .mac-help li { margin: 4px 0; }
+        #landing .mac-help code { display: block; margin: 6px 0; padding: 6px 8px; background: #2a2622;
+                   color: #dba852; border-radius: 4px; user-select: all; overflow-wrap: anywhere; }
+        #landing .fine { margin: 12px 0 0; color: #777; font-size: 11px; }
     </style>
 </head>
 <body>
@@ -52,20 +74,38 @@ Query parameters:
     <div class="panel">
         <h1>RailHub</h1>
         <button id="play">Play online</button>
-        <p class="status" id="landing-status">Loading (0%)...</p>
-        <p class="slow">Too slow? Download and play outside the browser</p>
+        <p class="status" id="landing-status">Turning cogs (0%)...</p>
+        <p class="tip" id="landing-tip"></p>
+    </div>
+    <details class="get">
+        <summary>Download</summary>
+        <div class="drop">
         <a class="download" id="download"></a>
         <p class="needs" id="needs"></p>
+        <details class="mac-help" id="mac-help" hidden>
+            <summary>How to open it on a Mac</summary>
+            <ol>
+                <li>Open the downloaded RailHub-macOS.zip (Safari unpacks it for you) and drag
+                    RailHub to Applications.</li>
+                <li>RailHub isn't from the App Store, so macOS blocks it at first. Open Terminal
+                    (in Applications, Utilities), paste this line and press Return:
+                    <code>xattr -dr com.apple.quarantine /Applications/RailHub.app</code></li>
+                <li>Double-click RailHub. From then on it opens like any other app.</li>
+            </ol>
+        </details>
         <p class="others" id="others"></p>
         <p class="fine">Saves work in both: in Load game, Export file, then Import file in the other.</p>
-    </div>
+        </div>
+    </details>
 </div>
-<div id="loader">Loading (0%)...</div>
+<div id="loader">Turning cogs (0%)...</div>
 <div id="version">v__VERSION__</div>
 <canvas id="canvas" tabindex="0"></canvas>
 <script>
     const IMGUI_BUNDLE = "wheels/imgui_bundle-1.93.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl";
     const GAME_WHEEL = "wheels/railroads-__VERSION__-py3-none-any.whl";
+    // Named with the version, so a browser never takes an older one it kept for a new page.
+    const PAINTER = "painter.js?v=__VERSION__";
 
     const loader = document.getElementById("loader");
     const landingStatus = document.getElementById("landing-status");
@@ -74,12 +114,44 @@ Query parameters:
     // How far loading has got: the share of the bytes the page loads at the start that have come
     // (build_site.py counts them), never less than the stage reached, and 100 once it is done.
     const LOAD_BYTES = Number("__LOAD_BYTES__") || 0;
+    // The make-believe work shown with it, a line every WORK_MS, until the page is ready.
+    const WORK = [
+        "Turning cogs",
+        "Steaming the engine",
+        "Playing with the hexes",
+        "Pouring water",
+        "Sprinkling sand",
+        "Making people",
+        "Making more people",
+        "Growing them apples",
+        "Shoveling cow shit",
+        "Handing out bread",
+    ];
+    const WORK_MS = 2500;
+    // A tip under it, one picked for each visit; the same tips as railroads.ui.waiting_screen.TIPS.
+    const TIPS = [
+        "Hexagons are bestagons!",
+        "Stations hand out to your own buildings first.",
+        "Freight pays up to 3 times as much where buildings go short.",
+        "Every 100 shares sell you 10% of a building's output at the market price.",
+        "Buy shares cheap where a building starves, then feed it.",
+        "Short trains of full cars pay best: every car costs a trip.",
+        "Passengers only ride between stations of different towns.",
+        "Taverns and clubs take any alcohol: beer, wine, vodka or sake.",
+        "Hover a category's icon to see what goods are in it.",
+        "A thriving building's shares are worth up to 3 times a starving one's.",
+        "A station not joined by track to another gathers and hands out nothing.",
+        "What buildings must have is handed out before anything they take as a bonus.",
+    ];
+    document.getElementById("landing-tip").textContent =
+        "Tip: " + TIPS[Math.floor(Math.random() * TIPS.length)];
     let reached = 0;
     function showProgress() {
         let bytes = 0;
         for (const entry of performance.getEntriesByType("resource")) bytes += entry.decodedBodySize;
         const share = LOAD_BYTES ? Math.min(99, Math.round(100 * bytes / LOAD_BYTES)) : 0;
-        const text = `Loading (${Math.max(reached, share)}%)...`;
+        const work = WORK[Math.floor(performance.now() / WORK_MS) % WORK.length];
+        const text = reached >= 100 ? "Ready" : `${work} (${Math.max(reached, share)}%)...`;
         loader.textContent = text;
         landingStatus.textContent = text;
     }
@@ -148,10 +220,14 @@ Query parameters:
         download.dataset.file = file;
         download.textContent = "Download for " + system;
         document.getElementById("needs").textContent = needs;
+        const macHelp = document.getElementById("mac-help");
+        macHelp.hidden = system !== "macOS";
         const others = Object.keys(DOWNLOADS).filter(name => name !== system);
         document.getElementById("others").innerHTML = "Also for " + others.map(name =>
             `<a href="${RELEASES + DOWNLOADS[name][0]}" data-file="${DOWNLOADS[name][0]}">${name}</a>`
         ).join(" and ");
+        document.querySelector('#others a[data-file="RailHub-macOS.zip"]')
+            ?.addEventListener("click", () => { macHelp.hidden = false; });
         linkNewestBuilds();
         const landing = document.getElementById("landing");
         landing.hidden = false;
@@ -183,7 +259,7 @@ Query parameters:
             this.memory = memory;
             this.inbox = [];
             this.workers = Array.from({ length: count }, (_, worker) => {
-                const painter = new Worker("painter.js", { type: "module" });
+                const painter = new Worker(PAINTER, { type: "module" });
                 painter.onmessage = event => this.inbox.push({ worker, ...event.data });
                 painter.onerror = event => {
                     event.preventDefault();
@@ -232,7 +308,7 @@ Query parameters:
         }
 
         started() {
-            const worker = new Worker("painter.js", { type: "module" });
+            const worker = new Worker(PAINTER, { type: "module" });
             worker.onmessage = event => {
                 if (worker === this.worker) this.inbox.push(event.data);
             };
