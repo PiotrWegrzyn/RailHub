@@ -13,7 +13,16 @@ from railroads.sim.events import (
     want_factor,
 )
 from railroads.sim.fuel_market import Fuel, history_factor
-from railroads.sim.goods import Good, Need, bonus_of, boosts_of, demands_of, makes_of, needs_of
+from railroads.sim.goods import (
+    RECIPES,
+    Good,
+    Need,
+    bonus_of,
+    boosts_of,
+    demands_of,
+    makes_of,
+    needs_of,
+)
 from railroads.sim.happenings import changes_of
 
 BOUNDS = {start.key: start.bounds for start in START_MAPS}
@@ -156,3 +165,21 @@ def test_after_electric_light_theatres_and_the_palace_still_take_wax_as_a_bonus(
     assert Need.WAX in theatre
     assert Need.WAX in palace
     assert Need.WAX in church
+
+
+@pytest.mark.parametrize("kind", [BuildingKind.FURNITURE_MAKER, BuildingKind.SHOE_FACTORY])
+def test_furniture_makers_and_shoe_works_make_a_quarter_more_with_a_little_wax(
+    kind: BuildingKind,
+) -> None:
+    recipe = RECIPES[kind]
+
+    wax = boosts_of(kind, 1900)[Need.WAX]
+
+    assert wax == pytest.approx(0.1 * recipe.most)
+    assert recipe.boost_most == 0.25
+
+
+def test_hospitals_take_a_little_wax_as_a_bonus() -> None:
+    bonus = bonus_of(BuildingKind.HOSPITAL, 1850)
+
+    assert bonus == {Need.WAX: 2}

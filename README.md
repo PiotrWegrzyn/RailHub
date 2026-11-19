@@ -554,7 +554,7 @@ window (H) lists the same.
 | Mega factory (1780) | 270 goods | 90 steel (from 1855), 45 copper (from 1880), 45 machinery (from 1870) |  |
 | Cannery (1810) | 300 cans | 90 fruit, 30 steel (from 1855) |  |
 | Textile mill (1780) | 40 clothes | 100 fibre |  |
-| Furniture maker | 20 furniture | 80 lumber |  |
+| Furniture maker | 20 furniture | 80 lumber | 2 wax |
 | Tool works (1870) | 80 tools | 80 steel (from 1855) |  |
 | Winery | 20 wine | 80 grapes | 40 barrels |
 | Barrel maker | 40 barrels | 20 lumber |  |
@@ -583,7 +583,7 @@ window (H) lists the same.
 | Distillery (1600) | 10 vodka | 20 potatoes | 4 glass |
 | Sake brewery | 15 sake | 30 rice |  |
 | Tannery | 40 leather | 20 livestock | 10 limestone |
-| Shoe factory (1850) | 20 shoes | 40 leather |  |
+| Shoe factory (1850) | 20 shoes | 40 leather | 2 wax |
 | Plastics works (1950) | 100 plastics | 50 oil, 50 chemicals (from 1880) |  |
 | Appliance factory (1950) | 30 appliances | 30 steel (from 1855), 15 copper (from 1880), 15 plastics (from 1950), 7.5 electronics (from 1960) |  |
 | Paper mill (1150) | 100 paper | 50 lumber, 25 chemicals (from 1880) |  |
@@ -620,8 +620,8 @@ window (H) lists the same.
 | Mega cannery (1810) | 4,219 cans | 1,266 fruit, 421.9 steel (from 1855) |  |
 | Big textile mill (1780) | 100 clothes | 250 fibre |  |
 | Mega textile mill (1780) | 250 clothes | 625 fibre |  |
-| Big furniture maker | 50 furniture | 200 lumber |  |
-| Mega furniture maker | 125 furniture | 500 lumber |  |
+| Big furniture maker | 50 furniture | 200 lumber | 5 wax |
+| Mega furniture maker | 125 furniture | 500 lumber | 12.5 wax |
 | Big tool works (1870) | 200 tools | 200 steel (from 1855) |  |
 | Mega tool works (1870) | 500 tools | 500 steel (from 1855) |  |
 | Big barrel maker | 100 barrels | 50 lumber |  |
@@ -656,8 +656,8 @@ window (H) lists the same.
 | Mega tannery | 250 leather | 125 livestock | 62.5 limestone |
 | Big butcher (1850) | 450 meat | 180 animals |  |
 | Mega butcher (1850) | 1,688 meat | 675 animals |  |
-| Big shoe factory (1850) | 50 shoes | 100 leather |  |
-| Mega shoe factory (1850) | 125 shoes | 250 leather |  |
+| Big shoe factory (1850) | 50 shoes | 100 leather | 5 wax |
+| Mega shoe factory (1850) | 125 shoes | 250 leather | 12.5 wax |
 | Big plastics works (1950) | 250 plastics | 125 oil, 125 chemicals (from 1880) |  |
 | Mega plastics works (1950) | 625 plastics | 312.5 oil, 312.5 chemicals (from 1880) |  |
 | Big appliance factory (1950) | 75 appliances | 75 steel (from 1855), 37.5 copper (from 1880), 37.5 plastics (from 1950), 18.75 electronics (from 1960) |  |
@@ -680,7 +680,7 @@ window (H) lists the same.
 | Mirror maker (1700) | 5 luxury goods | 10 glass, 0.5 gold |  |
 | Manor |  | 100 food, 10 heating, 10 wine, 3 luxury goods (from 1700) | 5 furniture |
 | Theatre |  | 10 clothes (from 1780), 5 glass, 5 paper (from 1150) | 5 wax |
-| Hospital (1850) |  | 50 food, 5 heating, 10 chemicals (from 1880), 5 glass |  |
+| Hospital (1850) |  | 50 food, 5 heating, 10 chemicals (from 1880), 5 glass | 2 wax |
 | Space center |  | 300 electronics (from 1960), 1,000 fuel (from 1910), 300 food |  |
 | Pear Company headquarters |  | 500 electronics (from 1960), 1,000 food |  |
 | Royal palace |  | 200 food, 50 wine, 20 porcelain | 20 furniture, 20 wax |
@@ -1074,7 +1074,9 @@ points live in its neighbourhood, and a basilica a cathedral at 240. The first c
 400 becomes the map's one St. Paul cathedral. Each point of worship sends and wants one passenger
 (church 5, basilica 20, cathedral 50, St. Paul cathedral 2137), and a fifth as much mail like any
 other building. Honey counts as food; wax comes only from beekeepers and incense only from groves
-on its own rare deposits.
+on its own rare deposits. Churches must have wax; homes take a little as a bonus until electric
+light in 1882, and theatres, the royal palace and hospitals always do, while furniture makers and
+shoe works make up to a quarter more with a little of it.
 
 ### Finding things
 
