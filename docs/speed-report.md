@@ -397,7 +397,7 @@ What is left: a month's work is about 110 ms in the browser on the bigger map (t
 scenery and the ground's fields put up again over the whole map each month the most of it).
 Putting the scenery and fields up only round the cells that changed would be the next step.
 
-## Moving the map, hovering and starting a game in the browser (19 November, 0.5.101)
+## Moving the map, hovering and starting a game in the browser (19 November, 0.5.110)
 
 The complaint: moving the map should stay smooth, hovering the map should cost nothing, and a new
 game should come up sooner. Measured in headless Chrome as above (1440×860 at 2× density, a 60 Hz
