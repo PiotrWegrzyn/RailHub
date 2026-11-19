@@ -19,13 +19,16 @@ from railroads.sim.clock import MONTH_NAMES
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.events import (
     EVENTS,
+    MAKE_RISE,
     PILGRIM_MONTHS,
     RISE,
     RISE_EVERY,
     RISE_FROM,
+    SLOW_MAKE_RISE,
     SLOW_RISE,
     WAR_GROWTH,
     Event,
+    price_fall,
     rise_of,
 )
 from railroads.sim.goods import GOOD_YEARS, Need
@@ -166,10 +169,14 @@ class Happenings:
                     "People want more",
                     f"A new decade: homes, shops and everything else people use want {RISE:.0%} "
                     f"more of every good than ten years ago, and {SLOW_RISE:.0%} more food and "
-                    "heating.",
+                    f"heating. Farms, mines and the rest make {MAKE_RISE:.0%} more, "
+                    f"{SLOW_MAKE_RISE:.0%} more food and heating, and every unit carried earns "
+                    "as much less as people want more of it.",
                     (
                         f"Goods wanted: {goods:.2f} times as much as in {RISE_FROM}",
                         f"Food and heating wanted: {food:.2f} times as much as in {RISE_FROM}",
+                        f"A unit of goods earns {price_fall(year):.0%} of its {RISE_FROM} price",
+                        f"Food and heating: {price_fall(year, slow=True):.0%} of it",
                     ),
                 )
             )

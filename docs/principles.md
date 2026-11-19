@@ -61,6 +61,14 @@ The ideas every rule of the game should follow, the most important first.
 
 ## Economy
 
+- Margins shrink as the world fills up: there are ever more goods and they are ever more used,
+  so a unit earns less and less, and to stay profitable the player has to carry more for less,
+  investing well enough to keep buying the newest trains.
+- Every good has a market: what it earns moves with what the map wants of it against what the
+  map makes of it, measured against the first year of play. Too much of a good on the market
+  makes it cheaper and hauling it stops paying; making towns grow makes demand for it, and with it
+  someone to sell large amounts to. At the start everything pays and everything is short, food
+  most of all.
 - Most money comes from the needs of grown homes, not from food or passengers.
 - Goods fall into categories of need: food, processed food, common goods and heating. Any kind of
   good in a category meets that need.

@@ -139,6 +139,17 @@ def test_every_decade_brings_news_that_people_want_more() -> None:
     assert [h.title for h in happenings.news] == ["People want more"]
 
 
+def test_the_decade_news_tells_that_the_land_gives_more_and_every_unit_earns_less() -> None:
+    growth = grown(1870, {})
+
+    happenings = happen(growth, 1870)
+
+    news = happenings.news[0]
+    assert "make 15% more" in news.story
+    assert "A unit of goods earns 83% of its 1850 price" in news.changes
+    assert "Food and heating: 94% of it" in news.changes
+
+
 def test_a_good_made_for_the_first_time_makes_news() -> None:
     growth = grown(1880, {})
 

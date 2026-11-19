@@ -245,6 +245,7 @@ class App:
                 railway.finances,
                 railway.fuel,
                 self.game.goal,
+                railway.market,
             )
         self._draw_saves()
         draw_goal_news(self)

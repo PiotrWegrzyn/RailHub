@@ -79,6 +79,7 @@ from railroads.sim.fuel_market import (
     signals_of,
 )
 from railroads.sim.goods import FOODS, TRAVELLERS, General, Good, Need, freight_of, price_of
+from railroads.sim.goods_market import GoodsMarket
 from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
@@ -192,6 +193,8 @@ class Railway:
         # What each year ended with and the cars delivered in it (railroads.sim.stats).
         self.history = History()
         self.fuel = FuelMarket()
+        # What each good earns with how short the map is of it (railroads.sim.goods_market).
+        self.market = GoodsMarket()
         # The way along the track, and what trains do calling at stations
         # (railroads.sim.track_network, railroads.sim.calls).
         self.network = TrackNetwork(constructions)
@@ -389,12 +392,13 @@ class Railway:
         return 1.0 - subsidy * food / len(train.cars)
 
     def fuel_month(self, trade: Trade, points: float = 0.0) -> None:
-        """Closes the fuel market's month with what this month's trade said about it, and the
-        points of the map's homes and factories, which want electricity."""
+        """Closes the fuel and goods markets' month with what this month's trade said about them,
+        and the points of the map's homes and factories, which want electricity."""
         owned = (
             None if self.owners is None else {kind: self.owners.owned(kind) for kind in PLANT_FUEL}
         )
         self.fuel.month(self.year, signals_of(trade, owned, points, self.year))
+        self.market.month(self.year, trade)
 
     def car_capacity(
         self, good: Good, engine: str | None = None, general: General | None = None
@@ -451,11 +455,13 @@ class Railway:
         return self.demand.setdefault(station, StationDemand())
 
     def price_factor(self, good: Good) -> float:
-        """How much more a good earns carried by train: its TRANSIT_PAY, with the player's tech, and
-        what history makes of it (railroads.sim.events)."""
+        """How much more a good earns carried by train: its TRANSIT_PAY, with the player's tech,
+        what history makes of it (railroads.sim.events) and the market now
+        (railroads.sim.goods_market)."""
         return (
             TRANSIT_PAY.get(good, 1.0)
             * history_price(good, self.year)
+            * self.market.factor_of(good)
             * (1.0 + self.research.bonus(Effect.PRICE, GOOD_TREES[good]))
         )
 
@@ -564,12 +570,12 @@ class Railway:
         earned = freight_of(good) * weighed * self.price_factor(good)
         earned *= self.facility_pay(station, good)
         self.finances.earn(earned, "cargo")
-        self.learn(GOOD_TREES[good], earned)
+        self.learn(GOOD_TREES[good], earned / self.market.factor_of(good))
 
     def sell_own(self, good: Good, amount: float) -> None:
         """Pays the player the market price of what their own buildings brought into a station:
         their company sold it, and the railway now carries it."""
-        self.finances.earn(price_of(good) * amount, "owned buildings")
+        self.finances.earn(price_of(good) * amount * self.market.factor_of(good), "owned buildings")
 
     def learn(self, tree: Tree, dollars: float) -> None:
         """Counts what a delivery earned as experience in a tree, more for every building of

@@ -26,13 +26,18 @@ from types import MappingProxyType
 
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.geo import Bounds
-from railroads.sim.goods import HOMES, MAKES, NEEDS, RECIPES, Good, Need
+from railroads.sim.goods import FITS, HOMES, MAKES, NEEDS, RECIPES, Good, Need
 
 RISE_FROM = 1850
 RISE_EVERY = 10
 RISE = 0.10
 SLOW_RISE = 0.03
 SLOW_RISERS = frozenset({Need.FOOD, Need.HEATING})
+# What the land gives grows every decade too, faster than people's wants: MAKE_RISE more of every
+# good, and SLOW_MAKE_RISE more of food and heating (SLOW_RISERS).
+MAKE_RISE = 0.15
+SLOW_MAKE_RISE = 0.05
+SLOW_GOODS = frozenset(good for need in SLOW_RISERS for good in FITS[need])
 NOT_RISING = frozenset(
     {
         BuildingKind.POWER_PLANT,
@@ -323,9 +328,20 @@ def _product(year: int, east: bool, of: str) -> float:
 
 
 @cache
+def price_fall(year: int, slow: bool = False) -> float:
+    """How many times its price a unit of a good earns in a year as goods grow plentiful: as much
+    less every decade from RISE_FROM as people want more, of food and heating (`slow`) SLOW_RISE
+    less."""
+    decades = max(0, (year - RISE_FROM) // RISE_EVERY)
+    return (1.0 + (SLOW_RISE if slow else RISE)) ** -decades
+
+
+@cache
 def make_factor(good: Good, year: int) -> float:
-    """How many times as much of a good buildings make in a year."""
-    factor = 1.0
+    """How many times as much of a good buildings make in a year: MAKE_RISE more every decade
+    from RISE_FROM, SLOW_MAKE_RISE more of food and heating, and what events make of it."""
+    decades = max(0, (year - RISE_FROM) // RISE_EVERY)
+    factor = (1.0 + (SLOW_MAKE_RISE if good in SLOW_GOODS else MAKE_RISE)) ** decades
     for event in happening(year):
         factor *= event.makes.get(good, 1.0)
     return factor

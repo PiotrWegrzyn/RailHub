@@ -1,6 +1,7 @@
 """The reports window: the company's worth each month against its target (railroads.sim.company),
 the cars delivered each year, stacked by what they carried, the stations
-the player had each year and the population of the whole map (railroads.sim.stats).
+the player had each year and the population of the whole map (railroads.sim.stats), each fuel's
+price (railroads.sim.fuel_market) and what goods earn on the market (railroads.sim.goods_market).
 
 The year under way shows as it stands so far, with today's stations and population.
 """
@@ -15,6 +16,7 @@ from railroads.sim.company import Goal
 from railroads.sim.finance import Finances, dollars
 from railroads.sim.fuel_market import Fuel, FuelMarket, FuelMonth, electrified
 from railroads.sim.goods import Good
+from railroads.sim.goods_market import GoodsMarket, NeedMonth
 from railroads.sim.stats import History
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.theme import GOOD_COLORS, GROWN, WINDOW_TOP
@@ -25,6 +27,8 @@ BAR_WIDTH = 0.8
 GOODS_COLORMAP = "Goods"
 GOODS = list(Good)
 MILLION = 1_000_000.0
+# How many of the most wanted needs the markets tab draws over the years.
+MARKET_LINES = 6
 
 
 @dataclass(frozen=True)
@@ -201,6 +205,66 @@ def _draw_fuel(market: FuelMarket) -> None:
         )
 
 
+def market_line(months: list[NeedMonth]) -> tuple[list[float], list[float]]:
+    """A need's price, as a share of the prices goods list, month by month, as years with the
+    months as twelfths of them."""
+    xs, seen = [], {}
+    for month in months:
+        xs.append(month.year + seen.get(month.year, 0) / 12)
+        seen[month.year] = seen.get(month.year, 0) + 1
+    return xs, [100.0 * month.price for month in months]
+
+
+def market_rows(market: GoodsMarket) -> list[tuple[str, str, str, str]]:
+    """Every need on the market, the most wanted first: its name, what its goods earn as a share
+    of their prices, and what the map wanted and could make of it last month."""
+    rows = []
+    for need, months in sorted(market.history.items(), key=lambda item: -item[1][-1].wanted):
+        last = months[-1]
+        rows.append(
+            (
+                need.value.capitalize(),
+                f"{last.price:.0%}",
+                f"{last.wanted:,.0f}",
+                f"{last.made:,.0f}",
+            )
+        )
+    return rows
+
+
+def _draw_markets(market: GoodsMarket) -> None:
+    """What goods earn on the market over the years, against the prices they list, the most
+    wanted needs drawn, and every need's market last month."""
+    if not market.history:
+        imgui.text_disabled("Markets open after the first month")
+        return
+    imgui.text_wrapped(
+        "What goods earn against the prices they list: more where the map wants more of them "
+        "than it makes, less where it makes more than it wants."
+    )
+    wanted = sorted(market.history.items(), key=lambda item: -item[1][-1].wanted)
+    if _begin_year_plot("##markets", PLOT_HEIGHT * 1.4, "%"):
+        for need, months in wanted[:MARKET_LINES]:
+            xs, ys = market_line(months)
+            implot.plot_line(
+                need.value.capitalize(),
+                np.array(xs, dtype=np.float64),
+                np.array(ys, dtype=np.float64),
+            )
+        implot.end_plot()
+    flags = imgui.TableFlags_.row_bg.value
+    if imgui.begin_table("markets", 4, flags):
+        for heading in ("Need", "Price", "Wanted", "Made"):
+            imgui.table_setup_column(heading)
+        imgui.table_headers_row()
+        for row in market_rows(market):
+            imgui.table_next_row()
+            for value in row:
+                imgui.table_next_column()
+                imgui.text(value)
+        imgui.end_table()
+
+
 def worth_line(goal: Goal) -> tuple[list[float], list[float]]:
     """The company's worth at the start of each month, by the year and the part of it gone."""
     return [year + month / 12 for year, month, _ in goal.values], [v for _, _, v in goal.values]
@@ -312,6 +376,7 @@ class ReportsWindow:
         finances: Finances | None = None,
         fuel: FuelMarket | None = None,
         goal: Goal | None = None,
+        market: GoodsMarket | None = None,
     ) -> None:
         if not self.open:
             return
@@ -331,6 +396,9 @@ class ReportsWindow:
                 imgui.end_tab_item()
             if fuel is not None and imgui.begin_tab_item("Fuel")[0]:
                 _draw_fuel(fuel)
+                imgui.end_tab_item()
+            if market is not None and imgui.begin_tab_item("Markets")[0]:
+                _draw_markets(market)
                 imgui.end_tab_item()
             imgui.end_tab_bar()
         end_ornate()

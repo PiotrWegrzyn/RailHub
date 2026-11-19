@@ -14,6 +14,7 @@ from railroads.sim.economy import (
     StationOrder,
     levels_of,
 )
+from railroads.sim.events import make_factor
 from railroads.sim.goods import BONUS_PART, PIPELINE, Good, Need, makes_of, needs_of
 from railroads.sim.grids import HexGrid
 from railroads.sim.ladders import LOGGING_CAMPS, MINES
@@ -890,7 +891,7 @@ def test_only_a_farm_the_player_owns_takes_limestone_and_machinery_once_their_te
 
     gathered = trade.gathered[STATION].get(Good.WHEAT, 0.0)
     brought = trade.owned_brought[STATION].get(Good.WHEAT, 0.0)
-    assert gathered + brought == pytest.approx(wheat)
+    assert gathered + brought == pytest.approx(wheat * make_factor(Good.WHEAT, 1900))
 
 
 @pytest.mark.parametrize("drink", ["BEER", "WINE", "VODKA"])
@@ -979,8 +980,9 @@ def test_a_farm_the_player_controls_takes_machinery_whole_and_they_get_their_par
 
     gathered = trade.gathered[STATION].get(Good.WHEAT, 0.0)
     brought = trade.owned_brought[STATION].get(Good.WHEAT, 0.0)
-    assert gathered + brought == pytest.approx(3.0 * FARM_MONTH)
-    assert brought == pytest.approx(0.6 * 3.0 * FARM_MONTH)
+    rise = make_factor(Good.WHEAT, 1900)
+    assert gathered + brought == pytest.approx(3.0 * FARM_MONTH * rise)
+    assert brought == pytest.approx(0.6 * 3.0 * FARM_MONTH * rise)
 
 
 @pytest.mark.parametrize(
@@ -1043,7 +1045,9 @@ def test_machinery_lets_any_logging_camp_fell_twice_the_logs_from_1870(
 
     trade = economy.trade(placed, holding(1000.0, MACHINERY=machinery))
 
-    assert trade.gathered[STATION].get(Good.LOGS, 0.0) == pytest.approx(logs)
+    assert trade.gathered[STATION].get(Good.LOGS, 0.0) == pytest.approx(
+        logs * make_factor(Good.LOGS, year)
+    )
 
 
 @pytest.mark.parametrize(("chips", "paper"), [(0.0, 0.0), (5.0, 50.0), (20.0, 100.0)])

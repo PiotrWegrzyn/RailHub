@@ -5,6 +5,7 @@ from test_taverns import served_at
 
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.economy import Economy
+from railroads.sim.events import make_factor
 from railroads.sim.goods import DIESEL_BOOST, PIPELINE, Good, Need
 from railroads.sim.growth import LIVELY_GROWTH, breeding_of
 from railroads.sim.ladders import FILLING_STATIONS, POINTS, WORKS, Points
@@ -29,7 +30,7 @@ def test_an_iron_mine_with_its_diesel_digs_half_as_much_again_from_1920() -> Non
     too_early = mined(1919, FUEL=10.0)
 
     assert fuelled == pytest.approx(without * (1 + DIESEL_BOOST))
-    assert too_early == pytest.approx(without)
+    assert too_early == pytest.approx(mined(1919))
 
 
 def test_diesel_adds_its_half_to_a_farm_that_takes_no_limestone_or_machinery_unless_owned() -> None:
@@ -39,7 +40,9 @@ def test_diesel_adds_its_half_to_a_farm_that_takes_no_limestone_or_machinery_unl
 
     trade = economy.trade(placed, holding(1000.0, FUEL=10.0, LIMESTONE=10.0, MACHINERY=10.0))
 
-    assert trade.gathered[STATION][Good.WHEAT] == pytest.approx(10 * (1 + DIESEL_BOOST))
+    assert trade.gathered[STATION][Good.WHEAT] == pytest.approx(
+        10 * (1 + DIESEL_BOOST) * make_factor(Good.WHEAT, 1950)
+    )
 
 
 def test_diesel_fuel_heats_a_home() -> None:
