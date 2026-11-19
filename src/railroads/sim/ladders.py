@@ -43,7 +43,8 @@ FloatGrid = npt.NDArray[np.float64]
 Cells = npt.NDArray[np.intp]
 
 
-# Farms with this many population points around them or more are pulled down, and none grow there.
+# Farms and every other grower of food (not the works that make food from it) with this many
+# population points around them or more are pulled down, and none grow there.
 FARMS_CROWDED_OUT = 5
 
 # How much likelier farms, orchards and other fields are on open flat grassland with nothing
@@ -559,6 +560,7 @@ FARMS = Ladder(
 # Orchards like sunny slopes and water nearby, and stay off the cold.
 ORCHARDS = Ladder(
     kinds=(BuildingKind.ORCHARD,),
+    crowded_at=FARMS_CROWDED_OUT,
     land=Land(
         vegetation={Vegetation.BARREN: 0.2, Vegetation.FOREST: 0.1},
         relief={Relief.FLAT: 0.4, Relief.HILLS: 1.5, Relief.MOUNTAINS: 0.0},
@@ -573,6 +575,7 @@ ORCHARDS = Ladder(
 # Date palms grow in hot desert, best at an oasis by water.
 DATE_PALMS = Ladder(
     kinds=(BuildingKind.DATE_PALMS,),
+    crowded_at=FARMS_CROWDED_OUT,
     land=Land(
         vegetation={Vegetation.GRASS: 0.2, Vegetation.FOREST: 0.0},
         relief={Relief.HILLS: 0.7, Relief.MOUNTAINS: 0.0},
@@ -587,6 +590,7 @@ DATE_PALMS = Ladder(
 # Bananas grow in the jungle.
 BANANA_PLANTATIONS = Ladder(
     kinds=(BuildingKind.BANANAS,),
+    crowded_at=FARMS_CROWDED_OUT,
     land=Land(
         vegetation={Vegetation.BARREN: 0.0, Vegetation.GRASS: 0.0},
         relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
@@ -601,6 +605,7 @@ BANANA_PLANTATIONS = Ladder(
 # Oranges want hot, green land: not the desert, not the jungle.
 ORANGE_FARMS = Ladder(
     kinds=(BuildingKind.ORANGE_FARM,),
+    crowded_at=FARMS_CROWDED_OUT,
     land=Land(
         vegetation={Vegetation.BARREN: 0.0, Vegetation.FOREST: 0.0},
         relief={Relief.HILLS: 1.0, Relief.MOUNTAINS: 0.0},
@@ -615,6 +620,7 @@ ORANGE_FARMS = Ladder(
 # Sugar grows on open, flat land wherever it is not cold: beet in mild lands, cane in hot ones.
 SUGAR_FIELDS = Ladder(
     kinds=(BuildingKind.SUGAR,),
+    crowded_at=FARMS_CROWDED_OUT,
     land=Land(
         vegetation={Vegetation.BARREN: 0.05, Vegetation.FOREST: 0.02},
         relief={Relief.HILLS: 0.6, Relief.MOUNTAINS: 0.0},
@@ -747,9 +753,14 @@ SHIPYARDS = Ladder(
 
 
 def _resource(
-    kind: BuildingKind, deposit: Deposit, from_year: int = 0, chance: float = 0.0004
+    kind: BuildingKind,
+    deposit: Deposit,
+    from_year: int = 0,
+    chance: float = 0.0004,
+    crowded_at: int | None = None,
 ) -> Ladder:
-    """Something dug, drilled or grown on its own deposit, and nowhere else."""
+    """Something dug, drilled or grown on its own deposit, and nowhere else; what is grown there
+    for food gives way to towns, as fields do (`crowded_at`)."""
     return Ladder(
         kinds=(kind,),
         land=Land(deposit=deposit),
@@ -757,6 +768,7 @@ def _resource(
         most_per_cell=1,
         most_nearby=1,
         from_year=from_year,
+        crowded_at=crowded_at,
     )
 
 
@@ -794,10 +806,10 @@ RESOURCES = (
     _resource(BuildingKind.OIL_WELL, Deposit.OIL, 1855, 0.003),
     _resource(BuildingKind.SALT_WORKS, Deposit.SALT),
     _resource(BuildingKind.FISHERY, Deposit.FISH),
-    _resource(BuildingKind.SHEEP_FARM, Deposit.WOOL),
-    _resource(BuildingKind.VINEYARD, Deposit.GRAPES),
+    _resource(BuildingKind.SHEEP_FARM, Deposit.WOOL, crowded_at=FARMS_CROWDED_OUT),
+    _resource(BuildingKind.VINEYARD, Deposit.GRAPES, crowded_at=FARMS_CROWDED_OUT),
     _resource(BuildingKind.COTTON_FIELD, Deposit.COTTON),
-    _resource(BuildingKind.COFFEE_PLANTATION, Deposit.COFFEE, 1700),
+    _resource(BuildingKind.COFFEE_PLANTATION, Deposit.COFFEE, 1700, crowded_at=FARMS_CROWDED_OUT),
     _resource(BuildingKind.RUBBER_PLANTATION, Deposit.RUBBER, 1900, 0.003),
     _resource(BuildingKind.INCENSE_GROVE, Deposit.INCENSE),
 )
@@ -842,6 +854,7 @@ CHURCHES = Ladder(
 # A few hives out on green land among the farms.
 BEEKEEPERS = Ladder(
     kinds=(BuildingKind.BEEKEEPER,),
+    crowded_at=FARMS_CROWDED_OUT,
     land=Land(
         vegetation={Vegetation.BARREN: 0.0, Vegetation.FOREST: 0.4},
         relief={Relief.MOUNTAINS: 0.0},
@@ -1032,6 +1045,7 @@ TEA_REGION = (65.0, 150.0, -10.0, 36.0)
 
 TEA_PLANTATIONS = Ladder(
     kinds=(BuildingKind.TEA_PLANTATION,),
+    crowded_at=FARMS_CROWDED_OUT,
     land=Land(
         vegetation={Vegetation.BARREN: 0.0, Vegetation.FOREST: 0.2},
         relief={Relief.FLAT: 0.3, Relief.HILLS: 1.5, Relief.MOUNTAINS: 0.0},

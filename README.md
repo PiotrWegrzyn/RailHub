@@ -424,11 +424,11 @@ than dry land unless a row names it:
 |---|---|---|---|
 | Houses | 0.0000012 + 0.00011 per doubling of population, from 2 population nearby | | forest x0.3, mountains x0.05, barren x0.5, hills x0.8, cold x0.6, hot x0.8; river x1.5, lake x1.3 |
 | Farms | 0.000000112 + 0.00000672 per doubling of population + 0.00000028 per doubling of food | fewer than 5 population | flat grass x10 while empty; hills x0.25, barren x0.1, forest x0.02, cold x0.2, hot x0.6; river or lake x4; none in mountains |
-| Orchards | 0.000000216 + 0.000000108 per doubling of population + 0.00000216 per doubling of food | | hills x1.5; flat x0.4, hot x1.2, cold x0.05; river or lake x3 |
-| Date palms | 0.000000168 + 0.00000168 per doubling of population + 0.00000126 per doubling of food | | hot desert; river or lake x5 |
-| Banana plantations | as date palms | | hot jungle; river or lake x2 |
-| Orange farms | as date palms | | hot grassland, not desert or jungle; hills x0.7; river or lake x2 |
-| Sugar fields | 0.0000000168 + 0.000000042 per doubling of population + 0.000000168 per doubling of food | | open flat land, not cold; mild x0.6; river x3 |
+| Orchards | 0.000000216 + 0.000000108 per doubling of population + 0.00000216 per doubling of food | fewer than 5 population | hills x1.5; flat x0.4, hot x1.2, cold x0.05; river or lake x3 |
+| Date palms | 0.000000168 + 0.00000168 per doubling of population + 0.00000126 per doubling of food | fewer than 5 population | hot desert; river or lake x5 |
+| Banana plantations | as date palms | fewer than 5 population | hot jungle; river or lake x2 |
+| Orange farms | as date palms | fewer than 5 population | hot grassland, not desert or jungle; hills x0.7; river or lake x2 |
+| Sugar fields | 0.0000000168 + 0.000000042 per doubling of population + 0.000000168 per doubling of food | fewer than 5 population | open flat land, not cold; mild x0.6; river x3 |
 | Mines | 0.000001 + 0.0000014 per doubling of ore | | mountains; hills x0.4, flat x0.01; beside mountains x3 |
 | Lumber mills | 0.000016 + 0.000001 per doubling of population | | forest with at least 4 forest cells in its neighbourhood and flat open land next to it; river x1.5 |
 | Ports | 0.0000008 + 0.000002 per doubling of population | 4 population | next to the sea, or a lake x0.3 |
@@ -439,7 +439,7 @@ than dry land unless a row names it:
 | Potato farms | 0.000000017 + 0.000001 per doubling of population + 0.00000004 of food | fewer than 5 population | cool open plains; hills x0.4; river or lake x2 |
 | Rice paddies | as farms | fewer than 5 population | only within 41° of the equator, north or south (Japan, the Yangtze delta, California, Southeast Australia, the tropics; not Poland, Germany, Britain, France, Moscow or Norway); flat grass x10 while empty; hills x0.8, barren x0.05, hot x1.2; never in mountains, forest or the cold; river or lake x4, but the sea is salty and does it no good |
 | Soy fields | a quarter of potato farms | fewer than 5 population | only in East Asia (95-150°E, 18-50°N: China, Korea, Japan, Manchuria); open plains, hills x0.6; never cold, in mountains or forest; river or lake x2 |
-| Tea plantations | a sixth of orchards | | only in the warm south and east of Asia (65-150°E, 10°S-36°N: India, Ceylon, southern China, Japan, Java); hills x1.5, flat x0.3, forest x0.2; never desert, cold or mountains |
+| Tea plantations | a sixth of orchards | fewer than 5 population | only in the warm south and east of Asia (65-150°E, 10°S-36°N: India, Ceylon, southern China, Japan, Java); hills x1.5, flat x0.3, forest x0.2; never desert, cold or mountains |
 | Cattle ranches | 0.0000000033 + 0.00000018 per doubling of population + 0.000000009 of food | fewer than 5 population | grassland and hills; hot x0.3 |
 | Flax fields | 0.000000006 + 0.0000003 per doubling of population + 0.00000002 of food | fewer than 5 population | cool wet land; river x3, lake x2, away from water x0.3 |
 | Hop gardens | 0.0000000012 + 0.00000012 per doubling of population | fewer than 5 population | open plains and hills; cold x0.3, hot x0.2 |
@@ -784,8 +784,10 @@ into a big factory and three of those into a mega factory. On Poland with the st
 that gives about 100 factories and 20 big factories in 1850, and some 280 factories, 40 big and 5
 mega factories by 2050.
 
-Farms with 8 or more population points around them are pulled down, and none grow there, so farms
-ring towns rather than standing in them. On flat grassland farms, orchards, date palms, bananas,
+Farms and every other grower of food (fields, orchards, groves, plantations, vineyards, beekeepers
+and animal farms, but not the works that make food from what they grow, nor fisheries) with 5 or
+more population points around them (a cell and the six beside it) are pulled down, and none grow
+there, so they ring towns rather than standing in them. On flat grassland farms, orchards, date palms, bananas,
 orange farms and sugar fields are ten times as likely, but where anything stands already only
 one turn in ten goes ahead, so they favour empty plains. Bakeries open in towns, one to a
 neighbourhood, a little likelier the more people live around.
