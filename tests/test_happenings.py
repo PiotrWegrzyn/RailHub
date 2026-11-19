@@ -146,8 +146,7 @@ def test_the_decade_news_tells_that_the_land_gives_more_and_every_unit_earns_les
 
     news = happenings.news[0]
     assert "make 15% more" in news.story
-    assert "A unit of goods earns 83% of its 1850 price" in news.changes
-    assert "Food and heating: 94% of it" in news.changes
+    assert "A unit of every good earns 85% of its 1850 price" in news.changes
 
 
 def test_a_good_made_for_the_first_time_makes_news() -> None:

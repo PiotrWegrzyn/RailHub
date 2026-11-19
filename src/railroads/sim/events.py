@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from functools import cache
 from types import MappingProxyType
 
+from railroads.sim.clock import END_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.geo import Bounds
 from railroads.sim.goods import FITS, HOMES, MAKES, NEEDS, RECIPES, Good, Need
@@ -38,6 +39,8 @@ SLOW_RISERS = frozenset({Need.FOOD, Need.HEATING})
 MAKE_RISE = 0.15
 SLOW_MAKE_RISE = 0.05
 SLOW_GOODS = frozenset(good for need in SLOW_RISERS for good in FITS[need])
+# How many times less a unit of every good earns in END_YEAR than in RISE_FROM (price_fall).
+CHEAPER_BY_END = 5.0
 NOT_RISING = frozenset(
     {
         BuildingKind.POWER_PLANT,
@@ -328,12 +331,12 @@ def _product(year: int, east: bool, of: str) -> float:
 
 
 @cache
-def price_fall(year: int, slow: bool = False) -> float:
-    """How many times its price a unit of a good earns in a year as goods grow plentiful: as much
-    less every decade from RISE_FROM as people want more, of food and heating (`slow`) SLOW_RISE
-    less."""
+def price_fall(year: int) -> float:
+    """How many times its price a unit of a good earns in a year as goods grow plentiful: a little
+    less every decade from RISE_FROM, the same share less each, until in END_YEAR it earns
+    CHEAPER_BY_END times less."""
     decades = max(0, (year - RISE_FROM) // RISE_EVERY)
-    return (1.0 + (SLOW_RISE if slow else RISE)) ** -decades
+    return CHEAPER_BY_END ** -(decades / ((END_YEAR - RISE_FROM) // RISE_EVERY))
 
 
 @cache

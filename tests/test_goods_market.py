@@ -3,7 +3,7 @@ import pytest
 
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Trade
-from railroads.sim.events import MAKE_RISE, RISE, SLOW_MAKE_RISE, SLOW_RISE, make_factor
+from railroads.sim.events import MAKE_RISE, SLOW_MAKE_RISE, make_factor
 from railroads.sim.goods import Good, Need
 from railroads.sim.goods_market import (
     ELASTICITY,
@@ -101,17 +101,16 @@ def test_makers_make_more_every_decade_and_less_more_of_food_and_heating(
     assert factor == pytest.approx((1.0 + rise) ** 2)
 
 
-@pytest.mark.parametrize(
-    ("good", "rise"), [(Good.STEEL, RISE), (Good.WHEAT, SLOW_RISE), (Good.COAL, SLOW_RISE)]
-)
-def test_a_unit_earns_as_much_less_every_decade_as_people_want_more(
-    good: Good, rise: float
+@pytest.mark.parametrize("good", [Good.STEEL, Good.WHEAT, Good.COAL])
+@pytest.mark.parametrize(("year", "share"), [(1859, 1.0), (1950, 5.0**-0.5), (2050, 0.2)])
+def test_every_good_earns_less_every_decade_and_five_times_less_by_the_end(
+    good: Good, year: int, share: float
 ) -> None:
     market = GoodsMarket()
 
-    market.month(1873, _trade(300.0, 500.0))
+    market.month(year, _trade(300.0, 500.0))
 
-    assert market.factor_of(good) == pytest.approx((1.0 + rise) ** -2)
+    assert market.factor_of(good) == pytest.approx(share)
 
 
 def test_passengers_and_mail_earn_as_much_whatever_the_decade() -> None:
@@ -123,11 +122,11 @@ def test_passengers_and_mail_earn_as_much_whatever_the_decade() -> None:
 
 
 def test_a_months_price_is_its_market_factor_as_much_less_as_its_decade_makes_it() -> None:
-    month = NeedMonth(Need.COMMON, 1871, 100.0, 50.0, 0.8)
+    month = NeedMonth(Need.COMMON, 1950, 100.0, 50.0, 0.8)
 
     price = month.price
 
-    assert price == pytest.approx(0.8 / (1.0 + RISE) ** 2)
+    assert price == pytest.approx(0.8 / 5.0**0.5)
 
 
 def test_a_need_the_map_makes_none_of_keeps_its_price_until_it_does_and_is_measured_from_then() -> (

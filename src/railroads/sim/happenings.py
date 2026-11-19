@@ -171,12 +171,11 @@ class Happenings:
                     f"more of every good than ten years ago, and {SLOW_RISE:.0%} more food and "
                     f"heating. Farms, mines and the rest make {MAKE_RISE:.0%} more, "
                     f"{SLOW_MAKE_RISE:.0%} more food and heating, and every unit carried earns "
-                    "as much less as people want more of it.",
+                    "less.",
                     (
                         f"Goods wanted: {goods:.2f} times as much as in {RISE_FROM}",
                         f"Food and heating wanted: {food:.2f} times as much as in {RISE_FROM}",
-                        f"A unit of goods earns {price_fall(year):.0%} of its {RISE_FROM} price",
-                        f"Food and heating: {price_fall(year, slow=True):.0%} of it",
+                        f"A unit of every good earns {price_fall(year):.0%} of its {RISE_FROM} price",
                     ),
                 )
             )

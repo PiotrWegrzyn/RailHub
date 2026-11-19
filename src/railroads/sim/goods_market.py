@@ -3,7 +3,7 @@ and moves with what the map wants of what it meets against what the map makes of
 war like the one for fuel (railroads.sim.fuel_market).
 
 People want more every decade (railroads.sim.events.RISE) and the land gives more still
-(MAKE_RISE), so a unit of a good earns as much less every decade as people want more of it
+(MAKE_RISE), so a unit of a good earns less every decade, five times less by the end of the game
 (price_fall): the player has to carry ever more to earn as much.
 
 Every need is a market. Each month it counts what the map's buildings wanted of it, and the most
@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 
 from railroads.sim.economy import Trade
-from railroads.sim.events import SLOW_GOODS, SLOW_RISERS, price_fall
+from railroads.sim.events import price_fall
 from railroads.sim.goods import FITS, TRAVELLERS, Good, Need
 
 ELASTICITY = 0.5
@@ -57,7 +57,7 @@ class NeedMonth:
     def price(self) -> float:
         """What its goods earn, as a share of their prices: its factor, as much less as goods have
         grown plentiful by its year."""
-        return self.factor * price_fall(self.year, self.need in SLOW_RISERS)
+        return self.factor * price_fall(self.year)
 
 
 def signals_of(trade: Trade) -> dict[Need, tuple[float, float]]:
@@ -94,7 +94,7 @@ class GoodsMarket:
         much of it was wanted. Passengers and mail earn their price."""
         if good in TRAVELLERS:
             return 1.0
-        fall = price_fall(self.year, good in SLOW_GOODS)
+        fall = price_fall(self.year)
         needs = MEETS.get(good, ())
         weights = [self.wanted.get(need, 0.0) for need in needs]
         total = sum(weights)

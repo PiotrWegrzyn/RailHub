@@ -68,7 +68,7 @@ The ideas every rule of the game should follow, the most important first.
   map makes of it, measured against the first year of play. Too much of a good on the market
   makes it cheaper and hauling it stops paying; making towns grow makes demand for it, and with it
   someone to sell large amounts to. At the start everything pays and everything is short, food
-  most of all.
+  most of all. By the end of the game every good earns about five times less than at the start.
 - Most money comes from the needs of grown homes, not from food or passengers.
 - Goods fall into categories of need: food, processed food, common goods and heating. Any kind of
   good in a category meets that need.
