@@ -133,11 +133,16 @@ class TrackNetwork:
         key = (start, end, electric, maglev)
         length = lengths.get(key)
         if length is None:
-            length = lengths[key] = sum(
-                math.dist(a, b) * self._burn(self.cell_at(((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)))
-                for a, b in itertools.pairwise(way[0])
-            )
+            length = lengths[key] = self.path_fuel_length(way[0])
         return length
+
+    def path_fuel_length(self, path: list[Point]) -> float:
+        """How many cells of fuel a train burns along a path: its length, each stretch weighed
+        by the burn factor of the cell it runs through."""
+        return sum(
+            math.dist(a, b) * self._burn(self.cell_at(((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)))
+            for a, b in itertools.pairwise(path)
+        )
 
     def _find_way(self, start: Cell, end: Cell, electric: bool, maglev: bool) -> Way | None:
         self._find_exits()

@@ -7,15 +7,16 @@ Demand left is the capacity less what was used up of it, averaged over the last
 MONTHS_REMEMBERED months, so a flood of cargo lowers the price for a few months before it climbs
 back.
 
-Freight trains brought earns its price (railroads.sim.goods.price_of) times the share of demand
-left when buildings take it, and uses that need up. Passengers and mail earn the same as they get
-off, against the need they meet.
+Passengers and mail earn their freight (railroads.sim.goods.freight_of) times the share of demand
+left as they get off, against the need they meet, and use that need up. Freight trains brought
+uses the need up too as buildings take it, but pays by how short the buildings were
+(railroads.sim.railway.Railway.pay_for).
 """
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from railroads.sim.goods import FITS, Good, Need, price_of
+from railroads.sim.goods import FITS, Good, Need, freight_of
 
 DEMAND_PER_NEED = 2.0
 MONTHS_REMEMBERED = 3
@@ -82,10 +83,17 @@ class StationDemand:
         )
         return [trial.deliver(good, amount) for good, amount in cargo]
 
+    def use(self, need: Need, amount: float) -> None:
+        """Uses up this much of the demand for a need this month."""
+        months = self.used.setdefault(need, [])
+        if not months:
+            months.append(0.0)
+        months[-1] += amount
+
     def pay(self, need: Need, good: Good, amount: float, rate: float = 1.0) -> float:
         """What buildings taking this much of a good for a need earn, unit by unit, each at the
         share of demand left as it is taken, and at `rate` of the full price."""
-        price = price_of(good)
+        price = freight_of(good)
         earned = 0.0
         left = amount
         capacity = self.capacity.get(need, 0.0)

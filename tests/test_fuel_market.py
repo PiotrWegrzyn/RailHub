@@ -130,6 +130,20 @@ def test_a_train_cannot_set_off_for_a_stop_further_than_its_fuel_takes_it() -> N
     assert railway.finances.month["coal"] == 0.0
 
 
+def test_a_train_sets_off_for_a_stop_as_far_as_its_fuel_takes_it_rounded_to_whole_cells(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    railway = line()
+    train = railway.buy("tank")
+    assert train is not None
+    train.stops = [Stop(WEST, wait_for_load=False), Stop(EAST, wait_for_load=False)]
+    monkeypatch.setattr(railway.network, "route_length", lambda *_: ENGINES["tank"].tank + 0.4)
+
+    railway.run(0.001)
+
+    assert train.status == "Running"
+
+
 def test_more_demand_against_supply_than_in_the_first_month_raises_the_price_bit_by_bit() -> None:
     market = FuelMarket()
     market.month(1850, {Fuel.COAL: Signals(buildings=1000.0, natural=1000.0)})

@@ -16,11 +16,13 @@ from railroads.places import Places, StationNames
 from railroads.sim import routes
 from railroads.sim.autoplay import StandInPlayer, play
 from railroads.sim.clock import START_YEAR
+from railroads.sim.company import Goal, company_value
 from railroads.sim.constructions import Constructions, TrackWidth
 from railroads.sim.demolition import bulldoze, bulldoze_price, station_site_price
 from railroads.sim.finance import STATION_PRICE, Finances, dollars
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
+from railroads.sim.lots import Lots
 from railroads.sim.railway import Railway
 from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
@@ -69,6 +71,11 @@ class Game:
         self.railway.owners = self.growth.owners
         # Plays in the player's place in a simulated game (railroads.sim.autoplay).
         self.stand_in: StandInPlayer | None = None
+        # The land the player owns and can buy around the map (railroads.sim.lots); None for a
+        # game on a map of its own, with nothing around it.
+        self.lots: Lots | None = None
+        # The company's worth each month, its target and going bankrupt (railroads.sim.company).
+        self.goal = Goal()
         self._reach = Reach(self.tile_map.grid)
 
     @property
@@ -85,8 +92,9 @@ class Game:
         self.railway.run(months)
 
     def month(self, rng: np.random.Generator, date: str = "") -> Month:
-        """Grows the towns by a month, or lets the stand-in player play it, and sums up what
-        changed within reach of the stations."""
+        """Grows the towns by a month, or lets the stand-in player play it, notes what the company
+        is worth at the start of the new month, and sums up what changed within reach of the
+        stations."""
         return finish(self.month_steps(rng, date))
 
     def month_steps(self, rng: np.random.Generator, date: str = "") -> Steps[Month]:
@@ -101,6 +109,8 @@ class Game:
                 changed = yield from self.growth.month_steps(rng)
             else:
                 changed = yield from self.stand_in.month_steps(rng)
+        growth = self.growth
+        self.goal.begin_month(growth.year, growth.months % 12, company_value(railway))
         return Month(changed, summarize(date, self.growth.rule.points, reach, changes))
 
     def simulate(self, years: int, rng: np.random.Generator) -> None:
@@ -138,6 +148,8 @@ class Game:
         planned with these choices since anything was last built, else the cheapest."""
         if maglev and not self.railway.maglev_open:
             return Done("Maglev track needs Magnetic levitation and a maglev engine on sale.")
+        if electric and not self.railway.electric_open:
+            return Done("Electric track needs Electric traction and an electric engine on sale.")
         route = (
             planned
             if planned is not None
@@ -166,7 +178,9 @@ class Game:
             return Done("Nothing here can be cleared.")
         if not finances.can_afford(price):
             return Done(f"Clearing this costs {dollars(price)}; you have {dollars(finances.cash)}.")
+        stations = set(self.railway.stations())
         changed = bulldoze(self.growth, cell)
+        self.railway.drop_stops(stations - set(self.railway.stations()))
         finances.spend(price, "demolition")
         return Done(f"Cleared for {dollars(price)}.", changed, ok=True)
 

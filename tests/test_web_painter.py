@@ -20,6 +20,7 @@ from railroads.ui.pixel.web_painter import (
     page_workers,
 )
 from railroads.ui.pixel.world import PixelWorld
+from railroads.version import VERSION
 
 
 class FakePage:
@@ -42,8 +43,10 @@ class FakePage:
         taken, self.inbox = self.inbox, []
         return taken
 
-    def start(self, *workers: int) -> None:
-        self.inbox += [{"worker": worker, "kind": "ready"} for worker in workers]
+    def start(self, *workers: int, version: str = VERSION) -> None:
+        self.inbox += [
+            {"worker": worker, "kind": "ready", "version": version} for worker in workers
+        ]
 
     def fail(self, worker: int) -> None:
         self.queues[worker] = []
@@ -219,6 +222,24 @@ def test_once_every_worker_failed_the_frames_paint_again() -> None:
     done = painted(painter)
 
     assert not threaded
+    np.testing.assert_array_equal(done["chunk"], world.render(*mountains, 2))
+
+
+def test_a_worker_of_another_version_counts_as_failed_and_the_frames_paint() -> None:
+    world, mountains, _ = world_over_mountains()
+    page = FakePage(1)
+    page.start(0, version="0.5.47")
+    workers = Workers(page)
+    painter = WorkerPainter(world, workers)
+    painter.finished()
+    painter.want("chunk", job(world, mountains), True, 1.0)
+
+    painter.work_once(1.0)
+    done = painted(painter)
+
+    assert workers.dead == {0}
+    assert not painter.threaded
+    assert page.kinds(0) == []
     np.testing.assert_array_equal(done["chunk"], world.render(*mountains, 2))
 
 

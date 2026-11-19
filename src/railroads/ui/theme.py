@@ -1,6 +1,7 @@
 """The look of every window: warm dark panels with brass highlights, and the small widgets the
 windows share (toggle buttons, car chips, good swatches)."""
 
+import colorsys
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -11,7 +12,7 @@ from imgui_bundle import hello_imgui, imgui
 from imgui_bundle import icons_fontawesome_4 as fa
 from PIL import Image
 
-from railroads.sim.goods import General, Good, Need
+from railroads.sim.goods import FITS, General, Good, Need
 from railroads.sim.trains import car_size
 from railroads.ui.pixel.good_icons import ICON_PIXELS, ICONS_INDEX, ICONS_PNG
 from railroads.ui.pixel.layer import blown_up_texture
@@ -86,6 +87,13 @@ GOOD_COLORS: Mapping[Good, Rgba] = {
     Good.LIMESTONE: (0.86, 0.84, 0.76, 1.0),
     Good.SAND: (0.94, 0.86, 0.58, 1.0),
     Good.POTATOES: (0.74, 0.6, 0.38, 1.0),
+    Good.RICE: (0.94, 0.92, 0.82, 1.0),
+    Good.SOYBEANS: (0.84, 0.8, 0.5, 1.0),
+    Good.SOY_SAUCE: (0.36, 0.2, 0.14, 1.0),
+    Good.TOFU: (0.96, 0.95, 0.9, 1.0),
+    Good.MISO: (0.72, 0.5, 0.26, 1.0),
+    Good.TEA: (0.46, 0.68, 0.34, 1.0),
+    Good.DRIED_FISH: (0.78, 0.7, 0.52, 1.0),
     Good.CATTLE: (0.5, 0.32, 0.2, 1.0),
     Good.PIGS: (0.9, 0.64, 0.62, 1.0),
     Good.CHICKENS: (0.94, 0.92, 0.86, 1.0),
@@ -100,6 +108,7 @@ GOOD_COLORS: Mapping[Good, Rgba] = {
     Good.GLASS: (0.6, 0.86, 0.92, 1.0),
     Good.BEER: (0.94, 0.7, 0.2, 1.0),
     Good.VODKA: (0.88, 0.92, 0.96, 1.0),
+    Good.SAKE: (0.92, 0.9, 0.8, 1.0),
     Good.LEATHER: (0.58, 0.36, 0.2, 1.0),
     Good.SHOES: (0.36, 0.22, 0.16, 1.0),
     Good.PLASTICS: (0.92, 0.36, 0.42, 1.0),
@@ -226,6 +235,19 @@ def color_u32(rgba: Rgba) -> int:
     return imgui.get_color_u32(imgui.ImVec4(*rgba))
 
 
+# How strongly the town lens tints each town's land, and the step between towns' hues.
+TOWN_TINT_ALPHA = 0.5
+GOLDEN_ANGLE = 0.381966
+
+
+def town_tint(town: int, alpha: float = TOWN_TINT_ALPHA) -> Rgba:
+    """A town's own colour: hues a golden angle apart, so neighbouring towns, numbered one after
+    another as they come up, look unlike."""
+    hue = (town * GOLDEN_ANGLE) % 1.0
+    red, green, blue = colorsys.hsv_to_rgb(hue, 0.75, 0.95)
+    return (red, green, blue, alpha)
+
+
 def rgba_u32(rgba: Rgba) -> int:
     """A colour packed for a draw list as it is, leaving out the style's alpha."""
     return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))
@@ -296,13 +318,21 @@ def draw_good_icon(
 
 
 def good_icon(good: Good | Need, *, framed: bool = False, size: float = ICON_SIZE) -> None:
-    """A good's icon, inline and named on hover, centred on the line's text; `framed` is for
-    lines lined up with buttons by align_text_to_frame_padding."""
+    """A good's icon, inline and named on hover with what a category holds, centred on the
+    line's text; `framed` is for lines lined up with buttons by align_text_to_frame_padding."""
     height = imgui.get_frame_height() if framed else imgui.get_text_line_height()
     imgui.dummy((size, height))
     low = imgui.get_item_rect_min()
     draw_good_icon(imgui.get_window_draw_list(), good, (low.x, low.y + (height - size) / 2), size)
-    tip(good.value)
+    tip(icon_name(good))
+
+
+def icon_name(good: Good | Need) -> str:
+    """What hovering a good's icon says: its name, and for a category of goods what is in it."""
+    goods = FITS.get(good, ()) if isinstance(good, Need) else ()
+    if len(goods) > 1:
+        return f"{good.value}: {', '.join(each.value for each in goods)}"
+    return good.value
 
 
 def good_amount(good: Good | Need, amount: str, *, framed: bool = False) -> None:

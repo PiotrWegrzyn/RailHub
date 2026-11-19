@@ -256,6 +256,45 @@ def tavern() -> Sprite:
     return p.sprite()
 
 
+def sushi_hut() -> Sprite:
+    """A small wooden eating house on a stone step, a red cloth curtain hung over its door, a
+    paper lantern glowing beside it, a slatted window and a dark tiled roof with a sign board
+    under the eaves."""
+    p = Painter(22, 24, (11, 18))
+    p.shadow(7, 2.5)
+    wall, slat = (178, 132, 84), (120, 84, 52)
+    _worn(p, (-5, -5), (0, -2.5), (0.4, 0.95), 5, 2.5, PAVING)
+    top = p.box(0, 0, 6, 6, wall, None)
+    left, front, right, _ = top
+    for a, b in ((left, front), (front, right)):
+        for t in (0.0, 1.0):
+            p.line([_on_wall(a, b, t, 0), _on_wall(a, b, t, 6)], slat)
+        _band(p, a, b, 0.6, slat)
+    _pale_plinth(p, top, 6, STONE, 0.8)
+    _patch(p, left, front, (0.1, 0.38), (2, 4), LIT)
+    for t in (0.17, 0.24, 0.31):
+        p.line([_on_wall(left, front, t, 2), _on_wall(left, front, t, 4)], slat)
+    _patch(p, left, front, (0.5, 0.86), (1.4, 6), (66, 46, 36))
+    curtain = (196, 48, 42)
+    _patch(p, left, front, (0.5, 0.86), (1.4, 3.4), curtain)
+    for t in (0.62, 0.74):
+        p.line([_on_wall(left, front, t, 1.4), _on_wall(left, front, t, 3.4)], shade(curtain, 0.7))
+    p.point(*_on_wall(left, front, 0.56, 2), (244, 236, 220))
+    _patch(p, front, right, (0.25, 0.75), (1.6, 3.6), shade(LIT, 0.78))
+    _foot(p, top, 6)
+    _doorstep(p, left, front, (0.48, 0.88), 6, shade(STONE, 1.15))
+    roof = (64, 62, 70)
+    p.gable(top, 4, roof, wall)
+    _tiles(p, top, 4, roof, (0.3, 0.6, 0.9))
+    _patch(p, left, front, (0.3, 0.7), (-0.6, 0.6), (236, 226, 200))
+    lantern = (230, 66, 46)
+    lx, ly = _out(left, front, 0.44, 1.2, 1)
+    p.line([(lx, ly - 0.8), (lx, ly)], POST)
+    p.blob(lx - 0.9, ly, lx + 0.9, ly + 2, lantern)
+    p.point(lx - 0.4, ly + 0.6, (255, 196, 120))
+    return p.sprite()
+
+
 def department_store() -> Sprite:
     """A wide, ornate store of three storeys: great display windows dressed with goods, a glazed
     entrance under a gold sign, arched windows above, a corner dome and a flag."""

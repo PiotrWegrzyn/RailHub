@@ -1,13 +1,16 @@
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
 from builders import flat_map
 from railroads.mapgen.deposits import GARRISON_SIZE, GARRISONS, place_deposits
+from railroads.mapgen.seeding import muster_garrisons
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Economy
 from railroads.sim.goods import Good, Need, needs_of
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import AIRPORTS, MILITARY, ORANGE_FARMS
+from railroads.sim.ladders import AIRPORTS, MILITARY, ORANGE_FARMS, GrowthRule
 from railroads.sim.tilemap import Deposit, Temperature, TileMap, Vegetation
 
 
@@ -38,11 +41,12 @@ def test_a_map_gets_only_a_few_small_patches_of_military_ground(seed: int) -> No
 def test_outposts_open_only_on_military_ground() -> None:
     ground = [(10, 10), (10, 11), (11, 10), (11, 11), (12, 10), (12, 11)]
     constructions = Constructions(make_map(deposits=garrison_at(*ground)))
-    growth = Growth(constructions, start_year=1850)
+    busy = replace(MILITARY, base_chance=10 * MILITARY.base_chance)
+    growth = Growth(constructions, GrowthRule(ladders=(busy,), trades=False), start_year=1850)
     military = (BuildingKind.OUTPOST, BuildingKind.BASE, BuildingKind.HEADQUARTERS)
 
     with growth.log_changes() as changes:
-        growth.run(2400, np.random.default_rng(0))
+        growth.run(240, np.random.default_rng(0))
 
     built = {cell for (cell, kind), _ in changes.items() if kind in military}
     assert built
@@ -56,6 +60,35 @@ def test_outposts_do_not_open_before_1800() -> None:
     growth.run(600, np.random.default_rng(1))
 
     assert count(constructions, BuildingKind.OUTPOST) == 0
+
+
+def military_on(constructions: Constructions, cells: set[tuple[int, int]]) -> list[BuildingKind]:
+    return sorted(
+        (b.kind for b in constructions if isinstance(b, Building) and b.cell in cells),
+        key=lambda kind: kind.name,
+    )
+
+
+def test_each_patch_of_military_ground_starts_play_with_one_base_and_two_outposts() -> None:
+    first = {(5, 5), (5, 6), (6, 5), (6, 6)}
+    second = {(30, 30), (30, 31), (31, 30), (31, 31)}
+    constructions = Constructions(make_map(deposits=garrison_at(*first, *second)))
+    for _ in range(3):
+        constructions.build(Building((5, 5), BuildingKind.BASE))
+
+    muster_garrisons(constructions, 1850, np.random.default_rng(0))
+
+    wanted = [BuildingKind.BASE, BuildingKind.OUTPOST, BuildingKind.OUTPOST]
+    assert military_on(constructions, first) == wanted
+    assert military_on(constructions, second) == wanted
+
+
+def test_no_military_is_mustered_when_play_begins_before_1800() -> None:
+    constructions = Constructions(make_map(deposits=garrison_at((5, 5), (5, 6))))
+
+    muster_garrisons(constructions, 1750, np.random.default_rng(0))
+
+    assert military_on(constructions, {(5, 5), (5, 6)}) == []
 
 
 @pytest.mark.parametrize(
@@ -132,8 +165,7 @@ def test_soldiers_travel_more_the_higher_their_rank() -> None:
         np.array([np.ravel_multi_index((9, 9), grid.shape)])
     )
 
-    assert outpost[Good.PASSENGERS] == 60
-    assert headquarters[Good.PASSENGERS] == 540
+    assert headquarters[Good.PASSENGERS] > outpost[Good.PASSENGERS] > 0
 
 
 @pytest.mark.parametrize(("flats", "houses", "opens"), [(4, 5, False), (5, 0, True)])

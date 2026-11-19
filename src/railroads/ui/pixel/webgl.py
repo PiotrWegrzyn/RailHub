@@ -43,6 +43,7 @@ GL_VERTEX_ARRAY_BINDING = 0x85B5
 GL_FRAMEBUFFER_BINDING = 0x8CA6
 GL_COLOR_ATTACHMENT0 = 0x8CE0
 GL_FRAMEBUFFER = 0x8D40
+GL_FRAMEBUFFER_COMPLETE = 0x8CD5
 GL_RGBA8UI = 0x8D7C
 GL_RGBA_INTEGER = 0x8D99
 
@@ -57,8 +58,15 @@ def module() -> Any:
     return pyodide_js._module
 
 
+@functools.cache
+def _function(name: str) -> Any:
+    """The exported C function of this name, looked up once: reaching into the page's module
+    takes about as long as the call itself."""
+    return getattr(module(), f"_{name}")
+
+
 def _call(name: str, *args: int) -> Any:
-    return getattr(module(), f"_{name}")(*args)
+    return _function(name)(*args)
 
 
 def address(array: np.ndarray | None) -> int:
@@ -189,9 +197,9 @@ def glIsEnabled(capability: int) -> bool:
     return bool(_call("glIsEnabled", capability))
 
 
-def _forward(name: str):
-    def call(*args: int) -> Any:
-        return _call(name, *(int(arg) for arg in args))
+def _forward(name: str, kind: type = int):
+    def call(*args: float) -> Any:
+        return _call(name, *(kind(arg) for arg in args))
 
     call.__name__ = name
     return call
@@ -215,7 +223,12 @@ glCreateShader = _forward("glCreateShader")
 glCompileShader = _forward("glCompileShader")
 glAttachShader = _forward("glAttachShader")
 glLinkProgram = _forward("glLinkProgram")
-glUniform1f = _forward("glUniform1f")
-glUniform2f = _forward("glUniform2f")
+glUniform1f = _forward("glUniform1f", float)
+glUniform2f = _forward("glUniform2f", float)
 glUniform1i = _forward("glUniform1i")
 glUniform2i = _forward("glUniform2i")
+glUniform4f = _forward("glUniform4f", float)
+glCheckFramebufferStatus = _forward("glCheckFramebufferStatus")
+glClear = _forward("glClear")
+glBlendFunc = _forward("glBlendFunc")
+glClearColor = _forward("glClearColor", float)

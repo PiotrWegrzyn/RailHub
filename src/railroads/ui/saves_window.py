@@ -7,6 +7,7 @@ from typing import Literal
 from imgui_bundle import imgui
 
 from railroads.saves import SaveInfo, Saves, name_problem
+from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.save_files import BrowserFiles, DesktopFiles, draw_file_buttons, save_files
 from railroads.ui.theme import BRASS, GONE, WINDOW_TOP
 
@@ -80,7 +81,7 @@ class SavesWindow:
             ((width - WINDOW_SIZE[0]) / 2, WINDOW_TOP), imgui.Cond_.appearing.value
         )
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.appearing.value)
-        expanded, self.open = imgui.begin("Save and load", self.open)
+        expanded, self.open = begin_ornate("Save and load")
         request = None
         if expanded and imgui.begin_tab_bar("saves tabs"):
             if imgui.begin_tab_item("Save")[0]:
@@ -92,7 +93,7 @@ class SavesWindow:
             imgui.end_tab_bar()
             if self.message:
                 imgui.text_wrapped(self.message)
-        imgui.end()
+        end_ornate()
         return request
 
     def _draw_save(self, saves: Saves) -> SaveRequest | None:

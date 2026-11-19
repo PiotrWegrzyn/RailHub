@@ -11,6 +11,7 @@ from imgui_bundle import imgui
 from railroads.sim.grids import Cell
 from railroads.sim.summaries import MonthSummary
 from railroads.ui.iso_camera import Vec2
+from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.stations_window import look_at_button
 from railroads.ui.theme import (
     BORDER,
@@ -137,7 +138,7 @@ class SummariesPanel:
         imgui.set_next_window_size_constraints((WINDOW_WIDTH, 0), (WINDOW_WIDTH, WINDOW_MAX_HEIGHT))
         title = f"{fa.ICON_FA_HOME}  {summary.date} near your stations###summary"
         flags = imgui.WindowFlags_.always_auto_resize.value
-        expanded, still_open = imgui.begin(title, True, flags)
+        expanded, still_open = begin_ornate(title, flags)
         if expanded:
             imgui.text_disabled("Outlined on the map. What changed within reach of:")
             for station in summary.stations:
@@ -153,6 +154,6 @@ class SummariesPanel:
                     imgui.same_line()
                     imgui.text(kind.value)
                 imgui.pop_id()
-        imgui.end()
+        end_ornate()
         if not still_open:
             self.open = None

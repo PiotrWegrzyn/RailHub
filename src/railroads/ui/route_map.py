@@ -1,11 +1,11 @@
 """The map in the trains window: the ground seen from above, softened, with the track and stations
 on it, the chosen train's stops numbered. The wheel zooms it around the mouse, dragging moves it,
-clicking a station adds it to the train's stops, and hovering one sums up what it wants and makes.
-While the player hovers a good, the stations around which it is wanted or made are ringed, a ring
-for each of three kinds, its shade by how much a month (SHADE_FROM): yellow to red where homes
-want it for a general need like food, heating or mail, light to dark violet where some
-building wants it for a need only it meets, and light to dark blue where more than LEAST_MADE of it
-is made."""
+clicking a station adds it to the train's stops, and hovering one sums up what it wants and what
+came to it. While the player hovers a good, the stations around which it is wanted or which it
+came to are ringed, a ring for each of three kinds, its shade by how much (SHADE_FROM): yellow to
+red where homes want it a month for a general need like food, heating or mail, light to dark
+violet where some building wants it a month for a need only it meets, and light to dark blue where
+more than LEAST_MADE of it came to the station over the last quarter."""
 
 import math
 import time
@@ -17,6 +17,7 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 from PIL import Image, ImageFilter
 
+from railroads.sim.clock import QUARTER
 from railroads.sim.constructions import TrackWidth
 from railroads.sim.demand import DEMAND_PER_NEED, StationDemand
 from railroads.sim.goods import FITS, Good, Need
@@ -73,9 +74,18 @@ MADE = (0.35, 0.65, 1.0, 1.0)
 # Needs homes everywhere have: food, common goods and heating, which many goods meet, and the
 # passengers and mail every station both sends and wants. Any other need is a special one.
 GENERAL_NEEDS = frozenset({Need.FOOD, Need.COMMON, Need.HEATING, Need.PASSENGERS, Need.MAIL})
-# How much of a good made around a station a month marks it as made there.
-LEAST_MADE = 10.0
-# The amounts a month from which a mark takes its second and third shade.
+
+
+def needs_named(needs: frozenset[Need]) -> str:
+    """The needs by name, in the order Need lists them: "food, heating or mail"."""
+    names = [need.value for need in Need if need in needs]
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} or {names[-1]}"
+
+
+# How much of a good coming to a station over the last quarter marks it as made there.
+LEAST_MADE = 30.0
+# The amounts from which a mark takes its second and third shade: a month for what is wanted,
+# QUARTER times as much over the last quarter for what came to a station.
 SHADE_FROM = (40.0, 120.0)
 # The three shades, least to most, of each kind of mark.
 GENERAL_SHADES: tuple[Rgba, Rgba, Rgba] = (
@@ -174,7 +184,8 @@ def edge_spot(panel: Panel, x: float, y: float, inset: float) -> Vec2:
 @dataclass(frozen=True)
 class Marks:
     """How much of a good a station's buildings want a month for general needs and for special
-    ones, and how much of it is made around the station a month, if more than LEAST_MADE."""
+    ones, and how much of it came to the station over the last quarter, if more than
+    LEAST_MADE."""
 
     general: float = 0.0
     special: float = 0.0
@@ -185,7 +196,7 @@ class Marks:
         kinds = (
             (self.general, GENERAL_SHADES),
             (self.special, SPECIAL_SHADES),
-            (self.made, MADE_SHADES),
+            (self.made / QUARTER, MADE_SHADES),
         )
         return [shades[shade_of(amount)] for amount, shades in kinds if amount > 0]
 
@@ -214,7 +225,7 @@ def marks_at(railway: Railway, good: Good, made: Mapping[Cell, Offer]) -> dict[C
     for station in railway.stations():
         general, special = needed(railway.station_demand(station), good)
         offer = made.get(station)
-        making = offer.made if offer is not None and offer.made > LEAST_MADE else 0.0
+        making = offer.gathered if offer is not None and offer.gathered > LEAST_MADE else 0.0
         if general > 0 or special > 0 or making > 0:
             found[station] = Marks(general, special, making)
     return found
@@ -234,7 +245,8 @@ def made_at(railway: Railway, good: Good, supplies: Supplies) -> dict[Cell, Offe
 class Summary:
     """What a station wants, need by need with what its buildings are still short of this month
     (or, before they have traded, the demand left), and what a train can load
-    there, good by good with how much is made a month, or waits if none is made; the most
+    there, good by good with how much came to it over the last quarter, or waits if none
+    came; the most
     first, at most SUMMARY_MOST of each, and how many more there are."""
 
     wants: list[tuple[Need, float]] = field(default_factory=list)
@@ -252,7 +264,7 @@ def summary_of(railway: Railway, station: Cell, made: Mapping[Good, float]) -> S
         left = [(need, demand.record(need).left) for need in Need]
     wants = sorted(((n, a) for n, a in left if a >= 0.5), key=lambda w: -w[1])
     offers = goods_to_load(railway, station, made)
-    amounts = [(o.good, o.made if o.made > 0 else o.waiting) for o in offers]
+    amounts = [(o.good, o.gathered if o.gathered > 0 else o.waiting) for o in offers]
     makes = sorted(((g, a) for g, a in amounts if a >= 0.5), key=lambda m: -m[1])
     return Summary(
         wants[:SUMMARY_MOST],
@@ -416,7 +428,7 @@ class RouteMap:
                 "needed",
                 GENERAL_SHADES,
                 sum(m.general > 0 for m in marks.values()),
-                "Wanted for food or heating",
+                f"Wanted for {needs_named(GENERAL_NEEDS)}",
             ),
             (
                 "special",
@@ -424,7 +436,12 @@ class RouteMap:
                 sum(m.special > 0 for m in marks.values()),
                 "Wanted by buildings that need just this",
             ),
-            ("made", MADE_SHADES, sum(m.made > 0 for m in marks.values()), "Made around"),
+            (
+                "given",
+                MADE_SHADES,
+                sum(m.made > 0 for m in marks.values()),
+                "Given to the station over the last quarter, counted",
+            ),
         )
         for label, shades, count, why in counts:
             imgui.same_line(0, 8)
@@ -530,6 +547,8 @@ class RouteMap:
         if self.good is not None:
             self._draw_marks(draw_list, railway, spots, marks, half, frame.panel)
         for station, numbers in stops.items():
+            if station not in spots:
+                continue
             x, y = spots[station]
             text = ",".join(map(str, numbers))
             left = x - half - 3 - imgui.calc_text_size(text).x
@@ -577,7 +596,7 @@ class RouteMap:
         imgui.begin_tooltip()
         imgui.text(railway.name_of(station))
         _summary_row("Wants", NEEDED, summary.wants, summary.more_wants)
-        _summary_row("Makes", MADE, summary.makes, summary.more_makes)
+        _summary_row("Given", MADE, summary.makes, summary.more_makes)
         if can_stop_at(train, station):
             imgui.text_disabled("Click to add it as a stop")
         else:

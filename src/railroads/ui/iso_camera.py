@@ -2,6 +2,7 @@ import math
 from dataclasses import dataclass
 
 from railroads.sim.geo import Coord
+from railroads.sim.grids import GridKind
 
 # On-screen width in pixels of one cell at each zoom level. The furthest levels draw the map as
 # one smooth picture; from PIXEL_CELL_WIDTH on it is pixel art, shown 1 to 6 times as big. The
@@ -71,11 +72,14 @@ class IsoCamera:
         self.center_x += before[0] - after[0]
         self.center_y += before[1] - after[1]
 
-    def keep_within(self, width: float, height: float) -> None:
-        """Keeps the centre of the view on a map this wide and high, so panning cannot lose it,
+    def keep_within(
+        self, width: float, height: float, margin: tuple[float, float] = (0.0, 0.0)
+    ) -> None:
+        """Keeps the centre of the view on a map this wide and high, or up to `margin` past its
+        edges (as far as the land around it the player can buy), so panning cannot lose it,
         however long and thin it is."""
-        self.center_x = min(max(self.center_x, 0.0), width)
-        self.center_y = min(max(self.center_y, 0.0), height)
+        self.center_x = min(max(self.center_x, -margin[0]), width + margin[0])
+        self.center_y = min(max(self.center_y, -margin[1]), height + margin[1])
 
     def map_direction(self, screen_dx: float, screen_dy: float) -> Vec2:
         """The direction on the map, as a unit vector, that points that way on screen."""
@@ -91,3 +95,22 @@ class IsoCamera:
         u, v = pixels_x / self._scale, pixels_y / (self._scale * TILT)
         cos, sin = math.cos(self.angle), math.sin(self.angle)
         return cos * u + sin * v, -sin * u + cos * v
+
+
+@dataclass(frozen=True)
+class GridLook:
+    """How a grid sits on screen. Squares are diamonds with north at the top-left, like RT2;
+    hexagons have north up."""
+
+    angle_deg: float
+    cell_units: float
+    # Cell widths in pixels from which the grid shows: first baked into the ground picture, while
+    # there are too many cells to outline one by one, then as sharp lines drawn on top.
+    baked_lines_from: int | None
+    drawn_lines_from: int
+
+
+LOOKS: dict[GridKind, GridLook] = {
+    "square": GridLook(-45.0, math.sqrt(2), baked_lines_from=None, drawn_lines_from=16),
+    "hex": GridLook(0.0, 1.0, baked_lines_from=8, drawn_lines_from=24),
+}

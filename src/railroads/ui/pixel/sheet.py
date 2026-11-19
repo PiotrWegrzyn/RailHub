@@ -2,6 +2,7 @@
 
 import json
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
 from typing import Self
 
@@ -47,7 +48,18 @@ class SpriteSheet:
         return cls.load(FINE_PNG, FINE_INDEX)
 
     def index(self, name: str) -> int:
-        return self.names.index(name)
+        found = self._indices.get(name)
+        if found is None:
+            raise ValueError(f"No sprite is named {name!r}")
+        return found
+
+    @cached_property
+    def _indices(self) -> dict[str, int]:
+        """Each name's first sprite."""
+        indices: dict[str, int] = {}
+        for i, name in enumerate(self.names):
+            indices.setdefault(name, i)
+        return indices
 
     def variants(self, prefix: str) -> list[int]:
         """Indices of the sprites named prefix_0, prefix_1 and so on."""

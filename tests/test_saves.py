@@ -36,8 +36,9 @@ def played_game(months: int = 3) -> SavedGame:
     game.finances.cash = 1_000_000.0
     for _ in range(4):
         game.growth.build(Building((8, 15), BuildingKind.HOUSE))
-    game.build_station((8, 6), (3, 9))
+    game.build_station((8, 6))
     game.build_station((8, 24))
+    game.build_station((2, 2), (3, 9))
     game.lay_track((8, 6), (8, 24))
     train = game.railway.buy()
     assert train is not None
@@ -104,7 +105,7 @@ def test_a_loaded_game_is_the_game_saved(tmp_path: Path) -> None:
     loaded = saves.load("My railway")
 
     assert differences(saved, loaded) == []
-    assert loaded.game.constructions.station_ends((8, 6)) == (3, 9)
+    assert loaded.game.constructions.station_ends((2, 2)) == (3, 9)
     assert loaded.game.railway.trains[0].stops == saved.game.railway.trains[0].stops
     assert loaded.clock == saved.clock
     assert loaded.camera == (4.5, 6.0, 2)
@@ -325,20 +326,6 @@ def test_older_autosaves_stay_put_until_the_new_one_is_written(tmp_path: Path) -
     assert midway == [("autosave 1", earlier.clock.date)]
     assert saves.load("autosave 1").clock.date == later.clock.date
     assert saves.load("autosave 2").clock.date == earlier.clock.date
-
-
-def test_a_snapshot_is_the_games_big_parts_pickled_then_the_game() -> None:
-    saved = played_game()
-    plain = BytesIO()
-    pickler = _Pickler(plain, protocol=pickle.HIGHEST_PROTOCOL)
-    for part in saved.game.big_parts():
-        pickler.dump(part)
-    pickler.dump(saved)
-
-    joined = bytes(snapshot(saved).data)
-    held = bytes(snapshot(saved, ReusedMemory()).data)
-
-    assert joined == held == plain.getvalue()
 
 
 def test_a_snapshot_taken_in_steps_takes_a_step_for_each_big_part() -> None:

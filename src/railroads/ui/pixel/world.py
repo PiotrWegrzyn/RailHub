@@ -40,7 +40,14 @@ from railroads.ui.pixel.ground import (
 from railroads.ui.pixel.ground_texture import textured
 from railroads.ui.pixel.lattice import Lattice
 from railroads.ui.pixel.projection import CHUNK, PixelProjection, Rgba
-from railroads.ui.pixel.relief import MOST_LIFT, Elevation, lighting, raise_picture, raycast
+from railroads.ui.pixel.relief import (
+    MOST_LIFT,
+    Elevation,
+    crossings,
+    lighting,
+    raise_picture,
+    raycast,
+)
 from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
 from railroads.ui.pixel.sheet import FINE, SpriteSheet
 from railroads.ui.pixel.track_art import TrackArt
@@ -171,8 +178,13 @@ class PixelWorld:
     def buildings_changed(self, cells: Iterable[Cell]) -> set[tuple[int, int]]:
         """Puts the ground and scenery up again after buildings or forests changed in `cells`;
         returns the chunks that look different now."""
+        return finish(self.buildings_changed_steps(cells))
+
+    def buildings_changed_steps(self, cells: Iterable[Cell]) -> Steps[set[tuple[int, int]]]:
+        """buildings_changed in steps, nothing changing the world between them."""
         self._grade()
         self.ground.refresh()
+        yield
         self.scenery = Scenery.of(
             self.tile_map,
             self.constructions,
@@ -181,6 +193,7 @@ class PixelWorld:
             self.station_levels,
             self.elevation,
         )
+        yield
         self._shade_trees()
         self.buildings_version += 1
         return self._chunks_around(cells)
@@ -300,20 +313,26 @@ class PixelWorld:
         resolution: int = 1,
         fine_relief: bool = False,
         over_ground: bool = False,
+        surfaces: bool = True,
     ) -> Rgba:
         """One chunk as RGBA pixels, `resolution` of them for every art pixel each way; off the
         map it is clear. Above 1 the ground is blown up and the track and everything standing
         on it are drawn that much finer. Where hills and mountains rise, the ground with its
         track is lifted, so the chunk shows ground from below it too; with `fine_relief` their
         heights, lift and colours are worked out at the full resolution too, which is smoother
-        and slower. With `over_ground` a chunk where nothing rises leaves its ground out, clear
-        but for the shade of trees, to be laid over ground the graphics card draws
-        (railroads.ui.pixel.ground_shader)."""
+        and slower. With `over_ground` the chunk leaves its ground out, clear but for the shade
+        of trees, to be laid over ground the graphics card draws and raises
+        (railroads.ui.pixel.ground_shader); what lies on raised ground is raised with it. Over
+        ground, without `surfaces` the chunk leaves out what lies on the ground too, the shade of
+        trees, fields, yards and woods, which the graphics card lays under it
+        (GroundShader.dress)."""
         self._grade()
         if fine_relief and resolution > 1:
             return self._render_fine(chunk_x, chunk_y, resolution)
-        if over_ground and not self.rises(chunk_x, chunk_y):
-            return self._render_over_ground(chunk_x, chunk_y, resolution)
+        if over_ground:
+            if self.rises(chunk_x, chunk_y):
+                return self._render_over_raised(chunk_x, chunk_y, resolution, surfaces)
+            return self._render_over_ground(chunk_x, chunk_y, resolution, surfaces)
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
         may_rise = self.elevation.may_rise(left, top, CHUNK, CHUNK + MOST_LIFT)
         points = self._points(left, top, CHUNK + MOST_LIFT + 1 if may_rise else CHUNK)
@@ -342,11 +361,13 @@ class PixelWorld:
             flat,
         )
         if offset is None:
+            self._stand_scenery(canvas, left, top, resolution, under_track=True)
             self._lay_track(canvas, left, top, resolution)
         else:
-            canvas = raise_picture(canvas, offset, resolution)
+            canvas = raise_picture(canvas, offset, resolution, crossings(raised.lift, offset))
             if resolution > 1:
                 textured(canvas, left, top, resolution)
+            self._stand_scenery(canvas, left, top, resolution, under_track=True)
             self._lay_lifted_track(canvas, left, top, resolution, offset, resolution)
         self._stand_scenery(canvas, left, top, resolution)
         return _finished(canvas)
@@ -394,28 +415,79 @@ class PixelWorld:
             grid=self.tile_map.grid,
         )
 
-    def _render_over_ground(self, chunk_x: int, chunk_y: int, k: int) -> Rgba:
+    def _render_over_ground(
+        self, chunk_x: int, chunk_y: int, k: int, surfaces: bool = True
+    ) -> Rgba:
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
         points = self._points(left, top, CHUNK)
-        inside, shade = self.ground.under(left, top, CHUNK, points)
-        shown = inside.repeat(k, axis=0).repeat(k, axis=1)
-        canvas = np.zeros((CHUNK * k, CHUNK * k, 4), dtype=np.float64)
-        art_pixels(canvas, k)[..., 3] = shade[:, None, :, None]
-        self._surfaces(
-            canvas,
-            left,
-            top,
-            k,
-            shown,
-            lambda layer, kk, on: (
-                self.ground.fields(layer, left, top, kk, shown=on, points=points),
-                self.ground.yards(layer, left, top, kk, shown=on),
-                self.ground.canopy(layer, left, top, kk, shown=on, points=points),
-            ),
-        )
+        shown, canvas = self._over(left, top, CHUNK, k, points, surfaces)
+        if surfaces:
+            self._surfaces_over(canvas, left, top, k, shown, points)
+        self._stand_scenery(canvas, left, top, k, under_track=True)
         self._lay_track(canvas, left, top, k, shown=shown)
         self._stand_scenery(canvas, left, top, k)
         return _finished(canvas)
+
+    def _render_over_raised(
+        self, chunk_x: int, chunk_y: int, k: int, surfaces: bool = True
+    ) -> Rgba:
+        left, top = chunk_x * CHUNK, chunk_y * CHUNK
+        points = self._points(left, top, CHUNK + MOST_LIFT + 1)
+        raised = self.elevation.area(left, top, CHUNK, CHUNK + MOST_LIFT, points=points)
+        if raised is None:
+            return self._render_over_ground(chunk_x, chunk_y, k, surfaces)
+        offset = raycast(raised.lift, CHUNK, CHUNK)
+        rows = CHUNK + min(int(offset.max()) + 1, MOST_LIFT)
+        shown, canvas = self._over(left, top, rows, k, points, surfaces)
+        lit = lighting(raised.top(rows))
+        if surfaces:
+            self._surfaces_over(canvas, left, top, k, shown, points, lit)
+        between = crossings(raised.lift, offset)
+        canvas = raise_picture(canvas, offset, k, between)
+        on_map = raise_picture(shown[::k, ::k].astype(np.float32), offset, 1, between) > 0
+        if k > 1:
+            if surfaces:
+                textured(canvas, left, top, k)
+            on_map = on_map.repeat(k, axis=0).repeat(k, axis=1)
+        self._stand_scenery(canvas, left, top, k, under_track=True)
+        self._lay_lifted_track(canvas, left, top, k, offset, k, on_map)
+        self._stand_scenery(canvas, left, top, k)
+        return _finished(canvas)
+
+    def _over(
+        self, left: int, top: int, rows: int, k: int, points: Lattice, surfaces: bool
+    ) -> tuple[npt.NDArray[np.bool_], FloatArray]:
+        """Which pixels of a chunk drawn over ground, CHUNK art pixels across and `rows` down
+        from (`left`, `top`), `k` pixels to each, lie on the map, and a clear canvas for it,
+        shaded under trees unless the graphics card shades it (without `surfaces`)."""
+        canvas = np.zeros((rows * k, CHUNK * k, 4), dtype=np.float64)
+        if surfaces:
+            inside, shade = self.ground.under(left, top, rows, points)
+            art_pixels(canvas, k)[..., 3] = shade[:, None, :, None]
+        else:
+            inside = points.cells(left, top, CHUNK, rows)[2]
+        return inside.repeat(k, axis=0).repeat(k, axis=1), canvas
+
+    def _surfaces_over(
+        self,
+        canvas: FloatArray,
+        left: int,
+        top: int,
+        k: int,
+        shown: npt.NDArray[np.bool_],
+        points: Lattice,
+        lit: FloatArray | None = None,
+    ) -> None:
+        """Lays fields, yards and woods over a chunk drawn over ground; raised (with `lit`), they
+        take the ground's texture once raised with it."""
+        ground = self.ground
+
+        def paint(layer: FloatArray, kk: int, on: npt.NDArray[np.bool_]) -> None:
+            ground.fields(layer, left, top, kk, lit, shown=on, points=points)
+            ground.yards(layer, left, top, kk, shown=on)
+            ground.canopy(layer, left, top, kk, shown=on, points=points)
+
+        self._surfaces(canvas, left, top, k, shown, paint, lit is None)
 
     def _render_fine(self, chunk_x: int, chunk_y: int, k: int) -> Rgba:
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
@@ -460,8 +532,9 @@ class PixelWorld:
             lambda layer, kk, on: self.ground.canopy(layer, left, top, kk, shown=on, points=points),
             False,
         )
-        canvas = raise_picture(canvas, offset, 1)
+        canvas = raise_picture(canvas, offset, 1, crossings(raised.lift, offset))
         textured(canvas, left, top, k)
+        self._stand_scenery(canvas, left, top, k, under_track=True)
         self._lay_lifted_track(canvas, left, top, k, offset / k)
         self._stand_scenery(canvas, left, top, k)
         return _finished(canvas)
@@ -505,10 +578,13 @@ class PixelWorld:
         resolution: int,
         seen: FloatArray,
         blow: int = 1,
+        on_map: npt.NDArray[np.bool_] | None = None,
     ) -> None:
         """Draws the track crossing the chunk over its raised ground, lifted with it, where the
         ground shown, `seen` art pixels further down the map in each pixel (of a picture `blow`
-        times coarser than the chunk's), is not in front of it."""
+        times coarser than the chunk's), is not in front of it, and the picture shows the map:
+        where `on_map`, for a picture of what lies over the ground, or else where it isn't
+        clear."""
         pieces = self._track_pieces()
         if not pieces:
             return
@@ -519,11 +595,19 @@ class PixelWorld:
         part, under = track[box], canvas[box]
         down, across = (np.arange(span.start, span.stop) // blow for span in box)
         seen = seen[down[:, None], across[None, :]]
-        shown = (seen <= lift[box] + HIDDEN_BEYOND) & (under[..., 3] > 0)
+        mapped = under[..., 3] > 0 if on_map is None else on_map[box]
+        shown = (seen <= lift[box] + HIDDEN_BEYOND) & mapped
         alpha = part[..., 3:] * shown[..., None]
         under[..., :3] = under[..., :3] * (1 - alpha) + part[..., :3] * alpha
+        if on_map is not None:
+            under[..., 3:] = under[..., 3:] * (1 - alpha) + alpha
 
-    def _stand_scenery(self, canvas: FloatArray, left: int, top: int, resolution: int) -> None:
+    def _stand_scenery(
+        self, canvas: FloatArray, left: int, top: int, resolution: int, under_track: bool = False
+    ) -> None:
+        """Stands what stands on the ground in the chunk on it, back to front: with
+        `under_track` only what is drawn under the track (Scenery.under_track), and otherwise the
+        rest."""
         sheet = resolution if resolution in self._sprites else max(self._sprites)
         times = resolution // sheet
         scenery, drawn, k = self.scenery, self._sprites[sheet], resolution
@@ -532,6 +616,7 @@ class PixelWorld:
         w, h = drawn.sizes[scenery.sprite, 0] * times, drawn.sizes[scenery.sprite, 1] * times
         span = CHUNK * k
         overlapping = (x0 < span) & (x0 + w > 0) & (y0 < span) & (y0 + h > 0)
+        overlapping &= scenery.under_track == under_track
         for i in np.flatnonzero(overlapping).tolist():
             pixels = drawn.premultiplied[int(scenery.sprite[i])]
             if times > 1:

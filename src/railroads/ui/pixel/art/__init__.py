@@ -16,12 +16,6 @@ from PIL import Image
 
 from railroads.sim.constructions import BUILDING_RULES, MERGED, BuildingKind
 from railroads.ui.pixel.art import (
-    built_batch1,
-    built_batch2,
-    built_batch3,
-    built_batch4,
-    built_farms,
-    built_homes,
     built_works,
     grand_crafts,
     grand_fire,
@@ -29,21 +23,32 @@ from railroads.ui.pixel.art import (
     grand_modern,
 )
 from railroads.ui.pixel.art.built import modelled
-from railroads.ui.pixel.art.built_homes import home
 from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_pauls
-from railroads.ui.pixel.art.commerce import airport, department_store, hotel, port, shop, tavern
+from railroads.ui.pixel.art.commerce import (
+    airport,
+    department_store,
+    hotel,
+    port,
+    shop,
+    sushi_hut,
+    tavern,
+)
 from railroads.ui.pixel.art.crafts import (
     carpet_weaver,
     clock_maker,
     coke_plant,
+    fish_dryer,
     foundry,
     hospital,
     manor,
     mirror_maker,
+    miso_maker,
     potter,
     sausage_maker,
+    soy_sauce_brewery,
     theatre,
     tile_works,
+    tofu_maker,
 )
 from railroads.ui.pixel.art.farms import (
     bananas,
@@ -61,7 +66,10 @@ from railroads.ui.pixel.art.farms import (
     pig_farm,
     plantation,
     potato_farm,
+    rice_paddy,
+    soy_field,
     sugar,
+    tea_plantation,
 )
 from railroads.ui.pixel.art.grown import grown
 from railroads.ui.pixel.art.homes import flats, house, skyscraper, tenement
@@ -94,6 +102,7 @@ from railroads.ui.pixel.art.industry import (
     printing_works,
     railway_works,
     refinery,
+    sake_brewery,
     shipyard,
     shoe_factory,
     steel_mill,
@@ -266,6 +275,13 @@ BUILDINGS = (
     "limestone_quarry",
     "sand_pit",
     "potato_farm",
+    "rice_paddy",
+    "soy_field",
+    "tea_plantation",
+    "soy_sauce_brewery",
+    "tofu_maker",
+    "miso_maker",
+    "fish_dryer",
     "cattle_ranch",
     "pig_farm",
     "chicken_farm",
@@ -277,6 +293,7 @@ BUILDINGS = (
     "glassworks",
     "brewery",
     "distillery",
+    "sake_brewery",
     "tannery",
     "shoe_factory",
     "plastics_works",
@@ -286,6 +303,7 @@ BUILDINGS = (
     "sugar_refinery",
     "porcelain_works",
     "tavern",
+    "sushi_hut",
     "department_store",
     "hotel",
     "meat_factory",
@@ -401,6 +419,13 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "limestone_quarry": limestone_quarry,
     "sand_pit": sand_pit,
     "potato_farm": potato_farm,
+    "rice_paddy": rice_paddy,
+    "soy_field": soy_field,
+    "tea_plantation": tea_plantation,
+    "soy_sauce_brewery": soy_sauce_brewery,
+    "tofu_maker": tofu_maker,
+    "miso_maker": miso_maker,
+    "fish_dryer": fish_dryer,
     "cattle_ranch": cattle_ranch,
     "pig_farm": pig_farm,
     "chicken_farm": chicken_farm,
@@ -412,6 +437,7 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "glassworks": glassworks,
     "brewery": brewery,
     "distillery": distillery,
+    "sake_brewery": sake_brewery,
     "tannery": tannery,
     "shoe_factory": shoe_factory,
     "plastics_works": plastics_works,
@@ -421,6 +447,7 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "sugar_refinery": sugar_refinery,
     "porcelain_works": porcelain_works,
     "tavern": tavern,
+    "sushi_hut": sushi_hut,
     "department_store": department_store,
     "hotel": hotel,
     "meat_factory": meat_factory,
@@ -438,85 +465,11 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "olympic_stadium": olympic_stadium,
 }
 
-# Buildings drawn from 3D models (railroads.ui.pixel.art.built) at every zoom, shaped and coloured
-# like the painted sprites they took the place of: on the sheet small, and up close as fine as the
-# screen with their fine details.
-MODELS: dict[str, Callable[[], Sprite]] = {
-    **{
-        f"house_{i}": home(lambda w=WALLS[i % 3], r=ROOFS[i % 4]: built_homes.house(w, r))
-        for i in range(12)
-    },
-    **{
-        f"tenement_{i}": home(lambda w=w, r=TENEMENT_ROOFS[i % 2]: built_homes.tenement(w, r))
-        for i, w in enumerate(TENEMENT_WALLS)
-    },
-    **{f"flats_{i}": home(lambda w=w: built_homes.flats(w)) for i, w in enumerate(FLAT_WALLS)},
-    "skyscraper": home(built_homes.skyscraper),
-    "farm": modelled(built_farms.farm),
-    "orchard": modelled(built_farms.orchard),
-    "orange_farm": modelled(lambda: built_farms.orchard([(244, 142, 36)])),
-    "potato_farm": modelled(built_farms.potato_farm),
-    "bakery": modelled(built_works.bakery),
-    "lumber_mill": modelled(built_works.lumber_mill),
-    "distillery": modelled(built_works.distillery),
-    "tavern": modelled(built_works.tavern),
-    "gasworks": modelled(built_works.gasworks),
-    "sausage_maker": modelled(built_batch1.sausage_maker),
-    "chicken_farm": modelled(built_batch1.chicken_farm),
-    "cattle_ranch": modelled(built_batch1.cattle_ranch),
-    "meat_factory": modelled(built_batch1.meat_factory),
-    "pig_farm": modelled(built_batch1.pig_farm),
-    "brewery": modelled(built_batch1.brewery),
-    "dairy": modelled(built_batch1.dairy),
-    "mine": modelled(built_batch1.mine),
-    "iron_mine": modelled(lambda: built_batch1.shaft_mine((104, 72, 62), (176, 98, 70))),
-    "copper_mine": modelled(lambda: built_batch1.shaft_mine((96, 84, 66), (206, 130, 76))),
-    "gold_mine": modelled(lambda: built_batch1.shaft_mine((88, 78, 62), (255, 214, 60))),
-    "diamond_mine": modelled(lambda: built_batch1.shaft_mine((58, 60, 72), (190, 238, 255))),
-    "winery": modelled(built_batch2.winery),
-    "car_dealer": modelled(
-        lambda: built_batch2.shop((226, 224, 218), (236, 80, 132), (60, 90, 170))
-    ),
-    "jeweller": modelled(lambda: built_batch2.shop((70, 62, 84), (232, 190, 70), (190, 238, 255))),
-    "fishery": modelled(built_batch2.fishery),
-    "hop_garden": modelled(built_batch2.hop_garden),
-    "beekeeper": modelled(built_batch2.beekeeper),
-    "potter": modelled(built_batch2.potter),
-    "sugar_refinery": modelled(built_batch2.sugar_refinery),
-    "furniture_maker": modelled(built_batch2.furniture_maker),
-    "flax_field": modelled(built_batch2.flax_field),
-    "sugar": modelled(built_batch2.sugar),
-    "factory": modelled(built_batch3.factory),
-    "textile_mill": modelled(built_batch3.textile_mill),
-    "tool_works": modelled(built_batch3.tool_works),
-    "tannery": modelled(built_batch3.tannery),
-    "foundry": modelled(built_batch3.foundry),
-    "tile_works": modelled(built_batch3.tile_works),
-    "clay_pit": modelled(built_batch3.clay_pit),
-    "sand_pit": modelled(built_batch3.sand_pit),
-    "limestone_quarry": modelled(built_batch3.limestone_quarry),
-    "glassworks": modelled(built_batch3.glassworks),
-    "brickworks": modelled(built_batch3.brickworks),
-    "machine_works": modelled(built_batch3.machine_works),
-    "steel_mill": modelled(built_batch3.steel_mill),
-    "cement_works": modelled(built_batch3.cement_works),
-    "shoe_factory": modelled(built_batch4.shoe_factory),
-    "plastics_works": modelled(built_batch4.plastics_works),
-    "appliance_factory": modelled(built_batch4.appliance_factory),
-    "paper_mill": modelled(built_batch4.paper_mill),
-    "printing_works": modelled(built_batch4.printing_works),
-    "porcelain_works": modelled(built_batch4.porcelain_works),
-    "refinery": modelled(built_batch4.refinery),
-    "chemical_works": modelled(built_batch4.chemical_works),
-    "electronics_plant": modelled(built_batch4.electronics_plant),
-    "car_factory": modelled(built_batch4.car_factory),
-    "barrel_maker": modelled(built_batch4.barrel_maker),
-    "coke_plant": modelled(built_batch4.coke_plant),
-}
-# The kinds drawn from their models: buildings are pixel art, but for the gasworks, whose painted
-# gasholder gave way to its brick rotunda. Every other model stays to hand for a 3D look.
-DRAWN_FROM_MODELS = ("gasworks",)
-SPRITES |= {name: MODELS[name] for name in DRAWN_FROM_MODELS}
+# The buildings drawn from 3D models (railroads.ui.pixel.art.built) instead of painted: only the
+# gasworks, whose brick rotunda took the place of its painted gasholder.
+MODELS: dict[str, Callable[[], Sprite]] = {"gasworks": modelled(built_works.gasworks)}
+DRAWN_FROM_MODELS = tuple(MODELS)
+SPRITES |= MODELS
 
 # Big and mega works drawn as buildings of their own, by trade.
 for _module in (grand_fire, grand_food, grand_crafts, grand_modern):

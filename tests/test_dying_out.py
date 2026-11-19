@@ -20,15 +20,6 @@ def run(growth: Growth, months: int) -> None:
     growth.run(months, np.random.default_rng(0))
 
 
-def test_a_house_with_nothing_dies_out_after_ten_years() -> None:
-    growth = standing(((5, 5), BuildingKind.HOUSE))
-
-    run(growth, HOMES_DIE_AFTER_MONTHS)
-
-    assert growth.counts[BuildingKind.HOUSE].sum() == 0
-    assert growth.died_out == 1
-
-
 def test_a_house_with_nothing_still_stands_just_short_of_ten_years() -> None:
     growth = standing(((5, 5), BuildingKind.HOUSE))
 

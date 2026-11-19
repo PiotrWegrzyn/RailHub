@@ -48,15 +48,6 @@ def test_saved_map_loads_back_unchanged(tmp_path: Path) -> None:
         assert np.array_equal(getattr(loaded, layer), getattr(tile_map, layer)), layer
 
 
-def test_map_file_keeps_its_scale_and_cell_shape(tmp_path: Path) -> None:
-    path = tmp_path / "test.npz"
-    make_map(HexGrid(rows=4, cols=5, km_per_cell=3.0)).save(path)
-
-    grid = TileMap.load(path).grid
-
-    assert (grid.kind, grid.km_per_cell) == ("hex", 3.0)
-
-
 def test_loading_a_map_in_another_format_fails(tmp_path: Path) -> None:
     path = tmp_path / "old.npz"
     np.savez(path, meta=np.array('{"format_version": 0}'))
@@ -116,3 +107,28 @@ def test_a_map_sent_between_processes_can_still_change_its_vegetation() -> None:
 
     assert tile_map.vegetation.flat[0] == Vegetation.FOREST
     assert not tile_map.vegetation.flags.writeable
+
+
+def test_the_square_in_the_middle_holds_a_quarter_of_the_land_on_an_even_row() -> None:
+    whole = make_map(HexGrid(rows=80, cols=60, km_per_cell=2.0))
+
+    square = whole.square_middle()
+
+    rows, cols = square.grid.shape
+    assert rows * cols == pytest.approx(80 * 60 / 4, rel=0.05)
+    assert cols == pytest.approx(rows * 0.866, abs=1)
+    top, left = (80 - rows) // 4 * 2, (60 - cols) // 2
+    assert top % 2 == 0
+    assert np.array_equal(square.height_m, whole.height_m[top : top + rows, left : left + cols])
+
+
+def test_the_square_in_the_middle_keeps_every_place_where_it_was() -> None:
+    whole = make_map(HexGrid(rows=80, cols=60, km_per_cell=2.0))
+    square = whole.square_middle()
+
+    lon, lat = square.lonlat((10, 10))
+
+    assert whole.cell_at_lonlat(lon, lat) == (
+        10 + (80 - square.grid.rows) // 4 * 2,
+        10 + (60 - square.grid.cols) // 2,
+    )

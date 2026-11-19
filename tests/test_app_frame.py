@@ -1,6 +1,8 @@
 import gc
+import pickle
 from collections.abc import Callable, Iterator
 from concurrent.futures import Executor, Future
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -11,26 +13,32 @@ from test_saves import played_game
 from test_web_setup import SETTINGS, FakePage, grows_as
 
 from builders import flat_map
-from railroads.newgame import MapChoice, Settings
+from railroads.land import lot_middle
+from railroads.newgame import MapChoice, Settings, make_game
 from railroads.saves import SavedGame, Saves
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.game import Game
 from railroads.sim.goods import Good
 from railroads.sim.grids import HexGrid
+from railroads.sim.lots import Lots
 from railroads.sim.steps import Steps
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.sim.trains import Stop
 from railroads.ui import app as app_module
 from railroads.ui import web_setup
-from railroads.ui.app import App, Shell
+from railroads.ui.app import OPENING_ZOOM, App, Shell
 from railroads.ui.build_menu import Tool
 from railroads.ui.ground import GroundPictures
+from railroads.ui.history_pictures import opening_center
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
-from railroads.ui.main_menu import MENU_WIDTH, MainMenu, Page
-from railroads.ui.map_view import VISIT_ZOOM, MapView
+from railroads.ui.main_menu import MENU_WIDTH, PANEL_PAD, MainMenu, Page
+from railroads.ui.map_view import VISIT_ZOOM, Lens, MapView
 from railroads.ui.route_map import soften
+from railroads.ui.waiting_screen import WORK
 from railroads.ui.web_setup import PageSetup
 from railroads.ui.workers import FrameWorker
+
+PICTURED = replace(SETTINGS, show_map_growing=True)
 
 
 class FakeTexture:
@@ -64,6 +72,7 @@ def made_app() -> App:
     game.finances.cash = 1_000_000.0
     for _ in range(4):
         game.growth.build(Building((10, 10), BuildingKind.HOUSE))
+    game.growth.build(Building((10, 11), BuildingKind.FARM))
     for cell in ((10, 6), (10, 16)):
         game.build_station(cell)
     game.lay_track((10, 6), (10, 16))
@@ -73,7 +82,7 @@ def made_app() -> App:
     app = App(MapView(game))
     app.help.open = app.tech.open = app.reports.open = True
     app.view.build.trains.open = True
-    app.view.selected = (10, 10)
+    app.view.selected = (10, 11)
     app.view.station_window.station = (10, 6)
     app.view.build.choose(Tool.TRACK)
     app.view.build.track_from = (10, 6)
@@ -101,6 +110,18 @@ def test_every_window_draws_at_every_zoom(context: None, zoom: int) -> None:
         frame(app)
 
     assert app.view.camera.zoom_level == zoom
+
+
+@pytest.mark.parametrize("lens", list(Lens))
+def test_the_map_draws_with_each_lens_on(context: None, lens: Lens) -> None:
+    app = made_app()
+    app.view.lens = lens
+    app.view.look_at((10, 10))
+
+    for _ in range(3):
+        frame(app)
+
+    assert app.view.lens == lens
 
 
 @pytest.fixture
@@ -141,18 +162,6 @@ def shell_frame(shell: Shell) -> None:
     imgui.render()
 
 
-def test_the_game_autosaves_as_a_month_begins(context: None, tmp_path: Path) -> None:
-    app = made_app()
-    app.saves = Saves(tmp_path)
-    app.clock.seconds = app.clock.seconds_per_month - 0.001
-
-    frame(app)
-    app.finish_autosave()
-
-    assert app.saves.load("autosave 1").clock.date == app.clock.date
-    assert app.notice == "Autosaved"
-
-
 def frames_until_the_month_is_done(app: App) -> int:
     frames = 1
     frame(app)
@@ -163,8 +172,9 @@ def frames_until_the_month_is_done(app: App) -> int:
 
 
 def test_a_month_is_done_over_a_few_frames_and_its_autosave_taken_in_its_last_ones(
-    context: None, tmp_path: Path
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(app_module, "MONTH_FRAME_SECONDS", 0.0)
     app = made_app()
     app.saves = Saves(tmp_path)
     app.clock.seconds = app.clock.seconds_per_month - 0.001
@@ -178,9 +188,13 @@ def test_a_month_is_done_over_a_few_frames_and_its_autosave_taken_in_its_last_on
     assert not app._autosave_due
     assert [info.name for info in app.saves.listing()] == ["autosave 1"]
     assert app.saves.load("autosave 1").clock.date == app.clock.date
+    assert app.notice == "Autosaved"
 
 
-def test_the_clock_and_trains_wait_while_a_month_is_half_done(context: None) -> None:
+def test_the_clock_and_trains_wait_while_a_month_is_half_done(
+    context: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "MONTH_FRAME_SECONDS", 0.0)
     app = made_app()
     app.clock.seconds = app.clock.seconds_per_month - 0.001
     frame(app)
@@ -203,7 +217,7 @@ def test_no_autosave_is_written_while_the_month_goes_on(context: None, tmp_path:
     assert app.saves.listing() == []
 
 
-def test_the_saves_window_draws_both_tabs(context: None, tmp_path: Path) -> None:
+def test_the_saves_window_lists_the_saves_on_disk_once_shown(context: None, tmp_path: Path) -> None:
     app = made_app()
     app.saves = Saves(tmp_path)
     app.saves.save("Earlier", app.saved())
@@ -234,7 +248,7 @@ def test_every_page_of_the_main_menu_draws(context: None, tmp_path: Path, page: 
 def test_the_menu_draws_nothing_past_its_buttons(context: None, tmp_path: Path, page: Page) -> None:
     menu = MainMenu(Saves(tmp_path))
     menu.go_to(page)
-    left = (1280 - MENU_WIDTH) / 2
+    left = (1280 - MENU_WIDTH) / 2 - PANEL_PAD
 
     for _ in range(3):
         imgui.new_frame()
@@ -246,7 +260,7 @@ def test_the_menu_draws_nothing_past_its_buttons(context: None, tmp_path: Path, 
         imgui.render()
 
     clips = [cmd.clip_rect for drawn in imgui.get_draw_data().cmd_lists for cmd in drawn.cmd_buffer]
-    assert (left, left + MENU_WIDTH) in [(clip.x, clip.z) for clip in clips]
+    assert (left, left + MENU_WIDTH + 2 * PANEL_PAD) in [(clip.x, clip.z) for clip in clips]
 
 
 def test_a_game_loaded_from_the_menu_comes_back_as_it_was_saved(
@@ -440,14 +454,20 @@ def test_the_waiting_screen_shows_how_far_a_new_game_has_grown(
     assert shell._done == 0.4
 
 
-def grown_on_the_frames(saved: SavedGame) -> Callable[..., Steps[SavedGame]]:
+def grown_on_the_frames(
+    saved: SavedGame, years: tuple[int, ...] = ()
+) -> Callable[..., Steps[SavedGame]]:
     def made(
         settings: Settings,
         report: Callable[[str], None],
         progress: Callable[[float], None] = lambda done: None,
+        look: Callable[[Constructions, int], None] = lambda constructions, year: None,
     ) -> Steps[SavedGame]:
         for done in (0.0, 0.5):
             progress(done)
+            yield
+        for year in years:
+            look(saved.game.constructions, year)
             yield
         progress(1.0)
         return saved
@@ -484,6 +504,77 @@ def test_without_threads_a_new_game_grown_by_the_page_worker_fills_the_waiting_b
     assert share == 0.5
     assert shell.app is not None
     assert shell.app.game.finances.cash == grown.game.finances.cash
+
+
+def test_the_menu_has_the_page_worker_grow_the_game_it_would_start_once_its_settings_rest(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "AHEAD_AFTER_S", 0.0)
+    page = FakePage()
+    setup = PageSetup(page)
+    monkeypatch.setattr(app_module, "page_setup", lambda: setup)
+    shell = Shell(Saves(tmp_path))
+
+    shell_frame(shell)
+
+    assert page.started == 1
+    assert pickle.loads(page.settings or b"")[0] == shell.menu.settings()
+
+
+def test_the_menu_grows_nothing_ahead_while_its_settings_keep_changing(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    page = FakePage()
+    monkeypatch.setattr(app_module, "page_setup", lambda: PageSetup(page))
+    shell = Shell(Saves(tmp_path))
+
+    for seed in range(3):
+        shell.menu.seed = seed
+        shell_frame(shell)
+
+    assert page.started == 0
+
+
+def test_starting_the_game_grown_ahead_takes_it_up_without_growing_it_again(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "AHEAD_AFTER_S", 0.0)
+    monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
+    monkeypatch.setattr(app_module, "make_game_steps", never_grown_here)
+    grown = played_game()
+    monkeypatch.setattr(web_setup, "make_game", grows_as(grown))
+    page = FakePage()
+    setup = PageSetup(page)
+    monkeypatch.setattr(app_module, "page_setup", lambda: setup)
+    shell = Shell(Saves(tmp_path))
+    shell_frame(shell)
+    page.work()
+
+    shell.start(shell.menu.settings())
+    frames = 0
+    while shell.app is None and frames < 20:
+        shell_frame(shell)
+        frames += 1
+
+    assert shell.app is not None
+    assert shell.app.game.finances.cash == grown.game.finances.cash
+    assert page.started == 1
+
+
+def test_loading_a_game_stops_the_one_grown_ahead(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "AHEAD_AFTER_S", 0.0)
+    page = FakePage()
+    setup = PageSetup(page)
+    monkeypatch.setattr(app_module, "page_setup", lambda: setup)
+    shell = Shell(Saves(tmp_path))
+    shell_frame(shell)
+
+    shell.load("missing")
+
+    assert page.stopped == 1
+    assert setup.ahead is None
 
 
 def test_without_threads_a_new_game_grows_on_the_frames_when_the_page_worker_fails(
@@ -660,6 +751,7 @@ def test_an_autosave_due_while_another_month_is_half_done_waits_for_that_month(
     writer = HeldWriter()
     monkeypatch.setattr(app_module, "WRITER", writer)
     monkeypatch.setattr(app_module, "AUTOSAVE_GAP_S", 0.0)
+    monkeypatch.setattr(app_module, "MONTH_FRAME_SECONDS", 0.0)
     app = made_app()
     app.saves = Saves(tmp_path)
     app.autosave()
@@ -724,12 +816,41 @@ def test_without_threads_frames_stay_at_full_speed_while_an_autosave_is_written(
     assert refreshes == []
 
 
-def test_a_new_game_opens_on_its_biggest_town_as_the_waiting_screen_falls_away(
+def test_a_new_game_opens_on_the_middle_of_the_map_and_stays_there_as_the_waiting_screen_falls(
     context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
     monkeypatch.setattr(app_module, "page_setup", lambda: None)
     monkeypatch.setattr(app_module, "make_game_steps", grown_on_the_frames(played_game()))
+    shell = Shell(Saves(tmp_path))
+    shell.start(PICTURED)
+    frames = 0
+    while shell.app is None and frames < 20:
+        shell_frame(shell)
+        frames += 1
+
+    opened = shell._shatter is not None
+    while shell._shatter is not None and frames < 400:
+        shell_frame(shell)
+        frames += 1
+
+    assert opened
+    assert shell._shatter is None
+    assert shell.app is not None
+    camera = shell.app.view.camera
+    middle = opening_center(shell.app.view.tile_map.grid, (1280, 800))
+    assert (camera.center_x, camera.center_y) == middle
+    assert camera.zoom_level == OPENING_ZOOM
+
+
+def test_a_new_game_without_pictures_shows_the_work_and_opens_on_its_biggest_town(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
+    monkeypatch.setattr(app_module, "page_setup", lambda: None)
+    monkeypatch.setattr(
+        app_module, "make_game_steps", grown_on_the_frames(played_game(), (850, 950))
+    )
     shell = Shell(Saves(tmp_path))
     shell.start(SETTINGS)
     frames = 0
@@ -737,15 +858,16 @@ def test_a_new_game_opens_on_its_biggest_town_as_the_waiting_screen_falls_away(
         shell_frame(shell)
         frames += 1
 
-    opened = shell._shatter is not None
-    view = shell.app.view if shell.app is not None else None
+    shown = [label.text for label in shell._labels]
     while shell._shatter is not None and frames < 400:
         shell_frame(shell)
         frames += 1
 
-    assert opened
-    assert shell._shatter is None
-    assert view is not None
+    assert shell._show.year is None
+    assert shown[0] is not None
+    assert shown[0].startswith(WORK[0])
+    assert shell.app is not None
+    view = shell.app.view
     assert view.camera.zoom_level >= VISIT_ZOOM
     assert (view.camera.center_x, view.camera.center_y) == view.tile_map.grid.center(8, 15)
 
@@ -781,3 +903,124 @@ def test_months_ending_soon_after_an_autosave_are_saved_once_the_gap_has_passed(
 
     assert saved_soon == ["autosave 1"]
     assert app.saves.load("autosave 1").clock.date == app.clock.date
+
+
+def test_a_new_game_shows_its_map_as_its_towns_grow_and_breaks_up_the_last_picture(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
+    monkeypatch.setattr(app_module, "page_setup", lambda: None)
+    monkeypatch.setattr(
+        app_module, "make_game_steps", grown_on_the_frames(played_game(), (850, 900, 950))
+    )
+    shell = Shell(Saves(tmp_path))
+    shell.start(PICTURED)
+    shown: list[int] = []
+    frames = 0
+    while shell.app is None and frames < 40:
+        shell_frame(shell)
+        year = shell._show.year
+        if year is not None and year not in shown:
+            shown.append(year)
+        frames += 1
+
+    assert shown == [850, 950]
+    assert shell._shatter is not None
+    assert shell._shatter.pictures
+    assert "The map in 950" in [label.text for label in shell._shatter.labels]
+
+
+def test_a_game_the_command_line_asks_for_starts_on_the_first_frame_for_the_windows_size(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "worker", lambda _: FrameWorker())
+    monkeypatch.setattr(app_module, "page_setup", lambda: None)
+    monkeypatch.setattr(app_module, "make_game_steps", grown_on_the_frames(played_game()))
+    imgui.get_io().display_size = imgui.ImVec2(1000, 700)
+    shell = Shell(Saves(tmp_path), SETTINGS)
+    started_before = shell._task is not None
+
+    shell_frame(shell)
+
+    assert not started_before
+    assert shell._task is not None
+    assert shell._window == (1000, 700)
+
+
+def test_the_menu_starts_games_without_pictures_of_the_map_growing_unless_ticked(
+    tmp_path: Path,
+) -> None:
+    plain = MainMenu(Saves(tmp_path))
+    ticked = MainMenu(Saves(tmp_path), show_map_growing=True)
+
+    settings = (plain.settings(), ticked.settings(), ticked.random_settings())
+
+    assert [each.show_map_growing for each in settings] == [False, True, True]
+
+
+@pytest.mark.parametrize("zoom", range(len(ZOOM_CELL_WIDTHS)))
+def test_the_land_for_sale_around_the_map_draws_at_every_zoom(context: None, zoom: int) -> None:
+    app = made_app()
+    lots = Lots.around_middle(app.game.tile_map)
+    lots.offers = lots.next_to()
+    app.game.lots = lots
+    app.view.land.asked = (-2, 0)
+    app.view.camera.zoom_level = zoom
+    app.view.look_at((0, 0))
+
+    for _ in range(3):
+        frame(app)
+
+    assert app.view.land.asked == (-2, 0)
+
+
+def test_land_confirmed_is_bought_behind_the_waiting_screen_and_the_view_opens_on_it(
+    context: None, tmp_path: Path
+) -> None:
+    settings = Settings(seed=5, map=MapChoice.POLAND, cash=2_000_000.0)
+    shell = Shell(Saves(tmp_path))
+    shell.app = App.from_saved(make_game(settings, report=lambda _: None), shell.saves)
+    shell.app.view.camera.zoom_level = 3
+    shell.app.view.land.wanted = (-2, 0)
+
+    shell_frame(shell)
+    assert shell._task is not None
+    shell._task.result()
+    shell_frame(shell)
+
+    app = shell.app
+    lots = app.game.lots
+    assert lots is not None
+    assert (-2, 0) in lots.owned
+    assert app.game.finances.cash == pytest.approx(2_000_000.0 - 377_000.0, abs=1.0)
+    assert app.view.camera.zoom_level == 3
+    x, y = app.game.tile_map.grid.center(*lot_middle(lots, (-2, 0)))
+    assert (app.view.camera.center_x, app.view.camera.center_y) == pytest.approx((x, y))
+
+
+def test_a_train_whose_stop_was_bulldozed_still_draws_runs_and_can_be_rerouted(
+    context: None,
+) -> None:
+    app = made_app()
+    game = app.view.game
+    game.build_station((10, 22))
+    game.lay_track((10, 16), (10, 22))
+    train = game.railway.trains[0]
+    train.stops.append(Stop((10, 22), [Good.PASSENGERS]))
+    app.view.station_window.station = (10, 16)
+    app.view.build.choose(Tool.NONE)
+    frame(app)
+    done = game.bulldoze((10, 16))
+    app.view.buildings_changed(done.changed)
+
+    for _ in range(3):
+        frame(app)
+    train.stops[0].add_car(Good.PASSENGERS)
+    train.cars_changed(0)
+    frame(app)
+    frames_until_the_month_is_done(app)
+    app.clock.advance(1.0)
+    frames_until_the_month_is_done(app)
+
+    assert done.ok
+    assert all(stop.cell != (10, 16) for stop in train.stops)

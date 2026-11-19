@@ -654,6 +654,114 @@ def potato_farm() -> Sprite:
     return p.sprite()
 
 
+def _paddy(p: Painter, x: float, y: float, half: float, water: RGB, shoot: RGB) -> None:
+    """A flooded rice paddy on the ground round (x, y), `half` across, inside a low earth bank,
+    with rows of green shoots standing in the water."""
+    bank = (128, 108, 70)
+    p.polygon(
+        [(x - half, y), (x, y + half / 2), (x + half, y), (x, y - half / 2)],
+        bank,
+        shade(bank, 0.7),
+    )
+    inner = half - 1.2
+    p.polygon([(x - inner, y), (x, y + inner / 2), (x + inner, y), (x, y - inner / 2)], water)
+    p.line([(x - inner + 1.5, y - 0.4), (x - 0.5, y - inner / 2 + 0.6)], shade(water, 1.25))
+    for row in range(-2, 3):
+        for k in range(-2, 3):
+            u, v = x + 1.6 * k + 1.6 * row, y + 0.8 * k - 0.8 * row
+            if abs(u - x) / inner + abs(v - y) / (inner / 2) < 0.8:
+                p.point(u, v - 1, shoot)
+                p.point(u, v, shade(shoot, 0.72))
+
+
+def rice_paddy() -> Sprite:
+    """A dark-timbered farmhouse under a steep, thick thatched roof, flooded paddies before and
+    beside it with rows of rice shoots in the water, and sheaves drying on a rack by its door."""
+    p = Painter(30, 26, (14, 17))
+    water = (112, 168, 196)
+    shoot = (112, 190, 70)
+    _paddy(p, -8, 4, 7, water, shoot)
+    _paddy(p, 6, 6.5, 6, water, shoot)
+    _paddy(p, -9, -3, 5, shade(water, 0.92), shoot)
+    p.shadow(7, 2.5)
+    wall = (112, 82, 58)
+    top = p.hall(3, -2, 9, 5, 4, wall, None)
+    left, front, right, _ = top
+    _footing(p, top, 4)
+    plaster = (226, 214, 186)
+    _patch(p, left, front, (0.1, 0.4), (0.8, 2.8), plaster)
+    _patch(p, left, front, (0.52, 0.8), (1.2, 4), (58, 42, 32))
+    _patch(p, front, right, (0.3, 0.7), (0.8, 2.4), shade(plaster, 0.78))
+    p.gable(top, 6, THATCH, wall)
+    _tiles(p, top, 6, THATCH, (0.3, 0.6))
+    ridge_back, ridge_front = (
+        ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 - 6) for a, b in ((left, top[3]), (front, right))
+    )
+    p.line([ridge_back, ridge_front], (70, 60, 48))
+    pole = (120, 84, 50)
+    p.line([(11, 1), (11, -3)], pole)
+    p.line([(15, 3), (15, -1)], pole)
+    p.line([(10.5, -3), (15.5, -1)], pole)
+    straw = (214, 186, 104)
+    for k in range(4):
+        x, y = 11.6 + 1.1 * k, -2.4 + 0.5 * k
+        p.line([(x, y), (x, y + 2.4)], straw if k % 2 else shade(straw, 0.82))
+    return p.sprite()
+
+
+def _farmhouse(p: Painter, x: float, y: float) -> Top:
+    """A small dark-timbered farmhouse of East Asia standing on (x, y), with plastered panels and
+    a door under a steep thatched roof."""
+    wall = (112, 82, 58)
+    top = p.hall(x, y, 8, 5, 4, wall, None)
+    left, front, right, _ = top
+    _footing(p, top, 4)
+    plaster = (226, 214, 186)
+    _patch(p, left, front, (0.1, 0.4), (0.8, 2.8), plaster)
+    _patch(p, left, front, (0.52, 0.8), (1.2, 4), (58, 42, 32))
+    _patch(p, front, right, (0.3, 0.7), (0.8, 2.4), shade(plaster, 0.78))
+    p.gable(top, 5, THATCH, wall)
+    _tiles(p, top, 5, THATCH, (0.35, 0.7))
+    return top
+
+
+def soy_field() -> Sprite:
+    """Rows of bushy soybean plants with pale pods behind a small thatched farmhouse, and sacks
+    of beans at its door."""
+    p = Painter(30, 24, (14, 16))
+    soil = (126, 100, 66)
+    p.polygon([(-13, 1), (-2, 6.5), (4, 3.5), (-7, -2)], soil, shade(soil, 0.7))
+    leaf = (92, 150, 58)
+    for row in range(4):
+        x0, y0 = -11.5 + 1.6 * row, 1 - 0.8 * row
+        for k in range(5):
+            x, y = x0 + 2 * k, y0 + k
+            p.blob(x - 1, y - 1.6, x + 1, y, leaf if (k + row) % 2 else shade(leaf, 1.15))
+            p.point(x, y - 0.6, (214, 206, 140))
+    p.shadow(7, 2.5)
+    _farmhouse(p, 5, -2)
+    for x, y in ((8, 4), (10.5, 3)):
+        _sack(p, x, y, (210, 190, 130), 3)
+    return p.sprite()
+
+
+def tea_plantation() -> Sprite:
+    """Rounded rows of clipped tea bushes on a slope, a picker's basket among them and a small
+    thatched drying house above."""
+    p = Painter(30, 24, (14, 16))
+    p.shadow(6, 2)
+    _farmhouse(p, 6, -5)
+    bush = (62, 128, 56)
+    for row in range(3):
+        x0, y0 = -13 + 2 * row, 0 + 1.6 * row
+        for k in range(4):
+            x, y = x0 + 3.2 * k, y0 + 1.6 * k - 1.2 * row
+            p.blob(x - 1.8, y - 2.2, x + 1.8, y + 0.4, bush)
+            p.blob(x - 1.2, y - 2.2, x + 0.6, y - 1.2, shade(bush, 1.3))
+    _basket(p, 3, 6, (120, 170, 80))
+    return p.sprite()
+
+
 def cattle_ranch() -> Sprite:
     """A boarded cattle barn on a plinth with cross-braced doors, a hayloft hatch and a tiled
     roof, a haystack, and a fenced paddock with a water trough and brown and black-and-white cows

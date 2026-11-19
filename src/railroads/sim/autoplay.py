@@ -149,12 +149,12 @@ class StandInPlayer:
         for kind in growth.owners.kinds():
             tree = tree_of(kind)
             sold = float((growth.owners.owned(kind) * served).sum()) * self._monthly_worth(kind)
-            earned = sold * growth.owners.share(kind) * growth.owners.output_factor(kind)
+            earned = sold * growth.owners.output_factor(kind)
             if earned <= 0:
                 continue
-            self.railway.finances.earn(earned, "owned buildings")
+            self.railway.finances.earn(earned, "cargo")
             if tree is not None:
-                self.railway.research.earn(tree, earned)
+                self.railway.learn(tree, earned)
 
     def _buy(self) -> None:
         """Buys the buildings in its stations' reach that would pay back soonest."""

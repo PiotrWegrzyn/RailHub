@@ -1,12 +1,20 @@
-"""The buildings the player owns (railroads.sim.growth keeps one Owners): how many of each kind in
-each cell, what buying one costs, and the share of what they sell that the player is paid.
+"""The shares of buildings the player owns (railroads.sim.growth keeps one Owners): how many of
+each kind in each cell, and what buying or selling them fetches.
 
-A building costs PAYBACK_YEARS of its owner's share at full output, OWNER_SHARE of what it sells,
-less what the player's tech takes off, down to MOST_DISCOUNT of the price; a power plant of any kind, which
-sells nothing but makes cheap electricity for the player's trains (railroads.sim.fuel_market),
-costs POWER_PLANT_PRICE. Tech in a building's
-tree can raise the share it pays and how many buildings' worth it makes. When buildings leave a
-cell, the player's go last.
+Every building is SHARES shares, bought and sold LOTS at a time. Holding CONTROL of the shares of
+the buildings of a kind in a cell gives the player control of them: only then do their production tech and the boosts only their
+own take (railroads.sim.goods.OWNED_BOOSTS) work on them, on the whole of them, and the player
+still takes their part of all they make; past that, more shares only raise that part. A building pays nothing of its own: the player's part of what it makes, by their shares, goes into the stations around it
+before anything is handed out, as if a train had brought it, so the stations hand it out to the
+buildings in their reach and it pays as a delivery does (railroads.sim.economy,
+railroads.sim.station_trade). A whole building costs PAYBACK_YEARS of all it makes at full
+output at full satisfaction, from two thirds of that with none to twice that at 200%
+(PRICE_BY_SATISFACTION), by how satisfied the buildings of its kind in its cell were over the
+last quarter (railroads.sim.ledger), less what the player's tech takes off, down to
+MOST_DISCOUNT of the price; shares sell at the price they buy at. A power plant of any kind,
+which makes cheap electricity for the player's trains (railroads.sim.fuel_market), costs
+POWER_PLANT_PRICE. Tech in a building's tree can raise how many buildings' worth it makes. When
+buildings leave a cell, the player's shares go last.
 """
 
 from collections.abc import Mapping
@@ -16,20 +24,38 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.economy import Trade
-from railroads.sim.goods import FITS, makes_of, price_of
+from railroads.sim.economy import OwnedShare
+from railroads.sim.goods import Need, makes_of, price_of
 from railroads.sim.grids import Cell
 from railroads.sim.ladders import IntGrid
-from railroads.sim.tech import SHOPS, Effect, Tree, tree_of
+from railroads.sim.tech import Effect, Tree, tree_of
 
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth
 
-# The player's share of what a building they own sells to their stations, and what it costs to
-# buy: this many years of that share at full output.
-OWNER_SHARE = 0.5
-PAYBACK_YEARS = 5
-# However much tech cuts the price of buildings, they cost at least this share of it.
+# Every building is SHARES shares, bought and sold LOT at a time: the player's shares of it are
+# their part of what it makes, which goes to the stations around before anything is handed out.
+SHARES = 1000
+LOT = 100
+# How many shares the player may buy or sell at once, LOT the fewest.
+LOTS = (100, 200, 600)
+# The part of the shares that gives control: a big flag over the buildings, and the player's tech
+# working on the whole of them.
+CONTROL = 0.6
+# What a whole building costs at full satisfaction: this many years of all it makes at full
+# output, at its goods' market prices, so its shares pay a tenth of their price back a year.
+PAYBACK_YEARS = 10
+# What a building's price is worth, times its price at full satisfaction, at each satisfaction
+# over the last quarter, in between in a straight line.
+PRICE_BY_SATISFACTION = ((0.0, 2 / 3), (1.0, 1.0), (2.0, 2.0))
+# Every whole building the player owns adds this much to the experience its tree gets from
+# deliveries for each of its points, and the shares of one their part of that.
+EXPERIENCE_PER_POINT = 0.01
+# Shares bought can be sold only this many months later, so they can't be flipped for quick gains.
+HOLD_MONTHS = 60
+# The name the player's company trades under, whose flag flies over the buildings it owns.
+COMPANY = "The Trains Corp"
+# However much tech cuts the price of shares, they cost at least this share of it.
 MOST_DISCOUNT = 0.5
 POWER_PLANT_PRICE = 2_000_000.0
 POWER_PLANTS = frozenset(
@@ -37,48 +63,71 @@ POWER_PLANTS = frozenset(
 )
 
 
+def satisfaction_price(satisfaction: float) -> float:
+    """How many times its price at full satisfaction a building costs at this satisfaction."""
+    points, factors = zip(*PRICE_BY_SATISFACTION, strict=True)
+    return float(np.interp(satisfaction, points, factors))
+
+
 class Owners:
     def __init__(self, growth: Growth) -> None:
         self._growth = growth
-        self._owned: dict[BuildingKind, IntGrid] = {}
-        # What each kind the player owns earned them last month.
-        self.income: dict[BuildingKind, float] = {}
+        self._shares: dict[BuildingKind, IntGrid] = {}
+        # Per kind and cell, the shares bought there and the month from which each lot may be sold.
+        self._held: dict[tuple[BuildingKind, Cell], list[tuple[int, int]]] = {}
+        self.company = COMPANY
 
-    def owned(self, kind: BuildingKind) -> IntGrid:
-        """How many buildings of a kind the player owns in each cell."""
-        return self._owned.get(kind, np.zeros(self._growth.grid.shape, dtype=np.int64))
+    def shares(self, kind: BuildingKind) -> IntGrid:
+        """How many shares of the buildings of a kind the player owns in each cell."""
+        return self._shares.get(kind, np.zeros(self._growth.grid.shape, dtype=np.int64))
 
-    def count(self) -> int:
-        """How many buildings the player owns in all."""
-        return sum(int(grid.sum()) for grid in self._owned.values())
+    def total(self, cell: Cell, kind: BuildingKind) -> int:
+        """How many shares the buildings of a kind in a cell are in all, SHARES for each."""
+        counts = self._growth.counts
+        return SHARES * int(counts[kind][cell]) if kind in counts else 0
+
+    def owned(self, kind: BuildingKind) -> npt.NDArray[np.float64]:
+        """How many buildings' worth of a kind the player owns in each cell, by their shares."""
+        return self.shares(kind) / SHARES
+
+    def count(self) -> float:
+        """How many buildings' worth the player owns in all."""
+        return sum(int(grid.sum()) for grid in self._shares.values()) / SHARES
+
+    def cells(self) -> list[Cell]:
+        """The cells where the player owns shares of any building."""
+        held = np.zeros(self._growth.grid.shape, dtype=bool)
+        for grid in self._shares.values():
+            held |= grid > 0
+        return [(int(row), int(col)) for row, col in np.argwhere(held)]
 
     def kinds(self) -> list[BuildingKind]:
-        """The kinds of building the player owns any of."""
-        return [kind for kind, grid in self._owned.items() if grid.any()]
-
-    def share(self, kind: BuildingKind) -> float:
-        """The player's share of what one building of a kind they own sells, with their tech."""
-        return OWNER_SHARE + self.boost(kind, Effect.SHARE)
+        """The kinds of building the player owns shares of."""
+        return [kind for kind, grid in self._shares.items() if grid.any()]
 
     def output_factor(self, kind: BuildingKind) -> float:
         """How many buildings' worth one of a kind the player owns makes, with their tech."""
         return 1.0 + self.boost(kind, Effect.PRODUCTION)
 
-    def own(self, cell: Cell, kind: BuildingKind) -> bool:
-        """Makes one more of the kind in the cell the player's, if any is left to own."""
-        grid = self._owned.setdefault(kind, np.zeros(self._growth.grid.shape, dtype=np.int64))
-        if grid[cell] >= self._growth.counts[kind][cell]:
-            return False
-        grid[cell] += 1
-        return True
+    def own(self, cell: Cell, kind: BuildingKind, shares: int = SHARES) -> int:
+        """Makes up to this many more shares of the kind in the cell the player's, as many as
+        are left to own; returns how many."""
+        grid = self._shares.setdefault(kind, np.zeros(self._growth.grid.shape, dtype=np.int64))
+        added = max(0, min(shares, SHARES * int(self._growth.counts[kind][cell]) - int(grid[cell])))
+        grid[cell] += added
+        return added
 
     def price_to_buy(self, kind: BuildingKind) -> float | None:
-        """What one building of a kind costs the player; None for what cannot be bought."""
+        """What a whole building of a kind costs at full satisfaction, with the player's tech;
+        None for what cannot be bought."""
         growth = self._growth
         if kind not in growth.counts:
             return None
         railway = growth.railway
-        discount = 0.0 if railway is None else railway.research.bonus(Effect.DISCOUNT)
+        tree = tree_of(kind)
+        discount = 0.0 if railway is None else railway.research.bonus(Effect.DISCOUNT, tree)
+        if tree is None and railway is not None:
+            discount = railway.research.bonus(Effect.DISCOUNT, Tree.COMMERCE)
         kept = max(MOST_DISCOUNT, 1.0 - discount)
         if kind in POWER_PLANTS:
             return POWER_PLANT_PRICE * kept
@@ -86,31 +135,112 @@ class Owners:
         if not makes:
             return None
         month = sum(amount * price_of(good) for good, amount in makes.items())
-        return 12 * PAYBACK_YEARS * OWNER_SHARE * month * kept
+        return 12 * PAYBACK_YEARS * month * kept
 
-    def buy(self, cell: Cell, kind: BuildingKind) -> str | None:
-        """Buys one building of a kind in a cell; why not, if it cannot be bought."""
-        price = self.price_to_buy(kind)
+    def lot_price(self, cell: Cell, kind: BuildingKind) -> float | None:
+        """What LOT shares of a building of a kind in a cell cost, or fetch, now: by how
+        satisfied the buildings of that kind there were over the last quarter, not the rest of
+        the cell; None for what cannot be bought."""
+        whole = self.price_to_buy(kind)
+        if whole is None:
+            return None
+        if kind in POWER_PLANTS:
+            return whole * LOT / SHARES
+        satisfaction = self._growth.ledger.satisfaction(kind, self._flat(cell))
+        return whole * LOT / SHARES * satisfaction_price(satisfaction)
+
+    def buy(self, cell: Cell, kind: BuildingKind, lot: int = LOT) -> str | None:
+        """Buys `lot` shares of a building of a kind in a cell; why not, if they cannot be
+        bought."""
+        price = self.lot_price(cell, kind)
         if price is None:
             return f"A {kind.value} cannot be bought"
-        if self.owned(kind)[cell] >= self._growth.counts[kind][cell]:
-            return f"You already own every {kind.value} here"
+        if self.shares(kind)[cell] + lot > self.total(cell, kind):
+            return f"There are not {lot} shares of the {kind.value}s here left to buy"
         railway = self._growth.railway
-        if railway is None or not railway.finances.pay(price, "buildings bought"):
+        if railway is None or not railway.finances.pay(price * lot / LOT, "shares bought"):
             return "Not enough cash"
-        self.own(cell, kind)
+        self.own(cell, kind, lot)
+        lots = self._held.setdefault((kind, cell), [])
+        lots.append((self._growth.months + HOLD_MONTHS, lot))
+        return None
+
+    def controls(self, cell: Cell, kind: BuildingKind) -> bool:
+        """Whether the player holds CONTROL of the shares of the buildings of a kind in a cell."""
+        total = self.total(cell, kind)
+        return total > 0 and int(self.shares(kind)[cell]) >= CONTROL * total
+
+    def controls_any(self, cell: Cell) -> bool:
+        """Whether the player controls the buildings of any kind in a cell."""
+        return any(self.controls(cell, kind) for kind in self.kinds())
+
+    def sellable(self, cell: Cell, kind: BuildingKind) -> int:
+        """How many of the player's shares of a kind in a cell they may sell now: all but those
+        bought less than HOLD_MONTHS ago."""
+        now = self._growth.months
+        locked = sum(shares for until, shares in self._held.get((kind, cell), ()) if until > now)
+        return max(0, int(self.shares(kind)[cell]) - locked)
+
+    def sellable_from(self, cell: Cell, kind: BuildingKind) -> int | None:
+        """The year the next of the player's shares of a kind in a cell they can't sell yet may
+        be sold; None if none are held back."""
+        now = self._growth.months
+        until = [until for until, _ in self._held.get((kind, cell), ()) if until > now]
+        if not until:
+            return None
+        return self._growth.start_year + min(until) // 12
+
+    def sell(self, cell: Cell, kind: BuildingKind, lot: int = LOT) -> str | None:
+        """Sells `lot` shares, or the last few, of a building of a kind in a cell at their price
+        now, of those bought at least HOLD_MONTHS ago; why not, if there are none to sell."""
+        held = int(self.shares(kind)[cell])
+        price = self.lot_price(cell, kind)
+        railway = self._growth.railway
+        if not held or price is None or railway is None:
+            return f"You own no shares of a {kind.value} here"
+        free = self.sellable(cell, kind)
+        if not free:
+            return f"These shares can be sold from {self.sellable_from(cell, kind)}"
+        sold = min(lot, free)
+        railway.finances.earn(price * sold / LOT, "shares sold")
+        self._shares[kind][cell] -= sold
         return None
 
     def lose(self, cell: Cell, kind: BuildingKind, gone: int) -> int:
-        """Counts `gone` buildings of a kind leaving a cell, the player's last; returns how
-        many of them the player owned."""
-        grid = self._owned.get(kind)
+        """Counts `gone` buildings of a kind leaving a cell, the player's shares last; returns
+        how many shares of them the player owned."""
+        grid = self._shares.get(kind)
         if grid is None or not grid[cell]:
             return 0
-        unowned = int(self._growth.counts[kind][cell] - grid[cell])
-        owned = max(0, gone - unowned)
-        grid[cell] -= owned
-        return owned
+        left = SHARES * max(0, int(self._growth.counts[kind][cell]) - gone)
+        lost = max(0, int(grid[cell]) - left)
+        grid[cell] -= lost
+        self._hold_at_most(cell, kind, int(grid[cell]))
+        return lost
+
+    def _hold_at_most(self, cell: Cell, kind: BuildingKind, shares: int) -> None:
+        """Lets the shares held back in a cell be no more than the player owns there, the newest
+        let go first."""
+        lots = self._held.get((kind, cell))
+        if not lots:
+            return
+        kept: list[tuple[int, int]] = []
+        for until, held in sorted(lots):
+            take = min(held, shares)
+            if take > 0:
+                kept.append((until, take))
+            shares -= take
+        self._held[(kind, cell)] = kept
+
+    def taking(self, kind: BuildingKind, need: Need) -> npt.NDArray[np.float64] | None:
+        """How many buildings of a kind take a boost only the player's own take, if their tech
+        opened it, in each cell as flat cells counted as they trade: all of them where the player
+        controls them, none elsewhere; None if the tech is not open."""
+        railway = self._growth.railway
+        grid = self._shares.get(kind)
+        if railway is None or grid is None or need not in railway.research.takes(kind):
+            return None
+        return self._controlled(kind, grid).ravel() * (1.0 + self.boost(kind, Effect.PRODUCTION))
 
     def boost(self, kind: BuildingKind, effect: Effect) -> float:
         """What the player's tech adds, of one effect, to the buildings of a kind they own."""
@@ -121,48 +251,54 @@ class Owners:
         return railway.research.bonus(effect, tree)
 
     def working_counts(self) -> Mapping[BuildingKind, npt.NDArray[np.int64 | np.float64]]:
-        """The buildings as they trade: each the player owns counts as more than one, by what
-        their production tech adds."""
+        """The buildings as they trade: those the player controls count as more, by what their
+        production tech adds."""
         counts_now = self._growth.counts
-        if not self._owned:
+        if not self._shares:
             return counts_now
         counts: dict[BuildingKind, npt.NDArray[np.int64 | np.float64]] = dict(counts_now)
-        for kind, grid in self._owned.items():
+        for kind, grid in self._shares.items():
             boost = self.boost(kind, Effect.PRODUCTION)
             if boost and grid.any():
-                counts[kind] = counts_now[kind] + boost * grid
+                counts[kind] = counts_now[kind] + boost * self._controlled(kind, grid)
         return counts
 
-    def pay(self, trade: Trade) -> None:
-        """Pays the player their share of what the buildings they own sold this month, which
-        is also experience in their trees, and counts what shops around the player's stations
-        took as commerce experience."""
-        self.income = {}
+    def _controlled(self, kind: BuildingKind, grid: IntGrid) -> npt.NDArray[np.float64]:
+        """How many buildings of a kind in each cell the player controls: all there, or none."""
+        counts = self._growth.counts[kind]
+        controlled = (counts > 0) & (grid >= CONTROL * SHARES * counts)
+        return np.where(controlled, counts, 0).astype(np.float64)
+
+    def first_for_stations(self) -> dict[BuildingKind, OwnedShare]:
+        """Per kind the player owns shares of, how many buildings' worth they own in each cell,
+        as they trade: all they make goes to the stations around before anything is handed
+        out. And the boosts only their own take that their tech opened."""
         railway = self._growth.railway
-        if railway is None:
-            return
-        research = railway.research
-        counts = self._growth.counts
-        for (kind, good), (given, _) in trade.goods_gave.items():
-            grid = self._owned.get(kind)
-            if grid is None:
+        shares: dict[BuildingKind, OwnedShare] = {}
+        for kind, grid in self._shares.items():
+            if not grid.any():
                 continue
-            owned = grid.ravel()[trade.cells].astype(np.float64)
-            if not owned.any():
-                continue
-            boost = self.boost(kind, Effect.PRODUCTION)
-            count = counts[kind].ravel()[trade.cells] + boost * owned
-            theirs = owned * (1.0 + boost) / np.maximum(count, 1.0)
-            share = OWNER_SHARE + self.boost(kind, Effect.SHARE)
-            earned = float((given * theirs).sum()) * price_of(good) * share
-            self.income[kind] = self.income.get(kind, 0.0) + earned
-        for kind, earned in self.income.items():
-            tree = tree_of(kind)
-            if tree is not None:
-                research.earn(tree, earned)
-        total = sum(self.income.values())
-        if total > 0:
-            railway.finances.earn(total, "owned buildings")
-        for (kind, need), (got, _) in trade.goods_got.items():
-            if kind in SHOPS:
-                research.earn(Tree.COMMERCE, float(got.sum()) * price_of(FITS[need][0]))
+            controlled = self._controlled(kind, grid).ravel()
+            more = 1.0 + self.boost(kind, Effect.PRODUCTION)
+            shares[kind] = OwnedShare(
+                grid.ravel() / SHARES * np.where(controlled > 0, more, 1.0),
+                1.0,
+                frozenset() if railway is None else railway.research.takes(kind),
+                controlled * more,
+            )
+        return shares
+
+    def experience_factor(self, tree: Tree) -> float:
+        """How many times what deliveries earn a tree gets as experience: once, and
+        EXPERIENCE_PER_POINT more for each point of the buildings of that tree the player owns,
+        by their shares."""
+        points = self._growth.rule.points
+        owned = sum(
+            points[kind][1] * int(grid.sum()) / SHARES
+            for kind, grid in self._shares.items()
+            if kind in points and tree_of(kind) == tree
+        )
+        return 1.0 + EXPERIENCE_PER_POINT * owned
+
+    def _flat(self, cell: Cell) -> int:
+        return int(np.ravel_multi_index(cell, self._growth.grid.shape))

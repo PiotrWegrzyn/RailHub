@@ -1,13 +1,13 @@
 """Making room on the map (railroads.sim.growth keeps one Room): clearing a cell for track, a
-station or a merged works, putting up a building that found no room in its own cell nearby,
-housing people a skyscraper pulled their flats down on, and putting up again the player's
-buildings that growth pulled down.
+station or a merged works, putting up a building that found no room in its own cell nearby, and
+housing people a skyscraper pulled their flats down on. A building cleared away comes down and
+never moves to another cell, the player's too, with their shares in it.
 
 A building that comes up in a cell goes up in it or a cell next to it, picked at random by how
 well their land suits it (scatter). One that finds no room there goes up in the nearest cell
 within SPILL_STEPS that has the room and land for it and that its ladder's caps allow, chosen
 among cells equally near at random by how well their land suits it. People rehoused go into the nearest cells within
-HOMES_STEPS with room, and the player's buildings go up again within RELOCATE_STEPS.
+HOMES_STEPS with room.
 """
 
 from collections.abc import Mapping
@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     from railroads.sim.growth import Growth
 
 HOMES_STEPS = 6
-RELOCATE_STEPS = 12
 SPILL_STEPS = 3
 
 
@@ -41,11 +40,11 @@ class Room:
     def __init__(self, growth: Growth) -> None:
         self._growth = growth
 
-    def clear(self, cell: Cell, units: int, avoid: frozenset[Cell] = frozenset()) -> set[Cell]:
+    def clear(self, cell: Cell, units: int) -> set[Cell]:
         """Makes `units` of room in the cell for track, a station or a merged works, the smallest
-        buildings first (railroads.sim.demolition prices them in the same order): each moves to a
-        cell next to it with room for it (never into `avoid`) if it can, and otherwise comes down.
-        Returns the cells whose buildings changed."""
+        buildings first (railroads.sim.demolition prices them in the same order): each comes
+        down, the player's shares in it with it; a building never moves to another cell. Returns
+        the cells whose buildings changed."""
         growth = self._growth
         constructions = growth.constructions
         changed: set[Cell] = set()
@@ -53,53 +52,9 @@ class Room:
             here = constructions.buildings_at(cell)
             if not here:
                 break
-            victim = leaving_order(here, growth.rule.points)[0]
-            target = self._beside(victim, avoid | {cell})
-            owned = growth.take_down(victim)
+            growth.take_down(leaving_order(here, growth.rule.points)[0])
             changed.add(cell)
-            if target is not None:
-                constructions.build(Building(target, victim.kind))
-                if victim.kind in growth.counts:
-                    growth.add(target, victim.kind, 1)
-                if owned:
-                    growth.owners.own(target, victim.kind)
-                changed.add(target)
-            elif owned:
-                changed |= self.relocate(victim)
         return changed
-
-    def _beside(self, building: Building, avoid: frozenset[Cell]) -> Cell | None:
-        """The cell next to the building's with the most room that would take it, if any."""
-        constructions = self._growth.constructions
-        options = [
-            near
-            for near in self._growth.grid.neighbours(*building.cell)
-            if near not in avoid and constructions.why_not(Building(near, building.kind)) is None
-        ]
-        return max(options, key=constructions.space_left, default=None)
-
-    def relocate(self, building: Building) -> set[Cell]:
-        """Puts up again, as the player's, a building of theirs that growth pulled down: in the
-        nearest cell with room and the land its ladder grows on."""
-        growth = self._growth
-        constructions, grid = growth.constructions, growth.grid
-        ladder = next((ld for ld in growth.rule.ladders if building.kind in ld.kinds), None)
-        reached = grid.within(building.cell, RELOCATE_STEPS)
-        for near, _ in sorted(reached.items(), key=lambda item: item[1]):
-            if near == building.cell:
-                continue
-            moved = Building(near, building.kind)
-            if constructions.why_not(moved) is not None:
-                continue
-            if ladder is not None:
-                flat = np.array([np.ravel_multi_index(near, grid.shape)])
-                land = growth.land(ladder.land, flat)
-                if land[0] <= 0:
-                    continue
-            growth.build(moved)
-            growth.owners.own(near, building.kind)
-            return {near}
-        return set()
 
     def scatter(self, cell: Cell, ladder: Ladder, rng: np.random.Generator) -> set[Cell]:
         """Puts up the ladder's first kind that came up in this cell in it or a cell next to

@@ -6,6 +6,7 @@ railroads.ui.pixel).
 from functools import cache
 
 import numpy as np
+import numpy.typing as npt
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import MERGED, BuildingKind
@@ -89,6 +90,9 @@ DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.LIMESTONE_QUARRY: ((214, 210, 192), 0.12),
     BuildingKind.SAND_PIT: ((236, 214, 140), 0.12),
     BuildingKind.POTATO_FARM: ((176, 146, 90), 0.12),
+    BuildingKind.RICE_PADDY: ((122, 196, 92), 0.12),
+    BuildingKind.SOY_FIELD: ((150, 170, 80), 0.12),
+    BuildingKind.TEA_PLANTATION: ((60, 130, 60), 0.12),
     BuildingKind.CATTLE_RANCH: ((140, 96, 60), 0.12),
     BuildingKind.PIG_FARM: ((226, 160, 156), 0.12),
     BuildingKind.CHICKEN_FARM: ((236, 224, 196), 0.12),
@@ -100,6 +104,11 @@ DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.GLASSWORKS: ((150, 220, 234), 0.14),
     BuildingKind.BREWERY: ((226, 170, 60), 0.14),
     BuildingKind.DISTILLERY: ((220, 226, 236), 0.14),
+    BuildingKind.SAKE_BREWERY: ((236, 232, 214), 0.14),
+    BuildingKind.SOY_SAUCE_BREWERY: ((80, 50, 36), 0.14),
+    BuildingKind.TOFU_MAKER: ((244, 242, 232), 0.1),
+    BuildingKind.MISO_MAKER: ((176, 120, 60), 0.1),
+    BuildingKind.FISH_DRYER: ((176, 190, 200), 0.1),
     BuildingKind.TANNERY: ((150, 96, 56), 0.14),
     BuildingKind.SHOE_FACTORY: ((96, 62, 44), 0.14),
     BuildingKind.PLASTICS_WORKS: ((234, 96, 108), 0.16),
@@ -123,6 +132,7 @@ DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.OLYMPIC_STADIUM: ((220, 90, 70), 0.3),
     BuildingKind.TAVERN: ((196, 130, 56), 0.1),
     BuildingKind.CLUB: ((150, 60, 130), 0.12),
+    BuildingKind.SUSHI_HUT: ((214, 64, 52), 0.1),
     BuildingKind.FILLING_STATION: ((230, 200, 60), 0.12),
     BuildingKind.DEPARTMENT_STORE: ((232, 200, 110), 0.16),
     BuildingKind.HOTEL: ((200, 70, 90), 0.16),
@@ -163,6 +173,14 @@ def draw_building_dots(
         draw_list.add_rect_filled(
             (xs[i] - half, ys[i] - half), (xs[i] + half, ys[i] + half), _color(color)
         )
+
+
+def dot_looks(spots: BuildingSpots) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.uint8]]:
+    """Each building's dot size in cells and its RGBA colour, as draw_building_dots draws it."""
+    looks = [DOTS[kind] for kind in spots.kinds]
+    radii = np.array([radius for _, radius in looks], dtype=np.float64)
+    colours = np.array([(*rgb, 255) for rgb, _ in looks], dtype=np.uint8).reshape(-1, 4)
+    return radii, colours
 
 
 @cache

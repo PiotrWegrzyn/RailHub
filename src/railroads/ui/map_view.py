@@ -3,21 +3,25 @@ buildings as dots on top; close up, it is pixel art (see railroads.ui.pixel). Th
 compass and the minimap go over both."""
 
 import math
-from dataclasses import dataclass
+from enum import Enum
 from functools import cache
 
 import numpy as np
+import numpy.typing as npt
 from imgui_bundle import hello_imgui, imgui
+from imgui_bundle import icons_fontawesome_4 as fa
 
 from railroads import maps
 from railroads.mapgen.world import WorldLand
 from railroads.sim.constructions import (
+    BuildingKind,
     Constructions,
     Station,
 )
+from railroads.sim.economy import Trade
 from railroads.sim.game import Game
 from railroads.sim.geo import Coord
-from railroads.sim.grids import Cell, GridKind
+from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
 from railroads.sim.steps import Steps, finish
@@ -27,32 +31,46 @@ from railroads.ui.build_menu import (
     Tool,
     draw_station_reach,
     draw_track,
-    draw_trains,
 )
 from railroads.ui.building_spots import BuildingSpots
-from railroads.ui.buildings import draw_building_dots
+from railroads.ui.buildings import dot_looks, draw_building_dots
 from railroads.ui.ground import GroundLayout, GroundPictures, Pixels, cell_colors
-from railroads.ui.hex_details import draw_hex_details, recently_described
-from railroads.ui.iso_camera import IsoCamera, Vec2
+from railroads.ui.hex_details import HexDetails, draw_hex_details, draw_shares, recently_described
+from railroads.ui.iso_camera import LOOKS, IsoCamera, Vec2
+from railroads.ui.land_offers import LandOffers
 from railroads.ui.map_input import MapInput
 from railroads.ui.map_overlays import (
+    MOODS_LEGEND,
     SELECTED_COLOR,
+    TOWNS_LEGEND,
+    consumers_in_reach,
     draw_compass,
     draw_found,
     draw_found_on_overview,
     draw_grid_lines,
+    draw_hand_out,
     draw_hovered_buildings,
+    draw_moods,
     draw_outline,
+    draw_owned_flags,
     draw_station_names,
     draw_status,
+    least_satisfied,
+    mood_tint,
     status_text,
+    tint_colours,
+    town_cells,
     visible_area,
 )
 from railroads.ui.map_tools import MapTools
-from railroads.ui.minimap import Minimap, MinimapLayout, view_corners
+from railroads.ui.minimap import FRAME_PAD, Minimap, MinimapLayout, view_corners
+from railroads.ui.ornate import DEEP, bar_buttons, frame_window, keep_in_front, ornate_window
+from railroads.ui.pixel.dots_shader import DotShader, dot_vertices
 from railroads.ui.pixel.ground import GLOW, glow_strength
 from railroads.ui.pixel.ground_shader import (
     GroundShader,
+    Screen,
+    View,
     cell_info,
     free_textures,
     screen_of,
@@ -66,37 +84,31 @@ from railroads.ui.pixel.train_layer import TrainLayer, engine_picture
 from railroads.ui.pixel.world import PixelWorld
 from railroads.ui.route_map import soften, soften_steps
 from railroads.ui.search import BuildingSearch
+from railroads.ui.spotlight import pulsing_brass, spot
 from railroads.ui.station_window import StationWindow
 from railroads.ui.summaries_panel import SummariesPanel
-from railroads.ui.theme import BRASS, SIDE_WINDOW_POS, rgba_u32
+from railroads.ui.theme import BRASS, OVERLAY_FLAGS, SIDE_WINDOW_POS, rgba_u32, toggle_button
 
 BACKGROUND_COLOR = (0.08, 0.09, 0.11, 1.0)
-DETAILS_SIZE = (680.0, 340.0)
+DETAILS_SIZE = (460.0, 420.0)
+SHARES_SIZE = (400.0, 400.0)
 # Stepping to a building found zooms in at least this far, so it can be seen.
 VISIT_ZOOM = 4
 # Slopes are lit from the top-left of the screen.
 LIGHT_ON_SCREEN = (-1.0, -1.0)
 # Population points a cell needs to show as a town on the minimap.
 MINIMAP_TOWN_POINTS = 12
+# How far above the minimap, or the map's corner without one, the lens buttons sit.
+LENS_GAP = 8.0
+# How thick the outline is round a cell the tutorial wants clicked.
+SPOT_WIDTH = 4.0
 
 
-@dataclass(frozen=True)
-class GridLook:
-    """How a grid sits on screen. Squares are diamonds with north at the top-left, like RT2;
-    hexagons have north up."""
+class Lens(Enum):
+    """What the map can be tinted by: how satisfied buildings are, or which town they are in."""
 
-    angle_deg: float
-    cell_units: float
-    # Cell widths in pixels from which the grid shows: first baked into the ground picture, while
-    # there are too many cells to outline one by one, then as sharp lines drawn on top.
-    baked_lines_from: int | None
-    drawn_lines_from: int
-
-
-LOOKS: dict[GridKind, GridLook] = {
-    "square": GridLook(-45.0, math.sqrt(2), baked_lines_from=None, drawn_lines_from=16),
-    "hex": GridLook(0.0, 1.0, baked_lines_from=8, drawn_lines_from=24),
-}
+    SATISFACTION = "satisfaction"
+    TOWNS = "towns"
 
 
 @cache
@@ -169,15 +181,34 @@ class MapView:
         self._shader: GroundShader | None = None
         self._shader_tried = False
         self._colors_version = 0
+        # The shader drawing the building dots zoomed out, once tried.
+        self._dots: DotShader | None = None
+        self._dots_tried = False
         self.hovered: Cell | None = None
         # The art pixel last looked up under the mouse and the ground point showing there, as the
         # mouse often rests while frames go on.
         self._under: tuple[tuple[float, float], tuple[float, float]] | None = None
         # The cell whose details are open, picked by clicking without dragging.
         self.selected: Cell | None = None
+        # The buildings that take what the selected cell makes, and the cell, buildings and year
+        # they were found for.
+        self._consumers: tuple[tuple[Cell, int, int], tuple[Cell, ...]] | None = None
+        # The cells Shift tints by how satisfied their buildings are, their packed colours, and
+        # the month's trade and buildings they were worked out for.
+        self._moods: tuple[tuple[Trade | None, int], npt.NDArray[np.intp], list[int]] | None = None
+        # The lens turned on above the minimap, if any, and the town tints with the buildings
+        # they were worked out for.
+        self.lens: Lens | None = None
+        self._towns: tuple[int, npt.NDArray[np.intp], list[int]] | None = None
+        # The top of the minimap on screen, which the lens buttons sit above.
+        self._minimap_top: float | None = None
+        # The left and right of the map the lens buttons sit over, if one is shown.
+        self._minimap_span: tuple[float, float] | None = None
         self.build = BuildMenu()
-        # What came of the last Buy pressed in the hex details.
+        # What came of the last Buy or Sell pressed in the shares window, and the kind of building
+        # in the selected cell whose shares it shows, if open.
         self._bought = ""
+        self.shares_of: tuple[Cell, BuildingKind] | None = None
         # The station levels the map shows, to redraw stations raised since.
         self._shown_levels: dict[Cell, int] = dict(self.railway.levels)
         # What the build tools do with clicks, and the mouse and keys (railroads.ui.map_tools,
@@ -188,6 +219,10 @@ class MapView:
         self.summaries = SummariesPanel()
         self.station_window = StationWindow()
         self.search = BuildingSearch()
+        # The land around the map the player can buy (railroads.ui.land_offers).
+        self.land = LandOffers()
+        # The cells the tutorial wants clicked, marked on the map (railroads.ui.spotlight).
+        self.spotlit: list[Cell] = []
 
     @property
     def tile_map(self) -> TileMap:
@@ -219,7 +254,9 @@ class MapView:
         self._draw_map()
         self._draw_details()
         self.build.maglev_open = self.railway.maglev_open
+        self.build.electric_open = self.railway.electric_open
         self.build.draw(*self._map_rect)
+        self._draw_lenses()
         self.build.trains.draw(
             self.railway,
             self.growth.station_trade.supplies,
@@ -237,6 +274,7 @@ class MapView:
         )
         self.summaries.draw(*self._map_rect, self.look_at, self.railway.name_of)
         self.search.draw(self.growth, self.visit, self._view_center)
+        self.land.confirm(self.game.lots, self.game.finances)
 
     def _view_center(self) -> Vec2:
         return self.camera.center_x, self.camera.center_y
@@ -280,19 +318,53 @@ class MapView:
             return
         imgui.set_next_window_pos(SIDE_WINDOW_POS, imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size(DETAILS_SIZE, imgui.Cond_.first_use_ever.value)
-        expanded, still_open = imgui.begin("Hex details", True)
-        if expanded:
-            details = recently_described(self.growth, self.selected, self._satisfaction)
-            bought = draw_hex_details(details)
-            if bought is not None:
-                self._bought = (
-                    self.growth.owners.buy(self.selected, bought) or f"You own a {bought.value}"
-                )
-            if self._bought:
-                imgui.text_disabled(self._bought)
-        imgui.end()
+        details = recently_described(self.growth, self.selected, self._satisfaction)
+        with ornate_window("Hex details", "details") as (expanded, still_open):
+            keep_in_front()
+            if expanded:
+                pressed = draw_hex_details(details)
+                if pressed is not None:
+                    self.shares_of = (self.selected, pressed)
+                    self._bought = ""
         if not still_open:
             self.selected = None
+            self.shares_of = None
+            self._bought = ""
+            return
+        self._draw_shares(details)
+
+    def _draw_shares(self, details: HexDetails) -> None:
+        """The shares window of the kind of building in the selected cell whose Shares button
+        was pressed, beside the details."""
+        cell = self.selected
+        if self.shares_of is None or self.shares_of[0] != cell:
+            self.shares_of = None
+            return
+        row = next((r for r in details.buildings if r.kind == self.shares_of[1]), None)
+        if cell is None or row is None or row.kind is None:
+            self.shares_of = None
+            return
+        imgui.set_next_window_pos(
+            (SIDE_WINDOW_POS[0] + DETAILS_SIZE[0] + 8, SIDE_WINDOW_POS[1]),
+            imgui.Cond_.first_use_ever.value,
+        )
+        imgui.set_next_window_size(SHARES_SIZE, imgui.Cond_.first_use_ever.value)
+        with ornate_window("Shares", "shares") as (expanded, still_open):
+            keep_in_front()
+            if expanded:
+                pressed = draw_shares(row, f"{cell[0]}, {cell[1]}")
+                if pressed is not None:
+                    owners = self.growth.owners
+                    kind = row.kind
+                    buying, lot = pressed
+                    trade = owners.buy if buying else owners.sell
+                    said = trade(cell, kind, lot)
+                    held = int(owners.shares(kind)[cell])
+                    self._bought = said or f"You own {held:,} shares of the {kind.value}s here"
+                if self._bought:
+                    imgui.text_disabled(self._bought)
+        if not still_open:
+            self.shares_of = None
             self._bought = ""
 
     def month_passed(self, rng: np.random.Generator, date: str = "") -> None:
@@ -333,7 +405,7 @@ class MapView:
             self.search.refresh(self.growth)
         if self._pixels is not None:
             yield
-            chunks = self._pixels.world.buildings_changed(changed)
+            chunks = yield from self._pixels.world.buildings_changed_steps(changed)
             # Copies of the world painting elsewhere hear of the change on a frame of its own;
             # asking for the changed chunks on this one would add that to it.
             yield
@@ -439,6 +511,9 @@ class MapView:
             if shown or world_shown
             else None
         )
+        under = None if minimap is None else minimap.overview or minimap.world
+        self._minimap_top = None if under is None else under.top
+        self._minimap_span = None if under is None else (under.left, under.right)
         self.input.handle_mouse(center, minimap)
 
         draw_list = imgui.get_window_draw_list()
@@ -451,6 +526,7 @@ class MapView:
             layer = self._pixel_layer()
             layer.over_ground = shaded
             layer.blow_up = self._shader.blow_up if shaded and self._shader is not None else None
+            layer.dress = self._shader.dress if shaded and self._shader is not None else None
             ready = layer.draw(
                 draw_list, self.camera, center, (top_left, bottom_right), ground_below=shaded
             )
@@ -459,12 +535,18 @@ class MapView:
                 hello_imgui.request_refresh()
         else:
             self._draw_smooth_map(draw_list, center, top_left, bottom_right)
+        lots = self.game.lots
+        if lots is not None:
+            world = self.minimap.world_texture()
+            cash = self.game.finances.cash
+            self.land.draw(draw_list, self.camera, center, self.tile_map, lots, world, cash)
         if self.camera.pixel_scale:
             if self.railway.trains:
                 self._train_layer().draw(draw_list, self.railway, self.camera, center)
         else:
             draw_track(draw_list, self.constructions, self.camera, center)
-            draw_trains(draw_list, self.railway, self.camera, center)
+            if self.railway.trains:
+                self._train_layer().draw(draw_list, self.railway, self.camera, center)
         if self.build.preview is not None:
             if self.camera.pixel_scale:
                 self._track_preview().draw(draw_list, self.build.preview, self.camera, center)
@@ -473,6 +555,19 @@ class MapView:
                     draw_list, self.constructions, self.camera, center, self.build.preview.pieces
                 )
         marks = self._marks_camera()
+        tints = (
+            self._mood_tints()
+            if self._showing_moods()
+            else self._town_tints()
+            if self.lens == Lens.TOWNS
+            else None
+        )
+        if tints is not None and not self._draw_shaded_tints(
+            draw_list, center, top_left, bottom_right, *tints
+        ):
+            draw_moods(
+                draw_list, marks, self.tile_map.grid, center, (top_left, bottom_right), *tints
+            )
         if self.build.track_from is not None:
             draw_outline(
                 draw_list,
@@ -520,14 +615,26 @@ class MapView:
                 self.constructions.platforms,
             )
         if self.selected is not None:
+            consumers = self._consumers_of(self.selected)
+            if consumers:
+                draw_hand_out(
+                    draw_list, marks, self.tile_map.grid, center, self.selected, consumers
+                )
             draw_outline(
                 draw_list, marks, self.tile_map.grid, center, self.selected, SELECTED_COLOR
             )
         for cell in self.summaries.outlined():
             draw_outline(draw_list, marks, self.tile_map.grid, center, cell, BRASS)
+        for cell in self.spotlit:
+            draw_outline(
+                draw_list, marks, self.tile_map.grid, center, cell, pulsing_brass(), SPOT_WIDTH
+            )
+        if self.spotlit:
+            hello_imgui.request_refresh()
         draw_found(
             draw_list, marks, self.tile_map.grid, self.search, center, top_left, bottom_right
         )
+        draw_owned_flags(draw_list, marks, self.tile_map.grid, self.growth.owners, center)
         draw_station_names(draw_list, marks, self.tile_map.grid, self.railway, center)
         draw_compass(draw_list, self.camera, (bottom_right[0] - 36, top_left[1] + 36))
         self._draw_status(draw_list, top_left, bottom_right)
@@ -550,7 +657,129 @@ class MapView:
         if drawn_lines:
             visible = visible_area(self.camera, center, top_left, bottom_right)
             draw_grid_lines(draw_list, self.camera, self.tile_map.grid, center, visible)
-        draw_building_dots(draw_list, self.camera, center, (top_left, bottom_right), self._spots)
+        if not self._draw_shaded_dots(draw_list, center, top_left, bottom_right):
+            clip = (top_left, bottom_right)
+            draw_building_dots(draw_list, self.camera, center, clip, self._spots)
+
+    def _draw_shaded_dots(
+        self, draw_list: imgui.ImDrawList, center: Vec2, top_left: Vec2, bottom_right: Vec2
+    ) -> bool:
+        """Draws the building dots with the graphics card, if it can here, into a texture laid
+        on whole device pixels; returns whether it did."""
+        shader = self._dot_shader()
+        if shader is None:
+            return False
+        spots = self._spots
+        if shader.dots_version is not spots:
+            shader.set_dots(dot_vertices(spots.x, spots.y, *dot_looks(spots)), spots)
+        density = imgui.get_io().display_framebuffer_scale.x
+        left, top = math.floor(top_left[0] * density), math.floor(top_left[1] * density)
+        right = math.ceil(bottom_right[0] * density)
+        bottom = math.ceil(bottom_right[1] * density)
+        corner = (left / density, top / density)
+        e, f = self.camera.to_screen(0.0, 0.0, center)
+        a, c = self.camera.to_screen(1.0, 0.0, center)
+        b, d = self.camera.to_screen(0.0, 1.0, center)
+        to_screen = (a - e, b - e, c - f, d - f, e - corner[0], f - corner[1])
+        unit = self.camera.cell_width / self.camera.cell_units
+        texture = shader.draw((right - left, bottom - top), density, to_screen, unit)
+        draw_list.add_image(
+            imgui.ImTextureRef(texture), corner, (right / density, bottom / density)
+        )
+        return True
+
+    def _consumers_of(self, cell: Cell) -> tuple[Cell, ...]:
+        """consumers_in_reach of the cell, found again only once its buildings or the year
+        changed: the hex details are drawn every frame."""
+        key = (cell, self.constructions.version, self.growth.year)
+        if self._consumers is None or self._consumers[0] != key:
+            self._consumers = key, consumers_in_reach(self.constructions, cell, self.growth.year)
+        return self._consumers[1]
+
+    def _draw_lenses(self) -> None:
+        """Buttons over the bottom-right corner of the map, above the minimap, that turn a lens
+        on or off: one at a time."""
+        _, (right, bottom) = self._map_rect
+        top = self._minimap_top if self._minimap_top is not None else bottom
+        flags = OVERLAY_FLAGS | imgui.WindowFlags_.no_move.value
+        if self._minimap_span is None:
+            imgui.set_next_window_pos(
+                (right - LENS_GAP, top - LENS_GAP), imgui.Cond_.always.value, (1.0, 1.0)
+            )
+        else:
+            left, edge = self._minimap_span
+            imgui.set_next_window_pos(
+                (edge + FRAME_PAD, top - FRAME_PAD - LENS_GAP),
+                imgui.Cond_.always.value,
+                (1.0, 1.0),
+            )
+            height = imgui.get_frame_height() + 2 * imgui.get_style().window_padding.y
+            imgui.set_next_window_size((edge - left + 2 * FRAME_PAD, height))
+            flags &= ~imgui.WindowFlags_.always_auto_resize.value
+        imgui.push_style_color(imgui.Col_.window_bg, imgui.ImVec4(*DEEP))
+        imgui.push_style_color(imgui.Col_.border, imgui.ImVec4(0, 0, 0, 0))
+        imgui.begin("##lenses", flags=flags)
+        imgui.pop_style_color(2)
+        frame_window()
+        with bar_buttons():
+            self._draw_lens_buttons(self._minimap_span is not None)
+        imgui.end()
+
+    def _draw_lens_buttons(self, fill: bool) -> None:
+        """The lens buttons side by side, sharing the window's width between them if `fill`, and
+        showing only their icons where their names would not fit."""
+        spacing = imgui.get_style().item_spacing.x
+        width = (imgui.get_content_region_avail().x - spacing) / 2 if fill else 0.0
+        buttons = (
+            (
+                Lens.SATISFACTION,
+                fa.ICON_FA_SMILE,
+                "Satisfaction",
+                "Tint the land by how satisfied its buildings are (or hold Shift)",
+            ),
+            (
+                Lens.TOWNS,
+                fa.ICON_FA_USERS,
+                "Towns",
+                "Tint the land by town; passengers and mail only travel between towns",
+            ),
+        )
+        padding = 2 * imgui.get_style().frame_padding.x
+        named = all(
+            imgui.calc_text_size(f"{icon}  {name}").x + padding <= width or not fill
+            for _, icon, name, _ in buttons
+        )
+        for lens, icon, name, tooltip in buttons:
+            label = f"{icon}  {name}" if named else icon
+            if not named:
+                tooltip = f"{name}: {tooltip}"
+            if lens != Lens.SATISFACTION:
+                imgui.same_line()
+            if toggle_button(label, self.lens == lens, tooltip, (width, 0)):
+                self.lens = None if self.lens == lens else lens
+            spot(f"lens:{lens.value}")
+
+    def _showing_moods(self) -> bool:
+        """Whether the satisfaction lens is on, or Shift is held for it, not while typing."""
+        io = imgui.get_io()
+        return self.lens == Lens.SATISFACTION or (io.key_shift and not io.want_text_input)
+
+    def _town_tints(self) -> tuple[npt.NDArray[np.intp], list[int]]:
+        """town_cells, worked out again only once the buildings changed."""
+        version = self.constructions.version
+        if self._towns is None or self._towns[0] != version:
+            self._towns = (version, *town_cells(self.growth.towns))
+        return self._towns[1], self._towns[2]
+
+    def _mood_tints(self) -> tuple[npt.NDArray[np.intp], list[int]]:
+        """least_satisfied's cells and their tints, worked out again only once the month's trade
+        or the buildings changed."""
+        key = (self.growth.trade, self.constructions.version)
+        if self._moods is None or self._moods[0][0] is not key[0] or self._moods[0][1] != key[1]:
+            cells, shares = least_satisfied(self.growth.trade, self.growth.assumed_shares)
+            colors = [rgba_u32(mood_tint(share)) for share in shares.tolist()]
+            self._moods = key, cells, colors
+        return self._moods[1], self._moods[2]
 
     def _marks_camera(self) -> IsoCamera | OnGround:
         """The camera marks on the map are drawn with: lifted onto raised ground in pixel art."""
@@ -582,6 +811,10 @@ class MapView:
             self.hovered,
             over_minimap,
         )
+        if self._showing_moods():
+            text = f"{text} {MOODS_LEGEND}"
+        elif self.lens == Lens.TOWNS:
+            text = f"{text} {TOWNS_LEGEND}"
         below = draw_status(draw_list, top_left, bottom_right, text)
         if self.hovered is not None and not over_minimap:
             draw_hovered_buildings(self.growth, self.hovered, below, self._satisfaction)
@@ -687,10 +920,27 @@ class MapView:
                 self.tile_map.deposits,
                 ground.hills,
                 glow_strength(ground.satisfaction),
+                ground.mountains,
+                ground.streams,
             )
             shader.set_cells(info, self._colors_version)
-        projection = world.projection
-        camera_pixel = projection.to_pixels(self.camera.center_x, self.camera.center_y)
+        if shader.surfaces_version != self._colors_version:
+            shader.set_surfaces(world.ground, self._colors_version)
+        elevation = world.elevation
+        grades = elevation.grades
+        if shader.bed_version != grades:
+            shader.set_bed(elevation.bed, grades)
+        view, screen = self._shaded_view(center, top_left, bottom_right)
+        texture = shader.picture(view, screen, blend=True)
+        draw_list.add_image(imgui.ImTextureRef(texture), top_left, bottom_right)
+        free_textures()
+        return True
+
+    def _shaded_view(self, center: Vec2, top_left: Vec2, bottom_right: Vec2) -> tuple[View, Screen]:
+        """The art pixels of the pixel map showing in the map area, and where they go on screen."""
+        camera_pixel = self._pixel_layer().world.projection.to_pixels(
+            self.camera.center_x, self.camera.center_y
+        )
         scale = self.camera.pixel_scale
         origin = (
             round(center[0] - float(camera_pixel[0]) * scale),
@@ -698,12 +948,56 @@ class MapView:
         )
         size = (bottom_right[0] - top_left[0], bottom_right[1] - top_left[1])
         density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
-        view = view_of(origin, scale, top_left, size)
-        screen = screen_of(origin, scale, top_left, size, density)
-        texture = shader.picture(view, screen, blend=True)
+        return view_of(origin, scale, top_left, size), screen_of(
+            origin, scale, top_left, size, density
+        )
+
+    def _draw_shaded_tints(
+        self,
+        draw_list: imgui.ImDrawList,
+        center: Vec2,
+        top_left: Vec2,
+        bottom_right: Vec2,
+        cells: npt.NDArray[np.intp],
+        colors: list[int],
+    ) -> bool:
+        """Tints the cells in their packed colours with the shader, each pixel by the cell it
+        shows, if it runs here and the cells are hexagons; returns whether it did."""
+        shader = self._ground_shader() if self.tile_map.grid.kind == "hex" else None
+        if shader is None:
+            return False
+        if shader.tints_version is not colors:
+            shader.set_tints(tint_colours(self.tile_map.grid.shape, cells, colors), colors)
+        density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
+        size = (bottom_right[0] - top_left[0], bottom_right[1] - top_left[1])
+        pixels = (round(size[0] * density), round(size[1] * density))
+        e, f = self.camera.to_plane(top_left[0], top_left[1], center)
+        a, c = self.camera.to_plane(top_left[0] + 1 / density, top_left[1], center)
+        b, d = self.camera.to_plane(top_left[0], top_left[1] + 1 / density, center)
+        flat = (a - e, b - e, c - f, d - f, e, f)
+        raised = None
+        if self.camera.pixel_scale:
+            raised = self._shaded_view(center, top_left, bottom_right)
+        texture = shader.tinted(pixels, flat, raised)
         draw_list.add_image(imgui.ImTextureRef(texture), top_left, bottom_right)
-        free_textures()
         return True
+
+    def _dot_shader(self) -> DotShader | None:
+        """The building dots' shader, made the first time the map shows zoomed out in a real
+        window."""
+        if not self._dots_tried:
+            self._dots_tried = True
+            if hello_imgui.is_using_hello_imgui():
+                self._dots = DotShader.make()
+        return self._dots
+
+    def ready_shaders(self) -> None:
+        """Makes the shaders and the world's texture the first frame would, where the game is
+        loaded on the frames of a real window: compiling them takes a frame of its own."""
+        if hello_imgui.is_using_hello_imgui():
+            self._ground_shader()
+            self._dot_shader()
+            self.minimap.world_texture()
 
     def _ground_shader(self) -> GroundShader | None:
         """The ground shader, made the first time the pixel map shows in a real window."""
@@ -712,7 +1006,10 @@ class MapView:
             if hello_imgui.is_using_hello_imgui():
                 world = self._pixel_layer().world
                 self._shader = GroundShader.make(
-                    world.projection, self.tile_map, world.ground.shading
+                    world.projection,
+                    self.tile_map.grid.shape,
+                    world.ground.shading,
+                    world.elevation.heights,
                 )
         return self._shader
 

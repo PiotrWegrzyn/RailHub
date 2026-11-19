@@ -142,6 +142,19 @@ class Blend:
 
 
 @dataclass(frozen=True)
+class Heights:
+    """What the graphics card needs to raise hills and mountains as Elevation does
+    (railroads.ui.pixel.ground_shader): its rasters, STEPS to a cell, of the ground's height, its
+    valley floor, how mountainous it is and how its lone peaks stand, four to a step, and how hilly
+    it is; and how many metres an art pixel and a plane unit span."""
+
+    rasters: Floats
+    hills: Floats
+    metres_per_pixel: float
+    metres_per_unit: float
+
+
+@dataclass(frozen=True)
 class Raised:
     """The raised ground over a block of art pixels: how far each is lifted, how high it rises
     above the valley, how mountainous and how hilly it is, how much light its slope catches and
@@ -191,6 +204,23 @@ class Elevation:
         # there times that share (`grade`), or None where no track is.
         self._bed: tuple[Floats, Floats] | None = None
         self.grades = 0
+
+    @property
+    def heights(self) -> Heights:
+        """The rasters the graphics card raises the ground from, which never change."""
+        rasters = np.stack([self._base, self._valley, self._mountains, self._peaks], axis=-1)
+        return Heights(
+            rasters.astype(np.float32),
+            self._hills,
+            self._metres_per_pixel,
+            self._metres_per_unit,
+        )
+
+    @property
+    def bed(self) -> tuple[Floats, Floats] | None:
+        """How fully each step is graded into a bed for track and the bed's rise there times
+        that share (`grade`), or None where no track is."""
+        return self._bed
 
     def shares(self, x: FloatArray, y: FloatArray) -> tuple[Floats, Floats]:
         """How mountainous and how hilly the ground is at plane points, from 0 to 1."""
@@ -510,11 +540,36 @@ def raycast(lift: Floats, rows: int, cols: int) -> npt.NDArray[np.int64]:
     return offset.astype(np.int64)
 
 
+def crossings(lift: Floats, offset: npt.NDArray[np.int64]) -> FloatArray:
+    """Where between the row `offset` below each pixel and the row after it the raised ground
+    passes exactly through the pixel, from 0 at the first to 1 at the next. A slope facing the
+    viewer steeply spreads each row over several pixels, which blend from one row to the next
+    by this rather than standing in bands."""
+    rows, cols = offset.shape
+    at = np.arange(rows)[:, None] + offset
+    across = np.arange(cols)[None, :]
+    last = lift.shape[0] - 1
+    here = lift[np.minimum(at, last), across] - offset
+    drop = here - (lift[np.minimum(at + 1, last), across] - offset - 1)
+    share = np.divide(here, drop, out=np.zeros(offset.shape), where=drop > 0)
+    return np.clip(share, 0.0, 1.0)
+
+
 def raise_picture(
-    picture: FloatArray, offset: npt.NDArray[np.int64], resolution: int
+    picture: FloatArray,
+    offset: npt.NDArray[np.int64],
+    resolution: int,
+    between: FloatArray | None = None,
 ) -> FloatArray:
     """The picture as seen with its ground lifted: each pixel taken from the rows `offset` art
-    pixels below it, `picture` holding `resolution` pixels for every art pixel and enough rows."""
+    pixels below it, `picture` holding `resolution` pixels for every art pixel and enough rows;
+    with `between` (crossings), blended that far towards the art pixel after."""
+    if between is not None:
+        near = raise_picture(picture, offset, resolution)
+        far = raise_picture(picture, offset + 1, resolution)
+        share = np.repeat(np.repeat(between, resolution, axis=0), resolution, axis=1)
+        share = share.reshape(share.shape + (1,) * (picture.ndim - 2)).astype(picture.dtype)
+        return near + (far - near) * share
     k = resolution
     rows, cols = offset.shape[0] * k, offset.shape[1] * k
     art_rows, art_cols = offset.shape

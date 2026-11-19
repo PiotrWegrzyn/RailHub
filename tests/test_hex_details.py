@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -9,6 +11,8 @@ from railroads.sim.goods import Good, Need, bonus_of
 from railroads.sim.grids import Cell, HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule, Points
+from railroads.sim.ledger import Takings
+from railroads.sim.ownership import HOLD_MONTHS
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.ui import hex_details
 from railroads.ui.hex_details import (
@@ -18,6 +22,9 @@ from railroads.ui.hex_details import (
     describe,
     mood_text,
     recently_described,
+    result_lines,
+    sell_lots,
+    share_lines,
 )
 
 
@@ -42,20 +49,24 @@ def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded(
     (house,) = details.buildings
     assert house.name == "house"
     assert house.count == 3
-    assert house.needs == [(Need.FOOD, 30), (Need.HEATING, 9), (Need.COMMON, 15)]
+    assert house.needs == [(Need.FOOD, 30), (Need.HEATING, 9)]
     assert dict(house.bonus) == {
-        need: pytest.approx(3 * amount)
-        for need, amount in bonus_of(BuildingKind.HOUSE, 1850).items()
+        Need.FOOD: 30,
+        **{
+            need: pytest.approx(3 * amount)
+            for need, amount in bonus_of(BuildingKind.HOUSE, 1850).items()
+        },
     }
     got = {flow.good: (flow.done, flow.wanted) for flow in house.got}
     bonus_got = {flow.good: (flow.done, flow.wanted) for flow in house.bonus_got}
-    assert got[Need.FOOD] == (pytest.approx(10.0), 30.0)
+    assert got[Need.FOOD] == (pytest.approx(10 * 13 / 21), 30.0)
+    assert bonus_got[Need.FOOD] == (0.0, 30.0)
     assert got[Need.HEATING] == (0.0, 9.0)
     assert bonus_got[Need.BEER] == (0.0, 3.0)
     assert house.satisfaction == "content"
     assert farm.makes == [(Good.WHEAT, 10)]
     assert [(flow.good, flow.done, flow.wanted) for flow in farm.gave] == [
-        (Good.WHEAT, pytest.approx(10.0), 10.0)
+        (Good.WHEAT, pytest.approx(10 * 13 / 21), 10.0)
     ]
     assert ("population", 3, 3) in details.points
     assert ("food", 0, 1) in details.points
@@ -74,7 +85,9 @@ def test_details_of_an_empty_cell_show_its_land_and_nearby_points() -> None:
     assert details.title.startswith("Cell 5, 6")
 
 
-def test_a_tenement_needs_food_common_goods_and_heating_and_takes_the_rest_as_bonus_goods() -> None:
+def test_a_tenement_must_have_half_its_food_common_goods_and_heating_and_takes_the_rest_as_bonus() -> (
+    None
+):
     constructions = Constructions(make_map())
     constructions.build(Building((5, 5), BuildingKind.TENEMENT))
     growth = Growth(constructions)
@@ -83,9 +96,12 @@ def test_a_tenement_needs_food_common_goods_and_heating_and_takes_the_rest_as_bo
 
     tenement = details.buildings[0]
     assert tenement.needs == [(Need.FOOD, 60), (Need.COMMON, 60), (Need.HEATING, 20)]
-    assert dict(tenement.bonus) == bonus_of(BuildingKind.TENEMENT, 1850)
+    assert dict(tenement.bonus) == {Need.FOOD: 60, **bonus_of(BuildingKind.TENEMENT, 1850)}
     assert {flow.good for flow in tenement.got} == {Need.FOOD, Need.COMMON, Need.HEATING}
-    assert {flow.good for flow in tenement.bonus_got} == set(bonus_of(BuildingKind.TENEMENT, 1850))
+    assert {flow.good for flow in tenement.bonus_got} == {
+        Need.FOOD,
+        *bonus_of(BuildingKind.TENEMENT, 1850),
+    }
     assert all(flow.done == 0.0 for flow in [*tenement.got, *tenement.bonus_got])
 
 
@@ -184,3 +200,71 @@ def test_a_bakery_must_get_wheat_and_shows_refined_sugar_as_a_bonus() -> None:
 
     assert [flow.good for flow in bakery.got] == [Need.WHEAT]
     assert [flow.good for flow in bakery.bonus_got] == [Need.REFINED_SUGAR]
+
+
+def test_details_say_the_company_flies_its_flag_over_a_building_the_player_owns() -> None:
+    constructions = Constructions(make_map())
+    constructions.build(Building((5, 4), BuildingKind.FARM))
+    growth = Growth(constructions, GrowthRule(trades=True, ladders=()))
+    growth.owners.own((5, 4), BuildingKind.FARM, 300)
+
+    others = describe(growth, (5, 4)).others
+
+    assert others == ["The Trains Corp flies its flag here: you own 300 shares of the farms."]
+
+
+def farms_row(**fields: object) -> BuildingRow:
+    row = BuildingRow("farm", 3, [], [], [], [], [], [], "content", BuildingKind.FARM)
+    return replace(row, **fields)
+
+
+def test_the_shares_window_shows_every_share_the_players_and_those_they_may_sell_now() -> None:
+    row = farms_row(owned=300, price=4320.0, sellable=100, sell_from=1862, total=3000)
+
+    lines = {label: value for label, value, _ in share_lines(row)}
+
+    assert lines["In all (3 x 1,000)"] == "3,000"
+    assert lines["Yours"] == "300 (10% of what they make)"
+    assert lines["Can sell now"] == "100"
+    assert lines["Sellable from 1862"] == "200"
+    assert lines["Price of 100"] == "$4,320"
+
+
+def test_results_show_last_year_and_the_forecast_and_a_dash_before_a_whole_year() -> None:
+    row = farms_row(total=3000, forecast=Takings(4300.0, 430.0, 80.0))
+
+    lines = {label: (last, forecast) for label, last, forecast, _ in result_lines(row)}
+
+    assert lines["All 3 farms: sold"] == ("-", "$4,300")
+    assert lines["Yours: sold to stations"] == ("-", "$430")
+    assert lines["Yours in all"] == ("-", "$510")
+
+
+def test_the_shares_window_says_how_many_years_shares_are_held_before_they_can_be_sold() -> None:
+    row = farms_row(owned=100, total=3000)
+
+    tips = {label: tip for label, _, tip in share_lines(row)}
+
+    assert tips["Can sell now"] == f"Shares bought can be sold {HOLD_MONTHS // 12} years later"
+
+
+@pytest.mark.parametrize(
+    ("sellable", "lots"), [(0, [0]), (50, [50]), (300, [100, 200]), (700, [100, 200, 600])]
+)
+def test_the_sell_buttons_offer_each_lot_the_player_may_sell_or_just_what_they_may(
+    sellable: int, lots: list[int]
+) -> None:
+    offered = sell_lots(sellable)
+
+    assert offered == lots
+
+
+@pytest.mark.parametrize(("owned", "control"), [(500, "from 600 shares"), (600, "yours")])
+def test_the_shares_window_says_from_how_many_shares_the_player_controls_the_buildings(
+    owned: int, control: str
+) -> None:
+    row = farms_row(owned=owned, price=4320.0, total=1000)
+
+    lines = {label: value for label, value, _ in share_lines(row)}
+
+    assert lines["Control"] == control

@@ -14,6 +14,7 @@ from railroads.mapgen.strategies import (
     VegetationPlaceholder,
     WaterFromShapes,
 )
+from railroads.mapgen.streams import StreamLines, StreamsFromLines
 
 OCEAN_FILE = "ne_10m_ocean.geojson"
 LAKE_FILES = ("ne_10m_lakes.geojson", "ne_10m_lakes_europe.geojson")
@@ -46,13 +47,14 @@ class NaturalEarth:
 
 
 def real_world_strategies(
-    data: NaturalEarth, elevation: Elevation, seed: int
+    data: NaturalEarth, elevation: Elevation, seed: int, streams: StreamLines | None = None
 ) -> dict[str, Strategy]:
     return {
         "height_m": HeightFromElevation(elevation),
         "terrain": WaterFromShapes(
             lakes=data.lakes, rivers=data.rivers, sea=data.ocean, min_river_km=MIN_RIVER_KM
         ),
+        "stream": StreamsFromLines(StreamLines.empty() if streams is None else streams),
         "relief": ReliefFromSlopes(),
         "temperature": TemperatureFromClimate(deserts=data.deserts),
         "vegetation": VegetationPlaceholder(deserts=data.deserts, seed=seed),

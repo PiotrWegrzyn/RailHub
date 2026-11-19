@@ -1,4 +1,4 @@
-"""The mouse and keys on the map view: dragging pans, the wheel and -/+ zoom, a press without a
+"""The mouse and keys on the map view: dragging pans, the wheel zooms, a press without a
 drag is a click for the build tools (railroads.ui.map_tools), a right click picks a cell or
 station or cancels building, and letter keys open windows and choose tools."""
 
@@ -80,17 +80,26 @@ class MapInput:
             if steps:
                 self._wheel -= steps
                 camera.zoom(steps, (io.mouse_pos.x, io.mouse_pos.y), center)
-        camera.keep_within(*grid.size())
+        lots = view.game.lots
+        margin = (0.0, 0.0) if lots is None else (2 * lots.radius, 2 * lots.radius)
+        camera.keep_within(*grid.size(), margin)
         view.hovered = None
+        on_map = None
         if hovered:
             x, y = view.ground_under(io.mouse_pos.x, io.mouse_pos.y, center)
             row, col = grid.cell_at(x, y)
             cell = int(row), int(col)
-            if grid.contains(*cell):
+            if grid.contains(*cell) and not view.tile_map.is_locked(cell):
                 view.hovered = cell
+            elif not grid.contains(*cell) or view.tile_map.is_locked(cell):
+                on_map = camera.to_plane(io.mouse_pos.x, io.mouse_pos.y, center)
+        view.land.hover(lots, on_map)
         clicked = imgui.is_item_deactivated() and self._dragged < CLICK_SLOP
-        if clicked and self._pressed_on is None and view.hovered is not None:
-            view.tools.click(view.hovered)
+        if clicked and self._pressed_on is None:
+            if view.hovered is not None:
+                view.tools.click(view.hovered)
+            else:
+                view.land.click(lots)
         if imgui.is_item_clicked(imgui.MouseButton_.right.value):
             self._right_click()
         if key_pressed(imgui.Key.escape):
@@ -118,10 +127,6 @@ class MapInput:
         view = self._view
         if imgui.get_io().want_text_input:
             return
-        if key_pressed(imgui.Key.minus, imgui.Key.keypad_subtract):
-            view.camera.zoom(-1, (0, 0), (0, 0))
-        if key_pressed(imgui.Key.equal, imgui.Key.keypad_add):
-            view.camera.zoom(1, (0, 0), (0, 0))
         if key_pressed(imgui.Key.m):
             view.minimap.shown = not view.minimap.shown
         if key_pressed(imgui.Key.w):

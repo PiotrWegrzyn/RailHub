@@ -165,7 +165,7 @@ def station_3() -> Sprite:
 # behind track running across or slanting and to the left of track running up and down
 # (railroads.ui.pixel.track_art.station_side).
 TURNED_LINES = {"across": 0.0, "falling": 60.0, "rising": 300.0, "upright": 270.0}
-# The hex map's look (railroads.ui.map_view.LOOKS): not turned, a cell wide per cell.
+# The hex map's look (railroads.ui.iso_camera.LOOKS): not turned, a cell wide per cell.
 _HEX_PROJECTION = PixelProjection.of(HexGrid(rows=1, cols=1, km_per_cell=1.0), 0.0, 1.0)
 POST: RGB = (60, 58, 62)
 DOOR: RGB = (88, 60, 44)

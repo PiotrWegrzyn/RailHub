@@ -1,12 +1,12 @@
 """What the land means for building track and running trains. A cell of track costs
 railroads.sim.finance.TRACK_PRICE times its price factor: $300 on the flat, $450 in hills,
-$10,000 for a bridge and $20,000 for a tunnel. The cost factor is how much route planning
-avoids it, kept small so planning stays quick. Trains run at the speed factor of their top
-speed through a cell, and burn the burn factor of their fuel there: hills slow them by 30% and make
-them burn half as much again, bridges and tunnels slow them by 20%."""
+twice that across a minor river, $10,000 for a bridge and $20,000 for a tunnel. The cost factor is how much route planning
+avoids it, kept small so planning stays quick. Trains run at the speed factor of their top speed
+through a cell, and burn the burn factor of their fuel there: hills slow them by 30% and make them
+burn half as much again, bridges and tunnels slow them by 20%."""
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import IntEnum
 
 from railroads.sim.tilemap import Relief, Terrain, Tile
@@ -41,6 +41,9 @@ RELIEF_RULES: dict[Relief, TrackRules] = {
 }
 BRIDGE_RULES = TrackRules(can_build=True, cost_factor=5.0, speed_factor=0.8, price_factor=100.0 / 3)
 TUNNEL_RULES = TrackRules(can_build=True, cost_factor=8.0, speed_factor=0.8, price_factor=200.0 / 3)
+# Track across a minor river (railroads.mapgen.streams) costs this many times as much, culverts and
+# all, and route planning shuns it as much more.
+STREAM_FACTOR = 2.0
 
 
 def track_rules_for(tile: Tile, bed: TrackBed = TrackBed.GROUND) -> TrackRules:
@@ -51,4 +54,13 @@ def track_rules_for(tile: Tile, bed: TrackBed = TrackBed.GROUND) -> TrackRules:
     if bed == TrackBed.TUNNEL:
         in_mountains = tile.terrain == Terrain.LAND and tile.relief == Relief.MOUNTAINS
         return TUNNEL_RULES if in_mountains else NO_TRACK
-    return RELIEF_RULES[tile.relief] if tile.terrain == Terrain.LAND else NO_TRACK
+    if tile.terrain != Terrain.LAND:
+        return NO_TRACK
+    rules = RELIEF_RULES[tile.relief]
+    if tile.stream and rules.can_build:
+        return replace(
+            rules,
+            cost_factor=rules.cost_factor * STREAM_FACTOR,
+            price_factor=rules.price_factor * STREAM_FACTOR,
+        )
+    return rules

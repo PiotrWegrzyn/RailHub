@@ -15,9 +15,12 @@ from railroads.sim.geo import Bounds
 from railroads.sim.grids import Cell
 from railroads.sim.tilemap import TileMap
 from railroads.ui.iso_camera import IsoCamera, Vec2
-from railroads.ui.theme import rgba_u32
+from railroads.ui.ornate import DEEP, frame_rect
+from railroads.ui.theme import color_u32, rgba_u32
 
 # Latitudes the world map shows, north to south; the poles are left out.
+# How far the frame round each map stands out past the map itself.
+FRAME_PAD = 4.0
 WORLD_NORTH = 84.0
 WORLD_SOUTH = -60.0
 WORLD_WIDTH = 300.0
@@ -31,8 +34,6 @@ OVERVIEW_ZOOMS = (1, 2, 4, 8)
 
 SEA_RGB = (32, 58, 92)
 LAND_RGB = (138, 150, 104)
-FRAME_COLOR = (0.06, 0.07, 0.09, 0.85)
-BORDER_COLOR = (1.0, 1.0, 1.0, 0.35)
 MARK_COLOR = (1.0, 0.82, 0.2, 1.0)
 CROSSHAIR_COLOR = (1.0, 0.82, 0.2, 0.35)
 VIEW_COLOR = (1.0, 1.0, 1.0, 0.95)
@@ -150,10 +151,12 @@ def _window(map_size: Vec2, zoom: int, focus: Vec2 | None) -> tuple[float, float
 
 
 def world_rgba(world: WorldLand) -> np.ndarray:
-    share = world.land[..., None].astype(np.float64) / 255
+    """The world's picture: each pixel between the sea's colour and the land's by its share of
+    land, looked up from the colour of every share worked out once."""
+    share = np.arange(256, dtype=np.float64)[:, None] / 255
     rgb = np.array(SEA_RGB) * (1 - share) + np.array(LAND_RGB) * share
-    alpha = np.full((*world.land.shape, 1), 255.0)
-    return np.ascontiguousarray(np.concatenate([rgb, alpha], axis=-1).astype(np.uint8))
+    colours = np.concatenate([rgb, np.full((256, 1), 255.0)], axis=-1).astype(np.uint8)
+    return np.ascontiguousarray(colours[world.land])
 
 
 class Minimap:
@@ -269,16 +272,9 @@ def view_corners(camera: IsoCamera, center: Vec2, top_left: Vec2, bottom_right: 
 
 
 def _frame(draw_list: imgui.ImDrawList, panel: Panel) -> None:
-    pad = 3.0
-    draw_list.add_rect_filled(
-        (panel.left - pad, panel.top - pad),
-        (panel.right + pad, panel.bottom + pad),
-        rgba_u32(FRAME_COLOR),
-        4.0,
-    )
-    draw_list.add_rect(
-        (panel.left - pad, panel.top - pad),
-        (panel.right + pad, panel.bottom + pad),
-        rgba_u32(BORDER_COLOR),
-        4.0,
-    )
+    """A dark plate under a map, framed in glowing brass with brackets at its corners."""
+    pad = FRAME_PAD
+    low = imgui.ImVec2(panel.left - pad, panel.top - pad)
+    high = imgui.ImVec2(panel.right + pad, panel.bottom + pad)
+    draw_list.add_rect_filled(low, high, color_u32(DEEP), 4.0)
+    frame_rect(draw_list, low, high, 4.0, bracket=10.0)

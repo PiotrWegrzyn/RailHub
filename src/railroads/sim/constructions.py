@@ -86,6 +86,13 @@ class BuildingKind(Enum):
     LIMESTONE_QUARRY = "limestone quarry"
     SAND_PIT = "sand pit"
     POTATO_FARM = "potato farm"
+    RICE_PADDY = "rice paddy"
+    SOY_FIELD = "soy field"
+    TEA_PLANTATION = "tea plantation"
+    SOY_SAUCE_BREWERY = "soy sauce brewery"
+    TOFU_MAKER = "tofu maker"
+    MISO_MAKER = "miso maker"
+    FISH_DRYER = "fish drying shed"
     CATTLE_RANCH = "cattle ranch"
     PIG_FARM = "pig farm"
     CHICKEN_FARM = "chicken farm"
@@ -111,6 +118,7 @@ class BuildingKind(Enum):
     GLASSWORKS = "glassworks"
     BREWERY = "brewery"
     DISTILLERY = "distillery"
+    SAKE_BREWERY = "sake brewery"
     TANNERY = "tannery"
     SHOE_FACTORY = "shoe factory"
     PLASTICS_WORKS = "plastics works"
@@ -136,6 +144,7 @@ class BuildingKind(Enum):
     DEPARTMENT_STORE = "department store"
     HOTEL = "hotel"
     CLUB = "club"
+    SUSHI_HUT = "sushi hut"
     FILLING_STATION = "filling station"
     JUICE_WORKS = "juice works"
     BIG_JUICE_WORKS = "big juice works"
@@ -200,6 +209,16 @@ class BuildingKind(Enum):
     MEGA_BREWERY = "mega brewery"
     BIG_DISTILLERY = "big distillery"
     MEGA_DISTILLERY = "mega distillery"
+    BIG_SAKE_BREWERY = "big sake brewery"
+    MEGA_SAKE_BREWERY = "mega sake brewery"
+    BIG_SOY_SAUCE_BREWERY = "big soy sauce brewery"
+    MEGA_SOY_SAUCE_BREWERY = "mega soy sauce brewery"
+    BIG_TOFU_MAKER = "big tofu maker"
+    MEGA_TOFU_MAKER = "mega tofu maker"
+    BIG_MISO_MAKER = "big miso maker"
+    MEGA_MISO_MAKER = "mega miso maker"
+    BIG_FISH_DRYER = "big fish drying shed"
+    MEGA_FISH_DRYER = "mega fish drying shed"
     BIG_TANNERY = "big tannery"
     MEGA_TANNERY = "mega tannery"
     BIG_MEAT_FACTORY = "big butcher"
@@ -279,6 +298,9 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.POTTER,
             BuildingKind.DAIRY,
             BuildingKind.SAUSAGE_MAKER,
+            BuildingKind.TOFU_MAKER,
+            BuildingKind.MISO_MAKER,
+            BuildingKind.FISH_DRYER,
             BuildingKind.CARPET_WEAVER,
             BuildingKind.CLOCK_MAKER,
             BuildingKind.MIRROR_MAKER,
@@ -299,6 +321,9 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.COFFEE_PLANTATION,
             BuildingKind.RUBBER_PLANTATION,
             BuildingKind.POTATO_FARM,
+            BuildingKind.RICE_PADDY,
+            BuildingKind.SOY_FIELD,
+            BuildingKind.TEA_PLANTATION,
             BuildingKind.CATTLE_RANCH,
             BuildingKind.PIG_FARM,
             BuildingKind.CHICKEN_FARM,
@@ -310,6 +335,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     BuildingKind.BAKERY: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.TAVERN: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.CLUB: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.SUSHI_HUT: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.FILLING_STATION: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.DEPARTMENT_STORE: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.HOTEL: BuildingRules(relief=frozenset(Relief)),
@@ -376,6 +402,8 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.GLASSWORKS,
             BuildingKind.BREWERY,
             BuildingKind.DISTILLERY,
+            BuildingKind.SAKE_BREWERY,
+            BuildingKind.SOY_SAUCE_BREWERY,
             BuildingKind.TANNERY,
             BuildingKind.SHOE_FACTORY,
             BuildingKind.PLASTICS_WORKS,
@@ -446,8 +474,9 @@ class Track:
 @dataclass(frozen=True, slots=True)
 class Station:
     """Fills its whole cell. Its own track runs straight through the cell between `ends`, two
-    opposite track points, and other track joins it only there: its way in and its way out. It
-    keeps that way however track is laid round it later; with `ends` None its track runs
+    opposite track points, and other track joins it only there: its way in and its way out. The
+    first track laid to it turns it (railroads.sim.routes); after that it keeps its way however
+    track is laid round it; with `ends` None its track runs
     across, from the first track point to the one opposite (Constructions.station_ends). A station
     raised high enough gets more platforms in cells beside it, each a Station of its own with
     `main` the cell of the station it belongs to, and its own way through, so lines come in from
@@ -477,6 +506,10 @@ type Construction = Track | Station | Building
 
 class CannotBuild(ValueError):
     pass
+
+
+# Why nothing can be built on land the player has not bought (railroads.sim.lots).
+LOCKED = "That land isn't yours: buy it first"
 
 
 class Constructions:
@@ -603,6 +636,8 @@ class Constructions:
         cell = construction.cell
         if not self.tile_map.grid.contains(*cell):
             return "That is off the map"
+        if self.tile_map.is_locked(cell):
+            return LOCKED
         match construction:
             case Track():
                 problem = self._track_problem(construction)
@@ -674,8 +709,11 @@ class Constructions:
         if (problem := self._bed_problem(track.cell, track.bed)) is not None:
             return problem
         for point in track.ends:
-            if not grid.contains(*grid.track_exit(track.cell, point)[0]):
+            beyond = grid.track_exit(track.cell, point)[0]
+            if not grid.contains(*beyond):
                 return "Track cannot run off the map"
+            if self.tile_map.is_locked(beyond):
+                return LOCKED
             for side in grid.track_flanks(track.cell, point):
                 if self._bed_problem(side, track.bed) is not None:
                     return "Track through a corner needs the cells on both sides to take it"
@@ -686,6 +724,8 @@ class Constructions:
     def _bed_problem(self, cell: Cell, bed: TrackBed) -> str | None:
         if not self.tile_map.grid.contains(*cell):
             return "That is off the map"
+        if self.tile_map.is_locked(cell):
+            return LOCKED
         tile = self.tile_map.tile(cell)
         if track_rules_for(tile, bed).can_build:
             return None

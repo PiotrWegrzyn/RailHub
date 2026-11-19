@@ -7,7 +7,9 @@ works rather than through them.
 Track leaves a cell through the middle of an edge, into the cell next to it, or through a corner,
 along the edge between two cells into the cell beyond; corners let track run straight where edges
 would zigzag. Stations at either end are joined without track in their own cell; a station in
-between is never crossed.
+between is never crossed. A station that no track joins yet turns to the way track comes into it,
+from its side too; one that track joins already is joined only at its ends, and a route that would
+end against its side runs on into it instead.
 
 A route that starts or ends where track is already laid joins it: its first or last piece runs
 from a point where that track carries on, turning no more than MAX_TURN_DEG, so trains can run
@@ -78,12 +80,14 @@ type _Leaving = tuple[float, float, tuple[int, ...], tuple[tuple[int, ...], ...]
 class Route:
     """Planned track: the pieces it runs along, in order, as they will be once it is laid, and
     what it costs to plan. `replaces` maps a piece to the track it takes the place of: a dead end
-    turned towards where the route goes, or track widened or electrified."""
+    turned towards where the route goes, or track widened or electrified. `turns` maps a station
+    that no track joins yet to the ends it turns to, so the route comes into it by one."""
 
     cells: list[Cell]
     pieces: list[Track]
     cost: float
     replaces: dict[Track, Track] = field(default_factory=dict)
+    turns: dict[Cell, tuple[int, int]] = field(default_factory=dict)
 
     def changes(self, constructions: Constructions) -> list[tuple[Track, Track | None]]:
         """The pieces that laying the route builds, each with the track it takes the place of."""
@@ -147,8 +151,19 @@ def plan_route_steps(
     frames; the constructions mustn't change between them."""
     if start == end:
         return None
-    planner = _Planner(constructions, start, end, width, electric and not maglev, maglev)
-    return (yield from planner.plan())
+    electric = electric and not maglev
+    route = yield from _Planner(constructions, start, end, width, electric, maglev).plan()
+    if route is None or not route.pieces:
+        return route
+    start_side = _side_station(constructions, route, route.pieces[0], start)
+    end_side = _side_station(constructions, route, route.pieces[-1], end)
+    if start_side is None and end_side is None:
+        return route
+    start, end = start_side or start, end_side or end
+    if start == end:
+        return route
+    into = yield from _Planner(constructions, start, end, width, electric, maglev).plan()
+    return route if into is None else into
 
 
 def route_price(constructions: Constructions, route: Route) -> float:
@@ -170,13 +185,18 @@ def route_price(constructions: Constructions, route: Route) -> float:
 def lay_route(growth: Growth, route: Route) -> set[Cell]:
     """Lays the planned track, making room for it as it goes; returns the cells that changed."""
     constructions = growth.constructions
-    avoid = frozenset(route.cells)
     changed: set[Cell] = set()
+    for cell, ends in route.turns.items():
+        station = constructions.station_at(cell)
+        if station is not None and constructions.station_ends(cell) != ends:
+            constructions.remove(station)
+            constructions.build(Station(cell, ends, station.main))
+            changed.add(cell)
     for piece, old in route.changes(constructions):
         replacing = old is not None and old in constructions.at(piece.cell)
         if replacing:
             constructions.remove(old)
-        changed |= growth.room.clear(piece.cell, piece.space, avoid)
+        changed |= growth.room.clear(piece.cell, piece.space)
         if constructions.why_not(piece) is None:
             constructions.build(piece)
             changed.add(piece.cell)
@@ -217,6 +237,8 @@ def build_station(
     tile = constructions.tile_map.tile(cell)
     if any(isinstance(b, Station) for b in built) or tile.terrain != Terrain.LAND:
         return None
+    if constructions.tile_map.is_locked(cell):
+        return None
     if station_site_price(constructions, cell) is None:
         return None
     if tile.relief == Relief.MOUNTAINS:
@@ -225,7 +247,7 @@ def build_station(
         return None
     for piece in constructions.track_at(cell):
         constructions.remove(piece)
-    changed = growth.room.clear(cell, station.space, frozenset({cell}))
+    changed = growth.room.clear(cell, station.space)
     constructions.build(station)
     return changed | {cell}
 
@@ -398,9 +420,9 @@ class _Planner:
         if not start_station and self._cell_cost(self.start) is None:
             return None
         if start_station:
-            self._ways_out = constructions.station_ends(self.start)
+            self._ways_out = _station_ways(constructions, self.start)
         if _is_station(constructions, self.end):
-            self._ways_in = constructions.station_ends(self.end)
+            self._ways_in = _station_ways(constructions, self.end)
         seeds: list[int | None] = [*self._ways_out] if start_station else [*self._joins(self.start)]
         along = {
             point
@@ -461,7 +483,11 @@ class _Planner:
             if index == start and key not in came and entry in along:
                 leads = tuple(point for point in leads if runs_on >> point & 1)
             if index == start and key not in came and self._ways_out:
-                leads = tuple(point for point in self._ways_out if point != entry)
+                leads = tuple(
+                    point
+                    for point in exits[_ANYWHERE]
+                    if point in self._ways_out and point != entry
+                )
             so_far = best[key]
             turning = bends[entry]
             for exit_point in leads:
@@ -566,7 +592,7 @@ class _Planner:
         if ground is None:
             cell = self._cell(index)
             tile_map = self.constructions.tile_map
-            if tile_map.grid.contains(*cell):
+            if tile_map.grid.contains(*cell) and not tile_map.is_locked(cell):
                 land = (int(tile_map.terrain[cell]), int(tile_map.relief[cell]))
                 ground = _GROUNDS.get(land)
                 if ground is None:
@@ -599,13 +625,17 @@ class _Planner:
 
     def _joins(self, cell: Cell) -> list[int]:
         """The points of the cell where laid track or a station carries on beyond it, which new
-        track there can join."""
+        track there can join, a station no track joins yet from its side too."""
         constructions = self.constructions
         fits = self._fits(self._number(cell))
         return [
             point
             for point in range(self._geometry.points)
-            if _leads_on(constructions, cell, point) and fits >> point & 1
+            if fits >> point & 1
+            and (
+                _leads_on(constructions, cell, point)
+                or _turned_way(constructions, cell, point) is not None
+            )
         ]
 
     def _join(self, entry: int, joins: list[int]) -> int | None:
@@ -676,7 +706,14 @@ class _Planner:
                 if piece != old:
                     replaces[piece] = old
             pieces.append(piece)
-        return Route([cell for cell, _, _ in steps], pieces, cost, replaces)
+        turns: dict[Cell, tuple[int, int]] = {}
+        grid = constructions.tile_map.grid
+        for piece in {pieces[0], pieces[-1]} if pieces else ():
+            for point in piece.ends:
+                way = _turned_way(constructions, piece.cell, point)
+                if way is not None:
+                    turns[grid.track_exit(piece.cell, point)[0]] = way
+        return Route([cell for cell, _, _ in steps], pieces, cost, replaces, turns)
 
     def _loose_end(self, cell: Cell, joined: int, bed: TrackBed) -> tuple[int, int]:
         """The ends of the piece at an open end of a route: from the point it joins by, out the
@@ -709,6 +746,62 @@ def _leads_on(constructions: Constructions, cell: Cell, point: int) -> bool:
     if _is_station(constructions, beyond):
         return entry in constructions.station_ends(beyond)
     return any(entry in piece.ends for piece in constructions.track_at(beyond))
+
+
+def _can_turn(constructions: Constructions, cell: Cell) -> bool:
+    """Whether the station in the cell may still turn: one without platforms that no track or
+    station joins at either end."""
+    station = constructions.station_at(cell)
+    if station is None or station.main is not None or constructions.platforms(cell):
+        return False
+    return not any(
+        _leads_on(constructions, cell, point) for point in constructions.station_ends(cell)
+    )
+
+
+def _station_ways(constructions: Constructions, cell: Cell) -> tuple[int, ...]:
+    """The points track may come into or leave the station in the cell by: its ends, or any
+    way a station can run while it may still turn."""
+    if not _can_turn(constructions, cell):
+        return constructions.station_ends(cell)
+    grid = constructions.tile_map.grid
+    count = len(grid.track_points())
+    return tuple(
+        point
+        for point in grid.track_ends()
+        if constructions._way_problem((point, (point + count // 2) % count)) is None
+    )
+
+
+def _turned_way(constructions: Constructions, cell: Cell, point: int) -> tuple[int, int] | None:
+    """The ends a station beyond the cell turns to for track leaving the cell by this point into
+    its side, if it may still turn; None where track there needs no turn or cannot have one."""
+    grid = constructions.tile_map.grid
+    beyond, entry = grid.track_exit(cell, point)
+    if not grid.contains(*beyond) or not _is_station(constructions, beyond):
+        return None
+    if entry in constructions.station_ends(beyond) or not _can_turn(constructions, beyond):
+        return None
+    count = len(grid.track_points())
+    way: tuple[int, int] = tuple(sorted((entry, (entry + count // 2) % count)))  # type: ignore[assignment]
+    return None if constructions._way_problem(way) is not None else way
+
+
+def _side_station(
+    constructions: Constructions, route: Route, piece: Track, end: Cell
+) -> Cell | None:
+    """The station whose side the piece at this end of the route runs into, where the end is
+    not a station itself and the route does not turn that station."""
+    if _is_station(constructions, end):
+        return None
+    grid = constructions.tile_map.grid
+    for point in piece.ends:
+        beyond, entry = grid.track_exit(piece.cell, point)
+        if not grid.contains(*beyond) or beyond in route.turns:
+            continue
+        if _is_station(constructions, beyond) and entry not in constructions.station_ends(beyond):
+            return beyond
+    return None
 
 
 def _dead_end(

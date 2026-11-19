@@ -1,26 +1,19 @@
 import pytest
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.goods import FITS, Need, bonus_of, demands_of, makes_of, needs_of
+from railroads.sim.goods import (
+    FITS,
+    RECIPES,
+    Need,
+    bonus_of,
+    demands_of,
+    makes_of,
+    needs_of,
+)
 from railroads.sim.ladders import LADDERS
 
 
-def test_a_house_demands_food_common_goods_and_heating_and_takes_small_comforts_as_bonus() -> None:
-    demands, bonus = demands_of(BuildingKind.HOUSE, 1900), bonus_of(BuildingKind.HOUSE, 1900)
-
-    assert set(demands) == {Need.FOOD, Need.COMMON, Need.HEATING}
-    assert set(bonus) == {
-        Need.BEER,
-        Need.NEWSPAPERS,
-        Need.VODKA,
-        Need.REFINED_SUGAR,
-        Need.BRICKS,
-        Need.GLASS,
-        Need.LIMESTONE,
-    }
-
-
-def test_a_processor_demands_every_input_even_a_special_resource() -> None:
+def test_a_processor_takes_no_bonus_goods_and_demands_its_special_resource() -> None:
     bonus = bonus_of(BuildingKind.STEEL_MILL, 1900)
 
     assert bonus == {}
@@ -54,11 +47,39 @@ def test_nothing_that_can_open_needs_what_nothing_open_makes_yet() -> None:
     assert unmet == []
 
 
-@pytest.mark.parametrize("kind", [BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS])
-def test_homes_must_have_food_common_goods_and_heating_and_take_the_rest_as_bonus_goods(
+@pytest.mark.parametrize("kind", [BuildingKind.TENEMENT, BuildingKind.FLATS])
+def test_tenements_and_flats_must_have_food_common_goods_and_heating_and_take_the_rest_as_bonus(
     kind: BuildingKind,
 ) -> None:
     demands = demands_of(kind, 2000)
 
     assert set(demands) == {Need.FOOD, Need.COMMON, Need.HEATING}
     assert set(bonus_of(kind, 2000)) == set(needs_of(kind, 2000)) - set(demands)
+
+
+def test_a_house_must_have_only_food_and_heating_and_takes_common_goods_as_a_bonus() -> None:
+    demands = demands_of(BuildingKind.HOUSE, 2000)
+
+    assert set(demands) == {Need.FOOD, Need.HEATING}
+    assert Need.COMMON in bonus_of(BuildingKind.HOUSE, 2000)
+    assert set(bonus_of(BuildingKind.HOUSE, 2000)) == set(needs_of(BuildingKind.HOUSE, 2000)) - set(
+        demands
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        kind
+        for kind, recipe in RECIPES.items()
+        if recipe.makes in FITS[Need.ALCOHOL] and not kind.name.startswith(("BIG_", "MEGA_"))
+    ],
+)
+def test_alcohol_is_no_food_so_no_maker_of_it_makes_more_than_it_takes_in(
+    kind: BuildingKind,
+) -> None:
+    recipe = RECIPES[kind]
+
+    per_unit = recipe.per_unit
+
+    assert sum(per_unit.values()) >= 1.0

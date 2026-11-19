@@ -304,3 +304,189 @@ The whole wait for a new game is still the towns growing: about 20 of the 23 sec
 remaining loading frames of 200–350 ms in the browser are single parts of the preparation
 (relief, scenery, ground, grading the track bed, the zoomed-out picture), each one piece of work
 that would have to be split inside itself.
+
+## The monthly freeze (18 November, a new game with 3 trains)
+
+The complaint: in the browser every month froze the game for about half a second, even in a new
+game with 3 trains. Measured on a new game (Poland, seed 1, 1850, the cropped square map) with 4
+stations, track between them and 3 trains, at zoom 3 over the first station, a month forced every
+90 frames, 12 months; same machine and headless Chrome as above. "Freeze" is the time from the frame
+a month begins to the frame it ends: the trains and the clock wait all of it.
+
+What was found: the month itself was not dear. Its work was about 25 ms on desktop (33 ms with the
+map's pictures) and about 76 ms in the browser, much as before the day's economy changes (owned
+shares, worth of what is handed out, experience, taverns, bonus goods). But it came in 17 or 18
+steps and the game gave each step a frame of its own, so a month took 18 frames, each drawing the
+whole map while the trains stood still: about 18 × 14 ms of drawing in the browser on top of the
+work. An autosave month added a frame per part of the save.
+
+| | before | after |
+|---|---|---|
+| Browser: trains frozen per month | 359 ms (18 frames) | 131 ms (4 frames) |
+| Browser: trains frozen, month with an autosave | 581 ms (26 frames) | 207 ms (6 frames) |
+| Browser: longest frame of a month | 41 ms | 42 ms |
+| Desktop: trains frozen per month | 228 ms (17 frames) | 71 ms (3 frames) |
+| Desktop: trains frozen, month with an autosave | 379 ms (25 frames) | 119 ms (4 frames) |
+| Desktop: longest frame of a month | 21 ms | 30 ms |
+| Desktop: scenery put up again after buildings changed | 9.2 ms | 7.9 ms |
+| Desktop: changes pickled for the painting workers | 3.5 ms | 1.7 ms |
+
+A frame without a month takes about 13 ms in the browser and 6.5 ms on desktop in this scene.
+
+What changed (no rule or number; the month computes exactly what it did):
+
+- **A month's steps run several to a frame** (`sim/steps.budgeted`, `MONTH_FRAME_SECONDS` = 16 ms
+  in `ui/app.py`): steps follow one another until 16 ms have gone on them, then the frame is drawn.
+  The autosave's parts after the month go the same way. A frame can take one step longer than
+  the 16 ms, which is why the longest frame grew a little on desktop.
+- **The track near each cell is kept** between months for the scenery (`scenery._track_near`),
+  found again only when the railway changes (`Constructions.railway_version`), and sprites are
+  looked up by name in a dictionary instead of a list.
+- **The painting workers hear of new buildings as kinds**, as saves keep them
+  (`Constructions.__getstate__`), instead of every building pickled as an object.
+- **Putting the scenery up again is split into three steps** (`PixelWorld.buildings_changed_steps`),
+  so the ground, the scenery and the trees' shading can land on different frames.
+
+Tried and dropped: enum hashing showed as the biggest cost in Pyodide's profiler, but a lookup by
+an (enum, enum) key takes 39 ns with the enum's own hash and 37 ns with the object's, so it is the
+profiler's overhead, as on desktop.
+
+What is left of the 131 ms: about 75 ms of work (the trade about half of it, the scenery and the
+ground pictures most of the rest) and the drawing of 4 frames. Bringing it lower would mean making
+the trade itself cheaper, or putting the scenery up only around the cells that changed instead of
+over the whole map.
+
+## Lag again on 0.5.83 (18 November, the same scene)
+
+The complaint: the browser build lagged badly again, frames as well as months. Measured with the
+same scene as the section above (new game, Poland seed 1, 4 stations, 3 trains, zoom 3 over the
+first station, a month forced every 90 frames), before = staging 0.5.83, after = it with the fixes.
+
+What was found:
+
+- **Every frame drew the chain round each lot for sale link by link** (`ui/land_offers.py`). At
+  zoom 3 a lot's sides run thousands of points across the screen, so each frame drew about
+  10,000 links of two ellipses each, nearly all off screen, and worked every lot's corners out
+  again. This was most of a frame's work in this scene, and had been since land could be bought,
+  which is why the section above measured 13 ms frames in the browser.
+- **The start map is bigger**: the honeycomb of seven lots makes a new game's map 48,697 hexes
+  instead of 31,872, and everything a month does over the whole map (the scenery, the ground's
+  biomes and fields, the towns' growth) grew with it, about 1.5 times.
+- The new ledger of what buildings take in costs about 2.6 ms a month on desktop, half of it
+  shifting each kind's last three months along with `np.roll`.
+
+| | before (0.5.83) | after |
+|---|---|---|
+| Browser: a frame without a month (mean / 95th percentile / worst) | 22.0 / 22.6 / 32.9 ms | 1.8 / 2.0 / 12.2 ms |
+| Browser: trains frozen per month | 228 ms (5–6 frames) | 125 ms (6 frames) |
+| Browser: trains frozen, month with an autosave | 329 ms | 201 ms |
+| Desktop: a frame without a month (mean) | 11.1 ms | 0.9 ms |
+| Desktop: trains frozen per month | 113 ms | 66 ms |
+| Desktop: the ledger's month (`Ledger.record`) | 2.6 ms | 1.7 ms |
+
+What changed (no rule, number or look):
+
+- Only the chain links on screen are drawn (`land_offers.seen_part` clips each side to the
+  screen), each where it lay before on its whole side; the chain's two colours are worked out
+  once a frame; each lot's corners on the map and on the place's picture are kept until a lot is
+  bought or the place's picture changes.
+- The ledger shifts its last three months in place, and finds where cells stand in its books
+  without merging them when it has them all already.
+
+What is left: a month's work is about 110 ms in the browser on the bigger map (the trade, the
+scenery and the ground's fields put up again over the whole map each month the most of it).
+Putting the scenery and fields up only round the cells that changed would be the next step.
+
+## Moving the map, hovering and starting a game in the browser (19 November, 0.5.110)
+
+The complaint: moving the map should stay smooth, hovering the map should cost nothing, and a new
+game should come up sooner. Measured in headless Chrome as above (1440×860 at 2× density, a 60 Hz
+display) on a new game (Poland, seed 1, 1850, the seven-lot start of 48,697 hexes), before =
+staging 0.5.100, after = it with this work, run one after the other. Each zoom level pans 200
+frames across land not yet seen from a different spot of the map; the zoom cycle steps through
+every level and back every 6 frames; hovering moves the mouse across the map every frame with no
+tool, the station tool and the track tool (track from the middle of the view), at zoom 4 and 1.
+Numbers are the Python time of a frame (mean / 95th percentile / worst, ms); every frame of every
+scene kept up with the display (16.7 ms apart) before and after on this machine, so what changed is
+how much room a slower one has.
+
+What was found:
+
+- **Zoomed out, every building was a call of its own.** At zoom 0–2 the map drew each of the
+  ~4,400 buildings' dots with its own imgui call, each looking up its kind's colour: 4–6 ms of
+  every frame, watching or panning. They are now two triangles each in one buffer on the graphics
+  card, handed over when the buildings change, and drawn into a texture in one call when the view
+  moves (`ui/pixel/dots_shader.py`). Where the window smooths edges (the browser's canvas does,
+  though GL reports no samples), a pixel on a dot's edge takes as much of its colour as the dot
+  covers of it, so the dots look as before (checked on screenshots at zoom 0, 1 and 2: no pixel
+  differs by more than the smoothing's rounding, at most 37 levels on single edge pixels).
+- **The chains, padlocks and price tags of all sixteen lots for sale** were drawn every frame,
+  those far off screen too. A lot is now skipped unless its outline, with room for its tag, reaches
+  the screen.
+- **The station tool found its reach's border anew in every cell it crossed**: hundreds of
+  lookups per cell. The same shape of cells moved by an even number of rows has the same border
+  moved with it, so each shape's border is found once (`build_menu.reach_border`).
+- **The ground shader asked GL where its uniforms are on every pass** and looked up each GL
+  function in the page's module on every call; both are now kept after the first time.
+- **The game's first frame compiled the shaders and drew the world map's picture** (130 ms in
+  the browser). Where the game loads on the frames, the shaders are made behind the waiting screen,
+  and the world picture comes from a table of 256 colours (8 ms instead of 46, identical bytes).
+- **The track preview was drawn on the same frame its route was planned on.** It now waits for
+  the next frame, with the last preview showing until then.
+- **A new game spent almost all of its wait growing towns** (9.6 of 10.5 s after pressing Start,
+  in the setup worker). In the browser the setup worker now starts growing the game the main menu
+  would start as soon as its settings have stayed the same for a second (`PageSetup.grow_ahead`,
+  `Shell._grow_ahead`); Start with those settings takes up what it has grown, other settings start
+  it anew, and loading a save or the tutorial stops it. Nothing changes on the desktop.
+
+| Browser, new game | before | after |
+|---|---|---|
+| Start pressed after 15 s in the menu, to the first game frame | 10.02 s | 0.98 s |
+| Start pressed after 5 s in the menu | 10.72 s | 7.01 s |
+| Game started from the address (`?args=`), to the first game frame | 12.08 s | 11.94 s |
+| The game's first frame | 127.5 ms | 33.7 ms |
+| Longest waiting-screen frame | 117–138 ms | 121–142 ms |
+
+| Browser frames (GUI ms: mean / 95th percentile / worst) | before | after |
+|---|---|---|
+| watching at zoom 4 | 2.8 / 4.2 / 9.5 | 2.0 / 3.5 / 6.7 |
+| panning at zoom 0 | 6.1 / 8.6 / 12.7 | 3.6 / 4.7 / 17.9 |
+| panning at zoom 1 | 5.9 / 7.9 / 14.5 | 3.8 / 4.3 / 12.9 |
+| panning at zoom 2 | 4.5 / 5.2 / 6.0 | 2.9 / 3.8 / 4.0 |
+| panning at zoom 3 | 3.8 / 8.7 / 11.2 | 2.9 / 5.8 / 7.8 |
+| panning at zoom 4 | 3.6 / 4.2 / 11.2 | 2.9 / 3.5 / 10.6 |
+| panning at zoom 5 | 3.9 / 5.2 / 9.8 | 3.2 / 4.4 / 8.0 |
+| panning at zoom 6 | 3.5 / 4.5 / 9.9 | 2.6 / 3.8 / 8.6 |
+| panning at zoom 7 | 3.8 / 4.8 / 68.8 | 3.2 / 4.3 / 11.2 |
+| zooming in and out | 3.7 / 8.0 / 10.9 | 2.1 / 4.9 / 9.9 |
+| mouse resting, zoom 0, no tool | 7.8 / 8.3 / 9.8 | 3.4 / 3.9 / 4.2 |
+| mouse resting, zoom 2, no tool | 4.3 / 5.2 / 5.5 | 1.3 / 1.9 / 2.0 |
+| mouse resting, zoom 4, no tool | 2.2 / 3.0 / 7.2 | 1.8 / 2.4 / 7.8 |
+| mouse moving, zoom 4, no tool | 1.8 / 2.4 / 11.5 | 2.3 / 3.1 / 14.9 |
+| mouse resting, zoom 4, station tool | 3.5 / 4.2 / 8.5 | 3.0 / 3.7 / 9.9 |
+| mouse moving, zoom 4, station tool | 3.3 / 8.6 / 12.4 | 2.8 / 4.8 / 8.0 |
+| mouse resting, zoom 4, track tool | 1.7 / 1.9 / 15.1 | 1.8 / 2.8 / 12.6 |
+| mouse moving, zoom 4, track tool | 3.2 / 13.2 / 25.2 | 3.1 / 11.4 / 33.3 |
+| mouse resting, zoom 1, no tool | 7.1 / 8.2 / 11.6 | 3.0 / 3.8 / 4.1 |
+| mouse moving, zoom 1, no tool | 7.2 / 7.8 / 8.5 | 3.3 / 4.0 / 5.2 |
+| mouse resting, zoom 1, station tool | 7.4 / 7.8 / 10.7 | 4.1 / 4.8 / 5.6 |
+| mouse moving, zoom 1, station tool | 8.8 / 10.6 / 12.5 | 3.8 / 4.7 / 5.6 |
+| mouse resting, zoom 1, track tool | 7.1 / 7.5 / 12.9 | 3.6 / 4.2 / 10.7 |
+| mouse moving, zoom 1, track tool | 7.0 / 7.6 / 13.6 | 3.5 / 4.2 / 10.4 |
+
+The worst frames are single ones: chunks arriving from the painting workers and blown up on the
+graphics card (panning, zooming), the first frame at a zoom level, and the track preview.
+
+What is left:
+
+- **The track preview** still takes one frame of 25–35 ms in the browser each time a new route
+  shows (drawing the planned track's pixel art, `PixelWorld.planned_track`); it no longer shares
+  that frame with planning the route. Drawing it in a painting worker, as chunks are, would take it
+  off the frames, but the workers would have to hear of the planned pieces and paint a picture of
+  any size; not done.
+- **Growing the towns** is as dear as before (about 9.6 s in the setup worker, 5.7 s on desktop); a
+  player who presses Start within a few seconds of the menu showing waits most of it. A game started
+  straight from the address grows only after the page has loaded, as before.
+- **The waiting screen** still has six or seven frames of 60–140 ms while the map is prepared
+  after the towns arrive (the pixel world's parts, the scenery, the ground pictures), and the first
+  game frame about 34 ms.

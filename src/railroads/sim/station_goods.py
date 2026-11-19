@@ -5,8 +5,10 @@ their room, and WAITING passengers and mail, who wait only a month before the ne
 in their place. Each storage upgrade adds STORAGE_STEP to every kind of
 freight and WAITING_STEP to the passengers and mail."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+from railroads.sim.clock import QUARTER
 from railroads.sim.goods import TRAVELLERS, Good
 from railroads.sim.trains import Parcels, take_parcels
 
@@ -38,6 +40,21 @@ class StationGoods:
     # Goods kept for trains, which the station doesn't hand out to the buildings around it. A
     # frozenset, so saves from before it existed load with none kept.
     kept: frozenset[Good] = frozenset()
+    # What came to the station in each of the last QUARTER months, the latest last: the freight
+    # it gathered and the passengers and mail who came to wait.
+    months_got: list[dict[Good, float]] = field(default_factory=list)
+
+    def count_month(self, got: Mapping[Good, float]) -> None:
+        """Counts what came to the station this month, forgetting months over a quarter ago."""
+        self.months_got = [*self.months_got[1 - QUARTER :], dict(got)]
+
+    def last_quarter(self) -> dict[Good, float]:
+        """What came to the station over the last QUARTER months, good by good."""
+        total: dict[Good, float] = {}
+        for month in self.months_got:
+            for good, amount in month.items():
+                total[good] = total.get(good, 0.0) + amount
+        return total
 
     @property
     def limit(self) -> float:
@@ -56,6 +73,16 @@ class StationGoods:
     def room(self, good: Good) -> float:
         """How much more of a kind of freight the station can take."""
         return max(0.0, self.limit - self.held(good))
+
+    def freight(self) -> dict[Good, float]:
+        """Every kind of freight the station holds and how much, gathered and brought together:
+        one stockpile, which it hands out and loads onto trains alike."""
+        goods = {*self.stockpile, *self.brought} - set(TRAVELLERS)
+        return {good: self.held(good) for good in goods if self.held(good) > 0}
+
+    def waiting(self) -> dict[Good, float]:
+        """The passengers and mail waiting at the station."""
+        return {good: self.stockpile[good] for good in TRAVELLERS if self.stockpile.get(good)}
 
     @property
     def fullest(self) -> tuple[Good | None, float]:

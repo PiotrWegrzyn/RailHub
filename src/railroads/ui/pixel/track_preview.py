@@ -37,6 +37,7 @@ class TrackPreview:
     def __init__(self, world: PixelWorld) -> None:
         self.world = world
         self._shown: tuple[tuple[Track, ...], int] | None = None
+        self._waiting: tuple[tuple[Track, ...], int] | None = None
         self._texture: hello_imgui.TextureGpu | None = None
         self._rect = (0, 0, 0, 0)
         self._factor = 1
@@ -48,8 +49,14 @@ class TrackPreview:
         density = max(1, round(imgui.get_io().display_framebuffer_scale.x))
         key = (tuple(route.pieces), scale * density)
         if key != self._shown:
-            self._make(list(route.pieces), scale * density)
-            self._shown = key
+            if self._waiting == key:
+                self._make(list(route.pieces), scale * density)
+                self._shown = key
+            else:
+                # Drawn on the next frame, as the frame a route is planned on has already spent
+                # its share on planning it; the last preview shows until then.
+                self._waiting = key
+                hello_imgui.request_refresh()
         if self._texture is None:
             return
         projection = self.world.projection

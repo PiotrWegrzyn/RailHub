@@ -23,7 +23,7 @@ def test_each_year_closes_with_its_stations_and_population() -> None:
     assert growth.history.stations == {1900: 1, 1901: 1}
 
 
-def test_a_car_counts_as_delivered_where_it_leaves_its_load() -> None:
+def test_only_cars_that_unload_count_as_delivered() -> None:
     growth = Growth(Constructions(flat_map()), QUIET)
     for cell in ((6, 3), (6, 20)):
         build_station(growth, cell)

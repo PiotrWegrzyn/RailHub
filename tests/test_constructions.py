@@ -208,7 +208,7 @@ def test_a_port_needs_water_next_to_it() -> None:
     assert inland == "A port needs water next to it"
 
 
-def test_only_mines_salt_works_and_town_buildings_can_be_built_in_mountains() -> None:
+def test_only_mines_quarries_salt_works_and_town_buildings_can_be_built_in_mountains() -> None:
     constructions = Constructions(make_map("m"))
 
     allowed = {
@@ -231,6 +231,7 @@ def test_only_mines_salt_works_and_town_buildings_can_be_built_in_mountains() ->
         BuildingKind.MEGA_BAKERY,
         BuildingKind.TAVERN,
         BuildingKind.CLUB,
+        BuildingKind.SUSHI_HUT,
         BuildingKind.FILLING_STATION,
         BuildingKind.DEPARTMENT_STORE,
         BuildingKind.HOTEL,

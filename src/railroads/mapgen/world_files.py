@@ -6,6 +6,7 @@ under world/ (built by tools/build_world_files.py) so a game reads only the few 
     world/shapes/{col}_{row}.npz    Natural Earth sea, lakes and deserts cut to a SQUARE_DEG square,
                                     and every whole river that crosses it
     world/places/{col}_{row}.npz    the GeoNames places in the square (railroads.places)
+    world/streams/{col}_{row}.npz   the HydroRIVERS reaches starting in the square (railroads.mapgen.streams)
 
 Squares count columns east from 180° W and rows south from 90° N. The desktop game reads the
 files from the world/ folder beside the code or inside the app; the web game, which has no such
@@ -24,6 +25,7 @@ import numpy.typing as npt
 
 from railroads.mapgen.presets import NaturalEarth
 from railroads.mapgen.sources import Shape
+from railroads.mapgen.streams import StreamLines, read_streams
 from railroads.mapgen.terrain_tiles import (
     HeightTile,
     TileElevation,
@@ -105,11 +107,13 @@ class WorldIndex:
     tiles: frozenset[tuple[int, int]]
     shape_squares: frozenset[tuple[int, int]]
     place_squares: frozenset[tuple[int, int]]
+    stream_squares: frozenset[tuple[int, int]] = frozenset()
 
     @classmethod
     def read(cls, data: bytes) -> Self:
         with np.load(io.BytesIO(data)) as arrays:
-            return cls(*(_pairs(arrays[key]) for key in ("tiles", "shapes", "places")))
+            keys = [key for key in ("tiles", "shapes", "places", "streams") if key in arrays]
+            return cls(*(_pairs(arrays[key]) for key in keys))
 
     def write(self) -> bytes:
         out = io.BytesIO()
@@ -118,6 +122,7 @@ class WorldIndex:
             tiles=_array(self.tiles),
             shapes=_array(self.shape_squares),
             places=_array(self.place_squares),
+            streams=_array(self.stream_squares),
         )
         return out.getvalue()
 
@@ -154,12 +159,7 @@ class World:
 
     def natural_earth(self, bounds: Bounds) -> NaturalEarth:
         """Sea, lakes, rivers and deserts on and around the bounds."""
-        wide = Bounds(
-            west=bounds.west - SHAPES_MARGIN_DEG,
-            east=bounds.east + SHAPES_MARGIN_DEG,
-            south=bounds.south - SHAPES_MARGIN_DEG,
-            north=bounds.north + SHAPES_MARGIN_DEG,
-        )
+        wide = _widened(bounds)
         ocean: list[Shape] = []
         lakes: list[Shape] = []
         deserts: list[Shape] = []
@@ -176,6 +176,16 @@ class World:
             deserts += found.deserts
             rivers |= dict(zip(found.river_ids, found.rivers, strict=True))
         return NaturalEarth(ocean=ocean, lakes=lakes, rivers=list(rivers.values()), deserts=deserts)
+
+    def streams(self, bounds: Bounds) -> StreamLines:
+        """The reaches of minor rivers starting on and around the bounds."""
+        found = []
+        for square in squares_over(_widened(bounds)):
+            if square in self.index.stream_squares:
+                data = self.files.read(streams_file(*square))
+                if data is not None:
+                    found.append(read_streams(data))
+        return StreamLines.joined(found)
 
     def places_files(self, bounds: Bounds) -> Iterator[bytes]:
         """The places files of the squares the bounds touch."""
@@ -207,6 +217,19 @@ def shapes_file(col: int, row: int) -> str:
 
 def places_file(col: int, row: int) -> str:
     return f"places/{col}_{row}.npz"
+
+
+def streams_file(col: int, row: int) -> str:
+    return f"streams/{col}_{row}.npz"
+
+
+def _widened(bounds: Bounds) -> Bounds:
+    return Bounds(
+        west=bounds.west - SHAPES_MARGIN_DEG,
+        east=bounds.east + SHAPES_MARGIN_DEG,
+        south=bounds.south - SHAPES_MARGIN_DEG,
+        north=bounds.north + SHAPES_MARGIN_DEG,
+    )
 
 
 def square_of(lon: float, lat: float) -> tuple[int, int]:

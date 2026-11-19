@@ -12,8 +12,9 @@ from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetat
 from railroads.ui import building_spots
 from railroads.ui.build_menu import draw_track
 from railroads.ui.building_spots import BuildingSpots, Plot, plots_of
-from railroads.ui.buildings import draw_building_dots
+from railroads.ui.buildings import DOTS, dot_looks, draw_building_dots
 from railroads.ui.iso_camera import IsoCamera
+from railroads.ui.pixel.dots_shader import dot_vertices
 
 
 def make_constructions(grid_type: type[Grid] = HexGrid) -> Constructions:
@@ -123,6 +124,21 @@ def test_buildings_off_screen_are_not_drawn(draw_list: imgui.ImDrawList) -> None
     draw_building_dots(draw_list, camera, (640.0, 400.0), ((0.0, 0.0), (1280.0, 800.0)), spots)
 
     assert draw_list.vtx_buffer.size() == before
+
+
+def test_each_building_dot_is_two_triangles_at_its_spot_in_its_kinds_colour() -> None:
+    spots = BuildingSpots.of(make_constructions())
+    radii, colours = dot_looks(spots)
+
+    vertices = dot_vertices(spots.x, spots.y, radii, colours).reshape(len(spots.kinds), 6)
+
+    first = vertices[0]
+    rgb, radius = DOTS[spots.kinds[0]]
+    assert len(vertices) == len(spots.kinds)
+    assert np.allclose(first["place"], (spots.x[0], spots.y[0]))
+    assert {tuple(corner) for corner in first["corner"]} == {(-1, -1), (1, -1), (1, 1), (-1, 1)}
+    assert np.allclose(first["radius"], radius)
+    assert (first["tint"] == (*rgb, 255)).all()
 
 
 def test_a_field_covers_its_whole_cell() -> None:
