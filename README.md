@@ -228,7 +228,7 @@ terrain (land, sea, lake, river), vegetation (barren, grass, forest), temperatur
 hot), height in metres and whether a minor river flows through it. A minor river leaves the cell
 land that anything can be built on and track crosses without a bridge for twice the price of
 dry land, takes no room, and counts
-as fresh water by a river for what grows there and beside it. Each property is one numpy layer, saved together with the map's scale,
+as fresh water by a river for what grows in that cell, though not beside it. Each property is one numpy layer, saved together with the map's scale,
 cell shape, bounds and data sources in one `.npz` file.
 
 `railroads.mapgen` makes a map by laying a grid over a lon/lat box and filling in each property
@@ -417,7 +417,7 @@ cell times that point's satisfaction (homes take the town ladder's chance instea
 chance holds anywhere the land allows, good surroundings raise it, and what is satisfied breeds
 far faster.
 The land multiplies the chance by its vegetation, relief, temperature and the best water next to
-the cell. Rivers, lakes and minor rivers are fresh water; the sea is salty, so it helps no more
+the cell. Rivers, lakes and minor rivers (in their own cell only) are fresh water; the sea is salty, so it helps no more
 than dry land unless a row names it:
 
 | Ladder | Chance per month | Needs nearby | Land |
@@ -1057,8 +1057,9 @@ station's name shows on a tag above it.
 
 A game starts with $100,000 (`railroads.sim.finance`). Track costs $600 a cell on the flat, $900
 in hills, twice that across a minor river, $20,000 a cell of bridge and $40,000 a cell of tunnel;
-electric track $450 a cell more, and double track 3 times as much as single, wires included, so a
-cell on the flat costs $1,800 double, $1,050 electric and $3,150 double and electric; maglev track $4,000 a cell more, with no
+electric track 5 times as much as the same track without wires, and only once an electric engine is
+on sale; double track 3 times as much as single, so a cell on the flat costs $1,800 double, $3,000
+electric and $9,000 double and electric; maglev track $4,000 a cell more, with no
 wires. A station costs $15,000 and the Planet $10,000, which
 sells back for half. Stations rise through five levels, for $50,000, $250,000, $1,500,000 and
 $10,000,000: a new one hands goods out a cell around it, and each level a cell further, gathers
@@ -1147,7 +1148,8 @@ as the real track would look, greyed out, once the pointer rests on a cell for a
 turns at most 60 degrees per cell, through edges or corners, bridging rivers and lakes and
 tunnelling through mountains, and makes room the same way. Each bend costs it as much as 0.6 of
 a cell of new track, so it runs straight and turns seldom instead of zigzagging. Every building it would have to move out of the way costs it as much as 2.5 cells of track, and half a cell more for each unit of room the building takes, so it goes round farms, works and towns rather than through them. Buildings sharing a cell with track stand beside it, at least a quarter of a cell from its middle. While the track tool is on, the bar
-chooses single or double track and whether it is electric, or, once the maglev is on sale, maglev.
+chooses single or double track and, once an electric engine is on sale, whether it is electric,
+or, once the maglev is on sale, maglev.
 Track lays only along the way it was
 planned: started on track already laid, its first piece branches off where that track runs on,
 turning at most 60 degrees, so trains can run from one onto the other; ended on track, its last

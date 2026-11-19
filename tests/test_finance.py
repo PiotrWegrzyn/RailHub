@@ -48,8 +48,8 @@ def test_money_shows_in_whole_dollars(amount: float, shown: str) -> None:
     [
         (Track((0, 0), (0, 6)), FLAT, 600),
         (Track((0, 0), (0, 6), TrackWidth.DOUBLE), FLAT, 1800),
-        (Track((0, 0), (0, 6), electric=True), FLAT, 1050),
-        (Track((0, 0), (0, 6), TrackWidth.DOUBLE, electric=True), FLAT, 3150),
+        (Track((0, 0), (0, 6), electric=True), FLAT, 3000),
+        (Track((0, 0), (0, 6), TrackWidth.DOUBLE, electric=True), FLAT, 9000),
         (Track((0, 0), (0, 6), TrackWidth.DOUBLE, TrackBed.BRIDGE), RIVER, 60_000),
     ],
 )

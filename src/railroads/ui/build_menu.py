@@ -23,7 +23,7 @@ from railroads.sim.demolition import (
 from railroads.sim.finance import (
     DOUBLE_TRACK_FACTOR,
     DOUBLE_TRACK_UPKEEP_FACTOR,
-    ELECTRIC_TRACK_PRICE,
+    ELECTRIC_TRACK_FACTOR,
     ELECTRIC_TRACK_UPKEEP,
     MAGLEV_TRACK_PRICE,
     MAGLEV_TRACK_UPKEEP,
@@ -103,11 +103,11 @@ HINTS = {
     ),
     Tool.TRACK: (
         f"Click where track starts, then where it goes; starting or ending on track joins it. "
-        f"{dollars(TRACK_PRICE)} a cell on the flat, {dollars(HILLS_PRICE)} in hills, twice that across a minor river, "
-        f"{dollars(BRIDGE_PRICE)} a bridge, {dollars(TUNNEL_PRICE)} a tunnel; double track "
-        f"{DOUBLE_TRACK_FACTOR:g} times as much, and electric {dollars(ELECTRIC_TRACK_PRICE)} "
-        f"a cell more. Laying it along your track widens or electrifies that. Buildings in the way "
-        "cost what taking them down does. Right click cancels."
+        f"{dollars(TRACK_PRICE)} a cell on the flat, {dollars(HILLS_PRICE)} in hills, twice that "
+        f"across a minor river, {dollars(BRIDGE_PRICE)} a bridge, {dollars(TUNNEL_PRICE)} a tunnel; "
+        f"double track {DOUBLE_TRACK_FACTOR:g} times as much, and electric "
+        f"{ELECTRIC_TRACK_FACTOR:g} times as much again. Laying it along your track widens or "
+        "electrifies that. Buildings in the way cost what taking them down does. Right click cancels."
     ),
     Tool.BULLDOZE: (
         f"Click a cell to clear it: homes from {dollars(DEMOLITION_PER_POINT[Points.POPULATION])}, "
@@ -146,9 +146,10 @@ WIDTH_BUTTONS = (
     ),
 )
 ELECTRIC_TIP = (
-    f"Wires over the track for electric engines: {dollars(ELECTRIC_TRACK_PRICE)} a cell more, "
-    f"{dollars(ELECTRIC_TRACK_UPKEEP)} a month more ({DOUBLE_TRACK_UPKEEP_FACTOR:g} times that on double "
-    "track). Lay it over your track to electrify that."
+    f"Wires over the track for electric engines, once electric engines are on sale: "
+    f"{ELECTRIC_TRACK_FACTOR:g} times the track's price, {dollars(ELECTRIC_TRACK_UPKEEP)} a month "
+    f"more ({DOUBLE_TRACK_UPKEEP_FACTOR:g} times that on double track). Lay it over your track to "
+    "electrify that."
 )
 MAGLEV_TIP = (
     f"A concrete guideway for maglev engines, which run on nothing else, and nothing else runs "
@@ -189,6 +190,8 @@ class BuildMenu:
     maglev: bool = False
     # Whether maglev track can be laid yet (Railway.maglev_open).
     maglev_open: bool = False
+    # Whether electric track can be laid yet (Railway.electric_open).
+    electric_open: bool = False
     trains: TrainsWindow = field(default_factory=TrainsWindow)
     stations: StationsWindow = field(default_factory=StationsWindow)
 
@@ -242,10 +245,13 @@ class BuildMenu:
             if toggle_button(label, self.track_width == width, tooltip, (0, BUTTON_HEIGHT)):
                 self.lay(width, self.electric, self.maglev)
             imgui.same_line()
-        label = f"{fa.ICON_FA_BOLT}  Electric"
-        if toggle_button(label, self.electric, ELECTRIC_TIP, (0, BUTTON_HEIGHT)):
-            self.lay(self.track_width, not self.electric)
-        imgui.same_line()
+        if self.electric_open:
+            label = f"{fa.ICON_FA_BOLT}  Electric"
+            if toggle_button(label, self.electric, ELECTRIC_TIP, (0, BUTTON_HEIGHT)):
+                self.lay(self.track_width, not self.electric)
+            imgui.same_line()
+        elif self.electric:
+            self.lay(self.track_width, False, self.maglev)
         if not self.maglev_open:
             if self.maglev:
                 self.lay(self.track_width, self.electric)

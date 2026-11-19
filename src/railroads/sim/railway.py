@@ -225,6 +225,16 @@ class Railway:
             for engine in ENGINES.values()
         )
 
+    @property
+    def electric_open(self) -> bool:
+        """Whether the player can lay electric track: once an electric engine's year has come
+        and they have its tech."""
+        taken = self.research.taken
+        return any(
+            engine.electric and engine.year <= self.year and all(n in taken for n in engine.needs)
+            for engine in ENGINES.values()
+        )
+
     def engines(self) -> list[str]:
         """The engines the player can buy now: those whose year has come and whose tech they
         have, but not those a newer one of their line has replaced (Engine.replaces)."""

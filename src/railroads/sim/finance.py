@@ -14,10 +14,10 @@ from railroads.sim.track_rules import track_rules_for
 
 START_CASH = 100_000.0
 # Track costs TRACK_PRICE per cell times its bed's cost factor (railroads.sim.track_rules), and
-# electrifying it ELECTRIC_TRACK_PRICE more, or making it a maglev guideway MAGLEV_TRACK_PRICE
-# more; double track costs DOUBLE_TRACK_FACTOR as much.
+# electric track ELECTRIC_TRACK_FACTOR times that, or a maglev guideway MAGLEV_TRACK_PRICE more;
+# double track costs DOUBLE_TRACK_FACTOR as much.
 TRACK_PRICE = 600.0
-ELECTRIC_TRACK_PRICE = 450.0
+ELECTRIC_TRACK_FACTOR = 5.0
 MAGLEV_TRACK_PRICE = 4_000.0
 DOUBLE_TRACK_FACTOR = 3.0
 STATION_PRICE = 15_000.0
@@ -68,7 +68,8 @@ def storage_price(upgrades: int) -> float:
 def track_price(piece: Track, tile: Tile) -> float:
     """What laying this piece of track in this cell costs."""
     price = TRACK_PRICE * track_rules_for(tile, piece.bed).price_factor
-    return _dressed(price, piece, ELECTRIC_TRACK_PRICE, MAGLEV_TRACK_PRICE)
+    price *= ELECTRIC_TRACK_FACTOR if piece.electric else 1.0
+    return _dressed(price, piece, 0.0, MAGLEV_TRACK_PRICE)
 
 
 def _dressed(
