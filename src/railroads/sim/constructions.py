@@ -80,7 +80,8 @@ class BuildingKind(Enum):
     AIRPORT = "airport"
     STEEL_MILL = "steel mill"
     SHIPYARD = "shipyard"
-    LUMBER_MILL = "lumber mill"
+    LOGGING_CAMP = "logging camp"
+    SAWMILL = "sawmill"
     PORT = "port"
     CLAY_PIT = "clay pit"
     LIMESTONE_QUARRY = "limestone quarry"
@@ -284,7 +285,8 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     BuildingKind.BIG_FACTORY: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.MEGA_FACTORY: BuildingRules(relief=_OFF_MOUNTAINS, space=CELL_SPACE),
     BuildingKind.SKYSCRAPER: BuildingRules(relief=frozenset(Relief)),
-    BuildingKind.LUMBER_MILL: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    BuildingKind.LOGGING_CAMP: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
+    BuildingKind.SAWMILL: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.GASWORKS: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.COKE_PLANT: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.TILE_WORKS: BuildingRules(relief=_OFF_MOUNTAINS, space=3),

@@ -23,7 +23,7 @@ from railroads.sim.ladders import (
     FOOD_PLANTS,
     FOOD_TOWN,
     LADDERS,
-    LUMBER_MILLS,
+    LOGGING_CAMPS,
     MINES,
     OPEN_FIELD,
     POINTS,
@@ -115,8 +115,8 @@ def test_land_weights_of_one_cell_multiply_and_the_best_water_counts() -> None:
         (FARMS, (5, 5), True),
         (FARMS, (2, 6), True),
         (FARMS, (5, -1), False),
-        (LUMBER_MILLS, (1, 6), False),
-        (LUMBER_MILLS, (5, 5), False),
+        (LOGGING_CAMPS, (1, 6), False),
+        (LOGGING_CAMPS, (5, 5), False),
         (MINES, (5, -1), True),
         (MINES, (5, 5), True),
         (PORTS, (5, 1), True),
@@ -539,7 +539,7 @@ def test_the_log_holds_every_change_months_make_to_the_counts() -> None:
     for cell in ((5, 9), (13, 9)):
         build(constructions, cell, BuildingKind.FARM, 1)
     for cell in ((3, 16), (15, 17)):
-        build(constructions, cell, BuildingKind.LUMBER_MILL, 1)
+        build(constructions, cell, BuildingKind.LOGGING_CAMP, 1)
     busy = tuple(replace(ladder, base_chance=ladder.base_chance + 0.002) for ladder in LADDERS)
     growth = Growth(constructions, GrowthRule(ladders=busy))
     rng = np.random.default_rng(2)

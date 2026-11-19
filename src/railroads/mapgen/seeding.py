@@ -1,5 +1,5 @@
 """Seeds a new map with its towns and industry by letting it grow (railroads.sim.growth) for the
-years before play, from HISTORY_START on: houses, farms, orchards, mines, lumber mills, ports and factories all come up
+years before play, from HISTORY_START on: houses, farms, orchards, mines, logging camps, ports and factories all come up
 where chance, the land and their neighbours take them. Stations and track are left for the player.
 """
 

@@ -1,5 +1,5 @@
 """The map grows by itself, a month at a time, like a cellular automaton, by the ladders of
-railroads.sim.ladders: towns, farms, orchards, mines, lumber mills, ports and every kind of works.
+railroads.sim.ladders: towns, farms, orchards, mines, logging camps, ports and every kind of works.
 
 Buildings breed (breeding_of): a cell's chance of another of a ladder's kinds is
 
@@ -41,7 +41,7 @@ one more of its first kind, in its likeliest cell: at least one of everything th
 year, and of the key buildings (KEY_BUILDINGS) at least KEY_LEAST on a map of KEY_LAND_CELLS land
 cells, more or fewer by the land, put on any land they could stand on where none is likely.
 
-Forests come and go as well (railroads.sim.forests): people, industry and above all lumber mills
+Forests come and go as well (railroads.sim.forests): people, industry and above all logging camps
 clear them, they spread onto open grassland beside them, and the land weighs again wherever they
 changed.
 

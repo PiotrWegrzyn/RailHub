@@ -57,7 +57,7 @@ def test_diesel_fuel_heats_a_home() -> None:
 def test_diesel_is_shared_out_before_what_it_helps_make() -> None:
     fuel = PIPELINE.index(Need.FUEL)
 
-    later = [PIPELINE.index(need) for need in (Need.LUMBER, Need.COAL, Need.IRON, Need.WHEAT)]
+    later = [PIPELINE.index(need) for need in (Need.PLANKS, Need.COAL, Need.IRON, Need.WHEAT)]
 
     assert all(fuel < step for step in later)
 

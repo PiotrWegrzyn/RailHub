@@ -60,7 +60,7 @@ def fuel_of(engine: Engine) -> Fuel:
 
 # The good a fuel is, which trains can take from a station's stockpile; electricity is no good.
 GOOD_OF: Mapping[Fuel, Good] = MappingProxyType(
-    {Fuel.COAL: Good.COAL, Fuel.WOOD: Good.LUMBER, Fuel.DIESEL: Good.FUEL}
+    {Fuel.COAL: Good.COAL, Fuel.WOOD: Good.LOGS, Fuel.DIESEL: Good.FUEL}
 )
 # Each kind of power plant and what it burns.
 PLANT_FUEL: Mapping[BuildingKind, Need] = MappingProxyType(

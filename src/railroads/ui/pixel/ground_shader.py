@@ -722,7 +722,7 @@ float table_hash(int a, int b, int seed) {
 
 # Which art pixels woods cover, as Ground._wooded and Ground.canopy work it out: land where the
 # woods' share of the cells round it, frayed by noise, is over half, but for the clearings round
-# lumber mills and bare mountainsides; then how deeply trees shade the grass there
+# logging camps and bare mountainsides; then how deeply trees shade the grass there
 # (Ground._tree_shade) and whether the art pixel lies on the map.
 WOODS = """out vec4 colour;
 uniform ivec2 art_origin;
@@ -2131,7 +2131,7 @@ class GroundShader:
     def set_surfaces(self, ground: cpu.Ground, version: object) -> None:
         """Takes what is drawn over the ground from `ground`: each cell's say in the woods and
         whether it is land, where trees stand, whose shade lies on the grass round them, where
-        lumber mills clear the woods round them, the fields and groves and the buildings' yards."""
+        logging camps clear the woods round them, the fields and groves and the buildings' yards."""
         GL.glDeleteTextures(1, [self._woodland])
         self._woodland = _floats(np.pad(ground.woodland, ((0, 0), (0, 0), (0, 2))))
         self._trees = np.stack(ground.trees, axis=-1).astype(np.float32).reshape(-1, 2)

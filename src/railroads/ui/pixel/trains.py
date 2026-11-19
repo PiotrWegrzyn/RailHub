@@ -63,6 +63,8 @@ WINDOW: RGB = (44, 52, 68)
 COAL: RGB = (28, 28, 30)
 LOG: RGB = (148, 98, 56)
 LOG_END: RGB = (200, 160, 110)
+PLANK: RGB = (206, 168, 112)
+PLANK_END: RGB = (232, 204, 150)
 STEEL: RGB = (150, 166, 186)
 DECK: RGB = (104, 74, 48)
 BOXCAR: RGB = (138, 56, 42)
@@ -138,6 +140,7 @@ HOPPERS: dict[Good, tuple[RGB, RGB]] = {
     Good.LIMESTONE: ((120, 118, 112), (226, 222, 204)),
     Good.SAND: ((124, 110, 80), (240, 220, 150)),
     Good.CEMENT: ((150, 150, 148), (196, 196, 192)),
+    Good.WOOD_CHIPS: ((112, 88, 62), (214, 180, 122)),
 }
 # Low wagons heaped with a load, and tank cars.
 HEAPS: dict[Good, RGB] = {
@@ -2090,6 +2093,23 @@ def _steel_wagon(m: Model, good: Good, full: bool) -> None:
         m.box((-h + 0.05, h - 0.05), (-0.03, 0.03), (0.13, 0.165), STEEL)
 
 
+def _plank_wagon(m: Model, good: Good, full: bool) -> None:
+    """A stake wagon with two stacks of sawn boards, their ends showing pale, and the gaps
+    between the layers."""
+    h = CAR_HALF
+    _deck(m)
+    _stakes(m)
+    if full:
+        for v in (-0.04, 0.04):
+            m.box((-h + 0.03, h - 0.03), (v - 0.032, v + 0.032), (0.085, 0.16), PLANK)
+            parts.lines(
+                m, (-h + 0.03, h - 0.03), (0.085, 0.16), abs(v) + 0.0326, shade(PLANK, 0.7), 3
+            )
+        with m.fine():
+            for u in (-h + 0.03, h - 0.03):
+                m.box((u - 0.004, u + 0.004), (-0.07, 0.07), (0.085, 0.16), PLANK_END)
+
+
 # The body of each car that is not a van, hopper, heap or tank (VANS, HOPPERS, HEAPS, TANKS).
 CAR_BODIES: dict[Good, CarBody] = {
     Good.CARS: _car_carrier,
@@ -2107,7 +2127,8 @@ CAR_BODIES: dict[Good, CarBody] = {
     Good.DATES: _fruit_wagon,
     Good.ORANGES: _fruit_wagon,
     Good.COAL: _coal_hopper,
-    Good.LUMBER: _log_wagon,
+    Good.LOGS: _log_wagon,
+    Good.PLANKS: _plank_wagon,
     Good.PASSENGERS: _coach,
     Good.MAIL: _mail_van,
     Good.STEEL: _steel_wagon,

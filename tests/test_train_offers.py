@@ -11,12 +11,12 @@ from railroads.ui.station_offers import goods_to_load
 def test_a_station_supplies_what_buildings_in_its_reach_make() -> None:
     growth, _ = joined_stations()
     growth.build(Building((6, 22), BuildingKind.MINE))
-    growth.build(Building((6, 12), BuildingKind.LUMBER_MILL))
+    growth.build(Building((6, 12), BuildingKind.LOGGING_CAMP))
 
     made = growth.station_trade.supplies((6, 20))
 
     assert set(makes_of(BuildingKind.MINE, growth.year)) <= set(made)
-    assert Good.LUMBER not in made
+    assert Good.PLANKS not in made
 
 
 def test_a_station_offers_what_a_processor_in_reach_makes_before_it_has_gathered_any() -> None:

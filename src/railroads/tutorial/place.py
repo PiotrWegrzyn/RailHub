@@ -5,7 +5,7 @@ The place is PLACE_SIZE cells a side. The land is drawn on the SQUARE_SIZE squar
 in (row, column) cells of the square; the game plays on the honeycomb of seven lots in the middle
 of the place, like any game (railroads.sim.lots), which holds the whole drawing, and the land
 around it is for sale. Two towns stand on it, Ashford in the west and Brookby in the east, with a
-coal mine in the hills to the north-west and a lumber mill in the forest to the north-east. The
+coal mine in the hills to the north-west and a logging camp in the forest to the north-east. The
 cells below are cells of the game's map, the honeycomb's window on the place (MAP_TOP, MAP_LEFT).
 """
 
@@ -71,7 +71,7 @@ HOUSE_CHANCE = (1.0, 1.0, 0.8, 0.4)
 CROWDED_FIELD = 8
 # The random numbers that pick which cells are built up, the same every time.
 LAYOUT_SEED = 1066
-# Where the mine, the lumber mill and the hamlets beside them stand, on the drawn square, and
+# Where the mine, the logging camp and the hamlets beside them stand, on the drawn square, and
 # the peaks the mine sits under, in the hills at their foot.
 MINE = (5, 6)
 PEAKS = (2, 4)
@@ -88,7 +88,7 @@ def _layout() -> dict[Cell, tuple[BuildingKind, ...]]:
     """Ashford: a farming village of a few houses, a bakery and a church, among fields that make
     more food than it eats. Brookby: a market town of houses and tenements round a free cell,
     thinning out at its edges, with no fields near enough to feed it, so it wants the food
-    trains bring. A coal mine in the hills under the peaks and a lumber mill in the forest, each
+    trains bring. A coal mine in the hills under the peaks and a logging camp in the forest, each
     with a hamlet."""
     grid = _grid()
     rng = np.random.default_rng(LAYOUT_SEED)
@@ -122,7 +122,7 @@ def _layout() -> dict[Cell, tuple[BuildingKind, ...]]:
     layout[church] = (BuildingKind.CHURCH,) + layout[church][1:]
     layout[on_map(MINE)] = (BuildingKind.MINE,)
     layout[on_map((6, 7))] = (H, H)
-    layout[on_map(MILL)] = (BuildingKind.LUMBER_MILL,)
+    layout[on_map(MILL)] = (BuildingKind.LOGGING_CAMP,)
     layout[on_map((7, 23))] = (H,)
     return layout
 

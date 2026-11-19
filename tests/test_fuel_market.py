@@ -84,15 +84,15 @@ def test_coal_out_of_the_stations_stockpile_costs_only_the_market_price() -> Non
     assert stocked.station_goods(WEST).stockpile[Good.COAL] < 100.0
 
 
-def test_the_american_burns_wood_taking_lumber_out_of_the_stations_stockpile() -> None:
+def test_the_american_burns_wood_taking_logs_out_of_the_stations_stockpile() -> None:
     railway = line(1860)
-    railway.station_goods(WEST).stockpile[Good.LUMBER] = 100.0
+    railway.station_goods(WEST).stockpile[Good.LOGS] = 100.0
 
     wood = set_off(railway, "american", Fuel.WOOD)
 
     assert wood > 0
     assert railway.finances.month.get(Fuel.COAL.value, 0.0) == 0
-    assert railway.station_goods(WEST).stockpile[Good.LUMBER] < 100.0
+    assert railway.station_goods(WEST).stockpile[Good.LOGS] < 100.0
 
 
 @pytest.mark.parametrize(

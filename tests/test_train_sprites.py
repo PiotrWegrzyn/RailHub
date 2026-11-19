@@ -31,7 +31,7 @@ EVERY_KIND_OF_FACE = {
     "planet": (Look.ENGINE, "planet"),
     "express": (Look.ENGINE, "express"),
     "pacific tender": (Look.TENDER, "pacific"),
-    "lumber": (Good.LUMBER, True),
+    "logs": (Good.LOGS, True),
     "oil": (Good.OIL, True),
     "tank wagon": (Good.TANKS, True),
 }
