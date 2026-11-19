@@ -226,15 +226,15 @@ def test_houses_coming_up_in_one_cell_spread_over_it_and_its_neighbours() -> Non
     assert len(changed) > 3
 
 
-@pytest.mark.parametrize(("houses", "pulled_down"), [(7, False), (8, True)])
-def test_eight_people_nearby_crowd_out_a_farm(houses: int, pulled_down: bool) -> None:
+@pytest.mark.parametrize(("houses", "pulled_down"), [(4, False), (5, True)])
+def test_five_people_nearby_crowd_out_a_farm(houses: int, pulled_down: bool) -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
     build(constructions, (5, 5), BuildingKind.FARM, 1)
     build(constructions, (9, 9), BuildingKind.FARM, 1)
     first, second = tile_map.grid.neighbours(5, 5)[:2]
-    build(constructions, first, BuildingKind.HOUSE, 4)
-    build(constructions, second, BuildingKind.HOUSE, houses - 4)
+    build(constructions, first, BuildingKind.HOUSE, 3)
+    build(constructions, second, BuildingKind.HOUSE, houses - 3)
     growth = Growth(constructions, NO_TRADE)
 
     changed = growth._crowd_out()
@@ -259,13 +259,13 @@ def test_a_town_crowds_out_potato_farms_as_well() -> None:
     assert growth.count(BuildingKind.POTATO_FARM)[5, 5] == 0
 
 
-@pytest.mark.parametrize(("houses", "grows"), [(7, True), (8, False)])
-def test_farms_never_grow_where_eight_people_live_nearby(houses: int, grows: bool) -> None:
+@pytest.mark.parametrize(("houses", "grows"), [(4, True), (5, False)])
+def test_farms_never_grow_where_five_people_live_nearby(houses: int, grows: bool) -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
     first, second = tile_map.grid.neighbours(5, 5)[:2]
-    build(constructions, first, BuildingKind.HOUSE, 4)
-    build(constructions, second, BuildingKind.HOUSE, houses - 4)
+    build(constructions, first, BuildingKind.HOUSE, 3)
+    build(constructions, second, BuildingKind.HOUSE, houses - 3)
     growth = Growth(constructions, NO_TRADE)
 
     chance = growth.chances(FARMS)[5, 5]

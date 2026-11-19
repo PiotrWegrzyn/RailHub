@@ -44,7 +44,7 @@ Cells = npt.NDArray[np.intp]
 
 
 # Farms with this many population points around them or more are pulled down, and none grow there.
-FARMS_CROWDED_OUT = 8
+FARMS_CROWDED_OUT = 5
 
 # How much likelier farms, orchards and other fields are on open flat grassland with nothing
 # built on it.
