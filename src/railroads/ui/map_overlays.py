@@ -68,6 +68,11 @@ NAMES_FROM_ZOOM = 2
 # far right of the cell's middle, both in cell widths, and its colours.
 FLAGS_FROM_WIDTH = 24.0
 FLAG_HEIGHT = 0.45
+# Over buildings the player controls (railroads.sim.ownership.CONTROL) the flag stands this many
+# times as tall and waves: its cloth in so many strips, rippling so fast, in radians a second.
+BIG_FLAG = 1.6
+WAVE_STRIPS = 6
+WAVE_SPEED = 4.0
 FLAG_RIGHT = 0.3
 FLAG_POLE = (0.15, 0.12, 0.1, 1.0)
 FLAG_CLOTH = (0.14, 0.3, 0.72, 1.0)
@@ -177,24 +182,54 @@ def draw_station_names(
 def draw_owned_flags(
     draw_list: imgui.ImDrawList, camera: IsoCamera, grid: Grid, owners: Owners, center: Vec2
 ) -> None:
-    """A small flag in the company's colours over every cell where the player owns a building,
-    once a cell is FLAGS_FROM_WIDTH pixels wide."""
+    """A flag in the company's colours over every cell where the player owns a building, once a
+    cell is FLAGS_FROM_WIDTH pixels wide: a small one, or a big waving one where they control
+    the buildings of a kind."""
     width = camera.cell_width
     if width < FLAGS_FROM_WIDTH:
         return
-    pole = rgba_u32(FLAG_POLE)
-    cloth = rgba_u32(FLAG_CLOTH)
-    stripe = rgba_u32(FLAG_STRIPE)
-    height = width * FLAG_HEIGHT
+    colours = rgba_u32(FLAG_POLE), rgba_u32(FLAG_CLOTH), rgba_u32(FLAG_STRIPE)
+    now = imgui.get_time()
     for cell in owners.cells():
         x, y = camera.to_screen(*grid.center(*cell), center)
+        big = owners.controls_any(cell)
+        height = width * FLAG_HEIGHT * (BIG_FLAG if big else 1.0)
         foot = (x + width * FLAG_RIGHT, y)
         top = (foot[0], y - height)
-        draw_list.add_line(foot, top, pole, max(1.0, width / 40))
-        far = (top[0] + height * 0.6, top[1] + height * 0.35)
+        draw_list.add_line(foot, top, colours[0], max(1.0, width / 40))
+        _draw_cloth(draw_list, top, height, colours[1:], now if big else None)
+
+
+def _draw_cloth(
+    draw_list: imgui.ImDrawList,
+    top: Vec2,
+    height: float,
+    colours: tuple[int, int],
+    now: float | None,
+) -> None:
+    """A flag's cloth hanging from the top of its pole, still, or rippling at this time."""
+    cloth, stripe = colours
+    long, deep = height * 0.6, height * 0.35
+    if now is None:
+        far = (top[0] + long, top[1] + deep)
         draw_list.add_rect_filled(top, far, cloth)
-        middle = top[1] + height * 0.35 / 2
+        middle = top[1] + deep / 2
         draw_list.add_line((top[0], middle), (far[0], middle), stripe, max(1.0, height * 0.08))
+        return
+    step = long / WAVE_STRIPS
+
+    def lift(index: int) -> float:
+        return math.sin(now * WAVE_SPEED - index * 0.9) * deep * 0.12 * index / WAVE_STRIPS
+
+    for index in range(WAVE_STRIPS):
+        left, right = top[0] + index * step, top[0] + (index + 1) * step
+        near, far = top[1] + lift(index), top[1] + lift(index + 1)
+        draw_list.add_quad_filled(
+            (left, near), (right, far), (right, far + deep), (left, near + deep), cloth
+        )
+        draw_list.add_line(
+            (left, near + deep / 2), (right, far + deep / 2), stripe, max(1.0, height * 0.06)
+        )
 
 
 def draw_compass(draw_list: imgui.ImDrawList, camera: IsoCamera, anchor: Vec2) -> None:

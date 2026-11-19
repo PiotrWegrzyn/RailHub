@@ -965,3 +965,19 @@ def test_wheat_doubles_a_sheep_farms_wool_and_machinery_adds_as_much_again_to_on
     gathered = trade.gathered[STATION].get(Good.WOOL, 0.0)
     brought = trade.owned_brought[STATION].get(Good.WOOL, 0.0)
     assert gathered + brought == pytest.approx(wool)
+
+
+def test_a_farm_the_player_controls_takes_machinery_whole_and_they_get_their_part_of_it() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    economy.year = 1900
+    placed = counts(tile_map, (STATION, BuildingKind.FARM, 1))
+    one = placed[BuildingKind.FARM].ravel().astype(np.float64)
+    owners = {BuildingKind.FARM: OwnedShare(0.6 * one, 1.0, frozenset({Need.MACHINERY}), one)}
+
+    trade = economy.trade(placed, holding(1000.0, MACHINERY=50.0), owned=owners)
+
+    gathered = trade.gathered[STATION].get(Good.WHEAT, 0.0)
+    brought = trade.owned_brought[STATION].get(Good.WHEAT, 0.0)
+    assert gathered + brought == pytest.approx(3.0 * FARM_MONTH)
+    assert brought == pytest.approx(0.6 * 3.0 * FARM_MONTH)

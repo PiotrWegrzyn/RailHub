@@ -42,8 +42,10 @@ The ideas every rule of the game should follow, the most important first.
   first, buildings as near sharing by how short they are, but without the falloff within its
   delivery reach. Where a starving building stands decides whether it is fed.
 - A station not joined by track to another station gathers and hands out nothing.
-- The player can buy shares of buildings, a thousand to a building, traded a hundred at a time. A
-  whole building costs ten years of all it makes at full satisfaction, two thirds of that at none
+- The player can buy shares of buildings, a thousand to a building, traded 100, 200 or 600 at a
+  time. With 60% of a building's shares the player controls it: their flag flies big over it and
+  their tech works on all of it, not just their part; more shares only raise their part. A whole
+  building costs ten years of all it makes at full satisfaction, two thirds of that at none
   and twice at 200%, by how satisfied it was over the last quarter, and shares bought can be sold
   only five years later. The player's part of what it makes goes into the stations around it
   first, before anything is handed out, and the stations buy it from the player at the market

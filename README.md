@@ -880,7 +880,7 @@ factories, refineries, power plants and shipyards.
 
 Shares of any building that makes something can be bought and sold from the hex details: farms,
 mines, mills, works and factories, but no homes, shops, churches or military. Every building is
-1,000 shares, traded 100 at a time, and 100 shares are a tenth of what it makes. A bought
+1,000 shares, traded 100, 200 or 600 at a time, and 100 shares are a tenth of what it makes. A bought
 building pays nothing of its own: the player's part of what it makes goes into the stations
 around it before anything is handed out, and the stations buy it from the player at the market
 price as it goes in; it then pays freight like any cargo when buildings take it out of a
@@ -890,9 +890,12 @@ however far within its reach they stand. A whole building costs ten years of all
 was fully satisfied over the last quarter, two thirds of that at none and
 twice at 200%, and shares sell at the price they buy at, so raising a building's satisfaction
 raises what its shares fetch; shares can be sold only five years after they were bought, so the
-way to earn on them is to buy into a building that struggles and make it work. Tech cuts the price of shares by up to half, and production tech
-makes the player's part bigger. Every cell where the player owns shares flies the flag of their
-company, The Trains Corp. A building never moves to another hex: one pulled down (a farm
+way to earn on them is to buy into a building that struggles and make it work. Tech cuts the price of shares by up to half. The
+player's tech, such as production or farm machinery, works on their part of a building, and on
+the whole of it once they hold 60% of its shares and control it; past that, more shares only
+raise their part of what it makes. Every cell where the player owns shares flies the flag of
+their company, The Trains Corp: a small one, or a big waving one where they control the
+buildings. A building never moves to another hex: one pulled down (a farm
 crowded out by a town, a lumber mill whose forest is gone, anything cleared for track, a station
 or a merged works) comes down for good, the player's shares in it with it, and one that merges
 into a bigger building (three factories into a big factory) passes its shares on to the bigger

@@ -7,9 +7,17 @@ from railroads.sim.goods import Good, price_of
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import FACTORIES, FARMS_CROWDED_OUT, GrowthRule
 from railroads.sim.ledger import _Books
-from railroads.sim.ownership import HOLD_MONTHS, LOT, PAYBACK_YEARS, SHARES, satisfaction_price
+from railroads.sim.ownership import (
+    HOLD_MONTHS,
+    LOT,
+    PAYBACK_YEARS,
+    SHARES,
+    Owners,
+    satisfaction_price,
+)
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
+from railroads.sim.tech import Effect
 
 
 def grown(*placed: tuple[tuple[int, int], BuildingKind]) -> Growth:
@@ -78,7 +86,7 @@ def test_shares_sell_at_their_price_now_so_a_building_satisfied_since_earns_more
         (
             [((5, 5), BuildingKind.MINE)],
             BuildingKind.MINE,
-            "You already own every share of the mines here",
+            "There are not 100 shares of the mines here left to buy",
         ),
     ],
 )
@@ -214,3 +222,54 @@ def test_a_building_that_never_traded_is_priced_as_fully_satisfied() -> None:
     )
 
     assert satisfaction == 1.0
+
+
+@pytest.mark.parametrize("lot", [100, 200, 600])
+def test_shares_are_bought_100_200_or_600_at_a_time_at_the_price_of_each_100(lot: int) -> None:
+    growth = satisfied(grown(((5, 5), BuildingKind.FARM)))
+    cash = growth.railway.finances.cash
+    each = growth.owners.lot_price((5, 5), BuildingKind.FARM)
+
+    growth.owners.buy((5, 5), BuildingKind.FARM, lot)
+
+    assert growth.owners.shares(BuildingKind.FARM)[5, 5] == lot
+    assert each is not None
+    assert growth.railway.finances.cash == pytest.approx(cash - each * lot / LOT)
+
+
+def test_no_more_shares_are_bought_than_are_left() -> None:
+    growth = satisfied(grown(((5, 5), BuildingKind.FARM)))
+    growth.railway.finances.earn(1_000_000.0, "test")
+    growth.owners.own((5, 5), BuildingKind.FARM, 500)
+
+    said = growth.owners.buy((5, 5), BuildingKind.FARM, 600)
+
+    assert said == "There are not 600 shares of the farms here left to buy"
+    assert growth.owners.shares(BuildingKind.FARM)[5, 5] == 500
+
+
+@pytest.mark.parametrize(("shares", "controls"), [(500, False), (599, False), (600, True)])
+def test_the_player_controls_a_building_from_sixty_percent_of_its_shares(
+    shares: int, controls: bool
+) -> None:
+    growth = grown(((5, 5), BuildingKind.FARM))
+    growth.owners.own((5, 5), BuildingKind.FARM, shares)
+
+    held = growth.owners.controls((5, 5), BuildingKind.FARM), growth.owners.controls_any((5, 5))
+
+    assert held == (controls, controls)
+
+
+@pytest.mark.parametrize(("shares", "worked"), [(300, 1.15), (500, 1.25), (600, 1.5), (1000, 1.5)])
+def test_production_tech_works_on_the_players_part_and_on_the_whole_once_they_control_it(
+    shares: int, worked: float, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    growth = grown(((5, 5), BuildingKind.FARM))
+    growth.owners.own((5, 5), BuildingKind.FARM, shares)
+    monkeypatch.setattr(
+        Owners, "boost", lambda self, kind, effect: 0.5 if effect == Effect.PRODUCTION else 0.0
+    )
+
+    counts = growth.owners.working_counts()
+
+    assert counts[BuildingKind.FARM][5, 5] == pytest.approx(worked)

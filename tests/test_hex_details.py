@@ -23,6 +23,7 @@ from railroads.ui.hex_details import (
     mood_text,
     recently_described,
     result_lines,
+    sell_lots,
     share_lines,
 )
 
@@ -245,3 +246,25 @@ def test_the_shares_window_says_how_many_years_shares_are_held_before_they_can_b
     tips = {label: tip for label, _, tip in share_lines(row)}
 
     assert tips["Can sell now"] == f"Shares bought can be sold {HOLD_MONTHS // 12} years later"
+
+
+@pytest.mark.parametrize(
+    ("sellable", "lots"), [(0, [0]), (50, [50]), (300, [100, 200]), (700, [100, 200, 600])]
+)
+def test_the_sell_buttons_offer_each_lot_the_player_may_sell_or_just_what_they_may(
+    sellable: int, lots: list[int]
+) -> None:
+    offered = sell_lots(sellable)
+
+    assert offered == lots
+
+
+@pytest.mark.parametrize(("owned", "control"), [(500, "from 600 shares"), (600, "yours")])
+def test_the_shares_window_says_from_how_many_shares_the_player_controls_the_buildings(
+    owned: int, control: str
+) -> None:
+    row = farms_row(owned=owned, price=4320.0, total=1000)
+
+    lines = {label: value for label, value, _ in share_lines(row)}
+
+    assert lines["Control"] == control

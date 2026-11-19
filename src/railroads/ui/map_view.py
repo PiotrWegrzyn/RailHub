@@ -356,7 +356,9 @@ class MapView:
                 if pressed is not None:
                     owners = self.growth.owners
                     kind = row.kind
-                    said = owners.buy(cell, kind) if pressed else owners.sell(cell, kind)
+                    buying, lot = pressed
+                    trade = owners.buy if buying else owners.sell
+                    said = trade(cell, kind, lot)
                     held = int(owners.shares(kind)[cell])
                     self._bought = said or f"You own {held:,} shares of the {kind.value}s here"
                 if self._bought:

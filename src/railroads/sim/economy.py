@@ -267,6 +267,9 @@ class OwnedShare:
     share: float
     # The boosts only the player's own take (OWNED_BOOSTS) that their tech opened.
     takes: frozenset[Need] = frozenset()
+    # How many buildings in each cell take those boosts, counted as `owned` is: all of them where
+    # the player controls them (railroads.sim.ownership.CONTROL); None for just the player's own.
+    taking: npt.NDArray[np.float64] | None = None
 
 
 # What Trade.share works out, by the trade's id and kinds, while the trade lasts: a trade is
@@ -627,6 +630,15 @@ class _Month:
                 wants[kind] = self._count_for(kind, need) * NEEDS[kind][need]
         return wants
 
+    def _owned_of_taking(self, kind: BuildingKind) -> FloatCells:
+        """The player's part of the buildings of a kind in each cell taking the boosts only their
+        own take: all of them, unless the player controls more than they own."""
+        share = self.owned[kind]
+        if share.taking is None:
+            return np.ones(self.cells.size)
+        taking = share.taking[self.cells]
+        return np.minimum(share.owned[self.cells] / np.where(taking > 0, taking, 1.0), 1.0)
+
     def _owned_part(self, kind: BuildingKind) -> FloatCells:
         """The share of the buildings of a kind in each cell that are the player's, as they
         trade."""
@@ -639,13 +651,14 @@ class _Month:
 
     def _count_for(self, kind: BuildingKind, need: Need) -> FloatCells:
         """How many buildings of a kind in each cell want a need: all of them, but for a boost
-        only the player's own take (OWNED_BOOSTS), only theirs, once their tech opens it."""
+        only the player's own take (OWNED_BOOSTS), only theirs or those they control, once their
+        tech opens it."""
         if (kind, need) not in OWNED_BOOSTS:
             return self.count[kind]
         share = self.owned.get(kind)
         if share is None or need not in share.takes:
             return self.zero
-        return share.owned[self.cells]
+        return (share.owned if share.taking is None else share.taking)[self.cells]
 
     def _taken(self, kind: BuildingKind, need: Need) -> FloatCells:
         """What buildings of a kind took of a need this month as goods reached their station."""
@@ -809,7 +822,9 @@ class _Month:
             self.offers[(kind, good)] = self.offers[(kind, good)] + more
             self.offered[good] = self.offered[good] + more
             if kind in self.owned:
-                mine = more if owned_only else more * self._owned_part(kind)
+                mine = more * (
+                    self._owned_of_taking(kind) if owned_only else self._owned_part(kind)
+                )
                 self.owned_made[(kind, good)] = self.owned_made.get((kind, good), self.zero) + mine
 
     def _sell_nearby(

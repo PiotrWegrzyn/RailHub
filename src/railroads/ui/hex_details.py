@@ -2,6 +2,7 @@
 what it makes, demands and takes as bonus goods, and how last month's trade went for it, what it
 must get apart from the bonus goods and boosts it can do without."""
 
+import math
 import time
 import weakref
 from collections import Counter
@@ -29,7 +30,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
 from railroads.sim.ledger import Takings
-from railroads.sim.ownership import HOLD_MONTHS, LOT, SHARES
+from railroads.sim.ownership import CONTROL, HOLD_MONTHS, LOT, LOTS, SHARES
 from railroads.sim.tilemap import Deposit, TileMap
 from railroads.ui.biomes import biome_of
 from railroads.ui.ornate import badge, bar, card, section
@@ -366,12 +367,12 @@ def mood_colour(row: BuildingRow) -> tuple[float, float, float, float]:
     return GONE if row.satisfaction == Satisfaction.UNSATISFIED.name.lower() else GROWN
 
 
-def draw_shares(row: BuildingRow, where: str) -> bool | None:
+def draw_shares(row: BuildingRow, where: str) -> tuple[bool, int] | None:
     """The shares window's contents for one kind of building in a cell: how many shares there
     are, the player's, how many they may sell now, the price of LOT and the buttons to buy and
-    sell them, and the buildings' money last year and forecast for the next; returns True if Buy
-    was pressed, False if Sell, None if neither."""
-    pressed: bool | None = None
+    sell LOTS of them, and the buildings' money last year and forecast for the next; returns
+    whether a Buy or a Sell button was pressed and for how many shares, None if none was."""
+    pressed: tuple[bool, int] | None = None
     badge(row.makes[0][0] if row.makes else None)
     imgui.same_line(0, 10)
     imgui.begin_group()
@@ -395,25 +396,28 @@ def draw_shares(row: BuildingRow, where: str) -> bool | None:
             imgui.text(value)
         imgui.end_table()
     if row.price is not None:
-        can_buy = row.owned + LOT <= row.total
-        imgui.begin_disabled(not can_buy)
-        if imgui.button(f"Buy {LOT} for {dollars(row.price)}"):
-            pressed = True
-        imgui.end_disabled()
-        spot("buy_shares")
-        imgui.same_line()
-        sold = min(LOT, row.sellable)
-        imgui.begin_disabled(not sold)
-        label = f"Sell {sold or LOT} for {dollars(row.price * (sold or LOT) / LOT)}"
-        if imgui.button(label):
-            pressed = False
-        imgui.end_disabled()
-        if (
-            not sold
-            and row.sell_from is not None
-            and imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value)
-        ):
-            imgui.set_tooltip(f"{HELD}: from {row.sell_from}")
+        for index, lot in enumerate(LOTS):
+            if index:
+                imgui.same_line()
+            imgui.begin_disabled(row.owned + lot > row.total)
+            if imgui.button(f"Buy {lot} for {dollars(row.price * lot / LOT)}"):
+                pressed = (True, lot)
+            imgui.end_disabled()
+            if not index:
+                spot("buy_shares")
+        for index, lot in enumerate(sell_lots(row.sellable)):
+            if index:
+                imgui.same_line()
+            imgui.begin_disabled(not lot)
+            if imgui.button(f"Sell {lot or LOT} for {dollars(row.price * (lot or LOT) / LOT)}"):
+                pressed = (False, lot)
+            imgui.end_disabled()
+            if (
+                not lot
+                and row.sell_from is not None
+                and imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value)
+            ):
+                imgui.set_tooltip(f"{HELD}: from {row.sell_from}")
     section("Financial results")
     if imgui.begin_table("results", 3, table | imgui.TableFlags_.borders_inner_h.value):
         imgui.table_setup_column("")
@@ -440,6 +444,12 @@ def draw_shares(row: BuildingRow, where: str) -> bool | None:
     return pressed
 
 
+def sell_lots(sellable: int) -> list[int]:
+    """How many shares each Sell button sells: each of LOTS the player may sell now, or just
+    what they may if that is fewer than the smallest; 0 for a button that can't sell yet."""
+    return [lot for lot in LOTS if lot <= sellable] or [min(LOT, sellable)]
+
+
 def share_lines(row: BuildingRow) -> list[tuple[str, str, str]]:
     """The shares window's lines: what each is, its value and what it means."""
     part = row.owned / row.total if row.total else 0.0
@@ -447,13 +457,14 @@ def share_lines(row: BuildingRow) -> list[tuple[str, str, str]]:
         (
             f"In all ({row.count} x {SHARES:,})",
             f"{row.total:,}",
-            f"Every building is {SHARES:,} shares, bought and sold {LOT} at a time",
+            f"Every building is {SHARES:,} shares, bought and sold {LOT}, 200 or 600 at a time",
         ),
         (
             "Yours",
             f"{row.owned:,} ({part:.0%} of what they make)",
             "Your part of what they make goes into your stations around them first",
         ),
+        control_line(row),
         ("Can sell now", f"{row.sellable:,}", HELD),
     ]
     if row.held_back:
@@ -467,6 +478,18 @@ def share_lines(row: BuildingRow) -> list[tuple[str, str, str]]:
             )
         )
     return lines
+
+
+def control_line(row: BuildingRow) -> tuple[str, str, str]:
+    """Whether the player controls the buildings, or how many more shares would give control."""
+    needed = math.ceil(CONTROL * row.total)
+    meaning = (
+        f"With {CONTROL:.0%} of the shares your flag flies big here and your tech works on all of "
+        "them, not just your part; more shares only raise your part"
+    )
+    if row.total and row.owned >= needed:
+        return ("Control", "yours", meaning)
+    return ("Control", f"from {needed:,} shares", meaning)
 
 
 def result_lines(row: BuildingRow) -> list[tuple[str, str, str, str]]:
@@ -503,7 +526,12 @@ def result_lines(row: BuildingRow) -> list[tuple[str, str, str, str]]:
 
 
 def _flag_note(growth: Growth, rows: list[BuildingRow]) -> list[str]:
-    owned = [f"{row.owned} shares of the {row.name}s" for row in rows if row.owned]
+    owned = [
+        f"{row.owned} shares of the {row.name}s"
+        + (", which you control" if row.owned >= CONTROL * row.total else "")
+        for row in rows
+        if row.owned
+    ]
     if not owned:
         return []
     return [f"{growth.owners.company} flies its flag here: you own {', '.join(owned)}."]
