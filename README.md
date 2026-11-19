@@ -993,8 +993,8 @@ lumber), so a food car carries only food. Every car costs $15, and $1 more for e
 each time the train leaves a stop with it, loaded or not: a bulk car of 89 costs $23 a trip, a
 dining car $15. A new train
 starts at its first stop. The window shows what the train pulls
-now. The Stations window shows every station's stockpile and the goods waiting to be handed out
-there, with a button to look at the station; clicking a name opens the station. Trains
+now. The Stations window shows every station's one stockpile, what trains brought and what it
+gathered together, and the passengers and mail waiting there, with a button to look at the station; clicking a name opens the station. Trains
 (`railroads.sim.railway`) run along the track at 40 cells a month on the flat at 60 km/h, slower on
 hills, and each car slows them: an empty car weighs 1, a full one 2 and a full bulk car 4, and
 every unit of weight costs 8%

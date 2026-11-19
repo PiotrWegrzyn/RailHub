@@ -124,16 +124,12 @@ class StationWindow:
         imgui.text_disabled("Stockpile")
         imgui.same_line(LABEL_WIDTH)
         stock_bar(goods, (-1, 0))
-        freight = {g: a for g, a in goods.stockpile.items() if g not in TRAVELLERS}
-        waiting = {g: a for g, a in goods.stockpile.items() if g in TRAVELLERS}
-        for label, held, empty in (
-            ("Freight", freight, "none"),
-            ("Waiting", waiting, "nobody"),
-            ("Brought by trains", goods.brought, "nothing"),
-        ):
-            imgui.text_disabled(label)
-            imgui.same_line(LABEL_WIDTH)
-            goods_inline(held, empty)
+        imgui.dummy((LABEL_WIDTH, 0))
+        imgui.same_line(LABEL_WIDTH)
+        goods_inline(goods.freight(), "empty")
+        imgui.text_disabled("Waiting")
+        imgui.same_line(LABEL_WIDTH)
+        goods_inline(goods.waiting(), "nobody")
         imgui.text_disabled("Demand left")
         imgui.same_line(LABEL_WIDTH)
         draw_demand(railway.station_demand(station))

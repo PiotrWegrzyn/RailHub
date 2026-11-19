@@ -74,6 +74,16 @@ class StationGoods:
         """How much more of a kind of freight the station can take."""
         return max(0.0, self.limit - self.held(good))
 
+    def freight(self) -> dict[Good, float]:
+        """Every kind of freight the station holds and how much, gathered and brought together:
+        one stockpile, which it hands out and loads onto trains alike."""
+        goods = {*self.stockpile, *self.brought} - set(TRAVELLERS)
+        return {good: self.held(good) for good in goods if self.held(good) > 0}
+
+    def waiting(self) -> dict[Good, float]:
+        """The passengers and mail waiting at the station."""
+        return {good: self.stockpile[good] for good in TRAVELLERS if self.stockpile.get(good)}
+
     @property
     def fullest(self) -> tuple[Good | None, float]:
         """The kind of freight the station holds most of, and how much; passengers and mail
