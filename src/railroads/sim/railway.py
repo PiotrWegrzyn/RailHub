@@ -617,7 +617,9 @@ class Railway:
                     f"Next stop {leg:.0f} cells away; it carries fuel for {engine.tank:.0f}"
                 )
                 return
-            self._take_fuel(train, here, leg)
+            burnt = self.network.fuel_length(here, there, engine.electric, engine.maglev)
+            assert burnt is not None
+            self._take_fuel(train, here, burnt)
             train.path, train.speeds = way
             train.along = 0.0
             train.pace = 0.0

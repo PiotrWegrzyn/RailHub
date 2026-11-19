@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from builders import flat_map
+from builders import flat_map, layer
 from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.economy import Trade
 from railroads.sim.fuel_market import (
@@ -25,13 +25,14 @@ from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.tech import Research
+from railroads.sim.tilemap import Relief
 from railroads.sim.trains import BULK_CAR, BURN_ALONE, ENGINES, Car, Stop, Train
 
 WEST, EAST = (6, 3), (6, 20)
 
 
-def line(year: int = 1850) -> Railway:
-    constructions = Constructions(flat_map())
+def line(year: int = 1850, relief: Relief = Relief.FLAT) -> Railway:
+    constructions = Constructions(flat_map(relief=layer(12, 30, relief)))
     growth = Growth(constructions, GrowthRule(trades=False))
     build_station(growth, WEST)
     build_station(growth, EAST)
@@ -280,3 +281,30 @@ def test_a_train_setting_off_full_buys_more_coal_than_one_setting_off_empty() ->
 
     paid = [-railway.finances.month.get(Fuel.COAL.value, 0.0) for railway in (empty, full)]
     assert 0 < paid[0] < paid[1]
+
+
+def test_a_leg_through_hills_burns_half_as_much_fuel_again_as_its_length() -> None:
+    railway = line(relief=Relief.HILLS)
+
+    length = railway.network.route_length(WEST, EAST)
+    burnt = railway.network.fuel_length(WEST, EAST)
+
+    assert length is not None and burnt is not None
+    assert burnt == pytest.approx(1.5 * length, rel=0.1)
+
+
+def test_a_leg_over_flat_land_burns_its_length_in_fuel() -> None:
+    railway = line()
+
+    length = railway.network.route_length(WEST, EAST)
+    burnt = railway.network.fuel_length(WEST, EAST)
+
+    assert burnt == pytest.approx(length)
+
+
+def test_a_train_through_hills_buys_more_fuel_than_one_over_flat_land() -> None:
+    flat, hills = line(), line(relief=Relief.HILLS)
+
+    paid = set_off(flat), set_off(hills)
+
+    assert paid[0] < paid[1]

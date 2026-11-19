@@ -60,3 +60,28 @@ def test_tunnels_go_only_through_mountains(relief: Relief, can_build: bool) -> N
     rules = track_rules_for(make_tile(Terrain.LAND, relief), TrackBed.TUNNEL)
 
     assert rules.can_build == can_build
+
+
+def test_hills_slow_trains_by_thirty_percent_and_make_them_burn_half_as_much_again() -> None:
+    hills = RELIEF_RULES[Relief.HILLS]
+
+    factors = hills.speed_factor, hills.burn_factor
+
+    assert factors == (pytest.approx(0.7), pytest.approx(1.5))
+
+
+@pytest.mark.parametrize(
+    ("terrain", "relief", "bed"),
+    [
+        (Terrain.RIVER, Relief.FLAT, TrackBed.BRIDGE),
+        (Terrain.LAND, Relief.MOUNTAINS, TrackBed.TUNNEL),
+    ],
+)
+def test_bridges_and_tunnels_slow_trains_by_twenty_percent_without_burning_more(
+    terrain: Terrain, relief: Relief, bed: TrackBed
+) -> None:
+    rules = track_rules_for(make_tile(terrain, relief), bed)
+
+    factors = rules.speed_factor, rules.burn_factor
+
+    assert factors == (pytest.approx(0.8), pytest.approx(1.0))

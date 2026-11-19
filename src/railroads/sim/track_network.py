@@ -38,6 +38,7 @@ class TrackNetwork:
     # How long each way found is, by its ends and track kind as in _routes, with the railway
     # version found for: a train that can't set off asks every frame.
     _lengths: tuple[int, dict[tuple, float]] = (-1, {})
+    _fuel_lengths: tuple[int, dict[tuple, float]] = (-1, {})
 
     def __init__(self, constructions: Constructions) -> None:
         self.constructions = constructions
@@ -115,6 +116,27 @@ class TrackNetwork:
         length = lengths.get(key)
         if length is None:
             length = lengths[key] = sum(math.dist(a, b) for a, b in itertools.pairwise(way[0]))
+        return length
+
+    def fuel_length(
+        self, start: Cell, end: Cell, electric: bool = False, maglev: bool = False
+    ) -> float | None:
+        """How many cells of fuel a train burns on the way route finds: its length, each stretch
+        weighed by the burn factor of the cell it runs through; None without one."""
+        way = self.route(start, end, electric, maglev)
+        if way is None:
+            return None
+        version = self.constructions.railway_version
+        if self._fuel_lengths[0] != version:
+            self._fuel_lengths = (version, {})
+        lengths = self._fuel_lengths[1]
+        key = (start, end, electric, maglev)
+        length = lengths.get(key)
+        if length is None:
+            length = lengths[key] = sum(
+                math.dist(a, b) * self._burn(self.cell_at(((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)))
+                for a, b in itertools.pairwise(way[0])
+            )
         return length
 
     def _find_way(self, start: Cell, end: Cell, electric: bool, maglev: bool) -> Way | None:
@@ -258,6 +280,13 @@ class TrackNetwork:
         if not pieces:
             return 1.0
         return max(0.2, track_rules_for(tile, pieces[0].bed).speed_factor)
+
+    def _burn(self, cell: Cell) -> float:
+        tile = self.constructions.tile_map.tile(cell)
+        pieces = [b for b in self.constructions.at(cell) if isinstance(b, Track)]
+        if not pieces:
+            return 1.0
+        return track_rules_for(tile, pieces[0].bed).burn_factor
 
     def position(self, train: Train, back: float = 0.0) -> tuple[Point, Point] | None:
         """Where the train is on the map, or a point `back` cells behind its front, and which way
