@@ -5,8 +5,9 @@ from imgui_bundle import hello_imgui, imgui
 from test_app_frame import FakeTexture
 from test_railway import joined_stations
 
+from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import Good
-from railroads.sim.railway import Railway
+from railroads.sim.railway import Railway, Ride
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, Car, Stop, Train
 from railroads.ui.buy_train import engine_figures
 from railroads.ui.trains_window import (
@@ -15,6 +16,7 @@ from railroads.ui.trains_window import (
     ROW_CAR_LINES,
     TrainsWindow,
     carried_in,
+    ride_rows,
     row_cars,
 )
 
@@ -220,3 +222,17 @@ def test_stop_cards_scrolled_out_of_sight_are_not_drawn(
     draw_frames(window, railway, 1)
 
     assert 0 < len(drawn) < len(train.stops)
+
+
+def test_the_cargo_line_says_goods_earn_freight_for_what_buildings_take_up_to_the_scarce_worth() -> (
+    None
+):
+    ride = Ride(
+        cells=10.0, cargo=120.0, fuel=5.0, loaded_cars=3.0, empty_cars=0.0, loaded=1, empty=0
+    )
+
+    label, amount, tip = ride_rows(ride)[0]
+
+    assert (label, amount) == ("Cargo", 120.0)
+    assert f"up to {SCARCE_WORTH:g} times as much" in tip
+    assert "what the buildings around would take at once" in tip

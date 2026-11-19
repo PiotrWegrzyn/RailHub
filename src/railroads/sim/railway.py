@@ -453,18 +453,35 @@ class Railway:
         return train.stops[heading].cell
 
     def cargo_worth(self, train: Train) -> list[float]:
-        """What each of a train's cars would earn if it were unloaded at its destination now,
-        at the demand left there and the player's tech; cargo that came from there earns
-        nothing, as it only goes back to that station's stockpile."""
+        """What each of a train's cars would earn if it were unloaded at its destination now
+        (worth_at), passengers on an express paying its fare too; cargo that came from there
+        earns nothing, as it only goes back to that station's stockpile."""
         destination = self.destination(train)
         if destination is None:
             return [0.0 for _ in train.cars]
         cargo = [(car.good, car.load - car.origins.get(destination, 0.0)) for car in train.cars]
-        earned = self.station_demand(destination).worth(cargo)
+        earned = self.worth_at(destination, cargo)
         return [
-            amount * self.price_factor(car.good) * self.fare_factor(train)
+            amount * (self.fare_factor(train) if car.good in TRAVELLERS else 1.0)
             for amount, car in zip(earned, train.cars, strict=True)
         ]
+
+    def worth_at(self, station: Cell, cargo: list[tuple[Good, float]]) -> list[float]:
+        """What each load of cargo would earn if a train unloaded it at a station now, one after
+        another, as it would be paid, with the player's tech and the station's facilities:
+        passengers and mail their freight at the share of demand left as they get off; goods
+        their freight for each unit the buildings around would take at once, times what it is
+        worth to the building taking it (railroads.sim.station_trade.StationTrade.would_take)."""
+        travellers = [(good, amount) for good, amount in cargo if good in TRAVELLERS]
+        fares = iter(self.station_demand(station).worth(travellers))
+        trade = self.station_trade
+        taken = iter([0.0 for _ in cargo] if trade is None else trade.would_take(station, cargo))
+        earned = []
+        for good, _ in cargo:
+            weighed = next(taken)
+            base = next(fares) if good in TRAVELLERS else freight_of(good) * weighed
+            earned.append(base * self.price_factor(good) * self.facility_pay(station, good))
+        return earned
 
     def ride(self, train: Train, worth: list[float] | None = None) -> Ride | None:
         """What the train's ride to its next stop earns and costs: the one it is on, or the one it

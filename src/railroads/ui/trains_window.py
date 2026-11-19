@@ -13,6 +13,7 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.sim.demand import StationDemand
+from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.finance import TRAIN_RESALE, dollars
 from railroads.sim.goods import GENERAL_GOODS, General, Good
 from railroads.sim.grids import Cell
@@ -39,6 +40,12 @@ from railroads.ui.theme import (
     offer_chip,
 )
 
+# How a cargo's worth at a stop is worked out, as freight is paid there.
+CARGO_WORTH = (
+    "Goods earn their freight for what the buildings around would take at once, up to "
+    f"{SCARCE_WORTH:g} times as much where they went short; the rest waits at the station. "
+    "Passengers and mail pay by the demand left there."
+)
 WINDOW_SIZE = (980.0, 500.0)
 # The window can't be made smaller than this, so the map beside the stop cards keeps its room.
 SMALLEST_WINDOW = (900.0, 440.0)
@@ -289,9 +296,8 @@ class TrainsWindow:
             imgui.text_colored(imgui.ImVec4(*BRASS), f"worth about {dollars(sum(worths))}")
             if imgui.is_item_hovered():
                 imgui.set_tooltip(
-                    f"What its cargo would earn if it were unloaded at {onward} now, at the "
-                    "demand left there.\nFreight is paid as the buildings around take it, and "
-                    f"cargo that came from {onward} only goes back into its stockpile."
+                    f"What its cargo would earn if it were unloaded at {onward} now.\n{CARGO_WORTH}"
+                    f"\nCargo that came from {onward} only goes back into its stockpile."
                 )
             imgui.same_line()
             imgui.text_disabled(f"at {onward}")
@@ -691,7 +697,7 @@ def ride_rows(ride: Ride) -> list[tuple[str, float, str]]:
         (
             "Cargo",
             ride.cargo,
-            "What its cargo would earn if it were unloaded there now, at the demand left there",
+            f"What its cargo would earn if it were unloaded there now.\n{CARGO_WORTH}",
         ),
         (
             f"Fuel for {ride.cells:.0f} cells",

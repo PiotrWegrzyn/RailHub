@@ -3,7 +3,7 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Track
-from railroads.sim.demand import DEMAND_PER_NEED, StationDemand
+from railroads.sim.demand import DEMAND_PER_NEED
 from railroads.sim.economy import SCARCE_WORTH, Economy, StationOrder
 from railroads.sim.finance import (
     CAR_TRIP_PRICE,
@@ -15,6 +15,7 @@ from railroads.sim.finance import (
     car_trip_price,
 )
 from railroads.sim.goods import Good, Need, freight_of, needs_of
+from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import CELLS_PER_MONTH, Railway
@@ -712,24 +713,47 @@ def test_a_train_unloads_a_good_at_a_station_full_of_another() -> None:
     assert railway.station_goods((6, 20)).brought[Good.WHEAT] == pytest.approx(10.0)
 
 
-def test_a_trains_cargo_is_worth_what_its_destination_would_pay_for_it() -> None:
-    _, railway = joined_stations()
-    railway.station_demand((6, 20)).capacity = {Need.FOOD: 200.0}
+def stations_with_houses(station: Cell, houses: int) -> tuple[Growth, Railway]:
+    growth, railway = joined_stations()
+    railway.station_trade = growth.station_trade
+    for _ in range(houses):
+        growth.build(Building((station[0], station[1] + 1), BuildingKind.HOUSE))
+    return growth, railway
+
+
+def test_a_trains_cargo_is_worth_what_the_buildings_at_its_destination_would_pay_for_it() -> None:
+    _, railway = stations_with_houses((6, 20), 2)
     train = railway.buy()
     assert train is not None
     train.stops = [Stop((6, 3), [Good.WHEAT]), Stop((6, 20))]
     train.cars = [Car(Good.WHEAT)]
-    train.cars[0].fill({(6, 3): 30.0})
+    train.cars[0].fill({(6, 3): 60.0})
 
     worth = railway.cargo_worth(train)
+    railway.station_goods((6, 20)).bring(Good.WHEAT, {(6, 3): 60.0})
+    railway.hand_out_now((6, 20), Good.WHEAT)
 
     assert railway.destination(train) == (6, 20)
-    assert worth == [pytest.approx(StationDemand({Need.FOOD: 200.0}).deliver(Good.WHEAT, 30.0))]
+    assert worth == [pytest.approx(railway.finances.month["cargo"])]
+    assert worth[0] > 0
+
+
+def test_cargo_is_worth_freight_only_for_what_the_buildings_around_still_want() -> None:
+    _, railway = stations_with_houses((6, 20), 1)
+
+    small, big = (
+        railway.worth_at((6, 20), [(Good.WHEAT, 5.0)]),
+        railway.worth_at((6, 20), [(Good.WHEAT, 500.0)]),
+    )
+    first, second = railway.worth_at((6, 20), [(Good.WHEAT, 500.0), (Good.WHEAT, 500.0)])
+
+    assert big[0] > small[0]
+    assert first == pytest.approx(big[0])
+    assert second == 0.0
 
 
 def test_cargo_going_back_where_it_came_from_is_worth_nothing() -> None:
-    _, railway = joined_stations()
-    railway.station_demand((6, 3)).capacity = {Need.FOOD: 200.0}
+    _, railway = stations_with_houses((6, 3), 2)
     train = railway.buy()
     assert train is not None
     train.stops = [Stop((6, 20)), Stop((6, 3))]
@@ -738,7 +762,8 @@ def test_cargo_going_back_where_it_came_from_is_worth_nothing() -> None:
 
     worth = railway.cargo_worth(train)
 
-    assert worth == [pytest.approx(StationDemand({Need.FOOD: 200.0}).deliver(Good.WHEAT, 10.0))]
+    assert worth == [pytest.approx(railway.worth_at((6, 3), [(Good.WHEAT, 10.0)])[0])]
+    assert worth[0] > 0
 
 
 def test_a_train_with_one_stop_has_no_destination() -> None:

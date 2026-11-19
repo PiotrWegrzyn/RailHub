@@ -189,7 +189,6 @@ class StationCalls:
         of here."""
         assert car.general is not None
         destination = self._railway.destination(train)
-        demand = None if destination is None else self._railway.station_demand(destination)
         best: tuple[float, float, Good] | None = None
         for good in GENERAL_GOODS[car.general]:
             capacity = self._railway.car_capacity(good, train.engine, car.general)
@@ -197,8 +196,8 @@ class StationCalls:
             if amount <= 1e-9:
                 continue
             worth = 0.0
-            if demand is not None and destination != stop.cell:
-                worth = demand.worth([(good, amount)])[0] * self._railway.price_factor(good)
+            if destination is not None and destination != stop.cell:
+                worth = self._railway.worth_at(destination, [(good, amount)])[0]
             if best is None or (worth, amount) > best[:2]:
                 best = (worth, amount, good)
         if best is not None:

@@ -168,9 +168,7 @@ class StationTrade:
         goods = railway.station_goods(station)
         if good in goods.kept:
             return
-        within = self._within(station, railway.reach(station)[0])
-        order = np.argsort(within.steps, kind="stable")
-        cells, bounds = within.cells[order], ring_starts(within.steps[order])
+        cells, bounds = self._in_reach(station)
         economy = growth.economy
         if economy.taken is None:
             economy.taken = {}
@@ -181,23 +179,7 @@ class StationTrade:
             wants = self._wants_at(cells, need)
             if not wants:
                 continue
-            demand = sum(wants.values(), start=np.zeros(cells.size))
-            left = np.array([have], dtype=np.float64)
-            sellers, buyers = np.zeros(cells.size, dtype=np.intp), np.arange(cells.size)
-            mine = self._owned_wants(cells, wants)
-            must = sum(
-                (
-                    np.maximum(want - self._spare(kind, need, cells), 0.0)
-                    for kind, want in wants.items()
-                ),
-                start=np.zeros(cells.size),
-            )
-            got = np.zeros(cells.size)
-            for target in (np.minimum(mine, must), must, demand):
-                short = np.maximum(target - got, 0.0)
-                wanted = short.copy()
-                distribute(sellers, buyers, bounds, left, short)
-                got += wanted - short
+            got, demand = self._share_out(cells, bounds, need, have, wants)
             total = float(got.sum())
             weighed = float((got * worth_to(economy.last_quarter()[cells])).sum())
             rate = weighed / total if total > 0 else 1.0
@@ -215,6 +197,85 @@ class StationTrade:
                     else:
                         taken = economy.taken.setdefault((kind, need), {})
                         taken[cell] = taken.get(cell, 0.0) + float(took[at])
+
+    def would_take(self, station: Cell, cargo: list[tuple[Good, float]]) -> list[float]:
+        """What each load of cargo would be worth to the buildings around a station if a train
+        unloaded it there now, one load after another, changing nothing: the units they would
+        take at once, as hand_out_now hands them out, each weighed by what it is worth to the
+        building taking it (worth_to), what pay_for pays freight on. Passengers and mail, goods
+        kept for trains and what doesn't fit in the station are worth nothing here."""
+        railway = self._growth.railway
+        if railway is None:
+            return [0.0 for _ in cargo]
+        goods = railway.station_goods(station)
+        cells, bounds = self._in_reach(station)
+        worth = worth_to(self._growth.economy.last_quarter()[cells])
+        assigned: dict[Need, FloatCells] = {}
+        room: dict[Good, float] = {}
+        weighed = []
+        for good, amount in cargo:
+            if good in TRAVELLERS or good in goods.kept:
+                weighed.append(0.0)
+                continue
+            have = min(amount, room.setdefault(good, goods.room(good)))
+            room[good] -= have
+            units = 0.0
+            for need in MEETS[good]:
+                if have <= 1e-9:
+                    break
+                wants = self._wants_at(cells, need)
+                if not wants:
+                    continue
+                demand = sum(wants.values(), start=np.zeros(cells.size))
+                before = assigned.get(need, np.zeros(cells.size))
+                left = np.maximum(1.0 - before / np.where(demand > 0, demand, 1.0), 0.0)
+                got, _ = self._share_out(
+                    cells, bounds, need, have, {kind: want * left for kind, want in wants.items()}
+                )
+                assigned[need] = before + got
+                have -= float(got.sum())
+                units += float((got * worth).sum())
+            weighed.append(units)
+        return weighed
+
+    def _in_reach(self, station: Cell) -> tuple[npt.NDArray[np.intp], tuple[int, ...]]:
+        """The cells a station hands goods out to, nearest first, and where each distance
+        starts among them."""
+        railway = self._growth.railway
+        assert railway is not None
+        within = self._within(station, railway.reach(station)[0])
+        order = np.argsort(within.steps, kind="stable")
+        return within.cells[order], ring_starts(within.steps[order])
+
+    def _share_out(
+        self,
+        cells: npt.NDArray[np.intp],
+        bounds: tuple[int, ...],
+        need: Need,
+        have: float,
+        wants: dict[BuildingKind, FloatCells],
+    ) -> tuple[FloatCells, FloatCells]:
+        """How much of `have` each of these cells takes for a need, by what its buildings still
+        want: the player's own buildings' musts first, then every must, then any bonus, the
+        nearest first; and what they wanted in all."""
+        demand = sum(wants.values(), start=np.zeros(cells.size))
+        left = np.array([have], dtype=np.float64)
+        sellers, buyers = np.zeros(cells.size, dtype=np.intp), np.arange(cells.size)
+        mine = self._owned_wants(cells, wants)
+        must = sum(
+            (
+                np.maximum(want - self._spare(kind, need, cells), 0.0)
+                for kind, want in wants.items()
+            ),
+            start=np.zeros(cells.size),
+        )
+        got = np.zeros(cells.size)
+        for target in (np.minimum(mine, must), must, demand):
+            short = np.maximum(target - got, 0.0)
+            wanted = short.copy()
+            distribute(sellers, buyers, bounds, left, short)
+            got += wanted - short
+        return got, demand
 
     def _spare(self, kind: BuildingKind, need: Need, cells: npt.NDArray[np.intp]) -> FloatCells:
         """The part of a need the buildings of a kind in these cells take only as a bonus
