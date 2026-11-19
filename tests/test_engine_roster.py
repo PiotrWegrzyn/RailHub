@@ -14,7 +14,6 @@ from railroads.sim.tech import GENERAL_CARS, NODES, Effect, Research
 from railroads.sim.trains import (
     BASE_GENERATION,
     BULK_CAR,
-    CAR_GROWTH,
     CAR_SIZES,
     ENGINES,
     EXPRESS_FARE,
@@ -26,10 +25,13 @@ from railroads.sim.trains import (
     Kind,
     Stop,
     Train,
+    amount_of,
     bigger,
     car_size,
     full_tonnes,
+    generation_in,
     tare_of,
+    unit_label,
     unit_tonnes,
 )
 from railroads.ui.tech_window import describe
@@ -131,13 +133,13 @@ def test_each_engine_of_a_class_costs_about_three_times_the_one_before(kind: Kin
     assert all(2.5 <= step <= 3.5 for step in steps)
 
 
-def test_electric_engines_run_faster_than_diesels_and_both_pull_the_newest_cars() -> None:
+def test_an_engine_pulls_the_cars_of_the_generation_after_its_years() -> None:
     steam, diesel, electric = ENGINES["planet"], ENGINES["mixed_diesel"], ENGINES["express"]
 
     generations = steam.top_generation, diesel.top_generation, electric.top_generation
 
     assert electric.speed > diesel.speed
-    assert generations == (3, GENERATIONS, GENERATIONS)
+    assert generations == (2, 6, 7)
 
 
 def of_its_day(engine: Engine, kind: Kind) -> Engine:
@@ -205,14 +207,17 @@ def test_the_specialised_classes_come_soon_after_1850_and_need_their_tech() -> N
     assert not {"goods", "single"} & set(without.engines())
 
 
-def test_the_game_ends_with_a_500_kmh_maglev_and_a_diesel_pulling_twenty_four_cars() -> None:
+def test_the_game_ends_with_a_500_kmh_maglev_and_a_diesel_pulling_ten_of_the_biggest_cars() -> None:
     railway = knowing(line(), *EVERY_NODE)
     railway.year = 2040
 
     engines = {name: ENGINES[name] for name in railway.engines()}
 
     assert any(e.maglev and e.kmh == pytest.approx(500.0) for e in engines.values())
-    assert any(e.power.value == "diesel" and e.cars == 24 for e in engines.values())
+    assert any(
+        e.power.value == "diesel" and e.cars == 10 and e.top_generation == GENERATIONS
+        for e in engines.values()
+    )
 
 
 def test_a_newer_engine_of_the_same_line_takes_the_older_ones_place_on_sale() -> None:
@@ -397,7 +402,9 @@ def test_a_car_weighs_its_tare_and_what_it_carries(good: Good) -> None:
     assert weight == pytest.approx(tare_of(good) + 10.0 * unit_tonnes(good))
 
 
-@pytest.mark.parametrize(("generation", "coal"), [(1, 55.0), (2, 89.0), (3, 144.0), (5, 377.0)])
+@pytest.mark.parametrize(
+    ("generation", "coal"), [(1, 55.0), (2, 89.0), (3, 144.0), (5, 377.0), (7, 987.0)]
+)
 def test_each_generation_of_cars_holds_one_fibonacci_size_more(
     generation: int, coal: float
 ) -> None:
@@ -406,20 +413,21 @@ def test_each_generation_of_cars_holds_one_fibonacci_size_more(
     assert size == coal
 
 
-def test_cars_tanks_and_planes_ride_one_to_a_car_from_the_third_generation() -> None:
+def test_vehicles_ride_from_the_fifth_generation_a_fibonacci_size_up_each_generation() -> None:
     goods = [Good.CARS, Good.TANKS, Good.PLANES]
 
-    sizes = [[car_size(good, generation) for generation in (2, 3, 4)] for good in goods]
+    sizes = [[car_size(good, generation) for generation in (4, 5, 6, 7)] for good in goods]
 
-    assert sizes == [[0.0, 1.0, 2.0]] * 3
+    assert sizes == [[0.0, 5.0, 8.0, 13.0], [0.0, 1.0, 1.0, 2.0], [0.0, 1.0, 1.0, 2.0]]
 
 
-def test_a_car_a_generation_newer_weighs_as_much_more_empty() -> None:
-    railway = knowing(line(), "bessemer", "couplings", "drawbars", "bogie_wagons")
+@pytest.mark.parametrize(("generation", "tonnes"), [(1, 1.5), (2, 4.0), (5, 14.0), (7, 24.0)])
+def test_an_empty_car_weighs_what_a_real_wagon_of_its_generation_did(
+    generation: int, tonnes: float
+) -> None:
+    weights = tare_of(Good.COAL, generation), tare_of(Good.PASSENGERS, generation)
 
-    tares = railway.car_tare(Good.COAL, "penydarren"), railway.car_tare(Good.COAL, "planet")
-
-    assert tares[1] == pytest.approx(tares[0] * CAR_GROWTH**2)
+    assert weights == (pytest.approx(tonnes), pytest.approx(tonnes * 1.75))
 
 
 def test_pioneers_pull_the_first_generation_and_the_planet_the_second_without_tech() -> None:
@@ -433,25 +441,24 @@ def test_pioneers_pull_the_first_generation_and_the_planet_the_second_without_te
     assert generations == (1, BASE_GENERATION)
 
 
-def test_wagon_tech_opens_newer_generations_up_to_the_newest_an_engine_pulls() -> None:
-    railway = knowing(
-        line(),
-        "bessemer",
-        "couplings",
-        "drawbars",
-        "bogie_wagons",
-        "open_hearth",
-        "rolling",
-        "steel_wagons",
-        "oxygen",
-        "modern_wagons",
-    )
+@pytest.mark.parametrize(
+    ("year", "generation"), [(1842, 1), (1843, 2), (1873, 3), (1931, 5), (1972, 7)]
+)
+def test_a_new_generation_of_cars_comes_in_its_year(year: int, generation: int) -> None:
+    newest = generation_in(year)
+
+    assert newest == generation
+
+
+def test_cars_are_of_the_years_generation_up_to_the_newest_an_engine_pulls() -> None:
+    railway = line()
+    railway.year = 1960
 
     generations = [
         railway.car_generation(Good.COAL, engine) for engine in ("planet", "mogul", "heavy_diesel")
     ]
 
-    assert generations == [3, 4, 5]
+    assert generations == [2, 3, 6]
 
 
 def test_a_pioneer_pulls_a_full_car_of_55_quintals_of_coal() -> None:
@@ -727,3 +734,24 @@ def test_a_good_too_heavy_for_the_engine_says_so_instead_of_offering_a_car() -> 
 
     assert "Too heavy" in tip
     assert "Click to add" not in tip
+
+
+@pytest.mark.parametrize(
+    ("good", "amount", "told"),
+    [
+        (Good.COAL, 89.0, "89 sacks of coal"),
+        (Good.CATTLE, 1.0, "1 head of cattle"),
+        (Good.PASSENGERS, 34.0, "34 passengers"),
+        (Good.CLOTHES, 21.0, "21 crates of clothes"),
+    ],
+)
+def test_an_amount_of_a_good_is_told_in_its_units(good: Good, amount: float, told: str) -> None:
+    text = amount_of(good, amount)
+
+    assert text == told
+
+
+def test_a_goods_unit_says_what_it_weighs() -> None:
+    label = unit_label(Good.COFFEE)
+
+    assert label == "coffee: 1 sack = 60 kg"

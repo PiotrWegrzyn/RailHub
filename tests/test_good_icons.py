@@ -29,4 +29,4 @@ def test_no_two_icons_are_the_same_picture() -> None:
 def test_hovering_a_category_names_the_goods_in_it() -> None:
     named = icon_name(Need.ALCOHOL), icon_name(Good.BEER)
 
-    assert named == ("alcohol: beer, wine, vodka, sake", "beer")
+    assert named == ("alcohol: beer, wine, vodka, sake", "beer: 1 barrel = 200 kg")

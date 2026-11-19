@@ -94,7 +94,6 @@ from railroads.sim.stats import History
 from railroads.sim.tech import GENERAL_CARS, GOOD_TREES, Effect, Research, Tree
 from railroads.sim.track_network import TrackNetwork
 from railroads.sim.trains import (
-    BASE_GENERATION,
     BURN_ALONE,
     ENGINES,
     EXPRESS_FARE,
@@ -110,6 +109,7 @@ from railroads.sim.trains import (
     car_size,
     full_tonnes,
     general_car_size,
+    generation_in,
     tare_of,
 )
 
@@ -270,8 +270,8 @@ class Railway:
 
     def can_carry(self, train: Train, cargo: Cargo) -> bool:
         """Whether a train's engine takes cars of a good: an express takes only passengers, a
-        general car only once its tech is taken, and a good first carried in a later generation
-        (FIRST_GENERATION) only once its cars are of that one."""
+        general car only once its tech is taken, and vehicles only once its cars are of a
+        generation that carries them (railroads.sim.trains.VEHICLES)."""
         if isinstance(cargo, General) and not self.general_open(cargo):
             return False
         if isinstance(cargo, Good) and not self.car_capacity(cargo, train.engine):
@@ -362,12 +362,12 @@ class Railway:
 
     def max_pull(self, engine: str) -> float:
         """The most an engine pulls, in tonnes, with what tech adds: as much more as the cars
-        it adds (Effect.PULL), pulling the generation of cars tech opens for every good.
-        Goods whose own tree opens a newer one ride in heavier cars against it."""
+        it adds (Effect.PULL), pulling the generation of cars every good has. Goods whose own
+        tree brings a newer one sooner ride in heavier cars against it."""
         built = ENGINES[engine]
         extra = int(self.research.bonus(Effect.PULL))
-        opened = int(self.research.everywhere_bonus(Effect.CAR_SIZE))
-        most = built.pull_at(BASE_GENERATION + opened)
+        sooner = int(self.research.everywhere_bonus(Effect.CAR_SIZE))
+        most = built.pull_at(min(generation_in(self.year) + sooner, GENERATIONS))
         return most * (built.hauls + extra) / built.hauls
 
     def pull(self, train: Train) -> float:
@@ -483,15 +483,15 @@ class Railway:
         return size
 
     def car_generation(self, good: Good, engine: str | None = None) -> int:
-        """The generation of a good's cars: BASE_GENERATION and one more for each generation
-        its tree's tech opens (Effect.CAR_SIZE), up to the newest an engine pulls."""
+        """The generation of a good's cars: the year's (generation_in) and one more for each its
+        tree's tech brings sooner (Effect.CAR_SIZE), up to the newest an engine pulls."""
         tree = GOOD_TREES.get(good)
-        opened = (
+        sooner = (
             self.research.everywhere_bonus(Effect.CAR_SIZE)
             if tree is None
             else self.research.bonus(Effect.CAR_SIZE, tree)
         )
-        generation = min(BASE_GENERATION + int(opened), GENERATIONS)
+        generation = min(generation_in(self.year) + int(sooner), GENERATIONS)
         if engine is None:
             return generation
         return min(generation, ENGINES[engine].top_generation)

@@ -150,7 +150,7 @@ def test_a_mogul_pulls_more_cars_and_steel_couplings_one_more() -> None:
     assert not stop.add_car(Good.COAL, railway.most_cars(train))
 
 
-def test_bogie_wagons_put_the_cars_of_every_engine_that_pulls_them_one_fibonacci_size_up() -> None:
+def test_bogie_wagons_bring_the_next_generation_sooner_behind_an_engine_that_pulls_it() -> None:
     railway, upgraded = joined().railway, joined().railway
     upgraded.research = learned(Tree.METALS, "bessemer", "couplings", "drawbars", "bogie_wagons")
 
@@ -160,7 +160,7 @@ def test_bogie_wagons_put_the_cars_of_every_engine_that_pulls_them_one_fibonacci
         for engine in ("planet", "mixed_diesel")
     ]
 
-    assert sizes == [55.0, 55.0, 89.0, 89.0]
+    assert sizes == [55.0, 55.0, 55.0, 89.0]
 
 
 def test_grain_hoppers_put_only_food_cars_one_size_up() -> None:

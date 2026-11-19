@@ -28,6 +28,8 @@ from railroads.sim.trains import (
     Kind,
     Stop,
     Train,
+    amount_of,
+    unit_name,
 )
 from railroads.ui.buy_train import BuyScreen, EnginePicture, engine_range, fuel_use
 from railroads.ui.demand_view import draw_demand
@@ -298,7 +300,10 @@ class TrainsWindow:
                 dining_chip(f"pulled{index}", "Dining car: carries nothing, costs its trips")
                 caption_under(f"{car.tonnes:.0f} t")
                 continue
-            tooltip = f"{car.good.value}: {car.load:.0f}/{car.capacity:.0f}, {car.tonnes:.0f} t"
+            tooltip = (
+                f"{car.good.value}: {car.load:.0f}/{car.capacity:.0f} "
+                f"{unit_name(car.good, car.capacity)}, {car.tonnes:.0f} t"
+            )
             if car.general is not None:
                 tooltip = f"{car.general.value} car, now {tooltip}"
             if destination is not None and car.load >= 0.5:
@@ -489,7 +494,7 @@ class TrainsWindow:
                 )
             else:
                 size = railway.car_capacity(cargo, train.engine)
-                tooltip = f"{cargo.value} car of {size:.0f} - click to remove"
+                tooltip = f"{cargo.value} car of {amount_of(cargo, size)} - click to remove"
             tonnes = railway.car_tonnes(cargo, train.engine)
             tooltip += f"\nWeighs {tonnes:.0f} t full"
             removed = car_chip(f"car{car_index}", cargo, tooltip=tooltip)
@@ -563,7 +568,7 @@ class TrainsWindow:
             wanted = demand.monthly_want(offer.good) > 0
             blocked = full or not fits(offer.good)
             tip = (
-                f"{offer.good.value}: {offer.waiting:.0f} waiting, "
+                f"{amount_of(offer.good, offer.waiting)} waiting, "
                 f"{offer.gathered:.0f} given to the station in the last quarter"
                 + (" - comes in on this train" if offer.good in carried else "")
                 + (" - wanted at the next stop" if wanted else "")

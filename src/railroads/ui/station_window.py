@@ -22,6 +22,7 @@ from railroads.sim.goods import TRAVELLERS, Good
 from railroads.sim.grids import Cell
 from railroads.sim.railway import MAX_LEVEL, Railway
 from railroads.sim.station_goods import STORAGE_STEP, WAITING_STEP, StationGoods
+from railroads.sim.trains import amount_of
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.ornate import begin_ornate, end_ornate, keep_in_front
 from railroads.ui.stations_window import look_at_button, stock_bar
@@ -185,13 +186,13 @@ def _draw_facilities(railway: Railway, station: Cell) -> None:
     for facility, (good, amount) in FACILITY_USES.items():
         effect = FACILITY_EFFECTS[facility]
         if facility in built:
-            state = "working" if facility in working else f"idle: needs {amount:.0f} {good.value}"
+            state = "working" if facility in working else f"idle: needs {amount_of(good, amount)}"
             imgui.text(f"{facility.value.capitalize()}: {state}")
-            tip(f"Uses {amount:.0f} {good.value} a month; {effect}")
+            tip(f"Uses {amount_of(good, amount)} a month; {effect}")
             continue
         price = FACILITY_PRICES[facility]
         label = f"{fa.ICON_FA_PLUS}  {facility.value.capitalize()}  {dollars(price)}"
-        detail = f"Uses {amount:.0f} {good.value} a month; {effect}"
+        detail = f"Uses {amount_of(good, amount)} a month; {effect}"
         if _priced_button(label, railway.finances.can_afford(price), detail):
             railway.build_facility(station, facility)
 

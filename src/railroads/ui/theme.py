@@ -13,7 +13,7 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from PIL import Image
 
 from railroads.sim.goods import FITS, General, Good, Need
-from railroads.sim.trains import car_size
+from railroads.sim.trains import car_size, unit_label
 from railroads.ui.pixel.good_icons import ICON_PIXELS, ICONS_INDEX, ICONS_PNG
 from railroads.ui.pixel.layer import blown_up_texture
 
@@ -328,8 +328,11 @@ def good_icon(good: Good | Need, *, framed: bool = False, size: float = ICON_SIZ
 
 
 def icon_name(good: Good | Need) -> str:
-    """What hovering a good's icon says: its name, and for a category of goods what is in it."""
-    goods = FITS.get(good, ()) if isinstance(good, Need) else ()
+    """What hovering a good's icon says: its name and what one unit of it is, and for a category
+    of goods what is in it."""
+    if isinstance(good, Good):
+        return unit_label(good)
+    goods = FITS.get(good, ())
     if len(goods) > 1:
         return f"{good.value}: {', '.join(each.value for each in goods)}"
     return good.value

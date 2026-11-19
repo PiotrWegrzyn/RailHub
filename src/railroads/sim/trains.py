@@ -24,8 +24,9 @@ from railroads.sim.grids import Cell
 MAX_CARS = 5
 
 
-# Cars come in sizes up the Fibonacci numbers, each holding about 1.6 times the one before.
+# Cars come in sizes up the Fibonacci numbers, each holding as much as the two before it.
 CAR_SIZES = (
+    1.0,
     1.0,
     2.0,
     3.0,
@@ -47,13 +48,24 @@ CAR_GROWTH = CAR_SIZES[-1] / CAR_SIZES[-2]
 
 # Cars come in generations, each a size up CAR_SIZES from the one before: the pioneers' small
 # wooden wagons (1), the wagons of the Planet's day (2), which the sizes below are for, and the
-# steel and bogie wagons after them, up to today's (GENERATIONS). Tech opens each generation
-# (railroads.sim.tech.Effect.CAR_SIZE) and an engine pulls those up to its top_generation.
+# steel and bogie wagons after them, up to today's hoppers of about 100 t (GENERATIONS). Each
+# comes in its year (GENERATION_YEARS), a tree's tech (railroads.sim.tech.Effect.CAR_SIZE) brings
+# the next one sooner for its goods, and an engine pulls those up to its top_generation.
 BASE_GENERATION = 2
-GENERATIONS = 5
-# Goods first carried in a later generation, one to a car then.
-FIRST_GENERATION: Mapping[Good, int] = MappingProxyType(
-    {Good.CARS: 3, Good.TANKS: 3, Good.PLANES: 3}
+GENERATIONS = 7
+GENERATION_YEARS = (1843, 1873, 1901, 1931, 1955, 1972)
+
+
+def generation_in(year: int) -> int:
+    """The newest generation of cars in a year."""
+    return 1 + sum(year >= start for start in GENERATION_YEARS)
+
+
+# Vehicles, made from about 1930, are carried from the fifth generation, so many to a car of it
+# and a Fibonacci size up for each generation after: tanks and planes from the first size.
+FIRST_GENERATION = 5
+VEHICLES: Mapping[Good, float] = MappingProxyType(
+    {Good.CARS: 5.0, Good.PLANES: 1.0, Good.TANKS: 1.0}
 )
 
 SMALL_CAR = 5.0
@@ -68,7 +80,7 @@ def _sized(size: float, *goods: Good) -> dict[Good, float]:
 
 # How many units of each good a car of BASE_GENERATION holds, about what fits in a wagon of
 # about 10 cubic metres bearing about 8 tonnes, whichever runs out first (UNIT_KG); goods not
-# listed go CAR_CAPACITY to a car, and those of a FIRST_GENERATION one to a car of it.
+# listed go CAR_CAPACITY to a car; VEHICLES have their own sizes.
 CAR_UNITS: Mapping[Good, float] = MappingProxyType(
     _sized(
         BULK_CAR,
@@ -84,13 +96,13 @@ CAR_UNITS: Mapping[Good, float] = MappingProxyType(
         Good.BREAD,
         Good.COFFEE,
         Good.REFINED_SUGAR,
-        Good.RUBBER,
         Good.MAIL,
     )
     | _sized(
         55.0,
         Good.POTATOES,
         Good.SUGAR,
+        Good.RUBBER,
         Good.LUMBER,
         Good.COKE,
         Good.TEA,
@@ -107,6 +119,7 @@ CAR_UNITS: Mapping[Good, float] = MappingProxyType(
         Good.FLAX,
         Good.HOPS,
         Good.HONEY,
+        Good.WAX,
         Good.GLASS,
         Good.PORCELAIN,
         Good.POTS,
@@ -126,7 +139,6 @@ CAR_UNITS: Mapping[Good, float] = MappingProxyType(
     )
     | _sized(8.0, Good.FURNITURE, Good.CATTLE)
     | _sized(SMALL_CAR, Good.MACHINERY, Good.GOLD, Good.DIAMONDS)
-    | _sized(1.0, *FIRST_GENERATION)
 )
 
 
@@ -218,11 +230,15 @@ GOOD_KG: Mapping[Good, float] = MappingProxyType(
 
 def car_size(good: Good, generation: int = BASE_GENERATION) -> float:
     """How much of a good one car of a generation carries, before what tech adds to coaches;
-    nothing in a generation before the good's first."""
-    first = FIRST_GENERATION.get(good)
-    if first is not None and generation < first:
-        return 0.0
-    return bigger(CAR_UNITS.get(good, CAR_CAPACITY), generation - (first or BASE_GENERATION))
+    no VEHICLES before FIRST_GENERATION."""
+    vehicles = VEHICLES.get(good)
+    if vehicles is not None:
+        return (
+            bigger(vehicles, generation - FIRST_GENERATION)
+            if generation >= FIRST_GENERATION
+            else 0.0
+        )
+    return bigger(CAR_UNITS.get(good, CAR_CAPACITY), generation - BASE_GENERATION)
 
 
 # The most a general car of a kind carries, whatever it holds: processed food rides in medium cars.
@@ -242,15 +258,105 @@ def bigger(size: float, levels: int) -> float:
     return CAR_SIZES[index]
 
 
-# What an empty car of BASE_GENERATION weighs, in tonnes, CAR_GROWTH times as much for each
-# generation up: freight cars about the same whatever they hold, coaches and mail vans more.
-FREIGHT_TARE = 4.0
-TARE: Mapping[Good, float] = MappingProxyType({Good.PASSENGERS: 7.0, Good.MAIL: 5.0})
+# What an empty freight car of each generation weighs, in tonnes, about as much as real wagons of
+# its day, whatever it holds: from 1.5 t for a pioneer's wooden wagon to 24 t for a 100 t hopper.
+# Coaches and mail vans weigh TARE times as much.
+GENERATION_TARE = (1.5, 4.0, 6.0, 9.0, 14.0, 18.0, 24.0)
+FREIGHT_TARE = GENERATION_TARE[BASE_GENERATION - 1]
+TARE: Mapping[Good, float] = MappingProxyType({Good.PASSENGERS: 1.75, Good.MAIL: 1.25})
 
 
 def tare_of(good: Good, generation: int = BASE_GENERATION) -> float:
     """What an empty car of a generation for a good weighs, in tonnes."""
-    return TARE.get(good, FREIGHT_TARE) * CAR_GROWTH ** (generation - BASE_GENERATION)
+    return GENERATION_TARE[generation - 1] * TARE.get(good, 1.0)
+
+
+def _counting(singular: str, plural: str, *goods: Good) -> dict[Good, tuple[str, str]]:
+    return dict.fromkeys(goods, (singular, plural))
+
+
+# What a unit of each good is called, one and many: a sack of coal or grain, a crate of
+# clothes, a barrel of oil, a head of cattle; goods not listed come in crates.
+UNIT_NAMES: Mapping[Good, tuple[str, str]] = MappingProxyType(
+    _counting(
+        "sack",
+        "sacks",
+        Good.COAL,
+        Good.IRON,
+        Good.SAND,
+        Good.CLAY,
+        Good.LIMESTONE,
+        Good.SALT,
+        Good.WHEAT,
+        Good.RICE,
+        Good.SOYBEANS,
+        Good.POTATOES,
+        Good.SUGAR,
+        Good.REFINED_SUGAR,
+        Good.COKE,
+        Good.PLASTICS,
+        Good.COFFEE,
+    )
+    | _counting(
+        "barrel",
+        "barrels",
+        Good.OIL,
+        Good.FUEL,
+        Good.GAS,
+        Good.CHEMICALS,
+        Good.MILK,
+        Good.BEER,
+        Good.WINE,
+        Good.VODKA,
+        Good.JUICE,
+        Good.SAKE,
+        Good.SOY_SAUCE,
+        Good.MISO,
+        Good.HONEY,
+        Good.WAX,
+        Good.BARRELS,
+    )
+    | _counting(
+        "bale", "bales", Good.WOOL, Good.COTTON, Good.FLAX, Good.HOPS, Good.RUBBER, Good.LEATHER
+    )
+    | _counting("bundle", "bundles", Good.STEEL, Good.COPPER, Good.CASTINGS, Good.NEWSPAPERS)
+    | _counting("pallet", "pallets", Good.BRICKS, Good.CEMENT)
+    | _counting("head", "head", Good.CATTLE, Good.PIGS, Good.SHEEP)
+    | _counting("chest", "chests", Good.TEA, Good.GOLD)
+    | _counting("piece", "pieces", Good.FURNITURE, Good.APPLIANCES)
+    | {
+        Good.LUMBER: ("beam", "beams"),
+        Good.MEAT: ("side", "sides"),
+        Good.PAPER: ("roll", "rolls"),
+        Good.MAIL: ("bag", "bags"),
+        Good.CHICKENS: ("cage", "cages"),
+        Good.MACHINERY: ("machine", "machines"),
+        Good.DIAMONDS: ("casket", "caskets"),
+        Good.PASSENGERS: ("passenger", "passengers"),
+        Good.CARS: ("car", "cars"),
+        Good.TANKS: ("tank", "tanks"),
+        Good.PLANES: ("plane", "planes"),
+    }
+)
+# Goods whose unit is the good itself, named without "of".
+SELF_COUNTED = frozenset({Good.PASSENGERS, Good.CARS, Good.TANKS, Good.PLANES})
+
+
+def unit_name(good: Good, amount: float = 2.0) -> str:
+    """What a unit of a good is called: one, or many."""
+    singular, plural = UNIT_NAMES.get(good, ("crate", "crates"))
+    return singular if round(amount) == 1 else plural
+
+
+def amount_of(good: Good, amount: float) -> str:
+    """So much of a good in its units: 89 sacks of coal, 8 head of cattle, 34 passengers."""
+    counted = f"{amount:.0f} {unit_name(good, amount)}"
+    return counted if good in SELF_COUNTED else f"{counted} of {good.value}"
+
+
+def unit_label(good: Good) -> str:
+    """What a unit of a good is and weighs: coal: 1 sack = 100 kg."""
+    return f"{good.value}: 1 {unit_name(good, 1)} = {GOOD_KG.get(good, UNIT_KG):,.0f} kg"
 
 
 def unit_tonnes(good: Good) -> float:
@@ -293,15 +399,6 @@ class Power(Enum):
 
 # Speed 1 stands for this many km/h.
 KMH_PER_SPEED = 60.0
-# The newest generation of cars an engine of a kind pulls on steam; diesel, electric and maglev
-# engines pull every generation, pioneers only the first.
-STEAM_GENERATION = {
-    Kind.PIONEER: 1,
-    Kind.LIGHT: 2,
-    Kind.GENERAL: 3,
-    Kind.HEAVY: 4,
-    Kind.EXPRESS: 3,
-}
 # How much an engine of a kind pulls at most, as a share of the train it is built for, full, of
 # its top_generation's cars: coal for most, as real trains were loaded up to what their engine
 # could pull, so a full train of coal runs its slowest; full coaches for expresses and railcars,
@@ -390,8 +487,11 @@ class Engine:
 
     @property
     def top_generation(self) -> int:
-        """The newest generation of cars it pulls."""
-        return STEAM_GENERATION[self.kind] if self.power == Power.STEAM else GENERATIONS
+        """The newest generation of cars it pulls: pioneers only the first, every other engine
+        the one after the generation of its year, built as it was for the cars to come."""
+        if self.kind == Kind.PIONEER:
+            return 1
+        return min(generation_in(self.year) + 1, GENERATIONS)
 
     @property
     def kmh(self) -> float:
@@ -527,7 +627,7 @@ ENGINES: dict[str, Engine] = {
         "Big articulated",
         1940,
         0.7,
-        10,
+        8,
         405_000.0,
         H,
         pickup=22.0,
@@ -550,7 +650,7 @@ ENGINES: dict[str, Engine] = {
         "Heavy diesel",
         1960,
         0.9,
-        12,
+        8,
         1_200_000.0,
         H,
         DIESEL,
@@ -608,7 +708,7 @@ ENGINES: dict[str, Engine] = {
         "Twin-unit diesel",
         1995,
         1.0,
-        16,
+        9,
         3_600_000.0,
         H,
         DIESEL,
@@ -623,7 +723,7 @@ ENGINES: dict[str, Engine] = {
         "Super-heavy diesel",
         2040,
         1.1,
-        24,
+        10,
         10_800_000.0,
         H,
         DIESEL,
