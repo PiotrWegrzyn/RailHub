@@ -154,3 +154,18 @@ def test_a_train_waiting_for_a_full_load_does_not_wait_for_passengers_who_wont_b
 
     assert train.status == "Running"
     assert train.cars[0].load == 0.0
+
+
+@pytest.mark.parametrize(
+    ("width", "river", "joined"),
+    [(1, False, False), (1, True, True), (2, True, True), (3, True, False)],
+)
+def test_a_town_spans_a_river_up_to_two_cells_wide(width: int, river: bool, joined: bool) -> None:
+    rivers = np.zeros((12, 12), dtype=bool)
+    rivers[:, 5 : 5 + width] = river
+    towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0), rivers)
+
+    towns.add((6, 4), 1.0)
+    towns.add((6, 5 + width), 1.0)
+
+    assert bool(towns.town[6, 4] == towns.town[6, 5 + width]) is joined

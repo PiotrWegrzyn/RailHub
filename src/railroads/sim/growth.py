@@ -422,7 +422,7 @@ class Growth:
                 self._counts[built.kind][built.cell] += 1
         # How many buildings of any kind stand in each cell.
         self._occupied = sum(self._counts.values(), start=np.zeros(grid.shape, dtype=np.int64))
-        self.towns = Towns(grid)
+        self.towns = Towns(grid, tile_map.terrain == Terrain.RIVER)
         self.towns.settle(self.sending())
         # The cells last month's trade was worked out on.
         self._traded = np.zeros(0, dtype=np.intp)

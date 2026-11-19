@@ -88,9 +88,10 @@ The ideas every rule of the game should follow, the most important first.
 - Venues, such as taverns and clubs, make the homes around them grow faster.
 - Every place that sends passengers belongs to a town. Whenever one is built, it and every such place
   next to it take the colour sending the most passengers there, and any other town with a place
-  there joins that colour whole, so towns that grow into each other merge and never touch. Stations
-  belong to the town around them, checked every year, and passengers and mail only travel between
-  stations of different towns.
+  there joins that colour whole, so towns that grow into each other merge and never touch. A river
+  up to two cells wide doesn't split a town: the places on its two banks count as next to each
+  other. Stations belong to the town around them, checked every year, and passengers and mail only
+  travel between stations of different towns.
 - What trains pay to burn coal, wood or diesel is priced apart from what hauling that good pays.
 - Every fuel price is a tug of war: demand, the player's own included, against supply, measured
   against the map's starting state so every map is fair.

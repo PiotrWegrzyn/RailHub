@@ -2,7 +2,8 @@
 PASSENGERS_PER_POINT) belongs to a town, numbered from 1, 0 for none.
 
 Whenever a building sending passengers goes up, every sending cell next to it (TOWN_REACH), its own
-included, takes the town that sends the most passengers there, or a new town if none does, and
+included, and every sending cell on the far bank of a river at most RIVER_SPAN cells wide
+beside it, takes the town that sends the most passengers there, or a new town if none does, and
 every other town with a cell there joins it whole. So towns that grow into each other merge, and a
 building on its own starts one. A cell that empties leaves its town. A station belongs to the
 town that sends the most passengers from the cells it hands out to, worked out when it is built and
@@ -16,11 +17,14 @@ import numpy.typing as npt
 from railroads.sim.grids import Cell, Grid
 
 TOWN_REACH = 1
+# The widest river, in cells, that a town spans as though its banks touched.
+RIVER_SPAN = 2
 
 
 class Towns:
-    def __init__(self, grid: Grid) -> None:
+    def __init__(self, grid: Grid, rivers: npt.NDArray[np.bool_] | None = None) -> None:
         self._grid = grid
+        self._rivers = np.zeros(grid.shape, dtype=bool) if rivers is None else rivers
         # Each cell's town, 0 for none, and the passengers its buildings send a month.
         self.town = np.zeros(grid.shape, dtype=np.int32)
         self.sending = np.zeros(grid.shape, dtype=np.float64)
@@ -36,7 +40,7 @@ class Towns:
             self._paint_around(cell)
 
     def _paint_around(self, cell: Cell) -> None:
-        around = [near for near in self._grid.within(cell, TOWN_REACH) if self.sending[near] > 0]
+        around = [near for near in self._reach(cell) if self.sending[near] > 0]
         votes: dict[int, float] = {}
         for near in around:
             town = int(self.town[near])
@@ -52,6 +56,20 @@ class Towns:
         merged = [other for other in votes if other != town]
         if merged:
             self.town[np.isin(self.town, merged)] = town
+
+    def _reach(self, cell: Cell) -> set[Cell]:
+        """The cells next to this one, and those across a narrow river beside it."""
+        reach = set(self._grid.within(cell, TOWN_REACH))
+        crossed = {near for near in reach if self._rivers[near]}
+        edge = crossed
+        for _ in range(RIVER_SPAN - 1):
+            edge = {
+                far for near in edge for far in self._grid.neighbours(*near) if self._rivers[far]
+            } - crossed
+            crossed |= edge
+        for near in crossed:
+            reach.update(self._grid.neighbours(*near))
+        return reach
 
     def settle(self, sending: npt.NDArray[np.float64]) -> None:
         """Gives every cell sending passengers a town, the busiest first, as if each went up
