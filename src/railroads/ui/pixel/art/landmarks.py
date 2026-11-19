@@ -656,3 +656,41 @@ def olympic_stadium() -> Sprite:
     p.blob(cx - 2.5, cy - 20, cx + 2.5, cy - 13, (246, 140, 40))
     p.blob(cx - 1, cy - 18, cx + 1, cy - 14, (255, 220, 110))
     return p.sprite()
+
+
+def gigafactory() -> Sprite:
+    """A battery gigafactory: one vast low white hall with solar panels over its whole roof and a
+    band of glass along its front, a row of battery containers beside it and new electric cars
+    parked on the lot."""
+    p = Painter(50, 38, (24, 24))
+    lot = (178, 180, 176)
+    _plate(p, lot)
+    for u in (-12, -8, -4, 0, 4, 8):
+        p.line([_iso(0, 0, u, -6), _iso(0, 0, u, -10)], shade(lot, 1.12))
+    for k, u in enumerate((-10, -6, -2, 2, 6)):
+        x, y = _iso(0, 0, u, -8)
+        colour = CAR_COLOURS[k % len(CAR_COLOURS)]
+        p.polygon([(x - 1.5, y), (x + 1.5, y - 0.5), (x + 1.5, y + 0.5), (x - 1.5, y + 1)], colour)
+    for v in (-4, 0, 4):
+        p.box(*_iso(0, 0, 14, v), 1.8, 2.5, (226, 228, 232), (204, 208, 214))
+    wall, roof = (240, 241, 243), (220, 222, 226)
+    hall = p.hall(*_iso(0, 0, -3, 5), 20, 10, 5, wall, roof)
+    left, front, right, back = hall
+    _patch(p, left, front, (0.04, 0.96), (2, 3.5), (88, 124, 156))
+    _patch(p, left, front, (0.4, 0.6), (3.5, 6), (64, 66, 74))
+    panel = (52, 68, 104)
+    for k in range(1, 12):
+        t = k / 12
+        a = (left[0] + (back[0] - left[0]) * 0.15, left[1] + (back[1] - left[1]) * 0.15)
+        b = (front[0] + (right[0] - front[0]) * 0.15, front[1] + (right[1] - front[1]) * 0.15)
+        c = (left[0] + (back[0] - left[0]) * 0.85, left[1] + (back[1] - left[1]) * 0.85)
+        d = (front[0] + (right[0] - front[0]) * 0.85, front[1] + (right[1] - front[1]) * 0.85)
+        p.line(
+            [
+                (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t),
+                (c[0] + (d[0] - c[0]) * t, c[1] + (d[1] - c[1]) * t),
+            ],
+            panel,
+        )
+    p.line([_on_wall(front, right, 0.2, 1.5), _on_wall(front, right, 0.8, 1.5)], (200, 40, 44))
+    return p.sprite()

@@ -95,7 +95,13 @@ def buy_lot_steps(
     return replace(
         saved,
         summaries=[
-            (_moved_summary(summary, rows, cols), seen) for summary, seen in saved.summaries
+            (
+                _moved_summary(summary, rows, cols)
+                if isinstance(summary, MonthSummary)
+                else summary,
+                seen,
+            )
+            for summary, seen in saved.summaries
         ],
         camera=None,
     )

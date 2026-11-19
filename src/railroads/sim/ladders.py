@@ -196,6 +196,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.GAS_POWER_PLANT: (Points.INDUSTRY, 4),
     BuildingKind.SPACE_CENTER: (Points.CORPORATE, 25),
     BuildingKind.PEAR_HQ: (Points.CORPORATE, 50),
+    BuildingKind.GIGAFACTORY: (Points.INDUSTRY, 40),
     BuildingKind.ROYAL_PALACE: (Points.CORPORATE, 15),
     BuildingKind.SALT_CATHEDRAL: (Points.WORSHIP, 200),
     BuildingKind.SPA_RESORT: (Points.CORPORATE, 15),

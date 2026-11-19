@@ -53,6 +53,7 @@ import numpy.typing as npt
 
 from railroads.sim.clock import QUARTER, START_YEAR
 from railroads.sim.constructions import GREW_FROM, BuildingKind
+from railroads.sim.events import in_eastern_bloc
 from railroads.sim.goods import (
     BONUS_PART,
     BOOST_MOST,
@@ -67,6 +68,7 @@ from railroads.sim.goods import (
     Good,
     Need,
     bonus_of,
+    bonus_part,
     boosts_of,
     makes_of,
     needs_of,
@@ -411,6 +413,9 @@ class Economy:
         # adds to its satisfaction (railroads.sim.growth sets it from the player's tech).
         self.year = START_YEAR
         self.bonus_per_good = BONUS_PER_GOOD
+        # Whether the map lies in the old Eastern Bloc, where some of history happens only
+        # (railroads.sim.events).
+        self.east = in_eastern_bloc(tile_map.bounds)
         # What the processors of each kind in each cell hold of each input.
         self.stock = Stockpiles(self.cells)
         # Each cell's satisfaction in each of the last QUARTER months, the latest last.
@@ -627,8 +632,12 @@ class _Month:
             if kind in RECIPES:
                 wants[kind] = np.maximum(input_stock(kind) * n - self.stock[(kind, need)], 0.0)
             else:
-                wants[kind] = self._count_for(kind, need) * NEEDS[kind][need]
+                wants[kind] = self._count_for(kind, need) * self._amount(kind, need)
         return wants
+
+    def _amount(self, kind: BuildingKind, need: Need) -> float:
+        """What one building of a kind wants of a need in a month this year."""
+        return needs_of(kind, self.economy.year, self.economy.east).get(need, 0.0)
 
     def _owned_of_taking(self, kind: BuildingKind) -> FloatCells:
         """The player's part of the buildings of a kind in each cell taking the boosts only their
@@ -718,7 +727,7 @@ class _Month:
             return None
         must = self.zero.copy()
         for kind, want in wants.items():
-            extra = BONUS_PART.get((kind, need))
+            extra = bonus_part(kind, need, self.economy.year, self.economy.east)
             spare = 0.0 if extra is None else self._count_for(kind, need) * extra
             must += np.maximum(want - spare, 0.0)
         return must
@@ -1016,7 +1025,7 @@ class _Month:
         bonus: dict[BuildingKind, FloatCells] = {}
         goods_got = {}
         for (kind, need), received in self.received.items():
-            wanted = self._count_for(kind, need) * NEEDS[kind][need]
+            wanted = self._count_for(kind, need) * self._amount(kind, need)
             goods_got[(kind, need)] = (received, wanted)
             if need in bonus_of(kind, self.economy.year):
                 part = np.minimum(received, wanted) / np.where(wanted > 0, wanted, 1.0)
@@ -1024,7 +1033,7 @@ class _Month:
                 continue
             if kind in RECIPES or need in boosts_of(kind, self.economy.year):
                 continue
-            extra = BONUS_PART.get((kind, need))
+            extra = bonus_part(kind, need, self.economy.year, self.economy.east)
             if extra is not None:
                 spare = self._count_for(kind, need) * extra
                 wanted = wanted - spare

@@ -489,13 +489,15 @@ needs and recipes of `railroads.sim.goods`. Buildings need *needs*, each met by 
 homes need food, and any food good feeds them one for one; canneries need fruit and bakeries
 wheat. Towns eat a lot, so they are hard to feed in full, and every farm and bakery a station can
 reach is worth having. The table below is written from the game's own figures by
-`tools/readme_tables.py`, as they stand in 2050; the help window (H) lists the same.
+`tools/readme_tables.py`, as they stand before history changes them (see History below): people want
+more every decade, and events such as wars and the internet change what they want. The help
+window (H) lists the same.
 
 <!-- table: buildings -->
 | Building | Makes a month at most | Must get a month | Bonus goods and boosts a month |
 |---|---|---|---|
-| House |  | 10 food, 3 heating | 10 food, 0.5 soy sauce, 1 beer, 1 newspapers (from 1600), 5 common goods, 0.5 vodka (from 1600), 0.5 refined sugar (from 1800), 0.5 bricks, 0.2 glass, 0.5 limestone |
-| Tenement |  | 60 food, 60 common goods, 20 heating | 60 food, 5 soy sauce, 10 salt, 20 goods, 10 hot drinks (from 1700), 10 tools (from 1870), 10 beer, 10 vodka (from 1600), 10 bricks, 10 glass, 10 cement (from 1880), 10 refined sugar (from 1800), 10 newspapers (from 1600), 10 limestone, 1 luxury goods (from 1700) |
+| House |  | 10 food, 3 heating | 10 food, 0.5 soy sauce, 1 beer, 1 newspapers (from 1600), 5 common goods, 0.5 vodka (from 1600), 0.5 refined sugar (from 1800), 0.5 bricks, 0.2 glass, 0.5 limestone, 0.5 wax |
+| Tenement |  | 60 food, 60 common goods, 20 heating | 60 food, 5 soy sauce, 10 salt, 20 goods, 10 hot drinks (from 1700), 10 tools (from 1870), 10 beer, 10 vodka (from 1600), 10 bricks, 10 glass, 10 cement (from 1880), 10 refined sugar (from 1800), 10 newspapers (from 1600), 10 limestone, 1 luxury goods (from 1700), 5 wax |
 | Block of flats |  | 200 food, 300 common goods, 80 heating | 200 food, 15 soy sauce, 30 salt, 40 goods, 30 hot drinks (from 1700), 10 tools (from 1870), 30 fuel (from 1910), 3 cars (from 1930), 30 beer, 30 vodka (from 1600), 50 bricks, 50 cement (from 1880), 50 glass, 30 newspapers (from 1600), 5 appliances (from 1950), 30 refined sugar (from 1800), 5 luxury goods (from 1700) |
 | Farm | 10 wheat |  | 5 machinery (from 1870), 10 limestone, 2 fuel (from 1920) |
 | Orchard | 10 apples |  |  |
@@ -592,6 +594,7 @@ reach is worth having. The table below is written from the game's own figures by
 | Power plant |  | 200 coal (from 1700) |  |
 | Diesel power plant |  | 100 fuel (from 1910) |  |
 | Gas power plant |  | 150 gas |  |
+| Battery gigafactory |  | 300 chemicals (from 1880), 200 electronics (from 1960), 200 steel (from 1855) | 300 copper (from 1880) |
 | Juice works (1870) | 100 juice | 50 fruit, 50 glass, 25 plastics (from 1950) | 10 refined sugar (from 1800) |
 | Big juice works (1870) | 375 juice | 187.5 fruit, 187.5 glass, 93.75 plastics (from 1950) | 37.5 refined sugar (from 1800) |
 | Mega juice works (1870) | 1,406 juice | 703.1 fruit, 703.1 glass, 351.6 plastics (from 1950) | 140.6 refined sugar (from 1800) |
@@ -866,6 +869,7 @@ and sends only goods the game already has, in vast amounts.
 | Amusement park | 1950 | by the biggest town, once 100 people live there | 200 food, 100 beer, 50 fuel | 800 passengers |
 | Space center | 1960 | anywhere on flat land, 20 times likelier within 10 hexes of military ground | 300 electronics, 1,000 fuel, 300 food | 500 passengers |
 | Pear Company headquarters | 1980 | once a skyscraper stands, as near as it can to the one with most people around | 500 electronics, 1,000 food | 1,000 passengers |
+| Battery gigafactory | 2030 | by the biggest town, once 100 people live there | 300 copper, 300 chemicals, 200 electronics, 200 steel | 400 passengers |
 
 Olympic stadiums are apart from the pick. In every real Summer Games year (1896 to 1912, 1920 to
 1936, 1948 to 2016, 2021, then every four years) a map hosts one with a 5% chance on Poland's land,
@@ -875,6 +879,51 @@ and 200 newspapers and sends 2,000 passengers.
 
 Some works are so big that they too fill a whole hex: car, tank and aircraft factories, mega
 factories, refineries, power plants and shipyards.
+
+### History
+
+The world moves on through the game's two hundred years (`railroads.sim.events`, with what it does
+to one map in `railroads.sim.happenings`).
+
+People want more. In 1860, 1870 and every decade after, every building that uses goods up (homes,
+shops, venues, churches, the military and the novelties, but not processors, makers, power plants
+or railway works) wants 10% more of every need than ten years before, and 3% more food and
+heating: by 2050 homes want 6.7 times the goods they wanted in 1850, and 1.8 times the food and
+heating. Each decade brings a news card saying so.
+
+Dated events change what is wanted, made and paid while they last, or for good:
+
+| Year | Event | What changes |
+|---|---|---|
+| 1854 | The telegraph | newspapers wanted +100% |
+| 1873 | The Long Depression | luxuries, furniture and wine -30% for 6 years |
+| 1882 | Electric light | homes stop wanting wax (they took it as a bonus); churches keep it; electricity wanted +20% |
+| 1914 | The Great War | guns and steel x2, luxuries and wine -40%, passengers +50%, ports take guns, for 5 years |
+| 1920 | Radio | newspapers -15%, electricity wanted +20% |
+| 1929 | The Great Depression | everything but food, common goods and heating -30% for 4 years |
+| 1939 | The Second World War | guns, tanks, planes and steel x2, luxuries, wine and cars -50%, passengers +50%, ports take guns, for 7 years |
+| 1955 | Television | newspapers -50%, appliances +30%, electricity wanted +50% and costs +25% |
+| 1973 | The oil crisis | oil wells make half as much, oil and diesel fuel earn and cost twice as much, for 2 years |
+| May 1981 | The Pope is shot (17:17, 13 May) | passengers getting off in the town of St Paul's earn +300% for 12 months |
+| 1989 | The Iron Curtain falls | on maps of the old Eastern Bloc only: cars, electronics and appliances +30% |
+| 1995 | The internet | newspapers -30%, electronics +30% |
+| September 2001 | September 11 | the two skyscrapers with the most people around are pulled down |
+| April 2005 | John Paul II dies (21:37, 2 April) | passengers getting off in the town of St Paul's earn +500% for 12 months |
+| 2007 | Smartphones | nobody wants newspapers any more; electronics +50% |
+| 2008 | The financial crisis | homes want half the food and a fifth less of everything else, for 2 years |
+| 2020 | The pandemic | passengers -80%, mail +50%, for 3 years |
+| 2030 | Electric cars | fuel -40%, electronics +20% |
+| 2040 | Goodbye to coal | coal power plants burn half as much coal for the same power |
+
+A war does more. The year before it two new patches of military ground go up, each with a base
+and two outposts; while it lasts the military grows 11 times as fast; as it begins two gun
+factories open by the biggest towns, four on a map with no port; and as it ends half the military
+buildings are pulled down.
+
+The player hears of each event in a news card among the monthly summaries, which opens its story
+and what it changes; wars, crises, the pandemic and September 11 also stop the game in a window
+until the player has read them. Goods made for the first time (tools and machinery in 1870, cars
+in 1930, electronics in 1960 and so on) get a card too.
 
 ### Owning buildings and tech
 

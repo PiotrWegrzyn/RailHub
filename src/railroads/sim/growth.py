@@ -41,6 +41,9 @@ one more of its first kind, in its likeliest cell: at least one of everything th
 year, and of the key buildings (KEY_BUILDINGS) at least KEY_LEAST on a map of KEY_LAND_CELLS land
 cells, more or fewer by the land, put on any land they could stand on where none is likely.
 
+History happens too (railroads.sim.happenings): wars, crises and new things, a month at a time; in a war the
+military grows military_growth times as fast (railroads.sim.events).
+
 Forests come and go as well (railroads.sim.forests): people, industry and above all lumber mills
 clear them, they spread onto open grassland beside them, and the land weighs again wherever they
 changed.
@@ -77,6 +80,7 @@ from railroads.sim.economy import (
     Trade,
     levels_of,
 )
+from railroads.sim.events import military_growth
 from railroads.sim.forests import change_forests
 from railroads.sim.goods import FITS, HOMES, MAKES, RECIPES, Good, demands_of, makes_of
 from railroads.sim.grids import Cell, Grid
@@ -108,6 +112,7 @@ from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 from railroads.sim.towns import Towns
 
 if TYPE_CHECKING:
+    from railroads.sim.happenings import Happenings
     from railroads.sim.novelties import Novelties
 
 MONTHS_BEFORE_PLAY = 1000 * 12
@@ -464,6 +469,9 @@ class Growth:
         self.railway: Railway | None = None
         # The one-off buildings this game may get (railroads.sim.novelties), rolled once a year.
         self.novelties: Novelties | None = None
+        # What history does to this game (railroads.sim.happenings); None while the map grows its
+        # history before play.
+        self.happenings: Happenings | None = None
         # The buildings the player owns, the stations growth trades with, and the room it makes
         # (railroads.sim.ownership, railroads.sim.station_trade, railroads.sim.room).
         self.owners = Owners(self)
@@ -939,6 +947,8 @@ class Growth:
         if reached(12):
             changed |= build_power_plants(self)
             changed |= self._top_up(rng)
+        if self.happenings is not None:
+            changed |= self.happenings.months(self, before + 1, self._months, rng)
         every = self.rule.forests_every_months
         if self.rule.forests is not None and reached(every):
             changed |= change_forests(self, self.rule.forests, every, rng)
@@ -956,7 +966,12 @@ class Growth:
                 strict=True,
             )
         )
+        war = military_growth(self.year)
         for place in growing:
+            if war > 1 and place.ladder is MILITARY:
+                hits = self._hits(place, rng, None, months * war)
+                turns += [(index, place.ladder) for index in hits.tolist()]
+                continue
             drawn = tries.get(id(place))
             if drawn == 0:
                 continue
@@ -997,6 +1012,23 @@ class Growth:
                 place.cells = allowed
                 self._reckon(place, cells)
                 place.highest = max(place.highest, float(place.chances[cells].max()))
+
+    def reweigh_deposits(self, cells: Cells) -> None:
+        """Weighs the land again in these flat cells, sorted, for the ladders that grow only over a
+        deposit, once the deposits there changed (railroads.sim.happenings)."""
+        tile_map = self.constructions.tile_map
+        surroundings = Surroundings(tile_map, cells, self._near)
+        weighed: set[int] = set()
+        for place in self._places:
+            land = place.ladder.land
+            if land.deposit is None:
+                continue
+            if id(place.land) not in weighed:
+                weighed.add(id(place.land))
+                place.land[cells] = _unlocked(tile_map, cells, land.weights_in(surroundings))
+            place.cells = _allowed(place.cells, cells[place.land[cells] > 0], place.land)
+            self._reckon(place, cells)
+            place.highest = max(place.highest, float(place.chances[cells].max()))
 
     def run(self, months: int, rng: np.random.Generator, step: int = 1) -> None:
         """Grows these many months, `step` months at a time and what is left at the end."""

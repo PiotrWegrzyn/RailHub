@@ -184,7 +184,7 @@ def describe(
                 [(good, amount * count) for good, amount in makes_of(kind, growth.year).items()],
                 [
                     (need, (amount - BONUS_PART.get((kind, need), 0.0)) * count)
-                    for need, amount in demands_of(kind, growth.year).items()
+                    for need, amount in demands_of(kind, growth.year, growth.economy.east).items()
                 ],
                 [
                     *(
@@ -194,7 +194,7 @@ def describe(
                     ),
                     *(
                         (need, amount * count)
-                        for need, amount in bonus_of(kind, growth.year).items()
+                        for need, amount in bonus_of(kind, growth.year, growth.economy.east).items()
                     ),
                 ],
                 got,

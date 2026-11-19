@@ -153,9 +153,10 @@ def test_wine_is_made_of_grapes_and_barrels_make_up_to_twice_as_much(
     assert made.sum() == wine
 
 
-def test_honey_feeds_houses_and_wax_lights_churches() -> None:
+def test_honey_feeds_houses_and_wax_lights_churches_once_homes_have_electric_light() -> None:
     tile_map = make_map(12)
     economy = Economy(tile_map)
+    economy.year = 1882
     neighbours = tile_map.grid.neighbours(5, 5)
     houses = np.zeros(tile_map.grid.shape, dtype=np.int64)
     houses[neighbours[0]] = 4

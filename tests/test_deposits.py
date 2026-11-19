@@ -5,6 +5,7 @@ from builders import flat_map
 from railroads.mapgen.deposits import allowed_land, place_deposits
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.demand import StationDemand
+from railroads.sim.events import want_factor
 from railroads.sim.goods import MAKES, Good, Need, freight_of, needs_of
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth, dies_after
@@ -134,7 +135,7 @@ def test_needs_start_in_their_year() -> None:
     after = needs_of(BuildingKind.FLATS, 1910)
 
     assert Need.FUEL not in before
-    assert after[Need.FUEL] == 30
+    assert after[Need.FUEL] == pytest.approx(30 * want_factor(BuildingKind.FLATS, Need.FUEL, 1910))
 
 
 def test_works_with_nothing_to_work_from_close_after_exactly_thirty_years_starving() -> None:
@@ -157,7 +158,7 @@ def test_flats_want_a_car_from_1930() -> None:
     after = needs_of(BuildingKind.FLATS, 1930)
 
     assert Need.CARS not in before
-    assert after[Need.CARS] == 3
+    assert after[Need.CARS] == pytest.approx(3 * want_factor(BuildingKind.FLATS, Need.CARS, 1930))
 
 
 @pytest.mark.parametrize(("gap", "opens"), [(6, False), (12, True)])

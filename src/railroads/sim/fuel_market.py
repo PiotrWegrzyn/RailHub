@@ -20,6 +20,10 @@ map's coal, diesel and gas power plants (PLANT_FUEL, railroads.sim.power_plants)
 a month each at full fuel and less on less. Power plants the player owns are counted among the
 map's, and their trains use what those make
 first, at OWN_POWER_SHARE of the price.
+
+History moves prices and use as well (railroads.sim.events): the oil crisis makes diesel fuel dear,
+electric light, radio and television make homes use more electricity, and television makes it
+cost more.
 """
 
 from collections.abc import Mapping
@@ -31,7 +35,8 @@ import numpy as np
 
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Trade
-from railroads.sim.goods import FITS, Good, Need
+from railroads.sim.events import electricity_price, electricity_use, price_factor
+from railroads.sim.goods import FITS, Good, Need, needs_of
 from railroads.sim.goods import NEEDS as BUILDING_NEEDS
 from railroads.sim.trains import Engine, Power
 
@@ -177,7 +182,7 @@ def signals_of(
         got, want = trade.goods_got.get((kind, need), (None, None))
         if got is None or want is None or float(want.sum()) <= 0:
             continue
-        per_plant = BUILDING_NEEDS[kind][need]
+        per_plant = needs_of(kind, year).get(need, BUILDING_NEEDS[kind][need])
         made += POWER_PLANT_OUTPUT * float(np.minimum(got, want).sum()) / per_plant
         got_all += float(np.minimum(got, want).sum())
         wanted_all += float(want.sum())
@@ -187,9 +192,17 @@ def signals_of(
             counts = np.asarray(grid).ravel()[trade.cells]
             own += POWER_PLANT_OUTPUT * float((counts * share).sum())
     fed = got_all / wanted_all if wanted_all > 0 else 0.0
-    homes = ELECTRICITY_PER_POINT * points * electrified(year)
+    homes = ELECTRICITY_PER_POINT * points * electrified(year) * electricity_use(year)
     signals[Fuel.ELECTRICITY] = Signals(homes, made, 0.0, fed, own)
     return signals
+
+
+def history_factor(fuel: Fuel, year: int) -> float:
+    """How many times as much history makes a fuel cost in a year: electricity as it says, the
+    others as the good they are."""
+    if fuel == Fuel.ELECTRICITY:
+        return electricity_price(year)
+    return price_factor(GOOD_OF[fuel], year)
 
 
 @dataclass
@@ -209,10 +222,13 @@ class FuelMarket:
     own_power: float = 0.0
     # What the trains bought last month.
     last_bought: dict[Fuel, float] = field(default_factory=lambda: dict.fromkeys(Fuel, 0.0))
+    # The year of the last month closed, whose history prices it.
+    year: int = 0
 
     def price(self, fuel: Fuel) -> float:
-        """What a unit of a fuel costs on the market now."""
-        return BASE_PRICE[fuel] * self.factor[fuel]
+        """What a unit of a fuel costs on the market now, dearer while history makes it scarce
+        (railroads.sim.events)."""
+        return BASE_PRICE[fuel] * self.factor[fuel] * history_factor(fuel, self.year)
 
     def bought(self, fuel: Fuel) -> float:
         return self.from_stations[fuel] + self.at_retail[fuel]
@@ -244,6 +260,7 @@ class FuelMarket:
     def month(self, year: int, signals: Mapping[Fuel, Signals]) -> None:
         """Closes a month: moves each fuel's price with what its demand and supply were, keeps the
         month in its history and starts the next."""
+        self.year = year
         for fuel in Fuel:
             got = signals.get(fuel, Signals())
             trains = self.bought(fuel)

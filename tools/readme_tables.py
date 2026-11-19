@@ -11,7 +11,7 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-from railroads.sim.clock import END_YEAR
+from railroads.sim.clock import END_YEAR, START_YEAR
 from railroads.sim.finance import dollars
 from railroads.sim.goods import (
     BONUS_PART,
@@ -46,9 +46,14 @@ def _amounts(amounts: list[tuple[Need | Good, float, int]]) -> str:
 
 def building_row(row: BuildingHelp) -> str:
     """A building's line: what it makes a month at most, what it must get, and what it takes as
-    bonus goods or boosts, all as they stand in END_YEAR."""
+    bonus goods or boosts, before history changes any of it (railroads.sim.events); a need is a
+    bonus good or a boost if it is one in any decade it is wanted in."""
     kind = row.kind
-    extras = {**bonus_of(kind, END_YEAR), **boosts_of(kind, END_YEAR)}
+    extras = {
+        need
+        for year in range(START_YEAR, END_YEAR + 1, 10)
+        for need in (*bonus_of(kind, year), *boosts_of(kind, year))
+    }
     must: list[tuple[Need | Good, float, int]] = []
     bonus: list[tuple[Need | Good, float, int]] = []
     for need, amount, year in row.wants:

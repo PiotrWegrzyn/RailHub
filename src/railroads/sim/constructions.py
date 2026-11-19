@@ -133,6 +133,7 @@ class BuildingKind(Enum):
     GAS_POWER_PLANT = "gas power plant"
     SPACE_CENTER = "space center"
     PEAR_HQ = "Pear Company headquarters"
+    GIGAFACTORY = "battery gigafactory"
     ROYAL_PALACE = "royal palace"
     SALT_CATHEDRAL = "salt mine cathedral"
     SPA_RESORT = "spa resort"
@@ -252,6 +253,7 @@ ONE_OFFS = frozenset(
     {
         BuildingKind.SPACE_CENTER,
         BuildingKind.PEAR_HQ,
+        BuildingKind.GIGAFACTORY,
         BuildingKind.ROYAL_PALACE,
         BuildingKind.SALT_CATHEDRAL,
         BuildingKind.SPA_RESORT,
@@ -353,6 +355,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.PLANE_FACTORY,
             BuildingKind.SPACE_CENTER,
             BuildingKind.PEAR_HQ,
+            BuildingKind.GIGAFACTORY,
             BuildingKind.ROYAL_PALACE,
             BuildingKind.SALT_CATHEDRAL,
             BuildingKind.SPA_RESORT,

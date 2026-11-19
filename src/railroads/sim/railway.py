@@ -49,6 +49,7 @@ from railroads.sim.clock import SECONDS_PER_MONTH, START_YEAR
 from railroads.sim.constructions import Constructions
 from railroads.sim.demand import StationDemand
 from railroads.sim.economy import COLLECTION_RADIUS, Trade
+from railroads.sim.events import price_factor as history_price
 from railroads.sim.facilities import (
     ENGINE_SHED_SPEED,
     SAND_TOWER_PICKUP,
@@ -99,6 +100,7 @@ from railroads.sim.trains import (
 )
 
 if TYPE_CHECKING:
+    from railroads.sim.happenings import Happenings
     from railroads.sim.ownership import Owners
     from railroads.sim.station_trade import StationTrade
 
@@ -196,6 +198,8 @@ class Railway:
         self.calls = StationCalls(self)
         # Each station's town (railroads.sim.towns) and the year it was worked out in.
         self._towns: dict[Cell, tuple[int, int]] = {}
+        # What history does to the game, which pays pilgrims more (railroads.sim.happenings).
+        self.happenings: Happenings | None = None
 
     def stations(self) -> list[Cell]:
         return self.constructions.stations()
@@ -447,9 +451,12 @@ class Railway:
         return self.demand.setdefault(station, StationDemand())
 
     def price_factor(self, good: Good) -> float:
-        """How much more a good earns carried by train: its TRANSIT_PAY, with the player's tech."""
-        return TRANSIT_PAY.get(good, 1.0) * (
-            1.0 + self.research.bonus(Effect.PRICE, GOOD_TREES[good])
+        """How much more a good earns carried by train: its TRANSIT_PAY, with the player's tech, and
+        what history makes of it (railroads.sim.events)."""
+        return (
+            TRANSIT_PAY.get(good, 1.0)
+            * history_price(good, self.year)
+            * (1.0 + self.research.bonus(Effect.PRICE, GOOD_TREES[good]))
         )
 
     def destination(self, train: Train) -> Cell | None:
@@ -571,8 +578,14 @@ class Railway:
         self.research.earn(tree, dollars * factor)
 
     def facility_pay(self, station: Cell, good: Good) -> float:
-        """How many times as much a good delivered at a station pays with its facilities."""
-        return pay_factor(self.working_at(station), good)
+        """How many times as much a good delivered at a station pays with its facilities, and for
+        passengers while pilgrims crowd its town (railroads.sim.happenings)."""
+        pay = pay_factor(self.working_at(station), good)
+        happenings = self.happenings
+        pilgrims = 0 if happenings is None or good != Good.PASSENGERS else happenings.pilgrim_town
+        if pilgrims and self.town_of(station) == pilgrims:
+            pay *= happenings.pilgrim_pay
+        return pay
 
     def connected(self) -> set[Cell]:
         """The stations that track joins to at least one other station."""

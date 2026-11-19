@@ -33,6 +33,7 @@ import numpy.typing as npt
 
 from railroads.sim.clock import GameClock
 from railroads.sim.game import Game
+from railroads.sim.happenings import Headline
 from railroads.sim.steps import Steps, finish
 from railroads.sim.summaries import MonthSummary
 
@@ -86,7 +87,7 @@ class SavedGame:
     title: str
     settings: Settings | None = None
     # The month summaries on the map, newest first, and whether each was seen.
-    summaries: list[tuple[MonthSummary, bool]] = field(default_factory=list)
+    summaries: list[tuple[MonthSummary | Headline, bool]] = field(default_factory=list)
     # Where the map was looked at: its centre and zoom level.
     camera: tuple[float, float, int] | None = None
     # How far the player has got through the tutorial, in a tutorial game.
