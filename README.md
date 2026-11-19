@@ -596,7 +596,14 @@ got all of, and that share of 30% for part of one, so bonus goods count only as 
 demands are met. Demands are counted by amount, so a car matters little next to a town's food. A
 house that gets its food and heating is at 100%, with all its beer at 130%, and with half its
 newspapers on top at 145%; one only half fed with all its beer is at 65%, and one that gets only
-its beer at 0%. A building
+its beer at 0%. Homes want twice the food they must eat: a house must eat 10 a month and
+takes 10 more as a bonus good, a tenement 60 and 60 more, a block of flats 200 and 200 more. A
+house must get only food and heating, with common goods a bonus; tenements and flats must get
+common goods too. What homes must have is handed out first, to every home within reach, and only
+then the bonus food, so the homes nearest a station or a farm don't thrive while those further off
+go hungry. A train unloading hands out at once only what the buildings around were left short
+of last month after the goods handed out on their own, so a train never takes a local
+supplier's place. A building
 that makes things counts what it gave away alongside what it got, and processors are judged on
 what they actually make, not on what they could.
 

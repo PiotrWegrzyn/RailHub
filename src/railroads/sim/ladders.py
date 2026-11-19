@@ -500,8 +500,8 @@ FARMS = Ladder(
         water={Terrain.RIVER: 4.0, Terrain.LAKE: 4.0, Terrain.SEA: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.0000000746,
-    chance_per_doubling={Points.POPULATION: 0.00001344, Points.FOOD: 0.00000056},
+    base_chance=9.698e-08,
+    chance_per_doubling={Points.POPULATION: 1.7472e-05, Points.FOOD: 7.28e-07},
     crowded_at=FARMS_CROWDED_OUT,
 )
 
@@ -515,8 +515,8 @@ ORCHARDS = Ladder(
         water={Terrain.RIVER: 3.0, Terrain.LAKE: 3.0, Terrain.SEA: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000056,
-    chance_per_doubling={Points.POPULATION: 0.000000108, Points.FOOD: 0.00000216},
+    base_chance=1.12e-07,
+    chance_per_doubling={Points.POPULATION: 2.16e-07, Points.FOOD: 4.32e-06},
 )
 
 # Date palms grow in hot desert, best at an oasis by water.
@@ -529,8 +529,8 @@ DATE_PALMS = Ladder(
         water={Terrain.RIVER: 5.0, Terrain.LAKE: 5.0, Terrain.SEA: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000168,
-    chance_per_doubling={Points.POPULATION: 0.00000168, Points.FOOD: 0.00000126},
+    base_chance=3.36e-07,
+    chance_per_doubling={Points.POPULATION: 3.36e-06, Points.FOOD: 2.52e-06},
 )
 
 # Bananas grow in the jungle.
@@ -543,8 +543,8 @@ BANANA_PLANTATIONS = Ladder(
         water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0, Terrain.SEA: 1.5},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000168,
-    chance_per_doubling={Points.POPULATION: 0.00000168, Points.FOOD: 0.00000126},
+    base_chance=3.36e-07,
+    chance_per_doubling={Points.POPULATION: 3.36e-06, Points.FOOD: 2.52e-06},
 )
 
 # Oranges want hot, green land: not the desert, not the jungle.
@@ -557,8 +557,8 @@ ORANGE_FARMS = Ladder(
         water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0, Terrain.SEA: 1.5},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000168,
-    chance_per_doubling={Points.POPULATION: 0.00000168, Points.FOOD: 0.00000126},
+    base_chance=3.36e-07,
+    chance_per_doubling={Points.POPULATION: 3.36e-06, Points.FOOD: 2.52e-06},
 )
 
 # Sugar grows on open, flat land wherever it is not cold: beet in mild lands, cane in hot ones.
@@ -571,8 +571,8 @@ SUGAR_FIELDS = Ladder(
         water={Terrain.RIVER: 3.0, Terrain.LAKE: 2.0, Terrain.SEA: 1.5},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000013,
-    chance_per_doubling={Points.POPULATION: 0.000000042, Points.FOOD: 0.000000168},
+    base_chance=2.6e-08,
+    chance_per_doubling={Points.POPULATION: 8.4e-08, Points.FOOD: 3.36e-07},
 )
 
 # Mines are dug in and beside mountains and in hills, where finding ore draws more digging nearby,
@@ -796,8 +796,8 @@ BEEKEEPERS = Ladder(
         relief={Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.1},
     ),
-    base_chance=0.000000008,
-    chance_per_doubling={Points.FOOD: 0.00000008},
+    base_chance=1.04e-08,
+    chance_per_doubling={Points.FOOD: 1.04e-07},
     most_per_cell=1,
     most_nearby=1,
 )
@@ -926,8 +926,8 @@ POTATO_FARMS = Ladder(
         water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.000000096,
-    chance_per_doubling={Points.POPULATION: 0.000001, Points.FOOD: 0.00000004},
+    base_chance=1.248e-07,
+    chance_per_doubling={Points.POPULATION: 1.3e-06, Points.FOOD: 5.2e-08},
     crowded_at=FARMS_CROWDED_OUT,
     from_year=1600,
 )
@@ -941,13 +941,13 @@ CATTLE_RANCHES = Ladder(
         temperature={Temperature.HOT: 0.3},
         open_field=OPEN_FIELD,
     ),
-    base_chance=0.0000000033,
-    chance_per_doubling={Points.POPULATION: 0.00000018, Points.FOOD: 0.000000009},
+    base_chance=4.29e-09,
+    chance_per_doubling={Points.POPULATION: 2.34e-07, Points.FOOD: 1.17e-08},
     crowded_at=FARMS_CROWDED_OUT,
 )
 
 # Pig farms and chicken farms keep to the same land as cattle; pigs are a little rarer.
-PIG_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.PIG_FARM,), base_chance=0.0000000025)
+PIG_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.PIG_FARM,), base_chance=3.25e-09)
 CHICKEN_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.CHICKEN_FARM,))
 
 # Flax wants cool, wet land by rivers and lakes.

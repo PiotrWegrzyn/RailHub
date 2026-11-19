@@ -74,6 +74,8 @@ The ideas every rule of the game should follow.
   good in a category meets that need.
 - Base goods are needed; comforts and novelties, such as newspapers, chairs or beer, are only a
   bonus.
+- What buildings must have is handed out before any bonus, so nearby homes don't thrive on extras
+  while those further off go short. Homes want twice the food they must eat; the rest is a bonus.
 - A bonus input raises output but never replaces the main input.
 - Hard chains, with many inputs, make few but valuable goods.
 - Works grow by merging: three food makers of a kind become a big one and three big ones a mega

@@ -697,7 +697,7 @@ MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
 _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
     {
         BuildingKind.HOUSE: {
-            Need.FOOD: 10,
+            Need.FOOD: 20,
             Need.HEATING: 3,
             Need.BEER: 1,
             Need.NEWSPAPERS: 1,
@@ -723,7 +723,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.GLASS: 5,
         },
         BuildingKind.TENEMENT: {
-            Need.FOOD: 60,
+            Need.FOOD: 120,
             Need.SALT: 10,
             Need.GOODS: 20,
             Need.COFFEE: 10,
@@ -741,7 +741,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.LUXURIES: 1,
         },
         BuildingKind.FLATS: {
-            Need.FOOD: 200,
+            Need.FOOD: 400,
             Need.SALT: 30,
             Need.GOODS: 40,
             Need.COFFEE: 30,
@@ -1048,6 +1048,18 @@ def boosts_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
 # else they want is a bonus good.
 HOMES = frozenset({BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS})
 HOME_DEMANDS = frozenset({Need.FOOD, Need.COMMON, Need.HEATING})
+# A house must get only food and heating; common goods are a bonus for it.
+HOUSE_DEMANDS = frozenset({Need.FOOD, Need.HEATING})
+# Needs whose last part is only a bonus: a home must eat half the food it wants, and the other
+# half counts as a bonus good (railroads.sim.economy): 10 of a house's 20, 60 of a tenement's 120
+# and 200 of a block's 400.
+BONUS_PART: Mapping[tuple[BuildingKind, Need], float] = MappingProxyType(
+    {
+        (BuildingKind.HOUSE, Need.FOOD): 10.0,
+        (BuildingKind.TENEMENT, Need.FOOD): 60.0,
+        (BuildingKind.FLATS, Need.FOOD): 200.0,
+    }
+)
 
 
 # Venues need alcohol of any kind; a tavern takes food as a bonus, and a club a little of
@@ -1071,8 +1083,9 @@ def bonus_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
             {need: amount for need, amount in needs.items() if need in VENUE_BONUSES[kind]}
         )
     if kind in HOMES:
+        demands = HOUSE_DEMANDS if kind == BuildingKind.HOUSE else HOME_DEMANDS
         return MappingProxyType(
-            {need: amount for need, amount in needs.items() if need not in HOME_DEMANDS}
+            {need: amount for need, amount in needs.items() if need not in demands}
         )
     bonus = {need: amount for need, amount in needs.items() if need in BONUS_NEEDS}
     if kind in MAKES or len(bonus) == len(needs):

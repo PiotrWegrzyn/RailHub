@@ -39,11 +39,21 @@ def test_nothing_that_can_open_needs_what_nothing_open_makes_yet() -> None:
     assert unmet == []
 
 
-@pytest.mark.parametrize("kind", [BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS])
-def test_homes_must_have_food_common_goods_and_heating_and_take_the_rest_as_bonus_goods(
+@pytest.mark.parametrize("kind", [BuildingKind.TENEMENT, BuildingKind.FLATS])
+def test_tenements_and_flats_must_have_food_common_goods_and_heating_and_take_the_rest_as_bonus(
     kind: BuildingKind,
 ) -> None:
     demands = demands_of(kind, 2000)
 
     assert set(demands) == {Need.FOOD, Need.COMMON, Need.HEATING}
     assert set(bonus_of(kind, 2000)) == set(needs_of(kind, 2000)) - set(demands)
+
+
+def test_a_house_must_have_only_food_and_heating_and_takes_common_goods_as_a_bonus() -> None:
+    demands = demands_of(BuildingKind.HOUSE, 2000)
+
+    assert set(demands) == {Need.FOOD, Need.HEATING}
+    assert Need.COMMON in bonus_of(BuildingKind.HOUSE, 2000)
+    assert set(bonus_of(BuildingKind.HOUSE, 2000)) == set(needs_of(BuildingKind.HOUSE, 2000)) - set(
+        demands
+    )

@@ -54,6 +54,7 @@ import numpy.typing as npt
 from railroads.sim.clock import QUARTER, START_YEAR
 from railroads.sim.constructions import GREW_FROM, BuildingKind
 from railroads.sim.goods import (
+    BONUS_PART,
     BOOST_MOST,
     HANDED_OUT,
     HOMES,
@@ -145,13 +146,15 @@ def distribute(
     supply: FloatCells,
     short: FloatCells,
     falloff: tuple[FloatCells, tuple[float, ...]] | None = None,
+    used: FloatCells | None = None,
 ) -> tuple[npt.NDArray[np.intp], FloatCells]:
     """Hands goods from sellers to buyers, the nearest first: pairs of a seller and a buyer in
     order of how far apart they are, the pairs of each distance starting at its `bounds`
     (ring_starts). A seller shares what it has among the buyers at the same distance by how short
     they are. With a `falloff` of a month per seller and a share per distance, a buyer takes at most
-    that share of the seller's month. Takes what went out of `supply`, per seller, and out of
-    `short`, per buyer; returns the pairs anything went between and how much."""
+    that share of the seller's month, less what `used` says already went between the pair this
+    month. Takes what went out of `supply`, per seller, and out of `short`, per buyer; returns the
+    pairs anything went between and how much."""
     went: list[npt.NDArray[np.intp]] = []
     amounts: list[FloatCells] = []
     for ring, (start, end) in enumerate(pairwise(bounds)):
@@ -161,11 +164,15 @@ def distribute(
         if not live.any():
             continue
         seller, buyer, wanting = seller[live], buyer[live], wanting[live]
+        before = None if used is None else used[start:end][live]
         share = wanting / np.bincount(seller, wanting, minlength=supply.size)[seller]
         sent = supply[seller] * share
         if falloff is not None:
             month, shares = falloff
-            sent = np.minimum(sent, month[seller] * shares[ring])
+            cap = month[seller] * shares[ring]
+            if before is not None:
+                cap = np.maximum(cap - before, 0.0)
+            sent = np.minimum(sent, cap)
         arriving = np.bincount(buyer, sent, minlength=short.size)[buyer]
         sent *= np.minimum(1.0, short[buyer] / np.maximum(arriving, 1e-12))
         supply -= np.bincount(seller, sent, minlength=supply.size)
@@ -663,16 +670,22 @@ class _Month:
         for kind, taken in early.items():
             wants[kind] = np.maximum(wants[kind] - taken, 0.0)
         demand = sum(wants.values(), start=self.zero.copy())
+        must = self._must(need, wants)
         received = self.zero.copy()
-        for good in HANDED_OUT[need]:
-            self._sell_nearby(good, demand, received)
-        self.local[need] = received.copy()
-        mine = self._owned_short(wants, demand, received)
-        if mine is not None:
+        local = self.zero.copy()
+        used: dict[Good, FloatCells] = {}
+        for target in (demand,) if must is None else (must, demand):
+            before = received.copy()
             for good in HANDED_OUT[need]:
-                self._hand_out(need, good, received + mine, received)
-        for good in HANDED_OUT[need]:
-            self._hand_out(need, good, demand, received)
+                used[good] = self._sell_nearby(good, target, received, used.get(good))
+            local += received - before
+            mine = self._owned_short(wants, target, received)
+            if mine is not None:
+                for good in HANDED_OUT[need]:
+                    self._hand_out(need, good, np.minimum(received + mine, target), received)
+            for good in HANDED_OUT[need]:
+                self._hand_out(need, good, target, received)
+        self.local[need] = local
         met = np.where(demand > 0, received / np.where(demand > 0, demand, 1.0), 0.0)
         for kind, want in wants.items():
             got = met * want
@@ -683,6 +696,19 @@ class _Month:
                 self.stock[key] = self.stock[key] + got
             else:
                 self._boost_from_land(kind, need, got)
+
+    def _must(self, need: Need, wants: dict[BuildingKind, FloatCells]) -> FloatCells | None:
+        """What the buildings wanting a need must get of it in each cell, without the part some
+        take only as a bonus (BONUS_PART), which is handed out after everyone has had the rest;
+        None where no one wants any of it as a bonus."""
+        if not any((kind, need) in BONUS_PART for kind in wants):
+            return None
+        must = self.zero.copy()
+        for kind, want in wants.items():
+            extra = BONUS_PART.get((kind, need))
+            spare = 0.0 if extra is None else self._count_for(kind, need) * extra
+            must += np.maximum(want - spare, 0.0)
+        return must
 
     def _owned_short(
         self, wants: dict[BuildingKind, FloatCells], demand: FloatCells, received: FloatCells
@@ -786,26 +812,36 @@ class _Month:
                 mine = more if owned_only else more * self._owned_part(kind)
                 self.owned_made[(kind, good)] = self.owned_made.get((kind, good), self.zero) + mine
 
-    def _sell_nearby(self, good: Good, demand: FloatCells, received: FloatCells) -> None:
+    def _sell_nearby(
+        self,
+        good: Good,
+        demand: FloatCells,
+        received: FloatCells,
+        used: FloatCells | None = None,
+    ) -> FloatCells | None:
         """Lets the cells with spare goods hand them out to the buildings still short of them, the
         nearest first, each cell taking from a seller at most its reach_share of the seller's
-        month."""
+        month, less what `used` says it took already this month; returns that, per pair, with
+        what went now."""
         self._gather_owned(good)
         spare = np.maximum(self.offered[good] - self.sold[good], 0.0)
         left = demand - received
         if not (spare > 1e-9).any() or not (left > 1e-9).any():
-            return
+            return used
         sellers, buyers, bounds, falloff = self._pairs(good)
         remaining = spare.copy()
         went, sent = distribute(
-            sellers, buyers, bounds, remaining, left, (self.offered[good], falloff)
+            sellers, buyers, bounds, remaining, left, (self.offered[good], falloff), used
         )
+        used = np.zeros(sellers.size) if used is None else used
+        used[went] += sent
         above = np.bincount(
             sellers[went], sent * (self.worth_to[buyers[went]] - 1.0), minlength=self.cells.size
         )
         self.worth_above[good] = self.worth_above.get(good, self.zero) + above
         self.sold[good] += spare - remaining
         received[:] = demand - left
+        return used
 
     def _gather_owned(self, good: Good) -> None:
         """Brings the player's share of what the buildings they own made of a good into the
@@ -973,6 +1009,13 @@ class _Month:
                 continue
             if kind in RECIPES or need in boosts_of(kind, self.economy.year):
                 continue
+            extra = BONUS_PART.get((kind, need))
+            if extra is not None:
+                spare = self._count_for(kind, need) * extra
+                wanted = wanted - spare
+                over = np.clip(received - wanted, 0.0, spare)
+                part = over / np.where(spare > 0, spare, 1.0)
+                bonus[kind] = bonus.get(kind, self.zero) + part
             got[kind] += np.minimum(received, wanted)
             needed[kind] += wanted
         for kind in HOMES:

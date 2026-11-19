@@ -27,6 +27,7 @@ from railroads.sim.economy import (
 )
 from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.goods import (
+    BONUS_PART,
     FITS,
     NEEDS,
     OWNED_BOOSTS,
@@ -60,6 +61,9 @@ class StationTrade:
         self._growth = growth
         # The cells the player's stations hand goods out to.
         self.in_reach: set[Cell] = set()
+        # What the buildings of each kind took of each need, cell by cell, as trains arrived this
+        # month.
+        self._arrived: dict[tuple[BuildingKind, Need], dict[int, float]] = {}
 
     def orders(self) -> dict[Cell, StationOrder]:
         railway = self._growth.railway
@@ -87,6 +91,7 @@ class StationTrade:
     def settle_steps(self, trade: Trade) -> Steps[None]:
         """settle in a few steps, which a caller can spread over frames; nothing else may change
         the game between them."""
+        self._arrived = {}
         railway = self._growth.railway
         if railway is None:
             return
@@ -180,11 +185,19 @@ class StationTrade:
             left = np.array([have], dtype=np.float64)
             sellers, buyers = np.zeros(cells.size, dtype=np.intp), np.arange(cells.size)
             mine = self._owned_wants(cells, wants)
-            short = mine.copy()
-            distribute(sellers, buyers, bounds, left, short)
-            short = demand - (mine - short)
-            distribute(sellers, buyers, bounds, left, short)
-            got = demand - short
+            must = sum(
+                (
+                    np.maximum(want - self._spare(kind, need, cells), 0.0)
+                    for kind, want in wants.items()
+                ),
+                start=np.zeros(cells.size),
+            )
+            got = np.zeros(cells.size)
+            for target in (np.minimum(mine, must), must, demand):
+                short = np.maximum(target - got, 0.0)
+                wanted = short.copy()
+                distribute(sellers, buyers, bounds, left, short)
+                got += wanted - short
             total = float(got.sum())
             weighed = float((got * worth_to(economy.last_quarter()[cells])).sum())
             rate = weighed / total if total > 0 else 1.0
@@ -195,11 +208,21 @@ class StationTrade:
                 took = want * met
                 for at in np.flatnonzero(took > 0).tolist():
                     cell = int(cells[at])
+                    arrived = self._arrived.setdefault((kind, need), {})
+                    arrived[cell] = arrived.get(cell, 0.0) + float(took[at])
                     if kind in RECIPES:
                         economy.stock[(kind, need)][cell] += took[at]
                     else:
                         taken = economy.taken.setdefault((kind, need), {})
                         taken[cell] = taken.get(cell, 0.0) + float(took[at])
+
+    def _spare(self, kind: BuildingKind, need: Need, cells: npt.NDArray[np.intp]) -> FloatCells:
+        """The part of a need the buildings of a kind in these cells take only as a bonus
+        (BONUS_PART), handed out after everyone has had what they must."""
+        extra = BONUS_PART.get((kind, need))
+        if extra is None:
+            return np.zeros(cells.size)
+        return self._growth.counts[kind].ravel()[cells].astype(np.float64) * extra
 
     def _owned_wants(
         self, cells: npt.NDArray[np.intp], wants: dict[BuildingKind, FloatCells]
@@ -237,8 +260,37 @@ class StationTrade:
                 taken = taken_by.get((kind, need), {})
                 had = np.array([taken.get(int(cell), 0.0) for cell in cells.tolist()])
                 want = n * NEEDS[kind][need] - had
+            short = self._short_last_month(cells, kind, need)
+            if short is not None:
+                arrived = self._arrived.get((kind, need), {})
+                got = np.array([arrived.get(int(cell), 0.0) for cell in cells.tolist()])
+                want = np.minimum(want, short - got)
             wants[kind] = np.where(n > 0, np.maximum(want, 0.0), 0.0)
         return wants
+
+    def _short_last_month(
+        self, cells: npt.NDArray[np.intp], kind: BuildingKind, need: Need
+    ) -> FloatCells | None:
+        """What the buildings of a kind in these cells were left short of a need last month after
+        the goods handed out around them on their own: all a station may hand them as trains
+        arrive, so a train never takes the place of the buildings nearby. Cells that did not
+        trade last month are not held back; None before any trade."""
+        trade = self._growth.trade
+        if trade is None or (kind, need) not in trade.goods_got or not trade.cells.size:
+            return None
+        _, wanted = trade.goods_got[(kind, need)]
+        total = sum(
+            (w for (_, n), (_, w) in trade.goods_got.items() if n == need),
+            start=np.zeros(trade.cells.size),
+        )
+        local = trade.local.get(need, np.zeros(trade.cells.size))
+        fed = np.minimum(local / np.where(total > 0, total, 1.0), 1.0)
+        short = wanted * (1.0 - fed)
+        positions = np.searchsorted(trade.cells, cells)
+        found = (positions < trade.cells.size) & (
+            trade.cells[np.minimum(positions, trade.cells.size - 1)] == cells
+        )
+        return np.where(found, short[np.minimum(positions, trade.cells.size - 1)], np.inf)
 
     def _give(
         self,
