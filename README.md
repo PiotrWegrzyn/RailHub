@@ -439,7 +439,7 @@ the cell:
 | Limestone quarries | 0.00000015 + 0.00000015 per doubling of ore | | hills; mountains x0.4, flat x0.02 |
 | Sand pits | 0.000000075 + 0.00000015 per doubling of ore | | by the sea (x4), rivers and lakes (x2), desert x3 |
 | Taverns | 0.00000001 + 0.000004 per doubling of population | 3 population | as houses, one to a neighbourhood |
-| Sushi huts | as taverns | 20 population | as houses, one to a neighbourhood, only where rice grows (within 41° of the equator) |
+| Sushi huts | a tenth of taverns | 20 population | as houses, 6 hexes apart, one per 4,000 land cells, only where rice grows (within 41° of the equator): a rare treat of grown towns |
 | Department stores | 0.00005 per doubling of population, from 1880 | 60 population | as houses, 6 hexes apart, one per 10,000 land cells |
 | Hotels | as department stores, from 1900 | 60 population | as houses, 5 hexes apart, one per 8,000 land cells |
 
@@ -551,6 +551,7 @@ bakery a station can reach is worth having.
 | Porcelain works | 30 porcelain | 15 clay, 8 coal |
 | Brewery | 160 beer | 40 wheat, 40 hops, 16 barrels |
 | Distillery | 40 vodka | 20 potatoes, 4 glass |
+| Sake brewery | 60 sake | 30 rice |
 | Sugar refinery | 60 refined sugar | 30 sugar, 6 coal |
 | Tannery | 40 leather | 20 cattle or sheep |
 | Meat factory | 60 meat (food) | 30 cattle or sheep |
@@ -559,8 +560,8 @@ bakery a station can reach is worth having.
 | Printing works | 3,000 newspapers | 150 paper |
 | Plastics works (1950) | 100 plastics | 50 oil, 50 chemicals |
 | Appliance factory (1950) | 30 appliances | 30 steel, 15 copper, 15 plastics, 8 electronics (from 1960) |
-| Tavern | | 90 alcohol (beer, wine or vodka); 20 food as a bonus |
-| Club | | 350 alcohol (beer, wine or vodka); 5 chemicals as a bonus |
+| Tavern | | 90 alcohol (beer, wine, vodka or sake); 20 food as a bonus |
+| Club | | 350 alcohol (beer, wine, vodka or sake); 5 chemicals as a bonus |
 | Sushi hut | | 60 fish, 60 rice |
 | Department store (1880) | | 20 clothes, 20 shoes, 10 furniture, 5 porcelain, 10 appliances (from 1950) |
 | Hotel (1900) | | 80 food, 10 wine, 10 beer, 10 newspapers |
@@ -593,7 +594,7 @@ nothing passes between neighbours by itself, and the land feeds no one.
 What a building needs comes in two lists, its demands and its bonus goods. Bonus goods are every
 special resource (iron ore, copper, gold, diamonds, oil, salt, grapes, coffee, rubber, incense)
 and beer, newspapers and furniture; everything else it needs is a demand. Taverns and clubs need
-alcohol, any of beer, wine and vodka; a tavern takes food as a bonus and a club a little of
+alcohol, any of beer, wine, vodka and sake; a tavern takes food as a bonus and a club a little of
 whatever chemicals it can get. Sushi huts need a lot of fish and a lot of rice, both demands, and
 fed, liven the homes around them as taverns do. Hovering the icon of such a category names what is in it.
 A building's satisfaction is the share of its demands it got, raised by 30% of itself for each bonus good it
@@ -656,8 +657,8 @@ coffee for homes or incense for churches, and demands to the processors that wor
 
 Other works open anywhere by chance, a little likelier where people and industry are, whether
 or not their inputs are near, so their inputs usually have to be brought from far away. Only
-the town food makers, brewers, distillers and potters need 3 people nearby, and shoe factories
-too. Chemical, cement, plastics, appliance and electronics works need 3 industry points nearby.
+the town food makers, brewers, distillers, sake brewers and potters need 3 people nearby, and
+shoe factories too. Sake breweries, like rice, open only within 41° of the equator. Chemical, cement, plastics, appliance and electronics works need 3 industry points nearby.
 Steel mills, chemical works, cement works and gasworks keep out of towns: their chance is divided
 by one plus the people around them. Gasworks come up by industry, and chemical and cement works
 are drawn by industry alone. Jewellers appear only in the bigger towns (25
@@ -942,7 +943,7 @@ share of demand left for each need.
 |---|---|
 | $2-10 | eggs 4, bread 6, chickens 6, milk 6, potatoes 6, rice 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, sugar 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, lumber 10, newspapers 10, pots 10 |
 | $11-20 | cement 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, beer 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, wool 20 |
-| $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, stove tiles 25, copper 28, castings 30, vodka 30, wax 30, plastics 40, rubber 40, wine 40 |
+| $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, sake 25, stove tiles 25, copper 28, castings 30, vodka 30, wax 30, plastics 40, rubber 40, wine 40 |
 | $41-200 | coffee 50, furniture 60, porcelain 60, clothes 70, steel 80, shoes 100, electronics 120, goods 120, guns 150, tools 160, machinery 180 |
 | $300 and up | appliances 300, incense 300, luxury goods 300, gold 800, diamonds 2,000, cars 5,000, tanks 8,000, planes 12,000 |
 

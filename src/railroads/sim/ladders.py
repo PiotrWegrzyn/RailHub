@@ -175,6 +175,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.GLASSWORKS: (Points.INDUSTRY, 2),
     BuildingKind.BREWERY: (Points.INDUSTRY, 1),
     BuildingKind.DISTILLERY: (Points.INDUSTRY, 1),
+    BuildingKind.SAKE_BREWERY: (Points.INDUSTRY, 1),
     BuildingKind.TANNERY: (Points.INDUSTRY, 2),
     BuildingKind.SHOE_FACTORY: (Points.INDUSTRY, 2),
     BuildingKind.PLASTICS_WORKS: (Points.INDUSTRY, 3),
@@ -1075,16 +1076,23 @@ CLUBS = replace(
     from_year=1900,
 )
 
-# Sushi huts serve a lot of fish and rice, one to a neighbourhood, only in towns of SUSHI_TOWN
-# people and only in the lands rice grows in, so none opens where it could never get its rice;
-# fed, they liven the homes around them as taverns do.
+# Sushi huts are a rare treat of grown towns: they serve a lot of fish and rice, only in towns of
+# SUSHI_TOWN people, a tenth as readily as taverns, SUSHI_APART cells apart and one per
+# SUSHI_LAND_CELLS land cells at most, and only in the lands rice grows in, so none opens where
+# it could never get its rice; fed, they liven the homes around them as taverns do.
 SUSHI_TOWN = 20
+SUSHI_APART = 6
+SUSHI_LAND_CELLS = 4_000
 
 SUSHI_HUTS = replace(
     TAVERNS,
     kinds=(BuildingKind.SUSHI_HUT,),
     land=replace(TOWN_LAND, most_latitude=RICE_LATITUDE),
+    base_chance=TAVERNS.base_chance / 10,
+    chance_per_doubling={Points.POPULATION: TAVERNS.chance_per_doubling[Points.POPULATION] / 10},
     needs={Points.POPULATION: SUSHI_TOWN},
+    apart=SUSHI_APART,
+    land_cells_each=SUSHI_LAND_CELLS,
 )
 
 # Filling stations open in towns once motor cars come, as often as taverns.
@@ -1111,6 +1119,17 @@ HOTELS = replace(
     apart=5,
     from_year=1900,
     land_cells_each=8_000,
+)
+
+# Sake breweries open in towns as distilleries do, but only in the lands rice grows in.
+SAKE_BREWERIES = replace(
+    _works(
+        BuildingKind.SAKE_BREWERY,
+        {POP: 8e-10, Points.FOOD: 3e-9},
+        {POP: FOOD_TOWN},
+        base=CRAFT_BASE * IN_TOWNS_ONLY / 2,
+    ),
+    land=replace(FACTORY_LAND, most_latitude=RICE_LATITUDE),
 )
 
 # Works that open by people and industry alone: their inputs must be brought to them.
@@ -1153,6 +1172,7 @@ WORKS = (
         1600,
         base=CRAFT_BASE * IN_TOWNS_ONLY / 2,
     ),
+    SAKE_BREWERIES,
     _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
     _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {POP: 3}, 1850, base=5e-8),
     _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=2e-7),

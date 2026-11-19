@@ -102,6 +102,7 @@ GOOD_COLORS: Mapping[Good, Rgba] = {
     Good.GLASS: (0.6, 0.86, 0.92, 1.0),
     Good.BEER: (0.94, 0.7, 0.2, 1.0),
     Good.VODKA: (0.88, 0.92, 0.96, 1.0),
+    Good.SAKE: (0.92, 0.9, 0.8, 1.0),
     Good.LEATHER: (0.58, 0.36, 0.2, 1.0),
     Good.SHOES: (0.36, 0.22, 0.16, 1.0),
     Good.PLASTICS: (0.92, 0.36, 0.42, 1.0),

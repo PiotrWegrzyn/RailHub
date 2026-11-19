@@ -789,6 +789,21 @@ def alcohol() -> Sprite:
     return p.sprite()
 
 
+def sake() -> Sprite:
+    """A white sake flask with a blue band round its neck, a little cup beside it."""
+    p = _canvas()
+    white: RGB = (240, 238, 230)
+    blue: RGB = (60, 90, 170)
+    p.rect(-4, -7, -1, -4, white)
+    p.line([(-4, -5), (-1, -5)], blue)
+    p.ellipse(-7, -4, 2, 7, white)
+    p.blob(-6, -2, -4, 2, (252, 252, 250))
+    p.line([(-5, 3), (0, 3)], blue)
+    p.polygon([(2, 2), (7, 2), (6, 6), (3, 6)], white, shade(white, 0.6))
+    p.line([(3, 3), (6, 3)], (230, 214, 160))
+    return p.sprite()
+
+
 def vodka() -> Sprite:
     p = _canvas()
     clear: RGB = (222, 236, 244)
@@ -1154,6 +1169,7 @@ ICONS: dict[str, Callable[[], Sprite]] = {
     "glass": glass,
     "beer": beer,
     "vodka": vodka,
+    "sake": sake,
     "alcohol": alcohol,
     "leather": leather,
     "shoes": shoes,

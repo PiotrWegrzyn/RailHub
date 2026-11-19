@@ -89,6 +89,7 @@ class Good(Enum):
     GLASS = "glass"
     BEER = "beer"
     VODKA = "vodka"
+    SAKE = "sake"
     LEATHER = "leather"
     SHOES = "shoes"
     PLASTICS = "plastics"
@@ -159,6 +160,7 @@ class Need(Enum):
     GLASS = "glass"
     BEER = "beer"
     VODKA = "vodka"
+    SAKE = "sake"
     LEATHER = "leather"
     SHOES = "shoes"
     PLASTICS = "plastics"
@@ -240,7 +242,7 @@ FITS: Mapping[Need, tuple[Good, ...]] = MappingProxyType(
         Need.FOOD: FOODS,
         Need.COMMON: COMMON_GOODS,
         Need.FRUIT: FRUITS,
-        Need.ALCOHOL: (Good.BEER, Good.WINE, Good.VODKA),
+        Need.ALCOHOL: (Good.BEER, Good.WINE, Good.VODKA, Good.SAKE),
         Need.FIBRE: (Good.WOOL, Good.COTTON, Good.FLAX),
         Need.LIVESTOCK: (Good.CATTLE, Good.SHEEP),
         Need.ANIMALS: (Good.CATTLE, Good.PIGS, Good.CHICKENS, Good.SHEEP),
@@ -395,6 +397,7 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.GLASS: 20,
         Good.BEER: 15,
         Good.VODKA: 30,
+        Good.SAKE: 25,
         Good.LEATHER: 25,
         Good.SHOES: 100,
         Good.PLASTICS: 40,
@@ -629,6 +632,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             BuildingKind.DISTILLERY: Recipe(
                 Good.VODKA, 40, {Need.POTATOES: 0.5}, {Need.GLASS: 0.1}
             ),
+            BuildingKind.SAKE_BREWERY: Recipe(Good.SAKE, 60, {Need.RICE: 0.5}),
             BuildingKind.TANNERY: Recipe(
                 Good.LEATHER, 40, {Need.LIVESTOCK: 0.5}, {Need.LIMESTONE: 0.25}
             ),
@@ -946,6 +950,8 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.FISH,
     BuildingKind.DISTILLERY,
     Need.VODKA,
+    BuildingKind.SAKE_BREWERY,
+    Need.SAKE,
     Need.ALCOHOL,
     Need.SUGAR,
     BuildingKind.SUGAR_REFINERY,

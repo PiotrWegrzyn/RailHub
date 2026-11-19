@@ -294,6 +294,7 @@ _GOODS: Mapping[Tree, tuple[Good, ...]] = {
         Good.HOPS,
         Good.BEER,
         Good.VODKA,
+        Good.SAKE,
         Good.REFINED_SUGAR,
         Good.MEAT,
         Good.MILK,

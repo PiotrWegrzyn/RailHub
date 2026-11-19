@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
-from test_economy import counts, holding, position
+from test_economy import STATION, counts, holding, position
 from test_economy import make_map as trade_map
 from test_growth import NO_TRADE, build
 
@@ -12,7 +12,16 @@ from railroads.sim.economy import Economy
 from railroads.sim.geo import Bounds
 from railroads.sim.goods import FITS, Good, Need
 from railroads.sim.growth import VENUES, Growth
-from railroads.sim.ladders import LADDERS, RICE_PADDIES, SUSHI_HUTS, SUSHI_TOWN
+from railroads.sim.ladders import (
+    LADDERS,
+    RICE_PADDIES,
+    SAKE_BREWERIES,
+    SUSHI_APART,
+    SUSHI_HUTS,
+    SUSHI_LAND_CELLS,
+    SUSHI_TOWN,
+    TAVERNS,
+)
 from railroads.sim.tech import GOOD_TREES, Tree
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 from railroads.sim.trains import BULK_CAR_GOODS
@@ -151,3 +160,42 @@ def test_no_sushi_hut_opens_where_rice_cannot_grow() -> None:
     chance = Growth(constructions, NO_TRADE).chances(SUSHI_HUTS)[5, 5]
 
     assert chance == 0
+
+
+def test_sushi_huts_are_a_rare_treat_next_to_taverns() -> None:
+    rarity = SUSHI_HUTS.base_chance / TAVERNS.base_chance
+
+    assert rarity == pytest.approx(0.1)
+    assert SUSHI_HUTS.apart == SUSHI_APART
+    assert SUSHI_HUTS.land_cells_each == SUSHI_LAND_CELLS
+
+
+def test_a_sake_brewery_brews_rice_into_sake_that_taverns_pour_as_alcohol() -> None:
+    tile_map = trade_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 8), BuildingKind.SAKE_BREWERY, 1))
+
+    trade = economy.trade(placed, holding(100.0, RICE=10.0))
+
+    assert trade.gathered[STATION][Good.SAKE] == pytest.approx(20.0)
+    assert Good.SAKE in FITS[Need.ALCOHOL]
+
+
+def test_a_tavern_takes_sake_for_its_alcohol() -> None:
+    tile_map = trade_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 8), BuildingKind.TAVERN, 1))
+
+    trade = economy.trade(placed, holding(SAKE=200.0))
+
+    poured, _ = trade.goods_got[(BuildingKind.TAVERN, Need.ALCOHOL)]
+    assert poured[position(trade, economy, (8, 8))] == pytest.approx(90.0)
+
+
+@pytest.mark.parametrize(("south", "north", "opens"), [(34.5, 35.5, True), (49.5, 50.5, False)])
+def test_sake_breweries_open_only_where_rice_grows(south: float, north: float, opens: bool) -> None:
+    tile_map = at_latitude(south, north)
+
+    weights = SAKE_BREWERIES.land.weights(tile_map)
+
+    assert bool((weights > 0).all()) == opens

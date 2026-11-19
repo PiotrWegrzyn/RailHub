@@ -170,6 +170,7 @@ BUILDING_SPRITES = {
     BuildingKind.GLASSWORKS: "glassworks",
     BuildingKind.BREWERY: "brewery",
     BuildingKind.DISTILLERY: "distillery",
+    BuildingKind.SAKE_BREWERY: "sake_brewery",
     BuildingKind.TANNERY: "tannery",
     BuildingKind.SHOE_FACTORY: "shoe_factory",
     BuildingKind.PLASTICS_WORKS: "plastics_works",

@@ -112,6 +112,7 @@ class BuildingKind(Enum):
     GLASSWORKS = "glassworks"
     BREWERY = "brewery"
     DISTILLERY = "distillery"
+    SAKE_BREWERY = "sake brewery"
     TANNERY = "tannery"
     SHOE_FACTORY = "shoe factory"
     PLASTICS_WORKS = "plastics works"
@@ -202,6 +203,8 @@ class BuildingKind(Enum):
     MEGA_BREWERY = "mega brewery"
     BIG_DISTILLERY = "big distillery"
     MEGA_DISTILLERY = "mega distillery"
+    BIG_SAKE_BREWERY = "big sake brewery"
+    MEGA_SAKE_BREWERY = "mega sake brewery"
     BIG_TANNERY = "big tannery"
     MEGA_TANNERY = "mega tannery"
     BIG_MEAT_FACTORY = "big butcher"
@@ -380,6 +383,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.GLASSWORKS,
             BuildingKind.BREWERY,
             BuildingKind.DISTILLERY,
+            BuildingKind.SAKE_BREWERY,
             BuildingKind.TANNERY,
             BuildingKind.SHOE_FACTORY,
             BuildingKind.PLASTICS_WORKS,
