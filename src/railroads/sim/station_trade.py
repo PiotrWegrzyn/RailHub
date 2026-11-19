@@ -429,7 +429,9 @@ class StationTrade:
 
     def _needs(self, counts: Mapping[BuildingKind, int], station: Cell) -> dict[Need, float]:
         """What these many buildings of each kind around a station need in a month; of a boost
-        only the player's own take (OWNED_BOOSTS), what theirs there take."""
+        only the player's own take (OWNED_BOOSTS), what theirs there take; of a processor's
+        input, no more than the room left in its stockpile, so one stocked up on coal while it
+        waits for iron ore wants none."""
         year = self._growth.year
         needs: dict[Need, float] = {}
         ring: npt.NDArray[np.intp] | None = None
@@ -446,9 +448,22 @@ class StationTrade:
                     many = float(taking[ring].sum())
                 else:
                     many = float(count)
-                if many > 0:
-                    needs[need] = needs.get(need, 0.0) + many * amount
+                if many <= 0:
+                    continue
+                wanted = many * amount
+                if kind in RECIPES:
+                    ring = self.inner_ring(station) if ring is None else ring
+                    wanted = min(wanted, self._stock_room(kind, need, ring))
+                if wanted > 0:
+                    needs[need] = needs.get(need, 0.0) + wanted
         return needs
+
+    def _stock_room(self, kind: BuildingKind, need: Need, cells: npt.NDArray[np.intp]) -> float:
+        """How much more of an input the processors of a kind in these cells have room for."""
+        many = self._growth.counts[kind].ravel()[cells].astype(np.float64)
+        held = self._growth.economy.stock.get((kind, need))
+        stocked = held[cells] if held is not None else 0.0
+        return float(np.maximum(input_stock(kind) * many - stocked, 0.0).sum())
 
     def update_reach(self) -> None:
         """Works out again which cells the player's stations hand goods out to."""

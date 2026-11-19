@@ -4,6 +4,7 @@ from test_railway import joined_stations
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.demand import DEMAND_PER_NEED
+from railroads.sim.economy import input_stock
 from railroads.sim.goods import Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
@@ -93,3 +94,21 @@ def test_a_station_wants_more_food_the_less_the_farms_around_could_hand_its_hous
     wanted = [food_wanted_with_a_farm_at(farm) for farm in farms]
 
     assert wanted[0] < wanted[1] < wanted[2]
+
+
+@pytest.mark.parametrize(("stocked", "wanted"), [(0.0, True), (None, False)])
+def test_a_processor_stocked_up_on_an_input_adds_no_demand_for_it_at_the_station(
+    stocked: float | None, wanted: bool
+) -> None:
+    growth, railway = joined_stations()
+    growth.build(Building((6, 21), BuildingKind.STEEL_MILL))
+    cell = growth.constructions.tile_map.grid.shape[1] * 6 + 21
+    full = input_stock(BuildingKind.STEEL_MILL)
+    growth.economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][cell] = (
+        full if stocked is None else stocked
+    )
+
+    growth.station_trade.measure_demand((6, 20))
+
+    capacity = railway.station_demand((6, 20)).capacity
+    assert (capacity.get(Need.COAL, 0.0) > 0) == wanted
