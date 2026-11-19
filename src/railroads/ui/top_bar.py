@@ -1,7 +1,7 @@
-"""The bar along the top of the window: the date and the money, the game speeds, the view's
-buttons (zoom, the two minimaps and the search), the map's title and any notice such as an
-autosave, and the buttons opening the reports, the tech trees, the help, the saves and the main
-menu."""
+"""The bar along the top of the window: the date, the money, the company's worth against its
+target and any countdown to bankruptcy, the game speeds, the view's buttons (zoom, the two
+minimaps and the search), the map's title and any notice such as an autosave, and the buttons
+opening the reports, the tech trees, the help, the saves and the main menu."""
 
 from typing import TYPE_CHECKING
 
@@ -10,6 +10,7 @@ from imgui_bundle import imgui
 
 from railroads.sim.clock import SPEEDS
 from railroads.sim.finance import Finances, dollars
+from railroads.ui.goal_view import draw_worth
 from railroads.ui.map_input import key_pressed
 from railroads.ui.ornate import band, bar_buttons, diamond, spaced, spaced_text
 from railroads.ui.spotlight import spot
@@ -55,6 +56,10 @@ def _draw_top_bar(app: App) -> None:
     imgui.same_line(0, 8)
     diamond()
     imgui.same_line(0, 8)
+    draw_worth(app.game)
+    imgui.same_line(0, 8)
+    diamond()
+    imgui.same_line(0, 8)
     for speed in SPEEDS:
         if toggle_button(
             f"x{speed}", clock.speed == speed, f"Run {speed} times as fast (- and = change speed)"
@@ -65,11 +70,15 @@ def _draw_top_bar(app: App) -> None:
     diamond()
     imgui.same_line(0, 8)
     draw_view_controls(app.view)
-    if app.title:
-        imgui.same_line(0, 8)
+    padding = imgui.get_style().window_padding.x
+    buttons = 5 if app.saves is not None else 3
+    right = imgui.get_window_width() - padding - buttons * WINDOW_BUTTON_WIDTH - (buttons - 1) * 4
+    title = app.title.upper()
+    imgui.same_line(0, 8)
+    room = right - imgui.get_cursor_pos_x() - 24
+    if app.title and spaced(title) <= room:
         diamond()
         imgui.same_line(0, 8)
-        title = app.title.upper()
         imgui.dummy((spaced(title), imgui.get_frame_height()))
         at = imgui.get_item_rect_min()
         text_top = at.y + (imgui.get_frame_height() - imgui.get_font_size()) / 2
@@ -78,11 +87,7 @@ def _draw_top_bar(app: App) -> None:
         imgui.same_line(0, 16)
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*GROWN), app.notice)
-    padding = imgui.get_style().window_padding.x
-    buttons = 5 if app.saves is not None else 3
-    imgui.same_line(
-        imgui.get_window_width() - padding - buttons * WINDOW_BUTTON_WIDTH - (buttons - 1) * 4
-    )
+    imgui.same_line(right)
     size = (WINDOW_BUTTON_WIDTH, 0)
     if toggle_button(fa.ICON_FA_CHART_BAR, app.reports.open, "Reports (G)", size):
         app.reports.open = not app.reports.open

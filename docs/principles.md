@@ -100,6 +100,16 @@ The ideas every rule of the game should follow.
   the gap.
 - Infrastructure the player owns, such as power plants, has to pay off by making a lot.
 
+## The goal
+
+- The player's aim is what their company is worth: its cash less any debt, its shares at what they
+  would fetch today, and half of what its stations, track and trains would cost today.
+- Each difficulty sets one target for 1 January 2050; the game says when it is reached, and on
+  that day whether it was.
+- Debt is allowed but not for long: six months in a row begun with the cash below nothing bankrupt
+  the company. The player is warned the moment the cash goes below nothing and sees the months
+  left.
+
 ## Trains and technology
 
 - The game is hard: its costs keep the player under pressure.
@@ -115,7 +125,8 @@ The ideas every rule of the game should follow.
 - Bigger things cost disproportionately more to keep: a station's upkeep doubles with each level
   and rises every year.
 - The player can see why numbers changed: charts and breakdowns of prices and spending.
-- The game never ends.
+- The game never ends on its own: the target for 1 January 2050 is a measure, not an ending, and
+  play goes on after it. Only going bankrupt ends a game.
 - Track is a network, not links from A to B. A train always takes the shortest way through it and
   may turn round at a station.
 - A train pulls several cars, not one: car sizes are chosen so a usual run fills several.

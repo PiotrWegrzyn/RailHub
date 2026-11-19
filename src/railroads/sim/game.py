@@ -16,6 +16,7 @@ from railroads.places import Places, StationNames
 from railroads.sim import routes
 from railroads.sim.autoplay import StandInPlayer, play
 from railroads.sim.clock import START_YEAR
+from railroads.sim.company import Goal, company_value
 from railroads.sim.constructions import Constructions, TrackWidth
 from railroads.sim.demolition import bulldoze, bulldoze_price, station_site_price
 from railroads.sim.finance import STATION_PRICE, Finances, dollars
@@ -73,6 +74,8 @@ class Game:
         # The land the player owns and can buy around the map (railroads.sim.lots); None for a
         # game on a map of its own, with nothing around it.
         self.lots: Lots | None = None
+        # The company's worth each month, its target and going bankrupt (railroads.sim.company).
+        self.goal = Goal()
         self._reach = Reach(self.tile_map.grid)
 
     @property
@@ -89,8 +92,9 @@ class Game:
         self.railway.run(months)
 
     def month(self, rng: np.random.Generator, date: str = "") -> Month:
-        """Grows the towns by a month, or lets the stand-in player play it, and sums up what
-        changed within reach of the stations."""
+        """Grows the towns by a month, or lets the stand-in player play it, notes what the company
+        is worth at the start of the new month, and sums up what changed within reach of the
+        stations."""
         return finish(self.month_steps(rng, date))
 
     def month_steps(self, rng: np.random.Generator, date: str = "") -> Steps[Month]:
@@ -105,6 +109,8 @@ class Game:
                 changed = yield from self.growth.month_steps(rng)
             else:
                 changed = yield from self.stand_in.month_steps(rng)
+        growth = self.growth
+        self.goal.begin_month(growth.year, growth.months % 12, company_value(railway))
         return Month(changed, summarize(date, self.growth.rule.points, reach, changes))
 
     def simulate(self, years: int, rng: np.random.Generator) -> None:

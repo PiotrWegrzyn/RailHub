@@ -23,6 +23,28 @@ uv run railroads
 
 It opens on the main menu: start a new game, play the tutorial, load a saved one, or quit.
 
+### The goal
+
+Every game is set a target for 1 January 2050, measured in what the company is worth
+(`railroads.sim.company`): its cash, less any debt, plus the shares it owns at what they would
+fetch today (`Owners.lot_price` for every 100), plus half of what its stations (with their levels,
+storage upgrades and facilities), track and trains would cost today, as a train sells for half its
+price. The new game page offers three difficulties, each with one target: Easy $50,000,000, Normal
+$100,000,000 and Hard $150,000,000. The top bar shows the worth against the target, with what
+it is made of on hover, and the Reports window charts it at the start of every month. The game
+says when the company is first worth the target, and on 1 January 2050 whether it still is, the
+clock waiting while the window is open; play goes on after that.
+
+The cash can go below nothing, since upkeep is charged whatever it is. The moment it does, a
+window warns the player and the top bar counts down the months left: if six months in a row
+begin with the cash below nothing, the company goes bankrupt and the game ends, leaving the main
+menu or a save to load. A month begun above nothing starts the count again.
+
+The targets are set by hand for now. A stand-in player (`railroads.sim.autoplay`) reaches $4 to
+$6 billion by 2050 on six maps (`tools/goal_calibration.py`), but it lays no track, runs no
+trains, gets its stations free and buys buildings on endless debt, so it is no measure of a real
+game; bought only with the cash it has, it can afford nothing and goes bankrupt before 1870.
+
 The tutorial (`railroads.tutorial`) is a premade game that is the same for every player: a small
 map made for it, not grown from a seed (`railroads.tutorial.place`), the honeycomb of seven lots
 in the middle of its place, in 1850 with the usual $80,000. Its hills, mountains, forests and lakes
@@ -845,7 +867,9 @@ engine with the engine table above, its Wikipedia links clickable.
 
 ### Reports
 
-The chart button in the top right corner (or G) opens the reports. At the top, Monthly, Quarterly
+The chart button in the top right corner (or G) opens the reports. At the top, a line shows the
+company's worth at the start of every month against its target, drawn on to 1 January 2050. Under
+it, Monthly, Quarterly
 and Yearly pick how the money is shown: a table of what it went in and out on in the last period and
 the one under way, and a chart of every period's profit, brass above nothing and red below. The next
 chart shows the cars
@@ -886,7 +910,7 @@ $150 in upkeep at the first level, $400, $1,200, $3,500 and $9,000 at the next, 
 year, compounded, from the year play began, and each cell of track $2,
 $40 more where it is electric, $60 more where it is maglev, and 1.8 times as much where it is double, charged once a cell for
 the dearest track in it (`track_upkeep`). Building needs the cash for it, but upkeep is charged
-anyway and can run into debt. The top bar shows the cash, with this month's and last month's books on hover, the Reports window the last and this month's, quarter's or year's books by what the money went on, and the
+anyway and can run into debt, which bankrupts the company after six months (see The goal). The top bar shows the cash, with this month's and last month's books on hover, the Reports window the last and this month's, quarter's or year's books by what the money went on, and the
 build bar shows what the track under the mouse would cost. Route planning still weighs hills,
 bridges and tunnels lightly, so it stays quick; click a point in between to steer track round a
 river.

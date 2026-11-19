@@ -1,4 +1,5 @@
-"""The reports window: the cars delivered each year, stacked by what they carried, the stations
+"""The reports window: the company's worth each month against its target (railroads.sim.company),
+the cars delivered each year, stacked by what they carried, the stations
 the player had each year and the population of the whole map (railroads.sim.stats).
 
 The year under way shows as it stands so far, with today's stations and population.
@@ -9,18 +10,21 @@ from dataclasses import dataclass
 import numpy as np
 from imgui_bundle import imgui, implot
 
+from railroads.sim.clock import END_YEAR
+from railroads.sim.company import Goal
 from railroads.sim.finance import Finances, dollars
 from railroads.sim.fuel_market import Fuel, FuelMarket, FuelMonth, electrified
 from railroads.sim.goods import Good
 from railroads.sim.stats import History
 from railroads.ui.ornate import begin_ornate, end_ornate
-from railroads.ui.theme import GOOD_COLORS, WINDOW_TOP
+from railroads.ui.theme import GOOD_COLORS, GROWN, WINDOW_TOP
 
 WINDOW_SIZE = (720.0, 640.0)
 PLOT_HEIGHT = 180.0
 BAR_WIDTH = 0.8
 GOODS_COLORMAP = "Goods"
 GOODS = list(Good)
+MILLION = 1_000_000.0
 
 
 @dataclass(frozen=True)
@@ -197,6 +201,36 @@ def _draw_fuel(market: FuelMarket) -> None:
         )
 
 
+def worth_line(goal: Goal) -> tuple[list[float], list[float]]:
+    """The company's worth at the start of each month, by the year and the part of it gone."""
+    return [year + month / 12 for year, month, _ in goal.values], [v for _, _, v in goal.values]
+
+
+def _draw_worth(goal: Goal) -> None:
+    """The company's worth each month against its target, in millions."""
+    imgui.text(
+        f"Company worth, against the {goal.difficulty.value.lower()} target of "
+        f"{dollars(goal.target)} for 1 January {END_YEAR}"
+    )
+    if not goal.values:
+        imgui.text_disabled("Shown from the start of the next month")
+        return
+    if not _begin_year_plot("##worth", PLOT_HEIGHT, "$ million"):
+        return
+    xs, ys = worth_line(goal)
+    implot.setup_axis_format(implot.ImAxis_.y1.value, "%g")
+    spec = implot.Spec(flags=implot.ItemFlags_.no_legend.value)
+    worth = np.array(ys, dtype=np.float64) / MILLION
+    implot.plot_line("Worth", np.array(xs, dtype=np.float64), worth, spec)
+    implot.plot_line(
+        "Target",
+        np.array([xs[0], max(xs[-1], END_YEAR)], dtype=np.float64),
+        np.array([goal.target, goal.target], dtype=np.float64) / MILLION,
+        implot.Spec(line_color=imgui.ImVec4(*GROWN), flags=implot.ItemFlags_.no_legend.value),
+    )
+    implot.end_plot()
+
+
 class ReportsWindow:
     def __init__(self) -> None:
         self.open = False
@@ -277,6 +311,7 @@ class ReportsWindow:
         begun: int | None = None,
         finances: Finances | None = None,
         fuel: FuelMarket | None = None,
+        goal: Goal | None = None,
     ) -> None:
         if not self.open:
             return
@@ -286,6 +321,8 @@ class ReportsWindow:
         if expanded and imgui.begin_tab_bar("reports"):
             if imgui.begin_tab_item("Overview")[0]:
                 shown = report(history, year, stations, population, begun)
+                if goal is not None:
+                    _draw_worth(goal)
                 if finances is not None:
                     self._draw_books(finances, year)
                 self._draw_deliveries(shown)

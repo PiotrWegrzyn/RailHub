@@ -3,10 +3,18 @@ from collections.abc import Iterator
 import pytest
 from imgui_bundle import imgui, implot
 
+from railroads.sim.company import CompanyValue, Goal
 from railroads.sim.finance import Finances
 from railroads.sim.goods import Good
 from railroads.sim.stats import History
-from railroads.ui.reports_window import ReportsWindow, books_rows, period_name, profits, report
+from railroads.ui.reports_window import (
+    ReportsWindow,
+    books_rows,
+    period_name,
+    profits,
+    report,
+    worth_line,
+)
 
 
 @pytest.fixture
@@ -133,3 +141,33 @@ def test_the_window_draws_the_books_and_profit_for_each_period(frame: None, leng
     window.draw(made_history(), 1851, 4, 150, finances=months_of_books())
 
     assert window.period == length
+
+
+def test_the_worth_chart_has_a_point_at_the_start_of_every_month() -> None:
+    goal = Goal()
+    for year, month, cash in (
+        (1850, 10, 100.0),
+        (1850, 11, 250.0),
+        (1851, 0, -50.0),
+        (1851, 1, 400.0),
+    ):
+        goal.begin_month(year, month, CompanyValue(cash=cash))
+
+    xs, ys = worth_line(goal)
+
+    assert xs == pytest.approx([1850 + 10 / 12, 1850 + 11 / 12, 1851.0, 1851 + 1 / 12])
+    assert ys == [100.0, 250.0, -50.0, 400.0]
+
+
+@pytest.mark.parametrize("months", [0, 3])
+def test_the_window_draws_the_worth_against_the_target(frame: None, months: int) -> None:
+    goal = Goal()
+    for month in range(months):
+        goal.begin_month(1850, month, CompanyValue(cash=1_000.0 * month))
+    window = ReportsWindow()
+    window.open = True
+
+    window.draw(made_history(), 1850, 4, 150, goal=goal)
+
+    assert window.open
+    assert len(goal.values) == months

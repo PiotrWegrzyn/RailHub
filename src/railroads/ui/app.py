@@ -35,6 +35,7 @@ from railroads.sim.steps import Steps, budgeted, finish
 from railroads.tutorial.game import make_tutorial
 from railroads.tutorial.steps import Seen, Tutorial
 from railroads.ui import spotlight
+from railroads.ui.goal_view import draw_goal_news
 from railroads.ui.help_window import HelpWindow
 from railroads.ui.history_pictures import HistoryPictures, opening_center
 from railroads.ui.main_menu import (
@@ -168,10 +169,13 @@ class App:
         if isinstance(WRITER, FrameWorker):
             WRITER.work_once(WRITING_SECONDS)
         self._check_autosave()
-        if self._turning is None:
-            self._let_time_pass(imgui.get_io().delta_time)
-        else:
+        goal = self.game.goal
+        if self._turning is not None:
             self._turn_once()
+        elif goal.bankrupt is None and not goal.news:
+            # Time waits while the player reads news of the target or bankruptcy.
+            goal.watch(self.game.finances.cash)
+            self._let_time_pass(imgui.get_io().delta_time)
         busy = self._turning is not None
         # While a month is half done nothing may change the game, so every control is off for
         # those few frames, without greying out.
@@ -237,8 +241,10 @@ class App:
                 railway.first_year,
                 railway.finances,
                 railway.fuel,
+                self.game.goal,
             )
         self._draw_saves()
+        draw_goal_news(self)
         if self.tutorial is not None:
             draw_tutorial(self.tutorial)
             if self._turning is None:

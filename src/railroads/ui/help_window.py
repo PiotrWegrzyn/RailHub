@@ -1,7 +1,7 @@
 """The help window: every building with what it makes and wants in a month, every good with
 what it earns and who makes and wants it, every engine with what it can do, when and with
-which tech it is sold, and the real engines it is drawn after, how towns work and why a game
-starts on a quarter of its place."""
+which tech it is sold, and the real engines it is drawn after, how towns work, the target
+set for the company and going bankrupt, and why a game starts on a quarter of its place."""
 
 from dataclasses import dataclass
 from functools import cache
@@ -9,6 +9,8 @@ from functools import cache
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
+from railroads.sim.clock import END_YEAR
+from railroads.sim.company import BANKRUPT_MONTHS, TARGETS, Difficulty
 from railroads.sim.constructions import BUILDING_RULES, BuildingKind
 from railroads.sim.finance import dollars
 from railroads.sim.goods import (
@@ -48,6 +50,28 @@ TOWNS_HELP = (
         "Passengers and mail only board for a stop in another town, so two stations in one town"
         " earn nothing carrying them to each other. A train waiting for a full load doesn't wait for"
         " them either."
+    ),
+)
+GOAL_HELP = (
+    (
+        "Your company is worth its cash, less any debt, plus the shares you own at what they"
+        " would fetch today, plus half of what your stations, with their levels, storage and"
+        " facilities, your track and your trains would cost today. The top bar shows it against"
+        " your target, with what it is made of on hover, and the Reports window charts it every"
+        " month."
+    ),
+    (
+        f"The new game page sets the target for 1 January {END_YEAR}: Easy"
+        f" {dollars(TARGETS[Difficulty.EASY])}, Normal {dollars(TARGETS[Difficulty.NORMAL])} or"
+        f" Hard {dollars(TARGETS[Difficulty.HARD])}. The game tells you when your company is"
+        f" first worth that much, and on 1 January {END_YEAR} whether it still is. Play goes on"
+        " after that."
+    ),
+    (
+        "Upkeep is charged whatever the cash, so it can go below nothing. The moment it does, the"
+        " game warns you, and the top bar counts down the months left. If"
+        f" {BANKRUPT_MONTHS} months in a row begin with the cash below nothing, the company goes"
+        " bankrupt and the game ends; a month begun above nothing starts the count again."
     ),
 )
 MAP_HELP = (
@@ -227,6 +251,9 @@ class HelpWindow:
                     imgui.end_tab_item()
                 if imgui.begin_tab_item("Towns")[0]:
                     _draw_paragraphs(TOWNS_HELP)
+                    imgui.end_tab_item()
+                if imgui.begin_tab_item("Goal")[0]:
+                    _draw_paragraphs(GOAL_HELP)
                     imgui.end_tab_item()
                 if imgui.begin_tab_item("Map")[0]:
                     _draw_paragraphs(MAP_HELP)

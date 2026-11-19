@@ -18,6 +18,7 @@ from railroads.mapgen.start import StartRegion, pick_start_bounds
 from railroads.mapgen.terrain_tiles import SOURCE as TERRAIN_TILES_SOURCE
 from railroads.saves import SavedGame
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
+from railroads.sim.company import Difficulty, Goal
 from railroads.sim.constructions import Constructions
 from railroads.sim.finance import START_CASH
 from railroads.sim.game import Game, place_names
@@ -88,6 +89,8 @@ class Settings:
     cash: float = START_CASH
     # Years a stand-in player builds and runs the railway before the player takes over.
     stand_in_years: int = 0
+    # Which target the company is set for 1 January of END_YEAR (railroads.sim.company).
+    difficulty: Difficulty = Difficulty.NORMAL
     # Whether the waiting screen shows the map as its towns grow (railroads.ui.history_pictures),
     # which makes setting it up take longer.
     show_map_growing: bool = False
@@ -211,6 +214,7 @@ def make_game_steps(
     )
     game = Game(seeded, start_year=begins, history=history, names=place_names(seeded.tile_map))
     game.finances.cash = settings.cash
+    game.goal = Goal(settings.difficulty)
     game.lots = lots
     lots.offer(place.terrain == Terrain.LAND)
     game.growth.novelties = Novelties.pick(game.tile_map, np.random.default_rng(seed + 3))

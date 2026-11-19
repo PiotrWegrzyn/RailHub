@@ -17,6 +17,7 @@ from railroads.newgame import (
 )
 from railroads.saves import SaveInfo, Saves
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
+from railroads.sim.company import BANKRUPT_MONTHS, TARGETS, Difficulty
 from railroads.sim.finance import START_CASH, dollars
 from railroads.sim.tilemap import START_SHARE
 from railroads.ui.menu_scene import HORIZON, MenuScene
@@ -106,6 +107,7 @@ class MainMenu:
     start_year: int = START_YEAR
     cash: int = int(START_CASH)
     stand_in_years: int = 0
+    difficulty: Difficulty = Difficulty.NORMAL
     show_map_growing: bool = False
     selected: str | None = None
     listing: list[SaveInfo] = field(default_factory=list)
@@ -131,6 +133,7 @@ class MainMenu:
             start_year=allowed_start_year(self.start_year),
             cash=float(self.cash),
             stand_in_years=self.stand_in_years,
+            difficulty=self.difficulty,
             show_map_growing=self.show_map_growing,
         )
 
@@ -262,6 +265,8 @@ class MainMenu:
         )
         imgui.pop_text_wrap_pos()
         imgui.spacing()
+        self._draw_difficulty()
+        imgui.spacing()
         self.start_year = allowed_start_year(self.start_year)
         if self._fold("Advanced options"):
             self._draw_advanced()
@@ -280,6 +285,21 @@ class MainMenu:
         if self._button("Back"):
             self.go_to("main")
         return None
+
+    def _draw_difficulty(self) -> None:
+        imgui.text("Difficulty")
+        for index, difficulty in enumerate(Difficulty):
+            if index:
+                imgui.same_line()
+            if imgui.radio_button(difficulty.value, self.difficulty == difficulty):
+                self.difficulty = difficulty
+        imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)
+        imgui.text_disabled(
+            f"Your company must be worth {dollars(TARGETS[self.difficulty])} on 1 January "
+            f"{END_YEAR}. Cash below nothing for {BANKRUPT_MONTHS} months in a row ends the game."
+        )
+        imgui.pop_text_wrap_pos()
+        imgui.spacing()
 
     def _draw_advanced(self) -> None:
         imgui.text("Seed")
