@@ -179,21 +179,35 @@ def test_the_world_reads_the_reaches_of_the_squares_round_a_map() -> None:
     assert found.points[0].tolist() == pytest.approx([14.5, 50.5], abs=2e-4)
 
 
-def test_a_stream_runs_down_to_its_lowest_neighbour_and_into_the_sea() -> None:
+def test_a_reach_links_the_cells_it_runs_through_one_to_the_next_and_into_the_sea() -> None:
+    grid = HexGrid(rows=ROWS, cols=COLS, km_per_cell=2.0)
+    area = MapArea.of(flat_map(ROWS, COLS).bounds, grid)
     terrain = layer(ROWS, COLS, Terrain.LAND)
-    terrain[4, 8] = Terrain.SEA
-    height = np.full((ROWS, COLS), 100, dtype=np.int16)
-    height[4, 5], height[4, 6], height[4, 7] = 30, 20, 10
-    tile_map = stream_map([(4, 5), (4, 6), (4, 7)], terrain=terrain, height_m=height)
+    terrain[4, 8:] = Terrain.SEA
+    row_y = float(grid.center(4, 0)[1])
+    lines = reach(area, [(2.6, row_y), (9.6, row_y)], 2000.0)
     east = 1 << STEPS.index((1.0, 0.0))
     west = 1 << STEPS.index((-1.0, 0.0))
 
-    links = stream_links(tile_map)
+    links = StreamsFromLines(lines, least_km2=1000.0)(area, {"terrain": terrain})
 
-    assert links[4, 5] == east
-    assert links[4, 6] == east | west
-    assert links[4, 7] == east | west
-    assert links[4, 8] == 0
+    assert links[4, 2] == east
+    assert all(links[4, col] == east | west for col in range(3, 8))
+    assert links[4, 8:].sum() == 0
+    assert links[3].sum() == links[5].sum() == 0
+
+
+def test_a_piece_of_stream_wiggling_along_a_river_is_taken_for_the_river() -> None:
+    grid = HexGrid(rows=ROWS, cols=COLS, km_per_cell=2.0)
+    area = MapArea.of(flat_map(ROWS, COLS).bounds, grid)
+    terrain = layer(ROWS, COLS, Terrain.LAND)
+    terrain[4, :] = Terrain.RIVER
+    above = float(grid.center(3, 0)[1])
+    lines = reach(area, [(1.6, above), (10.6, above)], 2000.0)
+
+    links = StreamsFromLines(lines, least_km2=1000.0)(area, {"terrain": terrain})
+
+    assert links.sum() == 0
 
 
 def test_stream_water_lies_along_the_line_between_linked_cells() -> None:

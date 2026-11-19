@@ -95,7 +95,9 @@ class TileMap:
     # The cells on land next to the player's that the player has not bought (railroads.sim.lots),
     # where nothing grows or is built; None while there are none.
     locked: npt.NDArray[np.bool_] | None = None
-    # 1 where a minor river flows through a land cell (railroads.mapgen.streams).
+    # Where a minor river flows through a land cell, its links to the cells beside it that the
+    # stream runs to or comes from, a bit for each of the grid's edge_normals; 0 elsewhere
+    # (railroads.mapgen.streams).
     stream: npt.NDArray[np.uint8] = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:

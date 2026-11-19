@@ -11,7 +11,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.mapgen.area import LINE_STEP, MapArea, densify
-from railroads.sim.grids import BoolGrid, FloatArray
+from railroads.sim.grids import BoolGrid, FloatArray, Grid
 from railroads.sim.tilemap import Terrain
 
 HYDRORIVERS_SOURCE = "Minor rivers: HydroRIVERS v1.0 (Lehner and Grill 2013), www.hydrosheds.org"
@@ -101,9 +101,10 @@ def read_streams(data: bytes) -> StreamLines:
 
 @dataclass(frozen=True)
 class StreamsFromLines:
-    """Which land cells a minor river flows through: those the reaches draining at least
-    `least_km2` pass, but no water cell, and no cell where a big reach only follows a river that
-    is drawn already."""
+    """Where minor rivers flow, as each land cell's links to the cells beside it that its stream
+    runs to or comes from, a bit for each of the grid's edge_normals: along the reaches draining
+    at least `least_km2`, through land only, leaving out where a big reach only follows a river
+    drawn already, and pieces that mostly run along a river, which are that river's wiggles."""
 
     lines: StreamLines
     least_km2: float = MIN_STREAM_KM2
@@ -111,21 +112,79 @@ class StreamsFromLines:
     def __call__(self, area: MapArea, layers: dict) -> npt.NDArray[np.uint8]:
         terrain = layers["terrain"]
         grid = area.grid
-        small = np.zeros(grid.shape, dtype=bool)
-        big = np.zeros(grid.shape, dtype=bool)
+        small = np.zeros(grid.shape, dtype=np.uint8)
+        big = np.zeros(grid.shape, dtype=np.uint8)
         for line, upland in zip(self.lines.lines(), self.lines.upland_km2, strict=True):
             if upland >= self.least_km2:
                 _trace(area, line, big if upland >= BIG_STREAM_KM2 else small)
-        big &= ~_near(terrain == Terrain.RIVER, area, BIG_STREAM_GAP)
-        return ((small | big) & (terrain == Terrain.LAND)).astype(np.uint8)
+        river = terrain == Terrain.RIVER
+        big[_near(river, area, BIG_STREAM_GAP)] = 0
+        links = small | big
+        links[terrain != Terrain.LAND] = 0
+        links = _tied(links, terrain, grid)
+        links[_along_rivers(links > 0, river, area)] = 0
+        return _tied(links, terrain, grid)
 
 
-def _trace(area: MapArea, line: FloatArray, into: BoolGrid) -> None:
+def _trace(area: MapArea, line: FloatArray, links: npt.NDArray[np.uint8]) -> None:
+    """Sets the links between each cell the line passes and the next one."""
+    grid = area.grid
     x, y = area.to_plane(line[:, 0], line[:, 1])
     points = densify(np.column_stack([x, y]), LINE_STEP)
-    rows, cols = area.grid.cell_at(points[:, 0], points[:, 1])
-    on_map = area.grid.contains(rows, cols)
-    into[rows[on_map], cols[on_map]] = True
+    rows, cols = grid.cell_at(points[:, 0], points[:, 1])
+    moved = np.flatnonzero((np.diff(rows) != 0) | (np.diff(cols) != 0))
+    if not len(moved):
+        return
+    rows_from, cols_from, rows_to, cols_to = (
+        rows[moved],
+        cols[moved],
+        rows[moved + 1],
+        cols[moved + 1],
+    )
+    normals = grid.edge_normals()
+    from_x, from_y = grid.center(rows_from, cols_from)
+    to_x, to_y = grid.center(rows_to, cols_to)
+    step = np.stack([np.asarray(to_x) - from_x, np.asarray(to_y) - from_y], axis=-1)
+    towards = np.argmax(step @ normals.T, axis=1)
+    back = (towards + len(normals) // 2) % len(normals)
+    for r, c, bits in ((rows_from, cols_from, towards), (rows_to, cols_to, back)):
+        on_map = grid.contains(r, c)
+        np.bitwise_or.at(links, (r[on_map], c[on_map]), (1 << bits[on_map]).astype(np.uint8))
+
+
+def _tied(
+    links: npt.NDArray[np.uint8], terrain: npt.NDArray[np.uint8], grid: Grid
+) -> npt.NDArray[np.uint8]:
+    """The links, without those to a cell with neither a stream nor water."""
+    rows, cols = grid.neighbour_index_grids()
+    reaches = (links > 0) | (terrain != Terrain.LAND)
+    tied = links.copy()
+    for bit in range(len(rows)):
+        beyond = reaches[rows[bit], cols[bit]] & (
+            (rows[bit], cols[bit]) != np.indices(grid.shape)
+        ).any(axis=0)
+        tied &= np.where(beyond, 0xFF, 0xFF ^ (1 << bit)).astype(np.uint8)
+    return tied
+
+
+def _along_rivers(streams: BoolGrid, river: BoolGrid, area: MapArea) -> BoolGrid:
+    """The cells of the pieces of streams that mostly lie beside a river cell."""
+    grid = area.grid
+    beside = streams & _near(river, area, 1)
+    rows, cols = grid.neighbour_index_grids()
+    label = np.where(streams, np.arange(streams.size).reshape(streams.shape), -1)
+    while True:
+        around = np.where(streams[rows, cols], label[rows, cols], -1).max(axis=0)
+        grown = np.where(streams, np.maximum(label, around), -1)
+        if np.array_equal(grown, label):
+            break
+        label = grown
+    pieces = label[streams]
+    cells = np.bincount(pieces, minlength=streams.size)
+    by_river = np.bincount(label[beside], minlength=streams.size)
+    along = np.zeros(streams.size, dtype=bool)
+    along[cells > 0] = by_river[cells > 0] * 2 >= cells[cells > 0]
+    return streams & along[np.where(streams, label, 0)]
 
 
 def _near(cells: BoolGrid, area: MapArea, steps: int) -> BoolGrid:
