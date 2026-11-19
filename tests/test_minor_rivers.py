@@ -45,14 +45,14 @@ def reach(area: MapArea, cells: list[tuple[float, float]], upland_km2: float) ->
     return StreamLines(np.column_stack([lon, lat]), np.array([len(points)]), np.array([upland_km2]))
 
 
-def test_a_minor_river_beside_a_cell_counts_as_a_river() -> None:
+def test_a_minor_river_counts_as_a_river_on_its_own_cell_only() -> None:
     tile_map = stream_map([(4, 5)])
     land = Land(water={Terrain.RIVER: 4.0, Terrain.LAND: 0.5})
 
     weights = land.weights(tile_map)
 
-    assert weights[4, 6] == pytest.approx(4.0)
     assert weights[4, 5] == pytest.approx(4.0)
+    assert weights[4, 6] == pytest.approx(0.5)
     assert weights[1, 1] == pytest.approx(0.5)
 
 

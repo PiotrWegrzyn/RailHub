@@ -231,9 +231,9 @@ _LAND_TABLES: dict[int, tuple] = {}
 @dataclass(frozen=True, slots=True)
 class Land:
     """How the land changes a ladder's chances: each weight multiplies them. Water weights go by
-    the best water next to the cell, LAND standing for none, and a minor river counts as a river
-    (Surroundings.water_around). The sea is salty, so unless a ladder names it, it does no more
-    than dry land; anything else left out weighs 1."""
+    the best water next to the cell, LAND standing for none; a minor river through the cell itself
+    counts as a river (Surroundings.on_stream). The sea is salty, so unless a ladder names it, it
+    does no more than dry land; anything else left out weighs 1."""
 
     vegetation: Mapping[Vegetation, float] = field(default_factory=dict)
     relief: Mapping[Relief, float] = field(default_factory=dict)
@@ -303,8 +303,8 @@ class Land:
     def weights_in(self, around: Surroundings) -> FloatGrid:
         """The weight of the cells whose surroundings these are, in their order."""
         vegetation_weights, relief_weights, temperature_weights, water = self._tables()
-        wet = around.is_wet
-        best = np.where(wet, water[around.water_around], 0.0).max(axis=0)
+        wet = around.is_water
+        best = np.where(wet, water[around.terrain_around], 0.0).max(axis=0)
         own = around.on_stream
         best = np.where(own, np.maximum(best, water[Terrain.RIVER]), best)
         by_water = np.where(wet.any(axis=0) | own, best, water[Terrain.LAND])
@@ -365,20 +365,9 @@ class Surroundings:
         return self.real & (self.terrain_around != Terrain.LAND)
 
     @cached_property
-    def water_around(self) -> npt.NDArray[np.uint8]:
-        """The water of each cell around, for the water weights: a minor river flowing through
-        land counts as a river, so it is fresh water like a river or a lake, and the sea is not."""
-        stream = self.tile_map.stream.ravel()[self.around].astype(bool)
-        on_land = self.terrain_around == Terrain.LAND
-        return np.where(stream & on_land, np.uint8(Terrain.RIVER), self.terrain_around)
-
-    @cached_property
-    def is_wet(self) -> npt.NDArray[np.bool_]:
-        return self.real & (self.water_around != Terrain.LAND)
-
-    @cached_property
     def on_stream(self) -> npt.NDArray[np.bool_]:
-        """Whether a minor river flows through the cell itself, which is fresh water by it too."""
+        """Whether a minor river flows through the cell itself: fresh water like a river there,
+        though not beside it, so the streams of a delta don't make a whole plain wet."""
         return self.tile_map.stream.ravel()[self.chosen].astype(bool) & self.land
 
     @cached_property
