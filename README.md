@@ -47,7 +47,7 @@ game; bought only with the cash it has, it can afford nothing and goes bankrupt 
 
 The tutorial (`railroads.tutorial`) is a premade game that is the same for every player: a small
 map made for it, not grown from a seed (`railroads.tutorial.place`), the honeycomb of seven lots
-in the middle of its place, in 1850 with the usual $80,000. Its hills, mountains, forests and lakes
+in the middle of its place, in 1850 with the usual $100,000. Its hills, mountains, forests and lakes
 take ragged shapes from smooth noise of fixed random numbers, and two rivers wind down to the
 south, none across the line between the towns. Ashford is a farming village of a few houses, a
 bakery and a church among some fifteen fields, with more wheat than it eats; Brookby a market
@@ -106,7 +106,7 @@ A new game is set up first with:
   new random one each time the game opens;
 - the year play begins, so how long towns grow from 850 before it: 1850 is suggested, and play
   can't begin before 1804, the year of the first steam engine on rails (`EARLIEST_START_YEAR` in `src/railroads/newgame.py`);
-- the starting money, $80,000 by default;
+- the starting money, $100,000 by default;
 - under "For testing", how many years a stand-in player runs the railway first (`--simulate`).
 
 Towns grow away from the window, which shows how far they have got: on a thread of its own on
@@ -1055,10 +1055,10 @@ closest place within 50 km. A second station with the same name is numbered ("Ł
 station with no place that near is called Station 1, Station 2 and so on. Zoomed in, each
 station's name shows on a tag above it.
 
-A game starts with $80,000 (`railroads.sim.finance`). Track costs $300 a cell on the flat, $450
-in hills, twice that across a minor river, $10,000 a cell of bridge and $20,000 a cell of tunnel; electric track $450 a cell more,
-and double track 1.8 times as much as single, wires included, so a cell on the flat costs $540
-double, $750 electric and $1,350 double and electric; maglev track $4,000 a cell more, with no
+A game starts with $100,000 (`railroads.sim.finance`). Track costs $600 a cell on the flat, $900
+in hills, twice that across a minor river, $20,000 a cell of bridge and $40,000 a cell of tunnel;
+electric track $450 a cell more, and double track 3 times as much as single, wires included, so a
+cell on the flat costs $1,800 double, $1,050 electric and $3,150 double and electric; maglev track $4,000 a cell more, with no
 wires. A station costs $15,000 and the Planet $10,000, which
 sells back for half. Stations rise through five levels, for $50,000, $250,000, $1,500,000 and
 $10,000,000: a new one hands goods out a cell around it, and each level a cell further, gathers

@@ -12,14 +12,14 @@ from railroads.sim.constructions import Track, TrackWidth
 from railroads.sim.tilemap import Tile
 from railroads.sim.track_rules import track_rules_for
 
-START_CASH = 80_000.0
+START_CASH = 100_000.0
 # Track costs TRACK_PRICE per cell times its bed's cost factor (railroads.sim.track_rules), and
 # electrifying it ELECTRIC_TRACK_PRICE more, or making it a maglev guideway MAGLEV_TRACK_PRICE
 # more; double track costs DOUBLE_TRACK_FACTOR as much.
-TRACK_PRICE = 300.0
+TRACK_PRICE = 600.0
 ELECTRIC_TRACK_PRICE = 450.0
 MAGLEV_TRACK_PRICE = 4_000.0
-DOUBLE_TRACK_FACTOR = 1.8
+DOUBLE_TRACK_FACTOR = 3.0
 STATION_PRICE = 15_000.0
 TRAIN_PRICE = 10_000.0
 # What selling a train gives back, as a share of its price.
@@ -47,9 +47,10 @@ WAREHOUSE_PRICE = 60_000.0
 STATION_UPKEEP = (150.0, 400.0, 1_200.0, 3_500.0, 9_000.0)
 STATION_UPKEEP_RISE = 0.02
 # Every cell of track costs TRACK_UPKEEP a month, ELECTRIC_TRACK_UPKEEP more where it is
-# electric, MAGLEV_TRACK_UPKEEP more where it is maglev, and DOUBLE_TRACK_FACTOR as much where
-# it is double.
+# electric, MAGLEV_TRACK_UPKEEP more where it is maglev, and DOUBLE_TRACK_UPKEEP_FACTOR as much
+# where it is double.
 TRACK_UPKEEP = 2.0
+DOUBLE_TRACK_UPKEEP_FACTOR = 1.8
 ELECTRIC_TRACK_UPKEEP = 40.0
 MAGLEV_TRACK_UPKEEP = 60.0
 
@@ -70,11 +71,13 @@ def track_price(piece: Track, tile: Tile) -> float:
     return _dressed(price, piece, ELECTRIC_TRACK_PRICE, MAGLEV_TRACK_PRICE)
 
 
-def _dressed(base: float, piece: Track, electric: float, maglev: float) -> float:
+def _dressed(
+    base: float, piece: Track, electric: float, maglev: float, double: float = DOUBLE_TRACK_FACTOR
+) -> float:
     """A piece's base cost with what its wires or guideway add, the whole doubled up for double
     track."""
     cost = base + (electric if piece.electric else 0.0) + (maglev if piece.maglev else 0.0)
-    return cost * (DOUBLE_TRACK_FACTOR if piece.width == TrackWidth.DOUBLE else 1.0)
+    return cost * (double if piece.width == TrackWidth.DOUBLE else 1.0)
 
 
 def track_upkeep(pieces: Iterable[Track]) -> float:
@@ -82,7 +85,13 @@ def track_upkeep(pieces: Iterable[Track]) -> float:
     dearest piece in it."""
     dearest: dict[tuple[int, int], float] = {}
     for piece in pieces:
-        upkeep = _dressed(TRACK_UPKEEP, piece, ELECTRIC_TRACK_UPKEEP, MAGLEV_TRACK_UPKEEP)
+        upkeep = _dressed(
+            TRACK_UPKEEP,
+            piece,
+            ELECTRIC_TRACK_UPKEEP,
+            MAGLEV_TRACK_UPKEEP,
+            DOUBLE_TRACK_UPKEEP_FACTOR,
+        )
         dearest[piece.cell] = max(upkeep, dearest.get(piece.cell, 0.0))
     return sum(dearest.values())
 

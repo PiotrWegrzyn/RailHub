@@ -91,7 +91,7 @@ def test_maglev_track_costs_its_guideway_on_top_of_plain_track() -> None:
     extra = route_price(constructions, guideway) - route_price(constructions, plain)
 
     assert extra == pytest.approx(MAGLEV_TRACK_PRICE * len(guideway.pieces))
-    assert MAGLEV_TRACK_PRICE > 10 * TRACK_PRICE
+    assert MAGLEV_TRACK_PRICE > 5 * TRACK_PRICE
 
 
 def test_maglev_track_costs_more_upkeep_than_electric_track() -> None:

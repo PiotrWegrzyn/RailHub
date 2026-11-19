@@ -22,6 +22,7 @@ from railroads.sim.demolition import (
 )
 from railroads.sim.finance import (
     DOUBLE_TRACK_FACTOR,
+    DOUBLE_TRACK_UPKEEP_FACTOR,
     ELECTRIC_TRACK_PRICE,
     ELECTRIC_TRACK_UPKEEP,
     MAGLEV_TRACK_PRICE,
@@ -140,13 +141,13 @@ WIDTH_BUTTONS = (
         "Double",
         (
             f"Two tracks side by side: {dollars(TRACK_PRICE * DOUBLE_TRACK_FACTOR)} a cell, "
-            f"${TRACK_UPKEEP * DOUBLE_TRACK_FACTOR:.2f} a month"
+            f"${TRACK_UPKEEP * DOUBLE_TRACK_UPKEEP_FACTOR:.2f} a month"
         ),
     ),
 )
 ELECTRIC_TIP = (
     f"Wires over the track for electric engines: {dollars(ELECTRIC_TRACK_PRICE)} a cell more, "
-    f"{dollars(ELECTRIC_TRACK_UPKEEP)} a month more ({DOUBLE_TRACK_FACTOR:g} times that on double "
+    f"{dollars(ELECTRIC_TRACK_UPKEEP)} a month more ({DOUBLE_TRACK_UPKEEP_FACTOR:g} times that on double "
     "track). Lay it over your track to electrify that."
 )
 MAGLEV_TIP = (

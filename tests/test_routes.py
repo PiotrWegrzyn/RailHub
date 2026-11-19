@@ -10,6 +10,7 @@ from railroads.sim.constructions import (
     Track,
     TrackWidth,
 )
+from railroads.sim.finance import TRACK_PRICE
 from railroads.sim.grids import Cell, Grid, HexGrid, SquareGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
@@ -295,7 +296,7 @@ def test_track_laid_on_from_a_dead_end_turns_it_instead_of_leaving_a_stub() -> N
 
     assert constructions.track_at((6, 6)) == (Track((6, 6), (6, 10)),)
     assert len(dead_ends(constructions)) == 2
-    assert price == pytest.approx(300 * (len(route.pieces) - 1))
+    assert price == pytest.approx(TRACK_PRICE * (len(route.pieces) - 1))
 
 
 def test_track_ending_on_a_line_joins_it_so_trains_run_onto_it() -> None:
@@ -327,10 +328,10 @@ def test_track_crossing_a_line_crosses_it_in_one_cell() -> None:
 @pytest.mark.parametrize(
     ("width", "electric", "per_cell"),
     [
-        (TrackWidth.SINGLE, False, 300),
-        (TrackWidth.DOUBLE, False, 540),
-        (TrackWidth.SINGLE, True, 750),
-        (TrackWidth.DOUBLE, True, 1350),
+        (TrackWidth.SINGLE, False, 600),
+        (TrackWidth.DOUBLE, False, 1800),
+        (TrackWidth.SINGLE, True, 1050),
+        (TrackWidth.DOUBLE, True, 3150),
     ],
 )
 def test_double_and_electric_track_cost_more_a_cell(
@@ -357,9 +358,9 @@ def test_electric_track_is_electrified_once_laid() -> None:
 @pytest.mark.parametrize(
     ("width", "electric", "per_cell"),
     [
-        (TrackWidth.DOUBLE, False, 240),
+        (TrackWidth.DOUBLE, False, 1200),
         (TrackWidth.SINGLE, True, 450),
-        (TrackWidth.DOUBLE, True, 1050),
+        (TrackWidth.DOUBLE, True, 2550),
     ],
 )
 def test_laying_along_a_line_widens_or_electrifies_it_without_new_track(

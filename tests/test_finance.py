@@ -9,10 +9,10 @@ FLAT = Tile(Terrain.LAND, Vegetation.GRASS, Temperature.NORMAL, 0, Relief.FLAT)
 RIVER = Tile(Terrain.RIVER, Vegetation.GRASS, Temperature.NORMAL, 0, Relief.FLAT)
 
 
-def test_a_game_starts_with_eighty_thousand() -> None:
+def test_a_game_starts_with_a_hundred_thousand() -> None:
     finances = Finances()
 
-    assert finances.cash == START_CASH == 80_000
+    assert finances.cash == START_CASH == 100_000
 
 
 def test_the_books_keep_this_month_and_last_by_what_money_was_for() -> None:
@@ -46,11 +46,11 @@ def test_money_shows_in_whole_dollars(amount: float, shown: str) -> None:
 @pytest.mark.parametrize(
     ("piece", "tile", "price"),
     [
-        (Track((0, 0), (0, 6)), FLAT, 300),
-        (Track((0, 0), (0, 6), TrackWidth.DOUBLE), FLAT, 540),
-        (Track((0, 0), (0, 6), electric=True), FLAT, 750),
-        (Track((0, 0), (0, 6), TrackWidth.DOUBLE, electric=True), FLAT, 1350),
-        (Track((0, 0), (0, 6), TrackWidth.DOUBLE, TrackBed.BRIDGE), RIVER, 18_000),
+        (Track((0, 0), (0, 6)), FLAT, 600),
+        (Track((0, 0), (0, 6), TrackWidth.DOUBLE), FLAT, 1800),
+        (Track((0, 0), (0, 6), electric=True), FLAT, 1050),
+        (Track((0, 0), (0, 6), TrackWidth.DOUBLE, electric=True), FLAT, 3150),
+        (Track((0, 0), (0, 6), TrackWidth.DOUBLE, TrackBed.BRIDGE), RIVER, 60_000),
     ],
 )
 def test_double_track_costs_more_and_electric_track_more_again(
