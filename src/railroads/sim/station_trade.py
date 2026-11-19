@@ -94,16 +94,15 @@ class StationTrade:
             goods = railway.station_goods(station)
             for good, amount in owned.items():
                 goods.bring(good, {station: amount})
-        # The share of what each station handed out of a good that never left it: the player's
-        # own buildings' goods, which carry no freight.
-        owned_share: dict[tuple[Cell, Good], float] = {}
         for station, handed in trade.handed.items():
             goods = railway.station_goods(station)
             for good, amount in handed.items():
-                parcels = goods.release(good, amount)
-                total = sum(parcels.values())
-                if total > 0 and parcels.get(station):
-                    owned_share[(station, good)] = parcels[station] / total
+                from_trains = min(amount, goods.brought.get(good, 0.0))
+                goods.release(good, from_trains)
+                if amount > from_trains:
+                    goods.stockpile[good] = max(
+                        0.0, goods.stockpile.get(good, 0.0) - (amount - from_trains)
+                    )
         for station, gathered in trade.gathered.items():
             goods = railway.station_goods(station)
             for good, amount in gathered.items():
@@ -130,9 +129,7 @@ class StationTrade:
         for station, handed_for in trade.handed_for.items():
             worths = trade.handed_worth.get(station, {})
             for (need, good), amount in handed_for.items():
-                carried = 1.0 - owned_share.get((station, good), 0.0)
-                worth = worths.get((need, good), amount)
-                railway.pay_for(station, need, good, amount * carried, worth * carried)
+                railway.pay_for(station, need, good, amount, worths.get((need, good), amount))
 
     def _short_after_local(
         self, station: Cell, needs: dict[Need, float], trade: Trade | None
@@ -252,17 +249,14 @@ class StationTrade:
         want: float,
         rate: float = 1.0,
     ) -> float:
-        """Gives up to `want` of a good trains brought to a station, and pays the freight of what
-        trains carried there, each unit worth `rate` to the buildings that took it; returns how
-        much went."""
+        """Gives up to `want` of a good trains brought to a station, and pays its freight, each
+        unit worth `rate` to the buildings that took it; returns how much went."""
         railway = self._growth.railway
         assert railway is not None
         given = min(want, goods.brought.get(good, 0.0))
         if given > 0:
-            parcels = goods.release(good, given)
-            total = sum(parcels.values())
-            carried = given * (1.0 - parcels.get(station, 0.0) / total if total > 0 else 1.0)
-            railway.pay_for(station, need, good, carried, carried * rate)
+            goods.release(good, given)
+            railway.pay_for(station, need, good, given, given * rate)
         return max(given, 0.0)
 
     @property

@@ -651,7 +651,7 @@ def test_only_stations_that_track_joins_to_another_count_as_connected() -> None:
     assert connected == {(6, 3), (6, 20)}
 
 
-def test_a_station_keeps_what_it_gathered_for_trains_and_hands_none_of_it_around() -> None:
+def test_a_station_hands_what_it_gathered_to_the_houses_around_and_earns_its_freight() -> None:
     growth, railway = joined_stations()
     settle_houses(growth, (6, 21), 4)
     railway.station_goods((6, 20)).stockpile[Good.WHEAT] = 10.0
@@ -659,8 +659,8 @@ def test_a_station_keeps_what_it_gathered_for_trains_and_hands_none_of_it_around
 
     growth.trade_goods()
 
-    assert railway.station_goods((6, 20)).stockpile[Good.WHEAT] == pytest.approx(10.0)
-    assert railway.finances.month["cargo"] == 0.0
+    assert railway.station_goods((6, 20)).stockpile[Good.WHEAT] < 10.0
+    assert railway.finances.month["cargo"] > 0.0
 
 
 def test_a_train_can_turn_round_at_a_station_it_passes_through() -> None:

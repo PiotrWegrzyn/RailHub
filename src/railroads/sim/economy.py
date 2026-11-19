@@ -12,12 +12,13 @@ twenty-firsts of it from one to six cells away (REACH_SHARES). Buildings the sam
 seller share what it has by how much they still want.
 
 Stations come after (railroads.sim.railway), those joined by track to another station: each hands
-what trains brought to buildings within its delivery radius still short of a need, the same way,
+what it holds, what trains brought and its stockpile, to buildings within its delivery radius
+still short of a need, the same way,
 nearest first and shared by how much they still want, but taking all they want from any distance,
 unless the player keeps the good for trains there (StationOrder.kept). Both go through one
 distribute. Once every need has been met, each station takes the spare goods no building
 took that buildings made within its collection radius into its stockpile, while it has room, for
-trains to carry away; it never hands them out around it. The player's share of what the buildings they
+trains to carry away or to hand out the next month. The player's share of what the buildings they
 own make goes to the stations in reach before anything else: before it is handed out around them.
 
 Nothing is made that has nowhere to go: a processor uses up only the inputs for what left it; the
@@ -239,6 +240,14 @@ class StationOrder:
     kept: frozenset[Good] = frozenset()
     # The platforms added to it, whose cells it reaches out from as well as its own.
     platforms: tuple[Cell, ...] = ()
+
+
+def _added(first: Mapping[Good, float], second: Mapping[Good, float]) -> dict[Good, float]:
+    """Two stores of goods taken together."""
+    total = dict(first)
+    for good, amount in second.items():
+        total[good] = total.get(good, 0.0) + amount
+    return total
 
 
 @dataclass(frozen=True)
@@ -541,7 +550,9 @@ class _Month:
         # of its boosts.
         self.uses: dict[BuildingKind, dict[Need, FloatCells]] = {}
         self.received: dict[tuple[BuildingKind, Need], FloatCells] = {}
-        self.brought = {station: dict(order.brought) for station, order in stations.items()}
+        self.brought = {
+            station: _added(order.brought, order.stockpile) for station, order in stations.items()
+        }
         self.handed: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
         self.handed_for: dict[Cell, dict[tuple[Need, Good], float]] = {
             station: {} for station in stations

@@ -112,7 +112,7 @@ def joined_with_owned_farm(shares: int, *houses: tuple[int, int]) -> Growth:
 
 
 @pytest.mark.parametrize("shares", [LOT, 3 * LOT, SHARES])
-def test_a_station_hands_out_the_players_part_of_their_farm_and_files_its_pay_as_owned(
+def test_a_station_hands_out_the_players_part_of_their_farm_and_earns_its_freight_too(
     shares: int,
 ) -> None:
     growth = joined_with_owned_farm(shares, (6, 21), (6, 21), (6, 21))
@@ -121,7 +121,7 @@ def test_a_station_hands_out_the_players_part_of_their_farm_and_files_its_pay_as
 
     assert growth.trade.handed[(6, 20)][Good.WHEAT] == pytest.approx(10 * shares / SHARES)
     assert growth.railway.finances.month["owned buildings"] > 0
-    assert growth.railway.finances.month.get("cargo", 0.0) == 0.0
+    assert growth.railway.finances.month["cargo"] > 0
 
 
 def test_an_owned_farm_far_from_any_station_pays_the_player_nothing() -> None:

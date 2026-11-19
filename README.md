@@ -697,8 +697,8 @@ mines, mills, works and factories, but no homes, shops, churches or military. Ev
 1,000 shares, traded 100 at a time, and 100 shares are a tenth of what it makes. A bought
 building pays nothing of its own: the player's part of what it makes goes into the stations
 around it before anything is handed out, and the stations buy it from the player at the market
-price as it goes in; it then pays freight like any cargo when a train carries it to another station and
-buildings there take it; what the station hands out around it carries no freight. A building
+price as it goes in; it then pays freight like any cargo when buildings take it out of a
+station, the one it went into or another a train carried it to. A building
 with no station near pays nothing. A station hands what it has to the player's own buildings before anyone else's,
 however far within its reach they stand. A whole building costs ten years of all it makes at full output when it
 was fully satisfied over the last quarter, two thirds of that at none and
@@ -892,7 +892,8 @@ bridges and tunnels lightly, so it stays quick; click a point in between to stee
 river.
 
 Every good has a market price, five times the figure in the table below. Freight earns a fifth of
-it, the figure in the table, for each unit trains brought that the buildings around a station take,
+it, the figure in the table, for each unit buildings take out of a station: what trains brought
+there and what the station gathered itself alike,
 times what the unit was worth to the building that took it: the full figure to one satisfied over
 the last quarter, up to three times as much to one that got nothing (`railroads.sim.railway`).
 Each station still keeps its demand (`railroads.sim.demand`): every month its capacity for a need
@@ -1030,10 +1031,11 @@ for trains going opposite ways, trains pass each other without stopping. Each mo
 everywhere on the map, the nearest first, up to 6 cells away: nothing is lost on the way, but a
 building can take less of a maker's month the further it is, all of it in the same cell, then 13,
 8, 5, 3, 2 and 1 twenty-firsts of it from one to six cells away. Then each station that
-track joins to another station hands what trains brought to buildings within its reach (1 cell at the first
-level), unsatisfied first, then content, nearest first, and takes the spare goods no building took
-that buildings made within 3 cells into its stockpile, for trains; it never hands those out around
-it, and goods handed out on their own earn the player nothing. A station on its own, with no track
+track joins to another station hands what it holds, what trains brought and what it gathered, to
+buildings within its reach (1 cell at the first level), nearest first, earning freight for each
+unit, and takes the spare goods no building took that buildings made within 3 cells into its
+stockpile, for trains or to hand out the next month; goods handed out on their own earn the player
+nothing. A station on its own, with no track
 to another, does nothing. A station holds up to 500 of each good, what trains brought and what it gathered together, so
 one good piling up never blocks the others; a train unloads only what fits and keeps the rest aboard if its next leg pulls a car for that good,
 otherwise the rest is lost. Goods a train brought beyond what the area can use in a month can be

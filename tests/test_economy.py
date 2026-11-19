@@ -173,7 +173,7 @@ def test_a_station_shares_out_among_houses_as_near_by_how_short_they_are() -> No
     assert eaten_at(economy, trade, (8, 9)) == pytest.approx(3 * HOUSE_FOOD / 2)
 
 
-def test_a_station_never_hands_out_the_freight_it_gathered() -> None:
+def test_a_station_hands_out_the_freight_it_gathered_to_the_buildings_around_it() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
@@ -181,8 +181,8 @@ def test_a_station_never_hands_out_the_freight_it_gathered() -> None:
 
     trade = economy.trade(placed, {STATION: order})
 
-    assert eaten_at(economy, trade, (8, 9)) == 0.0
-    assert trade.handed[STATION] == {}
+    assert eaten_at(economy, trade, (8, 9)) == pytest.approx(HOUSE_FOOD)
+    assert trade.handed[STATION] == {Good.WHEAT: pytest.approx(HOUSE_FOOD)}
 
 
 def test_a_farm_is_as_satisfied_as_the_share_of_its_wheat_that_was_taken() -> None:
