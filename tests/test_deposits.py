@@ -174,6 +174,7 @@ def test_jewellers_keep_far_apart(gap: int, opens: bool) -> None:
 
 def test_a_map_holds_only_a_few_printing_works_each_printing_thousands_of_newspapers() -> None:
     constructions = Constructions(make_map(mountains=False))
+    constructions.build(Building((100, 100), BuildingKind.PAPER_MILL))
     rule = GrowthRule(trades=False, ladders=(PRINTING_WORKS,), forests=None)
     growth = Growth(constructions, rule)
     cap = 160_000 // PRINTING_WORKS.land_cells_each

@@ -1078,8 +1078,8 @@ CLUBS = replace(
 
 # Sushi huts are a rare treat of grown towns: they serve a lot of fish and rice, only in towns of
 # SUSHI_TOWN people, a tenth as readily as taverns, SUSHI_APART cells apart and one per
-# SUSHI_LAND_CELLS land cells at most, and only in the lands rice grows in, so none opens where
-# it could never get its rice; fed, they liven the homes around them as taverns do.
+# SUSHI_LAND_CELLS land cells at most, and only once fish and rice are got on the map; fed, they
+# liven the homes around them as taverns do.
 SUSHI_TOWN = 20
 SUSHI_APART = 6
 SUSHI_LAND_CELLS = 4_000
@@ -1087,7 +1087,6 @@ SUSHI_LAND_CELLS = 4_000
 SUSHI_HUTS = replace(
     TAVERNS,
     kinds=(BuildingKind.SUSHI_HUT,),
-    land=replace(TOWN_LAND, most_latitude=RICE_LATITUDE),
     base_chance=TAVERNS.base_chance / 10,
     chance_per_doubling={Points.POPULATION: TAVERNS.chance_per_doubling[Points.POPULATION] / 10},
     needs={Points.POPULATION: SUSHI_TOWN},
@@ -1121,15 +1120,12 @@ HOTELS = replace(
     land_cells_each=8_000,
 )
 
-# Sake breweries open in towns as distilleries do, but only in the lands rice grows in.
-SAKE_BREWERIES = replace(
-    _works(
-        BuildingKind.SAKE_BREWERY,
-        {POP: 8e-10, Points.FOOD: 3e-9},
-        {POP: FOOD_TOWN},
-        base=CRAFT_BASE * IN_TOWNS_ONLY / 2,
-    ),
-    land=replace(FACTORY_LAND, most_latitude=RICE_LATITUDE),
+# Sake breweries open in towns as distilleries do, once rice grows on the map.
+SAKE_BREWERIES = _works(
+    BuildingKind.SAKE_BREWERY,
+    {POP: 8e-10, Points.FOOD: 3e-9},
+    {POP: FOOD_TOWN},
+    base=CRAFT_BASE * IN_TOWNS_ONLY / 2,
 )
 
 # Works that open by people and industry alone: their inputs must be brought to them.

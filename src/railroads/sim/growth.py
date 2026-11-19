@@ -52,6 +52,7 @@ every few minutes.
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
+from functools import cache
 from itertools import pairwise
 from types import MappingProxyType
 from typing import TYPE_CHECKING
@@ -77,7 +78,7 @@ from railroads.sim.economy import (
     levels_of,
 )
 from railroads.sim.forests import change_forests
-from railroads.sim.goods import HOMES, MAKES, RECIPES
+from railroads.sim.goods import FITS, HOMES, MAKES, RECIPES, Good, demands_of, makes_of
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.ladders import (
     GROWTH,
@@ -240,6 +241,38 @@ VENUES = (
     BuildingKind.SUSHI_HUT,
     BuildingKind.FILLING_STATION,
 )
+
+# A processor or venue comes up only once something on the map makes each of its main inputs
+# (inputs_of): a winery needs a vineyard, a sushi hut a fishery and a rice paddy. Only where the
+# land lets their makers grow, then, do they ever open.
+
+
+@cache
+def makers_of(good: Good, year: int) -> frozenset[BuildingKind]:
+    """Every kind of building that makes a good in a given year."""
+    return frozenset(kind for kind in MAKES if good in makes_of(kind, year))
+
+
+@cache
+def inputs_of(kind: BuildingKind, year: int) -> tuple[frozenset[BuildingKind], ...]:
+    """For each main input a processor or a venue must have in a given year, the kinds of
+    building that make it, any one of which will do; nothing for other kinds. A processor's
+    boosts are no main input, and an input another can stand in for is met by either."""
+    recipe = RECIPES.get(kind)
+    if recipe is not None:
+        swaps = recipe.swaps_in(year)
+        needs = [
+            (need, *(swaps[need][:1] if need in swaps else ())) for need in recipe.inputs(year)
+        ]
+    elif kind in VENUES:
+        needs = [(need,) for need in demands_of(kind, year)]
+    else:
+        return ()
+    return tuple(
+        frozenset(maker for need in fits for good in FITS[need] for maker in makers_of(good, year))
+        for fits in needs
+    )
+
 
 # Kinds every map keeps at least KEY_LEAST of on KEY_LAND_CELLS land cells, in proportion to its
 # land, once open: the only makers of what whole chains run on.
@@ -438,6 +471,9 @@ class Growth:
         self.station_trade = StationTrade(self)
         self.room = Room(self)
         self._months = 0
+        # The kinds standing on the map this month, worked out as asked for (_standing).
+        self._stood: dict[BuildingKind, bool] = {}
+        self._stood_month = -1
         self._land_cells = int((tile_map.terrain == Terrain.LAND).sum())
         if rule.trades:
             self.trade_goods()
@@ -1029,6 +1065,8 @@ class Growth:
             return set()
         if not self.ladder_allows(ladder, cell) or self._not_open(ladder, cell, rng):
             return set()
+        if not self._inputs_on_map(ladder):
+            return set()
         return self.room.scatter(cell, ladder, rng)
 
     def least_of(self, ladder: Ladder) -> int:
@@ -1050,6 +1088,8 @@ class Growth:
             if self.rule.top_ups is not None and ladder.kinds[0] not in self.rule.top_ups:
                 continue
             if self._as_many_as_first(ladder) >= self.least_of(ladder):
+                continue
+            if not self._inputs_on_map(ladder):
                 continue
             cell = self._likeliest(place, rng)
             if cell is None:
@@ -1109,6 +1149,23 @@ class Growth:
             merge = ladder.merges.get(kind)
             stands_for *= merge.pulled_down if merge is not None else 1
         return total
+
+    def _inputs_on_map(self, ladder: Ladder) -> bool:
+        """Whether something on the map makes each main input of the ladder's first kind
+        (inputs_of)."""
+        inputs = inputs_of(ladder.kinds[0], self.year)
+        return all(any(self._standing(maker) for maker in makers) for makers in inputs)
+
+    def _standing(self, kind: BuildingKind) -> bool:
+        """Whether any building of a kind stands on the map, as it was when first asked this
+        month."""
+        if self._stood_month != self._months:
+            self._stood, self._stood_month = {}, self._months
+        stood = self._stood.get(kind)
+        if stood is None:
+            counts = self._counts.get(kind)
+            stood = self._stood[kind] = counts is not None and bool(counts.any())
+        return stood
 
     def _not_open(self, ladder: Ladder, cell: Cell, rng: np.random.Generator) -> bool:
         """Whether a turn on flat grassland that is not empty falls through, as all but one in

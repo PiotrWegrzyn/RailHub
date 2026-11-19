@@ -11,6 +11,7 @@ from railroads.sim.ladders import FILLING_STATIONS, RESOURCES, TOWNS, WORKS, Gro
 
 def grown(year: int, *ladders, houses: int = 0) -> Growth:
     constructions = Constructions(flat_map(20, 20))
+    constructions.build(Building((2, 2), BuildingKind.REFINERY))
     for _ in range(houses):
         constructions.build(Building((10, 10), BuildingKind.HOUSE))
     rule = GrowthRule(trades=False, ladders=ladders, forests=None)

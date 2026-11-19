@@ -140,8 +140,11 @@ The ideas every rule of the game should follow, the most important first.
   they had over the years played, from the same pool.
 - Every map gets at least a minimum of each key building. They come up on their own first; if too
   few do, the game adds the missing ones in a random but natural place for them.
-- Every building that is not unique comes up at least once in the year it opens, and then has odds
-  high enough to grow on its own from there.
+- Every building that is not unique comes up at least once in the year it opens, once the map
+  makes its main inputs, and then has odds high enough to grow on its own from there.
+- Only the land limits where things are made: raw producers grow where the map suits them (rice
+  within 41° of the equator, grapes where it is warm), and a works or venue opens only once
+  something on the map makes each of its main inputs. No vineyard, no winery.
 - Unique buildings come up in some games and not in others, two or three a game. They fit their era
   and only make or use goods the game already has.
 

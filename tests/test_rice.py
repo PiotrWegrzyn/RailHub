@@ -15,7 +15,6 @@ from railroads.sim.growth import VENUES, Growth
 from railroads.sim.ladders import (
     LADDERS,
     RICE_PADDIES,
-    SAKE_BREWERIES,
     SUSHI_APART,
     SUSHI_HUTS,
     SUSHI_LAND_CELLS,
@@ -152,16 +151,6 @@ def test_a_sushi_hut_with_fish_but_no_rice_is_not_fully_served() -> None:
     assert np.max(share) < np.max(full)
 
 
-def test_no_sushi_hut_opens_where_rice_cannot_grow() -> None:
-    constructions = Constructions(at_latitude(49.5, 50.5))
-    for cell in ((5, 5), (5, 4), (5, 6), (4, 5)):
-        build(constructions, cell, BuildingKind.HOUSE, 6)
-
-    chance = Growth(constructions, NO_TRADE).chances(SUSHI_HUTS)[5, 5]
-
-    assert chance == 0
-
-
 def test_sushi_huts_are_a_rare_treat_next_to_taverns() -> None:
     rarity = SUSHI_HUTS.base_chance / TAVERNS.base_chance
 
@@ -190,12 +179,3 @@ def test_a_tavern_takes_sake_for_its_alcohol() -> None:
 
     poured, _ = trade.goods_got[(BuildingKind.TAVERN, Need.ALCOHOL)]
     assert poured[position(trade, economy, (8, 8))] == pytest.approx(90.0)
-
-
-@pytest.mark.parametrize(("south", "north", "opens"), [(34.5, 35.5, True), (49.5, 50.5, False)])
-def test_sake_breweries_open_only_where_rice_grows(south: float, north: float, opens: bool) -> None:
-    tile_map = at_latitude(south, north)
-
-    weights = SAKE_BREWERIES.land.weights(tile_map)
-
-    assert bool((weights > 0).all()) == opens

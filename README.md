@@ -441,7 +441,7 @@ the cell:
 | Limestone quarries | 0.00000015 + 0.00000015 per doubling of ore | | hills; mountains x0.4, flat x0.02 |
 | Sand pits | 0.000000075 + 0.00000015 per doubling of ore | | by the sea (x4), rivers and lakes (x2), desert x3 |
 | Taverns | 0.00000001 + 0.000004 per doubling of population | 3 population | as houses, one to a neighbourhood |
-| Sushi huts | a tenth of taverns | 20 population | as houses, 6 hexes apart, one per 4,000 land cells, only where rice grows (within 41° of the equator): a rare treat of grown towns |
+| Sushi huts | a tenth of taverns | 20 population | as houses, 6 hexes apart, one per 4,000 land cells, once the map has a fishery and a rice paddy: a rare treat of grown towns |
 | Department stores | 0.00005 per doubling of population, from 1880 | 60 population | as houses, 6 hexes apart, one per 10,000 land cells |
 | Hotels | as department stores, from 1900 | 60 population | as houses, 5 hexes apart, one per 8,000 land cells |
 
@@ -780,9 +780,13 @@ deposits give are bonus goods to the buildings that use them as they are, such a
 coffee for homes or incense for churches, and demands to the processors that work them up.
 
 Other works open anywhere by chance, a little likelier where people and industry are, whether
-or not their inputs are near, so their inputs usually have to be brought from far away. Only
+or not their inputs are near, so their inputs usually have to be brought from far away. But a
+works, or a tavern, club, sushi hut or filling station, opens only once something on the map
+makes each of its main inputs (boosts are no main input): a winery needs a vineyard somewhere,
+a sushi hut a fishery and a rice paddy, a filling station a refinery. Only the land, then, decides
+where a chain can start: no grapes, no wine. Only
 the town food makers, brewers, distillers, sake brewers and potters need 3 people nearby, and
-shoe factories too. Sake breweries, like rice, open only within 41° of the equator. Chemical, cement, plastics, appliance and electronics works need 3 industry points nearby.
+shoe factories too. Sake breweries open only once rice grows on the map. Chemical, cement, plastics, appliance and electronics works need 3 industry points nearby.
 Steel mills, chemical works, cement works and gasworks keep out of towns: their chance is divided
 by one plus the people around them. Gasworks come up by industry, and chemical and cement works
 are drawn by industry alone. Jewellers appear only in the bigger towns (25
