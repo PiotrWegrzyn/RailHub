@@ -150,6 +150,11 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.SAND_PIT: (Points.ORE, 1),
     BuildingKind.POTATO_FARM: (Points.FOOD, 1),
     BuildingKind.RICE_PADDY: (Points.FOOD, 1),
+    BuildingKind.SOY_FIELD: (Points.FOOD, 1),
+    BuildingKind.TEA_PLANTATION: (Points.FOOD, 1),
+    BuildingKind.TOFU_MAKER: (Points.FOOD, 1),
+    BuildingKind.MISO_MAKER: (Points.FOOD, 1),
+    BuildingKind.FISH_DRYER: (Points.FOOD, 1),
     BuildingKind.CATTLE_RANCH: (Points.FOOD, 1),
     BuildingKind.PIG_FARM: (Points.FOOD, 1),
     BuildingKind.CHICKEN_FARM: (Points.FOOD, 1),
@@ -176,6 +181,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.BREWERY: (Points.INDUSTRY, 1),
     BuildingKind.DISTILLERY: (Points.INDUSTRY, 1),
     BuildingKind.SAKE_BREWERY: (Points.INDUSTRY, 1),
+    BuildingKind.SOY_SAUCE_BREWERY: (Points.INDUSTRY, 1),
     BuildingKind.TANNERY: (Points.INDUSTRY, 2),
     BuildingKind.SHOE_FACTORY: (Points.INDUSTRY, 2),
     BuildingKind.PLASTICS_WORKS: (Points.INDUSTRY, 3),
@@ -243,6 +249,8 @@ class Land:
     deposit: Deposit | None = None
     # Only within this many degrees of the equator, north or south.
     most_latitude: float | None = None
+    # Only inside this box of longitude and latitude: west, east, south, north.
+    region: tuple[float, float, float, float] | None = None
     # Flat grassland weighs this much more, but where anything stands already only one turn in
     # this many goes ahead.
     open_field: float = 1.0
@@ -317,6 +325,10 @@ class Land:
             weight = weight * on_it
         if self.most_latitude is not None:
             weight = weight * (np.abs(around.latitude) < self.most_latitude)
+        if self.region is not None:
+            west, east, south, north = self.region
+            lon, lat = around.longitude, around.latitude
+            weight = weight * ((lon >= west) & (lon <= east) & (lat >= south) & (lat <= north))
         weight = weight * np.where(around.open_flat_grass, self.open_field, 1.0)
         return np.where(around.land, weight, 0.0)
 
@@ -414,12 +426,20 @@ class Surroundings:
         return (self.relief == Relief.FLAT) & (self.vegetation == Vegetation.GRASS)
 
     @cached_property
-    def latitude(self) -> FloatGrid:
+    def _lonlat(self) -> tuple[FloatGrid, FloatGrid]:
         rows, cols = np.unravel_index(self.chosen, self.tile_map.grid.shape)
         x, y = self.tile_map.grid.center(rows, cols)
         km = self.tile_map.grid.km_per_cell
-        _, lat = self.tile_map.bounds.to_lonlat(np.asarray(x) * km, np.asarray(y) * km)
-        return np.asarray(lat, dtype=np.float64)
+        lon, lat = self.tile_map.bounds.to_lonlat(np.asarray(x) * km, np.asarray(y) * km)
+        return np.asarray(lon, dtype=np.float64), np.asarray(lat, dtype=np.float64)
+
+    @cached_property
+    def longitude(self) -> FloatGrid:
+        return self._lonlat[0]
+
+    @cached_property
+    def latitude(self) -> FloatGrid:
+        return self._lonlat[1]
 
     @cached_property
     def land(self) -> npt.NDArray[np.bool_]:
@@ -880,8 +900,9 @@ BUTCHERS = _merges(
 
 # Town crafts that come up, like bakeries, the likelier the more people live around: potters and
 # dairies as often as other crafts; tile works, foundries and sausage makers, which need two
-# inputs and make goods worth more, half as often; the makers of luxury goods only in towns of
-# LUXURY_TOWN people or more, half as often as potters.
+# inputs and make goods worth more, half as often; tofu makers, miso makers and fish drying
+# sheds a quarter as often, and only in towns of FOOD_TOWN people; the makers of luxury goods
+# only in towns of LUXURY_TOWN people or more, half as often as potters.
 LUXURY_TOWN = 20
 # Potters, brewers and distillers open only in towns of FOOD_TOWN people, where they are this many
 # times likelier than before, so the map keeps about as many of them.
@@ -911,6 +932,9 @@ TOWN_CRAFTS = (
     _town_craft(BuildingKind.TILE_WORKS, 0.5),
     _town_craft(BuildingKind.FOUNDRY, 0.5, 1800),
     _town_craft(BuildingKind.SAUSAGE_MAKER, 0.625, 1850),
+    _town_craft(BuildingKind.TOFU_MAKER, 0.25, least_people=FOOD_TOWN),
+    _town_craft(BuildingKind.MISO_MAKER, 0.25, least_people=FOOD_TOWN),
+    _town_craft(BuildingKind.FISH_DRYER, 0.25, least_people=FOOD_TOWN),
     _town_craft(BuildingKind.JUICE_WORKS, 0.5, 1870),
     _town_craft(BuildingKind.CARPET_WEAVER, 0.5, 1700, LUXURY_TOWN),
     _town_craft(BuildingKind.CLOCK_MAKER, 0.5, 1880, LUXURY_TOWN),
@@ -991,6 +1015,42 @@ RICE_PADDIES = Ladder(
     base_chance=9.698e-08,
     chance_per_doubling={Points.POPULATION: 1.7472e-05, Points.FOOD: 7.28e-07},
     crowded_at=FARMS_CROWDED_OUT,
+)
+
+# Soy is grown only in East Asia (SOY_REGION: China, Korea, Japan, Manchuria and the north of
+# Vietnam), on open plains and gentle hills that are not cold, best by rivers and lakes.
+SOY_REGION = (95.0, 150.0, 18.0, 50.0)
+
+SOY_FIELDS = Ladder(
+    kinds=(BuildingKind.SOY_FIELD,),
+    land=Land(
+        vegetation={Vegetation.BARREN: 0.05, Vegetation.FOREST: 0.02},
+        relief={Relief.HILLS: 0.6, Relief.MOUNTAINS: 0.0},
+        temperature={Temperature.COLD: 0.0},
+        water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0},
+        open_field=OPEN_FIELD,
+        region=SOY_REGION,
+    ),
+    base_chance=3.12e-08,
+    chance_per_doubling={Points.POPULATION: 3.25e-07, Points.FOOD: 1.3e-08},
+    crowded_at=FARMS_CROWDED_OUT,
+)
+
+# Tea grows in the warm, wet south and east of Asia (TEA_REGION: India, Ceylon, southern China,
+# Japan, Java), best on hillsides, never in desert, the cold or mountains.
+TEA_REGION = (65.0, 150.0, -10.0, 36.0)
+
+TEA_PLANTATIONS = Ladder(
+    kinds=(BuildingKind.TEA_PLANTATION,),
+    land=Land(
+        vegetation={Vegetation.BARREN: 0.0, Vegetation.FOREST: 0.2},
+        relief={Relief.FLAT: 0.3, Relief.HILLS: 1.5, Relief.MOUNTAINS: 0.0},
+        temperature={Temperature.COLD: 0.0},
+        water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.5},
+        region=TEA_REGION,
+    ),
+    base_chance=1.87e-08,
+    chance_per_doubling={Points.POPULATION: 3.6e-08, Points.FOOD: 3.6e-07},
 )
 
 # Cattle graze open grassland and hills, away from the heat.
@@ -1154,6 +1214,14 @@ SAKE_BREWERIES = _works(
     base=CRAFT_BASE * IN_TOWNS_ONLY / 2,
 )
 
+# Soy sauce breweries open in towns as distilleries do, once soy grows on the map.
+SOY_SAUCE_BREWERIES = _works(
+    BuildingKind.SOY_SAUCE_BREWERY,
+    {POP: 8e-10, Points.FOOD: 3e-9},
+    {POP: FOOD_TOWN},
+    base=CRAFT_BASE * IN_TOWNS_ONLY / 2,
+)
+
 # Works that open by people and industry alone: their inputs must be brought to them.
 WORKS = (
     _works(BuildingKind.TEXTILE_MILL, {POP: 4e-10, IND: 1.2e-8}, {}, 1780, base=CRAFT_BASE),
@@ -1195,6 +1263,7 @@ WORKS = (
         base=CRAFT_BASE * IN_TOWNS_ONLY / 2,
     ),
     SAKE_BREWERIES,
+    SOY_SAUCE_BREWERIES,
     _works(BuildingKind.TANNERY, {POP: 4e-10, Points.FOOD: 3e-9}, {}, base=CRAFT_BASE),
     _works(BuildingKind.SHOE_FACTORY, {POP: 8e-10, IND: 6e-9}, {POP: 3}, 1850, base=5e-8),
     _works(BuildingKind.PAPER_MILL, {IND: 6e-9, Points.TIMBER: 6e-8}, {}, 1150, base=2e-7),
@@ -1252,6 +1321,8 @@ LADDERS = (
     *TOWN_SIGHTS,
     POTATO_FARMS,
     RICE_PADDIES,
+    SOY_FIELDS,
+    TEA_PLANTATIONS,
     CATTLE_RANCHES,
     PIG_FARMS,
     CHICKEN_FARMS,

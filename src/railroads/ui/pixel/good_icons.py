@@ -789,6 +789,91 @@ def alcohol() -> Sprite:
     return p.sprite()
 
 
+def soybeans() -> Sprite:
+    """A hairy green pod split open on three pale soybeans."""
+    p = _canvas()
+    pod: RGB = (118, 160, 70)
+    p.polygon([(-8, 3), (-4, -3), (3, -6), (8, -5), (5, 0), (-3, 5)], pod, shade(pod, 0.6))
+    for x, y in ((-4, 1), (0, -1), (4, -3)):
+        p.ellipse(x - 2, y - 2, x + 2, y + 2, (226, 210, 140))
+    for x, y in ((-3, 6), (2, 5), (6, 3)):
+        p.ellipse(x - 1.5, y - 1.5, x + 1.5, y + 1.5, (210, 190, 120))
+    return p.sprite()
+
+
+def soy_sauce() -> Sprite:
+    """A dark bottle of soy sauce with a red cap and a white label."""
+    p = _canvas()
+    dark: RGB = (60, 34, 26)
+    p.rect(-1, -7, 1, -5, (196, 46, 40))
+    p.polygon([(-1, -5), (1, -5), (4, -1), (4, 7), (-4, 7), (-4, -1)], dark, (30, 20, 16))
+    p.rect(-3, 1, 3, 4, (240, 234, 220))
+    p.line([(-2, 2), (2, 2)], (196, 46, 40))
+    p.line([(-3, -1), (-3, 6)], shade(dark, 1.6))
+    return p.sprite()
+
+
+def tofu() -> Sprite:
+    """Two white blocks of tofu in a shallow dish of water."""
+    p = _canvas()
+    p.ellipse(-8, 1, 8, 7, (130, 176, 206))
+    for x in (-5, 1):
+        p.polygon(
+            [(x, -2), (x + 4, -3), (x + 6, -1), (x + 6, 3), (x + 2, 4), (x, 2)],
+            (248, 246, 236),
+            (190, 186, 170),
+        )
+        p.line([(x, -2), (x + 2, -1), (x + 6, -1)], (226, 222, 206))
+    return p.sprite()
+
+
+def miso() -> Sprite:
+    """A wooden tub heaped with brown miso."""
+    p = _canvas()
+    p.blob(-6, -6, 6, -1, (176, 120, 60))
+    p.blob(-3, -6, 1, -4, (204, 150, 84))
+    p.rect(-7, -2, 7, 6, (150, 104, 62))
+    for y in (0, 4):
+        p.line([(-7, y), (7, y)], (176, 160, 96))
+    return p.sprite()
+
+
+def tea() -> Sprite:
+    """A green tea bowl with a sprig of two tea leaves."""
+    p = _canvas()
+    p.polygon([(-7, -1), (7, -1), (5, 6), (-5, 6)], (110, 150, 90), (60, 90, 50))
+    p.ellipse(-7, -3, 7, 1, (150, 196, 96))
+    p.polygon([(-2, -4), (0, -8), (2, -5)], LEAF)
+    p.polygon([(1, -4), (5, -7), (5, -4)], shade(LEAF, 1.2))
+    p.line([(0, -3), (0, -5)], STEM)
+    return p.sprite()
+
+
+def dried_fish() -> Sprite:
+    """Two split, dried fish hung from a string."""
+    p = _canvas()
+    p.line([(-8, -7), (8, -7)], (150, 120, 80))
+    body: RGB = (200, 176, 130)
+    for x in (-4, 3):
+        p.polygon(
+            [(x - 2, -6), (x + 2, -6), (x + 3, 2), (x, 5), (x - 3, 2)], body, shade(body, 0.6)
+        )
+        p.polygon([(x - 2, 5), (x + 2, 5), (x, 3)], shade(body, 0.8))
+        p.line([(x, -5), (x, 3)], shade(body, 0.7))
+    return p.sprite()
+
+
+def hot_drinks() -> Sprite:
+    """A steaming white cup, for coffee or tea."""
+    p = _canvas()
+    p.polygon([(-6, -1), (4, -1), (3, 6), (-5, 6)], (240, 238, 230), (150, 150, 162))
+    p.ellipse(-6, -3, 4, 1, (120, 76, 48))
+    p.line([(4, 0), (7, 1), (7, 3), (4, 4)], (210, 208, 200))
+    for x in (-3, 1):
+        p.line([(x, -4), (x + 1, -6), (x, -8)], (214, 214, 222))
+    return p.sprite()
+
+
 def sake() -> Sprite:
     """A white sake flask with a blue band round its neck, a little cup beside it."""
     p = _canvas()
@@ -1170,6 +1255,13 @@ ICONS: dict[str, Callable[[], Sprite]] = {
     "beer": beer,
     "vodka": vodka,
     "sake": sake,
+    "soybeans": soybeans,
+    "soy sauce": soy_sauce,
+    "tofu": tofu,
+    "miso": miso,
+    "tea": tea,
+    "dried fish": dried_fish,
+    "hot drinks": hot_drinks,
     "alcohol": alcohol,
     "leather": leather,
     "shoes": shoes,

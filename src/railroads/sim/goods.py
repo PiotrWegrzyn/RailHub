@@ -76,6 +76,12 @@ class Good(Enum):
     SAND = "sand"
     POTATOES = "potatoes"
     RICE = "rice"
+    SOYBEANS = "soybeans"
+    SOY_SAUCE = "soy sauce"
+    TOFU = "tofu"
+    MISO = "miso"
+    TEA = "tea"
+    DRIED_FISH = "dried fish"
     CATTLE = "cattle"
     PIGS = "pigs"
     CHICKENS = "chickens"
@@ -147,6 +153,9 @@ class Need(Enum):
     SUGAR = "sugar"
     POTATOES = "potatoes"
     RICE = "rice"
+    SOYBEANS = "soybeans"
+    SOY_SAUCE = "soy sauce"
+    HOT_DRINKS = "hot drinks"
     FISH = "fish"
     CLAY = "clay"
     LIMESTONE = "limestone"
@@ -196,6 +205,9 @@ FOODS = (
     Good.BREAD,
     Good.POTATOES,
     Good.RICE,
+    Good.TOFU,
+    Good.MISO,
+    Good.DRIED_FISH,
     Good.MEAT,
     Good.EGGS,
     Good.MILK,
@@ -216,7 +228,17 @@ COMMON_GOODS = (
 
 
 # Food made from other goods; the rest of the food is grown, caught or gathered.
-PROCESSED_FOODS = (Good.CANS, Good.BREAD, Good.MEAT, Good.DAIRY, Good.SAUSAGES, Good.JUICE)
+PROCESSED_FOODS = (
+    Good.CANS,
+    Good.BREAD,
+    Good.MEAT,
+    Good.DAIRY,
+    Good.SAUSAGES,
+    Good.JUICE,
+    Good.TOFU,
+    Good.MISO,
+    Good.DRIED_FISH,
+)
 
 
 class General(Enum):
@@ -243,6 +265,7 @@ FITS: Mapping[Need, tuple[Good, ...]] = MappingProxyType(
         Need.COMMON: COMMON_GOODS,
         Need.FRUIT: FRUITS,
         Need.ALCOHOL: (Good.BEER, Good.WINE, Good.VODKA, Good.SAKE),
+        Need.HOT_DRINKS: (Good.COFFEE, Good.TEA),
         Need.FIBRE: (Good.WOOL, Good.COTTON, Good.FLAX),
         Need.LIVESTOCK: (Good.CATTLE, Good.SHEEP),
         Need.ANIMALS: (Good.CATTLE, Good.PIGS, Good.CHICKENS, Good.SHEEP),
@@ -263,6 +286,7 @@ NEED_YEARS: Mapping[Need, int] = MappingProxyType(
         Need.CASTINGS: 1800,
         Need.COKE: 1850,
         Need.COFFEE: 1700,
+        Need.HOT_DRINKS: 1700,
         Need.CLOTHES: 1780,
         Need.REFINED_SUGAR: 1800,
         Need.SHOES: 1850,
@@ -295,6 +319,7 @@ DIESEL_USERS: Mapping[BuildingKind, tuple[float, int]] = MappingProxyType(
         BuildingKind.FARM: (2.0, TRACTOR_YEAR),
         BuildingKind.POTATO_FARM: (2.0, TRACTOR_YEAR),
         BuildingKind.RICE_PADDY: (2.0, TRACTOR_YEAR),
+        BuildingKind.SOY_FIELD: (2.0, TRACTOR_YEAR),
         BuildingKind.MINE: (10.0, MACHINE_YEAR),
         BuildingKind.IRON_MINE: (10.0, MACHINE_YEAR),
         BuildingKind.COPPER_MINE: (5.0, MACHINE_YEAR),
@@ -374,6 +399,12 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.SAND: 8,
         Good.POTATOES: 6,
         Good.RICE: 6,
+        Good.SOYBEANS: 8,
+        Good.SOY_SAUCE: 20,
+        Good.TOFU: 8,
+        Good.MISO: 10,
+        Good.TEA: 40,
+        Good.DRIED_FISH: 12,
         Good.CATTLE: 20,
         Good.PIGS: 14,
         Good.CHICKENS: 6,
@@ -633,6 +664,14 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
                 Good.VODKA, 40, {Need.POTATOES: 0.5}, {Need.GLASS: 0.1}
             ),
             BuildingKind.SAKE_BREWERY: Recipe(Good.SAKE, 60, {Need.RICE: 0.5}),
+            BuildingKind.SOY_SAUCE_BREWERY: Recipe(
+                Good.SOY_SAUCE, 20, {Need.SOYBEANS: 0.5, Need.WHEAT: 0.5, Need.SALT: 0.2}
+            ),
+            BuildingKind.TOFU_MAKER: Recipe(Good.TOFU, 60, {Need.SOYBEANS: 0.4}),
+            BuildingKind.MISO_MAKER: Recipe(
+                Good.MISO, 60, {Need.SOYBEANS: 0.25, Need.RICE: 0.15, Need.SALT: 0.1}
+            ),
+            BuildingKind.FISH_DRYER: Recipe(Good.DRIED_FISH, 60, {Need.FISH: 0.4, Need.SALT: 0.1}),
             BuildingKind.TANNERY: Recipe(
                 Good.LEATHER, 40, {Need.LIVESTOCK: 0.5}, {Need.LIMESTONE: 0.25}
             ),
@@ -693,6 +732,8 @@ MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
         BuildingKind.SAND_PIT: {Good.SAND: 60},
         BuildingKind.POTATO_FARM: {Good.POTATOES: 10},
         BuildingKind.RICE_PADDY: {Good.RICE: 10},
+        BuildingKind.SOY_FIELD: {Good.SOYBEANS: 10},
+        BuildingKind.TEA_PLANTATION: {Good.TEA: 20},
         BuildingKind.CATTLE_RANCH: {Good.CATTLE: 10, Good.MILK: 20},
         BuildingKind.PIG_FARM: {Good.PIGS: 12},
         BuildingKind.CHICKEN_FARM: {Good.CHICKENS: 20, Good.EGGS: 15},
@@ -709,6 +750,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
     {
         BuildingKind.HOUSE: {
             Need.FOOD: 20,
+            Need.SOY_SAUCE: 0.5,
             Need.HEATING: 3,
             Need.BEER: 1,
             Need.NEWSPAPERS: 1,
@@ -735,9 +777,10 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         },
         BuildingKind.TENEMENT: {
             Need.FOOD: 120,
+            Need.SOY_SAUCE: 5,
             Need.SALT: 10,
             Need.GOODS: 20,
-            Need.COFFEE: 10,
+            Need.HOT_DRINKS: 10,
             Need.COMMON: 60,
             Need.TOOLS: 10,
             Need.BEER: 10,
@@ -753,9 +796,10 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         },
         BuildingKind.FLATS: {
             Need.FOOD: 400,
+            Need.SOY_SAUCE: 15,
             Need.SALT: 30,
             Need.GOODS: 40,
-            Need.COFFEE: 30,
+            Need.HOT_DRINKS: 30,
             Need.COMMON: 300,
             Need.TOOLS: 10,
             Need.FUEL: 30,
@@ -773,7 +817,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         },
         BuildingKind.SKYSCRAPER: {
             Need.GOODS: 30,
-            Need.COFFEE: 10,
+            Need.HOT_DRINKS: 10,
             Need.CLOTHES: 5,
             Need.FURNITURE: 5,
             Need.WINE: 20,
@@ -817,7 +861,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.SHEEP_FARM: {Need.WHEAT: 90},
         BuildingKind.TAVERN: {Need.ALCOHOL: 90, Need.FOOD: 20},
         BuildingKind.CLUB: {Need.ALCOHOL: 350, Need.CHEMICALS: 5},
-        BuildingKind.SUSHI_HUT: {Need.FISH: 60, Need.RICE: 60},
+        BuildingKind.SUSHI_HUT: {Need.FISH: 60, Need.RICE: 60, Need.SOY_SAUCE: 10},
         BuildingKind.DEPARTMENT_STORE: {
             Need.CLOTHES: 20,
             Need.SHOES: 20,
@@ -875,6 +919,7 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.GOLD,
     Need.DIAMONDS,
     Need.COFFEE,
+    Need.HOT_DRINKS,
     Need.RUBBER,
     Need.WAX,
     Need.INCENSE,
@@ -948,6 +993,12 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.POTATOES,
     Need.RICE,
     Need.FISH,
+    Need.SOYBEANS,
+    BuildingKind.SOY_SAUCE_BREWERY,
+    Need.SOY_SAUCE,
+    BuildingKind.TOFU_MAKER,
+    BuildingKind.MISO_MAKER,
+    BuildingKind.FISH_DRYER,
     BuildingKind.DISTILLERY,
     Need.VODKA,
     BuildingKind.SAKE_BREWERY,
@@ -1009,6 +1060,8 @@ BONUS_NEEDS = frozenset(
         Need.SALT,
         Need.GRAPES,
         Need.COFFEE,
+        Need.HOT_DRINKS,
+        Need.SOY_SAUCE,
         Need.RUBBER,
         Need.INCENSE,
         Need.BEER,
@@ -1079,11 +1132,12 @@ BONUS_PART: Mapping[tuple[BuildingKind, Need], float] = MappingProxyType(
 
 
 # Venues need alcohol of any kind; a tavern takes food as a bonus, and a club a little of
-# whatever chemicals it can get.
+# whatever chemicals it can get. A sushi hut needs fish and rice, and takes soy sauce as a bonus.
 VENUE_BONUSES: Mapping[BuildingKind, frozenset[Need]] = MappingProxyType(
     {
         BuildingKind.TAVERN: frozenset({Need.FOOD}),
         BuildingKind.CLUB: frozenset({Need.CHEMICALS}),
+        BuildingKind.SUSHI_HUT: frozenset({Need.SOY_SAUCE}),
     }
 )
 

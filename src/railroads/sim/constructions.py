@@ -87,6 +87,12 @@ class BuildingKind(Enum):
     SAND_PIT = "sand pit"
     POTATO_FARM = "potato farm"
     RICE_PADDY = "rice paddy"
+    SOY_FIELD = "soy field"
+    TEA_PLANTATION = "tea plantation"
+    SOY_SAUCE_BREWERY = "soy sauce brewery"
+    TOFU_MAKER = "tofu maker"
+    MISO_MAKER = "miso maker"
+    FISH_DRYER = "fish drying shed"
     CATTLE_RANCH = "cattle ranch"
     PIG_FARM = "pig farm"
     CHICKEN_FARM = "chicken farm"
@@ -205,6 +211,14 @@ class BuildingKind(Enum):
     MEGA_DISTILLERY = "mega distillery"
     BIG_SAKE_BREWERY = "big sake brewery"
     MEGA_SAKE_BREWERY = "mega sake brewery"
+    BIG_SOY_SAUCE_BREWERY = "big soy sauce brewery"
+    MEGA_SOY_SAUCE_BREWERY = "mega soy sauce brewery"
+    BIG_TOFU_MAKER = "big tofu maker"
+    MEGA_TOFU_MAKER = "mega tofu maker"
+    BIG_MISO_MAKER = "big miso maker"
+    MEGA_MISO_MAKER = "mega miso maker"
+    BIG_FISH_DRYER = "big fish drying shed"
+    MEGA_FISH_DRYER = "mega fish drying shed"
     BIG_TANNERY = "big tannery"
     MEGA_TANNERY = "mega tannery"
     BIG_MEAT_FACTORY = "big butcher"
@@ -284,6 +298,9 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.POTTER,
             BuildingKind.DAIRY,
             BuildingKind.SAUSAGE_MAKER,
+            BuildingKind.TOFU_MAKER,
+            BuildingKind.MISO_MAKER,
+            BuildingKind.FISH_DRYER,
             BuildingKind.CARPET_WEAVER,
             BuildingKind.CLOCK_MAKER,
             BuildingKind.MIRROR_MAKER,
@@ -305,6 +322,8 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.RUBBER_PLANTATION,
             BuildingKind.POTATO_FARM,
             BuildingKind.RICE_PADDY,
+            BuildingKind.SOY_FIELD,
+            BuildingKind.TEA_PLANTATION,
             BuildingKind.CATTLE_RANCH,
             BuildingKind.PIG_FARM,
             BuildingKind.CHICKEN_FARM,
@@ -384,6 +403,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.BREWERY,
             BuildingKind.DISTILLERY,
             BuildingKind.SAKE_BREWERY,
+            BuildingKind.SOY_SAUCE_BREWERY,
             BuildingKind.TANNERY,
             BuildingKind.SHOE_FACTORY,
             BuildingKind.PLASTICS_WORKS,

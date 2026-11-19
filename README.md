@@ -394,7 +394,7 @@ of every kind in its neighbourhood (the cell and the six around it):
 | Points | Buildings |
 |---|---|
 | Population | house 1, tenement (kamienica) 6, block of flats 18 |
-| Food | farm, orchard, date palms, banana plantation, orange farm, sugar field, potato farm, rice paddy, cattle ranch, flax field, hop garden, beekeeper, incense grove 1 |
+| Food | farm, orchard, date palms, banana plantation, orange farm, sugar field, potato farm, rice paddy, soy field, tea plantation, cattle ranch, flax field, hop garden, beekeeper, incense grove 1 |
 | Ore | mine, clay pit, limestone quarry, sand pit 1 |
 | Timber | lumber mill 1 |
 | Trade | port 1 |
@@ -437,6 +437,8 @@ than dry land unless a row names it:
 | Shipyards | 0.000005 + 0.000002 per doubling of trade + 0.0000004 of industry | 1 trade | on the water |
 | Potato farms | 0.000000017 + 0.000001 per doubling of population + 0.00000004 of food | fewer than 8 population | cool open plains; hills x0.4; river or lake x2 |
 | Rice paddies | as farms | fewer than 8 population | only within 41° of the equator, north or south (Japan, the Yangtze delta, California, Southeast Australia, the tropics; not Poland, Germany, Britain, France, Moscow or Norway); flat grass x10 while empty; hills x0.8, barren x0.05, hot x1.2; never in mountains, forest or the cold; river or lake x4, but the sea is salty and does it no good |
+| Soy fields | a quarter of potato farms | fewer than 8 population | only in East Asia (95-150°E, 18-50°N: China, Korea, Japan, Manchuria); open plains, hills x0.6; never cold, in mountains or forest; river or lake x2 |
+| Tea plantations | a sixth of orchards | | only in the warm south and east of Asia (65-150°E, 10°S-36°N: India, Ceylon, southern China, Japan, Java); hills x1.5, flat x0.3, forest x0.2; never desert, cold or mountains |
 | Cattle ranches | 0.0000000033 + 0.00000018 per doubling of population + 0.000000009 of food | fewer than 8 population | grassland and hills; hot x0.3 |
 | Flax fields | 0.000000006 + 0.0000003 per doubling of population + 0.00000002 of food | fewer than 8 population | cool wet land; river x3, lake x2, away from water x0.3 |
 | Hop gardens | 0.0000000012 + 0.00000012 per doubling of population | fewer than 8 population | open plains and hills; cold x0.3, hot x0.2 |
@@ -491,9 +493,9 @@ reach is worth having. The table below is written from the game's own figures by
 <!-- table: buildings -->
 | Building | Makes a month at most | Must get a month | Bonus goods and boosts a month |
 |---|---|---|---|
-| House |  | 10 food, 3 heating | 10 food, 1 beer, 1 newspapers (from 1600), 5 common goods, 0.5 vodka (from 1600), 0.5 refined sugar (from 1800), 0.5 bricks, 0.2 glass, 0.5 limestone |
-| Tenement |  | 60 food, 60 common goods, 20 heating | 60 food, 10 salt, 20 goods, 10 coffee (from 1700), 10 tools (from 1870), 10 beer, 10 vodka (from 1600), 10 bricks, 10 glass, 10 cement (from 1880), 10 refined sugar (from 1800), 10 newspapers (from 1600), 10 limestone, 1 luxury goods (from 1700) |
-| Block of flats |  | 200 food, 300 common goods, 80 heating | 200 food, 30 salt, 40 goods, 30 coffee (from 1700), 10 tools (from 1870), 30 fuel (from 1910), 3 cars (from 1930), 30 beer, 30 vodka (from 1600), 50 bricks, 50 cement (from 1880), 50 glass, 30 newspapers (from 1600), 5 appliances (from 1950), 30 refined sugar (from 1800), 5 luxury goods (from 1700) |
+| House |  | 10 food, 3 heating | 10 food, 0.5 soy sauce, 1 beer, 1 newspapers (from 1600), 5 common goods, 0.5 vodka (from 1600), 0.5 refined sugar (from 1800), 0.5 bricks, 0.2 glass, 0.5 limestone |
+| Tenement |  | 60 food, 60 common goods, 20 heating | 60 food, 5 soy sauce, 10 salt, 20 goods, 10 hot drinks (from 1700), 10 tools (from 1870), 10 beer, 10 vodka (from 1600), 10 bricks, 10 glass, 10 cement (from 1880), 10 refined sugar (from 1800), 10 newspapers (from 1600), 10 limestone, 1 luxury goods (from 1700) |
+| Block of flats |  | 200 food, 300 common goods, 80 heating | 200 food, 15 soy sauce, 30 salt, 40 goods, 30 hot drinks (from 1700), 10 tools (from 1870), 30 fuel (from 1910), 3 cars (from 1930), 30 beer, 30 vodka (from 1600), 50 bricks, 50 cement (from 1880), 50 glass, 30 newspapers (from 1600), 5 appliances (from 1950), 30 refined sugar (from 1800), 5 luxury goods (from 1700) |
 | Farm | 10 wheat |  | 5 machinery (from 1870), 10 limestone, 2 fuel (from 1920) |
 | Orchard | 10 apples |  |  |
 | Date palms | 10 dates |  |  |
@@ -511,6 +513,11 @@ reach is worth having. The table below is written from the game's own figures by
 | Incense grove | 30 incense |  |  |
 | Potato farm (1600) | 10 potatoes |  | 2 fuel (from 1920) |
 | Rice paddy | 10 rice |  | 2 fuel (from 1920) |
+| Soy field | 10 soybeans |  | 2 fuel (from 1920) |
+| Tea plantation | 20 tea |  |  |
+| Tofu maker | 60 tofu | 24 soybeans |  |
+| Miso maker | 60 miso | 15 soybeans, 9 rice, 6 salt |  |
+| Fish drying shed | 60 dried fish | 24 fish, 6 salt |  |
 | Cattle ranch | 10 cattle, 20 milk |  | 120 wheat |
 | Pig farm | 12 pigs |  | 60 wheat |
 | Chicken farm | 20 chickens, 15 eggs |  | 30 wheat |
@@ -521,6 +528,12 @@ reach is worth having. The table below is written from the game's own figures by
 | Mega sausage maker (1850) | 3,375 sausages | 1,350 meat, 675 salt |  |
 | Big bakery | 450 bread | 180 wheat | 22.5 refined sugar (from 1800) |
 | Mega bakery | 1,688 bread | 675 wheat | 84.38 refined sugar (from 1800) |
+| Big tofu maker | 225 tofu | 90 soybeans |  |
+| Mega tofu maker | 843.8 tofu | 337.5 soybeans |  |
+| Big miso maker | 225 miso | 56.25 soybeans, 33.75 rice, 22.5 salt |  |
+| Mega miso maker | 843.8 miso | 210.9 soybeans, 126.6 rice, 84.38 salt |  |
+| Big fish drying shed | 225 dried fish | 90 fish, 22.5 salt |  |
+| Mega fish drying shed | 843.8 dried fish | 337.5 fish, 84.38 salt |  |
 | Mine (1700) | 100 coal |  | 20 lumber, 10 fuel (from 1920) |
 | Iron mine | 100 iron ore |  | 10 fuel (from 1920) |
 | Copper mine (1880) | 40 copper |  | 5 fuel (from 1920) |
@@ -551,6 +564,7 @@ reach is worth having. The table below is written from the game's own figures by
 | Aircraft factory (1935) | 20 planes | 60 steel (from 1855), 20 copper (from 1880), 20 fuel (from 1910), 20 electronics (from 1960) |  |
 | Steel mill (1855) | 100 steel | 250 iron ore, 250 coal (from 1700) | 25 coke (from 1850) |
 | Shipyard | 30 goods | 20 steel (from 1855), 10 lumber |  |
+| Soy sauce brewery | 20 soy sauce | 10 soybeans, 10 wheat, 4 salt |  |
 | Gasworks (1820) | 200 gas | 100 coal (from 1700) |  |
 | Coke plant (1850) | 100 coke | 100 coal (from 1700) |  |
 | Potter | 40 pots | 20 clay |  |
@@ -632,6 +646,8 @@ reach is worth having. The table below is written from the game's own figures by
 | Mega distillery (1600) | 250 vodka | 125 potatoes | 25 glass |
 | Big sake brewery | 150 sake | 75 rice |  |
 | Mega sake brewery | 375 sake | 187.5 rice |  |
+| Big soy sauce brewery | 50 soy sauce | 25 soybeans, 25 wheat, 10 salt |  |
+| Mega soy sauce brewery | 125 soy sauce | 62.5 soybeans, 62.5 wheat, 25 salt |  |
 | Big tannery | 100 leather | 50 livestock | 25 limestone |
 | Mega tannery | 250 leather | 125 livestock | 62.5 limestone |
 | Big butcher (1850) | 450 meat | 180 animals |  |
@@ -652,7 +668,7 @@ reach is worth having. The table below is written from the game's own figures by
 | Mega gasworks (1820) | 1,250 gas | 625 coal (from 1700) |  |
 | Big porcelain works (1710) | 75 porcelain | 37.5 clay | 18.75 coal (from 1700) |
 | Mega porcelain works (1710) | 187.5 porcelain | 93.75 clay | 46.88 coal (from 1700) |
-| Skyscraper |  | 30 goods, 5 clothes (from 1780), 20 wine, 20 fuel (from 1910), 30 electronics (from 1960), 10 glass, 10 cement (from 1880), 20 paper (from 1150), 5 appliances (from 1950), 2 porcelain, 2 luxury goods (from 1700) | 10 coffee (from 1700), 5 furniture, 20 newspapers (from 1600) |
+| Skyscraper |  | 30 goods, 5 clothes (from 1780), 20 wine, 20 fuel (from 1910), 30 electronics (from 1960), 10 glass, 10 cement (from 1880), 20 paper (from 1150), 5 appliances (from 1950), 2 porcelain, 2 luxury goods (from 1700) | 10 hot drinks (from 1700), 5 furniture, 20 newspapers (from 1600) |
 | Car dealer (1930) |  | 20 cars (from 1930) | 10 rubber |
 | Jeweller |  | 20 gold, 10 diamonds |  |
 | Carpet weaver (1700) | 5 luxury goods | 20 fibre |  |
@@ -673,7 +689,7 @@ reach is worth having. The table below is written from the game's own figures by
 | Department store (1880) |  | 20 clothes (from 1780), 20 shoes (from 1850), 5 porcelain, 10 appliances (from 1950) | 10 furniture |
 | Hotel (1900) |  | 80 food, 10 wine | 10 beer, 10 newspapers (from 1600) |
 | Club (1900) |  | 350 alcohol | 5 chemicals (from 1880) |
-| Sushi hut |  | 60 fish, 60 rice |  |
+| Sushi hut |  | 60 fish, 60 rice | 10 soy sauce |
 | Filling station (1920) |  | 40 fuel (from 1910) |  |
 | Big carpet weaver (1700) | 12.5 luxury goods | 50 fibre |  |
 | Mega carpet weaver (1700) | 31.25 luxury goods | 125 fibre |  |
@@ -722,7 +738,10 @@ salt, grapes, coffee, rubber, incense), beer, newspapers and furniture as bonus 
 (`BONUS_NEEDS`), and everything else they need they must get. Taverns and clubs need
 alcohol, any of beer, wine, vodka and sake; a tavern takes food as a bonus and a club a little of
 whatever chemicals it can get. Sushi huts need a lot of fish and a lot of rice, both demands, and
-fed, liven the homes around them as taverns do. Hovering the icon of such a category names what is in it.
+fed, liven the homes around them as taverns do. They take soy sauce as a bonus, as
+homes do. Coffee and tea both meet the need for hot drinks of tenements, blocks of flats and
+skyscrapers. Tofu, miso and dried fish are processed food, made in towns of 3 people from soy,
+from soy, rice and salt, and from fish and salt. Hovering the icon of such a category names what is in it.
 A building's satisfaction is the share of its demands it got, raised by 30% of itself for each bonus good it
 got all of, and that share of 30% for part of one, so bonus goods count only as much as the
 demands are met. Demands are counted by amount, so a car matters little next to a town's food. A
@@ -1075,9 +1094,9 @@ share of demand left for each need.
 <!-- table: freight -->
 | Freight a unit | Goods |
 |---|---|
-| $10 or less | eggs 4, bread 6, chickens 6, milk 6, potatoes 6, rice 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, sugar 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, lumber 10, newspapers 10, pots 10 |
-| $11-20 | cement 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, beer 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, wool 20 |
-| $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, sake 25, stove tiles 25, copper 28, castings 30, vodka 30, wax 30, plastics 40, rubber 40, wine 40 |
+| $10 or less | eggs 4, bread 6, chickens 6, milk 6, potatoes 6, rice 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, soybeans 8, sugar 8, tofu 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, lumber 10, miso 10, newspapers 10, pots 10 |
+| $11-20 | cement 12, dried fish 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, beer 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, soy sauce 20, wool 20 |
+| $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, sake 25, stove tiles 25, copper 28, castings 30, vodka 30, wax 30, plastics 40, rubber 40, tea 40, wine 40 |
 | $41-200 | coffee 50, furniture 60, porcelain 60, clothes 70, steel 80, shoes 100, electronics 120, goods 120, guns 150, tools 160, machinery 180 |
 | over $200 | appliances 300, incense 300, luxury goods 300, gold 800, diamonds 2,000, cars 5,000, tanks 8,000, planes 1.2e+04 |
 <!-- end table -->

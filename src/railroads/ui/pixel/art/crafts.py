@@ -259,3 +259,76 @@ def hospital() -> Sprite:
     p.line([(8, -14), (8, -8)], METAL)
     p.rect(8, -14, 11, -12, (200, 40, 40))
     return p.sprite()
+
+
+# The dark timber, pale plaster and black tiles of the workshops of East Asia.
+DARK_TIMBER: RGB = (112, 82, 58)
+PLASTER: RGB = (236, 230, 214)
+BLACK_TILE: RGB = (58, 60, 68)
+
+
+def _vat(p: Painter, x: float, y: float, half: float = 2.5, tall: float = 4) -> None:
+    """A big wooden vat standing on (x, y), bound with two hoops of split bamboo."""
+    wood: RGB = (150, 104, 62)
+    p.rect(x - half, y - tall, x + half, y, wood)
+    p.ellipse(x - half, y - tall - 1, x + half, y - tall + 1, shade(wood, 0.62))
+    for drop in (1, tall - 1):
+        p.line([(x - half, y - drop), (x + half, y - drop)], (176, 160, 96))
+
+
+def soy_sauce_brewery() -> Sprite:
+    """A dark-timbered brewhouse under black tiles, with big hooped vats of soy mash at its side
+    and a cedar ball for a sign over its door."""
+    p = Painter(28, 26, (13, 19))
+    p.shadow(11, 3)
+    _shop(p, -2, 0, DARK_TIMBER, BLACK_TILE, (236, 226, 200))
+    _vat(p, 7, 4)
+    _vat(p, 10.5, 2, 2, 3.5)
+    p.blob(-6.5, -2.5, -4.5, -0.5, (96, 112, 52))
+    return p.sprite()
+
+
+def tofu_maker() -> Sprite:
+    """A small plastered tofu shop with a dark sign, steam rising from its chimney, and white
+    blocks of tofu soaking in a tub of water by its door."""
+    p = Painter(24, 24, (11, 18))
+    p.shadow(9, 2.5)
+    _shop(p, -1, 0, PLASTER, BLACK_TILE, (60, 50, 44))
+    p.blob(3, -13, 6, -10, (232, 234, 238))
+    p.blob(4, -16, 7, -13, (220, 222, 228))
+    tub: RGB = (150, 104, 62)
+    p.ellipse(-10, 1, -4, 4, tub)
+    p.ellipse(-9, 1.4, -5, 3.2, (150, 196, 220))
+    for x in (-8.2, -6.6):
+        p.rect(x, 1.8, x + 1, 2.6, (250, 248, 238))
+    return p.sprite()
+
+
+def miso_maker() -> Sprite:
+    """A plastered storehouse on a dark skirt where miso ripens, its tubs of it weighted down
+    with stones outside and a sack of rice by the door."""
+    p = Painter(26, 24, (12, 18))
+    p.shadow(10, 2.5)
+    _shop(p, -1, 0, PLASTER, BLACK_TILE, (150, 104, 62))
+    for x, y in ((-9, 3), (-5.5, 4.5)):
+        _vat(p, x, y, 2, 2.5)
+        p.blob(x - 1.2, y - 4, x + 1.2, y - 2.4, (150, 150, 146))
+    p.ellipse(7, 2, 10, 5, (226, 216, 190))
+    return p.sprite()
+
+
+def fish_dryer() -> Sprite:
+    """A boarded shed by the shore with racks of split fish hung out to dry on poles before it."""
+    p = Painter(28, 22, (13, 16))
+    p.shadow(11, 2.5)
+    _shop(p, 3, -1, (140, 110, 80), SLATE, (110, 140, 170))
+    pole: RGB = (120, 84, 50)
+    fish: RGB = (190, 196, 200)
+    for x0, y0 in ((-12, 0), (-6, 3)):
+        p.line([(x0, y0), (x0, y0 - 6)], pole)
+        p.line([(x0 + 5, y0 + 2.5), (x0 + 5, y0 - 3.5)], pole)
+        p.line([(x0, y0 - 6), (x0 + 5, y0 - 3.5)], shade(pole, 1.2))
+        for k in range(4):
+            fx, fy = x0 + 0.8 + 1.2 * k, y0 - 5.4 + 0.6 * k
+            p.line([(fx, fy), (fx, fy + 2.4)], fish if k % 2 else shade(fish, 0.8))
+    return p.sprite()

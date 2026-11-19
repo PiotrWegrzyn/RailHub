@@ -101,6 +101,11 @@ VANS: dict[Good, tuple[RGB, RGB]] = {
     Good.BEER: ((150, 96, 40), (240, 190, 70)),
     Good.VODKA: ((210, 214, 220), (60, 90, 170)),
     Good.SAKE: ((200, 170, 120), (190, 40, 40)),
+    Good.SOY_SAUCE: ((92, 56, 40), (196, 46, 40)),
+    Good.TOFU: ((226, 226, 220), (120, 160, 196)),
+    Good.MISO: ((170, 120, 70), (230, 210, 160)),
+    Good.TEA: ((96, 130, 70), (210, 220, 160)),
+    Good.DRIED_FISH: ((150, 140, 116), (200, 206, 210)),
     Good.LEATHER: ((120, 80, 48), (190, 140, 90)),
     Good.SHOES: ((82, 52, 38), (200, 160, 110)),
     Good.CATTLE: ((132, 88, 56), (220, 200, 170)),
@@ -1898,7 +1903,7 @@ def _boxcar(m: Model, good: Good, full: bool) -> None:
 
 def _grain_hopper(m: Model, good: Good, full: bool) -> None:
     h = CAR_HALF
-    body = GRAIN_HOPPER if good in (Good.WHEAT, Good.RICE) else SUGAR_HOPPER
+    body = GRAIN_HOPPER if good in (Good.WHEAT, Good.RICE, Good.SOYBEANS) else SUGAR_HOPPER
     m.body((-h, h), (-0.08, 0.08), (0.06, 0.2), body)
     m.panel((-h + 0.02, h - 0.02), (0.08, 0.18), 0.0805, shade(body, 0.85))
     if good == Good.SUGAR:
@@ -2097,6 +2102,7 @@ CAR_BODIES: dict[Good, CarBody] = {
     Good.WHEAT: _grain_hopper,
     Good.SUGAR: _grain_hopper,
     Good.RICE: _grain_hopper,
+    Good.SOYBEANS: _grain_hopper,
     Good.APPLES: _fruit_wagon,
     Good.DATES: _fruit_wagon,
     Good.ORANGES: _fruit_wagon,

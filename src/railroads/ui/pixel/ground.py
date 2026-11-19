@@ -131,6 +131,7 @@ GROVES: dict[BuildingKind, Grove] = {
     BuildingKind.PIG_FARM: Grove((140, 150, 90), (120, 92, 60), ((226, 160, 156),), 4, 0.24),
     BuildingKind.CHICKEN_FARM: Grove((150, 176, 90), (196, 170, 110), ((244, 240, 230),), 5, 0.2),
     BuildingKind.HOP_GARDEN: Grove((150, 140, 96), (72, 132, 50), ((170, 214, 110),), 7, 0.34),
+    BuildingKind.TEA_PLANTATION: Grove((128, 150, 80), (56, 120, 52), ((120, 176, 80),), 6, 0.3),
 }
 
 
@@ -140,6 +141,7 @@ CROP_ROWS: dict[BuildingKind, tuple[RGB, RGB]] = {
     BuildingKind.COTTON_FIELD: ((238, 236, 226), (150, 172, 100)),
     BuildingKind.POTATO_FARM: ((150, 120, 80), (96, 140, 64)),
     BuildingKind.RICE_PADDY: ((112, 184, 72), (104, 150, 170)),
+    BuildingKind.SOY_FIELD: ((104, 156, 62), (134, 108, 72)),
     BuildingKind.FLAX_FIELD: ((140, 166, 226), (130, 160, 90)),
 }
 

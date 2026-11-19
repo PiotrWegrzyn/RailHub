@@ -52,6 +52,7 @@ BULK_CAR_GOODS = frozenset(
         Good.BREAD,
         Good.POTATOES,
         Good.RICE,
+        Good.SOYBEANS,
         Good.APPLES,
         Good.ORANGES,
         Good.BANANAS,
