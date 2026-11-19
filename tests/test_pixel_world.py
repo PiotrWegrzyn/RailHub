@@ -69,7 +69,7 @@ def make_world(sheet: SpriteSheet, grid_type: type[Grid] = HexGrid, houses: int 
     constructions = Constructions(tile_map)
     for _ in range(houses):
         constructions.build(Building((10, 4), BuildingKind.HOUSE))
-    constructions.build(Building((4, 8), BuildingKind.LUMBER_MILL))
+    constructions.build(Building((4, 8), BuildingKind.LOGGING_CAMP))
     constructions.build(Building((12, 3), BuildingKind.FARM))
     return PixelWorld(tile_map, constructions, sheet, *LOOKS[grid_type])
 
@@ -283,13 +283,13 @@ def test_woods_clear_round_what_is_built_in_them(sheet: SpriteSheet) -> None:
     assert (factory == 1).all()
 
 
-def test_a_lumber_mill_stands_in_a_small_clearing_with_woods_round_it_in_its_cell(
+def test_a_logging_camp_stands_in_a_small_clearing_with_woods_round_it_in_its_cell(
     sheet: SpriteSheet,
 ) -> None:
     world = make_world(sheet, houses=0)
     grid = world.tile_map.grid
-    mill = Building((4, 8), BuildingKind.LUMBER_MILL)
-    sawmill = world.scenery.sprite == sheet.index("lumber_mill")
+    mill = Building((4, 8), BuildingKind.LOGGING_CAMP)
+    sawmill = world.scenery.sprite == sheet.index("logging_camp")
     x, y = world.scenery.x[sawmill][0], world.scenery.y[sawmill][0]
 
     canvas, left, top = canopy_round(world, mill.cell)
@@ -303,7 +303,7 @@ def test_a_lumber_mill_stands_in_a_small_clearing_with_woods_round_it_in_its_cel
     assert wooded[in_cell].mean() > 0.6
 
 
-def test_a_lumber_mill_keeps_woods_in_its_cell_after_the_forest_there_is_cleared(
+def test_a_logging_camp_keeps_woods_in_its_cell_after_the_forest_there_is_cleared(
     sheet: SpriteSheet,
 ) -> None:
     world = make_world(sheet, houses=0)
@@ -326,7 +326,7 @@ def test_every_building_gets_its_sprite(sheet: SpriteSheet) -> None:
     names = [sheet.names[i] for i in scenery.sprite]
 
     assert sum(name.startswith("house_") for name in names) == 3
-    assert names.count("lumber_mill") == 1
+    assert names.count("logging_camp") == 1
     assert names.count("farm") == 1
 
 

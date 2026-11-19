@@ -712,7 +712,7 @@ DIGGINGS = (
     "clay_pit",
     "limestone_quarry",
     "sand_pit",
-    "lumber_mill",
+    "logging_camp",
     "outpost",
     "base",
 )

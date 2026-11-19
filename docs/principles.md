@@ -84,6 +84,10 @@ The ideas every rule of the game should follow, the most important first.
   short, well-managed trains pay.
 - A home that grows wants more of everything: its reward for growing is that it uses more.
 - A bonus input raises output but never replaces the main input.
+- Raw goods are worked before buildings use them: logging camps fell logs, and only a sawmill's
+  planks and wood chips go to other buildings. Homes and wood-burning engines burn logs as they are.
+- A boost of a works either makes more from the same inputs or lets it take in more of them, as
+  machinery and diesel let a sawmill saw more logs, still a plank from every log.
 - Hard chains, with many inputs, make few but valuable goods.
 - Works grow by merging: three food makers of a kind become a big one and three big ones a mega
   one; the harder processors merge two at a time.
@@ -180,7 +184,7 @@ The ideas every rule of the game should follow, the most important first.
 - Of what is underground, only the entrances are drawn: tunnel portals.
 - The perspective is consistent, as in Railroad Tycoon 2: track lies under the trees and stations
   stand turned along their track. The art is our own.
-- A building stands on the land it works with: a lumber mill among trees.
+- A building stands on the land it works with: a logging camp among trees.
 - Every kind of building is recognisable at a glance and never looks like a house or like another
   kind.
 - Big and mega works have their own look, the same trade grown grander; a mega one is spectacular.

@@ -25,7 +25,7 @@ TRACKS = ((0.64, 1, 18.0, 0.55), (0.685, 1, 24.0, 0.75), (0.735, 1, 32.0, 1.0))
 GOODS = (
     Good.WHEAT,
     Good.COAL,
-    Good.LUMBER,
+    Good.LOGS,
     Good.IRON,
     Good.STEEL,
     Good.CATTLE,

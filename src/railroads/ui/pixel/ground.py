@@ -381,10 +381,10 @@ FLOOR_FROM = 0.8
 BARE_ABOVE = 0.3
 BARE_MARGIN = 1e-4
 CLEARING = -4.0
-# Lumber mills stand in the woods: their cells keep their trees, but for a small clearing round
+# Logging camps stand in the woods: their cells keep their trees, but for a small clearing round
 # the mill itself, MILL_CLEARING of its yard's reach across and half that down, its edge frayed,
 # its middle CLEARING_DROP art pixels in front of the mill so its yard shows below it.
-IN_THE_WOODS = (BuildingKind.LUMBER_MILL,)
+IN_THE_WOODS = (BuildingKind.LOGGING_CAMP,)
 MILL_CLEARING = 1.2
 CLEARING_DROP = 3.0
 # Where the woods' share of the ground is worked out around each point: the point itself and six
@@ -472,7 +472,7 @@ class Ground:
             np.zeros(0, dtype=str),
             np.zeros(0),
         )
-        # Where lumber mills stand in the picture and how far the clearing round each reaches.
+        # Where logging camps stand in the picture and how far the clearing round each reaches.
         self.clearings: tuple[FloatArray, FloatArray, FloatArray] = (
             np.zeros(0),
             np.zeros(0),
@@ -498,7 +498,7 @@ class Ground:
                 woodland[construction.cell] = True
             else:
                 built[construction.cell] = True
-        # Each cell's say in whether woods cover a point near it: 1 for woods and lumber mills,
+        # Each cell's say in whether woods cover a point near it: 1 for woods and logging camps,
         # 0 for open land, and CLEARING where anything else is built, so the woods give it room.
         woods = np.isin(self._biomes, WOODS) | woodland
         self._woods = np.where(built, CLEARING, woods).astype(np.float32)
@@ -1201,7 +1201,7 @@ class Ground:
         return -(gx * CROWN_LIGHT[0] + gy * CROWN_LIGHT[1]) * CANOPY_SWELL * CANOPY_SWELL_SIZE
 
     def _clear_round_mills(self, woods: BoolArray, block: tuple[int, int, int, int]) -> None:
-        """Takes the woods out of the clearing round each lumber mill in the block, an oval
+        """Takes the woods out of the clearing round each logging camp in the block, an oval
         frayed at its edge like a yard's."""
         left, top = block[0], block[1]
         rows, cols = woods.shape

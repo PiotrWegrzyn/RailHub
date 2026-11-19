@@ -357,7 +357,7 @@ class Railway:
         return burnt.burn * cells * price * self._upkeep()
 
     def _take_fuel(self, train: Train, station: Cell, cells: float) -> None:
-        """Buys what a train setting off burns on the way to its next stop: coal, wood (lumber) or
+        """Buys what a train setting off burns on the way to its next stop: coal, wood (logs) or
         diesel fuel out of the station's stockpile first, at the market price, the rest at retail."""
         engine = ENGINES[train.engine]
         fuel = fuel_of(engine)

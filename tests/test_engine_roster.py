@@ -317,7 +317,7 @@ def test_a_full_bulk_car_weighs_as_many_times_as_much_as_it_holds_more() -> None
     assert weights == (pytest.approx(BULK_CAR / CAR_CAPACITY * FULL_LOAD), pytest.approx(FULL_LOAD))
 
 
-@pytest.mark.parametrize("good", [Good.WHEAT, Good.IRON, Good.APPLES, Good.COAL, Good.LUMBER])
+@pytest.mark.parametrize("good", [Good.WHEAT, Good.IRON, Good.APPLES, Good.COAL, Good.PLANKS])
 def test_grain_ore_apples_and_other_bulk_goods_go_two_car_sizes_up(good: Good) -> None:
     size = car_size(good)
 

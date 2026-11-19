@@ -65,7 +65,9 @@ BULK_CAR_GOODS = frozenset(
         Good.CLAY,
         Good.LIMESTONE,
         Good.SALT,
-        Good.LUMBER,
+        Good.LOGS,
+        Good.PLANKS,
+        Good.WOOD_CHIPS,
     }
 )
 # Goods carried in small or medium cars; everything else but passengers goes CAR_CAPACITY to a car.
@@ -217,7 +219,7 @@ class Engine:
     # only call at stops that near each other; 0 for electric and maglev engines, which run as
     # far as the wires or guideway go.
     tank: float = 0.0
-    # Whether it burns wood (lumber) instead of coal, as American engines did while forests
+    # Whether it burns wood (logs) instead of coal, as American engines did while forests
     # were near and coal far.
     wood: bool = False
 

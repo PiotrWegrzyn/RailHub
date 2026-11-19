@@ -51,7 +51,7 @@ USES: Mapping[Facility, tuple[Good, float]] = MappingProxyType(
         Facility.SAND_TOWER: (Good.SAND, SAND_A_MONTH),
         Facility.POST_OFFICE: (Good.PAPER, 10.0),
         Facility.REFRESHMENT_ROOM: (Good.BEER, 30.0),
-        Facility.MARKET_HALL: (Good.LUMBER, 20.0),
+        Facility.MARKET_HALL: (Good.PLANKS, 20.0),
         Facility.CATTLE_PENS: (Good.WHEAT, 30.0),
         Facility.WAREHOUSE: (Good.BRICKS, 20.0),
     }

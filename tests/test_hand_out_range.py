@@ -24,7 +24,7 @@ def test_a_farm_reaches_the_houses_up_to_six_hexes_away_and_no_further() -> None
 
 
 def test_buildings_that_need_nothing_a_cell_makes_are_not_consumers() -> None:
-    constructions = built(((10, 4), BuildingKind.FARM), ((10, 6), BuildingKind.LUMBER_MILL))
+    constructions = built(((10, 4), BuildingKind.FARM), ((10, 6), BuildingKind.LOGGING_CAMP))
 
     consumers = consumers_in_reach(constructions, (10, 4), 1850)
 

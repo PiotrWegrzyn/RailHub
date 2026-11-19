@@ -2,7 +2,8 @@
 how satisfied that leaves each kind of building in each cell.
 
 Each processor keeps a stockpile of up to INPUT_STOCK of every input for every building, taking in
-what reaches it even while it waits for another input, and works from it.
+what reaches it even while it waits for another input, and works from it; of a boost that lets it
+take in more, only BOOST_STOCK_MONTHS of it.
 
 Buildings hand out what they make on their own first, everywhere on the map (LOCAL_REACH): every
 cell's spare goods go first to the buildings in the same cell, then to those one cell away, and so
@@ -59,6 +60,7 @@ from railroads.sim.goods import (
     BOOST_MOST,
     HANDED_OUT,
     HOMES,
+    KIND_BOOST_MOST,
     LAND_BOOST_MOST,
     MAKES,
     NEEDS,
@@ -109,14 +111,19 @@ def reach_share(away: int) -> float:
 STEP_SECONDS = 0.008
 
 # The most of each input a processor keeps in stock, for every building; a big or mega works
-# keeps as much more as it makes (input_stock).
+# keeps as much more as it makes (input_stock). Of a boost that lets it take in more
+# (takes_more) it keeps only BOOST_STOCK_MONTHS of what it uses at most.
 INPUT_STOCK = 300.0
+BOOST_STOCK_MONTHS = 3.0
 
 
 @cache
-def input_stock(kind: BuildingKind) -> float:
-    """The most of each input one processor of a kind keeps in stock."""
-    return INPUT_STOCK * RECIPES[kind].most / RECIPES[GREW_FROM.get(kind, kind)].most
+def input_stock(kind: BuildingKind, need: Need | None = None) -> float:
+    """The most of an input one processor of a kind keeps in stock."""
+    recipe = RECIPES[kind]
+    if need in recipe.takes_more:
+        return BOOST_STOCK_MONTHS * recipe.most * recipe.boosts[need]
+    return INPUT_STOCK * recipe.most / RECIPES[GREW_FROM.get(kind, kind)].most
 
 
 # How much each bonus good a building gets all of adds to its satisfaction.
@@ -601,7 +608,7 @@ class _Month:
         self.stock = {
             (kind, need): np.minimum(
                 economy.stock[(kind, need)][cells],
-                input_stock(kind) * self.count.get(kind, self.zero),
+                input_stock(kind, need) * self.count.get(kind, self.zero),
             )
             if (kind, need) in economy.stock
             else np.zeros(cells.size)
@@ -630,7 +637,9 @@ class _Month:
             if need not in self.wanted[kind]:
                 continue
             if kind in RECIPES:
-                wants[kind] = np.maximum(input_stock(kind) * n - self.stock[(kind, need)], 0.0)
+                wants[kind] = np.maximum(
+                    input_stock(kind, need) * n - self.stock[(kind, need)], 0.0
+                )
             else:
                 wants[kind] = self._count_for(kind, need) * self._amount(kind, need)
         return wants
@@ -808,9 +817,10 @@ class _Month:
 
     def _boost_from_land(self, kind: BuildingKind, need: Need, got: FloatCells) -> None:
         """Lets what a kind making goods from the land got of one of its boosts make it make more
-        of each of its goods, before any of them is sold: up to its own LAND_BOOST_MOST more, or
-        its part of BOOST_MOST shared with the other boosts; a boost only the player's own take
-        makes only those make up to its OWNED_BOOSTS more, for the player."""
+        of each of its goods, before any of them is sold: up to its own KIND_BOOST_MOST or
+        LAND_BOOST_MOST more, or its part of BOOST_MOST shared with the other boosts; a boost only
+        the player's own take makes only those make up to its OWNED_BOOSTS more, for the
+        player."""
         boosts = boosts_of(kind, self.economy.year)
         if need not in boosts:
             return
@@ -820,10 +830,15 @@ class _Month:
         shared = [
             boost
             for boost in boosts
-            if boost not in LAND_BOOST_MOST and (kind, boost) not in OWNED_BOOSTS
+            if boost not in LAND_BOOST_MOST
+            and (kind, boost) not in KIND_BOOST_MOST
+            and (kind, boost) not in OWNED_BOOSTS
         ]
         most = OWNED_BOOSTS.get(
-            (kind, need), LAND_BOOST_MOST.get(need, BOOST_MOST / max(len(shared), 1))
+            (kind, need),
+            KIND_BOOST_MOST.get(
+                (kind, need), LAND_BOOST_MOST.get(need, BOOST_MOST / max(len(shared), 1))
+            ),
         )
         owned_only = (kind, need) in OWNED_BOOSTS
         for good, amount in makes_of(kind, self.economy.year).items():
@@ -958,15 +973,30 @@ class _Month:
 
     def _produce(self, kind: BuildingKind) -> None:
         """Offers what a kind of processor could make from its stockpile: what its inputs allow,
-        the inputs standing in for others first as they make the most, and up to the recipe's
-        boost_most more by the share it has of its boosts. Keeps how much of each input all of
-        that takes."""
+        the inputs standing in for others first as they make the most, within the room its
+        boosts that let it take in more give it (takes_more), and up to the recipe's boost_most
+        more by the share it has of its other boosts; and what that leaves over (also). Keeps
+        how much of each input all of that takes."""
         if kind not in self.count:
             return
         recipe = RECIPES[kind]
         year = self.economy.year
         inputs = recipe.inputs(year)
-        room = self.count[kind] * recipe.most
+        boosts = boosts_of(kind, year)
+        base = self.count[kind] * recipe.most
+        roomy = {
+            need: np.minimum(
+                self.stock[(kind, need)] / np.where(base > 0, base * recipe.boosts[need], 1.0),
+                1.0,
+            )
+            * (base > 0)
+            for need in boosts
+            if need in recipe.takes_more
+        }
+        room = base * (
+            1.0 + sum((recipe.takes_more[need] * share for need, share in roomy.items()), 0.0)
+        )
+        extra = room - base
         left = {need: self.stock[(kind, need)].copy() for need in inputs}
         uses = {need: self.zero.copy() for need in recipe.takes(year)}
         can = self.zero.copy()
@@ -988,7 +1018,11 @@ class _Month:
         for need, per_unit in inputs.items():
             uses[need] += plain * per_unit
         can += plain
-        boosts = boosts_of(kind, year)
+        if roomy:
+            used = np.clip((can - base) / np.where(extra > 0, extra, 1.0), 0.0, 1.0)
+            for need, share in roomy.items():
+                uses[need] = base * share * recipe.boosts[need] * used
+        boosts = {need: amount for need, amount in boosts.items() if need not in roomy}
         if boosts:
             shares = {
                 need: np.minimum(
@@ -1002,10 +1036,11 @@ class _Month:
                 uses[need] = can * share * recipe.boosts[need]
             can = can * (1.0 + recipe.boost_most * sum(shares.values()) / len(shares))
         self.uses[kind] = uses
-        self.offers[(kind, recipe.makes)] = can
-        self.offered[recipe.makes] += can
-        if kind in self.owned:
-            self.owned_made[(kind, recipe.makes)] = can * self._owned_part(kind)
+        for good, made in ((recipe.makes, can), *((g, can * a) for g, a in recipe.also.items())):
+            self.offers[(kind, good)] = made
+            self.offered[good] += made
+            if kind in self.owned:
+                self.owned_made[(kind, good)] = made * self._owned_part(kind)
 
     def _went(self, good: Good) -> FloatCells:
         """The share of all of a good on offer that went, to buildings or stations, in each
@@ -1061,7 +1096,7 @@ class _Month:
             gave[kind] += given
             could_make[kind] += most
             recipe = RECIPES.get(kind)
-            if recipe is not None:
+            if recipe is not None and good == recipe.makes:
                 went = np.where(offer > 0, sent / np.where(offer > 0, offer, 1.0), 0.0)
                 for need, amount in self.uses.get(kind, {}).items():
                     key = (kind, need)

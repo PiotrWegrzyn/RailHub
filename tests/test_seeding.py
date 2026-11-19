@@ -21,7 +21,7 @@ from railroads.sim.ladders import (
     FACTORIES,
     FARMS,
     GROWTH,
-    LUMBER_MILLS,
+    LOGGING_CAMPS,
     MINES,
     PORTS,
     TOWNS,
@@ -41,7 +41,7 @@ def busier(ladder: Ladder, times: float = 10) -> Ladder:
 
 # A small country grows the industry under test ten times as fast, and farms a hundred times, so
 # that each turns up in it often enough to judge where; towns grow as they always do.
-INDUSTRY = (busier(FARMS), MINES, LUMBER_MILLS, PORTS, FACTORIES)
+INDUSTRY = (busier(FARMS), MINES, LOGGING_CAMPS, PORTS, FACTORIES)
 BUSY = replace(GROWTH, ladders=(TOWNS, *(busier(ladder) for ladder in INDUSTRY)))
 
 
@@ -111,7 +111,7 @@ def test_seeding_grows_towns_and_the_industry_that_suits_the_land(history: Grown
         BuildingKind.HOUSE,
         BuildingKind.FARM,
         BuildingKind.MINE,
-        BuildingKind.LUMBER_MILL,
+        BuildingKind.LOGGING_CAMP,
     } <= kinds
 
 
@@ -135,14 +135,14 @@ def test_seeded_industry_mostly_goes_up_where_its_land_suits_it(
     assert np.mean(suited) > 0.9
 
 
-def test_seeded_lumber_mills_all_keep_enough_forest_around_them(history: Grown) -> None:
+def test_seeded_logging_camps_all_keep_enough_forest_around_them(history: Grown) -> None:
     country, grown = history
     tile_map = country.tile_map
     forests = forests_nearby(tile_map, Neighbourhoods(tile_map.grid).index)
 
-    mills = buildings_of(country, BuildingKind.LUMBER_MILL)
+    mills = buildings_of(country, BuildingKind.LOGGING_CAMP)
 
-    assert any(kind == BuildingKind.LUMBER_MILL for _, kind in grown)
+    assert any(kind == BuildingKind.LOGGING_CAMP for _, kind in grown)
     assert all(
         forests[np.ravel_multi_index(mill.cell, tile_map.grid.shape)] >= MILLS_CLOSE_BELOW
         for mill in mills

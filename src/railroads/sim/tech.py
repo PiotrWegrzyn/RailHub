@@ -340,7 +340,9 @@ _GOODS: Mapping[Tree, tuple[Good, ...]] = {
         Good.STOVE_TILES,
     ),
     Tree.CRAFT: (
-        Good.LUMBER,
+        Good.LOGS,
+        Good.PLANKS,
+        Good.WOOD_CHIPS,
         Good.WOOL,
         Good.COTTON,
         Good.FLAX,

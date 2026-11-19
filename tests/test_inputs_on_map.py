@@ -83,3 +83,15 @@ def test_a_yearly_top_up_puts_up_a_works_only_with_its_input_on_the_map(
     wineries = grown(later, *standing, months=12)
 
     assert wineries == topped_up
+
+
+(SAWMILLS,) = [ladder for ladder in LADDERS if ladder.kinds[0] == BuildingKind.SAWMILL]
+
+
+@pytest.mark.parametrize(("standing", "opens"), [((), False), ((BuildingKind.LOGGING_CAMP,), True)])
+def test_a_sawmill_opens_only_once_a_logging_camp_fells_logs_on_the_map(
+    standing: tuple[BuildingKind, ...], opens: bool
+) -> None:
+    sawmills = grown(replace(SAWMILLS, base_chance=50.0, merges={}), *standing)
+
+    assert (sawmills > 0) == opens

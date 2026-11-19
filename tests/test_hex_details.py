@@ -105,7 +105,7 @@ def test_a_tenement_must_have_half_its_food_common_goods_and_heating_and_takes_t
     assert all(flow.done == 0.0 for flow in [*tenement.got, *tenement.bonus_got])
 
 
-def test_a_factory_without_lumber_makes_none_of_the_most_it_could() -> None:
+def test_a_factory_without_planks_makes_none_of_the_most_it_could() -> None:
     constructions = Constructions(make_map())
     constructions.build(Building((5, 5), BuildingKind.FACTORY))
     growth = Growth(constructions)

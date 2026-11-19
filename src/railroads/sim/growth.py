@@ -1,5 +1,5 @@
 """The map grows by itself, a month at a time, like a cellular automaton, by the ladders of
-railroads.sim.ladders: towns, farms, orchards, mines, lumber mills, ports and every kind of works.
+railroads.sim.ladders: towns, farms, orchards, mines, logging camps, ports and every kind of works.
 
 Buildings breed (breeding_of): a cell's chance of another of a ladder's kinds is
 
@@ -44,7 +44,7 @@ cells, more or fewer by the land, put on any land they could stand on where none
 History happens too (railroads.sim.happenings): wars, crises and new things, a month at a time; in a war the
 military grows military_growth times as fast (railroads.sim.events).
 
-Forests come and go as well (railroads.sim.forests): people, industry and above all lumber mills
+Forests come and go as well (railroads.sim.forests): people, industry and above all logging camps
 clear them, they spread onto open grassland beside them, and the land weighs again wherever they
 changed.
 
