@@ -260,8 +260,8 @@ def test_the_player_controls_a_building_from_sixty_percent_of_its_shares(
     assert held == (controls, controls)
 
 
-@pytest.mark.parametrize(("shares", "worked"), [(300, 1.15), (500, 1.25), (600, 1.5), (1000, 1.5)])
-def test_production_tech_works_on_the_players_part_and_on_the_whole_once_they_control_it(
+@pytest.mark.parametrize(("shares", "worked"), [(300, 1.0), (500, 1.0), (600, 1.5), (1000, 1.5)])
+def test_production_tech_works_only_on_a_building_the_player_controls_and_on_all_of_it(
     shares: int, worked: float, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     growth = grown(((5, 5), BuildingKind.FARM))

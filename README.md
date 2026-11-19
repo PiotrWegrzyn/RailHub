@@ -891,9 +891,8 @@ was fully satisfied over the last quarter, two thirds of that at none and
 twice at 200%, and shares sell at the price they buy at, so raising a building's satisfaction
 raises what its shares fetch; shares can be sold only five years after they were bought, so the
 way to earn on them is to buy into a building that struggles and make it work. Tech cuts the price of shares by up to half. The
-player's production tech works on their part of a building, and on the whole of it once they
-hold 60% of its shares and control it; the boosts only the player's own take, limestone and
-machinery, work only on buildings they control, and then on the whole of them. Past 60%, more
+player's production tech and the boosts only their own take, limestone and machinery, work only
+on buildings they control, holding 60% of their shares, and then on the whole of them. Past 60%, more
 shares only raise their part of what it makes. Every cell where the player owns shares flies the flag of
 their company, The Trains Corp: a small one, or a big waving one where they control the
 buildings. A building never moves to another hex: one pulled down (a farm

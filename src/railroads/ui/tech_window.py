@@ -161,11 +161,16 @@ def _takes(node: Node) -> str:
 def explain(tree: Tree, node: Node) -> str:
     """What a node does, in a sentence: whose buildings or goods it reaches and how."""
     owned = "Every building you own" if node.everywhere else f"Every {tree.value} building you own"
+    controlled = (
+        "Every building you control"
+        if node.everywhere
+        else f"Every {tree.value} building you control"
+    )
     load = "Every load" if node.everywhere else f"Every load of {tree.value}"
     whose = "every building" if node.everywhere else f"every {tree.value} building"
     amount = f"{node.amount:.0%}"
     sentences = {
-        Effect.PRODUCTION: f"{owned} makes and takes in {amount} more.",
+        Effect.PRODUCTION: f"{controlled} makes and takes in {amount} more.",
         Effect.PRICE: f"{load} earns {amount} more.",
         Effect.STORAGE: f"Every station's stockpile holds {node.amount:g} more goods.",
         Effect.DISCOUNT: f"Shares of {whose} cost {amount} less.",

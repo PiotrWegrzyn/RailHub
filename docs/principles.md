@@ -44,8 +44,8 @@ The ideas every rule of the game should follow, the most important first.
 - A station not joined by track to another station gathers and hands out nothing.
 - The player can buy shares of buildings, a thousand to a building, traded 100, 200 or 600 at a
   time. With 60% of a building's shares the player controls it: their flag flies big over it and
-  their production tech works on all of it, not just their part, and only then does it take
-  limestone and machinery; more shares only raise their part. A whole
+  only then do their production tech, limestone and machinery work on it, on all of it; more
+  shares only raise their part. A whole
   building costs ten years of all it makes at full satisfaction, two thirds of that at none
   and twice at 200%, by how satisfied it was over the last quarter, and shares bought can be sold
   only five years later. The player's part of what it makes goes into the stations around it

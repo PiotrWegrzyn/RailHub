@@ -284,7 +284,7 @@ def test_production_nodes_reach_owned_buildings_and_discounts_every_share() -> N
     food = explain(Tree.FOOD, seed)
     everywhere = explain(Tree.COMMERCE, books)
 
-    assert food == "Every food and drink building you own makes and takes in 25% more."
+    assert food == "Every food and drink building you control makes and takes in 25% more."
     assert everywhere == "Shares of every building cost 10% less."
 
 
