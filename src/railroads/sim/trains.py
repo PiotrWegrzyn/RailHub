@@ -1,7 +1,7 @@
 """The trains on the railway (railroads.sim.railway runs them): the engines that can be bought, the
 cars, each carrying one good up to its car_size, the stops a train calls at with the cars it pulls
-from each, and the train itself, slowed by the weight of what it carries against the cars its
-engine is built to pull. Every engine costs a share of its price to run each month, by what drives
+from each, and the train itself, slowed by what its cars and their goods weigh against the most
+its engine pulls, in tonnes. Every engine costs a share of its price to run each month, by what drives
 it (RUNNING_SHARE). A train sets off from a stand and picks up speed evenly until it runs at full
 speed after its engine's pickup time, the Planet's twelve seconds at normal speed, a light
 engine's a few and a heavy or express engine's more. An express always leads its coaches with a dining car,
@@ -22,16 +22,6 @@ type Cargo = Good | General
 from railroads.sim.grids import Cell
 
 MAX_CARS = 5
-
-
-# A full car weighs this much more than an empty one, which counts 1; each car's weight slows the
-# train by DRAG_PER_CAR of the engine's speed alone, so six full cars still make about half of it.
-# That is for an engine built to pull MAX_CARS, like the Planet; one built to pull more is slowed
-# less by each car, in proportion.
-FULL_LOAD = 1.0
-
-
-DRAG_PER_CAR = 0.08
 
 
 # Cars come in sizes up the Fibonacci numbers, each holding about 1.6 times the one before; an
@@ -102,14 +92,6 @@ MEDIUM_CAR_GOODS = frozenset(
 )
 
 
-BULK_HEFT = BULK_CAR / CAR_CAPACITY
-
-
-def heft(good: Good) -> float:
-    """How many times as heavy as other full cars a full car of a good is."""
-    return BULK_HEFT if good in BULK_CAR_GOODS else 1.0
-
-
 def car_size(good: Good) -> float:
     """How much of a good one car carries, before what tech adds to coaches."""
     if good in BULK_CAR_GOODS:
@@ -133,6 +115,108 @@ def general_car_size(general: General, good: Good) -> float:
 def bigger(size: float, levels: int) -> float:
     """A car size `levels` sizes up CAR_SIZES."""
     return CAR_SIZES[min(CAR_SIZES.index(size) + levels, len(CAR_SIZES) - 1)]
+
+
+# How much bigger, and so heavier, each size up CAR_SIZES makes a car.
+CAR_GROWTH = CAR_SIZES[-1] / CAR_SIZES[-2]
+
+# What an empty car weighs, in tonnes: TARE_BASE and TARE_PER_PLACE for each unit it holds, so
+# an empty bulk car of 144 weighs 12 t and a mail van of 55 about 6 t.
+TARE_BASE = 2.0
+TARE_PER_PLACE = 0.07
+
+
+def tare(capacity: float) -> float:
+    """What an empty car holding `capacity` weighs, in tonnes."""
+    return TARE_BASE + TARE_PER_PLACE * capacity
+
+
+# What a unit of each good weighs, in tonnes; goods not listed weigh UNIT_TONNES. A full car of
+# coal weighs about 100 t, one of wheat about 30 t, a coach full of passengers about 10 t.
+UNIT_TONNES = 0.3
+ORE_TONNES = 0.6
+PRODUCE_TONNES = 0.12
+METAL_TONNES = 1.2
+BUILDING_TONNES = 1.0
+LIQUID_TONNES = 0.5
+ANIMAL_TONNES = 0.5
+FINE_TONNES = 0.5
+
+
+def _weighing(tonnes: float, *goods: Good) -> dict[Good, float]:
+    return dict.fromkeys(goods, tonnes)
+
+
+GOOD_TONNES: Mapping[Good, float] = MappingProxyType(
+    _weighing(ORE_TONNES, Good.COAL, Good.IRON, Good.SAND, Good.CLAY, Good.LIMESTONE, Good.SALT)
+    | _weighing(
+        PRODUCE_TONNES,
+        Good.WHEAT,
+        Good.POTATOES,
+        Good.APPLES,
+        Good.ORANGES,
+        Good.BANANAS,
+        Good.DATES,
+        Good.SUGAR,
+        Good.GRAPES,
+    )
+    | _weighing(
+        METAL_TONNES,
+        Good.STEEL,
+        Good.COPPER,
+        Good.CASTINGS,
+        Good.MACHINERY,
+        Good.TOOLS,
+        Good.GUNS,
+        Good.APPLIANCES,
+    )
+    | _weighing(
+        BUILDING_TONNES,
+        Good.BRICKS,
+        Good.CEMENT,
+        Good.GLASS,
+        Good.PORCELAIN,
+        Good.STOVE_TILES,
+        Good.POTS,
+    )
+    | _weighing(
+        LIQUID_TONNES,
+        Good.OIL,
+        Good.FUEL,
+        Good.GAS,
+        Good.CHEMICALS,
+        Good.MILK,
+        Good.WINE,
+        Good.BEER,
+        Good.VODKA,
+        Good.JUICE,
+    )
+    | _weighing(ANIMAL_TONNES, Good.CATTLE, Good.PIGS, Good.SHEEP, Good.CHICKENS)
+    | _weighing(
+        FINE_TONNES, Good.GOLD, Good.DIAMONDS, Good.LUXURIES, Good.INCENSE, Good.ELECTRONICS
+    )
+    | {
+        Good.LUMBER: 0.35,
+        Good.COKE: 0.6,
+        Good.FURNITURE: 0.5,
+        Good.BARRELS: 0.5,
+        Good.CARS: 1.5,
+        Good.PLANES: 2.5,
+        Good.TANKS: 3.0,
+        Good.PASSENGERS: 0.08,
+        Good.MAIL: 0.1,
+    }
+)
+
+
+def unit_tonnes(good: Good) -> float:
+    """What a unit of a good weighs, in tonnes."""
+    return GOOD_TONNES.get(good, UNIT_TONNES)
+
+
+def full_tonnes(good: Good, capacity: float) -> float:
+    """What a car holding `capacity` of a good weighs full, in tonnes."""
+    return tare(capacity) + capacity * unit_tonnes(good)
 
 
 # About how long an engine with its tender, and each car, are on the map, in cells.
@@ -165,9 +249,25 @@ class Power(Enum):
 
 # Speed 1 stands for this many km/h.
 KMH_PER_SPEED = 60.0
-# How much a load slows an engine of a kind, against the Planet: light engines the most, heavy
-# freight engines half as much.
-LOAD_DRAG = {Kind.LIGHT: 1.5, Kind.HEAVY: 0.5}
+# How many tonnes an engine of a kind pulls at most for each car it is built to pull, its cars
+# CAR_GROWTH times as much for each size up they are: the Planet 150 t, room for one full coal
+# car, and the first heavy freight engine 300 t, room for three.
+TONNES_PER_CAR = {
+    Kind.PIONEER: 40.0,
+    Kind.LIGHT: 35.0,
+    Kind.GENERAL: 50.0,
+    Kind.HEAVY: 75.0,
+    Kind.EXPRESS: 12.0,
+}
+# How much of its top speed an engine of a kind loses pulling as much as it can, and a share of
+# that for a share of it: half for most, less for heavy freight engines, more for light ones.
+SLOWDOWN = {
+    Kind.PIONEER: 0.5,
+    Kind.LIGHT: 0.6,
+    Kind.GENERAL: 0.5,
+    Kind.HEAVY: 0.3,
+    Kind.EXPRESS: 0.5,
+}
 # Passengers on an express pay this much more, and on a maglev MAGLEV_FARE times as much.
 EXPRESS_FARE = 1.2
 MAGLEV_FARE = 11.0
@@ -255,9 +355,13 @@ class Engine:
 
     @property
     def hauls(self) -> int:
-        """How many cars it is built to pull, the dining car included: a train of that many
-        full cars slows it as much as five full cars slow the Planet."""
+        """How many cars it is built to pull, the dining car included."""
         return self.cars + (1 if self.express else 0)
+
+    @property
+    def tonnes(self) -> float:
+        """The most it pulls, in tonnes, before what tech adds."""
+        return TONNES_PER_CAR[self.kind] * self.hauls * CAR_GROWTH**self.car_levels
 
 
 P, L, G, H, X = Kind.PIONEER, Kind.LIGHT, Kind.GENERAL, Kind.HEAVY, Kind.EXPRESS
@@ -513,6 +617,11 @@ class Car:
         """What a stop asks for to get this car: its kind of goods if it is general."""
         return self.general or self.good
 
+    @property
+    def tonnes(self) -> float:
+        """What it weighs now, in tonnes."""
+        return tare(self.capacity) + self.load * unit_tonnes(self.good)
+
     def fill(self, parcels: Parcels) -> None:
         for origin, amount in parcels.items():
             self.origins[origin] = self.origins.get(origin, 0.0) + amount
@@ -592,17 +701,9 @@ class Train:
         return carried
 
     @property
-    def weight(self) -> float:
-        """How heavy the cars are, in empty cars: an empty car weighs 1, a full one 1 + FULL_LOAD,
-        and a full bulk car 1 + FULL_LOAD * BULK_HEFT."""
-        return sum(1.0 + FULL_LOAD * heft(car.good) * car.load / car.capacity for car in self.cars)
-
-    @property
-    def pull(self) -> float:
-        """How much of the engine's top speed the train makes with its cars behind it."""
-        engine = ENGINES[self.engine]
-        drag = DRAG_PER_CAR * MAX_CARS / engine.hauls * LOAD_DRAG.get(engine.kind, 1.0)
-        return 1.0 / (1.0 + drag * self.weight)
+    def tonnes(self) -> float:
+        """What its cars weigh, in tonnes."""
+        return sum(car.tonnes for car in self.cars)
 
     @property
     def full(self) -> bool:

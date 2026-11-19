@@ -75,17 +75,19 @@ from railroads.sim.fuel_market import (
     fuel_of,
     signals_of,
 )
-from railroads.sim.goods import TRAVELLERS, General, Good, Need
+from railroads.sim.goods import GENERAL_GOODS, TRAVELLERS, General, Good, Need
 from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
 from railroads.sim.tech import GENERAL_CARS, GOOD_TREES, Effect, Research
 from railroads.sim.track_network import TrackNetwork
 from railroads.sim.trains import (
+    CAR_GROWTH,
     ENGINES,
     EXPRESS_FARE,
     FIRST_ENGINE,
     MAGLEV_FARE,
+    SLOWDOWN,
     Cargo,
     Point,
     Power,
@@ -93,7 +95,9 @@ from railroads.sim.trains import (
     Train,
     bigger,
     car_size,
+    full_tonnes,
     general_car_size,
+    tare,
 )
 
 if TYPE_CHECKING:
@@ -274,6 +278,42 @@ class Railway:
     def most_cars(self, train: Train) -> int:
         """How many cars a train's engine pulls, with what tech adds."""
         return ENGINES[train.engine].cars + int(self.research.bonus(Effect.PULL))
+
+    def max_pull(self, engine: str) -> float:
+        """The most an engine pulls, in tonnes, with what tech adds: as much more as the cars
+        it adds (Effect.PULL), and as their cars grow (Effect.CAR_SIZE)."""
+        built = ENGINES[engine]
+        extra = int(self.research.bonus(Effect.PULL))
+        levels = int(self.research.bonus(Effect.CAR_SIZE))
+        return built.tonnes * (built.hauls + extra) / built.hauls * CAR_GROWTH**levels
+
+    def pull(self, train: Train) -> float:
+        """How much of its engine's top speed a train makes with its cars behind it: all of it
+        with none, losing the engine's SLOWDOWN as their weight nears the most it pulls."""
+        engine = ENGINES[train.engine]
+        share = min(1.0, train.tonnes / self.max_pull(train.engine))
+        return 1.0 - SLOWDOWN[engine.kind] * share
+
+    def car_tonnes(self, cargo: Cargo, engine: str) -> float:
+        """What a full car for some cargo weighs behind an engine, in tonnes; a general car
+        as much as the heaviest of its goods would."""
+        goods = GENERAL_GOODS[cargo] if isinstance(cargo, General) else (cargo,)
+        general = cargo if isinstance(cargo, General) else None
+        return max(full_tonnes(good, self.car_capacity(good, engine, general)) for good in goods)
+
+    def stop_tonnes(self, train: Train, stop: Stop) -> float:
+        """What a train would weigh leaving a stop with every one of its cars full, in tonnes,
+        an express's dining car included."""
+        dining = tare(car_size(Good.PASSENGERS)) if ENGINES[train.engine].express else 0.0
+        return dining + sum(self.car_tonnes(cargo, train.engine) for cargo in stop.cars)
+
+    def add_car(self, train: Train, stop: Stop, cargo: Cargo) -> bool:
+        """Adds a car for some cargo to a stop's if the engine has room for one more and can
+        still pull them all full; False if not."""
+        heavier = self.stop_tonnes(train, stop) + self.car_tonnes(cargo, train.engine)
+        if heavier > self.max_pull(train.engine) + 1e-9:
+            return False
+        return stop.add_car(cargo, self.most_cars(train))
 
     def fuel_markup(self) -> float:
         """How much more fuel costs bought anywhere but out of a station's stockpile, with the
@@ -587,7 +627,9 @@ class Railway:
         speed = engine.speed * (1.0 + self.research.bonus(Effect.SPEED)) * pace
         if train.fuelled:
             speed *= ENGINE_SHED_SPEED
-        train.along += months * CELLS_PER_MONTH * self.network.speed_at(train) * train.pull * speed
+        train.along += (
+            months * CELLS_PER_MONTH * self.network.speed_at(train) * self.pull(train) * speed
+        )
         train.status = "Running"
         if train.along >= self.network.length(train):
             train.platform = self.network.cell_at(train.path[-1])

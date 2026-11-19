@@ -17,7 +17,16 @@ from railroads.sim.finance import TRAIN_RESALE, dollars
 from railroads.sim.goods import GENERAL_GOODS, General, Good
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
-from railroads.sim.trains import ENGINES, EXPRESS_FARE, MAGLEV_FARE, Engine, Kind, Stop, Train
+from railroads.sim.trains import (
+    ENGINES,
+    EXPRESS_FARE,
+    MAGLEV_FARE,
+    SLOWDOWN,
+    Engine,
+    Kind,
+    Stop,
+    Train,
+)
 from railroads.ui.buy_train import BuyScreen, EnginePicture, engine_range, fuel_use
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at
@@ -27,6 +36,8 @@ from railroads.ui.theme import (
     CARDS_WIDTH,
     OFFER_SIZE,
     TEXT_DIM,
+    caption_room,
+    caption_under,
     car_chip,
     color_u32,
     danger_button,
@@ -228,13 +239,15 @@ class TrainsWindow:
             imgui.same_line(0, 4 if index else 12)
             if car.dining:
                 dining_chip(f"pulled{index}", "Dining car: carries nothing, costs its trips")
+                caption_under(f"{car.tonnes:.0f} t")
                 continue
-            tooltip = f"{car.good.value}: {car.load:.0f}/{car.capacity:.0f}"
+            tooltip = f"{car.good.value}: {car.load:.0f}/{car.capacity:.0f}, {car.tonnes:.0f} t"
             if car.general is not None:
                 tooltip = f"{car.general.value} car, now {tooltip}"
             if destination is not None and car.load >= 0.5:
                 tooltip += f"\nWorth about {dollars(worth)} at {onward}"
             car_chip(f"pulled{index}", car.good, car.load, tooltip, car.capacity)
+            caption_under(f"{car.tonnes:.0f} t")
         if destination is not None and any(car.load >= 0.5 for car in train.cars):
             imgui.same_line(0, 14)
             imgui.text_colored(imgui.ImVec4(*BRASS), f"worth about {dollars(sum(worths))}")
@@ -246,6 +259,10 @@ class TrainsWindow:
                 )
             imgui.same_line()
             imgui.text_disabled(f"at {onward}")
+        if train.cars:
+            imgui.same_line(0, 14)
+            draw_tonnage(railway, train)
+            caption_room()
         imgui.spacing()
         route_map.good = None
         self._shown_map = route_map
@@ -368,7 +385,10 @@ class TrainsWindow:
             else:
                 size = railway.car_capacity(cargo, train.engine)
                 tooltip = f"{cargo.value} car of {size:.0f} - click to remove"
+            tonnes = railway.car_tonnes(cargo, train.engine)
+            tooltip += f"\nWeighs {tonnes:.0f} t full"
             removed = car_chip(f"car{car_index}", cargo, tooltip=tooltip)
+            caption_under(f"{tonnes:.0f} t")
             if imgui.is_item_hovered() and isinstance(cargo, Good):
                 self._shown_map.good = cargo
             if removed:
@@ -383,6 +403,15 @@ class TrainsWindow:
             if imgui.small_button("Clear"):
                 stop.cars.clear()
                 train.cars_changed(index)
+            imgui.same_line(0, 10)
+            planned = railway.stop_tonnes(train, stop)
+            imgui.text_disabled(f"{planned:.0f} / {railway.max_pull(train.engine):.0f} t full")
+            if imgui.is_item_hovered():
+                imgui.set_tooltip(
+                    "What these cars weigh full, against the most its engine pulls;\n"
+                    f"full, it runs at {speed_share(railway, train, planned):.0%} of its top speed"
+                )
+            caption_room()
 
     def _draw_offers(
         self,
@@ -413,6 +442,11 @@ class TrainsWindow:
             return
         most = railway.most_cars(train)
         full = len(stop.cars) >= most
+        spare = railway.max_pull(train.engine) - railway.stop_tonnes(train, stop)
+
+        def fits(cargo: Good | General) -> bool:
+            return railway.car_tonnes(cargo, train.engine) <= spare + 1e-9
+
         offers.sort(key=lambda o: (-(demand.monthly_want(o.good) > 0), -o.waiting, -o.made))
         left = imgui.get_cursor_pos_x()
         per_row = max(1, int(imgui.get_content_region_avail().x // (OFFER_SIZE[0] + 4)))
@@ -422,15 +456,16 @@ class TrainsWindow:
             elif number:
                 imgui.set_cursor_pos_x(left)
             wanted = demand.monthly_want(offer.good) > 0
+            blocked = full or not fits(offer.good)
             tip = (
                 f"{offer.good.value}: {offer.waiting:.0f} waiting, about {offer.made:.0f} a month"
                 + (" - comes in on this train" if offer.good in carried else "")
                 + (" - wanted at the next stop" if wanted else "")
-                + ("\nThe train is full: remove a car first" if full else "\nClick to add a car")
+                + adding_tip(full, railway.car_tonnes(offer.good, train.engine), spare)
             )
-            imgui.begin_disabled(full)
+            imgui.begin_disabled(blocked)
             if offer_chip(f"offer{number}", offer.good, f"{offer.waiting:.0f}", wanted, tip):
-                stop.add_car(offer.good, most)
+                railway.add_car(train, stop, offer.good)
                 train.cars_changed(index)
             if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
                 self._shown_map.good = offer.good
@@ -444,13 +479,44 @@ class TrainsWindow:
             tip = (
                 f"{general.value}: a car that takes whichever of its goods pays best at the "
                 f"next stop; {waiting:.0f} of them waiting here"
-                + ("\nThe train is full: remove a car first" if full else "\nClick to add a car")
+                + adding_tip(full, railway.car_tonnes(general, train.engine), spare)
             )
-            imgui.begin_disabled(full)
+            imgui.begin_disabled(full or not fits(general))
             if offer_chip(f"general{number}", general, f"{waiting:.0f}", waiting > 0, tip):
-                stop.add_car(general, most)
+                railway.add_car(train, stop, general)
                 train.cars_changed(index)
             imgui.end_disabled()
+
+
+def speed_share(railway: Railway, train: Train, tonnes: float) -> float:
+    """How much of its engine's top speed a train makes pulling `tonnes`."""
+    most = railway.max_pull(train.engine)
+    return 1.0 - SLOWDOWN[ENGINES[train.engine].kind] * min(1.0, tonnes / most)
+
+
+def draw_tonnage(railway: Railway, train: Train) -> None:
+    """What a train's cars weigh now against the most its engine pulls, and how fast that lets
+    it run."""
+    most = railway.max_pull(train.engine)
+    imgui.text_disabled(f"{train.tonnes:.0f} / {most:.0f} t")
+    if imgui.is_item_hovered():
+        imgui.set_tooltip(
+            f"What its cars weigh now, against the most its engine pulls;\nit runs at "
+            f"{railway.pull(train):.0%} of its top speed, "
+            f"{speed_share(railway, train, most):.0%} pulling the most"
+        )
+
+
+def adding_tip(full: bool, tonnes: float, spare: float) -> str:
+    """The last line of a good's tooltip on a stop card: whether a car of it can be added."""
+    if full:
+        return "\nThe train is full: remove a car first"
+    if tonnes > spare + 1e-9:
+        return (
+            f"\nToo heavy: a full car weighs {tonnes:.0f} t and the engine pulls only "
+            f"{max(0.0, spare):.0f} t more"
+        )
+    return f"\nClick to add a car, {tonnes:.0f} t full"
 
 
 def upgrade_button(railway: Railway, train: Train) -> None:
@@ -522,6 +588,7 @@ def engine_summary(engine: Engine, per_cell: float | None = None) -> str:
     cars = f"{engine.cars} coaches and a dining car" if engine.express else f"{engine.cars} cars"
     lines = [
         f"{engine.year}, {engine.power.value}: {engine.kmh:.0f} km/h, pulls up to {cars}",
+        f"Pulls at most {engine.tonnes:.0f} t, {SLOWDOWN[engine.kind]:.0%} slower at that",
         f"Up to speed in {engine.pickup:g} s",
         f"Burns {fuel_use(engine, per_cell)}",
         f"Range: {engine_range(engine)}",

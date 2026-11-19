@@ -329,6 +329,25 @@ def car_chip(
     return clicked
 
 
+# How big a caption under a chip is, against the font.
+CAPTION_SCALE = 0.72
+
+
+def caption_under(text: str) -> None:
+    """Writes `text` small and dim, centred under the item just drawn; the line under it needs
+    caption_room() of room for it."""
+    low, high = imgui.get_item_rect_min(), imgui.get_item_rect_max()
+    size = imgui.get_font_size() * CAPTION_SCALE
+    width = imgui.calc_text_size(text).x * CAPTION_SCALE
+    corner = (low.x + (high.x - low.x - width) / 2, high.y + 1)
+    imgui.get_window_draw_list().add_text(imgui.get_font(), size, corner, color_u32(TEXT_DIM), text)
+
+
+def caption_room() -> None:
+    """Leaves room under a line of chips for their captions."""
+    imgui.dummy((0, imgui.get_font_size() * CAPTION_SCALE - imgui.get_style().item_spacing.y + 2))
+
+
 def dining_chip(key: str, tooltip: str = "") -> None:
     """An express's dining car as a chip like car_chip's, with a cup on it."""
     _, draw_list, low, high = _chip(key)

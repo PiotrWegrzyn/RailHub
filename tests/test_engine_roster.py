@@ -5,7 +5,7 @@ import pytest
 from builders import flat_map
 from railroads.sim.constructions import Constructions
 from railroads.sim.finance import CAR_TRIP_PRICE, TRAIN_RESALE
-from railroads.sim.goods import Good, Need
+from railroads.sim.goods import General, Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
@@ -13,11 +13,10 @@ from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.tech import GENERAL_CARS, NODES, Effect, Research
 from railroads.sim.trains import (
     BULK_CAR,
-    CAR_CAPACITY,
     CAR_SIZES,
     ENGINES,
     EXPRESS_FARE,
-    FULL_LOAD,
+    SLOWDOWN,
     Car,
     Engine,
     Kind,
@@ -25,9 +24,11 @@ from railroads.sim.trains import (
     Train,
     bigger,
     car_size,
+    tare,
+    unit_tonnes,
 )
 from railroads.ui.tech_window import describe
-from railroads.ui.trains_window import engine_summary, engines_by_kind
+from railroads.ui.trains_window import adding_tip, engine_summary, engines_by_kind
 
 WEST, EAST = (6, 3), (6, 20)
 EVERY_NODE = frozenset(NODES)
@@ -261,7 +262,7 @@ def test_an_express_leads_its_coaches_with_an_empty_dining_car() -> None:
     assert dining.dining and dining.load == 0.0
     assert [car.good for car in coaches] == [Good.PASSENGERS]
     assert coaches[0].load > 0
-    assert train.weight == pytest.approx(1.0 + 1.0 + FULL_LOAD)
+    assert dining.tonnes == pytest.approx(tare(dining.capacity))
 
 
 def test_an_express_pays_a_car_trip_for_its_dining_car() -> None:
@@ -297,24 +298,131 @@ def test_passengers_on_an_express_pay_more() -> None:
     assert paid > 0
 
 
-def test_a_full_train_as_long_as_its_engine_is_built_for_slows_a_light_one_most_and_a_heavy_least() -> (
-    None
-):
+def test_a_train_at_its_most_slows_a_light_engine_most_and_a_heavy_one_least() -> None:
+    railway = line()
     light = full_train("tank", ENGINES["tank"].cars)
     planet = full_train("planet", ENGINES["planet"].cars)
-
     heavy = full_train("goods", ENGINES["goods"].cars)
 
-    assert light.pull < planet.pull < heavy.pull
+    pulls = [railway.pull(train) for train in (light, planet, heavy)]
+
+    assert pulls[0] < pulls[1] < pulls[2]
 
 
-def test_a_full_bulk_car_weighs_as_many_times_as_much_as_it_holds_more() -> None:
-    bulk = full_train("planet", 1)
-    other = Train("Test", cars=[Car(Good.MAIL, Car(Good.MAIL).capacity)])
+def test_a_general_engine_at_its_most_runs_at_half_speed_and_a_heavy_one_at_seventy_percent() -> (
+    None
+):
+    railway = line()
+    planet = full_train("planet", ENGINES["planet"].cars)
+    heavy = full_train("goods", ENGINES["goods"].cars)
 
-    weights = bulk.weight - 1, other.weight - 1
+    pulls = railway.pull(planet), railway.pull(heavy)
 
-    assert weights == (pytest.approx(BULK_CAR / CAR_CAPACITY * FULL_LOAD), pytest.approx(FULL_LOAD))
+    assert pulls == (pytest.approx(0.5), pytest.approx(0.7))
+
+
+def test_an_engine_with_no_cars_runs_at_full_speed() -> None:
+    railway = line()
+    train = Train("Test")
+
+    pull = railway.pull(train)
+
+    assert pull == 1.0
+
+
+def test_a_train_slows_by_what_its_cars_weigh_against_the_most_its_engine_pulls() -> None:
+    railway = line()
+    train = Train("Test", cars=[Car(Good.WHEAT, BULK_CAR)])
+    share = train.tonnes / railway.max_pull(train.engine)
+
+    pull = railway.pull(train)
+
+    assert pull == pytest.approx(1.0 - SLOWDOWN[Kind.GENERAL] * share)
+
+
+def test_a_full_coal_car_weighs_about_a_hundred_tonnes_and_a_wheat_car_about_thirty() -> None:
+    coal = Car(Good.COAL, BULK_CAR)
+    wheat = Car(Good.WHEAT, BULK_CAR)
+
+    weights = coal.tonnes, wheat.tonnes
+
+    assert weights == (pytest.approx(100.0, abs=5.0), pytest.approx(30.0, abs=3.0))
+
+
+def test_an_empty_car_weighs_more_the_bigger_it_is() -> None:
+    small, middle, bulk = Car(Good.GOLD), Car(Good.MAIL), Car(Good.COAL)
+
+    weights = [car.tonnes for car in (small, middle, bulk)]
+
+    assert 0 < weights[0] < weights[1] < weights[2]
+
+
+@pytest.mark.parametrize("good", [Good.COAL, Good.STEEL, Good.MAIL, Good.PASSENGERS])
+def test_a_car_weighs_its_tare_and_what_it_carries(good: Good) -> None:
+    car = Car(good, 10.0)
+
+    weight = car.tonnes
+
+    assert weight == pytest.approx(tare(car.capacity) + 10.0 * unit_tonnes(good))
+
+
+def test_the_planet_pulls_three_full_wheat_cars_but_not_a_second_coal_car() -> None:
+    railway = line()
+    train = railway.buy()
+    assert train is not None
+    wheat, coal = Stop(WEST), Stop(EAST)
+
+    wheat_added = [railway.add_car(train, wheat, Good.WHEAT) for _ in range(3)]
+    coal_added = [railway.add_car(train, coal, Good.COAL) for _ in range(2)]
+
+    assert wheat_added == [True, True, True]
+    assert coal_added == [True, False]
+
+
+def test_the_first_heavy_freight_engine_pulls_three_full_coal_cars() -> None:
+    railway = knowing(line(), "boilers")
+    railway.year = 1853
+    train = railway.buy("goods")
+    assert train is not None
+    stop = Stop(WEST)
+
+    added = [railway.add_car(train, stop, Good.COAL) for _ in range(4)]
+
+    assert added == [True, True, True, False]
+
+
+def test_a_general_car_weighs_as_much_as_the_heaviest_of_its_goods_would() -> None:
+    railway = line()
+
+    weight = railway.car_tonnes(General.FOOD, "planet")
+
+    assert weight == pytest.approx(railway.car_tonnes(Good.WHEAT, "planet"))
+
+
+def test_tech_that_adds_a_car_adds_as_much_to_the_most_an_engine_pulls() -> None:
+    plain, coupled = line(), knowing(line(), "couplings")
+    engine = ENGINES["planet"]
+
+    pulls = plain.max_pull("planet"), coupled.max_pull("planet")
+
+    assert pulls == (
+        pytest.approx(engine.tonnes),
+        pytest.approx(engine.tonnes * (engine.cars + 1) / engine.cars),
+    )
+
+
+def test_cars_load_no_more_than_their_engine_pulls() -> None:
+    railway = line()
+    train = railway.buy()
+    assert train is not None
+    stop = Stop(WEST, [Good.COAL, Good.COAL])
+    train.cars = [Car(Good.COAL), Car(Good.COAL)]
+    railway.station_goods(WEST).stockpile[Good.COAL] = 1_000.0
+
+    railway.calls.load(train, stop)
+
+    assert train.tonnes == pytest.approx(railway.max_pull(train.engine))
+    assert train.cars[0].load == pytest.approx(BULK_CAR)
 
 
 @pytest.mark.parametrize("good", [Good.WHEAT, Good.IRON, Good.APPLES, Good.COAL, Good.LUMBER])
@@ -460,3 +568,18 @@ def test_a_mass_upgrade_goes_as_far_as_the_cash_in_the_order_the_trains_were_bou
 
     assert swapped == 2
     assert [train.engine for train in planets] == ["american", "american", "planet"]
+
+
+def test_an_engines_summary_says_the_most_it_pulls_in_tonnes() -> None:
+    engine = ENGINES["planet"]
+
+    summary = engine_summary(engine)
+
+    assert f"Pulls at most {engine.tonnes:.0f} t" in summary
+
+
+def test_a_good_too_heavy_for_the_engine_says_so_instead_of_offering_a_car() -> None:
+    tip = adding_tip(False, 98.0, 52.0)
+
+    assert "Too heavy" in tip
+    assert "Click to add" not in tip

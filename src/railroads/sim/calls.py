@@ -14,7 +14,7 @@ from railroads.sim.goods import GENERAL_GOODS, TRAVELLERS, General, Good
 from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.tech import Tree
-from railroads.sim.trains import ENGINES, Car, Cargo, Parcels, Stop, Train
+from railroads.sim.trains import ENGINES, Car, Cargo, Parcels, Stop, Train, unit_tonnes
 
 WAIT_MONTHS = 1.0
 
@@ -129,20 +129,27 @@ class StationCalls:
         """Tops each car up from the stop's stockpile, then with goods trains brought that the
         buildings around it have no use for this month."""
         goods = self._railway.station_goods(stop.cell)
+        most = self._railway.max_pull(train.engine)
         for car in train.cars:
             if car.dining:
                 continue
             if car.general is not None and car.load <= 1e-9:
                 self.pick_load(train, stop, car)
-            take = min(car.capacity - car.load, goods.stockpile.get(car.good, 0.0))
+            take = min(self._room(train, car, most), goods.stockpile.get(car.good, 0.0))
             if take > 0:
                 car.fill({stop.cell: take})
                 goods.stockpile[car.good] -= take
             spare = goods.brought.get(car.good, 0.0)
             spare -= self._railway.station_demand(stop.cell).monthly_want(car.good)
-            transfer = min(car.capacity - car.load, spare)
+            transfer = min(self._room(train, car, most), spare)
             if transfer > 0:
                 car.fill(goods.release(car.good, transfer))
+
+    @staticmethod
+    def _room(train: Train, car: Car, most: float) -> float:
+        """How much more a car takes: up to its capacity, and no more than its engine pulls."""
+        spare_tonnes = max(0.0, most - train.tonnes)
+        return min(car.capacity - car.load, spare_tonnes / unit_tonnes(car.good))
 
     def spare(self, stop: Stop, good: Good) -> float:
         """How much of a good a car can take at a stop: its stockpile, and what trains brought

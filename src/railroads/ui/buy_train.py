@@ -11,7 +11,7 @@ from imgui_bundle import imgui
 from railroads.sim.finance import dollars
 from railroads.sim.fuel_market import fuel_of
 from railroads.sim.railway import Railway
-from railroads.sim.trains import ENGINES, EXPRESS_FARE, MAGLEV_FARE, Engine, Kind, Train
+from railroads.sim.trains import ENGINES, EXPRESS_FARE, MAGLEV_FARE, SLOWDOWN, Engine, Kind, Train
 from railroads.ui.iso_camera import Vec2
 from railroads.ui.theme import BRASS, TEXT_DIM, color_u32
 
@@ -201,6 +201,7 @@ def engine_figures(engine: Engine, per_cell: float | None = None) -> list[tuple[
         ("Power", engine.power.value.capitalize()),
         ("Top speed", f"{engine.kmh:.0f} km/h"),
         ("Pulls up to", cars),
+        ("Pulls at most", f"{engine.tonnes:.0f} t, {SLOWDOWN[engine.kind]:.0%} slower at that"),
         ("Up to speed in", f"{engine.pickup:g} s"),
         ("Price", dollars(engine.price)),
         ("Burns", fuel_use(engine, per_cell)),

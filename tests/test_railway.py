@@ -222,7 +222,7 @@ def test_cars_slow_a_train_and_full_cars_slow_it_more() -> None:
     empty.cars = [Car(Good.MAIL) for _ in range(cars)]
     full.cars = [Car(Good.MAIL, CAR_CAPACITY) for _ in range(cars)]
 
-    pulls = [train.pull for train in (light, empty, full)]
+    pulls = [railway.pull(train) for train in (light, empty, full)]
 
     assert pulls[0] == 1.0
     assert pulls[0] > pulls[1] > pulls[2] >= 0.5
