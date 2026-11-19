@@ -721,7 +721,7 @@ MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
         BuildingKind.OIL_WELL: {Good.OIL: 150, Good.GAS: 50},
         BuildingKind.SALT_WORKS: {Good.SALT: 60},
         BuildingKind.SHEEP_FARM: {Good.WOOL: 60, Good.SHEEP: 10},
-        BuildingKind.COTTON_FIELD: {Good.COTTON: 80},
+        BuildingKind.COTTON_FIELD: {Good.COTTON: 55},
         BuildingKind.VINEYARD: {Good.GRAPES: 60},
         BuildingKind.COFFEE_PLANTATION: {Good.COFFEE: 60},
         BuildingKind.RUBBER_PLANTATION: {Good.RUBBER: 60},
