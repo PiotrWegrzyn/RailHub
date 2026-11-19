@@ -108,6 +108,33 @@ float crest(float n) {
 }
 """
 
+# How far a plane point in a cell lies from the minor river through it, along the links the cell
+# keeps in its flags (railroads.ui.pixel.streams.stream_distance); for shaders that read `cells`.
+STREAM = """const vec2 STREAM_STEPS[6] = vec2[6](@STREAM_STEPS@);
+
+float stream_gap(vec2 p, ivec2 cell, uint links) {
+    if (links == 0u) return @STREAM_NONE@;
+    vec2 centre = vec2(float(cell.x) + 0.5 + 0.5 * float(cell.y & 1),
+                       HEX_RADIUS + float(cell.y) * 1.5 * HEX_RADIUS);
+    vec2 q = vec2(p.x + @MEANDER@ * sin(p.y * 7.3 + p.x * 2.1),
+                  p.y + @MEANDER@ * sin(p.x * 6.1 - p.y * 1.7));
+    float nearest = @STREAM_NONE@;
+    for (int i = 0; i < 6; i++) {
+        if (((links >> uint(i)) & 1u) == 0u) continue;
+        vec2 d = STREAM_STEPS[i];
+        float along = clamp(dot(q - centre, d) / dot(d, d), 0.0, 1.0);
+        nearest = min(nearest, length(q - centre - along * d));
+    }
+    return nearest;
+}
+
+// Whether plane point `p` lies on a minor river or its banks, which fields leave showing.
+bool on_stream(vec2 p) {
+    ivec2 cell = clamp(cell_at(p), ivec2(0), cells_size - 1);
+    return stream_gap(p, cell, texelFetch(cells, cell, 0).b >> 2u) < @STREAM_BANK_WIDTH@;
+}
+"""
+
 HEX = """const float HEX_RADIUS = 0.5773502691896258;
 const float SQRT3 = 1.7320508075688772;
 
@@ -345,25 +372,7 @@ uvec4 cell_info(ivec2 cell) {
     return texelFetch(cells, clamp(cell, ivec2(0), cells_size - 1), 0);
 }
 
-// How far plane point `p` in `cell` lies from the minor river through it, along the links the
-// cell keeps in its flags (railroads.ui.pixel.streams.stream_distance).
-const vec2 STREAM_STEPS[6] = vec2[6](@STREAM_STEPS@);
-
-float stream_gap(vec2 p, ivec2 cell, uint links) {
-    if (links == 0u) return @STREAM_NONE@;
-    vec2 centre = vec2(float(cell.x) + 0.5 + 0.5 * float(cell.y & 1),
-                       HEX_RADIUS + float(cell.y) * 1.5 * HEX_RADIUS);
-    vec2 q = vec2(p.x + @MEANDER@ * sin(p.y * 7.3 + p.x * 2.1),
-                  p.y + @MEANDER@ * sin(p.x * 6.1 - p.y * 1.7));
-    float nearest = @STREAM_NONE@;
-    for (int i = 0; i < 6; i++) {
-        if (((links >> uint(i)) & 1u) == 0u) continue;
-        vec2 d = STREAM_STEPS[i];
-        float along = clamp(dot(q - centre, d) / dot(d, d), 0.0, 1.0);
-        nearest = min(nearest, length(q - centre - along * d));
-    }
-    return nearest;
-}
+@STREAM@
 
 bool is_water(uint biome) {
     return biome <= @LAST_WATER@u;
@@ -818,7 +827,8 @@ void main() {
 # (row, column), the cell's middle on the plane, which way it faces, how wide it spreads and its
 # kind (its place in FIELD_KINDS); the buildings in `yards`, where each stands in the picture,
 # how far its yard reaches and which kind of yard it is.
-FIELDS = """const vec3 CROP_PLANT[@CROP_COUNT@] = vec3[@CROP_COUNT@](@CROP_PLANT@);
+FIELDS = """@STREAM@
+const vec3 CROP_PLANT[@CROP_COUNT@] = vec3[@CROP_COUNT@](@CROP_PLANT@);
 const vec3 CROP_SOIL[@CROP_COUNT@] = vec3[@CROP_COUNT@](@CROP_SOIL@);
 const vec3 GROVE_GROUND[@GROVE_COUNT@] = vec3[@GROVE_COUNT@](@GROVE_GROUND@);
 const vec3 GROVE_TREE[@GROVE_COUNT@] = vec3[@GROVE_COUNT@](@GROVE_TREE@);
@@ -925,6 +935,7 @@ void lay(inout vec4 layer, vec3 colour, float cover) {
 // Lays the field or grove at picture point `q`, if any, lit by the slope it lies on (`lit`).
 void lay_fields(vec2 q, ivec2 texel, float lit, inout vec4 layer) {
     vec2 p = to_plane * (q + projection_origin);
+    if (on_stream(p)) return;
     for (int i = 0; i < plot_count; i++) {
         vec4 at = texelFetch(plots, ivec2(i, 0), 0);
         vec4 shape = texelFetch(plots, ivec2(i, 1), 0);
@@ -1366,8 +1377,15 @@ def _grass_ramps(name: str) -> str:
 
 
 def _shared_names() -> dict[str, str]:
-    """The numbers of the snippets the ground and what lies on it share (SUN, NATURAL)."""
+    """The numbers of the snippets the ground and what lies on it share (SUN, NATURAL, STREAM)."""
     return {
+        "STREAM_STEPS": ", ".join(f"vec2({_number(x)}, {_number(y)})" for x, y in streams.STEPS),
+        "STREAM_NONE": _number(streams.NONE_NEAR),
+        "MEANDER": _number(streams.MEANDER),
+        "STREAM_BANK_WIDTH": _number(streams.BANK_WIDTH),
+        "STREAM_HALF_WIDTH": _number(streams.HALF_WIDTH),
+        "STREAM_BANK": _number(streams.STREAM_BANK),
+        "STREAM_WATER": _vec3(streams.STREAM_WATER),
         "R_16_301": _noise(1.6, 301, "q"),
         "R_55_302": _noise(0.55, 302, "q"),
         "R_18_303": _noise(0.18, 303, "q"),
@@ -1407,13 +1425,6 @@ def fragment_source() -> str:
         "SPECK_COUNT": str(len(cpu.DEPOSIT_SPECKS)),
         "SPECKS": ", ".join(_vec3(s) for s in cpu.DEPOSIT_SPECKS),
         "LAST_WATER": str(max(int(b) for b in cpu.WATER)),
-        "STREAM_STEPS": ", ".join(f"vec2({_number(x)}, {_number(y)})" for x, y in streams.STEPS),
-        "STREAM_NONE": _number(streams.NONE_NEAR),
-        "MEANDER": _number(streams.MEANDER),
-        "STREAM_BANK_WIDTH": _number(streams.BANK_WIDTH),
-        "STREAM_HALF_WIDTH": _number(streams.HALF_WIDTH),
-        "STREAM_BANK": _number(streams.STREAM_BANK),
-        "STREAM_WATER": _vec3(streams.STREAM_WATER),
         "STEPS": _number(cpu.RELIEF_STEPS_PER_CELL),
         "MEADOW_RAMPS": _grass_ramps("meadow"),
         "SAVANNA_RAMPS": _grass_ramps("savanna"),
@@ -1708,7 +1719,7 @@ def _filled(source: str, names: dict[str, str]) -> str:
     source = source.replace("@NOISE@", NOISE).replace("@HEX@", HEX)
     source = source.replace("@RASTER@", RASTER).replace("@TEXTURE@", TEXTURE)
     source = source.replace("@SUN@", SUN).replace("@NATURAL@", NATURAL)
-    source = source.replace("@FIELDS@", FIELDS)
+    source = source.replace("@FIELDS@", FIELDS).replace("@STREAM@", STREAM)
     for name, value in (names | {"MASK": str(TABLE_SIZE - 1)}).items():
         source = source.replace(f"@{name}@", value)
     assert "@" not in source

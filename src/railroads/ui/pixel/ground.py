@@ -838,6 +838,9 @@ class Ground:
         if sum((b[1] - b[0]) * (b[3] - b[2]) for b in boxes) > paint.shape[0] * paint.shape[1]:
             shared = self._patch_points((down, bottom, across, right), left - a, top - a, k, points)
         worked: dict[tuple[int, int, int, int], tuple] = {}
+        # Where each patch's pixels lie off the minor rivers and their banks, which fields leave
+        # showing.
+        dry: dict[tuple[int, int, int, int], FloatArray | float] = {}
         for plot, patch, crop, grove in jobs:
             box = (patch[0].start, patch[0].stop, patch[1].start, patch[1].stop)
             place = (slice(box[0] - down, box[1] - down), slice(box[2] - across, box[3] - across))
@@ -852,7 +855,9 @@ class Ground:
                 cover = self._sow(*args, plot, crop, k)
             else:
                 cover = self._plant(*args, plot, grove, k)
-            np.maximum(painted[place], cover, out=painted[place])
+            if box not in dry:
+                dry[box] = self._off_streams(*worked[box][:3])
+            np.maximum(painted[place], cover * dry[box], out=painted[place])
         top_row, left_col = max(down, a * k), max(across, a * k)
         bottom_row, right_col = min(bottom, (a + rows) * k), min(right, (a + CHUNK) * k)
         if top_row >= bottom_row or left_col >= right_col:
@@ -882,6 +887,16 @@ class Ground:
             colour = colour * lit[art_rows, art_cols][:, None]
         under[laid, :3] = under[laid, :3] * (1 - cover) + np.clip(colour, 0, 255) / 255 * cover
         under[laid, 3:] = under[laid, 3:] * (1 - cover) + cover
+
+    def _off_streams(self, x: FloatArray, y: FloatArray, flat: IntArray) -> FloatArray | float:
+        """1 where pixels at plane points `x`, `y` in flat cells `flat` lie off the minor rivers
+        and their banks, 0 on them."""
+        grid = self.tile_map.grid
+        if not isinstance(grid, HexGrid) or not (self._streams.ravel()[flat] > 0).any():
+            return 1.0
+        r, c = np.divmod(flat, grid.cols)
+        gap = stream_distance(self._streams, grid, x, y, r, c)
+        return (gap >= BANK_WIDTH).astype(np.float32)
 
     def _patch_points(
         self,
