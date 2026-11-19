@@ -24,211 +24,243 @@ from railroads.sim.grids import Cell
 MAX_CARS = 5
 
 
-# Cars come in sizes up the Fibonacci numbers, each holding about 1.6 times the one before; an
-# engine (CAR_LEVELS) or tech (railroads.sim.tech.Effect.CAR_SIZE) moves a car that many sizes up.
-CAR_SIZES = (5.0, 8.0, 13.0, 21.0, 34.0, 55.0, 89.0, 144.0, 233.0, 377.0, 610.0)
+# Cars come in sizes up the Fibonacci numbers, each holding about 1.6 times the one before.
+CAR_SIZES = (
+    1.0,
+    2.0,
+    3.0,
+    5.0,
+    8.0,
+    13.0,
+    21.0,
+    34.0,
+    55.0,
+    89.0,
+    144.0,
+    233.0,
+    377.0,
+    610.0,
+    987.0,
+)
+# How much bigger, and so heavier, each size up CAR_SIZES makes a car.
+CAR_GROWTH = CAR_SIZES[-1] / CAR_SIZES[-2]
+
+# Cars come in generations, each a size up CAR_SIZES from the one before: the pioneers' small
+# wooden wagons (1), the wagons of the Planet's day (2), which the sizes below are for, and the
+# steel and bogie wagons after them, up to today's (GENERATIONS). Tech opens each generation
+# (railroads.sim.tech.Effect.CAR_SIZE) and an engine pulls those up to its top_generation.
+BASE_GENERATION = 2
+GENERATIONS = 5
+# Goods first carried in a later generation, one to a car then.
+FIRST_GENERATION: Mapping[Good, int] = MappingProxyType(
+    {Good.CARS: 3, Good.TANKS: 3, Good.PLANES: 3}
+)
+
 SMALL_CAR = 5.0
 MEDIUM_CAR = 13.0
 CAR_CAPACITY = 34.0
-# Passengers ride a size up from other goods.
-PASSENGER_CAR = 55.0
-# Bulk goods, dug or grown in great amounts, go BULK_CAR to a car, and a full bulk car weighs as
-# much as BULK_CAR / CAR_CAPACITY full cars of anything else, so only heavy engines pull a long
-# train of them at a fair speed.
 BULK_CAR = 89.0
-BULK_CAR_GOODS = frozenset(
-    {
-        Good.WHEAT,
-        Good.BREAD,
-        Good.POTATOES,
-        Good.RICE,
-        Good.SOYBEANS,
-        Good.APPLES,
-        Good.ORANGES,
-        Good.BANANAS,
-        Good.DATES,
-        Good.SUGAR,
-        Good.GRAPES,
+
+
+def _sized(size: float, *goods: Good) -> dict[Good, float]:
+    return dict.fromkeys(goods, size)
+
+
+# How many units of each good a car of BASE_GENERATION holds, about what fits in a wagon of
+# about 10 cubic metres bearing about 8 tonnes, whichever runs out first (UNIT_KG); goods not
+# listed go CAR_CAPACITY to a car, and those of a FIRST_GENERATION one to a car of it.
+CAR_UNITS: Mapping[Good, float] = MappingProxyType(
+    _sized(
+        BULK_CAR,
         Good.COAL,
         Good.IRON,
         Good.SAND,
         Good.CLAY,
         Good.LIMESTONE,
         Good.SALT,
+        Good.WHEAT,
+        Good.RICE,
+        Good.SOYBEANS,
+        Good.BREAD,
+        Good.COFFEE,
+        Good.REFINED_SUGAR,
+        Good.RUBBER,
+        Good.MAIL,
+    )
+    | _sized(
+        55.0,
+        Good.POTATOES,
+        Good.SUGAR,
         Good.LUMBER,
-    }
-)
-# Goods carried in small or medium cars; everything else but passengers goes CAR_CAPACITY to a car.
-SMALL_CAR_GOODS = frozenset(
-    {
-        Good.GOLD,
-        Good.DIAMONDS,
-        Good.LUXURIES,
-        Good.INCENSE,
-        Good.ELECTRONICS,
-        Good.CARS,
-        Good.TANKS,
-        Good.PLANES,
-    }
-)
-MEDIUM_CAR_GOODS = frozenset(
-    {
-        Good.STEEL,
-        Good.COPPER,
         Good.COKE,
-        Good.CASTINGS,
-        Good.MACHINERY,
-        Good.TOOLS,
+        Good.TEA,
+        Good.OIL,
+        Good.FUEL,
+        Good.GAS,
+        Good.PLASTICS,
         Good.GUNS,
-        Good.APPLIANCES,
-        Good.BRICKS,
-        Good.CEMENT,
+        Good.CHICKENS,
+    )
+    | _sized(
+        21.0,
+        Good.COTTON,
+        Good.FLAX,
+        Good.HOPS,
+        Good.HONEY,
         Good.GLASS,
         Good.PORCELAIN,
-        Good.STOVE_TILES,
         Good.POTS,
-        Good.FURNITURE,
-        Good.BARRELS,
-        Good.CATTLE,
+        Good.STOVE_TILES,
         Good.PIGS,
-        Good.SHEEP,
-        Good.CHICKENS,
+        Good.ELECTRONICS,
+    )
+    | _sized(
+        MEDIUM_CAR,
+        Good.PAPER,
+        Good.STEEL,
+        Good.COPPER,
+        Good.CASTINGS,
+        Good.BRICKS,
+        Good.CEMENT,
+        Good.APPLIANCES,
+    )
+    | _sized(8.0, Good.FURNITURE, Good.CATTLE)
+    | _sized(SMALL_CAR, Good.MACHINERY, Good.GOLD, Good.DIAMONDS)
+    | _sized(1.0, *FIRST_GENERATION)
+)
+
+
+def _weighing(kg: float, *goods: Good) -> dict[Good, float]:
+    return dict.fromkeys(goods, kg)
+
+
+# What a unit of each good is and weighs, in kilograms: a quintal (sack) of coal, ore, grain or
+# fruit in crates, a 60 kg sack of coffee, a crate of clothes or shoes, a 200 litre barrel of a
+# drink or oil, a bundle of steel, a cow or a pig, a car; goods not listed weigh UNIT_KG, a crate.
+UNIT_KG = 60.0
+GOOD_KG: Mapping[Good, float] = MappingProxyType(
+    _weighing(
+        100.0,
+        Good.COAL,
+        Good.IRON,
+        Good.SAND,
+        Good.CLAY,
+        Good.LIMESTONE,
+        Good.SALT,
+        Good.WHEAT,
+        Good.RICE,
+        Good.SOYBEANS,
+        Good.POTATOES,
+        Good.SUGAR,
+        Good.REFINED_SUGAR,
+        Good.LUMBER,
+        Good.COKE,
+        Good.APPLES,
+        Good.ORANGES,
+        Good.BANANAS,
+        Good.DATES,
+        Good.GRAPES,
+        Good.MEAT,
+        Good.LEATHER,
+        Good.FLAX,
+        Good.HOPS,
+        Good.PLASTICS,
+        Good.PIGS,
+        Good.PORCELAIN,
+        Good.FURNITURE,
+        Good.ELECTRONICS,
+    )
+    | _weighing(
+        200.0,
+        Good.CANS,
+        Good.MILK,
+        Good.BEER,
+        Good.WINE,
+        Good.JUICE,
+        Good.SAKE,
+        Good.MISO,
+        Good.NEWSPAPERS,
+    )
+    | _weighing(150.0, Good.DAIRY, Good.SAUSAGES, Good.TOFU, Good.WOOL, Good.TOOLS)
+    | _weighing(600.0, Good.STEEL, Good.COPPER, Good.CASTINGS, Good.BRICKS, Good.CEMENT)
+    | _weighing(300.0, Good.HONEY, Good.WAX, Good.STOVE_TILES)
+    | _weighing(50.0, Good.BARRELS, Good.SHEEP, Good.LUXURIES, Good.INCENSE)
+    | _weighing(30.0, Good.BREAD, Good.MAIL)
+    | {
+        Good.FISH: 180.0,
+        Good.EGGS: 120.0,
+        Good.SHOES: 70.0,
+        Good.COTTON: 220.0,
+        Good.RUBBER: 110.0,
+        Good.TEA: 45.0,
+        Good.OIL: 170.0,
+        Good.FUEL: 160.0,
+        Good.GAS: 100.0,
+        Good.CHEMICALS: 220.0,
+        Good.VODKA: 190.0,
+        Good.SOY_SAUCE: 230.0,
+        Good.PAPER: 500.0,
+        Good.GLASS: 400.0,
+        Good.POTS: 80.0,
+        Good.APPLIANCES: 80.0,
+        Good.MACHINERY: 1_000.0,
+        Good.CATTLE: 500.0,
+        Good.CHICKENS: 25.0,
+        Good.GOLD: 250.0,
+        Good.DIAMONDS: 10.0,
+        Good.CARS: 1_200.0,
+        Good.PLANES: 15_000.0,
+        Good.TANKS: 45_000.0,
+        Good.PASSENGERS: 80.0,
     }
 )
 
 
-# Goods whose cars are this many sizes up CAR_SIZES from the rest of their kind: cattle ride in
-# roomier cattle cars than the other animals.
-SIZES_UP: Mapping[Good, int] = MappingProxyType({Good.CATTLE: 1})
-
-
-def car_size(good: Good) -> float:
-    """How much of a good one car carries, before what tech adds to coaches."""
-    if good == Good.PASSENGERS:
-        return PASSENGER_CAR
-    if good in BULK_CAR_GOODS:
-        return BULK_CAR
-    if good in SMALL_CAR_GOODS:
-        return SMALL_CAR
-    if good in MEDIUM_CAR_GOODS:
-        return bigger(MEDIUM_CAR, SIZES_UP.get(good, 0))
-    return CAR_CAPACITY
+def car_size(good: Good, generation: int = BASE_GENERATION) -> float:
+    """How much of a good one car of a generation carries, before what tech adds to coaches;
+    nothing in a generation before the good's first."""
+    first = FIRST_GENERATION.get(good)
+    if first is not None and generation < first:
+        return 0.0
+    return bigger(CAR_UNITS.get(good, CAR_CAPACITY), generation - (first or BASE_GENERATION))
 
 
 # The most a general car of a kind carries, whatever it holds: processed food rides in medium cars.
 GENERAL_CAR_MOST: Mapping[General, float] = MappingProxyType({General.PROCESSED_FOOD: MEDIUM_CAR})
 
 
-def general_car_size(general: General, good: Good) -> float:
-    """How much of a good one general car of a kind carries, before what engines add."""
-    return min(car_size(good), GENERAL_CAR_MOST.get(general, car_size(good)))
+def general_car_size(general: General, good: Good, generation: int = BASE_GENERATION) -> float:
+    """How much of a good one general car of a kind and generation carries."""
+    most = GENERAL_CAR_MOST.get(general)
+    size = car_size(good, generation)
+    return size if most is None else min(size, bigger(most, generation - BASE_GENERATION))
 
 
 def bigger(size: float, levels: int) -> float:
-    """A car size `levels` sizes up CAR_SIZES."""
-    return CAR_SIZES[min(CAR_SIZES.index(size) + levels, len(CAR_SIZES) - 1)]
+    """A car size `levels` sizes up CAR_SIZES, or down for fewer than none."""
+    index = min(max(CAR_SIZES.index(size) + levels, 0), len(CAR_SIZES) - 1)
+    return CAR_SIZES[index]
 
 
-# How much bigger, and so heavier, each size up CAR_SIZES makes a car.
-CAR_GROWTH = CAR_SIZES[-1] / CAR_SIZES[-2]
-
-# What an empty car weighs, in tonnes: TARE_BASE and TARE_PER_PLACE for each unit it holds, so
-# an empty bulk car of 144 weighs 12 t and a mail van of 55 about 6 t.
-TARE_BASE = 2.0
-TARE_PER_PLACE = 0.07
+# What an empty car of BASE_GENERATION weighs, in tonnes, CAR_GROWTH times as much for each
+# generation up: freight cars about the same whatever they hold, coaches and mail vans more.
+FREIGHT_TARE = 4.0
+TARE: Mapping[Good, float] = MappingProxyType({Good.PASSENGERS: 7.0, Good.MAIL: 5.0})
 
 
-def tare(capacity: float) -> float:
-    """What an empty car holding `capacity` weighs, in tonnes."""
-    return TARE_BASE + TARE_PER_PLACE * capacity
-
-
-# What a unit of each good weighs, in tonnes; goods not listed weigh UNIT_TONNES. A full car of
-# coal weighs about 100 t, one of wheat about 30 t, a coach full of passengers about 10 t.
-UNIT_TONNES = 0.3
-ORE_TONNES = 0.6
-PRODUCE_TONNES = 0.12
-METAL_TONNES = 1.2
-BUILDING_TONNES = 1.0
-LIQUID_TONNES = 0.5
-ANIMAL_TONNES = 0.5
-FINE_TONNES = 0.5
-
-
-def _weighing(tonnes: float, *goods: Good) -> dict[Good, float]:
-    return dict.fromkeys(goods, tonnes)
-
-
-GOOD_TONNES: Mapping[Good, float] = MappingProxyType(
-    _weighing(ORE_TONNES, Good.COAL, Good.IRON, Good.SAND, Good.CLAY, Good.LIMESTONE, Good.SALT)
-    | _weighing(
-        PRODUCE_TONNES,
-        Good.WHEAT,
-        Good.POTATOES,
-        Good.APPLES,
-        Good.ORANGES,
-        Good.BANANAS,
-        Good.DATES,
-        Good.SUGAR,
-        Good.GRAPES,
-    )
-    | _weighing(
-        METAL_TONNES,
-        Good.STEEL,
-        Good.COPPER,
-        Good.CASTINGS,
-        Good.MACHINERY,
-        Good.TOOLS,
-        Good.GUNS,
-        Good.APPLIANCES,
-    )
-    | _weighing(
-        BUILDING_TONNES,
-        Good.BRICKS,
-        Good.CEMENT,
-        Good.GLASS,
-        Good.PORCELAIN,
-        Good.STOVE_TILES,
-        Good.POTS,
-    )
-    | _weighing(
-        LIQUID_TONNES,
-        Good.OIL,
-        Good.FUEL,
-        Good.GAS,
-        Good.CHEMICALS,
-        Good.MILK,
-        Good.WINE,
-        Good.BEER,
-        Good.VODKA,
-        Good.JUICE,
-    )
-    | _weighing(ANIMAL_TONNES, Good.CATTLE, Good.PIGS, Good.SHEEP, Good.CHICKENS)
-    | _weighing(
-        FINE_TONNES, Good.GOLD, Good.DIAMONDS, Good.LUXURIES, Good.INCENSE, Good.ELECTRONICS
-    )
-    | {
-        Good.LUMBER: 0.35,
-        Good.COKE: 0.6,
-        Good.FURNITURE: 0.5,
-        Good.BARRELS: 0.5,
-        Good.CARS: 1.5,
-        Good.PLANES: 2.5,
-        Good.TANKS: 3.0,
-        Good.PASSENGERS: 0.08,
-        Good.MAIL: 0.1,
-    }
-)
+def tare_of(good: Good, generation: int = BASE_GENERATION) -> float:
+    """What an empty car of a generation for a good weighs, in tonnes."""
+    return TARE.get(good, FREIGHT_TARE) * CAR_GROWTH ** (generation - BASE_GENERATION)
 
 
 def unit_tonnes(good: Good) -> float:
     """What a unit of a good weighs, in tonnes."""
-    return GOOD_TONNES.get(good, UNIT_TONNES)
+    return GOOD_KG.get(good, UNIT_KG) / 1_000.0
 
 
-def full_tonnes(good: Good, capacity: float) -> float:
-    """What a car holding `capacity` of a good weighs full, in tonnes."""
-    return tare(capacity) + capacity * unit_tonnes(good)
+def full_tonnes(good: Good, capacity: float, generation: int = BASE_GENERATION) -> float:
+    """What a car of a generation holding `capacity` of a good weighs full, in tonnes."""
+    return tare_of(good, generation) + capacity * unit_tonnes(good)
 
 
 # About how long an engine with its tender, and each car, are on the map, in cells.
@@ -261,15 +293,26 @@ class Power(Enum):
 
 # Speed 1 stands for this many km/h.
 KMH_PER_SPEED = 60.0
-# How many tonnes an engine of a kind pulls at most for each car it is built to pull, its cars
-# CAR_GROWTH times as much for each size up they are: the Planet 150 t, room for one full coal
-# car, and the first heavy freight engine 300 t, room for three.
-TONNES_PER_CAR = {
-    Kind.PIONEER: 40.0,
-    Kind.LIGHT: 35.0,
-    Kind.GENERAL: 50.0,
-    Kind.HEAVY: 75.0,
-    Kind.EXPRESS: 12.0,
+# The newest generation of cars an engine of a kind pulls on steam; diesel, electric and maglev
+# engines pull every generation, pioneers only the first.
+STEAM_GENERATION = {
+    Kind.PIONEER: 1,
+    Kind.LIGHT: 2,
+    Kind.GENERAL: 3,
+    Kind.HEAVY: 4,
+    Kind.EXPRESS: 3,
+}
+# How much an engine of a kind pulls at most, as a share of the train it is built for, full, of
+# its top_generation's cars: coal for most, as real trains were loaded up to what their engine
+# could pull, so a full train of coal runs its slowest; full coaches for expresses and railcars,
+# with room for the passengers more coaches seat (railroads.sim.tech.Effect.COACHES); light
+# engines about half that.
+PULL_SHARE = {
+    Kind.PIONEER: 1.0,
+    Kind.LIGHT: 0.6,
+    Kind.GENERAL: 1.0,
+    Kind.HEAVY: 1.0,
+    Kind.EXPRESS: 1.25,
 }
 # How much of its top speed an engine of a kind loses pulling as much as it can, and a share of
 # that for a share of it: half for most, less for heavy freight engines, more for light ones.
@@ -295,8 +338,6 @@ LIGHT_BURN = 0.5
 # What an engine burns grows with what its cars weigh: BURN_ALONE of its burn with no cars, its
 # burn when they weigh half the most it pulls, and BURN_ALONE + 1 of it when they weigh the most.
 BURN_ALONE = 0.5
-# Diesel, electric and maglev engines pull heavier cars, this many sizes up CAR_SIZES.
-CAR_LEVELS = {Power.DIESEL: 1, Power.ELECTRIC: 1, Power.MAGLEV: 1}
 
 
 @dataclass(frozen=True, slots=True)
@@ -324,6 +365,10 @@ class Engine:
     # Whether it burns wood (lumber) instead of coal, as American engines did while forests
     # were near and coal far.
     wood: bool = False
+    # Its PULL_SHARE where that is not its kind's: the Rocket was built for speed, not loads.
+    pull_share: float = 0.0
+    # Whether it pulls as much as its coaches full rather than full coal cars: railcars.
+    railcar: bool = False
 
     @property
     def electric(self) -> bool:
@@ -344,9 +389,9 @@ class Engine:
         return BURN_PER_CAR[self.power] * self.hauls * light
 
     @property
-    def car_levels(self) -> int:
-        """How many sizes up CAR_SIZES its cars are."""
-        return CAR_LEVELS.get(self.power, 0)
+    def top_generation(self) -> int:
+        """The newest generation of cars it pulls."""
+        return STEAM_GENERATION[self.kind] if self.power == Power.STEAM else GENERATIONS
 
     @property
     def kmh(self) -> float:
@@ -375,8 +420,18 @@ class Engine:
 
     @property
     def tonnes(self) -> float:
-        """The most it pulls, in tonnes, before what tech adds."""
-        return TONNES_PER_CAR[self.kind] * self.hauls * CAR_GROWTH**self.car_levels
+        """The most it pulls, in tonnes, pulling its top_generation's cars."""
+        return self.pull_at(self.top_generation)
+
+    def pull_at(self, generation: int) -> float:
+        """The most it pulls, in tonnes, pulling cars of a generation up to its top_generation,
+        before what tech adds: PULL_SHARE of its train of them full."""
+        coaches = self.express or self.railcar
+        good = Good.PASSENGERS if coaches else Good.COAL
+        generation = min(generation, self.top_generation)
+        car = full_tonnes(good, car_size(good, generation), generation)
+        share = self.pull_share or PULL_SHARE[Kind.EXPRESS if coaches else self.kind]
+        return share * self.hauls * car
 
 
 P, L, G, H, X = Kind.PIONEER, Kind.LIGHT, Kind.GENERAL, Kind.HEAVY, Kind.EXPRESS
@@ -391,7 +446,7 @@ ENGINES: dict[str, Engine] = {
     "salamanca": Engine("Salamanca", 1812, 0.2, 1, 2_000.0, P, pickup=13.0, tank=6.0),
     "puffing_billy": Engine("Puffing Billy", 1815, 0.25, 1, 2_500.0, P, pickup=13.0, tank=7.0),
     "locomotion": Engine("Locomotion", 1820, 0.3, 2, 4_000.0, P, pickup=13.0, tank=8.0),
-    "rocket": Engine("Rocket", 1826, 0.4, 2, 6_000.0, P, pickup=13.0, tank=10.0),
+    "rocket": Engine("Rocket", 1826, 0.4, 2, 6_000.0, P, pickup=13.0, tank=10.0, pull_share=0.55),
     "lion": Engine("Lion", 1834, 0.45, 2, 8_000.0, P, pickup=13.0, tank=12.0),
     "planet": Engine("Planet steam engine", 1840, 0.5, 3, TRAIN_PRICE, G, pickup=12.0, tank=21.0),
     "tank": Engine("Tank engine", 1840, 0.4, 2, 3_000.0, L, pickup=3.0, tank=13.0),
@@ -445,7 +500,17 @@ ENGINES: dict[str, Engine] = {
         "Boxcab electric", 1925, 1.6, 5, 270_000.0, G, ELECTRIC, pickup=6.0, needs=("traction",)
     ),
     "railbus": Engine(
-        "Railbus", 1935, 1.0, 3, 27_000.0, L, DIESEL, pickup=2.0, tank=60.0, needs=("diesel",)
+        "Railbus",
+        1935,
+        1.0,
+        3,
+        27_000.0,
+        L,
+        DIESEL,
+        pickup=2.0,
+        tank=60.0,
+        needs=("diesel",),
+        railcar=True,
     ),
     "streamliner": Engine(
         "Streamliner",
@@ -526,6 +591,7 @@ ENGINES: dict[str, Engine] = {
         pickup=2.0,
         tank=100.0,
         needs=("diesel",),
+        railcar=True,
     ),
     "high_speed": Engine(
         "High-speed electric",
@@ -622,10 +688,14 @@ class Car:
     # An express's dining car, which carries nothing.
     dining: bool = False
     general: General | None = None
+    # What it weighs empty, in tonnes: its good's tare_of at its car size unless given.
+    tare: float = 0.0
 
     def __post_init__(self) -> None:
         if not self.capacity:
             self.capacity = car_size(self.good)
+        if not self.tare:
+            self.tare = tare_of(self.good)
 
     @property
     def cargo(self) -> Cargo:
@@ -635,7 +705,7 @@ class Car:
     @property
     def tonnes(self) -> float:
         """What it weighs now, in tonnes."""
-        return tare(self.capacity) + self.load * unit_tonnes(self.good)
+        return self.tare + self.load * unit_tonnes(self.good)
 
     def fill(self, parcels: Parcels) -> None:
         for origin, amount in parcels.items():

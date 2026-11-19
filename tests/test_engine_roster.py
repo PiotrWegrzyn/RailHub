@@ -4,18 +4,22 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Constructions
-from railroads.sim.finance import CAR_TRIP_PRICE, TRAIN_RESALE
-from railroads.sim.goods import General, Good, Need
+from railroads.sim.finance import CAR_TRIP_PRICE, TRAIN_RESALE, car_trip_price
+from railroads.sim.goods import GENERAL_GOODS, General, Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.tech import GENERAL_CARS, NODES, Effect, Research
 from railroads.sim.trains import (
+    BASE_GENERATION,
     BULK_CAR,
+    CAR_GROWTH,
     CAR_SIZES,
     ENGINES,
     EXPRESS_FARE,
+    FREIGHT_TARE,
+    GENERATIONS,
     SLOWDOWN,
     Car,
     Engine,
@@ -24,7 +28,8 @@ from railroads.sim.trains import (
     Train,
     bigger,
     car_size,
-    tare,
+    full_tonnes,
+    tare_of,
     unit_tonnes,
 )
 from railroads.ui.tech_window import describe
@@ -126,13 +131,13 @@ def test_each_engine_of_a_class_costs_about_three_times_the_one_before(kind: Kin
     assert all(2.5 <= step <= 3.5 for step in steps)
 
 
-def test_electric_engines_run_faster_than_diesels_and_both_pull_cars_one_size_bigger() -> None:
+def test_electric_engines_run_faster_than_diesels_and_both_pull_the_newest_cars() -> None:
     steam, diesel, electric = ENGINES["planet"], ENGINES["mixed_diesel"], ENGINES["express"]
 
-    levels = steam.car_levels, diesel.car_levels, electric.car_levels
+    generations = steam.top_generation, diesel.top_generation, electric.top_generation
 
     assert electric.speed > diesel.speed
-    assert levels == (0, 1, 1)
+    assert generations == (3, GENERATIONS, GENERATIONS)
 
 
 def of_its_day(engine: Engine, kind: Kind) -> Engine:
@@ -262,7 +267,7 @@ def test_an_express_leads_its_coaches_with_an_empty_dining_car() -> None:
     assert dining.dining and dining.load == 0.0
     assert [car.good for car in coaches] == [Good.PASSENGERS]
     assert coaches[0].load > 0
-    assert dining.tonnes == pytest.approx(tare(dining.capacity))
+    assert dining.tonnes == pytest.approx(tare_of(Good.PASSENGERS))
 
 
 def test_an_express_pays_a_car_trip_for_its_dining_car() -> None:
@@ -275,7 +280,8 @@ def test_an_express_pays_a_car_trip_for_its_dining_car() -> None:
 
     railway.run(0.001)
 
-    assert railway.finances.month["car trips"] == pytest.approx(-(CAR_TRIP_PRICE + 20))
+    coach = car_trip_price(railway.car_capacity(Good.PASSENGERS, "single"))
+    assert railway.finances.month["car trips"] == pytest.approx(-(CAR_TRIP_PRICE + coach))
 
 
 def test_passengers_on_an_express_pay_more() -> None:
@@ -340,21 +346,46 @@ def test_a_train_slows_by_what_its_cars_weigh_against_the_most_its_engine_pulls(
     assert pull == pytest.approx(1.0 - SLOWDOWN[Kind.GENERAL] * share)
 
 
-def test_a_full_coal_car_weighs_about_a_hundred_tonnes_and_a_wheat_car_about_thirty() -> None:
+def test_a_car_of_coal_or_wheat_of_the_planets_day_holds_89_quintals_weighing_about_13_t() -> None:
     coal = Car(Good.COAL, BULK_CAR)
     wheat = Car(Good.WHEAT, BULK_CAR)
 
     weights = coal.tonnes, wheat.tonnes
 
-    assert weights == (pytest.approx(100.0, abs=5.0), pytest.approx(30.0, abs=3.0))
+    assert weights == (pytest.approx(12.9), pytest.approx(12.9))
 
 
-def test_an_empty_car_weighs_more_the_bigger_it_is() -> None:
-    small, middle, bulk = Car(Good.GOLD), Car(Good.MAIL), Car(Good.COAL)
+@pytest.mark.parametrize(
+    ("good", "kg"),
+    [
+        (Good.COAL, 100.0),
+        (Good.COFFEE, 60.0),
+        (Good.CATTLE, 500.0),
+        (Good.SHOES, 70.0),
+        (Good.PASSENGERS, 80.0),
+    ],
+)
+def test_a_unit_of_a_good_weighs_what_the_thing_it_stands_for_does(good: Good, kg: float) -> None:
+    weight = unit_tonnes(good)
 
-    weights = [car.tonnes for car in (small, middle, bulk)]
+    assert weight == pytest.approx(kg / 1_000)
 
-    assert 0 < weights[0] < weights[1] < weights[2]
+
+def test_full_cars_of_light_or_bulky_goods_weigh_less_than_one_of_coal() -> None:
+    light = [Good.FISH, Good.GOLD, Good.APPLES, Good.CATTLE, Good.CLOTHES, Good.FURNITURE]
+
+    weights = [full_tonnes(good, car_size(good)) for good in light]
+
+    assert max(weights) < full_tonnes(Good.COAL, BULK_CAR)
+
+
+def test_freight_cars_weigh_the_same_empty_whatever_they_carry_and_a_coach_more() -> None:
+    goods = [Good.GOLD, Good.STEEL, Good.FISH, Good.COAL]
+
+    tares = [Car(good).tonnes for good in goods]
+
+    assert tares == [pytest.approx(FREIGHT_TARE)] * len(goods)
+    assert Car(Good.PASSENGERS).tonnes > FREIGHT_TARE
 
 
 @pytest.mark.parametrize("good", [Good.COAL, Good.STEEL, Good.MAIL, Good.PASSENGERS])
@@ -363,23 +394,139 @@ def test_a_car_weighs_its_tare_and_what_it_carries(good: Good) -> None:
 
     weight = car.tonnes
 
-    assert weight == pytest.approx(tare(car.capacity) + 10.0 * unit_tonnes(good))
+    assert weight == pytest.approx(tare_of(good) + 10.0 * unit_tonnes(good))
 
 
-def test_the_planet_pulls_three_full_wheat_cars_but_not_a_second_coal_car() -> None:
+@pytest.mark.parametrize(("generation", "coal"), [(1, 55.0), (2, 89.0), (3, 144.0), (5, 377.0)])
+def test_each_generation_of_cars_holds_one_fibonacci_size_more(
+    generation: int, coal: float
+) -> None:
+    size = car_size(Good.COAL, generation)
+
+    assert size == coal
+
+
+def test_cars_tanks_and_planes_ride_one_to_a_car_from_the_third_generation() -> None:
+    goods = [Good.CARS, Good.TANKS, Good.PLANES]
+
+    sizes = [[car_size(good, generation) for generation in (2, 3, 4)] for good in goods]
+
+    assert sizes == [[0.0, 1.0, 2.0]] * 3
+
+
+def test_a_car_a_generation_newer_weighs_as_much_more_empty() -> None:
+    railway = knowing(line(), "bessemer", "couplings", "drawbars", "bogie_wagons")
+
+    tares = railway.car_tare(Good.COAL, "penydarren"), railway.car_tare(Good.COAL, "planet")
+
+    assert tares[1] == pytest.approx(tares[0] * CAR_GROWTH**2)
+
+
+def test_pioneers_pull_the_first_generation_and_the_planet_the_second_without_tech() -> None:
     railway = line()
-    train = railway.buy()
+
+    generations = (
+        railway.car_generation(Good.COAL, "rocket"),
+        railway.car_generation(Good.COAL, "planet"),
+    )
+
+    assert generations == (1, BASE_GENERATION)
+
+
+def test_wagon_tech_opens_newer_generations_up_to_the_newest_an_engine_pulls() -> None:
+    railway = knowing(
+        line(),
+        "bessemer",
+        "couplings",
+        "drawbars",
+        "bogie_wagons",
+        "open_hearth",
+        "rolling",
+        "steel_wagons",
+        "oxygen",
+        "modern_wagons",
+    )
+
+    generations = [
+        railway.car_generation(Good.COAL, engine) for engine in ("planet", "mogul", "heavy_diesel")
+    ]
+
+    assert generations == [3, 4, 5]
+
+
+def test_a_pioneer_pulls_a_full_car_of_55_quintals_of_coal() -> None:
+    railway = line()
+    railway.year = 1804
+    train = railway.buy("penydarren")
     assert train is not None
-    wheat, coal = Stop(WEST), Stop(EAST)
+    stop = Stop(WEST)
 
-    wheat_added = [railway.add_car(train, wheat, Good.WHEAT) for _ in range(3)]
-    coal_added = [railway.add_car(train, coal, Good.COAL) for _ in range(2)]
+    added = railway.add_car(train, stop, Good.COAL)
 
-    assert wheat_added == [True, True, True]
-    assert coal_added == [True, False]
+    assert added
+    assert railway.car_capacity(Good.COAL, "penydarren") == 55.0
 
 
-def test_the_first_heavy_freight_engine_pulls_three_full_coal_cars() -> None:
+@pytest.mark.parametrize("engine", ["planet", "goods", "american", "mogul"])
+def test_a_freight_engine_pulls_a_full_train_of_coal_at_its_slowest(engine: str) -> None:
+    railway = line()
+    train = full_train(engine, ENGINES[engine].cars)
+
+    share = railway.load_share(train)
+
+    assert share == pytest.approx(1.0, abs=0.01)
+
+
+def test_a_full_train_of_general_goods_slows_a_general_engine_by_a_fifth_or_so() -> None:
+    railway = line()
+    train = Train("Test", cars=[Car(Good.GOODS, car_size(Good.GOODS)) for _ in range(3)])
+
+    pull = railway.pull(train)
+
+    assert 0.7 < pull < 0.85
+
+
+def test_an_express_slows_about_as_much_empty_as_full() -> None:
+    railway = knowing(line(), "express_trains")
+    railway.year = 1858
+    coaches = ENGINES["single"].cars
+    empty = Train("Empty", engine="single", cars=[Car(Good.PASSENGERS, dining=True)])
+    empty.cars += [Car(Good.PASSENGERS) for _ in range(coaches)]
+    full = Train("Full", engine="single", cars=[Car(Good.PASSENGERS, dining=True)])
+    full.cars += [Car(Good.PASSENGERS, car_size(Good.PASSENGERS)) for _ in range(coaches)]
+
+    pulls = railway.pull(empty), railway.pull(full)
+
+    assert pulls[1] < pulls[0] <= pulls[1] * 1.15
+
+
+def test_the_rocket_pulls_one_full_coal_car_but_not_two() -> None:
+    railway = line()
+    railway.year = 1826
+    train = railway.buy("rocket")
+    assert train is not None
+    stop = Stop(WEST)
+
+    added = [railway.add_car(train, stop, Good.COAL) for _ in range(2)]
+
+    assert added == [True, False]
+
+
+def test_a_railbus_pulls_its_coaches_full_but_not_as_many_coal_cars() -> None:
+    railway = knowing(line(), "diesel")
+    railway.year = 1935
+    train = railway.buy("railbus")
+    assert train is not None
+    coaches, coal = Stop(WEST), Stop(EAST)
+
+    coaches_added = [railway.add_car(train, coaches, Good.PASSENGERS) for _ in range(3)]
+    coal_added = [railway.add_car(train, coal, Good.COAL) for _ in range(3)]
+
+    assert coaches_added == [True, True, True]
+    assert coal_added == [True, True, False]
+
+
+def test_the_first_heavy_freight_engine_pulls_four_full_coal_cars() -> None:
     railway = knowing(line(), "boilers")
     railway.year = 1853
     train = railway.buy("goods")
@@ -388,15 +535,19 @@ def test_the_first_heavy_freight_engine_pulls_three_full_coal_cars() -> None:
 
     added = [railway.add_car(train, stop, Good.COAL) for _ in range(4)]
 
-    assert added == [True, True, True, False]
+    assert added == [True, True, True, True]
 
 
 def test_a_general_car_weighs_as_much_as_the_heaviest_of_its_goods_would() -> None:
     railway = line()
+    heaviest = max(
+        full_tonnes(good, railway.car_capacity(good, "planet", General.FOOD))
+        for good in GENERAL_GOODS[General.FOOD]
+    )
 
     weight = railway.car_tonnes(General.FOOD, "planet")
 
-    assert weight == pytest.approx(railway.car_tonnes(Good.WHEAT, "planet"))
+    assert weight == pytest.approx(heaviest)
 
 
 def test_tech_that_adds_a_car_adds_as_much_to_the_most_an_engine_pulls() -> None:
@@ -405,31 +556,24 @@ def test_tech_that_adds_a_car_adds_as_much_to_the_most_an_engine_pulls() -> None
 
     pulls = plain.max_pull("planet"), coupled.max_pull("planet")
 
-    assert pulls == (
-        pytest.approx(engine.tonnes),
-        pytest.approx(engine.tonnes * (engine.cars + 1) / engine.cars),
-    )
+    most = engine.pull_at(BASE_GENERATION)
+    assert pulls == (pytest.approx(most), pytest.approx(most * (engine.cars + 1) / engine.cars))
 
 
 def test_cars_load_no_more_than_their_engine_pulls() -> None:
     railway = line()
-    train = railway.buy()
+    railway.year = 1826
+    train = railway.buy("rocket")
     assert train is not None
     stop = Stop(WEST, [Good.COAL, Good.COAL])
-    train.cars = [Car(Good.COAL), Car(Good.COAL)]
+    size, tare = railway.car_capacity(Good.COAL, "rocket"), railway.car_tare(Good.COAL, "rocket")
+    train.cars = [Car(Good.COAL, capacity=size, tare=tare) for _ in range(2)]
     railway.station_goods(WEST).stockpile[Good.COAL] = 1_000.0
 
     railway.calls.load(train, stop)
 
     assert train.tonnes == pytest.approx(railway.max_pull(train.engine))
-    assert train.cars[0].load == pytest.approx(BULK_CAR)
-
-
-@pytest.mark.parametrize("good", [Good.WHEAT, Good.IRON, Good.APPLES, Good.COAL, Good.LUMBER])
-def test_grain_ore_apples_and_other_bulk_goods_go_two_car_sizes_up(good: Good) -> None:
-    size = car_size(good)
-
-    assert size == bigger(car_size(Good.MAIL), 2)
+    assert 0 < train.cars[0].load < size
 
 
 def test_each_car_size_holds_as_much_as_the_two_below_it_together() -> None:

@@ -30,7 +30,7 @@ def line_of_three() -> Railway:
 
 
 def passenger_train(railway: Railway, refuel: bool = True) -> Train:
-    railway.station_goods(FIRST).stockpile[Good.PASSENGERS] = 40.0
+    railway.station_goods(FIRST).stockpile[Good.PASSENGERS] = 30.0
     railway.station_demand(LAST).capacity = {Need.PASSENGERS: 200.0}
     train = railway.buy(SHORT_RANGE)
     assert train is not None
@@ -54,7 +54,7 @@ def test_passengers_ride_through_a_refuelling_stop_and_pay_at_the_far_station() 
 
     run_until(railway, train, reached=2)
 
-    assert railway.finances.month["passengers"] > 0.95 * 40 * freight_of(Good.PASSENGERS)
+    assert railway.finances.month["passengers"] > 0.95 * 30 * freight_of(Good.PASSENGERS)
 
 
 def test_nothing_unloads_or_loads_at_a_stop_the_train_only_refuels_at() -> None:
@@ -65,7 +65,7 @@ def test_nothing_unloads_or_loads_at_a_stop_the_train_only_refuels_at() -> None:
     run_until(railway, train, reached=1)
 
     middle = railway.station_goods(MIDDLE)
-    assert [(car.good, round(car.load)) for car in train.cars] == [(Good.PASSENGERS, 40)]
+    assert [(car.good, round(car.load)) for car in train.cars] == [(Good.PASSENGERS, 30)]
     assert not middle.brought.get(Good.PASSENGERS)
     assert middle.stockpile[Good.COAL] == 50.0
     assert "passengers" not in railway.finances.month
@@ -101,5 +101,5 @@ def test_cars_bound_past_a_refuelling_stop_are_worth_what_the_far_station_pays()
     assert destination == LAST
     assert railway.calls.next_cell(train, train.stops[0]) == LAST
     assert sum(railway.cargo_worth(train)) == pytest.approx(
-        40 * freight_of(Good.PASSENGERS) * railway.price_factor(Good.PASSENGERS), rel=0.05
+        30 * freight_of(Good.PASSENGERS) * railway.price_factor(Good.PASSENGERS), rel=0.05
     )

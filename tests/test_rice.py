@@ -23,7 +23,7 @@ from railroads.sim.ladders import (
 )
 from railroads.sim.tech import GOOD_TREES, Tree
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
-from railroads.sim.trains import BULK_CAR_GOODS
+from railroads.sim.trains import BULK_CAR, car_size
 
 
 def at_latitude(south: float, north: float) -> TileMap:
@@ -96,7 +96,7 @@ def test_rice_feeds_homes_and_rides_in_bulk_cars_with_the_food_tree() -> None:
     food = FITS[Need.FOOD]
 
     assert Good.RICE in food
-    assert Good.RICE in BULK_CAR_GOODS
+    assert car_size(Good.RICE) == BULK_CAR
     assert GOOD_TREES[Good.RICE] == Tree.FOOD
     assert RICE_PADDIES in LADDERS
 

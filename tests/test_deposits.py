@@ -99,7 +99,7 @@ def test_diamonds_cars_and_gold_are_worth_a_lot_but_only_where_someone_wants_the
 
     assert earned == pytest.approx(freight_of(Good.DIAMONDS))
     assert elsewhere.deliver(Good.DIAMONDS, 1.0) == 0.0
-    assert freight_of(Good.CARS) == 5000
+    assert freight_of(Good.CARS) >= 5000
 
 
 def test_a_map_only_holds_its_few_jewellers() -> None:

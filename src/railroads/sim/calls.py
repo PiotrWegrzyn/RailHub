@@ -67,7 +67,9 @@ class StationCalls:
                     self._railway.history.deliver(self._railway.year, car.good)
                     self._railway.hand_out_now(stop.cell, car.good)
             aboard = self._next_cars(aboard, wanted, train.engine)
-        dining = [Car(Good.PASSENGERS, dining=True)] if ENGINES[train.engine].express else []
+        coach = self._railway.car_tare(Good.PASSENGERS, train.engine)
+        express = ENGINES[train.engine].express
+        dining = [Car(Good.PASSENGERS, dining=True, tare=coach)] if express else []
         train.cars = dining + aboard
         train.loaded_at = stop.cell
         train.fuelled = Facility.ENGINE_SHED in working
@@ -124,8 +126,17 @@ class StationCalls:
         railway = self._railway
         if isinstance(cargo, General):
             good = GENERAL_GOODS[cargo][0]
-            return Car(good, capacity=railway.car_capacity(good, engine, cargo), general=cargo)
-        return Car(cargo, capacity=railway.car_capacity(cargo, engine))
+            return Car(
+                good,
+                capacity=railway.car_capacity(good, engine, cargo),
+                general=cargo,
+                tare=railway.car_tare(good, engine),
+            )
+        return Car(
+            cargo,
+            capacity=railway.car_capacity(cargo, engine),
+            tare=railway.car_tare(cargo, engine),
+        )
 
     def _swap_cars(
         self,
@@ -210,3 +221,4 @@ class StationCalls:
         if best is not None:
             car.good = best[2]
             car.capacity = self._railway.car_capacity(best[2], train.engine, car.general)
+            car.tare = self._railway.car_tare(best[2], train.engine)

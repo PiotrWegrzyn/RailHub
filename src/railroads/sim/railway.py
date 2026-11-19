@@ -93,11 +93,12 @@ from railroads.sim.stats import History
 from railroads.sim.tech import GENERAL_CARS, GOOD_TREES, Effect, Research, Tree
 from railroads.sim.track_network import TrackNetwork
 from railroads.sim.trains import (
+    BASE_GENERATION,
     BURN_ALONE,
-    CAR_GROWTH,
     ENGINES,
     EXPRESS_FARE,
     FIRST_ENGINE,
+    GENERATIONS,
     MAGLEV_FARE,
     SLOWDOWN,
     Cargo,
@@ -105,11 +106,10 @@ from railroads.sim.trains import (
     Power,
     Stop,
     Train,
-    bigger,
     car_size,
     full_tonnes,
     general_car_size,
-    tare,
+    tare_of,
 )
 
 if TYPE_CHECKING:
@@ -265,9 +265,12 @@ class Railway:
         ]
 
     def can_carry(self, train: Train, cargo: Cargo) -> bool:
-        """Whether a train's engine takes cars of a good: an express takes only passengers;
-        and a general car only once its tech is taken."""
+        """Whether a train's engine takes cars of a good: an express takes only passengers, a
+        general car only once its tech is taken, and a good first carried in a later generation
+        (FIRST_GENERATION) only once its cars are of that one."""
         if isinstance(cargo, General) and not self.general_open(cargo):
+            return False
+        if isinstance(cargo, Good) and not self.car_capacity(cargo, train.engine):
             return False
         return not ENGINES[train.engine].express or cargo == Good.PASSENGERS
 
@@ -355,11 +358,13 @@ class Railway:
 
     def max_pull(self, engine: str) -> float:
         """The most an engine pulls, in tonnes, with what tech adds: as much more as the cars
-        it adds (Effect.PULL), and as their cars grow (Effect.CAR_SIZE)."""
+        it adds (Effect.PULL), pulling the generation of cars tech opens for every good.
+        Goods whose own tree opens a newer one ride in heavier cars against it."""
         built = ENGINES[engine]
         extra = int(self.research.bonus(Effect.PULL))
-        levels = int(self.research.bonus(Effect.CAR_SIZE))
-        return built.tonnes * (built.hauls + extra) / built.hauls * CAR_GROWTH**levels
+        opened = int(self.research.everywhere_bonus(Effect.CAR_SIZE))
+        most = built.pull_at(BASE_GENERATION + opened)
+        return most * (built.hauls + extra) / built.hauls
 
     def pull(self, train: Train) -> float:
         """How much of its engine's top speed a train makes with its cars behind it: all of it
@@ -380,12 +385,18 @@ class Railway:
         as much as the heaviest of its goods would."""
         goods = GENERAL_GOODS[cargo] if isinstance(cargo, General) else (cargo,)
         general = cargo if isinstance(cargo, General) else None
-        return max(full_tonnes(good, self.car_capacity(good, engine, general)) for good in goods)
+        return max(
+            full_tonnes(
+                good, self.car_capacity(good, engine, general), self.car_generation(good, engine)
+            )
+            for good in goods
+        )
 
     def stop_tonnes(self, train: Train, stop: Stop) -> float:
         """What a train would weigh leaving a stop with every one of its cars full, in tonnes,
         an express's dining car included."""
-        dining = tare(car_size(Good.PASSENGERS)) if ENGINES[train.engine].express else 0.0
+        express = ENGINES[train.engine].express
+        dining = self.car_tare(Good.PASSENGERS, train.engine) if express else 0.0
         return dining + sum(self.car_tonnes(cargo, train.engine) for cargo in stop.cars)
 
     def add_car(self, train: Train, stop: Stop, cargo: Cargo) -> bool:
@@ -455,18 +466,35 @@ class Railway:
     def car_capacity(
         self, good: Good, engine: str | None = None, general: General | None = None
     ) -> float:
-        """How much of a good one car carries, a general car of a kind (general_car_size) or
-        one for the good alone: sizes up with its tree's tech (Effect.CAR_SIZE) and behind newer engines
-        (Engine.car_levels), and coaches and mail vans more with tech."""
-        base = car_size(good) if general is None else general_car_size(general, good)
-        tree = GOOD_TREES.get(good)
-        levels = int(self.research.bonus(Effect.CAR_SIZE, tree)) if tree is not None else 0
-        if engine is not None:
-            levels += ENGINES[engine].car_levels
-        size = bigger(base, levels)
+        """How much of a good one car of its car_generation carries, a general car of a kind
+        (general_car_size) or one for the good alone, and coaches and mail vans more with tech;
+        nothing in a generation before the good's first."""
+        generation = self.car_generation(good, engine)
+        if general is None:
+            size = car_size(good, generation)
+        else:
+            size = general_car_size(general, good, generation)
         if good in TRAVELLERS:
             return size * (1.0 + self.research.bonus(Effect.COACHES))
         return size
+
+    def car_generation(self, good: Good, engine: str | None = None) -> int:
+        """The generation of a good's cars: BASE_GENERATION and one more for each generation
+        its tree's tech opens (Effect.CAR_SIZE), up to the newest an engine pulls."""
+        tree = GOOD_TREES.get(good)
+        opened = (
+            self.research.everywhere_bonus(Effect.CAR_SIZE)
+            if tree is None
+            else self.research.bonus(Effect.CAR_SIZE, tree)
+        )
+        generation = min(BASE_GENERATION + int(opened), GENERATIONS)
+        if engine is None:
+            return generation
+        return min(generation, ENGINES[engine].top_generation)
+
+    def car_tare(self, good: Good, engine: str | None = None) -> float:
+        """What an empty car for a good weighs behind an engine, in tonnes."""
+        return tare_of(good, self.car_generation(good, engine))
 
     def _upkeep(self) -> float:
         return max(LEAST_UPKEEP, 1.0 - self.research.bonus(Effect.UPKEEP))

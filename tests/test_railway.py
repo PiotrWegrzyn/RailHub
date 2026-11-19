@@ -21,7 +21,16 @@ from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import CELLS_PER_MONTH, Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.station_goods import STOCKPILE, STORAGE_STEP, WAITING, StationGoods
-from railroads.sim.trains import BULK_CAR, CAR_CAPACITY, ENGINES, MAX_CARS, SMALL_CAR, Car, Stop
+from railroads.sim.trains import (
+    BULK_CAR,
+    CAR_CAPACITY,
+    ENGINES,
+    MAX_CARS,
+    SMALL_CAR,
+    Car,
+    Stop,
+    car_size,
+)
 
 
 def joined_stations() -> tuple[Growth, Railway]:
@@ -66,16 +75,17 @@ def test_a_new_train_leaves_its_first_stop_with_that_stops_cars_full() -> None:
     [
         (Good.GOLD, 5.0),
         (Good.STEEL, 13.0),
-        (Good.CATTLE, 21.0),
-        (Good.PIGS, 13.0),
-        (Good.OIL, 34.0),
+        (Good.CATTLE, 8.0),
+        (Good.PIGS, 21.0),
+        (Good.OIL, 55.0),
+        (Good.FISH, 34.0),
         (Good.IRON, 89.0),
         (Good.WHEAT, 89.0),
         (Good.BREAD, 89.0),
-        (Good.PASSENGERS, 55.0),
+        (Good.PASSENGERS, 34.0),
     ],
 )
-def test_a_car_holds_5_of_precious_goods_13_of_heavy_ones_89_of_bulk_55_passengers_and_34_else(
+def test_a_car_of_the_planets_day_holds_as_many_units_as_fit_in_a_real_wagon_of_it(
     good: Good, load: float
 ) -> None:
     _, railway = joined_stations()
@@ -143,18 +153,20 @@ def test_at_the_next_stop_it_unloads_and_takes_that_stops_cars() -> None:
 
     assert train.heading == 0
     assert railway.station_goods((6, 20)).brought[Good.WHEAT] == BULK_CAR
-    assert [(car.good, car.load) for car in train.cars] == [(Good.OIL, 34.0), (Good.OIL, 34.0)]
+    assert [(car.good, car.load) for car in train.cars] == [(Good.OIL, 55.0), (Good.OIL, 55.0)]
 
 
 def test_each_car_fills_with_its_own_good_from_the_stockpile() -> None:
     _, railway = joined_stations()
     train = railway.buy()
     train.stops = [Stop((6, 3), [Good.LUMBER, Good.LUMBER, Good.WHEAT]), Stop((6, 20))]
-    railway.station_goods((6, 3)).stockpile.update({Good.LUMBER: BULK_CAR + 20.0, Good.IRON: 150.0})
+    railway.station_goods((6, 3)).stockpile.update(
+        {Good.LUMBER: car_size(Good.LUMBER) + 20.0, Good.IRON: 150.0}
+    )
 
     railway.run(0.01)
 
-    assert [car.load for car in train.cars] == [BULK_CAR, 20.0, 0.0]
+    assert [car.load for car in train.cars] == [car_size(Good.LUMBER), 20.0, 0.0]
     assert railway.station_goods((6, 3)).stockpile == {Good.LUMBER: 0.0, Good.IRON: 150.0}
 
 
@@ -287,16 +299,17 @@ def test_new_cars_at_another_stop_leave_a_standing_train_be() -> None:
 def test_removing_one_loaded_car_keeps_the_others_full_and_returns_its_goods() -> None:
     _, railway = joined_stations()
     stockpile = railway.station_goods((6, 3)).stockpile
-    stockpile[Good.WHEAT] = (MAX_CARS - 1) * BULK_CAR + 10.0
+    cars = ENGINES["planet"].cars
+    stockpile[Good.WHEAT] = (cars - 1) * BULK_CAR + 10.0
     train = railway.buy()
-    train.stops = [Stop((6, 3), [Good.WHEAT] * MAX_CARS, wait_for_load=True), Stop((6, 20))]
+    train.stops = [Stop((6, 3), [Good.WHEAT] * cars, wait_for_load=True), Stop((6, 20))]
     railway.run(0.001)
 
     train.stops[0].cars.pop()
     train.cars_changed(0)
     railway.run(0.001)
 
-    assert [car.load for car in train.cars] == [BULK_CAR] * (MAX_CARS - 1)
+    assert [car.load for car in train.cars] == [BULK_CAR] * (cars - 1)
     assert stockpile[Good.WHEAT] == pytest.approx(10.0)
     assert railway.station_goods((6, 3)).brought == {}
 
@@ -415,7 +428,7 @@ def test_last_months_passengers_and_mail_give_way_to_this_months() -> None:
 
 def test_passengers_pay_on_arrival_and_go_on_their_way() -> None:
     _, railway = joined_stations()
-    railway.station_goods((6, 3)).stockpile[Good.PASSENGERS] = 50.0
+    railway.station_goods((6, 3)).stockpile[Good.PASSENGERS] = 30.0
     railway.station_demand((6, 20)).capacity = {Need.PASSENGERS: 200.0}
     train = railway.buy()
     assert train is not None
@@ -424,7 +437,7 @@ def test_passengers_pay_on_arrival_and_go_on_their_way() -> None:
     railway.run(0.01)
     railway.run(80 / CELLS_PER_MONTH)
 
-    assert railway.finances.month["passengers"] > 0.95 * 50 * freight_of(Good.PASSENGERS)
+    assert railway.finances.month["passengers"] > 0.95 * 30 * freight_of(Good.PASSENGERS)
     assert Good.PASSENGERS not in railway.station_goods((6, 20)).brought
 
 
@@ -915,7 +928,8 @@ def test_a_rides_bill_takes_the_fuel_and_every_cars_trip_off_what_its_cargo_earn
     assert ride is not None
     assert ride.cells == pytest.approx(cells, rel=0.05)
     assert (ride.loaded, ride.empty) == (1, 1)
-    assert ride.fuel == pytest.approx(railway.fuel_cost(train.engine, ride.cells))
+    loaded_share = railway.burn(train) / ENGINES[train.engine].burn
+    assert ride.fuel == pytest.approx(railway.fuel_cost(train.engine, ride.cells) * loaded_share)
     assert ride.loaded_cars == pytest.approx(car_trip_price(train.cars[0].capacity))
     assert ride.empty_cars == pytest.approx(car_trip_price(train.cars[0].capacity))
     assert ride.net == pytest.approx(300.0 - ride.fuel - 2 * car_trip_price(train.cars[0].capacity))

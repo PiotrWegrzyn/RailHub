@@ -150,7 +150,7 @@ def test_a_mogul_pulls_more_cars_and_steel_couplings_one_more() -> None:
     assert not stop.add_car(Good.COAL, railway.most_cars(train))
 
 
-def test_a_diesel_engine_and_bogie_wagons_each_put_a_car_one_fibonacci_size_up() -> None:
+def test_bogie_wagons_put_the_cars_of_every_engine_that_pulls_them_one_fibonacci_size_up() -> None:
     railway, upgraded = joined().railway, joined().railway
     upgraded.research = learned(Tree.METALS, "bessemer", "couplings", "drawbars", "bogie_wagons")
 
@@ -160,7 +160,7 @@ def test_a_diesel_engine_and_bogie_wagons_each_put_a_car_one_fibonacci_size_up()
         for engine in ("planet", "mixed_diesel")
     ]
 
-    assert sizes == [34.0, 55.0, 55.0, 89.0]
+    assert sizes == [55.0, 55.0, 89.0, 89.0]
 
 
 def test_grain_hoppers_put_only_food_cars_one_size_up() -> None:
@@ -179,8 +179,8 @@ def test_bogie_coaches_carry_more_passengers_but_freight_cars_stay_the_same() ->
     coach = railway.car_capacity(Good.PASSENGERS)
     wagon = railway.car_capacity(Good.OIL)
 
-    assert coach == pytest.approx(66.0)
-    assert wagon == pytest.approx(34.0)
+    assert coach == pytest.approx(34.0 * 1.2)
+    assert wagon == pytest.approx(55.0)
 
 
 def test_every_building_that_makes_something_has_a_tree_and_shops_are_commerce() -> None:

@@ -62,7 +62,7 @@ class Effect(Enum):
     # Fuel bought anywhere but out of a station's stockpile costs this much less over the market
     # price (railroads.sim.fuel_market).
     FUEL_MARKUP = "retail fuel markup"
-    # Every car holds this many sizes more (railroads.sim.trains.CAR_SIZES).
+    # Cars come this many generations newer, each a size up (railroads.sim.trains.CAR_SIZES).
     CAR_SIZE = "car size"
     # The buildings of a kind the player owns take a good as a boost (railroads.sim.goods.OWNED_BOOSTS).
     TAKES = "takes"
@@ -168,10 +168,28 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             ),
             _n("drawbars", "Heavy drawbars", E.PULL, 1, "couplings"),
             _n("bogie_wagons", "Bogie wagons", E.CAR_SIZE, 1, "drawbars", everywhere=True),
+            _n(
+                "steel_wagons",
+                "Steel wagons",
+                E.CAR_SIZE,
+                1,
+                "bogie_wagons",
+                "rolling",
+                everywhere=True,
+            ),
             _n("rolling", "Rolling mills", E.PRODUCTION, 0.25, "open_hearth"),
             _n("streamlining", "Streamlining", E.SPEED, 0.1, "superheaters"),
             _n("works_trust", "Engineering trust", E.TO_COME, 0.0, "cartel", "rolling"),
             _n("oxygen", "Basic oxygen steel", E.PRODUCTION, 0.25, "rolling"),
+            _n(
+                "modern_wagons",
+                "Modern wagons",
+                E.CAR_SIZE,
+                1,
+                "steel_wagons",
+                "oxygen",
+                everywhere=True,
+            ),
         ),
         Tree.FUEL: (
             _n("screening", "Coal screening", E.PRODUCTION, 0.25),
@@ -468,6 +486,14 @@ class Research:
         """The boosts the buildings of a kind the player owns take, by the nodes taken."""
         return frozenset(
             need for key in self.taken for taker, need in NODES[key][1].takes if taker == kind
+        )
+
+    def everywhere_bonus(self, effect: Effect) -> float:
+        """The sum of the taken nodes' effect of a kind that reach every tree."""
+        return sum(
+            NODES[key][1].amount
+            for key in self.taken
+            if NODES[key][1].effect == effect and NODES[key][1].everywhere
         )
 
     def bonus(self, effect: Effect, tree: Tree | None = None) -> float:

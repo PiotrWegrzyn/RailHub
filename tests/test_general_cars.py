@@ -28,7 +28,7 @@ def test_a_general_car_needs_its_tech() -> None:
     assert (before, railway.can_carry(train, General.FOOD)) == (False, True)
 
 
-def test_a_general_food_car_takes_the_food_that_pays_best_at_the_next_stop() -> None:
+def test_a_general_food_car_takes_the_food_that_fills_it_most_when_none_pays_more() -> None:
     _, railway = joined_stations()
     train = general_train(railway)
     railway.station_goods(HERE).stockpile.update({Good.FISH: 100.0, Good.HONEY: 100.0})
@@ -37,7 +37,7 @@ def test_a_general_food_car_takes_the_food_that_pays_best_at_the_next_stop() -> 
     railway.calls.arrive(train, train.stops[0])
 
     (car,) = train.cars
-    assert (car.general, car.good) == (General.FOOD, Good.HONEY)
+    assert (car.general, car.good) == (General.FOOD, Good.FISH)
     assert car.load == pytest.approx(car.capacity)
 
 

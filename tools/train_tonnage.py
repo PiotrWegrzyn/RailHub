@@ -1,90 +1,97 @@
-"""Prints, for every engine, the most it pulls in tonnes, what full cars weigh behind it and how
-fast it runs with a few typical trains, in cells a month on flat track, next to what the old
-drag by car count gave, so the weights in railroads.sim.trains can be tuned.
+"""Prints what a unit of every good weighs, how many a car of each generation holds and what it
+weighs full, and, for every engine, the most it pulls in tonnes and how fast it runs with a few
+typical trains of its newest cars, in cells a month on flat track, so the weights in
+railroads.sim.trains can be tuned.
 
     uv run python tools/train_tonnage.py"""
 
-from railroads.sim.goods import Good
+from railroads.sim.goods import FREIGHT_RATE, Good
 from railroads.sim.railway import CELLS_PER_MONTH
 from railroads.sim.trains import (
+    BASE_GENERATION,
     ENGINES,
+    GENERATIONS,
     SLOWDOWN,
     Engine,
-    Kind,
-    bigger,
     car_size,
     full_tonnes,
-    tare,
+    tare_of,
+    unit_tonnes,
 )
 
-OLD_DRAG_PER_CAR = 0.08
-OLD_LOAD_DRAG = {Kind.LIGHT: 1.5, Kind.HEAVY: 0.5}
-OLD_BULK = frozenset({Good.WHEAT, Good.COAL})
 
-
-def capacity(engine: Engine, good: Good) -> float:
-    return bigger(car_size(good), engine.car_levels)
-
-
-def cells(engine: Engine, tonnes: float) -> float:
-    pull = 1.0 - SLOWDOWN[engine.kind] * min(1.0, tonnes / engine.tonnes)
+def cells(engine: Engine, tonnes: float, generation: int) -> float:
+    pull = 1.0 - SLOWDOWN[engine.kind] * min(1.0, tonnes / engine.pull_at(generation))
     return CELLS_PER_MONTH * engine.speed * pull
 
 
-def old_cells(engine: Engine, cars: int, good: Good | None) -> float:
-    heft = 144.0 / 55.0 if good in OLD_BULK else 1.0
-    weight = cars * (1.0 + (0.0 if good is None else heft))
-    if engine.express:
-        weight += 1.0
-    drag = OLD_DRAG_PER_CAR * 5 / engine.hauls * OLD_LOAD_DRAG.get(engine.kind, 1.0)
-    return CELLS_PER_MONTH * engine.speed / (1.0 + drag * weight)
-
-
-def train(engine: Engine, good: Good, full: bool) -> tuple[int, float, float, float]:
-    """As many cars of a good as the engine takes and can pull full: how many, their weight, and
-    the speed now and with the old drag."""
-    size = capacity(engine, good)
-    car = full_tonnes(good, size) if full else tare(size)
-    dining = tare(car_size(Good.PASSENGERS)) if engine.express else 0.0
-    fit = int((engine.tonnes - dining + 1e-9) // car) if car else engine.cars
-    count = min(engine.cars, fit)
-    tonnes = dining + count * car
-    return count, tonnes, cells(engine, tonnes), old_cells(engine, count, good if full else None)
-
-
-def column(engine: Engine, good: Good, full: bool = True) -> str:
-    count, tonnes, now, old = train(engine, good, full)
+def column(engine: Engine, good: Good, generation: int, full: bool = True) -> str:
+    """As many cars of a good of a generation as the engine takes and can pull full: how many,
+    their weight, and the speed."""
+    size = car_size(good, generation)
+    if not size:
+        return "—"
+    car = full_tonnes(good, size, generation) if full else tare_of(good, generation)
+    dining = tare_of(Good.PASSENGERS, generation) if engine.express else 0.0
+    most = engine.pull_at(generation)
+    count = min(engine.cars, int((most - dining + 1e-9) // car))
     if count == 0:
         return "—"
-    return f"{count}× {tonnes:.0f} t: **{now:.1f}** ({old:.1f})"
+    tonnes = dining + count * car
+    return f"{count}× {tonnes:.0f} t: **{cells(engine, tonnes, generation):.1f}**"
+
+
+def goods_table() -> None:
+    generations = range(1, GENERATIONS + 1)
+    print(
+        "| Good | Unit | "
+        + " | ".join(f"G{g}" for g in generations)
+        + " | Full G2 car | Freight rate |"
+    )
+    print("|---|---|" + "---|" * GENERATIONS + "---|---|")
+    for good in sorted(Good, key=lambda good: -full_tonnes(good, car_size(good))):
+        sizes = " | ".join(
+            f"{car_size(good, g):.0f}" if car_size(good, g) else "—" for g in generations
+        )
+        full = full_tonnes(good, car_size(good, BASE_GENERATION))
+        full_text = f"{full:.1f} t" if car_size(good) else "—"
+        print(
+            f"| {good.value} | {unit_tonnes(good) * 1000:g} kg | {sizes} | {full_text} "
+            f"| ×{FREIGHT_RATE.get(good, 1.0):.2f} |"
+        )
+
+
+def engines_table() -> None:
+    print(
+        "| Engine | Year | Kind | Cars | Newest cars | Pulls with G2 | Pulls with its newest "
+        "| Alone | Empty cars | Full general goods | Full wheat | Full coal |"
+    )
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    for engine in ENGINES.values():
+        top = engine.top_generation
+        alone = CELLS_PER_MONTH * engine.speed
+        if engine.express:
+            rows = [
+                column(engine, Good.PASSENGERS, top, full=False),
+                column(engine, Good.PASSENGERS, top),
+                "—",
+                "—",
+            ]
+        else:
+            rows = [column(engine, Good.GOODS, top, full=False)]
+            rows += [column(engine, good, top) for good in (Good.GOODS, Good.WHEAT, Good.COAL)]
+        print(
+            f"| {engine.title} | {engine.year} | {engine.kind.value} | {engine.hauls} | G{top} "
+            f"| {engine.pull_at(BASE_GENERATION):.0f} t | {engine.tonnes:.0f} t | {alone:.1f} | "
+            + " | ".join(rows)
+            + " |"
+        )
 
 
 def main() -> None:
-    print("Full car weights behind an engine without bigger cars, in tonnes:")
-    for good in (Good.COAL, Good.WHEAT, Good.STEEL, Good.OIL, Good.GOODS, Good.PASSENGERS):
-        size = car_size(good)
-        print(
-            f"  {good.value}: {size:.0f} a car, {tare(size):.1f} t empty, "
-            f"{full_tonnes(good, size):.1f} t full"
-        )
+    goods_table()
     print()
-    print(
-        "| Engine | Year | Kind | Cars | Max pull | Alone | Empty cars | Full general goods "
-        "| Full wheat | Full coal |"
-    )
-    print("|---|---|---|---|---|---|---|---|---|---|")
-    for engine in ENGINES.values():
-        alone = CELLS_PER_MONTH * engine.speed
-        if engine.express:
-            empty = column(engine, Good.PASSENGERS, full=False)
-            rows = [column(engine, Good.PASSENGERS), "—", "—"]
-        else:
-            empty = column(engine, Good.GOODS, full=False)
-            rows = [column(engine, good) for good in (Good.GOODS, Good.WHEAT, Good.COAL)]
-        print(
-            f"| {engine.title} | {engine.year} | {engine.kind.value} | {engine.hauls} "
-            f"| {engine.tonnes:.0f} t | {alone:.1f} | {empty} | " + " | ".join(rows) + " |"
-        )
+    engines_table()
 
 
 if __name__ == "__main__":

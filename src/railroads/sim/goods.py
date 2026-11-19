@@ -478,6 +478,31 @@ PRICES: Mapping[Good, float] = MappingProxyType(
 )
 
 
+# How much of its share of the market price carrying a unit of a good earns: how many units a
+# car of the Planet's day held before units were things of the real world, over how many it holds
+# now (railroads.sim.trains.CAR_UNITS).
+FREIGHT_RATE: Mapping[Good, float] = MappingProxyType(
+    dict.fromkeys((Good.POTATOES, Good.SUGAR, Good.LUMBER), 89 / 55)
+    | dict.fromkeys((Good.APPLES, Good.ORANGES, Good.BANANAS, Good.DATES, Good.GRAPES), 89 / 34)
+    | dict.fromkeys((Good.COFFEE, Good.REFINED_SUGAR, Good.RUBBER, Good.MAIL), 34 / 89)
+    | dict.fromkeys((Good.TEA, Good.OIL, Good.FUEL, Good.GAS, Good.PLASTICS), 34 / 55)
+    | dict.fromkeys((Good.COKE, Good.GUNS, Good.CHICKENS), 13 / 55)
+    | dict.fromkeys((Good.COTTON, Good.FLAX, Good.HOPS, Good.HONEY), 34 / 21)
+    | dict.fromkeys((Good.GLASS, Good.PORCELAIN, Good.POTS, Good.STOVE_TILES, Good.PIGS), 13 / 21)
+    | dict.fromkeys((Good.TOOLS, Good.BARRELS, Good.SHEEP), 13 / 34)
+    | dict.fromkeys((Good.LUXURIES, Good.INCENSE), 5 / 34)
+    | dict.fromkeys((Good.CARS, Good.TANKS, Good.PLANES), 5 / 1)
+    | {
+        Good.ELECTRONICS: 5 / 21,
+        Good.PAPER: 34 / 13,
+        Good.FURNITURE: 13 / 8,
+        Good.CATTLE: 21 / 8,
+        Good.MACHINERY: 13 / 5,
+        Good.PASSENGERS: 55 / 34,
+    }
+)
+
+
 def price_of(good: Good) -> float:
     """A unit of a good's market price: what the player's own buildings sell it to their stations
     for, MARKET_TIMES its PRICES."""
@@ -486,8 +511,10 @@ def price_of(good: Good) -> float:
 
 def freight_of(good: Good) -> float:
     """What carrying a unit of a good to a building that takes it earns: FREIGHT_SHARE of its
-    market price, before what the buyer's satisfaction adds (railroads.sim.economy.worth_to)."""
-    return FREIGHT_SHARE * price_of(good)
+    market price, before what the buyer's satisfaction adds (railroads.sim.economy.worth_to). Goods
+    whose units fill a car faster or slower than before units were things of the real world
+    earn their FREIGHT_RATE of that, so a full car earns about what it did."""
+    return FREIGHT_SHARE * price_of(good) * FREIGHT_RATE.get(good, 1.0)
 
 
 # The goods meeting each need in the order stations hand them out: the most valuable first, so

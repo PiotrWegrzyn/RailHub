@@ -212,8 +212,7 @@ def engine_figures(engine: Engine, per_cell: float | None = None) -> list[tuple[
         ("Burns", fuel_use(engine, per_cell)),
         ("Range", engine_range(engine)),
     ]
-    if engine.car_levels:
-        figures.append(("Cars", f"{engine.car_levels} size bigger"))
+    figures.append(("Cars", f"Up to generation {engine.top_generation}"))
     if engine.express:
         fare = MAGLEV_FARE if engine.maglev else EXPRESS_FARE
         figures.append(("Fares", f"Passengers only, paying {fare - 1:.0%} more"))
