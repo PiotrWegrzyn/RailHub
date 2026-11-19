@@ -9,6 +9,7 @@ from railroads.sim.demolition import (
     demolition_price,
     station_site_price,
 )
+from railroads.sim.game import Game
 from railroads.sim.goods import Good
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
@@ -116,3 +117,41 @@ def test_a_moved_station_keeps_its_trains_name_and_goods_but_starts_its_upgrades
     assert railway.level((8, 22)) == 1
     assert railway.station_goods((8, 22)).stockpile[Good.COAL] == 40.0
     assert railway.station_goods((8, 22)).storage == 0
+
+
+def three_stations_on_a_line() -> Game:
+    game = Game(Constructions(flat_map(cols=32)))
+    game.finances.cash = 1_000_000.0
+    for station in ((6, 3), (6, 14), (6, 26)):
+        game.build_station(station)
+    game.lay_track((6, 3), (6, 14))
+    game.lay_track((6, 14), (6, 26))
+    return game
+
+
+def test_a_bulldozed_station_leaves_every_train_that_called_at_it() -> None:
+    game = three_stations_on_a_line()
+    train = game.railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3)), Stop((6, 14), [Good.COAL]), Stop((6, 26))]
+    game.railway.run(0.05)
+
+    done = game.bulldoze((6, 14))
+
+    assert done.ok
+    assert [stop.cell for stop in train.stops] == [(6, 3), (6, 26)]
+    assert train.heading == 1
+    assert not train.path
+
+
+def test_a_train_left_with_one_stop_after_a_bulldozing_waits_for_a_second() -> None:
+    game = three_stations_on_a_line()
+    train = game.railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3)), Stop((6, 14))]
+
+    game.bulldoze((6, 14))
+    game.railway.run(0.05)
+
+    assert [stop.cell for stop in train.stops] == [(6, 3)]
+    assert not train.path

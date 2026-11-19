@@ -924,3 +924,31 @@ def test_land_confirmed_is_bought_behind_the_waiting_screen_and_the_view_opens_o
     assert app.view.camera.zoom_level == 3
     x, y = app.game.tile_map.grid.center(*lot_middle(lots, (-2, 0)))
     assert (app.view.camera.center_x, app.view.camera.center_y) == pytest.approx((x, y))
+
+
+def test_a_train_whose_stop_was_bulldozed_still_draws_runs_and_can_be_rerouted(
+    context: None,
+) -> None:
+    app = made_app()
+    game = app.view.game
+    game.build_station((10, 22))
+    game.lay_track((10, 16), (10, 22))
+    train = game.railway.trains[0]
+    train.stops.append(Stop((10, 22), [Good.PASSENGERS]))
+    app.view.station_window.station = (10, 16)
+    app.view.build.choose(Tool.NONE)
+    frame(app)
+    done = game.bulldoze((10, 16))
+    app.view.buildings_changed(done.changed)
+
+    for _ in range(3):
+        frame(app)
+    train.stops[0].add_car(Good.PASSENGERS)
+    train.cars_changed(0)
+    frame(app)
+    frames_until_the_month_is_done(app)
+    app.clock.advance(1.0)
+    frames_until_the_month_is_done(app)
+
+    assert done.ok
+    assert all(stop.cell != (10, 16) for stop in train.stops)

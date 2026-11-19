@@ -539,6 +539,8 @@ class RouteMap:
         if self.good is not None:
             self._draw_marks(draw_list, railway, spots, marks, half, frame.panel)
         for station, numbers in stops.items():
+            if station not in spots:
+                continue
             x, y = spots[station]
             text = ",".join(map(str, numbers))
             left = x - half - 3 - imgui.calc_text_size(text).x

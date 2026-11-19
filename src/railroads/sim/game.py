@@ -170,7 +170,9 @@ class Game:
             return Done("Nothing here can be cleared.")
         if not finances.can_afford(price):
             return Done(f"Clearing this costs {dollars(price)}; you have {dollars(finances.cash)}.")
+        stations = set(self.railway.stations())
         changed = bulldoze(self.growth, cell)
+        self.railway.drop_stops(stations - set(self.railway.stations()))
         finances.spend(price, "demolition")
         return Done(f"Cleared for {dollars(price)}.", changed, ok=True)
 

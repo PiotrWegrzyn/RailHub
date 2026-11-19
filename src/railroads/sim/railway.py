@@ -35,7 +35,7 @@ train does calling at a station in railroads.sim.calls; Railway owns them all an
 """
 
 import itertools
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING
@@ -310,6 +310,16 @@ class Railway:
         """Swaps the engine of every train of `engine`'s line with an older one for it, in the
         order they were bought, while the cash lasts; returns how many were swapped."""
         return sum(self.swap_engine(train, engine) for train in self.trains_to_upgrade(engine))
+
+    def drop_stops(self, gone: Iterable[Cell]) -> None:
+        """Takes stations pulled down out of every train's stops, sending each train that
+        called at one back to its first stop left."""
+        cells = set(gone)
+        for train in self.trains:
+            kept = [stop for stop in train.stops if stop.cell not in cells]
+            if len(kept) != len(train.stops):
+                train.stops = kept
+                train.restart()
 
     def sell(self, train: Train) -> None:
         self.trains.remove(train)
