@@ -519,7 +519,7 @@ TRAVELLERS = (Good.PASSENGERS, Good.MAIL)
 # How much more a building makes with all of what boosts it (boosts_of): its share of its boosts
 # times this, unless its recipe says otherwise.
 BOOST_MOST = 1.0
-# Furniture makers polish and shoe works blacken with a little wax, which makes them make up to this
+# Furniture makers polish and shoe works blacken with wax, which makes them make up to this
 # much more.
 WAX_BOOST = 0.25
 
@@ -670,7 +670,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             BuildingKind.SHIPYARD: Recipe(Good.GOODS, 30, {Need.STEEL: 2 / 3, Need.PLANKS: 1 / 3}),
             BuildingKind.TEXTILE_MILL: Recipe(Good.CLOTHES, 40, {Need.FIBRE: 2.5}),
             BuildingKind.FURNITURE_MAKER: Recipe(
-                Good.FURNITURE, 20, {Need.PLANKS: 4.0}, {Need.WAX: 0.1}, boost_most=WAX_BOOST
+                Good.FURNITURE, 20, {Need.PLANKS: 4.0}, {Need.WAX: 0.5}, boost_most=WAX_BOOST
             ),
             BuildingKind.TOOL_WORKS: Recipe(Good.TOOLS, 80, {Need.STEEL: 1.0}),
             BuildingKind.BARREL_MAKER: Recipe(Good.BARRELS, 40, {Need.PLANKS: 0.5}),
@@ -711,7 +711,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             ),
             BuildingKind.MEAT_FACTORY: Recipe(Good.MEAT, 120, {Need.ANIMALS: 0.4}),
             BuildingKind.SHOE_FACTORY: Recipe(
-                Good.SHOES, 20, {Need.LEATHER: 2.0}, {Need.WAX: 0.1}, boost_most=WAX_BOOST
+                Good.SHOES, 20, {Need.LEATHER: 2.0}, {Need.WAX: 0.5}, boost_most=WAX_BOOST
             ),
             BuildingKind.PLASTICS_WORKS: Recipe(
                 Good.PLASTICS, 100, {Need.OIL: 0.5, Need.CHEMICALS: 0.5}
@@ -825,7 +825,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.HEATING: 5,
             Need.CHEMICALS: 10,
             Need.GLASS: 5,
-            Need.WAX: 2,
+            Need.WAX: 10,
         },
         BuildingKind.TENEMENT: {
             Need.FOOD: 120,
