@@ -296,6 +296,7 @@ def status_text(
     tile = tile_map.tile(hovered)
     row, col = hovered
     hills = " hills" if tile.relief == Relief.HILLS else ""
+    hills += " with a minor river" if tile.stream else ""
     built = _built_note(constructions, hovered)
     level = int(satisfaction[row, col])
     mood = f"; {Satisfaction(level).name.lower()}" if level >= 0 else ""

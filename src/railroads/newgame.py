@@ -15,6 +15,7 @@ from railroads.mapgen.generate import generate_map
 from railroads.mapgen.presets import NATURAL_EARTH_SOURCE, real_world_strategies
 from railroads.mapgen.seeding import play_begins, seed_steps
 from railroads.mapgen.start import StartRegion, pick_start_bounds
+from railroads.mapgen.streams import HYDRORIVERS_SOURCE
 from railroads.mapgen.terrain_tiles import SOURCE as TERRAIN_TILES_SOURCE
 from railroads.saves import SavedGame
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
@@ -135,14 +136,14 @@ def start_new_game(
     report("Loading the land there")
     shapes = world.natural_earth(bounds)
     elevation = world.elevation_for(bounds)
-    strategies = real_world_strategies(shapes, elevation, seed)
+    strategies = real_world_strategies(shapes, elevation, seed, world.streams(bounds))
     report("Building the map")
     tile_map = generate_map(
         f"Seed {seed}",
         bounds,
         HexGrid.covering(bounds.width_km, bounds.height_km, KM_PER_CELL),
         strategies,
-        (TERRAIN_TILES_SOURCE, NATURAL_EARTH_SOURCE),
+        (TERRAIN_TILES_SOURCE, NATURAL_EARTH_SOURCE, HYDRORIVERS_SOURCE),
     )
     return NewGame(seed, bounds, tile_map)
 

@@ -884,6 +884,7 @@ class MapView:
                 ground.hills,
                 glow_strength(ground.satisfaction),
                 ground.mountains,
+                ground.streams,
             )
             shader.set_cells(info, self._colors_version)
         if shader.surfaces_version != self._colors_version:

@@ -16,7 +16,7 @@ import numpy.typing as npt
 
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Satisfaction
-from railroads.sim.grids import FloatArray, Grid, IntArray
+from railroads.sim.grids import FloatArray, Grid, HexGrid, IntArray
 from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.building_spots import Plot, plots_of
@@ -32,6 +32,14 @@ from railroads.ui.pixel.relief import (
     mountain_cover,
     sample,
     smooth,
+)
+from railroads.ui.pixel.streams import (
+    BANK_WIDTH,
+    HALF_WIDTH,
+    STREAM_BANK,
+    STREAM_WATER,
+    stream_distance,
+    stream_links,
 )
 
 # Ground is worked out this far past a chunk's edges, so shores meet across chunks.
@@ -451,6 +459,8 @@ class Ground:
         self._hills = land & (tile_map.relief == Relief.HILLS)
         self._relief_light = self._light_slopes(angle_deg)
         self._wet, self._foot = self._surroundings()
+        # Each cell's links along the minor rivers through it (railroads.ui.pixel.streams).
+        self._streams = stream_links(tile_map)
         # Where trees stand in the picture, which shade the grass round them, and where buildings
         # stand, what ground lies round each and how far it reaches, both set by the world.
         self.trees: tuple[FloatArray, FloatArray] = (np.zeros(0), np.zeros(0))
@@ -581,6 +591,7 @@ class Ground:
         land = lit & dry
         if land.any():
             rgb[land] *= self._natural(x[land], y[land])
+        self._draw_streams(rgb, x, y, r, c, land, left, top)
         self._shores(rgb, water, rows, inside)
         # Ground that does not glow keeps its colour exactly, so only glowing ground is blended.
         strength = glow_strength(self.satisfaction[r, c])
@@ -594,6 +605,23 @@ class Ground:
         if raised is not None:
             self.elevation.colour(rgb, raised.top(rows), x, y, rocky)
         return np.clip(rgb, 0, 255) * alpha[..., None], alpha
+
+    def _draw_streams(
+        self, rgb: FloatArray, x: FloatArray, y: FloatArray, r: IntArray, c: IntArray,
+        land: BoolArray, left: int, top: int,
+    ) -> None:  # fmt: skip
+        """Draws the minor rivers over the land of a block: water along their lines and darker
+        banks beside it."""
+        grid = self.tile_map.grid
+        if not isinstance(grid, HexGrid) or not (land & (self._streams[r, c] > 0)).any():
+            return
+        gap = stream_distance(self._streams, grid, x, y, r, c)
+        rgb[land & (gap < BANK_WIDTH)] *= STREAM_BANK
+        down, across = np.nonzero(land & (gap < HALF_WIDTH))
+        if len(down):
+            at = (down, across)
+            water = self._water(x[at], y[at], left + across, top + down)
+            rgb[at] = (water + np.array(STREAM_WATER, dtype=np.float32)) / 2
 
     def _water(self, x: FloatArray, y: FloatArray, ix: IntArray, iy: IntArray) -> FloatArray:
         """The colour of water at plane points `x`, `y`, art pixels `ix`, `iy`: shallow or deep
@@ -733,6 +761,11 @@ class Ground:
         return np.stack([xs, ys, reaches, np.array(codes, dtype=np.float32)], axis=-1).astype(
             np.float32
         )
+
+    @property
+    def streams(self) -> npt.NDArray[np.uint8]:
+        """Each cell's links along the minor rivers through it (streams.stream_links)."""
+        return self._streams
 
     @property
     def mountains(self) -> BoolArray:

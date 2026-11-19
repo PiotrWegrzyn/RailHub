@@ -70,7 +70,14 @@ class PictureShow:
         if shader.cells_version != picture.year:
             glow = np.zeros(ground.shape, dtype=np.float64)
             shader.set_cells(
-                cell_info(picture.biomes, ground.deposits, ground.hills, glow, ground.mountains),
+                cell_info(
+                    picture.biomes,
+                    ground.deposits,
+                    ground.hills,
+                    glow,
+                    ground.mountains,
+                    ground.streams,
+                ),
                 picture.year,
             )
         view = view_of(picture.origin, 1, (0.0, 0.0), size)

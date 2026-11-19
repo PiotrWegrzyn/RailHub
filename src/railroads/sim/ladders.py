@@ -225,7 +225,9 @@ _LAND_TABLES: dict[int, tuple] = {}
 @dataclass(frozen=True, slots=True)
 class Land:
     """How the land changes a ladder's chances: each weight multiplies them. Water weights go by
-    the best water next to the cell, LAND standing for none; anything left out weighs 1."""
+    the best water next to the cell, LAND standing for none, and a minor river counts as a river
+    (Surroundings.water_around). The sea is salty, so unless a ladder names it, it does no more
+    than dry land; anything else left out weighs 1."""
 
     vegetation: Mapping[Vegetation, float] = field(default_factory=dict)
     relief: Mapping[Relief, float] = field(default_factory=dict)
@@ -255,6 +257,10 @@ class Land:
         """Whether a cell's weight changes with the forests around it, not just its own."""
         return self.forest_edge or self.least_forest_nearby > 0
 
+    @property
+    def _dry(self) -> float:
+        return self.water.get(Terrain.LAND, 1.0)
+
     def _tables(self) -> tuple[FloatGrid, FloatGrid, FloatGrid, FloatGrid]:
         """The weight of every vegetation, relief, temperature and water, as arrays indexed by
         their values, worked out once for each land."""
@@ -265,7 +271,12 @@ class Land:
                 np.array([self.vegetation.get(v, 1.0) for v in Vegetation]),
                 np.array([self.relief.get(r, 1.0) for r in Relief]),
                 np.array([self.temperature.get(t, 1.0) for t in Temperature]),
-                np.array([self.water.get(t, 1.0) for t in Terrain]),
+                np.array(
+                    [
+                        self.water.get(t, self._dry) if t == Terrain.SEA else self.water.get(t, 1.0)
+                        for t in Terrain
+                    ]
+                ),
             )
             _LAND_TABLES[id(self)] = tables
         return tables[1:]
@@ -284,9 +295,11 @@ class Land:
     def weights_in(self, around: Surroundings) -> FloatGrid:
         """The weight of the cells whose surroundings these are, in their order."""
         vegetation_weights, relief_weights, temperature_weights, water = self._tables()
-        is_water = around.is_water
-        best = np.where(is_water, water[around.terrain_around], 0.0).max(axis=0)
-        by_water = np.where(around.by_water, best, water[Terrain.LAND])
+        wet = around.is_wet
+        best = np.where(wet, water[around.water_around], 0.0).max(axis=0)
+        own = around.on_stream
+        best = np.where(own, np.maximum(best, water[Terrain.RIVER]), best)
+        by_water = np.where(wet.any(axis=0) | own, best, water[Terrain.LAND])
         weight = (
             vegetation_weights[around.vegetation]
             * relief_weights[around.relief]
@@ -340,8 +353,21 @@ class Surroundings:
         return self.real & (self.terrain_around != Terrain.LAND)
 
     @cached_property
-    def by_water(self) -> npt.NDArray[np.bool_]:
-        return self.is_water.any(axis=0)
+    def water_around(self) -> npt.NDArray[np.uint8]:
+        """The water of each cell around, for the water weights: a minor river flowing through
+        land counts as a river, so it is fresh water like a river or a lake, and the sea is not."""
+        stream = self.tile_map.stream.ravel()[self.around].astype(bool)
+        on_land = self.terrain_around == Terrain.LAND
+        return np.where(stream & on_land, np.uint8(Terrain.RIVER), self.terrain_around)
+
+    @cached_property
+    def is_wet(self) -> npt.NDArray[np.bool_]:
+        return self.real & (self.water_around != Terrain.LAND)
+
+    @cached_property
+    def on_stream(self) -> npt.NDArray[np.bool_]:
+        """Whether a minor river flows through the cell itself, which is fresh water by it too."""
+        return self.tile_map.stream.ravel()[self.chosen].astype(bool) & self.land
 
     @cached_property
     def vegetation(self) -> npt.NDArray[np.uint8]:
@@ -480,7 +506,7 @@ TOWN_LAND = Land(
     vegetation={Vegetation.BARREN: 0.5, Vegetation.FOREST: 0.3},
     relief={Relief.HILLS: 1.0, Relief.MOUNTAINS: 0.2},
     temperature={Temperature.COLD: 0.6, Temperature.HOT: 0.8},
-    water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.3, Terrain.SEA: 1.3},
+    water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.3},
 )
 
 FACTORY_LAND = Land(
@@ -512,7 +538,7 @@ FARMS = Ladder(
         vegetation={Vegetation.BARREN: 0.1, Vegetation.FOREST: 0.02},
         relief={Relief.HILLS: 0.6, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.2, Temperature.HOT: 0.6},
-        water={Terrain.RIVER: 4.0, Terrain.LAKE: 4.0, Terrain.SEA: 2.0},
+        water={Terrain.RIVER: 4.0, Terrain.LAKE: 4.0},
         open_field=OPEN_FIELD,
     ),
     base_chance=9.698e-08,
@@ -527,7 +553,7 @@ ORCHARDS = Ladder(
         vegetation={Vegetation.BARREN: 0.2, Vegetation.FOREST: 0.1},
         relief={Relief.FLAT: 0.4, Relief.HILLS: 1.5, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.05, Temperature.HOT: 1.2},
-        water={Terrain.RIVER: 3.0, Terrain.LAKE: 3.0, Terrain.SEA: 2.0},
+        water={Terrain.RIVER: 3.0, Terrain.LAKE: 3.0},
         open_field=OPEN_FIELD,
     ),
     base_chance=1.12e-07,
@@ -541,7 +567,7 @@ DATE_PALMS = Ladder(
         vegetation={Vegetation.GRASS: 0.2, Vegetation.FOREST: 0.0},
         relief={Relief.HILLS: 0.7, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.0, Temperature.NORMAL: 0.0},
-        water={Terrain.RIVER: 5.0, Terrain.LAKE: 5.0, Terrain.SEA: 2.0},
+        water={Terrain.RIVER: 5.0, Terrain.LAKE: 5.0},
         open_field=OPEN_FIELD,
     ),
     base_chance=3.36e-07,
@@ -555,7 +581,7 @@ BANANA_PLANTATIONS = Ladder(
         vegetation={Vegetation.BARREN: 0.0, Vegetation.GRASS: 0.0},
         relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.0, Temperature.NORMAL: 0.0},
-        water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0, Terrain.SEA: 1.5},
+        water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0},
         open_field=OPEN_FIELD,
     ),
     base_chance=3.36e-07,
@@ -569,7 +595,7 @@ ORANGE_FARMS = Ladder(
         vegetation={Vegetation.BARREN: 0.0, Vegetation.FOREST: 0.0},
         relief={Relief.HILLS: 1.0, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.0, Temperature.NORMAL: 0.0},
-        water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0, Terrain.SEA: 1.5},
+        water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0},
         open_field=OPEN_FIELD,
     ),
     base_chance=3.36e-07,
@@ -583,7 +609,7 @@ SUGAR_FIELDS = Ladder(
         vegetation={Vegetation.BARREN: 0.05, Vegetation.FOREST: 0.02},
         relief={Relief.HILLS: 0.6, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.0, Temperature.NORMAL: 0.6, Temperature.HOT: 1.0},
-        water={Terrain.RIVER: 3.0, Terrain.LAKE: 2.0, Terrain.SEA: 1.5},
+        water={Terrain.RIVER: 3.0, Terrain.LAKE: 2.0},
         open_field=OPEN_FIELD,
     ),
     base_chance=2.6e-08,

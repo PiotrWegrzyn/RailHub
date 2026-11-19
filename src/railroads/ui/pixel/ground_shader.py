@@ -48,7 +48,7 @@ from railroads.sim.tilemap import Deposit
 from railroads.ui.biomes import Biome
 from railroads.ui.iso_camera import TILT
 from railroads.ui.pixel import ground as cpu
-from railroads.ui.pixel import relief
+from railroads.ui.pixel import relief, streams
 from railroads.ui.pixel.noise import _TABLE, TABLE_SIZE
 from railroads.ui.pixel.projection import CHUNK, PixelProjection
 from railroads.ui.pixel.relief import LIGHT, Heights
@@ -345,6 +345,26 @@ uvec4 cell_info(ivec2 cell) {
     return texelFetch(cells, clamp(cell, ivec2(0), cells_size - 1), 0);
 }
 
+// How far plane point `p` in `cell` lies from the minor river through it, along the links the
+// cell keeps in its flags (railroads.ui.pixel.streams.stream_distance).
+const vec2 STREAM_STEPS[6] = vec2[6](@STREAM_STEPS@);
+
+float stream_gap(vec2 p, ivec2 cell, uint links) {
+    if (links == 0u) return @STREAM_NONE@;
+    vec2 centre = vec2(float(cell.x) + 0.5 + 0.5 * float(cell.y & 1),
+                       HEX_RADIUS + float(cell.y) * 1.5 * HEX_RADIUS);
+    vec2 q = vec2(p.x + @MEANDER@ * sin(p.y * 7.3 + p.x * 2.1),
+                  p.y + @MEANDER@ * sin(p.x * 6.1 - p.y * 1.7));
+    float nearest = @STREAM_NONE@;
+    for (int i = 0; i < 6; i++) {
+        if (((links >> uint(i)) & 1u) == 0u) continue;
+        vec2 d = STREAM_STEPS[i];
+        float along = clamp(dot(q - centre, d) / dot(d, d), 0.0, 1.0);
+        nearest = min(nearest, length(q - centre - along * d));
+    }
+    return nearest;
+}
+
 bool is_water(uint biome) {
     return biome <= @LAST_WATER@u;
 }
@@ -571,6 +591,11 @@ void main() {
     }
     if (!water) {
         rgb *= natural(p, around);
+        float gap = stream_gap(p, cell, info.b >> 2u);
+        if (gap < @STREAM_BANK_WIDTH@) rgb *= @STREAM_BANK@;
+        if (gap < @STREAM_HALF_WIDTH@) {
+            rgb = (water_colour(p, ix, iy, around.g) + @STREAM_WATER@) * 0.5;
+        }
     }
     rgb = shore(rgb, art, water);
     if (!water) {
@@ -1382,6 +1407,13 @@ def fragment_source() -> str:
         "SPECK_COUNT": str(len(cpu.DEPOSIT_SPECKS)),
         "SPECKS": ", ".join(_vec3(s) for s in cpu.DEPOSIT_SPECKS),
         "LAST_WATER": str(max(int(b) for b in cpu.WATER)),
+        "STREAM_STEPS": ", ".join(f"vec2({_number(x)}, {_number(y)})" for x, y in streams.STEPS),
+        "STREAM_NONE": _number(streams.NONE_NEAR),
+        "MEANDER": _number(streams.MEANDER),
+        "STREAM_BANK_WIDTH": _number(streams.BANK_WIDTH),
+        "STREAM_HALF_WIDTH": _number(streams.HALF_WIDTH),
+        "STREAM_BANK": _number(streams.STREAM_BANK),
+        "STREAM_WATER": _vec3(streams.STREAM_WATER),
         "STEPS": _number(cpu.RELIEF_STEPS_PER_CELL),
         "MEADOW_RAMPS": _grass_ramps("meadow"),
         "SAVANNA_RAMPS": _grass_ramps("savanna"),
@@ -1689,9 +1721,11 @@ def cell_info(
     hills: npt.NDArray[np.bool_],
     glow: FloatArray,
     mountains: npt.NDArray[np.bool_] | None = None,
+    streams: npt.NDArray[np.uint8] | None = None,
 ) -> npt.NDArray[np.uint8]:
     """What the shader needs of each cell, as (rows, cols, 4) bytes: its biome, its deposit, 1 on
-    hills and 2 on mountains, and how strongly it glows in GLOW_STEPS."""
+    hills and 2 on mountains with its links along a minor river (streams.stream_links) four
+    times over, and how strongly it glows in GLOW_STEPS."""
     info = np.zeros((*biomes.shape, 4), dtype=np.uint8)
     info[..., 0] = biomes
     if deposits is not None:
@@ -1699,6 +1733,8 @@ def cell_info(
     info[..., 2] = hills
     if mountains is not None:
         info[..., 2] |= mountains.astype(np.uint8) << 1
+    if streams is not None:
+        info[..., 2] |= streams << 2
     info[..., 3] = np.rint(np.asarray(glow) * GLOW_STEPS)
     return info
 

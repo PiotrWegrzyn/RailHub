@@ -17,8 +17,8 @@ import numpy.typing as npt
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import GRIDS, Cell, Grid
 
-FORMAT_VERSION = 2
-LAYERS = ("terrain", "vegetation", "temperature", "height_m", "relief")
+FORMAT_VERSION = 3
+LAYERS = ("terrain", "vegetation", "temperature", "height_m", "relief", "stream")
 # The share of a place's land a new game starts on (TileMap.square_middle).
 START_SHARE = 0.25
 
@@ -76,6 +76,7 @@ class Tile:
     temperature: Temperature
     height_m: int
     relief: Relief = Relief.FLAT
+    stream: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,8 +95,12 @@ class TileMap:
     # The cells on land next to the player's that the player has not bought (railroads.sim.lots),
     # where nothing grows or is built; None while there are none.
     locked: npt.NDArray[np.bool_] | None = None
+    # 1 where a minor river flows through a land cell (railroads.mapgen.streams).
+    stream: npt.NDArray[np.uint8] = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
+        if self.stream is None:
+            object.__setattr__(self, "stream", np.zeros(self.grid.shape, dtype=np.uint8))
         for layer in LAYERS:
             values = getattr(self, layer)
             if values.shape != self.grid.shape:
@@ -122,6 +127,7 @@ class TileMap:
             temperature=Temperature(self.temperature[cell]),
             height_m=int(self.height_m[cell]),
             relief=Relief(self.relief[cell]),
+            stream=bool(self.stream[cell]),
         )
 
     def cell_at_lonlat(self, lon: float, lat: float) -> Cell | None:
@@ -182,7 +188,7 @@ class TileMap:
             return part
 
         outside = {"terrain": Terrain.SEA, "relief": Relief.FLAT, "height_m": 0}
-        outside |= {"vegetation": Vegetation.BARREN, "temperature": Temperature.NORMAL}
+        outside |= {"vegetation": Vegetation.BARREN, "temperature": Temperature.NORMAL, "stream": 0}
         layers = {layer: cut(getattr(self, layer), outside[layer]) for layer in LAYERS}
         return replace(
             self,

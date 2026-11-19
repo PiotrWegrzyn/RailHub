@@ -45,6 +45,8 @@ class GroundLook:
     shading: FloatArray
     mountains: npt.NDArray[np.bool_]
     heights: Heights
+    # Each cell's links along the minor rivers through it (streams.stream_links).
+    streams: npt.NDArray[np.uint8] | None = None
 
 
 @dataclass(frozen=True)
@@ -136,6 +138,7 @@ class HistoryPictures:
                 world.ground.shading,
                 world.ground.mountains,
                 world.elevation.heights,
+                world.ground.streams,
             )
         else:
             world.buildings_changed(())

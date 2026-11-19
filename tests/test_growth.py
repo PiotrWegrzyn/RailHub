@@ -87,7 +87,7 @@ def test_an_empty_map_has_the_base_chance_on_flat_grass_away_from_water() -> Non
         ((1, 6), TOWN_LAND.vegetation[Vegetation.FOREST]),
         ((2, 6), TOWN_LAND.vegetation[Vegetation.BARREN]),
         ((3, 6), TOWN_LAND.temperature[Temperature.COLD]),
-        ((5, 1), TOWN_LAND.water[Terrain.SEA]),
+        ((5, 1), 1.0),
     ],
 )
 def test_the_land_multiplies_the_chance(cell: tuple[int, int], weight: float) -> None:

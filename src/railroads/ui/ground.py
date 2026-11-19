@@ -18,7 +18,7 @@ import numpy.typing as npt
 
 from railroads.sim.grids import Grid
 from railroads.sim.tilemap import TileMap
-from railroads.ui.biomes import biome_colors
+from railroads.ui.biomes import BIOME_COLORS, Biome, biome_colors
 from railroads.ui.relief import BEVEL_PIXELS, BEVEL_STRENGTH, relief_brightness
 
 Pixels = npt.NDArray[np.uint8]
@@ -31,14 +31,20 @@ ROWS_PER_PASS = 256
 BAKED_LINE_SHADE = 0.3
 # Edge distances are stored in sixteenths of a pixel.
 EDGE_STEPS_PER_PIXEL = 16
+# How far a cell with a minor river through it takes a river's colour.
+STREAM_TINT = 0.45
 # Most cells whose colour changed for the kept picture to be touched up where they lie instead of
 # being painted again whole.
 TOUCH_UP_CELLS = 2000
 
 
 def cell_colors(tile_map: TileMap) -> Pixels:
-    """Colour of every cell: its biome colour, lighter on hills."""
+    """Colour of every cell: its biome colour, lighter on hills, and STREAM_TINT of the way to
+    a river's where a minor river flows through it."""
     base = biome_colors(tile_map)
+    stream = tile_map.stream.astype(bool)
+    river = np.array(BIOME_COLORS[Biome.RIVER], dtype=np.float64)
+    base[stream, :3] = np.rint(base[stream, :3] * (1 - STREAM_TINT) + river * STREAM_TINT)
     colors = base.copy()
     lit = base[..., :3] * relief_brightness(tile_map)[..., None]
     colors[..., :3] = np.clip(lit, 0, 255).astype(np.uint8)

@@ -4,7 +4,7 @@ in data/raw/ and the places in data/places.npz square by square, for the squares
 LOWEST_LAT and HIGHEST_LAT, which hold every map the start region allows with room to spare.
 
 Needs the outputs of tools/build_elevation_db.py and tools/build_places.py and the Natural Earth
-downloads (see README.md). Rewrites world/ from scratch.
+downloads and HydroRIVERS (see README.md). Rewrites world/ from scratch.
 
 Run with: uv run python tools/build_world_files.py [--data DIR]
 """
@@ -15,6 +15,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
+from build_world_streams import write_stream_squares
 
 from railroads.mapgen import world_files
 from railroads.mapgen.area import clip_ring
@@ -170,7 +171,8 @@ def main() -> None:
     print(f"{len(shapes)} squares of shapes, {size_mb(out / 'shapes'):.1f} MB")
     places = write_place_squares(data / "places.npz", out)
     print(f"{len(places)} squares of places, {size_mb(out / 'places'):.1f} MB")
-    index = WorldIndex(frozenset(tiles), frozenset(shapes), frozenset(places))
+    streams = write_stream_squares(data, out)
+    index = WorldIndex(frozenset(tiles), frozenset(shapes), frozenset(places), frozenset(streams))
     (out / world_files.INDEX_FILE).write_bytes(index.write())
     print(f"{out} is {size_mb(out):.1f} MB")
 

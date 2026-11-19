@@ -3,6 +3,7 @@
 Inputs in data/raw/ (download commands in README.md):
 - etopo_poland.csv: NOAA ETOPO1 elevation, 1 arc-minute grid.
 - ne_10m_*.geojson: Natural Earth sea, lakes, rivers and geography regions (for deserts).
+And the minor rivers from world/streams/ (tools/build_world_streams.py).
 
 Run with: uv run python tools/build_poland_map.py
 """
@@ -10,6 +11,7 @@ Run with: uv run python tools/build_poland_map.py
 from collections import Counter
 
 from railroads import maps
+from railroads.mapgen import world_files
 from railroads.mapgen.generate import generate_map
 from railroads.mapgen.presets import (
     ETOPO_SOURCE,
@@ -18,7 +20,9 @@ from railroads.mapgen.presets import (
     real_world_strategies,
 )
 from railroads.mapgen.sources import Elevation, ElevationGrid
+from railroads.mapgen.streams import HYDRORIVERS_SOURCE, StreamLines
 from railroads.newgame import DATA_DIR
+from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
 from railroads.sim.tilemap import LAYERS, Temperature, Terrain, TileMap, Vegetation
 
@@ -26,6 +30,14 @@ RAW = DATA_DIR / "raw"
 POLAND = maps.start_map("poland")
 KM_PER_CELL = 2.0
 SEED = 7
+
+
+def minor_rivers(bounds: Bounds) -> StreamLines:
+    """The minor rivers around the bounds, from world/streams/ (tools/build_world_streams.py)."""
+    world = world_files.world()
+    if world is None:
+        raise SystemExit("no world/ folder to read the minor rivers from")
+    return world.streams(bounds)
 
 
 def summary(tile_map: TileMap) -> str:
@@ -45,9 +57,9 @@ def bake(
 ) -> None:
     """Bakes a start map from the elevation and Natural Earth data and says what it holds."""
     bounds = start.bounds
-    strategies = real_world_strategies(world, elevation, SEED)
+    strategies = real_world_strategies(world, elevation, SEED, minor_rivers(bounds))
     grid = HexGrid.covering(bounds.width_km, bounds.height_km, KM_PER_CELL)
-    sources = (elevation_source, NATURAL_EARTH_SOURCE)
+    sources = (elevation_source, NATURAL_EARTH_SOURCE, HYDRORIVERS_SOURCE)
     tile_map = generate_map(start.title, bounds, grid, strategies, sources)
     path = maps.map_file(start.key, "hex")
     tile_map.save(path)

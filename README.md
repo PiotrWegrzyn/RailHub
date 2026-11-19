@@ -225,7 +225,9 @@ uv run python tools/chunk_pixels.py check build/chunks.npz --game build/chunks-g
 A map is a grid of hexagon cells (the grids can also be squares, which the game no longer uses),
 where every cell has the same properties:
 terrain (land, sea, lake, river), vegetation (barren, grass, forest), temperature (cold, normal,
-hot) and height in metres. Each property is one numpy layer, saved together with the map's scale,
+hot), height in metres and whether a minor river flows through it. A minor river leaves the cell
+land that anything can be built on and track crosses without a bridge, takes no room, and counts
+as fresh water by a river for what grows there and beside it. Each property is one numpy layer, saved together with the map's scale,
 cell shape, bounds and data sources in one `.npz` file.
 
 `railroads.mapgen` makes a map by laying a grid over a lon/lat box and filling in each property
@@ -414,16 +416,17 @@ cell times that point's satisfaction (homes take the town ladder's chance instea
 chance holds anywhere the land allows, good surroundings raise it, and what is satisfied breeds
 far faster.
 The land multiplies the chance by its vegetation, relief, temperature and the best water next to
-the cell:
+the cell. Rivers, lakes and minor rivers are fresh water; the sea is salty, so it helps no more
+than dry land unless a row names it:
 
 | Ladder | Chance per month | Needs nearby | Land |
 |---|---|---|---|
-| Houses | 0.0000012 + 0.00011 per doubling of population, from 2 population nearby | | forest x0.3, mountains x0.05, barren x0.5, hills x0.8, cold x0.6, hot x0.8; river x1.5, lake or sea x1.3 |
-| Farms | 0.000000112 + 0.00000672 per doubling of population + 0.00000028 per doubling of food | fewer than 8 population | flat grass x10 while empty; hills x0.25, barren x0.1, forest x0.02, cold x0.2, hot x0.6; river or lake x5, sea x2; none in mountains |
-| Orchards | 0.000000216 + 0.000000108 per doubling of population + 0.00000216 per doubling of food | | hills x1.5; flat x0.4, hot x1.2, cold x0.05; river or lake x3, sea x2 |
-| Date palms | 0.000000168 + 0.00000168 per doubling of population + 0.00000126 per doubling of food | | hot desert; river or lake x5, sea x2 |
-| Banana plantations | as date palms | | hot jungle; river or lake x2, sea x1.5 |
-| Orange farms | as date palms | | hot grassland, not desert or jungle; hills x0.7; river or lake x2, sea x1.5 |
+| Houses | 0.0000012 + 0.00011 per doubling of population, from 2 population nearby | | forest x0.3, mountains x0.05, barren x0.5, hills x0.8, cold x0.6, hot x0.8; river x1.5, lake x1.3 |
+| Farms | 0.000000112 + 0.00000672 per doubling of population + 0.00000028 per doubling of food | fewer than 8 population | flat grass x10 while empty; hills x0.25, barren x0.1, forest x0.02, cold x0.2, hot x0.6; river or lake x4; none in mountains |
+| Orchards | 0.000000216 + 0.000000108 per doubling of population + 0.00000216 per doubling of food | | hills x1.5; flat x0.4, hot x1.2, cold x0.05; river or lake x3 |
+| Date palms | 0.000000168 + 0.00000168 per doubling of population + 0.00000126 per doubling of food | | hot desert; river or lake x5 |
+| Banana plantations | as date palms | | hot jungle; river or lake x2 |
+| Orange farms | as date palms | | hot grassland, not desert or jungle; hills x0.7; river or lake x2 |
 | Sugar fields | 0.0000000168 + 0.000000042 per doubling of population + 0.000000168 per doubling of food | | open flat land, not cold; mild x0.6; river x3 |
 | Mines | 0.000001 + 0.0000014 per doubling of ore | | mountains; hills x0.4, flat x0.01; beside mountains x3 |
 | Lumber mills | 0.000016 + 0.000001 per doubling of population | | forest with at least 4 forest cells in its neighbourhood and flat open land next to it; river x1.5 |
@@ -1243,6 +1246,9 @@ Maps are built from these sources:
 - Elevation for Poland: NOAA ETOPO1; for the other baked maps the terrain tiles above, 1 arc-minute (via NOAA CoastWatch ERDDAP, dataset `etopo180`).
 - Sea, lakes, rivers and deserts: [Natural Earth](https://www.naturalearthdata.com/) 1:10m,
   public domain. Rivers running less than 200 km on the map are left out.
+- Minor rivers: [HydroRIVERS](https://www.hydrosheds.org/products/hydrorivers) v1.0 (Lehner and
+  Grill 2013), free for any use: every reach draining at least 1,500 km² that isn't a Natural Earth
+  river already.
 - Temperature: a climate rule from latitude and height that works anywhere in the world.
 - Forests: random placeholder patches until a land-cover source is added.
 - Station names: [GeoNames](https://www.geonames.org/) cities500, every place with more than 500
@@ -1250,8 +1256,9 @@ Maps are built from these sources:
   numbered.
 
 The game reads the elevation, the shapes and the places from `world/`, which is in the repository
-(about 97 MB in some 3,700 small files; `railroads.mapgen.world_files`): one file per elevation
-tile and per 5° square of shapes and of places, so a map reads only the few it needs. The desktop
+(about 120 MB in some 4,500 small files; `railroads.mapgen.world_files`): one file per elevation
+tile and per 5° square of shapes, of minor rivers and of places, so a map reads only the few it
+needs. The desktop
 apps ship the whole folder, so random places work offline; the web game downloads each file
 beside its page as a map needs it, half a megabyte or so for a random place.
 
@@ -1271,6 +1278,15 @@ Then build the elevation database (about 70 MB download, resumes if interrupted)
 
 ```bash
 uv run python tools/build_elevation_db.py
+```
+
+Download the minor rivers (544 MB, 2.2 GB unpacked; `tools/build_world_streams.py` keeps 20 MB
+of it):
+
+```bash
+mkdir -p data/raw/hydrorivers && cd data/raw/hydrorivers
+curl -O https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_shp.zip && unzip HydroRIVERS_v10_shp.zip
+cd ../../..
 ```
 
 Build the place names stations are named from (about 14 MB download):
