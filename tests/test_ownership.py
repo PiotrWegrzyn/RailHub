@@ -3,7 +3,7 @@ import pytest
 
 from builders import QUIET, flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.goods import Good, price_of
+from railroads.sim.goods import Good, Need, price_of
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import FACTORIES, FARMS_CROWDED_OUT, GrowthRule
 from railroads.sim.ledger import _Books
@@ -273,3 +273,19 @@ def test_production_tech_works_on_the_players_part_and_on_the_whole_once_they_co
     counts = growth.owners.working_counts()
 
     assert counts[BuildingKind.FARM][5, 5] == pytest.approx(worked)
+
+
+@pytest.mark.parametrize(("shares", "taking"), [(500, 0.0), (600, 1.0), (1000, 1.0)])
+def test_limestone_is_taken_only_by_a_farm_the_player_controls_and_then_by_all_of_it(
+    shares: int, taking: float, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    growth = grown(((5, 5), BuildingKind.FARM))
+    growth.owners.own((5, 5), BuildingKind.FARM, shares)
+    research = type(growth.railway.research)
+    monkeypatch.setattr(research, "takes", lambda self, kind: frozenset({Need.LIMESTONE}))
+
+    taken = growth.owners.taking(BuildingKind.FARM, Need.LIMESTONE)
+
+    flat = int(np.ravel_multi_index((5, 5), growth.grid.shape))
+    assert taken is not None
+    assert taken[flat] == pytest.approx(taking)

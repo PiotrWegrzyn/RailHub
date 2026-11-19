@@ -10,6 +10,7 @@ from imgui_bundle import imgui
 
 from railroads.sim.finance import dollars
 from railroads.sim.goods import OWNED_BOOSTS
+from railroads.sim.ownership import CONTROL
 from railroads.sim.tech import NODES, TREES, Effect, Node, Research, Tree, xp_for
 from railroads.sim.trains import ENGINES
 from railroads.ui.ornate import (
@@ -142,7 +143,7 @@ def describe(node: Node) -> str:
         return "a bonus still to come"
     if node.effect == Effect.TAKES and node.takes:
         kinds = " and ".join(f"{kind.value}s" for kind, _ in node.takes)
-        return f"your {kinds} take {node.takes[0][1].value}"
+        return f"{kinds} you control take {node.takes[0][1].value}"
     if node.effect == Effect.CAR_SIZE:
         reach = "every car" if node.everywhere else "its cars"
         return f"{reach} {node.amount:g} size bigger"
@@ -151,8 +152,8 @@ def describe(node: Node) -> str:
 
 def _takes(node: Node) -> str:
     return " ".join(
-        f"Every {kind.value} you own takes {need.value} and makes up to "
-        f"{OWNED_BOOSTS[(kind, need)]:.0%} more with it."
+        f"Every {kind.value} you control, with {CONTROL:.0%} of its shares, takes {need.value} "
+        f"and makes up to {OWNED_BOOSTS[(kind, need)]:.0%} more with it."
         for kind, need in node.takes
     )
 

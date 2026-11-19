@@ -2,9 +2,10 @@
 each kind in each cell, and what buying or selling them fetches.
 
 Every building is SHARES shares, bought and sold LOTS at a time. Holding CONTROL of the shares of
-the buildings of a kind in a cell gives the player control of them: their tech then works on the
-whole of them, not just the player's part, and the player still takes their part of all they
-make; past that, more shares only raise that part. A building pays nothing of its own: the player's part of what it makes, by their shares, goes into the stations around it
+the buildings of a kind in a cell gives the player control of them: their production tech then
+works on the whole of them, not just the player's part, the boosts only the player's own take
+(railroads.sim.goods.OWNED_BOOSTS) work on them at all, on the whole of them, and the player
+still takes their part of all they make; past that, more shares only raise that part. A building pays nothing of its own: the player's part of what it makes, by their shares, goes into the stations around it
 before anything is handed out, as if a train had brought it, so the stations hand it out to the
 buildings in their reach and it pays as a delivery does (railroads.sim.economy,
 railroads.sim.station_trade). A whole building costs PAYBACK_YEARS of all it makes at full
@@ -233,13 +234,14 @@ class Owners:
         self._held[(kind, cell)] = kept
 
     def taking(self, kind: BuildingKind, need: Need) -> npt.NDArray[np.float64] | None:
-        """How many buildings' worth of a kind the player owns in each cell, as flat cells
-        counted as they trade, if their tech opened a boost only their own take; None if not."""
+        """How many buildings of a kind take a boost only the player's own take, if their tech
+        opened it, in each cell as flat cells counted as they trade: all of them where the player
+        controls them, none elsewhere; None if the tech is not open."""
         railway = self._growth.railway
         grid = self._shares.get(kind)
         if railway is None or grid is None or need not in railway.research.takes(kind):
             return None
-        return self._worked(kind, grid).ravel() * (1.0 + self.boost(kind, Effect.PRODUCTION))
+        return self._controlled(kind, grid).ravel() * (1.0 + self.boost(kind, Effect.PRODUCTION))
 
     def boost(self, kind: BuildingKind, effect: Effect) -> float:
         """What the player's tech adds, of one effect, to the buildings of a kind they own."""
@@ -262,6 +264,12 @@ class Owners:
                 counts[kind] = counts_now[kind] + boost * self._worked(kind, grid)
         return counts
 
+    def _controlled(self, kind: BuildingKind, grid: IntGrid) -> npt.NDArray[np.float64]:
+        """How many buildings of a kind in each cell the player controls: all there, or none."""
+        counts = self._growth.counts[kind]
+        controlled = (counts > 0) & (grid >= CONTROL * SHARES * counts)
+        return np.where(controlled, counts, 0).astype(np.float64)
+
     def _worked(self, kind: BuildingKind, grid: IntGrid) -> npt.NDArray[np.float64]:
         """How many buildings of a kind in each cell the player's tech works on: all of them
         where the player controls them, their part by their shares elsewhere."""
@@ -279,7 +287,7 @@ class Owners:
                 grid.ravel() / SHARES * (1.0 + self.boost(kind, Effect.PRODUCTION)),
                 1.0,
                 frozenset() if railway is None else railway.research.takes(kind),
-                self._worked(kind, grid).ravel() * (1.0 + self.boost(kind, Effect.PRODUCTION)),
+                self._controlled(kind, grid).ravel() * (1.0 + self.boost(kind, Effect.PRODUCTION)),
             )
             for kind, grid in self._shares.items()
             if grid.any()
