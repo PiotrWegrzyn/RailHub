@@ -475,12 +475,16 @@ class TilesWindow:
         y = low.y + 10 * scale
         _titled(draw_list, low.x + 4, high.x - 4, y, card.tile.value.upper(), 0.8 * max(0.8, scale))
         y += font * 1.3
+        big = font * 1.6 * scale
+        body = small * 1.6 + big * 1.25 + 26 * scale + small * 1.2
+        band = small * 3.4 + 8 if card.opens else 0.0
+        floor = high.y - 6 - band
+        y += max(0.0, (floor - y - body) / 2)
         level = f"Level {card.number}"
         _centred(
             draw_list, middle, y, level, color_u32(GROWN if card.picked else BRASS), small * 1.1
         )
         y += small * 1.6
-        big = font * 1.6 * scale
         if card.closed:
             _centred(draw_list, middle, y + big * 0.15, "CLOSED", _faded(TEXT_DIM, 1.0), font * 1.4)
         else:
@@ -489,9 +493,8 @@ class TilesWindow:
         self._draw_icons(draw_list, card, middle, y, scale)
         y += 18 * scale + 8 * scale
         self._draw_price(draw_list, card, middle, y, small)
-        y += small * 1.5
         if card.opens:
-            self._draw_unlock(draw_list, card, low, high, y, small)
+            self._draw_unlock(draw_list, card, low, high, max(y + small * 1.5, floor), small)
         if picking and not pickable:
             draw_list.add_rect_filled(low, high, color_u32(SHADE), 6.0)
         if hovered:
