@@ -9,15 +9,14 @@ from railroads.sim.economy import Trade
 from railroads.sim.grids import Cell, HexGrid
 from railroads.sim.growth import (
     BREEDING_TIMES,
-    SPAWN_SCALE,
     UNDYING,
-    WORKS_SPAWN_SCALE,
     Growth,
     _allowed,
     breeding_of,
 )
 from railroads.sim.ladders import (
     BAKERIES,
+    CHANCE_UNIT,
     FACTORIES,
     FARMS,
     FOOD_PLANTS,
@@ -75,7 +74,7 @@ def test_an_empty_map_has_the_base_chance_on_flat_grass_away_from_water() -> Non
 
     chances = growth.chances(TOWNS)
 
-    assert chances[5, 5] == pytest.approx(TOWNS.base_chance)
+    assert chances[5, 5] == pytest.approx(CHANCE_UNIT * TOWNS.base)
     assert chances[5, 0] == 0
 
 
@@ -95,7 +94,7 @@ def test_the_land_multiplies_the_chance(cell: tuple[int, int], weight: float) ->
 
     chances = growth.chances(TOWNS)
 
-    assert chances[cell] == pytest.approx(TOWNS.base_chance * weight)
+    assert chances[cell] == pytest.approx(CHANCE_UNIT * TOWNS.base * weight)
 
 
 def test_land_weights_of_one_cell_multiply_and_the_best_water_counts() -> None:
@@ -150,7 +149,7 @@ def test_houses_nobody_serves_leave_the_base_chance_raised_by_the_people_around(
     chances = Growth(constructions, NO_TRADE).chances(TOWNS)
 
     for cell, people in (((5, 5), 2), (neighbour, 2), ((5, 8), 0), ((8, 3), 18)):
-        drawn = TOWNS.base_chance * (1 + np.log2(1 + 6 * people))
+        drawn = CHANCE_UNIT * TOWNS.base * (1 + np.log2(1 + 6 * people))
         assert chances[cell] == pytest.approx(drawn)
 
 
@@ -180,7 +179,7 @@ def test_a_ladder_has_no_chance_until_the_neighbourhood_holds_what_it_needs() ->
 
 def test_a_sure_month_puts_up_a_house_for_every_land_cell_and_none_on_the_sea() -> None:
     constructions = Constructions(make_map())
-    sure = replace(TOWNS, base_chance=50.0, merges={})
+    sure = replace(TOWNS, base=50.0 / CHANCE_UNIT, merges={})
     growth = Growth(constructions, only(sure))
 
     growth.month(np.random.default_rng(1))
@@ -192,7 +191,7 @@ def test_a_sure_month_puts_up_a_house_for_every_land_cell_and_none_on_the_sea() 
 
 def test_small_chances_are_drawn_as_often_as_they_should_be() -> None:
     constructions = Constructions(make_map(40))
-    rare = replace(TOWNS, base_chance=0.01, chance_per_doubling={}, merges={}, land=Land())
+    rare = replace(TOWNS, base=0.01 / CHANCE_UNIT, per_doubling=0.0, merges={}, land=Land())
     growth = Growth(constructions, only(rare))
     rng = np.random.default_rng(4)
 
@@ -506,7 +505,7 @@ def test_farms_never_merge_or_raise_skyscrapers() -> None:
 
 def test_a_long_run_keeps_its_counts_and_chances_in_step_with_what_is_built() -> None:
     constructions = Constructions(make_map(16))
-    busy = tuple(replace(ladder, base_chance=ladder.base_chance + 0.002) for ladder in LADDERS)
+    busy = tuple(replace(ladder, base=ladder.base + 0.002 / CHANCE_UNIT) for ladder in LADDERS)
     growth = Growth(constructions, GrowthRule(ladders=busy, trades=False))
 
     growth.run(240, np.random.default_rng(2))
@@ -540,7 +539,7 @@ def test_the_log_holds_every_change_months_make_to_the_counts() -> None:
         build(constructions, cell, BuildingKind.FARM, 1)
     for cell in ((3, 16), (15, 17)):
         build(constructions, cell, BuildingKind.LOGGING_CAMP, 1)
-    busy = tuple(replace(ladder, base_chance=ladder.base_chance + 0.002) for ladder in LADDERS)
+    busy = tuple(replace(ladder, base=ladder.base + 0.002 / CHANCE_UNIT) for ladder in LADDERS)
     growth = Growth(constructions, GrowthRule(ladders=busy))
     rng = np.random.default_rng(2)
     logged, counted = [], []
@@ -559,7 +558,7 @@ def test_the_log_holds_every_change_months_make_to_the_counts() -> None:
 
 def test_growth_with_the_same_seed_builds_the_same_map() -> None:
     first, second = Constructions(make_map(20)), Constructions(make_map(20))
-    rule = only(replace(TOWNS, base_chance=0.001), replace(FARMS, base_chance=0.001))
+    rule = only(replace(TOWNS, base=0.001 / CHANCE_UNIT), replace(FARMS, base=0.001 / CHANCE_UNIT))
 
     Growth(first, rule).run(240, np.random.default_rng(3))
     Growth(second, rule).run(240, np.random.default_rng(3))
@@ -634,10 +633,8 @@ def test_served_buildings_add_their_points_by_the_share_they_are_served_to_their
     growth._count_served(houses_trade(tile_map, (5, 5), got, 2.0))
 
     chances = growth.chances(TOWNS)
-    base = TOWNS.base_chance
-    raised = (base + TOWNS.chance_per_doubling[Points.POPULATION] * multiplier * 4) * np.log2(
-        1 + 6 * 4
-    )
+    base = CHANCE_UNIT * TOWNS.base
+    raised = (base + CHANCE_UNIT * TOWNS.per_doubling * multiplier * 4) * np.log2(1 + 6 * 4)
     assert chances[5, 5] == pytest.approx(base + raised)
     assert chances[neighbour] == pytest.approx(neighbour_before)
 
@@ -667,8 +664,8 @@ def test_a_served_house_breeds_faster_the_more_people_live_around_it(around: int
 
     growth._count_served(houses_trade(tile_map, (5, 5), 2.0, 2.0))
 
-    base = TOWNS.base_chance
-    raised = (base + TOWNS.chance_per_doubling[Points.POPULATION]) * np.log2(1 + 6 * (1 + around))
+    base = CHANCE_UNIT * TOWNS.base
+    raised = (base + CHANCE_UNIT * TOWNS.per_doubling) * np.log2(1 + 6 * (1 + around))
     assert growth.chances(TOWNS)[5, 5] == pytest.approx(base + raised)
 
 
@@ -723,16 +720,7 @@ def test_a_bakery_is_likelier_by_every_doubling_of_the_people_around(houses: int
     chance = growth.chances(BAKERIES)[5, 5]
 
     drawn = 1 + np.log2(1 + houses)
-    assert chance == pytest.approx(BAKERIES.base_chance * SPAWN_SCALE * drawn * land)
-
-
-def test_glassworks_come_up_at_a_fifth_of_their_chance() -> None:
-    (glassworks,) = [ladder for ladder in LADDERS if ladder.kinds[0] == BuildingKind.GLASSWORKS]
-    unscaled = breeding_of(replace(glassworks, kinds=(BuildingKind.BREWERY,)), POINTS)
-
-    glass = breeding_of(glassworks, POINTS)
-
-    assert glass.spawn == pytest.approx(unscaled.spawn * WORKS_SPAWN_SCALE)
+    assert chance == pytest.approx(CHANCE_UNIT * BAKERIES.base * drawn * land)
 
 
 def test_brewers_distillers_and_potters_need_a_town_around_them() -> None:
@@ -784,7 +772,7 @@ def test_bakeries_give_food_points_but_come_up_and_breed_like_works() -> None:
     sausage = breeding_of(sausages, POINTS)
 
     assert (bread.own, sausage.own) == (Points.FOOD, Points.FOOD)
-    assert bread.spawn == pytest.approx(BAKERIES.base_chance * SPAWN_SCALE)
+    assert bread.spawn == pytest.approx(CHANCE_UNIT * BAKERIES.base)
     assert bread.per_doubling == pytest.approx(BREEDING_TIMES * bread.spawn)
     assert sausage.per_doubling == pytest.approx(BREEDING_TIMES * sausage.spawn)
 
@@ -794,5 +782,5 @@ def test_homes_are_pulled_to_towns_by_their_own_chance_per_doubling_not_their_ba
 
     pull = towns.per_doubling
 
-    assert pull == pytest.approx(TOWNS.chance_per_doubling[Points.POPULATION])
-    assert pull != pytest.approx(BREEDING_TIMES * TOWNS.base_chance)
+    assert pull == pytest.approx(CHANCE_UNIT * TOWNS.per_doubling)
+    assert pull != pytest.approx(BREEDING_TIMES * CHANCE_UNIT * TOWNS.base)

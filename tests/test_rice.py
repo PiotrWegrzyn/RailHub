@@ -150,7 +150,7 @@ def test_a_sushi_hut_with_fish_but_no_rice_is_not_fully_served() -> None:
 
 
 def test_sushi_huts_are_a_rare_treat_next_to_taverns() -> None:
-    rarity = SUSHI_HUTS.base_chance / TAVERNS.base_chance
+    rarity = SUSHI_HUTS.base / TAVERNS.base
 
     assert rarity == pytest.approx(0.1)
     assert SUSHI_HUTS.apart == SUSHI_APART

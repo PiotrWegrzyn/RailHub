@@ -34,8 +34,7 @@ from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 def busier(ladder: Ladder, times: float = 10) -> Ladder:
     return replace(
         ladder,
-        base_chance=times * ladder.base_chance,
-        chance_per_doubling={p: times * v for p, v in ladder.chance_per_doubling.items()},
+        base=times * ladder.base,
     )
 
 

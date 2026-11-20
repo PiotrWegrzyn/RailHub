@@ -41,7 +41,7 @@ def test_a_map_gets_only_a_few_small_patches_of_military_ground(seed: int) -> No
 def test_outposts_open_only_on_military_ground() -> None:
     ground = [(10, 10), (10, 11), (11, 10), (11, 11), (12, 10), (12, 11)]
     constructions = Constructions(make_map(deposits=garrison_at(*ground)))
-    busy = replace(MILITARY, base_chance=10 * MILITARY.base_chance)
+    busy = replace(MILITARY, base=10 * MILITARY.base)
     growth = Growth(constructions, GrowthRule(ladders=(busy,), trades=False), start_year=1850)
     military = (BuildingKind.OUTPOST, BuildingKind.BASE, BuildingKind.HEADQUARTERS)
 
