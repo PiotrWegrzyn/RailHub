@@ -695,8 +695,6 @@ FOOD_PLANTS = _merges(
         land=FACTORY_LAND,
         base=2,
         needs={Points.FOOD: 1},
-        most_per_cell=1,
-        most_nearby=6,
         from_year=1810,
     )
 )
@@ -711,8 +709,6 @@ STEEL_MILLS = _merges(
             water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.2, Terrain.SEA: 1.2},
         ),
         base=4,
-        most_per_cell=1,
-        most_nearby=2,
     )
 )
 
@@ -725,8 +721,6 @@ SHIPYARDS = Ladder(
     ),
     base=50,
     needs={Points.TRADE: 1},
-    most_per_cell=1,
-    most_nearby=1,
 )
 
 
@@ -765,8 +759,6 @@ def _works(
             land=FACTORY_LAND,
             base=base,
             needs=needs,
-            most_per_cell=1,
-            most_nearby=2,
             from_year=from_year,
             land_cells_each=land_cells_each,
         )
@@ -840,15 +832,13 @@ BEEKEEPERS = Ladder(
     most_nearby=1,
 )
 
-# Gasworks make town gas out of coal from 1820, one to a town, the likelier the more industry is
+# Gasworks make town gas out of coal from 1820, the likelier the more industry is
 # around.
 GASWORKS = _merges(
     Ladder(
         kinds=(BuildingKind.GASWORKS,),
         land=FACTORY_LAND,
         base=10,
-        most_per_cell=1,
-        most_nearby=1,
         from_year=1820,
     )
 )
@@ -862,8 +852,6 @@ _BAKERY = Ladder(
     kinds=(BuildingKind.BAKERY,),
     land=TOWN_LAND,
     base=5,
-    most_per_cell=1,
-    most_nearby=1,
 )
 
 BAKERIES = _merges(_BAKERY)
@@ -888,8 +876,6 @@ def _town_craft(
             land=TOWN_LAND,
             base=base,
             needs={Points.POPULATION: least_people} if least_people else {},
-            most_per_cell=1,
-            most_nearby=1,
             from_year=from_year,
         )
     )
