@@ -61,11 +61,11 @@ def generation_in(year: int) -> int:
     return 1 + sum(year >= start for start in GENERATION_YEARS)
 
 
-# Vehicles, made from about 1930, are carried from the fifth generation, so many to a car of it
-# and a Fibonacci size up for each generation after: tanks and planes from the first size.
-FIRST_GENERATION = 5
-VEHICLES: Mapping[Good, float] = MappingProxyType(
-    {Good.CARS: 5.0, Good.PLANES: 1.0, Good.TANKS: 1.0}
+# Vehicles, carried only from the generation of the years they are first made in: so many to a
+# car of it and a Fibonacci size up for each generation after. Cars, from about 1910, from the
+# fourth; tanks and planes, from the 1930s, from the fifth, from the first size.
+VEHICLES: Mapping[Good, tuple[int, float]] = MappingProxyType(
+    {Good.CARS: (4, 5.0), Good.PLANES: (5, 1.0), Good.TANKS: (5, 1.0)}
 )
 
 SMALL_CAR = 5.0
@@ -230,14 +230,11 @@ GOOD_KG: Mapping[Good, float] = MappingProxyType(
 
 def car_size(good: Good, generation: int = BASE_GENERATION) -> float:
     """How much of a good one car of a generation carries, before what tech adds to coaches;
-    no VEHICLES before FIRST_GENERATION."""
-    vehicles = VEHICLES.get(good)
-    if vehicles is not None:
-        return (
-            bigger(vehicles, generation - FIRST_GENERATION)
-            if generation >= FIRST_GENERATION
-            else 0.0
-        )
+    no VEHICLES before the generation they are first carried in."""
+    vehicle = VEHICLES.get(good)
+    if vehicle is not None:
+        first, size = vehicle
+        return bigger(size, generation - first) if generation >= first else 0.0
     return bigger(CAR_UNITS.get(good, CAR_CAPACITY), generation - BASE_GENERATION)
 
 

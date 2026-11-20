@@ -498,7 +498,7 @@ window (H) lists the same.
 |---|---|---|---|
 | House |  | 10 food, 3 heating | 10 food, 0.5 soy sauce, 1 beer, 1 newspapers (from 1600), 5 common goods, 0.5 vodka (from 1600), 0.5 refined sugar (from 1800), 0.5 bricks, 0.2 glass, 0.5 limestone, 0.5 wax |
 | Tenement |  | 60 food, 60 common goods, 20 heating | 60 food, 5 soy sauce, 10 salt, 20 goods, 10 hot drinks (from 1700), 10 tools (from 1870), 10 beer, 10 vodka (from 1600), 10 bricks, 10 glass, 10 cement (from 1880), 10 refined sugar (from 1800), 10 newspapers (from 1600), 10 limestone, 1 luxury goods (from 1700), 5 wax |
-| Block of flats |  | 200 food, 300 common goods, 80 heating | 200 food, 15 soy sauce, 30 salt, 40 goods, 30 hot drinks (from 1700), 10 tools (from 1870), 30 fuel (from 1910), 3 cars (from 1930), 30 beer, 30 vodka (from 1600), 50 bricks, 50 cement (from 1880), 50 glass, 30 newspapers (from 1600), 5 appliances (from 1950), 30 refined sugar (from 1800), 5 luxury goods (from 1700) |
+| Block of flats |  | 200 food, 300 common goods, 80 heating | 200 food, 15 soy sauce, 30 salt, 40 goods, 30 hot drinks (from 1700), 10 tools (from 1870), 30 fuel (from 1910), 3 cars (from 1910), 30 beer, 30 vodka (from 1600), 50 bricks, 50 cement (from 1880), 50 glass, 30 newspapers (from 1600), 5 appliances (from 1950), 30 refined sugar (from 1800), 5 luxury goods (from 1700) |
 | Farm | 10 wheat |  | 5 machinery (from 1870), 10 limestone, 2 fuel (from 1920) |
 | Orchard | 10 apples |  |  |
 | Date palms | 10 dates |  |  |
@@ -561,7 +561,7 @@ window (H) lists the same.
 | Refinery (1856) | 300 fuel | 150 oil |  |
 | Chemical works (1880) | 100 chemicals | 50 salt, 50 boiler fuel |  |
 | Electronics plant (1960) | 50 electronics | 50 copper (from 1880), 50 chemicals (from 1880) |  |
-| Car factory (1930) | 20 cars | 100 steel (from 1855), 40 fuel (from 1910) |  |
+| Car factory (1910) | 20 cars | 100 steel (from 1855), 40 fuel (from 1910) |  |
 | Gun factory (1800) | 100 guns | 50 steel (from 1855), 25 lumber |  |
 | Tank factory (1940) | 20 tanks | 120 steel (from 1855), 40 fuel (from 1910) |  |
 | Aircraft factory (1935) | 20 planes | 60 steel (from 1855), 20 copper (from 1880), 20 fuel (from 1910), 20 electronics (from 1960) |  |
@@ -634,8 +634,8 @@ window (H) lists the same.
 | Mega chemical works (1880) | 625 chemicals | 312.5 salt, 312.5 boiler fuel |  |
 | Big electronics plant (1960) | 125 electronics | 125 copper (from 1880), 125 chemicals (from 1880) |  |
 | Mega electronics plant (1960) | 312.5 electronics | 312.5 copper (from 1880), 312.5 chemicals (from 1880) |  |
-| Big car factory (1930) | 50 cars | 250 steel (from 1855), 100 fuel (from 1910) |  |
-| Mega car factory (1930) | 125 cars | 625 steel (from 1855), 250 fuel (from 1910) |  |
+| Big car factory (1910) | 50 cars | 250 steel (from 1855), 100 fuel (from 1910) |  |
+| Mega car factory (1910) | 125 cars | 625 steel (from 1855), 250 fuel (from 1910) |  |
 | Big machine works (1870) | 100 machinery | 100 steel (from 1855), 50 copper (from 1880) |  |
 | Mega machine works (1870) | 250 machinery | 250 steel (from 1855), 125 copper (from 1880) |  |
 | Big brickworks | 250 bricks | 125 clay | 62.5 coal (from 1700) |
@@ -673,7 +673,7 @@ window (H) lists the same.
 | Big porcelain works (1710) | 75 porcelain | 37.5 clay | 18.75 coal (from 1700) |
 | Mega porcelain works (1710) | 187.5 porcelain | 93.75 clay | 46.88 coal (from 1700) |
 | Skyscraper |  | 30 goods, 5 clothes (from 1780), 20 wine, 20 fuel (from 1910), 30 electronics (from 1960), 10 glass, 10 cement (from 1880), 20 paper (from 1150), 5 appliances (from 1950), 2 porcelain, 2 luxury goods (from 1700) | 10 hot drinks (from 1700), 5 furniture, 20 newspapers (from 1600) |
-| Car dealer (1930) |  | 20 cars (from 1930) | 10 rubber |
+| Car dealer (1910) |  | 20 cars (from 1910) | 10 rubber |
 | Jeweller |  | 20 gold, 10 diamonds |  |
 | Carpet weaver (1700) | 5 luxury goods | 20 fibre |  |
 | Clock maker (1880) | 5 luxury goods | 10 copper (from 1880), 5 glass |  |
@@ -701,9 +701,9 @@ window (H) lists the same.
 | Mega clock maker (1880) | 31.25 luxury goods | 62.5 copper (from 1880), 31.25 glass |  |
 | Big mirror maker (1700) | 12.5 luxury goods | 25 glass, 1.25 gold |  |
 | Mega mirror maker (1700) | 31.25 luxury goods | 62.5 glass, 3.125 gold |  |
-| Military outpost (1800) |  | 60 guns, 30 cars (from 1930) |  |
-| Military base (1800) |  | 180 guns, 90 cars (from 1930), 30 planes (from 1935) |  |
-| Headquarters (1800) |  | 450 guns, 180 cars (from 1930), 90 planes (from 1935), 90 tanks (from 1940) |  |
+| Military outpost (1800) |  | 60 guns, 30 cars (from 1910) |  |
+| Military base (1800) |  | 180 guns, 90 cars (from 1910), 30 planes (from 1935) |  |
+| Headquarters (1800) |  | 450 guns, 180 cars (from 1910), 90 planes (from 1935), 90 tanks (from 1940) |  |
 | Airport (1920) |  | 40 fuel (from 1910) |  |
 | Church |  | 10 wax | 10 incense |
 | Basilica |  | 30 wax | 20 incense |

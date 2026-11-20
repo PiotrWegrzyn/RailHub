@@ -1247,7 +1247,7 @@ WORKS = (
         BuildingKind.CHEMICAL_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {IND: 3}, 1880, 20_000, 4e-7
     ),
     _works(BuildingKind.REFINERY, {IND: 4e-7, Points.ORE: 1e-6}, {}, 1856, 10_000, 1e-6),
-    _works(BuildingKind.CAR_FACTORY, {IND: 6e-7}, {IND: 6}, 1930, 40_000, 4e-6),
+    _works(BuildingKind.CAR_FACTORY, {IND: 6e-7}, {IND: 6}, 1910, 40_000, 4e-6),
     _works(BuildingKind.ELECTRONICS_PLANT, {POP: 2.5e-8, IND: 4e-7}, {IND: 3}, 1960, 30_000, 4e-7),
     _works(BuildingKind.PLANE_FACTORY, {POP: 2.5e-8, IND: 6e-7}, {IND: 6}, 1935, 40_000, 1e-5),
     _works(BuildingKind.TANK_FACTORY, {IND: 6e-7}, {IND: 6}, 1940, 40_000, 1e-5),
@@ -1291,7 +1291,7 @@ JEWELLERS = replace(
     apart=JEWELLERS_APART,
 )
 
-CAR_DEALERS = _works(BuildingKind.CAR_DEALER, {POP: 0.000001}, {POP: 120}, 1930, 16_000)
+CAR_DEALERS = _works(BuildingKind.CAR_DEALER, {POP: 0.000001}, {POP: 120}, 1910, 16_000)
 
 LADDERS = (
     TOWNS,

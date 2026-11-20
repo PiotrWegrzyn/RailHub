@@ -153,12 +153,12 @@ def test_works_with_nothing_to_work_from_close_after_exactly_thirty_years_starvi
     assert standing == [1, 0]
 
 
-def test_flats_want_a_car_from_1930() -> None:
-    before = needs_of(BuildingKind.FLATS, 1929)
-    after = needs_of(BuildingKind.FLATS, 1930)
+def test_flats_want_a_car_from_1910() -> None:
+    before = needs_of(BuildingKind.FLATS, 1909)
+    after = needs_of(BuildingKind.FLATS, 1910)
 
     assert Need.CARS not in before
-    assert after[Need.CARS] == pytest.approx(3 * want_factor(BuildingKind.FLATS, Need.CARS, 1930))
+    assert after[Need.CARS] == pytest.approx(3 * want_factor(BuildingKind.FLATS, Need.CARS, 1910))
 
 
 @pytest.mark.parametrize(("gap", "opens"), [(6, False), (12, True)])

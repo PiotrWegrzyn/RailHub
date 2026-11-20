@@ -413,12 +413,16 @@ def test_each_generation_of_cars_holds_one_fibonacci_size_more(
     assert size == coal
 
 
-def test_vehicles_ride_from_the_fifth_generation_a_fibonacci_size_up_each_generation() -> None:
+def test_cars_ride_from_the_fourth_generation_and_tanks_and_planes_from_the_fifth() -> None:
     goods = [Good.CARS, Good.TANKS, Good.PLANES]
 
-    sizes = [[car_size(good, generation) for generation in (4, 5, 6, 7)] for good in goods]
+    sizes = [[car_size(good, generation) for generation in (3, 4, 5, 6, 7)] for good in goods]
 
-    assert sizes == [[0.0, 5.0, 8.0, 13.0], [0.0, 1.0, 1.0, 2.0], [0.0, 1.0, 1.0, 2.0]]
+    assert sizes == [
+        [0.0, 5.0, 8.0, 13.0, 21.0],
+        [0.0, 0.0, 1.0, 1.0, 2.0],
+        [0.0, 0.0, 1.0, 1.0, 2.0],
+    ]
 
 
 @pytest.mark.parametrize(("generation", "tonnes"), [(1, 1.5), (2, 4.0), (5, 14.0), (7, 24.0)])

@@ -114,8 +114,8 @@ def test_three_of_a_rank_become_one_of_the_next(small: BuildingKind, big: Buildi
     ("kind", "year", "need", "wanted"),
     [
         (BuildingKind.OUTPOST, 1850, Need.GUNS, True),
-        (BuildingKind.OUTPOST, 1929, Need.CARS, False),
-        (BuildingKind.OUTPOST, 1930, Need.CARS, True),
+        (BuildingKind.OUTPOST, 1909, Need.CARS, False),
+        (BuildingKind.OUTPOST, 1910, Need.CARS, True),
         (BuildingKind.OUTPOST, 2000, Need.PLANES, False),
         (BuildingKind.BASE, 1934, Need.PLANES, False),
         (BuildingKind.BASE, 1935, Need.PLANES, True),
