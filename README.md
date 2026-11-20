@@ -890,9 +890,11 @@ to one map in `railroads.sim.happenings`).
 Supply and demand grow by tiles (`railroads.sim.tiles`). Every good belongs to a tile, such as
 coal and coke, farming or vehicles, and every tile stands on two boards: supply, how much of its
 goods buildings make, and demand, how much of them homes, shops and everything else people use
-want. From 1804 every year two supply tiles and one demand tile go up a level on 1 January: the
-ones the player picked in the Supply and demand window (Y, opened by itself once a year), the
-lowest for the picks not made. No tile can be more than two levels above the lowest on its board.
+want. From 1804 every year two supply tiles and one demand tile go up a level on 1 January, the
+lowest in the years before play. In play the game waits as a year turns: the supply and demand
+screen shows every tile as a card, with what its next level adds and on demand who it lets take
+what; the player picks two production cards and confirms, the board slides away to consumption,
+and they pick one there and confirm. The same two boards can be looked at any time (Y). No tile can be more than two levels above the lowest on its board.
 Each level adds a flat share of the tile's base, not compounded: on supply its period's share,
 from 5% a level for farming in the early 1800s to 200% for modern goods after 1960, on demand the
 same share every level, 5% for food up to 30% for oil, vehicles and modern goods. Supply grows far
@@ -1159,7 +1161,7 @@ share of demand left for each need.
 The figures in the table are a good's base; what a unit earns follows a price list
 (`railroads.sim.tiles`): its tile's demand over its supply, to the power of 0.8, both as many
 times their base as the levels give. Prices change only when a tile goes up, on 1 January, and the
-Supply and demand window shows what each pick would do to them before it is made. Since supply
+supply and demand screen shows what each pick would do to them before it is made. Since supply
 grows faster than demand, margins shrink: in 2050 coal, ore, steel and chemicals earn about a
 fifth of their base, farming, animals, wood and textiles a little over a quarter, passengers and
 mail over a third and luxuries about half. The player's own buildings sell to their stations at

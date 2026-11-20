@@ -123,6 +123,8 @@ class App:
         self._autosave_memory = ReusedMemory()
         # The month being done a step a frame, if one is, and whether it autosaved at its end.
         self._turning: Steps[bool] | None = None
+        # The months turned that wait on the tiles picked for the year they begin.
+        self._waiting: list[str] = []
         # What the player asked to leave this game for: a save to load, or the main menu.
         self.load_wanted: str | None = None
         self.menu_wanted = False
@@ -175,8 +177,13 @@ class App:
         goal = self.game.goal
         if self._turning is not None:
             self._turn_once()
-        elif goal.bankrupt is None and not goal.news:
-            # Time waits while the player reads news of the target or bankruptcy.
+        elif self._waiting and not self.tiles.choosing:
+            dates, self._waiting = self._waiting, []
+            self._turning = budgeted(self._months(dates), MONTH_FRAME_SECONDS)
+            self._turn_once()
+        elif goal.bankrupt is None and not goal.news and not self.tiles.choosing:
+            # Time waits while the player reads news of the target or bankruptcy, and picks
+            # the tiles for a new year.
             goal.watch(self.game.finances.cash)
             self._let_time_pass(imgui.get_io().delta_time)
         busy = self._turning is not None
@@ -203,7 +210,12 @@ class App:
         first = self.clock.months
         turned = self.clock.advance(seconds)
         if turned:
-            dates = [self.clock.date_of(month) for month in range(first + 1, first + 1 + turned)]
+            months = range(first + 1, first + 1 + turned)
+            dates = [self.clock.date_of(month) for month in months]
+            januaries = [month for month in months if month % 12 == 0]
+            if januaries and self.tiles.must_choose(self.clock.first_year + januaries[0] // 12):
+                self._waiting = dates
+                return
             self._turning = budgeted(self._months(dates), MONTH_FRAME_SECONDS)
             self._turn_once()
 
@@ -232,7 +244,6 @@ class App:
         draw_top_bar(self)
         self.view.gui()
         self.help.draw()
-        self.tiles.new_year(self.view.growth.year)
         self.tiles.draw(self.view.railway.tiles)
         if self.reports.open:
             growth = self.view.growth

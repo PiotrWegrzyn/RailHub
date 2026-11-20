@@ -552,3 +552,20 @@ def kind_era(kind: BuildingKind) -> int:
 def era_come(era: int, year: int) -> bool:
     """Whether an era has come by a year: the first one always has."""
     return era <= 1 or of_year(year).era >= era
+
+
+def supply_step(tile: Tile, level: int) -> float:
+    """The share of its base a tile's next supply level adds over this one; nothing once closed."""
+    step = level + 1
+    if step > CLOSES.get(tile, step):
+        return 0.0
+    period = max(i for i, start in enumerate(PERIODS) if start < step)
+    return SUPPLY_STEPS[tile][period]
+
+
+def unlocks_of(tile: Tile) -> list[tuple[int, BuildingKind, Need]]:
+    """Every buyer a demand tile opens, by the level that opens it."""
+    return sorted(
+        ((level, kind, need) for (kind, need), (of, level) in UNLOCKS.items() if of == tile),
+        key=lambda unlock: (unlock[0], unlock[1].value, unlock[2].value),
+    )

@@ -67,6 +67,7 @@ The ideas every rule of the game should follow, the most important first.
 - Supply and demand grow by tiles: every good belongs to a tile on two boards, supply and demand.
   Every year two supply tiles and one demand tile go up a level, the ones the player picks, the
   lowest for picks not made, and no tile gets more than two levels above the lowest on its board.
+- As a year turns the game waits for the picks: production cards first, then consumption.
   Each level adds a flat share of the tile's base, not compounded, by good and period.
 - Supply raises only what a building makes and demand only what it takes, never both: more supply
   makes more from the same inputs, more demand takes more for as much.
