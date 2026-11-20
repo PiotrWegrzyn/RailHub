@@ -154,7 +154,6 @@ HEAPS: dict[Good, RGB] = {
     Good.HOPS: (130, 190, 84),
     Good.BRICKS: (180, 82, 60),
     Good.MACHINERY: (96, 100, 112),
-    Good.COKE: (70, 70, 76),
 }
 TANKS: dict[Good, RGB] = {
     Good.OIL: (34, 32, 38),
@@ -1727,7 +1726,7 @@ def _heap(m: Model, good: Good, full: bool) -> None:
 
 
 def _lumped(m: Model, color: RGB) -> None:
-    """A load heaped in lumps: potatoes, coke."""
+    """A load heaped in lumps, such as potatoes."""
     h = CAR_HALF
     parts.lumps(m, (-h + 0.02, h - 0.02), (-0.07, 0.07), 0.13, color, 0.024, 0.04)
 

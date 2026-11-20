@@ -1,4 +1,4 @@
-"""Town crafts and the town's grand buildings: coke plants, potters, tile works, foundries,
+"""Town crafts and the town's grand buildings: potters, tile works, foundries,
 sausage makers, the makers of luxury goods, manors, theatres and hospitals."""
 
 from railroads.ui.pixel.art.homes import _chimney_on, _foot
@@ -13,7 +13,7 @@ from railroads.ui.pixel.art.painter import (
     Sprite,
     shade,
 )
-from railroads.ui.pixel.art.parts import DOOR, _heap, _on_wall, _patch, _tiles, _window
+from railroads.ui.pixel.art.parts import DOOR, _on_wall, _patch, _tiles, _window
 
 ROOF: RGB = (150, 70, 52)
 MOLTEN: RGB = (240, 128, 36)
@@ -41,24 +41,6 @@ def _hall(p: Painter, wall: RGB, roof: RGB, length: float = 16) -> tuple:
     _foot(p, top, 6)
     p.gable(top, 3.5, roof, wall)
     return top
-
-
-def coke_plant() -> Sprite:
-    """A low battery of brick coke ovens with their doors in a row, a tall chimney smoking above
-    it, a quench tower and a heap of grey coke beside."""
-    p = Painter(32, 30, (15, 21))
-    p.shadow(13, 3.5)
-    top = p.hall(-1, 1, 18, 7, 4, BRICK, (70, 66, 64))
-    left, front, _, _ = top
-    for f in (0.1, 0.25, 0.4, 0.55, 0.7, 0.85):
-        _patch(p, left, front, (f - 0.04, f + 0.04), (1.2, 3.4), (40, 36, 36))
-    p.rect(9, -18, 10.6, -2, shade(BRICK, 0.85))
-    p.line([(9, -19), (10.6, -19)], shade(BRICK, 0.5))
-    for x, y in ((10, -21), (11.5, -23), (10.5, -25)):
-        p.point(x, y, (196, 196, 200))
-    p.rect(-13, -10, -9, 2, (120, 116, 110))
-    _heap(p, 12, 6, 3, 3, (70, 70, 76))
-    return p.sprite()
 
 
 def potter() -> Sprite:

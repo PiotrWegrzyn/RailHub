@@ -98,7 +98,6 @@ class BuildingKind(Enum):
     PIG_FARM = "pig farm"
     CHICKEN_FARM = "chicken farm"
     GASWORKS = "gasworks"
-    COKE_PLANT = "coke plant"
     POTTER = "potter"
     TILE_WORKS = "tile works"
     FOUNDRY = "foundry"
@@ -153,8 +152,6 @@ class BuildingKind(Enum):
     MEGA_JUICE_WORKS = "mega juice works"
     BIG_STEEL_MILL = "big steel mill"
     MEGA_STEEL_MILL = "mega steel mill"
-    BIG_COKE_PLANT = "big coke plant"
-    MEGA_COKE_PLANT = "mega coke plant"
     BIG_POTTER = "big potter"
     MEGA_POTTER = "mega potter"
     BIG_TILE_WORKS = "big tile works"
@@ -290,7 +287,6 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     BuildingKind.LOGGING_CAMP: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.SAWMILL: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.GASWORKS: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
-    BuildingKind.COKE_PLANT: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.TILE_WORKS: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.FOUNDRY: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.MANOR: BuildingRules(relief=_OFF_MOUNTAINS, space=3),

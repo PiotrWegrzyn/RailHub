@@ -160,7 +160,6 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.PIG_FARM: (Points.FOOD, 1),
     BuildingKind.CHICKEN_FARM: (Points.FOOD, 1),
     BuildingKind.GASWORKS: (Points.INDUSTRY, 1),
-    BuildingKind.COKE_PLANT: (Points.INDUSTRY, 2),
     BuildingKind.POTTER: (Points.INDUSTRY, 1),
     BuildingKind.TILE_WORKS: (Points.INDUSTRY, 1),
     BuildingKind.FOUNDRY: (Points.INDUSTRY, 2),
@@ -944,19 +943,6 @@ TOWN_CRAFTS = (
     _town_craft(BuildingKind.MIRROR_MAKER, 0.5, 1700, LUXURY_TOWN),
 )
 
-# Coke plants bake coal into coke for the steel mills from 1850, drawn to industry.
-COKE_PLANTS = _merges(
-    Ladder(
-        kinds=(BuildingKind.COKE_PLANT,),
-        land=FACTORY_LAND,
-        base_chance=0.0000002,
-        chance_per_doubling={Points.INDUSTRY: 0.0000004},
-        most_per_cell=1,
-        most_nearby=2,
-        from_year=1850,
-    )
-)
-
 # Buildings that only buy: manors in towns of MANOR_TOWN people, theatres in towns of
 # THEATRE_TOWN and hospitals, from 1850, in towns of HOSPITAL_TOWN; each one to a neighbourhood
 # and the likelier the more people live around.
@@ -1324,7 +1310,6 @@ LADDERS = (
     BAKERIES,
     BUTCHERS,
     GASWORKS,
-    COKE_PLANTS,
     *TOWN_CRAFTS,
     *TOWN_SIGHTS,
     POTATO_FARMS,

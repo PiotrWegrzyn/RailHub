@@ -32,7 +32,6 @@ DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.FOOD_PLANT: ((232, 220, 170), 0.14),
     BuildingKind.BAKERY: ((214, 160, 92), 0.1),
     BuildingKind.GASWORKS: ((110, 118, 112), 0.14),
-    BuildingKind.COKE_PLANT: ((70, 70, 76), 0.14),
     BuildingKind.POTTER: ((176, 104, 70), 0.1),
     BuildingKind.TILE_WORKS: ((70, 120, 170), 0.12),
     BuildingKind.FOUNDRY: ((74, 76, 82), 0.14),

@@ -137,7 +137,6 @@ BUILDING_SPRITES = {
     BuildingKind.FOOD_PLANT: "food_plant",
     BuildingKind.BAKERY: "bakery",
     BuildingKind.GASWORKS: "gasworks",
-    BuildingKind.COKE_PLANT: "coke_plant",
     BuildingKind.POTTER: "potter",
     BuildingKind.TILE_WORKS: "tile_works",
     BuildingKind.FOUNDRY: "foundry",
