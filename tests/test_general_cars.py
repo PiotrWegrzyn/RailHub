@@ -6,23 +6,27 @@ from railroads.sim.railway import Railway
 from railroads.sim.trains import MEDIUM_CAR, Stop, Train
 
 HERE, THERE = (6, 3), (6, 20)
+THIRD_ERA = 1880
 
 
 def general_train(railway: Railway, cargo: General = General.FOOD) -> Train:
     train = railway.buy()
     assert train is not None
+    railway.year = THIRD_ERA
     train.stops = [Stop(HERE, [cargo]), Stop(THERE)]
     return train
 
 
-def test_a_general_car_can_be_added_from_the_start() -> None:
+def test_a_general_car_comes_with_the_third_era() -> None:
     _, railway = joined_stations()
     train = railway.buy()
     assert train is not None
+    before = railway.can_carry(train, General.FOOD)
+    railway.year = THIRD_ERA
 
-    carried = railway.can_carry(train, General.FOOD)
+    after = railway.can_carry(train, General.FOOD)
 
-    assert carried
+    assert (before, after) == (False, True)
 
 
 def test_a_general_food_car_takes_the_food_that_fills_it_most_when_none_pays_more() -> None:

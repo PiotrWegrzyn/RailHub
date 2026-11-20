@@ -139,6 +139,9 @@ LEVEL_STORAGE_STEPS = 2
 # From this level up, each level lets a station have one more platform beside it, with its own way
 # through, so lines come in from more sides.
 PLATFORM_LEVEL = 4
+# General cars, taking whichever good of their kind pays best, come with this era (railroads.sim.tiles),
+# the one of the third generation of wagons.
+GENERAL_CARS_ERA = 3
 # What a train waits with when no track it can run on joins where it stands to its next stop.
 NO_TRACK_ON = "No track to its next stop"
 NO_ELECTRIFIED_TRACK_ON = "No electrified track to its next stop"
@@ -262,8 +265,11 @@ class Railway:
         return boards.of_year(self.year).supply.get(tile, 0) >= level
 
     def can_carry(self, train: Train, cargo: Cargo) -> bool:
-        """Whether a train's engine takes cars of a good: an express takes only passengers, and
-        vehicles only once its cars are of a generation that carries them (railroads.sim.trains.VEHICLES)."""
+        """Whether a train's engine takes cars of a good: an express takes only passengers, general
+        cars come with the era of GENERAL_CARS_ERA, and vehicles only once its cars are of a
+        generation that carries them (railroads.sim.trains.VEHICLES)."""
+        if isinstance(cargo, General) and boards.of_year(self.year).era < GENERAL_CARS_ERA:
+            return False
         if isinstance(cargo, Good) and not self.car_capacity(cargo, train.engine):
             return False
         return not ENGINES[train.engine].express or cargo == Good.PASSENGERS

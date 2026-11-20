@@ -191,8 +191,8 @@ STEPS: tuple[Step, ...] = (
         (
             "The way back can carry other goods than the way out: each stop has its own cars.",
             (
-                "General cars take whichever good of their kind pays best at the next stop, such "
-                "as any food."
+                "From the third era, about 1873, general cars take whichever good of their kind "
+                "pays best at the next stop, such as any food."
             ),
             (
                 "What a train brings beyond what the buildings around can use in a month stays at "
