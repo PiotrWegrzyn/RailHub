@@ -138,7 +138,7 @@ def test_a_gun_factory_arms_an_outpost_next_to_it_on_its_own() -> None:
     economy = Economy(tile_map)
     flat = int(np.ravel_multi_index((5, 5), tile_map.grid.shape))
     economy.stock[(BuildingKind.GUN_FACTORY, Need.STEEL)][flat] = 30.0
-    economy.stock[(BuildingKind.GUN_FACTORY, Need.LUMBER)][flat] = 30.0
+    economy.stock[(BuildingKind.GUN_FACTORY, Need.PLANKS)][flat] = 30.0
     factories = np.zeros(tile_map.grid.shape, dtype=np.int64)
     factories[5, 5] = 1
     outposts = np.zeros(tile_map.grid.shape, dtype=np.int64)

@@ -44,7 +44,7 @@ The ideas every rule of the game should follow, the most important first.
 - A station not joined by track to another station gathers and hands out nothing.
 - The player can buy shares of buildings, a thousand to a building, traded 100, 200 or 600 at a
   time. With 60% of a building's shares the player controls it: their flag flies big over it and
-  only then do their production tech, limestone and machinery work on it, on all of it; more
+  only then do limestone and machinery work on it, on all of it; more
   shares only raise their part. A whole
   building costs ten years of all it makes at full satisfaction, two thirds of that at none
   and twice at 200%, by how satisfied it was over the last quarter, and shares bought can be sold
@@ -61,6 +61,20 @@ The ideas every rule of the game should follow, the most important first.
 
 ## Economy
 
+- Margins shrink as the world fills up: supply grows far faster than demand, so a unit earns less
+  and less, and to stay profitable the player has to carry more for less, investing well enough to
+  keep buying the newest trains.
+- Supply and demand grow by tiles: every good belongs to a tile on two boards, supply and demand.
+  Every year two supply tiles and one demand tile go up a level, the ones the player picks, the
+  lowest for picks not made, and no tile gets more than two levels above the lowest on its board.
+  Each level adds a flat share of the tile's base, not compounded, by good and period.
+- Eras come when every supply tile reaches a level, each with a generation of wagons and new tiles,
+  which start at the lowest level on each board. Only coal closes, around 2000.
+- Prices follow a price list, not a market: a tile's demand over its supply decides what a unit of
+  its goods earns, it changes only when a tile goes up, and the player sees what a pick does to it
+  before making it.
+- At the start everything pays and everything is short, food most of all; growing towns make
+  demand, and someone to sell large amounts to.
 - Most money comes from the needs of grown homes, not from food or passengers.
 - Goods fall into categories of need: food, processed food, common goods and heating. Any kind of
   good in a category meets that need.
@@ -84,6 +98,10 @@ The ideas every rule of the game should follow, the most important first.
   short, well-managed trains pay.
 - A home that grows wants more of everything: its reward for growing is that it uses more.
 - A bonus input raises output but never replaces the main input.
+- Raw goods are worked before buildings use them: logging camps fell logs, and only a sawmill's
+  planks and wood chips go to other buildings. Homes and wood-burning engines burn logs as they are.
+- A boost of a works either makes more from the same inputs or lets it take in more of them, as
+  machinery and diesel let a sawmill saw more logs, still a plank from every log.
 - Hard chains, with many inputs, make few but valuable goods.
 - Works grow by merging: three food makers of a kind become a big one and three big ones a mega
   one; the harder processors merge two at a time.
@@ -101,9 +119,9 @@ The ideas every rule of the game should follow, the most important first.
 - Fuel bought out of the player's own stations is cheaper than at retail, and technology narrows
   the gap.
 - Infrastructure the player owns, such as power plants, has to pay off by making a lot.
-- The world moves through history: every decade people want more of everything, food and heating
-  least, and dated events (wars, crises, inventions) change what is wanted, made and paid. Each
-  one is news the player is told of, with what it changes, so nothing shifts unannounced.
+- The world moves through history: dated events (wars, crises, inventions) change what is
+  wanted, made and paid. Each one is news the player is told of, with what it changes, so nothing
+  shifts unannounced.
 - History is the same in every game, apart from what happens only in one part of the world, such
   as the market opening in the old Eastern Bloc in 1989.
 
@@ -180,7 +198,7 @@ The ideas every rule of the game should follow, the most important first.
 - Of what is underground, only the entrances are drawn: tunnel portals.
 - The perspective is consistent, as in Railroad Tycoon 2: track lies under the trees and stations
   stand turned along their track. The art is our own.
-- A building stands on the land it works with: a lumber mill among trees.
+- A building stands on the land it works with: a logging camp among trees.
 - Every kind of building is recognisable at a glance and never looks like a house or like another
   kind.
 - Big and mega works have their own look, the same trade grown grander; a mega one is spectacular.

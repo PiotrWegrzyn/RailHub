@@ -1,5 +1,5 @@
 """The map grows by itself, a month at a time, like a cellular automaton, by the ladders of
-railroads.sim.ladders: towns, farms, orchards, mines, lumber mills, ports and every kind of works.
+railroads.sim.ladders: towns, farms, orchards, mines, logging camps, ports and every kind of works.
 
 Buildings breed (breeding_of): a cell's chance of another of a ladder's kinds is
 
@@ -44,7 +44,7 @@ cells, more or fewer by the land, put on any land they could stand on where none
 History happens too (railroads.sim.happenings): wars, crises and new things, a month at a time; in a war the
 military grows military_growth times as fast (railroads.sim.events).
 
-Forests come and go as well (railroads.sim.forests): people, industry and above all lumber mills
+Forests come and go as well (railroads.sim.forests): people, industry and above all logging camps
 clear them, they spread onto open grassland beside them, and the land weighs again wherever they
 changed.
 
@@ -55,7 +55,6 @@ every few minutes.
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
-from functools import cache
 from itertools import pairwise
 from types import MappingProxyType
 from typing import TYPE_CHECKING
@@ -110,6 +109,7 @@ from railroads.sim.steps import Steps, finish
 from railroads.sim.tech import Effect
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 from railroads.sim.towns import Towns
+from railroads.sim.year_caches import year_cached
 
 if TYPE_CHECKING:
     from railroads.sim.happenings import Happenings
@@ -252,13 +252,13 @@ VENUES = (
 # land lets their makers grow, then, do they ever open.
 
 
-@cache
+@year_cached
 def makers_of(good: Good, year: int) -> frozenset[BuildingKind]:
     """Every kind of building that makes a good in a given year."""
     return frozenset(kind for kind in MAKES if good in makes_of(kind, year))
 
 
-@cache
+@year_cached
 def inputs_of(kind: BuildingKind, year: int) -> tuple[frozenset[BuildingKind], ...]:
     """For each main input a processor or a venue must have in a given year, the kinds of
     building that make it, any one of which will do; nothing for other kinds. A processor's
@@ -603,7 +603,7 @@ class Growth:
             self.railway.station_trade = self.station_trade
         yield
         self.trade = yield from self.economy.trade_steps(
-            self.owners.working_counts(),
+            self.counts,
             self.station_trade.orders(),
             np.flatnonzero(self._occupied),
             self.owners.first_for_stations(),
@@ -937,6 +937,8 @@ class Growth:
         stations = 0 if self.railway is None else len(self.railway.stations())
         for month in range((before // 12 + 1) * 12, self._months + 1, 12):
             self.history.close_year(self.start_year + month // 12 - 1, stations, self.population())
+            if self.railway is not None:
+                self.railway.new_year(self.start_year + month // 12)
         changed: set[Cell] = set()
         self.forests_changed = set()
         if self.rule.trades and reached(self.rule.trade_every_months):

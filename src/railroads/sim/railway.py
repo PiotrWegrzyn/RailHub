@@ -44,6 +44,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.places import StationNames
+from railroads.sim import tiles as boards
 from railroads.sim.calls import StationCalls
 from railroads.sim.clock import SECONDS_PER_MONTH, START_YEAR
 from railroads.sim.constructions import Constructions
@@ -92,6 +93,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
 from railroads.sim.tech import GENERAL_CARS, GOOD_TREES, Effect, Research, Tree
+from railroads.sim.tiles import Tiles
 from railroads.sim.track_network import TrackNetwork
 from railroads.sim.trains import (
     BURN_ALONE,
@@ -109,9 +111,9 @@ from railroads.sim.trains import (
     car_size,
     full_tonnes,
     general_car_size,
-    generation_in,
     tare_of,
 )
+from railroads.sim.year_caches import forget
 
 if TYPE_CHECKING:
     from railroads.sim.happenings import Happenings
@@ -206,6 +208,11 @@ class Railway:
         # What each year ended with and the cars delivered in it (railroads.sim.stats).
         self.history = History()
         self.fuel = FuelMarket()
+        # The supply and demand boards, which set what every good earns (railroads.sim.tiles): a
+        # game's from the year it begins, flat until then.
+        self.tiles = Tiles()
+        # What the boards brought at the turn of the year, for the news.
+        self.tile_news: list[str] = []
         # The way along the track, and what trains do calling at stations
         # (railroads.sim.track_network, railroads.sim.calls).
         self.network = TrackNetwork(constructions)
@@ -362,12 +369,11 @@ class Railway:
 
     def max_pull(self, engine: str) -> float:
         """The most an engine pulls, in tonnes, with what tech adds: as much more as the cars
-        it adds (Effect.PULL), pulling the generation of cars every good has. Goods whose own
-        tree brings a newer one sooner ride in heavier cars against it."""
+        it adds (Effect.PULL), pulling the newest generation of cars of the era
+        (railroads.sim.tiles)."""
         built = ENGINES[engine]
         extra = int(self.research.bonus(Effect.PULL))
-        sooner = int(self.research.everywhere_bonus(Effect.CAR_SIZE))
-        most = built.pull_at(min(generation_in(self.year) + sooner, GENERATIONS))
+        most = built.pull_at(self.wagon_era())
         return most * (built.hauls + extra) / built.hauls
 
     def pull(self, train: Train) -> float:
@@ -434,7 +440,7 @@ class Railway:
         return self.fuel.price(fuel) * (1.0 + markup)
 
     def _take_fuel(self, train: Train, station: Cell, cells: float) -> None:
-        """Buys what a train setting off burns on the way to its next stop: coal, wood (lumber) or
+        """Buys what a train setting off burns on the way to its next stop: coal, wood (logs) or
         diesel fuel out of the station's stockpile first, at the market price, the rest at retail."""
         engine = ENGINES[train.engine]
         fuel = fuel_of(engine)
@@ -466,8 +472,8 @@ class Railway:
         return 1.0 - subsidy * food / len(train.cars)
 
     def fuel_month(self, trade: Trade, points: float = 0.0) -> None:
-        """Closes the fuel market's month with what this month's trade said about it, and the
-        points of the map's homes and factories, which want electricity."""
+        """Closes the fuel market's month with what this month's trade said about them,
+        and the points of the map's homes and factories, which want electricity."""
         owned = (
             None if self.owners is None else {kind: self.owners.owned(kind) for kind in PLANT_FUEL}
         )
@@ -493,24 +499,22 @@ class Railway:
         return size
 
     def car_generation(self, good: Good, engine: str | None = None, asked: int = 0) -> int:
-        """The generation of a good's cars: the one asked for if older, or else the newest, the
-        year's (generation_in) and one more for each its tree's tech brings sooner
-        (Effect.CAR_SIZE), up to the newest an engine pulls."""
+        """The generation of a good's cars: the one asked for if older, or else the newest
+        (newest_generation)."""
         newest = self.newest_generation(good, engine)
         return min(asked, newest) if asked else newest
 
     def newest_generation(self, good: Good, engine: str | None = None) -> int:
-        """The newest generation of a good's cars behind an engine."""
-        tree = GOOD_TREES.get(good)
-        sooner = (
-            self.research.everywhere_bonus(Effect.CAR_SIZE)
-            if tree is None
-            else self.research.bonus(Effect.CAR_SIZE, tree)
-        )
-        generation = min(generation_in(self.year) + int(sooner), GENERATIONS)
+        """The newest generation of a good's cars behind an engine: the era's, up to the newest the
+        engine pulls."""
+        generation = self.wagon_era()
         if engine is None:
             return generation
         return min(generation, ENGINES[engine].top_generation)
+
+    def wagon_era(self) -> int:
+        """The newest generation of wagons the era of the boards in play has brought."""
+        return min(boards.of_year(self.year).wagons, GENERATIONS)
 
     def car_tare(self, good: Good, engine: str | None = None, asked: int = 0) -> float:
         """What an empty car for a good of the generation asked weighs behind an engine, in
@@ -556,11 +560,13 @@ class Railway:
         return self.demand.setdefault(station, StationDemand())
 
     def price_factor(self, good: Good) -> float:
-        """How much more a good earns carried by train: its TRANSIT_PAY, with the player's tech, and
-        what history makes of it (railroads.sim.events)."""
+        """How much more a good earns carried by train: its TRANSIT_PAY, with the player's tech,
+        what history makes of it (railroads.sim.events) and its price on the boards
+        (railroads.sim.tiles)."""
         return (
             TRANSIT_PAY.get(good, 1.0)
             * history_price(good, self.year)
+            * self.tiles.of_year(self.year).price(good)
             * (1.0 + self.research.bonus(Effect.PRICE, GOOD_TREES[good]))
         )
 
@@ -671,12 +677,18 @@ class Railway:
         earned = freight_of(good) * weighed * self.price_factor(good)
         earned *= self.facility_pay(station, good)
         self.finances.earn(earned, "cargo")
-        self.learn(GOOD_TREES[good], earned)
+        self.learn(GOOD_TREES[good], earned / self.tiles.of_year(self.year).price(good))
 
     def sell_own(self, good: Good, amount: float) -> None:
-        """Pays the player the market price of what their own buildings brought into a station:
-        their company sold it, and the railway now carries it."""
-        self.finances.earn(price_of(good) * amount, "owned buildings")
+        """Pays the player the market price of what their own buildings brought into a station, as
+        the boards price it now: their company sold it, and the railway now carries it."""
+        earned = price_of(good) * amount * self.tiles.of_year(self.year).price(good)
+        self.finances.earn(earned, "owned buildings")
+
+    def new_year(self, year: int) -> None:
+        """Turns the boards to a new year: the tiles picked go up, and what that changes is news."""
+        self.tile_news += self.tiles.turn(year)
+        forget()
 
     def learn(self, tree: Tree, dollars: float) -> None:
         """Counts what a delivery earned as experience in a tree, more for every building of

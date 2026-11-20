@@ -36,11 +36,11 @@ FREIGHT_BANDS = (
 )
 
 
-def _amounts(amounts: list[tuple[Need | Good, float, int]]) -> str:
-    """Goods or needs with their amounts, and the year each starts where it doesn't always."""
+def _amounts(amounts: list[tuple[Need | Good, float, str]]) -> str:
+    """Goods or needs with their amounts, and from when each is wanted where it isn't always."""
     return ", ".join(
-        f"{amount:,.4g} {what.value}" + (f" (from {year})" if year else "")
-        for what, amount, year in amounts
+        f"{amount:,.4g} {what.value}" + (f" (from {since})" if since else "")
+        for what, amount, since in amounts
     )
 
 
@@ -54,18 +54,18 @@ def building_row(row: BuildingHelp) -> str:
         for year in range(START_YEAR, END_YEAR + 1, 10)
         for need in (*bonus_of(kind, year), *boosts_of(kind, year))
     }
-    must: list[tuple[Need | Good, float, int]] = []
-    bonus: list[tuple[Need | Good, float, int]] = []
-    for need, amount, year in row.wants:
+    must: list[tuple[Need | Good, float, str]] = []
+    bonus: list[tuple[Need | Good, float, str]] = []
+    for need, amount, since in row.wants:
         spare = BONUS_PART.get((kind, need), 0.0)
         if need in extras:
-            bonus.append((need, amount, year))
+            bonus.append((need, amount, since))
             continue
         if amount - spare > 0:
-            must.append((need, amount - spare, year))
+            must.append((need, amount - spare, since))
         if spare:
-            bonus.append((need, spare, year))
-    makes = [(good, amount, 0) for good, amount in row.makes]
+            bonus.append((need, spare, since))
+    makes = [(good, amount, "") for good, amount in row.makes]
     name = kind.value[0].upper() + kind.value[1:]
     if row.from_year:
         name += f" ({row.from_year})"

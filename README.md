@@ -52,7 +52,7 @@ take ragged shapes from smooth noise of fixed random numbers, and two rivers win
 south, none across the line between the towns. Ashford is a farming village of a few houses, a
 bakery and a church among some fifteen fields, with more wheat than it eats; Brookby a market
 town of houses and tenements round a free cell, thinning out at its edge, with no field near. A
-coal mine in the foothills of a few peaks and a lumber mill in the forest each have a hamlet, and
+coal mine in the foothills of a few peaks and a logging camp in the forest each have a hamlet, and
 the land around is for sale in lots like any game's. Its months grow from a
 fixed seed, so they play out the same too. A window walks the player through it a step at a time
 (`railroads.tutorial.steps`): each explains something, frames in brass what to click, on the map
@@ -381,7 +381,7 @@ Every cell has room for 6 units:
 ## Growth
 
 `railroads.sim.growth` grows the whole map by itself, by the ladders of `railroads.sim.ladders`,
-like a cellular automaton, one month at a time: towns, farms, orchards, mines, lumber mills, ports and several kinds of factory. Its
+like a cellular automaton, one month at a time: towns, farms, orchards, mines, logging camps, sawmills, ports and several kinds of factory. Its
 other jobs live beside it:
 - `railroads.sim.room`: making room for track and stations, buildings spilling into nearby cells,
   rehousing people and putting the player's buildings up again.
@@ -397,7 +397,7 @@ of every kind in its neighbourhood (the cell and the six around it):
 | Population | house 1, tenement (kamienica) 6, block of flats 18 |
 | Food | farm, orchard, date palms, banana plantation, orange farm, sugar field, potato farm, rice paddy, soy field, tea plantation, cattle ranch, flax field, hop garden, beekeeper, incense grove 1 |
 | Ore | mine, clay pit, limestone quarry, sand pit 1 |
-| Timber | lumber mill 1 |
+| Timber | logging camp 1 |
 | Trade | port 1 |
 | Industry | factory 1, big factory 3, mega factory 9, cannery 2, steel mill 3, shipyard 3, machine works, plastics works, appliance factory 3, coal power plant 5, diesel and gas power plants 4, other works 2 |
 | Corporate | tavern 1, sushi hut 1, club 3, department store 3, hotel 5, skyscraper 10 |
@@ -430,7 +430,7 @@ than dry land unless a row names it:
 | Orange farms | as date palms | fewer than 5 population | hot grassland, not desert or jungle; hills x0.7; river or lake x2 |
 | Sugar fields | 0.0000000168 + 0.000000042 per doubling of population + 0.000000168 per doubling of food | fewer than 5 population | open flat land, not cold; mild x0.6; river x3 |
 | Mines | 0.000001 + 0.0000014 per doubling of ore | | mountains; hills x0.4, flat x0.01; beside mountains x3 |
-| Lumber mills | 0.000016 + 0.000001 per doubling of population | | forest with at least 4 forest cells in its neighbourhood and flat open land next to it; river x1.5 |
+| Logging camps | 0.000075 + 0.0000015 per doubling of population | | forest with at least 4 forest cells in its neighbourhood and flat open land next to it; river x1.5 |
 | Ports | 0.0000008 + 0.000002 per doubling of population | 4 population | next to the sea, or a lake x0.3 |
 | Factories | 0.00000004 + 0.000000006 per doubling of population + 0.000065 of industry + 0.0000008 of timber, each only from 5 points nearby | | flat; hills x0.5, forest x0.2; river x1.5 |
 | Canneries | 0.000000015 + 0.00000026 per doubling of food + 0.00000076 of industry | 1 food | as factories |
@@ -451,7 +451,7 @@ than dry land unless a row names it:
 | Department stores | 0.00005 per doubling of population, from 1880 | 60 population | as houses, 6 hexes apart, one per 10,000 land cells |
 | Hotels | as department stores, from 1900 | 60 population | as houses, 5 hexes apart, one per 8,000 land cells |
 
-Farms and orchards may crowd together; lumber mills and steel mills keep to two per neighbourhood, canneries to
+Farms and orchards may crowd together; logging camps keep to three per neighbourhood, steel mills to two, canneries to
 six, mines to eight, and ports and shipyards to one. Factories, mills and mines open mostly by
 chance, with only a weak pull towards their own kind, so they spread out across the land while
 houses gather into towns. On its turn a ladder builds its
@@ -476,10 +476,10 @@ orchards and every other field fill the whole hex and colour all of it.
 ### Forests
 
 Forests come and go as the map grows. Each month a forest cell may be cleared: 0.00002 for every
-industry point or 4 population points in its neighbourhood, and 0.002, a hundred times as much, for every
-lumber mill there. Open grassland with nothing built on it turns to forest by 0.00004 for every
-forest cell next to it. A lumber mill left with fewer than 3 forest cells in its neighbourhood
-closes, so mills clear their patch of forest and move on. Wherever a forest comes or goes, the
+industry point or 4 population points in its neighbourhood, and 0.0015, seventy-five times as much, for every
+logging camp there. Open grassland with nothing built on it turns to forest by 0.00004 for every
+forest cell next to it. A logging camp left with fewer than 3 forest cells in its neighbourhood
+closes, so camps clear their patch of forest and move on. Wherever a forest comes or goes, the
 land weighs again for every ladder.
 
 ### Goods and satisfaction
@@ -489,8 +489,9 @@ needs and recipes of `railroads.sim.goods`. Buildings need *needs*, each met by 
 homes need food, and any food good feeds them one for one; canneries need fruit and bakeries
 wheat. Towns eat a lot, so they are hard to feed in full, and every farm and bakery a station can
 reach is worth having. The table below is written from the game's own figures by
-`tools/readme_tables.py`, as they stand before history changes them (see History below): people want
-more every decade, and events such as wars and the internet change what they want. The help
+`tools/readme_tables.py`, as they stand before history changes them (see History below): the supply and demand boards
+raise what is made and wanted year by year, and events such as wars and the internet change what
+they want. The help
 window (H) lists the same.
 
 <!-- table: buildings -->
@@ -499,7 +500,7 @@ window (H) lists the same.
 | House |  | 10 food, 3 heating | 10 food, 0.5 soy sauce, 1 beer, 1 newspapers (from 1600), 5 common goods, 0.5 vodka (from 1600), 0.5 refined sugar (from 1800), 0.5 bricks, 0.2 glass, 0.5 limestone, 0.5 wax |
 | Tenement |  | 60 food, 60 common goods, 20 heating | 60 food, 5 soy sauce, 10 salt, 20 goods, 10 hot drinks (from 1700), 10 tools (from 1870), 10 beer, 10 vodka (from 1600), 10 bricks, 10 glass, 10 cement (from 1880), 10 refined sugar (from 1800), 10 newspapers (from 1600), 10 limestone, 1 luxury goods (from 1700), 5 wax |
 | Block of flats |  | 200 food, 300 common goods, 80 heating | 200 food, 15 soy sauce, 30 salt, 40 goods, 30 hot drinks (from 1700), 10 tools (from 1870), 30 fuel (from 1910), 3 cars (from 1910), 30 beer, 30 vodka (from 1600), 50 bricks, 50 cement (from 1880), 50 glass, 30 newspapers (from 1600), 5 appliances (from 1950), 30 refined sugar (from 1800), 5 luxury goods (from 1700) |
-| Farm | 10 wheat |  | 5 machinery (from 1870), 10 limestone, 2 fuel (from 1920) |
+| Farm | 10 wheat |  | 5 machinery (from machines and tools demand 10), 10 limestone (from ore and stone demand 3), 5 fertiliser (from chemicals and building demand 10), 2 fuel (from oil and fuel demand 11) |
 | Orchard | 10 apples |  |  |
 | Date palms | 10 dates |  |  |
 | Orange farm | 10 oranges |  |  |
@@ -507,23 +508,23 @@ window (H) lists the same.
 | Sugar field | 10 sugar |  |  |
 | Bakery | 120 bread | 48 wheat | 6 refined sugar (from 1800) |
 | Fishery | 10 fish |  | 2 fuel (from 1910) |
-| Sheep farm | 21 wool, 10 sheep |  | 90 wheat, 5 machinery (from 1870) |
+| Sheep farm | 21 wool, 10 sheep |  | 90 wheat (from farming demand 2), 5 machinery (from machines and tools demand 10) |
 | Cotton field | 80 cotton |  |  |
 | Vineyard | 60 grapes |  |  |
 | Coffee plantation (1700) | 60 coffee |  |  |
 | Rubber plantation (1900) | 60 rubber |  |  |
 | Beekeeper | 2 honey, 10 wax |  |  |
 | Incense grove | 30 incense |  |  |
-| Potato farm (1600) | 10 potatoes |  | 2 fuel (from 1920) |
-| Rice paddy | 10 rice |  | 2 fuel (from 1920) |
-| Soy field | 10 soybeans |  | 2 fuel (from 1920) |
+| Potato farm (1600) | 10 potatoes |  | 2 fuel (from oil and fuel demand 11) |
+| Rice paddy | 10 rice |  | 2 fuel (from oil and fuel demand 11) |
+| Soy field | 10 soybeans |  | 2 fuel (from oil and fuel demand 11) |
 | Tea plantation | 20 tea |  |  |
 | Tofu maker | 60 tofu | 24 soybeans |  |
 | Miso maker | 60 miso | 15 soybeans, 9 rice, 6 salt |  |
 | Fish drying shed | 60 dried fish | 24 fish, 6 salt |  |
-| Cattle ranch | 10 cattle, 20 milk |  | 120 wheat |
-| Pig farm | 12 pigs |  | 60 wheat |
-| Chicken farm | 20 chickens, 15 eggs |  | 30 wheat |
+| Cattle ranch | 10 cattle, 20 milk |  | 120 wheat (from farming demand 2) |
+| Pig farm | 12 pigs |  | 60 wheat (from farming demand 2) |
+| Chicken farm | 20 chickens, 15 eggs |  | 30 wheat (from farming demand 2) |
 | Sausage maker (1850) | 240 sausages | 96 meat, 48 salt |  |
 | Flax field | 60 flax |  |  |
 | Hop garden | 40 hops |  |  |
@@ -537,36 +538,37 @@ window (H) lists the same.
 | Mega miso maker | 843.8 miso | 210.9 soybeans, 126.6 rice, 84.38 salt |  |
 | Big fish drying shed | 225 dried fish | 90 fish, 22.5 salt |  |
 | Mega fish drying shed | 843.8 dried fish | 337.5 fish, 84.38 salt |  |
-| Mine (1700) | 100 coal |  | 20 lumber, 10 fuel (from 1920) |
-| Iron mine | 100 iron ore |  | 10 fuel (from 1920) |
-| Copper mine (1880) | 40 copper |  | 5 fuel (from 1920) |
-| Gold mine | 20 gold |  | 2 fuel (from 1920) |
-| Diamond mine | 10 diamonds |  | 2 fuel (from 1920) |
+| Mine (1700) | 100 coal |  | 20 planks (from wood demand 2), 5 machinery (from machines and tools demand 8), 10 fuel (from oil and fuel demand 11) |
+| Iron mine | 100 iron ore |  | 5 machinery (from machines and tools demand 8), 10 fuel (from oil and fuel demand 11) |
+| Copper mine (1880) | 40 copper |  | 5 fuel (from oil and fuel demand 11) |
+| Gold mine | 20 gold |  | 2 fuel (from oil and fuel demand 11) |
+| Diamond mine | 10 diamonds |  | 2 fuel (from oil and fuel demand 11) |
 | Oil well (1855) | 150 oil, 50 gas |  |  |
-| Salt works | 60 salt |  | 5 fuel (from 1920) |
-| Clay pit | 60 clay |  | 5 fuel (from 1920) |
-| Limestone quarry | 60 limestone |  | 5 fuel (from 1920) |
-| Sand pit | 60 sand |  | 5 fuel (from 1920) |
-| Lumber mill | 20 lumber |  | 3 fuel (from 1920) |
+| Salt works | 60 salt |  | 5 fuel (from oil and fuel demand 11) |
+| Clay pit | 60 clay |  | 5 fuel (from oil and fuel demand 11) |
+| Limestone quarry | 60 limestone |  | 5 fuel (from oil and fuel demand 11) |
+| Sand pit | 60 sand |  | 5 fuel (from oil and fuel demand 11) |
+| Logging camp | 20 logs |  | 5 machinery (from 1870), 3 fuel (from oil and fuel demand 11) |
 | Port | 20 goods, 50 oil, 50 gas |  | 10 fuel (from 1910) |
-| Factory (1780) | 30 goods | 10 lumber, 10 steel (from 1855) |  |
+| Factory (1780) | 30 goods | 10 planks, 10 steel (from 1855) |  |
 | Big factory (1780) | 90 goods | 30 steel (from 1855), 30 copper (from 1880) |  |
 | Mega factory (1780) | 270 goods | 90 steel (from 1855), 45 copper (from 1880), 45 machinery (from 1870) |  |
 | Cannery (1810) | 300 cans | 90 fruit, 30 steel (from 1855) |  |
 | Textile mill (1780) | 40 clothes | 100 fibre |  |
-| Furniture maker | 20 furniture | 80 lumber |  |
+| Furniture maker | 20 furniture | 80 planks | 10 wax |
 | Tool works (1870) | 80 tools | 80 steel (from 1855) |  |
 | Winery | 20 wine | 80 grapes | 40 barrels |
-| Barrel maker | 40 barrels | 20 lumber |  |
+| Barrel maker | 40 barrels | 20 planks |  |
 | Refinery (1856) | 300 fuel | 150 oil |  |
-| Chemical works (1880) | 100 chemicals | 50 salt, 50 boiler fuel |  |
+| Chemical works (1880) | 100 chemicals, 50 fertiliser | 50 salt, 50 boiler fuel |  |
 | Electronics plant (1960) | 50 electronics | 50 copper (from 1880), 50 chemicals (from 1880) |  |
 | Car factory (1910) | 20 cars | 100 steel (from 1855), 40 fuel (from 1910) |  |
-| Gun factory (1800) | 100 guns | 50 steel (from 1855), 25 lumber |  |
+| Gun factory (1800) | 100 guns | 50 steel (from 1855), 25 planks |  |
 | Tank factory (1940) | 20 tanks | 120 steel (from 1855), 40 fuel (from 1910) |  |
 | Aircraft factory (1935) | 20 planes | 60 steel (from 1855), 20 copper (from 1880), 20 fuel (from 1910), 20 electronics (from 1960) |  |
 | Steel mill (1855) | 100 steel | 250 iron ore, 250 coal (from 1700) | 25 coke (from 1850) |
-| Shipyard | 30 goods | 20 steel (from 1855), 10 lumber |  |
+| Shipyard | 30 goods | 20 steel (from 1855), 10 planks |  |
+| Sawmill | 40 planks, 8 wood chips | 40 logs | 5 machinery (from 1870), 3 fuel (from oil and fuel demand 11) |
 | Soy sauce brewery | 20 soy sauce | 10 soybeans, 10 wheat, 4 salt |  |
 | Gasworks (1820) | 200 gas | 100 coal (from 1700) |  |
 | Coke plant (1850) | 100 coke | 100 coal (from 1700) |  |
@@ -579,14 +581,14 @@ window (H) lists the same.
 | Brickworks | 100 bricks | 50 clay | 25 coal (from 1700) |
 | Cement works (1880) | 100 cement | 50 limestone | 25 coal (from 1700) |
 | Glassworks | 60 glass | 30 sand | 15 coal (from 1700), 15 limestone |
-| Brewery | 40 beer | 40 hops | 16 barrels |
+| Brewery | 40 beer | 40 hops | 16 barrels (from wood demand 4) |
 | Distillery (1600) | 10 vodka | 20 potatoes | 4 glass |
 | Sake brewery | 15 sake | 30 rice |  |
 | Tannery | 40 leather | 20 livestock | 10 limestone |
-| Shoe factory (1850) | 20 shoes | 40 leather |  |
+| Shoe factory (1850) | 20 shoes | 40 leather | 10 wax |
 | Plastics works (1950) | 100 plastics | 50 oil, 50 chemicals (from 1880) |  |
 | Appliance factory (1950) | 30 appliances | 30 steel (from 1855), 15 copper (from 1880), 15 plastics (from 1950), 7.5 electronics (from 1960) |  |
-| Paper mill (1150) | 100 paper | 50 lumber, 25 chemicals (from 1880) |  |
+| Paper mill (1150) | 100 paper | 10 wood chips, 25 chemicals (from 1880) |  |
 | Printing works (1600) | 3,000 newspapers | 150 paper (from 1150) |  |
 | Sugar refinery (1800) | 60 refined sugar | 30 sugar | 6 coal (from 1700), 6 limestone |
 | Porcelain works (1710) | 30 porcelain | 15 clay | 7.5 coal (from 1700) |
@@ -610,8 +612,8 @@ window (H) lists the same.
 | Mega foundry (1800) | 250 castings | 125 iron ore, 62.5 sand |  |
 | Big dairy | 450 dairy products | 180 milk |  |
 | Mega dairy | 1,688 dairy products | 675 milk |  |
-| Big gun factory (1800) | 250 guns | 125 steel (from 1855), 62.5 lumber |  |
-| Mega gun factory (1800) | 625 guns | 312.5 steel (from 1855), 156.2 lumber |  |
+| Big gun factory (1800) | 250 guns | 125 steel (from 1855), 62.5 planks |  |
+| Mega gun factory (1800) | 625 guns | 312.5 steel (from 1855), 156.2 planks |  |
 | Big tank factory (1940) | 50 tanks | 300 steel (from 1855), 100 fuel (from 1910) |  |
 | Mega tank factory (1940) | 125 tanks | 750 steel (from 1855), 250 fuel (from 1910) |  |
 | Big aircraft factory (1935) | 50 planes | 150 steel (from 1855), 50 copper (from 1880), 50 fuel (from 1910), 50 electronics (from 1960) |  |
@@ -620,18 +622,18 @@ window (H) lists the same.
 | Mega cannery (1810) | 4,219 cans | 1,266 fruit, 421.9 steel (from 1855) |  |
 | Big textile mill (1780) | 100 clothes | 250 fibre |  |
 | Mega textile mill (1780) | 250 clothes | 625 fibre |  |
-| Big furniture maker | 50 furniture | 200 lumber |  |
-| Mega furniture maker | 125 furniture | 500 lumber |  |
+| Big furniture maker | 50 furniture | 200 planks | 25 wax |
+| Mega furniture maker | 125 furniture | 500 planks | 62.5 wax |
 | Big tool works (1870) | 200 tools | 200 steel (from 1855) |  |
 | Mega tool works (1870) | 500 tools | 500 steel (from 1855) |  |
-| Big barrel maker | 100 barrels | 50 lumber |  |
-| Mega barrel maker | 250 barrels | 125 lumber |  |
+| Big barrel maker | 100 barrels | 50 planks |  |
+| Mega barrel maker | 250 barrels | 125 planks |  |
 | Big winery | 50 wine | 200 grapes | 100 barrels |
 | Mega winery | 125 wine | 500 grapes | 250 barrels |
 | Big refinery (1856) | 750 fuel | 375 oil |  |
 | Mega refinery (1856) | 1,875 fuel | 937.5 oil |  |
-| Big chemical works (1880) | 250 chemicals | 125 salt, 125 boiler fuel |  |
-| Mega chemical works (1880) | 625 chemicals | 312.5 salt, 312.5 boiler fuel |  |
+| Big chemical works (1880) | 250 chemicals, 125 fertiliser | 125 salt, 125 boiler fuel |  |
+| Mega chemical works (1880) | 625 chemicals, 312.5 fertiliser | 312.5 salt, 312.5 boiler fuel |  |
 | Big electronics plant (1960) | 125 electronics | 125 copper (from 1880), 125 chemicals (from 1880) |  |
 | Mega electronics plant (1960) | 312.5 electronics | 312.5 copper (from 1880), 312.5 chemicals (from 1880) |  |
 | Big car factory (1910) | 50 cars | 250 steel (from 1855), 100 fuel (from 1910) |  |
@@ -644,8 +646,8 @@ window (H) lists the same.
 | Mega cement works (1880) | 625 cement | 312.5 limestone | 156.2 coal (from 1700) |
 | Big glassworks | 150 glass | 75 sand | 37.5 coal (from 1700), 37.5 limestone |
 | Mega glassworks | 375 glass | 187.5 sand | 93.75 coal (from 1700), 93.75 limestone |
-| Big brewery | 100 beer | 100 hops | 40 barrels |
-| Mega brewery | 250 beer | 250 hops | 100 barrels |
+| Big brewery | 100 beer | 100 hops | 40 barrels (from wood demand 4) |
+| Mega brewery | 250 beer | 250 hops | 100 barrels (from wood demand 4) |
 | Big distillery (1600) | 25 vodka | 50 potatoes | 10 glass |
 | Mega distillery (1600) | 62.5 vodka | 125 potatoes | 25 glass |
 | Big sake brewery | 37.5 sake | 75 rice |  |
@@ -656,14 +658,14 @@ window (H) lists the same.
 | Mega tannery | 250 leather | 125 livestock | 62.5 limestone |
 | Big butcher (1850) | 450 meat | 180 animals |  |
 | Mega butcher (1850) | 1,688 meat | 675 animals |  |
-| Big shoe factory (1850) | 50 shoes | 100 leather |  |
-| Mega shoe factory (1850) | 125 shoes | 250 leather |  |
+| Big shoe factory (1850) | 50 shoes | 100 leather | 25 wax |
+| Mega shoe factory (1850) | 125 shoes | 250 leather | 62.5 wax |
 | Big plastics works (1950) | 250 plastics | 125 oil, 125 chemicals (from 1880) |  |
 | Mega plastics works (1950) | 625 plastics | 312.5 oil, 312.5 chemicals (from 1880) |  |
 | Big appliance factory (1950) | 75 appliances | 75 steel (from 1855), 37.5 copper (from 1880), 37.5 plastics (from 1950), 18.75 electronics (from 1960) |  |
 | Mega appliance factory (1950) | 187.5 appliances | 187.5 steel (from 1855), 93.75 copper (from 1880), 93.75 plastics (from 1950), 46.88 electronics (from 1960) |  |
-| Big paper mill (1150) | 250 paper | 125 lumber, 62.5 chemicals (from 1880) |  |
-| Mega paper mill (1150) | 625 paper | 312.5 lumber, 156.2 chemicals (from 1880) |  |
+| Big paper mill (1150) | 250 paper | 25 wood chips, 62.5 chemicals (from 1880) |  |
+| Mega paper mill (1150) | 625 paper | 62.5 wood chips, 156.2 chemicals (from 1880) |  |
 | Big printing works (1600) | 7,500 newspapers | 375 paper (from 1150) |  |
 | Mega printing works (1600) | 1.875e+04 newspapers | 937.5 paper (from 1150) |  |
 | Big sugar refinery (1800) | 150 refined sugar | 75 sugar | 15 coal (from 1700), 15 limestone |
@@ -680,7 +682,7 @@ window (H) lists the same.
 | Mirror maker (1700) | 5 luxury goods | 10 glass, 0.5 gold |  |
 | Manor |  | 100 food, 10 heating, 10 wine, 3 luxury goods (from 1700) | 5 furniture |
 | Theatre |  | 10 clothes (from 1780), 5 glass, 5 paper (from 1150) | 5 wax |
-| Hospital (1850) |  | 50 food, 5 heating, 10 chemicals (from 1880), 5 glass |  |
+| Hospital (1850) |  | 50 food, 5 heating, 10 chemicals (from 1880), 5 glass | 10 wax |
 | Space center |  | 300 electronics (from 1960), 1,000 fuel (from 1910), 300 food |  |
 | Pear Company headquarters |  | 500 electronics (from 1960), 1,000 food |  |
 | Royal palace |  | 200 food, 50 wine, 20 porcelain | 20 furniture, 20 wax |
@@ -717,7 +719,7 @@ Steel mills, canneries, factories, shipyards and every works are processors: eac
 input, and works from it. Nothing is made that has nowhere to go: a building makes only what a
 buyer takes, and a processor uses up only the inputs for what it made, so a steel mill with no
 one to take its steel keeps its iron ore and coal waiting. Needs are handed out in the order of
-the chain, coal and lumber, then steel, then wheat, then fruit, then food, then goods, so bakeries
+the chain, coal, logs and planks, then steel, then wheat, then fruit, then food, then goods, so bakeries
 take their wheat and canneries their fruit before houses eat what is left. Within a need, the most
 valuable good goes first (`HANDED_OUT`), so meat feeds a house before wheat does. A processor's
 second inputs are mostly boosts: a brickworks works on clay alone and makes more with coal, a
@@ -725,7 +727,7 @@ bakery more with refined sugar. An input that does not exist yet is left out of
 a recipe until its year: a big factory works on steel alone until copper comes in 1880, and a mega
 factory needs machinery only from 1870. Breweries take their wheat with the bakeries, distilleries
 their potatoes and sugar refineries their sugar before houses eat what is left. Homes burn
-lumber, coal or (from 1950) gas for heating, chemical works burn coal, oil or gas as boiler fuel,
+logs, coal or (from 1950) gas for heating, chemical works burn coal, oil or gas as boiler fuel,
 and coal, diesel and gas power plants burn coal, diesel fuel and gas; a station hands out the dearest of them first, as it does for every need. Cattle ranches
 and sheep farms eat a lot of wheat, alongside the bakeries and breweries, and their cattle and
 sheep go to tanneries and meat factories; meat feeds houses like any food.
@@ -887,11 +889,34 @@ factories, refineries, power plants and shipyards.
 The world moves on through the game's two hundred years (`railroads.sim.events`, with what it does
 to one map in `railroads.sim.happenings`).
 
-People want more. In 1860, 1870 and every decade after, every building that uses goods up (homes,
-shops, venues, churches, the military and the novelties, but not processors, makers, power plants
-or railway works) wants 10% more of every need than ten years before, and 3% more food and
-heating: by 2050 homes want 6.7 times the goods they wanted in 1850, and 1.8 times the food and
-heating. Each decade brings a news card saying so.
+Supply and demand grow by tiles (`railroads.sim.tiles`). Every good belongs to a tile, such as
+coal and coke, farming or vehicles, and every tile stands on two boards: supply, how much of its
+goods buildings make, and demand, how much of them homes, shops and everything else people use
+want. From 1804 every year two supply tiles and one demand tile go up a level on 1 January: the
+ones the player picked in the Supply and demand window (Y, opened by itself once a year), the
+lowest for the picks not made. No tile can be more than two levels above the lowest on its board.
+Each level adds a flat share of the tile's base, not compounded: on supply its period's share,
+from 5% a level for farming in the early 1800s to 200% for modern goods after 1960, on demand the
+same share every level, 5% for food up to 30% for oil, vehicles and modern goods. Supply grows far
+faster than demand. Processors take in and make as much more as their output's supply tile gives,
+and makers of what the land gives make as much more. Coal closes at level 30, about 2000: it goes
+no higher, can't be picked and no longer holds the other tiles back.
+
+Once every supply tile reaches an era's level, the era comes with its generation of wagons and new
+tiles, on both boards at the lowest level there: oil and fuel and steel and metals at level 9
+(1843 when the lowest always go up), machines and tools and chemicals and building at 14 (1873),
+copper and rubber at 18 (1901), vehicles at 22 (1931), modern goods at 25 (1955), and the last
+wagons at 27 (1972). Each era is news. A game that begins later starts on the boards the world
+grew to by then, every year the lowest tiles.
+
+A demand tile's levels also bring new buyers (`UNLOCKS`): at wood 2 coal mines take planks for
+pit props, at farming 2 cattle ranches, pig, chicken and sheep farms take wheat for feed, at ore
+and stone 3 farms the player controls take limestone, at wood 4 breweries take barrels, at
+machines and tools 8 coal and iron mines take machinery to dig up to half as much again, at 10
+farms and sheep farms the player controls take machinery, at chemicals and building 10 farms take
+fertiliser to grow up to half as much again, and at oil and fuel 11 farms, mines, quarries, pits,
+logging camps and sawmills take diesel fuel. Chemical works leave half a unit of fertiliser over
+every unit of chemicals they make.
 
 Dated events change what is wanted, made and paid while they last, or for good:
 
@@ -942,12 +967,12 @@ was fully satisfied over the last quarter, two thirds of that at none and
 twice at 200%, and shares sell at the price they buy at, so raising a building's satisfaction
 raises what its shares fetch; shares can be sold only five years after they were bought, so the
 way to earn on them is to buy into a building that struggles and make it work. Tech cuts the price of shares by up to half. The
-player's production tech and the boosts only their own take, limestone and machinery, work only
+boosts only the player's own buildings take, limestone and machinery, work only
 on buildings they control, holding 60% of their shares, and then on the whole of them. Past 60%, more
 shares only raise their part of what it makes. Every cell where the player owns shares flies the flag of
 their company, The Trains Corp: a small one, or a big waving one where they control the
 buildings. A building never moves to another hex: one pulled down (a farm
-crowded out by a town, a lumber mill whose forest is gone, anything cleared for track, a station
+crowded out by a town, a logging camp whose forest is gone, anything cleared for track, a station
 or a merged works) comes down for good, the player's shares in it with it, and one that merges
 into a bigger building (three factories into a big factory) passes its shares on to the bigger
 one.
@@ -961,11 +986,10 @@ and mail pay as they get off. Every point of the buildings of a tree the player 
 shares, adds 1% to the experience that tree gets. Goods handed out by buildings on their own
 give no experience. The first level needs only $5,000, the second $80,000 more and each next one
 1.6 times the step before; each level gives a point to spend on a node whose requirements are
-taken. Nodes raise the production of the buildings of their tree the player owns, what that tree's cargo earns,
-station storage and waiting rooms, speed, cars per train, car sizes and coach capacity, what each
+taken. Nodes raise what that tree's cargo earns, station storage and waiting rooms, speed, cars per train, car sizes and coach capacity, what each
 bonus good adds to satisfaction, cut upkeep, retail fuel and the price of shares, and open
-engines and general cars. Each business tree has four production nodes of +25%, so a bought
-building can make twice as much. Station shops, in commerce, cut every station's upkeep by 20%;
+engines and general cars. What buildings make, and the new buyers of limestone, machinery and
+the rest, come from the supply and demand tiles instead (see History). Station shops, in commerce, cut every station's upkeep by 20%;
 Subsidised fuel, deep in the food tree, cuts a train's fuel by up to half, by its share of cars
 carrying food. The other nodes that once raised the owner's share hold places for bonuses still
 to be decided and do nothing yet. Hovering a node says in a sentence what it does.
@@ -976,8 +1000,8 @@ is balanced around: three cars at 30 km/h for $10,000. Each newer engine of a li
 three times the one before it. Early steam engines are very slow and pull few cars; diesels,
 electrics and the maglev pull cars a size bigger, and electrics run fastest. Engines burn fuel
 (`railroads.sim.fuel_market`): steam coal, except the American 4-4-0, which burns wood
-(lumber) as the real ones did, diesels diesel fuel, electrics and the maglev electricity, a set amount a cell for each car they are built to pull, light engines half as much.
-A train buys the fuel for the way to its next stop as it sets off: coal, lumber or diesel fuel out of the
+(logs) as the real ones did, diesels diesel fuel, electrics and the maglev electricity, a set amount a cell for each car they are built to pull, light engines half as much.
+A train buys the fuel for the way to its next stop as it sets off: coal, logs or diesel fuel out of the
 station's stockpile at the market price, the rest at retail, 50% dearer, or 25% with the Regular
 customer node of the commerce tree. Coal and diesel engines carry only so much, so a train can't
 set off for a stop further than its range: the first steam engines run only 4 to 12 cells, the
@@ -1041,19 +1065,19 @@ own pixel art.
 | Mallet articulated | heavy freight | 1905–1940 (then the Big articulated) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 36 km/h | 25 s | 6 | $135,000 | 1.5 coal a cell half loaded | 50 cells | [Mallet locomotive (type)](https://en.wikipedia.org/wiki/Mallet_locomotive) |
 | Pacific engine | general | 1910–1950 (then the Mixed-traffic diesel) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 60 km/h | 9 s | 5 | $90,000 | 1.2 coal a cell half loaded | 50 cells | [4-6-2 Pacific (type)](https://en.wikipedia.org/wiki/4-6-2) |
 | Boxcab electric | general | 1925–1965 (then the Universal electric) | modern industry: Telegraph signals → Electric traction | electric | 96 km/h | 6 s | 5 | $270,000 | 0.75 electricity a cell half loaded | - | [Boxcab electric (type)](https://en.wikipedia.org/wiki/Boxcab) |
-| Railbus | light | 1935–1985 (then the Sprinter unit) | fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 60 km/h | 2 s | 3 | $27,000 | 0.15 diesel fuel a cell half loaded | 60 cells | [Railbus (type)](https://en.wikipedia.org/wiki/Railbus), [Uerdingen railbus](https://en.wikipedia.org/wiki/Uerdingen_railbus) |
+| Railbus | light | 1935–1985 (then the Sprinter unit) | fuel and minerals: Diesel engines | diesel | 60 km/h | 2 s | 3 | $27,000 | 0.15 diesel fuel a cell half loaded | 60 cells | [Railbus (type)](https://en.wikipedia.org/wiki/Railbus), [Uerdingen railbus](https://en.wikipedia.org/wiki/Uerdingen_railbus) |
 | Streamliner | express | 1935 on | passengers and mail: Timetables → Dining cars → Express trains; metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 138 km/h | 20 s | 5 + dining car | $360,000 | 1.5 coal a cell half loaded | 60 cells | [Streamliner (type)](https://en.wikipedia.org/wiki/Streamliner), [LNER Class A4](https://en.wikipedia.org/wiki/LNER_Class_A4) |
 | Big articulated | heavy freight | 1940–1960 (then the Heavy diesel) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 42 km/h | 22 s | 7 | $405,000 | 1.8 coal a cell half loaded | 60 cells | [Union Pacific Big Boy, 1941](https://en.wikipedia.org/wiki/Union_Pacific_Big_Boy) |
-| Mixed-traffic diesel | general | 1950 on | fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 78 km/h | 7 s | 6 | $800,000 | 0.6 diesel fuel a cell half loaded | 100 cells | [EMD F7](https://en.wikipedia.org/wiki/EMD_F7) |
-| Heavy diesel | heavy freight | 1960–1995 (then the Twin-unit diesel) | metals and machines: Heavy boilers; fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 54 km/h | 18 s | 8 | $1,200,000 | 0.8 diesel fuel a cell half loaded | 100 cells | [EMD SD40-2](https://en.wikipedia.org/wiki/EMD_SD40-2) |
+| Mixed-traffic diesel | general | 1950 on | fuel and minerals: Diesel engines | diesel | 78 km/h | 7 s | 6 | $800,000 | 0.6 diesel fuel a cell half loaded | 100 cells | [EMD F7](https://en.wikipedia.org/wiki/EMD_F7) |
+| Heavy diesel | heavy freight | 1960–1995 (then the Twin-unit diesel) | metals and machines: Heavy boilers; fuel and minerals: Diesel engines | diesel | 54 km/h | 18 s | 8 | $1,200,000 | 0.8 diesel fuel a cell half loaded | 100 cells | [EMD SD40-2](https://en.wikipedia.org/wiki/EMD_SD40-2) |
 | Bullet train | express | 1964–1990 (then the High-speed electric) | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 210 km/h | 15 s | 6 + dining car | $1,100,000 | 1.1 electricity a cell half loaded | - | [0 Series Shinkansen, 1964](https://en.wikipedia.org/wiki/0_Series_Shinkansen) |
 | Universal electric | general | 1965–2000 (then the Modern electric) | modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 144 km/h | 5 s | 7 | $2,400,000 | 1.1 electricity a cell half loaded | - | [DB Class 103](https://en.wikipedia.org/wiki/DB_Class_103) |
-| Sprinter unit | light | 1985 on | fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 96 km/h | 2 s | 3 | $81,000 | 0.15 diesel fuel a cell half loaded | 100 cells | [British Rail Class 150](https://en.wikipedia.org/wiki/British_Rail_Class_150) |
+| Sprinter unit | light | 1985 on | fuel and minerals: Diesel engines | diesel | 96 km/h | 2 s | 3 | $81,000 | 0.15 diesel fuel a cell half loaded | 100 cells | [British Rail Class 150](https://en.wikipedia.org/wiki/British_Rail_Class_150) |
 | High-speed electric | express | 1990 on | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 300 km/h | 14 s | 8 + dining car | $3,200,000 | 1.3 electricity a cell half loaded | - | [ICE 1](https://en.wikipedia.org/wiki/ICE_1) |
-| Twin-unit diesel | heavy freight | 1995–2040 (then the Super-heavy diesel) | metals and machines: Heavy boilers; fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 60 km/h | 18 s | 10 | $3,600,000 | 1 diesel fuel a cell half loaded | 150 cells | [GE Dash 9-44CW](https://en.wikipedia.org/wiki/GE_Dash_9-44CW) |
+| Twin-unit diesel | heavy freight | 1995–2040 (then the Super-heavy diesel) | metals and machines: Heavy boilers; fuel and minerals: Diesel engines | diesel | 60 km/h | 18 s | 10 | $3,600,000 | 1 diesel fuel a cell half loaded | 150 cells | [GE Dash 9-44CW](https://en.wikipedia.org/wiki/GE_Dash_9-44CW) |
 | Modern electric | general | 2000 on | modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 192 km/h | 4 s | 8 | $7,200,000 | 1.2 electricity a cell half loaded | - | [DB Class 101](https://en.wikipedia.org/wiki/DB_Class_101) |
 | Maglev | express | 2030 on | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control → Magnetic levitation | maglev | 500 km/h | 13 s | 10 + dining car | $10,000,000 | 4.4 electricity a cell half loaded | - | [Transrapid](https://en.wikipedia.org/wiki/Transrapid), [SCMaglev L0 Series](https://en.wikipedia.org/wiki/L0_Series) |
-| Super-heavy diesel | heavy freight | 2040 on | metals and machines: Heavy boilers; fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 66 km/h | 20 s | 12 | $10,800,000 | 1.2 diesel fuel a cell half loaded | 200 cells | our own design |
+| Super-heavy diesel | heavy freight | 2040 on | metals and machines: Heavy boilers; fuel and minerals: Diesel engines | diesel | 66 km/h | 20 s | 12 | $10,800,000 | 1.2 diesel fuel a cell half loaded | 200 cells | our own design |
 <!-- end table -->
 
 Electric engines run only on electrified track, and the maglev only on maglev track, which can be
@@ -1074,7 +1098,9 @@ points live in its neighbourhood, and a basilica a cathedral at 240. The first c
 400 becomes the map's one St. Paul cathedral. Each point of worship sends and wants one passenger
 (church 5, basilica 20, cathedral 50, St. Paul cathedral 2137), and a fifth as much mail like any
 other building. Honey counts as food; wax comes only from beekeepers and incense only from groves
-on its own rare deposits.
+on its own rare deposits. Churches must have wax; homes take a little as a bonus until electric
+light in 1882, and theatres, the royal palace and hospitals always do, while furniture makers and
+shoe works make up to a quarter more with it.
 
 ### Finding things
 
@@ -1147,11 +1173,22 @@ hand out on their own, and what they take uses it up, averaged over the last 3 m
 and mail pay their figure times the share of that demand left. The Stations window shows the
 share of demand left for each need.
 
+The figures in the table are a good's base; what a unit earns follows a price list
+(`railroads.sim.tiles`): its tile's demand over its supply, to the power of 0.8, both as many
+times their base as the levels give. Prices change only when a tile goes up, on 1 January, and the
+Supply and demand window shows what each pick would do to them before it is made. Since supply
+grows faster than demand, margins shrink: in 2050 coal, ore, steel and chemicals earn about a
+fifth of their base, farming, animals, wood and textiles a little over a quarter, passengers and
+mail over a third and luxuries about half. The player's own buildings sell to their stations at
+that price too, and tech is earned by the units delivered, at the table's figures, so cheaper
+goods don't slow it. The Reports window's Prices tab charts every tile's price over the years and
+lists the boards now.
+
 <!-- table: freight -->
 | Freight a unit | Goods |
 |---|---|
-| $10 or less | eggs 4, bread 6, chickens 6, milk 6, potatoes 6, rice 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, soybeans 8, sugar 8, tofu 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, lumber 10, miso 10, newspapers 10, pots 10 |
-| $11-20 | cement 12, dried fish 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, soy sauce 20, wool 20 |
+| $10 or less | eggs 4, bread 6, chickens 6, logs 6, milk 6, potatoes 6, rice 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, soybeans 8, sugar 8, tofu 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, miso 10, newspapers 10, planks 10, pots 10, wood chips 10 |
+| $11-20 | cement 12, dried fish 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, fertiliser 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, soy sauce 20, wool 20 |
 | $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, stove tiles 25, copper 28, castings 30, wax 30, plastics 40, rubber 40, tea 40 |
 | $41-200 | coffee 50, beer 60, furniture 60, porcelain 60, clothes 70, steel 80, sake 100, shoes 100, electronics 120, goods 120, vodka 120, guns 150, tools 160, wine 160, machinery 180 |
 | over $200 | appliances 300, incense 300, luxury goods 300, gold 800, diamonds 2,000, cars 5,000, tanks 8,000, planes 1.2e+04 |
@@ -1236,8 +1273,8 @@ its load, and its route as a table of stops. It buys a steam engine and sets its
 stations. Each stop has its own
 cars, up to 5, which the train pulls when it leaves that stop for the next, so the way out and the
 way back can carry different goods; each car is for one good and holds 34 of it, 5 of precious
-goods, 13 of heavy ones, 21 cattle (which pay twice their price delivered), 55 passengers, or 89 of bulk goods (grain, rice, bread, potatoes, fruit, sugar, grapes, coal, iron ore, sand, clay, limestone, salt and
-lumber), so a food car carries only food. Every car costs $15, and $1 more for every 10 it holds,
+goods, 13 of heavy ones, 21 cattle (which pay twice their price delivered), 55 passengers, or 89 of bulk goods (grain, rice, bread, potatoes, fruit, sugar, grapes, coal, iron ore, sand, clay, limestone, salt,
+logs, planks and wood chips), so a food car carries only food. Every car costs $15, and $1 more for every 10 it holds,
 each time the train leaves a stop with it, loaded or not: a bulk car of 89 costs $23 a trip, a
 dining car $15. A new train
 starts at its first stop. The window shows what the train pulls

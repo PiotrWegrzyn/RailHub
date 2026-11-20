@@ -2,9 +2,10 @@
 depends on one game; the buildings and the news it makes in one are in
 railroads.sim.happenings.
 
-People want more as the decades go by (rise_of). Every RISE_EVERY years from RISE_FROM, the
-buildings people use (RISERS: all that use goods up but power plants and railway works) want RISE
-more of each need than the decade before, and SLOW_RISE more of food and heating (SLOW_RISERS).
+What buildings make and want grows with the supply and demand boards (railroads.sim.tiles,
+rise_of): the buildings people use (RISERS: all that use goods up but power plants and railway
+works) want as much more of each need as its tiles' demand gives, processors and makers of what
+the land gives take in as much more as their supply gives.
 
 EVENTS are dated, each for its `years` or, at 0, for good. While one lasts, buildings that use
 goods up want so many times as much of each need in its `wants` (of every other need `rest`
@@ -24,15 +25,12 @@ from dataclasses import dataclass, field
 from functools import cache
 from types import MappingProxyType
 
+from railroads.sim import tiles
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.geo import Bounds
 from railroads.sim.goods import HOMES, MAKES, NEEDS, RECIPES, Good, Need
+from railroads.sim.year_caches import year_cached
 
-RISE_FROM = 1850
-RISE_EVERY = 10
-RISE = 0.10
-SLOW_RISE = 0.03
-SLOW_RISERS = frozenset({Need.FOOD, Need.HEATING})
 NOT_RISING = frozenset(
     {
         BuildingKind.POWER_PLANT,
@@ -284,16 +282,25 @@ def happening(year: int, east: bool = False) -> tuple[Event, ...]:
     return tuple(e for e in EVENTS if e.lasts(year) and (east or not e.east_only))
 
 
-@cache
+@year_cached
 def rise_of(kind: BuildingKind, need: Need, year: int) -> float:
-    """How many times as much of a need a kind of building wants in a year as in RISE_FROM."""
-    if kind not in RISERS:
-        return 1.0
-    decades = max(0, (year - RISE_FROM) // RISE_EVERY)
-    return (1.0 + (SLOW_RISE if need in SLOW_RISERS else RISE)) ** decades
+    """How many times as much of a need a kind of building wants in a year as its NEEDS say, by the
+    boards (railroads.sim.tiles): one people use as much more as the demand for the need's goods,
+    a processor as much more as the supply of what it makes, and one making what the land gives
+    as much more as the supply of what it makes."""
+    boards = tiles.of_year(year)
+    if kind in RISERS:
+        return boards.want_factor(need)
+    recipe = RECIPES.get(kind)
+    if recipe is not None:
+        return boards.make_factor(recipe.makes)
+    made = MAKES.get(kind)
+    if made:
+        return sum(boards.make_factor(good) for good in made) / len(made)
+    return 1.0
 
 
-@cache
+@year_cached
 def want_factor(kind: BuildingKind, need: Need, year: int, east: bool = False) -> float:
     """How many times as much of a need a kind of building wants in a year as its NEEDS say."""
     factor = rise_of(kind, need, year)
@@ -322,10 +329,11 @@ def _product(year: int, east: bool, of: str) -> float:
     return factor
 
 
-@cache
+@year_cached
 def make_factor(good: Good, year: int) -> float:
-    """How many times as much of a good buildings make in a year."""
-    factor = 1.0
+    """How many times as much of a good buildings make in a year: as much as its supply tile gives
+    (railroads.sim.tiles), and what events make of it."""
+    factor = tiles.of_year(year).make_factor(good)
     for event in happening(year):
         factor *= event.makes.get(good, 1.0)
     return factor
@@ -340,10 +348,11 @@ def price_factor(good: Good, year: int) -> float:
     return factor
 
 
-@cache
+@year_cached
 def travel_factor(good: Good, year: int) -> float:
-    """How many times as many passengers or as much mail come and go in a year."""
-    factor = 1.0
+    """How many times as many passengers or as much mail come and go in a year: as many as their
+    supply tile gives (railroads.sim.tiles), and what events make of it."""
+    factor = tiles.of_year(year).make_factor(good)
     for event in happening(year):
         factor *= event.travels.get(good, 1.0)
     return factor

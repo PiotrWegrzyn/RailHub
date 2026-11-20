@@ -49,15 +49,15 @@ CAR_GROWTH = CAR_SIZES[-1] / CAR_SIZES[-2]
 # Cars come in generations, each a size up CAR_SIZES from the one before: the pioneers' small
 # wooden wagons (1), the wagons of the Planet's day (2), which the sizes below are for, and the
 # steel and bogie wagons after them, up to today's hoppers of about 100 t (GENERATIONS). Each
-# comes in its year (GENERATION_YEARS), a tree's tech (railroads.sim.tech.Effect.CAR_SIZE) brings
-# the next one sooner for its goods, and an engine pulls those up to its top_generation.
+# comes with an era of the tiles (railroads.sim.tiles), and an engine pulls those up to its
+# top_generation, the one after the generation of the era its year falls in (GENERATION_YEARS).
 BASE_GENERATION = 2
 GENERATIONS = 7
 GENERATION_YEARS = (1843, 1873, 1901, 1931, 1955, 1972)
 
 
 def generation_in(year: int) -> int:
-    """The newest generation of cars in a year."""
+    """The generation of wagons of the era a year falls in at the world's own pace."""
     return 1 + sum(year >= start for start in GENERATION_YEARS)
 
 
@@ -96,6 +96,7 @@ CAR_UNITS: Mapping[Good, float] = MappingProxyType(
         Good.BREAD,
         Good.COFFEE,
         Good.REFINED_SUGAR,
+        Good.FERTILISER,
         Good.MAIL,
     )
     | _sized(
@@ -103,7 +104,7 @@ CAR_UNITS: Mapping[Good, float] = MappingProxyType(
         Good.POTATOES,
         Good.SUGAR,
         Good.RUBBER,
-        Good.LUMBER,
+        Good.PLANKS,
         Good.COKE,
         Good.TEA,
         Good.OIL,
@@ -165,7 +166,9 @@ GOOD_KG: Mapping[Good, float] = MappingProxyType(
         Good.POTATOES,
         Good.SUGAR,
         Good.REFINED_SUGAR,
-        Good.LUMBER,
+        Good.FERTILISER,
+        Good.PLANKS,
+        Good.WOOD_CHIPS,
         Good.COKE,
         Good.APPLES,
         Good.ORANGES,
@@ -220,6 +223,7 @@ GOOD_KG: Mapping[Good, float] = MappingProxyType(
         Good.CHICKENS: 25.0,
         Good.GOLD: 250.0,
         Good.DIAMONDS: 10.0,
+        Good.LOGS: 200.0,
         Good.CARS: 1_200.0,
         Good.PLANES: 15_000.0,
         Good.TANKS: 45_000.0,
@@ -293,6 +297,8 @@ UNIT_NAMES: Mapping[Good, tuple[str, str]] = MappingProxyType(
         Good.COKE,
         Good.PLASTICS,
         Good.COFFEE,
+        Good.FERTILISER,
+        Good.WOOD_CHIPS,
     )
     | _counting(
         "barrel",
@@ -322,7 +328,8 @@ UNIT_NAMES: Mapping[Good, tuple[str, str]] = MappingProxyType(
     | _counting("chest", "chests", Good.TEA, Good.GOLD)
     | _counting("piece", "pieces", Good.FURNITURE, Good.APPLIANCES)
     | {
-        Good.LUMBER: ("beam", "beams"),
+        Good.LOGS: ("log", "logs"),
+        Good.PLANKS: ("bundle", "bundles"),
         Good.MEAT: ("side", "sides"),
         Good.PAPER: ("roll", "rolls"),
         Good.MAIL: ("bag", "bags"),
@@ -456,7 +463,7 @@ class Engine:
     # only call at stops that near each other; 0 for electric and maglev engines, which run as
     # far as the wires or guideway go.
     tank: float = 0.0
-    # Whether it burns wood (lumber) instead of coal, as American engines did while forests
+    # Whether it burns wood (logs) instead of coal, as American engines did while forests
     # were near and coal far.
     wood: bool = False
     # Its PULL_SHARE where that is not its kind's: the Rocket was built for speed, not loads.

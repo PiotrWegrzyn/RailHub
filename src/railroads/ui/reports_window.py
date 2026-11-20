@@ -1,6 +1,7 @@
 """The reports window: the company's worth each month against its target (railroads.sim.company),
 the cars delivered each year, stacked by what they carried, the stations
-the player had each year and the population of the whole map (railroads.sim.stats).
+the player had each year and the population of the whole map (railroads.sim.stats), each fuel's
+price (railroads.sim.fuel_market) and what a unit of every tile's goods earns (railroads.sim.tiles).
 
 The year under way shows as it stands so far, with today's stations and population.
 """
@@ -16,6 +17,7 @@ from railroads.sim.finance import Finances, dollars
 from railroads.sim.fuel_market import Fuel, FuelMarket, FuelMonth, electrified
 from railroads.sim.goods import Good
 from railroads.sim.stats import History
+from railroads.sim.tiles import TILE_GOODS, Tile, Tiles
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.theme import GOOD_COLORS, GROWN, WINDOW_TOP
 
@@ -201,6 +203,62 @@ def _draw_fuel(market: FuelMarket) -> None:
         )
 
 
+def tile_price_line(tiles: Tiles, tile: Tile) -> tuple[list[float], list[float]]:
+    """What a unit of a tile's goods earned each year it was on the boards, as a share of its
+    base price."""
+    xs, ys = [], []
+    for year, boards in sorted(tiles.years.items()):
+        if tile in boards.made:
+            xs.append(float(year))
+            ys.append(100.0 * boards.price(TILE_GOODS[tile][0]))
+    return xs, ys
+
+
+def price_rows(tiles: Tiles, year: int) -> list[tuple[str, str, str, str]]:
+    """Every tile on the boards in a year, the cheapest first: its name, what a unit of its goods
+    earns as a share of its base price, and its supply and demand levels."""
+    boards = tiles.of_year(year)
+    rows = sorted(boards.supply, key=lambda tile: boards.price(TILE_GOODS[tile][0]))
+    return [
+        (
+            tile.value.capitalize(),
+            f"{boards.price(TILE_GOODS[tile][0]):.0%}",
+            str(boards.supply[tile]),
+            str(boards.demand[tile]),
+        )
+        for tile in rows
+    ]
+
+
+def _draw_prices(tiles: Tiles, year: int) -> None:
+    """What every tile's goods earned over the years against their base prices, and the boards
+    now."""
+    imgui.text_wrapped(
+        "What a unit of every tile's goods earns against its base price: less the higher its "
+        "supply, more the higher its demand. Prices change only as tiles go up, on 1 January."
+    )
+    if _begin_year_plot("##prices", PLOT_HEIGHT * 1.4, "%"):
+        for tile in tiles.of_year(year).supply:
+            xs, ys = tile_price_line(tiles, tile)
+            implot.plot_line(
+                tile.value.capitalize(),
+                np.array(xs, dtype=np.float64),
+                np.array(ys, dtype=np.float64),
+            )
+        implot.end_plot()
+    flags = imgui.TableFlags_.row_bg.value
+    if imgui.begin_table("prices", 4, flags):
+        for heading in ("Tile", "Price", "Supply", "Demand"):
+            imgui.table_setup_column(heading)
+        imgui.table_headers_row()
+        for row in price_rows(tiles, year):
+            imgui.table_next_row()
+            for value in row:
+                imgui.table_next_column()
+                imgui.text(value)
+        imgui.end_table()
+
+
 def worth_line(goal: Goal) -> tuple[list[float], list[float]]:
     """The company's worth at the start of each month, by the year and the part of it gone."""
     return [year + month / 12 for year, month, _ in goal.values], [v for _, _, v in goal.values]
@@ -312,6 +370,7 @@ class ReportsWindow:
         finances: Finances | None = None,
         fuel: FuelMarket | None = None,
         goal: Goal | None = None,
+        tiles: Tiles | None = None,
     ) -> None:
         if not self.open:
             return
@@ -331,6 +390,9 @@ class ReportsWindow:
                 imgui.end_tab_item()
             if fuel is not None and imgui.begin_tab_item("Fuel")[0]:
                 _draw_fuel(fuel)
+                imgui.end_tab_item()
+            if tiles is not None and imgui.begin_tab_item("Prices")[0]:
+                _draw_prices(tiles, year)
                 imgui.end_tab_item()
             imgui.end_tab_bar()
         end_ornate()

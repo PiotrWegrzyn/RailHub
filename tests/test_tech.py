@@ -67,41 +67,30 @@ def test_a_node_needs_a_point_and_the_nodes_it_builds_on() -> None:
     research = Research()
     research.earn(Tree.FOOD, xp_for(1))
 
-    early = research.take("rotation")
-    first = research.take("seed")
-    broke = research.take("rotation")
+    early = research.take("cold")
+    first = research.take("silos")
+    broke = research.take("cold")
 
     assert (early, first, broke) == (False, True, False)
-    assert research.taken == {"seed"}
+    assert research.taken == {"silos"}
 
 
 def test_bonuses_add_up_in_their_own_tree_and_from_nodes_that_reach_everywhere() -> None:
-    research = learned(Tree.FOOD, "seed", "rotation")
+    research = learned(Tree.FOOD, "stalls", "bread")
     research.earn(Tree.COMMERCE, xp_for(1))
     research.take("books")
 
-    food = research.bonus(Effect.PRODUCTION, Tree.FOOD)
+    food = research.bonus(Effect.PRICE, Tree.FOOD)
     metals = research.bonus(Effect.DISCOUNT, Tree.METALS)
 
-    assert food == pytest.approx(0.5)
+    assert food == pytest.approx(0.15)
     assert metals == pytest.approx(0.1)
-
-
-def test_an_owned_farm_with_better_seed_brings_a_bigger_share_into_the_station() -> None:
-    growth = joined()
-    growth.build(Building((6, 22), BuildingKind.FARM))
-    growth.owners.own((6, 22), BuildingKind.FARM)
-    growth.railway.research = learned(Tree.FOOD, "seed")
-
-    growth.trade_goods()
-
-    assert growth.trade.owned_brought[(6, 20)][Good.WHEAT] == pytest.approx(10 * 1.25)
 
 
 def test_market_stalls_raise_what_food_cargo_earns() -> None:
     growth = joined()
     railway = growth.railway
-    railway.research = learned(Tree.FOOD, "seed", "stalls")
+    railway.research = learned(Tree.FOOD, "stalls")
     railway.station_demand((6, 20)).capacity = {Need.FOOD: 100.0}
     plain = Railway(growth.constructions)
     plain.station_demand((6, 20)).capacity = {Need.FOOD: 100.0}
@@ -138,7 +127,7 @@ def test_the_mogul_can_be_bought_only_once_its_tech_and_year_have_come() -> None
 def test_a_mogul_pulls_more_cars_and_steel_couplings_one_more() -> None:
     railway = joined().railway
     railway.year = 1865
-    railway.research = learned(Tree.METALS, "boilers", "bessemer", "couplings")
+    railway.research = learned(Tree.METALS, "boilers", "couplings")
     railway.finances.earn(100_000.0, "test")
 
     train = railway.buy("mogul")
@@ -150,34 +139,12 @@ def test_a_mogul_pulls_more_cars_and_steel_couplings_one_more() -> None:
     assert not stop.add_car(Good.COAL, railway.most_cars(train))
 
 
-def test_bogie_wagons_bring_the_next_generation_sooner_behind_an_engine_that_pulls_it() -> None:
-    railway, upgraded = joined().railway, joined().railway
-    upgraded.research = learned(Tree.METALS, "bessemer", "couplings", "drawbars", "bogie_wagons")
-
-    sizes = [
-        each.car_capacity(Good.OIL, engine)
-        for each in (railway, upgraded)
-        for engine in ("planet", "mixed_diesel")
-    ]
-
-    assert sizes == [55.0, 55.0, 55.0, 89.0]
-
-
-def test_grain_hoppers_put_only_food_cars_one_size_up() -> None:
-    railway = joined().railway
-    railway.research = learned(Tree.FOOD, "silos", "hoppers")
-
-    sizes = railway.car_capacity(Good.WHEAT), railway.car_capacity(Good.COAL)
-
-    assert sizes == (144.0, 89.0)
-
-
 def test_bogie_coaches_carry_more_passengers_but_freight_cars_stay_the_same() -> None:
     railway = joined().railway
     railway.research = learned(Tree.PASSENGERS, "coaches")
 
-    coach = railway.car_capacity(Good.PASSENGERS)
-    wagon = railway.car_capacity(Good.OIL)
+    coach = railway.car_capacity(Good.PASSENGERS, "planet")
+    wagon = railway.car_capacity(Good.OIL, "planet")
 
     assert coach == pytest.approx(34.0 * 1.2)
     assert wagon == pytest.approx(55.0)
@@ -278,13 +245,13 @@ def test_freight_taken_out_of_a_station_earns_experience_in_its_goods_tree() -> 
     assert railway.research.xp[Tree.METALS] == 0.0
 
 
-def test_production_nodes_reach_owned_buildings_and_discounts_every_share() -> None:
-    seed, books = NODES["seed"][1], NODES["books"][1]
+def test_price_nodes_reach_their_trees_loads_and_discounts_every_share() -> None:
+    stalls, books = NODES["stalls"][1], NODES["books"][1]
 
-    food = explain(Tree.FOOD, seed)
+    food = explain(Tree.FOOD, stalls)
     everywhere = explain(Tree.COMMERCE, books)
 
-    assert food == "Every food and drink building you control makes and takes in 25% more."
+    assert food == "Every load of food and drink earns 5% more."
     assert everywhere == "Shares of every building cost 10% less."
 
 
@@ -296,27 +263,6 @@ def test_a_node_adding_cars_names_them_once_and_every_unlock_its_first_year() ->
 
     assert cars == "cars per train +1"
     assert engines == "opens heavy freight engines (from 1853)"
-
-
-def test_liming_and_farm_machinery_make_owned_farms_take_limestone_and_machinery() -> None:
-    research = learned(Tree.FOOD, "seed", "rotation", "liming", "fertiliser", "tractors")
-    before = research.takes(BuildingKind.FARM)
-    research.earn(Tree.FOOD, xp_for(6))
-    research.take("farm_machinery")
-
-    after = research.takes(BuildingKind.FARM)
-
-    assert before == {Need.LIMESTONE}
-    assert after == {Need.LIMESTONE, Need.MACHINERY}
-
-
-def test_farm_machinery_makes_owned_sheep_farms_take_machinery_too() -> None:
-    research = learned(Tree.FOOD, "seed", "rotation", "liming", "fertiliser", "tractors")
-    research.earn(Tree.FOOD, xp_for(6))
-
-    research.take("farm_machinery")
-
-    assert research.takes(BuildingKind.SHEEP_FARM) == {Need.MACHINERY}
 
 
 @pytest.mark.parametrize(("shares", "factor"), [(0, 1.0), (300, 1.003), (1000, 1.01)])

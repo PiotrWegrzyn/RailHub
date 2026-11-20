@@ -2,7 +2,7 @@
 land each kind grows on, and the ladders it climbs.
 
 Every building that grows gives points of one kind (POINTS): houses give population, farms and
-orchards food, mines ore, lumber mills timber, ports trade, factories industry and skyscrapers
+orchards food, mines ore, logging camps timber, ports trade, factories industry and skyscrapers
 corporate points. Each cell's neighbourhood (the cell and the cells next to it) adds up the
 points of every kind around it.
 
@@ -100,7 +100,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.BANANAS: (Points.FOOD, 1),
     BuildingKind.SUGAR: (Points.FOOD, 1),
     BuildingKind.MINE: (Points.ORE, 1),
-    BuildingKind.LUMBER_MILL: (Points.TIMBER, 1),
+    BuildingKind.LOGGING_CAMP: (Points.TIMBER, 1),
     BuildingKind.PORT: (Points.TRADE, 1),
     BuildingKind.FACTORY: (Points.INDUSTRY, 1),
     BuildingKind.BIG_FACTORY: (Points.INDUSTRY, 3),
@@ -188,6 +188,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.PLASTICS_WORKS: (Points.INDUSTRY, 3),
     BuildingKind.APPLIANCE_FACTORY: (Points.INDUSTRY, 3),
     BuildingKind.PAPER_MILL: (Points.INDUSTRY, 2),
+    BuildingKind.SAWMILL: (Points.INDUSTRY, 1),
     BuildingKind.PRINTING_WORKS: (Points.INDUSTRY, 2),
     BuildingKind.SUGAR_REFINERY: (Points.INDUSTRY, 2),
     BuildingKind.PORCELAIN_WORKS: (Points.INDUSTRY, 2),
@@ -649,11 +650,11 @@ MINES = Ladder(
     from_year=1700,
 )
 
-# Lumber mills stand in forests with at least four forest cells around them and flat open land
+# Logging camps stand in forests with at least four forest cells around them and flat open land
 # beside them, best by a river to float the logs and near towns to buy them. They clear the forest
 # around them (railroads.sim.forests) and close once it is gone.
-LUMBER_MILLS = Ladder(
-    kinds=(BuildingKind.LUMBER_MILL,),
+LOGGING_CAMPS = Ladder(
+    kinds=(BuildingKind.LOGGING_CAMP,),
     land=Land(
         vegetation={Vegetation.BARREN: 0.0, Vegetation.GRASS: 0.0},
         relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
@@ -662,10 +663,10 @@ LUMBER_MILLS = Ladder(
         forest_edge=True,
         least_forest_nearby=4,
     ),
-    base_chance=0.00005,
-    chance_per_doubling={Points.POPULATION: 0.000001},
+    base_chance=0.000075,
+    chance_per_doubling={Points.POPULATION: 0.0000015},
     most_per_cell=1,
-    most_nearby=2,
+    most_nearby=3,
 )
 
 # Ports open on the sea, or less often a lake, where a town has grown to use them.
@@ -1228,6 +1229,12 @@ SOY_SAUCE_BREWERIES = _works(
 
 # Works that open by people and industry alone: their inputs must be brought to them.
 WORKS = (
+    _works(
+        BuildingKind.SAWMILL,
+        {POP: 4e-10, IND: 6e-9, Points.TIMBER: 3e-6},
+        {},
+        base=CRAFT_BASE / 4,
+    ),
     _works(BuildingKind.TEXTILE_MILL, {POP: 4e-10, IND: 1.2e-8}, {}, 1780, base=CRAFT_BASE),
     _works(
         BuildingKind.FURNITURE_MAKER,
@@ -1302,7 +1309,7 @@ LADDERS = (
     ORANGE_FARMS,
     SUGAR_FIELDS,
     MINES,
-    LUMBER_MILLS,
+    LOGGING_CAMPS,
     PORTS,
     FACTORIES,
     FOOD_PLANTS,

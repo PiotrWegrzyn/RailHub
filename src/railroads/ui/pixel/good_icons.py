@@ -122,11 +122,33 @@ def bread() -> Sprite:
     return p.sprite()
 
 
-def lumber() -> Sprite:
+def logs() -> Sprite:
     p = _canvas()
     for y in (-6, -1, 4):
         p.rect(-7, y, 5, y + 3, WOOD)
         p.ellipse(3, y, 7, y + 3, (214, 170, 112))
+    return p.sprite()
+
+
+def planks() -> Sprite:
+    """A stack of sawn boards, their pale ends square."""
+    p = _canvas()
+    board: RGB = (206, 168, 112)
+    for y in (-6, -2, 2):
+        p.rect(-7, y, 6, y + 3, board)
+        p.line([(-7, y + 3), (6, y + 3)], shade(board, 0.62))
+        p.rect(5, y, 7, y + 3, (234, 206, 152))
+    p.rect(-7, 6, 7, 7, shade(board, 0.5))
+    return p.sprite()
+
+
+def wood_chips() -> Sprite:
+    """A heap of pale wood chips."""
+    p = _canvas()
+    chip: RGB = (222, 190, 132)
+    p.polygon([(-8, 6), (-4, -2), (0, -5), (4, -2), (8, 6)], chip, shade(chip, 0.66))
+    for x, y in ((-4, 2), (-1, -2), (2, 1), (4, 4), (-2, 4), (1, -4)):
+        p.rect(x, y, x + 1, y + 1, shade(chip, 0.86 if x % 2 else 1.12))
     return p.sprite()
 
 
@@ -252,6 +274,17 @@ def wax() -> Sprite:
     p.rect(-3, -3, 3, 7, (246, 234, 176))
     p.line([(0, -3), (0, -5)], (64, 56, 50))
     p.polygon([(0, -8), (-2, -5), (2, -5)], (252, 176, 52))
+    return p.sprite()
+
+
+def fertiliser() -> Sprite:
+    p = _canvas()
+    sack: RGB = (206, 184, 140)
+    p.polygon([(-5, -4), (5, -4), (6, 7), (-6, 7)], sack, shade(sack, 0.6))
+    p.rect(-3, -6, 3, -4, shade(sack, 0.8))
+    p.line([(0, 4), (0, 0)], STEM)
+    p.polygon([(0, 0), (-4, -2), (-1, 2)], LEAF)
+    p.polygon([(0, 1), (4, -1), (1, 3)], shade(LEAF, 1.2))
     return p.sprite()
 
 
@@ -1189,7 +1222,9 @@ ICONS: dict[str, Callable[[], Sprite]] = {
     "fish": fish,
     "cans": cans,
     "bread": bread,
-    "lumber": lumber,
+    "logs": logs,
+    "planks": planks,
+    "wood chips": wood_chips,
     "coal": coal,
     "iron ore": iron_ore,
     "copper": copper,
@@ -1203,6 +1238,7 @@ ICONS: dict[str, Callable[[], Sprite]] = {
     "coffee": coffee,
     "rubber": rubber,
     "wax": wax,
+    "fertiliser": fertiliser,
     "incense": incense,
     "steel": steel,
     "tools": tools,

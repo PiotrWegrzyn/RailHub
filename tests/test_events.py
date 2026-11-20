@@ -13,25 +13,50 @@ from railroads.sim.events import (
     want_factor,
 )
 from railroads.sim.fuel_market import Fuel, history_factor
-from railroads.sim.goods import Good, Need, bonus_of, boosts_of, demands_of, makes_of, needs_of
+from railroads.sim.goods import (
+    RECIPES,
+    Good,
+    Need,
+    bonus_of,
+    boosts_of,
+    demands_of,
+    makes_of,
+    needs_of,
+)
 from railroads.sim.happenings import changes_of
+from railroads.sim.tiles import Tiles, activate
 
 BOUNDS = {start.key: start.bounds for start in START_MAPS}
 
 
-def test_people_want_a_tenth_more_goods_and_three_hundredths_more_food_each_decade() -> None:
-    goods = rise_of(BuildingKind.HOUSE, Need.COMMON, 1879)
-    food = rise_of(BuildingKind.HOUSE, Need.FOOD, 1879)
+def test_homes_want_as_much_more_of_a_need_as_its_tiles_demand_gives() -> None:
+    boards = Tiles.until(1900)
+    activate(boards)
 
-    assert goods == pytest.approx(1.1**2)
-    assert food == pytest.approx(1.03**2)
+    goods = rise_of(BuildingKind.HOUSE, Need.COMMON, 1900)
+
+    assert goods == pytest.approx(boards.of_year(1900).want_factor(Need.COMMON))
+    assert goods > 1.0
 
 
 @pytest.mark.parametrize(
-    "kind", [BuildingKind.STEEL_MILL, BuildingKind.POWER_PLANT, BuildingKind.FARM]
+    ("kind", "good"), [(BuildingKind.STEEL_MILL, Good.STEEL), (BuildingKind.FARM, Good.WHEAT)]
 )
-def test_what_processors_power_plants_and_makers_take_does_not_rise(kind: BuildingKind) -> None:
-    risen = [rise_of(kind, need, 2040) for need in Need]
+def test_processors_and_makers_take_in_as_much_more_as_the_supply_of_what_they_make(
+    kind: BuildingKind, good: Good
+) -> None:
+    boards = Tiles.until(1960)
+    activate(boards)
+
+    risen = rise_of(kind, Need.MACHINERY, 1960)
+
+    assert risen == pytest.approx(boards.of_year(1960).make_factor(good))
+
+
+def test_what_power_plants_take_does_not_rise() -> None:
+    activate(Tiles.until(2040))
+
+    risen = [rise_of(BuildingKind.POWER_PLANT, need, 2040) for need in Need]
 
     assert set(risen) == {1.0}
 
@@ -156,3 +181,21 @@ def test_after_electric_light_theatres_and_the_palace_still_take_wax_as_a_bonus(
     assert Need.WAX in theatre
     assert Need.WAX in palace
     assert Need.WAX in church
+
+
+@pytest.mark.parametrize("kind", [BuildingKind.FURNITURE_MAKER, BuildingKind.SHOE_FACTORY])
+def test_furniture_makers_and_shoe_works_make_a_quarter_more_with_wax(
+    kind: BuildingKind,
+) -> None:
+    recipe = RECIPES[kind]
+
+    wax = boosts_of(kind, 1900)[Need.WAX]
+
+    assert wax == pytest.approx(0.5 * recipe.most)
+    assert recipe.boost_most == 0.25
+
+
+def test_hospitals_take_wax_as_a_bonus() -> None:
+    bonus = bonus_of(BuildingKind.HOSPITAL, 1850)
+
+    assert bonus == {Need.WAX: 10}

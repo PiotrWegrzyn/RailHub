@@ -159,15 +159,15 @@ def test_at_the_next_stop_it_unloads_and_takes_that_stops_cars() -> None:
 def test_each_car_fills_with_its_own_good_from_the_stockpile() -> None:
     _, railway = joined_stations()
     train = railway.buy()
-    train.stops = [Stop((6, 3), [Good.LUMBER, Good.LUMBER, Good.WHEAT]), Stop((6, 20))]
+    train.stops = [Stop((6, 3), [Good.PLANKS, Good.PLANKS, Good.WHEAT]), Stop((6, 20))]
     railway.station_goods((6, 3)).stockpile.update(
-        {Good.LUMBER: car_size(Good.LUMBER) + 20.0, Good.IRON: 150.0}
+        {Good.PLANKS: car_size(Good.PLANKS) + 20.0, Good.IRON: 150.0}
     )
 
     railway.run(0.01)
 
-    assert [car.load for car in train.cars] == [car_size(Good.LUMBER), 20.0, 0.0]
-    assert railway.station_goods((6, 3)).stockpile == {Good.LUMBER: 0.0, Good.IRON: 150.0}
+    assert [car.load for car in train.cars] == [car_size(Good.PLANKS), 20.0, 0.0]
+    assert railway.station_goods((6, 3)).stockpile == {Good.PLANKS: 0.0, Good.IRON: 150.0}
 
 
 def test_a_stop_sends_at_most_max_cars() -> None:
@@ -194,7 +194,7 @@ def test_a_station_hands_brought_goods_to_buildings_around_and_gathers_the_spare
     economy = Economy(tile_map)
     counts = {kind: np.zeros(tile_map.grid.shape, dtype=np.int64) for kind in BuildingKind}
     counts[BuildingKind.FLATS][6, 10] = 6
-    counts[BuildingKind.LUMBER_MILL][6, 25] = 1
+    counts[BuildingKind.LOGGING_CAMP][6, 25] = 1
     orders = {
         (6, 11): StationOrder({Good.WHEAT: 20.0}, 0.0),
         (6, 24): StationOrder({}, 50.0),
@@ -204,20 +204,20 @@ def test_a_station_hands_brought_goods_to_buildings_around_and_gathers_the_spare
 
     index = int(np.searchsorted(trade.cells, np.ravel_multi_index((6, 25), tile_map.grid.shape)))
     assert trade.handed[(6, 11)][Good.WHEAT] == pytest.approx(20.0)
-    assert trade.gathered[(6, 24)][Good.LUMBER] == pytest.approx(20.0)
-    assert trade.gave[BuildingKind.LUMBER_MILL][index] == pytest.approx(20.0)
+    assert trade.gathered[(6, 24)][Good.LOGS] == pytest.approx(20.0)
+    assert trade.gave[BuildingKind.LOGGING_CAMP][index] == pytest.approx(20.0)
     assert sum(trade.gathered[(6, 24)].values()) <= 50.0
 
 
 def test_growth_hands_station_goods_out_and_stores_what_was_gathered() -> None:
     growth, railway = joined_stations()
-    growth.build(Building((6, 21), BuildingKind.LUMBER_MILL))
+    growth.build(Building((6, 21), BuildingKind.LOGGING_CAMP))
 
     growth.trade_goods()
 
     goods = railway.station_goods((6, 20))
-    assert goods.stockpile[Good.LUMBER] == pytest.approx(20.0)
-    assert goods.held(Good.LUMBER) <= STOCKPILE
+    assert goods.stockpile[Good.LOGS] == pytest.approx(20.0)
+    assert goods.held(Good.LOGS) <= STOCKPILE
 
 
 def test_cars_slow_a_train_and_full_cars_slow_it_more() -> None:
@@ -514,16 +514,16 @@ def test_each_storage_upgrade_costs_twice_the_one_before() -> None:
 
 def test_a_raised_station_gathers_from_further_away() -> None:
     growth, railway = joined_stations()
-    growth.build(Building((6, 24), BuildingKind.LUMBER_MILL))
+    growth.build(Building((6, 24), BuildingKind.LOGGING_CAMP))
     growth.trade_goods()
-    before = railway.station_goods((6, 20)).stockpile.get(Good.LUMBER, 0.0)
+    before = railway.station_goods((6, 20)).stockpile.get(Good.LOGS, 0.0)
     railway.finances.cash = 100_000.0
     railway.upgrade((6, 20))
 
     growth.trade_goods()
 
     assert before == 0.0
-    assert railway.station_goods((6, 20)).stockpile[Good.LUMBER] == pytest.approx(20.0)
+    assert railway.station_goods((6, 20)).stockpile[Good.LOGS] == pytest.approx(20.0)
 
 
 def test_every_car_costs_fifteen_and_a_dollar_for_every_ten_it_holds_each_time_it_sets_off() -> (
@@ -693,7 +693,7 @@ def test_a_station_holds_five_hundred_of_each_good_counting_what_trains_brought(
     goods.brought[Good.COAL] = 200.0
     goods.stockpile[Good.WHEAT] = 120.0
 
-    rooms = (goods.room(Good.COAL), goods.room(Good.WHEAT), goods.room(Good.LUMBER))
+    rooms = (goods.room(Good.COAL), goods.room(Good.WHEAT), goods.room(Good.PLANKS))
 
     assert rooms == (0.0, 380.0, 500.0)
 

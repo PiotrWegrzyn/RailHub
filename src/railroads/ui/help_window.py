@@ -23,13 +23,13 @@ from railroads.sim.goods import (
     Good,
     Need,
     freight_of,
-    need_year,
     price_of,
 )
 from railroads.sim.ladders import LADDERS, PASSENGERS_PER_POINT, POINTS, Points
 from railroads.sim.lots import FIRST_FIBONACCI, PRICE_UNIT, fibonacci
 from railroads.sim.ownership import EXPERIENCE_PER_POINT
 from railroads.sim.tech import NODES, Tree, path_to
+from railroads.sim.tiles import opened_from
 from railroads.sim.trains import ENGINES, Engine, successor
 from railroads.ui.buy_train import fuel_use
 from railroads.ui.engine_origins import origins
@@ -139,8 +139,9 @@ class BuildingHelp:
     kind: BuildingKind
     group: Points
     makes: tuple[tuple[Good, float], ...]
-    # Each need, how much of it a month, and the year it starts to be felt (0 for always).
-    wants: tuple[tuple[Need, float, int], ...]
+    # Each need, how much of it a month, and from when it is felt ("" for always): a year, or the
+    # demand tile level that opens it.
+    wants: tuple[tuple[Need, float, str], ...]
     travellers: int
     space: int
     from_year: int
@@ -182,7 +183,7 @@ def building_help() -> tuple[BuildingHelp, ...]:
             POINTS[kind][0],
             tuple(MAKES.get(kind, {}).items()),
             tuple(
-                (need, amount, need_year(kind, need))
+                (need, amount, opened_from(kind, need))
                 for need, amount in NEEDS.get(kind, {}).items()
             ),
             PASSENGERS_PER_POINT[POINTS[kind][0]] * POINTS[kind][1],
@@ -442,11 +443,11 @@ def _draw_makes(row: BuildingHelp) -> None:
 def _draw_wants(row: BuildingHelp) -> None:
     if not row.wants:
         imgui.text_disabled("-")
-    for index, (need, amount, year) in enumerate(row.wants):
+    for index, (need, amount, since) in enumerate(row.wants):
         if index:
             imgui.same_line(0, 10)
         good_amount(need, f"{amount:g}")
-        if year:
+        if since:
             imgui.same_line(0, 2)
-            imgui.text_disabled(f"({year})")
-            tip(f"Wanted from {year}")
+            imgui.text_disabled(f"({since})")
+            tip(f"Wanted from {since}")

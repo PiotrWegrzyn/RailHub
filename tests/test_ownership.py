@@ -12,12 +12,11 @@ from railroads.sim.ownership import (
     LOT,
     PAYBACK_YEARS,
     SHARES,
-    Owners,
     satisfaction_price,
 )
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
-from railroads.sim.tech import Effect
+from railroads.sim.tiles import Tiles, activate
 
 
 def grown(*placed: tuple[tuple[int, int], BuildingKind]) -> Growth:
@@ -260,32 +259,25 @@ def test_the_player_controls_a_building_from_sixty_percent_of_its_shares(
     assert held == (controls, controls)
 
 
-@pytest.mark.parametrize(("shares", "worked"), [(300, 1.0), (500, 1.0), (600, 1.5), (1000, 1.5)])
-def test_production_tech_works_only_on_a_building_the_player_controls_and_on_all_of_it(
-    shares: int, worked: float, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    growth = grown(((5, 5), BuildingKind.FARM))
-    growth.owners.own((5, 5), BuildingKind.FARM, shares)
-    monkeypatch.setattr(
-        Owners, "boost", lambda self, kind, effect: 0.5 if effect == Effect.PRODUCTION else 0.0
-    )
-
-    counts = growth.owners.working_counts()
-
-    assert counts[BuildingKind.FARM][5, 5] == pytest.approx(worked)
-
-
 @pytest.mark.parametrize(("shares", "taking"), [(500, 0.0), (600, 1.0), (1000, 1.0)])
 def test_limestone_is_taken_only_by_a_farm_the_player_controls_and_then_by_all_of_it(
-    shares: int, taking: float, monkeypatch: pytest.MonkeyPatch
+    shares: int, taking: float
 ) -> None:
     growth = grown(((5, 5), BuildingKind.FARM))
     growth.owners.own((5, 5), BuildingKind.FARM, shares)
-    research = type(growth.railway.research)
-    monkeypatch.setattr(research, "takes", lambda self, kind: frozenset({Need.LIMESTONE}))
 
     taken = growth.owners.taking(BuildingKind.FARM, Need.LIMESTONE)
 
     flat = int(np.ravel_multi_index((5, 5), growth.grid.shape))
     assert taken is not None
     assert taken[flat] == pytest.approx(taking)
+
+
+def test_no_farm_takes_limestone_before_the_ore_and_stone_demand_tile_opens_it() -> None:
+    growth = grown(((5, 5), BuildingKind.FARM))
+    growth.owners.own((5, 5), BuildingKind.FARM)
+    activate(Tiles.until(1812))
+
+    taken = growth.owners.taking(BuildingKind.FARM, Need.LIMESTONE)
+
+    assert taken is None

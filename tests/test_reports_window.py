@@ -7,12 +7,15 @@ from railroads.sim.company import CompanyValue, Goal
 from railroads.sim.finance import Finances
 from railroads.sim.goods import Good
 from railroads.sim.stats import History
+from railroads.sim.tiles import Tile, Tiles
 from railroads.ui.reports_window import (
     ReportsWindow,
     books_rows,
     period_name,
+    price_rows,
     profits,
     report,
+    tile_price_line,
     worth_line,
 )
 
@@ -171,3 +174,31 @@ def test_the_window_draws_the_worth_against_the_target(frame: None, months: int)
 
     assert window.open
     assert len(goal.values) == months
+
+
+def test_the_price_list_shows_every_tile_the_cheapest_first() -> None:
+    tiles = Tiles.until(1850)
+
+    rows = price_rows(tiles, 1850)
+
+    assert rows[0] == ("Coal", "59%", "11", "6")
+    assert rows[-1][0] == "Luxuries"
+
+
+def test_a_tiles_price_line_runs_year_by_year_from_when_it_came() -> None:
+    tiles = Tiles.until(1850)
+
+    xs, ys = tile_price_line(tiles, Tile.STEEL)
+
+    assert xs[0] == 1843.0
+    assert xs[-1] == 1850.0
+    assert ys[0] == pytest.approx(100.0)
+
+
+def test_the_window_draws_the_prices(frame: None) -> None:
+    window = ReportsWindow()
+    window.open = True
+
+    window.draw(made_history(), 1903, 4, 150, tiles=Tiles.until(1903))
+
+    assert window.open

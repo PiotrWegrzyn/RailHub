@@ -14,11 +14,13 @@ from railroads.sim.economy import (
     StationOrder,
     levels_of,
 )
+from railroads.sim.events import make_factor
 from railroads.sim.goods import BONUS_PART, PIPELINE, Good, Need, makes_of, needs_of
 from railroads.sim.grids import HexGrid
-from railroads.sim.ladders import LUMBER_MILLS, MINES
+from railroads.sim.ladders import LOGGING_CAMPS, MINES
 from railroads.sim.steps import finish
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
+from railroads.sim.tiles import Tiles, activate
 
 STATION = (8, 10)
 FARM_MONTH = makes_of(BuildingKind.FARM, START_YEAR)[Good.WHEAT]
@@ -244,17 +246,17 @@ def test_a_farm_is_as_satisfied_as_the_share_of_its_wheat_a_station_takes(
 
 
 @pytest.mark.parametrize(
-    ("lumber", "steel", "goods"), [(0.0, 9.0, 0.0), (2.0, 9.0, 6.0), (9.0, 1.0, 3.0)]
+    ("planks", "steel", "goods"), [(0.0, 9.0, 0.0), (2.0, 9.0, 6.0), (9.0, 1.0, 3.0)]
 )
-def test_a_factory_makes_only_as_much_as_its_lumber_and_steel_allow(
-    lumber: float, steel: float, goods: float
+def test_a_factory_makes_only_as_much_as_its_planks_and_steel_allow(
+    planks: float, steel: float, goods: float
 ) -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     economy.year = 1855
     placed = counts(tile_map, ((8, 8), BuildingKind.FACTORY, 1))
 
-    trade = economy.trade(placed, holding(100.0, LUMBER=lumber, STEEL=steel))
+    trade = economy.trade(placed, holding(100.0, PLANKS=planks, STEEL=steel))
 
     assert trade.gave[BuildingKind.FACTORY][position(trade, economy, (8, 8))] == pytest.approx(
         goods
@@ -276,8 +278,8 @@ def test_satisfaction_goes_by_the_share_met(share: float, level: Satisfaction) -
     assert levels[0] == level
 
 
-def test_lumber_mills_only_grow_at_the_edge_of_a_forest() -> None:
-    weights = LUMBER_MILLS.land.weights(make_map())
+def test_logging_camps_only_grow_at_the_edge_of_a_forest() -> None:
+    weights = LOGGING_CAMPS.land.weights(make_map())
 
     assert weights[2, 4] > 0
     assert weights[2, 5] == 0
@@ -363,13 +365,13 @@ def test_canneries_take_their_fruit_before_houses_eat_it() -> None:
 
 
 @pytest.mark.parametrize(("year", "goods"), [(1854, 10.0), (1855, 0.0)])
-def test_a_factory_works_on_lumber_alone_until_steel_comes_in_1855(year: int, goods: float) -> None:
+def test_a_factory_works_on_planks_alone_until_steel_comes_in_1855(year: int, goods: float) -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     economy.year = year
     placed = counts(tile_map, ((8, 8), BuildingKind.FACTORY, 1))
 
-    trade = economy.trade(placed, holding(100.0, LUMBER=10.0 / 3))
+    trade = economy.trade(placed, holding(100.0, PLANKS=10.0 / 3))
 
     made = trade.gave[BuildingKind.FACTORY][position(trade, economy, (8, 8))]
     assert made == pytest.approx(goods)
@@ -428,12 +430,19 @@ def test_a_big_factory_works_on_steel_alone_until_copper_comes_in_1880(
     )
 
 
-def test_farms_list_limestone_and_machinery_always_and_diesel_only_from_1920() -> None:
-    before = needs_of(BuildingKind.FARM, 1919)
-    after = needs_of(BuildingKind.FARM, 1920)
+def test_farms_take_limestone_machinery_fertiliser_and_diesel_as_their_demand_tiles_open_them() -> (
+    None
+):
+    activate(Tiles.until(1925))
 
-    assert before == {Need.MACHINERY: 5, Need.LIMESTONE: 10}
-    assert after == {Need.MACHINERY: 5, Need.LIMESTONE: 10, Need.FUEL: 2}
+    taken = [set(needs_of(BuildingKind.FARM, year)) for year in (1805, 1820, 1910, 1925)]
+
+    assert taken == [
+        set(),
+        {Need.LIMESTONE},
+        {Need.LIMESTONE, Need.MACHINERY, Need.FERTILISER},
+        {Need.LIMESTONE, Need.MACHINERY, Need.FERTILISER, Need.FUEL},
+    ]
 
 
 @pytest.mark.parametrize(
@@ -619,8 +628,8 @@ def test_aircraft_factories_want_electronics_once_there_are_any_in_1960(
     assert trade.gathered[STATION][Good.PLANES] == pytest.approx(planes)
 
 
-@pytest.mark.parametrize("fuel", ["LUMBER", "COAL"])
-def test_houses_heat_with_lumber_or_coal(fuel: str) -> None:
+@pytest.mark.parametrize("fuel", ["LOGS", "COAL"])
+def test_houses_heat_with_logs_or_coal(fuel: str) -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
@@ -679,7 +688,7 @@ def test_bonus_goods_raise_a_fed_warm_and_furnished_house_past_full_satisfaction
     assert level_at(economy, trade, (8, 9), BuildingKind.HOUSE) == Satisfaction.THRIVING
 
 
-@pytest.mark.parametrize("given", [{"BEER": 1.0}, {"LUMBER": 3.0}, {"COAL": 3.0, "BEER": 1.0}])
+@pytest.mark.parametrize("given", [{"BEER": 1.0}, {"LOGS": 3.0}, {"COAL": 3.0, "BEER": 1.0}])
 def test_a_house_that_gets_no_food_is_unsatisfied_whatever_else_it_gets(given: dict) -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
@@ -737,15 +746,15 @@ def test_a_station_full_of_a_good_gathers_no_more_of_it() -> None:
     assert trade.gathered[STATION].get(Good.WHEAT, 0.0) == 0.0
 
 
-@pytest.mark.parametrize(("lumber", "coal"), [(0.0, 100.0), (10.0, 150.0), (20.0, 200.0)])
-def test_lumber_for_pit_props_lets_a_mine_dig_up_to_twice_the_coal(
-    lumber: float, coal: float
+@pytest.mark.parametrize(("planks", "coal"), [(0.0, 100.0), (10.0, 150.0), (20.0, 200.0)])
+def test_planks_for_pit_props_lets_a_mine_dig_up_to_twice_the_coal(
+    planks: float, coal: float
 ) -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 9), BuildingKind.MINE, 1))
 
-    trade = economy.trade(placed, holding(1000.0, LUMBER=lumber))
+    trade = economy.trade(placed, holding(1000.0, PLANKS=planks))
 
     assert trade.gathered[STATION].get(Good.COAL, 0.0) == pytest.approx(coal)
 
@@ -890,7 +899,7 @@ def test_only_a_farm_the_player_owns_takes_limestone_and_machinery_once_their_te
 
     gathered = trade.gathered[STATION].get(Good.WHEAT, 0.0)
     brought = trade.owned_brought[STATION].get(Good.WHEAT, 0.0)
-    assert gathered + brought == pytest.approx(wheat)
+    assert gathered + brought == pytest.approx(wheat * make_factor(Good.WHEAT, 1900))
 
 
 @pytest.mark.parametrize("drink", ["BEER", "WINE", "VODKA"])
@@ -979,5 +988,93 @@ def test_a_farm_the_player_controls_takes_machinery_whole_and_they_get_their_par
 
     gathered = trade.gathered[STATION].get(Good.WHEAT, 0.0)
     brought = trade.owned_brought[STATION].get(Good.WHEAT, 0.0)
-    assert gathered + brought == pytest.approx(3.0 * FARM_MONTH)
-    assert brought == pytest.approx(0.6 * 3.0 * FARM_MONTH)
+    rise = make_factor(Good.WHEAT, 1900)
+    assert gathered + brought == pytest.approx(3.0 * FARM_MONTH * rise)
+    assert brought == pytest.approx(0.6 * 3.0 * FARM_MONTH * rise)
+
+
+@pytest.mark.parametrize(
+    ("logs", "planks", "chips"), [(0.0, 0.0, 0.0), (20.0, 20.0, 4.0), (100.0, 40.0, 8.0)]
+)
+def test_a_sawmill_saws_a_plank_from_every_log_and_a_load_of_chips_from_every_five(
+    logs: float, planks: float, chips: float
+) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 8), BuildingKind.SAWMILL, 1))
+
+    trade = economy.trade(placed, holding(1000.0, LOGS=logs))
+
+    assert trade.gathered[STATION].get(Good.PLANKS, 0.0) == pytest.approx(planks)
+    assert trade.gathered[STATION].get(Good.WOOD_CHIPS, 0.0) == pytest.approx(chips)
+
+
+@pytest.mark.parametrize(
+    ("machinery", "fuel", "planks"),
+    [(0.0, 0.0, 40.0), (50.0, 0.0, 80.0), (0.0, 50.0, 60.0), (50.0, 50.0, 100.0)],
+)
+def test_machinery_and_diesel_let_a_sawmill_saw_more_logs(
+    machinery: float, fuel: float, planks: float
+) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    economy.year = 1925
+    placed = counts(tile_map, ((8, 8), BuildingKind.SAWMILL, 1))
+    economy.trade(placed, holding(1000.0, LOGS=200.0, MACHINERY=machinery, FUEL=fuel))
+
+    trade = economy.trade(placed, holding(1000.0, LOGS=200.0))
+
+    assert trade.gathered[STATION].get(Good.PLANKS, 0.0) == pytest.approx(planks)
+    assert trade.gathered[STATION].get(Good.WOOD_CHIPS, 0.0) == pytest.approx(planks / 5)
+
+
+def test_a_sawmill_keeps_only_three_months_of_machinery() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    economy.year = 1925
+    placed = counts(tile_map, ((8, 8), BuildingKind.SAWMILL, 1))
+
+    trade = economy.trade(placed, holding(1000.0, LOGS=40.0, MACHINERY=50.0))
+
+    took, _ = trade.goods_got[(BuildingKind.SAWMILL, Need.MACHINERY)]
+    assert took[position(trade, economy, (8, 8))] == pytest.approx(15.0)
+
+
+@pytest.mark.parametrize(
+    ("year", "machinery", "logs"), [(1869, 5.0, 20.0), (1870, 0.0, 20.0), (1870, 5.0, 40.0)]
+)
+def test_machinery_lets_any_logging_camp_fell_twice_the_logs_from_1870(
+    year: int, machinery: float, logs: float
+) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    economy.year = year
+    placed = counts(tile_map, ((8, 9), BuildingKind.LOGGING_CAMP, 1))
+
+    trade = economy.trade(placed, holding(1000.0, MACHINERY=machinery))
+
+    assert trade.gathered[STATION].get(Good.LOGS, 0.0) == pytest.approx(
+        logs * make_factor(Good.LOGS, year)
+    )
+
+
+@pytest.mark.parametrize(("chips", "paper"), [(0.0, 0.0), (5.0, 50.0), (20.0, 100.0)])
+def test_a_paper_mill_makes_paper_out_of_wood_chips(chips: float, paper: float) -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 8), BuildingKind.PAPER_MILL, 1))
+
+    trade = economy.trade(placed, holding(1000.0, WOOD_CHIPS=chips, PLANKS=50.0, LOGS=50.0))
+
+    assert trade.gathered[STATION].get(Good.PAPER, 0.0) == pytest.approx(paper)
+
+
+def test_houses_burn_logs_but_not_planks() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
+
+    trade = economy.trade(placed, holding(PLANKS=5.0))
+
+    burned, _ = trade.goods_got[(BuildingKind.HOUSE, Need.HEATING)]
+    assert burned[position(trade, economy, (8, 9))] == 0.0

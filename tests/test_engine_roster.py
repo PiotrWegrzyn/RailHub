@@ -11,6 +11,7 @@ from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.tech import GENERAL_CARS, NODES, Effect, Research
+from railroads.sim.tiles import Tiles, activate
 from railroads.sim.trains import (
     BASE_GENERATION,
     BULK_CAR,
@@ -66,7 +67,9 @@ def by_year(kind: Kind) -> list[str]:
 
 def full_train(engine: str, cars: int) -> Train:
     train = Train("Test", engine=engine)
-    train.cars = [Car(Good.COAL, Car(Good.COAL).capacity) for _ in range(cars)]
+    newest = ENGINES[engine].top_generation
+    size, tare = car_size(Good.COAL, newest), tare_of(Good.COAL, newest)
+    train.cars = [Car(Good.COAL, size, capacity=size, tare=tare) for _ in range(cars)]
     return train
 
 
@@ -274,7 +277,7 @@ def test_an_express_leads_its_coaches_with_an_empty_dining_car() -> None:
     assert dining.dining and dining.load == 0.0
     assert [car.good for car in coaches] == [Good.PASSENGERS]
     assert coaches[0].load > 0
-    assert dining.tonnes == pytest.approx(tare_of(Good.PASSENGERS))
+    assert dining.tonnes == pytest.approx(railway.car_tare(Good.PASSENGERS, "single"))
 
 
 def test_an_express_pays_a_car_trip_for_its_dining_car() -> None:
@@ -456,15 +459,23 @@ def test_a_new_generation_of_cars_comes_in_its_year(year: int, generation: int) 
     assert newest == generation
 
 
-def test_cars_are_of_the_years_generation_up_to_the_newest_an_engine_pulls() -> None:
+def test_cars_are_of_the_eras_generation_up_to_the_newest_an_engine_pulls() -> None:
     railway = line()
-    railway.year = 1960
 
     generations = [
         railway.car_generation(Good.COAL, engine) for engine in ("planet", "mogul", "heavy_diesel")
     ]
 
-    assert generations == [2, 3, 6]
+    assert generations == [2, 3, GENERATIONS]
+
+
+def test_before_the_second_era_even_the_planet_pulls_the_first_generation() -> None:
+    railway = line()
+    activate(Tiles())
+
+    generation = railway.car_generation(Good.COAL, "planet")
+
+    assert generation == 1
 
 
 def test_a_pioneer_pulls_a_full_car_of_55_quintals_of_coal() -> None:

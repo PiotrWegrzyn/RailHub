@@ -1,17 +1,23 @@
 """What tests build their games on: a small flat map of grassland, any layer of which a test can
 give itself, and a growth rule that grows and trades nothing, for tests that place every building
-themselves; and world files held in memory."""
+themselves; boards that open every buyer; and world files held in memory."""
+
+from types import MappingProxyType
 
 import numpy as np
 import numpy.typing as npt
 
+from railroads.sim.clock import END_YEAR
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import Grid, HexGrid
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.tiles import ERAS, FIRST_YEAR, Tile, Tiles, Year
 
 BOUNDS = Bounds(west=14.0, east=15.0, south=50.0, north=51.0)
 QUIET = GrowthRule(trades=False, ladders=(), forests=None)
+# A level above every one a demand tile opens a buyer at.
+OPEN_LEVEL = 99
 
 
 def layer(rows: int, cols: int, value: int) -> npt.NDArray[np.uint8]:
@@ -58,3 +64,18 @@ class MemoryFiles:
     def read(self, name: str) -> bytes | None:
         self.asked.add(name)
         return self.files.get(name)
+
+
+def open_boards() -> Tiles:
+    """Boards on which every good is made and wanted at its base and earns its base price, and
+    every buyer a demand tile opens is open, from the first year of the boards."""
+    tiles = Tiles()
+    year = Year(
+        MappingProxyType({}),
+        MappingProxyType(dict.fromkeys(Tile, OPEN_LEVEL)),
+        MappingProxyType({}),
+        MappingProxyType({}),
+        len(ERAS),
+    )
+    tiles.years = dict.fromkeys(range(FIRST_YEAR, END_YEAR + 100), year)
+    return tiles

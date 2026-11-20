@@ -130,11 +130,12 @@ from railroads.ui.pixel.art.military import base, headquarters, outpost
 from railroads.ui.pixel.art.mines import (
     clay_pit,
     limestone_quarry,
-    lumber_mill,
+    logging_camp,
     mine,
     oil_well,
     salt_works,
     sand_pit,
+    sawmill,
     shaft_mine,
 )
 from railroads.ui.pixel.art.nature import leafy, pine, rocks
@@ -270,7 +271,8 @@ BUILDINGS = (
     "mega_steel_mill",
     "shipyard",
     "mine",
-    "lumber_mill",
+    "logging_camp",
+    "sawmill",
     "port",
     "clay_pit",
     "limestone_quarry",
@@ -339,7 +341,8 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "mega_factory": mega_factory,
     "skyscraper": skyscraper,
     "mine": mine,
-    "lumber_mill": lumber_mill,
+    "logging_camp": logging_camp,
+    "sawmill": sawmill,
     "port": port,
     "orchard": orchard,
     "iron_mine": lambda: shaft_mine((104, 72, 62), (176, 98, 70)),

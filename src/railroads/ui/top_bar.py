@@ -1,7 +1,7 @@
 """The bar along the top of the window: the date, the money, the company's worth against its
 target and any countdown to bankruptcy, the game speeds, the view's buttons (zoom, the two
 minimaps and the search), the map's title and any notice such as an autosave, and the buttons
-opening the reports, the tech trees, the help, the saves and the main menu."""
+opening the reports, the supply and demand boards, the tech trees, the help, the saves and the main menu."""
 
 from typing import TYPE_CHECKING
 
@@ -71,7 +71,7 @@ def _draw_top_bar(app: App) -> None:
     imgui.same_line(0, 8)
     draw_view_controls(app.view)
     padding = imgui.get_style().window_padding.x
-    buttons = 5 if app.saves is not None else 3
+    buttons = 6 if app.saves is not None else 4
     right = imgui.get_window_width() - padding - buttons * WINDOW_BUTTON_WIDTH - (buttons - 1) * 4
     title = app.title.upper()
     imgui.same_line(0, 8)
@@ -91,6 +91,9 @@ def _draw_top_bar(app: App) -> None:
     size = (WINDOW_BUTTON_WIDTH, 0)
     if toggle_button(fa.ICON_FA_CHART_BAR, app.reports.open, "Reports (G)", size):
         app.reports.open = not app.reports.open
+    imgui.same_line(0, 4)
+    if toggle_button(fa.ICON_FA_BALANCE_SCALE, app.tiles.open, "Supply and demand (Y)", size):
+        app.tiles.open = not app.tiles.open
     imgui.same_line(0, 4)
     if toggle_button(fa.ICON_FA_FLASK, app.tech.open, "Tech trees (R)", size):
         app.tech.open = not app.tech.open
