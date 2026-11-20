@@ -398,5 +398,9 @@
  "boiler fuel": [
   48,
   192
+ ],
+ "fertiliser": [
+  64,
+  192
  ]
 }

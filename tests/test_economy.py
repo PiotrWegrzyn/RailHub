@@ -20,6 +20,7 @@ from railroads.sim.grids import HexGrid
 from railroads.sim.ladders import LOGGING_CAMPS, MINES
 from railroads.sim.steps import finish
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
+from railroads.sim.tiles import Tiles, activate
 
 STATION = (8, 10)
 FARM_MONTH = makes_of(BuildingKind.FARM, START_YEAR)[Good.WHEAT]
@@ -429,12 +430,19 @@ def test_a_big_factory_works_on_steel_alone_until_copper_comes_in_1880(
     )
 
 
-def test_farms_list_limestone_and_machinery_always_and_diesel_only_from_1920() -> None:
-    before = needs_of(BuildingKind.FARM, 1919)
-    after = needs_of(BuildingKind.FARM, 1920)
+def test_farms_take_limestone_machinery_fertiliser_and_diesel_as_their_demand_tiles_open_them() -> (
+    None
+):
+    activate(Tiles.until(1925))
 
-    assert before == {Need.MACHINERY: 5, Need.LIMESTONE: 10}
-    assert after == {Need.MACHINERY: 5, Need.LIMESTONE: 10, Need.FUEL: 2}
+    taken = [set(needs_of(BuildingKind.FARM, year)) for year in (1805, 1820, 1910, 1925)]
+
+    assert taken == [
+        set(),
+        {Need.LIMESTONE},
+        {Need.LIMESTONE, Need.MACHINERY, Need.FERTILISER},
+        {Need.LIMESTONE, Need.MACHINERY, Need.FERTILISER, Need.FUEL},
+    ]
 
 
 @pytest.mark.parametrize(

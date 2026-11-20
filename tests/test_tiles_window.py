@@ -3,8 +3,8 @@ from collections.abc import Iterator
 import pytest
 from imgui_bundle import imgui
 
-from railroads.sim.tiles import Board, Tiles
-from railroads.ui.tiles_window import TilesWindow, era_line, rows
+from railroads.sim.tiles import Board, Tile, Tiles
+from railroads.ui.tiles_window import TilesWindow, era_line, next_unlock, rows
 
 
 def test_the_window_lists_a_boards_tiles_the_lowest_first_with_what_a_pick_does() -> None:
@@ -47,3 +47,9 @@ def test_the_window_opens_by_itself_once_a_year_and_draws_both_boards(frame: Non
     window.draw(Tiles.until(1851))
 
     assert window.open
+
+
+def test_a_demand_tile_says_which_buyer_its_next_level_opens() -> None:
+    opens = next_unlock(Tile.ORE, 1), next_unlock(Tile.ORE, 3)
+
+    assert opens == ("level 3: farms take limestone", "")

@@ -500,7 +500,7 @@ window (H) lists the same.
 | House |  | 10 food, 3 heating | 10 food, 0.5 soy sauce, 1 beer, 1 newspapers (from 1600), 5 common goods, 0.5 vodka (from 1600), 0.5 refined sugar (from 1800), 0.5 bricks, 0.2 glass, 0.5 limestone, 0.5 wax |
 | Tenement |  | 60 food, 60 common goods, 20 heating | 60 food, 5 soy sauce, 10 salt, 20 goods, 10 hot drinks (from 1700), 10 tools (from 1870), 10 beer, 10 vodka (from 1600), 10 bricks, 10 glass, 10 cement (from 1880), 10 refined sugar (from 1800), 10 newspapers (from 1600), 10 limestone, 1 luxury goods (from 1700), 5 wax |
 | Block of flats |  | 200 food, 300 common goods, 80 heating | 200 food, 15 soy sauce, 30 salt, 40 goods, 30 hot drinks (from 1700), 10 tools (from 1870), 30 fuel (from 1910), 3 cars (from 1930), 30 beer, 30 vodka (from 1600), 50 bricks, 50 cement (from 1880), 50 glass, 30 newspapers (from 1600), 5 appliances (from 1950), 30 refined sugar (from 1800), 5 luxury goods (from 1700) |
-| Farm | 10 wheat |  | 5 machinery (from 1870), 10 limestone, 2 fuel (from 1920) |
+| Farm | 10 wheat |  | 5 machinery (from machines and tools demand 10), 10 limestone (from ore and stone demand 3), 5 fertiliser (from chemicals and building demand 10), 2 fuel (from oil and fuel demand 11) |
 | Orchard | 10 apples |  |  |
 | Date palms | 10 dates |  |  |
 | Orange farm | 10 oranges |  |  |
@@ -508,23 +508,23 @@ window (H) lists the same.
 | Sugar field | 10 sugar |  |  |
 | Bakery | 120 bread | 48 wheat | 6 refined sugar (from 1800) |
 | Fishery | 10 fish |  | 2 fuel (from 1910) |
-| Sheep farm | 21 wool, 10 sheep |  | 90 wheat, 5 machinery (from 1870) |
+| Sheep farm | 21 wool, 10 sheep |  | 90 wheat (from farming demand 2), 5 machinery (from machines and tools demand 10) |
 | Cotton field | 80 cotton |  |  |
 | Vineyard | 60 grapes |  |  |
 | Coffee plantation (1700) | 60 coffee |  |  |
 | Rubber plantation (1900) | 60 rubber |  |  |
 | Beekeeper | 2 honey, 10 wax |  |  |
 | Incense grove | 30 incense |  |  |
-| Potato farm (1600) | 10 potatoes |  | 2 fuel (from 1920) |
-| Rice paddy | 10 rice |  | 2 fuel (from 1920) |
-| Soy field | 10 soybeans |  | 2 fuel (from 1920) |
+| Potato farm (1600) | 10 potatoes |  | 2 fuel (from oil and fuel demand 11) |
+| Rice paddy | 10 rice |  | 2 fuel (from oil and fuel demand 11) |
+| Soy field | 10 soybeans |  | 2 fuel (from oil and fuel demand 11) |
 | Tea plantation | 20 tea |  |  |
 | Tofu maker | 60 tofu | 24 soybeans |  |
 | Miso maker | 60 miso | 15 soybeans, 9 rice, 6 salt |  |
 | Fish drying shed | 60 dried fish | 24 fish, 6 salt |  |
-| Cattle ranch | 10 cattle, 20 milk |  | 120 wheat |
-| Pig farm | 12 pigs |  | 60 wheat |
-| Chicken farm | 20 chickens, 15 eggs |  | 30 wheat |
+| Cattle ranch | 10 cattle, 20 milk |  | 120 wheat (from farming demand 2) |
+| Pig farm | 12 pigs |  | 60 wheat (from farming demand 2) |
+| Chicken farm | 20 chickens, 15 eggs |  | 30 wheat (from farming demand 2) |
 | Sausage maker (1850) | 240 sausages | 96 meat, 48 salt |  |
 | Flax field | 60 flax |  |  |
 | Hop garden | 40 hops |  |  |
@@ -538,17 +538,17 @@ window (H) lists the same.
 | Mega miso maker | 843.8 miso | 210.9 soybeans, 126.6 rice, 84.38 salt |  |
 | Big fish drying shed | 225 dried fish | 90 fish, 22.5 salt |  |
 | Mega fish drying shed | 843.8 dried fish | 337.5 fish, 84.38 salt |  |
-| Mine (1700) | 100 coal |  | 20 planks, 10 fuel (from 1920) |
-| Iron mine | 100 iron ore |  | 10 fuel (from 1920) |
-| Copper mine (1880) | 40 copper |  | 5 fuel (from 1920) |
-| Gold mine | 20 gold |  | 2 fuel (from 1920) |
-| Diamond mine | 10 diamonds |  | 2 fuel (from 1920) |
+| Mine (1700) | 100 coal |  | 20 planks (from wood demand 2), 5 machinery (from machines and tools demand 8), 10 fuel (from oil and fuel demand 11) |
+| Iron mine | 100 iron ore |  | 5 machinery (from machines and tools demand 8), 10 fuel (from oil and fuel demand 11) |
+| Copper mine (1880) | 40 copper |  | 5 fuel (from oil and fuel demand 11) |
+| Gold mine | 20 gold |  | 2 fuel (from oil and fuel demand 11) |
+| Diamond mine | 10 diamonds |  | 2 fuel (from oil and fuel demand 11) |
 | Oil well (1855) | 150 oil, 50 gas |  |  |
-| Salt works | 60 salt |  | 5 fuel (from 1920) |
-| Clay pit | 60 clay |  | 5 fuel (from 1920) |
-| Limestone quarry | 60 limestone |  | 5 fuel (from 1920) |
-| Sand pit | 60 sand |  | 5 fuel (from 1920) |
-| Logging camp | 20 logs |  | 5 machinery (from 1870), 3 fuel (from 1920) |
+| Salt works | 60 salt |  | 5 fuel (from oil and fuel demand 11) |
+| Clay pit | 60 clay |  | 5 fuel (from oil and fuel demand 11) |
+| Limestone quarry | 60 limestone |  | 5 fuel (from oil and fuel demand 11) |
+| Sand pit | 60 sand |  | 5 fuel (from oil and fuel demand 11) |
+| Logging camp | 20 logs |  | 5 machinery (from 1870), 3 fuel (from oil and fuel demand 11) |
 | Port | 20 goods, 50 oil, 50 gas |  | 10 fuel (from 1910) |
 | Factory (1780) | 30 goods | 10 planks, 10 steel (from 1855) |  |
 | Big factory (1780) | 90 goods | 30 steel (from 1855), 30 copper (from 1880) |  |
@@ -560,7 +560,7 @@ window (H) lists the same.
 | Winery | 20 wine | 80 grapes | 40 barrels |
 | Barrel maker | 40 barrels | 20 planks |  |
 | Refinery (1856) | 300 fuel | 150 oil |  |
-| Chemical works (1880) | 100 chemicals | 50 salt, 50 boiler fuel |  |
+| Chemical works (1880) | 100 chemicals, 50 fertiliser | 50 salt, 50 boiler fuel |  |
 | Electronics plant (1960) | 50 electronics | 50 copper (from 1880), 50 chemicals (from 1880) |  |
 | Car factory (1930) | 20 cars | 100 steel (from 1855), 40 fuel (from 1910) |  |
 | Gun factory (1800) | 100 guns | 50 steel (from 1855), 25 planks |  |
@@ -568,7 +568,7 @@ window (H) lists the same.
 | Aircraft factory (1935) | 20 planes | 60 steel (from 1855), 20 copper (from 1880), 20 fuel (from 1910), 20 electronics (from 1960) |  |
 | Steel mill (1855) | 100 steel | 250 iron ore, 250 coal (from 1700) | 25 coke (from 1850) |
 | Shipyard | 30 goods | 20 steel (from 1855), 10 planks |  |
-| Sawmill | 40 planks, 8 wood chips | 40 logs | 5 machinery (from 1870), 3 fuel (from 1920) |
+| Sawmill | 40 planks, 8 wood chips | 40 logs | 5 machinery (from 1870), 3 fuel (from oil and fuel demand 11) |
 | Soy sauce brewery | 20 soy sauce | 10 soybeans, 10 wheat, 4 salt |  |
 | Gasworks (1820) | 200 gas | 100 coal (from 1700) |  |
 | Coke plant (1850) | 100 coke | 100 coal (from 1700) |  |
@@ -581,7 +581,7 @@ window (H) lists the same.
 | Brickworks | 100 bricks | 50 clay | 25 coal (from 1700) |
 | Cement works (1880) | 100 cement | 50 limestone | 25 coal (from 1700) |
 | Glassworks | 60 glass | 30 sand | 15 coal (from 1700), 15 limestone |
-| Brewery | 40 beer | 40 hops | 16 barrels |
+| Brewery | 40 beer | 40 hops | 16 barrels (from wood demand 4) |
 | Distillery (1600) | 10 vodka | 20 potatoes | 4 glass |
 | Sake brewery | 15 sake | 30 rice |  |
 | Tannery | 40 leather | 20 livestock | 10 limestone |
@@ -632,8 +632,8 @@ window (H) lists the same.
 | Mega winery | 125 wine | 500 grapes | 250 barrels |
 | Big refinery (1856) | 750 fuel | 375 oil |  |
 | Mega refinery (1856) | 1,875 fuel | 937.5 oil |  |
-| Big chemical works (1880) | 250 chemicals | 125 salt, 125 boiler fuel |  |
-| Mega chemical works (1880) | 625 chemicals | 312.5 salt, 312.5 boiler fuel |  |
+| Big chemical works (1880) | 250 chemicals, 125 fertiliser | 125 salt, 125 boiler fuel |  |
+| Mega chemical works (1880) | 625 chemicals, 312.5 fertiliser | 312.5 salt, 312.5 boiler fuel |  |
 | Big electronics plant (1960) | 125 electronics | 125 copper (from 1880), 125 chemicals (from 1880) |  |
 | Mega electronics plant (1960) | 312.5 electronics | 312.5 copper (from 1880), 312.5 chemicals (from 1880) |  |
 | Big car factory (1930) | 50 cars | 250 steel (from 1855), 100 fuel (from 1910) |  |
@@ -646,8 +646,8 @@ window (H) lists the same.
 | Mega cement works (1880) | 625 cement | 312.5 limestone | 156.2 coal (from 1700) |
 | Big glassworks | 150 glass | 75 sand | 37.5 coal (from 1700), 37.5 limestone |
 | Mega glassworks | 375 glass | 187.5 sand | 93.75 coal (from 1700), 93.75 limestone |
-| Big brewery | 100 beer | 100 hops | 40 barrels |
-| Mega brewery | 250 beer | 250 hops | 100 barrels |
+| Big brewery | 100 beer | 100 hops | 40 barrels (from wood demand 4) |
+| Mega brewery | 250 beer | 250 hops | 100 barrels (from wood demand 4) |
 | Big distillery (1600) | 25 vodka | 50 potatoes | 10 glass |
 | Mega distillery (1600) | 62.5 vodka | 125 potatoes | 25 glass |
 | Big sake brewery | 37.5 sake | 75 rice |  |
@@ -909,6 +909,15 @@ copper and rubber at 18 (1901), vehicles at 22 (1931), modern goods at 25 (1955)
 wagons at 27 (1972). Each era is news. A game that begins later starts on the boards the world
 grew to by then, every year the lowest tiles.
 
+A demand tile's levels also bring new buyers (`UNLOCKS`): at wood 2 coal mines take planks for
+pit props, at farming 2 cattle ranches, pig, chicken and sheep farms take wheat for feed, at ore
+and stone 3 farms the player controls take limestone, at wood 4 breweries take barrels, at
+machines and tools 8 coal and iron mines take machinery to dig up to half as much again, at 10
+farms and sheep farms the player controls take machinery, at chemicals and building 10 farms take
+fertiliser to grow up to half as much again, and at oil and fuel 11 farms, mines, quarries, pits,
+logging camps and sawmills take diesel fuel. Chemical works leave half a unit of fertiliser over
+every unit of chemicals they make.
+
 Dated events change what is wanted, made and paid while they last, or for good:
 
 | Year | Event | What changes |
@@ -958,7 +967,7 @@ was fully satisfied over the last quarter, two thirds of that at none and
 twice at 200%, and shares sell at the price they buy at, so raising a building's satisfaction
 raises what its shares fetch; shares can be sold only five years after they were bought, so the
 way to earn on them is to buy into a building that struggles and make it work. Tech cuts the price of shares by up to half. The
-player's production tech and the boosts only their own take, limestone and machinery, work only
+boosts only the player's own buildings take, limestone and machinery, work only
 on buildings they control, holding 60% of their shares, and then on the whole of them. Past 60%, more
 shares only raise their part of what it makes. Every cell where the player owns shares flies the flag of
 their company, The Trains Corp: a small one, or a big waving one where they control the
@@ -977,11 +986,10 @@ and mail pay as they get off. Every point of the buildings of a tree the player 
 shares, adds 1% to the experience that tree gets. Goods handed out by buildings on their own
 give no experience. The first level needs only $5,000, the second $80,000 more and each next one
 1.6 times the step before; each level gives a point to spend on a node whose requirements are
-taken. Nodes raise the production of the buildings of their tree the player owns, what that tree's cargo earns,
-station storage and waiting rooms, speed, cars per train, car sizes and coach capacity, what each
+taken. Nodes raise what that tree's cargo earns, station storage and waiting rooms, speed, cars per train, car sizes and coach capacity, what each
 bonus good adds to satisfaction, cut upkeep, retail fuel and the price of shares, and open
-engines and general cars. Each business tree has four production nodes of +25%, so a bought
-building can make twice as much. Station shops, in commerce, cut every station's upkeep by 20%;
+engines and general cars. What buildings make, and the new buyers of limestone, machinery and
+the rest, come from the supply and demand tiles instead (see History). Station shops, in commerce, cut every station's upkeep by 20%;
 Subsidised fuel, deep in the food tree, cuts a train's fuel by up to half, by its share of cars
 carrying food. The other nodes that once raised the owner's share hold places for bonuses still
 to be decided and do nothing yet. Hovering a node says in a sentence what it does.
@@ -1057,19 +1065,19 @@ own pixel art.
 | Mallet articulated | heavy freight | 1905–1940 (then the Big articulated) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 36 km/h | 25 s | 8 | $135,000 | 2 coal | 50 cells | [Mallet locomotive (type)](https://en.wikipedia.org/wiki/Mallet_locomotive) |
 | Pacific engine | general | 1910–1950 (then the Mixed-traffic diesel) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 60 km/h | 9 s | 5 | $90,000 | 1.2 coal | 50 cells | [4-6-2 Pacific (type)](https://en.wikipedia.org/wiki/4-6-2) |
 | Boxcab electric | general | 1925–1965 (then the Universal electric) | modern industry: Telegraph signals → Electric traction | electric | 96 km/h | 6 s | 5 | $270,000 | 0.75 electricity | - | [Boxcab electric (type)](https://en.wikipedia.org/wiki/Boxcab) |
-| Railbus | light | 1935–1985 (then the Sprinter unit) | fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 60 km/h | 2 s | 3 | $27,000 | 0.15 diesel fuel | 60 cells | [Railbus (type)](https://en.wikipedia.org/wiki/Railbus), [Uerdingen railbus](https://en.wikipedia.org/wiki/Uerdingen_railbus) |
+| Railbus | light | 1935–1985 (then the Sprinter unit) | fuel and minerals: Diesel engines | diesel | 60 km/h | 2 s | 3 | $27,000 | 0.15 diesel fuel | 60 cells | [Railbus (type)](https://en.wikipedia.org/wiki/Railbus), [Uerdingen railbus](https://en.wikipedia.org/wiki/Uerdingen_railbus) |
 | Streamliner | express | 1935 on | passengers and mail: Timetables → Dining cars → Express trains; metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 138 km/h | 20 s | 5 + dining car | $360,000 | 1.5 coal | 60 cells | [Streamliner (type)](https://en.wikipedia.org/wiki/Streamliner), [LNER Class A4](https://en.wikipedia.org/wiki/LNER_Class_A4) |
 | Big articulated | heavy freight | 1940–1960 (then the Heavy diesel) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 42 km/h | 22 s | 10 | $405,000 | 2.5 coal | 60 cells | [Union Pacific Big Boy, 1941](https://en.wikipedia.org/wiki/Union_Pacific_Big_Boy) |
-| Mixed-traffic diesel | general | 1950 on | fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 78 km/h | 7 s | 6 | $800,000 | 0.6 diesel fuel | 100 cells | [EMD F7](https://en.wikipedia.org/wiki/EMD_F7) |
-| Heavy diesel | heavy freight | 1960–1995 (then the Twin-unit diesel) | metals and machines: Heavy boilers; fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 54 km/h | 18 s | 12 | $1,200,000 | 1.2 diesel fuel | 100 cells | [EMD SD40-2](https://en.wikipedia.org/wiki/EMD_SD40-2) |
+| Mixed-traffic diesel | general | 1950 on | fuel and minerals: Diesel engines | diesel | 78 km/h | 7 s | 6 | $800,000 | 0.6 diesel fuel | 100 cells | [EMD F7](https://en.wikipedia.org/wiki/EMD_F7) |
+| Heavy diesel | heavy freight | 1960–1995 (then the Twin-unit diesel) | metals and machines: Heavy boilers; fuel and minerals: Diesel engines | diesel | 54 km/h | 18 s | 12 | $1,200,000 | 1.2 diesel fuel | 100 cells | [EMD SD40-2](https://en.wikipedia.org/wiki/EMD_SD40-2) |
 | Bullet train | express | 1964–1990 (then the High-speed electric) | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 210 km/h | 15 s | 6 + dining car | $1,100,000 | 1.1 electricity | - | [0 Series Shinkansen, 1964](https://en.wikipedia.org/wiki/0_Series_Shinkansen) |
 | Universal electric | general | 1965–2000 (then the Modern electric) | modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 144 km/h | 5 s | 7 | $2,400,000 | 1.1 electricity | - | [DB Class 103](https://en.wikipedia.org/wiki/DB_Class_103) |
-| Sprinter unit | light | 1985 on | fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 96 km/h | 2 s | 3 | $81,000 | 0.15 diesel fuel | 100 cells | [British Rail Class 150](https://en.wikipedia.org/wiki/British_Rail_Class_150) |
+| Sprinter unit | light | 1985 on | fuel and minerals: Diesel engines | diesel | 96 km/h | 2 s | 3 | $81,000 | 0.15 diesel fuel | 100 cells | [British Rail Class 150](https://en.wikipedia.org/wiki/British_Rail_Class_150) |
 | High-speed electric | express | 1990 on | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 300 km/h | 14 s | 8 + dining car | $3,200,000 | 1.3 electricity | - | [ICE 1](https://en.wikipedia.org/wiki/ICE_1) |
-| Twin-unit diesel | heavy freight | 1995–2040 (then the Super-heavy diesel) | metals and machines: Heavy boilers; fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 60 km/h | 18 s | 16 | $3,600,000 | 1.6 diesel fuel | 150 cells | [GE Dash 9-44CW](https://en.wikipedia.org/wiki/GE_Dash_9-44CW) |
+| Twin-unit diesel | heavy freight | 1995–2040 (then the Super-heavy diesel) | metals and machines: Heavy boilers; fuel and minerals: Diesel engines | diesel | 60 km/h | 18 s | 16 | $3,600,000 | 1.6 diesel fuel | 150 cells | [GE Dash 9-44CW](https://en.wikipedia.org/wiki/GE_Dash_9-44CW) |
 | Modern electric | general | 2000 on | modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 192 km/h | 4 s | 8 | $7,200,000 | 1.2 electricity | - | [DB Class 101](https://en.wikipedia.org/wiki/DB_Class_101) |
 | Maglev | express | 2030 on | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control → Magnetic levitation | maglev | 500 km/h | 13 s | 10 + dining car | $10,000,000 | 4.4 electricity | - | [Transrapid](https://en.wikipedia.org/wiki/Transrapid), [SCMaglev L0 Series](https://en.wikipedia.org/wiki/L0_Series) |
-| Super-heavy diesel | heavy freight | 2040 on | metals and machines: Heavy boilers; fuel and minerals: Coal screening → Deep seams → Rotary drilling → Diesel engines | diesel | 66 km/h | 20 s | 24 | $10,800,000 | 2.4 diesel fuel | 200 cells | our own design |
+| Super-heavy diesel | heavy freight | 2040 on | metals and machines: Heavy boilers; fuel and minerals: Diesel engines | diesel | 66 km/h | 20 s | 24 | $10,800,000 | 2.4 diesel fuel | 200 cells | our own design |
 <!-- end table -->
 
 Electric engines run only on electrified track, and the maglev only on maglev track, which can be
@@ -1180,7 +1188,7 @@ lists the boards now.
 | Freight a unit | Goods |
 |---|---|
 | $10 or less | eggs 4, bread 6, chickens 6, logs 6, milk 6, potatoes 6, rice 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, soybeans 8, sugar 8, tofu 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, miso 10, newspapers 10, planks 10, pots 10, wood chips 10 |
-| $11-20 | cement 12, dried fish 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, soy sauce 20, wool 20 |
+| $11-20 | cement 12, dried fish 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, fertiliser 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, soy sauce 20, wool 20 |
 | $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, stove tiles 25, copper 28, castings 30, wax 30, plastics 40, rubber 40, tea 40 |
 | $41-200 | coffee 50, beer 60, furniture 60, porcelain 60, clothes 70, steel 80, sake 100, shoes 100, electronics 120, goods 120, vodka 120, guns 150, tools 160, wine 160, machinery 180 |
 | over $200 | appliances 300, incense 300, luxury goods 300, gold 800, diamonds 2,000, cars 5,000, tanks 8,000, planes 1.2e+04 |

@@ -603,7 +603,7 @@ class Growth:
             self.railway.station_trade = self.station_trade
         yield
         self.trade = yield from self.economy.trade_steps(
-            self.owners.working_counts(),
+            self.counts,
             self.station_trade.orders(),
             np.flatnonzero(self._occupied),
             self.owners.first_for_stations(),

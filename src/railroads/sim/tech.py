@@ -16,7 +16,7 @@ from enum import Enum
 from types import MappingProxyType
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.goods import MAKES, General, Good, Need
+from railroads.sim.goods import MAKES, General, Good
 
 # Dollars of experience a tree needs for its first level, kept low so the first node comes early;
 # the second level needs LEVEL_STEP more and each next one LEVEL_GROWTH times the step before.
@@ -36,8 +36,6 @@ class Tree(Enum):
 
 
 class Effect(Enum):
-    # The player's buildings make, and take in, this share more.
-    PRODUCTION = "production"
     # Cargo of the tree's goods earns this share more.
     PRICE = "price"
     # Every station's stockpile holds this many more goods.
@@ -64,8 +62,6 @@ class Effect(Enum):
     FUEL_MARKUP = "retail fuel markup"
     # Every car holds this many sizes more (railroads.sim.trains.CAR_SIZES).
     CAR_SIZE = "car size"
-    # The buildings of a kind the player owns take a good as a boost (railroads.sim.goods.OWNED_BOOSTS).
-    TAKES = "takes"
     # Stations cost this share less to keep.
     STATION_UPKEEP = "station upkeep"
     # A train pays this share less for its fuel, in proportion to its cars carrying food.
@@ -88,8 +84,6 @@ class Node:
     opens: str = ""
     # Whether the effect reaches every tree's buildings and goods, not just its own.
     everywhere: bool = False
-    # For TAKES, each kind of building and what it takes.
-    takes: tuple[tuple[BuildingKind, Need], ...] = ()
 
 
 def _n(key: str, name: str, effect: Effect, amount: float = 0.0, *requires: str, **kw) -> Node:
@@ -100,11 +94,9 @@ E = Effect
 TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
     {
         Tree.FOOD: (
-            _n("seed", "Better seed", E.PRODUCTION, 0.25),
             _n("silos", "Grain silos", E.STORAGE, 200),
-            _n("stalls", "Market stalls", E.PRICE, 0.05, "seed"),
-            _n("rotation", "Crop rotation", E.PRODUCTION, 0.25, "seed"),
-            _n("villages", "Thriving villages", E.TO_COME, 0.0, "rotation"),
+            _n("stalls", "Market stalls", E.PRICE, 0.05),
+            _n("villages", "Thriving villages", E.TO_COME, 0.0),
             _n("cold", "Cold stores", E.STORAGE, 300, "silos"),
             _n("hoppers", "Grain hoppers", E.CAR_SIZE, 1, "silos"),
             _n("coop", "Farmers' cooperative", E.TO_COME, 0.0, "stalls"),
@@ -125,39 +117,16 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
                 opens="general processed food cars of 25, taking whichever pays best",
             ),
             _n("bread", "Branded bread", E.PRICE, 0.1, "stalls"),
-            _n(
-                "liming",
-                "Liming the fields",
-                E.TAKES,
-                0.0,
-                "rotation",
-                takes=((BuildingKind.FARM, Need.LIMESTONE),),
-            ),
-            _n("fertiliser", "Fertiliser", E.PRODUCTION, 0.25, "rotation"),
             _n("reefers", "Refrigerated vans", E.PRICE, 0.1, "cold", "bread"),
             _n("conglomerate", "Food conglomerate", E.TO_COME, 0.0, "coop"),
-            _n("tractors", "Mechanised farming", E.PRODUCTION, 0.25, "fertiliser"),
-            _n(
-                "farm_machinery",
-                "Farm machinery",
-                E.TAKES,
-                0.0,
-                "tractors",
-                takes=(
-                    (BuildingKind.FARM, Need.MACHINERY),
-                    (BuildingKind.SHEEP_FARM, Need.MACHINERY),
-                ),
-            ),
             _n("brand", "National brand", E.PRICE, 0.15, "reefers", "conglomerate"),
             _n("food_fuel", "Subsidised fuel", E.FOOD_FUEL, 0.5, "brand"),
         ),
         Tree.METALS: (
-            _n("bessemer", "Bessemer converters", E.PRODUCTION, 0.25),
             _n("boilers", "Heavy boilers", E.UNLOCK, opens="heavy freight engines"),
-            _n("couplings", "Steel couplings", E.PULL, 1, "bessemer"),
-            _n("open_hearth", "Open hearth", E.PRODUCTION, 0.25, "bessemer"),
+            _n("couplings", "Steel couplings", E.PULL, 1),
             _n("bearings", "Roller bearings", E.SPEED, 0.05, "boilers"),
-            _n("cartel", "Steel cartel", E.TO_COME, 0.0, "open_hearth"),
+            _n("cartel", "Steel cartel", E.TO_COME, 0.0),
             _n(
                 "superheaters",
                 "Superheaters",
@@ -168,31 +137,24 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
             ),
             _n("drawbars", "Heavy drawbars", E.PULL, 1, "couplings"),
             _n("bogie_wagons", "Bogie wagons", E.CAR_SIZE, 1, "drawbars", everywhere=True),
-            _n("rolling", "Rolling mills", E.PRODUCTION, 0.25, "open_hearth"),
             _n("streamlining", "Streamlining", E.SPEED, 0.1, "superheaters"),
-            _n("works_trust", "Engineering trust", E.TO_COME, 0.0, "cartel", "rolling"),
-            _n("oxygen", "Basic oxygen steel", E.PRODUCTION, 0.25, "rolling"),
+            _n("works_trust", "Engineering trust", E.TO_COME, 0.0, "cartel"),
         ),
         Tree.FUEL: (
-            _n("screening", "Coal screening", E.PRODUCTION, 0.25),
             _n("firing", "Better firing", E.UPKEEP, 0.05),
-            _n("sanding", "Sand boxes", E.PULL, 1, "screening"),
+            _n("sanding", "Sand boxes", E.PULL, 1),
             _n("depots", "Coaling depots", E.UPKEEP, 0.05, "firing"),
-            _n("seams", "Deep seams", E.PRODUCTION, 0.25, "screening"),
-            _n("kilns", "Ring kilns", E.PRICE, 0.1, "seams"),
+            _n("kilns", "Ring kilns", E.PRICE, 0.1),
             _n("grid", "Power grid", E.UPKEEP, 0.05, "depots"),
-            _n("drilling", "Rotary drilling", E.PRODUCTION, 0.25, "seams"),
-            _n("pipelines", "Pipelines", E.STORAGE, 300, "drilling"),
-            _n("diesel", "Diesel engines", E.UNLOCK, 0.0, "drilling", opens="diesel engines"),
-            _n("fuel_trust", "Fuel trust", E.TO_COME, 0.0, "kilns", "drilling"),
+            _n("pipelines", "Pipelines", E.STORAGE, 300),
+            _n("diesel", "Diesel engines", E.UNLOCK, 0.0, opens="diesel engines"),
+            _n("fuel_trust", "Fuel trust", E.TO_COME, 0.0, "kilns"),
             _n("efficiency", "Fuel efficiency", E.UPKEEP, 0.1, "grid"),
         ),
         Tree.CRAFT: (
-            _n("looms", "Power looms", E.PRODUCTION, 0.25),
             _n("guilds", "Craft guilds", E.PRICE, 0.05),
             _n("patterns", "Pattern books", E.PRICE, 0.1, "guilds"),
-            _n("spinning", "Spinning mules", E.PRODUCTION, 0.25, "looms"),
-            _n("workshops", "Model workshops", E.TO_COME, 0.0, "spinning"),
+            _n("workshops", "Model workshops", E.TO_COME, 0.0),
             _n("fashion", "Fashion houses", E.PRICE, 0.15, "patterns"),
             _n(
                 "parcel_vans",
@@ -202,12 +164,10 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
                 "patterns",
                 opens="general common goods cars, taking whichever pays best",
             ),
-            _n("mills_trust", "Mill owners' trust", E.TO_COME, 0.0, "spinning"),
-            _n("synthetics", "Synthetic dyes", E.PRODUCTION, 0.25, "spinning"),
+            _n("mills_trust", "Mill owners' trust", E.TO_COME, 0.0),
             _n("couture", "Couture", E.TO_COME, 0.0, "fashion", "mills_trust"),
         ),
         Tree.MODERN: (
-            _n("labs", "Research labs", E.PRODUCTION, 0.25),
             _n("telegraph", "Telegraph signals", E.SPEED, 0.05),
             _n(
                 "traction",
@@ -217,12 +177,10 @@ TREES: Mapping[Tree, tuple[Node, ...]] = MappingProxyType(
                 "telegraph",
                 opens="electric engines",
             ),
-            _n("assembly", "Assembly lines", E.PRODUCTION, 0.25, "labs"),
             _n("relays", "Relay interlocking", E.SPEED, 0.05, "traction"),
-            _n("patents", "Patents", E.PRICE, 0.1, "labs"),
-            _n("automation", "Automation", E.PRODUCTION, 0.25, "assembly"),
+            _n("patents", "Patents", E.PRICE, 0.1),
             _n("thyristors", "Thyristor control", E.UNLOCK, 0.0, "relays", opens="fast electrics"),
-            _n("tech_trust", "Technology giant", E.TO_COME, 0.0, "patents", "automation"),
+            _n("tech_trust", "Technology giant", E.TO_COME, 0.0, "patents"),
             _n("computers", "Computer timetables", E.SPEED, 0.1, "thyristors"),
             _n(
                 "maglev",
@@ -361,6 +319,7 @@ _GOODS: Mapping[Tree, tuple[Good, ...]] = {
     ),
     Tree.MODERN: (
         Good.CHEMICALS,
+        Good.FERTILISER,
         Good.ELECTRONICS,
         Good.PLASTICS,
         Good.APPLIANCES,
@@ -465,12 +424,6 @@ class Research:
             return False
         self.taken.add(key)
         return True
-
-    def takes(self, kind: BuildingKind) -> frozenset[Need]:
-        """The boosts the buildings of a kind the player owns take, by the nodes taken."""
-        return frozenset(
-            need for key in self.taken for taker, need in NODES[key][1].takes if taker == kind
-        )
 
     def bonus(self, effect: Effect, tree: Tree | None = None) -> float:
         """The sum of the taken nodes' effect of a kind: those of one tree and those reaching

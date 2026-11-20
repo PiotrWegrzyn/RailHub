@@ -270,13 +270,12 @@ def _added(first: Mapping[Good, float], second: Mapping[Good, float]) -> dict[Go
 
 @dataclass(frozen=True)
 class OwnedShare:
-    """The buildings of a kind the player owns in each cell, each counted as many as its
-    production tech makes it, and the player's share of what they make: that part goes to the
-    stations in reach before anything is handed out around them."""
+    """The buildings of a kind the player owns in each cell and the player's share of what they
+    make: that part goes to the stations in reach before anything is handed out around them."""
 
     owned: npt.NDArray[np.float64]
     share: float
-    # The boosts only the player's own take (OWNED_BOOSTS) that their tech opened.
+    # The boosts only the player's own take (OWNED_BOOSTS) that their tiles opened.
     takes: frozenset[Need] = frozenset()
     # How many buildings in each cell take those boosts, counted as `owned` is: all of them where
     # the player controls them (railroads.sim.ownership.CONTROL); None for just the player's own.
@@ -672,7 +671,7 @@ class _Month:
     def _count_for(self, kind: BuildingKind, need: Need) -> FloatCells:
         """How many buildings of a kind in each cell want a need: all of them, but for a boost
         only the player's own take (OWNED_BOOSTS), only theirs or those they control, once their
-        tech opens it."""
+        tile opens it."""
         if (kind, need) not in OWNED_BOOSTS:
             return self.count[kind]
         share = self.owned.get(kind)

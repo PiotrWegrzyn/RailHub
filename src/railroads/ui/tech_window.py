@@ -9,8 +9,6 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.sim.finance import dollars
-from railroads.sim.goods import OWNED_BOOSTS
-from railroads.sim.ownership import CONTROL
 from railroads.sim.tech import NODES, TREES, Effect, Node, Research, Tree, xp_for
 from railroads.sim.trains import ENGINES
 from railroads.ui.ornate import (
@@ -35,7 +33,6 @@ LINK_WIDTH = 1.5
 LINK = (0.36, 0.28, 0.18, 1.0)
 # The icon on the badge of each kind of node.
 EFFECT_ICONS = {
-    Effect.PRODUCTION: fa.ICON_FA_INDUSTRY,
     Effect.PRICE: fa.ICON_FA_MONEY_BILL,
     Effect.STORAGE: fa.ICON_FA_ARCHIVE,
     Effect.DISCOUNT: fa.ICON_FA_TAG,
@@ -49,7 +46,6 @@ EFFECT_ICONS = {
     Effect.FUEL_MARKUP: fa.ICON_FA_FIRE,
     Effect.CAR_SIZE: fa.ICON_FA_EXPAND,
     Effect.UNLOCK: fa.ICON_FA_UNLOCK,
-    Effect.TAKES: fa.ICON_FA_PLUS,
     Effect.STATION_UPKEEP: fa.ICON_FA_HOME,
     Effect.FOOD_FUEL: fa.ICON_FA_TRUCK,
     Effect.TO_COME: fa.ICON_FA_GIFT,
@@ -59,7 +55,6 @@ LOWERING = frozenset(
 )
 PERCENT_EFFECTS = frozenset(
     {
-        Effect.PRODUCTION,
         Effect.PRICE,
         Effect.DISCOUNT,
         Effect.SPEED,
@@ -141,36 +136,19 @@ def describe(node: Node) -> str:
         return f"{node.effect.value} {sign}{node.amount:.0%}{reach}"
     if node.effect == Effect.TO_COME:
         return "a bonus still to come"
-    if node.effect == Effect.TAKES and node.takes:
-        kinds = " and ".join(f"{kind.value}s" for kind, _ in node.takes)
-        return f"{kinds} you control take {node.takes[0][1].value}"
     if node.effect == Effect.CAR_SIZE:
         reach = "every car" if node.everywhere else "its cars"
         return f"{reach} {node.amount:g} size bigger"
     return f"{node.effect.value} +{node.amount:g}"
 
 
-def _takes(node: Node) -> str:
-    return " ".join(
-        f"Every {kind.value} you control, with {CONTROL:.0%} of its shares, takes {need.value} "
-        f"and makes up to {OWNED_BOOSTS[(kind, need)]:.0%} more with it."
-        for kind, need in node.takes
-    )
-
-
 def explain(tree: Tree, node: Node) -> str:
     """What a node does, in a sentence: whose buildings or goods it reaches and how."""
     owned = "Every building you own" if node.everywhere else f"Every {tree.value} building you own"
-    controlled = (
-        "Every building you control"
-        if node.everywhere
-        else f"Every {tree.value} building you control"
-    )
     load = "Every load" if node.everywhere else f"Every load of {tree.value}"
     whose = "every building" if node.everywhere else f"every {tree.value} building"
     amount = f"{node.amount:.0%}"
     sentences = {
-        Effect.PRODUCTION: f"{controlled} makes and takes in {amount} more.",
         Effect.PRICE: f"{load} earns {amount} more.",
         Effect.STORAGE: f"Every station's stockpile holds {node.amount:g} more goods.",
         Effect.DISCOUNT: f"Shares of {whose} cost {amount} less.",
@@ -185,7 +163,6 @@ def explain(tree: Tree, node: Node) -> str:
         Effect.CAR_SIZE: f"{'Every car' if node.everywhere else f'Every car of {tree.value}'} holds "
         f"{node.amount:g} size more.",
         Effect.UNLOCK: f"O{describe(node)[1:]}.",
-        Effect.TAKES: _takes(node),
         Effect.STATION_UPKEEP: f"Every station costs {amount} less to keep.",
         Effect.FOOD_FUEL: (
             f"A train pays up to {amount} less for its fuel, in proportion to its cars carrying food."

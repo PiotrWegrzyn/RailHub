@@ -5,7 +5,7 @@ from railroads.sim.company import BOOK_SHARE
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.finance import dollars
-from railroads.sim.goods import FREIGHT_SHARE, KIND_NEED_YEARS, Good, Need, needs_of
+from railroads.sim.goods import FREIGHT_SHARE, Good, Need
 from railroads.sim.lots import Lots
 from railroads.sim.ownership import EXPERIENCE_PER_POINT
 from railroads.sim.tech import Tree
@@ -42,10 +42,10 @@ def test_the_help_gives_what_a_building_makes_and_wants_in_a_month() -> None:
 
 
 def test_the_help_says_when_a_need_begins() -> None:
-    wants = {need: year for need, _, year in row_of(BuildingKind.HEADQUARTERS).wants}
+    wants = {need: since for need, _, since in row_of(BuildingKind.HEADQUARTERS).wants}
 
-    assert wants[Need.GUNS] == 0
-    assert wants[Need.TANKS] == 1940
+    assert wants[Need.GUNS] == ""
+    assert wants[Need.TANKS] == "1940"
 
 
 @pytest.mark.parametrize(
@@ -150,16 +150,11 @@ def test_only_the_super_heavy_diesel_is_drawn_after_no_real_engine() -> None:
     assert own == ["super_diesel"]
 
 
-def test_the_help_says_when_a_farm_starts_needing_what_only_farms_need_later() -> None:
-    wants = {need: year for need, _, year in row_of(BuildingKind.FARM).wants}
+def test_the_help_says_which_demand_tile_level_opens_what_a_farm_takes() -> None:
+    wants = {need: since for need, _, since in row_of(BuildingKind.FARM).wants}
 
-    assert all(
-        needs_of(BuildingKind.FARM, year - 1).get(need) is None
-        and needs_of(BuildingKind.FARM, year).get(need) is not None
-        for need, year in wants.items()
-        if year
-    )
-    assert wants[Need.FUEL] == KIND_NEED_YEARS[(BuildingKind.FARM, Need.FUEL)]
+    assert wants[Need.FUEL] == "oil and fuel demand 11"
+    assert wants[Need.LIMESTONE] == "ore and stone demand 3"
 
 
 def test_the_map_help_names_the_prices_the_first_three_lots_cost() -> None:

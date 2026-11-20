@@ -2,15 +2,16 @@ from collections.abc import Iterator
 
 import pytest
 
-from railroads.sim.tiles import Tiles, activate
+from builders import open_boards
+from railroads.sim.tiles import activate
 
-activate(Tiles())
+activate(open_boards())
 
 
 @pytest.fixture(autouse=True)
 def flat_boards() -> Iterator[None]:
-    """Every test begins on boards that make and want of every good its base amount, and earn its
-    base price, unless it makes a game or turns the boards itself."""
-    activate(Tiles())
+    """Every test begins on boards that make and want of every good its base amount, earn its base
+    price and open every buyer, unless it makes a game or turns the boards itself."""
+    activate(open_boards())
     yield
-    activate(Tiles())
+    activate(open_boards())

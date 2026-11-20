@@ -9,6 +9,7 @@ from railroads.sim.events import make_factor
 from railroads.sim.goods import DIESEL_BOOST, PIPELINE, Good, Need
 from railroads.sim.growth import LIVELY_GROWTH, breeding_of
 from railroads.sim.ladders import FILLING_STATIONS, POINTS, WORKS, Points
+from railroads.sim.tiles import Tiles, activate
 
 MINE = (8, 9)
 
@@ -18,19 +19,20 @@ def mined(year: int, **held: float) -> float:
     economy.year = year
     placed = counts(economy.tile_map, (MINE, BuildingKind.IRON_MINE, 1))
 
-    trade = economy.trade(placed, holding(1000.0, **held))
+    trade = economy.trade(placed, holding(1_000_000.0, **held))
 
     return trade.gathered[STATION][Good.IRON]
 
 
-def test_an_iron_mine_with_its_diesel_digs_half_as_much_again_from_1920() -> None:
+def test_an_iron_mine_with_its_diesel_digs_half_as_much_again_once_the_oil_tile_opens_it() -> None:
+    activate(Tiles.until(1950))
     without = mined(1950)
 
-    fuelled = mined(1950, FUEL=10.0)
-    too_early = mined(1919, FUEL=10.0)
+    fuelled = mined(1950, FUEL=1000.0)
+    too_early = mined(1915, FUEL=1000.0)
 
     assert fuelled == pytest.approx(without * (1 + DIESEL_BOOST))
-    assert too_early == pytest.approx(mined(1919))
+    assert too_early == pytest.approx(mined(1915))
 
 
 def test_diesel_adds_its_half_to_a_farm_that_takes_no_limestone_or_machinery_unless_owned() -> None:

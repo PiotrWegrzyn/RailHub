@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from imgui_bundle import imgui
 
-from railroads.sim.tiles import CLOSES, ERAS, MOST_APART, TILE_GOODS, Board, Tile, Tiles
+from railroads.sim.tiles import CLOSES, ERAS, MOST_APART, TILE_GOODS, UNLOCKS, Board, Tile, Tiles
 from railroads.ui.ornate import bar_buttons, ornate_window, section
 from railroads.ui.theme import BRASS, GROWN, TEXT_DIM, WINDOW_TOP
 
@@ -25,6 +25,8 @@ class TileRow:
     after: str
     picked: int
     can_pick: bool
+    # The next buyer the tile opens on the demand board, in a few words.
+    opens: str = ""
 
 
 def rows(tiles: Tiles, board: Board) -> list[TileRow]:
@@ -49,9 +51,26 @@ def rows(tiles: Tiles, board: Board) -> list[TileRow]:
                 f"{tiles.price_after(board, tile):.0%}" if can else "-",
                 picked,
                 can,
+                next_unlock(tile, levels[tile]) if board == Board.DEMAND else "",
             )
         )
     return shown
+
+
+def next_unlock(tile: Tile, level: int) -> str:
+    """The next buyer a demand tile opens above a level: the level and who starts taking what."""
+    coming = [
+        (at, kind, need)
+        for (kind, need), (opening, at) in UNLOCKS.items()
+        if opening == tile and at > level
+    ]
+    if not coming:
+        return ""
+    at = min(lv for lv, _, _ in coming)
+    kinds = sorted({kind.value for lv, kind, _ in coming if lv == at})
+    needs = sorted({need.value for lv, _, need in coming if lv == at})
+    who = kinds[0] + "s" if len(kinds) == 1 else f"{len(kinds)} kinds of building"
+    return f"level {at}: {who} take {', '.join(needs)}"
 
 
 def era_line(tiles: Tiles) -> str:
@@ -103,9 +122,9 @@ class TilesWindow:
             section(f"{board.value}: {left} pick{'s' if left != 1 else ''} left")
             imgui.text_colored(imgui.ImVec4(*TEXT_DIM), BOARD_HINTS[board])
             flags = imgui.TableFlags_.row_bg.value
-            if not imgui.begin_table(f"board_{board.name}", 5, flags):
+            if not imgui.begin_table(f"board_{board.name}", 6, flags):
                 continue
-            for heading in ("Tile", "Level", "Earns", "Once up", ""):
+            for heading in ("Tile", "Level", "Earns", "Once up", "Opens", ""):
                 imgui.table_setup_column(heading)
             imgui.table_headers_row()
             for row in rows(tiles, board):
@@ -119,6 +138,8 @@ class TilesWindow:
                 imgui.text(row.price)
                 imgui.table_next_column()
                 imgui.text(row.after)
+                imgui.table_next_column()
+                imgui.text_colored(imgui.ImVec4(*TEXT_DIM), row.opens)
                 imgui.table_next_column()
                 with bar_buttons():
                     if row.can_pick and imgui.small_button(f"Pick##{board.name}{row.tile.name}"):

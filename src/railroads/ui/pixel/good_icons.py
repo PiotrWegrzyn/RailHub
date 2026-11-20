@@ -277,6 +277,17 @@ def wax() -> Sprite:
     return p.sprite()
 
 
+def fertiliser() -> Sprite:
+    p = _canvas()
+    sack: RGB = (206, 184, 140)
+    p.polygon([(-5, -4), (5, -4), (6, 7), (-6, 7)], sack, shade(sack, 0.6))
+    p.rect(-3, -6, 3, -4, shade(sack, 0.8))
+    p.line([(0, 4), (0, 0)], STEM)
+    p.polygon([(0, 0), (-4, -2), (-1, 2)], LEAF)
+    p.polygon([(0, 1), (4, -1), (1, 3)], shade(LEAF, 1.2))
+    return p.sprite()
+
+
 def incense() -> Sprite:
     p = _canvas()
     p.line([(-2, -1), (-4, -4), (-2, -6), (-3, -8)], (206, 178, 226))
@@ -1227,6 +1238,7 @@ ICONS: dict[str, Callable[[], Sprite]] = {
     "coffee": coffee,
     "rubber": rubber,
     "wax": wax,
+    "fertiliser": fertiliser,
     "incense": incense,
     "steel": steel,
     "tools": tools,

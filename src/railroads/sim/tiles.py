@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
 
+from railroads.sim.constructions import BuildingKind
 from railroads.sim.goods import FITS, Good, Need
 from railroads.sim.year_caches import forget
 
@@ -117,7 +118,7 @@ TILE_GOODS: Mapping[Tile, tuple[Good, ...]] = MappingProxyType(
         Tile.OIL: (G.OIL, G.FUEL, G.GAS),
         Tile.STEEL: (G.STEEL, G.CASTINGS),
         Tile.MACHINES: (G.TOOLS, G.MACHINERY, G.GUNS),
-        Tile.CHEMICALS: (G.CHEMICALS, G.CEMENT),
+        Tile.CHEMICALS: (G.CHEMICALS, G.CEMENT, G.FERTILISER),
         Tile.COPPER: (G.COPPER, G.RUBBER),
         Tile.VEHICLES: (G.CARS, G.PLANES, G.TANKS),
         Tile.MODERN: (G.PLASTICS, G.APPLIANCES, G.ELECTRONICS),
@@ -214,6 +215,46 @@ DEMAND_STEPS: Mapping[Tile, float] = MappingProxyType(
         T.COPPER: 0.25,
         T.VEHICLES: 0.30,
         T.MODERN: 0.30,
+    }
+)
+
+# The buyers a demand tile's levels open: each kind of building and the need it starts to take,
+# with the tile and the level that open it.
+K = BuildingKind
+_DIESEL = (
+    K.FARM,
+    K.POTATO_FARM,
+    K.RICE_PADDY,
+    K.SOY_FIELD,
+    K.MINE,
+    K.IRON_MINE,
+    K.COPPER_MINE,
+    K.GOLD_MINE,
+    K.DIAMOND_MINE,
+    K.SALT_WORKS,
+    K.CLAY_PIT,
+    K.LIMESTONE_QUARRY,
+    K.SAND_PIT,
+    K.LOGGING_CAMP,
+    K.SAWMILL,
+)
+UNLOCKS: Mapping[tuple[BuildingKind, Need], tuple[Tile, int]] = MappingProxyType(
+    {
+        (K.MINE, Need.PLANKS): (T.WOOD, 2),
+        **{
+            (kind, Need.WHEAT): (T.FARMING, 2)
+            for kind in (K.CATTLE_RANCH, K.PIG_FARM, K.CHICKEN_FARM, K.SHEEP_FARM)
+        },
+        (K.FARM, Need.LIMESTONE): (T.ORE, 3),
+        **{
+            (kind, Need.BARRELS): (T.WOOD, 4) for kind in (K.BREWERY, K.BIG_BREWERY, K.MEGA_BREWERY)
+        },
+        (K.MINE, Need.MACHINERY): (T.MACHINES, 8),
+        (K.IRON_MINE, Need.MACHINERY): (T.MACHINES, 8),
+        (K.FARM, Need.MACHINERY): (T.MACHINES, 10),
+        (K.SHEEP_FARM, Need.MACHINERY): (T.MACHINES, 10),
+        (K.FARM, Need.FERTILISER): (T.CHEMICALS, 10),
+        **{(kind, Need.FUEL): (T.OIL, 11) for kind in _DIESEL},
     }
 )
 
@@ -446,3 +487,26 @@ def activate(tiles: Tiles | None) -> None:
 
 def goods_of(tiles: Iterable[Tile]) -> list[Good]:
     return [good for tile in tiles for good in TILE_GOODS[tile]]
+
+
+def opens(kind: BuildingKind, need: Need, year: int) -> bool:
+    """Whether a kind of building takes a need in a year as far as the demand board goes: always,
+    unless a tile opens it (UNLOCKS) and is not at its level yet."""
+    unlock = UNLOCKS.get((kind, need))
+    if unlock is None:
+        return True
+    tile, level = unlock
+    return of_year(year).demand.get(tile, 0) >= level
+
+
+def opened_from(kind: BuildingKind, need: Need) -> str:
+    """From when a kind of building takes a need, in a few words: the demand tile level that opens
+    it, its year, or "" for always."""
+    from railroads.sim.goods import need_year
+
+    unlock = UNLOCKS.get((kind, need))
+    if unlock is not None:
+        tile, level = unlock
+        return f"{tile.value} demand {level}"
+    year = need_year(kind, need)
+    return str(year) if year else ""

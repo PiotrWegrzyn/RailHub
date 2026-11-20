@@ -3,7 +3,9 @@ needs, what each good earns, and the order a month's trade goes in.
 
 Buildings need needs (NEEDS), each met by one or more goods (FITS): any food good feeds a house,
 any fruit fills a cannery, wool, cotton or flax a textile mill. Some needs start only in later
-years (NEED_YEARS), a few only for one kind of building (KIND_NEED_YEARS). Farms, orchards, date
+years (NEED_YEARS), a few only for one kind of building (KIND_NEED_YEARS), and some kinds of
+building start to take a need only once its tile's demand reaches a level (railroads.sim.tiles
+UNLOCKS, need_open). Farms, orchards, date
 palms, banana plantations, sugar fields, potato farms and rice paddies grow food (MAKES); mines
 dig coal, logging camps fell logs, pits and quarries dig clay, limestone and sand, ports trade
 goods. Homes burn logs as they are, but every other building takes only sawn wood.
@@ -59,6 +61,7 @@ class Good(Enum):
     COFFEE = "coffee"
     RUBBER = "rubber"
     WAX = "wax"
+    FERTILISER = "fertiliser"
     INCENSE = "incense"
     STEEL = "steel"
     TOOLS = "tools"
@@ -141,6 +144,7 @@ class Need(Enum):
     COFFEE = "coffee"
     RUBBER = "rubber"
     WAX = "wax"
+    FERTILISER = "fertiliser"
     INCENSE = "incense"
     STEEL = "steel"
     TOOLS = "tools"
@@ -301,6 +305,7 @@ NEED_YEARS: Mapping[Need, int] = MappingProxyType(
         Need.MACHINERY: 1870,
         Need.COPPER: 1880,
         Need.CHEMICALS: 1880,
+        Need.FERTILISER: 1880,
         Need.CEMENT: 1880,
         Need.PLASTICS: 1950,
         Need.APPLIANCES: 1950,
@@ -313,29 +318,27 @@ NEED_YEARS: Mapping[Need, int] = MappingProxyType(
 )
 
 # Needs a kind of building feels only from a later year than everyone else.
-# Diesel fuel lets what makes goods from the land make up to DIESEL_BOOST more: farms from
-# TRACTOR_YEAR, mines, quarries and logging camps from MACHINE_YEAR, fisheries and ports from
-# MOTOR_BOAT_YEAR (DIESEL_USERS); sawmills take it from MACHINE_YEAR too (RECIPES).
+# Diesel fuel lets what makes goods from the land make up to DIESEL_BOOST more (DIESEL_USERS): farms,
+# mines, quarries, logging camps and sawmills (RECIPES) once the oil and fuel tile opens it for them
+# (railroads.sim.tiles.UNLOCKS), fisheries and ports from MOTOR_BOAT_YEAR.
 DIESEL_BOOST = 0.5
-TRACTOR_YEAR = 1920
-MACHINE_YEAR = 1920
 MOTOR_BOAT_YEAR = 1910
 DIESEL_USERS: Mapping[BuildingKind, tuple[float, int]] = MappingProxyType(
     {
-        BuildingKind.FARM: (2.0, TRACTOR_YEAR),
-        BuildingKind.POTATO_FARM: (2.0, TRACTOR_YEAR),
-        BuildingKind.RICE_PADDY: (2.0, TRACTOR_YEAR),
-        BuildingKind.SOY_FIELD: (2.0, TRACTOR_YEAR),
-        BuildingKind.MINE: (10.0, MACHINE_YEAR),
-        BuildingKind.IRON_MINE: (10.0, MACHINE_YEAR),
-        BuildingKind.COPPER_MINE: (5.0, MACHINE_YEAR),
-        BuildingKind.GOLD_MINE: (2.0, MACHINE_YEAR),
-        BuildingKind.DIAMOND_MINE: (2.0, MACHINE_YEAR),
-        BuildingKind.SALT_WORKS: (5.0, MACHINE_YEAR),
-        BuildingKind.CLAY_PIT: (5.0, MACHINE_YEAR),
-        BuildingKind.LIMESTONE_QUARRY: (5.0, MACHINE_YEAR),
-        BuildingKind.SAND_PIT: (5.0, MACHINE_YEAR),
-        BuildingKind.LOGGING_CAMP: (3.0, MACHINE_YEAR),
+        BuildingKind.FARM: (2.0, 0),
+        BuildingKind.POTATO_FARM: (2.0, 0),
+        BuildingKind.RICE_PADDY: (2.0, 0),
+        BuildingKind.SOY_FIELD: (2.0, 0),
+        BuildingKind.MINE: (10.0, 0),
+        BuildingKind.IRON_MINE: (10.0, 0),
+        BuildingKind.COPPER_MINE: (5.0, 0),
+        BuildingKind.GOLD_MINE: (2.0, 0),
+        BuildingKind.DIAMOND_MINE: (2.0, 0),
+        BuildingKind.SALT_WORKS: (5.0, 0),
+        BuildingKind.CLAY_PIT: (5.0, 0),
+        BuildingKind.LIMESTONE_QUARRY: (5.0, 0),
+        BuildingKind.SAND_PIT: (5.0, 0),
+        BuildingKind.LOGGING_CAMP: (3.0, 0),
         BuildingKind.FISHERY: (2.0, MOTOR_BOAT_YEAR),
         BuildingKind.PORT: (10.0, MOTOR_BOAT_YEAR),
     }
@@ -347,10 +350,15 @@ LAND_BOOST_MOST: Mapping[Need, float] = MappingProxyType({Need.FUEL: DIESEL_BOOS
 # more each makes it make, whatever else boosts it: machinery lets a logging camp fell twice the
 # logs.
 KIND_BOOST_MOST: Mapping[tuple[BuildingKind, Need], float] = MappingProxyType(
-    {(BuildingKind.LOGGING_CAMP, Need.MACHINERY): 1.0}
+    {
+        (BuildingKind.LOGGING_CAMP, Need.MACHINERY): 1.0,
+        (BuildingKind.MINE, Need.MACHINERY): 0.5,
+        (BuildingKind.IRON_MINE, Need.MACHINERY): 0.5,
+        (BuildingKind.FARM, Need.FERTILISER): 0.5,
+    }
 )
-# Boosts only the buildings the player owns take, once their tech opens them
-# (railroads.sim.tech.Effect.TAKES), and the most more each makes them make.
+# Boosts only the buildings the player controls take, once their tile opens them
+# (railroads.sim.tiles.UNLOCKS), and the most more each makes them make.
 OWNED_BOOSTS: Mapping[tuple[BuildingKind, Need], float] = MappingProxyType(
     {
         (BuildingKind.FARM, Need.LIMESTONE): 0.5,
@@ -361,8 +369,7 @@ OWNED_BOOSTS: Mapping[tuple[BuildingKind, Need], float] = MappingProxyType(
 
 KIND_NEED_YEARS: Mapping[tuple[BuildingKind, Need], int] = MappingProxyType(
     {
-        **{(kind, Need.FUEL): year for kind, (_, year) in DIESEL_USERS.items()},
-        (BuildingKind.SAWMILL, Need.FUEL): MACHINE_YEAR,
+        **{(kind, Need.FUEL): year for kind, (_, year) in DIESEL_USERS.items() if year},
     }
 )
 
@@ -378,6 +385,7 @@ GOOD_YEARS: Mapping[Good, int] = MappingProxyType(
         Good.TOOLS: 1870,
         Good.MACHINERY: 1870,
         Good.CHEMICALS: 1880,
+        Good.FERTILISER: 1880,
         Good.CEMENT: 1880,
         Good.COPPER: 1880,
         Good.OIL: 1855,
@@ -471,6 +479,7 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.FUEL: 20,
         Good.GAS: 10,
         Good.CHEMICALS: 25,
+        Good.FERTILISER: 15,
         Good.FURNITURE: 60,
         Good.CLOTHES: 70,
         Good.TOOLS: 160,
@@ -677,7 +686,10 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             BuildingKind.WINERY: Recipe(Good.WINE, 20, {Need.GRAPES: 4.0}, {Need.BARRELS: 2.0}),
             BuildingKind.REFINERY: Recipe(Good.FUEL, 300, {Need.OIL: 0.5}),
             BuildingKind.CHEMICAL_WORKS: Recipe(
-                Good.CHEMICALS, 100, {Need.SALT: 0.5, Need.BOILER_FUEL: 0.5}
+                Good.CHEMICALS,
+                100,
+                {Need.SALT: 0.5, Need.BOILER_FUEL: 0.5},
+                also={Good.FERTILISER: 0.5},
             ),
             BuildingKind.ELECTRONICS_PLANT: Recipe(
                 Good.ELECTRONICS, 50, {Need.COPPER: 1.0, Need.CHEMICALS: 1.0}
@@ -884,8 +896,9 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.PORCELAIN: 2,
             Need.LUXURIES: 2,
         },
-        BuildingKind.FARM: {Need.MACHINERY: 5, Need.LIMESTONE: 10},
-        BuildingKind.MINE: {Need.PLANKS: 20},
+        BuildingKind.FARM: {Need.MACHINERY: 5, Need.LIMESTONE: 10, Need.FERTILISER: 5},
+        BuildingKind.MINE: {Need.PLANKS: 20, Need.MACHINERY: 5},
+        BuildingKind.IRON_MINE: {Need.MACHINERY: 5},
         BuildingKind.LOGGING_CAMP: {Need.MACHINERY: 5},
         BuildingKind.RAILWAY_WORKS: {Need.STEEL: 200},
         BuildingKind.POWER_PLANT: {Need.COAL: 200},
@@ -1008,6 +1021,7 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.BOILER_FUEL,
     BuildingKind.CHEMICAL_WORKS,
     Need.CHEMICALS,
+    Need.FERTILISER,
     BuildingKind.PLASTICS_WORKS,
     Need.PLASTICS,
     BuildingKind.BRICKWORKS,
@@ -1146,6 +1160,21 @@ def need_year(kind: BuildingKind, need: Need) -> int:
     return max(NEED_YEARS.get(need, 0), KIND_NEED_YEARS.get((kind, need), 0))
 
 
+def need_open(kind: BuildingKind, need: Need, year: int) -> bool:
+    """Whether a kind of building needs something in a year: once its year has come and, for a
+    need a demand tile opens, once that tile is at its level (railroads.sim.tiles.UNLOCKS)."""
+    from railroads.sim.tiles import opens
+
+    return need_year(kind, need) <= year and opens(kind, need, year)
+
+
+def owned_boosts(kind: BuildingKind, year: int) -> frozenset[Need]:
+    """The boosts only the player's own buildings of a kind take that are open in a year."""
+    return frozenset(
+        need for taker, need in OWNED_BOOSTS if taker == kind and need_open(kind, need, year)
+    )
+
+
 @year_cached
 def needs_of(kind: BuildingKind, year: int, east: bool = False) -> Mapping[Need, float]:
     """What a kind of building needs in a month in a given year, on a map in the old Eastern Bloc
@@ -1154,9 +1183,7 @@ def needs_of(kind: BuildingKind, year: int, east: bool = False) -> Mapping[Need,
     from railroads.sim.events import added_needs, want_factor
 
     needs = {
-        need: amount
-        for need, amount in NEEDS.get(kind, {}).items()
-        if need_year(kind, need) <= year
+        need: amount for need, amount in NEEDS.get(kind, {}).items() if need_open(kind, need, year)
     }
     needs.update(
         (need, amount) for need, amount in added_needs(kind, year).items() if need not in needs
