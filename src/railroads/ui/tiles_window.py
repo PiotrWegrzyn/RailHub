@@ -27,7 +27,7 @@ from railroads.sim.tiles import (
 )
 from railroads.ui.theme import BRASS, GROWN, TEXT, TEXT_DIM, WINDOW_TOP, Rgba, color_u32
 
-CARD_SIZE = (176.0, 156.0)
+CARD_SIZE = (176.0, 172.0)
 CARD_GAP = 12.0
 SLIDE_SECONDS = 0.35
 BUTTON = (160.0, 32.0)
