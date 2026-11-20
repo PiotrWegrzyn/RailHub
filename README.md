@@ -498,8 +498,8 @@ window (H) lists the same.
 | Building | Makes a month at most | Must get a month | Bonus goods and boosts a month |
 |---|---|---|---|
 | House |  | 10 food, 3 heating | 10 food, 0.5 soy sauce, 1 beer, 1 newspapers (from 1600), 5 common goods, 0.5 vodka (from 1600), 0.5 refined sugar (from 1800), 0.5 bricks, 0.2 glass, 0.5 limestone, 0.5 wax |
-| Tenement |  | 60 food, 60 common goods, 20 heating | 60 food, 5 soy sauce, 10 salt, 20 goods, 10 hot drinks (from 1700), 10 tools (from 1870), 10 beer, 10 vodka (from 1600), 10 bricks, 10 glass, 10 cement (from 1880), 10 refined sugar (from 1800), 10 newspapers (from 1600), 10 limestone, 1 luxury goods (from 1700), 5 wax |
-| Block of flats |  | 200 food, 300 common goods, 80 heating | 200 food, 15 soy sauce, 30 salt, 40 goods, 30 hot drinks (from 1700), 10 tools (from 1870), 30 fuel (from 1910), 3 cars (from 1930), 30 beer, 30 vodka (from 1600), 50 bricks, 50 cement (from 1880), 50 glass, 30 newspapers (from 1600), 5 appliances (from 1950), 30 refined sugar (from 1800), 5 luxury goods (from 1700) |
+| Tenement |  | 60 food, 60 common goods, 20 heating | 60 food, 5 soy sauce, 10 salt, 20 goods, 10 hot drinks (from 1700), 10 tools (from era 3), 10 beer, 10 vodka (from 1600), 10 bricks, 10 glass, 10 cement (from era 3), 10 refined sugar (from 1800), 10 newspapers (from 1600), 10 limestone, 1 luxury goods (from 1700), 5 wax |
+| Block of flats |  | 200 food, 300 common goods, 80 heating | 200 food, 15 soy sauce, 30 salt, 40 goods, 30 hot drinks (from 1700), 10 tools (from era 3), 30 fuel (from era 2), 3 cars (from era 4), 30 beer, 30 vodka (from 1600), 50 bricks, 50 cement (from era 3), 50 glass, 30 newspapers (from 1600), 5 appliances (from era 6), 30 refined sugar (from 1800), 5 luxury goods (from 1700) |
 | Farm | 10 wheat |  | 5 machinery (from machines and tools demand 10), 10 limestone (from ore and stone demand 3), 5 fertiliser (from chemicals and building demand 10), 2 fuel (from oil and fuel demand 11) |
 | Orchard | 10 apples |  |  |
 | Date palms | 10 dates |  |  |
@@ -507,12 +507,12 @@ window (H) lists the same.
 | Banana plantation | 10 bananas |  |  |
 | Sugar field | 10 sugar |  |  |
 | Bakery | 120 bread | 48 wheat | 6 refined sugar (from 1800) |
-| Fishery | 10 fish |  | 2 fuel (from 1910) |
+| Fishery | 10 fish |  | 2 fuel (from era 2) |
 | Sheep farm | 21 wool, 10 sheep |  | 90 wheat (from farming demand 2), 5 machinery (from machines and tools demand 10) |
 | Cotton field | 80 cotton |  |  |
 | Vineyard | 60 grapes |  |  |
 | Coffee plantation (1700) | 60 coffee |  |  |
-| Rubber plantation (1900) | 60 rubber |  |  |
+| Rubber plantation (era 4) | 60 rubber |  |  |
 | Beekeeper | 2 honey, 10 wax |  |  |
 | Incense grove | 30 incense |  |  |
 | Potato farm (1600) | 10 potatoes |  | 2 fuel (from oil and fuel demand 11) |
@@ -540,110 +540,110 @@ window (H) lists the same.
 | Mega fish drying shed | 843.8 dried fish | 337.5 fish, 84.38 salt |  |
 | Mine (1700) | 100 coal |  | 20 planks (from wood demand 2), 5 machinery (from machines and tools demand 8), 10 fuel (from oil and fuel demand 11) |
 | Iron mine | 100 iron ore |  | 5 machinery (from machines and tools demand 8), 10 fuel (from oil and fuel demand 11) |
-| Copper mine (1880) | 40 copper |  | 5 fuel (from oil and fuel demand 11) |
+| Copper mine (era 4) | 40 copper |  | 5 fuel (from oil and fuel demand 11) |
 | Gold mine | 20 gold |  | 2 fuel (from oil and fuel demand 11) |
 | Diamond mine | 10 diamonds |  | 2 fuel (from oil and fuel demand 11) |
-| Oil well (1855) | 150 oil, 50 gas |  |  |
+| Oil well (era 2) | 150 oil, 50 gas |  |  |
 | Salt works | 60 salt |  | 5 fuel (from oil and fuel demand 11) |
 | Clay pit | 60 clay |  | 5 fuel (from oil and fuel demand 11) |
 | Limestone quarry | 60 limestone |  | 5 fuel (from oil and fuel demand 11) |
 | Sand pit | 60 sand |  | 5 fuel (from oil and fuel demand 11) |
-| Logging camp | 20 logs |  | 5 machinery (from 1870), 3 fuel (from oil and fuel demand 11) |
-| Port | 20 goods, 50 oil, 50 gas |  | 10 fuel (from 1910) |
-| Factory (1780) | 30 goods | 10 planks, 10 steel (from 1855) |  |
-| Big factory (1780) | 90 goods | 30 steel (from 1855), 30 copper (from 1880) |  |
-| Mega factory (1780) | 270 goods | 90 steel (from 1855), 45 copper (from 1880), 45 machinery (from 1870) |  |
-| Cannery (1810) | 300 cans | 90 fruit, 30 steel (from 1855) |  |
+| Logging camp | 20 logs |  | 5 machinery (from era 3), 3 fuel (from oil and fuel demand 11) |
+| Port | 20 goods, 50 oil, 50 gas |  | 10 fuel (from era 2) |
+| Factory (1780) | 30 goods | 10 planks, 10 steel (from era 2) |  |
+| Big factory (1780) | 90 goods | 30 steel (from era 2), 30 copper (from era 4) |  |
+| Mega factory (1780) | 270 goods | 90 steel (from era 2), 45 copper (from era 4), 45 machinery (from era 3) |  |
+| Cannery (1810) | 300 cans | 90 fruit, 30 steel (from era 2) |  |
 | Textile mill (1780) | 40 clothes | 100 fibre |  |
 | Furniture maker | 20 furniture | 80 planks | 10 wax |
-| Tool works (1870) | 80 tools | 80 steel (from 1855) |  |
+| Tool works (era 3) | 80 tools | 80 steel (from era 2) |  |
 | Winery | 20 wine | 80 grapes | 40 barrels |
 | Barrel maker | 40 barrels | 20 planks |  |
-| Refinery (1856) | 300 fuel | 150 oil |  |
-| Chemical works (1880) | 100 chemicals, 50 fertiliser | 50 salt, 50 boiler fuel |  |
-| Electronics plant (1960) | 50 electronics | 50 copper (from 1880), 50 chemicals (from 1880) |  |
-| Car factory (1930) | 20 cars | 100 steel (from 1855), 40 fuel (from 1910) |  |
-| Gun factory (1800) | 100 guns | 50 steel (from 1855), 25 planks |  |
-| Tank factory (1940) | 20 tanks | 120 steel (from 1855), 40 fuel (from 1910) |  |
-| Aircraft factory (1935) | 20 planes | 60 steel (from 1855), 20 copper (from 1880), 20 fuel (from 1910), 20 electronics (from 1960) |  |
-| Steel mill (1855) | 100 steel | 250 iron ore, 250 coal (from 1700) | 25 coke (from 1850) |
-| Shipyard | 30 goods | 20 steel (from 1855), 10 planks |  |
-| Sawmill | 40 planks, 8 wood chips | 40 logs | 5 machinery (from 1870), 3 fuel (from oil and fuel demand 11) |
+| Refinery (era 2) | 300 fuel | 150 oil (from era 2) |  |
+| Chemical works (era 3) | 100 chemicals, 50 fertiliser | 50 salt, 50 boiler fuel |  |
+| Electronics plant (era 6) | 50 electronics | 50 copper (from era 4), 50 chemicals (from era 3) |  |
+| Car factory (era 4) | 20 cars | 100 steel (from era 2), 40 fuel (from era 2) |  |
+| Gun factory (era 3) | 100 guns | 50 steel (from era 2), 25 planks |  |
+| Tank factory (era 5) | 20 tanks | 120 steel (from era 2), 40 fuel (from era 2) |  |
+| Aircraft factory (era 5) | 20 planes | 60 steel (from era 2), 20 copper (from era 4), 20 fuel (from era 2), 20 electronics (from era 6) |  |
+| Steel mill (era 2) | 100 steel | 250 iron ore, 250 coal (from 1700) | 25 coke (from 1850) |
+| Shipyard | 30 goods | 20 steel (from era 2), 10 planks |  |
+| Sawmill | 40 planks, 8 wood chips | 40 logs | 5 machinery (from era 3), 3 fuel (from oil and fuel demand 11) |
 | Soy sauce brewery | 20 soy sauce | 10 soybeans, 10 wheat, 4 salt |  |
-| Gasworks (1820) | 200 gas | 100 coal (from 1700) |  |
+| Gasworks (era 2) | 200 gas | 100 coal (from 1700) |  |
 | Coke plant (1850) | 100 coke | 100 coal (from 1700) |  |
 | Potter | 40 pots | 20 clay |  |
 | Tile works | 30 stove tiles | 15 clay, 7.5 sand |  |
-| Foundry (1800) | 40 castings | 20 iron ore, 10 sand |  |
+| Foundry (era 2) | 40 castings | 20 iron ore, 10 sand |  |
 | Dairy | 120 dairy products | 48 milk |  |
-| Railway works |  | 200 steel (from 1855) |  |
-| Machine works (1870) | 40 machinery | 40 steel (from 1855), 20 copper (from 1880) |  |
+| Railway works |  | 200 steel (from era 2) |  |
+| Machine works (era 3) | 40 machinery | 40 steel (from era 2), 20 copper (from era 4) |  |
 | Brickworks | 100 bricks | 50 clay | 25 coal (from 1700) |
-| Cement works (1880) | 100 cement | 50 limestone | 25 coal (from 1700) |
+| Cement works (era 3) | 100 cement | 50 limestone | 25 coal (from 1700) |
 | Glassworks | 60 glass | 30 sand | 15 coal (from 1700), 15 limestone |
 | Brewery | 40 beer | 40 hops | 16 barrels (from wood demand 4) |
 | Distillery (1600) | 10 vodka | 20 potatoes | 4 glass |
 | Sake brewery | 15 sake | 30 rice |  |
 | Tannery | 40 leather | 20 livestock | 10 limestone |
 | Shoe factory (1850) | 20 shoes | 40 leather | 10 wax |
-| Plastics works (1950) | 100 plastics | 50 oil, 50 chemicals (from 1880) |  |
-| Appliance factory (1950) | 30 appliances | 30 steel (from 1855), 15 copper (from 1880), 15 plastics (from 1950), 7.5 electronics (from 1960) |  |
-| Paper mill (1150) | 100 paper | 10 wood chips, 25 chemicals (from 1880) |  |
+| Plastics works (era 6) | 100 plastics | 50 oil (from era 2), 50 chemicals (from era 3) |  |
+| Appliance factory (era 6) | 30 appliances | 30 steel (from era 2), 15 copper (from era 4), 15 plastics (from era 6), 7.5 electronics (from era 6) |  |
+| Paper mill (1150) | 100 paper | 10 wood chips, 25 chemicals (from era 3) |  |
 | Printing works (1600) | 3,000 newspapers | 150 paper (from 1150) |  |
 | Sugar refinery (1800) | 60 refined sugar | 30 sugar | 6 coal (from 1700), 6 limestone |
 | Porcelain works (1710) | 30 porcelain | 15 clay | 7.5 coal (from 1700) |
 | Butcher (1850) | 120 meat | 48 animals |  |
 | Power plant |  | 200 coal (from 1700) |  |
-| Diesel power plant |  | 100 fuel (from 1910) |  |
-| Gas power plant |  | 150 gas |  |
-| Battery gigafactory |  | 300 chemicals (from 1880), 200 electronics (from 1960), 200 steel (from 1855) | 300 copper (from 1880) |
-| Juice works (1870) | 100 juice | 50 fruit, 50 glass, 25 plastics (from 1950) | 10 refined sugar (from 1800) |
-| Big juice works (1870) | 375 juice | 187.5 fruit, 187.5 glass, 93.75 plastics (from 1950) | 37.5 refined sugar (from 1800) |
-| Mega juice works (1870) | 1,406 juice | 703.1 fruit, 703.1 glass, 351.6 plastics (from 1950) | 140.6 refined sugar (from 1800) |
-| Big steel mill (1855) | 250 steel | 625 iron ore, 625 coal (from 1700) | 62.5 coke (from 1850) |
-| Mega steel mill (1855) | 625 steel | 1,562 iron ore, 1,562 coal (from 1700) | 156.2 coke (from 1850) |
+| Diesel power plant |  | 100 fuel (from era 2) |  |
+| Gas power plant |  | 150 gas (from era 2) |  |
+| Battery gigafactory |  | 300 chemicals (from era 3), 200 electronics (from era 6), 200 steel (from era 2) | 300 copper (from era 4) |
+| Juice works (1870) | 100 juice | 50 fruit, 50 glass, 25 plastics (from era 6) | 10 refined sugar (from 1800) |
+| Big juice works (1870) | 375 juice | 187.5 fruit, 187.5 glass, 93.75 plastics (from era 6) | 37.5 refined sugar (from 1800) |
+| Mega juice works (1870) | 1,406 juice | 703.1 fruit, 703.1 glass, 351.6 plastics (from era 6) | 140.6 refined sugar (from 1800) |
+| Big steel mill (era 2) | 250 steel | 625 iron ore, 625 coal (from 1700) | 62.5 coke (from 1850) |
+| Mega steel mill (era 2) | 625 steel | 1,562 iron ore, 1,562 coal (from 1700) | 156.2 coke (from 1850) |
 | Big coke plant (1850) | 250 coke | 250 coal (from 1700) |  |
 | Mega coke plant (1850) | 625 coke | 625 coal (from 1700) |  |
 | Big potter | 100 pots | 50 clay |  |
 | Mega potter | 250 pots | 125 clay |  |
 | Big tile works | 75 stove tiles | 37.5 clay, 18.75 sand |  |
 | Mega tile works | 187.5 stove tiles | 93.75 clay, 46.88 sand |  |
-| Big foundry (1800) | 100 castings | 50 iron ore, 25 sand |  |
-| Mega foundry (1800) | 250 castings | 125 iron ore, 62.5 sand |  |
+| Big foundry (era 2) | 100 castings | 50 iron ore, 25 sand |  |
+| Mega foundry (era 2) | 250 castings | 125 iron ore, 62.5 sand |  |
 | Big dairy | 450 dairy products | 180 milk |  |
 | Mega dairy | 1,688 dairy products | 675 milk |  |
-| Big gun factory (1800) | 250 guns | 125 steel (from 1855), 62.5 planks |  |
-| Mega gun factory (1800) | 625 guns | 312.5 steel (from 1855), 156.2 planks |  |
-| Big tank factory (1940) | 50 tanks | 300 steel (from 1855), 100 fuel (from 1910) |  |
-| Mega tank factory (1940) | 125 tanks | 750 steel (from 1855), 250 fuel (from 1910) |  |
-| Big aircraft factory (1935) | 50 planes | 150 steel (from 1855), 50 copper (from 1880), 50 fuel (from 1910), 50 electronics (from 1960) |  |
-| Mega aircraft factory (1935) | 125 planes | 375 steel (from 1855), 125 copper (from 1880), 125 fuel (from 1910), 125 electronics (from 1960) |  |
-| Big cannery (1810) | 1,125 cans | 337.5 fruit, 112.5 steel (from 1855) |  |
-| Mega cannery (1810) | 4,219 cans | 1,266 fruit, 421.9 steel (from 1855) |  |
+| Big gun factory (era 3) | 250 guns | 125 steel (from era 2), 62.5 planks |  |
+| Mega gun factory (era 3) | 625 guns | 312.5 steel (from era 2), 156.2 planks |  |
+| Big tank factory (era 5) | 50 tanks | 300 steel (from era 2), 100 fuel (from era 2) |  |
+| Mega tank factory (era 5) | 125 tanks | 750 steel (from era 2), 250 fuel (from era 2) |  |
+| Big aircraft factory (era 5) | 50 planes | 150 steel (from era 2), 50 copper (from era 4), 50 fuel (from era 2), 50 electronics (from era 6) |  |
+| Mega aircraft factory (era 5) | 125 planes | 375 steel (from era 2), 125 copper (from era 4), 125 fuel (from era 2), 125 electronics (from era 6) |  |
+| Big cannery (1810) | 1,125 cans | 337.5 fruit, 112.5 steel (from era 2) |  |
+| Mega cannery (1810) | 4,219 cans | 1,266 fruit, 421.9 steel (from era 2) |  |
 | Big textile mill (1780) | 100 clothes | 250 fibre |  |
 | Mega textile mill (1780) | 250 clothes | 625 fibre |  |
 | Big furniture maker | 50 furniture | 200 planks | 25 wax |
 | Mega furniture maker | 125 furniture | 500 planks | 62.5 wax |
-| Big tool works (1870) | 200 tools | 200 steel (from 1855) |  |
-| Mega tool works (1870) | 500 tools | 500 steel (from 1855) |  |
+| Big tool works (era 3) | 200 tools | 200 steel (from era 2) |  |
+| Mega tool works (era 3) | 500 tools | 500 steel (from era 2) |  |
 | Big barrel maker | 100 barrels | 50 planks |  |
 | Mega barrel maker | 250 barrels | 125 planks |  |
 | Big winery | 50 wine | 200 grapes | 100 barrels |
 | Mega winery | 125 wine | 500 grapes | 250 barrels |
-| Big refinery (1856) | 750 fuel | 375 oil |  |
-| Mega refinery (1856) | 1,875 fuel | 937.5 oil |  |
-| Big chemical works (1880) | 250 chemicals, 125 fertiliser | 125 salt, 125 boiler fuel |  |
-| Mega chemical works (1880) | 625 chemicals, 312.5 fertiliser | 312.5 salt, 312.5 boiler fuel |  |
-| Big electronics plant (1960) | 125 electronics | 125 copper (from 1880), 125 chemicals (from 1880) |  |
-| Mega electronics plant (1960) | 312.5 electronics | 312.5 copper (from 1880), 312.5 chemicals (from 1880) |  |
-| Big car factory (1930) | 50 cars | 250 steel (from 1855), 100 fuel (from 1910) |  |
-| Mega car factory (1930) | 125 cars | 625 steel (from 1855), 250 fuel (from 1910) |  |
-| Big machine works (1870) | 100 machinery | 100 steel (from 1855), 50 copper (from 1880) |  |
-| Mega machine works (1870) | 250 machinery | 250 steel (from 1855), 125 copper (from 1880) |  |
+| Big refinery (era 2) | 750 fuel | 375 oil (from era 2) |  |
+| Mega refinery (era 2) | 1,875 fuel | 937.5 oil (from era 2) |  |
+| Big chemical works (era 3) | 250 chemicals, 125 fertiliser | 125 salt, 125 boiler fuel |  |
+| Mega chemical works (era 3) | 625 chemicals, 312.5 fertiliser | 312.5 salt, 312.5 boiler fuel |  |
+| Big electronics plant (era 6) | 125 electronics | 125 copper (from era 4), 125 chemicals (from era 3) |  |
+| Mega electronics plant (era 6) | 312.5 electronics | 312.5 copper (from era 4), 312.5 chemicals (from era 3) |  |
+| Big car factory (era 4) | 50 cars | 250 steel (from era 2), 100 fuel (from era 2) |  |
+| Mega car factory (era 4) | 125 cars | 625 steel (from era 2), 250 fuel (from era 2) |  |
+| Big machine works (era 3) | 100 machinery | 100 steel (from era 2), 50 copper (from era 4) |  |
+| Mega machine works (era 3) | 250 machinery | 250 steel (from era 2), 125 copper (from era 4) |  |
 | Big brickworks | 250 bricks | 125 clay | 62.5 coal (from 1700) |
 | Mega brickworks | 625 bricks | 312.5 clay | 156.2 coal (from 1700) |
-| Big cement works (1880) | 250 cement | 125 limestone | 62.5 coal (from 1700) |
-| Mega cement works (1880) | 625 cement | 312.5 limestone | 156.2 coal (from 1700) |
+| Big cement works (era 3) | 250 cement | 125 limestone | 62.5 coal (from 1700) |
+| Mega cement works (era 3) | 625 cement | 312.5 limestone | 156.2 coal (from 1700) |
 | Big glassworks | 150 glass | 75 sand | 37.5 coal (from 1700), 37.5 limestone |
 | Mega glassworks | 375 glass | 187.5 sand | 93.75 coal (from 1700), 93.75 limestone |
 | Big brewery | 100 beer | 100 hops | 40 barrels (from wood demand 4) |
@@ -660,53 +660,53 @@ window (H) lists the same.
 | Mega butcher (1850) | 1,688 meat | 675 animals |  |
 | Big shoe factory (1850) | 50 shoes | 100 leather | 25 wax |
 | Mega shoe factory (1850) | 125 shoes | 250 leather | 62.5 wax |
-| Big plastics works (1950) | 250 plastics | 125 oil, 125 chemicals (from 1880) |  |
-| Mega plastics works (1950) | 625 plastics | 312.5 oil, 312.5 chemicals (from 1880) |  |
-| Big appliance factory (1950) | 75 appliances | 75 steel (from 1855), 37.5 copper (from 1880), 37.5 plastics (from 1950), 18.75 electronics (from 1960) |  |
-| Mega appliance factory (1950) | 187.5 appliances | 187.5 steel (from 1855), 93.75 copper (from 1880), 93.75 plastics (from 1950), 46.88 electronics (from 1960) |  |
-| Big paper mill (1150) | 250 paper | 25 wood chips, 62.5 chemicals (from 1880) |  |
-| Mega paper mill (1150) | 625 paper | 62.5 wood chips, 156.2 chemicals (from 1880) |  |
+| Big plastics works (era 6) | 250 plastics | 125 oil (from era 2), 125 chemicals (from era 3) |  |
+| Mega plastics works (era 6) | 625 plastics | 312.5 oil (from era 2), 312.5 chemicals (from era 3) |  |
+| Big appliance factory (era 6) | 75 appliances | 75 steel (from era 2), 37.5 copper (from era 4), 37.5 plastics (from era 6), 18.75 electronics (from era 6) |  |
+| Mega appliance factory (era 6) | 187.5 appliances | 187.5 steel (from era 2), 93.75 copper (from era 4), 93.75 plastics (from era 6), 46.88 electronics (from era 6) |  |
+| Big paper mill (1150) | 250 paper | 25 wood chips, 62.5 chemicals (from era 3) |  |
+| Mega paper mill (1150) | 625 paper | 62.5 wood chips, 156.2 chemicals (from era 3) |  |
 | Big printing works (1600) | 7,500 newspapers | 375 paper (from 1150) |  |
 | Mega printing works (1600) | 1.875e+04 newspapers | 937.5 paper (from 1150) |  |
 | Big sugar refinery (1800) | 150 refined sugar | 75 sugar | 15 coal (from 1700), 15 limestone |
 | Mega sugar refinery (1800) | 375 refined sugar | 187.5 sugar | 37.5 coal (from 1700), 37.5 limestone |
-| Big gasworks (1820) | 500 gas | 250 coal (from 1700) |  |
-| Mega gasworks (1820) | 1,250 gas | 625 coal (from 1700) |  |
+| Big gasworks (era 2) | 500 gas | 250 coal (from 1700) |  |
+| Mega gasworks (era 2) | 1,250 gas | 625 coal (from 1700) |  |
 | Big porcelain works (1710) | 75 porcelain | 37.5 clay | 18.75 coal (from 1700) |
 | Mega porcelain works (1710) | 187.5 porcelain | 93.75 clay | 46.88 coal (from 1700) |
-| Skyscraper |  | 30 goods, 5 clothes (from 1780), 20 wine, 20 fuel (from 1910), 30 electronics (from 1960), 10 glass, 10 cement (from 1880), 20 paper (from 1150), 5 appliances (from 1950), 2 porcelain, 2 luxury goods (from 1700) | 10 hot drinks (from 1700), 5 furniture, 20 newspapers (from 1600) |
-| Car dealer (1930) |  | 20 cars (from 1930) | 10 rubber |
+| Skyscraper |  | 30 goods, 5 clothes (from 1780), 20 wine, 20 fuel (from era 2), 30 electronics (from era 6), 10 glass, 10 cement (from era 3), 20 paper (from 1150), 5 appliances (from era 6), 2 porcelain, 2 luxury goods (from 1700) | 10 hot drinks (from 1700), 5 furniture, 20 newspapers (from 1600) |
+| Car dealer (era 4) |  | 20 cars (from era 4) | 10 rubber (from era 4) |
 | Jeweller |  | 20 gold, 10 diamonds |  |
 | Carpet weaver (1700) | 5 luxury goods | 20 fibre |  |
-| Clock maker (1880) | 5 luxury goods | 10 copper (from 1880), 5 glass |  |
+| Clock maker (1880) | 5 luxury goods | 10 copper (from era 4), 5 glass |  |
 | Mirror maker (1700) | 5 luxury goods | 10 glass, 0.5 gold |  |
 | Manor |  | 100 food, 10 heating, 10 wine, 3 luxury goods (from 1700) | 5 furniture |
 | Theatre |  | 10 clothes (from 1780), 5 glass, 5 paper (from 1150) | 5 wax |
-| Hospital (1850) |  | 50 food, 5 heating, 10 chemicals (from 1880), 5 glass | 10 wax |
-| Space center |  | 300 electronics (from 1960), 1,000 fuel (from 1910), 300 food |  |
-| Pear Company headquarters |  | 500 electronics (from 1960), 1,000 food |  |
+| Hospital (1850) |  | 50 food, 5 heating, 10 chemicals (from era 3), 5 glass | 10 wax |
+| Space center |  | 300 electronics (from era 6), 1,000 fuel (from era 2), 300 food |  |
+| Pear Company headquarters |  | 500 electronics (from era 6), 1,000 food |  |
 | Royal palace |  | 200 food, 50 wine, 20 porcelain | 20 furniture, 20 wax |
 | Spa resort |  | 100 food, 20 wine | 20 beer, 20 newspapers (from 1600) |
-| World's Fair hall |  | 200 goods, 100 glass, 100 steel (from 1855) |  |
-| Film studio |  | 50 chemicals (from 1880), 50 clothes (from 1780), 30 electronics (from 1960) |  |
-| Amusement park |  | 200 food, 50 fuel (from 1910) | 100 beer |
+| World's Fair hall |  | 200 goods, 100 glass, 100 steel (from era 2) |  |
+| Film studio |  | 50 chemicals (from era 3), 50 clothes (from 1780), 30 electronics (from era 6) |  |
+| Amusement park |  | 200 food, 50 fuel (from era 2) | 100 beer |
 | Olympic stadium |  | 500 food | 200 beer, 200 newspapers (from 1600) |
 | Tavern |  | 22 alcohol | 20 food |
-| Department store (1880) |  | 20 clothes (from 1780), 20 shoes (from 1850), 5 porcelain, 10 appliances (from 1950) | 10 furniture |
+| Department store (1880) |  | 20 clothes (from 1780), 20 shoes (from 1850), 5 porcelain, 10 appliances (from era 6) | 10 furniture |
 | Hotel (1900) |  | 80 food, 10 wine | 10 beer, 10 newspapers (from 1600) |
-| Club (1900) |  | 88 alcohol | 5 chemicals (from 1880) |
+| Club (1900) |  | 88 alcohol | 5 chemicals (from era 3) |
 | Sushi hut |  | 60 fish, 60 rice | 10 soy sauce |
-| Filling station (1920) |  | 40 fuel (from 1910) |  |
+| Filling station (1920) |  | 40 fuel (from era 2) |  |
 | Big carpet weaver (1700) | 12.5 luxury goods | 50 fibre |  |
 | Mega carpet weaver (1700) | 31.25 luxury goods | 125 fibre |  |
-| Big clock maker (1880) | 12.5 luxury goods | 25 copper (from 1880), 12.5 glass |  |
-| Mega clock maker (1880) | 31.25 luxury goods | 62.5 copper (from 1880), 31.25 glass |  |
+| Big clock maker (1880) | 12.5 luxury goods | 25 copper (from era 4), 12.5 glass |  |
+| Mega clock maker (1880) | 31.25 luxury goods | 62.5 copper (from era 4), 31.25 glass |  |
 | Big mirror maker (1700) | 12.5 luxury goods | 25 glass, 1.25 gold |  |
 | Mega mirror maker (1700) | 31.25 luxury goods | 62.5 glass, 3.125 gold |  |
-| Military outpost (1800) |  | 60 guns, 30 cars (from 1930) |  |
-| Military base (1800) |  | 180 guns, 90 cars (from 1930), 30 planes (from 1935) |  |
-| Headquarters (1800) |  | 450 guns, 180 cars (from 1930), 90 planes (from 1935), 90 tanks (from 1940) |  |
-| Airport (1920) |  | 40 fuel (from 1910) |  |
+| Military outpost (1800) |  | 60 guns (from era 3), 30 cars (from era 4) |  |
+| Military base (1800) |  | 180 guns (from era 3), 90 cars (from era 4), 30 planes (from era 5) |  |
+| Headquarters (1800) |  | 450 guns (from era 3), 180 cars (from era 4), 90 planes (from era 5), 90 tanks (from era 5) |  |
+| Airport (1920) |  | 40 fuel (from era 2) |  |
 | Church |  | 10 wax | 10 incense |
 | Basilica |  | 30 wax | 20 incense |
 | Cathedral |  | 60 wax | 40 incense |
@@ -906,8 +906,10 @@ no higher, can't be picked and no longer holds the other tiles back.
 Once every supply tile reaches an era's level, the era comes with its generation of wagons and new
 tiles, on both boards at the lowest level there: oil and fuel and steel and metals at level 9
 (1843 when the lowest always go up), machines and tools and chemicals and building at 14 (1873),
-copper and rubber at 18 (1901), vehicles at 22 (1931), modern goods at 25 (1955), and the last
-wagons at 27 (1972). Each era is news. A game that begins later starts on the boards the world
+copper and rubber and vehicles at 18 (1901), tanks and planes at 22 (1933), modern goods at 25
+(1957), and the last wagons at 27 (1974). A good, the buildings that make it and those there only
+to buy it, such as car dealers, come into the game with its era, not in a year of their own, and
+the news of an era names them. A game that begins later starts on the boards the world
 grew to by then, every year the lowest tiles.
 
 A demand tile's levels also bring new buyers (`UNLOCKS`): at wood 2 coal mines take planks for

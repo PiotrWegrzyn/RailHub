@@ -3,7 +3,7 @@
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
-from railroads.sim.goods import GOOD_YEARS, Good
+from railroads.sim.goods import Good, good_exists
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
 
@@ -29,5 +29,5 @@ def goods_to_load(railway: Railway, station: Cell, supplied: Mapping[Good, float
     return [
         Offer(good, waiting[good], supplied.get(good, 0.0))
         for good in Good
-        if good in known and GOOD_YEARS.get(good, 0) <= railway.year
+        if good in known and good_exists(good, railway.year)
     ]

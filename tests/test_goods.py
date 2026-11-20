@@ -10,6 +10,7 @@ from railroads.sim.goods import (
     makes_of,
     needs_of,
 )
+from railroads.sim.growth import ladder_open
 from railroads.sim.ladders import LADDERS
 
 
@@ -28,18 +29,13 @@ def test_a_jeweller_keeps_gold_and_diamonds_as_demands_since_they_are_all_it_wan
 
 
 def test_nothing_that_can_open_needs_what_nothing_open_makes_yet() -> None:
-    opens: dict[BuildingKind, int] = {}
-    for ladder in LADDERS:
-        for kind in ladder.kinds:
-            opens[kind] = min(opens.get(kind, ladder.from_year), ladder.from_year)
-
     unmet = []
     for year in range(850, 2051, 5):
-        made = {good for kind, y in opens.items() if y <= year for good in makes_of(kind, year)}
+        opened = {kind for ladder in LADDERS if ladder_open(ladder, year) for kind in ladder.kinds}
+        made = {good for kind in opened for good in makes_of(kind, year)}
         unmet += [
             (kind, need, year)
-            for kind, y in opens.items()
-            if y <= year
+            for kind in opened
             for need in needs_of(kind, year)
             if not any(good in made for good in FITS[need])
         ]

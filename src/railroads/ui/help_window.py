@@ -17,7 +17,6 @@ from railroads.sim.finance import dollars
 from railroads.sim.goods import (
     FITS,
     FREIGHT_SHARE,
-    GOOD_YEARS,
     MAKES,
     NEEDS,
     Good,
@@ -29,7 +28,7 @@ from railroads.sim.ladders import LADDERS, PASSENGERS_PER_POINT, POINTS, Points
 from railroads.sim.lots import FIRST_FIBONACCI, PRICE_UNIT, fibonacci
 from railroads.sim.ownership import EXPERIENCE_PER_POINT
 from railroads.sim.tech import NODES, Tree, path_to
-from railroads.sim.tiles import opened_from
+from railroads.sim.tiles import good_era, kind_era, opened_from
 from railroads.sim.trains import ENGINES, Engine, successor
 from railroads.ui.buy_train import fuel_use
 from railroads.ui.engine_origins import origins
@@ -144,7 +143,8 @@ class BuildingHelp:
     wants: tuple[tuple[Need, float, str], ...]
     travellers: int
     space: int
-    from_year: int
+    # From when it comes up: a year, its era, or "" for always.
+    since: str
 
 
 @dataclass(frozen=True)
@@ -152,7 +152,8 @@ class GoodHelp:
     good: Good
     price: float
     freight: float
-    from_year: int
+    # From when it is made: its era, or "" for always.
+    since: str
     made_by: tuple[str, ...]
     wanted_by: tuple[str, ...]
 
@@ -169,8 +170,12 @@ class EngineHelp:
     origins: tuple[tuple[str, str], ...]
 
 
-def _opening_year(kind: BuildingKind) -> int:
-    return next((ladder.from_year for ladder in LADDERS if kind in ladder.kinds), 0)
+def _opening(kind: BuildingKind) -> str:
+    era = kind_era(kind)
+    if era > 1:
+        return f"era {era}"
+    year = next((ladder.from_year for ladder in LADDERS if kind in ladder.kinds), 0)
+    return str(year) if year else ""
 
 
 @cache
@@ -188,7 +193,7 @@ def building_help() -> tuple[BuildingHelp, ...]:
             ),
             PASSENGERS_PER_POINT[POINTS[kind][0]] * POINTS[kind][1],
             BUILDING_RULES[kind].space,
-            _opening_year(kind),
+            _opening(kind),
         )
         for kind in BuildingKind
     ]
@@ -207,7 +212,7 @@ def good_help() -> tuple[GoodHelp, ...]:
                 good,
                 price_of(good),
                 freight_of(good),
-                GOOD_YEARS.get(good, 0),
+                f"era {good_era(good)}" if good_era(good) > 1 else "",
                 tuple(kind.value for kind, made in MAKES.items() if good in made),
                 tuple(kind.value for kind, wanted in NEEDS.items() if needs & set(wanted)),
             )
@@ -318,7 +323,7 @@ class HelpWindow:
             imgui.table_next_column()
             imgui.text(f"{row.space}/6")
             imgui.table_next_column()
-            imgui.text(str(row.from_year) if row.from_year else "always")
+            imgui.text(row.since or "always")
         imgui.end_table()
 
     def _draw_goods(self) -> None:
@@ -346,7 +351,7 @@ class HelpWindow:
             imgui.table_next_column()
             imgui.text(dollars(row.freight))
             imgui.table_next_column()
-            imgui.text(str(row.from_year) if row.from_year else "always")
+            imgui.text(row.since or "always")
             imgui.table_next_column()
             imgui.text_wrapped(", ".join(row.made_by) or _NO_MAKER.get(row.good, "-"))
             imgui.table_next_column()

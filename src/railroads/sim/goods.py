@@ -31,7 +31,7 @@ from enum import Enum
 from types import MappingProxyType
 
 from railroads.sim.constructions import MERGED, BuildingKind
-from railroads.sim.year_caches import year_cached
+from railroads.sim.year_caches import on_forget, year_cached
 
 
 class Good(Enum):
@@ -285,7 +285,8 @@ FITS: Mapping[Need, tuple[Good, ...]] = MappingProxyType(
     }
 )
 
-# The year needs start to be felt, where that is after the game begins.
+# The year needs of the first era start to be felt, where that is after history begins; the needs
+# of later eras come with their goods (railroads.sim.tiles.need_era, need_exists).
 NEED_YEARS: Mapping[Need, int] = MappingProxyType(
     {
         Need.PAPER: 1150,
@@ -300,20 +301,6 @@ NEED_YEARS: Mapping[Need, int] = MappingProxyType(
         Need.CLOTHES: 1780,
         Need.REFINED_SUGAR: 1800,
         Need.SHOES: 1850,
-        Need.STEEL: 1855,
-        Need.TOOLS: 1870,
-        Need.MACHINERY: 1870,
-        Need.COPPER: 1880,
-        Need.CHEMICALS: 1880,
-        Need.FERTILISER: 1880,
-        Need.CEMENT: 1880,
-        Need.PLASTICS: 1950,
-        Need.APPLIANCES: 1950,
-        Need.FUEL: 1910,
-        Need.CARS: 1930,
-        Need.PLANES: 1935,
-        Need.TANKS: 1940,
-        Need.ELECTRONICS: 1960,
     }
 )
 
@@ -379,27 +366,21 @@ KIND_GOOD_YEARS: Mapping[tuple[BuildingKind, Good], int] = MappingProxyType(
     {(BuildingKind.PORT, Good.GAS): 1950}
 )
 
-# The year goods first appear, where that is after the game begins.
-GOOD_YEARS: Mapping[Good, int] = MappingProxyType(
-    {
-        Good.TOOLS: 1870,
-        Good.MACHINERY: 1870,
-        Good.CHEMICALS: 1880,
-        Good.FERTILISER: 1880,
-        Good.CEMENT: 1880,
-        Good.COPPER: 1880,
-        Good.OIL: 1855,
-        Good.RUBBER: 1900,
-        Good.FUEL: 1856,
-        Good.CARS: 1930,
-        Good.PLANES: 1935,
-        Good.TANKS: 1940,
-        Good.GAS: 1820,
-        Good.PLASTICS: 1950,
-        Good.APPLIANCES: 1950,
-        Good.ELECTRONICS: 1960,
-    }
-)
+
+def good_exists(good: Good, year: int) -> bool:
+    """Whether a good is made in a year: once its era has come (railroads.sim.tiles.good_era)."""
+    from railroads.sim.tiles import era_come, good_era
+
+    return era_come(good_era(good), year)
+
+
+def need_exists(need: Need, year: int) -> bool:
+    """Whether a need is felt in a year: once its year has come (NEED_YEARS) and the era of its
+    goods (railroads.sim.tiles.need_era)."""
+    from railroads.sim.tiles import era_come, need_era
+
+    return NEED_YEARS.get(need, 0) <= year and era_come(need_era(need), year)
+
 
 # What carrying a unit of each good to a building that takes it earns, at full satisfaction
 # (freight_of); goods left out earn CARGO_PRICE. Their market price is MARKET_TIMES as much, and
@@ -565,7 +546,7 @@ class Recipe:
         return {
             need: (swap, times)
             for need, (swap, times) in self.swaps.items()
-            if need in inputs and NEED_YEARS.get(swap, 0) <= year
+            if need in inputs and need_exists(swap, year)
         }
 
     def takes(self, year: int) -> set[Need]:
@@ -589,6 +570,7 @@ class Recipe:
 
 
 _RECIPE_INPUTS: dict[tuple[int, int], tuple[Recipe, Mapping[Need, float]]] = {}
+on_forget(_RECIPE_INPUTS.clear)
 
 
 def _inputs(recipe: Recipe, year: int) -> Mapping[Need, float]:
@@ -596,9 +578,7 @@ def _inputs(recipe: Recipe, year: int) -> Mapping[Need, float]:
     kept = _RECIPE_INPUTS.get((id(recipe), year))
     if kept is None or kept[0] is not recipe:
         inputs = {
-            need: amount
-            for need, amount in recipe.per_unit.items()
-            if NEED_YEARS.get(need, 0) <= year
+            need: amount for need, amount in recipe.per_unit.items() if need_exists(need, year)
         }
         kept = _RECIPE_INPUTS[(id(recipe), year)] = (recipe, MappingProxyType(inputs))
     return kept[1]
@@ -1121,7 +1101,7 @@ def makes_of(kind: BuildingKind, year: int) -> Mapping[Good, float]:
         {
             good: amount * make_factor(good, year)
             for good, amount in MAKES.get(kind, {}).items()
-            if KIND_GOOD_YEARS.get((kind, good), GOOD_YEARS.get(good, 0)) <= year
+            if KIND_GOOD_YEARS.get((kind, good), 0) <= year and good_exists(good, year)
         }
     )
 
@@ -1165,7 +1145,7 @@ def need_open(kind: BuildingKind, need: Need, year: int) -> bool:
     need a demand tile opens, once that tile is at its level (railroads.sim.tiles.UNLOCKS)."""
     from railroads.sim.tiles import opens
 
-    return need_year(kind, need) <= year and opens(kind, need, year)
+    return need_year(kind, need) <= year and need_exists(need, year) and opens(kind, need, year)
 
 
 def owned_boosts(kind: BuildingKind, year: int) -> frozenset[Need]:

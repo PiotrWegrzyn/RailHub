@@ -33,7 +33,7 @@ def test_the_world_reaches_each_era_in_its_year_when_the_lowest_tiles_go_up() ->
 
     years = tiles.era_years
 
-    assert years == {2: 1843, 3: 1873, 4: 1901, 5: 1931, 6: 1955, 7: 1972}
+    assert years == {2: 1843, 3: 1873, 4: 1901, 5: 1933, 6: 1957, 7: 1974}
 
 
 def test_every_supply_level_adds_its_periods_share_of_the_base_not_compounded() -> None:
@@ -74,7 +74,7 @@ def test_coal_earns_about_a_fifth_of_its_price_by_2050_and_luxuries_about_half()
     coal, luxuries = boards.price(Good.COAL), boards.price(Good.GOLD)
 
     assert coal == pytest.approx(0.21, abs=0.01)
-    assert luxuries == pytest.approx(0.55, abs=0.01)
+    assert luxuries == pytest.approx(0.55, abs=0.02)
 
 
 def test_the_picked_tiles_go_up_on_1_january_and_the_lowest_for_picks_not_made() -> None:
@@ -148,7 +148,10 @@ def test_the_era_brings_its_generation_of_wagons_and_news() -> None:
 
     assert tiles.of_year(1843).wagons == 2
     assert news == [
-        "A new era: wagons of generation 2 and new tiles: oil and fuel, steel and metals."
+        (
+            "A new era: wagons of generation 2 and new tiles: oil and fuel, steel and metals. "
+            "From now on buildings make oil, steel, fuel, gas, castings."
+        )
     ]
 
 

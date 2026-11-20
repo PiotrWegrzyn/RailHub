@@ -27,6 +27,7 @@ from railroads.sim.regrid import regrid
 from railroads.sim.steps import Steps
 from railroads.sim.summaries import MonthSummary, StationSummary
 from railroads.sim.tilemap import LAYERS, Terrain, TileMap
+from railroads.sim.tiles import kind_era
 
 # The share of the buildings the map keeps at least one of that land bought keeps too, and of
 # the chance a novelty not yet built had over the years played that it comes up there.
@@ -114,7 +115,10 @@ def quarter_of_top_ups(rng: np.random.Generator) -> frozenset:
             ladder.kinds[0]
             for ladder in GROWTH.ladders
             if ladder.kinds[0] in KEY_BUILDINGS
-            or (ladder.from_year > 0 and ladder.kinds[0] not in ONE_OFFS)
+            or (
+                (ladder.from_year > 0 or kind_era(ladder.kinds[0]) > 1)
+                and ladder.kinds[0] not in ONE_OFFS
+            )
         },
         key=lambda kind: kind.value,
     )
