@@ -657,7 +657,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             BuildingKind.TOOL_WORKS: Recipe(Good.TOOLS, 80, {Need.STEEL: 1.0}),
             BuildingKind.BARREL_MAKER: Recipe(Good.BARRELS, 40, {Need.PLANKS: 0.5}),
             BuildingKind.WINERY: Recipe(Good.WINE, 20, {Need.GRAPES: 4.0}, {Need.BARRELS: 2.0}),
-            BuildingKind.REFINERY: Recipe(Good.FUEL, 900, {Need.OIL: 1.0}),
+            BuildingKind.REFINERY: Recipe(Good.FUEL, 1_000, {Need.OIL: 1.0}),
             BuildingKind.CHEMICAL_WORKS: Recipe(
                 Good.CHEMICALS,
                 100,
@@ -874,9 +874,9 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.IRON_MINE: {Need.MACHINERY: 5},
         BuildingKind.LOGGING_CAMP: {Need.MACHINERY: 5},
         BuildingKind.RAILWAY_WORKS: {Need.STEEL: 200},
-        BuildingKind.POWER_PLANT: {Need.COAL: 20_000},
-        BuildingKind.DIESEL_POWER_PLANT: {Need.FUEL: 10_000},
-        BuildingKind.GAS_POWER_PLANT: {Need.GAS: 15_000},
+        BuildingKind.POWER_PLANT: {Need.COAL: 4_000},
+        BuildingKind.DIESEL_POWER_PLANT: {Need.FUEL: 30_000},
+        BuildingKind.GAS_POWER_PLANT: {Need.GAS: 10_000},
         BuildingKind.SPACE_CENTER: {Need.ELECTRONICS: 300, Need.FUEL: 1000, Need.FOOD: 300},
         BuildingKind.PEAR_HQ: {Need.ELECTRONICS: 500, Need.FOOD: 1000},
         BuildingKind.GIGAFACTORY: {

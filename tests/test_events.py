@@ -52,12 +52,16 @@ def test_every_building_takes_as_much_more_as_the_demand_for_the_need_whatever_i
     assert risen != pytest.approx(boards.of_year(1960).make_factor(Good.STEEL))
 
 
-def test_what_power_plants_take_does_not_rise() -> None:
-    activate(Tiles.until(2040))
+def test_power_plants_take_more_coal_only_from_the_era_they_came_in() -> None:
+    world = Tiles.until(2040)
+    activate(world)
 
-    risen = [rise_of(BuildingKind.POWER_PLANT, need, 2040) for need in Need]
+    risen = [
+        rise_of(BuildingKind.POWER_PLANT, Need.COAL, year) for year in (world.era_years[3], 2040)
+    ]
 
-    assert set(risen) == {1.0}
+    assert risen[0] == pytest.approx(1.0)
+    assert risen[1] > 1.0
 
 
 def test_the_telegraph_doubles_what_homes_want_of_newspapers() -> None:

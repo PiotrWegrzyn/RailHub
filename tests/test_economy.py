@@ -653,9 +653,9 @@ def test_ports_bring_in_gas_only_once_there_is_any_in_1950(year: int, made: set)
 @pytest.mark.parametrize(
     ("kind", "need", "wanted"),
     [
-        (BuildingKind.POWER_PLANT, Need.COAL, 20_000.0),
-        (BuildingKind.DIESEL_POWER_PLANT, Need.FUEL, 10_000.0),
-        (BuildingKind.GAS_POWER_PLANT, Need.GAS, 15_000.0),
+        (BuildingKind.POWER_PLANT, Need.COAL, 4_000.0),
+        (BuildingKind.DIESEL_POWER_PLANT, Need.FUEL, 30_000.0),
+        (BuildingKind.GAS_POWER_PLANT, Need.GAS, 10_000.0),
     ],
 )
 def test_each_kind_of_power_plant_burns_only_its_own_fuel(

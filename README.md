@@ -559,7 +559,7 @@ window (H) lists the same.
 | Tool works (era 3) | 80 tools | 80 steel (from era 2) |  |
 | Winery | 20 wine | 80 grapes | 40 barrels |
 | Barrel maker | 40 barrels | 20 planks |  |
-| Refinery (era 2) | 900 fuel | 900 oil (from era 2) |  |
+| Refinery (era 2) | 1,000 fuel | 1,000 oil (from era 2) |  |
 | Chemical works (era 3) | 100 chemicals, 50 fertiliser | 50 salt, 50 boiler fuel |  |
 | Electronics plant (era 6) | 50 electronics | 50 copper (from era 4), 50 chemicals (from era 3) |  |
 | Car factory (era 4) | 20 cars | 100 steel (from era 2), 40 fuel (from era 2) |  |
@@ -592,9 +592,9 @@ window (H) lists the same.
 | Sugar refinery (1800) | 60 refined sugar | 30 sugar | 6 coal (from 1700), 6 limestone |
 | Porcelain works (1710) | 30 porcelain | 15 clay | 7.5 coal (from 1700) |
 | Butcher (1850) | 120 meat | 48 animals |  |
-| Power plant |  | 2e+04 coal (from 1700) |  |
-| Diesel power plant |  | 1e+04 fuel (from era 2) |  |
-| Gas power plant |  | 1.5e+04 gas (from era 2) |  |
+| Power plant (era 3) |  | 4,000 coal (from 1700) |  |
+| Diesel power plant (era 5) |  | 3e+04 fuel (from era 2) |  |
+| Gas power plant (era 6) |  | 1e+04 gas (from era 2) |  |
 | Battery gigafactory |  | 300 chemicals (from era 3), 200 electronics (from era 6), 200 steel (from era 2) | 300 copper (from era 4) |
 | Juice works (1870) | 100 juice | 50 fruit, 50 glass, 25 plastics (from era 6) | 10 refined sugar (from 1800) |
 | Big juice works (1870) | 375 juice | 187.5 fruit, 187.5 glass, 93.75 plastics (from era 6) | 37.5 refined sugar (from 1800) |
@@ -627,8 +627,8 @@ window (H) lists the same.
 | Mega barrel maker | 250 barrels | 125 planks |  |
 | Big winery | 50 wine | 200 grapes | 100 barrels |
 | Mega winery | 125 wine | 500 grapes | 250 barrels |
-| Big refinery (era 2) | 2,250 fuel | 2,250 oil (from era 2) |  |
-| Mega refinery (era 2) | 5,625 fuel | 5,625 oil (from era 2) |  |
+| Big refinery (era 2) | 2,500 fuel | 2,500 oil (from era 2) |  |
+| Mega refinery (era 2) | 6,250 fuel | 6,250 oil (from era 2) |  |
 | Big chemical works (era 3) | 250 chemicals, 125 fertiliser | 125 salt, 125 boiler fuel |  |
 | Mega chemical works (era 3) | 625 chemicals, 312.5 fertiliser | 312.5 salt, 312.5 boiler fuel |  |
 | Big electronics plant (era 6) | 125 electronics | 125 copper (from era 4), 125 chemicals (from era 3) |  |
