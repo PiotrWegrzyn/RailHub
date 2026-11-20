@@ -69,3 +69,12 @@ def test_the_speed_steps_up_and_down_its_settings_up_to_ten_times(
     clock.faster(steps)
 
     assert clock.speed == after
+
+
+def test_a_paused_clock_lets_no_time_pass_at_any_speed() -> None:
+    clock = GameClock(speed=10, paused=True)
+
+    turned = clock.advance(SECONDS_PER_MONTH * 3)
+
+    assert turned == 0
+    assert clock.months_in(SECONDS_PER_MONTH) == 0.0

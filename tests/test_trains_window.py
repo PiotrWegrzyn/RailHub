@@ -236,3 +236,17 @@ def test_the_cargo_line_says_goods_earn_freight_for_what_buildings_take_up_to_th
     assert (label, amount) == ("Cargo", 120.0)
     assert f"up to {SCARCE_WORTH:g} times as much" in tip
     assert "what the buildings around would take at once" in tip
+
+
+def test_a_stop_card_stays_open_when_its_first_car_is_added(gui: None) -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3)), Stop((6, 20))]
+    window = TrainsWindow(open=True, chosen=train.name)
+    draw_frames(window, railway)
+    train.stops[1].add_car(Good.COAL)
+
+    draw_frames(window, railway)
+
+    assert window._folded[(train.name, 1)]

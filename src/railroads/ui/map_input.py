@@ -25,6 +25,7 @@ TOOL_KEYS = (
 # How fast the arrow keys move the map, in screen pixels a second.
 PAN_SPEED = 900.0
 
+
 def key_pressed(*keys: imgui.Key) -> bool:
     return any(imgui.is_key_pressed(key, repeat=False) for key in keys)
 
@@ -139,7 +140,7 @@ class MapInput:
         if key_pressed(imgui.Key.q) and view.build.tool in STATION_TOOLS:
             view.tools.turn_station(view.hovered)
         if key_pressed(imgui.Key.t):
-            view.build.trains.open = not view.build.trains.open
+            view.build.toggle_trains()
         if key_pressed(imgui.Key.s):
             view.build.stations.open = not view.build.stations.open
         if key_pressed(imgui.Key.f):

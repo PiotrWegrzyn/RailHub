@@ -38,6 +38,7 @@ from railroads.ui import spotlight
 from railroads.ui.goal_view import draw_goal_news
 from railroads.ui.help_window import HelpWindow
 from railroads.ui.history_pictures import HistoryPictures, opening_center
+from railroads.ui.lively import Lively
 from railroads.ui.main_menu import (
     LoadChoice,
     MainMenu,
@@ -88,6 +89,7 @@ MONTH_FRAME_SECONDS = 0.016
 # In the browser, how long the main menu's settings stay as they are before the page's setup
 # worker starts growing the game they would start, so typing a seed doesn't start one a digit.
 AHEAD_AFTER_S = 1.0
+LIVELY = Lively()
 
 
 class App:
@@ -165,6 +167,7 @@ class App:
         self._notice_until = time.monotonic() + NOTICE_SECONDS
 
     def gui(self) -> None:
+        LIVELY.keep()
         if not self._styled:
             apply_theme()
             self._styled = True
@@ -547,6 +550,7 @@ class Shell:
         self._waiting_shown = False
 
     def gui(self) -> None:
+        LIVELY.keep()
         if not self._styled:
             apply_theme()
             self._styled = True

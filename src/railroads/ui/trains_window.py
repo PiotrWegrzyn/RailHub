@@ -396,7 +396,7 @@ class TrainsWindow:
         has to load, and what the next stop wants; returns whether it was removed."""
         with card("stop", highlight=here):
             key = (train.name, index)
-            opened = self._folded.get(key, not (stop.cars and not here))
+            opened = self._folded.setdefault(key, not (stop.cars and not here))
             removed, toggled = self._draw_stop_head(railway, train, index, stop, here, opened)
             if toggled:
                 opened = not opened
@@ -441,7 +441,11 @@ class TrainsWindow:
             imgui.text(name)
         if not opened and len(train.stops) > 1:
             following = railway.name_of(train.stops[train.onward(index)].cell)
-            note = "only refuels" if stop.refuel_only else f"{len(stop.cars)} cars to {following}"
+            note = (
+                "only refuels"
+                if stop.refuel_only
+                else f"{len(stop.cars)} car{'' if len(stop.cars) == 1 else 's'} to {following}"
+            )
             _note_before(note, right - 190)
         imgui.same_line(right - 190)
         imgui.begin_disabled(stop.refuel_only)

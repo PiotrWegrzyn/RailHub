@@ -1318,8 +1318,9 @@ Clicking a card opens what changed, station by station, and outlines those cells
 a right click dismisses it. The newest five cards show.
 
 The top bar shows the date and runs the game at x1, x2, x3, x6 or x10 speed (`SPEEDS`), - and = stepping
-down and up. It also zooms, and toggles the map overview
-(M) and the world map (W). What is under the mouse shows in a strip at the top of the map, and
+down and up; the pause button or Space stops time while you build. It also zooms, and toggles the map
+overview (M) and the world map (W); in a window narrower than 1,100 pixels it leaves out the target
+and the view's buttons, whose keys and the mouse wheel still work. What is under the mouse shows in a strip at the top of the map, and
 below it a small card lists the buildings in that cell, one to a line, each with how satisfied it
 is and the icons of what it makes and needs.
 

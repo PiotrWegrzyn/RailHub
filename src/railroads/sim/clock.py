@@ -2,7 +2,7 @@
 the map's history left off, and on for ever. A map's history begins in HISTORY_START, so the
 usual thousand years of it leave off in START_YEAR; play can begin as late as the year before
 END_YEAR, and from START_YEAR to END_YEAR is a hundred hours at normal speed. Play can run faster,
-at any of SPEEDS.
+at any of SPEEDS, or stand still.
 """
 
 from dataclasses import dataclass
@@ -41,6 +41,8 @@ class GameClock:
     speed: int = 1
     # The year play began, which is where the map's history left off.
     first_year: int = START_YEAR
+    # Whether time stands still, whatever the speed.
+    paused: bool = False
 
     def faster(self, steps: int) -> None:
         """Moves the speed this many steps up SPEEDS, or down for steps below 0, staying within
@@ -50,11 +52,13 @@ class GameClock:
 
     def months_in(self, seconds: float) -> float:
         """How much of a month `seconds` of play make at the current speed."""
-        return seconds * self.speed / self.seconds_per_month
+        return 0.0 if self.paused else seconds * self.speed / self.seconds_per_month
 
     def advance(self, seconds: float) -> int:
         """Lets `seconds` of play pass at the current speed; returns how many months turned
         over."""
+        if self.paused:
+            return 0
         self.seconds += seconds * self.speed
         turned = int(self.seconds // self.seconds_per_month)
         self.seconds -= turned * self.seconds_per_month

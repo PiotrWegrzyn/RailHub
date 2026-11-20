@@ -11,7 +11,7 @@ from railroads.sim.constructions import Track
 from railroads.sim.demolition import bulldoze_price, station_site_price
 from railroads.sim.finance import STATION_PRICE, dollars
 from railroads.sim.grids import Cell
-from railroads.sim.routes import Route, plan_route_steps, route_price, station_way
+from railroads.sim.routes import Route, plan_route_steps, route_price, station_problem, station_way
 from railroads.sim.steps import Steps, finish
 from railroads.ui.build_menu import PRICED_TOOLS, STATION_TOOLS, Tool
 
@@ -185,9 +185,10 @@ class MapTools:
                 else f"New platform here: {dollars(site)}. Q turns it."
             )
             return
+        problem = station_problem(constructions, cell)
         build.hover_note = (
-            "A station can't go here"
-            if site is None
+            f"A station can't go here: {problem or 'a building here cant be taken down'}."
+            if problem is not None or site is None
             else f"Here: {dollars(STATION_PRICE + site)}"
             + (f" ({dollars(site)} of it clearing the cell)" if site else "")
             + ". Q turns it."

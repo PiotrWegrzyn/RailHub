@@ -223,6 +223,24 @@ def station_way(constructions: Constructions, cell: Cell) -> tuple[int, int]:
     return 0, count // 2
 
 
+def station_problem(constructions: Constructions, cell: Cell) -> str | None:
+    """Why a station cannot go in the cell, or None if it can."""
+    tile = constructions.tile_map.tile(cell)
+    if any(isinstance(b, Station) for b in constructions.at(cell)):
+        return "there is a station here already"
+    if tile.terrain == Terrain.RIVER:
+        return "stations can't stand in a river"
+    if tile.terrain != Terrain.LAND:
+        return "stations can't stand on water"
+    if constructions.tile_map.is_locked(cell):
+        return "this land is not yours yet"
+    if tile.relief == Relief.MOUNTAINS:
+        return "stations can't stand on mountains"
+    if station_site_price(constructions, cell) is None:
+        return "a building here can't be taken down"
+    return None
+
+
 def build_station(
     growth: Growth, cell: Cell, ends: tuple[int, int] | None = None
 ) -> set[Cell] | None:
@@ -233,15 +251,7 @@ def build_station(
     station_site_price."""
     constructions = growth.constructions
     station = Station(cell, station_way(constructions, cell) if ends is None else ends)
-    built = constructions.at(cell)
-    tile = constructions.tile_map.tile(cell)
-    if any(isinstance(b, Station) for b in built) or tile.terrain != Terrain.LAND:
-        return None
-    if constructions.tile_map.is_locked(cell):
-        return None
-    if station_site_price(constructions, cell) is None:
-        return None
-    if tile.relief == Relief.MOUNTAINS:
+    if station_problem(constructions, cell) is not None:
         return None
     if ends is not None and constructions._way_problem(ends) is not None:
         return None

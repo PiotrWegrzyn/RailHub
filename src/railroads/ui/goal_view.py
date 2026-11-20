@@ -46,16 +46,17 @@ class Worth:
 WORTH = Worth()
 
 
-def draw_worth(game: Game) -> None:
-    """The worth and the target on the current line, what the worth is made of on hover, and
-    how many months are left while the cash is below nothing."""
+def draw_worth(game: Game, target: bool = True) -> None:
+    """The worth, and the target unless `target` is off, on the current line, what the worth is
+    made of on hover, and how many months are left while the cash is below nothing."""
     goal = game.goal
     value = WORTH.of(game)
     imgui.align_text_to_frame_padding()
     colour = GROWN if value.total >= goal.target else BRASS
     imgui.text_colored(
         imgui.ImVec4(*colour),
-        f"{fa.ICON_FA_UNIVERSITY}  {dollars(value.total)} / {dollars(goal.target)}",
+        f"{fa.ICON_FA_UNIVERSITY}  {dollars(value.total)}"
+        + (f" / {dollars(goal.target)}" if target else ""),
     )
     if imgui.is_item_hovered():
         _worth_tip(goal, value)

@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     from railroads.ui.map_view import MapView
 
 WINDOW_BUTTON_WIDTH = 30.0
+# Below this window width the bar leaves out the target and the view's buttons (the wheel, M, W
+# and F still do their work), so the speeds and the window buttons fit.
+COMPACT_WIDTH = 1100.0
 LEAVE_POPUP = "Leave this game?"
 
 
@@ -47,6 +50,8 @@ def _draw_top_bar(app: App) -> None:
             clock.faster(-1)
         if key_pressed(imgui.Key.equal, imgui.Key.keypad_add):
             clock.faster(1)
+        if key_pressed(imgui.Key.space):
+            clock.paused = not clock.paused
     imgui.align_text_to_frame_padding()
     imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_CLOCK}  {clock.date}")
     imgui.same_line(0, 8)
@@ -56,20 +61,27 @@ def _draw_top_bar(app: App) -> None:
     imgui.same_line(0, 8)
     diamond()
     imgui.same_line(0, 8)
-    draw_worth(app.game)
+    compact = imgui.get_window_width() < COMPACT_WIDTH
+    draw_worth(app.game, target=not compact)
     imgui.same_line(0, 8)
     diamond()
     imgui.same_line(0, 8)
+    if toggle_button(fa.ICON_FA_PAUSE, clock.paused, "Stop time while you build (Space)"):
+        clock.paused = not clock.paused
+    imgui.same_line(0, 2)
     for speed in SPEEDS:
         if toggle_button(
-            f"x{speed}", clock.speed == speed, f"Run {speed} times as fast (- and = change speed)"
+            f"x{speed}",
+            clock.speed == speed and not clock.paused,
+            f"Run {speed} times as fast (- and = change speed)",
         ):
-            clock.speed = speed
+            clock.speed, clock.paused = speed, False
         imgui.same_line(0, 2)
-    imgui.same_line(0, 6)
-    diamond()
-    imgui.same_line(0, 8)
-    draw_view_controls(app.view)
+    if not compact:
+        imgui.same_line(0, 6)
+        diamond()
+        imgui.same_line(0, 8)
+        draw_view_controls(app.view)
     padding = imgui.get_style().window_padding.x
     buttons = 5 if app.saves is not None else 3
     right = imgui.get_window_width() - padding - buttons * WINDOW_BUTTON_WIDTH - (buttons - 1) * 4
@@ -87,7 +99,8 @@ def _draw_top_bar(app: App) -> None:
         imgui.same_line(0, 16)
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*GROWN), app.notice)
-    imgui.same_line(right)
+    imgui.same_line(0, 8)
+    imgui.same_line(max(right, imgui.get_cursor_pos_x()))
     size = (WINDOW_BUTTON_WIDTH, 0)
     if toggle_button(fa.ICON_FA_CHART_BAR, app.reports.open, "Reports (G)", size):
         app.reports.open = not app.reports.open

@@ -501,7 +501,7 @@ class TilesWindow:
         if picking and not pickable:
             draw_list.add_rect_filled(low, high, color_u32(SHADE), 6.0)
         if hovered:
-            self._tip(card, board, low.x, high.y)
+            self._tip(card, board, low, high)
         if clicked and picking:
             if card.picked:
                 tiles.unpick(board, card.tile)
@@ -569,10 +569,17 @@ class TilesWindow:
         draw_list.pop_clip_rect()
 
     @staticmethod
-    def _tip(card: Card, board: Board, left: float, bottom: float) -> None:
-        """What a card stands for, under it: what carrying each of its goods earns now and once
-        picked, and on demand every buyer it opens."""
-        imgui.set_next_window_pos((left, bottom + 2))
+    def _tip(card: Card, board: Board, low: imgui.ImVec2, high: imgui.ImVec2) -> None:
+        """What a card stands for, beside it on the side with more room, so it stays on the
+        screen and leaves the cards in the next row to be seen: what carrying each of its goods
+        earns now and once picked, and on demand every buyer it opens."""
+        screen = imgui.get_io().display_size
+        right = (low.x + high.x) / 2 < screen.x / 2
+        lower = (low.y + high.y) / 2 > screen.y / 2
+        imgui.set_next_window_pos(
+            (high.x + 4 if right else low.x - 4, high.y if lower else low.y),
+            pivot=(0.0 if right else 1.0, 1.0 if lower else 0.0),
+        )
         imgui.begin_tooltip()
         imgui.text_colored(imgui.ImVec4(*BRASS), "Freight a unit")
         for good in TILE_GOODS[card.tile]:

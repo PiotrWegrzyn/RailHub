@@ -227,7 +227,7 @@ class BuildMenu:
         if toggle_button(
             f"{fa.ICON_FA_TRAIN}  Trains", self.trains.open, "Your trains (T)", (0, BUTTON_HEIGHT)
         ):
-            self.trains.open = not self.trains.open
+            self.toggle_trains()
         spot("trains")
         imgui.same_line()
         if toggle_button(
@@ -287,6 +287,13 @@ class BuildMenu:
         """Shows a message above the build bar for a few seconds."""
         self.message = message
         self.message_at = time.monotonic()
+
+    def toggle_trains(self) -> None:
+        """Opens the trains window, putting the tool away so a click on the map adds a stop
+        rather than building, or closes it."""
+        self.trains.open = not self.trains.open
+        if self.trains.open:
+            self.choose(Tool.NONE)
 
     def choose(self, tool: Tool) -> None:
         self.tool = tool
