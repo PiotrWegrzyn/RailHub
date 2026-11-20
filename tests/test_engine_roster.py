@@ -461,6 +461,7 @@ def test_a_new_generation_of_cars_comes_in_its_year(year: int, generation: int) 
 
 def test_cars_are_of_the_eras_generation_up_to_the_newest_an_engine_pulls() -> None:
     railway = line()
+    railway.year = 1980
 
     generations = [
         railway.car_generation(Good.COAL, engine) for engine in ("planet", "mogul", "heavy_diesel")

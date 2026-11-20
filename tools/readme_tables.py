@@ -67,8 +67,8 @@ def building_row(row: BuildingHelp) -> str:
             bonus.append((need, spare, since))
     makes = [(good, amount, "") for good, amount in row.makes]
     name = kind.value[0].upper() + kind.value[1:]
-    if row.from_year:
-        name += f" ({row.from_year})"
+    if row.since:
+        name += f" ({row.since})"
     return f"| {name} | {_amounts(makes)} | {_amounts(must)} | {_amounts(bonus)} |"
 
 

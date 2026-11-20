@@ -734,7 +734,6 @@ STEEL_MILLS = _merges(
         chance_per_doubling={Points.ORE: 0.000007, Points.INDUSTRY: 0.00000042},
         most_per_cell=1,
         most_nearby=2,
-        from_year=1855,
     )
 )
 
@@ -801,17 +800,17 @@ def _works(
 # Rare resources, each on the deposits a map was given.
 RESOURCES = (
     _resource(BuildingKind.IRON_MINE, Deposit.IRON),
-    _resource(BuildingKind.COPPER_MINE, Deposit.COPPER, 1880, 0.003),
+    _resource(BuildingKind.COPPER_MINE, Deposit.COPPER, 0, 0.003),
     _resource(BuildingKind.GOLD_MINE, Deposit.GOLD),
     _resource(BuildingKind.DIAMOND_MINE, Deposit.DIAMONDS),
-    _resource(BuildingKind.OIL_WELL, Deposit.OIL, 1855, 0.003),
+    _resource(BuildingKind.OIL_WELL, Deposit.OIL, 0, 0.003),
     _resource(BuildingKind.SALT_WORKS, Deposit.SALT),
     _resource(BuildingKind.FISHERY, Deposit.FISH),
     _resource(BuildingKind.SHEEP_FARM, Deposit.WOOL, crowded_at=FARMS_CROWDED_OUT),
     _resource(BuildingKind.VINEYARD, Deposit.GRAPES, crowded_at=FARMS_CROWDED_OUT),
     _resource(BuildingKind.COTTON_FIELD, Deposit.COTTON),
     _resource(BuildingKind.COFFEE_PLANTATION, Deposit.COFFEE, 1700, crowded_at=FARMS_CROWDED_OUT),
-    _resource(BuildingKind.RUBBER_PLANTATION, Deposit.RUBBER, 1900, 0.003),
+    _resource(BuildingKind.RUBBER_PLANTATION, Deposit.RUBBER, 0, 0.003),
     _resource(BuildingKind.INCENSE_GROVE, Deposit.INCENSE),
 )
 
@@ -1249,15 +1248,13 @@ WORKS = (
         {},
         base=5e-8,
     ),
-    _works(BuildingKind.TOOL_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 1870, base=2e-6),
-    _works(
-        BuildingKind.CHEMICAL_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {IND: 3}, 1880, 20_000, 4e-7
-    ),
-    _works(BuildingKind.REFINERY, {IND: 4e-7, Points.ORE: 1e-6}, {}, 1856, 10_000, 1e-6),
-    _works(BuildingKind.CAR_FACTORY, {IND: 6e-7}, {IND: 6}, 1910, 40_000, 4e-6),
-    _works(BuildingKind.ELECTRONICS_PLANT, {POP: 2.5e-8, IND: 4e-7}, {IND: 3}, 1960, 30_000, 4e-7),
-    _works(BuildingKind.PLANE_FACTORY, {POP: 2.5e-8, IND: 6e-7}, {IND: 6}, 1935, 40_000, 1e-5),
-    _works(BuildingKind.TANK_FACTORY, {IND: 6e-7}, {IND: 6}, 1940, 40_000, 1e-5),
+    _works(BuildingKind.TOOL_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 0, base=2e-6),
+    _works(BuildingKind.CHEMICAL_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {IND: 3}, 0, 20_000, 4e-7),
+    _works(BuildingKind.REFINERY, {IND: 4e-7, Points.ORE: 1e-6}, {}, 0, 10_000, 1e-6),
+    _works(BuildingKind.CAR_FACTORY, {IND: 6e-7}, {IND: 6}, 0, 40_000, 4e-6),
+    _works(BuildingKind.ELECTRONICS_PLANT, {POP: 2.5e-8, IND: 4e-7}, {IND: 3}, 0, 30_000, 4e-7),
+    _works(BuildingKind.PLANE_FACTORY, {POP: 2.5e-8, IND: 6e-7}, {IND: 6}, 0, 40_000, 1e-5),
+    _works(BuildingKind.TANK_FACTORY, {IND: 6e-7}, {IND: 6}, 0, 40_000, 1e-5),
     _works(BuildingKind.BRICKWORKS, {POP: 1e-9, Points.ORE: 1.2e-8}, {}, base=CRAFT_BASE),
     _works(BuildingKind.GLASSWORKS, {POP: 4e-10, IND: 6e-9, Points.ORE: 6e-9}, {}, base=CRAFT_BASE),
     _works(
@@ -1281,10 +1278,10 @@ WORKS = (
     _works(BuildingKind.PRINTING_WORKS, {POP: 1.5e-9, IND: 3e-9}, {}, 1600, PRINTING_CELLS, 2e-7),
     _works(BuildingKind.SUGAR_REFINERY, {IND: 6e-9, Points.FOOD: 3e-9}, {}, 1800, base=CRAFT_BASE),
     _works(BuildingKind.PORCELAIN_WORKS, {POP: 4e-10, Points.ORE: 6e-9}, {}, 1710, 30_000, 2e-7),
-    _works(BuildingKind.MACHINE_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 1870, base=2e-6),
-    _works(BuildingKind.CEMENT_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {IND: 3}, 1880, 20_000, 4e-7),
-    _works(BuildingKind.PLASTICS_WORKS, {IND: 4e-7}, {IND: 3}, 1950, 30_000, 4e-7),
-    _works(BuildingKind.APPLIANCE_FACTORY, {POP: 2.5e-8, IND: 4e-7}, {IND: 3}, 1950, 30_000, 4e-7),
+    _works(BuildingKind.MACHINE_WORKS, {POP: 1.5e-9, IND: 1e-7}, {IND: 2}, 0, base=2e-6),
+    _works(BuildingKind.CEMENT_WORKS, {IND: 4e-7, Points.ORE: 6e-7}, {IND: 3}, 0, 20_000, 4e-7),
+    _works(BuildingKind.PLASTICS_WORKS, {IND: 4e-7}, {IND: 3}, 0, 30_000, 4e-7),
+    _works(BuildingKind.APPLIANCE_FACTORY, {POP: 2.5e-8, IND: 4e-7}, {IND: 3}, 0, 30_000, 4e-7),
 )
 
 # The only source of guns when play begins.
@@ -1298,7 +1295,7 @@ JEWELLERS = replace(
     apart=JEWELLERS_APART,
 )
 
-CAR_DEALERS = _works(BuildingKind.CAR_DEALER, {POP: 0.000001}, {POP: 120}, 1910, 16_000)
+CAR_DEALERS = _works(BuildingKind.CAR_DEALER, {POP: 0.000001}, {POP: 120}, 0, 16_000)
 
 LADDERS = (
     TOWNS,

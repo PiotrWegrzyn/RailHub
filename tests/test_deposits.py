@@ -130,12 +130,12 @@ def test_buildings_of_a_later_era_do_not_open_before_their_year() -> None:
     assert growth.year == 1860
 
 
-def test_needs_start_in_their_year() -> None:
-    before = needs_of(BuildingKind.FLATS, 1909)
-    after = needs_of(BuildingKind.FLATS, 1910)
+def test_needs_start_in_the_era_of_their_goods() -> None:
+    before = needs_of(BuildingKind.FLATS, 1842)
+    after = needs_of(BuildingKind.FLATS, 1843)
 
     assert Need.FUEL not in before
-    assert after[Need.FUEL] == pytest.approx(30 * want_factor(BuildingKind.FLATS, Need.FUEL, 1910))
+    assert after[Need.FUEL] == pytest.approx(30 * want_factor(BuildingKind.FLATS, Need.FUEL, 1843))
 
 
 def test_works_with_nothing_to_work_from_close_after_exactly_thirty_years_starving() -> None:
@@ -153,12 +153,12 @@ def test_works_with_nothing_to_work_from_close_after_exactly_thirty_years_starvi
     assert standing == [1, 0]
 
 
-def test_flats_want_a_car_from_1910() -> None:
-    before = needs_of(BuildingKind.FLATS, 1909)
-    after = needs_of(BuildingKind.FLATS, 1910)
+def test_flats_want_a_car_once_the_vehicles_era_comes() -> None:
+    before = needs_of(BuildingKind.FLATS, 1900)
+    after = needs_of(BuildingKind.FLATS, 1901)
 
     assert Need.CARS not in before
-    assert after[Need.CARS] == pytest.approx(3 * want_factor(BuildingKind.FLATS, Need.CARS, 1910))
+    assert after[Need.CARS] == pytest.approx(3 * want_factor(BuildingKind.FLATS, Need.CARS, 1901))
 
 
 @pytest.mark.parametrize(("gap", "opens"), [(6, False), (12, True)])

@@ -10,7 +10,9 @@ supply the share its level's period gives it (SUPPLY_STEPS, PERIODS), on demand 
 the others back.
 
 Once every open supply tile reaches the level of the next era (ERAS), the era comes with the next
-generation of wagons and its new tiles, on both boards at the lowest level on that board.
+generation of wagons and its new tiles, on both boards at the lowest level on that board. A
+good, the buildings that make it and those there only to buy it come into the game with its era:
+its tile's, or a later one of its own (GOOD_ERAS).
 
 What a unit of a tile's goods earns is its PRICE LIST: (demand ÷ supply) ** PRICE_POWER of its
 base, worked out from the levels alone, so it changes only when a tile goes up a level, and the
@@ -27,7 +29,7 @@ from enum import Enum
 from types import MappingProxyType
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.goods import FITS, Good, Need
+from railroads.sim.goods import FITS, MAKES, NEEDS, Good, Need
 from railroads.sim.year_caches import forget
 
 
@@ -164,8 +166,8 @@ ERAS: tuple[Era, ...] = (
     ),
     Era(9, 2, (T.OIL, T.STEEL)),
     Era(14, 3, (T.MACHINES, T.CHEMICALS)),
-    Era(18, 4, (T.COPPER,)),
-    Era(22, 5, (T.VEHICLES,)),
+    Era(18, 4, (T.COPPER, T.VEHICLES)),
+    Era(22, 5, ()),
     Era(25, 6, (T.MODERN,)),
     Era(27, 7, ()),
 )
@@ -191,7 +193,7 @@ SUPPLY_STEPS: Mapping[Tile, tuple[float, ...]] = MappingProxyType(
         T.MACHINES: (0.0, 0.0, 0.60, 1.00, 1.50, 1.00, 0.50),
         T.CHEMICALS: (0.0, 0.0, 0.50, 0.80, 1.50, 1.50, 0.60),
         T.COPPER: (0.0, 0.0, 0.0, 0.80, 1.50, 1.50, 0.80),
-        T.VEHICLES: (0.0, 0.0, 0.0, 0.0, 1.00, 2.00, 0.80),
+        T.VEHICLES: (0.0, 0.0, 0.0, 0.80, 1.00, 2.00, 0.80),
         T.MODERN: (0.0, 0.0, 0.0, 0.0, 0.0, 2.00, 1.50),
     }
 )
@@ -454,9 +456,12 @@ class Tiles:
 
 
 def era_news(era: Era) -> str:
+    number = ERAS.index(era) + 1
     new = ", ".join(tile.value for tile in era.tiles)
     tiles = f" and new tiles: {new}" if new else ""
-    return f"A new era: wagons of generation {era.wagons}{tiles}."
+    goods = [good.value for good in Good if good_era(good) == number]
+    made = f" From now on buildings make {', '.join(goods)}." if goods else ""
+    return f"A new era: wagons of generation {era.wagons}{tiles}.{made}"
 
 
 # The world as it grows by itself, far enough for any year a game asks about.
@@ -501,12 +506,49 @@ def opens(kind: BuildingKind, need: Need, year: int) -> bool:
 
 def opened_from(kind: BuildingKind, need: Need) -> str:
     """From when a kind of building takes a need, in a few words: the demand tile level that opens
-    it, its year, or "" for always."""
+    it, the era of its goods, its year, or "" for always."""
     from railroads.sim.goods import need_year
 
     unlock = UNLOCKS.get((kind, need))
     if unlock is not None:
         tile, level = unlock
         return f"{tile.value} demand {level}"
+    era = need_era(need)
+    if era > 1:
+        return f"era {era}"
     year = need_year(kind, need)
     return str(year) if year else ""
+
+
+# The era each tile comes in, and goods that come in a later era than their tile.
+TILE_ERAS: Mapping[Tile, int] = MappingProxyType(
+    {tile: number for number, era in enumerate(ERAS, 1) for tile in era.tiles}
+)
+GOOD_ERAS: Mapping[Good, int] = MappingProxyType({G.PLANES: 5, G.TANKS: 5})
+# Buildings there only to buy a later era's goods, which come in with them.
+ERA_BUYERS = frozenset({K.CAR_DEALER})
+
+
+def good_era(good: Good) -> int:
+    return GOOD_ERAS.get(good, TILE_ERAS[TILE_OF[good]])
+
+
+def need_era(need: Need) -> int:
+    """The era a need comes in: that of the first good meeting it."""
+    return min(good_era(good) for good in FITS[need])
+
+
+def kind_era(kind: BuildingKind) -> int:
+    """The era a kind of building comes in: that of the first good it makes, or of the last it
+    must buy if it is there only for those; the first era for the rest."""
+    made = MAKES.get(kind)
+    if made:
+        return min(good_era(good) for good in made)
+    if kind in ERA_BUYERS:
+        return max(need_era(need) for need in NEEDS[kind])
+    return 1
+
+
+def era_come(era: int, year: int) -> bool:
+    """Whether an era has come by a year: the first one always has."""
+    return era <= 1 or of_year(year).era >= era

@@ -113,16 +113,16 @@ def test_three_of_a_rank_become_one_of_the_next(small: BuildingKind, big: Buildi
 @pytest.mark.parametrize(
     ("kind", "year", "need", "wanted"),
     [
-        (BuildingKind.OUTPOST, 1850, Need.GUNS, True),
-        (BuildingKind.OUTPOST, 1909, Need.CARS, False),
-        (BuildingKind.OUTPOST, 1910, Need.CARS, True),
+        (BuildingKind.OUTPOST, 1872, Need.GUNS, False),
+        (BuildingKind.OUTPOST, 1873, Need.GUNS, True),
+        (BuildingKind.OUTPOST, 1900, Need.CARS, False),
+        (BuildingKind.OUTPOST, 1901, Need.CARS, True),
         (BuildingKind.OUTPOST, 2000, Need.PLANES, False),
-        (BuildingKind.BASE, 1934, Need.PLANES, False),
-        (BuildingKind.BASE, 1935, Need.PLANES, True),
+        (BuildingKind.BASE, 1932, Need.PLANES, False),
+        (BuildingKind.BASE, 1933, Need.PLANES, True),
         (BuildingKind.BASE, 2000, Need.TANKS, False),
-        (BuildingKind.HEADQUARTERS, 1935, Need.PLANES, True),
-        (BuildingKind.HEADQUARTERS, 1939, Need.TANKS, False),
-        (BuildingKind.HEADQUARTERS, 1940, Need.TANKS, True),
+        (BuildingKind.HEADQUARTERS, 1932, Need.TANKS, False),
+        (BuildingKind.HEADQUARTERS, 1933, Need.TANKS, True),
     ],
 )
 def test_what_the_military_wants_goes_by_rank_and_era(
@@ -136,8 +136,9 @@ def test_what_the_military_wants_goes_by_rank_and_era(
 def test_a_gun_factory_arms_an_outpost_next_to_it_on_its_own() -> None:
     tile_map = make_map(12)
     economy = Economy(tile_map)
+    economy.year = 1880
     flat = int(np.ravel_multi_index((5, 5), tile_map.grid.shape))
-    economy.stock[(BuildingKind.GUN_FACTORY, Need.STEEL)][flat] = 30.0
+    economy.stock[(BuildingKind.GUN_FACTORY, Need.STEEL)][flat] = 60.0
     economy.stock[(BuildingKind.GUN_FACTORY, Need.PLANKS)][flat] = 30.0
     factories = np.zeros(tile_map.grid.shape, dtype=np.int64)
     factories[5, 5] = 1

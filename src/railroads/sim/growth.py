@@ -108,6 +108,7 @@ from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tech import Effect
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
+from railroads.sim.tiles import era_come, kind_era
 from railroads.sim.towns import Towns
 from railroads.sim.year_caches import year_cached
 
@@ -250,6 +251,12 @@ VENUES = (
 # A processor or venue comes up only once something on the map makes each of its main inputs
 # (inputs_of): a winery needs a vineyard, a sushi hut a fishery and a rice paddy. Only where the
 # land lets their makers grow, then, do they ever open.
+
+
+def ladder_open(ladder: Ladder, year: int) -> bool:
+    """Whether a ladder has opened by a year: its year and the era of its first kind have come
+    (railroads.sim.tiles.kind_era)."""
+    return ladder.from_year <= year and era_come(kind_era(ladder.kinds[0]), year)
 
 
 @year_cached
@@ -958,7 +965,7 @@ class Growth:
         growing = [
             place
             for place in self._places
-            if place.ladder.from_year <= self.year and place.cells.size and place.highest > 0
+            if ladder_open(place.ladder, self.year) and place.cells.size and place.highest > 0
         ]
         thin = [place for place in growing if place.highest <= THINNING_UP_TO and months == 1]
         tries = dict(
@@ -1109,7 +1116,8 @@ class Growth:
         kind = ladder.kinds[0]
         if kind in KEY_BUILDINGS:
             return max(1, round(KEY_LEAST * self._land_cells / KEY_LAND_CELLS))
-        return 1 if ladder.from_year > 0 and kind not in ONE_OFFS else 0
+        opens_later = ladder.from_year > 0 or kind_era(kind) > 1
+        return 1 if opens_later and kind not in ONE_OFFS else 0
 
     def _top_up(self, rng: np.random.Generator) -> set[Cell]:
         """Puts up one more of the first kind of every opened ladder below its least, in its
@@ -1117,7 +1125,7 @@ class Growth:
         changed: set[Cell] = set()
         for place in self._places:
             ladder = place.ladder
-            if ladder.from_year > self.year:
+            if not ladder_open(ladder, self.year):
                 continue
             if self.rule.top_ups is not None and ladder.kinds[0] not in self.rule.top_ups:
                 continue

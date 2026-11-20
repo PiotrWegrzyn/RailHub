@@ -16,3 +16,8 @@ def year_cached[F: Callable[..., object]](fn: F) -> F:
 def forget() -> None:
     for clear in _CLEARS:
         clear()
+
+
+def on_forget(clear: Callable[[], None]) -> None:
+    """Has forget call this too."""
+    _CLEARS.append(clear)

@@ -39,18 +39,17 @@ def test_homes_want_as_much_more_of_a_need_as_its_tiles_demand_gives() -> None:
     assert goods > 1.0
 
 
-@pytest.mark.parametrize(
-    ("kind", "good"), [(BuildingKind.STEEL_MILL, Good.STEEL), (BuildingKind.FARM, Good.WHEAT)]
-)
-def test_processors_and_makers_take_in_as_much_more_as_the_supply_of_what_they_make(
-    kind: BuildingKind, good: Good
+@pytest.mark.parametrize("kind", [BuildingKind.STEEL_MILL, BuildingKind.FARM, BuildingKind.HOUSE])
+def test_every_building_takes_as_much_more_as_the_demand_for_the_need_whatever_it_makes(
+    kind: BuildingKind,
 ) -> None:
     boards = Tiles.until(1960)
     activate(boards)
 
     risen = rise_of(kind, Need.MACHINERY, 1960)
 
-    assert risen == pytest.approx(boards.of_year(1960).make_factor(good))
+    assert risen == pytest.approx(boards.of_year(1960).want_factor(Need.MACHINERY))
+    assert risen != pytest.approx(boards.of_year(1960).make_factor(Good.STEEL))
 
 
 def test_what_power_plants_take_does_not_rise() -> None:

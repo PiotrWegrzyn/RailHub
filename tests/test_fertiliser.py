@@ -1,9 +1,11 @@
 import pytest
 from test_economy import STATION, counts, holding, make_map
 
+from builders import boards_with
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Economy
 from railroads.sim.goods import Good
+from railroads.sim.tiles import Tile, activate
 
 
 def test_a_chemical_works_leaves_half_a_unit_of_fertiliser_over_every_unit_of_chemicals() -> None:
@@ -47,3 +49,19 @@ def test_machinery_lets_a_mine_dig_up_to_half_as_much_again(
     trade = economy.trade(placed, holding(1000.0, MACHINERY=5.0))
 
     assert trade.gathered[STATION].get(good, 0.0) == pytest.approx(made)
+
+
+@pytest.mark.parametrize(
+    ("made", "wanted", "gas"), [(1.0, 1.0, 100.0), (1.5, 1.0, 150.0), (1.0, 1.25, 80.0)]
+)
+def test_supply_makes_a_works_make_more_from_its_inputs_and_demand_take_more_for_as_much(
+    made: float, wanted: float, gas: float
+) -> None:
+    activate(boards_with({Tile.OIL: made}, {Tile.COAL: wanted}))
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 8), BuildingKind.GASWORKS, 1))
+
+    trade = economy.trade(placed, holding(1000.0, COAL=50.0))
+
+    assert trade.gathered[STATION][Good.GAS] == pytest.approx(gas)

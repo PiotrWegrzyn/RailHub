@@ -44,25 +44,26 @@ def test_the_help_gives_what_a_building_makes_and_wants_in_a_month() -> None:
 def test_the_help_says_when_a_need_begins() -> None:
     wants = {need: since for need, _, since in row_of(BuildingKind.HEADQUARTERS).wants}
 
-    assert wants[Need.GUNS] == ""
-    assert wants[Need.TANKS] == "1940"
+    assert wants[Need.GUNS] == "era 3"
+    assert wants[Need.TANKS] == "era 5"
 
 
 @pytest.mark.parametrize(
-    ("kind", "travellers", "space", "year"),
+    ("kind", "travellers", "space", "since"),
     [
-        (BuildingKind.HOUSE, 1, 1, 0),
-        (BuildingKind.ST_PAULS, 2137, 1, 0),
-        (BuildingKind.FACTORY, 10, 3, 1780),
-        (BuildingKind.AIRPORT, 200, 1, 1920),
+        (BuildingKind.HOUSE, 1, 1, ""),
+        (BuildingKind.ST_PAULS, 2137, 1, ""),
+        (BuildingKind.FACTORY, 10, 3, "1780"),
+        (BuildingKind.AIRPORT, 200, 1, "1920"),
+        (BuildingKind.STEEL_MILL, 30, 3, "era 2"),
     ],
 )
-def test_the_help_gives_travellers_space_and_opening_year(
-    kind: BuildingKind, travellers: int, space: int, year: int
+def test_the_help_gives_travellers_space_and_when_it_opens(
+    kind: BuildingKind, travellers: int, space: int, since: str
 ) -> None:
     row = row_of(kind)
 
-    assert (row.travellers, row.space, row.from_year) == (travellers, space, year)
+    assert (row.travellers, row.space, row.since) == (travellers, space, since)
 
 
 def test_the_help_gives_the_market_price_and_freight_of_every_good() -> None:

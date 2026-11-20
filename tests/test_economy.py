@@ -364,8 +364,10 @@ def test_canneries_take_their_fruit_before_houses_eat_it() -> None:
     assert economy.stock[(BuildingKind.FOOD_PLANT, Need.FRUIT)][flat(economy, (8, 8))] == 3.0
 
 
-@pytest.mark.parametrize(("year", "goods"), [(1854, 10.0), (1855, 0.0)])
-def test_a_factory_works_on_planks_alone_until_steel_comes_in_1855(year: int, goods: float) -> None:
+@pytest.mark.parametrize(("year", "goods"), [(1842, 10.0), (1843, 0.0)])
+def test_a_factory_works_on_planks_alone_until_steel_comes_with_its_era(
+    year: int, goods: float
+) -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     economy.year = year
@@ -414,8 +416,8 @@ def test_bakeries_take_their_wheat_before_houses_eat_it_and_bread_feeds_houses()
     assert trade.handed_for[STATION][(Need.FOOD, Good.BREAD)] == pytest.approx(HOUSE_FOOD - baked)
 
 
-@pytest.mark.parametrize(("year", "goods"), [(1879, 30.0), (1880, 6.0)])
-def test_a_big_factory_works_on_steel_alone_until_copper_comes_in_1880(
+@pytest.mark.parametrize(("year", "goods"), [(1900, 30.0), (1901, 6.0)])
+def test_a_big_factory_works_on_steel_alone_until_copper_comes_with_its_era(
     year: int, goods: float
 ) -> None:
     tile_map = make_map()
@@ -614,10 +616,8 @@ def test_stations_hand_out_the_most_valuable_food_first() -> None:
     assert trade.handed_for[STATION] == {(Need.FOOD, Good.MEAT): HOUSE_FOOD}
 
 
-@pytest.mark.parametrize(("year", "planes"), [(1959, 2.0), (1960, 1.0)])
-def test_aircraft_factories_want_electronics_once_there_are_any_in_1960(
-    year: int, planes: float
-) -> None:
+@pytest.mark.parametrize(("year", "planes"), [(1956, 2.0), (1957, 1.0)])
+def test_aircraft_factories_want_electronics_once_their_era_comes(year: int, planes: float) -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     economy.year = year
@@ -823,10 +823,10 @@ def test_a_juice_works_bottles_fruit_in_glass_twice_as_far_in_plastic_and_more_w
     assert trade.gathered[STATION][Good.JUICE] == pytest.approx(juice)
 
 
-def test_plastic_bottles_only_once_there_is_plastic_in_1950() -> None:
+def test_plastic_bottles_only_once_there_is_plastic_in_its_era() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
-    economy.year = 1949
+    economy.year = 1956
     placed = counts(tile_map, ((8, 8), BuildingKind.JUICE_WORKS, 1))
 
     trade = economy.trade(placed, holding(100.0, APPLES=1.0, PLASTICS=1.0))
@@ -1041,9 +1041,9 @@ def test_a_sawmill_keeps_only_three_months_of_machinery() -> None:
 
 
 @pytest.mark.parametrize(
-    ("year", "machinery", "logs"), [(1869, 5.0, 20.0), (1870, 0.0, 20.0), (1870, 5.0, 40.0)]
+    ("year", "machinery", "logs"), [(1872, 5.0, 20.0), (1873, 0.0, 20.0), (1873, 5.0, 40.0)]
 )
-def test_machinery_lets_any_logging_camp_fell_twice_the_logs_from_1870(
+def test_machinery_lets_any_logging_camp_fell_twice_the_logs_once_its_era_comes(
     year: int, machinery: float, logs: float
 ) -> None:
     tile_map = make_map()

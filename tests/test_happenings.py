@@ -131,14 +131,6 @@ def test_the_news_of_the_popes_death_gives_the_hour() -> None:
     assert "21:37" in happenings.news[0].story
 
 
-def test_a_good_made_for_the_first_time_makes_news() -> None:
-    growth = grown(1880, {})
-
-    happenings = happen(growth, 1880)
-
-    assert "New: chemicals" in [h.title for h in happenings.news]
-
-
 def test_the_news_of_a_war_stops_the_game_until_the_player_reads_it() -> None:
     game = Game(Constructions(flat_map(20, 20)), start_year=1913)
     game.begin_history()

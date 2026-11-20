@@ -1,6 +1,5 @@
 """What history (railroads.sim.events) does to one game's map, and the news the player gets of it:
-a headline for every event as its month comes and for every good that is first made
-(GOOD_YEARS).
+a headline for every event as its month comes.
 
 The year before a war NEW_GARRISONS patches of military ground of GARRISON_SIZE cells go up, at
 least GARRISONS_APART steps from any other, each with a base and two outposts; as it begins
@@ -23,7 +22,6 @@ from railroads.sim.events import (
     WAR_GROWTH,
     Event,
 )
-from railroads.sim.goods import GOOD_YEARS
 from railroads.sim.grids import BoolGrid, Cell, Grid
 from railroads.sim.ladders import MILITARY, Points
 from railroads.sim.tilemap import Deposit, Relief, Terrain
@@ -150,16 +148,6 @@ class Happenings:
                         "Peace",
                         f"{event.title} is over, and the soldiers go home.",
                         (f"{len(gone)} military buildings pulled down",),
-                    )
-                )
-        for good, first in GOOD_YEARS.items():
-            if first == year:
-                self.news.append(
-                    Headline(
-                        date,
-                        f"New: {good.value}",
-                        f"{good.value.capitalize()} is made for the first time this year, by "
-                        "buildings that go up from now on.",
                     )
                 )
         return changed
