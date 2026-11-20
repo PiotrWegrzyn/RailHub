@@ -5,14 +5,18 @@ Buildings breed (breeding_of): a cell's chance of another of a ladder's kinds is
 
     base + (base + pull x served) x log2(1 + drawing)
 
-where base is the ladder's base chance, pull BREEDING_TIMES x base unless the ladder gives its own, as homes
-do so that few come up alone while towns still grow;
-served the points the buildings of its own kind of points give in the cell times their
-satisfaction (railroads.sim.economy), and drawing the points around the cell that draw it, each times its weight: six times the people and twice the industry for
-houses, food and people
-for food, people and industry for industry, mines, mills and ports, and twice the people for
-shops, inns and churches. So the base chance holds anywhere the land allows, good surroundings
-raise it even where none of the kind stands yet, and what is satisfied breeds far faster. A building that comes up in a cell
+where base is the ladder's base chance (in railroads.sim.ladders.CHANCE_UNIT), pull
+BREEDING_TIMES x base unless the ladder gives its own, as homes do so that few come up alone
+while towns still grow; served the points the buildings of its own kind of points give in the
+cell times their satisfaction (railroads.sim.economy), and drawing the points around the cell
+that draw it, each times its weight: six times the people and twice the industry for houses,
+food and people for food, people and industry for industry, mines, mills and ports, and twice
+the people for shops, inns and churches. Every building also gives its points to its own
+ladder, and a ladder drawn by industry is drawn by its own ladder's points OWN_KIND_TIMES as
+strongly instead, by industry only CATEGORY_SHARE as strongly, and breeds by its own served
+points the same way, so a served sawmill breeds sawmills and hardly any other works. So the base
+chance holds anywhere the land allows, good surroundings raise it even where none of the kind
+stands yet, and what is satisfied breeds far faster. A building that comes up in a cell
 goes up in it or a random cell next to it, and one that finds no room there spills over further
 (railroads.sim.room).
 
@@ -125,6 +129,15 @@ SKYSCRAPER_STARS = 4
 # How many times its base chance each served point of a ladder's own kind in a cell adds there,
 # per doubling of what draws it, unless the ladder gives its own (railroads.sim.ladders.Ladder).
 BREEDING_TIMES = 30.0
+# Ladders drawn by industry are drawn instead by their own kind around them OWN_KIND_TIMES as
+# strongly as industry drew them, and by industry CATEGORY_SHARE of that; in a cell, each served
+# point of their own kind counts OWN_KIND_TIMES and each of the rest of their kind of points
+# CATEGORY_SHARE. So a served sawmill breeds sawmills, not brickworks.
+OWN_KIND_TIMES = 10.0
+CATEGORY_SHARE = 0.1
+# What a ladder's chances can follow: points of a kind, or the points the buildings of one
+# ladder give, named by its first kind.
+Channel = Points | BuildingKind
 # The points around a cell that draw a ladder's buildings, and how much each counts, by the kind
 # of points they give.
 INDUSTRIAL = {Points.POPULATION: 1.0, Points.INDUSTRY: 1.0}
@@ -182,10 +195,13 @@ class Breeding:
 
     spawn: float
     own: Points
-    drawn_by: Mapping[Points, float]
+    drawn_by: Mapping[Channel, float]
     per_doubling: float
     # The points nearby that its whole chance is divided by, one plus each times its weight.
-    shunned_by: Mapping[Points, float] = field(default_factory=dict)
+    shunned_by: Mapping[Channel, float] = field(default_factory=dict)
+    # The served points in a cell that make it breed, each times its weight; its own kind of
+    # points when not given.
+    served_by: Mapping[Channel, float] = field(default_factory=dict)
 
 
 _BREEDINGS: dict[tuple[int, int], tuple[Ladder, Mapping, Breeding]] = {}
@@ -199,14 +215,33 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
     own = points[ladder.kinds[0]][0]
     kind = ladder.kinds[0]
     spawn = CHANCE_UNIT * ladder.base
-    drawn_by = DRAWN_BY_KIND.get(kind) or DRAWN_BY.get(own, {own: 1.0})
+    drawn_by: dict[Channel, float] = dict(DRAWN_BY_KIND.get(kind) or DRAWN_BY.get(own, {own: 1.0}))
+    served_by: dict[Channel, float] = {own: 1.0}
+    industry = drawn_by.get(Points.INDUSTRY)
+    if industry and own != Points.POPULATION:
+        drawn_by[kind] = OWN_KIND_TIMES * industry
+        drawn_by[Points.INDUSTRY] = CATEGORY_SHARE * industry
+        served_by = {kind: OWN_KIND_TIMES, own: CATEGORY_SHARE}
     shunned_by = SHUNNED_BY.get(kind, {})
     pull = (
         BREEDING_TIMES * spawn if ladder.per_doubling is None else CHANCE_UNIT * ladder.per_doubling
     )
-    breeding = Breeding(spawn, own, drawn_by, pull, shunned_by)
+    breeding = Breeding(spawn, own, drawn_by, pull, shunned_by, served_by)
     _BREEDINGS[(id(ladder), id(points))] = (ladder, points, breeding)
     return breeding
+
+
+def _kind_channels(rule: GrowthRule) -> dict[BuildingKind, BuildingKind]:
+    """Every kind on a ladder whose chances follow the points of its own ladder, to the first
+    kind of that ladder."""
+    channels: dict[BuildingKind, BuildingKind] = {}
+    for ladder in rule.ladders:
+        breeding = breeding_of(ladder, rule.points)
+        first = ladder.kinds[0]
+        if first in breeding.drawn_by or first in breeding.served_by:
+            for kind in ladder.kinds:
+                channels[kind] = first
+    return channels
 
 
 # The homes around a tavern, club, sushi hut or filling station that gets all it needs grow this
@@ -343,13 +378,15 @@ class _Touched:
     """The places whose chances one kind of points changes, laid out to work out all their
     chances in a few cells at once (Growth._reckon_touched), the same sums in the same order as
     Growth._reckon: their rows in the stacked chances and lands, the points they draw and shun
-    as rows of the stacked points with their weights (0 for a slot a place doesn't use), their
-    own kind of points, base chance and what each served point adds."""
+    as rows of the stacked points with their weights (0 for a slot a place doesn't use), the
+    served points they breed by with their weights, base chance and what each served point
+    adds."""
 
     places: tuple[_Place, ...]
     rows: npt.NDArray[np.intp]
     lands: npt.NDArray[np.intp]
-    own: npt.NDArray[np.intp]
+    served_by: npt.NDArray[np.intp]
+    served_weights: FloatGrid
     spawn: FloatGrid
     per_doubling: FloatGrid
     drawn_by: npt.NDArray[np.intp]
@@ -410,13 +447,17 @@ class Growth:
         # The cells last month's trade was worked out on.
         self._traded = np.zeros(0, dtype=np.intp)
         rows, cols = grid.neighbour_index_grids()
+        # The kinds on ladders that follow their own ladder's points, each to its ladder's first.
+        self._kind_channel = _kind_channels(rule)
+        channels = [*Points, *dict.fromkeys(self._kind_channel.values())]
         self._nearby = {
-            points: self._neighbourhood_sum(self.points(points), rows, cols) for points in Points
+            channel: self._neighbourhood_sum(self.points(channel), rows, cols)
+            for channel in channels
         }
         self.economy = Economy(tile_map)
         self._near = self.economy.neighbourhoods.index
         # Each cell's points of every kind counted as served, multiplied by how satisfied.
-        self._served = {points: np.zeros(grid.rows * grid.cols) for points in Points}
+        self._served = {channel: np.zeros(grid.rows * grid.cols) for channel in self._nearby}
         self._places = []
         everywhere = np.arange(grid.rows * grid.cols)
         # Ladders growing on the same land share its weights, and the cells it allows.
@@ -502,7 +543,7 @@ class Growth:
         for place in self._places:
             kept.setdefault(id(place.ladder.land), (place.ladder.land, place.land))
         self._land_of = tuple(kept.values())
-        kinds = list(Points)
+        kinds = list(self._nearby)
         self._nearby_all = np.stack([self._nearby[points] for points in kinds]).reshape(
             len(kinds), size
         )
@@ -513,6 +554,7 @@ class Growth:
             self._served[points] = self._served_all[at]
         breedings = [self._breeding(place) for place in self._places]
         drawn_slots = max((len(b.drawn_by) for b in breedings), default=1)
+        served_slots = max((len(self._served_by(b)) for b in breedings), default=1)
         shunned_slots = max((len(b.shunned_by) for b in breedings), default=1) or 1
         self._touched = {}
         for points in kinds:
@@ -525,8 +567,13 @@ class Growth:
             drawn_weights = np.zeros((len(picked), drawn_slots))
             shunned_by = np.zeros((len(picked), shunned_slots), dtype=np.intp)
             shunned_weights = np.zeros((len(picked), shunned_slots))
+            served_by = np.zeros((len(picked), served_slots), dtype=np.intp)
+            served_weights = np.zeros((len(picked), served_slots))
             for at, row in enumerate(picked):
                 b = breedings[row]
+                for slot, (served, weight) in enumerate(self._served_by(b).items()):
+                    served_by[at, slot] = kinds.index(served)
+                    served_weights[at, slot] = weight
                 for slot, (drawn, weight) in enumerate(b.drawn_by.items()):
                     drawn_by[at, slot] = kinds.index(drawn)
                     drawn_weights[at, slot] = weight
@@ -537,7 +584,8 @@ class Growth:
                 places=tuple(self._places[row] for row in picked),
                 rows=np.array(picked, dtype=np.intp),
                 lands=np.array([place_lands[row] for row in picked], dtype=np.intp),
-                own=np.array([kinds.index(breedings[row].own) for row in picked], dtype=np.intp),
+                served_by=served_by,
+                served_weights=served_weights,
                 spawn=np.array([[breedings[row].spawn] for row in picked]).reshape(-1, 1),
                 per_doubling=np.array([[breedings[row].per_doubling] for row in picked]).reshape(
                     -1, 1
@@ -651,7 +699,7 @@ class Growth:
     def _count_served(self, trade: Trade) -> None:
         """Works out each cell's served points of every kind, and what they add to the chances:
         in the cells traded on, and the cells traded on last month that have no buildings now."""
-        served = {points: np.zeros(trade.cells.size) for points in Points}
+        served = {channel: np.zeros(trade.cells.size) for channel in self._served}
         assumed = None if self.assumed_shares is None else self.assumed_shares[trade.cells]
         for kind in trade.got:
             bonus = trade.bonus.get(kind)
@@ -663,7 +711,11 @@ class Growth:
                 share = np.where(np.isnan(assumed), share, assumed)
             points, value = self.rule.points[kind]
             count = self._counts[kind].ravel()[trade.cells].astype(np.float64)
-            served[points] += np.maximum(share, 0.0) * value * count
+            given = np.maximum(share, 0.0) * value * count
+            served[points] += given
+            channel = self._kind_channel.get(kind)
+            if channel is not None:
+                served[channel] += given
         served[Points.POPULATION] *= 1.0 + LIVELY_GROWTH * self._lively(trade)
         emptied = np.setdiff1d(self._traded, trade.cells, assume_unique=True)
         self._traded = trade.cells
@@ -677,7 +729,7 @@ class Growth:
             cells = every[moved]
             old[cells] = now[moved]
             for place in self._places:
-                if self._breeding(place).own == points:
+                if points in self._served_by(self._breeding(place)):
                     self._reckon(place, cells)
 
     def _lively(self, trade: Trade) -> FloatGrid:
@@ -769,6 +821,17 @@ class Growth:
     def _breeding(self, place: _Place) -> Breeding:
         return breeding_of(place.ladder, self.rule.points)
 
+    @staticmethod
+    def _served_by(breeding: Breeding) -> Mapping[Channel, float]:
+        return breeding.served_by or {breeding.own: 1.0}
+
+    def _served_in(self, breeding: Breeding, cells: npt.NDArray[np.intp] | slice) -> FloatGrid:
+        """The served points a ladder breeds by in these cells, each times its weight."""
+        return sum(
+            weight * self._served[channel][cells]
+            for channel, weight in self._served_by(breeding).items()
+        )
+
     def _reckon(self, place: _Place, cells: npt.NDArray[np.intp]) -> None:
         """Works out the ladder's chances in these cells afresh."""
         breeding = self._breeding(place)
@@ -776,7 +839,7 @@ class Growth:
             weight * self._nearby[points].ravel()[cells]
             for points, weight in breeding.drawn_by.items()
         )
-        served = self._served[breeding.own][cells]
+        served = self._served_in(breeding, cells)
         doublings = np.log2(1 + drawing)
         raw = breeding.spawn + (breeding.spawn + breeding.per_doubling * served) * doublings
         if breeding.shunned_by:
@@ -792,14 +855,14 @@ class Growth:
     def _reckon_everywhere(self) -> None:
         """Works out every ladder's chances in every cell afresh, as _reckon does, the doublings
         of what draws them once for all the ladders drawn alike."""
-        doublings: dict[tuple[tuple[Points, float], ...], FloatGrid] = {}
+        doublings: dict[tuple[tuple[Channel, float], ...], FloatGrid] = {}
         for place in self._places:
             breeding = self._breeding(place)
             drawn_by = tuple(breeding.drawn_by.items())
             if drawn_by not in doublings:
                 drawing = sum(weight * self._nearby[points].ravel() for points, weight in drawn_by)
                 doublings[drawn_by] = np.log2(1 + drawing)
-            served = self._served[breeding.own]
+            served = self._served_in(breeding, slice(None))
             raw = (
                 breeding.spawn
                 + (breeding.spawn + breeding.per_doubling * served) * doublings[drawn_by]
@@ -853,12 +916,12 @@ class Growth:
         """How many grown buildings of a kind stand in each cell."""
         return self._counts[kind]
 
-    def points(self, points: Points = Points.POPULATION) -> IntGrid:
-        """Each cell's points of one kind."""
+    def points(self, points: Channel = Points.POPULATION) -> IntGrid:
+        """Each cell's points of one kind, or the points the buildings of one ladder give."""
         total = np.zeros(self._grid.shape, dtype=np.int64)
         for kind, count in self._counts.items():
             given, value = self.rule.points[kind]
-            if given == points:
+            if given == points or self._kind_channel.get(kind) == points:
                 total += value * count
         return total
 
@@ -880,8 +943,8 @@ class Growth:
             if given == Points.POPULATION
         )
 
-    def nearby(self, points: Points = Points.POPULATION) -> IntGrid:
-        """The points of one kind in each cell's neighbourhood."""
+    def nearby(self, points: Channel = Points.POPULATION) -> IntGrid:
+        """The points of one kind, or of one ladder, in each cell's neighbourhood."""
         return self._nearby[points]
 
     def chances(self, ladder: Ladder = TOWNS) -> FloatGrid:
@@ -1303,13 +1366,17 @@ class Growth:
         around = self._near[:, here]
         flat = np.concatenate(([here], around[around < self._near.shape[1]]))
         self._nearby_all[self._points_row[points], flat] += how_many * value
-        touched = self._touched[points]
-        if not touched.places:
-            return
-        chances = self._reckon_touched(touched, flat)
-        if how_many > 0:
-            for place, most in zip(touched.places, chances.max(axis=1).tolist(), strict=True):
-                place.highest = max(place.highest, most)
+        channel = self._kind_channel.get(kind)
+        if channel is not None:
+            self._nearby_all[self._points_row[channel], flat] += how_many * value
+        for changed in (points,) if channel is None else (points, channel):
+            touched = self._touched[changed]
+            if not touched.places:
+                continue
+            chances = self._reckon_touched(touched, flat)
+            if how_many > 0:
+                for place, most in zip(touched.places, chances.max(axis=1).tolist(), strict=True):
+                    place.highest = max(place.highest, most)
 
     def _reckon_touched(self, touched: _Touched, cells: npt.NDArray[np.intp]) -> FloatGrid:
         """Works out the chances of all the touched places in these cells afresh, as _reckon
@@ -1319,7 +1386,14 @@ class Growth:
         drawing = weights[:, :1] * nearby[touched.drawn_by[:, 0]]
         for slot in range(1, weights.shape[1]):
             drawing = drawing + weights[:, slot : slot + 1] * nearby[touched.drawn_by[:, slot]]
-        served = self._served_all[touched.own[:, None], cells]
+        served_weights = touched.served_weights
+        served = served_weights[:, :1] * self._served_all[touched.served_by[:, :1], cells]
+        for slot in range(1, served_weights.shape[1]):
+            served = (
+                served
+                + served_weights[:, slot : slot + 1]
+                * self._served_all[touched.served_by[:, slot : slot + 1], cells]
+            )
         doublings = np.log2(1 + drawing)
         raw = touched.spawn + (touched.spawn + touched.per_doubling * served) * doublings
         if touched.shunning.size:

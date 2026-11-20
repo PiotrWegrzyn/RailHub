@@ -9,6 +9,8 @@ from railroads.sim.economy import Trade
 from railroads.sim.grids import Cell, HexGrid
 from railroads.sim.growth import (
     BREEDING_TIMES,
+    CATEGORY_SHARE,
+    OWN_KIND_TIMES,
     UNDYING,
     Growth,
     _allowed,
@@ -391,7 +393,7 @@ def industry_trade(tile_map: TileMap, cell: tuple[int, int]) -> Trade:
 
 
 @pytest.mark.parametrize(("people", "industry"), [(0, 0), (6, 0), (0, 1)])
-def test_a_served_factory_breeds_by_the_people_and_half_as_much_again_the_industry_around_it(
+def test_a_served_factory_breeds_by_the_factories_around_it_and_a_tenth_as_much_by_industry(
     people: int, industry: int
 ) -> None:
     tile_map = make_map()
@@ -408,8 +410,10 @@ def test_a_served_factory_breeds_by_the_people_and_half_as_much_again_the_indust
 
     growth._count_served(industry_trade(tile_map, (5, 5)))
 
-    drawing = people + 1.5 * (value + industry * growth.rule.points[BuildingKind.STEEL_MILL][1])
-    raised = (breeding.spawn + breeding.per_doubling * value) * np.log2(1 + drawing)
+    steel = industry * growth.rule.points[BuildingKind.STEEL_MILL][1]
+    drawing = people + 1.5 * (OWN_KIND_TIMES * value + CATEGORY_SHARE * (value + steel))
+    served = (OWN_KIND_TIMES + CATEGORY_SHARE) * value
+    raised = (breeding.spawn + breeding.per_doubling * served) * np.log2(1 + drawing)
     assert points == Points.INDUSTRY
     assert growth.chances(FACTORIES)[5, 5] == pytest.approx(
         (breeding.spawn + raised) * FACTORIES.land.weights(tile_map)[5, 5]
@@ -760,9 +764,16 @@ def test_gasworks_are_drawn_by_industry_and_dairies_by_people_twice() -> None:
     gas = breeding_of(gasworks, POINTS)
     milk = breeding_of(dairies, POINTS)
 
-    assert gas.drawn_by == {Points.INDUSTRY: 1.0}
+    assert gas.drawn_by == {
+        Points.INDUSTRY: CATEGORY_SHARE,
+        BuildingKind.GASWORKS: OWN_KIND_TIMES,
+    }
     assert gas.shunned_by == {Points.POPULATION: 1.0}
-    assert milk.drawn_by == {Points.POPULATION: 2.0, Points.INDUSTRY: 1.0}
+    assert milk.drawn_by == {
+        Points.POPULATION: 2.0,
+        Points.INDUSTRY: CATEGORY_SHARE,
+        BuildingKind.DAIRY: OWN_KIND_TIMES,
+    }
 
 
 def test_bakeries_give_food_points_but_come_up_and_breed_like_works() -> None:
@@ -784,3 +795,32 @@ def test_homes_are_pulled_to_towns_by_their_own_chance_per_doubling_not_their_ba
 
     assert pull == pytest.approx(CHANCE_UNIT * TOWNS.per_doubling)
     assert pull != pytest.approx(BREEDING_TIMES * CHANCE_UNIT * TOWNS.base)
+
+
+def test_a_served_sawmill_breeds_sawmills_far_more_than_brickworks() -> None:
+    tile_map = make_map()
+    constructions = Constructions(tile_map)
+    build(constructions, (5, 5), BuildingKind.SAWMILL, 1)
+    growth = Growth(constructions, NO_TRADE)
+    sawmills = next(ladder for ladder in LADDERS if ladder.kinds[0] == BuildingKind.SAWMILL)
+    bricks = next(ladder for ladder in LADDERS if ladder.kinds[0] == BuildingKind.BRICKWORKS)
+    cells = np.array([np.ravel_multi_index((5, 5), tile_map.grid.shape)])
+    one = {BuildingKind.SAWMILL: np.ones(1)}
+    nothing = {BuildingKind.SAWMILL: np.zeros(1)}
+
+    growth._count_served(Trade(cells, one, one, nothing, nothing))
+
+    sawmill_raise = growth.chances(sawmills)[5, 5] / sawmills.land.weights(tile_map)[5, 5]
+    brick_raise = growth.chances(bricks)[5, 5] / bricks.land.weights(tile_map)[5, 5]
+    assert sawmill_raise / sawmills.base > 50 * brick_raise / bricks.base
+
+
+def test_a_big_furniture_maker_counts_as_furniture_makers_around_it() -> None:
+    tile_map = make_map()
+    constructions = Constructions(tile_map)
+    build(constructions, (5, 5), BuildingKind.BIG_FURNITURE_MAKER, 1)
+
+    growth = Growth(constructions, NO_TRADE)
+
+    big = growth.rule.points[BuildingKind.BIG_FURNITURE_MAKER][1]
+    assert growth.nearby(BuildingKind.FURNITURE_MAKER)[5, 5] == big
