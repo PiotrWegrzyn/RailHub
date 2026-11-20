@@ -630,14 +630,6 @@ def animals() -> Sprite:
     return p.sprite()
 
 
-def coke() -> Sprite:
-    p = _canvas()
-    for x, y, size in ((-4, 2, 4), (2, 3, 5), (-1, -3, 4), (4, -2, 3)):
-        p.blob(x - size / 2, y - size / 2, x + size / 2, y + size / 2, (70, 70, 76))
-        p.point(x - 1, y - 1, (130, 130, 138))
-    return p.sprite()
-
-
 def milk() -> Sprite:
     p = _canvas()
     tin: RGB = (196, 200, 206)
@@ -1265,7 +1257,6 @@ ICONS: dict[str, Callable[[], Sprite]] = {
     "potatoes": potatoes,
     "rice": rice,
     "cattle": cattle,
-    "coke": coke,
     "milk": milk,
     "dairy products": dairy,
     "pots": pots,

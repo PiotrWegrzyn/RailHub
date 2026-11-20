@@ -36,7 +36,6 @@ from railroads.ui.pixel.art.commerce import (
 from railroads.ui.pixel.art.crafts import (
     carpet_weaver,
     clock_maker,
-    coke_plant,
     fish_dryer,
     foundry,
     hospital,
@@ -247,7 +246,6 @@ BUILDINGS = (
     "big_bakery",
     "mega_bakery",
     "gasworks",
-    "coke_plant",
     "potter",
     "tile_works",
     "foundry",
@@ -397,7 +395,6 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "big_bakery": big_bakery,
     "mega_bakery": mega_bakery,
     "gasworks": gasworks,
-    "coke_plant": coke_plant,
     "potter": potter,
     "tile_works": tile_works,
     "foundry": foundry,

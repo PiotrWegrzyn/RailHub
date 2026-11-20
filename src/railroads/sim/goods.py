@@ -112,7 +112,6 @@ class Good(Enum):
     REFINED_SUGAR = "refined sugar"
     PORCELAIN = "porcelain"
     MEAT = "meat"
-    COKE = "coke"
     MILK = "milk"
     DAIRY = "dairy products"
     POTS = "pots"
@@ -191,7 +190,6 @@ class Need(Enum):
     GAS = "gas"
     HEATING = "heating"
     BOILER_FUEL = "boiler fuel"
-    COKE = "coke"
     MILK = "milk"
     MEAT = "meat"
     POTS = "pots"
@@ -295,7 +293,6 @@ NEED_YEARS: Mapping[Need, int] = MappingProxyType(
         Need.COAL: 1700,
         Need.LUXURIES: 1700,
         Need.CASTINGS: 1800,
-        Need.COKE: 1850,
         Need.COFFEE: 1700,
         Need.HOT_DRINKS: 1700,
         Need.CLOTHES: 1780,
@@ -415,7 +412,6 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.PIGS: 14,
         Good.CHICKENS: 6,
         Good.EGGS: 4,
-        Good.COKE: 14,
         Good.MILK: 6,
         Good.DAIRY: 9,
         Good.POTS: 10,
@@ -616,10 +612,7 @@ LOGS_A_CHIP = 5
 RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
     _with_merged(
         {
-            BuildingKind.STEEL_MILL: Recipe(
-                Good.STEEL, 200, {Need.IRON: 5.0, Need.COAL: 10.0}, {Need.COKE: 0.25}
-            ),
-            BuildingKind.COKE_PLANT: Recipe(Good.COKE, 100, {Need.COAL: 1.0}),
+            BuildingKind.STEEL_MILL: Recipe(Good.STEEL, 200, {Need.IRON: 5.0, Need.COAL: 10.0}),
             BuildingKind.POTTER: Recipe(Good.POTS, 40, {Need.CLAY: 0.5}),
             BuildingKind.TILE_WORKS: Recipe(
                 Good.STOVE_TILES, 30, {Need.CLAY: 0.5, Need.SAND: 0.25}
@@ -664,7 +657,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             BuildingKind.TOOL_WORKS: Recipe(Good.TOOLS, 80, {Need.STEEL: 1.0}),
             BuildingKind.BARREL_MAKER: Recipe(Good.BARRELS, 40, {Need.PLANKS: 0.5}),
             BuildingKind.WINERY: Recipe(Good.WINE, 20, {Need.GRAPES: 4.0}, {Need.BARRELS: 2.0}),
-            BuildingKind.REFINERY: Recipe(Good.FUEL, 300, {Need.OIL: 0.5}),
+            BuildingKind.REFINERY: Recipe(Good.FUEL, 900, {Need.OIL: 1.0}),
             BuildingKind.CHEMICAL_WORKS: Recipe(
                 Good.CHEMICALS,
                 100,
@@ -881,9 +874,9 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.IRON_MINE: {Need.MACHINERY: 5},
         BuildingKind.LOGGING_CAMP: {Need.MACHINERY: 5},
         BuildingKind.RAILWAY_WORKS: {Need.STEEL: 200},
-        BuildingKind.POWER_PLANT: {Need.COAL: 200},
-        BuildingKind.DIESEL_POWER_PLANT: {Need.FUEL: 100},
-        BuildingKind.GAS_POWER_PLANT: {Need.GAS: 150},
+        BuildingKind.POWER_PLANT: {Need.COAL: 20_000},
+        BuildingKind.DIESEL_POWER_PLANT: {Need.FUEL: 10_000},
+        BuildingKind.GAS_POWER_PLANT: {Need.GAS: 15_000},
         BuildingKind.SPACE_CENTER: {Need.ELECTRONICS: 300, Need.FUEL: 1000, Need.FOOD: 300},
         BuildingKind.PEAR_HQ: {Need.ELECTRONICS: 500, Need.FOOD: 1000},
         BuildingKind.GIGAFACTORY: {
@@ -966,8 +959,6 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.COAL,
     BuildingKind.GASWORKS,
     Need.GAS,
-    BuildingKind.COKE_PLANT,
-    Need.COKE,
     Need.IRON,
     Need.COPPER,
     Need.SALT,

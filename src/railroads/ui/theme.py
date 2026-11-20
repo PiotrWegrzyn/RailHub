@@ -122,7 +122,6 @@ GOOD_COLORS: Mapping[Good, Rgba] = {
     Good.PORCELAIN: (0.4, 0.56, 0.86, 1.0),
     Good.PASSENGERS: (0.36, 0.76, 0.6, 1.0),
     Good.MAIL: (0.68, 0.44, 0.86, 1.0),
-    Good.COKE: (0.3, 0.3, 0.32, 1.0),
     Good.MILK: (0.95, 0.95, 0.93, 1.0),
     Good.DAIRY: (0.95, 0.85, 0.5, 1.0),
     Good.POTS: (0.7, 0.45, 0.3, 1.0),

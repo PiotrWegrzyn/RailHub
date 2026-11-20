@@ -61,7 +61,7 @@ class Board(Enum):
 G = Good
 TILE_GOODS: Mapping[Tile, tuple[Good, ...]] = MappingProxyType(
     {
-        Tile.COAL: (G.COAL, G.COKE),
+        Tile.COAL: (G.COAL,),
         Tile.ORE: (G.IRON, G.CLAY, G.LIMESTONE, G.SAND, G.SALT),
         Tile.WOOD: (G.LOGS, G.PLANKS, G.WOOD_CHIPS, G.BARRELS),
         Tile.FARMING: (

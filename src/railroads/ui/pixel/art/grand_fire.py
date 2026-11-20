@@ -1,5 +1,4 @@
-"""Big and mega works of fire, each drawn as a building of its own: coke plants of long oven
-batteries by a steaming quench tower, foundries glowing round their cupolas, tile works, potters
+"""Big and mega works of fire, each drawn as a building of its own: foundries glowing round their cupolas, tile works, potters
 and porcelain works among clusters of bottle kilns and stacked ware, brickworks of Hoffmann kilns
 under tall chimneys, cement works of glowing rotary kilns under dusty silos, glassworks of brick
 cones lit at their mouths and gasworks of great gasholders in iron guide frames."""
@@ -29,7 +28,6 @@ from railroads.ui.pixel.art.industry import (
 from railroads.ui.pixel.art.painter import (
     BRICK,
     DOORWAY,
-    METAL,
     RGB,
     TIMBER,
     WHITEWASH,
@@ -105,83 +103,9 @@ def _wagon(p: Painter, x: float, y: float, load: RGB, glowing: bool = False) -> 
         p.blob(wx - 0.8, wy - 0.6, wx + 0.8, wy + 0.8, OVEN_DOOR)
 
 
-def _steam(
-    p: Painter, x: float, y: float, puffs: int = 4, colour: RGB = STEAM, drift: float = 1.4
-) -> None:
-    """A billowing white cloud of steam rising from (x, y), drifting `drift` aside each puff."""
-    for i in range(puffs):
-        r = 2 + 0.8 * i
-        cx, cy = x + drift * i, y - 2.6 * i
-        p.blob(cx - r, cy - r, cx + r, cy + r, shade(colour, 0.9))
-        p.blob(cx - r + 0.6, cy - r, cx + r - 1, cy + r - 1.2, colour)
-
-
 def _sparks(p: Painter, points: tuple[Point, ...]) -> None:
     for k, (x, y) in enumerate(points):
         p.point(x, y, WHITE_HOT if k % 2 else MOLTEN)
-
-
-def _battery(
-    p: Painter,
-    x: float,
-    y: float,
-    length: float,
-    depth: float,
-    doors: int,
-    glowing: tuple[int, ...],
-    height: float = 6,
-) -> Top:
-    """A battery of brick coke ovens: a long low block with the iron-framed doors of its ovens in a
-    row along its front, `glowing` of them opened on red-hot coke, charging holes along its flat
-    roof and a row of standpipes along its back under the gas main."""
-    top = p.hall(x, y, length, depth, height, BRICK, OVEN_ROOF)
-    left, front, right, back = top
-    _plinth(p, top, height, BRICK)
-    for k in range(doors):
-        t0, t1 = k / doors, (k + 1) / doors
-        span = (t0 + 0.3 * (t1 - t0), t1 - 0.3 * (t1 - t0))
-        if k in glowing:
-            _patch(p, left, front, span, (0.8, height - 0.6), MOLTEN)
-            _patch(p, left, front, (span[0] + 0.01, span[1] - 0.01), (2, height - 1.2), WHITE_HOT)
-        else:
-            _patch(p, left, front, span, (1.4, height - 0.8), OVEN_DOOR)
-        if k:
-            p.line([_on_wall(left, front, t0, -0.4), _on_wall(left, front, t0, height)], IRON)
-    _stains(p, front, right, height, (0.3, 0.7), shade(BRICK, 0.5), 2)
-    near, far = _mid(left, back), _mid(front, right)
-    for k in range(doors):
-        p.point(*_on_wall(near, far, (k + 0.5) / doors, 0), OVEN_DOOR)
-    for k in range(doors):
-        bx, by = _on_wall(back, right, (k + 0.5) / doors, 0)
-        p.line([(bx, by), (bx, by - 2.4)], IRON)
-    _band(p, back, right, -2.6, shade(IRON, 1.4))
-    return top
-
-
-def _larry(p: Painter, top: Top, along: float) -> None:
-    """A coal charging car on rails along the middle of a battery's roof, `along` of the way."""
-    left, front, right, back = top
-    near, far = _mid(left, back), _mid(front, right)
-    p.line([near, far], RAIL)
-    x, y = _on_wall(near, far, along, 0)
-    car = p.hall(x, y + 1, 3, 3, 2.6, (150, 124, 60), (178, 150, 76))
-    p.point(*_on_wall(car[0], car[1], 0.5, 1), WINDOW)
-
-
-def _quench_tower(
-    p: Painter, x: float, y: float, half: float, tall: float, puffs: int, drift: float = 1.4
-) -> None:
-    """A square timber-boarded quench tower open at its top and over the track at its foot,
-    pouring a great white cloud of steam."""
-    top = p.box(x, y, half, tall, QUENCH, (52, 50, 50))
-    left, front, right, _ = top
-    for t in (0.33, 0.66):
-        p.line([_on_wall(left, front, t, 1), _on_wall(left, front, t, tall)], shade(QUENCH, 0.86))
-        p.line([_on_wall(front, right, t, 1), _on_wall(front, right, t, tall)], shade(QUENCH, 0.7))
-    _band(p, left, front, tall * 0.4, shade(QUENCH, 1.15))
-    _patch(p, left, front, (0.2, 0.8), (tall - 4.5, tall), OVEN_DOOR)
-    cx, cy = _mid(left, right)
-    _steam(p, cx, cy - 1.5, puffs, STEAM, drift)
 
 
 def _coke_heap(p: Painter, x: float, y: float, half: float) -> None:
@@ -203,69 +127,6 @@ def _column(p: Painter, x: float, y: float, half: float, tall: float, colour: RG
     )
     for f in (0.3, 0.65):
         _ring(p, x, y - tall * f, half, shade(colour, 0.7))
-
-
-def big_coke_plant() -> Sprite:
-    """Two long batteries of brick coke ovens with their doors in rows, one opened on red-hot coke
-    and a coal charging car on the back battery's roof, a wagon of glowing coke on the siding before
-    them, a timber quench tower pouring steam, two tall chimneys smoking and a heap of grey coke."""
-    p = Painter(54, 64, (27, 52))
-    for x, foot, tip in ((-8, -16, -40), (9, -11, -35)):
-        _smoking_chimney(p, x, foot, tip, shade(BRICK, 0.85), close=True)
-    p.shadow(22, 6)
-    _quench_tower(p, 19, -5, 3.5, 17, 4, -0.8)
-    back = _battery(p, 2, -8, 24, 6, 8, (), 6)
-    _larry(p, back, 0.35)
-    foot = _footing(-9, -1.5, 21, 6)
-    _bed(p, foot)
-    _battery(p, -9, -1.5, 21, 6, 7, (4,), 5)
-    a, b = _on_wall(foot[0], foot[1], 0.05, 0), _on_wall(foot[0], foot[1], 1.25, 0)
-    _rails(p, _out(a, 1), _out(b, 1))
-    wx, wy = _out(_on_wall(foot[0], foot[1], 0.72, 0), 2.5)
-    _wagon(p, wx, wy, MOLTEN, True)
-    _steam(p, wx - 1, wy - 5, 2, (214, 214, 218))
-    _coke_heap(p, 16, 7, 4)
-    return p.sprite()
-
-
-def mega_coke_plant() -> Sprite:
-    """A great coking works: two long batteries of coke ovens end to end either side of a tall
-    concrete coal tower fed by a conveyor, glowing coke pushed from their open doors into a quench
-    car on the siding, a big quench tower billowing a cloud of steam, by-product columns behind,
-    three tall chimneys smoking, coke wagons and a great heap of coke."""
-    p = Painter(64, 80, (31, 62))
-    for x, foot, tip in ((-19, -20, -50), (-4, -14, -48), (12, -7, -44)):
-        _smoking_chimney(p, x, foot, tip, shade(BRICK, 0.82), close=True)
-    for x, y, half, tall in ((2, -16, 2.2, 16), (6, -14, 1.6, 20), (-9, -18, 1.6, 14)):
-        _column(p, x, y, half, tall, TANK)
-    p.shadow(28, 7)
-    p.polygon([(-10, -25), (-6, -27), (5, -6), (1, -4)], shade(METAL, 0.7))
-    p.line([(-8, -26), (3, -5)], shade(METAL, 1.1))
-    first = _footing(-13, -8, 18, 7)
-    second = _footing(12, 4.5, 18, 7)
-    _bed(p, (first[0], second[1], second[2], first[3]))
-    one = _battery(p, -13, -8, 18, 7, 6, (2,), 6)
-    _larry(p, one, 0.6)
-    _turned(p, -0.5, -1.75, [(0, 3.4), (6, 3.4)], shade(CONCRETE, 0.8))
-    tower = p.box(-0.5, -7.5, 4, 20, CONCRETE, shade(CONCRETE, 1.1))
-    tl, tf, tr, _ = tower
-    _windows(p, tl, tf, (0.3, 0.7), (3, 8), 2, WINDOW)
-    _bands(p, tl, tf, tr, 13, shade(CONCRETE, 0.75), shade(CONCRETE, 0.6))
-    _patch(p, tl, tf, (0.25, 0.75), (16, 20), OVEN_DOOR)
-    _quench_tower(p, 26, 1, 4, 22, 5, -1.2)
-    two = _battery(p, 12, 4.5, 18, 7, 6, (1, 4), 6)
-    _larry(p, two, 0.25)
-    a = _out(_on_wall(first[0], first[1], 0.08, 0), 1)
-    b = _out(_on_wall(second[0], second[1], 1.0, 0), 1)
-    _rails(p, a, b)
-    for t, hot in ((0.15, False), (0.5, True)):
-        x, y = _out(_on_wall(second[0], second[1], t, 0), 2.5)
-        _wagon(p, x, y, MOLTEN if hot else COKE, hot)
-    x, y = _out(_on_wall(first[0], first[1], 0.4, 0), 2.5)
-    _wagon(p, x, y, COKE)
-    _coke_heap(p, -20, 8, 5)
-    _coke_heap(p, -13, 11, 3)
-    return p.sprite()
 
 
 FOUNDRY_WALL: RGB = (126, 64, 45)

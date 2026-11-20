@@ -561,19 +561,18 @@ window (H) lists the same.
 | Tool works (era 3) | 80 tools | 80 steel (from era 2) |  |
 | Winery | 20 wine | 80 grapes | 40 barrels |
 | Barrel maker | 40 barrels | 20 planks |  |
-| Refinery (era 2) | 300 fuel | 150 oil (from era 2) |  |
+| Refinery (era 2) | 900 fuel | 900 oil (from era 2) |  |
 | Chemical works (era 3) | 100 chemicals, 50 fertiliser | 50 salt, 50 boiler fuel |  |
 | Electronics plant (era 6) | 50 electronics | 50 copper (from era 4), 50 chemicals (from era 3) |  |
 | Car factory (era 4) | 20 cars | 100 steel (from era 2), 40 fuel (from era 2) |  |
 | Gun factory (era 3) | 100 guns | 50 steel (from era 2), 25 planks |  |
 | Tank factory (era 5) | 20 tanks | 120 steel (from era 2), 40 fuel (from era 2) |  |
 | Aircraft factory (era 5) | 20 planes | 60 steel (from era 2), 20 copper (from era 4), 20 fuel (from era 2), 20 electronics (from era 6) |  |
-| Steel mill (era 2) | 200 steel | 1,000 iron ore, 2,000 coal (from 1700) | 50 coke (from 1850) |
+| Steel mill (era 2) | 200 steel | 1,000 iron ore, 2,000 coal (from 1700) |  |
 | Shipyard | 30 goods | 20 steel (from era 2), 10 planks |  |
 | Sawmill | 40 planks, 8 wood chips | 40 logs | 5 machinery (from era 3), 3 fuel (from oil and fuel demand 11) |
 | Soy sauce brewery | 20 soy sauce | 10 soybeans, 10 wheat, 4 salt |  |
 | Gasworks (era 2) | 200 gas | 100 coal (from 1700) |  |
-| Coke plant (1850) | 100 coke | 100 coal (from 1700) |  |
 | Potter | 40 pots | 20 clay |  |
 | Tile works | 30 stove tiles | 15 clay, 7.5 sand |  |
 | Foundry (era 2) | 40 castings | 20 iron ore, 10 sand |  |
@@ -595,17 +594,15 @@ window (H) lists the same.
 | Sugar refinery (1800) | 60 refined sugar | 30 sugar | 6 coal (from 1700), 6 limestone |
 | Porcelain works (1710) | 30 porcelain | 15 clay | 7.5 coal (from 1700) |
 | Butcher (1850) | 120 meat | 48 animals |  |
-| Power plant |  | 200 coal (from 1700) |  |
-| Diesel power plant |  | 100 fuel (from era 2) |  |
-| Gas power plant |  | 150 gas (from era 2) |  |
+| Power plant |  | 2e+04 coal (from 1700) |  |
+| Diesel power plant |  | 1e+04 fuel (from era 2) |  |
+| Gas power plant |  | 1.5e+04 gas (from era 2) |  |
 | Battery gigafactory |  | 300 chemicals (from era 3), 200 electronics (from era 6), 200 steel (from era 2) | 300 copper (from era 4) |
 | Juice works (1870) | 100 juice | 50 fruit, 50 glass, 25 plastics (from era 6) | 10 refined sugar (from 1800) |
 | Big juice works (1870) | 375 juice | 187.5 fruit, 187.5 glass, 93.75 plastics (from era 6) | 37.5 refined sugar (from 1800) |
 | Mega juice works (1870) | 1,406 juice | 703.1 fruit, 703.1 glass, 351.6 plastics (from era 6) | 140.6 refined sugar (from 1800) |
-| Big steel mill (era 2) | 500 steel | 2,500 iron ore, 5,000 coal (from 1700) | 125 coke (from 1850) |
-| Mega steel mill (era 2) | 1,250 steel | 6,250 iron ore, 1.25e+04 coal (from 1700) | 312.5 coke (from 1850) |
-| Big coke plant (1850) | 250 coke | 250 coal (from 1700) |  |
-| Mega coke plant (1850) | 625 coke | 625 coal (from 1700) |  |
+| Big steel mill (era 2) | 500 steel | 2,500 iron ore, 5,000 coal (from 1700) |  |
+| Mega steel mill (era 2) | 1,250 steel | 6,250 iron ore, 1.25e+04 coal (from 1700) |  |
 | Big potter | 100 pots | 50 clay |  |
 | Mega potter | 250 pots | 125 clay |  |
 | Big tile works | 75 stove tiles | 37.5 clay, 18.75 sand |  |
@@ -632,8 +629,8 @@ window (H) lists the same.
 | Mega barrel maker | 250 barrels | 125 planks |  |
 | Big winery | 50 wine | 200 grapes | 100 barrels |
 | Mega winery | 125 wine | 500 grapes | 250 barrels |
-| Big refinery (era 2) | 750 fuel | 375 oil (from era 2) |  |
-| Mega refinery (era 2) | 1,875 fuel | 937.5 oil (from era 2) |  |
+| Big refinery (era 2) | 2,250 fuel | 2,250 oil (from era 2) |  |
+| Mega refinery (era 2) | 5,625 fuel | 5,625 oil (from era 2) |  |
 | Big chemical works (era 3) | 250 chemicals, 125 fertiliser | 125 salt, 125 boiler fuel |  |
 | Mega chemical works (era 3) | 625 chemicals, 312.5 fertiliser | 312.5 salt, 312.5 boiler fuel |  |
 | Big electronics plant (era 6) | 125 electronics | 125 copper (from era 4), 125 chemicals (from era 3) |  |
@@ -890,7 +887,7 @@ The world moves on through the game's two hundred years (`railroads.sim.events`,
 to one map in `railroads.sim.happenings`).
 
 Supply and demand grow by tiles (`railroads.sim.tiles`). Every good belongs to a tile, such as
-coal and coke, farming or vehicles, and every tile stands on two boards: supply, how much of its
+coal, farming or vehicles, and every tile stands on two boards: supply, how much of its
 goods buildings make, and demand, how much of them homes, shops and everything else people use
 want. From 1804 every year two supply tiles and one demand tile go up a level on 1 January, the
 lowest in the years before play. In play the game waits as a year turns: the supply and demand
@@ -1174,7 +1171,7 @@ lists the boards now.
 | Freight a unit | Goods |
 |---|---|
 | $10 or less | eggs 4, bread 6, chickens 6, logs 6, milk 6, potatoes 6, rice 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, soybeans 8, sugar 8, tofu 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, miso 10, newspapers 10, planks 10, pots 10, wood chips 10 |
-| $11-20 | cement 12, dried fish 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, fertiliser 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, soy sauce 20, wool 20 |
+| $11-20 | cement 12, dried fish 12, honey 12, pigs 14, refined sugar 14, sausages 14, barrels 15, fertiliser 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, soy sauce 20, wool 20 |
 | $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, stove tiles 25, copper 28, castings 30, wax 30, plastics 40, rubber 40, tea 40 |
 | $41-200 | coffee 50, beer 60, furniture 60, porcelain 60, clothes 70, steel 80, sake 100, shoes 100, electronics 120, goods 120, vodka 120, guns 150, tools 160, wine 160, machinery 180 |
 | over $200 | appliances 300, incense 300, luxury goods 300, gold 800, diamonds 2,000, cars 5,000, tanks 8,000, planes 1.2e+04 |
