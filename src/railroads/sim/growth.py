@@ -5,8 +5,8 @@ Buildings breed (breeding_of): a cell's chance of another of a ladder's kinds is
 
     base + (base + pull x served) x log2(1 + drawing)
 
-where base is the ladder's base chance, pull BREEDING_TIMES x base, or for homes the town
-ladder's own chance per doubling of people, so few homes come up alone while towns still grow;
+where base is the ladder's base chance, pull BREEDING_TIMES x base unless the ladder gives its own, as homes
+do so that few come up alone while towns still grow;
 served the points the buildings of its own kind of points give in the cell times their
 satisfaction (railroads.sim.economy), and drawing the points around the cell that draw it, each times its weight: six times the people and twice the industry for
 houses, food and people
@@ -84,6 +84,7 @@ from railroads.sim.forests import change_forests
 from railroads.sim.goods import FITS, HOMES, MAKES, RECIPES, Good, demands_of, makes_of
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.ladders import (
+    CHANCE_UNIT,
     GROWTH,
     LADDERS,
     MILITARY,
@@ -121,13 +122,8 @@ SKYSCRAPER_HOMES = 10
 # Above this chance, a ladder draws for every cell instead of thinning.
 THINNING_UP_TO = 0.05
 SKYSCRAPER_STARS = 4
-# For every ladder but the homes': its base chance, its base chance or, where it has none, its
-# chance per doubling, times this; food from the land springs up far more readily.
-SPAWN_SCALE = 1.0
-FOOD_SPAWN_SCALE = 3.75
-FROM_THE_LAND = frozenset({Points.FOOD, Points.ORE, Points.TIMBER})
 # How many times its base chance each served point of a ladder's own kind in a cell adds there,
-# per doubling of what draws it; homes take theirs from the town ladder instead.
+# per doubling of what draws it, unless the ladder gives its own (railroads.sim.ladders.Ladder).
 BREEDING_TIMES = 30.0
 # The points around a cell that draw a ladder's buildings, and how much each counts, by the kind
 # of points they give.
@@ -148,21 +144,6 @@ DRAWN_BY: Mapping[Points, Mapping[Points, float]] = MappingProxyType(
     }
 )
 
-# Works whose base chance is scaled by WORKS_SPAWN_SCALE.
-SPAWN_ANYWHERE = frozenset(
-    {
-        BuildingKind.BRICKWORKS,
-        BuildingKind.TEXTILE_MILL,
-        BuildingKind.GLASSWORKS,
-        BuildingKind.TANNERY,
-        BuildingKind.WINERY,
-        BuildingKind.FURNITURE_MAKER,
-        BuildingKind.SUGAR_REFINERY,
-        BuildingKind.TILE_WORKS,
-        BuildingKind.FOUNDRY,
-    }
-)
-WORKS_SPAWN_SCALE = 0.2
 # Kinds drawn by other points than the rest of their kind of points (refineries by the oil wells
 # and mines and the ports around them), and kinds that keep away
 # from some: their whole chance is divided by one plus the points they shun around them, each
@@ -216,22 +197,13 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
     if kept is not None and kept[0] is ladder and kept[1] is points:
         return kept[2]
     own = points[ladder.kinds[0]][0]
-    per_doubling = sum(ladder.chance_per_doubling.values())
     kind = ladder.kinds[0]
-    # Bakers and sausage makers give food points but work up what others grow.
-    from_the_land = own in FROM_THE_LAND and kind not in RECIPES
-    if own == Points.POPULATION or not per_doubling:
-        spawn = ladder.base_chance
-    else:
-        spawn_scale = FOOD_SPAWN_SCALE if from_the_land and own == Points.FOOD else SPAWN_SCALE
-        spawn = spawn_scale * (ladder.base_chance or per_doubling)
-    if kind in SPAWN_ANYWHERE:
-        spawn *= WORKS_SPAWN_SCALE
+    spawn = CHANCE_UNIT * ladder.base
     drawn_by = DRAWN_BY_KIND.get(kind) or DRAWN_BY.get(own, {own: 1.0})
     shunned_by = SHUNNED_BY.get(kind, {})
-    # Homes are pulled to towns by their own chance per doubling, apart from their base chance,
-    # so few come up alone while towns still grow.
-    pull = per_doubling if own == Points.POPULATION else BREEDING_TIMES * spawn
+    pull = (
+        BREEDING_TIMES * spawn if ladder.per_doubling is None else CHANCE_UNIT * ladder.per_doubling
+    )
     breeding = Breeding(spawn, own, drawn_by, pull, shunned_by)
     _BREEDINGS[(id(ladder), id(points))] = (ladder, points, breeding)
     return breeding

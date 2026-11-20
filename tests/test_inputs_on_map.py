@@ -7,11 +7,13 @@ from test_growth import build, only
 from builders import flat_map
 from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.growth import Growth, inputs_of
-from railroads.sim.ladders import LADDERS, SUSHI_HUTS
+from railroads.sim.ladders import CHANCE_UNIT, LADDERS, SUSHI_HUTS
 
-SURE_SUSHI = replace(SUSHI_HUTS, base_chance=50.0, needs={}, apart=None, land_cells_each=None)
+SURE_SUSHI = replace(
+    SUSHI_HUTS, base=50.0 / CHANCE_UNIT, needs={}, apart=None, land_cells_each=None
+)
 (WINERIES,) = [ladder for ladder in LADDERS if ladder.kinds[0] == BuildingKind.WINERY]
-SURE_WINERIES = replace(WINERIES, base_chance=50.0, merges={})
+SURE_WINERIES = replace(WINERIES, base=50.0 / CHANCE_UNIT, merges={})
 
 
 def grown(ladder: object, *standing: BuildingKind, months: int = 1) -> int:
@@ -92,6 +94,6 @@ def test_a_yearly_top_up_puts_up_a_works_only_with_its_input_on_the_map(
 def test_a_sawmill_opens_only_once_a_logging_camp_fells_logs_on_the_map(
     standing: tuple[BuildingKind, ...], opens: bool
 ) -> None:
-    sawmills = grown(replace(SAWMILLS, base_chance=50.0, merges={}), *standing)
+    sawmills = grown(replace(SAWMILLS, base=50.0 / CHANCE_UNIT, merges={}), *standing)
 
     assert (sawmills > 0) == opens
