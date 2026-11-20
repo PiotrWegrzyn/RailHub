@@ -31,14 +31,7 @@ from railroads.sim.geo import Bounds
 from railroads.sim.goods import HOMES, MAKES, NEEDS, RECIPES, Good, Need
 from railroads.sim.year_caches import year_cached
 
-NOT_RISING = frozenset(
-    {
-        BuildingKind.POWER_PLANT,
-        BuildingKind.DIESEL_POWER_PLANT,
-        BuildingKind.GAS_POWER_PLANT,
-        BuildingKind.RAILWAY_WORKS,
-    }
-)
+NOT_RISING = frozenset({BuildingKind.RAILWAY_WORKS})
 WAR_GROWTH = 11
 PILGRIM_MONTHS = 12
 # West, east, south and north of the old Eastern Bloc, which a map's middle must fall in.
@@ -286,11 +279,11 @@ def happening(year: int, east: bool = False) -> tuple[Event, ...]:
 def rise_of(kind: BuildingKind, need: Need, year: int) -> float:
     """How many times as much of a need a kind of building takes in a year as its NEEDS say: as
     much more as the demand tiles of the need's goods give (railroads.sim.tiles), whatever it
-    makes; power plants and railway works take what they always took. Supply raises only what
-    buildings make (make_factor)."""
+    makes, counted from the era the kind came in (tiles.entry_want); railway works take what
+    they always took. Supply raises only what buildings make (make_factor)."""
     if kind in NOT_RISING:
         return 1.0
-    return tiles.of_year(year).want_factor(need)
+    return tiles.of_year(year).want_factor(need) / tiles.entry_want(kind, need)
 
 
 @year_cached

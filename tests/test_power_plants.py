@@ -73,7 +73,7 @@ def two_towns(year: int, maker: BuildingKind, *standing: BuildingKind) -> Growth
     ("year", "maker", "plant", "standing"),
     [
         (1890, BuildingKind.MINE, BuildingKind.POWER_PLANT, ()),
-        (1910, BuildingKind.REFINERY, BuildingKind.DIESEL_POWER_PLANT, (BuildingKind.POWER_PLANT,)),
+        (1940, BuildingKind.REFINERY, BuildingKind.DIESEL_POWER_PLANT, (BuildingKind.POWER_PLANT,)),
         (
             2030,
             BuildingKind.GASWORKS,

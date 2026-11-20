@@ -534,6 +534,11 @@ TILE_ERAS: Mapping[Tile, int] = MappingProxyType(
 GOOD_ERAS: Mapping[Good, int] = MappingProxyType({G.PLANES: 5, G.TANKS: 5})
 # Buildings there only to buy a later era's goods, which come in with them.
 ERA_BUYERS = frozenset({K.CAR_DEALER})
+# Kinds of building that come in an era of their own: coal power plants with the third, diesel
+# ones with the fifth and gas ones with the sixth.
+KIND_ERAS: Mapping[BuildingKind, int] = MappingProxyType(
+    {K.POWER_PLANT: 3, K.DIESEL_POWER_PLANT: 5, K.GAS_POWER_PLANT: 6}
+)
 
 
 def good_era(good: Good) -> int:
@@ -547,13 +552,24 @@ def need_era(need: Need) -> int:
 
 def kind_era(kind: BuildingKind) -> int:
     """The era a kind of building comes in: that of the first good it makes, or of the last it
-    must buy if it is there only for those; the first era for the rest."""
+    must buy if it is there only for those, or its own (KIND_ERAS); the first era for the rest."""
+    if kind in KIND_ERAS:
+        return KIND_ERAS[kind]
     made = MAKES.get(kind)
     if made:
         return min(good_era(good) for good in made)
     if kind in ERA_BUYERS:
         return max(need_era(need) for need in NEEDS[kind])
     return 1
+
+
+def entry_want(kind: BuildingKind, need: Need) -> float:
+    """How many times its base ordinary buyers wanted of a need when a kind of building came in
+    with its era, from which it wants more as the demand tile rises: 1 for the first era, or an
+    era that has not come."""
+    era = kind_era(kind)
+    year = world().era_years.get(era) if era > 1 else None
+    return of_year(year).want_factor(need) if year is not None else 1.0
 
 
 def era_come(era: int, year: int) -> bool:

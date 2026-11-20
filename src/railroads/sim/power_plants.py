@@ -1,13 +1,11 @@
-"""Power plants (railroads.sim.growth puts them up once a year): coal ones from the first, diesel
-and gas ones later, each burning its fuel and making electricity for the map
+"""Power plants (railroads.sim.growth puts them up once a year): coal ones from the third era,
+diesel ones from the fifth and gas ones from the sixth (railroads.sim.tiles.KIND_ERAS), each burning its fuel and making electricity for the map
 (railroads.sim.fuel_market). Whenever the plants standing would make less than the map's
 electrified homes and factories want, one more goes up, at most one a year, the first of each kind
 as soon as it opens: by whichever of the
 TOWNS biggest towns with none within PLANT_APART cells has the most fuel made within FUEL_REACH
 cells of it, burning that fuel; by the biggest of them, burning coal, where none has any."""
 
-from collections.abc import Mapping
-from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -22,18 +20,11 @@ from railroads.sim.fuel_market import (
 from railroads.sim.goods import FITS, MAKES
 from railroads.sim.grids import Cell, flat_within
 from railroads.sim.ladders import Points
+from railroads.sim.tiles import era_come, kind_era
 
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth
 
-# The first year a power plant of each kind goes up.
-PLANT_YEARS: Mapping[BuildingKind, int] = MappingProxyType(
-    {
-        BuildingKind.POWER_PLANT: 1882,
-        BuildingKind.DIESEL_POWER_PLANT: 1905,
-        BuildingKind.GAS_POWER_PLANT: 1930,
-    }
-)
 PLANT_APART = 6
 FUEL_REACH = 10
 # How far from its town a new plant looks for a free cell, and how many of the biggest towns
@@ -66,7 +57,7 @@ def plants(growth: Growth) -> np.ndarray:
 def build_power_plants(growth: Growth) -> set[Cell]:
     """Puts up one more power plant if those standing would make less than the map wants;
     returns the cells that changed."""
-    opened = [kind for kind, year in PLANT_YEARS.items() if year <= growth.year]
+    opened = [kind for kind in PLANT_FUEL if era_come(kind_era(kind), growth.year)]
     if not opened:
         return set()
     standing = plants(growth)
