@@ -491,7 +491,7 @@ FREIGHT_RATE: Mapping[Good, float] = MappingProxyType(
     | dict.fromkeys((Good.GLASS, Good.PORCELAIN, Good.POTS, Good.STOVE_TILES, Good.PIGS), 13 / 21)
     | dict.fromkeys((Good.TOOLS, Good.BARRELS, Good.SHEEP), 13 / 34)
     | dict.fromkeys((Good.LUXURIES, Good.INCENSE), 5 / 34)
-    | dict.fromkeys((Good.CARS, Good.TANKS, Good.PLANES), 5 / 1)
+    | dict.fromkeys((Good.TANKS, Good.PLANES), 5 / 1)
     | {
         Good.ELECTRONICS: 5 / 21,
         Good.PAPER: 34 / 13,

@@ -1154,7 +1154,7 @@ share of demand left for each need.
 | $11-20 | cement 12, dried fish 12, fuel 12.36, glass 12.38, sugar 12.95, sausages 14, oil 14.84, rubber 15.28, stove tiles 15.48, salt 16, lumber 16.18, iron ore 18, coffee 19.1, honey 19.43, cans 20, juice 20, soy sauce 20, wool 20 |
 | $21-40 | apples 20.94, bananas 20.94, dates 20.94, oranges 20.94, plastics 24.73, tea 24.73, chemicals 25, leather 25, copper 28, electronics 28.57, castings 30, wax 30, hops 32.38, guns 35.45, porcelain 37.14, cotton 38.86, flax 38.86 |
 | $41-200 | incense 44.12, luxury goods 44.12, paper 52.31, grapes 52.35, cattle 52.5, beer 60, tools 61.18, clothes 70, steel 80, furniture 97.5, sake 100, shoes 100, goods 120, vodka 120, wine 160 |
-| over $200 | appliances 300, machinery 468, gold 800, diamonds 2,000, cars 2.5e+04, tanks 4e+04, planes 6e+04 |
+| over $200 | appliances 300, machinery 468, gold 800, diamonds 2,000, cars 5,000, tanks 4e+04, planes 6e+04 |
 <!-- end table -->
 
 Passengers pay $10 and mail $25, as they get off the train. A good is worth nothing where no
