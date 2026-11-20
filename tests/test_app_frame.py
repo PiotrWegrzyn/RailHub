@@ -81,7 +81,7 @@ def made_app() -> App:
     assert train is not None
     train.stops = [Stop((10, 6)), Stop((10, 16))]
     app = App(MapView(game))
-    app.help.open = app.tech.open = app.reports.open = True
+    app.help.open = app.tiles.open = app.reports.open = True
     app.view.build.trains.open = True
     app.view.selected = (10, 11)
     app.view.station_window.station = (10, 6)

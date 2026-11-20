@@ -80,7 +80,6 @@ from railroads.sim.fuel_market import (
     signals_of,
 )
 from railroads.sim.goods import (
-    FOODS,
     GENERAL_GOODS,
     TRAVELLERS,
     General,
@@ -92,7 +91,6 @@ from railroads.sim.goods import (
 from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
-from railroads.sim.tech import GENERAL_CARS, GOOD_TREES, Effect, Research, Tree
 from railroads.sim.tiles import Tiles
 from railroads.sim.track_network import TrackNetwork
 from railroads.sim.trains import (
@@ -102,6 +100,7 @@ from railroads.sim.trains import (
     FIRST_ENGINE,
     GENERATIONS,
     MAGLEV_FARE,
+    OPENED_BY,
     SLOWDOWN,
     Cargo,
     Point,
@@ -140,8 +139,6 @@ LEVEL_STORAGE_STEPS = 2
 # From this level up, each level lets a station have one more platform beside it, with its own way
 # through, so lines come in from more sides.
 PLATFORM_LEVEL = 4
-# Upkeep never falls below this share of its full cost, however much tech cuts it.
-LEAST_UPKEEP = 0.5
 # What a train waits with when no track it can run on joins where it stands to its next stop.
 NO_TRACK_ON = "No track to its next stop"
 NO_ELECTRIFIED_TRACK_ON = "No electrified track to its next stop"
@@ -203,8 +200,6 @@ class Railway:
         # The year play began, from which station upkeep rises.
         self.first_year = START_YEAR
         self._bought = 0
-        # What the player has learned (railroads.sim.tech).
-        self.research = Research()
         # What each year ended with and the cars delivered in it (railroads.sim.stats).
         self.history = History()
         self.fuel = FuelMarket()
@@ -242,52 +237,36 @@ class Railway:
 
     @property
     def maglev_open(self) -> bool:
-        """Whether the player can lay maglev track: once a maglev engine's year has come and
-        they have its tech."""
-        taken = self.research.taken
-        return any(
-            engine.maglev and engine.year <= self.year and all(n in taken for n in engine.needs)
-            for engine in ENGINES.values()
-        )
+        """Whether the player can lay maglev track: once a maglev engine is open."""
+        return any(ENGINES[name].maglev and self.engine_open(name) for name in ENGINES)
 
     @property
     def electric_open(self) -> bool:
-        """Whether the player can lay electric track: once an electric engine's year has come
-        and they have its tech."""
-        taken = self.research.taken
-        return any(
-            engine.electric and engine.year <= self.year and all(n in taken for n in engine.needs)
-            for engine in ENGINES.values()
-        )
+        """Whether the player can lay electric track: once an electric engine is open."""
+        return any(ENGINES[name].electric and self.engine_open(name) for name in ENGINES)
 
     def engines(self) -> list[str]:
-        """The engines the player can buy now: those whose year has come and whose tech they
-        have, but not those a newer one of their line has replaced (Engine.replaces)."""
-        taken = self.research.taken
-        opened = [
-            name
-            for name, engine in ENGINES.items()
-            if engine.year <= self.year and all(need in taken for need in engine.needs)
-        ]
+        """The engines the player can buy now: those whose supply tile has reached its level
+        (engine_open), but not those a newer one of their line has replaced (Engine.replaces)."""
+        opened = [name for name in ENGINES if self.engine_open(name)]
         return [
             name
             for name in opened
             if not any(ENGINES[newer].replaces(ENGINES[name]) for newer in opened)
         ]
 
+    def engine_open(self, name: str) -> bool:
+        """Whether an engine is on sale: once its supply tile has reached its level in the boards
+        in play (railroads.sim.trains.OPENED_BY)."""
+        tile, level = OPENED_BY[name]
+        return boards.of_year(self.year).supply.get(tile, 0) >= level
+
     def can_carry(self, train: Train, cargo: Cargo) -> bool:
-        """Whether a train's engine takes cars of a good: an express takes only passengers, a
-        general car only once its tech is taken, and vehicles only once its cars are of a
-        generation that carries them (railroads.sim.trains.VEHICLES)."""
-        if isinstance(cargo, General) and not self.general_open(cargo):
-            return False
+        """Whether a train's engine takes cars of a good: an express takes only passengers, and
+        vehicles only once its cars are of a generation that carries them (railroads.sim.trains.VEHICLES)."""
         if isinstance(cargo, Good) and not self.car_capacity(cargo, train.engine):
             return False
         return not ENGINES[train.engine].express or cargo == Good.PASSENGERS
-
-    def general_open(self, general: General) -> bool:
-        """Whether the player has the tech for general cars of a kind."""
-        return GENERAL_CARS[general] in self.research.taken
 
     def buy(self, engine: str = FIRST_ENGINE, route_of: Train | None = None) -> Train | None:
         """Buys a train with an engine the player can buy, calling at the stops of `route_of` if
@@ -364,17 +343,13 @@ class Railway:
         self.finances.earn(ENGINES[train.engine].price * TRAIN_RESALE, "trains")
 
     def most_cars(self, train: Train) -> int:
-        """How many cars a train's engine pulls, with what tech adds."""
-        return ENGINES[train.engine].cars + int(self.research.bonus(Effect.PULL))
+        """How many cars a train's engine pulls."""
+        return ENGINES[train.engine].cars
 
     def max_pull(self, engine: str) -> float:
-        """The most an engine pulls, in tonnes, with what tech adds: as much more as the cars
-        it adds (Effect.PULL), pulling the newest generation of cars of the era
+        """The most an engine pulls, in tonnes, pulling the newest generation of cars of the era
         (railroads.sim.tiles)."""
-        built = ENGINES[engine]
-        extra = int(self.research.bonus(Effect.PULL))
-        most = built.pull_at(self.wagon_era())
-        return most * (built.hauls + extra) / built.hauls
+        return ENGINES[engine].pull_at(self.wagon_era())
 
     def pull(self, train: Train) -> float:
         """How much of its engine's top speed a train makes with its cars behind it: all of it
@@ -424,14 +399,13 @@ class Railway:
         return stop.add_car(cargo, self.most_cars(train), asked)
 
     def fuel_markup(self) -> float:
-        """How much more fuel costs bought anywhere but out of a station's stockpile, with the
-        player's tech."""
-        return max(0.0, RETAIL_MARKUP - self.research.bonus(Effect.FUEL_MARKUP))
+        """How much more fuel costs bought anywhere but out of a station's stockpile."""
+        return RETAIL_MARKUP
 
     def fuel_cost(self, engine: str, cells: float = 1.0) -> float:
         """What an engine's fuel for `cells` costs bought at retail now, the dearest it comes,
         pulling half the most it can."""
-        return ENGINES[engine].burn * cells * self._fuel_price(engine) * self._upkeep()
+        return ENGINES[engine].burn * cells * self._fuel_price(engine)
 
     def _fuel_price(self, engine: str) -> float:
         """What a unit of an engine's fuel costs bought at retail now."""
@@ -455,21 +429,7 @@ class Railway:
             if stocked > 0:
                 stockpile[good] -= stocked
         cost = self.fuel.buy(fuel, amount, stocked, self.fuel_markup())
-        self.finances.spend(cost * self._upkeep() * self._food_subsidy(train), fuel.value)
-
-    def _food_subsidy(self, train: Train) -> float:
-        """What share of its fuel a train pays with the player's tech: Effect.FOOD_FUEL less
-        for a train of nothing but food, in proportion to its cars carrying food."""
-        subsidy = self.research.bonus(Effect.FOOD_FUEL)
-        if not subsidy or not train.cars:
-            return 1.0
-        food = sum(
-            1
-            for car in train.cars
-            if car.load > 0
-            and (car.good in FOODS or car.general in (General.FOOD, General.PROCESSED_FOOD))
-        )
-        return 1.0 - subsidy * food / len(train.cars)
+        self.finances.spend(cost, fuel.value)
 
     def fuel_month(self, trade: Trade, points: float = 0.0) -> None:
         """Closes the fuel market's month with what this month's trade said about them,
@@ -487,15 +447,13 @@ class Railway:
         asked: int = 0,
     ) -> float:
         """How much of a good one car of its car_generation carries, a general car of a kind
-        (general_car_size) or one for the good alone, and coaches and mail vans more with tech;
+        (general_car_size) or one for the good alone;
         nothing in a generation before the good's first."""
         generation = self.car_generation(good, engine, asked)
         if general is None:
             size = car_size(good, generation)
         else:
             size = general_car_size(general, good, generation)
-        if good in TRAVELLERS:
-            return size * (1.0 + self.research.bonus(Effect.COACHES))
         return size
 
     def car_generation(self, good: Good, engine: str | None = None, asked: int = 0) -> int:
@@ -520,9 +478,6 @@ class Railway:
         """What an empty car for a good of the generation asked weighs behind an engine, in
         tonnes."""
         return tare_of(good, self.car_generation(good, engine, asked))
-
-    def _upkeep(self) -> float:
-        return max(LEAST_UPKEEP, 1.0 - self.research.bonus(Effect.UPKEEP))
 
     def moved(self, old: Cell, new: Cell) -> None:
         """Carries a station's name, goods, demand and trains over to where it now stands; its
@@ -550,24 +505,19 @@ class Railway:
 
     def station_goods(self, station: Cell) -> StationGoods:
         goods = self.goods.setdefault(station, StationGoods())
-        goods.extra_room = self.research.bonus(Effect.STORAGE)
-        if Facility.WAREHOUSE in self.working_at(station):
-            goods.extra_room += WAREHOUSE_ROOM
-        goods.extra_waiting = self.research.bonus(Effect.WAITING)
+        goods.extra_room = WAREHOUSE_ROOM if Facility.WAREHOUSE in self.working_at(station) else 0.0
         return goods
 
     def station_demand(self, station: Cell) -> StationDemand:
         return self.demand.setdefault(station, StationDemand())
 
     def price_factor(self, good: Good) -> float:
-        """How much more a good earns carried by train: its TRANSIT_PAY, with the player's tech,
-        what history makes of it (railroads.sim.events) and its price on the boards
+        """How much more a good earns carried by train: its TRANSIT_PAY, what history makes of it (railroads.sim.events) and its price on the boards
         (railroads.sim.tiles)."""
         return (
             TRANSIT_PAY.get(good, 1.0)
             * history_price(good, self.year)
             * self.tiles.of_year(self.year).price(good)
-            * (1.0 + self.research.bonus(Effect.PRICE, GOOD_TREES[good]))
         )
 
     def destination(self, train: Train) -> Cell | None:
@@ -596,7 +546,7 @@ class Railway:
 
     def worth_at(self, station: Cell, cargo: list[tuple[Good, float]]) -> list[float]:
         """What each load of cargo would earn if a train unloaded it at a station now, one after
-        another, as it would be paid, with the player's tech and the station's facilities:
+        another, as it would be paid, with the station's facilities:
         passengers and mail their freight at the share of demand left as they get off; goods
         their freight for each unit the buildings around would take at once, times what it is
         worth to the building taking it (railroads.sim.station_trade.StationTrade.would_take)."""
@@ -632,25 +582,22 @@ class Railway:
             if leg is None or burnt is None:
                 return None
             cells = leg
-        upkeep = self._upkeep()
         loaded = [car for car in train.cars if not car.dining and car.load >= 0.5]
         empty = [car for car in train.cars if car.dining or car.load < 0.5]
         return Ride(
             cells=cells,
             cargo=sum(self.cargo_worth(train) if worth is None else worth),
-            fuel=self.burn(train) * burnt * self._fuel_price(train.engine) * upkeep,
-            loaded_cars=sum(car_trip_price(car.capacity) for car in loaded) * upkeep,
-            empty_cars=sum(car_trip_price(0.0 if car.dining else car.capacity) for car in empty)
-            * upkeep,
+            fuel=self.burn(train) * burnt * self._fuel_price(train.engine),
+            loaded_cars=sum(car_trip_price(car.capacity) for car in loaded),
+            empty_cars=sum(car_trip_price(0.0 if car.dining else car.capacity) for car in empty),
             loaded=len(loaded),
             empty=len(empty),
         )
 
     def network_upkeep(self) -> tuple[float, float]:
         """What all the player's stations and all their track cost a month now."""
-        upkeep = self._upkeep()
         stations = sum(self.station_upkeep(station) for station in self.stations())
-        return stations * upkeep, track_upkeep(self.constructions.track()) * upkeep
+        return stations, track_upkeep(self.constructions.track())
 
     @staticmethod
     def fare_factor(train: Train) -> float:
@@ -667,17 +614,16 @@ class Railway:
     def pay_for(
         self, station: Cell, need: Need, good: Good, amount: float, worth: float | None = None
     ) -> None:
-        """Pays the freight for cargo trains brought that the buildings around a station took,
-        which is also experience in the good's tree: its freight (freight_of) for each unit,
+        """Pays the freight for cargo trains brought that the buildings around a station took: its
+        freight (freight_of) for each unit,
         times what it was worth to the building that took it (`worth`, the units counted by
-        railroads.sim.economy.worth_to; the units themselves if not given), with tech and the
+        railroads.sim.economy.worth_to; the units themselves if not given), with the
         station's facilities. Uses up that much of the station's demand."""
         self.station_demand(station).use(need, amount)
         weighed = amount if worth is None else worth
         earned = freight_of(good) * weighed * self.price_factor(good)
         earned *= self.facility_pay(station, good)
         self.finances.earn(earned, "cargo")
-        self.learn(GOOD_TREES[good], earned / self.tiles.of_year(self.year).price(good))
 
     def sell_own(self, good: Good, amount: float) -> None:
         """Pays the player the market price of what their own buildings brought into a station, as
@@ -689,12 +635,6 @@ class Railway:
         """Turns the boards to a new year: the tiles picked go up, and what that changes is news."""
         self.tile_news += self.tiles.turn(year)
         forget()
-
-    def learn(self, tree: Tree, dollars: float) -> None:
-        """Counts what a delivery earned as experience in a tree, more for every building of
-        that tree the player owns shares of (railroads.sim.ownership.Owners.experience_factor)."""
-        factor = 1.0 if self.owners is None else self.owners.experience_factor(tree)
-        self.research.earn(tree, dollars * factor)
 
     def facility_pay(self, station: Cell, good: Good) -> float:
         """How many times as much a good delivered at a station pays with its facilities, and for
@@ -749,7 +689,7 @@ class Railway:
         return max(0, allowed - len(self.constructions.platforms(station)))
 
     def station_upkeep(self, station: Cell) -> float:
-        """What a station costs to keep a month this year, by its level, before tech cuts it."""
+        """What a station costs to keep a month this year, by its level."""
         rise = (1.0 + STATION_UPKEEP_RISE) ** max(0, self.year - self.first_year)
         return STATION_UPKEEP[self.level(station) - 1] * rise
 
@@ -805,11 +745,9 @@ class Railway:
         self._supply_facilities()
         self.finances.close_month(self.year)
         track = self.constructions.track()
-        upkeep = self._upkeep()
         stations = sum(self.station_upkeep(station) for station in self.stations())
-        kept = 1.0 - self.research.bonus(Effect.STATION_UPKEEP)
-        self.finances.spend(stations * upkeep * kept, "station upkeep")
-        self.finances.spend(track_upkeep(track) * upkeep, "track upkeep")
+        self.finances.spend(stations, "station upkeep")
+        self.finances.spend(track_upkeep(track), "track upkeep")
 
     def run(self, months: float) -> None:
         """Moves every train on by this many months, then has trains that met give way."""
@@ -876,7 +814,7 @@ class Railway:
             train.status = "Running"
             if train.cars:
                 places = (0.0 if car.dining else car.capacity for car in train.cars)
-                trips = sum(map(car_trip_price, places)) * self._upkeep()
+                trips = sum(map(car_trip_price, places))
                 self.finances.spend(trips, "car trips")
         if train.giving_way:
             train.status = f"Giving way to {train.giving_way}"
@@ -885,7 +823,7 @@ class Railway:
         engine = ENGINES[train.engine]
         pickup = engine.pickup / SECONDS_PER_MONTH * (SAND_TOWER_PICKUP if train.sanded else 1.0)
         pace = train.speed_up(months, pickup)
-        speed = engine.speed * (1.0 + self.research.bonus(Effect.SPEED)) * pace
+        speed = engine.speed * pace
         if train.fuelled:
             speed *= ENGINE_SHED_SPEED
         train.along += (

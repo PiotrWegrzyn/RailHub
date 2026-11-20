@@ -170,9 +170,9 @@ class Game:
         """Lays track from `start` to `end`: the route `planned` for it already, if it was
         planned with these choices since anything was last built, else the cheapest."""
         if maglev and not self.railway.maglev_open:
-            return Done("Maglev track needs Magnetic levitation and a maglev engine on sale.")
+            return Done("Maglev track needs a maglev engine on sale.")
         if electric and not self.railway.electric_open:
-            return Done("Electric track needs Electric traction and an electric engine on sale.")
+            return Done("Electric track needs an electric engine on sale.")
         route = (
             planned
             if planned is not None

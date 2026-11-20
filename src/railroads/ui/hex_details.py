@@ -484,8 +484,8 @@ def control_line(row: BuildingRow) -> tuple[str, str, str]:
     """Whether the player controls the buildings, or how many more shares would give control."""
     needed = math.ceil(CONTROL * row.total)
     meaning = (
-        f"With {CONTROL:.0%} of the shares your flag flies big here and only then does your tech "
-        "work on them, on all of them; more shares only raise your part"
+        f"With {CONTROL:.0%} of the shares your flag flies big here and only then do the boosts only "
+        "your buildings take work on them, on all of them; more shares only raise your part"
     )
     if row.total and row.owned >= needed:
         return ("Control", "yours", meaning)

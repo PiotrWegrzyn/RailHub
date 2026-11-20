@@ -313,7 +313,7 @@ class Trade:
     # Per station, how much of what trains brought it handed out, by need and good.
     handed_for: Mapping[Cell, Mapping[tuple[Need, Good], float]] = field(default_factory=dict)
     bonus: Mapping[BuildingKind, FloatCells] = field(default_factory=dict)
-    # What each bonus good a building gets all of adds to its satisfaction, with the player's tech.
+    # What each bonus good a building gets all of adds to its satisfaction.
     bonus_per_good: float = BONUS_PER_GOOD
     # Per need, what each cell's buildings got of it from sellers nearby rather than stations.
     local: Mapping[Need, FloatCells] = field(default_factory=dict)
@@ -418,7 +418,7 @@ class Economy:
         # Each cell's satisfaction last month, which decides who is served first.
         self.levels = np.full(self.cells, Satisfaction.UNSATISFIED, dtype=np.int8)
         # The year, which decides what buildings need, and what each bonus good a building gets
-        # adds to its satisfaction (railroads.sim.growth sets it from the player's tech).
+        # adds to its satisfaction (railroads.sim.growth sets it).
         self.year = START_YEAR
         self.bonus_per_good = BONUS_PER_GOOD
         # Whether the map lies in the old Eastern Bloc, where some of history happens only

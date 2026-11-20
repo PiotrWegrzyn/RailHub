@@ -10,11 +10,10 @@ buildings in their reach and it pays as a delivery does (railroads.sim.economy,
 railroads.sim.station_trade). A whole building costs PAYBACK_YEARS of all it makes at full
 output at full satisfaction, at the prices on the boards (railroads.sim.tiles), from two thirds of
 that with none to twice that at 200% (PRICE_BY_SATISFACTION), by how satisfied the buildings of
-its kind in its cell were over the last quarter (railroads.sim.ledger), less what the player's tech takes off, down to
-MOST_DISCOUNT of the price; shares sell at the price they buy at. A power plant of any kind,
-which makes cheap electricity for the player's trains (railroads.sim.fuel_market), costs
-POWER_PLANT_PRICE. Tech in a building's tree can raise how many buildings' worth it makes. When
-buildings leave a cell, the player's shares go last.
+its kind in its cell were over the last quarter (railroads.sim.ledger); shares sell at the price
+they buy at. A power plant of any kind, which makes cheap electricity for the player's trains
+(railroads.sim.fuel_market), costs POWER_PLANT_PRICE. When buildings leave a cell, the player's
+shares go last.
 """
 
 from typing import TYPE_CHECKING
@@ -27,7 +26,6 @@ from railroads.sim.economy import OwnedShare
 from railroads.sim.goods import Need, makes_of, owned_boosts, price_of
 from railroads.sim.grids import Cell
 from railroads.sim.ladders import IntGrid
-from railroads.sim.tech import Effect, Tree, tree_of
 from railroads.sim.tiles import of_year
 
 if TYPE_CHECKING:
@@ -39,8 +37,8 @@ SHARES = 1000
 LOT = 100
 # How many shares the player may buy or sell at once, LOT the fewest.
 LOTS = (100, 200, 600)
-# The part of the shares that gives control: a big flag over the buildings, and the player's tech
-# working on the whole of them.
+# The part of the shares that gives control: a big flag over the buildings, and the boosts only
+# the player's buildings take working on the whole of them.
 CONTROL = 0.6
 # What a whole building costs at full satisfaction: this many years of all it makes at full
 # output, at its goods' market prices, so its shares pay a tenth of their price back a year.
@@ -48,15 +46,10 @@ PAYBACK_YEARS = 10
 # What a building's price is worth, times its price at full satisfaction, at each satisfaction
 # over the last quarter, in between in a straight line.
 PRICE_BY_SATISFACTION = ((0.0, 2 / 3), (1.0, 1.0), (2.0, 2.0))
-# Every whole building the player owns adds this much to the experience its tree gets from
-# deliveries for each of its points, and the shares of one their part of that.
-EXPERIENCE_PER_POINT = 0.01
 # Shares bought can be sold only this many months later, so they can't be flipped for quick gains.
 HOLD_MONTHS = 60
 # The name the player's company trades under, whose flag flies over the buildings it owns.
 COMPANY = "The Trains Corp"
-# However much tech cuts the price of shares, they cost at least this share of it.
-MOST_DISCOUNT = 0.5
 POWER_PLANT_PRICE = 2_000_000.0
 POWER_PLANTS = frozenset(
     {BuildingKind.POWER_PLANT, BuildingKind.DIESEL_POWER_PLANT, BuildingKind.GAS_POWER_PLANT}
@@ -114,25 +107,19 @@ class Owners:
         return added
 
     def price_to_buy(self, kind: BuildingKind) -> float | None:
-        """What a whole building of a kind costs at full satisfaction, with the player's tech;
-        None for what cannot be bought."""
+        """What a whole building of a kind costs at full satisfaction; None for what cannot be
+        bought."""
         growth = self._growth
         if kind not in growth.counts:
             return None
-        railway = growth.railway
-        tree = tree_of(kind)
-        discount = 0.0 if railway is None else railway.research.bonus(Effect.DISCOUNT, tree)
-        if tree is None and railway is not None:
-            discount = railway.research.bonus(Effect.DISCOUNT, Tree.COMMERCE)
-        kept = max(MOST_DISCOUNT, 1.0 - discount)
         if kind in POWER_PLANTS:
-            return POWER_PLANT_PRICE * kept
+            return POWER_PLANT_PRICE
         makes = makes_of(kind, growth.year)
         if not makes:
             return None
         boards = of_year(growth.year)
         month = sum(amount * price_of(good) * boards.price(good) for good, amount in makes.items())
-        return 12 * PAYBACK_YEARS * month * kept
+        return 12 * PAYBACK_YEARS * month
 
     def lot_price(self, cell: Cell, kind: BuildingKind) -> float | None:
         """What LOT shares of a building of a kind in a cell cost, or fetch, now: by how
@@ -239,14 +226,6 @@ class Owners:
             return None
         return self._controlled(kind, grid).ravel()
 
-    def boost(self, kind: BuildingKind, effect: Effect) -> float:
-        """What the player's tech adds, of one effect, to the buildings of a kind they own."""
-        tree = tree_of(kind)
-        railway = self._growth.railway
-        if railway is None or tree is None:
-            return 0.0
-        return railway.research.bonus(effect, tree)
-
     def _controlled(self, kind: BuildingKind, grid: IntGrid) -> npt.NDArray[np.float64]:
         """How many buildings of a kind in each cell the player controls: all there, or none."""
         counts = self._growth.counts[kind]
@@ -269,18 +248,6 @@ class Owners:
                 self._controlled(kind, grid).ravel(),
             )
         return shares
-
-    def experience_factor(self, tree: Tree) -> float:
-        """How many times what deliveries earn a tree gets as experience: once, and
-        EXPERIENCE_PER_POINT more for each point of the buildings of that tree the player owns,
-        by their shares."""
-        points = self._growth.rule.points
-        owned = sum(
-            points[kind][1] * int(grid.sum()) / SHARES
-            for kind, grid in self._shares.items()
-            if kind in points and tree_of(kind) == tree
-        )
-        return 1.0 + EXPERIENCE_PER_POINT * owned
 
     def _flat(self, cell: Cell) -> int:
         return int(np.ravel_multi_index(cell, self._growth.grid.shape))

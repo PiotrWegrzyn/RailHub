@@ -1,7 +1,7 @@
 """The bar along the top of the window: the date, the money, the company's worth against its
 target and any countdown to bankruptcy, the game speeds, the view's buttons (zoom, the two
 minimaps and the search), the map's title and any notice such as an autosave, and the buttons
-opening the reports, the supply and demand boards, the tech trees, the help, the saves and the main menu."""
+opening the reports, the supply and demand boards, the help, the saves and the main menu."""
 
 from typing import TYPE_CHECKING
 
@@ -94,10 +94,7 @@ def _draw_top_bar(app: App) -> None:
     imgui.same_line(0, 4)
     if toggle_button(fa.ICON_FA_BALANCE_SCALE, app.tiles.open, "Supply and demand (Y)", size):
         app.tiles.open = not app.tiles.open
-    imgui.same_line(0, 4)
-    if toggle_button(fa.ICON_FA_FLASK, app.tech.open, "Tech trees (R)", size):
-        app.tech.open = not app.tech.open
-    spot("tech")
+    spot("boards")
     imgui.same_line(0, 4)
     if toggle_button(
         fa.ICON_FA_QUESTION_CIRCLE, app.help.open, "Buildings, goods and engines (H)", size

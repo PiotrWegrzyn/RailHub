@@ -17,7 +17,6 @@ from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
 from railroads.sim.railway import Railway
 from railroads.sim.steps import Steps, finish
-from railroads.sim.tech import TREES, tree_of
 from railroads.sim.tiles import of_year
 
 STATIONS_AT_START = 5
@@ -117,7 +116,7 @@ class StandInPlayer:
 
     def month(self, rng: np.random.Generator) -> set[Cell]:
         """Grows one month, earning what the player's buildings would at the share of service
-        their cells get; each year buys buildings and spends its points, and each decade
+        their cells get; each year buys buildings, and each decade
         builds new stations. Returns the cells whose buildings or stations changed."""
         return finish(self.month_steps(rng))
 
@@ -128,7 +127,6 @@ class StandInPlayer:
         self._earn()
         if self.months % 12 == 0:
             self._buy()
-            self._learn()
         if self.months % 120 == 0:
             changed |= self.open_stations(self.rule.stations_per_decade)
         return changed
@@ -145,18 +143,15 @@ class StandInPlayer:
 
     def _earn(self) -> None:
         """Pays the share of what the owned buildings would sell to trains serving their
-        cells, as experience too, since no trains run."""
+        cells, since no trains run."""
         growth = self.growth
         served = self._served()
         for kind in growth.owners.kinds():
-            tree = tree_of(kind)
             sold = float((growth.owners.owned(kind) * served).sum()) * self._monthly_worth(kind)
             earned = sold
             if earned <= 0:
                 continue
             self.railway.finances.earn(earned, "cargo")
-            if tree is not None:
-                self.railway.learn(tree, earned)
 
     def _buy(self) -> None:
         """Buys the buildings in its stations' reach that would pay back soonest."""
@@ -176,16 +171,6 @@ class StandInPlayer:
         for _, cell, kind, price in offers[: self.rule.buys_per_year]:
             self.railway.finances.spend(price, "buildings bought")
             growth.owners.own(cell, kind)
-
-    def _learn(self) -> None:
-        """Spends every point on the first node of its tree that can be taken."""
-        research = self.railway.research
-        for tree, nodes in TREES.items():
-            while research.points(tree) > 0:
-                key = next((node.key for node in nodes if research.can_take(node.key)), None)
-                if key is None:
-                    break
-                research.take(key)
 
 
 def reach_sums(grid: Grid, values: npt.NDArray[np.int64], steps: int) -> npt.NDArray[np.int64]:

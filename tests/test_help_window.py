@@ -7,8 +7,6 @@ from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.finance import dollars
 from railroads.sim.goods import FREIGHT_SHARE, Good, Need
 from railroads.sim.lots import Lots
-from railroads.sim.ownership import EXPERIENCE_PER_POINT
-from railroads.sim.tech import Tree
 from railroads.sim.trains import ENGINES
 from railroads.ui.help_window import (
     ENGINES_NOTE,
@@ -117,24 +115,12 @@ def test_the_help_says_until_when_an_engine_is_sold(name: str, sold_until) -> No
     assert row.sold_until == sold_until
 
 
-def test_the_help_gives_every_tech_node_on_the_way_to_an_engine() -> None:
+def test_the_help_gives_the_supply_tile_level_that_opens_an_engine() -> None:
     row = engine_row("pacific")
 
-    assert row.tech == ((Tree.METALS, ("Heavy boilers", "Roller bearings", "Superheaters")),)
+    opened = row.opened_by
 
-
-def test_the_help_gives_the_tech_of_each_tree_an_engine_needs() -> None:
-    row = engine_row("bullet")
-
-    assert dict(row.tech) == {
-        Tree.PASSENGERS: ("Timetables", "Dining cars", "Express trains"),
-        Tree.MODERN: (
-            "Telegraph signals",
-            "Electric traction",
-            "Relay interlocking",
-            "Thyristor control",
-        ),
-    }
+    assert opened == "coal supply level 20"
 
 
 def test_the_help_links_an_engine_to_the_real_ones_it_is_drawn_after() -> None:
@@ -167,15 +153,12 @@ def test_the_map_help_names_the_prices_the_first_three_lots_cost() -> None:
     assert f"from the year {HISTORY_START}" in text
 
 
-def test_the_engines_help_says_experience_comes_only_from_deliveries_and_owned_buildings_add_to_it() -> (
-    None
-):
-    share = f"{EXPERIENCE_PER_POINT:.0%}"
-
+def test_the_engines_help_says_engines_come_from_supply_tile_levels() -> None:
     text = ENGINES_NOTE
 
-    assert "only from deliveries" in text
-    assert f"adds {share} to it" in text
+    found = "supply tile reaches its level" in text
+
+    assert found
 
 
 def test_the_goods_help_gives_freight_as_a_share_of_the_market_price_up_to_the_scarce_worth() -> (

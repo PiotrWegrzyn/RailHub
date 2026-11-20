@@ -25,7 +25,6 @@ from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
-from railroads.sim.tech import Research
 from railroads.sim.tilemap import Relief
 from railroads.sim.trains import BULK_CAR, BURN_ALONE, ENGINES, Car, Stop, Train
 
@@ -107,15 +106,6 @@ def test_each_engine_burns_its_own_fuel(engine: str, fuel: Fuel) -> None:
     found = fuel_of(burnt)
 
     assert found == fuel
-
-
-def test_the_regular_customer_node_cuts_the_retail_markup_to_a_quarter() -> None:
-    plain, regular = line(), line()
-    regular.research = Research(taken={"books", "regular_customer"})
-
-    paid = set_off(plain), set_off(regular)
-
-    assert paid[1] == pytest.approx(paid[0] * 1.25 / 1.5)
 
 
 def test_a_train_cannot_set_off_for_a_stop_further_than_its_fuel_takes_it() -> None:

@@ -8,10 +8,9 @@ from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route, route_price
-from railroads.sim.tech import NODES, Effect, Research
-from railroads.sim.trains import ENGINES, Stop, Train
+from railroads.sim.tiles import Tile, Tiles, activate
+from railroads.sim.trains import ENGINES, OPENED_BY, Stop, Train
 from railroads.ui.build_menu import BuildMenu
-from railroads.ui.tech_window import describe
 from railroads.ui.trains_window import engine_summary
 
 WEST, EAST = (6, 3), (6, 20)
@@ -29,24 +28,22 @@ def two_lines() -> Railway:
     return Railway(constructions)
 
 
-def maglev_game(year: int, *taken: str) -> Game:
+def maglev_game(year: int) -> Game:
     game = Game(Constructions(flat_map()))
     game.finances.cash = 10_000_000.0
     game.railway.year = year
-    game.railway.research = Research(taken=set(taken))
+    activate(Tiles.until(year))
     return game
 
 
-def test_the_500_kmh_engine_is_a_maglev_opened_by_magnetic_levitation() -> None:
+def test_the_500_kmh_engine_is_a_maglev_opened_by_passenger_supply() -> None:
     engine = ENGINES["maglev"]
 
-    _, node = NODES["maglev"]
+    tile, _ = OPENED_BY["maglev"]
 
     assert engine.maglev and not engine.electric
     assert engine.kmh == pytest.approx(500.0)
-    assert "maglev" in engine.needs
-    assert node.effect == Effect.UNLOCK
-    assert "thyristors" in node.requires
+    assert tile == Tile.PASSENGERS
 
 
 def test_a_maglev_finds_a_way_only_along_maglev_track() -> None:
@@ -144,30 +141,29 @@ def test_rails_laid_along_a_guideway_leave_it_a_guideway() -> None:
 
 
 def test_maglev_track_opens_with_the_maglev_engine() -> None:
-    early = maglev_game(2029, "express_trains", "maglev")
-    unlearned = maglev_game(2040, "express_trains")
-    ready = maglev_game(2040, "express_trains", "maglev")
+    early = maglev_game(2026)
+    ready = maglev_game(2040)
 
-    opened = [game.railway.maglev_open for game in (early, unlearned, ready)]
+    opened = [game.railway.maglev_open for game in (early, ready)]
 
-    assert opened == [False, False, True]
+    assert opened == [False, True]
     assert "maglev" in ready.railway.engines()
 
 
 def test_maglev_track_cannot_be_laid_before_it_opens() -> None:
-    game = maglev_game(2029, "express_trains", "maglev")
+    game = maglev_game(2026)
     cash = game.finances.cash
 
     done = game.lay_track(WEST, (6, 9), maglev=True)
 
     assert not done.ok
-    assert "Magnetic levitation" in done.message
+    assert "maglev engine" in done.message
     assert game.finances.cash == cash
     assert game.constructions.track() == []
 
 
 def test_maglev_track_is_laid_once_it_opens() -> None:
-    game = maglev_game(2040, "express_trains", "maglev")
+    game = maglev_game(2040)
 
     done = game.lay_track(WEST, (6, 9), maglev=True)
 
@@ -177,7 +173,6 @@ def test_maglev_track_is_laid_once_it_opens() -> None:
 
 def test_a_maglev_does_not_end_the_sale_of_the_fastest_electric() -> None:
     railway = two_lines()
-    railway.research = Research(taken=set(NODES))
     railway.year = 2040
 
     engines = railway.engines()
@@ -198,11 +193,3 @@ def test_a_maglev_tells_it_needs_maglev_track() -> None:
 
     assert "Runs on maglev track only" in summary
     assert "electrified" not in summary
-
-
-def test_magnetic_levitation_says_what_it_opens() -> None:
-    _, node = NODES["maglev"]
-
-    text = describe(node)
-
-    assert text == "opens maglev track and trains (from 2030)"

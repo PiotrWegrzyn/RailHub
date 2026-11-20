@@ -54,7 +54,6 @@ from railroads.ui.pixel.ground_shader import free_textures
 from railroads.ui.reports_window import ReportsWindow
 from railroads.ui.save_files import IN_BROWSER
 from railroads.ui.saves_window import SavesWindow
-from railroads.ui.tech_window import TechWindow
 from railroads.ui.theme import BRASS, apply_theme
 from railroads.ui.tiles_window import TilesWindow
 from railroads.ui.top_bar import draw_top_bar
@@ -112,7 +111,6 @@ class App:
         self.tutorial = tutorial
         self._styled = False
         self.help = HelpWindow()
-        self.tech = TechWindow()
         self.tiles = TilesWindow()
         self.reports = ReportsWindow()
         self.saves_window = SavesWindow()
@@ -234,7 +232,6 @@ class App:
         draw_top_bar(self)
         self.view.gui()
         self.help.draw()
-        self.tech.draw(self.view.railway.research)
         self.tiles.new_year(self.view.growth.year)
         self.tiles.draw(self.view.railway.tiles)
         if self.reports.open:
@@ -260,8 +257,6 @@ class App:
         typing = imgui.get_io().want_text_input
         if not typing and imgui.is_key_pressed(imgui.Key.h, repeat=False):
             self.help.open = not self.help.open
-        if not typing and imgui.is_key_pressed(imgui.Key.r, repeat=False):
-            self.tech.open = not self.tech.open
         if not typing and imgui.is_key_pressed(imgui.Key.y, repeat=False):
             self.tiles.open = not self.tiles.open
         if not typing and imgui.is_key_pressed(imgui.Key.g, repeat=False):
@@ -285,7 +280,7 @@ class App:
         return Seen(
             lens="satisfaction" if moods else None if view.lens is None else view.lens.value,
             selected=view.selected,
-            tech_open=self.tech.open,
+            boards_open=self.tiles.open,
             buying_train=view.build.trains.buy.open,
         )
 

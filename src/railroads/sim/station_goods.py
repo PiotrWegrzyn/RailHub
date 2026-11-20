@@ -31,9 +31,8 @@ class StationGoods:
     storage: int = 0
     # Where each good trains brought came from.
     origins: dict[Good, Parcels] = field(default_factory=dict)
-    # Room tech adds to every station's stockpile and waiting room (railroads.sim.tech).
+    # Room the station's warehouse adds to its stockpile (railroads.sim.facilities).
     extra_room: float = 0.0
-    extra_waiting: float = 0.0
     # The storage steps raising the station's level has added, which don't make bought storage
     # dearer.
     level_steps: int = 0
@@ -64,7 +63,7 @@ class StationGoods:
     @property
     def waiting_limit(self) -> float:
         """The most passengers, and the most mail, that wait here."""
-        return WAITING + WAITING_STEP * (self.storage + self.level_steps) + self.extra_waiting
+        return WAITING + WAITING_STEP * (self.storage + self.level_steps)
 
     def held(self, good: Good) -> float:
         """How much of a good the station holds, gathered and brought together."""

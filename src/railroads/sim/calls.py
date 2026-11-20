@@ -15,7 +15,6 @@ from railroads.sim.facilities import Facility
 from railroads.sim.goods import GENERAL_GOODS, TRAVELLERS, General, Good
 from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
-from railroads.sim.tech import Tree
 from railroads.sim.trains import ENGINES, Car, Cargo, Parcels, Stop, Train, unit_tonnes
 
 WAIT_MONTHS = math.inf
@@ -59,7 +58,6 @@ class StationCalls:
                         * self._railway.facility_pay(stop.cell, car.good)
                     )
                     self._railway.finances.earn(earned, car.good.value)
-                    self._railway.learn(Tree.PASSENGERS, earned)
                     car.empty(car.load)
                     self._railway.history.deliver(self._railway.year, car.good)
                     continue

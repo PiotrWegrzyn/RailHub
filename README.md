@@ -61,7 +61,7 @@ skipped. In order: a station at Ashford and one at Brookby, with what a station 
 gathers; track between them; a train with a passenger car and a food car; cars of its own for the
 way back, general cars and hubs; what buildings hand out on their own before stations; the
 Satisfaction lens; the Towns lens and passengers riding only between towns; buying shares of a
-farm; the tech window; fuel, range and the kinds of engine on the buy screen; and buying a lot,
+farm; the supply and demand boards; fuel, range and the kinds of engine on the buy screen; and buying a lot,
 for which the tutorial gives the money. The progress is saved with the game.
 
 A new game is set up first with:
@@ -776,9 +776,7 @@ thriving from 100% and content between; the ground under content and thriving bu
 warm glow, and the status bar names the hovered cell's satisfaction. Holding Shift over the map,
 or turning on the Satisfaction lens above the minimap, tints the land under every building that trades by how satisfied the least satisfied building in
 its cell is: green from 100%, yellow from 50%, orange below that and red at 0%; buildings that
-neither need nor make anything get no tint. The Fine living node of the
-commerce tree makes each bonus good worth 40% instead of 30%, a placeholder until bonus goods get
-tech of their own.
+neither need nor make anything get no tint.
 
 Factories gather into districts: industry nearby draws more of them only once at least 5
 industry points stand there, more than one steel mill, and then strongly, so three meet and merge
@@ -955,7 +953,7 @@ and what it changes; wars, crises, the pandemic and September 11 also stop the g
 until the player has read them. Goods made for the first time (tools and machinery in 1870, cars
 in 1930, electronics in 1960 and so on) get a card too.
 
-### Owning buildings and tech
+### Owning buildings
 
 Shares of any building that makes something can be bought and sold from the hex details: farms,
 mines, mills, works and factories, but no homes, shops, churches or military. Every building is
@@ -969,7 +967,7 @@ however far within its reach they stand. A whole building costs ten years of all
 was fully satisfied over the last quarter, two thirds of that at none and
 twice at 200%, and shares sell at the price they buy at, so raising a building's satisfaction
 raises what its shares fetch; shares can be sold only five years after they were bought, so the
-way to earn on them is to buy into a building that struggles and make it work. Tech cuts the price of shares by up to half. The
+way to earn on them is to buy into a building that struggles and make it work. The
 boosts only the player's own buildings take, limestone and machinery, work only
 on buildings they control, holding 60% of their shares, and then on the whole of them. Past 60%, more
 shares only raise their part of what it makes. Every cell where the player owns shares flies the flag of
@@ -979,23 +977,6 @@ crowded out by a town, a logging camp whose forest is gone, anything cleared for
 or a merged works) comes down for good, the player's shares in it with it, and one that merges
 into a bigger building (three factories into a big factory) passes its shares on to the bigger
 one.
-
-The tech window (R, or the flask in the top bar) has seven trees, 10 to 15 nodes each
-(`railroads.sim.tech`). Every tree gains experience in dollars only from deliveries: food and
-drink, metals and machines, fuel and minerals, craft and textiles, modern industry and commerce
-from what cargo of their goods earns as buildings take it out of the player's stations, the
-player's part of their own buildings' goods included; passengers and mail from what passengers
-and mail pay as they get off. Every point of the buildings of a tree the player owns, by their
-shares, adds 1% to the experience that tree gets. Goods handed out by buildings on their own
-give no experience. The first level needs only $5,000, the second $80,000 more and each next one
-1.6 times the step before; each level gives a point to spend on a node whose requirements are
-taken. Nodes raise what that tree's cargo earns, station storage and waiting rooms, speed, cars per train, car sizes and coach capacity, what each
-bonus good adds to satisfaction, cut upkeep, retail fuel and the price of shares, and open
-engines and general cars. What buildings make, and the new buyers of limestone, machinery and
-the rest, come from the supply and demand tiles instead (see History). Station shops, in commerce, cut every station's upkeep by 20%;
-Subsidised fuel, deep in the food tree, cuts a train's fuel by up to half, by its share of cars
-carrying food. The other nodes that once raised the owner's share hold places for bonuses still
-to be decided and do nothing yet. Hovering a node says in a sentence what it does.
 
 Engines (`railroads.sim.trains`) come in lines. Pioneers, from the first steam engine on rails in
 1804, each a little better than the one before, lead up to the Planet of 1840, the engine the game
@@ -1034,53 +1015,52 @@ maglev, and always lead with a dining car
 that carries nothing but weighs and costs its trips like any other car. In an 1850 game a better
 engine comes every few years: the Goods engine in 1853, the American in 1856, the Single-driver
 express in 1858. From then on
-each line gets better engines, up to a 500 km/h maglev and diesels pulling 24 cars by 2040. An
+each line gets better engines, up to a 500 km/h maglev and diesels pulling 12 of the biggest cars by 2040. An
 engine is sold only until a newer one of its line, running on the same track, can be bought: an
 electric never ends the sale of a steam or diesel engine, nor the maglev that of the fastest
-electric. Engines built to pull more cars are
-slowed less by each, in proportion, and then light ones half as much again and heavy ones half
-as much. Some lines and kinds of power need a tech node: heavy freight Heavy
-boilers, express Express trains, diesels Diesel engines, electrics Electric traction or, for the
-fast ones, Thyristor control, the maglev Magnetic levitation (after Thyristor control), and steam
-engines from 1900 on Superheaters. The table gives every node on the way to an engine, in the
-order they can be taken in each tree, the years it is on sale and the newer engine that ends its
+electric. A train is slowed by what its cars weigh against the most its engine pulls, in
+tonnes: at that most a general engine runs at half its top speed, a heavy freight one at 70% and
+a light one at 40%. An engine goes on sale once its supply tile reaches
+its level on the supply and demand boards: steam engines with coal, heavy freight engines with
+steel, the wood-burning American with wood, expresses with passengers, diesels with oil and
+electrics with copper. The table gives that tile and level, the years it is on sale and the newer engine that ends its
 sale, and the real engines it is drawn after (`railroads.ui.engine_origins`); the pictures are our
 own pixel art.
 
 <!-- table: engines -->
-| Engine | Class | On sale | Tech to take | Power | Speed | To full speed | Cars | Price | Burns a cell | Range | Drawn after |
+| Engine | Class | On sale | For sale from | Power | Speed | To full speed | Cars | Price | Burns a cell | Range | Drawn after |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Penydarren steam wagon | pioneer | 1804–1808 (then the Catch Me Who Can) |  | steam | 15 km/h | 14 s | 1 | $1,000 | 0.25 coal a cell half loaded | 4 cells | [Penydarren locomotive, 1804](https://en.wikipedia.org/wiki/Penydarren_(locomotive)) |
-| Catch Me Who Can | pioneer | 1808–1812 (then the Salamanca) |  | steam | 12 km/h | 13 s | 1 | $1,500 | 0.25 coal a cell half loaded | 5 cells | [Catch Me Who Can, 1808](https://en.wikipedia.org/wiki/Catch_Me_Who_Can) |
-| Salamanca | pioneer | 1812–1815 (then the Puffing Billy) |  | steam | 12 km/h | 13 s | 1 | $2,000 | 0.25 coal a cell half loaded | 6 cells | [Salamanca, 1812](https://en.wikipedia.org/wiki/Salamanca_(locomotive)) |
-| Puffing Billy | pioneer | 1815–1820 (then the Locomotion) |  | steam | 15 km/h | 13 s | 1 | $2,500 | 0.25 coal a cell half loaded | 7 cells | [Puffing Billy, 1813](https://en.wikipedia.org/wiki/Puffing_Billy_(locomotive)) |
-| Locomotion | pioneer | 1820–1826 (then the Rocket) |  | steam | 18 km/h | 13 s | 2 | $4,000 | 0.5 coal a cell half loaded | 8 cells | [Locomotion No. 1, 1825](https://en.wikipedia.org/wiki/Locomotion_No._1) |
-| Rocket | pioneer | 1826–1834 (then the Lion) |  | steam | 24 km/h | 13 s | 2 | $6,000 | 0.5 coal a cell half loaded | 10 cells | [Stephenson's Rocket, 1829](https://en.wikipedia.org/wiki/Stephenson%27s_Rocket) |
-| Lion | pioneer | 1834–1840 (then the Planet steam engine) |  | steam | 27 km/h | 13 s | 2 | $8,000 | 0.5 coal a cell half loaded | 12 cells | [LMR 57 Lion, 1838](https://en.wikipedia.org/wiki/LMR_57_Lion) |
-| Planet steam engine | general | 1840–1856 (then the American 4-4-0) |  | steam | 30 km/h | 12 s | 3 | $10,000 | 0.75 coal a cell half loaded | 21 cells | [Planet, 1830](https://en.wikipedia.org/wiki/Planet_(locomotive)) |
-| Tank engine | light | 1840–1862 (then the Light tank engine) |  | steam | 24 km/h | 3 s | 2 | $3,000 | 0.25 coal a cell half loaded | 13 cells | [Tank locomotive (type)](https://en.wikipedia.org/wiki/Tank_locomotive) |
-| Goods engine | heavy freight | 1853–1865 (then the Mogul freight engine) | metals and machines: Heavy boilers | steam | 21 km/h | 30 s | 4 | $15,000 | 1 coal a cell half loaded | 20 cells | [0-6-0 goods engine (type)](https://en.wikipedia.org/wiki/0-6-0) |
-| American 4-4-0 | general | 1856–1910 (then the Pacific engine) |  | steam | 42 km/h | 11 s | 4 | $30,000 | 1 wood a cell half loaded | 25 cells | [4-4-0 American (type)](https://en.wikipedia.org/wiki/4-4-0), [The General, 1855](https://en.wikipedia.org/wiki/The_General_(locomotive)) |
-| Single-driver express | express | 1858–1900 (then the Atlantic express) | passengers and mail: Timetables → Dining cars → Express trains | steam | 60 km/h | 25 s | 3 + dining car | $40,000 | 1 coal a cell half loaded | 30 cells | [GNR Stirling 4-2-2, 1870](https://en.wikipedia.org/wiki/GNR_Stirling_4-2-2) |
-| Light tank engine | light | 1862–1935 (then the Railbus) |  | steam | 33 km/h | 3 s | 2 | $9,000 | 0.25 coal a cell half loaded | 16 cells | [0-6-2 tank engine (type)](https://en.wikipedia.org/wiki/0-6-2) |
-| Mogul freight engine | heavy freight | 1865–1905 (then the Mallet articulated) | metals and machines: Heavy boilers | steam | 27 km/h | 28 s | 5 | $45,000 | 1.2 coal a cell half loaded | 30 cells | [2-6-0 Mogul (type)](https://en.wikipedia.org/wiki/2-6-0) |
-| Atlantic express | express | 1900–1935 (then the Streamliner) | passengers and mail: Timetables → Dining cars → Express trains; metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 90 km/h | 22 s | 4 + dining car | $120,000 | 1.2 coal a cell half loaded | 50 cells | [4-4-2 Atlantic (type)](https://en.wikipedia.org/wiki/4-4-2_(locomotive)) |
-| Mallet articulated | heavy freight | 1905–1940 (then the Big articulated) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 36 km/h | 25 s | 6 | $135,000 | 1.5 coal a cell half loaded | 50 cells | [Mallet locomotive (type)](https://en.wikipedia.org/wiki/Mallet_locomotive) |
-| Pacific engine | general | 1910–1950 (then the Mixed-traffic diesel) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 60 km/h | 9 s | 5 | $90,000 | 1.2 coal a cell half loaded | 50 cells | [4-6-2 Pacific (type)](https://en.wikipedia.org/wiki/4-6-2) |
-| Boxcab electric | general | 1925–1965 (then the Universal electric) | modern industry: Telegraph signals → Electric traction | electric | 96 km/h | 6 s | 5 | $270,000 | 0.75 electricity a cell half loaded | - | [Boxcab electric (type)](https://en.wikipedia.org/wiki/Boxcab) |
-| Railbus | light | 1935–1985 (then the Sprinter unit) | fuel and minerals: Diesel engines | diesel | 60 km/h | 2 s | 3 | $27,000 | 0.15 diesel fuel a cell half loaded | 60 cells | [Railbus (type)](https://en.wikipedia.org/wiki/Railbus), [Uerdingen railbus](https://en.wikipedia.org/wiki/Uerdingen_railbus) |
-| Streamliner | express | 1935 on | passengers and mail: Timetables → Dining cars → Express trains; metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 138 km/h | 20 s | 5 + dining car | $360,000 | 1.5 coal a cell half loaded | 60 cells | [Streamliner (type)](https://en.wikipedia.org/wiki/Streamliner), [LNER Class A4](https://en.wikipedia.org/wiki/LNER_Class_A4) |
-| Big articulated | heavy freight | 1940–1960 (then the Heavy diesel) | metals and machines: Heavy boilers → Roller bearings → Superheaters | steam | 42 km/h | 22 s | 7 | $405,000 | 1.8 coal a cell half loaded | 60 cells | [Union Pacific Big Boy, 1941](https://en.wikipedia.org/wiki/Union_Pacific_Big_Boy) |
-| Mixed-traffic diesel | general | 1950 on | fuel and minerals: Diesel engines | diesel | 78 km/h | 7 s | 6 | $800,000 | 0.6 diesel fuel a cell half loaded | 100 cells | [EMD F7](https://en.wikipedia.org/wiki/EMD_F7) |
-| Heavy diesel | heavy freight | 1960–1995 (then the Twin-unit diesel) | metals and machines: Heavy boilers; fuel and minerals: Diesel engines | diesel | 54 km/h | 18 s | 8 | $1,200,000 | 0.8 diesel fuel a cell half loaded | 100 cells | [EMD SD40-2](https://en.wikipedia.org/wiki/EMD_SD40-2) |
-| Bullet train | express | 1964–1990 (then the High-speed electric) | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 210 km/h | 15 s | 6 + dining car | $1,100,000 | 1.1 electricity a cell half loaded | - | [0 Series Shinkansen, 1964](https://en.wikipedia.org/wiki/0_Series_Shinkansen) |
-| Universal electric | general | 1965–2000 (then the Modern electric) | modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 144 km/h | 5 s | 7 | $2,400,000 | 1.1 electricity a cell half loaded | - | [DB Class 103](https://en.wikipedia.org/wiki/DB_Class_103) |
-| Sprinter unit | light | 1985 on | fuel and minerals: Diesel engines | diesel | 96 km/h | 2 s | 3 | $81,000 | 0.15 diesel fuel a cell half loaded | 100 cells | [British Rail Class 150](https://en.wikipedia.org/wiki/British_Rail_Class_150) |
-| High-speed electric | express | 1990 on | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 300 km/h | 14 s | 8 + dining car | $3,200,000 | 1.3 electricity a cell half loaded | - | [ICE 1](https://en.wikipedia.org/wiki/ICE_1) |
-| Twin-unit diesel | heavy freight | 1995–2040 (then the Super-heavy diesel) | metals and machines: Heavy boilers; fuel and minerals: Diesel engines | diesel | 60 km/h | 18 s | 10 | $3,600,000 | 1 diesel fuel a cell half loaded | 150 cells | [GE Dash 9-44CW](https://en.wikipedia.org/wiki/GE_Dash_9-44CW) |
-| Modern electric | general | 2000 on | modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control | electric | 192 km/h | 4 s | 8 | $7,200,000 | 1.2 electricity a cell half loaded | - | [DB Class 101](https://en.wikipedia.org/wiki/DB_Class_101) |
-| Maglev | express | 2030 on | passengers and mail: Timetables → Dining cars → Express trains; modern industry: Telegraph signals → Electric traction → Relay interlocking → Thyristor control → Magnetic levitation | maglev | 500 km/h | 13 s | 10 + dining car | $10,000,000 | 4.4 electricity a cell half loaded | - | [Transrapid](https://en.wikipedia.org/wiki/Transrapid), [SCMaglev L0 Series](https://en.wikipedia.org/wiki/L0_Series) |
-| Super-heavy diesel | heavy freight | 2040 on | metals and machines: Heavy boilers; fuel and minerals: Diesel engines | diesel | 66 km/h | 20 s | 12 | $10,800,000 | 1.2 diesel fuel a cell half loaded | 200 cells | our own design |
+| Penydarren steam wagon | pioneer | 1804–1808 (then the Catch Me Who Can) | coal supply level 1 | steam | 15 km/h | 14 s | 1 | $1,000 | 0.25 coal a cell half loaded | 4 cells | [Penydarren locomotive, 1804](https://en.wikipedia.org/wiki/Penydarren_(locomotive)) |
+| Catch Me Who Can | pioneer | 1808–1812 (then the Salamanca) | coal supply level 3 | steam | 12 km/h | 13 s | 1 | $1,500 | 0.25 coal a cell half loaded | 5 cells | [Catch Me Who Can, 1808](https://en.wikipedia.org/wiki/Catch_Me_Who_Can) |
+| Salamanca | pioneer | 1812–1815 (then the Puffing Billy) | coal supply level 4 | steam | 12 km/h | 13 s | 1 | $2,000 | 0.25 coal a cell half loaded | 6 cells | [Salamanca, 1812](https://en.wikipedia.org/wiki/Salamanca_(locomotive)) |
+| Puffing Billy | pioneer | 1815–1820 (then the Locomotion) | coal supply level 5 | steam | 15 km/h | 13 s | 1 | $2,500 | 0.25 coal a cell half loaded | 7 cells | [Puffing Billy, 1813](https://en.wikipedia.org/wiki/Puffing_Billy_(locomotive)) |
+| Locomotion | pioneer | 1820–1826 (then the Rocket) | coal supply level 6 | steam | 18 km/h | 13 s | 2 | $4,000 | 0.5 coal a cell half loaded | 8 cells | [Locomotion No. 1, 1825](https://en.wikipedia.org/wiki/Locomotion_No._1) |
+| Rocket | pioneer | 1826–1834 (then the Lion) | coal supply level 7 | steam | 24 km/h | 13 s | 2 | $6,000 | 0.5 coal a cell half loaded | 10 cells | [Stephenson's Rocket, 1829](https://en.wikipedia.org/wiki/Stephenson%27s_Rocket) |
+| Lion | pioneer | 1834–1840 (then the Planet steam engine) | coal supply level 8 | steam | 27 km/h | 13 s | 2 | $8,000 | 0.5 coal a cell half loaded | 12 cells | [LMR 57 Lion, 1838](https://en.wikipedia.org/wiki/LMR_57_Lion) |
+| Planet steam engine | general | 1840–1856 (then the American 4-4-0) | coal supply level 9 | steam | 30 km/h | 12 s | 3 | $10,000 | 0.75 coal a cell half loaded | 21 cells | [Planet, 1830](https://en.wikipedia.org/wiki/Planet_(locomotive)) |
+| Tank engine | light | 1840–1862 (then the Light tank engine) | coal supply level 9 | steam | 24 km/h | 3 s | 2 | $3,000 | 0.25 coal a cell half loaded | 13 cells | [Tank locomotive (type)](https://en.wikipedia.org/wiki/Tank_locomotive) |
+| Goods engine | heavy freight | 1853–1865 (then the Mogul freight engine) | steel and metals supply level 11 | steam | 21 km/h | 30 s | 4 | $15,000 | 1 coal a cell half loaded | 20 cells | [0-6-0 goods engine (type)](https://en.wikipedia.org/wiki/0-6-0) |
+| American 4-4-0 | general | 1856–1910 (then the Pacific engine) | wood supply level 12 | steam | 42 km/h | 11 s | 4 | $30,000 | 1 wood a cell half loaded | 25 cells | [4-4-0 American (type)](https://en.wikipedia.org/wiki/4-4-0), [The General, 1855](https://en.wikipedia.org/wiki/The_General_(locomotive)) |
+| Single-driver express | express | 1858–1900 (then the Atlantic express) | passengers supply level 12 | steam | 60 km/h | 25 s | 3 + dining car | $40,000 | 1 coal a cell half loaded | 30 cells | [GNR Stirling 4-2-2, 1870](https://en.wikipedia.org/wiki/GNR_Stirling_4-2-2) |
+| Light tank engine | light | 1862–1935 (then the Railbus) | coal supply level 13 | steam | 33 km/h | 3 s | 2 | $9,000 | 0.25 coal a cell half loaded | 16 cells | [0-6-2 tank engine (type)](https://en.wikipedia.org/wiki/0-6-2) |
+| Mogul freight engine | heavy freight | 1865–1905 (then the Mallet articulated) | steel and metals supply level 13 | steam | 27 km/h | 28 s | 5 | $45,000 | 1.2 coal a cell half loaded | 30 cells | [2-6-0 Mogul (type)](https://en.wikipedia.org/wiki/2-6-0) |
+| Atlantic express | express | 1900–1935 (then the Streamliner) | passengers supply level 18 | steam | 90 km/h | 22 s | 4 + dining car | $120,000 | 1.2 coal a cell half loaded | 50 cells | [4-4-2 Atlantic (type)](https://en.wikipedia.org/wiki/4-4-2_(locomotive)) |
+| Mallet articulated | heavy freight | 1905–1940 (then the Big articulated) | steel and metals supply level 19 | steam | 36 km/h | 25 s | 6 | $135,000 | 1.5 coal a cell half loaded | 50 cells | [Mallet locomotive (type)](https://en.wikipedia.org/wiki/Mallet_locomotive) |
+| Pacific engine | general | 1910–1950 (then the Mixed-traffic diesel) | coal supply level 20 | steam | 60 km/h | 9 s | 5 | $90,000 | 1.2 coal a cell half loaded | 50 cells | [4-6-2 Pacific (type)](https://en.wikipedia.org/wiki/4-6-2) |
+| Boxcab electric | general | 1925–1965 (then the Universal electric) | copper and rubber supply level 21 | electric | 96 km/h | 6 s | 5 | $270,000 | 0.75 electricity a cell half loaded | - | [Boxcab electric (type)](https://en.wikipedia.org/wiki/Boxcab) |
+| Railbus | light | 1935–1985 (then the Sprinter unit) | oil and fuel supply level 22 | diesel | 60 km/h | 2 s | 3 | $27,000 | 0.15 diesel fuel a cell half loaded | 60 cells | [Railbus (type)](https://en.wikipedia.org/wiki/Railbus), [Uerdingen railbus](https://en.wikipedia.org/wiki/Uerdingen_railbus) |
+| Streamliner | express | 1935 on | passengers supply level 23 | steam | 138 km/h | 20 s | 5 + dining car | $360,000 | 1.5 coal a cell half loaded | 60 cells | [Streamliner (type)](https://en.wikipedia.org/wiki/Streamliner), [LNER Class A4](https://en.wikipedia.org/wiki/LNER_Class_A4) |
+| Big articulated | heavy freight | 1940–1960 (then the Heavy diesel) | steel and metals supply level 23 | steam | 42 km/h | 22 s | 7 | $405,000 | 1.8 coal a cell half loaded | 60 cells | [Union Pacific Big Boy, 1941](https://en.wikipedia.org/wiki/Union_Pacific_Big_Boy) |
+| Mixed-traffic diesel | general | 1950 on | oil and fuel supply level 24 | diesel | 78 km/h | 7 s | 6 | $800,000 | 0.6 diesel fuel a cell half loaded | 100 cells | [EMD F7](https://en.wikipedia.org/wiki/EMD_F7) |
+| Heavy diesel | heavy freight | 1960–1995 (then the Twin-unit diesel) | oil and fuel supply level 26 | diesel | 54 km/h | 18 s | 8 | $1,200,000 | 0.8 diesel fuel a cell half loaded | 100 cells | [EMD SD40-2](https://en.wikipedia.org/wiki/EMD_SD40-2) |
+| Bullet train | express | 1964–1990 (then the High-speed electric) | passengers supply level 26 | electric | 210 km/h | 15 s | 6 + dining car | $1,100,000 | 1.1 electricity a cell half loaded | - | [0 Series Shinkansen, 1964](https://en.wikipedia.org/wiki/0_Series_Shinkansen) |
+| Universal electric | general | 1965–2000 (then the Modern electric) | copper and rubber supply level 26 | electric | 144 km/h | 5 s | 7 | $2,400,000 | 1.1 electricity a cell half loaded | - | [DB Class 103](https://en.wikipedia.org/wiki/DB_Class_103) |
+| Sprinter unit | light | 1985 on | oil and fuel supply level 29 | diesel | 96 km/h | 2 s | 3 | $81,000 | 0.15 diesel fuel a cell half loaded | 100 cells | [British Rail Class 150](https://en.wikipedia.org/wiki/British_Rail_Class_150) |
+| High-speed electric | express | 1990 on | passengers supply level 29 | electric | 300 km/h | 14 s | 8 + dining car | $3,200,000 | 1.3 electricity a cell half loaded | - | [ICE 1](https://en.wikipedia.org/wiki/ICE_1) |
+| Twin-unit diesel | heavy freight | 1995–2040 (then the Super-heavy diesel) | oil and fuel supply level 30 | diesel | 60 km/h | 18 s | 10 | $3,600,000 | 1 diesel fuel a cell half loaded | 150 cells | [GE Dash 9-44CW](https://en.wikipedia.org/wiki/GE_Dash_9-44CW) |
+| Modern electric | general | 2000 on | copper and rubber supply level 30 | electric | 192 km/h | 4 s | 8 | $7,200,000 | 1.2 electricity a cell half loaded | - | [DB Class 101](https://en.wikipedia.org/wiki/DB_Class_101) |
+| Maglev | express | 2030 on | passengers supply level 34 | maglev | 500 km/h | 13 s | 10 + dining car | $10,000,000 | 4.4 electricity a cell half loaded | - | [Transrapid](https://en.wikipedia.org/wiki/Transrapid), [SCMaglev L0 Series](https://en.wikipedia.org/wiki/L0_Series) |
+| Super-heavy diesel | heavy freight | 2040 on | oil and fuel supply level 35 | diesel | 66 km/h | 20 s | 12 | $10,800,000 | 1.2 diesel fuel a cell half loaded | 200 cells | our own design |
 <!-- end table -->
 
 Electric engines run only on electrified track, and the maglev only on maglev track, which can be
@@ -1183,8 +1163,7 @@ Supply and demand window shows what each pick would do to them before it is made
 grows faster than demand, margins shrink: in 2050 coal, ore, steel and chemicals earn about a
 fifth of their base, farming, animals, wood and textiles a little over a quarter, passengers and
 mail over a third and luxuries about half. The player's own buildings sell to their stations at
-that price too, and tech is earned by the units delivered, at the table's figures, so cheaper
-goods don't slow it. The Reports window's Prices tab charts every tile's price over the years and
+that price too. The Reports window's Prices tab charts every tile's price over the years and
 lists the boards now.
 
 <!-- table: freight -->

@@ -106,7 +106,6 @@ from railroads.sim.room import Room
 from railroads.sim.station_trade import StationTrade
 from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
-from railroads.sim.tech import Effect
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 from railroads.sim.tiles import era_come, kind_era
 from railroads.sim.towns import Towns
@@ -603,9 +602,7 @@ class Growth:
         settling what it traded."""
         changed = self._crowd_out()
         self.economy.year = self.year
-        self.economy.bonus_per_good = BONUS_PER_GOOD + (
-            0.0 if self.railway is None else self.railway.research.bonus(Effect.BONUS_GOODS)
-        )
+        self.economy.bonus_per_good = BONUS_PER_GOOD
         if self.railway is not None:
             self.railway.station_trade = self.station_trade
         yield
@@ -694,9 +691,6 @@ class Growth:
                 share = np.where(np.isnan(assumed), share, assumed)
             points, value = self.rule.points[kind]
             count = self._counts[kind].ravel()[trade.cells].astype(np.float64)
-            boost = self.owners.boost(kind, Effect.GROWTH)
-            if boost:
-                count += boost * self.owners.owned(kind).ravel()[trade.cells]
             served[points] += np.maximum(share, 0.0) * value * count
         served[Points.POPULATION] *= 1.0 + LIVELY_GROWTH * self._lively(trade)
         emptied = np.setdiff1d(self._traded, trade.cells, assume_unique=True)

@@ -1,6 +1,6 @@
 """The help window: every building with what it makes and wants in a month, every good with
 what it earns and who makes and wants it, every engine with what it can do, when and with
-which tech it is sold, and the real engines it is drawn after, how towns work, the target
+which supply level it is sold, and the real engines it is drawn after, how towns work, the target
 set for the company and going bankrupt, and why a game starts on a quarter of its place."""
 
 from dataclasses import dataclass
@@ -26,10 +26,8 @@ from railroads.sim.goods import (
 )
 from railroads.sim.ladders import LADDERS, PASSENGERS_PER_POINT, POINTS, Points
 from railroads.sim.lots import FIRST_FIBONACCI, PRICE_UNIT, fibonacci
-from railroads.sim.ownership import EXPERIENCE_PER_POINT
-from railroads.sim.tech import NODES, Tree, path_to
 from railroads.sim.tiles import good_era, kind_era, opened_from
-from railroads.sim.trains import ENGINES, Engine, successor
+from railroads.sim.trains import ENGINES, OPENED_BY, Engine, successor
 from railroads.ui.buy_train import fuel_use
 from railroads.ui.engine_origins import origins
 from railroads.ui.ornate import begin_ornate, end_ornate
@@ -116,13 +114,10 @@ MAP_HELP = (
     ),
 )
 ENGINES_NOTE = (
-    "An engine is sold from its year once its tech is taken, until a newer one of its line comes."
-    " Tech is taken in the tech window (R): every level a tree reaches gives a point for one node"
-    " whose requirements are taken. A tree gains experience only from deliveries: what cargo of"
-    " its goods earns as buildings take it out of your stations, and for passengers and mail"
-    " what they pay as they get off. Every point of the buildings of a tree you own adds"
-    f" {EXPERIENCE_PER_POINT:.0%} to it. Engines are drawn after real ones, linked to their"
-    " Wikipedia pages."
+    "An engine is sold once its supply tile reaches its level on the supply and demand boards (Y),"
+    " until a newer one of its line comes: steam engines with coal, heavy freight engines with"
+    " steel, the wood-burning American with wood, expresses with passengers, diesels with oil and"
+    " electrics with copper. Engines are drawn after real ones, linked to their Wikipedia pages."
 )
 GOODS_NOTE = (
     f"A good's freight is what carrying a unit of it earns: {FREIGHT_SHARE:.0%} of its market"
@@ -164,8 +159,8 @@ class EngineHelp:
     engine: Engine
     # The year its sale ends and the engine that ends it, if one does.
     sold_until: tuple[int, str] | None
-    # The nodes to take for it in each tree, each after those it requires.
-    tech: tuple[tuple[Tree, tuple[str, ...]], ...]
+    # The supply tile and level that open it for sale, in words.
+    opened_by: str
     # The real engines it is drawn after, as names and Wikipedia links.
     origins: tuple[tuple[str, str], ...]
 
@@ -220,12 +215,10 @@ def good_help() -> tuple[GoodHelp, ...]:
     return tuple(rows)
 
 
-def _tech_path(engine: Engine) -> tuple[tuple[Tree, tuple[str, ...]], ...]:
-    path = path_to(engine.needs)
-    trees = dict.fromkeys(NODES[key][0] for key in path)
-    return tuple(
-        (tree, tuple(NODES[key][1].name for key in path if NODES[key][0] == tree)) for tree in trees
-    )
+def opened_by(name: str) -> str:
+    """The supply tile and level that open an engine for sale, in words."""
+    tile, level = OPENED_BY[name]
+    return f"{tile.value} supply level {level}"
 
 
 @cache
@@ -239,7 +232,7 @@ def engine_help() -> tuple[EngineHelp, ...]:
                 name,
                 engine,
                 (ENGINES[newer].year, ENGINES[newer].title) if newer else None,
-                _tech_path(engine),
+                opened_by(name),
                 origins(name),
             )
         )
@@ -365,7 +358,7 @@ class HelpWindow:
         imgui.table_setup_scroll_freeze(1, 1)
         imgui.table_setup_column("Engine")
         imgui.table_setup_column("On sale")
-        imgui.table_setup_column("Tech to take", imgui.TableColumnFlags_.width_stretch.value, 1.2)
+        imgui.table_setup_column("For sale from", imgui.TableColumnFlags_.width_stretch.value, 1.2)
         imgui.table_setup_column("Speed")
         imgui.table_setup_column("Cars")
         imgui.table_setup_column("Price")
@@ -385,7 +378,7 @@ class HelpWindow:
             imgui.table_next_column()
             _draw_sale(row)
             imgui.table_next_column()
-            _draw_tech(row)
+            _draw_opened_by(row)
             imgui.table_next_column()
             imgui.text(f"{engine.kmh:.0f} km/h")
             imgui.text_disabled(f"full in {engine.pickup:g} s")
@@ -417,11 +410,8 @@ def _draw_sale(row: EngineHelp) -> None:
     tip(f"Sold until the {title} can be bought")
 
 
-def _draw_tech(row: EngineHelp) -> None:
-    if not row.tech:
-        imgui.text_disabled("none")
-    for tree, nodes in row.tech:
-        imgui.text_wrapped(f"{tree.value.capitalize()}: {' > '.join(nodes)}")
+def _draw_opened_by(row: EngineHelp) -> None:
+    imgui.text_wrapped(row.opened_by.capitalize())
 
 
 def _draw_origins(row: EngineHelp) -> None:

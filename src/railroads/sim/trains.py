@@ -20,6 +20,7 @@ from railroads.sim.goods import General, Good
 # What a stop asks for a car of: one good, or a whole kind of goods.
 type Cargo = Good | General
 from railroads.sim.grids import Cell
+from railroads.sim.tiles import Tile
 
 MAX_CARS = 5
 
@@ -233,7 +234,7 @@ GOOD_KG: Mapping[Good, float] = MappingProxyType(
 
 
 def car_size(good: Good, generation: int = BASE_GENERATION) -> float:
-    """How much of a good one car of a generation carries, before what tech adds to coaches;
+    """How much of a good one car of a generation carries;
     no VEHICLES before the generation they are first carried in."""
     vehicle = VEHICLES.get(good)
     if vehicle is not None:
@@ -406,8 +407,7 @@ KMH_PER_SPEED = 60.0
 # How much an engine of a kind pulls at most, as a share of the train it is built for, full, of
 # its top_generation's cars: coal for most, as real trains were loaded up to what their engine
 # could pull, so a full train of coal runs its slowest; full coaches for expresses and railcars,
-# with room for the passengers more coaches seat (railroads.sim.tech.Effect.COACHES); light
-# engines about half that.
+# with a little room to spare; light engines about half that.
 PULL_SHARE = {
     Kind.PIONEER: 1.0,
     Kind.LIGHT: 0.6,
@@ -443,10 +443,10 @@ BURN_ALONE = 0.5
 
 @dataclass(frozen=True, slots=True)
 class Engine:
-    """An engine model: from what year it can be bought, how fast it runs against the Planet,
+    """An engine model: the year it was built in history, how fast it runs against the Planet,
     how many cars it pulls (an express's coaches, without its dining car), what it costs, what it
-    is for and what drives it, and the tech nodes (railroads.sim.tech) it needs to open. Electric
-    engines run only on electrified track. Once a newer engine of its line can be bought, it is
+    is for and what drives it; it can be bought once a supply tile reaches a level (OPENED_BY).
+    Electric engines run only on electrified track. Once a newer engine of its line can be bought, it is
     no longer sold (railroads.sim.railway.Railway.engines)."""
 
     title: str
@@ -458,7 +458,6 @@ class Engine:
     power: Power = Power.STEAM
     # How many seconds of play at normal speed it takes to get from a stand to full speed.
     pickup: float = 10.0
-    needs: tuple[str, ...] = ()
     # How many cells it can run on the coal or diesel fuel it takes on setting off, so it can
     # only call at stops that near each other; 0 for electric and maglev engines, which run as
     # far as the wires or guideway go.
@@ -529,7 +528,7 @@ class Engine:
 
     def pull_at(self, generation: int) -> float:
         """The most it pulls, in tonnes, pulling cars of a generation up to its top_generation,
-        before what tech adds: PULL_SHARE of its train of them full."""
+        PULL_SHARE of its train of them full."""
         coaches = self.express or self.railcar
         good = Good.PASSENGERS if coaches else Good.COAL
         generation = min(generation, self.top_generation)
@@ -540,8 +539,6 @@ class Engine:
 
 P, L, G, H, X = Kind.PIONEER, Kind.LIGHT, Kind.GENERAL, Kind.HEAVY, Kind.EXPRESS
 DIESEL, ELECTRIC, MAGLEV = Power.DIESEL, Power.ELECTRIC, Power.MAGLEV
-BOILERS, SUPERHEATED = ("boilers",), ("superheaters",)
-EXPRESS_TECH = ("express_trains",)
 ENGINES: dict[str, Engine] = {
     "penydarren": Engine(
         "Penydarren steam wagon", 1804, 0.25, 1, 1_000.0, P, pickup=14.0, tank=4.0
@@ -554,9 +551,7 @@ ENGINES: dict[str, Engine] = {
     "lion": Engine("Lion", 1834, 0.45, 2, 8_000.0, P, pickup=13.0, tank=12.0),
     "planet": Engine("Planet steam engine", 1840, 0.5, 3, TRAIN_PRICE, G, pickup=12.0, tank=21.0),
     "tank": Engine("Tank engine", 1840, 0.4, 2, 3_000.0, L, pickup=3.0, tank=13.0),
-    "goods": Engine(
-        "Goods engine", 1853, 0.35, 4, 15_000.0, H, pickup=30.0, tank=20.0, needs=BOILERS
-    ),
+    "goods": Engine("Goods engine", 1853, 0.35, 4, 15_000.0, H, pickup=30.0, tank=20.0),
     "american": Engine(
         "American 4-4-0", 1856, 0.7, 4, 30_000.0, G, pickup=11.0, tank=25.0, wood=True
     ),
@@ -569,12 +564,9 @@ ENGINES: dict[str, Engine] = {
         X,
         pickup=25.0,
         tank=30.0,
-        needs=EXPRESS_TECH,
     ),
     "light_tank": Engine("Light tank engine", 1862, 0.55, 2, 9_000.0, L, pickup=3.0, tank=16.0),
-    "mogul": Engine(
-        "Mogul freight engine", 1865, 0.45, 5, 45_000.0, H, pickup=28.0, tank=30.0, needs=BOILERS
-    ),
+    "mogul": Engine("Mogul freight engine", 1865, 0.45, 5, 45_000.0, H, pickup=28.0, tank=30.0),
     "atlantic": Engine(
         "Atlantic express",
         1900,
@@ -584,7 +576,6 @@ ENGINES: dict[str, Engine] = {
         X,
         pickup=22.0,
         tank=50.0,
-        needs=EXPRESS_TECH + SUPERHEATED,
     ),
     "mallet": Engine(
         "Mallet articulated",
@@ -595,14 +586,9 @@ ENGINES: dict[str, Engine] = {
         H,
         pickup=25.0,
         tank=50.0,
-        needs=BOILERS + SUPERHEATED,
     ),
-    "pacific": Engine(
-        "Pacific engine", 1910, 1.0, 5, 90_000.0, G, pickup=9.0, tank=50.0, needs=SUPERHEATED
-    ),
-    "boxcab": Engine(
-        "Boxcab electric", 1925, 1.6, 5, 270_000.0, G, ELECTRIC, pickup=6.0, needs=("traction",)
-    ),
+    "pacific": Engine("Pacific engine", 1910, 1.0, 5, 90_000.0, G, pickup=9.0, tank=50.0),
+    "boxcab": Engine("Boxcab electric", 1925, 1.6, 5, 270_000.0, G, ELECTRIC, pickup=6.0),
     "railbus": Engine(
         "Railbus",
         1935,
@@ -613,7 +599,6 @@ ENGINES: dict[str, Engine] = {
         DIESEL,
         pickup=2.0,
         tank=60.0,
-        needs=("diesel",),
         railcar=True,
     ),
     "streamliner": Engine(
@@ -625,7 +610,6 @@ ENGINES: dict[str, Engine] = {
         X,
         pickup=20.0,
         tank=60.0,
-        needs=EXPRESS_TECH + SUPERHEATED,
     ),
     "big_boy": Engine(
         "Big articulated",
@@ -636,7 +620,6 @@ ENGINES: dict[str, Engine] = {
         H,
         pickup=22.0,
         tank=60.0,
-        needs=BOILERS + SUPERHEATED,
     ),
     "mixed_diesel": Engine(
         "Mixed-traffic diesel",
@@ -648,7 +631,6 @@ ENGINES: dict[str, Engine] = {
         DIESEL,
         pickup=7.0,
         tank=100.0,
-        needs=("diesel",),
     ),
     "heavy_diesel": Engine(
         "Heavy diesel",
@@ -660,7 +642,6 @@ ENGINES: dict[str, Engine] = {
         DIESEL,
         pickup=18.0,
         tank=100.0,
-        needs=BOILERS + ("diesel",),
     ),
     "bullet": Engine(
         "Bullet train",
@@ -671,7 +652,6 @@ ENGINES: dict[str, Engine] = {
         X,
         ELECTRIC,
         pickup=15.0,
-        needs=EXPRESS_TECH + ("thyristors",),
     ),
     "express": Engine(
         "Universal electric",
@@ -682,7 +662,6 @@ ENGINES: dict[str, Engine] = {
         G,
         ELECTRIC,
         pickup=5.0,
-        needs=("thyristors",),
     ),
     "sprinter": Engine(
         "Sprinter unit",
@@ -694,7 +673,6 @@ ENGINES: dict[str, Engine] = {
         DIESEL,
         pickup=2.0,
         tank=100.0,
-        needs=("diesel",),
         railcar=True,
     ),
     "high_speed": Engine(
@@ -706,7 +684,6 @@ ENGINES: dict[str, Engine] = {
         X,
         ELECTRIC,
         pickup=14.0,
-        needs=EXPRESS_TECH + ("thyristors",),
     ),
     "twin_diesel": Engine(
         "Twin-unit diesel",
@@ -718,10 +695,9 @@ ENGINES: dict[str, Engine] = {
         DIESEL,
         pickup=18.0,
         tank=150.0,
-        needs=BOILERS + ("diesel",),
     ),
     "modern_electric": Engine(
-        "Modern electric", 2000, 3.2, 8, 7_200_000.0, G, ELECTRIC, pickup=4.0, needs=("thyristors",)
+        "Modern electric", 2000, 3.2, 8, 7_200_000.0, G, ELECTRIC, pickup=4.0
     ),
     "super_diesel": Engine(
         "Super-heavy diesel",
@@ -733,7 +709,6 @@ ENGINES: dict[str, Engine] = {
         DIESEL,
         pickup=20.0,
         tank=200.0,
-        needs=BOILERS + ("diesel",),
     ),
     "maglev": Engine(
         "Maglev",
@@ -744,9 +719,50 @@ ENGINES: dict[str, Engine] = {
         X,
         MAGLEV,
         pickup=13.0,
-        needs=EXPRESS_TECH + ("maglev",),
     ),
 }
+
+
+# The supply tile and level that open each engine for sale (railroads.sim.tiles): the level its tile
+# first reaches nearest the engine's year when the world goes at its own pace, one level apart
+# within a line. Steam engines come with coal,
+# heavy freight engines with steel, the wood-burning American with wood, expresses with
+# passengers, diesels with oil and electrics with copper.
+OPENED_BY: Mapping[str, tuple[Tile, int]] = MappingProxyType(
+    {
+        "penydarren": (Tile.COAL, 1),
+        "catch_me": (Tile.COAL, 3),
+        "salamanca": (Tile.COAL, 4),
+        "puffing_billy": (Tile.COAL, 5),
+        "locomotion": (Tile.COAL, 6),
+        "rocket": (Tile.COAL, 7),
+        "lion": (Tile.COAL, 8),
+        "planet": (Tile.COAL, 9),
+        "tank": (Tile.COAL, 9),
+        "goods": (Tile.STEEL, 11),
+        "american": (Tile.WOOD, 12),
+        "single": (Tile.PASSENGERS, 12),
+        "light_tank": (Tile.COAL, 13),
+        "mogul": (Tile.STEEL, 13),
+        "atlantic": (Tile.PASSENGERS, 18),
+        "mallet": (Tile.STEEL, 19),
+        "pacific": (Tile.COAL, 20),
+        "boxcab": (Tile.COPPER, 21),
+        "railbus": (Tile.OIL, 22),
+        "streamliner": (Tile.PASSENGERS, 23),
+        "big_boy": (Tile.STEEL, 23),
+        "mixed_diesel": (Tile.OIL, 24),
+        "heavy_diesel": (Tile.OIL, 26),
+        "bullet": (Tile.PASSENGERS, 26),
+        "express": (Tile.COPPER, 26),
+        "sprinter": (Tile.OIL, 29),
+        "high_speed": (Tile.PASSENGERS, 29),
+        "twin_diesel": (Tile.OIL, 30),
+        "modern_electric": (Tile.COPPER, 30),
+        "maglev": (Tile.PASSENGERS, 34),
+        "super_diesel": (Tile.OIL, 35),
+    }
+)
 
 
 FIRST_ENGINE = "planet"

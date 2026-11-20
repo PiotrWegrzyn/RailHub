@@ -68,16 +68,16 @@ class MemoryFiles:
 
 
 @cache
-def _world_eras() -> dict[int, int]:
-    """The era of every year when the lowest tiles always go up."""
+def _world_years() -> dict[int, Year]:
+    """The boards of every year when the lowest tiles always go up."""
     world = Tiles.until(END_YEAR + 99)
-    return {year: world.of_year(year).era for year in range(FIRST_YEAR, END_YEAR + 100)}
+    return {year: world.of_year(year) for year in range(FIRST_YEAR, END_YEAR + 100)}
 
 
 def open_boards() -> Tiles:
     """Boards on which every good is made and wanted at its base and earns its base price, and
-    every buyer a demand tile opens is open, from the first year of the boards; the eras come as
-    they do when the lowest tiles always go up."""
+    every buyer a demand tile opens is open, from the first year of the boards; the supply levels,
+    which open engines, and the eras come as they do when the lowest tiles always go up."""
     return boards_with()
 
 
@@ -85,15 +85,15 @@ def boards_with(
     made: dict[Tile, float] | None = None, wanted: dict[Tile, float] | None = None
 ) -> Tiles:
     """open_boards, but with some tiles made or wanted so many times their base."""
-    eras = _world_eras()
+    world = _world_years()
     tiles = Tiles()
     tiles.years = {
         year: Year(
-            MappingProxyType({}),
+            world[year].supply,
             MappingProxyType(dict.fromkeys(Tile, OPEN_LEVEL)),
             MappingProxyType(made or {}),
             MappingProxyType(wanted or {}),
-            eras[year],
+            world[year].era,
         )
         for year in range(FIRST_YEAR, END_YEAR + 100)
     }

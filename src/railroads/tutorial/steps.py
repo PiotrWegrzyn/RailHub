@@ -14,7 +14,7 @@ from railroads.sim.game import Game
 from railroads.sim.goods import FOODS, FREIGHT_SHARE, Good
 from railroads.sim.grids import Cell
 from railroads.sim.lots import FIRST_FIBONACCI, PRICE_UNIT, Lots, fibonacci
-from railroads.sim.ownership import EXPERIENCE_PER_POINT, HOLD_MONTHS, LOT, SHARES
+from railroads.sim.ownership import HOLD_MONTHS, LOT, SHARES
 from railroads.sim.trains import ENGINES, FIRST_ENGINE
 from railroads.tutorial.place import ASHFORD_STATION, BROOKBY_STATION, SHOWN_FARM
 
@@ -32,7 +32,8 @@ class Seen:
     lens: str | None = None
     # The cell whose details are open.
     selected: Cell | None = None
-    tech_open: bool = False
+    # Whether the supply and demand boards are open.
+    boards_open: bool = False
     # Whether the screen for buying a train is open.
     buying_train: bool = False
 
@@ -190,8 +191,8 @@ STEPS: tuple[Step, ...] = (
         (
             "The way back can carry other goods than the way out: each stop has its own cars.",
             (
-                "Tech opens general cars, which take whichever good of their kind pays best at the "
-                "next stop, such as any food."
+                "General cars take whichever good of their kind pays best at the next stop, such "
+                "as any food."
             ),
             (
                 "What a train brings beyond what the buildings around can use in a month stays at "
@@ -286,22 +287,21 @@ STEPS: tuple[Step, ...] = (
         ("buy_shares",),
     ),
     Step(
-        "8. Tech",
+        "8. Supply and demand",
         (
             (
-                "Only deliveries earn experience: for the tree of their goods, and fares for "
-                "passengers and mail. Each point of the buildings you own in a tree adds "
-                f"{EXPERIENCE_PER_POINT:.0%} to it."
+                "Every January you raise two supply tiles and one demand tile: what the world "
+                "makes grows faster than what it wants, so prices fall as the years go by."
             ),
             (
-                "Each level gives a point for a node: more output from your buildings, bigger cars, "
-                "general cars, new engines and lower costs."
+                "Supply levels bring new engines and eras, with new goods and bigger wagons; "
+                "demand levels bring new buyers, such as mines taking planks."
             ),
         ),
-        "Open the tech window (R, or the flask at the top).",
-        lambda game, seen: seen.tech_open,
+        "Open the supply and demand boards (Y, or the scales at the top).",
+        lambda game, seen: seen.boards_open,
         lambda game: [],
-        ("tech",),
+        ("boards",),
     ),
     Step(
         "9. Fuel and engines",

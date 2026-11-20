@@ -10,8 +10,7 @@ from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
-from railroads.sim.tech import GENERAL_CARS, NODES, Effect, Research
-from railroads.sim.tiles import Tiles, activate
+from railroads.sim.tiles import Tiles, activate, of_year
 from railroads.sim.trains import (
     BASE_GENERATION,
     BULK_CAR,
@@ -20,6 +19,7 @@ from railroads.sim.trains import (
     EXPRESS_FARE,
     FREIGHT_TARE,
     GENERATIONS,
+    OPENED_BY,
     SLOWDOWN,
     Car,
     Engine,
@@ -35,11 +35,9 @@ from railroads.sim.trains import (
     unit_label,
     unit_tonnes,
 )
-from railroads.ui.tech_window import describe
 from railroads.ui.trains_window import adding_tip, engine_summary, engines_by_kind, picker_good
 
 WEST, EAST = (6, 3), (6, 20)
-EVERY_NODE = frozenset(NODES)
 
 
 def line() -> Railway:
@@ -53,11 +51,6 @@ def line() -> Railway:
     railway = Railway(constructions)
     growth.railway = railway
     railway.finances.earn(10_000_000.0, "test")
-    return railway
-
-
-def knowing(railway: Railway, *keys: str) -> Railway:
-    railway.research = Research(taken=set(keys))
     return railway
 
 
@@ -190,7 +183,7 @@ def test_an_express_runs_far_faster_than_a_general_engine_but_takes_longer_to_ge
 
 def test_a_better_engine_than_the_planet_comes_within_six_years_of_an_1850_start() -> None:
     railway = line()
-    railway.year = 1856
+    railway.year = opened_in("american")
 
     engines = railway.engines()
 
@@ -198,22 +191,19 @@ def test_a_better_engine_than_the_planet_comes_within_six_years_of_an_1850_start
     assert ENGINES["american"].speed > ENGINES["planet"].speed
 
 
-def test_the_specialised_classes_come_soon_after_1850_and_need_their_tech() -> None:
-    railway = knowing(line(), "boilers", "express_trains")
-    railway.year = 1858
-    without = line()
-    without.year = 1858
+def test_the_specialised_classes_come_within_ten_years_of_1850() -> None:
+    early, later = line_at(1850), line_at(1860)
 
-    engines = railway.engines()
+    engines = set(early.engines()), set(later.engines())
 
-    assert {"goods", "single"} <= set(engines)
-    assert not {"goods", "single"} & set(without.engines())
+    assert not {"goods", "single"} & engines[0]
+    assert {"goods", "single"} <= engines[1]
 
 
 def test_the_game_ends_with_a_500_kmh_maglev_and_a_diesel_pulling_twelve_of_the_biggest_cars() -> (
     None
 ):
-    railway = knowing(line(), *EVERY_NODE)
+    railway = line()
     railway.year = 2040
 
     engines = {name: ENGINES[name] for name in railway.engines()}
@@ -236,7 +226,7 @@ def test_a_newer_engine_of_the_same_line_takes_the_older_ones_place_on_sale() ->
 
 
 def test_an_electric_does_not_end_the_sale_of_the_engine_it_would_replace() -> None:
-    railway = knowing(line(), "superheaters", "traction")
+    railway = line()
     railway.year = 1925
 
     engines = railway.engines()
@@ -244,17 +234,29 @@ def test_an_electric_does_not_end_the_sale_of_the_engine_it_would_replace() -> N
     assert {"pacific", "boxcab"} <= set(engines)
 
 
-def test_every_tech_an_engine_needs_is_a_node_that_opens_engines() -> None:
-    needed = {need for engine in ENGINES.values() for need in engine.needs}
+def test_every_engine_is_opened_by_a_supply_tile_level() -> None:
+    opened = set(OPENED_BY)
 
-    opening = {key for key, (_, node) in NODES.items() if node.effect == Effect.UNLOCK}
+    engines = set(ENGINES)
 
-    assert needed == opening - set(GENERAL_CARS.values())
+    assert opened == engines
+
+
+def test_an_engine_goes_on_sale_once_its_supply_tile_reaches_its_level() -> None:
+    railway = line()
+    tile, level = OPENED_BY["mogul"]
+    railway.year = next(
+        year for year in range(1804, 2050) if of_year(year).supply.get(tile, 0) >= level
+    )
+
+    sale = "mogul" in line_at(railway.year - 1).engines(), "mogul" in railway.engines()
+
+    assert sale == (False, True)
 
 
 def test_an_express_carries_only_passengers() -> None:
-    railway = knowing(line(), "express_trains")
-    railway.year = 1858
+    railway = line()
+    railway.year = opened_in("single")
     train = railway.buy("single")
     assert train is not None
 
@@ -264,8 +266,8 @@ def test_an_express_carries_only_passengers() -> None:
 
 
 def test_an_express_leads_its_coaches_with_an_empty_dining_car() -> None:
-    railway = knowing(line(), "express_trains")
-    railway.year = 1858
+    railway = line()
+    railway.year = opened_in("single")
     train = railway.buy("single")
     assert train is not None
     train.stops = [Stop(WEST, [Good.PASSENGERS, Good.COAL]), Stop(EAST)]
@@ -281,8 +283,8 @@ def test_an_express_leads_its_coaches_with_an_empty_dining_car() -> None:
 
 
 def test_an_express_pays_a_car_trip_for_its_dining_car() -> None:
-    railway = knowing(line(), "express_trains")
-    railway.year = 1858
+    railway = line()
+    railway.year = opened_in("single")
     train = railway.buy("single")
     assert train is not None
     train.stops = [Stop(WEST, [Good.PASSENGERS]), Stop(EAST)]
@@ -295,8 +297,8 @@ def test_an_express_pays_a_car_trip_for_its_dining_car() -> None:
 
 
 def test_passengers_on_an_express_pay_more() -> None:
-    plain_railway, express_railway = line(), knowing(line(), "express_trains")
-    express_railway.year = plain_railway.year = 1858
+    plain_railway, express_railway = line(), line()
+    express_railway.year = plain_railway.year = max(opened_in("american"), opened_in("single"))
     plain = plain_railway.buy("american")
     express = express_railway.buy("single")
     assert plain is not None and express is not None
@@ -481,7 +483,7 @@ def test_before_the_second_era_even_the_planet_pulls_the_first_generation() -> N
 
 def test_a_pioneer_pulls_a_full_car_of_55_quintals_of_coal() -> None:
     railway = line()
-    railway.year = 1804
+    railway.year = opened_in("penydarren")
     train = railway.buy("penydarren")
     assert train is not None
     stop = Stop(WEST)
@@ -512,7 +514,7 @@ def test_a_full_train_of_general_goods_slows_a_general_engine_by_a_fifth_or_so()
 
 
 def test_an_express_slows_about_as_much_empty_as_full() -> None:
-    railway = knowing(line(), "express_trains")
+    railway = line()
     railway.year = 1858
     coaches = ENGINES["single"].cars
     empty = Train("Empty", engine="single", cars=[Car(Good.PASSENGERS, dining=True)])
@@ -527,7 +529,7 @@ def test_an_express_slows_about_as_much_empty_as_full() -> None:
 
 def test_the_rocket_pulls_one_full_coal_car_but_not_two() -> None:
     railway = line()
-    railway.year = 1826
+    railway.year = opened_in("rocket")
     train = railway.buy("rocket")
     assert train is not None
     stop = Stop(WEST)
@@ -538,8 +540,8 @@ def test_the_rocket_pulls_one_full_coal_car_but_not_two() -> None:
 
 
 def test_a_railbus_pulls_its_coaches_full_but_not_as_many_coal_cars() -> None:
-    railway = knowing(line(), "diesel")
-    railway.year = 1935
+    railway = line()
+    railway.year = opened_in("railbus")
     train = railway.buy("railbus")
     assert train is not None
     coaches, coal = Stop(WEST), Stop(EAST)
@@ -552,8 +554,8 @@ def test_a_railbus_pulls_its_coaches_full_but_not_as_many_coal_cars() -> None:
 
 
 def test_the_first_heavy_freight_engine_pulls_four_full_coal_cars() -> None:
-    railway = knowing(line(), "boilers")
-    railway.year = 1853
+    railway = line()
+    railway.year = opened_in("goods")
     train = railway.buy("goods")
     assert train is not None
     stop = Stop(WEST)
@@ -575,19 +577,18 @@ def test_a_general_car_weighs_as_much_as_the_heaviest_of_its_goods_would() -> No
     assert weight == pytest.approx(heaviest)
 
 
-def test_tech_that_adds_a_car_adds_as_much_to_the_most_an_engine_pulls() -> None:
-    plain, coupled = line(), knowing(line(), "couplings")
-    engine = ENGINES["planet"]
+def test_an_engine_pulls_as_much_as_its_train_full_of_the_eras_newest_cars() -> None:
+    railway = line()
+    railway.year = 1850
 
-    pulls = plain.max_pull("planet"), coupled.max_pull("planet")
+    pull = railway.max_pull("planet")
 
-    most = engine.pull_at(BASE_GENERATION)
-    assert pulls == (pytest.approx(most), pytest.approx(most * (engine.cars + 1) / engine.cars))
+    assert pull == pytest.approx(ENGINES["planet"].pull_at(BASE_GENERATION))
 
 
 def test_cars_load_no_more_than_their_engine_pulls() -> None:
     railway = line()
-    railway.year = 1826
+    railway.year = opened_in("rocket")
     train = railway.buy("rocket")
     assert train is not None
     stop = Stop(WEST, [Good.COAL, Good.COAL])
@@ -623,7 +624,7 @@ def test_electric_engines_burn_less_a_car_than_steam_and_light_engines_half_as_m
 
 
 def test_trains_are_named_by_what_drives_them() -> None:
-    railway = knowing(line(), "diesel")
+    railway = line()
     railway.year = 1935
 
     train = railway.buy("railbus")
@@ -655,26 +656,18 @@ def test_an_express_tells_it_takes_only_passengers_and_has_a_dining_car() -> Non
     assert "electrified track only" in summary
 
 
-def test_a_node_that_opens_engines_says_which_and_from_when() -> None:
-    _, node = NODES["express_trains"]
-
-    text = describe(node)
-
-    assert text == "opens express engines (from 1858)"
-
-
 def planets_on_the_line(railway: Railway, count: int) -> list[Train]:
     railway.year = 1850
     trains = [railway.buy("planet") for _ in range(count)]
     for train in trains:
         assert train is not None
         train.stops = [Stop(WEST, [Good.COAL, Good.MAIL]), Stop(EAST, [Good.WHEAT])]
-    railway.year = 1856
+    railway.year = opened_in("american")
     return [train for train in trains if train is not None]
 
 
 def test_a_train_can_swap_its_engine_only_for_a_newer_one_of_its_line_on_sale() -> None:
-    railway = knowing(line(), "boilers")
+    railway = line()
     (train,) = planets_on_the_line(railway, 1)
 
     options = railway.engine_upgrades(train)
@@ -713,12 +706,12 @@ def test_no_engine_swap_without_the_cash_or_for_an_engine_not_on_offer() -> None
 
 def test_a_mass_upgrade_swaps_every_train_of_the_category_with_an_older_engine_only() -> None:
     railway = line()
-    railway.year = 1835
+    railway.year = opened_in("lion")
     lion = railway.buy("lion")
     planets = planets_on_the_line(railway, 2)
-    railway.year = 1850
+    railway.year = opened_in("tank")
     tank = railway.buy("tank")
-    railway.year = 1856
+    railway.year = opened_in("american")
 
     swapped = railway.swap_all_engines("american")
 
@@ -805,8 +798,8 @@ def test_older_cars_weigh_less_full_than_the_newest() -> None:
 
 
 def test_a_stop_cannot_ask_for_vehicles_in_a_generation_before_theirs() -> None:
-    railway = knowing(line(), "boilers", "diesel")
-    railway.year = 1960
+    railway = line()
+    railway.year = opened_in("heavy_diesel")
     railway.finances.earn(10_000_000.0, "test")
     train = railway.buy("heavy_diesel")
     assert train is not None
@@ -848,3 +841,14 @@ def test_the_generation_picker_lists_coaches_behind_an_express_and_coal_cars_oth
     goods = picker_good(express), picker_good(freight)
 
     assert goods == (Good.PASSENGERS, Good.COAL)
+
+
+def line_at(year: int) -> Railway:
+    railway = line()
+    railway.year = year
+    return railway
+
+
+def opened_in(name: str) -> int:
+    tile, level = OPENED_BY[name]
+    return next(year for year in range(1804, 2051) if of_year(year).supply.get(tile, 0) >= level)

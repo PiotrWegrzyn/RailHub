@@ -13,7 +13,7 @@ from railroads.sim.economy import BONUS_PER_GOOD, LOCAL_REACH, SCARCE_WORTH
 from railroads.sim.finance import START_CASH, TRACK_PRICE
 from railroads.sim.game import Game
 from railroads.sim.goods import FREIGHT_SHARE, Good
-from railroads.sim.ownership import EXPERIENCE_PER_POINT, HOLD_MONTHS, LOT, SHARES
+from railroads.sim.ownership import HOLD_MONTHS, LOT, SHARES
 from railroads.sim.steps import finish
 from railroads.sim.tilemap import LAYERS
 from railroads.sim.trains import Stop
@@ -149,7 +149,7 @@ def test_the_tutorial_starts_on_its_first_step_looking_at_ashford() -> None:
         ("5. Satisfaction", lambda: make_tutorial().game),
         ("6. Passengers and towns", lambda: make_tutorial().game),
         ("7. Shares", lambda: make_tutorial().game),
-        ("8. Tech", lambda: make_tutorial().game),
+        ("8. Supply and demand", lambda: make_tutorial().game),
         ("9. Fuel and engines", lambda: make_tutorial().game),
         ("10. More land", lambda: make_tutorial().game),
     ],
@@ -210,7 +210,7 @@ def test_cars_on_the_way_back_do_the_cars_step() -> None:
         ("4. Making and using goods", Seen(selected=SHOWN_FARM)),
         ("5. Satisfaction", Seen(lens=Lens.SATISFACTION.value)),
         ("6. Passengers and towns", Seen(lens=Lens.TOWNS.value)),
-        ("8. Tech", Seen(tech_open=True)),
+        ("8. Supply and demand", Seen(boards_open=True)),
         ("9. Fuel and engines", Seen(buying_train=True)),
     ],
 )
@@ -291,9 +291,9 @@ def test_next_waits_for_the_task_and_skip_does_not() -> None:
 
 
 def test_a_task_done_once_stays_done_when_undone() -> None:
-    tutorial = Tutorial(step=STEPS.index(step("8. Tech")))
+    tutorial = Tutorial(step=STEPS.index(step("8. Supply and demand")))
     game = make_tutorial().game
-    tutorial.update(game, Seen(tech_open=True))
+    tutorial.update(game, Seen(boards_open=True))
 
     tutorial.update(game, NOTHING_SEEN)
     tutorial.next()
@@ -385,8 +385,8 @@ def test_the_tutorial_plays_through_to_the_end_on_the_app_s_frames(context: None
     def lens(chosen: Lens) -> None:
         view.lens = chosen
 
-    def tech() -> None:
-        app.tech.open = True
+    def boards() -> None:
+        app.tiles.open = True
 
     def buying() -> None:
         view.build.trains.open = True
@@ -403,7 +403,7 @@ def test_the_tutorial_plays_through_to_the_end_on_the_app_s_frames(context: None
     do_next(lambda: lens(Lens.SATISFACTION))
     do_next(lambda: lens(Lens.TOWNS))
     do_next(lambda: game.growth.owners.buy(SHOWN_FARM, BuildingKind.FARM))
-    do_next(tech)
+    do_next(boards)
     do_next(buying)
     view.build.trains.buy.open = False
     assert game.lots is not None
@@ -419,15 +419,12 @@ def test_the_tutorial_plays_through_to_the_end_on_the_app_s_frames(context: None
     assert tutorial.finished == set(range(1, len(STEPS) - 1))
 
 
-def test_the_tutorial_gives_freight_bonus_goods_shares_and_experience_as_the_game_has_them() -> (
-    None
-):
+def test_the_tutorial_gives_freight_bonus_goods_and_shares_as_the_game_has_them() -> None:
     numbers = [
         f"{FREIGHT_SHARE:.0%} of a good's market price, up to {SCARCE_WORTH:g} times",
         f"add {BONUS_PER_GOOD:.0%} each",
         f"{SHARES:,} shares, traded {LOT} at a time",
         f"sold {HOLD_MONTHS // 12} years after",
-        f"adds {EXPERIENCE_PER_POINT:.0%} to it",
         f"up to {LOCAL_REACH} cells away",
     ]
 

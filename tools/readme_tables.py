@@ -103,8 +103,8 @@ def _on_sale(row: EngineHelp) -> str:
     return f"{row.engine.year}–{year} (then the {title})"
 
 
-def _tech(row: EngineHelp) -> str:
-    return "; ".join(f"{tree.value}: {' → '.join(nodes)}" for tree, nodes in row.tech)
+def _opened_by(row: EngineHelp) -> str:
+    return row.opened_by
 
 
 def _origins(row: EngineHelp) -> str:
@@ -118,7 +118,7 @@ def engine_row(row: EngineHelp) -> str:
         engine.title,
         engine.kind.value,
         _on_sale(row),
-        _tech(row),
+        _opened_by(row),
         engine.power.value,
         f"{engine.kmh:.0f} km/h",
         f"{engine.pickup:g} s",
@@ -133,7 +133,7 @@ def engine_row(row: EngineHelp) -> str:
 
 def engines_table() -> list[str]:
     head = (
-        "| Engine | Class | On sale | Tech to take | Power | Speed | To full speed | Cars | Price |"
+        "| Engine | Class | On sale | For sale from | Power | Speed | To full speed | Cars | Price |"
         " Burns a cell | Range | Drawn after |"
     )
     return [head, "|" + "---|" * 12] + [engine_row(row) for row in engine_help()]
