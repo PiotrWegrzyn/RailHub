@@ -966,7 +966,7 @@ RICE_PADDIES = Ladder(
         open_field=OPEN_FIELD,
         most_latitude=RICE_LATITUDE,
     ),
-    base=3.63675,
+    base=3.5,
     crowded_at=FARMS_CROWDED_OUT,
 )
 
@@ -1154,14 +1154,14 @@ HOTELS = replace(
 SAKE_BREWERIES = _works(
     BuildingKind.SAKE_BREWERY,
     {POP: FOOD_TOWN},
-    base=60,
+    base=30,
 )
 
 # Soy sauce breweries open in towns as distilleries do, once soy grows on the map.
 SOY_SAUCE_BREWERIES = _works(
     BuildingKind.SOY_SAUCE_BREWERY,
     {POP: FOOD_TOWN},
-    base=60,
+    base=30,
 )
 
 # Works that open by people and industry alone: their inputs must be brought to them.
@@ -1181,7 +1181,7 @@ WORKS = (
     _works(BuildingKind.BRICKWORKS, {}, base=4),
     _works(BuildingKind.GLASSWORKS, {}, base=4),
     _works(BuildingKind.BREWERY, {POP: FOOD_TOWN}, base=30),
-    _works(BuildingKind.DISTILLERY, {POP: FOOD_TOWN}, 1600, base=60),
+    _works(BuildingKind.DISTILLERY, {POP: FOOD_TOWN}, 1600, base=30),
     SAKE_BREWERIES,
     SOY_SAUCE_BREWERIES,
     _works(BuildingKind.TANNERY, {}, base=4),
