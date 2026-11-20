@@ -5,7 +5,7 @@ railroads.sim.trains can be tuned.
 
     uv run python tools/train_tonnage.py"""
 
-from railroads.sim.goods import FREIGHT_RATE, Good
+from railroads.sim.goods import Good
 from railroads.sim.railway import CELLS_PER_MONTH
 from railroads.sim.trains import (
     BASE_GENERATION,
@@ -43,22 +43,15 @@ def column(engine: Engine, good: Good, generation: int, full: bool = True) -> st
 
 def goods_table() -> None:
     generations = range(1, GENERATIONS + 1)
-    print(
-        "| Good | Unit | "
-        + " | ".join(f"G{g}" for g in generations)
-        + " | Full G2 car | Freight rate |"
-    )
-    print("|---|---|" + "---|" * GENERATIONS + "---|---|")
+    print("| Good | Unit | " + " | ".join(f"G{g}" for g in generations) + " | Full G2 car |")
+    print("|---|---|" + "---|" * GENERATIONS + "---|")
     for good in sorted(Good, key=lambda good: -full_tonnes(good, car_size(good))):
         sizes = " | ".join(
             f"{car_size(good, g):.0f}" if car_size(good, g) else "—" for g in generations
         )
         full = full_tonnes(good, car_size(good, BASE_GENERATION))
         full_text = f"{full:.1f} t" if car_size(good) else "—"
-        print(
-            f"| {good.value} | {unit_tonnes(good) * 1000:g} kg | {sizes} | {full_text} "
-            f"| ×{FREIGHT_RATE.get(good, 1.0):.2f} |"
-        )
+        print(f"| {good.value} | {unit_tonnes(good) * 1000:g} kg | {sizes} | {full_text} |")
 
 
 def engines_table() -> None:

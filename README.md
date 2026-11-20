@@ -1150,11 +1150,11 @@ share of demand left for each need.
 <!-- table: freight -->
 | Freight a unit | Goods |
 |---|---|
-| $10 or less | chickens 1.418, coke 3.309, eggs 4, refined sugar 5.348, barrels 5.735, bread 6, milk 6, rice 6, wheat 6, sheep 6.118, gas 6.182, pots 6.19, bricks 8, fish 8, meat 8, sand 8, soybeans 8, tofu 8, pigs 8.667, dairy products 9, potatoes 9.709, clay 10, coal 10, limestone 10, miso 10, newspapers 10 |
-| $11-20 | cement 12, dried fish 12, fuel 12.36, glass 12.38, sugar 12.95, sausages 14, oil 14.84, rubber 15.28, stove tiles 15.48, salt 16, lumber 16.18, iron ore 18, coffee 19.1, honey 19.43, cans 20, juice 20, soy sauce 20, wool 20 |
-| $21-40 | apples 20.94, bananas 20.94, dates 20.94, oranges 20.94, plastics 24.73, tea 24.73, chemicals 25, leather 25, copper 28, electronics 28.57, castings 30, wax 30, hops 32.38, guns 35.45, porcelain 37.14, cotton 38.86, flax 38.86 |
-| $41-200 | incense 44.12, luxury goods 44.12, paper 52.31, grapes 52.35, cattle 52.5, beer 60, tools 61.18, clothes 70, steel 80, furniture 97.5, sake 100, shoes 100, goods 120, vodka 120, wine 160 |
-| over $200 | appliances 300, machinery 468, gold 800, diamonds 2,000, cars 5,000, tanks 4e+04, planes 6e+04 |
+| $10 or less | eggs 4, bread 6, chickens 6, milk 6, potatoes 6, rice 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, soybeans 8, sugar 8, tofu 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, lumber 10, miso 10, newspapers 10, pots 10 |
+| $11-20 | cement 12, dried fish 12, honey 12, coke 14, pigs 14, refined sugar 14, sausages 14, barrels 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, soy sauce 20, wool 20 |
+| $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, stove tiles 25, copper 28, castings 30, wax 30, plastics 40, rubber 40, tea 40 |
+| $41-200 | coffee 50, beer 60, furniture 60, porcelain 60, clothes 70, steel 80, sake 100, shoes 100, electronics 120, goods 120, vodka 120, guns 150, tools 160, wine 160, machinery 180 |
+| over $200 | appliances 300, incense 300, luxury goods 300, gold 800, diamonds 2,000, cars 5,000, tanks 8,000, planes 1.2e+04 |
 <!-- end table -->
 
 Passengers pay $10 and mail $25, as they get off the train. A good is worth nothing where no
