@@ -566,7 +566,7 @@ ENGINES: dict[str, Engine] = {
     ),
     "light_tank": Engine("Light tank engine", 1862, 0.55, 2, 9_000.0, L, pickup=3.0, tank=16.0),
     "mogul": Engine(
-        "Mogul freight engine", 1865, 0.45, 6, 45_000.0, H, pickup=28.0, tank=30.0, needs=BOILERS
+        "Mogul freight engine", 1865, 0.45, 5, 45_000.0, H, pickup=28.0, tank=30.0, needs=BOILERS
     ),
     "atlantic": Engine(
         "Atlantic express",
@@ -583,7 +583,7 @@ ENGINES: dict[str, Engine] = {
         "Mallet articulated",
         1905,
         0.6,
-        8,
+        6,
         135_000.0,
         H,
         pickup=25.0,
@@ -624,7 +624,7 @@ ENGINES: dict[str, Engine] = {
         "Big articulated",
         1940,
         0.7,
-        8,
+        7,
         405_000.0,
         H,
         pickup=22.0,
@@ -705,7 +705,7 @@ ENGINES: dict[str, Engine] = {
         "Twin-unit diesel",
         1995,
         1.0,
-        9,
+        10,
         3_600_000.0,
         H,
         DIESEL,
@@ -720,7 +720,7 @@ ENGINES: dict[str, Engine] = {
         "Super-heavy diesel",
         2040,
         1.1,
-        10,
+        12,
         10_800_000.0,
         H,
         DIESEL,

@@ -146,7 +146,7 @@ def test_a_mogul_pulls_more_cars_and_steel_couplings_one_more() -> None:
     assert train is not None
     assert railway.most_cars(train) == ENGINES["mogul"].cars + 1
     stop = Stop((6, 3))
-    assert all(stop.add_car(Good.COAL, railway.most_cars(train)) for _ in range(7))
+    assert all(stop.add_car(Good.COAL, railway.most_cars(train)) for _ in range(6))
     assert not stop.add_car(Good.COAL, railway.most_cars(train))
 
 
