@@ -61,14 +61,20 @@ The ideas every rule of the game should follow, the most important first.
 
 ## Economy
 
-- Margins shrink as the world fills up: there are ever more goods and they are ever more used,
-  so a unit earns less and less, and to stay profitable the player has to carry more for less,
-  investing well enough to keep buying the newest trains.
-- Every good has a market: what it earns moves with what the map wants of it against what the
-  map makes of it, measured against the first year of play. Too much of a good on the market
-  makes it cheaper and hauling it stops paying; making towns grow makes demand for it, and with it
-  someone to sell large amounts to. At the start everything pays and everything is short, food
-  most of all. By the end of the game every good earns about five times less than at the start.
+- Margins shrink as the world fills up: supply grows far faster than demand, so a unit earns less
+  and less, and to stay profitable the player has to carry more for less, investing well enough to
+  keep buying the newest trains.
+- Supply and demand grow by tiles: every good belongs to a tile on two boards, supply and demand.
+  Every year two supply tiles and one demand tile go up a level, the ones the player picks, the
+  lowest for picks not made, and no tile gets more than two levels above the lowest on its board.
+  Each level adds a flat share of the tile's base, not compounded, by good and period.
+- Eras come when every supply tile reaches a level, each with a generation of wagons and new tiles,
+  which start at the lowest level on each board. Only coal closes, around 2000.
+- Prices follow a price list, not a market: a tile's demand over its supply decides what a unit of
+  its goods earns, it changes only when a tile goes up, and the player sees what a pick does to it
+  before making it.
+- At the start everything pays and everything is short, food most of all; growing towns make
+  demand, and someone to sell large amounts to.
 - Most money comes from the needs of grown homes, not from food or passengers.
 - Goods fall into categories of need: food, processed food, common goods and heating. Any kind of
   good in a category meets that need.
@@ -113,9 +119,9 @@ The ideas every rule of the game should follow, the most important first.
 - Fuel bought out of the player's own stations is cheaper than at retail, and technology narrows
   the gap.
 - Infrastructure the player owns, such as power plants, has to pay off by making a lot.
-- The world moves through history: every decade people want more of everything, food and heating
-  least, and dated events (wars, crises, inventions) change what is wanted, made and paid. Each
-  one is news the player is told of, with what it changes, so nothing shifts unannounced.
+- The world moves through history: dated events (wars, crises, inventions) change what is
+  wanted, made and paid. Each one is news the player is told of, with what it changes, so nothing
+  shifts unannounced.
 - History is the same in every game, apart from what happens only in one part of the world, such
   as the market opening in the old Eastern Bloc in 1989.
 

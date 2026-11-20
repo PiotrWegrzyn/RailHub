@@ -18,6 +18,7 @@ from railroads.sim.ladders import Points
 from railroads.sim.railway import Railway
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tech import TREES, tree_of
+from railroads.sim.tiles import of_year
 
 STATIONS_AT_START = 5
 STATIONS_PER_DECADE = 2
@@ -139,7 +140,8 @@ class StandInPlayer:
 
     def _monthly_worth(self, kind: BuildingKind) -> float:
         makes = makes_of(kind, self.growth.year)
-        return sum(amount * price_of(good) for good, amount in makes.items())
+        boards = of_year(self.growth.year)
+        return sum(amount * price_of(good) * boards.price(good) for good, amount in makes.items())
 
     def _earn(self) -> None:
         """Pays the share of what the owned buildings would sell to trains serving their

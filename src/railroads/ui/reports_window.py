@@ -1,7 +1,7 @@
 """The reports window: the company's worth each month against its target (railroads.sim.company),
 the cars delivered each year, stacked by what they carried, the stations
 the player had each year and the population of the whole map (railroads.sim.stats), each fuel's
-price (railroads.sim.fuel_market) and what goods earn on the market (railroads.sim.goods_market).
+price (railroads.sim.fuel_market) and what a unit of every tile's goods earns (railroads.sim.tiles).
 
 The year under way shows as it stands so far, with today's stations and population.
 """
@@ -16,8 +16,8 @@ from railroads.sim.company import Goal
 from railroads.sim.finance import Finances, dollars
 from railroads.sim.fuel_market import Fuel, FuelMarket, FuelMonth, electrified
 from railroads.sim.goods import Good
-from railroads.sim.goods_market import GoodsMarket, NeedMonth
 from railroads.sim.stats import History
+from railroads.sim.tiles import TILE_GOODS, Tile, Tiles
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.theme import GOOD_COLORS, GROWN, WINDOW_TOP
 
@@ -27,8 +27,6 @@ BAR_WIDTH = 0.8
 GOODS_COLORMAP = "Goods"
 GOODS = list(Good)
 MILLION = 1_000_000.0
-# How many of the most wanted needs the markets tab draws over the years.
-MARKET_LINES = 6
 
 
 @dataclass(frozen=True)
@@ -205,59 +203,55 @@ def _draw_fuel(market: FuelMarket) -> None:
         )
 
 
-def market_line(months: list[NeedMonth]) -> tuple[list[float], list[float]]:
-    """A need's price, as a share of the prices goods list, month by month, as years with the
-    months as twelfths of them."""
-    xs, seen = [], {}
-    for month in months:
-        xs.append(month.year + seen.get(month.year, 0) / 12)
-        seen[month.year] = seen.get(month.year, 0) + 1
-    return xs, [100.0 * month.price for month in months]
+def tile_price_line(tiles: Tiles, tile: Tile) -> tuple[list[float], list[float]]:
+    """What a unit of a tile's goods earned each year it was on the boards, as a share of its
+    base price."""
+    xs, ys = [], []
+    for year, boards in sorted(tiles.years.items()):
+        if tile in boards.made:
+            xs.append(float(year))
+            ys.append(100.0 * boards.price(TILE_GOODS[tile][0]))
+    return xs, ys
 
 
-def market_rows(market: GoodsMarket) -> list[tuple[str, str, str, str]]:
-    """Every need on the market, the most wanted first: its name, what its goods earn as a share
-    of their prices, and what the map wanted and could make of it last month."""
-    rows = []
-    for need, months in sorted(market.history.items(), key=lambda item: -item[1][-1].wanted):
-        last = months[-1]
-        rows.append(
-            (
-                need.value.capitalize(),
-                f"{last.price:.0%}",
-                f"{last.wanted:,.0f}",
-                f"{last.made:,.0f}",
-            )
+def price_rows(tiles: Tiles, year: int) -> list[tuple[str, str, str, str]]:
+    """Every tile on the boards in a year, the cheapest first: its name, what a unit of its goods
+    earns as a share of its base price, and its supply and demand levels."""
+    boards = tiles.of_year(year)
+    rows = sorted(boards.supply, key=lambda tile: boards.price(TILE_GOODS[tile][0]))
+    return [
+        (
+            tile.value.capitalize(),
+            f"{boards.price(TILE_GOODS[tile][0]):.0%}",
+            str(boards.supply[tile]),
+            str(boards.demand[tile]),
         )
-    return rows
+        for tile in rows
+    ]
 
 
-def _draw_markets(market: GoodsMarket) -> None:
-    """What goods earn on the market over the years, against the prices they list, the most
-    wanted needs drawn, and every need's market last month."""
-    if not market.history:
-        imgui.text_disabled("Markets open after the first month")
-        return
+def _draw_prices(tiles: Tiles, year: int) -> None:
+    """What every tile's goods earned over the years against their base prices, and the boards
+    now."""
     imgui.text_wrapped(
-        "What goods earn against the prices they list: more where the map wants more of them "
-        "than it makes, less where it makes more than it wants."
+        "What a unit of every tile's goods earns against its base price: less the higher its "
+        "supply, more the higher its demand. Prices change only as tiles go up, on 1 January."
     )
-    wanted = sorted(market.history.items(), key=lambda item: -item[1][-1].wanted)
-    if _begin_year_plot("##markets", PLOT_HEIGHT * 1.4, "%"):
-        for need, months in wanted[:MARKET_LINES]:
-            xs, ys = market_line(months)
+    if _begin_year_plot("##prices", PLOT_HEIGHT * 1.4, "%"):
+        for tile in tiles.of_year(year).supply:
+            xs, ys = tile_price_line(tiles, tile)
             implot.plot_line(
-                need.value.capitalize(),
+                tile.value.capitalize(),
                 np.array(xs, dtype=np.float64),
                 np.array(ys, dtype=np.float64),
             )
         implot.end_plot()
     flags = imgui.TableFlags_.row_bg.value
-    if imgui.begin_table("markets", 4, flags):
-        for heading in ("Need", "Price", "Wanted", "Made"):
+    if imgui.begin_table("prices", 4, flags):
+        for heading in ("Tile", "Price", "Supply", "Demand"):
             imgui.table_setup_column(heading)
         imgui.table_headers_row()
-        for row in market_rows(market):
+        for row in price_rows(tiles, year):
             imgui.table_next_row()
             for value in row:
                 imgui.table_next_column()
@@ -376,7 +370,7 @@ class ReportsWindow:
         finances: Finances | None = None,
         fuel: FuelMarket | None = None,
         goal: Goal | None = None,
-        market: GoodsMarket | None = None,
+        tiles: Tiles | None = None,
     ) -> None:
         if not self.open:
             return
@@ -397,8 +391,8 @@ class ReportsWindow:
             if fuel is not None and imgui.begin_tab_item("Fuel")[0]:
                 _draw_fuel(fuel)
                 imgui.end_tab_item()
-            if market is not None and imgui.begin_tab_item("Markets")[0]:
-                _draw_markets(market)
+            if tiles is not None and imgui.begin_tab_item("Prices")[0]:
+                _draw_prices(tiles, year)
                 imgui.end_tab_item()
             imgui.end_tab_bar()
         end_ornate()

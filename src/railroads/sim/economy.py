@@ -52,6 +52,7 @@ from itertools import pairwise
 import numpy as np
 import numpy.typing as npt
 
+from railroads.sim import tiles
 from railroads.sim.clock import QUARTER, START_YEAR
 from railroads.sim.constructions import GREW_FROM, BuildingKind
 from railroads.sim.events import in_eastern_bloc
@@ -78,6 +79,7 @@ from railroads.sim.goods import (
 from railroads.sim.grids import Cell, Grid, flat_within_any
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import TileMap
+from railroads.sim.year_caches import year_cached
 
 FloatCells = npt.NDArray[np.float64]
 
@@ -497,7 +499,7 @@ class Economy:
         return take
 
 
-@cache
+@year_cached
 def wants_of(kind: BuildingKind, year: int) -> frozenset[Need]:
     """The needs a kind wants in a given year: what a processor takes in or is boosted by, and
     what the rest need."""
@@ -983,7 +985,7 @@ class _Month:
         year = self.economy.year
         inputs = recipe.inputs(year)
         boosts = boosts_of(kind, year)
-        base = self.count[kind] * recipe.most
+        base = self.count[kind] * recipe.most * tiles.of_year(year).make_factor(recipe.makes)
         roomy = {
             need: np.minimum(
                 self.stock[(kind, need)] / np.where(base > 0, base * recipe.boosts[need], 1.0),

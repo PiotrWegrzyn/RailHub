@@ -29,6 +29,7 @@ from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
 from railroads.sim.summaries import MonthSummary, Reach, summarize
 from railroads.sim.tilemap import TileMap
+from railroads.sim.tiles import Tiles, activate
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,8 @@ class Game:
         self.railway = Railway(constructions, names=names)
         self.railway.year = start_year
         self.railway.first_year = start_year
+        self.railway.tiles = Tiles.until(start_year)
+        activate(self.railway.tiles)
         self.railway.history = self.growth.history
         self.growth.railway = self.railway
         self.railway.station_trade = self.growth.station_trade
@@ -80,6 +83,10 @@ class Game:
         # The company's worth each month, its target and going bankrupt (railroads.sim.company).
         self.goal = Goal()
         self._reach = Reach(self.tile_map.grid)
+
+    def __setstate__(self, state: dict[str, object]) -> None:
+        self.__dict__.update(state)
+        activate(self.railway.tiles)
 
     def begin_history(self) -> None:
         """Lets history happen to the game from now on (railroads.sim.happenings)."""
@@ -124,6 +131,8 @@ class Game:
             for h in headlines
             if h.big
         ]
+        self.goal.news += [News("A new era", news) for news in railway.tile_news]
+        railway.tile_news.clear()
         summary = summarize(date, self.growth.rule.points, reach, changes)
         return Month(changed, summary, headlines)
 

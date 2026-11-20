@@ -79,11 +79,11 @@ from railroads.sim.fuel_market import (
     signals_of,
 )
 from railroads.sim.goods import FOODS, TRAVELLERS, General, Good, Need, freight_of, price_of
-from railroads.sim.goods_market import GoodsMarket
 from railroads.sim.grids import Cell
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
 from railroads.sim.tech import GENERAL_CARS, GOOD_TREES, Effect, Research, Tree
+from railroads.sim.tiles import Tiles
 from railroads.sim.track_network import TrackNetwork
 from railroads.sim.trains import (
     ENGINES,
@@ -99,6 +99,7 @@ from railroads.sim.trains import (
     car_size,
     general_car_size,
 )
+from railroads.sim.year_caches import forget
 
 if TYPE_CHECKING:
     from railroads.sim.happenings import Happenings
@@ -193,8 +194,11 @@ class Railway:
         # What each year ended with and the cars delivered in it (railroads.sim.stats).
         self.history = History()
         self.fuel = FuelMarket()
-        # What each good earns with how short the map is of it (railroads.sim.goods_market).
-        self.market = GoodsMarket()
+        # The supply and demand boards, which set what every good earns (railroads.sim.tiles): a
+        # game's from the year it begins, flat until then.
+        self.tiles = Tiles()
+        # What the boards brought at the turn of the year, for the news.
+        self.tile_news: list[str] = []
         # The way along the track, and what trains do calling at stations
         # (railroads.sim.track_network, railroads.sim.calls).
         self.network = TrackNetwork(constructions)
@@ -392,13 +396,12 @@ class Railway:
         return 1.0 - subsidy * food / len(train.cars)
 
     def fuel_month(self, trade: Trade, points: float = 0.0) -> None:
-        """Closes the fuel and goods markets' month with what this month's trade said about them,
+        """Closes the fuel market's month with what this month's trade said about them,
         and the points of the map's homes and factories, which want electricity."""
         owned = (
             None if self.owners is None else {kind: self.owners.owned(kind) for kind in PLANT_FUEL}
         )
         self.fuel.month(self.year, signals_of(trade, owned, points, self.year))
-        self.market.month(self.year, trade)
 
     def car_capacity(
         self, good: Good, engine: str | None = None, general: General | None = None
@@ -456,12 +459,12 @@ class Railway:
 
     def price_factor(self, good: Good) -> float:
         """How much more a good earns carried by train: its TRANSIT_PAY, with the player's tech,
-        what history makes of it (railroads.sim.events) and the market now
-        (railroads.sim.goods_market)."""
+        what history makes of it (railroads.sim.events) and its price on the boards
+        (railroads.sim.tiles)."""
         return (
             TRANSIT_PAY.get(good, 1.0)
             * history_price(good, self.year)
-            * self.market.factor_of(good)
+            * self.tiles.of_year(self.year).price(good)
             * (1.0 + self.research.bonus(Effect.PRICE, GOOD_TREES[good]))
         )
 
@@ -570,12 +573,18 @@ class Railway:
         earned = freight_of(good) * weighed * self.price_factor(good)
         earned *= self.facility_pay(station, good)
         self.finances.earn(earned, "cargo")
-        self.learn(GOOD_TREES[good], earned / self.market.factor_of(good))
+        self.learn(GOOD_TREES[good], earned / self.tiles.of_year(self.year).price(good))
 
     def sell_own(self, good: Good, amount: float) -> None:
-        """Pays the player the market price of what their own buildings brought into a station:
-        their company sold it, and the railway now carries it."""
-        self.finances.earn(price_of(good) * amount * self.market.factor_of(good), "owned buildings")
+        """Pays the player the market price of what their own buildings brought into a station, as
+        the boards price it now: their company sold it, and the railway now carries it."""
+        earned = price_of(good) * amount * self.tiles.of_year(self.year).price(good)
+        self.finances.earn(earned, "owned buildings")
+
+    def new_year(self, year: int) -> None:
+        """Turns the boards to a new year: the tiles picked go up, and what that changes is news."""
+        self.tile_news += self.tiles.turn(year)
+        forget()
 
     def learn(self, tree: Tree, dollars: float) -> None:
         """Counts what a delivery earned as experience in a tree, more for every building of

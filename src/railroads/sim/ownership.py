@@ -8,9 +8,9 @@ still takes their part of all they make; past that, more shares only raise that 
 before anything is handed out, as if a train had brought it, so the stations hand it out to the
 buildings in their reach and it pays as a delivery does (railroads.sim.economy,
 railroads.sim.station_trade). A whole building costs PAYBACK_YEARS of all it makes at full
-output at full satisfaction, from two thirds of that with none to twice that at 200%
-(PRICE_BY_SATISFACTION), by how satisfied the buildings of its kind in its cell were over the
-last quarter (railroads.sim.ledger), less what the player's tech takes off, down to
+output at full satisfaction, at the prices on the boards (railroads.sim.tiles), from two thirds of
+that with none to twice that at 200% (PRICE_BY_SATISFACTION), by how satisfied the buildings of
+its kind in its cell were over the last quarter (railroads.sim.ledger), less what the player's tech takes off, down to
 MOST_DISCOUNT of the price; shares sell at the price they buy at. A power plant of any kind,
 which makes cheap electricity for the player's trains (railroads.sim.fuel_market), costs
 POWER_PLANT_PRICE. Tech in a building's tree can raise how many buildings' worth it makes. When
@@ -29,6 +29,7 @@ from railroads.sim.goods import Need, makes_of, price_of
 from railroads.sim.grids import Cell
 from railroads.sim.ladders import IntGrid
 from railroads.sim.tech import Effect, Tree, tree_of
+from railroads.sim.tiles import of_year
 
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth
@@ -134,7 +135,8 @@ class Owners:
         makes = makes_of(kind, growth.year)
         if not makes:
             return None
-        month = sum(amount * price_of(good) for good, amount in makes.items())
+        boards = of_year(growth.year)
+        month = sum(amount * price_of(good) * boards.price(good) for good, amount in makes.items())
         return 12 * PAYBACK_YEARS * month * kept
 
     def lot_price(self, cell: Cell, kind: BuildingKind) -> float | None:

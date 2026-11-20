@@ -131,24 +131,6 @@ def test_the_news_of_the_popes_death_gives_the_hour() -> None:
     assert "21:37" in happenings.news[0].story
 
 
-def test_every_decade_brings_news_that_people_want_more() -> None:
-    growth = grown(1860, {})
-
-    happenings = happen(growth, 1860)
-
-    assert [h.title for h in happenings.news] == ["People want more"]
-
-
-def test_the_decade_news_tells_that_the_land_gives_more_and_every_unit_earns_less() -> None:
-    growth = grown(1870, {})
-
-    happenings = happen(growth, 1870)
-
-    news = happenings.news[0]
-    assert "make 15% more" in news.story
-    assert "A unit of every good earns 85% of its 1850 price" in news.changes
-
-
 def test_a_good_made_for_the_first_time_makes_news() -> None:
     growth = grown(1880, {})
 

@@ -489,8 +489,9 @@ needs and recipes of `railroads.sim.goods`. Buildings need *needs*, each met by 
 homes need food, and any food good feeds them one for one; canneries need fruit and bakeries
 wheat. Towns eat a lot, so they are hard to feed in full, and every farm and bakery a station can
 reach is worth having. The table below is written from the game's own figures by
-`tools/readme_tables.py`, as they stand before history changes them (see History below): people want
-more every decade, and events such as wars and the internet change what they want. The help
+`tools/readme_tables.py`, as they stand before history changes them (see History below): the supply and demand boards
+raise what is made and wanted year by year, and events such as wars and the internet change what
+they want. The help
 window (H) lists the same.
 
 <!-- table: buildings -->
@@ -888,14 +889,25 @@ factories, refineries, power plants and shipyards.
 The world moves on through the game's two hundred years (`railroads.sim.events`, with what it does
 to one map in `railroads.sim.happenings`).
 
-People want more. In 1860, 1870 and every decade after, every building that uses goods up (homes,
-shops, venues, churches, the military and the novelties, but not processors, makers, power plants
-or railway works) wants 10% more of every need than ten years before, and 3% more food and
-heating: by 2050 homes want 6.7 times the goods they wanted in 1850, and 1.8 times the food and
-heating. Each decade brings a news card saying so. The land gives more still: farms, mines,
-logging camps and every other maker of what the land gives make 15% more every decade, and 5%
-more of food and heating, 16 and 2.7 times as much by 2050, while every unit earns less, a fifth
-as much by 2050 (see Building and trains).
+Supply and demand grow by tiles (`railroads.sim.tiles`). Every good belongs to a tile, such as
+coal and coke, farming or vehicles, and every tile stands on two boards: supply, how much of its
+goods buildings make, and demand, how much of them homes, shops and everything else people use
+want. From 1804 every year two supply tiles and one demand tile go up a level on 1 January: the
+ones the player picked in the Supply and demand window (Y, opened by itself once a year), the
+lowest for the picks not made. No tile can be more than two levels above the lowest on its board.
+Each level adds a flat share of the tile's base, not compounded: on supply its period's share,
+from 5% a level for farming in the early 1800s to 200% for modern goods after 1960, on demand the
+same share every level, 5% for food up to 30% for oil, vehicles and modern goods. Supply grows far
+faster than demand. Processors take in and make as much more as their output's supply tile gives,
+and makers of what the land gives make as much more. Coal closes at level 30, about 2000: it goes
+no higher, can't be picked and no longer holds the other tiles back.
+
+Once every supply tile reaches an era's level, the era comes with its generation of wagons and new
+tiles, on both boards at the lowest level there: oil and fuel and steel and metals at level 9
+(1843 when the lowest always go up), machines and tools and chemicals and building at 14 (1873),
+copper and rubber at 18 (1901), vehicles at 22 (1931), modern goods at 25 (1955), and the last
+wagons at 27 (1972). Each era is news. A game that begins later starts on the boards the world
+grew to by then, every year the lowest tiles.
 
 Dated events change what is wanted, made and paid while they last, or for good:
 
@@ -1153,18 +1165,16 @@ hand out on their own, and what they take uses it up, averaged over the last 3 m
 and mail pay their figure times the share of that demand left. The Stations window shows the
 share of demand left for each need.
 
-The figures in the table are what goods earn in the 1850s; margins shrink after that
-(`railroads.sim.goods_market`). Every decade a unit of every good, food too, earns 8% less than
-the decade before, so by 1950 it earns 45% of what it did in 1850 and by 2050 a fifth. On top of that every need
-is a market, a tug of war like the one for fuel: what the map's buildings want of it against the
-most the map's makers of its goods could make, measured against the first three years of play in
-which the map makes any of it, when goods earn the table's figures. A need the map makes too
-much of gets cheaper, down to a quarter, and one the map's towns want more of dearer, up to three
-times, the square root of how many times as hard demand pulls, the price moving a quarter of the
-way there each month. Passengers and mail have no market. The player's own buildings sell to
-their stations at the market price too, and tech is earned by the units delivered, at the
-table's figures, so cheaper goods don't slow it. The Reports window's Markets tab charts what the
-most wanted needs earn over the years and lists every need's market last month.
+The figures in the table are a good's base; what a unit earns follows a price list
+(`railroads.sim.tiles`): its tile's demand over its supply, to the power of 0.8, both as many
+times their base as the levels give. Prices change only when a tile goes up, on 1 January, and the
+Supply and demand window shows what each pick would do to them before it is made. Since supply
+grows faster than demand, margins shrink: in 2050 coal, ore, steel and chemicals earn about a
+fifth of their base, farming, animals, wood and textiles a little over a quarter, passengers and
+mail over a third and luxuries about half. The player's own buildings sell to their stations at
+that price too, and tech is earned by the units delivered, at the table's figures, so cheaper
+goods don't slow it. The Reports window's Prices tab charts every tile's price over the years and
+lists the boards now.
 
 <!-- table: freight -->
 | Freight a unit | Goods |

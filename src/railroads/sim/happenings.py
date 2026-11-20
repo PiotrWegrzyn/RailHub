@@ -1,6 +1,6 @@
 """What history (railroads.sim.events) does to one game's map, and the news the player gets of it:
-a headline for every event as its month comes, for every decade people want more in, and for
-every good that is first made (GOOD_YEARS).
+a headline for every event as its month comes and for every good that is first made
+(GOOD_YEARS).
 
 The year before a war NEW_GARRISONS patches of military ground of GARRISON_SIZE cells go up, at
 least GARRISONS_APART steps from any other, each with a base and two outposts; as it begins
@@ -19,19 +19,11 @@ from railroads.sim.clock import MONTH_NAMES
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.events import (
     EVENTS,
-    MAKE_RISE,
     PILGRIM_MONTHS,
-    RISE,
-    RISE_EVERY,
-    RISE_FROM,
-    SLOW_MAKE_RISE,
-    SLOW_RISE,
     WAR_GROWTH,
     Event,
-    price_fall,
-    rise_of,
 )
-from railroads.sim.goods import GOOD_YEARS, Need
+from railroads.sim.goods import GOOD_YEARS
 from railroads.sim.grids import BoolGrid, Cell, Grid
 from railroads.sim.ladders import MILITARY, Points
 from railroads.sim.tilemap import Deposit, Relief, Terrain
@@ -160,25 +152,6 @@ class Happenings:
                         (f"{len(gone)} military buildings pulled down",),
                     )
                 )
-        if year > RISE_FROM and (year - RISE_FROM) % RISE_EVERY == 0:
-            goods = rise_of(BuildingKind.HOUSE, Need.COMMON, year)
-            food = rise_of(BuildingKind.HOUSE, Need.FOOD, year)
-            self.news.append(
-                Headline(
-                    date,
-                    "People want more",
-                    f"A new decade: homes, shops and everything else people use want {RISE:.0%} "
-                    f"more of every good than ten years ago, and {SLOW_RISE:.0%} more food and "
-                    f"heating. Farms, mines and the rest make {MAKE_RISE:.0%} more, "
-                    f"{SLOW_MAKE_RISE:.0%} more food and heating, and every unit carried earns "
-                    "less.",
-                    (
-                        f"Goods wanted: {goods:.2f} times as much as in {RISE_FROM}",
-                        f"Food and heating wanted: {food:.2f} times as much as in {RISE_FROM}",
-                        f"A unit of every good earns {price_fall(year):.0%} of its {RISE_FROM} price",
-                    ),
-                )
-            )
         for good, first in GOOD_YEARS.items():
             if first == year:
                 self.news.append(

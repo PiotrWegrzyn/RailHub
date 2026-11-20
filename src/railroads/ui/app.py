@@ -56,6 +56,7 @@ from railroads.ui.save_files import IN_BROWSER
 from railroads.ui.saves_window import SavesWindow
 from railroads.ui.tech_window import TechWindow
 from railroads.ui.theme import BRASS, apply_theme
+from railroads.ui.tiles_window import TilesWindow
 from railroads.ui.top_bar import draw_top_bar
 from railroads.ui.tutorial_panel import draw_tutorial
 from railroads.ui.waiting_screen import Label, Shatter, tip_for, waiting_line
@@ -112,6 +113,7 @@ class App:
         self._styled = False
         self.help = HelpWindow()
         self.tech = TechWindow()
+        self.tiles = TilesWindow()
         self.reports = ReportsWindow()
         self.saves_window = SavesWindow()
         self.notice = ""
@@ -233,6 +235,8 @@ class App:
         self.view.gui()
         self.help.draw()
         self.tech.draw(self.view.railway.research)
+        self.tiles.new_year(self.view.growth.year)
+        self.tiles.draw(self.view.railway.tiles)
         if self.reports.open:
             growth = self.view.growth
             railway = self.view.railway
@@ -245,7 +249,7 @@ class App:
                 railway.finances,
                 railway.fuel,
                 self.game.goal,
-                railway.market,
+                railway.tiles,
             )
         self._draw_saves()
         draw_goal_news(self)
@@ -258,6 +262,8 @@ class App:
             self.help.open = not self.help.open
         if not typing and imgui.is_key_pressed(imgui.Key.r, repeat=False):
             self.tech.open = not self.tech.open
+        if not typing and imgui.is_key_pressed(imgui.Key.y, repeat=False):
+            self.tiles.open = not self.tiles.open
         if not typing and imgui.is_key_pressed(imgui.Key.g, repeat=False):
             self.reports.open = not self.reports.open
         if not typing and imgui.is_key_pressed(imgui.Key.f5, repeat=False):

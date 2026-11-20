@@ -5,17 +5,17 @@ from imgui_bundle import imgui, implot
 
 from railroads.sim.company import CompanyValue, Goal
 from railroads.sim.finance import Finances
-from railroads.sim.goods import Good, Need
-from railroads.sim.goods_market import GoodsMarket, NeedMonth
+from railroads.sim.goods import Good
 from railroads.sim.stats import History
+from railroads.sim.tiles import Tile, Tiles
 from railroads.ui.reports_window import (
     ReportsWindow,
     books_rows,
-    market_line,
-    market_rows,
     period_name,
+    price_rows,
     profits,
     report,
+    tile_price_line,
     worth_line,
 )
 
@@ -176,43 +176,29 @@ def test_the_window_draws_the_worth_against_the_target(frame: None, months: int)
     assert len(goal.values) == months
 
 
-def made_market() -> GoodsMarket:
-    market = GoodsMarket()
-    market.history = {
-        Need.HEATING: [
-            NeedMonth(Need.HEATING, 1850, 100.0, 300.0, 1.0),
-            NeedMonth(Need.HEATING, 1850, 120.0, 300.0, 0.8),
-        ],
-        Need.FOOD: [
-            NeedMonth(Need.FOOD, 1850, 900.0, 800.0, 1.0),
-            NeedMonth(Need.FOOD, 1850, 1000.0, 800.0, 1.25),
-        ],
-    }
-    return market
+def test_the_price_list_shows_every_tile_the_cheapest_first() -> None:
+    tiles = Tiles.until(1850)
+
+    rows = price_rows(tiles, 1850)
+
+    assert rows[0] == ("Coal", "59%", "11", "6")
+    assert rows[-1][0] == "Luxuries"
 
 
-def test_the_markets_list_every_need_the_most_wanted_first() -> None:
-    market = made_market()
+def test_a_tiles_price_line_runs_year_by_year_from_when_it_came() -> None:
+    tiles = Tiles.until(1850)
 
-    rows = market_rows(market)
+    xs, ys = tile_price_line(tiles, Tile.STEEL)
 
-    assert rows == [("Food", "125%", "1,000", "800"), ("Heating", "80%", "120", "300")]
-
-
-def test_a_markets_line_runs_month_by_month_in_percent() -> None:
-    months = made_market().history[Need.HEATING]
-
-    xs, ys = market_line(months)
-
-    assert xs == pytest.approx([1850.0, 1850 + 1 / 12])
-    assert ys == pytest.approx([100.0, 80.0])
+    assert xs[0] == 1843.0
+    assert xs[-1] == 1850.0
+    assert ys[0] == pytest.approx(100.0)
 
 
-@pytest.mark.parametrize("market", [made_market(), GoodsMarket()])
-def test_the_window_draws_the_markets(frame: None, market: GoodsMarket) -> None:
+def test_the_window_draws_the_prices(frame: None) -> None:
     window = ReportsWindow()
     window.open = True
 
-    window.draw(made_history(), 1903, 4, 150, market=market)
+    window.draw(made_history(), 1903, 4, 150, tiles=Tiles.until(1903))
 
     assert window.open
