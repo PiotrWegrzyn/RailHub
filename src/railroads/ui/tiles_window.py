@@ -27,7 +27,7 @@ from railroads.sim.tiles import (
 )
 from railroads.ui.theme import BRASS, GROWN, TEXT, TEXT_DIM, WINDOW_TOP, Rgba, color_u32
 
-CARD_SIZE = (176.0, 132.0)
+CARD_SIZE = (176.0, 156.0)
 CARD_GAP = 12.0
 SLIDE_SECONDS = 0.35
 BUTTON = (160.0, 32.0)
@@ -110,7 +110,13 @@ def cards(tiles: Tiles, board: Board) -> list[Card]:
                 if closed
                 else f"next level +{step:.0%} {'made' if board == Board.SUPPLY else 'taken'}",
                 f"{now.price(TILE_GOODS[tile][0]):.0%}",
-                f"{tiles.price_after(board, tile):.0%}" if can else "",
+                (
+                    f"picked {tiles.planned_price(tile):.0%}"
+                    if picked
+                    else f"once picked {tiles.price_after(board, tile):.0%}"
+                    if can
+                    else ""
+                ),
                 (
                     (opened_at(tile, level + 1) or next_unlock(tile, level))
                     if board == Board.DEMAND
@@ -165,6 +171,8 @@ class TilesWindow:
         self.board = Board.SUPPLY
         # When the boards began to slide to the one now shown, 0 for not sliding.
         self._slid_at = 0.0
+        # Whether the screen was drawn on the frame before, to bring it to the front as it opens.
+        self._drawn = False
 
     def must_choose(self, year: int) -> bool:
         """Whether the game must wait on the picks for a year; begins waiting on them if so."""
@@ -205,7 +213,11 @@ class TilesWindow:
 
     def draw(self, tiles: Tiles) -> None:
         if not (self.open or self.choosing):
+            self._drawn = False
             return
+        if not self._drawn:
+            imgui.set_next_window_focus()
+            self._drawn = True
         io = imgui.get_io()
         imgui.set_next_window_pos((0.0, WINDOW_TOP))
         imgui.set_next_window_size((io.display_size.x, io.display_size.y - WINDOW_TOP))
@@ -285,12 +297,17 @@ class TilesWindow:
         draw_list.add_text((x, y + 2 * line), _faded(TEXT, alpha), card.adds)
         draw_list.add_text((x, y + 3.3 * line), _faded(TEXT_DIM, alpha), f"earns {card.price}")
         if card.after:
-            draw_list.add_text(
-                (x, y + 4.3 * line), _faded(TEXT_DIM, alpha), f"once up {card.after}"
-            )
+            draw_list.add_text((x, y + 4.3 * line), _faded(TEXT_DIM, alpha), card.after)
         if card.opens:
             colour = GROWN if card.opens_next else TEXT_DIM
-            draw_list.add_text((x, high.y - line - 4), _faded(colour, alpha), card.opens)
+            draw_list.add_text(
+                imgui.get_font(),
+                imgui.get_font_size(),
+                imgui.ImVec2(x, y + 5.6 * line),
+                _faded(colour, alpha),
+                card.opens,
+                CARD_SIZE[0] - 20,
+            )
         draw_list.pop_clip_rect()
         if hovered:
             self._tip(card, board, low.x, high.y)

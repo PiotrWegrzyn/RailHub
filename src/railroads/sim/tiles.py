@@ -414,6 +414,13 @@ class Tiles:
             demand_factor(tile, self.demand_entry[tile], demand[tile]),
         )
 
+    def planned_price(self, tile: Tile) -> float:
+        """What a unit of a tile's goods will earn next year once the picks so far go up."""
+        return price(
+            supply_factor(tile, self.supply_entry[tile], self.planned(Board.SUPPLY)[tile]),
+            demand_factor(tile, self.demand_entry[tile], self.planned(Board.DEMAND)[tile]),
+        )
+
     def turn(self, year: int) -> list[str]:
         """Begins a year: the tiles picked go up, the lowest for the picks left, and an era
         comes once every open supply tile is at its level. Returns what that brought, in words."""

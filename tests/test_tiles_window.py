@@ -3,6 +3,7 @@ from collections.abc import Iterator
 import pytest
 from imgui_bundle import imgui
 
+from railroads.sim.goods import Good
 from railroads.sim.tiles import Board, Tile, Tiles
 from railroads.ui.tiles_window import (
     TilesWindow,
@@ -104,3 +105,13 @@ def test_the_screen_draws_both_boards_to_pick_from_or_to_look_at(
     window.draw(Tiles.until(1850))
 
     assert window.open or window.choosing
+
+
+def test_a_picked_card_shows_what_its_goods_will_earn_once_the_picks_go_up() -> None:
+    tiles = Tiles.until(1850)
+    tiles.pick(Board.SUPPLY, Tile.WOOD)
+
+    wood = next(card for card in cards(tiles, Board.SUPPLY) if card.tile == Tile.WOOD)
+
+    assert wood.after == f"picked {tiles.planned_price(Tile.WOOD):.0%}"
+    assert tiles.planned_price(Tile.WOOD) < tiles.of_year(1850).price(Good.LOGS)
