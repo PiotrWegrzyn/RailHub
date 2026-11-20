@@ -787,6 +787,8 @@ class Car:
     general: General | None = None
     # What it weighs empty, in tonnes: its good's tare_of at its car size unless given.
     tare: float = 0.0
+    # The generation of cars the stop asked for it in; 0 for the newest its engine pulls.
+    generation: int = 0
 
     def __post_init__(self) -> None:
         if not self.capacity:
@@ -828,12 +830,40 @@ class Stop:
     # unloads and loads nothing and goes on with the cars it came with to the next stop that
     # isn't one, where its passengers and mail are bound.
     refuel_only: bool = False
+    # The generation of cars asked for each car, in step with `cars`; 0, or none given, for the
+    # newest its engine pulls.
+    generations: list[int] = field(default_factory=list)
 
-    def add_car(self, cargo: Cargo, most: int = MAX_CARS) -> bool:
+    def add_car(self, cargo: Cargo, most: int = MAX_CARS, generation: int = 0) -> bool:
         if len(self.cars) >= most:
             return False
+        del self.generations[len(self.cars) :]
+        self.generations += [0] * (len(self.cars) - len(self.generations))
         self.cars.append(cargo)
+        self.generations.append(generation)
         return True
+
+    def generation_at(self, index: int) -> int:
+        """The generation asked for the car at `index`: 0 for the newest."""
+        return self.generations[index] if index < len(self.generations) else 0
+
+    def asked(self) -> list[tuple[Cargo, int]]:
+        """Each car's cargo with the generation asked for it."""
+        return [(cargo, self.generation_at(index)) for index, cargo in enumerate(self.cars)]
+
+    def remove_car(self, index: int) -> None:
+        self.cars.pop(index)
+        if index < len(self.generations):
+            self.generations.pop(index)
+
+    def clear_cars(self) -> None:
+        self.cars.clear()
+        self.generations.clear()
+
+    def keep_cars(self, most: int) -> None:
+        """Drops the cars past the first `most`."""
+        del self.cars[most:]
+        del self.generations[most:]
 
 
 @dataclass

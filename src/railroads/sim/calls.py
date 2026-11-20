@@ -40,7 +40,9 @@ class StationCalls:
             train.sanded = Facility.SAND_TOWER in working
             return
         goods = self._railway.station_goods(stop.cell)
-        wanted = [good for good in stop.cars if self._railway.can_carry(train, good)]
+        wanted = [
+            (cargo, asked) for cargo, asked in stop.asked() if self._railway.can_carry(train, cargo)
+        ]
         aboard = [car for car in train.cars if not car.dining]
         if train.loaded_at == stop.cell:
             aboard = self._swap_cars(aboard, wanted, goods, stop.cell, train.engine)
@@ -101,47 +103,51 @@ class StationCalls:
             for car in train.cars
         )
 
-    def _next_cars(self, cars: list[Car], wanted: list[Cargo], engine: str) -> list[Car]:
+    def _next_cars(
+        self, cars: list[Car], wanted: list[tuple[Cargo, int]], engine: str
+    ) -> list[Car]:
         """The cars for the next leg: each keeps what the fullest car of its cargo still holds,
         freight that did not fit into the station; anything else left aboard is lost."""
         return self._match_cars(cars, wanted, engine)[0]
 
     def _match_cars(
-        self, cars: list[Car], wanted: list[Cargo], engine: str
+        self, cars: list[Car], wanted: list[tuple[Cargo, int]], engine: str
     ) -> tuple[list[Car], list[Car]]:
-        """The wanted cars, each the fullest car of its cargo or else a new one, and the cars
-        left over."""
+        """The wanted cars, each the fullest car of its cargo and generation asked or else a new
+        one, and the cars left over."""
         left = sorted(cars, key=lambda car: -car.load)
         kept = []
-        for cargo in wanted:
-            car = next((car for car in left if car.cargo == cargo), None)
+        for cargo, asked in wanted:
+            car = next((c for c in left if c.cargo == cargo and c.generation == asked), None)
             if car is None:
-                kept.append(self._new_car(cargo, engine))
+                kept.append(self._new_car(cargo, engine, asked))
             else:
                 left.remove(car)
                 kept.append(car)
         return kept, left
 
-    def _new_car(self, cargo: Cargo, engine: str) -> Car:
+    def _new_car(self, cargo: Cargo, engine: str, asked: int = 0) -> Car:
         railway = self._railway
         if isinstance(cargo, General):
             good = GENERAL_GOODS[cargo][0]
             return Car(
                 good,
-                capacity=railway.car_capacity(good, engine, cargo),
+                capacity=railway.car_capacity(good, engine, cargo, asked),
                 general=cargo,
-                tare=railway.car_tare(good, engine),
+                tare=railway.car_tare(good, engine, asked),
+                generation=asked,
             )
         return Car(
             cargo,
-            capacity=railway.car_capacity(cargo, engine),
-            tare=railway.car_tare(cargo, engine),
+            capacity=railway.car_capacity(cargo, engine, asked=asked),
+            tare=railway.car_tare(cargo, engine, asked),
+            generation=asked,
         )
 
     def _swap_cars(
         self,
         cars: list[Car],
-        wanted: list[Cargo],
+        wanted: list[tuple[Cargo, int]],
         goods: StationGoods,
         station: Cell,
         engine: str,
@@ -209,7 +215,7 @@ class StationCalls:
         destination = self._railway.destination(train)
         best: tuple[float, float, Good] | None = None
         for good in GENERAL_GOODS[car.general]:
-            capacity = self._railway.car_capacity(good, train.engine, car.general)
+            capacity = self._railway.car_capacity(good, train.engine, car.general, car.generation)
             amount = min(capacity, self.spare(stop, good))
             if amount <= 1e-9:
                 continue
@@ -220,5 +226,7 @@ class StationCalls:
                 best = (worth, amount, good)
         if best is not None:
             car.good = best[2]
-            car.capacity = self._railway.car_capacity(best[2], train.engine, car.general)
-            car.tare = self._railway.car_tare(best[2], train.engine)
+            car.capacity = self._railway.car_capacity(
+                best[2], train.engine, car.general, car.generation
+            )
+            car.tare = self._railway.car_tare(best[2], train.engine, car.generation)

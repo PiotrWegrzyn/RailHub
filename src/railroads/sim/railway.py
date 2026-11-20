@@ -329,7 +329,7 @@ class Railway:
         train.engine = engine
         most = self.most_cars(train)
         for stop in train.stops:
-            del stop.cars[most:]
+            stop.keep_cars(most)
         return True
 
     def trains_to_upgrade(self, engine: str) -> list[Train]:
@@ -384,14 +384,16 @@ class Railway:
         (BURN_ALONE)."""
         return ENGINES[train.engine].burn * (BURN_ALONE + self.load_share(train))
 
-    def car_tonnes(self, cargo: Cargo, engine: str) -> float:
-        """What a full car for some cargo weighs behind an engine, in tonnes; a general car
-        as much as the heaviest of its goods would."""
+    def car_tonnes(self, cargo: Cargo, engine: str, asked: int = 0) -> float:
+        """What a full car for some cargo weighs behind an engine, in tonnes, of the generation
+        asked (0 for the newest); a general car as much as the heaviest of its goods would."""
         goods = GENERAL_GOODS[cargo] if isinstance(cargo, General) else (cargo,)
         general = cargo if isinstance(cargo, General) else None
         return max(
             full_tonnes(
-                good, self.car_capacity(good, engine, general), self.car_generation(good, engine)
+                good,
+                self.car_capacity(good, engine, general, asked),
+                self.car_generation(good, engine, asked),
             )
             for good in goods
         )
@@ -401,15 +403,19 @@ class Railway:
         an express's dining car included."""
         express = ENGINES[train.engine].express
         dining = self.car_tare(Good.PASSENGERS, train.engine) if express else 0.0
-        return dining + sum(self.car_tonnes(cargo, train.engine) for cargo in stop.cars)
+        cars = stop.asked()
+        return dining + sum(self.car_tonnes(cargo, train.engine, asked) for cargo, asked in cars)
 
-    def add_car(self, train: Train, stop: Stop, cargo: Cargo) -> bool:
-        """Adds a car for some cargo to a stop's if the engine has room for one more and can
-        still pull them all full; False if not."""
-        heavier = self.stop_tonnes(train, stop) + self.car_tonnes(cargo, train.engine)
+    def add_car(self, train: Train, stop: Stop, cargo: Cargo, asked: int = 0) -> bool:
+        """Adds a car for some cargo, of the generation asked (0 for the newest), to a stop's
+        if the engine has room for one more and can still pull them all full, and the car
+        carries it; False if not."""
+        if isinstance(cargo, Good) and not self.car_capacity(cargo, train.engine, asked=asked):
+            return False
+        heavier = self.stop_tonnes(train, stop) + self.car_tonnes(cargo, train.engine, asked)
         if heavier > self.max_pull(train.engine) + 1e-9:
             return False
-        return stop.add_car(cargo, self.most_cars(train))
+        return stop.add_car(cargo, self.most_cars(train), asked)
 
     def fuel_markup(self) -> float:
         """How much more fuel costs bought anywhere but out of a station's stockpile, with the
@@ -468,12 +474,16 @@ class Railway:
         self.fuel.month(self.year, signals_of(trade, owned, points, self.year))
 
     def car_capacity(
-        self, good: Good, engine: str | None = None, general: General | None = None
+        self,
+        good: Good,
+        engine: str | None = None,
+        general: General | None = None,
+        asked: int = 0,
     ) -> float:
         """How much of a good one car of its car_generation carries, a general car of a kind
         (general_car_size) or one for the good alone, and coaches and mail vans more with tech;
         nothing in a generation before the good's first."""
-        generation = self.car_generation(good, engine)
+        generation = self.car_generation(good, engine, asked)
         if general is None:
             size = car_size(good, generation)
         else:
@@ -482,9 +492,15 @@ class Railway:
             return size * (1.0 + self.research.bonus(Effect.COACHES))
         return size
 
-    def car_generation(self, good: Good, engine: str | None = None) -> int:
-        """The generation of a good's cars: the year's (generation_in) and one more for each its
-        tree's tech brings sooner (Effect.CAR_SIZE), up to the newest an engine pulls."""
+    def car_generation(self, good: Good, engine: str | None = None, asked: int = 0) -> int:
+        """The generation of a good's cars: the one asked for if older, or else the newest, the
+        year's (generation_in) and one more for each its tree's tech brings sooner
+        (Effect.CAR_SIZE), up to the newest an engine pulls."""
+        newest = self.newest_generation(good, engine)
+        return min(asked, newest) if asked else newest
+
+    def newest_generation(self, good: Good, engine: str | None = None) -> int:
+        """The newest generation of a good's cars behind an engine."""
         tree = GOOD_TREES.get(good)
         sooner = (
             self.research.everywhere_bonus(Effect.CAR_SIZE)
@@ -496,9 +512,10 @@ class Railway:
             return generation
         return min(generation, ENGINES[engine].top_generation)
 
-    def car_tare(self, good: Good, engine: str | None = None) -> float:
-        """What an empty car for a good weighs behind an engine, in tonnes."""
-        return tare_of(good, self.car_generation(good, engine))
+    def car_tare(self, good: Good, engine: str | None = None, asked: int = 0) -> float:
+        """What an empty car for a good of the generation asked weighs behind an engine, in
+        tonnes."""
+        return tare_of(good, self.car_generation(good, engine, asked))
 
     def _upkeep(self) -> float:
         return max(LEAST_UPKEEP, 1.0 - self.research.bonus(Effect.UPKEEP))

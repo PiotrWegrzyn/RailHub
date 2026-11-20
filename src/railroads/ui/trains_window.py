@@ -101,6 +101,8 @@ class TrainsWindow:
     # What each stop's station has to send on each month, worked out at most every WORTH_EVERY
     # seconds, by station: when, and the goods.
     _supplied: dict[Cell, tuple[float, Mapping[Good, float]]] = field(default_factory=dict)
+    # The generation of cars added to each train's stops, by train name: 0 for the newest.
+    _asked: dict[str, int] = field(default_factory=dict)
     # Stop cards the player folded away or opened, by train and stop; the rest are open but for
     # those with cars set that the train is not heading for or standing at.
     _folded: dict[tuple[str, int], bool] = field(default_factory=dict)
@@ -484,25 +486,29 @@ class TrainsWindow:
         imgui.text_disabled(f"Cars to {onward}")
         imgui.same_line(CARD_LABEL)
         most = railway.most_cars(train)
-        for car_index, cargo in enumerate(list(stop.cars)):
+        for car_index, (cargo, asked) in enumerate(stop.asked()):
             if car_index:
                 imgui.same_line(0, 4)
+            good = GENERAL_GOODS[cargo][0] if isinstance(cargo, General) else cargo
+            generation = railway.car_generation(good, train.engine, asked)
             if isinstance(cargo, General):
                 tooltip = (
-                    f"{cargo.value} car: takes whichever of its goods pays best at the next stop"
-                    " - click to remove"
+                    f"G{generation} {cargo.value} car: takes whichever of its goods pays best at"
+                    " the next stop - click to remove"
                 )
             else:
-                size = railway.car_capacity(cargo, train.engine)
-                tooltip = f"{cargo.value} car of {amount_of(cargo, size)} - click to remove"
-            tonnes = railway.car_tonnes(cargo, train.engine)
+                size = railway.car_capacity(cargo, train.engine, asked=asked)
+                tooltip = (
+                    f"G{generation} {cargo.value} car of {amount_of(cargo, size)} - click to remove"
+                )
+            tonnes = railway.car_tonnes(cargo, train.engine, asked)
             tooltip += f"\nWeighs {tonnes:.0f} t full"
             removed = car_chip(f"car{car_index}", cargo, tooltip=tooltip)
             caption_under(f"{tonnes:.0f} t")
             if imgui.is_item_hovered() and isinstance(cargo, Good):
                 self._shown_map.good = cargo
             if removed:
-                stop.cars.pop(car_index)
+                stop.remove_car(car_index)
                 train.cars_changed(index)
         for slot in range(len(stop.cars), most):
             if slot:
@@ -511,7 +517,7 @@ class TrainsWindow:
         if stop.cars:
             imgui.same_line(0, 10)
             if imgui.small_button("Clear"):
-                stop.cars.clear()
+                stop.clear_cars()
                 train.cars_changed(index)
             imgui.same_line(0, 10)
             planned = railway.stop_tonnes(train, stop)
@@ -534,6 +540,7 @@ class TrainsWindow:
     ) -> None:
         imgui.align_text_to_frame_padding()
         imgui.text_disabled("Load here")
+        asked = self._draw_generation_picker(railway, train, index)
         imgui.same_line(CARD_LABEL)
         offers = [
             offer
@@ -555,7 +562,7 @@ class TrainsWindow:
         spare = railway.max_pull(train.engine) - railway.stop_tonnes(train, stop)
 
         def fits(cargo: Good | General) -> bool:
-            return railway.car_tonnes(cargo, train.engine) <= spare + 1e-9
+            return railway.car_tonnes(cargo, train.engine, asked) <= spare + 1e-9
 
         offers.sort(key=lambda o: (-(demand.monthly_want(o.good) > 0), -o.waiting, -o.gathered))
         left = imgui.get_cursor_pos_x()
@@ -572,11 +579,11 @@ class TrainsWindow:
                 f"{offer.gathered:.0f} given to the station in the last quarter"
                 + (" - comes in on this train" if offer.good in carried else "")
                 + (" - wanted at the next stop" if wanted else "")
-                + adding_tip(full, railway.car_tonnes(offer.good, train.engine), spare)
+                + adding_tip(full, railway.car_tonnes(offer.good, train.engine, asked), spare)
             )
             imgui.begin_disabled(blocked)
             if offer_chip(f"offer{number}", offer.good, f"{offer.waiting:.0f}", wanted, tip):
-                railway.add_car(train, stop, offer.good)
+                railway.add_car(train, stop, offer.good, asked)
                 train.cars_changed(index)
             spot(f"cargo:{index}:{offer.good.value}")
             if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
@@ -591,13 +598,37 @@ class TrainsWindow:
             tip = (
                 f"{general.value}: a car that takes whichever of its goods pays best at the "
                 f"next stop; {waiting:.0f} of them waiting here"
-                + adding_tip(full, railway.car_tonnes(general, train.engine), spare)
+                + adding_tip(full, railway.car_tonnes(general, train.engine, asked), spare)
             )
             imgui.begin_disabled(full or not fits(general))
             if offer_chip(f"general{number}", general, f"{waiting:.0f}", waiting > 0, tip):
-                railway.add_car(train, stop, general)
+                railway.add_car(train, stop, general, asked)
                 train.cars_changed(index)
             imgui.end_disabled()
+
+    def _draw_generation_picker(self, railway: Railway, train: Train, index: int) -> int:
+        """A small list beside 'Load here' of the generations of cars that can be added: the
+        newest its engine pulls, the default, or an older, smaller and lighter one; returns the
+        one picked, 0 for the newest."""
+        newest = railway.newest_generation(picker_good(train), train.engine)
+        asked = min(self._asked.get(train.name, 0), newest)
+        imgui.same_line(0, 8)
+        imgui.set_next_item_width(max(44.0, CARD_LABEL - imgui.get_cursor_pos_x() - 6))
+        shown = f"G{asked or newest}"
+        if imgui.begin_combo(f"##cars{index}", shown):
+            for generation in range(newest, 0, -1):
+                label = f"G{generation} (newest)" if generation == newest else f"G{generation}"
+                picked = (asked or newest) == generation
+                if imgui.selectable(label, picked)[0]:
+                    asked = 0 if generation == newest else generation
+                    self._asked[train.name] = asked
+            imgui.end_combo()
+        if imgui.is_item_hovered():
+            imgui.set_tooltip(
+                "The generation of the cars a click below adds: the newest by default, or an\n"
+                "older one that holds less and weighs less, for light engines and hills"
+            )
+        return asked
 
 
 def speed_share(railway: Railway, train: Train, tonnes: float) -> float:
@@ -619,6 +650,11 @@ def draw_tonnage(railway: Railway, train: Train) -> None:
             f"\nIt burns {railway.burn(train):.2g} {fuel_of(ENGINES[train.engine]).value} a cell, "
             f"{railway.burn(train) / ENGINES[train.engine].burn:.0%} of what it burns half loaded"
         )
+
+
+def picker_good(train: Train) -> Good:
+    """The good whose cars the generation picker lists: coaches behind an express."""
+    return Good.PASSENGERS if ENGINES[train.engine].express else Good.COAL
 
 
 def adding_tip(full: bool, tonnes: float, spare: float) -> str:

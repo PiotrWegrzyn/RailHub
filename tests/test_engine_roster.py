@@ -35,7 +35,7 @@ from railroads.sim.trains import (
     unit_tonnes,
 )
 from railroads.ui.tech_window import describe
-from railroads.ui.trains_window import adding_tip, engine_summary, engines_by_kind
+from railroads.ui.trains_window import adding_tip, engine_summary, engines_by_kind, picker_good
 
 WEST, EAST = (6, 3), (6, 20)
 EVERY_NODE = frozenset(NODES)
@@ -761,3 +761,78 @@ def test_a_goods_unit_says_what_it_weighs() -> None:
     label = unit_label(Good.COFFEE)
 
     assert label == "coffee: 1 sack = 60 kg"
+
+
+def test_a_stop_can_ask_for_an_older_smaller_and_lighter_car() -> None:
+    railway = line()
+    railway.year = 1850
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop(WEST), Stop(EAST)]
+    railway.add_car(train, train.stops[0], Good.COAL, 1)
+
+    railway.calls.arrive(train, train.stops[0])
+
+    (car,) = train.cars
+    assert (car.capacity, car.tare, car.generation) == (55.0, pytest.approx(1.5), 1)
+
+
+def test_older_cars_weigh_less_full_than_the_newest() -> None:
+    railway = line()
+    railway.year = 1850
+    train = railway.buy()
+    assert train is not None
+    newest, older = Stop(WEST), Stop(EAST)
+    for _ in range(3):
+        railway.add_car(train, newest, Good.COAL)
+        railway.add_car(train, older, Good.COAL, 1)
+
+    weights = railway.stop_tonnes(train, newest), railway.stop_tonnes(train, older)
+
+    assert weights[1] < weights[0]
+
+
+def test_a_stop_cannot_ask_for_vehicles_in_a_generation_before_theirs() -> None:
+    railway = knowing(line(), "boilers", "diesel")
+    railway.year = 1960
+    railway.finances.earn(10_000_000.0, "test")
+    train = railway.buy("heavy_diesel")
+    assert train is not None
+    stop = Stop(WEST)
+
+    added = railway.add_car(train, stop, Good.CARS, 3), railway.add_car(train, stop, Good.CARS)
+
+    assert added == (False, True)
+
+
+def test_removing_a_car_from_a_stop_removes_the_generation_asked_for_it() -> None:
+    stop = Stop(WEST)
+    stop.add_car(Good.COAL, generation=1)
+    stop.add_car(Good.WHEAT)
+
+    stop.remove_car(0)
+
+    assert stop.asked() == [(Good.WHEAT, 0)]
+
+
+def test_a_train_swaps_a_newer_car_for_the_older_one_its_stop_now_asks_for() -> None:
+    railway = line()
+    railway.year = 1850
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop(WEST, [Good.COAL]), Stop(EAST)]
+    railway.calls.arrive(train, train.stops[0])
+    train.stops[0].clear_cars()
+    train.stops[0].add_car(Good.COAL, generation=1)
+
+    railway.calls.arrive(train, train.stops[0])
+
+    assert [car.capacity for car in train.cars] == [55.0]
+
+
+def test_the_generation_picker_lists_coaches_behind_an_express_and_coal_cars_otherwise() -> None:
+    express, freight = Train("Express", engine="single"), Train("Freight", engine="goods")
+
+    goods = picker_good(express), picker_good(freight)
+
+    assert goods == (Good.PASSENGERS, Good.COAL)
