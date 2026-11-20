@@ -617,7 +617,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
     _with_merged(
         {
             BuildingKind.STEEL_MILL: Recipe(
-                Good.STEEL, 100, {Need.IRON: 2.5, Need.COAL: 2.5}, {Need.COKE: 0.25}
+                Good.STEEL, 200, {Need.IRON: 5.0, Need.COAL: 10.0}, {Need.COKE: 0.25}
             ),
             BuildingKind.COKE_PLANT: Recipe(Good.COKE, 100, {Need.COAL: 1.0}),
             BuildingKind.POTTER: Recipe(Good.POTS, 40, {Need.CLAY: 0.5}),
