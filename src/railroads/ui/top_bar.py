@@ -71,7 +71,7 @@ def _draw_top_bar(app: App) -> None:
     imgui.same_line(0, 8)
     draw_view_controls(app.view)
     padding = imgui.get_style().window_padding.x
-    buttons = 6 if app.saves is not None else 4
+    buttons = 5 if app.saves is not None else 3
     right = imgui.get_window_width() - padding - buttons * WINDOW_BUTTON_WIDTH - (buttons - 1) * 4
     title = app.title.upper()
     imgui.same_line(0, 8)
