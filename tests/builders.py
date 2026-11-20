@@ -69,12 +69,19 @@ class MemoryFiles:
 def open_boards() -> Tiles:
     """Boards on which every good is made and wanted at its base and earns its base price, and
     every buyer a demand tile opens is open, from the first year of the boards."""
+    return boards_with()
+
+
+def boards_with(
+    made: dict[Tile, float] | None = None, wanted: dict[Tile, float] | None = None
+) -> Tiles:
+    """open_boards, but with some tiles made or wanted so many times their base."""
     tiles = Tiles()
     year = Year(
         MappingProxyType({}),
         MappingProxyType(dict.fromkeys(Tile, OPEN_LEVEL)),
-        MappingProxyType({}),
-        MappingProxyType({}),
+        MappingProxyType(made or {}),
+        MappingProxyType(wanted or {}),
         len(ERAS),
     )
     tiles.years = dict.fromkeys(range(FIRST_YEAR, END_YEAR + 100), year)

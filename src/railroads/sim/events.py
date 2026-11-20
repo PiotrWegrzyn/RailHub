@@ -2,10 +2,10 @@
 depends on one game; the buildings and the news it makes in one are in
 railroads.sim.happenings.
 
-What buildings make and want grows with the supply and demand boards (railroads.sim.tiles,
-rise_of): the buildings people use (RISERS: all that use goods up but power plants and railway
-works) want as much more of each need as its tiles' demand gives, processors and makers of what
-the land gives take in as much more as their supply gives.
+What buildings make and take grows with the supply and demand boards (railroads.sim.tiles):
+every building but power plants and railway works takes as much more of each need as its tiles'
+demand gives (rise_of), and makes as much more of each good as its tile's supply gives
+(make_factor).
 
 EVENTS are dated, each for its `years` or, at 0, for good. While one lasts, buildings that use
 goods up want so many times as much of each need in its `wants` (of every other need `rest`
@@ -284,20 +284,13 @@ def happening(year: int, east: bool = False) -> tuple[Event, ...]:
 
 @year_cached
 def rise_of(kind: BuildingKind, need: Need, year: int) -> float:
-    """How many times as much of a need a kind of building wants in a year as its NEEDS say, by the
-    boards (railroads.sim.tiles): one people use as much more as the demand for the need's goods,
-    a processor as much more as the supply of what it makes, and one making what the land gives
-    as much more as the supply of what it makes."""
-    boards = tiles.of_year(year)
-    if kind in RISERS:
-        return boards.want_factor(need)
-    recipe = RECIPES.get(kind)
-    if recipe is not None:
-        return boards.make_factor(recipe.makes)
-    made = MAKES.get(kind)
-    if made:
-        return sum(boards.make_factor(good) for good in made) / len(made)
-    return 1.0
+    """How many times as much of a need a kind of building takes in a year as its NEEDS say: as
+    much more as the demand tiles of the need's goods give (railroads.sim.tiles), whatever it
+    makes; power plants and railway works take what they always took. Supply raises only what
+    buildings make (make_factor)."""
+    if kind in NOT_RISING:
+        return 1.0
+    return tiles.of_year(year).want_factor(need)
 
 
 @year_cached

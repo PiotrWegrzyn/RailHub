@@ -55,7 +55,7 @@ import numpy.typing as npt
 from railroads.sim import tiles
 from railroads.sim.clock import QUARTER, START_YEAR
 from railroads.sim.constructions import GREW_FROM, BuildingKind
-from railroads.sim.events import in_eastern_bloc
+from railroads.sim.events import in_eastern_bloc, rise_of
 from railroads.sim.goods import (
     BONUS_PART,
     BOOST_MOST,
@@ -977,17 +977,27 @@ class _Month:
         the inputs standing in for others first as they make the most, within the room its
         boosts that let it take in more give it (takes_more), and up to the recipe's boost_most
         more by the share it has of its other boosts; and what that leaves over (also). Keeps
-        how much of each input all of that takes."""
+        how much of each input all of that takes. Its supply tile lets it make more from the same
+        inputs, and the demand tiles of its inputs make it take more of them for as much
+        (railroads.sim.tiles)."""
         if kind not in self.count:
             return
         recipe = RECIPES[kind]
         year = self.economy.year
-        inputs = recipe.inputs(year)
+        made = tiles.of_year(year).make_factor(recipe.makes)
+        inputs = {
+            need: per_unit * rise_of(kind, need, year) / made
+            for need, per_unit in recipe.inputs(year).items()
+        }
+        per_boost = {
+            need: amount * rise_of(kind, need, year) / made
+            for need, amount in recipe.boosts.items()
+        }
         boosts = boosts_of(kind, year)
-        base = self.count[kind] * recipe.most * tiles.of_year(year).make_factor(recipe.makes)
+        base = self.count[kind] * recipe.most * made
         roomy = {
             need: np.minimum(
-                self.stock[(kind, need)] / np.where(base > 0, base * recipe.boosts[need], 1.0),
+                self.stock[(kind, need)] / np.where(base > 0, base * per_boost[need], 1.0),
                 1.0,
             )
             * (base > 0)
@@ -1022,19 +1032,19 @@ class _Month:
         if roomy:
             used = np.clip((can - base) / np.where(extra > 0, extra, 1.0), 0.0, 1.0)
             for need, share in roomy.items():
-                uses[need] = base * share * recipe.boosts[need] * used
+                uses[need] = base * share * per_boost[need] * used
         boosts = {need: amount for need, amount in boosts.items() if need not in roomy}
         if boosts:
             shares = {
                 need: np.minimum(
-                    self.stock[(kind, need)] / np.where(can > 0, can * recipe.boosts[need], 1.0),
+                    self.stock[(kind, need)] / np.where(can > 0, can * per_boost[need], 1.0),
                     1.0,
                 )
                 * (can > 0)
                 for need in boosts
             }
             for need, share in shares.items():
-                uses[need] = can * share * recipe.boosts[need]
+                uses[need] = can * share * per_boost[need]
             can = can * (1.0 + recipe.boost_most * sum(shares.values()) / len(shares))
         self.uses[kind] = uses
         for good, made in ((recipe.makes, can), *((g, can * a) for g, a in recipe.also.items())):

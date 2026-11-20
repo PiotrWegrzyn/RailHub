@@ -68,6 +68,8 @@ The ideas every rule of the game should follow, the most important first.
   Every year two supply tiles and one demand tile go up a level, the ones the player picks, the
   lowest for picks not made, and no tile gets more than two levels above the lowest on its board.
   Each level adds a flat share of the tile's base, not compounded, by good and period.
+- Supply raises only what a building makes and demand only what it takes, never both: more supply
+  makes more from the same inputs, more demand takes more for as much.
 - Eras come when every supply tile reaches a level, each with a generation of wagons and new tiles,
   which start at the lowest level on each board. Only coal closes, around 2000.
 - Prices follow a price list, not a market: a tile's demand over its supply decides what a unit of

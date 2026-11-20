@@ -898,8 +898,9 @@ lowest for the picks not made. No tile can be more than two levels above the low
 Each level adds a flat share of the tile's base, not compounded: on supply its period's share,
 from 5% a level for farming in the early 1800s to 200% for modern goods after 1960, on demand the
 same share every level, 5% for food up to 30% for oil, vehicles and modern goods. Supply grows far
-faster than demand. Processors take in and make as much more as their output's supply tile gives,
-and makers of what the land gives make as much more. Coal closes at level 30, about 2000: it goes
+faster than demand. Supply raises only what buildings make and demand only what they take: a
+works that takes 100 and makes 50 takes 100 and makes 75 at +50% supply of what it makes, and
+takes 125 and still makes 50 at +25% demand for what it takes. Coal closes at level 30, about 2000: it goes
 no higher, can't be picked and no longer holds the other tiles back.
 
 Once every supply tile reaches an era's level, the era comes with its generation of wagons and new

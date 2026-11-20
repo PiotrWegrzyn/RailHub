@@ -1211,12 +1211,8 @@ def boosts_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
     and the bonus goods of one that makes goods from the land, such as wheat for its animals."""
     recipe = RECIPES.get(kind)
     if recipe is not None:
-        from railroads.sim.tiles import of_year
-
-        most = recipe.most * of_year(year).make_factor(recipe.makes)
-        boosts = {need: most * amount for need, amount in recipe.boosts.items()}
         needs = needs_of(kind, year)
-        return MappingProxyType({need: amount for need, amount in boosts.items() if need in needs})
+        return MappingProxyType({need: needs[need] for need in recipe.boosts if need in needs})
     if kind not in MAKES:
         return MappingProxyType({})
     from railroads.sim.events import added_needs
