@@ -327,7 +327,7 @@ def status_text(
     if over_minimap:
         return f"{zoom}. Click or drag on the map overview to look there, scroll to zoom it."
     if hovered is None:
-        return f"{zoom}. Drag to pan, scroll or -/+ to zoom."
+        return f"{zoom}. Drag or hold the arrow keys to pan, scroll or -/+ to zoom."
     tile = tile_map.tile(hovered)
     row, col = hovered
     hills = " hills" if tile.relief == Relief.HILLS else ""

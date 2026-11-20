@@ -171,6 +171,8 @@ raised one level so it reaches three hexes out. It lays no track and runs no tra
 a station reaches, a third thrive, half are content (half their needs met) and the rest go
 unsatisfied, and they grow and glow as if trains served them. Only the hexagon map is grown.
 
+Drag the map or hold the arrow keys to move round it.
+
 In the corner of the view, a minimap (M to show or hide) shows where the map lies in the world
 and the whole map from above with the part on screen outlined; click or drag on it to look there, and scroll over it to zoom it in to x2, x4 or x8 around the view.
 

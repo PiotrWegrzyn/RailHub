@@ -1038,3 +1038,17 @@ def test_a_news_card_and_its_story_draw_beside_the_map(context: None) -> None:
 
     assert app.view.summaries.open is headline
     assert app.view.summaries.outlined() == ()
+
+
+def test_holding_an_arrow_key_moves_the_map(context: None) -> None:
+    app = made_app()
+    app.view.build.choose(Tool.NONE)
+    frame(app)
+    before = app.view.camera.center_x, app.view.camera.center_y
+
+    imgui.get_io().add_key_event(imgui.Key.right_arrow, True)
+    frame(app)
+    frame(app)
+    imgui.get_io().add_key_event(imgui.Key.right_arrow, False)
+
+    assert (app.view.camera.center_x, app.view.camera.center_y) != before
