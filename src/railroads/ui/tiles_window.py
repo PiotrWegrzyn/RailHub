@@ -16,7 +16,7 @@ from dataclasses import dataclass
 
 from imgui_bundle import hello_imgui, imgui
 
-from railroads.sim.goods import Need, freight_of
+from railroads.sim.goods import Good, Need, freight_of
 from railroads.sim.tiles import (
     CLOSES,
     DEMAND_STEPS,
@@ -177,10 +177,13 @@ def cards(tiles: Tiles, board: Board) -> list[Card]:
     return shown
 
 
-def freight_line(card: Card) -> str:
-    """What carrying a unit of a card's main good earns now, and once picked if it can be."""
-    base = freight_of(TILE_GOODS[card.tile][0])
-    line = f"Freight price ${base * card.now:,.2f}"
+def freight_line(card: Card, good: Good | None = None) -> str:
+    """What carrying a unit of a good of a card's tile earns now, and once picked if it can be:
+    of its main good unless another is given. Every good of a tile earns the same share more or
+    less."""
+    good = TILE_GOODS[card.tile][0] if good is None else good
+    base = freight_of(good)
+    line = f"{good.value.capitalize()} ${base * card.now:,.2f}"
     if card.then is not None:
         line += f" > ${base * card.then:,.2f}"
     return line
@@ -492,7 +495,7 @@ class TilesWindow:
         y += big * 1.25
         self._draw_icons(draw_list, card, middle, y, scale)
         y += 18 * scale + 8 * scale
-        self._draw_price(draw_list, card, middle, y, small)
+        self._draw_price(draw_list, card, middle, y, small, size - 16)
         if card.opens:
             self._draw_unlock(draw_list, card, low, high, max(y + small * 1.5, floor), small)
         if picking and not pickable:
@@ -519,10 +522,18 @@ class TilesWindow:
 
     @staticmethod
     def _draw_price(
-        draw_list: imgui.ImDrawList, card: Card, middle: float, top: float, size: float
+        draw_list: imgui.ImDrawList,
+        card: Card,
+        middle: float,
+        top: float,
+        size: float,
+        room: float,
     ) -> None:
-        """What carrying a unit of the tile's main good earns now and once picked, in grey."""
-        _centred(draw_list, middle, top, freight_line(card), color_u32(TEXT_DIM), size)
+        """What carrying a unit of the tile's main good earns now and once picked, in grey, as
+        small as it must be to fit the card."""
+        line = freight_line(card)
+        size = min(size, size * room / max(_text_width(line, size), 1.0))
+        _centred(draw_list, middle, top, line, color_u32(TEXT_DIM), size)
 
     @staticmethod
     def _draw_unlock(
@@ -559,11 +570,13 @@ class TilesWindow:
 
     @staticmethod
     def _tip(card: Card, board: Board, left: float, bottom: float) -> None:
-        """What a card stands for, under it: its goods and, on demand, every buyer it opens."""
+        """What a card stands for, under it: what carrying each of its goods earns now and once
+        picked, and on demand every buyer it opens."""
         imgui.set_next_window_pos((left, bottom + 2))
         imgui.begin_tooltip()
-        goods = ", ".join(good.value for good in TILE_GOODS[card.tile])
-        imgui.text_colored(imgui.ImVec4(*TEXT_DIM), goods)
+        imgui.text_colored(imgui.ImVec4(*BRASS), "Freight a unit")
+        for good in TILE_GOODS[card.tile]:
+            imgui.text_colored(imgui.ImVec4(*TEXT_DIM), freight_line(card, good))
         if board == Board.DEMAND:
             for line in all_unlocks(card.tile):
                 imgui.text_colored(imgui.ImVec4(*GROWN), line)

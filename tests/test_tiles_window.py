@@ -139,11 +139,21 @@ def test_the_cards_grow_as_large_as_the_screen_lets_every_one_fit(
     assert rows * size * CARD_TALL + (rows - 1) * CARD_GAP <= height + 1e-6
 
 
-def test_a_card_gives_the_freight_of_its_main_good_now_and_once_picked() -> None:
+def test_a_card_names_its_main_good_with_its_freight_now_and_once_picked() -> None:
     tiles = Tiles.until(1850)
     coal = next(card for card in cards(tiles, Board.SUPPLY) if card.tile == Tile.COAL)
 
     line = freight_line(coal)
 
     base = freight_of(Good.COAL)
-    assert line == f"Freight price ${base * coal.now:,.2f} > ${base * coal.then:,.2f}"
+    assert line == f"Coal ${base * coal.now:,.2f} > ${base * coal.then:,.2f}"
+
+
+def test_every_good_of_a_tile_earns_the_same_share_more_or_less_once_picked() -> None:
+    tiles = Tiles.until(1850)
+    farming = next(card for card in cards(tiles, Board.SUPPLY) if card.tile == Tile.FARMING)
+
+    line = freight_line(farming, Good.COFFEE)
+
+    base = freight_of(Good.COFFEE)
+    assert line == f"Coffee ${base * farming.now:,.2f} > ${base * farming.then:,.2f}"
