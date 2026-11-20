@@ -552,7 +552,7 @@ FARMS = Ladder(
         water={Terrain.RIVER: 4.0, Terrain.LAKE: 4.0},
         open_field=OPEN_FIELD,
     ),
-    base=3.63675,
+    base=3.5,
     crowded_at=FARMS_CROWDED_OUT,
 )
 
@@ -655,7 +655,7 @@ LOGGING_CAMPS = Ladder(
         forest_edge=True,
         least_forest_nearby=4,
     ),
-    base=750,
+    base=150,
     most_per_cell=1,
     most_nearby=3,
 )
@@ -1019,7 +1019,7 @@ CATTLE_RANCHES = Ladder(
 )
 
 # Pig farms and chicken farms keep to the same land as cattle; pigs are a little rarer.
-PIG_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.PIG_FARM,), base=0.121875)
+PIG_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.PIG_FARM,), base=0.15)
 CHICKEN_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.CHICKEN_FARM,))
 
 # Flax wants cool, wet land by rivers and lakes.
@@ -1180,7 +1180,7 @@ WORKS = (
     _works(BuildingKind.TANK_FACTORY, {IND: 6}, 0, 40_000, base=100),
     _works(BuildingKind.BRICKWORKS, {}, base=4),
     _works(BuildingKind.GLASSWORKS, {}, base=4),
-    _works(BuildingKind.BREWERY, {POP: FOOD_TOWN}, base=60),
+    _works(BuildingKind.BREWERY, {POP: FOOD_TOWN}, base=30),
     _works(BuildingKind.DISTILLERY, {POP: FOOD_TOWN}, 1600, base=60),
     SAKE_BREWERIES,
     SOY_SAUCE_BREWERIES,
