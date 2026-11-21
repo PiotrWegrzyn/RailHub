@@ -11,11 +11,21 @@ from imgui_bundle import imgui
 from railroads.sim.finance import dollars
 from railroads.sim.fuel_market import fuel_of
 from railroads.sim.railway import Railway
-from railroads.sim.trains import ENGINES, EXPRESS_FARE, MAGLEV_FARE, SLOWDOWN, Engine, Kind, Train
+from railroads.sim.tiles import Tile
+from railroads.sim.trains import (
+    ENGINES,
+    EXPRESS_FARE,
+    MAGLEV_FARE,
+    OPENED_BY,
+    SLOWDOWN,
+    Engine,
+    Kind,
+    Train,
+)
 from railroads.ui.iso_camera import Vec2
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.spotlight import spot
-from railroads.ui.theme import BRASS, TEXT_DIM, color_u32
+from railroads.ui.theme import BRASS, GONE, TEXT_DIM, color_u32
 
 SCREEN_SIZE = (860.0, 560.0)
 ENGINES_WIDTH = 250.0
@@ -124,12 +134,23 @@ class BuyScreen:
         imgui.text(engine.title)
         imgui.pop_style_color()
         imgui.separator()
-        for label, value in engine_figures(engine, railway.fuel_cost(name)):
+        route_of = next((t for t in railway.trains if t.name == self.route_of), None)
+        longest = 0.0
+        if route_of is not None and self.same_stops:
+            longest = max(
+                (leg or 0.0 for leg in railway.leg_lengths(route_of.stops, name)), default=0.0
+            )
+        short = bool(engine.tank) and round(longest) > engine.tank
+        for label, value in engine_figures(engine, railway.fuel_cost(name), OPENED_BY.get(name)):
             imgui.text_disabled(label)
             imgui.same_line(FIGURES_LABEL)
-            imgui.text(value)
+            if label == "Range" and short:
+                imgui.text_colored(
+                    imgui.ImVec4(*GONE), f"{value}; {longest:.0f} between two of those stops"
+                )
+            else:
+                imgui.text(value)
         imgui.spacing()
-        route_of = next((t for t in railway.trains if t.name == self.route_of), None)
         if route_of is not None:
             _, self.same_stops = imgui.checkbox(
                 f"Call at the stops of {route_of.name}", self.same_stops
@@ -197,12 +218,18 @@ def engine_range(engine: Engine) -> str:
     return "As far as the wires go" if engine.electric else "As far as the guideway goes"
 
 
-def engine_figures(engine: Engine, per_cell: float | None = None) -> list[tuple[str, str]]:
+def engine_figures(
+    engine: Engine, per_cell: float | None = None, opened: tuple[Tile, int] | None = None
+) -> list[tuple[str, str]]:
     """What an engine can do, as labels and values for its table on the screen, with what its
-    fuel for a cell costs now if given."""
+    fuel for a cell costs now and the supply tile level that put it on sale if given."""
     cars = f"{engine.cars} coaches and a dining car" if engine.express else f"{engine.cars} cars"
-    figures = [
-        ("Built from", str(engine.year)),
+    figures = []
+    if opened is not None:
+        tile, level = opened
+        figures.append(("On sale from", f"{tile.value.capitalize()} supply {level}"))
+    figures += [
+        ("First built", str(engine.year)),
         ("Power", engine.power.value.capitalize()),
         ("Top speed", f"{engine.kmh:.0f} km/h"),
         ("Pulls up to", cars),

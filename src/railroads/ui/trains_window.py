@@ -212,7 +212,8 @@ class TrainsWindow:
         low = imgui.get_item_rect_min()
         draw_list = imgui.get_window_draw_list()
         draw_list.add_text((low.x + 6, low.y + 3), imgui.get_color_u32(imgui.Col_.text), train.name)
-        status_color = imgui.get_color_u32(imgui.ImVec4(*TEXT_DIM))
+        stuck = train.status in NO_WAY_ON or bool(railway.long_legs(train))
+        status_color = color_u32(GONE) if stuck else imgui.get_color_u32(imgui.ImVec4(*TEXT_DIM))
         draw_list.add_text((low.x + 6, low.y + 21), status_color, train.status)
         ride = self.ride(railway, train)
         if ride is not None:
@@ -398,6 +399,14 @@ class TrainsWindow:
             key = (train.name, index)
             opened = self._folded.setdefault(key, not (stop.cars and not here))
             removed, toggled = self._draw_stop_head(railway, train, index, stop, here, opened)
+            leg = dict(railway.long_legs(train)).get(index)
+            if leg is not None and not removed:
+                imgui.push_text_wrap_pos(0.0)
+                imgui.text_colored(
+                    imgui.ImVec4(*GONE),
+                    f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {leg_warning(railway, train, index, leg)}",
+                )
+                imgui.pop_text_wrap_pos()
             if toggled:
                 opened = not opened
                 self._folded[key] = opened
@@ -675,11 +684,28 @@ def adding_tip(full: bool, tonnes: float, spare: float) -> str:
 
 def train_warning(railway: Railway, train: Train) -> str:
     """What the train window warns of first: that no track the train can run on reaches its next
-    stop, so it waits where it is; empty when it can go on."""
+    stop, or that a way between two of its stops is longer than its fuel lasts, so it waits where
+    it is; empty when it can go all the way round."""
     destination = railway.destination(train)
-    if train.status not in NO_WAY_ON or destination is None:
+    if train.status in NO_WAY_ON and destination is not None:
+        return (
+            f"{train.status}, {railway.name_of(destination)}: it waits here until track joins them"
+        )
+    legs = railway.long_legs(train)
+    if not legs:
         return ""
-    return f"{train.status}, {railway.name_of(destination)}: it waits here until track joins them"
+    index, leg = legs[0]
+    return f"{leg_warning(railway, train, index, leg)}. Add a stop between them to refuel at."
+
+
+def leg_warning(railway: Railway, train: Train, index: int, leg: float) -> str:
+    """That the way from a train's stop to the next is longer than its engine carries fuel for."""
+    there = train.stops[(index + 1) % len(train.stops)].cell
+    tank = ENGINES[train.engine].tank
+    return (
+        f"From {railway.name_of(train.stops[index].cell)} to {railway.name_of(there)} is "
+        f"{leg:.0f} cells, but it carries fuel for only {tank:.0f}"
+    )
 
 
 def upgrade_button(railway: Railway, train: Train) -> None:

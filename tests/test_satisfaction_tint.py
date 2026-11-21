@@ -11,12 +11,14 @@ from railroads.sim.towns import Towns
 from railroads.ui.map_overlays import (
     HALF_SATISFIED_TINT,
     LITTLE_SATISFIED_TINT,
+    MOODS_LEGEND,
     SATISFIED_TINT,
     UNSATISFIED_TINT,
     least_satisfied,
     mood_tint,
     tint_colours,
     town_cells,
+    with_legend,
 )
 from railroads.ui.theme import town_tint
 
@@ -121,3 +123,15 @@ def test_tinted_cells_hand_the_graphics_card_their_colours_as_bytes() -> None:
     assert tints[0, 1].tolist() == [0x30, 0x20, 0x10, 0x80]
     assert tints[1, 2].tolist() == [1, 0, 0, 0xFF]
     assert tints[0, 0].tolist() == [0, 0, 0, 0]
+
+
+def test_a_legend_follows_a_status_without_a_full_stop_as_a_sentence_of_its_own() -> None:
+    text = with_legend("Barcin: houses; unsatisfied", MOODS_LEGEND)
+
+    assert text == f"Barcin: houses; unsatisfied. {MOODS_LEGEND}"
+
+
+def test_a_legend_follows_a_status_ending_in_a_full_stop_after_a_space() -> None:
+    text = with_legend("Zoom 5/8.", MOODS_LEGEND)
+
+    assert text == f"Zoom 5/8. {MOODS_LEGEND}"

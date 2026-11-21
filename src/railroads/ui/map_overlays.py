@@ -314,6 +314,11 @@ def draw_found_on_overview(
             draw_list.add_rect_filled((x - 1.5, y - 1.5), (x + 1.5, y + 1.5), mark)
 
 
+def with_legend(text: str, legend: str) -> str:
+    """The status strip's text with a lens's legend after it, as a sentence of its own."""
+    return f"{text} {legend}" if text.endswith((".", "!", "?")) else f"{text}. {legend}"
+
+
 def status_text(
     camera: IsoCamera,
     tile_map: TileMap,

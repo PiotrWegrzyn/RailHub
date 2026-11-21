@@ -88,7 +88,8 @@ class Card:
     number: int = 0
     closed: bool = False
     step: float = 0.0
-    # What a unit of its goods earns now, and once picked or after the picks so far.
+    # What a unit of its goods earns before it is picked (now if it is, else after the picks
+    # so far on both boards), and once picked or after the picks so far.
     now: float = 1.0
     then: float | None = None
     # The need of the buyer it opens next.
@@ -148,6 +149,7 @@ def cards(tiles: Tiles, board: Board) -> list[Card]:
         then = (
             tiles.planned_price(tile) if picked else tiles.price_after(board, tile) if can else None
         )
+        start = price if picked else tiles.planned_price(tile)
         demand = board == Board.DEMAND
         shown.append(
             Card(
@@ -169,7 +171,7 @@ def cards(tiles: Tiles, board: Board) -> list[Card]:
                 level,
                 closed,
                 0.0 if closed else step,
-                price,
+                start,
                 then,
                 _next_need(tile, level) if demand else None,
             )

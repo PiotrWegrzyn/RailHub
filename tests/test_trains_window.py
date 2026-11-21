@@ -8,7 +8,7 @@ from test_railway import joined_stations
 from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import Good
 from railroads.sim.railway import Railway, Ride
-from railroads.sim.trains import ENGINES, EXPRESS_FARE, Car, Stop, Train
+from railroads.sim.trains import ENGINES, EXPRESS_FARE, OPENED_BY, Car, Stop, Train
 from railroads.ui.buy_train import engine_figures
 from railroads.ui.trains_window import (
     ROW_CAR,
@@ -18,6 +18,7 @@ from railroads.ui.trains_window import (
     carried_in,
     ride_rows,
     row_cars,
+    train_warning,
 )
 
 
@@ -199,6 +200,25 @@ def test_an_engines_figures_show_the_fuel_it_burns_and_how_far_it_runs_between_s
 
     assert figures["Burns"] == "0.75 coal a cell half loaded, about $2 a cell now"
     assert figures["Range"] == "21 cells between stops"
+
+
+def test_an_engines_figures_say_which_supply_level_put_it_on_sale_and_when_it_was_first_built() -> (
+    None
+):
+    figures = dict(engine_figures(ENGINES["goods"], opened=OPENED_BY["goods"]))
+
+    assert figures["On sale from"] == "Steel and metals supply 11"
+    assert figures["First built"] == str(ENGINES["goods"].year)
+
+
+def test_a_train_whose_way_between_two_stops_is_longer_than_its_fuel_is_warned_of() -> None:
+    _, railway = joined_stations()
+    train = Train("Test", [Stop((6, 3)), Stop((6, 20))], engine="penydarren")
+
+    warning = train_warning(railway, train)
+
+    assert warning.startswith(f"From {railway.name_of((6, 3))} to {railway.name_of((6, 20))} is ")
+    assert warning.endswith("Add a stop between them to refuel at.")
 
 
 def test_stop_cards_scrolled_out_of_sight_are_not_drawn(

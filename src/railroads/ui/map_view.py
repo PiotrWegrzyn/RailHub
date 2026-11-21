@@ -61,6 +61,7 @@ from railroads.ui.map_overlays import (
     tint_colours,
     town_cells,
     visible_area,
+    with_legend,
 )
 from railroads.ui.map_tools import MapTools
 from railroads.ui.minimap import FRAME_PAD, Minimap, MinimapLayout, view_corners
@@ -814,9 +815,9 @@ class MapView:
             over_minimap,
         )
         if self._showing_moods():
-            text = f"{text} {MOODS_LEGEND}"
+            text = with_legend(text, MOODS_LEGEND)
         elif self.lens == Lens.TOWNS:
-            text = f"{text} {TOWNS_LEGEND}"
+            text = with_legend(text, TOWNS_LEGEND)
         below = draw_status(draw_list, top_left, bottom_right, text)
         if self.hovered is not None and not over_minimap:
             draw_hovered_buildings(self.growth, self.hovered, below, self._satisfaction)

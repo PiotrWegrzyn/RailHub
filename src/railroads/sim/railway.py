@@ -536,6 +536,28 @@ class Railway:
             heading = train.onward(heading)
         return train.stops[heading].cell
 
+    def long_legs(self, train: Train) -> list[tuple[int, float]]:
+        """The stops from which the way to the next is longer than the train's engine carries
+        fuel for, with how long that way is in cells; the train stands at such a stop."""
+        tank = ENGINES[train.engine].tank
+        if not tank:
+            return []
+        legs = enumerate(self.leg_lengths(train.stops, train.engine))
+        return [(index, leg) for index, leg in legs if leg is not None and round(leg) > tank]
+
+    def leg_lengths(self, stops: list[Stop], engine: str) -> list[float | None]:
+        """How long the way from each stop to the next, the last to the first, is for an engine,
+        in cells; None where no track it runs on joins them."""
+        if len(stops) < 2:
+            return []
+        electric, maglev = ENGINES[engine].electric, ENGINES[engine].maglev
+        return [
+            self.network.route_length(
+                stop.cell, stops[(index + 1) % len(stops)].cell, electric, maglev
+            )
+            for index, stop in enumerate(stops)
+        ]
+
     def cargo_worth(self, train: Train) -> list[float]:
         """What each of a train's cars would earn if it were unloaded at its destination now
         (worth_at), passengers on an express paying its fare too; cargo that came from there
@@ -810,6 +832,9 @@ class Railway:
                 train.status = (
                     f"Next stop {leg:.0f} cells away; it carries fuel for {engine.tank:.0f}"
                 )
+                return
+            if months <= 0:
+                train.status = "Sets off once time runs"
                 return
             burnt = self.network.fuel_length(here, there, engine.electric, engine.maglev)
             assert burnt is not None

@@ -157,3 +157,13 @@ def test_every_good_of_a_tile_earns_the_same_share_more_or_less_once_picked() ->
 
     base = freight_of(Good.COFFEE)
     assert line == f"Coffee ${base * farming.now:,.2f} > ${base * farming.then:,.2f}"
+
+
+def test_a_demand_card_starts_from_what_its_goods_earn_after_the_supply_picks_so_far() -> None:
+    tiles = Tiles.until(1850)
+    tiles.pick(Board.SUPPLY, Tile.COAL)
+
+    coal = next(card for card in cards(tiles, Board.DEMAND) if card.tile == Tile.COAL)
+
+    assert coal.now == tiles.planned_price(Tile.COAL)
+    assert coal.then is not None and coal.then > coal.now
