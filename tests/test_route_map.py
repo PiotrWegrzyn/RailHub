@@ -27,6 +27,7 @@ from railroads.ui.route_map import (
     add_stop,
     can_stop_at,
     edge_spot,
+    framing,
     made_at,
     marks_at,
     needed,
@@ -416,3 +417,21 @@ def test_the_zoom_buttons_zoom_on_the_middle_of_the_trains_stops() -> None:
     assert route_map.zoom > 1.0
     assert PANEL.left < left < PANEL.right
     assert PANEL.top < top < PANEL.bottom
+
+
+def test_the_map_frames_a_new_train_again_once_it_gets_its_first_stops() -> None:
+    _, railway = joined_stations()
+    map_size = railway.constructions.tile_map.grid.size()
+    train = railway.buy()
+    assert train is not None
+    route_map = RouteMap()
+    route_map.frame(railway, train, map_size, PANEL)
+    unframed = route_map.focus
+    train.stops = [Stop((6, 3)), Stop((6, 8))]
+
+    stale = route_map._framed != framing(train)
+    route_map.frame(railway, train, map_size, PANEL)
+
+    assert stale
+    assert unframed is None
+    assert route_map.focus is not None

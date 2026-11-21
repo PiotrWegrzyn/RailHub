@@ -327,15 +327,16 @@ class RouteMap:
         self.good: Good | None = None
         # Where the hovered good was last found to be made: when, which good, and the stations.
         self._made: tuple[float, Good, dict[Cell, Offer]] | None = None
-        # The train the map was last framed on, to frame the next one chosen.
-        self._framed: str | None = None
+        # The train the map was last framed on, and whether it had stops then, to frame the next
+        # one chosen and a train again once it gets its first stops.
+        self._framed: tuple[str, bool] | None = None
         self._dragged = False
         # The track as lines on the map and their boxes, kept until track changes (_track_lines).
         self._track: tuple[int, list[tuple[np.ndarray, bool]], np.ndarray] | None = None
 
     def frame(self, railway: Railway, train: Train, map_size: Vec2, panel: Panel) -> None:
         """Centres the map on the train's stops, close enough to show them all."""
-        self._framed = train.name
+        self._framed = framing(train)
         grid = railway.constructions.tile_map.grid
         points = [grid.center(*stop.cell) for stop in train.stops]
         if not points:
@@ -394,7 +395,7 @@ class RouteMap:
         low = imgui.get_cursor_screen_pos()
         width, height = imgui.get_content_region_avail()
         panel = Panel(low.x, low.y, max(width, 40.0), max(height, 40.0))
-        if self._framed != train.name:
+        if self._framed != framing(train):
             self.frame(railway, train, map_size, panel)
         frame = MapFrame.of(panel, map_size, self.zoom, self.focus)
         if steps:
@@ -691,6 +692,11 @@ def track_lines(pieces: np.ndarray, double: list[bool]) -> list[tuple[np.ndarray
 def add_stop(train: Train, station: Cell) -> None:
     train.stops.append(Stop(station))
     train.restart()
+
+
+def framing(train: Train) -> tuple[str, bool]:
+    """What the route map is framed for: the train, and whether it has any stops."""
+    return train.name, bool(train.stops)
 
 
 def panel_middle(panel: Panel) -> Vec2:
