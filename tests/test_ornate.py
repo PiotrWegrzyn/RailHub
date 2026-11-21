@@ -106,3 +106,24 @@ def test_a_window_kept_in_front_stays_in_front_of_one_clicked_after_it(context: 
 
     order = [window.name for window in imgui.get_current_context().windows]
     assert order.index("Small###small") > order.index("Big###big")
+
+
+def test_a_self_sizing_window_taller_than_the_screen_ends_at_its_bottom_and_scrolls(
+    context: None,
+) -> None:
+    bottom, scroll = 0.0, 0.0
+    for _ in range(4):
+        imgui.new_frame()
+        imgui.set_next_window_pos((0, 100))
+        imgui.set_next_window_size_constraints((300, 0), (300, 2000))
+        begin_ornate("Tall###tall", imgui.WindowFlags_.always_auto_resize.value)
+        for line in range(200):
+            imgui.text(f"line {line}")
+        scroll = imgui.get_scroll_max_y()
+        end_ornate()
+        window = imgui.internal.find_window_by_name("Tall###tall")
+        bottom = window.pos.y + window.size.y
+        imgui.end_frame()
+
+    assert bottom <= 800
+    assert scroll > 0

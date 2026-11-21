@@ -73,6 +73,10 @@ SCROLL_FLAGS = (
     | imgui.WindowFlags_.always_vertical_scrollbar.value
     | imgui.WindowFlags_.no_scroll_with_mouse.value
 )
+# How much room a self-sizing window's body leaves under it to the screen's bottom edge, for the
+# window's padding and glowing frame, and the least it is let shrink to.
+BODY_MARGIN = 24.0
+BODY_LEAST = 120.0
 # Whether each ornate window begun and not yet ended opened its body, innermost last.
 _bodies: list[bool] = []
 
@@ -98,12 +102,23 @@ def begin_ornate(title: str, flags: int = 0) -> tuple[bool, bool]:
         _frame()
         still_open = _title(label)
         # A window sizing itself to what it holds keeps the width it is given, and its body
-        # as tall as what is in it.
+        # as tall as what is in it but no lower than the screen's bottom edge, scrolling past
+        # that.
         sizes_itself = flags & imgui.WindowFlags_.always_auto_resize.value
         body = imgui.ChildFlags_.auto_resize_y.value if sizes_itself else 0
+        if sizes_itself:
+            room = body_room(imgui.get_cursor_screen_pos().y, imgui.get_io().display_size.y)
+            imgui.set_next_window_size_constraints((0.0, 0.0), (1e6, room))
         imgui.begin_child(f"##body{key}", (0, 0), body, flags & SCROLL_FLAGS)
     _bodies.append(bool(expanded))
     return bool(expanded), still_open
+
+
+def body_room(top: float, screen_height: float) -> float:
+    """How tall a self-sizing window's body starting `top` down the screen may grow: to the
+    screen's bottom edge, leaving room for the window's own padding and frame, but never less
+    than BODY_LEAST."""
+    return max(BODY_LEAST, screen_height - top - BODY_MARGIN)
 
 
 def end_ornate() -> None:
