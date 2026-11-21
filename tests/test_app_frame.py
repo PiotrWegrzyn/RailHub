@@ -1076,3 +1076,35 @@ def test_the_pause_button_stays_put_whatever_the_month_and_the_cash(
 
     assert len(places) == 3
     assert places[1] == places[2]
+
+
+def test_a_save_that_failed_to_load_is_no_longer_reported_on_another_page(
+    tmp_path: Path,
+) -> None:
+    menu = MainMenu(Saves(tmp_path))
+    menu.go_to("load")
+    menu.error = "'autosave 1' was saved by a different version of the game and can't be loaded."
+
+    menu.go_to("new")
+
+    assert menu.error == ""
+
+
+@pytest.mark.parametrize("paused", [True, False])
+def test_a_banner_over_the_map_says_so_while_time_stands_still(
+    context: None, monkeypatch: pytest.MonkeyPatch, paused: bool
+) -> None:
+    app = made_app()
+    app.clock.paused = paused
+    drawn: list[object] = []
+    monkeypatch.setattr(app_module, "draw_pause_banner", lambda *corners: drawn.append(corners))
+
+    frame(app)
+
+    assert bool(drawn) == paused
+
+
+def test_a_new_game_begins_with_time_standing_still() -> None:
+    saved = make_game(Settings(seed=5, map=MapChoice.POLAND), report=lambda _: None)
+
+    assert saved.clock.paused

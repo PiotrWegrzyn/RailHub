@@ -86,6 +86,8 @@ NAME_LIFT = 0.55
 NAME_PADDING = 6.0
 STATUS_MARGIN = 10.0
 STATUS_PADDING = 10.0
+# How much of the map's top right the status strip leaves to the compass.
+STATUS_COMPASS_ROOM = 80.0
 # How big the goods' icons are in the card of the hovered cell's buildings.
 HOVER_ICON = 16.0
 # Lower left, upper left, top and upper right corner: three edges per hexagon draw the whole grid.
@@ -373,17 +375,24 @@ def _construction_name(construction: Construction) -> str:
 
 
 def draw_status(draw_list: imgui.ImDrawList, top_left: Vec2, bottom_right: Vec2, text: str) -> Vec2:
-    """The status text in a strip along the top of the map; returns where the space below it
+    """The status text in a strip along the top of the map, running on to more lines where it
+    is wider than the map leaves room for beside the compass; returns where the space below it
     starts."""
-    size = imgui.calc_text_size(text)
     x, y = top_left[0] + STATUS_MARGIN, top_left[1] + STATUS_MARGIN
-    right = min(x + size.x + 2 * STATUS_PADDING, bottom_right[0] - 80)
+    room = max(40.0, bottom_right[0] - STATUS_COMPASS_ROOM - x - 2 * STATUS_PADDING)
+    size = imgui.calc_text_size(text, wrap_width=room)
+    right = x + size.x + 2 * STATUS_PADDING
     draw_list.add_rect_filled(
         (x, y), (right, y + size.y + 2 * STATUS_PADDING * 0.6), color_u32(OVERLAY), 6.0
     )
-    draw_list.push_clip_rect((x, y), (right - STATUS_PADDING / 2, bottom_right[1]), True)
-    draw_list.add_text((x + STATUS_PADDING, y + STATUS_PADDING * 0.6), color_u32(TEXT), text)
-    draw_list.pop_clip_rect()
+    draw_list.add_text(
+        imgui.get_font(),
+        imgui.get_font_size(),
+        (x + STATUS_PADDING, y + STATUS_PADDING * 0.6),
+        color_u32(TEXT),
+        text,
+        room,
+    )
     return x, y + size.y + 2 * STATUS_PADDING * 0.6 + STATUS_MARGIN / 2
 
 

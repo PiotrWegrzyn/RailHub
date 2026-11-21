@@ -9,6 +9,7 @@ from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import Good
 from railroads.sim.railway import Railway, Ride
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, OPENED_BY, Car, Stop, Train
+from railroads.ui import buy_train
 from railroads.ui.buy_train import engine_figures
 from railroads.ui.trains_window import (
     ROW_CAR,
@@ -314,3 +315,38 @@ def test_what_follows_a_stops_cars_stays_put_when_its_first_car_is_added(
     draw_frames(window, railway)
 
     assert below[-1] == empty
+
+
+def test_the_buy_button_stays_in_sight_under_the_engines_figures(
+    gui: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(buy_train, "PICTURE_HEIGHT", 600.0)
+    _, railway = joined_stations()
+    first = railway.buy()
+    assert first is not None
+    first.stops = [Stop((6, 3)), Stop((6, 20))]
+    window = TrainsWindow(open=True)
+    window.buy.open_for(first)
+    ground = (imgui.ImTextureRef(1), railway.constructions.tile_map.grid.size())
+    places: list[tuple[float, float]] = []
+    button = imgui.button
+
+    def watched(label: str, size: tuple[float, float] = (0, 0)) -> bool:
+        clicked = button(label, size)
+        if "Buy for" in label:
+            shown = imgui.internal.get_current_window().inner_clip_rect.max.y
+            places.append((imgui.get_item_rect_max().y, shown))
+        return clicked
+
+    def tall_picture(_: str, __: int) -> tuple[imgui.ImTextureRef, tuple[float, float]]:
+        return imgui.ImTextureRef(1), (40.0, 70.0)
+
+    monkeypatch.setattr(imgui, "button", watched)
+
+    for _ in range(3):
+        imgui.new_frame()
+        window.draw(railway, lambda _: {}, lambda: ground, tall_picture)
+        imgui.end_frame()
+
+    bottom, edge = places[-1]
+    assert bottom <= edge

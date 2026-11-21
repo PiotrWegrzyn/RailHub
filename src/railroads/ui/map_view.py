@@ -314,6 +314,11 @@ class MapView:
         x, y = self.tile_map.grid.center(*cell)
         self.camera.center_x, self.camera.center_y = float(x), float(y)
 
+    @property
+    def map_rect(self) -> tuple[Vec2, Vec2]:
+        """The map's top left and bottom right corners on the screen, as last drawn."""
+        return self._map_rect
+
     def time_passed(self, months: float) -> None:
         """Moves the trains on by this much of a month."""
         self.game.time_passed(months)

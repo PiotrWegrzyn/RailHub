@@ -12,9 +12,10 @@ from railroads.sim.clock import MONTH_NAMES, SPEEDS
 from railroads.sim.finance import Finances, dollars
 from railroads.ui.goal_view import draw_worth
 from railroads.ui.map_input import key_pressed
-from railroads.ui.ornate import band, bar_buttons, diamond, spaced, spaced_text
+from railroads.ui.ornate import DEEP, band, bar_buttons, diamond, frame_rect, spaced, spaced_text
 from railroads.ui.spotlight import spot
-from railroads.ui.theme import BRASS, GONE, GROWN, danger_button, tip, toggle_button
+from railroads.ui.summaries_panel import CARDS_TOP
+from railroads.ui.theme import BRASS, GONE, GROWN, color_u32, danger_button, tip, toggle_button
 
 if TYPE_CHECKING:
     from railroads.ui.app import App
@@ -25,6 +26,10 @@ WINDOW_BUTTON_WIDTH = 30.0
 # and F still do their work), so the speeds and the window buttons fit.
 COMPACT_WIDTH = 1100.0
 LEAVE_POPUP = "Leave this game?"
+# How much larger than the text around it the banner over a paused game is written, and the room
+# round it.
+PAUSE_SCALE = 1.4
+PAUSE_PADDING = 14.0
 
 
 def draw_top_bar(app: App) -> None:
@@ -120,6 +125,28 @@ def _draw_top_bar(app: App) -> None:
         if toggle_button(fa.ICON_FA_HOME, False, "Main menu", size):
             imgui.open_popup(LEAVE_POPUP)
         draw_leave_popup(app)
+
+
+def draw_pause_banner(top_left: tuple[float, float], bottom_right: tuple[float, float]) -> None:
+    """A banner saying time stands still, centred over the map at the height of the news cards
+    and in front of everything else."""
+    draw_list = imgui.get_foreground_draw_list()
+    size = imgui.get_font_size() * PAUSE_SCALE
+    text = f"{fa.ICON_FA_PAUSE}  PAUSED  -  Space to go on"
+    width = imgui.calc_text_size(text).x * PAUSE_SCALE
+    middle = (top_left[0] + bottom_right[0]) / 2
+    top = top_left[1] + CARDS_TOP
+    low = (middle - width / 2 - PAUSE_PADDING, top)
+    high = (middle + width / 2 + PAUSE_PADDING, top + size + 2 * PAUSE_PADDING * 0.6)
+    draw_list.add_rect_filled(low, high, color_u32(DEEP), 6.0)
+    frame_rect(draw_list, imgui.ImVec2(*low), imgui.ImVec2(*high), 6.0, bracket=8.0)
+    draw_list.add_text(
+        imgui.get_font(),
+        size,
+        (low[0] + PAUSE_PADDING, top + PAUSE_PADDING * 0.6),
+        color_u32(BRASS),
+        text,
+    )
 
 
 def date_width() -> float:

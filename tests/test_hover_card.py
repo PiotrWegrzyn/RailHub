@@ -55,3 +55,16 @@ def test_a_left_click_on_a_station_opens_it() -> None:
     view.tools.click((5, 5))
 
     assert view.station_window.station == (5, 5)
+
+
+def test_a_status_too_long_for_the_map_runs_on_to_more_lines_short_of_the_compass(
+    frame: None,
+) -> None:
+    draw_list = imgui.get_window_draw_list()
+    short = map_overlays.draw_status(draw_list, (0, 0), (1000, 700), "Zoom 5/8.")
+
+    below = map_overlays.draw_status(
+        draw_list, (0, 0), (1000, 700), f"Zoom 5/8. River. {map_overlays.MOODS_LEGEND}" * 2
+    )
+
+    assert below[1] > short[1]

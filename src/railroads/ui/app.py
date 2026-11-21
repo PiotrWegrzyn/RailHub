@@ -57,7 +57,7 @@ from railroads.ui.save_files import IN_BROWSER
 from railroads.ui.saves_window import SavesWindow
 from railroads.ui.theme import BRASS, apply_theme
 from railroads.ui.tiles_window import TilesWindow
-from railroads.ui.top_bar import draw_top_bar
+from railroads.ui.top_bar import draw_pause_banner, draw_top_bar
 from railroads.ui.tutorial_panel import draw_tutorial
 from railroads.ui.waiting_screen import Label, Shatter, tip_for, waiting_line
 from railroads.ui.web_setup import go_back_to_landing, page_setup
@@ -264,6 +264,8 @@ class App:
             )
         self._draw_saves()
         draw_goal_news(self)
+        if self.clock.paused and not self.tiles.choosing:
+            draw_pause_banner(*self.view.map_rect)
         if self.tutorial is not None:
             draw_tutorial(self.tutorial)
             if self._turning is None:

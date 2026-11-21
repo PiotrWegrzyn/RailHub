@@ -225,5 +225,5 @@ def make_game_steps(
         report(f"Playing {played} years with a stand-in player")
         game.simulate(played, np.random.default_rng(seed + 2))
         title += ", simulated"
-    clock = GameClock(first_year=game.growth.year)
+    clock = GameClock(first_year=game.growth.year, paused=True)
     return SavedGame(game, clock, np.random.default_rng(seed + 1), title, settings)

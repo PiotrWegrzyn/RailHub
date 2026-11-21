@@ -127,30 +127,16 @@ class BuyScreen:
         imgui.get_window_draw_list().add_text((right, imgui.get_item_rect_min().y), color, price)
 
     def _draw_engine(self, railway: Railway, name: str, picture: EnginePicture) -> str | None:
+        """The engine picked: its picture and figures, which scroll on their own, over the
+        Call at the stops box and the Buy button, which stay at the bottom in sight."""
         engine = ENGINES[name]
-        self._draw_picture(name, picture)
-        imgui.spacing()
-        imgui.push_style_color(imgui.Col_.text, imgui.ImVec4(*BRASS))
-        imgui.text(engine.title)
-        imgui.pop_style_color()
-        imgui.separator()
         route_of = next((t for t in railway.trains if t.name == self.route_of), None)
-        longest = 0.0
-        if route_of is not None and self.same_stops:
-            longest = max(
-                (leg or 0.0 for leg in railway.leg_lengths(route_of.stops, name)), default=0.0
-            )
-        short = bool(engine.tank) and round(longest) > engine.tank
-        for label, value in engine_figures(engine, railway.fuel_cost(name), OPENED_BY.get(name)):
-            imgui.text_disabled(label)
-            imgui.same_line(FIGURES_LABEL)
-            if label == "Range" and short:
-                imgui.text_colored(
-                    imgui.ImVec4(*GONE), f"{value}; {longest:.0f} between two of those stops"
-                )
-            else:
-                imgui.text(value)
-        imgui.spacing()
+        lines = 2 if route_of is not None else 1
+        style = imgui.get_style()
+        footer = lines * imgui.get_frame_height_with_spacing() + style.item_spacing.y
+        imgui.begin_child("figures", (0, -footer))
+        self._draw_figures(railway, name, picture, route_of)
+        imgui.end_child()
         if route_of is not None:
             _, self.same_stops = imgui.checkbox(
                 f"Call at the stops of {route_of.name}", self.same_stops
@@ -171,6 +157,34 @@ class BuyScreen:
         train.held = True
         self.bought = train.name
         return train.name
+
+    def _draw_figures(
+        self, railway: Railway, name: str, picture: EnginePicture, route_of: Train | None
+    ) -> None:
+        """The engine's picture, its name and the table of what it can do, its range in red
+        when the stops it would call at are further apart."""
+        engine = ENGINES[name]
+        self._draw_picture(name, picture)
+        imgui.spacing()
+        imgui.push_style_color(imgui.Col_.text, imgui.ImVec4(*BRASS))
+        imgui.text(engine.title)
+        imgui.pop_style_color()
+        imgui.separator()
+        longest = 0.0
+        if route_of is not None and self.same_stops:
+            longest = max(
+                (leg or 0.0 for leg in railway.leg_lengths(route_of.stops, name)), default=0.0
+            )
+        short = bool(engine.tank) and round(longest) > engine.tank
+        for label, value in engine_figures(engine, railway.fuel_cost(name), OPENED_BY.get(name)):
+            imgui.text_disabled(label)
+            imgui.same_line(FIGURES_LABEL)
+            if label == "Range" and short:
+                imgui.text_colored(
+                    imgui.ImVec4(*GONE), f"{value}; {longest:.0f} between two of those stops"
+                )
+            else:
+                imgui.text(value)
 
     @staticmethod
     def _draw_picture(name: str, picture: EnginePicture) -> None:
