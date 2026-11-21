@@ -74,6 +74,9 @@ ROW_CAR_GAP = 2.0
 ROW_CAR_LINES = 3
 # The share of the space beside the list of trains the map takes.
 MAP_SHARE = 0.45
+# How far from a stop card's right edge its top line's buttons start: the Wait for full load
+# box, the arrows moving the stop and the one removing it.
+HEAD_BUTTONS = 236.0
 # Where a stop card's rows start, after their labels.
 CARD_LABEL = 130.0
 # How often, in seconds, what a train's cargo is worth is worked out again.
@@ -394,11 +397,15 @@ class TrainsWindow:
         supplies: Supplies,
     ) -> bool:
         """One stop as a card: where it is, the cars the train takes on from it, the goods it
-        has to load, and what the next stop wants; returns whether it was removed."""
+        has to load, and what the next stop wants; returns whether it was removed or moved."""
         with card("stop", highlight=here):
             key = (train.name, index)
             opened = self._folded.setdefault(key, not (stop.cars and not here))
-            removed, toggled = self._draw_stop_head(railway, train, index, stop, here, opened)
+            removed, toggled, moved = self._draw_stop_head(
+                railway, train, index, stop, here, opened
+            )
+            if moved:
+                return True
             leg = dict(railway.long_legs(train)).get(index)
             if leg is not None and not removed:
                 imgui.push_text_wrap_pos(0.0)
@@ -427,10 +434,11 @@ class TrainsWindow:
 
     def _draw_stop_head(
         self, railway: Railway, train: Train, index: int, stop: Stop, here: bool, opened: bool
-    ) -> tuple[bool, bool]:
+    ) -> tuple[bool, bool, bool]:
         """A stop card's top line: a button folding the card away or opening it, the stop's
-        number and name, and when folded the cars it sends on; returns whether the stop was
-        removed and whether the card was folded or opened."""
+        number and name, when folded the cars it sends on, and buttons moving it up or down the
+        route and removing it; returns whether the stop was removed, whether the card was folded
+        or opened and whether the stop was moved."""
         right = imgui.get_cursor_pos_x() + imgui.get_content_region_avail().x
         arrow = fa.ICON_FA_CARET_DOWN if opened else fa.ICON_FA_CARET_RIGHT
         toggled = imgui.small_button(f"{arrow}##fold")
@@ -445,7 +453,7 @@ class TrainsWindow:
         name = railway.name_of(stop.cell)
         if here:
             imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_TRAIN}  {name}")
-            _note_before("heading here" if train.path else "standing here", right - 190)
+            _note_before("heading here" if train.path else "standing here", right - HEAD_BUTTONS)
         else:
             imgui.text(name)
         if not opened and len(train.stops) > 1:
@@ -455,8 +463,8 @@ class TrainsWindow:
                 if stop.refuel_only
                 else f"{len(stop.cars)} car{'' if len(stop.cars) == 1 else 's'} to {following}"
             )
-            _note_before(note, right - 190)
-        imgui.same_line(right - 190)
+            _note_before(note, right - HEAD_BUTTONS)
+        imgui.same_line(right - HEAD_BUTTONS)
         imgui.begin_disabled(stop.refuel_only)
         _, stop.wait_for_load = imgui.checkbox("Wait for full load", stop.wait_for_load)
         imgui.end_disabled()
@@ -466,14 +474,42 @@ class TrainsWindow:
                 if stop.refuel_only
                 else "Wait here, up to a month, for every car to fill"
             )
+        moved = False
+        for step, icon, left, tip_text in (
+            (-1, fa.ICON_FA_ARROW_UP, 70, "Call here one stop earlier"),
+            (1, fa.ICON_FA_ARROW_DOWN, 46, "Call here one stop later"),
+        ):
+            imgui.same_line(right - left)
+            other = index + step
+            imgui.begin_disabled(not 0 <= other < len(train.stops))
+            if imgui.small_button(f"{icon}##move{step}"):
+                self._move_stop(train, index, other)
+                moved = True
+            imgui.end_disabled()
+            if imgui.is_item_hovered():
+                imgui.set_tooltip(f"{tip_text}, with its cars")
         imgui.same_line(right - 22)
         if imgui.small_button(fa.ICON_FA_TIMES):
             train.stops.pop(index)
             train.restart()
-            return True, toggled
+            return True, toggled, False
         if imgui.is_item_hovered():
             imgui.set_tooltip("Remove this stop")
-        return False, toggled
+        return False, toggled, moved
+
+    def _move_stop(self, train: Train, index: int, other: int) -> None:
+        """Swaps a stop with the one before or after it, cars, flags and folding and all, and
+        sends the train back to its first stop."""
+        stops = train.stops
+        stops[index], stops[other] = stops[other], stops[index]
+        here, there = (train.name, index), (train.name, other)
+        folded_here, folded_there = self._folded.get(here), self._folded.get(there)
+        for key, value in ((here, folded_there), (there, folded_here)):
+            if value is None:
+                self._folded.pop(key, None)
+            else:
+                self._folded[key] = value
+        train.restart()
 
     @staticmethod
     def _draw_refuel(railway: Railway, stop: Stop, following: Stop) -> bool:
@@ -540,7 +576,7 @@ class TrainsWindow:
                     "What these cars weigh full, against the most its engine pulls;\n"
                     f"full, it runs at {speed_share(railway, train, planned):.0%} of its top speed"
                 )
-            caption_room()
+        caption_room()
 
     def _draw_offers(
         self,

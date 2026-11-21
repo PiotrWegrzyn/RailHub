@@ -276,7 +276,8 @@ class Railway:
 
     def buy(self, engine: str = FIRST_ENGINE, route_of: Train | None = None) -> Train | None:
         """Buys a train with an engine the player can buy, calling at the stops of `route_of` if
-        given, with no cars yet; None without the cash for it."""
+        given, as that one does there and with its cars as far as the engine takes them; with no
+        cars otherwise. None without the cash for it."""
         if engine not in self.engines():
             return None
         price = ENGINES[engine].price
@@ -285,7 +286,14 @@ class Railway:
         self._bought += 1
         train = Train(f"{TRAIN_NAMES[ENGINES[engine].power]} {self._bought}", engine=engine)
         if route_of is not None:
-            train.stops = [Stop(stop.cell) for stop in route_of.stops]
+            for old in route_of.stops:
+                stop = Stop(old.cell, wait_for_load=old.wait_for_load, refuel_only=old.refuel_only)
+                train.stops.append(stop)
+                for cargo, generation in old.asked():
+                    if self.can_carry(train, cargo) and not self.add_car(
+                        train, stop, cargo, generation
+                    ):
+                        self.add_car(train, stop, cargo)
         self.trains.append(train)
         return train
 

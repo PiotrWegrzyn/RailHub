@@ -270,3 +270,47 @@ def test_a_stop_card_stays_open_when_its_first_car_is_added(gui: None) -> None:
     draw_frames(window, railway)
 
     assert window._folded[(train.name, 1)]
+
+
+def test_moving_a_stop_later_swaps_it_with_the_next_keeping_its_cars_and_folding(
+    gui: None,
+) -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3), [Good.COAL]), Stop((6, 20)), Stop((6, 3), [Good.WHEAT])]
+    train.heading = 2
+    window = TrainsWindow(open=True, chosen=train.name)
+    window._folded = {(train.name, 0): False, (train.name, 1): True}
+
+    window._move_stop(train, 0, 1)
+
+    assert [stop.cars for stop in train.stops] == [[], [Good.COAL], [Good.WHEAT]]
+    assert window._folded == {(train.name, 0): True, (train.name, 1): False}
+    assert train.heading == 1
+
+
+def test_what_follows_a_stops_cars_stays_put_when_its_first_car_is_added(
+    gui: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3)), Stop((6, 20))]
+    window = TrainsWindow(open=True, chosen=train.name)
+    window._folded = {(train.name, 0): True, (train.name, 1): False}
+    below: list[float] = []
+    cars = TrainsWindow._draw_cars
+
+    def measured(self: TrainsWindow, *args: object) -> None:
+        cars(self, *args)
+        below.append(imgui.get_cursor_pos_y())
+
+    monkeypatch.setattr(TrainsWindow, "_draw_cars", measured)
+    draw_frames(window, railway)
+    empty = below[-1]
+    train.stops[0].add_car(Good.COAL)
+
+    draw_frames(window, railway)
+
+    assert below[-1] == empty

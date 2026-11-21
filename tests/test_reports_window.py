@@ -17,6 +17,7 @@ from railroads.ui.reports_window import (
     report,
     tile_price_line,
     worth_line,
+    worth_unit,
 )
 
 
@@ -202,3 +203,15 @@ def test_the_window_draws_the_prices(frame: None) -> None:
     window.draw(made_history(), 1903, 4, 150, tiles=Tiles.until(1903))
 
     assert window.open
+
+
+def test_a_worth_under_a_million_is_charted_in_thousands() -> None:
+    scale, unit = worth_unit([45_000.0, 60_067.0])
+
+    assert (scale, unit) == (1000.0, "$ thousand")
+
+
+def test_a_worth_of_a_million_or_more_is_charted_in_millions() -> None:
+    scale, unit = worth_unit([900_000.0, 2_500_000.0])
+
+    assert (scale, unit) == (1_000_000.0, "$ million")

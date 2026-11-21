@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 import pytest
 from imgui_bundle import hello_imgui, imgui, implot
+from imgui_bundle import icons_fontawesome_4 as fa
 from test_saves import played_game
 from test_web_setup import SETTINGS, FakePage, grows_as
 
@@ -26,7 +27,7 @@ from railroads.sim.steps import Steps
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.sim.trains import Stop
 from railroads.ui import app as app_module
-from railroads.ui import web_setup
+from railroads.ui import top_bar, web_setup
 from railroads.ui.app import OPENING_ZOOM, App, Shell
 from railroads.ui.build_menu import Tool
 from railroads.ui.ground import GroundPictures
@@ -1052,3 +1053,26 @@ def test_holding_an_arrow_key_moves_the_map(context: None) -> None:
     imgui.get_io().add_key_event(imgui.Key.right_arrow, False)
 
     assert (app.view.camera.center_x, app.view.camera.center_y) != before
+
+
+def test_the_pause_button_stays_put_whatever_the_month_and_the_cash(
+    context: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = made_app()
+    places: list[float] = []
+    button = top_bar.toggle_button
+
+    def watched(label: str, *args: object) -> bool:
+        if label == fa.ICON_FA_PAUSE:
+            places.append(imgui.get_cursor_screen_pos().x)
+        return button(label, *args)
+
+    monkeypatch.setattr(top_bar, "toggle_button", watched)
+
+    for months, cash in ((4, 5.0), (4, 5.0), (8, 123_456_789.0)):
+        app.clock.months = months
+        app.game.finances.cash = cash
+        frame(app)
+
+    assert len(places) == 3
+    assert places[1] == places[2]

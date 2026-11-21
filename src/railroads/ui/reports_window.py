@@ -265,7 +265,9 @@ def worth_line(goal: Goal) -> tuple[list[float], list[float]]:
 
 
 def _draw_worth(goal: Goal) -> None:
-    """The company's worth each month against its target, in millions."""
+    """The company's worth each month against its target, in millions, or in thousands while it
+    is worth less than a million; the chart fits the worth, the target showing once it is
+    near."""
     imgui.text(
         f"Company worth, against the {goal.difficulty.value.lower()} target of "
         f"{dollars(goal.target)} for 1 January {END_YEAR}"
@@ -273,20 +275,32 @@ def _draw_worth(goal: Goal) -> None:
     if not goal.values:
         imgui.text_disabled("Shown from the start of the next month")
         return
-    if not _begin_year_plot("##worth", PLOT_HEIGHT, "$ million"):
-        return
     xs, ys = worth_line(goal)
+    scale, unit = worth_unit(ys)
+    if not _begin_year_plot("##worth", PLOT_HEIGHT, unit):
+        return
     implot.setup_axis_format(implot.ImAxis_.y1.value, "%g")
     spec = implot.Spec(flags=implot.ItemFlags_.no_legend.value)
-    worth = np.array(ys, dtype=np.float64) / MILLION
+    worth = np.array(ys, dtype=np.float64) / scale
     implot.plot_line("Worth", np.array(xs, dtype=np.float64), worth, spec)
     implot.plot_line(
         "Target",
         np.array([xs[0], max(xs[-1], END_YEAR)], dtype=np.float64),
-        np.array([goal.target, goal.target], dtype=np.float64) / MILLION,
-        implot.Spec(line_color=imgui.ImVec4(*GROWN), flags=implot.ItemFlags_.no_legend.value),
+        np.array([goal.target, goal.target], dtype=np.float64) / scale,
+        implot.Spec(
+            line_color=imgui.ImVec4(*GROWN),
+            flags=implot.ItemFlags_.no_legend.value | implot.ItemFlags_.no_fit.value,
+        ),
     )
     implot.end_plot()
+
+
+def worth_unit(values: list[float]) -> tuple[float, str]:
+    """What the worth chart divides its values by, and its axis label: millions, or thousands
+    while every value is under a million."""
+    if max((abs(value) for value in values), default=0.0) < MILLION:
+        return 1000.0, "$ thousand"
+    return MILLION, "$ million"
 
 
 class ReportsWindow:

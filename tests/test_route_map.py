@@ -393,3 +393,26 @@ def test_general_needs_are_named_in_the_order_needs_are_listed_the_last_after_or
     named = needs_named(needs)
 
     assert named == "food, heating or mail"
+
+
+def test_the_zoom_buttons_zoom_on_the_middle_of_the_trains_stops() -> None:
+    _, railway = joined_stations()
+    grid = railway.constructions.tile_map.grid
+    map_size = grid.size()
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3)), Stop((6, 20))]
+    route_map = RouteMap()
+    frame = MapFrame.of(PANEL, map_size, route_map.zoom)
+
+    route_map.zoom_on_stops(railway, train, frame, map_size, 6)
+
+    zoomed = MapFrame.of(PANEL, map_size, route_map.zoom, route_map.focus)
+    middle = (
+        (grid.center(6, 3)[0] + grid.center(6, 20)[0]) / 2,
+        (grid.center(6, 3)[1] + grid.center(6, 20)[1]) / 2,
+    )
+    left, top = zoomed.to_screen(*middle)
+    assert route_map.zoom > 1.0
+    assert PANEL.left < left < PANEL.right
+    assert PANEL.top < top < PANEL.bottom

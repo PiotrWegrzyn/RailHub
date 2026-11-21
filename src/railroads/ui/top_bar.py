@@ -1,6 +1,6 @@
-"""The bar along the top of the window: the date, the money, the company's worth against its
-target and any countdown to bankruptcy, the game speeds, the view's buttons (zoom, the two
-minimaps and the search), the map's title and any notice such as an autosave, and the buttons
+"""The bar along the top of the window: the date and the game speeds beside it, the money, the
+company's worth against its target and any countdown to bankruptcy, the view's buttons (zoom, the
+two minimaps and the search), the map's title and any notice such as an autosave, and the buttons
 opening the reports, the supply and demand boards, the help, the saves and the main menu."""
 
 from typing import TYPE_CHECKING
@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.sim.clock import SPEEDS
+from railroads.sim.clock import MONTH_NAMES, SPEEDS
 from railroads.sim.finance import Finances, dollars
 from railroads.ui.goal_view import draw_worth
 from railroads.ui.map_input import key_pressed
@@ -53,19 +53,9 @@ def _draw_top_bar(app: App) -> None:
         if key_pressed(imgui.Key.space):
             clock.paused = not clock.paused
     imgui.align_text_to_frame_padding()
+    start = imgui.get_cursor_pos_x()
     imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_CLOCK}  {clock.date}")
-    imgui.same_line(0, 8)
-    diamond()
-    imgui.same_line(0, 8)
-    draw_money(app.view.railway.finances)
-    imgui.same_line(0, 8)
-    diamond()
-    imgui.same_line(0, 8)
-    compact = imgui.get_window_width() < COMPACT_WIDTH
-    draw_worth(app.game, target=not compact)
-    imgui.same_line(0, 8)
-    diamond()
-    imgui.same_line(0, 8)
+    imgui.same_line(start + date_width() + 8)
     if toggle_button(fa.ICON_FA_PAUSE, clock.paused, "Stop time while you build (Space)"):
         clock.paused = not clock.paused
     imgui.same_line(0, 2)
@@ -77,8 +67,17 @@ def _draw_top_bar(app: App) -> None:
         ):
             clock.speed, clock.paused = speed, False
         imgui.same_line(0, 2)
+    imgui.same_line(0, 6)
+    diamond()
+    imgui.same_line(0, 8)
+    draw_money(app.view.railway.finances)
+    imgui.same_line(0, 8)
+    diamond()
+    imgui.same_line(0, 8)
+    compact = imgui.get_window_width() < COMPACT_WIDTH
+    draw_worth(app.game, target=not compact)
     if not compact:
-        imgui.same_line(0, 6)
+        imgui.same_line(0, 8)
         diamond()
         imgui.same_line(0, 8)
         draw_view_controls(app.view)
@@ -121,6 +120,11 @@ def _draw_top_bar(app: App) -> None:
         if toggle_button(fa.ICON_FA_HOME, False, "Main menu", size):
             imgui.open_popup(LEAVE_POPUP)
         draw_leave_popup(app)
+
+
+def date_width() -> float:
+    """How wide the date is in its longest month, so what follows it stays put."""
+    return max(imgui.calc_text_size(f"{fa.ICON_FA_CLOCK}  {month} 8888").x for month in MONTH_NAMES)
 
 
 def draw_leave_popup(app: App) -> None:

@@ -358,6 +358,22 @@ class RouteMap:
         focus = (origin[0] + panel.width / scale / 2, origin[1] + panel.height / scale / 2)
         self.focus = MapFrame.of(panel, map_size, self.zoom, focus).center
 
+    def zoom_on_stops(
+        self, railway: Railway, train: Train, frame: MapFrame, map_size: Vec2, steps: float
+    ) -> None:
+        """Zooms in (steps above 0) or out on the middle of the train's stops, or of the panel
+        while it has none, and centres the map on it as far as the map's edges let it."""
+        panel = frame.panel
+        grid = railway.constructions.tile_map.grid
+        points = [grid.center(*stop.cell) for stop in train.stops]
+        if not points:
+            self.zoom_at(frame, map_size, *panel_middle(panel), steps)
+            return
+        xs, ys = [float(x) for x, _ in points], [float(y) for _, y in points]
+        middle = ((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2)
+        self.zoom_at(frame, map_size, *frame.to_screen(*middle), steps)
+        self.focus = MapFrame.of(panel, map_size, self.zoom, middle).center
+
     def made(self, railway: Railway, good: Good, supplies: Supplies) -> dict[Cell, Offer]:
         """Where a good can be loaded, kept for a moment so hovering it stays cheap."""
         now = time.monotonic()
@@ -382,7 +398,7 @@ class RouteMap:
             self.frame(railway, train, map_size, panel)
         frame = MapFrame.of(panel, map_size, self.zoom, self.focus)
         if steps:
-            self.zoom_at(frame, map_size, panel.left + width / 2, panel.top + height / 2, steps)
+            self.zoom_on_stops(railway, train, frame, map_size, steps)
         imgui.invisible_button("route map", (panel.width, panel.height))
         hovering, clicked = self._handle_mouse(frame, map_size)
         frame = MapFrame.of(panel, map_size, self.zoom, self.focus)
@@ -675,6 +691,10 @@ def track_lines(pieces: np.ndarray, double: list[bool]) -> list[tuple[np.ndarray
 def add_stop(train: Train, station: Cell) -> None:
     train.stops.append(Stop(station))
     train.restart()
+
+
+def panel_middle(panel: Panel) -> Vec2:
+    return panel.left + panel.width / 2, panel.top + panel.height / 2
 
 
 def _fit(panel: Panel, map_size: Vec2) -> float:
