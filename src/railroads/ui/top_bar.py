@@ -1,6 +1,6 @@
-"""The bar along the top of the window: the date, the money, the company's worth against its
-target and any countdown to bankruptcy, the game speeds, the view's buttons (zoom, the two
-minimaps and the search), the map's title and any notice such as an autosave, and the buttons
+"""The bar along the top of the window: the date and the game speeds beside it, the money, the
+company's worth against its target and any countdown to bankruptcy, the view's buttons (zoom, the
+two minimaps and the search), the map's title and any notice such as an autosave, and the buttons
 opening the reports, the supply and demand boards, the help, the saves and the main menu."""
 
 from typing import TYPE_CHECKING
@@ -8,20 +8,28 @@ from typing import TYPE_CHECKING
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.sim.clock import SPEEDS
+from railroads.sim.clock import MONTH_NAMES, SPEEDS
 from railroads.sim.finance import Finances, dollars
 from railroads.ui.goal_view import draw_worth
 from railroads.ui.map_input import key_pressed
-from railroads.ui.ornate import band, bar_buttons, diamond, spaced, spaced_text
+from railroads.ui.ornate import DEEP, band, bar_buttons, diamond, frame_rect, spaced, spaced_text
 from railroads.ui.spotlight import spot
-from railroads.ui.theme import BRASS, GONE, GROWN, danger_button, tip, toggle_button
+from railroads.ui.summaries_panel import CARDS_TOP
+from railroads.ui.theme import BRASS, GONE, GROWN, color_u32, danger_button, tip, toggle_button
 
 if TYPE_CHECKING:
     from railroads.ui.app import App
     from railroads.ui.map_view import MapView
 
 WINDOW_BUTTON_WIDTH = 30.0
+# Below this window width the bar leaves out the target and the view's buttons (the wheel, M, W
+# and F still do their work), so the speeds and the window buttons fit.
+COMPACT_WIDTH = 1100.0
 LEAVE_POPUP = "Leave this game?"
+# How much larger than the text around it the banner over a paused game is written, and the room
+# round it.
+PAUSE_SCALE = 1.4
+PAUSE_PADDING = 14.0
 
 
 def draw_top_bar(app: App) -> None:
@@ -47,29 +55,37 @@ def _draw_top_bar(app: App) -> None:
             clock.faster(-1)
         if key_pressed(imgui.Key.equal, imgui.Key.keypad_add):
             clock.faster(1)
+        if key_pressed(imgui.Key.space):
+            clock.paused = not clock.paused
     imgui.align_text_to_frame_padding()
+    start = imgui.get_cursor_pos_x()
     imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_CLOCK}  {clock.date}")
-    imgui.same_line(0, 8)
+    imgui.same_line(start + date_width() + 8)
+    if toggle_button(fa.ICON_FA_PAUSE, clock.paused, "Stop time while you build (Space)"):
+        clock.paused = not clock.paused
+    imgui.same_line(0, 2)
+    for speed in SPEEDS:
+        if toggle_button(
+            f"x{speed}",
+            clock.speed == speed and not clock.paused,
+            f"Run {speed} times as fast (- and = change speed)",
+        ):
+            clock.speed, clock.paused = speed, False
+        imgui.same_line(0, 2)
+    imgui.same_line(0, 6)
     diamond()
     imgui.same_line(0, 8)
     draw_money(app.view.railway.finances)
     imgui.same_line(0, 8)
     diamond()
     imgui.same_line(0, 8)
-    draw_worth(app.game)
-    imgui.same_line(0, 8)
-    diamond()
-    imgui.same_line(0, 8)
-    for speed in SPEEDS:
-        if toggle_button(
-            f"x{speed}", clock.speed == speed, f"Run {speed} times as fast (- and = change speed)"
-        ):
-            clock.speed = speed
-        imgui.same_line(0, 2)
-    imgui.same_line(0, 6)
-    diamond()
-    imgui.same_line(0, 8)
-    draw_view_controls(app.view)
+    compact = imgui.get_window_width() < COMPACT_WIDTH
+    draw_worth(app.game, target=not compact)
+    if not compact:
+        imgui.same_line(0, 8)
+        diamond()
+        imgui.same_line(0, 8)
+        draw_view_controls(app.view)
     padding = imgui.get_style().window_padding.x
     buttons = 5 if app.saves is not None else 3
     right = imgui.get_window_width() - padding - buttons * WINDOW_BUTTON_WIDTH - (buttons - 1) * 4
@@ -87,7 +103,8 @@ def _draw_top_bar(app: App) -> None:
         imgui.same_line(0, 16)
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*GROWN), app.notice)
-    imgui.same_line(right)
+    imgui.same_line(0, 8)
+    imgui.same_line(max(right, imgui.get_cursor_pos_x()))
     size = (WINDOW_BUTTON_WIDTH, 0)
     if toggle_button(fa.ICON_FA_CHART_BAR, app.reports.open, "Reports (G)", size):
         app.reports.open = not app.reports.open
@@ -108,6 +125,33 @@ def _draw_top_bar(app: App) -> None:
         if toggle_button(fa.ICON_FA_HOME, False, "Main menu", size):
             imgui.open_popup(LEAVE_POPUP)
         draw_leave_popup(app)
+
+
+def draw_pause_banner(top_left: tuple[float, float], bottom_right: tuple[float, float]) -> None:
+    """A banner saying time stands still, centred over the map at the height of the news cards
+    and in front of everything else."""
+    draw_list = imgui.get_foreground_draw_list()
+    size = imgui.get_font_size() * PAUSE_SCALE
+    text = f"{fa.ICON_FA_PAUSE}  PAUSED  -  Space to go on"
+    width = imgui.calc_text_size(text).x * PAUSE_SCALE
+    middle = (top_left[0] + bottom_right[0]) / 2
+    top = top_left[1] + CARDS_TOP
+    low = (middle - width / 2 - PAUSE_PADDING, top)
+    high = (middle + width / 2 + PAUSE_PADDING, top + size + 2 * PAUSE_PADDING * 0.6)
+    draw_list.add_rect_filled(low, high, color_u32(DEEP), 6.0)
+    frame_rect(draw_list, imgui.ImVec2(*low), imgui.ImVec2(*high), 6.0, bracket=8.0)
+    draw_list.add_text(
+        imgui.get_font(),
+        size,
+        (low[0] + PAUSE_PADDING, top + PAUSE_PADDING * 0.6),
+        color_u32(BRASS),
+        text,
+    )
+
+
+def date_width() -> float:
+    """How wide the date is in its longest month, so what follows it stays put."""
+    return max(imgui.calc_text_size(f"{fa.ICON_FA_CLOCK}  {month} 8888").x for month in MONTH_NAMES)
 
 
 def draw_leave_popup(app: App) -> None:

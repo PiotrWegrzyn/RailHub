@@ -6,6 +6,8 @@ price (railroads.sim.fuel_market) and what a unit of every tile's goods earns (r
 The year under way shows as it stands so far, with today's stations and population.
 """
 
+import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -27,6 +29,8 @@ BAR_WIDTH = 0.8
 GOODS_COLORMAP = "Goods"
 GOODS = list(Good)
 MILLION = 1_000_000.0
+# The most years a plot names along its axis.
+MOST_YEAR_TICKS = 10
 
 
 @dataclass(frozen=True)
@@ -156,14 +160,28 @@ def fuel_breakdown(fuel: Fuel, month: FuelMonth) -> list[tuple[str, str]]:
     return rows
 
 
-def _begin_year_plot(plot_id: str, height: float, unit: str) -> bool:
-    """Starts a plot the window's width over the years, both axes fitted to what it shows;
-    whether it is drawn (then end it with implot.end_plot)."""
+def year_ticks(years: Sequence[float]) -> list[float]:
+    """Where a plot over these years marks its axis: on whole years only, so no year is named
+    twice, every year or every few so that no more than MOST_YEAR_TICKS are named."""
+    if not years:
+        return []
+    first, last = math.floor(min(years)), math.ceil(max(years))
+    step = (last - first) // MOST_YEAR_TICKS + 1
+    return [float(year) for year in range(first, last + 1, step)]
+
+
+def _begin_year_plot(plot_id: str, height: float, unit: str, years: Sequence[float]) -> bool:
+    """Starts a plot the window's width over the `years` it shows, both axes fitted to what it
+    shows and the years marked by year_ticks; whether it is drawn (then end it with
+    implot.end_plot)."""
     if not implot.begin_plot(plot_id, (-1.0, height)):
         return False
     flags = implot.AxisFlags_.auto_fit.value
     implot.setup_axes("", unit, flags, flags)
-    implot.setup_axis_format(implot.ImAxis_.x1.value, "%.0f")
+    ticks = year_ticks(years)
+    if ticks:
+        labels = [f"{tick:.0f}" for tick in ticks]
+        implot.setup_axis_ticks(implot.ImAxis_.x1.value, ticks, labels)
     return True
 
 
@@ -175,9 +193,10 @@ def _draw_fuel(market: FuelMarket) -> None:
         imgui.text_disabled("Fuel prices start after the first month")
         return
     imgui.text("Fuel prices, a unit")
-    if _begin_year_plot("##fuel prices", PLOT_HEIGHT * 1.4, "$"):
-        for fuel in opened:
-            xs, ys = price_line(market.history[fuel])
+    lines = {fuel: price_line(market.history[fuel]) for fuel in opened}
+    years = [x for xs, _ in lines.values() for x in xs]
+    if _begin_year_plot("##fuel prices", PLOT_HEIGHT * 1.4, "$", years):
+        for fuel, (xs, ys) in lines.items():
             implot.plot_line(
                 fuel.value.capitalize(),
                 np.array(xs, dtype=np.float64),
@@ -237,9 +256,10 @@ def _draw_prices(tiles: Tiles, year: int) -> None:
         "What a unit of every tile's goods earns against its base price: less the higher its "
         "supply, more the higher its demand. Prices change only as tiles go up, on 1 January."
     )
-    if _begin_year_plot("##prices", PLOT_HEIGHT * 1.4, "%"):
-        for tile in tiles.of_year(year).supply:
-            xs, ys = tile_price_line(tiles, tile)
+    lines = {tile: tile_price_line(tiles, tile) for tile in tiles.of_year(year).supply}
+    years = [x for xs, _ in lines.values() for x in xs]
+    if _begin_year_plot("##prices", PLOT_HEIGHT * 1.4, "%", years):
+        for tile, (xs, ys) in lines.items():
             implot.plot_line(
                 tile.value.capitalize(),
                 np.array(xs, dtype=np.float64),
@@ -265,7 +285,9 @@ def worth_line(goal: Goal) -> tuple[list[float], list[float]]:
 
 
 def _draw_worth(goal: Goal) -> None:
-    """The company's worth each month against its target, in millions."""
+    """The company's worth each month against its target, in millions, or in thousands while it
+    is worth less than a million; the chart fits the worth, the target showing once it is
+    near."""
     imgui.text(
         f"Company worth, against the {goal.difficulty.value.lower()} target of "
         f"{dollars(goal.target)} for 1 January {END_YEAR}"
@@ -273,20 +295,32 @@ def _draw_worth(goal: Goal) -> None:
     if not goal.values:
         imgui.text_disabled("Shown from the start of the next month")
         return
-    if not _begin_year_plot("##worth", PLOT_HEIGHT, "$ million"):
-        return
     xs, ys = worth_line(goal)
+    scale, unit = worth_unit(ys)
+    if not _begin_year_plot("##worth", PLOT_HEIGHT, unit, xs):
+        return
     implot.setup_axis_format(implot.ImAxis_.y1.value, "%g")
     spec = implot.Spec(flags=implot.ItemFlags_.no_legend.value)
-    worth = np.array(ys, dtype=np.float64) / MILLION
+    worth = np.array(ys, dtype=np.float64) / scale
     implot.plot_line("Worth", np.array(xs, dtype=np.float64), worth, spec)
     implot.plot_line(
         "Target",
         np.array([xs[0], max(xs[-1], END_YEAR)], dtype=np.float64),
-        np.array([goal.target, goal.target], dtype=np.float64) / MILLION,
-        implot.Spec(line_color=imgui.ImVec4(*GROWN), flags=implot.ItemFlags_.no_legend.value),
+        np.array([goal.target, goal.target], dtype=np.float64) / scale,
+        implot.Spec(
+            line_color=imgui.ImVec4(*GROWN),
+            flags=implot.ItemFlags_.no_legend.value | implot.ItemFlags_.no_fit.value,
+        ),
     )
     implot.end_plot()
+
+
+def worth_unit(values: list[float]) -> tuple[float, str]:
+    """What the worth chart divides its values by, and its axis label: millions, or thousands
+    while every value is under a million."""
+    if max((abs(value) for value in values), default=0.0) < MILLION:
+        return 1000.0, "$ thousand"
+    return MILLION, "$ million"
 
 
 class ReportsWindow:
@@ -339,9 +373,9 @@ class ReportsWindow:
     def _draw_profits(self, periods: list[tuple[int, int, dict[str, float]]]) -> None:
         """Each period's profit as a bar, brass above nothing and red below."""
         imgui.text(f"Profit, {PERIODS[self.period].lower()}")
-        if not _begin_year_plot("##profit", PLOT_HEIGHT, "$"):
-            return
         starts, amounts = profits(periods, self.period)
+        if not _begin_year_plot("##profit", PLOT_HEIGHT, "$", starts):
+            return
         xs = np.array(starts, dtype=np.float64) + self.period / 24
         ys = np.array(amounts, dtype=np.float64)
         width = self.period / 12 * BAR_WIDTH
@@ -399,7 +433,7 @@ class ReportsWindow:
 
     def _draw_deliveries(self, shown: Report) -> None:
         imgui.text("Cars delivered, by what they carried")
-        if not _begin_year_plot("##deliveries", PLOT_HEIGHT * 1.4, "cars"):
+        if not _begin_year_plot("##deliveries", PLOT_HEIGHT * 1.4, "cars", shown.delivery_years):
             return
         implot.setup_legend(implot.Location_.north_west.value, implot.LegendFlags_.outside.value)
         if shown.goods:
@@ -425,7 +459,7 @@ class ReportsWindow:
 
     def _draw_line(self, title: str, key: str, years: list[int], values: list[int]) -> None:
         imgui.text(title)
-        if not _begin_year_plot(f"##{key}", PLOT_HEIGHT, ""):
+        if not _begin_year_plot(f"##{key}", PLOT_HEIGHT, "", years):
             return
         xs = np.array(years, dtype=np.float64)
         ys = np.array(values, dtype=np.float64)

@@ -171,6 +171,8 @@ raised one level so it reaches three hexes out. It lays no track and runs no tra
 a station reaches, a third thrive, half are content (half their needs met) and the rest go
 unsatisfied, and they grow and glow as if trains served them. Only the hexagon map is grown.
 
+Drag the map or hold the arrow keys to move round it.
+
 In the corner of the view, a minimap (M to show or hide) shows where the map lies in the world
 and the whole map from above with the part on screen outlined; click or drag on it to look there, and scroll over it to zoom it in to x2, x4 or x8 around the view.
 
@@ -401,7 +403,7 @@ of every kind in its neighbourhood (the cell and the six around it):
 | Trade | port 1 |
 | Industry | factory 1, big factory 3, mega factory 9, cannery 2, steel mill 3, shipyard 3, machine works, plastics works, appliance factory 3, coal power plant 5, diesel and gas power plants 4, other works 2 |
 | Corporate | tavern 1, sushi hut 1, club 3, department store 3, hotel 5, skyscraper 10 |
-| Worship | church 5, basilica 20, cathedral 50, St. Paul cathedral 2137 |
+| Worship | church 5, basilica 20, cathedral 50, St. Peter's Basilica 2137 |
 
 Each kind of building grows on its own ladder. Every month each cell may take a turn on each
 ladder, with the ladder's base chance, plus its chance for every doubling of each kind of points
@@ -709,7 +711,7 @@ window (H) lists the same.
 | Church |  | 10 wax | 10 incense |
 | Basilica |  | 30 wax | 20 incense |
 | Cathedral |  | 60 wax | 40 incense |
-| St. Paul cathedral |  | 200 wax | 120 incense |
+| St. Peter's Basilica |  | 200 wax | 120 incense |
 | Salt mine cathedral | 200 salt |  |  |
 <!-- end table -->
 
@@ -771,11 +773,13 @@ percentage.
 
 Satisfaction goes wherever it counts with no ceiling: a building at 145% breeds as if it had
 1.45 times its points, against once at 100%. A building is unsatisfied at 0%,
-thriving from 100% and content between; the ground under content and thriving buildings has a
-warm glow, and the status bar names the hovered cell's satisfaction. Holding Shift over the map,
-or turning on the Satisfaction lens above the minimap, tints the land under every building that trades by how satisfied the least satisfied building in
-its cell is: green from 100%, yellow from 50%, orange below that and red at 0%; buildings that
-neither need nor make anything get no tint.
+short below 50%, content from 50% and thriving from 100%, as the Satisfaction lens colours them;
+the ground under served buildings has a warm glow, the brighter the more satisfied, and the status bar names the hovered cell's satisfaction. Holding Shift over the map,
+or turning on the Satisfaction lens above the minimap, tints the land under every building that
+trades by how much of all its cell's buildings want they get, each counting by how much it wants:
+green from 100%, yellow from 50%, orange below that and red at 0%. A cell in which some building
+gets nothing at all is edged in dark red. Buildings that neither need nor make anything get no
+tint.
 
 Factories gather into districts: industry nearby draws more of them only once at least 5
 industry points stand there, more than one steel mill, and then strongly, so three meet and merge
@@ -933,11 +937,11 @@ Dated events change what is wanted, made and paid while they last, or for good:
 | 1939 | The Second World War | guns, tanks, planes and steel x2, luxuries, wine and cars -50%, passengers +50%, ports take guns, for 7 years |
 | 1955 | Television | newspapers -50%, appliances +30%, electricity wanted +50% and costs +25% |
 | 1973 | The oil crisis | oil wells make half as much, oil and diesel fuel earn and cost twice as much, for 2 years |
-| May 1981 | The Pope is shot (17:17, 13 May) | passengers getting off in the town of St Paul's earn +300% for 12 months |
+| May 1981 | The Pope is shot (17:17, 13 May) | passengers getting off in the town of St Peter's earn +300% for 12 months |
 | 1989 | The Iron Curtain falls | on maps of the old Eastern Bloc only: cars, electronics and appliances +30% |
 | 1995 | The internet | newspapers -30%, electronics +30% |
 | September 2001 | September 11 | the two skyscrapers with the most people around are pulled down |
-| April 2005 | John Paul II dies (21:37, 2 April) | passengers getting off in the town of St Paul's earn +500% for 12 months |
+| April 2005 | John Paul II dies (21:37, 2 April) | passengers getting off in the town of St Peter's earn +500% for 12 months |
 | 2007 | Smartphones | nobody wants newspapers any more; electronics +50% |
 | 2008 | The financial crisis | homes want half the food and a fifth less of everything else, for 2 years |
 | 2020 | The pandemic | passengers -80%, mail +50%, for 3 years |
@@ -1079,8 +1083,8 @@ at normal speed.
 Churches go up where a neighbourhood holds at least 10 population points and no other church of
 any rank stands within 4 hexes. They do not merge: a church becomes a basilica once 120 population
 points live in its neighbourhood, and a basilica a cathedral at 240. The first cathedral to reach
-400 becomes the map's one St. Paul cathedral. Each point of worship sends and wants one passenger
-(church 5, basilica 20, cathedral 50, St. Paul cathedral 2137), and a fifth as much mail like any
+400 becomes the map's one St. Peter's Basilica. Each point of worship sends and wants one passenger
+(church 5, basilica 20, cathedral 50, St. Peter's Basilica 2137), and a fifth as much mail like any
 other building. Honey counts as food; wax comes only from beekeepers and incense only from groves
 on its own rare deposits. Churches must have wax; homes take a little as a bonus until electric
 light in 1882, and theatres, the royal palace and hospitals always do, while furniture makers and
@@ -1212,7 +1216,7 @@ track, smallest first, is paid for as if taken down, and the price shows before 
 building costs $500 a population point (a house $500, a block of flats $9,000), $1,000 a field,
 $15,000 an industry point (a factory $15,000, a mega factory $135,000), $20,000 a mine or a point
 of a shop or business, $30,000 a port, and a skyscraper $1,000,000; one-off buildings, the
-novelties and the St. Paul cathedral, cannot be taken down, and neither station nor track goes
+novelties and the St. Peter's Basilica, cannot be taken down, and neither station nor track goes
 where one would have to. The bulldozer clears a whole cell at those prices, track for a quarter
 of what it cost to lay and a station for $5,000, buildings the player owns too. A station can be
 moved from its window: it costs a new station and clearing the new cell, its trains, name and
@@ -1318,8 +1322,9 @@ Clicking a card opens what changed, station by station, and outlines those cells
 a right click dismisses it. The newest five cards show.
 
 The top bar shows the date and runs the game at x1, x2, x3, x6 or x10 speed (`SPEEDS`), - and = stepping
-down and up. It also zooms, and toggles the map overview
-(M) and the world map (W). What is under the mouse shows in a strip at the top of the map, and
+down and up; the pause button or Space stops time while you build. It also zooms, and toggles the map
+overview (M) and the world map (W); in a window narrower than 1,100 pixels it leaves out the target
+and the view's buttons, whose keys and the mouse wheel still work. What is under the mouse shows in a strip at the top of the map, and
 below it a small card lists the buildings in that cell, one to a line, each with how satisfied it
 is and the icons of what it makes and needs.
 

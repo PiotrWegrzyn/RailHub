@@ -327,15 +327,16 @@ class RouteMap:
         self.good: Good | None = None
         # Where the hovered good was last found to be made: when, which good, and the stations.
         self._made: tuple[float, Good, dict[Cell, Offer]] | None = None
-        # The train the map was last framed on, to frame the next one chosen.
-        self._framed: str | None = None
+        # The train the map was last framed on, and whether it had stops then, to frame the next
+        # one chosen and a train again once it gets its first stops.
+        self._framed: tuple[str, bool] | None = None
         self._dragged = False
         # The track as lines on the map and their boxes, kept until track changes (_track_lines).
         self._track: tuple[int, list[tuple[np.ndarray, bool]], np.ndarray] | None = None
 
     def frame(self, railway: Railway, train: Train, map_size: Vec2, panel: Panel) -> None:
         """Centres the map on the train's stops, close enough to show them all."""
-        self._framed = train.name
+        self._framed = framing(train)
         grid = railway.constructions.tile_map.grid
         points = [grid.center(*stop.cell) for stop in train.stops]
         if not points:
@@ -358,6 +359,22 @@ class RouteMap:
         focus = (origin[0] + panel.width / scale / 2, origin[1] + panel.height / scale / 2)
         self.focus = MapFrame.of(panel, map_size, self.zoom, focus).center
 
+    def zoom_on_stops(
+        self, railway: Railway, train: Train, frame: MapFrame, map_size: Vec2, steps: float
+    ) -> None:
+        """Zooms in (steps above 0) or out on the middle of the train's stops, or of the panel
+        while it has none, and centres the map on it as far as the map's edges let it."""
+        panel = frame.panel
+        grid = railway.constructions.tile_map.grid
+        points = [grid.center(*stop.cell) for stop in train.stops]
+        if not points:
+            self.zoom_at(frame, map_size, *panel_middle(panel), steps)
+            return
+        xs, ys = [float(x) for x, _ in points], [float(y) for _, y in points]
+        middle = ((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2)
+        self.zoom_at(frame, map_size, *frame.to_screen(*middle), steps)
+        self.focus = MapFrame.of(panel, map_size, self.zoom, middle).center
+
     def made(self, railway: Railway, good: Good, supplies: Supplies) -> dict[Cell, Offer]:
         """Where a good can be loaded, kept for a moment so hovering it stays cheap."""
         now = time.monotonic()
@@ -378,11 +395,11 @@ class RouteMap:
         low = imgui.get_cursor_screen_pos()
         width, height = imgui.get_content_region_avail()
         panel = Panel(low.x, low.y, max(width, 40.0), max(height, 40.0))
-        if self._framed != train.name:
+        if self._framed != framing(train):
             self.frame(railway, train, map_size, panel)
         frame = MapFrame.of(panel, map_size, self.zoom, self.focus)
         if steps:
-            self.zoom_at(frame, map_size, panel.left + width / 2, panel.top + height / 2, steps)
+            self.zoom_on_stops(railway, train, frame, map_size, steps)
         imgui.invisible_button("route map", (panel.width, panel.height))
         hovering, clicked = self._handle_mouse(frame, map_size)
         frame = MapFrame.of(panel, map_size, self.zoom, self.focus)
@@ -675,6 +692,15 @@ def track_lines(pieces: np.ndarray, double: list[bool]) -> list[tuple[np.ndarray
 def add_stop(train: Train, station: Cell) -> None:
     train.stops.append(Stop(station))
     train.restart()
+
+
+def framing(train: Train) -> tuple[str, bool]:
+    """What the route map is framed for: the train, and whether it has any stops."""
+    return train.name, bool(train.stops)
+
+
+def panel_middle(panel: Panel) -> Vec2:
+    return panel.left + panel.width / 2, panel.top + panel.height / 2
 
 
 def _fit(panel: Panel, map_size: Vec2) -> float:

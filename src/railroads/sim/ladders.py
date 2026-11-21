@@ -140,7 +140,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.CHURCH: (Points.WORSHIP, 5),
     BuildingKind.BASILICA: (Points.WORSHIP, 20),
     BuildingKind.CATHEDRAL: (Points.WORSHIP, 50),
-    BuildingKind.ST_PAULS: (Points.WORSHIP, 2137),
+    BuildingKind.ST_PETERS: (Points.WORSHIP, 2137),
     BuildingKind.CAR_DEALER: (Points.CORPORATE, 1),
     BuildingKind.JEWELLER: (Points.CORPORATE, 1),
     BuildingKind.SKYSCRAPER: (Points.CORPORATE, 10),
@@ -822,13 +822,13 @@ MILITARY = Ladder(
 )
 
 # Parish churches go up in towns, spaced out, and grow with the people around them; the first
-# neighbourhood to reach 400 gets the map's one St. Paul cathedral.
+# neighbourhood to reach 400 gets the map's one St. Peter's Basilica.
 CHURCHES = Ladder(
     kinds=(
         BuildingKind.CHURCH,
         BuildingKind.BASILICA,
         BuildingKind.CATHEDRAL,
-        BuildingKind.ST_PAULS,
+        BuildingKind.ST_PETERS,
     ),
     land=Land(relief={Relief.MOUNTAINS: 0.0}),
     base=50,

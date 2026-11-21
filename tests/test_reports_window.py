@@ -9,6 +9,7 @@ from railroads.sim.goods import Good
 from railroads.sim.stats import History
 from railroads.sim.tiles import Tile, Tiles
 from railroads.ui.reports_window import (
+    MOST_YEAR_TICKS,
     ReportsWindow,
     books_rows,
     period_name,
@@ -17,6 +18,8 @@ from railroads.ui.reports_window import (
     report,
     tile_price_line,
     worth_line,
+    worth_unit,
+    year_ticks,
 )
 
 
@@ -202,3 +205,35 @@ def test_the_window_draws_the_prices(frame: None) -> None:
     window.draw(made_history(), 1903, 4, 150, tiles=Tiles.until(1903))
 
     assert window.open
+
+
+def test_a_worth_under_a_million_is_charted_in_thousands() -> None:
+    scale, unit = worth_unit([45_000.0, 60_067.0])
+
+    assert (scale, unit) == (1000.0, "$ thousand")
+
+
+def test_a_worth_of_a_million_or_more_is_charted_in_millions() -> None:
+    scale, unit = worth_unit([900_000.0, 2_500_000.0])
+
+    assert (scale, unit) == (1_000_000.0, "$ million")
+
+
+def test_a_plot_over_two_years_names_each_whole_year_once() -> None:
+    ticks = year_ticks([1850.0, 1850.5, 1851.25, 1851.9])
+
+    assert ticks == [1850.0, 1851.0, 1852.0]
+
+
+def test_a_plot_over_two_centuries_names_no_more_than_ten_years() -> None:
+    ticks = year_ticks([1850.0, 2050.0])
+
+    assert len(ticks) <= MOST_YEAR_TICKS
+    assert ticks[0] == 1850.0
+    assert all(tick.is_integer() for tick in ticks)
+
+
+def test_a_plot_with_nothing_yet_names_no_years() -> None:
+    ticks = year_ticks([])
+
+    assert ticks == []

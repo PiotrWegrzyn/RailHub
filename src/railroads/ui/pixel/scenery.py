@@ -130,7 +130,7 @@ BUILDING_SPRITES = {
     BuildingKind.CHURCH: "church",
     BuildingKind.BASILICA: "basilica",
     BuildingKind.CATHEDRAL: "cathedral",
-    BuildingKind.ST_PAULS: "st_pauls",
+    BuildingKind.ST_PETERS: "st_peters",
     BuildingKind.DATE_PALMS: "date_palms",
     BuildingKind.BANANAS: "bananas",
     BuildingKind.SUGAR: "sugar",

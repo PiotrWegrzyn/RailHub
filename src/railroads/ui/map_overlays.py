@@ -11,7 +11,7 @@ import numpy.typing as npt
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import Building, Construction, Constructions, Station, Track
-from railroads.sim.economy import LOCAL_REACH, FloatCells, Satisfaction, Trade
+from railroads.sim.economy import HALF_SATISFIED, LOCAL_REACH, FloatCells, Satisfaction, Trade
 from railroads.sim.goods import HANDED_OUT, makes_of, needs_of
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, Grid
 from railroads.sim.growth import Growth
@@ -47,13 +47,18 @@ FOUND_COLOR = (0.3, 0.95, 1.0, 1.0)
 HAND_OUT_RING = (1.0, 0.85, 0.3, 0.95)
 CONSUMER_FILL = (0.25, 0.85, 0.3, 0.35)
 CONSUMER_LINE = (0.3, 0.95, 0.35, 0.95)
-# What Shift lays over the land under buildings by how satisfied they are: thriving, at least
-# half way there, short of half and getting nothing at all.
+# What Shift lays over the land under buildings by how much of what they want they get: all,
+# at least half, short of half and nothing at all.
 SATISFIED_TINT = (0.2, 0.85, 0.25, 0.5)
 HALF_SATISFIED_TINT = (0.95, 0.88, 0.15, 0.5)
 LITTLE_SATISFIED_TINT = (1.0, 0.5, 0.1, 0.5)
 UNSATISFIED_TINT = (0.9, 0.12, 0.1, 0.5)
-MOODS_LEGEND = "Satisfaction: green 100%, yellow 50%+, orange under 50%, red nothing."
+# The edge drawn round a cell in which some kind of building gets nothing at all.
+STARVING_EDGE = (0.35, 0.02, 0.02, 0.95)
+MOODS_LEGEND = (
+    "Share of what the buildings want: green 100%, yellow 50%+, orange under 50%, red nothing;"
+    " a dark edge where a building gets nothing."
+)
 TOWNS_LEGEND = "Towns: each colour is one town; passengers and mail only travel between towns."
 # From this cell width the tint fills each cell's hexagon; further out it is a square.
 TINT_HEXES_FROM = 8
@@ -81,6 +86,8 @@ NAME_LIFT = 0.55
 NAME_PADDING = 6.0
 STATUS_MARGIN = 10.0
 STATUS_PADDING = 10.0
+# How much of the map's top right the status strip leaves to the compass.
+STATUS_COMPASS_ROOM = 80.0
 # How big the goods' icons are in the card of the hovered cell's buildings.
 HOVER_ICON = 16.0
 # Lower left, upper left, top and upper right corner: three edges per hexagon draw the whole grid.
@@ -314,6 +321,11 @@ def draw_found_on_overview(
             draw_list.add_rect_filled((x - 1.5, y - 1.5), (x + 1.5, y + 1.5), mark)
 
 
+def with_legend(text: str, legend: str) -> str:
+    """The status strip's text with a lens's legend after it, as a sentence of its own."""
+    return f"{text} {legend}" if text.endswith((".", "!", "?")) else f"{text}. {legend}"
+
+
 def status_text(
     camera: IsoCamera,
     tile_map: TileMap,
@@ -327,7 +339,7 @@ def status_text(
     if over_minimap:
         return f"{zoom}. Click or drag on the map overview to look there, scroll to zoom it."
     if hovered is None:
-        return f"{zoom}. Drag to pan, scroll or -/+ to zoom."
+        return f"{zoom}. Drag or hold the arrow keys to pan, scroll or -/+ to zoom."
     tile = tile_map.tile(hovered)
     row, col = hovered
     hills = " hills" if tile.relief == Relief.HILLS else ""
@@ -363,17 +375,24 @@ def _construction_name(construction: Construction) -> str:
 
 
 def draw_status(draw_list: imgui.ImDrawList, top_left: Vec2, bottom_right: Vec2, text: str) -> Vec2:
-    """The status text in a strip along the top of the map; returns where the space below it
+    """The status text in a strip along the top of the map, running on to more lines where it
+    is wider than the map leaves room for beside the compass; returns where the space below it
     starts."""
-    size = imgui.calc_text_size(text)
     x, y = top_left[0] + STATUS_MARGIN, top_left[1] + STATUS_MARGIN
-    right = min(x + size.x + 2 * STATUS_PADDING, bottom_right[0] - 80)
+    room = max(40.0, bottom_right[0] - STATUS_COMPASS_ROOM - x - 2 * STATUS_PADDING)
+    size = imgui.calc_text_size(text, wrap_width=room)
+    right = x + size.x + 2 * STATUS_PADDING
     draw_list.add_rect_filled(
         (x, y), (right, y + size.y + 2 * STATUS_PADDING * 0.6), color_u32(OVERLAY), 6.0
     )
-    draw_list.push_clip_rect((x, y), (right - STATUS_PADDING / 2, bottom_right[1]), True)
-    draw_list.add_text((x + STATUS_PADDING, y + STATUS_PADDING * 0.6), color_u32(TEXT), text)
-    draw_list.pop_clip_rect()
+    draw_list.add_text(
+        imgui.get_font(),
+        imgui.get_font_size(),
+        (x + STATUS_PADDING, y + STATUS_PADDING * 0.6),
+        color_u32(TEXT),
+        text,
+        room,
+    )
     return x, y + size.y + 2 * STATUS_PADDING * 0.6 + STATUS_MARGIN / 2
 
 
@@ -458,22 +477,26 @@ def draw_hand_out(
         draw_list.add_line(a, b, rgba_u32(HAND_OUT_RING), 2.5)
 
 
-def least_satisfied(
+def cell_moods(
     trade: Trade | None, assumed: FloatCells | None = None
-) -> tuple[npt.NDArray[np.intp], FloatCells]:
-    """The flat cells whose buildings want anything, and how satisfied the least satisfied kind
-    of building in each is (Trade.share); `assumed` as Growth.assumed_shares, where it is given."""
+) -> tuple[npt.NDArray[np.intp], FloatCells, npt.NDArray[np.bool_]]:
+    """The flat cells whose buildings want anything; how much of all they want together each
+    cell's buildings get, each kind counting by how much it wants (Trade.share); and whether a
+    kind of building in it gets nothing at all. `assumed` as Growth.assumed_shares stands in for
+    both where it is given."""
     if trade is None:
-        return np.zeros(0, dtype=np.intp), np.zeros(0)
+        return np.zeros(0, dtype=np.intp), np.zeros(0), np.zeros(0, dtype=bool)
     least = np.full(trade.cells.size, np.nan)
     for kind in trade.got:
         least = np.fmin(least, trade.share((kind,), empty=np.nan))
     wanting = ~np.isnan(least)
-    cells, shares = trade.cells[wanting], least[wanting]
+    shares = trade.share(tuple(trade.got), empty=np.nan)[wanting]
+    cells, starving = trade.cells[wanting], least[wanting] <= 0.0
     if assumed is not None:
         given = assumed[cells]
         shares = np.where(np.isnan(given), shares, given)
-    return cells, shares
+        starving = np.where(np.isnan(given), starving, given <= 0.0)
+    return cells, shares, starving
 
 
 def town_cells(towns: Towns) -> tuple[npt.NDArray[np.intp], list[int]]:
@@ -484,10 +507,10 @@ def town_cells(towns: Towns) -> tuple[npt.NDArray[np.intp], list[int]]:
 
 
 def mood_tint(share: float) -> Rgba:
-    """The tint of a cell whose least satisfied building is at `share`, as levels_of judges it."""
+    """The tint of a cell whose buildings get `share` of what they want, as levels_of judges it."""
     if share >= 1.0 - 1e-9:
         return SATISFIED_TINT
-    if share >= 0.5:
+    if share >= HALF_SATISFIED:
         return HALF_SATISFIED_TINT
     if share > 0.0:
         return LITTLE_SATISFIED_TINT
@@ -515,10 +538,39 @@ def draw_moods(
     colors: list[int],
 ) -> None:
     """Fills each of the flat `cells` on screen in its packed colour: its hexagon, or a square
-    once cells are smaller than TINT_HEXES_FROM. The corners of every cell drawn are put on screen
-    in one go, as in draw_hand_out."""
+    once cells are smaller than TINT_HEXES_FROM."""
+    for i, polygon in _cell_shapes(camera, grid, center, clip, cells):
+        draw_list.add_convex_poly_filled(polygon, colors[i])
+
+
+def draw_starving(
+    draw_list: imgui.ImDrawList,
+    camera: IsoCamera,
+    grid: Grid,
+    center: Vec2,
+    clip: tuple[Vec2, Vec2],
+    cells: npt.NDArray[np.intp],
+) -> None:
+    """Edges each of the flat `cells` on screen in which a kind of building gets nothing."""
+    thickness = max(1.0, min(3.0, camera.cell_width / 12))
+    for _, polygon in _cell_shapes(camera, grid, center, clip, cells):
+        draw_list.add_polyline(
+            polygon, rgba_u32(STARVING_EDGE), thickness, imgui.ImDrawFlags_.closed.value
+        )
+
+
+def _cell_shapes(
+    camera: IsoCamera,
+    grid: Grid,
+    center: Vec2,
+    clip: tuple[Vec2, Vec2],
+    cells: npt.NDArray[np.intp],
+) -> list[tuple[int, list[imgui.ImVec2]]]:
+    """The flat `cells` on screen, by their index among `cells`, each as its corners on screen:
+    its hexagon, or a square once cells are smaller than TINT_HEXES_FROM. The corners of every
+    cell are put on screen in one go, as in draw_hand_out."""
     if not cells.size:
-        return
+        return []
     width = camera.cell_width
     cx, cy = grid.center(*np.divmod(cells, grid.cols))
     sx, sy = camera.to_screen(cx, cy, center)
@@ -528,13 +580,24 @@ def draw_moods(
     )
     if width < TINT_HEXES_FROM:
         half = max(1.0, width / 2)
-        for i, x, y in zip(shown.tolist(), sx[shown].tolist(), sy[shown].tolist(), strict=True):
-            draw_list.add_rect_filled((x - half, y - half), (x + half, y + half), colors[i])
-        return
+        return [
+            (
+                i,
+                [
+                    imgui.ImVec2(x - half, y - half),
+                    imgui.ImVec2(x + half, y - half),
+                    imgui.ImVec2(x + half, y + half),
+                    imgui.ImVec2(x - half, y + half),
+                ],
+            )
+            for i, x, y in zip(shown.tolist(), sx[shown].tolist(), sy[shown].tolist(), strict=True)
+        ]
     offsets = np.array(grid.corners(0, 0)) - np.array(grid.center(0, 0))
     px = np.asarray(cx)[shown, None] + offsets[:, 0]
     py = np.asarray(cy)[shown, None] + offsets[:, 1]
     hx, hy = camera.to_screen(px.ravel(), py.ravel(), center)
     corners = np.stack([hx, hy], axis=1).reshape(shown.size, len(offsets), 2).tolist()
-    for i, polygon in zip(shown.tolist(), corners, strict=True):
-        draw_list.add_convex_poly_filled([imgui.ImVec2(x, y) for x, y in polygon], colors[i])
+    return [
+        (i, [imgui.ImVec2(x, y) for x, y in polygon])
+        for i, polygon in zip(shown.tolist(), corners, strict=True)
+    ]

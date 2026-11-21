@@ -1,4 +1,4 @@
-"""Churches, basilicas, cathedrals and St. Paul's."""
+"""Churches, basilicas, cathedrals and St. Peter's Basilica."""
 
 import math
 
@@ -328,8 +328,8 @@ def cathedral() -> Sprite:
     return p.sprite()
 
 
-def st_pauls() -> Sprite:
-    """A Baroque cathedral like St Paul's: a great ribbed lead dome on a columned drum, crowned by
+def st_peters() -> Sprite:
+    """A Baroque basilica like St Peter's: a great ribbed lead dome on a columned drum, crowned by
     a lantern and a gold cross, over a long balustraded body fronted by a columned portico up a
     flight of steps between two west towers, one with a clock."""
     p = Painter(60, 74, (29, 61))

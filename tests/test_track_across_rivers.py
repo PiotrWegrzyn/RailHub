@@ -141,3 +141,12 @@ def test_a_train_with_track_to_its_next_stop_warns_of_nothing() -> None:
     warning = train_warning(game.railway, train)
 
     assert warning == ""
+
+
+def test_a_station_in_a_river_is_refused_saying_why() -> None:
+    game = Game(Constructions(wide_river_by_a_lot_border()))
+
+    done = game.build_station((5, 8))
+
+    assert not done.ok
+    assert done.message == "A station can't go there: stations can't stand in a river."

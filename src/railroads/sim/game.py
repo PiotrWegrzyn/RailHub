@@ -143,9 +143,10 @@ class Game:
 
     def build_station(self, cell: Cell, ends: tuple[int, int] | None = None) -> Done:
         finances = self.finances
-        site = station_site_price(self.constructions, cell)
-        if site is None:
-            return Done("A station can't go there.")
+        problem = routes.station_problem(self.constructions, cell)
+        if problem is not None:
+            return Done(f"A station can't go there: {problem}.")
+        site = station_site_price(self.constructions, cell) or 0.0
         if not finances.can_afford(STATION_PRICE + site):
             return Done(
                 f"This station costs {dollars(STATION_PRICE + site)}; "
@@ -231,9 +232,10 @@ class Game:
         """Moves a station, its track running between `ends` in its new cell, keeping its
         trains, name and goods but not its upgrades."""
         finances = self.finances
-        site = station_site_price(self.constructions, new)
-        if site is None:
-            return Done("The station can't go there.")
+        problem = routes.station_problem(self.constructions, new)
+        if problem is not None:
+            return Done(f"The station can't go there: {problem}.")
+        site = station_site_price(self.constructions, new) or 0.0
         price = STATION_PRICE + site
         if not finances.can_afford(price):
             return Done(

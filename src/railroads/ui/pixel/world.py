@@ -679,7 +679,7 @@ WORKS = (
 
 # How far the ground round a building reaches, as a share of its sprite's width.
 YARD_SHARE = 0.42
-CHURCHES = ("church", "basilica", "cathedral", "st_pauls")
+CHURCHES = ("church", "basilica", "cathedral", "st_peters")
 LANDMARKS = (
     "royal_palace",
     "spa_resort",

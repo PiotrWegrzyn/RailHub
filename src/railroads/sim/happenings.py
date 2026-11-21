@@ -6,7 +6,7 @@ least GARRISONS_APART steps from any other, each with a base and two outposts; a
 GUN_FACTORIES gun factories open by the biggest towns, and GUN_FACTORIES more on a map with no
 port; as it ends WAR_LOSSES of the military buildings are pulled down. Falling towers pull down
 skyscrapers, those with the most people around first. An event bringing pilgrims picks the town
-of St Paul's as its news comes, and the railway pays them there (Railway.pilgrims).
+of St Peter's as its news comes, and the railway pays them there (Railway.pilgrims).
 """
 
 from dataclasses import dataclass, field
@@ -78,7 +78,7 @@ def changes_of(event: Event) -> tuple[str, ...]:
         lines.append(f"Electricity costs {_percent(event.electricity_price)}")
     if event.pilgrims != 1:
         lines.append(
-            f"Passengers getting off in the town of St Paul's earn {_percent(event.pilgrims)} "
+            f"Passengers getting off in the town of St Peter's earn {_percent(event.pilgrims)} "
             f"for {PILGRIM_MONTHS} months"
         )
     if event.war:
@@ -159,7 +159,7 @@ class Happenings:
         if event.towers_fall:
             changed |= fell_towers(growth, event.towers_fall)
         if event.pilgrims != 1:
-            self.pilgrim_town = st_pauls_town(growth)
+            self.pilgrim_town = st_peters_town(growth)
             self.pilgrim_pay = event.pilgrims
             self.pilgrim_months = PILGRIM_MONTHS
         self.news.append(Headline(date, event.title, event.story, changes_of(event), event.big))
@@ -275,9 +275,9 @@ def fell_towers(growth: Growth, count: int) -> set[Cell]:
     return {tower.cell for tower in towers}
 
 
-def st_pauls_town(growth: Growth) -> int:
-    """The town St Paul's stands in, 0 if it stands nowhere."""
-    cathedral = growth.count(BuildingKind.ST_PAULS) > 0
+def st_peters_town(growth: Growth) -> int:
+    """The town St Peter's stands in, 0 if it stands nowhere."""
+    cathedral = growth.count(BuildingKind.ST_PETERS) > 0
     if not cathedral.any():
         return 0
     return growth.station_trade.town_near(divmod(int(np.argmax(cathedral)), growth.grid.cols))

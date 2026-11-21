@@ -112,3 +112,33 @@ def test_a_processor_stocked_up_on_an_input_adds_no_demand_for_it_at_the_station
 
     capacity = railway.station_demand((6, 20)).capacity
     assert (capacity.get(Need.COAL, 0.0) > 0) == wanted
+
+
+def test_a_station_about_to_be_built_counts_the_points_of_the_buildings_it_would_hand_out_to() -> (
+    None
+):
+    growth = Growth(Constructions(flat_map()), GrowthRule(trades=False))
+    put_up(growth, (6, 11), 2)
+    put_up(growth, (6, 14), 4)
+
+    preview = growth.station_trade.preview((6, 10))
+
+    kind, many, points, value = preview.reached[0]
+    assert (kind, many) == (BuildingKind.HOUSE, 2)
+    assert (points, value) == growth.rule.points[BuildingKind.HOUSE]
+    assert len(preview.reached) == 1
+
+
+def test_a_station_about_to_be_built_shows_what_its_buildings_want_and_what_is_made_around() -> (
+    None
+):
+    growth = Growth(Constructions(flat_map()), GrowthRule(trades=False))
+    put_up(growth, (6, 11), 3)
+    growth.build(Building((6, 12), BuildingKind.FARM))
+
+    preview = growth.station_trade.preview((6, 10))
+
+    assert preview.demand.capacity[Need.PASSENGERS] == DEMAND_PER_NEED * 3
+    assert preview.demand.capacity[Need.FOOD] > 0
+    assert preview.made[Good.WHEAT] > 0
+    assert preview.made[Good.PASSENGERS] > 0

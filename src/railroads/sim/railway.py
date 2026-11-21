@@ -276,7 +276,8 @@ class Railway:
 
     def buy(self, engine: str = FIRST_ENGINE, route_of: Train | None = None) -> Train | None:
         """Buys a train with an engine the player can buy, calling at the stops of `route_of` if
-        given, with no cars yet; None without the cash for it."""
+        given, as that one does there and with its cars as far as the engine takes them; with no
+        cars otherwise. None without the cash for it."""
         if engine not in self.engines():
             return None
         price = ENGINES[engine].price
@@ -285,7 +286,14 @@ class Railway:
         self._bought += 1
         train = Train(f"{TRAIN_NAMES[ENGINES[engine].power]} {self._bought}", engine=engine)
         if route_of is not None:
-            train.stops = [Stop(stop.cell) for stop in route_of.stops]
+            for old in route_of.stops:
+                stop = Stop(old.cell, wait_for_load=old.wait_for_load, refuel_only=old.refuel_only)
+                train.stops.append(stop)
+                for cargo, generation in old.asked():
+                    if self.can_carry(train, cargo) and not self.add_car(
+                        train, stop, cargo, generation
+                    ):
+                        self.add_car(train, stop, cargo)
         self.trains.append(train)
         return train
 
@@ -535,6 +543,28 @@ class Railway:
         if train.stops[heading].refuel_only:
             heading = train.onward(heading)
         return train.stops[heading].cell
+
+    def long_legs(self, train: Train) -> list[tuple[int, float]]:
+        """The stops from which the way to the next is longer than the train's engine carries
+        fuel for, with how long that way is in cells; the train stands at such a stop."""
+        tank = ENGINES[train.engine].tank
+        if not tank:
+            return []
+        legs = enumerate(self.leg_lengths(train.stops, train.engine))
+        return [(index, leg) for index, leg in legs if leg is not None and round(leg) > tank]
+
+    def leg_lengths(self, stops: list[Stop], engine: str) -> list[float | None]:
+        """How long the way from each stop to the next, the last to the first, is for an engine,
+        in cells; None where no track it runs on joins them."""
+        if len(stops) < 2:
+            return []
+        electric, maglev = ENGINES[engine].electric, ENGINES[engine].maglev
+        return [
+            self.network.route_length(
+                stop.cell, stops[(index + 1) % len(stops)].cell, electric, maglev
+            )
+            for index, stop in enumerate(stops)
+        ]
 
     def cargo_worth(self, train: Train) -> list[float]:
         """What each of a train's cars would earn if it were unloaded at its destination now
@@ -810,6 +840,9 @@ class Railway:
                 train.status = (
                     f"Next stop {leg:.0f} cells away; it carries fuel for {engine.tank:.0f}"
                 )
+                return
+            if months <= 0:
+                train.status = "Sets off once time runs"
                 return
             burnt = self.network.fuel_length(here, there, engine.electric, engine.maglev)
             assert burnt is not None

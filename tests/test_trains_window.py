@@ -8,7 +8,8 @@ from test_railway import joined_stations
 from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import Good
 from railroads.sim.railway import Railway, Ride
-from railroads.sim.trains import ENGINES, EXPRESS_FARE, Car, Stop, Train
+from railroads.sim.trains import ENGINES, EXPRESS_FARE, OPENED_BY, Car, Stop, Train
+from railroads.ui import buy_train
 from railroads.ui.buy_train import engine_figures
 from railroads.ui.trains_window import (
     ROW_CAR,
@@ -18,6 +19,7 @@ from railroads.ui.trains_window import (
     carried_in,
     ride_rows,
     row_cars,
+    train_warning,
 )
 
 
@@ -201,6 +203,25 @@ def test_an_engines_figures_show_the_fuel_it_burns_and_how_far_it_runs_between_s
     assert figures["Range"] == "21 cells between stops"
 
 
+def test_an_engines_figures_say_which_supply_level_put_it_on_sale_and_when_it_was_first_built() -> (
+    None
+):
+    figures = dict(engine_figures(ENGINES["goods"], opened=OPENED_BY["goods"]))
+
+    assert figures["On sale from"] == "Steel and metals supply 11"
+    assert figures["First built"] == str(ENGINES["goods"].year)
+
+
+def test_a_train_whose_way_between_two_stops_is_longer_than_its_fuel_is_warned_of() -> None:
+    _, railway = joined_stations()
+    train = Train("Test", [Stop((6, 3)), Stop((6, 20))], engine="penydarren")
+
+    warning = train_warning(railway, train)
+
+    assert warning.startswith(f"From {railway.name_of((6, 3))} to {railway.name_of((6, 20))} is ")
+    assert warning.endswith("Add a stop between them to refuel at.")
+
+
 def test_stop_cards_scrolled_out_of_sight_are_not_drawn(
     gui: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -236,3 +257,96 @@ def test_the_cargo_line_says_goods_earn_freight_for_what_buildings_take_up_to_th
     assert (label, amount) == ("Cargo", 120.0)
     assert f"up to {SCARCE_WORTH:g} times as much" in tip
     assert "what the buildings around would take at once" in tip
+
+
+def test_a_stop_card_stays_open_when_its_first_car_is_added(gui: None) -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3)), Stop((6, 20))]
+    window = TrainsWindow(open=True, chosen=train.name)
+    draw_frames(window, railway)
+    train.stops[1].add_car(Good.COAL)
+
+    draw_frames(window, railway)
+
+    assert window._folded[(train.name, 1)]
+
+
+def test_moving_a_stop_later_swaps_it_with_the_next_keeping_its_cars_and_folding(
+    gui: None,
+) -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3), [Good.COAL]), Stop((6, 20)), Stop((6, 3), [Good.WHEAT])]
+    train.heading = 2
+    window = TrainsWindow(open=True, chosen=train.name)
+    window._folded = {(train.name, 0): False, (train.name, 1): True}
+
+    window._move_stop(train, 0, 1)
+
+    assert [stop.cars for stop in train.stops] == [[], [Good.COAL], [Good.WHEAT]]
+    assert window._folded == {(train.name, 0): True, (train.name, 1): False}
+    assert train.heading == 1
+
+
+def test_what_follows_a_stops_cars_stays_put_when_its_first_car_is_added(
+    gui: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3)), Stop((6, 20))]
+    window = TrainsWindow(open=True, chosen=train.name)
+    window._folded = {(train.name, 0): True, (train.name, 1): False}
+    below: list[float] = []
+    cars = TrainsWindow._draw_cars
+
+    def measured(self: TrainsWindow, *args: object) -> None:
+        cars(self, *args)
+        below.append(imgui.get_cursor_pos_y())
+
+    monkeypatch.setattr(TrainsWindow, "_draw_cars", measured)
+    draw_frames(window, railway)
+    empty = below[-1]
+    train.stops[0].add_car(Good.COAL)
+
+    draw_frames(window, railway)
+
+    assert below[-1] == empty
+
+
+def test_the_buy_button_stays_in_sight_under_the_engines_figures(
+    gui: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(buy_train, "PICTURE_HEIGHT", 600.0)
+    _, railway = joined_stations()
+    first = railway.buy()
+    assert first is not None
+    first.stops = [Stop((6, 3)), Stop((6, 20))]
+    window = TrainsWindow(open=True)
+    window.buy.open_for(first)
+    ground = (imgui.ImTextureRef(1), railway.constructions.tile_map.grid.size())
+    places: list[tuple[float, float]] = []
+    button = imgui.button
+
+    def watched(label: str, size: tuple[float, float] = (0, 0)) -> bool:
+        clicked = button(label, size)
+        if "Buy for" in label:
+            shown = imgui.internal.get_current_window().inner_clip_rect.max.y
+            places.append((imgui.get_item_rect_max().y, shown))
+        return clicked
+
+    def tall_picture(_: str, __: int) -> tuple[imgui.ImTextureRef, tuple[float, float]]:
+        return imgui.ImTextureRef(1), (40.0, 70.0)
+
+    monkeypatch.setattr(imgui, "button", watched)
+
+    for _ in range(3):
+        imgui.new_frame()
+        window.draw(railway, lambda _: {}, lambda: ground, tall_picture)
+        imgui.end_frame()
+
+    bottom, edge = places[-1]
+    assert bottom <= edge

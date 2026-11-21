@@ -38,6 +38,7 @@ from railroads.ui import spotlight
 from railroads.ui.goal_view import draw_goal_news
 from railroads.ui.help_window import HelpWindow
 from railroads.ui.history_pictures import HistoryPictures, opening_center
+from railroads.ui.lively import Lively
 from railroads.ui.main_menu import (
     LoadChoice,
     MainMenu,
@@ -56,7 +57,7 @@ from railroads.ui.save_files import IN_BROWSER
 from railroads.ui.saves_window import SavesWindow
 from railroads.ui.theme import BRASS, apply_theme
 from railroads.ui.tiles_window import TilesWindow
-from railroads.ui.top_bar import draw_top_bar
+from railroads.ui.top_bar import draw_pause_banner, draw_top_bar
 from railroads.ui.tutorial_panel import draw_tutorial
 from railroads.ui.waiting_screen import Label, Shatter, tip_for, waiting_line
 from railroads.ui.web_setup import go_back_to_landing, page_setup
@@ -88,6 +89,7 @@ MONTH_FRAME_SECONDS = 0.016
 # In the browser, how long the main menu's settings stay as they are before the page's setup
 # worker starts growing the game they would start, so typing a seed doesn't start one a digit.
 AHEAD_AFTER_S = 1.0
+LIVELY = Lively()
 
 
 class App:
@@ -165,6 +167,7 @@ class App:
         self._notice_until = time.monotonic() + NOTICE_SECONDS
 
     def gui(self) -> None:
+        LIVELY.keep()
         if not self._styled:
             apply_theme()
             self._styled = True
@@ -261,6 +264,8 @@ class App:
             )
         self._draw_saves()
         draw_goal_news(self)
+        if self.clock.paused and not self.tiles.choosing:
+            draw_pause_banner(*self.view.map_rect)
         if self.tutorial is not None:
             draw_tutorial(self.tutorial)
             if self._turning is None:
@@ -547,6 +552,7 @@ class Shell:
         self._waiting_shown = False
 
     def gui(self) -> None:
+        LIVELY.keep()
         if not self._styled:
             apply_theme()
             self._styled = True

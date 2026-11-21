@@ -235,6 +235,7 @@ GLOW: RGB = (255, 214, 110)
 
 SERVED_GLOW = {
     Satisfaction.UNSATISFIED: 0.0,
+    Satisfaction.SHORT: 0.06,
     Satisfaction.CONTENT: 0.12,
     Satisfaction.THRIVING: 0.24,
 }

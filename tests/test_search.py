@@ -41,7 +41,7 @@ def test_a_search_finds_buildings_by_part_of_their_name() -> None:
     found = kinds_matching("cathed")
 
     assert BuildingKind.CATHEDRAL in found
-    assert found[0] in (BuildingKind.CATHEDRAL, BuildingKind.ST_PAULS)
+    assert found[0] in (BuildingKind.CATHEDRAL, BuildingKind.ST_PETERS)
 
 
 def test_a_search_for_a_good_finds_who_makes_and_wants_it() -> None:

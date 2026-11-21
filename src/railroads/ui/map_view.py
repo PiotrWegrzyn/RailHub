@@ -24,6 +24,7 @@ from railroads.sim.geo import Coord
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
+from railroads.sim.station_trade import StationPreview
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.ui.build_menu import (
@@ -43,6 +44,7 @@ from railroads.ui.map_overlays import (
     MOODS_LEGEND,
     SELECTED_COLOR,
     TOWNS_LEGEND,
+    cell_moods,
     consumers_in_reach,
     draw_compass,
     draw_found,
@@ -53,14 +55,15 @@ from railroads.ui.map_overlays import (
     draw_moods,
     draw_outline,
     draw_owned_flags,
+    draw_starving,
     draw_station_names,
     draw_status,
-    least_satisfied,
     mood_tint,
     status_text,
     tint_colours,
     town_cells,
     visible_area,
+    with_legend,
 )
 from railroads.ui.map_tools import MapTools
 from railroads.ui.minimap import FRAME_PAD, Minimap, MinimapLayout, view_corners
@@ -85,6 +88,7 @@ from railroads.ui.pixel.world import PixelWorld
 from railroads.ui.route_map import soften, soften_steps
 from railroads.ui.search import BuildingSearch
 from railroads.ui.spotlight import pulsing_brass, spot
+from railroads.ui.station_preview import draw_station_preview
 from railroads.ui.station_window import StationWindow
 from railroads.ui.summaries_panel import SummariesPanel
 from railroads.ui.theme import BRASS, OVERLAY_FLAGS, SIDE_WINDOW_POS, rgba_u32, toggle_button
@@ -195,7 +199,10 @@ class MapView:
         self._consumers: tuple[tuple[Cell, int, int], tuple[Cell, ...]] | None = None
         # The cells Shift tints by how satisfied their buildings are, their packed colours, and
         # the month's trade and buildings they were worked out for.
-        self._moods: tuple[tuple[Trade | None, int], npt.NDArray[np.intp], list[int]] | None = None
+        self._moods: (
+            tuple[tuple[Trade | None, int], npt.NDArray[np.intp], list[int], npt.NDArray[np.intp]]
+            | None
+        ) = None
         # The lens turned on above the minimap, if any, and the town tints with the buildings
         # they were worked out for.
         self.lens: Lens | None = None
@@ -216,6 +223,8 @@ class MapView:
         self.tools = MapTools(self)
         self.input = MapInput(self)
         self._map_rect: tuple[Vec2, Vec2] = ((0.0, 0.0), (0.0, 0.0))
+        # The station preview last worked out, and for which cell, buildings and month.
+        self._station_previewed: tuple[tuple[Cell, int, Trade | None], StationPreview] | None = None
         self.summaries = SummariesPanel()
         self.station_window = StationWindow()
         self.search = BuildingSearch()
@@ -308,6 +317,11 @@ class MapView:
         """Centres the view on a cell."""
         x, y = self.tile_map.grid.center(*cell)
         self.camera.center_x, self.camera.center_y = float(x), float(y)
+
+    @property
+    def map_rect(self) -> tuple[Vec2, Vec2]:
+        """The map's top left and bottom right corners on the screen, as last drawn."""
+        return self._map_rect
 
     def time_passed(self, months: float) -> None:
         """Moves the trains on by this much of a month."""
@@ -570,6 +584,15 @@ class MapView:
             draw_moods(
                 draw_list, marks, self.tile_map.grid, center, (top_left, bottom_right), *tints
             )
+        if self._showing_moods():
+            draw_starving(
+                draw_list,
+                marks,
+                self.tile_map.grid,
+                center,
+                (top_left, bottom_right),
+                self._starving_cells(),
+            )
         if self.build.track_from is not None:
             draw_outline(
                 draw_list,
@@ -774,14 +797,23 @@ class MapView:
         return self._towns[1], self._towns[2]
 
     def _mood_tints(self) -> tuple[npt.NDArray[np.intp], list[int]]:
-        """least_satisfied's cells and their tints, worked out again only once the month's trade
+        """cell_moods's cells and their tints, worked out again only once the month's trade
         or the buildings changed."""
+        return self._cell_moods()[1:3]
+
+    def _starving_cells(self) -> npt.NDArray[np.intp]:
+        """The cells cell_moods finds a kind of building getting nothing in."""
+        return self._cell_moods()[3]
+
+    def _cell_moods(
+        self,
+    ) -> tuple[tuple[Trade | None, int], npt.NDArray[np.intp], list[int], npt.NDArray[np.intp]]:
         key = (self.growth.trade, self.constructions.version)
         if self._moods is None or self._moods[0][0] is not key[0] or self._moods[0][1] != key[1]:
-            cells, shares = least_satisfied(self.growth.trade, self.growth.assumed_shares)
+            cells, shares, starving = cell_moods(self.growth.trade, self.growth.assumed_shares)
             colors = [rgba_u32(mood_tint(share)) for share in shares.tolist()]
-            self._moods = key, cells, colors
-        return self._moods[1], self._moods[2]
+            self._moods = key, cells, colors, cells[starving]
+        return self._moods
 
     def _marks_camera(self) -> IsoCamera | OnGround:
         """The camera marks on the map are drawn with: lifted onto raised ground in pixel art."""
@@ -814,12 +846,26 @@ class MapView:
             over_minimap,
         )
         if self._showing_moods():
-            text = f"{text} {MOODS_LEGEND}"
+            text = with_legend(text, MOODS_LEGEND)
         elif self.lens == Lens.TOWNS:
-            text = f"{text} {TOWNS_LEGEND}"
+            text = with_legend(text, TOWNS_LEGEND)
         below = draw_status(draw_list, top_left, bottom_right, text)
-        if self.hovered is not None and not over_minimap:
+        if self.hovered is None or over_minimap:
+            return
+        if self.build.tool in (Tool.STATION, Tool.MOVE_STATION):
+            draw_station_preview(self._station_preview(self.hovered), below)
+        else:
             draw_hovered_buildings(self.growth, self.hovered, below, self._satisfaction)
+
+    def _station_preview(self, cell: Cell) -> StationPreview:
+        """What a station built in a cell would reach, worked out again only for another cell,
+        once the buildings change or a month on."""
+        key = (cell, self.constructions.version, self.growth.trade)
+        kept = self._station_previewed
+        if kept is None or kept[0][0] != key[0] or kept[0][1] != key[1] or kept[0][2] is not key[2]:
+            kept = key, self.growth.station_trade.preview(cell)
+            self._station_previewed = kept
+        return kept[1]
 
     def _train_layer(self) -> TrainLayer:
         if self._trains is None:

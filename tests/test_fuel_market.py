@@ -121,6 +121,41 @@ def test_a_train_cannot_set_off_for_a_stop_further_than_its_fuel_takes_it() -> N
     assert railway.finances.month["coal"] == 0.0
 
 
+def test_a_train_names_the_stop_whose_way_on_is_longer_than_its_fuel_lasts() -> None:
+    railway = line(1804)
+    train = railway.buy("penydarren")
+    assert train is not None
+    train.stops = [Stop(WEST), Stop(EAST)]
+
+    legs = railway.long_legs(train)
+
+    assert [(index, round(leg)) for index, leg in legs] == [(0, 17), (1, 17)]
+
+
+def test_a_train_with_stops_its_fuel_reaches_has_no_long_legs() -> None:
+    railway = line()
+    train = railway.buy("planet")
+    assert train is not None
+    train.stops = [Stop(WEST), Stop(EAST)]
+
+    legs = railway.long_legs(train)
+
+    assert legs == []
+
+
+def test_a_train_whose_stops_change_while_time_stands_still_buys_no_fuel() -> None:
+    railway = line()
+    train = railway.buy("planet")
+    assert train is not None
+    train.stops = [Stop(WEST, wait_for_load=False), Stop(EAST, wait_for_load=False)]
+    train.restart()
+
+    railway.run(0.0)
+
+    assert train.path == []
+    assert railway.finances.month.get("coal", 0.0) == 0.0
+
+
 def test_a_train_sets_off_for_a_stop_as_far_as_its_fuel_takes_it_rounded_to_whole_cells(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

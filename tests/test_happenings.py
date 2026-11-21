@@ -109,8 +109,8 @@ def test_the_towers_that_fall_are_those_with_the_most_people_around() -> None:
     assert [tower.cell for tower in standing(growth, (BuildingKind.SKYSCRAPER,))] == [(30, 30)]
 
 
-def test_pilgrims_crowd_the_town_of_st_pauls_for_a_year_after_the_pope_dies() -> None:
-    growth = grown(2005, {(20, 20): (BuildingKind.ST_PAULS, 1), (20, 21): (BuildingKind.FLATS, 4)})
+def test_pilgrims_crowd_the_town_of_st_peters_for_a_year_after_the_pope_dies() -> None:
+    growth = grown(2005, {(20, 20): (BuildingKind.ST_PETERS, 1), (20, 21): (BuildingKind.FLATS, 4)})
     happenings = Happenings()
     rng = np.random.default_rng(0)
 
@@ -143,9 +143,9 @@ def test_the_news_of_a_war_stops_the_game_until_the_player_reads_it() -> None:
     assert [news.title for news in game.goal.news] == ["The Great War"]
 
 
-def test_passengers_pay_the_pilgrims_share_only_in_the_town_of_st_pauls() -> None:
+def test_passengers_pay_the_pilgrims_share_only_in_the_town_of_st_peters() -> None:
     constructions = Constructions(flat_map(30, 30))
-    constructions.build(Building((10, 10), BuildingKind.ST_PAULS))
+    constructions.build(Building((10, 10), BuildingKind.ST_PETERS))
     for _ in range(4):
         constructions.build(Building((10, 11), BuildingKind.FLATS))
         constructions.build(Building((25, 25), BuildingKind.FLATS))

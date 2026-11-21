@@ -63,7 +63,7 @@ def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded(
     assert bonus_got[Need.FOOD] == (0.0, 30.0)
     assert got[Need.HEATING] == (0.0, 9.0)
     assert bonus_got[Need.BEER] == (0.0, 3.0)
-    assert house.satisfaction == "content"
+    assert house.satisfaction == "short"
     assert farm.makes == [(Good.WHEAT, 10)]
     assert [(flow.good, flow.done, flow.wanted) for flow in farm.gave] == [
         (Good.WHEAT, pytest.approx(10 * 13 / 21), 10.0)

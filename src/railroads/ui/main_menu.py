@@ -142,7 +142,9 @@ class MainMenu:
         return replace(self.settings(), map=MapChoice.WORLD)
 
     def go_to(self, page: Page) -> None:
+        """Opens a page of the menu, leaving behind any error the last one showed."""
         self.page = page
+        self.error = ""
         if page == "load":
             self.listing = self.saves.listing()
             if self.selected is None and self.listing:
