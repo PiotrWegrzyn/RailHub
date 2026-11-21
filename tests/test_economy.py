@@ -231,7 +231,7 @@ def test_a_station_hands_out_the_players_share_of_a_farm_they_own_as_if_a_train_
 
 
 @pytest.mark.parametrize(
-    ("room", "level"), [(3.0, Satisfaction.CONTENT), (100.0, Satisfaction.THRIVING)]
+    ("room", "level"), [(3.0, Satisfaction.SHORT), (100.0, Satisfaction.THRIVING)]
 )
 def test_a_farm_is_as_satisfied_as_the_share_of_its_wheat_a_station_takes(
     room: float, level: Satisfaction
@@ -267,7 +267,9 @@ def test_a_factory_makes_only_as_much_as_its_planks_and_steel_allow(
     ("share", "level"),
     [
         (0.0, Satisfaction.UNSATISFIED),
-        (0.2, Satisfaction.CONTENT),
+        (0.2, Satisfaction.SHORT),
+        (0.49, Satisfaction.SHORT),
+        (0.5, Satisfaction.CONTENT),
         (0.99, Satisfaction.CONTENT),
         (1.0, Satisfaction.THRIVING),
     ],

@@ -5,14 +5,15 @@ the passengers and mail the buildings around it send.
 A station sends a piece of mail for every MAIL_PER_PASSENGERS passengers.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.demand import capacity_of
+from railroads.sim.demand import StationDemand, capacity_of
 from railroads.sim.economy import (
     COLLECTION_RADIUS,
     DELIVERY_RADIUS,
@@ -42,7 +43,9 @@ from railroads.sim.goods import (
 )
 from railroads.sim.grids import Cell, Within, flat_within_any
 from railroads.sim.ladders import PASSENGERS_PER_POINT
+from railroads.sim.points import Points
 from railroads.sim.power_plants import powered_points
+from railroads.sim.railway import FIRST_REACH
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.steps import Steps, finish
 
@@ -465,6 +468,34 @@ class StationTrade:
         made |= {good for good, amount in got.items() if amount > 0}
         return {good: got.get(good, 0.0) for good in made}
 
+    def preview(self, cell: Cell) -> StationPreview:
+        """What a station built in a cell would reach: the points of each kind of building it
+        would hand goods out to, what they would want of it each month, and what the buildings
+        it would gather from make each month with the passengers and mail sent from around it;
+        all as a first-level station has them, before any of it is traded."""
+        hand_out, gather = FIRST_REACH, COLLECTION_RADIUS
+        grid, counts, year = self._growth.grid, self._growth.counts, self._growth.year
+        ring = flat_within_any(grid, (cell,), hand_out).cells
+        around = {kind: int(count.ravel()[ring].sum()) for kind, count in counts.items()}
+        around = {kind: many for kind, many in around.items() if many}
+        points = self._growth.rule.points
+        reached = [(kind, many, *points[kind]) for kind, many in around.items() if kind in points]
+        reached.sort(key=lambda row: -row[1] * row[3])
+        travellers = self._travellers(around)
+        wanted = capacity_of(self._needs_in(around, lambda: ring) | as_needs(travellers))
+        gathered = flat_within_any(grid, (cell,), gather).cells
+        made: dict[Good, float] = {}
+        for kind, count in counts.items():
+            many = float(count.ravel()[gathered].sum())
+            if not many:
+                continue
+            for good, amount in makes_of(kind, year).items():
+                made[good] = made.get(good, 0.0) + amount * many
+        for good, amount in travellers.items():
+            if amount > 0:
+                made[good] = made.get(good, 0.0) + amount
+        return StationPreview(reached, StationDemand(wanted), made)
+
     def travellers_in(self, cells: npt.NDArray[np.intp]) -> dict[Good, float]:
         """The passengers and mail the buildings in these cells send, and want, in a month."""
         counts = self._growth.counts
@@ -501,10 +532,17 @@ class StationTrade:
         }
 
     def _needs(self, counts: Mapping[BuildingKind, int], station: Cell) -> dict[Need, float]:
-        """What these many buildings of each kind around a station need in a month; of a boost
-        only the player's own take (OWNED_BOOSTS), what theirs there take; of a processor's
-        input, no more than the room left in its stockpile, so one stocked up on coal while it
-        waits for iron ore wants none."""
+        """What these many buildings of each kind around a station need in a month
+        (_needs_in)."""
+        return self._needs_in(counts, lambda: self.inner_ring(station))
+
+    def _needs_in(
+        self, counts: Mapping[BuildingKind, int], cells: Callable[[], npt.NDArray[np.intp]]
+    ) -> dict[Need, float]:
+        """What these many buildings of each kind in the `cells` they stand in need in a month;
+        of a boost only the player's own take (OWNED_BOOSTS), what theirs there take; of a
+        processor's input, no more than the room left in its stockpile, so one stocked up on
+        coal while it waits for iron ore wants none. `cells` is asked for only when needed."""
         year = self._growth.year
         needs: dict[Need, float] = {}
         ring: npt.NDArray[np.intp] | None = None
@@ -517,7 +555,7 @@ class StationTrade:
                     taking = self._growth.owners.taking(kind, need)
                     if taking is None:
                         continue
-                    ring = self.inner_ring(station) if ring is None else ring
+                    ring = cells() if ring is None else ring
                     many = float(taking[ring].sum())
                 else:
                     many = float(count)
@@ -525,7 +563,7 @@ class StationTrade:
                     continue
                 wanted = many * amount
                 if kind in RECIPES:
-                    ring = self.inner_ring(station) if ring is None else ring
+                    ring = cells() if ring is None else ring
                     wanted = min(wanted, self._stock_room(kind, need, ring))
                 if wanted > 0:
                     needs[need] = needs.get(need, 0.0) + wanted
@@ -547,6 +585,19 @@ class StationTrade:
             for station in stations
             for index in self.inner_ring(station).tolist()
         }
+
+
+@dataclass(frozen=True)
+class StationPreview:
+    """What a station would reach where it is about to be built (StationTrade.preview)."""
+
+    # Each kind of building it would hand goods out to: how many, the kind of points they give
+    # and how many each, the most points first.
+    reached: list[tuple[BuildingKind, int, Points, int]]
+    # What they would want of it each month.
+    demand: StationDemand
+    # What the buildings it would gather from make each month, with the passengers and mail.
+    made: dict[Good, float]
 
 
 def as_needs(travellers: dict[Good, float]) -> dict[Need, float]:

@@ -11,7 +11,7 @@ import numpy.typing as npt
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import Building, Construction, Constructions, Station, Track
-from railroads.sim.economy import LOCAL_REACH, FloatCells, Satisfaction, Trade
+from railroads.sim.economy import HALF_SATISFIED, LOCAL_REACH, FloatCells, Satisfaction, Trade
 from railroads.sim.goods import HANDED_OUT, makes_of, needs_of
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, Grid
 from railroads.sim.growth import Growth
@@ -510,7 +510,7 @@ def mood_tint(share: float) -> Rgba:
     """The tint of a cell whose buildings get `share` of what they want, as levels_of judges it."""
     if share >= 1.0 - 1e-9:
         return SATISFIED_TINT
-    if share >= 0.5:
+    if share >= HALF_SATISFIED:
         return HALF_SATISFIED_TINT
     if share > 0.0:
         return LITTLE_SATISFIED_TINT

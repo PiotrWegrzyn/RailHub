@@ -24,6 +24,7 @@ from railroads.sim.geo import Coord
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
+from railroads.sim.station_trade import StationPreview
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.ui.build_menu import (
@@ -87,6 +88,7 @@ from railroads.ui.pixel.world import PixelWorld
 from railroads.ui.route_map import soften, soften_steps
 from railroads.ui.search import BuildingSearch
 from railroads.ui.spotlight import pulsing_brass, spot
+from railroads.ui.station_preview import draw_station_preview
 from railroads.ui.station_window import StationWindow
 from railroads.ui.summaries_panel import SummariesPanel
 from railroads.ui.theme import BRASS, OVERLAY_FLAGS, SIDE_WINDOW_POS, rgba_u32, toggle_button
@@ -221,6 +223,8 @@ class MapView:
         self.tools = MapTools(self)
         self.input = MapInput(self)
         self._map_rect: tuple[Vec2, Vec2] = ((0.0, 0.0), (0.0, 0.0))
+        # The station preview last worked out, and for which cell, buildings and month.
+        self._preview: tuple[tuple[Cell, int, Trade | None], StationPreview] | None = None
         self.summaries = SummariesPanel()
         self.station_window = StationWindow()
         self.search = BuildingSearch()
@@ -846,8 +850,22 @@ class MapView:
         elif self.lens == Lens.TOWNS:
             text = with_legend(text, TOWNS_LEGEND)
         below = draw_status(draw_list, top_left, bottom_right, text)
-        if self.hovered is not None and not over_minimap:
+        if self.hovered is None or over_minimap:
+            return
+        if self.build.tool in (Tool.STATION, Tool.MOVE_STATION):
+            draw_station_preview(self._station_preview(self.hovered), below)
+        else:
             draw_hovered_buildings(self.growth, self.hovered, below, self._satisfaction)
+
+    def _station_preview(self, cell: Cell) -> StationPreview:
+        """What a station built in a cell would reach, worked out again only for another cell,
+        once the buildings change or a month on."""
+        key = (cell, self.constructions.version, self.growth.trade)
+        kept = self._preview
+        if kept is None or kept[0][0] != key[0] or kept[0][1] != key[1] or kept[0][2] is not key[2]:
+            kept = key, self.growth.station_trade.preview(cell)
+            self._preview = kept
+        return kept[1]
 
     def _train_layer(self) -> TrainLayer:
         if self._trains is None:

@@ -85,10 +85,17 @@ FloatCells = npt.NDArray[np.float64]
 
 
 class Satisfaction(IntEnum):
-    UNSATISFIED = 0
-    CONTENT = 1
-    THRIVING = 2
+    """How much of what they want buildings get, in words that only describe them: nothing,
+    short of half, at least half and all of it."""
 
+    UNSATISFIED = 0
+    SHORT = 1
+    CONTENT = 2
+    THRIVING = 3
+
+
+# The share of what they want from which buildings are content rather than short.
+HALF_SATISFIED = 0.5
 
 DELIVERY_RADIUS = 2
 
@@ -198,8 +205,10 @@ def distribute(
 
 
 def levels_of(share: FloatCells) -> npt.NDArray[np.int8]:
-    """Satisfaction for a share of needs met or goods given away."""
+    """Satisfaction for a share of needs met or goods given away, as the satisfaction lens
+    colours it: nothing, short of HALF_SATISFIED, at least that, and all of it."""
     levels = np.full(share.shape, Satisfaction.CONTENT, dtype=np.int8)
+    levels[share < HALF_SATISFIED] = Satisfaction.SHORT
     levels[share <= 0.0] = Satisfaction.UNSATISFIED
     levels[share >= 1.0 - 1e-9] = Satisfaction.THRIVING
     return levels
