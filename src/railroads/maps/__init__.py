@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 
+from railroads.mapgen import lands
 from railroads.mapgen.world import WorldLand
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import GridKind
@@ -24,6 +25,8 @@ class StartMap:
     about: str
 
 
+# The made-up map of every land (railroads.mapgen.lands), baked by tools/build_lands_map.py.
+LANDS_TITLE = "Every land (test map)"
 START_MAPS = (
     StartMap(
         "poland",
@@ -114,6 +117,13 @@ START_MAPS = (
         "China: the Yangtze delta",
         Bounds(west=116.0, east=122.4, south=28.6, north=33.4),
         "Nanjing, Suzhou and Hangzhou around Lake Tai on the delta, with hills to the south.",
+    ),
+    StartMap(
+        "lands",
+        LANDS_TITLE,
+        lands.BOUNDS,
+        "A made-up map for testing: ice, tundra, taiga, steppe, farmland, woods, desert, savanna "
+        "and jungle side by side, each with plains, hills, mountains, a lake, a bay and rivers.",
     ),
     StartMap(
         "southeast_australia",

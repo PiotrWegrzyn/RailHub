@@ -65,6 +65,7 @@ class MapChoice(StrEnum):
     JAPAN = "Japan: Osaka to Nagoya"
     EAST_CHINA = "China: the Yangtze delta"
     SOUTHEAST_AUSTRALIA = "Southeast Australia"
+    LANDS = "Every land (test map)"
     WORLD = "A random place in the world"
     TUTORIAL = "Tutorial"
 
