@@ -35,7 +35,7 @@ def grown(*placed: tuple[tuple[int, int], BuildingKind]) -> Growth:
         (BuildingKind.MEGA_FACTORY, 135_000),
         (BuildingKind.SKYSCRAPER, 1_000_000),
         (BuildingKind.SPACE_CENTER, None),
-        (BuildingKind.ST_PAULS, None),
+        (BuildingKind.ST_PETERS, None),
     ],
 )
 def test_homes_and_fields_are_cheap_to_take_down_works_dear_and_one_offs_impossible(

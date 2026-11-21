@@ -23,7 +23,7 @@ from railroads.ui.pixel.art import (
     grand_modern,
 )
 from railroads.ui.pixel.art.built import modelled
-from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_pauls
+from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_peters
 from railroads.ui.pixel.art.commerce import (
     airport,
     department_store,
@@ -236,7 +236,7 @@ BUILDINGS = (
     "church",
     "basilica",
     "cathedral",
-    "st_pauls",
+    "st_peters",
     "factory",
     "big_factory",
     "mega_factory",
@@ -376,7 +376,7 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "church": church,
     "basilica": basilica,
     "cathedral": cathedral,
-    "st_pauls": st_pauls,
+    "st_peters": st_peters,
     "gun_factory": lambda: works((120, 104, 78), (84, 74, 58), (190, 56, 48), 1),
     "tank_factory": tank_factory,
     "plane_factory": plane_factory,

@@ -85,7 +85,7 @@ DOTS: dict[BuildingKind, tuple[Color, float]] = {
     BuildingKind.CHURCH: ((232, 226, 206), 0.14),
     BuildingKind.BASILICA: ((240, 228, 190), 0.18),
     BuildingKind.CATHEDRAL: ((250, 232, 170), 0.22),
-    BuildingKind.ST_PAULS: ((255, 220, 90), 0.3),
+    BuildingKind.ST_PETERS: ((255, 220, 90), 0.3),
     BuildingKind.CLAY_PIT: ((190, 112, 74), 0.12),
     BuildingKind.LIMESTONE_QUARRY: ((214, 210, 192), 0.12),
     BuildingKind.SAND_PIT: ((236, 214, 140), 0.12),

@@ -932,7 +932,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.CHURCH: {Need.WAX: 10, Need.INCENSE: 10},
         BuildingKind.BASILICA: {Need.WAX: 30, Need.INCENSE: 20},
         BuildingKind.CATHEDRAL: {Need.WAX: 60, Need.INCENSE: 40},
-        BuildingKind.ST_PAULS: {Need.WAX: 200, Need.INCENSE: 120},
+        BuildingKind.ST_PETERS: {Need.WAX: 200, Need.INCENSE: 120},
         **{kind: recipe.needs() for kind, recipe in RECIPES.items()},
     }
 )

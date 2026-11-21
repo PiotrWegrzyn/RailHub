@@ -14,7 +14,7 @@ of building its `kind_wants`; a kind of building wants some needs only while one
 (`adds`), as ports want guns in a war, which boost what they make. Goods can be made less of
 (`makes`) and earn more (`prices`, the diesel fuel trains burn too), passengers and mail come
 and go more or less (`travels`), homes want more electricity and it costs more
-(`electricity_use`, `electricity_price`), and passengers getting off in the town of St Paul's
+(`electricity_use`, `electricity_price`), and passengers getting off in the town of St Peter's
 earn `pilgrims` times as much for PILGRIM_MONTHS from the event's news, which comes in its
 `month`. One `east_only` happens only on maps in the old Eastern Bloc
 (EASTERN_BLOC). A war (`war`) also makes the military grow WAR_GROWTH times as fast.
@@ -66,7 +66,7 @@ class Event:
     electricity_price: float = 1.0
     # The month its news comes in, January as 0; it changes nothing by year.
     month: int = 0
-    # How many times as much passengers getting off in the town of St Paul's earn for
+    # How many times as much passengers getting off in the town of St Peter's earn for
     # PILGRIM_MONTHS from its news.
     pilgrims: float = 1.0
     east_only: bool = False
@@ -188,7 +188,7 @@ EVENTS = (
         1981,
         "The Pope is shot",
         "At 17:17 on 13 May Pope John Paul II is shot in St Peter's Square, and survives. For a "
-        "year pilgrims crowd the town of St Paul's to pray for him.",
+        "year pilgrims crowd the town of St Peter's to pray for him.",
         month=4,
         pilgrims=4.0,
     ),
@@ -219,7 +219,7 @@ EVENTS = (
         2005,
         "John Paul II dies",
         "At 21:37 on 2 April Pope John Paul II dies. For a year pilgrims crowd the town of "
-        "St Paul's to pray for him.",
+        "St Peter's to pray for him.",
         month=3,
         pilgrims=6.0,
     ),

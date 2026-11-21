@@ -403,7 +403,7 @@ of every kind in its neighbourhood (the cell and the six around it):
 | Trade | port 1 |
 | Industry | factory 1, big factory 3, mega factory 9, cannery 2, steel mill 3, shipyard 3, machine works, plastics works, appliance factory 3, coal power plant 5, diesel and gas power plants 4, other works 2 |
 | Corporate | tavern 1, sushi hut 1, club 3, department store 3, hotel 5, skyscraper 10 |
-| Worship | church 5, basilica 20, cathedral 50, St. Paul cathedral 2137 |
+| Worship | church 5, basilica 20, cathedral 50, St. Peter's Basilica 2137 |
 
 Each kind of building grows on its own ladder. Every month each cell may take a turn on each
 ladder, with the ladder's base chance, plus its chance for every doubling of each kind of points
@@ -709,7 +709,7 @@ window (H) lists the same.
 | Church |  | 10 wax | 10 incense |
 | Basilica |  | 30 wax | 20 incense |
 | Cathedral |  | 60 wax | 40 incense |
-| St. Paul cathedral |  | 200 wax | 120 incense |
+| St. Peter's Basilica |  | 200 wax | 120 incense |
 | Salt mine cathedral | 200 salt |  |  |
 <!-- end table -->
 
@@ -935,11 +935,11 @@ Dated events change what is wanted, made and paid while they last, or for good:
 | 1939 | The Second World War | guns, tanks, planes and steel x2, luxuries, wine and cars -50%, passengers +50%, ports take guns, for 7 years |
 | 1955 | Television | newspapers -50%, appliances +30%, electricity wanted +50% and costs +25% |
 | 1973 | The oil crisis | oil wells make half as much, oil and diesel fuel earn and cost twice as much, for 2 years |
-| May 1981 | The Pope is shot (17:17, 13 May) | passengers getting off in the town of St Paul's earn +300% for 12 months |
+| May 1981 | The Pope is shot (17:17, 13 May) | passengers getting off in the town of St Peter's earn +300% for 12 months |
 | 1989 | The Iron Curtain falls | on maps of the old Eastern Bloc only: cars, electronics and appliances +30% |
 | 1995 | The internet | newspapers -30%, electronics +30% |
 | September 2001 | September 11 | the two skyscrapers with the most people around are pulled down |
-| April 2005 | John Paul II dies (21:37, 2 April) | passengers getting off in the town of St Paul's earn +500% for 12 months |
+| April 2005 | John Paul II dies (21:37, 2 April) | passengers getting off in the town of St Peter's earn +500% for 12 months |
 | 2007 | Smartphones | nobody wants newspapers any more; electronics +50% |
 | 2008 | The financial crisis | homes want half the food and a fifth less of everything else, for 2 years |
 | 2020 | The pandemic | passengers -80%, mail +50%, for 3 years |
@@ -1081,8 +1081,8 @@ at normal speed.
 Churches go up where a neighbourhood holds at least 10 population points and no other church of
 any rank stands within 4 hexes. They do not merge: a church becomes a basilica once 120 population
 points live in its neighbourhood, and a basilica a cathedral at 240. The first cathedral to reach
-400 becomes the map's one St. Paul cathedral. Each point of worship sends and wants one passenger
-(church 5, basilica 20, cathedral 50, St. Paul cathedral 2137), and a fifth as much mail like any
+400 becomes the map's one St. Peter's Basilica. Each point of worship sends and wants one passenger
+(church 5, basilica 20, cathedral 50, St. Peter's Basilica 2137), and a fifth as much mail like any
 other building. Honey counts as food; wax comes only from beekeepers and incense only from groves
 on its own rare deposits. Churches must have wax; homes take a little as a bonus until electric
 light in 1882, and theatres, the royal palace and hospitals always do, while furniture makers and
@@ -1214,7 +1214,7 @@ track, smallest first, is paid for as if taken down, and the price shows before 
 building costs $500 a population point (a house $500, a block of flats $9,000), $1,000 a field,
 $15,000 an industry point (a factory $15,000, a mega factory $135,000), $20,000 a mine or a point
 of a shop or business, $30,000 a port, and a skyscraper $1,000,000; one-off buildings, the
-novelties and the St. Paul cathedral, cannot be taken down, and neither station nor track goes
+novelties and the St. Peter's Basilica, cannot be taken down, and neither station nor track goes
 where one would have to. The bulldozer clears a whole cell at those prices, track for a quarter
 of what it cost to lay and a station for $5,000, buildings the player owns too. A station can be
 moved from its window: it costs a new station and clearing the new cell, its trains, name and

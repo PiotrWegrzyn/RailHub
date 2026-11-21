@@ -64,7 +64,7 @@ class BuildingKind(Enum):
     CHURCH = "church"
     BASILICA = "basilica"
     CATHEDRAL = "cathedral"
-    ST_PAULS = "St. Paul cathedral"
+    ST_PETERS = "St. Peter's Basilica"
     REFINERY = "refinery"
     CHEMICAL_WORKS = "chemical works"
     ELECTRONICS_PLANT = "electronics plant"
@@ -246,7 +246,7 @@ class BuildingKind(Enum):
 
 
 # The buildings a map gets only one of, or a few: novelties, the Olympic stadiums, the railway
-# works and St Paul's.
+# works and St Peter's.
 ONE_OFFS = frozenset(
     {
         BuildingKind.SPACE_CENTER,
@@ -260,7 +260,7 @@ ONE_OFFS = frozenset(
         BuildingKind.AMUSEMENT_PARK,
         BuildingKind.OLYMPIC_STADIUM,
         BuildingKind.RAILWAY_WORKS,
-        BuildingKind.ST_PAULS,
+        BuildingKind.ST_PETERS,
     }
 )
 
@@ -394,7 +394,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.CHURCH,
             BuildingKind.BASILICA,
             BuildingKind.CATHEDRAL,
-            BuildingKind.ST_PAULS,
+            BuildingKind.ST_PETERS,
             BuildingKind.CLAY_PIT,
             BuildingKind.SAND_PIT,
             BuildingKind.MACHINE_WORKS,

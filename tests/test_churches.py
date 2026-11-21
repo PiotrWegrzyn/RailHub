@@ -14,7 +14,7 @@ RANKS = (
     BuildingKind.CHURCH,
     BuildingKind.BASILICA,
     BuildingKind.CATHEDRAL,
-    BuildingKind.ST_PAULS,
+    BuildingKind.ST_PETERS,
 )
 
 
@@ -75,8 +75,8 @@ def test_no_church_opens_within_four_hexes_of_another(
         (BuildingKind.CHURCH, BuildingKind.BASILICA, 120, True),
         (BuildingKind.BASILICA, BuildingKind.CATHEDRAL, 239, False),
         (BuildingKind.BASILICA, BuildingKind.CATHEDRAL, 240, True),
-        (BuildingKind.CATHEDRAL, BuildingKind.ST_PAULS, 399, False),
-        (BuildingKind.CATHEDRAL, BuildingKind.ST_PAULS, 400, True),
+        (BuildingKind.CATHEDRAL, BuildingKind.ST_PETERS, 399, False),
+        (BuildingKind.CATHEDRAL, BuildingKind.ST_PETERS, 400, True),
     ],
 )
 def test_churches_rise_with_the_people_around_them(
@@ -92,7 +92,7 @@ def test_churches_rise_with_the_people_around_them(
     assert count(constructions, small) == int(not rises)
 
 
-def test_only_the_most_crowded_cathedral_becomes_st_pauls() -> None:
+def test_only_the_most_crowded_cathedral_becomes_st_peters() -> None:
     constructions = Constructions(make_map())
     for cell, people in (((10, 10), 400), ((30, 30), 420)):
         constructions.build(Building(cell, BuildingKind.CATHEDRAL))
@@ -112,7 +112,7 @@ def test_only_the_most_crowded_cathedral_becomes_st_pauls() -> None:
     [
         (BuildingKind.BASILICA, 20),
         (BuildingKind.CATHEDRAL, 50),
-        (BuildingKind.ST_PAULS, 2137),
+        (BuildingKind.ST_PETERS, 2137),
     ],
 )
 def test_churches_send_their_congregation_as_passengers(kind: BuildingKind, people: int) -> None:
