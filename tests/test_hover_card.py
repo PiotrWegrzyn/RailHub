@@ -86,3 +86,14 @@ def test_a_station_preview_names_each_kind_of_building_with_the_points_it_gives(
     draw_station_preview(preview, (0, 0))
 
     assert lines == [f"house x3: {3 * value} {points.value} points"]
+
+
+def test_a_station_preview_says_point_for_a_single_one() -> None:
+    growth = Game(Constructions(make_map())).growth
+    growth.build(Building((5, 6), BuildingKind.HOUSE))
+    preview = growth.station_trade.preview((5, 5))
+    points, value = growth.rule.points[BuildingKind.HOUSE]
+
+    lines = preview_lines(preview)
+
+    assert lines == [f"house: {value} {points.value} point{'' if value == 1 else 's'}"]

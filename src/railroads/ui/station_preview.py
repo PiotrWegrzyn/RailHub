@@ -15,10 +15,12 @@ PREVIEW_WIDTH = 390.0
 def preview_lines(preview: StationPreview) -> list[str]:
     """A line for each kind of building the station would hand goods out to: how many there
     are and the points they give together."""
-    return [
-        f"{kind.value}{'' if many == 1 else f' x{many}'}: {many * value} {points.value} points"
-        for kind, many, points, value in preview.reached
-    ]
+    lines = []
+    for kind, many, points, value in preview.reached:
+        total = many * value
+        named = kind.value if many == 1 else f"{kind.value} x{many}"
+        lines.append(f"{named}: {total} {points.value} point{'' if total == 1 else 's'}")
+    return lines
 
 
 def draw_station_preview(preview: StationPreview, top_left: Vec2) -> None:
