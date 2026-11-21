@@ -434,3 +434,11 @@ def test_a_brought_in_file_gets_a_save_name_from_its_own(file_name: str, expecte
     name = imported_name(file_name, lambda name: False)
 
     assert name == expected
+
+
+def test_a_game_that_cant_be_pickled_raises_a_save_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    saved = played_game(1)
+    monkeypatch.setattr(saved.game, "big_parts", lambda: [lambda: None])
+
+    with pytest.raises(SaveError, match="couldn't be saved"):
+        snapshot(saved)

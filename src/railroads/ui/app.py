@@ -231,7 +231,12 @@ class App:
             return False
         yield
         self._autosaved_at = time.monotonic()
-        self._write_autosave((yield from snapshot_steps(self.saved(), self._autosave_memory)))
+        try:
+            taken = yield from snapshot_steps(self.saved(), self._autosave_memory)
+        except SaveError as error:
+            self._autosave_failed(error)
+            return True
+        self._write_autosave(taken)
         return True
 
     def _turn_once(self) -> None:
@@ -321,7 +326,17 @@ class App:
         if not self._can_autosave():
             return
         self._autosaved_at = time.monotonic()
-        self._write_autosave(snapshot(self.saved(), self._autosave_memory))
+        try:
+            taken = snapshot(self.saved(), self._autosave_memory)
+        except SaveError as error:
+            self._autosave_failed(error)
+            return
+        self._write_autosave(taken)
+
+    def _autosave_failed(self, error: Exception) -> None:
+        """Says an autosave couldn't be taken, and plays on."""
+        print(f"Autosave failed: {error}", file=sys.stderr)
+        self.tell(f"Autosave failed: {error}")
 
     def _can_autosave(self) -> bool:
         return self.saves is not None and self._autosaving is None
@@ -376,8 +391,7 @@ class App:
         if error is None:
             self.tell("Autosaved")
         else:
-            print(f"Autosave failed: {error}", file=sys.stderr)
-            self.tell(f"Autosave failed: {error}")
+            self._autosave_failed(error)
 
     def _draw_saves(self) -> None:
         if self.saves is None:
