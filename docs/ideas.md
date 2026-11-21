@@ -28,8 +28,3 @@ tuning on Poland is done. Raised on 2026-11-21.
 Where much of a good is made and nobody nearby uses it, the works that would use it come up more
 likely: lots of coal and no steel mill makes a steel mill likelier, many cattle make a dairy
 likelier. Raised on 2026-11-21.
-
-## Fisheries merge into ports
-
-Three fisheries in a neighbourhood merge into a port once the neighbourhood holds at least four
-people per land hex, not counting mountains and water. Raised on 2026-11-21.

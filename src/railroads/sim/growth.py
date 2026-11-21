@@ -98,6 +98,7 @@ from railroads.sim.ladders import (
     FloatGrid,
     GrowthRule,
     IntGrid,
+    Join,
     Ladder,
     Land,
     Points,
@@ -1128,6 +1129,10 @@ class Growth:
             merged = self._replace(cell, neighbourhood, [(small, merge.pulled_down)], big)
             if merged is not None:
                 return merged
+        if ladder.joins is not None:
+            joined = self._join(cell, neighbourhood, ladder.kinds[0], ladder.joins)
+            if joined is not None:
+                return joined
         if (
             ladder.land_cells_each is not None
             and self._as_many_as_first(ladder) >= self._land_cells // ladder.land_cells_each
@@ -1138,6 +1143,26 @@ class Growth:
         if not self._inputs_on_map(ladder):
             return set()
         return self.room.scatter(cell, ladder, rng)
+
+    def _join(
+        self, cell: Cell, neighbourhood: list[Cell], kind: BuildingKind, join: Join
+    ) -> set[Cell] | None:
+        """Pulls down join.needed of a kind in the neighbourhood and puts up what they join into
+        in the cell, if the neighbourhood is busy enough and none of that stands near; None, and
+        nothing changed, otherwise."""
+        if self._around(kind, neighbourhood) < join.needed:
+            return None
+        built = self._counts[join.into]
+        if any(built[near] for near in self._grid.within(cell, join.apart)):
+            return None
+        tile_map = self.constructions.tile_map
+        land = sum(
+            tile_map.terrain[near] == Terrain.LAND and tile_map.relief[near] != Relief.MOUNTAINS
+            for near in neighbourhood
+        )
+        if not land or self._nearby[Points.POPULATION][cell] < join.people_per_cell * land:
+            return None
+        return self._replace(cell, neighbourhood, [(kind, join.needed)], join.into)
 
     def least_of(self, ladder: Ladder) -> int:
         """The fewest of a ladder's first kind the map keeps once it has opened: KEY_LEAST for

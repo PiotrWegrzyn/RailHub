@@ -451,8 +451,10 @@ than dry land unless a row names it:
 | Department stores | 0.00005 per doubling of population, from 1880 | 60 population | as houses, 6 hexes apart, one per 10,000 land cells |
 | Hotels | as department stores, from 1900 | 60 population | as houses, 5 hexes apart, one per 8,000 land cells |
 
-Farms and orchards may crowd together; logging camps keep to three per neighbourhood, steel mills to two, canneries to
-six, mines to eight, and ports and shipyards to one. Factories, mills and mines open mostly by
+Farms, orchards and works may crowd together, held back only by the room in each cell; logging
+camps keep to three per neighbourhood, mines to eight, and ports to one. Three fisheries in a
+neighbourhood with four population points for each of its land cells off the mountains join into
+a port, unless a port stands within two cells. Factories, mills and mines open mostly by
 chance, with only a weak pull towards their own kind, so they spread out across the land while
 houses gather into towns. On its turn a ladder builds its
 first kind, unless it can merge: 16 houses nearby let six of them make way for a tenement and

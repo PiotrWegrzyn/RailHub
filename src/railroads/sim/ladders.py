@@ -445,6 +445,18 @@ class Merge:
 
 
 @dataclass(frozen=True, slots=True)
+class Join:
+    """So many of a ladder's first kind in a neighbourhood that become one building of another
+    kind, once the neighbourhood holds at least so many population points for each of its land
+    cells off the mountains, and none of that kind stands within so many cells."""
+
+    into: BuildingKind
+    needed: int
+    people_per_cell: float
+    apart: int
+
+
+@dataclass(frozen=True, slots=True)
 class Rise:
     """The population a neighbourhood must hold for a building to become the next kind, and
     whether the map only ever gets one of that kind, for the first to get there."""
@@ -478,6 +490,8 @@ class Ladder:
     apart: int | None = None
     # Kinds that climb the ladder by the people around them rather than by merging.
     rises: Mapping[BuildingKind, Rise] = field(default_factory=dict)
+    # What its first kind joins into where enough of them gather among people.
+    joins: Join | None = None
     # Grows only where the neighbourhood holds fewer population points than this.
     crowded_at: int | None = None
     # Points of a kind nearby draw more only once there are at least this many of them.
@@ -766,6 +780,12 @@ def _works(
     )
 
 
+# Three fisheries in a neighbourhood with four population points for each of its land cells off
+# the mountains join into a port, unless a port stands within two cells.
+FISHERIES_PER_PORT = 3
+PORT_PEOPLE_PER_CELL = 4
+PORTS_APART = 2
+
 # Rare resources, each on the deposits a map was given.
 RESOURCES = (
     _resource(BuildingKind.IRON_MINE, Deposit.IRON),
@@ -774,7 +794,10 @@ RESOURCES = (
     _resource(BuildingKind.DIAMOND_MINE, Deposit.DIAMONDS),
     _resource(BuildingKind.OIL_WELL, Deposit.OIL, 0, 30_000),
     _resource(BuildingKind.SALT_WORKS, Deposit.SALT),
-    _resource(BuildingKind.FISHERY, Deposit.FISH, most_nearby=2),
+    replace(
+        _resource(BuildingKind.FISHERY, Deposit.FISH, most_nearby=2),
+        joins=Join(BuildingKind.PORT, FISHERIES_PER_PORT, PORT_PEOPLE_PER_CELL, PORTS_APART),
+    ),
     _resource(BuildingKind.SHEEP_FARM, Deposit.WOOL, crowded_at=FARMS_CROWDED_OUT),
     _resource(BuildingKind.VINEYARD, Deposit.GRAPES, crowded_at=FARMS_CROWDED_OUT),
     _resource(BuildingKind.COTTON_FIELD, Deposit.COTTON),
