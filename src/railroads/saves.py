@@ -195,13 +195,18 @@ def snapshot(saved: SavedGame, memory: ReusedMemory | None = None) -> Snapshot:
 def snapshot_steps(saved: SavedGame, memory: ReusedMemory | None = None) -> Steps[Snapshot]:
     """snapshot in steps a caller can spread over frames, nothing changing the game between
     them: one pickler pickles each of the game's biggest parts (Game.big_parts) in a step of its
-    own, then the game, which only points back at what it pickled already."""
+    own, then the game, which only points back at what it pickled already. A game that can't be
+    pickled, such as one loaded from a save of another version whose parts no longer fit this
+    one, raises SaveError."""
     pieces = _Pieces()
     pickler = _Pickler(pieces, protocol=pickle.HIGHEST_PROTOCOL)
-    for part in saved.game.big_parts():
-        pickler.dump(part)
-        yield
-    pickler.dump(saved)
+    try:
+        for part in saved.game.big_parts():
+            pickler.dump(part)
+            yield
+        pickler.dump(saved)
+    except (pickle.PicklingError, AttributeError, TypeError) as error:
+        raise SaveError(f"The game couldn't be saved: {error}") from error
     data: Buffer
     if memory is None:
         data = b"".join(pieces.parts)

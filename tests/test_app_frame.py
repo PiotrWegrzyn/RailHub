@@ -1123,3 +1123,20 @@ def test_a_station_preview_is_kept_apart_from_the_track_preview_and_worked_out_o
 
     assert again is first
     assert other is not first
+
+
+def test_an_autosave_that_cant_be_taken_is_told_and_the_game_plays_on(
+    context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "MONTH_FRAME_SECONDS", 0.0)
+    app = made_app()
+    app.saves = Saves(tmp_path)
+    app.clock.seconds = app.clock.seconds_per_month - 0.001
+    monkeypatch.setattr(app.game, "big_parts", lambda: [lambda: None])
+
+    frames_until_the_month_is_done(app)
+    frame(app)
+
+    assert app._turning is None
+    assert app.notice.startswith("Autosave failed: The game couldn't be saved")
+    assert app.saves.listing() == []

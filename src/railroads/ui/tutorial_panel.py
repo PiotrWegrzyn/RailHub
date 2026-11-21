@@ -12,8 +12,9 @@ from railroads.ui.ornate import begin_ornate, end_ornate, keep_in_front
 from railroads.ui.theme import BRASS, CARDS_WIDTH, GROWN
 
 # The window sits at first in the column along the right edge that the trains window leaves free,
-# MARGIN from the edge, and stays in front of the other windows while no popup is open. Its top
-# is at least TOP down, and below the row of buttons along the top of the screen for buying a
+# MARGIN from the edge, and stays in front of the other windows while no popup is open and no
+# screen that holds up the game, such as the supply and demand boards, is up. It is kept on the
+# screen when the window shrinks. Its top is at least TOP down, and below the row of buttons along the top of the screen for buying a
 # train, which may reach under it: BUTTONS_ROW from that screen's top.
 WIDTH = CARDS_WIDTH
 MARGIN = 16.0
@@ -21,8 +22,9 @@ TOP = 96.0
 BUTTONS_ROW = 72.0
 
 
-def draw_tutorial(tutorial: Tutorial) -> None:
-    """Draws the step shown, if the tutorial is open; Next goes on once it is done."""
+def draw_tutorial(tutorial: Tutorial, in_front: bool = True) -> None:
+    """Draws the step shown, if the tutorial is open, in front of the other windows if
+    `in_front`; Next goes on once it is done."""
     step = tutorial.current
     if step is None:
         return
@@ -39,7 +41,9 @@ def draw_tutorial(tutorial: Tutorial) -> None:
         | imgui.WindowFlags_.always_auto_resize.value
     )
     expanded, still_open = begin_ornate(title, flags)
-    keep_in_front()
+    if in_front:
+        keep_in_front()
+    keep_on_screen(display)
     if expanded:
         imgui.push_text_wrap_pos(0.0)
         imgui.text_colored(imgui.ImVec4(*BRASS), step.title)
@@ -74,3 +78,14 @@ def draw_tutorial(tutorial: Tutorial) -> None:
     end_ornate()
     if not still_open:
         tutorial.closed = True
+
+
+def keep_on_screen(display: imgui.ImVec2) -> None:
+    """Moves the window begun last back onto the screen if any of it lies past an edge, as it
+    does once the screen shrinks after it was placed."""
+    window = imgui.internal.get_current_window().root_window
+    pos, size = window.pos, window.size
+    x = min(max(pos.x, 0.0), max(display.x - size.x, 0.0))
+    y = min(max(pos.y, 0.0), max(display.y - size.y, 0.0))
+    if (x, y) != (pos.x, pos.y):
+        imgui.internal.set_window_pos(window, imgui.ImVec2(x, y))

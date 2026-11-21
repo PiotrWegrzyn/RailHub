@@ -231,7 +231,12 @@ class App:
             return False
         yield
         self._autosaved_at = time.monotonic()
-        self._write_autosave((yield from snapshot_steps(self.saved(), self._autosave_memory)))
+        try:
+            taken = yield from snapshot_steps(self.saved(), self._autosave_memory)
+        except SaveError as error:
+            self._autosave_failed(error)
+            return True
+        self._write_autosave(taken)
         return True
 
     def _turn_once(self) -> None:
@@ -267,7 +272,9 @@ class App:
         if self.clock.paused and not self.tiles.choosing:
             draw_pause_banner(*self.view.map_rect)
         if self.tutorial is not None:
-            draw_tutorial(self.tutorial)
+            goal = self.game.goal
+            held_up = bool(self.tiles.open or self.tiles.choosing or goal.news or goal.bankrupt)
+            draw_tutorial(self.tutorial, in_front=not held_up)
             if self._turning is None:
                 self.tutorial.update(self.game, self.seen())
         typing = imgui.get_io().want_text_input
@@ -321,7 +328,17 @@ class App:
         if not self._can_autosave():
             return
         self._autosaved_at = time.monotonic()
-        self._write_autosave(snapshot(self.saved(), self._autosave_memory))
+        try:
+            taken = snapshot(self.saved(), self._autosave_memory)
+        except SaveError as error:
+            self._autosave_failed(error)
+            return
+        self._write_autosave(taken)
+
+    def _autosave_failed(self, error: Exception) -> None:
+        """Says an autosave couldn't be taken, and plays on."""
+        print(f"Autosave failed: {error}", file=sys.stderr)
+        self.tell(f"Autosave failed: {error}")
 
     def _can_autosave(self) -> bool:
         return self.saves is not None and self._autosaving is None
@@ -376,8 +393,7 @@ class App:
         if error is None:
             self.tell("Autosaved")
         else:
-            print(f"Autosave failed: {error}", file=sys.stderr)
-            self.tell(f"Autosave failed: {error}")
+            self._autosave_failed(error)
 
     def _draw_saves(self) -> None:
         if self.saves is None:

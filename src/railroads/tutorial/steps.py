@@ -14,7 +14,7 @@ from railroads.sim.game import Game
 from railroads.sim.goods import FOODS, FREIGHT_SHARE, Good
 from railroads.sim.grids import Cell
 from railroads.sim.lots import FIRST_FIBONACCI, PRICE_UNIT, Lots, fibonacci
-from railroads.sim.ownership import HOLD_MONTHS, LOT, SHARES
+from railroads.sim.ownership import HOLD_MONTHS, LOTS, SHARES
 from railroads.sim.trains import ENGINES, FIRST_ENGINE
 from railroads.tutorial.place import ASHFORD_STATION, BROOKBY_STATION, SHOWN_FARM
 
@@ -22,6 +22,8 @@ from railroads.tutorial.place import ASHFORD_STATION, BROOKBY_STATION, SHOWN_FAR
 NEAR = 2
 PLANET_RANGE = ENGINES[FIRST_ENGINE].tank
 FIRST_LOT = fibonacci(FIRST_FIBONACCI) * PRICE_UNIT
+# How many shares can be bought at once, in words: "100, 200 or 600".
+SHARE_LOTS = ", ".join(f"{lot:,}" for lot in LOTS[:-1]) + f" or {LOTS[-1]:,}"
 
 
 @dataclass(frozen=True)
@@ -222,7 +224,7 @@ STEPS: tuple[Step, ...] = (
                 "out on their own earn nothing."
             ),
         ),
-        "Right-click the marked farm to see what it makes and what it gave last month.",
+        "Right-click the marked farm to see what it made last month.",
         lambda game, seen: seen.selected == SHOWN_FARM,
         lambda game: [SHOWN_FARM],
     ),
@@ -271,7 +273,7 @@ STEPS: tuple[Step, ...] = (
         (
             (
                 "You can buy shares of any building that makes something: farms, mines, mills and "
-                f"works. A building has {SHARES:,} shares, traded {LOT} at a time, priced by how "
+                f"works. A building has {SHARES:,} shares, bought {SHARE_LOTS} at a time, priced by how "
                 f"satisfied it was last quarter. They can be sold {HOLD_MONTHS // 12} years after "
                 "they are bought."
             ),
