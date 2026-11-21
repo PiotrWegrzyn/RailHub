@@ -183,5 +183,5 @@ def test_a_map_holds_only_a_few_printing_works_each_printing_thousands_of_newspa
     for i in range(cap + 3):
         growth._turn((200, 20 + 10 * i), PRINTING_WORKS, np.random.default_rng(0))
 
-    assert growth.count(BuildingKind.PRINTING_WORKS).sum() == cap == 4
+    assert growth.count(BuildingKind.PRINTING_WORKS).sum() == cap == 8
     assert MAKES[BuildingKind.PRINTING_WORKS][Good.NEWSPAPERS] == 3000

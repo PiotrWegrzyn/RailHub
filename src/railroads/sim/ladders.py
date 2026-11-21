@@ -65,7 +65,7 @@ FACTORIES_DRAW_FROM = 5
 CHANCE_UNIT = 1e-7
 
 # A map has only a few printing works, one per this many land cells, each printing for many towns.
-PRINTING_CELLS = 40_000
+PRINTING_CELLS = 20_000
 
 # How many cells apart jewellers keep.
 JEWELLERS_APART = 10
@@ -530,7 +530,7 @@ FACTORY_LAND = Land(
 TOWNS = Ladder(
     kinds=(BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS),
     land=TOWN_LAND,
-    base=13,
+    base=16,
     per_doubling=840,
     merges={
         BuildingKind.HOUSE: Merge(needed=6, pulled_down=6),
@@ -636,7 +636,7 @@ MINES = Ladder(
         temperature={Temperature.COLD: 0.8},
         beside_mountains=3.0,
     ),
-    base=36,
+    base=56,
     most_per_cell=2,
     most_nearby=8,
     from_year=1700,
@@ -655,7 +655,7 @@ LOGGING_CAMPS = Ladder(
         forest_edge=True,
         least_forest_nearby=4,
     ),
-    base=150,
+    base=117,
     most_per_cell=1,
     most_nearby=3,
 )
@@ -1152,30 +1152,30 @@ SOY_SAUCE_BREWERIES = _works(
 
 # Works that open by people and industry alone: their inputs must be brought to them.
 WORKS = (
-    _works(BuildingKind.SAWMILL, {}, base=5),
-    _works(BuildingKind.TEXTILE_MILL, {}, 1780, base=4),
-    _works(BuildingKind.FURNITURE_MAKER, {}, base=4),
+    _works(BuildingKind.SAWMILL, {}, base=5.2),
+    _works(BuildingKind.TEXTILE_MILL, {}, 1780, base=2.2),
+    _works(BuildingKind.FURNITURE_MAKER, {}, base=3.2),
     _works(BuildingKind.WINERY, {}, base=4),
-    _works(BuildingKind.BARREL_MAKER, {}, base=0.5),
+    _works(BuildingKind.BARREL_MAKER, {}, base=2),
     _works(BuildingKind.TOOL_WORKS, {IND: 2}, 0, base=20),
     _works(BuildingKind.CHEMICAL_WORKS, {IND: 3}, 0, 20_000, base=4),
-    _works(BuildingKind.REFINERY, {}, 0, 10_000, base=10),
+    _works(BuildingKind.REFINERY, {}, 0, 10_000, base=3.5),
     _works(BuildingKind.CAR_FACTORY, {IND: 6}, 0, 40_000, base=40),
     _works(BuildingKind.ELECTRONICS_PLANT, {IND: 3}, 0, 30_000, base=4),
     _works(BuildingKind.PLANE_FACTORY, {IND: 6}, 0, 40_000, base=100),
     _works(BuildingKind.TANK_FACTORY, {IND: 6}, 0, 40_000, base=100),
     _works(BuildingKind.BRICKWORKS, {}, base=4),
-    _works(BuildingKind.GLASSWORKS, {}, base=4),
-    _works(BuildingKind.BREWERY, {POP: FOOD_TOWN}, base=30),
-    _works(BuildingKind.DISTILLERY, {POP: FOOD_TOWN}, 1600, base=30),
+    _works(BuildingKind.GLASSWORKS, {}, base=2.1),
+    _works(BuildingKind.BREWERY, {POP: FOOD_TOWN}, base=22),
+    _works(BuildingKind.DISTILLERY, {POP: FOOD_TOWN}, 1600, base=16),
     SAKE_BREWERIES,
     SOY_SAUCE_BREWERIES,
-    _works(BuildingKind.TANNERY, {}, base=4),
+    _works(BuildingKind.TANNERY, {}, base=3.2),
     _works(BuildingKind.SHOE_FACTORY, {POP: 3}, 1850, base=0.5),
-    _works(BuildingKind.PAPER_MILL, {}, 1150, base=2),
-    _works(BuildingKind.PRINTING_WORKS, {}, 1600, PRINTING_CELLS, base=2),
-    _works(BuildingKind.SUGAR_REFINERY, {}, 1800, base=4),
-    _works(BuildingKind.PORCELAIN_WORKS, {}, 1710, 30_000, base=2),
+    _works(BuildingKind.PAPER_MILL, {}, 1150, base=1.5),
+    _works(BuildingKind.PRINTING_WORKS, {}, 1600, PRINTING_CELLS, base=4),
+    _works(BuildingKind.SUGAR_REFINERY, {}, 1800, base=1.7),
+    _works(BuildingKind.PORCELAIN_WORKS, {}, 1710, 20_000, base=2),
     _works(BuildingKind.MACHINE_WORKS, {IND: 2}, 0, base=20),
     _works(BuildingKind.CEMENT_WORKS, {IND: 3}, 0, 20_000, base=4),
     _works(BuildingKind.PLASTICS_WORKS, {IND: 3}, 0, 30_000, base=4),
