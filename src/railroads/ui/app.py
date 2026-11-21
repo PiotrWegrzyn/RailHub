@@ -272,7 +272,9 @@ class App:
         if self.clock.paused and not self.tiles.choosing:
             draw_pause_banner(*self.view.map_rect)
         if self.tutorial is not None:
-            draw_tutorial(self.tutorial)
+            goal = self.game.goal
+            held_up = bool(self.tiles.open or self.tiles.choosing or goal.news or goal.bankrupt)
+            draw_tutorial(self.tutorial, in_front=not held_up)
             if self._turning is None:
                 self.tutorial.update(self.game, self.seen())
         typing = imgui.get_io().want_text_input

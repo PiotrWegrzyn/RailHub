@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from imgui_bundle import imgui
 from test_app_frame import context, frame, shell_frame
 
 from railroads.land import buy_lot_steps
@@ -13,7 +14,7 @@ from railroads.sim.economy import BONUS_PER_GOOD, LOCAL_REACH, SCARCE_WORTH
 from railroads.sim.finance import START_CASH, TRACK_PRICE
 from railroads.sim.game import Game
 from railroads.sim.goods import FREIGHT_SHARE, Good
-from railroads.sim.ownership import HOLD_MONTHS, LOT, SHARES
+from railroads.sim.ownership import HOLD_MONTHS, SHARES
 from railroads.sim.steps import finish
 from railroads.sim.tilemap import LAYERS
 from railroads.sim.trains import Stop
@@ -27,7 +28,7 @@ from railroads.tutorial.place import (
     MAP_ROWS,
     SHOWN_FARM,
 )
-from railroads.tutorial.steps import STEPS, Seen, Step, Tutorial
+from railroads.tutorial.steps import SHARE_LOTS, STEPS, Seen, Step, Tutorial
 from railroads.ui.app import App, Shell
 from railroads.ui.main_menu import TutorialChoice
 from railroads.ui.map_view import Lens
@@ -362,15 +363,43 @@ def test_the_tutorial_chosen_in_the_menu_opens_on_its_first_step(
     assert shell.app.view.land.wanted is None
 
 
-def test_the_tutorial_plays_through_to_the_end_on_the_app_s_frames(context: None) -> None:
+# How many steps a month of the trains' running is taken in by months_pass.
+TRAIN_STEPS = 50
+
+
+def months_pass(app: App, months: int) -> None:
+    """Lets months pass on the app's frames as they would in play, the trains running through
+    each, picking the lowest tiles a player could on each 1 January the game waits on."""
+    for _ in range(months):
+        for _ in range(TRAIN_STEPS):
+            app.view.time_passed(1 / TRAIN_STEPS)
+        app.clock.seconds = app.clock.seconds_per_month - 0.001
+        frame(app)
+        while app._turning is not None or app.tiles.choosing:
+            if app.tiles.choosing and app._turning is None:
+                tiles = app.game.railway.tiles
+                board = app.tiles.board
+                while tiles.picks_left(board):
+                    tiles.pick(
+                        board, next(t for t in tiles.open_tiles(board) if tiles.can_pick(board, t))
+                    )
+                app.tiles.confirm()
+            frame(app)
+
+
+def test_the_tutorial_plays_through_to_the_end_with_the_year_going_by(context: None) -> None:
     app = App.from_saved(make_tutorial())
     game = app.game
     view = app.view
+    shown: list[str] = []
 
-    def do_next(action=lambda: None) -> None:
+    def do_next(action=lambda: None, months: int = 0) -> None:
+        assert app.tutorial is not None and app.tutorial.current is not None
+        shown.append(app.tutorial.current.title)
         action()
         frame(app)
-        assert app.tutorial is not None and app.tutorial.done
+        months_pass(app, months)
+        assert app.tutorial.done, app.tutorial.current.title
         app.tutorial.next()
         frame(app)
 
@@ -382,12 +411,6 @@ def test_the_tutorial_plays_through_to_the_end_on_the_app_s_frames(context: None
             Stop(BROOKBY_STATION),
         ]
 
-    def lens(chosen: Lens) -> None:
-        view.lens = chosen
-
-    def boards() -> None:
-        app.tiles.open = True
-
     def buying() -> None:
         view.build.trains.open = True
         view.build.trains.buy.open = True
@@ -398,32 +421,54 @@ def test_the_tutorial_plays_through_to_the_end_on_the_app_s_frames(context: None
     do_next(lambda: game.build_station(BROOKBY_STATION))
     do_next(lambda: game.lay_track(ASHFORD_STATION, BROOKBY_STATION))
     do_next(buy_train)
-    do_next(lambda: game.railway.trains[0].stops[1].add_car(Good.PASSENGERS))
+    with_a_train = game.finances.cash
+    do_next(lambda: game.railway.trains[0].stops[1].add_car(Good.PASSENGERS), months=12)
+    earned = game.finances.cash - with_a_train
     do_next(lambda: setattr(view, "selected", SHOWN_FARM))
-    do_next(lambda: lens(Lens.SATISFACTION))
-    do_next(lambda: lens(Lens.TOWNS))
+    do_next(lambda: setattr(view, "lens", Lens.SATISFACTION))
+    do_next(lambda: setattr(view, "lens", Lens.TOWNS))
     do_next(lambda: game.growth.owners.buy(SHOWN_FARM, BuildingKind.FARM))
-    do_next(boards)
+    do_next(lambda: setattr(app.tiles, "open", True))
+    app.tiles.open = False
     do_next(buying)
     view.build.trains.buy.open = False
+    frame(app)
     assert game.lots is not None
     saved = finish(buy_lot_steps(app.saved(), game.lots.offers[0], report=lambda text: None))
     app = App.from_saved(saved)
+    frame(app)
     do_next()
     tutorial = app.tutorial
     assert tutorial is not None and tutorial.current is not None
     tutorial.closed = True
     frame(app)
 
+    assert shown == [step.title for step in STEPS[:-1]]
+    assert earned > 0
+    assert app.clock.date == "January 1851"
     assert tutorial.current is None
     assert tutorial.finished == set(range(1, len(STEPS) - 1))
+
+
+def test_the_tutorial_window_comes_back_onto_a_screen_that_shrank(context: None) -> None:
+    app = App.from_saved(make_tutorial())
+    frame(app)
+    io = imgui.get_io()
+    io.display_size = imgui.ImVec2(900, 600)
+
+    frame(app)
+    window = imgui.internal.find_window_by_name("###tutorial")
+
+    assert window is not None
+    assert window.pos.x + window.size.x <= 900
+    assert window.pos.y + window.size.y <= 600
 
 
 def test_the_tutorial_gives_freight_bonus_goods_and_shares_as_the_game_has_them() -> None:
     numbers = [
         f"{FREIGHT_SHARE:.0%} of a good's market price, up to {SCARCE_WORTH:g} times",
         f"add {BONUS_PER_GOOD:.0%} each",
-        f"{SHARES:,} shares, traded {LOT} at a time",
+        f"{SHARES:,} shares, bought {SHARE_LOTS} at a time",
         f"sold {HOLD_MONTHS // 12} years after",
         f"up to {LOCAL_REACH} cells away",
     ]
