@@ -433,6 +433,7 @@ than dry land unless a row names it:
 | Sugar fields | 0.0000000168 + 0.000000042 per doubling of population + 0.000000168 per doubling of food | fewer than 5 population | open flat land, not cold; mild x0.6; river x3 |
 | Mines | 0.000001 + 0.0000014 per doubling of ore | | mountains; hills x0.4, flat x0.01; beside mountains x3 |
 | Logging camps | 0.000075 + 0.0000015 per doubling of population | | forest with at least 4 forest cells in its neighbourhood and flat open land next to it; river x1.5 |
+| Fisheries | 0.000005 + 0.00015 per doubling of population x2 and of food x0.5 | | next to the sea; a lake x0.15, a river x0.1; none inland or in mountains |
 | Ports | 0.0000008 + 0.000002 per doubling of population | 4 population | next to the sea, or a lake x0.3 |
 | Factories | 0.00000004 + 0.000000006 per doubling of population + 0.000065 of industry + 0.0000008 of timber, each only from 5 points nearby | | flat; hills x0.5, forest x0.2; river x1.5 |
 | Canneries | 0.000000015 + 0.00000026 per doubling of food + 0.00000076 of industry | 1 food | as factories |
@@ -595,7 +596,7 @@ window (H) lists the same.
 | Printing works (1600) | 3,000 newspapers | 150 paper (from 1150) |  |
 | Sugar refinery (1800) | 60 refined sugar | 30 sugar | 6 coal (from 1700), 6 limestone |
 | Porcelain works (1710) | 30 porcelain | 15 clay | 7.5 coal (from 1700) |
-| Butcher (1850) | 120 meat | 48 animals |  |
+| Butcher (1600) | 120 meat | 48 animals |  |
 | Power plant (era 3) |  | 4,000 coal (from 1700) |  |
 | Diesel power plant (era 5) |  | 3e+04 fuel (from era 2) |  |
 | Gas power plant (era 6) |  | 1e+04 gas (from era 2) |  |
@@ -657,8 +658,8 @@ window (H) lists the same.
 | Mega soy sauce brewery | 125 soy sauce | 62.5 soybeans, 62.5 wheat, 25 salt |  |
 | Big tannery | 100 leather | 50 livestock | 25 limestone |
 | Mega tannery | 250 leather | 125 livestock | 62.5 limestone |
-| Big butcher (1850) | 450 meat | 180 animals |  |
-| Mega butcher (1850) | 1,688 meat | 675 animals |  |
+| Big butcher (1600) | 450 meat | 180 animals |  |
+| Mega butcher (1600) | 1,688 meat | 675 animals |  |
 | Big shoe factory (1850) | 50 shoes | 100 leather | 25 wax |
 | Mega shoe factory (1850) | 125 shoes | 250 leather | 62.5 wax |
 | Big plastics works (era 6) | 250 plastics | 125 oil (from era 2), 125 chemicals (from era 3) |  |
@@ -715,9 +716,12 @@ window (H) lists the same.
 | Salt mine cathedral | 200 salt |  |  |
 <!-- end table -->
 
-Steel mills, canneries, factories, shipyards and every works are processors: each keeps a stockpile of up to
-300 of every input for every building, takes in what reaches it even while it waits for another
-input, and works from it. Nothing is made that has nowhere to go: a building makes only what a
+Steel mills, canneries, factories, shipyards and every works are processors: each keeps a stockpile of two
+months of every input it uses at most for every building, takes in what reaches it even while it
+waits for another input, and works from it. A processor dies out only once nothing has reached it
+for thirty years (brickworks, breweries, distilleries, potters, glassworks, textile mills,
+coopers, gasworks, tile works and carpet weavers 250, the other rare crafts 50) and its stockpile is empty, so a steel mill with
+coal but no iron stands on. Nothing is made that has nowhere to go: a building makes only what a
 buyer takes, and a processor uses up only the inputs for what it made, so a steel mill with no
 one to take its steel keeps its iron ore and coal waiting. Needs are handed out in the order of
 the chain, coal, logs and planks, then steel, then wheat, then fruit, then food, then goods, so bakeries
@@ -800,8 +804,7 @@ neighbourhood, a little likelier the more people live around.
 Every new map gets deposits from its own geography and seed (`railroads.mapgen.deposits`), shown
 as coloured specks on the ground and named in the hex details: iron ore, copper, gold and diamonds
 in mountains and the hills beside them; oil on inland plains; salt on sea coasts, hills and
-mountains; fish on shores; wool on
-grassy hills; grapes on mild hills; cotton on hot plains; coffee on hot hills; rubber in hot
+mountains; wool on grassy hills; grapes on mild hills; cotton on hot plains; coffee on hot hills; rubber in hot
 forest; and, very rarely, incense on any land off the mountains. A map gets a number of clusters for its land, spread apart, closer together where little
 land allows them; those that do not fit are left out, and a map without the land for a resource
 has none. Each resource is worked only on its own deposit, at most once per neighbourhood.

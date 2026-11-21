@@ -496,6 +496,9 @@ class Ladder:
     crowded_at: int | None = None
     # Points of a kind nearby draw more only once there are at least this many of them.
     draws_from: int = 1
+    # How many years its buildings last starving (railroads.sim.growth.dies_after), when not the
+    # usual DIE_AFTER_MONTHS there.
+    starving_years: int | None = None
 
     def pull(self, nearby: npt.NDArray[np.int64]) -> FloatGrid:
         """What the points nearby add to the chance, in doublings."""
@@ -687,6 +690,24 @@ PORTS = Ladder(
     most_nearby=1,
 )
 
+# Three fisheries in a neighbourhood with four population points for each of its land cells off
+# the mountains join into a port, unless a port stands within two cells.
+FISHERIES_PER_PORT = 3
+PORT_PEOPLE_PER_CELL = 4
+PORTS_APART = 2
+
+# Fisheries grow on the shore like farms on fields, mostly by the sea and far less by lakes and
+# rivers, and more where people live (railroads.sim.growth.DRAWN_BY_KIND).
+FISHERIES = Ladder(
+    kinds=(BuildingKind.FISHERY,),
+    land=Land(
+        relief={Relief.MOUNTAINS: 0.0},
+        water={Terrain.LAND: 0.0, Terrain.SEA: 1.0, Terrain.LAKE: 0.15, Terrain.RIVER: 0.1},
+    ),
+    base=100,
+    joins=Join(BuildingKind.PORT, FISHERIES_PER_PORT, PORT_PEOPLE_PER_CELL, PORTS_APART),
+)
+
 # Factories make goods from steel, copper and machinery brought to them and draw more factories,
 # so they gather in industrial districts more than they follow people.
 FACTORIES = Ladder(
@@ -765,6 +786,7 @@ def _works(
     from_year: int = 0,
     land_cells_each: int | None = None,
     base: float = 0.0,
+    starving_years: int | None = None,
 ) -> Ladder:
     """A works that opens anywhere by chance, a little likelier where people and industry are,
     whether or not its inputs are near."""
@@ -776,15 +798,10 @@ def _works(
             needs=needs,
             from_year=from_year,
             land_cells_each=land_cells_each,
+            starving_years=starving_years,
         )
     )
 
-
-# Three fisheries in a neighbourhood with four population points for each of its land cells off
-# the mountains join into a port, unless a port stands within two cells.
-FISHERIES_PER_PORT = 3
-PORT_PEOPLE_PER_CELL = 4
-PORTS_APART = 2
 
 # Rare resources, each on the deposits a map was given.
 RESOURCES = (
@@ -794,10 +811,6 @@ RESOURCES = (
     _resource(BuildingKind.DIAMOND_MINE, Deposit.DIAMONDS),
     _resource(BuildingKind.OIL_WELL, Deposit.OIL, 0, 30_000),
     _resource(BuildingKind.SALT_WORKS, Deposit.SALT),
-    replace(
-        _resource(BuildingKind.FISHERY, Deposit.FISH, most_nearby=2),
-        joins=Join(BuildingKind.PORT, FISHERIES_PER_PORT, PORT_PEOPLE_PER_CELL, PORTS_APART),
-    ),
     _resource(BuildingKind.SHEEP_FARM, Deposit.WOOL, crowded_at=FARMS_CROWDED_OUT),
     _resource(BuildingKind.VINEYARD, Deposit.GRAPES, crowded_at=FARMS_CROWDED_OUT),
     _resource(BuildingKind.COTTON_FIELD, Deposit.COTTON),
@@ -862,8 +875,9 @@ GASWORKS = _merges(
     Ladder(
         kinds=(BuildingKind.GASWORKS,),
         land=FACTORY_LAND,
-        base=10,
+        base=3,
         from_year=1820,
+        starving_years=250,
     )
 )
 
@@ -875,13 +889,13 @@ FOOD_TOWN = 3
 _BAKERY = Ladder(
     kinds=(BuildingKind.BAKERY,),
     land=TOWN_LAND,
-    base=3.5,
+    base=2.85,
 )
 
 BAKERIES = _merges(_BAKERY)
 
 # Butchers open in towns from 1850, the likelier the more people live around, like bakeries.
-BUTCHERS = _merges(replace(_BAKERY, kinds=(BuildingKind.MEAT_FACTORY,), base=22, from_year=1850))
+BUTCHERS = _merges(replace(_BAKERY, kinds=(BuildingKind.MEAT_FACTORY,), base=0.75, from_year=1600))
 
 # Town crafts that come up, like bakeries, the likelier the more people live around: potters and
 # dairies as often as other crafts; tile works, foundries and sausage makers, which need two
@@ -892,7 +906,11 @@ LUXURY_TOWN = 20
 
 
 def _town_craft(
-    kind: BuildingKind, base: float, from_year: int = 0, least_people: int = 0
+    kind: BuildingKind,
+    base: float,
+    from_year: int = 0,
+    least_people: int = 0,
+    starving_years: int | None = None,
 ) -> Ladder:
     return _merges(
         Ladder(
@@ -901,23 +919,24 @@ def _town_craft(
             base=base,
             needs={Points.POPULATION: least_people} if least_people else {},
             from_year=from_year,
+            starving_years=starving_years,
         )
     )
 
 
 TOWN_CRAFTS = (
-    _town_craft(BuildingKind.POTTER, 24, least_people=FOOD_TOWN),
+    _town_craft(BuildingKind.POTTER, 8.9, least_people=FOOD_TOWN, starving_years=250),
     _town_craft(BuildingKind.DAIRY, 5),
-    _town_craft(BuildingKind.TILE_WORKS, 1.8),
-    _town_craft(BuildingKind.FOUNDRY, 2, 1800),
-    _town_craft(BuildingKind.SAUSAGE_MAKER, 12.5, 1850),
+    _town_craft(BuildingKind.TILE_WORKS, 0.36, starving_years=250),
+    _town_craft(BuildingKind.FOUNDRY, 2, 1800, starving_years=50),
+    _town_craft(BuildingKind.SAUSAGE_MAKER, 12.5, 1850, starving_years=50),
     _town_craft(BuildingKind.TOFU_MAKER, 5, least_people=FOOD_TOWN),
     _town_craft(BuildingKind.MISO_MAKER, 5, least_people=FOOD_TOWN),
     _town_craft(BuildingKind.FISH_DRYER, 5, least_people=FOOD_TOWN),
-    _town_craft(BuildingKind.JUICE_WORKS, 10, 1870),
-    _town_craft(BuildingKind.CARPET_WEAVER, 10, 1700, LUXURY_TOWN),
-    _town_craft(BuildingKind.CLOCK_MAKER, 10, 1880, LUXURY_TOWN),
-    _town_craft(BuildingKind.MIRROR_MAKER, 10, 1700, LUXURY_TOWN),
+    _town_craft(BuildingKind.JUICE_WORKS, 1, 1870, starving_years=50),
+    _town_craft(BuildingKind.CARPET_WEAVER, 2, 1700, LUXURY_TOWN, 250),
+    _town_craft(BuildingKind.CLOCK_MAKER, 10, 1880, LUXURY_TOWN, 50),
+    _town_craft(BuildingKind.MIRROR_MAKER, 10, 1700, LUXURY_TOWN, 50),
 )
 
 # Buildings that only buy: manors in towns of MANOR_TOWN people, theatres in towns of
@@ -1024,13 +1043,13 @@ CATTLE_RANCHES = Ladder(
         temperature={Temperature.HOT: 0.3},
         open_field=OPEN_FIELD,
     ),
-    base=0.245,
+    base=0.29,
     crowded_at=FARMS_CROWDED_OUT,
 )
 
 # Pig farms and chicken farms keep to the same land as cattle; pigs are a little rarer.
 PIG_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.PIG_FARM,), base=0.15)
-CHICKEN_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.CHICKEN_FARM,), base=0.26)
+CHICKEN_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.CHICKEN_FARM,), base=0.285)
 
 # Flax wants cool, wet land by rivers and lakes.
 FLAX_FIELDS = Ladder(
@@ -1175,12 +1194,14 @@ SOY_SAUCE_BREWERIES = _works(
 )
 
 # Works that open by people and industry alone: their inputs must be brought to them.
+# Works whose inputs seldom come together before the railway last starving_years long enough
+# that the land holds about as many in 1850 as it gains by 2040 when well served.
 WORKS = (
-    _works(BuildingKind.SAWMILL, {}, base=5.2),
-    _works(BuildingKind.TEXTILE_MILL, {}, 1780, base=2.2),
-    _works(BuildingKind.FURNITURE_MAKER, {}, base=3.2),
+    _works(BuildingKind.SAWMILL, {}, base=2),
+    _works(BuildingKind.TEXTILE_MILL, {}, 1780, base=0.6, starving_years=250),
+    _works(BuildingKind.FURNITURE_MAKER, {}, base=1.1),
     _works(BuildingKind.WINERY, {}, base=4),
-    _works(BuildingKind.BARREL_MAKER, {}, base=2),
+    _works(BuildingKind.BARREL_MAKER, {}, base=0.25, starving_years=250),
     _works(BuildingKind.TOOL_WORKS, {IND: 2}, 0, base=20),
     _works(BuildingKind.CHEMICAL_WORKS, {IND: 3}, 0, 20_000, base=4),
     _works(BuildingKind.REFINERY, {}, 0, 10_000, base=3.5),
@@ -1188,17 +1209,17 @@ WORKS = (
     _works(BuildingKind.ELECTRONICS_PLANT, {IND: 3}, 0, 30_000, base=4),
     _works(BuildingKind.PLANE_FACTORY, {IND: 6}, 0, 40_000, base=100),
     _works(BuildingKind.TANK_FACTORY, {IND: 6}, 0, 40_000, base=100),
-    _works(BuildingKind.BRICKWORKS, {}, base=4),
-    _works(BuildingKind.GLASSWORKS, {}, base=2.1),
-    _works(BuildingKind.BREWERY, {POP: FOOD_TOWN}, base=22),
-    _works(BuildingKind.DISTILLERY, {POP: FOOD_TOWN}, 1600, base=16),
+    _works(BuildingKind.BRICKWORKS, {}, base=0.8, starving_years=250),
+    _works(BuildingKind.GLASSWORKS, {}, base=0.36, starving_years=250),
+    _works(BuildingKind.BREWERY, {POP: FOOD_TOWN}, base=6.3, starving_years=250),
+    _works(BuildingKind.DISTILLERY, {POP: FOOD_TOWN}, 1600, base=12.7, starving_years=250),
     SAKE_BREWERIES,
     SOY_SAUCE_BREWERIES,
-    _works(BuildingKind.TANNERY, {}, base=3.2),
+    _works(BuildingKind.TANNERY, {}, base=0.5),
     _works(BuildingKind.SHOE_FACTORY, {POP: 3}, 1850, base=0.5),
     _works(BuildingKind.PAPER_MILL, {}, 1150, base=1.5),
     _works(BuildingKind.PRINTING_WORKS, {}, 1600, PRINTING_CELLS, base=4),
-    _works(BuildingKind.SUGAR_REFINERY, {}, 1800, base=1.7),
+    _works(BuildingKind.SUGAR_REFINERY, {}, 1800, base=0.9),
     _works(BuildingKind.PORCELAIN_WORKS, {}, 1710, 20_000, base=2),
     _works(BuildingKind.MACHINE_WORKS, {IND: 2}, 0, base=20),
     _works(BuildingKind.CEMENT_WORKS, {IND: 3}, 0, 20_000, base=4),
@@ -1230,6 +1251,7 @@ LADDERS = (
     MINES,
     LOGGING_CAMPS,
     PORTS,
+    FISHERIES,
     FACTORIES,
     FOOD_PLANTS,
     STEEL_MILLS,

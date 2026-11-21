@@ -2,16 +2,16 @@ import numpy as np
 import pytest
 from test_growth import build, make_map
 
+from builders import flat_map, layer
 from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import (
+    FISHERIES,
     FISHERIES_PER_PORT,
     PORT_PEOPLE_PER_CELL,
-    RESOURCES,
 )
 from railroads.sim.tilemap import Terrain, TileMap
 
-FISHERIES = next(ladder for ladder in RESOURCES if ladder.kinds[0] == BuildingKind.FISHERY)
 COAST = (5, 1)
 
 
@@ -61,7 +61,7 @@ def test_fisheries_stay_without_enough_people_or_enough_of_them(
     growth._turn(COAST, FISHERIES, np.random.default_rng(0))
 
     assert growth.count(BuildingKind.PORT).sum() == 0
-    assert growth.count(BuildingKind.FISHERY).sum() == fisheries
+    assert growth.count(BuildingKind.FISHERY).sum() >= fisheries
 
 
 def test_fisheries_do_not_join_into_a_port_beside_another_port() -> None:
@@ -70,4 +70,19 @@ def test_fisheries_do_not_join_into_a_port_beside_another_port() -> None:
     growth._turn(COAST, FISHERIES, np.random.default_rng(0))
 
     assert growth.count(BuildingKind.PORT).sum() == 1
-    assert growth.count(BuildingKind.FISHERY).sum() == FISHERIES_PER_PORT
+    assert growth.count(BuildingKind.FISHERY).sum() >= FISHERIES_PER_PORT
+
+
+def test_fisheries_grow_mostly_by_the_sea_less_by_lakes_and_rivers_and_never_inland() -> None:
+    terrain = layer(12, 12, Terrain.LAND)
+    terrain[:, 0] = Terrain.SEA
+    terrain[0, 4:8] = Terrain.LAKE
+    terrain[11, 4:8] = Terrain.RIVER
+    tile_map = flat_map(12, 12, terrain=terrain)
+
+    weights = FISHERIES.land.weights(tile_map)
+
+    by_sea, by_lake, by_river, inland = weights[6, 1], weights[1, 5], weights[10, 5], weights[6, 6]
+    assert by_sea > by_lake > 0
+    assert by_sea > by_river > 0
+    assert inland == 0

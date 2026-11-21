@@ -317,15 +317,15 @@ def test_ten_coal_and_five_iron_ore_make_one_steel_once_a_station_takes_it() -> 
     assert economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][flat(economy, (8, 8))] == 0.0
 
 
-def test_inputs_wait_in_a_stockpile_of_three_hundred_until_the_other_input_comes() -> None:
+def test_inputs_wait_in_a_stockpile_of_two_months_until_the_other_input_comes() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 8), BuildingKind.STEEL_MILL, 1))
 
-    for _ in range(5):
-        economy.trade(placed, holding(COAL=100.0))
+    for _ in range(3):
+        economy.trade(placed, holding(COAL=1500.0))
 
-    assert economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][flat(economy, (8, 8))] == 300.0
+    assert economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][flat(economy, (8, 8))] == 4000.0
 
 
 def test_nine_fruit_and_three_steel_make_thirty_cans() -> None:
@@ -1030,7 +1030,7 @@ def test_machinery_and_diesel_let_a_sawmill_saw_more_logs(
     assert trade.gathered[STATION].get(Good.WOOD_CHIPS, 0.0) == pytest.approx(planks / 5)
 
 
-def test_a_sawmill_keeps_only_three_months_of_machinery() -> None:
+def test_a_sawmill_keeps_only_two_months_of_machinery() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     economy.year = 1925
@@ -1039,7 +1039,7 @@ def test_a_sawmill_keeps_only_three_months_of_machinery() -> None:
     trade = economy.trade(placed, holding(1000.0, LOGS=40.0, MACHINERY=50.0))
 
     took, _ = trade.goods_got[(BuildingKind.SAWMILL, Need.MACHINERY)]
-    assert took[position(trade, economy, (8, 8))] == pytest.approx(15.0)
+    assert took[position(trade, economy, (8, 8))] == pytest.approx(10.0)
 
 
 @pytest.mark.parametrize(

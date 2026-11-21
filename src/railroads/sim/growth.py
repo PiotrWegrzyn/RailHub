@@ -30,8 +30,9 @@ Every TRADE_EVERY_MONTHS the stations hand out their goods and buildings sell to
 kind of building in each cell unsatisfied, content or thriving, and pays the player for the
 buildings they own (railroads.sim.ownership). What a cell's buildings of a kind get is shared
 equally among them: of ten houses with food for two, each gets a fifth of what it wants, and they
-starve only when nothing arrives, or, for homes, no food (railroads.sim.economy). Buildings that starve on end are pulled down, the player's too: homes after HOMES_DIE_AFTER_MONTHS,
-processors and the rest after DIE_AFTER_MONTHS. Producers of what the land gives and soldiers
+starve only when nothing arrives and, for processors, nothing is left in their stockpile, or, for
+homes, no food (railroads.sim.economy). Buildings that starve on end are pulled down, the player's too: homes after HOMES_DIE_AFTER_MONTHS,
+processors and the rest after DIE_AFTER_MONTHS, or the years their ladder gives (starving_years). Producers of what the land gives and soldiers
 never starve to death (UNDYING); fields go only when a town grows over them (crowded_at).
 
 Growth keeps the tally the other parts share: how many of each kind stand in each cell (counts),
@@ -70,7 +71,6 @@ import numpy.typing as npt
 from railroads.sim.clock import START_YEAR
 from railroads.sim.constructions import (
     GREW_FROM,
-    MERGED,
     ONE_OFFS,
     Building,
     BuildingKind,
@@ -129,7 +129,7 @@ THINNING_UP_TO = 0.05
 SKYSCRAPER_STARS = 4
 # How many times its base chance each served point of a ladder's own kind in a cell adds there,
 # per doubling of what draws it, unless the ladder gives its own (railroads.sim.ladders.Ladder).
-BREEDING_TIMES = 30.0
+BREEDING_TIMES = 3.0
 # Ladders drawn by industry are drawn instead by their own kind around them OWN_KIND_TIMES as
 # strongly as industry drew them, and by industry CATEGORY_SHARE of that; in a cell, each served
 # point of their own kind counts OWN_KIND_TIMES and each of the rest of their kind of points
@@ -173,6 +173,7 @@ DRAWN_BY_KIND: Mapping[BuildingKind, Mapping[Points, float]] = MappingProxyType(
         BuildingKind.GASWORKS: {Points.INDUSTRY: 1.0},
         BuildingKind.DAIRY: {Points.POPULATION: 2.0, Points.INDUSTRY: 1.0},
         BuildingKind.FARM: {Points.FOOD: 1.5, Points.POPULATION: 1.0},
+        BuildingKind.FISHERY: {Points.POPULATION: 2.0, Points.FOOD: 0.5},
     }
 )
 SHUNNED_BY: Mapping[BuildingKind, Mapping[Points, float]] = MappingProxyType(
@@ -303,31 +304,23 @@ KEY_LAND_CELLS = 120_000
 LIKELIEST_TRIED = 20
 ANYWHERE_TRIED = 200
 
-# How long buildings last starving: homes, and everything else.
+# How long buildings last starving: homes, and everything else unless its ladder says
+# (Ladder.starving_years).
 HOMES_DIE_AFTER_MONTHS = 10 * 12
 DIE_AFTER_MONTHS = 30 * 12
-# The crafts that need two inputs for goods that are no necessity but a bonus worth more last
-# longer starving, since they seldom get both.
-HARD_DIE_AFTER_MONTHS = 50 * 12
-HARD_CRAFTS = frozenset(
-    {
-        BuildingKind.TILE_WORKS,
-        BuildingKind.FOUNDRY,
-        BuildingKind.SAUSAGE_MAKER,
-        BuildingKind.JUICE_WORKS,
-        BuildingKind.CARPET_WEAVER,
-        BuildingKind.CLOCK_MAKER,
-        BuildingKind.MIRROR_MAKER,
-    }
-)
-HARD_CRAFTS = HARD_CRAFTS | {grown for kind in HARD_CRAFTS for grown in MERGED[kind]}
+_STARVING_MONTHS = {
+    kind: ladder.starving_years * 12
+    for ladder in LADDERS
+    if ladder.starving_years is not None
+    for kind in ladder.kinds
+}
 
 
 def dies_after(kind: BuildingKind) -> int:
     """How many months buildings of a kind last starving."""
     if kind in HOMES:
         return HOMES_DIE_AFTER_MONTHS
-    return HARD_DIE_AFTER_MONTHS if kind in HARD_CRAFTS else DIE_AFTER_MONTHS
+    return _STARVING_MONTHS.get(kind, DIE_AFTER_MONTHS)
 
 
 # Producers of what the land gives, which stand idle with nobody to sell to rather than dying out:
@@ -648,15 +641,26 @@ class Growth:
 
     def starving(self, trade: Trade, kind: BuildingKind) -> npt.NDArray[np.int64]:
         """How many buildings of a kind starve in each cell traded on: what arrives is shared
-        equally among them, so they starve all together, and only when none of it arrives. In a
-        simulated game, cells the stand-in serves have the share it assumes."""
+        equally among them, so they starve all together, and only when none of it arrives and,
+        for processors, their stockpile is empty too, so one that lacks one of its inputs lives
+        on what it holds of the others. In a simulated game, cells the stand-in serves have the
+        share it assumes."""
         count = self._counts[kind].ravel()[trade.cells]
         wanted = trade.needed[kind] + trade.could_make[kind]
         share = trade.share((kind,))
         if self.assumed_shares is not None:
             assumed = self.assumed_shares[trade.cells]
             share = np.where(np.isnan(assumed), share, assumed)
-        return np.where((wanted > 0) & (share <= 0.0), count, 0)
+        starving = (wanted > 0) & (share <= 0.0) & ~self._stocked(kind, trade.cells)
+        return np.where(starving, count, 0)
+
+    def _stocked(self, kind: BuildingKind, cells: npt.NDArray[np.intp]) -> npt.NDArray[np.bool_]:
+        """Whether the processors of a kind in each of these cells hold any of their inputs."""
+        held = np.zeros(cells.size, dtype=np.bool_)
+        for (stocked, _), stock in self.economy.stock.items():
+            if stocked == kind:
+                held |= stock[cells] > 0
+        return held
 
     def _die_out(self, trade: Trade) -> set[Cell]:
         """Counts the months buildings of each kind have starved in each cell, and pulls down as

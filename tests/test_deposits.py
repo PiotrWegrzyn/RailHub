@@ -10,7 +10,7 @@ from railroads.sim.goods import MAKES, Good, Need, freight_of, needs_of
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth, dies_after
 from railroads.sim.ladders import JEWELLERS, RESOURCES, WORKS, GrowthRule
-from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
+from railroads.sim.tilemap import Deposit, Relief, TileMap
 
 GOLD_MINES = next(ladder for ladder in RESOURCES if ladder.kinds[0] == BuildingKind.GOLD_MINE)
 TOOL_WORKS = next(ladder for ladder in WORKS if ladder.kinds[0] == BuildingKind.TOOL_WORKS)
@@ -54,24 +54,6 @@ def test_a_map_without_the_land_for_a_resource_simply_has_none() -> None:
 
     assert not np.isin(layer, [Deposit.GOLD, Deposit.IRON, Deposit.DIAMONDS]).any()
     assert (layer == Deposit.OIL).any()
-
-
-def river_map(rivers: int) -> TileMap:
-    terrain = np.full((60, 60), Terrain.LAND, dtype=np.uint8)
-    for river in range(rivers):
-        terrain[:, 5 + 10 * river] = Terrain.RIVER
-    return flat_map(60, 60, terrain=terrain)
-
-
-@pytest.mark.parametrize(("rivers", "least", "most"), [(0, 0, 0), (3, 6, 14), (6, 12, 28)])
-def test_fishing_grounds_come_with_the_land_beside_rivers(
-    rivers: int, least: int, most: int
-) -> None:
-    tile_map = river_map(rivers)
-
-    layer = place_deposits(tile_map, np.random.default_rng(1))
-
-    assert least <= (layer == Deposit.FISH).sum() <= most
 
 
 def test_where_little_land_allows_a_resource_its_clusters_still_fit() -> None:
@@ -140,14 +122,14 @@ def test_needs_start_in_the_era_of_their_goods() -> None:
 
 def test_works_with_nothing_to_work_from_close_after_exactly_thirty_years_starving() -> None:
     constructions = Constructions(make_map(40, False))
-    constructions.build(Building((20, 20), BuildingKind.TEXTILE_MILL))
+    constructions.build(Building((20, 20), BuildingKind.SAWMILL))
     growth = Growth(constructions, GrowthRule(ladders=(), forests=None))
     standing = []
 
-    for months in (dies_after(BuildingKind.TEXTILE_MILL) - 2, 1):
+    for months in (dies_after(BuildingKind.SAWMILL) - 2, 1):
         for _ in range(months):
             growth.trade_goods()
-        standing.append(int(growth.count(BuildingKind.TEXTILE_MILL).sum()))
+        standing.append(int(growth.count(BuildingKind.SAWMILL).sum()))
 
     assert growth.died_out == 1
     assert standing == [1, 0]

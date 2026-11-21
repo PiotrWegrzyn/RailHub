@@ -103,7 +103,7 @@ def test_a_processor_stocked_up_on_an_input_adds_no_demand_for_it_at_the_station
     growth, railway = joined_stations()
     growth.build(Building((6, 21), BuildingKind.STEEL_MILL))
     cell = growth.constructions.tile_map.grid.shape[1] * 6 + 21
-    full = input_stock(BuildingKind.STEEL_MILL)
+    full = input_stock(BuildingKind.STEEL_MILL, Need.COAL)
     growth.economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][cell] = (
         full if stocked is None else stocked
     )

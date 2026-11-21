@@ -24,8 +24,6 @@ class DepositRule:
     # One cluster for this many land cells, of between so many cells.
     land_cells_per_cluster: int
     size: tuple[int, int]
-    # Whether the land counted is only the land the resource can lie in.
-    on_its_land: bool = False
 
 
 # Rarest first, so they get the land they want before commoner ones spread over it.
@@ -42,7 +40,6 @@ DEPOSITS: dict[Deposit, DepositRule] = {
     Deposit.GRAPES: DepositRule(30_000, (5, 12)),
     Deposit.IRON: DepositRule(20_000, (6, 14)),
     Deposit.WOOL: DepositRule(9_000, (6, 12)),
-    Deposit.FISH: DepositRule(360, (6, 14), on_its_land=True),
 }
 # Military ground, whose few clusters hold every outpost on the map: how many, and of how many cells.
 GARRISONS = (1, 3)
@@ -71,7 +68,6 @@ def allowed_land(tile_map: TileMap) -> dict[Deposit, Mask]:
         Deposit.DIAMONDS: rocky,
         Deposit.OIL: plains,
         Deposit.SALT: by_sea | mountains | hills,
-        Deposit.FISH: land & by_water & (relief != Relief.MOUNTAINS),
         Deposit.WOOL: hills & (vegetation == Vegetation.GRASS),
         Deposit.GRAPES: hills & (temperature == Temperature.NORMAL) & open_land,
         Deposit.COTTON: land & hot & (relief == Relief.FLAT) & open_land,
@@ -94,8 +90,7 @@ def place_deposits(tile_map: TileMap, rng: np.random.Generator) -> npt.NDArray[n
     garrisons = int(rng.integers(GARRISONS[0], GARRISONS[1] + 1))
     _place_clusters(layer, allowed, Deposit.GARRISON, garrisons, GARRISON_SIZE, tile_map, rng)
     for deposit, rule in DEPOSITS.items():
-        counted = int(allowed[deposit].sum()) if rule.on_its_land else land_cells
-        wanted = round(counted / rule.land_cells_per_cluster)
+        wanted = round(land_cells / rule.land_cells_per_cluster)
         _place_clusters(layer, allowed, deposit, wanted, rule.size, tile_map, rng)
     return layer
 

@@ -44,7 +44,6 @@ class Deposit(IntEnum):
     DIAMONDS = 4
     OIL = 5
     SALT = 6
-    FISH = 7
     WOOL = 8
     GRAPES = 9
     COTTON = 10

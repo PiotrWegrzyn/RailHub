@@ -1,9 +1,8 @@
 """Trade: how the goods of railroads.sim.goods reach the buildings that need them each month, and
 how satisfied that leaves each kind of building in each cell.
 
-Each processor keeps a stockpile of up to INPUT_STOCK of every input for every building, taking in
-what reaches it even while it waits for another input, and works from it; of a boost that lets it
-take in more, only BOOST_STOCK_MONTHS of it.
+Each processor keeps a stockpile of STOCK_MONTHS of every input it uses at most for every
+building, taking in what reaches it even while it waits for another input, and works from it.
 
 Buildings hand out what they make on their own first, everywhere on the map (LOCAL_REACH): every
 cell's spare goods go first to the buildings in the same cell, then to those one cell away, and so
@@ -54,7 +53,7 @@ import numpy.typing as npt
 
 from railroads.sim import tiles
 from railroads.sim.clock import QUARTER, START_YEAR
-from railroads.sim.constructions import GREW_FROM, BuildingKind
+from railroads.sim.constructions import BuildingKind
 from railroads.sim.events import in_eastern_bloc, rise_of
 from railroads.sim.goods import (
     BONUS_PART,
@@ -119,20 +118,22 @@ def reach_share(away: int) -> float:
 # About how long a month's trade works before it pauses for the next frame.
 STEP_SECONDS = 0.008
 
-# The most of each input a processor keeps in stock, for every building; a big or mega works
-# keeps as much more as it makes (input_stock). Of a boost that lets it take in more
-# (takes_more) it keeps only BOOST_STOCK_MONTHS of what it uses at most.
-INPUT_STOCK = 300.0
-BOOST_STOCK_MONTHS = 3.0
+# How many months of the most it uses of each input a processor keeps in stock, for every
+# building.
+STOCK_MONTHS = 2.0
 
 
 @cache
-def input_stock(kind: BuildingKind, need: Need | None = None) -> float:
-    """The most of an input one processor of a kind keeps in stock."""
+def input_stock(kind: BuildingKind, need: Need) -> float:
+    """The most of an input one processor of a kind keeps in stock: STOCK_MONTHS of what it
+    uses of it making the most it can, with every boost that lets it take in more; an input
+    standing in for another as much as that one."""
     recipe = RECIPES[kind]
-    if need in recipe.takes_more:
-        return BOOST_STOCK_MONTHS * recipe.most * recipe.boosts[need]
-    return INPUT_STOCK * recipe.most / RECIPES[GREW_FROM.get(kind, kind)].most
+    if need in recipe.boosts:
+        return STOCK_MONTHS * recipe.most * recipe.boosts[need]
+    stands_for = {swap: replaced for replaced, (swap, _) in recipe.swaps.items()}
+    used = recipe.per_unit[stands_for.get(need, need)]
+    return STOCK_MONTHS * recipe.most * (1.0 + sum(recipe.takes_more.values())) * used
 
 
 # How much each bonus good a building gets all of adds to its satisfaction.

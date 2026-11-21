@@ -11,9 +11,9 @@ from railroads.sim.geo import Bounds
 from railroads.sim.ladders import (
     BAKERIES,
     FARMS,
+    FISHERIES,
     ORCHARDS,
     POTATO_FARMS,
-    RESOURCES,
     TOWNS,
     GrowthRule,
 )
@@ -22,7 +22,6 @@ from railroads.sim.tilemap import Terrain, TileMap
 SANDBOX_SIZE = 100
 
 HOUSES_ONLY = replace(TOWNS, kinds=(BuildingKind.HOUSE,), merges={}, rises={}, skyscrapers=False)
-FISHERIES = next(ladder for ladder in RESOURCES if ladder.kinds == (BuildingKind.FISHERY,))
 FOOD_ONLY = GrowthRule(ladders=(HOUSES_ONLY, FARMS, ORCHARDS, POTATO_FARMS, FISHERIES, BAKERIES))
 
 

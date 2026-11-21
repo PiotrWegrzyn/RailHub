@@ -150,3 +150,12 @@ def test_one_off_buildings_wait_for_what_they_need_however_long_it_takes() -> No
 
     assert BuildingKind.RAILWAY_WORKS in UNDYING
     assert growth.counts[BuildingKind.RAILWAY_WORKS][5, 5] == 1
+
+
+def test_a_steel_mill_with_coal_but_no_iron_lives_on_its_stockpile() -> None:
+    growth = standing(((5, 5), BuildingKind.STEEL_MILL), ((5, 7), BuildingKind.MINE))
+
+    run(growth, DIE_AFTER_MONTHS + 12)
+
+    assert growth.counts[BuildingKind.STEEL_MILL].sum() == 1
+    assert growth.died_out == 0
