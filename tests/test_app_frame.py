@@ -1108,3 +1108,18 @@ def test_a_new_game_begins_with_time_standing_still() -> None:
     saved = make_game(Settings(seed=5, map=MapChoice.POLAND), report=lambda _: None)
 
     assert saved.clock.paused
+
+
+def test_a_station_preview_is_kept_apart_from_the_track_preview_and_worked_out_once_per_cell(
+    context: None,
+) -> None:
+    app = made_app()
+    frame(app)
+    app.view._preview = object()  # type: ignore[assignment]
+
+    first = app.view._station_preview((10, 11))
+    again = app.view._station_preview((10, 11))
+    other = app.view._station_preview((10, 12))
+
+    assert again is first
+    assert other is not first

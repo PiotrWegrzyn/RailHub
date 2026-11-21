@@ -224,7 +224,7 @@ class MapView:
         self.input = MapInput(self)
         self._map_rect: tuple[Vec2, Vec2] = ((0.0, 0.0), (0.0, 0.0))
         # The station preview last worked out, and for which cell, buildings and month.
-        self._preview: tuple[tuple[Cell, int, Trade | None], StationPreview] | None = None
+        self._station_previewed: tuple[tuple[Cell, int, Trade | None], StationPreview] | None = None
         self.summaries = SummariesPanel()
         self.station_window = StationWindow()
         self.search = BuildingSearch()
@@ -861,10 +861,10 @@ class MapView:
         """What a station built in a cell would reach, worked out again only for another cell,
         once the buildings change or a month on."""
         key = (cell, self.constructions.version, self.growth.trade)
-        kept = self._preview
+        kept = self._station_previewed
         if kept is None or kept[0][0] != key[0] or kept[0][1] != key[1] or kept[0][2] is not key[2]:
             kept = key, self.growth.station_trade.preview(cell)
-            self._preview = kept
+            self._station_previewed = kept
         return kept[1]
 
     def _train_layer(self) -> TrainLayer:
