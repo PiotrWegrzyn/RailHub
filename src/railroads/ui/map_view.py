@@ -43,6 +43,7 @@ from railroads.ui.map_overlays import (
     MOODS_LEGEND,
     SELECTED_COLOR,
     TOWNS_LEGEND,
+    cell_moods,
     consumers_in_reach,
     draw_compass,
     draw_found,
@@ -53,9 +54,9 @@ from railroads.ui.map_overlays import (
     draw_moods,
     draw_outline,
     draw_owned_flags,
+    draw_starving,
     draw_station_names,
     draw_status,
-    least_satisfied,
     mood_tint,
     status_text,
     tint_colours,
@@ -196,7 +197,10 @@ class MapView:
         self._consumers: tuple[tuple[Cell, int, int], tuple[Cell, ...]] | None = None
         # The cells Shift tints by how satisfied their buildings are, their packed colours, and
         # the month's trade and buildings they were worked out for.
-        self._moods: tuple[tuple[Trade | None, int], npt.NDArray[np.intp], list[int]] | None = None
+        self._moods: (
+            tuple[tuple[Trade | None, int], npt.NDArray[np.intp], list[int], npt.NDArray[np.intp]]
+            | None
+        ) = None
         # The lens turned on above the minimap, if any, and the town tints with the buildings
         # they were worked out for.
         self.lens: Lens | None = None
@@ -571,6 +575,15 @@ class MapView:
             draw_moods(
                 draw_list, marks, self.tile_map.grid, center, (top_left, bottom_right), *tints
             )
+        if self._showing_moods():
+            draw_starving(
+                draw_list,
+                marks,
+                self.tile_map.grid,
+                center,
+                (top_left, bottom_right),
+                self._starving_cells(),
+            )
         if self.build.track_from is not None:
             draw_outline(
                 draw_list,
@@ -775,14 +788,23 @@ class MapView:
         return self._towns[1], self._towns[2]
 
     def _mood_tints(self) -> tuple[npt.NDArray[np.intp], list[int]]:
-        """least_satisfied's cells and their tints, worked out again only once the month's trade
+        """cell_moods's cells and their tints, worked out again only once the month's trade
         or the buildings changed."""
+        return self._cell_moods()[1:3]
+
+    def _starving_cells(self) -> npt.NDArray[np.intp]:
+        """The cells cell_moods finds a kind of building getting nothing in."""
+        return self._cell_moods()[3]
+
+    def _cell_moods(
+        self,
+    ) -> tuple[tuple[Trade | None, int], npt.NDArray[np.intp], list[int], npt.NDArray[np.intp]]:
         key = (self.growth.trade, self.constructions.version)
         if self._moods is None or self._moods[0][0] is not key[0] or self._moods[0][1] != key[1]:
-            cells, shares = least_satisfied(self.growth.trade, self.growth.assumed_shares)
+            cells, shares, starving = cell_moods(self.growth.trade, self.growth.assumed_shares)
             colors = [rgba_u32(mood_tint(share)) for share in shares.tolist()]
-            self._moods = key, cells, colors
-        return self._moods[1], self._moods[2]
+            self._moods = key, cells, colors, cells[starving]
+        return self._moods
 
     def _marks_camera(self) -> IsoCamera | OnGround:
         """The camera marks on the map are drawn with: lifted onto raised ground in pixel art."""

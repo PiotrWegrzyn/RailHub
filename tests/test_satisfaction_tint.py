@@ -14,7 +14,7 @@ from railroads.ui.map_overlays import (
     MOODS_LEGEND,
     SATISFIED_TINT,
     UNSATISFIED_TINT,
-    least_satisfied,
+    cell_moods,
     mood_tint,
     tint_colours,
     town_cells,
@@ -22,7 +22,7 @@ from railroads.ui.map_overlays import (
 )
 from railroads.ui.theme import town_tint
 
-HOUSE, FARM = BuildingKind.HOUSE, BuildingKind.FARM
+HOUSE, FARM, JEWELLER = BuildingKind.HOUSE, BuildingKind.FARM, BuildingKind.JEWELLER
 
 
 def houses_and_farms() -> Trade:
@@ -56,13 +56,37 @@ def test_a_cell_is_tinted_green_yellow_orange_or_red_by_its_satisfaction(
     assert chosen == tint
 
 
-def test_each_cell_wanting_anything_takes_its_least_satisfied_building() -> None:
+def test_each_cell_wanting_anything_is_tinted_by_the_share_of_all_its_buildings_want() -> None:
     trade = houses_and_farms()
 
-    cells, shares = least_satisfied(trade)
+    cells, shares, _ = cell_moods(trade)
 
     assert cells.tolist() == [3, 7, 9]
-    assert shares.tolist() == [1.0, 0.5, 0.0]
+    assert shares.tolist() == pytest.approx([1.0, 2 / 3, 0.0])
+
+
+def test_a_small_building_getting_nothing_leaves_a_well_served_cell_green_but_edged() -> None:
+    nothing = np.zeros(1)
+    trade = Trade(
+        np.array([5]),
+        got={HOUSE: np.array([95.0]), JEWELLER: nothing},
+        needed={HOUSE: np.array([95.0]), JEWELLER: np.array([5.0])},
+        gave={HOUSE: nothing, JEWELLER: nothing},
+        could_make={HOUSE: nothing, JEWELLER: nothing},
+    )
+
+    _, shares, starving = cell_moods(trade)
+
+    assert mood_tint(shares[0]) == HALF_SATISFIED_TINT
+    assert starving.tolist() == [True]
+
+
+def test_only_cells_with_a_building_getting_nothing_are_edged() -> None:
+    trade = houses_and_farms()
+
+    cells, _, starving = cell_moods(trade)
+
+    assert cells[starving].tolist() == [9]
 
 
 def test_cells_whose_buildings_want_nothing_are_not_tinted() -> None:
@@ -71,17 +95,15 @@ def test_cells_whose_buildings_want_nothing_are_not_tinted() -> None:
         np.array([4, 5]), {FARM: nothing}, {FARM: nothing}, {FARM: nothing}, {FARM: nothing}
     )
 
-    cells, shares = least_satisfied(trade)
+    cells, shares, starving = cell_moods(trade)
 
-    assert cells.size == 0
-    assert shares.size == 0
+    assert cells.size == shares.size == starving.size == 0
 
 
 def test_no_trade_yet_tints_nothing() -> None:
-    cells, shares = least_satisfied(None)
+    cells, shares, starving = cell_moods(None)
 
-    assert cells.size == 0
-    assert shares.size == 0
+    assert cells.size == shares.size == starving.size == 0
 
 
 def test_an_assumed_share_stands_in_for_the_trade_where_given() -> None:
@@ -89,10 +111,11 @@ def test_an_assumed_share_stands_in_for_the_trade_where_given() -> None:
     assumed = np.full(16, np.nan)
     assumed[9] = 0.7
 
-    cells, shares = least_satisfied(trade, assumed)
+    cells, shares, starving = cell_moods(trade, assumed)
 
     assert cells.tolist() == [3, 7, 9]
-    assert shares.tolist() == [1.0, 0.5, 0.7]
+    assert shares.tolist() == pytest.approx([1.0, 2 / 3, 0.7])
+    assert starving.tolist() == [False, False, False]
 
 
 def test_the_town_lens_tints_each_town_one_colour_and_leaves_land_without_a_town() -> None:

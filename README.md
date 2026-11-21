@@ -773,9 +773,11 @@ Satisfaction goes wherever it counts with no ceiling: a building at 145% breeds 
 1.45 times its points, against once at 100%. A building is unsatisfied at 0%,
 thriving from 100% and content between; the ground under content and thriving buildings has a
 warm glow, and the status bar names the hovered cell's satisfaction. Holding Shift over the map,
-or turning on the Satisfaction lens above the minimap, tints the land under every building that trades by how satisfied the least satisfied building in
-its cell is: green from 100%, yellow from 50%, orange below that and red at 0%; buildings that
-neither need nor make anything get no tint.
+or turning on the Satisfaction lens above the minimap, tints the land under every building that
+trades by how much of all its cell's buildings want they get, each counting by how much it wants:
+green from 100%, yellow from 50%, orange below that and red at 0%. A cell in which some building
+gets nothing at all is edged in dark red. Buildings that neither need nor make anything get no
+tint.
 
 Factories gather into districts: industry nearby draws more of them only once at least 5
 industry points stand there, more than one steel mill, and then strongly, so three meet and merge
