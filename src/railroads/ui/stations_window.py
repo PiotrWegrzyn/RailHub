@@ -25,6 +25,16 @@ from railroads.ui.trains_window import WINDOW_TOP as TRAINS_TOP
 WINDOW_SIZE = (860.0, 180.0)
 ROW_HEIGHT = 28.0
 GAP = 12.0
+# How much of the screen's bottom the window leaves free for the build bar.
+BUILD_BAR_ROOM = 80.0
+
+
+def window_place(width: float, height: float) -> tuple[float, float]:
+    """Where the window first opens on a screen this big: under the trains window and left of
+    the news cards, but never past the screen's left edge or down over the build bar."""
+    x = max(8.0, width - WINDOW_SIZE[0] - CARDS_WIDTH - 16)
+    y = min(TRAINS_TOP + TRAINS_SIZE[1] + GAP, height - WINDOW_SIZE[1] - BUILD_BAR_ROOM)
+    return x, max(8.0, y)
 
 
 def stock_bar(goods: StationGoods, size: tuple[float, float]) -> None:
@@ -61,8 +71,7 @@ class StationsWindow:
             return
         display = imgui.get_io().display_size
         imgui.set_next_window_pos(
-            (display.x - WINDOW_SIZE[0] - CARDS_WIDTH - 16, TRAINS_TOP + TRAINS_SIZE[1] + GAP),
-            imgui.Cond_.first_use_ever.value,
+            window_place(display.x, display.y), imgui.Cond_.first_use_ever.value
         )
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
         expanded, self.open = begin_ornate(f"{fa.ICON_FA_BUILDING}  Stations###stations")
