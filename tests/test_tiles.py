@@ -7,7 +7,8 @@ from railroads.sim.events import make_factor
 from railroads.sim.game import Game
 from railroads.sim.goods import Good, Need, makes_of, needs_of
 from railroads.sim.tiles import (
-    CLOSES,
+    BASE_LEVELS,
+    BENCHMARK_YEAR,
     FIRST_YEAR,
     TILE_GOODS,
     TILE_OF,
@@ -36,22 +37,52 @@ def test_the_world_reaches_each_era_in_its_year_when_the_lowest_tiles_go_up() ->
     assert years == {2: 1843, 3: 1873, 4: 1901, 5: 1933, 6: 1957, 7: 1974}
 
 
-def test_every_supply_level_adds_its_periods_share_of_the_base_not_compounded() -> None:
-    made = supply_factor(Tile.COAL, 1, 9)
+def test_every_supply_level_above_the_base_adds_its_periods_share_not_compounded() -> None:
+    made = supply_factor(Tile.COAL, 1, 16)
 
-    assert made == pytest.approx(1.0 + 7 * 0.10 + 0.40)
-
-
-def test_a_closed_tile_makes_no_more_past_its_closing_level() -> None:
-    made = supply_factor(Tile.COAL, 1, 40)
-
-    assert made == pytest.approx(supply_factor(Tile.COAL, 1, CLOSES[Tile.COAL]))
+    assert made == pytest.approx(1.0 + 3 * 0.15 + 2 * 0.18)
 
 
-def test_every_demand_level_adds_the_same_share_of_the_base() -> None:
-    wanted = demand_factor(Tile.FARMING, 1, 11)
+def test_every_supply_level_below_the_base_takes_away_its_share() -> None:
+    made = supply_factor(Tile.WOOD, 1, 1)
 
-    assert wanted == pytest.approx(1.5)
+    assert made == pytest.approx(1.0 - 9 * 0.04)
+
+
+def test_every_demand_level_above_the_base_adds_the_same_share() -> None:
+    wanted = demand_factor(Tile.FARMING, 1, 10)
+
+    assert wanted == pytest.approx(1.0 + 4 * 0.31)
+
+
+def test_every_demand_level_below_the_base_takes_away_its_share() -> None:
+    wanted = demand_factor(Tile.MAIL, 1, 1)
+
+    assert wanted == pytest.approx(1.0 - 4 * 0.09)
+
+
+def test_a_tile_that_comes_after_the_benchmark_year_makes_its_base_at_the_level_it_comes_at() -> (
+    None
+):
+    made, wanted = supply_factor(Tile.COPPER, 18, 18), demand_factor(Tile.COPPER, 9, 9)
+
+    assert (made, wanted) == (1.0, 1.0)
+
+
+def test_the_base_levels_are_those_of_the_benchmark_year_as_the_world_grows_by_itself() -> None:
+    boards = Tiles.until(BENCHMARK_YEAR).of_year(BENCHMARK_YEAR)
+
+    levels = {tile: (boards.supply[tile], boards.demand[tile]) for tile in boards.supply}
+
+    assert levels == dict(BASE_LEVELS)
+
+
+def test_every_good_earns_its_base_price_in_the_benchmark_year() -> None:
+    boards = Tiles.until(BENCHMARK_YEAR).of_year(BENCHMARK_YEAR)
+
+    earned = {tile: boards.price(TILE_GOODS[tile][0]) for tile in boards.supply}
+
+    assert earned == {tile: pytest.approx(1.0) for tile in boards.supply}
 
 
 def test_a_unit_earns_its_base_times_demand_over_supply_to_the_power_of_four_fifths() -> None:
@@ -68,13 +99,21 @@ def test_every_good_earns_its_base_price_before_the_first_year_of_the_boards() -
     assert earned == 1.0
 
 
-def test_coal_earns_about_a_fifth_of_its_price_by_2050_and_luxuries_about_half() -> None:
+def test_every_tile_makes_about_ten_times_and_is_wanted_about_five_times_its_base_by_2050() -> None:
     boards = Tiles.until(2050).of_year(2050)
 
-    coal, luxuries = boards.price(Good.COAL), boards.price(Good.GOLD)
+    made, wanted = boards.made, boards.wanted
 
-    assert coal == pytest.approx(0.21, abs=0.01)
-    assert luxuries == pytest.approx(0.55, abs=0.02)
+    assert made == {tile: pytest.approx(10.0, abs=0.1) for tile in Tile}
+    assert wanted == {tile: pytest.approx(5.0, abs=0.1) for tile in Tile}
+
+
+def test_every_good_earns_a_little_under_three_fifths_of_its_base_price_by_2050() -> None:
+    boards = Tiles.until(2050).of_year(2050)
+
+    earned = {tile: boards.price(TILE_GOODS[tile][0]) for tile in Tile}
+
+    assert earned == {tile: pytest.approx(0.58, abs=0.015) for tile in Tile}
 
 
 def test_the_picked_tiles_go_up_on_1_january_and_the_lowest_for_picks_not_made() -> None:
@@ -121,14 +160,12 @@ def test_taking_a_pick_back_frees_it() -> None:
     assert tiles.picks[Board.SUPPLY] == [Tile.WOOD]
 
 
-def test_a_closed_tile_cannot_be_picked_nor_holds_the_others_back() -> None:
-    tiles = Tiles.until(2010)
+def test_coal_keeps_going_up_after_2000() -> None:
+    before, after = Tiles.until(2000).supply[Tile.COAL], Tiles.until(2050).supply[Tile.COAL]
 
-    can = tiles.can_pick(Board.SUPPLY, Tile.COAL)
+    grown = after - before
 
-    assert tiles.supply[Tile.COAL] == CLOSES[Tile.COAL]
-    assert not can
-    assert min(tiles.supply[tile] for tile in tiles.open_tiles(Board.SUPPLY)) > CLOSES[Tile.COAL]
+    assert grown >= 5
 
 
 def test_an_eras_new_tiles_come_at_the_lowest_level_on_each_board() -> None:
@@ -138,7 +175,6 @@ def test_an_eras_new_tiles_come_at_the_lowest_level_on_each_board() -> None:
 
     assert supply == min(tiles.supply[tile] for tile in TILE_GOODS if tile in tiles.supply)
     assert demand == min(tiles.demand.values())
-    assert tiles.of_year(1843).make_factor(Good.STEEL) == 1.0
 
 
 def test_the_era_brings_its_generation_of_wagons_and_news() -> None:

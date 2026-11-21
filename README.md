@@ -901,13 +901,18 @@ lowest in the years before play. In play the game waits as a year turns: the sup
 screen shows every tile as a card, with what its next level adds and on demand who it lets take
 what; the player picks two production cards and confirms, the board slides away to consumption,
 and they pick one there and confirm. The same two boards can be looked at any time (Y). No tile can be more than two levels above the lowest on its board.
-Each level adds a flat share of the tile's base, not compounded: on supply its period's share,
-from 5% a level for farming in the early 1800s to 200% for modern goods after 1960, on demand the
-same share every level, 5% for food up to 30% for oil, vehicles and modern goods. Supply grows far
-faster than demand. Supply raises only what buildings make and demand only what they take: a
+The game is balanced for 1850 (`BENCHMARK_YEAR`): every tile makes, is wanted and earns its base
+at the levels it has then when the lowest always go up (`BASE_LEVELS`), and a tile that comes
+later at the levels it comes at. Each level above adds a flat share of that base, not compounded:
+on supply its period's share, growing from about 11% a level after 1850 to about 65% after 2000
+(more for tiles that come later, up to 123% for modern goods), so that every tile makes about ten
+times its base by 2050; on demand the same share every level, 31% for most tiles up to 67% for
+modern goods, about five times its base by 2050. Every price then falls from its base in 1850 to
+a little under three fifths of it in 2050. Each level below the base takes away a small share
+(4% on supply, 7–9% on demand), so before 1850 tiles make and are wanted about two thirds of it
+at about the base price. Supply raises only what buildings make and demand only what they take: a
 works that takes 100 and makes 50 takes 100 and makes 75 at +50% supply of what it makes, and
-takes 125 and still makes 50 at +25% demand for what it takes. Coal closes at level 30, about 2000: it goes
-no higher, can't be picked and no longer holds the other tiles back.
+takes 125 and still makes 50 at +25% demand for what it takes.
 
 Once every supply tile reaches an era's level, the era comes with its generation of wagons and new
 tiles, on both boards at the lowest level there: oil and fuel and steel and metals at level 9

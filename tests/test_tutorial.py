@@ -381,7 +381,7 @@ def months_pass(app: App, months: int) -> None:
                 board = app.tiles.board
                 while tiles.picks_left(board):
                     tiles.pick(
-                        board, next(t for t in tiles.open_tiles(board) if tiles.can_pick(board, t))
+                        board, next(t for t in tiles.levels(board) if tiles.can_pick(board, t))
                     )
                 app.tiles.confirm()
             frame(app)

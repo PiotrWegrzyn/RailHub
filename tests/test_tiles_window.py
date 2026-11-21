@@ -44,7 +44,7 @@ def test_every_tile_on_a_board_is_a_card_with_what_its_next_level_adds() -> None
 
     assert [card.tile for card in shown] == [tile for tile in Tile if tile in tiles.supply]
     wood = next(card for card in shown if card.tile == Tile.WOOD)
-    assert wood.adds == "next level +30% made"
+    assert wood.adds == "next level +11% made"
 
 
 def test_a_demand_card_says_who_its_next_level_lets_take_what() -> None:

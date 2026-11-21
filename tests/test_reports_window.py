@@ -180,12 +180,12 @@ def test_the_window_draws_the_worth_against_the_target(frame: None, months: int)
 
 
 def test_the_price_list_shows_every_tile_the_cheapest_first() -> None:
-    tiles = Tiles.until(1850)
+    tiles = Tiles.until(1900)
 
-    rows = price_rows(tiles, 1850)
+    rows = price_rows(tiles, 1900)
 
-    assert rows[0] == ("Coal", "59%", "11", "6")
-    assert rows[-1][0] == "Luxuries"
+    assert rows[0] == ("Textiles and household", "88%", "18", "9")
+    assert rows[-1][0] == "Chemicals and building"
 
 
 def test_a_tiles_price_line_runs_year_by_year_from_when_it_came() -> None:
@@ -195,7 +195,7 @@ def test_a_tiles_price_line_runs_year_by_year_from_when_it_came() -> None:
 
     assert xs[0] == 1843.0
     assert xs[-1] == 1850.0
-    assert ys[0] == pytest.approx(100.0)
+    assert ys[-1] == pytest.approx(100.0)
 
 
 def test_the_window_draws_the_prices(frame: None) -> None:
