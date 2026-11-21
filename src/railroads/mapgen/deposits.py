@@ -41,8 +41,8 @@ DEPOSITS: dict[Deposit, DepositRule] = {
     Deposit.SALT: DepositRule(40_000, (5, 10)),
     Deposit.GRAPES: DepositRule(30_000, (5, 12)),
     Deposit.IRON: DepositRule(20_000, (6, 14)),
-    Deposit.WOOL: DepositRule(12_000, (6, 12)),
-    Deposit.FISH: DepositRule(300, (6, 14), on_its_land=True),
+    Deposit.WOOL: DepositRule(9_000, (6, 12)),
+    Deposit.FISH: DepositRule(360, (6, 14), on_its_land=True),
 }
 # Military ground, whose few clusters hold every outpost on the map: how many, and of how many cells.
 GARRISONS = (1, 3)

@@ -730,6 +730,7 @@ def _resource(
     from_year: int = 0,
     chance: float = 4000,
     crowded_at: int | None = None,
+    most_nearby: int = 1,
 ) -> Ladder:
     """Something dug, drilled or grown on its own deposit, and nowhere else; what is grown there
     for food gives way to towns, as fields do (`crowded_at`)."""
@@ -738,7 +739,7 @@ def _resource(
         land=Land(deposit=deposit),
         base=chance,
         most_per_cell=1,
-        most_nearby=1,
+        most_nearby=most_nearby,
         from_year=from_year,
         crowded_at=crowded_at,
     )
@@ -773,7 +774,7 @@ RESOURCES = (
     _resource(BuildingKind.DIAMOND_MINE, Deposit.DIAMONDS),
     _resource(BuildingKind.OIL_WELL, Deposit.OIL, 0, 30_000),
     _resource(BuildingKind.SALT_WORKS, Deposit.SALT),
-    _resource(BuildingKind.FISHERY, Deposit.FISH),
+    _resource(BuildingKind.FISHERY, Deposit.FISH, most_nearby=2),
     _resource(BuildingKind.SHEEP_FARM, Deposit.WOOL, crowded_at=FARMS_CROWDED_OUT),
     _resource(BuildingKind.VINEYARD, Deposit.GRAPES, crowded_at=FARMS_CROWDED_OUT),
     _resource(BuildingKind.COTTON_FIELD, Deposit.COTTON),
@@ -851,13 +852,13 @@ FOOD_TOWN = 3
 _BAKERY = Ladder(
     kinds=(BuildingKind.BAKERY,),
     land=TOWN_LAND,
-    base=5,
+    base=3.5,
 )
 
 BAKERIES = _merges(_BAKERY)
 
 # Butchers open in towns from 1850, the likelier the more people live around, like bakeries.
-BUTCHERS = _merges(replace(_BAKERY, kinds=(BuildingKind.MEAT_FACTORY,), base=10, from_year=1850))
+BUTCHERS = _merges(replace(_BAKERY, kinds=(BuildingKind.MEAT_FACTORY,), base=22, from_year=1850))
 
 # Town crafts that come up, like bakeries, the likelier the more people live around: potters and
 # dairies as often as other crafts; tile works, foundries and sausage makers, which need two
@@ -882,9 +883,9 @@ def _town_craft(
 
 
 TOWN_CRAFTS = (
-    _town_craft(BuildingKind.POTTER, 40, least_people=FOOD_TOWN),
+    _town_craft(BuildingKind.POTTER, 24, least_people=FOOD_TOWN),
     _town_craft(BuildingKind.DAIRY, 5),
-    _town_craft(BuildingKind.TILE_WORKS, 2),
+    _town_craft(BuildingKind.TILE_WORKS, 1.8),
     _town_craft(BuildingKind.FOUNDRY, 2, 1800),
     _town_craft(BuildingKind.SAUSAGE_MAKER, 12.5, 1850),
     _town_craft(BuildingKind.TOFU_MAKER, 5, least_people=FOOD_TOWN),
@@ -1000,13 +1001,13 @@ CATTLE_RANCHES = Ladder(
         temperature={Temperature.HOT: 0.3},
         open_field=OPEN_FIELD,
     ),
-    base=0.160875,
+    base=0.245,
     crowded_at=FARMS_CROWDED_OUT,
 )
 
 # Pig farms and chicken farms keep to the same land as cattle; pigs are a little rarer.
 PIG_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.PIG_FARM,), base=0.15)
-CHICKEN_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.CHICKEN_FARM,))
+CHICKEN_FARMS = replace(CATTLE_RANCHES, kinds=(BuildingKind.CHICKEN_FARM,), base=0.26)
 
 # Flax wants cool, wet land by rivers and lakes.
 FLAX_FIELDS = Ladder(
@@ -1054,7 +1055,7 @@ LIMESTONE_QUARRIES = Ladder(
         vegetation={Vegetation.FOREST: 0.5},
         relief={Relief.FLAT: 0.02, Relief.HILLS: 1.0, Relief.MOUNTAINS: 0.4},
     ),
-    base=1.5,
+    base=4.5,
     most_per_cell=1,
     most_nearby=2,
 )
