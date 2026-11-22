@@ -907,6 +907,9 @@ class Train:
     # How far along the path each of its points lies, with the path it was worked out for
     # (TrackNetwork.ends).
     path_ends: tuple[list[Point], list[float]] | None = None
+    # How far along the path it turns round on plain track, with the path it was worked out
+    # for (TrackNetwork.turns).
+    path_turns: tuple[list[Point], list[float]] | None = None
     along: float = 0.0
     status: str = "Waiting for stops"
     engine: str = FIRST_ENGINE

@@ -22,7 +22,8 @@ next stop as it sets off (railroads.sim.fuel_market), and can't set off for a st
 its fuel takes it
 (railroads.sim.finance).
 
-Trains set off from a stand and pick up speed over their engine's pickup time. Trains that meet
+Trains set off from a stand and pick up speed over their engine's pickup time, and do so again
+where they turn round on plain track (railroads.sim.track_network). Trains that meet
 on the line, ahead of or against each other or where lines cross, can't run through each other
 for free: one of them stops and lets the other by, then sets off again from a stand. The train
 that has stood longest letting others by since it left its last stop goes first, so none waits for
@@ -867,9 +868,15 @@ class Railway:
         speed = engine.speed * pace
         if train.fuelled:
             speed *= ENGINE_SHED_SPEED
-        train.along += (
+        moved = train.along + (
             months * CELLS_PER_MONTH * self.network.speed_at(train) * self.pull(train) * speed
         )
+        turn = next((at for at in self.network.turns(train) if train.along < at <= moved), None)
+        if turn is None:
+            train.along = moved
+        else:
+            train.along = turn
+            train.pace = 0.0
         train.status = "Running"
         if train.along >= self.network.length(train):
             train.platform = self.network.cell_at(train.path[-1])

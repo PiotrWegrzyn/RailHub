@@ -254,3 +254,5 @@ def _move_train(train: Train, move: Move) -> None:
     if train.path_ends is not None:
         points, lengths = train.path_ends
         train.path_ends = ([move.point(point) for point in points], lengths)
+    if train.path_turns is not None:
+        train.path_turns = (train.path, train.path_turns[1])
