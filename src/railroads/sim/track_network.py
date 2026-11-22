@@ -2,9 +2,7 @@
 train takes from one station to another with the speed on each stretch, and where a train is on
 its way. Trains pass through stations, which join track only by their two ends, and may turn round
 in them; in a station with more platforms they may cross to a platform beside the one they are on,
-and they reach a station at whichever of its platforms their way comes to first. A train may also
-turn round on plain track, in the middle of a cell, where it stops and picks up speed again; the
-way takes that only when going on round would be longer by more than TURN_ROUND_CELLS."""
+and they reach a station at whichever of its platforms their way comes to first."""
 
 import bisect
 import heapq
@@ -22,9 +20,6 @@ from railroads.sim.trains import Point, Train
 type Way = tuple[list[Point], list[float]]
 # The step of a route that crosses from one platform of a station to the one beside it.
 CROSSING = -1
-# How many cells longer a way that turns round on plain track is counted as, for each time it
-# turns: about what a train loses stopping there and picking up speed again.
-TURN_ROUND_CELLS = 4.0
 
 
 class TrackNetwork:
@@ -172,23 +167,14 @@ class TrackNetwork:
             for beside in self._platforms_beside(cell):
                 taken.append((last, cell, CROSSING))
                 heapq.heappush(frontier, (cost + 1.0, next(counter), beside, None, len(taken) - 1))
-            exits = [(point, 0.0) for point in self._exits(cell, entry, electric, maglev)]
-            if entry is not None and constructions.station_at(cell) is None:
-                exits.append((entry, TURN_ROUND_CELLS))
-            for exit_point, turning in exits:
+            for exit_point in self._exits(cell, entry, electric, maglev):
                 nxt, nxt_entry = self._track_exit(cell, exit_point)
                 if not grid.contains(*nxt) or not self._joins(nxt, nxt_entry):
                     continue
                 taken.append((last, cell, exit_point))
                 heapq.heappush(
                     frontier,
-                    (
-                        cost + lengths[exit_point] + turning,
-                        next(counter),
-                        nxt,
-                        nxt_entry,
-                        len(taken) - 1,
-                    ),
+                    (cost + lengths[exit_point], next(counter), nxt, nxt_entry, len(taken) - 1),
                 )
         return None
 
@@ -379,24 +365,6 @@ class TrackNetwork:
     def length(self, train: Train) -> float:
         """How long the way the train is on is."""
         return self.ends(train)[-1] if train.path else 0.0
-
-    def turns(self, train: Train) -> list[float]:
-        """How far along the train's path it turns round on plain track, where it stops and
-        picks up speed again: each point the path comes back from the way it went in, outside
-        stations. Worked out once for each path, as trains ask every frame."""
-        kept = train.path_turns
-        if kept is not None and kept[0] is train.path:
-            return kept[1]
-        path = train.path
-        ends = self.ends(train)
-        found = [
-            ends[index]
-            for index in range(1, len(path) - 1)
-            if math.dist(path[index - 1], path[index + 1]) < 1e-6
-            and self.constructions.station_at(self.cell_at(path[index])) is None
-        ]
-        train.path_turns = (path, found)
-        return found
 
     @staticmethod
     def ends(train: Train) -> list[float]:
