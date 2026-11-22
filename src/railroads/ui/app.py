@@ -86,6 +86,10 @@ AUTOSAVE_GAP_S = 60.0
 # their steps are run several to a frame, so a month that costs little takes few frames and the
 # trains wait as briefly.
 MONTH_FRAME_SECONDS = 0.016
+# The most play one frame lets pass, in seconds: a frame that comes late, after the browser tab
+# was hidden or the computer slept, carries on from where the game stood instead of running
+# through all the months missed.
+MOST_SECONDS_A_FRAME = 0.25
 # In the browser, how long the main menu's settings stay as they are before the page's setup
 # worker starts growing the game they would start, so typing a seed doesn't start one a digit.
 AHEAD_AFTER_S = 1.0
@@ -188,7 +192,7 @@ class App:
             # Time waits while the player reads news of the target or bankruptcy, and picks
             # the tiles for a new year.
             goal.watch(self.game.finances.cash)
-            self._let_time_pass(imgui.get_io().delta_time)
+            self._let_time_pass(min(imgui.get_io().delta_time, MOST_SECONDS_A_FRAME))
         busy = self._turning is not None
         # While a month is half done nothing may change the game, so every control is off for
         # those few frames, without greying out.

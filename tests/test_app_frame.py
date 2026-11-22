@@ -1183,3 +1183,15 @@ def test_a_stations_card_draws_its_stockpile_waiting_and_demand(context: None) -
 
     imgui.render()
     assert imgui.internal.find_window_by_name("##station card") is not None
+
+
+def test_a_frame_that_comes_an_hour_late_lets_only_a_moment_of_play_pass(context: None) -> None:
+    app = made_app()
+    imgui.get_io().delta_time = 3600.0
+
+    imgui.new_frame()
+    app.gui()
+    imgui.render()
+
+    assert app.clock.months == 0
+    assert app.clock.seconds == pytest.approx(app_module.MOST_SECONDS_A_FRAME * app.clock.speed)
