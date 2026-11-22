@@ -18,14 +18,13 @@ from imgui_bundle import hello_imgui, imgui
 
 from railroads.sim.goods import Good, Need, freight_of
 from railroads.sim.tiles import (
-    CLOSES,
-    DEMAND_STEPS,
     ERAS,
     MOST_APART,
     TILE_GOODS,
     Board,
     Tile,
     Tiles,
+    demand_step,
     supply_step,
     unlocks_of,
 )
@@ -84,9 +83,8 @@ class Card:
     opens_next: bool
     picked: int
     can_pick: bool
-    # Its level with the picks so far, whether it is closed and what its next level adds.
+    # Its level with the picks so far and what its next level adds.
     number: int = 0
-    closed: bool = False
     step: float = 0.0
     # What a unit of its goods earns before it is picked (now if it is, else after the picks
     # so far on both boards), and once picked or after the picks so far.
@@ -142,8 +140,7 @@ def cards(tiles: Tiles, board: Board) -> list[Card]:
     for tile in (t for t in Tile if t in levels):
         picked = tiles.picks[board].count(tile)
         level = levels[tile] + picked
-        closed = board == Board.SUPPLY and levels[tile] >= CLOSES.get(tile, levels[tile] + 1)
-        step = supply_step(tile, level) if board == Board.SUPPLY else DEMAND_STEPS[tile]
+        step = supply_step(tile, level) if board == Board.SUPPLY else demand_step(tile, level)
         can = tiles.can_pick(board, tile)
         price = now.price(TILE_GOODS[tile][0])
         then = (
@@ -154,10 +151,8 @@ def cards(tiles: Tiles, board: Board) -> list[Card]:
         shown.append(
             Card(
                 tile,
-                "closed" if closed else f"level {levels[tile]}" + (f" +{picked}" if picked else ""),
-                ""
-                if closed
-                else f"next level +{step:.0%} {'made' if board == Board.SUPPLY else 'taken'}",
+                f"level {levels[tile]}" + (f" +{picked}" if picked else ""),
+                f"next level +{step:.0%} {'made' if board == Board.SUPPLY else 'taken'}",
                 f"{price:.0%}",
                 f"picked {then:.0%}"
                 if picked and then is not None
@@ -169,8 +164,7 @@ def cards(tiles: Tiles, board: Board) -> list[Card]:
                 picked,
                 can,
                 level,
-                closed,
-                0.0 if closed else step,
+                step,
                 start,
                 then,
                 _next_need(tile, level) if demand else None,
@@ -197,7 +191,7 @@ def era_line(tiles: Tiles) -> str:
     line = f"Era {tiles.era}: wagons of generation {wagons}."
     if tiles.era < len(ERAS):
         coming = ERAS[tiles.era]
-        low = min(tiles.supply[tile] for tile in tiles.open_tiles(Board.SUPPLY))
+        low = min(tiles.supply.values())
         line += (
             f" The next era comes once every supply tile is at level {coming.level} "
             f"(the lowest is at {low})."
@@ -490,10 +484,7 @@ class TilesWindow:
             draw_list, middle, y, level, color_u32(GROWN if card.picked else BRASS), small * 1.1
         )
         y += small * 1.6
-        if card.closed:
-            _centred(draw_list, middle, y + big * 0.15, "CLOSED", _faded(TEXT_DIM, 1.0), font * 1.4)
-        else:
-            _centred(draw_list, middle, y, f"+{card.step:.0%} {WORDS[board]}", color_u32(edge), big)
+        _centred(draw_list, middle, y, f"+{card.step:.0%} {WORDS[board]}", color_u32(edge), big)
         y += big * 1.25
         self._draw_icons(draw_list, card, middle, y, scale)
         y += 18 * scale + 8 * scale

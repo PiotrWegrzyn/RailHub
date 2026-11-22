@@ -4,12 +4,15 @@ Every good belongs to a tile (TILE_GOODS), and every tile stands on two boards: 
 of its goods buildings make, and demand, how much of them ordinary buyers want. Every year from
 FIRST_YEAR SUPPLY_PICKS supply tiles and DEMAND_PICKS demand tiles go up a level: the ones the
 player picked, the lowest for the rest. No tile on a board may get more than MOST_APART levels
-above the lowest one on it. Each level adds a flat share of the tile's base, not compounded: on
-supply the share its level's period gives it (SUPPLY_STEPS, PERIODS), on demand always the same
-(DEMAND_STEPS). A tile CLOSES at its level: it goes no higher, can't be picked and no longer holds
-the others back.
+above the lowest one on it.
 
-Once every open supply tile reaches the level of the next era (ERAS), the era comes with the next
+The game is balanced for BENCHMARK_YEAR: a tile makes, is wanted and earns its base at its BASE_LEVELS
+level, the one it has then as the world grows by itself, and a tile that comes later at the level
+it comes at. Each level above adds a flat share of that base, not compounded: on supply the share
+its level's period gives it (SUPPLY_STEPS, PERIODS), on demand always the same (DEMAND_STEPS). Each
+level below takes away its share of the years before (BEFORE_BASE).
+
+Once every supply tile reaches the level of the next era (ERAS), the era comes with the next
 generation of wagons and its new tiles, on both boards at the lowest level on that board. A
 good, the buildings that make it and those there only to buy it come into the game with its era:
 its tile's, or a later one of its own (GOOD_ERAS).
@@ -135,6 +138,7 @@ SUPPLY_PICKS = 2
 DEMAND_PICKS = 1
 MOST_APART = 2
 PRICE_POWER = 0.8
+BENCHMARK_YEAR = 1850
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,52 +175,89 @@ ERAS: tuple[Era, ...] = (
     Era(25, 6, (T.MODERN,)),
     Era(27, 7, ()),
 )
-CLOSES: Mapping[Tile, int] = MappingProxyType({T.COAL: 30})
+# The supply and demand levels of the tiles there are in BENCHMARK_YEAR, as the world grows by
+# itself: where they make and are wanted their base.
+BASE_LEVELS: Mapping[Tile, tuple[int, int]] = MappingProxyType(
+    {
+        T.COAL: (11, 6),
+        T.ORE: (11, 6),
+        T.WOOD: (10, 6),
+        T.FARMING: (10, 6),
+        T.ANIMALS: (10, 6),
+        T.FOOD: (10, 6),
+        T.HOUSEHOLD: (10, 6),
+        T.PASSENGERS: (10, 5),
+        T.MAIL: (10, 5),
+        T.LUXURIES: (10, 5),
+        T.OIL: (10, 5),
+        T.STEEL: (10, 5),
+    }
+)
+# The share of its base every supply and demand level below BASE_LEVELS takes away: about two thirds of
+# it made and wanted in FIRST_YEAR, at about its base price.
+BEFORE_BASE: Mapping[Tile, tuple[float, float]] = MappingProxyType(
+    {
+        T.COAL: (0.04, 0.08),
+        T.ORE: (0.04, 0.08),
+        T.WOOD: (0.04, 0.07),
+        T.FARMING: (0.04, 0.07),
+        T.ANIMALS: (0.04, 0.07),
+        T.FOOD: (0.04, 0.07),
+        T.HOUSEHOLD: (0.04, 0.07),
+        T.PASSENGERS: (0.04, 0.09),
+        T.MAIL: (0.04, 0.09),
+        T.LUXURIES: (0.04, 0.09),
+        T.OIL: (0.04, 0.07),
+        T.STEEL: (0.04, 0.07),
+    }
+)
 
 # The supply level each period begins at; a level counts in the last period begun below it.
 PERIODS = (1, 8, 14, 17, 21, 25, 30)
-# The share of its base every supply level adds to a tile, by period.
+# The share of its base every supply level above it adds to a tile, by period: about ten times
+# its base by 2050, more a level later on, so that its price falls evenly against demand.
 SUPPLY_STEPS: Mapping[Tile, tuple[float, ...]] = MappingProxyType(
     {
-        T.COAL: (0.10, 0.40, 0.80, 0.60, 1.50, 1.00, 0.0),
-        T.ORE: (0.10, 0.30, 0.80, 0.60, 1.50, 1.20, 0.40),
-        T.WOOD: (0.10, 0.30, 0.40, 0.40, 0.60, 0.60, 0.40),
-        T.FARMING: (0.05, 0.10, 0.15, 0.15, 0.30, 0.60, 0.30),
-        T.ANIMALS: (0.05, 0.10, 0.15, 0.15, 0.40, 0.60, 0.30),
-        T.FOOD: (0.05, 0.20, 0.30, 0.40, 0.60, 0.80, 0.40),
-        T.HOUSEHOLD: (0.20, 0.40, 0.50, 0.40, 0.60, 0.80, 0.60),
-        T.PASSENGERS: (0.10, 0.40, 0.60, 0.40, 0.30, 0.30, 0.30),
-        T.MAIL: (0.05, 0.30, 0.60, 0.40, 0.40, 0.20, 0.10),
-        T.LUXURIES: (0.05, 0.10, 0.20, 0.20, 0.30, 0.40, 0.40),
-        T.OIL: (0.0, 0.60, 1.00, 1.50, 2.00, 1.50, 0.20),
-        T.STEEL: (0.0, 0.60, 1.20, 0.80, 1.20, 0.80, 0.30),
-        T.MACHINES: (0.0, 0.0, 0.60, 1.00, 1.50, 1.00, 0.50),
-        T.CHEMICALS: (0.0, 0.0, 0.50, 0.80, 1.50, 1.50, 0.60),
-        T.COPPER: (0.0, 0.0, 0.0, 0.80, 1.50, 1.50, 0.80),
-        T.VEHICLES: (0.0, 0.0, 0.0, 0.80, 1.00, 2.00, 0.80),
-        T.MODERN: (0.0, 0.0, 0.0, 0.0, 0.0, 2.00, 1.50),
+        T.COAL: (0.0, 0.15, 0.18, 0.23, 0.30, 0.40, 0.65),
+        T.ORE: (0.0, 0.15, 0.18, 0.23, 0.30, 0.40, 0.65),
+        T.WOOD: (0.0, 0.11, 0.18, 0.23, 0.30, 0.40, 0.65),
+        T.FARMING: (0.0, 0.11, 0.18, 0.23, 0.30, 0.40, 0.65),
+        T.ANIMALS: (0.0, 0.12, 0.18, 0.23, 0.30, 0.40, 0.64),
+        T.FOOD: (0.0, 0.12, 0.18, 0.23, 0.30, 0.40, 0.64),
+        T.HOUSEHOLD: (0.0, 0.13, 0.19, 0.25, 0.32, 0.43, 0.58),
+        T.PASSENGERS: (0.0, 0.14, 0.19, 0.25, 0.32, 0.43, 0.57),
+        T.MAIL: (0.0, 0.14, 0.19, 0.25, 0.32, 0.43, 0.57),
+        T.LUXURIES: (0.0, 0.14, 0.19, 0.25, 0.32, 0.43, 0.57),
+        T.OIL: (0.0, 0.15, 0.19, 0.25, 0.32, 0.43, 0.57),
+        T.STEEL: (0.0, 0.15, 0.19, 0.25, 0.32, 0.43, 0.57),
+        T.MACHINES: (0.0, 0.0, 0.20, 0.25, 0.33, 0.46, 0.64),
+        T.CHEMICALS: (0.0, 0.0, 0.20, 0.25, 0.33, 0.46, 0.64),
+        T.COPPER: (0.0, 0.0, 0.0, 0.27, 0.34, 0.49, 0.73),
+        T.VEHICLES: (0.0, 0.0, 0.0, 0.27, 0.34, 0.49, 0.73),
+        T.MODERN: (0.0, 0.0, 0.0, 0.0, 0.0, 0.57, 1.23),
     }
 )
-# The share of its base every demand level adds to what ordinary buyers want of a tile.
+# The share of its base every demand level above it adds to what ordinary buyers want of a tile:
+# about five times its base by 2050.
 DEMAND_STEPS: Mapping[Tile, float] = MappingProxyType(
     {
-        T.COAL: 0.10,
-        T.ORE: 0.10,
-        T.WOOD: 0.10,
-        T.FARMING: 0.05,
-        T.ANIMALS: 0.05,
-        T.FOOD: 0.05,
-        T.HOUSEHOLD: 0.15,
-        T.PASSENGERS: 0.15,
-        T.MAIL: 0.10,
-        T.LUXURIES: 0.20,
-        T.OIL: 0.30,
-        T.STEEL: 0.15,
-        T.MACHINES: 0.20,
-        T.CHEMICALS: 0.20,
-        T.COPPER: 0.25,
-        T.VEHICLES: 0.30,
-        T.MODERN: 0.30,
+        T.COAL: 0.31,
+        T.ORE: 0.31,
+        T.WOOD: 0.31,
+        T.FARMING: 0.31,
+        T.ANIMALS: 0.31,
+        T.FOOD: 0.33,
+        T.HOUSEHOLD: 0.33,
+        T.PASSENGERS: 0.31,
+        T.MAIL: 0.31,
+        T.LUXURIES: 0.31,
+        T.OIL: 0.31,
+        T.STEEL: 0.31,
+        T.MACHINES: 0.36,
+        T.CHEMICALS: 0.36,
+        T.COPPER: 0.44,
+        T.VEHICLES: 0.44,
+        T.MODERN: 0.67,
     }
 )
 
@@ -261,21 +302,40 @@ UNLOCKS: Mapping[tuple[BuildingKind, Need], tuple[Tile, int]] = MappingProxyType
 )
 
 
+def supply_step(tile: Tile, level: int) -> float:
+    """The share of its base a tile's next supply level adds over this one: the share before its
+    BASE_LEVELS up to it, its period's share above."""
+    step = level + 1
+    if tile in BASE_LEVELS and step <= BASE_LEVELS[tile][0]:
+        return BEFORE_BASE[tile][0]
+    period = max(i for i, start in enumerate(PERIODS) if start < step)
+    return SUPPLY_STEPS[tile][period]
+
+
+def demand_step(tile: Tile, level: int) -> float:
+    """The share of its base a tile's next demand level adds over this one."""
+    if tile in BASE_LEVELS and level < BASE_LEVELS[tile][1]:
+        return BEFORE_BASE[tile][1]
+    return DEMAND_STEPS[tile]
+
+
 def supply_factor(tile: Tile, entry: int, level: int) -> float:
-    """How many times its base a tile's goods are made at a supply level, from the level it came
-    at: every level above adds its period's share."""
-    steps = SUPPLY_STEPS[tile]
-    top = min(level, CLOSES.get(tile, level))
-    total = 1.0
-    for step in range(entry + 1, top + 1):
-        period = max(i for i, start in enumerate(PERIODS) if start < step)
-        total += steps[period]
-    return total
+    """How many times its base a tile's goods are made at a supply level: its BASE_LEVELS, or the level
+    it came at, makes its base, every level above adds its period's share and every level below
+    takes its share away."""
+    base = BASE_LEVELS.get(tile, (entry, entry))[0]
+    added = sum(supply_step(tile, each) for each in range(base, level))
+    taken = sum(supply_step(tile, each) for each in range(level, base))
+    return 1.0 + added - taken
 
 
 def demand_factor(tile: Tile, entry: int, level: int) -> float:
-    """How many times its base ordinary buyers want of a tile's goods at a demand level."""
-    return 1.0 + DEMAND_STEPS[tile] * (level - entry)
+    """How many times its base ordinary buyers want of a tile's goods at a demand level, from its
+    BASE_LEVELS, or the level it came at."""
+    base = BASE_LEVELS.get(tile, (entry, entry))[1]
+    added = sum(demand_step(tile, each) for each in range(base, level))
+    taken = sum(demand_step(tile, each) for each in range(level, base))
+    return 1.0 + added - taken
 
 
 def price(supply: float, demand: float) -> float:
@@ -354,25 +414,15 @@ class Tiles:
     def levels(self, board: Board) -> dict[Tile, int]:
         return self.supply if board == Board.SUPPLY else self.demand
 
-    def open_tiles(self, board: Board, levels: Mapping[Tile, int] | None = None) -> list[Tile]:
-        """The tiles that can still go up on a board: on supply, those not closed."""
-        levels = self.levels(board) if levels is None else levels
-        if board == Board.DEMAND:
-            return list(levels)
-        return [tile for tile in levels if levels[tile] < CLOSES.get(tile, levels[tile] + 1)]
-
     def can_raise(self, board: Board, tile: Tile, levels: Mapping[Tile, int] | None = None) -> bool:
-        """Whether a tile can go up a level on a board: it is open, and no higher than
-        MOST_APART above the lowest open one once up."""
+        """Whether a tile can go up a level on a board: no higher than MOST_APART above the lowest
+        one once up."""
         levels = self.levels(board) if levels is None else levels
-        open_tiles = self.open_tiles(board, levels)
-        if tile not in open_tiles:
-            return False
-        return levels[tile] + 1 - min(levels[t] for t in open_tiles) <= MOST_APART
+        return tile in levels and levels[tile] + 1 - min(levels.values()) <= MOST_APART
 
     def lowest(self, board: Board, levels: Mapping[Tile, int] | None = None) -> Tile:
         levels = self.levels(board) if levels is None else levels
-        return min(self.open_tiles(board, levels), key=lambda tile: levels[tile])
+        return min(levels, key=lambda tile: levels[tile])
 
     def picks_left(self, board: Board) -> int:
         return (SUPPLY_PICKS if board == Board.SUPPLY else DEMAND_PICKS) - len(self.picks[board])
@@ -423,7 +473,7 @@ class Tiles:
 
     def turn(self, year: int) -> list[str]:
         """Begins a year: the tiles picked go up, the lowest for the picks left, and an era
-        comes once every open supply tile is at its level. Returns what that brought, in words."""
+        comes once every supply tile is at its level. Returns what that brought, in words."""
         news = []
         for board in Board:
             levels = self.levels(board)
@@ -434,7 +484,7 @@ class Tiles:
                 levels[self.lowest(board)] += 1
             self.picks[board] = []
         while self.era < len(ERAS):
-            supply_low = min(self.supply[tile] for tile in self.open_tiles(Board.SUPPLY))
+            supply_low = min(self.supply.values())
             coming = ERAS[self.era]
             if supply_low < coming.level:
                 break
@@ -575,15 +625,6 @@ def entry_want(kind: BuildingKind, need: Need) -> float:
 def era_come(era: int, year: int) -> bool:
     """Whether an era has come by a year: the first one always has."""
     return era <= 1 or of_year(year).era >= era
-
-
-def supply_step(tile: Tile, level: int) -> float:
-    """The share of its base a tile's next supply level adds over this one; nothing once closed."""
-    step = level + 1
-    if step > CLOSES.get(tile, step):
-        return 0.0
-    period = max(i for i, start in enumerate(PERIODS) if start < step)
-    return SUPPLY_STEPS[tile][period]
 
 
 def unlocks_of(tile: Tile) -> list[tuple[int, BuildingKind, Need]]:
