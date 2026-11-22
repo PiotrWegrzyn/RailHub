@@ -341,26 +341,38 @@ class TrackNetwork:
 
     def body(self, train: Train, step: float) -> list[tuple[Point, Point, Point]]:
         """Points along the running train from its front back to its tail, `step` cells
-        apart, leaving out what is still inside the station it left: each point, which way the
-        train faces there, and the middle of the stretch of track it is on."""
+        apart, leaving out what is still inside the station it left (TrackNetwork.spot)."""
         front = train.along
         tail = max(0.0, front - train.length)
-        path = train.path
-        if len(path) < 2 or front <= 0:
+        if len(train.path) < 2 or front <= 0:
             return []
-        ends = self.ends(train)
         count = int((front - tail) / step) + 1
-        found: list[tuple[Point, Point, Point]] = []
-        for k in range(count):
-            wanted = front - step * k
-            index = _stretch_at(ends, wanted)
-            a, b = path[index], path[index + 1]
-            length = ends[index + 1] - ends[index]
-            share = min(1.0, (wanted - ends[index]) / length) if length else 0.0
-            at = (a[0] + (b[0] - a[0]) * share, a[1] + (b[1] - a[1]) * share)
-            middle = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
-            found.append((at, (b[0] - a[0], b[1] - a[1]), middle))
-        return found
+        return [self.spot(train, front - step * k) for k in range(count)]
+
+    def spot(self, train: Train, along: float) -> tuple[Point, Point, Point]:
+        """The point this far along the train's path, which way the train faces there, and the
+        middle of the stretch of track it is on."""
+        path = train.path
+        ends = self.ends(train)
+        index = _stretch_at(ends, along)
+        a, b = path[index], path[index + 1]
+        length = ends[index + 1] - ends[index]
+        share = min(1.0, (along - ends[index]) / length) if length else 0.0
+        at = (a[0] + (b[0] - a[0]) * share, a[1] + (b[1] - a[1]) * share)
+        middle = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+        return at, (b[0] - a[0], b[1] - a[1]), middle
+
+    def can_pass(self, one: tuple[Point, Point, Point], other: tuple[Point, Point, Point]) -> bool:
+        """Whether two trains at these spots (TrackNetwork.spot) can pass each other: where
+        either is within a station, or on double track going opposite ways. Either is enough,
+        as spots close to where a station or double track ends may lie on each side of it."""
+        (_, way, middle), (_, other_way, other_middle) = one, other
+        in_station, double = self.passing(middle)
+        other_in_station, other_double = self.passing(other_middle)
+        if in_station or other_in_station:
+            return True
+        opposite = way[0] * other_way[0] + way[1] * other_way[1] < 0
+        return opposite and (double or other_double)
 
     def length(self, train: Train) -> float:
         """How long the way the train is on is."""

@@ -1,3 +1,6 @@
+import itertools
+import math
+
 import pytest
 
 from builders import flat_map
@@ -30,6 +33,14 @@ def running(railway: Railway, name: str, start, end, engine: str = "planet") -> 
     train = Train(name, stops=[Stop(start), Stop(end)], engine=engine)
     railway.trains.append(train)
     return train
+
+
+def along_to(railway: Railway, start, end, cell) -> float:
+    path, _ = railway.route(start, end)
+    ends = [0.0, *itertools.accumulate(math.dist(a, b) for a, b in itertools.pairwise(path))]
+    return next(
+        at for point, at in zip(path, ends, strict=True) if railway.network.cell_at(point) == cell
+    )
 
 
 def run_until(railway: Railway, done, seconds: float = 600.0) -> None:
@@ -103,19 +114,18 @@ def test_a_train_reaching_a_stop_sets_off_again_from_a_stand() -> None:
     assert train.pace == 0.0
 
 
-def test_trains_meeting_head_on_one_stops_and_lets_the_other_by() -> None:
+def test_a_train_waits_at_its_station_while_another_comes_the_other_way_on_single_line() -> None:
     railway = line()
     first = running(railway, "First", WEST, EAST)
     second = running(railway, "Second", EAST, WEST)
 
-    run_until(railway, lambda: bool(second.giving_way))
-    stood = second.along
+    run_until(railway, lambda: first.along > 3.0)
     railway.run(10 * FRAME)
 
     assert second.giving_way == "First"
     assert first.giving_way == ""
-    assert second.along == stood
-    assert second.status == "Giving way to First"
+    assert railway.network.passing(railway.network.spot(second, second.along)[2]) == (True, False)
+    assert second.status == "Waiting for First to clear the line"
 
 
 def test_a_train_that_let_another_by_sets_off_again_from_a_stand_and_both_arrive() -> None:
@@ -128,7 +138,7 @@ def test_a_train_that_let_another_by_sets_off_again_from_a_stand_and_both_arrive
     pace = second.pace
     run_until(railway, lambda: first.arrivals >= 1 and second.arrivals >= 1)
 
-    assert pace == 0.0
+    assert pace == pytest.approx(FRAME / (ENGINES["planet"].pickup / SECONDS_PER_MONTH))
     assert first.arrivals >= 1 and second.arrivals >= 1
 
 
@@ -176,7 +186,65 @@ def test_many_trains_on_one_line_all_keep_getting_through() -> None:
         start, end = (WEST, EAST) if number % 2 else (EAST, WEST)
         running(railway, f"Train {number}", start, end)
 
-    for _ in range(int(6 / FRAME / 10)):
+    for _ in range(int(12 / FRAME / 10)):
         railway.run(10 * FRAME)
 
-    assert all(train.arrivals >= 2 for train in railway.trains)
+    assert all(train.arrivals >= 3 for train in railway.trains)
+
+
+def test_a_fast_train_behind_a_slow_one_follows_it_and_never_runs_into_it() -> None:
+    railway = line()
+    slow = running(railway, "Slow", WEST, EAST)
+    run_until(railway, lambda: slow.along > 3.0)
+    fast = running(railway, "Fast", WEST, EAST, engine="pacific")
+    statuses = set()
+    gaps = []
+
+    while not slow.arrivals:
+        railway.run(FRAME)
+        statuses.add(fast.status)
+        if fast.along > 0:
+            gaps.append(slow.along - fast.along)
+
+    assert "Following Slow" in statuses
+    assert min(gaps) > slow.length
+
+
+def test_trains_going_the_same_way_follow_each_other_onto_single_line() -> None:
+    railway = line()
+    first = running(railway, "First", WEST, EAST)
+    run_until(railway, lambda: first.along > 3.0)
+    second = running(railway, "Second", WEST, EAST)
+
+    run_until(railway, lambda: second.along > 3.0 or first.arrivals > 0)
+
+    assert first.arrivals == 0
+    assert second.giving_way == ""
+
+
+def test_a_train_waits_for_another_crossing_its_line_and_both_get_through() -> None:
+    constructions = Constructions(flat_map())
+    growth = Growth(constructions, GrowthRule(trades=False))
+    lines = (((6, 6), (6, 16)), ((1, 11), (11, 11)))
+    for start, end in lines:
+        build_station(growth, start)
+        build_station(growth, end)
+        route = plan_route(constructions, start, end, TrackWidth.SINGLE)
+        assert route is not None
+        lay_route(growth, route)
+    railway = Railway(constructions)
+    growth.railway = railway
+    ahead = along_to(railway, *lines[0], (6, 12)) - along_to(railway, *lines[1], (6, 12))
+    across = running(railway, "Across", *lines[0])
+    run_until(railway, lambda: across.along > ahead)
+    down = running(railway, "Down", *lines[1])
+    statuses = set()
+
+    for _ in range(int(240 / FRAME / 60)):
+        railway.run(FRAME)
+        statuses.add(down.status)
+        if across.arrivals and down.arrivals:
+            break
+
+    assert "Giving way to Across" in statuses
+    assert across.arrivals == 1 and down.arrivals == 1

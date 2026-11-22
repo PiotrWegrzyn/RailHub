@@ -94,10 +94,11 @@ def test_the_ground_under_every_trains_smoke_is_looked_up_in_one_go(
     context: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     view = railway_seen_in_pixel_art()
-    for stops in ([(10, 6), (10, 16)], [(10, 16), (10, 6)]):
+    for _ in range(2):
         train = view.railway.buy()
         assert train is not None
-        train.stops = [Stop(stop) for stop in stops]
+        train.stops = [Stop((10, 6)), Stop((10, 16))]
+    view.time_passed(0.1)
     view.time_passed(0.1)
     layer = TrainLayer(view._pixel_layer().world)
     looked: list[int] = []

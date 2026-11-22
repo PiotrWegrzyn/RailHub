@@ -22,26 +22,22 @@ next stop as it sets off (railroads.sim.fuel_market), and can't set off for a st
 its fuel takes it
 (railroads.sim.finance).
 
-Trains set off from a stand and pick up speed over their engine's pickup time. Trains that meet
-on the line, ahead of or against each other or where lines cross, can't run through each other
-for free: one of them stops and lets the other by, then sets off again from a stand. The train
-that has stood longest letting others by since it left its last stop goes first, so none waits for
-ever; then the better engine, then the train bought first. Within stations, and on double track
-for trains going opposite ways, trains pass each other without stopping.
+Trains set off from a stand and pick up speed over their engine's pickup time. They keep out of
+each other's way (railroads.sim.traffic): a train enters single line only once no train is on it
+the other way, follows a slower train ahead, and waits at a crossing for a train going across; a
+train that had to stop sets off again from a stand. Trains move in order of the right of way: the
+train that has stood longest in another's way since it left its last stop first, so none waits
+for ever; then the better engine, then the train bought first.
 
 The engines, cars, stops and trains are in railroads.sim.trains, what stations hold in
 railroads.sim.station_goods, the way along the track in railroads.sim.track_network, and what a
 train does calling at a station in railroads.sim.calls; Railway owns them all and runs the trains.
 """
 
-import itertools
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING
-
-import numpy as np
-import numpy.typing as npt
 
 from railroads.places import StationNames
 from railroads.sim import tiles as boards
@@ -93,6 +89,7 @@ from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
 from railroads.sim.tiles import Tiles
 from railroads.sim.track_network import TrackNetwork
+from railroads.sim.traffic import Traffic
 from railroads.sim.trains import (
     BURN_ALONE,
     ENGINES,
@@ -128,9 +125,6 @@ TRAIN_NAMES = {
 }
 # How far a train runs in a month, in cells, on flat ground.
 CELLS_PER_MONTH = 40.0
-# Trains meet where points along them, MEET_STEP cells apart, come within MEET_DISTANCE cells.
-MEET_STEP = 0.2
-MEET_DISTANCE = 0.2
 MAX_LEVEL = 1 + len(LEVEL_PRICES)
 # How many cells out a new station hands goods out to; and how many storage upgrades' worth of
 # room each level a station is raised adds.
@@ -788,10 +782,15 @@ class Railway:
         self.finances.spend(track_upkeep(track), "track upkeep")
 
     def run(self, months: float) -> None:
-        """Moves every train on by this many months, then has trains that met give way."""
-        for train in self.trains:
-            self._run(train, months)
-        self._meet()
+        """Moves every train on by this many months, in order of the right of way, each keeping
+        out of the way of the trains moved before it (railroads.sim.traffic)."""
+        bought = {id(train): index for index, train in enumerate(self.trains)}
+        rank = {id(train): _right_of_way(train, bought[id(train)]) for train in self.trains}
+        traffic = Traffic(self.network, rank)
+        traffic.add(self.trains)
+        for train in sorted(self.trains, key=lambda train: rank[id(train)]):
+            self._run(train, months, traffic)
+            traffic.moved(train)
 
     def route(
         self, start: Cell, end: Cell, electric: bool = False, maglev: bool = False
@@ -799,7 +798,7 @@ class Railway:
         """The way along laid track from one station to another (TrackNetwork.route)."""
         return self.network.route(start, end, electric, maglev)
 
-    def _run(self, train: Train, months: float) -> None:
+    def _run(self, train: Train, months: float, traffic: Traffic) -> None:
         if len(train.stops) < 2:
             train.status = "Needs two stops"
             train.path = []
@@ -857,20 +856,31 @@ class Railway:
                 places = (0.0 if car.dining else car.capacity for car in train.cars)
                 trips = sum(map(car_trip_price, places))
                 self.finances.spend(trips, "car trips")
-        if train.giving_way:
-            train.status = f"Giving way to {train.giving_way}"
-            train.waited += months
-            return
         engine = ENGINES[train.engine]
         pickup = engine.pickup / SECONDS_PER_MONTH * (SAND_TOWER_PICKUP if train.sanded else 1.0)
         pace = train.speed_up(months, pickup)
         speed = engine.speed * pace
         if train.fuelled:
             speed *= ENGINE_SHED_SPEED
-        train.along += (
+        wanted = train.along + (
             months * CELLS_PER_MONTH * self.network.speed_at(train) * self.pull(train) * speed
         )
+        allowed, blocker, line = traffic.room(train, wanted)
+        train.giving_way = ""
         train.status = "Running"
+        if allowed <= train.along:
+            train.giving_way = blocker
+            train.status = (
+                f"Waiting for {blocker} to clear the line" if line else f"Giving way to {blocker}"
+            )
+            train.pace = 0.0
+            train.waited += months
+            return
+        if allowed < wanted:
+            train.pace = min(train.pace, pace * (allowed - train.along) / (wanted - train.along))
+            if not line:
+                train.status = f"Following {blocker}"
+        train.along = allowed
         if train.along >= self.network.length(train):
             train.platform = self.network.cell_at(train.path[-1])
             self.calls.arrive(train, train.stops[train.heading % len(train.stops)])
@@ -880,95 +890,13 @@ class Railway:
             train.pace = 0.0
             train.waited = 0.0
 
-    def _meet(self) -> None:
-        """Has trains that met give way: of each two running into each other, the one that
-        doesn't go first stops where it is; a train that stopped sets off again once nothing
-        with the right of way is in its way any more."""
-        for train in self.trains:
-            if len(train.path) < 2:
-                train.giving_way = ""
-        running = [train for train in self.trains if len(train.path) >= 2]
-        if not running:
-            return
-        bought = {id(train): index for index, train in enumerate(self.trains)}
-        rank = {id(train): _right_of_way(train, bought[id(train)]) for train in running}
-        running.sort(key=lambda train: rank[id(train)])
-        bodies = [self.network.body(train, MEET_STEP) for train in running]
-        met = self._met(bodies)
-        for i, train in enumerate(running):
-            if train.giving_way:
-                continue
-            for j in met[i]:
-                other = running[j]
-                if j > i and not other.giving_way:
-                    other.giving_way = train.name
-                    other.pace = 0.0
-        for i, train in enumerate(running):
-            if not train.giving_way:
-                continue
-            ahead = [running[j] for j in met[i] if j < i or not running[j].giving_way]
-            train.giving_way = ahead[0].name if ahead else ""
-
-    def _met(self, bodies: list[list[tuple[Point, Point, Point]]]) -> list[list[int]]:
-        """For each running train, as points along it (TrackNetwork.body), the others it has
-        met somewhere they can't pass each other."""
-        met: list[list[int]] = [[] for _ in bodies]
-        boxes = []
-        points = []
-        for body in bodies:
-            xs = [at[0] for at, _, _ in body]
-            ys = [at[1] for at, _, _ in body]
-            boxes.append((min(xs), min(ys), max(xs), max(ys)) if body else None)
-            points.append(np.array([at for at, _, _ in body]))
-        reach = MEET_DISTANCE
-        for i, j in itertools.combinations(range(len(bodies)), 2):
-            one, other = boxes[i], boxes[j]
-            if one is None or other is None:
-                continue
-            if (
-                one[0] - reach > other[2]
-                or other[0] - reach > one[2]
-                or one[1] - reach > other[3]
-                or other[1] - reach > one[3]
-            ):
-                continue
-            if self._in_the_way(bodies[i], bodies[j], points[i], points[j]):
-                met[i].append(j)
-                met[j].append(i)
-        return met
-
-    def _in_the_way(
-        self,
-        one: list[tuple[Point, Point, Point]],
-        other: list[tuple[Point, Point, Point]],
-        a: npt.NDArray[np.float64],
-        b: npt.NDArray[np.float64],
-    ) -> bool:
-        """Whether two running trains, as points along them (TrackNetwork.body) and those
-        points as arrays, have met somewhere they can't pass each other."""
-        close = np.argwhere(
-            np.hypot(*(a[:, None, :] - b[None, :, :]).transpose(2, 0, 1)) < MEET_DISTANCE
-        )
-        return any(not self._can_pass(one[i], other[j]) for i, j in close.tolist())
-
-    def _can_pass(self, one: tuple[Point, Point, Point], other: tuple[Point, Point, Point]) -> bool:
-        """Whether two trains can pass each other here: within a station, or on double track
-        going opposite ways."""
-        (_, way, middle), (_, other_way, other_middle) = one, other
-        in_station, double = self.network.passing(middle)
-        other_in_station, other_double = self.network.passing(other_middle)
-        if in_station and other_in_station:
-            return True
-        opposite = way[0] * other_way[0] + way[1] * other_way[1] < 0
-        return opposite and double and other_double
-
     def position(self, train: Train, back: float = 0.0) -> tuple[Point, Point] | None:
         """Where the train is on the map, and which way it faces (TrackNetwork.position)."""
         return self.network.position(train, back)
 
 
 def _right_of_way(train: Train, bought: int) -> tuple[float, float, int]:
-    """What decides which of two trains that meet goes first, the smaller first: having stood
-    longest letting others by on the way, then the better engine, then being bought first
+    """What decides which of two trains moves first, the smaller first: having stood longest in
+    another's way on the way, then the better engine, then being bought first
     (`bought` is its place among the trains)."""
     return -train.waited, -ENGINES[train.engine].speed, bought

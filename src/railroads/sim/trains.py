@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
 from railroads.sim.finance import TRAIN_PRICE
 from railroads.sim.goods import General, Good
@@ -21,6 +22,9 @@ from railroads.sim.goods import General, Good
 type Cargo = Good | General
 from railroads.sim.grids import Cell
 from railroads.sim.tiles import Tile
+
+if TYPE_CHECKING:
+    from railroads.sim.traffic import Stretches
 
 MAX_CARS = 5
 
@@ -907,6 +911,9 @@ class Train:
     # How far along the path each of its points lies, with the path it was worked out for
     # (TrackNetwork.ends).
     path_ends: tuple[list[Point], list[float]] | None = None
+    # Where the path crosses from cell to cell and runs on single line, with the path and the
+    # railway version it was worked out for (railroads.sim.traffic.stretches).
+    path_stretches: tuple[list[Point], int, Stretches] | None = None
     along: float = 0.0
     status: str = "Waiting for stops"
     engine: str = FIRST_ENGINE
