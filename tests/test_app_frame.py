@@ -34,8 +34,9 @@ from railroads.ui.ground import GroundPictures
 from railroads.ui.history_pictures import opening_center
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
 from railroads.ui.main_menu import MENU_WIDTH, PANEL_PAD, MainMenu, Page
-from railroads.ui.map_view import VISIT_ZOOM, Lens, MapView
+from railroads.ui.map_view import STATION_CARD_DELAY, VISIT_ZOOM, Lens, MapView
 from railroads.ui.route_map import soften
+from railroads.ui.station_window import draw_station_card
 from railroads.ui.waiting_screen import WORK
 from railroads.ui.web_setup import PageSetup
 from railroads.ui.workers import FrameWorker
@@ -1156,3 +1157,29 @@ def test_an_autosave_that_cant_be_taken_is_told_and_the_game_plays_on(
     assert app._turning is None
     assert app.notice.startswith("Autosave failed: The game couldn't be saved")
     assert app.saves.listing() == []
+
+
+def test_a_stations_card_shows_once_the_mouse_has_rested_on_it_a_second(context: None) -> None:
+    app = made_app()
+    view = app.view
+    view.hovered = (10, 6)
+
+    at_first = view.rested_station(5.0)
+    soon = view.rested_station(5.0 + STATION_CARD_DELAY / 2)
+    later = view.rested_station(5.0 + STATION_CARD_DELAY)
+    view.hovered = (10, 7)
+    off = view.rested_station(5.0 + STATION_CARD_DELAY * 2)
+    view.hovered = (10, 6)
+    back = view.rested_station(5.0 + STATION_CARD_DELAY * 2)
+
+    assert (at_first, soon, later, off, back) == (None, None, (10, 6), None, None)
+
+
+def test_a_stations_card_draws_its_stockpile_waiting_and_demand(context: None) -> None:
+    app = made_app()
+    imgui.new_frame()
+
+    draw_station_card(app.view.railway, (10, 6), (0.0, 0.0))
+
+    imgui.render()
+    assert imgui.internal.find_window_by_name("##station card") is not None

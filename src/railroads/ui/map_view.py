@@ -89,11 +89,13 @@ from railroads.ui.route_map import soften, soften_steps
 from railroads.ui.search import BuildingSearch
 from railroads.ui.spotlight import pulsing_brass, spot
 from railroads.ui.station_preview import draw_station_preview
-from railroads.ui.station_window import StationWindow
+from railroads.ui.station_window import StationWindow, draw_station_card
 from railroads.ui.summaries_panel import SummariesPanel
 from railroads.ui.theme import BRASS, OVERLAY_FLAGS, SIDE_WINDOW_POS, rgba_u32, toggle_button
 
 BACKGROUND_COLOR = (0.08, 0.09, 0.11, 1.0)
+# How long the mouse rests on a station, in seconds, before its card shows.
+STATION_CARD_DELAY = 1.0
 DETAILS_SIZE = (460.0, 420.0)
 SHARES_SIZE = (400.0, 400.0)
 # Stepping to a building found zooms in at least this far, so it can be seen.
@@ -226,6 +228,8 @@ class MapView:
         # The station preview last worked out, and for which cell, buildings and month.
         self._station_previewed: tuple[tuple[Cell, int, Trade | None], StationPreview] | None = None
         self._built_previewed: dict[Cell, tuple[tuple[object, ...], StationPreview]] = {}
+        # The station the mouse rests on, and since when, in imgui's seconds.
+        self._resting: tuple[Cell, float] | None = None
         self.summaries = SummariesPanel()
         self.station_window = StationWindow()
         self.search = BuildingSearch()
@@ -855,8 +859,22 @@ class MapView:
             return
         if self.build.tool in (Tool.STATION, Tool.MOVE_STATION):
             draw_station_preview(self._station_preview(self.hovered), below)
+            return
+        station = self.rested_station(imgui.get_time())
+        if station is not None:
+            draw_station_card(self.railway, station, below)
         else:
             draw_hovered_buildings(self.growth, self.hovered, below, self._satisfaction)
+
+    def rested_station(self, now: float) -> Cell | None:
+        """The station under the mouse once it has rested there STATION_CARD_DELAY seconds."""
+        station = None if self.hovered is None else self.constructions.main_station(self.hovered)
+        if station is None:
+            self._resting = None
+            return None
+        if self._resting is None or self._resting[0] != station:
+            self._resting = (station, now)
+        return station if now - self._resting[1] >= STATION_CARD_DELAY else None
 
     def _built_station_preview(self, station: Cell) -> StationPreview:
         """What a station standing reaches, with its own reach and platforms, worked out again

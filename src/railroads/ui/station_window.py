@@ -26,10 +26,12 @@ from railroads.sim.trains import amount_of
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.ornate import begin_ornate, end_ornate, keep_in_front
 from railroads.ui.station_preview import draw_preview_body
-from railroads.ui.stations_window import look_at_button, stock_bar
+from railroads.ui.stations_window import look_at_button
 from railroads.ui.theme import (
     BRASS,
     GONE,
+    OVERLAY,
+    OVERLAY_FLAGS,
     SIDE_WINDOW_POS,
     goods_inline,
     rgba_u32,
@@ -108,7 +110,6 @@ class StationWindow:
     ) -> None:
         level = railway.level(station)
         delivery, collection = railway.reach(station)
-        goods = railway.station_goods(station)
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*BRASS), f"Level {level} of {MAX_LEVEL}")
         imgui.same_line()
@@ -120,18 +121,7 @@ class StationWindow:
             imgui.text_colored(imgui.ImVec4(*GONE), f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {warning}")
             imgui.pop_text_wrap_pos()
         imgui.separator()
-        imgui.text_disabled("Stockpile")
-        imgui.same_line(LABEL_WIDTH)
-        stock_bar(goods, (-1, 0))
-        imgui.dummy((LABEL_WIDTH, 0))
-        imgui.same_line(LABEL_WIDTH)
-        goods_inline(goods.freight(), "empty")
-        imgui.text_disabled("Waiting")
-        imgui.same_line(LABEL_WIDTH)
-        goods_inline(goods.waiting(), "nobody")
-        imgui.text_disabled("Demand left")
-        imgui.same_line(LABEL_WIDTH)
-        draw_demand(railway.station_demand(station))
+        draw_station_summary(railway, station)
         if preview is not None:
             imgui.separator()
             draw_preview_body(preview(station), built=True)
@@ -159,6 +149,40 @@ class StationWindow:
         if _priced_button(storage, railway.finances.can_afford(storage_price), detail):
             railway.add_storage(station)
         _draw_facilities(railway, station)
+
+
+def draw_station_summary(railway: Railway, station: Cell) -> None:
+    """What the station holds and how much of it it can, who waits there and what its town
+    still wants: in the station window, and on the map once the mouse rests on the station."""
+    goods = railway.station_goods(station)
+    imgui.text_disabled("Stockpile")
+    imgui.same_line(LABEL_WIDTH)
+    goods_inline(goods.freight(), "empty")
+    imgui.dummy((LABEL_WIDTH, 0))
+    imgui.same_line(LABEL_WIDTH)
+    imgui.text_disabled(f"holds up to {goods.limit:,.0f} of each good")
+    imgui.text_disabled("Waiting")
+    imgui.same_line(LABEL_WIDTH)
+    goods_inline(goods.waiting(), "nobody")
+    imgui.dummy((LABEL_WIDTH, 0))
+    imgui.same_line(LABEL_WIDTH)
+    imgui.text_disabled(f"up to {goods.waiting_limit:,.0f} passengers and as much mail")
+    imgui.text_disabled("Demand left")
+    imgui.same_line(LABEL_WIDTH)
+    draw_demand(railway.station_demand(station))
+
+
+def draw_station_card(railway: Railway, station: Cell, top_left: tuple[float, float]) -> None:
+    """The station's name and summary in a card below the map's status strip."""
+    imgui.set_next_window_pos(top_left)
+    imgui.set_next_window_bg_alpha(OVERLAY[3])
+    imgui.set_next_window_size_constraints((WINDOW_WIDTH, 0), (WINDOW_WIDTH, 1e6))
+    flags = OVERLAY_FLAGS | imgui.WindowFlags_.no_inputs.value
+    if imgui.begin("##station card", None, flags):
+        imgui.text_colored(imgui.ImVec4(*BRASS), railway.name_of(station))
+        imgui.separator()
+        draw_station_summary(railway, station)
+    imgui.end()
 
 
 def station_warning(railway: Railway, station: Cell) -> str:
