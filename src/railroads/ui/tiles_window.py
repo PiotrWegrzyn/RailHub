@@ -50,6 +50,8 @@ from railroads.ui.theme import (
 
 # A card's width at its usual size, its height for every unit of width, and the most it grows.
 CARD_WIDTH = 190.0
+# How many levels ahead a demand card tells of the next buyer it opens.
+UNLOCK_AHEAD = 2
 CARD_TALL = 1.12
 CARD_MOST = 230.0
 CARD_GAP = 14.0
@@ -114,13 +116,14 @@ def opened_at(tile: Tile, at: int) -> str:
 
 
 def next_unlock(tile: Tile, level: int) -> str:
-    """The next buyer a demand tile opens above a level: the level and who starts taking what."""
-    coming = sorted(at for at, _, _ in unlocks_of(tile) if at > level)
+    """The next buyer a demand tile opens above a level: the level and who starts taking what;
+    "" for none within UNLOCK_AHEAD levels."""
+    coming = sorted(at for at, _, _ in unlocks_of(tile) if level < at <= level + UNLOCK_AHEAD)
     return f"level {coming[0]}: {opened_at(tile, coming[0])}" if coming else ""
 
 
 def _next_need(tile: Tile, level: int) -> Need | None:
-    coming = [(at, need) for at, _, need in unlocks_of(tile) if at > level]
+    coming = [(at, need) for at, _, need in unlocks_of(tile) if level < at <= level + UNLOCK_AHEAD]
     return min(coming, key=lambda each: each[0])[1] if coming else None
 
 

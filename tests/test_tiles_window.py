@@ -61,6 +61,12 @@ def test_a_demand_card_names_a_later_buyer_by_its_level() -> None:
     assert opens == ("level 3: Farms take limestone", "")
 
 
+def test_a_demand_card_tells_of_a_buyer_only_two_levels_ahead() -> None:
+    far, near = next_unlock(Tile.OIL, 5), next_unlock(Tile.OIL, 9)
+
+    assert (far, near) == ("", "level 11: Clay pits, copper mines and 13 more take fuel")
+
+
 def test_every_buyer_a_tile_opens_is_listed_by_level() -> None:
     lines = all_unlocks(Tile.WOOD)
 
