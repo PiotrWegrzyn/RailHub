@@ -132,6 +132,17 @@ def test_a_train_names_the_stop_whose_way_on_is_longer_than_its_fuel_lasts() -> 
     assert [(index, round(leg)) for index, leg in legs] == [(0, 17), (1, 17)]
 
 
+def test_two_stops_running_at_the_same_station_are_no_long_leg() -> None:
+    railway = line()
+    train = railway.buy("planet")
+    assert train is not None
+    train.stops = [Stop(WEST), Stop(EAST), Stop(WEST), Stop(WEST)]
+
+    legs = railway.long_legs(train)
+
+    assert legs == []
+
+
 def test_a_train_with_stops_its_fuel_reaches_has_no_long_legs() -> None:
     railway = line()
     train = railway.buy("planet")

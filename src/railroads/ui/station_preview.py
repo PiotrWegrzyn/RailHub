@@ -1,6 +1,7 @@
-"""The card shown while a station is being placed (railroads.sim.station_trade.StationPreview),
-in the map's top left below the status strip: the points of each kind of building the station
-would hand goods out to, what they would want of it each month and what is made around it."""
+"""What a station reaches (railroads.sim.station_trade.StationPreview): the points of each kind of
+building it hands goods out to, what they want of it each month and what is made around it. A card
+in the map's top left below the status strip shows it while a station is being placed, and the
+station window shows it for a station built."""
 
 from imgui_bundle import imgui
 
@@ -29,16 +30,23 @@ def draw_station_preview(preview: StationPreview, top_left: Vec2) -> None:
     imgui.set_next_window_size_constraints((PREVIEW_WIDTH, 0), (PREVIEW_WIDTH, 1e6))
     flags = OVERLAY_FLAGS | imgui.WindowFlags_.no_inputs.value
     if imgui.begin("##station preview", None, flags):
-        imgui.text_colored(imgui.ImVec4(*BRASS), "A station here hands goods out to")
-        lines = preview_lines(preview)
-        if not lines:
-            imgui.text_disabled("no buildings")
-        for line in lines:
-            imgui.text(line)
-        imgui.spacing()
-        imgui.text_colored(imgui.ImVec4(*BRASS), "They would want each month")
-        draw_demand(preview.demand)
-        imgui.spacing()
-        imgui.text_colored(imgui.ImVec4(*BRASS), "Made around it each month")
-        goods_inline(preview.made, "nothing")
+        draw_preview_body(preview)
     imgui.end()
+
+
+def draw_preview_body(preview: StationPreview, built: bool = False) -> None:
+    """What a station reaches, worded for one about to be built or, if `built`, one standing."""
+    heading = "It hands goods out to" if built else "A station here hands goods out to"
+    imgui.text_colored(imgui.ImVec4(*BRASS), heading)
+    lines = preview_lines(preview)
+    if not lines:
+        imgui.text_disabled("no buildings")
+    for line in lines:
+        imgui.text(line)
+    imgui.spacing()
+    wanted = "They want each month" if built else "They would want each month"
+    imgui.text_colored(imgui.ImVec4(*BRASS), wanted)
+    draw_demand(preview.demand)
+    imgui.spacing()
+    imgui.text_colored(imgui.ImVec4(*BRASS), "Made around it each month")
+    goods_inline(preview.made, "nothing")

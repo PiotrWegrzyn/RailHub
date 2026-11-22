@@ -879,35 +879,6 @@ def test_a_station_wants_only_what_its_houses_were_left_short_of_by_the_farms_ar
     assert railway.station_demand((6, 20)).capacity.get(Need.FOOD, 0.0) == pytest.approx(demand)
 
 
-def test_a_good_kept_for_trains_is_not_handed_out_around_the_station() -> None:
-    growth, railway = joined_stations()
-    growth.build(Building((6, 21), BuildingKind.HOUSE))
-    goods = railway.station_goods((6, 20))
-    goods.brought[Good.COAL] = 100.0
-    goods.keep_for_trains(Good.COAL)
-
-    growth.trade_goods()
-
-    _, heating = food_and_heating(growth, (6, 21))
-    assert heating == pytest.approx(0.0)
-    assert goods.brought[Good.COAL] == pytest.approx(100.0)
-
-
-def test_a_good_let_go_again_is_handed_out_around_the_station() -> None:
-    growth, railway = joined_stations()
-    growth.build(Building((6, 21), BuildingKind.HOUSE))
-    goods = railway.station_goods((6, 20))
-    goods.brought[Good.COAL] = 100.0
-    goods.keep_for_trains(Good.COAL)
-
-    goods.keep_for_trains(Good.COAL, kept=False)
-    growth.trade_goods()
-
-    _, heating = food_and_heating(growth, (6, 21))
-    assert goods.kept == frozenset()
-    assert heating == pytest.approx(3.0)
-
-
 def test_a_new_stop_does_not_wait_for_a_full_load() -> None:
     stop = Stop((6, 3))
 

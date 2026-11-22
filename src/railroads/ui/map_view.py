@@ -225,6 +225,7 @@ class MapView:
         self._map_rect: tuple[Vec2, Vec2] = ((0.0, 0.0), (0.0, 0.0))
         # The station preview last worked out, and for which cell, buildings and month.
         self._station_previewed: tuple[tuple[Cell, int, Trade | None], StationPreview] | None = None
+        self._built_previewed: dict[Cell, tuple[tuple[object, ...], StationPreview]] = {}
         self.summaries = SummariesPanel()
         self.station_window = StationWindow()
         self.search = BuildingSearch()
@@ -278,7 +279,7 @@ class MapView:
             self.look_at,
             self.growth.station_trade.measure_demand,
             self.tools.start_moving,
-            self.growth.station_trade.supplies,
+            self._built_station_preview,
             self.tools.start_adding_platform,
         )
         self.summaries.draw(*self._map_rect, self.look_at, self.railway.name_of)
@@ -856,6 +857,18 @@ class MapView:
             draw_station_preview(self._station_preview(self.hovered), below)
         else:
             draw_hovered_buildings(self.growth, self.hovered, below, self._satisfaction)
+
+    def _built_station_preview(self, station: Cell) -> StationPreview:
+        """What a station standing reaches, with its own reach and platforms, worked out again
+        once the buildings, its reach or its platforms change or a month on."""
+        delivery, collection = self.railway.reach(station)
+        platforms = tuple(self.constructions.platforms(station))
+        key = (self.constructions.version, delivery, collection, platforms)
+        kept = self._built_previewed.get(station)
+        if kept is None or kept[0][:-1] != key or kept[0][-1] is not self.growth.trade:
+            preview = self.growth.station_trade.preview(station, delivery, collection, platforms)
+            kept = self._built_previewed[station] = (*key, self.growth.trade), preview
+        return kept[1]
 
     def _station_preview(self, cell: Cell) -> StationPreview:
         """What a station built in a cell would reach, worked out again only for another cell,

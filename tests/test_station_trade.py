@@ -142,3 +142,23 @@ def test_a_station_about_to_be_built_shows_what_its_buildings_want_and_what_is_m
     assert preview.demand.capacity[Need.FOOD] > 0
     assert preview.made[Good.WHEAT] > 0
     assert preview.made[Good.PASSENGERS] > 0
+
+
+def test_a_station_standing_reaches_as_far_as_its_own_reach_goes() -> None:
+    growth = Growth(Constructions(flat_map()), GrowthRule(trades=False))
+    put_up(growth, (6, 11), 2)
+    put_up(growth, (6, 14), 4)
+
+    preview = growth.station_trade.preview((6, 10), hand_out=4)
+
+    assert {kind: many for kind, many, _, _ in preview.reached} == {BuildingKind.HOUSE: 6}
+
+
+def test_a_station_reaches_out_from_its_platforms_as_well() -> None:
+    growth = Growth(Constructions(flat_map()), GrowthRule(trades=False))
+    put_up(growth, (6, 11), 2)
+    put_up(growth, (6, 14), 4)
+
+    preview = growth.station_trade.preview((6, 10), platforms=((6, 13),))
+
+    assert {kind: many for kind, many, _, _ in preview.reached} == {BuildingKind.HOUSE: 6}

@@ -53,18 +53,6 @@ def test_freight_a_station_gathered_is_never_handed_out_at_once() -> None:
     assert railway.finances.month["cargo"] == 0.0
 
 
-def test_goods_trains_brought_but_kept_for_trains_are_not_handed_out_either() -> None:
-    growth, railway = joined_stations()
-    growth.build(Building((6, 21), BuildingKind.HOUSE))
-    bring(railway, Good.BREAD, 50.0)
-    railway.station_goods(STATION).keep_for_trains(Good.BREAD)
-
-    growth.station_trade.hand_out_now(STATION, Good.BREAD)
-    growth.trade_goods()
-
-    assert railway.station_goods(STATION).brought[Good.BREAD] == pytest.approx(50.0)
-
-
 def test_a_station_is_short_only_of_what_its_buildings_still_lack_this_month() -> None:
     growth, railway = joined_stations()
     growth.build(Building((6, 21), BuildingKind.HOUSE))

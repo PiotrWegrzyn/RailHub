@@ -9,7 +9,7 @@
 - a warehouse adds WAREHOUSE_ROOM to the room for every kind of freight.
 
 Each takes its good at the start of every month from what the station holds, gathered or brought,
-kept for trains or not, and works that month only if it got all of it."""
+and works that month only if it got all of it."""
 
 from collections.abc import Mapping
 from enum import Enum

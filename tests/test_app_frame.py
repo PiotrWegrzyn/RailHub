@@ -1125,6 +1125,22 @@ def test_a_station_preview_is_kept_apart_from_the_track_preview_and_worked_out_o
     assert other is not first
 
 
+def test_the_station_window_shows_what_the_station_reaches_with_its_own_reach_once_a_month(
+    context: None,
+) -> None:
+    app = made_app()
+    frame(app)
+    station = app.view.station_window.station
+    assert station is not None
+    delivery, collection = app.view.railway.reach(station)
+
+    first = app.view._built_station_preview(station)
+    again = app.view._built_station_preview(station)
+
+    assert again is first
+    assert first == app.view.growth.station_trade.preview(station, delivery, collection)
+
+
 def test_an_autosave_that_cant_be_taken_is_told_and_the_game_plays_on(
     context: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

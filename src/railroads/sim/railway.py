@@ -555,15 +555,17 @@ class Railway:
 
     def leg_lengths(self, stops: list[Stop], engine: str) -> list[float | None]:
         """How long the way from each stop to the next, the last to the first, is for an engine,
-        in cells; None where no track it runs on joins them."""
+        in cells; None where no track it runs on joins them. Two stops running at the same station
+        are no way apart: the train goes on from the platform it stands at."""
         if len(stops) < 2:
             return []
         electric, maglev = ENGINES[engine].electric, ENGINES[engine].maglev
+        legs = zip(stops, stops[1:] + stops[:1], strict=True)
         return [
-            self.network.route_length(
-                stop.cell, stops[(index + 1) % len(stops)].cell, electric, maglev
-            )
-            for index, stop in enumerate(stops)
+            0.0
+            if here.cell == there.cell
+            else self.network.route_length(here.cell, there.cell, electric, maglev)
+            for here, there in legs
         ]
 
     def cargo_worth(self, train: Train) -> list[float]:

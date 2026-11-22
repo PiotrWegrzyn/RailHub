@@ -1,8 +1,8 @@
 """The station window, opened by right clicking a station: its level and reach, what it holds
-and wants, which of the goods made around it or held in it are kept for trains rather than handed
-out there, the trains that call there, and buttons to raise its level or add storage."""
+and wants, what it reaches, as placing it shows (railroads.ui.station_preview), the trains that
+call there, and buttons to raise its level or add storage."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from imgui_bundle import icons_fontawesome_4 as fa
@@ -18,23 +18,21 @@ from railroads.sim.facilities import (
 from railroads.sim.facilities import PRICES as FACILITY_PRICES
 from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.finance import STATION_PRICE, dollars
-from railroads.sim.goods import TRAVELLERS, Good
 from railroads.sim.grids import Cell
 from railroads.sim.railway import MAX_LEVEL, Railway
-from railroads.sim.station_goods import STORAGE_STEP, WAITING_STEP, StationGoods
+from railroads.sim.station_goods import STORAGE_STEP, WAITING_STEP
+from railroads.sim.station_trade import StationPreview
 from railroads.sim.trains import amount_of
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.ornate import begin_ornate, end_ornate, keep_in_front
+from railroads.ui.station_preview import draw_preview_body
 from railroads.ui.stations_window import look_at_button, stock_bar
 from railroads.ui.theme import (
     BRASS,
     GONE,
     SIDE_WINDOW_POS,
-    good_icon,
     goods_inline,
-    next_good_slot,
     rgba_u32,
-    rows_that_fit,
     tip,
     town_tint,
 )
@@ -55,10 +53,10 @@ class StationWindow:
         look_at: Callable[[Cell], None],
         upgraded: Callable[[Cell], None],
         move: Callable[[Cell], None] = lambda _: None,
-        supplies: Callable[[Cell], Mapping[Good, float]] = lambda _: {},
+        preview: Callable[[Cell], StationPreview] | None = None,
         add_platform: Callable[[Cell], None] = lambda _: None,
     ) -> None:
-        """`supplies` says what the buildings around a station make (StationTrade.supplies);
+        """`preview` says what a station reaches (StationTrade.preview);
         `add_platform` lets the player choose where a platform goes, which raising a station to
         a level that allows one does at once."""
         station = self.station
@@ -80,7 +78,7 @@ class StationWindow:
                 if railway.platforms_left(cell):
                     add_platform(cell)
 
-            self._draw_body(railway, station, look_at, raised, supplies)
+            self._draw_body(railway, station, look_at, raised, preview)
             left = railway.platforms_left(station)
             if left:
                 label = f"{fa.ICON_FA_PLUS}  Add a platform beside it ({left} to add)"
@@ -106,7 +104,7 @@ class StationWindow:
         station: Cell,
         look_at: Callable[[Cell], None],
         upgraded: Callable[[Cell], None],
-        supplies: Callable[[Cell], Mapping[Good, float]],
+        preview: Callable[[Cell], StationPreview] | None,
     ) -> None:
         level = railway.level(station)
         delivery, collection = railway.reach(station)
@@ -134,9 +132,9 @@ class StationWindow:
         imgui.text_disabled("Demand left")
         imgui.same_line(LABEL_WIDTH)
         draw_demand(railway.station_demand(station))
-        imgui.text_disabled("Not for local use")
-        imgui.same_line(LABEL_WIDTH)
-        _draw_kept(goods, supplies(station))
+        if preview is not None:
+            imgui.separator()
+            draw_preview_body(preview(station), built=True)
         imgui.separator()
         calling = [
             train.name for train in railway.trains if any(s.cell == station for s in train.stops)
@@ -195,33 +193,6 @@ def _draw_facilities(railway: Railway, station: Cell) -> None:
         detail = f"Uses {amount_of(good, amount)} a month; {effect}"
         if _priced_button(label, railway.finances.can_afford(price), detail):
             railway.build_facility(station, facility)
-
-
-def _draw_kept(goods: StationGoods, made: Mapping[Good, float]) -> None:
-    """A tick for each good made around the station or held in it, and each already kept, to
-    keep it for trains instead of handing it to the buildings around the station."""
-    held = {g for g in {*goods.stockpile, *goods.brought} if goods.held(g) > 0}
-    shown = sorted(
-        set(made) | held - set(TRAVELLERS) | goods.kept,
-        key=lambda g: g.value,
-    )
-    if not shown:
-        imgui.text_disabled("nothing is made around it or held here")
-        return
-    left, per_row = rows_that_fit()
-    for index, good in enumerate(shown):
-        next_good_slot(index, left, per_row)
-        kept = good in goods.kept
-        changed, kept = imgui.checkbox(f"##keep {good.value}", kept)
-        if changed:
-            goods.keep_for_trains(good, kept)
-        if imgui.is_item_hovered():
-            imgui.set_tooltip(
-                f"Keep {good.value} for trains: the station won't hand it to the buildings "
-                "around it"
-            )
-        imgui.same_line(0, 3)
-        good_icon(good, framed=True)
 
 
 def _priced_button(label: str, affordable: bool, detail: str = "") -> bool:

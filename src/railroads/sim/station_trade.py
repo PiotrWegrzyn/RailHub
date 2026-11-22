@@ -86,7 +86,6 @@ class StationTrade:
                 delivery,
                 collection,
                 freight,
-                goods.kept,
                 tuple(self._growth.constructions.platforms(station)),
             )
         return orders
@@ -164,16 +163,13 @@ class StationTrade:
 
     def hand_out_now(self, station: Cell, good: Good) -> None:
         """Hands a good trains have just brought to a station to the buildings around it that
-        still want it this month, at once, unless the good is kept for trains: the nearest
-        first, as in a month's trade (railroads.sim.economy.distribute). Each takes up to what it
-        needs in a month, less what it took already; a processor up to the room in its
-        stockpile. They pay as they take."""
+        still want it this month, at once: the nearest first, as in a month's trade
+        (railroads.sim.economy.distribute). Each takes up to what it needs in a month, less what
+        it took already; a processor up to the room in its stockpile. They pay as they take."""
         growth, railway = self._growth, self._growth.railway
         if railway is None or good in TRAVELLERS:
             return
         goods = railway.station_goods(station)
-        if good in goods.kept:
-            return
         cells, bounds = self._in_reach(station)
         economy = growth.economy
         if economy.taken is None:
@@ -208,8 +204,8 @@ class StationTrade:
         """What each load of cargo would be worth to the buildings around a station if a train
         unloaded it there now, one load after another, changing nothing: the units they would
         take at once, as hand_out_now hands them out, each weighed by what it is worth to the
-        building taking it (worth_to), what pay_for pays freight on. Passengers and mail, goods
-        kept for trains and what doesn't fit in the station are worth nothing here."""
+        building taking it (worth_to), what pay_for pays freight on. Passengers and mail and what
+        doesn't fit in the station are worth nothing here."""
         railway = self._growth.railway
         if railway is None:
             return [0.0 for _ in cargo]
@@ -220,7 +216,7 @@ class StationTrade:
         room: dict[Good, float] = {}
         weighed = []
         for good, amount in cargo:
-            if good in TRAVELLERS or good in goods.kept:
+            if good in TRAVELLERS:
                 weighed.append(0.0)
                 continue
             have = min(amount, room.setdefault(good, goods.room(good)))
@@ -468,14 +464,20 @@ class StationTrade:
         made |= {good for good, amount in got.items() if amount > 0}
         return {good: got.get(good, 0.0) for good in made}
 
-    def preview(self, cell: Cell) -> StationPreview:
-        """What a station built in a cell would reach: the points of each kind of building it
-        would hand goods out to, what they would want of it each month, and what the buildings
-        it would gather from make each month with the passengers and mail sent from around it;
-        all as a first-level station has them, before any of it is traded."""
-        hand_out, gather = FIRST_REACH, COLLECTION_RADIUS
+    def preview(
+        self,
+        cell: Cell,
+        hand_out: int = FIRST_REACH,
+        gather: int = COLLECTION_RADIUS,
+        platforms: tuple[Cell, ...] = (),
+    ) -> StationPreview:
+        """What a station in a cell reaches, by default a first-level one built there: the
+        points of each kind of building it hands goods out to, what they want of it each month,
+        and what the buildings it gathers from make each month with the passengers and mail sent
+        from around it; all before any of it is traded. A station reaches out from its platforms
+        as well as its own cell."""
         grid, counts, year = self._growth.grid, self._growth.counts, self._growth.year
-        ring = flat_within_any(grid, (cell,), hand_out).cells
+        ring = flat_within_any(grid, (cell, *platforms), hand_out).cells
         around = {kind: int(count.ravel()[ring].sum()) for kind, count in counts.items()}
         around = {kind: many for kind, many in around.items() if many}
         points = self._growth.rule.points
@@ -483,7 +485,7 @@ class StationTrade:
         reached.sort(key=lambda row: -row[1] * row[3])
         travellers = self._travellers(around)
         wanted = capacity_of(self._needs_in(around, lambda: ring) | as_needs(travellers))
-        gathered = flat_within_any(grid, (cell,), gather).cells
+        gathered = flat_within_any(grid, (cell, *platforms), gather).cells
         made: dict[Good, float] = {}
         for kind, count in counts.items():
             many = float(count.ravel()[gathered].sum())

@@ -14,9 +14,8 @@ seller share what it has by how much they still want.
 Stations come after (railroads.sim.railway), those joined by track to another station: each hands
 what it holds, what trains brought and its stockpile, to buildings within its delivery radius
 still short of a need, the same way,
-nearest first and shared by how much they still want, but taking all they want from any distance,
-unless the player keeps the good for trains there (StationOrder.kept). Both go through one
-distribute. Once every need has been met, each station takes the spare goods no building
+nearest first and shared by how much they still want, but taking all they want from any distance.
+Both go through one distribute. Once every need has been met, each station takes the spare goods no building
 took that buildings made within its collection radius into its stockpile, while it has room, for
 trains to carry away or to hand out the next month. The player's share of what the buildings they
 own make goes to the stations in reach before anything else: before it is handed out around them.
@@ -264,8 +263,6 @@ class StationOrder:
     collection: int = COLLECTION_RADIUS
     # Freight it gathered before, which takes up its room.
     stockpile: Mapping[Good, float] = field(default_factory=dict)
-    # Goods kept for trains: none of what trains brought of them is handed out around it.
-    kept: frozenset[Good] = frozenset()
     # The platforms added to it, whose cells it reaches out from as well as its own.
     platforms: tuple[Cell, ...] = ()
 
@@ -701,8 +698,7 @@ class _Month:
     def _serve(self, need: Need) -> None:
         """Lets the goods meeting a need reach the buildings wanting it, the most valuable first:
         first what buildings hand out on their own, then what trains brought to stations, within
-        their delivery radius, unless the good is kept for trains. Buildings want only what they
-        did not take already this month."""
+        their delivery radius. Buildings want only what they did not take already this month."""
         wants = self._wants(need)
         if not wants:
             return
@@ -767,16 +763,9 @@ class _Month:
 
     def _hand_out(self, need: Need, good: Good, demand: FloatCells, received: FloatCells) -> None:
         """Lets every station hand out what trains brought of a good to the buildings within its
-        delivery radius still short of it, the nearest first, unless it keeps the good for
-        trains."""
+        delivery radius still short of it, the nearest first."""
         stations = list(self.stations)
-        brought = np.array(
-            [
-                0.0 if good in self.stations[s].kept else self.brought[s].get(good, 0.0)
-                for s in stations
-            ],
-            dtype=np.float64,
-        )
+        brought = np.array([self.brought[s].get(good, 0.0) for s in stations], dtype=np.float64)
         if not (brought > 1e-9).any():
             return
         sellers, buyers, bounds = self._station_pairs()

@@ -36,9 +36,6 @@ class StationGoods:
     # The storage steps raising the station's level has added, which don't make bought storage
     # dearer.
     level_steps: int = 0
-    # Goods kept for trains, which the station doesn't hand out to the buildings around it. A
-    # frozenset, so saves from before it existed load with none kept.
-    kept: frozenset[Good] = frozenset()
     # What came to the station in each of the last QUARTER months, the latest last: the freight
     # it gathered and the passengers and mail who came to wait.
     months_got: list[dict[Good, float]] = field(default_factory=list)
@@ -106,10 +103,6 @@ class StationGoods:
         amount = min(amount, held)
         self.brought[good] = held - amount
         return take_parcels(self.origins.setdefault(good, {}), amount, held)
-
-    def keep_for_trains(self, good: Good, kept: bool = True) -> None:
-        """Keeps a good for trains, or lets the station hand it out around it again."""
-        self.kept = self.kept | {good} if kept else self.kept - {good}
 
     def board(self, good: Good, amount: float) -> None:
         """Lets the month's passengers or mail come to the station to wait, up to its waiting
