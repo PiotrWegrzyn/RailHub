@@ -826,7 +826,7 @@ POP, IND = Points.POPULATION, Points.INDUSTRY
 MILITARY = Ladder(
     kinds=(BuildingKind.OUTPOST, BuildingKind.BASE, BuildingKind.HEADQUARTERS),
     land=Land(deposit=Deposit.GARRISON),
-    base=1500,
+    base=15,
     merges={
         BuildingKind.OUTPOST: Merge(needed=3, pulled_down=3),
         BuildingKind.BASE: Merge(needed=3, pulled_down=3),
@@ -1122,7 +1122,7 @@ CLUB_TOWN = 30
 TAVERNS = Ladder(
     kinds=(BuildingKind.TAVERN,),
     land=TOWN_LAND,
-    base=100,
+    base=60,
     needs={Points.POPULATION: FOOD_TOWN},
     most_per_cell=1,
     most_nearby=1,
@@ -1131,7 +1131,7 @@ TAVERNS = Ladder(
 CLUBS = replace(
     TAVERNS,
     kinds=(BuildingKind.CLUB,),
-    base=500,
+    base=150,
     needs={Points.POPULATION: CLUB_TOWN},
     from_year=1900,
 )
@@ -1147,16 +1147,16 @@ SUSHI_LAND_CELLS = 4_000
 SUSHI_HUTS = replace(
     TAVERNS,
     kinds=(BuildingKind.SUSHI_HUT,),
-    base=10,
+    base=6,
     needs={Points.POPULATION: SUSHI_TOWN},
     apart=SUSHI_APART,
     land_cells_each=SUSHI_LAND_CELLS,
 )
 
-# Filling stations open in towns once motor cars come, as often as taverns.
+# Filling stations open in towns once motor cars come, half as often as taverns.
 FILLING_STATION_YEAR = 1920
 FILLING_STATIONS = replace(
-    TAVERNS, kinds=(BuildingKind.FILLING_STATION,), from_year=FILLING_STATION_YEAR
+    TAVERNS, kinds=(BuildingKind.FILLING_STATION,), base=20, from_year=FILLING_STATION_YEAR
 )
 
 # Department stores and hotels open in big towns, spaced out, a few to a map.
@@ -1164,16 +1164,17 @@ DEPARTMENT_STORES = Ladder(
     kinds=(BuildingKind.DEPARTMENT_STORE,),
     land=TOWN_LAND,
     base=500,
-    needs={Points.POPULATION: 60},
+    needs={Points.POPULATION: 40},
     most_per_cell=1,
     apart=6,
-    from_year=1880,
+    from_year=1950,
     land_cells_each=10_000,
 )
 
 HOTELS = replace(
     DEPARTMENT_STORES,
     kinds=(BuildingKind.HOTEL,),
+    needs={Points.POPULATION: 30},
     apart=5,
     from_year=1900,
     land_cells_each=8_000,
@@ -1222,13 +1223,13 @@ WORKS = (
     _works(BuildingKind.SUGAR_REFINERY, {}, 1800, base=0.9),
     _works(BuildingKind.PORCELAIN_WORKS, {}, 1710, 20_000, base=2),
     _works(BuildingKind.MACHINE_WORKS, {IND: 2}, 0, base=20),
-    _works(BuildingKind.CEMENT_WORKS, {IND: 3}, 0, 20_000, base=4),
+    _works(BuildingKind.CEMENT_WORKS, {}, 1840, base=2),
     _works(BuildingKind.PLASTICS_WORKS, {IND: 3}, 0, 30_000, base=4),
     _works(BuildingKind.APPLIANCE_FACTORY, {IND: 3}, 0, 30_000, base=4),
 )
 
 # The only source of guns when play begins.
-GUN_FACTORIES = _works(BuildingKind.GUN_FACTORY, {IND: 3}, 1800, 26_000, base=10)
+GUN_FACTORIES = _works(BuildingKind.GUN_FACTORY, {}, 1800, 26_000, base=3, starving_years=250)
 
 AIRPORTS = _works(BuildingKind.AIRPORT, {POP: 80}, 1920, 20_000, base=10)
 

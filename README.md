@@ -694,7 +694,7 @@ window (H) lists the same.
 | Amusement park |  | 200 food, 50 fuel (from era 2) | 100 beer |
 | Olympic stadium |  | 500 food | 200 beer, 200 newspapers (from 1600) |
 | Tavern |  | 22 alcohol | 20 food |
-| Department store (1880) |  | 20 clothes (from 1780), 20 shoes (from 1850), 5 porcelain, 10 appliances (from era 6) | 10 furniture |
+| Department store (1950) |  | 20 clothes (from 1780), 20 shoes (from 1850), 5 porcelain, 10 appliances (from era 6) | 10 furniture |
 | Hotel (1900) |  | 80 food, 10 wine | 10 beer, 10 newspapers (from 1600) |
 | Club (1900) |  | 88 alcohol | 5 chemicals (from era 3) |
 | Sushi hut |  | 60 fish, 60 rice | 10 soy sauce |
