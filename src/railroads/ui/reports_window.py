@@ -86,6 +86,8 @@ def _goods_colormap() -> implot.Colormap:
 
 # The lengths the books can be shown over, in months, and what each is called.
 PERIODS = {1: "Monthly", 3: "Quarterly", 12: "Yearly"}
+# How many periods the table of money in and out shows, the one under way last.
+BOOKS_SHOWN = 5
 MONTH_NAMES = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 PROFIT = (0.86, 0.66, 0.32, 1.0)
 LOSS = (0.92, 0.46, 0.36, 1.0)
@@ -100,17 +102,11 @@ def period_name(year: int, index: int, length: int) -> str:
     return str(year)
 
 
-def books_rows(before: dict[str, float], now: dict[str, float]) -> list[tuple[str, float, float]]:
-    """What money went in and out on, in the period before and this one so far: costs first,
-    the dearest at the top, then income, the biggest first."""
-    rows = [(what, before.get(what, 0.0), now.get(what, 0.0)) for what in {*before, *now}]
-    return sorted(rows, key=lambda row: (row[1] + row[2] >= 0, abs(row[1] + row[2]) * -1))
-
-
-def profit_cells(totals: list[float], had_before: bool) -> list[str]:
-    """The profit row's cells for the period before and this one, the first left blank when the
-    game has no period before this one to show."""
-    return [dollars(totals[0]) if had_before else "", dollars(totals[1])]
+def books_rows(books: Sequence[dict[str, float]]) -> list[tuple[str, list[float]]]:
+    """What money went in and out on, in each period shown, oldest first: costs first, the
+    dearest over those periods at the top, then income, the biggest first."""
+    rows = [(what, [period.get(what, 0.0) for period in books]) for what in set().union(*books)]
+    return sorted(rows, key=lambda row: (sum(row[1]) >= 0, -abs(sum(row[1]))))
 
 
 def profits(
@@ -337,39 +333,36 @@ class ReportsWindow:
 
     def _draw_books(self, finances: Finances, year: int) -> None:
         """Buttons to show the books by month, quarter or year; a table of what money went in
-        and out on, in the period before and this one so far; and each period's profit."""
+        and out on, in the last BOOKS_SHOWN periods up to this one so far; and each period's
+        profit."""
         for length, name in PERIODS.items():
             if length != 1:
                 imgui.same_line()
             if imgui.radio_button(name, self.period == length):
                 self.period = length
         periods = finances.periods(self.period, year)
-        now = periods[-1]
-        before = periods[-2] if len(periods) > 1 else None
+        shown = periods[-BOOKS_SHOWN:]
         imgui.text("Money in and out")
-        rows = books_rows({} if before is None else before[2], now[2])
-        if rows and imgui.begin_table("books", 3, imgui.TableFlags_.row_bg.value):
+        rows = books_rows([books for _, _, books in shown])
+        if rows and imgui.begin_table("books", len(shown) + 1, imgui.TableFlags_.row_bg.value):
             imgui.table_setup_column("")
-            imgui.table_setup_column(
-                "" if before is None else period_name(before[0], before[1], self.period)
-            )
-            imgui.table_setup_column(f"{period_name(now[0], now[1], self.period)} so far")
+            for index, (start, part, _) in enumerate(shown):
+                name = period_name(start, part, self.period)
+                imgui.table_setup_column(f"{name} so far" if index == len(shown) - 1 else name)
             imgui.table_headers_row()
-            totals = [0.0, 0.0]
-            for what, last, current in rows:
+            for what, amounts in rows:
                 imgui.table_next_row()
                 imgui.table_next_column()
                 imgui.text(what.capitalize())
-                for index, amount in enumerate((last, current)):
-                    totals[index] += amount
+                for amount in amounts:
                     imgui.table_next_column()
                     imgui.text(dollars(amount) if amount else "")
             imgui.table_next_row()
             imgui.table_next_column()
             imgui.text("Profit")
-            for cell in profit_cells(totals, before is not None):
+            for _, _, books in shown:
                 imgui.table_next_column()
-                imgui.text(cell)
+                imgui.text(dollars(sum(books.values())))
             imgui.end_table()
         else:
             imgui.text_disabled("Nothing yet")

@@ -14,7 +14,6 @@ from railroads.ui.reports_window import (
     books_rows,
     period_name,
     price_rows,
-    profit_cells,
     profits,
     report,
     tile_price_line,
@@ -134,21 +133,17 @@ def test_profit_is_what_came_in_less_what_went_out_at_the_start_of_each_period()
 
 
 def test_the_books_list_costs_first_then_income() -> None:
-    rows = books_rows({"cargo": 500.0, "track": -20.0}, {"cargo": 100.0, "trains": -900.0})
+    rows = books_rows([{"cargo": 500.0, "track": -20.0}, {"cargo": 100.0, "trains": -900.0}])
 
-    assert [what for what, _, _ in rows] == ["trains", "track", "cargo"]
-
-
-def test_the_profit_row_leaves_the_period_before_blank_in_the_first_period() -> None:
-    cells = profit_cells([0.0, -52834.0], had_before=False)
-
-    assert cells == ["", "-$52,834"]
+    assert [what for what, _ in rows] == ["trains", "track", "cargo"]
 
 
-def test_the_profit_row_shows_both_periods_once_there_is_one_before() -> None:
-    cells = profit_cells([0.0, 120.0], had_before=True)
+def test_the_books_give_each_period_its_amount_oldest_first() -> None:
+    books = [{"cargo": 10.0}, {"cargo": 20.0, "coal": -5.0}, {"coal": -7.0}]
 
-    assert cells == ["$0", "$120"]
+    rows = dict(books_rows(books))
+
+    assert rows == {"coal": [0.0, -5.0, -7.0], "cargo": [10.0, 20.0, 0.0]}
 
 
 @pytest.mark.parametrize("length", [1, 3, 12])
