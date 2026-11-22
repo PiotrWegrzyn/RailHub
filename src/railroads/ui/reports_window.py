@@ -107,6 +107,12 @@ def books_rows(before: dict[str, float], now: dict[str, float]) -> list[tuple[st
     return sorted(rows, key=lambda row: (row[1] + row[2] >= 0, abs(row[1] + row[2]) * -1))
 
 
+def profit_cells(totals: list[float], had_before: bool) -> list[str]:
+    """The profit row's cells for the period before and this one, the first left blank when the
+    game has no period before this one to show."""
+    return [dollars(totals[0]) if had_before else "", dollars(totals[1])]
+
+
 def profits(
     periods: list[tuple[int, int, dict[str, float]]], length: int
 ) -> tuple[list[float], list[float]]:
@@ -361,9 +367,9 @@ class ReportsWindow:
             imgui.table_next_row()
             imgui.table_next_column()
             imgui.text("Profit")
-            for amount in totals:
+            for cell in profit_cells(totals, before is not None):
                 imgui.table_next_column()
-                imgui.text(dollars(amount))
+                imgui.text(cell)
             imgui.end_table()
         else:
             imgui.text_disabled("Nothing yet")
