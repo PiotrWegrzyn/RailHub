@@ -12,9 +12,9 @@ own module (railroads.ui.pixel.ground, track_art, scenery and projection); this 
 together from them.
 """
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Self
+from typing import Self, overload
 
 import numpy as np
 import numpy.typing as npt
@@ -49,7 +49,7 @@ from railroads.ui.pixel.relief import (
     raycast,
 )
 from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
-from railroads.ui.pixel.sheet import FINE, SpriteSheet
+from railroads.ui.pixel.sheet import FINE, FINEST, ByteSheet, SpriteSheet
 from railroads.ui.pixel.track_art import TrackArt
 
 # How far in art pixels a sprite can reach from where it stands.
@@ -77,9 +77,12 @@ class PixelWorld:
         cell_units: float,
         fine: SpriteSheet | None = None,
         station_levels: Mapping[Cell, int] | None = None,
+        finest: ByteSheet | None = None,
     ) -> None:
         finish(
-            self._build(tile_map, constructions, sheet, angle_deg, cell_units, fine, station_levels)
+            self._build(
+                tile_map, constructions, sheet, angle_deg, cell_units, fine, station_levels, finest
+            )
         )
 
     @classmethod
@@ -92,11 +95,12 @@ class PixelWorld:
         cell_units: float,
         fine: SpriteSheet | None = None,
         station_levels: Mapping[Cell, int] | None = None,
+        finest: ByteSheet | None = None,
     ) -> Steps[Self]:
         """The world made a part at a time, for a page to go on drawing frames between them."""
         world = cls.__new__(cls)
         yield from world._build(
-            tile_map, constructions, sheet, angle_deg, cell_units, fine, station_levels
+            tile_map, constructions, sheet, angle_deg, cell_units, fine, station_levels, finest
         )
         return world
 
@@ -109,6 +113,7 @@ class PixelWorld:
         cell_units: float,
         fine: SpriteSheet | None,
         station_levels: Mapping[Cell, int] | None,
+        finest: ByteSheet | None = None,
     ) -> Steps[None]:
         self.tile_map = tile_map
         self.constructions = constructions
@@ -141,12 +146,16 @@ class PixelWorld:
         self._pieces: list[Track] = []
         self._pieces_version = -1
         # The sprites at each resolution chunks can be drawn at: the sheet, and the same sprites
-        # drawn finer if there are any.
+        # drawn finer if there are any, and finest still for the closest views.
         self._sprites = {1: _Sprites.of(sheet)}
         if fine is not None:
             if fine.names != sheet.names:
                 raise ValueError("The fine sprite sheet must hold the same sprites in order")
             self._sprites[FINE] = _Sprites.of(fine)
+        if finest is not None:
+            if finest.names != sheet.names:
+                raise ValueError("The finest sprite sheet must hold the same sprites in order")
+            self._sprites[FINEST] = _Sprites.of_bytes(finest)
         # How many times buildings and satisfaction have changed, so copies of the world painting
         # elsewhere (railroads.ui.pixel.copies) know when to catch up.
         self.buildings_version = 0
@@ -163,17 +172,18 @@ class PixelWorld:
         self.satisfaction_version += 1
 
     def sprite(self, index: int) -> tuple[int, npt.NDArray[np.float32], tuple[int, int]]:
-        """A sprite as the finest sheet holds it: that sheet's resolution, the sprite's RGBA
-        pixels from 0 to 1 and its anchor."""
-        resolution = max(self._sprites)
+        """A sprite as the finest sheet held as pixels from 0 to 1 holds it: that sheet's
+        resolution, the sprite's RGBA pixels and its anchor."""
+        resolution = max(self.resolutions)
         sprites = self._sprites[resolution]
         anchor = sprites.anchors[index]
         return resolution, sprites.pixels[index], (int(anchor[0]), int(anchor[1]))
 
     @property
     def resolutions(self) -> tuple[int, ...]:
-        """The resolutions chunks can be drawn at, in pixels per art pixel."""
-        return tuple(self._sprites)
+        """The resolutions chunks can be drawn at, in pixels per art pixel, besides CLOSE, which
+        the closest views draw at and the finest sheet serves."""
+        return tuple(k for k in self._sprites if k <= FINE)
 
     def buildings_changed(self, cells: Iterable[Cell]) -> set[tuple[int, int]]:
         """Puts the ground and scenery up again after buildings or forests changed in `cells`;
@@ -608,7 +618,7 @@ class PixelWorld:
         """Stands what stands on the ground in the chunk on it, back to front: with
         `under_track` only what is drawn under the track (Scenery.under_track), and otherwise the
         rest."""
-        sheet = resolution if resolution in self._sprites else max(self._sprites)
+        sheet = max(k for k in self._sprites if resolution % k == 0)
         times = resolution // sheet
         scenery, drawn, k = self.scenery, self._sprites[sheet], resolution
         x0 = (scenery.x - left) * k - drawn.anchors[scenery.sprite, 0] * times
@@ -645,17 +655,64 @@ class _Sprites:
     """A sheet's sprites as the renderer uses them: each one's pixels, premultiplied too, its
     width and height, and its anchor."""
 
-    pixels: list[npt.NDArray[np.float32]]
-    premultiplied: list[npt.NDArray[np.float32]]
+    pixels: Sequence[npt.NDArray[np.float32]]
+    premultiplied: Sequence[npt.NDArray[np.float32]]
     sizes: IntArray
     anchors: IntArray
 
     @classmethod
     def of(cls, sheet: SpriteSheet) -> Self:
-        premultiplied = [
-            np.concatenate([p[..., :3] * p[..., 3:], p[..., 3:]], axis=-1) for p in sheet.pixels
-        ]
+        premultiplied = [_premultiplied(p) for p in sheet.pixels]
         return cls(sheet.pixels, premultiplied, sheet.sizes, sheet.anchors)
+
+    @classmethod
+    def of_bytes(cls, sheet: ByteSheet) -> Self:
+        return cls(
+            _Unpacked(sheet.pixels, False),
+            _Unpacked(sheet.pixels, True),
+            sheet.sizes,
+            sheet.anchors,
+        )
+
+
+def _premultiplied(pixels: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+    return np.concatenate([pixels[..., :3] * pixels[..., 3:], pixels[..., 3:]], axis=-1)
+
+
+class _Unpacked(Sequence[npt.NDArray[np.float32]]):
+    """Sprites kept as RGBA bytes, each made RGBA from 0 to 1, premultiplied or not, the first
+    time it is asked for and kept from then on. A copy of the world sent elsewhere carries only
+    the bytes."""
+
+    def __init__(self, pixels: list[npt.NDArray[np.uint8]], premultiply: bool) -> None:
+        self._bytes = pixels
+        self._premultiply = premultiply
+        self._made: dict[int, npt.NDArray[np.float32]] = {}
+
+    def __len__(self) -> int:
+        return len(self._bytes)
+
+    @overload
+    def __getitem__(self, index: int) -> npt.NDArray[np.float32]: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[npt.NDArray[np.float32]]: ...
+
+    def __getitem__(
+        self, index: int | slice
+    ) -> npt.NDArray[np.float32] | Sequence[npt.NDArray[np.float32]]:
+        if isinstance(index, slice):
+            return [self[i] for i in range(len(self))[index]]
+        made = self._made.get(index)
+        if made is None:
+            made = self._bytes[index].astype(np.float32) / 255
+            if self._premultiply:
+                made = _premultiplied(made)
+            self._made[index] = made
+        return made
+
+    def __getstate__(self) -> dict[str, object]:
+        return {"_bytes": self._bytes, "_premultiply": self._premultiply, "_made": {}}
 
 
 # Words in the names of works' sprites, which stand in a gravel yard.

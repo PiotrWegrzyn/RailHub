@@ -1,4 +1,5 @@
 import json
+import pickle
 
 import numpy as np
 import pytest
@@ -27,10 +28,10 @@ from railroads.ui.pixel.noise import noise, table_hash
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection, hash01
 from railroads.ui.pixel.relief import MOST_LIFT, raycast
 from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
-from railroads.ui.pixel.sheet import FINE, SHEET_INDEX, SpriteSheet
+from railroads.ui.pixel.sheet import FINE, FINEST, SHEET_INDEX, SpriteSheet
 from railroads.ui.pixel.track_art import RAIL
 from railroads.ui.pixel.track_preview import ghost
-from railroads.ui.pixel.world import PixelWorld
+from railroads.ui.pixel.world import CLOSE, PixelWorld
 
 LOOKS = {HexGrid: (0.0, 1.0), SquareGrid: (-45.0, float(np.sqrt(2)))}
 GAME_LOOK = (-45.0, float(np.sqrt(2)))
@@ -779,6 +780,61 @@ def test_the_fine_sheet_holds_the_same_sprites_twice_as_big_on_the_same_spots(
     assert shipped.names == fine_sheet.names == sheet.names
     assert np.abs(fine_sheet.sizes - FINE * sheet.sizes).max() <= 2
     assert np.abs(fine_sheet.anchors - FINE * sheet.anchors).max() <= 2
+
+
+def test_the_finest_sheet_holds_the_same_sprites_twice_as_big_as_the_fine_one(
+    sheet: SpriteSheet,
+) -> None:
+    fine = SpriteSheet.load_fine()
+
+    finest = SpriteSheet.load_finest()
+
+    times = FINEST // FINE
+    assert finest.names == sheet.names
+    assert np.abs(finest.sizes - times * fine.sizes).max() <= 6
+    assert np.abs(finest.anchors - times * fine.anchors).max() <= 6
+
+
+def test_the_closest_view_draws_what_stands_on_the_ground_from_the_finest_sheet(
+    sheet: SpriteSheet, fine_sheet: SpriteSheet
+) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    for _ in range(6):
+        constructions.build(Building((10, 4), BuildingKind.HOUSE))
+    look = LOOKS[HexGrid]
+    fine_only = PixelWorld(tile_map, constructions, sheet, *look, fine=fine_sheet)
+    finest = PixelWorld(
+        tile_map, constructions, sheet, *look, fine=fine_sheet, finest=SpriteSheet.load_finest()
+    )
+    px, py = finest.projection.to_pixels(*tile_map.grid.center(10, 4))
+    chunk = (int(px) // CHUNK, int(py) // CHUNK)
+
+    blown_up, sharp = fine_only.render(*chunk, CLOSE), finest.render(*chunk, CLOSE)
+
+    assert finest.resolutions == (1, FINE)
+    assert sharp.shape == blown_up.shape
+    assert (sharp != blown_up).any()
+    assert (finest.render(*chunk, FINE) == fine_only.render(*chunk, FINE)).all()
+
+
+def test_a_copy_of_the_world_carries_the_finest_sheet_as_bytes(
+    sheet: SpriteSheet, fine_sheet: SpriteSheet
+) -> None:
+    tile_map = make_tile_map()
+    world = PixelWorld(
+        tile_map,
+        Constructions(tile_map),
+        sheet,
+        *LOOKS[HexGrid],
+        fine=fine_sheet,
+        finest=SpriteSheet.load_finest(),
+    )
+    world.render(0, 1, CLOSE)
+
+    copy = pickle.loads(pickle.dumps(world))
+
+    assert (copy.render(0, 1, CLOSE) == world.render(0, 1, CLOSE)).all()
 
 
 def test_a_fine_chunk_keeps_the_grounds_colours_textured_and_draws_what_stands_on_it_finer(

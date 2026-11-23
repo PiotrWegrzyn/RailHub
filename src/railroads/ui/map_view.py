@@ -81,7 +81,7 @@ from railroads.ui.pixel.ground_shader import (
 )
 from railroads.ui.pixel.layer import PixelLayer
 from railroads.ui.pixel.relief import Elevation
-from railroads.ui.pixel.sheet import SpriteSheet
+from railroads.ui.pixel.sheet import ByteSheet, SpriteSheet
 from railroads.ui.pixel.track_preview import TrackPreview
 from railroads.ui.pixel.train_layer import TrainLayer, engine_picture
 from railroads.ui.pixel.world import PixelWorld
@@ -125,6 +125,11 @@ def _sprite_sheet() -> SpriteSheet:
 @cache
 def _fine_sprite_sheet() -> SpriteSheet:
     return SpriteSheet.load_fine()
+
+
+@cache
+def _finest_sprite_sheet() -> ByteSheet:
+    return SpriteSheet.load_finest()
 
 
 class OnGround:
@@ -962,6 +967,7 @@ class MapView:
             self._look.cell_units,
             fine=_fine_sprite_sheet(),
             station_levels=self.railway.levels,
+            finest=_finest_sprite_sheet(),
         )
         world.satisfaction = self._satisfaction.copy()
         self._pixels = PixelLayer(world)

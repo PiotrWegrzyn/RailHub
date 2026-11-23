@@ -18,6 +18,11 @@ SHEET_INDEX = SHEET_DIR / "sprites.json"
 FINE = 2
 FINE_PNG = SHEET_DIR / "sprites@2x.png"
 FINE_INDEX = SHEET_DIR / "sprites@2x.json"
+# The same sprites drawn FINEST times finer, for the closest zooms, which draw chunks that fine
+# (railroads.ui.pixel.world.CLOSE). It is kept as bytes until a sprite is drawn.
+FINEST = 4
+FINEST_PNG = SHEET_DIR / "sprites@4x.png"
+FINEST_INDEX = SHEET_DIR / "sprites@4x.json"
 
 Pixels = npt.NDArray[np.float32]
 
@@ -47,6 +52,11 @@ class SpriteSheet:
     def load_fine(cls) -> Self:
         return cls.load(FINE_PNG, FINE_INDEX)
 
+    @classmethod
+    def load_finest(cls) -> ByteSheet:
+        with Image.open(FINEST_PNG) as sheet:
+            return ByteSheet.from_image(sheet, json.loads(FINEST_INDEX.read_text()))
+
     def index(self, name: str) -> int:
         found = self._indices.get(name)
         if found is None:
@@ -72,4 +82,25 @@ class SpriteSheet:
     @property
     def sizes(self) -> npt.NDArray[np.int64]:
         """Width and height of each sprite."""
+        return np.array([[p.shape[1], p.shape[0]] for p in self.pixels], dtype=np.int64)
+
+
+@dataclass(frozen=True)
+class ByteSheet:
+    """Each sprite as RGBA bytes, with its anchor: a big sheet kept small in memory until its
+    sprites are drawn."""
+
+    names: list[str]
+    pixels: list[npt.NDArray[np.uint8]]
+    anchors: npt.NDArray[np.int64]
+
+    @classmethod
+    def from_image(cls, sheet: Image.Image, places: dict[str, list[int]]) -> Self:
+        rgba = np.asarray(sheet.convert("RGBA"))
+        pixels = [rgba[y : y + h, x : x + w].copy() for x, y, w, h, _, _ in places.values()]
+        anchors = np.array([place[4:6] for place in places.values()], dtype=np.int64)
+        return cls(list(places), pixels, anchors)
+
+    @cached_property
+    def sizes(self) -> npt.NDArray[np.int64]:
         return np.array([[p.shape[1], p.shape[0]] for p in self.pixels], dtype=np.int64)
