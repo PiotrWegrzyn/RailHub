@@ -16,13 +16,14 @@ from imgui_bundle import imgui, implot
 from railroads.sim import clock
 from railroads.sim.clock import END_YEAR, MONTHS_PER_YEAR, QUARTER
 from railroads.sim.company import Goal
-from railroads.sim.finance import Finances, dollars
+from railroads.sim.finance import Finances
 from railroads.sim.fuel_market import Fuel, FuelMarket, FuelMonth, electrified
 from railroads.sim.goods import Good
 from railroads.sim.stats import History
 from railroads.sim.tiles import TILE_GOODS, Tile, Tiles
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.theme import GOOD_COLORS, GROWN, WINDOW_TOP
+from railroads.words import dollars
 
 WINDOW_SIZE = (720.0, 640.0)
 PLOT_HEIGHT = 180.0
@@ -132,7 +133,9 @@ def fuel_breakdown(fuel: Fuel, month: FuelMonth) -> list[tuple[str, str]]:
     rows = [
         (
             "Price",
-            f"{dollars(month.price)} a unit" if month.price >= 1 else f"${month.price:.2f} a unit",
+            f"{dollars(month.price)} a unit"
+            if month.price >= 1
+            else f"{dollars(month.price, cents=True)} a unit",
         ),
     ]
     if fuel == Fuel.ELECTRICITY:

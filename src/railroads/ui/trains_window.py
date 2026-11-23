@@ -15,7 +15,7 @@ from imgui_bundle import imgui
 from railroads.sim.amounts import EPSILON
 from railroads.sim.demand import StationDemand
 from railroads.sim.economy import SCARCE_WORTH
-from railroads.sim.finance import TRAIN_RESALE, dollars
+from railroads.sim.finance import TRAIN_RESALE
 from railroads.sim.fuel_market import fuel_of
 from railroads.sim.goods import GENERAL_GOODS, General, Good
 from railroads.sim.grids import Cell
@@ -32,13 +32,7 @@ from railroads.sim.trains import (
     amount_of,
     unit_name,
 )
-from railroads.ui.buy_train import (
-    BuyScreen,
-    EnginePicture,
-    engine_range,
-    fuel_use,
-    tonnes_text,
-)
+from railroads.ui.buy_train import BuyScreen, EnginePicture, engine_range, fuel_use
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.ornate import card, ornate_window, section, tile
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at
@@ -64,7 +58,7 @@ from railroads.ui.theme import (
     offer_chip,
     tip,
 )
-from railroads.words import share_of
+from railroads.words import dollars, plural, share_of, tonnes_text
 
 # How a cargo's worth at a stop is worked out, as freight is paid there.
 CARGO_WORTH = (
@@ -468,7 +462,7 @@ class TrainsWindow:
             note = (
                 "only refuels"
                 if stop.refuel_only
-                else f"{len(stop.cars)} car{'' if len(stop.cars) == 1 else 's'} to {following}"
+                else f"{len(stop.cars)} {plural('car', len(stop.cars))} to {following}"
             )
             _note_before(note, right - HEAD_BUTTONS)
         imgui.same_line(right - HEAD_BUTTONS)

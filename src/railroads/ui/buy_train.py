@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.sim.finance import dollars
 from railroads.sim.fuel_market import fuel_of
 from railroads.sim.railway import Railway
 from railroads.sim.tiles import Tile
@@ -26,6 +25,7 @@ from railroads.ui.iso_camera import Vec2
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.spotlight import spot
 from railroads.ui.theme import BRASS, GONE, TEXT_DIM, color_u32, colored, tip
+from railroads.words import dollars, tonnes_text
 
 SCREEN_SIZE = (860.0, 560.0)
 ENGINES_WIDTH = 250.0
@@ -44,11 +44,6 @@ type DrawRoute = Callable[[Train], None]
 # The engines on sale grouped by what they are for, and an engine's tooltip.
 type EngineGroups = list[tuple[Kind, list[str]]]
 type Summary = Callable[[Engine, float], str]
-
-
-def tonnes_text(tonnes: float) -> str:
-    """Tonnes to a tenth, so cars that look as if they fit an engine's pull do."""
-    return f"{tonnes:,.1f}".removesuffix(".0")
 
 
 @dataclass

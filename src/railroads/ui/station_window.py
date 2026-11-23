@@ -17,7 +17,7 @@ from railroads.sim.facilities import (
 )
 from railroads.sim.facilities import PRICES as FACILITY_PRICES
 from railroads.sim.facilities import USES as FACILITY_USES
-from railroads.sim.finance import STATION_PRICE, dollars
+from railroads.sim.finance import STATION_PRICE
 from railroads.sim.grids import Cell
 from railroads.sim.railway import MAX_LEVEL, Railway
 from railroads.sim.station_goods import STORAGE_STEP, WAITING_STEP
@@ -37,6 +37,7 @@ from railroads.ui.theme import (
     tip,
     town_tint,
 )
+from railroads.words import dollars
 
 WINDOW_WIDTH = 460.0
 UNJOINED = "Not joined by track to another station: it gathers and hands out nothing"

@@ -10,6 +10,7 @@ from railroads.ui.demand_view import draw_demand
 from railroads.ui.iso_camera import Vec2
 from railroads.ui.ornate import hover_card
 from railroads.ui.theme import BRASS, colored, goods_inline
+from railroads.words import plural, times_over
 
 PREVIEW_WIDTH = 390.0
 
@@ -20,8 +21,8 @@ def preview_lines(preview: StationPreview) -> list[str]:
     lines = []
     for kind, many, points, value in preview.reached:
         total = many * value
-        named = kind.value if many == 1 else f"{kind.value} x{many}"
-        lines.append(f"{named}: {total} {points.value} point{'' if total == 1 else 's'}")
+        named = times_over(kind.value, many)
+        lines.append(f"{named}: {total} {points.value} {plural('point', total)}")
     return lines
 
 

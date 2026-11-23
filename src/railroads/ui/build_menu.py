@@ -31,7 +31,6 @@ from railroads.sim.finance import (
     TRACK_UPKEEP,
     TRACK_WIDTH_FACTORS,
     TRACK_WIDTH_UPKEEP_FACTORS,
-    dollars,
 )
 from railroads.sim.grids import Cell, FloatArray, Grid
 from railroads.sim.ladders import Points
@@ -58,7 +57,7 @@ from railroads.ui.theme import (
     toggle_button,
 )
 from railroads.ui.trains_window import TrainsWindow
-from railroads.words import share_of, times
+from railroads.words import dollars, share_of, times
 
 BALLAST = (0.36, 0.3, 0.24, 1.0)
 RAIL = (0.82, 0.8, 0.76, 1.0)
@@ -153,7 +152,7 @@ WIDTH_BUTTONS = (
         (
             f"Two tracks side by side: "
             f"{dollars(TRACK_PRICE * TRACK_WIDTH_FACTORS[TrackWidth.DOUBLE])} a cell, "
-            f"${TRACK_UPKEEP * TRACK_WIDTH_UPKEEP_FACTORS[TrackWidth.DOUBLE]:.2f} a month"
+            f"{dollars(TRACK_UPKEEP * TRACK_WIDTH_UPKEEP_FACTORS[TrackWidth.DOUBLE], cents=True)} a month"
         ),
     ),
     (
@@ -164,7 +163,7 @@ WIDTH_BUTTONS = (
             f"pair, slow ones to the outer, and each pair runs into its own platform where a "
             f"station has one beside it: "
             f"{dollars(TRACK_PRICE * TRACK_WIDTH_FACTORS[TrackWidth.QUADRUPLE])} a cell, "
-            f"${TRACK_UPKEEP * TRACK_WIDTH_UPKEEP_FACTORS[TrackWidth.QUADRUPLE]:.2f} a month"
+            f"{dollars(TRACK_UPKEEP * TRACK_WIDTH_UPKEEP_FACTORS[TrackWidth.QUADRUPLE], cents=True)} a month"
         ),
     ),
 )

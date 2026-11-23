@@ -14,7 +14,6 @@ from railroads.sim.clock import END_YEAR, HISTORY_START
 from railroads.sim.company import BANKRUPT_MONTHS, BOOK_SHARE, TARGETS, Difficulty
 from railroads.sim.constructions import BUILDING_RULES, BuildingKind
 from railroads.sim.economy import SCARCE_WORTH
-from railroads.sim.finance import dollars
 from railroads.sim.goods import (
     FITS,
     FREIGHT_SHARE,
@@ -43,7 +42,7 @@ from railroads.ui.theme import (
     good_icon,
     tip,
 )
-from railroads.words import counted, share_of
+from railroads.words import counted, dollars, share_of
 
 WINDOW_SIZE = (860.0, 600.0)
 

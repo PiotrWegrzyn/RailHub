@@ -12,7 +12,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 from railroads.sim.clock import END_YEAR, START_YEAR
-from railroads.sim.finance import dollars
 from railroads.sim.goods import (
     BONUS_PART,
     TRAVELLERS,
@@ -24,6 +23,7 @@ from railroads.sim.goods import (
 )
 from railroads.ui.buy_train import fuel_use
 from railroads.ui.help_window import BuildingHelp, EngineHelp, building_help, engine_help
+from railroads.words import dollars
 
 README = Path(__file__).resolve().parent.parent / "README.md"
 # The freight bands of the freight table: each one's name and the most freight in it.

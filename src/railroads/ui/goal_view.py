@@ -9,9 +9,9 @@ from imgui_bundle import imgui
 
 from railroads.sim.clock import END_YEAR
 from railroads.sim.company import BOOK_SHARE, CompanyValue, Goal, company_value
-from railroads.sim.finance import dollars
 from railroads.sim.game import Game
 from railroads.ui.theme import BRASS, GONE, GROWN, TEXT_DIM, colored, danger_button, tip
+from railroads.words import dollars, plural
 
 if TYPE_CHECKING:
     from railroads.ui.app import App
@@ -68,11 +68,10 @@ def draw_worth(game: Game, target: bool = True) -> None:
         months = goal.months_left
         colored(
             GONE,
-            f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  Bankrupt in {months} "
-            f"month{'' if months == 1 else 's'}",
+            f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  Bankrupt in {months} {plural('month', months)}",
         )
         tip(
-            f"If {months} more month{'' if months == 1 else 's'} begin with your cash below "
+            f"If {months} more {plural('month', months)} begin with your cash below "
             "nothing, the company goes bankrupt and the game ends."
         )
 

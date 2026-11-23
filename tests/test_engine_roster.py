@@ -35,7 +35,6 @@ from railroads.sim.trains import (
     unit_label,
     unit_tonnes,
 )
-from railroads.ui.buy_train import tonnes_text
 from railroads.ui.trains_window import (
     adding_tip,
     engine_summary,
@@ -43,6 +42,7 @@ from railroads.ui.trains_window import (
     picker_good,
     wagons_note,
 )
+from railroads.words import tonnes_text
 
 WEST, EAST = (6, 3), (6, 20)
 

@@ -18,7 +18,7 @@ from railroads.newgame import (
 from railroads.saves import SaveInfo, Saves
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
 from railroads.sim.company import BANKRUPT_MONTHS, TARGETS, Difficulty
-from railroads.sim.finance import START_CASH, dollars
+from railroads.sim.finance import START_CASH
 from railroads.sim.lots import START_LOTS
 from railroads.sim.tilemap import START_SHARE
 from railroads.ui.menu_scene import HORIZON, MenuScene
@@ -33,7 +33,7 @@ from railroads.ui.save_files import (
 from railroads.ui.saves_window import draw_save_list
 from railroads.ui.theme import BRASS, GONE, TEXT_DIM, color_u32, colored, tip
 from railroads.version import VERSION
-from railroads.words import counted
+from railroads.words import counted, dollars
 
 MENU_WIDTH = 460.0
 BUTTON_HEIGHT = 36.0

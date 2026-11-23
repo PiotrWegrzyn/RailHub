@@ -13,7 +13,7 @@ from railroads.newgame import MapChoice, Settings, make_game
 from railroads.sim.autoplay import DECADE, StandInPlayer
 from railroads.sim.clock import END_YEAR
 from railroads.sim.company import company_value
-from railroads.sim.finance import dollars
+from railroads.words import dollars
 
 
 class FrugalStandIn(StandInPlayer):

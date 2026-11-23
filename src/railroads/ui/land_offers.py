@@ -11,13 +11,14 @@ from dataclasses import dataclass, field
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
-from railroads.sim.finance import Finances, dollars
+from railroads.sim.finance import Finances
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP
 from railroads.sim.lots import Lot, Lots
 from railroads.sim.tilemap import TileMap
 from railroads.ui.ground import cell_colors
 from railroads.ui.iso_camera import IsoCamera, Vec2
 from railroads.ui.theme import BRASS, BRASS_DARK, GONE, OVERLAY, colored, rgba_u32
+from railroads.words import dollars
 
 CONFIRM_POPUP = "Buy land?"
 # How the world map is shown under a lot, and the shade over it, lighter on the one hovered.

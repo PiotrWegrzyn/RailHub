@@ -1,9 +1,10 @@
 import pytest
 
 from railroads.sim.constructions import Track, TrackWidth
-from railroads.sim.finance import START_CASH, Finances, dollars, track_price, track_upkeep
+from railroads.sim.finance import START_CASH, Finances, track_price, track_upkeep
 from railroads.sim.tilemap import Relief, Temperature, Terrain, Tile, Vegetation
 from railroads.sim.track_rules import TrackBed
+from railroads.words import dollars
 
 FLAT = Tile(Terrain.LAND, Vegetation.GRASS, Temperature.NORMAL, 0, Relief.FLAT)
 RIVER = Tile(Terrain.RIVER, Vegetation.GRASS, Temperature.NORMAL, 0, Relief.FLAT)
@@ -72,3 +73,19 @@ def test_each_cell_of_track_pays_upkeep_once_for_its_dearest_piece() -> None:
     upkeep = track_upkeep(pieces)
 
     assert upkeep == pytest.approx(2 + 3.6 + 1.8 * 2 + 2 * 40)
+
+
+def test_what_the_player_cant_pay_for_says_its_price_and_the_cash() -> None:
+    finances = Finances(cash=1_000.0)
+
+    short = finances.short_of(2_500.0, "This track")
+
+    assert short == "This track costs $2,500; you have $1,000."
+
+
+def test_nothing_is_short_of_what_the_cash_covers() -> None:
+    finances = Finances(cash=1_000.0)
+
+    short = finances.short_of(1_000.0, "This track")
+
+    assert short is None

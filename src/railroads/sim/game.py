@@ -19,7 +19,7 @@ from railroads.sim.clock import MONTHS_PER_YEAR, START_YEAR
 from railroads.sim.company import Goal, News, company_value
 from railroads.sim.constructions import Constructions, TrackWidth
 from railroads.sim.demolition import bulldoze, bulldoze_price, station_site_price
-from railroads.sim.finance import STATION_PRICE, Finances, dollars
+from railroads.sim.finance import STATION_PRICE, Finances
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.happenings import Happenings, Headline
@@ -30,7 +30,7 @@ from railroads.sim.steps import Steps, finish
 from railroads.sim.summaries import MonthSummary, Reach, summarize
 from railroads.sim.tilemap import TileMap
 from railroads.sim.tiles import Tiles, activate
-from railroads.words import either
+from railroads.words import dollars, either
 
 
 @dataclass(frozen=True)
@@ -148,11 +148,8 @@ class Game:
         if problem is not None:
             return Done(f"A station can't go there: {problem}.")
         site = station_site_price(self.constructions, cell) or 0.0
-        if not finances.can_afford(STATION_PRICE + site):
-            return Done(
-                f"This station costs {dollars(STATION_PRICE + site)}; "
-                f"you have {dollars(finances.cash)}."
-            )
+        if short := finances.short_of(STATION_PRICE + site, "This station"):
+            return Done(short)
         changed = routes.build_station(self.growth, cell, ends)
         if not changed:
             return Done("A station can't go there.")
@@ -187,8 +184,8 @@ class Game:
         laid = len(route.changes(self.constructions))
         price = routes.route_price(self.constructions, route)
         finances = self.finances
-        if not finances.can_afford(price):
-            return Done(f"This track costs {dollars(price)}; you have {dollars(finances.cash)}.")
+        if short := finances.short_of(price, "This track"):
+            return Done(short)
         changed = routes.lay_route(self.growth, route)
         finances.spend(price, "track")
         message = (
@@ -203,8 +200,8 @@ class Game:
         price = bulldoze_price(self.constructions, cell)
         if price is None:
             return Done("Nothing here can be cleared.")
-        if not finances.can_afford(price):
-            return Done(f"Clearing this costs {dollars(price)}; you have {dollars(finances.cash)}.")
+        if short := finances.short_of(price, "Clearing this"):
+            return Done(short)
         stations = set(self.railway.stations())
         changed = bulldoze(self.growth, cell)
         self.railway.drop_stops(stations - set(self.railway.stations()))
@@ -220,10 +217,8 @@ class Game:
         site = station_site_price(self.constructions, cell)
         if site is None:
             return Done("A platform can't go there.")
-        if not self.finances.can_afford(site):
-            return Done(
-                f"Clearing it costs {dollars(site)}; you have {dollars(self.finances.cash)}."
-            )
+        if short := self.finances.short_of(site, "Clearing it"):
+            return Done(short)
         changed = routes.add_platform(self.growth, station, cell, ends)
         if not changed:
             return Done("A platform goes in a free cell beside the station.")
@@ -241,10 +236,8 @@ class Game:
             return Done(f"The station can't go there: {problem}.")
         site = station_site_price(self.constructions, new) or 0.0
         price = STATION_PRICE + site
-        if not finances.can_afford(price):
-            return Done(
-                f"Moving it there costs {dollars(price)}; you have {dollars(finances.cash)}."
-            )
+        if short := finances.short_of(price, "Moving it there"):
+            return Done(short)
         changed = routes.move_station(self.growth, self.railway, old, new, ends)
         if changed is None:
             return Done("The station can't go there.")

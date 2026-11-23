@@ -3,10 +3,11 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
-from railroads.sim.finance import STATION_PRICE, dollars
+from railroads.sim.finance import STATION_PRICE
 from railroads.sim.game import Game
 from railroads.sim.routes import plan_route, route_price
 from railroads.sim.trains import Stop
+from railroads.words import dollars
 
 
 def make_game(cash: float = 1_000_000.0) -> Game:

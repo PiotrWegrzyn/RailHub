@@ -17,7 +17,6 @@ from railroads.sim.amounts import EPSILON
 from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import Building, BuildingKind, Construction, Station, Track
 from railroads.sim.economy import FloatCells, Satisfaction, Trade
-from railroads.sim.finance import dollars
 from railroads.sim.goods import (
     BONUS_PART,
     RECIPES,
@@ -38,6 +37,7 @@ from railroads.ui.biomes import biome_of
 from railroads.ui.ornate import badge, bar, card, section
 from railroads.ui.spotlight import spot
 from railroads.ui.theme import BRASS, GONE, GROWN, TEXT_DIM, colored, good_amount, tip
+from railroads.words import dollars
 
 
 @dataclass(frozen=True)

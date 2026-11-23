@@ -48,6 +48,7 @@ from railroads.ui.theme import (
     colored,
     draw_good_icon,
 )
+from railroads.words import dollars
 
 # A card's width at its usual size, its height for every unit of width, and the most it grows.
 CARD_WIDTH = 190.0
@@ -183,9 +184,9 @@ def freight_line(card: Card, good: Good | None = None) -> str:
     less."""
     good = TILE_GOODS[card.tile][0] if good is None else good
     base = freight_of(good)
-    line = f"{good.value.capitalize()} ${base * card.now:,.2f}"
+    line = f"{good.value.capitalize()} {dollars(base * card.now, cents=True)}"
     if card.then is not None:
-        line += f" > ${base * card.then:,.2f}"
+        line += f" > {dollars(base * card.then, cents=True)}"
     return line
 
 

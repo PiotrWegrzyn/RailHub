@@ -9,11 +9,12 @@ from imgui_bundle import imgui
 
 from railroads.sim.constructions import Track
 from railroads.sim.demolition import bulldoze_price, station_site_price
-from railroads.sim.finance import STATION_PRICE, dollars
+from railroads.sim.finance import STATION_PRICE
 from railroads.sim.grids import Cell
 from railroads.sim.routes import Route, plan_route_steps, route_price, station_problem, station_way
 from railroads.sim.steps import Steps, finish
 from railroads.ui.build_menu import PRICED_TOOLS, STATION_TOOLS, Tool
+from railroads.words import dollars
 
 if TYPE_CHECKING:
     from railroads.sim.game import Done

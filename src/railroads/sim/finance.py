@@ -13,6 +13,7 @@ from railroads.sim.amounts import EPSILON
 from railroads.sim.constructions import Track, TrackWidth
 from railroads.sim.tilemap import Tile
 from railroads.sim.track_rules import track_rules_for
+from railroads.words import dollars
 
 START_CASH = 100_000.0
 # Track costs TRACK_PRICE per cell times its bed's cost factor (railroads.sim.track_rules), times
@@ -109,6 +110,13 @@ class Finances:
     def can_afford(self, price: float) -> bool:
         return price <= self.cash + EPSILON
 
+    def short_of(self, price: float, what: str) -> str | None:
+        """Why the player can't pay for something: "{what} costs $X; you have $Y."; None if
+        they can."""
+        if self.can_afford(price):
+            return None
+        return f"{what} costs {dollars(price)}; you have {dollars(self.cash)}."
+
     def pay(self, price: float, what: str) -> bool:
         """Spends the price if there is cash enough; whether it was paid."""
         if not self.can_afford(price):
@@ -166,9 +174,3 @@ class Finances:
             for what, amount in self.month.items():
                 books[what] = books.get(what, 0.0) + amount
         return books
-
-
-def dollars(amount: float) -> str:
-    """An amount of money as the game shows it: $15,000, or -$1,200 in debt."""
-    sign = "-" if amount < -0.5 else ""
-    return f"{sign}${abs(amount):,.0f}"

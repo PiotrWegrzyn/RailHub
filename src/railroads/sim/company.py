@@ -21,7 +21,6 @@ from railroads.sim.finance import (
     LEVEL_PRICES,
     STATION_PRICE,
     TRAIN_RESALE,
-    dollars,
     storage_price,
     track_price,
 )
@@ -29,6 +28,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.ownership import LOT, Owners
 from railroads.sim.railway import Railway
 from railroads.sim.trains import ENGINES
+from railroads.words import dollars
 
 # What stations, track and trains count for, as a share of what they cost today: what a train
 # sells for.

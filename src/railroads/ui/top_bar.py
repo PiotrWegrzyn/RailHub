@@ -9,7 +9,7 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.sim.clock import MONTH_NAMES, SPEEDS
-from railroads.sim.finance import Finances, dollars
+from railroads.sim.finance import Finances
 from railroads.ui.goal_view import draw_worth
 from railroads.ui.map_input import key_pressed
 from railroads.ui.ornate import DEEP, band, bar_buttons, diamond, frame_rect, spaced, spaced_text
@@ -25,6 +25,7 @@ from railroads.ui.theme import (
     tip,
     toggle_button,
 )
+from railroads.words import dollars
 
 if TYPE_CHECKING:
     from railroads.ui.app import App

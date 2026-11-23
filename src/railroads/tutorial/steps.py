@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.economy import BONUS_PER_GOOD, COLLECTION_RADIUS, LOCAL_REACH, SCARCE_WORTH
-from railroads.sim.finance import TRACK_PRICE, dollars
+from railroads.sim.finance import TRACK_PRICE
 from railroads.sim.game import Game
 from railroads.sim.goods import FOODS, FREIGHT_SHARE, Good
 from railroads.sim.grids import Cell
@@ -18,6 +18,7 @@ from railroads.sim.lots import FIRST_FIBONACCI, PRICE_UNIT, Lots, fibonacci
 from railroads.sim.ownership import HOLD_MONTHS, LOTS, SHARES
 from railroads.sim.trains import ENGINES, FIRST_ENGINE
 from railroads.tutorial.place import ASHFORD_STATION, BROOKBY_STATION, SHOWN_FARM
+from railroads.words import dollars
 
 # How far from the cell the tutorial marks a station may stand and still count.
 NEAR = 2

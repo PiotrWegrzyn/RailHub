@@ -3,10 +3,10 @@ from pathlib import Path
 from types import ModuleType
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.finance import dollars
 from railroads.sim.goods import Good, freight_of
 from railroads.sim.trains import ENGINES
 from railroads.ui.help_window import building_help, engine_help
+from railroads.words import dollars
 
 ROOT = Path(__file__).resolve().parents[1]
 

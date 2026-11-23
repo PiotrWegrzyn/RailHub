@@ -39,6 +39,7 @@ from railroads.ui.theme import (
     rgba_u32,
     town_tint,
 )
+from railroads.words import times_over
 
 GRID_COLOR = (0.0, 0.0, 0.0, 0.25)
 HOVER_COLOR = (1.0, 1.0, 1.0, 0.9)
@@ -358,7 +359,7 @@ def _built_note(constructions: Constructions, cell: Cell) -> str:
     if not built:
         return ""
     counts = Counter(_construction_name(construction) for construction in built)
-    listed = ", ".join(name if n == 1 else f"{name} x{n}" for name, n in counts.items())
+    listed = ", ".join(times_over(name, n) for name, n in counts.items())
     left = constructions.space_left(cell)
     return f"; {listed}, " + (f"room for {left} more" if left else "full")
 
@@ -411,7 +412,7 @@ def draw_hovered_buildings(
     with hover_card("##hovered buildings", top_left) as shown:
         if shown:
             for row in rows:
-                imgui.text(row.name if row.count == 1 else f"{row.name} x{row.count}")
+                imgui.text(times_over(row.name, row.count))
                 if row.satisfaction in MOODS:
                     imgui.same_line(0, 8)
                     colored(MOODS[row.satisfaction], mood_text(row))

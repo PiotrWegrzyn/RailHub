@@ -10,7 +10,7 @@ from railroads.sim.goods import Good
 from railroads.sim.railway import Railway, Ride
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, OPENED_BY, Car, Stop, Train
 from railroads.ui import buy_train
-from railroads.ui.buy_train import engine_figures, tonnes_text
+from railroads.ui.buy_train import engine_figures
 from railroads.ui.trains_window import (
     ROW_CAR,
     ROW_CAR_GAP,
@@ -21,6 +21,7 @@ from railroads.ui.trains_window import (
     row_cars,
     train_warning,
 )
+from railroads.words import tonnes_text
 
 
 def train_calling_at(*stops: Stop) -> Train:

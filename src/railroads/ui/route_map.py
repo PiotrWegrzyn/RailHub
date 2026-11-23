@@ -38,6 +38,7 @@ from railroads.ui.theme import (
     good_icon,
     tip,
 )
+from railroads.words import either
 
 # How many times as close as the whole map the map can show.
 MOST_ZOOM = 24.0
@@ -82,8 +83,7 @@ GENERAL_NEEDS = frozenset({Need.FOOD, Need.COMMON, Need.HEATING, Need.PASSENGERS
 
 def needs_named(needs: frozenset[Need]) -> str:
     """The needs by name, in the order Need lists them: "food, heating or mail"."""
-    names = [need.value for need in Need if need in needs]
-    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} or {names[-1]}"
+    return either(need.value for need in Need if need in needs)
 
 
 # How much of a good coming to a station over the last quarter marks it as made there.

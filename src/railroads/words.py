@@ -23,6 +23,30 @@ _PARTS = {2: "half", 3: "third", 4: "quarter", 5: "fifth", 6: "sixth", 7: "seven
 _TIMES = {2: "twice", 3: "three times"}
 
 
+def dollars(amount: float, cents: bool = False) -> str:
+    """An amount of money as the game shows it: $15,000, or -$1,200 in debt; with cents if
+    `cents`."""
+    if cents:
+        return f"${amount:,.2f}"
+    sign = "-" if amount < -0.5 else ""
+    return f"{sign}${abs(amount):,.0f}"
+
+
+def tonnes_text(tonnes: float) -> str:
+    """Tonnes to a tenth, so cars that look as if they fit an engine's pull do."""
+    return f"{tonnes:,.1f}".removesuffix(".0")
+
+
+def plural(word: str, n: int) -> str:
+    """A word for `n` of something: "month" for one, "months" for any other number."""
+    return word if n == 1 else f"{word}s"
+
+
+def times_over(name: str, n: int) -> str:
+    """A name with how many of it there are, past one: "farm", "farm x3"."""
+    return name if n == 1 else f"{name} x{n}"
+
+
 def counted(n: int) -> str:
     """A count in words up to twelve, in digits past it."""
     return _NUMBERS[n] if 0 <= n < len(_NUMBERS) else f"{n:,}"
