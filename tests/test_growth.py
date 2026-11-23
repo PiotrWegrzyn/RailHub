@@ -487,13 +487,21 @@ def test_a_long_run_keeps_its_counts_and_chances_in_step_with_what_is_built() ->
     growth = Growth(constructions, GrowthRule(ladders=busy, trades=False))
 
     growth.run(240, np.random.default_rng(2))
-
     fresh = Growth(constructions, growth.rule)
+    miscounted = [
+        kind
+        for kind in growth.rule.points
+        if not np.array_equal(growth.count(kind), fresh.count(kind))
+    ]
+    off_chances = [
+        ladder
+        for ladder in busy
+        if not np.allclose(growth.chances(ladder), fresh.chances(ladder), rtol=1e-7, atol=1e-12)
+    ]
+
     assert growth.count(BuildingKind.FARM).sum() > 0
-    for kind in growth.rule.points:
-        np.testing.assert_array_equal(growth.count(kind), fresh.count(kind))
-    for ladder in busy:
-        np.testing.assert_allclose(growth.chances(ladder), fresh.chances(ladder), atol=1e-12)
+    assert miscounted == []
+    assert off_chances == []
 
 
 def changes_between(

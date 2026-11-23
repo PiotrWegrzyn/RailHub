@@ -95,7 +95,7 @@ def test_until_a_worker_is_ready_chunks_are_painted_on_the_frames() -> None:
     done = painted(painter)
 
     assert not painter.threaded
-    np.testing.assert_array_equal(done["chunk"], world.render(*mountains, 2))
+    assert np.array_equal(done["chunk"], world.render(*mountains, 2))
 
 
 def test_a_ready_worker_paints_the_chunks_and_one_still_starting_only_holds_the_world() -> None:
@@ -113,8 +113,8 @@ def test_a_ready_worker_paints_the_chunks_and_one_still_starting_only_holds_the_
 
     assert painter.threaded
     assert starting == ["world"]
-    np.testing.assert_array_equal(done["mountains"], world.render(*mountains, 2))
-    np.testing.assert_array_equal(done["plains"], world.render(*plains, 2))
+    assert np.array_equal(done["mountains"], world.render(*mountains, 2))
+    assert np.array_equal(done["plains"], world.render(*plains, 2))
     assert painter.waiting() == 0
 
 
@@ -161,7 +161,7 @@ def test_changes_reach_a_worker_before_any_chunk_asked_for_after_them() -> None:
     done = painted(painter)
 
     assert kinds == ["update", "paint"]
-    np.testing.assert_array_equal(done["plains"], world.render(*plains, 2))
+    assert np.array_equal(done["plains"], world.render(*plains, 2))
 
 
 def test_a_layer_catching_up_sends_a_change_so_the_chunks_asked_for_next_go_out_alone(
@@ -204,7 +204,7 @@ def test_a_failed_workers_chunks_go_to_another() -> None:
 
     assert lost
     assert set(done) == {mountains, plains}
-    np.testing.assert_array_equal(done[lost[0]], world.render(*lost[0], 2))
+    assert np.array_equal(done[lost[0]], world.render(*lost[0], 2))
 
 
 def test_once_every_worker_failed_the_frames_paint_again() -> None:
@@ -222,7 +222,7 @@ def test_once_every_worker_failed_the_frames_paint_again() -> None:
     done = painted(painter)
 
     assert not threaded
-    np.testing.assert_array_equal(done["chunk"], world.render(*mountains, 2))
+    assert np.array_equal(done["chunk"], world.render(*mountains, 2))
 
 
 def test_a_worker_of_another_version_counts_as_failed_and_the_frames_paint() -> None:
@@ -240,7 +240,7 @@ def test_a_worker_of_another_version_counts_as_failed_and_the_frames_paint() -> 
     assert workers.dead == {0}
     assert not painter.threaded
     assert page.kinds(0) == []
-    np.testing.assert_array_equal(done["chunk"], world.render(*mountains, 2))
+    assert np.array_equal(done["chunk"], world.render(*mountains, 2))
 
 
 def test_a_chunk_a_worker_could_not_paint_is_painted_on_a_frame(
@@ -301,7 +301,7 @@ def test_a_new_map_takes_the_workers_over_and_the_old_one_paints_on_its_frames()
     assert not first.threaded
     assert first.waiting() == 1
     assert set(done) == {"new"}
-    np.testing.assert_array_equal(done["new"], new.render(*plains, 2))
+    assert np.array_equal(done["new"], new.render(*plains, 2))
 
 
 def test_workers_still_starting_get_the_world_as_the_map_is_made_and_never_again(
@@ -344,8 +344,8 @@ def test_a_worker_ready_later_paints_the_world_as_it_is_then() -> None:
     done = painted(painter)
 
     assert painting == [1, 1]
-    np.testing.assert_array_equal(done["mountains"], world.render(*mountains, 2))
-    np.testing.assert_array_equal(done["plains"], world.render(*plains, 2))
+    assert np.array_equal(done["mountains"], world.render(*mountains, 2))
+    assert np.array_equal(done["plains"], world.render(*plains, 2))
 
 
 def test_a_worker_that_cant_be_posted_to_paints_no_more_and_another_takes_its_chunk(
@@ -396,7 +396,7 @@ def test_with_workers_the_layer_never_waits_and_draws_raised_chunks_as_the_frame
     assert not layer._moved(camera, 1.0)
     assert taken == {mountains}
     assert layer._painter.waiting() == 0
-    np.testing.assert_array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2))
+    assert np.array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2))
 
 
 class FakeJsMessage:

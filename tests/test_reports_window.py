@@ -46,10 +46,10 @@ def test_the_report_runs_from_the_first_delivery_to_this_year_with_today_last() 
     history = made_history()
 
     shown = report(history, 1903, stations=4, population=150)
+    coal = shown.goods.index(Good.COAL)
 
     assert shown.delivery_years == [1901, 1902, 1903]
     assert shown.goods == [g for g in Good if g in (Good.COAL, Good.WOOL)]
-    coal = shown.goods.index(Good.COAL)
     assert shown.cars[coal].tolist() == [3, 0, 1]
     assert shown.years == [1901, 1902, 1903]
     assert shown.stations == [1, 2, 4]
@@ -106,9 +106,9 @@ def test_the_books_add_up_over_months_quarters_or_years_with_the_month_on_the_bo
     finances = months_of_books()
 
     periods = finances.periods(length, 1851)
+    year, index, books = periods[-1]
 
     assert len(periods) == count
-    year, index, books = periods[-1]
     assert (year, index, books["cargo"]) == last
 
 

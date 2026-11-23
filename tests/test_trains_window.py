@@ -148,9 +148,9 @@ def test_a_train_bought_on_the_buy_screen_stands_until_the_screen_is_closed(
     pressing(monkeypatch, "Buy for")
 
     draw_frames(window, railway, 1)
+    train = railway.trains[0]
 
     assert len(railway.trains) == 1
-    train = railway.trains[0]
     assert window.chosen == train.name
     assert window.buy.bought == train.name
     assert train.held

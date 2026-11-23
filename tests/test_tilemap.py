@@ -41,11 +41,15 @@ def test_saved_map_loads_back_unchanged(tmp_path: Path) -> None:
     tile_map.save(path)
 
     loaded = TileMap.load(path)
+    changed = [
+        layer
+        for layer in LAYERS
+        if not np.array_equal(getattr(loaded, layer), getattr(tile_map, layer))
+    ]
 
     assert (loaded.name, loaded.grid, loaded.bounds) == ("Test", tile_map.grid, BOUNDS)
     assert loaded.sources == ("Test data",)
-    for layer in LAYERS:
-        assert np.array_equal(getattr(loaded, layer), getattr(tile_map, layer)), layer
+    assert changed == []
 
 
 def test_loading_a_map_in_another_format_fails(tmp_path: Path) -> None:
@@ -113,11 +117,11 @@ def test_the_square_in_the_middle_holds_a_quarter_of_the_land_on_an_even_row() -
     whole = make_map(HexGrid(rows=80, cols=60, km_per_cell=2.0))
 
     square = whole.square_middle()
-
     rows, cols = square.grid.shape
+    top, left = (80 - rows) // 4 * 2, (60 - cols) // 2
+
     assert rows * cols == pytest.approx(80 * 60 / 4, rel=0.05)
     assert cols == pytest.approx(rows * 0.866, abs=1)
-    top, left = (80 - rows) // 4 * 2, (60 - cols) // 2
     assert top % 2 == 0
     assert np.array_equal(square.height_m, whole.height_m[top : top + rows, left : left + cols])
 

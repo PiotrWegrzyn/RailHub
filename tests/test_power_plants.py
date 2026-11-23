@@ -50,10 +50,10 @@ def test_a_coal_power_plant_goes_up_by_the_town_when_electricity_is_wanted() -> 
     growth = town(2030)
 
     changed = build_power_plants(growth)
-
     plants_built = built(growth)
-    assert list(plants_built) == [BuildingKind.POWER_PLANT]
     (cell,) = plants_built[BuildingKind.POWER_PLANT]
+
+    assert list(plants_built) == [BuildingKind.POWER_PLANT]
     assert changed == {cell}
     assert cell in growth.grid.within((20, 20), PLANT_APART)
 

@@ -133,13 +133,14 @@ def test_woods_stand_as_a_canopy_not_trees_and_everything_is_sorted_back_to_fron
     scenery = world.scenery
 
     trees = np.isin(scenery.sprite, sheet.variants("pine") + sheet.variants("leafy"))
-    x, y = world.projection.to_plane(scenery.x[trees], scenery.y[trees])
-    rows, cols = world.tile_map.grid.cell_at(x, y)
-    in_forest = world.tile_map.vegetation[rows, cols] == Vegetation.FOREST
-    assert not in_forest.any()
+    tree_x, tree_y = world.projection.to_plane(scenery.x[trees], scenery.y[trees])
+    tree_rows, tree_cols = world.tile_map.grid.cell_at(tree_x, tree_y)
+    in_forest = world.tile_map.vegetation[tree_rows, tree_cols] == Vegetation.FOREST
     x, y = world.projection.to_plane(scenery.x, scenery.y)
     rows, cols = world.tile_map.grid.cell_at(x, y)
     depth = world.projection.to_pixels(*world.tile_map.grid.center(rows, cols))[1]
+
+    assert not in_forest.any()
     assert (np.diff(np.round(depth, 6)) >= 0).all()
 
 
@@ -391,10 +392,7 @@ def test_a_building_with_no_room_clear_of_the_track_is_drawn_under_it(sheet: Spr
     factory = sheet.index(BUILDING_SPRITES[BuildingKind.BIG_FACTORY])
 
     world = PixelWorld(tile_map, constructions, sheet, *PLAIN_LOOKS[HexGrid])
-
     at = int(np.flatnonzero(world.scenery.sprite == factory)[0])
-    assert world.scenery.under_track[at]
-    assert world.scenery.under_track.sum() == 1
     chunk_x, chunk_y = world.scenery.x[at] // CHUNK, world.scenery.y[at] // CHUNK
     left, top = chunk_x * CHUNK, chunk_y * CHUNK
     drawn = world.render(chunk_x, chunk_y)
@@ -403,8 +401,11 @@ def test_a_building_with_no_room_clear_of_the_track_is_drawn_under_it(sheet: Spr
     rows, columns = np.nonzero(sheet.pixels[factory][..., 3] > 0.5)
     rows, columns = rows + world.scenery.y[at] - ay - top, columns + world.scenery.x[at] - ax - left
     solid = track[rows, columns, 3] == 1
-    assert solid.sum() > 0
     shown = np.rint(track[rows, columns, :3][solid] * 255)
+
+    assert world.scenery.under_track[at]
+    assert world.scenery.under_track.sum() == 1
+    assert solid.sum() > 0
     assert np.abs(drawn[rows, columns, :3][solid] - shown).max() <= 1
 
 
@@ -819,12 +820,12 @@ def test_a_fine_chunk_keeps_the_grounds_colours_textured_and_draws_what_stands_o
     chunk = (int(px) // CHUNK, int(py) // CHUNK)
 
     coarse, fine = world.render(*chunk), world.render(*chunk, FINE)
-
     blown_up = coarse.repeat(FINE, axis=0).repeat(FINE, axis=1)
-    assert world.resolutions == (1, FINE)
-    assert fine.shape == (CHUNK * FINE, CHUNK * FINE, 4)
     fine_bare = world.render(0, 1, FINE).astype(float)
     bare_blown = bare.repeat(FINE, axis=0).repeat(FINE, axis=1).astype(float)
+
+    assert world.resolutions == (1, FINE)
+    assert fine.shape == (CHUNK * FINE, CHUNK * FINE, 4)
     assert abs(fine_bare[..., :3].mean() - bare_blown[..., :3].mean()) < 0.08 * 255
     assert (fine_bare != bare_blown).any()
     assert (fine != blown_up).any(axis=-1).sum() > 100
@@ -1206,15 +1207,16 @@ def test_a_raised_chunk_drawn_over_ground_leaves_its_ground_and_lifts_what_lies_
     constructions.build(Building((12, 6), BuildingKind.FARM))
     world = PixelWorld(tile_map, constructions, sheet, *PLAIN_LOOKS[HexGrid])
     world.ground.trees = (np.zeros(0), np.zeros(0))
-    assert world.rises(0, 0)
+    rises = world.rises(0, 0)
 
     whole = world.render(0, 0)
     over = world.render(0, 0, over_ground=True)
-
     drawn = over[..., 3] == 255
+    difference = np.abs(over[..., :3].astype(int) - whole[..., :3])[drawn]
+
+    assert rises
     assert (over[..., 3] == 0).mean() > 0.5
     assert drawn.any()
-    difference = np.abs(over[..., :3].astype(int) - whole[..., :3])[drawn]
     assert np.percentile(difference, 99) <= 2
 
 

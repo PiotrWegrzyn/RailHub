@@ -72,6 +72,7 @@ def test_a_train_sets_off_slowly_and_reaches_full_speed_after_its_pickup_time() 
     railway = line()
     train = running(railway, "Slow starter", WEST, EAST)
     pickup = ENGINES["planet"].pickup / SECONDS_PER_MONTH
+    speed = ENGINES["planet"].speed
 
     for _ in range(50):
         railway.run(pickup / 100)
@@ -81,7 +82,6 @@ def test_a_train_sets_off_slowly_and_reaches_full_speed_after_its_pickup_time() 
 
     assert halfway == pytest.approx(0.5)
     assert train.pace == pytest.approx(1.0)
-    speed = ENGINES["planet"].speed
     assert train.along == pytest.approx(0.5 * pickup * CELLS_PER_MONTH * speed, rel=1e-3)
 
 
@@ -307,12 +307,13 @@ def test_a_train_put_first_takes_the_way_from_a_train_yet_to_set_off_onto_it() -
     railway = line()
     set_off = running(railway, "Set off", WEST, EAST)
     railway.run(FRAME)
-    assert set_off.cleared > 1.0
+    cleared = set_off.cleared
     put_first = running(railway, "First", EAST, WEST)
     put_first.first = True
 
     run_until(railway, lambda: put_first.along > 3.0)
 
+    assert cleared > 1.0
     assert set_off.along < 0.5
     assert set_off.giving_way == "First"
 

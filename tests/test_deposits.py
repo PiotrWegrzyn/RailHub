@@ -31,11 +31,14 @@ def test_deposits_lie_only_on_land_that_allows_them() -> None:
     tile_map = make_map()
 
     layer = place_deposits(tile_map, np.random.default_rng(1))
+    misplaced = [
+        deposit
+        for deposit, mask in allowed_land(tile_map).items()
+        if ((layer == deposit) & ~mask).any()
+    ]
 
-    allowed = allowed_land(tile_map)
     assert (layer == Deposit.GOLD).any()
-    for deposit, mask in allowed.items():
-        assert not ((layer == deposit) & ~mask).any()
+    assert misplaced == []
 
 
 def test_the_same_seed_gives_the_same_deposits() -> None:

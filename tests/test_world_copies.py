@@ -97,12 +97,14 @@ def test_a_copy_keeps_up_with_buildings_track_and_forests() -> None:
     changed = world.buildings_changed([(10, 4), (10, 3), (9, 3), (9, 4), (11, 5)])
 
     copy.update(1, update_message(world, seen))
+    behind = [
+        chunk
+        for chunk in changed
+        if not np.array_equal(copy.paint(1, (*chunk, 2, False, False)), world.render(*chunk, 2))
+    ]
 
     assert chunk_of(world, (10, 4)) in changed
-    for chunk in changed:
-        np.testing.assert_array_equal(
-            copy.paint(1, (*chunk, 2, False, False)), world.render(*chunk, 2)
-        )
+    assert behind == []
     assert not np.array_equal(world.render(*plains, 2), before)
 
 
@@ -117,9 +119,7 @@ def test_a_copy_keeps_up_with_how_satisfied_cells_are() -> None:
     copy.update(1, update_message(world, seen))
 
     assert plains in changed
-    np.testing.assert_array_equal(
-        copy.paint(1, (*plains, 2, False, False)), world.render(*plains, 2)
-    )
+    assert np.array_equal(copy.paint(1, (*plains, 2, False, False)), world.render(*plains, 2))
 
 
 def test_nothing_is_sent_while_the_world_stays_as_it_was() -> None:
@@ -146,6 +146,4 @@ def test_a_copy_leaves_out_what_belongs_to_a_world_it_no_longer_has() -> None:
     assert copy.world is not old
     assert painted is None
     assert update_message(world, seen) is not None
-    np.testing.assert_array_equal(
-        copy.paint(2, (*plains, 2, False, False)), world.render(*plains, 2)
-    )
+    assert np.array_equal(copy.paint(2, (*plains, 2, False, False)), world.render(*plains, 2))

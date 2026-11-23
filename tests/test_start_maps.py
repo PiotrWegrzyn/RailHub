@@ -78,13 +78,13 @@ def test_a_game_on_a_long_thin_map_starts_on_the_honeycomb_in_its_middle_and_loa
     saved = make_game(settings, report=lambda _: None)
     saves.save("Andes", saved)
     loaded = saves.load("Andes")
+    place = maps.load("chile", "hex")
+    start = place.window(*Lots.around_middle(place).window())
+    locked = loaded.game.tile_map.locked
 
     assert saved.title == "Central Chile, seed 3"
     assert loaded.title == saved.title
     assert loaded.settings == settings
-    place = maps.load("chile", "hex")
-    start = place.window(*Lots.around_middle(place).window())
-    locked = loaded.game.tile_map.locked
     assert loaded.game.tile_map.grid == start.grid
     assert loaded.game.tile_map.bounds == start.bounds
     assert locked is not None

@@ -899,11 +899,11 @@ def test_a_rides_bill_takes_the_fuel_and_every_cars_trip_off_what_its_cargo_earn
     assert cells is not None
 
     ride = railway.ride(train, [300.0, 0.0])
+    loaded_share = railway.burn(train) / ENGINES[train.engine].burn
 
     assert ride is not None
     assert ride.cells == pytest.approx(cells, rel=0.05)
     assert (ride.loaded, ride.empty) == (1, 1)
-    loaded_share = railway.burn(train) / ENGINES[train.engine].burn
     assert ride.fuel == pytest.approx(railway.fuel_cost(train.engine, ride.cells) * loaded_share)
     assert ride.loaded_cars == pytest.approx(car_trip_price(train.cars[0].capacity))
     assert ride.empty_cars == pytest.approx(car_trip_price(train.cars[0].capacity))

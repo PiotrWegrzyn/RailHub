@@ -360,9 +360,9 @@ def test_track_pieces_end_to_end_are_drawn_as_one_line_in_order() -> None:
     pieces = np.array([[[1.0, 0.0], [1.5, 0.0], [2.0, 0.0]], [[0.0, 0.0], [0.5, 0.0], [1.0, 0.0]]])
 
     lines = track_lines(pieces, [False, False])
+    points, double = lines[0]
 
     assert len(lines) == 1
-    points, double = lines[0]
     assert points[:, 0].tolist() == [0.0, 0.5, 1.0, 1.5, 2.0]
     assert not double
 

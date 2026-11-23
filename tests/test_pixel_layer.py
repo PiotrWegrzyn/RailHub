@@ -36,7 +36,7 @@ def test_a_chunk_asked_for_is_drawn_and_kept_once_taken() -> None:
     taken = layer.take_drawn()
 
     assert taken == {mountains}
-    np.testing.assert_array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2))
+    assert np.array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2))
 
 
 def taken_within(layer: PixelLayer, seconds: float = 30) -> set:
@@ -58,7 +58,7 @@ def test_raised_chunks_are_drawn_again_finely() -> None:
     taken = taken_within(layer)
 
     assert taken == {mountains}
-    np.testing.assert_array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2, True))
+    assert np.array_equal(layer._chunks[(*mountains, 2)], world.render(*mountains, 2, True))
 
 
 def test_a_chunk_drawn_finely_and_let_go_is_drawn_finely_again_when_it_comes_back(
@@ -81,7 +81,7 @@ def test_a_chunk_drawn_finely_and_let_go_is_drawn_finely_again_when_it_comes_bac
     taken = taken_within(layer)
 
     assert taken == {mountains}
-    np.testing.assert_array_equal(layer._chunks[drawn], world.render(*drawn, True))
+    assert np.array_equal(layer._chunks[drawn], world.render(*drawn, True))
 
 
 def test_without_threads_raised_chunks_are_not_drawn_again_finely() -> None:
@@ -179,8 +179,8 @@ def test_textures_repeat_pixels_into_squares_and_skip_the_copy_at_screen_scale()
     doubled, same = blown_up(pixels, 2), blown_up(pixels, 1)
 
     assert doubled.shape == (4, 6, 4)
-    np.testing.assert_array_equal(doubled[::2, ::2], pixels)
-    np.testing.assert_array_equal(doubled[1::2, 1::2], pixels)
+    assert np.array_equal(doubled[::2, ::2], pixels)
+    assert np.array_equal(doubled[1::2, 1::2], pixels)
     assert same is pixels
 
 

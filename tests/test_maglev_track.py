@@ -83,7 +83,8 @@ def test_maglev_track_costs_its_guideway_on_top_of_plain_track() -> None:
     constructions = Constructions(flat_map())
     plain = plan_route(constructions, WEST, (6, 9))
     guideway = plan_route(constructions, WEST, (6, 9), maglev=True)
-    assert plain is not None and guideway is not None
+    assert plain is not None
+    assert guideway is not None
 
     extra = route_price(constructions, guideway) - route_price(constructions, plain)
 

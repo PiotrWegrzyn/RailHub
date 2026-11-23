@@ -76,12 +76,16 @@ def test_the_tutorial_starts_with_the_same_land_and_buildings_every_time() -> No
     first = make_tutorial()
 
     second = make_tutorial()
-
-    assert built(first) == built(second)
-    for layer in LAYERS:
-        assert np.array_equal(
+    differing = [
+        layer
+        for layer in LAYERS
+        if not np.array_equal(
             getattr(first.game.tile_map, layer), getattr(second.game.tile_map, layer)
         )
+    ]
+
+    assert built(first) == built(second)
+    assert differing == []
     assert first.game.finances.cash == second.game.finances.cash
     assert first.game.lots is not None and second.game.lots is not None
     assert first.game.lots.offers == second.game.lots.offers
@@ -110,11 +114,11 @@ def test_the_tutorial_plays_its_first_year_the_same_every_time() -> None:
 def test_the_line_between_the_towns_crosses_only_flat_open_land() -> None:
     game = with_stations()
     cash = game.finances.cash
+    laid = BROOKBY_STATION[1] - ASHFORD_STATION[1] - 1
 
     done = game.lay_track(ASHFORD_STATION, BROOKBY_STATION)
 
     assert done.ok
-    laid = BROOKBY_STATION[1] - ASHFORD_STATION[1] - 1
     assert cash - game.finances.cash == pytest.approx(laid * TRACK_PRICE)
 
 
@@ -439,7 +443,8 @@ def test_the_tutorial_plays_through_to_the_end_with_the_year_going_by(context: N
     frame(app)
     do_next()
     tutorial = app.tutorial
-    assert tutorial is not None and tutorial.current is not None
+    assert tutorial is not None
+    assert tutorial.current is not None
     tutorial.closed = True
     frame(app)
 

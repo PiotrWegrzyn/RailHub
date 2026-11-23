@@ -27,9 +27,9 @@ def test_an_engine_shed_works_a_month_only_on_a_months_coal(coal: float, works: 
     railway.station_goods(STATION).stockpile[Good.COAL] = coal
 
     railway.turn_month({})
+    left = railway.station_goods(STATION).held(Good.COAL)
 
     assert (Facility.ENGINE_SHED in railway.working_at(STATION)) is works
-    left = railway.station_goods(STATION).held(Good.COAL)
     assert left == pytest.approx(0.0 if works else coal)
 
 

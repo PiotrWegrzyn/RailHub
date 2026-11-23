@@ -35,9 +35,9 @@ def test_every_tile_on_a_board_is_a_card_with_what_its_next_level_adds() -> None
     tiles = Tiles.until(1850)
 
     shown = cards(tiles, Board.SUPPLY)
+    wood = next(card for card in shown if card.tile == Tile.WOOD)
 
     assert [card.tile for card in shown] == [tile for tile in Tile if tile in tiles.supply]
-    wood = next(card for card in shown if card.tile == Tile.WOOD)
     assert wood.adds == "next level +11% made"
 
 

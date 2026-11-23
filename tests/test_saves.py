@@ -122,13 +122,13 @@ def test_autosaves_keep_only_the_newest_few_newest_first(tmp_path: Path) -> None
     saves = Saves(tmp_path, autosaves=3)
 
     dates = autosaved(saves, 5)
+    kept = [saves.load(f"autosave {n}").clock.date for n in (1, 2, 3)]
 
     assert sorted(path.name for path in tmp_path.iterdir()) == [
         "autosave 1.save",
         "autosave 2.save",
         "autosave 3.save",
     ]
-    kept = [saves.load(f"autosave {n}").clock.date for n in (1, 2, 3)]
     assert kept == dates[:-4:-1]
 
 

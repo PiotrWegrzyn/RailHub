@@ -43,10 +43,10 @@ def test_a_summary_lists_what_was_built_within_reach_of_a_station_and_where() ->
         put_up(growth, (10, 25), BuildingKind.FARM)
 
     summary = summarize("March 1850", growth.rule.points, reach, changes)
-
     assert summary is not None
-    assert summary.date == "March 1850"
     (station,) = summary.stations
+
+    assert summary.date == "March 1850"
     assert station.station == (10, 10)
     assert station.changes == {BuildingKind.HOUSE: 2}
     assert station.cells == ((10, 12),)

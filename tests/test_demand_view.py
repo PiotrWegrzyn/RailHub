@@ -31,7 +31,7 @@ def test_the_food_tooltip_says_freight_pays_up_to_the_scarce_worth() -> None:
     record = DemandRecord(capacity=100.0, left=50.0)
 
     lines = demand_lines(Need.FOOD, record)
+    wheat = next(line for line in lines if "wheat" in line)
 
     assert f"up to {SCARCE_WORTH:g}x" in lines[0]
-    wheat = next(line for line in lines if "wheat" in line)
     assert wheat.endswith(dollars(freight_of(Good.WHEAT) * SCARCE_WORTH))

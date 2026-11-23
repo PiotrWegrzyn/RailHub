@@ -220,7 +220,8 @@ def test_up_close_a_train_far_off_the_screen_is_not_drawn(
     game.lay_track((10, 4), (10, 38))
     view = MapView(game)
     near, far = view.railway.buy(), view.railway.buy()
-    assert near is not None and far is not None
+    assert near is not None
+    assert far is not None
     near.engine = far.engine = "mixed_diesel"
     near.stops = [Stop((10, 4)), Stop((10, 38))]
     far.stops = [Stop((10, 38)), Stop((10, 4))]
@@ -317,10 +318,10 @@ def test_up_close_a_page_is_drawn_a_few_pictures_a_frame(
     after_one = len(layer._pages), sum(len(done) for _, done in layer._painting.values())
     for _ in range(HEADINGS * len(looks)):
         frame()
+    times = view.camera.pixel_scale * 2 // DETAIL
 
     assert after_one[0] == 0
     assert 0 < after_one[1] < HEADINGS
-    times = view.camera.pixel_scale * 2 // DETAIL
     assert set(layer._pages) == {(look, times) for look in looks}
     assert not layer._painting
 

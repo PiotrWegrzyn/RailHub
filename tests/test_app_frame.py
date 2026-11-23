@@ -290,10 +290,11 @@ def test_a_game_loaded_is_set_aside_from_the_garbage_collector(
     shell._task.result()
 
     shell_frame(shell)
+    frozen = gc.get_freeze_count()
+    gc.unfreeze()
 
     assert shell.app is not None
-    assert gc.get_freeze_count() > 0
-    gc.unfreeze()
+    assert frozen > 0
 
 
 def test_a_save_that_fails_to_load_stays_in_the_menu_with_why(
@@ -826,12 +827,12 @@ def test_a_new_game_opens_on_the_middle_of_the_map_and_stays_there_as_the_waitin
     while shell._shatter is not None and frames < 400:
         shell_frame(shell)
         frames += 1
-
-    assert opened
-    assert shell._shatter is None
     assert shell.app is not None
     camera = shell.app.view.camera
     middle = opening_center(shell.app.view.tile_map.grid, (1280, 800))
+
+    assert opened
+    assert shell._shatter is None
     assert (camera.center_x, camera.center_y) == middle
     assert camera.zoom_level == OPENING_ZOOM
 
@@ -855,12 +856,12 @@ def test_a_new_game_without_pictures_shows_the_work_and_opens_on_its_biggest_tow
     while shell._shatter is not None and frames < 400:
         shell_frame(shell)
         frames += 1
+    assert shell.app is not None
+    view = shell.app.view
 
     assert shell._show.year is None
     assert shown[0] is not None
     assert shown[0].startswith(WORK[0])
-    assert shell.app is not None
-    view = shell.app.view
     assert view.camera.zoom_level >= VISIT_ZOOM
     assert (view.camera.center_x, view.camera.center_y) == view.tile_map.grid.center(8, 15)
 
@@ -980,14 +981,14 @@ def test_land_confirmed_is_bought_behind_the_waiting_screen_and_the_view_opens_o
     assert shell._task is not None
     shell._task.result()
     shell_frame(shell)
-
     app = shell.app
     lots = app.game.lots
     assert lots is not None
+    x, y = app.game.tile_map.grid.center(*lot_middle(lots, (-2, 0)))
+
     assert (-2, 0) in lots.owned
     assert app.game.finances.cash == pytest.approx(2_000_000.0 - 377_000.0, abs=1.0)
     assert app.view.camera.zoom_level == 3
-    x, y = app.game.tile_map.grid.center(*lot_middle(lots, (-2, 0)))
     assert (app.view.camera.center_x, app.view.camera.center_y) == pytest.approx((x, y))
 
 

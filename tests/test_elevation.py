@@ -130,7 +130,7 @@ def test_fine_relief_draws_raised_ground_finely_and_flat_ground_as_before() -> N
     assert (fine != fast).any(axis=-1).mean() > 0.05
     assert world.rises(*mountains)
     assert not world.rises(*plains)
-    np.testing.assert_array_equal(world.render(*plains, 2, True), world.render(*plains, 2))
+    assert np.array_equal(world.render(*plains, 2, True), world.render(*plains, 2))
 
 
 def test_a_lone_mountain_cell_rises_to_a_peak_of_its_own() -> None:

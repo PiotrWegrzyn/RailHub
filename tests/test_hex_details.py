@@ -46,8 +46,10 @@ def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded(
 
     details = describe(growth, (5, 5))
     farm = describe(growth, (5, 4)).buildings[0]
-
     (house,) = details.buildings
+    got = {flow.good: (flow.done, flow.wanted) for flow in house.got}
+    bonus_got = {flow.good: (flow.done, flow.wanted) for flow in house.bonus_got}
+
     assert house.name == "house"
     assert house.count == 3
     assert house.needs == [(Need.FOOD, 30), (Need.HEATING, 9)]
@@ -58,8 +60,6 @@ def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded(
             for need, amount in bonus_of(BuildingKind.HOUSE, 1850).items()
         },
     }
-    got = {flow.good: (flow.done, flow.wanted) for flow in house.got}
-    bonus_got = {flow.good: (flow.done, flow.wanted) for flow in house.bonus_got}
     assert got[Need.FOOD] == (pytest.approx(10 * 13 / 21), 30.0)
     assert bonus_got[Need.FOOD] == (0.0, 30.0)
     assert got[Need.HEATING] == (0.0, 9.0)

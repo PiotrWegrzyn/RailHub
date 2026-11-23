@@ -168,9 +168,9 @@ def test_railway_works_go_up_from_1855_by_the_biggest_towns_apart_up_to_their_nu
 
     for _ in range(200):
         novelties.year(growth, np.random.default_rng(len(novelties.works) + _))
-
     works = built(growth, BuildingKind.RAILWAY_WORKS)
+    grid = growth.constructions.tile_map.grid
+    by_the_biggest_town = any(cell in grid.within((10, 10), 2) for cell in works)
+
     assert len(works) == most
-    if most:
-        grid = growth.constructions.tile_map.grid
-        assert any(cell in grid.within((10, 10), 2) for cell in works)
+    assert by_the_biggest_town is (most > 0)

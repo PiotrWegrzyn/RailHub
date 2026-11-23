@@ -66,13 +66,14 @@ def test_a_route_over_open_land_runs_cell_to_cell_and_can_all_be_laid() -> None:
     growth = Growth(constructions, NO_TRADE)
 
     route = plan_route(constructions, (6, 2), (6, 12))
-
     assert route is not None
-    assert route.cells[0] == (6, 2) and route.cells[-1] == (6, 12)
-    assert len(route.pieces) == len(route.cells)
-    assert all(constructions.why_not(piece) is None for piece in route.pieces)
+    refused = [piece for piece in route.pieces if constructions.why_not(piece) is not None]
     lay_route(growth, route)
     laid = [built for built in constructions if isinstance(built, Track)]
+
+    assert route.cells[0] == (6, 2) and route.cells[-1] == (6, 12)
+    assert len(route.pieces) == len(route.cells)
+    assert refused == []
     assert len(laid) == len(route.pieces)
 
 
@@ -276,11 +277,11 @@ def test_a_junction_cell_holds_the_line_and_a_branch_that_shares_one_end_with_it
     line = laid(constructions, (6, 2), (6, 10))
 
     laid(constructions, (6, 5), (2, 8))
-
     junctions = [cell for cell in line.cells if len(constructions.track_at(cell)) == 2]
-    assert len(junctions) == 1
     through, branch = constructions.track_at(junctions[0])
     shared = set(through.ends) & set(branch.ends)
+
+    assert len(junctions) == 1
     assert len(shared) == 1
     assert constructions.tile_map.grid.track_turn(*branch.ends) <= 60 + 1e-6
 
@@ -317,10 +318,10 @@ def test_track_crossing_a_line_crosses_it_in_one_cell() -> None:
     line = laid(constructions, (6, 2), (6, 10))
 
     laid(constructions, (2, 6), (10, 6))
-
     crossings = [cell for cell in line.cells if len(constructions.track_at(cell)) == 2]
-    assert len(crossings) == 1
     first, second = constructions.track_at(crossings[0])
+
+    assert len(crossings) == 1
     assert not set(first.ends) & set(second.ends)
     assert len(dead_ends(constructions)) == 4
 

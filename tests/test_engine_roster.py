@@ -94,9 +94,9 @@ def test_in_1850_only_a_cheap_small_engine_and_the_planet_are_for_sale() -> None
     railway.year = 1850
 
     engines = railway.engines()
+    tank, planet = ENGINES["tank"], ENGINES["planet"]
 
     assert sorted(engines) == ["planet", "tank"]
-    tank, planet = ENGINES["tank"], ENGINES["planet"]
     assert (tank.cars, planet.cars) == (2, 3)
     assert tank.price < planet.price == 10_000.0
     assert tank.speed < planet.speed
@@ -308,7 +308,8 @@ def test_passengers_on_an_express_pay_more() -> None:
     express_railway.year = plain_railway.year = max(opened_in("american"), opened_in("single"))
     plain = plain_railway.buy("american")
     express = express_railway.buy("single")
-    assert plain is not None and express is not None
+    assert plain is not None
+    assert express is not None
     for railway, train in ((plain_railway, plain), (express_railway, express)):
         train.stops = [Stop(WEST, [Good.PASSENGERS]), Stop(EAST)]
         train.loaded_at = WEST
@@ -694,6 +695,7 @@ def test_an_engine_swap_costs_the_new_engine_less_half_the_old_and_keeps_the_rou
     (train,) = planets_on_the_line(railway, 1)
     stops = [(stop.cell, list(stop.cars)) for stop in train.stops]
     cash = railway.finances.cash
+    price = ENGINES["american"].price - ENGINES["planet"].price * TRAIN_RESALE
 
     swapped = railway.swap_engine(train, "american")
 
@@ -701,7 +703,6 @@ def test_an_engine_swap_costs_the_new_engine_less_half_the_old_and_keeps_the_rou
     assert train.engine == "american"
     assert train.name == "Steam engine 1"
     assert [(stop.cell, stop.cars) for stop in train.stops] == stops
-    price = ENGINES["american"].price - ENGINES["planet"].price * TRAIN_RESALE
     assert railway.finances.cash == pytest.approx(cash - price)
 
 

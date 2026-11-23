@@ -85,4 +85,4 @@ def test_double_track_planned_over_single_track_looks_as_it_will_once_laid() -> 
     laid = _world_with(with_double).planned_track(route.pieces, *area)
 
     assert planned[..., 3].any()
-    np.testing.assert_allclose(planned, laid, atol=1e-6)
+    assert np.allclose(planned, laid, rtol=1e-7, atol=1e-6)
