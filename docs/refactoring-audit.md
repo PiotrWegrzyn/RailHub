@@ -23,6 +23,36 @@ and factors in words) and `sim/amounts.py` (`EPSILON`, `ratio`, `divided`). The 
 divisions that keep the part where the whole is nothing became `divided`. They were left with that
 meaning on purpose, since a `ratio` there would change results.
 
+**Done (steps 7-11, 0.5.185):** D2-D7, D10-D14, K2, K3, K10-K13, C9-C13, and the UI half of P2 and
+P4. New shared pieces:
+- `theme.tip(disabled=)`, `colored`, `left_of_cards` and `next_good_slot(gap=)`, plus
+  `ornate.hover_card`.
+- `words.dollars(cents=)`, `tonnes_text`, `plural` and `times_over`, and
+  `Finances.short_of`.
+- `Constructions.nearest_free`, `ladders.ladder_of`, `grids.parity_steps` and
+  `Growth._pull_down`.
+- `grids.FlatIndices`.
+- In tests: `screens.py` (`gui_context`, `FakeTexture` and the pixel worlds), plus
+  `builders.joined_stations`, `played_game`, `square_map` and `make_game`, and the new
+  `trading.py` and `growing.py`.
+
+Renamed: `Done` → `Outcome`, `_Month` → `MonthOfTrade`, `Growth.trade` → `Growth.last_trade`,
+plus constants that shared a name with others of a different value.
+
+Left out on purpose:
+- D8 priced buttons and the D9 deep panel: each place differs in width, note or when the
+  style is popped, so one helper would change how they look.
+- The "biggest town apart" half of D4: the two searches differ.
+- D16: `fingerprint.py` builds the whole Poland map, `make_game` only the start lots.
+- D17: `_town_sight` shares only the `Ladder` call with `_town_craft`.
+- K8: dropping the underscores of the art helpers clashes with local names such as `window`,
+  `track` and `plinth` inside the sprite functions.
+- `test_tutorial.py` still imports three fixtures from `test_app_frame.py`, which is how pytest
+  shares fixtures without making them global.
+
+Results were checked before and after every step: `tools/fingerprint.py` gives the same
+output, and the engine texts, help and hints read word for word as before.
+
 ## 0. Bugs found on the way
 
 | # | Where | What | Sev | Eff |
