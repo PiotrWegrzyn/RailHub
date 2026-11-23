@@ -136,7 +136,6 @@ def main() -> None:
         "trains": lambda: railway.trains,
         "station goods": lambda: sorted(railway.goods.items()),
         "levels and names": lambda: (sorted(railway.levels.items()), railway.stations()),
-        "research": lambda: railway.research,
         "history": lambda: history,
         "messages": lambda: said,
         "stand-in report": lambda: printed.getvalue(),
