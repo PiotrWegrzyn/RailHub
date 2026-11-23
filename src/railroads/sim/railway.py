@@ -787,7 +787,8 @@ class Railway:
         (railroads.sim.signals)."""
         signals = Signals(self.network, self.trains)
         queue = sorted(
-            enumerate(self.trains), key=lambda pair: (not pair[1].asked, pair[1].asked, pair[0])
+            enumerate(self.trains),
+            key=lambda pair: (not pair[1].first, not pair[1].asked, pair[1].asked, pair[0]),
         )
         for _, train in queue:
             self._run(train, months, signals)
@@ -904,6 +905,7 @@ class Railway:
             train.path = []
             train.pace = 0.0
             train.waited = 0.0
+            train.first = False
 
     def position(self, train: Train, back: float = 0.0) -> tuple[Point, Point] | None:
         """Where the train is on the map, and which way it faces (TrackNetwork.position)."""

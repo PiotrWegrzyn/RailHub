@@ -285,3 +285,43 @@ def test_a_train_too_long_for_a_station_on_the_way_never_meets_another_there() -
 
     assert long.length > 1.5
     assert long.arrivals >= 2 and short.arrivals >= 2
+
+
+def test_a_train_put_first_gets_the_line_before_a_train_that_waited_longer() -> None:
+    railway = line()
+    ahead = running(railway, "Ahead", WEST, EAST)
+    waiting = running(railway, "Waiting", EAST, WEST)
+    run_until(railway, lambda: ahead.along > 3.0)
+    put_first = running(railway, "First", WEST, EAST)
+    run_until(railway, lambda: bool(put_first.giving_way))
+    put_first.first = True
+
+    run_until(railway, lambda: ahead.arrivals >= 1)
+    run_until(railway, lambda: not waiting.giving_way or not put_first.giving_way)
+
+    assert put_first.giving_way == ""
+    assert waiting.giving_way == "First"
+
+
+def test_a_train_put_first_takes_the_way_from_a_train_yet_to_set_off_onto_it() -> None:
+    railway = line()
+    set_off = running(railway, "Set off", WEST, EAST)
+    railway.run(FRAME)
+    assert set_off.cleared > 1.0
+    put_first = running(railway, "First", EAST, WEST)
+    put_first.first = True
+
+    run_until(railway, lambda: put_first.along > 3.0)
+
+    assert set_off.along < 0.5
+    assert set_off.giving_way == "First"
+
+
+def test_a_train_is_first_only_until_it_reaches_its_next_stop() -> None:
+    railway = line()
+    train = running(railway, "First", WEST, EAST)
+    train.first = True
+
+    run_until(railway, lambda: train.arrivals >= 1)
+
+    assert not train.first

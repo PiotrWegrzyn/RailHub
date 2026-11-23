@@ -255,7 +255,9 @@ class TrainsWindow:
         imgui.same_line()
         imgui.text_disabled(f"{ENGINES[train.engine].title} - {train.status}")
         width = imgui.get_content_region_avail().x
-        imgui.same_line(max(0.0, imgui.get_cursor_pos_x() + width - 210))
+        imgui.same_line(max(0.0, imgui.get_cursor_pos_x() + width - 330))
+        first_button(train)
+        imgui.same_line()
         upgrade_button(railway, train)
         imgui.same_line()
         sold = danger_button(f"{fa.ICON_FA_TRASH}  Sell")
@@ -712,6 +714,25 @@ def draw_tonnage(railway: Railway, train: Train) -> None:
 def picker_good(train: Train) -> Good:
     """The good whose cars the generation picker lists: coaches behind an express."""
     return Good.PASSENGERS if ENGINES[train.engine].express else Good.COAL
+
+
+FIRST_TIP = (
+    "Puts it first in every queue at the signals until it reaches its next stop: it gets the\n"
+    "way on before any train waiting there, and takes back the way set for a train that has\n"
+    "yet to come to it. It still never runs into a train standing on the track."
+)
+
+
+def first_button(train: Train) -> None:
+    """The button that puts a running train first in every queue for the way on, or, once it
+    is, says so."""
+    imgui.begin_disabled(not train.path or train.first)
+    label = "First in line" if train.first else "Go first"
+    if imgui.button(f"{fa.ICON_FA_FAST_FORWARD}  {label}"):
+        train.first = True
+    imgui.end_disabled()
+    if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
+        imgui.set_tooltip(FIRST_TIP)
 
 
 def adding_tip(full: bool, tonnes: float, spare: float) -> str:

@@ -932,6 +932,9 @@ class Train:
     claims_for: list[Point] | None = None
     cleared: float = 0.0
     asked: int = 0
+    # Whether the player put it first in every queue for the way on until it reaches its next
+    # stop.
+    first: bool = False
     # Whether it set off from a station whose engine shed had its coal, and whose sand tower had
     # its sand, this month (railroads.sim.facilities).
     fuelled: bool = False
@@ -1012,6 +1015,7 @@ class Train:
         self.pace = 0.0
         self.giving_way = ""
         self.waited = 0.0
+        self.first = False
 
     def cars_changed(self, index: int) -> None:
         """Takes in new cars for the stop at `index`. A train standing at that stop calls there

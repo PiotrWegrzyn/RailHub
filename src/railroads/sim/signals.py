@@ -337,6 +337,8 @@ class Signals:
         holder = None
         for crossing in wanted:
             holder = self._holder(train, crossing, follow=True)
+            while holder is not None and train.first and self._give_way(holder, crossing):
+                holder = self._holder(train, crossing, follow=True)
             alongside = self._going_my_way(train, crossing)
             if holder is None and not leaders.keys() <= alongside.keys():
                 holder = next(iter(leaders.values()))[0]
@@ -345,7 +347,7 @@ class Signals:
             leaders |= alongside
         if holder is None and leaders and not self._clear_behind(train, crossings, stop, leaders):
             holder = max(leaders.values(), key=lambda pair: pair[0].along + pair[1])[0]
-        if holder is None:
+        if holder is None and not train.first:
             holder = self._queued_before(train, wanted)
         if holder is not None:
             if not train.asked:
@@ -366,6 +368,35 @@ class Signals:
         train.cleared = stop
         train.asked = 0
         return None
+
+    def _give_way(self, other: Train, crossing: Pass) -> bool:
+        """Takes back from another train the way set for it from the cell a train put first wants
+        on, if it can be: if it has not come to any of it yet, could stop short of it, and would
+        stand clear there, with no train following it on any of it. Whether it did."""
+        cell = crossing.cell
+        taken = [claim for claim in other.claims if claim[0] == cell and not claim[5]]
+        if not taken:
+            return False
+        back = min(claim[3] for claim in taken)
+        if other.along > back - SIGNAL_GAP - SAME:
+            return False
+        if not self._on_double(passes(self.network, other), back - other.length, back):
+            return False
+        given = [claim for claim in other.claims if claim[3] >= back - SAME]
+        for cell_given, entry, exit_, _, _, _ in given:
+            for holder, *way in self._held.get(cell_given, ()):
+                if holder is not other and tuple(way[:2]) == (entry, exit_):
+                    return False
+        other.claims = [claim for claim in other.claims if claim[3] < back - SAME]
+        for cell_given, entry, exit_, _, _, soft in given:
+            if soft:
+                continue
+            held = self._held.get(cell_given, [])
+            self._held[cell_given] = [
+                pair for pair in held if not (pair[0] is other and pair[1:3] == (entry, exit_))
+            ]
+        other.cleared = back
+        return True
 
     def _queued_before(self, train: Train, wanted: list[Pass]) -> Train | None:
         """A train that asked before this one and still waits for track this one wants, which it

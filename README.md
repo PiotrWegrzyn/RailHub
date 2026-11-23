@@ -1315,7 +1315,10 @@ finds the next signal clear without slowing when the track is free. Within stati
 track for trains going opposite ways, trains pass each other without stopping. A train may follow
 another going its way onto track that one holds, single line too, as long as wherever they all
 stopped it would stand in a station or on double track; a train waiting to come the other way
-keeps later trains from joining, so it is not kept waiting for ever. Each month buildings first hand out what they make on their own,
+keeps later trains from joining, so it is not kept waiting for ever. A running train's Go first
+button puts it first in every queue at the signals until it reaches its next stop: it gets the way
+on before any train waiting there, and takes back the way set for a train that has yet to come to
+it, as long as that one can still stop short of it and stand clear. Each month buildings first hand out what they make on their own,
 everywhere on the map, the nearest first, up to 6 cells away: nothing is lost on the way, but a
 building can take less of a maker's month the further it is, all of it in the same cell, then 13,
 8, 5, 3, 2 and 1 twenty-firsts of it from one to six cells away. Then each station that
