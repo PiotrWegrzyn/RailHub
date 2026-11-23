@@ -23,11 +23,9 @@ its fuel takes it
 (railroads.sim.finance).
 
 Trains set off from a stand and pick up speed over their engine's pickup time. They keep out of
-each other's way (railroads.sim.traffic): a train enters single line only once no train is on it
-the other way, follows a slower train ahead, and waits at a crossing for a train going across; a
-train that had to stop sets off again from a stand. Trains move in order of the right of way: the
-train that has stood longest in another's way since it left its last stop first, so none waits
-for ever; then the better engine, then the train bought first.
+each other's way by block signals (railroads.sim.signals): a train runs on past a signal only once
+the way beyond it is set for it, and the way is set for the trains in the order they asked for it;
+a train that had to stop sets off again from a stand.
 
 The engines, cars, stops and trains are in railroads.sim.trains, what stations hold in
 railroads.sim.station_goods, the way along the track in railroads.sim.track_network, and what a
@@ -85,11 +83,11 @@ from railroads.sim.goods import (
     price_of,
 )
 from railroads.sim.grids import Cell
+from railroads.sim.signals import Signals
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
 from railroads.sim.tiles import Tiles
 from railroads.sim.track_network import TrackNetwork
-from railroads.sim.traffic import Traffic
 from railroads.sim.trains import (
     BURN_ALONE,
     ENGINES,
@@ -172,6 +170,9 @@ class Railway:
     # The facilities put up beside each station, and those that got what they use this month
     # (railroads.sim.facilities). None in older saves, which have none.
     facilities: dict[Cell, set[Facility]] | None = None
+    # How many times a train has had to queue for the way on at a signal: the next to queue
+    # takes the next number (railroads.sim.signals).
+    asks: int = 0
     supplied: dict[Cell, set[Facility]] | None = None
     # The buildings the player owns (railroads.sim.ownership), which make running engines a
     # little cheaper; set by the game, None until then.
@@ -782,14 +783,15 @@ class Railway:
 
     def run(self, months: float) -> None:
         """Moves every train on by this many months, in order of the right of way, each keeping
-        out of the way of the trains moved before it (railroads.sim.traffic)."""
-        bought = {id(train): index for index, train in enumerate(self.trains)}
-        rank = {id(train): _right_of_way(train, bought[id(train)]) for train in self.trains}
-        traffic = Traffic(self.network, rank)
-        traffic.add(self.trains)
-        for train in sorted(self.trains, key=lambda train: rank[id(train)]):
-            self._run(train, months, traffic)
-            traffic.moved(train)
+        on the way its signals set for it, the trains that asked first let on first
+        (railroads.sim.signals)."""
+        signals = Signals(self.network, self.trains)
+        queue = sorted(
+            enumerate(self.trains), key=lambda pair: (not pair[1].asked, pair[1].asked, pair[0])
+        )
+        for _, train in queue:
+            self._run(train, months, signals)
+            signals.leave(train)
 
     def route(
         self, start: Cell, end: Cell, electric: bool = False, maglev: bool = False
@@ -797,7 +799,7 @@ class Railway:
         """The way along laid track from one station to another (TrackNetwork.route)."""
         return self.network.route(start, end, electric, maglev)
 
-    def _run(self, train: Train, months: float, traffic: Traffic) -> None:
+    def _run(self, train: Train, months: float, signals: Signals) -> None:
         if len(train.stops) < 2:
             train.status = "Needs two stops"
             train.path = []
@@ -864,21 +866,31 @@ class Railway:
         wanted = train.along + (
             months * CELLS_PER_MONTH * self.network.speed_at(train) * self.pull(train) * speed
         )
-        allowed, blocker, line = traffic.room(train, wanted)
+        ask = self.asks + 1
+        holder = signals.let_on(train, ask, wanted)
+        if train.asked == ask:
+            self.asks = ask
+        limit, ahead = signals.limit(train)
+        allowed = min(wanted, limit)
         train.giving_way = ""
         train.status = "Running"
         if allowed <= train.along:
-            train.giving_way = blocker
+            blocker = ahead or holder
+            train.giving_way = blocker.name if blocker is not None else ""
             train.status = (
-                f"Waiting for {blocker} to clear the line" if line else f"Giving way to {blocker}"
+                f"Following {blocker.name}"
+                if ahead
+                else f"Waiting at a signal for {blocker.name}"
+                if blocker
+                else "Waiting at a signal"
             )
             train.pace = 0.0
             train.waited += months
             return
         if allowed < wanted:
             train.pace = min(train.pace, pace * (allowed - train.along) / (wanted - train.along))
-            if not line:
-                train.status = f"Following {blocker}"
+            if ahead is not None:
+                train.status = f"Following {ahead.name}"
         train.along = allowed
         if train.along >= self.network.length(train):
             train.platform = self.network.cell_at(train.path[-1])
@@ -892,10 +904,3 @@ class Railway:
     def position(self, train: Train, back: float = 0.0) -> tuple[Point, Point] | None:
         """Where the train is on the map, and which way it faces (TrackNetwork.position)."""
         return self.network.position(train, back)
-
-
-def _right_of_way(train: Train, bought: int) -> tuple[float, float, int]:
-    """What decides which of two trains moves first, the smaller first: having stood longest in
-    another's way on the way, then the better engine, then being bought first
-    (`bought` is its place among the trains)."""
-    return -train.waited, -ENGINES[train.engine].speed, bought

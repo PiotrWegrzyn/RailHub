@@ -82,6 +82,7 @@ from railroads.ui.pixel.ground_shader import (
 from railroads.ui.pixel.layer import PixelLayer
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import ByteSheet, SpriteSheet
+from railroads.ui.pixel.signal_layer import SignalLayer
 from railroads.ui.pixel.track_preview import TrackPreview
 from railroads.ui.pixel.train_layer import TrainLayer, engine_picture
 from railroads.ui.pixel.world import PixelWorld
@@ -172,6 +173,7 @@ class MapView:
         self._pictures: GroundPictures | None = None
         self._pixels: PixelLayer | None = None
         self._trains: TrainLayer | None = None
+        self._signals: SignalLayer | None = None
         # Each engine's picture for the buy screen, by engine and how many times it is blown up:
         # its texture and its size in art pixels.
         self._engine_pictures: dict[tuple[str, int], tuple[hello_imgui.TextureGpu, Vec2]] = {}
@@ -567,8 +569,11 @@ class MapView:
             cash = self.game.finances.cash
             self.land.draw(draw_list, self.camera, center, self.tile_map, lots, world, cash)
         if self.camera.pixel_scale:
+            signals = self._signal_layer()
+            signals.draw(draw_list, self.railway, self.camera, center, near=False)
             if self.railway.trains:
                 self._train_layer().draw(draw_list, self.railway, self.camera, center)
+            signals.draw(draw_list, self.railway, self.camera, center, near=True)
         else:
             draw_track(draw_list, self.constructions, self.camera, center)
             if self.railway.trains:
@@ -902,6 +907,11 @@ class MapView:
             kept = key, self.growth.station_trade.preview(cell)
             self._station_previewed = kept
         return kept[1]
+
+    def _signal_layer(self) -> SignalLayer:
+        if self._signals is None:
+            self._signals = SignalLayer(self._pixel_layer().world)
+        return self._signals
 
     def _train_layer(self) -> TrainLayer:
         if self._trains is None:

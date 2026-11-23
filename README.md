@@ -1302,12 +1302,16 @@ At each stop a train unloads its cars, takes on that stop's cars and fills them 
 stockpile. If the stop says to wait for a full load, it waits there until its cars are full, topping
 them up as the station gathers more. Trains run through stations on the way that are not among their
 stops, and can turn round in any station, but not on open track. Each time a train sets off it takes
-the shortest way to its next stop over all the track there is. Trains can't run through each other
-for free: when two meet on the line, head on, one catching up with another, or where lines cross,
-one of them stops where it is until the other has gone by, then sets off again from a stand. The
-train that has stood longest letting others by since its last stop goes first, so none waits for
-ever, then the better engine, then the train bought first. Within stations, and on double track
-for trains going opposite ways, trains pass each other without stopping. Each month buildings first hand out what they make on their own,
+the shortest way to its next stop over all the track there is. Trains keep out of each other's way
+by block signals: semaphores, striped red and white, stand wherever track leaves a station, runs
+into a junction or crossing, or changes from single to double track. A train runs on past a signal
+only once the way beyond it is set for it, up to the next signal where it could stand without
+blocking anyone but trains following it: in a station, or wholly on double track, never on a
+junction or single line. Until then the arm lies level and the lamp shows red, and the train
+stands before it; once the way is set the arm rises and the lamp turns green. Trains get the way
+in the order they asked, so the one that has waited longest goes first and none waits for ever.
+Within stations, and on double track for trains going opposite ways, trains pass each other
+without stopping, and on double track a train may follow another going its way. Each month buildings first hand out what they make on their own,
 everywhere on the map, the nearest first, up to 6 cells away: nothing is lost on the way, but a
 building can take less of a maker's month the further it is, all of it in the same cell, then 13,
 8, 5, 3, 2 and 1 twenty-firsts of it from one to six cells away. Then each station that

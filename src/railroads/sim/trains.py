@@ -25,7 +25,12 @@ from railroads.sim.grids import Cell
 from railroads.sim.tiles import Tile
 
 if TYPE_CHECKING:
-    from railroads.sim.traffic import Stretches
+    from railroads.sim.signals import Pass
+
+# Track a train holds in a cell (railroads.sim.signals): the cell, the points on its edge the
+# train's way enters and leaves by, how far along its path it enters and leaves the cell, and
+# whether it took it standing there without holding up the trains already holding it.
+type Claim = tuple[Cell, Point, Point, float, float, bool]
 
 MAX_CARS = 5
 
@@ -908,18 +913,25 @@ class Train:
     # How far along the path each of its points lies, with the path it was worked out for
     # (TrackNetwork.ends).
     path_ends: tuple[list[Point], list[float]] | None = None
-    # Where the path crosses from cell to cell and runs on single line, with the path and the
-    # railway version it was worked out for (railroads.sim.traffic.stretches).
-    path_stretches: tuple[list[Point], int, float, Stretches] | None = None
+    # The cells outside stations the path crosses, with the path they were worked out for
+    # (railroads.sim.signals.passes).
+    path_passes: tuple[list[Point], list[Pass]] | None = None
     along: float = 0.0
     status: str = "Waiting for stops"
     engine: str = FIRST_ENGINE
     # How fast it runs as a share of its full speed, which it picks up after setting off.
     pace: float = 0.0
-    # The train it has stopped to let by, if any, and how long it has stood letting trains by
-    # since it last set off from a stop, in months.
+    # The train holding the track it waits for at a signal, if any, and how long it has stood at
+    # signals since it last set off from a stop, in months.
     giving_way: str = ""
     waited: float = 0.0
+    # The track it holds (railroads.sim.signals), with the path it holds it on; how far along
+    # that path the way is set for it; and its place in the queue for the way on, 0 when it
+    # waits for none.
+    claims: list[Claim] = field(default_factory=list)
+    claims_for: list[Point] | None = None
+    cleared: float = 0.0
+    asked: int = 0
     # Whether it set off from a station whose engine shed had its coal, and whose sand tower had
     # its sand, this month (railroads.sim.facilities).
     fuelled: bool = False

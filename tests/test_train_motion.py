@@ -129,7 +129,7 @@ def test_a_train_waits_at_its_station_while_another_comes_the_other_way_on_singl
     assert second.giving_way == "First"
     assert first.giving_way == ""
     assert railway.network.passing(railway.network.spot(second, second.along)[2]) == (True, False)
-    assert second.status == "Waiting for First to clear the line"
+    assert second.status == "Waiting at a signal for First"
 
 
 def test_a_train_that_let_another_by_sets_off_again_from_a_stand_and_both_arrive() -> None:
@@ -146,26 +146,19 @@ def test_a_train_that_let_another_by_sets_off_again_from_a_stand_and_both_arrive
     assert first.arrivals >= 1 and second.arrivals >= 1
 
 
-def test_the_better_engine_goes_first() -> None:
-    railway = line()
-    steam = running(railway, "Steam", WEST, EAST)
-    express = running(railway, "Express", EAST, WEST, engine="pacific")
-
-    run_until(railway, lambda: bool(steam.giving_way or express.giving_way))
-
-    assert steam.giving_way == "Express"
-    assert express.giving_way == ""
-
-
-def test_a_train_that_has_stood_longer_letting_others_by_goes_first() -> None:
+def test_the_train_that_waited_first_at_a_signal_gets_the_line_first() -> None:
     railway = line()
     first = running(railway, "First", WEST, EAST)
-    second = running(railway, "Second", EAST, WEST)
-    second.waited = 0.01
+    waiting = running(railway, "Waiting", EAST, WEST)
+    run_until(railway, lambda: first.along > 3.0)
+    later = running(railway, "Later", WEST, EAST, engine="pacific")
+    run_until(railway, lambda: bool(later.giving_way))
 
-    run_until(railway, lambda: bool(first.giving_way or second.giving_way))
+    run_until(railway, lambda: first.arrivals >= 1)
+    run_until(railway, lambda: not waiting.giving_way or not later.giving_way)
 
-    assert first.giving_way == "Second"
+    assert waiting.giving_way == ""
+    assert later.giving_way == "Waiting"
 
 
 def test_trains_going_opposite_ways_on_double_track_pass_without_stopping() -> None:
@@ -193,11 +186,13 @@ def test_many_trains_on_one_line_all_keep_getting_through() -> None:
     for _ in range(int(12 / FRAME / 10)):
         railway.run(10 * FRAME)
 
-    assert all(train.arrivals >= 3 for train in railway.trains)
+    arrivals = [train.arrivals for train in railway.trains]
+    assert min(arrivals) >= 2
+    assert max(arrivals) - min(arrivals) <= 1
 
 
-def test_a_fast_train_behind_a_slow_one_follows_it_and_never_runs_into_it() -> None:
-    railway = line()
+def test_a_fast_train_behind_a_slow_one_on_double_track_follows_it_and_never_runs_into_it() -> None:
+    railway = line(TrackWidth.DOUBLE)
     slow = running(railway, "Slow", WEST, EAST)
     run_until(railway, lambda: slow.along > 3.0)
     fast = running(railway, "Fast", WEST, EAST, engine="pacific")
@@ -214,7 +209,9 @@ def test_a_fast_train_behind_a_slow_one_follows_it_and_never_runs_into_it() -> N
     assert min(gaps) > slow.length
 
 
-def test_trains_going_the_same_way_follow_each_other_onto_single_line() -> None:
+def test_a_train_waits_for_one_ahead_going_its_way_to_leave_single_line_before_entering_it() -> (
+    None
+):
     railway = line()
     first = running(railway, "First", WEST, EAST)
     run_until(railway, lambda: first.along > 3.0)
@@ -222,8 +219,9 @@ def test_trains_going_the_same_way_follow_each_other_onto_single_line() -> None:
 
     run_until(railway, lambda: second.along > 3.0 or first.arrivals > 0)
 
-    assert first.arrivals == 0
-    assert second.giving_way == ""
+    assert first.arrivals == 1
+    assert second.along < 1.0
+    assert second.status == "Waiting at a signal for First"
 
 
 def test_a_train_waits_for_another_crossing_its_line_and_both_get_through() -> None:
@@ -250,7 +248,7 @@ def test_a_train_waits_for_another_crossing_its_line_and_both_get_through() -> N
         if across.arrivals and down.arrivals:
             break
 
-    assert "Giving way to Across" in statuses
+    assert "Waiting at a signal for Across" in statuses
     assert across.arrivals == 1 and down.arrivals == 1
 
 

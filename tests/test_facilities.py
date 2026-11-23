@@ -34,18 +34,22 @@ def test_an_engine_shed_works_a_month_only_on_a_months_coal(coal: float, works: 
 
 
 def test_a_fuelled_train_runs_faster_by_the_engine_shed_speed() -> None:
-    _, railway = joined_stations()
-    railway.finances.earn(1_000_000.0, "test")
-    plain, fuelled = railway.buy(), railway.buy()
-    assert plain is not None and fuelled is not None
-    for train in (plain, fuelled):
+    railways = [joined_stations()[1] for _ in range(2)]
+    trains = []
+    for railway in railways:
+        railway.finances.earn(1_000_000.0, "test")
+        train = railway.buy()
+        assert train is not None
         train.stops = [Stop(STATION, wait_for_load=False), Stop((6, 20), wait_for_load=False)]
-    railway.run(0.01)
+        railway.run(0.01)
+        train.pace = 1.0
+        trains.append(train)
+    plain, fuelled = trains
     fuelled.fuelled = True
-    plain.pace = fuelled.pace = 1.0
     before = (plain.along, fuelled.along)
 
-    railway.run(0.02)
+    for railway in railways:
+        railway.run(0.02)
 
     gained = (plain.along - before[0], fuelled.along - before[1])
     assert gained[1] == pytest.approx(gained[0] * ENGINE_SHED_SPEED, rel=0.05)

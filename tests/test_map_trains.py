@@ -5,7 +5,7 @@ import pytest
 from imgui_bundle import hello_imgui, imgui  # noqa: TID251
 
 from builders import flat_map
-from railroads.sim.constructions import Constructions
+from railroads.sim.constructions import Constructions, TrackWidth
 from railroads.sim.game import Game
 from railroads.sim.goods import Good
 from railroads.sim.grids import HexGrid
@@ -13,8 +13,9 @@ from railroads.sim.trains import Car, Stop, Train
 from railroads.ui import map_view
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
 from railroads.ui.map_view import MapView
-from railroads.ui.pixel import train_layer
+from railroads.ui.pixel import signal_layer, train_layer
 from railroads.ui.pixel.relief import Elevation
+from railroads.ui.pixel.signal_layer import SignalLayer
 from railroads.ui.pixel.train_layer import TrainLayer
 from railroads.ui.pixel.trains import DETAIL, HEADINGS
 
@@ -35,12 +36,12 @@ def context(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     imgui.destroy_context(gui)
 
 
-def railway_seen_in_pixel_art() -> MapView:
+def railway_seen_in_pixel_art(width: TrackWidth = TrackWidth.SINGLE) -> MapView:
     game = Game(Constructions(flat_map(grid=HexGrid(rows=20, cols=24, km_per_cell=2.0))))
     game.finances.cash = 1_000_000.0
     for cell in ((10, 6), (10, 16)):
         game.build_station(cell)
-    game.lay_track((10, 6), (10, 16))
+    game.lay_track((10, 6), (10, 16), width)
     view = MapView(game)
     view.camera.zoom_level = 4
     view.look_at((10, 10))
@@ -93,11 +94,11 @@ def test_the_pixel_map_draws_its_trains_from_the_train_sheet(
 def test_the_ground_under_every_trains_smoke_is_looked_up_in_one_go(
     context: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    view = railway_seen_in_pixel_art()
-    for _ in range(2):
+    view = railway_seen_in_pixel_art(TrackWidth.DOUBLE)
+    for stops in ([Stop((10, 6)), Stop((10, 16))], [Stop((10, 16)), Stop((10, 6))]):
         train = view.railway.buy()
         assert train is not None
-        train.stops = [Stop((10, 6)), Stop((10, 16))]
+        train.stops = stops
     view.time_passed(0.1)
     view.time_passed(0.1)
     layer = TrainLayer(view._pixel_layer().world)
@@ -361,3 +362,36 @@ def test_zoomed_out_past_the_pixel_art_trains_still_show_their_pictures(context:
 
     imgui.end_frame()
     assert layer._sheet is not None
+
+
+def test_a_signal_s_lamp_turns_from_red_to_green_once_the_way_past_it_is_set(
+    context: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    view = railway_seen_in_pixel_art()
+    view.camera.zoom_level = len(ZOOM_CELL_WIDTHS) - 1
+    view.look_at((10, 7))
+    layer = SignalLayer(view._pixel_layer().world)
+    lamps: list[tuple[float, float, float]] = []
+    monkeypatch.setattr(signal_layer, "_glow", lambda _, __, ___, color: lamps.append(color))
+
+    def drawn() -> list[tuple[float, float, float]]:
+        lamps.clear()
+        imgui.get_io().delta_time = 1.0
+        imgui.new_frame()
+        for near in (False, True):
+            layer.draw(
+                imgui.get_foreground_draw_list(), view.railway, view.camera, (640, 400), near
+            )
+        imgui.end_frame()
+        return list(lamps)
+
+    before = drawn()
+    train = view.railway.buy()
+    assert train is not None
+    train.stops = [Stop((10, 6)), Stop((10, 16))]
+    view.railway.run(1e-4)
+
+    after = drawn()
+
+    assert before and all(color == signal_layer.RED for color in before)
+    assert any(color == pytest.approx(signal_layer.GREEN) for color in after)
