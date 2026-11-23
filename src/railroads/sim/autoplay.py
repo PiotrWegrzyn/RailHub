@@ -12,13 +12,14 @@ import numpy.typing as npt
 
 from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import BuildingKind, Station
-from railroads.sim.goods import makes_of, price_of
+from railroads.sim.goods import price_of
 from railroads.sim.grids import Cell, Grid, parity_steps
 from railroads.sim.growth import Growth
 from railroads.sim.points import Points
 from railroads.sim.railway import Railway
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tiles import of_year
+from railroads.sim.yearly import makes_of
 
 STATIONS_AT_START = 5
 STATIONS_PER_DECADE = 2

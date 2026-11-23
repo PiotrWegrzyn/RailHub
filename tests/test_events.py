@@ -13,18 +13,10 @@ from railroads.sim.events import (
     want_factor,
 )
 from railroads.sim.fuel_market import Fuel, history_factor
-from railroads.sim.goods import (
-    RECIPES,
-    Good,
-    Need,
-    bonus_of,
-    boosts_of,
-    demands_of,
-    makes_of,
-    needs_of,
-)
+from railroads.sim.goods import RECIPES, Good, Need
 from railroads.sim.happenings import changes_of
 from railroads.sim.tiles import Tiles, activate
+from railroads.sim.yearly import bonus_of, boosts_of, demands_of, makes_of, needs_of
 
 BOUNDS = {start.key: start.bounds for start in START_MAPS}
 

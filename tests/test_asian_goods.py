@@ -8,10 +8,11 @@ from builders import flat_map, layer
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Economy
 from railroads.sim.geo import Bounds
-from railroads.sim.goods import FITS, PROCESSED_FOODS, Good, Need, bonus_of, needs_of
+from railroads.sim.goods import FITS, PROCESSED_FOODS, Good, Need
 from railroads.sim.growth import inputs_of
 from railroads.sim.ladders import SOY_FIELDS, TEA_PLANTATIONS
 from railroads.sim.tilemap import Relief, TileMap
+from railroads.sim.yearly import bonus_of, needs_of
 
 
 def placed_at(west: float, south: float, relief: Relief = Relief.FLAT) -> TileMap:

@@ -14,7 +14,7 @@ from railroads.sim.finance import (
     TRAIN_PRICE,
     car_trip_price,
 )
-from railroads.sim.goods import Good, Need, freight_of, needs_of
+from railroads.sim.goods import Good, Need, freight_of
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.railway import CELLS_PER_MONTH, Railway
@@ -30,6 +30,7 @@ from railroads.sim.trains import (
     Stop,
     car_size,
 )
+from railroads.sim.yearly import needs_of
 
 
 def test_trains_find_their_way_along_track_between_stations() -> None:

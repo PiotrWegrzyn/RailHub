@@ -38,8 +38,6 @@ from railroads.sim.goods import (
     TRAVELLERS,
     Good,
     Need,
-    makes_of,
-    needs_of,
 )
 from railroads.sim.grids import Cell, FloatArray, Within, flat_within_any
 from railroads.sim.ladders import PASSENGERS_PER_POINT
@@ -47,6 +45,7 @@ from railroads.sim.points import Points
 from railroads.sim.power_plants import powered_points
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.steps import Steps, finish
+from railroads.sim.yearly import makes_of, needs_of
 
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth

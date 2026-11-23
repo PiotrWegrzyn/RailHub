@@ -31,7 +31,7 @@ from enum import Enum
 from types import MappingProxyType
 
 from railroads.sim.constructions import MERGED, BuildingKind
-from railroads.sim.year_caches import on_forget, year_cached
+from railroads.sim.year_caches import on_forget
 
 
 class Good(Enum):
@@ -1086,21 +1086,6 @@ PIPELINE: tuple[Need | BuildingKind, ...] = tuple(
 )
 
 
-@year_cached
-def makes_of(kind: BuildingKind, year: int) -> Mapping[Good, float]:
-    """The most a kind of building makes of each good in a month in a given year: nothing of a
-    good that does not exist yet, and less of one history makes scarce (railroads.sim.events)."""
-    from railroads.sim.events import make_factor
-
-    return MappingProxyType(
-        {
-            good: amount * make_factor(good, year)
-            for good, amount in MAKES.get(kind, {}).items()
-            if KIND_GOOD_YEARS.get((kind, good), 0) <= year and good_exists(good, year)
-        }
-    )
-
-
 # Needs buildings can do without but that raise their satisfaction: every special resource
 # (railroads.mapgen.deposits), beer, newspapers and furniture, the wheat animals are fed and the
 # planks mines prop their shafts with. Wool, cotton and fish meet
@@ -1133,76 +1118,6 @@ def need_year(kind: BuildingKind, need: Need) -> int:
     """The year a kind of building starts to need something: once there is any of it, and its
     own year for that need if it has one."""
     return max(NEED_YEARS.get(need, 0), KIND_NEED_YEARS.get((kind, need), 0))
-
-
-def need_open(kind: BuildingKind, need: Need, year: int) -> bool:
-    """Whether a kind of building needs something in a year: once its year has come and, for a
-    need a demand tile opens, once that tile is at its level (railroads.sim.tiles.UNLOCKS)."""
-    from railroads.sim.tiles import opens
-
-    return need_year(kind, need) <= year and need_exists(need, year) and opens(kind, need, year)
-
-
-def owned_boosts(kind: BuildingKind, year: int) -> frozenset[Need]:
-    """The boosts only the player's own buildings of a kind take that are open in a year."""
-    return frozenset(
-        need for taker, need in OWNED_BOOSTS if taker == kind and need_open(kind, need, year)
-    )
-
-
-@year_cached
-def needs_of(kind: BuildingKind, year: int, east: bool = False) -> Mapping[Need, float]:
-    """What a kind of building needs in a month in a given year, on a map in the old Eastern Bloc
-    or not: what it needs once that has begun, and what it wants only while an event lasts, times
-    what history makes of each (railroads.sim.events); nothing of what it no longer wants."""
-    from railroads.sim.events import added_needs, want_factor
-
-    needs = {
-        need: amount for need, amount in NEEDS.get(kind, {}).items() if need_open(kind, need, year)
-    }
-    needs.update(
-        (need, amount) for need, amount in added_needs(kind, year).items() if need not in needs
-    )
-    scaled = (
-        (need, amount * want_factor(kind, need, year, east)) for need, amount in needs.items()
-    )
-    return MappingProxyType({need: amount for need, amount in scaled if amount > 0})
-
-
-@year_cached
-def bonus_part(kind: BuildingKind, need: Need, year: int, east: bool = False) -> float | None:
-    """How much of a need a kind of building takes only as a bonus in a year (BONUS_PART), grown as
-    what it needs of it grows (railroads.sim.events); None if all of it must arrive."""
-    from railroads.sim.events import want_factor
-
-    part = BONUS_PART.get((kind, need))
-    return None if part is None else part * want_factor(kind, need, year, east)
-
-
-@year_cached
-def boosts_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
-    """What a kind of building that makes goods can do without but makes up to BOOST_MOST more
-    with, and how much of each it needs in a month for all of that: a processor's recipe boosts,
-    and the bonus goods of one that makes goods from the land, such as wheat for its animals."""
-    recipe = RECIPES.get(kind)
-    if recipe is not None:
-        needs = needs_of(kind, year)
-        return MappingProxyType({need: needs[need] for need in recipe.boosts if need in needs})
-    if kind not in MAKES:
-        return MappingProxyType({})
-    from railroads.sim.events import added_needs
-
-    return MappingProxyType(
-        {
-            need: amount
-            for need, amount in needs_of(kind, year).items()
-            if need in BONUS_NEEDS
-            or need in LAND_BOOST_MOST
-            or (kind, need) in KIND_BOOST_MOST
-            or (kind, need) in OWNED_BOOSTS
-            or need in added_needs(kind, year)
-        }
-    )
 
 
 # Homes need food, common goods and heating to live, more of each the bigger they grow; everything
@@ -1242,39 +1157,3 @@ KIND_BONUSES: Mapping[BuildingKind, frozenset[Need]] = MappingProxyType(
         BuildingKind.HOSPITAL: frozenset({Need.WAX}),
     }
 )
-
-
-@year_cached
-def bonus_of(kind: BuildingKind, year: int, east: bool = False) -> Mapping[Need, float]:
-    """The bonus goods among what a kind of building needs in a month in a given year: for homes
-    all but food, common goods and heating; those of buildings that make goods boost what they make instead
-    (boosts_of)."""
-    needs = needs_of(kind, year, east)
-    if kind in VENUE_BONUSES:
-        return MappingProxyType(
-            {need: amount for need, amount in needs.items() if need in VENUE_BONUSES[kind]}
-        )
-    if kind in HOMES:
-        demands = HOUSE_DEMANDS if kind == BuildingKind.HOUSE else HOME_DEMANDS
-        return MappingProxyType(
-            {need: amount for need, amount in needs.items() if need not in demands}
-        )
-    extra = KIND_BONUSES.get(kind, frozenset())
-    bonus = {need: amount for need, amount in needs.items() if need in BONUS_NEEDS or need in extra}
-    if kind in MAKES or len(bonus) == len(needs):
-        return MappingProxyType({})
-    return MappingProxyType(bonus)
-
-
-@year_cached
-def demands_of(kind: BuildingKind, year: int, east: bool = False) -> Mapping[Need, float]:
-    """What a kind of building must get in a month in a given year to be satisfied: its needs
-    that are neither bonus goods nor boosts."""
-    left_out = {**bonus_of(kind, year, east), **boosts_of(kind, year)}
-    return MappingProxyType(
-        {
-            need: amount
-            for need, amount in needs_of(kind, year, east).items()
-            if need not in left_out
-        }
-    )

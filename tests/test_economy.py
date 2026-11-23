@@ -15,10 +15,11 @@ from railroads.sim.economy import (
     levels_of,
 )
 from railroads.sim.events import make_factor
-from railroads.sim.goods import BONUS_PART, MAKES, PIPELINE, Good, Need, makes_of, needs_of
+from railroads.sim.goods import BONUS_PART, MAKES, PIPELINE, Good, Need
 from railroads.sim.ladders import LOGGING_CAMPS, MINES
 from railroads.sim.steps import finish
 from railroads.sim.tiles import Tiles, activate
+from railroads.sim.yearly import makes_of, needs_of
 
 FARM_MONTH = makes_of(BuildingKind.FARM, START_YEAR)[Good.WHEAT]
 HOUSE_FOOD = needs_of(BuildingKind.HOUSE, START_YEAR)[Need.FOOD]

@@ -69,16 +69,12 @@ from railroads.sim.goods import (
     RECIPES,
     Good,
     Need,
-    bonus_of,
-    bonus_part,
-    boosts_of,
-    makes_of,
-    needs_of,
 )
 from railroads.sim.grids import Cell, FloatArray, Grid, flat_within_any, parity_steps
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import TileMap
 from railroads.sim.year_caches import year_cached
+from railroads.sim.yearly import bonus_of, bonus_part, boosts_of, makes_of, needs_of
 
 
 class Satisfaction(IntEnum):

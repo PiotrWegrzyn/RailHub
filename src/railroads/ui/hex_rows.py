@@ -15,22 +15,14 @@ from railroads.sim.amounts import EPSILON
 from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import Building, BuildingKind, Construction, Station, Track
 from railroads.sim.economy import Satisfaction, Trade
-from railroads.sim.goods import (
-    BONUS_PART,
-    RECIPES,
-    Good,
-    Need,
-    bonus_of,
-    boosts_of,
-    demands_of,
-    makes_of,
-)
+from railroads.sim.goods import BONUS_PART, RECIPES, Good, Need
 from railroads.sim.grids import Cell, FloatArray
 from railroads.sim.growth import Growth
 from railroads.sim.ledger import Takings
 from railroads.sim.ownership import CONTROL, HOLD_MONTHS, LOT, LOTS, SHARES
 from railroads.sim.points import Points
 from railroads.sim.tilemap import Deposit, TileMap
+from railroads.sim.yearly import bonus_of, boosts_of, demands_of, makes_of
 from railroads.ui.biomes import biome_of
 from railroads.words import dollars
 

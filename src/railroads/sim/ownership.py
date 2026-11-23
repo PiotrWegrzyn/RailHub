@@ -24,9 +24,10 @@ import numpy.typing as npt
 from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import OwnedShare
-from railroads.sim.goods import Need, makes_of, owned_boosts, price_of
+from railroads.sim.goods import Need, price_of
 from railroads.sim.grids import Cell, IntArray
 from railroads.sim.tiles import of_year
+from railroads.sim.yearly import makes_of, owned_boosts
 
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth

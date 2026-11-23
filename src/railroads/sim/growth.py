@@ -84,7 +84,7 @@ from railroads.sim.economy import (
 )
 from railroads.sim.events import military_growth
 from railroads.sim.forests import change_forests
-from railroads.sim.goods import FITS, HOMES, MAKES, RECIPES, Good, demands_of, makes_of
+from railroads.sim.goods import FITS, HOMES, MAKES, RECIPES, Good
 from railroads.sim.grids import Cell, FlatIndices, FloatArray, Grid, IntArray
 from railroads.sim.ladder_types import Join, Ladder
 from railroads.sim.ladders import (
@@ -111,6 +111,7 @@ from railroads.sim.tilemap import REFERENCE_LAND, Relief, Terrain, TileMap, Vege
 from railroads.sim.tiles import era_come, kind_era
 from railroads.sim.towns import Towns
 from railroads.sim.year_caches import year_cached
+from railroads.sim.yearly import demands_of, makes_of
 
 if TYPE_CHECKING:
     from railroads.sim.happenings import Happenings

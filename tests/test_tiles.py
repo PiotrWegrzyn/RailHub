@@ -5,7 +5,7 @@ from builders import flat_map
 from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.events import make_factor
 from railroads.sim.game import Game
-from railroads.sim.goods import Good, Need, makes_of, needs_of
+from railroads.sim.goods import Good, Need
 from railroads.sim.tiles import (
     BASE_LEVELS,
     BENCHMARK_YEAR,
@@ -20,6 +20,7 @@ from railroads.sim.tiles import (
     price,
     supply_factor,
 )
+from railroads.sim.yearly import makes_of, needs_of
 
 
 def test_every_good_belongs_to_exactly_one_tile() -> None:

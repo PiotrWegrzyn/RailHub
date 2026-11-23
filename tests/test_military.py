@@ -8,10 +8,11 @@ from railroads.mapgen.deposits import GARRISON_SIZE, GARRISONS, place_deposits
 from railroads.mapgen.seeding import muster_garrisons
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Economy
-from railroads.sim.goods import Good, Need, needs_of
+from railroads.sim.goods import Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import AIRPORTS, MILITARY, ORANGE_FARMS, GrowthRule
 from railroads.sim.tilemap import Deposit, Temperature, Vegetation
+from railroads.sim.yearly import needs_of
 
 
 def garrison_at(*cells: tuple[int, int]) -> np.ndarray:

@@ -4,7 +4,8 @@ import pytest
 from builders import joined_stations
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.economy import Satisfaction
-from railroads.sim.goods import BONUS_PART, Good, Need, needs_of
+from railroads.sim.goods import BONUS_PART, Good, Need
+from railroads.sim.yearly import needs_of
 
 STATION = (6, 20)
 HOUSE_FOOD = (BuildingKind.HOUSE, Need.FOOD)

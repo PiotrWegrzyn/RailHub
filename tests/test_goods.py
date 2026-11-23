@@ -1,17 +1,10 @@
 import pytest
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.goods import (
-    FITS,
-    RECIPES,
-    Need,
-    bonus_of,
-    demands_of,
-    makes_of,
-    needs_of,
-)
+from railroads.sim.goods import FITS, RECIPES, Need
 from railroads.sim.growth import ladder_open
 from railroads.sim.ladders import LADDERS
+from railroads.sim.yearly import bonus_of, demands_of, makes_of, needs_of
 
 
 def test_a_processor_takes_no_bonus_goods_and_demands_its_special_resource() -> None:

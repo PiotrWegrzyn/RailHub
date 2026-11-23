@@ -38,9 +38,10 @@ from railroads.sim.clock import FIRST_RAILWAY_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Trade
 from railroads.sim.events import electricity_price, electricity_use, price_factor
-from railroads.sim.goods import FITS, Good, Need, needs_of
+from railroads.sim.goods import FITS, Good, Need
 from railroads.sim.goods import NEEDS as BUILDING_NEEDS
 from railroads.sim.trains import Engine, Power
+from railroads.sim.yearly import needs_of
 
 
 class Fuel(Enum):

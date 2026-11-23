@@ -3,7 +3,7 @@ import pytest
 
 from builders import square_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.goods import MAKES, Good, Need, needs_of
+from railroads.sim.goods import MAKES, Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.novelties import (
@@ -14,6 +14,7 @@ from railroads.sim.novelties import (
     place_space_center,
 )
 from railroads.sim.tilemap import Deposit
+from railroads.sim.yearly import needs_of
 
 QUIET = GrowthRule(ladders=(), forests=None)
 BY_KIND = {novelty.kind: novelty for novelty in NOVELTIES}

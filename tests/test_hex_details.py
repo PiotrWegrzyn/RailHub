@@ -7,7 +7,7 @@ from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
 from railroads.sim.economy import Satisfaction
 from railroads.sim.game import Game
-from railroads.sim.goods import Good, Need, bonus_of
+from railroads.sim.goods import Good, Need
 from railroads.sim.grids import Cell, HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
@@ -15,6 +15,7 @@ from railroads.sim.ledger import Takings
 from railroads.sim.ownership import HOLD_MONTHS
 from railroads.sim.points import Points
 from railroads.sim.tilemap import Terrain, TileMap
+from railroads.sim.yearly import bonus_of
 from railroads.ui import hex_rows
 from railroads.ui.hex_rows import (
     BuildingRow,

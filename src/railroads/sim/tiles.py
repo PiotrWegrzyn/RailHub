@@ -33,7 +33,7 @@ from types import MappingProxyType
 
 from railroads.sim.clock import FIRST_RAILWAY_YEAR
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.goods import FITS, MAKES, NEEDS, Good, Need
+from railroads.sim.goods import FITS, MAKES, NEEDS, Good, Need, need_year
 from railroads.sim.year_caches import forget
 
 
@@ -565,7 +565,6 @@ def opens(kind: BuildingKind, need: Need, year: int) -> bool:
 def opened_from(kind: BuildingKind, need: Need) -> str:
     """From when a kind of building takes a need, in a few words: the demand tile level that opens
     it, the era of its goods, its year, or "" for always."""
-    from railroads.sim.goods import need_year
 
     unlock = UNLOCKS.get((kind, need))
     if unlock is not None:
