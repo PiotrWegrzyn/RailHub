@@ -640,7 +640,7 @@ class RouteMap:
         imgui.text(railway.name_of(station))
         colored(NEEDED, "Wants")
         draw_wants(railway.station_demand(station), TOOLTIP_WANTS_PER_ROW)
-        _summary_row("Given", MADE, summary.makes, summary.more_makes)
+        _summary_row("To load", MADE, summary.makes, summary.more_makes)
         if can_stop_at(train, station):
             imgui.text_disabled("Click to add it as a stop")
         else:
@@ -655,7 +655,7 @@ def _summary_row(
     more: int,
 ) -> None:
     colored(rgba, title)
-    imgui.same_line(56)
+    imgui.same_line(64)
     if not items:
         imgui.text_disabled("nothing")
         return
