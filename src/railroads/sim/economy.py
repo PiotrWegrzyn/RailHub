@@ -104,7 +104,7 @@ COLLECTION_RADIUS = 3
 # and nothing from LOCAL_REACH + 1 cells away.
 REACH_SHARES = (21 / 21, 13 / 21, 8 / 21, 5 / 21, 3 / 21, 2 / 21, 1 / 21)
 LOCAL_REACH = len(REACH_SHARES) - 1
-# The cells of -1 around the map that let _Month._pairs look LOCAL_REACH cells out from any cell
+# The cells of -1 around the map that let MonthOfTrade._pairs look LOCAL_REACH cells out from any cell
 # without checking for the edge.
 _PAD = LOCAL_REACH
 
@@ -461,7 +461,7 @@ class Economy:
         owned: Mapping[BuildingKind, OwnedShare] | None = None,
     ) -> Steps[Trade]:
         """trade, pausing about every STEP_SECONDS; nothing else may change the game between."""
-        return _Month(self, counts, stations or {}, cells, owned).run_steps()
+        return MonthOfTrade(self, counts, stations or {}, cells, owned).run_steps()
 
     def _around(
         self,
@@ -513,7 +513,7 @@ def wants_of(kind: BuildingKind, year: int) -> frozenset[Need]:
     return frozenset(recipe.takes(year)) | frozenset(boosts_of(kind, year))
 
 
-class _Month:
+class MonthOfTrade:
     """One month of trade on the cells with buildings, worked out need by need in the order of
     the chain: what each building is offered, takes in, makes and gives away."""
 

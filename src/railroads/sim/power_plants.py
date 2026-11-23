@@ -3,7 +3,7 @@ diesel ones from the fifth and gas ones from the sixth (railroads.sim.tiles.KIND
 (railroads.sim.fuel_market). Whenever the plants standing would make less than the map's
 electrified homes and factories want, one more goes up, at most one a year, the first of each kind
 as soon as it opens: by whichever of the
-TOWNS biggest towns with none within PLANT_APART cells has the most fuel made within FUEL_REACH
+PLANT_TOWNS biggest towns with none within PLANT_APART cells has the most fuel made within FUEL_REACH
 cells of it, burning that fuel; by the biggest of them, burning coal, where none has any."""
 
 from typing import TYPE_CHECKING
@@ -30,7 +30,7 @@ FUEL_REACH = 10
 # How far from its town a new plant looks for a free cell, and how many of the biggest towns
 # without one it chooses among.
 PLACE_STEPS = 8
-TOWNS = 12
+PLANT_TOWNS = 12
 
 
 def powered_points(growth: Growth) -> float:
@@ -104,7 +104,7 @@ def _first_of(growth: Growth, kind: BuildingKind, standing: np.ndarray) -> set[C
 
 
 def _towns_without_plant(growth: Growth, standing: np.ndarray) -> list[Cell]:
-    """The TOWNS cells with the most people around them, biggest first, with no power plant
+    """The PLANT_TOWNS cells with the most people around them, biggest first, with no power plant
     near them, apart from each other."""
     near = growth.nearby(Points.POPULATION).astype(np.float64)
     blocked = np.zeros(near.shape, dtype=bool)
@@ -114,7 +114,7 @@ def _towns_without_plant(growth: Growth, standing: np.ndarray) -> list[Cell]:
     near[blocked] = -1.0
     towns: list[Cell] = []
     for index in np.argsort(near, axis=None)[::-1].tolist():
-        if len(towns) >= TOWNS or near.flat[index] <= 0:
+        if len(towns) >= PLANT_TOWNS or near.flat[index] <= 0:
             break
         cell = divmod(index, near.shape[1])
         if all(cell not in growth.grid.within(town, PLANT_APART) for town in towns):

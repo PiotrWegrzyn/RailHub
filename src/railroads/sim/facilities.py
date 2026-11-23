@@ -57,7 +57,7 @@ USES: Mapping[Facility, tuple[Good, float]] = MappingProxyType(
         Facility.WAREHOUSE: (Good.BRICKS, 20.0),
     }
 )
-PRICES: Mapping[Facility, float] = MappingProxyType(
+FACILITY_PRICES: Mapping[Facility, float] = MappingProxyType(
     {
         Facility.ENGINE_SHED: ENGINE_SHED_PRICE,
         Facility.SAND_TOWER: SAND_TOWER_PRICE,

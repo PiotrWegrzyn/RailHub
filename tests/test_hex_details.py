@@ -149,7 +149,7 @@ def test_a_cell_alone_is_described_as_the_whole_map_has_it() -> None:
 
     described = {cell: describe(growth, cell, growth.satisfaction()) for cell in cells}
 
-    trade = growth.trade
+    trade = growth.last_trade
     assert trade is not None
     rated = 0
     for cell, details in described.items():

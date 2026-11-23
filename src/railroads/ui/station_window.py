@@ -10,12 +10,12 @@ from imgui_bundle import imgui
 
 from railroads.sim.facilities import (
     ENGINE_SHED_SPEED,
+    FACILITY_PRICES,
     PAYS_MORE,
     SAND_TOWER_PICKUP,
     WAREHOUSE_ROOM,
     Facility,
 )
-from railroads.sim.facilities import PRICES as FACILITY_PRICES
 from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.finance import STATION_PRICE
 from railroads.sim.grids import Cell

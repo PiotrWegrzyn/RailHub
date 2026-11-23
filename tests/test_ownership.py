@@ -126,7 +126,7 @@ def test_a_station_hands_out_the_players_part_of_their_farm_and_earns_its_freigh
 
     growth.trade_goods()
 
-    assert growth.trade.handed[(6, 20)][Good.WHEAT] == pytest.approx(10 * shares / SHARES)
+    assert growth.last_trade.handed[(6, 20)][Good.WHEAT] == pytest.approx(10 * shares / SHARES)
     assert growth.railway.finances.month["owned buildings"] > 0
     assert growth.railway.finances.month["cargo"] > 0
 

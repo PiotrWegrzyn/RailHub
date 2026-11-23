@@ -79,9 +79,9 @@ def test_the_players_own_buildings_die_out_too() -> None:
 
 def test_four_houses_beside_one_farm_share_its_food_and_none_starve() -> None:
     growth = standing(*[((5, 5), BuildingKind.HOUSE)] * 4, ((5, 6), BuildingKind.FARM))
-    assert growth.trade is not None
+    assert growth.last_trade is not None
 
-    starving = growth.starving(growth.trade, BuildingKind.HOUSE)
+    starving = growth.starving(growth.last_trade, BuildingKind.HOUSE)
 
     assert starving.tolist() == [0, 0]
 
@@ -117,11 +117,11 @@ def test_a_house_the_stand_in_player_serves_does_not_starve() -> None:
 def test_a_steel_mill_with_coal_but_no_iron_is_unsatisfied_however_full_its_stockpile() -> None:
     growth = standing(((5, 5), BuildingKind.STEEL_MILL), ((5, 7), BuildingKind.MINE))
     run(growth, 12)
-    assert growth.trade is not None
+    assert growth.last_trade is not None
 
-    mill = int(np.searchsorted(growth.trade.cells, 5 * 30 + 5))
+    mill = int(np.searchsorted(growth.last_trade.cells, 5 * 30 + 5))
 
-    share = growth.trade.share((BuildingKind.STEEL_MILL,))
+    share = growth.last_trade.share((BuildingKind.STEEL_MILL,))
 
     assert share[mill] == 0.0
 

@@ -833,9 +833,9 @@ def test_a_train_bought_on_its_own_has_no_stops() -> None:
 
 def food_and_heating(growth: Growth, cell: tuple[int, int]) -> tuple[float, float]:
     index = np.ravel_multi_index(cell, growth.constructions.tile_map.grid.shape)
-    position = int(np.searchsorted(growth.trade.cells, index))
-    food = growth.trade.goods_got[(BuildingKind.HOUSE, Need.FOOD)][0][position]
-    heating = growth.trade.goods_got[(BuildingKind.HOUSE, Need.HEATING)][0][position]
+    position = int(np.searchsorted(growth.last_trade.cells, index))
+    food = growth.last_trade.goods_got[(BuildingKind.HOUSE, Need.FOOD)][0][position]
+    heating = growth.last_trade.goods_got[(BuildingKind.HOUSE, Need.HEATING)][0][position]
     return float(food), float(heating)
 
 

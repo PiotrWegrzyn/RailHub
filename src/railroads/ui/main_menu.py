@@ -40,7 +40,7 @@ BUTTON_HEIGHT = 36.0
 CASH_STEP = 10_000
 MOST_CASH = 10_000_000
 SEEDS = 1_000_000
-TITLE_SCALE = 2.0
+GAME_TITLE_SCALE = 2.0
 # The room round the menu inside its frame, and the panel behind it.
 PANEL_PAD = 20.0
 # How fast the menu grows or shrinks to what it holds: the share of the way a second.
@@ -375,13 +375,13 @@ def _draw_title() -> None:
     draw_list = imgui.get_window_draw_list()
     at = imgui.get_cursor_screen_pos()
     name = "RAILHUB"
-    wide = spaced(name, TITLE_SCALE)
+    wide = spaced(name, GAME_TITLE_SCALE)
     left = at.x + (MENU_WIDTH - wide) / 2
-    spaced_text(draw_list, (left, at.y), name, BRASS, TITLE_SCALE)
-    middle = at.y + imgui.get_font_size() * TITLE_SCALE / 2
+    spaced_text(draw_list, (left, at.y), name, BRASS, GAME_TITLE_SCALE)
+    middle = at.y + imgui.get_font_size() * GAME_TITLE_SCALE / 2
     rule(draw_list, at.x, left - 14, middle, fade_left=True)
     rule(draw_list, left + wide + 14, at.x + MENU_WIDTH, middle, fade_left=False)
-    imgui.dummy((MENU_WIDTH, imgui.get_font_size() * TITLE_SCALE + 4))
+    imgui.dummy((MENU_WIDTH, imgui.get_font_size() * GAME_TITLE_SCALE + 4))
 
 
 def grown_towards(shown: float, wanted: float, seconds: float) -> float:

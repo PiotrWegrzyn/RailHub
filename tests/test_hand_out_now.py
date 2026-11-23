@@ -35,8 +35,8 @@ def test_food_taken_at_once_is_not_handed_out_again_and_counts_for_the_month() -
 
     growth.trade_goods()
 
-    assert growth.trade is not None
-    eaten, _ = growth.trade.goods_got[(BuildingKind.HOUSE, Need.FOOD)]
+    assert growth.last_trade is not None
+    eaten, _ = growth.last_trade.goods_got[(BuildingKind.HOUSE, Need.FOOD)]
     assert float(eaten.sum()) == pytest.approx(20.0)
     assert railway.station_goods(STATION).brought[Good.BREAD] == pytest.approx(30.0)
 

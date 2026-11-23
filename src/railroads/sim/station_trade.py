@@ -337,7 +337,7 @@ class StationTrade:
         the goods handed out around them on their own: all a station may hand them as trains
         arrive, so a train never takes the place of the buildings nearby. Cells that did not
         trade last month are not held back; None before any trade."""
-        trade = self._growth.trade
+        trade = self._growth.last_trade
         if trade is None or (kind, need) not in trade.goods_got or not trade.cells.size:
             return None
         _, wanted = trade.goods_got[(kind, need)]
@@ -376,7 +376,7 @@ class StationTrade:
     @property
     def has_traded(self) -> bool:
         """Whether the buildings have had a month's trade yet, so what they are short of is known."""
-        return self._growth.trade is not None
+        return self._growth.last_trade is not None
 
     def short_of(self, station: Cell) -> dict[Need, float]:
         """What the buildings a station hands goods out to are still short of this month, need by
@@ -388,7 +388,7 @@ class StationTrade:
             for facility in railway.facilities_at(station) - railway.working_at(station):
                 good, amount = FACILITY_USES[facility]
                 short[Need(good.value)] = short.get(Need(good.value), 0.0) + amount
-        trade = self._growth.trade
+        trade = self._growth.last_trade
         if trade is None or not trade.cells.size:
             return short
         ring = self.inner_ring(station)
@@ -414,7 +414,7 @@ class StationTrade:
         if railway is not None:
             (counts,) = self._ring_counts([station])
             needs = self._short_after_local(
-                station, self._needs(counts, station), self._growth.trade
+                station, self._needs(counts, station), self._growth.last_trade
             )
             needs |= as_needs(self._travellers(counts))
             railway.station_demand(station).capacity = capacity_of(needs)

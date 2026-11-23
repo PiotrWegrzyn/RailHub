@@ -5,7 +5,7 @@ from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.game import Game
 from railroads.sim.goods import Good
 from railroads.sim.growth import Growth
-from railroads.sim.happenings import GUN_FACTORIES, NEW_GARRISONS, Happenings
+from railroads.sim.happenings import NEW_GARRISONS, WAR_GUN_FACTORIES, Happenings
 from railroads.sim.ladders import MILITARY, GrowthRule
 from railroads.sim.novelties import NOVELTIES
 from railroads.sim.tilemap import Deposit, Terrain
@@ -80,8 +80,8 @@ def test_a_war_opens_twice_as_many_gun_factories_on_a_map_without_a_port() -> No
     happen(inland, 1914)
     happen(coast, 1914)
 
-    assert len(standing(inland, (BuildingKind.GUN_FACTORY,))) == 2 * GUN_FACTORIES
-    assert len(standing(coast, (BuildingKind.GUN_FACTORY,))) == GUN_FACTORIES
+    assert len(standing(inland, (BuildingKind.GUN_FACTORY,))) == 2 * WAR_GUN_FACTORIES
+    assert len(standing(coast, (BuildingKind.GUN_FACTORY,))) == WAR_GUN_FACTORIES
 
 
 def test_as_a_war_ends_half_the_military_buildings_are_pulled_down() -> None:

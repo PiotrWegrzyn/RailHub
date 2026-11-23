@@ -153,7 +153,7 @@ def describe(
     ]
     built = constructions.at(cell)
     kinds = Counter(b.kind for b in built if isinstance(b, Building))
-    trade = growth.trade
+    trade = growth.last_trade
     position = None
     if trade is not None:
         found = int(np.searchsorted(trade.cells, flat))

@@ -47,13 +47,13 @@ from railroads.sim.economy import COLLECTION_RADIUS, DELIVERY_RADIUS, Trade
 from railroads.sim.events import price_factor as history_price
 from railroads.sim.facilities import (
     ENGINE_SHED_SPEED,
+    FACILITY_PRICES,
     SAND_TOWER_PICKUP,
     WAREHOUSE_ROOM,
     Facility,
     pay_factor,
     supply,
 )
-from railroads.sim.facilities import PRICES as FACILITY_PRICES
 from railroads.sim.finance import (
     LEVEL_PRICES,
     STATION_UPKEEP,

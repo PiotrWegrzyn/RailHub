@@ -59,7 +59,7 @@ CARD_MOST = 230.0
 CARD_GAP = 14.0
 SLIDE_SECONDS = 0.35
 BUTTON = (180.0, 34.0)
-TITLE_SCALE = 1.3
+BOARD_TITLE_SCALE = 1.3
 # Room under the boards for the buttons.
 FOOT = 64.0
 SUPPLY_EDGE: Rgba = (0.86, 0.36, 0.42, 1.0)
@@ -368,8 +368,8 @@ class TilesWindow:
         width = imgui.get_content_region_avail().x
         draw_list = imgui.get_window_draw_list()
         at = imgui.get_cursor_screen_pos()
-        _titled(draw_list, at.x, at.x + width, at.y, "SUPPLY AND DEMAND", TITLE_SCALE)
-        imgui.dummy((width, imgui.get_font_size() * TITLE_SCALE + 6))
+        _titled(draw_list, at.x, at.x + width, at.y, "SUPPLY AND DEMAND", BOARD_TITLE_SCALE)
+        imgui.dummy((width, imgui.get_font_size() * BOARD_TITLE_SCALE + 6))
         notes = [era_line(tiles)]
         if self.choosing:
             notes.append(

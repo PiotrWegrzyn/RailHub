@@ -147,7 +147,7 @@ def _moved_growth(old: Growth, move: Move) -> Growth:
         growth.assumed_shares = move.flat_cells(old.assumed_shares, np.nan)
     growth.forests_changed = move.cells(old.forests_changed)
     growth.economy = _moved_economy(old.economy, growth.economy, move)
-    growth.trade = None if old.trade is None else _moved_trade(old.trade, move)
+    growth.last_trade = None if old.last_trade is None else _moved_trade(old.last_trade, move)
     growth.owners._shares = {kind: move.grid(shares) for kind, shares in old.owners._shares.items()}
     growth.owners.company = old.owners.company
     novelties = old.novelties

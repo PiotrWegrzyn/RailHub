@@ -470,7 +470,7 @@ class Growth:
             place.highest = float(place.chances.max())
         # The cells whose forest came or went in the last month.
         self.forests_changed: set[Cell] = set()
-        self.trade: Trade | None = None
+        self.last_trade: Trade | None = None
         # The share of its needs each cell's buildings get in a simulated game, standing in for
         # trains (railroads.sim.autoplay); NaN where trains decide.
         self.assumed_shares: FloatArray | None = None
@@ -595,7 +595,7 @@ class Growth:
         return [
             self._counts,
             self.economy,
-            self.trade,
+            self.last_trade,
             self._starving,
             [place.land for place in self._places],
             [place.cells for place in self._places],
@@ -616,21 +616,21 @@ class Growth:
         if self.railway is not None:
             self.railway.station_trade = self.station_trade
         yield
-        self.trade = yield from self.economy.trade_steps(
+        self.last_trade = yield from self.economy.trade_steps(
             self.counts,
             self.station_trade.orders(),
             np.flatnonzero(self._occupied),
             self.owners.first_for_stations(),
         )
-        self.ledger.record(self.trade, max(0, self._months - 1))
+        self.ledger.record(self.last_trade, max(0, self._months - 1))
         yield
-        yield from self.station_trade.settle_steps(self.trade)
+        yield from self.station_trade.settle_steps(self.last_trade)
         self.station_trade.update_reach()
         yield
-        changed |= self._die_out(self.trade)
+        changed |= self._die_out(self.last_trade)
         changed |= self._raise_buildings()
         yield
-        self._count_served(self.trade)
+        self._count_served(self.last_trade)
         for place, highest in zip(self._places, self._chances.max(axis=1).tolist(), strict=True):
             place.highest = highest
         return changed
@@ -890,14 +890,14 @@ class Growth:
 
     def satisfaction(self) -> npt.NDArray[np.int8]:
         """How satisfied each cell's buildings are on the whole, or -1 where none trade."""
-        if self.trade is None:
+        if self.last_trade is None:
             return np.full(self._grid.shape, -1, dtype=np.int8)
         levels = np.full(self._grid.rows * self._grid.cols, -1, dtype=np.int8)
-        everything = tuple(self.trade.got)
-        trading = self.trade.wanted(everything) > 0
-        levels[self.trade.cells[trading]] = self.trade.levels()[trading]
+        everything = tuple(self.last_trade.got)
+        trading = self.last_trade.wanted(everything) > 0
+        levels[self.last_trade.cells[trading]] = self.last_trade.levels()[trading]
         if self.assumed_shares is not None:
-            cells = self.trade.cells[trading]
+            cells = self.last_trade.cells[trading]
             assumed = self.assumed_shares[cells]
             given = ~np.isnan(assumed)
             levels[cells[given]] = levels_of(assumed[given])

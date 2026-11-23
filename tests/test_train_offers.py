@@ -37,8 +37,8 @@ def test_a_station_supplies_only_what_it_was_given_over_the_last_quarter() -> No
 
     made = growth.station_trade.supplies((6, 20))
 
-    assert growth.trade is not None
-    month = growth.trade.gathered[(6, 20)][Good.COAL]
+    assert growth.last_trade is not None
+    month = growth.last_trade.gathered[(6, 20)][Good.COAL]
     assert made[Good.COAL] == pytest.approx(QUARTER * month)
     assert 0 < month < makes_of(BuildingKind.MINE, growth.year)[Good.COAL]
     assert made[Good.PASSENGERS] == pytest.approx(

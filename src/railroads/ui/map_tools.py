@@ -17,7 +17,7 @@ from railroads.ui.build_menu import PRICED_TOOLS, STATION_TOOLS, Tool
 from railroads.words import dollars
 
 if TYPE_CHECKING:
-    from railroads.sim.game import Done
+    from railroads.sim.game import Outcome
     from railroads.ui.map_view import MapView
 
 # How long the pointer must rest on a cell, in seconds, before the track planned to it is shown.
@@ -90,7 +90,7 @@ class MapTools:
                 build.track_from = cell
                 build.preview, build.preview_to = None, None
 
-    def _said(self, done: Done) -> bool:
+    def _said(self, done: Outcome) -> bool:
         """Tells the player how a build went; whether it was done."""
         self._view.build.say(done.message)
         return done.ok

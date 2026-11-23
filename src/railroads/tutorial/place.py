@@ -59,7 +59,7 @@ LINE = frozenset(
 )
 # How far out from its station Ashford's fields reach, and Brookby's houses.
 FARMS_REACH = 3
-TOWN_REACH = 3
+TOWN_SPREAD = 3
 # The chance a cell that far out from its station is built up: fields thin out towards the
 # edge of the farmland and houses towards the edge of the town, so neither ends in a clean ring.
 FIELD_CHANCE = (1.0, 0.9, 0.65, 0.35)
@@ -104,7 +104,7 @@ def _layout() -> dict[Cell, tuple[BuildingKind, ...]]:
         if around < CROWDED_FIELD:
             layout[cell] = (F,)
     layout.setdefault(SHOWN_FARM, (F,))
-    town = sorted(grid.within(BROOKBY_STATION, TOWN_REACH).items())
+    town = sorted(grid.within(BROOKBY_STATION, TOWN_SPREAD).items())
     tenements = 0
     for cell, steps in town:
         if not steps or cell in LINE or rng.random() >= HOUSE_CHANCE[steps]:
@@ -227,7 +227,7 @@ def place_map() -> TileMap:
     rugged, wooded, wet, gentle = (_noise(shape, NOISE_SEED + n, size) for n, size in NOISE)
     towns = (
         blob(_drawn(ASHFORD_STATION), FARMS_REACH + 1.5, np.full(shape, 0.5))
-        | blob(_drawn(BROOKBY_STATION), TOWN_REACH + 1.5, np.full(shape, 0.5))
+        | blob(_drawn(BROOKBY_STATION), TOWN_SPREAD + 1.5, np.full(shape, 0.5))
         | _between(grid, _drawn(ASHFORD_STATION), _drawn(BROOKBY_STATION))
     )
     far = ~(

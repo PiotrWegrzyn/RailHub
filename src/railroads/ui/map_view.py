@@ -828,9 +828,9 @@ class MapView:
     def _cell_moods(
         self,
     ) -> tuple[tuple[Trade | None, int], npt.NDArray[np.intp], list[int], npt.NDArray[np.intp]]:
-        key = (self.growth.trade, self.constructions.version)
+        key = (self.growth.last_trade, self.constructions.version)
         if self._moods is None or self._moods[0][0] is not key[0] or self._moods[0][1] != key[1]:
-            cells, shares, starving = cell_moods(self.growth.trade, self.growth.assumed_shares)
+            cells, shares, starving = cell_moods(self.growth.last_trade, self.growth.assumed_shares)
             colors = [rgba_u32(mood_tint(share)) for share in shares.tolist()]
             self._moods = key, cells, colors, cells[starving]
         return self._moods
@@ -898,15 +898,15 @@ class MapView:
         platforms = tuple(self.constructions.platforms(station))
         key = (self.constructions.version, delivery, collection, platforms)
         kept = self._built_previewed.get(station)
-        if kept is None or kept[0][:-1] != key or kept[0][-1] is not self.growth.trade:
+        if kept is None or kept[0][:-1] != key or kept[0][-1] is not self.growth.last_trade:
             preview = self.growth.station_trade.preview(station, delivery, collection, platforms)
-            kept = self._built_previewed[station] = (*key, self.growth.trade), preview
+            kept = self._built_previewed[station] = (*key, self.growth.last_trade), preview
         return kept[1]
 
     def _station_preview(self, cell: Cell) -> StationPreview:
         """What a station built in a cell would reach, worked out again only for another cell,
         once the buildings change or a month on."""
-        key = (cell, self.constructions.version, self.growth.trade)
+        key = (cell, self.constructions.version, self.growth.last_trade)
         kept = self._station_previewed
         if kept is None or kept[0][0] != key[0] or kept[0][1] != key[1] or kept[0][2] is not key[2]:
             kept = key, self.growth.station_trade.preview(cell)

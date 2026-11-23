@@ -14,8 +14,7 @@ from railroads.sim.company import (
     company_value,
 )
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.facilities import PRICES as FACILITY_PRICES
-from railroads.sim.facilities import Facility
+from railroads.sim.facilities import FACILITY_PRICES, Facility
 from railroads.sim.finance import LEVEL_PRICES, STATION_PRICE, STORAGE_PRICE
 from railroads.sim.game import Game
 from railroads.sim.routes import plan_route, route_price

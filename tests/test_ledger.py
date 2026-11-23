@@ -130,8 +130,8 @@ def test_a_buildings_satisfaction_is_its_own_over_the_months_of_the_last_quarter
     moods = []
     for _ in range(4):
         trade_for(growth, 1)
-        position = int(np.searchsorted(growth.trade.cells, flat(growth, FARM)))
-        moods.append(float(growth.trade.share((BuildingKind.FARM,))[position]))
+        position = int(np.searchsorted(growth.last_trade.cells, flat(growth, FARM)))
+        moods.append(float(growth.last_trade.share((BuildingKind.FARM,))[position]))
 
     satisfaction = growth.ledger.satisfaction(BuildingKind.FARM, flat(growth, FARM))
 

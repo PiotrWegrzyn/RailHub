@@ -38,7 +38,7 @@ KINDS = (
 
 def report(growth: Growth, seconds: float) -> str:
     counts = [int(growth.counts[kind].sum()) for kind in KINDS]
-    trade = growth.trade
+    trade = growth.last_trade
     fed = "-"
     hungry = "-"
     food = "-"
@@ -71,7 +71,7 @@ def snapshot(growth: Growth) -> dict:
     cells = growth.grid.rows * growth.grid.cols
     fed = np.full(cells, -1.0)
     sold = np.full(cells, -1.0)
-    trade = growth.trade
+    trade = growth.last_trade
     if trade is not None:
         for (kind, need), (got, wanted) in trade.goods_got.items():
             if kind == BuildingKind.HOUSE and need == Need.FOOD:

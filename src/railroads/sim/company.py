@@ -16,7 +16,7 @@ from enum import Enum
 import numpy as np
 
 from railroads.sim.clock import END_YEAR, MONTH_NAMES
-from railroads.sim.facilities import PRICES as FACILITY_PRICES
+from railroads.sim.facilities import FACILITY_PRICES
 from railroads.sim.finance import (
     LEVEL_PRICES,
     STATION_PRICE,

@@ -2,7 +2,7 @@
 the history of every year, with the month run in one place and the player's actions checked and
 paid for here.
 
-Each action returns a Done: what to tell the player, the cells that changed and whether it went
+Each action returns an Outcome: what to tell the player, the cells that changed and whether it went
 ahead. Nothing is paid for unless it does, and the price told is what is paid. A station costs
 STATION_PRICE and clearing its site (railroads.sim.demolition), track what route_price says, the
 bulldozer what clearing the cell does, and moving a station what a new one there would.
@@ -34,7 +34,7 @@ from railroads.words import dollars, either
 
 
 @dataclass(frozen=True)
-class Done:
+class Outcome:
     message: str
     changed: set[Cell] = field(default_factory=set)
     ok: bool = False
@@ -142,20 +142,20 @@ class Game:
         map every ten years, and goes on playing for the player from there."""
         self.stand_in = play(self.growth, self.railway, years, rng)
 
-    def build_station(self, cell: Cell, ends: tuple[int, int] | None = None) -> Done:
+    def build_station(self, cell: Cell, ends: tuple[int, int] | None = None) -> Outcome:
         finances = self.finances
         problem = routes.station_problem(self.constructions, cell)
         if problem is not None:
-            return Done(f"A station can't go there: {problem}.")
+            return Outcome(f"A station can't go there: {problem}.")
         site = station_site_price(self.constructions, cell) or 0.0
         if short := finances.short_of(STATION_PRICE + site, "This station"):
-            return Done(short)
+            return Outcome(short)
         changed = routes.build_station(self.growth, cell, ends)
         if not changed:
-            return Done("A station can't go there.")
+            return Outcome("A station can't go there.")
         self._pay_for_station(site)
         self.growth.station_trade.measure_demand(cell)
-        return Done(f"Station built for {dollars(STATION_PRICE + site)}.", changed, ok=True)
+        return Outcome(f"Station built for {dollars(STATION_PRICE + site)}.", changed, ok=True)
 
     def lay_track(
         self,
@@ -165,27 +165,27 @@ class Game:
         electric: bool = False,
         maglev: bool = False,
         planned: routes.Route | None = None,
-    ) -> Done:
+    ) -> Outcome:
         """Lays track from `start` to `end`: the route `planned` for it already, if it was
         planned with these choices since anything was last built, else the cheapest."""
         if maglev and not self.railway.maglev_open:
-            return Done("Maglev track needs a maglev engine on sale.")
+            return Outcome("Maglev track needs a maglev engine on sale.")
         if electric and not self.railway.electric_open:
-            return Done("Electric track needs an electric engine on sale.")
+            return Outcome("Electric track needs an electric engine on sale.")
         if width == TrackWidth.QUADRUPLE and not self.railway.quadruple_open:
-            return Done(f"Quadruple track comes with era {QUADRUPLE_ERA}.")
+            return Outcome(f"Quadruple track comes with era {QUADRUPLE_ERA}.")
         route = (
             planned
             if planned is not None
             else routes.plan_route(self.constructions, start, end, width, electric, maglev)
         )
         if route is None:
-            return Done("No way for track to get there.")
+            return Outcome("No way for track to get there.")
         laid = len(route.changes(self.constructions))
         price = routes.route_price(self.constructions, route)
         finances = self.finances
         if short := finances.short_of(price, "This track"):
-            return Done(short)
+            return Outcome(short)
         changed = routes.lay_route(self.growth, route)
         finances.spend(price, "track")
         message = (
@@ -193,57 +193,59 @@ class Game:
             if laid
             else "That track is laid already."
         )
-        return Done(message, changed, ok=True)
+        return Outcome(message, changed, ok=True)
 
-    def bulldoze(self, cell: Cell) -> Done:
+    def bulldoze(self, cell: Cell) -> Outcome:
         finances = self.finances
         price = bulldoze_price(self.constructions, cell)
         if price is None:
-            return Done("Nothing here can be cleared.")
+            return Outcome("Nothing here can be cleared.")
         if short := finances.short_of(price, "Clearing this"):
-            return Done(short)
+            return Outcome(short)
         stations = set(self.railway.stations())
         changed = bulldoze(self.growth, cell)
         self.railway.drop_stops(stations - set(self.railway.stations()))
         finances.spend(price, "demolition")
-        return Done(f"Cleared for {dollars(price)}.", changed, ok=True)
+        return Outcome(f"Cleared for {dollars(price)}.", changed, ok=True)
 
-    def add_platform(self, station: Cell, cell: Cell, ends: tuple[int, int] | None = None) -> Done:
+    def add_platform(
+        self, station: Cell, cell: Cell, ends: tuple[int, int] | None = None
+    ) -> Outcome:
         """Adds a platform to a station raised high enough, in a cell beside it, for what
         clearing the cell costs."""
         if self.railway.platforms_left(station) <= 0:
             levels = either(range(PLATFORM_LEVEL, MAX_LEVEL + 1))
-            return Done(f"Raise the station to level {levels} for another platform.")
+            return Outcome(f"Raise the station to level {levels} for another platform.")
         site = station_site_price(self.constructions, cell)
         if site is None:
-            return Done("A platform can't go there.")
+            return Outcome("A platform can't go there.")
         if short := self.finances.short_of(site, "Clearing it"):
-            return Done(short)
+            return Outcome(short)
         changed = routes.add_platform(self.growth, station, cell, ends)
         if not changed:
-            return Done("A platform goes in a free cell beside the station.")
+            return Outcome("A platform goes in a free cell beside the station.")
         if site:
             self.finances.spend(site, "demolition")
         price = f" for {dollars(site)}" if site else ""
-        return Done(f"Platform added{price}.", changed, ok=True)
+        return Outcome(f"Platform added{price}.", changed, ok=True)
 
-    def move_station(self, old: Cell, new: Cell, ends: tuple[int, int] | None = None) -> Done:
+    def move_station(self, old: Cell, new: Cell, ends: tuple[int, int] | None = None) -> Outcome:
         """Moves a station, its track running between `ends` in its new cell, keeping its
         trains, name and goods but not its upgrades."""
         finances = self.finances
         problem = routes.station_problem(self.constructions, new)
         if problem is not None:
-            return Done(f"The station can't go there: {problem}.")
+            return Outcome(f"The station can't go there: {problem}.")
         site = station_site_price(self.constructions, new) or 0.0
         price = STATION_PRICE + site
         if short := finances.short_of(price, "Moving it there"):
-            return Done(short)
+            return Outcome(short)
         changed = routes.move_station(self.growth, self.railway, old, new, ends)
         if changed is None:
-            return Done("The station can't go there.")
+            return Outcome("The station can't go there.")
         self._pay_for_station(site)
         self.growth.station_trade.measure_demand(new)
-        return Done(f"Station moved for {dollars(price)}.", changed, ok=True)
+        return Outcome(f"Station moved for {dollars(price)}.", changed, ok=True)
 
     def _pay_for_station(self, site: float) -> None:
         self.finances.spend(STATION_PRICE, "stations")

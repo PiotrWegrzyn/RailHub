@@ -2901,7 +2901,7 @@ def far_pictures(matrix_key: tuple[float, float, float, float], look: object) ->
 
 # How wide the sheet of looks drawn as they are wanted is, in pixels: as wide as train_sprites'
 # sheet of every look or so, which keeps it within MAX_TEXTURE tall.
-GROWN_WIDTH = 2432
+SHEET_WIDTH = 2432
 
 
 class GrownTrainSprites:
@@ -2913,7 +2913,7 @@ class GrownTrainSprites:
         self, matrix_key: tuple[float, float, float, float], looks: Iterable[object] = ()
     ) -> None:
         self._matrix_key = matrix_key
-        self.image = np.zeros((0, GROWN_WIDTH, 4), dtype=np.uint8)
+        self.image = np.zeros((0, SHEET_WIDTH, 4), dtype=np.uint8)
         self.places: dict[tuple[object, int], tuple[int, int, int, int, int, int]] = {}
         # Where the next picture goes, and how tall the row it goes in is so far.
         self._x = self._y = self._row = 0
@@ -2941,11 +2941,11 @@ class GrownTrainSprites:
             return
         for index, picture in enumerate(far_pictures(self._matrix_key, look)):
             w, h = picture.image.size
-            if self._x + w > GROWN_WIDTH:
+            if self._x + w > SHEET_WIDTH:
                 self._x, self._y, self._row = 0, self._y + self._row + 1, 0
             if self._y + h > len(self.image):
                 grown = np.zeros(
-                    (max(len(self.image) + 512, self._y + h), GROWN_WIDTH, 4), np.uint8
+                    (max(len(self.image) + 512, self._y + h), SHEET_WIDTH, 4), np.uint8
                 )
                 grown[: len(self.image)] = self.image
                 self.image = grown

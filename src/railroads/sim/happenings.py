@@ -3,7 +3,7 @@ a headline for every event as its month comes.
 
 The year before a war NEW_GARRISONS patches of military ground of GARRISON_SIZE cells go up, at
 least GARRISONS_APART steps from any other, each with a base and GARRISON_OUTPOSTS outposts; as it begins
-GUN_FACTORIES gun factories open by the biggest towns, and GUN_FACTORIES more on a map with no
+WAR_GUN_FACTORIES gun factories open by the biggest towns, and WAR_GUN_FACTORIES more on a map with no
 port; as it ends WAR_LOSSES of the military buildings are pulled down. Falling towers pull down
 skyscrapers, those with the most people around first. An event bringing pilgrims picks the town
 of St Peter's as its news comes, and the railway pays them there (Railway.pilgrims).
@@ -34,7 +34,7 @@ NEW_GARRISONS = 2
 GARRISON_SIZE = (10, 18)
 GARRISON_OUTPOSTS = 2
 GARRISONS_APART = 15
-GUN_FACTORIES = 2
+WAR_GUN_FACTORIES = 2
 WAR_LOSSES = 0.5
 
 
@@ -86,7 +86,7 @@ def changes_of(event: Event) -> tuple[str, ...]:
     if event.war:
         lines += [
             f"The military grows {WAR_GROWTH} times as fast",
-            f"{GUN_FACTORIES} gun factories open, {GUN_FACTORIES} more where there is no port",
+            f"{WAR_GUN_FACTORIES} gun factories open, {WAR_GUN_FACTORIES} more where there is no port",
             f"When it ends, {WAR_LOSSES:.0%} of the military buildings are pulled down",
         ]
     if event.towers_fall:
@@ -174,7 +174,7 @@ class Happenings:
 
         ports = bool(growth.count(BuildingKind.PORT).any())
         changed: set[Cell] = set()
-        for _ in range(GUN_FACTORIES if ports else 2 * GUN_FACTORIES):
+        for _ in range(WAR_GUN_FACTORIES if ports else 2 * WAR_GUN_FACTORIES):
             built = by_biggest_town(growth, BuildingKind.GUN_FACTORY, self.gun_factories)
             if built is None:
                 break
