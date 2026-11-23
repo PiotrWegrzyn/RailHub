@@ -2,7 +2,7 @@ import numpy as np
 import numpy.typing as npt
 import pytest
 
-from railroads.ui.pixel.noise import _MASK, _TABLE, noise, ridged, table_hash
+from railroads.ui.pixel.noise import _MASK, NOISE_TABLE, noise, ridged, table_hash
 
 
 def noise_point_by_point(x: npt.ArrayLike, y: npt.ArrayLike, scale: float, seed: int):
@@ -14,14 +14,14 @@ def noise_point_by_point(x: npt.ArrayLike, y: npt.ArrayLike, scale: float, seed:
     fu, fv = fu * fu * (3 - 2 * fu), fv * fv * (3 - 2 * fv)
     i0, j0 = i & _MASK, j & _MASK
     i1, j1 = (i0 + 1) & _MASK, (j0 + 1) & _MASK
-    top = _TABLE[j0, i0] * (1 - fu) + _TABLE[j0, i1] * fu
-    bottom = _TABLE[j1, i0] * (1 - fu) + _TABLE[j1, i1] * fu
+    top = NOISE_TABLE[j0, i0] * (1 - fu) + NOISE_TABLE[j0, i1] * fu
+    bottom = NOISE_TABLE[j1, i0] * (1 - fu) + NOISE_TABLE[j1, i1] * fu
     return top * (1 - fv) + bottom * fv
 
 
 def hash_point_by_point(a: npt.ArrayLike, b: npt.ArrayLike, seed: int):
     a, b = np.asarray(a, dtype=np.int64), np.asarray(b, dtype=np.int64)
-    return _TABLE[(b * 7 + seed * 131) & _MASK, (a * 13 + seed * 71) & _MASK]
+    return NOISE_TABLE[(b * 7 + seed * 131) & _MASK, (a * 13 + seed * 71) & _MASK]
 
 
 @pytest.mark.parametrize("shape", [(), (5,), (60, 70)], ids=["scalar", "row", "block"])

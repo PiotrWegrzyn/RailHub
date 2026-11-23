@@ -557,7 +557,7 @@ class MapView:
             shaded = self._draw_shaded_ground(draw_list, center, top_left, bottom_right)
             if not shaded:
                 self._draw_ground(draw_list, center, self._ground_texture(False))
-            layer = self._pixel_layer()
+            layer = self.pixel_layer()
             layer.over_ground = shaded
             layer.stand = self._stand.stand if shaded and self._stand is not None else None
             ready = layer.draw(
@@ -839,14 +839,14 @@ class MapView:
         """The camera marks on the map are drawn with: lifted onto raised ground in pixel art."""
         if not self.camera.pixel_scale:
             return self.camera
-        return OnGround(self.camera, self._pixel_layer().world.elevation)
+        return OnGround(self.camera, self.pixel_layer().world.elevation)
 
     def ground_under(self, screen_x: float, screen_y: float, center: Vec2) -> tuple[float, float]:
         """The map point showing at a spot on screen, on raised ground where it rises."""
         x, y = self.camera.to_plane(screen_x, screen_y, center)
         if not self.camera.pixel_scale:
             return x, y
-        world = self._pixel_layer().world
+        world = self.pixel_layer().world
         px, py = world.projection.to_pixels(x, y)
         pixel = (float(px), float(py))
         if self._under is None or self._under[0] != pixel:
@@ -915,12 +915,12 @@ class MapView:
 
     def _signal_layer(self) -> SignalLayer:
         if self._signals is None:
-            self._signals = SignalLayer(self._pixel_layer().world)
+            self._signals = SignalLayer(self.pixel_layer().world)
         return self._signals
 
     def _train_layer(self) -> TrainLayer:
         if self._trains is None:
-            self._trains = TrainLayer(self._pixel_layer().world, self.railway.trains)
+            self._trains = TrainLayer(self.pixel_layer().world, self.railway.trains)
         return self._trains
 
     def _engine_picture(self, engine: str, times: int) -> tuple[imgui.ImTextureRef, Vec2]:
@@ -937,7 +937,7 @@ class MapView:
 
     def _track_preview(self) -> TrackPreview:
         if self._preview is None:
-            self._preview = TrackPreview(self._pixel_layer().world)
+            self._preview = TrackPreview(self.pixel_layer().world)
         return self._preview
 
     def prepare(self, size: Vec2, density: int, chunks: bool = True) -> None:
@@ -958,7 +958,7 @@ class MapView:
         yield
         if self._pixels is None:
             yield from self._pixel_layer_steps()
-        layer = self._pixel_layer()
+        layer = self.pixel_layer()
         if self.railway.trains:
             yield
             self._train_layer()
@@ -968,7 +968,7 @@ class MapView:
             standing = hello_imgui.is_using_hello_imgui()
             layer.prepare(self.camera, center, ((0.0, 0.0), size), density, standing)
 
-    def _pixel_layer(self) -> PixelLayer:
+    def pixel_layer(self) -> PixelLayer:
         if self._pixels is None:
             finish(self._pixel_layer_steps())
         assert self._pixels is not None
@@ -1013,7 +1013,7 @@ class MapView:
         shader = self._ground_shader()
         if shader is None:
             return False
-        world = self._pixel_layer().world
+        world = self.pixel_layer().world
         if shader.cells_version != self._colors_version:
             ground = world.ground
             info = cell_info(
@@ -1039,7 +1039,7 @@ class MapView:
 
     def _shaded_view(self, center: Vec2, top_left: Vec2, bottom_right: Vec2) -> tuple[View, Screen]:
         """The art pixels of the pixel map showing in the map area, and where they go on screen."""
-        camera_pixel = self._pixel_layer().world.projection.to_pixels(
+        camera_pixel = self.pixel_layer().world.projection.to_pixels(
             self.camera.center_x, self.camera.center_y
         )
         scale = self.camera.pixel_scale
@@ -1105,7 +1105,7 @@ class MapView:
         if not self._shader_tried:
             self._shader_tried = True
             if hello_imgui.is_using_hello_imgui():
-                world = self._pixel_layer().world
+                world = self.pixel_layer().world
                 self._shader = GroundShader.make(
                     world.projection,
                     self.tile_map.grid.shape,

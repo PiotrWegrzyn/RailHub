@@ -595,7 +595,7 @@ class Constructions:
             return station.ends
         return 0, len(self.tile_map.grid.track_points()) // 2
 
-    def _way_problem(self, ends: tuple[int, int]) -> str | None:
+    def way_problem(self, ends: tuple[int, int]) -> str | None:
         grid = self.tile_map.grid
         count = len(grid.track_points())
         start, end = ends
@@ -657,7 +657,7 @@ class Constructions:
             case Station():
                 problem = _site_problem(self.tile_map.tile(cell), STATION_RELIEF, "station")
                 if problem is None and construction.ends is not None:
-                    problem = self._way_problem(construction.ends)
+                    problem = self.way_problem(construction.ends)
             case Building():
                 problem = self._building_problem(construction)
         if problem is None and construction.space > self.space_left(cell):

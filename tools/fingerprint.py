@@ -110,7 +110,7 @@ def main() -> None:
     play_months(MONTHS_PER_YEAR)
 
     growth, railway = view.growth, view.railway
-    world = view._pixel_layer().world
+    world = view.pixel_layer().world
     stations = [x for x in view.constructions if isinstance(x, Station)]
     chunks = sorted(
         {

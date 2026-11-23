@@ -45,7 +45,7 @@ from railroads.ui.biomes import Biome
 from railroads.ui.iso_camera import TILT
 from railroads.ui.pixel import ground as cpu
 from railroads.ui.pixel import relief, streams
-from railroads.ui.pixel.noise import _TABLE, TABLE_SIZE
+from railroads.ui.pixel.noise import NOISE_TABLE, TABLE_SIZE
 from railroads.ui.pixel.projection import CHUNK, PixelProjection
 from railroads.ui.pixel.relief import LIGHT, Heights
 from railroads.ui.pixel.sheet import FINE
@@ -1562,7 +1562,7 @@ def woods_source() -> str:
         "PEAK_GAIN": _number(relief.PEAK_GAIN),
         "PEAK_FROM": _number(relief.PEAK_FROM),
         "BARE_ABOVE": _number(cpu.BARE_ABOVE),
-        "GRASS": str(sum(1 << i for i, grass in enumerate(cpu._GRASS) if grass)),
+        "GRASS": str(sum(1 << i for i, grass in enumerate(cpu.GRASS_BIOMES) if grass)),
         "SHADE_X": _number(cpu.SHADE_REACH[0]),
         "SHADE_Y": _number(cpu.SHADE_REACH[1]),
         "TREE_SHADE": _number(cpu.TREE_SHADE),
@@ -1831,7 +1831,7 @@ def free_textures() -> None:
         GL.glDeleteTextures(len(unwanted), unwanted)
 
 
-class _Target:
+class RenderTarget:
     """A texture the shaders draw into, with its framebuffer: of bytes, or of floats where
     `floats`, for what is worked on before it is shown."""
 
@@ -1925,14 +1925,14 @@ class GroundShader:
         GL.glBindVertexArray(0)
         self._cells = _texture()
         self._light = _floats(light)
-        self._table = _floats(_TABLE)
+        self._table = _floats(NOISE_TABLE)
         self._rasters = _floats(heights.rasters)
         self._beds = 0
-        self._relief = _Target(floats=True)
-        self._lit = _Target(floats=True)
-        self._art = _Target()
-        self._screen = _Target()
-        self._tinted = _Target()
+        self._relief = RenderTarget(floats=True)
+        self._lit = RenderTarget(floats=True)
+        self._art = RenderTarget()
+        self._screen = RenderTarget()
+        self._tinted = RenderTarget()
         self._tints = _texture()
         self.tints_version: object = None
         self._tinted_key: tuple | None = None
@@ -1947,10 +1947,10 @@ class GroundShader:
         self._plots = np.zeros((0, 10), dtype=np.float32)
         self._yards = np.zeros((0, 4), dtype=np.float32)
         self.surfaces_version: object = None
-        self._chunk_relief = _Target(floats=True)
-        self._wooded = _Target(floats=True)
-        self._edges = _Target(floats=True)
-        self._canopy = _Target(floats=True)
+        self._chunk_relief = RenderTarget(floats=True)
+        self._wooded = RenderTarget(floats=True)
+        self._edges = RenderTarget(floats=True)
+        self._canopy = RenderTarget(floats=True)
 
     @classmethod
     def make(
@@ -1967,15 +1967,15 @@ class GroundShader:
             return None
         try:
             programs = _Programs(
-                _program(HEADER + VERTEX, HEADER + fragment_source()),
-                _program(HEADER + VERTEX, HEADER + relief_source()),
-                _program(HEADER + VERTEX, HEADER + raise_source()),
-                _program(HEADER + VERTEX, HEADER + _filled(BLOW_UP, {})),
-                _program(HEADER + VERTEX, HEADER + tint_source()),
-                _program(HEADER + VERTEX, HEADER + woods_source()),
-                _program(HEADER + VERTEX, HEADER + edges_source()),
-                _program(HEADER + VERTEX, HEADER + canopy_source()),
-                _program(HEADER + VERTEX, HEADER + dress_source()),
+                gl_program(HEADER + VERTEX, HEADER + fragment_source()),
+                gl_program(HEADER + VERTEX, HEADER + relief_source()),
+                gl_program(HEADER + VERTEX, HEADER + raise_source()),
+                gl_program(HEADER + VERTEX, HEADER + _filled(BLOW_UP, {})),
+                gl_program(HEADER + VERTEX, HEADER + tint_source()),
+                gl_program(HEADER + VERTEX, HEADER + woods_source()),
+                gl_program(HEADER + VERTEX, HEADER + edges_source()),
+                gl_program(HEADER + VERTEX, HEADER + canopy_source()),
+                gl_program(HEADER + VERTEX, HEADER + dress_source()),
             )
             shader = cls(programs, projection, shape, light, heights)
             shader._relief.fit(1, 1)
@@ -2282,13 +2282,13 @@ class GroundShader:
 
     def _run(
         self,
-        target: _Target | _Into,
+        target: RenderTarget | _Into,
         program: int,
         uniforms: dict[str, tuple[str, tuple]],
         inputs: tuple[int, ...],
     ) -> None:
         """Draws `program` over the whole of `target`, reading `inputs` from texture units 0 on."""
-        saved = _saved_state()
+        saved = saved_gl_state()
         try:
             GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, target.framebuffer)
             GL.glViewport(0, 0, *target.size)
@@ -2298,7 +2298,7 @@ class GroundShader:
             GL.glBindVertexArray(self._vao)
             GL.glDrawArrays(GL.GL_TRIANGLE_STRIP, 0, 4)
         finally:
-            _restore(saved)
+            restore_gl_state(saved)
 
 
 def use(program: int, uniforms: dict[str, tuple[str, tuple]], inputs: tuple[int, ...]) -> None:
@@ -2389,7 +2389,7 @@ def _floats(values: npt.NDArray[np.floating]) -> int:
     return texture
 
 
-def _program(vertex: str, fragment: str) -> int:
+def gl_program(vertex: str, fragment: str) -> int:
     program = GL.glCreateProgram()
     for kind, source in ((GL.GL_VERTEX_SHADER, vertex), (GL.GL_FRAGMENT_SHADER, fragment)):
         shader = GL.glCreateShader(kind)
@@ -2404,7 +2404,7 @@ def _program(vertex: str, fragment: str) -> int:
     return program
 
 
-def _saved_state() -> tuple:
+def saved_gl_state() -> tuple:
     return (
         int(GL.glGetIntegerv(GL.GL_FRAMEBUFFER_BINDING)),
         tuple(int(v) for v in GL.glGetIntegerv(GL.GL_VIEWPORT)),
@@ -2416,7 +2416,7 @@ def _saved_state() -> tuple:
     )
 
 
-def _restore(saved: tuple) -> None:
+def restore_gl_state(saved: tuple) -> None:
     framebuffer, viewport, program, vao, active, blend, scissor = saved
     GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, framebuffer)
     GL.glViewport(*viewport)

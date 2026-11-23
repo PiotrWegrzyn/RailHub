@@ -21,10 +21,10 @@ import numpy.typing as npt
 from railroads.ui.pixel.ground_shader import (
     GL,
     HEADER,
-    _program,
-    _restore,
-    _saved_state,
-    _Target,
+    RenderTarget,
+    gl_program,
+    restore_gl_state,
+    saved_gl_state,
     uniform,
 )
 from railroads.ui.pixel.ground_shader import VERTEX as WHOLE_TARGET
@@ -123,8 +123,8 @@ class DotShader:
         self._vao = GL.glGenVertexArrays(1)
         self._buffer = GL.glGenBuffers(1)
         self._count = 0
-        self._laid = _Target()
-        self._target = _Target()
+        self._laid = RenderTarget()
+        self._target = RenderTarget()
         self.dots_version: object = None
         self._drawn: tuple | None = None
         GL.glBindVertexArray(self._vao)
@@ -158,8 +158,8 @@ class DotShader:
         try:
             # The browser's canvas smooths edges, though GL says its framebuffer has no samples.
             smooth = sys.platform == "emscripten" or int(GL.glGetIntegerv(GL_SAMPLES)) > 1
-            dots = _program(HEADER + VERTEX, HEADER + FRAGMENT)
-            unmultiply = _program(HEADER + WHOLE_TARGET, HEADER + UNMULTIPLY)
+            dots = gl_program(HEADER + VERTEX, HEADER + FRAGMENT)
+            unmultiply = gl_program(HEADER + WHOLE_TARGET, HEADER + UNMULTIPLY)
             return cls(dots, unmultiply, smooth)
         except Exception:  # noqa: BLE001 - any GL failure means drawing the dots with imgui
             return None
@@ -189,7 +189,7 @@ class DotShader:
         key = (size, density, to_screen, unit, self.dots_version)
         resized = self._laid.fit(*size) | self._target.fit(*size)
         if resized or self._drawn != key:
-            saved = _saved_state()
+            saved = saved_gl_state()
             try:
                 self._lay(size, density, to_screen, unit)
                 GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self._target.framebuffer)
@@ -201,7 +201,7 @@ class DotShader:
                 GL.glBindVertexArray(self._whole)
                 GL.glDrawArrays(GL.GL_TRIANGLE_STRIP, 0, 4)
             finally:
-                _restore(saved)
+                restore_gl_state(saved)
             self._drawn = key
         return self._target.texture
 

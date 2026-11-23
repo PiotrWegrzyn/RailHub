@@ -33,11 +33,11 @@ from railroads.ui.pixel.models import (
     SHADES,
     Face,
     Model,
-    _outline,
     decals,
     fine_shades,
     halfway,
     keeping_fine,
+    outline_drawing,
     shade,
     without_fine,
 )
@@ -2825,12 +2825,12 @@ class FinePainter:
         matrix = np.array(matrix_key, dtype=np.float64).reshape(2, 2)
         self._sight = _Sight.of(matrix, DETAIL * SCALE * times)
         self._faces = _Faces.of(MODELS[look](), fine=True, finest=times >= FINEST_FROM)
-        self._outline = max(1, times // 2)
+        self.outline_drawing = max(1, times // 2)
 
     def picture(self, index: int) -> Sprite:
         """The look running heading `index` of HEADINGS."""
         picture = _picture(self._faces, self._sight, 2 * math.pi * index / HEADINGS)
-        _outline(picture.image, self._outline)
+        outline_drawing(picture.image, self.outline_drawing)
         return picture
 
 
@@ -2879,7 +2879,7 @@ def train_sprites(matrix_key: tuple[float, float, float, float]) -> TrainSprites
     sheet = Image.new("RGBA", (width, y + row), (0, 0, 0, 0))
     for key, sprite in sprites.items():
         sheet.paste(sprite.image, places[key][:2])
-    _outline(sheet)
+    outline_drawing(sheet)
     return TrainSprites(np.asarray(sheet).copy(), places)
 
 
@@ -2895,7 +2895,7 @@ def far_pictures(matrix_key: tuple[float, float, float, float], look: object) ->
         model = MODELS[look]()
     pictures = _pictures(model, _far_sight(matrix_key))
     for picture in pictures:
-        _outline(picture.image)
+        outline_drawing(picture.image)
     return pictures
 
 

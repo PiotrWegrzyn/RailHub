@@ -636,7 +636,7 @@ def test_the_map_is_prepared_a_part_at_a_time_ending_as_prepared_at_once(context
     assert np.array_equal(stepped.view._soft[1], at_once.view._soft[1])
     assert stepped.view._pixels is not None
     assert stepped.view._pixels.world.ground.biomes.tolist() == (
-        at_once.view._pixel_layer().world.ground.biomes.tolist()
+        at_once.view.pixel_layer().world.ground.biomes.tolist()
     )
 
 

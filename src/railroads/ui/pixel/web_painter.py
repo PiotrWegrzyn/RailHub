@@ -23,7 +23,7 @@ from typing import Any, Protocol
 import numpy as np
 
 from railroads.ui.pixel.copies import ChunkJob, Seen, update_message, world_message
-from railroads.ui.pixel.painter import _Job, _Queue
+from railroads.ui.pixel.painter import PaintJob, PaintQueue
 from railroads.ui.pixel.world import PixelWorld
 from railroads.version import VERSION
 
@@ -107,16 +107,16 @@ class WorkerPainter:
     def __init__(self, world: PixelWorld, workers: Workers) -> None:
         self._world = world
         self._workers = workers
-        self._queue = _Queue()
+        self._queue = PaintQueue()
         # The workers sent this world, ready or still starting, and what they have seen of its
         # changes.
         self._holding: set[int] = set()
         self._seen = Seen.now(world)
         # Jobs given to workers by their numbers, each with its key and its worker.
-        self._given: dict[int, tuple[Hashable, _Job, int]] = {}
+        self._given: dict[int, tuple[Hashable, PaintJob, int]] = {}
         self._numbers = itertools.count()
         # Jobs a worker could not paint, to paint on the frames instead.
-        self._failed: list[tuple[Hashable, _Job]] = []
+        self._failed: list[tuple[Hashable, PaintJob]] = []
         self._number = workers.serve(self)
         workers.poll()
         # Sent as the map is made, while a game loads, the world waits in the messages of

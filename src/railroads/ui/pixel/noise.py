@@ -12,11 +12,11 @@ import numpy as np
 import numpy.typing as npt
 
 TABLE_SIZE = 1024
-_TABLE = np.random.default_rng(5).random((TABLE_SIZE, TABLE_SIZE)).astype(np.float32)
+NOISE_TABLE = np.random.default_rng(5).random((TABLE_SIZE, TABLE_SIZE)).astype(np.float32)
 _MASK = TABLE_SIZE - 1
-_FLAT = _TABLE.ravel()
+_FLAT = NOISE_TABLE.ravel()
 _WRAPPED_SIZE = TABLE_SIZE + 1
-_WRAPPED = np.pad(_TABLE, ((0, 1), (0, 1)), mode="wrap").ravel()
+_WRAPPED = np.pad(NOISE_TABLE, ((0, 1), (0, 1)), mode="wrap").ravel()
 
 Floats = npt.NDArray[np.float32]
 

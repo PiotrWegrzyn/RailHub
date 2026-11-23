@@ -254,7 +254,7 @@ def build_station(
     station = Station(cell, station_way(constructions, cell) if ends is None else ends)
     if station_problem(constructions, cell) is not None:
         return None
-    if ends is not None and constructions._way_problem(ends) is not None:
+    if ends is not None and constructions.way_problem(ends) is not None:
         return None
     for piece in constructions.track_at(cell):
         constructions.remove(piece)
@@ -786,7 +786,7 @@ def _station_ways(constructions: Constructions, cell: Cell) -> tuple[int, ...]:
     return tuple(
         point
         for point in grid.track_ends()
-        if constructions._way_problem((point, (point + count // 2) % count)) is None
+        if constructions.way_problem((point, (point + count // 2) % count)) is None
     )
 
 
@@ -801,7 +801,7 @@ def _turned_way(constructions: Constructions, cell: Cell, point: int) -> tuple[i
         return None
     count = len(grid.track_points())
     way: tuple[int, int] = tuple(sorted((entry, (entry + count // 2) % count)))  # type: ignore[assignment]
-    return None if constructions._way_problem(way) is not None else way
+    return None if constructions.way_problem(way) is not None else way
 
 
 def _side_station(

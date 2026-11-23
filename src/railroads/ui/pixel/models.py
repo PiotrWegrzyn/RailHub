@@ -759,7 +759,7 @@ def draw_model(
         for _, points, color, _ in drawn:
             paint.polygon([(x - left, y - top) for x, y in points], fill=(*color, 255))
     if outline:
-        _outline(image)
+        outline_drawing(image)
     return image, (-left, -top)
 
 
@@ -796,7 +796,7 @@ def _depth_tested(
     return Image.fromarray(pixels)
 
 
-def _outline(image: Image.Image, width: int = 1) -> None:
+def outline_drawing(image: Image.Image, width: int = 1) -> None:
     """Rings what is drawn in a dark line `width` pixels wide."""
     pixels = np.asarray(image).copy()
     solid = pixels[..., 3] > 0

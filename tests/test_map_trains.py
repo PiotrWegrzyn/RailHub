@@ -101,7 +101,7 @@ def test_the_ground_under_every_trains_smoke_is_looked_up_in_one_go(
         train.stops = stops
     view.time_passed(0.1)
     view.time_passed(0.1)
-    layer = TrainLayer(view._pixel_layer().world)
+    layer = TrainLayer(view.pixel_layer().world)
     looked: list[int] = []
     plain = Elevation.lift
 
@@ -123,7 +123,7 @@ def test_a_layer_draws_up_front_only_the_looks_of_the_trains_it_is_given(context
     train = view.railway.buy()
     assert train is not None
 
-    layer = TrainLayer(view._pixel_layer().world, view.railway.trains)
+    layer = TrainLayer(view.pixel_layer().world, view.railway.trains)
 
     assert {look for look, _ in layer.sprites.places} == {look for look, _ in layer._parts(train)}
 
@@ -136,7 +136,7 @@ def test_the_sheet_goes_to_the_graphics_card_again_only_for_a_look_not_on_it(
     assert train is not None
     train.stops = [Stop((10, 6)), Stop((10, 16))]
     view.time_passed(0.1)
-    layer = TrainLayer(view._pixel_layer().world, view.railway.trains)
+    layer = TrainLayer(view.pixel_layer().world, view.railway.trains)
     monkeypatch.setattr(train_layer, "PAGES_TIME", -1.0)
     uploads: list[int] = []
     monkeypatch.setattr(
@@ -167,7 +167,7 @@ def test_no_zoom_on_any_screen_makes_a_train_texture_bigger_than_every_graphics_
     assert train is not None
     train.stops = [Stop((10, 6)), Stop((10, 16))]
     view.time_passed(0.1)
-    layer = TrainLayer(view._pixel_layer().world)
+    layer = TrainLayer(view.pixel_layer().world)
     sizes: list[int] = []
     monkeypatch.setattr(
         hello_imgui,
@@ -198,7 +198,7 @@ def test_up_close_only_the_looks_on_screen_are_blown_up(
     view.time_passed(0.1)
     view.camera.zoom_level = len(ZOOM_CELL_WIDTHS) - 1
     imgui.get_io().display_framebuffer_scale = imgui.ImVec2(2, 2)
-    layer = TrainLayer(view._pixel_layer().world)
+    layer = TrainLayer(view.pixel_layer().world)
     monkeypatch.setattr(train_layer, "PAGES_TIME", 10.0)
     made: list[int] = []
     monkeypatch.setattr(
@@ -233,7 +233,7 @@ def test_up_close_a_train_far_off_the_screen_is_not_drawn(
     view.time_passed(0.1)
     view.camera.zoom_level = len(ZOOM_CELL_WIDTHS) - 1
     view.look_at((10, 5))
-    layer = TrainLayer(view._pixel_layer().world)
+    layer = TrainLayer(view.pixel_layer().world)
     parted: list[str] = []
     parts = TrainLayer._parts
     monkeypatch.setattr(
@@ -262,7 +262,7 @@ def test_up_close_the_pictures_are_drawn_as_many_times_as_fine_as_the_sheet(
     context: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     view, train = train_up_close()
-    layer = TrainLayer(view._pixel_layer().world)
+    layer = TrainLayer(view.pixel_layer().world)
     monkeypatch.setattr(train_layer, "PAGES_TIME", 10.0)
     imgui.new_frame()
 
@@ -280,7 +280,7 @@ def test_up_close_looks_not_drawn_fine_in_a_frames_time_show_from_the_sheet_till
     context: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     view, train = train_up_close()
-    layer = TrainLayer(view._pixel_layer().world)
+    layer = TrainLayer(view.pixel_layer().world)
     monkeypatch.setattr(train_layer, "PAGES_TIME", -1.0)
     imgui.new_frame()
     layer.draw(imgui.get_foreground_draw_list(), view.railway, view.camera, (640.0, 400.0))
@@ -310,7 +310,7 @@ def test_up_close_a_page_is_drawn_a_few_pictures_a_frame(
     context: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     view, train = train_up_close()
-    layer = TrainLayer(view._pixel_layer().world)
+    layer = TrainLayer(view.pixel_layer().world)
     monkeypatch.setattr(train_layer, "time", Clock(train_layer.PAGES_TIME / 3))
     looks = {look for look, _ in layer._parts(train)}
 
@@ -335,7 +335,7 @@ def test_up_close_the_pages_of_a_zoom_left_are_kept_for_coming_back_to_it(
     context: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     view, train = train_up_close()
-    layer = TrainLayer(view._pixel_layer().world)
+    layer = TrainLayer(view.pixel_layer().world)
     monkeypatch.setattr(train_layer, "PAGES_TIME", 10.0)
     first = view.camera.pixel_scale * 2 // DETAIL
     imgui.new_frame()
@@ -353,7 +353,7 @@ def test_up_close_the_pages_of_a_zoom_left_are_kept_for_coming_back_to_it(
 
 def test_zoomed_out_past_the_pixel_art_trains_still_show_their_pictures(context: None) -> None:
     view, _ = train_up_close()
-    layer = TrainLayer(view._pixel_layer().world)
+    layer = TrainLayer(view.pixel_layer().world)
     while view.camera.pixel_scale:
         view.camera.zoom_level -= 1
     imgui.new_frame()
@@ -370,7 +370,7 @@ def test_a_signal_s_lamp_turns_from_red_to_green_once_the_way_past_it_is_set(
     view = railway_seen_in_pixel_art()
     view.camera.zoom_level = len(ZOOM_CELL_WIDTHS) - 1
     view.look_at((10, 7))
-    layer = SignalLayer(view._pixel_layer().world)
+    layer = SignalLayer(view.pixel_layer().world)
     lamps: list[tuple[float, float, float]] = []
     monkeypatch.setattr(signal_layer, "_glow", lambda _, __, ___, color: lamps.append(color))
 

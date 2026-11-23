@@ -18,24 +18,24 @@ FORGET_S = 1.0
 
 
 @dataclass
-class _Job:
+class PaintJob:
     work: Callable[[], object]
     urgent: bool
     wanted: float
 
 
 @dataclass
-class _Queue:
+class PaintQueue:
     """What the painter and its thread share, under one lock."""
 
     lock: threading.Condition = field(default_factory=threading.Condition)
-    jobs: dict[Hashable, _Job] = field(default_factory=dict)
+    jobs: dict[Hashable, PaintJob] = field(default_factory=dict)
     done: list[tuple[Hashable, object, BaseException | None]] = field(default_factory=list)
     busy: Hashable | None = None
     now: float = 0.0
     stopped: bool = False
 
-    def most_wanted(self) -> tuple[Hashable, _Job] | None:
+    def most_wanted(self) -> tuple[Hashable, PaintJob] | None:
         """Takes the most wanted job, forgetting those asked for too long ago."""
         stale = [key for key, job in self.jobs.items() if job.wanted < self.now - FORGET_S]
         for key in stale:
@@ -45,7 +45,7 @@ class _Queue:
         key = max(self.jobs, key=lambda k: (self.jobs[k].urgent, self.jobs[k].wanted))
         return key, self.jobs.pop(key)
 
-    def next(self) -> tuple[Hashable, _Job] | None:
+    def next(self) -> tuple[Hashable, PaintJob] | None:
         """Takes the most wanted job to do it on this thread."""
         taken = self.most_wanted()
         if taken is not None:
@@ -56,7 +56,7 @@ class _Queue:
         """Adds a job, or wants one already waiting again; whether it was new."""
         job = self.jobs.get(key)
         if job is None:
-            self.jobs[key] = _Job(work, urgent, now)
+            self.jobs[key] = PaintJob(work, urgent, now)
             return True
         job.wanted = now
         job.urgent = job.urgent or urgent
@@ -70,7 +70,7 @@ class _Queue:
         if taken is not None:
             self.run(*taken)
 
-    def run(self, key: Hashable, job: _Job) -> None:
+    def run(self, key: Hashable, job: PaintJob) -> None:
         try:
             result, error = job.work(), None
         except Exception as raised:  # noqa: BLE001 - the asker reads it and asks again
@@ -80,7 +80,7 @@ class _Queue:
             self.busy = None
 
 
-def _paint(queue: _Queue) -> None:
+def _paint(queue: PaintQueue) -> None:
     while True:
         with queue.lock:
             while not queue.stopped and not queue.jobs:
@@ -94,7 +94,7 @@ def _paint(queue: _Queue) -> None:
 
 class Painter:
     def __init__(self, threads: bool | None = None) -> None:
-        self._queue = _Queue()
+        self._queue = PaintQueue()
         self.threaded = threads_start() if threads is None else threads
         if self.threaded:
             threading.Thread(
@@ -128,7 +128,7 @@ class Painter:
         self._queue.work_once(now)
 
 
-def _stop(queue: _Queue) -> None:
+def _stop(queue: PaintQueue) -> None:
     with queue.lock:
         queue.stopped = True
         queue.lock.notify_all()

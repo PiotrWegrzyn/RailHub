@@ -785,7 +785,7 @@ class Ground:
         block = (left, top, CHUNK, rows)
         points = _lattice(points, self.projection, self.tile_map.grid, block)
         r, c, inside = points.cells(*block)
-        grass = _GRASS[self._biomes[r, c]] & inside
+        grass = GRASS_BIOMES[self._biomes[r, c]] & inside
         cover = np.zeros(inside.shape, dtype=np.float32)
         if grass.any():
             cover[grass] = TREE_SHADE * self._tree_shade(left, top, inside.shape)[grass]
@@ -1923,4 +1923,4 @@ _GRASSES = {
     "tundra": _biome_table((Biome.TUNDRA,)),
     "desert": _biome_table((Biome.DESERT,)),
 }
-_GRASS = np.logical_or.reduce(list(_GRASSES.values()))
+GRASS_BIOMES = np.logical_or.reduce(list(_GRASSES.values()))
