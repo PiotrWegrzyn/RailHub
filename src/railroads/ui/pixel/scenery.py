@@ -19,7 +19,7 @@ from railroads.sim.track_rules import TrackBed
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
-from railroads.ui.pixel.ground import FIELD_KINDS
+from railroads.ui.pixel.ground_palette import FIELD_KINDS
 from railroads.ui.pixel.projection import PixelProjection, hash01
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import SpriteSheet

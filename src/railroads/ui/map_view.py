@@ -72,7 +72,8 @@ from railroads.ui.minimap import FRAME_PAD, Minimap, MinimapLayout, view_corners
 from railroads.ui.ornate import DEEP, bar_buttons, frame_window, keep_in_front, ornate_window
 from railroads.ui.pixel.dots_shader import DotShader, dot_vertices
 from railroads.ui.pixel.gl_util import free_textures
-from railroads.ui.pixel.ground import GLOW, glow_strength
+from railroads.ui.pixel.ground import glow_strength
+from railroads.ui.pixel.ground_palette import GLOW
 from railroads.ui.pixel.ground_shader import (
     GroundShader,
     Screen,

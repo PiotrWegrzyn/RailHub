@@ -25,7 +25,8 @@ from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
-from railroads.ui.pixel.ground import (
+from railroads.ui.pixel.ground import Ground, art_pixels, glow_strength
+from railroads.ui.pixel.ground_palette import (
     APRON,
     CANOPY_REACH,
     FIELD_KINDS,
@@ -33,9 +34,6 @@ from railroads.ui.pixel.ground import (
     MILL_CLEARING,
     OVERHANG,
     YARD_REACH,
-    Ground,
-    art_pixels,
-    glow_strength,
 )
 from railroads.ui.pixel.ground_texture import textured
 from railroads.ui.pixel.lattice import Lattice

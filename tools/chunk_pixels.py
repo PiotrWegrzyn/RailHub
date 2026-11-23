@@ -37,7 +37,7 @@ from railroads.sim.tilemap import Relief, Terrain
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.biomes import Biome
 from railroads.ui.map_view import LOOKS
-from railroads.ui.pixel.ground import CROP_ROWS, GROVES
+from railroads.ui.pixel.ground_palette import CROP_ROWS, GROVES
 from railroads.ui.pixel.projection import CHUNK
 from railroads.ui.pixel.sheet import FINE, SpriteSheet
 from railroads.ui.pixel.world import PixelWorld
