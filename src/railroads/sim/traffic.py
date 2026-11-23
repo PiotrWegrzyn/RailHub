@@ -6,13 +6,15 @@ it enters, and holds it from its tail to where the stretch ends: no train going 
 enters any part of it until the train is out, but waits where the stretch begins. Trains going
 the same way may follow each other onto it, until a train waiting at the other end has waited
 LINE_PATIENCE months: from then on it keeps trains that have waited less from entering ahead of
-it the other way, so none waits for ever on a busy line.
+it the other way, so none waits for ever on a busy line. A station or double track shorter than a
+train is no place for it to pass another: to that train, the single line runs on through it.
 
 Wherever else a train would run into another where they can't pass, it runs only up to
 FOLLOW_GAP cells short of it: it slows to the pace of a slower train ahead and follows it until
 that one turns off, and stops before a crossing until a train going across has cleared it. Two
-trains that stand in each other's way, as when track is changed under them, let the one with the
-right of way through the other, as nothing else would move them.
+trains that stand in each other's way, or wait for each other to clear the line, as when track is
+changed under them, let the one with the right of way through the other, as nothing else would
+move them.
 """
 
 import bisect
@@ -71,11 +73,13 @@ class Stretches:
 
 
 def stretches(network: TrackNetwork, train: Train) -> Stretches:
-    """The train's path's Stretches, worked out once for each path and state of the track."""
+    """The train's path's Stretches, worked out once for each path, state of the track and length
+    of train. A place to pass shorter than the train is no place for it to pass: the single line
+    on either side of it is one stretch for that train."""
     version = network.constructions.railway_version
     kept = train.path_stretches
-    if kept is not None and kept[0] is train.path and kept[1] == version:
-        return kept[2]
+    if kept is not None and kept[:3] == (train.path, version, train.length):
+        return kept[3]
     path = train.path
     places = network.ends(train)
     cells = []
@@ -87,8 +91,9 @@ def stretches(network: TrackNetwork, train: Train) -> Stretches:
         single.append(not in_station and not double)
     alongs: list[float] = []
     steps: list[Step] = []
-    entries: list[tuple[float, list[Step]]] = []
-    ends: list[tuple[float, float]] = []
+    # Each stretch of single line: how far along it begins and ends, and its first crossing and
+    # the one after its last.
+    lines: list[tuple[float, float, int, int]] = []
     begun: tuple[float, int] | None = None
     for index in range(1, len(cells)):
         if cells[index] == cells[index - 1]:
@@ -98,14 +103,20 @@ def stretches(network: TrackNetwork, train: Train) -> Stretches:
         if single[index] and not single[index - 1]:
             begun = (places[index], len(steps) - 1)
         elif single[index - 1] and not single[index] and begun is not None:
-            entries.append((begun[0], steps[begun[1] :]))
-            ends.append((begun[0], places[index]))
+            lines.append((begun[0], places[index], begun[1], len(steps)))
             begun = None
     if begun is not None:
-        entries.append((begun[0], steps[begun[1] :]))
-        ends.append((begun[0], places[-1]))
+        lines.append((begun[0], places[-1], begun[1], len(steps)))
+    joined: list[tuple[float, float, int, int]] = []
+    for line in lines:
+        if joined and line[0] - joined[-1][1] < train.length:
+            last = joined.pop()
+            line = (last[0], line[1], last[2], line[3])
+        joined.append(line)
+    entries = [(start, steps[first:after]) for start, _, first, after in joined]
+    ends = [(start, stop) for start, stop, _, _ in joined]
     found = Stretches(alongs, steps, entries, ends)
-    train.path_stretches = (path, version, found)
+    train.path_stretches = (path, version, train.length, found)
     return found
 
 
@@ -129,6 +140,7 @@ class Traffic:
     _asked: dict[Step, int] = field(default_factory=dict)
     _bodies: dict[int, tuple[Train, _Body]] = field(default_factory=dict)
     _names: dict[int, str] = field(default_factory=dict)
+    _giving_way: dict[int, str] = field(default_factory=dict)
 
     def add(self, trains: list[Train]) -> None:
         for train in trains:
@@ -138,6 +150,7 @@ class Traffic:
         """Takes note of where a train is now, and what it holds."""
         key = id(train)
         self._names[key] = train.name
+        self._giving_way[key] = train.giving_way
         for step in self._holding.pop(key, []):
             self._held[step].discard(key)
         self._bodies.pop(key, None)
@@ -172,28 +185,35 @@ class Traffic:
             if start < along or start >= wanted:
                 continue
             holder = self._against(train, steps)
-            if holder:
-                if train.waited >= LINE_PATIENCE:
-                    for step in steps:
-                        self._asked.setdefault(step, id(train))
-                return start, holder, True
+            if holder is None:
+                continue
+            if (
+                self._giving_way.get(holder) == train.name
+                and self.rank[id(train)] < self.rank[holder]
+            ):
+                continue
+            if train.waited >= LINE_PATIENCE:
+                for step in steps:
+                    self._asked.setdefault(step, id(train))
+            return start, self._names[holder], True
         spot, blocker = self._first_in_the_way(train, along, limit + FOLLOW_GAP)
         if blocker:
             return max(along, spot - FOLLOW_GAP), blocker, False
         return limit, "", False
 
-    def _against(self, train: Train, steps: list[Step]) -> str:
-        """The train holding, or asking first for, any of these crossings the other way."""
+    def _against(self, train: Train, steps: list[Step]) -> int | None:
+        """The train holding, or asking first for, any of these crossings the other way; a train
+        waiting for this one asks for nothing it can have before this one has gone."""
         key = id(train)
         for start, end in steps:
             back = (end, start)
             others = [other for other in self._held.get(back, ()) if other != key]
             if others:
-                return self._names[others[0]]
+                return others[0]
             asked = self._asked.get(back)
-            if asked is not None and asked != key:
-                return self._names[asked]
-        return ""
+            if asked is not None and asked != key and self._giving_way.get(asked) != train.name:
+                return asked
+        return None
 
     def _first_in_the_way(self, train: Train, along: float, ahead: float) -> tuple[float, str]:
         """How far along its path, up to `ahead`, the train first runs into another where they

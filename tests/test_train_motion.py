@@ -6,6 +6,7 @@ import pytest
 from builders import flat_map
 from railroads.sim.clock import SECONDS_PER_MONTH
 from railroads.sim.constructions import Constructions, TrackWidth
+from railroads.sim.goods import Good
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import CELLS_PER_MONTH, Railway
@@ -16,7 +17,7 @@ WEST, EAST = (6, 3), (6, 20)
 FRAME = 1 / 60 / SECONDS_PER_MONTH
 
 
-def line(width: TrackWidth = TrackWidth.SINGLE) -> Railway:
+def line(width: TrackWidth = TrackWidth.SINGLE, *between: tuple[int, int]) -> Railway:
     constructions = Constructions(flat_map())
     growth = Growth(constructions, GrowthRule(trades=False))
     build_station(growth, WEST)
@@ -24,6 +25,8 @@ def line(width: TrackWidth = TrackWidth.SINGLE) -> Railway:
     route = plan_route(constructions, WEST, EAST, width)
     assert route is not None
     lay_route(growth, route)
+    for cell in between:
+        assert build_station(growth, cell) is not None
     railway = Railway(constructions)
     growth.railway = railway
     return railway
@@ -249,3 +252,16 @@ def test_a_train_waits_for_another_crossing_its_line_and_both_get_through() -> N
 
     assert "Giving way to Across" in statuses
     assert across.arrivals == 1 and down.arrivals == 1
+
+
+def test_a_train_too_long_for_a_station_on_the_way_never_meets_another_there() -> None:
+    railway = line(TrackWidth.SINGLE, (6, 11))
+    coal = [Good.COAL] * 3
+    long = Train("Long", stops=[Stop(WEST, cars=coal), Stop(EAST, cars=coal)])
+    short = Train("Short", stops=[Stop(EAST), Stop(WEST)])
+    railway.trains.extend([long, short])
+
+    run_until(railway, lambda: long.arrivals >= 2 and short.arrivals >= 2)
+
+    assert long.length > 1.5
+    assert long.arrivals >= 2 and short.arrivals >= 2

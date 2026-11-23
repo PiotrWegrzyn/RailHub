@@ -914,7 +914,7 @@ class Train:
     path_ends: tuple[list[Point], list[float]] | None = None
     # Where the path crosses from cell to cell and runs on single line, with the path and the
     # railway version it was worked out for (railroads.sim.traffic.stretches).
-    path_stretches: tuple[list[Point], int, Stretches] | None = None
+    path_stretches: tuple[list[Point], int, float, Stretches] | None = None
     along: float = 0.0
     status: str = "Waiting for stops"
     engine: str = FIRST_ENGINE
