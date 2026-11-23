@@ -111,8 +111,8 @@ class StationCalls:
     def _match_cars(
         self, cars: list[Car], wanted: list[tuple[Cargo, int]], engine: str
     ) -> tuple[list[Car], list[Car]]:
-        """The wanted cars, each the fullest car of its cargo and generation asked or else a new
-        one, and the cars left over."""
+        """The wanted cars, each the fullest car of its cargo and generation asked, made the size
+        that generation is now behind the engine, or else a new one; and the cars left over."""
         left = sorted(cars, key=lambda car: -car.load)
         kept = []
         for cargo, asked in wanted:
@@ -121,6 +121,9 @@ class StationCalls:
                 kept.append(self._new_car(cargo, engine, asked))
             else:
                 left.remove(car)
+                railway = self._railway
+                car.capacity = railway.car_capacity(car.good, engine, car.general, asked)
+                car.tare = railway.car_tare(car.good, engine, asked)
                 kept.append(car)
         return kept, left
 

@@ -852,3 +852,29 @@ def line_at(year: int) -> Railway:
 def opened_in(name: str) -> int:
     tile, level = OPENED_BY[name]
     return next(year for year in range(1804, 2051) if of_year(year).supply.get(tile, 0) >= level)
+
+
+def test_a_train_s_cars_grow_at_its_next_stop_once_newer_wagons_come(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    railway = line()
+    (train,) = planets_on_the_line(railway, 1)
+    railway.swap_engine(train, "american")
+    train.stops = [Stop(WEST, [Good.COAL]), Stop(EAST, [Good.COAL])]
+    for _ in range(20_000):
+        railway.run(0.001)
+        if train.arrivals:
+            break
+    before = {car.good: car.capacity for car in train.cars}
+    monkeypatch.setattr(railway, "wagon_era", lambda: 3)
+    arrivals = train.arrivals
+
+    for _ in range(20_000):
+        railway.run(0.001)
+        if train.arrivals > arrivals:
+            break
+
+    after = {car.good: car.capacity for car in train.cars}
+    assert ENGINES["american"].top_generation >= 3
+    assert after == {good: car_size(good, 3) for good in after}
+    assert after[Good.COAL] > before[Good.COAL]
