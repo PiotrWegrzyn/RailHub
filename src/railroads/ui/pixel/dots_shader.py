@@ -18,7 +18,7 @@ import sys
 import numpy as np
 import numpy.typing as npt
 
-from railroads.ui.pixel.ground_shader import (
+from railroads.ui.pixel.gl_util import (
     GL,
     HEADER,
     RenderTarget,
@@ -27,7 +27,7 @@ from railroads.ui.pixel.ground_shader import (
     saved_gl_state,
     uniform,
 )
-from railroads.ui.pixel.ground_shader import VERTEX as WHOLE_TARGET
+from railroads.ui.pixel.ground_glsl import VERTEX as WHOLE_TARGET
 
 VERTEX = """layout(location = 0) in vec2 place;
 layout(location = 1) in vec2 corner;

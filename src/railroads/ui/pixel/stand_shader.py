@@ -29,23 +29,21 @@ import numpy.typing as npt
 
 from railroads.ui.iso_camera import TILT
 from railroads.ui.pixel import relief
-from railroads.ui.pixel.ground_shader import (
+from railroads.ui.pixel.gl_util import (
     GL,
     HEADER,
-    VERTEX,
-    ChunkInputs,
     ChunkTexture,
-    GroundShader,
+    FrameBuffer,
     RenderTarget,
-    _Into,
-    _number,
-    _texture,
     free_textures,
     gl_program,
+    new_texture,
     restore_gl_state,
     saved_gl_state,
     use,
 )
+from railroads.ui.pixel.ground_glsl import VERTEX, glsl_number
+from railroads.ui.pixel.ground_shader import ChunkInputs, GroundShader
 from railroads.ui.pixel.projection import CHUNK
 from railroads.ui.pixel.scenery import Scenery
 from railroads.ui.pixel.sheet import DENSITIES, ByteSheet
@@ -182,13 +180,13 @@ void main() {
 """
 
 
-def _filled(source: str) -> str:
+def fill_names(source: str) -> str:
     names = {
-        "EXAGGERATION": _number(relief.EXAGGERATION),
-        "TILT": _number(TILT),
-        "MOST_LIFT": _number(relief.MOST_LIFT),
+        "EXAGGERATION": glsl_number(relief.EXAGGERATION),
+        "TILT": glsl_number(TILT),
+        "MOST_LIFT": glsl_number(relief.MOST_LIFT),
         "MOST_LIFT_ROWS": str(relief.MOST_LIFT),
-        "HIDDEN_BEYOND": _number(HIDDEN_BEYOND),
+        "HIDDEN_BEYOND": glsl_number(HIDDEN_BEYOND),
     }
     for name, value in names.items():
         source = source.replace(f"@{name}@", value)
@@ -198,11 +196,11 @@ def _filled(source: str) -> str:
 
 def track_source() -> str:
     """The shader averaging the track down and hiding it behind raised ground (TRACK)."""
-    return _filled(TRACK)
+    return fill_names(TRACK)
 
 
 def lift_source() -> str:
-    return _filled(LIFT)
+    return fill_names(LIFT)
 
 
 def sheet_for(scale: int) -> int:
@@ -281,7 +279,7 @@ class _Pages:
         if self._x + w > PAGE:
             self._x, self._y, self._row = 0, self._y + self._row, 0
         if not self.textures or self._y + h > PAGE:
-            self.textures.append(_texture())
+            self.textures.append(new_texture())
             GL.glTexImage2D(
                 GL.GL_TEXTURE_2D,
                 0,
@@ -438,7 +436,7 @@ class StandShader:
         uniforms = {"size": ("2f", (float(span), float(span))), "page": ("1i", (0,))}
         for start, count, texture in runs:
             self._draw(
-                _Into(self._made.framebuffer, (span, span)),
+                FrameBuffer(self._made.framebuffer, (span, span)),
                 (0, 0, span, span),
                 self._programs.sprite,
                 uniforms,
@@ -499,7 +497,7 @@ class StandShader:
             }
             textures = (self._fine.texture, self._heights.texture, inputs.relief, inputs.wooded)
             self._draw(
-                _Into(self._made.framebuffer, (span, span)),
+                FrameBuffer(self._made.framebuffer, (span, span)),
                 (left, top, width, height),
                 self._programs.track,
                 uniforms,
@@ -510,7 +508,7 @@ class StandShader:
             )
 
     def _finished(self, span: int) -> ChunkTexture:
-        texture = _texture()
+        texture = new_texture()
         GL.glTexImage2D(
             GL.GL_TEXTURE_2D, 0, GL.GL_RGBA8, span, span, 0, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, None
         )
@@ -522,7 +520,7 @@ class StandShader:
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, int(saved))
         uniforms = {"made": ("1i", (0,))}
         self._draw(
-            _Into(self._out, (span, span)),
+            FrameBuffer(self._out, (span, span)),
             (0, 0, span, span),
             self._programs.finish,
             uniforms,
@@ -545,7 +543,7 @@ class StandShader:
 
     def _draw(
         self,
-        target: RenderTarget | _Into,
+        target: RenderTarget | FrameBuffer,
         viewport: tuple[int, int, int, int],
         program: int,
         uniforms: dict[str, tuple[str, tuple]],

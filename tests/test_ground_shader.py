@@ -3,8 +3,9 @@ import pytest
 
 from builders import flat_map
 from railroads.ui.map_view import LOOKS
-from railroads.ui.pixel import ground_shader
-from railroads.ui.pixel.ground_shader import ChunkTexture, GroundShader, screen_of, view_of
+from railroads.ui.pixel import gl_util, ground_glsl, ground_shader
+from railroads.ui.pixel.gl_util import ChunkTexture
+from railroads.ui.pixel.ground_shader import GroundShader, screen_of, view_of
 from railroads.ui.pixel.projection import PixelProjection
 from railroads.ui.pixel.relief import Elevation
 
@@ -42,7 +43,7 @@ def test_without_opengl_there_is_no_shader_and_the_map_keeps_its_ground_picture(
 
 
 def test_the_shader_has_every_table_and_number_of_the_cpu_ground_written_in() -> None:
-    source = ground_shader.fragment_source()
+    source = ground_glsl.fragment_source()
 
     assert "@" not in source
     assert source.count("vec3(") > 52
@@ -70,13 +71,13 @@ def test_a_blown_up_chunk_texture_is_deleted_on_a_frame_after_nothing_holds_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     gl = DeletingGL()
-    monkeypatch.setattr(ground_shader, "GL", gl)
-    monkeypatch.setattr(ground_shader, "_UNWANTED", [])
+    monkeypatch.setattr(gl_util, "GL", gl)
+    monkeypatch.setattr(gl_util, "_UNWANTED", [])
     kept, dropped = ChunkTexture(7), ChunkTexture(8)
     del dropped
 
-    ground_shader.free_textures()
-    ground_shader.free_textures()
+    gl_util.free_textures()
+    gl_util.free_textures()
 
     assert gl.deleted == [8]
     assert kept.texture_id() == 7
@@ -84,13 +85,13 @@ def test_a_blown_up_chunk_texture_is_deleted_on_a_frame_after_nothing_holds_it(
 
 def test_the_raised_ground_shaders_have_every_number_of_the_cpu_relief_written_in() -> None:
     sources = [
-        ground_shader.relief_source(),
-        ground_shader.raise_source(),
-        ground_shader.tint_source(),
-        ground_shader.woods_source(),
-        ground_shader.edges_source(),
-        ground_shader.canopy_source(),
-        ground_shader.dress_source(),
+        ground_glsl.relief_source(),
+        ground_glsl.raise_source(),
+        ground_glsl.tint_source(),
+        ground_glsl.woods_source(),
+        ground_glsl.edges_source(),
+        ground_glsl.canopy_source(),
+        ground_glsl.dress_source(),
     ]
 
     assert all("@" not in source for source in sources)

@@ -58,7 +58,7 @@ from railroads.ui.main_menu import (
 from railroads.ui.map_view import MapView
 from railroads.ui.picture_show import PictureShow
 from railroads.ui.pixel import ground_shader
-from railroads.ui.pixel.ground_shader import free_textures
+from railroads.ui.pixel.gl_util import free_textures
 from railroads.ui.reports_window import ReportsWindow
 from railroads.ui.save_files import IN_BROWSER
 from railroads.ui.saves_window import SavesWindow
