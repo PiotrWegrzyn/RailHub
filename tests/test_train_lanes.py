@@ -12,7 +12,7 @@ from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.trains import Stop, Train
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
 from railroads.ui.pixel.projection import PixelProjection
-from railroads.ui.pixel.track_art import DOUBLE_SPACING, ISLAND_TRACKS, TrackArt
+from railroads.ui.pixel.track_art import DOUBLE_SPACING, ISLAND_TRACKS, QUADRUPLE_OUTER, TrackArt
 from railroads.ui.pixel.train_layer import Lanes
 
 WEST, EAST = (6, 3), (6, 20)
@@ -122,7 +122,7 @@ def test_single_track_branching_off_wider_track_leaves_from_its_outer_track_on_t
         point for point in branch.ends if any(p.width == main and point in p.ends for p in double)
     )
     share = 0.0 if branch.ends[0] == shared else 1.0
-    outer = DOUBLE_SPACING / 2 * (int(main) - 1)
+    outer = DOUBLE_SPACING / 2 if main == TrackWidth.DOUBLE else QUADRUPLE_OUTER
 
     at_the_junction = track.riding_side(branch, share, True)
     far_end = track.riding_side(branch, 1.0 - share, True)
@@ -131,7 +131,7 @@ def test_single_track_branching_off_wider_track_leaves_from_its_outer_track_on_t
     assert far_end == pytest.approx(0.0)
 
 
-@pytest.mark.parametrize(("lane", "off"), [(0, FULL), (1, 3 * FULL)])
+@pytest.mark.parametrize(("lane", "off"), [(0, FULL), (1, QUADRUPLE_OUTER * PIXEL_CELL_WIDTH)])
 def test_a_train_on_quadruple_track_rides_the_inner_track_fast_and_the_outer_one_slow(
     lane: int, off: float
 ) -> None:
@@ -161,10 +161,10 @@ def test_quadruple_track_closes_its_outer_tracks_onto_the_inner_ones_where_it_me
     sides = track._sides_at(piece, [0.0, 0.5, 1.0])
 
     meeting_double, middle, onward = ([lane[k] for lane in sides] for k in range(3))
-    assert {round(abs(side) / DOUBLE_SPACING, 2) for side in middle} == {0.5, 1.5}
+    assert {round(abs(side), 2) for side in middle} == {DOUBLE_SPACING / 2, QUADRUPLE_OUTER}
     half = DOUBLE_SPACING / 2
     assert sorted(meeting_double + onward) == pytest.approx(
-        sorted([-half, -half, half, half] + [-3 * half, -half, half, 3 * half])
+        sorted([-half, -half, half, half] + [-QUADRUPLE_OUTER, -half, half, QUADRUPLE_OUTER])
     )
 
 

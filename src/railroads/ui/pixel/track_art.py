@@ -51,7 +51,11 @@ PORTAL_HEIGHT = 0.26
 PORTAL_NARROWEST = 0.6
 PORTAL_FACING = 0.5
 SHADOW_REACH = 0.03
-DOUBLE_SPACING = 0.22
+DOUBLE_SPACING = 0.18
+# How far the outer tracks of quadruple track lie from its middle, in cells: as far from the inner
+# tracks as these lie from each other, close enough that two lines of it in cells beside each
+# other keep apart.
+QUADRUPLE_OUTER = 1.5 * DOUBLE_SPACING
 BEND = 0.2
 # How far a rail may wander across the picture, in pixels it is shown at, and still count as
 # running straight across or down it, to be kept to one row or column of pixels (_crisp).
@@ -317,7 +321,7 @@ def _spread(width: TrackWidth, station: bool = False) -> float:
     in a station on quadruple track, beyond its island platforms."""
     half = DOUBLE_SPACING / 2
     if width == TrackWidth.QUADRUPLE:
-        return half + ISLAND_TRACKS if station else 3 * half
+        return half + ISLAND_TRACKS if station else QUADRUPLE_OUTER
     return half if width == TrackWidth.DOUBLE else 0.0
 
 
@@ -344,10 +348,10 @@ def _lane_sides(tracks: int, lanes: int | None = None) -> list[float]:
         return [0.0]
     half = DOUBLE_SPACING / 2
     if lanes == 2:
-        outer = 3 * half if tracks >= 4 else half if tracks == 2 else 0.0
+        outer = QUADRUPLE_OUTER if tracks >= 4 else half if tracks == 2 else 0.0
         return [-outer, outer]
     if tracks >= 4:
-        return [-3 * half, -half, half, 3 * half]
+        return [-QUADRUPLE_OUTER, -half, half, QUADRUPLE_OUTER]
     if tracks >= 2:
         return [-half, -half, half, half]
     return [0.0, 0.0, 0.0, 0.0]
