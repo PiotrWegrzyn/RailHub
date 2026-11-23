@@ -6,17 +6,19 @@ from screens import FakeTexture, gui_context
 
 from builders import joined_stations
 from railroads.catalogue import engine_figures
-from railroads.sim.goods import Good
+from railroads.sim.demand import StationDemand
+from railroads.sim.goods import Good, Need
 from railroads.sim.railway import Railway, Ride
 from railroads.sim.trade import SCARCE_WORTH
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, OPENED_BY, Car, Stop, Train
 from railroads.ui import buy_train
+from railroads.ui.station_offers import Offer
 from railroads.ui.train_texts import (
     carried_in,
     ride_rows,
     train_warning,
 )
-from railroads.ui.trains_window import TrainsWindow
+from railroads.ui.trains_window import TrainsWindow, sort_offers
 from railroads.words import tonnes_text
 
 
@@ -351,3 +353,18 @@ def test_the_table_draws_a_train_of_every_category_with_its_framed_engine(
     draw_frames(window, railway)
 
     assert window.chosen == train.name
+
+
+def test_goods_to_load_come_by_what_the_next_stop_wants_most_or_by_what_waits_most() -> None:
+    demand = StationDemand(capacity={Need.FOOD: 40.0, Need(Good.PASSENGERS.value): 300.0})
+    offers = [
+        Offer(Good.COAL, 500.0, 0.0),
+        Offer(Good.WHEAT, 80.0, 0.0),
+        Offer(Good.PASSENGERS, 20.0, 0.0),
+    ]
+
+    wanted = [o.good for o in sort_offers(offers, demand, by_wanted=True)]
+    waiting = [o.good for o in sort_offers(offers, demand, by_wanted=False)]
+
+    assert wanted == [Good.PASSENGERS, Good.WHEAT, Good.COAL]
+    assert waiting == [Good.COAL, Good.WHEAT, Good.PASSENGERS]

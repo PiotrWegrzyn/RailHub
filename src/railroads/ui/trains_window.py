@@ -103,6 +103,9 @@ class TrainsWindow:
     _drawn: bool = False
     # The name being typed for the chosen train.
     _naming: str = ""
+    # Whether the goods on the stop cards come in the order the next stop wants them most, or
+    # in the order the most of them waits at the stop.
+    by_wanted: bool = True
     # What each train's cars would earn at its destination, and its ride to its next stop,
     # worked out at most every WORTH_EVERY seconds, by train name.
     _worth: Fresh[str, list[float]] = field(default_factory=lambda: Fresh(WORTH_EVERY))
@@ -344,6 +347,7 @@ class TrainsWindow:
         map_width = imgui.get_content_region_avail().x * MAP_SHARE
         imgui.begin_child("route", (-map_width, 0))
         section("Route")
+        self._draw_sort_choice()
         self._draw_stops(railway, train, supplies)
         imgui.end_child()
         imgui.same_line()
@@ -407,6 +411,17 @@ class TrainsWindow:
                 colour = BRASS if amount >= 0 else GONE
                 colored(colour, signed(amount))
             imgui.end_table()
+
+    def _draw_sort_choice(self) -> None:
+        """Which order the goods to load at each stop and those the next stop wants come in,
+        the same in both."""
+        imgui.text_disabled("Goods by")
+        imgui.same_line()
+        if imgui.radio_button("what the next stop wants most", self.by_wanted):
+            self.by_wanted = True
+        imgui.same_line()
+        if imgui.radio_button("what waits here most", not self.by_wanted):
+            self.by_wanted = False
 
     def _draw_stops(self, railway: Railway, train: Train, supplies: Supplies) -> None:
         stops = len(train.stops)
@@ -490,6 +505,7 @@ class TrainsWindow:
                 imgui.text_disabled(f"{railway.name_of(following.cell)} wants")
                 imgui.same_line(CARD_LABEL)
                 offers, _ = self._offers(railway, train, index, stop, supplies)
+                offers = sort_offers(offers, demand, self.by_wanted)
                 draw_wants_of(demand, [offer.good for offer in offers])
         return removed
 
@@ -660,7 +676,7 @@ class TrainsWindow:
         def fits(cargo: Good | General) -> bool:
             return railway.car_tonnes(cargo, train.engine, asked) <= spare + EPSILON
 
-        offers.sort(key=lambda o: (-(demand.monthly_want(o.good) > 0), -o.waiting, -o.gathered))
+        offers = sort_offers(offers, demand, self.by_wanted)
         left = imgui.get_cursor_pos_x()
         per_row = max(1, int(imgui.get_content_region_avail().x // (OFFER_SIZE[0] + 4)))
         for number, offer in enumerate(offers):
@@ -735,6 +751,14 @@ class TrainsWindow:
             "older one that holds less and weighs less, for light engines and hills"
         )
         return asked
+
+
+def sort_offers(offers: list[Offer], demand: StationDemand, by_wanted: bool) -> list[Offer]:
+    """The goods to load at a stop in the order the next stop uses most of them a month, or in
+    the order the most of them waits at the stop, each order breaking its ties by the other."""
+    if by_wanted:
+        return sorted(offers, key=lambda o: (-demand.monthly_want(o.good), -o.waiting, -o.gathered))
+    return sorted(offers, key=lambda o: (-o.waiting, -o.gathered, -demand.monthly_want(o.good)))
 
 
 def speed_share(railway: Railway, train: Train, tonnes: float) -> float:

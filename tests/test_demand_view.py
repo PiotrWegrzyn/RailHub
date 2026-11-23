@@ -53,10 +53,10 @@ def test_the_passenger_tooltip_prices_one_at_the_share_of_demand_left() -> None:
     assert lines == [f"Each one getting off now earns {dollars(freight_of(Good.PASSENGERS) * 0.5)}"]
 
 
-def test_only_the_goods_given_that_the_station_uses_are_wanted_the_most_used_first() -> None:
+def test_only_the_goods_given_that_the_station_uses_are_wanted_in_the_order_given() -> None:
     demand = StationDemand(capacity={Need.FOOD: 40.0, Need(Good.PASSENGERS.value): 300.0})
 
     wanted = goods_wanted(demand, [Good.COAL, Good.WHEAT, Good.PASSENGERS, Good.WHEAT])
 
-    assert [good for good, _ in wanted] == [Good.PASSENGERS, Good.WHEAT]
-    assert wanted[0][1] == 300.0 / DEMAND_PER_NEED
+    assert [good for good, _ in wanted] == [Good.WHEAT, Good.PASSENGERS]
+    assert wanted[1][1] == 300.0 / DEMAND_PER_NEED

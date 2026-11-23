@@ -68,14 +68,14 @@ def wants_in_order(demand: StationDemand) -> list[tuple[Need, DemandRecord]]:
 
 
 def goods_wanted(demand: StationDemand, goods: list[Good]) -> list[tuple[Good, float]]:
-    """Of these goods, those the buildings round a station use, with how much a month, the one
-    used most first."""
+    """Of these goods, in their order, those the buildings round a station use, with how much a
+    month."""
     wanted = [(good, demand.monthly_want(good)) for good in dict.fromkeys(goods)]
-    return sorted([pair for pair in wanted if pair[1] > 0], key=lambda pair: -pair[1])
+    return [pair for pair in wanted if pair[1] > 0]
 
 
 def draw_wants_of(demand: StationDemand, goods: list[Good]) -> None:
-    """What a station wants of these goods, the one used most first, each as a pile of its icon,
+    """What a station wants of these goods, in their order, each as a pile of its icon,
     one for each coin of how well it pays, with how much the buildings round it use a month.
     Hovering one tells how much of its demand is left and what it pays."""
     wanted = goods_wanted(demand, goods)
