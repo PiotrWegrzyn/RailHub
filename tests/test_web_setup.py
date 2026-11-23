@@ -1,77 +1,12 @@
-import ctypes
 import pickle
-from collections.abc import Callable
-from typing import Any
 
-import numpy as np
 import pytest
-from test_saves import played_game
 
+from builders import SETTINGS, FakePage, grows_as, played_game
 from railroads.newgame import MapChoice, Settings
-from railroads.saves import SavedGame
-from railroads.sim.constructions import Constructions
 from railroads.sim.steps import finish
 from railroads.ui import web_setup
 from railroads.ui.web_setup import PageSetup, unpacked
-from railroads.version import VERSION
-
-SETTINGS = Settings(seed=7, map=MapChoice.POLAND, start_year=1850)
-
-
-class FakePage:
-    """A setup worker as the page runs one: it grows the game when told to work and its bytes
-    are copied out of Python's memory by their address, as web/painter.js copies them."""
-
-    def __init__(self, fails: bool = False, version: str = VERSION) -> None:
-        self.fails = fails
-        self.version = version
-        self.settings: bytes | None = None
-        self.inbox: list[dict[str, Any]] = []
-        self.stopped = 0
-        self.started = 0
-
-    def start(self, settings: bytes) -> None:
-        self.settings = settings
-        self.started += 1
-
-    def work(self) -> None:
-        assert self.settings is not None
-        if self.fails:
-            self.inbox.append({"kind": "dead", "error": "out of memory"})
-            return
-        report = lambda text: self.inbox.append({"kind": "progress", "text": text})
-        advance = lambda done: self.inbox.append({"kind": "advance", "done": done})
-        grown = web_setup.grow(self.settings, report, advance, self.see)
-        game = np.frombuffer(ctypes.string_at(grown.address, grown.length), dtype=np.uint8)
-        self.inbox.append(
-            {"kind": "grown", "game": game, "size": grown.size, "version": self.version}
-        )
-
-    def see(self, address: int, length: int) -> None:
-        pixels = np.frombuffer(ctypes.string_at(address, length), dtype=np.uint8)
-        self.inbox.append({"kind": "picture", "pixels": pixels})
-
-    def take(self) -> list[dict[str, Any]]:
-        taken, self.inbox = self.inbox, []
-        return taken
-
-    def stop(self) -> None:
-        self.stopped += 1
-
-
-def grows_as(saved: SavedGame) -> Callable[..., SavedGame]:
-    def made(
-        settings: Settings,
-        report: Callable[[str], None],
-        progress: Callable[[float], None] = lambda done: None,
-        look: Callable[[Constructions, int], None] = lambda constructions, year: None,
-    ) -> SavedGame:
-        report(f"Growing towns for seed {settings.seed}")
-        progress(0.5)
-        look(saved.game.constructions, 950)
-        return saved
-
-    return made
 
 
 def test_a_game_grown_in_a_worker_comes_back_as_it_was_grown(

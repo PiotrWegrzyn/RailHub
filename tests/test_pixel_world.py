@@ -3,6 +3,7 @@ import pickle
 
 import numpy as np
 import pytest
+from screens import PLAIN_LOOKS, make_tile_map, make_world
 
 from builders import flat_map
 from railroads.sim.constructions import (
@@ -33,7 +34,6 @@ from railroads.ui.pixel.track_art import RAIL, TrackShapes, _crisp, _raised_stri
 from railroads.ui.pixel.track_preview import ghost
 from railroads.ui.pixel.world import CLOSE, PixelWorld
 
-LOOKS = {HexGrid: (0.0, 1.0), SquareGrid: (-45.0, float(np.sqrt(2)))}
 GAME_LOOK = (-45.0, float(np.sqrt(2)))
 
 
@@ -41,38 +41,6 @@ GAME_LOOK = (-45.0, float(np.sqrt(2)))
 def sheet() -> SpriteSheet:
     image, places = draw_sheet()
     return SpriteSheet.from_image(image, places)
-
-
-def make_tile_map(
-    grid_type: type[Grid] = HexGrid,
-    hills_from_col: int | None = None,
-    rise_per_col: float = 0.0,
-    mountains_from_col: int | None = None,
-) -> TileMap:
-    grid = grid_type(rows=16, cols=12, km_per_cell=2.0)
-    relief = np.full(grid.shape, Relief.FLAT, dtype=np.uint8)
-    if hills_from_col is not None:
-        relief[:, hills_from_col:] = Relief.HILLS
-    if mountains_from_col is not None:
-        relief[:, mountains_from_col:] = Relief.MOUNTAINS
-    heights = np.broadcast_to(np.arange(grid.cols) * rise_per_col, grid.shape).astype(np.int16)
-    terrain = np.full(grid.shape, Terrain.LAND, dtype=np.uint8)
-    terrain[:, 0] = Terrain.SEA
-    vegetation = np.full(grid.shape, Vegetation.GRASS, dtype=np.uint8)
-    vegetation[:8, 6:] = Vegetation.FOREST
-    return flat_map(
-        grid=grid, terrain=terrain, vegetation=vegetation, height_m=heights, relief=relief
-    )
-
-
-def make_world(sheet: SpriteSheet, grid_type: type[Grid] = HexGrid, houses: int = 3) -> PixelWorld:
-    tile_map = make_tile_map(grid_type)
-    constructions = Constructions(tile_map)
-    for _ in range(houses):
-        constructions.build(Building((10, 4), BuildingKind.HOUSE))
-    constructions.build(Building((4, 8), BuildingKind.LOGGING_CAMP))
-    constructions.build(Building((12, 3), BuildingKind.FARM))
-    return PixelWorld(tile_map, constructions, sheet, *LOOKS[grid_type])
 
 
 def test_sheet_holds_every_sprite_once_without_overlaps() -> None:
@@ -128,7 +96,7 @@ def test_hash_is_repeatable_and_spread_between_zero_and_one() -> None:
 
 @pytest.mark.parametrize("grid_type", [HexGrid, SquareGrid], ids=["hex", "square"])
 def test_projection_turns_pixels_back_into_the_same_map_points(grid_type: type[Grid]) -> None:
-    projection = PixelProjection.of(make_tile_map(grid_type).grid, *LOOKS[grid_type])
+    projection = PixelProjection.of(make_tile_map(grid_type).grid, *PLAIN_LOOKS[grid_type])
 
     px, py = projection.to_pixels(3.25, 7.5)
 
@@ -138,7 +106,7 @@ def test_projection_turns_pixels_back_into_the_same_map_points(grid_type: type[G
 @pytest.mark.parametrize("grid_type", [HexGrid, SquareGrid], ids=["hex", "square"])
 def test_the_whole_map_fits_in_the_picture(grid_type: type[Grid]) -> None:
     grid = make_tile_map(grid_type).grid
-    projection = PixelProjection.of(grid, *LOOKS[grid_type])
+    projection = PixelProjection.of(grid, *PLAIN_LOOKS[grid_type])
     width, height = grid.size()
 
     px, py = projection.to_pixels([0, width, width, 0], [0, 0, height, height])
@@ -148,8 +116,8 @@ def test_the_whole_map_fits_in_the_picture(grid_type: type[Grid]) -> None:
 
 
 def test_hexagons_are_one_pixel_cell_wide_and_squares_two_to_one_diamonds() -> None:
-    hexes = PixelProjection.of(make_tile_map(HexGrid).grid, *LOOKS[HexGrid])
-    squares = PixelProjection.of(make_tile_map(SquareGrid).grid, *LOOKS[SquareGrid])
+    hexes = PixelProjection.of(make_tile_map(HexGrid).grid, *PLAIN_LOOKS[HexGrid])
+    squares = PixelProjection.of(make_tile_map(SquareGrid).grid, *PLAIN_LOOKS[SquareGrid])
 
     hex_step = np.subtract(hexes.to_pixels(1, 0), hexes.to_pixels(0, 0))
     east = np.subtract(squares.to_pixels(1, 0), squares.to_pixels(0, 0))
@@ -175,7 +143,7 @@ def test_woods_stand_as_a_canopy_not_trees_and_everything_is_sorted_back_to_fron
     assert (np.diff(np.round(depth, 6)) >= 0).all()
 
 
-@pytest.mark.parametrize("look", [LOOKS[HexGrid], GAME_LOOK])
+@pytest.mark.parametrize("look", [PLAIN_LOOKS[HexGrid], GAME_LOOK])
 def test_a_station_house_is_drawn_over_the_buildings_in_the_cells_behind_it(
     sheet: SpriteSheet, look: tuple[float, float]
 ) -> None:
@@ -404,7 +372,7 @@ def test_buildings_in_a_cell_with_track_stand_off_the_track(
     constructions.build(Building((10, 4), BuildingKind.BRICKWORKS))
     constructions.build(Track((10, 4), ends))
 
-    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+    world = PixelWorld(tile_map, constructions, sheet, *PLAIN_LOOKS[HexGrid])
 
     buildings = np.flatnonzero(
         np.isin(world.scenery.sprite, [*sheet.variants("house"), sheet.index("brickworks")])
@@ -422,7 +390,7 @@ def test_a_building_with_no_room_clear_of_the_track_is_drawn_under_it(sheet: Spr
         constructions.build(Track((10, 4), ends))
     factory = sheet.index(BUILDING_SPRITES[BuildingKind.BIG_FACTORY])
 
-    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+    world = PixelWorld(tile_map, constructions, sheet, *PLAIN_LOOKS[HexGrid])
 
     at = int(np.flatnonzero(world.scenery.sprite == factory)[0])
     assert world.scenery.under_track[at]
@@ -445,7 +413,7 @@ def test_laying_track_through_a_town_moves_its_buildings_off_it(sheet: SpriteShe
     constructions = Constructions(tile_map)
     for _ in range(4):
         constructions.build(Building((10, 4), BuildingKind.HOUSE))
-    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+    world = PixelWorld(tile_map, constructions, sheet, *PLAIN_LOOKS[HexGrid])
     constructions.build(Track((10, 4), (2, 8)))
 
     world.buildings_changed([(10, 4)])
@@ -534,12 +502,12 @@ def test_placement_leaves_out_chunks_past_the_picture() -> None:
 
 def make_hilly_world(sheet: SpriteSheet, rise_per_col: float = 0.0) -> PixelWorld:
     tile_map = make_tile_map(hills_from_col=6, rise_per_col=rise_per_col)
-    return PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    return PixelWorld(tile_map, Constructions(tile_map), sheet, *PLAIN_LOOKS[HexGrid])
 
 
 def test_mountains_have_no_sprites_and_no_loose_rocks(sheet: SpriteSheet) -> None:
     tile_map = make_tile_map(hills_from_col=4, mountains_from_col=8)
-    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *PLAIN_LOOKS[HexGrid])
     scenery = world.scenery
 
     x, y = world.projection.to_plane(scenery.x, scenery.y)
@@ -590,7 +558,7 @@ def track_chunk(
         constructions.build(piece)
     for station in stations:
         constructions.build(station)
-    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+    world = PixelWorld(tile_map, constructions, sheet, *PLAIN_LOOKS[HexGrid])
     px, py = world.projection.to_pixels(*tile_map.grid.center(*at))
     return world, world.render(int(px // CHUNK), int(py // CHUNK))
 
@@ -802,7 +770,7 @@ def test_the_closest_view_draws_what_stands_on_the_ground_from_the_finest_sheet(
     constructions = Constructions(tile_map)
     for _ in range(6):
         constructions.build(Building((10, 4), BuildingKind.HOUSE))
-    look = LOOKS[HexGrid]
+    look = PLAIN_LOOKS[HexGrid]
     fine_only = PixelWorld(tile_map, constructions, sheet, *look, fine=fine_sheet)
     finest = PixelWorld(
         tile_map, constructions, sheet, *look, fine=fine_sheet, finest=SpriteSheet.load_finest()
@@ -826,7 +794,7 @@ def test_a_copy_of_the_world_carries_the_finest_sheet_as_bytes(
         tile_map,
         Constructions(tile_map),
         sheet,
-        *LOOKS[HexGrid],
+        *PLAIN_LOOKS[HexGrid],
         fine=fine_sheet,
         finest=SpriteSheet.load_finest(),
     )
@@ -842,7 +810,7 @@ def test_a_fine_chunk_keeps_the_grounds_colours_textured_and_draws_what_stands_o
 ) -> None:
     tile_map = make_tile_map()
     constructions = Constructions(tile_map)
-    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid], fine=fine_sheet)
+    world = PixelWorld(tile_map, constructions, sheet, *PLAIN_LOOKS[HexGrid], fine=fine_sheet)
     bare = world.render(0, 1)
     for _ in range(6):
         constructions.build(Building((10, 4), BuildingKind.HOUSE))
@@ -864,7 +832,7 @@ def test_a_fine_chunk_keeps_the_grounds_colours_textured_and_draws_what_stands_o
 
 def test_fine_track_keeps_one_pixel_rails_over_twice_the_pixels(sheet: SpriteSheet) -> None:
     tile_map = make_tile_map()
-    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *PLAIN_LOOKS[HexGrid])
     piece = Track((10, 3), (0, 6))
     px, py = world.projection.to_pixels(*tile_map.grid.center(10, 3))
     left, top = int(px) - 32, int(py) - 32
@@ -1064,7 +1032,7 @@ def desert_beside_grassland() -> TileMap:
 
 def test_biomes_meet_along_a_winding_line_not_along_the_cells_edges(sheet: SpriteSheet) -> None:
     tile_map = desert_beside_grassland()
-    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *PLAIN_LOOKS[HexGrid])
     x, y = world.projection.to_plane(
         np.arange(CHUNK)[None, :] + 0.5, np.arange(CHUNK)[:, None] + 0.5
     )
@@ -1083,7 +1051,7 @@ def test_biomes_meet_along_a_winding_line_not_along_the_cells_edges(sheet: Sprit
 
 def test_land_near_water_is_greener_than_land_far_from_it(sheet: SpriteSheet) -> None:
     tile_map = make_tile_map()
-    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *PLAIN_LOOKS[HexGrid])
     x, y = world.projection.to_plane(
         np.arange(CHUNK)[None, :] + 0.5, np.arange(CHUNK)[:, None] + 0.5
     )
@@ -1107,7 +1075,7 @@ def test_a_chunk_showing_ground_lifted_as_far_as_ground_goes_is_drawn(
     heights = np.broadcast_to(np.where(np.arange(grid.cols) >= 6, 1500, 0), grid.shape)
     tile_map = flat_map(grid=grid, height_m=heights.astype(np.int16), relief=relief)
     constructions = Constructions(tile_map)
-    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid], fine=fine_sheet)
+    world = PixelWorld(tile_map, constructions, sheet, *PLAIN_LOOKS[HexGrid], fine=fine_sheet)
     raised = world.elevation.area(0, 0, CHUNK, CHUNK + MOST_LIFT)
 
     pictures = [world.render(0, 0, k) for k in (1, FINE)]
@@ -1200,7 +1168,7 @@ def test_a_field_fades_into_the_ground_at_its_edge_instead_of_lying_on_it(
     tile_map = make_tile_map()
     constructions = Constructions(tile_map)
     constructions.build(Building((12, 3), kind))
-    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+    world = PixelWorld(tile_map, constructions, sheet, *PLAIN_LOOKS[HexGrid])
     px, py = world.projection.to_pixels(*tile_map.grid.center(12, 3))
     left, top = int(px) - 32, int(py) - 32
     canvas = np.zeros((64, 64, 4))
@@ -1218,7 +1186,7 @@ def test_water_is_lighter_by_the_shore_than_far_out(sheet: SpriteSheet) -> None:
     terrain = np.full(grid.shape, Terrain.LAND, dtype=np.uint8)
     terrain[:, :10] = Terrain.SEA
     tile_map = flat_map(grid=grid, terrain=terrain)
-    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *PLAIN_LOOKS[HexGrid])
     x, y = world.projection.to_plane(
         np.arange(CHUNK * 2)[None, :] + 0.5, np.arange(CHUNK)[:, None] + 0.5
     )
@@ -1236,7 +1204,7 @@ def test_a_raised_chunk_drawn_over_ground_leaves_its_ground_and_lifts_what_lies_
     tile_map = make_tile_map(hills_from_col=4, rise_per_col=150.0, mountains_from_col=8)
     constructions = Constructions(tile_map)
     constructions.build(Building((12, 6), BuildingKind.FARM))
-    world = PixelWorld(tile_map, constructions, sheet, *LOOKS[HexGrid])
+    world = PixelWorld(tile_map, constructions, sheet, *PLAIN_LOOKS[HexGrid])
     world.ground.trees = (np.zeros(0), np.zeros(0))
     assert world.rises(0, 0)
 
@@ -1255,7 +1223,7 @@ def test_both_rails_of_straight_track_show_as_full_bright_lines(
     sheet: SpriteSheet, resolution: int
 ) -> None:
     tile_map = make_tile_map()
-    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *PLAIN_LOOKS[HexGrid])
     piece = Track((10, 3), (0, 6))
     px, py = world.projection.to_pixels(*tile_map.grid.center(10, 3))
     left, top = int(px) - 32, int(py) - 32

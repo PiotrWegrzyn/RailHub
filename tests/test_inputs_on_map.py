@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
-from test_growth import build, only
+from growing import build, only
 
 from builders import flat_map
 from railroads.sim.constructions import BuildingKind, Constructions

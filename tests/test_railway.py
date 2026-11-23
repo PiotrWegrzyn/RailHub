@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from builders import flat_map
+from builders import flat_map, joined_stations
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Track
 from railroads.sim.demand import DEMAND_PER_NEED
 from railroads.sim.economy import SCARCE_WORTH, Economy, StationOrder
@@ -17,7 +17,6 @@ from railroads.sim.finance import (
 from railroads.sim.goods import Good, Need, freight_of, needs_of
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import CELLS_PER_MONTH, Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.station_goods import STOCKPILE, STORAGE_STEP, WAITING, StationGoods
@@ -31,19 +30,6 @@ from railroads.sim.trains import (
     Stop,
     car_size,
 )
-
-
-def joined_stations() -> tuple[Growth, Railway]:
-    constructions = Constructions(flat_map())
-    growth = Growth(constructions, GrowthRule(trades=False))
-    build_station(growth, (6, 3))
-    build_station(growth, (6, 20))
-    route = plan_route(constructions, (6, 3), (6, 20))
-    assert route is not None
-    lay_route(growth, route)
-    railway = Railway(constructions)
-    growth.railway = railway
-    return growth, railway
 
 
 def test_trains_find_their_way_along_track_between_stations() -> None:

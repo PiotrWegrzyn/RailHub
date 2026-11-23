@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from screens import COLS, ROWS, mountain_map, world_over_mountains
 
 from builders import flat_map, layer
 from railroads.sim.constructions import Building, BuildingKind, Constructions
@@ -18,16 +19,6 @@ from railroads.ui.pixel.relief import (
 )
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.world import PixelWorld
-
-ROWS, COLS = 20, 30
-
-
-def mountain_map() -> TileMap:
-    relief = layer(ROWS, COLS, Relief.FLAT)
-    relief[:, 18:] = Relief.MOUNTAINS
-    relief[:, 10:13] = Relief.HILLS
-    heights = np.where(relief == Relief.MOUNTAINS, 1500, 200).astype(np.int16)
-    return flat_map(ROWS, COLS, relief=relief, height_m=heights)
 
 
 def elevation_of(tile_map: TileMap) -> Elevation:
@@ -128,25 +119,6 @@ def test_marks_on_the_map_follow_the_raised_ground() -> None:
     assert raised[0] == flat[0]
     assert flat[1] - raised[1] == float(elevation.lift(x, y)) * camera.pixel_scale
     assert 0 < flat[1] - raised[1] <= MOST_LIFT * camera.pixel_scale
-
-
-def world_over_mountains() -> tuple[PixelWorld, tuple[int, int], tuple[int, int]]:
-    tile_map = mountain_map()
-    look = LOOKS[tile_map.grid.kind]
-    world = PixelWorld(
-        tile_map,
-        Constructions(tile_map),
-        SpriteSheet.load(),
-        look.angle_deg,
-        look.cell_units,
-        fine=SpriteSheet.load_fine(),
-    )
-    grid = tile_map.grid
-    chunks = []
-    for col in (25, 3):
-        px, py = world.projection.to_pixels(*grid.center(10, col))
-        chunks.append((int(px) // 256, int(py) // 256))
-    return world, chunks[0], chunks[1]
 
 
 def test_fine_relief_draws_raised_ground_finely_and_flat_ground_as_before() -> None:

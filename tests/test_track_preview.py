@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from imgui_bundle import imgui
 from PIL import Image
-from test_elevation import world_over_mountains
+from screens import world_over_mountains
 
 from builders import flat_map
 from railroads.sim.constructions import Constructions, Track, TrackWidth

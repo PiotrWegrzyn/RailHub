@@ -3,8 +3,8 @@ from collections.abc import Iterator
 import pytest
 from imgui_bundle import hello_imgui, imgui
 from screens import FakeTexture, gui_context
-from test_railway import joined_stations
 
+from builders import joined_stations
 from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import Good
 from railroads.sim.railway import Railway, Ride

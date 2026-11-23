@@ -4,8 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 from imgui_bundle import hello_imgui, imgui
-from screens import FakeTexture
-from test_elevation import world_over_mountains
+from screens import FakeTexture, world_over_mountains
 from test_pixel_world import chunk_of, track_chunk
 
 from railroads.sim.constructions import Track

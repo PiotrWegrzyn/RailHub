@@ -1,6 +1,6 @@
 import pytest
-from test_railway import joined_stations
 
+from builders import joined_stations
 from railroads.sim.goods import General, Good, Need
 from railroads.sim.railway import Railway
 from railroads.sim.trains import MEDIUM_CAR, Stop, Train

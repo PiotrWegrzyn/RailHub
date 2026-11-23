@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
-from test_railway import joined_stations
 
+from builders import joined_stations
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.economy import Satisfaction
 from railroads.sim.goods import BONUS_PART, Good, Need, needs_of

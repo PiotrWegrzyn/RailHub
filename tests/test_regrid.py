@@ -2,9 +2,8 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
-from test_saves import played_game
 
-from builders import flat_map
+from builders import flat_map, played_game
 from railroads.saves import SavedGame, snapshot, unpickled
 from railroads.sim.constructions import LOCKED, Building, BuildingKind, Station
 from railroads.sim.game import Game

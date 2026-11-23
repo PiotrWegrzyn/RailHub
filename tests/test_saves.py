@@ -9,13 +9,11 @@ from types import BuiltinFunctionType, FunctionType
 import numpy as np
 import pytest
 
-from builders import flat_map
-from railroads.newgame import MapChoice, Settings
+from builders import played_game
 from railroads.saves import (
     MAGIC,
     SAVE_FORMAT,
     ReusedMemory,
-    SavedGame,
     SaveError,
     Saves,
     _Pickler,
@@ -25,34 +23,7 @@ from railroads.saves import (
     snapshot_steps,
     unpickled_steps,
 )
-from railroads.sim.clock import GameClock
-from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.game import Game
-from railroads.sim.trains import Stop
-
-
-def played_game(months: int = 3) -> SavedGame:
-    game = Game(Constructions(flat_map(rows=16, cols=30)))
-    game.finances.cash = 1_000_000.0
-    for _ in range(4):
-        game.growth.build(Building((8, 15), BuildingKind.HOUSE))
-    game.build_station((8, 6))
-    game.build_station((8, 24))
-    game.build_station((2, 2), (3, 9))
-    game.lay_track((8, 6), (8, 24))
-    train = game.railway.buy()
-    assert train is not None
-    train.stops = [Stop((8, 6)), Stop((8, 24))]
-    clock = GameClock(first_year=1850)
-    rng = np.random.default_rng(7)
-    for _ in range(months):
-        clock.advance(clock.seconds_per_month)
-        game.month(rng, clock.date)
-        game.time_passed(0.4)
-    clock.advance(clock.seconds_per_month / 3)
-    settings = Settings(seed=7, map=MapChoice.POLAND, start_year=1850)
-    return SavedGame(game, clock, rng, "Test, seed 7", settings, camera=(4.5, 6.0, 2))
-
+from railroads.sim.constructions import BuildingKind
 
 ATOMS = (Enum, type, FunctionType, BuiltinFunctionType, set, frozenset, str, bytes, int, float)
 

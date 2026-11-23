@@ -2,8 +2,8 @@ import itertools
 import math
 
 import pytest
-from test_railway import joined_stations
 
+from builders import joined_stations
 from railroads.sim.constructions import Track
 from railroads.sim.trains import Train
 

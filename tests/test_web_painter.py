@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from test_elevation import world_over_mountains
+from screens import world_over_mountains
 
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.ui.pixel import copies, web_painter

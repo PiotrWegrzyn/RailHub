@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from test_growth import build, make_map
+from growing import build, make_map
 
 from builders import flat_map, layer
 from railroads.sim.constructions import BuildingKind, Constructions

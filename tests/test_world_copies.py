@@ -3,7 +3,7 @@ import subprocess
 import sys
 
 import numpy as np
-from test_elevation import world_over_mountains
+from screens import world_over_mountains
 
 from railroads.sim.constructions import Building, BuildingKind, Track, TrackWidth
 from railroads.sim.economy import Satisfaction

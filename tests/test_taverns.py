@@ -1,10 +1,9 @@
 import pytest
-from test_railway import joined_stations
 
+from builders import joined_stations, served_at
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.goods import Good
-from railroads.sim.growth import LIVELY_GROWTH, Growth
-from railroads.sim.points import Points
+from railroads.sim.growth import LIVELY_GROWTH
 
 STATION, HOUSE, TAVERN = (6, 20), (6, 21), (5, 20)
 
@@ -19,10 +18,6 @@ def served_house(tavern: bool) -> float:
     )
     growth.trade_goods()
     return served_at(growth, HOUSE)
-
-
-def served_at(growth: Growth, cell: tuple[int, int]) -> float:
-    return float(growth._served[Points.POPULATION][cell[0] * growth.grid.cols + cell[1]])
 
 
 def test_a_tavern_with_all_its_drink_makes_the_homes_around_it_grow_half_as_fast_again() -> None:

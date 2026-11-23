@@ -1,6 +1,6 @@
 import pytest
-from test_railway import joined_stations
 
+from builders import joined_stations
 from railroads.sim.clock import QUARTER
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.goods import TRAVELLERS, Good, makes_of

@@ -1,6 +1,6 @@
 import pytest
-from test_railway import joined_stations
 
+from builders import joined_stations
 from railroads.sim.facilities import COAL_A_MONTH, ENGINE_SHED_SPEED, WAREHOUSE_ROOM, Facility
 from railroads.sim.finance import ENGINE_SHED_PRICE
 from railroads.sim.goods import Good, Need

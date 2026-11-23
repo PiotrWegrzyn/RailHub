@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 from imgui_bundle import hello_imgui, imgui
 from screens import FakeTexture, gui_context
-from test_railway import joined_stations
 
+from builders import joined_stations
 from railroads.sim.clock import QUARTER
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.demand import DEMAND_PER_NEED

@@ -1,5 +1,5 @@
 import pytest
-from test_economy import STATION, counts, holding, make_map
+from trading import STATION, counts, holding, make_map
 
 from builders import boards_with
 from railroads.sim.constructions import BuildingKind

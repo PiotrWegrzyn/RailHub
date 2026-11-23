@@ -1,8 +1,7 @@
 import pytest
-from test_economy import STATION, counts, holding, make_map, position
-from test_railway import joined_stations
-from test_taverns import served_at
+from trading import STATION, counts, holding, make_map, position
 
+from builders import joined_stations, served_at
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.economy import Economy
 from railroads.sim.events import make_factor

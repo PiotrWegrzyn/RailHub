@@ -1,7 +1,6 @@
 import pytest
-from test_railway import joined_stations
 
-from builders import boards_with, flat_map, open_boards
+from builders import boards_with, flat_map, joined_stations, open_boards
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.demand import DEMAND_PER_NEED
 from railroads.sim.economy import input_stock

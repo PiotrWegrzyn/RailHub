@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from test_growth import build, make_map
+from growing import build, make_map
 
 from railroads.sim.constructions import MERGED, BuildingKind, Constructions
 from railroads.sim.goods import FOOD_MERGING, MERGE_BONUS, MERGING, NEEDS, RECIPES

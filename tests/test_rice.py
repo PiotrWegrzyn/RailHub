@@ -2,9 +2,9 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
-from test_economy import STATION, counts, holding, position
-from test_economy import make_map as trade_map
-from test_growth import NO_TRADE, build
+from growing import NO_TRADE, build
+from trading import STATION, counts, holding, position
+from trading import make_map as trade_map
 
 from builders import flat_map, layer
 from railroads.sim.constructions import BuildingKind, Constructions

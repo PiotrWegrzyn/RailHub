@@ -11,10 +11,8 @@ import pytest
 from imgui_bundle import hello_imgui, imgui
 from imgui_bundle import icons_fontawesome_4 as fa
 from screens import FakeTexture, gui_context
-from test_saves import played_game
-from test_web_setup import SETTINGS, FakePage, grows_as
 
-from builders import flat_map
+from builders import SETTINGS, FakePage, flat_map, grows_as, played_game
 from railroads.land import lot_middle
 from railroads.newgame import MapChoice, Settings, make_game
 from railroads.saves import SavedGame, Saves
