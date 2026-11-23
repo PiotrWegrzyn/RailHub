@@ -403,7 +403,7 @@ Query parameters:
 
         const code = measure
             ? await (await fetch(query.get("measure") || "measure.py")).text()
-            : "from railroads.ui.app import main\nmain()";
+            : "from railroads.ui.cli import main\nmain()";
         pyodide.globals.set("game_args", pyodide.toPy(args));
         pyodide.runPython("import sys\nsys.argv = ['railroads', *game_args]");
         mark("python_start");
