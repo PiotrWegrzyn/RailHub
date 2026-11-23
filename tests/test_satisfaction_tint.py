@@ -5,9 +5,9 @@ import numpy as np
 import pytest
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.economy import Trade
 from railroads.sim.grids import SquareGrid
 from railroads.sim.towns import Towns
+from railroads.sim.trade import Trade
 from railroads.ui.map_overlays import (
     HALF_SATISFIED_TINT,
     LITTLE_SATISFIED_TINT,

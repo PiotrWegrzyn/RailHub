@@ -4,11 +4,12 @@ import pytest
 from builders import square_map
 from railroads.mapgen.deposits import place_deposits
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.economy import Economy, StationOrder
+from railroads.sim.economy import Economy
 from railroads.sim.goods import NEEDS, Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import CHURCHES, FARMS, ORCHARDS
 from railroads.sim.tilemap import Deposit, Relief
+from railroads.sim.trade import StationOrder
 
 RANKS = (
     BuildingKind.CHURCH,

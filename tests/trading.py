@@ -5,14 +5,11 @@ import numpy as np
 
 from builders import flat_map
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.economy import (
-    COLLECTION_RADIUS,
-    Economy,
-    StationOrder,
-)
+from railroads.sim.economy import Economy
 from railroads.sim.goods import Good
 from railroads.sim.grids import HexGrid
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
+from railroads.sim.trade import COLLECTION_RADIUS, StationOrder
 
 STATION = (8, 10)
 

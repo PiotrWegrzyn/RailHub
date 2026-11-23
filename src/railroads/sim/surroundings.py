@@ -8,8 +8,8 @@ from functools import cached_property
 import numpy as np
 import numpy.typing as npt
 
-from railroads.sim.economy import Neighbourhoods
 from railroads.sim.grids import FlatIndices, FloatArray
+from railroads.sim.reach import Neighbourhoods
 from railroads.sim.tilemap import Deposit, Relief, Temperature, Terrain, TileMap, Vegetation
 
 # Each land's weight tables (Land._tables), kept with the land they belong to.

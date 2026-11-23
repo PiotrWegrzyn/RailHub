@@ -6,7 +6,6 @@ from growing import NO_TRADE, build, make_map, only
 
 from builders import flat_map, layer
 from railroads.sim.constructions import BuildingKind, Constructions
-from railroads.sim.economy import Trade
 from railroads.sim.grids import Cell
 from railroads.sim.growth import (
     BREEDING_TIMES,
@@ -41,6 +40,7 @@ from railroads.sim.points import Points
 from railroads.sim.room import SPILL_STEPS
 from railroads.sim.surroundings import Land
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.trade import Trade
 
 PLAIN_FARMS = replace(FARMS, crowded_at=None, land=replace(FARMS.land, open_field=1.0))
 

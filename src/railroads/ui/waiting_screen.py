@@ -11,9 +11,9 @@ from typing import Self
 import numpy as np
 from imgui_bundle import imgui
 
-from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import FITS, Need
 from railroads.sim.ownership import LOT, MOST_PRICED, SHARES, satisfaction_price
+from railroads.sim.trade import SCARCE_WORTH
 
 RANDOM_JOKES = ("Random bullshit coming!",)
 JOKE_SECONDS = 5.0

@@ -5,8 +5,8 @@ must get apart from the bonus goods and boosts it can do without."""
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.economy import Satisfaction
 from railroads.sim.ownership import LOT, LOTS, MOST_PRICED
+from railroads.sim.trade import Satisfaction
 from railroads.ui.hex_rows import (
     HELD,
     BuildingRow,

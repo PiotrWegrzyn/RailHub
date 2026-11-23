@@ -2,11 +2,11 @@ import numpy as np
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.economy import Neighbourhoods
 from railroads.sim.forests import FORESTS, ForestRule, change_forests, forest_turn, forests_nearby
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import LOGGING_CAMPS, TOWNS, GrowthRule
+from railroads.sim.reach import Neighbourhoods
 from railroads.sim.tilemap import Relief, TileMap, Vegetation
 
 STILL = ForestRule(clearing_per_point=0.0, clearing_per_mill=0.0, spread_per_forest=0.0)

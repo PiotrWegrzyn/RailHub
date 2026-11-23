@@ -3,7 +3,6 @@ import pytest
 
 from builders import flat_map, layer
 from railroads.sim.constructions import BuildingKind, Constructions
-from railroads.sim.economy import Trade
 from railroads.sim.events import electricity_use
 from railroads.sim.fuel_market import (
     BASE_PRICE,
@@ -26,6 +25,7 @@ from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.tilemap import Relief
+from railroads.sim.trade import Trade
 from railroads.sim.trains import BULK_CAR, BURN_ALONE, ENGINES, Car, Stop, Train
 
 WEST, EAST = (6, 3), (6, 20)

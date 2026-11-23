@@ -20,11 +20,11 @@ from railroads import maps
 from railroads.mapgen.deposits import place_deposits
 from railroads.sim.clock import HISTORY_START, MONTHS_PER_YEAR
 from railroads.sim.constructions import BuildingKind, Constructions
-from railroads.sim.economy import Satisfaction
 from railroads.sim.goods import Need
 from railroads.sim.growth import Growth
 from railroads.sim.sandbox import FOOD_ONLY, SANDBOX_SIZE, small_map
 from railroads.sim.tilemap import Deposit
+from railroads.sim.trade import Satisfaction
 
 KINDS = (
     BuildingKind.HOUSE,

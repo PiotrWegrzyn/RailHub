@@ -1,8 +1,8 @@
 import pytest
 
 from railroads.sim.demand import DemandRecord
-from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import HANDED_OUT, Good, Need, freight_of
+from railroads.sim.trade import SCARCE_WORTH
 from railroads.ui.demand_view import coins_for, demand_lines
 from railroads.words import dollars
 

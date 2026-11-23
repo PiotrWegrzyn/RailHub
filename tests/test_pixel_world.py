@@ -15,9 +15,9 @@ from railroads.sim.constructions import (
     Track,
     TrackWidth,
 )
-from railroads.sim.economy import Satisfaction
 from railroads.sim.grids import Cell, Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.trade import Satisfaction
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 from railroads.ui.pixel import track_art
 from railroads.ui.pixel.art.registry import SPRITES, draw_sheet

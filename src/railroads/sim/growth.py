@@ -76,12 +76,7 @@ from railroads.sim.constructions import (
     BuildingKind,
     Constructions,
 )
-from railroads.sim.economy import (
-    BONUS_PER_GOOD,
-    Economy,
-    Trade,
-    levels_of,
-)
+from railroads.sim.economy import Economy
 from railroads.sim.events import military_growth
 from railroads.sim.forests import change_forests
 from railroads.sim.goods import FITS, HOMES, MAKES, RECIPES, Good
@@ -110,6 +105,7 @@ from railroads.sim.surroundings import Land, Surroundings
 from railroads.sim.tilemap import REFERENCE_LAND, Relief, Terrain, TileMap, Vegetation
 from railroads.sim.tiles import era_come, kind_era
 from railroads.sim.towns import Towns
+from railroads.sim.trade import BONUS_PER_GOOD, Trade, levels_of
 from railroads.sim.year_caches import year_cached
 from railroads.sim.yearly import demands_of, makes_of
 

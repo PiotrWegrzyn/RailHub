@@ -19,13 +19,13 @@ from railroads.catalogue import (
 from railroads.land import NOVELTY_SHARE, TOP_UP_SHARE
 from railroads.sim.clock import END_YEAR, HISTORY_START
 from railroads.sim.company import BANKRUPT_MONTHS, BOOK_SHARE, TARGETS, Difficulty
-from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import (
     FREIGHT_SHARE,
     Good,
 )
 from railroads.sim.lots import AROUND, FIRST_FOR_SALE, START_LOTS, land_price
 from railroads.sim.tilemap import START_SHARE
+from railroads.sim.trade import SCARCE_WORTH
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.search import goods_of
 from railroads.ui.theme import (

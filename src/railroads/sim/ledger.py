@@ -17,8 +17,8 @@ import numpy.typing as npt
 
 from railroads.sim.clock import MONTHS_PER_YEAR, QUARTER
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.economy import Trade
 from railroads.sim.goods import freight_of, price_of
+from railroads.sim.trade import Trade
 
 # What a month's takings of each cell hold, in this order.
 OUTPUT, SOLD, FREIGHT = range(3)

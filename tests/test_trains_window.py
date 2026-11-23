@@ -6,9 +6,9 @@ from screens import FakeTexture, gui_context
 
 from builders import joined_stations
 from railroads.catalogue import engine_figures
-from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import Good
 from railroads.sim.railway import Railway, Ride
+from railroads.sim.trade import SCARCE_WORTH
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, OPENED_BY, Car, Stop, Train
 from railroads.ui import buy_train
 from railroads.ui.train_texts import (

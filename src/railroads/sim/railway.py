@@ -43,7 +43,6 @@ from railroads.sim.calls import StationCalls
 from railroads.sim.clock import SECONDS_PER_MONTH, START_YEAR
 from railroads.sim.constructions import Constructions
 from railroads.sim.demand import StationDemand
-from railroads.sim.economy import COLLECTION_RADIUS, DELIVERY_RADIUS, Trade
 from railroads.sim.events import price_factor as history_price
 from railroads.sim.facilities import (
     ENGINE_SHED_SPEED,
@@ -88,6 +87,7 @@ from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
 from railroads.sim.tiles import Tiles
 from railroads.sim.track_network import TrackNetwork
+from railroads.sim.trade import COLLECTION_RADIUS, DELIVERY_RADIUS, Trade
 from railroads.sim.trains import (
     BURN_ALONE,
     ENGINES,

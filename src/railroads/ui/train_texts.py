@@ -9,9 +9,9 @@ from railroads.catalogue import (
     track_needed,
 )
 from railroads.sim.amounts import EPSILON
-from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import Good
 from railroads.sim.railway import NO_WAY_ON, Railway, Ride
+from railroads.sim.trade import SCARCE_WORTH
 from railroads.sim.trains import (
     ENGINES,
     Engine,

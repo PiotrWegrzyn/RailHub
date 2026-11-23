@@ -14,13 +14,14 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import Building, Construction, Constructions, Station
-from railroads.sim.economy import Economy, Stockpiles, Trade
+from railroads.sim.economy import Economy
 from railroads.sim.game import Game
 from railroads.sim.grids import HEX_ROW_STEP, Cell, Grid, HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.summaries import Reach
 from railroads.sim.tilemap import TileMap
 from railroads.sim.track_network import TrackNetwork
+from railroads.sim.trade import Stockpiles, Trade
 from railroads.sim.trains import Train
 
 

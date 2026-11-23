@@ -5,8 +5,8 @@ share and what a unit earns."""
 from imgui_bundle import imgui
 
 from railroads.sim.demand import DemandRecord, StationDemand
-from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import FITS, HANDED_OUT, TRAVELLERS, Need, freight_of
+from railroads.sim.trade import SCARCE_WORTH
 from railroads.ui.theme import BORDER, BRASS, BRASS_DARK, color_u32, good_icon, next_good_slot
 from railroads.words import dollars
 

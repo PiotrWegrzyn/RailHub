@@ -13,12 +13,12 @@ from railroads.mapgen.seeding import (
 )
 from railroads.sim.clock import HISTORY_START
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station, Track
-from railroads.sim.economy import Neighbourhoods
 from railroads.sim.forests import MILLS_CLOSE_BELOW, forests_nearby
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import MONTHS_BEFORE_PLAY, Growth
 from railroads.sim.ladder_types import Ladder
 from railroads.sim.ladders import FACTORIES, FARMS, GROWTH, LOGGING_CAMPS, MINES, PORTS, TOWNS
+from railroads.sim.reach import Neighbourhoods
 from railroads.sim.steps import finish
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
 

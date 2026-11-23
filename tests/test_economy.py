@@ -5,20 +5,20 @@ from trading import STATION, counts, flat, holding, make_map, position
 from railroads.sim import economy as economy_module
 from railroads.sim.clock import QUARTER, START_YEAR
 from railroads.sim.constructions import BuildingKind
-from railroads.sim.economy import (
-    COLLECTION_RADIUS,
-    SCARCE_WORTH,
-    Economy,
-    OwnedShare,
-    Satisfaction,
-    StationOrder,
-    levels_of,
-)
+from railroads.sim.economy import Economy
 from railroads.sim.events import make_factor
 from railroads.sim.goods import BONUS_PART, MAKES, PIPELINE, Good, Need
 from railroads.sim.ladders import LOGGING_CAMPS, MINES
 from railroads.sim.steps import finish
 from railroads.sim.tiles import Tiles, activate
+from railroads.sim.trade import (
+    COLLECTION_RADIUS,
+    SCARCE_WORTH,
+    OwnedShare,
+    Satisfaction,
+    StationOrder,
+    levels_of,
+)
 from railroads.sim.yearly import makes_of, needs_of
 
 FARM_MONTH = makes_of(BuildingKind.FARM, START_YEAR)[Good.WHEAT]

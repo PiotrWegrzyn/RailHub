@@ -6,9 +6,9 @@ import numpy as np
 from screens import world_over_mountains
 
 from railroads.sim.constructions import Building, BuildingKind, Track, TrackWidth
-from railroads.sim.economy import Satisfaction
 from railroads.sim.tilemap import Vegetation
 from railroads.sim.track_rules import TrackBed
+from railroads.sim.trade import Satisfaction
 from railroads.ui.pixel.copies import (
     GROUND,
     TRACK,

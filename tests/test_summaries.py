@@ -2,7 +2,6 @@ import numpy as np
 
 from railroads.sim.clock import GameClock
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.economy import COLLECTION_RADIUS
 from railroads.sim.geo import Bounds
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
@@ -10,6 +9,7 @@ from railroads.sim.ladders import GrowthRule
 from railroads.sim.routes import build_station
 from railroads.sim.summaries import Reach, summarize
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
+from railroads.sim.trade import COLLECTION_RADIUS
 
 
 def make_growth() -> Growth:

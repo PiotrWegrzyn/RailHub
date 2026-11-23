@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.ownership import LOT, SHARES
+from railroads.sim.trade import SCARCE_WORTH
 from railroads.ui.waiting_screen import (
     HEX_RADIUS,
     JOKE_SECONDS,

@@ -3,13 +3,13 @@ import pytest
 from builders import boards_with, flat_map, joined_stations, open_boards
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.demand import DEMAND_PER_NEED
-from railroads.sim.economy import input_stock
 from railroads.sim.goods import Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station
 from railroads.sim.tiles import Tile, activate
+from railroads.sim.trade import input_stock
 
 
 def close_stations() -> tuple[Growth, Railway]:

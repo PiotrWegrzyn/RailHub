@@ -12,15 +12,16 @@ from imgui_bundle import imgui
 
 from railroads.sim.amounts import EPSILON
 from railroads.sim.constructions import Building, Construction, Constructions, Station, Track
-from railroads.sim.economy import HALF_SATISFIED, LOCAL_REACH, Satisfaction, Trade
 from railroads.sim.goods import HANDED_OUT
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, FloatArray, Grid
 from railroads.sim.growth import Growth
 from railroads.sim.ownership import Owners
 from railroads.sim.railway import Railway
+from railroads.sim.reach import LOCAL_REACH
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.towns import Towns
 from railroads.sim.track_rules import TrackBed
+from railroads.sim.trade import HALF_SATISFIED, Satisfaction, Trade
 from railroads.sim.yearly import makes_of, needs_of
 from railroads.ui.biomes import biome_of
 from railroads.ui.build_menu import reach_border

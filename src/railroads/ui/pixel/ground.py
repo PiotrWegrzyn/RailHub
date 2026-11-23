@@ -15,9 +15,9 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.economy import Satisfaction
 from railroads.sim.grids import FloatArray, Grid, HexGrid, IntArray
 from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
+from railroads.sim.trade import Satisfaction
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.building_spots import Plot, plots_of
 from railroads.ui.pixel.lattice import BoolArray, Lattice

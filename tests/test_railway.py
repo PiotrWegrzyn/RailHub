@@ -4,7 +4,7 @@ import pytest
 from builders import flat_map, joined_stations
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Track
 from railroads.sim.demand import DEMAND_PER_NEED
-from railroads.sim.economy import SCARCE_WORTH, Economy, StationOrder
+from railroads.sim.economy import Economy
 from railroads.sim.finance import (
     CAR_TRIP_PRICE,
     STATION_UPKEEP,
@@ -20,6 +20,7 @@ from railroads.sim.growth import Growth
 from railroads.sim.railway import CELLS_PER_MONTH, Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.station_goods import STOCKPILE, STORAGE_STEP, WAITING, StationGoods
+from railroads.sim.trade import SCARCE_WORTH, StationOrder
 from railroads.sim.trains import (
     BULK_CAR,
     CAR_CAPACITY,

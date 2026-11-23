@@ -10,13 +10,14 @@ from test_app_frame import context, frame, shell_frame
 from railroads.land import buy_lot_steps
 from railroads.saves import SavedGame, Saves
 from railroads.sim.constructions import Building, BuildingKind
-from railroads.sim.economy import BONUS_PER_GOOD, LOCAL_REACH, SCARCE_WORTH
 from railroads.sim.finance import START_CASH, TRACK_PRICE
 from railroads.sim.game import Game
 from railroads.sim.goods import FREIGHT_SHARE, Good
 from railroads.sim.ownership import HOLD_MONTHS, SHARES
+from railroads.sim.reach import LOCAL_REACH
 from railroads.sim.steps import finish
 from railroads.sim.tilemap import LAYERS
+from railroads.sim.trade import BONUS_PER_GOOD, SCARCE_WORTH
 from railroads.sim.trains import Stop
 from railroads.tutorial.game import make_tutorial
 from railroads.tutorial.place import (
