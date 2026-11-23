@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 
 from railroads.sim.finance import TRAIN_PRICE
 from railroads.sim.goods import General, Good
+from railroads.sim.move import Move
 
 # What a stop asks for a car of: one good, or a whole kind of goods.
 type Cargo = Good | General
@@ -1027,3 +1028,18 @@ class Train:
         if (self.heading - 1) % len(self.stops) == index % len(self.stops):
             self.called = False
             self.waiting = 0.0
+
+    def move(self, move: Move) -> None:
+        """Moves the train, its stops and where its goods came from onto the moved map."""
+        for stop in self.stops:
+            stop.cell = move.cell(stop.cell)
+        if self.loaded_at is not None:
+            self.loaded_at = move.cell(self.loaded_at)
+        if self.platform is not None:
+            self.platform = move.cell(self.platform)
+        for car in self.cars:
+            car.origins = move.parcels(car.origins)
+        self.path = [move.point(point) for point in self.path]
+        if self.path_ends is not None:
+            points, lengths = self.path_ends
+            self.path_ends = ([move.point(point) for point in points], lengths)

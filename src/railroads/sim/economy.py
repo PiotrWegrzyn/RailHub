@@ -67,6 +67,7 @@ from railroads.sim.goods import (
     Need,
 )
 from railroads.sim.grids import Cell, FloatArray, flat_within_any
+from railroads.sim.move import Move
 from railroads.sim.reach import REACH_SHARES, RING_PAD, Neighbourhoods, ring_starts, rings_of
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import TileMap
@@ -235,6 +236,23 @@ class Economy:
         take = min(room, total)
         sold[positions] += spare * (take / total)
         return take
+
+    def moved_into(self, new: Economy, move: Move) -> Economy:
+        """`new`, an economy of the moved map, given what this one remembers, moved."""
+        new.levels = move.flat_cells(self.levels, self.levels.dtype.type(new.levels[0]))
+        new.year = self.year
+        new.bonus_per_good = self.bonus_per_good
+        stock = Stockpiles(new.cells)
+        for key, held in self.stock.items():
+            stock[key] = move.flat_cells(held)
+        new.stock = stock
+        new.months = [move.flat_cells(month, 1.0) for month in self.months]
+        if self.taken is not None:
+            new.taken = {
+                key: {move.flat(cell): amount for cell, amount in taken.items()}
+                for key, taken in self.taken.items()
+            }
+        return new
 
 
 @year_cached

@@ -8,7 +8,8 @@ from railroads.saves import SavedGame, snapshot, unpickled
 from railroads.sim.constructions import LOCKED, Building, BuildingKind, Station
 from railroads.sim.game import Game
 from railroads.sim.grids import HEX_ROW_STEP, HexGrid
-from railroads.sim.regrid import Move, regrid
+from railroads.sim.move import Move
+from railroads.sim.regrid import regrid
 from railroads.sim.tilemap import TileMap
 
 DOWN, RIGHT = 2, 3

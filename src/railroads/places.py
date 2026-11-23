@@ -21,6 +21,7 @@ from railroads.mapgen import world_files
 from railroads.mapgen.world_files import World
 from railroads.sim.geo import KM_PER_DEGREE_LAT, Bounds
 from railroads.sim.grids import Cell
+from railroads.sim.move import Move
 from railroads.sim.tilemap import TileMap
 
 REACH_KM = 1.0
@@ -143,3 +144,8 @@ class StationNames:
         while f"{town} [{number}]" in taken:
             number += 1
         return f"{town} [{number}]"
+
+    def move_onto(self, tile_map: TileMap, move: Move) -> None:
+        """Keeps the stations' names, by their moved cells, on the bigger map."""
+        self.tile_map = tile_map
+        self._names = move.keys(self._names)

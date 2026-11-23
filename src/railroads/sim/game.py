@@ -8,6 +8,7 @@ STATION_PRICE and clearing its site (railroads.sim.demolition), track what route
 bulldozer what clearing the cell does, and moving a station what a new one there would.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -17,13 +18,14 @@ from railroads.sim import routes
 from railroads.sim.autoplay import StandInPlayer, play
 from railroads.sim.clock import MONTHS_PER_YEAR, START_YEAR
 from railroads.sim.company import Goal, News, company_value
-from railroads.sim.constructions import Constructions, TrackWidth
+from railroads.sim.constructions import Building, Constructions, TrackWidth
 from railroads.sim.demolition import bulldoze, bulldoze_price, station_site_price
 from railroads.sim.finance import STATION_PRICE, Finances
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.happenings import Happenings, Headline
 from railroads.sim.lots import Lots
+from railroads.sim.move import Move
 from railroads.sim.railway import MAX_LEVEL, PLATFORM_LEVEL, QUADRUPLE_ERA, Railway
 from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
@@ -251,3 +253,17 @@ class Game:
         self.finances.spend(STATION_PRICE, "stations")
         if site:
             self.finances.spend(site, "demolition")
+
+    def move_onto(self, tile_map: TileMap, move: Move, buildings: Iterable[Building] = ()) -> None:
+        """Moves the game onto `tile_map` as `move` moves its cells, and puts up `buildings`
+        there, already on the new map's cells: those that can stand there as the map now is."""
+        self.constructions.move_onto(tile_map, move)
+        for building in buildings:
+            if self.constructions.why_not(building) is None:
+                self.constructions.build(building)
+        self.tile_map = tile_map
+        self.growth = self.growth.moved(move)
+        self.railway.move_onto(tile_map, self.growth, move)
+        self._reach = Reach(tile_map.grid)
+        if self.stand_in is not None:
+            self.stand_in.move_onto(self.growth, move)

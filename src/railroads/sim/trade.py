@@ -4,8 +4,9 @@ stockpiles stations keep (Stockpiles)."""
 
 import weakref
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import IntEnum
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -19,6 +20,7 @@ from railroads.sim.goods import (
     Need,
 )
 from railroads.sim.grids import Cell, FloatArray
+from railroads.sim.move import Move
 from railroads.sim.year_caches import year_cached
 
 
@@ -223,6 +225,38 @@ class Trade:
         """Satisfaction of each cell's buildings of these kinds, or of all of them; cells with
         none count as thriving."""
         return levels_of(self.share(kinds if kinds is not None else tuple(self.needed)))
+
+    def moved(self, move: Move) -> Trade:
+        """This trade on the moved cells: its arrays follow its cells, or the map."""
+        size = move.old.rows * move.old.cols
+
+        def values(value: Any) -> Any:
+            if isinstance(value, tuple):
+                return tuple(values(part) for part in value)
+            if isinstance(value, np.ndarray) and value.shape[-1:] == (size,):
+                return move.flat_cells(value)
+            return value
+
+        def arrays[K](by_key: Mapping[K, Any]) -> dict[K, Any]:
+            return {key: values(value) for key, value in by_key.items()}
+
+        return replace(
+            self,
+            cells=move.flats(self.cells),
+            got=arrays(self.got),
+            needed=arrays(self.needed),
+            gave=arrays(self.gave),
+            could_make=arrays(self.could_make),
+            handed=move.keys(self.handed),
+            gathered=move.keys(self.gathered),
+            goods_got=arrays(self.goods_got),
+            goods_gave=arrays(self.goods_gave),
+            handed_for=move.keys(self.handed_for),
+            bonus=arrays(self.bonus),
+            local=arrays(self.local),
+            worth=arrays(self.worth),
+            owned_brought=move.keys(self.owned_brought),
+        )
 
 
 # Every processor's kind and each input it ever takes in.

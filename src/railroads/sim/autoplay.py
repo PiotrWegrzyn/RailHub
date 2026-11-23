@@ -15,6 +15,7 @@ from railroads.sim.constructions import BuildingKind, Station
 from railroads.sim.goods import price_of
 from railroads.sim.grids import Cell, Grid, parity_steps
 from railroads.sim.growth import Growth
+from railroads.sim.move import Move
 from railroads.sim.points import Points
 from railroads.sim.railway import Railway
 from railroads.sim.steps import Steps, finish
@@ -174,6 +175,12 @@ class StandInPlayer:
         for _, cell, kind, price in offers[: self.rule.buys_per_year]:
             self.railway.finances.spend(price, "buildings bought")
             growth.owners.own(cell, kind)
+
+    def move_onto(self, growth: Growth, move: Move) -> None:
+        """Plays on in the moved game, its stations by their moved cells."""
+        self.growth = growth
+        self.stations = [move.cell(station) for station in self.stations]
+        self._grid = growth.constructions.tile_map.grid
 
 
 def reach_sums(grid: Grid, values: npt.NDArray[np.int64], steps: int) -> npt.NDArray[np.int64]:

@@ -100,6 +100,7 @@ from railroads.sim.ladders import (
     ladder_of,
 )
 from railroads.sim.ledger import Ledger
+from railroads.sim.move import Move
 from railroads.sim.ownership import Owners
 from railroads.sim.points import Points
 from railroads.sim.power_plants import build_power_plants
@@ -1289,3 +1290,35 @@ class Growth:
         own_rows, own_cols = np.indices(values.shape)
         off_map = (rows == own_rows) & (cols == own_cols)
         return values + np.where(off_map, 0, values[rows, cols]).sum(axis=0)
+
+    def moved(self, move: Move) -> Growth:
+        """A growth for the moved constructions, worked out afresh and given what this one
+        remembered, without the month of trade a new one starts with."""
+        growth = Growth(
+            self.constructions, replace(self.rule, trades=False), self.start_year, self.history
+        )
+        growth.rule = self.rule
+        growth._months = self._months
+        growth._served = {
+            points: move.flat_cells(served) for points, served in self._served.items()
+        }
+        if self._starving is not None:
+            growth._starving = {
+                kind: move.flat_cells(starving) for kind, starving in self._starving.items()
+            }
+        growth._traded = move.flats(self._traded)
+        if self.assumed_shares is not None:
+            growth.assumed_shares = move.flat_cells(self.assumed_shares, np.nan)
+        growth.forests_changed = move.cells(self.forests_changed)
+        growth.economy = self.economy.moved_into(growth.economy, move)
+        growth.last_trade = None if self.last_trade is None else self.last_trade.moved(move)
+        growth.owners.take_moved(self.owners, move)
+        if self.novelties is not None:
+            self.novelties.move(move)
+        growth.novelties = self.novelties
+        growth.railway = self.railway
+        growth._stack()
+        growth._reckon_everywhere()
+        for place in growth._places:
+            place.highest = float(place.chances.max()) if place.chances.size else 0.0
+        return growth

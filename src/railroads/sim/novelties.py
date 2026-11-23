@@ -21,6 +21,7 @@ import numpy.typing as npt
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.grids import BoolGrid, Cell
 from railroads.sim.growth import Growth
+from railroads.sim.move import Move
 from railroads.sim.points import Points
 from railroads.sim.tilemap import REFERENCE_LAND, Deposit, Relief, Terrain, TileMap
 
@@ -275,3 +276,8 @@ class Novelties:
             return set()
         self.hosts.append(built[0])
         return {built[1]}
+
+    def move(self, move: Move) -> None:
+        """Moves the hosts and railway works onto the moved map."""
+        self.hosts = [move.cell(cell) for cell in self.hosts]
+        self.works = [move.cell(cell) for cell in self.works]

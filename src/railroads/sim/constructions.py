@@ -11,6 +11,7 @@ from dataclasses import dataclass, replace
 from enum import Enum, IntEnum
 
 from railroads.sim.grids import Cell
+from railroads.sim.move import Move
 from railroads.sim.tilemap import Relief, Terrain, Tile, TileMap
 from railroads.sim.track_rules import TrackBed, track_rules_for
 
@@ -764,6 +765,26 @@ class Constructions:
     def _by_water(self, cell: Cell) -> bool:
         terrain = self.tile_map.terrain
         return any(terrain[other] != Terrain.LAND for other in self.tile_map.grid.neighbours(*cell))
+
+    def move_onto(self, tile_map: TileMap, move: Move) -> None:
+        """Moves everything built onto a bigger map, every cell as `move` moves it."""
+
+        def moved(built: Construction) -> Construction:
+            if isinstance(built, Station) and built.main is not None:
+                return replace(built, cell=move.cell(built.cell), main=move.cell(built.main))
+            return replace(built, cell=move.cell(built.cell))
+
+        self.tile_map = tile_map
+        self._cells = {
+            move.cell(cell): [moved(built) for built in here] for cell, here in self._cells.items()
+        }
+        self._stations = move.cells(self._stations)
+        self._platforms = {
+            move.cell(main): move.cells(added) for main, added in self._platforms.items()
+        }
+        self._track = move.keys(self._track)
+        self.version += 1
+        self.railway_version += 1
 
 
 def _site_problem(tile: Tile, relief: frozenset[Relief], name: str) -> str | None:

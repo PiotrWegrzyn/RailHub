@@ -82,9 +82,11 @@ from railroads.sim.goods import (
     price_of,
 )
 from railroads.sim.grids import Cell
+from railroads.sim.move import Move
 from railroads.sim.signals import Signals
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
+from railroads.sim.tilemap import TileMap
 from railroads.sim.tiles import Tiles
 from railroads.sim.track_network import TrackNetwork
 from railroads.sim.trade import COLLECTION_RADIUS, DELIVERY_RADIUS, Trade
@@ -110,6 +112,7 @@ from railroads.sim.trains import (
 from railroads.sim.year_caches import forget
 
 if TYPE_CHECKING:
+    from railroads.sim.growth import Growth
     from railroads.sim.happenings import Happenings
     from railroads.sim.ownership import Owners
     from railroads.sim.station_trade import StationTrade
@@ -916,3 +919,25 @@ class Railway:
     def position(self, train: Train, back: float = 0.0) -> tuple[Point, Point] | None:
         """Where the train is on the map, and which way it faces (TrackNetwork.position)."""
         return self.network.position(train, back)
+
+    def move_onto(self, tile_map: TileMap, growth: Growth, move: Move) -> None:
+        """Moves the stations' goods, demand, levels, facilities and names and every train onto
+        the moved map, trading with `growth` from now on."""
+        growth.railway = self
+        self.station_trade = growth.station_trade
+        self.owners = growth.owners
+        self.goods = move.keys(self.goods)
+        for goods in self.goods.values():
+            goods.origins = {good: move.parcels(parcels) for good, parcels in goods.origins.items()}
+        self.demand = move.keys(self.demand)
+        self.levels = move.keys(self.levels)
+        if self.facilities is not None:
+            self.facilities = move.keys(self.facilities)
+        if self.supplied is not None:
+            self.supplied = move.keys(self.supplied)
+        self._towns = {}
+        self.name_of.move_onto(tile_map, move)
+        for train in self.trains:
+            train.move(move)
+        self.network = TrackNetwork(self.constructions)
+        growth.station_trade.update_reach()
