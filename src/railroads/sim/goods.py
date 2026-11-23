@@ -519,8 +519,8 @@ class Recipe:
     other inputs makes with it: plastic for glass at a juice works makes twice the juice from
     the same fruit. Boosts in `takes_more` let it take in more instead, up to so much more
     each, making as much from every unit of its inputs: machinery lets a sawmill saw twice the
-    logs. What else every unit made leaves over it offers too (also): the wood chips of the
-    planks a sawmill saws."""
+    logs, chemicals let a paper mill pulp twice the wood chips. What else every unit made leaves
+    over it offers too (also): the wood chips of the planks a sawmill saws."""
 
     makes: Good
     most: float
@@ -707,7 +707,11 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
                 {Need.STEEL: 1.0, Need.COPPER: 0.5, Need.PLASTICS: 0.5, Need.ELECTRONICS: 0.25},
             ),
             BuildingKind.PAPER_MILL: Recipe(
-                Good.PAPER, 100, {Need.WOOD_CHIPS: 0.1, Need.CHEMICALS: 0.25}
+                Good.PAPER,
+                100,
+                {Need.WOOD_CHIPS: 0.1},
+                {Need.CHEMICALS: 0.25},
+                takes_more={Need.CHEMICALS: 1.0},
             ),
             BuildingKind.PRINTING_WORKS: Recipe(Good.NEWSPAPERS, 3000, {Need.PAPER: 0.05}),
             BuildingKind.SUGAR_REFINERY: Recipe(

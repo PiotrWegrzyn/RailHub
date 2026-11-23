@@ -592,7 +592,7 @@ window (H) lists the same.
 | Shoe factory (1850) | 20 shoes | 40 leather | 10 wax |
 | Plastics works (era 6) | 100 plastics | 50 oil (from era 2), 50 chemicals (from era 3) |  |
 | Appliance factory (era 6) | 30 appliances | 30 steel (from era 2), 15 copper (from era 4), 15 plastics (from era 6), 7.5 electronics (from era 6) |  |
-| Paper mill (1150) | 100 paper | 10 wood chips, 25 chemicals (from era 3) |  |
+| Paper mill (1150) | 100 paper | 10 wood chips | 25 chemicals (from era 3) |
 | Printing works (1600) | 3,000 newspapers | 150 paper (from 1150) |  |
 | Sugar refinery (1800) | 60 refined sugar | 30 sugar | 6 coal (from 1700), 6 limestone |
 | Porcelain works (1710) | 30 porcelain | 15 clay | 7.5 coal (from 1700) |
@@ -666,8 +666,8 @@ window (H) lists the same.
 | Mega plastics works (era 6) | 625 plastics | 312.5 oil (from era 2), 312.5 chemicals (from era 3) |  |
 | Big appliance factory (era 6) | 75 appliances | 75 steel (from era 2), 37.5 copper (from era 4), 37.5 plastics (from era 6), 18.75 electronics (from era 6) |  |
 | Mega appliance factory (era 6) | 187.5 appliances | 187.5 steel (from era 2), 93.75 copper (from era 4), 93.75 plastics (from era 6), 46.88 electronics (from era 6) |  |
-| Big paper mill (1150) | 250 paper | 25 wood chips, 62.5 chemicals (from era 3) |  |
-| Mega paper mill (1150) | 625 paper | 62.5 wood chips, 156.2 chemicals (from era 3) |  |
+| Big paper mill (1150) | 250 paper | 25 wood chips | 62.5 chemicals (from era 3) |
+| Mega paper mill (1150) | 625 paper | 62.5 wood chips | 156.2 chemicals (from era 3) |
 | Big printing works (1600) | 7,500 newspapers | 375 paper (from 1150) |  |
 | Mega printing works (1600) | 1.875e+04 newspapers | 937.5 paper (from 1150) |  |
 | Big sugar refinery (1800) | 150 refined sugar | 75 sugar | 15 coal (from 1700), 15 limestone |

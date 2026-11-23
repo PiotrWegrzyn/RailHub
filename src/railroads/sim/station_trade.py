@@ -318,7 +318,7 @@ class StationTrade:
             if not n.any():
                 continue
             if kind in RECIPES:
-                want = input_stock(kind, need) * n - economy.stock[(kind, need)][cells]
+                want = input_stock(kind, need, growth.year) * n - economy.stock[(kind, need)][cells]
             else:
                 taken = taken_by.get((kind, need), {})
                 had = np.array([taken.get(int(cell), 0.0) for cell in cells.tolist()])
@@ -576,7 +576,9 @@ class StationTrade:
         many = self._growth.counts[kind].ravel()[cells].astype(np.float64)
         held = self._growth.economy.stock.get((kind, need))
         stocked = held[cells] if held is not None else 0.0
-        return float(np.maximum(input_stock(kind, need) * many - stocked, 0.0).sum())
+        return float(
+            np.maximum(input_stock(kind, need, self._growth.year) * many - stocked, 0.0).sum()
+        )
 
     def update_reach(self) -> None:
         """Works out again which cells the player's stations hand goods out to."""

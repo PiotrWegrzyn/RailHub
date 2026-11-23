@@ -123,16 +123,18 @@ STOCK_MONTHS = 2.0
 
 
 @cache
-def input_stock(kind: BuildingKind, need: Need) -> float:
-    """The most of an input one processor of a kind keeps in stock: STOCK_MONTHS of what it
-    uses of it making the most it can, with every boost that lets it take in more; an input
-    standing in for another as much as that one."""
+def input_stock(kind: BuildingKind, need: Need, year: int) -> float:
+    """The most of an input one processor of a kind keeps in stock in a given year: STOCK_MONTHS
+    of what it uses of it making the most it can, with every boost that lets it take in more and
+    as much more as the input's demand tiles make it take (rise_of); an input standing in for
+    another as much as that one."""
     recipe = RECIPES[kind]
+    rise = rise_of(kind, need, year)
     if need in recipe.boosts:
-        return STOCK_MONTHS * recipe.most * recipe.boosts[need]
+        return STOCK_MONTHS * recipe.most * recipe.boosts[need] * rise
     stands_for = {swap: replaced for replaced, (swap, _) in recipe.swaps.items()}
     used = recipe.per_unit[stands_for.get(need, need)]
-    return STOCK_MONTHS * recipe.most * (1.0 + sum(recipe.takes_more.values())) * used
+    return STOCK_MONTHS * recipe.most * (1.0 + sum(recipe.takes_more.values())) * used * rise
 
 
 # How much each bonus good a building gets all of adds to its satisfaction.
@@ -616,7 +618,7 @@ class _Month:
         self.stock = {
             (kind, need): np.minimum(
                 economy.stock[(kind, need)][cells],
-                input_stock(kind, need) * self.count.get(kind, self.zero),
+                input_stock(kind, need, economy.year) * self.count.get(kind, self.zero),
             )
             if (kind, need) in economy.stock
             else np.zeros(cells.size)
@@ -646,7 +648,7 @@ class _Month:
                 continue
             if kind in RECIPES:
                 wants[kind] = np.maximum(
-                    input_stock(kind, need) * n - self.stock[(kind, need)], 0.0
+                    input_stock(kind, need, self.economy.year) * n - self.stock[(kind, need)], 0.0
                 )
             else:
                 wants[kind] = self._count_for(kind, need) * self._amount(kind, need)
@@ -1101,7 +1103,7 @@ class _Month:
             if good not in shares:
                 shares[good] = self._went(good)
             sent = given = offer * shares[good]
-            most = self.count[kind] * MAKES[kind][good]
+            most = self.count[kind] * makes_of(kind, self.economy.year).get(good, 0.0)
             goods_gave[(kind, good)] = (given, most)
             gave[kind] += given
             could_make[kind] += most

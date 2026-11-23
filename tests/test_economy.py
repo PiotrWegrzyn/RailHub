@@ -15,7 +15,7 @@ from railroads.sim.economy import (
     levels_of,
 )
 from railroads.sim.events import make_factor
-from railroads.sim.goods import BONUS_PART, PIPELINE, Good, Need, makes_of, needs_of
+from railroads.sim.goods import BONUS_PART, MAKES, PIPELINE, Good, Need, makes_of, needs_of
 from railroads.sim.grids import HexGrid
 from railroads.sim.ladders import LOGGING_CAMPS, MINES
 from railroads.sim.steps import finish
@@ -1069,6 +1069,40 @@ def test_a_paper_mill_makes_paper_out_of_wood_chips(chips: float, paper: float) 
     trade = economy.trade(placed, holding(1000.0, WOOD_CHIPS=chips, PLANKS=50.0, LOGS=50.0))
 
     assert trade.gathered[STATION].get(Good.PAPER, 0.0) == pytest.approx(paper)
+
+
+def test_a_paper_mill_makes_paper_without_chemicals_and_twice_as_much_with_them() -> None:
+    tile_map = make_map()
+    plain, boosted = Economy(tile_map), Economy(tile_map)
+    plain.year = boosted.year = 1925
+    placed = counts(tile_map, ((8, 8), BuildingKind.PAPER_MILL, 1))
+    chips = holding(1000.0, WOOD_CHIPS=400.0)
+    chips_and_chemicals = holding(1000.0, WOOD_CHIPS=400.0, CHEMICALS=500.0)
+    plain.trade(placed, chips)
+    boosted.trade(placed, chips_and_chemicals)
+
+    without = plain.trade(placed, chips).gathered[STATION].get(Good.PAPER, 0.0)
+    with_them = boosted.trade(placed, chips_and_chemicals).gathered[STATION].get(Good.PAPER, 0.0)
+
+    assert without == pytest.approx(100.0 * make_factor(Good.PAPER, 1925))
+    assert with_them == pytest.approx(2 * without)
+
+
+def test_a_farm_counts_its_satisfaction_from_what_its_supply_tile_lets_it_make() -> None:
+    activate(Tiles.until(1925))
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    economy.year = 1925
+    placed = counts(tile_map, ((8, 8), BuildingKind.FARM, 1))
+    most = makes_of(BuildingKind.FARM, 1925)[Good.WHEAT]
+
+    trade = economy.trade(placed, holding(1000.0))
+
+    given, could = trade.goods_gave[(BuildingKind.FARM, Good.WHEAT)]
+    at = position(trade, economy, (8, 8))
+    assert most > MAKES[BuildingKind.FARM][Good.WHEAT]
+    assert could[at] == pytest.approx(most)
+    assert given[at] == pytest.approx(most)
 
 
 def test_houses_burn_logs_but_not_planks() -> None:
