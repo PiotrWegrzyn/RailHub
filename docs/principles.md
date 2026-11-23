@@ -182,7 +182,8 @@ The ideas every rule of the game should follow, the most important first.
 
 - Track goes round buildings: never under them. A building in the way of track, a station or a
   facility moves aside to a cell nearby, at a high price that rises with people's anger at the
-  company.
+  company. Bulldozing a building angers people the same way; the player's own buildings and
+  track do not.
 - Anything can be demolished, at a price: a house costs little, a factory a lot, and unique
   buildings cannot be removed.
 

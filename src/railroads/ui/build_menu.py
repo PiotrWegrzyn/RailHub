@@ -121,14 +121,16 @@ HINTS = {
         f"{ELECTRIC_TRACK_FACTOR - 1:g} times a single track's price again for each track. Laying it "
         "along your track widens or electrifies that. Buildings in the way move aside, from "
         f"{dollars(DEMOLITION_PER_POINT[Points.POPULATION])} a house or field, and {share_of(ANGER_SURCHARGE)} that "
-        "again for each point of anger people feel at your company. Right click cancels."
+        "again for each point of anger people feel at your company, your own buildings "
+        "excepted. Right click cancels."
     ),
     Tool.BULLDOZE: (
         f"Click a cell to clear it: homes from {dollars(DEMOLITION_PER_POINT[Points.POPULATION])}, "
         f"fields {dollars(DEMOLITION_PER_POINT[Points.FOOD])}, factories and mines from "
         f"{dollars(DEMOLITION_PER_POINT[Points.INDUSTRY])}, a skyscraper "
-        f"{dollars(SKYSCRAPER_DEMOLITION)}; track {share_of(TRACK_REMOVAL_SHARE)} of its price, a station "
-        f"{dollars(STATION_REMOVAL)}. One-off buildings stay. Right click cancels."
+        f"{dollars(SKYSCRAPER_DEMOLITION)}, each not your own {share_of(ANGER_SURCHARGE)} that again for each point "
+        f"of anger people feel at your company, and raising it; track {share_of(TRACK_REMOVAL_SHARE)} "
+        f"of its price, a station {dollars(STATION_REMOVAL)}. One-off buildings stay. Right click cancels."
     ),
     Tool.ADD_PLATFORM: (
         f"Click a free cell up to {PLATFORM_REACH} cells from the station for its new platform; Q turns its track. Clearing "
@@ -211,6 +213,7 @@ class BuildMenu:
     # What the previewed track would cost, and how many buildings it would move aside.
     preview_price: float | None = None
     preview_moved: int = 0
+    preview_angering: int = 0
     # What the tool would cost in the cell under the mouse, and what it would do there.
     hover_note: str = ""
     # The station being moved, with the move tool, or added to.
@@ -319,7 +322,7 @@ class BuildMenu:
         if self.tool in HINTS:
             imgui.text_disabled(HINTS[self.tool])
         if self.tool == Tool.TRACK and self.preview is not None and self.preview_price is not None:
-            moving = moving_note(self.preview_moved)
+            moving = moving_note(self.preview_moved, self.preview_angering)
             colored(BRASS, f"This track: {dollars(self.preview_price)}{moving}")
         if self.hover_note and self.tool in PRICED_TOOLS:
             colored(BRASS, self.hover_note)
@@ -353,15 +356,27 @@ class BuildMenu:
         self.preview_for = ()
         self.preview_price = None
         self.preview_moved = 0
+        self.preview_angering = 0
 
 
-def moving_note(moved: int) -> str:
-    """What to add to a price about the buildings it moves aside, each raising people's anger
-    with the company."""
-    if not moved:
+def moving_note(moved: int, angering: int) -> str:
+    """What to add to a price about the buildings it moves aside, each not the player's own
+    raising people's anger with the company."""
+    return _anger_note(moved, angering, "moving", "aside")
+
+
+def taking_down_note(taken: int, angering: int) -> str:
+    """What to add to the bulldozer's price about the buildings it takes down, each not the
+    player's own raising people's anger with the company."""
+    return _anger_note(taken, angering, "taking", "down")
+
+
+def _anger_note(buildings: int, angering: int, doing: str, where: str) -> str:
+    if not buildings:
         return ""
-    buildings = "building" if moved == 1 else "buildings"
-    return f", moving {moved} {buildings} aside (anger +{moved * ANGER_PER_BUILDING})"
+    many = "building" if buildings == 1 else "buildings"
+    anger = f" (anger +{angering * ANGER_PER_BUILDING})" if angering else ""
+    return f", {doing} {buildings} {many} {where}{anger}"
 
 
 def _vertical_rule() -> None:

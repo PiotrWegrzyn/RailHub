@@ -43,8 +43,6 @@ def leaving_order(
 class Room:
     def __init__(self, growth: Growth) -> None:
         self._growth = growth
-        # How many buildings have been moved aside for the player's railway.
-        self.moved = 0
 
     def clear(self, cell: Cell, units: int) -> set[Cell]:
         """Makes `units` of room in the cell for a merged works, the smallest buildings first:
@@ -65,8 +63,7 @@ class Room:
         """Makes `units` of room in the cell for the player's track, station or facility, the
         smallest buildings first (railroads.sim.demolition prices them in the same order): each
         spills to the nearest cell that will take it, the player's shares in it with it, and
-        comes down where none will; counts them in `moved`. Returns the cells whose buildings
-        changed."""
+        comes down where none will. Returns the cells whose buildings changed."""
         growth = self._growth
         constructions = growth.constructions
         rng = np.random.default_rng(list(cell))
@@ -78,7 +75,6 @@ class Room:
             building = leaving_order(here, growth.rule.points)[0]
             owned = growth.take_down(building)
             changed.add(cell)
-            self.moved += 1
             ladder = ladder_of(building.kind, (*growth.rule.ladders, *LADDERS))
             if ladder is None:
                 continue

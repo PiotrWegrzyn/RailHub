@@ -163,7 +163,6 @@ def test_moving_aside_spills_the_lowest_building_to_a_cell_nearby() -> None:
     assert houses_here == 4
     assert growth.count(BuildingKind.HOUSE).sum() == 5
     assert growth.count(BuildingKind.HOUSE)[spilled] == 1
-    assert growth.room.moved == 1
 
 
 def test_moving_aside_carries_the_players_shares_with_the_building() -> None:

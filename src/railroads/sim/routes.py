@@ -41,7 +41,7 @@ from railroads.sim.constructions import (
 from railroads.sim.demolition import (
     clearing,
     clearing_price,
-    moving_price,
+    leaving_price,
     remove_added,
     station_site_price,
 )
@@ -51,6 +51,7 @@ from railroads.sim.facilities import REACH as FACILITY_REACH
 from railroads.sim.finance import track_price
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.growth import Growth
+from railroads.sim.ownership import Owners
 from railroads.sim.railway import PLATFORM_REACH, Railway
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Relief, Terrain, Tile
@@ -177,7 +178,9 @@ def plan_route_steps(
     return route if into is None else into
 
 
-def route_price(constructions: Constructions, route: Route, anger: int = 0) -> float:
+def route_price(
+    constructions: Constructions, route: Route, anger: int = 0, owners: Owners | None = None
+) -> float:
     """What laying the route costs while the company's anger is `anger`: the price of each new
     piece, less the price of the track it takes the place of, and the price of moving aside the
     buildings in its way."""
@@ -186,7 +189,7 @@ def route_price(constructions: Constructions, route: Route, anger: int = 0) -> f
     for piece, old in route.changes(constructions):
         tile = tile_map.tile(piece.cell)
         total += track_price(piece, tile) - (0.0 if old is None else track_price(old, tile))
-    return total + sum(moving_price(b.kind, anger) or 0.0 for b in in_the_way(constructions, route))
+    return total + leaving_price(in_the_way(constructions, route), anger, owners)
 
 
 def in_the_way(constructions: Constructions, route: Route) -> list[Building]:
@@ -350,11 +353,15 @@ def facility_site(constructions: Constructions, cell: Cell, facility: Facility) 
 
 
 def facility_site_price(
-    constructions: Constructions, cell: Cell, facility: Facility, anger: int = 0
+    constructions: Constructions,
+    cell: Cell,
+    facility: Facility,
+    anger: int = 0,
+    owners: Owners | None = None,
 ) -> float:
     """What clearing room in a cell for a facility costs while the company's anger is `anger`:
     moving aside the buildings that must go."""
-    return clearing_price(constructions, cell, ANNEX_SPACE[facility], anger) or 0.0
+    return clearing_price(constructions, cell, ANNEX_SPACE[facility], anger, owners) or 0.0
 
 
 def add_facility(growth: Growth, station: Cell, facility: Facility, cell: Cell) -> set[Cell]:
