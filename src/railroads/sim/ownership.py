@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
+from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import OwnedShare
 from railroads.sim.goods import Need, makes_of, owned_boosts, price_of
@@ -119,7 +120,7 @@ class Owners:
             return None
         boards = of_year(growth.year)
         month = sum(amount * price_of(good) * boards.price(good) for good, amount in makes.items())
-        return 12 * PAYBACK_YEARS * month
+        return MONTHS_PER_YEAR * PAYBACK_YEARS * month
 
     def lot_price(self, cell: Cell, kind: BuildingKind) -> float | None:
         """What LOT shares of a building of a kind in a cell cost, or fetch, now: by how
@@ -172,7 +173,7 @@ class Owners:
         until = [until for until, _ in self._held.get((kind, cell), ()) if until > now]
         if not until:
             return None
-        return self._growth.start_year + min(until) // 12
+        return self._growth.start_year + min(until) // MONTHS_PER_YEAR
 
     def sell(self, cell: Cell, kind: BuildingKind, lot: int = LOT) -> str | None:
         """Sells `lot` shares, or the last few, of a building of a kind in a cell at their price

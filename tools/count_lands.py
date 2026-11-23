@@ -13,6 +13,7 @@ import numpy as np
 
 from railroads.mapgen.lands import BANDS, COVERS
 from railroads.newgame import MapChoice, Settings, make_game
+from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.growth import Growth
 from railroads.sim.tilemap import Terrain
@@ -71,7 +72,7 @@ def main() -> None:
     while growth.year < args.until:
         growth.month(rng)
         due = growth.year >= next_print or growth.year >= args.until
-        if due and growth.months % 12 == 0:
+        if due and growth.months % MONTHS_PER_YEAR == 0:
             print(f"## {growth.year}\n\n{table(growth)}\n", flush=True)
             next_print += args.every
 

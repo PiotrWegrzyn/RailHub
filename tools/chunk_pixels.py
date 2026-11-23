@@ -29,7 +29,7 @@ from fingerprint import towns
 
 from railroads.newgame import MapChoice, Settings, allowed_start_year, make_game
 from railroads.saves import SavedGame, Saves
-from railroads.sim.clock import HISTORY_START
+from railroads.sim.clock import HISTORY_START, MONTHS_PER_YEAR
 from railroads.sim.constructions import Building, BuildingKind, Track, TrackWidth
 from railroads.sim.grids import Cell
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
@@ -56,7 +56,7 @@ def build_game(cache: Path | None) -> SavedGame:
     settings = Settings(
         seed=SEED,
         map=MapChoice.POLAND,
-        start_year=allowed_start_year(HISTORY_START + MONTHS_BEFORE_PLAY // 12),
+        start_year=allowed_start_year(HISTORY_START + MONTHS_BEFORE_PLAY // MONTHS_PER_YEAR),
         stand_in_years=STAND_IN_YEARS,
     )
     with contextlib.redirect_stdout(io.StringIO()):

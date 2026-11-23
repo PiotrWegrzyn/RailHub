@@ -18,7 +18,7 @@ import numpy as np
 
 from railroads import maps
 from railroads.mapgen.deposits import place_deposits
-from railroads.sim.clock import HISTORY_START
+from railroads.sim.clock import HISTORY_START, MONTHS_PER_YEAR
 from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.economy import Satisfaction
 from railroads.sim.goods import Need
@@ -134,7 +134,7 @@ def main() -> None:
     frames = [snapshot(growth)]
     lines = [report(growth, 0.0)]
     for _ in range(args.years // args.every):
-        growth.run(12 * args.every, rng)
+        growth.run(MONTHS_PER_YEAR * args.every, rng)
         lines.append(report(growth, time.perf_counter() - started))
         frames.append(snapshot(growth))
         print(lines[-1], flush=True)

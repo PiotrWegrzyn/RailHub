@@ -15,7 +15,7 @@ import numpy as np
 from railroads.mapgen.seeding import seed_growth_steps
 from railroads.newgame import place_map
 from railroads.saves import SavedGame
-from railroads.sim.clock import HISTORY_START
+from railroads.sim.clock import HISTORY_START, MONTHS_PER_YEAR
 from railroads.sim.constructions import ONE_OFFS, Building
 from railroads.sim.game import Game
 from railroads.sim.grids import Cell
@@ -72,7 +72,7 @@ def buy_lot_steps(
         replace(place.window(*window), locked=~inside),
         saved.rng,
         replace(GROWTH, top_ups=quarter_of_top_ups(saved.rng)),
-        months=(year - HISTORY_START) * 12,
+        months=(year - HISTORY_START) * MONTHS_PER_YEAR,
         progress=progress,
     )
     yield

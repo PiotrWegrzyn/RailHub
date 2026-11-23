@@ -10,7 +10,7 @@ import time
 import numpy as np
 
 from railroads.newgame import MapChoice, Settings, make_game
-from railroads.sim.autoplay import StandInPlayer
+from railroads.sim.autoplay import DECADE, StandInPlayer
 from railroads.sim.clock import END_YEAR
 from railroads.sim.company import company_value
 from railroads.sim.finance import dollars
@@ -53,7 +53,7 @@ def main(map_title: str, seed: int, frugal: bool = False) -> None:
     print(f"{map_title} seed {seed}: set up in {time.monotonic() - began:.0f} s", flush=True)
     while game.growth.year < END_YEAR:
         player.month(np.random.default_rng(seed + player.months))
-        if player.months % 120 == 0:
+        if player.months % DECADE == 0:
             value = company_value(game.railway)
             parts = ", ".join(f"{name} {dollars(amount)}" for name, amount in value.parts())
             print(

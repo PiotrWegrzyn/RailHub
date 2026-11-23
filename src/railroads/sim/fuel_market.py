@@ -33,6 +33,7 @@ from types import MappingProxyType
 
 import numpy as np
 
+from railroads.sim.clock import FIRST_RAILWAY_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Trade
 from railroads.sim.events import electricity_price, electricity_use, price_factor
@@ -86,7 +87,12 @@ BASE_PRICE: Mapping[Fuel, float] = MappingProxyType(
     }
 )
 OPENS: Mapping[Fuel, int] = MappingProxyType(
-    {Fuel.COAL: 1804, Fuel.WOOD: 1804, Fuel.DIESEL: 1935, Fuel.ELECTRICITY: 1925}
+    {
+        Fuel.COAL: FIRST_RAILWAY_YEAR,
+        Fuel.WOOD: FIRST_RAILWAY_YEAR,
+        Fuel.DIESEL: 1935,
+        Fuel.ELECTRICITY: 1925,
+    }
 )
 # The buildings' needs each good fuel meets.
 NEEDS: Mapping[Fuel, frozenset[Need]] = MappingProxyType(

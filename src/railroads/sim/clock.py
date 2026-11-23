@@ -11,6 +11,10 @@ SECONDS_PER_MONTH = 150.0
 # Months in a quarter: how long stations remember what came to them and buyers how satisfied
 # they were.
 QUARTER = 3
+MONTHS_PER_YEAR = 12
+# The year of the first steam engine on rails (railroads.sim.trains): the supply and demand boards
+# turn from it, coal and wood are sold for engines from it, and play can't begin before it.
+FIRST_RAILWAY_YEAR = 1804
 START_YEAR = 1850
 # The year every map's history begins: by default a thousand years before play.
 HISTORY_START = 850
@@ -71,5 +75,5 @@ class GameClock:
 
     def date_of(self, months: int) -> str:
         """The date this many months after play began."""
-        year, month = divmod(months, 12)
+        year, month = divmod(months, MONTHS_PER_YEAR)
         return f"{MONTH_NAMES[month]} {self.first_year + year}"

@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import numpy.typing as npt
 
-from railroads.sim.clock import QUARTER
+from railroads.sim.clock import MONTHS_PER_YEAR, QUARTER
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Trade
 from railroads.sim.goods import freight_of, price_of
@@ -103,7 +103,7 @@ class Ledger:
 
     def record(self, trade: Trade, month: int) -> None:
         """Counts a month of trade, `month` months from the start, into the books."""
-        year = month // 12
+        year = month // MONTHS_PER_YEAR
         if self._year is not None and year != self._year:
             self._last_months = self._months if year == self._year + 1 else 0
             self._months = 0
@@ -140,7 +140,7 @@ class Ledger:
     def last_year(self, kind: BuildingKind, flat: int) -> Takings | None:
         """What the buildings of a kind in a flat cell took last year; None if trade did not run
         through all of it."""
-        if self._last_months < 12:
+        if self._last_months < MONTHS_PER_YEAR:
             return None
         return self._read(kind, flat, lambda books, at: books.last[:, at])
 
@@ -158,7 +158,7 @@ class Ledger:
         taken = self._read(kind, flat, lambda books, at: books.recent[:, :, at].sum(axis=0))
         if taken is None:
             return Takings(0.0, 0.0, 0.0)
-        scale = 12 / months
+        scale = MONTHS_PER_YEAR / months
         return Takings(taken.output * scale, taken.sold * scale, taken.freight * scale)
 
     def satisfaction(self, kind: BuildingKind, flat: int) -> float:

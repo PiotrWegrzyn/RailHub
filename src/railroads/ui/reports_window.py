@@ -13,7 +13,8 @@ from dataclasses import dataclass
 import numpy as np
 from imgui_bundle import imgui, implot
 
-from railroads.sim.clock import END_YEAR
+from railroads.sim import clock
+from railroads.sim.clock import END_YEAR, MONTHS_PER_YEAR, QUARTER
 from railroads.sim.company import Goal
 from railroads.sim.finance import Finances, dollars
 from railroads.sim.fuel_market import Fuel, FuelMarket, FuelMonth, electrified
@@ -85,10 +86,10 @@ def _goods_colormap() -> implot.Colormap:
 
 
 # The lengths the books can be shown over, in months, and what each is called.
-PERIODS = {1: "Monthly", 3: "Quarterly", 12: "Yearly"}
+PERIODS = {1: "Monthly", QUARTER: "Quarterly", MONTHS_PER_YEAR: "Yearly"}
 # How many periods the table of money in and out shows, the one under way last.
 BOOKS_SHOWN = 5
-MONTH_NAMES = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+MONTH_NAMES = tuple(name[:3] for name in clock.MONTH_NAMES)
 PROFIT = (0.86, 0.66, 0.32, 1.0)
 LOSS = (0.92, 0.46, 0.36, 1.0)
 
@@ -113,7 +114,7 @@ def profits(
     periods: list[tuple[int, int, dict[str, float]]], length: int
 ) -> tuple[list[float], list[float]]:
     """Each period's profit, placed at its start as years with months as twelfths of them."""
-    starts = [year + index * length / 12 for year, index, _ in periods]
+    starts = [year + index * length / MONTHS_PER_YEAR for year, index, _ in periods]
     return starts, [sum(books.values()) for _, _, books in periods]
 
 
@@ -121,7 +122,7 @@ def price_line(months: list[FuelMonth]) -> tuple[list[float], list[float]]:
     """A fuel's price month by month, as years with the months as twelfths of them, and prices."""
     xs, seen = [], {}
     for month in months:
-        xs.append(month.year + seen.get(month.year, 0) / 12)
+        xs.append(month.year + seen.get(month.year, 0) / MONTHS_PER_YEAR)
         seen[month.year] = seen.get(month.year, 0) + 1
     return xs, [month.price for month in months]
 
@@ -283,7 +284,9 @@ def _draw_prices(tiles: Tiles, year: int) -> None:
 
 def worth_line(goal: Goal) -> tuple[list[float], list[float]]:
     """The company's worth at the start of each month, by the year and the part of it gone."""
-    return [year + month / 12 for year, month, _ in goal.values], [v for _, _, v in goal.values]
+    return [year + month / MONTHS_PER_YEAR for year, month, _ in goal.values], [
+        v for _, _, v in goal.values
+    ]
 
 
 def _draw_worth(goal: Goal) -> None:
@@ -329,7 +332,7 @@ class ReportsWindow:
     def __init__(self) -> None:
         self.open = False
         # How many months the books are shown over: 1, 3 or 12.
-        self.period = 12
+        self.period = MONTHS_PER_YEAR
 
     def _draw_books(self, finances: Finances, year: int) -> None:
         """Buttons to show the books by month, quarter or year; a table of what money went in
@@ -377,7 +380,7 @@ class ReportsWindow:
             return
         xs = np.array(starts, dtype=np.float64) + self.period / 24
         ys = np.array(amounts, dtype=np.float64)
-        width = self.period / 12 * BAR_WIDTH
+        width = self.period / MONTHS_PER_YEAR * BAR_WIDTH
         for name, colour, shown in (
             ("Profit", PROFIT, np.where(ys >= 0, ys, 0.0)),
             ("Loss", LOSS, np.where(ys < 0, ys, 0.0)),

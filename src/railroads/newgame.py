@@ -18,7 +18,14 @@ from railroads.mapgen.start import StartRegion, pick_start_bounds
 from railroads.mapgen.streams import HYDRORIVERS_SOURCE
 from railroads.mapgen.terrain_tiles import SOURCE as TERRAIN_TILES_SOURCE
 from railroads.saves import SavedGame
-from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
+from railroads.sim.clock import (
+    END_YEAR,
+    FIRST_RAILWAY_YEAR,
+    HISTORY_START,
+    MONTHS_PER_YEAR,
+    START_YEAR,
+    GameClock,
+)
 from railroads.sim.company import Difficulty, Goal
 from railroads.sim.constructions import Constructions
 from railroads.sim.finance import START_CASH
@@ -37,8 +44,7 @@ from railroads.tutorial import place as tutorial_place
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 ELEVATION_DB = DATA_DIR / "elevation.sqlite"
 # Play can't begin before this year; START_YEAR is the start suggested.
-# The year of the first steam engine on rails (railroads.sim.trains).
-EARLIEST_START_YEAR = 1804
+EARLIEST_START_YEAR = FIRST_RAILWAY_YEAR
 START_REGION = StartRegion()
 MAP_WIDTH_KM = 537.0
 MAP_HEIGHT_KM = 537.0
@@ -202,7 +208,7 @@ def make_game_steps(
     lots = Lots.around_middle(place)
     tile_map = replace(place.window(*lots.window()), locked=lots.locked())
     years = settings.start_year - HISTORY_START
-    months = years * 12
+    months = years * MONTHS_PER_YEAR
     begins = play_begins(months)
     report(f"Generating map from year {HISTORY_START} to {begins}")
     history = History()

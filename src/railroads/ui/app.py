@@ -27,7 +27,13 @@ from railroads.saves import (
     snapshot,
     snapshot_steps,
 )
-from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR, GameClock
+from railroads.sim.clock import (
+    END_YEAR,
+    HISTORY_START,
+    MONTHS_PER_YEAR,
+    START_YEAR,
+    GameClock,
+)
 from railroads.sim.game import Game
 from railroads.sim.growth import MONTHS_BEFORE_PLAY
 from railroads.sim.lots import Lot
@@ -219,8 +225,10 @@ class App:
         if turned:
             months = range(first + 1, first + 1 + turned)
             dates = [self.clock.date_of(month) for month in months]
-            januaries = [month for month in months if month % 12 == 0]
-            if januaries and self.tiles.must_choose(self.clock.first_year + januaries[0] // 12):
+            januaries = [month for month in months if month % MONTHS_PER_YEAR == 0]
+            if januaries and self.tiles.must_choose(
+                self.clock.first_year + januaries[0] // MONTHS_PER_YEAR
+            ):
                 self._waiting = dates
                 return
             self._turning = budgeted(self._months(dates), MONTH_FRAME_SECONDS)
@@ -761,7 +769,7 @@ def settings_from(args: argparse.Namespace) -> Settings | None:
         and args.simulate is None
     ):
         return None
-    years = MONTHS_BEFORE_PLAY // 12 if args.years is None else args.years
+    years = MONTHS_BEFORE_PLAY // MONTHS_PER_YEAR if args.years is None else args.years
     baked = maps.start_map("poland" if args.poland else args.map or "")
     return Settings(
         seed=random_seed() if args.seed is None else args.seed,

@@ -31,6 +31,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
 
+from railroads.sim.clock import FIRST_RAILWAY_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.goods import FITS, MAKES, NEEDS, Good, Need
 from railroads.sim.year_caches import forget
@@ -133,7 +134,7 @@ TILE_OF: Mapping[Good, Tile] = MappingProxyType(
     {good: tile for tile, goods in TILE_GOODS.items() for good in goods}
 )
 
-FIRST_YEAR = 1804
+FIRST_YEAR = FIRST_RAILWAY_YEAR
 SUPPLY_PICKS = 2
 DEMAND_PICKS = 1
 MOST_APART = 2

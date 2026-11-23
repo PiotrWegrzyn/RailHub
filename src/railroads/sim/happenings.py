@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from railroads.sim.clock import MONTH_NAMES
+from railroads.sim.clock import MONTH_NAMES, MONTHS_PER_YEAR
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.events import (
     EVENTS,
@@ -114,7 +114,9 @@ class Happenings:
         as went by at once; returns the cells that changed."""
         changed: set[Cell] = set()
         for months in range(first, last + 1):
-            changed |= self._month(growth, growth.start_year + months // 12, months % 12, rng)
+            changed |= self._month(
+                growth, growth.start_year + months // MONTHS_PER_YEAR, months % MONTHS_PER_YEAR, rng
+            )
         return changed
 
     def _month(self, growth: Growth, year: int, month: int, rng: np.random.Generator) -> set[Cell]:

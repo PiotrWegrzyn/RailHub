@@ -16,10 +16,11 @@ uses the need up too as buildings take it, but pays by how short the buildings w
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+from railroads.sim.clock import QUARTER
 from railroads.sim.goods import FITS, Good, Need, freight_of
 
 DEMAND_PER_NEED = 2.0
-MONTHS_REMEMBERED = 3
+MONTHS_REMEMBERED = QUARTER
 # The needs each good meets, the other way round from FITS.
 NEEDS_MET: dict[Good, tuple[Need, ...]] = {
     good: tuple(need for need, goods in FITS.items() if good in goods) for good in Good

@@ -8,6 +8,7 @@ moved onto a bigger map by land bought goes on where it was."""
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.economy import BONUS_PER_GOOD, COLLECTION_RADIUS, LOCAL_REACH, SCARCE_WORTH
 from railroads.sim.finance import TRACK_PRICE, dollars
 from railroads.sim.game import Game
@@ -274,7 +275,7 @@ STEPS: tuple[Step, ...] = (
             (
                 "You can buy shares of any building that makes something: farms, mines, mills and "
                 f"works. A building has {SHARES:,} shares, bought {SHARE_LOTS} at a time, priced by how "
-                f"satisfied it was last quarter. They can be sold {HOLD_MONTHS // 12} years after "
+                f"satisfied it was last quarter. They can be sold {HOLD_MONTHS // MONTHS_PER_YEAR} years after "
                 "they are bought."
             ),
             (

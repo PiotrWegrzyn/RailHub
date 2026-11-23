@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
+from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import BuildingKind, Station
 from railroads.sim.goods import makes_of, price_of
 from railroads.sim.grids import Cell, Grid
@@ -21,6 +22,7 @@ from railroads.sim.tiles import of_year
 
 STATIONS_AT_START = 5
 STATIONS_PER_DECADE = 2
+DECADE = 10 * MONTHS_PER_YEAR
 # A station raised two levels reaches three cells out.
 STATION_LEVEL = 3
 THRIVING_PART = 1 / 3
@@ -125,9 +127,9 @@ class StandInPlayer:
         changed = yield from self.growth.month_steps(rng)
         self.months += 1
         self._earn()
-        if self.months % 12 == 0:
+        if self.months % MONTHS_PER_YEAR == 0:
             self._buy()
-        if self.months % 120 == 0:
+        if self.months % DECADE == 0:
             changed |= self.open_stations(self.rule.stations_per_decade)
         return changed
 
@@ -206,9 +208,9 @@ def play(
     years."""
     player = StandInPlayer(growth, railway, rng, rule)
     report(describe(player))
-    for _ in range(years * 12):
+    for _ in range(years * MONTHS_PER_YEAR):
         player.month(rng)
-        if player.months % 120 == 0:
+        if player.months % DECADE == 0:
             report(describe(player))
     return player
 

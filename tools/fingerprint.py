@@ -17,12 +17,12 @@ import numpy as np
 
 from railroads import maps
 from railroads.mapgen.seeding import play_begins, seed_buildings
-from railroads.sim.clock import GameClock
+from railroads.sim.clock import MONTHS_PER_YEAR, GameClock
 from railroads.sim.constructions import BuildingKind, Station
 from railroads.sim.game import Game, place_names
 from railroads.sim.goods import Good
 from railroads.sim.grids import Cell
-from railroads.sim.growth import Growth
+from railroads.sim.growth import MONTHS_BEFORE_PLAY, Growth
 from railroads.sim.ladders import Points
 from railroads.sim.novelties import Novelties
 from railroads.sim.routes import plan_route
@@ -34,7 +34,6 @@ from railroads.ui.pixel.projection import CHUNK
 from railroads.ui.pixel.sheet import FINE
 
 SEED = 7
-YEARS = 1000
 STAND_IN_YEARS = 10
 STEPS_PER_MONTH = 10
 
@@ -70,7 +69,7 @@ def main() -> None:
 
     BuildMenu.say = say  # type: ignore[method-assign]
     rng = np.random.default_rng(SEED)
-    months = YEARS * 12
+    months = MONTHS_BEFORE_PLAY
     history = History()
     seeded = seed_buildings(maps.load("poland", "hex"), rng, months=months, history=history)
     game = Game(
@@ -105,10 +104,10 @@ def main() -> None:
     click(Tool.BULLDOZE, beside, (0, 0))
     view.tools.start_moving(c)
     view.tools.click(view.tile_map.grid.neighbours(*c)[1])
-    play_months(12)
+    play_months(MONTHS_PER_YEAR)
     with contextlib.redirect_stdout(io.StringIO()) as printed:
         view.simulate(STAND_IN_YEARS, np.random.default_rng(SEED + 2))
-    play_months(12)
+    play_months(MONTHS_PER_YEAR)
 
     growth, railway = view.growth, view.railway
     world = view._pixel_layer().world

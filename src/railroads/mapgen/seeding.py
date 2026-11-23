@@ -10,7 +10,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.mapgen.deposits import place_deposits
-from railroads.sim.clock import HISTORY_START
+from railroads.sim.clock import HISTORY_START, MONTHS_PER_YEAR
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.growth import MONTHS_BEFORE_PLAY, Growth
@@ -22,7 +22,7 @@ from railroads.sim.tilemap import Deposit, TileMap
 # Before play, the map grows this many years at a step: goods are shared out, forests change and
 # buildings come up once a step, at the chances of every month of it, to seed quickly.
 HISTORY_STEP_YEARS = 5
-HISTORY_STEP = HISTORY_STEP_YEARS * 12
+HISTORY_STEP = HISTORY_STEP_YEARS * MONTHS_PER_YEAR
 
 # The outposts each patch of military ground starts play with beside its one base.
 STARTING_OUTPOSTS = 2
@@ -127,4 +127,4 @@ def _patches(ground: npt.NDArray[np.bool_], grid: Grid) -> list[list[Cell]]:
 
 def play_begins(months: int = MONTHS_BEFORE_PLAY) -> int:
     """The year play begins after `months` of history."""
-    return HISTORY_START + months // 12
+    return HISTORY_START + months // MONTHS_PER_YEAR

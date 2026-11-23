@@ -26,6 +26,7 @@ from functools import cache
 from types import MappingProxyType
 
 from railroads.sim import tiles
+from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.geo import Bounds
 from railroads.sim.goods import HOMES, MAKES, NEEDS, RECIPES, Good, Need
@@ -33,7 +34,7 @@ from railroads.sim.year_caches import year_cached
 
 NOT_RISING = frozenset({BuildingKind.RAILWAY_WORKS})
 WAR_GROWTH = 11
-PILGRIM_MONTHS = 12
+PILGRIM_MONTHS = MONTHS_PER_YEAR
 # West, east, south and north of the old Eastern Bloc, which a map's middle must fall in.
 EASTERN_BLOC = (12.0, 60.0, 42.0, 60.0)
 

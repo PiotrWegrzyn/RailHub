@@ -15,7 +15,7 @@ import numpy as np
 from railroads.places import Places, StationNames
 from railroads.sim import routes
 from railroads.sim.autoplay import StandInPlayer, play
-from railroads.sim.clock import START_YEAR
+from railroads.sim.clock import MONTHS_PER_YEAR, START_YEAR
 from railroads.sim.company import Goal, News, company_value
 from railroads.sim.constructions import Constructions, TrackWidth
 from railroads.sim.demolition import bulldoze, bulldoze_price, station_site_price
@@ -124,7 +124,7 @@ class Game:
             else:
                 changed = yield from self.stand_in.month_steps(rng)
         growth = self.growth
-        self.goal.begin_month(growth.year, growth.months % 12, company_value(railway))
+        self.goal.begin_month(growth.year, growth.months % MONTHS_PER_YEAR, company_value(railway))
         headlines = () if growth.happenings is None else tuple(growth.happenings.take())
         self.goal.news += [
             News(h.title, "\n".join((h.story, "", *h.changes)), bad=True)

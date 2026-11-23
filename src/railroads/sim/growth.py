@@ -68,7 +68,7 @@ import numpy as np
 import numpy.ma  # np.unique loads it on first use, which would stall the first month.
 import numpy.typing as npt
 
-from railroads.sim.clock import START_YEAR
+from railroads.sim.clock import HISTORY_START, MONTHS_PER_YEAR, START_YEAR
 from railroads.sim.constructions import (
     GREW_FROM,
     ONE_OFFS,
@@ -121,7 +121,7 @@ if TYPE_CHECKING:
     from railroads.sim.happenings import Happenings
     from railroads.sim.novelties import Novelties
 
-MONTHS_BEFORE_PLAY = 1000 * 12
+MONTHS_BEFORE_PLAY = (START_YEAR - HISTORY_START) * MONTHS_PER_YEAR
 SKYSCRAPER_FLATS = 3
 SKYSCRAPER_HOMES = 10
 # Above this chance, a ladder draws for every cell instead of thinning.
@@ -306,10 +306,10 @@ ANYWHERE_TRIED = 200
 
 # How long buildings last starving: homes, and everything else unless its ladder says
 # (Ladder.starving_years).
-HOMES_DIE_AFTER_MONTHS = 10 * 12
-DIE_AFTER_MONTHS = 30 * 12
+HOMES_DIE_AFTER_MONTHS = 10 * MONTHS_PER_YEAR
+DIE_AFTER_MONTHS = 30 * MONTHS_PER_YEAR
 _STARVING_MONTHS = {
-    kind: ladder.starving_years * 12
+    kind: ladder.starving_years * MONTHS_PER_YEAR
     for ladder in LADDERS
     if ladder.starving_years is not None
     for kind in ladder.kinds
@@ -752,7 +752,7 @@ class Growth:
 
     @property
     def year(self) -> int:
-        return self.start_year + self._months // 12
+        return self.start_year + self._months // MONTHS_PER_YEAR
 
     @property
     def months(self) -> int:
@@ -976,18 +976,21 @@ class Growth:
             return self._months // every > before // every
 
         stations = 0 if self.railway is None else len(self.railway.stations())
-        for month in range((before // 12 + 1) * 12, self._months + 1, 12):
-            self.history.close_year(self.start_year + month // 12 - 1, stations, self.population())
+        year = MONTHS_PER_YEAR
+        for month in range((before // year + 1) * year, self._months + 1, year):
+            self.history.close_year(
+                self.start_year + month // year - 1, stations, self.population()
+            )
             if self.railway is not None:
-                self.railway.new_year(self.start_year + month // 12)
+                self.railway.new_year(self.start_year + month // year)
         changed: set[Cell] = set()
         self.forests_changed = set()
         if self.rule.trades and reached(self.rule.trade_every_months):
             changed = yield from self._trade_steps()
             yield
-        if self.novelties is not None and reached(12):
+        if self.novelties is not None and reached(MONTHS_PER_YEAR):
             changed |= self.novelties.year(self, rng)
-        if reached(12):
+        if reached(MONTHS_PER_YEAR):
             changed |= build_power_plants(self)
             changed |= self._top_up(rng)
         if self.happenings is not None:

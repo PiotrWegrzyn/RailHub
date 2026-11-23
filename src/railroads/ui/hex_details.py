@@ -13,6 +13,7 @@ import numpy as np
 import numpy.typing as npt
 from imgui_bundle import imgui
 
+from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import Building, BuildingKind, Construction, Station, Track
 from railroads.sim.economy import FloatCells, Satisfaction, Trade
 from railroads.sim.finance import dollars
@@ -107,7 +108,7 @@ CARD_LABEL = 56.0
 # How wide the bar after each good on a card's line is.
 FLOW_BAR = 36.0
 # How long the player must hold shares before they may sell them.
-HELD = f"Shares bought can be sold {HOLD_MONTHS // 12} years later"
+HELD = f"Shares bought can be sold {HOLD_MONTHS // MONTHS_PER_YEAR} years later"
 
 # How long a cell's description is shown again before it is worked out anew, and how many cells'
 # descriptions are kept: the hovered cell's and the open details' at least. Working one out takes
