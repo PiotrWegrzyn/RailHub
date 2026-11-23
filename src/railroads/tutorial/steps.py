@@ -8,23 +8,29 @@ moved onto a bigger map by land bought goes on where it was."""
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from railroads.sim.anger import ANGER_SURCHARGE
 from railroads.sim.clock import MONTHS_PER_YEAR
+from railroads.sim.demolition import DEMOLITION_PER_POINT
 from railroads.sim.finance import TRACK_PRICE
 from railroads.sim.game import Game
 from railroads.sim.goods import FOODS, FREIGHT_SHARE, Good
 from railroads.sim.grids import Cell
 from railroads.sim.lots import FIRST_FIBONACCI, PRICE_UNIT, Lots, fibonacci
 from railroads.sim.ownership import HOLD_MONTHS, LOTS, SHARES
+from railroads.sim.points import Points
+from railroads.sim.railway import PLATFORM_LEVEL, PLATFORM_REACH, QUADRUPLE_ERA, REACH_LEVEL
 from railroads.sim.reach import LOCAL_REACH
 from railroads.sim.trade import BONUS_PER_GOOD, COLLECTION_RADIUS, SCARCE_WORTH
 from railroads.sim.trains import ENGINES, FIRST_ENGINE
 from railroads.tutorial.place import ASHFORD_STATION, BROOKBY_STATION, SHOWN_FARM
-from railroads.words import dollars
+from railroads.words import dollars, share_of
 
 # How far from the cell the tutorial marks a station may stand and still count.
 NEAR = 2
 PLANET_RANGE = ENGINES[FIRST_ENGINE].tank
 FIRST_LOT = fibonacci(FIRST_FIBONACCI) * PRICE_UNIT
+# What moving a house or field out of the way costs at the least.
+MOVE_ASIDE = DEMOLITION_PER_POINT[Points.POPULATION]
 # How many shares can be bought at once, in words: "100, 200 or 600".
 SHARE_LOTS = ", ".join(f"{lot:,}" for lot in LOTS[:-1]) + f" or {LOTS[-1]:,}"
 
@@ -128,7 +134,9 @@ STEPS: tuple[Step, ...] = (
                 "A station is where goods meet trains. It hands goods out to the buildings a cell "
                 "around it (shaded orange) and gathers what the buildings within "
                 f"{COLLECTION_RADIUS} cells have left over (the blue line). Each level reaches a "
-                "cell further."
+                f"cell further, up to level {REACH_LEVEL}; from level {PLATFORM_LEVEL} each level "
+                f"lets it add a platform up to {PLATFORM_REACH} cells away instead, which reaches "
+                "as far round it."
             ),
             "A station does nothing on its own: track has to join it to another station.",
         ),
@@ -155,7 +163,13 @@ STEPS: tuple[Step, ...] = (
         (
             (
                 f"Track costs {dollars(TRACK_PRICE)} a cell on the flat, more in hills and much more over water or "
-                "through mountains. Track joins a station only at its two ends."
+                "through mountains. Track joins a station only at its two ends: Q turns a station "
+                "as you place it."
+            ),
+            (
+                f"Buildings in the way are moved aside, from {dollars(MOVE_ASIDE)} each, and "
+                f"{share_of(ANGER_SURCHARGE)} that again for each point of anger people feel at "
+                "your company; every building moved makes them angrier."
             ),
         ),
         "Pick Track (2), click the Ashford station, then the Brookby station.",
@@ -172,11 +186,13 @@ STEPS: tuple[Step, ...] = (
             ),
             (
                 "Each car carries one good. Every car costs a little each time it leaves a stop, "
-                "full or not, so take only cars that will fill."
+                "full or not, so take only cars that will fill. An engine pulls only so many "
+                "cars and so much weight, and the heavier its load the slower it runs."
             ),
         ),
         "Open Trains (T), press Buy a train and buy the Planet. Add Ashford and Brookby as "
-        "stops, give Ashford's cars a passenger car and a food car, then press Done.",
+        "stops. Under Ashford, click passengers and a food in Load here, each a car to "
+        "Brookby, then press Done.",
         lambda game, seen: train_set_off(game),
         lambda game: [],
         (
@@ -205,7 +221,7 @@ STEPS: tuple[Step, ...] = (
                 "Goods taken back to the station they were loaded at only go back into its stock."
             ),
         ),
-        "Give Brookby's cars a passenger car too.",
+        "Under Brookby, click passengers in Load here: a car back to Ashford.",
         lambda game, seen: cars_both_ways(game),
         lambda game: [],
         ("trains", "cargo:1:passengers"),
@@ -302,6 +318,10 @@ STEPS: tuple[Step, ...] = (
                 "Supply levels bring new engines and eras, with new goods and bigger wagons; "
                 "demand levels bring new buyers, such as mines taking planks."
             ),
+            (
+                "The marks above each card stand for its levels: one with a picture brings an "
+                "engine, an era or new buyers. Hover it to see what."
+            ),
         ),
         "Open the supply and demand boards (Y, or the scales at the top).",
         lambda game, seen: seen.boards_open,
@@ -355,6 +375,16 @@ STEPS: tuple[Step, ...] = (
             (
                 "Build more stations and track, and give your trains goods that are missing where "
                 "they go. Help (H) lists every building, good and engine."
+            ),
+            (
+                "Trains sharing track wait at signals for the way ahead, the first come the first "
+                "let on; Go first in a train's window puts it ahead of the rest. On double track "
+                f"trains going opposite ways pass each other, and from era {QUADRUPLE_ERA} "
+                "quadruple track gives fast trains a pair of their own."
+            ),
+            (
+                "Right-click a station to raise its level, add storage and put up facilities "
+                "beside it, such as an engine shed or cattle pens: each uses goods every month."
             ),
         ),
     ),
