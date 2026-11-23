@@ -6,7 +6,8 @@ fields are cheap, mines, factories and works dear, and a skyscraper costs a mill
 buildings (UNIQUE) cannot be taken down at all, and nothing is cleared where one would have to go.
 Making room takes the smallest buildings first, as Growth.clear_room does, so a price worked out
 beforehand is what is paid. Track costs TRACK_REMOVAL_SHARE of what it cost to lay, and a station
-STATION_REMOVAL.
+STATION_REMOVAL. Track or a station bulldozed takes with it, for nothing, any branch beside it
+that led only into it off a junction; the end of a plain line stays to be laid on from.
 """
 
 from collections.abc import Mapping
@@ -117,6 +118,7 @@ def bulldoze(growth: Growth, cell: Cell) -> set[Cell]:
     the cells that changed."""
     constructions = growth.constructions
     taken: set[Cell] = set()
+    railway = any(not isinstance(built, Building) for built in constructions.at(cell))
     for built in constructions.at(cell):
         if isinstance(built, Building):
             if built.kind in UNIQUE:
@@ -127,6 +129,26 @@ def bulldoze(growth: Growth, cell: Cell) -> set[Cell]:
                 taken |= remove_platforms(constructions, cell)
             constructions.remove(built)
         taken.add(cell)
+    if railway:
+        taken |= remove_dead_branches(constructions, cell)
+    return taken
+
+
+def remove_dead_branches(constructions: Constructions, cell: Cell) -> set[Cell]:
+    """Takes up the pieces of track beside an emptied cell that led into it off a junction: their
+    other end joins another piece in their cell. Returns their cells."""
+    grid = constructions.tile_map.grid
+    taken: set[Cell] = set()
+    for point in range(len(grid.track_points())):
+        beside, entry = grid.track_exit(cell, point)
+        for piece in constructions.track_at(beside):
+            if entry not in piece.ends:
+                continue
+            far = piece.other_end(entry)
+            others = constructions.track_at(beside)
+            if any(far in other.ends for other in others if other is not piece):
+                constructions.remove(piece)
+                taken.add(beside)
     return taken
 
 

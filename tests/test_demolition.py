@@ -1,7 +1,7 @@
 import pytest
 
 from builders import QUIET, flat_map
-from railroads.sim.constructions import Building, BuildingKind, Constructions
+from railroads.sim.constructions import Building, BuildingKind, Constructions, Track
 from railroads.sim.demolition import (
     STATION_REMOVAL,
     bulldoze,
@@ -155,3 +155,44 @@ def test_a_train_left_with_one_stop_after_a_bulldozing_waits_for_a_second() -> N
 
     assert [stop.cell for stop in train.stops] == [(6, 3)]
     assert not train.path
+
+
+def junction() -> Growth:
+    growth = grown()
+    for piece in (
+        Track((6, 9), (0, 6)),
+        Track((6, 10), (0, 6)),
+        Track((6, 11), (0, 6)),
+        Track((6, 10), (2, 6)),
+        Track((7, 10), (2, 8)),
+    ):
+        growth.constructions.build(piece)
+    return growth
+
+
+def test_bulldozing_a_branch_takes_up_its_stub_at_the_junction_it_left() -> None:
+    growth = junction()
+
+    changed = bulldoze(growth, (7, 10))
+
+    assert growth.constructions.track_at((6, 10)) == (Track((6, 10), (0, 6)),)
+    assert (6, 10) in changed
+
+
+def test_bulldozing_the_line_beyond_a_junction_leaves_the_line_turning_into_the_branch() -> None:
+    growth = junction()
+
+    bulldoze(growth, (6, 11))
+
+    assert growth.constructions.track_at((6, 10)) == (Track((6, 10), (2, 6)),)
+    assert growth.constructions.track_at((6, 9)) == (Track((6, 9), (0, 6)),)
+
+
+def test_bulldozing_track_leaves_the_plain_line_beside_it_to_be_laid_on_from() -> None:
+    growth = grown()
+    for cell in ((6, 9), (6, 10), (6, 11)):
+        growth.constructions.build(Track(cell, (0, 6)))
+
+    bulldoze(growth, (6, 11))
+
+    assert growth.constructions.track_at((6, 10)) == (Track((6, 10), (0, 6)),)
