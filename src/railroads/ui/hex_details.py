@@ -13,6 +13,7 @@ import numpy as np
 import numpy.typing as npt
 from imgui_bundle import imgui
 
+from railroads.sim.amounts import EPSILON
 from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import Building, BuildingKind, Construction, Station, Track
 from railroads.sim.economy import FloatCells, Satisfaction, Trade
@@ -598,7 +599,7 @@ def _per_good(
                 good,
                 float(done[position]),
                 float(wanted[position]),
-                limit if limit > wanted[position] + 1e-9 else None,
+                limit if limit > wanted[position] + EPSILON else None,
             )
         )
     return flows

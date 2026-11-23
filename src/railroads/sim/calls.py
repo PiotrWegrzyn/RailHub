@@ -10,6 +10,7 @@ with the month's trade."""
 import math
 from typing import TYPE_CHECKING
 
+from railroads.sim.amounts import EPSILON
 from railroads.sim.constructions import Station
 from railroads.sim.facilities import Facility
 from railroads.sim.goods import GENERAL_GOODS, TRAVELLERS, General, Good
@@ -97,7 +98,9 @@ class StationCalls:
     def loaded(self, train: Train, stop: Stop) -> bool:
         """Whether every car that can be filled at a stop is full."""
         return all(
-            car.dining or car.load >= car.capacity - 1e-9 or not self.boards(train, stop, car.good)
+            car.dining
+            or car.load >= car.capacity - EPSILON
+            or not self.boards(train, stop, car.good)
             for car in train.cars
         )
 
@@ -180,7 +183,7 @@ class StationCalls:
         for car in train.cars:
             if car.dining:
                 continue
-            if car.general is not None and car.load <= 1e-9:
+            if car.general is not None and car.load <= EPSILON:
                 self.pick_load(train, stop, car)
             if not self.boards(train, stop, car.good):
                 continue
@@ -218,7 +221,7 @@ class StationCalls:
         for good in GENERAL_GOODS[car.general]:
             capacity = self._railway.car_capacity(good, train.engine, car.general, car.generation)
             amount = min(capacity, self.spare(stop, good))
-            if amount <= 1e-9:
+            if amount <= EPSILON:
                 continue
             worth = 0.0
             if destination is not None and destination != stop.cell:

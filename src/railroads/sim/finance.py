@@ -8,6 +8,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
+from railroads.sim.amounts import EPSILON
 from railroads.sim.constructions import Track, TrackWidth
 from railroads.sim.tilemap import Tile
 from railroads.sim.track_rules import track_rules_for
@@ -112,7 +113,7 @@ class Finances:
     months: list[tuple[int, int, dict[str, float]]] = field(default_factory=list)
 
     def can_afford(self, price: float) -> bool:
-        return price <= self.cash + 1e-9
+        return price <= self.cash + EPSILON
 
     def pay(self, price: float, what: str) -> bool:
         """Spends the price if there is cash enough; whether it was paid."""

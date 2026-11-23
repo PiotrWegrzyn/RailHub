@@ -10,6 +10,7 @@ import numpy as np
 import numpy.typing as npt
 from imgui_bundle import imgui
 
+from railroads.sim.amounts import EPSILON
 from railroads.sim.constructions import Building, Construction, Constructions, Station, Track
 from railroads.sim.economy import HALF_SATISFIED, LOCAL_REACH, FloatCells, Satisfaction, Trade
 from railroads.sim.goods import HANDED_OUT, makes_of, needs_of
@@ -509,7 +510,7 @@ def town_cells(towns: Towns) -> tuple[npt.NDArray[np.intp], list[int]]:
 
 def mood_tint(share: float) -> Rgba:
     """The tint of a cell whose buildings get `share` of what they want, as levels_of judges it."""
-    if share >= 1.0 - 1e-9:
+    if share >= 1.0 - EPSILON:
         return SATISFIED_TINT
     if share >= HALF_SATISFIED:
         return HALF_SATISFIED_TINT

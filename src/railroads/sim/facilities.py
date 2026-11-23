@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from enum import Enum
 from types import MappingProxyType
 
+from railroads.sim.amounts import EPSILON
 from railroads.sim.finance import (
     CATTLE_PENS_PRICE,
     ENGINE_SHED_PRICE,
@@ -96,7 +97,7 @@ def supply(goods: StationGoods, facility: Facility) -> bool:
     """Takes a month of what a facility uses from what a station holds, its stockpile first;
     returns whether there was all of it."""
     good, amount = USES[facility]
-    if goods.held(good) < amount - 1e-9:
+    if goods.held(good) < amount - EPSILON:
         return False
     stocked = min(amount, goods.stockpile.get(good, 0.0))
     goods.stockpile[good] = goods.stockpile.get(good, 0.0) - stocked

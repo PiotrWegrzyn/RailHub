@@ -51,6 +51,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim import tiles
+from railroads.sim.amounts import EPSILON, divided, ratio
 from railroads.sim.clock import QUARTER, START_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.events import in_eastern_bloc, rise_of
@@ -181,7 +182,7 @@ def distribute(
     for ring, (start, end) in enumerate(pairwise(bounds)):
         seller, buyer = sellers[start:end], buyers[start:end]
         wanting = short[buyer]
-        live = (wanting > 1e-9) & (supply[seller] > 1e-9)
+        live = (wanting > EPSILON) & (supply[seller] > EPSILON)
         if not live.any():
             continue
         seller, buyer, wanting = seller[live], buyer[live], wanting[live]
@@ -200,7 +201,7 @@ def distribute(
         short -= np.bincount(buyer, sent, minlength=short.size)
         went.append(np.flatnonzero(live) + start)
         amounts.append(sent)
-        if supply.max() <= 1e-9 or short.max() <= 1e-9:
+        if supply.max() <= EPSILON or short.max() <= EPSILON:
             break
     if not went:
         return np.zeros(0, dtype=np.intp), np.zeros(0)
@@ -213,7 +214,7 @@ def levels_of(share: FloatCells) -> npt.NDArray[np.int8]:
     levels = np.full(share.shape, Satisfaction.CONTENT, dtype=np.int8)
     levels[share < HALF_SATISFIED] = Satisfaction.SHORT
     levels[share <= 0.0] = Satisfaction.UNSATISFIED
-    levels[share >= 1.0 - 1e-9] = Satisfaction.THRIVING
+    levels[share >= 1.0 - EPSILON] = Satisfaction.THRIVING
     return levels
 
 
@@ -376,13 +377,13 @@ class Trade:
                 continue
             wanted = self.needed[kind] + self.could_make[kind]
             done = self.got[kind] + self.gave[kind]
-            own = np.where(wanted > 0, done / np.where(wanted > 0, wanted, 1.0), 0.0)
+            own = ratio(done, wanted)
             if kind in self.bonus:
                 own = own * (1.0 + self.bonus_per_good * self.bonus[kind])
             total += wanted * own
             weight += wanted
         wanting = weight > 0
-        found = kept[kinds] = (total / np.where(wanting, weight, 1.0), wanting)
+        found = kept[kinds] = (divided(total, weight), wanting)
         return found
 
     def levels(self, kinds: tuple[BuildingKind, ...] | None = None) -> npt.NDArray[np.int8]:
@@ -666,7 +667,7 @@ class _Month:
         if share.taking is None:
             return np.ones(self.cells.size)
         taking = share.taking[self.cells]
-        return np.minimum(share.owned[self.cells] / np.where(taking > 0, taking, 1.0), 1.0)
+        return np.minimum(divided(share.owned[self.cells], taking), 1.0)
 
     def _owned_part(self, kind: BuildingKind) -> FloatCells:
         """The share of the buildings of a kind in each cell that are the player's, as they
@@ -676,7 +677,7 @@ class _Month:
             return self.zero
         owned = share.owned[self.cells]
         count = self.count[kind]
-        return np.minimum(owned / np.where(count > 0, count, 1.0), 1.0)
+        return np.minimum(divided(owned, count), 1.0)
 
     def _count_for(self, kind: BuildingKind, need: Need) -> FloatCells:
         """How many buildings of a kind in each cell want a need: all of them, but for a boost
@@ -727,7 +728,7 @@ class _Month:
             for good in HANDED_OUT[need]:
                 self._hand_out(need, good, target, received)
         self.local[need] = local
-        met = np.where(demand > 0, received / np.where(demand > 0, demand, 1.0), 0.0)
+        met = ratio(received, demand)
         for kind, want in wants.items():
             got = met * want
             key = (kind, need)
@@ -761,7 +762,7 @@ class _Month:
         if not owned:
             return None
         want = sum((wants[kind] * self._owned_part(kind) for kind in owned), start=self.zero)
-        met = np.where(demand > 0, received / np.where(demand > 0, demand, 1.0), 0.0)
+        met = ratio(received, demand)
         return want * (1.0 - met)
 
     def _hand_out(self, need: Need, good: Good, demand: FloatCells, received: FloatCells) -> None:
@@ -769,7 +770,7 @@ class _Month:
         delivery radius still short of it, the nearest first."""
         stations = list(self.stations)
         brought = np.array([self.brought[s].get(good, 0.0) for s in stations], dtype=np.float64)
-        if not (brought > 1e-9).any():
+        if not (brought > EPSILON).any():
             return
         sellers, buyers, bounds = self._station_pairs()
         left = brought.copy()
@@ -812,7 +813,7 @@ class _Month:
             left = {
                 cell: amount - counted.get(cell, 0.0)
                 for cell, amount in taken.items()
-                if amount - counted.get(cell, 0.0) > 1e-9
+                if amount - counted.get(cell, 0.0) > EPSILON
             }
             if left:
                 later[key] = left
@@ -829,7 +830,7 @@ class _Month:
             return
         taking = self._count_for(kind, need)
         wanted = taking * boosts[need]
-        share = np.minimum(got / np.where(wanted > 0, wanted, 1.0), 1.0) * (wanted > 0)
+        share = np.minimum(ratio(got, wanted), 1.0)
         shared = [
             boost
             for boost in boosts
@@ -868,7 +869,7 @@ class _Month:
         self._gather_owned(good)
         spare = np.maximum(self.offered[good] - self.sold[good], 0.0)
         left = demand - received
-        if not (spare > 1e-9).any() or not (left > 1e-9).any():
+        if not (spare > EPSILON).any() or not (left > EPSILON).any():
             return used
         sellers, buyers, bounds, falloff = self._pairs(good)
         remaining = spare.copy()
@@ -916,7 +917,7 @@ class _Month:
                 owned = self.owned_brought[station]
                 owned[good] = owned.get(good, 0.0) + taken
                 self.room[station][good] -= taken
-        sent = (offered - left) / np.where(offered > 0, offered, 1.0)
+        sent = divided(offered - left, offered)
         for kind, part in parts.items():
             self.owned_sent[(kind, good)] = part * sent
 
@@ -1032,7 +1033,7 @@ class _Month:
             uses[need] += plain * per_unit
         can += plain
         if roomy:
-            used = np.clip((can - base) / np.where(extra > 0, extra, 1.0), 0.0, 1.0)
+            used = np.clip(divided(can - base, extra), 0.0, 1.0)
             for need, share in roomy.items():
                 uses[need] = base * share * per_boost[need] * used
         boosts = {need: amount for need, amount in boosts.items() if need not in roomy}
@@ -1058,10 +1059,7 @@ class _Month:
     def _went(self, good: Good) -> FloatCells:
         """The share of all of a good on offer that went, to buildings or stations, in each
         cell."""
-        offered = self.offered[good]
-        on_offer = offered > 0
-        went = np.where(on_offer, self.sold[good] / np.where(on_offer, offered, 1.0), 0.0)
-        return np.minimum(went, 1.0)
+        return np.minimum(ratio(self.sold[good], self.offered[good]), 1.0)
 
     def _settle(self) -> Steps[Trade]:
         """Counts what every building got and gave, uses up the inputs of what the processors
@@ -1076,7 +1074,7 @@ class _Month:
             wanted = self._count_for(kind, need) * self._amount(kind, need)
             goods_got[(kind, need)] = (received, wanted)
             if need in bonus_of(kind, self.economy.year):
-                part = np.minimum(received, wanted) / np.where(wanted > 0, wanted, 1.0)
+                part = divided(np.minimum(received, wanted), wanted)
                 bonus[kind] = bonus.get(kind, self.zero) + part
                 continue
             if kind in RECIPES or need in boosts_of(kind, self.economy.year):
@@ -1086,7 +1084,7 @@ class _Month:
                 spare = self._count_for(kind, need) * extra
                 wanted = wanted - spare
                 over = np.clip(received - wanted, 0.0, spare)
-                part = over / np.where(spare > 0, spare, 1.0)
+                part = divided(over, spare)
                 bonus[kind] = bonus.get(kind, self.zero) + part
             got[kind] += np.minimum(received, wanted)
             needed[kind] += wanted
@@ -1110,7 +1108,7 @@ class _Month:
             could_make[kind] += most
             recipe = RECIPES.get(kind)
             if recipe is not None and good == recipe.makes:
-                went = np.where(offer > 0, sent / np.where(offer > 0, offer, 1.0), 0.0)
+                went = ratio(sent, offer)
                 for need, amount in self.uses.get(kind, {}).items():
                     key = (kind, need)
                     self.stock[key] = np.maximum(self.stock[key] - went * amount, 0.0)
@@ -1139,7 +1137,7 @@ class _Month:
             self.economy.bonus_per_good,
             self.local,
             {
-                good: 1.0 + above / np.where(self.sold[good] > 0, self.sold[good], 1.0)
+                good: 1.0 + divided(above, self.sold[good])
                 for good, above in self.worth_above.items()
             },
             self.owned_brought,

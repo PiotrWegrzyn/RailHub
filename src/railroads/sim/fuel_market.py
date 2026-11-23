@@ -33,6 +33,7 @@ from types import MappingProxyType
 
 import numpy as np
 
+from railroads.sim.amounts import ratio
 from railroads.sim.clock import FIRST_RAILWAY_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Trade
@@ -194,7 +195,7 @@ def signals_of(
         wanted_all += float(want.sum())
         grid = None if owned is None else owned.get(kind)
         if grid is not None:
-            share = np.where(want > 0, np.minimum(1.0, got / np.where(want > 0, want, 1.0)), 0.0)
+            share = np.minimum(1.0, ratio(got, want))
             counts = np.asarray(grid).ravel()[trade.cells]
             own += POWER_PLANT_OUTPUT * float((counts * share).sum())
     fed = got_all / wanted_all if wanted_all > 0 else 0.0

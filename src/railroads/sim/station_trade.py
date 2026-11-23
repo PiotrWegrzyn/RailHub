@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
+from railroads.sim.amounts import EPSILON, divided, ratio
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.demand import StationDemand, capacity_of
 from railroads.sim.economy import (
@@ -186,7 +187,7 @@ class StationTrade:
             rate = weighed / total if total > 0 else 1.0
             if self._give(station, goods, need, good, total, rate) <= 0:
                 continue
-            met = np.where(demand > 0, got / np.where(demand > 0, demand, 1.0), 0.0)
+            met = ratio(got, demand)
             for kind, want in wants.items():
                 took = want * met
                 for at in np.flatnonzero(took > 0).tolist():
@@ -222,14 +223,14 @@ class StationTrade:
             room[good] -= have
             units = 0.0
             for need in MEETS[good]:
-                if have <= 1e-9:
+                if have <= EPSILON:
                     break
                 wants = self._wants_at(cells, need)
                 if not wants:
                     continue
                 demand = sum(wants.values(), start=np.zeros(cells.size))
                 before = assigned.get(need, np.zeros(cells.size))
-                left = np.maximum(1.0 - before / np.where(demand > 0, demand, 1.0), 0.0)
+                left = np.maximum(1.0 - divided(before, demand), 0.0)
                 got, _ = self._share_out(
                     cells, bounds, need, have, {kind: want * left for kind, want in wants.items()}
                 )
@@ -346,7 +347,7 @@ class StationTrade:
             start=np.zeros(trade.cells.size),
         )
         local = trade.local.get(need, np.zeros(trade.cells.size))
-        fed = np.minimum(local / np.where(total > 0, total, 1.0), 1.0)
+        fed = np.minimum(divided(local, total), 1.0)
         short = wanted * (1.0 - fed)
         positions = np.searchsorted(trade.cells, cells)
         found = (positions < trade.cells.size) & (

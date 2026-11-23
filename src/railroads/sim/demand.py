@@ -16,6 +16,7 @@ uses the need up too as buildings take it, but pays by how short the buildings w
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+from railroads.sim.amounts import EPSILON
 from railroads.sim.clock import QUARTER
 from railroads.sim.goods import FITS, Good, Need, freight_of
 
@@ -66,7 +67,7 @@ class StationDemand:
         of demand left of the need it meets best as it came in."""
         earned = 0.0
         left = amount
-        while left > 1e-9:
+        while left > EPSILON:
             unit = min(1.0, left)
             need = self.best_need(good)
             if need is None:
@@ -99,7 +100,7 @@ class StationDemand:
         left = amount
         capacity = self.capacity.get(need, 0.0)
         months = self.used.get(need, ())
-        while left > 1e-9:
+        while left > EPSILON:
             unit = min(1.0, left)
             share = (
                 max(0.0, capacity - sum(months) / MONTHS_REMEMBERED) / capacity

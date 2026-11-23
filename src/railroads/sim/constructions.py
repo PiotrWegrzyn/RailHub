@@ -16,6 +16,8 @@ from railroads.sim.track_rules import TrackBed, track_rules_for
 
 CELL_SPACE = 6
 MAX_TURN_DEG = 60.0
+# How far past MAX_TURN_DEG a turn worked out in floats may go and still count as within it.
+TURN_SLACK_DEG = 1e-6
 
 
 class TrackWidth(IntEnum):
@@ -705,7 +707,7 @@ class Constructions:
             return f"Track joins two different track points, numbered 0 to {count - 1}"
         if start not in (ends := grid.track_ends()) or end not in ends:
             return "Track runs across edges, or straight up and down through corners"
-        if grid.track_turn(start, end) > MAX_TURN_DEG + 1e-6:
+        if grid.track_turn(start, end) > MAX_TURN_DEG + TURN_SLACK_DEG:
             return f"Track can turn at most {MAX_TURN_DEG:g} degrees in one cell"
         if (problem := self._bed_problem(track.cell, track.bed)) is not None:
             return problem

@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
+from railroads.sim.amounts import EPSILON
 from railroads.sim.demand import StationDemand
 from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.finance import TRAIN_RESALE, dollars
@@ -622,7 +623,7 @@ class TrainsWindow:
         spare = railway.max_pull(train.engine) - railway.stop_tonnes(train, stop)
 
         def fits(cargo: Good | General) -> bool:
-            return railway.car_tonnes(cargo, train.engine, asked) <= spare + 1e-9
+            return railway.car_tonnes(cargo, train.engine, asked) <= spare + EPSILON
 
         offers.sort(key=lambda o: (-(demand.monthly_want(o.good) > 0), -o.waiting, -o.gathered))
         left = imgui.get_cursor_pos_x()
@@ -740,7 +741,7 @@ def adding_tip(full: bool, tonnes: float, spare: float) -> str:
     """The last line of a good's tooltip on a stop card: whether a car of it can be added."""
     if full:
         return "\nThe train is full: remove a car first"
-    if tonnes > spare + 1e-9:
+    if tonnes > spare + EPSILON:
         return (
             f"\nToo heavy: a full car weighs {tonnes_text(tonnes)} t and the engine pulls only "
             f"{tonnes_text(max(0.0, spare))} t more"

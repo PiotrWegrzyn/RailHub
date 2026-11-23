@@ -26,6 +26,7 @@ from functools import cache
 
 from railroads.sim.constructions import (
     MAX_TURN_DEG,
+    TURN_SLACK_DEG,
     Constructions,
     Station,
     Track,
@@ -348,10 +349,12 @@ def _geometry(grid: Grid) -> _Geometry:
     exits: list[tuple[int, ...]] = [()] * (_ANYWHERE + 1)
     for entry in ends:
         exits[entry] = tuple(
-            point for point in ends if point != entry and turns[entry][point] <= MAX_TURN_DEG + 1e-6
+            point
+            for point in ends
+            if point != entry and turns[entry][point] <= MAX_TURN_DEG + TURN_SLACK_DEG
         )
     exits[_ANYWHERE] = ends
-    bends = [tuple(0.0 if turn < 1e-6 else BEND_COST for turn in row) for row in turns]
+    bends = [tuple(0.0 if turn < TURN_SLACK_DEG else BEND_COST for turn in row) for row in turns]
     bends += [(0.0,) * points] * (_ANYWHERE + 1 - points)
     origins = [(0, 0), (1, 0)]
 
@@ -652,7 +655,11 @@ class _Planner:
         """The point the last piece leads out by to join laid track, coming in by `entry`:
         along track already there if it can, else turning as little as it can."""
         turns = self._geometry.turns[entry]
-        fits = [point for point in joins if point != entry and turns[point] <= MAX_TURN_DEG + 1e-6]
+        fits = [
+            point
+            for point in joins
+            if point != entry and turns[point] <= MAX_TURN_DEG + TURN_SLACK_DEG
+        ]
         return min(
             fits,
             key=lambda point: (
@@ -737,7 +744,7 @@ class _Planner:
         )
         crowded = f"Not enough room: needs {int(self.width)}, {constructions.space_left(cell)} left"
         for point in [straight, *others]:
-            if turns[point] > MAX_TURN_DEG + 1e-6:
+            if turns[point] > MAX_TURN_DEG + TURN_SLACK_DEG:
                 continue
             piece = Track(cell, (joined, point), self.width, bed, self.electric, self.maglev)
             laid = constructions.track_between(cell, piece.ends) is not None
