@@ -1,7 +1,9 @@
-"""Making room on the map (railroads.sim.growth keeps one Room): clearing a cell for track, a
-station or a merged works, putting up a building that found no room in its own cell nearby, and
-housing people a skyscraper pulled their flats down on. A building cleared away comes down and
-never moves to another cell, the player's too, with their shares in it.
+"""Making room on the map (railroads.sim.growth keeps one Room): moving buildings aside for the
+player's track, stations and facilities, clearing a cell for a merged works, putting up a building
+that found no room in its own cell nearby, and housing people a skyscraper pulled their flats down
+on. A building moved aside spills: it goes up again in the nearest cell that will take it, as a
+building that found no room does, the player's shares in it with it, and comes down only where no
+cell within SPILL_STEPS will. A building cleared for a merged works comes down.
 
 A building that comes up in a cell goes up in it or a cell next to it, picked at random by how
 well their land suits it (scatter). One that finds no room there goes up in the nearest cell
@@ -19,7 +21,7 @@ import numpy.typing as npt
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.grids import Cell
 from railroads.sim.ladder_types import Ladder
-from railroads.sim.ladders import POINTS, TOWN_LAND
+from railroads.sim.ladders import LADDERS, POINTS, TOWN_LAND, ladder_of
 from railroads.sim.points import Points
 
 if TYPE_CHECKING:
@@ -41,12 +43,13 @@ def leaving_order(
 class Room:
     def __init__(self, growth: Growth) -> None:
         self._growth = growth
+        # How many buildings have been moved aside for the player's railway.
+        self.moved = 0
 
     def clear(self, cell: Cell, units: int) -> set[Cell]:
-        """Makes `units` of room in the cell for track, a station or a merged works, the smallest
-        buildings first (railroads.sim.demolition prices them in the same order): each comes
-        down, the player's shares in it with it; a building never moves to another cell. Returns
-        the cells whose buildings changed."""
+        """Makes `units` of room in the cell for a merged works, the smallest buildings first:
+        each comes down, the player's shares in it with it. Returns the cells whose buildings
+        changed."""
         growth = self._growth
         constructions = growth.constructions
         changed: set[Cell] = set()
@@ -58,6 +61,34 @@ class Room:
             changed.add(cell)
         return changed
 
+    def move_aside(self, cell: Cell, units: int) -> set[Cell]:
+        """Makes `units` of room in the cell for the player's track, station or facility, the
+        smallest buildings first (railroads.sim.demolition prices them in the same order): each
+        spills to the nearest cell that will take it, the player's shares in it with it, and
+        comes down where none will; counts them in `moved`. Returns the cells whose buildings
+        changed."""
+        growth = self._growth
+        constructions = growth.constructions
+        rng = np.random.default_rng(list(cell))
+        changed: set[Cell] = set()
+        while constructions.space_left(cell) < units:
+            here = constructions.buildings_at(cell)
+            if not here:
+                break
+            building = leaving_order(here, growth.rule.points)[0]
+            owned = growth.take_down(building)
+            changed.add(cell)
+            self.moved += 1
+            ladder = ladder_of(building.kind, (*growth.rule.ladders, *LADDERS))
+            if ladder is None:
+                continue
+            spilled = self.spill(cell, ladder, rng, building.kind)
+            changed |= spilled
+            if owned:
+                for near in spilled:
+                    growth.owners.own(near, building.kind, owned)
+        return changed
+
     def scatter(self, cell: Cell, ladder: Ladder, rng: np.random.Generator) -> set[Cell]:
         """Puts up the ladder's first kind that came up in this cell in it or a cell next to
         it, picked at random by how well their land suits it, or, where none of them will take
@@ -67,14 +98,26 @@ class Room:
             cell, ladder, rng
         )
 
-    def spill(self, cell: Cell, ladder: Ladder, rng: np.random.Generator) -> set[Cell]:
-        """Puts up the ladder's first kind in the nearest cell but this one that will take it,
-        picked among cells equally near at random by how well their land suits it; returns the
-        cell it went up in, if it found one."""
-        return self._put_near(cell, ladder, rng, SPILL_STEPS, nearest_first=True)
+    def spill(
+        self,
+        cell: Cell,
+        ladder: Ladder,
+        rng: np.random.Generator,
+        kind: BuildingKind | None = None,
+    ) -> set[Cell]:
+        """Puts up a kind on the ladder, by default its first, in the nearest cell but this one
+        that will take it, picked among cells equally near at random by how well their land
+        suits it; returns the cell it went up in, if it found one."""
+        return self._put_near(cell, ladder, rng, SPILL_STEPS, nearest_first=True, kind=kind)
 
     def _put_near(
-        self, cell: Cell, ladder: Ladder, rng: np.random.Generator, most: int, nearest_first: bool
+        self,
+        cell: Cell,
+        ladder: Ladder,
+        rng: np.random.Generator,
+        most: int,
+        nearest_first: bool,
+        kind: BuildingKind | None = None,
     ) -> set[Cell]:
         growth = self._growth
         constructions, grid = growth.constructions, growth.grid
@@ -83,7 +126,7 @@ class Room:
         rows, cols = zip(*(near for near, _ in reached), strict=True)
         flat = np.ravel_multi_index((rows, cols), grid.shape)
         land = growth.land(ladder.land, flat)
-        first = ladder.kinds[0]
+        first = ladder.kinds[0] if kind is None else kind
         suits = rng.random(steps.size) ** (1.0 / np.maximum(land, 1e-12))
         order = np.lexsort((-suits, steps)) if nearest_first else np.argsort(-suits)
         for index in order.tolist():
@@ -93,7 +136,7 @@ class Room:
                 (near != cell or not nearest_first)
                 and land[index] > 0
                 and constructions.why_not(new) is None
-                and growth.ladder_allows(ladder, near)
+                and (first != ladder.kinds[0] or growth.ladder_allows(ladder, near))
             ):
                 constructions.build(new)
                 growth.add(near, first, 1)

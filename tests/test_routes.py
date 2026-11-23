@@ -3,6 +3,7 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import (
+    CELL_SPACE,
     Building,
     BuildingKind,
     Constructions,
@@ -127,7 +128,7 @@ def test_track_goes_round_a_farm_rather_than_moving_it() -> None:
     assert (6, 8) not in route.cells
 
 
-def test_laying_track_pulls_down_the_lowest_building_and_moves_none() -> None:
+def test_room_for_a_merged_works_pulls_down_the_lowest_building_and_moves_none() -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
     for _ in range(5):
@@ -146,7 +147,39 @@ def test_laying_track_pulls_down_the_lowest_building_and_moves_none() -> None:
     assert changed == {(6, 5)}
 
 
-def test_with_nowhere_to_move_the_lowest_building_comes_down() -> None:
+def test_moving_aside_spills_the_lowest_building_to_a_cell_nearby() -> None:
+    tile_map = make_map()
+    constructions = Constructions(tile_map)
+    for _ in range(5):
+        constructions.build(Building((6, 5), BuildingKind.HOUSE))
+    constructions.build(Building((6, 5), BuildingKind.FLATS))
+    growth = Growth(constructions, NO_TRADE)
+
+    changed = growth.room.move_aside((6, 5), 1)
+
+    houses_here = sum(1 for b in constructions.at((6, 5)) if b.kind == BuildingKind.HOUSE)
+    (spilled,) = changed - {(6, 5)}
+    assert constructions.space_left((6, 5)) == 1
+    assert houses_here == 4
+    assert growth.count(BuildingKind.HOUSE).sum() == 5
+    assert growth.count(BuildingKind.HOUSE)[spilled] == 1
+    assert growth.room.moved == 1
+
+
+def test_moving_aside_carries_the_players_shares_with_the_building() -> None:
+    constructions = Constructions(make_map())
+    constructions.build(Building((6, 5), BuildingKind.FARM))
+    growth = Growth(constructions, NO_TRADE)
+    growth.owners.own((6, 5), BuildingKind.FARM, 300)
+
+    changed = growth.room.move_aside((6, 5), CELL_SPACE)
+
+    (spilled,) = changed - {(6, 5)}
+    assert growth.owners.shares(BuildingKind.FARM)[spilled] == 300
+    assert growth.owners.shares(BuildingKind.FARM)[6, 5] == 0
+
+
+def test_room_for_a_merged_works_with_nowhere_free_pulls_the_lowest_building_down() -> None:
     tile_map = make_map()
     constructions = Constructions(tile_map)
     for _ in range(5):
@@ -164,7 +197,9 @@ def test_with_nowhere_to_move_the_lowest_building_comes_down() -> None:
     assert growth.count(BuildingKind.HOUSE).sum() == 0
 
 
-def test_a_station_pulls_down_what_stands_in_its_cell_and_track_joins_it_without_entering() -> None:
+def test_a_station_moves_aside_what_stands_in_its_cell_and_track_joins_it_without_entering() -> (
+    None
+):
     constructions = Constructions(make_map())
     for _ in range(3):
         constructions.build(Building((6, 12), BuildingKind.HOUSE))
@@ -174,7 +209,8 @@ def test_a_station_pulls_down_what_stands_in_its_cell_and_track_joins_it_without
     route = plan_route(constructions, (6, 2), (6, 12))
 
     assert constructions.station_at((6, 12)) is not None
-    assert growth.count(BuildingKind.HOUSE).sum() == 0
+    assert growth.count(BuildingKind.HOUSE).sum() == 3
+    assert growth.count(BuildingKind.HOUSE)[6, 12] == 0
     assert route is not None
     assert all(piece.cell != (6, 12) for piece in route.pieces)
 

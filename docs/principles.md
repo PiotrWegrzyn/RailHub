@@ -180,8 +180,9 @@ The ideas every rule of the game should follow, the most important first.
 
 ## Building
 
-- Track goes round buildings: never under them, and it never moves them. No building ever moves
-  to another hex: one in the way comes down.
+- Track goes round buildings: never under them. A building in the way of track, a station or a
+  facility moves aside to a cell nearby, at a high price that rises with people's anger at the
+  company.
 - Anything can be demolished, at a price: a house costs little, a factory a lot, and unique
   buildings cannot be removed.
 

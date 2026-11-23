@@ -1,11 +1,12 @@
-"""What clearing things away costs: buildings a station or track makes room for, and everything the
-bulldozer takes down.
+"""What clearing things away costs: buildings moved aside for track, a station or a facility, and
+everything the bulldozer takes down.
 
-A building costs DEMOLITION_PER_POINT times the points it gives (railroads.sim.ladders): homes and
-fields are cheap, mines, factories and works dear, and a skyscraper costs a million. One-off
-buildings (UNIQUE) cannot be taken down at all, and nothing is cleared where one would have to go.
-Making room takes the smallest buildings first, as Growth.clear_room does, so a price worked out
-beforehand is what is paid. Track costs TRACK_REMOVAL_SHARE of what it cost to lay, a station
+A building costs DEMOLITION_PER_POINT times the points it gives (railroads.sim.ladders): a house or
+a field $5,000, mines, factories and works dearer, and a skyscraper a million. Moving one aside
+costs that times the surcharge people's anger with the company sets (railroads.sim.anger); the
+bulldozer pays it plain. One-off buildings (UNIQUE) cannot be moved or taken down at all, and
+nothing is cleared where one would have to go. Making room moves the smallest buildings first, as
+Room.move_aside does, so a price worked out beforehand is what is paid. Track costs TRACK_REMOVAL_SHARE of what it cost to lay, a station
 STATION_REMOVAL, taking its platforms and facilities with it, and a facility FACILITY_REMOVAL. Track or a station bulldozed takes with it, for nothing, any branch beside it
 that led only into it off a junction; the end of a plain line stays to be laid on from.
 """
@@ -13,6 +14,7 @@ that led only into it off a junction; the end of a plain line stays to be laid o
 from collections.abc import Mapping
 from types import MappingProxyType
 
+from railroads.sim.anger import surcharge
 from railroads.sim.constructions import (
     CELL_SPACE,
     ONE_OFFS,
@@ -31,8 +33,8 @@ from railroads.sim.room import leaving_order
 
 DEMOLITION_PER_POINT: Mapping[Points, float] = MappingProxyType(
     {
-        Points.POPULATION: 500.0,
-        Points.FOOD: 1_000.0,
+        Points.POPULATION: 5_000.0,
+        Points.FOOD: 5_000.0,
         Points.TIMBER: 15_000.0,
         Points.INDUSTRY: 15_000.0,
         Points.ORE: 20_000.0,
@@ -60,6 +62,13 @@ def demolition_price(kind: BuildingKind) -> float | None:
     return DEMOLITION_PER_POINT[points] * value
 
 
+def moving_price(kind: BuildingKind, anger: int = 0) -> float | None:
+    """What moving one building of a kind aside costs while the company's anger is `anger`; None
+    for those that cannot be."""
+    price = demolition_price(kind)
+    return None if price is None else price * surcharge(anger)
+
+
 def clearing(constructions: Constructions, cell: Cell, units: int) -> list[Building] | None:
     """The buildings that must leave the cell for `units` of room, in the order they go; None if
     one of them cannot be taken down."""
@@ -76,25 +85,36 @@ def clearing(constructions: Constructions, cell: Cell, units: int) -> list[Build
     return leaving
 
 
-def clearing_price(constructions: Constructions, cell: Cell, units: int) -> float | None:
-    """What making `units` of room in the cell costs; None where it cannot be made."""
+def clearing_price(
+    constructions: Constructions, cell: Cell, units: int, anger: int = 0
+) -> float | None:
+    """What making `units` of room in the cell costs while the company's anger is `anger`; None
+    where it cannot be made."""
     leaving = clearing(constructions, cell, units)
     if leaving is None:
         return None
-    return sum(demolition_price(b.kind) or 0.0 for b in leaving)
+    return sum(moving_price(b.kind, anger) or 0.0 for b in leaving)
 
 
-def station_site_price(constructions: Constructions, cell: Cell) -> float | None:
-    """What clearing a cell for a station costs: every building there, the track giving way for
-    free; None where one cannot be taken down."""
-    track = constructions.track_room(cell)
-    room = constructions.space_left(cell) + track
+def station_site(constructions: Constructions, cell: Cell) -> list[Building] | None:
+    """The buildings that must move aside for a station in the cell: every one there, the track
+    giving way for free; None where one cannot be moved."""
+    room = constructions.space_left(cell) + constructions.track_room(cell)
     here = constructions.buildings_at(cell)
     if room >= CELL_SPACE:
-        return 0.0
+        return []
     if any(b.kind in UNIQUE for b in here):
         return None
-    return sum(demolition_price(b.kind) or 0.0 for b in here)
+    return list(here)
+
+
+def station_site_price(constructions: Constructions, cell: Cell, anger: int = 0) -> float | None:
+    """What clearing a cell for a station costs while the company's anger is `anger`; None where
+    a building cannot be moved."""
+    site = station_site(constructions, cell)
+    if site is None:
+        return None
+    return sum(moving_price(b.kind, anger) or 0.0 for b in site)
 
 
 def bulldoze_price(constructions: Constructions, cell: Cell) -> float | None:

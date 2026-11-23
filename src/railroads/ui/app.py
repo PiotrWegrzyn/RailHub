@@ -266,6 +266,7 @@ class App:
                 railway.fuel,
                 self.game.goal,
                 railway.tiles,
+                self.game.anger,
             )
         self._draw_saves()
         draw_goal_news(self)

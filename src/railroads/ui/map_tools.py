@@ -10,9 +10,9 @@ from imgui_bundle import imgui
 from railroads.sim.constructions import Facility, Track
 from railroads.sim.grids import Cell
 from railroads.sim.railway import PLATFORM_REACH
-from railroads.sim.routes import Route, plan_route_steps, route_price, station_way
+from railroads.sim.routes import Route, plan_route_steps, station_way
 from railroads.sim.steps import Steps, finish
-from railroads.ui.build_menu import PRICED_TOOLS, STATION_TOOLS, Tool
+from railroads.ui.build_menu import PRICED_TOOLS, STATION_TOOLS, Tool, moving_note
 from railroads.words import dollars
 
 if TYPE_CHECKING:
@@ -212,15 +212,20 @@ class MapTools:
                 f"{name} can't go here: {quote.problem}."
                 if quote.price is None
                 else f"{name} here"
-                + (f": {dollars(quote.price)} to clear the cell." if quote.price else ".")
+                + (
+                    f": {dollars(quote.price)} to clear the cell{moving_note(quote.moved)}."
+                    if quote.price
+                    else "."
+                )
             )
             return
         if build.tool == Tool.ADD_PLATFORM:
-            site = game.platform_quote(cell).price
+            platform = game.platform_quote(cell)
             build.hover_note = (
                 "A platform can't go here"
-                if site is None
-                else f"New platform here: {dollars(site)}. Q turns it."
+                if platform.price is None
+                else f"New platform here: {dollars(platform.price)}"
+                f"{moving_note(platform.moved)}. Q turns it."
             )
             return
         quote = game.station_quote(cell)
@@ -228,7 +233,11 @@ class MapTools:
             f"A station can't go here: {quote.problem}."
             if quote.price is None
             else f"Here: {dollars(quote.price)}"
-            + (f" ({dollars(quote.site)} of it clearing the cell)" if quote.site else "")
+            + (
+                f" ({dollars(quote.site)} of it clearing the cell{moving_note(quote.moved)})"
+                if quote.site
+                else ""
+            )
             + ". Q turns it."
         )
 
@@ -287,4 +296,6 @@ class MapTools:
                 return
             self._planning = None
             build.preview_to, build.preview_for, build.preview = cell, wanted, route
-            build.preview_price = None if route is None else route_price(constructions, route)
+            quote = None if route is None else self._view.game.track_quote(route)
+            build.preview_price = None if quote is None else quote.price
+            build.preview_moved = 0 if quote is None else quote.moved

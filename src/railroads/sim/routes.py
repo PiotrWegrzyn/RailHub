@@ -31,6 +31,7 @@ from railroads.sim.constructions import (
     STATION_RELIEF,
     TURN_SLACK_DEG,
     Annex,
+    Building,
     Constructions,
     Facility,
     Station,
@@ -40,6 +41,7 @@ from railroads.sim.constructions import (
 from railroads.sim.demolition import (
     clearing,
     clearing_price,
+    moving_price,
     remove_added,
     station_site_price,
 )
@@ -54,7 +56,7 @@ from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Relief, Terrain, Tile
 from railroads.sim.track_rules import TrackBed, track_rules_for
 
-# How much each building that must move or come down adds to a cell's cost, against a cell of new
+# How much each building that must move aside adds to a cell's cost, against a cell of new
 # track on open flat land, and how much more for each unit of room it takes.
 BUILDING_COST = 2.5
 SPACE_COST = 0.5
@@ -175,22 +177,31 @@ def plan_route_steps(
     return route if into is None else into
 
 
-def route_price(constructions: Constructions, route: Route) -> float:
-    """What laying the route costs: the price of each new piece, less the price of the track it
-    takes the place of, and the price of clearing the buildings in its way."""
+def route_price(constructions: Constructions, route: Route, anger: int = 0) -> float:
+    """What laying the route costs while the company's anger is `anger`: the price of each new
+    piece, less the price of the track it takes the place of, and the price of moving aside the
+    buildings in its way."""
     tile_map = constructions.tile_map
     total = 0.0
-    room: dict[Cell, int] = {}
     for piece, old in route.changes(constructions):
         tile = tile_map.tile(piece.cell)
         total += track_price(piece, tile) - (0.0 if old is None else track_price(old, tile))
+    return total + sum(moving_price(b.kind, anger) or 0.0 for b in in_the_way(constructions, route))
+
+
+def in_the_way(constructions: Constructions, route: Route) -> list[Building]:
+    """The buildings laying the route moves aside, in the order it moves them."""
+    room: dict[Cell, int] = {}
+    for piece, old in route.changes(constructions):
         others = [t for t in constructions.track_at(piece.cell) if t != old]
         widest = max((int(t.width) for t in others), default=0)
         needed = max(0, int(piece.width) - widest)
         room[piece.cell] = max(room.get(piece.cell, 0), needed)
-    return total + sum(
-        clearing_price(constructions, cell, units) or 0.0 for cell, units in room.items()
-    )
+    return [
+        building
+        for cell, units in room.items()
+        for building in clearing(constructions, cell, units) or []
+    ]
 
 
 def lay_route(growth: Growth, route: Route) -> set[Cell]:
@@ -207,7 +218,7 @@ def lay_route(growth: Growth, route: Route) -> set[Cell]:
         replacing = old is not None and old in constructions.at(piece.cell)
         if replacing:
             constructions.remove(old)
-        changed |= growth.room.clear(piece.cell, constructions.room_needed(piece))
+        changed |= growth.room.move_aside(piece.cell, constructions.room_needed(piece))
         if constructions.why_not(piece) is None:
             constructions.build(piece)
             changed.add(piece.cell)
@@ -248,7 +259,7 @@ def station_problem(constructions: Constructions, cell: Cell) -> str | None:
     if tile.relief == Relief.MOUNTAINS:
         return "stations can't stand on mountains"
     if station_site_price(constructions, cell) is None:
-        return "a building here can't be taken down"
+        return "a building here can't be moved"
     return None
 
 
@@ -256,9 +267,9 @@ def build_station(
     growth: Growth, cell: Cell, ends: tuple[int, int] | None = None
 ) -> set[Cell] | None:
     """Builds a station in the cell, its track running between `ends` (by default the way of
-    station_way), moving or pulling down the buildings there and taking the place of any track
+    station_way), moving aside the buildings there and taking the place of any track
     through it; None if a station cannot go there (water, mountains, a station already, a way
-    that is not straight, or a building that cannot be taken down). Clearing the cell costs
+    that is not straight, or a building that cannot be moved). Clearing the cell costs
     station_site_price."""
     constructions = growth.constructions
     station = Station(cell, station_way(constructions, cell) if ends is None else ends)
@@ -268,7 +279,7 @@ def build_station(
         return None
     for piece in constructions.track_at(cell):
         constructions.remove(piece)
-    changed = growth.room.clear(cell, station.space)
+    changed = growth.room.move_aside(cell, station.space)
     constructions.build(station)
     return changed | {cell}
 
@@ -300,7 +311,7 @@ def facility_problem(
     """Why a facility that stands on the map (PLACED) cannot go up in the cell beside a station
     raised to `level`, or None if it can: it needs its level, one of a kind, a cell of land next
     to the station or one of its platforms with no station or other facility in it, room enough
-    for it there once the buildings that can be are taken down, and for an engine shed, which
+    for it there once the buildings that can be are moved aside, and for an engine shed, which
     fills its cell, no track either."""
     if facility not in PLACED:
         return "it goes in the station itself"
@@ -329,19 +340,27 @@ def facility_problem(
     if room < units:
         return "the track leaves no room for it" if units < CELL_SPACE else "track runs there"
     if clearing_price(constructions, cell, units) is None:
-        return "a building here can't be taken down"
+        return "a building here can't be moved"
     return None
 
 
-def facility_site_price(constructions: Constructions, cell: Cell, facility: Facility) -> float:
-    """What clearing room in a cell for a facility costs: the buildings that must go."""
-    return clearing_price(constructions, cell, ANNEX_SPACE[facility]) or 0.0
+def facility_site(constructions: Constructions, cell: Cell, facility: Facility) -> list[Building]:
+    """The buildings that must move aside for a facility in the cell."""
+    return clearing(constructions, cell, ANNEX_SPACE[facility]) or []
+
+
+def facility_site_price(
+    constructions: Constructions, cell: Cell, facility: Facility, anger: int = 0
+) -> float:
+    """What clearing room in a cell for a facility costs while the company's anger is `anger`:
+    moving aside the buildings that must go."""
+    return clearing_price(constructions, cell, ANNEX_SPACE[facility], anger) or 0.0
 
 
 def add_facility(growth: Growth, station: Cell, facility: Facility, cell: Cell) -> set[Cell]:
-    """Puts up a facility beside a station in the cell, taking down the buildings in its way,
+    """Puts up a facility beside a station in the cell, moving aside the buildings in its way,
     which facility_problem must have allowed; returns the cells that changed."""
-    changed = growth.room.clear(cell, ANNEX_SPACE[facility])
+    changed = growth.room.move_aside(cell, ANNEX_SPACE[facility])
     growth.constructions.build(Annex(cell, facility, station))
     return changed | {cell}
 

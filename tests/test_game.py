@@ -18,8 +18,8 @@ def test_a_station_costs_its_price_and_clearing_its_site() -> None:
 
     assert done.ok
     assert (5, 5) in done.changed
-    assert game.finances.cash == 1_000_000.0 - STATION_PRICE - 1_000
-    assert done.message == f"Station built for {dollars(STATION_PRICE + 1_000)}."
+    assert game.finances.cash == 1_000_000.0 - STATION_PRICE - 10_000
+    assert done.message.startswith(f"Station built for {dollars(STATION_PRICE + 10_000)}.")
 
 
 def test_a_station_is_built_turned_the_way_the_player_chose() -> None:

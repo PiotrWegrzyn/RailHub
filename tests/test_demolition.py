@@ -28,8 +28,8 @@ def grown(*placed: tuple[tuple[int, int], BuildingKind]) -> Growth:
 @pytest.mark.parametrize(
     ("kind", "price"),
     [
-        (BuildingKind.HOUSE, 500),
-        (BuildingKind.FARM, 1_000),
+        (BuildingKind.HOUSE, 5_000),
+        (BuildingKind.FARM, 5_000),
         (BuildingKind.MINE, 20_000),
         (BuildingKind.FACTORY, 15_000),
         (BuildingKind.MEGA_FACTORY, 135_000),
@@ -38,7 +38,7 @@ def grown(*placed: tuple[tuple[int, int], BuildingKind]) -> Growth:
         (BuildingKind.ST_PETERS, None),
     ],
 )
-def test_homes_and_fields_are_cheap_to_take_down_works_dear_and_one_offs_impossible(
+def test_homes_and_fields_cost_least_to_clear_works_more_and_one_offs_cannot_be_cleared(
     kind: BuildingKind, price: float | None
 ) -> None:
     worth = demolition_price(kind)
@@ -46,7 +46,7 @@ def test_homes_and_fields_are_cheap_to_take_down_works_dear_and_one_offs_impossi
     assert worth == price
 
 
-def test_a_station_pays_for_every_building_it_clears_and_not_where_a_one_off_stands() -> None:
+def test_a_station_pays_for_every_building_it_moves_and_not_where_a_one_off_stands() -> None:
     growth = grown(
         ((5, 5), BuildingKind.HOUSE),
         ((5, 5), BuildingKind.HOUSE),
@@ -56,12 +56,12 @@ def test_a_station_pays_for_every_building_it_clears_and_not_where_a_one_off_sta
     houses = station_site_price(growth.constructions, (5, 5))
     palace = station_site_price(growth.constructions, (5, 9))
 
-    assert houses == 1_000
+    assert houses == 10_000
     assert palace is None
     assert build_station(growth, (5, 9)) is None
 
 
-def test_track_through_buildings_costs_what_clearing_them_does() -> None:
+def test_track_through_buildings_costs_what_moving_them_aside_does() -> None:
     growth = grown()
     route = plan_route(growth.constructions, (6, 3), (6, 9))
     assert route is not None
@@ -73,7 +73,7 @@ def test_track_through_buildings_costs_what_clearing_them_does() -> None:
 
     price = route_price(growth.constructions, route)
 
-    assert price == pytest.approx(plain + 500 * len(middle))
+    assert price == pytest.approx(plain + 5_000 * len(middle))
 
 
 def test_the_bulldozer_clears_buildings_and_track_for_their_price_and_leaves_one_offs() -> None:
@@ -85,7 +85,7 @@ def test_the_bulldozer_clears_buildings_and_track_for_their_price_and_leaves_one
     bulldoze(growth, (5, 5))
     bulldoze(growth, (5, 9))
 
-    assert price == 20_500
+    assert price == 25_000
     assert growth.constructions.at((5, 5)) == ()
     assert growth.count(BuildingKind.MINE).sum() == 0
     assert growth.count(BuildingKind.ROYAL_PALACE).sum() == 1

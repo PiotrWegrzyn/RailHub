@@ -985,9 +985,10 @@ boosts only the player's own buildings take, limestone and machinery, work only
 on buildings they control, holding 60% of their shares, and then on the whole of them. Past 60%, more
 shares only raise their part of what it makes. Every cell where the player owns shares flies the flag of
 their company, The Trains Corp: a small one, or a big waving one where they control the
-buildings. A building never moves to another hex: one pulled down (a farm
-crowded out by a town, a logging camp whose forest is gone, anything cleared for track, a station
-or a merged works) comes down for good, the player's shares in it with it, and one that merges
+buildings. A building moved aside for track, a station, a platform or a facility goes up again
+nearby with the player's shares in it. One pulled down (a farm crowded out by a town, a logging
+camp whose forest is gone, anything cleared for a merged works or by the bulldozer, or a building
+moved aside with nowhere to go) comes down for good, the player's shares in it with it, and one that merges
 into a bigger building (three factories into a big factory) passes its shares on to the bigger
 one.
 
@@ -1221,18 +1222,25 @@ town, so two stations in one town can't carry them to each other for pay; a trai
 full load doesn't wait for them. The Towns lens above the minimap tints every town's land its own
 colour.
 
-The build bar along the bottom of the map chooses what a left click builds (keys 1 and 2): a station (what stands in the cell moves to a
-cell next to it, or comes down when it cannot move; built on a line, it takes the line's way and
+The build bar along the bottom of the map chooses what a left click builds (keys 1 and 2): a station (what stands in the cell moves aside; built on a line, it takes the line's way and
 the place of its track; elsewhere it turns towards track ending next to it, or runs across; Q
 turns it while it is being placed, and its track shows greyed out through the cell), track, or
 the bulldozer (key 3). Clearing costs
-money (`railroads.sim.demolition`): every building that has to leave a cell for a station or
-track, smallest first, is paid for as if taken down, and the price shows before the click. A
-building costs $500 a population point (a house $500, a block of flats $9,000), $1,000 a field,
-$15,000 an industry point (a factory $15,000, a mega factory $135,000), $20,000 a mine or a point
+money (`railroads.sim.demolition`). Every building that has to leave a cell for a station,
+platform, facility or track, smallest first, is moved aside (`railroads.sim.room`): it spills to
+the nearest cell within 3 steps with room and land for it, the way a building that found no room
+where it came up does, and comes down only where none will take it. The price and how many
+buildings move show before the click. A building costs $5,000 a population point (a house $5,000,
+a block of flats $90,000), $5,000 a field, $15,000 an industry point (a factory $15,000, a mega factory $135,000), $20,000 a mine or a point
 of a shop or business, $30,000 a port, and a skyscraper $1,000,000; one-off buildings, the
-novelties and the St. Peter's Basilica, cannot be taken down, and neither station nor track goes
-where one would have to. The bulldozer clears a whole cell at those prices, track for a quarter
+novelties and the St. Peter's Basilica, cannot be moved or taken down, and neither station nor
+track goes where one would have to. Every building moved aside raises people's anger with the
+company, W (`railroads.sim.anger`), by 1, and each point of W makes moving a building 50% of its
+price dearer, added up and not compounded: at W = 2 it costs twice its price. W cools on
+1 January of every year divisible by 5, to W − ceil(log2(1 + W)): three buildings moved leave
+W = 1 after the next cooling. The player is told when it cools, and the reports show W, what
+moving a building costs and when it cools next. The bulldozer clears a whole cell at the plain
+prices, raising no anger, track for a quarter
 of what it cost to lay and a station for $5,000, buildings the player owns too. A station can be
 moved from its window: it costs a new station and clearing the new cell, its trains, name and
 goods go with it, and it starts again at level 1 with no extra storage. For track,

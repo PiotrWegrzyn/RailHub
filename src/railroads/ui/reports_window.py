@@ -14,6 +14,7 @@ import numpy as np
 from imgui_bundle import imgui, implot
 
 from railroads.sim import clock
+from railroads.sim.anger import Anger, cooled, cooling_year
 from railroads.sim.clock import END_YEAR, MONTHS_PER_YEAR, QUARTER
 from railroads.sim.company import Goal
 from railroads.sim.finance import Finances
@@ -331,6 +332,23 @@ def worth_unit(values: list[float]) -> tuple[float, str]:
     return MILLION, "$ million"
 
 
+def anger_lines(anger: Anger, year: int) -> list[str]:
+    """What the reports say about people's anger with the company (railroads.sim.anger)."""
+    later = cooling_year(year + 1)
+    text = (
+        f"Moving a building aside costs {anger.surcharge:g} times its price. Anger cools on "
+        f"1 January {later}, to {cooled(anger.value)}."
+    )
+    return [f"Anger with the company: {anger.value}", text]
+
+
+def _draw_anger(anger: Anger, year: int) -> None:
+    title, text = anger_lines(anger, year)
+    imgui.text(title)
+    imgui.text_wrapped(text)
+    imgui.spacing()
+
+
 class ReportsWindow:
     def __init__(self) -> None:
         self.open = False
@@ -410,6 +428,7 @@ class ReportsWindow:
         fuel: FuelMarket | None = None,
         goal: Goal | None = None,
         tiles: Tiles | None = None,
+        anger: Anger | None = None,
     ) -> None:
         if not self.open:
             return
@@ -421,6 +440,8 @@ class ReportsWindow:
                 shown = report(history, year, stations, population, begun)
                 if goal is not None:
                     _draw_worth(goal)
+                if anger is not None:
+                    _draw_anger(anger, year)
                 if finances is not None:
                     self._draw_books(finances, year)
                 self._draw_deliveries(shown)
