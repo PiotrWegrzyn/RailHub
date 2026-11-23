@@ -1,9 +1,9 @@
 import pytest
 
 from builders import joined_stations, served_at
+from railroads.sim.breeding import LIVELY_GROWTH
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.goods import Good
-from railroads.sim.growth import LIVELY_GROWTH
 
 STATION, HOUSE, TAVERN = (6, 20), (6, 21), (5, 20)
 

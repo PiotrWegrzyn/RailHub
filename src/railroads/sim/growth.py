@@ -59,15 +59,22 @@ every few minutes.
 
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from itertools import pairwise
-from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.ma  # np.unique loads it on first use, which would stall the first month.
 import numpy.typing as npt
 
+from railroads.sim.breeding import (
+    LIVELY_GROWTH,
+    VENUES,
+    Breeding,
+    Channel,
+    breeding_of,
+    kind_channels,
+)
 from railroads.sim.clock import HISTORY_START, MONTHS_PER_YEAR, START_YEAR
 from railroads.sim.constructions import (
     GREW_FROM,
@@ -76,14 +83,14 @@ from railroads.sim.constructions import (
     BuildingKind,
     Constructions,
 )
+from railroads.sim.dying import UNDYING, dies_after
 from railroads.sim.economy import Economy
 from railroads.sim.events import military_growth
 from railroads.sim.forests import change_forests
-from railroads.sim.goods import FITS, HOMES, MAKES, RECIPES, Good
+from railroads.sim.goods import FITS, MAKES, RECIPES, Good
 from railroads.sim.grids import Cell, FlatIndices, FloatArray, Grid, IntArray
 from railroads.sim.ladder_types import Join, Ladder
 from railroads.sim.ladders import (
-    CHANCE_UNIT,
     GROWTH,
     LADDERS,
     MILITARY,
@@ -119,134 +126,7 @@ SKYSCRAPER_HOMES = 10
 # Above this chance, a ladder draws for every cell instead of thinning.
 THINNING_UP_TO = 0.05
 SKYSCRAPER_STARS = 4
-# How many times its base chance each served point of a ladder's own kind in a cell adds there,
-# per doubling of what draws it, unless the ladder gives its own (railroads.sim.ladders.Ladder).
-BREEDING_TIMES = 3.0
-# Ladders drawn by industry are drawn instead by their own kind around them OWN_KIND_TIMES as
-# strongly as industry drew them, and by industry CATEGORY_SHARE of that; in a cell, each served
-# point of their own kind counts OWN_KIND_TIMES and each of the rest of their kind of points
-# CATEGORY_SHARE. So a served sawmill breeds sawmills, not brickworks.
-OWN_KIND_TIMES = 10.0
-CATEGORY_SHARE = 0.1
-# What a ladder's chances can follow: points of a kind, or the points the buildings of one
-# ladder give, named by its first kind.
-Channel = Points | BuildingKind
-# The points around a cell that draw a ladder's buildings, and how much each counts, by the kind
-# of points they give.
-INDUSTRIAL = {Points.POPULATION: 1.0, Points.INDUSTRY: 1.0}
-SOCIAL = {Points.POPULATION: 2.0}
-DRAWN_BY: Mapping[Points, Mapping[Points, float]] = MappingProxyType(
-    {
-        Points.POPULATION: {Points.POPULATION: 6.0, Points.INDUSTRY: 2.0},
-        Points.FOOD: {Points.FOOD: 1.0, Points.POPULATION: 1.0},
-        Points.ORE: INDUSTRIAL,
-        Points.TIMBER: INDUSTRIAL,
-        Points.TRADE: INDUSTRIAL,
-        Points.INDUSTRY: INDUSTRIAL,
-        Points.CORPORATE: SOCIAL,
-        Points.WORSHIP: SOCIAL,
-        Points.AIR: SOCIAL,
-        Points.MILITARY: {Points.MILITARY: 1.0},
-    }
-)
 
-# Kinds drawn by other points than the rest of their kind of points (refineries by the oil wells
-# and mines and the ports around them), and kinds that keep away
-# from some: their whole chance is divided by one plus the points they shun around them, each
-# times its weight, so heavy works stay out of towns.
-DRAWN_BY_KIND: Mapping[BuildingKind, Mapping[Points, float]] = MappingProxyType(
-    {
-        BuildingKind.REFINERY: {Points.ORE: 1.0, Points.TRADE: 2.0},
-        BuildingKind.FACTORY: {Points.POPULATION: 1.0, Points.INDUSTRY: 1.5},
-        BuildingKind.BAKERY: {Points.POPULATION: 1.0},
-        BuildingKind.SAUSAGE_MAKER: {Points.POPULATION: 1.0},
-        BuildingKind.CHEMICAL_WORKS: {Points.INDUSTRY: 1.5},
-        BuildingKind.CEMENT_WORKS: {Points.INDUSTRY: 1.5},
-        BuildingKind.GASWORKS: {Points.INDUSTRY: 1.0},
-        BuildingKind.DAIRY: {Points.POPULATION: 2.0, Points.INDUSTRY: 1.0},
-        BuildingKind.FARM: {Points.FOOD: 1.5, Points.POPULATION: 1.0},
-        BuildingKind.FISHERY: {Points.POPULATION: 2.0, Points.FOOD: 0.5},
-    }
-)
-SHUNNED_BY: Mapping[BuildingKind, Mapping[Points, float]] = MappingProxyType(
-    {
-        kind: {Points.POPULATION: 1.0}
-        for kind in (
-            BuildingKind.STEEL_MILL,
-            BuildingKind.CHEMICAL_WORKS,
-            BuildingKind.CEMENT_WORKS,
-            BuildingKind.GASWORKS,
-        )
-    }
-)
-
-
-@dataclass(frozen=True, slots=True)
-class Breeding:
-    """How a ladder's buildings come up: its base chance, the kind of points its buildings give,
-    which points around draw them and how much, and what each served point adds per doubling of
-    those."""
-
-    spawn: float
-    own: Points
-    drawn_by: Mapping[Channel, float]
-    per_doubling: float
-    # The points nearby that its whole chance is divided by, one plus each times its weight.
-    shunned_by: Mapping[Channel, float] = field(default_factory=dict)
-    # The served points in a cell that make it breed, each times its weight; its own kind of
-    # points when not given.
-    served_by: Mapping[Channel, float] = field(default_factory=dict)
-
-
-_BREEDINGS: dict[tuple[int, int], tuple[Ladder, Mapping, Breeding]] = {}
-
-
-def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]]) -> Breeding:
-    """How a ladder's buildings come up, worked out once for each ladder and points."""
-    kept = _BREEDINGS.get((id(ladder), id(points)))
-    if kept is not None and kept[0] is ladder and kept[1] is points:
-        return kept[2]
-    own = points[ladder.kinds[0]][0]
-    kind = ladder.kinds[0]
-    spawn = CHANCE_UNIT * ladder.base
-    drawn_by: dict[Channel, float] = dict(DRAWN_BY_KIND.get(kind) or DRAWN_BY.get(own, {own: 1.0}))
-    served_by: dict[Channel, float] = {own: 1.0}
-    industry = drawn_by.get(Points.INDUSTRY)
-    if industry and own != Points.POPULATION:
-        drawn_by[kind] = OWN_KIND_TIMES * industry
-        drawn_by[Points.INDUSTRY] = CATEGORY_SHARE * industry
-        served_by = {kind: OWN_KIND_TIMES, own: CATEGORY_SHARE}
-    shunned_by = SHUNNED_BY.get(kind, {})
-    pull = (
-        BREEDING_TIMES * spawn if ladder.per_doubling is None else CHANCE_UNIT * ladder.per_doubling
-    )
-    breeding = Breeding(spawn, own, drawn_by, pull, shunned_by, served_by)
-    _BREEDINGS[(id(ladder), id(points))] = (ladder, points, breeding)
-    return breeding
-
-
-def _kind_channels(rule: GrowthRule) -> dict[BuildingKind, BuildingKind]:
-    """Every kind on a ladder whose chances follow the points of its own ladder, to the first
-    kind of that ladder."""
-    channels: dict[BuildingKind, BuildingKind] = {}
-    for ladder in rule.ladders:
-        breeding = breeding_of(ladder, rule.points)
-        first = ladder.kinds[0]
-        if first in breeding.drawn_by or first in breeding.served_by:
-            for kind in ladder.kinds:
-                channels[kind] = first
-    return channels
-
-
-# The homes around a tavern, club, sushi hut or filling station that gets all it needs grow this
-# much faster, and those around one that gets some of it that share as much faster.
-LIVELY_GROWTH = 0.5
-VENUES = (
-    BuildingKind.TAVERN,
-    BuildingKind.CLUB,
-    BuildingKind.SUSHI_HUT,
-    BuildingKind.FILLING_STATION,
-)
 
 # A processor or venue comes up only once something on the map makes each of its main inputs
 # (inputs_of): a winery needs a vineyard, a sushi hut a fishery and a rice paddy. Only where the
@@ -294,32 +174,6 @@ KEY_LEAST = 3
 # likely at all.
 LIKELIEST_TRIED = 20
 ANYWHERE_TRIED = 200
-
-# How long buildings last starving: homes, and everything else unless its ladder says
-# (Ladder.starving_years).
-HOMES_DIE_AFTER_MONTHS = 10 * MONTHS_PER_YEAR
-DIE_AFTER_MONTHS = 30 * MONTHS_PER_YEAR
-_STARVING_MONTHS = {
-    kind: ladder.starving_years * MONTHS_PER_YEAR
-    for ladder in LADDERS
-    if ladder.starving_years is not None
-    for kind in ladder.kinds
-}
-
-
-def dies_after(kind: BuildingKind) -> int:
-    """How many months buildings of a kind last starving."""
-    if kind in HOMES:
-        return HOMES_DIE_AFTER_MONTHS
-    return _STARVING_MONTHS.get(kind, DIE_AFTER_MONTHS)
-
-
-# Producers of what the land gives, which stand idle with nobody to sell to rather than dying out:
-# the land decides where they are, and so how many people and what industry it can keep; and the
-# one-off buildings and the soldiers, which wait for what they need however long it takes.
-UNDYING = (
-    frozenset(kind for kind in MAKES if kind not in RECIPES) | ONE_OFFS | frozenset(MILITARY.kinds)
-)
 
 
 def _unlocked(tile_map: TileMap, cells: FlatIndices, weights: FloatArray) -> FloatArray:
@@ -433,7 +287,7 @@ class Growth:
         self._traded = np.zeros(0, dtype=np.intp)
         rows, cols = grid.neighbour_index_grids()
         # The kinds on ladders that follow their own ladder's points, each to its ladder's first.
-        self._kind_channel = _kind_channels(rule)
+        self._kind_channel = kind_channels(rule)
         channels = [*Points, *dict.fromkeys(self._kind_channel.values())]
         self._nearby = {
             channel: self._neighbourhood_sum(self.points(channel), rows, cols)

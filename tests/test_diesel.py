@@ -2,11 +2,11 @@ import pytest
 from trading import STATION, counts, holding, make_map, position
 
 from builders import joined_stations, served_at
+from railroads.sim.breeding import LIVELY_GROWTH, breeding_of
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.economy import Economy
 from railroads.sim.events import make_factor
 from railroads.sim.goods import DIESEL_BOOST, PIPELINE, Good, Need
-from railroads.sim.growth import LIVELY_GROWTH, breeding_of
 from railroads.sim.ladders import FILLING_STATIONS, POINTS, WORKS
 from railroads.sim.points import Points
 from railroads.sim.tiles import Tiles, activate

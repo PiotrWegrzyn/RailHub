@@ -7,11 +7,12 @@ from trading import STATION, counts, holding, position
 from trading import make_map as trade_map
 
 from builders import flat_map, layer
+from railroads.sim.breeding import VENUES
 from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.economy import Economy
 from railroads.sim.geo import Bounds
 from railroads.sim.goods import FITS, Good, Need
-from railroads.sim.growth import VENUES, Growth
+from railroads.sim.growth import Growth
 from railroads.sim.ladders import (
     LADDERS,
     RICE_PADDIES,

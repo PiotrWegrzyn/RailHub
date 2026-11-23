@@ -5,17 +5,11 @@ import pytest
 from growing import NO_TRADE, build, make_map, only
 
 from builders import flat_map, layer
+from railroads.sim.breeding import BREEDING_TIMES, CATEGORY_SHARE, OWN_KIND_TIMES, breeding_of
 from railroads.sim.constructions import BuildingKind, Constructions
+from railroads.sim.dying import UNDYING
 from railroads.sim.grids import Cell
-from railroads.sim.growth import (
-    BREEDING_TIMES,
-    CATEGORY_SHARE,
-    OWN_KIND_TIMES,
-    UNDYING,
-    Growth,
-    _allowed,
-    breeding_of,
-)
+from railroads.sim.growth import Growth, _allowed
 from railroads.sim.ladder_types import Merge
 from railroads.sim.ladders import (
     BAKERIES,

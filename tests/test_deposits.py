@@ -5,10 +5,11 @@ from builders import flat_map
 from railroads.mapgen.deposits import allowed_land, place_deposits
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.demand import StationDemand
+from railroads.sim.dying import dies_after
 from railroads.sim.events import want_factor
 from railroads.sim.goods import MAKES, Good, Need, freight_of
 from railroads.sim.grids import HexGrid
-from railroads.sim.growth import Growth, dies_after
+from railroads.sim.growth import Growth
 from railroads.sim.ladders import JEWELLERS, RESOURCES, WORKS, GrowthRule
 from railroads.sim.tilemap import Deposit, Relief, TileMap
 from railroads.sim.yearly import needs_of

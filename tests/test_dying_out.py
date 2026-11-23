@@ -3,7 +3,8 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.growth import DIE_AFTER_MONTHS, HOMES_DIE_AFTER_MONTHS, UNDYING, Growth
+from railroads.sim.dying import DIE_AFTER_MONTHS, HOMES_DIE_AFTER_MONTHS, UNDYING
+from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 
 TRADING = GrowthRule(trades=True, ladders=(), forests=None)
