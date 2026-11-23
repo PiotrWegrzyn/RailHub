@@ -15,9 +15,12 @@ from pathlib import Path
 
 from PIL import Image
 
-from railroads.ui.pixel.art.registry import draw_sheet
+from railroads.ui.pixel.art.registry import draw_sheets
 from railroads.ui.pixel.good_icons import ICONS_INDEX, ICONS_PNG, draw_icon_sheet
 from railroads.ui.pixel.sheet import DENSITIES, sheet_files, sprite_name
+
+# The date every sprite in a zip is marked with, so drawing the same sprites makes the same zip.
+ZIPPED_ON = (1980, 1, 1, 0, 0, 0)
 
 
 def zip_sprites(sheet: Image.Image, places: dict[str, list[int]], path: Path) -> None:
@@ -26,13 +29,13 @@ def zip_sprites(sheet: Image.Image, places: dict[str, list[int]], path: Path) ->
         for index, (x, y, w, h, _, _) in enumerate(places.values()):
             png = io.BytesIO()
             sheet.crop((x, y, x + w, y + h)).save(png, "PNG", optimize=True)
-            sprites.writestr(sprite_name(index), png.getvalue())
+            entry = zipfile.ZipInfo(sprite_name(index), date_time=ZIPPED_ON)
+            sprites.writestr(entry, png.getvalue())
 
 
 def main() -> None:
-    for resolution in DENSITIES:
+    for resolution, (sheet, places) in draw_sheets(DENSITIES).items():
         path, index = sheet_files(resolution)
-        sheet, places = draw_sheet(resolution=resolution)
         if path.suffix == ".zip":
             zip_sprites(sheet, places, path)
         else:

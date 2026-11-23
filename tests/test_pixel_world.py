@@ -1292,7 +1292,7 @@ def offset_of(world: PixelWorld, cell: Cell = (10, 3)) -> tuple[int, int]:
     return chunk[0] * CHUNK, chunk[1] * CHUNK
 
 
-def test_rails_up_close_are_a_quarter_of_an_art_pixel_wide_but_never_under_a_pixel(
+def test_rails_the_graphics_card_draws_are_a_quarter_of_an_art_pixel_wide_at_every_zoom(
     sheet: SpriteSheet,
 ) -> None:
     world, _ = track_chunk(sheet, [Track((10, 3), (0, 6))])
@@ -1305,7 +1305,7 @@ def test_rails_up_close_are_a_quarter_of_an_art_pixel_wide_but_never_under_a_pix
         quads = lit[:6, :2] / shapes.quality
         widths[scale] = float(np.linalg.norm(quads[0] - quads[5]))
 
-    assert widths[2] == pytest.approx(1.0, abs=0.01)
+    assert widths[2] == pytest.approx(0.5, abs=0.01)
     assert widths[12] == pytest.approx(3.0, abs=0.01)
 
 

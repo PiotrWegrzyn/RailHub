@@ -12,6 +12,7 @@ several families share are in parts. This module lists them all (SPRITES) and pa
 from collections.abc import Callable
 from functools import cache, partial
 
+import numpy as np
 from PIL import Image
 
 from railroads.sim.constructions import BUILDING_RULES, MERGED, BuildingKind
@@ -174,10 +175,11 @@ __all__ = [
     "Painter",
     "Sprite",
     "draw_sheet",
+    "draw_sheets",
     "drawn_at",
     "fine_sprite",
     "shade",
-    "shrink",
+    "shrunk_from",
 ]
 
 BUILDING_SCALE = 0.7
@@ -463,10 +465,13 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "olympic_stadium": olympic_stadium,
 }
 
+# How many pixels for every art pixel each sprite is drawn at, once, for every sheet to shrink it
+# from (draw_sheets): every resolution sheets are drawn at divides it.
+MASTER_RESOLUTION = 24
+
 # The buildings drawn from 3D models (railroads.ui.pixel.art.built) instead of painted: the
 # gasworks, whose brick rotunda took the place of its painted gasholder, and the stations.
 MODELS: dict[str, Callable[[], Sprite]] = {"gasworks": modelled(built_works.gasworks)}
-DRAWN_FROM_MODELS = (*MODELS, *SQUARE_STATIONS, *TURNED_STATIONS)
 SPRITES |= MODELS
 
 # Big and mega works drawn as buildings of their own, by trade.
@@ -490,17 +495,6 @@ for _kind in MERGED:
                 f"{_size}_{_base}",
                 partial(grown, SPRITES[_base], _size, _most / BUILDING_SCALE),
             )
-
-
-def shrink(sprite: Sprite, factor: float) -> Sprite:
-    """A smaller copy of a sprite: each new pixel takes the colour of the old pixel under its
-    middle, so edges stay hard and colours stay the sprite's own."""
-    w, h = sprite.image.size
-    small = sprite.image.resize(
-        (max(1, round(w * factor)), max(1, round(h * factor))), Image.Resampling.NEAREST
-    )
-    ax, ay = sprite.anchor
-    return Sprite(small, (round(ax * factor), round(ay * factor)))
 
 
 # How wide a works may be drawn at most, in pixels, so it stands inside its cell, which is about
@@ -535,6 +529,7 @@ def _width(sprite: Sprite) -> int:
     return 1 if box is None else box[2] - box[0]
 
 
+@cache
 def _scale_of(name: str) -> float:
     """How big a sprite is drawn on the map: its kind's scale, and smaller still if that would
     make a works wider than MOST_WIDTH lets it be."""
@@ -543,11 +538,18 @@ def _scale_of(name: str) -> float:
     if kind is None or name in FARMSTEADS:
         return scale
     most = GROWN_MOST_WIDTH.get(name.partition("_")[0], MOST_WIDTH[BUILDING_RULES[kind].space])
-    full = _full_size(name)
-    scale = min(scale, most / _width(full))
-    while _width(shrink(full, scale)) > most:
+    scale = min(scale, most / _width(_full_size(name)))
+    while _shown_width(name, scale) > most:
         scale *= SHRINK_STEP
     return scale
+
+
+def _shown_width(name: str, scale: float) -> int:
+    """How many pixels wide a sprite shows on the map drawn at `scale`, shrunk there from its
+    finest drawing (shrunk_from), edge pixels it only partly covers too."""
+    with drawn_at(scale * MASTER_RESOLUTION):
+        finest = SPRITES[name]()
+    return _width(shrunk_from(finest, MASTER_RESOLUTION))
 
 
 def fine_sprite(name: str, resolution: int) -> Sprite:
@@ -558,22 +560,36 @@ def fine_sprite(name: str, resolution: int) -> Sprite:
 
 
 def draw_sheet(padding: int = 1, resolution: int = 1) -> tuple[Image.Image, dict[str, list[int]]]:
-    """Every sprite packed in rows on one sheet, and where each sits: x, y, width, height and its
-    anchor inside it. Buildings other than stations are drawn at BUILDING_SCALE, houses,
-    tenements and flats at HOME_SCALE, and farms and orchards at FARMSTEAD_SCALE. At a
-    resolution above 1 each sprite is drawn that many times finer (fine_sprite) rather than
-    shrunk from its full size; one drawn from a model is shrunk from its drawing at 2, so both
-    sheets hold it alike."""
-    if resolution == 1:
-        sprites = {
-            name: shrink(fine_sprite(name, 2), 0.5)
-            if name in DRAWN_FROM_MODELS
-            else shrink(draw(), _scale_of(name))
-            for name, draw in SPRITES.items()
-        }
-    else:
-        sprites = {name: fine_sprite(name, resolution) for name in SPRITES}
-    width = 128 * resolution
+    """Every sprite packed in rows on one sheet, `resolution` pixels for every art pixel, and
+    where each sits: x, y, width, height and its anchor inside it (draw_sheets)."""
+    return draw_sheets((resolution,), padding)[resolution]
+
+
+def draw_sheets(
+    resolutions: tuple[int, ...], padding: int = 1
+) -> dict[str, tuple[Image.Image, dict[str, list[int]]]]:
+    """A sheet (draw_sheet) at each of `resolutions`. Buildings other than stations are drawn at
+    BUILDING_SCALE, houses, tenements and flats at HOME_SCALE, and farms and orchards at
+    FARMSTEAD_SCALE. Each sprite is drawn once, MASTER_RESOLUTION times finer than an art pixel
+    (fine_sprite), and every sheet holds it shrunk from that drawing (shrunk_from), so a sprite
+    is the very same picture on every sheet, only smaller or bigger: lines a pixel wide where it
+    is drawn, such as the outline round a model, would make the coarse sheets look like other,
+    outlined pixel art if each were drawn at its own resolution."""
+    shrunk: dict[int, dict[str, Sprite]] = {resolution: {} for resolution in resolutions}
+    for name in SPRITES:
+        master = fine_sprite(name, MASTER_RESOLUTION)
+        for resolution in resolutions:
+            shrunk[resolution][name] = shrunk_from(master, MASTER_RESOLUTION // resolution)
+    return {
+        resolution: _packed(sprites, 128 * resolution, padding)
+        for resolution, sprites in shrunk.items()
+    }
+
+
+def _packed(
+    sprites: dict[str, Sprite], width: int, padding: int
+) -> tuple[Image.Image, dict[str, list[int]]]:
+    """The sprites packed in rows `width` pixels wide, and where each sits."""
     x = y = row_height = 0
     places: dict[str, list[int]] = {}
     for name, sprite in sprites.items():
@@ -587,3 +603,30 @@ def draw_sheet(padding: int = 1, resolution: int = 1) -> tuple[Image.Image, dict
     for name, sprite in sprites.items():
         sheet.paste(sprite.image, tuple(places[name][:2]))
     return sheet, places
+
+
+def shrunk_from(sprite: Sprite, times: int) -> Sprite:
+    """A sprite `times` times smaller each way, each pixel the average of those it covers,
+    weighted by how solid each is, laid so its anchor falls on a pixel's corner as it does at
+    full size, with the rows and columns left clear round it cut off."""
+    if times == 1:
+        return sprite
+    ax, ay = sprite.anchor
+    left, top = -ax % times, -ay % times
+    pixels = np.asarray(sprite.image.convert("RGBA"), dtype=np.float64) / 255
+    h, w = pixels.shape[:2]
+    rows, cols = -(-(h + top) // times) * times, -(-(w + left) // times) * times
+    padded = np.zeros((rows, cols, 4))
+    padded[top : top + h, left : left + w] = pixels
+    padded[..., :3] *= padded[..., 3:]
+    small = padded.reshape(rows // times, times, cols // times, times, 4).mean(axis=(1, 3))
+    small[..., :3] /= np.maximum(small[..., 3:], 1e-9)
+    shrunk = np.rint(np.clip(small, 0, 1) * 255).astype(np.uint8)
+    anchor = ((ax + left) // times, (ay + top) // times)
+    solid = shrunk[..., 3] > 0
+    if not solid.any():
+        return Sprite(Image.fromarray(shrunk[:1, :1]), (0, 0))
+    kept_rows, kept_cols = np.flatnonzero(solid.any(axis=1)), np.flatnonzero(solid.any(axis=0))
+    r0, c0 = int(kept_rows[0]), int(kept_cols[0])
+    cut = shrunk[r0 : int(kept_rows[-1]) + 1, c0 : int(kept_cols[-1]) + 1]
+    return Sprite(Image.fromarray(np.ascontiguousarray(cut)), (anchor[0] - c0, anchor[1] - r0))

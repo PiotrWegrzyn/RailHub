@@ -529,7 +529,9 @@ class TrackArt:
             return None
         shapes = _Recorder()
         s = scale * quality
-        self._lay_out(shapes, shapes.shadow, shapes.heights, laid, left, top, s, quality, lifted)
+        self._lay_out(
+            shapes, shapes.shadow, shapes.heights, laid, left, top, s, quality, lifted, True
+        )
         return shapes.shapes(scale, quality)
 
     def _laid_near(
@@ -563,10 +565,14 @@ class TrackArt:
         s: int,
         smoothing: int,
         lifted: bool,
+        thin_rails: bool = False,
     ) -> None:
         """Draws the laid pieces `s` pixels to an art pixel from (`left`, `top`): the track with
         `paint`, its shadow with `shade` and, raised, how far each stretch is lifted with
-        `measure`; `smoothing` pixels make one shown."""
+        `measure`; `smoothing` pixels make one shown. Rails are RAIL_WIDTH wide, but never
+        narrower than a pixel shown unless `thin_rails`, which leaves a rail narrower than a
+        pixel far off to show only as faint as its share of the pixel, as everything else
+        drawn finely and shrunk does."""
         cell = PIXEL_CELL_WIDTH * s
         raise_up = lifted and self.elevation is not None
 
@@ -607,7 +613,7 @@ class TrackArt:
                 for lane in lanes:
                     bed = _raised_strip(lane, lifts, TRACK_BED / 2 * cell)
                     paint.polygon(bed, fill=(*GRAVEL, 255))
-        rail = max(smoothing, round(RAIL_WIDTH * s))
+        rail = max(1 if thin_rails else smoothing, round(RAIL_WIDTH * s))
         for each, _, lanes, lifts in ground:
             if each.piece.maglev:
                 _lay_guideway(paint, lanes, lifts, cell, rail)
@@ -616,7 +622,7 @@ class TrackArt:
                 for sleeper in _sleepers(lane, lifts, cell):
                     paint.polygon(sleeper, fill=(*SLEEPER, 255))
         rails = [
-            _crisp(_raised(_offset(lane, side), lifts), smoothing, rail)
+            _crisp(_raised(_offset(lane, side), lifts), smoothing, max(rail, smoothing))
             for _, _, lanes, lifts in railed
             for lane in lanes
             for side in (-GAUGE / 2 * cell, GAUGE / 2 * cell)
