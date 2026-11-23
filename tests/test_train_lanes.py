@@ -101,10 +101,7 @@ def test_either_way_along_double_track_a_train_keeps_to_the_same_side_of_its_way
     assert backward == pytest.approx(DOUBLE_SPACING / 2)
 
 
-@pytest.mark.parametrize("main", [TrackWidth.DOUBLE, TrackWidth.QUADRUPLE])
-def test_single_track_branching_off_wider_track_leaves_from_its_outer_track_on_that_side(
-    main: TrackWidth,
-) -> None:
+def single_branch(main: TrackWidth) -> tuple[TrackArt, Track, float]:
     railway, track = line(main)
     constructions = railway.constructions
     growth = Growth(constructions, GrowthRule(trades=False))
@@ -121,14 +118,34 @@ def test_single_track_branching_off_wider_track_leaves_from_its_outer_track_on_t
     shared = next(
         point for point in branch.ends if any(p.width == main and point in p.ends for p in double)
     )
-    share = 0.0 if branch.ends[0] == shared else 1.0
-    outer = DOUBLE_SPACING / 2 if main == TrackWidth.DOUBLE else QUADRUPLE_OUTER
+    return track, branch, 0.0 if branch.ends[0] == shared else 1.0
+
+
+@pytest.mark.parametrize(
+    ("main", "leaves_from"),
+    [(TrackWidth.DOUBLE, DOUBLE_SPACING / 2), (TrackWidth.QUADRUPLE, DOUBLE_SPACING / 2)],
+)
+def test_single_track_branching_off_wider_track_leaves_from_the_outermost_track_it_can_turn_out_of(
+    main: TrackWidth, leaves_from: float
+) -> None:
+    track, branch, share = single_branch(main)
 
     at_the_junction = track.riding_side(branch, share, True)
     far_end = track.riding_side(branch, 1.0 - share, True)
 
-    assert abs(at_the_junction) == pytest.approx(outer)
-    assert far_end == pytest.approx(0.0)
+    assert abs(at_the_junction) == pytest.approx(leaves_from)
+    assert far_end == pytest.approx(0.0, abs=1e-3)
+
+
+def test_single_track_branching_off_quadruple_track_joins_all_four_of_its_tracks() -> None:
+    track, branch, share = single_branch(TrackWidth.QUADRUPLE)
+
+    drawn = track._sides_at(branch, [share], forks=True)
+
+    half = DOUBLE_SPACING / 2
+    assert sorted(abs(lane[0]) for lane in drawn) == pytest.approx(
+        [half, half, QUADRUPLE_OUTER, QUADRUPLE_OUTER]
+    )
 
 
 @pytest.mark.parametrize(("lane", "off"), [(0, FULL), (1, QUADRUPLE_OUTER * PIXEL_CELL_WIDTH)])

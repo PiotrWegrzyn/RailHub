@@ -81,13 +81,12 @@ PLATFORM_WIDTH = 0.12
 # track, in cells, and how far into the station's cell from each end they have opened out to that.
 ISLAND_TRACKS = 0.3
 ISLAND_FROM = 0.22
-# How far along a piece from the end it branches off at, as a share of the piece, track
-# branching off other track is first drawn: a little short of the middle, where it turns away.
-FORK_FROM = 0.42
-# How far along a piece branching off other track it has turned away enough for its tracks to
-# draw together to its own spacing without first swinging back over the track it left.
-TURNED_BY = 0.65
 SET_BACK = 0.34
+# How gently a track branching off other track turns out of it: round a circle of this radius,
+# in cells, or as wide as there is room for; and how many cells along that track another track of
+# it crosses over to the track that turns out for each cell it crosses, as a crossover does.
+TURNOUT_RADIUS = 0.6
+CROSSOVER_SLOPE = 4.0
 
 # Overhead wires on electric track: how far beside the track their masts stand and how far
 # apart, in cells, and how tall the masts are and how high the wires hang, in art pixels.
@@ -247,16 +246,20 @@ def _point_at(path: Path, lengths: list[float], along: float) -> tuple[Point, Po
     raise ValueError("A path needs two points")
 
 
-def _sleepers(lane: Path, lifts: list[float], cell: float) -> list[Path]:
+def _sleepers(
+    lane: Path, lifts: list[float], cell: float, kept: tuple[float, float] | None = None
+) -> list[Path]:
     """The sleepers under one track on the screen, evenly along it as it lies flat, each lying
-    square to the way it runs there and lifted with it; `cell` is a cell's width in the
-    picture's pixels."""
+    square to the way it runs there and lifted with it, only those `kept` between these two
+    distances along it if given; `cell` is a cell's width in the picture's pixels."""
     lengths = _lengths(lane)
     count = max(1, round(lengths[-1] / (SLEEPER_GAP * cell)))
     half_width, half_length = SLEEPER_WIDTH * cell / 2, SLEEPER_LENGTH * cell / 2
     sleepers = []
     for k in range(count):
         middle = (k + 0.5) * lengths[-1] / count
+        if kept is not None and not kept[0] <= middle <= kept[1]:
+            continue
         (x, y), (ux, uy) = _point_at(lane, lengths, middle)
         y -= float(np.interp(middle, lengths, lifts))
         along, across = (ux * half_width, uy * half_width), (-uy * half_length, ux * half_length)
@@ -343,13 +346,96 @@ def _eased(share: float) -> float:
     return share * share * (3 - 2 * share)
 
 
-def _onward(branching: float, beyond: float, share: float) -> float:
-    """Where a track branching off another lies `share` of the way along its piece from the end
-    it branches off at: on that track until it has turned away, TURNED_BY of the way along,
-    then easing over to where it lies at its other end."""
-    if share <= TURNED_BY:
-        return branching
-    return branching + (beyond - branching) * _eased((share - TURNED_BY) / (1 - TURNED_BY))
+def _turnout(line: Path, start: float, end: float, radius: float) -> Path | None:
+    """The way a track runs through a piece branching off other track, the piece's centre line
+    lying along `line` in the picture from the end it branches off at: in along the line
+    `start` to its left and out of it `end` to its left, running straight on from where it
+    comes in and then round in one curve, round `radius` where there is room, onto the straight
+    it goes out along. Its first point is where it comes in, its second where it starts to
+    turn. None where it cannot turn that way, its way out lying back behind where it comes
+    in."""
+    (ax, ay), (bx, by) = _offset(line[:2], start)[0], _offset(line[-2:], end)[-1]
+    (x0, y0), (x1, y1) = line[0], line[1]
+    (x2, y2), (x3, y3) = line[-2], line[-1]
+    d0, d1 = (x1 - x0, y1 - y0), (x3 - x2, y3 - y2)
+    t, u = _corner((ax, ay), d0, (bx, by), d1) or (0.0, 0.0)
+    if t <= 0 or u <= 0:
+        return None
+    corner = (ax + t * d0[0], ay + t * d0[1])
+    return _bend((ax, ay), corner, (bx, by), np.eye(2), radius)
+
+
+def _corner(a: Point, along: Point, b: Point, onward: Point) -> tuple[float, float] | None:
+    """How far on from `a` along `along`, and back from `b` against `onward`, the lines through
+    them meet, in lengths of those; None where they run side by side."""
+    det = along[1] * onward[0] - along[0] * onward[1]
+    if abs(det) < 1e-9:
+        return None
+    gap = (b[0] - a[0], b[1] - a[1])
+    return (
+        (gap[1] * onward[0] - gap[0] * onward[1]) / det,
+        (along[1] * gap[0] - along[0] * gap[1]) / det,
+    )
+
+
+def _crossover(line: Path, main: float, turning: Path, slope: float) -> Path:
+    """The way a track of the track a piece branches off runs over to the track `turning`
+    turns out of (`_turnout`) and on along it, the piece's centre line lying along `line` in
+    the picture from the end it branches off at and the track coming in `main` to its left:
+    straight on, then over in an easy S just before `turning` starts to turn, `slope` along for
+    each across where there is room."""
+    (x0, y0), (x1, y1) = line[0], line[1]
+    length = math.hypot(x1 - x0, y1 - y0) or 1.0
+    dx, dy = (x1 - x0) / length, (y1 - y0) / length
+    nx, ny = -dy, dx
+    ax, ay = x0 + nx * main, y0 + ny * main
+    (rx, ry), (tx, ty) = turning[0], turning[1]
+    turn = (tx - rx) * dx + (ty - ry) * dy
+    across = (rx - ax) * nx + (ry - ay) * ny
+    span = min(turn, abs(across) * slope)
+    steps = 12
+    over = [
+        (
+            ax + dx * (turn - span * (1 - k / steps)) + nx * across * _eased(k / steps),
+            ay + dy * (turn - span * (1 - k / steps)) + ny * across * _eased(k / steps),
+        )
+        for k in range(steps + 1)
+    ]
+    return [(ax, ay), *over, *turning[2:]]
+
+
+def _sides_along(line: Path, lane: Path) -> list[float]:
+    """How far to the left of each point of `line` the lane lies, square to the line there."""
+    starts = np.array(lane[:-1])
+    runs = np.array(lane[1:]) - starts
+    sides = []
+    for index, (x, y) in enumerate(line):
+        (px, py), (qx, qy) = line[max(0, index - 1)], line[min(len(line) - 1, index + 1)]
+        length = math.hypot(qx - px, qy - py) or 1.0
+        normal = np.array([-(qy - py) / length, (qx - px) / length])
+        det = normal[0] * -runs[:, 1] + runs[:, 0] * normal[1]
+        gap = starts - (x, y)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            out = (gap[:, 0] * -runs[:, 1] + runs[:, 0] * gap[:, 1]) / det
+            along = (normal[0] * gap[:, 1] - normal[1] * gap[:, 0]) / det
+        hits = out[(np.abs(det) > 1e-12) & (along >= -1e-6) & (along <= 1 + 1e-6)]
+        if hits.size:
+            sides.append(float(hits[np.argmin(np.abs(hits))]))
+        else:
+            sides.append(sides[-1] if sides else 0.0)
+    return sides
+
+
+def _on_its_way_in(lane: Path, within: float) -> int:
+    """How many of the lane's first points lie no further than `within` from the straight line
+    it comes in along: where track branching off other track still lies on that track's."""
+    (x0, y0), (x1, y1) = lane[0], lane[1]
+    length = math.hypot(x1 - x0, y1 - y0) or 1.0
+    ux, uy = (x1 - x0) / length, (y1 - y0) / length
+    for k, (x, y) in enumerate(lane):
+        if abs((x - x0) * uy - (y - y0) * ux) > within:
+            return k
+    return len(lane)
 
 
 def _lane_sides(tracks: int, lanes: int | None = None) -> list[float]:
@@ -389,6 +475,7 @@ class _Laid:
     line: FloatArray
     sides: list[list[float]]
     platform: Point | None = None
+    forks: tuple[bool, bool] = (False, False)
 
 
 class TrackArt:
@@ -411,6 +498,7 @@ class TrackArt:
         # are lifted, kept until track or stations change, and the last three for no more than
         # PIECES_KEPT pieces.
         self._shapes: dict[Track, tuple[list[float], list[float]]] = {}
+        self._turnout_lanes: dict[Track, tuple[FloatArray, list[FloatArray]]] = {}
         self._laid_pieces: dict[tuple[Track, Point | None], tuple[int, _Laid]] = {}
         self._placed: dict[tuple[Track, Point | None], FloatArray] = {}
         self._lifts: dict[tuple[Track, Point | None], FloatArray] = {}
@@ -429,6 +517,7 @@ class TrackArt:
         and how far they lift before the ground was last graded for track."""
         if self._shapes_version != self.constructions.railway_version:
             self._shapes.clear()
+            self._turnout_lanes.clear()
             self._forget_laid()
             self._shapes_version = self.constructions.railway_version
         grades = 0 if self.elevation is None else self.elevation.grades
@@ -643,9 +732,9 @@ class TrackArt:
         for each, _, lanes, lifts in ground:
             if each.piece.maglev:
                 _lay_guideway(paint, lanes, lifts, cell, rail)
-        for _, _, lanes, lifts in railed:
+        for each, _, lanes, lifts in railed:
             for lane in lanes:
-                for sleeper in _sleepers(lane, lifts, cell):
+                for sleeper in _sleepers(lane, lifts, cell, self._bare(each, lanes, lane, cell)):
                     paint.polygon(sleeper, fill=(*SLEEPER, 255))
         rails = [
             _crisp(_raised(_offset(lane, side), lifts), smoothing, max(rail, smoothing))
@@ -664,6 +753,28 @@ class TrackArt:
         for each, line, lanes, lifts in ground:
             if each.piece.electric:
                 self._hang_wires(paint, line, lanes, lifts, cell, s)
+
+    @staticmethod
+    def _bare(laid: _Laid, lanes: list[Path], lane: Path, cell: float) -> tuple[float, float]:
+        """How far along the lane its sleepers start and end: where it branches off other
+        track, only once it has left that track's, and crossing over to another track of the
+        piece, only until it is on it: there the other's sleepers lie already and would only be
+        blurred by its own."""
+        lengths = _lengths(lane)
+        within = GAUGE / 2 * cell
+        start = _on_its_way_in(lane, within) if laid.forks[0] else 0
+        end = len(lane) - _on_its_way_in(lane[::-1], within) if laid.forks[1] else len(lane)
+        onto = [other for other in lanes[: int(laid.piece.width)] if other is not lane]
+        if any(laid.forks) and lanes.index(lane) >= int(laid.piece.width) and onto:
+            on = [
+                min(math.dist(point, other[k]) for other in onto) < within
+                for k, point in enumerate(lane)
+            ]
+            if laid.forks[0]:
+                end = min(end, next((k for k in range(start, len(lane)) if on[k]), end))
+            else:
+                start = max(start, next((k for k in range(end - 1, -1, -1) if on[k]), start))
+        return lengths[max(0, start - 1)], lengths[max(0, min(len(lane), end) - 1)]
 
     def _measure(
         self,
@@ -707,14 +818,11 @@ class TrackArt:
         kept = self._laid_pieces.get((piece, platform))
         if kept is not None and kept[0] == version:
             return kept[1]
-        reach = max(abs(side) for lane in self._sides_at(piece, [0.0, 0.5, 1.0]) for side in lane)
-        bed = BRIDGE_WIDTH if piece.bed == TrackBed.BRIDGE else BANK
-        radius = (reach + bed / 2 + SHADOW_REACH) * PIXEL_CELL_WIDTH
-        line = centre_line(self.tile_map.grid, self._steps, self.projection.matrix, piece, radius)
+        line = self._centre_line(piece)
         sides = self._sides(piece, line)
-        line, sides = self._past_the_fork(piece, line, sides)
+        forks = tuple(self._branch_lanes(piece, point) is not None for point in piece.ends)
         plane = np.array([[x for x, _ in line], [y for _, y in line]])
-        laid = _Laid(piece, plane, sides, platform)
+        laid = _Laid(piece, plane, sides, platform, (forks[0], forks[1]))
         if len(self._laid_pieces) >= PIECES_KEPT:
             self._forget_laid()
         self._laid_pieces[piece, platform] = (version, laid)
@@ -780,20 +888,28 @@ class TrackArt:
 
     def _sides(self, piece: Track, line: Path) -> list[list[float]]:
         """How far to the left of the centre line each track of the piece lies at each of its
-        points, in cells. Double track has one track either side of its centre line, closing up
-        to it at an end that runs into single track; quadruple track two either side, the inner
-        pair DOUBLE_SPACING apart and the outer ones as far again beyond them, the outer ones
-        closing up onto the inner where it runs into double track and all onto the centre line
-        where it runs into single. Single track keeps to its centre line, except where it
-        branches off double or quadruple track in the same cell: there it splits in two, one
-        track running into the outer track on each side, and closes up again by the middle of
-        the cell."""
+        points, in cells, with the tracks branching off other track forking into every track
+        of it they join (`_sides_at`)."""
         lengths = _lengths(line)
-        return self._sides_at(piece, [along / lengths[-1] for along in lengths])
+        return self._sides_at(piece, [along / lengths[-1] for along in lengths], forks=True)
 
-    def _sides_at(self, piece: Track, shares: list[float]) -> list[list[float]]:
-        """The same as `_sides`, at these shares of the way along the piece from its first end
-        to its second."""
+    def _sides_at(
+        self, piece: Track, shares: list[float], forks: bool = False
+    ) -> list[list[float]]:
+        """How far to the left of the centre line each track of the piece lies at these shares
+        of the way along it from its first end to its second, in cells. Double track has one
+        track either side of its centre line, closing up to it at an end that runs into single
+        track; quadruple track two either side, the inner pair DOUBLE_SPACING apart and the
+        outer ones as far again beyond them, the outer ones closing up onto the inner where it
+        runs into double track and all onto the centre line where it runs into single. Where the
+        piece branches off straighter track in its cell each of its tracks leaves from a track
+        of that one going its way (`_branch_lanes`), and with `forks` from each of the others
+        going its way too, crossing the tracks between, each turning out of it in one curve
+        (`_turnouts`)."""
+        if any(self._branch_lanes(piece, point) is not None for point in piece.ends):
+            along, turnouts = self._turnouts(piece)
+            kept = turnouts if forks else turnouts[: int(piece.width)]
+            return [np.interp(shares, along, lane).tolist() for lane in kept]
         full = _lane_sides(int(piece.width))
         opening = 2.0
         if piece.width == TrackWidth.QUADRUPLE and self.constructions.station_at(piece.cell):
@@ -801,16 +917,11 @@ class TrackArt:
             full = [-(half + ISLAND_TRACKS), -half, half, half + ISLAND_TRACKS]
             opening = 1 / ISLAND_FROM
         at_start, at_end = self._ends(piece)
-        branch_start, branch_end = (self._branch_lanes(piece, point) for point in piece.ends)
         lanes = []
         for index, middle in enumerate(full):
             sides = []
             for share in shares:
-                if branch_start is not None:
-                    side = _onward(at_start[index], at_end[index], share)
-                elif branch_end is not None:
-                    side = _onward(at_end[index], at_start[index], 1 - share)
-                elif share < 0.5:
+                if share < 0.5:
                     side = at_start[index] + (middle - at_start[index]) * _eased(opening * share)
                 elif share > 0.5:
                     side = at_end[index] + (middle - at_end[index]) * _eased(opening * (1 - share))
@@ -819,6 +930,70 @@ class TrackArt:
                 sides.append(side)
             lanes.append(sides)
         return lanes
+
+    def _turnouts(self, piece: Track) -> tuple[FloatArray, list[FloatArray]]:
+        """How far to the left of the centre line of a piece branching off other track each of
+        its tracks lies, in cells, at the shares of the way along it in the first array: first
+        its own tracks, each from the track it leaves from (`_branch_lanes`), then each other
+        track of the track it branches off going that way, each running into the track of the
+        piece it joins in one curve (`_turnout`)."""
+        self._keep_current()
+        found = self._turnout_lanes.get(piece)
+        if found is not None:
+            return found
+        at_start, at_end = self._ends(piece)
+        branch = self._branch_lanes(piece, piece.ends[0])
+        # Laid out from the end it branches off at, where the left is the other side.
+        way = 1.0 if branch is not None else -1.0
+        if branch is None:
+            branch = self._branch_lanes(piece, piece.ends[1])
+            at_start, at_end = at_end, at_start
+        assert branch is not None
+        xs, ys = self.projection.matrix @ np.array(self._centre_line(piece)).T
+        line = list(zip(xs.tolist(), ys.tolist(), strict=True))
+        if way < 0:
+            line.reverse()
+        lengths = _lengths(line)
+        along = [length / (lengths[-1] or 1.0) for length in lengths]
+        cell = way * PIXEL_CELL_WIDTH
+        radius = TURNOUT_RADIUS * PIXEL_CELL_WIDTH
+        turning = [
+            _turnout(line, start * cell, end * cell, radius)
+            or _offset(line, [start * cell + (end - start) * cell * _eased(k) for k in along])
+            for start, end in zip(at_start, at_end, strict=True)
+        ]
+        paths = turning + [
+            _turnout(line, main * cell, at_end[k] * cell, radius)
+            or _crossover(line, main * cell, turning[k], CROSSOVER_SLOPE)
+            for k, joins in enumerate(branch)
+            for main in joins[1:]
+        ]
+        if way < 0:
+            line.reverse()
+        lengths = _lengths(line)
+        shares = np.array(lengths) / (lengths[-1] or 1.0)
+        lanes = [np.array(_sides_along(line, _dense(path, STEP))) / abs(cell) for path in paths]
+        found = self._turnout_lanes[piece] = (shares, lanes)
+        return found
+
+    def _centre_line(self, piece: Track) -> Path:
+        """The piece's centre line in the plane, rounded off round the middle of its cell enough
+        for the furthest of its tracks to turn round without folding over itself."""
+        if any(self._branch_lanes(piece, point) is not None for point in piece.ends):
+            reach = max(
+                abs(side)
+                for point in piece.ends
+                for joins in (self._branch_lanes(piece, point) or [])
+                for side in joins
+            )
+            reach = max(reach, *(abs(side) for end in self._ends(piece) for side in end))
+        else:
+            reach = max(
+                abs(side) for lane in self._sides_at(piece, [0.0, 0.5, 1.0]) for side in lane
+            )
+        bed = BRIDGE_WIDTH if piece.bed == TrackBed.BRIDGE else BANK
+        radius = (reach + bed / 2 + SHADOW_REACH) * PIXEL_CELL_WIDTH
+        return centre_line(self.tile_map.grid, self._steps, self.projection.matrix, piece, radius)
 
     def _ends(self, piece: Track) -> tuple[list[float], list[float]]:
         """Where each track of the piece lies at each of its ends, in cells to the left of its
@@ -834,7 +1009,7 @@ class TrackArt:
             for point in piece.ends:
                 branch = self._branch_lanes(piece, point)
                 if branch is not None:
-                    ends.append(branch)
+                    ends.append([joins[0] for joins in branch])
                 elif lanes == 1:
                     ends.append([0.0])
                 else:
@@ -842,31 +1017,15 @@ class TrackArt:
             shape = self._shapes[piece] = (ends[0], ends[1])
         return shape
 
-    def _past_the_fork(
-        self, piece: Track, line: Path, sides: list[list[float]]
-    ) -> tuple[Path, list[list[float]]]:
-        """The piece's centre line and its tracks' sides, left out up to where it turns away
-        from track it branches off (`_branch_lanes`): up to there its tracks lie on that
-        track's, which shows them already, and drawn again they would only blur them."""
-        lengths = _lengths(line)
-        total = lengths[-1] or 1.0
-        shares = [along / total for along in lengths]
-        low, high = 0.0, 1.0
-        start, end = (self._branch_lanes(piece, point) for point in piece.ends)
-        if start is not None:
-            low = FORK_FROM
-        if end is not None:
-            high = 1.0 - FORK_FROM
-        keep = [k for k, share in enumerate(shares) if low <= share <= high]
-        if len(keep) < 2 or (start is None and end is None):
-            return line, sides
-        return [line[k] for k in keep], [[lane[k] for k in keep] for lane in sides]
-
-    def _branch_lanes(self, piece: Track, point: int) -> list[float] | None:
-        """Where the piece's tracks lie at this end where it branches off straighter track in its
-        cell at least as wide: on the outermost tracks of that track on the side the piece turns
-        to, as many as the piece has, or where it is as wide, on all of them, so the whole line
-        forks; None where it branches off none, or off wider track with too few that side."""
+    def _branch_lanes(self, piece: Track, point: int) -> list[list[float]] | None:
+        """Where the piece's tracks leave from at this end where it branches off straighter
+        track in its cell at least as wide: for each of its tracks, in order from its right to
+        its left, the tracks of that one it joins, each in cells to the left of the piece's centre
+        line, the one it leaves from first. Each joins every track there going its way: where
+        the piece is as wide its own, so the whole line forks; double off quadruple the pair on
+        its side; single all of them. It leaves from the one furthest to the side it turns to,
+        the others crossing over to that one (`_turnouts`), so a train off it keeps clear of the
+        rest. None where it branches off none."""
         grid = self.tile_map.grid
         turn = grid.track_turn(*piece.ends)
         mains = [
@@ -880,20 +1039,49 @@ class TrackArt:
         if not mains:
             return None
         main = min(mains, key=lambda other: grid.track_turn(*other.ends))
+        # The tracks of both, to the left of the way from this end into the cell.
+        tracks = _lane_sides(int(main.width))
+        own = _lane_sides(int(piece.width))
         matrix = self.projection.matrix
         on = matrix @ (self._steps[main.other_end(point)] / 2)
         off = matrix @ (self._steps[piece.other_end(point)] / 2)
         side = 1.0 if on[0] * off[1] - on[1] * off[0] > 0 else -1.0
-        # The main track's tracks, to the left of the way from this end into the cell.
-        from_here = 1.0 if point == main.ends[0] else -1.0
-        tracks = [from_here * lane for lane in _lane_sides(int(main.width))]
-        that_side = sorted((lane for lane in tracks if lane * side > 0), key=abs, reverse=True)
-        lanes = int(piece.width)
-        chosen = that_side[:lanes] if len(that_side) >= lanes else tracks
-        if len(chosen) != lanes:
-            return None
+        if len(own) == len(tracks):
+            joins = [[lane] for lane in tracks]
+        else:
+            joins = [
+                sorted(
+                    (lane for lane in tracks if len(own) == 1 or lane * mine > 0),
+                    key=lambda lane: -lane * side,
+                )
+                for mine in own
+            ]
+        joins = [
+            sorted(lanes, key=lambda lane: not self._turns_out(piece, point, main, lane, mine))
+            for lanes, mine in zip(joins, own, strict=True)
+        ]
         into_piece = 1.0 if point == piece.ends[0] else -1.0
-        return sorted(into_piece * lane for lane in chosen)
+        if into_piece < 0:
+            joins.reverse()
+        return [[into_piece * lane for lane in lanes] for lanes in joins]
+
+    def _turns_out(self, piece: Track, point: int, main: Track, lane: float, mine: float) -> bool:
+        """Whether a track of the piece can turn out of the track `lane` of `main` to the left of
+        the way from this end into the cell in one curve, onto where it leaves the cell `mine`
+        to the left of its way, as it is seen in the picture: where wide track lies across more
+        of the cell than its far edge, its outer track on that side can turn out only by first
+        swinging back."""
+        grid = self.tile_map.grid
+        centre = np.array(grid.center(*piece.cell), dtype=float)
+        matrix = self.projection.matrix
+        here = matrix @ (centre + self._steps[point] / 2)
+        along = matrix @ (self._steps[main.other_end(point)] - self._steps[point]) / 2
+        there = matrix @ (centre + self._steps[piece.other_end(point)] / 2)
+        onward = matrix @ (self._steps[piece.other_end(point)] / 2)
+        start = _offset([tuple(here), tuple(here + along)], lane * PIXEL_CELL_WIDTH)[0]
+        end = _offset([tuple(there - onward), tuple(there)], mine * PIXEL_CELL_WIDTH)[-1]
+        met = _corner(start, tuple(along), end, tuple(onward))
+        return met is not None and met[0] > 0 and met[1] > 0
 
     def _width_beyond(self, piece: Track, point: int) -> int:
         """How many tracks wide the track leaving the piece by this point runs on: the widest
