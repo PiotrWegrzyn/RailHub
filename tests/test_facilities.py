@@ -1,36 +1,163 @@
 import pytest
 
-from builders import joined_stations
-from railroads.sim.facilities import COAL_A_MONTH, ENGINE_SHED_SPEED, WAREHOUSE_ROOM, Facility
-from railroads.sim.finance import ENGINE_SHED_PRICE
+from builders import joined_stations, make_game
+from railroads.sim.constructions import CELL_SPACE, Building, BuildingKind
+from railroads.sim.demolition import bulldoze
+from railroads.sim.facilities import (
+    DELIVERED_SHARE,
+    ENGINE_SHED_SPEED,
+    USES,
+    WAREHOUSE_ROOM,
+    Facility,
+    monthly_cost,
+)
+from railroads.sim.game import Game
 from railroads.sim.goods import Good, Need
+from railroads.sim.growth import Growth
+from railroads.sim.railway import Railway
+from railroads.sim.routes import add_facility
 from railroads.sim.trains import Stop
 
 STATION = (6, 3)
+BESIDE = (5, 3)
+ON_THE_LINE = (6, 4)
+COAL = USES[Facility.ENGINE_SHED][1]
 
 
-def test_putting_up_an_engine_shed_costs_its_price_once() -> None:
-    _, railway = joined_stations()
-    cash = railway.finances.cash
-
-    first = railway.build_facility(STATION, Facility.ENGINE_SHED)
-    second = railway.build_facility(STATION, Facility.ENGINE_SHED)
-
-    assert (first, second) == (True, False)
-    assert railway.finances.cash == pytest.approx(cash - ENGINE_SHED_PRICE)
+def _with_shed() -> tuple[Growth, Railway]:
+    growth, railway = joined_stations()
+    add_facility(growth, STATION, Facility.ENGINE_SHED, BESIDE)
+    return growth, railway
 
 
-@pytest.mark.parametrize(("coal", "works"), [(COAL_A_MONTH, True), (COAL_A_MONTH - 1, False)])
-def test_an_engine_shed_works_a_month_only_on_a_months_coal(coal: float, works: bool) -> None:
-    _, railway = joined_stations()
-    railway.build_facility(STATION, Facility.ENGINE_SHED)
-    railway.station_goods(STATION).stockpile[Good.COAL] = coal
+def _raised_game() -> Game:
+    game = make_game(10_000_000.0)
+    game.build_station(STATION)
+    game.railway.upgrade(STATION)
+    game.railway.upgrade(STATION)
+    return game
+
+
+def test_a_facility_costs_its_months_good_at_the_market_price_when_the_station_holds_none() -> None:
+    _, railway = _with_shed()
 
     railway.turn_month({})
-    left = railway.station_goods(STATION).held(Good.COAL)
 
-    assert (Facility.ENGINE_SHED in railway.working_at(STATION)) is works
-    assert left == pytest.approx(0.0 if works else coal)
+    spent = -railway.finances.month["station facilities"]
+    assert spent == pytest.approx(COAL * railway.market_price(Good.COAL))
+
+
+@pytest.mark.parametrize("held", [0.0, 20.0, COAL, COAL + 30.0])
+def test_what_the_station_holds_costs_the_delivered_share(held: float) -> None:
+    taken = min(held, COAL)
+
+    cost = monthly_cost(Facility.ENGINE_SHED, held, 10.0)
+
+    assert cost == pytest.approx((taken * DELIVERED_SHARE + COAL - taken) * 10.0)
+
+
+def test_a_facility_takes_what_the_station_holds_and_pays_less_for_it() -> None:
+    _, railway = _with_shed()
+    railway.station_goods(STATION).stockpile[Good.COAL] = 20.0
+
+    railway.turn_month({})
+
+    spent = -railway.finances.month["station facilities"]
+    price = railway.market_price(Good.COAL)
+    assert spent == pytest.approx((20.0 * DELIVERED_SHARE + COAL - 20.0) * price)
+    assert railway.station_goods(STATION).held(Good.COAL) == pytest.approx(0.0)
+
+
+def test_an_engine_shed_fills_its_cell_taking_the_buildings_there_down() -> None:
+    growth, railway = joined_stations()
+    growth.build(Building(BESIDE, BuildingKind.HOUSE))
+
+    add_facility(growth, STATION, Facility.ENGINE_SHED, BESIDE)
+
+    assert growth.constructions.buildings_at(BESIDE) == []
+    assert growth.constructions.space_left(BESIDE) == 0
+    assert railway.facilities_at(STATION) == {Facility.ENGINE_SHED}
+
+
+@pytest.mark.parametrize(("houses", "left"), [(4, 4), (CELL_SPACE, CELL_SPACE - 1)])
+def test_cattle_pens_take_one_place_in_their_cell(houses: int, left: int) -> None:
+    growth, _ = joined_stations()
+    for _ in range(houses):
+        growth.build(Building(BESIDE, BuildingKind.HOUSE))
+
+    add_facility(growth, STATION, Facility.CATTLE_PENS, BESIDE)
+
+    assert len(growth.constructions.buildings_at(BESIDE)) == left
+
+
+def test_an_engine_shed_needs_the_station_raised_to_level_3() -> None:
+    game = make_game(10_000_000.0)
+    game.build_station(STATION)
+    early = game.add_facility(STATION, Facility.ENGINE_SHED, BESIDE)
+    game.railway.upgrade(STATION)
+    game.railway.upgrade(STATION)
+
+    late = game.add_facility(STATION, Facility.ENGINE_SHED, BESIDE)
+
+    assert (early.ok, late.ok) == (False, True)
+
+
+@pytest.mark.parametrize(("cell", "ok"), [(BESIDE, True), ((4, 3), False), (STATION, False)])
+def test_an_engine_shed_stands_next_to_its_station(cell: tuple[int, int], ok: bool) -> None:
+    game = _raised_game()
+
+    done = game.add_facility(STATION, Facility.ENGINE_SHED, cell)
+
+    assert done.ok is ok
+
+
+def test_an_engine_shed_cannot_stand_on_track_but_cattle_pens_can_beside_it() -> None:
+    game = _raised_game()
+    game.lay_track(STATION, (6, 8))
+
+    shed = game.add_facility(STATION, Facility.ENGINE_SHED, ON_THE_LINE)
+    pens = game.add_facility(STATION, Facility.CATTLE_PENS, ON_THE_LINE)
+
+    assert (shed.ok, pens.ok) == (False, True)
+
+
+def test_a_station_has_one_facility_of_each_kind() -> None:
+    game = _raised_game()
+    game.add_facility(STATION, Facility.ENGINE_SHED, BESIDE)
+
+    again = game.add_facility(STATION, Facility.ENGINE_SHED, (7, 3))
+
+    assert again.ok is False
+
+
+def test_the_other_facilities_go_in_the_station_itself_and_not_on_the_map() -> None:
+    game = _raised_game()
+
+    placed = game.add_facility(STATION, Facility.POST_OFFICE, BESIDE)
+    put_up = game.railway.put_up(STATION, Facility.POST_OFFICE)
+
+    assert (placed.ok, put_up) == (False, True)
+    assert game.constructions.at(BESIDE) == ()
+    assert game.railway.facilities_at(STATION) == {Facility.POST_OFFICE}
+
+
+def test_closing_a_facility_in_the_station_stops_its_cost() -> None:
+    _, railway = joined_stations()
+    railway.put_up(STATION, Facility.POST_OFFICE)
+
+    railway.close_facility(STATION, Facility.POST_OFFICE)
+    railway.turn_month({})
+
+    assert railway.finances.month["station facilities"] == 0.0
+
+
+def test_bulldozing_a_station_takes_its_facilities_down() -> None:
+    growth, railway = _with_shed()
+
+    bulldoze(growth, STATION)
+
+    assert growth.constructions.annex_at(BESIDE) is None
+    assert railway.facilities_at(STATION) == set()
 
 
 def test_a_fuelled_train_runs_faster_by_the_engine_shed_speed() -> None:
@@ -55,34 +182,30 @@ def test_a_fuelled_train_runs_faster_by_the_engine_shed_speed() -> None:
     assert gained[1] == pytest.approx(gained[0] * ENGINE_SHED_SPEED, rel=0.05)
 
 
-def test_a_station_whose_engine_shed_lacks_coal_wants_it() -> None:
-    growth, railway = joined_stations()
-    railway.build_facility(STATION, Facility.ENGINE_SHED)
+def test_a_station_wants_what_its_facilities_will_use_beyond_what_it_holds() -> None:
+    growth, railway = _with_shed()
     growth.trade_goods()
+    railway.station_goods(STATION).stockpile[Good.COAL] = 20.0
 
     short = growth.station_trade.short_of(STATION)
 
-    assert short[Need.COAL] == pytest.approx(COAL_A_MONTH)
+    assert short[Need.COAL] == pytest.approx(COAL - 20.0)
 
 
-def test_a_working_post_office_makes_mail_delivered_there_pay_half_as_much_again() -> None:
+def test_a_post_office_makes_mail_delivered_there_pay_half_as_much_again() -> None:
     _, railway = joined_stations()
-    railway.build_facility(STATION, Facility.POST_OFFICE)
-    railway.station_goods(STATION).stockpile[Good.PAPER] = 50.0
-    railway.turn_month({})
+    railway.put_up(STATION, Facility.POST_OFFICE)
 
     factors = (railway.facility_pay(STATION, Good.MAIL), railway.facility_pay(STATION, Good.COAL))
 
     assert factors == (pytest.approx(1.5), 1.0)
 
 
-def test_a_working_warehouse_gives_every_good_more_room() -> None:
+def test_a_warehouse_gives_every_good_more_room() -> None:
     _, railway = joined_stations()
     before = railway.station_goods(STATION).limit
-    railway.build_facility(STATION, Facility.WAREHOUSE)
-    railway.station_goods(STATION).stockpile[Good.BRICKS] = 50.0
-    railway.turn_month({})
+
+    railway.put_up(STATION, Facility.WAREHOUSE)
 
     after = railway.station_goods(STATION).limit
-
     assert after == pytest.approx(before + WAREHOUSE_ROOM)

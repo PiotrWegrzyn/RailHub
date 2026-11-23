@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from imgui_bundle import imgui
 
-from railroads.sim.constructions import Track
+from railroads.sim.constructions import Facility, Track
 from railroads.sim.grids import Cell
 from railroads.sim.railway import PLATFORM_REACH
 from railroads.sim.routes import Route, plan_route_steps, route_price, station_way
@@ -57,6 +57,9 @@ class MapTools:
         match build.tool:
             case Tool.NONE:
                 station = view.constructions.main_station(cell)
+                annex = view.constructions.annex_at(cell)
+                if station is None and annex is not None:
+                    station = annex.station
                 if station is not None:
                     view.open_station(station)
             case Tool.STATION:
@@ -69,6 +72,8 @@ class MapTools:
                 self._move_station(cell)
             case Tool.ADD_PLATFORM:
                 self._add_platform(cell)
+            case Tool.ADD_FACILITY:
+                self._add_facility(cell)
             case Tool.TRACK:
                 if build.track_from is None:
                     build.track_from = cell
@@ -131,6 +136,24 @@ class MapTools:
             return
         build.choose(Tool.NONE)
 
+    def _add_facility(self, cell: Cell) -> None:
+        view = self._view
+        build = view.build
+        if build.moving is None or build.facility is None:
+            return
+        done = view.game.add_facility(build.moving, build.facility, cell)
+        if not self._said(done):
+            return
+        view.buildings_changed(done.changed)
+        build.choose(Tool.NONE)
+
+    def start_adding_facility(self, station: Cell, facility: Facility) -> None:
+        """Lets the next click choose where a facility beside a station goes."""
+        build = self._view.build
+        build.choose(Tool.ADD_FACILITY)
+        build.moving, build.facility = station, facility
+        build.say(f"Click a cell next to the station for its {facility.value}.")
+
     def start_adding_platform(self, station: Cell) -> None:
         """Lets the next click choose where a station's new platform goes."""
         build = self._view.build
@@ -178,6 +201,19 @@ class MapTools:
         if build.tool == Tool.BULLDOZE:
             price = game.clearing_quote(cell).price
             build.hover_note = "" if price is None else f"Clearing this cell: {dollars(price)}"
+            return
+        if build.tool == Tool.ADD_FACILITY:
+            if build.moving is None or build.facility is None:
+                build.hover_note = ""
+                return
+            quote = game.facility_quote(build.moving, build.facility, cell)
+            name = build.facility.value.capitalize()
+            build.hover_note = (
+                f"{name} can't go here: {quote.problem}."
+                if quote.price is None
+                else f"{name} here"
+                + (f": {dollars(quote.price)} to clear the cell." if quote.price else ".")
+            )
             return
         if build.tool == Tool.ADD_PLATFORM:
             site = game.platform_quote(cell).price

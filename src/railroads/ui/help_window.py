@@ -64,7 +64,7 @@ GOAL_HELP = (
     (
         "Your company is worth its cash, less any debt, plus the shares you own at what they"
         f" would fetch today, plus {BOOK_SHARE:.0%} of what your stations, with their levels,"
-        " storage and facilities, your track and your trains would cost today. The top bar shows it against"
+        " and storage, your track and your trains would cost today. The top bar shows it against"
         " your target, with what it is made of on hover, and the Reports window charts it every"
         " month."
     ),

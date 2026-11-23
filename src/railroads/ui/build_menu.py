@@ -14,7 +14,7 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.kept import KeptFor
-from railroads.sim.constructions import Constructions, Track, TrackWidth
+from railroads.sim.constructions import Constructions, Facility, Track, TrackWidth
 from railroads.sim.demolition import (
     DEMOLITION_PER_POINT,
     SKYSCRAPER_DEMOLITION,
@@ -93,12 +93,13 @@ class Tool(Enum):
     BULLDOZE = "Bulldoze"
     MOVE_STATION = "Move station"
     ADD_PLATFORM = "Add platform"
+    ADD_FACILITY = "Add facility"
 
 
 # The tools that place a station or a platform, which Q turns.
 STATION_TOOLS = frozenset((Tool.STATION, Tool.MOVE_STATION, Tool.ADD_PLATFORM))
 # The tools that note what they would cost in the cell under the mouse.
-PRICED_TOOLS = STATION_TOOLS | {Tool.BULLDOZE}
+PRICED_TOOLS = STATION_TOOLS | {Tool.BULLDOZE, Tool.ADD_FACILITY}
 
 HILLS_PRICE = TRACK_PRICE * RELIEF_RULES[Relief.HILLS].price_factor
 BRIDGE_PRICE = TRACK_PRICE * BRIDGE_RULES.price_factor
@@ -129,6 +130,12 @@ HINTS = {
     Tool.ADD_PLATFORM: (
         f"Click a free cell up to {PLATFORM_REACH} cells from the station for its new platform; Q turns its track. Clearing "
         "the cell costs what the buildings there cost to take down. Right click cancels."
+    ),
+    Tool.ADD_FACILITY: (
+        "Click a cell next to the station or a platform for the facility: an engine shed fills "
+        "a cell with no track, its own track running into the station; cattle pens take a "
+        "little room. Clearing it costs what the buildings in the way cost to take down. Right "
+        "click cancels."
     ),
     Tool.MOVE_STATION: (
         f"Click where the station goes: {dollars(STATION_PRICE)} and clearing the cell. Its trains, "
@@ -202,8 +209,10 @@ class BuildMenu:
     preview_price: float | None = None
     # What the tool would cost in the cell under the mouse, and what it would do there.
     hover_note: str = ""
-    # The station being moved, with the move tool.
+    # The station being moved, with the move tool, or added to.
     moving: Cell | None = None
+    # The facility being put up beside it.
+    facility: Facility | None = None
     # Which of the grid's ways the player turned the station being placed to, by its place in
     # MapTools.station_ways; None while it takes the way of the cell under the pointer.
     station_turn: int | None = None
@@ -330,6 +339,7 @@ class BuildMenu:
 
     def stop(self) -> None:
         self.moving = None
+        self.facility = None
         self.station_turn = None
         self.hover_note = ""
         self.track_from = None

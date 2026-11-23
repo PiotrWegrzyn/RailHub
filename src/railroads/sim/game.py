@@ -18,7 +18,7 @@ from railroads.sim import routes
 from railroads.sim.autoplay import StandInPlayer, play
 from railroads.sim.clock import MONTHS_PER_YEAR, START_YEAR
 from railroads.sim.company import Goal, News, company_value
-from railroads.sim.constructions import Building, Constructions, TrackWidth
+from railroads.sim.constructions import Building, Constructions, Facility, TrackWidth
 from railroads.sim.demolition import bulldoze, bulldoze_price, station_site_price
 from railroads.sim.finance import STATION_PRICE, Finances
 from railroads.sim.grids import Cell
@@ -259,6 +259,32 @@ class Game:
             self.finances.spend(site, "demolition")
         price = f" for {dollars(site)}" if site else ""
         return Outcome(f"Platform added{price}.", changed, ok=True)
+
+    def facility_quote(self, station: Cell, facility: Facility, cell: Cell) -> Quote:
+        """What clearing the cell for a facility beside a station costs, or why it can't go
+        there."""
+        problem = routes.facility_problem(
+            self.constructions, self.railway.level(station), station, facility, cell
+        )
+        if problem is not None:
+            return Quote(None, problem=problem)
+        site = routes.facility_site_price(self.constructions, cell, facility)
+        return Quote(site, site)
+
+    def add_facility(self, station: Cell, facility: Facility, cell: Cell) -> Outcome:
+        """Puts up a facility beside a station for what clearing its cell costs; from then on it
+        costs a month of what it uses (railroads.sim.facilities)."""
+        name = facility.value.capitalize()
+        quote = self.facility_quote(station, facility, cell)
+        if quote.price is None:
+            return Outcome(f"{name} can't go there: {quote.problem}.")
+        if short := self.finances.short_of(quote.price, "Clearing it"):
+            return Outcome(short)
+        changed = routes.add_facility(self.growth, station, facility, cell)
+        if quote.price:
+            self.finances.spend(quote.price, "demolition")
+        price = f" for {dollars(quote.price)}" if quote.price else ""
+        return Outcome(f"{name} put up{price}.", changed, ok=True)
 
     def move_station(self, old: Cell, new: Cell, ends: tuple[int, int] | None = None) -> Outcome:
         """Moves a station, its track running between `ends` in its new cell, keeping its

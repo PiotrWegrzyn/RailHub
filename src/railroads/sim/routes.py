@@ -25,9 +25,14 @@ from dataclasses import dataclass, field
 from functools import cache
 
 from railroads.sim.constructions import (
+    ANNEX_SPACE,
+    CELL_SPACE,
     MAX_TURN_DEG,
+    STATION_RELIEF,
     TURN_SLACK_DEG,
+    Annex,
     Constructions,
+    Facility,
     Station,
     Track,
     TrackWidth,
@@ -35,9 +40,12 @@ from railroads.sim.constructions import (
 from railroads.sim.demolition import (
     clearing,
     clearing_price,
-    remove_platforms,
+    remove_added,
     station_site_price,
 )
+from railroads.sim.facilities import LEVEL as FACILITY_LEVEL
+from railroads.sim.facilities import PLACED
+from railroads.sim.facilities import REACH as FACILITY_REACH
 from railroads.sim.finance import track_price
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.growth import Growth
@@ -286,6 +294,58 @@ def add_platform(
     return changed
 
 
+def facility_problem(
+    constructions: Constructions, level: int, station: Cell, facility: Facility, cell: Cell
+) -> str | None:
+    """Why a facility that stands on the map (PLACED) cannot go up in the cell beside a station
+    raised to `level`, or None if it can: it needs its level, one of a kind, a cell of land next
+    to the station or one of its platforms with no station or other facility in it, room enough
+    for it there once the buildings that can be are taken down, and for an engine shed, which
+    fills its cell, no track either."""
+    if facility not in PLACED:
+        return "it goes in the station itself"
+    if constructions.station_at(station) is None or constructions.main_station(station) != station:
+        return "there is no station here"
+    if level < FACILITY_LEVEL[facility]:
+        return f"the station must be raised to level {FACILITY_LEVEL[facility]} first"
+    if facility in constructions.annexes(station):
+        return f"the station has {facility.value} already"
+    grid = constructions.tile_map.grid
+    if not any(
+        cell in grid.within(own, FACILITY_REACH) for own in constructions.station_cells(station)
+    ):
+        return "it must stand next to the station or a platform"
+    if any(isinstance(built, Station | Annex) for built in constructions.at(cell)):
+        return "the cell has a station or a facility in it"
+    tile = constructions.tile_map.tile(cell)
+    if constructions.tile_map.is_locked(cell):
+        return "this land is not yours yet"
+    if tile.terrain != Terrain.LAND:
+        return "facilities can't stand on water"
+    if tile.relief not in STATION_RELIEF:
+        return f"facilities can't stand on {tile.relief.name.lower()}"
+    units = ANNEX_SPACE[facility]
+    room = constructions.space_left(cell) + sum(b.space for b in constructions.buildings_at(cell))
+    if room < units:
+        return "the track leaves no room for it" if units < CELL_SPACE else "track runs there"
+    if clearing_price(constructions, cell, units) is None:
+        return "a building here can't be taken down"
+    return None
+
+
+def facility_site_price(constructions: Constructions, cell: Cell, facility: Facility) -> float:
+    """What clearing room in a cell for a facility costs: the buildings that must go."""
+    return clearing_price(constructions, cell, ANNEX_SPACE[facility]) or 0.0
+
+
+def add_facility(growth: Growth, station: Cell, facility: Facility, cell: Cell) -> set[Cell]:
+    """Puts up a facility beside a station in the cell, taking down the buildings in its way,
+    which facility_problem must have allowed; returns the cells that changed."""
+    changed = growth.room.clear(cell, ANNEX_SPACE[facility])
+    growth.constructions.build(Annex(cell, facility, station))
+    return changed | {cell}
+
+
 def move_station(
     growth: Growth, railway: Railway, old: Cell, new: Cell, ends: tuple[int, int] | None = None
 ) -> set[Cell] | None:
@@ -304,7 +364,7 @@ def move_station(
     if changed is None:
         constructions.build(station)
         return None
-    platforms = remove_platforms(constructions, old)
+    platforms = remove_added(constructions, old)
     railway.moved(old, new)
     return changed | {old} | platforms
 

@@ -1,6 +1,7 @@
 """The station window, opened by right clicking a station: its level and reach, what it holds
 and wants, what it reaches, as placing it shows (railroads.ui.station_preview), the trains that
-call there, and buttons to raise its level or add storage."""
+call there, buttons to raise its level or add storage, and the facilities beside it with what
+each costs a month and buttons to put up the others."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -9,13 +10,15 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.sim.facilities import (
+    DELIVERED_SHARE,
     ENGINE_SHED_SPEED,
-    FACILITY_PRICES,
     PAYS_MORE,
+    PLACED,
     SAND_TOWER_PICKUP,
     WAREHOUSE_ROOM,
     Facility,
 )
+from railroads.sim.facilities import LEVEL as FACILITY_LEVEL
 from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.finance import STATION_PRICE
 from railroads.sim.grids import Cell
@@ -57,10 +60,11 @@ class StationWindow:
         move: Callable[[Cell], None] = lambda _: None,
         preview: Callable[[Cell], StationPreview] | None = None,
         add_platform: Callable[[Cell], None] = lambda _: None,
+        add_facility: Callable[[Cell, Facility], None] = lambda _, __: None,
     ) -> None:
         """`preview` says what a station reaches (StationTrade.preview);
         `add_platform` lets the player choose where a platform goes, which raising a station to
-        a level that allows one does at once."""
+        a level that allows one does at once, and `add_facility` where a facility goes."""
         station = self.station
         if station is None:
             return
@@ -81,6 +85,7 @@ class StationWindow:
                     add_platform(cell)
 
             self._draw_body(railway, station, look_at, raised, preview)
+            _draw_facilities(railway, station, add_facility)
             left = railway.platforms_left(station)
             if left:
                 label = f"{fa.ICON_FA_PLUS}  Add a platform beside it ({left} to add)"
@@ -155,7 +160,6 @@ class StationWindow:
         detail = f"+{STORAGE_STEP} of each good, +{WAITING_STEP} passengers and mail"
         if _priced_button(storage, railway.finances.can_afford(storage_price), detail):
             railway.add_storage(station)
-        _draw_facilities(railway, station)
 
 
 def draw_station_summary(railway: Railway, station: Cell) -> None:
@@ -205,21 +209,54 @@ FACILITY_EFFECTS = {
 }
 
 
-def _draw_facilities(railway: Railway, station: Cell) -> None:
-    """A line for each facility: whether it works this month, or a button to put it up."""
-    built, working = railway.facilities_at(station), railway.working_at(station)
+def _draw_facilities(
+    railway: Railway, station: Cell, add: Callable[[Cell, Facility], None]
+) -> None:
+    """A line for each facility at the station with what its next month costs, those in the
+    station itself with a button to close them, and a button for each of the others: those
+    standing beside the station let the player choose their cell on the map, the rest go up
+    in the station at once."""
+    imgui.separator()
+    imgui.text_disabled("Facilities")
+    tip(
+        "None costs anything to put up, but every month each uses a good and pays the market "
+        f"price for it: {DELIVERED_SHARE:.0%} of that for what the station holds, gathered or "
+        "brought. An engine shed fills a cell next to the station, its track running into it; "
+        "cattle pens take a little room in one; the others go in the station itself"
+    )
+    built = railway.facilities_at(station)
+    level = railway.level(station)
     for facility, (good, amount) in FACILITY_USES.items():
-        effect = FACILITY_EFFECTS[facility]
+        name = facility.value.capitalize()
+        cost = railway.facility_cost(station, facility)
+        uses = f"Uses {amount_of(good, amount)} a month; {FACILITY_EFFECTS[facility]}"
         if facility in built:
-            state = "working" if facility in working else f"idle: needs {amount_of(good, amount)}"
-            imgui.text(f"{facility.value.capitalize()}: {state}")
-            tip(f"Uses {amount_of(good, amount)} a month; {effect}")
+            imgui.align_text_to_frame_padding()
+            imgui.text(f"{name}: {dollars(cost)} a month")
+            tip(uses)
+            if facility not in PLACED:
+                imgui.same_line()
+                if imgui.small_button(f"Close##{facility.name}"):
+                    railway.close_facility(station, facility)
+                tip("Closes it, so it costs nothing more")
             continue
-        price = FACILITY_PRICES[facility]
-        label = f"{fa.ICON_FA_PLUS}  {facility.value.capitalize()}  {dollars(price)}"
-        detail = f"Uses {amount_of(good, amount)} a month; {effect}"
-        if _priced_button(label, railway.finances.can_afford(price), detail):
-            railway.build_facility(station, facility)
+        needed = FACILITY_LEVEL[facility]
+        label = f"{fa.ICON_FA_PLUS}  {name}  {dollars(cost)} a month"
+        imgui.begin_disabled(level < needed)
+        clicked = imgui.button(label, (-1, 0))
+        imgui.end_disabled()
+        if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
+            lines = [uses]
+            if facility in PLACED:
+                lines.append("Click, then the cell next to the station it goes in")
+            if level < needed:
+                lines.append(f"Raise the station to level {needed} first")
+            imgui.set_tooltip("\n".join(lines))
+        if clicked:
+            if facility in PLACED:
+                add(station, facility)
+            else:
+                railway.put_up(station, facility)
 
 
 def _priced_button(label: str, affordable: bool, detail: str = "") -> bool:

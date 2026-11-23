@@ -11,7 +11,7 @@ import numpy.typing as npt
 from imgui_bundle import imgui
 
 from railroads.sim.amounts import EPSILON
-from railroads.sim.constructions import Building, Construction, Constructions, Station, Track
+from railroads.sim.constructions import Annex, Building, Construction, Constructions, Station, Track
 from railroads.sim.goods import HANDED_OUT
 from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, FloatArray, Grid
 from railroads.sim.growth import Growth
@@ -372,6 +372,8 @@ def _construction_name(construction: Construction) -> str:
             return construction.kind.value
         case Station():
             return "station"
+        case Annex():
+            return construction.facility.value
         case Track():
             bed = "" if construction.bed == TrackBed.GROUND else f" {construction.bed.name.lower()}"
             kind = (

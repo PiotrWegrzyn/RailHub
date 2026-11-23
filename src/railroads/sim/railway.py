@@ -48,13 +48,16 @@ from railroads.sim.demand import StationDemand
 from railroads.sim.events import price_factor as history_price
 from railroads.sim.facilities import (
     ENGINE_SHED_SPEED,
-    FACILITY_PRICES,
+    PLACED,
     SAND_TOWER_PICKUP,
     WAREHOUSE_ROOM,
     Facility,
+    monthly_cost,
     pay_factor,
     supply,
 )
+from railroads.sim.facilities import LEVEL as FACILITY_LEVEL
+from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.finance import (
     LEVEL_PRICES,
     STATION_UPKEEP,
@@ -185,13 +188,12 @@ class Railway:
     # Where goods reaching a station are handed out at once to the buildings around it
     # (railroads.sim.station_trade); set by growth, None until then and in older saves.
     station_trade: StationTrade | None = None
-    # The facilities put up beside each station, and those that got what they use this month
-    # (railroads.sim.facilities). None in older saves, which have none.
-    facilities: dict[Cell, set[Facility]] | None = None
+    # The facilities put up in each station itself, taking no room on the map; those standing
+    # beside it are in its constructions (railroads.sim.facilities).
+    tucked: dict[Cell, set[Facility]] | None = None
     # How many times a train has had to queue for the way on at a signal: the next to queue
     # takes the next number (railroads.sim.signals).
     asks: int = 0
-    supplied: dict[Cell, set[Facility]] | None = None
     # The buildings the player owns (railroads.sim.ownership), which make running engines a
     # little cheaper; set by the game, None until then.
     owners: Owners | None = None
@@ -368,6 +370,8 @@ class Railway:
         """Takes stations pulled down out of every train's stops, sending each train that
         called at one back to its first stop left."""
         cells = set(gone)
+        for cell in cells:
+            (self.tucked or {}).pop(cell, None)
         for train in self.trains:
             kept = [stop for stop in train.stops if stop.cell not in cells]
             if len(kept) != len(train.stops):
@@ -527,8 +531,7 @@ class Railway:
         if demand is not None:
             self.demand[new] = demand
         self.levels.pop(old, None)
-        if self.facilities is not None:
-            self.facilities.pop(old, None)
+        (self.tucked or {}).pop(old, None)
         for train in self.trains:
             calling = [stop for stop in train.stops if stop.cell == old]
             for stop in calling:
@@ -540,7 +543,9 @@ class Railway:
 
     def station_goods(self, station: Cell) -> StationGoods:
         goods = self.goods.setdefault(station, StationGoods())
-        goods.extra_room = WAREHOUSE_ROOM if Facility.WAREHOUSE in self.working_at(station) else 0.0
+        goods.extra_room = (
+            WAREHOUSE_ROOM if Facility.WAREHOUSE in self.facilities_at(station) else 0.0
+        )
         return goods
 
     def station_demand(self, station: Cell) -> StationDemand:
@@ -687,8 +692,7 @@ class Railway:
     def sell_own(self, good: Good, amount: float) -> None:
         """Pays the player the market price of what their own buildings brought into a station, as
         the boards price it now: their company sold it, and the railway now carries it."""
-        earned = price_of(good) * amount * self.tiles.of_year(self.year).price(good)
-        self.finances.earn(earned, "owned buildings")
+        self.finances.earn(self.market_price(good) * amount, "owned buildings")
 
     def new_year(self, year: int) -> None:
         """Turns the boards to a new year: the tiles picked go up, and what that changes is news."""
@@ -698,7 +702,7 @@ class Railway:
     def facility_pay(self, station: Cell, good: Good) -> float:
         """How many times as much a good delivered at a station pays with its facilities, and for
         passengers while pilgrims crowd its town (railroads.sim.happenings)."""
-        pay = pay_factor(self.working_at(station), good)
+        pay = pay_factor(self.facilities_at(station), good)
         happenings = self.happenings
         pilgrims = 0 if happenings is None or good != Good.PASSENGERS else happenings.pilgrim_town
         if pilgrims and self.town_of(station) == pilgrims:
@@ -755,32 +759,47 @@ class Railway:
         return STATION_UPKEEP[self.level(station) - 1] * rise
 
     def facilities_at(self, station: Cell) -> set[Facility]:
-        return (self.facilities or {}).get(station, set())
+        """The facilities put up at a station, in it or beside it (railroads.sim.facilities)."""
+        return set(self.constructions.annexes(station)) | (self.tucked or {}).get(station, set())
 
-    def working_at(self, station: Cell) -> set[Facility]:
-        """The facilities at a station that got what they use this month."""
-        return (self.supplied or {}).get(station, set())
-
-    def build_facility(self, station: Cell, facility: Facility) -> bool:
-        """Puts up a facility beside a station, if it has none of the kind and there is the cash;
-        it works from the month after, given what it uses."""
-        price = FACILITY_PRICES[facility]
-        if facility in self.facilities_at(station) or not self.finances.pay(
-            price, "station upgrades"
+    def put_up(self, station: Cell, facility: Facility) -> bool:
+        """Puts up a facility that stands in the station itself, if it is high enough for it
+        and has none of the kind; it costs nothing until its month is paid for."""
+        if (
+            facility in PLACED
+            or self.level(station) < FACILITY_LEVEL[facility]
+            or facility in self.facilities_at(station)
         ):
             return False
-        if self.facilities is None:
-            self.facilities = {}
-        self.facilities.setdefault(station, set()).add(facility)
+        if self.tucked is None:
+            self.tucked = {}
+        self.tucked.setdefault(station, set()).add(facility)
         return True
 
+    def close_facility(self, station: Cell, facility: Facility) -> None:
+        """Takes down a facility standing in the station itself, which stops its costs."""
+        (self.tucked or {}).get(station, set()).discard(facility)
+
+    def market_price(self, good: Good) -> float:
+        """What a unit of a good fetches on the market now, as the boards price it: what the
+        player's own buildings sell it for (sell_own) and their facilities pay for it."""
+        return price_of(good) * self.tiles.of_year(self.year).price(good)
+
+    def facility_cost(self, station: Cell, facility: Facility) -> float:
+        """What a month of a facility beside a station costs with what the station holds now."""
+        good, _ = FACILITY_USES[facility]
+        held = self.station_goods(station).held(good)
+        return monthly_cost(facility, held, self.market_price(good))
+
     def _supply_facilities(self) -> None:
-        """Lets every facility take a month of what it uses from its station."""
-        self.supplied = {
-            station: {f for f in facilities if supply(self.station_goods(station), f)}
-            for station, facilities in (self.facilities or {}).items()
-            if station in self.goods
-        }
+        """Lets every facility take a month of what it uses from its station and pays for it."""
+        cost = sum(
+            supply(self.station_goods(station), facility, self.market_price)
+            for station in self.stations()
+            for facility in sorted(self.facilities_at(station), key=lambda f: f.value)
+        )
+        if cost > 0:
+            self.finances.spend(cost, "station facilities")
 
     def storage_price(self, station: Cell) -> float:
         """What the station's next storage upgrade costs."""
@@ -803,8 +822,8 @@ class Railway:
         of stations and track."""
         for station in self.stations():
             self.station_demand(station).turn_month(capacity.get(station, {}))
-        self._supply_facilities()
         self.finances.close_month(self.year)
+        self._supply_facilities()
         track = self.constructions.track()
         stations = sum(self.station_upkeep(station) for station in self.stations())
         self.finances.spend(stations, "station upkeep")
@@ -997,7 +1016,7 @@ class Railway:
         return self.network.position(train, back)
 
     def move_onto(self, tile_map: TileMap, growth: Growth, move: Move) -> None:
-        """Moves the stations' goods, demand, levels, facilities and names and every train onto
+        """Moves the stations' goods, demand, levels and names and every train onto
         the moved map, trading with `growth` from now on."""
         growth.railway = self
         self.station_trade = growth.station_trade
@@ -1007,10 +1026,8 @@ class Railway:
             goods.origins = {good: move.parcels(parcels) for good, parcels in goods.origins.items()}
         self.demand = move.keys(self.demand)
         self.levels = move.keys(self.levels)
-        if self.facilities is not None:
-            self.facilities = move.keys(self.facilities)
-        if self.supplied is not None:
-            self.supplied = move.keys(self.supplied)
+        if self.tucked is not None:
+            self.tucked = move.keys(self.tucked)
         self._towns = {}
         self.name_of.move_onto(tile_map, move)
         for train in self.trains:

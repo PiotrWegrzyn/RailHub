@@ -50,6 +50,7 @@ from railroads.ui.pixel.art.crafts import (
     tile_works,
     tofu_maker,
 )
+from railroads.ui.pixel.art.facilities import FACILITIES
 from railroads.ui.pixel.art.farms import (
     bananas,
     beekeeper,
@@ -472,7 +473,7 @@ MASTER_RESOLUTION = 24
 # The buildings drawn from 3D models (railroads.ui.pixel.art.built) instead of painted: the
 # gasworks, whose brick rotunda took the place of its painted gasholder, and the stations.
 MODELS: dict[str, Callable[[], Sprite]] = {"gasworks": modelled(built_works.gasworks)}
-SPRITES |= MODELS
+SPRITES |= MODELS | FACILITIES
 
 # Big and mega works drawn as buildings of their own, by trade.
 for _module in (grand_fire, grand_food, grand_crafts, grand_modern):

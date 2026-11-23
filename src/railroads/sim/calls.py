@@ -34,7 +34,7 @@ class StationCalls:
         if not any(isinstance(b, Station) for b in self._railway.constructions.at(stop.cell)):
             train.status = "Its stop has no station"
             return
-        working = self._railway.working_at(stop.cell)
+        working = self._railway.facilities_at(stop.cell)
         if stop.refuel_only:
             train.fuelled = Facility.ENGINE_SHED in working
             train.sanded = Facility.SAND_TOWER in working
