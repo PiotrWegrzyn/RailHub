@@ -220,6 +220,11 @@ def platform_sprite(line: str | None = None) -> str:
     return "platform" if line is None else f"platform_{line}"
 
 
+# The highest level whose house a station shows: above it a station grows platforms, each with a
+# smaller house of its own, rather than a bigger house.
+HOUSE_LEVEL = 4
+
+
 def station_sprite(level: int, line: str | None = None) -> str:
     """The sprite of a station raised to a level, turned along track running `line` on the
     screen (railroads.ui.pixel.track_art.station_line) if it is given."""
@@ -298,7 +303,7 @@ class Scenery:
                 np.array(
                     [
                         sheet.index(
-                            station_sprite(levels.get(cell, 1), line)
+                            station_sprite(min(levels.get(cell, 1), HOUSE_LEVEL), line)
                             if constructions.main_station(cell) == cell
                             else platform_sprite(line)
                         )

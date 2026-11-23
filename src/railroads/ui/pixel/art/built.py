@@ -61,7 +61,7 @@ def modelled(
 
     def draw() -> Sprite:
         pixels = fineness()
-        model = _stretched(build(), across, up)
+        model = stretched(build(), across, up)
         ground, standing = Model(), Model()
         for face in model.faces:
             (ground if _lying(face) else standing).faces.append(face)
@@ -103,27 +103,27 @@ def _stacked(sprites: list[Sprite]) -> Sprite:
     return Sprite(image, (left, top))
 
 
-def _stretched(model: Model, across: float, up: float) -> Model:
+def stretched(model: Model, across: float, up: float) -> Model:
     """The model `across` times as wide and long and `up` times as tall, its faces still facing
     the right way."""
     if across == 1.0 and up == 1.0:
         return model
-    stretched = Model()
-    stretched.footprints = [
+    out = Model()
+    out.footprints = [
         ((u0 * across, u1 * across), (v0 * across, v1 * across))
         for (u0, u1), (v0, v1) in model.footprints
     ]
     for face in model.faces:
         nu, nv, nz = face.normal[0] / across, face.normal[1] / across, face.normal[2] / up
         length = math.sqrt(nu * nu + nv * nv + nz * nz) or 1.0
-        stretched.faces.append(
+        out.faces.append(
             replace(
                 face,
                 corners=[(u * across, v * across, z * up) for u, v, z in face.corners],
                 normal=(nu / length, nv / length, nz / length),
             )
         )
-    return stretched
+    return out
 
 
 def _shadowed(sprite: Sprite, model: Model, pixels: float, shadow: float, heading: float) -> Sprite:

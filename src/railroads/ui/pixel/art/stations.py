@@ -25,6 +25,7 @@ from railroads.ui.pixel.art.built import (
     footing,
     gable_roof,
     modelled,
+    stretched,
     upright,
     walls,
     window,
@@ -37,6 +38,8 @@ from railroads.ui.pixel.track_art import BANK, PLATFORM_WIDTH, SET_BACK
 # runs on the screen, the heading the house's length lies along, chosen so its front, with the
 # platform canopy, faces the track. The house stands behind track running across or slanting and
 # to the left of track running up and down (railroads.ui.pixel.track_art.station_side).
+# How big a platform's house is, as a share of the grand station it belongs to.
+PLATFORM_HOUSE = 0.6
 TURNED_LINES = {"across": 0.0, "falling": 60.0, "rising": 300.0, "upright": 270.0}
 
 TIMBER: RGB = (200, 178, 134)
@@ -394,6 +397,12 @@ def grand_station() -> Model:
     return m
 
 
+def branch_station() -> Model:
+    """A platform added to a grand station: the grand station in small, its towers, wings and
+    canopy PLATFORM_HOUSE times the size."""
+    return stretched(grand_station(), PLATFORM_HOUSE, PLATFORM_HOUSE)
+
+
 def terminus() -> Model:
     """A central terminus of pale stone: a long three-storey front with a tall clock tower in its
     middle and a pavilion at either end, all under slate, and an arched train shed of iron and
@@ -459,7 +468,7 @@ LEVELS: dict[str, tuple[Callable[[], Model], float]] = {
     "station_3": (town_station, 0.09),
     "station_4": (grand_station, 0.1),
     "station_5": (terminus, 0.24),
-    "platform": (island_platform, 0.0),
+    "platform": (branch_station, 0.1 * PLATFORM_HOUSE),
 }
 
 

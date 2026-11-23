@@ -101,10 +101,11 @@ def test_either_way_along_double_track_a_train_keeps_to_the_same_side_of_its_way
     assert backward == pytest.approx(DOUBLE_SPACING / 2)
 
 
-def test_single_track_branching_off_double_splits_so_trains_either_way_meet_their_own_track() -> (
-    None
-):
-    railway, track = line(TrackWidth.DOUBLE)
+@pytest.mark.parametrize("main", [TrackWidth.DOUBLE, TrackWidth.QUADRUPLE])
+def test_single_track_branching_off_wider_track_leaves_from_its_outer_track_on_that_side(
+    main: TrackWidth,
+) -> None:
+    railway, track = line(main)
     constructions = railway.constructions
     growth = Growth(constructions, GrowthRule(trades=False))
     build_station(growth, (11, 15))
@@ -114,22 +115,19 @@ def test_single_track_branching_off_double_splits_so_trains_either_way_meet_thei
     double = next(
         found
         for found in (constructions.track_at((6, col)) for col in range(4, 20))
-        if {piece.width for piece in found} == {TrackWidth.SINGLE, TrackWidth.DOUBLE}
+        if {piece.width for piece in found} == {TrackWidth.SINGLE, main}
     )
     branch = next(piece for piece in double if piece.width == TrackWidth.SINGLE)
     shared = next(
-        point
-        for point in branch.ends
-        if any(p.width == TrackWidth.DOUBLE and point in p.ends for p in double)
+        point for point in branch.ends if any(p.width == main and point in p.ends for p in double)
     )
     share = 0.0 if branch.ends[0] == shared else 1.0
+    outer = DOUBLE_SPACING / 2 * (int(main) - 1)
 
-    one_way = track.riding_side(branch, share, True)
-    other_way = track.riding_side(branch, share, False)
+    at_the_junction = track.riding_side(branch, share, True)
     far_end = track.riding_side(branch, 1.0 - share, True)
 
-    assert one_way == pytest.approx(DOUBLE_SPACING / 2)
-    assert other_way == pytest.approx(DOUBLE_SPACING / 2)
+    assert abs(at_the_junction) == pytest.approx(outer)
     assert far_end == pytest.approx(0.0)
 
 

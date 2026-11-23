@@ -326,6 +326,16 @@ def track_spread(piece: Track, station: bool = False) -> float:
     return _spread(piece.width, station)
 
 
+def _onward(branching: float, beyond: float, share: float) -> float:
+    """Where a track branching off another lies `share` of the way along its piece from the end
+    it branches off at: on that track up to the middle of the cell, where it turns away, then
+    easing over to where it lies at its other end."""
+    if share <= 0.5:
+        return branching
+    eased = (2 * share - 1) ** 2 * (3 - 2 * (2 * share - 1))
+    return branching + (beyond - branching) * eased
+
+
 def _lane_sides(tracks: int, lanes: int | None = None) -> list[float]:
     """How far to the left of the centre line each of `lanes` tracks lies, in cells, where the
     track is `tracks` wide: lanes the narrower track has no room for run into its outer tracks."""
@@ -384,7 +394,7 @@ class TrackArt:
         # drawn (`_laid`), and where the points of its line land in the picture and how far they
         # are lifted, kept until track or stations change, and the last three for no more than
         # PIECES_KEPT pieces.
-        self._shapes: dict[Track, tuple[float, float]] = {}
+        self._shapes: dict[Track, tuple[list[float], list[float]]] = {}
         self._laid_pieces: dict[tuple[Track, Point | None], tuple[int, _Laid]] = {}
         self._placed: dict[tuple[Track, Point | None], FloatArray] = {}
         self._lifts: dict[tuple[Track, Point | None], FloatArray] = {}
@@ -742,6 +752,8 @@ class TrackArt:
         for `lane` 0, the fast track, and the outer one for lane 1, the slow track; elsewhere on
         single track the track itself."""
         sides = [lane_sides[0] for lane_sides in self._sides_at(piece, [share])]
+        if len(sides) == 1:
+            return sides[0] if forward else -sides[0]
         if len(sides) == 2:
             return sides[1] if forward else -sides[0]
         if len(sides) == 4:
@@ -764,61 +776,88 @@ class TrackArt:
     def _sides_at(self, piece: Track, shares: list[float]) -> list[list[float]]:
         """The same as `_sides`, at these shares of the way along the piece from its first end
         to its second."""
-        start, end = self._ends(piece)
-        tracks = int(piece.width)
-        if tracks == 1 and start == 1 and end == 1:
-            return [[0.0] * len(shares)]
-        full = _lane_sides(max(start, end), 2) if tracks == 1 else _lane_sides(tracks)
+        full = _lane_sides(int(piece.width))
         opening = 2.0
-        if tracks == 4 and self.constructions.station_at(piece.cell) is not None:
+        if piece.width == TrackWidth.QUADRUPLE and self.constructions.station_at(piece.cell):
             half = DOUBLE_SPACING / 2
             full = [-(half + ISLAND_TRACKS), -half, half, half + ISLAND_TRACKS]
             opening = 1 / ISLAND_FROM
-        at_start = _lane_sides(start, len(full))
-        at_end = _lane_sides(end, len(full))
+        at_start, at_end = self._ends(piece)
+        branch_start, branch_end = (self._branch_lanes(piece, point) for point in piece.ends)
         lanes = []
         for index, middle in enumerate(full):
             sides = []
             for share in shares:
-                side = middle
-                if share < 0.5:
+                if branch_start is not None:
+                    side = _onward(at_start[index], at_end[index], share)
+                elif branch_end is not None:
+                    side = _onward(at_end[index], at_start[index], 1 - share)
+                elif share < 0.5:
                     side = at_start[index] + (middle - at_start[index]) * min(1.0, opening * share)
                 elif share > 0.5:
                     side = at_end[index] + (middle - at_end[index]) * min(
                         1.0, opening * (1 - share)
                     )
+                else:
+                    side = middle
                 sides.append(side)
             lanes.append(sides)
         return lanes
 
-    def _ends(self, piece: Track) -> tuple[int, int]:
-        """How many tracks wide the piece is at each of its ends: as wide as it is, or as the
-        track it runs into there if that is narrower; single track as wide as double or
-        quadruple track it branches off in its cell (`_branched_off`)."""
+    def _ends(self, piece: Track) -> tuple[list[float], list[float]]:
+        """Where each track of the piece lies at each of its ends, in cells to the left of its
+        centre line: where it branches off straighter track at least as wide in its cell, on
+        that track's outer tracks on the side it turns to (`_branch_lanes`); elsewhere as wide
+        as it is, or as the track it runs into there if that is narrower, its outer tracks
+        closing onto the inner ones."""
         self._keep_current()
         shape = self._shapes.get(piece)
         if shape is None:
-            if piece.width == TrackWidth.SINGLE:
-                start, end = (self._branched_off(piece, point) for point in piece.ends)
-            else:
-                start, end = (
-                    min(int(piece.width), self._width_beyond(piece, point)) for point in piece.ends
-                )
-            shape = self._shapes[piece] = (start, end)
+            lanes = int(piece.width)
+            ends = []
+            for point in piece.ends:
+                branch = self._branch_lanes(piece, point)
+                if branch is not None:
+                    ends.append(branch)
+                elif lanes == 1:
+                    ends.append([0.0])
+                else:
+                    ends.append(_lane_sides(min(lanes, self._width_beyond(piece, point)), lanes))
+            shape = self._shapes[piece] = (ends[0], ends[1])
         return shape
 
-    def _branched_off(self, piece: Track, point: int) -> int:
-        """How many tracks wide the widest track single track leaves from by this end in its
-        cell is there, which it splits in two to run into the outer track on each side: 1 where
-        it leaves none."""
-        return max(
-            [
-                min(int(other.width), self._width_beyond(other, point))
-                for other in self._track_at(piece.cell)
-                if other.width > TrackWidth.SINGLE and point in other.ends
-            ],
-            default=1,
-        )
+    def _branch_lanes(self, piece: Track, point: int) -> list[float] | None:
+        """Where the piece's tracks lie at this end where it branches off straighter track in its
+        cell at least as wide, running on beyond it: on the outermost tracks of that track on
+        the side the piece turns to, as many as the piece has, or on all of its tracks where it
+        has too few that side; None where it branches off none."""
+        grid = self.tile_map.grid
+        turn = grid.track_turn(*piece.ends)
+        mains = [
+            other
+            for other in self._track_at(piece.cell)
+            if other != piece
+            and point in other.ends
+            and other.width >= piece.width
+            and grid.track_turn(*other.ends) < turn - 1e-6
+        ]
+        if not mains:
+            return None
+        main = min(mains, key=lambda other: grid.track_turn(*other.ends))
+        matrix = self.projection.matrix
+        on = matrix @ (self._steps[main.other_end(point)] / 2)
+        off = matrix @ (self._steps[piece.other_end(point)] / 2)
+        side = 1.0 if on[0] * off[1] - on[1] * off[0] > 0 else -1.0
+        # The main track's tracks, to the left of the way from this end into the cell.
+        from_here = 1.0 if point == main.ends[0] else -1.0
+        tracks = [from_here * lane for lane in _lane_sides(int(main.width))]
+        that_side = sorted((lane for lane in tracks if lane * side > 0), key=abs, reverse=True)
+        lanes = int(piece.width)
+        chosen = that_side[:lanes] or tracks
+        while len(chosen) < lanes:
+            chosen = [lane for lane in chosen for _ in (0, 1)]
+        into_piece = 1.0 if point == piece.ends[0] else -1.0
+        return sorted(into_piece * lane for lane in chosen[:lanes])
 
     def _width_beyond(self, piece: Track, point: int) -> int:
         """How many tracks wide the track leaving the piece by this point runs on: the widest
