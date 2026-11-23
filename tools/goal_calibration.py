@@ -9,7 +9,8 @@ import time
 
 import numpy as np
 
-from railroads.newgame import MapChoice, Settings, make_game
+from railroads.newgame import make_game
+from railroads.settings import MapChoice, Settings
 from railroads.sim.autoplay import DECADE, StandInPlayer
 from railroads.sim.clock import END_YEAR
 from railroads.sim.company import company_value

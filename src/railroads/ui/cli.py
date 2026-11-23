@@ -5,15 +5,11 @@ import argparse
 from imgui_bundle import immapp
 
 from railroads import maps
-from railroads.newgame import (
-    EARLIEST_START_YEAR,
-    MapChoice,
-    Settings,
-    allowed_start_year,
-)
+from railroads.newgame import EARLIEST_START_YEAR, allowed_start_year
 from railroads.saves import (
     Saves,
 )
+from railroads.settings import MapChoice, Settings
 from railroads.sim.clock import (
     END_YEAR,
     HISTORY_START,

@@ -3,8 +3,9 @@ from typing import Any
 import pytest
 
 from railroads import newgame
-from railroads.newgame import EARLIEST_START_YEAR, MapChoice, Settings, allowed_start_year
+from railroads.newgame import EARLIEST_START_YEAR, allowed_start_year
 from railroads.saves import Saves
+from railroads.settings import MapChoice, Settings
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
 from railroads.sim.constructions import Constructions
 from railroads.sim.steps import Steps

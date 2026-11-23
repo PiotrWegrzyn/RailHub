@@ -8,14 +8,9 @@ from typing import Literal
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.newgame import (
-    EARLIEST_START_YEAR,
-    MapChoice,
-    Settings,
-    allowed_start_year,
-    world_maps_available,
-)
+from railroads.newgame import EARLIEST_START_YEAR, allowed_start_year, world_maps_available
 from railroads.saves import SaveInfo, Saves
+from railroads.settings import MapChoice, Settings
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
 from railroads.sim.company import BANKRUPT_MONTHS, TARGETS, Difficulty
 from railroads.sim.finance import START_CASH

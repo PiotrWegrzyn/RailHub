@@ -8,12 +8,7 @@ import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
 from railroads.land import buy_lot_steps, lot_middle
-from railroads.newgame import (
-    MapChoice,
-    Settings,
-    make_game_steps,
-    place_map,
-)
+from railroads.newgame import make_game_steps, place_map
 from railroads.saves import (
     ReusedMemory,
     SavedGame,
@@ -23,6 +18,7 @@ from railroads.saves import (
     snapshot,
     snapshot_steps,
 )
+from railroads.settings import MapChoice, Settings
 from railroads.sim.clock import (
     MONTHS_PER_YEAR,
     GameClock,

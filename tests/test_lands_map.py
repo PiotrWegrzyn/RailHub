@@ -4,7 +4,8 @@ import pytest
 
 from railroads import maps
 from railroads.mapgen.lands import BANDS, COVERS, lands_map, square
-from railroads.newgame import EARLIEST_START_YEAR, MapChoice, Settings, make_game
+from railroads.newgame import EARLIEST_START_YEAR, make_game
+from railroads.settings import MapChoice, Settings
 from railroads.sim.tilemap import LAYERS, Relief, Temperature, Terrain, TileMap, Vegetation
 
 LANDS = [(band, cover) for band in BANDS for cover in COVERS]

@@ -14,8 +14,9 @@ from screens import FakeTexture, gui_context
 
 from builders import SETTINGS, FakePage, flat_map, grows_as, played_game
 from railroads.land import lot_middle
-from railroads.newgame import MapChoice, Settings, make_game
+from railroads.newgame import make_game
 from railroads.saves import SavedGame, Saves
+from railroads.settings import MapChoice, Settings
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.game import Game
 from railroads.sim.goods import Good

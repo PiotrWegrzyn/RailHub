@@ -5,8 +5,9 @@ from pathlib import Path
 import pytest
 
 from railroads import maps, newgame
-from railroads.newgame import EARLIEST_START_YEAR, MapChoice, Settings, make_game
+from railroads.newgame import EARLIEST_START_YEAR, make_game
 from railroads.saves import Saves
+from railroads.settings import MapChoice, Settings
 from railroads.sim.constructions import Constructions
 from railroads.sim.grids import HexGrid
 from railroads.sim.lots import Lots

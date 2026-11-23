@@ -12,7 +12,8 @@ import argparse
 import numpy as np
 
 from railroads.mapgen.lands import BANDS, COVERS
-from railroads.newgame import MapChoice, Settings, make_game
+from railroads.newgame import make_game
+from railroads.settings import MapChoice, Settings
 from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.growth import Growth

@@ -31,6 +31,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import numpy.typing as npt
 
+from railroads.settings import Settings
 from railroads.sim.clock import GameClock
 from railroads.sim.game import Game
 from railroads.sim.happenings import Headline
@@ -38,7 +39,6 @@ from railroads.sim.steps import Steps, finish
 from railroads.sim.summaries import MonthSummary
 
 if TYPE_CHECKING:
-    from railroads.newgame import Settings
     from railroads.tutorial.steps import Tutorial
 
 SAVE_FORMAT = 1

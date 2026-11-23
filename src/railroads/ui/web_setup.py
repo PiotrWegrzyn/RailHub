@@ -23,8 +23,9 @@ from typing import Any, Protocol
 
 import numpy as np
 
-from railroads.newgame import Settings, make_game
+from railroads.newgame import make_game
 from railroads.saves import SavedGame, snapshot, unpickled_steps
+from railroads.settings import Settings
 from railroads.sim.steps import Steps
 from railroads.ui.history_pictures import HistoryPictures, Picture
 from railroads.version import VERSION

@@ -4,7 +4,6 @@ year play begins."""
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from enum import StrEnum
 from pathlib import Path
 
 import numpy as np
@@ -18,17 +17,16 @@ from railroads.mapgen.start import StartRegion, pick_start_bounds
 from railroads.mapgen.streams import HYDRORIVERS_SOURCE
 from railroads.mapgen.terrain_tiles import SOURCE as TERRAIN_TILES_SOURCE
 from railroads.saves import SavedGame
+from railroads.settings import MapChoice, Settings
 from railroads.sim.clock import (
     END_YEAR,
     FIRST_RAILWAY_YEAR,
     HISTORY_START,
     MONTHS_PER_YEAR,
-    START_YEAR,
     GameClock,
 )
-from railroads.sim.company import Difficulty, Goal
+from railroads.sim.company import Goal
 from railroads.sim.constructions import Constructions
-from railroads.sim.finance import START_CASH
 from railroads.sim.game import Game, place_names
 from railroads.sim.geo import Bounds, describe_lonlat
 from railroads.sim.grids import KM_PER_CELL, HexGrid
@@ -48,59 +46,6 @@ EARLIEST_START_YEAR = FIRST_RAILWAY_YEAR
 START_REGION = StartRegion()
 MAP_WIDTH_KM = 537.0
 MAP_HEIGHT_KM = 537.0
-
-
-class MapChoice(StrEnum):
-    """Each baked map by its title in railroads.maps.START_MAPS, and a random place. Saves keep
-    the value, so a title once used must not change."""
-
-    POLAND = "Poland"
-    GERMANY = "Germany"
-    FRANCE = "France: Paris and the Loire"
-    BRITAIN = "Great Britain"
-    ITALY = "Italy: Bologna and Florence"
-    MOSCOW = "Moscow"
-    CONSTANTINOPLE = "Constantinople"
-    ALPS = "The Alps"
-    NORWAY = "Norwegian fjords"
-    US_NORTHEAST = "US Northeast"
-    CALIFORNIA = "California"
-    COLORADO = "Colorado Rockies"
-    CHILE = "Central Chile"
-    JAPAN = "Japan: Osaka to Nagoya"
-    EAST_CHINA = "China: the Yangtze delta"
-    SOUTHEAST_AUSTRALIA = "Southeast Australia"
-    LANDS = "Every land (test map)"
-    WORLD = "A random place in the world"
-    TUTORIAL = "Tutorial"
-
-    @property
-    def start_map(self) -> maps.StartMap | None:
-        """The baked map this choice plays on, or None for a random place."""
-        return maps.start_map(self.value)
-
-    @property
-    def offered(self) -> bool:
-        """Whether the new game page lists it among its maps: the baked maps only."""
-        return self.start_map is not None
-
-
-@dataclass(frozen=True)
-class Settings:
-    """What a new game is set up with."""
-
-    seed: int
-    map: MapChoice = MapChoice.POLAND
-    # Towns grow from HISTORY_START until this year, when play begins (see allowed_start_year).
-    start_year: int = START_YEAR
-    cash: float = START_CASH
-    # Years a stand-in player builds and runs the railway before the player takes over.
-    stand_in_years: int = 0
-    # Which target the company is set for 1 January of END_YEAR (railroads.sim.company).
-    difficulty: Difficulty = Difficulty.NORMAL
-    # Whether the waiting screen shows the map as its towns grow (railroads.ui.history_pictures),
-    # which makes setting it up take longer.
-    show_map_growing: bool = False
 
 
 def allowed_start_year(year: int) -> int:

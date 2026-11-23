@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from builders import make_game
-from railroads.newgame import Settings
+from railroads.settings import Settings
 from railroads.sim.clock import END_YEAR
 from railroads.sim.company import (
     BANKRUPT_MONTHS,

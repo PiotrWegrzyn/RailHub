@@ -27,8 +27,9 @@ from pathlib import Path
 import numpy as np
 from fingerprint import towns
 
-from railroads.newgame import MapChoice, Settings, allowed_start_year, make_game
+from railroads.newgame import allowed_start_year, make_game
 from railroads.saves import SavedGame, Saves
+from railroads.settings import MapChoice, Settings
 from railroads.sim.clock import HISTORY_START, MONTHS_PER_YEAR
 from railroads.sim.constructions import Building, BuildingKind, Track, TrackWidth
 from railroads.sim.grids import Cell

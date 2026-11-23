@@ -8,8 +8,9 @@ from railroads.land import (
     offered_lots,
     quarter_of_top_ups,
 )
-from railroads.newgame import MapChoice, Settings, make_game
+from railroads.newgame import make_game
 from railroads.saves import SavedGame
+from railroads.settings import MapChoice, Settings
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.lots import START_LOTS
 from railroads.sim.novelties import YEARLY_CHANCE

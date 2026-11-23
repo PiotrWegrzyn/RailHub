@@ -3,8 +3,8 @@ with nothing grown from a seed, so it starts the same every time."""
 
 import numpy as np
 
-from railroads.newgame import MapChoice, Settings
 from railroads.saves import SavedGame
+from railroads.settings import MapChoice, Settings
 from railroads.sim.clock import GameClock
 from railroads.sim.constructions import Constructions
 from railroads.sim.finance import START_CASH

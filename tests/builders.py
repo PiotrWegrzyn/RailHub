@@ -12,8 +12,8 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from railroads.newgame import MapChoice, Settings
 from railroads.saves import SavedGame
+from railroads.settings import MapChoice, Settings
 from railroads.sim.clock import END_YEAR, GameClock
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.game import Game

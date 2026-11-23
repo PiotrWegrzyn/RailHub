@@ -3,7 +3,7 @@ import pickle
 import pytest
 
 from builders import SETTINGS, FakePage, grows_as, played_game
-from railroads.newgame import MapChoice, Settings
+from railroads.settings import MapChoice, Settings
 from railroads.sim.steps import finish
 from railroads.ui import web_setup
 from railroads.ui.web_setup import PageSetup, unpacked
