@@ -12,8 +12,10 @@ SIGNAL_GAP short of the signal, red for it. Trains are let on in the order they 
 train frees track the train that has waited longest for it gets it first. A train gives up track
 cell by cell as its tail leaves it.
 
-On double track trains going opposite ways keep to their own tracks and never hold each other up;
-anywhere else two trains never hold track in the same cell at once. Stations are no blocks: any
+On double track trains going opposite ways keep to their own tracks and never hold each other up.
+A train may follow another going its way onto track that one holds, FOLLOW_GAP behind it, as long
+as wherever all the trains ahead stopped it would stand clear too, and never past where theirs is
+set; anywhere else two trains never hold track in the same cell at once. Stations are no blocks: any
 number of trains may be in one, passing each other. A train standing where it could not have been
 let on, as when track is laid under it, takes the track under it without holding up the trains
 already on it, so nothing is left stuck.
@@ -253,16 +255,43 @@ class Signals:
             return other
         return None
 
-    def _going_my_way(self, train: Train, crossing: Pass) -> dict[int, Train]:
-        """The other trains ahead of this one holding the cell on the same way across it."""
+    def _going_my_way(self, train: Train, crossing: Pass) -> dict[int, tuple[Train, float]]:
+        """The other trains ahead of this one holding the cell on the same way across it, with
+        how much further along this train's path than along theirs the cell lies."""
         way = (crossing.entry, crossing.exit)
         return {
-            id(other): other
+            id(other): (other, crossing.start - start)
             for other, entry, exit_, start in self._held.get(crossing.cell, ())
             if other is not train
             and (entry, exit_) == way
             and _ahead(train, crossing, other, start)
         }
+
+    def _clear_behind(
+        self,
+        train: Train,
+        crossings: list[Pass],
+        stop: float,
+        leaders: dict[int, tuple[Train, float]],
+    ) -> bool:
+        """Whether a train following these trains would stand clear of all but trains following
+        it wherever they all stopped: each as far as the way set for it lets it, or close
+        behind the one before; none behind a train that reaches its last stop, which leaves the
+        track there."""
+        stand = stop
+        before: Train | None = None
+        for other, offset in sorted(leaders.values(), key=lambda pair: -(pair[0].along + pair[1])):
+            if other.cleared >= self.network.length(other) - SAME:
+                continue
+            if before is not None:
+                stand -= before.length + FOLLOW_GAP
+            stand = min(stand, other.cleared + offset - SIGNAL_GAP)
+            before = other
+        if before is not None:
+            stand -= before.length + FOLLOW_GAP
+        if stand >= stop - SAME:
+            return True
+        return stand > train.along and self._on_double(crossings, stand - train.length, stand)
 
     def _take_ground(self, train: Train) -> None:
         """Has a train standing where it was not let on hold the track under it and the rest of
@@ -299,21 +328,24 @@ class Signals:
         crossings = passes(self.network, train)
         stop = self._stand(train, crossings, length)
         wanted = [p for p in crossings if p.start >= train.cleared - SAME and p.start < stop - SAME]
-        # The trains going its way that it would follow onto track they hold: it may not be set
-        # a way past where theirs is set.
-        leaders: dict[int, Train] = {}
+        # The trains going its way that it would follow onto track they hold, by how much further
+        # along this train's path than along theirs each place lies: it may not be set a way past
+        # where theirs is set.
+        leaders: dict[int, tuple[Train, float]] = {}
         for held in train.claims:
             leaders |= self._going_my_way(train, Pass(held[0], held[3], held[4], held[1], held[2]))
+        holder = None
         for crossing in wanted:
-            follow = self._on_double(crossings, crossing.start - train.length, stop)
-            holder = self._holder(train, crossing, follow)
+            holder = self._holder(train, crossing, follow=True)
             alongside = self._going_my_way(train, crossing)
             if holder is None and not leaders.keys() <= alongside.keys():
-                holder = next(iter(leaders.values()))
+                holder = next(iter(leaders.values()))[0]
             if holder is not None:
                 break
             leaders |= alongside
-        else:
+        if holder is None and leaders and not self._clear_behind(train, crossings, stop, leaders):
+            holder = max(leaders.values(), key=lambda pair: pair[0].along + pair[1])[0]
+        if holder is None:
             holder = self._queued_before(train, wanted)
         if holder is not None:
             if not train.asked:
@@ -366,8 +398,7 @@ class Signals:
 
     def _on_double(self, crossings: list[Pass], start: float, stop: float) -> bool:
         """Whether the train's way between these places along its path runs only in stations and
-        on plain double track, where a train standing blocks none but trains following it: so
-        it may follow a train going its way onto track that one holds."""
+        on plain double track, where a train standing blocks none but trains following it."""
         double = self.blocks.double
         return all(
             double.get(other.cell, False)

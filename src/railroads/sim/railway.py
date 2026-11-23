@@ -874,6 +874,10 @@ class Railway:
         allowed = min(wanted, limit)
         train.giving_way = ""
         train.status = "Running"
+        if allowed <= train.along and ahead is not None and ahead.pace > 0:
+            train.status = f"Following {ahead.name}"
+            train.pace = min(train.pace, ahead.pace)
+            return
         if allowed <= train.along:
             blocker = ahead or holder
             train.giving_way = blocker.name if blocker is not None else ""

@@ -11,6 +11,7 @@ from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import CELLS_PER_MONTH, Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
+from railroads.sim.signals import passes
 from railroads.sim.trains import ENGINES, Kind, Stop, Train
 
 WEST, EAST = (6, 3), (6, 20)
@@ -209,9 +210,7 @@ def test_a_fast_train_behind_a_slow_one_on_double_track_follows_it_and_never_run
     assert min(gaps) > slow.length
 
 
-def test_a_train_waits_for_one_ahead_going_its_way_to_leave_single_line_before_entering_it() -> (
-    None
-):
+def test_trains_going_the_same_way_follow_each_other_onto_single_line() -> None:
     railway = line()
     first = running(railway, "First", WEST, EAST)
     run_until(railway, lambda: first.along > 3.0)
@@ -219,9 +218,32 @@ def test_a_train_waits_for_one_ahead_going_its_way_to_leave_single_line_before_e
 
     run_until(railway, lambda: second.along > 3.0 or first.arrivals > 0)
 
-    assert first.arrivals == 1
-    assert second.along < 1.0
-    assert second.status == "Waiting at a signal for First"
+    assert first.arrivals == 0
+    assert second.along > 3.0
+
+
+def test_trains_following_each_other_on_single_line_never_stand_still_on_it() -> None:
+    railway = line(TrackWidth.SINGLE, (6, 11))
+    coal = [Good.COAL] * 3
+    for number in range(6):
+        start, end = (WEST, EAST) if number % 3 else (EAST, WEST)
+        cars = coal if number % 2 else []
+        railway.trains.append(Train(f"Train {number}", stops=[Stop(start, cars), Stop(end, cars)]))
+    stood_on_line = []
+
+    for _ in range(int(12 / FRAME / 10)):
+        railway.run(10 * FRAME)
+        for train in railway.trains:
+            if train.giving_way and train.along > 0:
+                tail = train.along - train.length
+                stood_on_line += [
+                    crossing.cell
+                    for crossing in passes(railway.network, train)
+                    if crossing.end > tail and crossing.start < train.along
+                ]
+
+    assert stood_on_line == []
+    assert min(train.arrivals for train in railway.trains) >= 3
 
 
 def test_a_train_waits_for_another_crossing_its_line_and_both_get_through() -> None:

@@ -1310,8 +1310,12 @@ blocking anyone but trains following it: in a station, or wholly on double track
 junction or single line. Until then the arm lies level and the lamp shows red, and the train
 stands before it; once the way is set the arm rises and the lamp turns green. Trains get the way
 in the order they asked, so the one that has waited longest goes first and none waits for ever.
-Within stations, and on double track for trains going opposite ways, trains pass each other
-without stopping, and on double track a train may follow another going its way. Each month buildings first hand out what they make on their own,
+A train asks for the way on when it comes within 2 cells of the end of the way set for it, so it
+finds the next signal clear without slowing when the track is free. Within stations, and on double
+track for trains going opposite ways, trains pass each other without stopping. A train may follow
+another going its way onto track that one holds, single line too, as long as wherever they all
+stopped it would stand in a station or on double track; a train waiting to come the other way
+keeps later trains from joining, so it is not kept waiting for ever. Each month buildings first hand out what they make on their own,
 everywhere on the map, the nearest first, up to 6 cells away: nothing is lost on the way, but a
 building can take less of a maker's month the further it is, all of it in the same cell, then 13,
 8, 5, 3, 2 and 1 twenty-firsts of it from one to six cells away. Then each station that
