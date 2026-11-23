@@ -12,7 +12,7 @@ from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.trains import Stop, Train
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
 from railroads.ui.pixel.projection import PixelProjection
-from railroads.ui.pixel.track_art import DOUBLE_SPACING, TrackArt
+from railroads.ui.pixel.track_art import DOUBLE_SPACING, ISLAND_TRACKS, TrackArt
 from railroads.ui.pixel.train_layer import Lanes
 
 WEST, EAST = (6, 3), (6, 20)
@@ -168,3 +168,20 @@ def test_quadruple_track_closes_its_outer_tracks_onto_the_inner_ones_where_it_me
     assert sorted(meeting_double + onward) == pytest.approx(
         sorted([-half, -half, half, half] + [-3 * half, -half, half, 3 * half])
     )
+
+
+def test_a_station_on_quadruple_track_opens_its_outer_tracks_round_two_island_platforms() -> None:
+    constructions = Constructions(flat_map())
+    growth = Growth(constructions, GrowthRule(trades=False))
+    build_station(growth, (6, 6))
+    for col in (5, 7):
+        constructions.build(Track((6, col), (0, 6), TrackWidth.QUADRUPLE))
+    projection = PixelProjection.of(constructions.tile_map.grid, 0.0, 1.0)
+    track = TrackArt(constructions.tile_map, constructions, projection)
+    piece = track.station_piece((6, 6))
+
+    sides = sorted(lane[0] for lane in track._sides_at(piece, [0.5]))
+
+    half = DOUBLE_SPACING / 2
+    assert piece.width == TrackWidth.QUADRUPLE
+    assert sides == pytest.approx([-(half + ISLAND_TRACKS), -half, half, half + ISLAND_TRACKS])

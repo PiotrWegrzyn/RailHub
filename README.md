@@ -1139,7 +1139,8 @@ flat costs $1,800 double, $6,000 quadruple, $3,000 electric, $6,600 double and e
 quadruple and electric; maglev track $4,000 a cell more, with no wires. Quadruple track is two
 tracks each way: express engines and railcars take the inner, fast track first and other trains
 the outer, slow one, so two trains going the same way run side by side and a fast one passes a
-slow one. A station costs $15,000 and the Planet $10,000, which
+slow one. A station on quadruple track has four tracks through it round two island platforms, the
+two tracks each way either side of one, the outer tracks opening out to make room. A station costs $15,000 and the Planet $10,000, which
 sells back for half. Stations rise through five levels, for $50,000, $250,000, $1,500,000 and
 $10,000,000: a new one hands goods out a cell around it, and each level a cell further, gathers
 them a cell further and adds as much room as two storage upgrades. At level 4 a station gets a

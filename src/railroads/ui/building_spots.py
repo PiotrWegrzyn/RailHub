@@ -181,7 +181,7 @@ def _clear_of_track(
     for _ in range(3):
         nearest, away = math.inf, (0.0, 0.0)
         for piece in pieces:
-            clearance = TRACK_CLEARANCE + (DOUBLE_CLEARANCE if int(piece.width) > 1 else 0.0)
+            clearance = TRACK_CLEARANCE + DOUBLE_CLEARANCE * (int(piece.width) - 1)
             for point in piece.ends:
                 ex, ey = cx + float(steps[point][0]), cy + float(steps[point][1])
                 dx, dy = ex - cx, ey - cy

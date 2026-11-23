@@ -25,11 +25,12 @@ from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.track_art import (
     BANK,
     BRIDGE_WIDTH,
-    DOUBLE_SPACING,
     PLATFORM_WIDTH,
     centre_line,
     station_house,
     station_line,
+    station_width,
+    track_spread,
 )
 
 # What grows on each biome as single trees: how many per cell (a fraction is a chance of one)
@@ -256,6 +257,10 @@ class Scenery:
         built = np.zeros(grid.shape, dtype=bool)
         for construction in constructions:
             built[construction.cell] = True
+        for cell in constructions.every_station_cell():
+            if station_width(constructions, cell) == TrackWidth.QUADRUPLE:
+                for beside in grid.neighbours(*cell):
+                    built[beside] = True
         xs: list[FloatArray] = []
         ys: list[FloatArray] = []
         sprites: list[IntArray] = []
@@ -461,7 +466,7 @@ def _track_near(constructions: Constructions) -> dict[Cell, tuple[tuple[Track, b
     grid = constructions.tile_map.grid
     pieces = [(piece, False) for piece in constructions.track() if piece.bed != TrackBed.TUNNEL]
     pieces += [
-        (Track(cell, constructions.station_ends(cell)), True)
+        (Track(cell, constructions.station_ends(cell), station_width(constructions, cell)), True)
         for cell in constructions.every_station_cell()
     ]
     near: dict[Cell, list[tuple[Track, bool]]] = {}
@@ -563,9 +568,7 @@ def _track_mask(
     paint = ImageDraw.Draw(image)
     for piece, station in pieces:
         side = (BRIDGE_WIDTH if piece.bed == TrackBed.BRIDGE else BANK) / 2
-        side += (
-            DOUBLE_SPACING / 2 * (int(piece.width) - 1) if piece.width > TrackWidth.SINGLE else 0.0
-        )
+        side += track_spread(piece, station)
         side += PLATFORM_WIDTH if station else 0.0
         line = centre_line(grid, steps, projection.matrix, piece, side * PIXEL_CELL_WIDTH)
         x, y = projection.to_pixels(*np.array(line).T)

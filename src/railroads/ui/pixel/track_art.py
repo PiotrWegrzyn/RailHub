@@ -73,6 +73,10 @@ PIECES_KEPT = 1 << 11
 # A station's platform beside its track, and how far from the track's middle the station house
 # stands, in cells of the picture's width.
 PLATFORM_WIDTH = 0.12
+# How far apart the two tracks either side of an island platform lie in a station on quadruple
+# track, in cells, and how far into the station's cell from each end they have opened out to that.
+ISLAND_TRACKS = 0.3
+ISLAND_FROM = 0.22
 SET_BACK = 0.34
 
 # Overhead wires on electric track: how far beside the track their masts stand and how far
@@ -291,14 +295,35 @@ def station_house(constructions: Constructions, projection: PixelProjection, cel
     steps = grid.track_steps()
     run = constructions.station_ends(cell)
     side = station_side(projection, steps, run)
-    double = any(
-        piece.width >= TrackWidth.DOUBLE
-        for point in run
-        for piece in _joined(constructions, cell, point)
-    )
-    cells = SET_BACK + (DOUBLE_SPACING / 2 if double else 0.0)
+    cells = SET_BACK + _spread(station_width(constructions, cell), station=True)
     width = float(np.hypot(*(projection.matrix @ steps[0])))
     return side[0] * cells * width, side[1] * cells * width
+
+
+def station_width(constructions: Constructions, cell: Cell) -> TrackWidth:
+    """How many tracks run through a station: as many as the widest track coming in."""
+    return max(
+        (
+            piece.width
+            for point in constructions.station_ends(cell)
+            for piece in _joined(constructions, cell, point)
+        ),
+        default=TrackWidth.SINGLE,
+    )
+
+
+def _spread(width: TrackWidth, station: bool = False) -> float:
+    """How far the middle of the outer tracks of track this wide lie from its middle, in cells:
+    in a station on quadruple track, beyond its island platforms."""
+    half = DOUBLE_SPACING / 2
+    if width == TrackWidth.QUADRUPLE:
+        return half + ISLAND_TRACKS if station else 3 * half
+    return half if width == TrackWidth.DOUBLE else 0.0
+
+
+def track_spread(piece: Track, station: bool = False) -> float:
+    """How far the middle of a piece's outer tracks lie from its middle, in cells."""
+    return _spread(piece.width, station)
 
 
 def _lane_sides(tracks: int, lanes: int | None = None) -> list[float]:
@@ -624,7 +649,7 @@ class TrackArt:
             for portal in self._portals(laid, line, lanes, lifts, cell):
                 measure.polygon(_arch(portal, s), fill=portal.lift / s)
             return
-        half = (max(BANK, BRIDGE_WIDTH) / 2 + _lane_spread(lanes) + SHADOW_REACH) * cell
+        half = (max(BANK, BRIDGE_WIDTH) / 2 + _lane_spread(lanes, cell) + SHADOW_REACH) * cell
         rises = (0, (MAST_HEIGHT + 1) * s) if laid.piece.electric else (0,)
         if laid.piece.electric:
             half += MAST_SIDE * cell
@@ -699,8 +724,7 @@ class TrackArt:
         electric = all(any(piece.electric for piece in found) for found in joined)
         coming_in = [piece for found in joined for piece in found]
         maglev = bool(coming_in) and all(piece.maglev for piece in coming_in)
-        double = any(piece.width >= TrackWidth.DOUBLE for found in joined for piece in found)
-        width = TrackWidth.DOUBLE if double else TrackWidth.SINGLE
+        width = max((piece.width for found in joined for piece in found), default=TrackWidth.SINGLE)
         return Track(cell, run, width, TrackBed.GROUND, electric and not maglev, maglev)
 
     def riding_side(self, piece: Track, share: float, forward: bool, lane: int = 0) -> float:
@@ -739,6 +763,11 @@ class TrackArt:
         if tracks == 1 and start == 1 and end == 1:
             return [[0.0] * len(shares)]
         full = _lane_sides(max(start, end), 2) if tracks == 1 else _lane_sides(tracks)
+        opening = 2.0
+        if tracks == 4 and self.constructions.station_at(piece.cell) is not None:
+            half = DOUBLE_SPACING / 2
+            full = [-(half + ISLAND_TRACKS), -half, half, half + ISLAND_TRACKS]
+            opening = 1 / ISLAND_FROM
         at_start = _lane_sides(start, len(full))
         at_end = _lane_sides(end, len(full))
         lanes = []
@@ -747,9 +776,11 @@ class TrackArt:
             for share in shares:
                 side = middle
                 if share < 0.5:
-                    side = at_start[index] + (middle - at_start[index]) * min(1.0, 2 * share)
+                    side = at_start[index] + (middle - at_start[index]) * min(1.0, opening * share)
                 elif share > 0.5:
-                    side = at_end[index] + (middle - at_end[index]) * min(1.0, 2 * (1 - share))
+                    side = at_end[index] + (middle - at_end[index]) * min(
+                        1.0, opening * (1 - share)
+                    )
                 sides.append(side)
             lanes.append(sides)
         return lanes
@@ -785,14 +816,17 @@ class TrackArt:
 
     def _width_beyond(self, piece: Track, point: int) -> int:
         """How many tracks wide the track leaving the piece by this point runs on: the widest
-        track it joins there; double into a station or nowhere."""
+        track it joins there, or the track through the station it runs into; as wide as the
+        piece where it runs nowhere."""
         grid = self.tile_map.grid
         beyond, entry = grid.track_exit(piece.cell, point)
         if not grid.contains(*beyond):
-            return int(TrackWidth.DOUBLE)
+            return int(piece.width)
+        if self.constructions.station_at(beyond) is not None:
+            return int(self.station_piece(beyond).width)
         joined = [other for other in self._track_at(beyond) if entry in other.ends]
         if not joined:
-            return int(TrackWidth.DOUBLE)
+            return int(piece.width)
         return max(int(other.width) for other in joined)
 
     def _lay_deck(
@@ -804,7 +838,7 @@ class TrackArt:
         s: int,
     ) -> None:
         """A timber deck under the tracks with a railing along each side."""
-        spread = (_lane_spread(lanes) + BRIDGE_WIDTH / 2) * cell
+        spread = (_lane_spread(lanes, cell) + BRIDGE_WIDTH / 2) * cell
         middle = lanes[0] if len(lanes) == 1 else _middle(lanes)
         deck = _raised_strip(middle, lifts, spread + 0.03 * cell)
         paint.polygon(deck, fill=(*BRIDGE_SHADOW, 255))
@@ -824,16 +858,47 @@ class TrackArt:
         s: int,
     ) -> None:
         """A paved platform along the station's side of its track, its white edge by the
-        track."""
+        track; on quadruple track instead an island platform between the two tracks each way,
+        white edges along both."""
+        if len(lanes) == 4:
+            self._lay_islands(paint, line, lifts, cell, s)
+            return
         (x0, y0), (x1, y1) = line[0], line[-1]
         nx, ny = -(y1 - y0), x1 - x0
         sign = 1.0 if nx * side[0] + ny * side[1] > 0 else -1.0
-        near = (_lane_spread(lanes) + BANK / 2) * cell
+        near = (_lane_spread(lanes, cell) + BANK / 2) * cell
         far = near + PLATFORM_WIDTH * cell
         platform = _raised_strip(line, lifts, sign * near, sign * far)
         paint.polygon(platform, fill=(*PLATFORM, 255))
         edge = _raised(_offset(line, sign * (near + s / 2)), lifts)
         paint.line(edge, fill=(*PLATFORM_EDGE, 255), width=s)
+
+    def _lay_islands(
+        self, paint: Canvas, line: Path, lifts: list[float], cell: float, s: int
+    ) -> None:
+        """The two island platforms of a station on quadruple track, along the middle of its
+        cell where the tracks either side of them have opened out."""
+        lengths = _lengths(line)
+        total = lengths[-1] or 1.0
+        keep = [
+            k for k, along in enumerate(lengths) if ISLAND_FROM <= along / total <= 1 - ISLAND_FROM
+        ]
+        if len(keep) < 2:
+            return
+        middle = [line[k] for k in keep]
+        raised = [lifts[k] for k in keep]
+        centre = DOUBLE_SPACING / 2 + ISLAND_TRACKS / 2
+        half = (ISLAND_TRACKS - TRACK_BED) / 2
+        for sign in (-1.0, 1.0):
+            near, far = (centre - half) * cell, (centre + half) * cell
+            island = _raised_strip(middle, raised, sign * near, sign * far)
+            paint.polygon(island, fill=(*PLATFORM, 255))
+            for edge in (near + s / 2, far - s / 2):
+                paint.line(
+                    _raised(_offset(middle, sign * edge), raised),
+                    fill=(*PLATFORM_EDGE, 255),
+                    width=s,
+                )
 
     def _portals(
         self, laid: _Laid, line: Path, lanes: list[Path], lifts: list[float], cell: float
@@ -843,7 +908,7 @@ class TrackArt:
         grid = self.tile_map.grid
         piece = laid.piece
         mx, my = line[len(line) // 2]
-        width = (PORTAL / 2 + _lane_spread(lanes)) * cell
+        width = (PORTAL / 2 + _lane_spread(lanes, cell)) * cell
         portals = []
         for point, index in zip(piece.ends, (0, -1), strict=True):
             beyond, _ = grid.track_exit(piece.cell, point)
@@ -949,9 +1014,12 @@ def _crisp(rail: Path, smoothing: int, width: int | None = None) -> Path:
     return rail
 
 
-def _lane_spread(lanes: list[Path]) -> float:
-    """How far the outer tracks lie from the middle of the piece, in cells."""
-    return 0.0 if len(lanes) == 1 else DOUBLE_SPACING / 2
+def _lane_spread(lanes: list[Path], cell: float) -> float:
+    """How far the outer tracks lie from the middle of the piece at their widest, in cells,
+    `cell` being a cell's width on the picture."""
+    if len(lanes) == 1:
+        return 0.0
+    return max(math.dist(a, b) for a, b in zip(lanes[0], lanes[-1], strict=True)) / 2 / cell
 
 
 def _middle(lanes: list[Path]) -> Path:

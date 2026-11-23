@@ -398,7 +398,7 @@ class Lanes:
         self._paths: dict[int, tuple[list[Point], int, list[_Stretch], list[float]]] = {}
 
     def sideways(
-        self, path: list[Point], along: float, lanes: Mapping[Cell, int] | None = None
+        self, path: list[Point], along: float, lanes: Mapping[Cell | None, int] | None = None
     ) -> Point:
         """How far across the picture, in art pixels, a train `along` cells into its path is
         moved off the path's centre line to ride the track drawn there: square to the way it
@@ -416,7 +416,8 @@ class Lanes:
             share, forward = (first - from_middle) / (first + second), stretch.inward
         else:
             share, forward = (first + from_middle) / (first + second), not stretch.inward
-        lane = (lanes or {}).get(stretch.piece.cell, 0)
+        lanes = lanes or {}
+        lane = lanes.get(stretch.piece.cell, lanes.get(None, 0))
         side = self.track.riding_side(stretch.piece, share, forward, lane)
         if side == 0.0:
             return 0.0, 0.0
@@ -496,9 +497,14 @@ class Lanes:
         return stretches
 
 
-def lanes_of(train: Train) -> dict[Cell, int]:
-    """The track of quadruple track the train takes in each cell it holds (railroads.sim.signals)."""
-    return {claim[0]: claim[6] for claim in train.claims if claim[6]}
+def lanes_of(train: Train) -> dict[Cell | None, int]:
+    """The track of quadruple track the train takes in each cell it holds (railroads.sim.signals),
+    and under None the one it keeps to through stations, which no train holds: the one it last
+    took."""
+    lanes: dict[Cell | None, int] = {claim[0]: claim[6] for claim in train.claims if claim[6]}
+    if train.claims:
+        lanes[None] = train.claims[-1][6]
+    return lanes
 
 
 def _point(steps: np.ndarray, dx: float, dy: float) -> int:

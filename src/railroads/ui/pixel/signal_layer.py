@@ -10,18 +10,19 @@ at a glance where trains wait."""
 import math
 
 import numpy as np
+import numpy.typing as npt
 from imgui_bundle import imgui
 
 from railroads.sim.railway import Railway
-from railroads.sim.signals import blocks_of, cleared_signals
+from railroads.sim.signals import SignalSpot, blocks_of, cleared_signals
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, IsoCamera, Vec2
 from railroads.ui.pixel.models import HEIGHT_PER_WIDTH
-from railroads.ui.pixel.track_art import DOUBLE_SPACING
+from railroads.ui.pixel.track_art import DOUBLE_SPACING, track_spread
 from railroads.ui.pixel.world import PixelWorld
 
-# How far to the side of the track's middle a signal stands, in cells: clear of the outer rail of
-# double track.
-SIDE = DOUBLE_SPACING / 2 + 0.16
+# How far to the side of the middle of the outer track a signal stands, in cells, beside single
+# or double track and beside quadruple track.
+SIDE = 0.16
 # How tall a mast is, how wide, and how many red and white stripes it has, in cells; how long its
 # arm is and how thick; how big its lamp's glasses are.
 MAST = 0.38
@@ -69,6 +70,26 @@ class SignalLayer:
         self.world = world
         # How clear each signal shows, from 0 at danger to 1 clear, by where it stands.
         self._clear: dict[tuple, float] = {}
+        self._spread_for: tuple[list[SignalSpot], npt.NDArray[np.float64]] | None = None
+
+    def _spreads(self, railway: Railway, spots: list[SignalSpot]) -> npt.NDArray[np.float64]:
+        """How far the outer track lies from the middle of the track by each signal, in cells,
+        never less than double track's: worked out again only when the signals change."""
+        kept = self._spread_for
+        if kept is not None and kept[0] is spots:
+            return kept[1]
+        constructions = railway.constructions
+        spreads = np.array(
+            [
+                max(
+                    [DOUBLE_SPACING / 2]
+                    + [track_spread(piece) for piece in constructions.track_at(spot.cell)]
+                )
+                for spot in spots
+            ]
+        )
+        self._spread_for = (spots, spreads)
+        return spreads
 
     def draw(
         self,
@@ -103,7 +124,7 @@ class SignalLayer:
         way = np.hypot(dx, dy)
         way[way == 0] = 1.0
         dx, dy = dx / way, dy / way
-        side = SIDE * PIXEL_CELL_WIDTH
+        side = (SIDE + self._spreads(railway, spots)) * PIXEL_CELL_WIDTH
         lift = self.world.elevation.lift(xs, ys)
         sx = origin[0] + (ax - dy * side) * scale
         sy = origin[1] + (ay + dx * side - lift) * scale
