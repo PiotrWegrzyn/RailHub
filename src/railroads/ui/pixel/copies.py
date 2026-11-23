@@ -18,14 +18,23 @@ import numpy.typing as npt
 from railroads.ui.pixel.projection import Rgba
 from railroads.ui.pixel.world import PixelWorld
 
-type Drawing = tuple[int, int, int, bool, bool, bool]
+type Drawing = tuple[int, int, int, bool, bool, bool, str]
+
+# What a job paints: the chunk's picture (PixelWorld.render), the same without the track and
+# everything standing on its ground (`standing`), or only its track, for the graphics card to draw
+# (PixelWorld.track_shapes).
+PICTURE = "picture"
+GROUND = "ground"
+TRACK = "track"
 
 
 @dataclass(frozen=True)
 class ChunkJob:
     """A chunk to paint (PixelWorld.render): where, at what resolution, with its raised ground
-    worked out finely or not, over ground the graphics card draws or not, and with what lies
-    on its ground or without, which the graphics card then draws. Called, the world paints it."""
+    worked out finely or not, over ground the graphics card draws or not, with what lies on its
+    ground or without, which the graphics card then draws, and what of it (`what`): its whole
+    picture, its ground alone, or its track as shapes `resolution` pixels to an art pixel.
+    Called, the world paints it."""
 
     world: PixelWorld = field(repr=False, compare=False)
     chunk_x: int
@@ -34,9 +43,10 @@ class ChunkJob:
     fine_relief: bool = False
     over_ground: bool = False
     surfaces: bool = True
+    what: str = PICTURE
 
     def __call__(self) -> Rgba:
-        return self.world.render(*self.drawing)
+        return paint(self.world, self.drawing)
 
     @property
     def drawing(self) -> Drawing:
@@ -48,7 +58,16 @@ class ChunkJob:
             self.fine_relief,
             self.over_ground,
             self.surfaces,
+            self.what,
         )
+
+
+def paint(world: PixelWorld, drawing: Drawing) -> Rgba:
+    """What a job (ChunkJob.drawing) paints, painted from `world`."""
+    *chunk, what = drawing
+    if what == TRACK:
+        return world.track_shapes(*chunk[:3])
+    return world.render(*chunk, standing=what != GROUND)
 
 
 def world_message(world: PixelWorld) -> bytes:
@@ -128,4 +147,4 @@ class WorldCopy:
         it no longer has."""
         if self.world is None or number != self.number:
             return None
-        return self.world.render(*drawing)
+        return paint(self.world, tuple(drawing))

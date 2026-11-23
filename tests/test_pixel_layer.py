@@ -5,11 +5,15 @@ import numpy as np
 import pytest
 from imgui_bundle import hello_imgui, imgui
 from test_elevation import world_over_mountains
+from test_pixel_world import chunk_of, track_chunk
 
+from railroads.sim.constructions import Track
 from railroads.sim.grids import SquareGrid
 from railroads.ui.pixel import layer as layer_module
 from railroads.ui.pixel.layer import SETTLE_S, PixelLayer, blown_up, middle_out
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection
+from railroads.ui.pixel.sheet import SpriteSheet
+from railroads.ui.pixel.track_art import no_track
 
 
 class FakeTexture:
@@ -185,38 +189,70 @@ def test_textures_repeat_pixels_into_squares_and_skip_the_copy_at_screen_scale()
     assert same is pixels
 
 
-def test_where_the_graphics_card_blows_textures_up_only_its_own_pixels_go_up() -> None:
+class Standing:
+    def __init__(self) -> None:
+        self.asked: list[tuple] = []
+
+    def __call__(self, chunk, scale, k, scenery, track, ground=None) -> FakeTexture:
+        self.asked.append((chunk, scale, k, scenery, track, ground))
+        return FakeTexture()
+
+
+def test_where_the_graphics_card_stands_chunks_one_without_track_near_is_made_at_once() -> None:
     world, mountains, _ = world_over_mountains()
     layer = PixelLayer(world, threads=False)
-    drawn_now(layer, (*mountains, 2))
-    asked: list[tuple[np.ndarray, int]] = []
-    layer.blow_up = lambda pixels, times: asked.append((pixels, times)) or FakeTexture()
+    layer.stand = stand = Standing()
 
-    layer._upload(mountains, 4, 2)
-    layer._upload(mountains, 2, 2)
+    layer._ask((*mountains, 8), 0.0)
+    layer._upload(mountains, 8, 4)
 
-    [(pixels, times)] = asked
-    assert times == 2
-    assert pixels is layer._chunks[(*mountains, 2)]
-    assert set(layer._textures) == {(*mountains, 4), (*mountains, 2)}
+    [(chunk, scale, k, scenery, track, ground)] = stand.asked
+    assert (chunk, scale, k, ground) == (mountains, 8, 4, None)
+    assert scenery is world.scenery
+    np.testing.assert_array_equal(track, no_track())
+    assert not layer._painter.waiting()
 
 
-def test_where_the_graphics_card_draws_what_lies_on_the_ground_chunks_are_drawn_without_it() -> (
+def test_where_the_graphics_card_stands_chunks_their_track_is_laid_out_away_from_the_frames() -> (
     None
 ):
+    world, _ = track_chunk(SpriteSheet.load(), [Track((10, 3), (0, 6))])
+    chunk = chunk_of(world, (10, 3))
+    layer = PixelLayer(world, threads=False)
+    layer.stand = stand = Standing()
+
+    drawn_now(layer, (*chunk, 6))
+    layer._upload(chunk, 6, 2)
+
+    [(_, _, _, _, track, _)] = stand.asked
+    np.testing.assert_array_equal(track, world.track_shapes(*chunk, 6))
+
+
+def test_a_chunk_whose_sheet_is_still_loading_gets_no_texture_yet() -> None:
     world, mountains, _ = world_over_mountains()
     layer = PixelLayer(world, threads=False)
-    layer.over_ground = True
-    asked: list[tuple[np.ndarray, int, tuple[int, int]]] = []
-    layer.dress = lambda pixels, times, chunk: asked.append((pixels, times, chunk)) or FakeTexture()
-    drawn_now(layer, (*mountains, 2))
+    layer.stand = lambda *_args: None
+    layer._ask((*mountains, 12), 0.0)
 
-    layer._upload(mountains, 2, 2)
+    made = layer._upload(mountains, 12, 4)
 
-    [(pixels, times, chunk)] = asked
-    assert (times, chunk) == (1, mountains)
+    assert made is None
+    assert not layer._textures
+
+
+def test_where_the_graphics_card_stands_chunks_raised_ground_drawn_finely_goes_under_them() -> None:
+    world, mountains, _ = world_over_mountains()
+    layer = PixelLayer(world, threads=True)
+    layer.stand = stand = Standing()
+    layer._ask((*mountains, 4), time.perf_counter())
+    layer._refine((*mountains, 2), time.perf_counter(), (*mountains, 4))
+
+    taken_within(layer)
+    layer._upload(mountains, 4, 2)
+
+    ground = stand.asked[-1][5]
     np.testing.assert_array_equal(
-        pixels, world.render(*mountains, 2, over_ground=True, surfaces=False)
+        ground, world.render(*mountains, 2, fine_relief=True, standing=False)
     )
 
 

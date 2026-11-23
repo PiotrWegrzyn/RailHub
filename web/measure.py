@@ -57,12 +57,26 @@ def _timed_render(
     fine_relief: bool = False,
     over_ground: bool = False,
     surfaces: bool = True,
+    standing: bool = True,
 ):
     before = time.perf_counter()
-    pixels = _plain_render(self, chunk_x, chunk_y, resolution, fine_relief, over_ground, surfaces)
+    pixels = _plain_render(
+        self, chunk_x, chunk_y, resolution, fine_relief, over_ground, surfaces, standing
+    )
     kind = _kind(self, chunk_x, chunk_y, resolution, fine_relief, over_ground)
     _renders.append((kind, time.perf_counter() - before))
     return pixels
+
+
+_plain_track_shapes = PixelWorld.track_shapes
+
+
+def _timed_track_shapes(self: PixelWorld, chunk_x: int, chunk_y: int, scale: int):
+    before = time.perf_counter()
+    shapes = _plain_track_shapes(self, chunk_x, chunk_y, scale)
+    kind = "raised" if self.rises(chunk_x, chunk_y) else "flat"
+    _renders.append((f"track {kind} x{scale}", time.perf_counter() - before))
+    return shapes
 
 
 def _kind(
@@ -73,8 +87,12 @@ def _kind(
     fine_relief: bool,
     over_ground: bool,
     surfaces: bool = True,
+    what: str = "picture",
 ) -> str:
     del surfaces
+    if what == "track":
+        kind = "raised" if world.rises(chunk_x, chunk_y) else "flat"
+        return f"track {kind} x{resolution}"
     if fine_relief and resolution > 1:
         kind = "fine raised"
     else:
@@ -150,6 +168,7 @@ def _report() -> None:
 
 
 PixelWorld.render = _timed_render
+PixelWorld.track_shapes = _timed_track_shapes
 WorkerPainter.heard = _timed_heard
 app.App.gui = _timed_gui
 

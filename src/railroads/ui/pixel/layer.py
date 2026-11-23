@@ -1,19 +1,21 @@
 """Shows the pixel art on screen: chunks are drawn as the view reaches them and kept as textures
 blown up to the zoom's pixel scale. Where each art pixel covers an even number of screen pixels the
 chunks are drawn finer (PixelWorld.render), so buildings, trees and track keep thin lines instead of
-growing blocky. Where the ground shader runs, the graphics card blows the textures up, which saves
-the frames repeating every pixel and sending the graphics card all of them.
+growing blocky.
 
 Chunks are drawn away from the frames (railroads.ui.pixel.painter); until a chunk is ready, the
 ground drawn beneath shows where it is missing, and a chunk that changed keeps its old texture.
-Where the ground shader runs, it also draws what lies on the ground under the chunks as their
-textures are made, the shade of trees, fields, yards and woods, and chunks are drawn without
-them, in a third of the time or less.
+
+Where the ground shader runs, the graphics card makes every chunk's texture itself, at the size
+it shows on screen (railroads.ui.pixel.stand_shader): what lies on the ground, the shade of
+trees, fields, yards and woods, and everything standing on it and the track, so a sprite pixel
+is a screen pixel at every zoom. Only the track is laid out away from the frames, as triangles; a
+chunk with no track near is made as soon as it shows.
 
 Chunks where hills or mountains rise show first as they are quickly drawn, over the ground the
 graphics card raises where it can, then are drawn again whole with the heights, lift and colours of
 their raised ground at the full resolution, and the finer drawing takes their place once it is
-ready.
+ready; where the graphics card stands what stands on them, the CPU draws only that ground again.
 
 In a browser, where threads cannot start, the page's web workers draw the chunks instead
 (railroads.ui.pixel.web_painter), several at once, and frames carry on meanwhile as with a thread.
@@ -29,17 +31,18 @@ fills in from the middle out."""
 
 import time
 from collections import OrderedDict
-from collections.abc import Callable
 from typing import Protocol
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
 from railroads.ui.iso_camera import IsoCamera, Vec2
-from railroads.ui.pixel.copies import ChunkJob
+from railroads.ui.pixel.copies import GROUND, TRACK, ChunkJob
 from railroads.ui.pixel.painter import Painter
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, Rgba
+from railroads.ui.pixel.scenery import Scenery
 from railroads.ui.pixel.sheet import FINE
+from railroads.ui.pixel.track_art import no_track
 from railroads.ui.pixel.web_painter import WorkerPainter, page_workers
 from railroads.ui.pixel.world import CLOSE, PixelWorld
 from railroads.ui.workers import threads_start
@@ -62,9 +65,23 @@ type ChunkKey = tuple[int, int]
 
 
 class Texture(Protocol):
-    """A chunk's texture: one hello_imgui made, or one the ground shader blew up."""
+    """A chunk's texture: one hello_imgui made, or one the graphics card made."""
 
     def texture_id(self) -> int: ...
+
+
+class Stand(Protocol):
+    """What makes a chunk's texture on the graphics card (StandShader.stand)."""
+
+    def __call__(
+        self,
+        chunk: ChunkKey,
+        scale: int,
+        k: int,
+        scenery: Scenery,
+        track: Rgba,
+        ground: Rgba | None = None,
+    ) -> Texture | None: ...
 
 
 def resolution_for(screen_pixels: int, resolutions: tuple[int, ...]) -> int:
@@ -113,20 +130,22 @@ class PixelLayer:
         self._view: tuple | None = None
         self._still_since = 0.0
         # Whether the graphics card draws and raises the ground beneath, so chunks are drawn
-        # without theirs, and what blows textures up on it then, which makes the same
-        # texels as blowing them up here (GroundShader.blow_up).
+        # without theirs.
         self.over_ground = False
-        self.blow_up: Callable[[Rgba, int], Texture] | None = None
-        # What lays chunks over what lies on the ground on the graphics card, where it draws
-        # that, so chunks are drawn without it (GroundShader.dress), and which drawn chunks were.
-        self.dress: Callable[[Rgba, int, ChunkKey], Texture] | None = None
-        self._bare: set[tuple[int, int, int]] = set()
+        # What makes chunks' textures on the graphics card, where it does (StandShader.stand):
+        # then what is kept of each chunk is the track over it, as shapes, by where it is and
+        # the scale it shows at, and its raised ground drawn finely, by the resolution it was
+        # drawn at.
+        self.stand: Stand | None = None
+        self._tracks: OrderedDict[tuple[int, int, int], Rgba] = OrderedDict()
+        self._grounds: dict[tuple[int, int, int], Rgba] = {}
 
     def refresh(self, chunks: set[ChunkKey]) -> None:
         """Draws these chunks again next time they show, keeping their old textures on screen
         until then."""
-        for key in [key for key in self._chunks if key[:2] in chunks]:
-            del self._chunks[key]
+        for kept in (self._chunks, self._tracks, self._grounds):
+            for key in [key for key in kept if key[:2] in chunks]:
+                del kept[key]
         self._stale |= {key for key in self._textures if key[:2] in chunks}
         for chunk in chunks:
             self._refreshes[chunk] = self._refreshes.get(chunk, 0) + 1
@@ -143,25 +162,27 @@ class PixelLayer:
         """Keeps the chunks the painter has finished, unless they changed since they were asked
         for; returns them."""
         taken: set[ChunkKey] = set()
-        for (fine, drawn, refreshes, surfaces), pixels, error in self._painter.finished():
+        for (fine, drawn, refreshes, what), pixels, error in self._painter.finished():
             chunk = drawn[:2]
             if error is not None or refreshes != self._refreshes.get(chunk, 0):
                 continue
+            kept = self._tracks if what == TRACK else self._chunks
             if fine:
                 self._refined.add(drawn)
                 self._stale |= {key for key in self._textures if key[:2] == chunk}
-            elif drawn in self._chunks:
+                if what == GROUND:
+                    kept = self._grounds
+            elif drawn in kept:
                 continue
-            self._chunks[drawn] = pixels
-            if surfaces:
-                self._bare.discard(drawn)
-            else:
-                self._bare.add(drawn)
+            kept[drawn] = pixels
             taken.add(chunk)
-        while len(self._chunks) > 1 and self._chunk_bytes() > CHUNK_BUDGET:
-            # A chunk drawn finely and let go is drawn quickly when it shows again, and so is
-            # drawn finely again too.
-            self._refined.discard(self._chunks.popitem(last=False)[0])
+        for kept in (self._chunks, self._tracks):
+            while len(kept) > 1 and self._chunk_bytes() > CHUNK_BUDGET:
+                # A chunk drawn finely and let go is drawn quickly when it shows again, and so
+                # is drawn finely again too.
+                dropped = kept.popitem(last=False)[0]
+                self._refined.discard(dropped)
+                self._grounds.pop(dropped, None)
         return taken
 
     def draw(
@@ -188,22 +209,27 @@ class PixelLayer:
         for chunk in middle_out(placement, center):
             key = (*chunk, scale)
             fine = self._resolution_of(chunk, resolution)
-            drawn = (*chunk, fine)
+            drawn = key if self.stand is not None else (*chunk, fine)
+            kept = self._kept()
             texture = self._textures.get(key)
             if texture is None or key in self._stale:
                 late = uploaded and time.perf_counter() - now > UPLOAD_BUDGET_S
-                if drawn in self._chunks and not late:
-                    texture = self._upload(chunk, scale, fine)
-                    self._stale.discard(key)
-                    uploaded = True
-                else:
-                    complete = False
+                if drawn not in kept:
                     self._ask(drawn, now)
+                made = None
+                if drawn in kept and not late:
+                    made = self._upload(chunk, scale, fine)
+                    uploaded = True
+                if made is None:
+                    complete = False
+                else:
+                    texture = made
+                    self._stale.discard(key)
                 if texture is None:
                     texture = self._shown_before(chunk)
                 if texture is None:
                     continue
-            self._refine(drawn, now)
+            self._refine((*chunk, fine), now, drawn)
             if key in self._textures:
                 self._textures.move_to_end(key)
             top_left, bottom_right = placement.screen_rect(chunk)
@@ -215,17 +241,29 @@ class PixelLayer:
         return complete and not self._painter.waiting()
 
     def prepare(
-        self, camera: IsoCamera, center: Vec2, clip: tuple[Vec2, Vec2], density: int
+        self,
+        camera: IsoCamera,
+        center: Vec2,
+        clip: tuple[Vec2, Vec2],
+        density: int,
+        standing: bool = False,
     ) -> None:
         """Draws the chunks this view would show, at most PREPARED_CHUNKS of them, on the calling
-        thread, so they are ready for the first frame; for a game being loaded."""
+        thread, so they are ready for the first frame; for a game being loaded. With `standing`,
+        as where the graphics card will make chunks' textures (`stand`), it lays out only
+        their track."""
         placement = self._placement(camera, center, clip)
         resolution = chunk_resolution(placement.scale, density, self.world.resolutions)
+        scale = placement.scale * density
         for chunk in placement.chunks[:PREPARED_CHUNKS]:
+            if standing or self.stand is not None:
+                drawn = (*chunk, scale)
+                if drawn not in self._tracks:
+                    self._tracks[drawn] = self.world.track_shapes(*chunk, scale)
+                continue
             drawn = (*chunk, self._resolution_of(chunk, resolution))
             if drawn not in self._chunks:
                 self._chunks[drawn] = self.world.render(*drawn)
-                self._bare.discard(drawn)
 
     def _resolution_of(self, chunk: ChunkKey, resolution: int) -> int:
         """The resolution a chunk is drawn at in a view drawing chunks at `resolution`: in a close
@@ -269,20 +307,34 @@ class PixelLayer:
         return not self._painter.threaded and now - self._still_since < SETTLE_S
 
     def _ask(self, drawn: tuple[int, int, int], now: float) -> None:
-        if drawn in self._chunks:
+        """Asks for a chunk to be drawn: its picture, or where the graphics card makes its
+        texture, the track over it, which a chunk with no track near has at once."""
+        if drawn in self._kept():
             return
         refreshes = self._refreshes.get(drawn[:2], 0)
-        surfaces = self.dress is None
-        work = ChunkJob(self.world, *drawn, over_ground=self.over_ground, surfaces=surfaces)
-        self._painter.want((False, drawn, refreshes, surfaces), work, True, now)
+        if self.stand is None:
+            work = ChunkJob(self.world, *drawn, over_ground=self.over_ground)
+        elif not self.world.track_near(*drawn[:2]):
+            self._tracks[drawn] = no_track()
+            return
+        else:
+            work = ChunkJob(self.world, *drawn, what=TRACK)
+        self._painter.want((False, drawn, refreshes, work.what), work, True, now)
 
-    def _refine(self, drawn: tuple[int, int, int], now: float) -> None:
+    def _kept(self) -> OrderedDict[tuple[int, int, int], Rgba]:
+        """What is kept of each chunk to make its texture from: its track where the graphics
+        card makes chunks' textures, else its picture."""
+        return self._tracks if self.stand is not None else self._chunks
+
+    def _refine(
+        self, drawn: tuple[int, int, int], now: float, kept: tuple[int, int, int] | None = None
+    ) -> None:
         """Asks for a chunk to be drawn again with fine raised ground, if it has any and is not
-        drawn finely already."""
+        drawn finely already; `kept` is what is kept of the chunk meanwhile."""
         resolution = drawn[2]
         if not self._refines or resolution == 1:
             return
-        if drawn in self._refined or drawn not in self._chunks:
+        if drawn in self._refined or (drawn if kept is None else kept) not in self._kept():
             return
         rises = self._rises.get(drawn[:2])
         if rises is None:
@@ -290,27 +342,32 @@ class PixelLayer:
         if not rises:
             return
         refreshes = self._refreshes.get(drawn[:2], 0)
-        work = ChunkJob(self.world, *drawn, fine_relief=True)
-        self._painter.want((True, drawn, refreshes, True), work, False, now)
+        what = GROUND if self.stand is not None else "picture"
+        work = ChunkJob(self.world, *drawn, fine_relief=True, what=what)
+        self._painter.want((True, drawn, refreshes, what), work, False, now)
 
     def _chunk_bytes(self) -> int:
-        return sum(pixels.nbytes for pixels in self._chunks.values())
+        kept = [*self._chunks.values(), *self._tracks.values(), *self._grounds.values()]
+        return sum(pixels.nbytes for pixels in kept)
 
     def _texture_bytes(self) -> int:
         return sum((CHUNK * key[2]) ** 2 * 4 for key in self._textures)
 
-    def _upload(self, chunk: ChunkKey, scale: int, resolution: int) -> Texture:
-        drawn = (*chunk, resolution)
-        pixels = self._chunks[drawn]
-        self._chunks.move_to_end(drawn)
-        times = scale // resolution
-        texture: Texture
-        if drawn in self._bare and self.dress is not None:
-            texture = self.dress(pixels, times, chunk)
-        elif times > 1 and self.blow_up is not None:
-            texture = self.blow_up(pixels, times)
+    def _upload(self, chunk: ChunkKey, scale: int, resolution: int) -> Texture | None:
+        """Makes a chunk's texture from what is kept of it; None if it can't be made yet."""
+        texture: Texture | None
+        if self.stand is not None:
+            drawn = (*chunk, scale)
+            ground = self._grounds.get((*chunk, resolution))
+            scenery = self.world.scenery
+            texture = self.stand(chunk, scale, resolution, scenery, self._tracks[drawn], ground)
+            if texture is None:
+                return None
+            self._tracks.move_to_end(drawn)
         else:
-            texture = blown_up_texture(pixels, times)
+            drawn = (*chunk, resolution)
+            texture = blown_up_texture(self._chunks[drawn], scale // resolution)
+            self._chunks.move_to_end(drawn)
         self._textures[(*chunk, scale)] = texture
         return texture
 

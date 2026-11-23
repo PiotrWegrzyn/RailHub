@@ -23,6 +23,19 @@ FINE_INDEX = SHEET_DIR / "sprites@2x.json"
 FINEST = 4
 FINEST_PNG = SHEET_DIR / "sprites@4x.png"
 FINEST_INDEX = SHEET_DIR / "sprites@4x.json"
+# Every resolution the sprites are drawn at, in pixels per art pixel: one for each number of
+# screen pixels an art pixel covers at a zoom where the graphics card stands them on the map, so
+# each sprite pixel there is one screen pixel, whether the screen has one or two pixels to a
+# point.
+DENSITIES = (1, 2, 3, 4, 6, 8, 12)
+
+
+def sheet_files(resolution: int) -> tuple[Path, Path]:
+    """The PNG and JSON of the sheet drawn at `resolution`."""
+    if resolution == 1:
+        return SHEET_PNG, SHEET_INDEX
+    return SHEET_DIR / f"sprites@{resolution}x.png", SHEET_DIR / f"sprites@{resolution}x.json"
+
 
 Pixels = npt.NDArray[np.float32]
 
@@ -54,8 +67,15 @@ class SpriteSheet:
 
     @classmethod
     def load_finest(cls) -> ByteSheet:
-        with Image.open(FINEST_PNG) as sheet:
-            return ByteSheet.from_image(sheet, json.loads(FINEST_INDEX.read_text()))
+        return cls.load_bytes(FINEST)
+
+    @classmethod
+    def load_bytes(cls, resolution: int) -> ByteSheet:
+        """The sheet drawn at `resolution` (DENSITIES), as bytes, each sprite a view of the
+        whole sheet's, which is quicker to load than copying each out."""
+        png, index = sheet_files(resolution)
+        with Image.open(png) as sheet:
+            return ByteSheet.from_image(sheet, json.loads(index.read_text()), copied=False)
 
     def index(self, name: str) -> int:
         found = self._indices.get(name)
@@ -95,9 +115,13 @@ class ByteSheet:
     anchors: npt.NDArray[np.int64]
 
     @classmethod
-    def from_image(cls, sheet: Image.Image, places: dict[str, list[int]]) -> Self:
-        rgba = np.asarray(sheet.convert("RGBA"))
-        pixels = [rgba[y : y + h, x : x + w].copy() for x, y, w, h, _, _ in places.values()]
+    def from_image(
+        cls, sheet: Image.Image, places: dict[str, list[int]], copied: bool = True
+    ) -> Self:
+        rgba = np.asarray(sheet if sheet.mode == "RGBA" else sheet.convert("RGBA"))
+        pixels = [rgba[y : y + h, x : x + w] for x, y, w, h, _, _ in places.values()]
+        if copied:
+            pixels = [sprite.copy() for sprite in pixels]
         anchors = np.array([place[4:6] for place in places.values()], dtype=np.int64)
         return cls(list(places), pixels, anchors)
 

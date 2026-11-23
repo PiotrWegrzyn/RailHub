@@ -50,7 +50,7 @@ from railroads.ui.pixel.relief import (
 )
 from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
 from railroads.ui.pixel.sheet import FINE, FINEST, ByteSheet, SpriteSheet
-from railroads.ui.pixel.track_art import TrackArt
+from railroads.ui.pixel.track_art import TrackArt, no_track
 
 # How far in art pixels a sprite can reach from where it stands.
 SPRITE_REACH = 48
@@ -60,6 +60,11 @@ CLOSE = FINEST
 # How many art pixels further down the map than track the ground showing where it is drawn may
 # lie before the track counts as hidden behind it: the track's own width over gentle slopes.
 HIDDEN_BEYOND = 2.0
+# How many times finer than shown, each way, the graphics card draws track before averaging it
+# down (TrackArt.shapes), by how many pixels an art pixel is shown at: as the CPU does at one, and
+# twice finer at any other, which up close is smooth enough without a huge picture.
+TRACK_QUALITY = {1: 4}
+FINER_TRACK = 2
 
 
 class PixelWorld:
@@ -145,6 +150,9 @@ class PixelWorld:
         # Every piece of track, kept until track or stations change.
         self._pieces: list[Track] = []
         self._pieces_version = -1
+        # Where track lies in the picture, kept until track or stations change.
+        self._track_centres = np.zeros((0, 2))
+        self._centres_version = -1
         # The sprites at each resolution chunks can be drawn at: the sheet, and the same sprites
         # drawn finer if there are any, and finest still for the closest views.
         self._sprites = {1: _Sprites.of(sheet)}
@@ -324,6 +332,7 @@ class PixelWorld:
         fine_relief: bool = False,
         over_ground: bool = False,
         surfaces: bool = True,
+        standing: bool = True,
     ) -> Rgba:
         """One chunk as RGBA pixels, `resolution` of them for every art pixel each way; off the
         map it is clear. Above 1 the ground is blown up and the track and everything standing
@@ -335,10 +344,12 @@ class PixelWorld:
         (railroads.ui.pixel.ground_shader); what lies on raised ground is raised with it. Over
         ground, without `surfaces` the chunk leaves out what lies on the ground too, the shade of
         trees, fields, yards and woods, which the graphics card lays under it
-        (GroundShader.dress)."""
+        (GroundShader.dress). With finely worked out raised ground, without `standing` the chunk
+        leaves out the track and everything standing on the ground, which the graphics card
+        stands on it then (GroundShader.stand)."""
         self._grade()
         if fine_relief and resolution > 1:
-            return self._render_fine(chunk_x, chunk_y, resolution)
+            return self._render_fine(chunk_x, chunk_y, resolution, standing)
         if over_ground:
             if self.rises(chunk_x, chunk_y):
                 return self._render_over_raised(chunk_x, chunk_y, resolution, surfaces)
@@ -499,7 +510,7 @@ class PixelWorld:
 
         self._surfaces(canvas, left, top, k, shown, paint, lit is None)
 
-    def _render_fine(self, chunk_x: int, chunk_y: int, k: int) -> Rgba:
+    def _render_fine(self, chunk_x: int, chunk_y: int, k: int, standing: bool = True) -> Rgba:
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
         fine = Lattice(
             self.projection, left, top, CHUNK, CHUNK + MOST_LIFT + 1, k, self.tile_map.grid
@@ -544,10 +555,49 @@ class PixelWorld:
         )
         canvas = raise_picture(canvas, offset, 1, crossings(raised.lift, offset))
         textured(canvas, left, top, k)
-        self._stand_scenery(canvas, left, top, k, under_track=True)
-        self._lay_lifted_track(canvas, left, top, k, offset / k)
-        self._stand_scenery(canvas, left, top, k)
+        if standing:
+            self._stand_scenery(canvas, left, top, k, under_track=True)
+            self._lay_lifted_track(canvas, left, top, k, offset / k)
+            self._stand_scenery(canvas, left, top, k)
         return _finished(canvas)
+
+    def track_shapes(self, chunk_x: int, chunk_y: int, scale: int) -> Rgba:
+        """The track over a chunk as triangles for the graphics card to draw `scale` pixels to an
+        art pixel (TrackArt.shapes), lifted with the ground where hills or mountains rise in it,
+        packed as a chunk's pixels are (TrackShapes.packed)."""
+        self._grade()
+        pieces = self._track_pieces()
+        if not pieces:
+            return no_track()
+        left, top = chunk_x * CHUNK, chunk_y * CHUNK
+        quality = TRACK_QUALITY.get(scale, FINER_TRACK)
+        lifted = self.rises(chunk_x, chunk_y)
+        shapes = self.track.shapes(pieces, left, top, CHUNK, CHUNK, scale, quality, lifted)
+        return no_track() if shapes is None else shapes.packed()
+
+    def track_near(self, chunk_x: int, chunk_y: int) -> bool:
+        """Whether any track can show in a chunk, quickly, so a chunk with none needn't wait
+        for its track to be laid out (track_shapes)."""
+        version = self.constructions.railway_version
+        if version != self._centres_version:
+            pieces = self._track_pieces()
+            cells = [piece.cell for piece in pieces]
+            if pieces:
+                cells += list(self.constructions.every_station_cell())
+            if cells:
+                rows, cols = np.array(cells).T
+                centres = self.projection.to_pixels(*self.tile_map.grid.center(rows, cols))
+                self._track_centres = np.stack(centres, axis=-1)
+            else:
+                self._track_centres = np.zeros((0, 2))
+            self._centres_version = version
+        if not len(self._track_centres):
+            return False
+        left, top = chunk_x * CHUNK, chunk_y * CHUNK
+        reach = PIXEL_CELL_WIDTH * 2
+        x, y = self._track_centres.T
+        across = (x > left - reach) & (x < left + CHUNK + reach)
+        return bool((across & (y > top - reach) & (y < top + CHUNK + reach + MOST_LIFT)).any())
 
     def _track_pieces(self) -> list[Track]:
         version = self.constructions.railway_version

@@ -11,23 +11,19 @@ ground.
 
 It draws one pixel per art pixel over the part of the map on screen, then blows that up into a
 texture the size of the map on screen, every art pixel a crisp square, which the map shows like
-any picture under the chunks the CPU draws (railroads.ui.pixel.layer). Chunks are then drawn
-without their ground (PixelWorld.render with `over_ground`), with only the fields, woods, track
-and buildings to lay over it, lifted with the ground where it rises. A picture is drawn again only
-when the view, the cells or the bed graded for track change.
+any picture under the chunks (railroads.ui.pixel.layer). A picture is drawn again only when the
+view, the cells or the bed graded for track change.
 
-The same blowing up makes the chunks' textures where a chunk's pixel covers several screen pixels
-(GroundShader.blow_up): imgui samples every texture smoothly, so a texture must hold a texel for
-every screen pixel to show crisp squares, and blowing a chunk up here gives the very texels the CPU
-would (np.repeat) from an upload a fraction of the size.
-
-The woods, and the shade trees cast on the grass, are drawn here too, a chunk at a time as its texture
-is made (GroundShader.dress), so the CPU draws chunks without them: where woods cover each art
-pixel round the chunk (WOODS), how far crowns reach round them (EDGES), then the crowns, the floor
-between them, trunks and shadows the way railroads.ui.pixel.ground paints them (Ground.canopy),
-finely where an art pixel covers several of the chunk's pixels (CANOPY), and last the chunk laid
-over them, raised with the ground and with its texture (DRESS). The crowns differ from the CPU's
-only by the grain of that texture, as the ground does.
+The woods, and the shade trees cast on the grass, are drawn here too, a chunk at a time as its
+texture is made (GroundShader.lay_surfaces): where woods cover each art pixel round the chunk
+(WOODS), how far crowns reach round them (EDGES), then the crowns, the floor between them, trunks
+and shadows the way railroads.ui.pixel.ground paints them (Ground.canopy), finely where an art
+pixel covers several of the chunk's pixels (CANOPY), with fields and yards, and last all of it
+raised with the ground and with its texture into the chunk's texture (DRESS), over which
+railroads.ui.pixel.stand_shader stands the track and everything standing on the ground. The crowns
+differ from the CPU's only by the grain of that texture, as the ground does. Where the CPU works
+out a chunk's raised ground finely, that is blown up into the chunk's texture instead
+(GroundShader.blow_up_onto).
 
 On the desktop it reaches OpenGL through PyOpenGL; in the browser build, through the GL that
 imgui draws with there (railroads.ui.pixel.webgl), as WebGL 2. Without either, or if the graphics
@@ -680,12 +676,14 @@ uniform vec2 origin;
 uniform float scale;
 uniform ivec2 art_origin;
 uniform int blend;
+uniform int premultiply;
 uniform highp sampler2D art;
 @TEXTURE@
 void main() {
     vec2 p = (gl_FragCoord.xy - origin) / scale;
     if (blend == 0) {
         colour = texelFetch(art, ivec2(floor(p)) - art_origin, 0);
+        if (premultiply == 1) colour.rgb *= colour.a;
         return;
     }
     vec2 q = p - 0.5;
@@ -1296,7 +1294,6 @@ uniform int drawn;
 uniform int times;
 uniform ivec2 relief_origin;
 uniform float metres_per_pixel;
-uniform highp sampler2D pixels;
 uniform highp sampler2D surface;
 uniform highp sampler2D relief;
 @TEXTURE@
@@ -1335,10 +1332,7 @@ void main() {
     if (k > 1 && shown.a > 0.0) {
         shown.rgb = textured(shown.rgb / shown.a, at + vec2(chunk_origin)) * shown.a;
     }
-    vec4 over = texelFetch(pixels, pixel, 0);
-    float alpha = over.a + shown.a * (1.0 - over.a);
-    vec3 rgb = over.rgb * over.a + shown.rgb * (1.0 - over.a);
-    colour = alpha > 0.0 ? vec4(clamp(rgb / alpha, 0.0, 1.0), alpha) : vec4(0.0);
+    colour = shown;
 }
 """
 
@@ -1817,7 +1811,7 @@ _UNWANTED: list[int] = []
 
 
 class ChunkTexture:
-    """A chunk's texture blown up by the graphics card (GroundShader.blow_up), shown like any
+    """A chunk's texture made by the graphics card (StandShader.stand), shown like any
     texture imgui made and deleted once nothing holds it."""
 
     def __init__(self, texture: int) -> None:
@@ -1867,6 +1861,21 @@ class _Target:
             raise RuntimeError("The graphics card can't draw into this texture")
         self.size = (width, height)
         return True
+
+
+@dataclass(frozen=True)
+class ChunkInputs:
+    """What the ground shader worked out for a chunk that what stands on it reads: where the
+    chunk starts, its raised ground (RELIEF) and where its first art pixel lies, whether each art
+    pixel lies on the map (WOODS, its third channel) and where its first lies, and the metres
+    an art pixel of lift stands for."""
+
+    chunk_origin: tuple[int, int]
+    relief: int
+    relief_origin: tuple[int, int]
+    wooded: int
+    woods_origin: tuple[int, int]
+    metres_per_pixel: float
 
 
 @dataclass(frozen=True)
@@ -1932,7 +1941,6 @@ class GroundShader:
         self.cells_version = -1
         self.bed_version = -1
         self.set_bed(None, -1)
-        self._chunks = GL.glGenFramebuffers(1)
         self._woodland = _texture()
         self._trees = np.zeros((0, 2), dtype=np.float32)
         self._clearings = np.zeros((0, 4), dtype=np.float32)
@@ -2107,26 +2115,32 @@ class GroundShader:
                 "scale": ("1f", (screen.scale,)),
                 "art_origin": ("2i", (view.left, view.top)),
                 "blend": ("1i", (int(blend),)),
+                "premultiply": ("1i", (0,)),
                 "art": ("1i", (0,)),
             }
             self._run(self._screen, self._programs.blow_up, uniforms, (art,))
             self._shown = shown
         return self._screen.texture
 
-    def blow_up(self, pixels: npt.NDArray[np.uint8], times: int) -> ChunkTexture:
-        """A texture of a chunk's RGBA pixels with each repeated `times` times each way."""
-        free_textures()
-        small, big, size = self._chunk_textures(pixels, times)
+    def blow_up_onto(self, target: _Target, pixels: npt.NDArray[np.uint8], times: int) -> None:
+        """Draws a chunk's RGBA pixels into `target`, premultiplied by their alpha, each
+        repeated `times` times each way."""
+        small = _texture()
+        rows, cols = pixels.shape[:2]
+        data = np.ascontiguousarray(pixels)
+        GL.glTexImage2D(
+            GL.GL_TEXTURE_2D, 0, GL.GL_RGBA8, cols, rows, 0, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, data
+        )
         uniforms = {
             "origin": ("2f", (0.0, 0.0)),
             "scale": ("1f", (float(times),)),
             "art_origin": ("2i", (0, 0)),
             "blend": ("1i", (0,)),
+            "premultiply": ("1i", (1,)),
             "art": ("1i", (0,)),
         }
-        self._run(_Into(self._chunks, size), self._programs.blow_up, uniforms, (small,))
+        self._run(target, self._programs.blow_up, uniforms, (small,))
         GL.glDeleteTextures(1, [small])
-        return ChunkTexture(big)
 
     def set_surfaces(self, ground: cpu.Ground, version: object) -> None:
         """Takes what is drawn over the ground from `ground`: each cell's say in the woods and
@@ -2143,14 +2157,11 @@ class GroundShader:
         self._yards = ground.yard_table
         self.surfaces_version = version
 
-    def dress(
-        self, pixels: npt.NDArray[np.uint8], times: int, chunk: tuple[int, int]
-    ) -> ChunkTexture:
-        """A texture of a chunk drawn without its woods (PixelWorld.render without `woods`) laid
-        over the woods and the shade of trees, which are drawn here (WOODS, EDGES, CANOPY), raised
-        with the ground where it rises; every pixel repeated `times` times each way."""
-        free_textures()
-        k = pixels.shape[1] // CHUNK
+    def lay_surfaces(self, chunk: tuple[int, int], k: int) -> None:
+        """Works out what lies on a chunk's ground, `k` pixels to an art pixel (no finer than
+        FINE): its raised ground (RELIEF), where woods cover it (WOODS) and how far round them
+        their crowns reach (EDGES), and the woods, the shade of trees, fields and yards over it
+        (CANOPY), for `dress_onto` to lay and for what stands on it to read (`chunk_inputs`)."""
         drawn = min(k, FINE)
         left, top = chunk[0] * CHUNK, chunk[1] * CHUNK
         rows = CHUNK + relief.MOST_LIFT + 2
@@ -2213,51 +2224,37 @@ class GroundShader:
         inputs = (self._cells, self._light, self._table, self._chunk_relief.texture, *textures)
         self._run(self._canopy, self._programs.canopy, uniforms, inputs)
         GL.glDeleteTextures(2, list(listed))
-        small, big, size = self._chunk_textures(pixels, times)
+
+    def dress_onto(self, target: _Target, chunk: tuple[int, int], k: int, times: int) -> None:
+        """Draws what `lay_surfaces` worked out for a chunk into `target`, premultiplied by its
+        alpha, raised with the ground where it rises: `k` pixels to an art pixel, each repeated
+        `times` times each way (DRESS)."""
+        left, top = chunk[0] * CHUNK, chunk[1] * CHUNK
         uniforms = {
             "chunk_origin": ("2i", (left, top)),
             "k": ("1i", (k,)),
-            "drawn": ("1i", (drawn,)),
+            "drawn": ("1i", (min(k, FINE),)),
             "times": ("1i", (times,)),
-            "relief_origin": ("2i", relief_origin),
+            "relief_origin": ("2i", (left - 1, top - 1)),
             "metres_per_pixel": ("1f", (self._heights.metres_per_pixel,)),
-            "pixels": ("1i", (0,)),
-            "surface": ("1i", (1,)),
-            "relief": ("1i", (2,)),
+            "surface": ("1i", (0,)),
+            "relief": ("1i", (1,)),
         }
-        inputs = (small, self._canopy.texture, self._chunk_relief.texture)
-        self._run(_Into(self._chunks, size), self._programs.dress, uniforms, inputs)
-        GL.glDeleteTextures(1, [small])
-        return ChunkTexture(big)
+        inputs = (self._canopy.texture, self._chunk_relief.texture)
+        self._run(target, self._programs.dress, uniforms, inputs)
 
-    def _chunk_textures(self, pixels: npt.NDArray[np.uint8], times: int) -> tuple[int, int, tuple]:
-        """A texture of a chunk's pixels, and one `times` as big each way for the chunk's
-        framebuffer to draw into, with its size."""
-        rows, cols = pixels.shape[:2]
-        size = (cols * times, rows * times)
-        small = _texture()
-        GL.glTexImage2D(
-            GL.GL_TEXTURE_2D,
-            0,
-            GL.GL_RGBA8,
-            cols,
-            rows,
-            0,
-            GL.GL_RGBA,
-            GL.GL_UNSIGNED_BYTE,
-            np.ascontiguousarray(pixels),
+    def chunk_inputs(self, chunk: tuple[int, int]) -> ChunkInputs:
+        """What `lay_surfaces` last worked out that what stands on a chunk reads: its raised
+        ground and whether each art pixel lies on the map, with where each starts."""
+        left, top = chunk[0] * CHUNK, chunk[1] * CHUNK
+        return ChunkInputs(
+            (left, top),
+            self._chunk_relief.texture,
+            (left - 1, top - 1),
+            self._wooded.texture,
+            (left - WOODS_MARGIN, top - WOODS_MARGIN),
+            self._heights.metres_per_pixel,
         )
-        big = _texture()
-        GL.glTexImage2D(
-            GL.GL_TEXTURE_2D, 0, GL.GL_RGBA8, *size, 0, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, None
-        )
-        saved = GL.glGetIntegerv(GL.GL_FRAMEBUFFER_BINDING)
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self._chunks)
-        GL.glFramebufferTexture2D(
-            GL.GL_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0, GL.GL_TEXTURE_2D, big, 0
-        )
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, int(saved))
-        return small, big, size
 
     def _inputs(self) -> tuple[int, ...]:
         return self._cells, self._light, self._table, self._relief.texture
@@ -2297,30 +2294,36 @@ class GroundShader:
             GL.glViewport(0, 0, *target.size)
             GL.glDisable(GL.GL_BLEND)
             GL.glDisable(GL.GL_SCISSOR_TEST)
-            GL.glUseProgram(program)
-            for name, (kind, values) in uniforms.items():
-                at = uniform(program, name)
-                match kind:
-                    case "1i":
-                        GL.glUniform1i(at, *values)
-                    case "2i":
-                        GL.glUniform2i(at, *values)
-                    case "1f":
-                        GL.glUniform1f(at, *values)
-                    case "2f":
-                        GL.glUniform2f(at, *values)
-                    case "4f":
-                        GL.glUniform4f(at, *values)
-                    case "m2":
-                        matrix = np.array(values, np.float32)
-                        GL.glUniformMatrix2fv(at, 1, GL.GL_FALSE, matrix)
-            for unit, texture in enumerate(inputs):
-                GL.glActiveTexture(GL.GL_TEXTURE0 + unit)
-                GL.glBindTexture(GL.GL_TEXTURE_2D, texture)
+            use(program, uniforms, inputs)
             GL.glBindVertexArray(self._vao)
             GL.glDrawArrays(GL.GL_TRIANGLE_STRIP, 0, 4)
         finally:
             _restore(saved)
+
+
+def use(program: int, uniforms: dict[str, tuple[str, tuple]], inputs: tuple[int, ...]) -> None:
+    """Draws with `program` from now on, with these uniforms, reading `inputs` from texture
+    units 0 on."""
+    GL.glUseProgram(program)
+    for name, (kind, values) in uniforms.items():
+        at = uniform(program, name)
+        match kind:
+            case "1i":
+                GL.glUniform1i(at, *values)
+            case "2i":
+                GL.glUniform2i(at, *values)
+            case "1f":
+                GL.glUniform1f(at, *values)
+            case "2f":
+                GL.glUniform2f(at, *values)
+            case "4f":
+                GL.glUniform4f(at, *values)
+            case "m2":
+                matrix = np.array(values, np.float32)
+                GL.glUniformMatrix2fv(at, 1, GL.GL_FALSE, matrix)
+    for unit, texture in enumerate(inputs):
+        GL.glActiveTexture(GL.GL_TEXTURE0 + unit)
+        GL.glBindTexture(GL.GL_TEXTURE_2D, texture)
 
 
 # Where each program's uniforms are, by program and name, found once: a program's uniforms stay

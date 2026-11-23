@@ -29,7 +29,7 @@ from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection
 from railroads.ui.pixel.relief import MOST_LIFT, raycast
 from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
 from railroads.ui.pixel.sheet import FINE, FINEST, SHEET_INDEX, SpriteSheet
-from railroads.ui.pixel.track_art import RAIL
+from railroads.ui.pixel.track_art import RAIL, TrackShapes, _crisp, _raised_strip, _triangles
 from railroads.ui.pixel.track_preview import ghost
 from railroads.ui.pixel.world import CLOSE, PixelWorld
 
@@ -1266,3 +1266,92 @@ def test_both_rails_of_straight_track_show_as_full_bright_lines(
     bright = np.flatnonzero(column > RAIL[2] / 255 - 0.05)
     assert len(bright) == 2
     assert bright[1] - bright[0] > 1
+
+
+def track_shapes_of(world: PixelWorld, cell: Cell, scale: int) -> TrackShapes:
+    px, py = world.projection.to_pixels(*world.tile_map.grid.center(*cell))
+    return TrackShapes.unpacked(world.track_shapes(int(px // CHUNK), int(py // CHUNK), scale))
+
+
+def test_track_shapes_come_back_as_they_were_packed() -> None:
+    triangles = np.arange(18, dtype=np.float32).reshape(3, 6)
+    lifts = np.arange(9, dtype=np.float32).reshape(3, 3)
+
+    shapes = TrackShapes.unpacked(TrackShapes(triangles, lifts, 8, 2).packed())
+
+    np.testing.assert_array_equal(shapes.triangles, triangles)
+    np.testing.assert_array_equal(shapes.lifts, lifts)
+    assert (shapes.scale, shapes.quality) == (8, 2)
+
+
+def test_a_chunk_far_from_track_has_none_to_lay_out(sheet: SpriteSheet) -> None:
+    world, _ = track_chunk(sheet, [Track((10, 3), (0, 6))])
+    far = world.projection.to_pixels(*world.tile_map.grid.center(1, 14))
+    chunk = (int(far[0] // CHUNK), int(far[1] // CHUNK))
+
+    shapes = TrackShapes.unpacked(world.track_shapes(*chunk, 4))
+
+    assert not world.track_near(*chunk)
+    assert len(shapes.triangles) == 0
+
+
+def test_track_shapes_cover_where_the_cpu_draws_the_track(sheet: SpriteSheet) -> None:
+    world, _ = track_chunk(sheet, [Track((10, 3), (0, 6))])
+    drawn = np.argwhere(
+        world.track.layer(world._track_pieces(), *offset_of(world), CHUNK, CHUNK)[..., 3] > 0
+    )
+
+    shapes = track_shapes_of(world, (10, 3), 1)
+
+    corners = shapes.triangles[:, :2] / shapes.quality
+    assert world.track_near(*chunk_of(world, (10, 3)))
+    assert abs(corners[:, 0].min() - drawn[:, 1].min()) <= 1
+    assert abs(corners[:, 0].max() - drawn[:, 1].max() - 1) <= 1
+    assert abs(corners[:, 1].min() - drawn[:, 0].min()) <= 1
+    assert abs(corners[:, 1].max() - drawn[:, 0].max() - 1) <= 1
+
+
+def chunk_of(world: PixelWorld, cell: Cell) -> tuple[int, int]:
+    px, py = world.projection.to_pixels(*world.tile_map.grid.center(*cell))
+    return int(px // CHUNK), int(py // CHUNK)
+
+
+def offset_of(world: PixelWorld, cell: Cell = (10, 3)) -> tuple[int, int]:
+    chunk = chunk_of(world, cell)
+    return chunk[0] * CHUNK, chunk[1] * CHUNK
+
+
+def test_rails_up_close_are_a_quarter_of_an_art_pixel_wide_but_never_under_a_pixel(
+    sheet: SpriteSheet,
+) -> None:
+    world, _ = track_chunk(sheet, [Track((10, 3), (0, 6))])
+    rail = np.array([*RAIL, 255]) / 255
+
+    widths = {}
+    for scale in (2, 12):
+        shapes = track_shapes_of(world, (10, 3), scale)
+        lit = shapes.triangles[np.all(np.isclose(shapes.triangles[:, 2:], rail), axis=1)]
+        quads = lit[:6, :2] / shapes.quality
+        widths[scale] = float(np.linalg.norm(quads[0] - quads[5]))
+
+    assert widths[2] == pytest.approx(1.0, abs=0.01)
+    assert widths[12] == pytest.approx(3.0, abs=0.01)
+
+
+def test_a_wide_straight_rail_is_moved_so_both_its_edges_lie_between_pixels() -> None:
+    rail = [(0.0, 10.3), (50.0, 10.3)]
+
+    moved = _crisp(rail, 2, 6)
+
+    assert (moved[0][1] - 3) % 2 == pytest.approx(0)
+    assert (moved[0][1] + 3) % 2 == pytest.approx(0)
+    assert abs(moved[0][1] - 10.3) <= 1
+
+
+def test_a_strip_is_filled_as_the_quads_between_its_two_sides() -> None:
+    strip = _raised_strip([(0.0, 0.0), (10.0, 0.0), (20.0, 0.0)], [0.0, 0.0, 0.0], 2.0)
+
+    corners = _triangles(strip)
+
+    assert len(corners) == 12
+    assert {y for _, y in corners} == {-2.0, 2.0}

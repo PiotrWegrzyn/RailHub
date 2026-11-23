@@ -142,6 +142,20 @@ def glTexImage2D(
     )
 
 
+def glTexSubImage2D(
+    target: int,
+    level: int,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    form: int,
+    kind: int,
+    pixels: np.ndarray,
+) -> None:
+    _call("glTexSubImage2D", target, level, x, y, width, height, form, kind, address(pixels))
+
+
 def glGetUniformLocation(program: int, name: str) -> int:
     text = _text(name)
     return int(_call("glGetUniformLocation", program, address(text)))
@@ -231,4 +245,5 @@ glUniform4f = _forward("glUniform4f", float)
 glCheckFramebufferStatus = _forward("glCheckFramebufferStatus")
 glClear = _forward("glClear")
 glBlendFunc = _forward("glBlendFunc")
+glBlendEquation = _forward("glBlendEquation")
 glClearColor = _forward("glClearColor", float)

@@ -84,6 +84,7 @@ from railroads.ui.pixel.layer import PixelLayer
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import ByteSheet, SpriteSheet
 from railroads.ui.pixel.signal_layer import SignalLayer
+from railroads.ui.pixel.stand_shader import StandShader
 from railroads.ui.pixel.track_preview import TrackPreview
 from railroads.ui.pixel.train_layer import TrainLayer, engine_picture
 from railroads.ui.pixel.world import PixelWorld
@@ -193,6 +194,9 @@ class MapView:
         # The ground shader for the pixel map, once tried (railroads.ui.pixel.ground_shader), and
         # how many times the cells' colours have changed, so it takes them up again.
         self._shader: GroundShader | None = None
+        # The shaders standing what stands on the map over that ground, made with it
+        # (railroads.ui.pixel.stand_shader).
+        self._stand: StandShader | None = None
         self._shader_tried = False
         self._colors_version = 0
         # The shader drawing the building dots zoomed out, once tried.
@@ -554,8 +558,7 @@ class MapView:
                 self._draw_ground(draw_list, center, self._ground_texture(False))
             layer = self._pixel_layer()
             layer.over_ground = shaded
-            layer.blow_up = self._shader.blow_up if shaded and self._shader is not None else None
-            layer.dress = self._shader.dress if shaded and self._shader is not None else None
+            layer.stand = self._stand.stand if shaded and self._stand is not None else None
             ready = layer.draw(
                 draw_list, self.camera, center, (top_left, bottom_right), ground_below=shaded
             )
@@ -961,7 +964,8 @@ class MapView:
         if chunks and self.camera.pixel_scale:
             yield
             center = (size[0] / 2, size[1] / 2)
-            layer.prepare(self.camera, center, ((0.0, 0.0), size), density)
+            standing = hello_imgui.is_using_hello_imgui()
+            layer.prepare(self.camera, center, ((0.0, 0.0), size), density, standing)
 
     def _pixel_layer(self) -> PixelLayer:
         if self._pixels is None:
@@ -1107,6 +1111,7 @@ class MapView:
                     world.ground.shading,
                     world.elevation.heights,
                 )
+                self._stand = StandShader.make(self._shader, SpriteSheet.load_bytes)
         return self._shader
 
     def _draw_ground(

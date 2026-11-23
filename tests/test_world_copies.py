@@ -5,10 +5,19 @@ import sys
 import numpy as np
 from test_elevation import world_over_mountains
 
-from railroads.sim.constructions import Building, BuildingKind, Track
+from railroads.sim.constructions import Building, BuildingKind, Track, TrackWidth
 from railroads.sim.economy import Satisfaction
 from railroads.sim.tilemap import Vegetation
-from railroads.ui.pixel.copies import ChunkJob, Seen, WorldCopy, update_message, world_message
+from railroads.sim.track_rules import TrackBed
+from railroads.ui.pixel.copies import (
+    GROUND,
+    TRACK,
+    ChunkJob,
+    Seen,
+    WorldCopy,
+    update_message,
+    world_message,
+)
 from railroads.ui.pixel.projection import CHUNK
 from railroads.ui.pixel.world import PixelWorld
 
@@ -56,6 +65,24 @@ def test_a_copy_paints_the_very_pixels_its_world_paints() -> None:
 
     for job in jobs:
         np.testing.assert_array_equal(copy.paint(1, job.drawing), job())
+
+
+def test_a_copy_lays_out_the_very_track_and_ground_its_world_does() -> None:
+    world, mountains, _ = world_over_mountains()
+    for col in range(14, 26):
+        bed = TrackBed.TUNNEL if col > 17 else TrackBed.GROUND
+        world.constructions.build(Track((10, col), (0, 6), TrackWidth.SINGLE, bed))
+    world.buildings_changed([(10, 17)])
+    jobs = [
+        ChunkJob(world, *chunk_of(world, (10, 17)), 8, what=TRACK),
+        ChunkJob(world, *mountains, 2, fine_relief=True, what=GROUND),
+    ]
+
+    copy = copied(world)
+
+    for job in jobs:
+        np.testing.assert_array_equal(copy.paint(1, job.drawing), job())
+    assert len(jobs[0]()) > 1
 
 
 def test_a_copy_keeps_up_with_buildings_track_and_forests() -> None:

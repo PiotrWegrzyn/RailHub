@@ -14,9 +14,12 @@ it covers is kept, so the map can hide it behind raised ground in front of it
 
 import itertools
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Protocol, Self
 
 import numpy as np
+import numpy.typing as npt
 from PIL import Image, ImageDraw
 
 from railroads.sim.constructions import Constructions, Track, TrackWidth
@@ -60,6 +63,8 @@ STEP = 1 / 12
 # How many times finer than shown, each way, track is drawn before it is averaged down, by the
 # resolution it is shown at: enough to smooth it, without drawing a huge picture up close.
 SMOOTHING = {1: 4, 2: 2}
+# How wide a rail is, in art pixels, though never narrower than a pixel shown.
+RAIL_WIDTH = 0.25
 # How many pieces of track are kept laid out, with where they land in the picture and how far
 # they are lifted, before all are forgotten and laid out again as they are drawn: more than the
 # chunks round a view of a busy railway draw, and few enough that a big railway's pieces do not
@@ -100,7 +105,7 @@ WIRE: RGB = (40, 40, 46)
 
 
 def _lay_guideway(
-    paint: ImageDraw.ImageDraw, lanes: list[Path], lifts: list[float], cell: float, line: int
+    paint: Canvas, lanes: list[Path], lifts: list[float], cell: float, line: int
 ) -> None:
     """Maglev track: a pale concrete beam with darker edges and a groove down its middle where
     rails and sleepers would be."""
@@ -143,7 +148,12 @@ def _raised_strip(path: Path, lifts: list[float], left: float, right: float | No
     """`_strip` laid out flat along the path and then lifted point by point, so it keeps to the
     same side of the path however steeply the lifts carry it up or down the picture."""
     right = -left if right is None else right
-    return _raised(_offset(path, left), lifts) + _raised(_offset(path, right), lifts)[::-1]
+    return _Strip(_raised(_offset(path, left), lifts) + _raised(_offset(path, right), lifts)[::-1])
+
+
+class _Strip(list[Point]):
+    """The outline of a strip along a path: its points along one side, then back along the
+    other, which the graphics card fills as the quads between the two sides."""
 
 
 def _bend(start: Point, middle: Point, end: Point, matrix: FloatArray, radius: float) -> Path:
@@ -440,12 +450,7 @@ class TrackArt:
         k = resolution
         smoothing = SMOOTHING.get(k, 1)
         s = k * smoothing
-        reach = PIXEL_CELL_WIDTH * 2
-        below = MOST_LIFT if lifted else 0
-        near = (left - reach, top - reach, left + width + reach, top + height + reach + below)
-        laid = [self._laid(piece) for piece in pieces if self._near(piece.cell, near)]
-        if stations:
-            laid += self._through_stations(near)
+        laid = self._laid_near(pieces, left, top, width, height, stations, lifted)
         if not laid:
             empty = np.zeros((height * k, width * k, 4), dtype=np.float32)
             return empty, np.zeros((height * k, width * k), dtype=np.float32)
@@ -458,6 +463,68 @@ class TrackArt:
             ImageDraw.Draw(shadow),
             ImageDraw.Draw(heights),
         )
+        self._lay_out(paint, shade, measure, laid, left, top, s, smoothing, lifted)
+        return _averaged(picture, shadow, smoothing), _highest(heights, smoothing)
+
+    def shapes(
+        self,
+        pieces: list[Track],
+        left: int,
+        top: int,
+        width: int,
+        height: int,
+        scale: int,
+        quality: int,
+        lifted: bool,
+        stations: bool = True,
+    ) -> TrackShapes | None:
+        """The same track as `layer`, or as `lifted` with `lifted`, as triangles for the graphics
+        card to draw (TrackShapes), laid out `scale` pixels to an art pixel and `quality` times
+        finer still, to be averaged down as the CPU averages its picture; None if no track lies
+        near."""
+        laid = self._laid_near(pieces, left, top, width, height, stations, lifted)
+        if not laid:
+            return None
+        shapes = _Recorder()
+        s = scale * quality
+        self._lay_out(shapes, shapes.shadow, shapes.heights, laid, left, top, s, quality, lifted)
+        return shapes.shapes(scale, quality)
+
+    def _laid_near(
+        self,
+        pieces: list[Track],
+        left: int,
+        top: int,
+        width: int,
+        height: int,
+        stations: bool,
+        lifted: bool,
+    ) -> list[_Laid]:
+        """The pieces, and with `stations` the track through stations, that can show over the
+        art pixels from `left`, `top` across `width` by `height`."""
+        reach = PIXEL_CELL_WIDTH * 2
+        below = MOST_LIFT if lifted else 0
+        near = (left - reach, top - reach, left + width + reach, top + height + reach + below)
+        laid = [self._laid(piece) for piece in pieces if self._near(piece.cell, near)]
+        if stations:
+            laid += self._through_stations(near)
+        return laid
+
+    def _lay_out(
+        self,
+        paint: Canvas,
+        shade: Canvas,
+        measure: Canvas,
+        laid: list[_Laid],
+        left: int,
+        top: int,
+        s: int,
+        smoothing: int,
+        lifted: bool,
+    ) -> None:
+        """Draws the laid pieces `s` pixels to an art pixel from (`left`, `top`): the track with
+        `paint`, its shadow with `shade` and, raised, how far each stretch is lifted with
+        `measure`; `smoothing` pixels make one shown."""
         cell = PIXEL_CELL_WIDTH * s
         raise_up = lifted and self.elevation is not None
 
@@ -498,16 +565,16 @@ class TrackArt:
                 for lane in lanes:
                     bed = _raised_strip(lane, lifts, TRACK_BED / 2 * cell)
                     paint.polygon(bed, fill=(*GRAVEL, 255))
+        rail = max(smoothing, round(RAIL_WIDTH * s))
         for each, _, lanes, lifts in ground:
             if each.piece.maglev:
-                _lay_guideway(paint, lanes, lifts, cell, smoothing)
+                _lay_guideway(paint, lanes, lifts, cell, rail)
         for _, _, lanes, lifts in railed:
             for lane in lanes:
                 for sleeper in _sleepers(lane, lifts, cell):
                     paint.polygon(sleeper, fill=(*SLEEPER, 255))
-        rail = smoothing
         rails = [
-            _crisp(_raised(_offset(lane, side), lifts), smoothing)
+            _crisp(_raised(_offset(lane, side), lifts), smoothing, rail)
             for _, _, lanes, lifts in railed
             for lane in lanes
             for side in (-GAUGE / 2 * cell, GAUGE / 2 * cell)
@@ -523,11 +590,10 @@ class TrackArt:
         for each, line, lanes, lifts in ground:
             if each.piece.electric:
                 self._hang_wires(paint, line, lanes, lifts, cell, s)
-        return _averaged(picture, shadow, smoothing), _highest(heights, smoothing)
 
     def _measure(
         self,
-        measure: ImageDraw.ImageDraw,
+        measure: Canvas,
         laid: _Laid,
         line: Path,
         lanes: list[Path],
@@ -696,7 +762,7 @@ class TrackArt:
 
     def _lay_deck(
         self,
-        paint: ImageDraw.ImageDraw,
+        paint: Canvas,
         lanes: list[Path],
         lifts: list[float],
         cell: float,
@@ -714,7 +780,7 @@ class TrackArt:
 
     def _lay_platform(
         self,
-        paint: ImageDraw.ImageDraw,
+        paint: Canvas,
         line: Path,
         lanes: list[Path],
         lifts: list[float],
@@ -762,7 +828,7 @@ class TrackArt:
 
     def _hang_wires(
         self,
-        paint: ImageDraw.ImageDraw,
+        paint: Canvas,
         line: Path,
         lanes: list[Path],
         lifts: list[float],
@@ -821,7 +887,7 @@ def _arch(portal: _Portal, s: int, inset: float = 0.0) -> Path:
     return [(x - half, y), *top, (x + half, y)]
 
 
-def _lay_portal(paint: ImageDraw.ImageDraw, portal: _Portal, s: int) -> None:
+def _lay_portal(paint: Canvas, portal: _Portal, s: int) -> None:
     """A stone arch round a dark opening, lit along its top."""
     stone = max(portal.half * 0.3, float(s))
     outline = _arch(portal, s)
@@ -830,16 +896,18 @@ def _lay_portal(paint: ImageDraw.ImageDraw, portal: _Portal, s: int) -> None:
     paint.polygon(_arch(portal, s, stone), fill=(*PORTAL_DARK, 255))
 
 
-def _crisp(rail: Path, smoothing: int) -> Path:
-    """A rail running straight across or down the picture moved by less than a pixel onto the
-    middle of the row or column of pixels it is shown on, so it shows as one bright line instead
-    of two dim ones where it would straddle two."""
+def _crisp(rail: Path, smoothing: int, width: int | None = None) -> Path:
+    """A rail running straight across or down the picture moved by less than a pixel so its
+    edges lie between the rows or columns of pixels it is shown on, `width` of the picture's
+    pixels wide (`smoothing` of them to a pixel shown): one shown pixel wide, it lies on the middle
+    of one, so it shows as one bright line instead of two dim ones where it would straddle two."""
+    wider = 0 if width is None else width - smoothing
     for axis in (1, 0):
         across = [point[axis] for point in rail]
         if max(across) - min(across) > smoothing * STRAIGHT_WITHIN:
             continue
         mean = sum(across) / len(across)
-        shift = (math.floor(mean / smoothing) + 0.5) * smoothing - mean
+        shift = (math.floor((mean - wider / 2) / smoothing) + 0.5) * smoothing + wider / 2 - mean
         if axis:
             return [(x, y + shift) for x, y in rail]
         return [(x + shift, y) for x, y in rail]
@@ -925,3 +993,203 @@ def _averaged(picture: Image.Image, shadow: Image.Image, smoothing: int) -> Floa
     top, left = y0 // smoothing, x0 // smoothing
     out[top : top + h, left : left + w] = coarse.transpose(1, 2, 0)
     return out
+
+
+class Canvas(Protocol):
+    """What track art draws with: a picture's ImageDraw, or a _Recorder of triangles."""
+
+    def polygon(
+        self,
+        xy: Sequence[Point],
+        fill: float | tuple[int, ...] | None = None,
+        outline: tuple[int, ...] | None = None,
+        width: int = 1,
+    ) -> None: ...
+
+    def line(
+        self,
+        xy: Sequence[Point],
+        fill: tuple[int, ...] | None = None,
+        width: int = 0,
+        joint: str | None = None,
+    ) -> None: ...
+
+
+# How many floats each vertex of the track's triangles holds: where it lies, then its colour.
+TRIANGLE_FLOATS = 6
+# How many floats each vertex of the triangles marking how far track is lifted holds: where it
+# lies, then the lift.
+LIFT_FLOATS = 3
+
+
+@dataclass(frozen=True)
+class TrackShapes:
+    """Track as triangles for the graphics card (TrackArt.shapes), laid out `scale` pixels to an
+    art pixel and `quality` times finer still from the corner of the chunk: its shadow and then
+    the track itself, each vertex with its colour, from 0 to 1, in the order they are drawn, and
+    triangles marking how far each stretch is lifted, in art pixels, over all it can cover."""
+
+    triangles: npt.NDArray[np.float32]
+    lifts: npt.NDArray[np.float32]
+    scale: int
+    quality: int
+
+    def packed(self) -> npt.NDArray[np.uint8]:
+        """The shapes as bytes in the form of a chunk's pixels, rows of one pixel of four bytes,
+        to go wherever drawn chunks go (railroads.ui.pixel.copies)."""
+        head = np.array(
+            [len(self.triangles), len(self.lifts), self.scale, self.quality], dtype=np.float32
+        )
+        floats = np.concatenate([head, self.triangles.ravel(), self.lifts.ravel()])
+        return floats.astype(np.float32).view(np.uint8).reshape(-1, 1, 4)
+
+    @classmethod
+    def unpacked(cls, packed: npt.NDArray[np.uint8]) -> Self:
+        floats = np.ascontiguousarray(packed).reshape(-1).view(np.float32)
+        triangles, lifts, scale, quality = (int(v) for v in floats[:4])
+        at = 4 + triangles * TRIANGLE_FLOATS
+        return cls(
+            floats[4:at].reshape(-1, TRIANGLE_FLOATS),
+            floats[at : at + lifts * LIFT_FLOATS].reshape(-1, LIFT_FLOATS),
+            scale,
+            quality,
+        )
+
+
+def no_track() -> npt.NDArray[np.uint8]:
+    """Shapes (TrackShapes.packed) of a chunk with no track."""
+    empty = np.zeros((0, 1), dtype=np.float32)
+    return TrackShapes(empty, empty, 0, 0).packed()
+
+
+class _Recorder:
+    """A canvas recording what track art draws as triangles (TrackShapes): its own drawing,
+    `shadow`'s and `heights`'."""
+
+    def __init__(self) -> None:
+        self._shadow: list[float] = []
+        self._track: list[float] = []
+        self._lifts: list[float] = []
+        self.shadow = _Marks(self._shadow, None)
+        self.heights = _Marks(self._lifts, 0.0)
+
+    def polygon(
+        self,
+        xy: Sequence[Point],
+        fill: float | tuple[int, ...] | None = None,
+        outline: tuple[int, ...] | None = None,
+        width: int = 1,
+    ) -> None:
+        if outline is not None:
+            _coloured(self._track, _triangles(xy), outline)
+            xy = _inset(xy, width)
+        assert isinstance(fill, tuple)
+        _coloured(self._track, _triangles(xy), fill)
+
+    def line(
+        self,
+        xy: Sequence[Point],
+        fill: tuple[int, ...] | None = None,
+        width: int = 0,
+        joint: str | None = None,
+    ) -> None:
+        assert fill is not None
+        _coloured(self._track, _wide_line(xy, width, joint == "curve"), fill)
+
+    def shapes(self, scale: int, quality: int) -> TrackShapes:
+        shadow = np.array(self._shadow, dtype=np.float32).reshape(-1, 2)
+        dark = np.zeros((len(shadow), 4), dtype=np.float32)
+        dark[:, 3] = SHADOW
+        track = np.array(self._track, dtype=np.float32).reshape(-1, TRIANGLE_FLOATS)
+        triangles = np.concatenate([np.hstack([shadow, dark]), track])
+        lifts = np.array(self._lifts, dtype=np.float32).reshape(-1, LIFT_FLOATS)
+        return TrackShapes(triangles, lifts, scale, quality)
+
+
+class _Marks:
+    """A canvas recording only where polygons lie, as triangles, each vertex with the polygon's
+    fill when `valued` is not None."""
+
+    def __init__(self, into: list[float], valued: float | None) -> None:
+        self._into = into
+        self._valued = valued
+
+    def polygon(
+        self,
+        xy: Sequence[Point],
+        fill: float | tuple[int, ...] | None = None,
+        outline: tuple[int, ...] | None = None,
+        width: int = 1,
+    ) -> None:
+        del outline, width
+        for x, y in _triangles(xy):
+            self._into += (x, y) if self._valued is None else (x, y, float(fill or 0.0))
+
+    def line(
+        self,
+        xy: Sequence[Point],
+        fill: tuple[int, ...] | None = None,
+        width: int = 0,
+        joint: str | None = None,
+    ) -> None:
+        raise NotImplementedError
+
+
+def _coloured(into: list[float], points: list[Point], fill: tuple[int, ...]) -> None:
+    r, g, b, a = (v / 255 for v in fill)
+    for x, y in points:
+        into += (x, y, r, g, b, a)
+
+
+def _triangles(xy: Sequence[Point]) -> list[Point]:
+    """The corners of triangles filling a polygon: a strip (_Strip) as the quads between its two
+    sides, any other polygon, which track art draws only convex, as a fan."""
+    points = list(xy)
+    triangles: list[Point] = []
+    if isinstance(xy, _Strip):
+        half = len(points) // 2
+        side, other = points[:half], points[half:][::-1]
+        for i in range(half - 1):
+            a, b, c, d = side[i], side[i + 1], other[i + 1], other[i]
+            triangles += (a, b, c, a, c, d)
+        return triangles
+    for i in range(1, len(points) - 1):
+        triangles += (points[0], points[i], points[i + 1])
+    return triangles
+
+
+def _wide_line(xy: Sequence[Point], width: float, joined: bool) -> list[Point]:
+    """The corners of triangles drawing a line `width` wide along the points, its stretches
+    joined across the outside of each bend where `joined`."""
+    half = width / 2
+    triangles: list[Point] = []
+    normals: list[tuple[Point, Point] | None] = []
+    for (x0, y0), (x1, y1) in itertools.pairwise(xy):
+        length = math.hypot(x1 - x0, y1 - y0)
+        if length == 0:
+            continue
+        nx, ny = -(y1 - y0) / length * half, (x1 - x0) / length * half
+        a, b = (x0 + nx, y0 + ny), (x1 + nx, y1 + ny)
+        c, d = (x1 - nx, y1 - ny), (x0 - nx, y0 - ny)
+        triangles += (a, b, c, a, c, d)
+        normals.append(((x1, y1), (nx, ny)))
+    if joined:
+        for before, after in itertools.pairwise(normals):
+            assert before is not None and after is not None
+            (x, y), (n0x, n0y) = before
+            n1x, n1y = after[1]
+            triangles += ((x, y), (x + n0x, y + n0y), (x + n1x, y + n1y))
+            triangles += ((x, y), (x - n0x, y - n0y), (x - n1x, y - n1y))
+    return triangles
+
+
+def _inset(xy: Sequence[Point], by: float) -> list[Point]:
+    """A convex polygon with each side moved `by` inwards."""
+    points = list(xy)
+    area = sum(
+        x0 * y1 - x1 * y0
+        for (x0, y0), (x1, y1) in zip(points, points[1:] + points[:1], strict=True)
+    )
+    closed = [points[-1], *points, points[0]]
+    moved = _offset(closed, by if area > 0 else -by)
+    return moved[1:-1]
