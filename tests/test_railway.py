@@ -429,7 +429,7 @@ def test_passengers_pay_on_arrival_and_go_on_their_way() -> None:
     assert Good.PASSENGERS not in railway.station_goods((6, 20)).brought
 
 
-def test_a_station_rises_through_five_levels_for_50k_250k_1_5m_and_10m_each_reaching_further() -> (
+def test_a_station_rises_through_five_levels_for_50k_250k_1_5m_and_10m_reaching_further_to_3() -> (
     None
 ):
     _, railway = joined_stations()
@@ -440,7 +440,7 @@ def test_a_station_rises_through_five_levels_for_50k_250k_1_5m_and_10m_each_reac
         railway.upgrade((6, 20))
         reaches.append(railway.reach((6, 20)))
 
-    assert reaches == [(1, 3), (2, 4), (3, 5), (4, 6), (5, 7), (5, 7)]
+    assert reaches == [(1, 3), (2, 4), (3, 5), (3, 5), (3, 5), (3, 5)]
     assert railway.finances.cash == 12_000_000.0 - 11_800_000.0
     assert railway.upgrade_price((6, 20)) is None
 

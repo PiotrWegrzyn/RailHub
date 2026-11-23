@@ -32,6 +32,8 @@ railroads.sim.station_goods, the way along the track in railroads.sim.track_netw
 train does calling at a station in railroads.sim.calls; Railway owns them all and runs the trains.
 """
 
+import itertools
+import math
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -132,6 +134,17 @@ LEVEL_STORAGE_STEPS = 2
 # From this level up, each level lets a station have one more platform beside it, with its own way
 # through, so lines come in from more sides.
 PLATFORM_LEVEL = 4
+# The level from which a station reaches no further: each level above adds a platform, up to
+# PLATFORM_REACH cells away, which reaches as far round it.
+REACH_LEVEL = 3
+PLATFORM_REACH = 2
+# Within how many cells of the end of its path, about its last few blocks, the way set for a
+# train must come before it looks again for the quickest platform of the station it is bound for, as it also does every
+# PLATFORM_WAIT months it waits at a signal; and how many cells longer a way counts for each cell
+# of it another train holds.
+PLATFORM_CHOICE = 10.0
+PLATFORM_WAIT = 0.02
+HELD_WAY_COST = 4.0
 # The era of the boards from which quadruple track can be laid: the first lines of four tracks
 # came in the 1870s to 1890s.
 QUADRUPLE_ERA = 3
@@ -700,8 +713,10 @@ class Railway:
         return self.levels.get(station, 1)
 
     def reach(self, station: Cell) -> tuple[int, int]:
-        """How many cells out a station hands goods out to, and gathers them from."""
-        return self.reach_at(self.level(station))
+        """How many cells out a station hands goods out to, and gathers them from, round it and
+        each of its platforms: as far as at its level, but no further than at REACH_LEVEL, as the
+        levels above add platforms instead."""
+        return self.reach_at(min(self.level(station), REACH_LEVEL))
 
     @staticmethod
     def reach_at(level: int) -> tuple[int, int]:
@@ -876,6 +891,7 @@ class Railway:
         wanted = train.along + (
             months * CELLS_PER_MONTH * self.network.speed_at(train) * self.pull(train) * speed
         )
+        self._choose_platform(train, signals)
         ask = self.asks + 1
         holder = signals.let_on(train, ask, wanted)
         if train.asked == ask:
@@ -916,6 +932,61 @@ class Railway:
             train.waited = 0.0
             train.first = False
 
+    def _choose_platform(self, train: Train, signals: Signals) -> None:
+        """Takes the quickest way on to the station the train is bound for, if it has more than
+        one platform: looked for again as the way set for it comes within PLATFORM_CHOICE cells
+        of the end of its path, and each PLATFORM_WAIT months it waits at a signal, from the end
+        of the way set for it, a way counting HELD_WAY_COST cells longer for each cell of it
+        another train holds."""
+        blocked = bool(train.giving_way)
+        length = self.network.length(train)
+        if length - train.cleared > PLATFORM_CHOICE and not blocked:
+            return
+        check = (round(train.cleared, 6), int(train.waited / PLATFORM_WAIT) if blocked else -1)
+        if train.platform_check == check:
+            return
+        train.platform_check = check
+        there = train.stops[train.heading % len(train.stops)].cell
+        cells = self.constructions.station_cells(self.constructions.main_station(there) or there)
+        if len(cells) < 2:
+            return
+        path = train.path
+        ends = self.network.ends(train)
+        at = next(
+            (
+                k
+                for k in range(len(path) - 1)
+                if ends[k] >= train.cleared - 1e-6
+                and not self.network.passing(_middle(path[k], path[k + 1]))[0]
+            ),
+            None,
+        )
+        if at is None or ends[at] > train.cleared + 1e-6 and train.cleared > 0:
+            return
+        a = path[at]
+        cell = self.network.cell_at(_middle(a, path[at + 1]))
+        entry = self.network.entry_point(cell, a)
+        engine = ENGINES[train.engine]
+        best: tuple[float, Cell, tuple[list[Point], list[float]]] | None = None
+        for target in cells:
+            way = self.network.way_on(cell, entry, target, engine.electric, engine.maglev)
+            if way is None:
+                continue
+            points = way[0]
+            crossed = {
+                self.network.cell_at(_middle(p, q)) for p, q in itertools.pairwise(points)
+            } - set(cells)
+            cost = sum(math.dist(p, q) for p, q in itertools.pairwise(points))
+            cost += HELD_WAY_COST * signals.held_by_others(train, crossed)
+            if best is None or cost < best[0]:
+                best = (cost, target, way)
+        if best is None or best[1] == self.network.cell_at(path[-1]):
+            return
+        points, speeds = best[2]
+        train.path = path[: at + 1] + points
+        train.speeds = train.speeds[:at] + [self.network.speed_in(cell)] + speeds
+        train.claims_for = train.path
+
     def position(self, train: Train, back: float = 0.0) -> tuple[Point, Point] | None:
         """Where the train is on the map, and which way it faces (TrackNetwork.position)."""
         return self.network.position(train, back)
@@ -941,3 +1012,7 @@ class Railway:
             train.move(move)
         self.network = TrackNetwork(self.constructions)
         growth.station_trade.update_reach()
+
+
+def _middle(a: Point, b: Point) -> Point:
+    return ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)

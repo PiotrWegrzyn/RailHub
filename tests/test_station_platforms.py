@@ -1,3 +1,5 @@
+import pytest
+
 from builders import flat_map
 from railroads.sim.constructions import Constructions
 from railroads.sim.demolition import bulldoze
@@ -6,6 +8,7 @@ from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import add_platform, build_station, lay_route, plan_route
+from railroads.sim.signals import Signals
 from railroads.sim.trains import Stop
 
 WEST, HUB, NORTH = (8, 3), (8, 12), (1, 12)
@@ -39,16 +42,17 @@ def test_a_station_gets_one_platform_at_level_4_and_two_at_level_5() -> None:
     assert counts == [0, 1, 2]
 
 
-def test_a_platform_goes_only_in_a_cell_beside_its_station() -> None:
+def test_a_platform_goes_only_in_a_cell_up_to_two_cells_from_its_station() -> None:
     growth, _ = junction()
+    two_away = next(c for c, steps in growth.grid.within(HUB, 2).items() if steps == 2)
 
     far = add_platform(growth, HUB, (4, 12))
-    beside = add_platform(growth, HUB, platform_cell(growth))
+    near = add_platform(growth, HUB, two_away)
 
     assert far is None
-    assert beside is not None
-    assert growth.constructions.platforms(HUB) == [platform_cell(growth)]
-    assert growth.constructions.main_station(platform_cell(growth)) == HUB
+    assert near is not None
+    assert growth.constructions.platforms(HUB) == [two_away]
+    assert growth.constructions.main_station(two_away) == HUB
     assert growth.constructions.stations() == sorted([WEST, HUB, NORTH])
 
 
@@ -125,3 +129,27 @@ def test_the_reach_of_a_station_with_platforms_counts_each_cell_from_the_nearest
     flat = growth.grid.cols * platform[0] + platform[1]
     assert steps[flat] == 0.0
     assert len(steps) == len(set(within.cells.tolist()))
+
+
+def test_a_train_bound_for_a_station_takes_its_other_platform_when_the_way_to_one_is_held(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    growth, railway = junction()
+    platform = (10, 12)
+    assert add_platform(growth, HUB, platform) is not None
+    branch = plan_route(growth.constructions, WEST, platform)
+    assert branch is not None
+    lay_route(growth, branch)
+    by_branch = set(branch.cells)
+    monkeypatch.setattr(
+        Signals,
+        "held_by_others",
+        lambda _, __, cells: sum(1 for cell in cells if cell not in by_branch),
+    )
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop(WEST, wait_for_load=False), Stop(HUB, wait_for_load=False)]
+
+    railway.run(1e-4)
+
+    assert railway.network.cell_at(train.path[-1]) == platform

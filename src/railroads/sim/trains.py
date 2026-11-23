@@ -937,6 +937,10 @@ class Train:
     # Whether the player put it first in every queue for the way on until it reaches its next
     # stop.
     first: bool = False
+    # How far the way set for it reached, and how many spells it had waited at a signal, when it
+    # last looked for the quickest platform of the station it is bound for
+    # (railroads.sim.railway.Railway._choose_platform).
+    platform_check: tuple[float, int] = (-1.0, -1)
     # Whether it set off from a station whose engine shed had its coal, and whose sand tower had
     # its sand, this month (railroads.sim.facilities).
     fuelled: bool = False

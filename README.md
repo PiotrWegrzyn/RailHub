@@ -1143,12 +1143,15 @@ slow one. A station on quadruple track has four tracks through it round two isla
 two tracks each way either side of one, the outer tracks opening out to make room. A station costs $15,000 and the Planet $10,000, which
 sells back for half. Stations rise through five levels, for $50,000, $250,000, $1,500,000 and
 $10,000,000: a new one hands goods out a cell around it, and each level a cell further, gathers
-them a cell further and adds as much room as two storage upgrades. At level 4 a station gets a
-second platform and at level 5 a third: raising it there asks where the new one goes, in a free cell
-beside the station or its other platforms, with its own way through that Q turns, for what clearing
-the cell costs, and the station window offers it again until it is built. Lines then come into the
-station from more sides; trains cross between platforms beside each other inside the station, reach
-it at whichever platform their way comes to first and set off again from there. Platforms go with
+them a cell further and adds as much room as two storage upgrades. A station reaches no further
+than at level 3: at level 4 it gets a second platform instead and at level 5 a third, raising it
+there asks where the new one goes, in a free cell up to 2 cells from the station, with its own way
+through that Q turns, for what clearing the cell costs, and the station window offers it again
+until it is built. Track is laid to a platform as to any station. The station serves trains at all
+its platforms as one, with one stockpile, handing goods out and gathering them as far round each
+platform as round itself; trains cross between platforms beside each other inside the station,
+and over the last few blocks of their way take whichever platform they reach quickest, passing
+over one whose way another train holds, and set off again from there. Platforms go with
 their station when it is bulldozed or moved. A station hands goods out and gathers them around
 every platform as well as its own cell. Level 4 is drawn as a junction station between two clock
 towers under a long glass shed, level 5 as a central station with a tall clock tower and three

@@ -19,7 +19,7 @@ from railroads.sim.facilities import (
 from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.finance import STATION_PRICE
 from railroads.sim.grids import Cell
-from railroads.sim.railway import MAX_LEVEL, Railway
+from railroads.sim.railway import MAX_LEVEL, PLATFORM_REACH, REACH_LEVEL, Railway
 from railroads.sim.station_goods import STORAGE_STEP, WAITING_STEP
 from railroads.sim.station_trade import StationPreview
 from railroads.sim.trains import amount_of
@@ -138,7 +138,12 @@ class StationWindow:
             imgui.text_disabled("At the top level")
         else:
             label = f"{fa.ICON_FA_ARROW_UP}  Level {level + 1}  {dollars(price)}"
-            detail = f"Hands out within {delivery + 1} cells, gathers within {collection + 1}"
+            detail = (
+                f"Hands out within {delivery + 1} cells, gathers within {collection + 1}"
+                if level < REACH_LEVEL
+                else f"A platform more, up to {PLATFORM_REACH} cells away, handing out and "
+                f"gathering as far round it as the station does"
+            )
             affordable = railway.finances.can_afford(price)
             if _priced_button(label, affordable, detail) and railway.upgrade(station):
                 upgraded(station)

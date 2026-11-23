@@ -295,6 +295,12 @@ class Signals:
         for train in loose:
             self._take_ground(train)
 
+    def held_by_others(self, train: Train, cells: Iterable[Cell]) -> int:
+        """How many of these cells another train holds track in."""
+        return sum(
+            any(other is not train for other, *_ in self._held.get(cell, ())) for cell in cells
+        )
+
     def _hold(self, train: Train, claim: Claim) -> None:
         cell, entry, exit_, start, _, soft, lane = claim
         if not soft:

@@ -9,6 +9,7 @@ from imgui_bundle import imgui
 
 from railroads.sim.constructions import Track
 from railroads.sim.grids import Cell
+from railroads.sim.railway import PLATFORM_REACH
 from railroads.sim.routes import Route, plan_route_steps, route_price, station_way
 from railroads.sim.steps import Steps, finish
 from railroads.ui.build_menu import PRICED_TOOLS, STATION_TOOLS, Tool
@@ -135,7 +136,9 @@ class MapTools:
         build = self._view.build
         build.choose(Tool.ADD_PLATFORM)
         build.moving = station
-        build.say("Click a free cell beside the station for its new platform; Q turns it.")
+        build.say(
+            f"Click a free cell up to {PLATFORM_REACH} cells from the station for its new platform; Q turns it."
+        )
 
     def start_moving(self, station: Cell) -> None:
         """Lets the next click choose where a station goes."""

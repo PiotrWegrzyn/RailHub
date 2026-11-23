@@ -26,7 +26,7 @@ from railroads.sim.growth import Growth
 from railroads.sim.happenings import Happenings, Headline
 from railroads.sim.lots import Lots
 from railroads.sim.move import Move
-from railroads.sim.railway import MAX_LEVEL, PLATFORM_LEVEL, QUADRUPLE_ERA, Railway
+from railroads.sim.railway import MAX_LEVEL, PLATFORM_LEVEL, PLATFORM_REACH, QUADRUPLE_ERA, Railway
 from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
 from railroads.sim.summaries import MonthSummary, Reach, summarize
@@ -252,7 +252,9 @@ class Game:
             return Outcome(short)
         changed = routes.add_platform(self.growth, station, cell, ends)
         if not changed:
-            return Outcome("A platform goes in a free cell beside the station.")
+            return Outcome(
+                f"A platform goes in a free cell up to {PLATFORM_REACH} cells from the station."
+            )
         if site:
             self.finances.spend(site, "demolition")
         price = f" for {dollars(site)}" if site else ""

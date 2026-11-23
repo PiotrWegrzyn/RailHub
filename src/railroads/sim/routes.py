@@ -41,7 +41,7 @@ from railroads.sim.demolition import (
 from railroads.sim.finance import track_price
 from railroads.sim.grids import Cell, Grid
 from railroads.sim.growth import Growth
-from railroads.sim.railway import Railway
+from railroads.sim.railway import PLATFORM_REACH, Railway
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Relief, Terrain, Tile
 from railroads.sim.track_rules import TrackBed, track_rules_for
@@ -266,16 +266,13 @@ def build_station(
 def add_platform(
     growth: Growth, station: Cell, cell: Cell, ends: tuple[int, int] | None = None
 ) -> set[Cell] | None:
-    """Adds a platform to a station in a cell beside it or beside one of its platforms, its
-    track running between `ends`, clearing the cell as a new station would; None if it cannot go
+    """Adds a platform to a station in a free cell up to PLATFORM_REACH cells from it, its track
+    running between `ends`, clearing the cell as a new station would; None if it cannot go
     there."""
     constructions = growth.constructions
     if constructions.station_at(station) is None or constructions.main_station(station) != station:
         return None
-    beside = {
-        near for own in constructions.station_cells(station) for near in growth.grid.within(own, 1)
-    }
-    if cell not in beside:
+    if cell not in growth.grid.within(station, PLATFORM_REACH):
         return None
     changed = build_station(growth, cell, ends)
     if changed is None:

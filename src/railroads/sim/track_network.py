@@ -145,16 +145,46 @@ class TrackNetwork:
         )
 
     def _find_way(self, start: Cell, end: Cell, electric: bool, maglev: bool) -> Way | None:
-        self._find_exits()
         constructions = self.constructions
-        grid = constructions.tile_map.grid
-        lengths = [float(math.hypot(*step)) for step in grid.track_steps()]
         arrivals = set(constructions.station_cells(constructions.main_station(end) or end))
+        return self._search(start, None, arrivals, electric, maglev)
+
+    def way_on(
+        self, cell: Cell, entry: int, arrival: Cell, electric: bool = False, maglev: bool = False
+    ) -> Way | None:
+        """The way on for a train coming into a cell of track by this point, to one station cell
+        or platform: its points from the middle of the cell on, and the speed on each stretch
+        between them; None without track that leads there."""
+        return self._search(cell, entry, {arrival}, electric, maglev)
+
+    def entry_point(self, cell: Cell, point: Point) -> int:
+        """The track point of a cell a point on its edge, as on a train's path, lies at."""
+        grid = self.constructions.tile_map.grid
+        cx, cy = grid.center(*cell)
+        offsets = grid.track_steps() / 2
+        gaps = np.hypot(cx + offsets[:, 0] - point[0], cy + offsets[:, 1] - point[1])
+        return int(np.argmin(gaps))
+
+    def speed_in(self, cell: Cell) -> float:
+        """How fast trains run through a cell, as a share of their speed."""
+        return self._speed(cell)
+
+    def _search(
+        self,
+        start: Cell,
+        start_entry: int | None,
+        arrivals: set[Cell],
+        electric: bool,
+        maglev: bool,
+    ) -> Way | None:
+        self._find_exits()
+        grid = self.constructions.tile_map.grid
+        lengths = [float(math.hypot(*step)) for step in grid.track_steps()]
         counter = itertools.count()
         # Each step taken: the step before it (-1 for none), the cell and the point left by.
         taken: list[tuple[int, Cell, int]] = []
         frontier: list[tuple[float, int, Cell, int | None, int]] = [
-            (0.0, next(counter), start, None, -1)
+            (0.0, next(counter), start, start_entry, -1)
         ]
         seen: set[tuple[Cell, int | None]] = set()
         while frontier:

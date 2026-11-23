@@ -34,7 +34,7 @@ from railroads.sim.finance import (
 )
 from railroads.sim.grids import Cell, FloatArray, Grid
 from railroads.sim.points import Points
-from railroads.sim.railway import QUADRUPLE_ERA
+from railroads.sim.railway import PLATFORM_REACH, QUADRUPLE_ERA
 from railroads.sim.routes import Route
 from railroads.sim.tilemap import Relief
 from railroads.sim.track_rules import (
@@ -127,7 +127,7 @@ HINTS = {
         f"{dollars(STATION_REMOVAL)}. One-off buildings stay. Right click cancels."
     ),
     Tool.ADD_PLATFORM: (
-        "Click a free cell beside the station for its new platform; Q turns its track. Clearing "
+        f"Click a free cell up to {PLATFORM_REACH} cells from the station for its new platform; Q turns its track. Clearing "
         "the cell costs what the buildings there cost to take down. Right click cancels."
     ),
     Tool.MOVE_STATION: (
