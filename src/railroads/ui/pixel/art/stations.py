@@ -11,9 +11,13 @@ Models are in cells: u along the track, v across it towards the track, z up."""
 
 import math
 from collections.abc import Callable
+from functools import partial
+
+import numpy as np
 
 from railroads.ui.pixel.art.built import (
     HEADING,
+    PROJECTION,
     chimney,
     cornice,
     dome,
@@ -52,9 +56,6 @@ VALANCE: RGB = (236, 230, 214)
 PLATFORM_STONE: RGB = (178, 172, 160)
 CLOCK: RGB = (246, 242, 230)
 PANE: RGB = (64, 78, 100)
-# How far in front of where a station house stands the back of its platform lies, in cells: the
-# house stands set back from its track (railroads.ui.pixel.track_art.SET_BACK) past the platform.
-PLATFORM_BACK = 0.15
 # How wide a station's shadow is beside its footprint: its long low wings cast less than a tall
 # building's.
 SHADOW = 0.6
@@ -259,15 +260,6 @@ def clock(m: Model, u: float, v: float, z: float, half: float = 0.014) -> None:
         m.panel((u - 0.0015, u + half * 0.6), (z - 0.0015, z + 0.0015), v + 0.0014, IRON)
 
 
-def _by_platform(m: Model, front: float) -> Model:
-    """The model moved across so its front, `front` out from where it stands, meets the back of
-    the platform beside the track."""
-    shift = PLATFORM_BACK - front
-    m.move(0, 0.0, shift)
-    m.footprints = [(u, (v[0] + shift, v[1] + shift)) for u, v in m.footprints]
-    return m
-
-
 def block(
     m: Model,
     u: tuple[float, float],
@@ -300,7 +292,7 @@ def wooden_halt() -> Model:
     gable_roof(m, shed_u, shed_v, (shed_high, shed_high + 0.06), shade(SHINGLE, 0.9), TIMBER)
     chimney(m, -0.06, -0.02, (high + 0.04, high + 0.12), BRICK)
     name_board(m, -0.176, 0.0, 0.07)
-    return _by_platform(m, 0.06)
+    return m
 
 
 def brick_station() -> Model:
@@ -322,9 +314,9 @@ def brick_station() -> Model:
     row_of_windows(m, wing_u, wing_v[1], (0.04,), gap=0.055)
     gable_roof(m, wing_u, wing_v, (wing_high, wing_high + 0.06), ROOF_SLATE, STATION_BRICK)
     chimney(m, -0.12, 0.0, (high + 0.04, high + 0.11), STATION_BRICK)
-    canopy(m, (-0.13, 0.13), v[1], 0.08, (high - 0.035, high - 0.01))
+    canopy(m, (-0.13, 0.13), v[1], 0.08, (high - 0.035, high - 0.01), ROOF_SLATE, COLUMN)
     name_board(m, 0.254, 0.0, 0.05)
-    return _by_platform(m, 0.075)
+    return m
 
 
 def town_station() -> Model:
@@ -358,10 +350,10 @@ def town_station() -> Model:
         hip_roof(m, wing_u, wing_v, (wing_high, wing_high + 0.065), TILE, 0.012)
     for at in (-0.2, 0.2):
         chimney(m, at, 0.0, (0.18, 0.25), shade(OCHRE, 0.85))
-    canopy(m, (-0.25, 0.25), 0.075, 0.09, (0.1, 0.125))
+    canopy(m, (-0.25, 0.25), 0.075, 0.09, (0.1, 0.125), TILE, COLUMN)
     name_board(m, -0.324, 0.0, 0.06)
     name_board(m, 0.324, 0.0, 0.06)
-    return _by_platform(m, 0.09)
+    return m
 
 
 def grand_station() -> Model:
@@ -397,8 +389,8 @@ def grand_station() -> Model:
         row_of_windows(m, wing_u, wing_v[1], (0.04, 0.14), tall=0.05, gap=0.045)
         hip_roof(m, wing_u, wing_v, (wing_high, wing_high + 0.08), ROOF_SLATE, 0.012)
         chimney(m, sum(wing_u) / 2, 0.0, (0.26, 0.33), STATION_BRICK)
-    canopy(m, (-0.3, 0.3), 0.08, 0.1, (0.11, 0.14))
-    return _by_platform(m, 0.1)
+    canopy(m, (-0.3, 0.3), 0.08, 0.1, (0.11, 0.14), ROOF_SLATE, COLUMN)
+    return m
 
 
 def terminus() -> Model:
@@ -438,7 +430,7 @@ def terminus() -> Model:
         side = shed_half
         m.box((at - 0.005, at + 0.005), (side - 0.005, side + 0.005), (0.0, 0.1), COLUMN)
     m.move(start, 0.0, shed_v)
-    return _by_platform(m, 0.24)
+    return m
 
 
 def island_platform() -> Model:
@@ -458,25 +450,51 @@ def island_platform() -> Model:
     return m
 
 
-LEVELS: dict[str, Callable[[], Model]] = {
-    "station": wooden_halt,
-    "station_2": brick_station,
-    "station_3": town_station,
-    "station_4": grand_station,
-    "station_5": terminus,
-    "platform": island_platform,
+# Each station's model, and how far out from where it stands its front lies, in cells: the wall
+# or train shed that meets the back of the platform.
+LEVELS: dict[str, tuple[Callable[[], Model], float]] = {
+    "station": (wooden_halt, 0.06),
+    "station_2": (brick_station, 0.075),
+    "station_3": (town_station, 0.09),
+    "station_4": (grand_station, 0.1),
+    "station_5": (terminus, 0.24),
+    "platform": (island_platform, 0.0),
 }
 
 
-def turned(build: Callable[[], Model], line: str) -> Callable[[], Sprite]:
-    """The sprite of a station built by `build`, turned along track running `line`."""
-    return modelled(build, shadow=SHADOW, heading=math.radians(TURNED_LINES[line]))
+def by_platform(build: Callable[[], Model], front: float, heading: float) -> Model:
+    """The station built by `build`, moved across its track so that, seen turned `heading`, its
+    front meets the back of the platform: the house stands set back from its track across the
+    picture, past the bank and the platform (railroads.ui.pixel.track_art, which needs this
+    module's package first), and the cells across the track fill more or less of the picture by
+    the way it runs."""
+    from railroads.ui.pixel.track_art import BANK, PLATFORM_WIDTH, SET_BACK
+
+    m = build()
+    if front == 0.0:
+        return m
+    gap = SET_BACK - BANK / 2 - PLATFORM_WIDTH
+    plane = PROJECTION.matrix
+    along = plane @ (math.cos(heading), math.sin(heading))
+    across = plane @ (-math.sin(heading), math.cos(heading))
+    towards = np.array([-along[1], along[0]]) / float(np.hypot(*along))
+    reach = abs(float(across @ towards))
+    shift = gap * float(np.hypot(*plane[:, 0])) / reach - front
+    m.move(0, 0.0, shift)
+    m.footprints = [(u, (v[0] + shift, v[1] + shift)) for u, v in m.footprints]
+    return m
 
 
-SQUARE_STATIONS = {
-    name: modelled(build, shadow=SHADOW, heading=HEADING) for name, build in LEVELS.items()
-}
+def turned(build: Callable[[], Model], front: float, heading: float) -> Callable[[], Sprite]:
+    """The sprite of a station built by `build`, its front `front` out, turned `heading`
+    radians and standing by its platform."""
+    return modelled(partial(by_platform, build, front, heading), shadow=SHADOW, heading=heading)
+
+
+SQUARE_STATIONS = {name: turned(*level, HEADING) for name, level in LEVELS.items()}
 
 TURNED_STATIONS = {
-    f"{name}_{line}": turned(build, line) for name, build in LEVELS.items() for line in TURNED_LINES
+    f"{name}_{line}": turned(*level, math.radians(heading))
+    for name, level in LEVELS.items()
+    for line, heading in TURNED_LINES.items()
 }

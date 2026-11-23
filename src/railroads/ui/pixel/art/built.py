@@ -81,7 +81,7 @@ def modelled(
             for part in (ground, standing)
             if part.faces
         ]
-        return _shadowed(_stacked(sprites), model, pixels * shadow)
+        return _shadowed(_stacked(sprites), model, pixels, shadow, heading)
 
     return draw
 
@@ -126,9 +126,10 @@ def _stretched(model: Model, across: float, up: float) -> Model:
     return stretched
 
 
-def _shadowed(sprite: Sprite, model: Model, pixels: float) -> Sprite:
-    """The sprite with a soft dark shadow on the ground under it, reaching out to the lower right
-    away from the light, as the painted buildings have."""
+def _shadowed(sprite: Sprite, model: Model, pixels: float, shadow: float, heading: float) -> Sprite:
+    """The sprite with a soft dark shadow `shadow` times as wide as its footprint on the ground
+    under the footprint, seen turned `heading`, reaching out to the lower right away from the
+    light, as the painted buildings have."""
     if model.footprints:
         us = [u for (u0, u1), _ in model.footprints for u in (u0, u1)]
         vs = [v for _, (v0, v1) in model.footprints for v in (v0, v1)]
@@ -139,22 +140,26 @@ def _shadowed(sprite: Sprite, model: Model, pixels: float) -> Sprite:
     if not us:
         return sprite
     reach = max(max(us) - min(us), max(vs) - min(vs))
+    middle_u, middle_v = (min(us) + max(us)) / 2, (min(vs) + max(vs)) / 2
+    cos, sin = math.cos(heading), math.sin(heading)
     scale = PROJECTION.matrix * pixels
-    half_w = float(abs(scale[0, 0]) * reach * 0.62) + 1
+    off_x, off_y = scale @ (middle_u * cos - middle_v * sin, middle_u * sin + middle_v * cos)
+    half_w = float(abs(scale[0, 0]) * reach * 0.62 * shadow) + 1
     half_h = half_w * 0.42
     w, h = sprite.image.size
     ax, ay = sprite.anchor
-    pad = math.ceil(half_w * 0.5)
-    image = Image.new("RGBA", (w + pad, h + pad), (0, 0, 0, 0))
+    pad = math.ceil(half_w * 2 + abs(off_x) + abs(off_y))
+    image = Image.new("RGBA", (w + 2 * pad, h + 2 * pad), (0, 0, 0, 0))
     overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    cx, cy = ax + half_w * 0.3, ay + half_h * 0.35
+    cx = pad + ax + float(off_x) + half_w * 0.3
+    cy = pad + ay + float(off_y) + half_h * 0.35
     ImageDraw.Draw(overlay).ellipse(
         (cx - half_w, cy - half_h, cx + half_w, cy + half_h), fill=SHADOW
     )
     image.alpha_composite(overlay)
-    image.alpha_composite(sprite.image)
+    image.alpha_composite(sprite.image, (pad, pad))
     box = image.getchannel("A").getbbox() or (0, 0, 1, 1)
-    return Sprite(image.crop(box), (ax - box[0], ay - box[1]))
+    return Sprite(image.crop(box), (pad + ax - box[0], pad + ay - box[1]))
 
 
 def walls(
