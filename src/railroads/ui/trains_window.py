@@ -775,8 +775,11 @@ def upgrade_menu(railway: Railway, train: Train) -> None:
         if imgui.selectable(f"This train  {dollars(price)}##one{name}", False)[0]:
             railway.swap_engine(train, name)
         imgui.end_disabled()
+        summary = "\n".join(
+            [engine_summary(engine, railway.fuel_cost(name)), *wagons_note(railway, name)]
+        )
         if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-            imgui.set_tooltip(engine_summary(engine, railway.fuel_cost(name)))
+            imgui.set_tooltip(summary)
         if len(alike) > 1:
             total = sum(railway.swap_price(t, name) for t in alike)
             imgui.begin_disabled(not railway.finances.can_afford(price))
@@ -788,11 +791,19 @@ def upgrade_menu(railway: Railway, train: Train) -> None:
                 railway.swap_all_engines(name)
             imgui.end_disabled()
             if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-                imgui.set_tooltip(
-                    f"{engine_summary(engine, railway.fuel_cost(name))}\n"
-                    "As many as the cash allows, in the order bought"
-                )
+                imgui.set_tooltip(f"{summary}\nAs many as the cash allows, in the order bought")
     imgui.end_popup()
+
+
+def wagons_note(railway: Railway, name: str) -> list[str]:
+    """A line saying the engine's cars stay the size of today's wagons until newer ones come,
+    when it pulls newer ones than there are yet; none otherwise."""
+    era = railway.wagon_era()
+    top = ENGINES[name].top_generation
+    if top <= era:
+        return []
+    note = f"Its cars stay generation {era}, the newest there are, until a new era brings "
+    return [f"{note}generation {era + 1}"]
 
 
 def engines_by_kind(names: list[str]) -> list[tuple[Kind, list[str]]]:

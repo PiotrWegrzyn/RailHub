@@ -35,7 +35,13 @@ from railroads.sim.trains import (
     unit_label,
     unit_tonnes,
 )
-from railroads.ui.trains_window import adding_tip, engine_summary, engines_by_kind, picker_good
+from railroads.ui.trains_window import (
+    adding_tip,
+    engine_summary,
+    engines_by_kind,
+    picker_good,
+    wagons_note,
+)
 
 WEST, EAST = (6, 3), (6, 20)
 
@@ -878,3 +884,20 @@ def test_a_train_s_cars_grow_at_its_next_stop_once_newer_wagons_come(
     assert ENGINES["american"].top_generation >= 3
     assert after == {good: car_size(good, 3) for good in after}
     assert after[Good.COAL] > before[Good.COAL]
+
+
+def test_an_upgrade_tells_its_cars_stay_today_s_size_until_newer_wagons_come(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    railway = line()
+    monkeypatch.setattr(railway, "wagon_era", lambda: 2)
+
+    waiting = wagons_note(railway, "light_tank")
+    monkeypatch.setattr(railway, "wagon_era", lambda: 3)
+    come = wagons_note(railway, "light_tank")
+
+    assert ENGINES["light_tank"].top_generation == 3
+    assert waiting == [
+        "Its cars stay generation 2, the newest there are, until a new era brings generation 3"
+    ]
+    assert come == []
