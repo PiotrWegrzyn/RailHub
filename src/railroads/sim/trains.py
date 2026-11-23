@@ -4,7 +4,8 @@ from each, and the train itself, slowed by what its cars and their goods weigh a
 its engine pulls, in tonnes. Every engine costs a share of its price to run each month, by what drives
 it (RUNNING_SHARE). A train sets off from a stand and picks up speed evenly until it runs at full
 speed after its engine's pickup time, the Planet's twelve seconds at normal speed, a light
-engine's a few and a heavy or express engine's more. An express always leads its coaches with a dining car,
+engine's a few, an express engine's about as long as a general one of its day, and a pioneer's
+or a heavy freight engine's far more. An express always leads its coaches with a dining car,
 which carries nothing but weighs and costs like any other car.
 
 Freight remembers where it came from as parcels: how much from each station."""
@@ -381,13 +382,13 @@ CAR_LENGTH = 0.42
 
 
 class Kind(Enum):
-    """What an engine is for. Pioneers come before the Planet. Light engines are cheap to buy and
-    run and are up to speed at once, but pull three or four cars, slowly, and a heavy load slows
-    them most: for short lines with many stops. General ones are the Planet and its heirs. Heavy
-    freight engines pull twice as many cars or more and are hardly slowed by a full load, but run
-    slowly, take long to get going and cost the most to run after express engines. Express engines
-    carry only passengers, much faster, with a dining car, but cost the most and take longest to
-    get up to speed, so they pay on long lines."""
+    """What an engine is for. Pioneers come before the Planet and are slow to get going. Light
+    engines are cheap to buy and run and are up to speed at once, but pull three or four cars,
+    slowly, and a heavy load slows them most: for short lines with many stops. General ones are
+    the Planet and its heirs. Heavy freight engines pull twice as many cars or more and are hardly
+    slowed by a full load, but run slowly, take longest of all to get going and cost the most to
+    run after express engines. Express engines carry only passengers, much faster, with a dining
+    car, but cost the most, so they pay on long lines."""
 
     PIONEER = "pioneer"
     LIGHT = "light"
@@ -542,17 +543,17 @@ P, L, G, H, X = Kind.PIONEER, Kind.LIGHT, Kind.GENERAL, Kind.HEAVY, Kind.EXPRESS
 DIESEL, ELECTRIC, MAGLEV = Power.DIESEL, Power.ELECTRIC, Power.MAGLEV
 ENGINES: dict[str, Engine] = {
     "penydarren": Engine(
-        "Penydarren steam wagon", 1804, 0.25, 1, 1_000.0, P, pickup=14.0, tank=4.0
+        "Penydarren steam wagon", 1804, 0.25, 1, 1_000.0, P, pickup=45.0, tank=4.0
     ),
-    "catch_me": Engine("Catch Me Who Can", 1808, 0.2, 1, 1_500.0, P, pickup=13.0, tank=5.0),
-    "salamanca": Engine("Salamanca", 1812, 0.2, 1, 2_000.0, P, pickup=13.0, tank=6.0),
-    "puffing_billy": Engine("Puffing Billy", 1815, 0.25, 1, 2_500.0, P, pickup=13.0, tank=7.0),
-    "locomotion": Engine("Locomotion", 1820, 0.3, 2, 4_000.0, P, pickup=13.0, tank=8.0),
-    "rocket": Engine("Rocket", 1826, 0.4, 2, 6_000.0, P, pickup=13.0, tank=10.0, pull_share=0.55),
-    "lion": Engine("Lion", 1834, 0.45, 2, 8_000.0, P, pickup=13.0, tank=12.0),
+    "catch_me": Engine("Catch Me Who Can", 1808, 0.2, 1, 1_500.0, P, pickup=43.0, tank=5.0),
+    "salamanca": Engine("Salamanca", 1812, 0.2, 1, 2_000.0, P, pickup=42.0, tank=6.0),
+    "puffing_billy": Engine("Puffing Billy", 1815, 0.25, 1, 2_500.0, P, pickup=40.0, tank=7.0),
+    "locomotion": Engine("Locomotion", 1820, 0.3, 2, 4_000.0, P, pickup=38.0, tank=8.0),
+    "rocket": Engine("Rocket", 1826, 0.4, 2, 6_000.0, P, pickup=36.0, tank=10.0, pull_share=0.55),
+    "lion": Engine("Lion", 1834, 0.45, 2, 8_000.0, P, pickup=35.0, tank=12.0),
     "planet": Engine("Planet steam engine", 1840, 0.5, 3, TRAIN_PRICE, G, pickup=12.0, tank=21.0),
     "tank": Engine("Tank engine", 1840, 0.4, 2, 3_000.0, L, pickup=3.0, tank=13.0),
-    "goods": Engine("Goods engine", 1853, 0.35, 4, 15_000.0, H, pickup=30.0, tank=20.0),
+    "goods": Engine("Goods engine", 1853, 0.35, 4, 15_000.0, H, pickup=50.0, tank=20.0),
     "american": Engine(
         "American 4-4-0", 1856, 0.7, 4, 30_000.0, G, pickup=11.0, tank=25.0, wood=True
     ),
@@ -563,11 +564,11 @@ ENGINES: dict[str, Engine] = {
         3,
         40_000.0,
         X,
-        pickup=25.0,
+        pickup=12.0,
         tank=30.0,
     ),
     "light_tank": Engine("Light tank engine", 1862, 0.55, 2, 9_000.0, L, pickup=3.0, tank=16.0),
-    "mogul": Engine("Mogul freight engine", 1865, 0.45, 5, 45_000.0, H, pickup=28.0, tank=30.0),
+    "mogul": Engine("Mogul freight engine", 1865, 0.45, 5, 45_000.0, H, pickup=45.0, tank=30.0),
     "atlantic": Engine(
         "Atlantic express",
         1900,
@@ -575,7 +576,7 @@ ENGINES: dict[str, Engine] = {
         4,
         120_000.0,
         X,
-        pickup=22.0,
+        pickup=10.0,
         tank=50.0,
     ),
     "mallet": Engine(
@@ -585,7 +586,7 @@ ENGINES: dict[str, Engine] = {
         6,
         135_000.0,
         H,
-        pickup=25.0,
+        pickup=40.0,
         tank=50.0,
     ),
     "pacific": Engine("Pacific engine", 1910, 1.0, 5, 90_000.0, G, pickup=9.0, tank=50.0),
@@ -609,7 +610,7 @@ ENGINES: dict[str, Engine] = {
         5,
         360_000.0,
         X,
-        pickup=20.0,
+        pickup=8.0,
         tank=60.0,
     ),
     "big_boy": Engine(
@@ -619,7 +620,7 @@ ENGINES: dict[str, Engine] = {
         7,
         405_000.0,
         H,
-        pickup=22.0,
+        pickup=35.0,
         tank=60.0,
     ),
     "mixed_diesel": Engine(
@@ -641,7 +642,7 @@ ENGINES: dict[str, Engine] = {
         1_200_000.0,
         H,
         DIESEL,
-        pickup=18.0,
+        pickup=30.0,
         tank=100.0,
     ),
     "bullet": Engine(
@@ -652,7 +653,7 @@ ENGINES: dict[str, Engine] = {
         1_100_000.0,
         X,
         ELECTRIC,
-        pickup=15.0,
+        pickup=7.0,
     ),
     "express": Engine(
         "Universal electric",
@@ -684,7 +685,7 @@ ENGINES: dict[str, Engine] = {
         3_200_000.0,
         X,
         ELECTRIC,
-        pickup=14.0,
+        pickup=6.0,
     ),
     "twin_diesel": Engine(
         "Twin-unit diesel",
@@ -694,7 +695,7 @@ ENGINES: dict[str, Engine] = {
         3_600_000.0,
         H,
         DIESEL,
-        pickup=18.0,
+        pickup=28.0,
         tank=150.0,
     ),
     "modern_electric": Engine(
@@ -708,7 +709,7 @@ ENGINES: dict[str, Engine] = {
         10_800_000.0,
         H,
         DIESEL,
-        pickup=20.0,
+        pickup=25.0,
         tank=200.0,
     ),
     "maglev": Engine(
@@ -719,7 +720,7 @@ ENGINES: dict[str, Engine] = {
         10_000_000.0,
         X,
         MAGLEV,
-        pickup=13.0,
+        pickup=5.0,
     ),
 }
 

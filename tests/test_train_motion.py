@@ -50,7 +50,7 @@ def run_until(railway: Railway, done, seconds: float = 600.0) -> None:
             return
 
 
-def test_light_engines_get_going_quickest_and_heavy_and_express_ones_slowest() -> None:
+def test_light_engines_get_going_quickest_and_pioneers_and_heavy_freight_ones_slowest() -> None:
     planet = ENGINES["planet"]
 
     pickups = {
@@ -59,8 +59,9 @@ def test_light_engines_get_going_quickest_and_heavy_and_express_ones_slowest() -
 
     assert planet.pickup == 12.0
     assert max(pickups[Kind.LIGHT]) <= 3.0
-    assert min(pickups[Kind.HEAVY] + pickups[Kind.EXPRESS]) > planet.pickup
-    assert all(pickup > planet.pickup for pickup in pickups[Kind.PIONEER])
+    assert max(pickups[Kind.EXPRESS]) <= planet.pickup
+    assert min(pickups[Kind.PIONEER]) > 2 * planet.pickup
+    assert min(pickups[Kind.HEAVY]) > 2 * max(pickups[Kind.GENERAL])
 
 
 def test_a_train_sets_off_slowly_and_reaches_full_speed_after_its_pickup_time() -> None:

@@ -124,7 +124,7 @@ TRAIN_NAMES = {
     Power.MAGLEV: "Maglev",
 }
 # How far a train runs in a month, in cells, on flat ground.
-CELLS_PER_MONTH = 40.0
+CELLS_PER_MONTH = 48.0
 MAX_LEVEL = 1 + len(LEVEL_PRICES)
 # How many cells out a new station hands goods out to; and how many storage upgrades' worth of
 # room each level a station is raised adds.

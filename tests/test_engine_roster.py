@@ -169,7 +169,7 @@ def test_a_light_engine_costs_far_less_to_run_and_is_quicker_off_the_mark_than_a
 
 
 @pytest.mark.parametrize("name", by_year(Kind.EXPRESS))
-def test_an_express_runs_far_faster_than_a_general_engine_but_takes_longer_to_get_going(
+def test_an_express_runs_far_faster_than_a_general_engine_and_gets_going_about_as_quickly(
     name: str,
 ) -> None:
     express = ENGINES[name]
@@ -177,7 +177,7 @@ def test_an_express_runs_far_faster_than_a_general_engine_but_takes_longer_to_ge
     general = of_its_day(express, Kind.GENERAL)
 
     assert express.speed >= 1.4 * general.speed
-    assert express.pickup > general.pickup
+    assert express.pickup <= 1.5 * general.pickup
     assert express.price > general.price
 
 
