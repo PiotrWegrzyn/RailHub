@@ -53,6 +53,41 @@ Left out on purpose:
 Results were checked before and after every step: `tools/fingerprint.py` gives the same
 output, and the engine texts, help and hints read word for word as before.
 
+**Done (steps 12-15):**
+- **P3, cache helper.** `railroads/kept.py` gives `Kept`, `KeptFor` and `Fresh`. The map view,
+  trains window, route map, build bar and scenery caches now use them. Keys compare plain values
+  by equality and everything else by identity. The world and shader version slots stay as they
+  were.
+- **Module splits, one commit each:**
+  - S11: `art/registry.py`, which ends cycle S7; the lazy imports in art went to the top.
+  - S8: `ground_glsl.py` and `gl_util.py`.
+  - S14: `railroads/catalogue.py`, which loads no UI.
+  - S7, in part: `ui/cli.py`, also the `railroads` script and the desktop app.
+  - S13: `ui/hex_rows.py` and `ui/train_texts.py`.
+  - S5: `sim/surroundings.py` and `sim/ladder_types.py`.
+  - S1: `sim/yearly.py` holds what is made, needed and boosted in a year. Of cycle S1, only
+    `good_exists` and `need_exists` stay lazy, because `Recipe` needs eras.
+  - S4: `sim/reach.py` and `sim/trade.py`.
+  - S3, in part: `sim/breeding.py` and `sim/dying.py`.
+  - S9, in part: `ui/pixel/ground_palette.py`.
+  - S18: `railroads/settings.py`, which ends cycle S4.
+  - S19: `ui/bevels.py`, `ui/ground_picture.py` and `ui/pixel/chunk_painter.py`.
+- **K1, regrid.** `sim/move.py` holds `Move`. `Constructions`, `Growth`, `Economy`, `Trade`,
+  `Owners`, `Novelties`, `Railway`, `StationNames`, `Train`, `StandInPlayer` and `Game` each move
+  their own state, so `regrid` only calls them.
+- **P1, in part, and S16.** `Game.station_quote`, `platform_quote` and `clearing_quote` price the
+  build actions and the hover note from one place.
+
+Left for a pass of their own:
+- **Class splits:** `MapView` into ground drawing and lenses (S6), `App` into shell and autosave
+  (S7), and placement out of `Growth` (S3). Tests patch module names that `Shell` reads, and
+  autosave is woven through the months being done.
+- **The woods geometry out of `ground.py`:** its helpers are private and used by `Ground`.
+- **Further splits:** `goods.py` into prices, recipes and bonuses, and `POINTS` into
+  `points.py`, which would need goods first.
+- **UI windows acting through `Game`:** station, train and share buttons still call `Railway`
+  and `Owners` directly (K4); the windows hold only the railway.
+
 ## 0. Bugs found on the way
 
 | # | Where | What | Sev | Eff |
