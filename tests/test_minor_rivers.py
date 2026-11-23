@@ -16,7 +16,8 @@ from railroads.mapgen.world_files import World, WorldIndex, square_of, streams_f
 from railroads.sim.constructions import CELL_SPACE, Building, BuildingKind, Constructions, Track
 from railroads.sim.finance import track_price
 from railroads.sim.grids import HexGrid
-from railroads.sim.ladders import FARMS, TOWN_LAND, Land
+from railroads.sim.ladders import FARMS, TOWN_LAND
+from railroads.sim.surroundings import Land
 from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.sim.track_rules import RELIEF_RULES, STREAM_FACTOR, track_rules_for
 from railroads.ui.ground import cell_colors

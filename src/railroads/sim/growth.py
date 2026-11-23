@@ -86,6 +86,7 @@ from railroads.sim.events import military_growth
 from railroads.sim.forests import change_forests
 from railroads.sim.goods import FITS, HOMES, MAKES, RECIPES, Good, demands_of, makes_of
 from railroads.sim.grids import Cell, FlatIndices, FloatArray, Grid, IntArray
+from railroads.sim.ladder_types import Join, Ladder
 from railroads.sim.ladders import (
     CHANCE_UNIT,
     GROWTH,
@@ -94,10 +95,6 @@ from railroads.sim.ladders import (
     PASSENGERS_PER_POINT,
     TOWNS,
     GrowthRule,
-    Join,
-    Ladder,
-    Land,
-    Surroundings,
     ladder_of,
 )
 from railroads.sim.ledger import Ledger
@@ -109,6 +106,7 @@ from railroads.sim.room import Room
 from railroads.sim.station_trade import StationTrade
 from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
+from railroads.sim.surroundings import Land, Surroundings
 from railroads.sim.tilemap import REFERENCE_LAND, Relief, Terrain, TileMap, Vegetation
 from railroads.sim.tiles import era_come, kind_era
 from railroads.sim.towns import Towns

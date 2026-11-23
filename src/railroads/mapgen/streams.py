@@ -1,6 +1,6 @@
 """Minor rivers: the HydroRIVERS reaches too small for Natural Earth, which flow through land
 cells without making them water. A cell with one stays land that anything may be built on, but
-counts as fresh water by a river for what grows (railroads.sim.ladders.Surroundings)."""
+counts as fresh water by a river for what grows (railroads.sim.surroundings.Surroundings)."""
 
 import io
 from collections.abc import Sequence

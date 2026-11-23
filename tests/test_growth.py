@@ -17,6 +17,7 @@ from railroads.sim.growth import (
     _allowed,
     breeding_of,
 )
+from railroads.sim.ladder_types import Merge
 from railroads.sim.ladders import (
     BAKERIES,
     CHANCE_UNIT,
@@ -35,11 +36,10 @@ from railroads.sim.ladders import (
     TOWN_LAND,
     TOWNS,
     GrowthRule,
-    Land,
-    Merge,
 )
 from railroads.sim.points import Points
 from railroads.sim.room import SPILL_STEPS
+from railroads.sim.surroundings import Land
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 
 PLAIN_FARMS = replace(FARMS, crowded_at=None, land=replace(FARMS.land, open_field=1.0))
