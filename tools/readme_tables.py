@@ -11,6 +11,7 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
+from railroads.catalogue import BuildingHelp, EngineHelp, building_help, engine_help, fuel_use
 from railroads.sim.clock import END_YEAR, START_YEAR
 from railroads.sim.goods import (
     BONUS_PART,
@@ -21,8 +22,6 @@ from railroads.sim.goods import (
     boosts_of,
     freight_of,
 )
-from railroads.ui.buy_train import fuel_use
-from railroads.ui.help_window import BuildingHelp, EngineHelp, building_help, engine_help
 from railroads.words import dollars
 
 README = Path(__file__).resolve().parent.parent / "README.md"

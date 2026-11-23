@@ -8,15 +8,11 @@ from dataclasses import dataclass
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
-from railroads.sim.fuel_market import fuel_of
+from railroads.catalogue import engine_figures
 from railroads.sim.railway import Railway
-from railroads.sim.tiles import Tile
 from railroads.sim.trains import (
     ENGINES,
-    EXPRESS_FARE,
-    MAGLEV_FARE,
     OPENED_BY,
-    SLOWDOWN,
     Engine,
     Kind,
     Train,
@@ -25,7 +21,7 @@ from railroads.ui.iso_camera import Vec2
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.spotlight import spot
 from railroads.ui.theme import BRASS, GONE, TEXT_DIM, color_u32, colored, tip
-from railroads.words import dollars, tonnes_text
+from railroads.words import dollars
 
 SCREEN_SIZE = (860.0, 560.0)
 ENGINES_WIDTH = 250.0
@@ -214,71 +210,3 @@ class BuyScreen:
         spot("done_buying")
         imgui.separator()
         draw_route(train)
-
-
-def fuel_use(engine: Engine, per_cell: float | None = None) -> str:
-    """How much fuel an engine burns a cell, and what that costs now if given."""
-    text = f"{engine.burn:.2g} {fuel_of(engine).value} a cell half loaded"
-    return text if per_cell is None else f"{text}, about {dollars(per_cell)} a cell now"
-
-
-def engine_range(engine: Engine) -> str:
-    """How far an engine runs on the fuel it takes on setting off."""
-    if engine.tank:
-        return f"{engine.tank:.0f} cells between stops"
-    return "As far as the wires go" if engine.electric else "As far as the guideway goes"
-
-
-def cars_pulled(engine: Engine) -> str:
-    """The cars an engine pulls at most: "5 cars", or an express's coaches and dining car."""
-    return f"{engine.cars} coaches and a dining car" if engine.express else f"{engine.cars} cars"
-
-
-def most_pulled(engine: Engine) -> str:
-    """The most an engine pulls, and how much slower it runs pulling that."""
-    return f"{tonnes_text(engine.tonnes)} t, {SLOWDOWN[engine.kind]:.0%} slower at that"
-
-
-def fares_note(engine: Engine) -> str | None:
-    """What an express is paid more for its passengers; None for other engines."""
-    if not engine.express:
-        return None
-    fare = MAGLEV_FARE if engine.maglev else EXPRESS_FARE
-    return f"Passengers only, paying {fare - 1:.0%} more"
-
-
-def track_needed(engine: Engine) -> list[str]:
-    """The only track an engine runs on, if it needs track of its own."""
-    return [
-        track
-        for track, needed in (("Electrified", engine.electric), ("Maglev", engine.maglev))
-        if needed
-    ]
-
-
-def engine_figures(
-    engine: Engine, per_cell: float | None = None, opened: tuple[Tile, int] | None = None
-) -> list[tuple[str, str]]:
-    """What an engine can do, as labels and values for its table on the screen, with what its
-    fuel for a cell costs now and the supply tile level that put it on sale if given."""
-    figures = []
-    if opened is not None:
-        tile, level = opened
-        figures.append(("On sale from", f"{tile.value.capitalize()} supply {level}"))
-    figures += [
-        ("First built", str(engine.year)),
-        ("Power", engine.power.value.capitalize()),
-        ("Top speed", f"{engine.kmh:.0f} km/h"),
-        ("Pulls up to", cars_pulled(engine)),
-        ("Pulls at most", most_pulled(engine)),
-        ("Up to speed in", f"{engine.pickup:g} s"),
-        ("Price", dollars(engine.price)),
-        ("Burns", fuel_use(engine, per_cell)),
-        ("Range", engine_range(engine)),
-    ]
-    figures.append(("Cars", f"Up to generation {engine.top_generation}"))
-    fares = fares_note(engine)
-    if fares is not None:
-        figures.append(("Fares", fares))
-    figures += [("Runs on", f"{track} track only") for track in track_needed(engine)]
-    return figures

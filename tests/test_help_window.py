@@ -1,5 +1,6 @@
 import pytest
 
+from railroads.catalogue import building_help, engine_help, good_help
 from railroads.sim.clock import HISTORY_START
 from railroads.sim.company import BOOK_SHARE
 from railroads.sim.constructions import BuildingKind
@@ -7,15 +8,7 @@ from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import FREIGHT_SHARE, Good, Need
 from railroads.sim.lots import Lots
 from railroads.sim.trains import ENGINES
-from railroads.ui.help_window import (
-    ENGINES_NOTE,
-    GOAL_HELP,
-    GOODS_NOTE,
-    MAP_HELP,
-    building_help,
-    engine_help,
-    good_help,
-)
+from railroads.ui.help_window import ENGINES_NOTE, GOAL_HELP, GOODS_NOTE, MAP_HELP
 from railroads.words import dollars
 
 

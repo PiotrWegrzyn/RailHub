@@ -11,6 +11,14 @@ from dataclasses import dataclass, field
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
+from railroads.catalogue import (
+    cars_pulled,
+    engine_range,
+    fares_note,
+    fuel_use,
+    most_pulled,
+    track_needed,
+)
 from railroads.kept import Fresh
 from railroads.sim.amounts import EPSILON
 from railroads.sim.demand import StationDemand
@@ -30,16 +38,7 @@ from railroads.sim.trains import (
     amount_of,
     unit_name,
 )
-from railroads.ui.buy_train import (
-    BuyScreen,
-    EnginePicture,
-    cars_pulled,
-    engine_range,
-    fares_note,
-    fuel_use,
-    most_pulled,
-    track_needed,
-)
+from railroads.ui.buy_train import BuyScreen, EnginePicture
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.ornate import card, ornate_window, section, tile
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at

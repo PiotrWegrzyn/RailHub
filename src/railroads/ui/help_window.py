@@ -4,34 +4,28 @@ which supply level it is sold, and the real engines it is drawn after, how towns
 set for the company and going bankrupt, and why a game starts on a quarter of its place."""
 
 from dataclasses import dataclass
-from functools import cache
 
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
+from railroads.catalogue import (
+    BuildingHelp,
+    EngineHelp,
+    building_help,
+    engine_help,
+    fuel_use,
+    good_help,
+)
 from railroads.land import NOVELTY_SHARE, TOP_UP_SHARE
 from railroads.sim.clock import END_YEAR, HISTORY_START
 from railroads.sim.company import BANKRUPT_MONTHS, BOOK_SHARE, TARGETS, Difficulty
-from railroads.sim.constructions import BUILDING_RULES, BuildingKind
 from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import (
-    FITS,
     FREIGHT_SHARE,
-    MAKES,
-    NEEDS,
     Good,
-    Need,
-    freight_of,
-    price_of,
 )
-from railroads.sim.ladders import PASSENGERS_PER_POINT, POINTS, ladder_of
 from railroads.sim.lots import AROUND, FIRST_FOR_SALE, START_LOTS, land_price
-from railroads.sim.points import Points
 from railroads.sim.tilemap import START_SHARE
-from railroads.sim.tiles import good_era, kind_era, opened_from
-from railroads.sim.trains import ENGINES, OPENED_BY, Engine, successor
-from railroads.ui.buy_train import fuel_use
-from railroads.ui.engine_origins import origins
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.search import goods_of
 from railroads.ui.theme import (
@@ -135,118 +129,6 @@ GOODS_NOTE = (
     " gathered. Passengers and mail pay their freight times the share of demand left where they"
     " get off. What your own buildings put into your stations is sold to them at the market price."
 )
-
-
-@dataclass(frozen=True)
-class BuildingHelp:
-    kind: BuildingKind
-    group: Points
-    makes: tuple[tuple[Good, float], ...]
-    # Each need, how much of it a month, and from when it is felt ("" for always): a year, or the
-    # demand tile level that opens it.
-    wants: tuple[tuple[Need, float, str], ...]
-    travellers: int
-    space: int
-    # From when it comes up: a year, its era, or "" for always.
-    since: str
-
-
-@dataclass(frozen=True)
-class GoodHelp:
-    good: Good
-    price: float
-    freight: float
-    # From when it is made: its era, or "" for always.
-    since: str
-    made_by: tuple[str, ...]
-    wanted_by: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class EngineHelp:
-    name: str
-    engine: Engine
-    # The year its sale ends and the engine that ends it, if one does.
-    sold_until: tuple[int, str] | None
-    # The supply tile and level that open it for sale, in words.
-    opened_by: str
-    # The real engines it is drawn after, as names and Wikipedia links.
-    origins: tuple[tuple[str, str], ...]
-
-
-def _opening(kind: BuildingKind) -> str:
-    era = kind_era(kind)
-    if era > 1:
-        return f"era {era}"
-    ladder = ladder_of(kind)
-    year = 0 if ladder is None else ladder.from_year
-    return str(year) if year else ""
-
-
-@cache
-def building_help() -> tuple[BuildingHelp, ...]:
-    """Every kind of building, grouped by the points it gives; worked out once, as the open
-    window draws them all every frame."""
-    rows = [
-        BuildingHelp(
-            kind,
-            POINTS[kind][0],
-            tuple(MAKES.get(kind, {}).items()),
-            tuple(
-                (need, amount, opened_from(kind, need))
-                for need, amount in NEEDS.get(kind, {}).items()
-            ),
-            PASSENGERS_PER_POINT[POINTS[kind][0]] * POINTS[kind][1],
-            BUILDING_RULES[kind].space,
-            _opening(kind),
-        )
-        for kind in BuildingKind
-    ]
-    order = list(Points)
-    return tuple(sorted(rows, key=lambda row: order.index(row.group)))
-
-
-@cache
-def good_help() -> tuple[GoodHelp, ...]:
-    """Every good, with its market price and what carrying it earns; worked out once."""
-    rows = []
-    for good in Good:
-        needs = {need for need, goods in FITS.items() if good in goods}
-        rows.append(
-            GoodHelp(
-                good,
-                price_of(good),
-                freight_of(good),
-                f"era {good_era(good)}" if good_era(good) > 1 else "",
-                tuple(kind.value for kind, made in MAKES.items() if good in made),
-                tuple(kind.value for kind, wanted in NEEDS.items() if needs & set(wanted)),
-            )
-        )
-    return tuple(rows)
-
-
-def opened_by(name: str) -> str:
-    """The supply tile and level that open an engine for sale, in words."""
-    tile, level = OPENED_BY[name]
-    return f"{tile.value} supply level {level}"
-
-
-@cache
-def engine_help() -> tuple[EngineHelp, ...]:
-    """Every engine by the year it is first sold; worked out once."""
-    rows = []
-    for name, engine in sorted(ENGINES.items(), key=lambda item: item[1].year):
-        newer = successor(name)
-        rows.append(
-            EngineHelp(
-                name,
-                engine,
-                (ENGINES[newer].year, ENGINES[newer].title) if newer else None,
-                opened_by(name),
-                origins(name),
-            )
-        )
-    return tuple(rows)
 
 
 @dataclass
