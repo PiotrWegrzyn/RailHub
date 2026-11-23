@@ -10,9 +10,8 @@ rest of the sprites, back to front, as the CPU stands them (PixelWorld.render).
 Sprites come from the sheet drawn at exactly as many pixels to an art pixel as the screen shows
 (railroads.ui.pixel.sheet.DENSITIES), so a sprite pixel is a screen pixel at every zoom: the same
 model drawn at the size it is seen, never a coarser picture blown up nor a finer one shrunk. Only
-the sprites a chunk shows are put on the graphics card, on pages of the sheet's own. A sheet is
-loaded the first time a zoom needs it, on a thread of its own where threads can start; until it
-is, chunks of that zoom wait, showing as they did at the zoom before.
+the sprites a chunk shows are unpacked and put on the graphics card, on pages of the sheet's own,
+the first time a chunk stands them.
 
 The track is laid out by the CPU, away from the frames, as triangles (TrackArt.shapes), which
 the graphics card draws a few times finer than shown and averages down, as the CPU averages its
@@ -23,7 +22,6 @@ track is lifted, by more than HIDDEN_BEYOND."""
 import ctypes
 from collections import OrderedDict
 from collections.abc import Callable
-from concurrent.futures import Executor, Future
 from dataclasses import dataclass
 
 import numpy as np
@@ -53,7 +51,6 @@ from railroads.ui.pixel.scenery import Scenery
 from railroads.ui.pixel.sheet import DENSITIES, ByteSheet
 from railroads.ui.pixel.track_art import TrackShapes
 from railroads.ui.pixel.world import HIDDEN_BEYOND
-from railroads.ui.workers import threads_start, worker
 
 # How big a page of sprites on the graphics card is each way, and the picture the track is drawn
 # into finely before it is averaged down: several of the biggest sprites fit on a page, and both
@@ -359,8 +356,6 @@ class StandShader:
         self._ground = ground
         self._sheets = sheets
         self._pages: OrderedDict[int, _Pages] = OrderedDict()
-        self._loader: Executor | None = worker("sheets") if threads_start() else None
-        self._loading: dict[int, Future[ByteSheet]] = {}
         self._made = _Target()
         self._fine = _Target()
         self._heights = _Target()
@@ -400,15 +395,13 @@ class StandShader:
         scenery: Scenery,
         track: npt.NDArray[np.uint8],
         ground: npt.NDArray[np.uint8] | None = None,
-    ) -> ChunkTexture | None:
+    ) -> ChunkTexture:
         """A chunk's texture, `scale` pixels to an art pixel: what lies on its ground drawn `k`
         pixels to an art pixel and blown up to `scale`, or `ground` if the CPU drew it, with
         everything in `scenery` standing in the chunk and the track (`track`, as
-        TrackShapes.packed) over it; None while the sheet its sprites come from loads."""
+        TrackShapes.packed) over it."""
         free_textures()
         pages = self.pages(sheet_for(scale))
-        if pages is None:
-            return None
         span = CHUNK * scale
         times = scale // k
         ground_shader = self._ground
@@ -426,32 +419,16 @@ class StandShader:
         self._stand_sprites(laid, span, laid.under, len(laid.sprite))
         return self._finished(span)
 
-    def pages(self, density: int) -> _Pages | None:
-        """The pages of the sheet drawn at `density`, or None while it loads, letting go of the
-        sheets used longest ago beyond SHEETS_KEPT once it has."""
+    def pages(self, density: int) -> _Pages:
+        """The pages of the sheet drawn at `density`, loading it the first time, and letting go
+        of the sheets used longest ago beyond SHEETS_KEPT."""
         pages = self._pages.get(density)
         if pages is None:
-            sheet = self._loaded(density)
-            if sheet is None:
-                return None
-            pages = self._pages[density] = _Pages(sheet)
+            pages = self._pages[density] = _Pages(self._sheets(density))
             while len(self._pages) > SHEETS_KEPT:
                 self._pages.popitem(last=False)[1].free()
         self._pages.move_to_end(density)
         return pages
-
-    def _loaded(self, density: int) -> ByteSheet | None:
-        """The sheet drawn at `density`, loaded here where threads can't start, else on the
-        loader's thread: None until it has."""
-        if self._loader is None:
-            return self._sheets(density)
-        loading = self._loading.get(density)
-        if loading is None:
-            loading = self._loading[density] = self._loader.submit(self._sheets, density)
-        if not loading.done():
-            return None
-        del self._loading[density]
-        return loading.result()
 
     def _stand_sprites(self, laid: _Laid, span: int, first: int, last: int) -> None:
         if first == last:

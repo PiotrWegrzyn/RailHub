@@ -228,18 +228,6 @@ def test_where_the_graphics_card_stands_chunks_their_track_is_laid_out_away_from
     np.testing.assert_array_equal(track, world.track_shapes(*chunk, 6))
 
 
-def test_a_chunk_whose_sheet_is_still_loading_gets_no_texture_yet() -> None:
-    world, mountains, _ = world_over_mountains()
-    layer = PixelLayer(world, threads=False)
-    layer.stand = lambda *_args: None
-    layer._ask((*mountains, 12), 0.0)
-
-    made = layer._upload(mountains, 12, 4)
-
-    assert made is None
-    assert not layer._textures
-
-
 def test_where_the_graphics_card_stands_chunks_raised_ground_drawn_finely_goes_under_them() -> None:
     world, mountains, _ = world_over_mountains()
     layer = PixelLayer(world, threads=True)

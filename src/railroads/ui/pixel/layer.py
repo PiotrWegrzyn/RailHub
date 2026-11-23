@@ -81,7 +81,7 @@ class Stand(Protocol):
         scenery: Scenery,
         track: Rgba,
         ground: Rgba | None = None,
-    ) -> Texture | None: ...
+    ) -> Texture: ...
 
 
 def resolution_for(screen_pixels: int, resolutions: tuple[int, ...]) -> int:
@@ -216,15 +216,12 @@ class PixelLayer:
                 late = uploaded and time.perf_counter() - now > UPLOAD_BUDGET_S
                 if drawn not in kept:
                     self._ask(drawn, now)
-                made = None
                 if drawn in kept and not late:
-                    made = self._upload(chunk, scale, fine)
-                    uploaded = True
-                if made is None:
-                    complete = False
-                else:
-                    texture = made
+                    texture = self._upload(chunk, scale, fine)
                     self._stale.discard(key)
+                    uploaded = True
+                else:
+                    complete = False
                 if texture is None:
                     texture = self._shown_before(chunk)
                 if texture is None:
@@ -353,16 +350,14 @@ class PixelLayer:
     def _texture_bytes(self) -> int:
         return sum((CHUNK * key[2]) ** 2 * 4 for key in self._textures)
 
-    def _upload(self, chunk: ChunkKey, scale: int, resolution: int) -> Texture | None:
-        """Makes a chunk's texture from what is kept of it; None if it can't be made yet."""
-        texture: Texture | None
+    def _upload(self, chunk: ChunkKey, scale: int, resolution: int) -> Texture:
+        """Makes a chunk's texture from what is kept of it."""
+        texture: Texture
         if self.stand is not None:
             drawn = (*chunk, scale)
             ground = self._grounds.get((*chunk, resolution))
             scenery = self.world.scenery
             texture = self.stand(chunk, scale, resolution, scenery, self._tracks[drawn], ground)
-            if texture is None:
-                return None
             self._tracks.move_to_end(drawn)
         else:
             drawn = (*chunk, resolution)

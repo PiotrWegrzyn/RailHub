@@ -3,6 +3,7 @@ import pytest
 from test_pixel_world import make_world
 
 from railroads.ui.pixel import world as world_module
+from railroads.ui.pixel.art import draw_sheet
 from railroads.ui.pixel.projection import CHUNK
 from railroads.ui.pixel.sheet import DENSITIES, SpriteSheet
 from railroads.ui.pixel.stand_shader import (
@@ -34,6 +35,16 @@ def test_every_sheet_holds_the_same_sprites_as_big_as_its_resolution_makes_them(
     for density, drawn in sheets.items():
         assert drawn.names == plain.names
         assert np.abs(drawn.sizes - density * plain.sizes).max() <= 3 * density
+
+
+def test_a_zipped_sprite_unpacks_to_the_pixels_drawn_on_its_sheet() -> None:
+    sheet, places = draw_sheet(resolution=3)
+    x, y, w, h, _, _ = places["pine_0"]
+
+    zipped = SpriteSheet.load_bytes(3)
+
+    sprite = zipped.pixels[zipped.names.index("pine_0")]
+    np.testing.assert_array_equal(sprite, np.asarray(sheet.crop((x, y, x + w, y + h))))
 
 
 def test_the_sprites_standing_in_a_chunk_are_those_the_cpu_stands_there_in_its_order(
