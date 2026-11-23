@@ -4,7 +4,7 @@ import pytest
 from builders import flat_map
 from railroads.sim.grids import SquareGrid
 from railroads.sim.tilemap import Relief, Terrain, TileMap
-from railroads.ui.relief import HILL_BRIGHTNESS, relief_brightness
+from railroads.ui.bevels import HILL_BRIGHTNESS, relief_brightness
 
 
 def make_map(relief: list[list[Relief]], terrain: Terrain = Terrain.LAND) -> TileMap:

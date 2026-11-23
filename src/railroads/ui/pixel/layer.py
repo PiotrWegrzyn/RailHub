@@ -3,7 +3,7 @@ blown up to the zoom's pixel scale. Where each art pixel covers an even number o
 chunks are drawn finer (PixelWorld.render), so buildings, trees and track keep thin lines instead of
 growing blocky.
 
-Chunks are drawn away from the frames (railroads.ui.pixel.painter); until a chunk is ready, the
+Chunks are drawn away from the frames (railroads.ui.pixel.chunk_painter); until a chunk is ready, the
 ground drawn beneath shows where it is missing, and a chunk that changed keeps its old texture.
 
 Where the ground shader runs, the graphics card makes every chunk's texture itself, at the size
@@ -37,8 +37,8 @@ import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
 from railroads.ui.iso_camera import IsoCamera, Vec2
+from railroads.ui.pixel.chunk_painter import Painter
 from railroads.ui.pixel.copies import GROUND, TRACK, ChunkJob
-from railroads.ui.pixel.painter import Painter
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, Rgba
 from railroads.ui.pixel.scenery import Scenery
 from railroads.ui.pixel.sheet import FINE

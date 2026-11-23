@@ -612,7 +612,7 @@ class Growth:
 
     @property
     def near(self) -> FlatIndices:
-        """Every cell's neighbours as flat indices (railroads.sim.economy.Neighbourhoods)."""
+        """Every cell's neighbours as flat indices (railroads.sim.reach.Neighbourhoods)."""
         return self._near
 
     def _raise_buildings(self) -> set[Cell]:
@@ -730,7 +730,7 @@ class Growth:
             place.chances[:] = raw * place.land
 
     def land(self, land: Land, cells: npt.NDArray[np.intp]) -> FloatArray:
-        """The weights of these flat cells for a land (railroads.sim.ladders.Land.weights), as
+        """The weights of these flat cells for a land (railroads.sim.surroundings.Land.weights), as
         kept up to date for the ladders growing on it."""
         for kept, weights in self._land_of:
             if kept is land:

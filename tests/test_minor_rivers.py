@@ -20,7 +20,7 @@ from railroads.sim.ladders import FARMS, TOWN_LAND
 from railroads.sim.surroundings import Land
 from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.sim.track_rules import RELIEF_RULES, STREAM_FACTOR, track_rules_for
-from railroads.ui.ground import cell_colors
+from railroads.ui.ground_picture import cell_colors
 from railroads.ui.pixel.streams import NONE_NEAR, STEPS, stream_distance, stream_links
 
 ROWS, COLS = 8, 12

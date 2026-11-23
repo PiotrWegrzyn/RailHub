@@ -1,7 +1,7 @@
 import threading
 import time
 
-from railroads.ui.pixel.painter import FORGET_S, Painter
+from railroads.ui.pixel.chunk_painter import FORGET_S, Painter
 
 
 def test_urgent_drawings_come_first_and_the_latest_asked_for_among_them() -> None:

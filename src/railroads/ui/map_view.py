@@ -36,7 +36,7 @@ from railroads.ui.build_menu import (
 )
 from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.buildings import dot_looks, draw_building_dots
-from railroads.ui.ground import GroundLayout, GroundPictures, Pixels, cell_colors
+from railroads.ui.ground_picture import GroundLayout, GroundPictures, Pixels, cell_colors
 from railroads.ui.hex_details import draw_hex_details, draw_shares
 from railroads.ui.hex_rows import HexDetails, recently_described
 from railroads.ui.iso_camera import LOOKS, PIXEL_CELL_WIDTH, ZOOM_CELL_WIDTHS, IsoCamera, Vec2

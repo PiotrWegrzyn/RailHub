@@ -7,9 +7,10 @@ import pytest
 from builders import flat_map
 from railroads.sim.grids import Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Terrain, TileMap
-from railroads.ui import ground
+from railroads.ui import ground_picture
+from railroads.ui.bevels import BEVEL_PIXELS, BEVEL_STRENGTH
 from railroads.ui.biomes import biome_colors
-from railroads.ui.ground import (
+from railroads.ui.ground_picture import (
     BAKED_LINE_SHADE,
     EDGE_STEPS_PER_PIXEL,
     PIXELS_PER_CELL,
@@ -18,7 +19,6 @@ from railroads.ui.ground import (
     Pixels,
     cell_colors,
 )
-from railroads.ui.relief import BEVEL_PIXELS, BEVEL_STRENGTH
 
 FROM_WEST = (-1.0, 0.0)
 FROM_NORTH_EAST = (0.6, -0.8)
@@ -66,7 +66,7 @@ def random_ground(
 
 def layout_pixel_by_pixel(grid: Grid) -> GroundLayout:
     """The ground layout worked out for every pixel on its own, all at once."""
-    per_cell = ground.PIXELS_PER_CELL
+    per_cell = ground_picture.PIXELS_PER_CELL
     width, height = grid.size()
     xs = (np.arange(math.ceil(width * per_cell)) + 0.5) / per_cell
     ys = (np.arange(math.ceil(height * per_cell)) + 0.5) / per_cell
@@ -211,7 +211,7 @@ def test_layout_matches_working_out_every_pixel(grid: Grid) -> None:
 def test_layout_is_exact_for_cell_widths_it_does_not_repeat_at(
     per_cell: int, grid: Grid, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(ground, "PIXELS_PER_CELL", per_cell)
+    monkeypatch.setattr(ground_picture, "PIXELS_PER_CELL", per_cell)
     expected = layout_pixel_by_pixel(grid)
 
     layout = GroundLayout.of(grid)

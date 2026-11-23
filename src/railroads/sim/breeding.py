@@ -17,7 +17,7 @@ from railroads.sim.ladders import (
 from railroads.sim.points import Points
 
 # How many times its base chance each served point of a ladder's own kind in a cell adds there,
-# per doubling of what draws it, unless the ladder gives its own (railroads.sim.ladders.Ladder).
+# per doubling of what draws it, unless the ladder gives its own (railroads.sim.ladder_types.Ladder).
 BREEDING_TIMES = 3.0
 
 

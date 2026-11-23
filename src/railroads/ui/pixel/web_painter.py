@@ -9,7 +9,7 @@ world as the map is made, while a game loads, then whatever changed in it before
 for after the change, and hands them the chunks the frames want, the most wanted first and a
 couple to each at a time, so a worker starts the next the moment one is done.
 
-WorkerPainter has the interface of railroads.ui.pixel.painter.Painter. Until a worker is ready,
+WorkerPainter has the interface of railroads.ui.pixel.chunk_painter.Painter. Until a worker is ready,
 and if every worker fails, chunks are painted on the frames the way Painter does there; a chunk a
 worker could not paint is painted on a frame too."""
 
@@ -22,8 +22,8 @@ from typing import Any, Protocol
 
 import numpy as np
 
+from railroads.ui.pixel.chunk_painter import PaintJob, PaintQueue
 from railroads.ui.pixel.copies import ChunkJob, Seen, update_message, world_message
-from railroads.ui.pixel.painter import PaintJob, PaintQueue
 from railroads.ui.pixel.world import PixelWorld
 from railroads.version import VERSION
 
@@ -102,7 +102,7 @@ class Workers:
 
 class WorkerPainter:
     """Paints chunks (railroads.ui.pixel.copies.ChunkJob) in the page's workers, with the
-    interface of railroads.ui.pixel.painter.Painter."""
+    interface of railroads.ui.pixel.chunk_painter.Painter."""
 
     def __init__(self, world: PixelWorld, workers: Workers) -> None:
         self._world = world

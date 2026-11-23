@@ -9,9 +9,9 @@ from screens import world_over_mountains
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.ui.pixel import copies, web_painter
 from railroads.ui.pixel import layer as layer_module
+from railroads.ui.pixel.chunk_painter import Painter
 from railroads.ui.pixel.copies import ChunkJob, WorldCopy
 from railroads.ui.pixel.layer import PixelLayer, painter_for
-from railroads.ui.pixel.painter import Painter
 from railroads.ui.pixel.web_painter import (
     JOBS_PER_WORKER,
     WorkerPainter,

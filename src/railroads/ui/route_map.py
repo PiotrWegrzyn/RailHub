@@ -109,7 +109,7 @@ MADE_SHADES: tuple[Rgba, Rgba, Rgba] = (
     (0.08, 0.24, 0.72, 1.0),
 )
 
-# The picture of the ground (railroads.ui.ground) and its size in map units.
+# The picture of the ground (railroads.ui.ground_picture) and its size in map units.
 type GroundPicture = Callable[[], tuple[imgui.ImTextureRef, Vec2]]
 
 

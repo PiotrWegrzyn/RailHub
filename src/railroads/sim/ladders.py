@@ -403,7 +403,7 @@ PORT_PEOPLE_PER_CELL = 4
 PORTS_APART = 2
 
 # Fisheries grow on the shore like farms on fields, mostly by the sea and far less by lakes and
-# rivers, and more where people live (railroads.sim.growth.DRAWN_BY_KIND).
+# rivers, and more where people live (railroads.sim.breeding.DRAWN_BY_KIND).
 FISHERIES = Ladder(
     kinds=(BuildingKind.FISHERY,),
     land=Land(
@@ -822,7 +822,7 @@ SAND_PITS = Ladder(
 
 # Taverns pour a lot of beer and vodka, one to a neighbourhood, and come up as readily as
 # bakeries; from 1900 clubs pour far more in towns of CLUB_TOWN people. Either one, getting its
-# drink, makes the homes around it grow faster (railroads.sim.growth.LIVELY_GROWTH).
+# drink, makes the homes around it grow faster (railroads.sim.breeding.LIVELY_GROWTH).
 CLUB_TOWN = 30
 
 TAVERNS = Ladder(

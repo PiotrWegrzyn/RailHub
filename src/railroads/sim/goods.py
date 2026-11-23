@@ -487,7 +487,7 @@ def price_of(good: Good) -> float:
 
 def freight_of(good: Good) -> float:
     """What carrying a unit of a good to a building that takes it earns: FREIGHT_SHARE of its
-    market price, before what the buyer's satisfaction adds (railroads.sim.economy.worth_to)."""
+    market price, before what the buyer's satisfaction adds (railroads.sim.trade.worth_to)."""
     return FREIGHT_SHARE * price_of(good)
 
 

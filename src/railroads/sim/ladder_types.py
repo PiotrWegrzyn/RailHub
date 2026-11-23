@@ -52,7 +52,7 @@ class Ladder:
     # The chance a turn puts one up in a cell, before what is around it, in CHANCE_UNITs.
     base: float = 0.0
     # What each served point of its own kind in a cell adds there per doubling of what draws it,
-    # in CHANCE_UNITs; railroads.sim.growth.BREEDING_TIMES times the base when not given.
+    # in CHANCE_UNITs; railroads.sim.breeding.BREEDING_TIMES times the base when not given.
     per_doubling: float | None = None
     # Points the neighbourhood must hold before the ladder has any chance there.
     needs: Mapping[Points, int] = field(default_factory=dict)
@@ -74,7 +74,7 @@ class Ladder:
     crowded_at: int | None = None
     # Points of a kind nearby draw more only once there are at least this many of them.
     draws_from: int = 1
-    # How many years its buildings last starving (railroads.sim.growth.dies_after), when not the
+    # How many years its buildings last starving (railroads.sim.dying.dies_after), when not the
     # usual DIE_AFTER_MONTHS there.
     starving_years: int | None = None
 

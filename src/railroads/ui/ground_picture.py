@@ -18,8 +18,8 @@ import numpy.typing as npt
 
 from railroads.sim.grids import Grid
 from railroads.sim.tilemap import TileMap
+from railroads.ui.bevels import BEVEL_PIXELS, BEVEL_STRENGTH, relief_brightness
 from railroads.ui.biomes import BIOME_COLORS, Biome, biome_colors
-from railroads.ui.relief import BEVEL_PIXELS, BEVEL_STRENGTH, relief_brightness
 
 Pixels = npt.NDArray[np.uint8]
 

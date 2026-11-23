@@ -655,7 +655,7 @@ class Railway:
         """Pays the freight for cargo trains brought that the buildings around a station took: its
         freight (freight_of) for each unit,
         times what it was worth to the building that took it (`worth`, the units counted by
-        railroads.sim.economy.worth_to; the units themselves if not given), with the
+        railroads.sim.trade.worth_to; the units themselves if not given), with the
         station's facilities. Uses up that much of the station's demand."""
         self.station_demand(station).use(need, amount)
         weighed = amount if worth is None else worth

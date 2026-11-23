@@ -30,7 +30,7 @@ from railroads.ui import app as app_module
 from railroads.ui import top_bar, web_setup
 from railroads.ui.app import OPENING_ZOOM, App, Shell
 from railroads.ui.build_menu import Tool
-from railroads.ui.ground import GroundPictures
+from railroads.ui.ground_picture import GroundPictures
 from railroads.ui.history_pictures import opening_center
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS
 from railroads.ui.main_menu import MENU_WIDTH, PANEL_PAD, MainMenu, Page
