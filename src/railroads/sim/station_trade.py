@@ -45,7 +45,6 @@ from railroads.sim.grids import Cell, Within, flat_within_any
 from railroads.sim.ladders import PASSENGERS_PER_POINT
 from railroads.sim.points import Points
 from railroads.sim.power_plants import powered_points
-from railroads.sim.railway import FIRST_REACH
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.steps import Steps, finish
 
@@ -467,7 +466,7 @@ class StationTrade:
     def preview(
         self,
         cell: Cell,
-        hand_out: int = FIRST_REACH,
+        hand_out: int = DELIVERY_RADIUS,
         gather: int = COLLECTION_RADIUS,
         platforms: tuple[Cell, ...] = (),
     ) -> StationPreview:

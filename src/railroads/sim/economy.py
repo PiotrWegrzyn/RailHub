@@ -95,8 +95,9 @@ class Satisfaction(IntEnum):
 # The share of what they want from which buildings are content rather than short.
 HALF_SATISFIED = 0.5
 
-DELIVERY_RADIUS = 2
-
+# How many cells out a station hands goods out to, and gathers spare goods from, before it is
+# raised (railroads.sim.railway.Railway.reach).
+DELIVERY_RADIUS = 1
 COLLECTION_RADIUS = 3
 
 # The most of a seller's month a cell can take, by how many cells away from it it is: all of it in

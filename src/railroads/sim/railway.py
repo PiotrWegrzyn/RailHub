@@ -8,7 +8,7 @@ fills those from the station's stockpile and from freight the buildings around i
 for. Freight remembers where it came from: it earns money only when buildings at another station
 take it, and back at its own station it just returns to the stockpile. Stations deal with the buildings around them once a month, when goods
 are shared out (railroads.sim.economy): they hand what trains brought to buildings within
-FIRST_REACH cells, and take every spare good made within COLLECTION_RADIUS cells into their
+DELIVERY_RADIUS cells, and take every spare good made within COLLECTION_RADIUS cells into their
 stockpile, up to STOCKPILE of each good. Each of the MAX_LEVEL levels a station is raised to
 widens both by a cell and adds LEVEL_STORAGE_STEPS storage upgrades' worth of room, and each
 storage upgrade adds STORAGE_STEP of each good to its stockpile and WAITING_STEP to its waiting
@@ -43,7 +43,7 @@ from railroads.sim.calls import StationCalls
 from railroads.sim.clock import SECONDS_PER_MONTH, START_YEAR
 from railroads.sim.constructions import Constructions
 from railroads.sim.demand import StationDemand
-from railroads.sim.economy import COLLECTION_RADIUS, Trade
+from railroads.sim.economy import COLLECTION_RADIUS, DELIVERY_RADIUS, Trade
 from railroads.sim.events import price_factor as history_price
 from railroads.sim.facilities import (
     ENGINE_SHED_SPEED,
@@ -124,9 +124,7 @@ TRAIN_NAMES = {
 # How far a train runs in a month, in cells, on flat ground.
 CELLS_PER_MONTH = 48.0
 MAX_LEVEL = 1 + len(LEVEL_PRICES)
-# How many cells out a new station hands goods out to; and how many storage upgrades' worth of
-# room each level a station is raised adds.
-FIRST_REACH = 1
+# How many storage upgrades' worth of room each level a station is raised adds.
 LEVEL_STORAGE_STEPS = 2
 # From this level up, each level lets a station have one more platform beside it, with its own way
 # through, so lines come in from more sides.
@@ -698,7 +696,7 @@ class Railway:
     def reach_at(level: int) -> tuple[int, int]:
         """How many cells out a station of this level hands goods out to, a cell at the first
         level, and gathers them from; each level a cell further."""
-        return FIRST_REACH + level - 1, COLLECTION_RADIUS + level - 1
+        return DELIVERY_RADIUS + level - 1, COLLECTION_RADIUS + level - 1
 
     def upgrade_price(self, station: Cell) -> float | None:
         """What raising the station a level costs; None at the top level."""
