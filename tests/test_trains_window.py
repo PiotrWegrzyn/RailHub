@@ -11,16 +11,16 @@ from railroads.sim.goods import Good
 from railroads.sim.railway import Railway, Ride
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, OPENED_BY, Car, Stop, Train
 from railroads.ui import buy_train
-from railroads.ui.trains_window import (
+from railroads.ui.train_texts import (
     ROW_CAR,
     ROW_CAR_GAP,
     ROW_CAR_LINES,
-    TrainsWindow,
     carried_in,
     ride_rows,
     row_cars,
     train_warning,
 )
+from railroads.ui.trains_window import TrainsWindow
 from railroads.words import tonnes_text
 
 

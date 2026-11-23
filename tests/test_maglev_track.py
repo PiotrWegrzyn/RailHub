@@ -11,7 +11,7 @@ from railroads.sim.routes import build_station, lay_route, plan_route, route_pri
 from railroads.sim.tiles import Tile, Tiles, activate
 from railroads.sim.trains import ENGINES, OPENED_BY, Stop, Train
 from railroads.ui.build_menu import BuildMenu
-from railroads.ui.trains_window import engine_summary
+from railroads.ui.train_texts import engine_summary
 
 WEST, EAST = (6, 3), (6, 20)
 

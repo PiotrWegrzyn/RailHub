@@ -15,8 +15,8 @@ from railroads.sim.ledger import Takings
 from railroads.sim.ownership import HOLD_MONTHS
 from railroads.sim.points import Points
 from railroads.sim.tilemap import Terrain, TileMap
-from railroads.ui import hex_details
-from railroads.ui.hex_details import (
+from railroads.ui import hex_rows
+from railroads.ui.hex_rows import (
     BuildingRow,
     Flow,
     HexDetails,
@@ -177,13 +177,13 @@ def test_cells_described_by_turns_are_each_worked_out_once(
 ) -> None:
     growth = traded_growth()
     worked: list[Cell] = []
-    plain = hex_details.describe
+    plain = hex_rows.describe
 
     def counted(growth: Growth, cell: Cell, satisfaction: object = None) -> HexDetails:
         worked.append(cell)
         return plain(growth, cell)
 
-    monkeypatch.setattr(hex_details, "describe", counted)
+    monkeypatch.setattr(hex_rows, "describe", counted)
 
     for _ in range(3):
         recently_described(growth, (5, 5))

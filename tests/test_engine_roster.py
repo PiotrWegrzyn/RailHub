@@ -35,7 +35,7 @@ from railroads.sim.trains import (
     unit_label,
     unit_tonnes,
 )
-from railroads.ui.trains_window import (
+from railroads.ui.train_texts import (
     adding_tip,
     engine_summary,
     engines_by_kind,

@@ -18,7 +18,7 @@ from railroads.sim.tilemap import Terrain, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.sim.trains import Stop
 from railroads.ui.station_window import UNJOINED, station_warning
-from railroads.ui.trains_window import train_warning
+from railroads.ui.train_texts import train_warning
 
 NORTH_BANK, SOUTH_BANK = (11, 17), (15, 16)
 DZIALOSZYN_RIVER = (122, 108), (124, 118)
