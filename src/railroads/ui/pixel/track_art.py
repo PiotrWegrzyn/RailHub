@@ -50,6 +50,9 @@ PORTAL_FACING = 0.5
 SHADOW_REACH = 0.03
 DOUBLE_SPACING = 0.22
 BEND = 0.2
+# How far a rail may wander across the picture, in pixels it is shown at, and still count as
+# running straight across or down it, to be kept to one row or column of pixels (_crisp).
+STRAIGHT_WITHIN = 0.25
 # How dark the shadow round the track is, from 0 to 1.
 SHADOW = 0.35
 # How far apart track is followed over the ground to lift it, in cells.
@@ -504,7 +507,7 @@ class TrackArt:
                     paint.polygon(sleeper, fill=(*SLEEPER, 255))
         rail = smoothing
         rails = [
-            _raised(_offset(lane, side), lifts)
+            _crisp(_raised(_offset(lane, side), lifts), smoothing)
             for _, _, lanes, lifts in railed
             for lane in lanes
             for side in (-GAUGE / 2 * cell, GAUGE / 2 * cell)
@@ -825,6 +828,22 @@ def _lay_portal(paint: ImageDraw.ImageDraw, portal: _Portal, s: int) -> None:
     paint.polygon(outline, fill=(*PORTAL_STONE, 255), outline=(*PORTAL_EDGE, 255), width=s)
     paint.line(outline[1:-1], fill=(*PORTAL_LIT, 255), width=s)
     paint.polygon(_arch(portal, s, stone), fill=(*PORTAL_DARK, 255))
+
+
+def _crisp(rail: Path, smoothing: int) -> Path:
+    """A rail running straight across or down the picture moved by less than a pixel onto the
+    middle of the row or column of pixels it is shown on, so it shows as one bright line instead
+    of two dim ones where it would straddle two."""
+    for axis in (1, 0):
+        across = [point[axis] for point in rail]
+        if max(across) - min(across) > smoothing * STRAIGHT_WITHIN:
+            continue
+        mean = sum(across) / len(across)
+        shift = (math.floor(mean / smoothing) + 0.5) * smoothing - mean
+        if axis:
+            return [(x, y + shift) for x, y in rail]
+        return [(x + shift, y) for x, y in rail]
+    return rail
 
 
 def _lane_spread(lanes: list[Path]) -> float:

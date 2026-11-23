@@ -1192,3 +1192,21 @@ def test_a_raised_chunk_drawn_over_ground_leaves_its_ground_and_lifts_what_lies_
     assert drawn.any()
     difference = np.abs(over[..., :3].astype(int) - whole[..., :3])[drawn]
     assert np.percentile(difference, 99) <= 2
+
+
+@pytest.mark.parametrize("resolution", [1, FINE])
+def test_both_rails_of_straight_track_show_as_full_bright_lines(
+    sheet: SpriteSheet, resolution: int
+) -> None:
+    tile_map = make_tile_map()
+    world = PixelWorld(tile_map, Constructions(tile_map), sheet, *LOOKS[HexGrid])
+    piece = Track((10, 3), (0, 6))
+    px, py = world.projection.to_pixels(*tile_map.grid.center(10, 3))
+    left, top = int(px) - 32, int(py) - 32
+
+    layer = world.track.layer([piece], left, top, 64, 64, resolution)
+
+    column = layer[:, layer.shape[1] // 2, :3].min(axis=-1)
+    bright = np.flatnonzero(column > RAIL[2] / 255 - 0.05)
+    assert len(bright) == 2
+    assert bright[1] - bright[0] > 1
