@@ -32,6 +32,6 @@ if __name__ == "__main__":
     if save := os.environ.get("RAILROADS_SMOKE_TEST"):
         smoke_test(save)
         sys.exit()
-    from railroads.ui.app import main
+    from railroads.ui.cli import main
 
     main()

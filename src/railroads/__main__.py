@@ -1,3 +1,3 @@
-from railroads.ui.app import main
+from railroads.ui.cli import main
 
 main()

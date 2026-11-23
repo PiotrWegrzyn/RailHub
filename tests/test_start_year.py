@@ -8,7 +8,7 @@ from railroads.saves import Saves
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
 from railroads.sim.constructions import Constructions
 from railroads.sim.steps import Steps
-from railroads.ui.app import parse_args, settings_from
+from railroads.ui.cli import parse_args, settings_from
 from railroads.ui.main_menu import MainMenu
 
 

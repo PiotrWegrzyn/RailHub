@@ -1,4 +1,5 @@
-"""What the help window and the README say of every building, good and engine, worked out without drawing anything: who makes and wants what, when it opens, and an engine's figures."""
+"""What the help window and the README say of every building, good and engine, worked out
+without drawing anything: who makes and wants what, when it opens, and an engine's figures."""
 
 from dataclasses import dataclass
 from functools import cache

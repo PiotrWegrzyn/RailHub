@@ -1,4 +1,6 @@
-"""The GLSL the ground shader is built from, and the sources of its programs with the numbers of railroads.ui.pixel.ground written into them (fragment_source and the rest), so the GPU draws the ground as the CPU does."""
+"""The GLSL the ground shader is built from, and the sources of its programs with the numbers of
+railroads.ui.pixel.ground written into them (fragment_source and the rest), so the graphics card
+draws the ground as the CPU does."""
 
 import numpy as np
 

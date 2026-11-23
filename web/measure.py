@@ -16,7 +16,7 @@ import time
 import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
-from railroads.ui import app
+from railroads.ui import app, cli
 from railroads.ui.pixel.web_painter import Message, WorkerPainter
 from railroads.ui.pixel.world import PixelWorld
 
@@ -173,4 +173,4 @@ WorkerPainter.heard = _timed_heard
 app.App.gui = _timed_gui
 
 if __name__ == "__main__":
-    app.main()
+    cli.main()

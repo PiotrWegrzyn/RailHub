@@ -12,7 +12,7 @@ from railroads.sim.grids import HexGrid
 from railroads.sim.lots import Lots
 from railroads.sim.steps import Steps
 from railroads.sim.tilemap import TileMap
-from railroads.ui.app import settings_from
+from railroads.ui.cli import settings_from
 from railroads.ui.main_menu import MainMenu, map_note, random_seed
 
 
