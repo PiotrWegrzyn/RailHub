@@ -7,9 +7,21 @@ Severity: **H** hides balance, must stay in sync by hand, or is a bug; **M** an 
 real maintenance cost; **L** cosmetic. Effort: **S** under an hour, **M** a few hours, **L** a day
 or more.
 
-Files another session is rewriting right now (train traffic: `sim/railway.py`, `sim/trains.py`,
-`sim/track_network.py`, `sim/traffic.py` → `sim/signals.py`, `ui/pixel/track_art.py`) are not
-planned for edits here. Their findings are collected under [Later](#7-later-train-traffic-files).
+Files another session was rewriting during the audit (train traffic: `sim/railway.py`,
+`sim/trains.py`, `sim/track_network.py`, `sim/traffic.py` → `sim/signals.py`,
+`ui/pixel/track_art.py`) were left out of the plan. Their findings are under
+[Later](#7-later-train-traffic-files). That rewrite reached staging in 0.5.179, so they are open now.
+
+**Done (steps 1-6 of section 8):** B1-B4, B6-B8 and M13-M18, M20-M22, M24, M26-M34. B5 was not a
+bug: the farm sprite is 13 px wide and a house 9 px, so the farmstead does stand bigger. Steps 1-6
+changed no line of `tools/fingerprint.py` output. That tool had been broken since the tech tree
+went, and is now fixed. The help, hint and message texts read word for word as before. New shared
+pieces: `sim/clock.MONTHS_PER_YEAR` and `FIRST_RAILWAY_YEAR`, `sim/grids.KM_PER_CELL`,
+`sim/tilemap.REFERENCE_LAND`, `sim/lots.land_price` and `Lots.in_middle_of`,
+`ui/theme.SIDE_WINDOW_TOP`, `sim/year_caches.boards_changed`, `railroads/words.py` (counts, shares
+and factors in words) and `sim/amounts.py` (`EPSILON`, `ratio`, `divided`). The short-form
+divisions that keep the part where the whole is nothing became `divided`. They were left with that
+meaning on purpose, since a `ratio` there would change results.
 
 ## 0. Bugs found on the way
 
