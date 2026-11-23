@@ -3,7 +3,10 @@ production (supply) then consumption (demand), drawn as the start menu is: dark 
 glowing brass with corner brackets and titles in spaced capitals between fading rules. Every card
 shows a tile, its level, what its next level adds, the icons of its goods, what a unit of them
 earns now and once picked, and on demand the buyer it opens next; hovering a demand card lists
-every buyer it opens under it. The cards grow as large as the screen lets them.
+every buyer it opens under it. Above every card a row of marks stands for its levels, reached and
+ahead, from where the lowest on its board stood when the era came: a mark for a level that brings
+more than its share (railroads.sim.level_perks) shows what, and hovering one tells of it. The
+cards grow as large as the screen lets them.
 
 When a year is about to turn the game waits on it: the player picks the supply cards and
 confirms, the supply board slides away to the left for the demand board, and once they pick there
@@ -17,6 +20,7 @@ from dataclasses import dataclass
 from imgui_bundle import hello_imgui, imgui
 
 from railroads.sim.goods import Good, Need, freight_of
+from railroads.sim.level_perks import Perk, opened_at, perks
 from railroads.sim.tiles import (
     ERAS,
     MOST_APART,
@@ -73,6 +77,16 @@ HINTS = {
     Board.DEMAND: "More demand makes buyers take more of a tile's goods, and each unit earns more.",
 }
 ICONS_SHOWN = 6
+# How many levels above the highest tile on a board the marks over its cards reach: twice as many
+# on supply, which goes up two tiles a year, as on demand, with the most marks a row holds.
+MARKS_AHEAD = {Board.SUPPLY: 6, Board.DEMAND: 3}
+MARKS_MOST = {Board.SUPPLY: 14, Board.DEMAND: 10}
+# The room above a card for its marks, for every unit of its width: as tall as a mark is wide
+# when the fewest there can be span the card.
+MARK_TALL = 1 / 10
+MARK_REACHED: Rgba = (0.98, 0.84, 0.42, 1.0)
+MARK_AHEAD: Rgba = (0.34, 0.33, 0.32, 1.0)
+MARK_INK: Rgba = (0.16, 0.11, 0.06, 1.0)
 
 
 @dataclass(frozen=True)
@@ -96,25 +110,6 @@ class Card:
     then: float | None = None
     # The need of the buyer it opens next.
     need: Need | None = None
-
-
-def _kinds(names: list[str]) -> str:
-    """Kinds of building in words, big and mega ones counted with the plain one."""
-    plain = sorted({name.removeprefix("big ").removeprefix("mega ") for name in names})
-    named = [f"{name[:-1]}ies" if name.endswith("y") else f"{name}s" for name in plain]
-    if len(named) <= 2:
-        return " and ".join(named)
-    return f"{named[0]}, {named[1]} and {len(named) - 2} more"
-
-
-def opened_at(tile: Tile, at: int) -> str:
-    """Who starts taking what at a demand tile's level, in words; "" for no one."""
-    opened = [(kind, need) for lv, kind, need in unlocks_of(tile) if lv == at]
-    if not opened:
-        return ""
-    needs = sorted({need.value for _, need in opened})
-    who = _kinds([kind.value for kind, _ in opened])
-    return f"{who[0].upper()}{who[1:]} take {', '.join(needs)}"
 
 
 def next_unlock(tile: Tile, level: int) -> str:
@@ -190,6 +185,31 @@ def freight_line(card: Card, good: Good | None = None) -> str:
     return line
 
 
+def era_start(tiles: Tiles, board: Board) -> int:
+    """The lowest level on a board when the era in play came: 1 in the first era."""
+    year = tiles.era_years.get(tiles.era)
+    came = tiles.years.get(year) if year is not None else None
+    if came is None:
+        return 1 if tiles.era == 1 else min(tiles.levels(board).values())
+    return min((came.supply if board == Board.SUPPLY else came.demand).values())
+
+
+def mark_levels(tiles: Tiles, board: Board) -> range:
+    """The levels the marks above a board's cards stand for: from where the lowest stood when the
+    era came, so they move left by as much as each era lasted, to MARKS_AHEAD above the highest
+    with the picks so far, no more than MARKS_MOST."""
+    end = max(tiles.planned(board).values()) + MARKS_AHEAD[board]
+    return range(max(era_start(tiles, board), end - MARKS_MOST[board] + 1), end + 1)
+
+
+def mark_tip(board: Board, tile: Tile, level: int) -> list[str]:
+    """What a mark tells of its level: what it adds and what else it brings."""
+    step = supply_step(tile, level - 1) if board == Board.SUPPLY else demand_step(tile, level - 1)
+    return [f"Level {level}: +{step:.0%} {WORDS[board]}"] + [
+        perk.text for perk in perks(board, tile, level)
+    ]
+
+
 def era_line(tiles: Tiles) -> str:
     """The era, its wagons and what the next one waits for."""
     wagons = ERAS[tiles.era - 1].wagons
@@ -212,13 +232,13 @@ def can_confirm(tiles: Tiles, board: Board) -> bool:
 
 
 def card_layout(count: int, width: float, height: float) -> tuple[int, float]:
-    """How many cards a row holds and how wide each is, for so many cards to fill an area as
-    large as they can without passing it."""
+    """How many cards a row holds and how wide each is, for so many cards with their marks to
+    fill an area as large as they can without passing it."""
     best = (1, 0.0)
     for columns in range(1, count + 1):
         rows = math.ceil(count / columns)
         across = (width - (columns - 1) * CARD_GAP) / columns
-        down = (height - (rows - 1) * CARD_GAP) / rows / CARD_TALL
+        down = (height - (rows - 1) * CARD_GAP) / rows / (CARD_TALL + MARK_TALL)
         size = min(across, down, CARD_MOST)
         if size > best[1]:
             best = (columns, size)
@@ -274,6 +294,36 @@ def _quiet_frame(draw_list: imgui.ImDrawList, low: imgui.ImVec2, high: imgui.ImV
     ):
         draw_list.add_line((x, y), (x + dx * bracket, y), dim, 1.5)
         draw_list.add_line((x, y), (x, y + dy * bracket), dim, 1.5)
+
+
+def _star(middle: imgui.ImVec2, radius: float) -> list[imgui.ImVec2]:
+    return [
+        imgui.ImVec2(
+            middle.x + math.sin(i * math.pi / 5) * radius * (1.0 if i % 2 == 0 else 0.45),
+            middle.y - math.cos(i * math.pi / 5) * radius * (1.0 if i % 2 == 0 else 0.45),
+        )
+        for i in range(10)
+    ]
+
+
+def _draw_sign(
+    draw_list: imgui.ImDrawList, perk: Perk, middle: imgui.ImVec2, radius: float, ink: int
+) -> None:
+    """A level's sign inside its mark: a star for new buyers, an engine for a new one for sale,
+    a wagon for an era."""
+    x, y, r = middle.x, middle.y, radius
+    if perk == Perk.BUYERS:
+        draw_list.add_concave_poly_filled(_star(middle, r * 1.15), ink)
+        return
+    wheel = max(1.0, r * 0.28)
+    if perk == Perk.ENGINE:
+        draw_list.add_rect_filled((x - r, y - r * 0.35), (x + r * 0.35, y + r * 0.45), ink)
+        draw_list.add_rect_filled((x + r * 0.1, y - r * 0.85), (x + r, y + r * 0.45), ink)
+        draw_list.add_rect_filled((x - r * 0.8, y - r * 0.85), (x - r * 0.45, y - r * 0.35), ink)
+    else:
+        draw_list.add_rect_filled((x - r, y - r * 0.7), (x + r, y + r * 0.45), ink)
+    for wx in (x - r * 0.55, x + r * 0.55):
+        draw_list.add_circle_filled((wx, y + r * 0.6), wheel, ink)
 
 
 class TilesWindow:
@@ -439,12 +489,16 @@ class TilesWindow:
         row = columns * size + (columns - 1) * CARD_GAP
         indent = (width - row) / 2
         picking = bool(self.choosing) and self.board == board
+        marks = mark_levels(tiles, board)
         for index, card in enumerate(shown):
             if index % columns:
                 imgui.same_line(0, CARD_GAP)
             else:
                 imgui.set_cursor_pos((imgui.get_cursor_pos().x + indent, imgui.get_cursor_pos().y))
+            imgui.begin_group()
+            self._draw_marks(tiles, board, card, marks, size)
             self._draw_card(tiles, board, card, edge, picking, size)
+            imgui.end_group()
             if index % columns == columns - 1:
                 imgui.dummy((0, CARD_GAP - imgui.get_style().item_spacing.y))
 
@@ -505,6 +559,46 @@ class TilesWindow:
                 tiles.unpick(board, card.tile)
             elif card.can_pick:
                 tiles.pick(board, card.tile)
+
+    @staticmethod
+    def _draw_marks(tiles: Tiles, board: Board, card: Card, marks: range, size: float) -> None:
+        """A card's levels in a row of touching rounds above it: filled for the ones reached,
+        green for the ones picked, grey for the ones ahead, and a sign on the ones that bring
+        more than their share. Hovering one tells of its level."""
+        at = imgui.get_cursor_screen_pos()
+        room = size * MARK_TALL
+        imgui.dummy((size, room - imgui.get_style().item_spacing.y))
+        draw_list = imgui.get_window_draw_list()
+        across = min(room, size / max(len(marks), 1))
+        left = at.x + (size - across * len(marks)) / 2
+        middle_y = at.y + room - across / 2
+        reached = tiles.levels(board)[card.tile]
+        for index, level in enumerate(marks):
+            middle = imgui.ImVec2(left + (index + 0.5) * across, middle_y)
+            radius = across / 2 - 0.5
+            fill = (
+                MARK_REACHED if level <= reached else GROWN if level <= card.number else MARK_AHEAD
+            )
+            ahead = level > card.number
+            draw_list.add_circle_filled(middle, radius, color_u32(fill))
+            draw_list.add_circle(
+                middle, radius, color_u32(BRASS if not ahead else TEXT_DIM), 0, 1.0
+            )
+            found = perks(board, card.tile, level)
+            if found:
+                ink = color_u32(BRASS if ahead else MARK_INK)
+                _draw_sign(draw_list, found[0].kind, middle, radius * 0.72, ink)
+            low = imgui.ImVec2(middle.x - across / 2, middle.y - across / 2)
+            high = imgui.ImVec2(middle.x + across / 2, middle.y + across / 2)
+            if imgui.is_window_hovered() and imgui.is_mouse_hovering_rect(low, high):
+                imgui.begin_tooltip()
+                lines = mark_tip(board, card.tile, level)
+                colored(BRASS, lines[0])
+                for line in lines[1:]:
+                    imgui.push_text_wrap_pos(imgui.get_font_size() * 24)
+                    colored(GROWN, line)
+                    imgui.pop_text_wrap_pos()
+                imgui.end_tooltip()
 
     @staticmethod
     def _draw_icons(

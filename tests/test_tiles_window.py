@@ -5,10 +5,12 @@ from imgui_bundle import hello_imgui, imgui
 from screens import FakeTexture, gui_context
 
 from railroads.sim.goods import Good, freight_of
-from railroads.sim.tiles import Board, Tile, Tiles
+from railroads.sim.tiles import ERAS, Board, Tile, Tiles
 from railroads.ui.tiles_window import (
     CARD_GAP,
     CARD_TALL,
+    MARK_TALL,
+    MARKS_AHEAD,
     TilesWindow,
     all_unlocks,
     can_confirm,
@@ -16,6 +18,8 @@ from railroads.ui.tiles_window import (
     cards,
     era_line,
     freight_line,
+    mark_levels,
+    mark_tip,
     next_unlock,
 )
 
@@ -136,7 +140,7 @@ def test_the_cards_grow_as_large_as_the_screen_lets_every_one_fit(
     rows = -(-17 // across)
     assert across == columns
     assert across * size + (across - 1) * CARD_GAP <= width + 1e-6
-    assert rows * size * CARD_TALL + (rows - 1) * CARD_GAP <= height + 1e-6
+    assert rows * size * (CARD_TALL + MARK_TALL) + (rows - 1) * CARD_GAP <= height + 1e-6
 
 
 def test_a_card_names_its_main_good_with_its_freight_now_and_once_picked() -> None:
@@ -167,3 +171,29 @@ def test_a_demand_card_starts_from_what_its_goods_earn_after_the_supply_picks_so
 
     assert coal.now == tiles.planned_price(Tile.COAL)
     assert coal.then is not None and coal.then > coal.now
+
+
+def test_the_marks_move_left_by_as_many_levels_as_the_era_lasted() -> None:
+    came = Tiles.until(1850).era_years[2]
+    before, after = Tiles.until(1820), Tiles.until(came)
+
+    shifted = mark_levels(before, Board.SUPPLY).start, mark_levels(after, Board.SUPPLY).start
+
+    assert shifted == (1, ERAS[1].level)
+
+
+def test_supply_marks_reach_twice_as_far_ahead_as_demand_ones() -> None:
+    tiles = Tiles.until(1850)
+
+    ahead = {
+        board: mark_levels(tiles, board)[-1] - max(tiles.planned(board).values()) for board in Board
+    }
+
+    assert ahead == MARKS_AHEAD
+    assert ahead[Board.SUPPLY] == 2 * ahead[Board.DEMAND]
+
+
+def test_a_mark_tells_what_its_level_adds_and_brings() -> None:
+    lines = mark_tip(Board.SUPPLY, Tile.COAL, 13)
+
+    assert lines == ["Level 13: +15% supply", "New engine for sale: Light tank engine"]
