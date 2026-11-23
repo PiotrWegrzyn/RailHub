@@ -2,6 +2,7 @@ from collections.abc import Iterator
 
 import pytest
 from imgui_bundle import imgui, implot
+from screens import gui_context
 
 from railroads.sim.company import CompanyValue, Goal
 from railroads.sim.finance import Finances
@@ -25,16 +26,10 @@ from railroads.ui.reports_window import (
 
 @pytest.fixture
 def frame() -> Iterator[None]:
-    context = imgui.create_context()
-    plots = implot.create_context()
-    io = imgui.get_io()
-    io.display_size = imgui.ImVec2(1280, 800)
-    io.backend_flags |= imgui.BackendFlags_.renderer_has_textures.value
-    imgui.new_frame()
-    yield
-    imgui.render()
-    implot.destroy_context(plots)
-    imgui.destroy_context(context)
+    with gui_context(plots=True):
+        imgui.new_frame()
+        yield
+        imgui.render()
 
 
 def made_history() -> History:

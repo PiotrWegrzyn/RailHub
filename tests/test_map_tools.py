@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 
 import pytest
-from imgui_bundle import imgui  # noqa: TID251
+from screens import gui_context
 
 from builders import flat_map
 from railroads.sim import routes
@@ -14,10 +14,8 @@ from railroads.ui.map_view import MapView
 
 @pytest.fixture
 def context() -> Iterator[None]:
-    gui = imgui.create_context()
-    imgui.get_io().display_size = imgui.ImVec2(1280, 800)
-    yield
-    imgui.destroy_context(gui)
+    with gui_context(textures=False):
+        yield
 
 
 def laying_track() -> MapView:

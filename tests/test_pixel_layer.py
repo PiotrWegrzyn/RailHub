@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 from imgui_bundle import hello_imgui, imgui
+from screens import FakeTexture
 from test_elevation import world_over_mountains
 from test_pixel_world import chunk_of, track_chunk
 
@@ -14,11 +15,6 @@ from railroads.ui.pixel.layer import SETTLE_S, PixelLayer, blown_up, middle_out
 from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection
 from railroads.ui.pixel.sheet import SpriteSheet
 from railroads.ui.pixel.track_art import no_track
-
-
-class FakeTexture:
-    def texture_id(self) -> int:
-        return 1
 
 
 @pytest.fixture(autouse=True)

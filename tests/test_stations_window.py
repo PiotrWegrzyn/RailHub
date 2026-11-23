@@ -2,6 +2,7 @@ from collections.abc import Iterator
 
 import pytest
 from imgui_bundle import imgui  # noqa: TID251
+from screens import gui_context
 
 from builders import flat_map
 from railroads.sim.constructions import Constructions
@@ -12,12 +13,8 @@ from railroads.ui.stations_window import BUILD_BAR_ROOM, WINDOW_SIZE, StationsWi
 
 @pytest.fixture
 def gui() -> Iterator[None]:
-    context = imgui.create_context()
-    io = imgui.get_io()
-    io.display_size = imgui.ImVec2(1280, 800)
-    io.backend_flags |= imgui.BackendFlags_.renderer_has_textures.value
-    yield
-    imgui.destroy_context(context)
+    with gui_context():
+        yield
 
 
 def many_stations() -> Railway:

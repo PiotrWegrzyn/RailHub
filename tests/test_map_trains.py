@@ -3,6 +3,7 @@ from collections.abc import Iterator
 import numpy as np
 import pytest
 from imgui_bundle import hello_imgui, imgui  # noqa: TID251
+from screens import FakeTexture, gui_context
 
 from builders import flat_map
 from railroads.sim.constructions import Constructions, TrackWidth
@@ -20,20 +21,13 @@ from railroads.ui.pixel.train_layer import TrainLayer
 from railroads.ui.pixel.trains import DETAIL, HEADINGS
 
 
-class FakeTexture:
-    def texture_id(self) -> int:
-        return 1
-
-
 @pytest.fixture
 def context(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    monkeypatch.setattr(hello_imgui, "create_texture_gpu_from_rgba_data", lambda _: FakeTexture())
-    gui = imgui.create_context()
-    io = imgui.get_io()
-    io.display_size = imgui.ImVec2(1280, 800)
-    io.backend_flags |= imgui.BackendFlags_.renderer_has_textures.value
-    yield
-    imgui.destroy_context(gui)
+    with gui_context():
+        monkeypatch.setattr(
+            hello_imgui, "create_texture_gpu_from_rgba_data", lambda _: FakeTexture()
+        )
+        yield
 
 
 def railway_seen_in_pixel_art(width: TrackWidth = TrackWidth.SINGLE) -> MapView:

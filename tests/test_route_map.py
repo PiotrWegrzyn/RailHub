@@ -3,6 +3,7 @@ from collections.abc import Iterator
 import numpy as np
 import pytest
 from imgui_bundle import hello_imgui, imgui
+from screens import FakeTexture, gui_context
 from test_railway import joined_stations
 
 from railroads.sim.clock import QUARTER
@@ -313,24 +314,17 @@ def test_zoom_stays_between_the_whole_map_and_the_closest_view() -> None:
     assert route_map.zoom == MOST_ZOOM
 
 
-class FakeTexture:
-    def texture_id(self) -> int:
-        return 1
-
-
 @pytest.fixture
 def context(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    monkeypatch.setattr(hello_imgui, "create_texture_gpu_from_rgba_data", lambda _: FakeTexture())
-    gui = imgui.create_context()
-    io = imgui.get_io()
-    io.display_size = imgui.ImVec2(800, 600)
-    io.backend_flags |= imgui.BackendFlags_.renderer_has_textures.value
-    imgui.new_frame()
-    imgui.begin("map", None)
-    yield
-    imgui.end()
-    imgui.render()
-    imgui.destroy_context(gui)
+    with gui_context((800, 600)):
+        monkeypatch.setattr(
+            hello_imgui, "create_texture_gpu_from_rgba_data", lambda _: FakeTexture()
+        )
+        imgui.new_frame()
+        imgui.begin("map", None)
+        yield
+        imgui.end()
+        imgui.render()
 
 
 def test_the_map_centres_on_the_trains_stops(context: None) -> None:

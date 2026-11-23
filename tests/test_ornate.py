@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from imgui_bundle import imgui
+from screens import gui_context
 
 from railroads.ui.ornate import begin_ornate, end_ornate, keep_in_front
 
@@ -12,12 +13,8 @@ UI = Path(__file__).resolve().parents[1] / "src" / "railroads" / "ui"
 
 @pytest.fixture
 def context() -> Iterator[None]:
-    gui = imgui.create_context()
-    io = imgui.get_io()
-    io.display_size = imgui.ImVec2(1280, 800)
-    io.backend_flags |= imgui.BackendFlags_.renderer_has_textures.value
-    yield
-    imgui.destroy_context(gui)
+    with gui_context():
+        yield
 
 
 def draw_long_window(scroll_to: float | None = None) -> None:

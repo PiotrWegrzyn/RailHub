@@ -2,7 +2,7 @@ from collections.abc import Iterator
 
 import pytest
 from imgui_bundle import hello_imgui, imgui
-from test_app_frame import FakeTexture
+from screens import FakeTexture, gui_context
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
@@ -20,16 +20,12 @@ def make_map() -> TileMap:
 
 @pytest.fixture
 def frame() -> Iterator[None]:
-    context = imgui.create_context()
-    io = imgui.get_io()
-    io.display_size = imgui.ImVec2(1280, 800)
-    io.backend_flags |= imgui.BackendFlags_.renderer_has_textures.value
-    imgui.new_frame()
-    imgui.begin("map")
-    yield
-    imgui.end()
-    imgui.render()
-    imgui.destroy_context(context)
+    with gui_context():
+        imgui.new_frame()
+        imgui.begin("map")
+        yield
+        imgui.end()
+        imgui.render()
 
 
 def test_the_card_lists_each_building_with_what_it_makes_and_needs(

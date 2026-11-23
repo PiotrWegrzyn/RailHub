@@ -2,6 +2,7 @@ from collections.abc import Iterator
 
 import pytest
 from imgui_bundle import hello_imgui, imgui
+from screens import FakeTexture, gui_context
 
 from railroads.sim.goods import Good, freight_of
 from railroads.sim.tiles import Board, Tile, Tiles
@@ -19,22 +20,15 @@ from railroads.ui.tiles_window import (
 )
 
 
-class FakeTexture:
-    def texture_id(self) -> int:
-        return 1
-
-
 @pytest.fixture
 def frame(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    monkeypatch.setattr(hello_imgui, "create_texture_gpu_from_rgba_data", lambda _: FakeTexture())
-    context = imgui.create_context()
-    io = imgui.get_io()
-    io.display_size = imgui.ImVec2(1280, 800)
-    io.backend_flags |= imgui.BackendFlags_.renderer_has_textures.value
-    imgui.new_frame()
-    yield
-    imgui.render()
-    imgui.destroy_context(context)
+    with gui_context():
+        monkeypatch.setattr(
+            hello_imgui, "create_texture_gpu_from_rgba_data", lambda _: FakeTexture()
+        )
+        imgui.new_frame()
+        yield
+        imgui.render()
 
 
 def test_every_tile_on_a_board_is_a_card_with_what_its_next_level_adds() -> None:

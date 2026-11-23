@@ -2,7 +2,7 @@ from collections.abc import Iterator
 
 import pytest
 from imgui_bundle import hello_imgui, imgui
-from test_app_frame import FakeTexture
+from screens import FakeTexture, gui_context
 from test_railway import joined_stations
 
 from railroads.sim.economy import SCARCE_WORTH
@@ -84,13 +84,11 @@ def test_the_list_draws_a_twenty_five_car_train_led_by_a_dining_car(gui: None) -
 
 @pytest.fixture
 def gui(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    monkeypatch.setattr(hello_imgui, "create_texture_gpu_from_rgba_data", lambda _: FakeTexture())
-    context = imgui.create_context()
-    io = imgui.get_io()
-    io.display_size = imgui.ImVec2(1280, 800)
-    io.backend_flags |= imgui.BackendFlags_.renderer_has_textures.value
-    yield
-    imgui.destroy_context(context)
+    with gui_context():
+        monkeypatch.setattr(
+            hello_imgui, "create_texture_gpu_from_rgba_data", lambda _: FakeTexture()
+        )
+        yield
 
 
 def test_the_buy_button_stays_at_the_top_while_a_long_list_of_trains_scrolls(

@@ -8,8 +8,9 @@ from typing import Any
 
 import numpy as np
 import pytest
-from imgui_bundle import hello_imgui, imgui, implot
+from imgui_bundle import hello_imgui, imgui
 from imgui_bundle import icons_fontawesome_4 as fa
+from screens import FakeTexture, gui_context
 from test_saves import played_game
 from test_web_setup import SETTINGS, FakePage, grows_as
 
@@ -44,11 +45,6 @@ from railroads.ui.workers import FrameWorker
 PICTURED = replace(SETTINGS, show_map_growing=True)
 
 
-class FakeTexture:
-    def texture_id(self) -> int:
-        return 1
-
-
 def make_map() -> TileMap:
     grid = HexGrid(rows=20, cols=24, km_per_cell=2.0)
     terrain = np.full(grid.shape, Terrain.LAND, dtype=np.uint8)
@@ -58,15 +54,11 @@ def make_map() -> TileMap:
 
 @pytest.fixture
 def context(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    monkeypatch.setattr(hello_imgui, "create_texture_gpu_from_rgba_data", lambda _: FakeTexture())
-    gui = imgui.create_context()
-    plots = implot.create_context()
-    io = imgui.get_io()
-    io.display_size = imgui.ImVec2(1280, 800)
-    io.backend_flags |= imgui.BackendFlags_.renderer_has_textures.value
-    yield
-    implot.destroy_context(plots)
-    imgui.destroy_context(gui)
+    with gui_context(plots=True):
+        monkeypatch.setattr(
+            hello_imgui, "create_texture_gpu_from_rgba_data", lambda _: FakeTexture()
+        )
+        yield
 
 
 def made_app() -> App:

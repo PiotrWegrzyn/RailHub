@@ -3,6 +3,7 @@ from collections.abc import Iterator
 import numpy as np
 import pytest
 from imgui_bundle import imgui
+from screens import gui_context
 
 from builders import flat_map
 from railroads.mapgen.world import WorldLand
@@ -29,14 +30,10 @@ def make_tile_map() -> TileMap:
 
 @pytest.fixture
 def draw_list() -> Iterator[imgui.ImDrawList]:
-    context = imgui.create_context()
-    io = imgui.get_io()
-    io.display_size = imgui.ImVec2(*SCREEN)
-    io.backend_flags |= imgui.BackendFlags_.renderer_has_textures.value
-    imgui.new_frame()
-    yield imgui.get_background_draw_list()
-    imgui.render()
-    imgui.destroy_context(context)
+    with gui_context(SCREEN):
+        imgui.new_frame()
+        yield imgui.get_background_draw_list()
+        imgui.render()
 
 
 def test_both_maps_sit_side_by_side_in_the_corner() -> None:

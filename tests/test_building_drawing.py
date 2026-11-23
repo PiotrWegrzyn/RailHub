@@ -4,6 +4,7 @@ from collections.abc import Iterator
 import numpy as np
 import pytest
 from imgui_bundle import imgui
+from screens import gui_context
 
 from railroads.sim.constructions import Building, BuildingKind, Constructions, Track, TrackWidth
 from railroads.sim.geo import Bounds
@@ -63,14 +64,10 @@ def make_constructions(grid_type: type[Grid] = HexGrid) -> Constructions:
 
 @pytest.fixture
 def draw_list() -> Iterator[imgui.ImDrawList]:
-    context = imgui.create_context()
-    io = imgui.get_io()
-    io.display_size = imgui.ImVec2(1280, 800)
-    io.backend_flags |= imgui.BackendFlags_.renderer_has_textures.value
-    imgui.new_frame()
-    yield imgui.get_background_draw_list()
-    imgui.render()
-    imgui.destroy_context(context)
+    with gui_context():
+        imgui.new_frame()
+        yield imgui.get_background_draw_list()
+        imgui.render()
 
 
 @pytest.mark.parametrize("grid_type", [HexGrid, SquareGrid], ids=["hex", "square"])
