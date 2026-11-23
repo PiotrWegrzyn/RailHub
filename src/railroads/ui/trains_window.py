@@ -5,13 +5,13 @@ cards a map to add stops on, which marks where a hovered good is wanted (railroa
 The chosen train's engine can be upgraded to a newer one of its line, alone or with every train of
 that line with an older engine."""
 
-import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
+from railroads.kept import Fresh
 from railroads.sim.amounts import EPSILON
 from railroads.sim.demand import StationDemand
 from railroads.sim.economy import SCARCE_WORTH
@@ -100,10 +100,10 @@ class TrainsWindow:
     open: bool = False
     # The name of the train shown on the right.
     chosen: str | None = None
-    # What each train's cars would earn at its destination, worked out at most every
-    # WORTH_EVERY seconds, by train name: when, and per car.
-    _worth: dict[str, tuple[float, list[float]]] = field(default_factory=dict)
-    _rides: dict[str, tuple[float, Ride | None]] = field(default_factory=dict)
+    # What each train's cars would earn at its destination, and its ride to its next stop,
+    # worked out at most every WORTH_EVERY seconds, by train name.
+    _worth: Fresh[str, list[float]] = field(default_factory=lambda: Fresh(WORTH_EVERY))
+    _rides: Fresh[str, Ride | None] = field(default_factory=lambda: Fresh(WORTH_EVERY))
     map: RouteMap = field(default_factory=RouteMap)
     # The screen trains are bought on, and the map on it for the route of a train just bought.
     buy: BuyScreen = field(default_factory=BuyScreen)
@@ -114,8 +114,8 @@ class TrainsWindow:
     # The map of the train drawn now, which shows where a good hovered on its stop cards is wanted.
     _shown_map: RouteMap = field(default_factory=RouteMap)
     # What each stop's station has to send on each month, worked out at most every WORTH_EVERY
-    # seconds, by station: when, and the goods.
-    _supplied: dict[Cell, tuple[float, Mapping[Good, float]]] = field(default_factory=dict)
+    # seconds, by station.
+    _supplied: Fresh[Cell, Mapping[Good, float]] = field(default_factory=lambda: Fresh(WORTH_EVERY))
     # The generation of cars added to each train's stops, by train name: 0 for the newest.
     _asked: dict[str, int] = field(default_factory=dict)
     # Stop cards the player folded away or opened, by train and stop; the rest are open but for
@@ -125,31 +125,16 @@ class TrainsWindow:
     def worth(self, railway: Railway, train: Train) -> list[float]:
         """What each of the train's cars would earn at its destination now, kept for a moment
         so the list of trains stays cheap to draw."""
-        now = time.monotonic()
-        kept = self._worth.get(train.name)
-        if kept is None or now - kept[0] > WORTH_EVERY or len(kept[1]) != len(train.cars):
-            kept = (now, railway.cargo_worth(train))
-            self._worth[train.name] = kept
-        return kept[1]
+        return self._worth.get(train.name, lambda: railway.cargo_worth(train), key=len(train.cars))
 
     def ride(self, railway: Railway, train: Train) -> Ride | None:
         """What the train's ride to its next stop earns and costs, kept like its cars' worth."""
-        now = time.monotonic()
-        kept = self._rides.get(train.name)
-        if kept is None or now - kept[0] > WORTH_EVERY:
-            kept = (now, railway.ride(train, self.worth(railway, train)))
-            self._rides[train.name] = kept
-        return kept[1]
+        return self._rides.get(train.name, lambda: railway.ride(train, self.worth(railway, train)))
 
     def supplied(self, supplies: Supplies, station: Cell) -> Mapping[Good, float]:
         """What a station has to send on each month, kept for a moment as it changes only
         monthly and the stop cards ask every frame."""
-        now = time.monotonic()
-        kept = self._supplied.get(station)
-        if kept is None or now - kept[0] > WORTH_EVERY:
-            kept = (now, supplies(station))
-            self._supplied[station] = kept
-        return kept[1]
+        return self._supplied.get(station, lambda: supplies(station))
 
     def draw(
         self,
@@ -164,6 +149,8 @@ class TrainsWindow:
             railway.let_go()
         if not self.open:
             return
+        for kept in (self._worth, self._rides, self._supplied):
+            kept.forget_old()
         display = imgui.get_io().display_size
         imgui.set_next_window_pos(
             (left_of_cards(display.x, WINDOW_SIZE[0]), SIDE_WINDOW_TOP),

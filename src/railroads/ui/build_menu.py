@@ -4,7 +4,6 @@ trains and stations windows; and drawing the track, routes, station reach and fa
 import itertools
 import math
 import time
-import weakref
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
@@ -14,6 +13,7 @@ import numpy as np
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
+from railroads.kept import KeptFor
 from railroads.sim.constructions import Constructions, Track, TrackWidth
 from railroads.sim.demolition import (
     DEMOLITION_PER_POINT,
@@ -501,22 +501,15 @@ def _greyed(rgba: Rgba) -> int:
 
 # The laid track of each Constructions and where its pieces run on the map, kept until the
 # railway changes.
-_LAID: weakref.WeakKeyDictionary[Constructions, tuple[int, list[Track], FloatArray]] = (
-    weakref.WeakKeyDictionary()
-)
+_LAID: KeptFor[Constructions, tuple[list[Track], FloatArray]] = KeptFor(weak=True)
 
 
 def _laid_track(constructions: Constructions) -> tuple[list[Track], FloatArray]:
-    kept = _LAID.get(constructions)
-    if kept is None or kept[0] != constructions.railway_version:
-        laid = list(constructions.track())
-        kept = (
-            constructions.railway_version,
-            laid,
-            _track_plane(laid, constructions.tile_map.grid),
-        )
-        _LAID[constructions] = kept
-    return kept[1], kept[2]
+    def laid() -> tuple[list[Track], FloatArray]:
+        pieces = list(constructions.track())
+        return pieces, _track_plane(pieces, constructions.tile_map.grid)
+
+    return _LAID.get(constructions, constructions.railway_version, laid)
 
 
 def _track_plane(pieces: list[Track], grid: Grid) -> FloatArray:

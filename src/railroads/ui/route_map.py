@@ -17,6 +17,7 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 from PIL import Image, ImageFilter
 
+from railroads.kept import Kept
 from railroads.sim.clock import QUARTER
 from railroads.sim.constructions import TrackWidth
 from railroads.sim.demand import DEMAND_PER_NEED, StationDemand
@@ -336,7 +337,7 @@ class RouteMap:
         self._framed: tuple[str, bool] | None = None
         self._dragged = False
         # The track as lines on the map and their boxes, kept until track changes (_track_lines).
-        self._track: tuple[int, list[tuple[np.ndarray, bool]], np.ndarray] | None = None
+        self._track: Kept[tuple[list[tuple[np.ndarray, bool]], np.ndarray]] = Kept()
 
     def frame(self, railway: Railway, train: Train, map_size: Vec2, panel: Panel) -> None:
         """Centres the map on the train's stops, close enough to show them all."""
@@ -522,8 +523,9 @@ class RouteMap:
     def _track_lines(self, railway: Railway) -> tuple[list[tuple[np.ndarray, bool]], np.ndarray]:
         """The track as lines on the map (track_lines), with the box round each, worked out
         again only when track has changed."""
-        version = railway.constructions.railway_version
-        if self._track is None or self._track[0] != version:
+        constructions = railway.constructions
+
+        def track() -> tuple[list[tuple[np.ndarray, bool]], np.ndarray]:
             grid = railway.constructions.tile_map.grid
             offsets = grid.track_steps() / 2
             pieces = railway.constructions.track()
@@ -537,8 +539,9 @@ class RouteMap:
             boxes = np.array([(*line.min(axis=0), *line.max(axis=0)) for line, _ in lines]).reshape(
                 -1, 4
             )
-            self._track = (version, lines, boxes)
-        return self._track[1], self._track[2]
+            return lines, boxes
+
+        return self._track.get((constructions, constructions.railway_version), track)
 
     def _draw_stations(
         self,

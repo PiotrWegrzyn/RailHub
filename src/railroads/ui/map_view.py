@@ -12,13 +12,13 @@ from imgui_bundle import hello_imgui, imgui
 from imgui_bundle import icons_fontawesome_4 as fa
 
 from railroads import maps
+from railroads.kept import Kept, KeptFor
 from railroads.mapgen.world import WorldLand
 from railroads.sim.constructions import (
     BuildingKind,
     Constructions,
     Station,
 )
-from railroads.sim.economy import Trade
 from railroads.sim.game import Game
 from railroads.sim.geo import Coord
 from railroads.sim.grids import Cell
@@ -208,19 +208,14 @@ class MapView:
         self._under: tuple[tuple[float, float], tuple[float, float]] | None = None
         # The cell whose details are open, picked by clicking without dragging.
         self.selected: Cell | None = None
-        # The buildings that take what the selected cell makes, and the cell, buildings, year and
-        # boards they were found for.
-        self._consumers: tuple[tuple[Cell, int, int, int], tuple[Cell, ...]] | None = None
+        # The buildings that take what the selected cell makes.
+        self._consumers: Kept[tuple[Cell, ...]] = Kept()
         # The cells Shift tints by how satisfied their buildings are, their packed colours, and
-        # the month's trade and buildings they were worked out for.
-        self._moods: (
-            tuple[tuple[Trade | None, int], npt.NDArray[np.intp], list[int], npt.NDArray[np.intp]]
-            | None
-        ) = None
-        # The lens turned on above the minimap, if any, and the town tints with the buildings
-        # they were worked out for.
+        # those where a kind of building gets nothing.
+        self._moods: Kept[tuple[npt.NDArray[np.intp], list[int], npt.NDArray[np.intp]]] = Kept()
+        # The lens turned on above the minimap, if any, and the town tints.
         self.lens: Lens | None = None
-        self._towns: tuple[int, npt.NDArray[np.intp], list[int]] | None = None
+        self._towns: Kept[tuple[npt.NDArray[np.intp], list[int]]] = Kept()
         # The top of the minimap on screen, which the lens buttons sit above.
         self._minimap_top: float | None = None
         # The left and right of the map the lens buttons sit over, if one is shown.
@@ -237,9 +232,10 @@ class MapView:
         self.tools = MapTools(self)
         self.input = MapInput(self)
         self._map_rect: tuple[Vec2, Vec2] = ((0.0, 0.0), (0.0, 0.0))
-        # The station preview last worked out, and for which cell, buildings and month.
-        self._station_previewed: tuple[tuple[Cell, int, Trade | None], StationPreview] | None = None
-        self._built_previewed: dict[Cell, tuple[tuple[object, ...], StationPreview]] = {}
+        # What a station built in the cell under the mouse would reach, and what each station
+        # standing reaches.
+        self._station_previewed: Kept[StationPreview] = Kept()
+        self._built_previewed: KeptFor[Cell, StationPreview] = KeptFor()
         # The station the mouse rests on, and since when, in imgui's seconds.
         self._resting: tuple[Cell, float] | None = None
         self.summaries = SummariesPanel()
@@ -737,9 +733,9 @@ class MapView:
         """consumers_in_reach of the cell, found again only once its buildings, the year or the
         boards changed: the hex details are drawn every frame."""
         key = (cell, self.constructions.version, self.growth.year, boards_changed())
-        if self._consumers is None or self._consumers[0] != key:
-            self._consumers = key, consumers_in_reach(self.constructions, cell, self.growth.year)
-        return self._consumers[1]
+        return self._consumers.get(
+            key, lambda: consumers_in_reach(self.constructions, cell, self.growth.year)
+        )
 
     def _draw_lenses(self) -> None:
         """Buttons over the bottom-right corner of the map, above the minimap, that turn a lens
@@ -811,29 +807,23 @@ class MapView:
 
     def _town_tints(self) -> tuple[npt.NDArray[np.intp], list[int]]:
         """town_cells, worked out again only once the buildings changed."""
-        version = self.constructions.version
-        if self._towns is None or self._towns[0] != version:
-            self._towns = (version, *town_cells(self.growth.towns))
-        return self._towns[1], self._towns[2]
+        return self._towns.get(self.constructions.version, lambda: town_cells(self.growth.towns))
 
     def _mood_tints(self) -> tuple[npt.NDArray[np.intp], list[int]]:
         """cell_moods's cells and their tints, worked out again only once the month's trade
         or the buildings changed."""
-        return self._cell_moods()[1:3]
+        return self._cell_moods()[:2]
 
     def _starving_cells(self) -> npt.NDArray[np.intp]:
         """The cells cell_moods finds a kind of building getting nothing in."""
-        return self._cell_moods()[3]
+        return self._cell_moods()[2]
 
-    def _cell_moods(
-        self,
-    ) -> tuple[tuple[Trade | None, int], npt.NDArray[np.intp], list[int], npt.NDArray[np.intp]]:
-        key = (self.growth.last_trade, self.constructions.version)
-        if self._moods is None or self._moods[0][0] is not key[0] or self._moods[0][1] != key[1]:
+    def _cell_moods(self) -> tuple[npt.NDArray[np.intp], list[int], npt.NDArray[np.intp]]:
+        def moods() -> tuple[npt.NDArray[np.intp], list[int], npt.NDArray[np.intp]]:
             cells, shares, starving = cell_moods(self.growth.last_trade, self.growth.assumed_shares)
-            colors = [rgba_u32(mood_tint(share)) for share in shares.tolist()]
-            self._moods = key, cells, colors, cells[starving]
-        return self._moods
+            return cells, [rgba_u32(mood_tint(share)) for share in shares.tolist()], cells[starving]
+
+        return self._moods.get((self.growth.last_trade, self.constructions.version), moods)
 
     def _marks_camera(self) -> IsoCamera | OnGround:
         """The camera marks on the map are drawn with: lifted onto raised ground in pixel art."""
@@ -896,22 +886,18 @@ class MapView:
         once the buildings, its reach or its platforms change or a month on."""
         delivery, collection = self.railway.reach(station)
         platforms = tuple(self.constructions.platforms(station))
-        key = (self.constructions.version, delivery, collection, platforms)
-        kept = self._built_previewed.get(station)
-        if kept is None or kept[0][:-1] != key or kept[0][-1] is not self.growth.last_trade:
-            preview = self.growth.station_trade.preview(station, delivery, collection, platforms)
-            kept = self._built_previewed[station] = (*key, self.growth.last_trade), preview
-        return kept[1]
+        key = (self.constructions.version, delivery, collection, platforms, self.growth.last_trade)
+        return self._built_previewed.get(
+            station,
+            key,
+            lambda: self.growth.station_trade.preview(station, delivery, collection, platforms),
+        )
 
     def _station_preview(self, cell: Cell) -> StationPreview:
         """What a station built in a cell would reach, worked out again only for another cell,
         once the buildings change or a month on."""
         key = (cell, self.constructions.version, self.growth.last_trade)
-        kept = self._station_previewed
-        if kept is None or kept[0][0] != key[0] or kept[0][1] != key[1] or kept[0][2] is not key[2]:
-            kept = key, self.growth.station_trade.preview(cell)
-            self._station_previewed = kept
-        return kept[1]
+        return self._station_previewed.get(key, lambda: self.growth.station_trade.preview(cell))
 
     def _signal_layer(self) -> SignalLayer:
         if self._signals is None:

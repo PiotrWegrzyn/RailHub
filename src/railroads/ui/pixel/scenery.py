@@ -11,6 +11,7 @@ from typing import Self
 import numpy as np
 from PIL import Image, ImageDraw
 
+from railroads.kept import KeptFor
 from railroads.sim.constructions import GREW_FROM, BuildingKind, Constructions, Track, TrackWidth
 from railroads.sim.grids import BoolGrid, Cell, FloatArray, Grid, IntArray
 from railroads.sim.tilemap import Relief, Terrain, TileMap
@@ -450,32 +451,31 @@ _KNOWN: weakref.WeakKeyDictionary[Constructions, dict[Cell, tuple]] = weakref.We
 
 # The track near each cell (_track_near) for each Constructions, with the railway version it was
 # found for.
-_NEAR: weakref.WeakKeyDictionary[Constructions, tuple[int, dict[Cell, tuple]]] = (
-    weakref.WeakKeyDictionary()
-)
+_NEAR: KeptFor[Constructions, dict[Cell, tuple[tuple[Track, bool], ...]]] = KeptFor(weak=True)
 
 
 def _track_near(constructions: Constructions) -> dict[Cell, tuple[tuple[Track, bool], ...]]:
     """The track drawn in or next to each cell, each piece with whether it runs through a
     station, with its platform beside it. Track in tunnels is out of sight and left out. Found
     again only once track or stations changed."""
-    version = constructions.railway_version
-    kept = _NEAR.get(constructions)
-    if kept is not None and kept[0] == version:
-        return kept[1]
-    grid = constructions.tile_map.grid
-    pieces = [(piece, False) for piece in constructions.track() if piece.bed != TrackBed.TUNNEL]
-    pieces += [
-        (Track(cell, constructions.station_ends(cell), station_width(constructions, cell)), True)
-        for cell in constructions.every_station_cell()
-    ]
-    near: dict[Cell, list[tuple[Track, bool]]] = {}
-    for piece, station in pieces:
-        for cell in (piece.cell, *grid.neighbours(*piece.cell)):
-            near.setdefault(cell, []).append((piece, station))
-    found_near = {cell: tuple(found) for cell, found in near.items()}
-    _NEAR[constructions] = (version, found_near)
-    return found_near
+
+    def near() -> dict[Cell, tuple[tuple[Track, bool], ...]]:
+        grid = constructions.tile_map.grid
+        pieces = [(piece, False) for piece in constructions.track() if piece.bed != TrackBed.TUNNEL]
+        pieces += [
+            (
+                Track(cell, constructions.station_ends(cell), station_width(constructions, cell)),
+                True,
+            )
+            for cell in constructions.every_station_cell()
+        ]
+        found: dict[Cell, list[tuple[Track, bool]]] = {}
+        for piece, station in pieces:
+            for cell in (piece.cell, *grid.neighbours(*piece.cell)):
+                found.setdefault(cell, []).append((piece, station))
+        return {cell: tuple(each) for cell, each in found.items()}
+
+    return _NEAR.get(constructions, constructions.railway_version, near)
 
 
 def _placed_off_track(
