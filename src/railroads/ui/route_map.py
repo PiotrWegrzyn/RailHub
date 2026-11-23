@@ -48,6 +48,9 @@ DRAG_START = 3.0
 # How much room round a train's stops is shown when the map frames them, as a share of the
 # distance they spread over.
 FRAME_MARGIN = 0.6
+# How many times as close as the whole map the map comes at most when it frames a train's stops,
+# so a first stop or two near each other still show a large part of the map round them.
+MOST_FRAMING_ZOOM = 3.0
 HIGHLIGHT_ICON = 16.0
 # How far inside the map's edge a station off it that wants the hovered good is pointed at.
 EDGE_INSET = 10.0
@@ -347,7 +350,7 @@ class RouteMap:
         spread_x = (max(xs) - min(xs)) * (1 + FRAME_MARGIN) + 8
         spread_y = (max(ys) - min(ys)) * (1 + FRAME_MARGIN) + 8
         wanted = min(panel.width / spread_x, panel.height / spread_y)
-        self.zoom = min(max(wanted / _fit(panel, map_size), 1.0), MOST_ZOOM)
+        self.zoom = min(max(wanted / _fit(panel, map_size), 1.0), MOST_FRAMING_ZOOM)
 
     def zoom_at(self, frame: MapFrame, map_size: Vec2, x: float, y: float, steps: float) -> None:
         """Zooms in (steps above 0) or out, keeping the map point under (x, y) where it is."""

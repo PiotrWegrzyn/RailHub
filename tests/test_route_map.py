@@ -16,6 +16,7 @@ from railroads.ui.route_map import (
     GENERAL_SHADES,
     LEAST_MADE,
     MADE_SHADES,
+    MOST_FRAMING_ZOOM,
     MOST_ZOOM,
     SHADE_FROM,
     SOFTEN_ROWS,
@@ -435,3 +436,18 @@ def test_the_map_frames_a_new_train_again_once_it_gets_its_first_stops() -> None
     assert stale
     assert unframed is None
     assert route_map.focus is not None
+
+
+def test_framing_a_train_with_one_stop_comes_only_a_little_closer_and_shows_much_of_the_map() -> (
+    None
+):
+    _, railway = joined_stations()
+    map_size = railway.constructions.tile_map.grid.size()
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3))]
+    route_map = RouteMap()
+
+    route_map.frame(railway, train, map_size, PANEL)
+
+    assert 1.0 <= route_map.zoom <= MOST_FRAMING_ZOOM < MOST_ZOOM
