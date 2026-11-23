@@ -20,7 +20,7 @@ from railroads.sim.grids import Cell, Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 from railroads.ui.pixel import track_art
-from railroads.ui.pixel.art import SPRITES, draw_sheet
+from railroads.ui.pixel.art.registry import SPRITES, draw_sheet
 from railroads.ui.pixel.art.stations import TURNED_LINES
 from railroads.ui.pixel.ground import AROUND, CROWN_GAP, _depths, _tallest_crown, crown_radii
 from railroads.ui.pixel.lattice import Lattice

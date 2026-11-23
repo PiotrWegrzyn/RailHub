@@ -23,7 +23,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
 from railroads.sim.trains import Point, Train
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, IsoCamera, Vec2
-from railroads.ui.pixel.art import Sprite
+from railroads.ui.pixel.art.registry import Sprite
 from railroads.ui.pixel.models import HEIGHT_PER_WIDTH
 from railroads.ui.pixel.relief import MOST_LIFT
 from railroads.ui.pixel.track_art import BEND, TrackArt

@@ -26,7 +26,7 @@ from railroads.sim.goods import Good
 from railroads.sim.grids import FloatArray, IntArray
 from railroads.ui.iso_camera import TILT
 from railroads.ui.pixel import train_parts as parts
-from railroads.ui.pixel.art import Sprite
+from railroads.ui.pixel.art.registry import Sprite
 from railroads.ui.pixel.models import (
     HEIGHT_PER_WIDTH,
     RGB,

@@ -15,7 +15,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from railroads.ui.pixel.art import draw_sheet
+from railroads.ui.pixel.art.registry import draw_sheet
 from railroads.ui.pixel.good_icons import ICONS_INDEX, ICONS_PNG, draw_icon_sheet
 from railroads.ui.pixel.sheet import DENSITIES, sheet_files, sprite_name
 

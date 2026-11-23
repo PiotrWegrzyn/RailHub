@@ -8,7 +8,7 @@ from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
 from railroads.ui.pixel import track_art
-from railroads.ui.pixel.art import draw_sheet
+from railroads.ui.pixel.art.registry import draw_sheet
 from railroads.ui.pixel.projection import PixelProjection
 from railroads.ui.pixel.relief import Elevation
 from railroads.ui.pixel.sheet import SpriteSheet

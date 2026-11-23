@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from railroads.ui.pixel.art import Painter, Sprite, shade
+from railroads.ui.pixel.art.registry import Painter, Sprite, shade
 from railroads.ui.pixel.projection import RGB
 
 ICON_DIR = Path(__file__).parent

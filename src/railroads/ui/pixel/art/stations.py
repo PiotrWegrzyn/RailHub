@@ -31,6 +31,7 @@ from railroads.ui.pixel.art.built import (
 )
 from railroads.ui.pixel.art.painter import BRICK, NAME_BOARD, RGB, VERDIGRIS, Sprite, shade
 from railroads.ui.pixel.models import Face, Model
+from railroads.ui.pixel.track_art import BANK, PLATFORM_WIDTH, SET_BACK
 
 # The station houses on hexes, drawn turned along the track through them: for each way track
 # runs on the screen, the heading the house's length lies along, chosen so its front, with the
@@ -468,7 +469,6 @@ def by_platform(build: Callable[[], Model], front: float, heading: float) -> Mod
     picture, past the bank and the platform (railroads.ui.pixel.track_art, which needs this
     module's package first), and the cells across the track fill more or less of the picture by
     the way it runs."""
-    from railroads.ui.pixel.track_art import BANK, PLATFORM_WIDTH, SET_BACK
 
     m = build()
     if front == 0.0:

@@ -4,10 +4,11 @@ import numpy as np
 import pytest
 from screens import make_world
 
-from railroads.ui.pixel.art import MODELS, _scale_of, draw_sheet, fine_sprite, homes, industry
+from railroads.ui.pixel.art import homes, industry
 from railroads.ui.pixel.art.built import HEADING, PROJECTION
 from railroads.ui.pixel.art.nature import DRAWN_AT, _drawn_at
 from railroads.ui.pixel.art.painter import ROOFS, WALLS, drawn_at
+from railroads.ui.pixel.art.registry import MODELS, _scale_of, draw_sheet, fine_sprite
 from railroads.ui.pixel.layer import CLOSE_FROM, chunk_resolution
 from railroads.ui.pixel.models import Model, draw_model
 from railroads.ui.pixel.sheet import SpriteSheet

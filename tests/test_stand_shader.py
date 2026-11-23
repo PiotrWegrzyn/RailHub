@@ -3,7 +3,7 @@ import pytest
 from test_pixel_world import make_world
 
 from railroads.ui.pixel import world as world_module
-from railroads.ui.pixel.art import draw_sheet
+from railroads.ui.pixel.art.registry import draw_sheet
 from railroads.ui.pixel.projection import CHUNK
 from railroads.ui.pixel.sheet import DENSITIES, SpriteSheet
 from railroads.ui.pixel.stand_shader import (

@@ -15,7 +15,7 @@ from dataclasses import replace
 from PIL import Image, ImageDraw
 
 from railroads.sim.grids import HexGrid
-from railroads.ui.pixel.art.painter import RGB, SHADOW, Sprite, fineness, shade
+from railroads.ui.pixel.art.painter import RGB, SHADOW, Sprite, chimney_top, fineness, shade
 from railroads.ui.pixel.models import HEIGHT_PER_WIDTH, Face, Model, draw_model
 from railroads.ui.pixel.projection import PixelProjection
 
@@ -629,7 +629,6 @@ def stack(
 ) -> float:
     """The painted sprite's chimney stack drawn from `foot` up to `top` at x (lowered as the
     painted ones are), standing on the ground behind; returns how high its cap is."""
-    from railroads.ui.pixel.art.painter import chimney_top
 
     u, v = spot(x + width / 2, foot)
     high = tall(foot - chimney_top(foot, top))
