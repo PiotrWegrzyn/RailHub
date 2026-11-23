@@ -69,7 +69,7 @@ GOOD_COLORS: Mapping[Good, Rgba] = {
     Good.FUEL: (0.82, 0.74, 0.26, 1.0),
     Good.GAS: (0.5, 0.72, 0.92, 1.0),
     Good.CHEMICALS: (0.56, 0.84, 0.4, 1.0),
-    Good.FURNITURE: (0.6, 0.42, 0.24, 1.0),
+    Good.FURNITURE: (0.56, 0.3, 0.1, 1.0),
     Good.CLOTHES: (0.86, 0.48, 0.7, 1.0),
     Good.BARRELS: (0.58, 0.38, 0.2, 1.0),
     Good.WINE: (0.56, 0.1, 0.26, 1.0),

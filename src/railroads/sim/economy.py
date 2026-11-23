@@ -122,7 +122,7 @@ STEP_SECONDS = 0.008
 STOCK_MONTHS = 2.0
 
 
-@cache
+@year_cached
 def input_stock(kind: BuildingKind, need: Need, year: int) -> float:
     """The most of an input one processor of a kind keeps in stock in a given year: STOCK_MONTHS
     of what it uses of it making the most it can, with every boost that lets it take in more and

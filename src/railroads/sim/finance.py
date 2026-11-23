@@ -29,7 +29,7 @@ TRAIN_RESALE = 0.5
 CAR_TRIP_PRICE = 15.0
 CAR_PLACE_PRICE = 1.0
 CAR_PLACES = 10
-# What raising a station to level 2, and then to level 3, costs; and the first storage upgrade,
+# What raising a station to each level above the first costs; and the first storage upgrade,
 # each one after costing STORAGE_GROWTH times the one before (storage_price).
 LEVEL_PRICES = (50_000.0, 250_000.0, 1_500_000.0, 10_000_000.0)
 STORAGE_PRICE = 10_000.0

@@ -5,6 +5,7 @@ from collections.abc import Callable
 from functools import cache
 
 _CLEARS: list[Callable[[], None]] = []
+_forgotten = 0
 
 
 def year_cached[F: Callable[..., object]](fn: F) -> F:
@@ -14,8 +15,15 @@ def year_cached[F: Callable[..., object]](fn: F) -> F:
 
 
 def forget() -> None:
+    global _forgotten
+    _forgotten += 1
     for clear in _CLEARS:
         clear()
+
+
+def boards_changed() -> int:
+    """How many times the boards have changed, for a cache kept elsewhere to know it is stale."""
+    return _forgotten
 
 
 def on_forget(clear: Callable[[], None]) -> None:

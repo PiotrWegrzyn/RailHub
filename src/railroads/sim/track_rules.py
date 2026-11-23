@@ -1,7 +1,7 @@
 """What the land means for building track and running trains. A cell of track costs
-railroads.sim.finance.TRACK_PRICE times its price factor: $300 on the flat, $450 in hills,
-twice that across a minor river, $10,000 for a bridge and $20,000 for a tunnel. The cost factor is how much route planning
-avoids it, kept small so planning stays quick. Trains run at the speed factor of their top speed
+railroads.sim.finance.TRACK_PRICE times its price factor: half as much again in hills,
+STREAM_FACTOR times that across a minor river, and far more for a bridge or a tunnel. The cost
+factor is how much route planning avoids it, kept small so planning stays quick. Trains run at the speed factor of their top speed
 through a cell, and burn the burn factor of their fuel there: hills slow them by 30% and make them
 burn half as much again, bridges and tunnels slow them by 20%."""
 

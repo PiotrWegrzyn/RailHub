@@ -419,8 +419,8 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     },
 }
 
-# Works that merge as they gather: two of a kind in a neighbourhood become its big one, and two
-# big ones its mega one (railroads.sim.ladders). The factory line merges its own way.
+# Works that merge as they gather: a few of a kind in a neighbourhood become its big one, and as
+# many big ones its mega one (railroads.sim.goods.merging, railroads.sim.ladders). The factory line merges its own way.
 MERGED: dict[BuildingKind, tuple[BuildingKind, BuildingKind]] = {
     BuildingKind[kind.name.removeprefix("BIG_")]: (kind, BuildingKind["MEGA_" + kind.name[4:]])
     for kind in BuildingKind

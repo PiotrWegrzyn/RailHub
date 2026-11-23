@@ -27,6 +27,7 @@ from railroads.sim.railway import Railway
 from railroads.sim.station_trade import StationPreview
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Terrain, TileMap
+from railroads.sim.year_caches import boards_changed
 from railroads.ui.build_menu import (
     BuildMenu,
     Tool,
@@ -203,9 +204,9 @@ class MapView:
         self._under: tuple[tuple[float, float], tuple[float, float]] | None = None
         # The cell whose details are open, picked by clicking without dragging.
         self.selected: Cell | None = None
-        # The buildings that take what the selected cell makes, and the cell, buildings and year
-        # they were found for.
-        self._consumers: tuple[tuple[Cell, int, int], tuple[Cell, ...]] | None = None
+        # The buildings that take what the selected cell makes, and the cell, buildings, year and
+        # boards they were found for.
+        self._consumers: tuple[tuple[Cell, int, int, int], tuple[Cell, ...]] | None = None
         # The cells Shift tints by how satisfied their buildings are, their packed colours, and
         # the month's trade and buildings they were worked out for.
         self._moods: (
@@ -729,9 +730,9 @@ class MapView:
         return True
 
     def _consumers_of(self, cell: Cell) -> tuple[Cell, ...]:
-        """consumers_in_reach of the cell, found again only once its buildings or the year
-        changed: the hex details are drawn every frame."""
-        key = (cell, self.constructions.version, self.growth.year)
+        """consumers_in_reach of the cell, found again only once its buildings, the year or the
+        boards changed: the hex details are drawn every frame."""
+        key = (cell, self.constructions.version, self.growth.year, boards_changed())
         if self._consumers is None or self._consumers[0] != key:
             self._consumers = key, consumers_in_reach(self.constructions, cell, self.growth.year)
         return self._consumers[1]

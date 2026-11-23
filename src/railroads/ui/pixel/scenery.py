@@ -208,7 +208,7 @@ BUILDING_SPRITES = {
     BuildingKind.JUICE_WORKS: "winery",
 }
 
-# Big and mega works have sprites of their own (railroads.ui.pixel.art.GROWN_SCALE).
+# Big and mega works have sprites of their own (railroads.ui.pixel.art.GROWN_WIDTH).
 for _grown, _kind in GREW_FROM.items():
     BUILDING_SPRITES[_grown] = f"{_grown.name.split('_')[0].lower()}_{BUILDING_SPRITES[_kind]}"
 

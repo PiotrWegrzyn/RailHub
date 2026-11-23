@@ -1,7 +1,7 @@
 import pytest
 from test_railway import joined_stations
 
-from builders import flat_map
+from builders import boards_with, flat_map, open_boards
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.demand import DEMAND_PER_NEED
 from railroads.sim.economy import input_stock
@@ -10,6 +10,7 @@ from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station
+from railroads.sim.tiles import Tile, activate
 
 
 def close_stations() -> tuple[Growth, Railway]:
@@ -162,3 +163,13 @@ def test_a_station_reaches_out_from_its_platforms_as_well() -> None:
     preview = growth.station_trade.preview((6, 10), platforms=((6, 13),))
 
     assert {kind: many for kind, many, _, _ in preview.reached} == {BuildingKind.HOUSE: 6}
+
+
+def test_a_processor_keeps_as_much_more_input_in_stock_once_its_demand_tile_goes_up() -> None:
+    activate(open_boards())
+    before = input_stock(BuildingKind.STEEL_MILL, Need.COAL, 1900)
+
+    activate(boards_with(wanted={Tile.COAL: 2.0}))
+    after = input_stock(BuildingKind.STEEL_MILL, Need.COAL, 1900)
+
+    assert after > before

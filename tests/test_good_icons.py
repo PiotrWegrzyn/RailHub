@@ -6,7 +6,7 @@ from PIL import Image
 
 from railroads.sim.goods import Good, Need
 from railroads.ui.pixel.good_icons import ICON_PIXELS, ICONS, ICONS_INDEX, ICONS_PNG
-from railroads.ui.theme import icon_name
+from railroads.ui.theme import GOOD_COLORS, icon_name
 
 
 @pytest.mark.parametrize("good", [*Good, *Need], ids=lambda good: good.value)
@@ -30,3 +30,11 @@ def test_hovering_a_category_names_the_goods_in_it() -> None:
     named = icon_name(Need.ALCOHOL), icon_name(Good.BEER)
 
     assert named == ("alcohol: beer, wine, vodka, sake", "beer: 1 barrel = 200 kg")
+
+
+def test_no_two_goods_share_a_colour() -> None:
+    colours = list(GOOD_COLORS.values())
+
+    shared = len(colours) - len(set(colours))
+
+    assert shared == 0

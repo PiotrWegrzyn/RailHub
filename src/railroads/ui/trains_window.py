@@ -810,8 +810,9 @@ def upgrade_menu(railway: Railway, train: Train) -> None:
         if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
             imgui.set_tooltip(summary)
         if len(alike) > 1:
-            total = sum(railway.swap_price(t, name) for t in alike)
-            imgui.begin_disabled(not railway.finances.can_afford(price))
+            prices = [railway.swap_price(t, name) for t in alike]
+            total = sum(prices)
+            imgui.begin_disabled(not railway.finances.can_afford(min(prices)))
             line = engine.line.value
             label = (
                 f"All {len(alike)} {line} trains with older engines  {dollars(total)}##all{name}"

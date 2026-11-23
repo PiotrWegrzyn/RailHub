@@ -894,7 +894,7 @@ _BAKERY = Ladder(
 
 BAKERIES = _merges(_BAKERY)
 
-# Butchers open in towns from 1850, the likelier the more people live around, like bakeries.
+# Butchers open in towns, the likelier the more people live around, like bakeries.
 BUTCHERS = _merges(replace(_BAKERY, kinds=(BuildingKind.MEAT_FACTORY,), base=0.75, from_year=1600))
 
 # Town crafts that come up, like bakeries, the likelier the more people live around: potters and
@@ -1153,7 +1153,7 @@ SUSHI_HUTS = replace(
     land_cells_each=SUSHI_LAND_CELLS,
 )
 
-# Filling stations open in towns once motor cars come, half as often as taverns.
+# Filling stations open in towns once motor cars come, less often than taverns.
 FILLING_STATION_YEAR = 1920
 FILLING_STATIONS = replace(
     TAVERNS, kinds=(BuildingKind.FILLING_STATION,), base=20, from_year=FILLING_STATION_YEAR
