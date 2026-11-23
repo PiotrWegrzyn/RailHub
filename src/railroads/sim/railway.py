@@ -355,9 +355,8 @@ class Railway:
         return ENGINES[train.engine].cars
 
     def max_pull(self, engine: str) -> float:
-        """The most an engine pulls, in tonnes, pulling the newest generation of cars of the era
-        (railroads.sim.tiles)."""
-        return ENGINES[engine].pull_at(self.wagon_era())
+        """The most an engine pulls, in tonnes, whatever generation of cars it pulls."""
+        return ENGINES[engine].tonnes
 
     def pull(self, train: Train) -> float:
         """How much of its engine's top speed a train makes with its cars behind it: all of it

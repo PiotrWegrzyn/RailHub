@@ -545,9 +545,12 @@ def test_the_rocket_pulls_one_full_coal_car_but_not_two() -> None:
     assert added == [True, False]
 
 
-def test_a_railbus_pulls_its_coaches_full_but_not_as_many_coal_cars() -> None:
+def test_a_railbus_pulls_its_coaches_full_but_not_as_many_coal_cars_of_its_newest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     railway = line()
     railway.year = opened_in("railbus")
+    monkeypatch.setattr(railway, "wagon_era", lambda: ENGINES["railbus"].top_generation)
     train = railway.buy("railbus")
     assert train is not None
     coaches, coal = Stop(WEST), Stop(EAST)
@@ -583,13 +586,17 @@ def test_a_general_car_weighs_as_much_as_the_heaviest_of_its_goods_would() -> No
     assert weight == pytest.approx(heaviest)
 
 
-def test_an_engine_pulls_as_much_as_its_train_full_of_the_eras_newest_cars() -> None:
+def test_an_engine_pulls_as_much_with_today_s_cars_as_it_will_with_the_newest_it_takes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     railway = line()
-    railway.year = 1850
+    monkeypatch.setattr(railway, "wagon_era", lambda: 2)
 
-    pull = railway.max_pull("planet")
+    pull = railway.max_pull("light_tank")
 
-    assert pull == pytest.approx(ENGINES["planet"].pull_at(BASE_GENERATION))
+    assert ENGINES["light_tank"].top_generation == 3
+    assert pull == pytest.approx(ENGINES["light_tank"].tonnes)
+    assert pull > ENGINES["tank"].tonnes
 
 
 def test_cars_load_no_more_than_their_engine_pulls() -> None:

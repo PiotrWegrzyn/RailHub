@@ -525,15 +525,11 @@ class Engine:
 
     @property
     def tonnes(self) -> float:
-        """The most it pulls, in tonnes, pulling its top_generation's cars."""
-        return self.pull_at(self.top_generation)
-
-    def pull_at(self, generation: int) -> float:
-        """The most it pulls, in tonnes, pulling cars of a generation up to its top_generation,
-        PULL_SHARE of its train of them full."""
+        """The most it pulls, in tonnes, behind it whatever generation of cars: PULL_SHARE of its
+        train full of its top_generation's cars."""
         coaches = self.express or self.railcar
         good = Good.PASSENGERS if coaches else Good.COAL
-        generation = min(generation, self.top_generation)
+        generation = self.top_generation
         car = full_tonnes(good, car_size(good, generation), generation)
         share = self.pull_share or PULL_SHARE[Kind.EXPRESS if coaches else self.kind]
         return share * self.hauls * car
