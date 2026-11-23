@@ -32,6 +32,7 @@ from railroads.ui.theme import (
     BRASS,
     Rgba,
     color_u32,
+    colored,
     draw_good_icon,
     good_amount,
     good_icon,
@@ -465,11 +466,8 @@ class RouteMap:
         )
         for label, shades, count, why in counts:
             imgui.same_line(0, 8)
-            imgui.text_colored(imgui.ImVec4(*shades[1]), f"{label} {count}")
-            if imgui.is_item_hovered():
-                imgui.set_tooltip(
-                    f"{why}: lightest under {low} a month, middle {low}-{high}, darkest {high}+"
-                )
+            colored(shades[1], f"{label} {count}")
+            tip(f"{why}: lightest under {low} a month, middle {low}-{high}, darkest {high}+")
         return steps
 
     def _handle_mouse(self, frame: MapFrame, map_size: Vec2) -> tuple[bool, bool]:
@@ -630,7 +628,7 @@ def _summary_row(
     items: list[tuple[Need, float]] | list[tuple[Good, float]],
     more: int,
 ) -> None:
-    imgui.text_colored(imgui.ImVec4(*rgba), title)
+    colored(rgba, title)
     imgui.same_line(56)
     if not items:
         imgui.text_disabled("nothing")

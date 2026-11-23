@@ -11,7 +11,7 @@ from railroads.sim.clock import END_YEAR
 from railroads.sim.company import BOOK_SHARE, CompanyValue, Goal, company_value
 from railroads.sim.finance import dollars
 from railroads.sim.game import Game
-from railroads.ui.theme import BRASS, GONE, GROWN, TEXT_DIM, danger_button
+from railroads.ui.theme import BRASS, GONE, GROWN, TEXT_DIM, colored, danger_button, tip
 
 if TYPE_CHECKING:
     from railroads.ui.app import App
@@ -53,8 +53,8 @@ def draw_worth(game: Game, target: bool = True) -> None:
     value = WORTH.of(game)
     imgui.align_text_to_frame_padding()
     colour = GROWN if value.total >= goal.target else BRASS
-    imgui.text_colored(
-        imgui.ImVec4(*colour),
+    colored(
+        colour,
         f"{fa.ICON_FA_UNIVERSITY}  {dollars(value.total)}"
         + (f" / {dollars(goal.target)}" if target else ""),
     )
@@ -62,27 +62,26 @@ def draw_worth(game: Game, target: bool = True) -> None:
         _worth_tip(goal, value)
     if goal.bankrupt is not None:
         imgui.same_line(0, 10)
-        imgui.text_colored(imgui.ImVec4(*GONE), f"{fa.ICON_FA_BAN}  Bankrupt")
+        colored(GONE, f"{fa.ICON_FA_BAN}  Bankrupt")
     elif game.finances.cash < 0:
         imgui.same_line(0, 10)
         months = goal.months_left
-        imgui.text_colored(
-            imgui.ImVec4(*GONE),
+        colored(
+            GONE,
             f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  Bankrupt in {months} "
             f"month{'' if months == 1 else 's'}",
         )
-        if imgui.is_item_hovered():
-            imgui.set_tooltip(
-                f"If {months} more month{'' if months == 1 else 's'} begin with your cash below "
-                "nothing, the company goes bankrupt and the game ends."
-            )
+        tip(
+            f"If {months} more month{'' if months == 1 else 's'} begin with your cash below "
+            "nothing, the company goes bankrupt and the game ends."
+        )
 
 
 def _worth_tip(goal: Goal, value: CompanyValue) -> None:
     imgui.begin_tooltip()
     imgui.text(f"Company worth: {dollars(value.total)}")
     for name, amount in value.parts():
-        imgui.text_colored(imgui.ImVec4(*(TEXT_DIM if amount >= 0 else GONE)), f"   {name}")
+        colored(TEXT_DIM if amount >= 0 else GONE, f"   {name}")
         imgui.same_line(110)
         imgui.text(dollars(amount))
     imgui.text_disabled(
@@ -91,11 +90,9 @@ def _worth_tip(goal: Goal, value: CompanyValue) -> None:
     imgui.separator()
     imgui.text(f"{goal.difficulty.value} target for 1 January {END_YEAR}: {dollars(goal.target)}")
     if goal.met is not None:
-        imgui.text_colored(
-            imgui.ImVec4(*(GROWN if goal.met else GONE)), "Met" if goal.met else "Missed"
-        )
+        colored(GROWN if goal.met else GONE, "Met" if goal.met else "Missed")
     elif goal.reached is not None:
-        imgui.text_colored(imgui.ImVec4(*GROWN), f"First reached in {goal.reached}")
+        colored(GROWN, f"First reached in {goal.reached}")
     imgui.end_tooltip()
 
 
@@ -114,7 +111,7 @@ def draw_goal_news(app: App) -> None:
         return
     bankrupt = news.ends_game
     colour = GONE if news.bad else BRASS
-    imgui.text_colored(imgui.ImVec4(*colour), news.title.upper())
+    colored(colour, news.title.upper())
     imgui.separator()
     imgui.push_text_wrap_pos(0.0)
     imgui.text(news.text)

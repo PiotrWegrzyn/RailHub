@@ -10,7 +10,15 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.sim.goods import Good, Need
-from railroads.ui.theme import BRASS, TEXT_DIM, Rgba, color_u32, draw_good_icon
+from railroads.ui.theme import (
+    BRASS,
+    OVERLAY,
+    OVERLAY_FLAGS,
+    TEXT_DIM,
+    Rgba,
+    color_u32,
+    draw_good_icon,
+)
 
 DEEP = (0.065, 0.05, 0.04, 0.97)
 CARD = (0.12, 0.093, 0.07, 1.0)
@@ -356,3 +364,19 @@ def keep_in_front() -> None:
     if imgui.is_popup_open("", imgui.PopupFlags_.any_popup_id.value):
         return
     imgui.internal.bring_window_to_display_front(imgui.internal.get_current_window().root_window)
+
+
+@contextmanager
+def hover_card(
+    name: str, top_left: tuple[float, float], width: float | None = None
+) -> Iterator[bool]:
+    """A card laid over the map at `top_left` that takes no clicks, `width` wide if given; yields
+    whether it is shown."""
+    imgui.set_next_window_pos(top_left)
+    imgui.set_next_window_bg_alpha(OVERLAY[3])
+    if width is not None:
+        imgui.set_next_window_size_constraints((width, 0), (width, 1e6))
+    try:
+        yield imgui.begin(name, None, OVERLAY_FLAGS | imgui.WindowFlags_.no_inputs.value)[0]
+    finally:
+        imgui.end()

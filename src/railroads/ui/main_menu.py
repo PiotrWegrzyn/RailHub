@@ -31,7 +31,7 @@ from railroads.ui.save_files import (
     save_files,
 )
 from railroads.ui.saves_window import draw_save_list
-from railroads.ui.theme import BRASS, GONE, TEXT_DIM, color_u32, tip
+from railroads.ui.theme import BRASS, GONE, TEXT_DIM, color_u32, colored, tip
 from railroads.version import VERSION
 from railroads.words import counted
 
@@ -176,7 +176,7 @@ class MainMenu:
         imgui.spacing()
         if self.error:
             imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)
-            imgui.text_colored(imgui.ImVec4(*GONE), self.error)
+            colored(GONE, self.error)
             imgui.pop_text_wrap_pos()
         imgui.spacing()
         with bar_buttons():
@@ -253,9 +253,10 @@ class MainMenu:
         imgui.begin_disabled(not world)
         yolo = imgui.button(f"{fa.ICON_FA_RANDOM}  Yolo! random map", (MENU_WIDTH, 0))
         imgui.end_disabled()
-        if not world and imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-            imgui.set_tooltip(
-                "Needs the world's map data: uv run python tools/build_world_files.py"
+        if not world:
+            tip(
+                "Needs the world's map data: uv run python tools/build_world_files.py",
+                disabled=True,
             )
         if yolo:
             self.error = ""
@@ -263,10 +264,7 @@ class MainMenu:
         imgui.spacing()
         _, self.show_map_growing = imgui.checkbox("Show map generation", self.show_map_growing)
         imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)
-        imgui.text_colored(
-            imgui.ImVec4(*BRASS),
-            "Shows the map as its towns grow; loading takes about a minute longer.",
-        )
+        colored(BRASS, "Shows the map as its towns grow; loading takes about a minute longer.")
         imgui.pop_text_wrap_pos()
         imgui.spacing()
         self._draw_difficulty()
@@ -325,7 +323,7 @@ class MainMenu:
             flags=imgui.SliderFlags_.always_clamp.value,
         )
         self.start_year = allowed_start_year(year)
-        imgui.text_colored(imgui.ImVec4(*BRASS), f"{START_YEAR} is suggested.")
+        colored(BRASS, f"{START_YEAR} is suggested.")
         imgui.text_disabled(
             f"Towns grow for {self.start_year - HISTORY_START} years from {HISTORY_START} first; "
             "more years take longer to set up."

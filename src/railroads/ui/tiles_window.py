@@ -45,6 +45,7 @@ from railroads.ui.theme import (
     WINDOW_TOP,
     Rgba,
     color_u32,
+    colored,
     draw_good_icon,
 )
 
@@ -577,12 +578,12 @@ class TilesWindow:
             pivot=(0.0 if right else 1.0, 1.0 if lower else 0.0),
         )
         imgui.begin_tooltip()
-        imgui.text_colored(imgui.ImVec4(*BRASS), "Freight a unit")
+        colored(BRASS, "Freight a unit")
         for good in TILE_GOODS[card.tile]:
-            imgui.text_colored(imgui.ImVec4(*TEXT_DIM), freight_line(card, good))
+            colored(TEXT_DIM, freight_line(card, good))
         if board == Board.DEMAND:
             for line in all_unlocks(card.tile):
-                imgui.text_colored(imgui.ImVec4(*GROWN), line)
+                colored(GROWN, line)
         imgui.end_tooltip()
 
     def _draw_buttons(self, tiles: Tiles) -> None:

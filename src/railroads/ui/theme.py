@@ -257,10 +257,22 @@ def rgba_u32(rgba: Rgba) -> int:
     return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))
 
 
-def tip(text: str) -> None:
-    """Shows `text` while the last item is hovered."""
-    if imgui.is_item_hovered():
+def left_of_cards(screen_width: float, window_width: float) -> float:
+    """Where a window this wide first opens so that it stands just left of the news cards, but
+    never past the screen's left edge."""
+    return max(8.0, screen_width - window_width - CARDS_WIDTH - 16)
+
+
+def tip(text: str, *, disabled: bool = False) -> None:
+    """Shows `text` while the last item is hovered, even while it is disabled if `disabled`."""
+    flags = imgui.HoveredFlags_.allow_when_disabled.value if disabled else 0
+    if imgui.is_item_hovered(flags):
         imgui.set_tooltip(text)
+
+
+def colored(rgba: Rgba, text: str) -> None:
+    """A line of text in a colour of its own."""
+    imgui.text_colored(imgui.ImVec4(*rgba), text)
 
 
 def toggle_button(
@@ -515,10 +527,10 @@ def rows_that_fit() -> tuple[float, int]:
     )
 
 
-def next_good_slot(index: int, left: float, per_row: int) -> None:
-    """Places the next good of a run: beside the last, or at the start of a new row."""
+def next_good_slot(index: int, left: float, per_row: int, gap: float = 10.0) -> None:
+    """Places the next good of a run: `gap` beside the last, or at the start of a new row."""
     if index % per_row:
-        imgui.same_line(0, 10)
+        imgui.same_line(0, gap)
     elif index:
         imgui.set_cursor_pos_x(left)
 

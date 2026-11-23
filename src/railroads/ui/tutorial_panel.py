@@ -9,7 +9,7 @@ from railroads.tutorial.steps import STEPS, Tutorial
 from railroads.ui import spotlight
 from railroads.ui.buy_train import SCREEN_SIZE as BUY_SCREEN
 from railroads.ui.ornate import begin_ornate, end_ornate, keep_in_front
-from railroads.ui.theme import BRASS, CARDS_WIDTH, GROWN, SIDE_WINDOW_TOP
+from railroads.ui.theme import BRASS, CARDS_WIDTH, GROWN, SIDE_WINDOW_TOP, colored
 
 # The window sits at first in the column along the right edge that the trains window leaves free,
 # MARGIN from the edge, and stays in front of the other windows while no popup is open and no
@@ -45,7 +45,7 @@ def draw_tutorial(tutorial: Tutorial, in_front: bool = True) -> None:
     keep_on_screen(display)
     if expanded:
         imgui.push_text_wrap_pos(0.0)
-        imgui.text_colored(imgui.ImVec4(*BRASS), step.title)
+        colored(BRASS, step.title)
         imgui.spacing()
         for paragraph in step.text:
             imgui.text(paragraph)
@@ -53,11 +53,9 @@ def draw_tutorial(tutorial: Tutorial, in_front: bool = True) -> None:
         if step.task:
             imgui.separator()
             if tutorial.done:
-                imgui.text_colored(imgui.ImVec4(*GROWN), f"{fa.ICON_FA_CHECK}  {step.task}")
+                colored(GROWN, f"{fa.ICON_FA_CHECK}  {step.task}")
             else:
-                imgui.text_colored(
-                    imgui.ImVec4(*BRASS), f"{fa.ICON_FA_HAND_POINT_RIGHT}  {step.task}"
-                )
+                colored(BRASS, f"{fa.ICON_FA_HAND_POINT_RIGHT}  {step.task}")
         imgui.pop_text_wrap_pos()
         imgui.spacing()
         last = tutorial.step == len(STEPS) - 1

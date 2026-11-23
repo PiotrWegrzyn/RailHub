@@ -9,7 +9,7 @@ from imgui_bundle import imgui
 from railroads.saves import SaveInfo, Saves, name_problem
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.save_files import BrowserFiles, DesktopFiles, draw_file_buttons, save_files
-from railroads.ui.theme import BRASS, GONE, WINDOW_TOP
+from railroads.ui.theme import BRASS, GONE, WINDOW_TOP, colored
 
 WINDOW_SIZE = (560.0, 420.0)
 LIST_HEIGHT = 240.0
@@ -44,7 +44,7 @@ def draw_save_list(
             chosen = imgui.is_mouse_double_clicked(imgui.MouseButton_.left)
         imgui.indent()
         if info.problem is not None:
-            imgui.text_colored(imgui.ImVec4(*GONE), describe(info))
+            colored(GONE, describe(info))
         else:
             imgui.text_disabled(describe(info))
         imgui.unindent()
@@ -112,7 +112,7 @@ class SavesWindow:
         clicked = imgui.button(label, (-1, 0))
         imgui.end_disabled()
         if problem and self.name:
-            imgui.text_colored(imgui.ImVec4(*GONE), problem)
+            colored(GONE, problem)
         else:
             imgui.text_disabled("Pick a save to write over it, or type a new name.")
         if (clicked or entered) and problem is None:
@@ -134,9 +134,7 @@ class SavesWindow:
         )
         if message:
             self.message = message
-        imgui.text_colored(
-            imgui.ImVec4(*BRASS), "Loading leaves this game; save it first to keep it."
-        )
+        colored(BRASS, "Loading leaves this game; save it first to keep it.")
         if loadable and self.selected and (clicked or chosen):
             return SaveRequest("load", self.selected)
         return None

@@ -26,14 +26,15 @@ from railroads.ui.build_menu import reach_border
 from railroads.ui.hex_details import mood_text, recently_described
 from railroads.ui.iso_camera import ZOOM_CELL_WIDTHS, IsoCamera, Vec2
 from railroads.ui.minimap import MinimapLayout
+from railroads.ui.ornate import hover_card
 from railroads.ui.search import BuildingSearch, pulse
 from railroads.ui.theme import (
     MOODS,
     OVERLAY,
-    OVERLAY_FLAGS,
     TEXT,
     Rgba,
     color_u32,
+    colored,
     good_icon,
     rgba_u32,
     town_tint,
@@ -407,24 +408,25 @@ def draw_hovered_buildings(
     rows = recently_described(growth, cell, satisfaction).buildings
     if not rows:
         return
-    imgui.set_next_window_pos(top_left)
-    imgui.set_next_window_bg_alpha(OVERLAY[3])
-    flags = OVERLAY_FLAGS | imgui.WindowFlags_.no_inputs.value
-    if imgui.begin("##hovered buildings", None, flags):
-        for row in rows:
-            imgui.text(row.name if row.count == 1 else f"{row.name} x{row.count}")
-            if row.satisfaction in MOODS:
-                imgui.same_line(0, 8)
-                imgui.text_colored(imgui.ImVec4(*MOODS[row.satisfaction]), mood_text(row))
-            for goods, label in ((row.makes, "makes"), (row.needs, "needs"), (row.bonus, "bonus")):
-                if not goods:
-                    continue
-                imgui.same_line(0, 10)
-                imgui.text_disabled(label)
-                for good, _ in goods:
-                    imgui.same_line(0, 2)
-                    good_icon(good, size=HOVER_ICON)
-    imgui.end()
+    with hover_card("##hovered buildings", top_left) as shown:
+        if shown:
+            for row in rows:
+                imgui.text(row.name if row.count == 1 else f"{row.name} x{row.count}")
+                if row.satisfaction in MOODS:
+                    imgui.same_line(0, 8)
+                    colored(MOODS[row.satisfaction], mood_text(row))
+                for goods, label in (
+                    (row.makes, "makes"),
+                    (row.needs, "needs"),
+                    (row.bonus, "bonus"),
+                ):
+                    if not goods:
+                        continue
+                    imgui.same_line(0, 10)
+                    imgui.text_disabled(label)
+                    for good, _ in goods:
+                        imgui.same_line(0, 2)
+                        good_icon(good, size=HOVER_ICON)
 
 
 def consumers_in_reach(constructions: Constructions, cell: Cell, year: int) -> tuple[Cell, ...]:

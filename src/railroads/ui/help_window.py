@@ -34,7 +34,15 @@ from railroads.ui.buy_train import fuel_use
 from railroads.ui.engine_origins import origins
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.search import goods_of
-from railroads.ui.theme import BRASS, LIST_TABLE_FLAGS, WINDOW_TOP, good_amount, good_icon, tip
+from railroads.ui.theme import (
+    BRASS,
+    LIST_TABLE_FLAGS,
+    WINDOW_TOP,
+    colored,
+    good_amount,
+    good_icon,
+    tip,
+)
 from railroads.words import counted, share_of
 
 WINDOW_SIZE = (860.0, 600.0)
@@ -304,7 +312,7 @@ class HelpWindow:
                 group = row.group
                 imgui.table_next_row()
                 imgui.table_next_column()
-                imgui.text_colored(imgui.ImVec4(*BRASS), group.value.capitalize())
+                colored(BRASS, group.value.capitalize())
             imgui.table_next_row()
             imgui.table_next_column()
             imgui.text(row.kind.value)

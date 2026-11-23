@@ -28,6 +28,7 @@ from railroads.ui.theme import (
     TEXT,
     TEXT_DIM,
     color_u32,
+    colored,
 )
 
 CARD_SIZE = (250.0, 50.0)
@@ -155,7 +156,7 @@ class SummariesPanel:
                 look_at_button(station.station, look_at)
                 for kind, count in sorted(station.changes.items(), key=lambda kc: -kc[1]):
                     color = GROWN if count > 0 else GONE
-                    imgui.text_colored(imgui.ImVec4(*color), f"   {count:+d}")
+                    colored(color, f"   {count:+d}")
                     imgui.same_line()
                     imgui.text(kind.value)
                 imgui.pop_id()

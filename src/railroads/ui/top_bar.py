@@ -15,7 +15,16 @@ from railroads.ui.map_input import key_pressed
 from railroads.ui.ornate import DEEP, band, bar_buttons, diamond, frame_rect, spaced, spaced_text
 from railroads.ui.spotlight import spot
 from railroads.ui.summaries_panel import CARDS_TOP
-from railroads.ui.theme import BRASS, GONE, GROWN, color_u32, danger_button, tip, toggle_button
+from railroads.ui.theme import (
+    BRASS,
+    GONE,
+    GROWN,
+    color_u32,
+    colored,
+    danger_button,
+    tip,
+    toggle_button,
+)
 
 if TYPE_CHECKING:
     from railroads.ui.app import App
@@ -59,7 +68,7 @@ def _draw_top_bar(app: App) -> None:
             clock.paused = not clock.paused
     imgui.align_text_to_frame_padding()
     start = imgui.get_cursor_pos_x()
-    imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_CLOCK}  {clock.date}")
+    colored(BRASS, f"{fa.ICON_FA_CLOCK}  {clock.date}")
     imgui.same_line(start + date_width() + 8)
     if toggle_button(fa.ICON_FA_PAUSE, clock.paused, "Stop time while you build (Space)"):
         clock.paused = not clock.paused
@@ -102,7 +111,7 @@ def _draw_top_bar(app: App) -> None:
     if app.notice:
         imgui.same_line(0, 16)
         imgui.align_text_to_frame_padding()
-        imgui.text_colored(imgui.ImVec4(*GROWN), app.notice)
+        colored(GROWN, app.notice)
     imgui.same_line(0, 8)
     imgui.same_line(max(right, imgui.get_cursor_pos_x()))
     size = (WINDOW_BUTTON_WIDTH, 0)
@@ -172,7 +181,7 @@ def draw_money(finances: Finances) -> None:
     """The cash, on the current line, with this month's and last month's books on hover."""
     imgui.align_text_to_frame_padding()
     color = BRASS if finances.cash >= 0 else GONE
-    imgui.text_colored(imgui.ImVec4(*color), f"{fa.ICON_FA_MONEY_BILL}  {dollars(finances.cash)}")
+    colored(color, f"{fa.ICON_FA_MONEY_BILL}  {dollars(finances.cash)}")
     if imgui.is_item_hovered():
         imgui.begin_tooltip()
         for title, books in (
@@ -181,9 +190,7 @@ def draw_money(finances: Finances) -> None:
         ):
             imgui.text(f"{title}: {dollars(sum(books.values()))}")
             for what, amount in sorted(books.items(), key=lambda item: -item[1]):
-                imgui.text_colored(
-                    imgui.ImVec4(*(GROWN if amount >= 0 else GONE)), f"   {dollars(amount)}"
-                )
+                colored(GROWN if amount >= 0 else GONE, f"   {dollars(amount)}")
                 imgui.same_line()
                 imgui.text_disabled(what)
         imgui.end_tooltip()

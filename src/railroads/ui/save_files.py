@@ -152,8 +152,7 @@ def draw_file_buttons(
         except (SaveError, OSError) as error:
             message = str(error)
     imgui.end_disabled()
-    if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-        imgui.set_tooltip("Keep this save as a file, to load it in the game online or offline.")
+    tip("Keep this save as a file, to load it in the game online or offline.", disabled=True)
     imgui.same_line()
     if imgui.button(f"{fa.ICON_FA_UPLOAD}  Import file", (half, 0)):
         files.pick()

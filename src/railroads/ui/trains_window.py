@@ -46,7 +46,6 @@ from railroads.ui.spotlight import spot
 from railroads.ui.station_offers import Offer, Supplies, goods_to_load
 from railroads.ui.theme import (
     BRASS,
-    CARDS_WIDTH,
     GONE,
     OFFER_SIZE,
     SIDE_WINDOW_TOP,
@@ -55,11 +54,15 @@ from railroads.ui.theme import (
     caption_under,
     car_chip,
     color_u32,
+    colored,
     danger_button,
     dining_chip,
     draw_small_car,
     empty_car_slot,
+    left_of_cards,
+    next_good_slot,
     offer_chip,
+    tip,
 )
 from railroads.words import share_of
 
@@ -162,7 +165,7 @@ class TrainsWindow:
             return
         display = imgui.get_io().display_size
         imgui.set_next_window_pos(
-            (max(8.0, display.x - WINDOW_SIZE[0] - CARDS_WIDTH - 16), SIDE_WINDOW_TOP),
+            (left_of_cards(display.x, WINDOW_SIZE[0]), SIDE_WINDOW_TOP),
             imgui.Cond_.first_use_ever.value,
         )
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
@@ -224,7 +227,7 @@ class TrainsWindow:
         draw_list = imgui.get_window_draw_list()
         draw_list.add_text((low.x + 6, low.y + 3), imgui.get_color_u32(imgui.Col_.text), train.name)
         stuck = train.status in NO_WAY_ON or bool(railway.long_legs(train))
-        status_color = color_u32(GONE) if stuck else imgui.get_color_u32(imgui.ImVec4(*TEXT_DIM))
+        status_color = color_u32(GONE) if stuck else color_u32(TEXT_DIM)
         draw_list.add_text((low.x + 6, low.y + 21), status_color, train.status)
         ride = self.ride(railway, train)
         if ride is not None:
@@ -232,8 +235,7 @@ class TrainsWindow:
             right = imgui.get_item_rect_max().x - 6 - imgui.calc_text_size(money).x
             colour = BRASS if ride.net >= 0 else GONE
             draw_list.add_text((right, low.y + 3), color_u32(colour), money)
-            if imgui.is_item_hovered():
-                imgui.set_tooltip(f"What this ride earns after its costs\n\n{ride_lines(ride)}")
+            tip(f"What this ride earns after its costs\n\n{ride_lines(ride)}")
         for index, car in enumerate(train.cars):
             line, place = divmod(index, per_line)
             left = low.x + 6 + place * (car_width + ROW_CAR_GAP)
@@ -263,8 +265,7 @@ class TrainsWindow:
         upgrade_button(railway, train)
         imgui.same_line()
         sold = danger_button(f"{fa.ICON_FA_TRASH}  Sell")
-        if imgui.is_item_hovered():
-            imgui.set_tooltip(f"Sell it for {dollars(ENGINES[train.engine].price * TRAIN_RESALE)}")
+        tip(f"Sell it for {dollars(ENGINES[train.engine].price * TRAIN_RESALE)}")
         if sold:
             railway.sell(train)
             self.chosen = None
@@ -275,7 +276,7 @@ class TrainsWindow:
         onward = "" if destination is None else railway.name_of(destination)
         if warning := train_warning(railway, train):
             imgui.push_text_wrap_pos(0.0)
-            imgui.text_colored(imgui.ImVec4(*GONE), f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {warning}")
+            colored(GONE, f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {warning}")
             imgui.pop_text_wrap_pos()
         worths = self.worth(railway, train)
         ride = railway.ride(train, worths)
@@ -328,12 +329,11 @@ class TrainsWindow:
             caption_under(f"{tonnes_text(car.tonnes)} t")
         if destination is not None and any(car.load >= 0.5 for car in train.cars):
             imgui.same_line(0, 14)
-            imgui.text_colored(imgui.ImVec4(*BRASS), f"worth about {dollars(sum(worths))}")
-            if imgui.is_item_hovered():
-                imgui.set_tooltip(
-                    f"What its cargo would earn if it were unloaded at {onward} now.\n{CARGO_WORTH}"
-                    f"\nCargo that came from {onward} only goes back into its stockpile."
-                )
+            colored(BRASS, f"worth about {dollars(sum(worths))}")
+            tip(
+                f"What its cargo would earn if it were unloaded at {onward} now.\n{CARGO_WORTH}"
+                f"\nCargo that came from {onward} only goes back into its stockpile."
+            )
             imgui.same_line()
             imgui.text_disabled(f"at {onward}")
         if train.cars:
@@ -347,15 +347,15 @@ class TrainsWindow:
         the way and the trips of its loaded and empty cars."""
         imgui.text_disabled(f"Ride to {onward}, {ride.cells:.0f} cells")
         if imgui.begin_table("ride", 2, imgui.TableFlags_.sizing_fixed_fit.value):
-            for label, amount, tip in ride_rows(ride):
+            for label, amount, hint in ride_rows(ride):
                 imgui.table_next_row()
                 imgui.table_next_column()
                 imgui.text_disabled(label)
-                if tip and imgui.is_item_hovered():
-                    imgui.set_tooltip(tip)
+                if hint:
+                    tip(hint)
                 imgui.table_next_column()
                 colour = BRASS if amount >= 0 else GONE
-                imgui.text_colored(imgui.ImVec4(*colour), signed(amount))
+                colored(colour, signed(amount))
             imgui.end_table()
 
     def _draw_stops(self, railway: Railway, train: Train, supplies: Supplies) -> None:
@@ -419,8 +419,8 @@ class TrainsWindow:
             leg = dict(railway.long_legs(train)).get(index)
             if leg is not None and not removed:
                 imgui.push_text_wrap_pos(0.0)
-                imgui.text_colored(
-                    imgui.ImVec4(*GONE),
+                colored(
+                    GONE,
                     f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {leg_warning(railway, train, index, leg)}",
                 )
                 imgui.pop_text_wrap_pos()
@@ -452,17 +452,14 @@ class TrainsWindow:
         right = imgui.get_cursor_pos_x() + imgui.get_content_region_avail().x
         arrow = fa.ICON_FA_CARET_DOWN if opened else fa.ICON_FA_CARET_RIGHT
         toggled = imgui.small_button(f"{arrow}##fold")
-        if imgui.is_item_hovered():
-            imgui.set_tooltip(
-                "Fold this stop away" if opened else "Show this stop's cars and goods"
-            )
+        tip("Fold this stop away" if opened else "Show this stop's cars and goods")
         imgui.same_line(0, 6)
         imgui.align_text_to_frame_padding()
         imgui.text_disabled(f"{index + 1}")
         imgui.same_line(0, 10)
         name = railway.name_of(stop.cell)
         if here:
-            imgui.text_colored(imgui.ImVec4(*BRASS), f"{fa.ICON_FA_TRAIN}  {name}")
+            colored(BRASS, f"{fa.ICON_FA_TRAIN}  {name}")
             _note_before("heading here" if train.path else "standing here", right - HEAD_BUTTONS)
         else:
             imgui.text(name)
@@ -478,12 +475,12 @@ class TrainsWindow:
         imgui.begin_disabled(stop.refuel_only)
         _, stop.wait_for_load = imgui.checkbox("Wait for full load", stop.wait_for_load)
         imgui.end_disabled()
-        if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-            imgui.set_tooltip(
-                "It only refuels here, so it doesn't wait for a load"
-                if stop.refuel_only
-                else "Wait here, up to a month, for every car to fill"
-            )
+        tip(
+            "It only refuels here, so it doesn't wait for a load"
+            if stop.refuel_only
+            else "Wait here, up to a month, for every car to fill",
+            disabled=True,
+        )
         moved = False
         for step, icon, left, tip_text in (
             (-1, fa.ICON_FA_ARROW_UP, 70, "Call here one stop earlier"),
@@ -496,15 +493,13 @@ class TrainsWindow:
                 self._move_stop(train, index, other)
                 moved = True
             imgui.end_disabled()
-            if imgui.is_item_hovered():
-                imgui.set_tooltip(f"{tip_text}, with its cars")
+            tip(f"{tip_text}, with its cars")
         imgui.same_line(right - 22)
         if imgui.small_button(fa.ICON_FA_TIMES):
             train.stops.pop(index)
             train.restart()
             return True, toggled, False
-        if imgui.is_item_hovered():
-            imgui.set_tooltip("Remove this stop")
+        tip("Remove this stop")
         return False, toggled, moved
 
     def _move_stop(self, train: Train, index: int, other: int) -> None:
@@ -526,11 +521,10 @@ class TrainsWindow:
         """The checkbox making a stop one the train only refuels at, for a leg longer than its
         fuel lasts, and what that means; returns whether the stop is one."""
         _, stop.refuel_only = imgui.checkbox("Only refuel here", stop.refuel_only)
-        if imgui.is_item_hovered():
-            imgui.set_tooltip(
-                "For a way longer than the engine carries fuel for: the train only takes on fuel\n"
-                "here and goes on with its cars, taking its passengers and mail through"
-            )
+        tip(
+            "For a way longer than the engine carries fuel for: the train only takes on fuel\n"
+            "here and goes on with its cars, taking its passengers and mail through"
+        )
         if stop.refuel_only:
             imgui.text_disabled(
                 f"Unloads and loads nothing here: its cars ride on to "
@@ -583,11 +577,10 @@ class TrainsWindow:
             imgui.text_disabled(
                 f"{tonnes_text(planned)} / {tonnes_text(railway.max_pull(train.engine))} t full"
             )
-            if imgui.is_item_hovered():
-                imgui.set_tooltip(
-                    "What these cars weigh full, against the most its engine pulls;\n"
-                    f"full, it runs at {speed_share(railway, train, planned):.0%} of its top speed"
-                )
+            tip(
+                "What these cars weigh full, against the most its engine pulls;\n"
+                f"full, it runs at {speed_share(railway, train, planned):.0%} of its top speed"
+            )
         caption_room()
 
     def _draw_offers(
@@ -629,13 +622,10 @@ class TrainsWindow:
         left = imgui.get_cursor_pos_x()
         per_row = max(1, int(imgui.get_content_region_avail().x // (OFFER_SIZE[0] + 4)))
         for number, offer in enumerate(offers):
-            if number % per_row:
-                imgui.same_line(0, 4)
-            elif number:
-                imgui.set_cursor_pos_x(left)
+            next_good_slot(number, left, per_row, gap=4.0)
             wanted = demand.monthly_want(offer.good) > 0
             blocked = full or not fits(offer.good)
-            tip = (
+            hint = (
                 f"{amount_of(offer.good, offer.waiting)} waiting, "
                 f"{offer.gathered:.0f} given to the station in the last quarter"
                 + (" - comes in on this train" if offer.good in carried else "")
@@ -643,7 +633,7 @@ class TrainsWindow:
                 + adding_tip(full, railway.car_tonnes(offer.good, train.engine, asked), spare)
             )
             imgui.begin_disabled(blocked)
-            if offer_chip(f"offer{number}", offer.good, f"{offer.waiting:.0f}", wanted, tip):
+            if offer_chip(f"offer{number}", offer.good, f"{offer.waiting:.0f}", wanted, hint):
                 railway.add_car(train, stop, offer.good, asked)
                 train.cars_changed(index)
             spot(f"cargo:{index}:{offer.good.value}")
@@ -651,18 +641,15 @@ class TrainsWindow:
                 self._shown_map.good = offer.good
             imgui.end_disabled()
         for number, general in enumerate(generals, start=len(offers)):
-            if number % per_row:
-                imgui.same_line(0, 4)
-            elif number:
-                imgui.set_cursor_pos_x(left)
+            next_good_slot(number, left, per_row, gap=4.0)
             waiting = sum(waiting_here.held(good) for good in GENERAL_GOODS[general])
-            tip = (
+            hint = (
                 f"{general.value}: a car that takes whichever of its goods pays best at the "
                 f"next stop; {waiting:.0f} of them waiting here"
                 + adding_tip(full, railway.car_tonnes(general, train.engine, asked), spare)
             )
             imgui.begin_disabled(full or not fits(general))
-            if offer_chip(f"general{number}", general, f"{waiting:.0f}", waiting > 0, tip):
+            if offer_chip(f"general{number}", general, f"{waiting:.0f}", waiting > 0, hint):
                 railway.add_car(train, stop, general, asked)
                 train.cars_changed(index)
             imgui.end_disabled()
@@ -684,11 +671,10 @@ class TrainsWindow:
                     asked = 0 if generation == newest else generation
                     self._asked[train.name] = asked
             imgui.end_combo()
-        if imgui.is_item_hovered():
-            imgui.set_tooltip(
-                "The generation of the cars a click below adds: the newest by default, or an\n"
-                "older one that holds less and weighs less, for light engines and hills"
-            )
+        tip(
+            "The generation of the cars a click below adds: the newest by default, or an\n"
+            "older one that holds less and weighs less, for light engines and hills"
+        )
         return asked
 
 
@@ -703,14 +689,13 @@ def draw_tonnage(railway: Railway, train: Train) -> None:
     run and how much fuel it burns."""
     most = railway.max_pull(train.engine)
     imgui.text_disabled(f"{tonnes_text(train.tonnes)} / {tonnes_text(most)} t")
-    if imgui.is_item_hovered():
-        imgui.set_tooltip(
-            f"What its cars weigh now, against the most its engine pulls;\nit runs at "
-            f"{railway.pull(train):.0%} of its top speed, "
-            f"{speed_share(railway, train, most):.0%} pulling the most"
-            f"\nIt burns {railway.burn(train):.2g} {fuel_of(ENGINES[train.engine]).value} a cell, "
-            f"{railway.burn(train) / ENGINES[train.engine].burn:.0%} of what it burns half loaded"
-        )
+    tip(
+        f"What its cars weigh now, against the most its engine pulls;\nit runs at "
+        f"{railway.pull(train):.0%} of its top speed, "
+        f"{speed_share(railway, train, most):.0%} pulling the most"
+        f"\nIt burns {railway.burn(train):.2g} {fuel_of(ENGINES[train.engine]).value} a cell, "
+        f"{railway.burn(train) / ENGINES[train.engine].burn:.0%} of what it burns half loaded"
+    )
 
 
 def picker_good(train: Train) -> Good:
@@ -733,8 +718,7 @@ def first_button(train: Train) -> None:
     if imgui.button(f"{fa.ICON_FA_FAST_FORWARD}  {label}"):
         train.first = True
     imgui.end_disabled()
-    if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-        imgui.set_tooltip(FIRST_TIP)
+    tip(FIRST_TIP, disabled=True)
 
 
 def adding_tip(full: bool, tonnes: float, spare: float) -> str:
@@ -783,13 +767,13 @@ def upgrade_button(railway: Railway, train: Train) -> None:
     if imgui.button(f"{fa.ICON_FA_ARROW_UP}  Upgrade"):
         imgui.open_popup("upgrade engine")
     imgui.end_disabled()
-    if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-        imgui.set_tooltip(
-            "Swap its engine for a newer one, keeping its stops and cars;\n"
-            f"the old engine goes towards the price at {share_of(TRAIN_RESALE)} what it cost"
-            if options
-            else "No newer engine of its line is on sale"
-        )
+    tip(
+        "Swap its engine for a newer one, keeping its stops and cars;\n"
+        f"the old engine goes towards the price at {share_of(TRAIN_RESALE)} what it cost"
+        if options
+        else "No newer engine of its line is on sale",
+        disabled=True,
+    )
 
 
 def upgrade_menu(railway: Railway, train: Train) -> None:
@@ -809,8 +793,7 @@ def upgrade_menu(railway: Railway, train: Train) -> None:
         summary = "\n".join(
             [engine_summary(engine, railway.fuel_cost(name)), *wagons_note(railway, name)]
         )
-        if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-            imgui.set_tooltip(summary)
+        tip(summary, disabled=True)
         if len(alike) > 1:
             prices = [railway.swap_price(t, name) for t in alike]
             total = sum(prices)
@@ -822,8 +805,7 @@ def upgrade_menu(railway: Railway, train: Train) -> None:
             if imgui.selectable(label, False)[0]:
                 railway.swap_all_engines(name)
             imgui.end_disabled()
-            if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
-                imgui.set_tooltip(f"{summary}\nAs many as the cash allows, in the order bought")
+            tip(f"{summary}\nAs many as the cash allows, in the order bought", disabled=True)
     imgui.end_popup()
 
 
@@ -966,12 +948,11 @@ def _draw_tiles(railway: Railway, ride: Ride, onward: str) -> None:
     )
     gap = 8.0
     width = (imgui.get_content_region_avail().x - 2 * gap) / 3
-    for number, (label, amount, tip) in enumerate(ride_tiles(ride, onward)):
+    for number, (label, amount, hint) in enumerate(ride_tiles(ride, onward)):
         if number:
             imgui.same_line(0, gap)
         tile(label, signed(amount), BRASS if amount >= 0 else GONE, width)
-        if imgui.is_item_hovered():
-            imgui.set_tooltip(tip + upkeep)
+        tip(hint + upkeep)
 
 
 def _note_before(note: str, limit: float) -> None:

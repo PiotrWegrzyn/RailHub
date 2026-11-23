@@ -25,7 +25,7 @@ from railroads.sim.trains import (
 from railroads.ui.iso_camera import Vec2
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.spotlight import spot
-from railroads.ui.theme import BRASS, GONE, TEXT_DIM, color_u32
+from railroads.ui.theme import BRASS, GONE, TEXT_DIM, color_u32, colored, tip
 
 SCREEN_SIZE = (860.0, 560.0)
 ENGINES_WIDTH = 250.0
@@ -123,8 +123,7 @@ class BuyScreen:
         if imgui.selectable(f"{engine.title}##{name}", self.engine == name)[0]:
             self.engine = name
         spot(f"engine:{name}")
-        if imgui.is_item_hovered():
-            imgui.set_tooltip(summary(engine, railway.fuel_cost(name)))
+        tip(summary(engine, railway.fuel_cost(name)))
         price = dollars(engine.price)
         affordable = railway.finances.can_afford(engine.price)
         right = imgui.get_item_rect_max().x - imgui.calc_text_size(price).x - 4
@@ -185,9 +184,7 @@ class BuyScreen:
             imgui.text_disabled(label)
             imgui.same_line(FIGURES_LABEL)
             if label == "Range" and short:
-                imgui.text_colored(
-                    imgui.ImVec4(*GONE), f"{value}; {longest:.0f} between two of those stops"
-                )
+                colored(GONE, f"{value}; {longest:.0f} between two of those stops")
             else:
                 imgui.text(value)
 

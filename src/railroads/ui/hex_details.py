@@ -37,7 +37,7 @@ from railroads.sim.tilemap import Deposit, TileMap
 from railroads.ui.biomes import biome_of
 from railroads.ui.ornate import badge, bar, card, section
 from railroads.ui.spotlight import spot
-from railroads.ui.theme import BRASS, GONE, GROWN, TEXT_DIM, good_amount
+from railroads.ui.theme import BRASS, GONE, GROWN, TEXT_DIM, colored, good_amount, tip
 
 
 @dataclass(frozen=True)
@@ -303,21 +303,20 @@ def _draw_card_inside(row: BuildingRow) -> bool:
     badge(shown)
     imgui.same_line(0, 10)
     imgui.begin_group()
-    imgui.text_colored(imgui.ImVec4(*BRASS), f"{row.name.capitalize()} x {row.count}")
+    colored(BRASS, f"{row.name.capitalize()} x {row.count}")
     mood = mood_text(row)
     imgui.same_line()
     imgui.set_cursor_pos_x(
         imgui.get_cursor_pos_x() + imgui.get_content_region_avail().x - imgui.calc_text_size(mood).x
     )
-    imgui.text_colored(imgui.ImVec4(*mood_colour(row)), mood)
+    colored(mood_colour(row), mood)
     if row.percent is not None:
         width = right - imgui.get_cursor_pos_x()
         bar(row.percent / MOST_PRICED, mood_colour(row), width, 5.0)
-        if imgui.is_item_hovered():
-            imgui.set_tooltip(
-                f"Satisfied {row.percent:.0%} last month: 100% with all it must have, more "
-                "with bonus goods"
-            )
+        tip(
+            f"Satisfied {row.percent:.0%} last month: 100% with all it must have, more "
+            "with bonus goods"
+        )
     imgui.end_group()
     imgui.spacing()
     _draw_line("Made", row.gave, "given away of made")
@@ -350,8 +349,7 @@ def _draw_card_inside(row: BuildingRow) -> bool:
 def _draw_line(label: str, flows: list[Flow], meaning: str) -> None:
     """A line of a card: what it is about, then each good's icon, how it went and a bar of it."""
     imgui.text_disabled(label)
-    if imgui.is_item_hovered():
-        imgui.set_tooltip(f"Last month: {meaning}")
+    tip(f"Last month: {meaning}")
     if not flows:
         imgui.same_line(CARD_LABEL)
         imgui.text_disabled("-")
@@ -378,22 +376,21 @@ def draw_shares(row: BuildingRow, where: str) -> tuple[bool, int] | None:
     badge(row.makes[0][0] if row.makes else None)
     imgui.same_line(0, 10)
     imgui.begin_group()
-    imgui.text_colored(imgui.ImVec4(*BRASS), f"{row.name.capitalize()} x {row.count}")
+    colored(BRASS, f"{row.name.capitalize()} x {row.count}")
     imgui.text_disabled(f"at {where}")
     imgui.end_group()
     section("Shares")
     if row.total:
         bar(row.owned / row.total, BRASS, imgui.get_content_region_avail().x, 6.0)
-        if imgui.is_item_hovered():
-            imgui.set_tooltip(f"Yours: {row.owned:,} of {row.total:,}")
+        tip(f"Yours: {row.owned:,} of {row.total:,}")
     table = imgui.TableFlags_.sizing_fixed_fit.value
     if imgui.begin_table("shares", 2, table):
-        for label, value, tip in share_lines(row):
+        for label, value, hint in share_lines(row):
             imgui.table_next_row()
             imgui.table_next_column()
             imgui.text_disabled(label)
-            if tip and imgui.is_item_hovered():
-                imgui.set_tooltip(tip)
+            if hint:
+                tip(hint)
             imgui.table_next_column()
             imgui.text(value)
         imgui.end_table()
@@ -414,12 +411,8 @@ def draw_shares(row: BuildingRow, where: str) -> tuple[bool, int] | None:
             if imgui.button(f"Sell {lot or LOT} for {dollars(row.price * (lot or LOT) / LOT)}"):
                 pressed = (False, lot)
             imgui.end_disabled()
-            if (
-                not lot
-                and row.sell_from is not None
-                and imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value)
-            ):
-                imgui.set_tooltip(f"{HELD}: from {row.sell_from}")
+            if not lot and row.sell_from is not None:
+                tip(f"{HELD}: from {row.sell_from}", disabled=True)
     section("Financial results")
     if imgui.begin_table("results", 3, table | imgui.TableFlags_.borders_inner_h.value):
         imgui.table_setup_column("")
@@ -429,19 +422,19 @@ def draw_shares(row: BuildingRow, where: str) -> tuple[bool, int] | None:
         for heading in ("", "Last year", "Next year"):
             imgui.table_next_column()
             imgui.text_disabled(heading)
-        for label, last, forecast, tip in result_lines(row):
+        for label, last, forecast, hint in result_lines(row):
             imgui.table_next_row()
             imgui.table_next_column()
-            colour = TEXT_DIM if tip else BRASS
-            imgui.text_colored(imgui.ImVec4(*colour), label)
-            if tip and imgui.is_item_hovered():
-                imgui.set_tooltip(tip)
+            colour = TEXT_DIM if hint else BRASS
+            colored(colour, label)
+            if hint:
+                tip(hint)
             for value in (last, forecast):
                 imgui.table_next_column()
                 if tip:
                     imgui.text(value)
                 else:
-                    imgui.text_colored(imgui.ImVec4(*BRASS), value)
+                    colored(BRASS, value)
         imgui.end_table()
     return pressed
 

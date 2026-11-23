@@ -53,6 +53,7 @@ from railroads.ui.theme import (
     BRASS,
     OVERLAY_FLAGS,
     Rgba,
+    colored,
     rgba_u32,
     toggle_button,
 )
@@ -302,13 +303,13 @@ class BuildMenu:
             return
         imgui.push_text_wrap_pos(HINT_WIDTH)
         if recent:
-            imgui.text_colored(imgui.ImVec4(*BRASS), self.message)
+            colored(BRASS, self.message)
         if self.tool in HINTS:
             imgui.text_disabled(HINTS[self.tool])
         if self.tool == Tool.TRACK and self.preview is not None and self.preview_price is not None:
-            imgui.text_colored(imgui.ImVec4(*BRASS), f"This track: {dollars(self.preview_price)}")
+            colored(BRASS, f"This track: {dollars(self.preview_price)}")
         if self.hover_note and self.tool in PRICED_TOOLS:
-            imgui.text_colored(imgui.ImVec4(*BRASS), self.hover_note)
+            colored(BRASS, self.hover_note)
         imgui.pop_text_wrap_pos()
         imgui.spacing()
 

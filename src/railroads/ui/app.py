@@ -62,7 +62,7 @@ from railroads.ui.pixel.ground_shader import free_textures
 from railroads.ui.reports_window import ReportsWindow
 from railroads.ui.save_files import IN_BROWSER
 from railroads.ui.saves_window import SavesWindow
-from railroads.ui.theme import BRASS, apply_theme
+from railroads.ui.theme import BRASS, apply_theme, color_u32
 from railroads.ui.tiles_window import TilesWindow
 from railroads.ui.top_bar import draw_pause_banner, draw_top_bar
 from railroads.ui.tutorial_panel import draw_tutorial
@@ -723,7 +723,7 @@ class Shell:
                 top_left.y - PANEL_MARGIN,
                 bottom_right.x - top_left.x + 2 * PANEL_MARGIN,
                 bottom_right.y - top_left.y + 2 * PANEL_MARGIN,
-                imgui.get_color_u32(imgui.ImVec4(*PANEL_COLOUR)),
+                color_u32(PANEL_COLOUR),
             )
             draw_list.add_rect_filled(
                 (panel.x, panel.y), (panel.x + panel.width, panel.y + panel.height), panel.colour

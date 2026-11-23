@@ -24,15 +24,14 @@ from railroads.sim.station_goods import STORAGE_STEP, WAITING_STEP
 from railroads.sim.station_trade import StationPreview
 from railroads.sim.trains import amount_of
 from railroads.ui.demand_view import draw_demand
-from railroads.ui.ornate import begin_ornate, end_ornate, keep_in_front
+from railroads.ui.ornate import begin_ornate, end_ornate, hover_card, keep_in_front
 from railroads.ui.station_preview import draw_preview_body
 from railroads.ui.stations_window import look_at_button
 from railroads.ui.theme import (
     BRASS,
     GONE,
-    OVERLAY,
-    OVERLAY_FLAGS,
     SIDE_WINDOW_POS,
+    colored,
     goods_inline,
     rgba_u32,
     tip,
@@ -86,11 +85,10 @@ class StationWindow:
                 label = f"{fa.ICON_FA_PLUS}  Add a platform beside it ({left} to add)"
                 if imgui.button(label):
                     add_platform(station)
-                if imgui.is_item_hovered():
-                    imgui.set_tooltip(
-                        "Its own way through lets lines come in from another side;\n"
-                        "trains cross to it inside the station"
-                    )
+                tip(
+                    "Its own way through lets lines come in from another side;\n"
+                    "trains cross to it inside the station"
+                )
             label = (
                 f"{fa.ICON_FA_ARROWS_ALT}  Move it, keeping its trains  {dollars(STATION_PRICE)}+"
             )
@@ -111,14 +109,14 @@ class StationWindow:
         level = railway.level(station)
         delivery, collection = railway.reach(station)
         imgui.align_text_to_frame_padding()
-        imgui.text_colored(imgui.ImVec4(*BRASS), f"Level {level} of {MAX_LEVEL}")
+        colored(BRASS, f"Level {level} of {MAX_LEVEL}")
         imgui.same_line()
         imgui.text_disabled(f"hands out within {delivery} cells, gathers within {collection}")
         imgui.same_line()
         look_at_button(station, look_at)
         if warning := station_warning(railway, station):
             imgui.push_text_wrap_pos(0.0)
-            imgui.text_colored(imgui.ImVec4(*GONE), f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {warning}")
+            colored(GONE, f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {warning}")
             imgui.pop_text_wrap_pos()
         imgui.separator()
         draw_station_summary(railway, station)
@@ -174,15 +172,11 @@ def draw_station_summary(railway: Railway, station: Cell) -> None:
 
 def draw_station_card(railway: Railway, station: Cell, top_left: tuple[float, float]) -> None:
     """The station's name and summary in a card below the map's status strip."""
-    imgui.set_next_window_pos(top_left)
-    imgui.set_next_window_bg_alpha(OVERLAY[3])
-    imgui.set_next_window_size_constraints((WINDOW_WIDTH, 0), (WINDOW_WIDTH, 1e6))
-    flags = OVERLAY_FLAGS | imgui.WindowFlags_.no_inputs.value
-    if imgui.begin("##station card", None, flags):
-        imgui.text_colored(imgui.ImVec4(*BRASS), railway.name_of(station))
-        imgui.separator()
-        draw_station_summary(railway, station)
-    imgui.end()
+    with hover_card("##station card", top_left, WINDOW_WIDTH) as shown:
+        if shown:
+            colored(BRASS, railway.name_of(station))
+            imgui.separator()
+            draw_station_summary(railway, station)
 
 
 def station_warning(railway: Railway, station: Cell) -> str:

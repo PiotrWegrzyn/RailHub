@@ -17,7 +17,7 @@ from railroads.sim.lots import Lot, Lots
 from railroads.sim.tilemap import TileMap
 from railroads.ui.ground import cell_colors
 from railroads.ui.iso_camera import IsoCamera, Vec2
-from railroads.ui.theme import BRASS, BRASS_DARK, GONE, OVERLAY, rgba_u32
+from railroads.ui.theme import BRASS, BRASS_DARK, GONE, OVERLAY, colored, rgba_u32
 
 CONFIRM_POPUP = "Buy land?"
 # How the world map is shown under a lot, and the shade over it, lighter on the one hovered.
@@ -220,7 +220,7 @@ class LandOffers:
         imgui.text_disabled("It grows up to this year first, as the rest of the map did.")
         afford = finances.can_afford(price)
         if not afford:
-            imgui.text_colored(imgui.ImVec4(*GONE), f"You have {dollars(finances.cash)}.")
+            colored(GONE, f"You have {dollars(finances.cash)}.")
         imgui.begin_disabled(not afford)
         if imgui.button("Buy"):
             self.wanted, self.asked = self.asked, None

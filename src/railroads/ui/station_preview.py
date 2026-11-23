@@ -8,7 +8,8 @@ from imgui_bundle import imgui
 from railroads.sim.station_trade import StationPreview
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.iso_camera import Vec2
-from railroads.ui.theme import BRASS, OVERLAY, OVERLAY_FLAGS, goods_inline
+from railroads.ui.ornate import hover_card
+from railroads.ui.theme import BRASS, colored, goods_inline
 
 PREVIEW_WIDTH = 390.0
 
@@ -25,19 +26,15 @@ def preview_lines(preview: StationPreview) -> list[str]:
 
 
 def draw_station_preview(preview: StationPreview, top_left: Vec2) -> None:
-    imgui.set_next_window_pos(top_left)
-    imgui.set_next_window_bg_alpha(OVERLAY[3])
-    imgui.set_next_window_size_constraints((PREVIEW_WIDTH, 0), (PREVIEW_WIDTH, 1e6))
-    flags = OVERLAY_FLAGS | imgui.WindowFlags_.no_inputs.value
-    if imgui.begin("##station preview", None, flags):
-        draw_preview_body(preview)
-    imgui.end()
+    with hover_card("##station preview", top_left, PREVIEW_WIDTH) as shown:
+        if shown:
+            draw_preview_body(preview)
 
 
 def draw_preview_body(preview: StationPreview, built: bool = False) -> None:
     """What a station reaches, worded for one about to be built or, if `built`, one standing."""
     heading = "It hands goods out to" if built else "A station here hands goods out to"
-    imgui.text_colored(imgui.ImVec4(*BRASS), heading)
+    colored(BRASS, heading)
     lines = preview_lines(preview)
     if not lines:
         imgui.text_disabled("no buildings")
@@ -45,8 +42,8 @@ def draw_preview_body(preview: StationPreview, built: bool = False) -> None:
         imgui.text(line)
     imgui.spacing()
     wanted = "They want each month" if built else "They would want each month"
-    imgui.text_colored(imgui.ImVec4(*BRASS), wanted)
+    colored(BRASS, wanted)
     draw_demand(preview.demand)
     imgui.spacing()
-    imgui.text_colored(imgui.ImVec4(*BRASS), "Made around it each month")
+    colored(BRASS, "Made around it each month")
     goods_inline(preview.made, "nothing")

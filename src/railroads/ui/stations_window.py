@@ -14,10 +14,10 @@ from railroads.ui.demand_view import draw_demand
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.theme import (
     BRASS_DARK,
-    CARDS_WIDTH,
     LIST_TABLE_FLAGS,
     SIDE_WINDOW_TOP,
     goods_inline,
+    left_of_cards,
     tip,
 )
 from railroads.ui.trains_window import WINDOW_SIZE as TRAINS_SIZE
@@ -32,7 +32,7 @@ BUILD_BAR_ROOM = 80.0
 def window_place(width: float, height: float) -> tuple[float, float]:
     """Where the window first opens on a screen this big: under the trains window and left of
     the news cards, but never past the screen's left edge or down over the build bar."""
-    x = max(8.0, width - WINDOW_SIZE[0] - CARDS_WIDTH - 16)
+    x = left_of_cards(width, WINDOW_SIZE[0])
     y = min(SIDE_WINDOW_TOP + TRAINS_SIZE[1] + GAP, height - WINDOW_SIZE[1] - BUILD_BAR_ROOM)
     return x, max(8.0, y)
 
