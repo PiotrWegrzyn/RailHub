@@ -105,8 +105,6 @@ class MapInput:
                 view.land.click(lots)
         if imgui.is_item_clicked(imgui.MouseButton_.right.value):
             self._right_click()
-        if key_pressed(imgui.Key.escape):
-            view.build.stop()
         view.tools.update_preview(view.hovered)
         view.tools.update_hover_note(view.hovered)
 

@@ -17,6 +17,7 @@ from railroads.land import lot_middle
 from railroads.newgame import make_game
 from railroads.saves import SavedGame, Saves
 from railroads.settings import MapChoice, Settings
+from railroads.sim.company import News
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.game import Game
 from railroads.sim.goods import Good
@@ -1032,6 +1033,61 @@ def test_a_news_card_and_its_story_draw_beside_the_map(context: None) -> None:
 
     assert app.view.summaries.open is headline
     assert app.view.summaries.outlined() == ()
+
+
+def press_escape(app: App) -> None:
+    imgui.get_io().add_key_event(imgui.Key.escape, True)
+    frame(app)
+    imgui.get_io().add_key_event(imgui.Key.escape, False)
+    frame(app)
+
+
+def windows_open(app: App) -> list[bool]:
+    view = app.view
+    return [
+        app.help.open,
+        app.tiles.open,
+        app.reports.open,
+        view.build.trains.open,
+        view.selected is not None,
+        view.station_window.station is not None,
+    ]
+
+
+def test_escape_cancels_the_track_being_laid_and_leaves_the_windows_open(context: None) -> None:
+    app = made_app()
+    frame(app)
+
+    press_escape(app)
+
+    assert app.view.build.track_from is None
+    assert app.view.build.tool == Tool.TRACK
+    assert all(windows_open(app))
+
+
+def test_escape_with_nothing_being_built_closes_every_open_window(context: None) -> None:
+    app = made_app()
+    app.view.build.track_from = None
+    app.view.build.stations.open = True
+    app.view.toggle_search()
+    frame(app)
+
+    press_escape(app)
+
+    assert not any(windows_open(app))
+    assert not app.view.build.stations.open
+    assert not app.view.search.open
+
+
+def test_escape_leaves_the_windows_to_a_popup_in_front_of_them(context: None) -> None:
+    app = made_app()
+    app.view.build.track_from = None
+    app.game.goal.news.append(News("Target met", "Well done."))
+    frame(app)
+
+    press_escape(app)
+
+    assert all(windows_open(app))
 
 
 def test_holding_an_arrow_key_moves_the_map(context: None) -> None:

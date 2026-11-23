@@ -325,6 +325,19 @@ class MapView:
             self.search.open = True
             self.search.refresh(self.growth)
 
+    def close_windows(self) -> None:
+        """Closes the windows over the map: trains, stations, a station's, a cell's details and
+        its shares, a month's summary and the search."""
+        self.build.trains.open = self.build.trains.buy.open = False
+        self.build.stations.open = False
+        self.station_window.station = None
+        self.selected = None
+        self.shares_of = None
+        self._bought = ""
+        self.summaries.open = None
+        if self.search.open:
+            self.search.close()
+
     def open_station(self, station: Cell) -> None:
         """Opens a station's details in place of any cell's."""
         self.station_window.station = station

@@ -345,6 +345,12 @@ class BuildMenu:
         self.tool = tool
         self.stop()
 
+    @property
+    def busy(self) -> bool:
+        """Whether a piece of track, a station being moved or added to, or a facility is half
+        built."""
+        return self.track_from is not None or self.moving is not None or self.facility is not None
+
     def stop(self) -> None:
         self.moving = None
         self.facility = None
