@@ -167,7 +167,7 @@ from railroads.ui.pixel.art.showpieces import (
     mega_mirror_maker,
     mega_steel_mill,
 )
-from railroads.ui.pixel.art.stations import TURNED_STATIONS, station, station_2, station_3
+from railroads.ui.pixel.art.stations import SQUARE_STATIONS, TURNED_STATIONS
 
 __all__ = [
     "SPRITES",
@@ -383,12 +383,7 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "date_palms": date_palms,
     "bananas": bananas,
     "sugar": sugar,
-    "station": station,
-    "station_2": station_2,
-    "station_3": station_3,
-    "station_4": station_3,
-    "station_5": station_3,
-    "platform": station,
+    **SQUARE_STATIONS,
     **TURNED_STATIONS,
     "food_plant": food_plant,
     "bakery": bakery,
@@ -468,10 +463,10 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "olympic_stadium": olympic_stadium,
 }
 
-# The buildings drawn from 3D models (railroads.ui.pixel.art.built) instead of painted: only the
-# gasworks, whose brick rotunda took the place of its painted gasholder.
+# The buildings drawn from 3D models (railroads.ui.pixel.art.built) instead of painted: the
+# gasworks, whose brick rotunda took the place of its painted gasholder, and the stations.
 MODELS: dict[str, Callable[[], Sprite]] = {"gasworks": modelled(built_works.gasworks)}
-DRAWN_FROM_MODELS = tuple(MODELS)
+DRAWN_FROM_MODELS = (*MODELS, *SQUARE_STATIONS, *TURNED_STATIONS)
 SPRITES |= MODELS
 
 # Big and mega works drawn as buildings of their own, by trade.

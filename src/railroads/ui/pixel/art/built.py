@@ -48,11 +48,15 @@ CRATE: RGB = (156, 108, 62)
 
 
 def modelled(
-    build: Callable[[], Model], across: float = 1.0, up: float = 1.0, shadow: float = 1.0
+    build: Callable[[], Model],
+    across: float = 1.0,
+    up: float = 1.0,
+    shadow: float = 1.0,
+    heading: float = HEADING,
 ) -> Callable[[], Sprite]:
     """The draw function of a building built by `build`: its model stretched `across` the ground
-    and `up`, drawn at the fineness the sheet asks, standing in a soft shadow `shadow` times as
-    wide as its footprint. Stretching lets a model be built in handy sizes and match the size and
+    and `up`, turned `heading` radians, drawn at the fineness the sheet asks, standing in a soft
+    shadow `shadow` times as wide as its footprint. Stretching lets a model be built in handy sizes and match the size and
     tall look of the painted buildings beside it."""
 
     def draw() -> Sprite:
@@ -65,7 +69,7 @@ def modelled(
             Sprite(
                 *draw_model(
                     part,
-                    HEADING,
+                    heading,
                     PROJECTION.matrix,
                     pixels,
                     fine=pixels >= FINE_FROM,

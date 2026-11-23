@@ -1,336 +1,482 @@
-"""Stations at each level, and the platforms added to the biggest: drawn in the pixel style for
-squares, and as small models turned along their track for hexes. On squares, levels 4 and 5 look
-like level 3 and a platform like a country station."""
+"""Stations at each level, and the platforms added to the biggest, built as small models
+(railroads.ui.pixel.art.built) like the other modelled buildings: lit, outlined and standing in a
+soft shadow, with window frames, roof tiles and boards once drawn big enough to show them.
+
+They grow from a wooden halt by the line, through a brick station with a canopy, a yellow town
+station with wings and a red brick one between two domed towers, to a stone terminus with a clock
+tower and a glass train shed over its platform. On hexes each is drawn turned along the track
+through it; on squares turned as the other buildings are.
+
+Models are in cells: u along the track, v across it towards the track, z up."""
 
 import math
 from collections.abc import Callable
 
-import numpy as np
-
-from railroads.sim.grids import HexGrid
-from railroads.ui.pixel.art.homes import _doorstep, _foot
-from railroads.ui.pixel.art.painter import (
-    BRICK,
-    NAME_BOARD,
-    RGB,
-    STATION_ROOF,
-    STATION_WALL,
-    WINDOW,
-    Painter,
-    Sprite,
-    Top,
-    fineness,
-    shade,
+from railroads.ui.pixel.art.built import (
+    HEADING,
+    chimney,
+    cornice,
+    dome,
+    door,
+    footing,
+    gable_roof,
+    modelled,
+    upright,
+    walls,
+    window,
 )
-from railroads.ui.pixel.art.parts import (
-    _band,
-    _flag,
-    _gable_across,
-    _iso,
-    _on_wall,
-    _patch,
-    _vault,
-    _windows,
-)
-from railroads.ui.pixel.models import Face, Model, draw_model
-from railroads.ui.pixel.projection import PixelProjection
+from railroads.ui.pixel.art.painter import BRICK, NAME_BOARD, RGB, VERDIGRIS, Sprite, shade
+from railroads.ui.pixel.models import Face, Model
 
-
-def _name_board(p: Painter, x: float, y: float, half: float = 3) -> None:
-    """A blue station name board on two posts, its foot at (x, y)."""
-    post = (52, 50, 54)
-    for dx in (-half + 1, half - 1):
-        p.line([(x + dx, y), (x + dx, y - 4)], post)
-    p.rect(x - half, y - 7, x + half, y - 4, NAME_BOARD)
-    for dx in range(-round(half) + 1, round(half), 1):
-        if dx % 2 == 0 or abs(dx) < half - 1:
-            p.point(x + dx, y - 5.5, (236, 240, 250))
-
-
-def _lamp(p: Painter, x: float, y: float, height: float = 7) -> None:
-    p.line([(x, y), (x, y - height)], (40, 40, 46))
-    p.rect(x - 1, y - height - 2, x + 1, y - height, (255, 226, 120))
-
-
-def _clock(p: Painter, x: float, y: float, radius: float = 1.5) -> None:
-    p.ellipse(x - radius, y - radius, x + radius, y + radius, (246, 244, 236))
-    p.line([(x, y), (x, y - radius + 0.5)], (30, 30, 34))
-    p.point(x + 1, y, (30, 30, 34))
-
-
-def _canopy(p: Painter, x: float, y: float, length: float, depth: float, height: float) -> Top:
-    """A platform canopy on posts: a flat dark red roof `height` up with a cream valance."""
-    top = p.hall(x, y - height, length, depth, 1.5, STATION_WALL, STATION_ROOF)
-    _band(p, top[0], top[1], 1.5, STATION_ROOF)
-    for t in np.linspace(0.08, 0.92, max(2, round(length / 4))):
-        fx, fy = _on_wall(top[0], top[1], t, height + 1.5)
-        p.line([(fx, fy), (fx, fy - height)], (60, 58, 62))
-    return top
-
-
-def station() -> Sprite:
-    """A small country station: a cream station house with a dark red roof and brick base, a
-    canopy over the platform, a blue name board and a lamp by the white platform edge."""
-    p = Painter(34, 38, (16, 27))
-    house = p.hall(*_iso(0, 0, 1, 3), 9, 5, 6, STATION_WALL, None)
-    left, front, right, back = house
-    _patch(p, left, front, (0, 1), (4.5, 6), BRICK)
-    _patch(p, front, right, (0, 1), (4.5, 6), shade(BRICK, 0.78))
-    _windows(p, left, front, (0.2, 0.75), (1.5,), 2)
-    _windows(p, front, right, (0.5,), (1.5,), 2, shade(WINDOW, 0.75))
-    _patch(p, left, front, (0.42, 0.58), (2, 6), (88, 60, 44))
-    _foot(p, house, 6)
-    _doorstep(p, left, front, (0.38, 0.62), 6, shade(STATION_WALL, 0.8))
-    p.gable(house, 4, STATION_ROOF, STATION_WALL)
-    cx, cy = _on_wall(_on_wall(left, back, 0.5, -4), _on_wall(front, right, 0.5, -4), 0.3, 0)
-    p.rect(cx - 1, cy - 2, cx + 0.5, cy + 1, BRICK)
-    p.line([(cx - 1, cy - 2.5), (cx + 0.5, cy - 2.5)], shade(BRICK, 0.55))
-    _canopy(p, *_iso(0, 0, 0, -1.5), 10, 3, 5)
-    _name_board(p, *_iso(0, 0, -5, -4.5))
-    _lamp(p, *_iso(0, 0, 5.5, -5))
-    return p.sprite()
-
-
-def station_2() -> Sprite:
-    """A town station: a two-storey cream building under a dark red roof with a clock in its
-    central gable, and a long canopy over the platform with name boards and lamps."""
-    p = Painter(34, 42, (16, 30))
-    house = p.hall(*_iso(0, 0, 0, 4), 13, 5, 10, STATION_WALL, None)
-    left, front, right, _ = house
-    _patch(p, left, front, (0, 1), (9, 10), BRICK)
-    _windows(p, left, front, (0.1, 0.25, 0.4, 0.6, 0.75, 0.9), (1.5, 5.5), 2)
-    _patch(p, left, front, (0.44, 0.56), (6.5, 10), (88, 60, 44))
-    _windows(p, front, right, (0.3, 0.7), (1.5, 5.5), 2, shade(WINDOW, 0.75))
-    _patch(p, front, right, (0, 1), (9, 10), shade(BRICK, 0.78))
-    _foot(p, house, 10)
-    _doorstep(p, left, front, (0.4, 0.6), 10, shade(STATION_WALL, 0.8))
-    p.gable(house, 4, STATION_ROOF, STATION_WALL)
-    gx, gy = _iso(0, 0, 0, 1.5)
-    gable = p.hall(gx, gy, 5, 1, 10, STATION_WALL, None)
-    _gable_across(p, gable, 4, STATION_ROOF, STATION_WALL)
-    _clock(p, *_on_wall(gable[0], gable[1], 0.5, -1.5))
-    _canopy(p, *_iso(0, 0, 0, -2.5), 14, 3, 6)
-    for u in (-5.5, 2):
-        _name_board(p, *_iso(0, 0, u, -5))
-    for u in (-1.5, 6):
-        _lamp(p, *_iso(0, 0, u, -5.5))
-    return p.sprite()
-
-
-def station_3() -> Sprite:
-    """A grand terminal: a cream head building with a clock tower under a dark red spire, before
-    an arched train shed of iron and glass over the platforms, with name boards and lamps."""
-    p = Painter(38, 58, (18, 45))
-    house = p.hall(*_iso(0, 0, 0, 5.5), 15, 4, 11, STATION_WALL, None)
-    left, front, *_ = house
-    _patch(p, left, front, (0, 1), (10, 11), BRICK)
-    _windows(p, left, front, tuple(k / 10 for k in range(1, 10)), (1.5, 5.5), 2)
-    _foot(p, house, 11)
-    p.gable(house, 3, STATION_ROOF, STATION_WALL)
-    tx, ty = _iso(0, 0, -5, 5)
-    tower = p.box(tx, ty, 2.5, 22, STATION_WALL, None)
-    _patch(p, tower[0], tower[1], (0, 1), (21, 22), BRICK)
-    _patch(p, tower[1], tower[2], (0, 1), (21, 22), shade(BRICK, 0.78))
-    for a, b in ((tower[0], tower[1]), (tower[1], tower[2])):
-        _band(p, a, b, 1, shade(STATION_WALL, 1.08))
-        _windows(p, a, b, (0.5,), (8, 13), 2)
-    _clock(p, *_on_wall(tower[0], tower[1], 0.5, 4), 1.6)
-    apex = (tx, ty - 31)
-    p.polygon([tower[0], tower[1], apex], STATION_ROOF, shade(STATION_ROOF, 0.55))
-    p.polygon([tower[1], tower[2], apex], shade(STATION_ROOF, 0.7), shade(STATION_ROOF, 0.45))
-    _flag(p, apex[0], apex[1], 4, NAME_BOARD)
-    glass, iron = (186, 220, 236), (70, 82, 100)
-    shed = p.hall(*_iso(0, 0, 0, -1.5), 15, 8, 5, STATION_WALL, None)
-    sl, sf, sr, _ = shed
-    for t in np.linspace(0.07, 0.93, 7):
-        p.line([_on_wall(sl, sf, t, 0.5), _on_wall(sl, sf, t, 5)], iron)
-    _patch(p, sl, sf, (0, 1), (0, 1), STATION_ROOF)
-    _foot(p, shed, 5)
-    _vault(p, shed, 7, glass, glass, tuple(k / 8 for k in range(1, 8)), iron)
-    _patch(p, sf, sr, (0, 1), (4, 5), shade(BRICK, 0.78))
-    _patch(p, sf, sr, (0.25, 0.75), (1.5, 5), (52, 56, 66))
-    board = _on_wall(sf, sr, 0.5, 0.5)
-    p.rect(board[0] - 3, board[1] - 2, board[0] + 3, board[1] + 1, NAME_BOARD)
-    for dx in (-2, 0, 2):
-        p.point(board[0] + dx, board[1] - 0.5, (236, 240, 250))
-    _name_board(p, *_iso(0, 0, -4, -6.5))
-    for u in (-0.5, 5):
-        _lamp(p, *_iso(0, 0, u, -6.5))
-    return p.sprite()
-
-
-# The station houses on hexes, built as models (railroads.ui.pixel.models) and drawn turned along
-# the track through them: for each way track runs on the screen, the heading the house's length
-# lies along, chosen so its front, with the platform canopy, faces the track. The house stands
-# behind track running across or slanting and to the left of track running up and down
-# (railroads.ui.pixel.track_art.station_side).
+# The station houses on hexes, drawn turned along the track through them: for each way track
+# runs on the screen, the heading the house's length lies along, chosen so its front, with the
+# platform canopy, faces the track. The house stands behind track running across or slanting and
+# to the left of track running up and down (railroads.ui.pixel.track_art.station_side).
 TURNED_LINES = {"across": 0.0, "falling": 60.0, "rising": 300.0, "upright": 270.0}
-# The hex map's look (railroads.ui.iso_camera.LOOKS): not turned, a cell wide per cell.
-_HEX_PROJECTION = PixelProjection.of(HexGrid(rows=1, cols=1, km_per_cell=1.0), 0.0, 1.0)
-POST: RGB = (60, 58, 62)
-DOOR: RGB = (88, 60, 44)
-CLOCK: RGB = (246, 244, 236)
-GLASS: RGB = (186, 220, 236)
-IRON: RGB = (70, 82, 100)
+
+TIMBER: RGB = (200, 178, 134)
+TIMBER_TRIM: RGB = (104, 66, 44)
+SHINGLE: RGB = (112, 72, 60)
+STONE: RGB = (196, 188, 172)
+CREAM: RGB = (230, 220, 196)
+OCHRE: RGB = (228, 192, 116)
+TILE: RGB = (154, 70, 50)
+STATION_BRICK: RGB = (172, 90, 62)
+ASHLAR: RGB = (216, 206, 184)
+ROOF_SLATE: RGB = (92, 96, 110)
+IRON: RGB = (74, 80, 92)
+GLASS: RGB = (176, 204, 218)
+COLUMN: RGB = (138, 150, 140)
+CANOPY: RGB = (118, 112, 110)
+VALANCE: RGB = (236, 230, 214)
+PLATFORM_STONE: RGB = (178, 172, 160)
+CLOCK: RGB = (246, 242, 230)
+PANE: RGB = (64, 78, 100)
+# How far in front of where a station house stands the back of its platform lies, in cells: the
+# house stands set back from its track (railroads.ui.pixel.track_art.SET_BACK) past the platform.
+PLATFORM_BACK = 0.15
+# How wide a station's shadow is beside its footprint: its long low wings cast less than a tall
+# building's.
+SHADOW = 0.6
 
 
-def _house(m: Model, half: float, depth: float, height: float, storeys: int) -> None:
-    """A cream house with a brick base, windows on each storey, a door in the middle of its
-    front and a dark red pitched roof."""
-    m.box((-half, half), (-depth, depth), (0.0, 0.03), BRICK)
-    m.box((-half, half), (-depth, depth), (0.03, height), STATION_WALL)
-    m.roof(
-        (-half - 0.02, half + 0.02),
-        (-depth - 0.02, depth + 0.02),
-        (height, height + 0.1),
-        STATION_ROOF,
-        STATION_WALL,
-    )
-    count = max(2, round(half / 0.06))
-    for storey in range(storeys):
-        low = 0.065 + storey * 0.1
-        for k in range(count):
-            u = -half + (k + 0.5) * 2 * half / count
-            if storey == 0 and abs(u) < 0.04:
-                continue
-            m.panel((u - 0.018, u + 0.018), (low, low + 0.045), depth + 0.0005, WINDOW)
-    m.panel((-0.025, 0.025), (0.03, 0.12), depth + 0.001, DOOR)
+def _slope_normal(rise: float, run: float, way: tuple[float, float]) -> tuple[float, float, float]:
+    """The way out of a roof face rising `rise` over `run`, sloping down towards `way` (u, v)."""
+    length = math.hypot(rise, run) or 1.0
+    return (way[0] * rise / length, way[1] * rise / length, run / length)
 
 
-def _shelter(
-    m: Model, half: float, front: float, reach: float, height: float, roof: RGB = STATION_ROOF
+def hip_roof(
+    m: Model,
+    u: tuple[float, float],
+    v: tuple[float, float],
+    z: tuple[float, float],
+    color: RGB,
+    overhang: float = 0.01,
 ) -> None:
-    """A flat canopy over the platform in front of the house, on a row of posts."""
-    m.box((-half, half), (front, front + reach), (height, height + 0.015), roof)
-    for k in range(max(2, round(half / 0.12)) + 1):
-        u = -half + 0.02 + k * (2 * half - 0.04) / max(2, round(half / 0.12))
-        m.box((u - 0.006, u + 0.006), (front + reach - 0.012, front + reach), (0.0, height), POST)
+    """A roof hipped at both ends over walls `u` by `v`, from eaves `z[0]` to a ridge `z[1]`
+    along the middle, with rows of tiles and a ridge up close."""
+    (u0, u1), (v0, v1) = (u[0] - overhang, u[1] + overhang), (v[0] - overhang, v[1] + overhang)
+    eaves, ridge = z
+    rise, half = ridge - eaves, (v1 - v0) / 2
+    hip = min(half, (u1 - u0) / 2)
+    middle = (v0 + v1) / 2
+    m.faces += [
+        Face(
+            [
+                (u0, v1, eaves),
+                (u1, v1, eaves),
+                (u1 - hip, middle, ridge),
+                (u0 + hip, middle, ridge),
+            ],
+            color,
+            _slope_normal(rise, half, (0.0, 1.0)),
+        ),
+        Face(
+            [
+                (u1, v0, eaves),
+                (u0, v0, eaves),
+                (u0 + hip, middle, ridge),
+                (u1 - hip, middle, ridge),
+            ],
+            color,
+            _slope_normal(rise, half, (0.0, -1.0)),
+        ),
+        Face(
+            [(u1, v1, eaves), (u1, v0, eaves), (u1 - hip, middle, ridge)],
+            color,
+            _slope_normal(rise, hip, (1.0, 0.0)),
+        ),
+        Face(
+            [(u0, v0, eaves), (u0, v1, eaves), (u0 + hip, middle, ridge)],
+            color,
+            _slope_normal(rise, hip, (-1.0, 0.0)),
+        ),
+    ]
+    with m.fine():
+        rows = max(2, round(rise / 0.012))
+        for k in range(1, rows):
+            t = k / rows
+            high = eaves + rise * t
+            ends = (u0 + hip * t + 0.002, u1 - hip * t - 0.002)
+            for edge in (v0, v1):
+                at = edge + (middle - edge) * t
+                m.box(ends, (at - 0.0012, at + 0.0012), (high, high + 0.0014), shade(color, 0.72))
+        if u1 - u0 > 2 * hip + 0.004:
+            m.box(
+                (u0 + hip, u1 - hip),
+                (middle - 0.004, middle + 0.004),
+                (ridge - 0.002, ridge + 0.004),
+                shade(color, 0.8),
+            )
 
 
-def _board(m: Model, u: float, v: float) -> None:
-    """A blue name board on two posts."""
-    m.box((u - 0.035, u + 0.035), (v - 0.004, v + 0.004), (0.055, 0.09), NAME_BOARD)
-    for side in (-0.028, 0.028):
-        m.box((u + side - 0.004, u + side + 0.004), (v - 0.004, v + 0.004), (0.0, 0.055), POST)
+def pavilion_roof(m: Model, u: float, half: float, z: tuple[float, float], color: RGB) -> None:
+    """A pointed four-sided roof over a square `half` either way of (`u`, 0), its eaves out a
+    little, with a finial up close."""
+    m.spire(u, half + 0.006, z, color)
+    with m.fine():
+        upright(m, u, 0.0, 0.003, (z[1] - 0.004, z[1] + 0.02), IRON)
 
 
-def country_station() -> Model:
-    """A small country station: a cream house with a chimney and a canopy over the platform."""
-    m = Model()
-    _house(m, 0.19, 0.075, 0.15, 1)
-    m.box((0.08, 0.11), (-0.02, 0.02), (0.2, 0.3), BRICK)
-    _shelter(m, 0.15, 0.075, 0.07, 0.12)
-    _board(m, -0.26, 0.12)
+def canopy(
+    m: Model,
+    u: tuple[float, float],
+    front: float,
+    reach: float,
+    z: tuple[float, float],
+    roof: RGB = CANOPY,
+    posts: RGB | None = None,
+) -> None:
+    """A platform canopy leaning from the front wall at `front` out over the platform by `reach`:
+    its roof falling from `z[1]` at the wall to `z[0]` at its edge, with a pale valance along
+    that edge, held up by a row of `posts` under it or, without them, by brackets on the wall."""
+    (u0, u1), (low, high) = u, z
+    edge = front + reach
+    m.faces.append(
+        Face(
+            [(u0, front, high), (u1, front, high), (u1, edge, low), (u0, edge, low)],
+            roof,
+            _slope_normal(high - low, reach, (0.0, 1.0)),
+        )
+    )
+    drop = 0.012
+    m.box((u0, u1), (edge - 0.002, edge), (low - drop, low), VALANCE)
+    for end, out in ((u0, -1.0), (u1, 1.0)):
+        m.faces.append(
+            Face(
+                [(end, front, high), (end, edge, low), (end, edge, low - drop), (end, front, low)],
+                VALANCE,
+                (out, 0.0, 0.0),
+            )
+        )
+    count = max(1, round((u1 - u0) / 0.16))
+    for k in range(count + 1):
+        at = u0 + 0.012 + k * (u1 - u0 - 0.024) / count
+        if posts is not None:
+            m.box((at - 0.003, at + 0.003), (edge - 0.01, edge - 0.004), (0.0, low - drop), posts)
+            continue
+        with m.fine():
+            brace = [
+                (at, front, low - 0.034),
+                (at, front, low - 0.026),
+                (at, edge - 0.01, low),
+                (at, edge - 0.016, low),
+            ]
+            m.faces.append(Face(brace, roof, (1.0, 0.0, 0.0)))
+            m.faces.append(Face(brace[::-1], roof, (-1.0, 0.0, 0.0)))
+    with m.fine():
+        for k in range(count * 3):
+            at = u0 + (k + 0.5) * (u1 - u0) / (count * 3)
+            m.box(
+                (at - 0.002, at + 0.002),
+                (edge - 0.0026, edge + 0.0004),
+                (low - drop, low - drop + 0.004),
+                shade(VALANCE, 0.75),
+            )
+
+
+def boards(m: Model, u: tuple[float, float], v: float, height: float, color: RGB) -> None:
+    """Upright battens up close down both long walls `v` out, every few hundredths of a cell."""
+    with m.fine():
+        count = round((u[1] - u[0]) / 0.014)
+        for k in range(1, count):
+            at = u[0] + k * (u[1] - u[0]) / count
+            m.panel((at - 0.0012, at + 0.0012), (0.014, height), v + 0.0004, shade(color, 0.8))
+
+
+def quoins(
+    m: Model, u: tuple[float, float], v: tuple[float, float], height: float, color: RGB
+) -> None:
+    """Pale stone at the corners of a block, up close."""
+    (u0, u1), (v0, v1) = u, v
+    with m.fine():
+        for cu in (u0, u1):
+            for cv in (v0, v1):
+                m.box((cu - 0.004, cu + 0.004), (cv - 0.004, cv + 0.004), (0.014, height), color)
+
+
+def row_of_windows(
+    m: Model,
+    u: tuple[float, float],
+    v: float,
+    lows: tuple[float, ...],
+    tall: float = 0.04,
+    gap: float = 0.05,
+    skip_middle: float = 0.0,
+    glass: RGB = PANE,
+) -> None:
+    """Windows evenly along both long walls `v` out, a row at each of `lows`, leaving a space of
+    `skip_middle` either side of the middle on the lowest row for a door."""
+    count = max(1, round((u[1] - u[0]) / gap))
+    for row, low in enumerate(lows):
+        for k in range(count):
+            at = u[0] + (k + 0.5) * (u[1] - u[0]) / count
+            if row == 0 and abs(at) < skip_middle:
+                continue
+            window(m, (at - 0.011, at + 0.011), (low, low + tall), v, glass)
+
+
+def name_board(m: Model, u: float, v: float, z: float, half: float = 0.03) -> None:
+    """The station's blue name board on the wall at the end `u`, its face `v` across."""
+    out = 0.004 if u > 0 else -0.004
+    m.box((min(u, u + out), max(u, u + out)), (v - half, v + half), (z, z + 0.026), NAME_BOARD)
+    with m.fine():
+        for k in range(-2, 3):
+            m.box(
+                (min(u, u + 1.4 * out), max(u, u + 1.4 * out)),
+                (v + k * half / 3 - 0.003, v + k * half / 3 + 0.003),
+                (z + 0.011, z + 0.015),
+                (236, 240, 250),
+            )
+
+
+def clock(m: Model, u: float, v: float, z: float, half: float = 0.014) -> None:
+    """A clock face on both long walls `v` out, `z` up at its middle."""
+    m.panel((u - half, u + half), (z - half, z + half), v + 0.0008, CLOCK)
+    with m.fine():
+        m.panel((u - 0.0015, u + 0.0015), (z - 0.001, z + half * 0.7), v + 0.0014, IRON)
+        m.panel((u - 0.0015, u + half * 0.6), (z - 0.0015, z + 0.0015), v + 0.0014, IRON)
+
+
+def _by_platform(m: Model, front: float) -> Model:
+    """The model moved across so its front, `front` out from where it stands, meets the back of
+    the platform beside the track."""
+    shift = PLATFORM_BACK - front
+    m.move(0, 0.0, shift)
+    m.footprints = [(u, (v[0] + shift, v[1] + shift)) for u, v in m.footprints]
     return m
+
+
+def block(
+    m: Model,
+    u: tuple[float, float],
+    v: tuple[float, float],
+    height: float,
+    wall: RGB,
+    trim: RGB,
+) -> None:
+    """A block of walls on a stone plinth, with a ledge of `trim` under its eaves."""
+    footing(m, u, v)
+    walls(m, u, v, height, wall, STONE)
+    cornice(m, u, v, height - 0.008, trim)
+
+
+def wooden_halt() -> Model:
+    """A small wooden station: a board-and-batten waiting room under a shingled roof, a lower
+    goods shed at one end, a chimney and a name board."""
+    m = Model()
+    u, v, high = (-0.16, 0.12), (-0.06, 0.06), 0.11
+    footing(m, (-0.16, 0.22), v)
+    walls(m, u, v, high, TIMBER, STONE)
+    boards(m, u, v[1], high, TIMBER)
+    row_of_windows(m, u, v[1], (0.04,), gap=0.07, skip_middle=0.03)
+    door(m, (-0.016, 0.016), 0.085, v[1], TIMBER_TRIM)
+    gable_roof(m, u, v, (high, high + 0.085), SHINGLE, TIMBER, 0.016)
+    shed_u, shed_v, shed_high = (0.12, 0.22), (-0.05, 0.05), 0.08
+    walls(m, shed_u, shed_v, shed_high, shade(TIMBER, 0.85), STONE)
+    boards(m, shed_u, shed_v[1], shed_high, shade(TIMBER, 0.85))
+    door(m, (0.15, 0.19), 0.065, shed_v[1], TIMBER_TRIM)
+    gable_roof(m, shed_u, shed_v, (shed_high, shed_high + 0.06), shade(SHINGLE, 0.9), TIMBER)
+    chimney(m, -0.06, -0.02, (high + 0.04, high + 0.12), BRICK)
+    name_board(m, -0.176, 0.0, 0.07)
+    return _by_platform(m, 0.06)
+
+
+def brick_station() -> Model:
+    """A brick station: a long block under a hipped slate roof with a little lookout tower over
+    its middle, a one-storey wing at one end and a canopy on iron posts over the platform."""
+    m = Model()
+    u, v, high = (-0.18, 0.14), (-0.075, 0.075), 0.14
+    block(m, u, v, high, STATION_BRICK, ASHLAR)
+    quoins(m, u, v, high, ASHLAR)
+    row_of_windows(m, u, v[1], (0.05,), tall=0.05, gap=0.055, skip_middle=0.03)
+    door(m, (-0.018, 0.018), 0.1, v[1])
+    hip_roof(m, u, v, (high, high + 0.08), ROOF_SLATE, 0.014)
+    tower = (-0.035, 0.035)
+    block(m, tower, tower, high + 0.15, STATION_BRICK, ASHLAR)
+    window(m, (-0.012, 0.012), (high + 0.09, high + 0.125), 0.035, PANE)
+    pavilion_roof(m, 0.0, 0.035, (high + 0.15, high + 0.23), ROOF_SLATE)
+    wing_u, wing_v, wing_high = (0.14, 0.25), (-0.06, 0.06), 0.1
+    block(m, wing_u, wing_v, wing_high, STATION_BRICK, ASHLAR)
+    row_of_windows(m, wing_u, wing_v[1], (0.04,), gap=0.055)
+    gable_roof(m, wing_u, wing_v, (wing_high, wing_high + 0.06), ROOF_SLATE, STATION_BRICK)
+    chimney(m, -0.12, 0.0, (high + 0.04, high + 0.11), STATION_BRICK)
+    canopy(m, (-0.13, 0.13), v[1], 0.08, (high - 0.035, high - 0.01))
+    name_board(m, 0.254, 0.0, 0.05)
+    return _by_platform(m, 0.075)
 
 
 def town_station() -> Model:
-    """A town station: a long two-storey house with a clock in a gable over its middle and a
-    long canopy over the platform."""
+    """A town station in yellow render: a two-storey middle under a tiled hipped roof with a
+    clock in a gable over its door, a one-storey wing either side and a long canopy over the
+    platform."""
     m = Model()
-    _house(m, 0.29, 0.085, 0.24, 2)
-    m.box((-0.07, 0.07), (0.085, 0.1), (0.0, 0.27), STATION_WALL)
+    u, v, high = (-0.11, 0.11), (-0.09, 0.09), 0.24
+    block(m, u, v, high, OCHRE, CREAM)
+    quoins(m, u, v, high, CREAM)
+    cornice(m, u, v, 0.125, CREAM)
+    row_of_windows(m, u, v[1], (0.05, 0.155), tall=0.05, gap=0.05, skip_middle=0.03)
+    door(m, (-0.02, 0.02), 0.105, v[1])
+    hip_roof(m, u, v, (high, high + 0.1), TILE, 0.014)
     m.faces.append(
-        Face([(-0.07, 0.1, 0.27), (0.07, 0.1, 0.27), (0.0, 0.1, 0.34)], STATION_WALL, (0, 1, 0))
+        Face(
+            [
+                (-0.06, v[1] + 0.001, high),
+                (0.06, v[1] + 0.001, high),
+                (0.0, v[1] + 0.001, high + 0.06),
+            ],
+            CREAM,
+            (0.0, 1.0, 0.0),
+        )
     )
-    m.panel((-0.02, 0.02), (0.19, 0.23), 0.1005, CLOCK)
-    _shelter(m, 0.3, 0.1, 0.08, 0.13)
-    for u in (-0.36, 0.36):
-        _board(m, u, 0.14)
-    return m
+    clock(m, 0.0, v[1] + 0.001, high + 0.022)
+    for wing_u in ((-0.31, -0.11), (0.11, 0.31)):
+        wing_v, wing_high = (-0.075, 0.075), 0.14
+        block(m, wing_u, wing_v, wing_high, OCHRE, CREAM)
+        row_of_windows(m, wing_u, wing_v[1], (0.05,), tall=0.05, gap=0.05)
+        hip_roof(m, wing_u, wing_v, (wing_high, wing_high + 0.065), TILE, 0.012)
+    for at in (-0.2, 0.2):
+        chimney(m, at, 0.0, (0.18, 0.25), shade(OCHRE, 0.85))
+    canopy(m, (-0.25, 0.25), 0.075, 0.09, (0.1, 0.125))
+    name_board(m, -0.324, 0.0, 0.06)
+    name_board(m, 0.324, 0.0, 0.06)
+    return _by_platform(m, 0.09)
 
 
 def grand_station() -> Model:
-    """A grand terminal: a long house with a clock tower under a pointed roof, and a glass
-    train shed on iron posts over the platform."""
+    """A grand red brick station trimmed in pale stone: a high hall with a tall arched window
+    between two towers under green copper domes, two-storey wings either side and a long canopy
+    over the platform."""
     m = Model()
-    _house(m, 0.34, 0.09, 0.28, 2)
-    m.box((-0.3, -0.2), (-0.05, 0.05), (0.0, 0.56), STATION_WALL)
-    m.panel((-0.275, -0.225), (0.43, 0.48), 0.0505, CLOCK)
-    m.spire(-0.25, 0.06, (0.56, 0.74), STATION_ROOF)
-    m.roof((-0.4, 0.4), (0.09, 0.23), (0.17, 0.24), GLASS, IRON)
-    for k in range(7):
-        u = -0.38 + k * 0.76 / 6
-        m.box((u - 0.006, u + 0.006), (0.215, 0.227), (0.0, 0.17), IRON)
-    for u in (-0.44, 0.44):
-        _board(m, u, 0.16)
-    return m
+    u, v, high = (-0.1, 0.1), (-0.1, 0.1), 0.3
+    block(m, u, v, high, STATION_BRICK, ASHLAR)
+    gable_roof(m, (-0.1, 0.1), v, (high, high + 0.12), ROOF_SLATE, STATION_BRICK, 0.012)
+    m.panel((-0.045, 0.045), (0.11, 0.24), v[1] + 0.0008, ASHLAR)
+    m.panel((-0.035, 0.035), (0.12, 0.235), v[1] + 0.0014, GLASS)
+    with m.fine():
+        for at in (-0.012, 0.012):
+            m.panel((at - 0.0015, at + 0.0015), (0.12, 0.235), v[1] + 0.002, IRON)
+        m.panel((-0.035, 0.035), (0.175, 0.178), v[1] + 0.002, IRON)
+    door(m, (-0.03, 0.03), 0.1, v[1])
+    clock(m, 0.0, v[1], 0.27, 0.016)
+    for at in (-0.135, 0.135):
+        tower = (at - 0.04, at + 0.04)
+        block(m, tower, (-0.045, 0.045), 0.4, STATION_BRICK, ASHLAR)
+        quoins(m, tower, (-0.045, 0.045), 0.4, ASHLAR)
+        for low in (0.06, 0.17, 0.29):
+            window(m, (at - 0.012, at + 0.012), (low, low + 0.05), 0.045, PANE)
+        m.box((at - 0.046, at + 0.046), (-0.051, 0.051), (0.4, 0.412), ASHLAR)
+        dome(m, at, 0.0, 0.045, (0.412, 0.49), VERDIGRIS)
+        with m.fine():
+            upright(m, at, 0.0, 0.003, (0.48, 0.53), IRON)
+    for wing_u in ((-0.39, -0.175), (0.175, 0.39)):
+        wing_v, wing_high = (-0.08, 0.08), 0.22
+        block(m, wing_u, wing_v, wing_high, STATION_BRICK, ASHLAR)
+        cornice(m, wing_u, wing_v, 0.11, ASHLAR)
+        row_of_windows(m, wing_u, wing_v[1], (0.04, 0.14), tall=0.05, gap=0.045)
+        hip_roof(m, wing_u, wing_v, (wing_high, wing_high + 0.08), ROOF_SLATE, 0.012)
+        chimney(m, sum(wing_u) / 2, 0.0, (0.26, 0.33), STATION_BRICK)
+    canopy(m, (-0.3, 0.3), 0.08, 0.1, (0.11, 0.14))
+    return _by_platform(m, 0.1)
 
 
-def junction_station() -> Model:
-    """A junction station: a long three-storey house between two clock towers under pointed
-    roofs, and a long glass train shed on iron posts over the platform."""
+def terminus() -> Model:
+    """A central terminus of pale stone: a long three-storey front with a tall clock tower in its
+    middle and a pavilion at either end, all under slate, and an arched train shed of iron and
+    glass over its platform before it."""
     m = Model()
-    _house(m, 0.38, 0.095, 0.32, 3)
-    for u in (-0.32, 0.32):
-        m.box((u - 0.05, u + 0.05), (-0.05, 0.05), (0.0, 0.58), STATION_WALL)
-        m.panel((u - 0.025, u + 0.025), (0.45, 0.5), 0.0505, CLOCK)
-        m.spire(u, 0.06, (0.58, 0.76), STATION_ROOF)
-    m.roof((-0.44, 0.44), (0.095, 0.25), (0.19, 0.27), GLASS, IRON)
-    for k in range(9):
-        u = -0.42 + k * 0.84 / 8
-        m.box((u - 0.006, u + 0.006), (0.237, 0.249), (0.0, 0.19), IRON)
-    for u in (-0.46, 0.46):
-        _board(m, u, 0.17)
-    return m
-
-
-def central_station() -> Model:
-    """A central station: a grand four-storey house with a tall clock tower in its middle and a
-    tower at either end, all under pointed roofs, and a high glass train shed over the
-    platform, stepped down at both ends."""
-    m = Model()
-    _house(m, 0.42, 0.1, 0.38, 3)
-    m.box((-0.07, 0.07), (-0.07, 0.07), (0.0, 0.74), STATION_WALL)
-    m.panel((-0.035, 0.035), (0.58, 0.65), 0.0705, CLOCK)
-    m.spire(0.0, 0.08, (0.74, 0.98), STATION_ROOF)
-    for u in (-0.36, 0.36):
-        m.box((u - 0.045, u + 0.045), (-0.045, 0.045), (0.0, 0.52), STATION_WALL)
-        m.spire(u, 0.055, (0.52, 0.66), STATION_ROOF)
-    m.roof((-0.3, 0.3), (0.1, 0.27), (0.22, 0.32), GLASS, IRON)
-    for low, high in ((-0.46, -0.3), (0.3, 0.46)):
-        m.roof((low, high), (0.1, 0.25), (0.17, 0.24), GLASS, IRON)
-    for k in range(11):
-        u = -0.44 + k * 0.88 / 10
-        m.box((u - 0.006, u + 0.006), (0.25, 0.262), (0.0, 0.17), IRON)
-    for u in (-0.2, 0.2):
-        _board(m, u, 0.3)
-    return m
+    u, v, high = (-0.4, 0.4), (-0.07, 0.07), 0.32
+    block(m, u, v, high, ASHLAR, CREAM)
+    for low in (0.11, 0.215):
+        cornice(m, u, v, low, CREAM)
+    row_of_windows(m, u, v[1], (0.04, 0.14, 0.24), tall=0.05, gap=0.05)
+    hip_roof(m, u, v, (high, high + 0.09), ROOF_SLATE, 0.012)
+    for at in (-0.37, 0.37):
+        pavilion = (at - 0.06, at + 0.06)
+        block(m, pavilion, (-0.08, 0.08), 0.38, ASHLAR, CREAM)
+        quoins(m, pavilion, (-0.08, 0.08), 0.38, CREAM)
+        pavilion_roof(m, at, 0.06, (0.38, 0.47), ROOF_SLATE)
+    tower = (-0.055, 0.055)
+    block(m, tower, tower, 0.56, ASHLAR, CREAM)
+    quoins(m, tower, tower, 0.56, CREAM)
+    clock(m, 0.0, 0.055, 0.49, 0.02)
+    m.box((-0.06, 0.06), (-0.06, 0.06), (0.56, 0.575), CREAM)
+    pavilion_roof(m, 0.0, 0.06, (0.575, 0.72), ROOF_SLATE)
+    back = -0.09
+    m.move(0, 0.0, back)
+    m.footprints = [(fu, (fv[0] + back, fv[1] + back)) for fu, fv in m.footprints]
+    shed_half, shed_v = 0.13, 0.11
+    start = len(m.faces)
+    m.vault((-0.38, 0.38), shed_half, (0.1, 0.25), GLASS)
+    with m.fine():
+        for k in range(9):
+            at = -0.38 + k * 0.76 / 8
+            m.vault((at - 0.004, at + 0.004), shed_half + 0.003, (0.1, 0.253), IRON)
+    for k in range(5):
+        at = -0.37 + k * 0.74 / 4
+        side = shed_half
+        m.box((at - 0.005, at + 0.005), (side - 0.005, side + 0.005), (0.0, 0.1), COLUMN)
+    m.move(start, 0.0, shed_v)
+    return _by_platform(m, 0.24)
 
 
 def island_platform() -> Model:
-    """A platform added to a station: a stone island under a long canopy on a row of posts down
-    its middle, with a name board at one end and no house."""
+    """A platform added to a station: a stone island under a long ridged canopy on a row of iron
+    posts down its middle, with a name board on a post at either end."""
     m = Model()
-    stone = (176, 170, 158)
-    m.box((-0.4, 0.4), (-0.07, 0.07), (0.0, 0.03), stone)
-    m.box((-0.33, 0.33), (-0.09, 0.09), (0.13, 0.145), STATION_ROOF)
+    m.footprints.append(((-0.33, 0.33), (-0.08, 0.08)))
+    m.box((-0.4, 0.4), (-0.07, 0.07), (0.0, 0.03), PLATFORM_STONE)
+    gable_roof(m, (-0.33, 0.33), (-0.08, 0.08), (0.13, 0.155), CANOPY, CANOPY, 0.0)
+    m.box((-0.33, 0.33), (-0.082, 0.082), (0.118, 0.13), VALANCE)
     for k in range(6):
-        u = -0.3 + k * 0.6 / 5
-        m.box((u - 0.006, u + 0.006), (-0.006, 0.006), (0.03, 0.13), POST)
-    _board(m, -0.37, 0.0)
+        at = -0.3 + k * 0.6 / 5
+        m.box((at - 0.005, at + 0.005), (-0.005, 0.005), (0.03, 0.118), IRON)
+    for at in (-0.37, 0.37):
+        m.box((at - 0.003, at + 0.003), (-0.003, 0.003), (0.03, 0.09), IRON)
+        name_board(m, at, 0.0, 0.09, 0.04)
     return m
 
 
+LEVELS: dict[str, Callable[[], Model]] = {
+    "station": wooden_halt,
+    "station_2": brick_station,
+    "station_3": town_station,
+    "station_4": grand_station,
+    "station_5": terminus,
+    "platform": island_platform,
+}
+
+
 def turned(build: Callable[[], Model], line: str) -> Callable[[], Sprite]:
-    """The sprite of a station house built by `build`, turned along track running `line`."""
+    """The sprite of a station built by `build`, turned along track running `line`."""
+    return modelled(build, shadow=SHADOW, heading=math.radians(TURNED_LINES[line]))
 
-    def draw() -> Sprite:
-        heading = math.radians(TURNED_LINES[line])
-        return Sprite(*draw_model(build(), heading, _HEX_PROJECTION.matrix, fineness()))
 
-    return draw
-
+SQUARE_STATIONS = {
+    name: modelled(build, shadow=SHADOW, heading=HEADING) for name, build in LEVELS.items()
+}
 
 TURNED_STATIONS = {
-    f"{name}_{line}": turned(build, line)
-    for name, build in (
-        ("station", country_station),
-        ("station_2", town_station),
-        ("station_3", grand_station),
-        ("station_4", junction_station),
-        ("station_5", central_station),
-        ("platform", island_platform),
-    )
-    for line in TURNED_LINES
+    f"{name}_{line}": turned(build, line) for name, build in LEVELS.items() for line in TURNED_LINES
 }
