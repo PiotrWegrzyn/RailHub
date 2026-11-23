@@ -38,6 +38,10 @@ SWING = 0.5
 # below the second no signals at all.
 MASTS_FROM = 48.0
 LAMPS_FROM = 10.0
+# Signals standing closer than this, in cells, share a mast, with an arm for each, at most
+# MOST_ARMS of them.
+SHARED = 0.5
+MOST_ARMS = 3
 RED = (0.95, 0.2, 0.14)
 GREEN = (0.3, 0.95, 0.4)
 SIGNAL_RED = (0.78, 0.12, 0.1)
@@ -48,6 +52,11 @@ OUTLINE = (0.09, 0.08, 0.08)
 FOOTING = (0.14, 0.16, 0.22)
 RIM = (0.72, 0.73, 0.75)
 SHADOW = (0.0, 0.0, 0.0, 0.28)
+
+
+# A semaphore arm: how clear it shows, from 0 at danger to 1 clear, whether it reaches towards the
+# right (1) or the left (-1), and its lamp's colour.
+type Arm = tuple[float, float, tuple[float, float, float]]
 
 
 def _u32(color: tuple[float, ...], alpha: float = 1.0) -> int:
@@ -115,6 +124,7 @@ class SignalLayer:
             for k, under in zip(indices.tolist(), hidden, strict=True)
             if not under
         )
+        groups: list[tuple[Vec2, list[Arm]]] = []
         for y, x, k in order:
             spot = spots[k]
             key = (spot.cell, spot.at)
@@ -123,11 +133,24 @@ class SignalLayer:
             clear += max(-step, min(step, wanted - clear))
             self._clear[key] = clear
             lamp = tuple(r + (g - r) * clear for r, g in zip(RED, GREEN, strict=True))
-            if masts:
-                towards = 1.0 if dy[k] >= 0 else -1.0
-                _semaphore(draw_list, (x, y), per_cell, up, clear, towards, lamp)
-            else:
+            if not masts:
                 _glow(draw_list, (x, y - MAST * up * 0.8), max(1.6, GLASS * per_cell), lamp)
+                continue
+            arm = (clear, 1.0 if dy[k] >= 0 else -1.0, lamp)
+            near = next(
+                (
+                    arms
+                    for (gx, gy), arms in groups
+                    if len(arms) < MOST_ARMS and math.hypot(gx - x, gy - y) < SHARED * per_cell
+                ),
+                None,
+            )
+            if near is None:
+                groups.append(((x, y), [arm]))
+            else:
+                near.append(arm)
+        for foot, arms in groups:
+            _semaphore(draw_list, foot, per_cell, up, arms)
 
 
 def _semaphore(
@@ -135,12 +158,11 @@ def _semaphore(
     foot: Vec2,
     per_cell: float,
     up: float,
-    clear: float,
-    towards: float,
-    lamp: tuple[float, float, float],
+    arms: list[Arm],
 ) -> None:
-    """One semaphore standing at `foot` on the screen, its arm reaching `towards` the right
-    (1) or the left (-1) and risen `clear` of the way from danger to clear."""
+    """One semaphore standing at `foot` on the screen with its arms, the first at the top: each
+    reaching towards the right (1) or the left (-1), risen as clear as it shows from danger to
+    clear, its lamp lit."""
     x, y = foot
     line = max(1.0, 0.005 * per_cell)
     draw_list.add_ellipse_filled(
@@ -165,7 +187,20 @@ def _semaphore(
     finial = max(1.2, 0.012 * per_cell)
     draw_list.add_circle_filled((x, top - finial * 0.6), finial + line, _u32(OUTLINE))
     draw_list.add_circle_filled((x, top - finial * 0.6), finial, _u32(WHITE))
-    pivot = (x, top + band * 0.6)
+    for index, (clear, towards, lamp) in enumerate(arms):
+        _arm(draw_list, (x, top + band * (0.6 + 1.6 * index)), per_cell, line, clear, towards, lamp)
+
+
+def _arm(
+    draw_list: imgui.ImDrawList,
+    pivot: Vec2,
+    per_cell: float,
+    line: float,
+    clear: float,
+    towards: float,
+    lamp: tuple[float, float, float],
+) -> None:
+    """A semaphore's arm on its pivot, with its spectacle and lamp."""
     angle = math.radians(RISE * clear)
     ax, ay = towards * math.cos(angle), -math.sin(angle)
     nx, ny = -ay, ax
