@@ -1,19 +1,12 @@
 import numpy as np
 import pytest
 
-from builders import flat_map
-from railroads.sim.constructions import Building, BuildingKind, Constructions, Station
+from builders import make_game
+from railroads.sim.constructions import Building, BuildingKind, Station
 from railroads.sim.finance import STATION_PRICE
-from railroads.sim.game import Game
 from railroads.sim.routes import plan_route, route_price
 from railroads.sim.trains import Stop
 from railroads.words import dollars
-
-
-def make_game(cash: float = 1_000_000.0) -> Game:
-    game = Game(Constructions(flat_map()))
-    game.finances.cash = cash
-    return game
 
 
 def test_a_station_costs_its_price_and_clearing_its_site() -> None:

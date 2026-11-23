@@ -212,3 +212,15 @@ def grows_as(saved: SavedGame) -> Callable[..., SavedGame]:
         return saved
 
     return made
+
+
+def square_map(size: int = 40, deposits: npt.NDArray[np.uint8] | None = None) -> TileMap:
+    """flat_map, as many cells across as down."""
+    return flat_map(size, size, deposits=deposits)
+
+
+def make_game(cash: float = 1_000_000.0) -> Game:
+    """A game on flat_map with this much cash."""
+    game = Game(Constructions(flat_map()))
+    game.finances.cash = cash
+    return game

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from builders import flat_map
+from builders import square_map
 from railroads.sim.autoplay import PlayerRule, StandInPlayer, reach_sums
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Satisfaction
@@ -10,18 +10,13 @@ from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.points import Points
 from railroads.sim.railway import Railway
-from railroads.sim.tilemap import TileMap
 
 QUIET = GrowthRule(ladders=(), forests=None)
 TOWNS = [(5, 5), (5, 20), (5, 35), (20, 5), (20, 20), (20, 35)]
 
 
-def make_map(size: int = 40) -> TileMap:
-    return flat_map(size, size)
-
-
 def grown(towns: list[tuple[int, int]] = TOWNS, same: bool = False) -> Growth:
-    constructions = Constructions(make_map())
+    constructions = Constructions(square_map())
     for houses, cell in enumerate(towns, start=1):
         for _ in range(1 if same else houses):
             constructions.build(Building(cell, BuildingKind.HOUSE))

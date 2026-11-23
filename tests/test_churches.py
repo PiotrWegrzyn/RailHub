@@ -1,14 +1,14 @@
 import numpy as np
 import pytest
 
-from builders import flat_map
+from builders import square_map
 from railroads.mapgen.deposits import place_deposits
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Economy, StationOrder
 from railroads.sim.goods import NEEDS, Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import CHURCHES, FARMS, ORCHARDS
-from railroads.sim.tilemap import Deposit, Relief, TileMap
+from railroads.sim.tilemap import Deposit, Relief
 
 RANKS = (
     BuildingKind.CHURCH,
@@ -16,10 +16,6 @@ RANKS = (
     BuildingKind.CATHEDRAL,
     BuildingKind.ST_PETERS,
 )
-
-
-def make_map(size: int = 40) -> TileMap:
-    return flat_map(size, size)
 
 
 def settle(constructions: Constructions, cell: tuple[int, int], points: int) -> None:
@@ -39,7 +35,7 @@ def count(constructions: Constructions, kind: BuildingKind) -> int:
 
 @pytest.mark.parametrize(("people", "opens"), [(9, False), (10, True)])
 def test_a_church_needs_ten_population_nearby(people: int, opens: bool) -> None:
-    constructions = Constructions(make_map())
+    constructions = Constructions(square_map())
     settle(constructions, (10, 10), people)
     growth = Growth(constructions)
 
@@ -53,7 +49,7 @@ def test_a_church_needs_ten_population_nearby(people: int, opens: bool) -> None:
 def test_no_church_opens_within_four_hexes_of_another(
     rank: BuildingKind, steps: int, opens: bool
 ) -> None:
-    constructions = Constructions(make_map())
+    constructions = Constructions(square_map())
     grid = constructions.tile_map.grid
     cell = next(c for c, away in grid.within((20, 20), steps).items() if away == steps)
     constructions.build(Building((20, 20), rank))
@@ -82,7 +78,7 @@ def test_no_church_opens_within_four_hexes_of_another(
 def test_churches_rise_with_the_people_around_them(
     small: BuildingKind, big: BuildingKind, people: int, rises: bool
 ) -> None:
-    constructions = Constructions(make_map())
+    constructions = Constructions(square_map())
     constructions.build(Building((20, 20), small))
     settle(constructions, (20, 20), people)
 
@@ -93,7 +89,7 @@ def test_churches_rise_with_the_people_around_them(
 
 
 def test_only_the_most_crowded_cathedral_becomes_st_peters() -> None:
-    constructions = Constructions(make_map())
+    constructions = Constructions(square_map())
     for cell, people in (((10, 10), 400), ((30, 30), 420)):
         constructions.build(Building(cell, BuildingKind.CATHEDRAL))
         settle(constructions, cell, people)
@@ -116,7 +112,7 @@ def test_only_the_most_crowded_cathedral_becomes_st_peters() -> None:
     ],
 )
 def test_churches_send_their_congregation_as_passengers(kind: BuildingKind, people: int) -> None:
-    constructions = Constructions(make_map())
+    constructions = Constructions(square_map())
     constructions.build(Building((5, 5), kind))
     growth = Growth(constructions)
     flat = np.array([np.ravel_multi_index((5, 5), constructions.tile_map.grid.shape)])
@@ -139,7 +135,7 @@ def test_each_rank_of_church_wants_more_wax_and_incense(need: Need) -> None:
 def test_wine_is_made_of_grapes_and_barrels_make_up_to_twice_as_much(
     grapes: float, barrels: float, wine: float
 ) -> None:
-    tile_map = make_map(12)
+    tile_map = square_map(12)
     economy = Economy(tile_map)
     flat = int(np.ravel_multi_index((5, 5), tile_map.grid.shape))
     economy.stock[(BuildingKind.WINERY, Need.GRAPES)][flat] = grapes
@@ -154,7 +150,7 @@ def test_wine_is_made_of_grapes_and_barrels_make_up_to_twice_as_much(
 
 
 def test_honey_feeds_houses_and_wax_lights_churches_once_homes_have_electric_light() -> None:
-    tile_map = make_map(12)
+    tile_map = square_map(12)
     economy = Economy(tile_map)
     economy.year = 1882
     neighbours = tile_map.grid.neighbours(5, 5)
@@ -175,7 +171,7 @@ def test_honey_feeds_houses_and_wax_lights_churches_once_homes_have_electric_lig
 
 @pytest.mark.parametrize("seed", range(6))
 def test_incense_lies_in_only_a_handful_of_cells(seed: int) -> None:
-    layer = place_deposits(make_map(400), np.random.default_rng(seed))
+    layer = place_deposits(square_map(400), np.random.default_rng(seed))
 
     assert int((layer == Deposit.INCENSE).sum()) <= 12
 

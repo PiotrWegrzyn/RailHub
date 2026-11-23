@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from builders import flat_map
+from builders import square_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.goods import MAKES, Good, Need, needs_of
 from railroads.sim.growth import Growth
@@ -13,18 +13,14 @@ from railroads.sim.novelties import (
     olympic_year,
     place_space_center,
 )
-from railroads.sim.tilemap import Deposit, TileMap
+from railroads.sim.tilemap import Deposit
 
 QUIET = GrowthRule(ladders=(), forests=None)
 BY_KIND = {novelty.kind: novelty for novelty in NOVELTIES}
 
 
-def make_map(size: int = 40, deposits: np.ndarray | None = None) -> TileMap:
-    return flat_map(size, size, deposits=deposits)
-
-
 def grown(year: int, towns: dict[tuple[int, int], BuildingKind] | None = None, **kw) -> Growth:
-    constructions = Constructions(make_map(**kw))
+    constructions = Constructions(square_map(**kw))
     for cell, kind in (towns or {}).items():
         for _ in range(6 if kind == BuildingKind.HOUSE else 1):
             constructions.build(Building(cell, kind))
@@ -39,7 +35,7 @@ def built(growth: Growth, kind: BuildingKind) -> list[tuple[int, int]]:
 def test_a_game_gets_two_or_three_novelties_on_a_map_like_poland_and_fewer_on_a_small_one(
     size: int, least: int, most: int
 ) -> None:
-    tile_map = make_map(size)
+    tile_map = square_map(size)
 
     counts = {len(Novelties.pick(tile_map, np.random.default_rng(s)).picked) for s in range(20)}
 
@@ -49,7 +45,7 @@ def test_a_game_gets_two_or_three_novelties_on_a_map_like_poland_and_fewer_on_a_
 
 @pytest.mark.parametrize(("size", "chance"), [(348, 0.05), (174, 0.0125)])
 def test_the_chance_of_hosting_the_games_grows_with_the_land(size: int, chance: float) -> None:
-    novelties = Novelties.pick(make_map(size), np.random.default_rng(0))
+    novelties = Novelties.pick(square_map(size), np.random.default_rng(0))
 
     assert novelties.olympic_chance == pytest.approx(chance, rel=0.01)
 
@@ -149,7 +145,7 @@ def test_the_salt_mine_cathedral_stands_on_salt_and_digs_it() -> None:
 
 
 def test_novelties_want_only_goods_the_game_already_has_and_fill_a_whole_hex() -> None:
-    constructions = Constructions(make_map())
+    constructions = Constructions(square_map())
 
     for novelty in (*NOVELTIES, Novelty(BuildingKind.OLYMPIC_STADIUM, 1896, lambda *_: None)):
         constructions.build(Building((5, 5), novelty.kind))

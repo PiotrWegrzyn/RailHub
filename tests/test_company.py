@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from builders import flat_map
+from builders import make_game
 from railroads.newgame import Settings
 from railroads.sim.clock import END_YEAR
 from railroads.sim.company import (
@@ -13,18 +13,11 @@ from railroads.sim.company import (
     Goal,
     company_value,
 )
-from railroads.sim.constructions import Building, BuildingKind, Constructions
+from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.facilities import FACILITY_PRICES, Facility
 from railroads.sim.finance import LEVEL_PRICES, STATION_PRICE, STORAGE_PRICE
-from railroads.sim.game import Game
 from railroads.sim.routes import plan_route, route_price
 from railroads.sim.trains import ENGINES, FIRST_ENGINE
-
-
-def make_game(cash: float = 10_000_000.0) -> Game:
-    game = Game(Constructions(flat_map()))
-    game.finances.cash = cash
-    return game
 
 
 def test_a_company_with_nothing_built_is_worth_its_cash() -> None:
@@ -37,7 +30,7 @@ def test_a_company_with_nothing_built_is_worth_its_cash() -> None:
 
 
 def test_debt_takes_from_what_the_company_is_worth() -> None:
-    game = make_game()
+    game = make_game(10_000_000.0)
     game.build_station((5, 5))
     game.finances.cash = -50_000.0
 
@@ -47,7 +40,7 @@ def test_debt_takes_from_what_the_company_is_worth() -> None:
 
 
 def test_a_station_counts_for_half_of_what_it_and_its_upgrades_cost() -> None:
-    game = make_game()
+    game = make_game(10_000_000.0)
     game.build_station((5, 5))
     railway = game.railway
     railway.upgrade((5, 5))
@@ -62,7 +55,7 @@ def test_a_station_counts_for_half_of_what_it_and_its_upgrades_cost() -> None:
 
 
 def test_track_and_trains_count_for_half_of_what_they_cost() -> None:
-    game = make_game()
+    game = make_game(10_000_000.0)
     game.build_station((6, 3))
     game.build_station((6, 12))
     route = plan_route(game.constructions, (6, 3), (6, 12))
@@ -78,7 +71,7 @@ def test_track_and_trains_count_for_half_of_what_they_cost() -> None:
 
 
 def test_shares_count_at_what_they_would_fetch_today() -> None:
-    game = make_game()
+    game = make_game(10_000_000.0)
     game.growth.build(Building((5, 5), BuildingKind.FARM))
     owners = game.growth.owners
     owners.own((5, 5), BuildingKind.FARM, 300)
