@@ -28,7 +28,7 @@ from railroads.sim.trains import (
     unit_name,
 )
 from railroads.ui.buy_train import BuyScreen, EnginePicture
-from railroads.ui.demand_view import draw_demand
+from railroads.ui.demand_view import draw_wants
 from railroads.ui.ornate import card, ornate_window, section, tile
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at
 from railroads.ui.spotlight import spot
@@ -489,7 +489,7 @@ class TrainsWindow:
                 imgui.align_text_to_frame_padding()
                 imgui.text_disabled(f"{railway.name_of(following.cell)} wants")
                 imgui.same_line(CARD_LABEL)
-                draw_demand(demand)
+                draw_wants(demand)
         return removed
 
     def _draw_stop_head(

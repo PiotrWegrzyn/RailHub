@@ -1,9 +1,9 @@
 import pytest
 
-from railroads.sim.demand import DemandRecord
+from railroads.sim.demand import DemandRecord, StationDemand
 from railroads.sim.goods import HANDED_OUT, Good, Need, freight_of
 from railroads.sim.trade import SCARCE_WORTH
-from railroads.ui.demand_view import coins_for, demand_lines
+from railroads.ui.demand_view import coins_for, demand_lines, wants_in_order
 from railroads.words import dollars
 
 
@@ -35,3 +35,19 @@ def test_the_food_tooltip_says_freight_pays_up_to_the_scarce_worth() -> None:
 
     assert f"up to {SCARCE_WORTH:g}x" in lines[0]
     assert wheat.endswith(dollars(freight_of(Good.WHEAT) * SCARCE_WORTH))
+
+
+def test_the_wants_come_the_one_taken_most_of_first_leaving_out_those_not_wanted() -> None:
+    demand = StationDemand(capacity={Need.FOOD: 40.0, Need(Good.PASSENGERS.value): 300.0})
+
+    wanted = [need for need, _ in wants_in_order(demand)]
+
+    assert wanted == [Need(Good.PASSENGERS.value), Need.FOOD]
+
+
+def test_the_passenger_tooltip_prices_one_at_the_share_of_demand_left() -> None:
+    record = DemandRecord(capacity=100.0, left=50.0)
+
+    lines = demand_lines(Need(Good.PASSENGERS.value), record)
+
+    assert lines == [f"Each one getting off now earns {dollars(freight_of(Good.PASSENGERS) * 0.5)}"]
