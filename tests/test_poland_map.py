@@ -4,9 +4,11 @@ import pytest
 
 from railroads import maps
 from railroads.sim.grids import Cell
+from railroads.sim.lots import Lots
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap
 
 WARSAW = (21.01, 52.23)
+KRAKOW = (19.94, 50.06)
 
 
 @pytest.fixture(scope="module")
@@ -55,10 +57,9 @@ def test_map_covers_poland(poland: TileMap) -> None:
 @pytest.mark.parametrize(
     ("place", "lon", "lat", "expected"),
     [
-        ("Baltic Sea north of Łeba", 17.5, 54.84, Terrain.SEA),
         ("Łódź", 19.46, 51.76, Terrain.LAND),
-        ("Żuławy delta, below sea level", 19.12, 54.21, Terrain.LAND),
-        ("Szczecin Lagoon", 14.2, 53.75, Terrain.SEA),
+        ("Vistula at Kraków", *KRAKOW, Terrain.RIVER),
+        ("Szczecin Lagoon", 14.3, 53.8, Terrain.SEA),
         ("Śniardwy lake", 21.73, 53.75, Terrain.LAKE),
     ],
 )
@@ -97,9 +98,20 @@ def test_most_of_poland_is_flat(poland: TileMap) -> None:
     assert flat_share > 0.8
 
 
-def test_vistula_carries_water_from_warsaw_to_the_sea(poland: TileMap) -> None:
-    river = nearest_cell(poland, cell_at(poland, *WARSAW), Terrain.RIVER)
+def test_vistula_carries_water_from_krakow_to_warsaw(poland: TileMap) -> None:
+    upstream = nearest_cell(poland, cell_at(poland, *KRAKOW), Terrain.RIVER)
+    downstream = nearest_cell(poland, cell_at(poland, *WARSAW), Terrain.RIVER)
 
-    reached = water_reachable_from(poland, river)
+    reached = water_reachable_from(poland, upstream)
 
-    assert any(poland.terrain[cell] == Terrain.SEA for cell in reached)
+    assert downstream in reached
+
+
+def test_start_reaches_the_mountains(poland: TileMap) -> None:
+    lots = Lots.around_middle(poland)
+    top, left, rows, cols = window = lots.window()
+
+    start = lots.in_lots(window, lots.owned)
+
+    relief = poland.relief[top : top + rows, left : left + cols][start]
+    assert (relief == Relief.MOUNTAINS).sum() > 100

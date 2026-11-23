@@ -5,7 +5,7 @@ Inputs in data/raw/ (download commands in README.md): Natural Earth ne_10m_ocean
 Run with: uv run python tools/build_world_map.py
 """
 
-from build_poland_map import RAW
+from build_start_maps import RAW
 
 from railroads import maps
 from railroads.mapgen.presets import NaturalEarth

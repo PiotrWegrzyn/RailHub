@@ -14,7 +14,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
-from build_poland_map import RAW
+from build_start_maps import RAW
 from PIL import Image
 
 from railroads.mapgen.area import MapArea

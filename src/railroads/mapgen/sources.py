@@ -3,7 +3,7 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Protocol, Self
+from typing import Any, Literal, Protocol
 
 import numpy as np
 import numpy.typing as npt
@@ -70,12 +70,6 @@ class ElevationGrid:
     lons: FloatArray
     lats: FloatArray
     heights: FloatArray
-
-    @classmethod
-    def from_erddap_csv(cls, path: Path) -> Self:
-        rows = np.loadtxt(path, delimiter=",", skiprows=2)
-        lats, lons = np.unique(rows[:, 0]), np.unique(rows[:, 1])
-        return cls(lons=lons, lats=lats, heights=rows[:, 2].reshape(len(lats), len(lons)))
 
     def covers(self, bounds: Bounds) -> bool:
         slack = 1e-6

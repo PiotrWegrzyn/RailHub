@@ -31,8 +31,9 @@ START_MAPS = (
     StartMap(
         "poland",
         "Poland",
-        Bounds(west=14.08, east=24.19, south=48.97, north=54.87),
-        "Central Poland: Warsaw, Łódź, Poznań and Wrocław on the plain of the Vistula and the Oder.",
+        Bounds(west=14.19, east=24.08, south=47.97, north=53.87),
+        "Southern Poland: Łódź, Wrocław, Katowice and Kraków, from the plain to the Beskids and "
+        "the Tatras.",
     ),
     StartMap(
         "germany",

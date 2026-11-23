@@ -21,7 +21,7 @@ from railroads.ui.station_window import UNJOINED, station_warning
 from railroads.ui.trains_window import train_warning
 
 NORTH_BANK, SOUTH_BANK = (11, 17), (15, 16)
-DZIALOSZYN_RIVER = (186, 108), (188, 118)
+DZIALOSZYN_RIVER = (122, 108), (124, 118)
 
 
 def wide_river_by_a_lot_border() -> TileMap:

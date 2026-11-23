@@ -1387,7 +1387,6 @@ once:
 
 ```bash
 mkdir -p data/raw && cd data/raw
-curl -o etopo_poland.csv "https://coastwatch.pfeg.noaa.gov/erddap/griddap/etopo180.csv?altitude%5B(48.9):1:(55.0)%5D%5B(13.6):1:(24.4)%5D"
 for f in ne_10m_ocean ne_10m_lakes ne_10m_lakes_europe ne_10m_rivers_lake_centerlines ne_10m_rivers_europe ne_10m_geography_regions_polys; do
   curl -O "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/$f.geojson"
 done
@@ -1423,11 +1422,9 @@ Then cut all of it into `world/` (about half a minute):
 uv run python tools/build_world_files.py
 ```
 
-and, to rebake the Poland map, the other start maps (all, or the keys given) and the world
-picture for the minimap:
+and, to rebake the start maps (all, or the keys given) and the world picture for the minimap:
 
 ```bash
-uv run python tools/build_poland_map.py
 uv run python tools/build_start_maps.py
 uv run python tools/build_world_map.py
 ```

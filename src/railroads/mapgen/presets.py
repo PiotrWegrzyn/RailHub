@@ -21,7 +21,6 @@ LAKE_FILES = ("ne_10m_lakes.geojson", "ne_10m_lakes_europe.geojson")
 RIVER_FILES = ("ne_10m_rivers_lake_centerlines.geojson", "ne_10m_rivers_europe.geojson")
 REGIONS_FILE = "ne_10m_geography_regions_polys.geojson"
 MIN_RIVER_KM = 200.0
-ETOPO_SOURCE = "Elevation: NOAA ETOPO1, 1 arc-minute, public domain"
 NATURAL_EARTH_SOURCE = "Sea, lakes, rivers and deserts: Natural Earth 1:10m, public domain"
 
 
