@@ -832,9 +832,9 @@ class TrackArt:
 
     def _branch_lanes(self, piece: Track, point: int) -> list[float] | None:
         """Where the piece's tracks lie at this end where it branches off straighter track in its
-        cell at least as wide, running on beyond it: on the outermost tracks of that track on
-        the side the piece turns to, as many as the piece has, or on all of its tracks where it
-        has too few that side; None where it branches off none."""
+        cell at least as wide: on the outermost tracks of that track on the side the piece turns
+        to, as many as the piece has, or where it is as wide, on all of them, so the whole line
+        forks; None where it branches off none, or off wider track with too few that side."""
         grid = self.tile_map.grid
         turn = grid.track_turn(*piece.ends)
         mains = [
@@ -857,11 +857,11 @@ class TrackArt:
         tracks = [from_here * lane for lane in _lane_sides(int(main.width))]
         that_side = sorted((lane for lane in tracks if lane * side > 0), key=abs, reverse=True)
         lanes = int(piece.width)
-        chosen = that_side[:lanes] or tracks
-        while len(chosen) < lanes:
-            chosen = [lane for lane in chosen for _ in (0, 1)]
+        chosen = that_side[:lanes] if len(that_side) >= lanes else tracks
+        if len(chosen) != lanes:
+            return None
         into_piece = 1.0 if point == piece.ends[0] else -1.0
-        return sorted(into_piece * lane for lane in chosen[:lanes])
+        return sorted(into_piece * lane for lane in chosen)
 
     def _width_beyond(self, piece: Track, point: int) -> int:
         """How many tracks wide the track leaving the piece by this point runs on: the widest

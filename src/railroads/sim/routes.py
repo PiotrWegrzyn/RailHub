@@ -176,8 +176,10 @@ def route_price(constructions: Constructions, route: Route) -> float:
     for piece, old in route.changes(constructions):
         tile = tile_map.tile(piece.cell)
         total += track_price(piece, tile) - (0.0 if old is None else track_price(old, tile))
-        freed = old.space if old is not None and old in constructions.at(piece.cell) else 0
-        room[piece.cell] = room.get(piece.cell, 0) + piece.space - freed
+        others = [t for t in constructions.track_at(piece.cell) if t != old]
+        widest = max((int(t.width) for t in others), default=0)
+        needed = max(0, int(piece.width) - widest)
+        room[piece.cell] = max(room.get(piece.cell, 0), needed)
     return total + sum(
         clearing_price(constructions, cell, units) or 0.0 for cell, units in room.items()
     )
@@ -197,7 +199,7 @@ def lay_route(growth: Growth, route: Route) -> set[Cell]:
         replacing = old is not None and old in constructions.at(piece.cell)
         if replacing:
             constructions.remove(old)
-        changed |= growth.room.clear(piece.cell, piece.space)
+        changed |= growth.room.clear(piece.cell, constructions.room_needed(piece))
         if constructions.why_not(piece) is None:
             constructions.build(piece)
             changed.add(piece.cell)
@@ -619,8 +621,9 @@ class _Planner:
             if factor is None:
                 self._costs[cell] = None
             else:
-                crowd = max(0, int(self.width) - self.constructions.space_left(cell))
-                leaving = clearing(self.constructions, cell, int(self.width)) if crowd else []
+                needed = max(0, int(self.width) - self.constructions.track_room(cell))
+                crowd = max(0, needed - self.constructions.space_left(cell))
+                leaving = clearing(self.constructions, cell, needed) if crowd else []
                 if leaving is None:
                     self._costs[cell] = None
                 else:
@@ -739,7 +742,8 @@ class _Planner:
         others = sorted(
             (point for point in self._geometry.ends if point != joined), key=turns.__getitem__
         )
-        crowded = f"Not enough room: needs {int(self.width)}, {constructions.space_left(cell)} left"
+        needed = max(0, int(self.width) - constructions.track_room(cell))
+        crowded = f"Not enough room: needs {needed}, {constructions.space_left(cell)} left"
         for point in [straight, *others]:
             if turns[point] > MAX_TURN_DEG + TURN_SLACK_DEG:
                 continue

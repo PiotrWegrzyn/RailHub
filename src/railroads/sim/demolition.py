@@ -85,7 +85,7 @@ def clearing_price(constructions: Constructions, cell: Cell, units: int) -> floa
 def station_site_price(constructions: Constructions, cell: Cell) -> float | None:
     """What clearing a cell for a station costs: every building there, the track giving way for
     free; None where one cannot be taken down."""
-    track = sum(piece.space for piece in constructions.track_at(cell))
+    track = constructions.track_room(cell)
     room = constructions.space_left(cell) + track
     here = constructions.buildings_at(cell)
     if room >= CELL_SPACE:

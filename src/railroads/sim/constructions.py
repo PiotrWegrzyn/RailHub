@@ -634,7 +634,22 @@ class Constructions:
         return bool(pieces) and all(piece.electric for piece in pieces)
 
     def space_left(self, cell: Cell) -> int:
-        return CELL_SPACE - sum(built.space for built in self._cells.get(cell, ()))
+        """How much room is left in the cell: all its track, which shares its bed at junctions
+        and crossings, takes as much as its widest piece."""
+        built = self._cells.get(cell, ())
+        others = sum(one.space for one in built if not isinstance(one, Track))
+        return CELL_SPACE - others - self.track_room(cell)
+
+    def track_room(self, cell: Cell) -> int:
+        """How much room the track in a cell takes: as much as its widest piece."""
+        return max((int(one.width) for one in self.track_at(cell)), default=0)
+
+    def room_needed(self, construction: Construction) -> int:
+        """How much more room building this takes in its cell: track only as much as it is
+        wider than the widest track there."""
+        if isinstance(construction, Track):
+            return max(0, int(construction.width) - self.track_room(construction.cell))
+        return construction.space
 
     def nearest_free(self, kind: BuildingKind, centre: Cell, steps: int) -> Cell | None:
         """The nearest cell to `centre`, at most `steps` away, a building of the kind can go up
@@ -661,8 +676,9 @@ class Constructions:
                     problem = self.way_problem(construction.ends)
             case Building():
                 problem = self._building_problem(construction)
-        if problem is None and construction.space > self.space_left(cell):
-            problem = f"Not enough room: needs {construction.space}, {self.space_left(cell)} left"
+        needed = self.room_needed(construction)
+        if problem is None and needed > self.space_left(cell):
+            problem = f"Not enough room: needs {needed}, {self.space_left(cell)} left"
         return problem
 
     def build(self, construction: Construction) -> None:

@@ -3,6 +3,7 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import (
+    CELL_SPACE,
     Building,
     BuildingKind,
     CannotBuild,
@@ -308,3 +309,15 @@ def test_big_works_take_half_a_cell_and_mega_works_two_thirds_or_all_their_works
     taken = building.space
 
     assert taken == space
+
+
+def test_track_branching_off_track_in_its_cell_takes_only_the_room_its_widest_piece_does() -> None:
+    constructions = Constructions(flat_map())
+    constructions.build(Track((6, 6), (0, 6), TrackWidth.QUADRUPLE))
+    branch = Track((6, 6), (2, 6), TrackWidth.QUADRUPLE)
+
+    problem = constructions.why_not(branch)
+    constructions.build(branch)
+
+    assert problem is None
+    assert constructions.space_left((6, 6)) == CELL_SPACE - 4
