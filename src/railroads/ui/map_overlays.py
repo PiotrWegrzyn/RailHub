@@ -56,7 +56,8 @@ UNSATISFIED_TINT = (0.9, 0.12, 0.1, 0.5)
 # The edge drawn round a cell in which some kind of building gets nothing at all.
 STARVING_EDGE = (0.35, 0.02, 0.02, 0.95)
 MOODS_LEGEND = (
-    "Share of what the buildings want: green 100%, yellow 50%+, orange under 50%, red nothing;"
+    f"Share of what the buildings want: green 100%, yellow {HALF_SATISFIED:.0%}+, orange under"
+    f" {HALF_SATISFIED:.0%}, red nothing;"
     " a dark edge where a building gets nothing."
 )
 TOWNS_LEGEND = "Towns: each colour is one town; passengers and mail only travel between towns."

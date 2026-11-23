@@ -19,6 +19,7 @@ from railroads.sim.demolition import (
     DEMOLITION_PER_POINT,
     SKYSCRAPER_DEMOLITION,
     STATION_REMOVAL,
+    TRACK_REMOVAL_SHARE,
 )
 from railroads.sim.finance import (
     DOUBLE_TRACK_FACTOR,
@@ -36,7 +37,13 @@ from railroads.sim.grids import Cell, FloatArray, Grid
 from railroads.sim.ladders import Points
 from railroads.sim.routes import Route
 from railroads.sim.tilemap import Relief
-from railroads.sim.track_rules import BRIDGE_RULES, RELIEF_RULES, TUNNEL_RULES, TrackBed
+from railroads.sim.track_rules import (
+    BRIDGE_RULES,
+    RELIEF_RULES,
+    STREAM_FACTOR,
+    TUNNEL_RULES,
+    TrackBed,
+)
 from railroads.ui.iso_camera import IsoCamera, Vec2
 from railroads.ui.ornate import DEEP, bar_buttons, diamond, frame_window
 from railroads.ui.spotlight import spot
@@ -49,6 +56,7 @@ from railroads.ui.theme import (
     toggle_button,
 )
 from railroads.ui.trains_window import TrainsWindow
+from railroads.words import share_of, times
 
 BALLAST = (0.36, 0.3, 0.24, 1.0)
 RAIL = (0.82, 0.8, 0.76, 1.0)
@@ -103,7 +111,7 @@ HINTS = {
     ),
     Tool.TRACK: (
         f"Click where track starts, then where it goes; starting or ending on track joins it. "
-        f"{dollars(TRACK_PRICE)} a cell on the flat, {dollars(HILLS_PRICE)} in hills, twice that "
+        f"{dollars(TRACK_PRICE)} a cell on the flat, {dollars(HILLS_PRICE)} in hills, {times(STREAM_FACTOR)} that "
         f"across a minor river, {dollars(BRIDGE_PRICE)} a bridge, {dollars(TUNNEL_PRICE)} a tunnel; "
         f"double track {DOUBLE_TRACK_FACTOR:g} times as much, and electric "
         f"{ELECTRIC_TRACK_FACTOR:g} times as much again. Laying it along your track widens or "
@@ -113,7 +121,7 @@ HINTS = {
         f"Click a cell to clear it: homes from {dollars(DEMOLITION_PER_POINT[Points.POPULATION])}, "
         f"fields {dollars(DEMOLITION_PER_POINT[Points.FOOD])}, factories and mines from "
         f"{dollars(DEMOLITION_PER_POINT[Points.INDUSTRY])}, a skyscraper "
-        f"{dollars(SKYSCRAPER_DEMOLITION)}; track a quarter of its price, a station "
+        f"{dollars(SKYSCRAPER_DEMOLITION)}; track {share_of(TRACK_REMOVAL_SHARE)} of its price, a station "
         f"{dollars(STATION_REMOVAL)}. One-off buildings stay. Right click cancels."
     ),
     Tool.ADD_PLATFORM: (

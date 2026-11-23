@@ -60,6 +60,7 @@ from railroads.ui.theme import (
     empty_car_slot,
     offer_chip,
 )
+from railroads.words import share_of
 
 # How a cargo's worth at a stop is worked out, as freight is paid there.
 CARGO_WORTH = (
@@ -784,7 +785,7 @@ def upgrade_button(railway: Railway, train: Train) -> None:
     if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
         imgui.set_tooltip(
             "Swap its engine for a newer one, keeping its stops and cars;\n"
-            "the old engine goes towards the price at half what it cost"
+            f"the old engine goes towards the price at {share_of(TRAIN_RESALE)} what it cost"
             if options
             else "No newer engine of its line is on sale"
         )

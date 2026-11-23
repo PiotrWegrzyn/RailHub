@@ -24,12 +24,13 @@ from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.happenings import Happenings, Headline
 from railroads.sim.lots import Lots
-from railroads.sim.railway import Railway
+from railroads.sim.railway import MAX_LEVEL, PLATFORM_LEVEL, Railway
 from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
 from railroads.sim.summaries import MonthSummary, Reach, summarize
 from railroads.sim.tilemap import TileMap
 from railroads.sim.tiles import Tiles, activate
+from railroads.words import either
 
 
 @dataclass(frozen=True)
@@ -212,7 +213,8 @@ class Game:
         """Adds a platform to a station raised high enough, in a cell beside it, for what
         clearing the cell costs."""
         if self.railway.platforms_left(station) <= 0:
-            return Done("Raise the station to level 4 or 5 for another platform.")
+            levels = either(range(PLATFORM_LEVEL, MAX_LEVEL + 1))
+            return Done(f"Raise the station to level {levels} for another platform.")
         site = station_site_price(self.constructions, cell)
         if site is None:
             return Done("A platform can't go there.")

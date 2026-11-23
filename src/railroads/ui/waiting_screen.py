@@ -13,7 +13,7 @@ from imgui_bundle import imgui
 
 from railroads.sim.economy import SCARCE_WORTH
 from railroads.sim.goods import FITS, Need
-from railroads.sim.ownership import LOT, SHARES, satisfaction_price
+from railroads.sim.ownership import LOT, MOST_PRICED, SHARES, satisfaction_price
 
 RANDOM_JOKES = ("Random bullshit coming!",)
 JOKE_SECONDS = 5.0
@@ -33,7 +33,7 @@ WORK_SECONDS = 2.5
 
 *_FIRST_DRINKS, _LAST_DRINK = (good.value for good in FITS[Need.ALCOHOL])
 # How many times a starving building's price a thriving one's shares cost.
-_THRIVING_PRICE = satisfaction_price(2.0) / satisfaction_price(0.0)
+_THRIVING_PRICE = satisfaction_price(MOST_PRICED) / satisfaction_price(0.0)
 # A tip shown under the waiting screen's lines, one picked for each wait.
 TIPS = (
     "Hexagons are bestagons!",

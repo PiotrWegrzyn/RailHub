@@ -47,6 +47,8 @@ PAYBACK_YEARS = 10
 # What a building's price is worth, times its price at full satisfaction, at each satisfaction
 # over the last quarter, in between in a straight line.
 PRICE_BY_SATISFACTION = ((0.0, 2 / 3), (1.0, 1.0), (2.0, 2.0))
+# The satisfaction from which a building's price rises no more.
+MOST_PRICED = PRICE_BY_SATISFACTION[-1][0]
 # Shares bought can be sold only this many months later, so they can't be flipped for quick gains.
 HOLD_MONTHS = 60
 # The name the player's company trades under, whose flag flies over the buildings it owns.

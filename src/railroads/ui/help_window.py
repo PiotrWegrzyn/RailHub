@@ -9,6 +9,7 @@ from functools import cache
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
+from railroads.land import NOVELTY_SHARE, TOP_UP_SHARE
 from railroads.sim.clock import END_YEAR, HISTORY_START
 from railroads.sim.company import BANKRUPT_MONTHS, BOOK_SHARE, TARGETS, Difficulty
 from railroads.sim.constructions import BUILDING_RULES, BuildingKind
@@ -25,7 +26,8 @@ from railroads.sim.goods import (
     price_of,
 )
 from railroads.sim.ladders import LADDERS, PASSENGERS_PER_POINT, POINTS, Points
-from railroads.sim.lots import land_price
+from railroads.sim.lots import AROUND, FIRST_FOR_SALE, START_LOTS, land_price
+from railroads.sim.tilemap import START_SHARE
 from railroads.sim.tiles import good_era, kind_era, opened_from
 from railroads.sim.trains import ENGINES, OPENED_BY, Engine, successor
 from railroads.ui.buy_train import fuel_use
@@ -33,6 +35,7 @@ from railroads.ui.engine_origins import origins
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.search import goods_of
 from railroads.ui.theme import BRASS, LIST_TABLE_FLAGS, WINDOW_TOP, good_amount, good_icon, tip
+from railroads.words import counted, share_of
 
 WINDOW_SIZE = (860.0, 600.0)
 
@@ -79,8 +82,9 @@ GOAL_HELP = (
 )
 MAP_HELP = (
     (
-        "A game starts on a honeycomb of seven big hexagons, or lots, in the middle of its place,"
-        " holding a quarter of it: one lot in the middle and six around it, each about 140 km"
+        f"A game starts on a honeycomb of {counted(len(START_LOTS))} big hexagons, or lots, in the"
+        f" middle of its place, holding {share_of(START_SHARE)} of it: one lot in the middle and"
+        f" {counted(len(AROUND))} around it, each about 140 km"
         " across on Poland."
     ),
     (
@@ -92,8 +96,9 @@ MAP_HELP = (
         " browser both take about twice as long."
     ),
     (
-        "The land around it can be bought a lot at a time, each a seventh of the land a game"
-        " starts on. Any lot sharing a side with yours is for sale, twelve at the start: past the"
+        "The land around it can be bought a lot at a time, each"
+        f" {share_of(1 / len(START_LOTS))} of the land a game starts on. Any lot sharing a side"
+        f" with yours is for sale, {counted(FIRST_FOR_SALE)} at the start: past the"
         " map's edge it shows its rivers, forests and mountains, without the buildings, behind a"
         f" chain and a padlock with its price. The first costs {dollars(land_price(0))} and each"
         f" after it the next Fibonacci number of thousands: {dollars(land_price(1))},"
@@ -102,8 +107,9 @@ MAP_HELP = (
     (
         f"Click a lot and confirm to buy it. It then grows on its own from {HISTORY_START} to this"
         " year, as the rest of the map did, while the waiting screen shows, and the view opens on it. It"
-        " gets only a quarter of the buildings every map is sure to have, picked at random, and"
-        " each one-off building the game hasn't got yet comes up there at a quarter of the"
+        f" gets only {share_of(TOP_UP_SHARE)} of the buildings every map is sure to have, picked at"
+        " random, and each one-off building the game hasn't got yet comes up there at"
+        f" {share_of(NOVELTY_SHARE)} of the"
         " chance it had over the years played, at most. Each lot bought makes a month a few"
         " milliseconds longer."
     ),

@@ -29,6 +29,8 @@ type Window = tuple[int, int, int, int]
 # The six lots around a lot, by axial steps.
 AROUND = ((1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1))
 START_LOTS = frozenset({(0, 0), *AROUND})
+# How many lots are for sale when a game starts: those sharing a side with the start lots.
+FIRST_FOR_SALE = len({(q + dq, r + dr) for q, r in START_LOTS for dq, dr in AROUND} - START_LOTS)
 # The first lot costs the FIRST_FIBONACCI-th Fibonacci number of PRICE_UNIT dollars, $377,000, and
 # every lot bought after it the next one: $610,000, $987,000 and so on.
 FIRST_FIBONACCI = 14

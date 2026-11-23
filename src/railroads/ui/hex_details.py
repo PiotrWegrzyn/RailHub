@@ -31,7 +31,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
 from railroads.sim.ledger import Takings
-from railroads.sim.ownership import CONTROL, HOLD_MONTHS, LOT, LOTS, SHARES
+from railroads.sim.ownership import CONTROL, HOLD_MONTHS, LOT, LOTS, MOST_PRICED, SHARES
 from railroads.sim.tilemap import Deposit, TileMap
 from railroads.ui.biomes import biome_of
 from railroads.ui.ornate import badge, bar, card, section
@@ -311,7 +311,7 @@ def _draw_card_inside(row: BuildingRow) -> bool:
     imgui.text_colored(imgui.ImVec4(*mood_colour(row)), mood)
     if row.percent is not None:
         width = right - imgui.get_cursor_pos_x()
-        bar(row.percent / 2, mood_colour(row), width, 5.0)
+        bar(row.percent / MOST_PRICED, mood_colour(row), width, 5.0)
         if imgui.is_item_hovered():
             imgui.set_tooltip(
                 f"Satisfied {row.percent:.0%} last month: 100% with all it must have, more "
