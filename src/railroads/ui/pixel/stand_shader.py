@@ -36,14 +36,14 @@ from railroads.ui.pixel.ground_shader import (
     ChunkInputs,
     ChunkTexture,
     GroundShader,
+    RenderTarget,
     _Into,
     _number,
-    _program,
-    _restore,
-    _saved_state,
-    _Target,
     _texture,
     free_textures,
+    gl_program,
+    restore_gl_state,
+    saved_gl_state,
     use,
 )
 from railroads.ui.pixel.projection import CHUNK
@@ -356,9 +356,9 @@ class StandShader:
         self._ground = ground
         self._sheets = sheets
         self._pages: OrderedDict[int, _Pages] = OrderedDict()
-        self._made = _Target()
-        self._fine = _Target()
-        self._heights = _Target()
+        self._made = RenderTarget()
+        self._fine = RenderTarget()
+        self._heights = RenderTarget()
         self._out = GL.glGenFramebuffers(1)
         self._sprites = _Geometry((2, 2))
         self._shapes = _Geometry((2, 4))
@@ -374,11 +374,11 @@ class StandShader:
             return None
         try:
             programs = _Programs(
-                _program(HEADER + SPRITE_VERTEX, HEADER + SPRITE),
-                _program(HEADER + SHAPE_VERTEX, HEADER + SHAPE),
-                _program(HEADER + LIFT_VERTEX, HEADER + lift_source()),
-                _program(HEADER + VERTEX, HEADER + track_source()),
-                _program(HEADER + VERTEX, HEADER + FINISH),
+                gl_program(HEADER + SPRITE_VERTEX, HEADER + SPRITE),
+                gl_program(HEADER + SHAPE_VERTEX, HEADER + SHAPE),
+                gl_program(HEADER + LIFT_VERTEX, HEADER + lift_source()),
+                gl_program(HEADER + VERTEX, HEADER + track_source()),
+                gl_program(HEADER + VERTEX, HEADER + FINISH),
             )
             shader = cls(programs, ground, sheets)
             shader._fine.fit(PAGE, PAGE)
@@ -533,19 +533,19 @@ class StandShader:
         )
         return ChunkTexture(texture)
 
-    def _clear(self, target: _Target) -> None:
-        saved = _saved_state()
+    def _clear(self, target: RenderTarget) -> None:
+        saved = saved_gl_state()
         try:
             GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, target.framebuffer)
             GL.glDisable(GL.GL_SCISSOR_TEST)
             GL.glClearColor(0.0, 0.0, 0.0, 0.0)
             GL.glClear(GL_COLOR_BUFFER_BIT)
         finally:
-            _restore(saved)
+            restore_gl_state(saved)
 
     def _draw(
         self,
-        target: _Target | _Into,
+        target: RenderTarget | _Into,
         viewport: tuple[int, int, int, int],
         program: int,
         uniforms: dict[str, tuple[str, tuple]],
@@ -557,7 +557,7 @@ class StandShader:
         """Draws `vertices` (first and count) of `geometry` as triangles with `program` into
         `viewport` of `target`, or the whole viewport without geometry, blended by `blend`
         (equation, source and destination factors) or over what is there."""
-        saved = _saved_state()
+        saved = saved_gl_state()
         try:
             GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, target.framebuffer)
             GL.glViewport(*viewport)
@@ -578,7 +578,7 @@ class StandShader:
         finally:
             GL.glBlendEquation(GL_FUNC_ADD)
             GL.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-            _restore(saved)
+            restore_gl_state(saved)
 
 
 @dataclass(frozen=True)

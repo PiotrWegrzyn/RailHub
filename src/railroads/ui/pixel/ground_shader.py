@@ -2122,7 +2122,7 @@ class GroundShader:
             self._shown = shown
         return self._screen.texture
 
-    def blow_up_onto(self, target: _Target, pixels: npt.NDArray[np.uint8], times: int) -> None:
+    def blow_up_onto(self, target: RenderTarget, pixels: npt.NDArray[np.uint8], times: int) -> None:
         """Draws a chunk's RGBA pixels into `target`, premultiplied by their alpha, each
         repeated `times` times each way."""
         small = _texture()
@@ -2225,7 +2225,7 @@ class GroundShader:
         self._run(self._canopy, self._programs.canopy, uniforms, inputs)
         GL.glDeleteTextures(2, list(listed))
 
-    def dress_onto(self, target: _Target, chunk: tuple[int, int], k: int, times: int) -> None:
+    def dress_onto(self, target: RenderTarget, chunk: tuple[int, int], k: int, times: int) -> None:
         """Draws what `lay_surfaces` worked out for a chunk into `target`, premultiplied by its
         alpha, raised with the ground where it rises: `k` pixels to an art pixel, each repeated
         `times` times each way (DRESS)."""
