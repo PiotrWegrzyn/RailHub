@@ -81,6 +81,12 @@ PLATFORM_WIDTH = 0.12
 # track, in cells, and how far into the station's cell from each end they have opened out to that.
 ISLAND_TRACKS = 0.3
 ISLAND_FROM = 0.22
+# How far along a piece from the end it branches off at, as a share of the piece, track
+# branching off other track is first drawn: a little short of the middle, where it turns away.
+FORK_FROM = 0.42
+# How far along a piece branching off other track it has turned away enough for its tracks to
+# draw together to its own spacing without first swinging back over the track it left.
+TURNED_BY = 0.65
 SET_BACK = 0.34
 
 # Overhead wires on electric track: how far beside the track their masts stand and how far
@@ -330,14 +336,20 @@ def track_spread(piece: Track, station: bool = False) -> float:
     return _spread(piece.width, station)
 
 
+def _eased(share: float) -> float:
+    """How far a track moving over from one place to another has got, `share` of the way along:
+    setting out and arriving gently, so it runs over in a curve rather than a straight line."""
+    share = min(1.0, max(0.0, share))
+    return share * share * (3 - 2 * share)
+
+
 def _onward(branching: float, beyond: float, share: float) -> float:
     """Where a track branching off another lies `share` of the way along its piece from the end
-    it branches off at: on that track up to the middle of the cell, where it turns away, then
-    easing over to where it lies at its other end."""
-    if share <= 0.5:
+    it branches off at: on that track until it has turned away, TURNED_BY of the way along,
+    then easing over to where it lies at its other end."""
+    if share <= TURNED_BY:
         return branching
-    eased = (2 * share - 1) ** 2 * (3 - 2 * (2 * share - 1))
-    return branching + (beyond - branching) * eased
+    return branching + (beyond - branching) * _eased((share - TURNED_BY) / (1 - TURNED_BY))
 
 
 def _lane_sides(tracks: int, lanes: int | None = None) -> list[float]:
@@ -699,8 +711,10 @@ class TrackArt:
         bed = BRIDGE_WIDTH if piece.bed == TrackBed.BRIDGE else BANK
         radius = (reach + bed / 2 + SHADOW_REACH) * PIXEL_CELL_WIDTH
         line = centre_line(self.tile_map.grid, self._steps, self.projection.matrix, piece, radius)
+        sides = self._sides(piece, line)
+        line, sides = self._past_the_fork(piece, line, sides)
         plane = np.array([[x for x, _ in line], [y for _, y in line]])
-        laid = _Laid(piece, plane, self._sides(piece, line), platform)
+        laid = _Laid(piece, plane, sides, platform)
         if len(self._laid_pieces) >= PIECES_KEPT:
             self._forget_laid()
         self._laid_pieces[piece, platform] = (version, laid)
@@ -797,11 +811,9 @@ class TrackArt:
                 elif branch_end is not None:
                     side = _onward(at_end[index], at_start[index], 1 - share)
                 elif share < 0.5:
-                    side = at_start[index] + (middle - at_start[index]) * min(1.0, opening * share)
+                    side = at_start[index] + (middle - at_start[index]) * _eased(opening * share)
                 elif share > 0.5:
-                    side = at_end[index] + (middle - at_end[index]) * min(
-                        1.0, opening * (1 - share)
-                    )
+                    side = at_end[index] + (middle - at_end[index]) * _eased(opening * (1 - share))
                 else:
                     side = middle
                 sides.append(side)
@@ -829,6 +841,26 @@ class TrackArt:
                     ends.append(_lane_sides(min(lanes, self._width_beyond(piece, point)), lanes))
             shape = self._shapes[piece] = (ends[0], ends[1])
         return shape
+
+    def _past_the_fork(
+        self, piece: Track, line: Path, sides: list[list[float]]
+    ) -> tuple[Path, list[list[float]]]:
+        """The piece's centre line and its tracks' sides, left out up to where it turns away
+        from track it branches off (`_branch_lanes`): up to there its tracks lie on that
+        track's, which shows them already, and drawn again they would only blur them."""
+        lengths = _lengths(line)
+        total = lengths[-1] or 1.0
+        shares = [along / total for along in lengths]
+        low, high = 0.0, 1.0
+        start, end = (self._branch_lanes(piece, point) for point in piece.ends)
+        if start is not None:
+            low = FORK_FROM
+        if end is not None:
+            high = 1.0 - FORK_FROM
+        keep = [k for k, share in enumerate(shares) if low <= share <= high]
+        if len(keep) < 2 or (start is None and end is None):
+            return line, sides
+        return [line[k] for k in keep], [[lane[k] for k in keep] for lane in sides]
 
     def _branch_lanes(self, piece: Track, point: int) -> list[float] | None:
         """Where the piece's tracks lie at this end where it branches off straighter track in its
