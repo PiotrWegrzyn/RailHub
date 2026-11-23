@@ -12,13 +12,22 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from railroads.kept import KeptFor
-from railroads.sim.constructions import GREW_FROM, BuildingKind, Constructions, Track, TrackWidth
+from railroads.sim.constructions import (
+    GREW_FROM,
+    Annex,
+    BuildingKind,
+    Constructions,
+    Facility,
+    Track,
+    TrackWidth,
+)
 from railroads.sim.grids import BoolGrid, Cell, FloatArray, Grid, IntArray
 from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
+from railroads.ui.pixel.art.facilities import PENS_SPRITE, SHED_HEADINGS, shed_sprite
 from railroads.ui.pixel.ground_palette import FIELD_KINDS
 from railroads.ui.pixel.projection import PixelProjection, hash01
 from railroads.ui.pixel.relief import Elevation
@@ -48,6 +57,13 @@ ROCKS_ON = (Biome.MOUNTAIN, Biome.SNOW)
 
 
 ROCK_CHANCE = 0.4
+
+
+# Where cattle pens may stand in their cell: its middle or one of PENS_SPOTS spots PENS_OUT
+# from it, in cells, at least PENS_CLEAR from the track through it.
+PENS_SPOTS = 12
+PENS_OUT = 0.28
+PENS_CLEAR = 0.2
 
 
 TREE_SPREAD = 0.4
@@ -215,6 +231,59 @@ for _grown, _kind in GREW_FROM.items():
     BUILDING_SPRITES[_grown] = f"{_grown.name.split('_')[0].lower()}_{BUILDING_SPRITES[_kind]}"
 
 
+def facility_spot(constructions: Constructions, annex: Annex) -> tuple[float, float, str]:
+    """Where a facility beside a station stands on the map and its sprite: an engine shed in the
+    middle of its cell, turned so its lead track runs to the nearest cell of its station, and
+    cattle pens clear of the track in their cell, as near it as they can stand (_pens_spot)."""
+    grid = constructions.tile_map.grid
+    x, y = grid.center(*annex.cell)
+    nearest = min(
+        constructions.station_cells(annex.station) or [annex.station],
+        key=lambda cell: math.dist(grid.center(*cell), (x, y)),
+    )
+    sx, sy = grid.center(*nearest)
+    if annex.facility == Facility.ENGINE_SHED:
+        angle = math.degrees(math.atan2(sy - y, sx - x))
+        step = SHED_HEADINGS[1] - SHED_HEADINGS[0]
+        return x, y, shed_sprite(round(angle / step) * step % 360)
+    dx, dy = _pens_spot(constructions, annex.cell, (sx - x, sy - y))
+    return x + dx, y + dy, PENS_SPRITE
+
+
+def _pens_spot(
+    constructions: Constructions, cell: Cell, towards: tuple[float, float]
+) -> tuple[float, float]:
+    """Where in their cell, from its middle, cattle pens stand: of the middle and PENS_SPOTS
+    spots PENS_OUT round it, the nearest to the way `towards` their station at least
+    PENS_CLEAR from every piece of track in the cell, or the furthest from the track if none is."""
+    points = constructions.tile_map.grid.track_points()
+    pieces = [(points[a], points[b]) for a, b in (t.ends for t in constructions.track_at(cell))]
+    spots = [(0.0, 0.0)] + [
+        (PENS_OUT * math.cos(a), PENS_OUT * math.sin(a))
+        for a in (2 * math.pi * k / PENS_SPOTS for k in range(PENS_SPOTS))
+    ]
+
+    def clear(spot: tuple[float, float]) -> float:
+        return min((_to_segment(spot, a, b) for a, b in pieces), default=math.inf)
+
+    def near(spot: tuple[float, float]) -> float:
+        return math.dist(spot, towards)
+
+    clear_ones = [spot for spot in spots if clear(spot) >= PENS_CLEAR]
+    if clear_ones:
+        return min(clear_ones, key=near)
+    return max(spots, key=clear)
+
+
+def _to_segment(p: tuple[float, float], a: FloatArray, b: FloatArray) -> float:
+    """How far a point lies from the straight line between `a` and `b`, ends included."""
+    ax, ay, bx, by = float(a[0]), float(a[1]), float(b[0]), float(b[1])
+    dx, dy = bx - ax, by - ay
+    length = dx * dx + dy * dy
+    t = 0.0 if length == 0 else max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / length))
+    return math.hypot(p[0] - ax - t * dx, p[1] - ay - t * dy)
+
+
 def platform_sprite(line: str | None = None) -> str:
     """The sprite of a platform added to a station, turned like station_sprite."""
     return "platform" if line is None else f"platform_{line}"
@@ -312,6 +381,11 @@ class Scenery:
                     ]
                 )
             )
+        annexes = [facility_spot(constructions, a) for a in constructions.every_annex()]
+        if annexes:
+            xs.append(np.array([x for x, _, _ in annexes], dtype=np.float64))
+            ys.append(np.array([y for _, y, _ in annexes], dtype=np.float64))
+            sprites.append(np.array([sheet.index(name) for _, _, name in annexes]))
         spots = BuildingSpots.of(constructions, frozenset(FIELD_KINDS))
         looks = {kind: sheet.variants(name) for kind, name in VARIED_SPRITES.items()}
         built_looks = np.array(

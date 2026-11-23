@@ -14,7 +14,6 @@ from railroads.sim.company import (
     company_value,
 )
 from railroads.sim.constructions import Building, BuildingKind
-from railroads.sim.facilities import FACILITY_PRICES, Facility
 from railroads.sim.finance import LEVEL_PRICES, STATION_PRICE, STORAGE_PRICE
 from railroads.sim.routes import plan_route, route_price
 from railroads.sim.trains import ENGINES, FIRST_ENGINE
@@ -45,11 +44,10 @@ def test_a_station_counts_for_half_of_what_it_and_its_upgrades_cost() -> None:
     railway = game.railway
     railway.upgrade((5, 5))
     railway.add_storage((5, 5))
-    railway.build_facility((5, 5), Facility.ENGINE_SHED)
 
     value = company_value(railway)
 
-    cost = STATION_PRICE + LEVEL_PRICES[0] + STORAGE_PRICE + FACILITY_PRICES[Facility.ENGINE_SHED]
+    cost = STATION_PRICE + LEVEL_PRICES[0] + STORAGE_PRICE
     assert value.stations == pytest.approx(cost * BOOK_SHARE)
     assert BOOK_SHARE == 0.5
 

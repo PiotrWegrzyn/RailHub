@@ -379,13 +379,16 @@ class StationTrade:
     def short_of(self, station: Cell) -> dict[Need, float]:
         """What the buildings a station hands goods out to are still short of this month, need by
         need: what last month's trade left them wanting, less what they took since; and what its
-        facilities lacked this month."""
+        facilities will use next month beyond what it holds, which they would otherwise buy."""
         short: dict[Need, float] = {}
         railway = self._growth.railway
         if railway is not None:
-            for facility in railway.facilities_at(station) - railway.working_at(station):
+            goods = railway.station_goods(station)
+            for facility in railway.facilities_at(station):
                 good, amount = FACILITY_USES[facility]
-                short[Need(good.value)] = short.get(Need(good.value), 0.0) + amount
+                lacking = amount - goods.held(good)
+                if lacking > 0:
+                    short[Need(good.value)] = short.get(Need(good.value), 0.0) + lacking
         trade = self._growth.last_trade
         if trade is None or not trade.cells.size:
             return short

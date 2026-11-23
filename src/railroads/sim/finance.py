@@ -40,14 +40,6 @@ CAR_PLACES = 10
 LEVEL_PRICES = (50_000.0, 250_000.0, 1_500_000.0, 10_000_000.0)
 STORAGE_PRICE = 10_000.0
 STORAGE_GROWTH = 2.0
-# What each facility at a station costs (railroads.sim.facilities).
-ENGINE_SHED_PRICE = 40_000.0
-SAND_TOWER_PRICE = 25_000.0
-POST_OFFICE_PRICE = 30_000.0
-REFRESHMENT_ROOM_PRICE = 30_000.0
-MARKET_HALL_PRICE = 50_000.0
-CATTLE_PENS_PRICE = 35_000.0
-WAREHOUSE_PRICE = 60_000.0
 # What a station of each level costs to keep a month, every station alike, rising by
 # STATION_UPKEEP_RISE a year, compounded, from the year play began.
 STATION_UPKEEP = (150.0, 400.0, 1_200.0, 3_500.0, 9_000.0)

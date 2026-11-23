@@ -5,8 +5,8 @@ A building costs DEMOLITION_PER_POINT times the points it gives (railroads.sim.l
 fields are cheap, mines, factories and works dear, and a skyscraper costs a million. One-off
 buildings (UNIQUE) cannot be taken down at all, and nothing is cleared where one would have to go.
 Making room takes the smallest buildings first, as Growth.clear_room does, so a price worked out
-beforehand is what is paid. Track costs TRACK_REMOVAL_SHARE of what it cost to lay, and a station
-STATION_REMOVAL. Track or a station bulldozed takes with it, for nothing, any branch beside it
+beforehand is what is paid. Track costs TRACK_REMOVAL_SHARE of what it cost to lay, a station
+STATION_REMOVAL, taking its platforms and facilities with it, and a facility FACILITY_REMOVAL. Track or a station bulldozed takes with it, for nothing, any branch beside it
 that led only into it off a junction; the end of a plain line stays to be laid on from.
 """
 
@@ -16,6 +16,7 @@ from types import MappingProxyType
 from railroads.sim.constructions import (
     CELL_SPACE,
     ONE_OFFS,
+    Annex,
     Building,
     BuildingKind,
     Constructions,
@@ -46,6 +47,7 @@ SKYSCRAPER_DEMOLITION = 1_000_000.0
 UNIQUE = ONE_OFFS
 TRACK_REMOVAL_SHARE = 0.25
 STATION_REMOVAL = 5_000.0
+FACILITY_REMOVAL = 2_000.0
 
 
 def demolition_price(kind: BuildingKind) -> float | None:
@@ -108,6 +110,8 @@ def bulldoze_price(constructions: Constructions, cell: Cell) -> float | None:
             total += price
         elif isinstance(built, Station):
             total += STATION_REMOVAL
+        elif isinstance(built, Annex):
+            total += FACILITY_REMOVAL
         else:
             total += track_price(built, tile) * TRACK_REMOVAL_SHARE
         found = True
@@ -119,7 +123,7 @@ def bulldoze(growth: Growth, cell: Cell) -> set[Cell]:
     the cells that changed."""
     constructions = growth.constructions
     taken: set[Cell] = set()
-    railway = any(not isinstance(built, Building) for built in constructions.at(cell))
+    railway = any(not isinstance(built, (Building, Annex)) for built in constructions.at(cell))
     for built in constructions.at(cell):
         if isinstance(built, Building):
             if built.kind in UNIQUE:
@@ -127,7 +131,7 @@ def bulldoze(growth: Growth, cell: Cell) -> set[Cell]:
             growth.take_down(built)
         else:
             if isinstance(built, Station) and built.main is None:
-                taken |= remove_platforms(constructions, cell)
+                taken |= remove_added(constructions, cell)
             constructions.remove(built)
         taken.add(cell)
     if railway:
@@ -153,11 +157,16 @@ def remove_dead_branches(constructions: Constructions, cell: Cell) -> set[Cell]:
     return taken
 
 
-def remove_platforms(constructions: Constructions, station: Cell) -> set[Cell]:
-    """Takes down every platform added to a station; returns their cells."""
+def remove_added(constructions: Constructions, station: Cell) -> set[Cell]:
+    """Takes down every platform and facility added to a station; returns their cells."""
     cells = set(constructions.platforms(station))
     for cell in cells:
         platform = constructions.station_at(cell)
         if platform is not None:
             constructions.remove(platform)
+    for cell in constructions.annexes(station).values():
+        annex = constructions.annex_at(cell)
+        if annex is not None:
+            constructions.remove(annex)
+            cells.add(cell)
     return cells

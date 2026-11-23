@@ -13,7 +13,7 @@ import numpy.typing as npt
 
 from railroads.sim.amounts import EPSILON
 from railroads.sim.clock import MONTHS_PER_YEAR
-from railroads.sim.constructions import Building, BuildingKind, Construction, Station, Track
+from railroads.sim.constructions import Annex, Building, BuildingKind, Construction, Station, Track
 from railroads.sim.goods import BONUS_PART, RECIPES, Good, Need
 from railroads.sim.grids import Cell, FloatArray
 from railroads.sim.growth import Growth
@@ -373,6 +373,11 @@ def _other(construction: Construction, growth: Growth) -> str:
             if growth.railway is None:
                 return "station"
             return f"station: {growth.railway.name_of(construction.cell)}"
+        case Annex():
+            if growth.railway is None:
+                return construction.facility.value
+            name = growth.railway.name_of(construction.station)
+            return f"{construction.facility.value} of {name}"
         case Track():
             kind = (
                 ", maglev" if construction.maglev else ", electric" if construction.electric else ""

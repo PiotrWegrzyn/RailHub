@@ -16,7 +16,6 @@ from enum import Enum
 import numpy as np
 
 from railroads.sim.clock import END_YEAR, MONTH_NAMES
-from railroads.sim.facilities import FACILITY_PRICES
 from railroads.sim.finance import (
     LEVEL_PRICES,
     STATION_PRICE,
@@ -74,13 +73,12 @@ class CompanyValue:
 
 
 def station_cost(railway: Railway, station: Cell) -> float:
-    """What a station as it stands would cost today: the station, its levels, its storage
-    upgrades and its facilities."""
+    """What a station as it stands would cost today: the station, its levels and its storage
+    upgrades; its facilities cost nothing to put up."""
     levels = sum(LEVEL_PRICES[: railway.level(station) - 1])
     goods = railway.goods.get(station)
     storage = sum(storage_price(n) for n in range(0 if goods is None else goods.storage))
-    facilities = sum(FACILITY_PRICES[f] for f in railway.facilities_at(station))
-    return STATION_PRICE + levels + storage + facilities
+    return STATION_PRICE + levels + storage
 
 
 def shares_worth(owners: Owners) -> float:

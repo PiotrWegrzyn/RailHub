@@ -1,7 +1,7 @@
-"""Things the player can build: track, stations and buildings.
+"""Things the player can build: track, stations, the facilities beside stations and buildings.
 
 Every cell has room for CELL_SPACE units. A single track takes one unit and a double track two,
-and a station fills its whole cell. Most buildings take one unit, so a cell with a double track
+and a station or an engine shed fills its whole cell, and cattle pens take ANNEX_SPACE of it. Most buildings take one unit, so a cell with a double track
 through it still fits four houses. Farms, orchards and other fields fill a whole cell, as do the
 biggest works and the novelties, and factories, canneries and mills take three.
 """
@@ -506,7 +506,37 @@ class Building:
         return BUILDING_RULES[self.kind].space
 
 
-type Construction = Track | Station | Building
+class Facility(Enum):
+    """What the player can put up beside a station (railroads.sim.facilities)."""
+
+    ENGINE_SHED = "engine shed"
+    SAND_TOWER = "sand tower"
+    POST_OFFICE = "post office"
+    REFRESHMENT_ROOM = "refreshment room"
+    MARKET_HALL = "market hall"
+    CATTLE_PENS = "cattle pens"
+    WAREHOUSE = "warehouse"
+
+
+# The facilities that stand in a cell of their own beside their station, and how much room each
+# takes there; the others stand in the station itself and take none.
+ANNEX_SPACE = {Facility.ENGINE_SHED: CELL_SPACE, Facility.CATTLE_PENS: 1}
+
+
+@dataclass(frozen=True, slots=True)
+class Annex:
+    """A facility put up in a cell beside the station in `station`."""
+
+    cell: Cell
+    facility: Facility
+    station: Cell
+
+    @property
+    def space(self) -> int:
+        return ANNEX_SPACE[self.facility]
+
+
+type Construction = Track | Station | Annex | Building
 
 
 class CannotBuild(ValueError):
@@ -528,6 +558,8 @@ class Constructions:
         self._stations: set[Cell] = set()
         # The platforms added to each station, by the station's cell.
         self._platforms: dict[Cell, set[Cell]] = {}
+        # The facilities put up beside each station, by the station's cell, and where each stands.
+        self._annexes: dict[Cell, dict[Facility, Cell]] = {}
         self._track: dict[Cell, int] = {}
         self.railway_version = 0
         # A count that goes up whenever anything is built or removed.
@@ -578,6 +610,19 @@ class Constructions:
         if station is None:
             return None
         return station.cell if station.main is None else station.main
+
+    def annexes(self, station: Cell) -> dict[Facility, Cell]:
+        """The facilities put up beside a station, and the cell each stands in."""
+        return dict(self._annexes.get(station, {}))
+
+    def annex_at(self, cell: Cell) -> Annex | None:
+        """The facility standing in the cell, if there is one."""
+        return next((b for b in self._cells.get(cell, ()) if isinstance(b, Annex)), None)
+
+    def every_annex(self) -> list[Annex]:
+        """Every facility put up beside a station, in order of their cells."""
+        found = (self.annex_at(cell) for kinds in self._annexes.values() for cell in kinds.values())
+        return sorted((a for a in found if a is not None), key=lambda a: a.cell)
 
     def every_station_cell(self) -> list[Cell]:
         """Every cell a station or a platform of one fills."""
@@ -674,6 +719,8 @@ class Constructions:
                 problem = _site_problem(self.tile_map.tile(cell), STATION_RELIEF, "station")
                 if problem is None and construction.ends is not None:
                     problem = self.way_problem(construction.ends)
+            case Annex():
+                problem = _site_problem(self.tile_map.tile(cell), STATION_RELIEF, "facility")
             case Building():
                 problem = self._building_problem(construction)
         needed = self.room_needed(construction)
@@ -712,6 +759,15 @@ class Constructions:
                     self._platforms.get(main, set()).discard(construction.cell)
                     if not self._platforms.get(main):
                         self._platforms.pop(main, None)
+            case Annex():
+                kinds = self._annexes.setdefault(construction.station, {})
+                if change > 0:
+                    kinds[construction.facility] = construction.cell
+                else:
+                    kinds.pop(construction.facility, None)
+                    if not kinds:
+                        self._annexes.pop(construction.station, None)
+                return
             case Track():
                 left = self._track.get(construction.cell, 0) + change
                 if left > 0:
@@ -788,6 +844,8 @@ class Constructions:
         def moved(built: Construction) -> Construction:
             if isinstance(built, Station) and built.main is not None:
                 return replace(built, cell=move.cell(built.cell), main=move.cell(built.main))
+            if isinstance(built, Annex):
+                return replace(built, cell=move.cell(built.cell), station=move.cell(built.station))
             return replace(built, cell=move.cell(built.cell))
 
         self.tile_map = tile_map
@@ -797,6 +855,10 @@ class Constructions:
         self._stations = move.cells(self._stations)
         self._platforms = {
             move.cell(main): move.cells(added) for main, added in self._platforms.items()
+        }
+        self._annexes = {
+            move.cell(station): {kind: move.cell(cell) for kind, cell in kinds.items()}
+            for station, kinds in self._annexes.items()
         }
         self._track = move.keys(self._track)
         self.version += 1

@@ -296,6 +296,7 @@ class MapView:
             self.tools.start_moving,
             self._built_station_preview,
             self.tools.start_adding_platform,
+            self.tools.start_adding_facility,
         )
         self.summaries.draw(*self._map_rect, self.look_at, self.railway.name_of)
         self.search.draw(self.growth, self.visit, self._view_center)
