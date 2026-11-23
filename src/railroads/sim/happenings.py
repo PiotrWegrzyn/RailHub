@@ -2,7 +2,7 @@
 a headline for every event as its month comes.
 
 The year before a war NEW_GARRISONS patches of military ground of GARRISON_SIZE cells go up, at
-least GARRISONS_APART steps from any other, each with a base and two outposts; as it begins
+least GARRISONS_APART steps from any other, each with a base and GARRISON_OUTPOSTS outposts; as it begins
 GUN_FACTORIES gun factories open by the biggest towns, and GUN_FACTORIES more on a map with no
 port; as it ends WAR_LOSSES of the military buildings are pulled down. Falling towers pull down
 skyscrapers, those with the most people around first. An event bringing pilgrims picks the town
@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 
 NEW_GARRISONS = 2
 GARRISON_SIZE = (10, 18)
+GARRISON_OUTPOSTS = 2
 GARRISONS_APART = 15
 GUN_FACTORIES = 2
 WAR_LOSSES = 0.5
@@ -238,7 +239,7 @@ def new_garrisons(growth: Growth, rng: np.random.Generator) -> set[Cell]:
 
 def _muster(growth: Growth, patch: list[Cell], rng: np.random.Generator) -> set[Cell]:
     changed: set[Cell] = set()
-    for kind in (BuildingKind.BASE, BuildingKind.OUTPOST, BuildingKind.OUTPOST):
+    for kind in (BuildingKind.BASE,) + (BuildingKind.OUTPOST,) * GARRISON_OUTPOSTS:
         for index in rng.permutation(len(patch)).tolist():
             building = Building(patch[index], kind)
             if growth.constructions.why_not(building) is None:

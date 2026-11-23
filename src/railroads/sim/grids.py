@@ -25,6 +25,8 @@ type Index = int | npt.NDArray[np.int64]
 FloatArray = npt.NDArray[np.float64]
 IntArray = npt.NDArray[np.int64]
 BoolGrid = npt.NDArray[np.bool_]
+# How many kilometres across a cell of every map is.
+KM_PER_CELL = 2.0
 
 HEX_RADIUS = 1 / math.sqrt(3)
 HEX_ROW_STEP = 1.5 * HEX_RADIUS

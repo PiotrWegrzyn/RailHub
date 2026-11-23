@@ -38,7 +38,7 @@ from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.buildings import dot_looks, draw_building_dots
 from railroads.ui.ground import GroundLayout, GroundPictures, Pixels, cell_colors
 from railroads.ui.hex_details import HexDetails, draw_hex_details, draw_shares, recently_described
-from railroads.ui.iso_camera import LOOKS, IsoCamera, Vec2
+from railroads.ui.iso_camera import LOOKS, PIXEL_CELL_WIDTH, ZOOM_CELL_WIDTHS, IsoCamera, Vec2
 from railroads.ui.land_offers import LandOffers
 from railroads.ui.map_input import MapInput
 from railroads.ui.map_overlays import (
@@ -101,7 +101,7 @@ STATION_CARD_DELAY = 1.0
 DETAILS_SIZE = (460.0, 420.0)
 SHARES_SIZE = (400.0, 400.0)
 # Stepping to a building found zooms in at least this far, so it can be seen.
-VISIT_ZOOM = 4
+VISIT_ZOOM = ZOOM_CELL_WIDTHS.index(2 * PIXEL_CELL_WIDTH)
 # Slopes are lit from the top-left of the screen.
 LIGHT_ON_SCREEN = (-1.0, -1.0)
 # Population points a cell needs to show as a town on the minimap.

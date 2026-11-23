@@ -18,9 +18,9 @@ from railroads.ui.iso_camera import IsoCamera, Vec2
 from railroads.ui.ornate import DEEP, frame_rect
 from railroads.ui.theme import color_u32, rgba_u32
 
-# Latitudes the world map shows, north to south; the poles are left out.
 # How far the frame round each map stands out past the map itself.
 FRAME_PAD = 4.0
+# Latitudes the world map shows, north to south; the poles are left out.
 WORLD_NORTH = 84.0
 WORLD_SOUTH = -60.0
 WORLD_WIDTH = 300.0

@@ -147,7 +147,8 @@ CARDS_WIDTH = 278.0
 # Where windows open: big ones just under the top bar, and a cell's or station's details down the
 # left side of the map.
 WINDOW_TOP = 56.0
-SIDE_WINDOW_POS = (16.0, 96.0)
+SIDE_WINDOW_TOP = 96.0
+SIDE_WINDOW_POS = (16.0, SIDE_WINDOW_TOP)
 
 # Panels laid over the map: no title or border, sized to what they hold, and never taking the
 # keyboard or a saved place.

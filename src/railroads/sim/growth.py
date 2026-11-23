@@ -43,7 +43,7 @@ after.
 
 Once a year every ladder that has opened and stands below its least on the map (least_of) gets
 one more of its first kind, in its likeliest cell: at least one of everything that opens in some
-year, and of the key buildings (KEY_BUILDINGS) at least KEY_LEAST on a map of KEY_LAND_CELLS land
+year, and of the key buildings (KEY_BUILDINGS) at least KEY_LEAST on a map of REFERENCE_LAND land
 cells, more or fewer by the land, put on any land they could stand on where none is likely.
 
 History happens too (railroads.sim.happenings): wars, crises and new things, a month at a time; in a war the
@@ -112,7 +112,7 @@ from railroads.sim.room import Room
 from railroads.sim.station_trade import StationTrade
 from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
-from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
+from railroads.sim.tilemap import REFERENCE_LAND, Relief, Terrain, TileMap, Vegetation
 from railroads.sim.tiles import era_come, kind_era
 from railroads.sim.towns import Towns
 from railroads.sim.year_caches import year_cached
@@ -294,11 +294,10 @@ def inputs_of(kind: BuildingKind, year: int) -> tuple[frozenset[BuildingKind], .
     )
 
 
-# Kinds every map keeps at least KEY_LEAST of on KEY_LAND_CELLS land cells, in proportion to its
+# Kinds every map keeps at least KEY_LEAST of on REFERENCE_LAND land cells, in proportion to its
 # land, once open: the only makers of what whole chains run on.
 KEY_BUILDINGS = frozenset({BuildingKind.OIL_WELL, BuildingKind.REFINERY})
 KEY_LEAST = 3
-KEY_LAND_CELLS = 120_000
 # How many of a ladder's likeliest cells a top-up tries, and how many cells anywhere when none is
 # likely at all.
 LIKELIEST_TRIED = 20
@@ -1176,7 +1175,7 @@ class Growth:
         the land of a key building, one of anything that opens in some year, else none."""
         kind = ladder.kinds[0]
         if kind in KEY_BUILDINGS:
-            return max(1, round(KEY_LEAST * self._land_cells / KEY_LAND_CELLS))
+            return max(1, round(KEY_LEAST * self._land_cells / REFERENCE_LAND))
         opens_later = ladder.from_year > 0 or kind_era(kind) > 1
         return 1 if opens_later and kind not in ONE_OFFS else 0
 

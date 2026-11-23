@@ -31,7 +31,7 @@ from railroads.sim.constructions import Constructions
 from railroads.sim.finance import START_CASH
 from railroads.sim.game import Game, place_names
 from railroads.sim.geo import Bounds, describe_lonlat
-from railroads.sim.grids import HexGrid
+from railroads.sim.grids import KM_PER_CELL, HexGrid
 from railroads.sim.lots import Lots
 from railroads.sim.novelties import Novelties
 from railroads.sim.stats import History
@@ -48,7 +48,6 @@ EARLIEST_START_YEAR = FIRST_RAILWAY_YEAR
 START_REGION = StartRegion()
 MAP_WIDTH_KM = 537.0
 MAP_HEIGHT_KM = 537.0
-KM_PER_CELL = 2.0
 
 
 class MapChoice(StrEnum):

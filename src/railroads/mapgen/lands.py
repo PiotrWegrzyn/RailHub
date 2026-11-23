@@ -22,14 +22,13 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.geo import Bounds
-from railroads.sim.grids import Cell, HexGrid
+from railroads.sim.grids import KM_PER_CELL, Cell, HexGrid
 from railroads.sim.lots import Lots
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 
 # Where the place is said to lie, for the world map and the names of its stations: a box a tenth
 # bigger each way than Poland's, about it.
 BOUNDS = Bounds(west=13.55, east=24.65, south=48.65, north=55.15)
-KM_PER_CELL = 2.0
 BANDS = (Temperature.COLD, Temperature.NORMAL, Temperature.HOT)
 COVERS = (Vegetation.BARREN, Vegetation.GRASS, Vegetation.FOREST)
 # The share of a land's cells in the square each feature takes, and where its middle lies in the
@@ -61,8 +60,7 @@ def place_grid() -> HexGrid:
 
 def square(grid: HexGrid) -> npt.NDArray[np.bool_]:
     """The cells of the place a new game starts on: the seven lots in its middle."""
-    rows, cols = grid.shape
-    lots = Lots(radius=Lots.radius_for(rows * cols), middle=(rows // 2 // 2 * 2, cols // 2))
+    lots = Lots.in_middle_of(grid)
     window = lots.window()
     top, left, height, width = window
     held = np.zeros(grid.shape, dtype=bool)

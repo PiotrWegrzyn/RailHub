@@ -19,7 +19,7 @@ from typing import Self
 import numpy as np
 import numpy.typing as npt
 
-from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP
+from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Grid
 from railroads.sim.tilemap import START_SHARE, TileMap
 
 type Lot = tuple[int, int]
@@ -36,6 +36,11 @@ PRICE_UNIT = 1000
 # The least share of a lot's cells that must be land for it to be offered.
 LEAST_LAND = 0.02
 SQRT3 = math.sqrt(3)
+
+
+def land_price(bought: int) -> int:
+    """What the next lot costs once this many have been bought, in dollars."""
+    return fibonacci(FIRST_FIBONACCI + bought) * PRICE_UNIT
 
 
 def fibonacci(n: int) -> int:
@@ -69,7 +74,13 @@ class Lots:
     def around_middle(cls, place: TileMap, share: float = START_SHARE) -> Self:
         """The lots of a game starting on the middle of a place's map, the seven it starts on
         holding `share` of its cells."""
-        rows, cols = place.grid.shape
+        return cls.in_middle_of(place.grid, share)
+
+    @classmethod
+    def in_middle_of(cls, grid: Grid, share: float = START_SHARE) -> Self:
+        """The lots around the middle of a grid, the seven in the middle holding `share` of its
+        cells; the middle lot stands on an even row."""
+        rows, cols = grid.shape
         return cls(
             radius=cls.radius_for(rows * cols, share), middle=(rows // 2 // 2 * 2, cols // 2)
         )
@@ -207,7 +218,7 @@ class Lots:
 
     def price(self) -> int:
         """What the next lot costs, in dollars."""
-        return fibonacci(FIRST_FIBONACCI + self.bought) * PRICE_UNIT
+        return land_price(self.bought)
 
     def buy(self, lot: Lot) -> None:
         if lot not in self.next_to():

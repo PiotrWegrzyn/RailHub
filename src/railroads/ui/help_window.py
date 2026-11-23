@@ -25,7 +25,7 @@ from railroads.sim.goods import (
     price_of,
 )
 from railroads.sim.ladders import LADDERS, PASSENGERS_PER_POINT, POINTS, Points
-from railroads.sim.lots import FIRST_FIBONACCI, PRICE_UNIT, fibonacci
+from railroads.sim.lots import land_price
 from railroads.sim.tiles import good_era, kind_era, opened_from
 from railroads.sim.trains import ENGINES, OPENED_BY, Engine, successor
 from railroads.ui.buy_train import fuel_use
@@ -35,11 +35,6 @@ from railroads.ui.search import goods_of
 from railroads.ui.theme import BRASS, LIST_TABLE_FLAGS, WINDOW_TOP, good_amount, good_icon, tip
 
 WINDOW_SIZE = (860.0, 600.0)
-
-
-def lot_price(bought: int) -> float:
-    """What the next lot costs once this many have been bought (railroads.sim.lots)."""
-    return float(fibonacci(FIRST_FIBONACCI + bought) * PRICE_UNIT)
 
 
 TOWNS_HELP = (
@@ -100,9 +95,9 @@ MAP_HELP = (
         "The land around it can be bought a lot at a time, each a seventh of the land a game"
         " starts on. Any lot sharing a side with yours is for sale, twelve at the start: past the"
         " map's edge it shows its rivers, forests and mountains, without the buildings, behind a"
-        f" chain and a padlock with its price. The first costs {dollars(lot_price(0))} and each"
-        f" after it the next Fibonacci number of thousands: {dollars(lot_price(1))},"
-        f" {dollars(lot_price(2))} and so on."
+        f" chain and a padlock with its price. The first costs {dollars(land_price(0))} and each"
+        f" after it the next Fibonacci number of thousands: {dollars(land_price(1))},"
+        f" {dollars(land_price(2))} and so on."
     ),
     (
         f"Click a lot and confirm to buy it. It then grows on its own from {HISTORY_START} to this"

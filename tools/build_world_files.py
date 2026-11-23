@@ -23,6 +23,8 @@ from railroads.mapgen.presets import NaturalEarth
 from railroads.mapgen.sources import Shape
 from railroads.mapgen.terrain_tiles import ElevationDatabase, pack_tile
 from railroads.mapgen.world_files import (
+    HIGHEST_LAT,
+    LOWEST_LAT,
     SQUARE_DEG,
     SQUARE_OVERLAP_DEG,
     SquareShapes,
@@ -37,9 +39,6 @@ from railroads.mapgen.world_files import (
 from railroads.newgame import DATA_DIR
 from railroads.places import Places
 from railroads.sim.geo import Bounds
-
-LOWEST_LAT = -60.0
-HIGHEST_LAT = 70.0
 
 
 def cut_polygons(shapes: Sequence[Shape], boxes: Sequence[np.ndarray], area: Bounds) -> list[Shape]:

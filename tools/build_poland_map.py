@@ -23,12 +23,11 @@ from railroads.mapgen.sources import Elevation, ElevationGrid
 from railroads.mapgen.streams import HYDRORIVERS_SOURCE, StreamLines
 from railroads.newgame import DATA_DIR
 from railroads.sim.geo import Bounds
-from railroads.sim.grids import HexGrid
+from railroads.sim.grids import KM_PER_CELL, HexGrid
 from railroads.sim.tilemap import LAYERS, Temperature, Terrain, TileMap, Vegetation
 
 RAW = DATA_DIR / "raw"
 POLAND = maps.start_map("poland")
-KM_PER_CELL = 2.0
 SEED = 7
 
 

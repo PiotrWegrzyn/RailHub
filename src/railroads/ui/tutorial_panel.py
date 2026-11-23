@@ -9,16 +9,15 @@ from railroads.tutorial.steps import STEPS, Tutorial
 from railroads.ui import spotlight
 from railroads.ui.buy_train import SCREEN_SIZE as BUY_SCREEN
 from railroads.ui.ornate import begin_ornate, end_ornate, keep_in_front
-from railroads.ui.theme import BRASS, CARDS_WIDTH, GROWN
+from railroads.ui.theme import BRASS, CARDS_WIDTH, GROWN, SIDE_WINDOW_TOP
 
 # The window sits at first in the column along the right edge that the trains window leaves free,
 # MARGIN from the edge, and stays in front of the other windows while no popup is open and no
 # screen that holds up the game, such as the supply and demand boards, is up. It is kept on the
-# screen when the window shrinks. Its top is at least TOP down, and below the row of buttons along the top of the screen for buying a
+# screen when the window shrinks. Its top is at least SIDE_WINDOW_TOP down, and below the row of buttons along the top of the screen for buying a
 # train, which may reach under it: BUTTONS_ROW from that screen's top.
 WIDTH = CARDS_WIDTH
 MARGIN = 16.0
-TOP = 96.0
 BUTTONS_ROW = 72.0
 
 
@@ -29,7 +28,7 @@ def draw_tutorial(tutorial: Tutorial, in_front: bool = True) -> None:
     if step is None:
         return
     display = imgui.get_io().display_size
-    top = max(TOP, (display.y - BUY_SCREEN[1]) / 2 + BUTTONS_ROW)
+    top = max(SIDE_WINDOW_TOP, (display.y - BUY_SCREEN[1]) / 2 + BUTTONS_ROW)
     imgui.set_next_window_pos(
         (display.x - MARGIN, top), imgui.Cond_.first_use_ever.value, (1.0, 0.0)
     )

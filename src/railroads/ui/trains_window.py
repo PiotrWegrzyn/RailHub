@@ -48,6 +48,7 @@ from railroads.ui.theme import (
     CARDS_WIDTH,
     GONE,
     OFFER_SIZE,
+    SIDE_WINDOW_TOP,
     TEXT_DIM,
     caption_room,
     caption_under,
@@ -69,7 +70,6 @@ CARGO_WORTH = (
 WINDOW_SIZE = (980.0, 500.0)
 # The window can't be made smaller than this, so the map beside the stop cards keeps its room.
 SMALLEST_WINDOW = (900.0, 440.0)
-WINDOW_TOP = 96.0
 LIST_WIDTH = 190.0
 # Where the cars start in a train's row in the list, under its name and status.
 ROW_CARS_TOP = 39.0
@@ -160,7 +160,7 @@ class TrainsWindow:
             return
         display = imgui.get_io().display_size
         imgui.set_next_window_pos(
-            (max(8.0, display.x - WINDOW_SIZE[0] - CARDS_WIDTH - 16), WINDOW_TOP),
+            (max(8.0, display.x - WINDOW_SIZE[0] - CARDS_WIDTH - 16), SIDE_WINDOW_TOP),
             imgui.Cond_.first_use_ever.value,
         )
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)

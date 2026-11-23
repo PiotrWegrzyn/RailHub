@@ -12,13 +12,14 @@ from imgui_bundle import hello_imgui, imgui
 
 from railroads.sim.goods import Good
 from railroads.sim.trains import ENGINES, Car, Power, Train
+from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 from railroads.ui.ornate import DEEP, GLOW
 from railroads.ui.pixel.train_layer import train_picture
 from railroads.ui.pixel.trains import GrownTrainSprites
 from railroads.ui.theme import color_u32
 
 # How the map's projection looks at trains here: straight from the side, tilted as the map is.
-MATRIX = np.array([[32.0, 0.0], [0.0, 16.0]])
+MATRIX = np.array([[PIXEL_CELL_WIDTH, 0.0], [0.0, PIXEL_CELL_WIDTH * TILT]])
 # Each track: how far down the screen it lies, how finely its trains are drawn, how fast they run,
 # in pixels a second, and how brightly they are lit, the far ones darker; the farthest first.
 TRACKS = ((0.64, 1, 18.0, 0.55), (0.685, 1, 24.0, 0.75), (0.735, 1, 32.0, 1.0))

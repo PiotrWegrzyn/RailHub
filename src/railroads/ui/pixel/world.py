@@ -56,7 +56,7 @@ from railroads.ui.pixel.track_art import TrackArt
 SPRITE_REACH = 48
 # The resolution chunks are drawn at in close views: the ground, fields and woods that fine, and
 # what stands on the ground as its pixel art from the finest sheet, each pixel blown up to a square.
-CLOSE = 4
+CLOSE = FINEST
 # How many art pixels further down the map than track the ground showing where it is drawn may
 # lie before the track counts as hidden behind it: the track's own width over gentle slopes.
 HIDDEN_BEYOND = 2.0

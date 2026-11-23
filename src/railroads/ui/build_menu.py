@@ -57,8 +57,8 @@ TUNNEL = (0.18, 0.17, 0.17, 1.0)
 WIRE = (0.12, 0.14, 0.2, 1.0)
 GUIDEWAY = (0.74, 0.74, 0.72, 1.0)
 GUIDEWAY_EDGE = (0.42, 0.42, 0.44, 1.0)
-# How far apart the two tracks of double track are drawn, as a share of a cell.
-DOUBLE_SPACING = 0.28
+# How far apart the two tracks of double track are drawn zoomed out, as a share of a cell.
+FLAT_DOUBLE_SPACING = 0.28
 # Track not laid yet is drawn in this grey, this see-through.
 PLANNED_GREY = 0.82
 PLANNED_OPACITY = 0.7
@@ -440,7 +440,7 @@ def draw_track(
             draw_list.add_polyline(points, shade(TUNNEL), bed, 0)
         else:
             draw_list.add_polyline(points, shade(BALLAST), bed, 0)
-    spacing = camera.cell_width * DOUBLE_SPACING / 2
+    spacing = camera.cell_width * FLAT_DOUBLE_SPACING / 2
     for piece, points in pieces:
         if piece.bed == TrackBed.TUNNEL:
             continue

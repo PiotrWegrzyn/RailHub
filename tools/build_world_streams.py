@@ -18,13 +18,18 @@ import numpy as np
 
 from railroads.mapgen import world_files
 from railroads.mapgen.streams import StreamLines, write_streams
-from railroads.mapgen.world_files import WorldIndex, square_bounds, square_of, streams_file
+from railroads.mapgen.world_files import (
+    HIGHEST_LAT,
+    LOWEST_LAT,
+    WorldIndex,
+    square_bounds,
+    square_of,
+    streams_file,
+)
 from railroads.newgame import DATA_DIR
 
 FLOOR_KM2 = 300.0
 STEP_DEG = 0.01
-LOWEST_LAT = -60.0
-HIGHEST_LAT = 70.0
 SHAPEFILE = Path("raw/hydrorivers/HydroRIVERS_v10_shp/HydroRIVERS_v10")
 # Where UPLAND_SKM, the land a reach drains in km², lies in each .dbf record, and how wide it is.
 UPLAND_FIELD = slice(56, 66)

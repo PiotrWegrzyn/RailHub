@@ -24,6 +24,7 @@ from railroads.ui.theme import (
     GROWN,
     OVERLAY_FLAGS,
     PANEL,
+    SIDE_WINDOW_TOP,
     TEXT,
     TEXT_DIM,
     color_u32,
@@ -128,7 +129,7 @@ class SummariesPanel:
         assert summary is not None
         display = imgui.get_io().display_size
         imgui.set_next_window_pos(
-            (display.x - CARDS_WIDTH - 12, 96), imgui.Cond_.appearing.value, (1.0, 0.0)
+            (display.x - CARDS_WIDTH - 12, SIDE_WINDOW_TOP), imgui.Cond_.appearing.value, (1.0, 0.0)
         )
         imgui.set_next_window_size_constraints((WINDOW_WIDTH, 0), (WINDOW_WIDTH, WINDOW_MAX_HEIGHT))
         flags = imgui.WindowFlags_.always_auto_resize.value

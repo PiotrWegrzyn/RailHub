@@ -21,6 +21,9 @@ FORMAT_VERSION = 3
 LAYERS = ("terrain", "vegetation", "temperature", "height_m", "relief", "stream")
 # The share of a place's land a new game starts on (TileMap.square_middle).
 START_SHARE = 0.25
+# About the land cells of the map of Poland: the counts of rare buildings each game gets are set
+# for a map of this much land and scaled to the land of the others.
+REFERENCE_LAND = 121_000
 
 
 class Terrain(IntEnum):

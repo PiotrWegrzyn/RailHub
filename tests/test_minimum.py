@@ -2,8 +2,9 @@ import numpy as np
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.growth import KEY_LAND_CELLS, KEY_LEAST, Growth
+from railroads.sim.growth import KEY_LEAST, Growth
 from railroads.sim.ladders import FILLING_STATIONS, RESOURCES, TOWNS, WORKS, GrowthRule
+from railroads.sim.tilemap import REFERENCE_LAND
 
 (OIL_WELLS,) = [ladder for ladder in RESOURCES if ladder.kinds[0] == BuildingKind.OIL_WELL]
 (REFINERIES,) = [ladder for ladder in WORKS if ladder.kinds[0] == BuildingKind.REFINERY]
@@ -50,9 +51,9 @@ def test_key_buildings_keep_three_on_a_map_of_poland_and_more_on_a_bigger_one() 
     growth = grown(1900, REFINERIES)
 
     least = growth.least_of(REFINERIES)
-    growth._land_cells = KEY_LAND_CELLS
+    growth._land_cells = REFERENCE_LAND
     poland = growth.least_of(REFINERIES)
-    growth._land_cells = 2 * KEY_LAND_CELLS
+    growth._land_cells = 2 * REFERENCE_LAND
     bigger = growth.least_of(REFINERIES)
 
     assert (least, poland, bigger) == (1, KEY_LEAST, 2 * KEY_LEAST)

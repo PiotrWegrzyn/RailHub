@@ -44,6 +44,7 @@ from railroads.ui import spotlight
 from railroads.ui.goal_view import draw_goal_news
 from railroads.ui.help_window import HelpWindow
 from railroads.ui.history_pictures import HistoryPictures, opening_center
+from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, ZOOM_CELL_WIDTHS
 from railroads.ui.lively import Lively
 from railroads.ui.main_menu import (
     LoadChoice,
@@ -77,7 +78,7 @@ WAITING_WIDTH = 320.0
 PANEL_MARGIN = 12.0
 PANEL_COLOUR = (0.11, 0.1, 0.09, 0.85)
 # A new game opens on the middle of the map at this zoom, as the pictures of its history show it.
-OPENING_ZOOM = 3
+OPENING_ZOOM = ZOOM_CELL_WIDTHS.index(PIXEL_CELL_WIDTH)
 # The window's size when the game opens.
 WINDOW_SIZE = (1280.0, 800.0)
 # Saves are written one at a time, away from the frames, so play doesn't stutter. Where threads

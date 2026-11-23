@@ -23,6 +23,7 @@ from railroads.sim.constructions import (
     Constructions,
 )
 from railroads.sim.grids import Cell, FloatArray
+from railroads.ui.pixel.track_art import DOUBLE_SPACING
 
 SLOT_RADIUS = 0.3
 # How far from its cell's middle a farmstead stands at the back of the field filling its cell,
@@ -32,7 +33,7 @@ FARMSTEAD_SWING = 0.7
 # How far from the middle of a track through its cell a building stands at least, in cells, and
 # how much further for double track.
 TRACK_CLEARANCE = 0.25
-DOUBLE_CLEARANCE = 0.11
+DOUBLE_CLEARANCE = DOUBLE_SPACING / 2
 
 
 @dataclass(frozen=True)

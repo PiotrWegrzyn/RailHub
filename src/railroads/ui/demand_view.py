@@ -18,11 +18,11 @@ NEED_WIDTH = 116.0
 
 
 def coins_for(share: float) -> int:
-    """How many coins a share of demand left is worth: none once it is nearly used up, one, two
-    from a third left, and all three from two thirds."""
+    """How many coins a share of demand left is worth: none once it is nearly used up, then one
+    more for every 1 / COINS of it left, up to COINS."""
     if share < 0.05:
         return 0
-    return 3 if share >= 2 / 3 else 2 if share >= 1 / 3 else 1
+    return min(COINS, 1 + int(share * COINS))
 
 
 def draw_demand(demand: StationDemand) -> None:

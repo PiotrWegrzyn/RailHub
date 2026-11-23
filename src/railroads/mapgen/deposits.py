@@ -14,6 +14,7 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
+from railroads.sim.happenings import GARRISON_SIZE
 from railroads.sim.tilemap import Deposit, Relief, Temperature, Terrain, TileMap, Vegetation
 
 type Mask = npt.NDArray[np.bool_]
@@ -43,7 +44,6 @@ DEPOSITS: dict[Deposit, DepositRule] = {
 }
 # Military ground, whose few clusters hold every outpost on the map: how many, and of how many cells.
 GARRISONS = (1, 3)
-GARRISON_SIZE = (10, 18)
 # How far apart clusters are kept, as a share of the even spacing over all the map's land.
 SPREAD = 0.6
 

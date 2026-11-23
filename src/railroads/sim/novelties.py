@@ -22,9 +22,8 @@ from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.grids import BoolGrid, Cell
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
-from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
+from railroads.sim.tilemap import REFERENCE_LAND, Deposit, Relief, Terrain, TileMap
 
-REFERENCE_LAND = 121_000
 NOVELTIES_PER_GAME = (2, 3)
 RAILWAY_WORKS_PER_GAME = (2, 3)
 RAILWAY_WORKS_YEAR = 1855

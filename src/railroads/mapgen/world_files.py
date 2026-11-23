@@ -38,6 +38,9 @@ if sys.platform == "emscripten":
     import js
 
 SQUARE_DEG = 5.0
+# The latitudes the files cover, south and north (tools/build_world_files.py).
+LOWEST_LAT = -60.0
+HIGHEST_LAT = 70.0
 INDEX_FILE = "index.npz"
 # How far past a map's edges the shapes are still read, in degrees.
 SHAPES_MARGIN_DEG = 0.5

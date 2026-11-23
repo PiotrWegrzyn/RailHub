@@ -18,7 +18,7 @@ import numpy as np
 from railroads.places import Places, StationNames
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.geo import KM_PER_DEGREE_LAT, Bounds
-from railroads.sim.grids import Cell, HexGrid
+from railroads.sim.grids import KM_PER_CELL, Cell, HexGrid
 from railroads.sim.lots import Lots
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 
@@ -29,9 +29,7 @@ SQUARE_TOP = SQUARE_LEFT = (PLACE_SIZE - SQUARE_SIZE) // 2
 
 def start_lots() -> Lots:
     """The lots of the tutorial's place, the seven in its middle the game's own."""
-    grid = HexGrid(rows=PLACE_SIZE, cols=PLACE_SIZE, km_per_cell=2.0)
-    rows, cols = grid.shape
-    return Lots(radius=Lots.radius_for(rows * cols), middle=(rows // 2 // 2 * 2, cols // 2))
+    return Lots.in_middle_of(HexGrid(rows=PLACE_SIZE, cols=PLACE_SIZE, km_per_cell=KM_PER_CELL))
 
 
 MAP_TOP, MAP_LEFT, MAP_ROWS, MAP_COLS = start_lots().window()
@@ -42,7 +40,6 @@ def on_map(cell: Cell) -> Cell:
     return cell[0] + SQUARE_TOP - MAP_TOP, cell[1] + SQUARE_LEFT - MAP_LEFT
 
 
-KM_PER_CELL = 2.0
 # Where the place lies in the world: the English Midlands, for the minimap's world map.
 CENTER_LON, CENTER_LAT = -1.5, 52.5
 # The year play begins in, and what history the map pretends to have.
