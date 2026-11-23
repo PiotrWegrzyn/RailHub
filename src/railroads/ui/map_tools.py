@@ -8,10 +8,8 @@ from typing import TYPE_CHECKING
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import Track
-from railroads.sim.demolition import bulldoze_price, station_site_price
-from railroads.sim.finance import STATION_PRICE
 from railroads.sim.grids import Cell
-from railroads.sim.routes import Route, plan_route_steps, route_price, station_problem, station_way
+from railroads.sim.routes import Route, plan_route_steps, route_price, station_way
 from railroads.sim.steps import Steps, finish
 from railroads.ui.build_menu import PRICED_TOOLS, STATION_TOOLS, Tool
 from railroads.words import dollars
@@ -170,28 +168,28 @@ class MapTools:
 
     def update_hover_note(self, cell: Cell | None) -> None:
         """What the chosen tool would cost in the cell under the mouse."""
-        build, constructions = self._view.build, self._view.constructions
+        build, game = self._view.build, self._view.game
         if cell is None or build.tool not in PRICED_TOOLS:
             build.hover_note = ""
             return
         if build.tool == Tool.BULLDOZE:
-            price = bulldoze_price(constructions, cell)
+            price = game.clearing_quote(cell).price
             build.hover_note = "" if price is None else f"Clearing this cell: {dollars(price)}"
             return
-        site = station_site_price(constructions, cell)
         if build.tool == Tool.ADD_PLATFORM:
+            site = game.platform_quote(cell).price
             build.hover_note = (
                 "A platform can't go here"
                 if site is None
                 else f"New platform here: {dollars(site)}. Q turns it."
             )
             return
-        problem = station_problem(constructions, cell)
+        quote = game.station_quote(cell)
         build.hover_note = (
-            f"A station can't go here: {problem or 'a building here cant be taken down'}."
-            if problem is not None or site is None
-            else f"Here: {dollars(STATION_PRICE + site)}"
-            + (f" ({dollars(site)} of it clearing the cell)" if site else "")
+            f"A station can't go here: {quote.problem}."
+            if quote.price is None
+            else f"Here: {dollars(quote.price)}"
+            + (f" ({dollars(quote.site)} of it clearing the cell)" if quote.site else "")
             + ". Q turns it."
         )
 

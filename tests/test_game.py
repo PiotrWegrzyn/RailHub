@@ -111,3 +111,31 @@ def test_a_month_grows_the_map_and_sums_up_what_changed_near_the_stations() -> N
     assert any(month.changed for month in months)
     assert any(month.summary is not None for month in months)
     assert all(isinstance(x, Station) for x in game.constructions.at((6, 6)))
+
+
+def test_a_station_costs_what_its_quote_says() -> None:
+    game = make_game()
+    quote = game.station_quote((5, 5))
+
+    game.build_station((5, 5))
+
+    assert quote.price is not None
+    assert game.finances.cash == pytest.approx(1_000_000.0 - quote.price)
+
+
+def test_a_station_quote_says_why_it_cant_go_where_a_station_stands() -> None:
+    game = make_game()
+    game.build_station((5, 5))
+
+    quote = game.station_quote((5, 5))
+
+    assert quote.price is None
+    assert quote.problem
+
+
+def test_an_empty_cell_has_nothing_to_clear() -> None:
+    game = make_game()
+
+    quote = game.clearing_quote((5, 5))
+
+    assert quote.price is None
