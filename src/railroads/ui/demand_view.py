@@ -24,9 +24,6 @@ COIN_SIZE = 10.0
 COIN_STEP = 11.5
 # How wide one need takes on its row, icon, amount and coins together.
 NEED_WIDTH = 116.0
-# How many of the needs wanted most draw_wants shows with how much is wanted; the rest only
-# show their icons.
-TOP_WANTS = 6
 # How far each of a need's icons in draw_wants sits right of the one before, a pile of as many
 # as it has coins, and how wide its place is with its amount.
 PILE_STEP = 8.0
@@ -71,43 +68,32 @@ def wants_in_order(demand: StationDemand) -> list[tuple[Need, DemandRecord]]:
 
 
 def draw_wants(demand: StationDemand) -> None:
-    """What a station wants, short: the TOP_WANTS needs wanted most, each as a pile of its icon,
-    one for each coin of how well it pays, with how much more is taken; after them the rest by
-    their icon alone. Hovering one tells how much, how much of its demand is left and what it
-    pays."""
+    """What a station wants, the need taken most of first, each as a pile of its icon, one for
+    each coin of how well it pays, with how much more is taken. Hovering one tells how much of
+    its demand is left and what it pays."""
     wanted = wants_in_order(demand)
     if not wanted:
         imgui.text_disabled("none")
         return
     left = imgui.get_cursor_pos_x()
     per_row = max(1, int(imgui.get_content_region_avail().x // WANT_WIDTH))
-    top, rest = wanted[:TOP_WANTS], wanted[TOP_WANTS:]
-    for index, (need, record) in enumerate(top):
+    for index, (need, record) in enumerate(wanted):
         next_good_slot(index, left, per_row)
         imgui.begin_group()
-        _draw_pile(need, max(1, coins_for(record.share)), ICON_SIZE + PILE_STEP * (COINS - 1))
+        _draw_pile(need, max(1, coins_for(record.share)))
         imgui.same_line(0, 3)
         imgui.align_text_to_frame_padding()
         imgui.text(f"{record.left:.0f}")
         imgui.end_group()
         if imgui.is_item_hovered():
             _demand_tooltip(demand, need, record)
-    if not rest:
-        return
-    imgui.set_cursor_pos_x(left)
-    per_row = max(1, int(imgui.get_content_region_avail().x // (ICON_SIZE + 4)))
-    for index, (need, record) in enumerate(rest):
-        next_good_slot(index, left, per_row, 4.0)
-        _draw_pile(need, 1, ICON_SIZE)
-        if imgui.is_item_hovered():
-            _demand_tooltip(demand, need, record)
 
 
-def _draw_pile(need: Need, count: int, width: float) -> None:
-    """A need's icon `count` times, each a little right of the one before, in a place this
-    wide."""
+def _draw_pile(need: Need, count: int) -> None:
+    """A need's icon `count` times, each a little right of the one before, in the room of
+    COINS of them."""
     height = imgui.get_frame_height()
-    imgui.dummy((width, height))
+    imgui.dummy((ICON_SIZE + PILE_STEP * (COINS - 1), height))
     low = imgui.get_item_rect_min()
     top = low.y + (height - ICON_SIZE) / 2
     draw_list = imgui.get_window_draw_list()
