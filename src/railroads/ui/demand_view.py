@@ -5,7 +5,7 @@ share and what a unit earns."""
 from imgui_bundle import imgui
 
 from railroads.sim.demand import DemandRecord, StationDemand
-from railroads.sim.goods import FITS, HANDED_OUT, TRAVELLERS, Need, freight_of
+from railroads.sim.goods import FITS, HANDED_OUT, TRAVELLERS, Good, Need, freight_of
 from railroads.sim.trade import SCARCE_WORTH
 from railroads.ui.theme import (
     BORDER,
@@ -67,16 +67,61 @@ def wants_in_order(demand: StationDemand) -> list[tuple[Need, DemandRecord]]:
     return sorted(wanted, key=lambda pair: -pair[1].left)
 
 
-def draw_wants(demand: StationDemand) -> None:
+def goods_wanted(demand: StationDemand, goods: list[Good]) -> list[tuple[Good, float]]:
+    """Of these goods, those the buildings round a station use, with how much a month, the one
+    used most first."""
+    wanted = [(good, demand.monthly_want(good)) for good in dict.fromkeys(goods)]
+    return sorted([pair for pair in wanted if pair[1] > 0], key=lambda pair: -pair[1])
+
+
+def draw_wants_of(demand: StationDemand, goods: list[Good]) -> None:
+    """What a station wants of these goods, the one used most first, each as a pile of its icon,
+    one for each coin of how well it pays, with how much the buildings round it use a month.
+    Hovering one tells how much of its demand is left and what it pays."""
+    wanted = goods_wanted(demand, goods)
+    if not wanted:
+        imgui.text_disabled("none of these goods")
+        return
+    left = imgui.get_cursor_pos_x()
+    per_row = max(1, int(imgui.get_content_region_avail().x // WANT_WIDTH))
+    for index, (good, monthly) in enumerate(wanted):
+        need = demand.best_need(good)
+        record = demand.record(need) if need is not None else DemandRecord(0.0, 0.0)
+        next_good_slot(index, left, per_row)
+        imgui.begin_group()
+        _draw_pile(good, max(1, coins_for(record.share)))
+        imgui.same_line(0, 3)
+        imgui.align_text_to_frame_padding()
+        imgui.text(f"{monthly:.0f}")
+        imgui.end_group()
+        if imgui.is_item_hovered() and need is not None:
+            _good_tooltip(good, monthly, need, record)
+
+
+def _good_tooltip(good: Good, monthly: float, need: Need, record: DemandRecord) -> None:
+    imgui.begin_tooltip()
+    imgui.text(f"{good.value}: the buildings around use about {monthly:.0f} a month")
+    imgui.text(f"{record.share:.0%} of the demand for {need.value} is left")
+    low = freight_of(good)
+    if need in TRAVELLER_NEEDS:
+        imgui.text(f"Each one getting off now earns {dollars(low * record.share)}")
+    else:
+        imgui.text(f"Each unit earns {dollars(low)}, up to {dollars(low * SCARCE_WORTH)}")
+        imgui.text_disabled("where the buildings went short")
+    imgui.end_tooltip()
+
+
+def draw_wants(demand: StationDemand, per_row: int | None = None) -> None:
     """What a station wants, the need taken most of first, each as a pile of its icon, one for
-    each coin of how well it pays, with how much more is taken. Hovering one tells how much of
-    its demand is left and what it pays."""
+    each coin of how well it pays, with how much more is taken, `per_row` of them to a row or as
+    many as fit. Hovering one tells how much of its demand is left and what it pays."""
     wanted = wants_in_order(demand)
     if not wanted:
         imgui.text_disabled("none")
         return
     left = imgui.get_cursor_pos_x()
-    per_row = max(1, int(imgui.get_content_region_avail().x // WANT_WIDTH))
+    if per_row is None:
+        per_row = max(1, int(imgui.get_content_region_avail().x // WANT_WIDTH))
     for index, (need, record) in enumerate(wanted):
         next_good_slot(index, left, per_row)
         imgui.begin_group()
@@ -89,7 +134,7 @@ def draw_wants(demand: StationDemand) -> None:
             _demand_tooltip(demand, need, record)
 
 
-def _draw_pile(need: Need, count: int) -> None:
+def _draw_pile(need: Need | Good, count: int) -> None:
     """A need's icon `count` times, each a little right of the one before, in the room of
     COINS of them."""
     height = imgui.get_frame_height()

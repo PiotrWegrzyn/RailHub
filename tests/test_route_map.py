@@ -23,6 +23,7 @@ from railroads.ui.route_map import (
     SOFTEN_ROWS,
     SPECIAL_SHADES,
     SUMMARY_MOST,
+    TOOLTIP_DELAY,
     MapFrame,
     Marks,
     RouteMap,
@@ -34,6 +35,7 @@ from railroads.ui.route_map import (
     marks_at,
     needed,
     needs_named,
+    rest_on,
     shade_of,
     soften,
     soften_steps,
@@ -445,3 +447,21 @@ def test_framing_a_train_with_one_stop_comes_only_a_little_closer_and_shows_much
     route_map.frame(railway, train, map_size, PANEL)
 
     assert 1.0 <= route_map.zoom <= MOST_FRAMING_ZOOM < MOST_ZOOM
+
+
+def test_a_stations_summary_waits_until_the_mouse_has_rested_on_it() -> None:
+    hover, early = rest_on(None, (3, 4), 10.0)
+
+    hover, still_early = rest_on(hover, (3, 4), 10.0 + TOOLTIP_DELAY / 2)
+    _, rested = rest_on(hover, (3, 4), 10.0 + TOOLTIP_DELAY)
+
+    assert (early, still_early, rested) == (False, False, True)
+
+
+def test_moving_to_another_station_starts_the_wait_again() -> None:
+    hover, _ = rest_on(None, (3, 4), 10.0)
+
+    moved, shown = rest_on(hover, (5, 5), 10.0 + TOOLTIP_DELAY)
+
+    assert moved == ((5, 5), 10.0 + TOOLTIP_DELAY)
+    assert not shown

@@ -1,9 +1,9 @@
 import pytest
 
-from railroads.sim.demand import DemandRecord, StationDemand
+from railroads.sim.demand import DEMAND_PER_NEED, DemandRecord, StationDemand
 from railroads.sim.goods import HANDED_OUT, Good, Need, freight_of
 from railroads.sim.trade import SCARCE_WORTH
-from railroads.ui.demand_view import coins_for, demand_lines, wants_in_order
+from railroads.ui.demand_view import coins_for, demand_lines, goods_wanted, wants_in_order
 from railroads.words import dollars
 
 
@@ -51,3 +51,12 @@ def test_the_passenger_tooltip_prices_one_at_the_share_of_demand_left() -> None:
     lines = demand_lines(Need(Good.PASSENGERS.value), record)
 
     assert lines == [f"Each one getting off now earns {dollars(freight_of(Good.PASSENGERS) * 0.5)}"]
+
+
+def test_only_the_goods_given_that_the_station_uses_are_wanted_the_most_used_first() -> None:
+    demand = StationDemand(capacity={Need.FOOD: 40.0, Need(Good.PASSENGERS.value): 300.0})
+
+    wanted = goods_wanted(demand, [Good.COAL, Good.WHEAT, Good.PASSENGERS, Good.WHEAT])
+
+    assert [good for good, _ in wanted] == [Good.PASSENGERS, Good.WHEAT]
+    assert wanted[0][1] == 300.0 / DEMAND_PER_NEED

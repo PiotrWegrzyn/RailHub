@@ -28,7 +28,7 @@ from railroads.sim.trains import (
     unit_name,
 )
 from railroads.ui.buy_train import BuyScreen, EnginePicture
-from railroads.ui.demand_view import draw_wants
+from railroads.ui.demand_view import draw_wants_of
 from railroads.ui.ornate import card, ornate_window, section, tile
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at
 from railroads.ui.spotlight import spot
@@ -489,7 +489,8 @@ class TrainsWindow:
                 imgui.align_text_to_frame_padding()
                 imgui.text_disabled(f"{railway.name_of(following.cell)} wants")
                 imgui.same_line(CARD_LABEL)
-                draw_wants(demand)
+                offers, _ = self._offers(railway, train, index, stop, supplies)
+                draw_wants_of(demand, [offer.good for offer in offers])
         return removed
 
     def _draw_stop_head(
@@ -646,17 +647,8 @@ class TrainsWindow:
         imgui.text_disabled("Load here")
         asked = self._draw_generation_picker(railway, train, index)
         imgui.same_line(CARD_LABEL)
-        offers = [
-            offer
-            for offer in goods_to_load(railway, stop.cell, self.supplied(supplies, stop.cell))
-            if railway.can_carry(train, offer.good)
-        ]
-        here = {offer.good for offer in offers}
+        offers, carried = self._offers(railway, train, index, stop, supplies)
         waiting_here = railway.station_goods(stop.cell)
-        carried = [
-            g for g in carried_in(train, index) if g not in here and railway.can_carry(train, g)
-        ]
-        offers += [Offer(good, waiting_here.held(good), 0.0) for good in carried]
         generals = [general for general in General if railway.can_carry(train, general)]
         if not offers and not generals:
             imgui.text_disabled("nothing made or waiting here yet")
@@ -703,6 +695,23 @@ class TrainsWindow:
                 railway.add_car(train, stop, general, asked)
                 train.cars_changed(index)
             imgui.end_disabled()
+
+    def _offers(
+        self, railway: Railway, train: Train, index: int, stop: Stop, supplies: Supplies
+    ) -> tuple[list[Offer], list[Good]]:
+        """The goods the train can take on at a stop: those made or waiting there, then those
+        its cars bring in from the stop before that are not; and those brought in alone."""
+        offers = [
+            offer
+            for offer in goods_to_load(railway, stop.cell, self.supplied(supplies, stop.cell))
+            if railway.can_carry(train, offer.good)
+        ]
+        here = {offer.good for offer in offers}
+        waiting_here = railway.station_goods(stop.cell)
+        carried = [
+            g for g in carried_in(train, index) if g not in here and railway.can_carry(train, g)
+        ]
+        return offers + [Offer(good, waiting_here.held(good), 0.0) for good in carried], carried
 
     def _draw_generation_picker(self, railway: Railway, train: Train, index: int) -> int:
         """A small list beside 'Load here' of the generations of cars that can be added: the

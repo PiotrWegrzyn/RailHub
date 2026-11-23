@@ -26,6 +26,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
 from railroads.sim.steps import Steps
 from railroads.sim.trains import Stop, Train
+from railroads.ui.demand_view import draw_wants
 from railroads.ui.iso_camera import Vec2
 from railroads.ui.minimap import Panel
 from railroads.ui.station_offers import Offer, Supplies, goods_to_load
@@ -46,6 +47,10 @@ MOST_ZOOM = 24.0
 ZOOM_STEP = 1.25
 # How far, in pixels, from a station's spot a click still picks it.
 PICK_REACH = 9.0
+# How long, in seconds, the mouse rests on a station before its summary shows, and how many of
+# its wants go on a row of it.
+TOOLTIP_DELAY = 0.3
+TOOLTIP_WANTS_PER_ROW = 6
 # How far, in pixels, the mouse moves before a press is a drag rather than a click.
 DRAG_START = 3.0
 # How much room round a train's stops is shown when the map frames them, as a share of the
@@ -318,6 +323,18 @@ def blur_reach(radius: float) -> int:
     return 3 * (math.floor(radius) + 1)
 
 
+def rest_on(
+    hover: tuple[Cell, float] | None, hovered: Cell | None, now: float
+) -> tuple[tuple[Cell, float] | None, bool]:
+    """The station the mouse is over and since when, given what it was over before, and whether
+    it has rested there TOOLTIP_DELAY yet."""
+    if hovered is None:
+        return None, False
+    if hover is None or hover[0] != hovered:
+        hover = (hovered, now)
+    return hover, now - hover[1] >= TOOLTIP_DELAY
+
+
 def can_stop_at(train: Train, station: Cell) -> bool:
     """Whether a station can be added as the train's next stop: any but the one it ends with."""
     return not train.stops or train.stops[-1].cell != station
@@ -336,6 +353,8 @@ class RouteMap:
         # one chosen and a train again once it gets its first stops.
         self._framed: tuple[str, bool] | None = None
         self._dragged = False
+        # The station the mouse is over and since when, its summary showing after TOOLTIP_DELAY.
+        self._hover: tuple[Cell, float] | None = None
         # The track as lines on the map and their boxes, kept until track changes (_track_lines).
         self._track: Kept[tuple[list[tuple[np.ndarray, bool]], np.ndarray]] = Kept()
 
@@ -424,8 +443,10 @@ class RouteMap:
             )
         self._draw_stations(draw_list, railway, train, spots, marks, hovered, frame)
         draw_list.pop_clip_rect()
+        self._hover, rested = rest_on(self._hover, hovered, time.monotonic())
         if hovered is not None:
-            self._station_tooltip(railway, train, hovered, supplies)
+            if rested:
+                self._station_tooltip(railway, train, hovered, supplies)
             if clicked and can_stop_at(train, hovered):
                 add_stop(train, hovered)
 
@@ -612,11 +633,13 @@ class RouteMap:
 
     @staticmethod
     def _station_tooltip(railway: Railway, train: Train, station: Cell, supplies: Supplies) -> None:
-        """A short summary of a station: what it wants and what a train can load there."""
+        """A summary of a station: everything its buildings want, and what a train can load
+        there."""
         summary = summary_of(railway, station, supplies(station))
         imgui.begin_tooltip()
         imgui.text(railway.name_of(station))
-        _summary_row("Wants", NEEDED, summary.wants, summary.more_wants)
+        colored(NEEDED, "Wants")
+        draw_wants(railway.station_demand(station), TOOLTIP_WANTS_PER_ROW)
         _summary_row("Given", MADE, summary.makes, summary.more_makes)
         if can_stop_at(train, station):
             imgui.text_disabled("Click to add it as a stop")
