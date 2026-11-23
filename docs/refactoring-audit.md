@@ -23,7 +23,7 @@ and factors in words) and `sim/amounts.py` (`EPSILON`, `ratio`, `divided`). The 
 divisions that keep the part where the whole is nothing became `divided`. They were left with that
 meaning on purpose, since a `ratio` there would change results.
 
-**Done (steps 7-11, 0.5.185):** D2-D7, D10-D14, K2, K3, K10-K13, C9-C13, and the UI half of P2 and
+**Done (steps 7-11, 0.5.187):** D2-D7, D10-D14, K2, K3, K10-K13, C9-C13, and the UI half of P2 and
 P4. New shared pieces:
 - `theme.tip(disabled=)`, `colored`, `left_of_cards` and `next_good_slot(gap=)`, plus
   `ornate.hover_card`.
