@@ -42,7 +42,7 @@ buildings are paid by (railroads.sim.ownership).
 import time
 import weakref
 from collections.abc import Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from enum import IntEnum
 from functools import cache
 from itertools import pairwise
@@ -75,7 +75,7 @@ from railroads.sim.goods import (
     makes_of,
     needs_of,
 )
-from railroads.sim.grids import Cell, Grid, flat_within_any
+from railroads.sim.grids import Cell, Grid, flat_within_any, parity_steps
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import TileMap
 from railroads.sim.year_caches import year_cached
@@ -242,16 +242,12 @@ class Rings:
 
 @cache
 def rings_of(grid: Grid) -> Rings:
-    reach = LOCAL_REACH
-    middle = 2 * reach + 2
-    roomy = replace(grid, rows=2 * middle + 2, cols=2 * middle + 2)
-    rows, cols, away = [], [], None
-    for row in (middle, middle + 1):
-        steps = sorted(roomy.within((row, middle), reach).items(), key=lambda item: item[1])
-        rows.append(np.array([r - row for (r, _), _ in steps], dtype=np.intp))
-        cols.append(np.array([c - middle for (_, c), _ in steps], dtype=np.intp))
-        away = np.array([d for _, d in steps], dtype=np.intp)
-    assert away is not None
+    even, odd = parity_steps(grid, LOCAL_REACH)
+    rows, cols = (
+        tuple(np.array([offset[part] for offset in steps], dtype=np.intp) for steps in (even, odd))
+        for part in (0, 1)
+    )
+    away = np.array([offset[2] for offset in odd], dtype=np.intp)
     return Rings((rows[0], rows[1]), (cols[0], cols[1]), away)
 
 

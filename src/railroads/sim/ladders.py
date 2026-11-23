@@ -21,7 +21,7 @@ that fits first. Ladders can cap how many of their first kind stand in one cell 
 neighbourhood, so farms and ports keep their distance.
 """
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from types import MappingProxyType
@@ -1311,3 +1311,8 @@ class GrowthRule:
 
 
 GROWTH = GrowthRule()
+
+
+def ladder_of(kind: BuildingKind, ladders: Iterable[Ladder] = LADDERS) -> Ladder | None:
+    """The ladder a kind of building stands on, if any."""
+    return next((ladder for ladder in ladders if kind in ladder.kinds), None)

@@ -635,6 +635,15 @@ class Constructions:
     def space_left(self, cell: Cell) -> int:
         return CELL_SPACE - sum(built.space for built in self._cells.get(cell, ()))
 
+    def nearest_free(self, kind: BuildingKind, centre: Cell, steps: int) -> Cell | None:
+        """The nearest cell to `centre`, at most `steps` away, a building of the kind can go up
+        in."""
+        reached = self.tile_map.grid.within(centre, steps)
+        for cell, _ in sorted(reached.items(), key=lambda item: item[1]):
+            if self.why_not(Building(cell, kind)) is None:
+                return cell
+        return None
+
     def why_not(self, construction: Construction) -> str | None:
         """Why this cannot be built, or None when it can."""
         cell = construction.cell

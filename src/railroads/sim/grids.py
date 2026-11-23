@@ -10,7 +10,7 @@ a grid never changes, and every month the simulation asks again for the cells ar
 
 import math
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from typing import ClassVar, Literal, Self
 
@@ -380,3 +380,26 @@ def _track_ends(grid: Grid) -> tuple[int, ...]:
 @lru_cache(maxsize=4096)
 def _track_turn(grid: Grid, start: int, end: int) -> float:
     return grid._find_track_turn(start, end)
+
+
+type Offsets = tuple[tuple[int, int, int], ...]
+
+
+@lru_cache(maxsize=64)
+def parity_steps(grid: Grid, steps: int) -> tuple[Offsets, Offsets]:
+    """Every cell at most `steps` steps from a cell on an even row, and from one on an odd row,
+    as its row and column offsets and how many steps away it is, nearest first: on a hex grid
+    the offsets depend on the row. Worked out on a grid of the same kind big enough that none
+    is cut off by its edge."""
+    middle = 2 * steps + 2
+    roomy = replace(grid, rows=2 * middle + 2, cols=2 * middle + 2)
+    even, odd = (
+        tuple(
+            (r - row, c - middle, away)
+            for (r, c), away in sorted(
+                roomy.within((row, middle), steps).items(), key=lambda item: item[1]
+            )
+        )
+        for row in (middle, middle + 1)
+    )
+    return even, odd

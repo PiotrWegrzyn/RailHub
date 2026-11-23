@@ -103,6 +103,7 @@ from railroads.sim.ladders import (
     Land,
     Points,
     Surroundings,
+    ladder_of,
 )
 from railroads.sim.ledger import Ledger
 from railroads.sim.ownership import Owners
@@ -692,10 +693,7 @@ class Growth:
         changed: set[Cell] = set()
         for index, kind, gone in dead:
             cell = divmod(index, self._grid.cols)
-            self.owners.lose(cell, kind, gone)
-            for _ in range(gone):
-                self.constructions.remove(Building(cell, kind))
-            self.add(cell, kind, -gone)
+            self._pull_down(cell, kind, gone)
             self.died_out += gone
             changed.add(cell)
         return changed
@@ -798,6 +796,15 @@ class Growth:
             self.add(building.cell, building.kind, -1)
         return owned
 
+    def _pull_down(self, cell: Cell, kind: BuildingKind, many: int) -> int:
+        """Pulls down this many buildings of a kind in a cell, the player's last; returns how
+        many shares of them the player owned."""
+        owned = self.owners.lose(cell, kind, many)
+        for _ in range(many):
+            self.constructions.remove(Building(cell, kind))
+        self.add(cell, kind, -many)
+        return owned
+
     def _crowd_out(self) -> set[Cell]:
         """Pulls down the fields towns have grown over: the first kind of every ladder, of the
         game's or this growth's own, that grows only where fewer people live around than its
@@ -814,11 +821,7 @@ class Growth:
             if fields is None:
                 continue
             for row, col in np.argwhere((fields > 0) & (people >= most)).tolist():
-                gone = int(fields[row, col])
-                self.owners.lose((row, col), kind, gone)
-                for _ in range(gone):
-                    self.constructions.remove(Building((row, col), kind))
-                self.add((row, col), kind, -gone)
+                self._pull_down((row, col), kind, int(fields[row, col]))
                 changed.add((row, col))
         return changed
 
@@ -908,7 +911,7 @@ class Growth:
         """How high a kind stands on its ladder: 1 for the first kind, 2 for the next..."""
         if kind == BuildingKind.SKYSCRAPER:
             return SKYSCRAPER_STARS
-        ladder = next((ld for ld in self.rule.ladders if kind in ld.kinds), None)
+        ladder = ladder_of(kind, self.rule.ladders)
         return 1 if ladder is None else ladder.kinds.index(kind) + 1
 
     def build(self, building: Building) -> None:
@@ -1357,10 +1360,7 @@ class Growth:
             return None
         owned = 0
         for near, kind, take in plan:
-            owned += self.owners.lose(near, kind, take)
-            for _ in range(take):
-                self.constructions.remove(Building(near, kind))
-            self.add(near, kind, -take)
+            owned += self._pull_down(near, kind, take)
         moved = self.room.clear(cell, new.space)
         self.constructions.build(new)
         self.add(cell, new_kind, 1)

@@ -22,8 +22,6 @@ from railroads.sim.grids import Cell
 from railroads.sim.railway import NO_WAY_ON, Railway, Ride
 from railroads.sim.trains import (
     ENGINES,
-    EXPRESS_FARE,
-    MAGLEV_FARE,
     SLOWDOWN,
     Engine,
     Kind,
@@ -32,7 +30,16 @@ from railroads.sim.trains import (
     amount_of,
     unit_name,
 )
-from railroads.ui.buy_train import BuyScreen, EnginePicture, engine_range, fuel_use
+from railroads.ui.buy_train import (
+    BuyScreen,
+    EnginePicture,
+    cars_pulled,
+    engine_range,
+    fares_note,
+    fuel_use,
+    most_pulled,
+    track_needed,
+)
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.ornate import card, ornate_window, section, tile
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at
@@ -829,22 +836,21 @@ def engines_by_kind(names: list[str]) -> list[tuple[Kind, list[str]]]:
 def engine_summary(engine: Engine, per_cell: float | None = None) -> str:
     """An engine's speed, cars, fuel and what it runs on, for its tooltip, with what its fuel for
     a cell costs now if given."""
-    cars = f"{engine.cars} coaches and a dining car" if engine.express else f"{engine.cars} cars"
     lines = [
-        f"{engine.year}, {engine.power.value}: {engine.kmh:.0f} km/h, pulls up to {cars}",
-        f"Pulls at most {tonnes_text(engine.tonnes)} t, {SLOWDOWN[engine.kind]:.0%} slower at that",
+        (
+            f"{engine.year}, {engine.power.value}: {engine.kmh:.0f} km/h, "
+            f"pulls up to {cars_pulled(engine)}"
+        ),
+        f"Pulls at most {most_pulled(engine)}",
         f"Up to speed in {engine.pickup:g} s",
         f"Burns {fuel_use(engine, per_cell)}",
         f"Range: {engine_range(engine)}",
     ]
     lines.append(f"Pulls cars up to generation {engine.top_generation}")
-    if engine.express:
-        fare = MAGLEV_FARE if engine.maglev else EXPRESS_FARE
-        lines.append(f"Passengers only, paying {fare - 1:.0%} more")
-    if engine.electric:
-        lines.append("Runs on electrified track only")
-    if engine.maglev:
-        lines.append("Runs on maglev track only")
+    fares = fares_note(engine)
+    if fares is not None:
+        lines.append(fares)
+    lines += [f"Runs on {track.lower()} track only" for track in track_needed(engine)]
     return "\n".join(lines)
 
 

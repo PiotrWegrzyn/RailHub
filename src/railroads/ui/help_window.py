@@ -24,7 +24,7 @@ from railroads.sim.goods import (
     freight_of,
     price_of,
 )
-from railroads.sim.ladders import LADDERS, PASSENGERS_PER_POINT, POINTS, Points
+from railroads.sim.ladders import PASSENGERS_PER_POINT, POINTS, Points, ladder_of
 from railroads.sim.lots import AROUND, FIRST_FOR_SALE, START_LOTS, land_price
 from railroads.sim.tilemap import START_SHARE
 from railroads.sim.tiles import good_era, kind_era, opened_from
@@ -177,7 +177,8 @@ def _opening(kind: BuildingKind) -> str:
     era = kind_era(kind)
     if era > 1:
         return f"era {era}"
-    year = next((ladder.from_year for ladder in LADDERS if kind in ladder.kinds), 0)
+    ladder = ladder_of(kind)
+    year = 0 if ladder is None else ladder.from_year
     return str(year) if year else ""
 
 

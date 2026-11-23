@@ -83,14 +83,6 @@ def _highest(values: npt.NDArray[Any]) -> Cell:
     return int(best[0]), int(best[1])
 
 
-def _nearest_free(growth: Growth, kind: BuildingKind, centre: Cell) -> Cell | None:
-    reached = growth.constructions.tile_map.grid.within(centre, TOWN_STEPS)
-    for cell, _ in sorted(reached.items(), key=lambda item: item[1]):
-        if _free(growth, kind, cell):
-            return cell
-    return None
-
-
 def by_biggest_town(
     growth: Growth, kind: BuildingKind, away_from: list[Cell]
 ) -> tuple[Cell, Cell] | None:
@@ -104,7 +96,7 @@ def by_biggest_town(
     town = _highest(near)
     if near[town] <= 0:
         return None
-    cell = _nearest_free(growth, kind, town)
+    cell = growth.constructions.nearest_free(kind, town, TOWN_STEPS)
     if cell is None:
         return None
     growth.build(Building(cell, kind))
@@ -158,7 +150,7 @@ def place_pear_hq(growth: Growth, kind: BuildingKind, rng: np.random.Generator) 
     if not towers.any():
         return None
     near = np.where(towers, growth.nearby(Points.POPULATION), -1)
-    return _nearest_free(growth, kind, _highest(near))
+    return growth.constructions.nearest_free(kind, _highest(near), TOWN_STEPS)
 
 
 def place_royal_palace(growth: Growth, kind: BuildingKind, rng: np.random.Generator) -> Cell | None:
@@ -203,7 +195,7 @@ class ByTown:
 
     def __call__(self, growth: Growth, kind: BuildingKind, rng: np.random.Generator) -> Cell | None:
         town = _town(growth, self.least)
-        return None if town is None else _nearest_free(growth, kind, town)
+        return None if town is None else growth.constructions.nearest_free(kind, town, TOWN_STEPS)
 
 
 NOVELTIES = (

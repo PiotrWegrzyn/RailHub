@@ -229,12 +229,38 @@ def engine_range(engine: Engine) -> str:
     return "As far as the wires go" if engine.electric else "As far as the guideway goes"
 
 
+def cars_pulled(engine: Engine) -> str:
+    """The cars an engine pulls at most: "5 cars", or an express's coaches and dining car."""
+    return f"{engine.cars} coaches and a dining car" if engine.express else f"{engine.cars} cars"
+
+
+def most_pulled(engine: Engine) -> str:
+    """The most an engine pulls, and how much slower it runs pulling that."""
+    return f"{tonnes_text(engine.tonnes)} t, {SLOWDOWN[engine.kind]:.0%} slower at that"
+
+
+def fares_note(engine: Engine) -> str | None:
+    """What an express is paid more for its passengers; None for other engines."""
+    if not engine.express:
+        return None
+    fare = MAGLEV_FARE if engine.maglev else EXPRESS_FARE
+    return f"Passengers only, paying {fare - 1:.0%} more"
+
+
+def track_needed(engine: Engine) -> list[str]:
+    """The only track an engine runs on, if it needs track of its own."""
+    return [
+        track
+        for track, needed in (("Electrified", engine.electric), ("Maglev", engine.maglev))
+        if needed
+    ]
+
+
 def engine_figures(
     engine: Engine, per_cell: float | None = None, opened: tuple[Tile, int] | None = None
 ) -> list[tuple[str, str]]:
     """What an engine can do, as labels and values for its table on the screen, with what its
     fuel for a cell costs now and the supply tile level that put it on sale if given."""
-    cars = f"{engine.cars} coaches and a dining car" if engine.express else f"{engine.cars} cars"
     figures = []
     if opened is not None:
         tile, level = opened
@@ -243,22 +269,16 @@ def engine_figures(
         ("First built", str(engine.year)),
         ("Power", engine.power.value.capitalize()),
         ("Top speed", f"{engine.kmh:.0f} km/h"),
-        ("Pulls up to", cars),
-        (
-            "Pulls at most",
-            f"{tonnes_text(engine.tonnes)} t, {SLOWDOWN[engine.kind]:.0%} slower at that",
-        ),
+        ("Pulls up to", cars_pulled(engine)),
+        ("Pulls at most", most_pulled(engine)),
         ("Up to speed in", f"{engine.pickup:g} s"),
         ("Price", dollars(engine.price)),
         ("Burns", fuel_use(engine, per_cell)),
         ("Range", engine_range(engine)),
     ]
     figures.append(("Cars", f"Up to generation {engine.top_generation}"))
-    if engine.express:
-        fare = MAGLEV_FARE if engine.maglev else EXPRESS_FARE
-        figures.append(("Fares", f"Passengers only, paying {fare - 1:.0%} more"))
-    if engine.electric:
-        figures.append(("Runs on", "Electrified track only"))
-    if engine.maglev:
-        figures.append(("Runs on", "Maglev track only"))
+    fares = fares_note(engine)
+    if fares is not None:
+        figures.append(("Fares", fares))
+    figures += [("Runs on", f"{track} track only") for track in track_needed(engine)]
     return figures

@@ -13,7 +13,7 @@ import numpy.typing as npt
 from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import BuildingKind, Station
 from railroads.sim.goods import makes_of, price_of
-from railroads.sim.grids import Cell, Grid
+from railroads.sim.grids import Cell, Grid, parity_steps
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import Points
 from railroads.sim.railway import Railway
@@ -179,11 +179,9 @@ def reach_sums(grid: Grid, values: npt.NDArray[np.int64], steps: int) -> npt.NDA
     """For every cell, the sum of `values` over the cells at most `steps` steps from it."""
     sums = np.zeros_like(values)
     padded = np.pad(values, steps)
-    middle_row, col = grid.rows // 2, grid.cols // 2
-    for parity in (0, 1):
-        row = middle_row - middle_row % 2 + parity
+    for parity, offsets in enumerate(parity_steps(grid, steps)):
         rows = slice(parity, None, 2)
-        for d_row, d_col in ((r - row, c - col) for r, c in grid.within((row, col), steps)):
+        for d_row, d_col, _ in offsets:
             top, left = steps + d_row, steps + d_col
             shifted = padded[top : top + grid.rows, left : left + grid.cols]
             sums[rows] += shifted[rows]

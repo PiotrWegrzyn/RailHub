@@ -80,7 +80,7 @@ def build_power_plants(growth: Growth) -> set[Cell]:
     made, _, town, kind = best
     if made <= 0:
         town, kind = towns[0], BuildingKind.POWER_PLANT
-    cell = _nearest_free(growth, kind, town)
+    cell = growth.constructions.nearest_free(kind, town, PLACE_STEPS)
     if cell is None:
         return set()
     growth.build(Building(cell, kind))
@@ -96,20 +96,11 @@ def _first_of(growth: Growth, kind: BuildingKind, standing: np.ndarray) -> set[C
     if not towns:
         return set()
     town = max(towns, key=lambda found: _fuel_near(growth, found, kind))
-    cell = _nearest_free(growth, kind, town)
+    cell = growth.constructions.nearest_free(kind, town, PLACE_STEPS)
     if cell is None:
         return set()
     growth.build(Building(cell, kind))
     return {cell}
-
-
-def _nearest_free(growth: Growth, kind: BuildingKind, centre: Cell) -> Cell | None:
-    """The nearest cell to `centre` a building of the kind can go up in."""
-    reached = growth.grid.within(centre, PLACE_STEPS)
-    for cell, _ in sorted(reached.items(), key=lambda item: item[1]):
-        if growth.constructions.why_not(Building(cell, kind)) is None:
-            return cell
-    return None
 
 
 def _towns_without_plant(growth: Growth, standing: np.ndarray) -> list[Cell]:
