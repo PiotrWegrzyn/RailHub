@@ -22,8 +22,6 @@ from railroads.sim.demolition import (
     TRACK_REMOVAL_SHARE,
 )
 from railroads.sim.finance import (
-    DOUBLE_TRACK_FACTOR,
-    DOUBLE_TRACK_UPKEEP_FACTOR,
     ELECTRIC_TRACK_FACTOR,
     ELECTRIC_TRACK_UPKEEP,
     MAGLEV_TRACK_PRICE,
@@ -31,10 +29,13 @@ from railroads.sim.finance import (
     STATION_PRICE,
     TRACK_PRICE,
     TRACK_UPKEEP,
+    TRACK_WIDTH_FACTORS,
+    TRACK_WIDTH_UPKEEP_FACTORS,
     dollars,
 )
 from railroads.sim.grids import Cell, FloatArray, Grid
 from railroads.sim.ladders import Points
+from railroads.sim.railway import QUADRUPLE_ERA
 from railroads.sim.routes import Route
 from railroads.sim.tilemap import Relief
 from railroads.sim.track_rules import (
@@ -113,9 +114,10 @@ HINTS = {
         f"Click where track starts, then where it goes; starting or ending on track joins it. "
         f"{dollars(TRACK_PRICE)} a cell on the flat, {dollars(HILLS_PRICE)} in hills, {times(STREAM_FACTOR)} that "
         f"across a minor river, {dollars(BRIDGE_PRICE)} a bridge, {dollars(TUNNEL_PRICE)} a tunnel; "
-        f"double track {DOUBLE_TRACK_FACTOR:g} times as much, and electric "
-        f"{ELECTRIC_TRACK_FACTOR:g} times as much again. Laying it along your track widens or "
-        "electrifies that. Buildings in the way cost what taking them down does. Right click cancels."
+        f"double track {TRACK_WIDTH_FACTORS[TrackWidth.DOUBLE]:g} times as much, quadruple "
+        f"{TRACK_WIDTH_FACTORS[TrackWidth.QUADRUPLE]:g} times, and wires "
+        f"{ELECTRIC_TRACK_FACTOR - 1:g} times a single track's price again for each track. Laying it "
+        "along your track widens or electrifies that. Buildings in the way cost what taking them down does. Right click cancels."
     ),
     Tool.BULLDOZE: (
         f"Click a cell to clear it: homes from {dollars(DEMOLITION_PER_POINT[Points.POPULATION])}, "
@@ -148,21 +150,34 @@ WIDTH_BUTTONS = (
         TrackWidth.DOUBLE,
         "Double",
         (
-            f"Two tracks side by side: {dollars(TRACK_PRICE * DOUBLE_TRACK_FACTOR)} a cell, "
-            f"${TRACK_UPKEEP * DOUBLE_TRACK_UPKEEP_FACTOR:.2f} a month"
+            f"Two tracks side by side: "
+            f"{dollars(TRACK_PRICE * TRACK_WIDTH_FACTORS[TrackWidth.DOUBLE])} a cell, "
+            f"${TRACK_UPKEEP * TRACK_WIDTH_UPKEEP_FACTORS[TrackWidth.DOUBLE]:.2f} a month"
+        ),
+    ),
+    (
+        TrackWidth.QUADRUPLE,
+        "Quadruple",
+        (
+            f"Four tracks, two each way, from era {QUADRUPLE_ERA}: fast trains keep to the inner "
+            f"pair, slow ones to the outer, and each pair runs into its own platform where a "
+            f"station has one beside it: "
+            f"{dollars(TRACK_PRICE * TRACK_WIDTH_FACTORS[TrackWidth.QUADRUPLE])} a cell, "
+            f"${TRACK_UPKEEP * TRACK_WIDTH_UPKEEP_FACTORS[TrackWidth.QUADRUPLE]:.2f} a month"
         ),
     ),
 )
 ELECTRIC_TIP = (
     f"Wires over the track for electric engines, once electric engines are on sale: "
-    f"{ELECTRIC_TRACK_FACTOR:g} times the track's price, {dollars(ELECTRIC_TRACK_UPKEEP)} a month "
-    f"more ({DOUBLE_TRACK_UPKEEP_FACTOR:g} times that on double track). Lay it over your track to "
+    f"{ELECTRIC_TRACK_FACTOR - 1:g} times a single track's price more for each track, "
+    f"{dollars(ELECTRIC_TRACK_UPKEEP)} a month more for each track. Lay it over your track to "
     "electrify that."
 )
 MAGLEV_TIP = (
     f"A concrete guideway for maglev engines, which run on nothing else, and nothing else runs "
     f"on it: {dollars(MAGLEV_TRACK_PRICE)} a cell more, {dollars(MAGLEV_TRACK_UPKEEP)} a month "
-    f"more ({DOUBLE_TRACK_FACTOR:g} times that on double track). Laid over your track it takes "
+    f"more ({TRACK_WIDTH_FACTORS[TrackWidth.DOUBLE]:g} times that on double track). Laid over "
+    "your track it takes "
     "the place of the rails."
 )
 
@@ -200,6 +215,8 @@ class BuildMenu:
     maglev_open: bool = False
     # Whether electric track can be laid yet (Railway.electric_open).
     electric_open: bool = False
+    # Whether quadruple track can be laid yet (Railway.quadruple_open).
+    quadruple_open: bool = False
     trains: TrainsWindow = field(default_factory=TrainsWindow)
     stations: StationsWindow = field(default_factory=StationsWindow)
 
@@ -249,7 +266,11 @@ class BuildMenu:
     def _draw_track_options(self) -> None:
         _vertical_rule()
         imgui.same_line()
+        if not self.quadruple_open and self.track_width == TrackWidth.QUADRUPLE:
+            self.lay(TrackWidth.DOUBLE, self.electric, self.maglev)
         for width, label, tooltip in WIDTH_BUTTONS:
+            if width == TrackWidth.QUADRUPLE and not self.quadruple_open:
+                continue
             if toggle_button(label, self.track_width == width, tooltip, (0, BUTTON_HEIGHT)):
                 self.lay(width, self.electric, self.maglev)
             imgui.same_line()
@@ -441,7 +462,7 @@ def draw_track(
         return color
 
     for piece, points in pieces:
-        bed = width * (1.6 + (1.4 if piece.width == TrackWidth.DOUBLE else 0.0))
+        bed = width * (1.6 + 1.4 * (int(piece.width) - 1))
         if piece.bed == TrackBed.BRIDGE:
             draw_list.add_polyline(points, shade(DECK), bed + width * 1.4, 0)
         if piece.bed == TrackBed.TUNNEL:
@@ -452,7 +473,11 @@ def draw_track(
     for piece, points in pieces:
         if piece.bed == TrackBed.TUNNEL:
             continue
-        sides = (-spacing, spacing) if piece.width == TrackWidth.DOUBLE else (0.0,)
+        sides = {
+            TrackWidth.SINGLE: (0.0,),
+            TrackWidth.DOUBLE: (-spacing, spacing),
+            TrackWidth.QUADRUPLE: (-3 * spacing, -spacing, spacing, 3 * spacing),
+        }[piece.width]
         for side in sides:
             lane = _parallel(points, side)
             if piece.maglev:

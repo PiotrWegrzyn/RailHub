@@ -131,3 +131,40 @@ def test_single_track_branching_off_double_splits_so_trains_either_way_meet_thei
     assert one_way == pytest.approx(DOUBLE_SPACING / 2)
     assert other_way == pytest.approx(DOUBLE_SPACING / 2)
     assert far_end == pytest.approx(0.0)
+
+
+@pytest.mark.parametrize(("lane", "off"), [(0, FULL), (1, 3 * FULL)])
+def test_a_train_on_quadruple_track_rides_the_inner_track_fast_and_the_outer_one_slow(
+    lane: int, off: float
+) -> None:
+    railway, track = line(TrackWidth.QUADRUPLE)
+    path = path_of(railway, WEST, EAST)
+    middle = railway.network.cell_at(path[len(path) // 2])
+
+    shift = Lanes(track).sideways(path, halfway(path), {middle: lane})
+
+    assert math.hypot(*shift) == pytest.approx(off)
+
+
+def test_quadruple_track_closes_its_outer_tracks_onto_the_inner_ones_where_it_meets_double() -> (
+    None
+):
+    constructions = Constructions(flat_map())
+    for col, width in (
+        (5, TrackWidth.DOUBLE),
+        (6, TrackWidth.QUADRUPLE),
+        (7, TrackWidth.QUADRUPLE),
+    ):
+        constructions.build(Track((6, col), (0, 6), width))
+    projection = PixelProjection.of(constructions.tile_map.grid, 0.0, 1.0)
+    track = TrackArt(constructions.tile_map, constructions, projection)
+    piece = Track((6, 6), (0, 6), TrackWidth.QUADRUPLE)
+
+    sides = track._sides_at(piece, [0.0, 0.5, 1.0])
+
+    meeting_double, middle, onward = ([lane[k] for lane in sides] for k in range(3))
+    assert {round(abs(side) / DOUBLE_SPACING, 2) for side in middle} == {0.5, 1.5}
+    half = DOUBLE_SPACING / 2
+    assert sorted(meeting_double + onward) == pytest.approx(
+        sorted([-half, -half, half, half] + [-3 * half, -half, half, 3 * half])
+    )

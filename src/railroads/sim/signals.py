@@ -24,13 +24,17 @@ already on it, so nothing is left stuck.
 import itertools
 import weakref
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from railroads.sim.constructions import Constructions, TrackWidth
 from railroads.sim.grids import Cell
 from railroads.sim.track_network import TrackNetwork
-from railroads.sim.trains import Claim, Point, Train
+from railroads.sim.trains import ENGINES, Claim, Point, Train
 
+# The tracks of quadruple track each way: the inner, fast track, which express engines and
+# railcars take first, and the outer, slow one, which all others take first.
+FAST_LANE = 0
+SLOW_LANE = 1
 # How far short of a red signal a train stands, and of a train it follows, in cells.
 SIGNAL_GAP = 0.15
 FOLLOW_GAP = 0.3
@@ -58,6 +62,9 @@ class Pass:
     entry: Point
     exit: Point
     touch: bool = False
+    # Which track of quadruple track it takes (railroads.sim.signals.FAST_LANE): the same on
+    # all other track.
+    lane: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,16 +102,16 @@ class Blocks:
             here = pieces[cell]
             if len(here) > 1:
                 return "junction"
-            return "double" if here[0].width == TrackWidth.DOUBLE else "single"
+            return here[0].width.name.lower()
 
         # Whether each cell is plain double track, and the pairs of points its double track
         # joins, where trains going opposite ways keep to their own tracks.
-        self.double = {cell: kind(cell) == "double" for cell in cells}
+        self.double = {cell: kind(cell) in ("double", "quadruple") for cell in cells}
         self.lanes: dict[Cell, set[frozenset[Point]]] = {
             cell: {
                 frozenset(point(cell, end) for end in piece.ends)
                 for piece in pieces[cell]
-                if piece.width == TrackWidth.DOUBLE
+                if piece.width >= TrackWidth.DOUBLE
             }
             for cell in cells
         }
@@ -116,7 +123,7 @@ class Blocks:
         }
         for cell in cells:
             for piece in pieces[cell]:
-                if piece.width != TrackWidth.DOUBLE:
+                if piece.width < TrackWidth.DOUBLE:
                     continue
                 for end in piece.ends:
                     beyond, _ = exits[(cell, end)]
@@ -129,6 +136,19 @@ class Blocks:
                 continue
             if any(entry in other.ends for other in pieces[beside]):
                 links[cell].append(beside)
+        # The cells of quadruple track that runs on as quadruple track at both ends, where trains
+        # going the same way keep to two tracks.
+        self.four_lanes = {
+            cell
+            for cell in cells
+            if kind(cell) == "quadruple"
+            and all(
+                kind(exits[(cell, end)][0]) == "quadruple"
+                for end in pieces[cell][0].ends
+                if exits[(cell, end)][0] in pieces
+            )
+            and all(exits[(cell, end)][0] in pieces for end in pieces[cell][0].ends)
+        }
         # The block of each cell outside stations.
         self.block: dict[Cell, tuple[str, int]] = {}
         groups: dict[tuple[str, int], set[Cell]] = {}
@@ -168,9 +188,18 @@ class Blocks:
                 x, y = grid.center(*cell)
                 self.spots.append(SignalSpot(at, (float(x) - at[0], float(y) - at[1]), cell))
 
-    def apart(self, cell: Cell, one: tuple[Point, Point], other: tuple[Point, Point]) -> bool:
-        """Whether two trains crossing a cell, entering and leaving by these points, keep apart:
-        on double track going opposite ways."""
+    def apart(
+        self,
+        cell: Cell,
+        one: tuple[Point, Point],
+        other: tuple[Point, Point],
+        lanes: tuple[int, int] = (0, 0),
+    ) -> bool:
+        """Whether two trains crossing a cell, entering and leaving by these points, on these
+        tracks of quadruple track, keep apart: on double or quadruple track going opposite ways,
+        or on quadruple track going the same way on different tracks."""
+        if one == other:
+            return cell in self.four_lanes and lanes[0] != lanes[1]
         return (
             one[0] == other[1]
             and one[1] == other[0]
@@ -246,8 +275,8 @@ class Signals:
         self.network = network
         self.blocks = blocks_of(network.constructions)
         # Who holds track in each cell: the train, the points its way enters and leaves the cell
-        # by, and how far along its path it enters it.
-        self._held: dict[Cell, list[tuple[Train, Point, Point, float]]] = {}
+        # by, how far along its path it enters it, and the track of quadruple track it takes.
+        self._held: dict[Cell, list[tuple[Train, Point, Point, float, int]]] = {}
         # The trains that were not let on this moment, in the order they asked, with the way
         # each waits for, which trains that asked later must not take from them.
         self._waiting: list[tuple[Train, list[Pass]]] = []
@@ -267,31 +296,34 @@ class Signals:
             self._take_ground(train)
 
     def _hold(self, train: Train, claim: Claim) -> None:
-        cell, entry, exit_, start, _, soft = claim
+        cell, entry, exit_, start, _, soft, lane = claim
         if not soft:
-            self._held.setdefault(cell, []).append((train, entry, exit_, start))
+            self._held.setdefault(cell, []).append((train, entry, exit_, start, lane))
 
     def _holder(self, train: Train, crossing: Pass, follow: bool = False) -> Train | None:
         """A train other than this one holding track in the cell that this way across it can't
         share; with `follow`, a train ahead of it going the same way across it can share it."""
         way = (crossing.entry, crossing.exit)
-        for other, entry, exit_, start in self._held.get(crossing.cell, ()):
-            if other is train or self.blocks.apart(crossing.cell, way, (entry, exit_)):
+        for other, entry, exit_, start, lane in self._held.get(crossing.cell, ()):
+            lanes = (crossing.lane, lane)
+            if other is train or self.blocks.apart(crossing.cell, way, (entry, exit_), lanes):
                 continue
-            if follow and way == (entry, exit_) and _ahead(train, crossing, other, start):
+            same = way == (entry, exit_) and crossing.lane == lane
+            if follow and same and _ahead(train, crossing, other, start):
                 continue
             return other
         return None
 
     def _going_my_way(self, train: Train, crossing: Pass) -> dict[int, tuple[Train, float]]:
-        """The other trains ahead of this one holding the cell on the same way across it, with
-        how much further along this train's path than along theirs the cell lies."""
+        """The other trains ahead of this one holding the cell on the same way and track across
+        it, with how much further along this train's path than along theirs the cell lies."""
         way = (crossing.entry, crossing.exit)
         return {
             id(other): (other, crossing.start - start)
-            for other, entry, exit_, start in self._held.get(crossing.cell, ())
+            for other, entry, exit_, start, lane in self._held.get(crossing.cell, ())
             if other is not train
             and (entry, exit_) == way
+            and lane == crossing.lane
             and _ahead(train, crossing, other, start)
         }
 
@@ -327,14 +359,7 @@ class Signals:
         tail = train.along - train.length
         under = [p for p in passes(self.network, train) if p.end > tail and p.start < train.along]
         for crossing in under:
-            claim = (
-                crossing.cell,
-                crossing.entry,
-                crossing.exit,
-                crossing.start,
-                crossing.end,
-                self._holder(train, crossing) is not None,
-            )
+            claim = _claim(crossing, soft=self._holder(train, crossing) is not None)
             train.claims.append(claim)
             self._hold(train, claim)
         train.cleared = max([train.along, *(p.end for p in under)])
@@ -356,13 +381,46 @@ class Signals:
         crossings = passes(self.network, train)
         stop = self._stand(train, crossings, length)
         wanted = [p for p in crossings if p.start >= train.cleared - SAME and p.start < stop - SAME]
+        holder = None
+        for lane in self._lanes_for(train, wanted):
+            on_lane = [
+                replace(p, lane=lane) if p.cell in self.blocks.four_lanes else p for p in wanted
+            ]
+            found = self._kept_off(train, crossings, stop, on_lane)
+            if found is None:
+                for crossing in on_lane:
+                    claim = _claim(crossing)
+                    train.claims.append(claim)
+                    self._hold(train, claim)
+                train.cleared = stop
+                train.asked = 0
+                return None
+            holder = holder or found
+        if not train.asked:
+            train.asked = ask
+        self._waiting.append((train, wanted))
+        return holder
+
+    def _lanes_for(self, train: Train, wanted: list[Pass]) -> tuple[int, ...]:
+        """The tracks of quadruple track a train tries in turn for the way it wants: the fast
+        track first for an express engine or a railcar, the slow track first for any other; only
+        one where the way crosses no quadruple track."""
+        if not any(p.cell in self.blocks.four_lanes for p in wanted):
+            return (FAST_LANE,)
+        engine = ENGINES[train.engine]
+        fast = engine.express or engine.railcar
+        return (FAST_LANE, SLOW_LANE) if fast else (SLOW_LANE, FAST_LANE)
+
+    def _kept_off(
+        self, train: Train, crossings: list[Pass], stop: float, wanted: list[Pass]
+    ) -> Train | None:
+        """The train that keeps this one from being set the way it wants, if one does."""
         # The trains going its way that it would follow onto track they hold, by how much further
         # along this train's path than along theirs each place lies: it may not be set a way past
         # where theirs is set.
         leaders: dict[int, tuple[Train, float]] = {}
         for held in train.claims:
-            leaders |= self._going_my_way(train, Pass(held[0], held[3], held[4], held[1], held[2]))
-        holder = None
+            leaders |= self._going_my_way(train, _crossing(held))
         for crossing in wanted:
             holder = self._holder(train, crossing, follow=True)
             while holder is not None and train.first and self._give_way(holder, crossing):
@@ -371,30 +429,12 @@ class Signals:
             if holder is None and not leaders.keys() <= alongside.keys():
                 holder = next(iter(leaders.values()))[0]
             if holder is not None:
-                break
+                return holder
             leaders |= alongside
-        if holder is None and leaders and not self._clear_behind(train, crossings, stop, leaders):
-            holder = max(leaders.values(), key=lambda pair: pair[0].along + pair[1])[0]
-        if holder is None and not train.first:
-            holder = self._queued_before(train, wanted)
-        if holder is not None:
-            if not train.asked:
-                train.asked = ask
-            self._waiting.append((train, wanted))
-            return holder
-        for crossing in wanted:
-            claim = (
-                crossing.cell,
-                crossing.entry,
-                crossing.exit,
-                crossing.start,
-                crossing.end,
-                False,
-            )
-            train.claims.append(claim)
-            self._hold(train, claim)
-        train.cleared = stop
-        train.asked = 0
+        if leaders and not self._clear_behind(train, crossings, stop, leaders):
+            return max(leaders.values(), key=lambda pair: pair[0].along + pair[1])[0]
+        if not train.first:
+            return self._queued_before(train, wanted)
         return None
 
     def _give_way(self, other: Train, crossing: Pass) -> bool:
@@ -411,18 +451,13 @@ class Signals:
         if not self._on_double(passes(self.network, other), back - other.length, back):
             return False
         given = [claim for claim in other.claims if claim[3] >= back - SAME]
-        for cell_given, entry, exit_, _, _, _ in given:
+        for cell_given, entry, exit_, _, _, _, lane in given:
             for holder, *way in self._held.get(cell_given, ()):
-                if holder is not other and tuple(way[:2]) == (entry, exit_):
+                if holder is not other and (way[0], way[1], way[3]) == (entry, exit_, lane):
                     return False
         other.claims = [claim for claim in other.claims if claim[3] < back - SAME]
-        for cell_given, entry, exit_, _, _, soft in given:
-            if soft:
-                continue
-            held = self._held.get(cell_given, [])
-            self._held[cell_given] = [
-                pair for pair in held if not (pair[0] is other and pair[1:3] == (entry, exit_))
-            ]
+        for claim in given:
+            self._let_go(other, claim)
         other.cleared = back
         return True
 
@@ -494,14 +529,19 @@ class Signals:
             if not gone:
                 return
             train.claims = [claim for claim in train.claims if claim[4] > tail + SAME]
-        for cell, entry, exit_, _, _, soft in gone:
-            if soft:
-                continue
-            held = self._held.get(cell, [])
-            for index, (other, other_entry, other_exit, _) in enumerate(held):
-                if other is train and (other_entry, other_exit) == (entry, exit_):
-                    del held[index]
-                    break
+        for claim in gone:
+            self._let_go(train, claim)
+
+    def _let_go(self, train: Train, claim: Claim) -> None:
+        """Stops the train holding the track of one of its claims."""
+        cell, entry, exit_, _, _, soft, lane = claim
+        if soft:
+            return
+        held = self._held.get(cell, [])
+        for index, (other, other_entry, other_exit, _, other_lane) in enumerate(held):
+            if other is train and (other_entry, other_exit, other_lane) == (entry, exit_, lane):
+                del held[index]
+                return
 
     def limit(self, train: Train) -> tuple[float, Train | None]:
         """How far along its path the train may run on the way set for it, FOLLOW_GAP short of
@@ -509,9 +549,9 @@ class Signals:
         length = self.network.length(train)
         limit = length if train.cleared >= length - SAME else train.cleared - SIGNAL_GAP
         ahead = None
-        for cell, entry, exit_, start, _, _ in train.claims:
-            for other, other_entry, other_exit, other_start in self._held.get(cell, ()):
-                if other is train or (other_entry, other_exit) != (entry, exit_):
+        for cell, entry, exit_, start, _, _, lane in train.claims:
+            for other, other_entry, other_exit, other_start, other_lane in self._held.get(cell, ()):
+                if other is train or (other_entry, other_exit, other_lane) != (entry, exit_, lane):
                     continue
                 front = start + other.along - other_start
                 if front <= train.along:
@@ -520,6 +560,25 @@ class Signals:
                 if tail < limit:
                     limit, ahead = tail, other
         return max(train.along, limit), ahead
+
+
+def _claim(crossing: Pass, soft: bool = False) -> Claim:
+    """A train's claim on the track of one crossing of its path."""
+    return (
+        crossing.cell,
+        crossing.entry,
+        crossing.exit,
+        crossing.start,
+        crossing.end,
+        soft,
+        crossing.lane,
+    )
+
+
+def _crossing(claim: Claim) -> Pass:
+    """The crossing of a train's path a claim is on."""
+    cell, entry, exit_, start, end, _, lane = claim
+    return Pass(cell, start, end, entry, exit_, lane=lane)
 
 
 def _ahead(train: Train, crossing: Pass, other: Train, start: float) -> bool:
@@ -534,6 +593,6 @@ def cleared_signals(trains: Iterable[Train]) -> set[tuple[Cell, Point]]:
     return {
         (cell, entry)
         for train in trains
-        for cell, entry, _, start, _, soft in train.claims
+        for cell, entry, _, start, _, soft, _ in train.claims
         if not soft and start > train.along
     }

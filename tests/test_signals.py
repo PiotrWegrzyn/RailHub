@@ -4,7 +4,8 @@ from builders import flat_map
 from railroads.sim.clock import SECONDS_PER_MONTH
 from railroads.sim.constructions import Constructions, TrackWidth
 from railroads.sim.game import Game
-from railroads.sim.signals import blocks_of, cleared_signals, passes
+from railroads.sim.railway import QUADRUPLE_ERA, Railway
+from railroads.sim.signals import FAST_LANE, SLOW_LANE, blocks_of, cleared_signals, passes
 from railroads.sim.trains import Stop, Train
 
 WEST, EAST, NORTH, SOUTH = (8, 3), (8, 20), (1, 11), (15, 12)
@@ -102,3 +103,50 @@ def test_a_train_never_holds_track_another_holds_unless_they_pass_on_double_trac
             shared += [(one, other, cell) for cell in cells]
 
     assert bool(shared) is (width == TrackWidth.DOUBLE)
+
+
+def quadruple_game(monkeypatch: pytest.MonkeyPatch) -> Game:
+    monkeypatch.setattr(Railway, "quadruple_open", property(lambda _: True))
+    game = Game(Constructions(flat_map(rows=16, cols=24)))
+    game.finances.cash = 1e9
+    for station in (WEST, EAST):
+        game.build_station(station)
+    for start, end, width in (
+        (WEST, (8, 6), TrackWidth.DOUBLE),
+        ((8, 6), (8, 17), TrackWidth.QUADRUPLE),
+        ((8, 17), EAST, TrackWidth.DOUBLE),
+    ):
+        assert game.lay_track(start, end, width).ok
+    return game
+
+
+def test_an_express_takes_the_fast_track_and_a_goods_train_the_slow_one_side_by_side(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    game = quadruple_game(monkeypatch)
+    express, goods = shuttle(game, WEST, EAST), shuttle(game, WEST, EAST)
+    express.engine = "single"
+    side_by_side = []
+
+    for _ in range(int(2 / STEP)):
+        game.railway.run(STEP)
+        lanes = [{cell: lane for cell, *_, lane in train.claims} for train in (express, goods)]
+        side_by_side += [
+            (lanes[0][cell], lanes[1][cell])
+            for cell in lanes[0].keys() & lanes[1].keys()
+            if cell in blocks_of(game.constructions).four_lanes
+        ]
+
+    assert (FAST_LANE, SLOW_LANE) in side_by_side
+
+
+def test_quadruple_track_opens_with_its_era() -> None:
+    game = Game(Constructions(flat_map(rows=16, cols=24)))
+    game.finances.cash = 1e9
+    game.build_station(WEST)
+    game.build_station(EAST)
+
+    done = game.lay_track(WEST, EAST, TrackWidth.QUADRUPLE)
+
+    assert not done.ok
+    assert str(QUADRUPLE_ERA) in done.message

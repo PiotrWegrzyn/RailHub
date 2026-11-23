@@ -366,7 +366,7 @@ Every cell has room for 6 units:
   edges and only the top and bottom corners, so it runs across, along both diagonals and
   straight up and down: eight directions. On a square it uses all eight points. A piece turns
   at most 60°.
-- Single track takes 1 unit and double track 2, so a cell with a double track still fits four
+- Single track takes 1 unit, double track 2 and quadruple track 4, so a cell with a double track still fits four
   houses. Either can be electric, with wires overhead that electric engines need: `Track.electric`
   says so for a piece, and `Constructions.electrified(cell)` for a cell (every piece in it, or
   the piece between two given track points). Or it can be maglev (`Track.maglev`): a concrete
@@ -1133,10 +1133,13 @@ station's name shows on a tag above it.
 
 A game starts with $100,000 (`railroads.sim.finance`). Track costs $600 a cell on the flat, $900
 in hills, twice that across a minor river, $20,000 a cell of bridge and $40,000 a cell of tunnel;
-electric track 5 times as much as the same track without wires, and only once an electric engine is
-on sale; double track 3 times as much as single, so a cell on the flat costs $1,800 double, $3,000
-electric and $9,000 double and electric; maglev track $4,000 a cell more, with no
-wires. A station costs $15,000 and the Planet $10,000, which
+double track 3 times as much as single and quadruple track, from era 3, 10 times; wires, only once
+an electric engine is on sale, cost each track 4 times a single track's price more, so a cell on the
+flat costs $1,800 double, $6,000 quadruple, $3,000 electric, $6,600 double and electric and $15,600
+quadruple and electric; maglev track $4,000 a cell more, with no wires. Quadruple track is two
+tracks each way: express engines and railcars take the inner, fast track first and other trains
+the outer, slow one, so two trains going the same way run side by side and a fast one passes a
+slow one. A station costs $15,000 and the Planet $10,000, which
 sells back for half. Stations rise through five levels, for $50,000, $250,000, $1,500,000 and
 $10,000,000: a new one hands goods out a cell around it, and each level a cell further, gathers
 them a cell further and adds as much room as two storage upgrades. At level 4 a station gets a

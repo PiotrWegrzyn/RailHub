@@ -281,6 +281,7 @@ class MapView:
         self._draw_details()
         self.build.maglev_open = self.railway.maglev_open
         self.build.electric_open = self.railway.electric_open
+        self.build.quadruple_open = self.railway.quadruple_open
         self.build.draw(*self._map_rect)
         self._draw_lenses()
         self.build.trains.draw(

@@ -9,7 +9,7 @@ import itertools
 import math
 import time
 from collections import OrderedDict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -19,6 +19,7 @@ from imgui_bundle import hello_imgui, imgui
 from PIL import Image
 
 from railroads.sim.constructions import Track
+from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
 from railroads.sim.trains import Point, Train
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, IsoCamera, Vec2
@@ -111,7 +112,7 @@ class TrainLayer:
         found = []
         for (train, back, look, placed), under in zip(seen, hidden, strict=True):
             if not under:
-                shift = self.lanes.sideways(train.path, train.along - back)
+                shift = self.lanes.sideways(train.path, train.along - back, lanes_of(train))
                 found.append((placed, shift, look))
         parts = []
         if found:
@@ -261,7 +262,7 @@ class TrainLayer:
                 continue
             model = ENGINES[train.engine]
             assert model.chimney is not None
-            shift = self.lanes.sideways(train.path, train.along - back)
+            shift = self.lanes.sideways(train.path, train.along - back, lanes_of(train))
             phase = (train.along * 6.0) % 1.0
             chimneys.append(_Chimney(x, y, dx, dy, shift, model.chimney[1] * SCALE, phase))
         return chimneys
@@ -396,7 +397,9 @@ class Lanes:
         self.track = track
         self._paths: dict[int, tuple[list[Point], int, list[_Stretch], list[float]]] = {}
 
-    def sideways(self, path: list[Point], along: float) -> Point:
+    def sideways(
+        self, path: list[Point], along: float, lanes: Mapping[Cell, int] | None = None
+    ) -> Point:
         """How far across the picture, in art pixels, a train `along` cells into its path is
         moved off the path's centre line to ride the track drawn there: square to the way it
         goes, turning smoothly with the track round the middle of a cell."""
@@ -413,7 +416,8 @@ class Lanes:
             share, forward = (first - from_middle) / (first + second), stretch.inward
         else:
             share, forward = (first + from_middle) / (first + second), not stretch.inward
-        side = self.track.riding_side(stretch.piece, share, forward)
+        lane = (lanes or {}).get(stretch.piece.cell, 0)
+        side = self.track.riding_side(stretch.piece, share, forward, lane)
         if side == 0.0:
             return 0.0, 0.0
         dx, dy = stretch.way
@@ -490,6 +494,11 @@ class Lanes:
             )
             start += length
         return stretches
+
+
+def lanes_of(train: Train) -> dict[Cell, int]:
+    """The track of quadruple track the train takes in each cell it holds (railroads.sim.signals)."""
+    return {claim[0]: claim[6] for claim in train.claims if claim[6]}
 
 
 def _point(steps: np.ndarray, dx: float, dy: float) -> int:

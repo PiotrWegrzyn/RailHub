@@ -28,9 +28,10 @@ if TYPE_CHECKING:
     from railroads.sim.signals import Pass
 
 # Track a train holds in a cell (railroads.sim.signals): the cell, the points on its edge the
-# train's way enters and leaves by, how far along its path it enters and leaves the cell, and
-# whether it took it standing there without holding up the trains already holding it.
-type Claim = tuple[Cell, Point, Point, float, float, bool]
+# train's way enters and leaves by, how far along its path it enters and leaves the cell,
+# whether it took it standing there without holding up the trains already holding it, and which
+# track of quadruple track it takes.
+type Claim = tuple[Cell, Point, Point, float, float, bool, int]
 
 MAX_CARS = 5
 

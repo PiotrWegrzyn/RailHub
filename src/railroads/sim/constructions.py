@@ -25,6 +25,7 @@ class TrackWidth(IntEnum):
 
     SINGLE = 1
     DOUBLE = 2
+    QUADRUPLE = 4
 
 
 class BuildingKind(Enum):

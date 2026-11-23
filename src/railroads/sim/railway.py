@@ -129,6 +129,9 @@ LEVEL_STORAGE_STEPS = 2
 # From this level up, each level lets a station have one more platform beside it, with its own way
 # through, so lines come in from more sides.
 PLATFORM_LEVEL = 4
+# The era of the boards from which quadruple track can be laid: the first lines of four tracks
+# came in the 1870s to 1890s.
+QUADRUPLE_ERA = 3
 # General cars, taking whichever good of their kind pays best, come with this era (railroads.sim.tiles),
 # the one of the third generation of wagons.
 GENERAL_CARS_ERA = 3
@@ -235,6 +238,11 @@ class Railway:
     def maglev_open(self) -> bool:
         """Whether the player can lay maglev track: once a maglev engine is open."""
         return any(ENGINES[name].maglev and self.engine_open(name) for name in ENGINES)
+
+    @property
+    def quadruple_open(self) -> bool:
+        """Whether the player can lay quadruple track: from the era QUADRUPLE_ERA on."""
+        return boards.of_year(self.year).wagons >= QUADRUPLE_ERA
 
     @property
     def electric_open(self) -> bool:

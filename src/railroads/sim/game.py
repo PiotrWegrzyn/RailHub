@@ -24,7 +24,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.happenings import Happenings, Headline
 from railroads.sim.lots import Lots
-from railroads.sim.railway import MAX_LEVEL, PLATFORM_LEVEL, Railway
+from railroads.sim.railway import MAX_LEVEL, PLATFORM_LEVEL, QUADRUPLE_ERA, Railway
 from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
 from railroads.sim.summaries import MonthSummary, Reach, summarize
@@ -175,6 +175,8 @@ class Game:
             return Done("Maglev track needs a maglev engine on sale.")
         if electric and not self.railway.electric_open:
             return Done("Electric track needs an electric engine on sale.")
+        if width == TrackWidth.QUADRUPLE and not self.railway.quadruple_open:
+            return Done(f"Quadruple track comes with era {QUADRUPLE_ERA}.")
         route = (
             planned
             if planned is not None

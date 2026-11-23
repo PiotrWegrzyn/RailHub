@@ -5,8 +5,9 @@ Building needs the cash for it; upkeep is charged whatever the cash, so it can r
 """
 
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 
 from railroads.sim.amounts import EPSILON
 from railroads.sim.constructions import Track, TrackWidth
@@ -14,13 +15,16 @@ from railroads.sim.tilemap import Tile
 from railroads.sim.track_rules import track_rules_for
 
 START_CASH = 100_000.0
-# Track costs TRACK_PRICE per cell times its bed's cost factor (railroads.sim.track_rules), and
-# electric track ELECTRIC_TRACK_FACTOR times that, or a maglev guideway MAGLEV_TRACK_PRICE more;
-# double track costs DOUBLE_TRACK_FACTOR as much.
+# Track costs TRACK_PRICE per cell times its bed's cost factor (railroads.sim.track_rules), times
+# TRACK_WIDTH_FACTORS for as many tracks side by side as it has, or a maglev guideway
+# MAGLEV_TRACK_PRICE more before that. Wires cost each of its tracks as much again as
+# ELECTRIC_TRACK_FACTOR makes single electric track cost.
 TRACK_PRICE = 600.0
 ELECTRIC_TRACK_FACTOR = 5.0
 MAGLEV_TRACK_PRICE = 4_000.0
-DOUBLE_TRACK_FACTOR = 3.0
+TRACK_WIDTH_FACTORS: Mapping[TrackWidth, float] = MappingProxyType(
+    {TrackWidth.SINGLE: 1.0, TrackWidth.DOUBLE: 3.0, TrackWidth.QUADRUPLE: 10.0}
+)
 STATION_PRICE = 15_000.0
 TRAIN_PRICE = 10_000.0
 # What selling a train gives back, as a share of its price.
@@ -47,11 +51,13 @@ WAREHOUSE_PRICE = 60_000.0
 # STATION_UPKEEP_RISE a year, compounded, from the year play began.
 STATION_UPKEEP = (150.0, 400.0, 1_200.0, 3_500.0, 9_000.0)
 STATION_UPKEEP_RISE = 0.02
-# Every cell of track costs TRACK_UPKEEP a month, ELECTRIC_TRACK_UPKEEP more where it is
-# electric, MAGLEV_TRACK_UPKEEP more where it is maglev, and DOUBLE_TRACK_UPKEEP_FACTOR as much
-# where it is double.
+# Every cell of track costs TRACK_UPKEEP a month, MAGLEV_TRACK_UPKEEP more where it is maglev,
+# that times TRACK_WIDTH_UPKEEP_FACTORS for as many tracks as it has, and ELECTRIC_TRACK_UPKEEP
+# more for each of its tracks where it is electric.
 TRACK_UPKEEP = 2.0
-DOUBLE_TRACK_UPKEEP_FACTOR = 1.8
+TRACK_WIDTH_UPKEEP_FACTORS: Mapping[TrackWidth, float] = MappingProxyType(
+    {TrackWidth.SINGLE: 1.0, TrackWidth.DOUBLE: 1.8, TrackWidth.QUADRUPLE: 5.0}
+)
 ELECTRIC_TRACK_UPKEEP = 40.0
 MAGLEV_TRACK_UPKEEP = 60.0
 
@@ -68,18 +74,10 @@ def storage_price(upgrades: int) -> float:
 
 def track_price(piece: Track, tile: Tile) -> float:
     """What laying this piece of track in this cell costs."""
-    price = TRACK_PRICE * track_rules_for(tile, piece.bed).price_factor
-    price *= ELECTRIC_TRACK_FACTOR if piece.electric else 1.0
-    return _dressed(price, piece, 0.0, MAGLEV_TRACK_PRICE)
-
-
-def _dressed(
-    base: float, piece: Track, electric: float, maglev: float, double: float = DOUBLE_TRACK_FACTOR
-) -> float:
-    """A piece's base cost with what its wires or guideway add, the whole doubled up for double
-    track."""
-    cost = base + (electric if piece.electric else 0.0) + (maglev if piece.maglev else 0.0)
-    return cost * (double if piece.width == TrackWidth.DOUBLE else 1.0)
+    bed = TRACK_PRICE * track_rules_for(tile, piece.bed).price_factor
+    guideway = MAGLEV_TRACK_PRICE if piece.maglev else 0.0
+    wires = (ELECTRIC_TRACK_FACTOR - 1.0) * bed * int(piece.width) if piece.electric else 0.0
+    return (bed + guideway) * TRACK_WIDTH_FACTORS[piece.width] + wires
 
 
 def track_upkeep(pieces: Iterable[Track]) -> float:
@@ -87,13 +85,9 @@ def track_upkeep(pieces: Iterable[Track]) -> float:
     dearest piece in it."""
     dearest: dict[tuple[int, int], float] = {}
     for piece in pieces:
-        upkeep = _dressed(
-            TRACK_UPKEEP,
-            piece,
-            ELECTRIC_TRACK_UPKEEP,
-            MAGLEV_TRACK_UPKEEP,
-            DOUBLE_TRACK_UPKEEP_FACTOR,
-        )
+        base = TRACK_UPKEEP + (MAGLEV_TRACK_UPKEEP if piece.maglev else 0.0)
+        wires = ELECTRIC_TRACK_UPKEEP * int(piece.width) if piece.electric else 0.0
+        upkeep = base * TRACK_WIDTH_UPKEEP_FACTORS[piece.width] + wires
         dearest[piece.cell] = max(upkeep, dearest.get(piece.cell, 0.0))
     return sum(dearest.values())
 

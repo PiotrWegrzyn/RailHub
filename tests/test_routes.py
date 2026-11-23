@@ -331,7 +331,8 @@ def test_track_crossing_a_line_crosses_it_in_one_cell() -> None:
         (TrackWidth.SINGLE, False, 600),
         (TrackWidth.DOUBLE, False, 1800),
         (TrackWidth.SINGLE, True, 3000),
-        (TrackWidth.DOUBLE, True, 9000),
+        (TrackWidth.DOUBLE, True, 6600),
+        (TrackWidth.QUADRUPLE, False, 6000),
     ],
 )
 def test_double_and_electric_track_cost_more_a_cell(
@@ -360,7 +361,8 @@ def test_electric_track_is_electrified_once_laid() -> None:
     [
         (TrackWidth.DOUBLE, False, 1200),
         (TrackWidth.SINGLE, True, 2400),
-        (TrackWidth.DOUBLE, True, 8400),
+        (TrackWidth.DOUBLE, True, 6000),
+        (TrackWidth.QUADRUPLE, False, 5400),
     ],
 )
 def test_laying_along_a_line_widens_or_electrifies_it_without_new_track(

@@ -292,13 +292,30 @@ def station_house(constructions: Constructions, projection: PixelProjection, cel
     run = constructions.station_ends(cell)
     side = station_side(projection, steps, run)
     double = any(
-        piece.width == TrackWidth.DOUBLE
+        piece.width >= TrackWidth.DOUBLE
         for point in run
         for piece in _joined(constructions, cell, point)
     )
     cells = SET_BACK + (DOUBLE_SPACING / 2 if double else 0.0)
     width = float(np.hypot(*(projection.matrix @ steps[0])))
     return side[0] * cells * width, side[1] * cells * width
+
+
+def _lane_sides(tracks: int, lanes: int | None = None) -> list[float]:
+    """How far to the left of the centre line each of `lanes` tracks lies, in cells, where the
+    track is `tracks` wide: lanes the narrower track has no room for run into its outer tracks."""
+    lanes = tracks if lanes is None else lanes
+    if lanes == 1:
+        return [0.0]
+    half = DOUBLE_SPACING / 2
+    if lanes == 2:
+        outer = 3 * half if tracks >= 4 else half if tracks == 2 else 0.0
+        return [-outer, outer]
+    if tracks >= 4:
+        return [-3 * half, -half, half, 3 * half]
+    if tracks >= 2:
+        return [-half, -half, half, half]
+    return [0.0, 0.0, 0.0, 0.0]
 
 
 def _joined(constructions: Constructions, cell: Cell, point: int) -> list[Track]:
@@ -682,27 +699,34 @@ class TrackArt:
         electric = all(any(piece.electric for piece in found) for found in joined)
         coming_in = [piece for found in joined for piece in found]
         maglev = bool(coming_in) and all(piece.maglev for piece in coming_in)
-        double = any(piece.width == TrackWidth.DOUBLE for found in joined for piece in found)
+        double = any(piece.width >= TrackWidth.DOUBLE for found in joined for piece in found)
         width = TrackWidth.DOUBLE if double else TrackWidth.SINGLE
         return Track(cell, run, width, TrackBed.GROUND, electric and not maglev, maglev)
 
-    def riding_side(self, piece: Track, share: float, forward: bool) -> float:
+    def riding_side(self, piece: Track, share: float, forward: bool, lane: int = 0) -> float:
         """How far a train `share` of the way along the piece, from its first end to its
         second, rides to the left of the way it goes (as `_offset` moves a line), in cells: on
         double track the track to that side of the centre line, so trains going opposite ways
         keep to different tracks, and so too where single track splits in two to run into both
-        tracks of double track it branches off; elsewhere on single track the track itself."""
-        sides = [lane[0] for lane in self._sides_at(piece, [share])]
+        tracks of double track it branches off; on quadruple track the inner track that side
+        for `lane` 0, the fast track, and the outer one for lane 1, the slow track; elsewhere on
+        single track the track itself."""
+        sides = [lane_sides[0] for lane_sides in self._sides_at(piece, [share])]
         if len(sides) == 2:
             return sides[1] if forward else -sides[0]
+        if len(sides) == 4:
+            return sides[2 + lane] if forward else -sides[1 - lane]
         return 0.0
 
     def _sides(self, piece: Track, line: Path) -> list[list[float]]:
         """How far to the left of the centre line each track of the piece lies at each of its
         points, in cells. Double track has one track either side of its centre line, closing up
-        to it at an end that runs into single track. Single track keeps to its centre line,
-        except where it branches off double track in the same cell: there it splits in two, one
-        track running into each track of the double track, and closes up again by the middle of
+        to it at an end that runs into single track; quadruple track two either side, the inner
+        pair DOUBLE_SPACING apart and the outer ones as far again beyond them, the outer ones
+        closing up onto the inner where it runs into double track and all onto the centre line
+        where it runs into single. Single track keeps to its centre line, except where it
+        branches off double or quadruple track in the same cell: there it splits in two, one
+        track running into the outer track on each side, and closes up again by the middle of
         the cell."""
         lengths = _lengths(line)
         return self._sides_at(piece, [along / lengths[-1] for along in lengths])
@@ -711,54 +735,65 @@ class TrackArt:
         """The same as `_sides`, at these shares of the way along the piece from its first end
         to its second."""
         start, end = self._ends(piece)
-        wide_start, wide_end = start > 0, end > 0
-        if piece.width == TrackWidth.SINGLE and not (wide_start or wide_end):
+        tracks = int(piece.width)
+        if tracks == 1 and start == 1 and end == 1:
             return [[0.0] * len(shares)]
-        widths = []
-        for share in shares:
-            open_by = 1.0
-            if not wide_start:
-                open_by = min(open_by, 2 * share)
-            if not wide_end:
-                open_by = min(open_by, 2 * (1 - share))
-            widths.append(DOUBLE_SPACING / 2 * open_by)
-        return [[-width for width in widths], widths]
+        full = _lane_sides(max(start, end), 2) if tracks == 1 else _lane_sides(tracks)
+        at_start = _lane_sides(start, len(full))
+        at_end = _lane_sides(end, len(full))
+        lanes = []
+        for index, middle in enumerate(full):
+            sides = []
+            for share in shares:
+                side = middle
+                if share < 0.5:
+                    side = at_start[index] + (middle - at_start[index]) * min(1.0, 2 * share)
+                elif share > 0.5:
+                    side = at_end[index] + (middle - at_end[index]) * min(1.0, 2 * (1 - share))
+                sides.append(side)
+            lanes.append(sides)
+        return lanes
 
-    def _ends(self, piece: Track) -> tuple[float, float]:
-        """At each end of the piece 1 if it is two tracks wide there or else 0: for single track
-        where it branches off double track (`_branches_off_double`), and for double track where
-        it runs on as double track (`_double_beyond`)."""
+    def _ends(self, piece: Track) -> tuple[int, int]:
+        """How many tracks wide the piece is at each of its ends: as wide as it is, or as the
+        track it runs into there if that is narrower; single track as wide as double or
+        quadruple track it branches off in its cell (`_branched_off`)."""
         self._keep_current()
         shape = self._shapes.get(piece)
         if shape is None:
-            wide = (
-                self._branches_off_double
-                if piece.width == TrackWidth.SINGLE
-                else self._double_beyond
-            )
-            start, end = (float(wide(piece, point)) for point in piece.ends)
+            if piece.width == TrackWidth.SINGLE:
+                start, end = (self._branched_off(piece, point) for point in piece.ends)
+            else:
+                start, end = (
+                    min(int(piece.width), self._width_beyond(piece, point)) for point in piece.ends
+                )
             shape = self._shapes[piece] = (start, end)
         return shape
 
-    def _branches_off_double(self, piece: Track, point: int) -> bool:
-        """Whether single track leaves this end from full double track in its cell, which it
-        splits in two to run into."""
-        return any(
-            other.width == TrackWidth.DOUBLE
-            and point in other.ends
-            and self._double_beyond(other, point)
-            for other in self._track_at(piece.cell)
+    def _branched_off(self, piece: Track, point: int) -> int:
+        """How many tracks wide the widest track single track leaves from by this end in its
+        cell is there, which it splits in two to run into the outer track on each side: 1 where
+        it leaves none."""
+        return max(
+            [
+                min(int(other.width), self._width_beyond(other, point))
+                for other in self._track_at(piece.cell)
+                if other.width > TrackWidth.SINGLE and point in other.ends
+            ],
+            default=1,
         )
 
-    def _double_beyond(self, piece: Track, point: int) -> bool:
-        """Whether track leaving the piece by this point runs on as double track, or into a
-        station or nowhere, rather than into single track."""
+    def _width_beyond(self, piece: Track, point: int) -> int:
+        """How many tracks wide the track leaving the piece by this point runs on: the widest
+        track it joins there; double into a station or nowhere."""
         grid = self.tile_map.grid
         beyond, entry = grid.track_exit(piece.cell, point)
         if not grid.contains(*beyond):
-            return True
+            return int(TrackWidth.DOUBLE)
         joined = [other for other in self._track_at(beyond) if entry in other.ends]
-        return not joined or any(other.width == TrackWidth.DOUBLE for other in joined)
+        if not joined:
+            return int(TrackWidth.DOUBLE)
+        return max(int(other.width) for other in joined)
 
     def _lay_deck(
         self,

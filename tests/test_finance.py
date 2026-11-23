@@ -49,7 +49,9 @@ def test_money_shows_in_whole_dollars(amount: float, shown: str) -> None:
         (Track((0, 0), (0, 6)), FLAT, 600),
         (Track((0, 0), (0, 6), TrackWidth.DOUBLE), FLAT, 1800),
         (Track((0, 0), (0, 6), electric=True), FLAT, 3000),
-        (Track((0, 0), (0, 6), TrackWidth.DOUBLE, electric=True), FLAT, 9000),
+        (Track((0, 0), (0, 6), TrackWidth.DOUBLE, electric=True), FLAT, 6600),
+        (Track((0, 0), (0, 6), TrackWidth.QUADRUPLE), FLAT, 6000),
+        (Track((0, 0), (0, 6), TrackWidth.QUADRUPLE, electric=True), FLAT, 15_600),
         (Track((0, 0), (0, 6), TrackWidth.DOUBLE, TrackBed.BRIDGE), RIVER, 60_000),
     ],
 )
@@ -69,4 +71,4 @@ def test_each_cell_of_track_pays_upkeep_once_for_its_dearest_piece() -> None:
 
     upkeep = track_upkeep(pieces)
 
-    assert upkeep == pytest.approx(2 + 3.6 + 1.8 * 42)
+    assert upkeep == pytest.approx(2 + 3.6 + 1.8 * 2 + 2 * 40)

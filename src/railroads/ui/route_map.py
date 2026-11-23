@@ -534,7 +534,7 @@ class RouteMap:
                 center = np.asarray(grid.center(*piece.cell), dtype=float)
                 start, end = (offsets[point] for point in piece.ends)
                 points[index] = (center + start, center, center + end)
-            double = [piece.width == TrackWidth.DOUBLE for piece in pieces]
+            double = [piece.width >= TrackWidth.DOUBLE for piece in pieces]
             lines = track_lines(points, double)
             boxes = np.array([(*line.min(axis=0), *line.max(axis=0)) for line, _ in lines]).reshape(
                 -1, 4

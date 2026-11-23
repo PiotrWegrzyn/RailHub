@@ -324,7 +324,7 @@ class TrackNetwork:
             built = self.constructions.at(cell)
             kept = found[point] = (
                 self.constructions.station_at(cell) is not None,
-                any(isinstance(b, Track) and b.width == TrackWidth.DOUBLE for b in built),
+                any(isinstance(b, Track) and b.width >= TrackWidth.DOUBLE for b in built),
             )
         return kept
 

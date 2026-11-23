@@ -19,14 +19,17 @@ def electric_game(year: int) -> Game:
     return game
 
 
-@pytest.mark.parametrize("width", [TrackWidth.SINGLE, TrackWidth.DOUBLE])
-def test_electric_track_costs_five_times_the_same_track_without_wires(width: TrackWidth) -> None:
-    plain = Track((0, 0), (0, 6), width)
+@pytest.mark.parametrize(
+    ("width", "times"),
+    [(TrackWidth.SINGLE, 5), (TrackWidth.DOUBLE, 11), (TrackWidth.QUADRUPLE, 26)],
+)
+def test_wires_cost_each_track_four_single_tracks_more(width: TrackWidth, times: float) -> None:
+    single = Track((0, 0), (0, 6))
     wired = Track((0, 0), (0, 6), width, electric=True)
 
     price = track_price(wired, FLAT)
 
-    assert price == pytest.approx(ELECTRIC_TRACK_FACTOR * track_price(plain, FLAT))
+    assert price == pytest.approx(times * track_price(single, FLAT))
     assert ELECTRIC_TRACK_FACTOR == 5
 
 

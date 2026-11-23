@@ -563,7 +563,9 @@ def _track_mask(
     paint = ImageDraw.Draw(image)
     for piece, station in pieces:
         side = (BRIDGE_WIDTH if piece.bed == TrackBed.BRIDGE else BANK) / 2
-        side += DOUBLE_SPACING / 2 if piece.width == TrackWidth.DOUBLE else 0.0
+        side += (
+            DOUBLE_SPACING / 2 * (int(piece.width) - 1) if piece.width > TrackWidth.SINGLE else 0.0
+        )
         side += PLATFORM_WIDTH if station else 0.0
         line = centre_line(grid, steps, projection.matrix, piece, side * PIXEL_CELL_WIDTH)
         x, y = projection.to_pixels(*np.array(line).T)
