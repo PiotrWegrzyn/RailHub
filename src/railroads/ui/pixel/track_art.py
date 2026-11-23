@@ -621,20 +621,20 @@ class TrackArt:
         """How far a train `share` of the way along the piece, from its first end to its
         second, rides to the left of the way it goes (as `_offset` moves a line), in cells: on
         double track the track to that side of the centre line, so trains going opposite ways
-        keep to different tracks, and on single track the track itself, which leaves the
-        centre line only where it branches off double track."""
+        keep to different tracks, and so too where single track splits in two to run into both
+        tracks of double track it branches off; elsewhere on single track the track itself."""
         sides = [lane[0] for lane in self._sides_at(piece, [share])]
-        if piece.width == TrackWidth.DOUBLE:
+        if len(sides) == 2:
             return sides[1] if forward else -sides[0]
-        return sides[0] if forward else -sides[0]
+        return 0.0
 
     def _sides(self, piece: Track, line: Path) -> list[list[float]]:
         """How far to the left of the centre line each track of the piece lies at each of its
         points, in cells. Double track has one track either side of its centre line, closing up
         to it at an end that runs into single track. Single track keeps to its centre line,
-        except where it branches off double track in the same cell: there it runs on along the
-        outer track on the side it turns to, and closes in to its centre line by its other
-        end."""
+        except where it branches off double track in the same cell: there it splits in two, one
+        track running into each track of the double track, and closes up again by the middle of
+        the cell."""
         lengths = _lengths(line)
         return self._sides_at(piece, [along / lengths[-1] for along in lengths])
 
@@ -642,11 +642,9 @@ class TrackArt:
         """The same as `_sides`, at these shares of the way along the piece from its first end
         to its second."""
         start, end = self._ends(piece)
-        if piece.width == TrackWidth.SINGLE:
-            return [
-                [start * min(1.0, 2 * (1 - share)) + end * min(1.0, 2 * share) for share in shares]
-            ]
         wide_start, wide_end = start > 0, end > 0
+        if piece.width == TrackWidth.SINGLE and not (wide_start or wide_end):
+            return [[0.0] * len(shares)]
         widths = []
         for share in shares:
             open_by = 1.0
@@ -658,39 +656,30 @@ class TrackArt:
         return [[-width for width in widths], widths]
 
     def _ends(self, piece: Track) -> tuple[float, float]:
-        """At each end of the piece, for single track how far to the left of its centre line
-        it starts there (`_branch_shift`), and for double track 1 if it runs on as double
-        track there (`_double_beyond`) or else 0."""
+        """At each end of the piece 1 if it is two tracks wide there or else 0: for single track
+        where it branches off double track (`_branches_off_double`), and for double track where
+        it runs on as double track (`_double_beyond`)."""
         self._keep_current()
         shape = self._shapes.get(piece)
         if shape is None:
-            if piece.width == TrackWidth.SINGLE:
-                start, end = (self._branch_shift(piece, point) for point in piece.ends)
-            else:
-                start, end = (float(self._double_beyond(piece, point)) for point in piece.ends)
+            wide = (
+                self._branches_off_double
+                if piece.width == TrackWidth.SINGLE
+                else self._double_beyond
+            )
+            start, end = (float(wide(piece, point)) for point in piece.ends)
             shape = self._shapes[piece] = (start, end)
         return shape
 
-    def _branch_shift(self, piece: Track, point: int) -> float:
-        """How far to the left of its centre line single track starts at this end, to leave
-        from the outer track of full double track it branches off there: half the spacing to
-        whichever side it turns away to, or nothing."""
-        steps = self._steps
-        mine = piece.ends[1] if piece.ends[0] == point else piece.ends[0]
-        for other in self._track_at(piece.cell):
-            if other.width != TrackWidth.DOUBLE or point not in other.ends:
-                continue
-            if not self._double_beyond(other, point):
-                continue
-            theirs = other.ends[1] if other.ends[0] == point else other.ends[0]
-            ux, uy = -steps[point]
-            turn = sum(
-                sign * (ux * steps[end][1] - uy * steps[end][0])
-                for sign, end in ((1, mine), (-1, theirs))
-            )
-            side = math.copysign(DOUBLE_SPACING / 2, turn)
-            return side if point == piece.ends[0] else -side
-        return 0.0
+    def _branches_off_double(self, piece: Track, point: int) -> bool:
+        """Whether single track leaves this end from full double track in its cell, which it
+        splits in two to run into."""
+        return any(
+            other.width == TrackWidth.DOUBLE
+            and point in other.ends
+            and self._double_beyond(other, point)
+            for other in self._track_at(piece.cell)
+        )
 
     def _double_beyond(self, piece: Track, point: int) -> bool:
         """Whether track leaving the piece by this point runs on as double track, or into a
