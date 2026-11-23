@@ -35,6 +35,7 @@ from railroads.sim.trains import (
     unit_label,
     unit_tonnes,
 )
+from railroads.ui.buy_train import tonnes_text
 from railroads.ui.trains_window import (
     adding_tip,
     engine_summary,
@@ -750,7 +751,7 @@ def test_an_engines_summary_says_the_most_it_pulls_in_tonnes() -> None:
 
     summary = engine_summary(engine)
 
-    assert f"Pulls at most {engine.tonnes:.0f} t" in summary
+    assert f"Pulls at most {tonnes_text(engine.tonnes)} t" in summary
 
 
 def test_a_good_too_heavy_for_the_engine_says_so_instead_of_offering_a_car() -> None:

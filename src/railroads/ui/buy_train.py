@@ -46,6 +46,11 @@ type EngineGroups = list[tuple[Kind, list[str]]]
 type Summary = Callable[[Engine, float], str]
 
 
+def tonnes_text(tonnes: float) -> str:
+    """Tonnes to a tenth, so cars that look as if they fit an engine's pull do."""
+    return f"{tonnes:,.1f}".removesuffix(".0")
+
+
 @dataclass
 class BuyScreen:
     open: bool = False
@@ -247,7 +252,10 @@ def engine_figures(
         ("Power", engine.power.value.capitalize()),
         ("Top speed", f"{engine.kmh:.0f} km/h"),
         ("Pulls up to", cars),
-        ("Pulls at most", f"{engine.tonnes:.0f} t, {SLOWDOWN[engine.kind]:.0%} slower at that"),
+        (
+            "Pulls at most",
+            f"{tonnes_text(engine.tonnes)} t, {SLOWDOWN[engine.kind]:.0%} slower at that",
+        ),
         ("Up to speed in", f"{engine.pickup:g} s"),
         ("Price", dollars(engine.price)),
         ("Burns", fuel_use(engine, per_cell)),

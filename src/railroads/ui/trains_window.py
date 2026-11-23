@@ -31,7 +31,13 @@ from railroads.sim.trains import (
     amount_of,
     unit_name,
 )
-from railroads.ui.buy_train import BuyScreen, EnginePicture, engine_range, fuel_use
+from railroads.ui.buy_train import (
+    BuyScreen,
+    EnginePicture,
+    engine_range,
+    fuel_use,
+    tonnes_text,
+)
 from railroads.ui.demand_view import draw_demand
 from railroads.ui.ornate import card, ornate_window, section, tile
 from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_at
@@ -304,18 +310,18 @@ class TrainsWindow:
             imgui.same_line(0, 4 if index else 12)
             if car.dining:
                 dining_chip(f"pulled{index}", "Dining car: carries nothing, costs its trips")
-                caption_under(f"{car.tonnes:.0f} t")
+                caption_under(f"{tonnes_text(car.tonnes)} t")
                 continue
             tooltip = (
                 f"{car.good.value}: {car.load:.0f}/{car.capacity:.0f} "
-                f"{unit_name(car.good, car.capacity)}, {car.tonnes:.0f} t"
+                f"{unit_name(car.good, car.capacity)}, {tonnes_text(car.tonnes)} t"
             )
             if car.general is not None:
                 tooltip = f"{car.general.value} car, now {tooltip}"
             if destination is not None and car.load >= 0.5:
                 tooltip += f"\nWorth about {dollars(worth)} at {onward}"
             car_chip(f"pulled{index}", car.good, car.load, tooltip, car.capacity)
-            caption_under(f"{car.tonnes:.0f} t")
+            caption_under(f"{tonnes_text(car.tonnes)} t")
         if destination is not None and any(car.load >= 0.5 for car in train.cars):
             imgui.same_line(0, 14)
             imgui.text_colored(imgui.ImVec4(*BRASS), f"worth about {dollars(sum(worths))}")
@@ -551,9 +557,9 @@ class TrainsWindow:
                     f"G{generation} {cargo.value} car of {amount_of(cargo, size)} - click to remove"
                 )
             tonnes = railway.car_tonnes(cargo, train.engine, asked)
-            tooltip += f"\nWeighs {tonnes:.0f} t full"
+            tooltip += f"\nWeighs {tonnes_text(tonnes)} t full"
             removed = car_chip(f"car{car_index}", cargo, tooltip=tooltip)
-            caption_under(f"{tonnes:.0f} t")
+            caption_under(f"{tonnes_text(tonnes)} t")
             if imgui.is_item_hovered() and isinstance(cargo, Good):
                 self._shown_map.good = cargo
             if removed:
@@ -570,7 +576,9 @@ class TrainsWindow:
                 train.cars_changed(index)
             imgui.same_line(0, 10)
             planned = railway.stop_tonnes(train, stop)
-            imgui.text_disabled(f"{planned:.0f} / {railway.max_pull(train.engine):.0f} t full")
+            imgui.text_disabled(
+                f"{tonnes_text(planned)} / {tonnes_text(railway.max_pull(train.engine))} t full"
+            )
             if imgui.is_item_hovered():
                 imgui.set_tooltip(
                     "What these cars weigh full, against the most its engine pulls;\n"
@@ -690,7 +698,7 @@ def draw_tonnage(railway: Railway, train: Train) -> None:
     """What a train's cars weigh now against the most its engine pulls, how fast that lets it
     run and how much fuel it burns."""
     most = railway.max_pull(train.engine)
-    imgui.text_disabled(f"{train.tonnes:.0f} / {most:.0f} t")
+    imgui.text_disabled(f"{tonnes_text(train.tonnes)} / {tonnes_text(most)} t")
     if imgui.is_item_hovered():
         imgui.set_tooltip(
             f"What its cars weigh now, against the most its engine pulls;\nit runs at "
@@ -712,10 +720,10 @@ def adding_tip(full: bool, tonnes: float, spare: float) -> str:
         return "\nThe train is full: remove a car first"
     if tonnes > spare + 1e-9:
         return (
-            f"\nToo heavy: a full car weighs {tonnes:.0f} t and the engine pulls only "
-            f"{max(0.0, spare):.0f} t more"
+            f"\nToo heavy: a full car weighs {tonnes_text(tonnes)} t and the engine pulls only "
+            f"{tonnes_text(max(0.0, spare))} t more"
         )
-    return f"\nClick to add a car, {tonnes:.0f} t full"
+    return f"\nClick to add a car, {tonnes_text(tonnes)} t full"
 
 
 def train_warning(railway: Railway, train: Train) -> str:
@@ -824,7 +832,7 @@ def engine_summary(engine: Engine, per_cell: float | None = None) -> str:
     cars = f"{engine.cars} coaches and a dining car" if engine.express else f"{engine.cars} cars"
     lines = [
         f"{engine.year}, {engine.power.value}: {engine.kmh:.0f} km/h, pulls up to {cars}",
-        f"Pulls at most {engine.tonnes:.0f} t, {SLOWDOWN[engine.kind]:.0%} slower at that",
+        f"Pulls at most {tonnes_text(engine.tonnes)} t, {SLOWDOWN[engine.kind]:.0%} slower at that",
         f"Up to speed in {engine.pickup:g} s",
         f"Burns {fuel_use(engine, per_cell)}",
         f"Range: {engine_range(engine)}",

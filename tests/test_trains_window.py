@@ -10,7 +10,7 @@ from railroads.sim.goods import Good
 from railroads.sim.railway import Railway, Ride
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, OPENED_BY, Car, Stop, Train
 from railroads.ui import buy_train
-from railroads.ui.buy_train import engine_figures
+from railroads.ui.buy_train import engine_figures, tonnes_text
 from railroads.ui.trains_window import (
     ROW_CAR,
     ROW_CAR_GAP,
@@ -350,3 +350,14 @@ def test_the_buy_button_stays_in_sight_under_the_engines_figures(
 
     bottom, edge = places[-1]
     assert bottom <= edge
+
+
+@pytest.mark.parametrize(
+    ("tonnes", "text"), [(12.5, "12.5"), (24.48, "24.5"), (12.0, "12"), (1234.0, "1,234")]
+)
+def test_tonnes_show_to_a_tenth_so_two_half_tonne_cars_do_not_look_as_if_they_fit(
+    tonnes: float, text: str
+) -> None:
+    shown = tonnes_text(tonnes)
+
+    assert shown == text
