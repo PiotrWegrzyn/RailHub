@@ -5,7 +5,8 @@ from test_growth import build, make_map
 from railroads.sim.constructions import MERGED, BuildingKind, Constructions
 from railroads.sim.goods import FOOD_MERGING, MERGE_BONUS, MERGING, NEEDS, RECIPES
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import BAKERIES, LADDERS, POINTS, WORKS, Points
+from railroads.sim.ladders import BAKERIES, LADDERS, POINTS, WORKS
+from railroads.sim.points import Points
 
 TEXTILE_MILLS = next(ladder for ladder in WORKS if ladder.kinds[0] == BuildingKind.TEXTILE_MILL)
 GLASSWORKS = next(ladder for ladder in WORKS if ladder.kinds[0] == BuildingKind.GLASSWORKS)

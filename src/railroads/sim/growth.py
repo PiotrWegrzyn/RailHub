@@ -79,14 +79,13 @@ from railroads.sim.constructions import (
 from railroads.sim.economy import (
     BONUS_PER_GOOD,
     Economy,
-    FloatCells,
     Trade,
     levels_of,
 )
 from railroads.sim.events import military_growth
 from railroads.sim.forests import change_forests
 from railroads.sim.goods import FITS, HOMES, MAKES, RECIPES, Good, demands_of, makes_of
-from railroads.sim.grids import Cell, Grid
+from railroads.sim.grids import Cell, FlatIndices, FloatArray, Grid, IntArray
 from railroads.sim.ladders import (
     CHANCE_UNIT,
     GROWTH,
@@ -94,19 +93,16 @@ from railroads.sim.ladders import (
     MILITARY,
     PASSENGERS_PER_POINT,
     TOWNS,
-    Cells,
-    FloatGrid,
     GrowthRule,
-    IntGrid,
     Join,
     Ladder,
     Land,
-    Points,
     Surroundings,
     ladder_of,
 )
 from railroads.sim.ledger import Ledger
 from railroads.sim.ownership import Owners
+from railroads.sim.points import Points
 from railroads.sim.power_plants import build_power_plants
 from railroads.sim.railway import Railway
 from railroads.sim.room import Room
@@ -331,7 +327,7 @@ UNDYING = (
 )
 
 
-def _unlocked(tile_map: TileMap, cells: Cells, weights: FloatGrid) -> FloatGrid:
+def _unlocked(tile_map: TileMap, cells: FlatIndices, weights: FloatArray) -> FloatArray:
     """A land's weights of these flat cells, none on land the player has not bought
     (railroads.sim.lots), where nothing grows."""
     if tile_map.locked is None:
@@ -339,7 +335,7 @@ def _unlocked(tile_map: TileMap, cells: Cells, weights: FloatGrid) -> FloatGrid:
     return np.where(tile_map.locked.ravel()[cells], 0.0, weights)
 
 
-def _allowed(cells: Cells, opened: Cells, land: FloatGrid) -> Cells:
+def _allowed(cells: FlatIndices, opened: FlatIndices, land: FloatArray) -> FlatIndices:
     """The cells a ladder may grow in once these have opened to it, in order. Cells that closed
     stay in until they are a tenth of the rest, harmless with no chance to grow there."""
     if opened.size and not cells.size:
@@ -360,9 +356,9 @@ class _Place:
     come and go."""
 
     ladder: Ladder
-    cells: Cells
-    land: FloatGrid
-    chances: FloatGrid
+    cells: FlatIndices
+    land: FloatArray
+    chances: FloatArray
     # No cell's chance is above this; a month draws its cells against it.
     highest: float = 0.0
 
@@ -380,14 +376,14 @@ class _Touched:
     rows: npt.NDArray[np.intp]
     lands: npt.NDArray[np.intp]
     served_by: npt.NDArray[np.intp]
-    served_weights: FloatGrid
-    spawn: FloatGrid
-    per_doubling: FloatGrid
+    served_weights: FloatArray
+    spawn: FloatArray
+    per_doubling: FloatArray
     drawn_by: npt.NDArray[np.intp]
-    drawn_weights: FloatGrid
+    drawn_weights: FloatArray
     shunning: npt.NDArray[np.intp]
     shunned_by: npt.NDArray[np.intp]
-    shunned_weights: FloatGrid
+    shunned_weights: FloatArray
 
 
 # The arrays Growth._stack lays out, left out of saves and laid out again as a game loads.
@@ -455,7 +451,7 @@ class Growth:
         self._places = []
         everywhere = np.arange(grid.rows * grid.cols)
         # Ladders growing on the same land share its weights, and the cells it allows.
-        lands: dict[int, tuple[Land, FloatGrid, Cells]] = {}
+        lands: dict[int, tuple[Land, FloatArray, FlatIndices]] = {}
         surroundings = Surroundings(tile_map, everywhere, self._near)
         for ladder in rule.ladders:
             shared = lands.get(id(ladder.land))
@@ -477,7 +473,7 @@ class Growth:
         self.trade: Trade | None = None
         # The share of its needs each cell's buildings get in a simulated game, standing in for
         # trains (railroads.sim.autoplay); NaN where trains decide.
-        self.assumed_shares: FloatCells | None = None
+        self.assumed_shares: FloatArray | None = None
         # Trains and their stations, once the player has any (railroads.sim.railway).
         self.railway: Railway | None = None
         # The one-off buildings this game may get (railroads.sim.novelties), rolled once a year.
@@ -522,7 +518,7 @@ class Growth:
         size = self._grid.rows * self._grid.cols
         self._chances = np.zeros((len(self._places), size))
         land_rows: dict[int, int] = {}
-        lands: list[FloatGrid] = []
+        lands: list[FloatArray] = []
         for place in self._places:
             if id(place.land) not in land_rows:
                 land_rows[id(place.land)] = len(lands)
@@ -533,7 +529,7 @@ class Growth:
         for row, place in enumerate(self._places):
             place.land = views[place_lands[row]]
             place.chances = self._chances[row]
-        kept: dict[int, tuple[Land, FloatGrid]] = {}
+        kept: dict[int, tuple[Land, FloatArray]] = {}
         for place in self._places:
             kept.setdefault(id(place.ladder.land), (place.ladder.land, place.land))
         self._land_of = tuple(kept.values())
@@ -734,7 +730,7 @@ class Growth:
                 if points in self._served_by(self._breeding(place)):
                     self._reckon(place, cells)
 
-    def _lively(self, trade: Trade) -> FloatGrid:
+    def _lively(self, trade: Trade) -> FloatArray:
         """How lively each traded cell is: the best share of what they need that the venues in
         its neighbourhood got."""
         size = self._grid.rows * self._grid.cols
@@ -761,12 +757,12 @@ class Growth:
         return self._grid
 
     @property
-    def counts(self) -> Mapping[BuildingKind, IntGrid]:
+    def counts(self) -> Mapping[BuildingKind, IntArray]:
         """How many grown buildings of each kind stand in each cell."""
         return self._counts
 
     @property
-    def near(self) -> Cells:
+    def near(self) -> FlatIndices:
         """Every cell's neighbours as flat indices (railroads.sim.economy.Neighbourhoods)."""
         return self._near
 
@@ -832,7 +828,7 @@ class Growth:
     def _served_by(breeding: Breeding) -> Mapping[Channel, float]:
         return breeding.served_by or {breeding.own: 1.0}
 
-    def _served_in(self, breeding: Breeding, cells: npt.NDArray[np.intp] | slice) -> FloatGrid:
+    def _served_in(self, breeding: Breeding, cells: npt.NDArray[np.intp] | slice) -> FloatArray:
         """The served points a ladder breeds by in these cells, each times its weight."""
         return sum(
             weight * self._served[channel][cells]
@@ -862,7 +858,7 @@ class Growth:
     def _reckon_everywhere(self) -> None:
         """Works out every ladder's chances in every cell afresh, as _reckon does, the doublings
         of what draws them once for all the ladders drawn alike."""
-        doublings: dict[tuple[tuple[Channel, float], ...], FloatGrid] = {}
+        doublings: dict[tuple[tuple[Channel, float], ...], FloatArray] = {}
         for place in self._places:
             breeding = self._breeding(place)
             drawn_by = tuple(breeding.drawn_by.items())
@@ -884,7 +880,7 @@ class Growth:
                 )
             place.chances[:] = raw * place.land
 
-    def land(self, land: Land, cells: npt.NDArray[np.intp]) -> FloatGrid:
+    def land(self, land: Land, cells: npt.NDArray[np.intp]) -> FloatArray:
         """The weights of these flat cells for a land (railroads.sim.ladders.Land.weights), as
         kept up to date for the ladders growing on it."""
         for kept, weights in self._land_of:
@@ -919,11 +915,11 @@ class Growth:
         self.constructions.build(building)
         self.add(building.cell, building.kind, 1)
 
-    def count(self, kind: BuildingKind) -> IntGrid:
+    def count(self, kind: BuildingKind) -> IntArray:
         """How many grown buildings of a kind stand in each cell."""
         return self._counts[kind]
 
-    def points(self, points: Channel = Points.POPULATION) -> IntGrid:
+    def points(self, points: Channel = Points.POPULATION) -> IntArray:
         """Each cell's points of one kind, or the points the buildings of one ladder give."""
         total = np.zeros(self._grid.shape, dtype=np.int64)
         for kind, count in self._counts.items():
@@ -932,7 +928,7 @@ class Growth:
                 total += value * count
         return total
 
-    def sending(self) -> FloatGrid:
+    def sending(self) -> FloatArray:
         """The passengers each cell's buildings send a month."""
         total = np.zeros(self._grid.shape, dtype=np.float64)
         for kind, count in self._counts.items():
@@ -950,11 +946,11 @@ class Growth:
             if given == Points.POPULATION
         )
 
-    def nearby(self, points: Channel = Points.POPULATION) -> IntGrid:
+    def nearby(self, points: Channel = Points.POPULATION) -> IntArray:
         """The points of one kind, or of one ladder, in each cell's neighbourhood."""
         return self._nearby[points]
 
-    def chances(self, ladder: Ladder = TOWNS) -> FloatGrid:
+    def chances(self, ladder: Ladder = TOWNS) -> FloatArray:
         """Each cell's chance of a turn on the ladder this month."""
         place = next(place for place in self._places if place.ladder == ladder)
         cells = np.arange(place.chances.size)
@@ -1030,7 +1026,7 @@ class Growth:
             changed |= self._turn(divmod(index, self._grid.cols), ladder, rng)
         return changed
 
-    def reweigh_land(self, changed_cells: Cells) -> None:
+    def reweigh_land(self, changed_cells: FlatIndices) -> None:
         """Weighs the land again wherever forests came or went, and the cells beside them for
         ladders that care about forest nearby."""
         tile_map = self.constructions.tile_map
@@ -1061,7 +1057,7 @@ class Growth:
                 self._reckon(place, cells)
                 place.highest = max(place.highest, float(place.chances[cells].max()))
 
-    def reweigh_deposits(self, cells: Cells) -> None:
+    def reweigh_deposits(self, cells: FlatIndices) -> None:
         """Weighs the land again in these flat cells, sorted, for the ladders that grow only over a
         deposit, once the deposits there changed (railroads.sim.happenings)."""
         tile_map = self.constructions.tile_map
@@ -1228,7 +1224,7 @@ class Growth:
                 return cell
         return None
 
-    def _open_cells(self) -> Cells:
+    def _open_cells(self) -> FlatIndices:
         """Every cell not locked (railroads.sim.lots)."""
         locked = self.constructions.tile_map.locked
         if locked is None:
@@ -1409,7 +1405,7 @@ class Growth:
                 for place, most in zip(touched.places, chances.max(axis=1).tolist(), strict=True):
                     place.highest = max(place.highest, most)
 
-    def _reckon_touched(self, touched: _Touched, cells: npt.NDArray[np.intp]) -> FloatGrid:
+    def _reckon_touched(self, touched: _Touched, cells: npt.NDArray[np.intp]) -> FloatArray:
         """Works out the chances of all the touched places in these cells afresh, as _reckon
         does each, and returns them, a row for each place."""
         nearby = self._nearby_all[:, cells]
@@ -1440,7 +1436,7 @@ class Growth:
         return chances
 
     @staticmethod
-    def _neighbourhood_sum(values: IntGrid, rows: IntGrid, cols: IntGrid) -> IntGrid:
+    def _neighbourhood_sum(values: IntArray, rows: IntArray, cols: IntArray) -> IntArray:
         own_rows, own_cols = np.indices(values.shape)
         off_map = (rows == own_rows) & (cols == own_cols)
         return values + np.where(off_map, 0, values[rows, cols]).sum(axis=0)

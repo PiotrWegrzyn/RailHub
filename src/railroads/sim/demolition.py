@@ -24,7 +24,8 @@ from railroads.sim.constructions import (
 from railroads.sim.finance import track_price
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import POINTS, Points
+from railroads.sim.ladders import POINTS
+from railroads.sim.points import Points
 from railroads.sim.room import leaving_order
 
 DEMOLITION_PER_POINT: Mapping[Points, float] = MappingProxyType(

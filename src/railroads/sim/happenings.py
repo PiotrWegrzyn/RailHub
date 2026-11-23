@@ -23,7 +23,8 @@ from railroads.sim.events import (
     Event,
 )
 from railroads.sim.grids import BoolGrid, Cell, Grid
-from railroads.sim.ladders import MILITARY, Points
+from railroads.sim.ladders import MILITARY
+from railroads.sim.points import Points
 from railroads.sim.tilemap import Deposit, Relief, Terrain
 
 if TYPE_CHECKING:

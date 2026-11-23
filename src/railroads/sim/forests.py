@@ -15,7 +15,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import Building, BuildingKind
-from railroads.sim.grids import Cell
+from railroads.sim.grids import Cell, FlatIndices
 from railroads.sim.points import Points
 from railroads.sim.tilemap import Terrain, TileMap, Vegetation
 
@@ -27,8 +27,6 @@ CLEARING_PER_MILL = 75 * CLEARING_PER_POINT
 SPREAD_PER_FOREST = 0.00004
 MILLS_CLOSE_BELOW = 3
 POPULATION_PER_CLEARING_POINT = 4
-
-type Cells = npt.NDArray[np.intp]
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,7 +41,7 @@ FORESTS = ForestRule()
 
 
 def forests_nearby(
-    tile_map: TileMap, near: Cells, cells: Cells | None = None
+    tile_map: TileMap, near: FlatIndices, cells: FlatIndices | None = None
 ) -> npt.NDArray[np.int64]:
     """How many forest cells each cell's neighbourhood holds, as a flat array, or each of the
     given flat cells alone. `near` holds every cell's neighbours as flat indices, one past the
@@ -57,13 +55,13 @@ def forests_nearby(
 
 def forest_turn(
     tile_map: TileMap,
-    near: Cells,
+    near: FlatIndices,
     people: npt.NDArray[np.float64] | npt.NDArray[np.int64],
     mills: npt.NDArray[np.int64],
     rule: ForestRule,
     months: int,
     rng: np.random.Generator,
-) -> tuple[Cells, Cells]:
+) -> tuple[FlatIndices, FlatIndices]:
     """Which forest cells are cleared and which grassland cells turn to forest over `months`,
     from the population and industry points and the logging camps in each neighbourhood. Says
     nothing of what stands in the cells; the vegetation is left as it is."""

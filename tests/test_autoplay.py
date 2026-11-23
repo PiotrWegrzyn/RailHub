@@ -7,7 +7,8 @@ from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Satisfaction
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import GrowthRule, Points
+from railroads.sim.ladders import GrowthRule
+from railroads.sim.points import Points
 from railroads.sim.railway import Railway
 from railroads.sim.tilemap import TileMap
 

@@ -12,9 +12,9 @@ from imgui_bundle import imgui
 
 from railroads.sim.amounts import EPSILON
 from railroads.sim.constructions import Building, Construction, Constructions, Station, Track
-from railroads.sim.economy import HALF_SATISFIED, LOCAL_REACH, FloatCells, Satisfaction, Trade
+from railroads.sim.economy import HALF_SATISFIED, LOCAL_REACH, Satisfaction, Trade
 from railroads.sim.goods import HANDED_OUT, makes_of, needs_of
-from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, Grid
+from railroads.sim.grids import HEX_RADIUS, HEX_ROW_STEP, Cell, FloatArray, Grid
 from railroads.sim.growth import Growth
 from railroads.sim.ownership import Owners
 from railroads.sim.railway import Railway
@@ -483,8 +483,8 @@ def draw_hand_out(
 
 
 def cell_moods(
-    trade: Trade | None, assumed: FloatCells | None = None
-) -> tuple[npt.NDArray[np.intp], FloatCells, npt.NDArray[np.bool_]]:
+    trade: Trade | None, assumed: FloatArray | None = None
+) -> tuple[npt.NDArray[np.intp], FloatArray, npt.NDArray[np.bool_]]:
     """The flat cells whose buildings want anything; how much of all they want together each
     cell's buildings get, each kind counting by how much it wants (Trade.share); and whether a
     kind of building in it gets nothing at all. `assumed` as Growth.assumed_shares stands in for

@@ -12,10 +12,9 @@ from imgui_bundle import imgui
 from railroads.sim.constructions import MERGED, BuildingKind
 from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.iso_camera import IsoCamera, Vec2
+from railroads.ui.pixel.projection import RGB
 
-type Color = tuple[int, int, int]
-
-DOTS: dict[BuildingKind, tuple[Color, float]] = {
+DOTS: dict[BuildingKind, tuple[RGB, float]] = {
     BuildingKind.HOUSE: ((176, 66, 50), 0.09),
     BuildingKind.TENEMENT: ((206, 150, 96), 0.12),
     BuildingKind.FLATS: ((92, 86, 96), 0.14),
@@ -185,6 +184,6 @@ def dot_looks(spots: BuildingSpots) -> tuple[npt.NDArray[np.float64], npt.NDArra
 
 
 @cache
-def _color(rgb: Color, alpha: float = 1.0) -> int:
+def _color(rgb: RGB, alpha: float = 1.0) -> int:
     r, g, b = rgb
     return imgui.color_convert_float4_to_u32(imgui.ImVec4(r / 255, g / 255, b / 255, alpha))

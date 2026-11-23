@@ -23,8 +23,8 @@ from railroads.sim.game import Game, place_names
 from railroads.sim.goods import Good
 from railroads.sim.grids import Cell
 from railroads.sim.growth import MONTHS_BEFORE_PLAY, Growth
-from railroads.sim.ladders import Points
 from railroads.sim.novelties import Novelties
+from railroads.sim.points import Points
 from railroads.sim.routes import plan_route
 from railroads.sim.stats import History
 from railroads.sim.trains import Stop

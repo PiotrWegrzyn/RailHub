@@ -25,8 +25,7 @@ from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import OwnedShare
 from railroads.sim.goods import Need, makes_of, owned_boosts, price_of
-from railroads.sim.grids import Cell
-from railroads.sim.ladders import IntGrid
+from railroads.sim.grids import Cell, IntArray
 from railroads.sim.tiles import of_year
 
 if TYPE_CHECKING:
@@ -68,12 +67,12 @@ def satisfaction_price(satisfaction: float) -> float:
 class Owners:
     def __init__(self, growth: Growth) -> None:
         self._growth = growth
-        self._shares: dict[BuildingKind, IntGrid] = {}
+        self._shares: dict[BuildingKind, IntArray] = {}
         # Per kind and cell, the shares bought there and the month from which each lot may be sold.
         self._held: dict[tuple[BuildingKind, Cell], list[tuple[int, int]]] = {}
         self.company = COMPANY
 
-    def shares(self, kind: BuildingKind) -> IntGrid:
+    def shares(self, kind: BuildingKind) -> IntArray:
         """How many shares of the buildings of a kind the player owns in each cell."""
         return self._shares.get(kind, np.zeros(self._growth.grid.shape, dtype=np.int64))
 
@@ -229,7 +228,7 @@ class Owners:
             return None
         return self._controlled(kind, grid).ravel()
 
-    def _controlled(self, kind: BuildingKind, grid: IntGrid) -> npt.NDArray[np.float64]:
+    def _controlled(self, kind: BuildingKind, grid: IntArray) -> npt.NDArray[np.float64]:
         """How many buildings of a kind in each cell the player controls: all there, or none."""
         counts = self._growth.counts[kind]
         controlled = (counts > 0) & (grid >= CONTROL * SHARES * counts)

@@ -33,7 +33,7 @@ from railroads.sim.finance import (
     TRACK_WIDTH_UPKEEP_FACTORS,
 )
 from railroads.sim.grids import Cell, FloatArray, Grid
-from railroads.sim.ladders import Points
+from railroads.sim.points import Points
 from railroads.sim.railway import QUADRUPLE_ERA
 from railroads.sim.routes import Route
 from railroads.sim.tilemap import Relief

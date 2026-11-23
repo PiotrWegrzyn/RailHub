@@ -18,7 +18,8 @@ import numpy.typing as npt
 
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.grids import Cell
-from railroads.sim.ladders import POINTS, TOWN_LAND, Ladder, Points
+from railroads.sim.ladders import POINTS, TOWN_LAND, Ladder
+from railroads.sim.points import Points
 
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth

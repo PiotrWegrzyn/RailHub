@@ -18,7 +18,6 @@ from railroads.sim.demand import StationDemand, capacity_of
 from railroads.sim.economy import (
     COLLECTION_RADIUS,
     DELIVERY_RADIUS,
-    FloatCells,
     StationOrder,
     Trade,
     distribute,
@@ -42,7 +41,7 @@ from railroads.sim.goods import (
     makes_of,
     needs_of,
 )
-from railroads.sim.grids import Cell, Within, flat_within_any
+from railroads.sim.grids import Cell, FloatArray, Within, flat_within_any
 from railroads.sim.ladders import PASSENGERS_PER_POINT
 from railroads.sim.points import Points
 from railroads.sim.power_plants import powered_points
@@ -212,7 +211,7 @@ class StationTrade:
         goods = railway.station_goods(station)
         cells, bounds = self._in_reach(station)
         worth = worth_to(self._growth.economy.last_quarter()[cells])
-        assigned: dict[Need, FloatCells] = {}
+        assigned: dict[Need, FloatArray] = {}
         room: dict[Good, float] = {}
         weighed = []
         for good, amount in cargo:
@@ -255,8 +254,8 @@ class StationTrade:
         bounds: tuple[int, ...],
         need: Need,
         have: float,
-        wants: dict[BuildingKind, FloatCells],
-    ) -> tuple[FloatCells, FloatCells]:
+        wants: dict[BuildingKind, FloatArray],
+    ) -> tuple[FloatArray, FloatArray]:
         """How much of `have` each of these cells takes for a need, by what its buildings still
         want: the player's own buildings' musts first, then every must, then any bonus, the
         nearest first; and what they wanted in all."""
@@ -279,7 +278,7 @@ class StationTrade:
             got += wanted - short
         return got, demand
 
-    def _spare(self, kind: BuildingKind, need: Need, cells: npt.NDArray[np.intp]) -> FloatCells:
+    def _spare(self, kind: BuildingKind, need: Need, cells: npt.NDArray[np.intp]) -> FloatArray:
         """The part of a need the buildings of a kind in these cells take only as a bonus
         (BONUS_PART), handed out after everyone has had what they must."""
         extra = BONUS_PART.get((kind, need))
@@ -288,8 +287,8 @@ class StationTrade:
         return self._growth.counts[kind].ravel()[cells].astype(np.float64) * extra
 
     def _owned_wants(
-        self, cells: npt.NDArray[np.intp], wants: dict[BuildingKind, FloatCells]
-    ) -> FloatCells:
+        self, cells: npt.NDArray[np.intp], wants: dict[BuildingKind, FloatArray]
+    ) -> FloatArray:
         """The part of these wants that is the player's own buildings', which a station hands
         out before anyone else's."""
         growth = self._growth
@@ -301,13 +300,13 @@ class StationTrade:
                 mine += want * np.minimum(owned / np.maximum(count, 1), 1.0)
         return mine
 
-    def _wants_at(self, cells: npt.NDArray[np.intp], need: Need) -> dict[BuildingKind, FloatCells]:
+    def _wants_at(self, cells: npt.NDArray[np.intp], need: Need) -> dict[BuildingKind, FloatArray]:
         """What each kind of building in these cells still wants of a need this month: up to
         what it needs in a month, less what it took already; a processor up to the room in its
         stockpile."""
         growth, economy = self._growth, self._growth.economy
         taken_by = economy.taken or {}
-        wants: dict[BuildingKind, FloatCells] = {}
+        wants: dict[BuildingKind, FloatArray] = {}
         for kind, count in growth.counts.items():
             if need not in wants_of(kind, growth.year):
                 continue
@@ -333,7 +332,7 @@ class StationTrade:
 
     def _short_last_month(
         self, cells: npt.NDArray[np.intp], kind: BuildingKind, need: Need
-    ) -> FloatCells | None:
+    ) -> FloatArray | None:
         """What the buildings of a kind in these cells were left short of a need last month after
         the goods handed out around them on their own: all a station may hand them as trains
         arrive, so a train never takes the place of the buildings nearby. Cells that did not

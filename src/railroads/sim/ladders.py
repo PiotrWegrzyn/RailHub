@@ -33,15 +33,9 @@ from railroads.sim.constructions import MERGED, BuildingKind
 from railroads.sim.economy import Neighbourhoods
 from railroads.sim.forests import FORESTS, ForestRule
 from railroads.sim.goods import RECIPES, merging
+from railroads.sim.grids import FlatIndices, FloatArray
 from railroads.sim.points import Points
 from railroads.sim.tilemap import Deposit, Relief, Temperature, Terrain, TileMap, Vegetation
-
-IntGrid = npt.NDArray[np.int64]
-
-FloatGrid = npt.NDArray[np.float64]
-
-Cells = npt.NDArray[np.intp]
-
 
 # Farms and every other grower of food (not the works that make food from it) with this many
 # population points around them or more are pulled down, and none grow there.
@@ -269,7 +263,7 @@ class Land:
     def _dry(self) -> float:
         return self.water.get(Terrain.LAND, 1.0)
 
-    def _tables(self) -> tuple[FloatGrid, FloatGrid, FloatGrid, FloatGrid]:
+    def _tables(self) -> tuple[FloatArray, FloatArray, FloatArray, FloatArray]:
         """The weight of every vegetation, relief, temperature and water, as arrays indexed by
         their values, worked out once for each land."""
         tables = _LAND_TABLES.get(id(self))
@@ -293,14 +287,14 @@ class Land:
         self,
         tile_map: TileMap,
         cells: npt.NDArray[np.intp] | None = None,
-        near: Cells | None = None,
-    ) -> FloatGrid:
+        near: FlatIndices | None = None,
+    ) -> FloatArray:
         """The weight of every cell as a grid, or of the given flat cells alone. `near` holds
         every cell's neighbours as flat indices, one past the last cell for off the map."""
         weight = self.weights_in(Surroundings(tile_map, cells, near))
         return weight.reshape(tile_map.grid.shape) if cells is None else weight
 
-    def weights_in(self, around: Surroundings) -> FloatGrid:
+    def weights_in(self, around: Surroundings) -> FloatArray:
         """The weight of the cells whose surroundings these are, in their order."""
         vegetation_weights, relief_weights, temperature_weights, water = self._tables()
         wet = around.is_water
@@ -342,7 +336,7 @@ class Surroundings:
         self,
         tile_map: TileMap,
         cells: npt.NDArray[np.intp] | None = None,
-        near: Cells | None = None,
+        near: FlatIndices | None = None,
     ) -> None:
         size = tile_map.grid.rows * tile_map.grid.cols
         if near is None:
@@ -415,7 +409,7 @@ class Surroundings:
         return (self.relief == Relief.FLAT) & (self.vegetation == Vegetation.GRASS)
 
     @cached_property
-    def _lonlat(self) -> tuple[FloatGrid, FloatGrid]:
+    def _lonlat(self) -> tuple[FloatArray, FloatArray]:
         rows, cols = np.unravel_index(self.chosen, self.tile_map.grid.shape)
         x, y = self.tile_map.grid.center(rows, cols)
         km = self.tile_map.grid.km_per_cell
@@ -423,11 +417,11 @@ class Surroundings:
         return np.asarray(lon, dtype=np.float64), np.asarray(lat, dtype=np.float64)
 
     @cached_property
-    def longitude(self) -> FloatGrid:
+    def longitude(self) -> FloatArray:
         return self._lonlat[0]
 
     @cached_property
-    def latitude(self) -> FloatGrid:
+    def latitude(self) -> FloatArray:
         return self._lonlat[1]
 
     @cached_property
@@ -500,7 +494,7 @@ class Ladder:
     # usual DIE_AFTER_MONTHS there.
     starving_years: int | None = None
 
-    def pull(self, nearby: npt.NDArray[np.int64]) -> FloatGrid:
+    def pull(self, nearby: npt.NDArray[np.int64]) -> FloatArray:
         """What the points nearby add to the chance, in doublings."""
         return np.where(nearby >= self.draws_from, np.log2(1 + nearby), 0.0)
 

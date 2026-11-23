@@ -21,7 +21,7 @@ import numpy.typing as npt
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.grids import BoolGrid, Cell
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import Points
+from railroads.sim.points import Points
 from railroads.sim.tilemap import REFERENCE_LAND, Deposit, Relief, Terrain, TileMap
 
 NOVELTIES_PER_GAME = (2, 3)

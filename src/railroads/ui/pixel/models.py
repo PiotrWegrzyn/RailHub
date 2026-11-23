@@ -16,8 +16,8 @@ import numpy.typing as npt
 from PIL import Image, ImageDraw
 
 from railroads.ui.iso_camera import TILT
+from railroads.ui.pixel.projection import RGB
 
-type RGB = tuple[int, int, int]
 type Vec3 = tuple[float, float, float]
 
 # How many map art pixels tall a cell-wide height is, for a view from 30 degrees above.

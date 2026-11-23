@@ -6,9 +6,8 @@ from dataclasses import dataclass
 
 from PIL import Image, ImageDraw
 
-type RGB = tuple[int, int, int]
+from railroads.ui.pixel.projection import RGB, Point
 
-type Point = tuple[float, float]
 # The four corners of a box's top: left, front, right and back (Painter.box).
 type Top = tuple[Point, Point, Point, Point]
 

@@ -36,8 +36,8 @@ from railroads.sim.ladders import (
     GrowthRule,
     Land,
     Merge,
-    Points,
 )
+from railroads.sim.points import Points
 from railroads.sim.room import SPILL_STEPS
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 

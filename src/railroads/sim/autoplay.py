@@ -15,7 +15,7 @@ from railroads.sim.constructions import BuildingKind, Station
 from railroads.sim.goods import makes_of, price_of
 from railroads.sim.grids import Cell, Grid, parity_steps
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import Points
+from railroads.sim.points import Points
 from railroads.sim.railway import Railway
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tiles import of_year

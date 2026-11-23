@@ -24,8 +24,9 @@ from railroads.sim.goods import (
     freight_of,
     price_of,
 )
-from railroads.sim.ladders import PASSENGERS_PER_POINT, POINTS, Points, ladder_of
+from railroads.sim.ladders import PASSENGERS_PER_POINT, POINTS, ladder_of
 from railroads.sim.lots import AROUND, FIRST_FOR_SALE, START_LOTS, land_price
+from railroads.sim.points import Points
 from railroads.sim.tilemap import START_SHARE
 from railroads.sim.tiles import good_era, kind_era, opened_from
 from railroads.sim.trains import ENGINES, OPENED_BY, Engine, successor

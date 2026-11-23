@@ -75,12 +75,10 @@ from railroads.sim.goods import (
     makes_of,
     needs_of,
 )
-from railroads.sim.grids import Cell, Grid, flat_within_any, parity_steps
+from railroads.sim.grids import Cell, FloatArray, Grid, flat_within_any, parity_steps
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import TileMap
 from railroads.sim.year_caches import year_cached
-
-FloatCells = npt.NDArray[np.float64]
 
 
 class Satisfaction(IntEnum):
@@ -146,7 +144,7 @@ BONUS_PER_GOOD = 0.3
 SCARCE_WORTH = 3.0
 
 
-def worth_to(satisfaction: FloatCells) -> FloatCells:
+def worth_to(satisfaction: FloatArray) -> FloatArray:
     """What a unit handed out on its own is worth, times its price, to buyers this satisfied."""
     return 1.0 + (SCARCE_WORTH - 1.0) * (1.0 - np.clip(satisfaction, 0.0, 1.0))
 
@@ -165,11 +163,11 @@ def distribute(
     sellers: npt.NDArray[np.intp],
     buyers: npt.NDArray[np.intp],
     bounds: tuple[int, ...],
-    supply: FloatCells,
-    short: FloatCells,
-    falloff: tuple[FloatCells, tuple[float, ...]] | None = None,
-    used: FloatCells | None = None,
-) -> tuple[npt.NDArray[np.intp], FloatCells]:
+    supply: FloatArray,
+    short: FloatArray,
+    falloff: tuple[FloatArray, tuple[float, ...]] | None = None,
+    used: FloatArray | None = None,
+) -> tuple[npt.NDArray[np.intp], FloatArray]:
     """Hands goods from sellers to buyers, the nearest first: pairs of a seller and a buyer in
     order of how far apart they are, the pairs of each distance starting at its `bounds`
     (ring_starts). A seller shares what it has among the buyers at the same distance by how short
@@ -178,7 +176,7 @@ def distribute(
     month. Takes what went out of `supply`, per seller, and out of `short`, per buyer; returns the
     pairs anything went between and how much."""
     went: list[npt.NDArray[np.intp]] = []
-    amounts: list[FloatCells] = []
+    amounts: list[FloatArray] = []
     for ring, (start, end) in enumerate(pairwise(bounds)):
         seller, buyer = sellers[start:end], buyers[start:end]
         wanting = short[buyer]
@@ -208,7 +206,7 @@ def distribute(
     return np.concatenate(went), np.concatenate(amounts)
 
 
-def levels_of(share: FloatCells) -> npt.NDArray[np.int8]:
+def levels_of(share: FloatArray) -> npt.NDArray[np.int8]:
     """Satisfaction for a share of needs met or goods given away, as the satisfaction lens
     colours it: nothing, short of HALF_SATISFIED, at least that, and all of it."""
     levels = np.full(share.shape, Satisfaction.CONTENT, dtype=np.int8)
@@ -291,7 +289,7 @@ class OwnedShare:
 
 # What Trade.share works out, by the trade's id and kinds, while the trade lasts: a trade is
 # saved with the game, so it keeps none of it itself.
-_SHARES: dict[int, dict[tuple[BuildingKind, ...], tuple[FloatCells, npt.NDArray[np.bool_]]]] = {}
+_SHARES: dict[int, dict[tuple[BuildingKind, ...], tuple[FloatArray, npt.NDArray[np.bool_]]]] = {}
 
 
 @dataclass(frozen=True)
@@ -302,32 +300,32 @@ class Trade:
     share of it that came."""
 
     cells: npt.NDArray[np.intp]
-    got: Mapping[BuildingKind, FloatCells]
-    needed: Mapping[BuildingKind, FloatCells]
-    gave: Mapping[BuildingKind, FloatCells]
-    could_make: Mapping[BuildingKind, FloatCells]
+    got: Mapping[BuildingKind, FloatArray]
+    needed: Mapping[BuildingKind, FloatArray]
+    gave: Mapping[BuildingKind, FloatArray]
+    could_make: Mapping[BuildingKind, FloatArray]
     # Per station, the goods it handed out and the goods it gathered.
     handed: Mapping[Cell, Mapping[Good, float]] = field(default_factory=dict)
     gathered: Mapping[Cell, Mapping[Good, float]] = field(default_factory=dict)
     # Per kind of building and need: what it took in this month, from anywhere, and what it
     # needs; per kind and good: what it gave away and the most it could make.
-    goods_got: Mapping[tuple[BuildingKind, Need], tuple[FloatCells, FloatCells]] = field(
+    goods_got: Mapping[tuple[BuildingKind, Need], tuple[FloatArray, FloatArray]] = field(
         default_factory=dict
     )
-    goods_gave: Mapping[tuple[BuildingKind, Good], tuple[FloatCells, FloatCells]] = field(
+    goods_gave: Mapping[tuple[BuildingKind, Good], tuple[FloatArray, FloatArray]] = field(
         default_factory=dict
     )
     # Per station, how much of what trains brought it handed out, by need and good.
     handed_for: Mapping[Cell, Mapping[tuple[Need, Good], float]] = field(default_factory=dict)
-    bonus: Mapping[BuildingKind, FloatCells] = field(default_factory=dict)
+    bonus: Mapping[BuildingKind, FloatArray] = field(default_factory=dict)
     # What each bonus good a building gets all of adds to its satisfaction.
     bonus_per_good: float = BONUS_PER_GOOD
     # Per need, what each cell's buildings got of it from sellers nearby rather than stations.
-    local: Mapping[Need, FloatCells] = field(default_factory=dict)
+    local: Mapping[Need, FloatArray] = field(default_factory=dict)
     # Per good, what a unit that left each cell was worth on average, times its price: more the
     # less satisfied the buildings it was handed out to were over the last quarter, and the
     # price itself for what went to stations. Goods missing here were worth their price.
-    worth: Mapping[Good, FloatCells] = field(default_factory=dict)
+    worth: Mapping[Good, FloatArray] = field(default_factory=dict)
     # Per station, what it took of the player's share of their own buildings' goods, to hand
     # out as if a train had brought it.
     owned_brought: Mapping[Cell, Mapping[Good, float]] = field(default_factory=dict)
@@ -336,28 +334,28 @@ class Trade:
     handed_worth: Mapping[Cell, Mapping[tuple[Need, Good], float]] = field(default_factory=dict)
     # Per kind of building and good, what of the player's share of it each cell sent into the
     # stations around.
-    owned_sent: Mapping[tuple[BuildingKind, Good], FloatCells] = field(default_factory=dict)
+    owned_sent: Mapping[tuple[BuildingKind, Good], FloatArray] = field(default_factory=dict)
 
-    def done(self, kinds: tuple[BuildingKind, ...]) -> FloatCells:
+    def done(self, kinds: tuple[BuildingKind, ...]) -> FloatArray:
         return sum(
             (self.got[k] + self.gave[k] for k in kinds if k in self.got),
             start=np.zeros(self.cells.size),
         )
 
-    def wanted(self, kinds: tuple[BuildingKind, ...]) -> FloatCells:
+    def wanted(self, kinds: tuple[BuildingKind, ...]) -> FloatArray:
         return sum(
             (self.needed[k] + self.could_make[k] for k in kinds if k in self.got),
             start=np.zeros(self.cells.size),
         )
 
-    def share(self, kinds: tuple[BuildingKind, ...], empty: float = 1.0) -> FloatCells:
+    def share(self, kinds: tuple[BuildingKind, ...], empty: float = 1.0) -> FloatArray:
         """The satisfaction of each cell's buildings of these kinds, from 0 up and past 1 with
         bonus goods. Where kinds share a cell, each counts by how much it wants; cells where they
         want nothing get `empty`."""
         share, wanting = self._shares(kinds)
         return np.where(wanting, share, empty)
 
-    def _shares(self, kinds: tuple[BuildingKind, ...]) -> tuple[FloatCells, npt.NDArray[np.bool_]]:
+    def _shares(self, kinds: tuple[BuildingKind, ...]) -> tuple[FloatArray, npt.NDArray[np.bool_]]:
         """share before cells that want nothing get theirs, and those that want anything,
         worked out once for each trade and kinds and kept in _SHARES while the trade lasts."""
         kept = _SHARES.get(id(self))
@@ -394,7 +392,7 @@ STOCKPILES = tuple(
 )
 
 
-class Stockpiles(dict[tuple[BuildingKind, Need], FloatCells]):
+class Stockpiles(dict[tuple[BuildingKind, Need], FloatArray]):
     """What the processors of each kind in each cell hold of each input: a map-sized array for
     each kind and input some of them hold, and none for the rest, which holds nothing anywhere:
     asked for, it gets an empty one."""
@@ -403,7 +401,7 @@ class Stockpiles(dict[tuple[BuildingKind, Need], FloatCells]):
         super().__init__()
         self.cells = cells
 
-    def __missing__(self, key: tuple[BuildingKind, Need]) -> FloatCells:
+    def __missing__(self, key: tuple[BuildingKind, Need]) -> FloatArray:
         stock = self[key] = np.zeros(self.cells)
         return stock
 
@@ -434,9 +432,9 @@ class Economy:
         # What the processors of each kind in each cell hold of each input.
         self.stock = Stockpiles(self.cells)
         # Each cell's satisfaction in each of the last QUARTER months, the latest last.
-        self.months: list[FloatCells] = []
+        self.months: list[FloatArray] = []
 
-    def last_quarter(self) -> FloatCells:
+    def last_quarter(self) -> FloatArray:
         """Each cell's satisfaction over the last quarter, on average; full before any trade."""
         if not self.months:
             return np.ones(self.cells)
@@ -471,7 +469,7 @@ class Economy:
         cells: npt.NDArray[np.intp],
         radius: float,
         platforms: tuple[Cell, ...] = (),
-    ) -> tuple[npt.NDArray[np.intp], FloatCells]:
+    ) -> tuple[npt.NDArray[np.intp], FloatArray]:
         """The traded cells within `radius` steps of a station or any of its platforms, as
         positions among `cells`, nearest first, and how many steps away each is."""
         within = flat_within_any(self.tile_map.grid, (station, *platforms), int(radius))
@@ -487,10 +485,10 @@ class Economy:
     @staticmethod
     def _gather(
         room: float,
-        far: tuple[npt.NDArray[np.intp], FloatCells],
-        supply: FloatCells,
-        made: FloatCells,
-        sold: FloatCells,
+        far: tuple[npt.NDArray[np.intp], FloatArray],
+        supply: FloatArray,
+        made: FloatArray,
+        sold: FloatArray,
     ) -> float:
         """Takes spare goods that buildings made from the cells around, evenly, up to the room
         left; returns how much was taken."""
@@ -546,17 +544,17 @@ class _Month:
         # What a unit handed out on its own is worth to each cell, times its price, and per good
         # how much more than its price what each cell handed out was worth in all.
         self.worth_to = worth_to(economy.last_quarter()[cells])
-        self.worth_above: dict[Good, FloatCells] = {}
+        self.worth_above: dict[Good, FloatArray] = {}
         # What each kind of processor holds of each input, worked out as the trade begins.
-        self.stock: dict[tuple[BuildingKind, Need], FloatCells] = {}
+        self.stock: dict[tuple[BuildingKind, Need], FloatArray] = {}
         # What buildings offer of each good, by kind and in all, and how much of it went; and how
         # much of each kind's offer the player's own buildings made.
-        self.offers: dict[tuple[BuildingKind, Good], FloatCells] = {}
-        self.owned_made: dict[tuple[BuildingKind, Good], FloatCells] = {}
+        self.offers: dict[tuple[BuildingKind, Good], FloatArray] = {}
+        self.owned_made: dict[tuple[BuildingKind, Good], FloatArray] = {}
         self.offered = {good: self.zero.copy() for good in Good}
         self.sold = {good: self.zero.copy() for good in Good}
         # Per need, what buildings got of it from sellers nearby rather than stations.
-        self.local: dict[Need, FloatCells] = {}
+        self.local: dict[Need, FloatArray] = {}
         # Where each traded cell stands among them, -1 for the rest, and per good the pairs of
         # sellers and buyers near enough to trade.
         self.position = np.full(economy.cells, -1, dtype=np.intp)
@@ -578,8 +576,8 @@ class _Month:
                     )
         # Per kind of processor, what it makes from its inputs alone, and the share it has of each
         # of its boosts.
-        self.uses: dict[BuildingKind, dict[Need, FloatCells]] = {}
-        self.received: dict[tuple[BuildingKind, Need], FloatCells] = {}
+        self.uses: dict[BuildingKind, dict[Need, FloatArray]] = {}
+        self.received: dict[tuple[BuildingKind, Need], FloatArray] = {}
         self.brought = {
             station: _added(order.brought, order.stockpile) for station, order in stations.items()
         }
@@ -592,7 +590,7 @@ class _Month:
         }
         self.gathered: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
         self.owned_brought: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
-        self.owned_sent: dict[tuple[BuildingKind, Good], FloatCells] = {}
+        self.owned_sent: dict[tuple[BuildingKind, Good], FloatArray] = {}
         self.room = {
             station: {
                 good: max(
@@ -637,7 +635,7 @@ class _Month:
             self._gather(good)
         return (yield from self._settle())
 
-    def _wants(self, need: Need) -> dict[BuildingKind, FloatCells]:
+    def _wants(self, need: Need) -> dict[BuildingKind, FloatArray]:
         """What each kind wants of a need: consumers what they use in a month, processors the
         room left in their stockpile."""
         wants = {}
@@ -656,7 +654,7 @@ class _Month:
         """What one building of a kind wants of a need in a month this year."""
         return needs_of(kind, self.economy.year, self.economy.east).get(need, 0.0)
 
-    def _owned_of_taking(self, kind: BuildingKind) -> FloatCells:
+    def _owned_of_taking(self, kind: BuildingKind) -> FloatArray:
         """The player's part of the buildings of a kind in each cell taking the boosts only their
         own take: all of them, unless the player controls more than they own."""
         share = self.owned[kind]
@@ -665,7 +663,7 @@ class _Month:
         taking = share.taking[self.cells]
         return np.minimum(divided(share.owned[self.cells], taking), 1.0)
 
-    def _owned_part(self, kind: BuildingKind) -> FloatCells:
+    def _owned_part(self, kind: BuildingKind) -> FloatArray:
         """The share of the buildings of a kind in each cell that are the player's, as they
         trade."""
         share = self.owned.get(kind)
@@ -675,7 +673,7 @@ class _Month:
         count = self.count[kind]
         return np.minimum(divided(owned, count), 1.0)
 
-    def _count_for(self, kind: BuildingKind, need: Need) -> FloatCells:
+    def _count_for(self, kind: BuildingKind, need: Need) -> FloatArray:
         """How many buildings of a kind in each cell want a need: all of them, but for a boost
         only the player's own take (OWNED_BOOSTS), only theirs or those they control, once their
         tile opens it."""
@@ -686,7 +684,7 @@ class _Month:
             return self.zero
         return (share.owned if share.taking is None else share.taking)[self.cells]
 
-    def _taken(self, kind: BuildingKind, need: Need) -> FloatCells:
+    def _taken(self, kind: BuildingKind, need: Need) -> FloatArray:
         """What buildings of a kind took of a need this month as goods reached their station."""
         taken = self.zero.copy()
         for cell, amount in ((self.economy.taken or {}).get((kind, need)) or {}).items():
@@ -711,7 +709,7 @@ class _Month:
         must = self._must(need, wants)
         received = self.zero.copy()
         local = self.zero.copy()
-        used: dict[Good, FloatCells] = {}
+        used: dict[Good, FloatArray] = {}
         for target in (demand,) if must is None else (must, demand):
             before = received.copy()
             for good in HANDED_OUT[need]:
@@ -735,7 +733,7 @@ class _Month:
             else:
                 self._boost_from_land(kind, need, got)
 
-    def _must(self, need: Need, wants: dict[BuildingKind, FloatCells]) -> FloatCells | None:
+    def _must(self, need: Need, wants: dict[BuildingKind, FloatArray]) -> FloatArray | None:
         """What the buildings wanting a need must get of it in each cell, without the part some
         take only as a bonus (BONUS_PART), which is handed out after everyone has had the rest;
         None where no one wants any of it as a bonus."""
@@ -749,8 +747,8 @@ class _Month:
         return must
 
     def _owned_short(
-        self, wants: dict[BuildingKind, FloatCells], demand: FloatCells, received: FloatCells
-    ) -> FloatCells | None:
+        self, wants: dict[BuildingKind, FloatArray], demand: FloatArray, received: FloatArray
+    ) -> FloatArray | None:
         """What the player's own buildings in each cell are still short of a need after the
         goods handed out on their own, which the stations hand them before anyone else; None
         if they own none that want it."""
@@ -761,7 +759,7 @@ class _Month:
         met = ratio(received, demand)
         return want * (1.0 - met)
 
-    def _hand_out(self, need: Need, good: Good, demand: FloatCells, received: FloatCells) -> None:
+    def _hand_out(self, need: Need, good: Good, demand: FloatArray, received: FloatArray) -> None:
         """Lets every station hand out what trains brought of a good to the buildings within its
         delivery radius still short of it, the nearest first."""
         stations = list(self.stations)
@@ -815,7 +813,7 @@ class _Month:
                 later[key] = left
         return later
 
-    def _boost_from_land(self, kind: BuildingKind, need: Need, got: FloatCells) -> None:
+    def _boost_from_land(self, kind: BuildingKind, need: Need, got: FloatArray) -> None:
         """Lets what a kind making goods from the land got of one of its boosts make it make more
         of each of its goods, before any of them is sold: up to its own KIND_BOOST_MOST or
         LAND_BOOST_MOST more, or its part of BOOST_MOST shared with the other boosts; a boost only
@@ -854,10 +852,10 @@ class _Month:
     def _sell_nearby(
         self,
         good: Good,
-        demand: FloatCells,
-        received: FloatCells,
-        used: FloatCells | None = None,
-    ) -> FloatCells | None:
+        demand: FloatArray,
+        received: FloatArray,
+        used: FloatArray | None = None,
+    ) -> FloatArray | None:
         """Lets the cells with spare goods hand them out to the buildings still short of them, the
         nearest first, each cell taking from a seller at most its reach_share of the seller's
         month, less what `used` says it took already this month; returns that, per pair, with
@@ -890,7 +888,7 @@ class _Month:
             return
         self.first_gathered.add(good)
         left = self.zero.copy()
-        parts: dict[BuildingKind, FloatCells] = {}
+        parts: dict[BuildingKind, FloatArray] = {}
         for (kind, made), mine in self.owned_made.items():
             if made == good:
                 part = mine * self.owned[kind].share
@@ -1052,7 +1050,7 @@ class _Month:
             if kind in self.owned:
                 self.owned_made[(kind, good)] = made * self._owned_part(kind)
 
-    def _went(self, good: Good) -> FloatCells:
+    def _went(self, good: Good) -> FloatArray:
         """The share of all of a good on offer that went, to buildings or stations, in each
         cell."""
         return np.minimum(ratio(self.sold[good], self.offered[good]), 1.0)
@@ -1064,7 +1062,7 @@ class _Month:
         needed = {k: self.zero.copy() for k in self.count}
         gave = {k: self.zero.copy() for k in self.count}
         could_make = {k: self.zero.copy() for k in self.count}
-        bonus: dict[BuildingKind, FloatCells] = {}
+        bonus: dict[BuildingKind, FloatArray] = {}
         goods_got = {}
         for (kind, need), received in self.received.items():
             wanted = self._count_for(kind, need) * self._amount(kind, need)
@@ -1093,7 +1091,7 @@ class _Month:
             if kind in bonus:
                 bonus[kind] = np.where(hungry, 0.0, bonus[kind])
         goods_gave = {}
-        shares: dict[Good, FloatCells] = {}
+        shares: dict[Good, FloatArray] = {}
         for (kind, good), offer in self.offers.items():
             if good not in shares:
                 shares[good] = self._went(good)

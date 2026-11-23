@@ -7,6 +7,7 @@ from pathlib import Path
 from PIL import Image
 
 from railroads.ui.pixel.art import Painter, Sprite, shade
+from railroads.ui.pixel.projection import RGB
 
 ICON_DIR = Path(__file__).parent
 ICONS_PNG = ICON_DIR / "good_icons.png"
@@ -14,7 +15,6 @@ ICONS_INDEX = ICON_DIR / "good_icons.json"
 ICON_PIXELS = 16
 COLUMNS = 8
 
-RGB = tuple[int, int, int]
 LEAF: RGB = (86, 156, 62)
 STEM: RGB = (120, 84, 50)
 WOOD: RGB = (160, 110, 62)

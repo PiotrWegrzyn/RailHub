@@ -10,9 +10,10 @@ from railroads.sim.game import Game
 from railroads.sim.goods import Good, Need, bonus_of
 from railroads.sim.grids import Cell, HexGrid
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import GrowthRule, Points
+from railroads.sim.ladders import GrowthRule
 from railroads.sim.ledger import Takings
 from railroads.sim.ownership import HOLD_MONTHS
+from railroads.sim.points import Points
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.ui import hex_details
 from railroads.ui.hex_details import (

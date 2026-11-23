@@ -4,7 +4,7 @@ from test_railway import joined_stations
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.goods import Good
 from railroads.sim.growth import LIVELY_GROWTH, Growth
-from railroads.sim.ladders import Points
+from railroads.sim.points import Points
 
 STATION, HOUSE, TAVERN = (6, 20), (6, 21), (5, 20)
 

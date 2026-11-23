@@ -19,7 +19,7 @@ from railroads.sim.fuel_market import (
 )
 from railroads.sim.goods import FITS, MAKES
 from railroads.sim.grids import Cell, flat_within
-from railroads.sim.ladders import Points
+from railroads.sim.points import Points
 from railroads.sim.tiles import era_come, kind_era
 
 if TYPE_CHECKING:

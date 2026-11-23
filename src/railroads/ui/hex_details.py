@@ -16,7 +16,7 @@ from imgui_bundle import imgui
 from railroads.sim.amounts import EPSILON
 from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import Building, BuildingKind, Construction, Station, Track
-from railroads.sim.economy import FloatCells, Satisfaction, Trade
+from railroads.sim.economy import Satisfaction, Trade
 from railroads.sim.goods import (
     BONUS_PART,
     RECIPES,
@@ -27,11 +27,11 @@ from railroads.sim.goods import (
     demands_of,
     makes_of,
 )
-from railroads.sim.grids import Cell
+from railroads.sim.grids import Cell, FloatArray
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import Points
 from railroads.sim.ledger import Takings
 from railroads.sim.ownership import CONTROL, HOLD_MONTHS, LOT, LOTS, MOST_PRICED, SHARES
+from railroads.sim.points import Points
 from railroads.sim.tilemap import Deposit, TileMap
 from railroads.ui.biomes import biome_of
 from railroads.ui.ornate import badge, bar, card, section
@@ -573,8 +573,8 @@ def _split_bonus_part(
 
 
 def _per_good(
-    goods: Mapping[tuple[BuildingKind, Good], tuple[FloatCells, FloatCells]]
-    | Mapping[tuple[BuildingKind, Need], tuple[FloatCells, FloatCells]],
+    goods: Mapping[tuple[BuildingKind, Good], tuple[FloatArray, FloatArray]]
+    | Mapping[tuple[BuildingKind, Need], tuple[FloatArray, FloatArray]],
     kind: BuildingKind,
     position: int,
     most: Mapping[Good, float] | None = None,
