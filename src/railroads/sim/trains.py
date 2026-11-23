@@ -896,6 +896,8 @@ class Stop:
 
 @dataclass
 class Train:
+    # What the simulation knows it by, as bought; the player sees it by its title
+    # (railroads.sim.train_names), or by `label` once they name it.
     name: str
     stops: list[Stop] = field(default_factory=list)
     # The cars it pulls now.
@@ -951,6 +953,8 @@ class Train:
     # Whether it stands at its first stop until the player is done setting it up, so it does not
     # set off empty with half a route.
     held: bool = False
+    # The name the player gave it, if any.
+    label: str = ""
 
     @property
     def load(self) -> dict[Good, float]:

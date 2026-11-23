@@ -12,12 +12,8 @@ from railroads.sim.trade import SCARCE_WORTH
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, OPENED_BY, Car, Stop, Train
 from railroads.ui import buy_train
 from railroads.ui.train_texts import (
-    ROW_CAR,
-    ROW_CAR_GAP,
-    ROW_CAR_LINES,
     carried_in,
     ride_rows,
-    row_cars,
     train_warning,
 )
 from railroads.ui.trains_window import TrainsWindow
@@ -44,28 +40,6 @@ def test_the_first_stop_offers_what_the_train_brings_back_from_the_last() -> Non
     carried = carried_in(train, 0)
 
     assert carried == [Good.WHEAT]
-
-
-def test_a_short_train_shows_its_cars_full_size_on_one_line_of_the_list() -> None:
-    car_width, per_line = row_cars(4, 160.0)
-
-    assert car_width == ROW_CAR
-    assert per_line >= 4
-
-
-def test_a_twenty_four_car_train_shows_its_cars_full_size_over_three_lines() -> None:
-    car_width, per_line = row_cars(24, 160.0)
-
-    assert car_width == ROW_CAR
-    assert per_line * ROW_CAR_LINES >= 24
-
-
-def test_cars_too_many_for_three_lines_are_narrowed_to_fit_them() -> None:
-    car_width, per_line = row_cars(40, 160.0)
-
-    assert car_width < ROW_CAR
-    assert per_line * ROW_CAR_LINES >= 40
-    assert per_line * (car_width + ROW_CAR_GAP) - ROW_CAR_GAP == pytest.approx(160.0)
 
 
 def test_the_list_draws_a_twenty_five_car_train_led_by_a_dining_car(gui: None) -> None:
@@ -360,3 +334,20 @@ def test_tonnes_show_to_a_tenth_so_two_half_tonne_cars_do_not_look_as_if_they_fi
     shown = tonnes_text(tonnes)
 
     assert shown == text
+
+
+@pytest.mark.parametrize("engine", ["planet", "single", "tank", "goods"])
+def test_the_table_draws_a_train_of_every_category_with_its_framed_engine(
+    gui: None, engine: str
+) -> None:
+    _, railway = joined_stations()
+    railway.finances.cash = 1e9
+    railway.buy()
+    train = railway.trains[0]
+    train.engine = engine
+    train.stops = [Stop(cell, [Good.PASSENGERS]) for cell in railway.stations()]
+    window = TrainsWindow(open=True)
+
+    draw_frames(window, railway)
+
+    assert window.chosen == train.name

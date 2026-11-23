@@ -125,8 +125,11 @@ class StationWindow:
             imgui.separator()
             draw_preview_body(preview(station), built=True)
         imgui.separator()
+        titles = railway.titles()
         calling = [
-            train.name for train in railway.trains if any(s.cell == station for s in train.stops)
+            titles[train.name]
+            for train in railway.trains
+            if any(s.cell == station for s in train.stops)
         ]
         imgui.text_disabled("Trains calling")
         imgui.same_line(LABEL_WIDTH)

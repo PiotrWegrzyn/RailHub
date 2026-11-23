@@ -20,20 +20,18 @@ from railroads.ui.theme import (
     left_of_cards,
     tip,
 )
-from railroads.ui.trains_window import WINDOW_SIZE as TRAINS_SIZE
 
 WINDOW_SIZE = (860.0, 180.0)
 ROW_HEIGHT = 28.0
-GAP = 12.0
 # How much of the screen's bottom the window leaves free for the build bar.
 BUILD_BAR_ROOM = 80.0
 
 
 def window_place(width: float, height: float) -> tuple[float, float]:
-    """Where the window first opens on a screen this big: under the trains window and left of
-    the news cards, but never past the screen's left edge or down over the build bar."""
+    """Where the window first opens on a screen this big: left of the news cards, but never
+    past the screen's left edge or down over the build bar."""
     x = left_of_cards(width, WINDOW_SIZE[0])
-    y = min(SIDE_WINDOW_TOP + TRAINS_SIZE[1] + GAP, height - WINDOW_SIZE[1] - BUILD_BAR_ROOM)
+    y = min(SIDE_WINDOW_TOP, height - WINDOW_SIZE[1] - BUILD_BAR_ROOM)
     return x, max(8.0, y)
 
 

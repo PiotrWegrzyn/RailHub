@@ -134,7 +134,8 @@ class BuyScreen:
         imgui.end_child()
         if route_of is not None:
             _, self.same_stops = imgui.checkbox(
-                f"Call at the stops of {route_of.name}", self.same_stops
+                f"Call at the stops of {railway.titles().get(route_of.name, route_of.name)}",
+                self.same_stops,
             )
         affordable = railway.finances.can_afford(engine.price)
         imgui.begin_disabled(not affordable)

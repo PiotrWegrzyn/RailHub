@@ -18,7 +18,7 @@ from railroads.sim.finance import TRAIN_RESALE
 from railroads.sim.fuel_market import fuel_of
 from railroads.sim.goods import GENERAL_GOODS, General, Good
 from railroads.sim.grids import Cell
-from railroads.sim.railway import NO_WAY_ON, Railway, Ride
+from railroads.sim.railway import Railway, Ride
 from railroads.sim.trains import (
     ENGINES,
     SLOWDOWN,
@@ -34,11 +34,11 @@ from railroads.ui.route_map import GroundPicture, RouteMap, add_stop, can_stop_a
 from railroads.ui.spotlight import spot
 from railroads.ui.station_offers import Offer, Supplies, goods_to_load
 from railroads.ui.theme import (
+    BORDER,
     BRASS,
     GONE,
     OFFER_SIZE,
-    SIDE_WINDOW_TOP,
-    TEXT_DIM,
+    WINDOW_TOP,
     caption_room,
     caption_under,
     car_chip,
@@ -46,41 +46,41 @@ from railroads.ui.theme import (
     colored,
     danger_button,
     dining_chip,
-    draw_small_car,
     empty_car_slot,
-    left_of_cards,
     next_good_slot,
     offer_chip,
     tip,
 )
+from railroads.ui.train_table import ICON_BOX, TrainTable, engine_icon, shown_status, train_rows
 from railroads.ui.train_texts import (
     CARGO_WORTH,
     FIRST_TIP,
-    ROW_CAR,
-    ROW_CAR_GAP,
     adding_tip,
     carried_in,
     engine_summary,
     engines_by_kind,
     leg_warning,
     picker_good,
-    ride_lines,
     ride_rows,
     ride_tiles,
-    row_cars,
     signed,
     train_warning,
     wagons_note,
 )
 from railroads.words import dollars, plural, share_of, tonnes_text
 
-WINDOW_SIZE = (980.0, 500.0)
-# The window can't be made smaller than this, so the map beside the stop cards keeps its room.
-SMALLEST_WINDOW = (900.0, 440.0)
-LIST_WIDTH = 190.0
-# Where the cars start in a train's row in the list, under its name and status.
-ROW_CARS_TOP = 39.0
-# The share of the space beside the list of trains the map takes.
+# The share of the window the table of trains takes at first, the least it can be dragged to and
+# the least it leaves the chosen train beside it.
+LIST_SHARE = 0.5
+LEAST_LIST = 420.0
+LEAST_TRAIN = 700.0
+# How wide the bar between the table and the chosen train is, which drags the split.
+SPLIT_WIDTH = 8.0
+# How wide the Go first, Upgrade and Sell buttons are together, at the right of a train's top
+# line, and the room its name takes besides its text, for its gaps and the rename button.
+HEAD_BUTTONS_WIDTH = 330.0
+NAME_ROOM = 60.0
+# The share of the space beside the chosen train's stop cards the map takes.
 MAP_SHARE = 0.45
 # How far from a stop card's right edge its top line's buttons start: the Wait for full load
 # box, the arrows moving the stop and the one removing it.
@@ -94,8 +94,15 @@ WORTH_EVERY = 0.5
 @dataclass
 class TrainsWindow:
     open: bool = False
-    # The name of the train shown on the right.
+    # The name of the train shown on the right, and whether it fills the window.
     chosen: str | None = None
+    maximized: bool = False
+    table: TrainTable = field(default_factory=TrainTable)
+    # How wide the player dragged the table, if they did.
+    list_width: float | None = None
+    _drawn: bool = False
+    # The name being typed for the chosen train.
+    _naming: str = ""
     # What each train's cars would earn at its destination, and its ride to its next stop,
     # worked out at most every WORTH_EVERY seconds, by train name.
     _worth: Fresh[str, list[float]] = field(default_factory=lambda: Fresh(WORTH_EVERY))
@@ -141,93 +148,142 @@ class TrainsWindow:
     ) -> None:
         if not self.open:
             self.buy.open = False
+            self._drawn = False
         if not self.buy.open:
             railway.let_go()
         if not self.open:
             return
         for kept in (self._worth, self._rides, self._supplied):
             kept.forget_old()
+        if not self._drawn:
+            imgui.set_next_window_focus()
+            self._drawn = True
         display = imgui.get_io().display_size
-        imgui.set_next_window_pos(
-            (left_of_cards(display.x, WINDOW_SIZE[0]), SIDE_WINDOW_TOP),
-            imgui.Cond_.first_use_ever.value,
+        imgui.set_next_window_pos((0.0, WINDOW_TOP))
+        imgui.set_next_window_size((display.x, display.y - WINDOW_TOP))
+        flags = (
+            imgui.WindowFlags_.no_move.value
+            | imgui.WindowFlags_.no_resize.value
+            | imgui.WindowFlags_.no_collapse.value
+            | imgui.WindowFlags_.no_saved_settings.value
         )
-        imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
-        imgui.set_next_window_size_constraints(SMALLEST_WINDOW, (1e6, 1e6))
-        with ornate_window("Trains", "trains") as (expanded, still_open):
+        with ornate_window("Trains", "trains", flags) as (expanded, still_open):
             if expanded:
-                train = self._draw_list(railway)
-                imgui.same_line()
-                imgui.begin_child("train", (0, 0))
-                if train is None:
-                    _centered_hint("Buy a train, then give it two stations joined by track.")
-                else:
-                    self._draw_train(railway, train, supplies, ground, self.map)
-                imgui.end_child()
+                self._draw_panes(railway, supplies, ground, picture)
         self.open = still_open
         bought = self.buy.draw(
             railway,
             engines_by_kind(railway.engines()),
             engine_summary,
             picture,
-            lambda shown: self._draw_train(railway, shown, supplies, ground, self.buy_map),
+            lambda shown: self._draw_train(railway, shown, supplies, ground, self.buy_map, picture),
         )
         if bought is not None:
             self.chosen = bought
 
-    def _draw_list(self, railway: Railway) -> Train | None:
-        """The Buy a train button, always at the top, over the list of trains, which scrolls on
-        its own; only the trains in sight are drawn."""
-        imgui.begin_child("list", (LIST_WIDTH, 0), imgui.ChildFlags_.borders.value)
-        if imgui.button(f"{fa.ICON_FA_PLUS}  Buy a train", (-1, 0)):
+    def _draw_panes(
+        self,
+        railway: Railway,
+        supplies: Supplies,
+        ground: GroundPicture,
+        picture: EnginePicture,
+    ) -> None:
+        """The table of trains on the left and the chosen train on the right, with a bar
+        between them to drag; or the chosen train alone, filling the window."""
+        trains = railway.trains
+        if self.chosen is None and trains:
+            self.chosen = trains[0].name
+        train = next((t for t in trains if t.name == self.chosen), None)
+        if train is None:
+            self.maximized = False
+        if not self.maximized:
+            room = imgui.get_content_region_avail().x
+            width = list_width(room, self.list_width)
+            imgui.begin_child("list", (width, 0))
+            self._draw_list(railway, picture)
+            imgui.end_child()
+            imgui.same_line(0, 0)
+            imgui.invisible_button("split", (SPLIT_WIDTH, imgui.get_content_region_avail().y))
+            if imgui.is_item_hovered() or imgui.is_item_active():
+                imgui.set_mouse_cursor(imgui.MouseCursor_.resize_ew)
+            if imgui.is_item_active():
+                self.list_width = width + imgui.get_io().mouse_delta.x
+            low, high = imgui.get_item_rect_min(), imgui.get_item_rect_max()
+            middle = (low.x + high.x) / 2
+            imgui.get_window_draw_list().add_line(
+                (middle, low.y), (middle, high.y), color_u32(BORDER), 1.0
+            )
+            imgui.same_line(0, 0)
+        imgui.begin_child("train", (0, 0))
+        if train is None:
+            _centered_hint("Buy a train, then give it two stations joined by track.")
+        else:
+            self._draw_maximize()
+            imgui.same_line(0, 10)
+            self._draw_train(railway, train, supplies, ground, self.map, picture)
+        imgui.end_child()
+
+    def _draw_maximize(self) -> None:
+        """The button letting the chosen train fill the window, or taking it back beside the
+        table."""
+        if self.maximized:
+            if imgui.button(f"{fa.ICON_FA_ARROW_LEFT}  All trains"):
+                self.maximized = False
+            tip("Back to the table of trains")
+            return
+        if imgui.button(fa.ICON_FA_EXPAND):
+            self.maximized = True
+        tip("Fill the window with this train; a double click on its row does too")
+
+    def _draw_list(self, railway: Railway, picture: EnginePicture) -> None:
+        """The Buy a train button and the filters, always at the top, over the table of
+        trains, which scrolls on its own."""
+        if imgui.button(f"{fa.ICON_FA_PLUS}  Buy a train"):
             self.buy.open_for(next((t for t in railway.trains if t.name == self.chosen), None))
         spot("buy_train")
+        imgui.same_line(0, 12)
+        self.table.draw_filters(railway)
         imgui.spacing()
-        imgui.begin_child("rows", (0, 0))
-        trains = railway.trains
-        for train in trains:
-            self._draw_row(railway, train)
-        imgui.end_child()
-        imgui.end_child()
-        chosen = next((t for t in trains if t.name == self.chosen), None)
-        if chosen is None and trains and self.chosen is None:
-            self.chosen = trains[0].name
-        return chosen
+        titles = railway.titles()
+        rows = train_rows(railway, titles, lambda train: self.net(railway, train))
+        clicked, twice = self.table.draw(rows, self.chosen, picture)
+        if clicked is not None:
+            self.chosen = clicked
+            self.maximized = twice
 
-    def _draw_row(self, railway: Railway, train: Train) -> None:
-        """A train's row: its name, status and cargo's worth over its cars, in up to
-        ROW_CAR_LINES lines; a row out of sight only takes up its room."""
-        width = imgui.get_content_region_avail().x
-        car_width, per_line = row_cars(len(train.cars), width - 12)
-        lines = -(-len(train.cars) // per_line)
-        height = ROW_CARS_TOP + lines * (ROW_CAR + ROW_CAR_GAP) + 1
-        if not imgui.is_rect_visible((width, height)):
-            imgui.dummy((width, height))
-            return
-        picked = train.name == self.chosen
-        if imgui.selectable(f"##{train.name}", picked, 0, (0, height))[0]:
-            self.chosen = train.name
-        low = imgui.get_item_rect_min()
-        draw_list = imgui.get_window_draw_list()
-        draw_list.add_text((low.x + 6, low.y + 3), imgui.get_color_u32(imgui.Col_.text), train.name)
-        stuck = train.status in NO_WAY_ON or bool(railway.long_legs(train))
-        status_color = color_u32(GONE) if stuck else color_u32(TEXT_DIM)
-        draw_list.add_text((low.x + 6, low.y + 21), status_color, train.status)
+    def net(self, railway: Railway, train: Train) -> float | None:
         ride = self.ride(railway, train)
-        if ride is not None:
-            money = dollars(ride.net)
-            right = imgui.get_item_rect_max().x - 6 - imgui.calc_text_size(money).x
-            colour = BRASS if ride.net >= 0 else GONE
-            draw_list.add_text((right, low.y + 3), color_u32(colour), money)
-            tip(f"What this ride earns after its costs\n\n{ride_lines(ride)}")
-        for index, car in enumerate(train.cars):
-            line, place = divmod(index, per_line)
-            left = low.x + 6 + place * (car_width + ROW_CAR_GAP)
-            top = low.y + ROW_CARS_TOP + line * (ROW_CAR + ROW_CAR_GAP)
-            good = None if car.dining else car.good
-            draw_small_car(
-                draw_list, good, car.load, car.capacity, (left, top), (car_width, ROW_CAR)
-            )
+        return None if ride is None else ride.net
+
+    def _rename_button(self, train: Train, title: str) -> None:
+        """A small pencil opening a box to name the train, or to give it back its route's
+        name."""
+        if imgui.small_button(f"{fa.ICON_FA_EDIT}##rename"):
+            self._naming = train.label or title
+            imgui.open_popup("rename train")
+        tip("Name this train")
+        if not imgui.begin_popup("rename train"):
+            return
+        if imgui.is_window_appearing():
+            imgui.set_keyboard_focus_here()
+        imgui.set_next_item_width(260)
+        entered, self._naming = imgui.input_text(
+            "##name", self._naming, imgui.InputTextFlags_.enter_returns_true.value
+        )
+        if entered:
+            train.label = self._naming.strip()
+            imgui.close_current_popup()
+        imgui.same_line()
+        if imgui.button("Name it"):
+            train.label = self._naming.strip()
+            imgui.close_current_popup()
+        imgui.begin_disabled(not train.label)
+        if imgui.button("Use its route's name"):
+            train.label = ""
+            imgui.close_current_popup()
+        imgui.end_disabled()
+        tip("Called after its first and last stations and its category, as it was", disabled=True)
+        imgui.end_popup()
 
     def _draw_train(
         self,
@@ -236,14 +292,23 @@ class TrainsWindow:
         supplies: Supplies,
         ground: GroundPicture,
         route_map: RouteMap,
+        picture: EnginePicture,
     ) -> None:
-        imgui.push_style_color(imgui.Col_.text, imgui.ImVec4(*BRASS))
-        imgui.text(train.name)
-        imgui.pop_style_color()
-        imgui.same_line()
-        imgui.text_disabled(f"{ENGINES[train.engine].title} - {train.status}")
-        width = imgui.get_content_region_avail().x
-        imgui.same_line(max(0.0, imgui.get_cursor_pos_x() + width - 330))
+        titles = railway.titles()
+        title = titles.get(train.name, train.name)
+        left = imgui.get_cursor_pos_x()
+        right = left + imgui.get_content_region_avail().x
+        engine_icon(picture, train)
+        imgui.same_line(0, 8)
+        imgui.align_text_to_frame_padding()
+        colored(BRASS, title)
+        imgui.same_line(0, 4)
+        self._rename_button(train, title)
+        named = left + ICON_BOX[0] + imgui.calc_text_size(title).x + NAME_ROOM
+        if named + HEAD_BUTTONS_WIDTH <= right:
+            imgui.same_line(right - HEAD_BUTTONS_WIDTH)
+        else:
+            imgui.set_cursor_pos_x(max(imgui.get_cursor_pos_x(), right - HEAD_BUTTONS_WIDTH))
         first_button(train)
         imgui.same_line()
         upgrade_button(railway, train)
@@ -255,6 +320,7 @@ class TrainsWindow:
             self.chosen = None
             return
         upgrade_menu(railway, train)
+        imgui.text_disabled(f"{ENGINES[train.engine].title} - {shown_status(train.status, titles)}")
         imgui.separator()
         destination = railway.destination(train)
         onward = "" if destination is None else railway.name_of(destination)
@@ -741,6 +807,14 @@ def upgrade_menu(railway: Railway, train: Train) -> None:
             imgui.end_disabled()
             tip(f"{summary}\nAs many as the cash allows, in the order bought", disabled=True)
     imgui.end_popup()
+
+
+def list_width(room: float, dragged: float | None) -> float:
+    """How wide the table of trains is in a window this wide: as the player dragged it, or
+    LIST_SHARE of it, but never under LEAST_LIST nor leaving the chosen train under
+    LEAST_TRAIN, unless the window is too narrow for both."""
+    wanted = room * LIST_SHARE if dragged is None else dragged
+    return max(min(wanted, room - LEAST_TRAIN - SPLIT_WIDTH), min(LEAST_LIST, room / 2))
 
 
 def _centered_hint(text: str) -> None:

@@ -269,7 +269,7 @@ class App:
             )
         self._draw_saves()
         draw_goal_news(self)
-        if self.clock.paused and not self.tiles.choosing:
+        if self.clock.paused and not (self.tiles.choosing or self.view.build.trains.open):
             draw_pause_banner(*self.view.map_rect)
         if self.tutorial is not None:
             goal = self.game.goal

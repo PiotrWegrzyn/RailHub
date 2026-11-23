@@ -122,16 +122,6 @@ def engine_summary(engine: Engine, per_cell: float | None = None) -> str:
     return "\n".join(lines)
 
 
-def row_cars(cars: int, width: float) -> tuple[float, int]:
-    """How wide a train's cars are drawn in its row of the list, and how many go on a line of
-    that width: ROW_CAR wide over up to ROW_CAR_LINES lines, or narrowed to fit in them."""
-    per_line = max(1, int((width + ROW_CAR_GAP) // (ROW_CAR + ROW_CAR_GAP)))
-    if cars <= per_line * ROW_CAR_LINES:
-        return ROW_CAR, per_line
-    per_line = -(-cars // ROW_CAR_LINES)
-    return max(1.0, (width + ROW_CAR_GAP) / per_line - ROW_CAR_GAP), per_line
-
-
 def carried_in(train: Train, index: int) -> list[Good]:
     """The goods a train's cars bring into its stop at `index`: what it takes on at the stop
     before, past any it only refuels at, so a train can carry them on past a station that has no
@@ -175,11 +165,6 @@ def ride_rows(ride: Ride) -> list[tuple[str, float, str]]:
     ]
 
 
-def ride_lines(ride: Ride) -> str:
-    """A ride's bill as lines of text."""
-    return "\n".join(f"{label}: {signed(amount)}" for label, amount, _ in ride_rows(ride))
-
-
 def ride_tiles(ride: Ride, onward: str) -> list[tuple[str, float, str]]:
     """The three figures over a train's route: what its cargo is worth at the next stop, what
     the ride there costs and what it earns after that."""
@@ -193,14 +178,3 @@ def ride_tiles(ride: Ride, onward: str) -> list[tuple[str, float, str]]:
         ),
         ("This ride earns", ride.net, "What its cargo earns there, less what the ride costs"),
     ]
-
-
-# The size of a car in a train's row, and the gap between cars and between their lines.
-ROW_CAR = 16.0
-
-
-ROW_CAR_GAP = 2.0
-
-
-# The most lines a train's cars take in its row; a train too long for them has its cars narrowed.
-ROW_CAR_LINES = 3

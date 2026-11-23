@@ -92,6 +92,7 @@ from railroads.sim.tilemap import TileMap
 from railroads.sim.tiles import Tiles
 from railroads.sim.track_network import TrackNetwork
 from railroads.sim.trade import COLLECTION_RADIUS, DELIVERY_RADIUS, Trade
+from railroads.sim.train_names import train_titles
 from railroads.sim.trains import (
     BURN_ALONE,
     ENGINES,
@@ -234,6 +235,10 @@ class Railway:
 
     def stations(self) -> list[Cell]:
         return self.constructions.stations()
+
+    def titles(self) -> dict[str, str]:
+        """What the player sees each train called, by its own name (train_titles)."""
+        return train_titles(self.trains, self.name_of)
 
     def town_of(self, station: Cell) -> int:
         """The town a station belongs to, 0 for none: worked out the first time it is asked

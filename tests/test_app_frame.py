@@ -1088,6 +1088,7 @@ def test_a_banner_over_the_map_says_so_while_time_stands_still(
     context: None, monkeypatch: pytest.MonkeyPatch, paused: bool
 ) -> None:
     app = made_app()
+    app.view.build.trains.open = False
     app.clock.paused = paused
     drawn: list[object] = []
     monkeypatch.setattr(app_module, "draw_pause_banner", lambda *corners: drawn.append(corners))
@@ -1095,6 +1096,20 @@ def test_a_banner_over_the_map_says_so_while_time_stands_still(
     frame(app)
 
     assert bool(drawn) == paused
+
+
+def test_the_pause_banner_stays_off_the_trains_window_that_covers_the_map(
+    context: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = made_app()
+    app.clock.paused = True
+    app.view.build.trains.open = True
+    drawn: list[object] = []
+    monkeypatch.setattr(app_module, "draw_pause_banner", lambda *corners: drawn.append(corners))
+
+    frame(app)
+
+    assert drawn == []
 
 
 def test_a_new_game_begins_with_time_standing_still() -> None:
