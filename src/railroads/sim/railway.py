@@ -587,18 +587,50 @@ class Railway:
 
     def leg_lengths(self, stops: list[Stop], engine: str) -> list[float | None]:
         """How long the way from each stop to the next, the last to the first, is for an engine,
-        in cells; None where no track it runs on joins them. Two stops running at the same station
-        are no way apart: the train goes on from the platform it stands at."""
+        in cells, from the platform it pulls into there coming from the stop before
+        (arrival_platform); None where no track it runs on joins them. Two stops running at the
+        same station are no way apart: the train goes on from the platform it stands at."""
         if len(stops) < 2:
             return []
         electric, maglev = ENGINES[engine].electric, ENGINES[engine].maglev
-        legs = zip(stops, stops[1:] + stops[:1], strict=True)
+        legs = zip(stops[-1:] + stops[:-1], stops, stops[1:] + stops[:1], strict=True)
         return [
             0.0
             if here.cell == there.cell
-            else self.network.route_length(here.cell, there.cell, electric, maglev)
-            for here, there in legs
+            else self.network.route_length(
+                self.arrival_platform(before.cell, here.cell, there.cell, engine),
+                there.cell,
+                electric,
+                maglev,
+            )
+            for before, here, there in legs
         ]
+
+    def arrival_platform(self, before: Cell, station: Cell, after: Cell, engine: str) -> Cell:
+        """The cell of a station a train coming from `before` and going on to `after` pulls into:
+        of its platforms, the one with the shortest way in and on (onward_cost)."""
+        cells = self.constructions.station_cells(
+            self.constructions.main_station(station) or station
+        )
+        if len(cells) < 2:
+            return station
+        electric, maglev = ENGINES[engine].electric, ENGINES[engine].maglev
+
+        def cost(cell: Cell) -> float:
+            way_in = self.network.route_length(before, cell, electric, maglev)
+            return (math.inf if way_in is None else way_in) + self.onward_cost(cell, after, engine)
+
+        return min(cells, key=cost)
+
+    def onward_cost(self, platform: Cell, after: Cell, engine: str) -> float:
+        """How far a train standing at a platform goes on to its next stop, in cells: nothing if
+        that is at the same station, and endless where no track it runs on leads there."""
+        main = self.constructions.main_station
+        if (main(platform) or platform) == (main(after) or after):
+            return 0.0
+        electric, maglev = ENGINES[engine].electric, ENGINES[engine].maglev
+        onward = self.network.route_length(platform, after, electric, maglev)
+        return math.inf if onward is None else onward
 
     def cargo_worth(self, train: Train) -> list[float]:
         """What each of a train's cars would earn if it were unloaded at its destination now
@@ -963,8 +995,8 @@ class Railway:
             train.first = False
 
     def _choose_platform(self, train: Train, signals: Signals) -> None:
-        """Takes the quickest way on to the station the train is bound for, if it has more than
-        one platform: looked for again as the way set for it comes within PLATFORM_CHOICE cells
+        """Takes the quickest way on to the station the train is bound for and from it to the stop
+        after (onward_cost), if it has more than one platform: looked for again as the way set for it comes within PLATFORM_CHOICE cells
         of the end of its path, and each PLATFORM_WAIT months it waits at a signal, from the end
         of the way set for it, a way counting HELD_WAY_COST cells longer for each cell of it
         another train holds."""
@@ -997,6 +1029,7 @@ class Railway:
         cell = self.network.cell_at(_middle(a, path[at + 1]))
         entry = self.network.entry_point(cell, a)
         engine = ENGINES[train.engine]
+        after = train.stops[(train.heading + 1) % len(train.stops)].cell
         best: tuple[float, Cell, tuple[list[Point], list[float]]] | None = None
         for target in cells:
             way = self.network.way_on(cell, entry, target, engine.electric, engine.maglev)
@@ -1008,6 +1041,7 @@ class Railway:
             } - set(cells)
             cost = sum(math.dist(p, q) for p, q in itertools.pairwise(points))
             cost += HELD_WAY_COST * signals.held_by_others(train, crossed)
+            cost += self.onward_cost(target, after, train.engine)
             if best is None or cost < best[0]:
                 best = (cost, target, way)
         if best is None or best[1] == self.network.cell_at(path[-1]):

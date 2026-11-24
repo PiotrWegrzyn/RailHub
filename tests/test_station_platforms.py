@@ -153,3 +153,18 @@ def test_a_train_bound_for_a_station_takes_its_other_platform_when_the_way_to_on
     railway.run(1e-4)
 
     assert railway.network.cell_at(train.path[-1]) == platform
+
+
+def test_the_way_on_from_a_station_is_measured_from_the_platform_a_train_pulls_into() -> None:
+    growth, railway = junction()
+    platform = platform_cell(growth)
+    assert add_platform(growth, HUB, platform, (3, 9)) is not None
+    north = plan_route(growth.constructions, platform, NORTH)
+    assert north is not None
+    lay_route(growth, north)
+    stops = [Stop(NORTH), Stop(HUB)]
+
+    legs = railway.leg_lengths(stops, "planet")
+
+    assert legs[1] == railway.network.route_length(platform, NORTH)
+    assert legs[1] < railway.network.route_length(HUB, NORTH)
