@@ -42,6 +42,7 @@ from railroads.ui.route_map import (
     station_at,
     summary_of,
     track_lines,
+    train_spot,
 )
 from railroads.ui.station_offers import Offer
 
@@ -465,3 +466,27 @@ def test_moving_to_another_station_starts_the_wait_again() -> None:
 
     assert moved == ((5, 5), 10.0 + TOOLTIP_DELAY)
     assert not shown
+
+
+def test_a_train_loading_at_a_station_is_shown_at_that_station() -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    train.stops = [Stop((6, 3), [Good.WHEAT], wait_for_load=True), Stop((6, 20))]
+    railway.run(0.1)
+
+    spot = train_spot(railway, train)
+
+    assert spot == railway.constructions.tile_map.grid.center(6, 3)
+
+
+def test_a_train_on_its_way_is_shown_where_it_runs() -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    train.stops = [Stop((6, 3)), Stop((6, 20))]
+    railway.run(0.3)
+    placed = railway.position(train)
+
+    spot = train_spot(railway, train)
+
+    assert placed is not None
+    assert spot == placed[0]

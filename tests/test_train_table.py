@@ -1,3 +1,4 @@
+from builders import joined_stations
 from railroads.sim.goods import Good
 from railroads.sim.trains import Car, Stop, Train
 from railroads.ui.train_table import (
@@ -10,6 +11,7 @@ from railroads.ui.train_table import (
     carried,
     shown_status,
     sort_rows,
+    train_rows,
 )
 from railroads.ui.trains_window import LEAST_LIST, LEAST_TRAIN, SPLIT_WIDTH, list_width
 
@@ -139,3 +141,13 @@ def test_the_table_is_dragged_no_narrower_than_its_least_nor_crowding_the_train_
     assert narrow == LEAST_LIST
     assert wide == room - LEAST_TRAIN - SPLIT_WIDTH
     assert untouched == room / 2
+
+
+def test_a_row_shows_every_car_the_train_pulls_now() -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    train.cars = [Car(Good.COAL, 10.0, capacity=144.0), Car(Good.WHEAT)]
+
+    rows = train_rows(railway, {}, lambda _: None)
+
+    assert rows[0].wagons == tuple(train.cars)

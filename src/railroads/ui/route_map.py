@@ -1,11 +1,11 @@
 """The map in the trains window: the ground seen from above, softened, with the track and stations
-on it, the chosen train's stops numbered. The wheel zooms it around the mouse, dragging moves it,
-clicking a station adds it to the train's stops, and hovering one sums up what it wants and what
-came to it. While the player hovers a good, the stations around which it is wanted or which it
-came to are ringed, a ring for each of three kinds, its shade by how much (SHADE_FROM): yellow to
-red where homes want it a month for a general need like food, heating or mail, light to dark
-violet where some building wants it a month for a need only it meets, and light to dark blue where
-more than LEAST_MADE of it came to the station over the last quarter."""
+on it, the chosen train's stops numbered and a dot where it is now. The wheel zooms it around the
+mouse, dragging moves it, clicking a station adds it to the train's stops, and hovering one sums
+up what it wants and what came to it. While the player hovers a good, the stations around which it
+is wanted or which it came to are ringed, a ring for each of three kinds, its shade by how much
+(SHADE_FROM): yellow to red where homes want it a month for a general need like food, heating or
+mail, light to dark violet where some building wants it a month for a need only it meets, and
+light to dark blue where more than LEAST_MADE of it came to the station over the last quarter."""
 
 import math
 import time
@@ -80,6 +80,8 @@ LABEL_SHADOW = (0.0, 0.0, 0.0, 0.75)
 DIMMED = (0.0, 0.0, 0.0, 0.35)
 NEEDED = (0.95, 0.27, 0.22, 1.0)
 MADE = (0.35, 0.65, 1.0, 1.0)
+# Where the train is now: a dot this colour, ringed.
+TRAIN_DOT = (0.35, 0.95, 0.45, 1.0)
 
 
 # Needs homes everywhere have: food, common goods and heating, which many goods meet, and the
@@ -442,6 +444,7 @@ class RouteMap:
                 (panel.left, panel.top), (panel.right, panel.bottom), color_u32(DIMMED)
             )
         self._draw_stations(draw_list, railway, train, spots, marks, hovered, frame)
+        _draw_train(draw_list, railway, train, frame)
         draw_list.pop_clip_rect()
         self._hover, rested = rest_on(self._hover, hovered, time.monotonic())
         if hovered is not None:
@@ -714,6 +717,30 @@ def track_lines(pieces: np.ndarray, double: list[bool]) -> list[tuple[np.ndarray
         points = behind[::-1] + pieces[first].tolist() + ahead
         lines.append((np.array(points), double[first]))
     return lines
+
+
+def train_spot(railway: Railway, train: Train) -> Vec2 | None:
+    """Where on the map the train is now: on its way, or at the station it stands at."""
+    placed = railway.position(train)
+    if placed is not None:
+        return placed[0]
+    if not train.stops:
+        return None
+    standing = train.stops[(train.heading - 1) % len(train.stops)].cell
+    x, y = railway.constructions.tile_map.grid.center(*standing)
+    return float(x), float(y)
+
+
+def _draw_train(
+    draw_list: imgui.ImDrawList, railway: Railway, train: Train, frame: MapFrame
+) -> None:
+    spot = train_spot(railway, train)
+    if spot is None:
+        return
+    x, y = frame.to_screen(*spot)
+    radius = min(max(frame.scale * 0.4, 4.0), 9.0)
+    draw_list.add_circle_filled((x, y), radius + 2.0, color_u32(STATION_EDGE))
+    draw_list.add_circle_filled((x, y), radius, color_u32(TRAIN_DOT))
 
 
 def add_stop(train: Train, station: Cell) -> None:

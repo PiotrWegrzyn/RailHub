@@ -1,6 +1,6 @@
 """The table of trains in the trains window, like a mail program's list of mail: a row a train
 with its engine's picture framed by its category, its name, first and last station, the cars its
-route takes most of, what it carries now, its status and what its ride earns; filters over it by station, a stop on
+route takes most of, the cars it pulls now and how full each is, its status and what its ride earns; filters over it by station, a stop on
 the way or a kind of car, and a click on a column's head sorts by it."""
 
 from collections.abc import Callable
@@ -19,7 +19,7 @@ from railroads.sim.train_names import (
     first_station,
     last_station,
 )
-from railroads.sim.trains import Cargo, Train, unit_name
+from railroads.sim.trains import Car, Cargo, Train, unit_name
 from railroads.ui.buy_train import PICTURE_BACK, EnginePicture
 from railroads.ui.theme import (
     BRASS,
@@ -30,6 +30,7 @@ from railroads.ui.theme import (
     color_u32,
     colored,
     draw_good_icon,
+    draw_small_car,
     tip,
 )
 from railroads.words import dollars, plural
@@ -46,6 +47,9 @@ FRAME_WIDTH = 2.0
 ROW_HEIGHT = 26.0
 # The size of a good's icon among the cars a route takes most of.
 CAR_ICON = 18.0
+# A car among those a train pulls now, filled by its load, and the gap between two.
+WAGON = (11.0, 16.0)
+WAGON_GAP = 1.0
 # How a status naming the train ahead begins: the simulation names it as bought.
 NAMING_STATUSES = ("Following ", "Waiting at a signal for ")
 ANY = "Any"
@@ -64,7 +68,7 @@ COLUMNS = (
     Column("First stop", 96.0),
     Column("Last stop", 96.0),
     Column("Cars used most", 112.0),
-    Column("Carrying", 120.0),
+    Column("Carrying", 150.0),
     Column("Status", 1.0, stretch=True),
     Column("This ride", 72.0),
 )
@@ -110,6 +114,7 @@ class Row:
     stuck: bool
     net: float | None
     carrying: tuple[tuple[Good, float], ...] = ()
+    wagons: tuple[Car, ...] = ()
 
 
 def carried(train: Train) -> tuple[tuple[Good, float], ...]:
@@ -149,6 +154,7 @@ def train_rows(
                 train.status in NO_WAY_ON or bool(railway.long_legs(train)),
                 net_of(train),
                 carried(train),
+                tuple(train.cars),
             )
         )
     return rows
@@ -309,7 +315,7 @@ def _draw_row(row: Row, picked: bool, picture: EnginePicture) -> bool:
     imgui.table_set_column_index(CARS)
     _draw_cars(row.cars)
     imgui.table_set_column_index(CARRYING)
-    _draw_carrying(row.carrying)
+    _draw_wagons(row.wagons)
     _cell(STATUS, row.status, GONE if row.stuck else TEXT_DIM)
     if row.net is None:
         _cell(RIDE, "-", TEXT_DIM)
@@ -348,22 +354,25 @@ def _draw_cars(cars: list[tuple[Cargo, int]]) -> None:
         imgui.text_disabled(f"{count}")
 
 
-def _draw_carrying(carrying: tuple[tuple[Good, float], ...]) -> None:
-    """What a train carries now, each good an icon and how much of it."""
-    if not carrying:
-        _cell(CARRYING, "empty", TEXT_DIM)
+def _draw_wagons(wagons: tuple[Car, ...]) -> None:
+    """The cars a train pulls now, each filled from the bottom by its share of what it holds."""
+    if not wagons:
+        _cell(CARRYING, "no cars", TEXT_DIM)
         return
-    top = imgui.get_cursor_pos_y() + (ROW_HEIGHT - CAR_ICON) / 2
-    for number, (good, load) in enumerate(carrying):
+    imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + (ROW_HEIGHT - WAGON[1]) / 2)
+    draw_list = imgui.get_window_draw_list()
+    for number, car in enumerate(wagons):
         if number:
-            imgui.same_line(0, 6)
-        imgui.set_cursor_pos_y(top)
-        imgui.dummy((CAR_ICON, CAR_ICON))
-        draw_good_icon(imgui.get_window_draw_list(), good, imgui.get_item_rect_min(), CAR_ICON)
-        tip(f"{good.value}: {load:.0f} {unit_name(good, load)} on board now")
-        imgui.same_line(0, 1)
-        imgui.set_cursor_pos_y(top + (CAR_ICON - imgui.get_text_line_height()) / 2)
-        imgui.text_disabled(f"{load:.0f}")
+            imgui.same_line(0, WAGON_GAP)
+        imgui.dummy(WAGON)
+        low = imgui.get_item_rect_min()
+        good = None if car.dining else car.good
+        draw_small_car(draw_list, good, car.load, car.capacity, (low.x, low.y), WAGON)
+        if car.dining:
+            tip("Dining car")
+        else:
+            held = f"{car.load:.0f} of {car.capacity:.0f} {unit_name(car.good, car.capacity)}"
+            tip(f"{car.good.value}: {held}")
 
 
 def _station_filter(
