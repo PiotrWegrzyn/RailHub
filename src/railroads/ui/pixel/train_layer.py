@@ -110,7 +110,7 @@ class TrainLayer:
         hidden = self.world.underground_all(
             [placed[0][0] for *_, placed in seen], [placed[0][1] for *_, placed in seen]
         )
-        four_lanes = blocks_of(railway.constructions).four_lanes
+        four_lanes = blocks_of(railway.constructions).lane_cells
         found = []
         for (train, back, look, placed), under in zip(seen, hidden, strict=True):
             if not under:
@@ -260,7 +260,7 @@ class TrainLayer:
         hidden = self.world.underground_all(
             [placed[0][0] for *_, placed in seen], [placed[0][1] for *_, placed in seen]
         )
-        four_lanes = blocks_of(railway.constructions).four_lanes
+        four_lanes = blocks_of(railway.constructions).lane_cells
         chimneys = []
         for (train, back, ((x, y), (dx, dy))), under in zip(seen, hidden, strict=True):
             if under:

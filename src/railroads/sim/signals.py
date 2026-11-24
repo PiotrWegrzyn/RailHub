@@ -15,7 +15,10 @@ SIGNAL_GAP short of the signal, red for it. Trains are let on in the order they 
 train frees track the train that has waited longest for it gets it first. A train gives up track
 cell by cell as its tail leaves it.
 
-On double track trains going opposite ways keep to their own tracks and never hold each other up.
+On double track trains going opposite ways keep to their own tracks and never hold each other up;
+on quadruple track trains going the same way keep to its two tracks that way, taking one no train
+ahead runs on, and through its junctions too, where two trains coming together or parting run side
+by side, the one on the side those tracks lie on taking the outer track (Blocks.apart).
 A train may follow another going its way onto track that one holds, FOLLOW_GAP behind it, as long
 as wherever all the trains ahead stopped it would stand clear too, and never past where theirs is
 set; anywhere else two trains never hold track in the same cell at once. Stations are no blocks:
@@ -153,19 +156,36 @@ class Blocks:
                 continue
             if any(entry in other.ends for other in pieces[beside]):
                 links[cell].append(beside)
-        # The cells of quadruple track that runs on as quadruple track at both ends, where trains
-        # going the same way keep to two tracks.
+
+        def runs_on_four(cell: Cell, end: int) -> bool:
+            beyond, entry = exits[(cell, end)]
+            return beyond in pieces and any(
+                piece.width == TrackWidth.QUADRUPLE and entry in piece.ends
+                for piece in pieces[beyond]
+            )
+
+        # The cells of quadruple track that runs on as quadruple track at both ends, straight on
+        # or through a junction, where trains going the same way keep to two tracks.
         self.four_lanes = {
             cell
             for cell in cells
             if kind(cell) == "quadruple"
-            and all(
-                kind(exits[(cell, end)][0]) == "quadruple"
-                for end in pieces[cell][0].ends
-                if exits[(cell, end)][0] in pieces
-            )
-            and all(exits[(cell, end)][0] in pieces for end in pieces[cell][0].ends)
+            and all(runs_on_four(cell, end) for end in pieces[cell][0].ends)
         }
+        # The ways across junction cells along quadruple track, where trains going the same way
+        # keep to its two tracks too, and the middle of each of those cells.
+        self.laned_ways: dict[Cell, set[frozenset[Point]]] = {}
+        for cell in cells:
+            ways = {
+                frozenset(point(cell, end) for end in piece.ends)
+                for piece in pieces[cell]
+                if piece.width == TrackWidth.QUADRUPLE
+            }
+            if kind(cell) == "junction" and ways:
+                self.laned_ways[cell] = ways
+        self.middles = {cell: rounded(grid.center(*cell)) for cell in self.laned_ways}
+        # The cells where trains going the same way keep to the two tracks of quadruple track.
+        self.lane_cells = self.four_lanes | set(self.laned_ways)
         # The block of each cell outside stations.
         self.block: dict[Cell, tuple[str, int]] = {}
         groups: dict[tuple[str, int], set[Cell]] = {}
@@ -225,14 +245,76 @@ class Blocks:
     ) -> bool:
         """Whether two trains crossing a cell, entering and leaving by these points, on these
         tracks of quadruple track, keep apart: on double or quadruple track going opposite ways,
-        or on quadruple track going the same way on different tracks."""
+        or on quadruple track going the same way on different tracks; through a junction of
+        quadruple track also where they come together or part, the one on the side its tracks
+        that way lie on taking the outer one (_branches_apart)."""
         if one == other:
-            return cell in self.four_lanes and lanes[0] != lanes[1]
-        return (
-            one[0] == other[1]
-            and one[1] == other[0]
-            and frozenset(one) in self.lanes.get(cell, set())
+            return lanes[0] != lanes[1] and (cell in self.four_lanes or self._laned(cell, one))
+        if one[0] == other[1] and one[1] == other[0]:
+            return frozenset(one) in self.lanes.get(cell, set())
+        if lanes[0] == lanes[1] or not (self._laned(cell, one) and self._laned(cell, other)):
+            return False
+        return self._branches_apart(cell, one, other, lanes)
+
+    def takes_lane(self, cell: Cell, entry: Point, exit_: Point) -> bool:
+        """Whether a way across a cell runs on one of the two tracks of quadruple track going
+        its way."""
+        return cell in self.four_lanes or self._laned(cell, (entry, exit_))
+
+    def natural_lane(self, cell: Cell, way: tuple[Point, Point]) -> int | None:
+        """The track of quadruple track a way across a junction keeps apart on from every other
+        way there going the same way that it comes together with or parts from
+        (_branches_apart), so a train coming the other way in can run alongside; None where
+        there is no such way, or no one track does."""
+        entry, exit_ = way
+        others = []
+        for other in self.laned_ways.get(cell, ()):
+            if other == frozenset(way):
+                continue
+            if exit_ in other and entry not in other:
+                (start,) = other - {exit_}
+                others.append((start, exit_))
+            elif entry in other and exit_ not in other:
+                (end,) = other - {entry}
+                others.append((entry, end))
+        if not others:
+            return None
+        for lane in (SLOW_LANE, FAST_LANE):
+            if all(self._branches_apart(cell, way, other, (lane, 1 - lane)) for other in others):
+                return lane
+        return None
+
+    def _laned(self, cell: Cell, way: tuple[Point, Point]) -> bool:
+        return frozenset(way) in self.laned_ways.get(cell, ())
+
+    def _branches_apart(
+        self,
+        cell: Cell,
+        one: tuple[Point, Point],
+        other: tuple[Point, Point],
+        lanes: tuple[int, int],
+    ) -> bool:
+        """Whether two ways going the same way across a junction of quadruple track, coming
+        together at one end or parting at the other, keep apart on these tracks: trains keep to
+        the tracks to the left of the way they go, the slow one outermost, so the one whose
+        other end lies further to the left must take the slow track and the other the fast."""
+        middle = self.middles[cell]
+        if one[1] == other[1] and one[0] != other[0]:
+            shared, ends, inward = one[1], (one[0], other[0]), False
+        elif one[0] == other[0] and one[1] != other[1]:
+            shared, ends, inward = one[0], (one[1], other[1]), True
+        else:
+            return False
+        way = (
+            (middle[0] - shared[0], middle[1] - shared[1])
+            if inward
+            else (shared[0] - middle[0], shared[1] - middle[1])
         )
+        left = [way[0] * (end[1] - middle[1]) - way[1] * (end[0] - middle[0]) for end in ends]
+        if abs(left[0] - left[1]) < SAME:
+            return False
+        outer = 0 if left[0] > left[1] else 1
+        return lanes[outer] == SLOW_LANE and lanes[1 - outer] == FAST_LANE
 
 
 def _joined(start: Cell, links: dict[Cell, list[Cell]]) -> set[Cell]:
@@ -447,7 +529,8 @@ class Signals:
         holder = None
         for lane in self._lanes_for(train, wanted):
             on_lane = [
-                replace(p, lane=lane) if p.cell in self.blocks.four_lanes else p for p in wanted
+                replace(p, lane=lane) if self.blocks.takes_lane(p.cell, p.entry, p.exit) else p
+                for p in wanted
             ]
             found = self._kept_off(train, crossings, stop, on_lane)
             if found is None:
@@ -457,7 +540,7 @@ class Signals:
                     self._hold(train, claim)
                 train.cleared = stop
                 train.asked = 0
-                if any(crossing.cell in self.blocks.four_lanes for crossing in wanted):
+                if any(self.blocks.takes_lane(p.cell, p.entry, p.exit) for p in wanted):
                     train.lane = lane
                 way = self._way_on(train, crossings, stop) if stop < length - SAME else None
                 if way:
@@ -472,15 +555,29 @@ class Signals:
     def _lanes_for(self, train: Train, wanted: list[Pass]) -> tuple[int, ...]:
         """The tracks of quadruple track a train tries in turn for the way it wants: one no train
         going its way runs on before one it would follow, so a train held up by one ahead passes
-        it on the other track; of two alike the fast track first for an express engine or a
-        railcar, and the slow track first for any other; only one where the way crosses no
-        quadruple track."""
-        if not any(p.cell in self.blocks.four_lanes for p in wanted):
+        it on the other track; of two alike the one a junction on the way leaves room beside
+        (Blocks.natural_lane), then the fast track first for an express engine or a railcar,
+        and the slow track first for any other; only one where the way crosses no quadruple
+        track."""
+        if not any(self.blocks.takes_lane(p.cell, p.entry, p.exit) for p in wanted):
             return (FAST_LANE,)
         engine = ENGINES[train.engine]
         fast = engine.express or engine.railcar
         lanes = (FAST_LANE, SLOW_LANE) if fast else (SLOW_LANE, FAST_LANE)
-        return tuple(sorted(lanes, key=lambda lane: self._taken(train, wanted, lane)))
+        natural = next(
+            (
+                lane
+                for p in wanted
+                if (lane := self.blocks.natural_lane(p.cell, (p.entry, p.exit))) is not None
+            ),
+            None,
+        )
+        return tuple(
+            sorted(
+                lanes,
+                key=lambda lane: (self._taken(train, wanted, lane), natural not in (None, lane)),
+            )
+        )
 
     def _taken(self, train: Train, wanted: list[Pass], lane: int) -> bool:
         """Whether another train holds quadruple track on the way the train wants, going its way
@@ -488,7 +585,7 @@ class Signals:
         return any(
             other is not train and (entry, exit_, held) == (crossing.entry, crossing.exit, lane)
             for crossing in wanted
-            if crossing.cell in self.blocks.four_lanes
+            if self.blocks.takes_lane(crossing.cell, crossing.entry, crossing.exit)
             for other, entry, exit_, _, held in self._held.get(crossing.cell, ())
         )
 

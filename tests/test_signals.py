@@ -540,3 +540,26 @@ def test_no_train_stands_on_the_way_on_kept_by_a_train_at_the_end_of_a_single_li
         game.railway.run(1 / 240)
 
     assert all(train.arrivals > old for train, old in zip(trains, before, strict=True))
+
+
+def test_two_trains_coming_together_at_a_junction_of_quadruple_track_go_through_side_by_side(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    game = quadruple_game(monkeypatch)
+    game.build_station(NORTH)
+    assert game.lay_track((8, 14), (4, 15), TrackWidth.QUADRUPLE).ok
+    assert game.lay_track((4, 15), NORTH, TrackWidth.DOUBLE).ok
+    branch = shuttle(game, NORTH, WEST)
+    for _ in range(120):
+        game.railway.run(STEP)
+    main = shuttle(game, EAST, WEST)
+    together = waited = 0
+
+    for _ in range(900):
+        game.railway.run(STEP)
+        held = [{claim[0] for claim in train.claims} for train in (main, branch)]
+        together += (8, 14) in held[0] and (8, 14) in held[1]
+        waited += any(train.status.startswith("Waiting") for train in (main, branch))
+
+    assert together > 0
+    assert waited == 0
