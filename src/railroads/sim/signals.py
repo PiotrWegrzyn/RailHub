@@ -6,7 +6,9 @@ beside it and any short line between them, is one; plain line between them is an
 single line meets double. A signal stands wherever track runs into a block from another, or out of
 a station. A train runs only on track set for it: before it runs on past a signal it asks for the
 way from there on, block by block, up to the first signal it could stand at without being in
-anyone's way but trains following it, with all of it in a station or on double track. The way is
+anyone's way but trains following it, with all of it in a station or on double track, or on the
+single line it came along when the way on from there runs into a station or onto double track
+before any more single line (`_line_end`). The way is
 set for it only once no other train holds any of it, and then all at once; until then it stands
 SIGNAL_GAP short of the signal, red for it. Trains are let on in the order they asked, so as one
 train frees track the train that has waited longest for it gets it first. A train gives up track
@@ -545,7 +547,45 @@ class Signals:
                 continue
             if self._on_double(crossings, crossing.start - train.length, crossing.start):
                 return crossing.start
+            if self._line_end(train, crossings, crossing.start):
+                return crossing.start
         return length
+
+    def _line_end(self, train: Train, crossings: list[Pass], signal: float) -> bool:
+        """Whether the train could stand at this signal at the end of a single line, all of it on
+        that line: as only trains wanting that line could want the track it holds, it is in
+        no one's way as long as the way on from there runs, before any more single line, to
+        where it could stand on double track or in a station, so none of the trains it waits
+        for could wait for it."""
+        blocks = self.blocks
+        behind = {
+            blocks.block.get(crossing.cell)
+            for crossing in crossings
+            if not crossing.touch
+            and crossing.end > signal - train.length + SAME
+            and crossing.start < signal - SAME
+        }
+        if len(behind) != 1:
+            return False
+        (line,) = behind
+        if line is None or line[0] != "single":
+            return False
+        before = None
+        for crossing in crossings:
+            if crossing.touch or crossing.start < signal - SAME:
+                continue
+            block = blocks.block.get(crossing.cell)
+            if block is not None and block[0] == "single":
+                return False
+            changes = before is None or block != before[1] or before[0] < crossing.start - SAME
+            before = (crossing.end, block)
+            if (
+                changes
+                and crossing.start > signal + SAME
+                and self._on_double(crossings, crossing.start - train.length, crossing.start)
+            ):
+                return True
+        return True
 
     def leave(self, train: Train) -> None:
         """Gives up the track the train's tail has left."""
