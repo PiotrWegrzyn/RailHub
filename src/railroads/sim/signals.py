@@ -8,7 +8,7 @@ a station. A train runs only on track set for it: before it runs on past a signa
 way from there on, block by block, up to the first signal it could stand at without being in
 anyone's way but trains following it, with all of it in a station or on double track, or on the
 single line it came along when the way on from there runs into a station or onto double track
-before any more single line (`_line_end`). The way is
+before any more single line and no other train holds any of it (`_line_end`). The way is
 set for it only once no other train holds any of it, and then all at once; until then it stands
 SIGNAL_GAP short of the signal, red for it. Trains are let on in the order they asked, so as one
 train frees track the train that has waited longest for it gets it first. A train gives up track
@@ -570,8 +570,8 @@ class Signals:
         """Whether the train could stand at this signal at the end of a single line, all of it on
         that line: as only trains wanting that line could want the track it holds, it is in
         no one's way as long as the way on from there runs, before any more single line, to
-        where it could stand on double track or in a station, so none of the trains it waits
-        for could wait for it."""
+        where it could stand on double track or in a station, and no other train holds any of
+        that way now, so none of the trains it waits for could wait for it."""
         blocks = self.blocks
         behind = {
             blocks.block.get(crossing.cell)
@@ -587,7 +587,11 @@ class Signals:
             return False
         before = None
         for crossing in crossings:
-            if crossing.touch or crossing.start < signal - SAME:
+            if crossing.start < signal - SAME:
+                continue
+            if crossing.touch:
+                if self._holder(train, crossing) is not None:
+                    return False
                 continue
             block = blocks.block.get(crossing.cell)
             if block is not None and block[0] == "single":
@@ -600,6 +604,8 @@ class Signals:
                 and self._on_double(crossings, crossing.start - train.length, crossing.start)
             ):
                 return True
+            if self._holder(train, crossing) is not None:
+                return False
         return True
 
     def leave(self, train: Train) -> None:
