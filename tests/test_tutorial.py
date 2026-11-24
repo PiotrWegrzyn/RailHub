@@ -9,11 +9,15 @@ from test_app_frame import context, frame, shell_frame
 
 from railroads.land import buy_lot_steps
 from railroads.saves import SavedGame, Saves
+from railroads.sim.anger import ANGER_SURCHARGE
 from railroads.sim.constructions import Building, BuildingKind
+from railroads.sim.demolition import DEMOLITION_PER_POINT
 from railroads.sim.finance import START_CASH, TRACK_PRICE
 from railroads.sim.game import Game
 from railroads.sim.goods import FREIGHT_SHARE, Good
 from railroads.sim.ownership import HOLD_MONTHS, SHARES
+from railroads.sim.points import Points
+from railroads.sim.railway import PLATFORM_LEVEL, PLATFORM_REACH, QUADRUPLE_ERA, REACH_LEVEL
 from railroads.sim.reach import LOCAL_REACH
 from railroads.sim.steps import finish
 from railroads.sim.tilemap import LAYERS
@@ -33,6 +37,7 @@ from railroads.tutorial.steps import SHARE_LOTS, STEPS, Seen, Step, Tutorial
 from railroads.ui.app import App, Shell
 from railroads.ui.main_menu import TutorialChoice
 from railroads.ui.map_view import Lens
+from railroads.words import dollars, share_of
 
 __all__ = ["context"]
 
@@ -477,6 +482,19 @@ def test_the_tutorial_gives_freight_bonus_goods_and_shares_as_the_game_has_them(
         f"{SHARES:,} shares, bought {SHARE_LOTS} at a time",
         f"sold {HOLD_MONTHS // 12} years after",
         f"up to {LOCAL_REACH} cells away",
+    ]
+
+    text = " ".join(" ".join(step.text) for step in STEPS)
+
+    assert [number for number in numbers if number not in text] == []
+
+
+def test_the_tutorial_gives_station_reach_moving_aside_and_track_as_the_game_has_them() -> None:
+    numbers = [
+        f"up to level {REACH_LEVEL}; from level {PLATFORM_LEVEL}",
+        f"a platform up to {PLATFORM_REACH} cells away",
+        f"from {dollars(DEMOLITION_PER_POINT[Points.POPULATION])} each, and {share_of(ANGER_SURCHARGE)}",
+        f"from era {QUADRUPLE_ERA}",
     ]
 
     text = " ".join(" ".join(step.text) for step in STEPS)

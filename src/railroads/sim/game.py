@@ -6,8 +6,8 @@ Each action returns an Outcome: what to tell the player, the cells that changed 
 ahead. Nothing is paid for unless it does, and the price told is what is paid. A station costs
 STATION_PRICE and clearing its site (railroads.sim.demolition), track what route_price says, the
 bulldozer what clearing the cell does, and moving a station what a new one there would. Buildings
-in the way of track, a station, a platform or a facility move aside at the price people's anger
-with the company sets (railroads.sim.anger), each raising it; it cools every few years, and the
+in the way of track, a station, a platform or a facility move aside, and the bulldozer takes them
+down, at the price people's anger with the company sets (railroads.sim.anger), each raising it; it cools every few years, and the
 player is told.
 """
 
@@ -23,7 +23,14 @@ from railroads.sim.autoplay import StandInPlayer, play
 from railroads.sim.clock import MONTHS_PER_YEAR, START_YEAR
 from railroads.sim.company import Goal, News, company_value
 from railroads.sim.constructions import Building, Constructions, Facility, TrackWidth
-from railroads.sim.demolition import bulldoze, bulldoze_price, station_site, station_site_price
+from railroads.sim.demolition import (
+    bulldoze,
+    bulldoze_price,
+    bulldozed_buildings,
+    station_site,
+    station_site_price,
+    strangers,
+)
 from railroads.sim.finance import STATION_PRICE, Finances
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
@@ -47,7 +54,10 @@ class Quote:
     price: float | None
     site: float = 0.0
     problem: str = ""
+    # How many buildings it moves aside or takes down, and how many of them are not the player's
+    # own and so raise people's anger with the company.
     moved: int = 0
+    angering: int = 0
 
 
 @dataclass(frozen=True)
@@ -169,26 +179,32 @@ class Game:
         problem = routes.station_problem(self.constructions, cell)
         if problem is not None:
             return Quote(None, problem=problem)
-        site = station_site_price(self.constructions, cell, self.anger.value)
+        owners, anger = self.growth.owners, self.anger.value
+        site = station_site_price(self.constructions, cell, anger, owners)
         if site is None:
             return Quote(None, problem="a building here can't be moved")
-        return Quote(STATION_PRICE + site, site, moved=self._site_moves(cell))
+        return self._leaving(STATION_PRICE + site, site, station_site(self.constructions, cell))
 
     def platform_quote(self, cell: Cell) -> Quote:
         """What clearing the cell for a platform costs, or why a platform can't go there."""
         problem = routes.station_problem(self.constructions, cell)
         if problem is not None:
             return Quote(None, problem=problem)
-        site = station_site_price(self.constructions, cell, self.anger.value)
-        return Quote(None) if site is None else Quote(site, site, moved=self._site_moves(cell))
-
-    def _site_moves(self, cell: Cell) -> int:
-        return len(station_site(self.constructions, cell) or [])
+        owners, anger = self.growth.owners, self.anger.value
+        site = station_site_price(self.constructions, cell, anger, owners)
+        if site is None:
+            return Quote(None)
+        return self._leaving(site, site, station_site(self.constructions, cell))
 
     def track_quote(self, route: routes.Route) -> Quote:
         """What laying a planned route costs, and how many buildings it moves aside."""
-        price = routes.route_price(self.constructions, route, self.anger.value)
-        return Quote(price, moved=len(routes.in_the_way(self.constructions, route)))
+        price = routes.route_price(self.constructions, route, self.anger.value, self.growth.owners)
+        return self._leaving(price, 0.0, routes.in_the_way(self.constructions, route))
+
+    def _leaving(self, price: float | None, site: float, buildings: list[Building] | None) -> Quote:
+        leaving = buildings or []
+        angering = len(strangers(leaving, self.growth.owners))
+        return Quote(price, site, moved=len(leaving), angering=angering)
 
     def _cool(self, year: int) -> None:
         """Cools people's anger with the company if this is a year it cools in, and tells the
@@ -207,19 +223,20 @@ class Game:
             )
         )
 
-    def _angered(self, before: int) -> str:
-        """Raises people's anger by the buildings moved aside since the room had moved `before`;
-        what to tell the player about it."""
-        moved = self.growth.room.moved - before
-        if not moved:
+    def _angered(self, quote: Quote, done: str = "moved aside") -> str:
+        """Raises people's anger by the buildings not the player's own that a quote moved aside
+        or took down; what to tell the player about it."""
+        if not quote.angering:
             return ""
-        self.anger.moved(moved)
-        buildings = "building" if moved == 1 else "buildings"
-        return f" Moved {moved} {buildings} aside; anger with the company is {self.anger.value}."
+        self.anger.moved(quote.angering)
+        many = "building" if quote.angering == 1 else "buildings"
+        return f" {quote.angering} {many} {done}; anger with the company is {self.anger.value}."
 
     def clearing_quote(self, cell: Cell) -> Quote:
-        """What clearing the cell with the bulldozer costs."""
-        return Quote(bulldoze_price(self.constructions, cell))
+        """What clearing the cell with the bulldozer costs, and how many buildings it takes down."""
+        owners = self.growth.owners
+        price = bulldoze_price(self.constructions, cell, self.anger.value, owners)
+        return self._leaving(price, 0.0, bulldozed_buildings(self.constructions, cell))
 
     def build_station(self, cell: Cell, ends: tuple[int, int] | None = None) -> Outcome:
         quote = self.station_quote(cell)
@@ -227,13 +244,12 @@ class Game:
             return Outcome(f"A station can't go there: {quote.problem}.")
         if short := self.finances.short_of(quote.price, "This station"):
             return Outcome(short)
-        before = self.growth.room.moved
         changed = routes.build_station(self.growth, cell, ends)
         if not changed:
             return Outcome("A station can't go there.")
         self._pay_for_station(quote.site)
         self.growth.station_trade.measure_demand(cell)
-        angered = self._angered(before)
+        angered = self._angered(quote)
         return Outcome(f"Station built for {dollars(quote.price)}.{angered}", changed, ok=True)
 
     def lay_track(
@@ -261,11 +277,11 @@ class Game:
         if route is None:
             return Outcome("No way for track to get there.")
         laid = len(route.changes(self.constructions))
-        price = routes.route_price(self.constructions, route, self.anger.value)
+        quote = self.track_quote(route)
+        price = quote.price or 0.0
         finances = self.finances
         if short := finances.short_of(price, "This track"):
             return Outcome(short)
-        before = self.growth.room.moved
         changed = routes.lay_route(self.growth, route)
         finances.spend(price, "track")
         message = (
@@ -273,11 +289,12 @@ class Game:
             if laid
             else "That track is laid already."
         )
-        return Outcome(message + self._angered(before), changed, ok=True)
+        return Outcome(message + self._angered(quote), changed, ok=True)
 
     def bulldoze(self, cell: Cell) -> Outcome:
         finances = self.finances
-        price = self.clearing_quote(cell).price
+        quote = self.clearing_quote(cell)
+        price = quote.price
         if price is None:
             return Outcome("Nothing here can be cleared.")
         if short := finances.short_of(price, "Clearing this"):
@@ -286,7 +303,8 @@ class Game:
         changed = bulldoze(self.growth, cell)
         self.railway.drop_stops(stations - set(self.railway.stations()))
         finances.spend(price, "demolition")
-        return Outcome(f"Cleared for {dollars(price)}.", changed, ok=True)
+        angered = self._angered(quote, "taken down")
+        return Outcome(f"Cleared for {dollars(price)}.{angered}", changed, ok=True)
 
     def add_platform(
         self, station: Cell, cell: Cell, ends: tuple[int, int] | None = None
@@ -296,12 +314,12 @@ class Game:
         if self.railway.platforms_left(station) <= 0:
             levels = either(range(PLATFORM_LEVEL, MAX_LEVEL + 1))
             return Outcome(f"Raise the station to level {levels} for another platform.")
-        site = self.platform_quote(cell).price
+        quote = self.platform_quote(cell)
+        site = quote.price
         if site is None:
             return Outcome("A platform can't go there.")
         if short := self.finances.short_of(site, "Clearing it"):
             return Outcome(short)
-        before = self.growth.room.moved
         changed = routes.add_platform(self.growth, station, cell, ends)
         if not changed:
             return Outcome(
@@ -310,7 +328,7 @@ class Game:
         if site:
             self.finances.spend(site, "demolition")
         price = f" for {dollars(site)}" if site else ""
-        return Outcome(f"Platform added{price}.{self._angered(before)}", changed, ok=True)
+        return Outcome(f"Platform added{price}.{self._angered(quote)}", changed, ok=True)
 
     def facility_quote(self, station: Cell, facility: Facility, cell: Cell) -> Quote:
         """What clearing the cell for a facility beside a station costs, or why it can't go
@@ -320,9 +338,11 @@ class Game:
         )
         if problem is not None:
             return Quote(None, problem=problem)
-        site = routes.facility_site_price(self.constructions, cell, facility, self.anger.value)
-        moved = len(routes.facility_site(self.constructions, cell, facility))
-        return Quote(site, site, moved=moved)
+        owners = self.growth.owners
+        site = routes.facility_site_price(
+            self.constructions, cell, facility, self.anger.value, owners
+        )
+        return self._leaving(site, site, routes.facility_site(self.constructions, cell, facility))
 
     def add_facility(self, station: Cell, facility: Facility, cell: Cell) -> Outcome:
         """Puts up a facility beside a station for what clearing its cell costs; from then on it
@@ -333,12 +353,11 @@ class Game:
             return Outcome(f"{name} can't go there: {quote.problem}.")
         if short := self.finances.short_of(quote.price, "Clearing it"):
             return Outcome(short)
-        before = self.growth.room.moved
         changed = routes.add_facility(self.growth, station, facility, cell)
         if quote.price:
             self.finances.spend(quote.price, "demolition")
         price = f" for {dollars(quote.price)}" if quote.price else ""
-        return Outcome(f"{name} put up{price}.{self._angered(before)}", changed, ok=True)
+        return Outcome(f"{name} put up{price}.{self._angered(quote)}", changed, ok=True)
 
     def move_station(self, old: Cell, new: Cell, ends: tuple[int, int] | None = None) -> Outcome:
         """Moves a station, its track running between `ends` in its new cell, keeping its
@@ -348,13 +367,12 @@ class Game:
             return Outcome(f"The station can't go there: {quote.problem}.")
         if short := self.finances.short_of(quote.price, "Moving it there"):
             return Outcome(short)
-        before = self.growth.room.moved
         changed = routes.move_station(self.growth, self.railway, old, new, ends)
         if changed is None:
             return Outcome("The station can't go there.")
         self._pay_for_station(quote.site)
         self.growth.station_trade.measure_demand(new)
-        angered = self._angered(before)
+        angered = self._angered(quote)
         return Outcome(f"Station moved for {dollars(quote.price)}.{angered}", changed, ok=True)
 
     def _pay_for_station(self, site: float) -> None:

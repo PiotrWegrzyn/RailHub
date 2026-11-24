@@ -171,7 +171,9 @@ raised one level so it reaches three hexes out. It lays no track and runs no tra
 a station reaches, a third thrive, half are content (half their needs met) and the rest go
 unsatisfied, and they grow and glow as if trains served them. Only the hexagon map is grown.
 
-Drag the map or hold the arrow keys to move round it.
+Drag the map or hold the arrow keys to move round it. Esc cancels track, a station move or a
+facility half built and, with nothing half built, closes every open window at once; the tutorial
+stays, and an open question keeps Esc for itself.
 
 In the corner of the view, a minimap (M to show or hide) shows where the map lies in the world
 and the whole map from above with the part on screen outlined; click or drag on it to look there, and scroll over it to zoom it in to x2, x4 or x8 around the view.
@@ -1234,14 +1236,16 @@ buildings move show before the click. A building costs $5,000 a population point
 a block of flats $90,000), $5,000 a field, $15,000 an industry point (a factory $15,000, a mega factory $135,000), $20,000 a mine or a point
 of a shop or business, $30,000 a port, and a skyscraper $1,000,000; one-off buildings, the
 novelties and the St. Peter's Basilica, cannot be moved or taken down, and neither station nor
-track goes where one would have to. Every building moved aside raises people's anger with the
-company, W (`railroads.sim.anger`), by 1, and each point of W makes moving a building 50% of its
-price dearer, added up and not compounded: at W = 2 it costs twice its price. W cools on
-1 January of every year divisible by 5, to W − ceil(log2(1 + W)): three buildings moved leave
-W = 1 after the next cooling. The player is told when it cools, and the reports show W, what
-moving a building costs and when it cools next. The bulldozer clears a whole cell at the plain
-prices, raising no anger, track for a quarter
-of what it cost to lay and a station for $5,000, buildings the player owns too. A station can be
+track goes where one would have to. Every building moved aside or bulldozed raises people's
+anger with the company, W (`railroads.sim.anger`), by 1, and each point of W makes moving or
+bulldozing a building 50% of its price dearer, added up and not compounded: at W = 2 it costs
+twice its price. The player's own buildings, all of whose shares they hold, cost the plain price
+and raise no anger, and leave a cell after the others of their kind; a building they own only
+part of counts as anyone else's, and track and stations never count. W cools on 1 January of
+every year divisible by 5, to W − ceil(log2(1 + W)): three buildings moved leave W = 1 after the
+next cooling. The player is told when it cools, and the reports show W, what moving a building
+costs and when it cools next. The bulldozer clears a whole cell, buildings at those prices, track
+for a quarter of what it cost to lay and a station for $5,000, buildings the player owns too. A station can be
 moved from its window: it costs a new station and clearing the new cell, its trains, name and
 goods go with it, and it starts again at level 1 with no extra storage. For track,
 click where it starts and then where it goes; while choosing where it goes, the planned track shows

@@ -12,7 +12,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.railway import PLATFORM_REACH
 from railroads.sim.routes import Route, plan_route_steps, station_way
 from railroads.sim.steps import Steps, finish
-from railroads.ui.build_menu import PRICED_TOOLS, STATION_TOOLS, Tool, moving_note
+from railroads.ui.build_menu import PRICED_TOOLS, STATION_TOOLS, Tool, moving_note, taking_down_note
 from railroads.words import dollars
 
 if TYPE_CHECKING:
@@ -199,8 +199,13 @@ class MapTools:
             build.hover_note = ""
             return
         if build.tool == Tool.BULLDOZE:
-            price = game.clearing_quote(cell).price
-            build.hover_note = "" if price is None else f"Clearing this cell: {dollars(price)}"
+            clearing = game.clearing_quote(cell)
+            build.hover_note = (
+                ""
+                if clearing.price is None
+                else f"Clearing this cell: {dollars(clearing.price)}"
+                f"{taking_down_note(clearing.moved, clearing.angering)}"
+            )
             return
         if build.tool == Tool.ADD_FACILITY:
             if build.moving is None or build.facility is None:
@@ -213,7 +218,7 @@ class MapTools:
                 if quote.price is None
                 else f"{name} here"
                 + (
-                    f": {dollars(quote.price)} to clear the cell{moving_note(quote.moved)}."
+                    f": {dollars(quote.price)} to clear the cell{moving_note(quote.moved, quote.angering)}."
                     if quote.price
                     else "."
                 )
@@ -225,7 +230,7 @@ class MapTools:
                 "A platform can't go here"
                 if platform.price is None
                 else f"New platform here: {dollars(platform.price)}"
-                f"{moving_note(platform.moved)}. Q turns it."
+                f"{moving_note(platform.moved, platform.angering)}. Q turns it."
             )
             return
         quote = game.station_quote(cell)
@@ -234,7 +239,7 @@ class MapTools:
             if quote.price is None
             else f"Here: {dollars(quote.price)}"
             + (
-                f" ({dollars(quote.site)} of it clearing the cell{moving_note(quote.moved)})"
+                f" ({dollars(quote.site)} of it clearing the cell{moving_note(quote.moved, quote.angering)})"
                 if quote.site
                 else ""
             )
@@ -299,3 +304,4 @@ class MapTools:
             quote = None if route is None else self._view.game.track_quote(route)
             build.preview_price = None if quote is None else quote.price
             build.preview_moved = 0 if quote is None else quote.moved
+            build.preview_angering = 0 if quote is None else quote.angering

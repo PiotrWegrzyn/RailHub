@@ -701,5 +701,5 @@ class TilesWindow:
             if imgui.button(TITLES[other], BUTTON) or imgui.is_key_pressed(key):
                 self.show(other)
             imgui.same_line(0, max(8.0, width - 2 * BUTTON[0]))
-            if imgui.button("Close", BUTTON) or imgui.is_key_pressed(imgui.Key.escape):
+            if imgui.button("Close", BUTTON):
                 self.open = False

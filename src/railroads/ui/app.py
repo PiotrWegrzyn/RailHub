@@ -248,6 +248,8 @@ class App:
             self._autosave_due = not done.value
 
     def _draw(self) -> None:
+        if self._escape_pressed():
+            self.escape()
         self._point_the_way()
         draw_top_bar(self)
         self.view.gui()
@@ -287,6 +289,30 @@ class App:
             self.reports.open = not self.reports.open
         if not typing and imgui.is_key_pressed(imgui.Key.f5, repeat=False):
             self.toggle_saves()
+
+    @staticmethod
+    def _escape_pressed() -> bool:
+        """Whether Esc was pressed for the game, not for a text field or a popup, which close on
+        it themselves."""
+        any_popup = imgui.PopupFlags_.any_popup_id.value | imgui.PopupFlags_.any_popup_level.value
+        return (
+            imgui.is_key_pressed(imgui.Key.escape, repeat=False)
+            and not imgui.get_io().want_text_input
+            and not imgui.is_popup_open("", any_popup)
+        )
+
+    def escape(self) -> None:
+        """Cancels what is half built or, with nothing half built, closes every open window at
+        once; the tutorial stays."""
+        build = self.view.build
+        busy = build.busy
+        build.stop()
+        if not busy:
+            self.close_windows()
+
+    def close_windows(self) -> None:
+        self.help.open = self.tiles.open = self.reports.open = self.saves_window.open = False
+        self.view.close_windows()
 
     def _point_the_way(self) -> None:
         """Frames what the tutorial's step wants clicked and marks its cells on the map, until

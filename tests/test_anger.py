@@ -3,10 +3,17 @@ import pytest
 
 from builders import flat_map, make_game
 from railroads.sim.anger import Anger, cooled, cooling_year, surcharge
-from railroads.sim.constructions import Building, BuildingKind, Constructions, TrackWidth
+from railroads.sim.constructions import (
+    Building,
+    BuildingKind,
+    Constructions,
+    Track,
+    TrackWidth,
+)
 from railroads.sim.demolition import moving_price
 from railroads.sim.finance import STATION_PRICE
 from railroads.sim.game import Game
+from railroads.sim.ownership import SHARES
 from railroads.sim.railway import Railway
 from railroads.sim.routes import plan_route
 from railroads.ui.reports_window import anger_lines
@@ -148,3 +155,54 @@ def test_the_reports_say_nobody_is_angry_before_any_building_is_moved() -> None:
     assert title == "Anger with the company: 0"
     assert "1 times" not in text
     assert "cools" not in text
+
+
+def test_the_bulldozer_raises_anger_and_pays_the_surcharge_for_each_building() -> None:
+    game = make_game()
+    game.anger.value = 2
+    for _ in range(2):
+        game.growth.build(Building((5, 5), BuildingKind.HOUSE))
+
+    done = game.bulldoze((5, 5))
+
+    assert done.ok
+    assert game.anger.value == 4
+    assert game.finances.cash == 1_000_000.0 - 20_000
+
+
+def test_bulldozing_track_raises_no_anger() -> None:
+    game = make_game()
+    game.constructions.build(Track((5, 5), (0, 6)))
+
+    done = game.bulldoze((5, 5))
+
+    assert done.ok
+    assert game.anger.value == 0
+
+
+def test_the_players_own_buildings_cost_the_plain_price_and_raise_no_anger() -> None:
+    game = make_game()
+    game.anger.value = 2
+    for _ in range(2):
+        game.growth.build(Building((5, 5), BuildingKind.HOUSE))
+    game.growth.owners.own((5, 5), BuildingKind.HOUSE, SHARES)
+    quote = game.station_quote((5, 5))
+
+    done = game.build_station((5, 5))
+
+    assert done.ok
+    assert quote.moved == 2
+    assert quote.angering == 1
+    assert quote.site == 10_000 + 5_000
+    assert game.anger.value == 3
+
+
+def test_a_building_the_player_owns_only_part_of_still_raises_anger() -> None:
+    game = make_game()
+    game.growth.build(Building((5, 5), BuildingKind.HOUSE))
+    game.growth.owners.own((5, 5), BuildingKind.HOUSE, SHARES - 100)
+
+    done = game.bulldoze((5, 5))
+
+    assert done.ok
+    assert game.anger.value == 1

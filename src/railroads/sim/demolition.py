@@ -3,15 +3,18 @@ everything the bulldozer takes down.
 
 A building costs DEMOLITION_PER_POINT times the points it gives (railroads.sim.ladders): a house or
 a field $5,000, mines, factories and works dearer, and a skyscraper a million. Moving one aside
-costs that times the surcharge people's anger with the company sets (railroads.sim.anger); the
-bulldozer pays it plain. One-off buildings (UNIQUE) cannot be moved or taken down at all, and
+costs that times the surcharge people's anger with the company sets (railroads.sim.anger), and so
+does taking one down with the bulldozer; either raises the anger. The player's own buildings, all
+of whose shares they hold, cost the plain price and raise no anger, and leave a cell after the
+others of their kind, as the player's shares do (railroads.sim.ownership). One-off buildings (UNIQUE) cannot be moved or taken down at all, and
 nothing is cleared where one would have to go. Making room moves the smallest buildings first, as
 Room.move_aside does, so a price worked out beforehand is what is paid. Track costs TRACK_REMOVAL_SHARE of what it cost to lay, a station
 STATION_REMOVAL, taking its platforms and facilities with it, and a facility FACILITY_REMOVAL. Track or a station bulldozed takes with it, for nothing, any branch beside it
 that led only into it off a junction; the end of a plain line stays to be laid on from.
 """
 
-from collections.abc import Mapping
+from collections import Counter
+from collections.abc import Iterable, Mapping
 from types import MappingProxyType
 
 from railroads.sim.anger import surcharge
@@ -28,6 +31,7 @@ from railroads.sim.finance import track_price
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import POINTS
+from railroads.sim.ownership import SHARES, Owners
 from railroads.sim.points import Points
 from railroads.sim.room import leaving_order
 
@@ -69,6 +73,37 @@ def moving_price(kind: BuildingKind, anger: int = 0) -> float | None:
     return None if price is None else price * surcharge(anger)
 
 
+def strangers(buildings: Iterable[Building], owners: Owners | None) -> list[Building]:
+    """Those of the buildings leaving their cells, in the order they leave, that are not the
+    player's own: the player's own buildings of a kind in a cell, all of whose shares they hold,
+    leave after the others."""
+    leaving = list(buildings)
+    if owners is None:
+        return leaving
+    others: dict[tuple[Cell, BuildingKind], int] = {}
+    for cell, kind in Counter((b.cell, b.kind) for b in leaving):
+        own = int(owners.shares(kind)[cell]) // SHARES
+        others[cell, kind] = owners.total(cell, kind) // SHARES - own
+    picked = []
+    for building in leaving:
+        key = (building.cell, building.kind)
+        if others[key] > 0:
+            others[key] -= 1
+            picked.append(building)
+    return picked
+
+
+def leaving_price(
+    buildings: Iterable[Building], anger: int = 0, owners: Owners | None = None
+) -> float:
+    """What moving the buildings aside or taking them down costs while the company's anger is
+    `anger`: the player's own at the plain price, the rest at the surcharge."""
+    leaving = list(buildings)
+    plain = sum(demolition_price(b.kind) or 0.0 for b in leaving)
+    angering = sum(demolition_price(b.kind) or 0.0 for b in strangers(leaving, owners))
+    return plain + angering * (surcharge(anger) - 1.0)
+
+
 def clearing(constructions: Constructions, cell: Cell, units: int) -> list[Building] | None:
     """The buildings that must leave the cell for `units` of room, in the order they go; None if
     one of them cannot be taken down."""
@@ -86,14 +121,18 @@ def clearing(constructions: Constructions, cell: Cell, units: int) -> list[Build
 
 
 def clearing_price(
-    constructions: Constructions, cell: Cell, units: int, anger: int = 0
+    constructions: Constructions,
+    cell: Cell,
+    units: int,
+    anger: int = 0,
+    owners: Owners | None = None,
 ) -> float | None:
     """What making `units` of room in the cell costs while the company's anger is `anger`; None
     where it cannot be made."""
     leaving = clearing(constructions, cell, units)
     if leaving is None:
         return None
-    return sum(moving_price(b.kind, anger) or 0.0 for b in leaving)
+    return leaving_price(leaving, anger, owners)
 
 
 def station_site(constructions: Constructions, cell: Cell) -> list[Building] | None:
@@ -108,27 +147,35 @@ def station_site(constructions: Constructions, cell: Cell) -> list[Building] | N
     return list(here)
 
 
-def station_site_price(constructions: Constructions, cell: Cell, anger: int = 0) -> float | None:
+def station_site_price(
+    constructions: Constructions, cell: Cell, anger: int = 0, owners: Owners | None = None
+) -> float | None:
     """What clearing a cell for a station costs while the company's anger is `anger`; None where
     a building cannot be moved."""
     site = station_site(constructions, cell)
     if site is None:
         return None
-    return sum(moving_price(b.kind, anger) or 0.0 for b in site)
+    return leaving_price(site, anger, owners)
 
 
-def bulldoze_price(constructions: Constructions, cell: Cell) -> float | None:
-    """What bulldozing a cell costs: every building, piece of track and station there, one-off
-    buildings left standing; None when there is nothing it can take down."""
+def bulldozed_buildings(constructions: Constructions, cell: Cell) -> list[Building]:
+    """The buildings bulldozing a cell takes down: all but the one-offs."""
+    return [b for b in constructions.buildings_at(cell) if b.kind not in UNIQUE]
+
+
+def bulldoze_price(
+    constructions: Constructions, cell: Cell, anger: int = 0, owners: Owners | None = None
+) -> float | None:
+    """What bulldozing a cell costs while the company's anger is `anger`: every building at
+    what moving it aside would cost, every piece of track and station there, one-off buildings
+    left standing; None when there is nothing it can take down."""
     tile = constructions.tile_map.tile(cell)
-    total, found = 0.0, False
+    taken = bulldozed_buildings(constructions, cell)
+    total, found = leaving_price(taken, anger, owners), bool(taken)
     for built in constructions.at(cell):
         if isinstance(built, Building):
-            price = demolition_price(built.kind)
-            if price is None:
-                continue
-            total += price
-        elif isinstance(built, Station):
+            continue
+        if isinstance(built, Station):
             total += STATION_REMOVAL
         elif isinstance(built, Annex):
             total += FACILITY_REMOVAL
