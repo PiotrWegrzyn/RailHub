@@ -1039,8 +1039,11 @@ class TrackArt:
         if not mains:
             return None
         main = min(mains, key=lambda other: grid.track_turn(*other.ends))
-        # The tracks of both, to the left of the way from this end into the cell.
-        tracks = _lane_sides(int(main.width))
+        # The tracks of both, to the left of the way from this end into the cell: the main
+        # track's where they lie at this end, closed up where it runs into narrower track.
+        from_here = 1.0 if point == main.ends[0] else -1.0
+        at_end = self._ends(main)[0 if point == main.ends[0] else 1]
+        tracks = sorted({round(from_here * lane, 9) for lane in at_end})
         own = _lane_sides(int(piece.width))
         matrix = self.projection.matrix
         on = matrix @ (self._steps[main.other_end(point)] / 2)
@@ -1051,7 +1054,7 @@ class TrackArt:
         else:
             joins = [
                 sorted(
-                    (lane for lane in tracks if len(own) == 1 or lane * mine > 0),
+                    [lane for lane in tracks if len(own) == 1 or lane * mine > 0] or tracks,
                     key=lambda lane: -lane * side,
                 )
                 for mine in own
