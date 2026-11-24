@@ -84,6 +84,31 @@ def test_a_train_coming_down_a_single_line_leaves_the_junction_at_its_end_to_oth
     assert coming_was < at_junction
 
 
+def test_a_train_on_a_single_line_holds_only_its_line_while_a_train_from_a_branch_goes_ahead() -> (
+    None
+):
+    junction = (8, 8)
+    game = game_with(
+        (EAST, junction, TrackWidth.SINGLE),
+        (junction, WEST, TrackWidth.SINGLE),
+        (SOUTH, junction, TrackWidth.SINGLE),
+    )
+    far = shuttle(game, EAST, WEST)
+    run_months(game, 0.01)
+    near = shuttle(game, SOUTH, WEST)
+    at_junction = next(p.start for p in passes(game.railway.network, far) if p.cell == junction)
+    far_was = None
+
+    for _ in range(int(1 / STEP)):
+        game.railway.run(STEP)
+        if junction in {claim[0] for claim in near.claims}:
+            far_was = far.along
+            break
+
+    assert far_was is not None
+    assert far_was < at_junction
+
+
 def test_a_plain_line_has_signals_only_where_it_leaves_each_station() -> None:
     game = game_with((WEST, EAST, TrackWidth.SINGLE))
 

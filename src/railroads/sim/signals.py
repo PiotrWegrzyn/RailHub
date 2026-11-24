@@ -8,8 +8,9 @@ a station. A train runs only on track set for it: before it runs on past a signa
 way from there on, block by block, up to the first signal it could stand at without being in
 anyone's way but trains following it, with all of it in a station or on double track (none of it
 beside track through a corner), or on the
-single line it came along when the way on from there runs into a station or onto double track
-before any more single line and no other train holds any of it (`_line_end`). The way is
+single line it came along, holding no more than that line, when no other train holds any of the
+way on from there to a station or double track (`_line_end`), which no train may stand on
+meanwhile. The way is
 set for it only once no other train holds any of it, and then all at once; until then it stands
 SIGNAL_GAP short of the signal, red for it. Trains are let on in the order they asked, so as one
 train frees track the train that has waited longest for it gets it first. A train gives up track
@@ -622,12 +623,23 @@ class Signals:
                     for crossing in crossings
                     if crossing.end > stop - train.length + SAME and crossing.start < stop - SAME
                 ]
+            arriving = stop >= self.network.length(train) - SAME
             for other, way in self._kept:
-                if other is not train and self._crosses(standing, way):
+                if other is train or not self._crosses(standing, way):
+                    continue
+                if not (arriving and not leaders and self._ends_with(other, way)):
                     return other
         if not train.first:
             return self._queued_before(train, wanted)
         return None
+
+    def _ends_with(self, train: Train, way: list[Pass]) -> bool:
+        """Whether a train's path ends where this way on of it does: a train coming to the end
+        of its path there gives up all its track as it gets in, so it may stand on that way
+        as it does, but not where the train keeping it turns back to come out again."""
+        return not any(
+            crossing.start > way[-1].start + SAME for crossing in passes(self.network, train)
+        )
 
     def _crosses(self, wanted: list[Pass], way: list[Pass]) -> bool:
         """Whether a way a train wants crosses another way, on track that can't be shared."""
@@ -749,8 +761,9 @@ class Signals:
     def _way_on(self, train: Train, crossings: list[Pass], signal: float) -> list[Pass] | None:
         """The way on from a signal at the end of a single line, with all of the train on that
         line, where as only trains wanting that line could want the track it holds, it is in no
-        one's way while that way is free: if it runs, before any more single line, to where the
-        train could stand on double track or in a station."""
+        one's way while that way is free: up to where the train could stand on double track or
+        in a station, across any junctions and single line between, as long as it never comes
+        back onto that line."""
         blocks = self.blocks
         behind = {
             blocks.block.get(crossing.cell)
@@ -773,7 +786,7 @@ class Signals:
                 way.append(crossing)
                 continue
             block = blocks.block.get(crossing.cell)
-            if block is not None and block[0] == "single":
+            if block == line:
                 return None
             changes = before is None or block != before[1] or before[0] < crossing.start - SAME
             before = (crossing.end, block)
