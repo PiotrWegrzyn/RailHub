@@ -17,7 +17,7 @@ from railroads.sim.finance import (
 from railroads.sim.goods import Good, Need, freight_of
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
-from railroads.sim.railway import CELLS_PER_MONTH, Railway
+from railroads.sim.railway import CELLS_PER_MONTH, NO_TRACK_ON, Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.station_goods import STOCKPILE, STORAGE_STEP, WAITING, StationGoods
 from railroads.sim.trade import SCARCE_WORTH, StationOrder
@@ -945,3 +945,23 @@ def test_a_train_whose_way_ahead_is_taken_up_goes_round_by_the_track_laid_instea
     cells = {railway.network.cell_at(point) for point in train.path}
     assert not cells & gone
     assert railway.network.cell_at(train.path[-1]) == (6, 20)
+
+
+def test_a_train_whose_way_ahead_is_taken_up_with_no_other_stands_and_says_there_is_no_track() -> (
+    None
+):
+    _, railway = joined_stations()
+    constructions = railway.constructions
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3), wait_for_load=False), Stop((6, 20), wait_for_load=False)]
+    railway.run(0.05)
+    for piece in constructions.track_at((6, 12)):
+        constructions.remove(piece)
+    railway.run(0.01)
+    standing = train.along
+
+    railway.run(0.1)
+
+    assert train.along == standing
+    assert train.status == NO_TRACK_ON

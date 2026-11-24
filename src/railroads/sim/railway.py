@@ -106,6 +106,7 @@ from railroads.sim.trains import (
     OPENED_BY,
     SLOWDOWN,
     Cargo,
+    Engine,
     Point,
     Power,
     Stop,
@@ -915,13 +916,7 @@ class Railway:
             engine = ENGINES[train.engine]
             way = self.route(here, there, engine.electric, engine.maglev)
             if way is None:
-                train.status = (
-                    NO_ELECTRIFIED_TRACK_ON
-                    if engine.electric
-                    else NO_MAGLEV_TRACK_ON
-                    if engine.maglev
-                    else NO_TRACK_ON
-                )
+                train.status = self._no_way_status(engine)
                 return
             leg = self.network.route_length(here, there, engine.electric, engine.maglev)
             assert leg is not None
@@ -954,6 +949,10 @@ class Railway:
             months * CELLS_PER_MONTH * self.network.speed_at(train) * self.pull(train) * speed
         )
         self._keep_on_track(train, signals)
+        if train.stranded:
+            train.status = self._no_way_status(engine)
+            train.pace = 0.0
+            return
         self._choose_platform(train, signals)
         ask = self.asks + 1
         holder = signals.let_on(train, ask, wanted)
@@ -1015,15 +1014,23 @@ class Railway:
             return
         self._take_quickest(train, signals, cells)
 
+    @staticmethod
+    def _no_way_status(engine: Engine) -> str:
+        """What a train says when no track its engine runs on leads to its next stop."""
+        if engine.electric:
+            return NO_ELECTRIFIED_TRACK_ON
+        return NO_MAGLEV_TRACK_ON if engine.maglev else NO_TRACK_ON
+
     def _keep_on_track(self, train: Train, signals: Signals) -> None:
         """Once track has changed, finds the train a new way on if the way set for it runs where
-        track is no longer laid (_take_quickest); it keeps the old one, and waits, while no track
-        leads on."""
+        track is no longer laid (_take_quickest); while no track leads on it is stranded, standing
+        where it is until track changes again."""
         version = self.constructions.railway_version
         if train.laid_for == version:
             return
         if not train.path or self._still_laid(train):
             train.laid_for = version
+            train.stranded = False
             return
         there = train.stops[train.heading % len(train.stops)].cell
         cells = self.constructions.station_cells(self.constructions.main_station(there) or there)
@@ -1108,8 +1115,12 @@ class Railway:
             cost += self.onward_cost(target, after, train.engine)
             if best is None or cost < best[0]:
                 best = (cost, target, way)
+        if best is None and lost:
+            train.stranded = True
+            return True
         if best is None or not lost and best[1] == self.network.cell_at(path[-1]):
             return True
+        train.stranded = False
         points, speeds = best[2]
         train.path = path[: at + 1] + points
         train.speeds = train.speeds[:at] + [self.network.speed_in(cell)] + speeds

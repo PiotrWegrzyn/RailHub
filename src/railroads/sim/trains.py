@@ -944,6 +944,8 @@ class Train:
     # The version of the railway (Constructions.railway_version) its way was last found to run
     # on laid track in.
     laid_for: int = -1
+    # Whether track on its way was taken up with none left leading on, so it stands where it is.
+    stranded: bool = False
     # Whether the player put it first in every queue for the way on until it reaches its next
     # stop.
     first: bool = False
