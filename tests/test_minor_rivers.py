@@ -163,6 +163,28 @@ def test_stream_squares_keep_their_reaches_when_packed() -> None:
     assert unpacked.upland_km2.tolist() == [600.0, 12000.0]
 
 
+def test_stream_squares_unpack_where_numpy_counts_in_32_bits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repeat = np.repeat
+
+    def repeat_in_32_bits(a, repeats, axis=None):
+        return repeat(a, np.asarray(repeats).astype(np.int32, casting="safe"), axis)
+
+    lines = StreamLines(
+        np.array([[20.001, 50.002], [20.011, 50.012], [21.5, 49.0]]),
+        np.array([2, 3], dtype=np.int64),
+        np.array([600.0, 12000.0]),
+    )
+    packed = write_streams(lines, 20.0, 50.0)
+    monkeypatch.setattr(np, "intp", np.int32)
+    monkeypatch.setattr(np, "repeat", repeat_in_32_bits)
+
+    unpacked = read_streams(packed)
+
+    assert unpacked.ends.tolist() == [2, 3]
+
+
 def test_the_world_reads_the_reaches_of_the_squares_round_a_map() -> None:
     near = StreamLines(np.array([[14.5, 50.5], [14.6, 50.6]]), np.array([2]), np.array([900.0]))
     far = StreamLines(np.array([[100.5, 10.5], [100.6, 10.6]]), np.array([2]), np.array([900.0]))

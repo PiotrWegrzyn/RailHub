@@ -90,10 +90,11 @@ def read_streams(data: bytes) -> StreamLines:
     with np.load(io.BytesIO(data)) as arrays:
         middle = arrays["middle"]
         moves = arrays["moves"].astype(np.int64)
-        ends = np.cumsum(arrays["counts"].astype(np.int64))
+        counts = arrays["counts"].astype(np.intp)
         upland = arrays["upland_km2"].astype(np.float64)
+    ends = np.cumsum(counts, dtype=np.int64)
     starts = np.concatenate([[0], ends[:-1]])
-    reach = np.repeat(np.arange(len(ends)), np.diff(ends, prepend=0))
+    reach = np.repeat(np.arange(len(ends)), counts)
     walked = np.cumsum(moves, axis=0)
     steps = walked - (walked[starts] - moves[starts])[reach]
     return StreamLines(steps * POINT_STEP_DEG + middle, ends, upland)
