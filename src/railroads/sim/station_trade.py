@@ -49,7 +49,7 @@ from railroads.sim.yearly import makes_of, needs_of
 if TYPE_CHECKING:
     from railroads.sim.growth import Growth
 
-MAIL_PER_PASSENGERS = 5
+MAIL_PER_PASSENGERS = 2
 # How far from a building the town it stands in is looked for.
 TOWN_NEAR = 2
 # The needs each good meets, in the order a month's trade hands them out.

@@ -612,7 +612,7 @@ LOGS_A_CHIP = 5
 RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
     _with_merged(
         {
-            BuildingKind.STEEL_MILL: Recipe(Good.STEEL, 200, {Need.IRON: 5.0, Need.COAL: 10.0}),
+            BuildingKind.STEEL_MILL: Recipe(Good.STEEL, 200, {Need.IRON: 1.25, Need.COAL: 2.5}),
             BuildingKind.POTTER: Recipe(Good.POTS, 40, {Need.CLAY: 0.5}),
             BuildingKind.TILE_WORKS: Recipe(
                 Good.STOVE_TILES, 30, {Need.CLAY: 0.5, Need.SAND: 0.25}
@@ -878,9 +878,9 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.IRON_MINE: {Need.MACHINERY: 5},
         BuildingKind.LOGGING_CAMP: {Need.MACHINERY: 5},
         BuildingKind.RAILWAY_WORKS: {Need.STEEL: 200},
-        BuildingKind.POWER_PLANT: {Need.COAL: 4_000},
-        BuildingKind.DIESEL_POWER_PLANT: {Need.FUEL: 30_000},
-        BuildingKind.GAS_POWER_PLANT: {Need.GAS: 10_000},
+        BuildingKind.POWER_PLANT: {Need.COAL: 1_000},
+        BuildingKind.DIESEL_POWER_PLANT: {Need.FUEL: 7_500},
+        BuildingKind.GAS_POWER_PLANT: {Need.GAS: 2_500},
         BuildingKind.SPACE_CENTER: {Need.ELECTRONICS: 300, Need.FUEL: 1000, Need.FOOD: 300},
         BuildingKind.PEAR_HQ: {Need.ELECTRONICS: 500, Need.FOOD: 1000},
         BuildingKind.GIGAFACTORY: {

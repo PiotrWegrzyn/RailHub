@@ -273,8 +273,8 @@ def test_a_fed_power_plant_the_player_owns_makes_electricity_and_others_do_not()
     cells = np.array([0, 1])
     got = {
         (BuildingKind.POWER_PLANT, Need.COAL): (
-            np.array([4_000.0, 4_000.0]),
-            np.array([4_000.0, 4_000.0]),
+            np.array([1_000.0, 1_000.0]),
+            np.array([1_000.0, 1_000.0]),
         )
     }
     trade = Trade(cells, {}, {}, {}, {}, goods_got=got)

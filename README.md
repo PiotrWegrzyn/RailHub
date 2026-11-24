@@ -576,7 +576,7 @@ window (H) lists the same.
 | Gun factory (era 3) | 100 guns | 50 steel (from era 2), 25 planks |  |
 | Tank factory (era 5) | 20 tanks | 120 steel (from era 2), 40 fuel (from era 2) |  |
 | Aircraft factory (era 5) | 20 planes | 60 steel (from era 2), 20 copper (from era 4), 20 fuel (from era 2), 20 electronics (from era 6) |  |
-| Steel mill (era 2) | 200 steel | 1,000 iron ore, 2,000 coal (from 1700) |  |
+| Steel mill (era 2) | 200 steel | 250 iron ore, 500 coal (from 1700) |  |
 | Shipyard | 30 goods | 20 steel (from era 2), 10 planks |  |
 | Sawmill | 40 planks, 8 wood chips | 40 logs | 5 machinery (from era 3), 3 fuel (from oil and fuel demand 11) |
 | Soy sauce brewery | 20 soy sauce | 10 soybeans, 10 wheat, 4 salt |  |
@@ -602,15 +602,15 @@ window (H) lists the same.
 | Sugar refinery (1800) | 60 refined sugar | 30 sugar | 6 coal (from 1700), 6 limestone |
 | Porcelain works (1710) | 30 porcelain | 15 clay | 7.5 coal (from 1700) |
 | Butcher (1600) | 120 meat | 48 animals |  |
-| Power plant (era 3) |  | 4,000 coal (from 1700) |  |
-| Diesel power plant (era 5) |  | 3e+04 fuel (from era 2) |  |
-| Gas power plant (era 6) |  | 1e+04 gas (from era 2) |  |
+| Power plant (era 3) |  | 1,000 coal (from 1700) |  |
+| Diesel power plant (era 5) |  | 7,500 fuel (from era 2) |  |
+| Gas power plant (era 6) |  | 2,500 gas (from era 2) |  |
 | Battery gigafactory |  | 300 chemicals (from era 3), 200 electronics (from era 6), 200 steel (from era 2) | 300 copper (from era 4) |
 | Juice works (1870) | 100 juice | 50 fruit, 50 glass, 25 plastics (from era 6) | 10 refined sugar (from 1800) |
 | Big juice works (1870) | 375 juice | 187.5 fruit, 187.5 glass, 93.75 plastics (from era 6) | 37.5 refined sugar (from 1800) |
 | Mega juice works (1870) | 1,406 juice | 703.1 fruit, 703.1 glass, 351.6 plastics (from era 6) | 140.6 refined sugar (from 1800) |
-| Big steel mill (era 2) | 500 steel | 2,500 iron ore, 5,000 coal (from 1700) |  |
-| Mega steel mill (era 2) | 1,250 steel | 6,250 iron ore, 1.25e+04 coal (from 1700) |  |
+| Big steel mill (era 2) | 500 steel | 625 iron ore, 1,250 coal (from 1700) |  |
+| Mega steel mill (era 2) | 1,250 steel | 1,562 iron ore, 3,125 coal (from 1700) |  |
 | Big potter | 100 pots | 50 clay |  |
 | Mega potter | 250 pots | 125 clay |  |
 | Big tile works | 75 stove tiles | 37.5 clay, 18.75 sand |  |

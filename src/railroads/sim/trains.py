@@ -55,6 +55,8 @@ CAR_SIZES = (
     377.0,
     610.0,
     987.0,
+    1597.0,
+    2584.0,
 )
 # How much bigger, and so heavier, each size up CAR_SIZES makes a car.
 CAR_GROWTH = CAR_SIZES[-1] / CAR_SIZES[-2]
@@ -81,18 +83,18 @@ VEHICLES: Mapping[Good, tuple[int, float]] = MappingProxyType(
     {Good.CARS: (4, 5.0), Good.PLANES: (5, 1.0), Good.TANKS: (5, 1.0)}
 )
 
-SMALL_CAR = 5.0
-MEDIUM_CAR = 13.0
-CAR_CAPACITY = 34.0
-BULK_CAR = 89.0
+SMALL_CAR = 8.0
+MEDIUM_CAR = 21.0
+CAR_CAPACITY = 55.0
+BULK_CAR = 144.0
 
 
 def _sized(size: float, *goods: Good) -> dict[Good, float]:
     return dict.fromkeys(goods, size)
 
 
-# How many units of each good a car of BASE_GENERATION holds, about what fits in a wagon of
-# about 10 cubic metres bearing about 8 tonnes, whichever runs out first (UNIT_KG); goods not
+# How many units of each good a car of BASE_GENERATION holds, a size up
+# from what fits in a wagon of about 10 cubic metres bearing about 8 tonnes (UNIT_KG); goods not
 # listed go CAR_CAPACITY to a car; VEHICLES have their own sizes.
 CAR_UNITS: Mapping[Good, float] = MappingProxyType(
     _sized(
@@ -110,10 +112,9 @@ CAR_UNITS: Mapping[Good, float] = MappingProxyType(
         Good.COFFEE,
         Good.REFINED_SUGAR,
         Good.FERTILISER,
-        Good.MAIL,
     )
     | _sized(
-        55.0,
+        89.0,
         Good.POTATOES,
         Good.SUGAR,
         Good.RUBBER,
@@ -127,7 +128,7 @@ CAR_UNITS: Mapping[Good, float] = MappingProxyType(
         Good.CHICKENS,
     )
     | _sized(
-        21.0,
+        34.0,
         Good.COTTON,
         Good.FLAX,
         Good.HOPS,
@@ -139,6 +140,7 @@ CAR_UNITS: Mapping[Good, float] = MappingProxyType(
         Good.STOVE_TILES,
         Good.PIGS,
         Good.ELECTRONICS,
+        Good.MAIL,
     )
     | _sized(
         MEDIUM_CAR,
@@ -150,7 +152,7 @@ CAR_UNITS: Mapping[Good, float] = MappingProxyType(
         Good.CEMENT,
         Good.APPLIANCES,
     )
-    | _sized(8.0, Good.FURNITURE, Good.CATTLE)
+    | _sized(13.0, Good.FURNITURE, Good.CATTLE)
     | _sized(SMALL_CAR, Good.MACHINERY, Good.GOLD, Good.DIAMONDS)
 )
 

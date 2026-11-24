@@ -272,12 +272,12 @@ def test_a_steel_mill_makes_nothing_with_nowhere_for_its_steel_and_keeps_its_inp
     assert economy.stock[(BuildingKind.STEEL_MILL, Need.IRON)][flat(economy, (8, 8))] == 12.0
 
 
-def test_ten_coal_and_five_iron_ore_make_one_steel_once_a_station_takes_it() -> None:
+def test_two_and_a_half_coal_and_a_quarter_more_than_one_iron_ore_make_one_steel() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 8), BuildingKind.STEEL_MILL, 1))
 
-    trade = economy.trade(placed, holding(100.0, COAL=10.0, IRON=5.0))
+    trade = economy.trade(placed, holding(100.0, COAL=2.5, IRON=1.25))
 
     assert trade.gathered[STATION][Good.STEEL] == pytest.approx(1.0)
     assert economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][flat(economy, (8, 8))] == 0.0
@@ -289,9 +289,9 @@ def test_inputs_wait_in_a_stockpile_of_two_months_until_the_other_input_comes() 
     placed = counts(tile_map, ((8, 8), BuildingKind.STEEL_MILL, 1))
 
     for _ in range(3):
-        economy.trade(placed, holding(COAL=1500.0))
+        economy.trade(placed, holding(COAL=400.0))
 
-    assert economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][flat(economy, (8, 8))] == 4000.0
+    assert economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][flat(economy, (8, 8))] == 1000.0
 
 
 def test_nine_fruit_and_three_steel_make_thirty_cans() -> None:
@@ -621,9 +621,9 @@ def test_ports_bring_in_gas_only_once_there_is_any_in_1950(year: int, made: set)
 @pytest.mark.parametrize(
     ("kind", "need", "wanted"),
     [
-        (BuildingKind.POWER_PLANT, Need.COAL, 4_000.0),
-        (BuildingKind.DIESEL_POWER_PLANT, Need.FUEL, 30_000.0),
-        (BuildingKind.GAS_POWER_PLANT, Need.GAS, 10_000.0),
+        (BuildingKind.POWER_PLANT, Need.COAL, 1_000.0),
+        (BuildingKind.DIESEL_POWER_PLANT, Need.FUEL, 7_500.0),
+        (BuildingKind.GAS_POWER_PLANT, Need.GAS, 2_500.0),
     ],
 )
 def test_each_kind_of_power_plant_burns_only_its_own_fuel(

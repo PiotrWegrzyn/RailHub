@@ -366,13 +366,13 @@ def test_a_train_slows_by_what_its_cars_weigh_against_the_most_its_engine_pulls(
     assert pull == pytest.approx(1.0 - SLOWDOWN[Kind.GENERAL] * share)
 
 
-def test_a_car_of_coal_or_wheat_of_the_planets_day_holds_89_quintals_weighing_about_13_t() -> None:
+def test_a_car_of_coal_or_wheat_of_the_planets_day_holds_144_quintals_weighing_about_18_t() -> None:
     coal = Car(Good.COAL, BULK_CAR)
     wheat = Car(Good.WHEAT, BULK_CAR)
 
     weights = coal.tonnes, wheat.tonnes
 
-    assert weights == (pytest.approx(12.9), pytest.approx(12.9))
+    assert weights == (pytest.approx(18.4), pytest.approx(18.4))
 
 
 @pytest.mark.parametrize(
@@ -418,7 +418,7 @@ def test_a_car_weighs_its_tare_and_what_it_carries(good: Good) -> None:
 
 
 @pytest.mark.parametrize(
-    ("generation", "coal"), [(1, 55.0), (2, 89.0), (3, 144.0), (5, 377.0), (7, 987.0)]
+    ("generation", "coal"), [(1, 89.0), (2, 144.0), (3, 233.0), (5, 610.0), (7, 1597.0)]
 )
 def test_each_generation_of_cars_holds_one_fibonacci_size_more(
     generation: int, coal: float
@@ -489,7 +489,7 @@ def test_before_the_second_era_even_the_planet_pulls_the_first_generation() -> N
     assert generation == 1
 
 
-def test_a_pioneer_pulls_a_full_car_of_55_quintals_of_coal() -> None:
+def test_a_pioneer_pulls_a_full_car_of_89_quintals_of_coal() -> None:
     railway = line()
     railway.year = opened_in("penydarren")
     train = railway.buy("penydarren")
@@ -499,7 +499,7 @@ def test_a_pioneer_pulls_a_full_car_of_55_quintals_of_coal() -> None:
     added = railway.add_car(train, stop, Good.COAL)
 
     assert added
-    assert railway.car_capacity(Good.COAL, "penydarren") == 55.0
+    assert railway.car_capacity(Good.COAL, "penydarren") == 89.0
 
 
 @pytest.mark.parametrize("engine", ["planet", "goods", "american", "mogul"])
@@ -561,7 +561,7 @@ def test_a_railbus_pulls_its_coaches_full_but_not_as_many_coal_cars_of_its_newes
     coal_added = [railway.add_car(train, coal, Good.COAL) for _ in range(3)]
 
     assert coaches_added == [True, True, True]
-    assert coal_added == [True, True, False]
+    assert coal_added == [True, False, False]
 
 
 def test_the_first_heavy_freight_engine_pulls_four_full_coal_cars() -> None:
@@ -812,7 +812,7 @@ def test_a_stop_can_ask_for_an_older_smaller_and_lighter_car() -> None:
     railway.calls.arrive(train, train.stops[0])
 
     (car,) = train.cars
-    assert (car.capacity, car.tare, car.generation) == (55.0, pytest.approx(1.5), 1)
+    assert (car.capacity, car.tare, car.generation) == (89.0, pytest.approx(1.5), 1)
 
 
 def test_older_cars_weigh_less_full_than_the_newest() -> None:
@@ -865,7 +865,7 @@ def test_a_train_swaps_a_newer_car_for_the_older_one_its_stop_now_asks_for() -> 
 
     railway.calls.arrive(train, train.stops[0])
 
-    assert [car.capacity for car in train.cars] == [55.0]
+    assert [car.capacity for car in train.cars] == [89.0]
 
 
 def test_the_generation_picker_lists_coaches_behind_an_express_and_coal_cars_otherwise() -> None:

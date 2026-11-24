@@ -874,7 +874,7 @@ class Railway:
                     train.waiting = 0.0
                 else:
                     train.waiting -= months
-                    train.status = f"Loading at {leaving.cell[0]}, {leaving.cell[1]}"
+                    train.status = f"Loading at {self.name_of(leaving.cell)}"
                     return
             here = leaving.cell
             if train.platform in self.constructions.platforms(leaving.cell):
