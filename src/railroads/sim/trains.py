@@ -936,6 +936,9 @@ class Train:
     claims_for: list[Point] | None = None
     cleared: float = 0.0
     asked: int = 0
+    # The track of quadruple track it last took, which it keeps to through junctions: the slow
+    # one (railroads.sim.signals.SLOW_LANE) until it takes one.
+    lane: int = 1
     # Whether the player put it first in every queue for the way on until it reaches its next
     # stop.
     first: bool = False

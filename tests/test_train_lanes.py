@@ -13,7 +13,7 @@ from railroads.sim.trains import Stop, Train
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
 from railroads.ui.pixel.projection import PixelProjection
 from railroads.ui.pixel.track_art import DOUBLE_SPACING, ISLAND_TRACKS, QUADRUPLE_OUTER, TrackArt
-from railroads.ui.pixel.train_layer import Lanes
+from railroads.ui.pixel.train_layer import Lanes, lanes_of
 
 WEST, EAST = (6, 3), (6, 20)
 FULL = DOUBLE_SPACING / 2 * PIXEL_CELL_WIDTH
@@ -221,3 +221,24 @@ def test_track_branching_off_double_track_where_it_narrows_to_single_leaves_from
     drawn = track._sides_at(branch, [1.0], forks=True)
 
     assert [lane[0] for lane in drawn] == pytest.approx([0.0])
+
+
+def test_a_train_is_drawn_on_the_track_of_quadruple_track_it_holds_through_the_junctions_between() -> (
+    None
+):
+    four_lanes = {(5, 5), (5, 8)}
+    point = (0.0, 0.0)
+    train = Train("Test")
+    train.claims = [
+        ((5, 4), point, point, 0.0, 1.0, False, 0),
+        ((5, 5), point, point, 1.0, 2.0, False, 1),
+        ((5, 6), point, point, 2.0, 3.0, False, 0),
+        ((5, 7), point, point, 3.0, 4.0, False, 0),
+        ((5, 8), point, point, 4.0, 5.0, False, 0),
+        ((5, 9), point, point, 5.0, 6.0, False, 0),
+    ]
+
+    lanes = lanes_of(train, four_lanes)
+
+    assert [lanes[(5, col)] for col in range(4, 10)] == [1, 1, 1, 1, 0, 0]
+    assert lanes[None] == 0

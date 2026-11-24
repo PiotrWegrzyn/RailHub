@@ -204,14 +204,36 @@ def test_an_express_takes_the_fast_track_and_a_goods_train_the_slow_one_side_by_
 
     for _ in range(int(2 / STEP)):
         game.railway.run(STEP)
-        lanes = [{cell: lane for cell, *_, lane in train.claims} for train in (express, goods)]
-        side_by_side += [
-            (lanes[0][cell], lanes[1][cell])
-            for cell in lanes[0].keys() & lanes[1].keys()
-            if cell in blocks_of(game.constructions).four_lanes
-        ]
+        side_by_side += alongside(game, express, goods)
 
     assert (FAST_LANE, SLOW_LANE) in side_by_side
+
+
+def alongside(game: Game, one: Train, other: Train) -> list[tuple[int, int]]:
+    lanes = [{cell: lane for cell, *_, lane in train.claims} for train in (one, other)]
+    return [
+        (lanes[0][cell], lanes[1][cell])
+        for cell in lanes[0].keys() & lanes[1].keys()
+        if cell in blocks_of(game.constructions).four_lanes
+    ]
+
+
+def test_a_train_coming_onto_quadruple_track_behind_another_takes_its_other_track_that_way(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    game = quadruple_game(monkeypatch)
+    ahead = shuttle(game, WEST, EAST)
+    ahead.engine = "goods"
+    run_months(game, 0.6)
+    behind = shuttle(game, WEST, EAST)
+    behind.engine = "pacific"
+    side_by_side = []
+
+    for _ in range(int(1 / STEP)):
+        game.railway.run(STEP)
+        side_by_side += alongside(game, ahead, behind)
+
+    assert (SLOW_LANE, FAST_LANE) in side_by_side
 
 
 def test_quadruple_track_opens_with_its_era() -> None:

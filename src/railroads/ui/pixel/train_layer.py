@@ -9,7 +9,7 @@ import itertools
 import math
 import time
 from collections import OrderedDict
-from collections.abc import Iterable, Mapping
+from collections.abc import Container, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -21,6 +21,7 @@ from PIL import Image
 from railroads.sim.constructions import Track
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
+from railroads.sim.signals import blocks_of
 from railroads.sim.trains import Point, Train
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, IsoCamera, Vec2
 from railroads.ui.pixel.art.registry import Sprite
@@ -109,10 +110,13 @@ class TrainLayer:
         hidden = self.world.underground_all(
             [placed[0][0] for *_, placed in seen], [placed[0][1] for *_, placed in seen]
         )
+        four_lanes = blocks_of(railway.constructions).four_lanes
         found = []
         for (train, back, look, placed), under in zip(seen, hidden, strict=True):
             if not under:
-                shift = self.lanes.sideways(train.path, train.along - back, lanes_of(train))
+                shift = self.lanes.sideways(
+                    train.path, train.along - back, lanes_of(train, four_lanes)
+                )
                 found.append((placed, shift, look))
         parts = []
         if found:
@@ -256,13 +260,14 @@ class TrainLayer:
         hidden = self.world.underground_all(
             [placed[0][0] for *_, placed in seen], [placed[0][1] for *_, placed in seen]
         )
+        four_lanes = blocks_of(railway.constructions).four_lanes
         chimneys = []
         for (train, back, ((x, y), (dx, dy))), under in zip(seen, hidden, strict=True):
             if under:
                 continue
             model = ENGINES[train.engine]
             assert model.chimney is not None
-            shift = self.lanes.sideways(train.path, train.along - back, lanes_of(train))
+            shift = self.lanes.sideways(train.path, train.along - back, lanes_of(train, four_lanes))
             phase = (train.along * 6.0) % 1.0
             chimneys.append(_Chimney(x, y, dx, dy, shift, model.chimney[1] * SCALE, phase))
         return chimneys
@@ -497,13 +502,28 @@ class Lanes:
         return stretches
 
 
-def lanes_of(train: Train) -> dict[Cell | None, int]:
-    """The track of quadruple track the train takes in each cell it holds (railroads.sim.signals),
-    and under None the one it keeps to through stations, which no train holds: the one it last
+def lanes_of(train: Train, four_lanes: Container[Cell]) -> dict[Cell | None, int]:
+    """The track of quadruple track the train takes in each cell it holds (railroads.sim.signals):
+    where trains going one way keep to two tracks the one it holds, and through junctions and
+    where quadruple track ends the one it held last before, or else the one it holds next; and
+    under None the one it keeps to through stations, which no train holds: the one it last
     took."""
-    lanes: dict[Cell | None, int] = {claim[0]: claim[6] for claim in train.claims if claim[6]}
-    if train.claims:
-        lanes[None] = train.claims[-1][6]
+    lanes: dict[Cell | None, int] = {}
+    carried = None
+    before: list[Cell] = []
+    for claim in sorted(train.claims, key=lambda claim: claim[3]):
+        cell, lane = claim[0], claim[6]
+        if cell in four_lanes:
+            carried = lane
+            lanes |= dict.fromkeys(before, lane)
+            before = []
+            lanes[cell] = lane
+        elif carried is None:
+            before.append(cell)
+        else:
+            lanes[cell] = carried
+    lanes |= dict.fromkeys(before, train.lane)
+    lanes[None] = train.lane if carried is None else carried
     return lanes
 
 

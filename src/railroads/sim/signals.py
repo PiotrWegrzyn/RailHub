@@ -457,6 +457,8 @@ class Signals:
                     self._hold(train, claim)
                 train.cleared = stop
                 train.asked = 0
+                if any(crossing.cell in self.blocks.four_lanes for crossing in wanted):
+                    train.lane = lane
                 way = self._way_on(train, crossings, stop) if stop < length - SAME else None
                 if way:
                     self._kept.append((train, way))
@@ -468,14 +470,27 @@ class Signals:
         return holder
 
     def _lanes_for(self, train: Train, wanted: list[Pass]) -> tuple[int, ...]:
-        """The tracks of quadruple track a train tries in turn for the way it wants: the fast
-        track first for an express engine or a railcar, the slow track first for any other; only
-        one where the way crosses no quadruple track."""
+        """The tracks of quadruple track a train tries in turn for the way it wants: one no train
+        going its way runs on before one it would follow, so a train held up by one ahead passes
+        it on the other track; of two alike the fast track first for an express engine or a
+        railcar, and the slow track first for any other; only one where the way crosses no
+        quadruple track."""
         if not any(p.cell in self.blocks.four_lanes for p in wanted):
             return (FAST_LANE,)
         engine = ENGINES[train.engine]
         fast = engine.express or engine.railcar
-        return (FAST_LANE, SLOW_LANE) if fast else (SLOW_LANE, FAST_LANE)
+        lanes = (FAST_LANE, SLOW_LANE) if fast else (SLOW_LANE, FAST_LANE)
+        return tuple(sorted(lanes, key=lambda lane: self._taken(train, wanted, lane)))
+
+    def _taken(self, train: Train, wanted: list[Pass], lane: int) -> bool:
+        """Whether another train holds quadruple track on the way the train wants, going its way
+        on this track of it."""
+        return any(
+            other is not train and (entry, exit_, held) == (crossing.entry, crossing.exit, lane)
+            for crossing in wanted
+            if crossing.cell in self.blocks.four_lanes
+            for other, entry, exit_, _, held in self._held.get(crossing.cell, ())
+        )
 
     def _kept_off(
         self, train: Train, crossings: list[Pass], stop: float, wanted: list[Pass]
