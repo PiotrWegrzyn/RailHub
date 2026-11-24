@@ -477,3 +477,44 @@ def test_no_train_stands_beside_track_through_a_corner_where_it_would_block_it(
     ]
     assert running
     assert all(train.arrivals > old for train, old in running)
+
+
+def test_no_train_stands_on_the_way_on_kept_by_a_train_at_the_end_of_a_single_line() -> None:
+    game = Game(Constructions(flat_map(rows=14, cols=18)))
+    game.finances.cash = 1e9
+    a, b, c, d = (8, 5), (10, 12), (1, 9), (4, 8)
+    for station in (a, b, c, d):
+        game.build_station(station)
+    for start, end, width in (
+        (c, a, TrackWidth.SINGLE),
+        (a, d, TrackWidth.DOUBLE),
+        (b, c, TrackWidth.DOUBLE),
+        (b, d, TrackWidth.SINGLE),
+        (a, c, TrackWidth.DOUBLE),
+        (a, (4, 5), TrackWidth.DOUBLE),
+        ((4, 5), c, TrackWidth.SINGLE),
+    ):
+        assert game.lay_track(start, end, width).ok
+    trains = fleet(
+        game,
+        [
+            ("tank", [d, c]),
+            ("tank", [c, b]),
+            ("tank", [b, a, d, c]),
+            ("planet", [c, a]),
+            ("planet", [c, d, a]),
+            ("planet", [a, d, b]),
+            ("tank", [b, d, a]),
+            ("planet", [d, c, b]),
+            ("tank", [c, a, d]),
+            ("tank", [b, a]),
+        ],
+    )
+    for _ in range(5 * 240):
+        game.railway.run(1 / 240)
+    before = [train.arrivals for train in trains]
+
+    for _ in range(6 * 240):
+        game.railway.run(1 / 240)
+
+    assert all(train.arrivals > old for train, old in zip(trains, before, strict=True))

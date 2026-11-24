@@ -325,6 +325,14 @@ class Signals:
                 self._hold(train, claim)
         for train in loose:
             self._take_ground(train)
+        # The trains set a way to the end of a single line, with the way on from there each
+        # keeps for itself (_way_on).
+        self._kept: list[tuple[Train, list[Pass]]] = []
+        for train in trains:
+            if train.path and train.claims and train.cleared < network.length(train) - SAME:
+                way = self._way_on(train, passes(network, train), train.cleared)
+                if way:
+                    self._kept.append((train, way))
 
     def held_by_others(self, train: Train, cells: Iterable[Cell]) -> int:
         """How many of these cells another train holds track in."""
@@ -449,6 +457,9 @@ class Signals:
                     self._hold(train, claim)
                 train.cleared = stop
                 train.asked = 0
+                way = self._way_on(train, crossings, stop) if stop < length - SAME else None
+                if way:
+                    self._kept.append((train, way))
                 return None
             holder = holder or found
         if not train.asked:
@@ -491,9 +502,30 @@ class Signals:
         for leader, _ in leaders.values():
             if self._needs_later(leader, wanted):
                 return leader
+        if self._kept:
+            standing = wanted
+            if not leaders:
+                standing = [
+                    crossing
+                    for crossing in crossings
+                    if crossing.end > stop - train.length + SAME and crossing.start < stop - SAME
+                ]
+            for other, way in self._kept:
+                if other is not train and self._crosses(standing, way):
+                    return other
         if not train.first:
             return self._queued_before(train, wanted)
         return None
+
+    def _crosses(self, wanted: list[Pass], way: list[Pass]) -> bool:
+        """Whether a way a train wants crosses another way, on track that can't be shared."""
+        theirs = [(crossing.cell, (crossing.entry, crossing.exit)) for crossing in way]
+        return any(
+            cell == crossing.cell
+            and not self.blocks.apart(cell, (crossing.entry, crossing.exit), other)
+            for crossing in wanted
+            for cell, other in theirs
+        )
 
     def _needs_later(self, leader: Train, wanted: list[Pass]) -> bool:
         """Whether a train ahead has yet to be set a way across track that this way crosses, as
@@ -591,11 +623,22 @@ class Signals:
         return length
 
     def _line_end(self, train: Train, crossings: list[Pass], signal: float) -> bool:
-        """Whether the train could stand at this signal at the end of a single line, all of it on
-        that line: as only trains wanting that line could want the track it holds, it is in
-        no one's way as long as the way on from there runs, before any more single line, to
-        where it could stand on double track or in a station, and no other train holds any of
-        that way now, so none of the trains it waits for could wait for it."""
+        """Whether the train could stand at this signal at the end of a single line (`_way_on`):
+        only while no other train holds any of the way on from there, nor keeps it for itself
+        so, so that none of the trains it waits for could wait for it; none stands on it later
+        (`_kept_off`)."""
+        way = self._way_on(train, crossings, signal)
+        if way is None or any(self._holder(train, crossing) is not None for crossing in way):
+            return False
+        return not any(
+            other is not train and self._crosses(way, kept) for other, kept in self._kept
+        )
+
+    def _way_on(self, train: Train, crossings: list[Pass], signal: float) -> list[Pass] | None:
+        """The way on from a signal at the end of a single line, with all of the train on that
+        line, where as only trains wanting that line could want the track it holds, it is in no
+        one's way while that way is free: if it runs, before any more single line, to where the
+        train could stand on double track or in a station."""
         blocks = self.blocks
         behind = {
             blocks.block.get(crossing.cell)
@@ -605,21 +648,21 @@ class Signals:
             and crossing.start < signal - SAME
         }
         if len(behind) != 1:
-            return False
+            return None
         (line,) = behind
         if line is None or line[0] != "single":
-            return False
+            return None
+        way: list[Pass] = []
         before = None
         for crossing in crossings:
             if crossing.start < signal - SAME:
                 continue
             if crossing.touch:
-                if self._holder(train, crossing) is not None:
-                    return False
+                way.append(crossing)
                 continue
             block = blocks.block.get(crossing.cell)
             if block is not None and block[0] == "single":
-                return False
+                return None
             changes = before is None or block != before[1] or before[0] < crossing.start - SAME
             before = (crossing.end, block)
             if (
@@ -627,10 +670,9 @@ class Signals:
                 and crossing.start > signal + SAME
                 and self._on_double(crossings, crossing.start - train.length, crossing.start)
             ):
-                return True
-            if self._holder(train, crossing) is not None:
-                return False
-        return True
+                return way
+            way.append(crossing)
+        return way
 
     def leave(self, train: Train) -> None:
         """Gives up the track the train's tail has left."""
