@@ -3,6 +3,7 @@ with a box picking it for upgrading or selling with others, its engine's picture
 category, its name, its schedule, where it is heading and the cars it pulls now with how full each
 is; a filter over it by schedule, and a click on a column's head sorts by it."""
 
+import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -25,7 +26,7 @@ from railroads.ui.theme import (
     draw_small_car,
     tip,
 )
-from railroads.words import plural
+from railroads.words import dollars, plural
 
 # The frame round an engine's picture, by its train's category; normal trains have none.
 CATEGORY_COLOURS = {
@@ -60,9 +61,14 @@ COLUMNS = (
     Column("Train", 2.2, stretch=True),
     Column("Schedule", 1.6, stretch=True),
     Column("Heading to", 1.4, stretch=True),
+    Column("Last round", 84.0),
     Column("Cars", 150.0),
 )
-PICK, TRAIN, SCHEDULE, HEADING, CARRYING = range(len(COLUMNS))
+PICK, TRAIN, SCHEDULE, HEADING, LAST_ROUND, CARRYING = range(len(COLUMNS))
+LAST_ROUND_TIP = (
+    "What its last whole round earned: its cargo's worth where it was unloaded,\n"
+    "less its fuel and car trips"
+)
 # The least of a good a train carries for it to count among what it carries.
 SHOWN_LOAD = 0.5
 
@@ -77,6 +83,7 @@ class Row:
     stuck: bool = False
     carrying: tuple[tuple[Good, float], ...] = ()
     wagons: tuple[Car, ...] = ()
+    last_round: float | None = None
 
 
 def carried(train: Train) -> tuple[tuple[Good, float], ...]:
@@ -123,6 +130,7 @@ def train_rows(railway: Railway, titles: dict[str, str]) -> list[Row]:
                 train.status in NO_WAY_ON or bool(railway.long_legs(train)),
                 carried(train),
                 tuple(train.cars),
+                train.last_round,
             )
         )
     return rows
@@ -135,6 +143,7 @@ def sort_rows(rows: list[Row], column: int, descending: bool) -> list[Row]:
         TRAIN: lambda r: r.title.casefold(),
         SCHEDULE: lambda r: r.schedule.casefold(),
         HEADING: lambda r: r.heading.casefold(),
+        LAST_ROUND: lambda r: -math.inf if r.last_round is None else r.last_round,
         CARRYING: lambda r: sum(load for _, load in r.carrying),
     }
     return sorted(rows, key=keys.get(column, keys[TRAIN]), reverse=descending)
@@ -201,10 +210,16 @@ class TrainTable:
         tip("Show only the trains of one schedule")
 
     def draw(
-        self, rows: list[Row], chosen: str | None, picture: EnginePicture, picking: bool = True
+        self,
+        rows: list[Row],
+        chosen: str | None,
+        picture: EnginePicture,
+        picking: bool = True,
+        schedules: bool = True,
     ) -> tuple[str | None, bool]:
         """The table of the rows of the schedule shown, sorted, with boxes picking trains if
-        `picking`; returns the train clicked, if any, and whether it was clicked twice."""
+        `picking` and the schedule each runs if `schedules`; returns the train clicked, if any,
+        and whether it was clicked twice."""
         clicked, twice = None, False
         flags = (
             LIST_TABLE_FLAGS
@@ -228,6 +243,7 @@ class TrainTable:
                 own |= imgui.TableColumnFlags_.no_sort.value
             imgui.table_setup_column(column.title, own, column.width)
         imgui.table_set_column_enabled(PICK, picking)
+        imgui.table_set_column_enabled(SCHEDULE, schedules)
         imgui.table_headers_row()
         specs = imgui.table_get_sort_specs()
         if specs is not None and specs.specs_count:
@@ -286,17 +302,23 @@ class TrainTable:
             tip("Pick it to upgrade or sell with the other trains picked")
         _cell(SCHEDULE, row.schedule or "-", TEXT_DIM)
         _cell(HEADING, row.heading, GONE if row.stuck else TEXT_DIM)
+        if row.last_round is None:
+            _cell(LAST_ROUND, "-", TEXT_DIM)
+        else:
+            _cell(LAST_ROUND, dollars(row.last_round), BRASS if row.last_round >= 0 else GONE)
+        tip(LAST_ROUND_TIP)
         imgui.table_set_column_index(CARRYING)
         _draw_wagons(row.wagons)
         return clicked
 
 
-def draw_cargo_counts(cars: list[tuple[Cargo, int]], hint: str) -> None:
+def draw_cargo_counts(cars: list[tuple[Cargo, int]], hint: str) -> Cargo | None:
     """Cargos each as an icon and how many cars of it, in a table cell; `hint` says where the
-    cars are counted."""
+    cars are counted. Returns the cargo whose icon is hovered, if any."""
     if not cars:
         imgui.text_disabled("no cars")
-        return
+        return None
+    hovered = None
     top = imgui.get_cursor_pos_y() + (ROW_HEIGHT - CAR_ICON) / 2
     for number, (cargo, count) in enumerate(cars):
         if number:
@@ -304,10 +326,13 @@ def draw_cargo_counts(cars: list[tuple[Cargo, int]], hint: str) -> None:
         imgui.set_cursor_pos_y(top)
         imgui.dummy((CAR_ICON, CAR_ICON))
         draw_good_icon(imgui.get_window_draw_list(), cargo, imgui.get_item_rect_min(), CAR_ICON)
+        if imgui.is_item_hovered():
+            hovered = cargo
         tip(f"{cargo.value}: {count} {plural('car', count)} {hint}")
         imgui.same_line(0, 1)
         imgui.set_cursor_pos_y(top + (CAR_ICON - imgui.get_text_line_height()) / 2)
         imgui.text_disabled(f"{count}")
+    return hovered
 
 
 def _cell(column: int, text: str, colour: tuple[float, float, float, float] | None = None) -> None:

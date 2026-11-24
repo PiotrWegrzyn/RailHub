@@ -331,7 +331,7 @@ class TrainsWindow:
         imgui.table_setup_column("Carries", stretch, 1.0)
         imgui.table_setup_column("Trains", fixed, 52.0)
         imgui.table_setup_column("Stops", fixed, 44.0)
-        imgui.table_setup_column("Rides", fixed, 80.0)
+        imgui.table_setup_column("Last rounds", fixed, 90.0)
         imgui.table_headers_row()
         for schedule in schedules.all:
             trains = members.get(schedule.name, [])
@@ -361,11 +361,14 @@ class TrainsWindow:
                 imgui.text(text)
             imgui.table_next_column()
             imgui.set_cursor_pos_y(top + (ROW_HEIGHT - imgui.get_text_line_height()) / 2)
-            nets = [net for net in (self.net(railway, t) for t in trains) if net is not None]
-            if nets:
-                total = sum(nets)
+            rounds = [t.last_round for t in trains if t.last_round is not None]
+            if rounds:
+                total = sum(rounds)
                 colored(BRASS if total >= 0 else GONE, dollars(total))
-                tip("What its trains' rides to their next stops earn after their costs")
+                tip(
+                    "What its trains' last whole rounds earned together: their cargo's worth\n"
+                    "where it was unloaded, less their fuel and car trips"
+                )
             else:
                 imgui.text_disabled("-")
         imgui.end_table()
@@ -416,7 +419,7 @@ class TrainsWindow:
         ]
         height = (min(max(len(rows), 1), SCHEDULE_ROWS) + 1.8) * ROW_HEIGHT
         imgui.begin_child("schedule trains", (0, height))
-        clicked, _ = self.schedule_table.draw(rows, None, picture, picking=False)
+        clicked, _ = self.schedule_table.draw(rows, None, picture, picking=False, schedules=False)
         imgui.end_child()
         if clicked is not None:
             self.chosen = clicked
@@ -621,10 +624,6 @@ class TrainsWindow:
                 imgui.close_current_popup()
             imgui.end_popup()
 
-    def net(self, railway: Railway, train: Train) -> float | None:
-        ride = self.ride(railway, train)
-        return None if ride is None else ride.net
-
     def _rename_button(self, train: Train, title: str) -> None:
         """A small pencil opening a box to name the train, or to give it back its route's
         name."""
@@ -712,11 +711,10 @@ class TrainsWindow:
                 self._draw_ride(ride, onward)
                 imgui.tree_pop()
         imgui.spacing()
-        route_map.good = None
         map_width = imgui.get_content_region_avail().x * MAP_SHARE
         imgui.begin_child("route", (-map_width, 0))
         section("Its stops")
-        _draw_calls(railway, train)
+        route_map.good = _draw_calls(railway, train)
         imgui.end_child()
         imgui.same_line()
         imgui.begin_child("map", (0, 0), imgui.ChildFlags_.borders.value)
@@ -901,6 +899,7 @@ class TrainsWindow:
                     return removed
                 demand = railway.station_demand(following.cell)
                 self._draw_cars(railway, train, index, stop, railway.name_of(following.cell))
+                self._draw_last_ride(index, railway.name_of(following.cell))
                 self._draw_offers(railway, train, index, stop, demand, supplies)
                 imgui.align_text_to_frame_padding()
                 imgui.text_disabled(f"{railway.name_of(following.cell)} wants")
@@ -1084,6 +1083,24 @@ class TrainsWindow:
             imgui.set_cursor_pos_y(row_top + imgui.get_frame_height_with_spacing())
         caption_room()
         self._draw_taken(railway, stop)
+
+    def _draw_last_ride(self, index: int, following: str) -> None:
+        """What the last ride from a schedule's stop to the next earned, once one was made on its
+        stops as they are."""
+        schedule = self._editing
+        if schedule is None or schedule.rides_version != schedule.version:
+            return
+        earned = schedule.rides.get(index)
+        if earned is None:
+            return
+        imgui.align_text_to_frame_padding()
+        imgui.text_disabled("Last ride")
+        imgui.same_line(CARD_LABEL)
+        colored(BRASS if earned >= 0 else GONE, dollars(earned))
+        tip(
+            f"What the last train's ride from here to {following} earned: its cargo's worth\n"
+            "where it was unloaded, less its fuel and car trips"
+        )
 
     def _most_cars(self, railway: Railway, train: Train) -> int:
         """How many cars a stop card takes: a schedule's as many as any engine pulls
@@ -1333,19 +1350,21 @@ def _view(schedule: Schedule, engine: str) -> Train:
     return Train(schedule.name, stops=schedule.stops, engine=engine)
 
 
-def _draw_calls(railway: Railway, train: Train) -> None:
+def _draw_calls(railway: Railway, train: Train) -> Good | None:
     """The stops the train calls at as it took them up from its schedule, to look at only: the
-    one it heads for or stands at picked out, and the cars it takes on at each."""
+    one it heads for or stands at picked out, and the cars it takes on at each. Returns the good
+    of a car hovered, to show on the map where it is wanted."""
     stops = train.stops
     if len(stops) < 2:
         imgui.text_disabled("Its schedule has no stops yet: open it to give it some.")
-        return
+        return None
+    hovered = None
     current = -1
     if train.away <= 0:
         current = (train.heading if train.path else train.heading - 1) % len(stops)
     flags = imgui.TableFlags_.row_bg.value | imgui.TableFlags_.borders_inner_h.value
     if not imgui.begin_table("calls", 3, flags):
-        return
+        return None
     imgui.table_setup_column("#", imgui.TableColumnFlags_.width_fixed.value, 22)
     imgui.table_setup_column("Stop", imgui.TableColumnFlags_.width_stretch.value, 1.0)
     imgui.table_setup_column("Cars", imgui.TableColumnFlags_.width_stretch.value, 1.2)
@@ -1373,8 +1392,11 @@ def _draw_calls(railway: Railway, train: Train) -> None:
             imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + middle)
             imgui.text_disabled("only refuels" if stop.refuel_only else "no cars")
         else:
-            draw_cargo_counts(list(Counter(stop.cars).items()), f"to {following}")
+            cargo = draw_cargo_counts(list(Counter(stop.cars).items()), f"to {following}")
+            if isinstance(cargo, Good):
+                hovered = cargo
     imgui.end_table()
+    return hovered
 
 
 def _draw_split(width: float) -> float | None:

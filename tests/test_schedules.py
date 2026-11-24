@@ -329,17 +329,6 @@ def test_a_schedule_some_train_runs_cannot_be_removed() -> None:
     assert railway.schedules.all == [schedule]
 
 
-def test_a_train_is_named_after_its_schedules_ends_not_the_refuelling_stop_on_the_way_back() -> (
-    None
-):
-    railway = line_of_three()
-    train = bought(railway, schedule_of(railway, Stop(FIRST), Stop(LAST)))
-
-    title = railway.titles()[train.name]
-
-    assert title.startswith(f"{railway.name_of(FIRST)} – {railway.name_of(LAST)}")
-
-
 def test_a_train_takes_a_stops_cars_from_the_left_only_while_its_engine_pulls_them_full() -> None:
     railway = line_of_three()
     schedule = schedule_of(railway, Stop(FIRST, [Good.WHEAT] * 3), Stop(MIDDLE))
@@ -348,3 +337,39 @@ def test_a_train_takes_a_stops_cars_from_the_left_only_while_its_engine_pulls_th
     taken = railway.schedules.taken(train, schedule.stops[0])
 
     assert taken == len(train.stops[0].cars) < 3
+
+
+def test_a_train_back_at_its_first_stop_keeps_what_its_round_earned_less_its_costs() -> None:
+    railway = line_of_three()
+    schedule = schedule_of(railway, Stop(FIRST), Stop(MIDDLE))
+    train = bought(railway, schedule)
+    spent_before = railway.finances.cash
+
+    run_until(railway, lambda: train.last_round is not None)
+
+    assert train.last_round == pytest.approx(railway.finances.cash - spent_before)
+    assert train.last_round < 0
+
+
+def test_a_train_moved_to_another_schedule_forgets_its_last_round() -> None:
+    railway = line_of_three()
+    first = schedule_of(railway, Stop(FIRST), Stop(MIDDLE))
+    other = schedule_of(railway, Stop(MIDDLE), Stop(LAST))
+    train = bought(railway, first)
+    run_until(railway, lambda: train.last_round is not None)
+
+    railway.schedules.join(train, other)
+    run_until(railway, lambda: train.taken[0] == other.name)
+
+    assert train.last_round is None
+
+
+def test_a_schedule_keeps_what_the_last_ride_from_each_of_its_stops_earned() -> None:
+    railway = line_of_three()
+    schedule = schedule_of(railway, Stop(FIRST), Stop(MIDDLE))
+    train = bought(railway, schedule)
+
+    run_until(railway, lambda: train.last_round is not None)
+
+    assert set(schedule.rides) == {0, 1}
+    assert sum(schedule.rides.values()) == pytest.approx(train.last_round)

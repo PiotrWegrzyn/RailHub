@@ -244,7 +244,7 @@ class Railway:
 
     def titles(self) -> dict[str, str]:
         """What the player sees each train called, by its own name (train_titles)."""
-        return train_titles(self.trains, self.name_of)
+        return train_titles(self.trains)
 
     def town_of(self, station: Cell) -> int:
         """The town a station belongs to, 0 for none: worked out the first time it is asked
@@ -481,14 +481,15 @@ class Railway:
         markup = 0.0 if fuel == Fuel.ELECTRICITY else self.fuel_markup()
         return self.fuel.price(fuel) * (1.0 + markup)
 
-    def _take_fuel(self, train: Train, station: Cell, cells: float) -> None:
+    def _take_fuel(self, train: Train, station: Cell, cells: float) -> float:
         """Buys what a train setting off burns on the way to its next stop: coal, wood (logs) or
-        diesel fuel out of the station's stockpile first, at the market price, the rest at retail."""
+        diesel fuel out of the station's stockpile first, at the market price, the rest at retail;
+        returns what it cost."""
         engine = ENGINES[train.engine]
         fuel = fuel_of(engine)
         amount = self.burn(train) * cells
         if amount <= 0:
-            return
+            return 0.0
         good = GOOD_OF.get(fuel)
         stocked = 0.0
         if good is not None:
@@ -498,6 +499,7 @@ class Railway:
                 stockpile[good] -= stocked
         cost = self.fuel.buy(fuel, amount, stocked, self.fuel_markup())
         self.finances.spend(cost, fuel.value)
+        return cost
 
     def fuel_month(self, trade: Trade, points: float = 0.0) -> None:
         """Closes the fuel market's month with what this month's trade said about them,
@@ -954,7 +956,7 @@ class Railway:
                 return
             burnt = self.network.fuel_length(here, there, engine.electric, engine.maglev)
             assert burnt is not None
-            self._take_fuel(train, here, burnt)
+            train.leg = -self._take_fuel(train, here, burnt)
             train.path, train.speeds = way
             train.along = 0.0
             train.pace = 0.0
@@ -963,6 +965,8 @@ class Railway:
                 places = (0.0 if car.dining else car.capacity for car in train.cars)
                 trips = sum(map(car_trip_price, places))
                 self.finances.spend(trips, "car trips")
+                train.leg -= trips
+            train.takings += train.leg
         engine = ENGINES[train.engine]
         pickup = engine.pickup / SECONDS_PER_MONTH * (SAND_TOWER_PICKUP if train.sanded else 1.0)
         pace = train.speed_up(months, pickup)
@@ -1010,9 +1014,15 @@ class Railway:
         train.along = allowed
         if train.along >= self.network.length(train):
             train.platform = self.network.cell_at(train.path[-1])
-            self.calls.arrive(train, train.stops[train.heading % len(train.stops)])
+            stop = train.stops[train.heading % len(train.stops)]
+            worth = 0.0 if stop.refuel_only else sum(self.cargo_worth(train))
+            train.takings += worth
+            self.schedules.ridden(train, (train.heading - 1) % len(train.stops), train.leg + worth)
+            self.calls.arrive(train, stop)
             train.arrivals += 1
             train.heading = (train.heading + 1) % len(train.stops)
+            if train.heading == 1:
+                train.last_round, train.takings = train.takings, 0.0
             train.path = []
             train.pace = 0.0
             train.waited = 0.0

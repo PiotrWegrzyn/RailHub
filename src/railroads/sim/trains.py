@@ -971,6 +971,13 @@ class Train:
     taken: tuple[str, int] = ("", -1)
     # How many months longer it is off the map on its way to the first stop of a new schedule.
     away: float = 0.0
+    # What its round so far earned: its cargo's worth where it was unloaded (as
+    # railroads.sim.railway.Railway.cargo_worth reckons it) less its fuel and car trips; and what
+    # its last whole round on its schedule earned, None before it finished one.
+    takings: float = 0.0
+    last_round: float | None = None
+    # What the ride to its next stop has earned so far, reckoned the same way.
+    leg: float = 0.0
 
     @property
     def load(self) -> dict[Good, float]:

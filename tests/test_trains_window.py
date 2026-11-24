@@ -464,3 +464,18 @@ def test_a_schedule_with_no_trains_says_when_no_engine_on_sale_could_run_it(
     draw_frames(window, railway, 3)
 
     assert any("No engine on sale could run it" in note for note in notes) == said
+
+
+def test_hovering_a_car_on_a_trains_stops_shows_on_its_map_where_that_good_is_wanted(
+    gui: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    assert train is not None
+    routed(railway, train, [Stop((6, 3), [Good.COAL]), Stop((6, 20))])
+    window = TrainsWindow(open=True, chosen=train.name)
+    monkeypatch.setattr(imgui, "is_item_hovered", lambda *_: True)
+
+    draw_frames(window, railway, 2)
+
+    assert window.map.good == Good.COAL

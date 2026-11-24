@@ -60,6 +60,10 @@ class Schedule:
     loading: tuple = ()
     # The railway version and the player's stops its refuelling stops were planned for.
     planned_for: tuple = ()
+    # What the last ride from each of its stops to the next earned (Train.leg), by the stop's
+    # place among its stops, for the version of its stops they were ridden on.
+    rides: dict[int, float] = field(default_factory=dict)
+    rides_version: int = -1
 
     def own_stops(self) -> list[Stop]:
         """The stops the player gave it, without the refuelling stops the game put in."""
@@ -173,6 +177,9 @@ class Schedules:
         railway = self._railway
         stops = self.fitted(train, schedule)
         here = train.stops[(train.heading - 1) % len(train.stops)].cell if train.stops else None
+        if train.taken[0] != schedule.name:
+            train.last_round = None
+        train.takings = 0.0
         train.taken = (schedule.name, schedule.version)
         if here is not None and stops and not self._same_station(here, stops[0].cell):
             if train.away <= 0:
@@ -180,6 +187,16 @@ class Schedules:
             train.away += railway.way_months(train, here, stops[0].cell)
         train.stops = stops
         train.restart()
+
+    def ridden(self, train: Train, index: int, earned: float) -> None:
+        """Notes what a train's ride from its stop at `index` to the next earned, if it runs its
+        schedule's stops as they are now."""
+        schedule = self.of(train)
+        if schedule is None or train.taken != (schedule.name, schedule.version):
+            return
+        if schedule.rides_version != schedule.version:
+            schedule.rides, schedule.rides_version = {}, schedule.version
+        schedule.rides[index] = earned
 
     def fitted(self, train: Train, schedule: Schedule) -> list[Stop]:
         """A schedule's stops as a train calls at them: with each stop's cars from the left
