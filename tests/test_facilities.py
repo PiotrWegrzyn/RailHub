@@ -209,3 +209,21 @@ def test_a_warehouse_gives_every_good_more_room() -> None:
 
     after = railway.station_goods(STATION).limit
     assert after == pytest.approx(before + WAREHOUSE_ROOM)
+
+
+@pytest.mark.parametrize("facility", [Facility.ENGINE_SHED, Facility.CATTLE_PENS])
+def test_no_station_or_platform_goes_up_on_a_facility(facility: Facility) -> None:
+    game = _raised_game()
+    for _ in range(2):
+        game.railway.upgrade(STATION)
+    assert game.add_facility(STATION, facility, BESIDE).ok
+
+    quote = game.station_quote(BESIDE)
+    platform = game.platform_quote(BESIDE)
+    station = game.build_station(BESIDE)
+    added = game.add_platform(STATION, BESIDE)
+
+    assert quote.price is None
+    assert platform.price is None
+    assert not station.ok
+    assert not added.ok

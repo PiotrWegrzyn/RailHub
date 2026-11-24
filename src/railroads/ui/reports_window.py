@@ -334,6 +334,11 @@ def worth_unit(values: list[float]) -> tuple[float, str]:
 
 def anger_lines(anger: Anger, year: int) -> list[str]:
     """What the reports say about people's anger with the company (railroads.sim.anger)."""
+    if not anger.value:
+        return [
+            "Anger with the company: 0",
+            "Nobody is angry with the company yet: moving a building aside costs its plain price.",
+        ]
     later = cooling_year(year + 1)
     text = (
         f"Moving a building aside costs {anger.surcharge:g} times its price. Anger cools on "

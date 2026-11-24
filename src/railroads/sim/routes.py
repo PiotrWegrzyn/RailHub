@@ -214,11 +214,13 @@ def lay_route(growth: Growth, route: Route) -> set[Cell]:
             constructions.remove(station)
             constructions.build(Station(cell, ends, station.main))
             changed.add(cell)
-    for piece, old in route.changes(constructions):
+    changes = route.changes(constructions)
+    laid_on = {piece.cell for piece, _ in changes}
+    for piece, old in changes:
         replacing = old is not None and old in constructions.at(piece.cell)
         if replacing:
             constructions.remove(old)
-        changed |= growth.room.move_aside(piece.cell, constructions.room_needed(piece))
+        changed |= growth.room.move_aside(piece.cell, constructions.room_needed(piece), laid_on)
         if constructions.why_not(piece) is None:
             constructions.build(piece)
             changed.add(piece.cell)
@@ -250,6 +252,8 @@ def station_problem(constructions: Constructions, cell: Cell) -> str | None:
     tile = constructions.tile_map.tile(cell)
     if any(isinstance(b, Station) for b in constructions.at(cell)):
         return "there is a station here already"
+    if any(isinstance(b, Annex) for b in constructions.at(cell)):
+        return "a station facility stands here"
     if tile.terrain == Terrain.RIVER:
         return "stations can't stand in a river"
     if tile.terrain != Terrain.LAND:

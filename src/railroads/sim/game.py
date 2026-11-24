@@ -175,7 +175,10 @@ class Game:
         return Quote(STATION_PRICE + site, site, moved=self._site_moves(cell))
 
     def platform_quote(self, cell: Cell) -> Quote:
-        """What clearing the cell for a platform costs."""
+        """What clearing the cell for a platform costs, or why a platform can't go there."""
+        problem = routes.station_problem(self.constructions, cell)
+        if problem is not None:
+            return Quote(None, problem=problem)
         site = station_site_price(self.constructions, cell, self.anger.value)
         return Quote(None) if site is None else Quote(site, site, moved=self._site_moves(cell))
 

@@ -12,7 +12,7 @@ among cells equally near at random by how well their land suits it. People rehou
 HOMES_STEPS with room.
 """
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -61,12 +61,14 @@ class Room:
             changed.add(cell)
         return changed
 
-    def move_aside(self, cell: Cell, units: int) -> set[Cell]:
+    def move_aside(
+        self, cell: Cell, units: int, keep_clear: Collection[Cell] = frozenset()
+    ) -> set[Cell]:
         """Makes `units` of room in the cell for the player's track, station or facility, the
         smallest buildings first (railroads.sim.demolition prices them in the same order): each
-        spills to the nearest cell that will take it, the player's shares in it with it, and
-        comes down where none will; counts them in `moved`. Returns the cells whose buildings
-        changed."""
+        spills to the nearest cell outside `keep_clear` (the rest of the track being laid) that
+        will take it, the player's shares in it with it, and comes down where none will; counts
+        them in `moved`. Returns the cells whose buildings changed."""
         growth = self._growth
         constructions = growth.constructions
         rng = np.random.default_rng(list(cell))
@@ -82,7 +84,7 @@ class Room:
             ladder = ladder_of(building.kind, (*growth.rule.ladders, *LADDERS))
             if ladder is None:
                 continue
-            spilled = self.spill(cell, ladder, rng, building.kind)
+            spilled = self.spill(cell, ladder, rng, building.kind, keep_clear)
             changed |= spilled
             if owned:
                 for near in spilled:
@@ -104,11 +106,14 @@ class Room:
         ladder: Ladder,
         rng: np.random.Generator,
         kind: BuildingKind | None = None,
+        keep_clear: Collection[Cell] = frozenset(),
     ) -> set[Cell]:
         """Puts up a kind on the ladder, by default its first, in the nearest cell but this one
-        that will take it, picked among cells equally near at random by how well their land
-        suits it; returns the cell it went up in, if it found one."""
-        return self._put_near(cell, ladder, rng, SPILL_STEPS, nearest_first=True, kind=kind)
+        and those in `keep_clear` that will take it, picked among cells equally near at random by
+        how well their land suits it; returns the cell it went up in, if it found one."""
+        return self._put_near(
+            cell, ladder, rng, SPILL_STEPS, nearest_first=True, kind=kind, keep_clear=keep_clear
+        )
 
     def _put_near(
         self,
@@ -118,6 +123,7 @@ class Room:
         most: int,
         nearest_first: bool,
         kind: BuildingKind | None = None,
+        keep_clear: Collection[Cell] = frozenset(),
     ) -> set[Cell]:
         growth = self._growth
         constructions, grid = growth.constructions, growth.grid
@@ -134,6 +140,7 @@ class Room:
             new = Building(near, first)
             if (
                 (near != cell or not nearest_first)
+                and near not in keep_clear
                 and land[index] > 0
                 and constructions.why_not(new) is None
                 and (first != ladder.kinds[0] or growth.ladder_allows(ladder, near))

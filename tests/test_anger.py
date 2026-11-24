@@ -3,10 +3,11 @@ import pytest
 
 from builders import flat_map, make_game
 from railroads.sim.anger import Anger, cooled, cooling_year, surcharge
-from railroads.sim.constructions import Building, BuildingKind, Constructions
+from railroads.sim.constructions import Building, BuildingKind, Constructions, TrackWidth
 from railroads.sim.demolition import moving_price
 from railroads.sim.finance import STATION_PRICE
 from railroads.sim.game import Game
+from railroads.sim.railway import Railway
 from railroads.sim.routes import plan_route
 from railroads.ui.reports_window import anger_lines
 
@@ -99,6 +100,24 @@ def test_track_moves_buildings_aside_and_its_quote_counts_them() -> None:
     assert game.growth.count(BuildingKind.HOUSE).sum() == houses
 
 
+def test_buildings_moved_aside_for_track_never_spill_into_its_later_cells(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(Railway, "quadruple_open", property(lambda _: True))
+    game = make_game()
+    route = plan_route(game.constructions, (6, 3), (6, 9), TrackWidth.QUADRUPLE)
+    assert route is not None
+    for cell in route.cells[1:-1]:
+        for _ in range(5):
+            game.growth.build(Building(cell, BuildingKind.HOUSE))
+    quote = game.track_quote(route)
+
+    done = game.lay_track((6, 3), (6, 9), TrackWidth.QUADRUPLE, planned=route)
+
+    assert done.ok
+    assert game.anger.value == quote.moved
+
+
 def test_a_new_year_divisible_by_five_cools_anger_and_tells_the_player() -> None:
     game = Game(Constructions(flat_map()), start_year=1854)
     game.anger.value = 3
@@ -119,3 +138,13 @@ def test_the_reports_show_the_anger_and_when_it_cools() -> None:
     assert title == "Anger with the company: 3"
     assert "2.5 times" in text
     assert "1 January 1855, to 1" in text
+
+
+def test_the_reports_say_nobody_is_angry_before_any_building_is_moved() -> None:
+    anger = Anger(0)
+
+    title, text = anger_lines(anger, 1851)
+
+    assert title == "Anger with the company: 0"
+    assert "1 times" not in text
+    assert "cools" not in text
