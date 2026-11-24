@@ -600,8 +600,9 @@ _BAKERY = Ladder(
 
 BAKERIES = _merges(_BAKERY)
 
-# Butchers open in towns, the likelier the more people live around, like bakeries.
-BUTCHERS = _merges(replace(_BAKERY, kinds=(BuildingKind.MEAT_FACTORY,), base=0.75, from_year=1600))
+# Butchers open in towns from 1600, the likelier the more people live around, like bakeries but
+# a little more often, so most towns have one.
+BUTCHERS = _merges(replace(_BAKERY, kinds=(BuildingKind.MEAT_FACTORY,), base=3.75, from_year=1600))
 
 # Town crafts that come up, like bakeries, the likelier the more people live around: potters and
 # dairies as often as other crafts; tile works, foundries and sausage makers, which need two
