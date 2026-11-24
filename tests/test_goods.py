@@ -74,11 +74,11 @@ def test_alcohol_is_no_food_so_no_maker_of_it_makes_more_than_it_takes_in(
     assert sum(per_unit.values()) >= 1.0
 
 
-def test_a_sugar_refinery_takes_sixty_sugar_with_forty_coal_and_some_paper_as_a_bonus() -> None:
+def test_a_sugar_refinery_takes_sixty_sugar_with_forty_heating_and_some_paper_as_a_bonus() -> None:
     refinery = RECIPES[BuildingKind.SUGAR_REFINERY]
 
     taken = {need: refinery.most * share for need, share in refinery.per_unit.items()}
     bonus = {need: refinery.most * share for need, share in refinery.boosts.items()}
 
     assert taken == pytest.approx({Need.SUGAR: 60.0})
-    assert bonus == pytest.approx({Need.COAL: 40.0, Need.PAPER: 6.0})
+    assert bonus == pytest.approx({Need.HEATING: 40.0, Need.PAPER: 6.0})
