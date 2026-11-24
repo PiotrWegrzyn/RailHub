@@ -6,8 +6,10 @@ fetch today (railroads.sim.ownership), plus BOOK_SHARE of what its stations, tra
 would cost to build or buy today: a station with its levels, storage and facilities, each piece
 of track on its own bed, each train's engine. The game keeps one Goal: the company's worth at
 the start of every month, the target its difficulty sets, when that was first reached and
-whether it stood on 1 January of END_YEAR. Play goes on after that. Cash below nothing at the
-start of BANKRUPT_MONTHS months in a row ends the game.
+whether it stood on 1 January of END_YEAR. Play goes on after that. The difficulty also sets the
+cash the company starts with (START_CASHES) and how many times the boards' prices every good
+fetches all game (PRICE_FACTORS). Cash below nothing at the start of BANKRUPT_MONTHS months in a
+row ends the game.
 """
 
 from dataclasses import dataclass, field
@@ -18,6 +20,7 @@ import numpy as np
 from railroads.sim.clock import END_YEAR, MONTH_NAMES
 from railroads.sim.finance import (
     LEVEL_PRICES,
+    START_CASH,
     STATION_PRICE,
     TRAIN_RESALE,
     storage_price,
@@ -46,6 +49,21 @@ TARGETS = {
     Difficulty.EASY: 50_000_000.0,
     Difficulty.NORMAL: 100_000_000.0,
     Difficulty.HARD: 150_000_000.0,
+}
+
+# How many times the price the supply and demand boards give every good fetches at each
+# difficulty, for the whole game (railroads.sim.tiles.Tiles.markup).
+PRICE_FACTORS = {
+    Difficulty.EASY: 2.0,
+    Difficulty.NORMAL: 1.5,
+    Difficulty.HARD: 1.0,
+}
+
+# The cash each difficulty starts the company with.
+START_CASHES = {
+    Difficulty.EASY: 150_000.0,
+    Difficulty.NORMAL: START_CASH,
+    Difficulty.HARD: 80_000.0,
 }
 
 

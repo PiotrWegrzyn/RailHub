@@ -12,8 +12,13 @@ from railroads.newgame import EARLIEST_START_YEAR, allowed_start_year, world_map
 from railroads.saves import SaveInfo, Saves
 from railroads.settings import MapChoice, Settings
 from railroads.sim.clock import END_YEAR, HISTORY_START, START_YEAR
-from railroads.sim.company import BANKRUPT_MONTHS, TARGETS, Difficulty
-from railroads.sim.finance import START_CASH
+from railroads.sim.company import (
+    BANKRUPT_MONTHS,
+    PRICE_FACTORS,
+    START_CASHES,
+    TARGETS,
+    Difficulty,
+)
 from railroads.sim.lots import START_LOTS
 from railroads.sim.tilemap import START_SHARE
 from railroads.ui.menu_scene import HORIZON, MenuScene
@@ -94,6 +99,17 @@ def map_note(choice: MapChoice) -> str:
     return f"About {area:,.0f} km² to start, in {counted(len(START_LOTS))} hexagonal lots. {baked.about}"
 
 
+def difficulty_text(difficulty: Difficulty) -> str:
+    """What a difficulty sets, for the new game page."""
+    factor = PRICE_FACTORS[difficulty]
+    prices = "their usual prices" if factor == 1 else f"{factor:g} times their usual prices"
+    return (
+        f"You start with {dollars(START_CASHES[difficulty])} and goods pay {prices} all game. "
+        f"Your company must be worth {dollars(TARGETS[difficulty])} on 1 January {END_YEAR}. Cash below "
+        f"nothing for {BANKRUPT_MONTHS} months in a row ends the game."
+    )
+
+
 @dataclass
 class MainMenu:
     saves: Saves
@@ -102,7 +118,7 @@ class MainMenu:
     map: MapChoice = MapChoice.POLAND
     seed: int = field(default_factory=random_seed)
     start_year: int = START_YEAR
-    cash: int = int(START_CASH)
+    cash: int = int(START_CASHES[Difficulty.NORMAL])
     stand_in_years: int = 0
     difficulty: Difficulty = Difficulty.NORMAL
     show_map_growing: bool = False
@@ -283,18 +299,20 @@ class MainMenu:
             self.go_to("main")
         return None
 
+    def choose_difficulty(self, difficulty: Difficulty) -> None:
+        """Picks a difficulty, with the cash it starts the company with."""
+        self.difficulty = difficulty
+        self.cash = int(START_CASHES[difficulty])
+
     def _draw_difficulty(self) -> None:
         imgui.text("Difficulty")
         for index, difficulty in enumerate(Difficulty):
             if index:
                 imgui.same_line()
             if imgui.radio_button(difficulty.value, self.difficulty == difficulty):
-                self.difficulty = difficulty
+                self.choose_difficulty(difficulty)
         imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + MENU_WIDTH)
-        imgui.text_disabled(
-            f"Your company must be worth {dollars(TARGETS[self.difficulty])} on 1 January "
-            f"{END_YEAR}. Cash below nothing for {BANKRUPT_MONTHS} months in a row ends the game."
-        )
+        imgui.text_disabled(difficulty_text(self.difficulty))
         imgui.pop_text_wrap_pos()
         imgui.spacing()
 
@@ -330,7 +348,10 @@ class MainMenu:
         imgui.text("Starting money")
         _, self.cash = imgui.input_int("##cash", self.cash, CASH_STEP, CASH_STEP * 10)
         self.cash = min(max(self.cash, 0), MOST_CASH)
-        imgui.text_disabled(f"{dollars(self.cash)}; the usual start is {dollars(START_CASH)}.")
+        usual = START_CASHES[self.difficulty]
+        imgui.text_disabled(
+            f"{dollars(self.cash)}; the usual {self.difficulty.value} start is {dollars(usual)}."
+        )
         imgui.text("A stand-in player runs the railway first for (years)")
         _, self.stand_in_years = imgui.slider_int(
             "##stand-in", self.stand_in_years, 0, END_YEAR - self.start_year

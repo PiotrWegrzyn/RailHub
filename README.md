@@ -30,7 +30,10 @@ Every game is set a target for 1 January 2050, measured in what the company is w
 fetch today (`Owners.lot_price` for every 100), plus half of what its stations (with their levels,
 storage upgrades and facilities), track and trains would cost today, as a train sells for half its
 price. The new game page offers three difficulties, each with one target: Easy $50,000,000, Normal
-$100,000,000 and Hard $150,000,000. The top bar shows the worth against the target, with what
+$100,000,000 and Hard $150,000,000. Each also sets the starting cash and marks every good's price
+up for the whole game (`START_CASHES` and `PRICE_FACTORS`): Easy starts with $150,000 and goods pay
+2 times the boards' price, Normal $100,000 and 1.5 times, Hard $80,000 and the boards' price
+itself. The page lists all three for the difficulty picked. The top bar shows the worth against the target, with what
 it is made of on hover, and the Reports window charts it at the start of every month. The game
 says when the company is first worth the target, and on 1 January 2050 whether it still is, the
 clock waiting while the window is open; play goes on after that.
@@ -106,7 +109,7 @@ A new game is set up first with:
   new random one each time the game opens;
 - the year play begins, so how long towns grow from 850 before it: 1850 is suggested, and play
   can't begin before 1804, the year of the first steam engine on rails (`EARLIEST_START_YEAR` in `src/railroads/newgame.py`);
-- the starting money, $100,000 by default;
+- the starting money, the difficulty's ($100,000 on Normal) unless changed under "Cheats";
 - under "For testing", how many years a stand-in player runs the railway first (`--simulate`).
 
 Towns grow away from the window, which shows how far they have got: on a thread of its own on
@@ -1134,7 +1137,8 @@ closest place within 50 km. A second station with the same name is numbered ("Ł
 station with no place that near is called Station 1, Station 2 and so on. Zoomed in, each
 station's name shows on a tag above it.
 
-A game starts with $100,000 (`railroads.sim.finance`). Track costs $600 a cell on the flat, $900
+A game starts with $100,000 on Normal, $150,000 on Easy and $80,000 on Hard
+(`railroads.sim.company.START_CASHES`). Track costs $600 a cell on the flat, $900
 in hills, twice that across a minor river, $20,000 a cell of bridge and $40,000 a cell of tunnel;
 double track 3 times as much as single and quadruple track, from era 3, 10 times; wires, only once
 an electric engine is on sale, cost each track 4 times a single track's price more, so a cell on the
@@ -1187,7 +1191,9 @@ grows faster than demand, margins shrink: in 2050 coal, ore, steel and chemicals
 fifth of their base, farming, animals, wood and textiles a little over a quarter, passengers and
 mail over a third and luxuries about half. The player's own buildings sell to their stations at
 that price too. The Reports window's Prices tab charts every tile's price over the years and
-lists the boards now.
+lists the boards now. All of that is on Hard: Normal marks every price up 1.5 times and Easy 2
+times for the whole game (`Tiles.markup`), and the supply and demand screen, the Reports window and
+what buildings' shares cost show the marked-up prices.
 
 <!-- table: freight -->
 | Freight a unit | Goods |
