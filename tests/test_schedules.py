@@ -303,3 +303,13 @@ def test_a_train_is_named_after_its_schedules_ends_not_the_refuelling_stop_on_th
     title = railway.titles()[train.name]
 
     assert title.startswith(f"{railway.name_of(FIRST)} – {railway.name_of(LAST)}")
+
+
+def test_a_train_takes_a_stops_cars_from_the_left_only_while_its_engine_pulls_them_full() -> None:
+    railway = line_of_three()
+    schedule = schedule_of(railway, Stop(FIRST, [Good.WHEAT] * 3), Stop(MIDDLE))
+    train = bought(railway, schedule)
+
+    taken = railway.schedules.taken(train, schedule.stops[0])
+
+    assert taken == len(train.stops[0].cars) < 3

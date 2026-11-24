@@ -390,3 +390,31 @@ def test_the_schedules_tab_shows_the_first_schedule_with_its_trains_and_stops(gu
 
     assert window.tab == SCHEDULES
     assert window.chosen_schedule == train.schedule
+
+
+def test_a_schedules_stops_hold_cars_for_the_biggest_engine_on_sale_not_only_its_trains() -> None:
+    _, railway = joined_stations()
+    railway.year = 1850
+    train = railway.buy("tank")
+    assert train is not None
+
+    engine = TrainsWindow._schedule_engine(railway, [train])
+
+    assert ENGINES[engine].cars > ENGINES["tank"].cars
+
+
+def test_a_schedules_stop_says_how_many_of_its_cars_its_trains_take(
+    gui: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    assert train is not None
+    routed(railway, train, [Stop((6, 3), [Good.COAL] * 5), Stop((6, 20))])
+    window = TrainsWindow(open=True)
+    window._pick_tab = SCHEDULES
+    notes: list[str] = []
+    monkeypatch.setattr("railroads.ui.trains_window.colored", lambda _, text: notes.append(text))
+
+    draw_frames(window, railway)
+
+    assert any(note.endswith("take the first 3") for note in notes)

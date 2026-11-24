@@ -192,6 +192,14 @@ class Schedules:
             stops.append(stop)
         return stops
 
+    def taken(self, train: Train, template: Stop) -> int:
+        """How many of a stop's cars a train takes on there: from the left, while its engine has
+        room for them and can pull them, leaving out those it can't carry."""
+        stop = Stop(template.cell)
+        if not template.refuel_only:
+            self._fill(train, stop, template)
+        return len(stop.cars)
+
     def refit(self, train: Train, schedule: Schedule) -> None:
         """Gives a train whose stops are its schedule's that schedule's cars and loading again,
         taking new cars at once at the stop it stands at, otherwise the next time it calls."""

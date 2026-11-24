@@ -154,6 +154,7 @@ class TrainsWindow:
     # The schedule whose stops are drawn now, and the train they are drawn for, if any.
     _editing: Schedule | None = None
     _live: Train | None = None
+    _riders: list[Train] = field(default_factory=list)
 
     def worth(self, railway: Railway, train: Train) -> list[float]:
         """What each of the train's cars would earn at its destination now, kept for a moment
@@ -412,7 +413,7 @@ class TrainsWindow:
         imgui.begin_child("route", (-map_width, 0))
         section("Stops")
         self._draw_sort_choice()
-        self._draw_stops(railway, view, supplies, schedule)
+        self._draw_stops(railway, view, supplies, schedule, riders=trains)
         imgui.end_child()
         imgui.same_line()
         imgui.begin_child("map", (0, 0), imgui.ChildFlags_.borders.value)
@@ -422,14 +423,15 @@ class TrainsWindow:
 
     @staticmethod
     def _schedule_engine(railway: Railway, trains: list[Train]) -> str:
-        """The engine a schedule's stop cards are drawn for: of its trains, the one with room for
-        the most cars and pulling the most, so that every train takes on its cars from the left
-        as far as it can; with no trains, the first on sale."""
-        if trains:
-            biggest = max(trains, key=lambda t: (railway.most_cars(t), railway.max_pull(t.engine)))
-            return biggest.engine
-        on_sale = railway.engines()
-        return on_sale[0] if on_sale else FIRST_ENGINE
+        """The engine a schedule's stop cards are drawn for: of its trains' engines and those on
+        sale but expresses, the one with room for the most cars and pulling the most, so that its
+        stops can hold cars for the biggest train it could get, each train taking them from the
+        left as far as it can."""
+        engines = {train.engine for train in trains}
+        engines |= {name for name in railway.engines() if not ENGINES[name].express}
+        if not engines:
+            return FIRST_ENGINE
+        return max(engines, key=lambda name: (ENGINES[name].cars, railway.max_pull(name), name))
 
     @staticmethod
     def _draw_add_train(railway: Railway, schedule: Schedule) -> None:
@@ -745,10 +747,13 @@ class TrainsWindow:
         supplies: Supplies,
         schedule: Schedule | None = None,
         live: Train | None = None,
+        riders: list[Train] | None = None,
     ) -> None:
         """The stop cards of a train's stops, or a schedule's through `train` standing in for it
-        (_view), with the stop `live` runs to or stands at picked out, and a list adding one."""
+        (_view), with the stop `live` runs to or stands at picked out, and a list adding one;
+        under each stop's cars, how many of them `riders` (`live` if not given) take on."""
         self._editing, self._live = schedule, live
+        self._riders = riders if riders is not None else [] if live is None else [live]
         stops = len(train.stops)
         current = -1
         if (
@@ -998,6 +1003,35 @@ class TrainsWindow:
                 f"full, it runs at {speed_share(railway, train, planned):.0%} of its top speed"
             )
         caption_room()
+        self._draw_taken(railway, stop)
+
+    def _draw_taken(self, railway: Railway, stop: Stop) -> None:
+        """Under a schedule's stop's cars, how many of them its trains take on, by engine, when
+        some take fewer than all."""
+        if self._editing is None or not stop.cars or not self._riders:
+            return
+        taken: dict[str, int] = {}
+        for rider in self._riders:
+            if rider.engine not in taken:
+                taken[rider.engine] = railway.schedules.taken(rider, stop)
+        if all(count == len(stop.cars) for count in taken.values()):
+            return
+        if self._live is not None:
+            note = f"This train takes the first {taken[self._live.engine]} of these cars"
+        else:
+            note = "; ".join(
+                f"trains behind a {ENGINES[engine].title} take the first {count}"
+                for engine, count in sorted(taken.items(), key=lambda pair: pair[1])
+            )
+            note = note[0].upper() + note[1:]
+        imgui.set_cursor_pos_x(CARD_LABEL)
+        imgui.push_text_wrap_pos(0.0)
+        colored(GONE, note)
+        imgui.pop_text_wrap_pos()
+        tip(
+            "A train takes a stop's cars from the left while its engine has room for them and\n"
+            "can pull them full; the rest are for bigger engines"
+        )
 
     def _draw_offers(
         self,
