@@ -343,8 +343,9 @@ class Railway:
         return ENGINES[engine].price - ENGINES[train.engine].price * TRAIN_RESALE
 
     def swap_engine(self, train: Train, engine: str) -> bool:
-        """Swaps a train's engine for a newer one of its line, keeping its name, stops and cars;
-        False if it can't be swapped for that one or there isn't the cash."""
+        """Swaps a train's engine for a newer one of its line, keeping its name, stops and cars,
+        and at each stop adding more of its last car while the new engine has room for them and
+        can pull them; False if it can't be swapped for that one or there isn't the cash."""
         if engine not in self.engine_upgrades(train):
             return False
         price = self.swap_price(train, engine)
@@ -354,6 +355,11 @@ class Railway:
         most = self.most_cars(train)
         for stop in train.stops:
             stop.keep_cars(most)
+            if stop.cars and not stop.refuel_only:
+                last = len(stop.cars) - 1
+                cargo, generation = stop.cars[last], stop.generation_at(last)
+                while self.add_car(train, stop, cargo, generation):
+                    pass
         return True
 
     def trains_to_upgrade(self, engine: str) -> list[Train]:

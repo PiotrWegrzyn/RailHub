@@ -702,8 +702,26 @@ def test_an_engine_swap_costs_the_new_engine_less_half_the_old_and_keeps_the_rou
     assert swapped
     assert train.engine == "american"
     assert train.name == "Steam engine 1"
-    assert [(stop.cell, stop.cars) for stop in train.stops] == stops
+    assert [
+        (stop.cell, stop.cars[: len(cars)])
+        for stop, (_, cars) in zip(train.stops, stops, strict=True)
+    ] == stops
     assert railway.finances.cash == pytest.approx(cash - price)
+
+
+def test_an_engine_swap_adds_more_of_each_stops_last_car_while_the_new_engine_takes_them() -> None:
+    railway = line()
+    (train,) = planets_on_the_line(railway, 1)
+    before = [list(stop.cars) for stop in train.stops]
+
+    railway.swap_engine(train, "american")
+
+    after = [list(stop.cars) for stop in train.stops]
+    assert all(cars[: len(old)] == old for cars, old in zip(after, before, strict=True))
+    assert all(set(cars[len(old) :]) <= {old[-1]} for cars, old in zip(after, before, strict=True))
+    assert sum(map(len, after)) > sum(map(len, before))
+    for stop in train.stops:
+        assert not railway.add_car(train, stop, stop.cars[-1])
 
 
 def test_no_engine_swap_without_the_cash_or_for_an_engine_not_on_offer() -> None:
