@@ -440,7 +440,8 @@ FOOD_PLANTS = _merges(
     )
 )
 
-# Steel mills make steel from iron ore and coal, near mines and among other industry.
+# Steel mills make steel from iron ore and coal, near mines and among other industry, five times
+# as often as they once did, as nearly everything wants steel.
 STEEL_MILLS = _merges(
     Ladder(
         kinds=(BuildingKind.STEEL_MILL,),
@@ -449,7 +450,7 @@ STEEL_MILLS = _merges(
             relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
             water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.2, Terrain.SEA: 1.2},
         ),
-        base=4,
+        base=20,
     )
 )
 

@@ -738,6 +738,17 @@ def test_a_textile_mill_opens_more_often_than_a_furniture_maker() -> None:
     assert mill > growth.chances(works[BuildingKind.FURNITURE_MAKER])[5, 5] > 0
 
 
+def test_a_steel_mill_opens_more_often_than_a_sawmill() -> None:
+    constructions = Constructions(make_map())
+    build(constructions, (5, 5), BuildingKind.HOUSE, 6)
+    growth = Growth(constructions, NO_TRADE, start_year=1800)
+    works = {ladder.kinds[0]: ladder for ladder in WORKS}
+
+    mill = growth.chances(STEEL_MILLS)[5, 6]
+
+    assert mill > growth.chances(works[BuildingKind.SAWMILL])[5, 6] > 0
+
+
 @pytest.mark.parametrize(("shares", "factor"), [(SHARES // 2, 1.25), (2 * SHARES, 2.0)])
 def test_the_players_part_of_a_ladders_buildings_in_a_cell_raises_its_chance_there(
     shares: int, factor: float
