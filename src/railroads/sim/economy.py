@@ -426,6 +426,16 @@ class MonthOfTrade:
         count = self.count[kind]
         return np.minimum(divided(owned, count), 1.0)
 
+    def _first_part(self, kind: BuildingKind) -> FloatArray:
+        """The share of the buildings of a kind in each cell that stations serve before anyone
+        else's: the player's part of them (_owned_part), or all of them where the player
+        controls them (OwnedShare.taking)."""
+        share = self.owned.get(kind)
+        if share is None or share.taking is None:
+            return self._owned_part(kind)
+        controlled = np.minimum(divided(share.taking[self.cells], self.count[kind]), 1.0)
+        return np.maximum(self._owned_part(kind), controlled)
+
     def _count_for(self, kind: BuildingKind, need: Need) -> FloatArray:
         """How many buildings of a kind in each cell want a need: all of them, but for a boost
         only the player's own take (OWNED_BOOSTS), only theirs or those they control, once their
@@ -508,7 +518,7 @@ class MonthOfTrade:
         owned = [kind for kind in wants if kind in self.owned]
         if not owned:
             return None
-        want = sum((wants[kind] * self._owned_part(kind) for kind in owned), start=self.zero)
+        want = sum((wants[kind] * self._first_part(kind) for kind in owned), start=self.zero)
         met = ratio(received, demand)
         return want * (1.0 - met)
 

@@ -3,7 +3,8 @@ each kind in each cell, and what buying or selling them fetches.
 
 Every building is SHARES shares, bought and sold LOTS at a time. Holding CONTROL of the shares of
 the buildings of a kind in a cell gives the player control of them: only then do the boosts only their
-own take (railroads.sim.goods.OWNED_BOOSTS) work on them, on the whole of them, and the player
+own take (railroads.sim.goods.OWNED_BOOSTS) work on them, on the whole of them, and stations hand the
+whole of them what they need before anyone else's, not just the player's part; and the player
 still takes their part of all they make; past that, more shares only raise that part. A building pays nothing of its own: the player's part of what it makes, by their shares, goes into the stations around it
 before anything is handed out, as if a train had brought it, so the stations hand it out to the
 buildings in their reach and it pays as a delivery does (railroads.sim.economy,
@@ -229,6 +230,14 @@ class Owners:
         if railway is None or grid is None or need not in owned_boosts(kind, self._growth.year):
             return None
         return self._controlled(kind, grid).ravel()
+
+    def served_first(self, kind: BuildingKind) -> npt.NDArray[np.float64]:
+        """How many buildings' worth of a kind in each cell a station serves before anyone
+        else's: all of them where the player controls them, else as many as their shares make."""
+        grid = self._shares.get(kind)
+        if grid is None:
+            return np.zeros(self._growth.grid.shape)
+        return np.maximum(grid / SHARES, self._controlled(kind, grid))
 
     def _controlled(self, kind: BuildingKind, grid: IntArray) -> npt.NDArray[np.float64]:
         """How many buildings of a kind in each cell the player controls: all there, or none."""

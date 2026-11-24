@@ -1080,3 +1080,24 @@ def test_houses_burn_logs_but_not_planks() -> None:
 
     burned, _ = trade.goods_got[(BuildingKind.HOUSE, Need.HEATING)]
     assert burned[position(trade, economy, (8, 9))] == 0.0
+
+
+def bakery_wheat(controlled: bool) -> float:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.BAKERY, 1), ((8, 7), BuildingKind.BAKERY, 1))
+    mine, control = np.zeros(tile_map.grid.shape), np.zeros(tile_map.grid.shape)
+    mine[(8, 7)] = 0.6
+    if controlled:
+        control[(8, 7)] = 1.0
+    owners = {BuildingKind.BAKERY: OwnedShare(mine.ravel(), 1.0, frozenset(), control.ravel())}
+    trade = economy.trade(placed, holding(WHEAT=100.0), owned=owners)
+    got, _ = trade.goods_got[(BuildingKind.BAKERY, Need.WHEAT)]
+    return float(got[position(trade, economy, (8, 7))])
+
+
+def test_a_station_hands_all_a_building_the_player_controls_needs_out_to_it_first() -> None:
+    shares = bakery_wheat(controlled=False), bakery_wheat(controlled=True)
+
+    assert shares[0] == pytest.approx(0.6 * shares[1])
+    assert shares[1] == pytest.approx(96.0)

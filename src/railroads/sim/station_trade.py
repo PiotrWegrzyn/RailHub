@@ -288,11 +288,11 @@ class StationTrade:
         self, cells: npt.NDArray[np.intp], wants: dict[BuildingKind, FloatArray]
     ) -> FloatArray:
         """The part of these wants that is the player's own buildings', which a station hands
-        out before anyone else's."""
+        out before anyone else's: all of the buildings they control (Owners.served_first)."""
         growth = self._growth
         mine = np.zeros(cells.size)
         for kind, want in wants.items():
-            owned = growth.owners.owned(kind).ravel()[cells]
+            owned = growth.owners.served_first(kind).ravel()[cells]
             if owned.any():
                 count = growth.counts[kind].ravel()[cells]
                 mine += want * np.minimum(owned / np.maximum(count, 1), 1.0)
