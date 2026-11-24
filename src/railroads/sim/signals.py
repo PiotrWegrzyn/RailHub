@@ -45,7 +45,7 @@ FAST_LANE = 0
 SLOW_LANE = 1
 # How far short of a red signal a train stands, and of a train it follows, in cells.
 SIGNAL_GAP = 0.15
-FOLLOW_GAP = 0.3
+FOLLOW_GAP = 0.5
 # How far ahead of the end of the way set for it a train asks for more, in cells, so it finds
 # the next signal clear without slowing for it.
 SIGHT = 2.0
