@@ -906,7 +906,8 @@ SOY_SAUCE_BREWERIES = _works(
 # that the land holds about as many in 1850 as it gains by 2040 when well served.
 WORKS = (
     _works(BuildingKind.SAWMILL, {}, base=2),
-    _works(BuildingKind.TEXTILE_MILL, {}, 1780, base=0.6, starving_years=250),
+    # Textile mills open three times as often as they once did.
+    _works(BuildingKind.TEXTILE_MILL, {}, 1780, base=1.8, starving_years=250),
     _works(BuildingKind.FURNITURE_MAKER, {}, base=1.1),
     _works(BuildingKind.WINERY, {}, base=4),
     _works(BuildingKind.BARREL_MAKER, {}, base=0.25, starving_years=250),
@@ -919,7 +920,8 @@ WORKS = (
     _works(BuildingKind.TANK_FACTORY, {IND: 6}, 0, 40_000, base=100),
     _works(BuildingKind.BRICKWORKS, {}, base=0.8, starving_years=250),
     _works(BuildingKind.GLASSWORKS, {}, base=0.36, starving_years=250),
-    _works(BuildingKind.BREWERY, {POP: FOOD_TOWN}, base=6.3, starving_years=250),
+    # Breweries open five times as often as they once did, so most towns have one.
+    _works(BuildingKind.BREWERY, {POP: FOOD_TOWN}, base=31.5, starving_years=250),
     _works(BuildingKind.DISTILLERY, {POP: FOOD_TOWN}, 1600, base=12.7, starving_years=250),
     SAKE_BREWERIES,
     SOY_SAUCE_BREWERIES,

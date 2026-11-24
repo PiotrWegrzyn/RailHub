@@ -16,7 +16,9 @@ ladder, and a ladder drawn by industry is drawn by its own ladder's points OWN_K
 strongly instead, by industry only CATEGORY_SHARE as strongly, and breeds by its own served
 points the same way, so a served sawmill breeds sawmills and hardly any other works. So the base
 chance holds anywhere the land allows, good surroundings raise it even where none of the kind
-stands yet, and what is satisfied breeds far faster. A building that comes up in a cell
+stands yet, and what is satisfied breeds far faster. The player's buildings raise their ladder's
+chance in their cell, of more coming up and of merging, by their part of its buildings there
+(railroads.sim.ownership.OWNED_CHANCE). A building that comes up in a cell
 goes up in it or a random cell next to it, and one that finds no room there spills over further
 (railroads.sim.room).
 
@@ -801,12 +803,13 @@ class Growth:
         return self._nearby[points]
 
     def chances(self, ladder: Ladder = TOWNS) -> FloatArray:
-        """Each cell's chance of a turn on the ladder this month."""
+        """Each cell's chance of a turn on the ladder this month, the player's buildings of its
+        kinds raising it (Owners.chance_factor)."""
         place = next(place for place in self._places if place.ladder == ladder)
         cells = np.arange(place.chances.size)
-        return np.where(self._meets_needs(place, cells), place.chances, 0.0).reshape(
-            self._grid.shape
-        )
+        factor = self.owners.chance_factor(ladder.kinds)
+        chances = place.chances if factor is None else place.chances * factor
+        return np.where(self._meets_needs(place, cells), chances, 0.0).reshape(self._grid.shape)
 
     def month(self, rng: np.random.Generator) -> set[Cell]:
         """Grows one month; returns the cells whose buildings changed."""
@@ -864,6 +867,11 @@ class Growth:
         for place in growing:
             if war > 1 and place.ladder is MILITARY:
                 hits = self._hits(place, rng, None, months * war)
+                turns += [(index, place.ladder) for index in hits.tolist()]
+                continue
+            factor = self.owners.chance_factor(place.ladder.kinds)
+            if factor is not None:
+                hits = self._hits(place, rng, None, months, factor)
                 turns += [(index, place.ladder) for index in hits.tolist()]
                 continue
             drawn = tries.get(id(place))
@@ -937,30 +945,33 @@ class Growth:
         rng: np.random.Generator,
         tries: int | None = None,
         months: int = 1,
+        factor: FloatArray | None = None,
     ) -> npt.NDArray[np.intp]:
         """The cells that take a turn on the ladder this month. With small chances, cells are
         drawn as if all had the highest chance and each kept by how its own compares, so a month
         costs what grows rather than the size of the map: `tries` of them, if already drawn
         for every ladder at once. Over many months, a cell is drawn as many times as it takes
-        turns, on average its chance times the months."""
+        turns, on average its chance times the months. `factor` multiplies each flat cell's
+        chance, as the player's buildings do (Owners.chance_factor)."""
         cells = place.cells
         if not cells.size:
             return cells
-        highest = place.highest
+        chances = place.chances if factor is None else place.chances * factor
+        highest = place.highest * (1.0 if factor is None else float(factor[cells].max()))
         if highest <= 0:
             return cells[:0]
         if months > 1:
             tried = cells[rng.integers(0, cells.size, rng.poisson(cells.size * highest * months))]
-            drawn = tried[rng.random(tried.size) * highest < place.chances[tried]]
+            drawn = tried[rng.random(tried.size) * highest < chances[tried]]
         elif highest > THINNING_UP_TO:
-            drawn = cells[rng.random(cells.size, dtype=np.float32) < place.chances[cells]]
+            drawn = cells[rng.random(cells.size, dtype=np.float32) < chances[cells]]
         else:
             if tries is None:
                 tries = int(rng.binomial(cells.size, highest))
             if not tries:
                 return cells[:0]
             tried = np.unique(cells[rng.integers(0, cells.size, tries)])
-            drawn = tried[rng.random(tried.size) * highest < place.chances[tried]]
+            drawn = tried[rng.random(tried.size) * highest < chances[tried]]
         if not drawn.size or not (place.ladder.needs or place.ladder.crowded_at is not None):
             return drawn
         return drawn[self._meets_needs(place, drawn)]

@@ -29,8 +29,10 @@ from railroads.sim.ladders import (
     STEEL_MILLS,
     TOWN_LAND,
     TOWNS,
+    WORKS,
     GrowthRule,
 )
+from railroads.sim.ownership import SHARES
 from railroads.sim.points import Points
 from railroads.sim.room import SPILL_STEPS
 from railroads.sim.surroundings import Land
@@ -712,6 +714,46 @@ def test_a_butcher_opens_in_a_town_more_often_than_a_bakery() -> None:
     butcher = growth.chances(BUTCHERS)[5, 5]
 
     assert butcher > growth.chances(BAKERIES)[5, 5] > 0
+
+
+def test_a_brewery_opens_in_a_town_more_often_than_a_distillery() -> None:
+    constructions = Constructions(make_map())
+    build(constructions, (5, 5), BuildingKind.HOUSE, 6)
+    growth = Growth(constructions, NO_TRADE, start_year=1700)
+    works = {ladder.kinds[0]: ladder for ladder in WORKS}
+
+    brewery = growth.chances(works[BuildingKind.BREWERY])[5, 5]
+
+    assert brewery > growth.chances(works[BuildingKind.DISTILLERY])[5, 5] > 0
+
+
+def test_a_textile_mill_opens_more_often_than_a_furniture_maker() -> None:
+    constructions = Constructions(make_map())
+    build(constructions, (5, 5), BuildingKind.HOUSE, 6)
+    growth = Growth(constructions, NO_TRADE, start_year=1800)
+    works = {ladder.kinds[0]: ladder for ladder in WORKS}
+
+    mill = growth.chances(works[BuildingKind.TEXTILE_MILL])[5, 5]
+
+    assert mill > growth.chances(works[BuildingKind.FURNITURE_MAKER])[5, 5] > 0
+
+
+@pytest.mark.parametrize(("shares", "factor"), [(SHARES // 2, 1.25), (2 * SHARES, 2.0)])
+def test_the_players_part_of_a_ladders_buildings_in_a_cell_raises_its_chance_there(
+    shares: int, factor: float
+) -> None:
+    constructions = Constructions(make_map())
+    build(constructions, (5, 5), BuildingKind.HOUSE, 6)
+    build(constructions, (5, 6), BuildingKind.BAKERY, 2)
+    growth = Growth(constructions, NO_TRADE, start_year=1700)
+    before = growth.chances(BAKERIES)
+
+    growth.owners.own((5, 6), BuildingKind.BAKERY, shares)
+
+    after = growth.chances(BAKERIES)
+    assert before[5, 6] > 0
+    assert after[5, 6] == pytest.approx(factor * before[5, 6])
+    assert after[5, 5] == pytest.approx(before[5, 5])
 
 
 def test_brewers_distillers_and_potters_need_a_town_around_them() -> None:

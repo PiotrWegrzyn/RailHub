@@ -43,6 +43,10 @@ LOTS = (100, 200, 600)
 # The part of the shares that gives control: a big flag over the buildings, and the boosts only
 # the player's buildings take working on the whole of them.
 CONTROL = 0.6
+# How much more likely the player's buildings make more of their kind to come up, or merge, in
+# their cell (railroads.sim.growth): the chance rises by this times the player's part of the
+# buildings of their ladder there, so owning them all doubles it.
+OWNED_CHANCE = 1.0
 # What a whole building costs at full satisfaction: this many years of all it makes at full
 # output, at its goods' market prices, so its shares pay a tenth of their price back a year.
 PAYBACK_YEARS = 10
@@ -98,6 +102,19 @@ class Owners:
         for grid in self._shares.values():
             held |= grid > 0
         return [(int(row), int(col)) for row, col in np.argwhere(held)]
+
+    def chance_factor(self, kinds: tuple[BuildingKind, ...]) -> npt.NDArray[np.float64] | None:
+        """What the chances of a ladder of these kinds are multiplied by in each flat cell:
+        1 plus OWNED_CHANCE times the player's part of its buildings there; None where the
+        player owns none of them anywhere."""
+        owned_kinds = [kind for kind in kinds if kind in self._shares and self._shares[kind].any()]
+        if not owned_kinds:
+            return None
+        counts = self._growth.counts
+        owned = sum(self.owned(kind).ravel() for kind in owned_kinds)
+        standing = sum(counts[kind].ravel() for kind in kinds if kind in counts)
+        part = np.minimum(np.divide(owned, np.maximum(standing, 1)), 1.0)
+        return 1.0 + OWNED_CHANCE * part
 
     def kinds(self) -> list[BuildingKind]:
         """The kinds of building the player owns shares of."""
