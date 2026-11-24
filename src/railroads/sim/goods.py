@@ -715,7 +715,10 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             ),
             BuildingKind.PRINTING_WORKS: Recipe(Good.NEWSPAPERS, 3000, {Need.PAPER: 0.05}),
             BuildingKind.SUGAR_REFINERY: Recipe(
-                Good.REFINED_SUGAR, 60, {Need.SUGAR: 0.5}, {Need.COAL: 0.1, Need.LIMESTONE: 0.1}
+                Good.REFINED_SUGAR,
+                60,
+                {Need.SUGAR: 1.0},
+                {Need.COAL: 40 / 60, Need.PAPER: 0.1},
             ),
             BuildingKind.GASWORKS: Recipe(Good.GAS, 200, {Need.COAL: 0.5}),
             BuildingKind.PORCELAIN_WORKS: Recipe(
