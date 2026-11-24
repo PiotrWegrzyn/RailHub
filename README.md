@@ -599,7 +599,7 @@ window (H) lists the same.
 | Appliance factory (era 6) | 30 appliances | 30 steel (from era 2), 15 copper (from era 4), 15 plastics (from era 6), 7.5 electronics (from era 6) |  |
 | Paper mill (1150) | 100 paper | 10 wood chips | 25 chemicals (from era 3) |
 | Printing works (1600) | 3,000 newspapers | 150 paper (from 1150) |  |
-| Sugar refinery (1800) | 60 refined sugar | 60 sugar | 40 heating, 6 paper (from 1150) |
+| Sugar refinery (1800) | 60 refined sugar | 60 sugar | 40 heating, 6 paper (from 1150), 6 limestone |
 | Porcelain works (1710) | 30 porcelain | 15 clay | 7.5 coal (from 1700) |
 | Butcher (1600) | 120 meat | 48 animals |  |
 | Power plant (era 3) |  | 1,000 coal (from 1700) |  |
@@ -675,8 +675,8 @@ window (H) lists the same.
 | Mega paper mill (1150) | 625 paper | 62.5 wood chips | 156.2 chemicals (from era 3) |
 | Big printing works (1600) | 7,500 newspapers | 375 paper (from 1150) |  |
 | Mega printing works (1600) | 1.875e+04 newspapers | 937.5 paper (from 1150) |  |
-| Big sugar refinery (1800) | 150 refined sugar | 150 sugar | 100 heating, 15 paper (from 1150) |
-| Mega sugar refinery (1800) | 375 refined sugar | 375 sugar | 250 heating, 37.5 paper (from 1150) |
+| Big sugar refinery (1800) | 150 refined sugar | 150 sugar | 100 heating, 15 paper (from 1150), 15 limestone |
+| Mega sugar refinery (1800) | 375 refined sugar | 375 sugar | 250 heating, 37.5 paper (from 1150), 37.5 limestone |
 | Big gasworks (era 2) | 500 gas | 250 coal (from 1700) |  |
 | Mega gasworks (era 2) | 1,250 gas | 625 coal (from 1700) |  |
 | Big porcelain works (1710) | 75 porcelain | 37.5 clay | 18.75 coal (from 1700) |
