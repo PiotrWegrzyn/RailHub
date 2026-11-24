@@ -59,6 +59,31 @@ def test_trains_through_the_junctions_of_a_double_track_main_line_never_lock_eac
     assert min(train.arrivals for train in trains) >= 3
 
 
+def test_a_train_coming_down_a_single_line_leaves_the_junction_at_its_end_to_others_until_near() -> (
+    None
+):
+    junction = (8, 15)
+    game = game_with(
+        (WEST, junction, TrackWidth.SINGLE),
+        (junction, EAST, TrackWidth.DOUBLE),
+        (NORTH, junction, TrackWidth.SINGLE),
+    )
+    coming = shuttle(game, NORTH, EAST)
+    run_months(game, 0.01)
+    leaving = shuttle(game, EAST, WEST)
+    at_junction = next(p.start for p in passes(game.railway.network, coming) if p.cell == junction)
+    coming_was = None
+
+    for _ in range(int(1 / STEP)):
+        game.railway.run(STEP)
+        if junction in {claim[0] for claim in leaving.claims}:
+            coming_was = coming.along
+            break
+
+    assert coming_was is not None
+    assert coming_was < at_junction
+
+
 def test_a_plain_line_has_signals_only_where_it_leaves_each_station() -> None:
     game = game_with((WEST, EAST, TrackWidth.SINGLE))
 

@@ -1,6 +1,6 @@
 """The table of trains in the trains window, like a mail program's list of mail: a row a train
 with its engine's picture framed by its category, its name, first and last station, the cars its
-route takes most of, its status and what its ride earns; filters over it by station, a stop on
+route takes most of, what it carries now, its status and what its ride earns; filters over it by station, a stop on
 the way or a kind of car, and a click on a column's head sorts by it."""
 
 from collections.abc import Callable
@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
+from railroads.sim.goods import Good
 from railroads.sim.grids import Cell
 from railroads.sim.railway import NO_WAY_ON, Railway
 from railroads.sim.train_names import (
@@ -18,7 +19,7 @@ from railroads.sim.train_names import (
     first_station,
     last_station,
 )
-from railroads.sim.trains import Cargo, Train
+from railroads.sim.trains import Cargo, Train, unit_name
 from railroads.ui.buy_train import PICTURE_BACK, EnginePicture
 from railroads.ui.theme import (
     BRASS,
@@ -63,10 +64,16 @@ COLUMNS = (
     Column("First stop", 96.0),
     Column("Last stop", 96.0),
     Column("Cars used most", 112.0),
+    Column("Carrying", 120.0),
     Column("Status", 1.0, stretch=True),
     Column("This ride", 72.0),
 )
-TRAIN, FIRST, LAST, CARS, STATUS, RIDE = range(len(COLUMNS))
+TRAIN, FIRST, LAST, CARS, CARRYING, STATUS, RIDE = range(len(COLUMNS))
+# The least of a good a train carries for it to show among what it carries, and how wide the
+# table must be to show each train's first and last station: narrower, the columns are left out,
+# a train's name holding them already.
+SHOWN_LOAD = 0.5
+ROOM_FOR_STOPS = 900.0
 
 
 @dataclass
@@ -102,6 +109,18 @@ class Row:
     status: str
     stuck: bool
     net: float | None
+    carrying: tuple[tuple[Good, float], ...] = ()
+
+
+def carried(train: Train) -> tuple[tuple[Good, float], ...]:
+    """What the train carries now, each good once with its load over all its cars, the most
+    first."""
+    loads: dict[Good, float] = {}
+    for car in train.cars:
+        if not car.dining:
+            loads[car.good] = loads.get(car.good, 0.0) + car.load
+    shown = [(good, load) for good, load in loads.items() if load >= SHOWN_LOAD]
+    return tuple(sorted(shown, key=lambda pair: -pair[1]))
 
 
 def shown_status(status: str, titles: dict[str, str]) -> str:
@@ -129,6 +148,7 @@ def train_rows(
                 shown_status(train.status, titles),
                 train.status in NO_WAY_ON or bool(railway.long_legs(train)),
                 net_of(train),
+                carried(train),
             )
         )
     return rows
@@ -142,6 +162,7 @@ def sort_rows(rows: list[Row], column: int, descending: bool) -> list[Row]:
         FIRST: lambda r: r.first.casefold(),
         LAST: lambda r: r.last.casefold(),
         CARS: lambda r: r.cars[0][0].value if r.cars else "~",
+        CARRYING: lambda r: sum(load for _, load in r.carrying),
         STATUS: lambda r: r.status.casefold(),
     }
     if column == RIDE:
@@ -224,7 +245,9 @@ class TrainTable:
             | imgui.TableFlags_.sortable.value
             | imgui.TableFlags_.resizable.value
             | imgui.TableFlags_.borders_outer_h.value
+            | imgui.TableFlags_.hideable.value
         )
+        wide = imgui.get_content_region_avail().x >= ROOM_FOR_STOPS
         if not imgui.begin_table("trains", len(COLUMNS), flags):
             return None, False
         imgui.table_setup_scroll_freeze(0, 1)
@@ -237,6 +260,8 @@ class TrainTable:
             if number == TRAIN:
                 own |= imgui.TableColumnFlags_.default_sort.value
             imgui.table_setup_column(column.title, own, column.width)
+        imgui.table_set_column_enabled(FIRST, wide)
+        imgui.table_set_column_enabled(LAST, wide)
         imgui.table_headers_row()
         specs = imgui.table_get_sort_specs()
         if specs is not None and specs.specs_count:
@@ -283,6 +308,8 @@ def _draw_row(row: Row, picked: bool, picture: EnginePicture) -> bool:
     _cell(LAST, row.last or "-", TEXT_DIM if not row.last else None)
     imgui.table_set_column_index(CARS)
     _draw_cars(row.cars)
+    imgui.table_set_column_index(CARRYING)
+    _draw_carrying(row.carrying)
     _cell(STATUS, row.status, GONE if row.stuck else TEXT_DIM)
     if row.net is None:
         _cell(RIDE, "-", TEXT_DIM)
@@ -319,6 +346,24 @@ def _draw_cars(cars: list[tuple[Cargo, int]]) -> None:
         imgui.same_line(0, 1)
         imgui.set_cursor_pos_y(top + (CAR_ICON - imgui.get_text_line_height()) / 2)
         imgui.text_disabled(f"{count}")
+
+
+def _draw_carrying(carrying: tuple[tuple[Good, float], ...]) -> None:
+    """What a train carries now, each good an icon and how much of it."""
+    if not carrying:
+        _cell(CARRYING, "empty", TEXT_DIM)
+        return
+    top = imgui.get_cursor_pos_y() + (ROW_HEIGHT - CAR_ICON) / 2
+    for number, (good, load) in enumerate(carrying):
+        if number:
+            imgui.same_line(0, 6)
+        imgui.set_cursor_pos_y(top)
+        imgui.dummy((CAR_ICON, CAR_ICON))
+        draw_good_icon(imgui.get_window_draw_list(), good, imgui.get_item_rect_min(), CAR_ICON)
+        tip(f"{good.value}: {load:.0f} {unit_name(good, load)} on board now")
+        imgui.same_line(0, 1)
+        imgui.set_cursor_pos_y(top + (CAR_ICON - imgui.get_text_line_height()) / 2)
+        imgui.text_disabled(f"{load:.0f}")
 
 
 def _station_filter(

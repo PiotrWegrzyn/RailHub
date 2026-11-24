@@ -200,3 +200,24 @@ def test_a_station_on_quadruple_track_opens_its_outer_tracks_round_two_island_pl
     half = DOUBLE_SPACING / 2
     assert piece.width == TrackWidth.QUADRUPLE
     assert sides == pytest.approx([-(half + ISLAND_TRACKS), -half, half, half + ISLAND_TRACKS])
+
+
+def test_track_branching_off_double_track_where_it_narrows_to_single_leaves_from_the_middle() -> (
+    None
+):
+    constructions = Constructions(flat_map())
+    grid = constructions.tile_map.grid
+    cell = (6, 6)
+    narrow, into_narrow = grid.track_exit(cell, 8)
+    wide, into_wide = grid.track_exit(cell, 2)
+    constructions.build(Track(narrow, (into_narrow, (into_narrow + 6) % 12)))
+    constructions.build(Track(wide, (into_wide, (into_wide + 6) % 12), TrackWidth.DOUBLE))
+    constructions.build(Track(cell, (2, 8), TrackWidth.DOUBLE))
+    branch = Track(cell, (0, 8))
+    constructions.build(branch)
+    projection = PixelProjection.of(grid, 0.0, 1.0)
+    track = TrackArt(constructions.tile_map, constructions, projection)
+
+    drawn = track._sides_at(branch, [1.0], forks=True)
+
+    assert [lane[0] for lane in drawn] == pytest.approx([0.0])
