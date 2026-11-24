@@ -7,6 +7,8 @@ of its line, alone or with every train of that line with an older engine. Schedu
 schedule in a list (railroads.sim.schedules); the chosen one's trains in a table, how its
 refuelling stops are set, and its stops as cards and on the map, as for a train."""
 
+import math
+from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
@@ -21,11 +23,12 @@ from railroads.sim.fuel_market import fuel_of
 from railroads.sim.goods import GENERAL_GOODS, General, Good
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway, Ride
-from railroads.sim.schedules import Schedule
+from railroads.sim.schedules import MOST_CARS, Schedule
 from railroads.sim.trains import (
     ENGINES,
     FIRST_ENGINE,
     SLOWDOWN,
+    Cargo,
     Stop,
     Train,
     amount_of,
@@ -40,6 +43,7 @@ from railroads.ui.station_offers import Offer, Supplies, goods_to_load
 from railroads.ui.theme import (
     BORDER,
     BRASS,
+    CHIP_SIZE,
     GONE,
     OFFER_SIZE,
     WINDOW_TOP,
@@ -59,6 +63,7 @@ from railroads.ui.train_table import (
     ICON_BOX,
     ROW_HEIGHT,
     TrainTable,
+    draw_cargo_counts,
     engine_icon,
     shown_status,
     train_rows,
@@ -314,28 +319,32 @@ class TrainsWindow:
             | imgui.TableFlags_.scroll_y.value
             | imgui.TableFlags_.borders_outer_h.value
         )
-        if not imgui.begin_table("schedules", 4, flags):
+        if not imgui.begin_table("schedules", 5, flags):
             return
         imgui.table_setup_scroll_freeze(0, 1)
         stretch, fixed = (
             imgui.TableColumnFlags_.width_stretch.value,
             imgui.TableColumnFlags_.width_fixed.value,
         )
-        imgui.table_setup_column("Schedule", stretch, 1.0)
-        imgui.table_setup_column("Trains", fixed, 56.0)
-        imgui.table_setup_column("Stops", fixed, 48.0)
-        imgui.table_setup_column("Rides", fixed, 86.0)
+        imgui.table_setup_column("Schedule", stretch, 1.2)
+        imgui.table_setup_column("Carries", stretch, 1.0)
+        imgui.table_setup_column("Trains", fixed, 52.0)
+        imgui.table_setup_column("Stops", fixed, 44.0)
+        imgui.table_setup_column("Rides", fixed, 80.0)
         imgui.table_headers_row()
         for schedule in schedules.all:
             trains = members.get(schedule.name, [])
             imgui.table_next_row(0, ROW_HEIGHT)
             imgui.table_next_column()
-            imgui.align_text_to_frame_padding()
+            top = imgui.get_cursor_pos_y()
             title = schedules.title(schedule)
             flags = imgui.SelectableFlags_.span_all_columns.value
-            if imgui.selectable(f"##{schedule.name}", schedule is chosen, flags, (0, 0))[0]:
+            if imgui.selectable(f"##{schedule.name}", schedule is chosen, flags, (0, ROW_HEIGHT))[
+                0
+            ]:
                 self.chosen_schedule = schedule.name
             imgui.same_line(0, 0)
+            imgui.set_cursor_pos_y(top + (ROW_HEIGHT - imgui.get_text_line_height()) / 2)
             if schedule.problem:
                 colored(GONE, f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {title}")
                 tip(schedule.problem)
@@ -344,10 +353,13 @@ class TrainsWindow:
             else:
                 imgui.text(title)
             imgui.table_next_column()
-            imgui.text(f"{len(trains)}")
+            draw_cargo_counts(carries(schedule), "taken on over its round")
+            for number, text in ((2, f"{len(trains)}"), (3, f"{len(schedule.own_stops())}")):
+                imgui.table_set_column_index(number)
+                imgui.set_cursor_pos_y(top + (ROW_HEIGHT - imgui.get_text_line_height()) / 2)
+                imgui.text(text)
             imgui.table_next_column()
-            imgui.text(f"{len(schedule.own_stops())}")
-            imgui.table_next_column()
+            imgui.set_cursor_pos_y(top + (ROW_HEIGHT - imgui.get_text_line_height()) / 2)
             nets = [net for net in (self.net(railway, t) for t in trains) if net is not None]
             if nets:
                 total = sum(nets)
@@ -397,12 +409,12 @@ class TrainsWindow:
         section(f"{len(trains)} {plural('train', len(trains))}")
         rows = [
             row
-            for row in train_rows(railway, railway.titles(), lambda t: self.net(railway, t))
+            for row in train_rows(railway, railway.titles())
             if row.train.schedule == schedule.name
         ]
         height = (min(max(len(rows), 1), SCHEDULE_ROWS) + 1.8) * ROW_HEIGHT
         imgui.begin_child("schedule trains", (0, height))
-        clicked, _ = self.schedule_table.draw(rows, None, picture)
+        clicked, _ = self.schedule_table.draw(rows, None, picture, picking=False)
         imgui.end_child()
         if clicked is not None:
             self.chosen = clicked
@@ -522,21 +534,91 @@ class TrainsWindow:
         tip("Fill the window with this train; a double click on its row does too")
 
     def _draw_list(self, railway: Railway, picture: EnginePicture) -> None:
-        """The Buy a train button and the filters, always at the top, over the table of
-        trains, which scrolls on its own."""
+        """The Buy a train button, the schedule filter and what to do with the trains picked,
+        always at the top, over the table of trains, which scrolls on its own."""
         if imgui.button(f"{fa.ICON_FA_PLUS}  Buy a train"):
             chosen = next((t for t in railway.trains if t.name == self.chosen), None)
             self.buy.open_for(None if chosen is None else railway.schedules.of(chosen))
         spot("buy_train")
         imgui.same_line(0, 12)
-        self.table.draw_filters(railway)
+        self.table.draw_filter(railway)
+        self._draw_picked(railway)
         imgui.spacing()
-        titles = railway.titles()
-        rows = train_rows(railway, titles, lambda train: self.net(railway, train))
+        rows = train_rows(railway, railway.titles())
         clicked, twice = self.table.draw(rows, self.chosen, picture)
         if clicked is not None:
             self.chosen = clicked
             self.maximized = twice
+
+    def _draw_picked(self, railway: Railway) -> None:
+        """Buttons picking every train shown or none, and upgrading or selling the trains
+        picked all at once."""
+        names = {train.name for train in railway.trains}
+        self.table.picked &= names
+        picked = [train for train in railway.trains if train.name in self.table.picked]
+        if imgui.small_button("Pick all shown"):
+            self.table.picked |= set(self.table.shown)
+        imgui.same_line()
+        imgui.begin_disabled(not picked)
+        if imgui.small_button("Pick none"):
+            self.table.picked.clear()
+        imgui.same_line(0, 14)
+        imgui.text_disabled(f"{len(picked)} picked")
+        imgui.same_line(0, 14)
+        upgrades = sorted(
+            {name for train in picked for name in railway.engine_upgrades(train)},
+            key=lambda name: (ENGINES[name].year, name),
+        )
+        imgui.begin_disabled(not upgrades)
+        if imgui.small_button(f"{fa.ICON_FA_ARROW_UP}  Upgrade"):
+            imgui.open_popup("upgrade picked")
+        imgui.end_disabled()
+        tip(
+            "Swap the engines of the trains picked for a newer one of their line"
+            if upgrades
+            else "No newer engine is on sale for the trains picked",
+            disabled=True,
+        )
+        imgui.same_line()
+        resale = sum(ENGINES[train.engine].price * TRAIN_RESALE for train in picked)
+        if danger_button(f"{fa.ICON_FA_TRASH}  Sell"):
+            imgui.open_popup("sell picked")
+        tip(f"Sell the trains picked for {dollars(resale)}", disabled=True)
+        imgui.end_disabled()
+        if imgui.begin_popup("upgrade picked"):
+            for name in upgrades:
+                trains = [train for train in picked if name in railway.engine_upgrades(train)]
+                total = sum(railway.swap_price(train, name) for train in trains)
+                label = (
+                    f"{ENGINES[name].title}: {len(trains)} {plural('train', len(trains))}"
+                    f"  {dollars(total)}##{name}"
+                )
+                if imgui.selectable(label, False)[0]:
+                    for train in trains:
+                        railway.swap_engine(train, name)
+                tip(
+                    "\n".join(
+                        [
+                            engine_summary(ENGINES[name], railway.fuel_cost(name)),
+                            *wagons_note(railway, name),
+                            "As many as the cash allows, in the order bought",
+                        ]
+                    )
+                )
+            imgui.end_popup()
+        if imgui.begin_popup("sell picked"):
+            imgui.text(f"Sell {len(picked)} {plural('train', len(picked))} for {dollars(resale)}?")
+            if danger_button("Sell them"):
+                for train in picked:
+                    railway.sell(train)
+                self.table.picked.clear()
+                if self.chosen not in {train.name for train in railway.trains}:
+                    self.chosen = None
+                imgui.close_current_popup()
+            imgui.same_line()
+            if imgui.button("Keep them"):
+                imgui.close_current_popup()
+            imgui.end_popup()
 
     def net(self, railway: Railway, train: Train) -> float | None:
         ride = self.ride(railway, train)
@@ -959,10 +1041,19 @@ class TrainsWindow:
         imgui.align_text_to_frame_padding()
         imgui.text_disabled(f"Cars to {onward}")
         imgui.same_line(CARD_LABEL)
-        most = railway.most_cars(train)
-        for car_index, (cargo, asked) in enumerate(stop.asked()):
-            if car_index:
+        most = self._most_cars(railway, train)
+        left = imgui.get_cursor_pos_x()
+        per_row = max(1, int((imgui.get_content_region_avail().x + 4) // (CHIP_SIZE[0] + 4)))
+
+        def place(slot: int) -> None:
+            if slot % per_row:
                 imgui.same_line(0, 4)
+            elif slot:
+                caption_room()
+                imgui.set_cursor_pos_x(left)
+
+        for car_index, (cargo, asked) in enumerate(stop.asked()):
+            place(car_index)
             good = GENERAL_GOODS[cargo][0] if isinstance(cargo, General) else cargo
             generation = railway.car_generation(good, train.engine, asked)
             if isinstance(cargo, General):
@@ -985,25 +1076,52 @@ class TrainsWindow:
                 stop.remove_car(car_index)
                 train.cars_changed(index)
         for slot in range(len(stop.cars), most):
-            if slot:
-                imgui.same_line(0, 4)
+            place(slot)
             empty_car_slot()
+        wrapped = most > per_row
+        if wrapped:
+            caption_room()
+            imgui.set_cursor_pos_x(left)
+        row_top = imgui.get_cursor_pos_y()
         if stop.cars:
-            imgui.same_line(0, 10)
+            if not wrapped:
+                imgui.same_line(0, 10)
             if imgui.small_button("Clear"):
                 stop.clear_cars()
                 train.cars_changed(index)
             imgui.same_line(0, 10)
             planned = railway.stop_tonnes(train, stop)
-            imgui.text_disabled(
-                f"{tonnes_text(planned)} / {tonnes_text(railway.max_pull(train.engine))} t full"
-            )
-            tip(
-                "What these cars weigh full, against the most its engine pulls;\n"
-                f"full, it runs at {speed_share(railway, train, planned):.0%} of its top speed"
-            )
+            if self._editing is not None:
+                imgui.text_disabled(f"{tonnes_text(planned)} t full")
+                tip(
+                    "What these cars weigh full. Each train takes them from the left while its\n"
+                    "engine has room for them and can pull them"
+                )
+            else:
+                imgui.text_disabled(
+                    f"{tonnes_text(planned)} / {tonnes_text(railway.max_pull(train.engine))} t full"
+                )
+                tip(
+                    "What these cars weigh full, against the most its engine pulls;\n"
+                    f"full, it runs at {speed_share(railway, train, planned):.0%} of its top speed"
+                )
+        if wrapped:
+            imgui.set_cursor_pos_y(row_top + imgui.get_frame_height_with_spacing())
         caption_room()
         self._draw_taken(railway, stop)
+
+    def _most_cars(self, railway: Railway, train: Train) -> int:
+        """How many cars a stop card takes: a schedule's as many as any engine pulls
+        (MOST_CARS), a lone train's as many as its engine pulls."""
+        return MOST_CARS if self._editing is not None else railway.most_cars(train)
+
+    def _add_car(
+        self, railway: Railway, train: Train, stop: Stop, cargo: Good | General, asked: int
+    ) -> None:
+        if self._editing is not None:
+            railway.schedules.add_car(train, stop, cargo, asked)
+        else:
+            railway.add_car(train, stop, cargo, asked)
 
     def _draw_taken(self, railway: Railway, stop: Stop) -> None:
         """Under a schedule's stop's cars, how many of them its trains take on, by engine, when
@@ -1052,9 +1170,13 @@ class TrainsWindow:
         if not offers and not generals:
             imgui.text_disabled("nothing made or waiting here yet")
             return
-        most = railway.most_cars(train)
+        most = self._most_cars(railway, train)
         full = len(stop.cars) >= most
-        spare = railway.max_pull(train.engine) - railway.stop_tonnes(train, stop)
+        spare = (
+            math.inf
+            if self._editing is not None
+            else railway.max_pull(train.engine) - railway.stop_tonnes(train, stop)
+        )
 
         def fits(cargo: Good | General) -> bool:
             return railway.car_tonnes(cargo, train.engine, asked) <= spare + EPSILON
@@ -1075,7 +1197,7 @@ class TrainsWindow:
             )
             imgui.begin_disabled(blocked)
             if offer_chip(f"offer{number}", offer.good, f"{offer.waiting:.0f}", wanted, hint):
-                railway.add_car(train, stop, offer.good, asked)
+                self._add_car(railway, train, stop, offer.good, asked)
                 train.cars_changed(index)
             spot(f"cargo:{index}:{offer.good.value}")
             if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
@@ -1091,7 +1213,7 @@ class TrainsWindow:
             )
             imgui.begin_disabled(full or not fits(general))
             if offer_chip(f"general{number}", general, f"{waiting:.0f}", waiting > 0, hint):
-                railway.add_car(train, stop, general, asked)
+                self._add_car(railway, train, stop, general, asked)
                 train.cars_changed(index)
             imgui.end_disabled()
 
@@ -1223,6 +1345,13 @@ def upgrade_menu(railway: Railway, train: Train) -> None:
             imgui.end_disabled()
             tip(f"{summary}\nAs many as the cash allows, in the order bought", disabled=True)
     imgui.end_popup()
+
+
+def carries(schedule: Schedule, most: int = 4) -> list[tuple[Cargo, int]]:
+    """The cargos a schedule takes on the most cars of over its round, most first, and how many
+    cars of each."""
+    counts = Counter(cargo for stop in schedule.own_stops() for cargo in stop.cars)
+    return counts.most_common(most)
 
 
 def _view(schedule: Schedule, engine: str) -> Train:

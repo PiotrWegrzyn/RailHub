@@ -3,12 +3,12 @@ from railroads.sim.goods import Good
 from railroads.sim.trains import Car, Stop, Train
 from railroads.ui.train_table import (
     CARRYING,
-    FIRST,
-    RIDE,
+    SCHEDULE,
     TRAIN,
     Row,
-    TrainFilter,
+    TrainTable,
     carried,
+    heading_of,
     shown_status,
     sort_rows,
     train_rows,
@@ -16,43 +16,15 @@ from railroads.ui.train_table import (
 from railroads.ui.trains_window import LEAST_LIST, LEAST_TRAIN, SPLIT_WIDTH, list_width
 
 
-def route(*stops: Stop) -> Train:
-    return Train("a", list(stops))
+def row(title: str, schedule: str = "", carrying: tuple[tuple[Good, float], ...] = ()) -> Row:
+    return Row(Train(title), title, schedule, carrying=carrying)
 
 
-def row(title: str, first: str = "", net: float | None = None) -> Row:
-    return Row(Train(title), title, first, "", [], "Running", False, net)
+def test_the_schedule_filter_keeps_only_that_schedules_trains() -> None:
+    ours, theirs = Train("a", schedule="Schedule 1"), Train("b", schedule="Schedule 2")
+    table = TrainTable(schedule="Schedule 1")
 
-
-def test_the_first_and_last_station_filters_keep_only_trains_starting_and_ending_there() -> None:
-    trains = [
-        route(Stop((0, 0)), Stop((5, 5)), Stop((9, 9))),
-        route(Stop((9, 9)), Stop((5, 5)), Stop((0, 0))),
-    ]
-    picked = TrainFilter(first=(0, 0), last=(9, 9))
-
-    kept = [picked.keeps(each) for each in trains]
-
-    assert kept == [True, False]
-
-
-def test_the_stop_filter_keeps_trains_calling_there_anywhere_on_the_way() -> None:
-    trains = [route(Stop((0, 0)), Stop((5, 5)), Stop((9, 9))), route(Stop((0, 0)), Stop((9, 9)))]
-    picked = TrainFilter(calls_at=(5, 5))
-
-    kept = [picked.keeps(each) for each in trains]
-
-    assert kept == [True, False]
-
-
-def test_the_car_filter_keeps_trains_taking_on_cars_of_that_good_at_any_stop() -> None:
-    trains = [
-        route(Stop((0, 0)), Stop((9, 9), [Good.COAL])),
-        route(Stop((0, 0), [Good.MAIL]), Stop((9, 9))),
-    ]
-    picked = TrainFilter(cargo=Good.COAL)
-
-    kept = [picked.keeps(each) for each in trains]
+    kept = [table.keeps(Row(train, train.name)) for train in (ours, theirs)]
 
     assert kept == [True, False]
 
@@ -66,21 +38,12 @@ def test_sorting_by_name_ignores_case_and_can_run_from_the_bottom_up() -> None:
     assert [r.title for r in down] == ["c", "b", "A"]
 
 
-def test_sorting_by_first_station_puts_the_same_station_together() -> None:
+def test_sorting_by_schedule_puts_the_same_schedule_together() -> None:
     rows = [row("a", "Warka"), row("b", "Grójec"), row("c", "Warka")]
 
-    shown = sort_rows(rows, FIRST, False)
+    shown = sort_rows(rows, SCHEDULE, False)
 
     assert [r.title for r in shown] == ["b", "a", "c"]
-
-
-def test_trains_not_running_come_last_whichever_way_rides_are_sorted() -> None:
-    rows = [row("idle"), row("poor", net=-50.0), row("rich", net=900.0)]
-
-    up, down = sort_rows(rows, RIDE, False), sort_rows(rows, RIDE, True)
-
-    assert [r.title for r in up] == ["poor", "rich", "idle"]
-    assert [r.title for r in down] == ["rich", "poor", "idle"]
 
 
 def test_what_a_train_carries_sums_each_good_over_its_cars_the_most_first() -> None:
@@ -100,18 +63,8 @@ def test_what_a_train_carries_sums_each_good_over_its_cars_the_most_first() -> N
 
 def test_sorting_by_what_trains_carry_orders_them_by_their_whole_load() -> None:
     empty = row("empty")
-    light = Row(Train("light"), "light", "", "", [], "Running", False, None, ((Good.COAL, 5.0),))
-    heavy = Row(
-        Train("heavy"),
-        "heavy",
-        "",
-        "",
-        [],
-        "Running",
-        False,
-        None,
-        ((Good.COAL, 5.0), (Good.WHEAT, 30.0)),
-    )
+    light = row("light", carrying=((Good.COAL, 5.0),))
+    heavy = row("heavy", carrying=((Good.COAL, 5.0), (Good.WHEAT, 30.0)))
 
     shown = sort_rows([heavy, empty, light], CARRYING, True)
 
@@ -127,6 +80,16 @@ def test_a_status_names_the_train_ahead_by_its_title() -> None:
     )
 
     assert shown == ("Waiting at a signal for Warka – Magnuszew Cargo", "Running")
+
+
+def test_a_running_train_is_heading_to_its_next_stop_and_says_when_only_to_refuel() -> None:
+    _, railway = joined_stations()
+    train = Train("a", [Stop((6, 3)), Stop((6, 20), refuel_only=True)], path=[(0.0, 0.0)])
+    standing = Train("b", [Stop((6, 3)), Stop((6, 20))], status="Loading at Warka")
+
+    headings = (heading_of(railway, train, {}), heading_of(railway, standing, {}))
+
+    assert headings == (f"{railway.name_of((6, 20))} to refuel", "Loading at Warka")
 
 
 def test_the_table_is_dragged_no_narrower_than_its_least_nor_crowding_the_train_beside() -> None:
@@ -148,6 +111,6 @@ def test_a_row_shows_every_car_the_train_pulls_now() -> None:
     train = railway.buy()
     train.cars = [Car(Good.COAL, 10.0, capacity=144.0), Car(Good.WHEAT)]
 
-    rows = train_rows(railway, {}, lambda _: None)
+    rows = train_rows(railway, {})
 
     assert rows[0].wagons == tuple(train.cars)

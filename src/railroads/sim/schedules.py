@@ -20,14 +20,19 @@ import math
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from railroads.sim.goods import Good
 from railroads.sim.grids import Cell
-from railroads.sim.trains import ENGINES, Stop, Train
+from railroads.sim.trains import ENGINES, Cargo, Stop, Train
 
 if TYPE_CHECKING:
     from railroads.sim.railway import Railway
 
 # Between the first and last station of a schedule's name.
 DASH = " – "
+# The most cars a schedule's stop holds: as many as the engine pulling the most in the game, so a
+# schedule need not change as bigger engines come on sale. Each train takes as many of them as it
+# can (Schedules.fitted).
+MOST_CARS = max(engine.cars for engine in ENGINES.values())
 # How many times a refuelling plan is made again with legs that much shorter, when the platform a
 # train pulls into makes one of them longer than the plan reckoned with.
 TRIES = 3
@@ -199,6 +204,14 @@ class Schedules:
         if not template.refuel_only:
             self._fill(train, stop, template)
         return len(stop.cars)
+
+    def add_car(self, train: Train, stop: Stop, cargo: Cargo, asked: int = 0) -> bool:
+        """Adds a car to a schedule's stop, up to MOST_CARS whatever they weigh, if `train`'s
+        engine (standing in for the schedule's) has cars for that good yet."""
+        railway = self._railway
+        if isinstance(cargo, Good) and not railway.car_capacity(cargo, train.engine, asked=asked):
+            return False
+        return stop.add_car(cargo, MOST_CARS, asked)
 
     def refit(self, train: Train, schedule: Schedule) -> None:
         """Gives a train whose stops are its schedule's that schedule's cars and loading again,
