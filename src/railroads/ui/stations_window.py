@@ -1,12 +1,13 @@
 """The stations window: every station's stockpile of spare goods waiting for trains, and the
 goods trains brought waiting to be handed out."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
+from railroads.sim.goods import Good
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
 from railroads.sim.station_goods import StationGoods
@@ -16,7 +17,7 @@ from railroads.ui.theme import (
     BRASS_DARK,
     LIST_TABLE_FLAGS,
     SIDE_WINDOW_TOP,
-    goods_inline,
+    draw_good_icon,
     left_of_cards,
     tip,
 )
@@ -25,6 +26,14 @@ WINDOW_SIZE = (860.0, 180.0)
 ROW_HEIGHT = 28.0
 # How much of the screen's bottom the window leaves free for the build bar.
 BUILD_BAR_ROOM = 80.0
+# A good's icon in the Goods and Waiting columns, as small as those of a schedule's cargo, the
+# room between its icon and its amount, between two goods, and between two lines of them.
+GOOD_ICON = 18.0
+AMOUNT_GAP = 1.0
+GOOD_GAP = 6.0
+LINE_GAP = 2.0
+# The least of a good the station holds for it to show.
+SHOWN_AMOUNT = 0.5
 
 
 def window_place(width: float, height: float) -> tuple[float, float]:
@@ -43,6 +52,49 @@ def stock_bar(goods: StationGoods, size: tuple[float, float]) -> None:
     imgui.push_style_color(imgui.Col_.plot_histogram, imgui.ImVec4(*BRASS_DARK))
     imgui.progress_bar(min(1.0, held / goods.limit), size, label)
     imgui.pop_style_color()
+
+
+def counted(goods: Mapping[Good, float]) -> list[tuple[Good, int]]:
+    """Each good the station holds enough of to show, in whole units, the most first."""
+    shown = [(good, round(amount)) for good, amount in goods.items() if amount >= SHOWN_AMOUNT]
+    return sorted(shown, key=lambda pair: (-pair[1], pair[0].value))
+
+
+def places(widths: list[float], room: float) -> list[tuple[float, int]]:
+    """Where each of a run of goods this wide goes in a column this wide: how far from its left
+    edge and on which line, a new line begun when the next would run past the edge."""
+    placed: list[tuple[float, int]] = []
+    x, line = 0.0, 0
+    for width in widths:
+        if x > 0 and x + width > room:
+            x, line = 0.0, line + 1
+        placed.append((x, line))
+        x += width + GOOD_GAP
+    return placed
+
+
+def draw_good_counts(goods: Mapping[Good, float], empty: str, hint: str) -> None:
+    """Goods each as a small icon and how much of it, as a schedule's cargo shows, on as many
+    lines as the column needs; `hint` says where the amounts are counted."""
+    shown = counted(goods)
+    if not shown:
+        imgui.align_text_to_frame_padding()
+        imgui.text_disabled(empty)
+        return
+    left, top = imgui.get_cursor_pos()
+    frame = imgui.get_frame_height()
+    text = imgui.get_text_line_height()
+    widths = [GOOD_ICON + AMOUNT_GAP + imgui.calc_text_size(f"{n}").x for _, n in shown]
+    room = imgui.get_content_region_avail().x
+    draw_list = imgui.get_window_draw_list()
+    for (good, count), (x, line) in zip(shown, places(widths, room), strict=True):
+        y = top + line * (max(frame, GOOD_ICON) + LINE_GAP)
+        imgui.set_cursor_pos((left + x + GOOD_ICON + AMOUNT_GAP, y + (frame - text) / 2))
+        imgui.text_disabled(f"{count}")
+        imgui.set_cursor_pos((left + x, y + (frame - GOOD_ICON) / 2))
+        imgui.dummy((GOOD_ICON, GOOD_ICON))
+        draw_good_icon(draw_list, good, imgui.get_item_rect_min(), GOOD_ICON)
+        tip(f"{good.value}: {count} {hint}")
 
 
 def look_at_button(station: Cell, look_at: Callable[[Cell], None]) -> None:
@@ -127,10 +179,10 @@ class StationsWindow:
         imgui.table_next_column()
         stock_bar(goods, (110, 0))
         imgui.table_next_column()
-        goods_inline(goods.freight(), "empty")
+        draw_good_counts(goods.freight(), "empty", "in the stockpile")
         bottom = max(bottom, imgui.get_item_rect_max().y)
         imgui.table_next_column()
-        goods_inline(goods.waiting(), "nobody")
+        draw_good_counts(goods.waiting(), "nobody", "waiting for a train")
         bottom = max(bottom, imgui.get_item_rect_max().y)
         imgui.table_next_column()
         draw_demand(railway.station_demand(station))
