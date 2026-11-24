@@ -15,8 +15,10 @@ cell by cell as its tail leaves it.
 On double track trains going opposite ways keep to their own tracks and never hold each other up.
 A train may follow another going its way onto track that one holds, FOLLOW_GAP behind it, as long
 as wherever all the trains ahead stopped it would stand clear too, and never past where theirs is
-set; anywhere else two trains never hold track in the same cell at once. Stations are no blocks: any
-number of trains may be in one, passing each other. A train standing where it could not have been
+set; anywhere else two trains never hold track in the same cell at once. Stations are no blocks:
+any number of trains may be in one, passing each other, but never a train they follow. Of two
+trains level on one way, the one whose way is set further, else the one bought first, is ahead.
+A train standing where it could not have been
 let on, as when track is laid under it, takes the track under it without holding up the trains
 already on it, so nothing is left stuck.
 """
@@ -282,6 +284,9 @@ class Signals:
         self._waiting: list[tuple[Train, list[Pass]]] = []
         trains = list(trains)
         self._named = {train.name: train for train in trains}
+        # Of two trains level on one way with their ways set as far, the one earlier here counts
+        # as ahead of the other.
+        self._order = {id(train): index for index, train in enumerate(trains)}
         loose = []
         for train in trains:
             if train.claims_for is not train.path:
@@ -315,7 +320,7 @@ class Signals:
             if other is train or self.blocks.apart(crossing.cell, way, (entry, exit_), lanes):
                 continue
             same = way == (entry, exit_) and crossing.lane == lane
-            if follow and same and _ahead(train, crossing, other, start):
+            if follow and same and self._ahead(train, crossing, other, start):
                 continue
             return other
         return None
@@ -330,8 +335,26 @@ class Signals:
             if other is not train
             and (entry, exit_) == way
             and lane == crossing.lane
-            and _ahead(train, crossing, other, start)
+            and self._ahead(train, crossing, other, start)
         }
+
+    def _ahead(self, train: Train, crossing: Pass, other: Train, start: float) -> bool:
+        """Whether another train crossing a cell the same way as this train's `crossing`, which it
+        comes into `start` along its path, is ahead of this one (_leads)."""
+        offset = crossing.start - start
+        return self._leads(other, train, offset + other.along - train.along, offset)
+
+    def _leads(self, other: Train, train: Train, lead: float, offset: float) -> bool:
+        """Whether a train `lead` further along than another, the place it is at lying `offset`
+        further along the other's path than along its own, is ahead of it: where they are level,
+        the one whose way is set further, or if neither's is, the one earlier among the
+        trains."""
+        if abs(lead) > SAME:
+            return lead > 0
+        further = offset + other.cleared - train.cleared
+        if abs(further) > SAME:
+            return further > 0
+        return self._order.get(id(other), 0) < self._order.get(id(train), 0)
 
     def _clear_behind(
         self,
@@ -551,7 +574,9 @@ class Signals:
 
     def limit(self, train: Train) -> tuple[float, Train | None]:
         """How far along its path the train may run on the way set for it, FOLLOW_GAP short of
-        the tail of any train going its way ahead of it on track they share; with that train."""
+        the tail of any train going its way ahead of it on track they share, and never past its
+        front, as in a station where it could otherwise pass the train it was let on behind;
+        with that train."""
         length = self.network.length(train)
         limit = length if train.cleared >= length - SAME else train.cleared - SIGNAL_GAP
         ahead = None
@@ -559,12 +584,14 @@ class Signals:
             for other, other_entry, other_exit, other_start, other_lane in self._held.get(cell, ()):
                 if other is train or (other_entry, other_exit, other_lane) != (entry, exit_, lane):
                     continue
-                front = start + other.along - other_start
-                if front <= train.along:
+                offset = start - other_start
+                front = offset + other.along
+                if not self._leads(other, train, front - train.along, offset):
                     continue
                 tail = start + max(0.0, other.along - other.length - other_start) - FOLLOW_GAP
-                if tail < limit:
-                    limit, ahead = tail, other
+                stand = min(tail, front)
+                if stand < limit:
+                    limit, ahead = stand, other
         return max(train.along, limit), ahead
 
 
@@ -585,12 +612,6 @@ def _crossing(claim: Claim) -> Pass:
     """The crossing of a train's path a claim is on."""
     cell, entry, exit_, start, end, _, lane = claim
     return Pass(cell, start, end, entry, exit_, lane=lane)
-
-
-def _ahead(train: Train, crossing: Pass, other: Train, start: float) -> bool:
-    """Whether another train crossing a cell the same way as this train's `crossing`, which it
-    comes into `start` along its path, is ahead of this one."""
-    return crossing.start + other.along - start > train.along
 
 
 def cleared_signals(trains: Iterable[Train]) -> set[tuple[Cell, Point]]:

@@ -5,7 +5,13 @@ from railroads.sim.clock import SECONDS_PER_MONTH
 from railroads.sim.constructions import Constructions, TrackWidth
 from railroads.sim.game import Game
 from railroads.sim.railway import QUADRUPLE_ERA, Railway
-from railroads.sim.signals import FAST_LANE, SLOW_LANE, blocks_of, cleared_signals, passes
+from railroads.sim.signals import (
+    FAST_LANE,
+    SLOW_LANE,
+    blocks_of,
+    cleared_signals,
+    passes,
+)
 from railroads.sim.trains import Stop, Train
 
 WEST, EAST, NORTH, SOUTH = (8, 3), (8, 20), (1, 11), (15, 12)
@@ -150,3 +156,86 @@ def test_quadruple_track_opens_with_its_era() -> None:
 
     assert not done.ok
     assert str(QUADRUPLE_ERA) in done.message
+
+
+def test_trains_set_off_together_and_brought_level_behind_another_never_wait_for_each_other() -> (
+    None
+):
+    game = Game(Constructions(flat_map(rows=14, cols=18)))
+    game.finances.cash = 1e9
+    north, east, west, bend = (4, 15), (7, 16), (5, 6), (5, 12)
+    for station in (north, east, west):
+        game.build_station(station)
+    for start, end, width in (
+        (north, east, TrackWidth.SINGLE),
+        (west, north, TrackWidth.SINGLE),
+        (east, north, TrackWidth.DOUBLE),
+        (west, bend, TrackWidth.DOUBLE),
+        (bend, north, TrackWidth.SINGLE),
+        (east, bend, TrackWidth.SINGLE),
+        (bend, west, TrackWidth.SINGLE),
+    ):
+        assert game.lay_track(start, end, width).ok
+    rounds = [
+        ("tank", [north, west, east]),
+        ("planet", [east, north]),
+        ("tank", [east, north]),
+        ("planet", [west, east]),
+        ("planet", [west, north, east]),
+        ("planet", [north, east]),
+        ("planet", [north, west, east]),
+        ("tank", [east, west, north]),
+    ]
+    for engine, stops in rounds:
+        train = game.railway.buy(engine)
+        assert train is not None
+        train.stops = [Stop(cell) for cell in stops]
+
+    for _ in range(3 * 240):
+        game.railway.run(1 / 240)
+
+    following = {
+        (train.name, train.status.removeprefix("Following "))
+        for train in game.railway.trains
+        if train.status.startswith("Following ")
+    }
+    assert not any((other, name) in following for name, other in following)
+
+
+def test_a_quicker_train_let_on_behind_another_in_a_station_never_passes_it_there(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(Railway, "quadruple_open", property(lambda _: True))
+    game = Game(Constructions(flat_map(rows=14, cols=18)))
+    game.finances.cash = 1e9
+    home, east, north, south = (4, 6), (4, 11), (1, 12), (12, 4)
+    for station in (home, north, east, south):
+        game.build_station(station)
+    for start, end, width in (
+        (south, north, TrackWidth.DOUBLE),
+        (home, north, TrackWidth.DOUBLE),
+        (home, east, TrackWidth.QUADRUPLE),
+        (east, north, TrackWidth.DOUBLE),
+    ):
+        assert game.lay_track(start, end, width).ok
+    rounds = [
+        ("tank", [north, south, home, east]),
+        ("planet", [home, east]),
+        ("planet", [home, east, south, north]),
+        ("planet", [east, south, home, north]),
+        ("tank", [east, south, north]),
+        ("tank", [home, north]),
+        ("tank", [home, east, south, north]),
+        ("planet", [south, north, home]),
+    ]
+    trains = []
+    for engine, stops in rounds:
+        train = game.railway.buy(engine)
+        assert train is not None
+        train.stops = [Stop(cell) for cell in stops]
+        trains.append(train)
+
+    for _ in range(3 * 240):
+        game.railway.run(1 / 240)
+
+    assert trains[1].arrivals and trains[5].arrivals
