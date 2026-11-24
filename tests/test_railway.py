@@ -781,37 +781,6 @@ def test_a_train_with_one_stop_has_no_destination() -> None:
     assert worth == [0.0]
 
 
-def test_a_train_bought_after_another_calls_at_its_stops_with_their_cars_and_flags() -> None:
-    _, railway = joined_stations()
-    railway.finances.earn(1_000_000.0, "test")
-    first = railway.buy()
-    first.stops = [
-        Stop((6, 3), [Good.WHEAT], wait_for_load=True),
-        Stop((6, 12), refuel_only=True),
-        Stop((6, 20), [Good.COAL]),
-    ]
-
-    second = railway.buy(route_of=first)
-
-    assert [stop.cell for stop in second.stops] == [(6, 3), (6, 12), (6, 20)]
-    assert [stop.cars for stop in second.stops] == [[Good.WHEAT], [], [Good.COAL]]
-    assert [stop.wait_for_load for stop in second.stops] == [True, False, False]
-    assert [stop.refuel_only for stop in second.stops] == [False, True, False]
-    assert second.stops[0] is not first.stops[0]
-
-
-def test_a_train_bought_after_another_leaves_out_the_cars_its_engine_cannot_pull() -> None:
-    _, railway = joined_stations()
-    railway.finances.earn(1_000_000.0, "test")
-    first = railway.buy()
-    first.stops = [Stop((6, 3), [Good.WHEAT] * 30), Stop((6, 20))]
-
-    second = railway.buy(route_of=first)
-
-    assert 0 < len(second.stops[0].cars) <= railway.most_cars(second)
-    assert len(first.stops[0].cars) == 30
-
-
 def test_a_train_bought_on_its_own_has_no_stops() -> None:
     _, railway = joined_stations()
 

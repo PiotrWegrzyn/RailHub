@@ -1,9 +1,11 @@
-"""The trains window: every train in a list on the left; the chosen one's cars and route on the
-right, a card for each stop with the cars it pulls on to the next, the goods made or waiting there
-to click into cars, those the next stop wants outlined, and what the next stop wants; and beside the
-cards a map to add stops on, which marks where a hovered good is wanted (railroads.ui.route_map).
-The chosen train's engine can be upgraded to a newer one of its line, alone or with every train of
-that line with an older engine."""
+"""The trains window, in two tabs. Trains: every train in a list on the left; the chosen one's
+cars and its schedule's stops on the right, a card for each stop with the cars it pulls on to the
+next, the goods made or waiting there to click into cars, those the next stop wants outlined, and
+what the next stop wants; and beside the cards a map to add stops on, which marks where a hovered
+good is wanted (railroads.ui.route_map). The chosen train's engine can be upgraded to a newer one
+of its line, alone or with every train of that line with an older engine. Schedules: every
+schedule in a list (railroads.sim.schedules); the chosen one's trains in a table, how its
+refuelling stops are set, and its stops as cards and on the map, as for a train."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -19,8 +21,10 @@ from railroads.sim.fuel_market import fuel_of
 from railroads.sim.goods import GENERAL_GOODS, General, Good
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway, Ride
+from railroads.sim.schedules import Schedule
 from railroads.sim.trains import (
     ENGINES,
+    FIRST_ENGINE,
     SLOWDOWN,
     Stop,
     Train,
@@ -51,7 +55,14 @@ from railroads.ui.theme import (
     offer_chip,
     tip,
 )
-from railroads.ui.train_table import ICON_BOX, TrainTable, engine_icon, shown_status, train_rows
+from railroads.ui.train_table import (
+    ICON_BOX,
+    ROW_HEIGHT,
+    TrainTable,
+    engine_icon,
+    shown_status,
+    train_rows,
+)
 from railroads.ui.train_texts import (
     CARGO_WORTH,
     FIRST_TIP,
@@ -89,6 +100,9 @@ HEAD_BUTTONS = 236.0
 CARD_LABEL = 130.0
 # How often, in seconds, what a train's cargo is worth is worked out again.
 WORTH_EVERY = 0.5
+TRAINS, SCHEDULES = "Trains", "Schedules"
+# How many rows of trains a schedule's table shows before it scrolls.
+SCHEDULE_ROWS = 6
 
 
 @dataclass
@@ -124,9 +138,22 @@ class TrainsWindow:
     _supplied: Fresh[Cell, Mapping[Good, float]] = field(default_factory=lambda: Fresh(WORTH_EVERY))
     # The generation of cars added to each train's stops, by train name: 0 for the newest.
     _asked: dict[str, int] = field(default_factory=dict)
-    # Stop cards the player folded away or opened, by train and stop; the rest are open but for
-    # those with cars set that the train is not heading for or standing at.
+    # Stop cards the player folded away or opened, by schedule and stop; the rest are open but
+    # for those with cars set, or that the game put in, that the train is not heading for or
+    # standing at.
     _folded: dict[tuple[str, int], bool] = field(default_factory=dict)
+    # The tab shown, and the one to show next, picked by a button rather than its tab.
+    tab: str = TRAINS
+    _pick_tab: str | None = None
+    # The schedule shown on the Schedules tab, how wide the player dragged its list, the table
+    # of its trains and the map of its stops.
+    chosen_schedule: str | None = None
+    schedules_width: float | None = None
+    schedule_table: TrainTable = field(default_factory=TrainTable)
+    schedule_map: RouteMap = field(default_factory=RouteMap)
+    # The schedule whose stops are drawn now, and the train they are drawn for, if any.
+    _editing: Schedule | None = None
+    _live: Train | None = None
 
     def worth(self, railway: Railway, train: Train) -> list[float]:
         """What each of the train's cars would earn at its destination now, kept for a moment
@@ -172,7 +199,7 @@ class TrainsWindow:
         )
         with ornate_window("Trains", "trains", flags) as (expanded, still_open):
             if expanded:
-                self._draw_panes(railway, supplies, ground, picture)
+                self._draw_tabs(railway, supplies, ground, picture)
         self.open = still_open
         bought = self.buy.draw(
             railway,
@@ -183,6 +210,27 @@ class TrainsWindow:
         )
         if bought is not None:
             self.chosen = bought
+
+    def _draw_tabs(
+        self,
+        railway: Railway,
+        supplies: Supplies,
+        ground: GroundPicture,
+        picture: EnginePicture,
+    ) -> None:
+        if not imgui.begin_tab_bar("trains tabs"):
+            return
+        for tab in (TRAINS, SCHEDULES):
+            flags = imgui.TabItemFlags_.set_selected.value if self._pick_tab == tab else 0
+            if imgui.begin_tab_item(tab, None, flags)[0]:
+                self.tab = tab
+                if tab == TRAINS:
+                    self._draw_panes(railway, supplies, ground, picture)
+                else:
+                    self._draw_schedule_panes(railway, supplies, ground, picture)
+                imgui.end_tab_item()
+        self._pick_tab = None
+        imgui.end_tab_bar()
 
     def _draw_panes(
         self,
@@ -205,18 +253,9 @@ class TrainsWindow:
             imgui.begin_child("list", (width, 0))
             self._draw_list(railway, picture)
             imgui.end_child()
-            imgui.same_line(0, 0)
-            imgui.invisible_button("split", (SPLIT_WIDTH, imgui.get_content_region_avail().y))
-            if imgui.is_item_hovered() or imgui.is_item_active():
-                imgui.set_mouse_cursor(imgui.MouseCursor_.resize_ew)
-            if imgui.is_item_active():
-                self.list_width = width + imgui.get_io().mouse_delta.x
-            low, high = imgui.get_item_rect_min(), imgui.get_item_rect_max()
-            middle = (low.x + high.x) / 2
-            imgui.get_window_draw_list().add_line(
-                (middle, low.y), (middle, high.y), color_u32(BORDER), 1.0
-            )
-            imgui.same_line(0, 0)
+            dragged = _draw_split(width)
+            if dragged is not None:
+                self.list_width = dragged
         imgui.begin_child("train", (0, 0))
         if train is None:
             _centered_hint("Buy a train, then give it two stations joined by track.")
@@ -225,6 +264,248 @@ class TrainsWindow:
             imgui.same_line(0, 10)
             self._draw_train(railway, train, supplies, ground, self.map, picture)
         imgui.end_child()
+
+    def _draw_schedule_panes(
+        self,
+        railway: Railway,
+        supplies: Supplies,
+        ground: GroundPicture,
+        picture: EnginePicture,
+    ) -> None:
+        """The list of schedules on the left and the chosen one on the right."""
+        schedules = railway.schedules
+        schedule = None if self.chosen_schedule is None else schedules.named(self.chosen_schedule)
+        if schedule is None and schedules.all:
+            schedule = schedules.all[0]
+            self.chosen_schedule = schedule.name
+        width = list_width(imgui.get_content_region_avail().x, self.schedules_width)
+        imgui.begin_child("schedules", (width, 0))
+        self._draw_schedule_list(railway, schedule)
+        imgui.end_child()
+        dragged = _draw_split(width)
+        if dragged is not None:
+            self.schedules_width = dragged
+        imgui.begin_child("schedule", (0, 0))
+        if schedule is None:
+            _centered_hint(
+                "Buy a train: it runs a schedule of its own, which more trains can join."
+            )
+        else:
+            self._draw_schedule(railway, schedule, supplies, ground, picture)
+        imgui.end_child()
+
+    def _draw_schedule_list(self, railway: Railway, chosen: Schedule | None) -> None:
+        """The buttons making a schedule and buying a train for the one chosen, over a table of
+        every schedule: its trains, its stops and what its trains' rides earn."""
+        schedules = railway.schedules
+        if imgui.button(f"{fa.ICON_FA_PLUS}  New schedule"):
+            self.chosen_schedule = schedules.new().name
+        imgui.same_line()
+        if imgui.button(f"{fa.ICON_FA_SHOPPING_CART}  Buy a train"):
+            self.buy.open_for(chosen)
+        tip("Buy a train for the schedule chosen")
+        imgui.spacing()
+        members: dict[str, list[Train]] = {}
+        for train in railway.trains:
+            members.setdefault(train.schedule, []).append(train)
+        flags = (
+            imgui.TableFlags_.row_bg.value
+            | imgui.TableFlags_.scroll_y.value
+            | imgui.TableFlags_.borders_outer_h.value
+        )
+        if not imgui.begin_table("schedules", 4, flags):
+            return
+        imgui.table_setup_scroll_freeze(0, 1)
+        stretch, fixed = (
+            imgui.TableColumnFlags_.width_stretch.value,
+            imgui.TableColumnFlags_.width_fixed.value,
+        )
+        imgui.table_setup_column("Schedule", stretch, 1.0)
+        imgui.table_setup_column("Trains", fixed, 56.0)
+        imgui.table_setup_column("Stops", fixed, 48.0)
+        imgui.table_setup_column("Rides", fixed, 86.0)
+        imgui.table_headers_row()
+        for schedule in schedules.all:
+            trains = members.get(schedule.name, [])
+            imgui.table_next_row(0, ROW_HEIGHT)
+            imgui.table_next_column()
+            imgui.align_text_to_frame_padding()
+            title = schedules.title(schedule)
+            flags = imgui.SelectableFlags_.span_all_columns.value
+            if imgui.selectable(f"##{schedule.name}", schedule is chosen, flags, (0, 0))[0]:
+                self.chosen_schedule = schedule.name
+            imgui.same_line(0, 0)
+            if schedule.problem:
+                colored(GONE, f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {title}")
+                tip(schedule.problem)
+            elif schedule is chosen:
+                colored(BRASS, title)
+            else:
+                imgui.text(title)
+            imgui.table_next_column()
+            imgui.text(f"{len(trains)}")
+            imgui.table_next_column()
+            imgui.text(f"{len(schedule.own_stops())}")
+            imgui.table_next_column()
+            nets = [net for net in (self.net(railway, t) for t in trains) if net is not None]
+            if nets:
+                total = sum(nets)
+                colored(BRASS if total >= 0 else GONE, dollars(total))
+                tip("What its trains' rides to their next stops earn after their costs")
+            else:
+                imgui.text_disabled("-")
+        imgui.end_table()
+
+    def _draw_schedule(
+        self,
+        railway: Railway,
+        schedule: Schedule,
+        supplies: Supplies,
+        ground: GroundPicture,
+        picture: EnginePicture,
+    ) -> None:
+        """A schedule: its name and buttons, how its refuelling stops are set, the table of its
+        trains, and its stops as cards beside the map."""
+        schedules = railway.schedules
+        trains = schedules.trains(schedule)
+        title = schedules.title(schedule)
+        imgui.align_text_to_frame_padding()
+        colored(BRASS, title)
+        imgui.same_line(0, 4)
+        self._rename_schedule(schedule, title)
+        imgui.same_line(0, 16)
+        if imgui.button(f"{fa.ICON_FA_SHOPPING_CART}  Buy a train"):
+            self.buy.open_for(schedule)
+        tip("Buy a train that runs this schedule")
+        imgui.same_line()
+        self._draw_add_train(railway, schedule)
+        imgui.same_line()
+        imgui.begin_disabled(bool(trains))
+        if danger_button(f"{fa.ICON_FA_TRASH}  Delete"):
+            schedules.remove(schedule)
+            self.chosen_schedule = None
+            imgui.end_disabled()
+            return
+        imgui.end_disabled()
+        tip("Move or sell its trains first" if trains else "Delete this schedule", disabled=True)
+        self._draw_refuel_mode(railway, schedule)
+        if schedule.problem:
+            imgui.push_text_wrap_pos(0.0)
+            colored(GONE, f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {schedule.problem}")
+            imgui.pop_text_wrap_pos()
+        section(f"{len(trains)} {plural('train', len(trains))}")
+        rows = [
+            row
+            for row in train_rows(railway, railway.titles(), lambda t: self.net(railway, t))
+            if row.train.schedule == schedule.name
+        ]
+        height = (min(max(len(rows), 1), SCHEDULE_ROWS) + 1.8) * ROW_HEIGHT
+        imgui.begin_child("schedule trains", (0, height))
+        clicked, _ = self.schedule_table.draw(rows, None, picture)
+        imgui.end_child()
+        if clicked is not None:
+            self.chosen = clicked
+            self.maximized = False
+            self._pick_tab = TRAINS
+        view = _view(schedule, self._schedule_engine(railway, trains))
+        map_width = imgui.get_content_region_avail().x * MAP_SHARE
+        imgui.begin_child("route", (-map_width, 0))
+        section("Stops")
+        self._draw_sort_choice()
+        self._draw_stops(railway, view, supplies, schedule)
+        imgui.end_child()
+        imgui.same_line()
+        imgui.begin_child("map", (0, 0), imgui.ChildFlags_.borders.value)
+        self.schedule_map.draw(railway, view, ground, supplies, trains)
+        imgui.end_child()
+        schedules.settle(schedule)
+
+    @staticmethod
+    def _schedule_engine(railway: Railway, trains: list[Train]) -> str:
+        """The engine a schedule's stop cards are drawn for: of its trains, the one with room for
+        the most cars and pulling the most, so that every train takes on its cars from the left
+        as far as it can; with no trains, the first on sale."""
+        if trains:
+            biggest = max(trains, key=lambda t: (railway.most_cars(t), railway.max_pull(t.engine)))
+            return biggest.engine
+        on_sale = railway.engines()
+        return on_sale[0] if on_sale else FIRST_ENGINE
+
+    @staticmethod
+    def _draw_add_train(railway: Railway, schedule: Schedule) -> None:
+        """A list of the trains running other schedules, one picked moving to this one."""
+        schedules = railway.schedules
+        others = [train for train in railway.trains if train.schedule != schedule.name]
+        imgui.set_next_item_width(170)
+        imgui.begin_disabled(not others)
+        if imgui.begin_combo("##add train", f"{fa.ICON_FA_PLUS}  Add a train"):
+            titles = railway.titles()
+            for train in others:
+                own = schedules.of(train)
+                came = "" if own is None else f"  (from {schedules.title(own)})"
+                if imgui.selectable(f"{titles.get(train.name, train.name)}{came}##{train.name}")[0]:
+                    schedules.join(train, schedule)
+            imgui.end_combo()
+        imgui.end_disabled()
+        tip(
+            "Move a train here from its schedule: it finishes its round first, then runs to\n"
+            "this one's first stop, off the map for as long as the way there takes",
+            disabled=True,
+        )
+
+    @staticmethod
+    def _draw_refuel_mode(railway: Railway, schedule: Schedule) -> None:
+        """Who sets the refuelling stops, the game or the player, and a button giving them back
+        to the game."""
+        if schedule.manual:
+            imgui.align_text_to_frame_padding()
+            imgui.text_disabled("Refuelling stops set by hand")
+            imgui.same_line()
+            if imgui.small_button("Let the game set them"):
+                railway.schedules.set_manual(schedule, False)
+            tip(
+                "Takes out every refuelling stop and puts in those its weakest train needs,\n"
+                "planned again whenever its stops, its trains or the track change"
+            )
+            return
+        if schedule.tank:
+            imgui.text_disabled(
+                f"Refuelling stops set by the game for trains carrying fuel for "
+                f"{schedule.tank:.0f} cells"
+            )
+        else:
+            imgui.text_disabled("Refuelling stops set by the game: none are needed now")
+        tip(
+            "The fewest stations on the way for its weakest train that can make the round,\n"
+            "planned again whenever its stops, its trains or the track change.\n"
+            "Changing one of them sets them all by hand from then on."
+        )
+
+    def _rename_schedule(self, schedule: Schedule, title: str) -> None:
+        """A small pencil opening a box to name the schedule, or to give it back its stations'
+        name."""
+        if imgui.small_button(f"{fa.ICON_FA_EDIT}##rename schedule"):
+            self._naming = schedule.label or title
+            imgui.open_popup("rename schedule")
+        tip("Name this schedule")
+        if not imgui.begin_popup("rename schedule"):
+            return
+        if imgui.is_window_appearing():
+            imgui.set_keyboard_focus_here()
+        imgui.set_next_item_width(260)
+        entered, self._naming = imgui.input_text(
+            "##name", self._naming, imgui.InputTextFlags_.enter_returns_true.value
+        )
+        imgui.same_line()
+        if imgui.button("Name it") or entered:
+            schedule.label = self._naming.strip()
+            imgui.close_current_popup()
+        imgui.begin_disabled(not schedule.label)
+        if imgui.button("Use its stations' name"):
+            schedule.label = ""
+            imgui.close_current_popup()
+        imgui.end_disabled()
+        imgui.end_popup()
 
     def _draw_maximize(self) -> None:
         """The button letting the chosen train fill the window, or taking it back beside the
@@ -242,7 +523,8 @@ class TrainsWindow:
         """The Buy a train button and the filters, always at the top, over the table of
         trains, which scrolls on its own."""
         if imgui.button(f"{fa.ICON_FA_PLUS}  Buy a train"):
-            self.buy.open_for(next((t for t in railway.trains if t.name == self.chosen), None))
+            chosen = next((t for t in railway.trains if t.name == self.chosen), None)
+            self.buy.open_for(None if chosen is None else railway.schedules.of(chosen))
         spot("buy_train")
         imgui.same_line(0, 12)
         self.table.draw_filters(railway)
@@ -324,6 +606,9 @@ class TrainsWindow:
             return
         upgrade_menu(railway, train)
         imgui.text_disabled(f"{ENGINES[train.engine].title} - {shown_status(train.status, titles)}")
+        schedule = railway.schedules.of(train)
+        if schedule is not None:
+            self._draw_schedule_line(railway, train, schedule)
         imgui.separator()
         destination = railway.destination(train)
         onward = "" if destination is None else railway.name_of(destination)
@@ -345,15 +630,45 @@ class TrainsWindow:
         route_map.good = None
         self._shown_map = route_map
         map_width = imgui.get_content_region_avail().x * MAP_SHARE
+        view = train if schedule is None else _view(schedule, train.engine)
         imgui.begin_child("route", (-map_width, 0))
-        section("Route")
+        section("Its schedule's stops" if schedule is not None else "Route")
         self._draw_sort_choice()
-        self._draw_stops(railway, train, supplies)
+        self._draw_stops(railway, view, supplies, schedule, train)
         imgui.end_child()
         imgui.same_line()
         imgui.begin_child("map", (0, 0), imgui.ChildFlags_.borders.value)
-        route_map.draw(railway, train, ground, supplies)
+        route_map.draw(railway, view, ground, supplies, [train])
         imgui.end_child()
+        if schedule is not None:
+            railway.schedules.settle(schedule)
+
+    def _draw_schedule_line(self, railway: Railway, train: Train, schedule: Schedule) -> None:
+        """The schedule the train runs, in a list moving it to another, and a button showing it."""
+        schedules = railway.schedules
+        imgui.align_text_to_frame_padding()
+        imgui.text_disabled("Schedule")
+        imgui.same_line(0, 8)
+        imgui.set_next_item_width(280)
+        if imgui.begin_combo("##schedule", schedules.title(schedule)):
+            for other in schedules.all:
+                picked = imgui.selectable(
+                    f"{schedules.title(other)}##{other.name}", other is schedule
+                )
+                if picked[0] and other is not schedule:
+                    schedules.join(train, other)
+            imgui.end_combo()
+        tip(
+            "Move it to another schedule: it finishes its round first, then runs to that one's\n"
+            "first stop, off the map for as long as the way there takes"
+        )
+        imgui.same_line()
+        if imgui.button(f"{fa.ICON_FA_LIST}  Open schedule"):
+            self.chosen_schedule = schedule.name
+            self._pick_tab = SCHEDULES
+        if train.taken != (schedule.name, schedule.version) and train.away <= 0:
+            imgui.same_line(0, 10)
+            imgui.text_disabled("takes up the schedule's new stops after this round")
 
     @staticmethod
     def _draw_pulling(
@@ -423,9 +738,27 @@ class TrainsWindow:
         if imgui.radio_button("what waits here most", not self.by_wanted):
             self.by_wanted = False
 
-    def _draw_stops(self, railway: Railway, train: Train, supplies: Supplies) -> None:
+    def _draw_stops(
+        self,
+        railway: Railway,
+        train: Train,
+        supplies: Supplies,
+        schedule: Schedule | None = None,
+        live: Train | None = None,
+    ) -> None:
+        """The stop cards of a train's stops, or a schedule's through `train` standing in for it
+        (_view), with the stop `live` runs to or stands at picked out, and a list adding one."""
+        self._editing, self._live = schedule, live
         stops = len(train.stops)
-        current = train.heading % stops if stops and train.path else (train.heading - 1)
+        current = -1
+        if (
+            stops
+            and live is not None
+            and live.stops
+            and live.away <= 0
+            and (schedule is None or live.taken == (schedule.name, schedule.version))
+        ):
+            current = live.heading % stops if live.path else (live.heading - 1)
         width = imgui.get_content_region_avail().x
         for index, stop in enumerate(list(train.stops)):
             key = (train.name, index, round(width))
@@ -437,7 +770,7 @@ class TrainsWindow:
                 imgui.dummy((width, height))
                 continue
             imgui.push_id(index)
-            here = stops > 1 and index == current % stops
+            here = stops > 1 and current >= 0 and index == current % stops
             removed = self._draw_stop(railway, train, index, stop, here, supplies)
             imgui.pop_id()
             if removed:
@@ -475,7 +808,7 @@ class TrainsWindow:
         has to load, and what the next stop wants; returns whether it was removed or moved."""
         with card("stop", highlight=here):
             key = (train.name, index)
-            opened = self._folded.setdefault(key, not (stop.cars and not here))
+            opened = self._folded.setdefault(key, not ((stop.cars or stop.auto) and not here))
             removed, toggled, moved = self._draw_stop_head(
                 railway, train, index, stop, here, opened
             )
@@ -530,13 +863,16 @@ class TrainsWindow:
         name = railway.name_of(stop.cell)
         if here:
             colored(BRASS, f"{fa.ICON_FA_TRAIN}  {name}")
-            _note_before("heading here" if train.path else "standing here", right - HEAD_BUTTONS)
+            running = self._live is not None and bool(self._live.path)
+            _note_before("heading here" if running else "standing here", right - HEAD_BUTTONS)
         else:
             imgui.text(name)
+        if stop.auto:
+            tip("The game put this refuelling stop in; changing it sets them all by hand")
         if not opened and len(train.stops) > 1:
             following = railway.name_of(train.stops[train.onward(index)].cell)
             note = (
-                "only refuels"
+                ("refuels, set by the game" if stop.auto else "only refuels")
                 if stop.refuel_only
                 else f"{len(stop.cars)} {plural('car', len(stop.cars))} to {following}"
             )
@@ -560,12 +896,14 @@ class TrainsWindow:
             other = index + step
             imgui.begin_disabled(not 0 <= other < len(train.stops))
             if imgui.small_button(f"{icon}##move{step}"):
+                self._set_by_hand(railway, stop, train.stops[other])
                 self._move_stop(train, index, other)
                 moved = True
             imgui.end_disabled()
             tip(f"{tip_text}, with its cars")
         imgui.same_line(right - 22)
         if imgui.small_button(fa.ICON_FA_TIMES):
+            self._set_by_hand(railway, stop)
             train.stops.pop(index)
             train.restart()
             return True, toggled, False
@@ -586,11 +924,19 @@ class TrainsWindow:
                 self._folded[key] = value
         train.restart()
 
-    @staticmethod
-    def _draw_refuel(railway: Railway, stop: Stop, following: Stop) -> bool:
+    def _set_by_hand(self, railway: Railway, *stops: Stop) -> None:
+        """Sets the refuelling stops of the schedule drawn now by hand, once the player changes
+        one the game put in."""
+        if self._editing is not None and any(stop.auto for stop in stops):
+            railway.schedules.set_manual(self._editing, True)
+
+    def _draw_refuel(self, railway: Railway, stop: Stop, following: Stop) -> bool:
         """The checkbox making a stop one the train only refuels at, for a leg longer than its
         fuel lasts, and what that means; returns whether the stop is one."""
-        _, stop.refuel_only = imgui.checkbox("Only refuel here", stop.refuel_only)
+        changed, refuel_only = imgui.checkbox("Only refuel here", stop.refuel_only)
+        if changed:
+            self._set_by_hand(railway, stop)
+            stop.refuel_only = refuel_only
         tip(
             "For a way longer than the engine carries fuel for: the train only takes on fuel\n"
             "here and goes on with its cars, taking its passengers and mail through"
@@ -843,6 +1189,28 @@ def upgrade_menu(railway: Railway, train: Train) -> None:
             imgui.end_disabled()
             tip(f"{summary}\nAs many as the cash allows, in the order bought", disabled=True)
     imgui.end_popup()
+
+
+def _view(schedule: Schedule, engine: str) -> Train:
+    """A train standing in for a schedule on the stop cards and the map: its stops are the
+    schedule's, so what they change changes the schedule, and its engine sets how many cars
+    and how much weight a stop can take."""
+    return Train(schedule.name, stops=schedule.stops, engine=engine)
+
+
+def _draw_split(width: float) -> float | None:
+    """The bar between a list and what is chosen in it, on the line after the list; returns the
+    list's width dragged to, if it is being dragged."""
+    imgui.same_line(0, 0)
+    imgui.invisible_button("split", (SPLIT_WIDTH, imgui.get_content_region_avail().y))
+    if imgui.is_item_hovered() or imgui.is_item_active():
+        imgui.set_mouse_cursor(imgui.MouseCursor_.resize_ew)
+    dragged = width + imgui.get_io().mouse_delta.x if imgui.is_item_active() else None
+    low, high = imgui.get_item_rect_min(), imgui.get_item_rect_max()
+    middle = (low.x + high.x) / 2
+    imgui.get_window_draw_list().add_line((middle, low.y), (middle, high.y), color_u32(BORDER), 1.0)
+    imgui.same_line(0, 0)
+    return dragged
 
 
 def list_width(room: float, dragged: float | None) -> float:

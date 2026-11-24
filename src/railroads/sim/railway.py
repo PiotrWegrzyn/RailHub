@@ -88,6 +88,7 @@ from railroads.sim.goods import (
 )
 from railroads.sim.grids import Cell
 from railroads.sim.move import Move
+from railroads.sim.schedules import Schedule, Schedules, between_rounds
 from railroads.sim.signals import Signals
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
@@ -231,6 +232,8 @@ class Railway:
         # (railroads.sim.track_network, railroads.sim.calls).
         self.network = TrackNetwork(constructions)
         self.calls = StationCalls(self)
+        # The rounds trains run (railroads.sim.schedules).
+        self.schedules = Schedules(self)
         # Each station's town (railroads.sim.towns) and the year it was worked out in.
         self._towns: dict[Cell, tuple[int, int]] = {}
         # What history does to the game, which pays pilgrims more (railroads.sim.happenings).
@@ -299,10 +302,10 @@ class Railway:
             return False
         return not ENGINES[train.engine].express or cargo == Good.PASSENGERS
 
-    def buy(self, engine: str = FIRST_ENGINE, route_of: Train | None = None) -> Train | None:
-        """Buys a train with an engine the player can buy, calling at the stops of `route_of` if
-        given, as that one does there and with its cars as far as the engine takes them; with no
-        cars otherwise. None without the cash for it."""
+    def buy(self, engine: str = FIRST_ENGINE, schedule: Schedule | None = None) -> Train | None:
+        """Buys a train with an engine the player can buy, running `schedule` from its first stop
+        with as many of each stop's cars as the engine takes, or a new schedule of its own if none
+        is given. None without the cash for it."""
         if engine not in self.engines():
             return None
         price = ENGINES[engine].price
@@ -310,16 +313,13 @@ class Railway:
             return None
         self._bought += 1
         train = Train(f"{TRAIN_NAMES[ENGINES[engine].power]} {self._bought}", engine=engine)
-        if route_of is not None:
-            for old in route_of.stops:
-                stop = Stop(old.cell, wait_for_load=old.wait_for_load, refuel_only=old.refuel_only)
-                train.stops.append(stop)
-                for cargo, generation in old.asked():
-                    if self.can_carry(train, cargo) and not self.add_car(
-                        train, stop, cargo, generation
-                    ):
-                        self.add_car(train, stop, cargo)
         self.trains.append(train)
+        if schedule is None:
+            schedule = self.schedules.new()
+        train.schedule = schedule.name
+        self.schedules.settle(schedule, replan=True)
+        if self.schedules.due(train) is not None:
+            self.schedules.take_up(train, schedule)
         return train
 
     def let_go(self) -> None:
@@ -353,6 +353,13 @@ class Railway:
         if not self.finances.pay(price, "trains"):
             return False
         train.engine = engine
+        schedule = self.schedules.of(train)
+        if schedule is not None and schedule.stops:
+            self.schedules.grow(schedule, train)
+            self.schedules.settle(schedule, replan=True)
+            if self.schedules.due(train) is None:
+                self.schedules.refit(train, schedule)
+            return True
         most = self.most_cars(train)
         for stop in train.stops:
             stop.keep_cars(most)
@@ -384,10 +391,30 @@ class Railway:
             if len(kept) != len(train.stops):
                 train.stops = kept
                 train.restart()
+        self.schedules.drop(cells)
 
     def sell(self, train: Train) -> None:
         self.trains.remove(train)
         self.finances.earn(ENGINES[train.engine].price * TRAIN_RESALE, "trains")
+        schedule = self.schedules.of(train)
+        if schedule is not None:
+            self.schedules.settle(schedule, replan=True)
+
+    def way_months(self, train: Train, here: Cell, there: Cell) -> float:
+        """How long a train takes from one station to another at its top speed, the way track
+        it runs on goes there and as fast as that track lets it, or straight there without one."""
+        engine = ENGINES[train.engine]
+        way = self.route(here, there, engine.electric, engine.maglev)
+        if way is None:
+            grid = self.constructions.tile_map.grid
+            cells = math.dist(grid.center(*here), grid.center(*there))
+        else:
+            points, speeds = way
+            cells = sum(
+                math.dist(a, b) / (speed or 1.0)
+                for (a, b), speed in zip(itertools.pairwise(points), speeds, strict=False)
+            )
+        return cells / (CELLS_PER_MONTH * engine.speed)
 
     def most_cars(self, train: Train) -> int:
         """How many cars a train's engine pulls."""
@@ -547,6 +574,7 @@ class Railway:
                 train.loaded_at = new
             if calling:
                 train.restart()
+        self.schedules.moved(old, new)
 
     def station_goods(self, station: Cell) -> StationGoods:
         goods = self.goods.setdefault(station, StationGoods())
@@ -888,6 +916,8 @@ class Railway:
         return self.network.route(start, end, electric, maglev)
 
     def _run(self, train: Train, months: float, signals: Signals) -> None:
+        if not train.path and self._new_round(train, months):
+            return
         if len(train.stops) < 2:
             train.status = "Needs two stops"
             train.path = []
@@ -917,6 +947,7 @@ class Railway:
             way = self.route(here, there, engine.electric, engine.maglev)
             if way is None:
                 train.status = self._no_way_status(engine)
+                self._leave_stuck(train)
                 return
             leg = self.network.route_length(here, there, engine.electric, engine.maglev)
             assert leg is not None
@@ -924,6 +955,7 @@ class Railway:
                 train.status = (
                     f"Next stop {leg:.0f} cells away; it carries fuel for {engine.tank:.0f}"
                 )
+                self._leave_stuck(train)
                 return
             if months <= 0:
                 train.status = "Sets off once time runs"
@@ -993,6 +1025,36 @@ class Railway:
             train.pace = 0.0
             train.waited = 0.0
             train.first = False
+            schedule = self.schedules.of(train)
+            if train.heading == 1 and schedule is not None:
+                self.schedules.settle(schedule)
+
+    def _new_round(self, train: Train, months: float) -> bool:
+        """Takes a train standing between rounds onto its schedule's changed stops, and keeps one
+        on its way to a new schedule's first stop off the map until it gets there; returns
+        whether it is off the map."""
+        schedule = self.schedules.due(train)
+        if schedule is not None and between_rounds(train):
+            self.schedules.take_up(train, schedule)
+        if train.away <= 0:
+            return False
+        train.away -= months
+        if train.away > 0:
+            there = self.name_of(train.stops[0].cell) if train.stops else "its first stop"
+            train.status = f"On its way to {there}"
+            return True
+        train.away = 0.0
+        return False
+
+    def _leave_stuck(self, train: Train) -> None:
+        """Lets a train that can't set off take up its schedule's changed stops at once, rather
+        than wait for a round it can't finish."""
+        schedule = self.schedules.of(train)
+        if schedule is None:
+            return
+        self.schedules.settle(schedule)
+        if self.schedules.due(train) is not None:
+            self.schedules.take_up(train, schedule)
 
     def _choose_platform(self, train: Train, signals: Signals) -> None:
         """Takes the quickest way on to the station the train is bound for and from it to the stop
@@ -1148,6 +1210,9 @@ class Railway:
         self.name_of.move_onto(tile_map, move)
         for train in self.trains:
             train.move(move)
+        for schedule in self.schedules.all:
+            for stop in schedule.stops:
+                stop.cell = move.cell(stop.cell)
         self.network = TrackNetwork(self.constructions)
         growth.station_trade.update_reach()
 

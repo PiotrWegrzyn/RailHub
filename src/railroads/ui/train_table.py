@@ -1,5 +1,5 @@
 """The table of trains in the trains window, like a mail program's list of mail: a row a train
-with its engine's picture framed by its category, its name, first and last station, the cars its
+with its engine's picture framed by its category, its name, its schedule, first and last station, the cars its
 route takes most of, the cars it pulls now and how full each is, its status and what its ride earns; filters over it by station, a stop on
 the way or a kind of car, and a click on a column's head sorts by it."""
 
@@ -65,6 +65,7 @@ class Column:
 
 COLUMNS = (
     Column("Train", 2.2, stretch=True),
+    Column("Schedule", 1.4, stretch=True),
     Column("First stop", 96.0),
     Column("Last stop", 96.0),
     Column("Cars used most", 112.0),
@@ -72,7 +73,7 @@ COLUMNS = (
     Column("Status", 1.0, stretch=True),
     Column("This ride", 72.0),
 )
-TRAIN, FIRST, LAST, CARS, CARRYING, STATUS, RIDE = range(len(COLUMNS))
+TRAIN, SCHEDULE, FIRST, LAST, CARS, CARRYING, STATUS, RIDE = range(len(COLUMNS))
 # The least of a good a train carries for it to show among what it carries, and how wide the
 # table must be to show each train's first and last station: narrower, the columns are left out,
 # a train's name holding them already.
@@ -115,6 +116,7 @@ class Row:
     net: float | None
     carrying: tuple[tuple[Good, float], ...] = ()
     wagons: tuple[Car, ...] = ()
+    schedule: str = ""
 
 
 def carried(train: Train) -> tuple[tuple[Good, float], ...]:
@@ -141,8 +143,10 @@ def train_rows(
     railway: Railway, titles: dict[str, str], net_of: Callable[[Train], float | None]
 ) -> list[Row]:
     rows = []
+    schedules = railway.schedules
     for train in railway.trains:
         first, last = first_station(train), last_station(train)
+        schedule = schedules.of(train)
         rows.append(
             Row(
                 train,
@@ -155,6 +159,7 @@ def train_rows(
                 net_of(train),
                 carried(train),
                 tuple(train.cars),
+                "" if schedule is None else schedules.title(schedule),
             )
         )
     return rows
@@ -165,6 +170,7 @@ def sort_rows(rows: list[Row], column: int, descending: bool) -> list[Row]:
     by what they earn with those not running last; ties keep the order trains were bought in."""
     keys: dict[int, Callable[[Row], object]] = {
         TRAIN: lambda r: r.title.casefold(),
+        SCHEDULE: lambda r: r.schedule.casefold(),
         FIRST: lambda r: r.first.casefold(),
         LAST: lambda r: r.last.casefold(),
         CARS: lambda r: r.cars[0][0].value if r.cars else "~",
@@ -310,6 +316,7 @@ def _draw_row(row: Row, picked: bool, picture: EnginePicture) -> bool:
     text_top = low.y + (ROW_HEIGHT - imgui.get_text_line_height()) / 2
     colour = BRASS if picked else TEXT
     draw_list.add_text((low.x + ICON_BOX[0] + 10, text_top), color_u32(colour), row.title)
+    _cell(SCHEDULE, row.schedule or "-", TEXT_DIM)
     _cell(FIRST, row.first or "-", TEXT_DIM if not row.first else None)
     _cell(LAST, row.last or "-", TEXT_DIM if not row.last else None)
     imgui.table_set_column_index(CARS)

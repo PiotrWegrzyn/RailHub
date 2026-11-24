@@ -863,6 +863,9 @@ class Stop:
     # The generation of cars asked for each car, in step with `cars`; 0, or none given, for the
     # newest its engine pulls.
     generations: list[int] = field(default_factory=list)
+    # Whether the game put this refuelling stop in its schedule, rather than the player
+    # (railroads.sim.schedules).
+    auto: bool = False
 
     def add_car(self, cargo: Cargo, most: int = MAX_CARS, generation: int = 0) -> bool:
         if len(self.cars) >= most:
@@ -965,6 +968,12 @@ class Train:
     held: bool = False
     # The name the player gave it, if any.
     label: str = ""
+    # The schedule it runs (railroads.sim.schedules), and the schedule and version of it its
+    # stops were copied from.
+    schedule: str = ""
+    taken: tuple[str, int] = ("", -1)
+    # How many months longer it is off the map on its way to the first stop of a new schedule.
+    away: float = 0.0
 
     @property
     def load(self) -> dict[Good, float]:

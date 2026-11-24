@@ -9,7 +9,7 @@ light to dark blue where more than LEAST_MADE of it came to the station over the
 
 import math
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -411,9 +411,15 @@ class RouteMap:
         return kept[2]
 
     def draw(
-        self, railway: Railway, train: Train, ground: GroundPicture, supplies: Supplies
+        self,
+        railway: Railway,
+        train: Train,
+        ground: GroundPicture,
+        supplies: Supplies,
+        riders: Sequence[Train] | None = None,
     ) -> None:
-        """Draws a row of zoom buttons and a hint, and the map below them in the space left."""
+        """Draws a row of zoom buttons and a hint, and the map below them in the space left,
+        with a dot where each of `riders` is, the train itself if none are given."""
         texture, map_size = ground()
         good = self.good
         marks = {} if good is None else marks_at(railway, good, self.made(railway, good, supplies))
@@ -444,7 +450,8 @@ class RouteMap:
                 (panel.left, panel.top), (panel.right, panel.bottom), color_u32(DIMMED)
             )
         self._draw_stations(draw_list, railway, train, spots, marks, hovered, frame)
-        _draw_train(draw_list, railway, train, frame)
+        for rider in [train] if riders is None else riders:
+            _draw_train(draw_list, railway, rider, frame)
         draw_list.pop_clip_rect()
         self._hover, rested = rest_on(self._hover, hovered, time.monotonic())
         if hovered is not None:
@@ -734,7 +741,7 @@ def train_spot(railway: Railway, train: Train) -> Vec2 | None:
 def _draw_train(
     draw_list: imgui.ImDrawList, railway: Railway, train: Train, frame: MapFrame
 ) -> None:
-    spot = train_spot(railway, train)
+    spot = None if train.away > 0 else train_spot(railway, train)
     if spot is None:
         return
     x, y = frame.to_screen(*spot)

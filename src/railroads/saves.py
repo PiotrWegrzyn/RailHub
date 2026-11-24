@@ -41,7 +41,7 @@ from railroads.sim.summaries import MonthSummary
 if TYPE_CHECKING:
     from railroads.tutorial.steps import Tutorial
 
-SAVE_FORMAT = 1
+SAVE_FORMAT = 2
 MAGIC = b"RAILROADS SAVE\n"
 SUFFIX = ".save"
 AUTOSAVES = 3

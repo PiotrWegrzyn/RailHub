@@ -38,10 +38,13 @@ def first_station(train: Train) -> Cell | None:
 
 
 def last_station(train: Train) -> Cell | None:
-    """The last stop on the route that is not its first station, as a route that ends where it
-    began still runs to somewhere; None with fewer than two stations."""
+    """The last stop on the route that is not its first station nor one it only refuels at, as
+    a route that ends where it began still runs to somewhere; None with fewer than two
+    stations."""
     first = first_station(train)
-    return next((s.cell for s in reversed(train.stops) if s.cell != first), None)
+    return next(
+        (s.cell for s in reversed(train.stops) if s.cell != first and not s.refuel_only), None
+    )
 
 
 def route_name(train: Train, name_of: Callable[[Cell], str]) -> str:

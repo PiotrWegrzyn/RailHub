@@ -18,7 +18,7 @@ from railroads.ui.train_texts import (
     ride_rows,
     train_warning,
 )
-from railroads.ui.trains_window import TrainsWindow, sort_offers
+from railroads.ui.trains_window import SCHEDULES, TrainsWindow, sort_offers
 from railroads.words import tonnes_text
 
 
@@ -197,13 +197,21 @@ def test_a_train_whose_way_between_two_stops_is_longer_than_its_fuel_is_warned_o
     assert warning.endswith("Add a stop between them to refuel at.")
 
 
+def routed(railway: Railway, train: Train, stops: list[Stop]) -> list[Stop]:
+    schedule = railway.schedules.of(train)
+    assert schedule is not None
+    schedule.stops = stops
+    railway.schedules.settle(schedule)
+    return schedule.stops
+
+
 def test_stop_cards_scrolled_out_of_sight_are_not_drawn(
     gui: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _, railway = joined_stations()
     train = railway.buy()
     assert train is not None
-    train.stops = [Stop((6, 3) if index % 2 else (6, 20)) for index in range(12)]
+    routed(railway, train, [Stop((6, 3) if index % 2 else (6, 20)) for index in range(12)])
     window = TrainsWindow(open=True, chosen=train.name)
     draw_frames(window, railway, 3)
     drawn: list[int] = []
@@ -238,14 +246,14 @@ def test_a_stop_card_stays_open_when_its_first_car_is_added(gui: None) -> None:
     _, railway = joined_stations()
     train = railway.buy()
     assert train is not None
-    train.stops = [Stop((6, 3)), Stop((6, 20))]
+    stops = routed(railway, train, [Stop((6, 3)), Stop((6, 20))])
     window = TrainsWindow(open=True, chosen=train.name)
     draw_frames(window, railway)
-    train.stops[1].add_car(Good.COAL)
+    stops[1].add_car(Good.COAL)
 
     draw_frames(window, railway)
 
-    assert window._folded[(train.name, 1)]
+    assert window._folded[(train.schedule, 1)]
 
 
 def test_moving_a_stop_later_swaps_it_with_the_next_keeping_its_cars_and_folding(
@@ -272,9 +280,9 @@ def test_what_follows_a_stops_cars_stays_put_when_its_first_car_is_added(
     _, railway = joined_stations()
     train = railway.buy()
     assert train is not None
-    train.stops = [Stop((6, 3)), Stop((6, 20))]
+    stops = routed(railway, train, [Stop((6, 3)), Stop((6, 20))])
     window = TrainsWindow(open=True, chosen=train.name)
-    window._folded = {(train.name, 0): True, (train.name, 1): False}
+    window._folded = {(train.schedule, 0): True, (train.schedule, 1): False}
     below: list[float] = []
     cars = TrainsWindow._draw_cars
 
@@ -285,7 +293,7 @@ def test_what_follows_a_stops_cars_stays_put_when_its_first_car_is_added(
     monkeypatch.setattr(TrainsWindow, "_draw_cars", measured)
     draw_frames(window, railway)
     empty = below[-1]
-    train.stops[0].add_car(Good.COAL)
+    stops[0].add_car(Good.COAL)
 
     draw_frames(window, railway)
 
@@ -299,9 +307,9 @@ def test_the_buy_button_stays_in_sight_under_the_engines_figures(
     _, railway = joined_stations()
     first = railway.buy()
     assert first is not None
-    first.stops = [Stop((6, 3)), Stop((6, 20))]
+    routed(railway, first, [Stop((6, 3)), Stop((6, 20))])
     window = TrainsWindow(open=True)
-    window.buy.open_for(first)
+    window.buy.open_for(railway.schedules.of(first))
     ground = (imgui.ImTextureRef(1), railway.constructions.tile_map.grid.size())
     places: list[tuple[float, float]] = []
     button = imgui.button
@@ -368,3 +376,17 @@ def test_goods_to_load_come_by_what_the_next_stop_wants_most_or_by_what_waits_mo
 
     assert wanted == [Good.PASSENGERS, Good.WHEAT, Good.COAL]
     assert waiting == [Good.COAL, Good.WHEAT, Good.PASSENGERS]
+
+
+def test_the_schedules_tab_shows_the_first_schedule_with_its_trains_and_stops(gui: None) -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    assert train is not None
+    routed(railway, train, [Stop((6, 3), [Good.COAL]), Stop((6, 20))])
+    window = TrainsWindow(open=True)
+    window._pick_tab = SCHEDULES
+
+    draw_frames(window, railway)
+
+    assert window.tab == SCHEDULES
+    assert window.chosen_schedule == train.schedule
