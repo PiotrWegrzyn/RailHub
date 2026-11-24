@@ -242,3 +242,62 @@ def test_a_train_is_drawn_on_the_track_of_quadruple_track_it_holds_through_the_j
 
     assert [lanes[(5, col)] for col in range(4, 10)] == [1, 1, 1, 1, 0, 0]
     assert lanes[None] == 0
+
+
+def test_a_junction_keeps_the_track_it_was_drawn_on_once_the_quadruple_track_behind_is_let_go() -> (
+    None
+):
+    railway, track = line(TrackWidth.QUADRUPLE)
+    four_lanes = {(5, 5), (5, 8)}
+    point = (0.0, 0.0)
+    train = Train("Test")
+    train.path = path_of(railway, WEST, EAST)
+    train.along = 4.5
+    train.claims = [
+        ((5, 5), point, point, 1.0, 2.0, False, 0),
+        ((5, 6), point, point, 2.0, 3.0, False, 0),
+        ((5, 7), point, point, 3.0, 4.0, False, 0),
+        ((5, 8), point, point, 4.0, 5.0, False, 1),
+    ]
+    lanes = Lanes(track)
+    lanes.of(train, four_lanes)
+    train.claims = train.claims[1:]
+
+    held = lanes.of(train, four_lanes)
+
+    assert [held[(5, col)] for col in range(5, 9)] == [0, 0, 0, 1]
+
+
+def test_a_train_on_the_outer_track_crosses_over_on_quadruple_track_into_double_at_a_junction() -> (
+    None
+):
+    railway, track = line(TrackWidth.QUADRUPLE)
+    constructions = track.constructions
+    piece = constructions.track_at((6, 11))[0]
+    constructions.remove(piece)
+    constructions.build(Track((6, 11), piece.ends, TrackWidth.DOUBLE))
+    constructions.build(Track((6, 11), (piece.ends[0], 4), TrackWidth.QUADRUPLE))
+    path = path_of(railway, WEST, EAST)
+    lanes = Lanes(track)
+
+    shifts = [
+        lanes.sideways(path, step / 50, {None: 1}) for step in range(int(halfway(path) * 100))
+    ]
+
+    assert max(math.dist(a, b) for a, b in itertools.pairwise(shifts)) < 1.0
+
+
+def test_double_track_branching_off_quadruple_track_can_be_ridden_on_from_its_outer_track() -> None:
+    _railway, track = line(TrackWidth.QUADRUPLE)
+    constructions = track.constructions
+    main = constructions.track_at((6, 11))[0]
+    branch = Track((6, 11), (main.ends[0], 4), TrackWidth.DOUBLE)
+    constructions.build(branch)
+    end = 0.0 if branch.ends[0] == main.ends[0] else 1.0
+    outer = track.riding_side(main, 0.0, True, 1)
+
+    found = track.riding_choices(branch, end, end == 0.0, 1)
+
+    assert found is not None
+    assert found[0] == main.ends[0]
+    assert any(at_end == pytest.approx(outer) for _, at_end in found[1])

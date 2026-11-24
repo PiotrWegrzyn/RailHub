@@ -886,6 +886,40 @@ class TrackArt:
             return sides[2 + lane] if forward else -sides[1 - lane]
         return 0.0
 
+    def riding_choices(
+        self, piece: Track, share: float, forward: bool, lane: int = 0
+    ) -> tuple[int, list[tuple[float, float]]] | None:
+        """Where a piece branches off straighter track in its cell, the end it branches off at
+        and every track drawn on it that a train going its way could ride, the one riding_side
+        gives first and then those forking into that one from the other tracks it branches off:
+        how far each lies to the left of the way the train goes `share` of the way along the
+        piece, and at that end. None for a piece that branches off none."""
+        point = next((p for p in piece.ends if self._branch_lanes(piece, p) is not None), None)
+        if point is None:
+            return None
+        branch = self._branch_lanes(piece, point)
+        assert branch is not None
+        own = len(branch)
+        if own == 1:
+            mine = 0
+        elif own == 2:
+            mine = 1 if forward else 0
+        else:
+            mine = 2 + lane if forward else 1 - lane
+        joins = list(range(own)) + [k for k, mains in enumerate(branch) for _ in mains[1:]]
+        end = 0.0 if point == piece.ends[0] else 1.0
+        along, turnouts = self._turnouts(piece)
+        sign = 1.0 if forward else -1.0
+        choices = [
+            (
+                sign * float(np.interp(share, along, track)),
+                sign * float(np.interp(end, along, track)),
+            )
+            for track, k in zip(turnouts, joins, strict=True)
+            if k == mine
+        ]
+        return point, choices
+
     def _sides(self, piece: Track, line: Path) -> list[list[float]]:
         """How far to the left of the centre line each track of the piece lies at each of its
         points, in cells, with the tracks branching off other track forking into every track

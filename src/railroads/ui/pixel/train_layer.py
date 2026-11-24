@@ -18,7 +18,7 @@ import numpy.typing as npt
 from imgui_bundle import hello_imgui, imgui
 from PIL import Image
 
-from railroads.sim.constructions import Track
+from railroads.sim.constructions import Track, TrackWidth
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
 from railroads.sim.signals import blocks_of
@@ -115,7 +115,7 @@ class TrainLayer:
         for (train, back, look, placed), under in zip(seen, hidden, strict=True):
             if not under:
                 shift = self.lanes.sideways(
-                    train.path, train.along - back, lanes_of(train, four_lanes)
+                    train.path, train.along - back, self.lanes.of(train, four_lanes)
                 )
                 found.append((placed, shift, look))
         parts = []
@@ -267,7 +267,9 @@ class TrainLayer:
                 continue
             model = ENGINES[train.engine]
             assert model.chimney is not None
-            shift = self.lanes.sideways(train.path, train.along - back, lanes_of(train, four_lanes))
+            shift = self.lanes.sideways(
+                train.path, train.along - back, self.lanes.of(train, four_lanes)
+            )
             phase = (train.along * 6.0) % 1.0
             chimneys.append(_Chimney(x, y, dx, dy, shift, model.chimney[1] * SCALE, phase))
         return chimneys
@@ -401,6 +403,29 @@ class Lanes:
     def __init__(self, track: TrackArt) -> None:
         self.track = track
         self._paths: dict[int, tuple[list[Point], int, list[_Stretch], list[float]]] = {}
+        self._held: dict[str, tuple[list[Point] | None, dict[Cell, int]]] = {}
+
+    def of(self, train: Train, four_lanes: Container[Cell]) -> dict[Cell | None, int]:
+        """The track of quadruple track the train takes in each cell it holds (lanes_of), a
+        cell keeping the one it was drawn on after quadruple track while the train holds it and
+        after it lets go of it, along the same path, and the station it sets off from the one it
+        stood on."""
+        if len(self._held) > 1024:
+            self._held.clear()
+        path, kept = self._held.get(train.name, (None, {}))
+        if path is not train.path:
+            kept = {}
+        lanes, sure = _held_lanes(train, four_lanes, kept)
+        behind = {cell: lane for cell, lane in kept.items() if cell not in lanes}
+        lanes |= behind
+        sure |= behind
+        if train.path:
+            row, col = self.track.tile_map.grid.cell_at(*train.path[0])
+            start = (int(row), int(col))
+            if start not in lanes:
+                lanes[start] = sure[start] = kept.get(start, lanes[None])
+        self._held[train.name] = (train.path, sure)
+        return lanes
 
     def sideways(
         self, path: list[Point], along: float, lanes: Mapping[Cell | None, int] | None = None
@@ -411,7 +436,8 @@ class Lanes:
         stretches, starts = self._stretches(path)
         if not stretches:
             return 0.0, 0.0
-        stretch = stretches[max(0, bisect.bisect_right(starts, along) - 1)]
+        index = max(0, bisect.bisect_right(starts, along) - 1)
+        stretch = stretches[index]
         if stretch.piece is None:
             return 0.0, 0.0
         t = min(1.0, max(0.0, (along - stretch.start) / (stretch.length or 1.0)))
@@ -422,8 +448,22 @@ class Lanes:
         else:
             share, forward = (first + from_middle) / (first + second), not stretch.inward
         lanes = lanes or {}
-        lane = lanes.get(stretch.piece.cell, lanes.get(None, 0))
-        side = self.track.riding_side(stretch.piece, share, forward, lane)
+        piece = stretch.piece
+        lane = _lane_at(stretches, index, lanes)
+        side = self.track.riding_side(piece, share, forward, lane)
+        choices = self.track.riding_choices(piece, share, forward, lane)
+        if choices is not None and len(choices[1]) > 1:
+            met = self._met_side(stretches, index, choices[0], lanes)
+            if met is not None:
+                side = min(choices[1], key=lambda choice: abs(choice[1] - met))[0]
+        elif piece.width == TrackWidth.QUADRUPLE:
+            first, second = (
+                self._end_lane(stretches, index, end, forward, lane, lanes) for end in piece.ends
+            )
+            if first != lane or second != lane:
+                side = (1 - share) * self.track.riding_side(
+                    piece, share, forward, first
+                ) + share * self.track.riding_side(piece, share, forward, second)
         if side == 0.0:
             return 0.0, 0.0
         dx, dy = stretch.way
@@ -432,6 +472,68 @@ class Lanes:
             dx, dy = (1 - mix) * dx + mix * stretch.turn[0], (1 - mix) * dy + mix * stretch.turn[1]
         length = math.hypot(dx, dy) or 1.0
         return -dy / length * side * PIXEL_CELL_WIDTH, dx / length * side * PIXEL_CELL_WIDTH
+
+    def _end_lane(
+        self,
+        stretches: list[_Stretch],
+        index: int,
+        point: int,
+        forward: bool,
+        lane: int,
+        lanes: Mapping[Cell | None, int],
+    ) -> int:
+        """Which track of quadruple track a train rides at the piece's end `point`: where it
+        meets track there that does not branch off other, the one that track runs on from, so
+        it crosses over to the one it takes on the piece rather than jumping at the edge, and
+        from other quadruple track only where it comes from it; elsewhere the one it takes."""
+        piece = stretches[index].piece
+        assert piece is not None
+        entering = point == (piece.ends[0] if forward else piece.ends[1])
+        met = self._met_side(stretches, index, point, lanes, plain=True, wide=entering)
+        if met is None:
+            return lane
+        share = 0.0 if point == piece.ends[0] else 1.0
+        return min(
+            (lane, 1 - lane),
+            key=lambda each: abs(self.track.riding_side(piece, share, forward, each) - met),
+        )
+
+    def _met_side(
+        self,
+        stretches: list[_Stretch],
+        index: int,
+        point: int,
+        lanes: Mapping[Cell | None, int],
+        plain: bool = False,
+        wide: bool = False,
+    ) -> float | None:
+        """How far to the left of its way a train rides on the track it meets the stretch's piece
+        from, or goes on to, across that piece's end `point`; None where its path does not cross
+        that end, or with `plain` where the track there branches off other, or is quadruple
+        unless `wide`."""
+        stretch = stretches[index]
+        piece = stretch.piece
+        assert piece is not None
+        edge = piece.ends[0] if stretch.at_first else piece.ends[1]
+        if edge != point:
+            index = index + 1 if stretch.inward else index - 1
+            if not 0 <= index < len(stretches) or stretches[index].piece != piece:
+                return None
+        beyond = index - 1 if stretches[index].inward else index + 1
+        if not 0 <= beyond < len(stretches):
+            return None
+        other = stretches[beyond]
+        if other.piece is None:
+            return None
+        share = 0.0 if other.at_first else 1.0
+        forward = other.inward if other.at_first else not other.inward
+        lane = _lane_at(stretches, beyond, lanes)
+        if plain and (
+            (other.piece.width == TrackWidth.QUADRUPLE and not wide)
+            or self.track.riding_choices(other.piece, share, forward, lane) is not None
+        ):
+            return None
+        return self.track.riding_side(other.piece, share, forward, lane)
 
     def _stretches(self, path: list[Point]) -> tuple[list[_Stretch], list[float]]:
         """The path's stretches and how far into it each starts, worked out again only when
@@ -502,29 +604,53 @@ class Lanes:
         return stretches
 
 
-def lanes_of(train: Train, four_lanes: Container[Cell]) -> dict[Cell | None, int]:
+def _lane_at(stretches: list[_Stretch], index: int, lanes: Mapping[Cell | None, int]) -> int:
+    """The track of quadruple track a train rides on the stretch's piece: the one it holds there,
+    or else the one it holds on the nearest cell behind it on its path, or ahead, so a car on a
+    cell the train has let go of keeps to the track it rode there."""
+    for near in itertools.chain(range(index, -1, -1), range(index + 1, len(stretches))):
+        piece = stretches[near].piece
+        if piece is not None and piece.cell in lanes:
+            return lanes[piece.cell]
+    return lanes.get(None, 0)
+
+
+def lanes_of(
+    train: Train, four_lanes: Container[Cell], kept: Mapping[Cell, int] | None = None
+) -> dict[Cell | None, int]:
     """The track of quadruple track the train takes in each cell it holds (railroads.sim.signals):
     where trains going one way keep to two tracks the one it holds, and through junctions and
-    where quadruple track ends the one it held last before, or else the one it holds next; and
-    under None the one it keeps to through stations, which no train holds: the one it last
-    took."""
+    where quadruple track ends the one it held last before, or else the one `kept` there, or
+    else the one it holds next; and under None the one it keeps to through stations, which no
+    train holds: the one it last took."""
+    return _held_lanes(train, four_lanes, kept or {})[0]
+
+
+def _held_lanes(
+    train: Train, four_lanes: Container[Cell], kept: Mapping[Cell, int]
+) -> tuple[dict[Cell | None, int], dict[Cell, int]]:
+    """lanes_of, and those of its cells that come from a track of quadruple track the train
+    holds there or before them, or that it has come onto, which keep theirs."""
     lanes: dict[Cell | None, int] = {}
+    sure: dict[Cell, int] = {}
     carried = None
     before: list[Cell] = []
     for claim in sorted(train.claims, key=lambda claim: claim[3]):
         cell, lane = claim[0], claim[6]
         if cell in four_lanes:
             carried = lane
-            lanes |= dict.fromkeys(before, lane)
+            lanes |= {each: kept.get(each, lane) for each in before}
             before = []
-            lanes[cell] = lane
+            lanes[cell] = sure[cell] = lane
         elif carried is None:
             before.append(cell)
         else:
-            lanes[cell] = carried
-    lanes |= dict.fromkeys(before, train.lane)
+            lanes[cell] = sure[cell] = carried
+    lanes |= {each: kept.get(each, train.lane) for each in before}
+    entered = {claim[0] for claim in train.claims if claim[3] <= train.along}
+    sure |= {cell: lanes[cell] for cell in entered if cell in lanes and cell not in sure}
     lanes[None] = train.lane if carried is None else carried
-    return lanes
+    return lanes, sure
 
 
 def _point(steps: np.ndarray, dx: float, dy: float) -> int:
