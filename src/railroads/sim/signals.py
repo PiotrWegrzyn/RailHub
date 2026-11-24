@@ -462,9 +462,24 @@ class Signals:
             leaders |= alongside
         if leaders and not self._clear_behind(train, crossings, stop, leaders):
             return max(leaders.values(), key=lambda pair: pair[0].along + pair[1])[0]
+        for leader, _ in leaders.values():
+            if self._needs_later(leader, wanted):
+                return leader
         if not train.first:
             return self._queued_before(train, wanted)
         return None
+
+    def _needs_later(self, leader: Train, wanted: list[Pass]) -> bool:
+        """Whether a train ahead has yet to be set a way across track that this way crosses, as
+        when it turns back in a station too short for it to stand in: a train following it
+        there must leave that track to it, or neither could go on."""
+        mine = [(crossing.cell, (crossing.entry, crossing.exit)) for crossing in wanted]
+        return any(
+            cell == later.cell and not self.blocks.apart(cell, way, (later.entry, later.exit))
+            for later in passes(self.network, leader)
+            if later.start >= leader.cleared - SAME
+            for cell, way in mine
+        )
 
     def _give_way(self, other: Train, crossing: Pass) -> bool:
         """Takes back from another train the way set for it from the cell a train put first wants

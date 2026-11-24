@@ -4,6 +4,7 @@ from builders import flat_map
 from railroads.sim.clock import SECONDS_PER_MONTH
 from railroads.sim.constructions import Constructions, TrackWidth
 from railroads.sim.game import Game
+from railroads.sim.goods import Good
 from railroads.sim.railway import QUADRUPLE_ERA, Railway
 from railroads.sim.signals import (
     FAST_LANE,
@@ -239,3 +240,50 @@ def test_a_quicker_train_let_on_behind_another_in_a_station_never_passes_it_ther
         game.railway.run(1 / 240)
 
     assert trains[1].arrivals and trains[5].arrivals
+
+
+def test_a_train_following_one_that_turns_back_in_a_short_station_leaves_it_the_way_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(Railway, "quadruple_open", property(lambda _: True))
+    game = Game(Constructions(flat_map(rows=14, cols=18)))
+    game.finances.cash = 1e9
+    west, north, south = (3, 8), (3, 16), (11, 16)
+    for station in (west, north, south):
+        game.build_station(station)
+    for start, end, width in (
+        (west, (4, 4), TrackWidth.QUADRUPLE),
+        ((4, 4), north, TrackWidth.DOUBLE),
+        (north, south, TrackWidth.DOUBLE),
+        (south, west, TrackWidth.DOUBLE),
+        (south, (10, 13), TrackWidth.SINGLE),
+        ((10, 13), west, TrackWidth.QUADRUPLE),
+    ):
+        assert game.lay_track(start, end, width).ok
+    rounds = [
+        ("planet", [south, north, west]),
+        ("planet", [south, north]),
+        ("tank", [south, north, west]),
+        ("planet", [south, west]),
+        ("planet", [west, north, south]),
+        ("tank", [north, south, west]),
+        ("planet", [north, west]),
+    ]
+    trains = []
+    for engine, stops in rounds:
+        train = game.railway.buy(engine)
+        assert train is not None
+        for cell in stops:
+            stop = Stop(cell)
+            train.stops.append(stop)
+            game.railway.add_car(train, stop, Good.PASSENGERS)
+        trains.append(train)
+    planets = [train for train in trains if train.engine == "planet"]
+    for _ in range(8 * 240):
+        game.railway.run(1 / 240)
+    before = [train.arrivals for train in planets]
+
+    for _ in range(3 * 240):
+        game.railway.run(1 / 240)
+
+    assert all(train.arrivals > old for train, old in zip(planets, before, strict=True))
