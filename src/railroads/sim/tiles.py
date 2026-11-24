@@ -19,7 +19,8 @@ its tile's, or a later one of its own (GOOD_ERAS).
 
 What a unit of a tile's goods earns is its PRICE LIST: (demand ÷ supply) ** PRICE_POWER of its
 base, worked out from the levels alone, so it changes only when a tile goes up a level, and the
-player sees what a pick does to it before making it.
+player sees what a pick does to it before making it. A game's difficulty marks every price up by
+the same factor all game (Tiles.markup, railroads.sim.company.PRICE_FACTORS).
 
 A game's tiles are on the boards of the year it is in (Tiles); everything else asks for a year's
 (of_year), from the game in play (activate) or, with none, as the world grows by itself, every
@@ -27,7 +28,7 @@ year the lowest tiles.
 """
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from types import MappingProxyType
 
@@ -354,6 +355,8 @@ class Year:
     made: Mapping[Tile, float]
     wanted: Mapping[Tile, float]
     era: int
+    # How many times the boards' price every good fetches (Tiles.markup).
+    markup: float = 1.0
 
     def make_factor(self, good: Good) -> float:
         return self.made.get(TILE_OF[good], 1.0)
@@ -366,7 +369,7 @@ class Year:
 
     def price(self, good: Good) -> float:
         tile = TILE_OF[good]
-        return price(self.made.get(tile, 1.0), self.wanted.get(tile, 1.0))
+        return self.markup * price(self.made.get(tile, 1.0), self.wanted.get(tile, 1.0))
 
     @property
     def wagons(self) -> int:
@@ -394,6 +397,8 @@ class Tiles:
     picks: dict[Board, list[Tile]] = field(
         default_factory=lambda: {Board.SUPPLY: [], Board.DEMAND: []}
     )
+    # How many times the boards' price every good fetches, as the game's difficulty sets it.
+    markup: float = 1.0
 
     @classmethod
     def until(cls, year: int) -> Tiles:
@@ -406,6 +411,13 @@ class Tiles:
     @property
     def year(self) -> int:
         return max(self.years, default=FIRST_YEAR - 1)
+
+    def mark_up(self, markup: float) -> None:
+        """Has every good fetch this many times the boards' price, in every year so far and to
+        come."""
+        self.markup = markup
+        self.years = {year: replace(boards, markup=markup) for year, boards in self.years.items()}
+        forget()
 
     def of_year(self, year: int) -> Year:
         if year < FIRST_YEAR or not self.years:
@@ -460,14 +472,14 @@ class Tiles:
         supply = self.planned(Board.SUPPLY)
         demand = self.planned(Board.DEMAND)
         (supply if board == Board.SUPPLY else demand)[tile] += 1
-        return price(
+        return self.markup * price(
             supply_factor(tile, self.supply_entry[tile], supply[tile]),
             demand_factor(tile, self.demand_entry[tile], demand[tile]),
         )
 
     def planned_price(self, tile: Tile) -> float:
         """What a unit of a tile's goods will earn next year once the picks so far go up."""
-        return price(
+        return self.markup * price(
             supply_factor(tile, self.supply_entry[tile], self.planned(Board.SUPPLY)[tile]),
             demand_factor(tile, self.demand_entry[tile], self.planned(Board.DEMAND)[tile]),
         )
@@ -510,6 +522,7 @@ class Tiles:
                 {t: demand_factor(t, self.demand_entry[t], lv) for t, lv in self.demand.items()}
             ),
             self.era,
+            self.markup,
         )
 
 

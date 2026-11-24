@@ -9,7 +9,6 @@ from railroads.sim.clock import (
     START_YEAR,
 )
 from railroads.sim.company import Difficulty
-from railroads.sim.finance import START_CASH
 
 
 class MapChoice(StrEnum):
@@ -55,7 +54,9 @@ class Settings:
     map: MapChoice = MapChoice.POLAND
     # Towns grow from HISTORY_START until this year, when play begins (see allowed_start_year).
     start_year: int = START_YEAR
-    cash: float = START_CASH
+    # The cash the company starts with; None for what the difficulty sets
+    # (railroads.sim.company.START_CASHES).
+    cash: float | None = None
     # Years a stand-in player builds and runs the railway before the player takes over.
     stand_in_years: int = 0
     # Which target the company is set for 1 January of END_YEAR (railroads.sim.company).

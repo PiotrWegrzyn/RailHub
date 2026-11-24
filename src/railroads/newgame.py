@@ -25,7 +25,7 @@ from railroads.sim.clock import (
     MONTHS_PER_YEAR,
     GameClock,
 )
-from railroads.sim.company import Goal
+from railroads.sim.company import PRICE_FACTORS, START_CASHES, Goal
 from railroads.sim.constructions import Constructions
 from railroads.sim.game import Game, place_names
 from railroads.sim.geo import Bounds, describe_lonlat
@@ -165,7 +165,10 @@ def make_game_steps(
         look=look,
     )
     game = Game(seeded, start_year=begins, history=history, names=place_names(seeded.tile_map))
-    game.finances.cash = settings.cash
+    game.finances.cash = (
+        START_CASHES[settings.difficulty] if settings.cash is None else settings.cash
+    )
+    game.railway.tiles.mark_up(PRICE_FACTORS[settings.difficulty])
     game.goal = Goal(settings.difficulty)
     game.lots = lots
     lots.offer(place.terrain == Terrain.LAND)
