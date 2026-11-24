@@ -417,13 +417,15 @@ class RouteMap:
         ground: GroundPicture,
         supplies: Supplies,
         riders: Sequence[Train] | None = None,
+        adding: bool = True,
     ) -> None:
         """Draws a row of zoom buttons and a hint, and the map below them in the space left,
-        with a dot where each of `riders` is, the train itself if none are given."""
+        with a dot where each of `riders` is, the train itself if none are given; a station
+        clicked is added as a stop if `adding`."""
         texture, map_size = ground()
         good = self.good
         marks = {} if good is None else marks_at(railway, good, self.made(railway, good, supplies))
-        steps = self._draw_buttons(marks)
+        steps = self._draw_buttons(marks, adding)
         low = imgui.get_cursor_screen_pos()
         width, height = imgui.get_content_region_avail()
         panel = Panel(low.x, low.y, max(width, 40.0), max(height, 40.0))
@@ -457,10 +459,10 @@ class RouteMap:
         if hovered is not None:
             if rested:
                 self._station_tooltip(railway, train, hovered, supplies)
-            if clicked and can_stop_at(train, hovered):
+            if adding and clicked and can_stop_at(train, hovered):
                 add_stop(train, hovered)
 
-    def _draw_buttons(self, marks: Mapping[Cell, Marks]) -> int:
+    def _draw_buttons(self, marks: Mapping[Cell, Marks], adding: bool) -> int:
         """The zoom buttons and a line on what the map shows; returns the zoom steps pressed."""
         steps = 0
         if imgui.small_button(f"{fa.ICON_FA_SEARCH_PLUS}##zoom in"):
@@ -472,7 +474,8 @@ class RouteMap:
         tip("Zoom out; drag the map to move it")
         imgui.same_line(0, 10)
         if self.good is None:
-            imgui.text_disabled("Click a station to add it")
+            if adding:
+                imgui.text_disabled("Click a station to add it")
             return steps
         good_icon(self.good)
         low, high = f"{SHADE_FROM[0]:.0f}", f"{SHADE_FROM[1]:.0f}"

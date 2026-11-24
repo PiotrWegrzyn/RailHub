@@ -130,9 +130,8 @@ class TrainsWindow:
     _worth: Fresh[str, list[float]] = field(default_factory=lambda: Fresh(WORTH_EVERY))
     _rides: Fresh[str, Ride | None] = field(default_factory=lambda: Fresh(WORTH_EVERY))
     map: RouteMap = field(default_factory=RouteMap)
-    # The screen trains are bought on, and the map on it for the route of a train just bought.
+    # The screen trains are bought on.
     buy: BuyScreen = field(default_factory=BuyScreen)
-    buy_map: RouteMap = field(default_factory=RouteMap)
     # How tall each stop card was last drawn, by train, stop and width: a card out of sight
     # only takes up its room.
     _card_heights: dict[tuple[str, int, int], float] = field(default_factory=dict)
@@ -144,8 +143,7 @@ class TrainsWindow:
     # The generation of cars added to each train's stops, by train name: 0 for the newest.
     _asked: dict[str, int] = field(default_factory=dict)
     # Stop cards the player folded away or opened, by schedule and stop; the rest are open but
-    # for those with cars set, or that the game put in, that the train is not heading for or
-    # standing at.
+    # for those with cars set, or that the game put in.
     _folded: dict[tuple[str, int], bool] = field(default_factory=dict)
     # The tab shown, and the one to show next, picked by a button rather than its tab.
     tab: str = TRAINS
@@ -158,7 +156,6 @@ class TrainsWindow:
     schedule_map: RouteMap = field(default_factory=RouteMap)
     # The schedule whose stops are drawn now, and the train they are drawn for, if any.
     _editing: Schedule | None = None
-    _live: Train | None = None
     _riders: list[Train] = field(default_factory=list)
 
     def worth(self, railway: Railway, train: Train) -> list[float]:
@@ -185,9 +182,6 @@ class TrainsWindow:
         if not self.open:
             self.buy.open = False
             self._drawn = False
-        if not self.buy.open:
-            railway.let_go()
-        if not self.open:
             return
         for kept in (self._worth, self._rides, self._supplied):
             kept.forget_old()
@@ -212,10 +206,18 @@ class TrainsWindow:
             engines_by_kind(railway.engines()),
             engine_summary,
             picture,
-            lambda shown: self._draw_train(railway, shown, supplies, ground, self.buy_map, picture),
         )
         if bought is not None:
-            self.chosen = bought
+            self._bought(railway, bought)
+
+    def _bought(self, railway: Railway, name: str) -> None:
+        """Picks a train just bought, and shows its schedule when that has no stops yet."""
+        self.chosen = name
+        train = next(t for t in railway.trains if t.name == name)
+        schedule = railway.schedules.of(train)
+        if schedule is not None and len(schedule.stops) < 2:
+            self.chosen_schedule = schedule.name
+            self._pick_tab = SCHEDULES
 
     def _draw_tabs(
         self,
@@ -264,7 +266,7 @@ class TrainsWindow:
                 self.list_width = dragged
         imgui.begin_child("train", (0, 0))
         if train is None:
-            _centered_hint("Buy a train, then give it two stations joined by track.")
+            _centered_hint("Buy a train, then give its schedule two stations joined by track.")
         else:
             self._draw_maximize()
             imgui.same_line(0, 10)
@@ -421,6 +423,8 @@ class TrainsWindow:
             self.maximized = False
             self._pick_tab = TRAINS
         view = _view(schedule, self._schedule_engine(railway, trains))
+        self.schedule_map.good = None
+        self._shown_map = self.schedule_map
         map_width = imgui.get_content_region_avail().x * MAP_SHARE
         imgui.begin_child("route", (-map_width, 0))
         section("Stops")
@@ -712,17 +716,14 @@ class TrainsWindow:
                 imgui.tree_pop()
         imgui.spacing()
         route_map.good = None
-        self._shown_map = route_map
         map_width = imgui.get_content_region_avail().x * MAP_SHARE
-        view = train if schedule is None else _view(schedule, train.engine)
         imgui.begin_child("route", (-map_width, 0))
-        section("Its schedule's stops" if schedule is not None else "Route")
-        self._draw_sort_choice()
-        self._draw_stops(railway, view, supplies, schedule, train)
+        section("Its stops")
+        _draw_calls(railway, train)
         imgui.end_child()
         imgui.same_line()
         imgui.begin_child("map", (0, 0), imgui.ChildFlags_.borders.value)
-        route_map.draw(railway, view, ground, supplies, [train])
+        route_map.draw(railway, train, ground, supplies, [train], adding=False)
         imgui.end_child()
         if schedule is not None:
             railway.schedules.settle(schedule)
@@ -827,25 +828,12 @@ class TrainsWindow:
         railway: Railway,
         train: Train,
         supplies: Supplies,
-        schedule: Schedule | None = None,
-        live: Train | None = None,
-        riders: list[Train] | None = None,
+        schedule: Schedule,
+        riders: list[Train],
     ) -> None:
-        """The stop cards of a train's stops, or a schedule's through `train` standing in for it
-        (_view), with the stop `live` runs to or stands at picked out, and a list adding one;
-        under each stop's cars, how many of them `riders` (`live` if not given) take on."""
-        self._editing, self._live = schedule, live
-        self._riders = riders if riders is not None else [] if live is None else [live]
-        stops = len(train.stops)
-        current = -1
-        if (
-            stops
-            and live is not None
-            and live.stops
-            and live.away <= 0
-            and (schedule is None or live.taken == (schedule.name, schedule.version))
-        ):
-            current = live.heading % stops if live.path else (live.heading - 1)
+        """The stop cards of a schedule's stops through `train` standing in for it (_view), and
+        a list adding one; under each stop's cars, how many of them `riders` take on."""
+        self._editing, self._riders = schedule, riders
         width = imgui.get_content_region_avail().x
         for index, stop in enumerate(list(train.stops)):
             key = (train.name, index, round(width))
@@ -857,8 +845,7 @@ class TrainsWindow:
                 imgui.dummy((width, height))
                 continue
             imgui.push_id(index)
-            here = stops > 1 and current >= 0 and index == current % stops
-            removed = self._draw_stop(railway, train, index, stop, here, supplies)
+            removed = self._draw_stop(railway, train, index, stop, supplies)
             imgui.pop_id()
             if removed:
                 self._card_heights.clear()
@@ -878,7 +865,7 @@ class TrainsWindow:
             spot("add_stop")
         imgui.same_line()
         if len(train.stops) == 1:
-            imgui.text_disabled("A train needs a second stop to run.")
+            imgui.text_disabled("A schedule needs a second stop to run.")
         else:
             imgui.text_disabled("or click one on the map")
 
@@ -888,17 +875,14 @@ class TrainsWindow:
         train: Train,
         index: int,
         stop: Stop,
-        here: bool,
         supplies: Supplies,
     ) -> bool:
         """One stop as a card: where it is, the cars the train takes on from it, the goods it
         has to load, and what the next stop wants; returns whether it was removed or moved."""
-        with card("stop", highlight=here):
+        with card("stop"):
             key = (train.name, index)
-            opened = self._folded.setdefault(key, not ((stop.cars or stop.auto) and not here))
-            removed, toggled, moved = self._draw_stop_head(
-                railway, train, index, stop, here, opened
-            )
+            opened = self._folded.setdefault(key, not (stop.cars or stop.auto))
+            removed, toggled, moved = self._draw_stop_head(railway, train, index, stop, opened)
             if moved:
                 return True
             leg = dict(railway.long_legs(train)).get(index)
@@ -933,7 +917,7 @@ class TrainsWindow:
         return removed
 
     def _draw_stop_head(
-        self, railway: Railway, train: Train, index: int, stop: Stop, here: bool, opened: bool
+        self, railway: Railway, train: Train, index: int, stop: Stop, opened: bool
     ) -> tuple[bool, bool, bool]:
         """A stop card's top line: a button folding the card away or opening it, the stop's
         number and name, when folded the cars it sends on, and buttons moving it up or down the
@@ -947,13 +931,7 @@ class TrainsWindow:
         imgui.align_text_to_frame_padding()
         imgui.text_disabled(f"{index + 1}")
         imgui.same_line(0, 10)
-        name = railway.name_of(stop.cell)
-        if here:
-            colored(BRASS, f"{fa.ICON_FA_TRAIN}  {name}")
-            running = self._live is not None and bool(self._live.path)
-            _note_before("heading here" if running else "standing here", right - HEAD_BUTTONS)
-        else:
-            imgui.text(name)
+        imgui.text(railway.name_of(stop.cell))
         if stop.auto:
             tip("The game put this refuelling stop in; changing it sets them all by hand")
         if not opened and len(train.stops) > 1:
@@ -1134,14 +1112,11 @@ class TrainsWindow:
                 taken[rider.engine] = railway.schedules.taken(rider, stop)
         if all(count == len(stop.cars) for count in taken.values()):
             return
-        if self._live is not None:
-            note = f"This train takes the first {taken[self._live.engine]} of these cars"
-        else:
-            note = "; ".join(
-                f"trains behind a {ENGINES[engine].title} take the first {count}"
-                for engine, count in sorted(taken.items(), key=lambda pair: pair[1])
-            )
-            note = note[0].upper() + note[1:]
+        note = "; ".join(
+            f"trains behind a {ENGINES[engine].title} take the first {count}"
+            for engine, count in sorted(taken.items(), key=lambda pair: pair[1])
+        )
+        note = note[0].upper() + note[1:]
         imgui.set_cursor_pos_x(CARD_LABEL)
         imgui.push_text_wrap_pos(0.0)
         colored(GONE, note)
@@ -1359,6 +1334,50 @@ def _view(schedule: Schedule, engine: str) -> Train:
     schedule's, so what they change changes the schedule, and its engine sets how many cars
     and how much weight a stop can take."""
     return Train(schedule.name, stops=schedule.stops, engine=engine)
+
+
+def _draw_calls(railway: Railway, train: Train) -> None:
+    """The stops the train calls at as it took them up from its schedule, to look at only: the
+    one it heads for or stands at picked out, and the cars it takes on at each."""
+    stops = train.stops
+    if len(stops) < 2:
+        imgui.text_disabled("Its schedule has no stops yet: open it to give it some.")
+        return
+    current = -1
+    if train.away <= 0:
+        current = (train.heading if train.path else train.heading - 1) % len(stops)
+    flags = imgui.TableFlags_.row_bg.value | imgui.TableFlags_.borders_inner_h.value
+    if not imgui.begin_table("calls", 3, flags):
+        return
+    imgui.table_setup_column("#", imgui.TableColumnFlags_.width_fixed.value, 22)
+    imgui.table_setup_column("Stop", imgui.TableColumnFlags_.width_stretch.value, 1.0)
+    imgui.table_setup_column("Cars", imgui.TableColumnFlags_.width_stretch.value, 1.2)
+    for index, stop in enumerate(stops):
+        imgui.table_next_row(0, ROW_HEIGHT)
+        middle = (ROW_HEIGHT - imgui.get_text_line_height()) / 2
+        imgui.table_set_column_index(0)
+        imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + middle)
+        imgui.text_disabled(f"{index + 1}")
+        imgui.table_set_column_index(1)
+        imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + middle)
+        name = railway.name_of(stop.cell)
+        if index == current:
+            colored(BRASS, f"{fa.ICON_FA_TRAIN}  {name}")
+            imgui.same_line(0, 8)
+            imgui.text_disabled("heading here" if train.path else "standing here")
+        else:
+            imgui.text(name)
+        if stop.wait_for_load:
+            imgui.same_line(0, 8)
+            imgui.text_disabled("waits for a full load")
+        imgui.table_set_column_index(2)
+        following = railway.name_of(stops[train.onward(index)].cell)
+        if stop.refuel_only or not stop.cars:
+            imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + middle)
+            imgui.text_disabled("only refuels" if stop.refuel_only else "no cars")
+        else:
+            draw_cargo_counts(list(Counter(stop.cars).items()), f"to {following}")
+    imgui.end_table()
 
 
 def _draw_split(width: float) -> float | None:

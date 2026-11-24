@@ -310,6 +310,19 @@ class Schedules:
             reach -= max(1.0, math.ceil(longest - tank))
         return None, "The platforms trains pull into make the legs too long to plan"
 
+    def cannot_run(self, schedule: Schedule, engine: str) -> str:
+        """Why a train behind this engine would stand rather than run the schedule; "" if it
+        would run, as a train carrying fuel for more than the schedule's refuelling is planned
+        for, or for which refuelling can be planned, or a train with no fuel to carry."""
+        tank = ENGINES[engine].tank
+        if len(schedule.stops) < 2:
+            return ""
+        if schedule.manual:
+            return self._manual_problem(schedule, [(tank, engine)] if tank else [])
+        if not tank or (schedule.tank and tank >= schedule.tank):
+            return self._missing_track(schedule.stops)
+        return self._plan_for(schedule.own_stops(), tank, engine)[1]
+
     def _tanks(self, schedule: Schedule) -> list[tuple[float, str]]:
         """Each tank of its trains that burn fuel, smallest first, with an engine that has it."""
         tanks: dict[float, str] = {}
@@ -364,16 +377,10 @@ class Schedules:
 
 
 def between_rounds(train: Train) -> bool:
-    """Whether a train standing at a station is not out on a round: it has no round yet, is held
-    at its first stop, has reached no stop since it took up its stops, or is back at its first."""
+    """Whether a train standing at a station is not out on a round: it has no round yet, has
+    reached no stop since it took up its stops, or is back at its first."""
     stops = len(train.stops)
-    return (
-        stops < 2
-        or train.held
-        or train.arrivals == 0
-        or (train.heading - 1) % stops == 0
-        or train.away > 0
-    )
+    return stops < 2 or train.arrivals == 0 or (train.heading - 1) % stops == 0 or train.away > 0
 
 
 def refuel_chain(railway: Railway, start: Cell, end: Cell, reach: float) -> list[Cell] | None:

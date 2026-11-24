@@ -115,7 +115,28 @@ def pressing(monkeypatch: pytest.MonkeyPatch, wanted: str) -> None:
     monkeypatch.setattr(imgui, "button", pressed)
 
 
-def test_a_train_bought_on_the_buy_screen_stands_until_the_screen_is_closed(
+def test_a_train_bought_for_a_schedule_runs_it_and_the_buy_screen_closes(
+    gui: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, railway = joined_stations()
+    first = railway.buy()
+    assert first is not None
+    routed(railway, first, [Stop((6, 3)), Stop((6, 20))])
+    schedule = railway.schedules.of(first)
+    window = TrainsWindow(open=True)
+    window.buy.open_for(schedule)
+    pressing(monkeypatch, "Buy for")
+
+    draw_frames(window, railway, 1)
+    train = railway.trains[-1]
+
+    assert len(railway.trains) == 2
+    assert train.schedule == first.schedule
+    assert window.chosen == train.name
+    assert not window.buy.open
+
+
+def test_a_train_bought_with_a_new_schedule_shows_that_schedule_to_give_it_stops(
     gui: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _, railway = joined_stations()
@@ -123,31 +144,11 @@ def test_a_train_bought_on_the_buy_screen_stands_until_the_screen_is_closed(
     window.buy.open_for(None)
     pressing(monkeypatch, "Buy for")
 
-    draw_frames(window, railway, 1)
-    train = railway.trains[0]
+    draw_frames(window, railway, 3)
 
     assert len(railway.trains) == 1
-    assert window.chosen == train.name
-    assert window.buy.bought == train.name
-    assert train.held
-
-
-def test_closing_the_buy_screen_lets_the_trains_bought_on_it_set_off(gui: None) -> None:
-    _, railway = joined_stations()
-    train = railway.buy()
-    assert train is not None
-    train.held = True
-    window = TrainsWindow(open=True)
-    window.buy.open_for(None)
-    window.buy.bought = train.name
-    draw_frames(window, railway)
-    held_while_open = train.held
-
-    window.buy.open = False
-    draw_frames(window, railway)
-
-    assert held_while_open
-    assert not train.held
+    assert window.chosen_schedule == railway.trains[0].schedule
+    assert window.tab == SCHEDULES
 
 
 def test_closing_the_trains_window_closes_the_buy_screen_too(gui: None) -> None:
@@ -205,6 +206,12 @@ def routed(railway: Railway, train: Train, stops: list[Stop]) -> list[Stop]:
     return schedule.stops
 
 
+def showing_schedule(train: Train) -> TrainsWindow:
+    window = TrainsWindow(open=True, chosen_schedule=train.schedule)
+    window._pick_tab = SCHEDULES
+    return window
+
+
 def test_stop_cards_scrolled_out_of_sight_are_not_drawn(
     gui: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -212,8 +219,8 @@ def test_stop_cards_scrolled_out_of_sight_are_not_drawn(
     train = railway.buy()
     assert train is not None
     routed(railway, train, [Stop((6, 3) if index % 2 else (6, 20)) for index in range(12)])
-    window = TrainsWindow(open=True, chosen=train.name)
-    draw_frames(window, railway, 3)
+    window = showing_schedule(train)
+    draw_frames(window, railway, 4)
     drawn: list[int] = []
     card = TrainsWindow._draw_stop
 
@@ -247,7 +254,7 @@ def test_a_stop_card_stays_open_when_its_first_car_is_added(gui: None) -> None:
     train = railway.buy()
     assert train is not None
     stops = routed(railway, train, [Stop((6, 3)), Stop((6, 20))])
-    window = TrainsWindow(open=True, chosen=train.name)
+    window = showing_schedule(train)
     draw_frames(window, railway)
     stops[1].add_car(Good.COAL)
 
@@ -281,7 +288,7 @@ def test_what_follows_a_stops_cars_stays_put_when_its_first_car_is_added(
     train = railway.buy()
     assert train is not None
     stops = routed(railway, train, [Stop((6, 3)), Stop((6, 20))])
-    window = TrainsWindow(open=True, chosen=train.name)
+    window = showing_schedule(train)
     window._folded = {(train.schedule, 0): True, (train.schedule, 1): False}
     below: list[float] = []
     cars = TrainsWindow._draw_cars
@@ -410,11 +417,28 @@ def test_a_schedules_stop_says_how_many_of_its_cars_its_trains_take(
     train = railway.buy()
     assert train is not None
     routed(railway, train, [Stop((6, 3), [Good.COAL] * 5), Stop((6, 20))])
-    window = TrainsWindow(open=True)
-    window._pick_tab = SCHEDULES
+    window = showing_schedule(train)
+    window._folded = {(train.schedule, 0): True}
     notes: list[str] = []
     monkeypatch.setattr("railroads.ui.trains_window.colored", lambda _, text: notes.append(text))
 
-    draw_frames(window, railway)
+    draw_frames(window, railway, 3)
 
     assert any(note.endswith("take the first 3") for note in notes)
+
+
+def test_a_trains_view_shows_its_stops_without_cards_to_change_them(
+    gui: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    assert train is not None
+    routed(railway, train, [Stop((6, 3), [Good.COAL]), Stop((6, 20))])
+    window = TrainsWindow(open=True, chosen=train.name)
+    cards: list[int] = []
+    monkeypatch.setattr(TrainsWindow, "_draw_stop", lambda *_: cards.append(1))
+
+    draw_frames(window, railway, 3)
+
+    assert cards == []
+    assert len(train.stops) == 2

@@ -845,22 +845,6 @@ def test_a_new_stop_does_not_wait_for_a_full_load() -> None:
     assert waits is False
 
 
-def test_a_held_train_stands_at_its_first_stop_until_let_go() -> None:
-    _, railway = joined_stations()
-    train = railway.buy()
-    train.stops = [Stop((6, 3)), Stop((6, 20))]
-    train.held = True
-    railway.run(0.1)
-    stood = not train.path
-
-    railway.let_go()
-    railway.run(0.1)
-
-    assert stood
-    assert train.path
-    assert train.status == "Running"
-
-
 def test_a_rides_bill_takes_the_fuel_and_every_cars_trip_off_what_its_cargo_earns() -> None:
     _, railway = joined_stations()
     railway.station_goods((6, 3)).stockpile[Good.WHEAT] = BULK_CAR

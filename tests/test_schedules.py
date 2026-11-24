@@ -142,6 +142,31 @@ def test_a_schedule_says_when_no_station_is_within_its_weakest_trains_reach() ->
     assert "no station is within the 13 cells" in schedule.problem
 
 
+@pytest.mark.parametrize(("engine", "stands"), [(SHORT_RANGE, True), ("planet", False)])
+def test_an_engine_that_cannot_reach_a_schedules_next_stop_is_said_to_stand_on_it(
+    engine: str, stands: bool
+) -> None:
+    _, railway = joined_stations()
+    railway.year = 1850
+    railway.finances.earn(1_000_000.0, "test")
+    schedule = schedule_of(railway, Stop((6, 3)), Stop((6, 20)))
+    bought(railway, schedule, "planet")
+
+    why = railway.schedules.cannot_run(schedule, engine)
+
+    assert bool(why) == stands
+
+
+def test_an_engine_runs_a_line_where_refuelling_can_be_planned_for_it() -> None:
+    railway = line_of_three()
+    schedule = schedule_of(railway, Stop(FIRST), Stop(LAST))
+    bought(railway, schedule, "planet")
+
+    why = railway.schedules.cannot_run(schedule, SHORT_RANGE)
+
+    assert why == ""
+
+
 def test_the_weakest_train_that_can_make_the_round_sets_the_refuelling_stops() -> None:
     _, railway = joined_stations()
     railway.year = 1850

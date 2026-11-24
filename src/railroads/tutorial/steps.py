@@ -21,7 +21,7 @@ from railroads.sim.points import Points
 from railroads.sim.railway import PLATFORM_LEVEL, PLATFORM_REACH, QUADRUPLE_ERA, REACH_LEVEL
 from railroads.sim.reach import LOCAL_REACH
 from railroads.sim.trade import BONUS_PER_GOOD, COLLECTION_RADIUS, SCARCE_WORTH
-from railroads.sim.trains import ENGINES, FIRST_ENGINE
+from railroads.sim.trains import ENGINES, FIRST_ENGINE, Stop
 from railroads.tutorial.place import ASHFORD_STATION, BROOKBY_STATION, SHOWN_FARM
 from railroads.words import dollars, share_of
 
@@ -67,22 +67,31 @@ def joined(game: Game) -> bool:
 
 
 def train_set_off(game: Game) -> bool:
-    """Whether a train with two stops or more, carrying passengers and some food out of one of
-    them, has been let go."""
+    """Whether a train runs a schedule with two stops or more, carrying passengers and some food
+    out of one of them."""
     return any(
-        len(train.stops) >= 2
-        and not train.held
+        len(stops) >= 2
         and any(
             Good.PASSENGERS in stop.cars and any(cargo in FOODS for cargo in stop.cars)
-            for stop in train.stops
+            for stop in stops
         )
-        for train in game.railway.trains
+        for stops in _trains_stops(game)
     )
 
 
 def cars_both_ways(game: Game) -> bool:
-    """Whether a train pulls cars out of two of its stops or more."""
-    return any(sum(1 for stop in train.stops if stop.cars) >= 2 for train in game.railway.trains)
+    """Whether a train's schedule has cars out of two of its stops or more."""
+    return any(sum(1 for stop in stops if stop.cars) >= 2 for stops in _trains_stops(game))
+
+
+def _trains_stops(game: Game) -> list[list[Stop]]:
+    """The stops of the schedule each train runs."""
+    schedules = game.railway.schedules
+    return [
+        schedule.stops
+        for schedule in (schedules.of(train) for train in game.railway.trains)
+        if schedule is not None
+    ]
 
 
 def lot_offers(lots: Lots | None) -> list[Cell]:
@@ -181,8 +190,8 @@ STEPS: tuple[Step, ...] = (
         "2. A train",
         (
             (
-                "A train runs from stop to stop. At each stop it unloads, then takes on the cars "
-                "set for the way to the next stop and fills them from the station."
+                "A train runs its schedule from stop to stop. At each stop it unloads, then takes "
+                "on the cars set for the way to the next stop and fills them from the station."
             ),
             (
                 "Each car carries one good. Every car costs a little each time it leaves a stop, "
@@ -190,9 +199,9 @@ STEPS: tuple[Step, ...] = (
                 "cars and so much weight, and the heavier its load the slower it runs."
             ),
         ),
-        "Open Trains (T), press Buy a train and buy the Planet. Add Ashford and Brookby as "
-        "stops. Under Ashford, click passengers and a food in Load here, each a car to "
-        "Brookby, then press Done.",
+        "Open Trains (T), press Buy a train and buy the Planet. Its schedule opens: add Ashford "
+        "and Brookby as stops. Under Ashford, click passengers and a food in Load here, each a "
+        "car to Brookby.",
         lambda game, seen: train_set_off(game),
         lambda game: [],
         (
@@ -204,7 +213,6 @@ STEPS: tuple[Step, ...] = (
             "cargo:0:passengers",
             "cargo:0:wheat",
             "cargo:0:bread",
-            "done_buying",
         ),
     ),
     Step(

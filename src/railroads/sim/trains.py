@@ -963,9 +963,6 @@ class Train:
     # The platform of its station the train stands at, which it sets off from: the station's own
     # cell, or one of the platforms added to it; None for the station's own cell.
     platform: Cell | None = None
-    # Whether it stands at its first stop until the player is done setting it up, so it does not
-    # set off empty with half a route.
-    held: bool = False
     # The name the player gave it, if any.
     label: str = ""
     # The schedule it runs (railroads.sim.schedules), and the schedule and version of it its

@@ -1,10 +1,10 @@
 """The screen a train is bought on: the engines on sale in a list, the one picked shown big as
 the map draws it with what it can do, and the schedule it is to run, a new one of its own or one
-other trains run (railroads.sim.schedules); once it is bought, its schedule's stops set there and
-then. A train bought here stands at its first stop until the screen is closed (Train.held)."""
+other trains run (railroads.sim.schedules), with a warning when that engine can't run it. A train
+bought here sets off at once and the screen closes."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
@@ -17,7 +17,6 @@ from railroads.sim.trains import (
     OPENED_BY,
     Engine,
     Kind,
-    Train,
 )
 from railroads.ui.iso_camera import Vec2
 from railroads.ui.ornate import begin_ornate, end_ornate
@@ -38,7 +37,6 @@ PICTURE_BACK = (0.08, 0.07, 0.06, 1.0)
 # An engine's picture (railroads.ui.pixel.train_layer.engine_picture) as a texture drawn so many
 # times as fine each way, and its size in the sprite sheet's pixels.
 type EnginePicture = Callable[[str, int], tuple[imgui.ImTextureRef, Vec2]]
-type DrawRoute = Callable[[Train], None]
 # The engines on sale grouped by what they are for, and an engine's tooltip.
 type EngineGroups = list[tuple[Kind, list[str]]]
 type Summary = Callable[[Engine, float], str]
@@ -49,15 +47,15 @@ class BuyScreen:
     open: bool = False
     # The engine shown big.
     engine: str | None = None
-    # The train just bought here, whose route is being set; None while an engine is being picked.
-    bought: str | None = None
     # The schedule a train bought here runs; None for a new one of its own.
     schedule: str | None = None
+    # Why an engine can't run a schedule, by schedule, its version, what its refuelling was
+    # planned for and engine, so it is worked out once rather than every frame.
+    _cannot: dict[tuple, str] = field(default_factory=dict)
 
     def open_for(self, schedule: Schedule | None) -> None:
         """Opens the screen to pick an engine, for a train running `schedule` if it has stops."""
         self.open = True
-        self.bought = None
         self.schedule = schedule.name if schedule is not None and schedule.stops else None
 
     def draw(
@@ -66,7 +64,6 @@ class BuyScreen:
         groups: EngineGroups,
         summary: Summary,
         picture: EnginePicture,
-        draw_route: DrawRoute,
     ) -> str | None:
         """Draws the screen; returns the name of a train bought on it this frame."""
         if not self.open:
@@ -80,13 +77,10 @@ class BuyScreen:
         expanded, self.open = begin_ornate(title, imgui.WindowFlags_.no_collapse.value)
         bought = None
         if expanded:
-            train = next((t for t in railway.trains if t.name == self.bought), None)
-            if train is None:
-                self.bought = None
-                bought = self._draw_engines(railway, groups, summary, picture)
-            else:
-                self._draw_route(train, draw_route)
+            bought = self._draw_engines(railway, groups, summary, picture)
         end_ornate()
+        if bought is not None:
+            self.open = False
         return bought
 
     def _draw_engines(
@@ -128,10 +122,13 @@ class BuyScreen:
         engine = ENGINES[name]
         schedules = railway.schedules
         schedule = None if self.schedule is None else schedules.named(self.schedule)
+        cannot = "" if schedule is None else self.cannot_run(railway, schedule, name)
         style = imgui.get_style()
         footer = 2 * imgui.get_frame_height_with_spacing() + style.item_spacing.y
+        if cannot:
+            footer += imgui.get_text_line_height_with_spacing()
         imgui.begin_child("figures", (0, -footer))
-        self._draw_figures(railway, name, picture, schedule)
+        self._draw_figures(railway, name, picture)
         imgui.end_child()
         imgui.align_text_to_frame_padding()
         imgui.text_disabled("Runs")
@@ -151,6 +148,8 @@ class BuyScreen:
                     self.schedule = other.name
             imgui.end_combo()
         tip("The schedule it runs: its stops and the cars taken on at each, shared by its trains")
+        if cannot:
+            colored(GONE, f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  It would stand: {cannot}")
         affordable = railway.finances.can_afford(engine.price)
         imgui.begin_disabled(not affordable)
         clicked = imgui.button(f"{fa.ICON_FA_SHOPPING_CART}  Buy for {dollars(engine.price)}")
@@ -162,38 +161,32 @@ class BuyScreen:
         if not clicked:
             return None
         train = railway.buy(name, schedule=schedule)
-        if train is None:
-            return None
-        train.held = True
-        self.bought = train.name
-        return train.name
+        return None if train is None else train.name
 
-    def _draw_figures(
-        self, railway: Railway, name: str, picture: EnginePicture, schedule: Schedule | None
-    ) -> None:
-        """The engine's picture, its name and the table of what it can do, its range in red
-        when the stops it would call at are further apart and the player sets the refuelling
-        stops of its schedule by hand."""
+    def cannot_run(self, railway: Railway, schedule: Schedule, engine: str) -> str:
+        """Why a train behind this engine would stand rather than run the schedule; "" if it
+        would run."""
+        key = (schedule.name, schedule.version, schedule.planned_for, schedule.manual, engine)
+        if key not in self._cannot:
+            if len(self._cannot) > 64:
+                self._cannot.clear()
+            self._cannot[key] = railway.schedules.cannot_run(schedule, engine)
+        return self._cannot[key]
+
+    @staticmethod
+    def _draw_figures(railway: Railway, name: str, picture: EnginePicture) -> None:
+        """The engine's picture, its name and the table of what it can do."""
         engine = ENGINES[name]
-        self._draw_picture(name, picture)
+        BuyScreen._draw_picture(name, picture)
         imgui.spacing()
         imgui.push_style_color(imgui.Col_.text, imgui.ImVec4(*BRASS))
         imgui.text(engine.title)
         imgui.pop_style_color()
         imgui.separator()
-        longest = 0.0
-        if schedule is not None and schedule.manual:
-            longest = max(
-                (leg or 0.0 for leg in railway.leg_lengths(schedule.stops, name)), default=0.0
-            )
-        short = bool(engine.tank) and round(longest) > engine.tank
         for label, value in engine_figures(engine, railway.fuel_cost(name), OPENED_BY.get(name)):
             imgui.text_disabled(label)
             imgui.same_line(FIGURES_LABEL)
-            if label == "Range" and short:
-                colored(GONE, f"{value}; {longest:.0f} between two of those stops")
-            else:
-                imgui.text(value)
+            imgui.text(value)
 
     @staticmethod
     def _draw_picture(name: str, picture: EnginePicture) -> None:
@@ -211,18 +204,3 @@ class BuyScreen:
         top = low.y + (band - height * times) / 2
         draw_list.add_image(texture, (left, top), (left + width * times, top + height * times))
         imgui.dummy((room, band))
-
-    def _draw_route(self, train: Train, draw_route: DrawRoute) -> None:
-        imgui.align_text_to_frame_padding()
-        imgui.text_disabled("Give it its stops and cars; it sets off once this window is closed.")
-        imgui.same_line()
-        right = imgui.get_cursor_pos_x() + imgui.get_content_region_avail().x
-        imgui.same_line(max(imgui.get_cursor_pos_x(), right - 190))
-        if imgui.button(f"{fa.ICON_FA_PLUS}  Buy another"):
-            self.bought = None
-        imgui.same_line()
-        if imgui.button("Done"):
-            self.open = False
-        spot("done_buying")
-        imgui.separator()
-        draw_route(train)

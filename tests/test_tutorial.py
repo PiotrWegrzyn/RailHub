@@ -19,10 +19,11 @@ from railroads.sim.ownership import HOLD_MONTHS, SHARES
 from railroads.sim.points import Points
 from railroads.sim.railway import PLATFORM_LEVEL, PLATFORM_REACH, QUADRUPLE_ERA, REACH_LEVEL
 from railroads.sim.reach import LOCAL_REACH
+from railroads.sim.schedules import Schedule
 from railroads.sim.steps import finish
 from railroads.sim.tilemap import LAYERS
 from railroads.sim.trade import BONUS_PER_GOOD, SCARCE_WORTH
-from railroads.sim.trains import Stop
+from railroads.sim.trains import Stop, Train
 from railroads.tutorial.game import make_tutorial
 from railroads.tutorial.place import (
     ASHFORD,
@@ -69,13 +70,23 @@ def with_line() -> Game:
     return game
 
 
-def with_train(cars: list[Good], back: list[Good] | None = None, held: bool = False) -> Game:
+def with_train(cars: list[Good], back: list[Good] | None = None) -> Game:
     game = with_line()
     train = game.railway.buy()
     assert train is not None
-    train.stops = [Stop(ASHFORD_STATION, list(cars)), Stop(BROOKBY_STATION, list(back or []))]
-    train.held = held
+    routed(
+        game, train, [Stop(ASHFORD_STATION, list(cars)), Stop(BROOKBY_STATION, list(back or []))]
+    )
     return game
+
+
+def routed(game: Game, train: Train, stops: list[Stop]) -> Schedule:
+    schedules = game.railway.schedules
+    schedule = schedules.of(train)
+    assert schedule is not None
+    schedule.stops[:] = stops
+    schedules.settle(schedule, replan=True)
+    return schedule
 
 
 def test_the_tutorial_starts_with_the_same_land_and_buildings_every_time() -> None:
@@ -154,7 +165,6 @@ def test_the_tutorial_starts_on_its_first_step_looking_at_ashford() -> None:
         ("1. Track", with_stations),
         ("2. A train", with_line),
         ("2. A train", lambda: with_train([Good.PASSENGERS])),
-        ("2. A train", lambda: with_train([Good.PASSENGERS, Good.WHEAT], held=True)),
         ("3. Cars and hubs", lambda: with_train([Good.PASSENGERS, Good.WHEAT])),
         ("4. Making and using goods", lambda: make_tutorial().game),
         ("5. Satisfaction", lambda: make_tutorial().game),
@@ -416,10 +426,11 @@ def test_the_tutorial_plays_through_to_the_end_with_the_year_going_by(context: N
     def buy_train() -> None:
         train = game.railway.buy()
         assert train is not None
-        train.stops = [
-            Stop(ASHFORD_STATION, [Good.PASSENGERS, Good.WHEAT]),
-            Stop(BROOKBY_STATION),
-        ]
+        routed(
+            game,
+            train,
+            [Stop(ASHFORD_STATION, [Good.PASSENGERS, Good.WHEAT]), Stop(BROOKBY_STATION)],
+        )
 
     def buying() -> None:
         view.build.trains.open = True
@@ -432,7 +443,7 @@ def test_the_tutorial_plays_through_to_the_end_with_the_year_going_by(context: N
     do_next(lambda: game.lay_track(ASHFORD_STATION, BROOKBY_STATION))
     do_next(buy_train)
     with_a_train = game.finances.cash
-    do_next(lambda: game.railway.trains[0].stops[1].add_car(Good.PASSENGERS), months=12)
+    do_next(lambda: game.railway.schedules.all[0].stops[1].add_car(Good.PASSENGERS), months=12)
     earned = game.finances.cash - with_a_train
     do_next(lambda: setattr(view, "selected", SHOWN_FARM))
     do_next(lambda: setattr(view, "lens", Lens.SATISFACTION))
