@@ -6,7 +6,8 @@ beside it and any short single line between them, is one; plain line between the
 single line meets double. A signal stands wherever track runs into a block from another, or out of
 a station. A train runs only on track set for it: before it runs on past a signal it asks for the
 way from there on, block by block, up to the first signal it could stand at without being in
-anyone's way but trains following it, with all of it in a station or on double track, or on the
+anyone's way but trains following it, with all of it in a station or on double track (none of it
+beside track through a corner), or on the
 single line it came along when the way on from there runs into a station or onto double track
 before any more single line and no other train holds any of it (`_line_end`). The way is
 set for it only once no other train holds any of it, and then all at once; until then it stands
@@ -111,7 +112,18 @@ class Blocks:
 
         # Whether each cell is plain double track, and the pairs of points its double track
         # joins, where trains going opposite ways keep to their own tracks.
-        self.double = {cell: kind(cell) in ("double", "quadruple") for cell in cells}
+        # Track through a corner runs between the two cells beside it, so a train standing in
+        # either would be in the way of trains on that track: no train stands there.
+        flanking = {
+            flank
+            for cell in cells
+            for piece in pieces[cell]
+            for end in piece.ends
+            for flank in grid.track_flanks(cell, end)
+        }
+        self.double = {
+            cell: kind(cell) in ("double", "quadruple") and cell not in flanking for cell in cells
+        }
         self.lanes: dict[Cell, set[frozenset[Point]]] = {
             cell: {
                 frozenset(point(cell, end) for end in piece.ends)

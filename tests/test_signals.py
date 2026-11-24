@@ -409,3 +409,71 @@ def test_a_train_stands_at_the_end_of_a_single_line_only_while_the_way_on_is_fre
         game.railway.run(1 / 240)
 
     assert all(train.arrivals > old for train, old in zip(planets, before, strict=True))
+
+
+def fleet(game: Game, rounds: list[tuple[str, list[tuple[int, int]]]]) -> list[Train]:
+    trains = []
+    for engine, stops in rounds:
+        train = game.railway.buy(engine)
+        assert train is not None
+        for cell in stops:
+            stop = Stop(cell)
+            train.stops.append(stop)
+            game.railway.add_car(train, stop, Good.PASSENGERS)
+        trains.append(train)
+    return trains
+
+
+def test_no_train_stands_beside_track_through_a_corner_where_it_would_block_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(Railway, "quadruple_open", property(lambda _: True))
+    game = Game(Constructions(flat_map(rows=14, cols=18)))
+    game.finances.cash = 1e9
+    a, b, c, d, e, f = (4, 9), (12, 9), (10, 5), (1, 16), (9, 1), (4, 5)
+    for station in (a, b, c, d, e, f):
+        game.build_station(station)
+    for start, end, width in (
+        (e, b, TrackWidth.QUADRUPLE),
+        (c, (2, 4), TrackWidth.DOUBLE),
+        ((2, 4), f, TrackWidth.QUADRUPLE),
+        (c, f, TrackWidth.QUADRUPLE),
+        (f, d, TrackWidth.SINGLE),
+        (f, (11, 12), TrackWidth.SINGLE),
+        ((11, 12), b, TrackWidth.QUADRUPLE),
+        (f, a, TrackWidth.SINGLE),
+        (e, f, TrackWidth.SINGLE),
+    ):
+        assert game.lay_track(start, end, width).ok
+    trains = fleet(
+        game,
+        [
+            ("planet", [b, f, a, c]),
+            ("tank", [b, c]),
+            ("planet", [e, f, a]),
+            ("tank", [f, e, b, a]),
+            ("tank", [c, a, b, e]),
+            ("planet", [f, d, a, e]),
+            ("planet", [e, d, b, c]),
+            ("planet", [f, c, b, a]),
+            ("tank", [f, b, a]),
+            ("tank", [f, c]),
+        ],
+    )
+    for _ in range(4 * 240):
+        game.railway.run(1 / 240)
+    earlier = [train.arrivals for train in trains]
+    for _ in range(3 * 240):
+        game.railway.run(1 / 240)
+    before = [train.arrivals for train in trains]
+
+    for _ in range(3 * 240):
+        game.railway.run(1 / 240)
+
+    running = [
+        (train, old)
+        for train, old, first in zip(trains, before, earlier, strict=True)
+        if old > first
+    ]
+    assert running
+    assert all(train.arrivals > old for train, old in running)
