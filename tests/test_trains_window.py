@@ -405,7 +405,10 @@ def test_a_schedules_stops_hold_cars_for_the_biggest_engine_on_sale_not_only_its
     train = railway.buy("tank")
     assert train is not None
 
-    engine = TrainsWindow._schedule_engine(railway, [train])
+    schedule = railway.schedules.of(train)
+    assert schedule is not None
+
+    engine = railway.schedules.biggest_engine(schedule)
 
     assert ENGINES[engine].cars > ENGINES["tank"].cars
 
@@ -442,3 +445,22 @@ def test_a_trains_view_shows_its_stops_without_cards_to_change_them(
 
     assert cards == []
     assert len(train.stops) == 2
+
+
+@pytest.mark.parametrize(("on_sale", "said"), [(["tank"], True), (["tank", "planet"], False)])
+def test_a_schedule_with_no_trains_says_when_no_engine_on_sale_could_run_it(
+    gui: None, monkeypatch: pytest.MonkeyPatch, on_sale: list[str], said: bool
+) -> None:
+    _, railway = joined_stations()
+    railway.year = 1850
+    schedule = railway.schedules.new()
+    schedule.stops = [Stop((6, 3)), Stop((6, 20))]
+    monkeypatch.setattr(railway, "engines", lambda: on_sale)
+    window = TrainsWindow(open=True, chosen_schedule=schedule.name)
+    window._pick_tab = SCHEDULES
+    notes: list[str] = []
+    monkeypatch.setattr("railroads.ui.trains_window.colored", lambda _, text: notes.append(text))
+
+    draw_frames(window, railway, 3)
+
+    assert any("No engine on sale could run it" in note for note in notes) == said

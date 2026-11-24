@@ -113,6 +113,16 @@ def test_the_game_puts_in_the_refuelling_stops_the_weakest_trains_fuel_needs() -
     assert schedule.problem == ""
 
 
+def test_a_schedule_with_no_trains_gets_the_refuelling_stops_its_biggest_engine_needs() -> None:
+    railway = line_of_three()
+
+    schedule = schedule_of(railway, Stop(FIRST), Stop(LAST))
+
+    assert ENGINES[railway.schedules.biggest_engine(schedule)].tank == schedule.tank
+    assert MIDDLE in [stop.cell for stop in schedule.stops if stop.auto]
+    assert schedule.problem == ""
+
+
 def test_no_refuelling_stop_goes_in_where_the_fuel_lasts() -> None:
     railway = line_of_three()
     schedule = schedule_of(railway, Stop(FIRST), Stop(MIDDLE))

@@ -26,7 +26,6 @@ from railroads.sim.railway import Railway, Ride
 from railroads.sim.schedules import MOST_CARS, Schedule
 from railroads.sim.trains import (
     ENGINES,
-    FIRST_ENGINE,
     SLOWDOWN,
     Cargo,
     Stop,
@@ -404,9 +403,10 @@ class TrainsWindow:
         imgui.end_disabled()
         tip("Move or sell its trains first" if trains else "Delete this schedule", disabled=True)
         self._draw_refuel_mode(railway, schedule)
-        if schedule.problem:
+        problem = schedule.problem if trains else self._none_on_sale(railway, schedule)
+        if problem:
             imgui.push_text_wrap_pos(0.0)
-            colored(GONE, f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {schedule.problem}")
+            colored(GONE, f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {problem}")
             imgui.pop_text_wrap_pos()
         section(f"{len(trains)} {plural('train', len(trains))}")
         rows = [
@@ -422,7 +422,7 @@ class TrainsWindow:
             self.chosen = clicked
             self.maximized = False
             self._pick_tab = TRAINS
-        view = _view(schedule, self._schedule_engine(railway, trains))
+        view = _view(schedule, schedules.biggest_engine(schedule))
         self.schedule_map.good = None
         self._shown_map = self.schedule_map
         map_width = imgui.get_content_region_avail().x * MAP_SHARE
@@ -437,17 +437,14 @@ class TrainsWindow:
         imgui.end_child()
         schedules.settle(schedule)
 
-    @staticmethod
-    def _schedule_engine(railway: Railway, trains: list[Train]) -> str:
-        """The engine a schedule's stop cards are drawn for: of its trains' engines and those on
-        sale but expresses, the one with room for the most cars and pulling the most, so that its
-        stops can hold cars for the biggest train it could get, each train taking them from the
-        left as far as it can."""
-        engines = {train.engine for train in trains}
-        engines |= {name for name in railway.engines() if not ENGINES[name].express}
-        if not engines:
-            return FIRST_ENGINE
-        return max(engines, key=lambda name: (ENGINES[name].cars, railway.max_pull(name), name))
+    def _none_on_sale(self, railway: Railway, schedule: Schedule) -> str:
+        """That no engine on sale could run the schedule, and why the one carrying fuel the
+        furthest couldn't; "" if one could."""
+        engines = sorted(railway.engines(), key=lambda name: -ENGINES[name].tank)
+        reasons = [self.buy.cannot_run(railway, schedule, name) for name in engines]
+        if not reasons or not all(reasons):
+            return ""
+        return f"No engine on sale could run it: {reasons[0]}"
 
     @staticmethod
     def _draw_add_train(railway: Railway, schedule: Schedule) -> None:

@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 
 from railroads.sim.goods import Good
 from railroads.sim.grids import Cell
-from railroads.sim.trains import ENGINES, Cargo, Stop, Train
+from railroads.sim.trains import ENGINES, FIRST_ENGINE, Cargo, Stop, Train
 
 if TYPE_CHECKING:
     from railroads.sim.railway import Railway
@@ -271,7 +271,7 @@ class Schedules:
             if planned is not None:
                 schedule.stops[:] = planned
                 schedule.tank = tank
-                if first_failure:
+                if first_failure and self.trains(schedule):
                     schedule.problem = (
                         f"Trains carrying fuel for less than {tank:.0f} cells wait: {first_failure}"
                     )
@@ -323,14 +323,36 @@ class Schedules:
             return self._missing_track(schedule.stops)
         return self._plan_for(schedule.own_stops(), tank, engine)[1]
 
+    def biggest_engine(self, schedule: Schedule) -> str:
+        """Of its trains' engines and those on sale but expresses, the one with room for the most
+        cars and pulling the most: its stops hold cars for the biggest train it could get, and
+        while it has no trains its refuelling stops are planned for that engine."""
+        engines = {train.engine for train in self.trains(schedule)}
+        railway = self._railway
+        engines |= {name for name in railway.engines() if not ENGINES[name].express}
+        if not engines:
+            return FIRST_ENGINE
+        return max(engines, key=lambda name: (ENGINES[name].cars, railway.max_pull(name), name))
+
     def _tanks(self, schedule: Schedule) -> list[tuple[float, str]]:
-        """Each tank of its trains that burn fuel, smallest first, with an engine that has it."""
+        """Each tank of its trains that burn fuel, smallest first, with an engine that has it;
+        while it has none, the tank of its biggest engine (biggest_engine), then the others on
+        sale smallest first, should that one not make the round."""
+        trains = self.trains(schedule)
+        if not trains:
+            biggest = self.biggest_engine(schedule)
+            if not ENGINES[biggest].tank:
+                return []
+            others = sorted(self._railway.engines(), key=lambda name: ENGINES[name].tank)
+            engines = [biggest, *others]
+        else:
+            engines = sorted((train.engine for train in trains), key=lambda e: ENGINES[e].tank)
         tanks: dict[float, str] = {}
-        for train in self.trains(schedule):
-            tank = ENGINES[train.engine].tank
+        for engine in engines:
+            tank = ENGINES[engine].tank
             if tank:
-                tanks.setdefault(tank, train.engine)
-        return sorted(tanks.items())
+                tanks.setdefault(tank, engine)
+        return list(tanks.items())
 
     def _manual_problem(self, schedule: Schedule, tanks: list[tuple[float, str]]) -> str:
         if not tanks or len(schedule.stops) < 2:
