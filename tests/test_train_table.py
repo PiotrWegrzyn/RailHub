@@ -1,11 +1,13 @@
 from railroads.sim.goods import Good
-from railroads.sim.trains import Stop, Train
+from railroads.sim.trains import Car, Stop, Train
 from railroads.ui.train_table import (
+    CARRYING,
     FIRST,
     RIDE,
     TRAIN,
     Row,
     TrainFilter,
+    carried,
     shown_status,
     sort_rows,
 )
@@ -77,6 +79,41 @@ def test_trains_not_running_come_last_whichever_way_rides_are_sorted() -> None:
 
     assert [r.title for r in up] == ["poor", "rich", "idle"]
     assert [r.title for r in down] == ["rich", "poor", "idle"]
+
+
+def test_what_a_train_carries_sums_each_good_over_its_cars_the_most_first() -> None:
+    train = Train("a")
+    train.cars = [
+        Car(Good.COAL, load=10.0),
+        Car(Good.CATTLE, load=20.0),
+        Car(Good.COAL, load=15.0),
+        Car(Good.WHEAT),
+        Car(Good.PASSENGERS, dining=True),
+    ]
+
+    carrying = carried(train)
+
+    assert carrying == ((Good.COAL, 25.0), (Good.CATTLE, 20.0))
+
+
+def test_sorting_by_what_trains_carry_orders_them_by_their_whole_load() -> None:
+    empty = row("empty")
+    light = Row(Train("light"), "light", "", "", [], "Running", False, None, ((Good.COAL, 5.0),))
+    heavy = Row(
+        Train("heavy"),
+        "heavy",
+        "",
+        "",
+        [],
+        "Running",
+        False,
+        None,
+        ((Good.COAL, 5.0), (Good.WHEAT, 30.0)),
+    )
+
+    shown = sort_rows([heavy, empty, light], CARRYING, True)
+
+    assert [r.title for r in shown] == ["heavy", "light", "empty"]
 
 
 def test_a_status_names_the_train_ahead_by_its_title() -> None:
