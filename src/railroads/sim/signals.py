@@ -2,7 +2,7 @@
 them through it).
 
 The track outside stations is cut into blocks: each crossing or junction, with the junctions
-beside it and any short line between them, is one; plain line between them is another, cut where
+beside it and any short single line between them, is one; plain line between them is another, cut where
 single line meets double. A signal stands wherever track runs into a block from another, or out of
 a station. A train runs only on track set for it: before it runs on past a signal it asks for the
 way from there on, block by block, up to the first signal it could stand at without being in
@@ -45,8 +45,9 @@ FOLLOW_GAP = 0.3
 # How far ahead of the end of the way set for it a train asks for more, in cells, so it finds
 # the next signal clear without slowing for it.
 SIGHT = 2.0
-# Plain line shorter than this, in cells, between junctions on both ends belongs with them, as no
-# train stands in so little: one block, with signals only on the ways into it.
+# Plain single line shorter than this, in cells, between junctions on both ends belongs with them,
+# as no train stands in so little: one block, with signals only on the ways into it. Double track
+# keeps its signals however short, as a train stands on it only where all of it fits.
 SHORT_LINE = 3
 # Distances along a path closer than this, in cells, are one place.
 SAME = 1e-6
@@ -170,7 +171,7 @@ class Blocks:
             return block
 
         for block, group in groups.items():
-            if block[0] == "junction" or len(group) >= SHORT_LINE:
+            if block[0] != "single" or len(group) >= SHORT_LINE:
                 continue
             beside = {
                 self.block.get(exits[(cell, end)][0])
@@ -185,6 +186,17 @@ class Blocks:
         for cell, block in self.block.items():
             found = root(block)
             self.block[cell] = ("junction", found[1]) if found in merged else block
+        # Track of a junction through a corner runs between the two cells beside it, so a train
+        # standing on plain line in either would be in the way of trains through the junction:
+        # those cells belong with it, and a train stands short of them.
+        for cell in cells:
+            if self.block[cell][0] != "junction":
+                continue
+            for piece in pieces[cell]:
+                for end in piece.ends:
+                    for flank in grid.track_flanks(cell, end):
+                        if flank in self.block and self.block[flank][0] != "junction":
+                            self.block[flank] = self.block[cell]
         self.spots: list[SignalSpot] = []
         for (cell, end), (beside, _) in exits.items():
             if beside in stations or self.block.get(beside, self.block[cell]) != self.block[cell]:

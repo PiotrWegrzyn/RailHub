@@ -103,6 +103,48 @@ def test_signals_stand_before_a_junction_on_every_way_into_it() -> None:
     assert into == junction
 
 
+@pytest.mark.parametrize(("width", "kept"), [(TrackWidth.DOUBLE, True), (TrackWidth.SINGLE, False)])
+def test_a_short_double_line_between_junctions_keeps_its_own_signals_and_a_single_one_does_not(
+    width: TrackWidth, kept: bool
+) -> None:
+    game = game_with((WEST, EAST, width))
+    assert game.lay_track((8, 9), NORTH, TrackWidth.SINGLE).ok
+    assert game.lay_track((8, 12), SOUTH, TrackWidth.SINGLE).ok
+    between = {(8, 10), (8, 11)}
+
+    blocks = blocks_of(game.constructions)
+
+    signalled = {spot.cell for spot in blocks.spots} & between
+    assert (signalled == between) == kept
+    assert (blocks.block[(8, 10)][0] == "junction") != kept
+
+
+def test_plain_line_beside_where_junction_track_runs_through_a_corner_belongs_to_the_junction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(Railway, "quadruple_open", property(lambda _: True))
+    game = Game(Constructions(flat_map(rows=14, cols=18)))
+    game.finances.cash = 1e9
+    one, two, three, four, bend = (5, 7), (9, 7), (5, 15), (4, 10), (8, 12)
+    for station in (one, two, three, four):
+        game.build_station(station)
+    for start, end, width in (
+        (one, two, TrackWidth.SINGLE),
+        (one, three, TrackWidth.SINGLE),
+        (three, four, TrackWidth.SINGLE),
+        (two, four, TrackWidth.SINGLE),
+        (two, bend, TrackWidth.QUADRUPLE),
+        (bend, one, TrackWidth.QUADRUPLE),
+    ):
+        assert game.lay_track(start, end, width).ok
+
+    blocks = blocks_of(game.constructions)
+
+    junction = blocks.block[(7, 7)]
+    assert blocks.block[(6, 8)] == junction
+    assert blocks.block[(8, 8)] == junction
+
+
 def test_a_signal_shows_clear_once_the_way_past_it_is_set_for_a_train_coming_to_it() -> None:
     game = game_with((WEST, EAST, TrackWidth.SINGLE))
     train = shuttle(game, WEST, EAST)
