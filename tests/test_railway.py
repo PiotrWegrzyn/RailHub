@@ -921,3 +921,27 @@ def test_a_train_with_one_stop_has_no_ride() -> None:
     ride = railway.ride(train)
 
     assert ride is None
+
+
+def test_a_train_whose_way_ahead_is_taken_up_goes_round_by_the_track_laid_instead() -> None:
+    growth, railway = joined_stations()
+    constructions = growth.constructions
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop((6, 3), wait_for_load=False), Stop((6, 20), wait_for_load=False)]
+    railway.run(0.05)
+    gone = {(6, col) for col in range(10, 15)}
+    for cell in gone:
+        for piece in constructions.track_at(cell):
+            constructions.remove(piece)
+    for start, end in [((6, 8), (2, 10)), ((2, 10), (2, 14)), ((2, 14), (6, 16))]:
+        detour = plan_route(constructions, start, end)
+        assert detour is not None
+        lay_route(growth, detour)
+
+    for _ in range(10):
+        railway.run(0.01)
+
+    cells = {railway.network.cell_at(point) for point in train.path}
+    assert not cells & gone
+    assert railway.network.cell_at(train.path[-1]) == (6, 20)

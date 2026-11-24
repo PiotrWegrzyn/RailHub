@@ -953,6 +953,7 @@ class Railway:
         wanted = train.along + (
             months * CELLS_PER_MONTH * self.network.speed_at(train) * self.pull(train) * speed
         )
+        self._keep_on_track(train, signals)
         self._choose_platform(train, signals)
         ask = self.asks + 1
         holder = signals.let_on(train, ask, wanted)
@@ -1012,19 +1013,82 @@ class Railway:
         cells = self.constructions.station_cells(self.constructions.main_station(there) or there)
         if len(cells) < 2:
             return
+        self._take_quickest(train, signals, cells)
+
+    def _keep_on_track(self, train: Train, signals: Signals) -> None:
+        """Once track has changed, finds the train a new way on if the way set for it runs where
+        track is no longer laid (_take_quickest); it keeps the old one, and waits, while no track
+        leads on."""
+        version = self.constructions.railway_version
+        if train.laid_for == version:
+            return
+        if not train.path or self._still_laid(train):
+            train.laid_for = version
+            return
+        there = train.stops[train.heading % len(train.stops)].cell
+        cells = self.constructions.station_cells(self.constructions.main_station(there) or there)
+        if self._take_quickest(train, signals, cells, lost=True):
+            train.laid_for = version
+
+    def _still_laid(self, train: Train) -> bool:
+        """Whether the way set for the train runs on what is built now from the cell its front
+        is in to the station it is bound for."""
+        network, path = self.network, train.path
+        if self.constructions.main_station(network.cell_at(path[-1])) is None:
+            return False
+        engine = ENGINES[train.engine]
+        grid = self.constructions.tile_map.grid
+        ends = network.ends(train)
+        for k in range(1, len(path) - 1):
+            if ends[k + 1] < train.along:
+                continue
+            cell = network.cell_at(path[k])
+            if math.dist(path[k], grid.center(*cell)) > 1e-6:
+                continue
+            entry = network.entry_point(cell, path[k - 1])
+            exit_point = network.entry_point(cell, path[k + 1])
+            if not network.leads(cell, entry, exit_point, engine.electric, engine.maglev):
+                return False
+        return True
+
+    def _take_quickest(
+        self, train: Train, signals: Signals, cells: list[Cell], lost: bool = False
+    ) -> bool:
+        """Sets the train the quickest way on from the end of the track it holds to one of a
+        station's cells and from it to the stop after, a way counting HELD_WAY_COST cells longer
+        for each cell of it another train holds: only if it ends elsewhere than the way set now,
+        unless that one is `lost`: then from where the train came into the cell its front is in,
+        as the track there may have changed too, taking the track under it again
+        (railroads.sim.signals) as it next moves. Returns whether it looked for one: not while
+        the train is still in the station it left."""
         path = train.path
         ends = self.network.ends(train)
-        at = next(
-            (
-                k
-                for k in range(len(path) - 1)
-                if ends[k] >= train.cleared - 1e-6
-                and not self.network.passing(_middle(path[k], path[k + 1]))[0]
-            ),
-            None,
-        )
-        if at is None or ends[at] > train.cleared + 1e-6 and train.cleared > 0:
-            return
+        grid = self.constructions.tile_map.grid
+        if lost:
+            at = next(
+                (
+                    k
+                    for k in range(len(path) - 2, 0, -1)
+                    if ends[k] <= train.along + 1e-6
+                    and math.dist(path[k], grid.center(*self.network.cell_at(path[k]))) > 1e-6
+                    and not self.network.passing(_middle(path[k], path[k + 1]))[0]
+                ),
+                None,
+            )
+        else:
+            at = next(
+                (
+                    k
+                    for k in range(len(path) - 1)
+                    if ends[k] >= train.cleared - 1e-6
+                    and not self.network.passing(_middle(path[k], path[k + 1]))[0]
+                ),
+                None,
+            )
+            if at is not None and ends[at] > train.cleared + 1e-6 and train.cleared > 0:
+                return True
+        if at is None:
+            return False
         a = path[at]
         cell = self.network.cell_at(_middle(a, path[at + 1]))
         entry = self.network.entry_point(cell, a)
@@ -1044,12 +1108,13 @@ class Railway:
             cost += self.onward_cost(target, after, train.engine)
             if best is None or cost < best[0]:
                 best = (cost, target, way)
-        if best is None or best[1] == self.network.cell_at(path[-1]):
-            return
+        if best is None or not lost and best[1] == self.network.cell_at(path[-1]):
+            return True
         points, speeds = best[2]
         train.path = path[: at + 1] + points
         train.speeds = train.speeds[:at] + [self.network.speed_in(cell)] + speeds
-        train.claims_for = train.path
+        train.claims_for = None if lost else train.path
+        return True
 
     def position(self, train: Train, back: float = 0.0) -> tuple[Point, Point] | None:
         """Where the train is on the map, and which way it faces (TrackNetwork.position)."""

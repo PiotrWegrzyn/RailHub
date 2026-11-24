@@ -239,6 +239,13 @@ class TrackNetwork:
             and piece.maglev == maglev
         ]
 
+    def leads(
+        self, cell: Cell, entry: int, exit_point: int, electric: bool = False, maglev: bool = False
+    ) -> bool:
+        """Whether a train that came into a cell by `entry` can leave it by `exit_point` on what is
+        built there now (_exits)."""
+        return exit_point in self._exits(cell, entry, electric, maglev)
+
     def _find_exits(self) -> None:
         """Where track leaving each cell with track or a station by each point runs into, for
         all of them at once (Grid.track_exit): one at a time is slow, and finding a way asks

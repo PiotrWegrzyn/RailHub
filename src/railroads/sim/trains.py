@@ -941,6 +941,9 @@ class Train:
     # The track of quadruple track it last took, which it keeps to through junctions: the slow
     # one (railroads.sim.signals.SLOW_LANE) until it takes one.
     lane: int = 1
+    # The version of the railway (Constructions.railway_version) its way was last found to run
+    # on laid track in.
+    laid_for: int = -1
     # Whether the player put it first in every queue for the way on until it reaches its next
     # stop.
     first: bool = False
