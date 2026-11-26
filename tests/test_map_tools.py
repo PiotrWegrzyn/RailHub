@@ -99,3 +99,25 @@ def test_clicking_while_the_route_is_being_planned_lays_it_once_it_is_done(
     assert view.build.preview_to is None
     assert len(planned) == 1
     assert view.constructions.track_at((8, 26))
+
+
+def test_turning_a_station_back_undoes_turning_it_on(context: None) -> None:
+    view = MapView(Game(Constructions(flat_map(rows=16, cols=30))))
+    view.build.choose(Tool.STATION)
+    first = view.tools.station_ends((8, 10))
+
+    view.tools.turn_station((8, 10), 2)
+    view.tools.turn_station((8, 10), -2)
+
+    assert view.tools.station_ends((8, 10)) == first
+
+
+def test_a_station_turned_once_back_runs_the_last_way_before_its_own(context: None) -> None:
+    view = MapView(Game(Constructions(flat_map(rows=16, cols=30))))
+    view.build.choose(Tool.STATION)
+    ways = view.tools.station_ways()
+    first = view.tools.station_ends((8, 10))
+
+    view.tools.turn_station((8, 10), -1)
+
+    assert view.tools.station_ends((8, 10)) == ways[ways.index(first) - 1]

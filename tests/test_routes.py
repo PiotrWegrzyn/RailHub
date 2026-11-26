@@ -16,7 +16,14 @@ from railroads.sim.grids import Cell, Grid, HexGrid, SquareGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
-from railroads.sim.routes import Route, build_station, lay_route, plan_route, route_price
+from railroads.sim.routes import (
+    Route,
+    add_platform,
+    build_station,
+    lay_route,
+    plan_route,
+    route_price,
+)
 from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.sim.track_rules import TrackBed
 
@@ -463,6 +470,20 @@ def test_track_into_the_side_of_a_station_no_track_joins_turns_the_station() -> 
 
     assert constructions.station_ends((6, 10)) == (0, 6)
     assert dead_ends(constructions) == [((6, 2), 6)]
+
+
+def test_track_into_the_side_of_a_platform_no_track_joins_turns_the_platform() -> None:
+    constructions = Constructions(make_map())
+    growth = Growth(constructions, NO_TRADE)
+    build_station(growth, (8, 10), (3, 9))
+    add_platform(growth, (8, 10), (8, 12), (3, 9))
+    route = plan_route(constructions, (8, 18), (8, 12))
+    assert route is not None
+
+    lay_route(growth, route)
+
+    assert constructions.station_ends((8, 12)) == (0, 6)
+    assert constructions.main_station((8, 12)) == (8, 10)
 
 
 def test_track_ending_against_the_side_of_a_station_no_track_joins_turns_it_to_join() -> None:

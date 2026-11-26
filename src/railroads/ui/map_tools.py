@@ -160,7 +160,8 @@ class MapTools:
         build.choose(Tool.ADD_PLATFORM)
         build.moving = station
         build.say(
-            f"Click a free cell up to {PLATFORM_REACH} cells from the station for its new platform; Q turns it."
+            f"Click a free cell up to {PLATFORM_REACH} cells from the station for its new platform; "
+            "Q or the mouse wheel turns it."
         )
 
     def start_moving(self, station: Cell) -> None:
@@ -186,11 +187,11 @@ class MapTools:
         ways = self.station_ways()
         return ways[build.station_turn % len(ways)]
 
-    def turn_station(self, cell: Cell | None) -> None:
-        """Turns the station being placed to the next way."""
+    def turn_station(self, cell: Cell | None, by: int = 1) -> None:
+        """Turns the station being placed `by` ways on, back for a negative number."""
         ways = self.station_ways()
         current = self.station_ends(cell) if cell is not None else ways[-1]
-        self._view.build.station_turn = (ways.index(current) + 1) % len(ways)
+        self._view.build.station_turn = (ways.index(current) + by) % len(ways)
 
     def update_hover_note(self, cell: Cell | None) -> None:
         """What the chosen tool would cost in the cell under the mouse."""
@@ -227,10 +228,12 @@ class MapTools:
         if build.tool == Tool.ADD_PLATFORM:
             platform = game.platform_quote(cell)
             build.hover_note = (
-                "A platform can't go here"
+                f"A platform can't go here: {platform.problem}."
+                if platform.price is None and platform.problem
+                else "A platform can't go here."
                 if platform.price is None
                 else f"New platform here: {dollars(platform.price)}"
-                f"{moving_note(platform.moved, platform.angering)}. Q turns it."
+                f"{moving_note(platform.moved, platform.angering)}. Q or the mouse wheel turns it."
             )
             return
         quote = game.station_quote(cell)
@@ -243,7 +246,7 @@ class MapTools:
                 if quote.site
                 else ""
             )
-            + ". Q turns it."
+            + ". Q or the mouse wheel turns it."
         )
 
     def _planned(self, cell: Cell) -> Route | None:

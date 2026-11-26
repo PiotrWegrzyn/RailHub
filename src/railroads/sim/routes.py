@@ -857,10 +857,10 @@ def _leads_on(constructions: Constructions, cell: Cell, point: int) -> bool:
 
 
 def _can_turn(constructions: Constructions, cell: Cell) -> bool:
-    """Whether the station in the cell may still turn: one without platforms that no track or
-    station joins at either end."""
+    """Whether the station or platform in the cell may still turn: one without platforms of its
+    own that no track or station joins at either end."""
     station = constructions.station_at(cell)
-    if station is None or station.main is not None or constructions.platforms(cell):
+    if station is None or constructions.platforms(cell):
         return False
     return not any(
         _leads_on(constructions, cell, point) for point in constructions.station_ends(cell)

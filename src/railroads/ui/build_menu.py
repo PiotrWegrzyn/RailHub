@@ -97,7 +97,7 @@ class Tool(Enum):
     ADD_FACILITY = "Add facility"
 
 
-# The tools that place a station or a platform, which Q turns.
+# The tools that place a station or a platform, which Q or the mouse wheel turns.
 STATION_TOOLS = frozenset((Tool.STATION, Tool.MOVE_STATION, Tool.ADD_PLATFORM))
 # The tools that note what they would cost in the cell under the mouse.
 PRICED_TOOLS = STATION_TOOLS | {Tool.BULLDOZE, Tool.ADD_FACILITY}
@@ -133,8 +133,9 @@ HINTS = {
         f"of its price, a station {dollars(STATION_REMOVAL)}. One-off buildings stay. Right click cancels."
     ),
     Tool.ADD_PLATFORM: (
-        f"Click a free cell up to {PLATFORM_REACH} cells from the station for its new platform; Q turns its track. Clearing "
-        "the cell costs what moving the buildings there aside does. Right click cancels."
+        f"Click a free cell up to {PLATFORM_REACH} cells from the station for its new platform; "
+        "Q or the mouse wheel turns its track. Clearing the cell costs what moving the buildings "
+        "there aside does. Right click cancels."
     ),
     Tool.ADD_FACILITY: (
         "Click a cell next to the station or a platform for the facility: an engine shed fills "

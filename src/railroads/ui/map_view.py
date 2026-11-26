@@ -29,6 +29,7 @@ from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.sim.year_caches import boards_changed
 from railroads.ui.build_menu import (
+    STATION_TOOLS,
     BuildMenu,
     Tool,
     draw_station_reach,
@@ -595,13 +596,6 @@ class MapView:
             draw_track(draw_list, self.constructions, self.camera, center)
             if self.railway.trains:
                 self._train_layer().draw(draw_list, self.railway, self.camera, center)
-        if self.build.preview is not None:
-            if self.camera.pixel_scale:
-                self._track_preview().draw(draw_list, self.build.preview, self.camera, center)
-            else:
-                draw_track(
-                    draw_list, self.constructions, self.camera, center, self.build.preview.pieces
-                )
         marks = self._marks_camera()
         tints = (
             self._mood_tints()
@@ -671,6 +665,15 @@ class MapView:
                 self.railway.reach,
                 self.constructions.platforms,
             )
+        if self.build.preview is not None:
+            if self.camera.pixel_scale:
+                self._track_preview().draw(draw_list, self.build.preview, self.camera, center)
+            else:
+                draw_track(
+                    draw_list, self.constructions, self.camera, center, self.build.preview.pieces
+                )
+            if self.hovered is not None and self.build.tool in STATION_TOOLS:
+                draw_outline(draw_list, marks, self.tile_map.grid, center, self.hovered)
         if self.selected is not None:
             consumers = self._consumers_of(self.selected)
             if consumers:

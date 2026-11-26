@@ -1153,8 +1153,9 @@ $10,000,000: a new one hands goods out a cell around it, and each level a cell f
 them a cell further and adds as much room as two storage upgrades. A station reaches no further
 than at level 3: at level 4 it gets a second platform instead and at level 5 a third, raising it
 there asks where the new one goes, in a free cell up to 2 cells from the station, with its own way
-through that Q turns, for what clearing the cell costs, and the station window offers it again
-until it is built. Track is laid to a platform as to any station. The station serves trains at all
+through that Q or the mouse wheel turns, for what clearing the cell costs, and the station window
+offers it again until it is built. Track is laid to a platform as to any station, and as long as
+no track joins either of its ends it turns to take track laid into its side. The station serves trains at all
 its platforms as one, with one stockpile, handing goods out and gathering them as far round each
 platform as round itself; trains cross between platforms beside each other inside the station,
 and over the last few blocks of their way take whichever platform they reach quickest, passing
@@ -1231,8 +1232,9 @@ full load doesn't wait for them. The Towns lens above the minimap tints every to
 colour.
 
 The build bar along the bottom of the map chooses what a left click builds (keys 1 and 2): a station (what stands in the cell moves aside; built on a line, it takes the line's way and
-the place of its track; elsewhere it turns towards track ending next to it, or runs across; Q
-turns it while it is being placed, and its track shows greyed out through the cell), track, or
+the place of its track; elsewhere it turns towards track ending next to it, or runs across; Q or
+the mouse wheel turns it while it is being placed, and its track shows greyed out through the
+cell, over the reach of an open station too), track, or
 the bulldozer (key 3). Clearing costs
 money (`railroads.sim.demolition`). Every building that has to leave a cell for a station,
 platform, facility or track, smallest first, is moved aside (`railroads.sim.room`): it spills to

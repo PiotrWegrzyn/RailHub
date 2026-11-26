@@ -137,14 +137,13 @@ def test_a_train_bound_for_a_station_takes_its_other_platform_when_the_way_to_on
     growth, railway = junction()
     platform = (10, 12)
     assert add_platform(growth, HUB, platform) is not None
+    line = plan_route(growth.constructions, WEST, HUB)
     branch = plan_route(growth.constructions, WEST, platform)
-    assert branch is not None
+    assert line is not None and branch is not None
     lay_route(growth, branch)
-    by_branch = set(branch.cells)
+    own = set(branch.cells) - set(line.cells)
     monkeypatch.setattr(
-        Signals,
-        "held_by_others",
-        lambda _, __, cells: sum(1 for cell in cells if cell not in by_branch),
+        Signals, "held_by_others", lambda _, __, cells: 0 if own & set(cells) else 1
     )
     train = railway.buy()
     assert train is not None

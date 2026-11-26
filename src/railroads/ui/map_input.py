@@ -82,7 +82,10 @@ class MapInput:
             steps = int(self._wheel)
             if steps:
                 self._wheel -= steps
-                camera.zoom(steps, (io.mouse_pos.x, io.mouse_pos.y), center)
+                if view.build.tool in STATION_TOOLS and view.hovered is not None:
+                    view.tools.turn_station(view.hovered, steps)
+                else:
+                    camera.zoom(steps, (io.mouse_pos.x, io.mouse_pos.y), center)
         lots = view.game.lots
         margin = (0.0, 0.0) if lots is None else (2 * lots.radius, 2 * lots.radius)
         camera.keep_within(*grid.size(), margin)
