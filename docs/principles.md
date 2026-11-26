@@ -185,6 +185,9 @@ The ideas every change to the game should follow.
 - What a train's cars and goods weigh slows it and makes it burn more, but never shortens its
   range, which would confuse the player.
 - How fast a train picks up speed depends on its engine, not on its cars.
+- An engine's pull is a fixed number of tonnes of its own and never grows with the cars: a
+  freight engine pulls just a full train of coal in the cars of the era it comes in, so with the
+  bigger cars of a later era it no longer manages a full train.
 
 ## How the map grows
 

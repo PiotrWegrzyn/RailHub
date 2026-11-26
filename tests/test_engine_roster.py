@@ -327,7 +327,7 @@ def test_a_general_engine_at_its_most_runs_at_half_speed_and_a_heavy_one_at_seve
 
     pulls = railway.pull(planet), railway.pull(heavy)
 
-    assert pulls == (pytest.approx(0.5), pytest.approx(0.7))
+    assert pulls == (pytest.approx(0.5, abs=0.01), pytest.approx(0.7, abs=0.01))
 
 
 def test_a_train_slows_by_what_its_cars_weigh_against_the_most_its_engine_pulls() -> None:
@@ -521,17 +521,17 @@ def test_a_general_car_weighs_as_much_as_the_heaviest_of_its_goods_would() -> No
     assert weight == pytest.approx(heaviest)
 
 
-def test_an_engine_pulls_as_much_with_today_s_cars_as_it_will_with_the_newest_it_takes(
+def test_an_engine_pulls_the_same_whatever_era_its_cars_come_from(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     railway = line()
     monkeypatch.setattr(railway, "wagon_era", lambda: 2)
+    early = railway.max_pull("light_tank")
+    monkeypatch.setattr(railway, "wagon_era", lambda: 3)
 
-    pull = railway.max_pull("light_tank")
+    late = railway.max_pull("light_tank")
 
-    assert ENGINES["light_tank"].top_generation == 3
-    assert pull == pytest.approx(ENGINES["light_tank"].tonnes)
-    assert pull > ENGINES["tank"].tonnes
+    assert late == early == ENGINES["light_tank"].pull
 
 
 def test_cars_load_no_more_than_their_engine_pulls() -> None:
