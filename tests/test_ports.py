@@ -229,10 +229,19 @@ def test_the_owner_of_a_mega_port_picks_a_good_of_any_tier_for_it_to_give() -> N
     growth.ports.at[COAST] = Port([Slot(Good.COAL, Tier.COMMON, True)])
     owned(growth, COAST)
 
-    growth.ports.pick(COAST, Good.CARS, Tier.LEGENDARY)
+    growth.ports.pick(COAST, Good.GOLD, Tier.LEGENDARY)
 
     assert growth.ports.can_pick(COAST)
-    assert growth.ports.at[COAST].pick == Slot(Good.CARS, Tier.LEGENDARY, gives=True, picked=True)
+    assert growth.ports.at[COAST].pick == Slot(Good.GOLD, Tier.LEGENDARY, gives=True, picked=True)
+
+
+def test_a_mega_port_cannot_pick_a_good_not_yet_in_the_game() -> None:
+    growth = port_town((COAST, K.MEGA_PORT), year=1800)
+    growth.ports.at[COAST] = Port([Slot(Good.COAL, Tier.COMMON, True)])
+
+    growth.ports.pick(COAST, Good.PLANES, Tier.LEGENDARY)
+
+    assert growth.ports.at[COAST].pick is None
 
 
 def test_a_month_of_trade_settles_what_ports_ship() -> None:

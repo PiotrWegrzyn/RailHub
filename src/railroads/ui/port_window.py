@@ -116,18 +116,19 @@ class PortWindow:
             shares(cell, kind)
         section("Gives")
         for slot in port.gives:
-            _slot_row(slot, ports.amount(slot), "picked" if slot.picked else "drawn")
+            _good_row(slot.good, slot.tier, f"{ports.amount(slot):,.0f} a month", _source(slot))
         for good, landed in port.landed.items():
             if landed > 0:
-                _good_row(good, None, landed, "by ship")
+                _good_row(good, None, f"{landed:,.0f} landed", "by ship")
         if not port.gives and not port.landed:
             imgui.text_disabled("Nothing")
         section("Takes")
         for slot in port.takes:
-            _slot_row(slot, ports.amount(slot), "drawn")
+            _good_row(slot.good, slot.tier, f"{ports.amount(slot):,.0f} a month", _source(slot))
         for good in port.ships:
             room = STORE_MONTHS * ports.load(good)
-            _good_row(good, None, port.store.get(good, 0.0), f"to ship, of {room:,.0f}")
+            held = port.store.get(good, 0.0)
+            _good_row(good, None, f"{held:,.0f} of {room:,.0f}", "in store to ship")
         if not port.takes and not port.ships:
             imgui.text_disabled("Nothing")
         if cell not in ports.controlled():
@@ -195,11 +196,11 @@ class PortWindow:
             imgui.text_disabled(self._said)
 
 
-def _slot_row(slot: Slot, amount: float, source: str) -> None:
-    _good_row(slot.good, slot.tier, amount, source)
+def _source(slot: Slot) -> str:
+    return "picked" if slot.picked else "drawn"
 
 
-def _good_row(good: Good, tier: Tier | None, amount: float, source: str) -> None:
+def _good_row(good: Good, tier: Tier | None, amount: str, source: str) -> None:
     if tier is not None:
         tier_dot(tier)
     else:
@@ -209,6 +210,6 @@ def _good_row(good: Good, tier: Tier | None, amount: float, source: str) -> None
     imgui.same_line()
     imgui.text(good.value)
     imgui.same_line(AMOUNT_AT)
-    imgui.text(f"{amount:,.0f} a month" if source != "by ship" else f"{amount:,.0f} landed")
+    imgui.text(amount)
     imgui.same_line(SOURCE_AT)
     imgui.text_disabled(source)

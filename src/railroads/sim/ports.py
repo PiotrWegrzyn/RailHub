@@ -351,10 +351,13 @@ class Ports:
         port.slots.append(Slot(good, tier, gives))
 
     def pick(self, cell: Cell, good: Good | None, tier: Tier | None = None) -> None:
-        """The owner of a mega port picks a good of a tier for it to give, or none."""
+        """The owner of a mega port picks a good of a tier in the game this year for it to give,
+        or none."""
         port = self.at[cell]
         port.slots = [slot for slot in port.slots if not slot.picked]
-        if good is not None and tier is not None and good not in port.goods:
+        if good is None or tier is None or (good, tier) not in self.pick_choices():
+            return
+        if good not in port.goods:
             port.slots.append(Slot(good, tier, gives=True, picked=True))
 
     def pick_choices(self) -> list[tuple[Good, Tier]]:

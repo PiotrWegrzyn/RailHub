@@ -53,7 +53,7 @@ def draw_frames(window: PortWindow, growth: Growth, frames: int = 2) -> list[obj
 
 def test_the_port_window_draws_a_controlled_mega_port_with_its_pick_and_ships(gui: None) -> None:
     growth = two_ports()
-    growth.ports.pick(HOME, Good.CARS, Tier.LEGENDARY)
+    growth.ports.pick(HOME, Good.GOLD, Tier.LEGENDARY)
     growth.ports.ship(HOME, Good.WOOL, AWAY)
     window = PortWindow(cell=HOME)
 
