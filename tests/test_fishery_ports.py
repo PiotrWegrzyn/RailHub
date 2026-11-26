@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 from growing import build, make_map
 
@@ -98,3 +100,17 @@ def test_fisheries_on_an_empty_shore_join_into_a_port_within_a_year_without_grow
         growth.month(rng)
 
     assert growth.count(BuildingKind.PORT).sum() >= 1
+
+
+def test_fisheries_never_grow_by_a_minor_river_alone() -> None:
+    terrain = layer(12, 12, Terrain.LAND)
+    terrain[11, 4:8] = Terrain.RIVER
+    tile_map = flat_map(12, 12, terrain=terrain)
+    stream = tile_map.stream.copy()
+    stream[6, 4:8] = 1
+    tile_map = replace(tile_map, stream=stream)
+
+    weights = FISHERIES.land.weights(tile_map)
+
+    assert weights[6, 5] == 0
+    assert weights[10, 5] > 0

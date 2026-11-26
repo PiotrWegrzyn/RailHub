@@ -20,13 +20,15 @@ _LAND_TABLES: dict[int, tuple] = {}
 class Land:
     """How the land changes a ladder's chances: each weight multiplies them. Water weights go by
     the best water next to the cell, LAND standing for none; a minor river through the cell itself
-    counts as a river (Surroundings.on_stream). The sea is salty, so unless a ladder names it, it
+    counts as a river (Surroundings.on_stream) unless minor_rivers is off. The sea is salty, so unless a ladder names it, it
     does no more than dry land; anything else left out weighs 1."""
 
     vegetation: Mapping[Vegetation, float] = field(default_factory=dict)
     relief: Mapping[Relief, float] = field(default_factory=dict)
     temperature: Mapping[Temperature, float] = field(default_factory=dict)
     water: Mapping[Terrain, float] = field(default_factory=dict)
+    # Whether a minor river through the cell counts as a river.
+    minor_rivers: bool = True
     # Weight for a cell with mountains next to it.
     beside_mountains: float = 1.0
     # Only where at least one cell next to it is flat open land: not forest, not water.
@@ -93,7 +95,7 @@ class Land:
         vegetation_weights, relief_weights, temperature_weights, water = self._tables()
         wet = around.is_water
         best = np.where(wet, water[around.terrain_around], 0.0).max(axis=0)
-        own = around.on_stream
+        own = around.on_stream if self.minor_rivers else np.zeros_like(around.on_stream)
         best = np.where(own, np.maximum(best, water[Terrain.RIVER]), best)
         by_water = np.where(wet.any(axis=0) | own, best, water[Terrain.LAND])
         weight = (

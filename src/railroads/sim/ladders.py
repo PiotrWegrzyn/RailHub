@@ -380,7 +380,7 @@ LOGGING_CAMPS = Ladder(
         forest_edge=True,
         least_forest_nearby=4,
     ),
-    base=117,
+    base=234,
     most_per_cell=1,
     most_nearby=3,
 )
@@ -408,12 +408,14 @@ PORTS = Ladder(
 FISHERIES_PER_PORT = 3
 
 # Fisheries grow on the shore like farms on fields, mostly by the sea and far less by lakes and
-# rivers, and more where people live (railroads.sim.breeding.DRAWN_BY_KIND).
+# rivers, never by minor rivers alone, and more where people live
+# (railroads.sim.breeding.DRAWN_BY_KIND).
 FISHERIES = Ladder(
     kinds=(BuildingKind.FISHERY,),
     land=Land(
         relief={Relief.MOUNTAINS: 0.0},
         water={Terrain.LAND: 0.0, Terrain.SEA: 1.0, Terrain.LAKE: 0.15, Terrain.RIVER: 0.1},
+        minor_rivers=False,
     ),
     base=100,
     joins=Join(BuildingKind.PORT, FISHERIES_PER_PORT, PORT_KINDS),
@@ -911,7 +913,7 @@ SOY_SAUCE_BREWERIES = _works(
 # Works whose inputs seldom come together before the railway last starving_years long enough
 # that the land holds about as many in 1850 as it gains by 2040 when well served.
 WORKS = (
-    _works(BuildingKind.SAWMILL, {}, base=2),
+    _works(BuildingKind.SAWMILL, {}, base=4),
     # Textile mills open three times as often as they once did.
     _works(BuildingKind.TEXTILE_MILL, {}, 1780, base=1.8, starving_years=250),
     _works(BuildingKind.FURNITURE_MAKER, {}, base=1.1),
@@ -926,8 +928,7 @@ WORKS = (
     _works(BuildingKind.TANK_FACTORY, {IND: 6}, 0, 40_000, base=100),
     _works(BuildingKind.BRICKWORKS, {}, base=0.8, starving_years=250),
     _works(BuildingKind.GLASSWORKS, {}, base=0.36, starving_years=250),
-    # Breweries open five times as often as they once did, so most towns have one.
-    _works(BuildingKind.BREWERY, {POP: FOOD_TOWN}, base=31.5, starving_years=250),
+    _works(BuildingKind.BREWERY, {POP: FOOD_TOWN}, base=15.75, starving_years=250),
     _works(BuildingKind.DISTILLERY, {POP: FOOD_TOWN}, 1600, base=6.35, starving_years=250),
     SAKE_BREWERIES,
     SOY_SAUCE_BREWERIES,
