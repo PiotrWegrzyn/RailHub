@@ -525,11 +525,22 @@ ANNEX_SPACE = {Facility.ENGINE_SHED: CELL_SPACE, Facility.CATTLE_PENS: 1}
 
 @dataclass(frozen=True, slots=True)
 class Annex:
-    """A facility put up in a cell beside the station in `station`."""
+    """A facility put up in a cell beside the station in `station`. An engine shed has track of
+    its own, running into it between `ends` as a station's does (Constructions.station_ends):
+    track laid to it joins it there, and trains waiting for a load wait in it."""
 
     cell: Cell
     facility: Facility
     station: Cell
+    ends: tuple[int, int] | None = None
+
+    def __setstate__(self, state: tuple[object, ...]) -> None:
+        """Takes up a pickled facility, one put up before engine sheds had track running across
+        it too."""
+        for name, value in zip(
+            ("cell", "facility", "station", "ends"), (*state, None), strict=False
+        ):
+            object.__setattr__(self, name, value)
 
     @property
     def space(self) -> int:
@@ -624,6 +635,29 @@ class Constructions:
         found = (self.annex_at(cell) for kinds in self._annexes.values() for cell in kinds.values())
         return sorted((a for a in found if a is not None), key=lambda a: a.cell)
 
+    def shed_at(self, cell: Cell) -> Annex | None:
+        """The engine shed standing in the cell, if there is one."""
+        annex = self.annex_at(cell)
+        return annex if annex is not None and annex.facility == Facility.ENGINE_SHED else None
+
+    def shed_of(self, station: Cell) -> Cell | None:
+        """Where a station's engine shed stands, if it has one."""
+        return self._annexes.get(station, {}).get(Facility.ENGINE_SHED)
+
+    def every_shed_cell(self) -> list[Cell]:
+        """Every cell an engine shed stands in."""
+        return sorted(
+            cell
+            for kinds in self._annexes.values()
+            for facility, cell in kinds.items()
+            if facility == Facility.ENGINE_SHED
+        )
+
+    def is_stop(self, cell: Cell) -> bool:
+        """Whether trains stop in the cell, where track joins only by its two ends: a station, a
+        platform or an engine shed."""
+        return self.station_at(cell) is not None or self.shed_at(cell) is not None
+
     def every_station_cell(self) -> list[Cell]:
         """Every cell a station or a platform of one fills."""
         return sorted({*self._stations, *(c for cells in self._platforms.values() for c in cells)})
@@ -633,12 +667,13 @@ class Constructions:
         return next((b for b in self._cells.get(cell, ()) if isinstance(b, Station)), None)
 
     def station_ends(self, cell: Cell) -> tuple[int, int]:
-        """The two track points the station in the cell joins track by, in order."""
-        station = self.station_at(cell)
-        if station is None:
+        """The two track points the station, platform or engine shed in the cell joins track by,
+        in order."""
+        stop: Station | Annex | None = self.station_at(cell) or self.shed_at(cell)
+        if stop is None:
             raise ValueError(f"There is no station at {cell}")
-        if station.ends is not None:
-            return station.ends
+        if stop.ends is not None:
+            return stop.ends
         return 0, len(self.tile_map.grid.track_points()) // 2
 
     def way_problem(self, ends: tuple[int, int]) -> str | None:
@@ -767,7 +802,8 @@ class Constructions:
                     kinds.pop(construction.facility, None)
                     if not kinds:
                         self._annexes.pop(construction.station, None)
-                return
+                if construction.facility != Facility.ENGINE_SHED:
+                    return
             case Track():
                 left = self._track.get(construction.cell, 0) + change
                 if left > 0:

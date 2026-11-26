@@ -344,16 +344,23 @@ class Game:
         )
         return self._leaving(site, site, routes.facility_site(self.constructions, cell, facility))
 
-    def add_facility(self, station: Cell, facility: Facility, cell: Cell) -> Outcome:
+    def add_facility(
+        self,
+        station: Cell,
+        facility: Facility,
+        cell: Cell,
+        ends: tuple[int, int] | None = None,
+    ) -> Outcome:
         """Puts up a facility beside a station for what clearing its cell costs; from then on it
-        costs a month of what it uses (railroads.sim.facilities)."""
+        costs a month of what it uses (railroads.sim.facilities). An engine shed's track runs
+        between `ends`."""
         name = facility.value.capitalize()
         quote = self.facility_quote(station, facility, cell)
         if quote.price is None:
             return Outcome(f"{name} can't go there: {quote.problem}.")
         if short := self.finances.short_of(quote.price, "Clearing it"):
             return Outcome(short)
-        changed = routes.add_facility(self.growth, station, facility, cell)
+        changed = routes.add_facility(self.growth, station, facility, cell, ends)
         if quote.price:
             self.finances.spend(quote.price, "demolition")
         price = f" for {dollars(quote.price)}" if quote.price else ""

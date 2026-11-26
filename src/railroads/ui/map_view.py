@@ -29,7 +29,6 @@ from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.sim.year_caches import boards_changed
 from railroads.ui.build_menu import (
-    STATION_TOOLS,
     BuildMenu,
     Tool,
     draw_station_reach,
@@ -672,7 +671,7 @@ class MapView:
                 draw_track(
                     draw_list, self.constructions, self.camera, center, self.build.preview.pieces
                 )
-            if self.hovered is not None and self.build.tool in STATION_TOOLS:
+            if self.hovered is not None and self.build.placing_track:
                 draw_outline(draw_list, marks, self.tile_map.grid, center, self.hovered)
         if self.selected is not None:
             consumers = self._consumers_of(self.selected)

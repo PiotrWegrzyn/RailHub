@@ -1,9 +1,11 @@
 """What the player can put up at a station besides raising it. An engine shed, a roundhouse round
-a turntable with its track running into the station, fills a cell beside the station or one of
-its platforms, and cattle pens take a little room in one (railroads.sim.constructions.ANNEX_SPACE);
+a turntable with track of its own that track is laid to as to a station, fills a cell beside the
+station or one of its platforms, and cattle pens take a little room in one (railroads.sim.constructions.ANNEX_SPACE);
 the others stand in the station itself and take no room on the map:
 
-- an engine shed lets trains setting off from the station run ENGINE_SHED_SPEED times as fast;
+- an engine shed lets trains setting off from the station run ENGINE_SHED_SPEED times as fast,
+  and trains waiting there for a full load the station holds too little to fill wait in it, on
+  its own track (railroads.sim.railway);
 - a sand tower lets them pick up speed in SAND_TOWER_PICKUP of the time;
 - a post office, a refreshment room, a market hall and cattle pens make what is delivered at the
   station pay more (PAYS_MORE): mail, passengers, food and livestock;

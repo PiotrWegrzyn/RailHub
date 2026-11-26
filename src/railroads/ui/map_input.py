@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Literal
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import Station
-from railroads.ui.build_menu import STATION_TOOLS, Tool
+from railroads.ui.build_menu import Tool
 from railroads.ui.iso_camera import Vec2
 from railroads.ui.minimap import MinimapLayout
 
@@ -82,7 +82,7 @@ class MapInput:
             steps = int(self._wheel)
             if steps:
                 self._wheel -= steps
-                if view.build.tool in STATION_TOOLS and view.hovered is not None:
+                if view.build.placing_track and view.hovered is not None:
                     view.tools.turn_station(view.hovered, steps)
                 else:
                     camera.zoom(steps, (io.mouse_pos.x, io.mouse_pos.y), center)
@@ -138,7 +138,7 @@ class MapInput:
         for key, tool in TOOL_KEYS:
             if key_pressed(key):
                 view.build.choose(Tool.NONE if view.build.tool == tool else tool)
-        if key_pressed(imgui.Key.q) and view.build.tool in STATION_TOOLS:
+        if key_pressed(imgui.Key.q) and view.build.placing_track:
             view.tools.turn_station(view.hovered)
         if key_pressed(imgui.Key.t):
             view.build.toggle_trains()

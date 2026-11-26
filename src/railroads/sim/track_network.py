@@ -2,7 +2,9 @@
 train takes from one station to another with the speed on each stretch, and where a train is on
 its way. Trains pass through stations, which join track only by their two ends, and may turn round
 in them; in a station with more platforms they may cross to a platform beside the one they are on,
-and they reach a station at whichever of its platforms their way comes to first."""
+and they reach a station at whichever of its platforms their way comes to first. An engine shed
+joins track by its ends as a station does, but only as the end of a way: trains go into it to
+wait and come out of it again, never through it."""
 
 import bisect
 import heapq
@@ -146,7 +148,10 @@ class TrackNetwork:
 
     def _find_way(self, start: Cell, end: Cell, electric: bool, maglev: bool) -> Way | None:
         constructions = self.constructions
-        arrivals = set(constructions.station_cells(constructions.main_station(end) or end))
+        if constructions.shed_at(end) is not None:
+            arrivals = {end}
+        else:
+            arrivals = set(constructions.station_cells(constructions.main_station(end) or end))
         return self._search(start, None, arrivals, electric, maglev)
 
     def way_on(
@@ -194,6 +199,8 @@ class TrackNetwork:
             if (cell, entry) in seen:
                 continue
             seen.add((cell, entry))
+            if last >= 0 and self.constructions.shed_at(cell) is not None:
+                continue
             for beside in self._platforms_beside(cell):
                 taken.append((last, cell, CROSSING))
                 heapq.heappush(frontier, (cost + 1.0, next(counter), beside, None, len(taken) - 1))
@@ -228,7 +235,7 @@ class TrackNetwork:
         piece of track, electrified if `electric` and maglev just when `maglev`, that starts
         where it came in."""
         built = self.constructions.at(cell)
-        if any(isinstance(b, Station) for b in built):
+        if any(isinstance(b, Station) for b in built) or self.constructions.shed_at(cell):
             return list(self.constructions.station_ends(cell))
         return [
             piece.other_end(entry)
@@ -259,6 +266,7 @@ class TrackNetwork:
         cells = sorted(
             {
                 *self.constructions.every_station_cell(),
+                *self.constructions.every_shed_cell(),
                 *(p.cell for p in self.constructions.track()),
             }
             - {cell for cell, point in self._exits_to if point == 0}
@@ -292,7 +300,7 @@ class TrackNetwork:
     def _joins(self, cell: Cell, entry: int) -> bool:
         """Whether a train coming in by `entry` can go on from this cell: by one of a station's
         ends, or onto track that starts there."""
-        if self.constructions.station_at(cell) is not None:
+        if self.constructions.is_stop(cell):
             return entry in self.constructions.station_ends(cell)
         return any(isinstance(b, Track) and entry in b.ends for b in self.constructions.at(cell))
 
@@ -360,7 +368,7 @@ class TrackNetwork:
             cell = self.cell_at(point)
             built = self.constructions.at(cell)
             kept = found[point] = (
-                self.constructions.station_at(cell) is not None,
+                self.constructions.is_stop(cell),
                 any(isinstance(b, Track) and b.width >= TrackWidth.DOUBLE for b in built),
             )
         return kept

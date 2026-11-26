@@ -104,6 +104,19 @@ class StationCalls:
             for car in train.cars
         )
 
+    def short(self, train: Train, stop: Stop) -> bool:
+        """Whether the stop's station holds too little to fill the room the train's cars have
+        left that it can take on there (spare)."""
+        most = self._railway.max_pull(train.engine)
+        needed: dict[Good, float] = {}
+        for car in train.cars:
+            if car.dining or not self.boards(train, stop, car.good):
+                continue
+            room = self._room(train, car, most)
+            if room > EPSILON:
+                needed[car.good] = needed.get(car.good, 0.0) + room
+        return any(self.spare(stop, good) < room - EPSILON for good, room in needed.items())
+
     def _next_cars(
         self, cars: list[Car], wanted: list[tuple[Cargo, int]], engine: str
     ) -> list[Car]:

@@ -1160,7 +1160,13 @@ its platforms as one, with one stockpile, handing goods out and gathering them a
 platform as round itself; trains cross between platforms beside each other inside the station,
 and as they set off for it, and again over the last few blocks of their way, take whichever
 platform they reach quickest, counting the way on to the stop after and every cell of track other
-trains hold on either way as four cells more, and set off again from there. Platforms go with
+trains hold on either way as four cells more, and set off again from there. An engine shed, put
+up beside a station from level 3, takes the place of any track in its cell with its own, which Q
+or the mouse wheel turns as it is placed and which track is laid to as to a station: a train
+waiting at the station for a full load that the station holds too little to fill goes into the
+shed and waits there, leaving the platforms to other trains, and comes back to load once the
+station holds enough; without a shed it waits at its platform. Trains go into a shed and out of
+it again, never through it. Platforms go with
 their station when it is bulldozed or moved. A station hands goods out and gathers them around
 every platform as well as its own cell. Level 4 is drawn as a junction station between two clock
 towers under a long glass shed, level 5 as a central station with a tall clock tower and three

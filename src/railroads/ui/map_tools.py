@@ -12,7 +12,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.railway import PLATFORM_REACH
 from railroads.sim.routes import Route, plan_route_steps, station_way
 from railroads.sim.steps import Steps, finish
-from railroads.ui.build_menu import PRICED_TOOLS, STATION_TOOLS, Tool, moving_note, taking_down_note
+from railroads.ui.build_menu import PRICED_TOOLS, Tool, moving_note, taking_down_note
 from railroads.words import dollars
 
 if TYPE_CHECKING:
@@ -141,7 +141,8 @@ class MapTools:
         build = view.build
         if build.moving is None or build.facility is None:
             return
-        done = view.game.add_facility(build.moving, build.facility, cell)
+        ends = self.station_ends(cell) if build.placing_track else None
+        done = view.game.add_facility(build.moving, build.facility, cell, ends)
         if not self._said(done):
             return
         view.buildings_changed(done.changed)
@@ -275,7 +276,7 @@ class MapTools:
 
     def update_preview(self, cell: Cell | None) -> None:
         build, constructions = self._view.build, self._view.constructions
-        if build.tool in STATION_TOOLS and cell is not None:
+        if build.placing_track and cell is not None:
             build.preview = Route([cell], [Track(cell, self.station_ends(cell))], 0.0)
             build.preview_to, build.preview_price = cell, None
             return

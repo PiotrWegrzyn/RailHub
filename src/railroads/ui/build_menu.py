@@ -139,9 +139,10 @@ HINTS = {
     ),
     Tool.ADD_FACILITY: (
         "Click a cell next to the station or a platform for the facility: an engine shed fills "
-        "a cell with no track, its own track running into the station; cattle pens take a "
-        "little room. Clearing it costs what moving the buildings in the way aside does. "
-        "Right click cancels."
+        "its cell, taking the place of any track there with its own, which Q or the mouse wheel "
+        "turns and track is laid to as to a station; trains waiting for a load wait in it. "
+        "Cattle pens take a little room. Clearing it costs what moving the buildings in the way "
+        "aside does. Right click cancels."
     ),
     Tool.MOVE_STATION: (
         f"Click where the station goes: {dollars(STATION_PRICE)} and clearing the cell. Its trains, "
@@ -345,6 +346,14 @@ class BuildMenu:
     def choose(self, tool: Tool) -> None:
         self.tool = tool
         self.stop()
+
+    @property
+    def placing_track(self) -> bool:
+        """Whether the tool places something with its own way of track through its cell, which Q
+        or the mouse wheel turns: a station, a platform or an engine shed."""
+        return self.tool in STATION_TOOLS or (
+            self.tool == Tool.ADD_FACILITY and self.facility == Facility.ENGINE_SHED
+        )
 
     @property
     def busy(self) -> bool:

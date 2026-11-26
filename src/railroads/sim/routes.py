@@ -21,12 +21,11 @@ widened or electrified to match it. Elsewhere an open end runs straight on acros
 import heapq
 import itertools
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cache
 
 from railroads.sim.constructions import (
     ANNEX_SPACE,
-    CELL_SPACE,
     MAX_TURN_DEG,
     STATION_RELIEF,
     TURN_SLACK_DEG,
@@ -43,6 +42,7 @@ from railroads.sim.demolition import (
     clearing_price,
     leaving_price,
     remove_added,
+    station_site,
     station_site_price,
 )
 from railroads.sim.facilities import LEVEL as FACILITY_LEVEL
@@ -212,10 +212,17 @@ def lay_route(growth: Growth, route: Route) -> set[Cell]:
     constructions = growth.constructions
     changed: set[Cell] = set()
     for cell, ends in route.turns.items():
+        if constructions.station_ends(cell) == ends:
+            continue
         station = constructions.station_at(cell)
-        if station is not None and constructions.station_ends(cell) != ends:
+        shed = constructions.shed_at(cell)
+        if station is not None:
             constructions.remove(station)
             constructions.build(Station(cell, ends, station.main))
+            changed.add(cell)
+        elif shed is not None:
+            constructions.remove(shed)
+            constructions.build(replace(shed, ends=ends))
             changed.add(cell)
     changes = route.changes(constructions)
     laid_on = {piece.cell for piece, _ in changes}
@@ -317,9 +324,9 @@ def facility_problem(
 ) -> str | None:
     """Why a facility that stands on the map (PLACED) cannot go up in the cell beside a station
     raised to `level`, or None if it can: it needs its level, one of a kind, a cell of land next
-    to the station or one of its platforms with no station or other facility in it, room enough
-    for it there once the buildings that can be are moved aside, and for an engine shed, which
-    fills its cell, no track either."""
+    to the station or one of its platforms with no station or other facility in it, and room
+    enough for it there once the buildings that can be are moved aside; an engine shed, which
+    fills its cell, takes the place of any track there with its own, as a station does."""
     if facility not in PLACED:
         return "it goes in the station itself"
     if constructions.station_at(station) is None or constructions.main_station(station) != station:
@@ -342,17 +349,24 @@ def facility_problem(
         return "facilities can't stand on water"
     if tile.relief not in STATION_RELIEF:
         return f"facilities can't stand on {tile.relief.name.lower()}"
+    if facility == Facility.ENGINE_SHED:
+        return (
+            "a building here can't be moved" if station_site(constructions, cell) is None else None
+        )
     units = ANNEX_SPACE[facility]
     room = constructions.space_left(cell) + sum(b.space for b in constructions.buildings_at(cell))
     if room < units:
-        return "the track leaves no room for it" if units < CELL_SPACE else "track runs there"
+        return "the track leaves no room for it"
     if clearing_price(constructions, cell, units) is None:
         return "a building here can't be moved"
     return None
 
 
 def facility_site(constructions: Constructions, cell: Cell, facility: Facility) -> list[Building]:
-    """The buildings that must move aside for a facility in the cell."""
+    """The buildings that must move aside for a facility in the cell: for an engine shed every
+    one there, as for a station."""
+    if facility == Facility.ENGINE_SHED:
+        return station_site(constructions, cell) or []
     return clearing(constructions, cell, ANNEX_SPACE[facility]) or []
 
 
@@ -365,14 +379,30 @@ def facility_site_price(
 ) -> float:
     """What clearing room in a cell for a facility costs while the company's anger is `anger`:
     moving aside the buildings that must go."""
+    if facility == Facility.ENGINE_SHED:
+        return station_site_price(constructions, cell, anger, owners) or 0.0
     return clearing_price(constructions, cell, ANNEX_SPACE[facility], anger, owners) or 0.0
 
 
-def add_facility(growth: Growth, station: Cell, facility: Facility, cell: Cell) -> set[Cell]:
+def add_facility(
+    growth: Growth,
+    station: Cell,
+    facility: Facility,
+    cell: Cell,
+    ends: tuple[int, int] | None = None,
+) -> set[Cell]:
     """Puts up a facility beside a station in the cell, moving aside the buildings in its way,
-    which facility_problem must have allowed; returns the cells that changed."""
+    which facility_problem must have allowed; returns the cells that changed. An engine shed
+    takes the place of the track there with its own, running between `ends` (by default the way
+    of station_way)."""
+    constructions = growth.constructions
+    shed_ends = None
+    if facility == Facility.ENGINE_SHED:
+        shed_ends = station_way(constructions, cell) if ends is None else ends
+        for piece in constructions.track_at(cell):
+            constructions.remove(piece)
     changed = growth.room.move_aside(cell, ANNEX_SPACE[facility])
-    growth.constructions.build(Annex(cell, facility, station))
+    constructions.build(Annex(cell, facility, station, shed_ends))
     return changed | {cell}
 
 
@@ -857,10 +887,9 @@ def _leads_on(constructions: Constructions, cell: Cell, point: int) -> bool:
 
 
 def _can_turn(constructions: Constructions, cell: Cell) -> bool:
-    """Whether the station or platform in the cell may still turn: one without platforms of its
-    own that no track or station joins at either end."""
-    station = constructions.station_at(cell)
-    if station is None or constructions.platforms(cell):
+    """Whether the station, platform or engine shed in the cell may still turn: one without
+    platforms of its own that no track or station joins at either end."""
+    if not constructions.is_stop(cell) or constructions.platforms(cell):
         return False
     return not any(
         _leads_on(constructions, cell, point) for point in constructions.station_ends(cell)
@@ -944,4 +973,5 @@ def _merged(piece: Track, old: Track) -> Track:
 
 
 def _is_station(constructions: Constructions, cell: Cell) -> bool:
-    return any(isinstance(built, Station) for built in constructions.at(cell))
+    """Whether track joins the cell only by the ends of a station, platform or engine shed."""
+    return constructions.is_stop(cell)

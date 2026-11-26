@@ -102,10 +102,13 @@ from railroads.sim.trains import (
     ENGINES,
     EXPRESS_FARE,
     FIRST_ENGINE,
+    FROM_SHED,
     GENERATIONS,
+    IN_SHED,
     MAGLEV_FARE,
     OPENED_BY,
     SLOWDOWN,
+    TO_SHED,
     Cargo,
     Engine,
     Point,
@@ -937,15 +940,11 @@ class Railway:
             if not train.called:
                 self.calls.arrive(train, leaving)
             if not leaving.wait_for_load:
-                train.waiting = 0.0
-            if train.waiting > 0:
-                self.calls.load(train, leaving)
-                if self.calls.loaded(train, leaving):
-                    train.waiting = 0.0
-                else:
-                    train.waiting -= months
-                    train.status = f"Loading at {self.name_of(leaving.cell)}"
-                    return
+                train.waiting, train.shed = 0.0, ""
+            if train.waiting > 0 and not self._wait_for_load(train, leaving, months):
+                return
+        if not train.path:
+            leaving = train.stops[(train.heading - 1) % len(train.stops)]
             here = leaving.cell
             if train.platform in self.constructions.platforms(leaving.cell):
                 here = train.platform
@@ -1030,6 +1029,11 @@ class Railway:
             if ahead is not None:
                 train.status = f"Following {ahead.name}"
         train.along = allowed
+        if train.along >= self.network.length(train) and train.shed:
+            train.platform = self.network.cell_at(train.path[-1])
+            train.path, train.pace = [], 0.0
+            train.shed = IN_SHED if train.shed == TO_SHED else ""
+            return
         if train.along >= self.network.length(train):
             train.platform = self.network.cell_at(train.path[-1])
             stop = train.stops[train.heading % len(train.stops)]
@@ -1048,6 +1052,51 @@ class Railway:
             schedule = self.schedules.of(train)
             if train.heading == 1 and schedule is not None:
                 self.schedules.settle(schedule)
+
+    def _wait_for_load(self, train: Train, stop: Stop, months: float) -> bool:
+        """Has a train waiting for its cars to fill at a stop load what the station holds, and
+        returns whether it moves on: full, it sets off; short of a full load with an engine shed
+        at the station, it goes there and waits in it until the station holds enough to fill
+        it, then comes back to load (_to_shed); without one it waits at the platform."""
+        name = self.name_of(stop.cell)
+        if train.shed == IN_SHED:
+            if not self.calls.short(train, stop):
+                return self._to_shed(train, stop.cell, FROM_SHED)
+            train.waiting -= months
+            train.status = f"Waiting in the engine shed at {name}"
+            return False
+        self.calls.load(train, stop)
+        if self.calls.loaded(train, stop):
+            train.waiting, train.shed = 0.0, ""
+            return True
+        main = self.constructions.main_station(stop.cell) or stop.cell
+        shed = self.constructions.shed_of(main)
+        if (
+            shed is not None
+            and self.calls.short(train, stop)
+            and self._to_shed(train, shed, TO_SHED)
+        ):
+            return True
+        train.waiting -= months
+        train.status = f"Loading at {name}"
+        return False
+
+    def _to_shed(self, train: Train, target: Cell, shed: str) -> bool:
+        """Sets a train waiting for a load off from where it stands into its station's engine
+        shed (TO_SHED), or out of it back to the station to load (FROM_SHED); whether track
+        leads there."""
+        if train.platform is not None and self.constructions.is_stop(train.platform):
+            start = train.platform
+        else:
+            start = train.stops[(train.heading - 1) % len(train.stops)].cell
+        engine = ENGINES[train.engine]
+        way = self.route(start, target, engine.electric, engine.maglev)
+        if way is None:
+            return False
+        train.path, train.speeds = way
+        train.along, train.pace, train.shed = 0.0, 0.0, shed
+        train.status = "Running"
+        return True
 
     def _new_round(self, train: Train, months: float) -> bool:
         """Takes a train standing between rounds onto its schedule's changed stops, and keeps one
@@ -1085,7 +1134,7 @@ class Railway:
         another train holds."""
         blocked = bool(train.giving_way)
         length = self.network.length(train)
-        if length - train.cleared > PLATFORM_CHOICE and not blocked:
+        if train.shed or (length - train.cleared > PLATFORM_CHOICE and not blocked):
             return
         check = (round(train.cleared, 6), int(train.waited / PLATFORM_WAIT) if blocked else -1)
         if train.platform_check == check:
@@ -1115,8 +1164,14 @@ class Railway:
             train.laid_for = version
             train.stranded = False
             return
-        there = train.stops[train.heading % len(train.stops)].cell
-        cells = self.constructions.station_cells(self.constructions.main_station(there) or there)
+        if train.shed == TO_SHED:
+            cells = [self.network.cell_at(train.path[-1])]
+        else:
+            heading = train.heading - 1 if train.shed == FROM_SHED else train.heading
+            there = train.stops[heading % len(train.stops)].cell
+            cells = self.constructions.station_cells(
+                self.constructions.main_station(there) or there
+            )
         if self._take_quickest(train, signals, cells, lost=True):
             train.laid_for = version
 

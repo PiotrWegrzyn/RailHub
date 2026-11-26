@@ -5,7 +5,7 @@ from screens import gui_context
 
 from builders import flat_map
 from railroads.sim import routes
-from railroads.sim.constructions import Building, BuildingKind, Constructions
+from railroads.sim.constructions import Building, BuildingKind, Constructions, Facility
 from railroads.sim.game import Game
 from railroads.ui import map_tools
 from railroads.ui.build_menu import Tool
@@ -121,3 +121,16 @@ def test_a_station_turned_once_back_runs_the_last_way_before_its_own(context: No
     view.tools.turn_station((8, 10), -1)
 
     assert view.tools.station_ends((8, 10)) == ways[ways.index(first) - 1]
+
+
+def test_an_engine_shed_being_put_up_turns_like_a_station_and_cattle_pens_do_not(
+    context: None,
+) -> None:
+    view = MapView(Game(Constructions(flat_map(rows=16, cols=30))))
+
+    view.tools.start_adding_facility((8, 10), Facility.ENGINE_SHED)
+    shed = view.build.placing_track
+    view.tools.start_adding_facility((8, 10), Facility.CATTLE_PENS)
+    pens = view.build.placing_track
+
+    assert (shed, pens) == (True, False)

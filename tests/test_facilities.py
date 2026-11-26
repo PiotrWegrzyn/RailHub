@@ -111,14 +111,25 @@ def test_an_engine_shed_stands_next_to_its_station(cell: tuple[int, int], ok: bo
     assert done.ok is ok
 
 
-def test_an_engine_shed_cannot_stand_on_track_but_cattle_pens_can_beside_it() -> None:
+def test_an_engine_shed_put_up_on_the_line_takes_the_place_of_its_track() -> None:
     game = _raised_game()
     game.lay_track(STATION, (6, 8))
 
     shed = game.add_facility(STATION, Facility.ENGINE_SHED, ON_THE_LINE)
+
+    assert shed.ok
+    assert game.constructions.track_at(ON_THE_LINE) == ()
+    assert game.constructions.shed_at(ON_THE_LINE) is not None
+
+
+def test_cattle_pens_stand_beside_the_track_on_the_line() -> None:
+    game = _raised_game()
+    game.lay_track(STATION, (6, 8))
+
     pens = game.add_facility(STATION, Facility.CATTLE_PENS, ON_THE_LINE)
 
-    assert (shed.ok, pens.ok) == (False, True)
+    assert pens.ok
+    assert game.constructions.track_at(ON_THE_LINE) != ()
 
 
 def test_a_station_has_one_facility_of_each_kind() -> None:

@@ -899,6 +899,10 @@ class Stop:
         del self.generations[most:]
 
 
+# What a train waiting for a load does with its station's engine shed (Train.shed).
+TO_SHED, IN_SHED, FROM_SHED = "to shed", "in shed", "from shed"
+
+
 @dataclass
 class Train:
     # What the simulation knows it by, as bought; the player sees it by its title
@@ -963,6 +967,9 @@ class Train:
     # The platform of its station the train stands at, which it sets off from: the station's own
     # cell, or one of the platforms added to it; None for the station's own cell.
     platform: Cell | None = None
+    # Where it is with waiting for a load in its station's engine shed: on its way there
+    # (TO_SHED), standing in it (IN_SHED), back on its way to load (FROM_SHED), or "" for none.
+    shed: str = ""
     # The name the player gave it, if any.
     label: str = ""
     # The schedule it runs (railroads.sim.schedules), and the schedule and version of it its
