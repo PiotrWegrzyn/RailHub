@@ -255,3 +255,17 @@ def test_trains_over_and_under_a_flyover_run_through_it_at_once() -> None:
 
     assert all(train.arrivals for train in trains)
     assert held == set()
+
+
+def test_track_running_through_corners_goes_over_track_too() -> None:
+    game = game_on(flat_map(14, 20))
+    game.lay_track(WEST, EAST)
+    grid = game.tile_map.grid
+    steps = grid.track_steps()
+    across = tuple(point for point in grid.track_ends() if abs(steps[point][0]) < 1e-6)
+
+    problem = game.constructions.why_not(
+        Track(CROSSING, across, bed=TrackBed.BRIDGE, bridge=Bridge.STEEL)
+    )
+
+    assert problem is None

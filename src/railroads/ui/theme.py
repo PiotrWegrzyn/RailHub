@@ -263,11 +263,20 @@ def left_of_cards(screen_width: float, window_width: float) -> float:
     return max(8.0, screen_width - window_width - CARDS_WIDTH - 16)
 
 
+# How many characters wide a tooltip runs before its lines wrap.
+TIP_WIDTH = 36
+
+
 def tip(text: str, *, disabled: bool = False) -> None:
-    """Shows `text` while the last item is hovered, even while it is disabled if `disabled`."""
+    """Shows `text` while the last item is hovered, even while it is disabled if `disabled`,
+    its lines wrapped at TIP_WIDTH characters so a long one stays on the screen."""
     flags = imgui.HoveredFlags_.allow_when_disabled.value if disabled else 0
     if imgui.is_item_hovered(flags):
-        imgui.set_tooltip(text)
+        imgui.begin_tooltip()
+        imgui.push_text_wrap_pos(imgui.get_font_size() * TIP_WIDTH)
+        imgui.text_unformatted(text)
+        imgui.pop_text_wrap_pos()
+        imgui.end_tooltip()
 
 
 def colored(rgba: Rgba, text: str) -> None:

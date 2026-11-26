@@ -894,8 +894,8 @@ class Constructions:
         )
 
     def _bridge_problem(self, track: Track) -> str | None:
-        """Why a piece of track can't go on its bridge: one that can't carry it, or a flyover
-        through a corner, or with no track under it to cross, or joining it."""
+        """Why a piece of track can't go on its bridge: one that can't carry it, or a flyover with
+        no track under it to cross, or joining it."""
         kind = BRIDGES[track.bridge]
         if not carries(track.bridge, int(track.width), track.electric, track.maglev):
             if int(track.width) > kind.tracks:
@@ -905,9 +905,6 @@ class Constructions:
             return f"A {kind.name} bridge can't take a {needs}"
         if not self.is_flyover(track):
             return None
-        grid = self.tile_map.grid
-        if any(point not in grid.track_ends() for point in track.ends):
-            return "A flyover runs across edges, not through corners"
         under = self.track_at(track.cell)
         if not under or self.is_stop(track.cell):
             return "A flyover goes over track"
