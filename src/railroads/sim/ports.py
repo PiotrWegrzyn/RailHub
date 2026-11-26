@@ -357,6 +357,19 @@ class Ports:
         if good is not None and tier is not None and good not in port.goods:
             port.slots.append(Slot(good, tier, gives=True, picked=True))
 
+    def pick_choices(self) -> list[tuple[Good, Tier]]:
+        """Every good of every tier in the game this year, which a mega port's owner may pick."""
+        return [
+            (good, tier)
+            for tier, goods in TIER_GOODS.items()
+            for good in goods
+            if good_exists(good, self.year)
+        ]
+
+    def ship_choices(self) -> list[Good]:
+        """Every good of any tier in the game this year, which a port may ship."""
+        return list(dict.fromkeys(good for good, _ in self.pick_choices()))
+
     def can_pick(self, cell: Cell) -> bool:
         return self.kind_at(cell) == BuildingKind.MEGA_PORT and self._growth.owners.controls(
             cell, BuildingKind.MEGA_PORT

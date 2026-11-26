@@ -17,6 +17,7 @@ from railroads.sim.goods import (
 )
 from railroads.sim.ladders import PASSENGERS_PER_POINT, POINTS, ladder_of
 from railroads.sim.points import Points
+from railroads.sim.ports import tiers_of
 from railroads.sim.tiles import Tile, good_era, kind_era, opened_from
 from railroads.sim.trains import (
     ENGINES,
@@ -180,11 +181,25 @@ def good_help() -> tuple[GoodHelp, ...]:
                 price_of(good),
                 freight_of(good),
                 f"era {good_era(good)}" if good_era(good) > 1 else "",
-                tuple(kind.value for kind, made in MAKES.items() if good in made),
-                tuple(kind.value for kind, wanted in NEEDS.items() if needs & set(wanted)),
+                (
+                    *(kind.value for kind, made in MAKES.items() if good in made),
+                    *_drawn_by_ports(good),
+                ),
+                (
+                    *(kind.value for kind, wanted in NEEDS.items() if needs & set(wanted)),
+                    *_drawn_by_ports(good),
+                ),
             )
         )
     return tuple(rows)
+
+
+def _drawn_by_ports(good: Good) -> tuple[str, ...]:
+    """Ports that may draw a good, by the tiers it is in (railroads.sim.ports)."""
+    tiers = tiers_of(good)
+    if not tiers:
+        return ()
+    return (f"ports that draw it ({', '.join(tier.value for tier in tiers)})",)
 
 
 def opened_by(name: str) -> str:

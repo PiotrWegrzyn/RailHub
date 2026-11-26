@@ -19,14 +19,17 @@ from railroads.catalogue import (
 from railroads.land import NOVELTY_SHARE, TOP_UP_SHARE
 from railroads.sim.clock import END_YEAR, HISTORY_START
 from railroads.sim.company import BANKRUPT_MONTHS, BOOK_SHARE, TARGETS, Difficulty
+from railroads.sim.constructions import PORT_KINDS, BuildingKind
 from railroads.sim.goods import (
     FREIGHT_SHARE,
     Good,
 )
 from railroads.sim.lots import AROUND, FIRST_FOR_SALE, START_LOTS, land_price
+from railroads.sim.ports import DRAW_RADIUS, SHIP_WAGONS, SHIPS, TIER_GOODS, TIER_VALUES, monthly
 from railroads.sim.tilemap import START_SHARE
 from railroads.sim.trade import SCARCE_WORTH
 from railroads.ui.ornate import begin_ornate, end_ornate
+from railroads.ui.port_window import tier_dot
 from railroads.ui.search import goods_of
 from railroads.ui.theme import (
     BRASS,
@@ -116,6 +119,29 @@ MAP_HELP = (
         " milliseconds longer."
     ),
 )
+PORTS_HELP = (
+    (
+        "A port gives and takes goods of its own, drawn when it goes up. Every good it can draw"
+        " has a tier, shown by the colour of its dot, and every tier a worth a month: a port gives"
+        " or takes as many units of a good a month as its tier's worth buys at the good's price,"
+        " more as the good's supply grows."
+    ),
+    (
+        "An ordinary port draws a common or rare good it gives, one made within"
+        f" {DRAW_RADIUS} cells of it only a little or not at all, and one it takes that is made"
+        " there. Two ports in a neighbourhood merge into a big port with all their goods and one"
+        " more epic or legendary good it gives; two big ports into a mega port, with one more,"
+        " whose owner may pick a good of any tier for it to give as well."
+    ),
+    (
+        "A port you control ships goods to another port you control, any good of any tier:"
+        f" a port {SHIPS[BuildingKind.PORT]}, a big port {SHIPS[BuildingKind.BIG_PORT]}, a mega"
+        f" port {SHIPS[BuildingKind.MEGA_PORT]}. It buys the good from trains into its store, and"
+        f" every month a ship carries {SHIP_WAGONS} wagons of it to the other port, free, which"
+        " gives it to trains. Right click a port to see its goods, pick and ship."
+    ),
+)
+PORT_GOOD_WIDTH = 110.0
 ENGINES_NOTE = (
     "An engine is sold once its supply tile reaches its level on the supply and demand boards (Y),"
     " until a newer one of its line comes: steam engines with coal, heavy freight engines with"
@@ -159,6 +185,9 @@ class HelpWindow:
                     imgui.end_tab_item()
                 if imgui.begin_tab_item("Engines")[0]:
                     self._draw_engines()
+                    imgui.end_tab_item()
+                if imgui.begin_tab_item("Ports")[0]:
+                    self._draw_ports()
                     imgui.end_tab_item()
                 if imgui.begin_tab_item("Towns")[0]:
                     _draw_paragraphs(TOWNS_HELP)
@@ -243,6 +272,34 @@ class HelpWindow:
             imgui.text_wrapped(", ".join(row.wanted_by) or _NO_BUYER.get(row.good, "-"))
         imgui.end_table()
 
+    def _draw_ports(self) -> None:
+        _draw_paragraphs(PORTS_HELP)
+        if not imgui.begin_table("port tiers", 3, LIST_TABLE_FLAGS):
+            return
+        imgui.table_setup_column("Tier")
+        imgui.table_setup_column("Worth a month")
+        imgui.table_setup_column(
+            "Goods, units a month", imgui.TableColumnFlags_.width_stretch.value
+        )
+        imgui.table_headers_row()
+        for tier, goods in TIER_GOODS.items():
+            shown = [good for good in goods if self._shown(good.value, tier.value)]
+            if not shown:
+                continue
+            imgui.table_next_row()
+            imgui.table_next_column()
+            tier_dot(tier)
+            imgui.same_line()
+            imgui.text(tier.value.title())
+            imgui.table_next_column()
+            imgui.text(dollars(TIER_VALUES[tier]))
+            imgui.table_next_column()
+            for index, good in enumerate(shown):
+                if index and imgui.get_content_region_avail().x > PORT_GOOD_WIDTH:
+                    imgui.same_line(0, 10)
+                good_amount(good, f"{monthly(good, tier):,.4g}")
+        imgui.end_table()
+
     def _draw_engines(self) -> None:
         imgui.text_wrapped(ENGINES_NOTE)
         if not imgui.begin_table("all engines", 9, LIST_TABLE_FLAGS):
@@ -319,6 +376,9 @@ _NO_BUYER = {Good.PASSENGERS: "every building", Good.MAIL: "every building"}
 
 
 def _draw_makes(row: BuildingHelp) -> None:
+    if row.kind in PORT_KINDS:
+        imgui.text_disabled("goods drawn by tier, see Ports")
+        return
     if not row.makes:
         imgui.text_disabled("-")
     for index, (good, amount) in enumerate(row.makes):

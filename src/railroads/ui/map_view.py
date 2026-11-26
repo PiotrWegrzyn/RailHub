@@ -92,6 +92,7 @@ from railroads.ui.pixel.stand_shader import StandShader
 from railroads.ui.pixel.track_preview import TrackPreview
 from railroads.ui.pixel.train_layer import TrainLayer, engine_picture
 from railroads.ui.pixel.world import PixelWorld
+from railroads.ui.port_window import PortWindow
 from railroads.ui.route_map import soften, soften_steps
 from railroads.ui.search import BuildingSearch
 from railroads.ui.spotlight import pulsing_brass, spot
@@ -246,6 +247,7 @@ class MapView:
         self._resting: tuple[Cell, float] | None = None
         self.summaries = SummariesPanel()
         self.station_window = StationWindow()
+        self.port_window = PortWindow()
         self.search = BuildingSearch()
         # The growth window and the kind the growth lens shows (railroads.ui.growth_window).
         self.growth_window = GrowthWindow()
@@ -306,6 +308,7 @@ class MapView:
             self.tools.start_adding_platform,
             self.tools.start_adding_facility,
         )
+        self.port_window.draw(self.growth, self.look_at, self.open_shares)
         self.summaries.draw(*self._map_rect, self.look_at, self.railway.name_of)
         self.search.draw(self.growth, self.visit, self._view_center)
         self.growth_window.draw(self.growth, self.visit, self._growth_picked)
@@ -373,6 +376,7 @@ class MapView:
         self.build.trains.open = self.build.trains.buy.open = False
         self.build.stations.open = False
         self.station_window.station = None
+        self.port_window.cell = None
         self.selected = None
         self.shares_of = None
         self._bought = ""
@@ -384,6 +388,12 @@ class MapView:
         """Opens a station's details in place of any cell's."""
         self.station_window.station = station
         self.selected = None
+
+    def open_shares(self, cell: Cell, kind: BuildingKind) -> None:
+        """Opens a cell's details with the shares window of a kind of building there."""
+        self.selected = cell
+        self.shares_of = (cell, kind)
+        self._bought = ""
 
     def look_at(self, cell: Cell) -> None:
         """Centres the view on a cell."""

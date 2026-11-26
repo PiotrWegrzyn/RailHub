@@ -126,10 +126,17 @@ class MapInput:
         ):
             opened = view.station_window.station == hovered
             view.station_window.station = None if opened else hovered
+            view.port_window.cell = None
+            view.selected = None
+        elif hovered is not None and view.growth.ports.kind_at(hovered) is not None:
+            opened = view.port_window.cell == hovered
+            view.port_window.cell = None if opened else hovered
+            view.station_window.station = None
             view.selected = None
         elif hovered is not None:
             view.selected = None if view.selected == hovered else hovered
             view.station_window.station = None
+            view.port_window.cell = None
 
     def handle_keys(self) -> None:
         view = self._view
