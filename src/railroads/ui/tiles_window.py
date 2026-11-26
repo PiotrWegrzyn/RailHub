@@ -321,7 +321,7 @@ def _draw_sign(
         for px in (x - r * 0.85, x + r * 0.85 - thick):
             draw_list.add_rect_filled((px, y - r * 0.55), (px + thick, y + r * 0.8), ink)
         draw_list.path_arc_to((x, y + r * 0.8), r * 0.55, math.pi, 2 * math.pi, 12)
-        draw_list.path_stroke(ink, 0, thick)
+        draw_list.path_stroke(ink, thick)
         return
     wheel = max(1.0, r * 0.28)
     if perk == Perk.ENGINE:
