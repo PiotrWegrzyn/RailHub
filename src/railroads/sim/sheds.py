@@ -30,7 +30,7 @@ STALL_TO = 0.33
 # The stalls trains take, by their place in STALL_HEADINGS: the middle ones first.
 STALL_ORDER = (2, 3, 1, 4, 0, 5)
 # How far a waiting train's front stands out of its stall's door, in cells.
-NOSE = 0.06
+NOSE = 0.035
 
 
 def lead_end(constructions: Constructions, cell: Cell, towards: Point | None = None) -> int:

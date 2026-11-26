@@ -61,6 +61,9 @@ PAGES_TIME = 0.006
 # How many times smaller than on the line the engine of a train standing in an engine shed's stall
 # is drawn, so it fits its stall (railroads.sim.sheds).
 MINI = 0.45
+# How far round the way out of a stall's door the front of an engine standing in it shows, in
+# cells: the rest is inside, cut away.
+NOSE_ROUND = 0.025
 PUFFS = 5
 # The most trains whose parts' places on their track are kept while they stand.
 SHIFTS_KEPT = 4096
@@ -115,43 +118,45 @@ class TrainLayer:
             if train.shed == IN_SHED:
                 stalled = _in_stall(train)
                 if stalled is not None:
-                    seen.append((train, 0.0, (Look.ENGINE, train.engine), stalled, MINI))
+                    nose = self._nose(train.path[-2:], origin, scale)
+                    seen.append((train, 0.0, (Look.ENGINE, train.engine), stalled, MINI, nose))
                 continue
             for look, back in self._parts(train):
                 placed = railway.position(train, back)
                 if placed is not None and not _in_shed(railway, train, placed[0]):
-                    seen.append((train, back, look, placed, 1.0))
+                    seen.append((train, back, look, placed, 1.0, None))
         hidden = self.world.underground_all(
-            [placed[0][0] for *_, placed, _ in seen], [placed[0][1] for *_, placed, _ in seen]
+            [part[3][0][0] for part in seen], [part[3][0][1] for part in seen]
         )
         four_lanes = blocks_of(railway.constructions).lane_cells
         found = []
         # Each train's lanes, found once for all its parts.
         lanes_of: dict[int, dict[Cell | None, int]] = {}
         version = railway.constructions.railway_version
-        for (train, back, look, placed, size), under in zip(seen, hidden, strict=True):
+        for (train, back, look, placed, size, nose), under in zip(seen, hidden, strict=True):
             if not under:
                 lanes = lanes_of.get(id(train))
                 if lanes is None:
                     lanes = lanes_of[id(train)] = self.lanes.of(train, four_lanes)
-                found.append((placed, self._shift(train, back, lanes, version), look, size))
+                shift = self._shift(train, back, lanes, version)
+                found.append((placed, shift, look, size, nose))
         parts = []
         if found:
             xs = np.array([placed[0][0] for placed, *_ in found])
             ys = np.array([placed[0][1] for placed, *_ in found])
             ax, ay = projection.to_pixels(xs, ys)
             ay = ay - self.world.elevation.lift(xs, ys)
-            for k, (((_, _), (dx, dy)), shift, look, size) in enumerate(found):
+            for k, (((_, _), (dx, dy)), shift, look, size, nose) in enumerate(found):
                 sx = origin[0] + round((float(ax[k]) + shift[0]) * snap) * scale / snap
                 sy = origin[1] + round((float(ay[k]) + shift[1]) * snap) * scale / snap
-                parts.append((sy, sx, look, math.atan2(dy, dx), size))
+                parts.append((sy, sx, look, math.atan2(dy, dx), size, nose))
         parts.sort(key=lambda part: part[0])
-        wanted = {look for _, _, look, _, _ in parts}
+        wanted = {part[2] for part in parts}
         for look in wanted:
             self.sprites.draw(look)
         drawn: set[tuple[object, int]] = set()
         self._paging_until = time.perf_counter() + PAGES_TIME
-        for sy, sx, look, heading, size in parts:
+        for sy, sx, look, heading, size, nose in parts:
             page, fine = (None, factor) if factor == 1 else self._page_or_nearest(look, factor)
             if page is None:
                 px, py, w, h, anchor_x, anchor_y = self.sprites.place(look, heading)
@@ -167,6 +172,8 @@ class TrainLayer:
             per *= size
             left = sx - anchor_x * per
             top = sy - anchor_y * per
+            if nose is not None:
+                draw_list.push_clip_rect(*nose, True)
             draw_list.add_image(
                 imgui.ImTextureRef(texture.texture_id()),
                 (left, top),
@@ -174,9 +181,28 @@ class TrainLayer:
                 (px / width, py / height),
                 ((px + w) / width, (py + h) / height),
             )
+            if nose is not None:
+                draw_list.pop_clip_rect()
         self._let_go(drawn)
         self._smoke(draw_list, railway, in_sight, origin, scale)
         self.sprites.draw_ahead(self._paging_until)
+
+    def _nose(self, way: list[Point], origin: tuple[int, int], scale: float) -> tuple[Vec2, Vec2]:
+        """The part of the screen the front of a train standing in an engine shed's stall shows
+        in: round the way from the stall's door to its front, NOSE_ROUND cells either side, so
+        the rest of its engine, inside the stall, is cut away."""
+        projection = self.world.projection
+        xs = np.array([point[0] for point in way])
+        ys = np.array([point[1] for point in way])
+        ax, ay = projection.to_pixels(xs, ys)
+        ay = ay - self.world.elevation.lift(xs, ys)
+        sx = origin[0] + ax * scale
+        sy = origin[1] + ay * scale
+        pad = NOSE_ROUND * PIXEL_CELL_WIDTH * scale
+        return (
+            (float(sx.min()) - pad, float(sy.min()) - pad - 2 * pad),
+            (float(sx.max()) + pad, float(sy.max()) + pad),
+        )
 
     def _shift(
         self, train: Train, back: float, lanes: dict[Cell | None, int], version: int

@@ -192,7 +192,7 @@ def roundhouse() -> Model:
     stalls' arched doors, an engine on the turntable's bridge, the lead track running out along
     u, and beside the lead a water tower and a coal stage."""
     m = Model()
-    _disc(m, TURNTABLE, STALL_FROM + 0.12, ASH, 0.0004)
+    _disc(m, TURNTABLE, STALL_FROM + 0.01, ASH, 0.0004)
     _disc(m, TURNTABLE, TURNTABLE_RADIUS, PIT, 0.0008)
     _disc(m, TURNTABLE, TURNTABLE_RADIUS * 0.85, shade(PIT, 0.8), 0.001)
     for angle in STALL_HEADINGS:
