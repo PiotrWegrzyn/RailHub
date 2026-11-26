@@ -227,8 +227,9 @@ class TrainsWindow:
     ) -> None:
         if not imgui.begin_tab_bar("trains tabs"):
             return
+        picked = self._pick_tab
         for tab in (TRAINS, SCHEDULES):
-            flags = imgui.TabItemFlags_.set_selected.value if self._pick_tab == tab else 0
+            flags = imgui.TabItemFlags_.set_selected.value if picked == tab else 0
             if imgui.begin_tab_item(tab, None, flags)[0]:
                 self.tab = tab
                 if tab == TRAINS:
@@ -236,7 +237,8 @@ class TrainsWindow:
                 else:
                     self._draw_schedule_panes(railway, supplies, ground, picture)
                 imgui.end_tab_item()
-        self._pick_tab = None
+        if self._pick_tab == picked:
+            self._pick_tab = None
         imgui.end_tab_bar()
 
     def _draw_panes(
@@ -417,10 +419,9 @@ class TrainsWindow:
             for row in train_rows(railway, railway.titles())
             if row.train.schedule == schedule.name
         ]
-        height = (min(max(len(rows), 1), SCHEDULE_ROWS) + 1.8) * ROW_HEIGHT
-        imgui.begin_child("schedule trains", (0, height))
-        clicked, _ = self.schedule_table.draw(rows, None, picture, picking=False, schedules=False)
-        imgui.end_child()
+        clicked, _ = self.schedule_table.draw(
+            rows, None, picture, picking=False, schedules=False, rows_shown=SCHEDULE_ROWS
+        )
         if clicked is not None:
             self.chosen = clicked
             self.maximized = False
@@ -880,13 +881,12 @@ class TrainsWindow:
             removed, toggled, moved = self._draw_stop_head(railway, train, index, stop, opened)
             if moved:
                 return True
-            leg = dict(railway.long_legs(train)).get(index)
+            engine = self._fuel_engine(train)
+            leg = dict(railway.long_legs(train, engine)).get(index)
             if leg is not None and not removed:
+                warning = leg_warning(railway, train, index, leg, engine)
                 imgui.push_text_wrap_pos(0.0)
-                colored(
-                    GONE,
-                    f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {leg_warning(railway, train, index, leg)}",
-                )
+                colored(GONE, f"{fa.ICON_FA_EXCLAMATION_TRIANGLE}  {warning}")
                 imgui.pop_text_wrap_pos()
             if toggled:
                 opened = not opened
@@ -911,6 +911,15 @@ class TrainsWindow:
                     needs.sort(key=lambda need: -demand.record(need).left)
                 draw_needs(demand, needs)
         return removed
+
+    def _fuel_engine(self, train: Train) -> str:
+        """The engine whose fuel the stop cards warn of: of the schedule's trains the one with
+        the smallest tank, as it is the first to stand, or one burning none; with no trains the
+        engine standing in for the schedule (_view)."""
+        if not self._riders:
+            return train.engine
+        tanked = [rider.engine for rider in self._riders if ENGINES[rider.engine].tank]
+        return min(tanked, key=lambda name: ENGINES[name].tank, default=self._riders[0].engine)
 
     def _draw_stop_head(
         self, railway: Railway, train: Train, index: int, stop: Stop, opened: bool

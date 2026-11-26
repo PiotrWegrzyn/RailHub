@@ -602,13 +602,15 @@ class Railway:
             heading = train.onward(heading)
         return train.stops[heading].cell
 
-    def long_legs(self, train: Train) -> list[tuple[int, float]]:
-        """The stops from which the way to the next is longer than the train's engine carries
-        fuel for, with how long that way is in cells; the train stands at such a stop."""
-        tank = ENGINES[train.engine].tank
+    def long_legs(self, train: Train, engine: str | None = None) -> list[tuple[int, float]]:
+        """The stops from which the way to the next is longer than the train's engine, or the
+        engine given, carries fuel for, with how long that way is in cells; the train stands at
+        such a stop."""
+        engine = engine or train.engine
+        tank = ENGINES[engine].tank
         if not tank:
             return []
-        legs = enumerate(self.leg_lengths(train.stops, train.engine))
+        legs = enumerate(self.leg_lengths(train.stops, engine))
         return [(index, leg) for index, leg in legs if leg is not None and round(leg) > tank]
 
     def leg_lengths(self, stops: list[Stop], engine: str) -> list[float | None]:

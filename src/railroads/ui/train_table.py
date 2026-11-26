@@ -216,10 +216,12 @@ class TrainTable:
         picture: EnginePicture,
         picking: bool = True,
         schedules: bool = True,
+        rows_shown: int = 0,
     ) -> tuple[str | None, bool]:
         """The table of the rows of the schedule shown, sorted, with boxes picking trains if
-        `picking` and the schedule each runs if `schedules`; returns the train clicked, if any,
-        and whether it was clicked twice."""
+        `picking` and the schedule each runs if `schedules`; with `rows_shown` only so many rows
+        high, scrolling the rest under its frozen headers. Returns the train clicked, if any, and
+        whether it was clicked twice."""
         clicked, twice = None, False
         flags = (
             LIST_TABLE_FLAGS
@@ -228,7 +230,12 @@ class TrainTable:
             | imgui.TableFlags_.borders_outer_h.value
             | imgui.TableFlags_.hideable.value
         )
-        if not imgui.begin_table("trains", len(COLUMNS), flags):
+        outer = (0.0, 0.0)
+        if rows_shown:
+            padding = 2 * imgui.get_style().cell_padding.y
+            header = imgui.get_text_line_height() + padding
+            outer = (0.0, header + min(max(len(rows), 1), rows_shown) * (ROW_HEIGHT + padding))
+        if not imgui.begin_table("trains", len(COLUMNS), flags, outer):
             return None, False
         imgui.table_setup_scroll_freeze(0, 1)
         for number, column in enumerate(COLUMNS):

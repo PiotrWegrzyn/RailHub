@@ -18,7 +18,7 @@ from railroads.ui.train_texts import (
     ride_rows,
     train_warning,
 )
-from railroads.ui.trains_window import SCHEDULES, TrainsWindow, sort_offers
+from railroads.ui.trains_window import SCHEDULES, TRAINS, TrainsWindow, sort_offers
 from railroads.words import tonnes_text
 
 
@@ -151,6 +151,22 @@ def test_a_train_bought_with_a_new_schedule_shows_that_schedule_to_give_it_stops
     assert window.tab == SCHEDULES
 
 
+def test_clicking_a_train_in_a_schedules_table_opens_that_train(
+    gui: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, railway = joined_stations()
+    train = railway.buy()
+    assert train is not None
+    window = showing_schedule(train)
+    draw_frames(window, railway, 2)
+    monkeypatch.setattr(window.schedule_table, "draw", lambda *args, **kwargs: (train.name, False))
+
+    draw_frames(window, railway, 3)
+
+    assert window.chosen == train.name
+    assert window.tab == TRAINS
+
+
 def test_closing_the_trains_window_closes_the_buy_screen_too(gui: None) -> None:
     _, railway = joined_stations()
     window = TrainsWindow(open=False)
@@ -196,6 +212,34 @@ def test_a_train_whose_way_between_two_stops_is_longer_than_its_fuel_is_warned_o
 
     assert warning.startswith(f"From {railway.name_of((6, 3))} to {railway.name_of((6, 20))} is ")
     assert warning.endswith("Add a stop between them to refuel at.")
+
+
+def test_stop_cards_warn_of_the_fuel_of_the_schedules_weakest_train_not_the_engine_standing_in() -> (
+    None
+):
+    window = TrainsWindow()
+    window._riders = [Train("A", engine="mixed_diesel"), Train("B", engine="pacific")]
+
+    engine = window._fuel_engine(Train("Schedule", engine="big_boy"))
+
+    assert engine == "pacific"
+
+
+def test_stop_cards_of_a_schedule_run_by_electric_trains_warn_of_no_fuel() -> None:
+    window = TrainsWindow()
+    window._riders = [Train("A", engine="boxcab")]
+
+    engine = window._fuel_engine(Train("Schedule", engine="big_boy"))
+
+    assert not ENGINES[engine].tank
+
+
+def test_stop_cards_of_a_schedule_with_no_trains_warn_of_the_engine_standing_in() -> None:
+    window = TrainsWindow()
+
+    engine = window._fuel_engine(Train("Schedule", engine="big_boy"))
+
+    assert engine == "big_boy"
 
 
 def routed(railway: Railway, train: Train, stops: list[Stop]) -> list[Stop]:

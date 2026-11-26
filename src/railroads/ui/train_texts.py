@@ -68,10 +68,13 @@ def train_warning(railway: Railway, train: Train) -> str:
     return f"{leg_warning(railway, train, index, leg)}. Add a stop between them to refuel at."
 
 
-def leg_warning(railway: Railway, train: Train, index: int, leg: float) -> str:
-    """That the way from a train's stop to the next is longer than its engine carries fuel for."""
+def leg_warning(
+    railway: Railway, train: Train, index: int, leg: float, engine: str | None = None
+) -> str:
+    """That the way from a train's stop to the next is longer than its engine, or the engine
+    given, carries fuel for."""
     there = train.stops[(index + 1) % len(train.stops)].cell
-    tank = ENGINES[train.engine].tank
+    tank = ENGINES[engine or train.engine].tank
     return (
         f"From {railway.name_of(train.stops[index].cell)} to {railway.name_of(there)} is "
         f"{leg:.0f} cells, but it carries fuel for only {tank:.0f}"
