@@ -12,12 +12,14 @@ fetches all game (PRICE_FACTORS). Cash below nothing at the start of BANKRUPT_MO
 row ends the game.
 """
 
+import weakref
 from dataclasses import dataclass, field
 from enum import Enum
 
 import numpy as np
 
 from railroads.sim.clock import END_YEAR, MONTH_NAMES
+from railroads.sim.constructions import Constructions
 from railroads.sim.finance import (
     LEVEL_PRICES,
     START_CASH,
@@ -111,13 +113,27 @@ def shares_worth(owners: Owners) -> float:
     return worth
 
 
+# What the laid track of each Constructions cost, with the railway version it was summed for:
+# the worth shows every frame and its cash changes nearly every one.
+_TRACK_COST: weakref.WeakKeyDictionary[Constructions, tuple[int, float]] = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _track_cost(constructions: Constructions) -> float:
+    """What every piece of track laid cost, summed again only once the railway changed."""
+    kept = _TRACK_COST.get(constructions)
+    if kept is None or kept[0] != constructions.railway_version:
+        tile_map = constructions.tile_map
+        cost = sum(track_price(piece, tile_map.tile(piece.cell)) for piece in constructions.track())
+        kept = _TRACK_COST[constructions] = (constructions.railway_version, cost)
+    return kept[1]
+
+
 def company_value(railway: Railway) -> CompanyValue:
     """What the player's company is worth now."""
-    tile_map = railway.constructions.tile_map
     stations = sum(station_cost(railway, station) for station in railway.stations())
-    track = sum(
-        track_price(piece, tile_map.tile(piece.cell)) for piece in railway.constructions.track()
-    )
+    track = _track_cost(railway.constructions)
     trains = sum(ENGINES[train.engine].price for train in railway.trains)
     return CompanyValue(
         cash=railway.finances.cash,

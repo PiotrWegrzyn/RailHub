@@ -832,12 +832,11 @@ class Signals:
         in a station, across any junctions and single line between, as long as it never comes
         back onto that line."""
         blocks = self.blocks
+        tail, ahead = signal - train.length + SAME, signal - SAME
         behind = {
             blocks.block.get(crossing.cell)
             for crossing in crossings
-            if not crossing.touch
-            and crossing.end > signal - train.length + SAME
-            and crossing.start < signal - SAME
+            if not crossing.touch and crossing.end > tail and crossing.start < ahead
         }
         if len(behind) != 1:
             return None

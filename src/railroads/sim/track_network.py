@@ -45,23 +45,24 @@ class _Memo:
     joins: dict[tuple[Cell, int], bool] = field(default_factory=dict)
     beside: dict[Cell, list[Cell]] = field(default_factory=dict)
     sheds: dict[Cell, bool] = field(default_factory=dict)
-    searches: dict[tuple[Cell, bool, bool], _Search] = field(default_factory=dict)
+    searches: dict[tuple[Cell, int | None, bool, bool], _Search] = field(default_factory=dict)
     speeds: dict[Cell, float] = field(default_factory=dict)
     burns: dict[Cell, float] = field(default_factory=dict)
 
 
 class _Search:
-    """A search for ways from a station (TrackNetwork._search with no entry), kept going as far
+    """A search for ways from a station, or a cell come into by a point (TrackNetwork._search),
+    kept going as far
     as each way asked for from it needs and taken up again for the next: it takes its steps in
     the same order whatever it is looking for, so a way found here is the one a search of its
     own would find, and many ways asked for from one station take one search. Each cell is kept
     with where it was first reached from, and in what order."""
 
-    def __init__(self, start: Cell) -> None:
+    def __init__(self, start: Cell, entry: int | None = None) -> None:
         self.counter = itertools.count()
         self.taken: list[tuple[int, Cell, int]] = []
         self.frontier: list[tuple[float, int, Cell, int | None, int]] = [
-            (0.0, next(self.counter), start, None, -1)
+            (0.0, next(self.counter), start, entry, -1)
         ]
         self.seen: set[tuple[Cell, int | None]] = set()
         self.first: dict[Cell, tuple[int, int | None, int]] = {}
@@ -288,11 +289,23 @@ class TrackNetwork:
             arrivals = {end}
         else:
             arrivals = set(constructions.station_cells(constructions.main_station(end) or end))
+        return self._reach(start, None, arrivals, electric, maglev)
+
+    def _reach(
+        self,
+        start: Cell,
+        start_entry: int | None,
+        arrivals: set[Cell],
+        electric: bool,
+        maglev: bool,
+    ) -> tuple[list[tuple[Cell, int]], tuple[Cell, int]] | None:
+        """The steps of the way _search finds and where it arrives, if any, taking up the search
+        from the same start where an earlier way since track or stations changed left it."""
         searches = self._memo().searches
-        key = (start, electric, maglev)
+        key = (start, start_entry, electric, maglev)
         search = searches.get(key)
         if search is None:
-            search = searches[key] = _Search(start)
+            search = searches[key] = _Search(start, start_entry)
         found = search.reach(self, arrivals, electric, maglev)
         if found is None:
             return None
@@ -305,7 +318,8 @@ class TrackNetwork:
         """The way on for a train coming into a cell of track by this point, to one station cell
         or platform: its points from the middle of the cell on, and the speed on each stretch
         between them; None without track that leads there."""
-        return self._search(cell, entry, {arrival}, electric, maglev)
+        found = self._reach(cell, entry, {arrival}, electric, maglev)
+        return None if found is None else self._way(*found)
 
     def entry_point(self, cell: Cell, point: Point) -> int:
         """The track point of a cell a point on its edge, as on a train's path, lies at; kept,
