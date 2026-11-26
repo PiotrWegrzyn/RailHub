@@ -14,7 +14,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.grids import FloatArray, Grid, HexGrid, IntArray
+from railroads.sim.grids import Cell, FloatArray, Grid, HexGrid, IntArray
 from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
 from railroads.sim.trade import Satisfaction
 from railroads.ui.biomes import Biome, biome_grid
@@ -255,11 +255,17 @@ class Ground:
         self._mixed = unlike | unlike.ravel()[self._round].any(axis=0)
         built = np.zeros(self.tile_map.grid.shape, dtype=bool)
         woodland = np.zeros(self.tile_map.grid.shape, dtype=bool)
+        in_woods: list[Cell] = []
+        elsewhere: list[Cell] = []
         for construction in self.constructions:
             if isinstance(construction, Building) and construction.kind in IN_THE_WOODS:
-                woodland[construction.cell] = True
+                in_woods.append(construction.cell)
             else:
-                built[construction.cell] = True
+                elsewhere.append(construction.cell)
+        for mask, cells in ((woodland, in_woods), (built, elsewhere)):
+            if cells:
+                rows, cols = np.array(cells, dtype=np.int64).T
+                mask[rows, cols] = True
         # Each cell's say in whether woods cover a point near it: 1 for woods and logging camps,
         # 0 for open land, and CLEARING where anything else is built, so the woods give it room.
         woods = np.isin(self._biomes, WOODS) | woodland
@@ -508,13 +514,24 @@ class Ground:
         cell lies in the picture, its cell's row and column, that middle on the plane, which way
         the plot faces, how wide it spreads, and its kind as its place in FIELD_KINDS."""
         grid = self.tile_map.grid
-        rows = []
+        parts = []
         for code, kind in enumerate(FIELD_KINDS):
+            plots = self._plots[kind]
+            if not plots:
+                continue
             px, py = self._plot_pixels[kind]
-            for plot, x, y in zip(self._plots[kind], px.tolist(), py.tolist(), strict=True):
-                cx, cy = grid.center(*plot.cell)
-                rows.append((x, y, *plot.cell, cx, cy, *plot.facing, plot.spread, code))
-        return np.array(rows, dtype=np.float32).reshape(-1, 10)
+            cells = np.array([plot.cell for plot in plots], dtype=np.int64).reshape(-1, 2)
+            cx, cy = grid.center(cells[:, 0], cells[:, 1])
+            facing = np.array([plot.facing for plot in plots], dtype=np.float64).reshape(-1, 2)
+            spread = np.array([plot.spread for plot in plots], dtype=np.float64)
+            parts.append(
+                np.column_stack(
+                    [px, py, cells, cx, cy, facing, spread, np.full(len(plots), float(code))]
+                ).astype(np.float32)
+            )
+        if not parts:
+            return np.zeros((0, 10), dtype=np.float32)
+        return np.concatenate(parts)
 
     @property
     def yard_table(self) -> FloatArray:

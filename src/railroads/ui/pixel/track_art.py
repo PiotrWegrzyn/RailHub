@@ -24,6 +24,7 @@ from PIL import Image, ImageDraw
 
 from railroads.sim.constructions import Constructions, Track, TrackWidth
 from railroads.sim.grids import Cell, FloatArray, Grid
+from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
@@ -494,6 +495,10 @@ class _Laid:
     forks: tuple[bool, bool] = (False, False)
 
 
+# How many pieces of track TrackArt.beds_steps lays out in a step.
+BEDS_STEP = 300
+
+
 class TrackArt:
     """Draws the track of one map's constructions in the pixel map's projection."""
 
@@ -580,11 +585,17 @@ class TrackArt:
         """The middle line through the plane of all track laid on the ground, through stations
         too, as a row of x and a row of y each, for the ground to be graded under
         (Elevation.grade)."""
-        laid = [
-            self._laid(piece)
-            for piece in self.constructions.track()
-            if piece.bed == TrackBed.GROUND
-        ]
+        return finish(self.beds_steps())
+
+    def beds_steps(self) -> Steps[list[FloatArray]]:
+        """beds a part at a time: a step ends after each BEDS_STEP pieces, which takes long for
+        a big railway laid out for the first time, as a game loads."""
+        laid = []
+        for index, piece in enumerate(self.constructions.track(), start=1):
+            if piece.bed == TrackBed.GROUND:
+                laid.append(self._laid(piece))
+            if index % BEDS_STEP == 0:
+                yield
         for cell in self.constructions.every_station_cell():
             piece = self.station_piece(cell)
             laid.append(self._laid(piece, station_side(self.projection, self._steps, piece.ends)))

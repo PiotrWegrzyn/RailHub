@@ -130,9 +130,9 @@ class PixelWorld:
         # The track (railroads.ui.pixel.track_art), with the ground graded under it.
         self.track = TrackArt(tile_map, constructions, self.projection, self.elevation)
         self._graded_version = -1
-        self._grade()
+        yield from self._grade_steps()
         yield
-        self.scenery = Scenery.of(
+        self.scenery = yield from Scenery.of_steps(
             tile_map,
             constructions,
             self.projection,
@@ -217,15 +217,20 @@ class PixelWorld:
     def _grade(self) -> None:
         """Grades the ground under the track through hills and mountains (Elevation.grade), if
         track or stations changed since it last was."""
+        finish(self._grade_steps())
+
+    def _grade_steps(self) -> Steps[None]:
+        """_grade a part at a time, for a game loading."""
         version = self.constructions.railway_version
         if version == self._graded_version:
             return
+        lines = yield from self.track.beds_steps()
         beds = []
         # Whether each line runs over hills or mountains, kept by the line, which track art
         # keeps for every piece that did not change.
         raised: dict[int, tuple[FloatArray, bool]] = {}
         kept = self.__dict__.get("_raised_lines", {})
-        for line in self.track.beds():
+        for line in lines:
             found = kept.get(id(line))
             if found is None or found[0] is not line:
                 mountains, hills = self.elevation.shares(*line)

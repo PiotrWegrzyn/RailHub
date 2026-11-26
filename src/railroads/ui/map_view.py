@@ -169,7 +169,7 @@ class MapView:
         self.minimap = Minimap(
             tile_map, maps.world_land() if world is None else world, self._town_cells()
         )
-        self._spots = BuildingSpots.of(self.constructions)
+        self._spots_kept: BuildingSpots | None = None
         self._look = LOOKS[tile_map.grid.kind]
         width, height = tile_map.grid.size()
         self.camera = IsoCamera(
@@ -315,6 +315,14 @@ class MapView:
         self.growth_window.draw(self.growth, self.visit, self._growth_picked)
         self._draw_growth_legend()
         self.land.confirm(self.game.lots, self.game.finances)
+
+    @property
+    def _spots(self) -> BuildingSpots:
+        """Where every building stands (BuildingSpots), worked out the first time it is wanted,
+        which a game loading does on a step of its own (prepare_steps)."""
+        if self._spots_kept is None:
+            self._spots_kept = BuildingSpots.of(self.constructions)
+        return self._spots_kept
 
     def _view_center(self) -> Vec2:
         return self.camera.center_x, self.camera.center_y
@@ -501,7 +509,7 @@ class MapView:
         if not changed:
             return
         yield
-        self._spots = BuildingSpots.of(self.constructions)
+        self._spots_kept = BuildingSpots.of(self.constructions)
         self.minimap.show_towns(self._town_cells())
         if self.search.open:
             self.search.refresh(self.growth)
@@ -1032,6 +1040,9 @@ class MapView:
 
     def prepare_steps(self, size: Vec2, density: int, chunks: bool = True) -> Steps[None]:
         """prepare a part at a time, for a page to go on drawing frames between them."""
+        if self._spots_kept is None:
+            self._spots_kept = BuildingSpots.of(self.constructions)
+        yield
         plain = self._plain_picture()
         yield
         self._soft = (self._ground_version, (yield from soften_steps(plain)))
@@ -1079,7 +1090,7 @@ class MapView:
 
     def buildings_changed(self, changed: set[Cell]) -> None:
         """Shows buildings, track and stations that changed outside the monthly growth."""
-        self._spots = BuildingSpots.of(self.constructions)
+        self._spots_kept = BuildingSpots.of(self.constructions)
         self.minimap.show_towns(self._town_cells())
         if self.search.open:
             self.search.refresh(self.growth)

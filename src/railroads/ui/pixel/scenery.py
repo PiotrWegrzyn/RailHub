@@ -24,6 +24,7 @@ from railroads.sim.constructions import (
 )
 from railroads.sim.grids import BoolGrid, Cell, FloatArray, Grid, IntArray
 from railroads.sim.sheds import lead_end
+from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.biomes import Biome, biome_grid
@@ -288,6 +289,10 @@ def station_sprite(level: int, line: str | None = None) -> str:
     return name if line is None else f"{name}_{line}"
 
 
+# How many cells by track _off_track places the buildings of in a step.
+PLACED_STEP = 60
+
+
 @dataclass(frozen=True)
 class Scenery:
     """Everything standing on the ground, sorted back to front: cell by cell, by how far the
@@ -314,11 +319,29 @@ class Scenery:
         station_levels: Mapping[Cell, int] | None = None,
         elevation: Elevation | None = None,
     ) -> Self:
+        return finish(
+            cls.of_steps(tile_map, constructions, projection, sheet, station_levels, elevation)
+        )
+
+    @classmethod
+    def of_steps(
+        cls,
+        tile_map: TileMap,
+        constructions: Constructions,
+        projection: PixelProjection,
+        sheet: SpriteSheet,
+        station_levels: Mapping[Cell, int] | None = None,
+        elevation: Elevation | None = None,
+    ) -> Steps[Self]:
+        """`of` a part at a time: the buildings by track are placed a few cells at a time the
+        first time, as a game loads, which takes long for a big railway."""
         grid = tile_map.grid
         biomes = biome_grid(tile_map)
         built = np.zeros(grid.shape, dtype=bool)
-        for construction in constructions:
-            built[construction.cell] = True
+        standing = [construction.cell for construction in constructions]
+        if standing:
+            rows, cols = np.array(standing, dtype=np.int64).T
+            built[rows, cols] = True
         for cell in constructions.every_station_cell():
             if station_width(constructions, cell) == TrackWidth.QUADRUPLE:
                 for beside in grid.neighbours(*cell):
@@ -431,7 +454,9 @@ class Scenery:
         sprite = np.concatenate(sprites).astype(np.int64)
         rows, cols = grid.cell_at(spots.x, spots.y)
         cells = list(zip(np.asarray(rows).tolist(), np.asarray(cols).tolist(), strict=True))
-        under = _off_track(constructions, projection, sheet, (px, py), sprite, before, cells)
+        under = yield from _off_track(
+            constructions, projection, sheet, (px, py), sprite, before, cells
+        )
         lift = np.zeros(px.shape, dtype=np.int64)
         if elevation is not None and px.size:
             x, y = projection.to_plane(px, py)
@@ -495,11 +520,12 @@ def _off_track(
     sprite: IntArray,
     first: int,
     cells: list[Cell],
-) -> BoolGrid:
+) -> Steps[BoolGrid]:
     """Moves each building in or next to a cell with track to where it hides as little of the
     track as it can (_placed_off_track), changing where things stand in `at`; returns which still
     hide some, to be drawn under the track. The buildings are everything from `first` on, and
-    `cells` holds the cell of each. Stations fill their cells, so no building shares one."""
+    `cells` holds the cell of each. Stations fill their cells, so no building shares one. A step
+    ends after each PLACED_STEP cells whose buildings were placed again."""
     px, py = at
     under = np.zeros(len(px), dtype=bool)
     near = _track_near(constructions)
@@ -511,19 +537,32 @@ def _off_track(
         if cell in near:
             here.setdefault(cell, []).append(i)
     known = _KNOWN.setdefault(constructions, {})
-    for cell, found in here.items():
-        cx, cy = projection.to_pixels(*grid.center(*cell))
-        origin = (int(np.rint(cx)), int(np.rint(cy)))
+    if not here:
+        return under
+    # The pixel nearest each cell's middle, for all the cells at once.
+    rows, cols = (np.array(axis, dtype=np.int64) for axis in zip(*here, strict=True))
+    middle_x, middle_y = projection.to_pixels(*grid.center(rows, cols))
+    origins = zip(
+        np.rint(middle_x).astype(np.int64).tolist(),
+        np.rint(middle_y).astype(np.int64).tolist(),
+        strict=True,
+    )
+    looks = projection.matrix.tobytes()
+    placing = 0
+    for (cell, found), origin in zip(here.items(), origins, strict=True):
         wanted = tuple(
             (int(sprite[i]), int(px[i]) - origin[0], int(py[i]) - origin[1]) for i in found
         )
-        key = (id(sheet), projection.matrix.tobytes(), near[cell], wanted)
+        key = (id(sheet), looks, near[cell], wanted)
         entry = known.get(cell)
         if entry is None or entry[0] != key:
             placed = _placed_off_track(
                 constructions.tile_map, projection, sheet, cell, near[cell], wanted
             )
             entry = known[cell] = (key, placed)
+            placing += 1
+            if placing % PLACED_STEP == 0:
+                yield
         for i, (dx, dy, hiding) in zip(found, entry[1], strict=True):
             px[i], py[i] = origin[0] + dx, origin[1] + dy
             under[i] = hiding
