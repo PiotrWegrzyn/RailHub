@@ -261,6 +261,37 @@ def test_a_train_coming_onto_quadruple_track_behind_another_takes_its_other_trac
     assert (SLOW_LANE, FAST_LANE) in side_by_side
 
 
+def test_a_quicker_train_passes_a_slower_one_ahead_on_the_other_track_of_quadruple_track(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    game = quadruple_game(monkeypatch)
+    ahead = shuttle(game, WEST, EAST)
+    ahead.engine = "goods"
+    run_months(game, 0.5)
+    behind = shuttle(game, WEST, EAST)
+    behind.engine = "streamliner"
+
+    for _ in range(int(6 / STEP)):
+        game.railway.run(STEP)
+        if ahead.arrivals or behind.arrivals:
+            break
+
+    assert behind.arrivals == 1
+    assert ahead.arrivals == 0
+
+
+def test_signals_stand_where_the_two_tracks_each_way_of_quadruple_track_come_together(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    game = quadruple_game(monkeypatch)
+    blocks = blocks_of(game.constructions)
+
+    ends = {spot.cell for spot in blocks.spots if spot.cell in blocks.four_lanes}
+
+    assert {blocks.block[cell][0] for cell in blocks.four_lanes} == {"lanes"}
+    assert len(ends) == 2
+
+
 def test_quadruple_track_opens_with_its_era() -> None:
     game = Game(Constructions(flat_map(rows=16, cols=24)))
     game.finances.cash = 1e9

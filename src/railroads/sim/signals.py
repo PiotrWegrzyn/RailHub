@@ -18,11 +18,14 @@ cell by cell as its tail leaves it.
 
 On double track trains going opposite ways keep to their own tracks and never hold each other up;
 on quadruple track trains going the same way keep to its two tracks that way, taking one no train
-ahead runs on, and through its junctions too, where two trains coming together or parting run side
-by side, the one on the side those tracks lie on taking the outer track (Blocks.apart).
+ahead runs on, leaving one they followed onto it to run beside it, and through its junctions too,
+where two trains coming together or parting run side by side, the one on the side those tracks lie
+on taking the outer track (Blocks.apart). Its two-track stretches are blocks of their own, apart
+from its ends where the tracks come together, so a train stands on its track short of an end until
+the way through it is set, and one beside it can pass.
 A train may follow another going its way onto track that one holds, FOLLOW_GAP behind it, as long
 as wherever all the trains ahead stopped it would stand clear too, and never past where theirs is
-set; anywhere else two trains never hold track in the same cell at once. Stations are no blocks:
+set unless it runs beside it on quadruple track; anywhere else two trains never hold track in the same cell at once. Stations are no blocks:
 any number of trains may be in one, passing each other, but never a train they follow. Of two
 trains level on one way, the one whose way is set further, else the one bought first, is ahead.
 A train standing where it could not have been
@@ -151,12 +154,6 @@ class Blocks:
                     ends = frozenset(rounded(grid.center(*c)) for c in (cell, beyond))
                     for flank in grid.track_flanks(cell, end):
                         self.lanes.setdefault(flank, set()).add(ends)
-        links: dict[Cell, list[Cell]] = {cell: [] for cell in cells}
-        for (cell, _), (beside, entry) in exits.items():
-            if beside not in pieces or kind(beside) != kind(cell):
-                continue
-            if any(entry in other.ends for other in pieces[beside]):
-                links[cell].append(beside)
 
         def runs_on_four(cell: Cell, end: int) -> bool:
             beyond, entry = exits[(cell, end)]
@@ -173,6 +170,19 @@ class Blocks:
             if kind(cell) == "quadruple"
             and all(runs_on_four(cell, end) for end in pieces[cell][0].ends)
         }
+
+        def block_kind(cell: Cell) -> str:
+            """What a cell is for cutting blocks: the two-track stretches of quadruple track are
+            blocks of their own, apart from its ends where its tracks come together, so a train
+            stands on its own track short of them and a train beside it can pass."""
+            return "lanes" if cell in self.four_lanes else kind(cell)
+
+        links: dict[Cell, list[Cell]] = {cell: [] for cell in cells}
+        for (cell, _), (beside, entry) in exits.items():
+            if beside not in pieces or block_kind(beside) != block_kind(cell):
+                continue
+            if any(entry in other.ends for other in pieces[beside]):
+                links[cell].append(beside)
         # The ways across junction cells along quadruple track, where trains going the same way
         # keep to its two tracks too, and the middle of each of those cells.
         self.laned_ways: dict[Cell, set[frozenset[Point]]] = {}
@@ -193,9 +203,9 @@ class Blocks:
         for number, cell in enumerate(cells):
             if cell in self.block:
                 continue
-            group = groups[(kind(cell), number)] = _joined(cell, links)
+            group = groups[(block_kind(cell), number)] = _joined(cell, links)
             for member in group:
-                self.block[member] = (kind(cell), number)
+                self.block[member] = (block_kind(cell), number)
         parent = {block: block for block in groups}
 
         def root(block: tuple[str, int]) -> tuple[str, int]:
@@ -597,10 +607,14 @@ class Signals:
         # The trains going its way that it would follow onto track they hold, by how much further
         # along this train's path than along theirs each place lies: it may not be set a way past
         # where theirs is set.
+        # A train it ran on beside on the other track of quadruple track it no longer follows.
         leaders: dict[int, tuple[Train, float]] = {}
         for held in train.claims:
-            leaders |= self._going_my_way(train, _crossing(held))
+            crossing = _crossing(held)
+            leaders = self._still_ahead(leaders, crossing)
+            leaders |= self._going_my_way(train, crossing)
         for crossing in wanted:
+            leaders = self._still_ahead(leaders, crossing)
             holder = self._holder(train, crossing, follow=True)
             while holder is not None and train.first and self._give_way(holder, crossing):
                 holder = self._holder(train, crossing, follow=True)
@@ -632,6 +646,22 @@ class Signals:
         if not train.first:
             return self._queued_before(train, wanted)
         return None
+
+    def _still_ahead(
+        self, leaders: dict[int, tuple[Train, float]], crossing: Pass
+    ) -> dict[int, tuple[Train, float]]:
+        """The trains a train follows but those that are set the way across this cell of
+        quadruple track on its other track going the same way: from there they run side by
+        side, so it may pass them."""
+        if not leaders or not self.blocks.takes_lane(crossing.cell, crossing.entry, crossing.exit):
+            return leaders
+        way = (crossing.entry, crossing.exit)
+        beside = {
+            id(other)
+            for other, entry, exit_, _, lane in self._held.get(crossing.cell, ())
+            if (entry, exit_) == way and lane != crossing.lane
+        }
+        return {key: pair for key, pair in leaders.items() if key not in beside}
 
     def _ends_with(self, train: Train, way: list[Pass]) -> bool:
         """Whether a train's path ends where this way on of it does: a train coming to the end
