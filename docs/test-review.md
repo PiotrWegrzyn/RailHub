@@ -8,6 +8,18 @@ or is slow. Marks: **done** was fixed on this branch; **open** is a safe change 
 The suite took 123 s, five tests 67 s of it; after this pass it takes 57 s for 1,899 tests (24
 fewer: no-op, repeated and old-save tests deleted, six trade-rule tests added).
 
+## Second pass (November 2026, ~2,950 tests)
+
+About 85 test cases deleted: constants and tables compared to literals (engine weights, tares,
+start cash, difficulty prices, recipes, track factors), tests a broader one already asserts
+(tutorial steps the playthrough does, ground pixels the reference painter checks, electric track
+prices in `test_finance`), duplicate setups (`test_towns`, `test_dying_out`, `test_deposits`), and
+redundant parametrize rows. Rocket and goods-engine car tests and the two tutorial number tests
+were merged. Left alone: test files other sessions were changing (economy, growth, ports,
+fisheries, engine shed, schedules), and the slow sprite-sheet fixtures, which are the only checks
+on the sheets. Possible merges not done: the shuttle and queue tests in `test_signals` and the
+signal-order pair in `test_train_motion`.
+
 ## Trade rules (`docs/principles.md`)
 
 | Rule | Tests |
