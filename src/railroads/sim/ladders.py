@@ -922,7 +922,7 @@ WORKS = (
     _works(BuildingKind.GLASSWORKS, {}, base=0.36, starving_years=250),
     # Breweries open five times as often as they once did, so most towns have one.
     _works(BuildingKind.BREWERY, {POP: FOOD_TOWN}, base=31.5, starving_years=250),
-    _works(BuildingKind.DISTILLERY, {POP: FOOD_TOWN}, 1600, base=12.7, starving_years=250),
+    _works(BuildingKind.DISTILLERY, {POP: FOOD_TOWN}, 1600, base=6.35, starving_years=250),
     SAKE_BREWERIES,
     SOY_SAUCE_BREWERIES,
     _works(BuildingKind.TANNERY, {}, base=0.5),

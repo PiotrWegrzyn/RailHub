@@ -532,9 +532,9 @@ window (H) lists the same.
 | Tofu maker | 60 tofu | 24 soybeans |  |
 | Miso maker | 60 miso | 15 soybeans, 9 rice, 6 salt |  |
 | Fish drying shed | 60 dried fish | 24 fish, 6 salt |  |
-| Cattle ranch | 10 cattle, 20 milk |  | 120 wheat (from farming demand 2) |
+| Cattle ranch | 2 cattle, 20 milk |  | 120 wheat (from farming demand 2) |
 | Pig farm | 12 pigs |  | 60 wheat (from farming demand 2) |
-| Chicken farm | 20 chickens, 15 eggs |  | 30 wheat (from farming demand 2) |
+| Chicken farm | 10 chickens, 7.5 eggs |  | 30 wheat (from farming demand 2) |
 | Sausage maker (1850) | 240 sausages | 96 meat, 48 salt |  |
 | Flax field | 60 flax |  |  |
 | Hop garden | 40 hops |  |  |
@@ -1208,7 +1208,7 @@ what buildings' shares cost show the marked-up prices.
 <!-- table: freight -->
 | Freight a unit | Goods |
 |---|---|
-| $10 or less | eggs 4, bread 6, chickens 6, logs 6, milk 6, potatoes 6, rice 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, fish 8, meat 8, oranges 8, sand 8, soybeans 8, sugar 8, tofu 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, miso 10, newspapers 10, planks 10, pots 10, wood chips 10 |
+| $10 or less | bread 6, chickens 6, logs 6, milk 6, potatoes 6, rice 6, wheat 6, apples 8, bananas 8, bricks 8, dates 8, eggs 8, fish 8, meat 8, oranges 8, sand 8, soybeans 8, sugar 8, tofu 8, dairy products 9, clay 10, coal 10, gas 10, limestone 10, miso 10, newspapers 10, planks 10, pots 10, wood chips 10 |
 | $11-20 | cement 12, dried fish 12, honey 12, pigs 14, refined sugar 14, sausages 14, barrels 15, fertiliser 15, salt 16, sheep 16, iron ore 18, cans 20, cattle 20, fuel 20, glass 20, grapes 20, hops 20, juice 20, paper 20, soy sauce 20, wool 20 |
 | $21-40 | cotton 24, flax 24, oil 24, chemicals 25, leather 25, stove tiles 25, copper 28, castings 30, wax 30, plastics 40, rubber 40, tea 40 |
 | $41-200 | coffee 50, beer 60, furniture 60, porcelain 60, clothes 70, steel 80, sake 100, shoes 100, electronics 120, goods 120, vodka 120, guns 150, tools 160, wine 160, machinery 180 |

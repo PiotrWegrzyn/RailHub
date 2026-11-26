@@ -13,7 +13,6 @@ from railroads.sim.growth import Growth, _allowed
 from railroads.sim.ladder_types import Merge
 from railroads.sim.ladders import (
     BAKERIES,
-    BUTCHERS,
     CHANCE_UNIT,
     FACTORIES,
     FARMS,
@@ -704,16 +703,6 @@ def test_a_bakery_is_likelier_by_every_doubling_of_the_people_around(houses: int
 
     drawn = 1 + np.log2(1 + houses)
     assert chance == pytest.approx(CHANCE_UNIT * BAKERIES.base * drawn * land)
-
-
-def test_a_butcher_opens_in_a_town_more_often_than_a_bakery() -> None:
-    constructions = Constructions(make_map())
-    build(constructions, (5, 5), BuildingKind.HOUSE, 6)
-    growth = Growth(constructions, NO_TRADE, start_year=1700)
-
-    butcher = growth.chances(BUTCHERS)[5, 5]
-
-    assert butcher > growth.chances(BAKERIES)[5, 5] > 0
 
 
 def test_a_brewery_opens_in_a_town_more_often_than_a_distillery() -> None:

@@ -476,9 +476,9 @@ def test_a_brewery_makes_no_beer_from_barrels_without_hops() -> None:
     assert trade.gathered[STATION].get(Good.BEER, 0.0) == 0.0
 
 
-@pytest.mark.parametrize(("wheat", "cattle"), [(0.0, 10.0), (60.0, 15.0), (120.0, 20.0)])
+@pytest.mark.parametrize(("wheat", "times"), [(0.0, 1.0), (60.0, 1.5), (120.0, 2.0)])
 def test_wheat_lets_a_cattle_ranch_raise_up_to_twice_the_cattle(
-    wheat: float, cattle: float
+    wheat: float, times: float
 ) -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
@@ -486,6 +486,7 @@ def test_wheat_lets_a_cattle_ranch_raise_up_to_twice_the_cattle(
 
     trade = economy.trade(placed, holding(100.0, WHEAT=wheat))
 
+    cattle = times * MAKES[BuildingKind.CATTLE_RANCH][Good.CATTLE]
     assert trade.gathered[STATION].get(Good.CATTLE, 0.0) == pytest.approx(cattle)
 
 
