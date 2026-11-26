@@ -34,3 +34,9 @@ likelier. Raised on 2026-11-21.
 For the next version of the game. Once the player has a port by the sea, they can buy lots on
 other continents, in nine places: Japan, Africa, three places in the USA, Russia, the UK and
 Australia. Raised on 2026-11-26.
+
+## Ships sailing between ports
+
+Ships that carry goods between the player's ports (railroads.sim.ports) sail on the map along the
+water between them, instead of the goods only arriving each month: sailing ships first, then
+steamers, then motor ships and container ships as the eras change. Raised on 2026-11-26.
