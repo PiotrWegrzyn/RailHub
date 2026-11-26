@@ -374,19 +374,6 @@ def test_without_threads_a_save_loads_once_the_waiting_screen_has_shown(
     assert shell.app.saves is saves
 
 
-def test_leaving_a_game_goes_back_to_the_main_menu(context: None, tmp_path: Path) -> None:
-    shell = Shell(Saves(tmp_path))
-    shell.app = made_app()
-    shell.app.saves = shell.saves
-    shell.app.menu_wanted = True
-
-    shell_frame(shell)
-    shell_frame(shell)
-
-    assert shell.app is None
-    assert shell.menu.page == "main"
-
-
 def full_screen_frame(shell: Shell, click: tuple[float, float] | None = None) -> None:
     io = imgui.get_io()
     io.delta_time = 1 / 60

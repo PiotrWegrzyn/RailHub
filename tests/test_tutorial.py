@@ -450,22 +450,13 @@ def test_the_tutorial_window_comes_back_onto_a_screen_that_shrank(context: None)
     assert window.pos.y + window.size.y <= 600
 
 
-def test_the_tutorial_gives_freight_bonus_goods_and_shares_as_the_game_has_them() -> None:
+def test_the_tutorial_gives_the_numbers_the_game_has() -> None:
     numbers = [
         f"{FREIGHT_SHARE:.0%} of a good's market price, up to {SCARCE_WORTH:g} times",
         f"add {BONUS_PER_GOOD:.0%} each",
         f"{SHARES:,} shares, bought {SHARE_LOTS} at a time",
         f"sold {HOLD_MONTHS // 12} years after",
         f"up to {LOCAL_REACH} cells away",
-    ]
-
-    text = " ".join(" ".join(step.text) for step in STEPS)
-
-    assert [number for number in numbers if number not in text] == []
-
-
-def test_the_tutorial_gives_station_reach_moving_aside_and_track_as_the_game_has_them() -> None:
-    numbers = [
         f"up to level {REACH_LEVEL}; from level {PLATFORM_LEVEL}",
         f"a platform up to {PLATFORM_REACH} cells away",
         f"from {dollars(DEMOLITION_PER_POINT[Points.POPULATION])} each, and {share_of(ANGER_SURCHARGE)}",

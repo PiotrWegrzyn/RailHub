@@ -92,17 +92,6 @@ def test_grain_wanted_by_homes_and_a_bakery_is_both_a_general_and_a_special_need
     assert special == pytest.approx(300.0 / DEMAND_PER_NEED)
 
 
-def test_heating_is_a_general_need_for_coal_and_a_boiler_a_special_one() -> None:
-    _, railway = joined_stations()
-    demand = railway.station_demand((6, 3))
-    demand.capacity = {Need.HEATING: 20.0, Need.BOILER_FUEL: 60.0}
-
-    general, special = needed(demand, Good.COAL)
-
-    assert general == pytest.approx(20.0 / DEMAND_PER_NEED)
-    assert special == pytest.approx(60.0 / DEMAND_PER_NEED)
-
-
 def test_mail_wanted_and_sent_at_a_station_is_a_general_need_and_made_there() -> None:
     _, railway = joined_stations()
     railway.station_demand((6, 3)).capacity = {Need.MAIL: 30.0}

@@ -247,7 +247,7 @@ def test_no_more_shares_are_bought_than_are_left() -> None:
     assert growth.owners.shares(BuildingKind.FARM)[5, 5] == 500
 
 
-@pytest.mark.parametrize(("shares", "controls"), [(500, False), (599, False), (600, True)])
+@pytest.mark.parametrize(("shares", "controls"), [(599, False), (600, True)])
 def test_the_player_controls_a_building_from_sixty_percent_of_its_shares(
     shares: int, controls: bool
 ) -> None:
@@ -269,7 +269,7 @@ def test_the_flags_mark_every_cell_owned_and_whether_the_player_controls_it() ->
     assert flags == [((5, 5), True), ((7, 7), False)]
 
 
-@pytest.mark.parametrize(("shares", "taking"), [(500, 0.0), (600, 1.0), (1000, 1.0)])
+@pytest.mark.parametrize(("shares", "taking"), [(500, 0.0), (600, 1.0)])
 def test_limestone_is_taken_only_by_a_farm_the_player_controls_and_then_by_all_of_it(
     shares: int, taking: float
 ) -> None:

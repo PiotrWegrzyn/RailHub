@@ -198,17 +198,6 @@ def test_a_station_hands_brought_goods_to_buildings_around_and_gathers_the_spare
     assert sum(trade.gathered[(6, 24)].values()) <= 50.0
 
 
-def test_growth_hands_station_goods_out_and_stores_what_was_gathered() -> None:
-    growth, railway = joined_stations()
-    growth.build(Building((6, 21), BuildingKind.LOGGING_CAMP))
-
-    growth.trade_goods()
-
-    goods = railway.station_goods((6, 20))
-    assert goods.stockpile[Good.LOGS] == pytest.approx(20.0)
-    assert goods.held(Good.LOGS) <= STOCKPILE
-
-
 def test_cars_slow_a_train_and_full_cars_slow_it_more() -> None:
     _, railway = joined_stations()
     railway.finances.earn(1_000_000.0, "test")

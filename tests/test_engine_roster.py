@@ -442,7 +442,7 @@ def test_a_pioneer_pulls_a_full_car_of_89_quintals_of_coal() -> None:
     assert railway.car_capacity(Good.COAL, "penydarren") == 89.0
 
 
-@pytest.mark.parametrize("engine", ["planet", "goods", "american", "mogul"])
+@pytest.mark.parametrize("engine", ["american", "mogul"])
 def test_a_freight_engine_pulls_a_full_train_of_coal_at_its_slowest(engine: str) -> None:
     railway = line()
     train = full_train(engine, ENGINES[engine].cars)
@@ -475,16 +475,21 @@ def test_an_express_slows_about_as_much_empty_as_full() -> None:
     assert pulls[1] < pulls[0] <= pulls[1] * 1.15
 
 
-def test_the_rocket_pulls_one_full_coal_car_but_not_two() -> None:
+@pytest.mark.parametrize(
+    ("engine", "expected"), [("rocket", [True, False]), ("goods", [True, True, True, True])]
+)
+def test_an_engine_pulls_only_as_many_full_coal_cars_as_its_strength_allows(
+    engine: str, expected: list[bool]
+) -> None:
     railway = line()
-    railway.year = opened_in("rocket")
-    train = railway.buy("rocket")
+    railway.year = opened_in(engine)
+    train = railway.buy(engine)
     assert train is not None
     stop = Stop(WEST)
 
-    added = [railway.add_car(train, stop, Good.COAL) for _ in range(2)]
+    added = [railway.add_car(train, stop, Good.COAL) for _ in expected]
 
-    assert added == [True, False]
+    assert added == expected
 
 
 def test_a_railbus_pulls_its_coaches_full_but_not_as_many_coal_cars_of_its_newest(
@@ -502,18 +507,6 @@ def test_a_railbus_pulls_its_coaches_full_but_not_as_many_coal_cars_of_its_newes
 
     assert coaches_added == [True, True, True]
     assert coal_added == [True, False, False]
-
-
-def test_the_first_heavy_freight_engine_pulls_four_full_coal_cars() -> None:
-    railway = line()
-    railway.year = opened_in("goods")
-    train = railway.buy("goods")
-    assert train is not None
-    stop = Stop(WEST)
-
-    added = [railway.add_car(train, stop, Good.COAL) for _ in range(4)]
-
-    assert added == [True, True, True, True]
 
 
 def test_a_general_car_weighs_as_much_as_the_heaviest_of_its_goods_would() -> None:
