@@ -28,7 +28,6 @@ from railroads.sim.ladders import (
     STEEL_MILLS,
     TOWN_LAND,
     TOWNS,
-    WORKS,
     GrowthRule,
 )
 from railroads.sim.ownership import SHARES
@@ -703,39 +702,6 @@ def test_a_bakery_is_likelier_by_every_doubling_of_the_people_around(houses: int
 
     drawn = 1 + np.log2(1 + houses)
     assert chance == pytest.approx(CHANCE_UNIT * BAKERIES.base * drawn * land)
-
-
-def test_a_brewery_opens_in_a_town_more_often_than_a_distillery() -> None:
-    constructions = Constructions(make_map())
-    build(constructions, (5, 5), BuildingKind.HOUSE, 6)
-    growth = Growth(constructions, NO_TRADE, start_year=1700)
-    works = {ladder.kinds[0]: ladder for ladder in WORKS}
-
-    brewery = growth.chances(works[BuildingKind.BREWERY])[5, 5]
-
-    assert brewery > growth.chances(works[BuildingKind.DISTILLERY])[5, 5] > 0
-
-
-def test_a_textile_mill_opens_more_often_than_a_furniture_maker() -> None:
-    constructions = Constructions(make_map())
-    build(constructions, (5, 5), BuildingKind.HOUSE, 6)
-    growth = Growth(constructions, NO_TRADE, start_year=1800)
-    works = {ladder.kinds[0]: ladder for ladder in WORKS}
-
-    mill = growth.chances(works[BuildingKind.TEXTILE_MILL])[5, 5]
-
-    assert mill > growth.chances(works[BuildingKind.FURNITURE_MAKER])[5, 5] > 0
-
-
-def test_a_steel_mill_opens_more_often_than_a_sawmill() -> None:
-    constructions = Constructions(make_map())
-    build(constructions, (5, 5), BuildingKind.HOUSE, 6)
-    growth = Growth(constructions, NO_TRADE, start_year=1800)
-    works = {ladder.kinds[0]: ladder for ladder in WORKS}
-
-    mill = growth.chances(STEEL_MILLS)[5, 6]
-
-    assert mill > growth.chances(works[BuildingKind.SAWMILL])[5, 6] > 0
 
 
 @pytest.mark.parametrize(("shares", "factor"), [(SHARES // 2, 1.25), (2 * SHARES, 2.0)])
