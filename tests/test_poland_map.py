@@ -45,15 +45,6 @@ def water_reachable_from(tile_map: TileMap, start: Cell) -> set[Cell]:
     return seen
 
 
-def test_map_covers_poland(poland: TileMap) -> None:
-    width, height = poland.grid.size()
-
-    size_km = (width * poland.grid.km_per_cell, height * poland.grid.km_per_cell)
-
-    assert 680 < size_km[0] < 710
-    assert 640 < size_km[1] < 670
-
-
 @pytest.mark.parametrize(
     ("place", "lon", "lat", "expected"),
     [

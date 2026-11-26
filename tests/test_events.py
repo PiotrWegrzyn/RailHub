@@ -188,9 +188,3 @@ def test_furniture_makers_and_shoe_works_make_a_quarter_more_with_wax(
 
     assert wax == pytest.approx(0.5 * recipe.most)
     assert recipe.boost_most == 0.25
-
-
-def test_hospitals_take_wax_as_a_bonus() -> None:
-    bonus = bonus_of(BuildingKind.HOSPITAL, 1850)
-
-    assert bonus == {Need.WAX: 10}

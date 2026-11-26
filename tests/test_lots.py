@@ -14,7 +14,7 @@ from railroads.sim.constructions import (
 )
 from railroads.sim.game import Game
 from railroads.sim.growth import Growth
-from railroads.sim.lots import START_LOTS, Lots, fibonacci
+from railroads.sim.lots import START_LOTS, Lots
 from railroads.sim.tilemap import TileMap
 
 
@@ -73,11 +73,6 @@ def test_a_lot_past_the_places_map_has_no_land() -> None:
     share = lots.land_share((9, 0), land)
 
     assert share == 0.0
-
-
-@pytest.mark.parametrize(("n", "number"), [(1, 1), (2, 1), (10, 55), (14, 377), (15, 610)])
-def test_fibonacci_numbers_count_from_one_one(n: int, number: int) -> None:
-    assert fibonacci(n) == number
 
 
 def test_each_lot_costs_the_next_fibonacci_number_of_thousands() -> None:

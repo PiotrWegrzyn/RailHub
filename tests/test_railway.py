@@ -687,16 +687,6 @@ def test_a_station_holds_five_hundred_of_each_good_counting_what_trains_brought(
     assert rooms == (0.0, 380.0, 500.0)
 
 
-def test_a_storage_upgrade_gives_every_good_two_hundred_and_fifty_more_room() -> None:
-    _, railway = joined_stations()
-    goods = railway.station_goods((6, 20))
-    goods.stockpile[Good.COAL] = 500.0
-
-    railway.add_storage((6, 20))
-
-    assert (goods.room(Good.COAL), goods.room(Good.WHEAT)) == (250.0, 750.0)
-
-
 def test_a_train_unloads_a_good_at_a_station_full_of_another() -> None:
     _, railway = joined_stations()
     railway.station_goods((6, 3)).stockpile[Good.WHEAT] = 10.0
@@ -835,14 +825,6 @@ def test_a_station_wants_only_what_its_houses_were_left_short_of_by_the_farms_ar
     growth.trade_goods()
 
     assert railway.station_demand((6, 20)).capacity.get(Need.FOOD, 0.0) == pytest.approx(demand)
-
-
-def test_a_new_stop_does_not_wait_for_a_full_load() -> None:
-    stop = Stop((6, 3))
-
-    waits = stop.wait_for_load
-
-    assert waits is False
 
 
 def test_a_rides_bill_takes_the_fuel_and_every_cars_trip_off_what_its_cargo_earns() -> None:

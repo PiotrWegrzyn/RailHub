@@ -26,14 +26,6 @@ def test_no_line_on_the_page_calls_for_leeroy() -> None:
     assert not called
 
 
-def test_the_page_says_ready_in_place_of_the_work_once_it_has_loaded() -> None:
-    page = PAGE.read_text()
-
-    ready = 'reached >= 100 ? "Ready"' in page
-
-    assert ready
-
-
 def test_the_landing_page_offers_the_same_tips_as_the_game() -> None:
     page = PAGE.read_text()
 

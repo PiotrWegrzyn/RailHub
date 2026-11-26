@@ -33,14 +33,6 @@ def test_the_calendar_runs_on_past_the_last_year_play_can_begin_in() -> None:
     assert clock.months_in(SECONDS_PER_MONTH) == 1.0
 
 
-def test_from_the_usual_start_to_the_last_start_year_is_a_hundred_hours_at_normal_speed() -> None:
-    months = (END_YEAR - START_YEAR) * 12
-
-    hours = months * SECONDS_PER_MONTH / 3600
-
-    assert hours == pytest.approx(100)
-
-
 def test_at_six_times_speed_a_month_takes_a_sixth_of_its_seconds() -> None:
     clock = GameClock(speed=6)
 

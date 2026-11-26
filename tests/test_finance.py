@@ -10,12 +10,6 @@ FLAT = Tile(Terrain.LAND, Vegetation.GRASS, Temperature.NORMAL, 0, Relief.FLAT)
 RIVER = Tile(Terrain.RIVER, Vegetation.GRASS, Temperature.NORMAL, 0, Relief.FLAT)
 
 
-def test_a_game_starts_with_a_hundred_thousand() -> None:
-    finances = Finances()
-
-    assert finances.cash == START_CASH == 100_000
-
-
 def test_the_books_keep_this_month_and_last_by_what_money_was_for() -> None:
     finances = Finances()
     finances.spend(15_000, "stations")

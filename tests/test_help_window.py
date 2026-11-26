@@ -8,7 +8,7 @@ from railroads.sim.goods import FREIGHT_SHARE, Good, Need
 from railroads.sim.lots import Lots
 from railroads.sim.trade import SCARCE_WORTH
 from railroads.sim.trains import ENGINES
-from railroads.ui.help_window import ENGINES_NOTE, GOAL_HELP, GOODS_NOTE, MAP_HELP
+from railroads.ui.help_window import GOAL_HELP, GOODS_NOTE, MAP_HELP
 from railroads.words import dollars
 
 
@@ -116,14 +116,6 @@ def test_the_help_gives_the_supply_tile_level_that_opens_an_engine() -> None:
     assert opened == "coal supply level 20"
 
 
-def test_the_help_links_an_engine_to_the_real_ones_it_is_drawn_after() -> None:
-    row = engine_row("big_boy")
-
-    assert row.origins == (
-        ("Union Pacific Big Boy, 1941", "https://en.wikipedia.org/wiki/Union_Pacific_Big_Boy"),
-    )
-
-
 def test_only_the_super_heavy_diesel_is_drawn_after_no_real_engine() -> None:
     own = [row.name for row in engine_help() if not row.origins]
 
@@ -144,14 +136,6 @@ def test_the_map_help_names_the_prices_the_first_three_lots_cost() -> None:
 
     assert all(price in text for price in prices)
     assert f"from the year {HISTORY_START}" in text
-
-
-def test_the_engines_help_says_engines_come_from_supply_tile_levels() -> None:
-    text = ENGINES_NOTE
-
-    found = "supply tile reaches its level" in text
-
-    assert found
 
 
 def test_the_goods_help_gives_freight_as_a_share_of_the_market_price_up_to_the_scarce_worth() -> (

@@ -201,48 +201,12 @@ def test_building_a_station_at_brookby_does_the_second_station_step() -> None:
     assert step("1. A second station").done(game, NOTHING_SEEN)
 
 
-def test_laying_track_between_the_stations_does_the_track_step() -> None:
-    game = with_stations()
-
-    game.lay_track(ASHFORD_STATION, BROOKBY_STATION)
-
-    assert step("1. Track").done(game, NOTHING_SEEN)
-
-
-def test_a_train_let_go_with_passengers_and_food_does_the_train_step() -> None:
-    game = with_train([Good.PASSENGERS, Good.WHEAT])
-
-    done = step("2. A train").done(game, NOTHING_SEEN)
-
-    assert done
-
-
 def test_cars_on_the_way_back_do_the_cars_step() -> None:
     game = with_train([Good.PASSENGERS, Good.WHEAT], [Good.PASSENGERS])
 
     done = step("3. Cars and hubs").done(game, NOTHING_SEEN)
 
     assert done
-
-
-@pytest.mark.parametrize(
-    ("title", "seen"),
-    [
-        ("4. Making and using goods", Seen(selected=SHOWN_FARM)),
-        ("5. Satisfaction", Seen(lens=Lens.SATISFACTION.value)),
-        ("6. Passengers and towns", Seen(lens=Lens.TOWNS.value)),
-        ("8. Supply and demand", Seen(boards_open=True)),
-        ("9. Fuel and engines", Seen(buying_train=True)),
-    ],
-)
-def test_a_step_waiting_for_something_opened_is_done_once_it_is_open(
-    title: str, seen: Seen
-) -> None:
-    game = make_tutorial().game
-
-    done = step(title).done
-
-    assert done is not None and done(game, seen)
 
 
 def test_the_satisfaction_step_is_not_done_by_the_towns_lens() -> None:

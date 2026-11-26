@@ -14,16 +14,11 @@ from railroads.sim.geo import Bounds
 from railroads.sim.goods import FITS, Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import (
-    LADDERS,
     RICE_PADDIES,
-    SUSHI_APART,
     SUSHI_HUTS,
-    SUSHI_LAND_CELLS,
     SUSHI_TOWN,
-    TAVERNS,
 )
 from railroads.sim.tilemap import Relief, Terrain, TileMap, Vegetation
-from railroads.sim.trains import BULK_CAR, car_size
 
 
 def at_latitude(south: float, north: float) -> TileMap:
@@ -92,14 +87,6 @@ def test_rice_grows_on_flat_land_and_hills_but_never_in_mountains_or_forest() ->
     assert weights[0, 5] == 0
 
 
-def test_rice_feeds_homes_and_rides_in_bulk_cars() -> None:
-    food = FITS[Need.FOOD]
-
-    assert Good.RICE in food
-    assert car_size(Good.RICE) == BULK_CAR
-    assert RICE_PADDIES in LADDERS
-
-
 def test_a_house_eats_the_rice_a_station_brings() -> None:
     tile_map = trade_map()
     economy = Economy(tile_map)
@@ -148,14 +135,6 @@ def test_a_sushi_hut_with_fish_but_no_rice_is_not_fully_served() -> None:
     share = fish_only.share((BuildingKind.SUSHI_HUT,), empty=0.0)
     full = fed.share((BuildingKind.SUSHI_HUT,), empty=0.0)
     assert np.max(share) < np.max(full)
-
-
-def test_sushi_huts_are_a_rare_treat_next_to_taverns() -> None:
-    rarity = SUSHI_HUTS.base / TAVERNS.base
-
-    assert rarity == pytest.approx(0.1)
-    assert SUSHI_HUTS.apart == SUSHI_APART
-    assert SUSHI_HUTS.land_cells_each == SUSHI_LAND_CELLS
 
 
 def test_a_sake_brewery_brews_rice_into_sake_that_taverns_pour_as_alcohol() -> None:

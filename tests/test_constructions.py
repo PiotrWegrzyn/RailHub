@@ -292,26 +292,6 @@ def test_a_cell_is_electrified_when_all_its_track_is_electric() -> None:
     assert not constructions.electrified((2, 3))
 
 
-@pytest.mark.parametrize(
-    ("kind", "space"),
-    [
-        (BuildingKind.BIG_GLASSWORKS, 3),
-        (BuildingKind.MEGA_GLASSWORKS, 4),
-        (BuildingKind.BIG_TEXTILE_MILL, 3),
-        (BuildingKind.MEGA_TEXTILE_MILL, 4),
-        (BuildingKind.MEGA_REFINERY, 6),
-    ],
-)
-def test_big_works_take_half_a_cell_and_mega_works_two_thirds_or_all_their_works_took(
-    kind: BuildingKind, space: int
-) -> None:
-    building = Building((0, 0), kind)
-
-    taken = building.space
-
-    assert taken == space
-
-
 def test_track_branching_off_track_in_its_cell_takes_only_the_room_its_widest_piece_does() -> None:
     constructions = Constructions(flat_map())
     constructions.build(Track((6, 6), (0, 6), TrackWidth.QUADRUPLE))

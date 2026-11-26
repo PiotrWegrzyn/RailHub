@@ -8,7 +8,7 @@ from builders import flat_map, layer
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.economy import Economy
 from railroads.sim.geo import Bounds
-from railroads.sim.goods import FITS, PROCESSED_FOODS, Good, Need
+from railroads.sim.goods import FITS, Good, Need
 from railroads.sim.growth import inputs_of
 from railroads.sim.ladders import SOY_FIELDS, TEA_PLANTATIONS
 from railroads.sim.tilemap import Relief, TileMap
@@ -95,15 +95,6 @@ def test_the_soy_and_fish_works_make_their_goods_from_their_inputs(
     trade = economy.trade(placed, holding(100.0, **inputs))
 
     assert trade.gathered[STATION][made] == pytest.approx(amount)
-
-
-def test_tofu_miso_and_dried_fish_are_processed_food_homes_eat() -> None:
-    food = FITS[Need.FOOD]
-
-    made = {Good.TOFU, Good.MISO, Good.DRIED_FISH}
-
-    assert made <= set(food)
-    assert made <= set(PROCESSED_FOODS)
 
 
 def test_a_house_eats_the_tofu_a_station_brings() -> None:

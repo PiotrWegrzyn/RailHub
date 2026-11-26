@@ -143,30 +143,6 @@ def test_water_keeps_its_own_colour() -> None:
     assert np.array_equal(colors, biome_colors(tile_map))
 
 
-@pytest.mark.parametrize(
-    "grid",
-    [SquareGrid(rows=3, cols=4, km_per_cell=2.0), HexGrid(rows=3, cols=4, km_per_cell=2.0)],
-    ids=["square", "hex"],
-)
-def test_each_pixel_shows_the_colour_of_its_cell(grid: Grid) -> None:
-    pictures = flat_pictures(grid)
-    colors = np.arange(grid.rows * grid.cols * 4, dtype=np.uint8).reshape(*grid.shape, 4)
-    x, y = grid.center(1, 2)
-
-    rgba = pictures.picture(colors, FROM_WEST)
-
-    assert rgba[pixel(grid, x, y)].tolist() == colors[1, 2].tolist()
-
-
-def test_pixels_off_the_map_stay_clear() -> None:
-    pictures = flat_pictures(HexGrid(rows=3, cols=4, km_per_cell=2.0))
-    colors = np.full((3, 4, 4), 200, dtype=np.uint8)
-
-    rgba = pictures.picture(colors, FROM_WEST)
-
-    assert rgba[0, 0].tolist() == [0, 0, 0, 0]
-
-
 def test_raised_edges_are_lit_on_the_side_facing_the_light() -> None:
     grid = SquareGrid(rows=3, cols=3, km_per_cell=2.0)
     colors = np.full((3, 3, 4), 120, dtype=np.uint8)

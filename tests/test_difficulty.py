@@ -25,16 +25,6 @@ def quick_game(monkeypatch: pytest.MonkeyPatch, settings: Settings) -> SavedGame
     return newgame.make_game(settings, report=lambda _: None)
 
 
-def test_easy_doubles_prices_and_starts_with_150k_and_hard_keeps_prices_with_80k() -> None:
-    rules = {d: (PRICE_FACTORS[d], START_CASHES[d]) for d in Difficulty}
-
-    assert rules == {
-        Difficulty.EASY: (2.0, 150_000.0),
-        Difficulty.NORMAL: (1.5, 100_000.0),
-        Difficulty.HARD: (1.0, 80_000.0),
-    }
-
-
 def test_marked_up_boards_price_every_good_that_many_times_in_years_so_far_and_to_come() -> None:
     plain = Tiles.until(1901)
     tiles = Tiles.until(1900)

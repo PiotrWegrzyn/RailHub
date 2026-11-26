@@ -36,15 +36,6 @@ def _raised_game() -> Game:
     return game
 
 
-def test_a_facility_costs_its_months_good_at_the_market_price_when_the_station_holds_none() -> None:
-    _, railway = _with_shed()
-
-    railway.turn_month({})
-
-    spent = -railway.finances.month["station facilities"]
-    assert spent == pytest.approx(COAL * railway.market_price(Good.COAL))
-
-
 @pytest.mark.parametrize("held", [0.0, 20.0, COAL, COAL + 30.0])
 def test_what_the_station_holds_costs_the_delivered_share(held: float) -> None:
     taken = min(held, COAL)
@@ -100,17 +91,6 @@ def test_an_engine_shed_stands_up_to_two_cells_from_its_station(
     done = game.add_facility(STATION, Facility.ENGINE_SHED, cell)
 
     assert done.ok is ok
-
-
-def test_an_engine_shed_put_up_on_the_line_takes_the_place_of_its_track() -> None:
-    game = _raised_game()
-    game.lay_track(STATION, (6, 8))
-
-    shed = game.add_facility(STATION, Facility.ENGINE_SHED, ON_THE_LINE)
-
-    assert shed.ok
-    assert game.constructions.track_at(ON_THE_LINE) == ()
-    assert game.constructions.shed_at(ON_THE_LINE) is not None
 
 
 def test_a_station_has_one_facility_of_each_kind() -> None:

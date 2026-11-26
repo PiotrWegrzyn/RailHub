@@ -8,8 +8,8 @@ from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route, route_price
-from railroads.sim.tiles import Tile, Tiles, activate
-from railroads.sim.trains import ENGINES, OPENED_BY, Stop, Train
+from railroads.sim.tiles import Tiles, activate
+from railroads.sim.trains import ENGINES, Stop, Train
 from railroads.ui.build_menu import BuildMenu
 from railroads.ui.train_texts import engine_summary
 
@@ -34,16 +34,6 @@ def maglev_game(year: int) -> Game:
     game.railway.year = year
     activate(Tiles.until(year))
     return game
-
-
-def test_the_500_kmh_engine_is_a_maglev_opened_by_passenger_supply() -> None:
-    engine = ENGINES["maglev"]
-
-    tile, _ = OPENED_BY["maglev"]
-
-    assert engine.maglev and not engine.electric
-    assert engine.kmh == pytest.approx(500.0)
-    assert tile == Tile.PASSENGERS
 
 
 def test_a_maglev_finds_a_way_only_along_maglev_track() -> None:

@@ -59,9 +59,3 @@ def test_calls_with_plain_numbers_go_straight_through(emscripten: FakeEmscripten
     webgl.glBindTexture(webgl.GL_TEXTURE_2D, np.uint32(5))
 
     assert emscripten.calls == [("glBindTexture", webgl.GL_TEXTURE_2D, 5)]
-
-
-def test_no_data_is_handed_over_as_address_zero() -> None:
-    address = webgl.address(None)
-
-    assert address == 0

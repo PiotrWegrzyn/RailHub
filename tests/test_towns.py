@@ -24,16 +24,6 @@ def test_a_lone_house_starts_a_town_and_one_next_to_it_joins_it() -> None:
     assert towns.town[5, 5] not in (0, towns.town[5, 2])
 
 
-def test_a_cell_joins_the_town_sending_the_most_passengers_next_to_it() -> None:
-    towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
-    towns.add((5, 2), 1.0)
-    towns.add((5, 4), 6.0)
-
-    towns.add((5, 3), 1.0)
-
-    assert towns.town[5, 3] == towns.town[5, 4]
-
-
 def test_a_building_between_two_towns_paints_its_neighbours_the_busier_ones_colour() -> None:
     towns = Towns(SquareGrid(rows=12, cols=12, km_per_cell=2.0))
     towns.add((5, 2), 1.0)

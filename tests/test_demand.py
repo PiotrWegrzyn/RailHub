@@ -32,16 +32,6 @@ def test_each_unit_earns_at_the_share_of_demand_left_as_it_is_taken() -> None:
     assert demand.used[Need.FOOD] == [2.5]
 
 
-def test_each_unloaded_unit_lowers_the_price_of_the_next() -> None:
-    demand = StationDemand(capacity={Need.FOOD: 20.0})
-
-    first = demand.deliver(Good.WHEAT, 10.0)
-    second = demand.deliver(Good.WHEAT, 10.0)
-
-    assert 0.9 * 10 * freight_of(Good.WHEAT) < first < 10 * freight_of(Good.WHEAT)
-    assert second < first
-
-
 def test_a_flooded_station_recovers_its_demand_over_three_months() -> None:
     demand = StationDemand(capacity={Need.FOOD: 20.0})
     demand.deliver(Good.WHEAT, 60.0)

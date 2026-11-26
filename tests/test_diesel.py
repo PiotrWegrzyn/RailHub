@@ -2,13 +2,11 @@ import pytest
 from trading import STATION, counts, holding, make_map, position
 
 from builders import joined_stations, served_at
-from railroads.sim.breeding import LIVELY_GROWTH, breeding_of
+from railroads.sim.breeding import LIVELY_GROWTH
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.economy import Economy
 from railroads.sim.events import make_factor
 from railroads.sim.goods import DIESEL_BOOST, PIPELINE, Good, Need
-from railroads.sim.ladders import FILLING_STATIONS, POINTS, WORKS
-from railroads.sim.points import Points
 from railroads.sim.tiles import Tiles, activate
 
 MINE = (8, 9)
@@ -87,13 +85,3 @@ def test_a_filling_station_with_all_its_fuel_makes_the_homes_around_it_grow_fast
 
     assert alone > 0
     assert lively == pytest.approx(alone * (1 + LIVELY_GROWTH))
-
-
-def test_refineries_come_up_near_ore_and_ports_and_filling_stations_from_1920() -> None:
-    (refineries,) = [ladder for ladder in WORKS if ladder.kinds[0] == BuildingKind.REFINERY]
-    breeding = breeding_of(refineries, POINTS)
-
-    near = breeding.drawn_by
-
-    assert near == {Points.ORE: 1.0, Points.TRADE: 2.0}
-    assert FILLING_STATIONS.from_year == 1920

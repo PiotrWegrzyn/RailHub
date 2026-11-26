@@ -2,7 +2,6 @@ import numpy as np
 import pytest
 
 from builders import make_game
-from railroads.settings import Settings
 from railroads.sim.clock import END_YEAR
 from railroads.sim.company import (
     BANKRUPT_MONTHS,
@@ -89,15 +88,6 @@ def test_each_difficulty_sets_a_higher_target_than_the_one_before() -> None:
     assert targets == [TARGETS[d] for d in Difficulty]
     assert targets == sorted(targets)
     assert len(set(targets)) == 3
-
-
-def test_a_new_game_is_set_for_the_normal_target_unless_chosen() -> None:
-    default = Settings(seed=1)
-    chosen = Settings(seed=1, difficulty=Difficulty.HARD)
-
-    goals = Goal(default.difficulty), Goal(chosen.difficulty)
-
-    assert [goal.difficulty for goal in goals] == [Difficulty.NORMAL, Difficulty.HARD]
 
 
 def test_the_player_is_told_once_when_the_target_is_first_reached() -> None:

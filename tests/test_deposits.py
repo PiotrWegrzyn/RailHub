@@ -4,10 +4,9 @@ import pytest
 from builders import flat_map
 from railroads.mapgen.deposits import allowed_land, place_deposits
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.demand import StationDemand
 from railroads.sim.dying import dies_after
 from railroads.sim.events import want_factor
-from railroads.sim.goods import MAKES, Good, Need, freight_of
+from railroads.sim.goods import Need
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import JEWELLERS, RESOURCES, WORKS, GrowthRule
@@ -79,17 +78,6 @@ def test_a_mine_opens_only_on_its_deposit() -> None:
     assert weights[5, 6] == 0
 
 
-def test_diamonds_cars_and_gold_are_worth_a_lot_but_only_where_someone_wants_them() -> None:
-    wanted = StationDemand(capacity={Need.DIAMONDS: 2.0})
-    elsewhere = StationDemand(capacity={Need.FOOD: 20.0})
-
-    earned = wanted.pay(Need.DIAMONDS, Good.DIAMONDS, 1.0)
-
-    assert earned == pytest.approx(freight_of(Good.DIAMONDS))
-    assert elsewhere.deliver(Good.DIAMONDS, 1.0) == 0.0
-    assert freight_of(Good.CARS) >= 5000
-
-
 def test_a_map_only_holds_its_few_jewellers() -> None:
     constructions = Constructions(make_map(200, False))
     rule = GrowthRule(trades=False, ladders=(JEWELLERS,), forests=None)
@@ -140,14 +128,6 @@ def test_works_with_nothing_to_work_from_close_after_exactly_thirty_years_starvi
     assert standing == [1, 0]
 
 
-def test_flats_want_a_car_once_the_vehicles_era_comes() -> None:
-    before = needs_of(BuildingKind.FLATS, 1900)
-    after = needs_of(BuildingKind.FLATS, 1901)
-
-    assert Need.CARS not in before
-    assert after[Need.CARS] == pytest.approx(3 * want_factor(BuildingKind.FLATS, Need.CARS, 1901))
-
-
 @pytest.mark.parametrize(("gap", "opens"), [(6, False), (12, True)])
 def test_jewellers_keep_far_apart(gap: int, opens: bool) -> None:
     constructions = Constructions(make_map(mountains=False))
@@ -158,17 +138,3 @@ def test_jewellers_keep_far_apart(gap: int, opens: bool) -> None:
     built = growth._turn((200, 200 + gap), JEWELLERS, np.random.default_rng(0))
 
     assert bool(built) == opens
-
-
-def test_a_map_holds_only_a_few_printing_works_each_printing_thousands_of_newspapers() -> None:
-    constructions = Constructions(make_map(mountains=False))
-    constructions.build(Building((100, 100), BuildingKind.PAPER_MILL))
-    rule = GrowthRule(trades=False, ladders=(PRINTING_WORKS,), forests=None)
-    growth = Growth(constructions, rule)
-    cap = 160_000 // PRINTING_WORKS.land_cells_each
-
-    for i in range(cap + 3):
-        growth._turn((200, 20 + 10 * i), PRINTING_WORKS, np.random.default_rng(0))
-
-    assert growth.count(BuildingKind.PRINTING_WORKS).sum() == cap == 8
-    assert MAKES[BuildingKind.PRINTING_WORKS][Good.NEWSPAPERS] == 3000

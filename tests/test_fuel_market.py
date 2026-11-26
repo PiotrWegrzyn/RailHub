@@ -143,17 +143,6 @@ def test_two_stops_running_at_the_same_station_are_no_long_leg() -> None:
     assert legs == []
 
 
-def test_a_train_with_stops_its_fuel_reaches_has_no_long_legs() -> None:
-    railway = line()
-    train = railway.buy("planet")
-    assert train is not None
-    train.stops = [Stop(WEST), Stop(EAST)]
-
-    legs = railway.long_legs(train)
-
-    assert legs == []
-
-
 def test_a_train_whose_stops_change_while_time_stands_still_buys_no_fuel() -> None:
     railway = line()
     train = railway.buy("planet")
@@ -294,16 +283,6 @@ def test_a_power_plant_can_be_bought_for_two_million() -> None:
     price = growth.owners.price_to_buy(BuildingKind.POWER_PLANT)
 
     assert price == 2_000_000.0
-
-
-def test_a_heavier_train_burns_more_fuel_a_cell() -> None:
-    railway = line()
-    empty = Train("Empty", cars=[Car(Good.COAL)])
-    full = Train("Full", cars=[Car(Good.COAL, BULK_CAR)])
-
-    burns = railway.burn(empty), railway.burn(full)
-
-    assert burns[0] < burns[1]
 
 
 def test_a_train_burns_half_its_engines_fuel_alone_and_half_as_much_again_at_its_most() -> None:

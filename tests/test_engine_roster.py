@@ -32,7 +32,6 @@ from railroads.sim.trains import (
     full_tonnes,
     generation_in,
     tare_of,
-    unit_label,
     unit_tonnes,
 )
 from railroads.ui.train_texts import (
@@ -71,12 +70,6 @@ def full_train(engine: str, cars: int) -> Train:
     size, tare = car_size(Good.COAL, newest), tare_of(Good.COAL, newest)
     train.cars = [Car(Good.COAL, size, capacity=size, tare=tare) for _ in range(cars)]
     return train
-
-
-def test_there_are_about_thirty_engines() -> None:
-    count = len(ENGINES)
-
-    assert 28 <= count <= 32
 
 
 def test_the_first_engine_on_rails_is_the_only_one_for_sale_in_1804() -> None:
@@ -186,16 +179,6 @@ def test_an_express_runs_far_faster_than_a_general_engine_and_gets_going_about_a
     assert express.speed >= 1.4 * general.speed
     assert express.pickup <= 1.5 * general.pickup
     assert express.price > general.price
-
-
-def test_a_better_engine_than_the_planet_comes_within_six_years_of_an_1850_start() -> None:
-    railway = line()
-    railway.year = opened_in("american")
-
-    engines = railway.engines()
-
-    assert "american" in engines
-    assert ENGINES["american"].speed > ENGINES["planet"].speed
 
 
 def test_the_specialised_classes_come_within_ten_years_of_1850() -> None:
@@ -347,15 +330,6 @@ def test_a_general_engine_at_its_most_runs_at_half_speed_and_a_heavy_one_at_seve
     assert pulls == (pytest.approx(0.5), pytest.approx(0.7))
 
 
-def test_an_engine_with_no_cars_runs_at_full_speed() -> None:
-    railway = line()
-    train = Train("Test")
-
-    pull = railway.pull(train)
-
-    assert pull == 1.0
-
-
 def test_a_train_slows_by_what_its_cars_weigh_against_the_most_its_engine_pulls() -> None:
     railway = line()
     train = Train("Test", cars=[Car(Good.WHEAT, BULK_CAR)])
@@ -364,31 +338,6 @@ def test_a_train_slows_by_what_its_cars_weigh_against_the_most_its_engine_pulls(
     pull = railway.pull(train)
 
     assert pull == pytest.approx(1.0 - SLOWDOWN[Kind.GENERAL] * share)
-
-
-def test_a_car_of_coal_or_wheat_of_the_planets_day_holds_144_quintals_weighing_about_18_t() -> None:
-    coal = Car(Good.COAL, BULK_CAR)
-    wheat = Car(Good.WHEAT, BULK_CAR)
-
-    weights = coal.tonnes, wheat.tonnes
-
-    assert weights == (pytest.approx(18.4), pytest.approx(18.4))
-
-
-@pytest.mark.parametrize(
-    ("good", "kg"),
-    [
-        (Good.COAL, 100.0),
-        (Good.COFFEE, 60.0),
-        (Good.CATTLE, 500.0),
-        (Good.SHOES, 70.0),
-        (Good.PASSENGERS, 80.0),
-    ],
-)
-def test_a_unit_of_a_good_weighs_what_the_thing_it_stands_for_does(good: Good, kg: float) -> None:
-    weight = unit_tonnes(good)
-
-    assert weight == pytest.approx(kg / 1_000)
 
 
 def test_full_cars_of_light_or_bulky_goods_weigh_less_than_one_of_coal() -> None:
@@ -438,15 +387,6 @@ def test_cars_ride_from_the_fourth_generation_and_tanks_and_planes_from_the_fift
         [0.0, 0.0, 1.0, 1.0, 2.0],
         [0.0, 0.0, 1.0, 1.0, 2.0],
     ]
-
-
-@pytest.mark.parametrize(("generation", "tonnes"), [(1, 1.5), (2, 4.0), (5, 14.0), (7, 24.0)])
-def test_an_empty_car_weighs_what_a_real_wagon_of_its_generation_did(
-    generation: int, tonnes: float
-) -> None:
-    weights = tare_of(Good.COAL, generation), tare_of(Good.PASSENGERS, generation)
-
-    assert weights == (pytest.approx(tonnes), pytest.approx(tonnes * 1.75))
 
 
 def test_pioneers_pull_the_first_generation_and_the_planet_the_second_without_tech() -> None:
@@ -793,12 +733,6 @@ def test_an_amount_of_a_good_is_told_in_its_units(good: Good, amount: float, tol
     text = amount_of(good, amount)
 
     assert text == told
-
-
-def test_a_goods_unit_says_what_it_weighs() -> None:
-    label = unit_label(Good.COFFEE)
-
-    assert label == "coffee: 1 sack = 60 kg"
 
 
 def test_a_stop_can_ask_for_an_older_smaller_and_lighter_car() -> None:

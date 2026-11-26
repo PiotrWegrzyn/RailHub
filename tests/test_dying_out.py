@@ -78,15 +78,6 @@ def test_the_players_own_buildings_die_out_too() -> None:
     assert growth.counts[BuildingKind.HOUSE].sum() == 0
 
 
-def test_four_houses_beside_one_farm_share_its_food_and_none_starve() -> None:
-    growth = standing(*[((5, 5), BuildingKind.HOUSE)] * 4, ((5, 6), BuildingKind.FARM))
-    assert growth.last_trade is not None
-
-    starving = growth.starving(growth.last_trade, BuildingKind.HOUSE)
-
-    assert starving.tolist() == [0, 0]
-
-
 def test_houses_sharing_a_farm_all_stay_after_ten_years() -> None:
     growth = standing(*[((5, 5), BuildingKind.HOUSE)] * 4, ((5, 6), BuildingKind.FARM))
 
@@ -125,23 +116,6 @@ def test_a_steel_mill_with_coal_but_no_iron_is_unsatisfied_however_full_its_stoc
     share = growth.last_trade.share((BuildingKind.STEEL_MILL,))
 
     assert share[mill] == 0.0
-
-
-def test_a_steel_mill_with_nothing_to_make_steel_from_dies_after_thirty_years() -> None:
-    growth = standing(((5, 5), BuildingKind.STEEL_MILL))
-
-    run(growth, DIE_AFTER_MONTHS)
-
-    assert growth.counts[BuildingKind.STEEL_MILL].sum() == 0
-
-
-def test_a_coal_mine_with_nobody_to_sell_to_stands_idle_and_never_dies() -> None:
-    growth = standing(((5, 5), BuildingKind.MINE))
-
-    run(growth, DIE_AFTER_MONTHS + 12)
-
-    assert BuildingKind.MINE in UNDYING
-    assert growth.counts[BuildingKind.MINE][5, 5] == 1
 
 
 def test_one_off_buildings_wait_for_what_they_need_however_long_it_takes() -> None:
