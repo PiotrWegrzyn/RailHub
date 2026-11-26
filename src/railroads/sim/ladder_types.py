@@ -25,11 +25,11 @@ class Merge:
 @dataclass(frozen=True, slots=True)
 class Join:
     """So many of a ladder's first kind in a neighbourhood that become one building of another
-    kind, when none of that kind stands within so many cells."""
+    kind, in a cell where none of the `alone` kinds stands."""
 
     into: BuildingKind
     needed: int
-    apart: int
+    alone: tuple[BuildingKind, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +57,9 @@ class Ladder:
     merges: Mapping[BuildingKind, Merge] = field(default_factory=dict)
     # The most of the first kind one cell, and one neighbourhood, may hold, beyond what fits.
     most_per_cell: int | None = None
+    # Whether most_per_cell counts every kind on the ladder, and merges never put a second
+    # building of it in a cell.
+    one_per_cell: bool = False
     most_nearby: int | None = None
     skyscrapers: bool = False
     # The first year it grows, and if it is rare, one on the map for this many land cells at most.

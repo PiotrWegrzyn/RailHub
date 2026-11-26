@@ -128,6 +128,38 @@ class OwnedShare:
     taking: npt.NDArray[np.float64] | None = None
 
 
+@dataclass(frozen=True)
+class CellGoods:
+    """What the buildings of some kinds make and need cell by cell rather than by kind, as ports
+    do (railroads.sim.ports): per building in each of `cells` (flat, in order), what they make
+    of each good, take of each need, and have room to store of each need beyond that, which
+    their satisfaction leaves out."""
+
+    kinds: frozenset[BuildingKind]
+    cells: npt.NDArray[np.intp]
+    makes: Mapping[Good, FloatArray]
+    takes: Mapping[Need, FloatArray]
+    stores: Mapping[Need, FloatArray]
+
+    def over[K](
+        self, by_key: Mapping[K, FloatArray], cells: npt.NDArray[np.intp]
+    ) -> dict[K, FloatArray]:
+        """Each key's values at these flat cells, none where no building of the kinds is."""
+        found = np.searchsorted(self.cells, cells)
+        clipped = np.minimum(found, max(self.cells.size - 1, 0))
+        inside = (
+            (found < self.cells.size) & (self.cells[clipped] == cells)
+            if self.cells.size
+            else np.zeros(cells.size, dtype=bool)
+        )
+        result: dict[K, FloatArray] = {}
+        for key, values in by_key.items():
+            at = np.zeros(cells.size)
+            at[inside] = values[clipped[inside]]
+            result[key] = at
+        return result
+
+
 # What Trade.share works out, by the trade's id and kinds, while the trade lasts: a trade is
 # saved with the game, so it keeps none of it itself.
 _SHARES: dict[int, dict[tuple[BuildingKind, ...], tuple[FloatArray, npt.NDArray[np.bool_]]]] = {}

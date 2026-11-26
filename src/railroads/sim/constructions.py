@@ -91,6 +91,8 @@ class BuildingKind(Enum):
     LOGGING_CAMP = "logging camp"
     SAWMILL = "sawmill"
     PORT = "port"
+    BIG_PORT = "big port"
+    MEGA_PORT = "mega port"
     CLAY_PIT = "clay pit"
     LIMESTONE_QUARRY = "limestone quarry"
     SAND_PIT = "sand pit"
@@ -315,6 +317,8 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
         )
     },
     BuildingKind.PORT: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True),
+    BuildingKind.BIG_PORT: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True, space=2),
+    BuildingKind.MEGA_PORT: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True, space=3),
     **{
         kind: BuildingRules(relief=_OFF_MOUNTAINS, space=CELL_SPACE)
         for kind in (
@@ -432,8 +436,12 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
 MERGED: dict[BuildingKind, tuple[BuildingKind, BuildingKind]] = {
     BuildingKind[kind.name.removeprefix("BIG_")]: (kind, BuildingKind["MEGA_" + kind.name[4:]])
     for kind in BuildingKind
-    if kind.name.startswith("BIG_") and kind != BuildingKind.BIG_FACTORY
+    if kind.name.startswith("BIG_")
+    and kind not in (BuildingKind.BIG_FACTORY, BuildingKind.BIG_PORT)
 }
+
+# Ports by size: two of a size in a neighbourhood merge into one of the next (railroads.sim.ports).
+PORT_KINDS = (BuildingKind.PORT, BuildingKind.BIG_PORT, BuildingKind.MEGA_PORT)
 
 # What each big or mega works grew from.
 GREW_FROM: dict[BuildingKind, BuildingKind] = {
@@ -537,13 +545,18 @@ class Annex:
     facility: Facility
     station: Cell
     ends: tuple[int, int] | None = None
+    # An engine shed's level, which gives its roundhouse more stalls (railroads.sim.sheds), and
+    # whether a sand tower stands by its lead (railroads.sim.facilities).
+    level: int = 1
+    sand_tower: bool = False
 
     def __setstate__(self, state: tuple[object, ...]) -> None:
         """Takes up a pickled facility, one put up before engine sheds had track running across
-        it too."""
-        for name, value in zip(
-            ("cell", "facility", "station", "ends"), (*state, None), strict=False
-        ):
+        it, levels and sand towers too."""
+        names = ("cell", "facility", "station", "ends", "level", "sand_tower")
+        defaults = (None, 1, False)
+        values = (*state, *defaults[len(state) - 3 :])
+        for name, value in zip(names, values, strict=True):
             object.__setattr__(self, name, value)
 
     @property

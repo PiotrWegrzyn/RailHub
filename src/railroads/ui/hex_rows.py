@@ -13,7 +13,15 @@ import numpy.typing as npt
 
 from railroads.sim.amounts import EPSILON
 from railroads.sim.clock import MONTHS_PER_YEAR
-from railroads.sim.constructions import Annex, Building, BuildingKind, Construction, Station, Track
+from railroads.sim.constructions import (
+    PORT_KINDS,
+    Annex,
+    Building,
+    BuildingKind,
+    Construction,
+    Station,
+    Track,
+)
 from railroads.sim.goods import BONUS_PART, RECIPES, Good, Need
 from railroads.sim.grids import Cell, FloatArray
 from railroads.sim.growth import Growth
@@ -112,6 +120,11 @@ def describe(
             position = found
     rows = []
     for kind, count in kinds.items():
+        makes: Mapping[Good, float] = makes_of(kind, growth.year)
+        demands: Mapping[Need, float] = demands_of(kind, growth.year, growth.economy.east)
+        if kind in PORT_KINDS:
+            makes = growth.ports.gives_at(cell)
+            demands = {**demands, **growth.ports.takes_at(cell)}
         got: list[Flow] = []
         bonus_got: list[Flow] = []
         gave: list[Flow] = []
@@ -126,7 +139,7 @@ def describe(
             got, bonus_got = _split_bonus_part(kind, count, got, bonus_got)
             if kind in RECIPES:
                 stock = _stock(growth, kind, flat)
-            gave = _per_good(trade.goods_gave, kind, position, makes_of(kind, growth.year), count)
+            gave = _per_good(trade.goods_gave, kind, position, makes, count)
             alone = one_cell(trade, position, kind)
             mood = Satisfaction(int(alone.levels((kind,))[0])).name.lower()
             percent = float(alone.share((kind,))[0])
@@ -134,10 +147,10 @@ def describe(
             BuildingRow(
                 kind.value,
                 count,
-                [(good, amount * count) for good, amount in makes_of(kind, growth.year).items()],
+                [(good, amount * count) for good, amount in makes.items()],
                 [
                     (need, (amount - BONUS_PART.get((kind, need), 0.0)) * count)
-                    for need, amount in demands_of(kind, growth.year, growth.economy.east).items()
+                    for need, amount in demands.items()
                 ],
                 [
                     *(

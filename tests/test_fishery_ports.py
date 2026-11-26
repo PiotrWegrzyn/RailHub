@@ -58,8 +58,16 @@ def test_two_fisheries_stay_fisheries() -> None:
     assert growth.count(BuildingKind.FISHERY).sum() >= FISHERIES_PER_PORT - 1
 
 
-def test_fisheries_do_not_join_into_a_port_beside_another_port() -> None:
+def test_fisheries_join_into_a_port_beside_another_port() -> None:
     growth = fishing_village(1, port=(COAST[0] + 2, COAST[1]))
+
+    growth._turn(COAST, FISHERIES, np.random.default_rng(0))
+
+    assert growth.count(BuildingKind.PORT).sum() == 2
+
+
+def test_fisheries_do_not_join_into_a_cell_holding_a_port() -> None:
+    growth = fishing_village(1, port=COAST)
 
     growth._turn(COAST, FISHERIES, np.random.default_rng(0))
 

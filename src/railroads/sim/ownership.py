@@ -23,7 +23,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.clock import MONTHS_PER_YEAR
-from railroads.sim.constructions import BuildingKind
+from railroads.sim.constructions import PORT_KINDS, BuildingKind
 from railroads.sim.goods import Need, price_of
 from railroads.sim.grids import Cell, IntArray
 from railroads.sim.move import Move
@@ -128,15 +128,17 @@ class Owners:
         grid[cell] += added
         return added
 
-    def price_to_buy(self, kind: BuildingKind) -> float | None:
-        """What a whole building of a kind costs at full satisfaction; None for what cannot be
-        bought."""
+    def price_to_buy(self, kind: BuildingKind, cell: Cell | None = None) -> float | None:
+        """What a whole building of a kind costs at full satisfaction, a port by what the one in
+        the cell gives; None for what cannot be bought."""
         growth = self._growth
         if kind not in growth.counts:
             return None
         if kind in POWER_PLANTS:
             return POWER_PLANT_PRICE
         makes = makes_of(kind, growth.year)
+        if kind in PORT_KINDS and cell is not None:
+            makes = growth.ports.gives_at(cell)
         if not makes:
             return None
         boards = of_year(growth.year)
@@ -147,7 +149,7 @@ class Owners:
         """What LOT shares of a building of a kind in a cell cost, or fetch, now: by how
         satisfied the buildings of that kind there were over the last quarter, not the rest of
         the cell; None for what cannot be bought."""
-        whole = self.price_to_buy(kind)
+        whole = self.price_to_buy(kind, cell)
         if whole is None:
             return None
         if kind in POWER_PLANTS:

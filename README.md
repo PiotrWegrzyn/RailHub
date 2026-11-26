@@ -405,7 +405,7 @@ of every kind in its neighbourhood (the cell and the six around it):
 | Food | farm, orchard, date palms, banana plantation, orange farm, sugar field, potato farm, rice paddy, soy field, tea plantation, cattle ranch, flax field, hop garden, beekeeper, incense grove 1 |
 | Ore | mine, clay pit, limestone quarry, sand pit 1 |
 | Timber | logging camp 1 |
-| Trade | port 1 |
+| Trade | port 1, big port 2, mega port 4 |
 | Industry | factory 1, big factory 3, mega factory 9, cannery 2, steel mill 3, shipyard 3, machine works, plastics works, appliance factory 3, coal power plant 5, diesel and gas power plants 4, other works 2 |
 | Corporate | tavern 1, sushi hut 1, club 3, department store 3, hotel 5, skyscraper 10 |
 | Worship | church 5, basilica 20, cathedral 50, St. Peter's Basilica 2137 |
@@ -439,7 +439,7 @@ than dry land unless a row names it:
 | Mines | 0.000001 + 0.0000014 per doubling of ore | | mountains; hills x0.4, flat x0.01; beside mountains x3 |
 | Logging camps | 0.000075 + 0.0000015 per doubling of population | | forest with at least 4 forest cells in its neighbourhood and flat open land next to it; river x1.5 |
 | Fisheries | 0.000005 + 0.00015 per doubling of population x2 and of food x0.5 | | next to the sea; a lake x0.15, a river x0.1; none inland or in mountains |
-| Ports | 0.0000008 + 0.000002 per doubling of population | 4 population | next to the sea, or a lake x0.3 |
+| Ports | 0.0000008 + 0.000002 per doubling of population | 2 population | next to the sea; a lake or a river x0.3; hills x0.5; none in mountains |
 | Factories | 0.00000004 + 0.000000006 per doubling of population + 0.000065 of industry + 0.0000008 of timber, each only from 5 points nearby | | flat; hills x0.5, forest x0.2; river x1.5 |
 | Canneries | 0.000000015 + 0.00000026 per doubling of food + 0.00000076 of industry | 1 food | as factories |
 | Steel mills | 0.00000008 + 0.00001 per doubling of ore + 0.0000006 of industry | | as factories |
@@ -460,14 +460,14 @@ than dry land unless a row names it:
 | Hotels | as department stores, from 1900 | 60 population | as houses, 5 hexes apart, one per 8,000 land cells |
 
 Farms, orchards and works may crowd together, held back only by the room in each cell; logging
-camps keep to three per neighbourhood, mines to eight, and ports to one. Three fisheries in a
-neighbourhood with four population points for each of its land cells off the mountains join into
-a port, unless a port stands within two cells. Factories, mills and mines open mostly by
+camps keep to three per neighbourhood, mines to eight, and ports to one a cell. Three fisheries
+in a neighbourhood join into a port in a cell without one, checked every new year. Factories, mills and mines open mostly by
 chance, with only a weak pull towards their own kind, so they spread out across the land while
 houses gather into towns. On its turn a ladder builds its
 first kind, unless it can merge: 16 houses nearby let six of them make way for a tenement and
 five tenements let three make way for a block of flats; three factories nearby make a big factory
-and three big factories a mega factory. On a town turn, a neighbourhood with 150 population
+and three big factories a mega factory; two ports nearby make a big port and two big ports a mega
+port. On a town turn, a neighbourhood with 150 population
 points and three blocks of flats puts up a skyscraper instead, one turn in 200: a business centre
 worth 10 corporate points, so it sends and wants 200 passengers and 40 pieces of mail a month. It
 pulls down the three blocks of flats, and their people move into 10 houses in the nearest cells
@@ -559,7 +559,9 @@ window (H) lists the same.
 | Limestone quarry | 60 limestone |  | 5 fuel (from oil and fuel demand 11) |
 | Sand pit | 60 sand |  | 5 fuel (from oil and fuel demand 11) |
 | Logging camp | 20 logs |  | 5 machinery (from era 3), 3 fuel (from oil and fuel demand 11) |
-| Port | 20 goods, 50 oil, 50 gas |  | 10 fuel (from era 2) |
+| Port |  |  | 10 fuel (from era 2) |
+| Big port |  |  | 20 fuel (from era 2) |
+| Mega port |  |  | 40 fuel (from era 2) |
 | Factory (1780) | 30 goods | 10 planks, 10 steel (from era 2) |  |
 | Big factory (1780) | 90 goods | 30 steel (from era 2), 30 copper (from era 4) |  |
 | Mega factory (1780) | 270 goods | 90 steel (from era 2), 45 copper (from era 4), 45 machinery (from era 3) |  |
@@ -720,6 +722,35 @@ window (H) lists the same.
 | St. Peter's Basilica |  | 200 wax | 120 incense |
 | Salt mine cathedral | 200 salt |  |  |
 <!-- end table -->
+
+#### Ports
+
+Ports (`railroads.sim.ports`) have no fixed goods: each draws its own when it goes up. Every good
+a port can draw has a tier, and every tier a value a month; a port gives or takes as many units of
+a good a month as its tier's value buys at the good's base price, and more as the good's supply
+grows. An ordinary port draws one good it gives and one it takes, both common or rare, from the
+goods already in the game that year: it gives a good made within 300 cells of it less than its
+tier's value a month (wheat in farmland makes no sense, coal far from any mine does), and takes
+one made there more. Two ports in a neighbourhood merge into a big port that keeps everything
+both had and draws one more epic or legendary good to give; two big ports make a mega port, which
+draws one more, and whose owner may pick any good of any tier for it to give. Steel is common,
+rare and epic; eggs, bread, honey, dried fish, pots, sheep, pigs, cattle, passengers, mail and
+newspapers are never drawn.
+
+<!-- table: ports -->
+| Tier | Worth a month | Goods, units a month |
+|---|---|---|
+| Common | $600 | wheat 100, logs 100, potatoes 100, rice 100, chickens 100, milk 100, apples 75, bananas 75, dates 75, oranges 75, sugar 75, fish 75, sand 75, soybeans 75, tofu 75, bricks 75, meat 75, dairy products 66.67, planks 60, wood chips 60, coal 60, gas 60, clay 60, limestone 60, miso 60, cement 50, steel 7.5 |
+| Rare | $2,400 | refined sugar 171.4, sausages 171.4, fertiliser 160, barrels 160, salt 150, iron ore 133.3, cans 120, wool 120, grapes 120, fuel 120, soy sauce 120, hops 120, glass 120, paper 120, juice 120, oil 100, cotton 100, flax 100, chemicals 96, leather 96, stove tiles 96, copper 85.71, wax 80, castings 80, incense 8, steel 30 |
+| Epic | $4,800 | rubber 120, tea 120, plastics 120, coffee 96, furniture 80, beer 80, porcelain 80, clothes 68.57, sake 48, shoes 48, electronics 40, goods 40, vodka 40, tools 30, wine 30, guns 32, machinery 26.67, appliances 16, luxury goods 16, steel 60 |
+| Legendary | $10,000 | gold 12.5, diamonds 5, cars 2, tanks 1.25, planes 0.8333 |
+<!-- end table -->
+
+A port the player controls can ship goods to another port they control: an ordinary port one
+good, a big port two, a mega port four, of any tier. The sending port buys each from trains into
+its store, and every month a ship carries two wagons of the era's worth of it, free, to the other
+port, which gives it to trains. A port sends 18 passengers a month like a block of flats, a big
+port 36 and a mega port 72; from 1910 ports burn diesel in their boats like fisheries.
 
 Steel mills, canneries, factories, shipyards and every works are processors: each keeps a stockpile of two
 months of every input it uses at most for every building, takes in what reaches it even while it

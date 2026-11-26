@@ -5,7 +5,7 @@ them."""
 from collections.abc import Mapping
 from types import MappingProxyType
 
-from railroads.sim.constructions import BuildingKind
+from railroads.sim.constructions import PORT_KINDS, BuildingKind
 from railroads.sim.events import added_needs, make_factor, want_factor
 from railroads.sim.goods import (
     BONUS_NEEDS,
@@ -96,7 +96,7 @@ def boosts_of(kind: BuildingKind, year: int) -> Mapping[Need, float]:
     if recipe is not None:
         needs = needs_of(kind, year)
         return MappingProxyType({need: needs[need] for need in recipe.boosts if need in needs})
-    if kind not in MAKES:
+    if kind not in MAKES and kind not in PORT_KINDS:
         return MappingProxyType({})
 
     return MappingProxyType(
@@ -129,7 +129,7 @@ def bonus_of(kind: BuildingKind, year: int, east: bool = False) -> Mapping[Need,
         )
     extra = KIND_BONUSES.get(kind, frozenset())
     bonus = {need: amount for need, amount in needs.items() if need in BONUS_NEEDS or need in extra}
-    if kind in MAKES or len(bonus) == len(needs):
+    if kind in MAKES or kind in PORT_KINDS or len(bonus) == len(needs):
         return MappingProxyType({})
     return MappingProxyType(bonus)
 

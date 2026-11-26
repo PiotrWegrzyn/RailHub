@@ -25,7 +25,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 
-from railroads.sim.constructions import MERGED, BuildingKind
+from railroads.sim.constructions import MERGED, PORT_KINDS, BuildingKind
 from railroads.sim.forests import FORESTS, ForestRule
 from railroads.sim.goods import RECIPES, merging
 from railroads.sim.ladder_types import Join, Ladder, Merge, Rise
@@ -69,7 +69,7 @@ PASSENGERS_PER_POINT: Mapping[Points, int] = MappingProxyType(
         Points.TIMBER: 5,
         Points.ORE: 10,
         Points.INDUSTRY: 10,
-        Points.TRADE: 10,
+        Points.TRADE: 18,
         Points.CORPORATE: 20,
         Points.MILITARY: 20,
         Points.AIR: 200,
@@ -90,6 +90,8 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.MINE: (Points.ORE, 1),
     BuildingKind.LOGGING_CAMP: (Points.TIMBER, 1),
     BuildingKind.PORT: (Points.TRADE, 1),
+    BuildingKind.BIG_PORT: (Points.TRADE, 2),
+    BuildingKind.MEGA_PORT: (Points.TRADE, 4),
     BuildingKind.FACTORY: (Points.INDUSTRY, 1),
     BuildingKind.BIG_FACTORY: (Points.INDUSTRY, 3),
     BuildingKind.MEGA_FACTORY: (Points.INDUSTRY, 9),
@@ -383,23 +385,27 @@ LOGGING_CAMPS = Ladder(
     most_nearby=3,
 )
 
-# Ports open on the sea, or less often a lake, where a town has grown to use them.
+# Ports open on the sea, less often a lake or a river, where a town has grown to use them, one
+# to a cell; two in a neighbourhood merge into a big port, and two big ones into a mega port.
 PORTS = Ladder(
-    kinds=(BuildingKind.PORT,),
+    kinds=PORT_KINDS,
     land=Land(
         relief={Relief.HILLS: 0.5, Relief.MOUNTAINS: 0.0},
-        water={Terrain.LAND: 0.0, Terrain.RIVER: 0.0, Terrain.SEA: 1.0, Terrain.LAKE: 0.3},
+        water={Terrain.LAND: 0.0, Terrain.RIVER: 0.3, Terrain.SEA: 1.0, Terrain.LAKE: 0.3},
     ),
     base=8,
     needs={Points.POPULATION: 2},
+    merges={
+        BuildingKind.PORT: Merge(needed=2, pulled_down=2),
+        BuildingKind.BIG_PORT: Merge(needed=2, pulled_down=2),
+    },
     most_per_cell=1,
-    most_nearby=1,
+    one_per_cell=True,
 )
 
-# Three fisheries in a neighbourhood join into a port, however few live there, unless a port
-# stands within two cells.
+# Three fisheries in a neighbourhood join into a port, however few live there, in a cell without
+# one.
 FISHERIES_PER_PORT = 3
-PORTS_APART = 2
 
 # Fisheries grow on the shore like farms on fields, mostly by the sea and far less by lakes and
 # rivers, and more where people live (railroads.sim.breeding.DRAWN_BY_KIND).
@@ -410,7 +416,7 @@ FISHERIES = Ladder(
         water={Terrain.LAND: 0.0, Terrain.SEA: 1.0, Terrain.LAKE: 0.15, Terrain.RIVER: 0.1},
     ),
     base=100,
-    joins=Join(BuildingKind.PORT, FISHERIES_PER_PORT, PORTS_APART),
+    joins=Join(BuildingKind.PORT, FISHERIES_PER_PORT, PORT_KINDS),
 )
 
 # Factories make goods from steel, copper and machinery brought to them and draw more factories,

@@ -4,6 +4,7 @@ DIE_AFTER_MONTHS unless their ladder says, and those that never die (UNDYING).""
 from railroads.sim.clock import MONTHS_PER_YEAR
 from railroads.sim.constructions import (
     ONE_OFFS,
+    PORT_KINDS,
     BuildingKind,
 )
 from railroads.sim.goods import HOMES, MAKES, RECIPES
@@ -39,5 +40,8 @@ def dies_after(kind: BuildingKind) -> int:
 # the land decides where they are, and so how many people and what industry it can keep; and the
 # one-off buildings and the soldiers, which wait for what they need however long it takes.
 UNDYING = (
-    frozenset(kind for kind in MAKES if kind not in RECIPES) | ONE_OFFS | frozenset(MILITARY.kinds)
+    frozenset(kind for kind in MAKES if kind not in RECIPES)
+    | frozenset(PORT_KINDS)
+    | ONE_OFFS
+    | frozenset(MILITARY.kinds)
 )

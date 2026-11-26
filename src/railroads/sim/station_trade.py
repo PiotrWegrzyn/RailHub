@@ -13,7 +13,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.sim.amounts import EPSILON, divided, ratio
-from railroads.sim.constructions import BuildingKind
+from railroads.sim.constructions import PORT_KINDS, BuildingKind
 from railroads.sim.demand import StationDemand, capacity_of
 from railroads.sim.economy import distribute, wants_of
 from railroads.sim.events import travel_factor
@@ -305,8 +305,10 @@ class StationTrade:
         growth, economy = self._growth, self._growth.economy
         taken_by = economy.taken or {}
         wants: dict[BuildingKind, FloatArray] = {}
+        by_port = growth.ports.wants(need, cells)
         for kind, count in growth.counts.items():
-            if need not in wants_of(kind, growth.year):
+            at_port = by_port is not None and kind in PORT_KINDS
+            if need not in wants_of(kind, growth.year) and not at_port:
                 continue
             n = count.ravel()[cells].astype(np.float64)
             if (kind, need) in OWNED_BOOSTS:
@@ -319,7 +321,11 @@ class StationTrade:
             else:
                 taken = taken_by.get((kind, need), {})
                 had = np.array([taken.get(int(cell), 0.0) for cell in cells.tolist()])
-                want = n * needs_of(kind, growth.year, economy.east)[need] - had
+                each = needs_of(kind, growth.year, economy.east).get(need, 0.0)
+                if at_port:
+                    assert by_port is not None
+                    each = each + by_port
+                want = n * each - had
             short = self._short_last_month(cells, kind, need)
             if short is not None:
                 arrived = self._arrived.get((kind, need), {})
@@ -454,6 +460,8 @@ class StationTrade:
             if count.ravel()[cells].sum() <= 0:
                 continue
             made |= set(makes_of(kind, self._growth.year))
+            if kind in PORT_KINDS:
+                made |= set(self._growth.ports.gives_in(cells))
             if kind in RECIPES:
                 made.add(RECIPES[kind].makes)
                 made |= set(RECIPES[kind].also)
@@ -493,6 +501,9 @@ class StationTrade:
                 continue
             for good, amount in makes_of(kind, year).items():
                 made[good] = made.get(good, 0.0) + amount * many
+        if any(counts[kind].ravel()[gathered].any() for kind in PORT_KINDS):
+            for good, amount in self._growth.ports.gives_in(gathered).items():
+                made[good] = made.get(good, 0.0) + amount
         for good, amount in travellers.items():
             if amount > 0:
                 made[good] = made.get(good, 0.0) + amount
@@ -569,6 +580,10 @@ class StationTrade:
                     wanted = min(wanted, self._stock_room(kind, need, ring))
                 if wanted > 0:
                     needs[need] = needs.get(need, 0.0) + wanted
+        if any(counts.get(kind) for kind in PORT_KINDS):
+            ring = cells() if ring is None else ring
+            for need, wanted in self._growth.ports.wants_in(ring).items():
+                needs[need] = needs.get(need, 0.0) + wanted
         return needs
 
     def _stock_room(self, kind: BuildingKind, need: Need, cells: npt.NDArray[np.intp]) -> float:

@@ -7,8 +7,9 @@ years (NEED_YEARS), a few only for one kind of building (KIND_NEED_YEARS), and s
 building start to take a need only once its tile's demand reaches a level (railroads.sim.tiles
 UNLOCKS, need_open). Farms, orchards, date
 palms, banana plantations, sugar fields, potato farms and rice paddies grow food (MAKES); mines
-dig coal, logging camps fell logs, pits and quarries dig clay, limestone and sand, ports trade
-goods. Homes burn logs as they are, but every other building takes only sawn wood.
+dig coal, logging camps fell logs, pits and quarries dig clay, limestone and sand; ports give and
+take goods of their own (railroads.sim.ports). Homes burn logs as they are, but every other
+building takes only sawn wood.
 
 Processors turn their inputs into something else by a recipe (RECIPES): steel mills coal and
 iron ore into steel, canneries fruit and steel into cans, sawmills logs into planks and wood
@@ -200,6 +201,42 @@ class Need(Enum):
     ALCOHOL = "alcohol"
     PASSENGERS = "passengers"
     MAIL = "mail"
+    APPLES = "apples"
+    BANANAS = "bananas"
+    DATES = "dates"
+    ORANGES = "oranges"
+    CHICKENS = "chickens"
+    TOFU = "tofu"
+    MISO = "miso"
+    DAIRY = "dairy products"
+    SAUSAGES = "sausages"
+    CANS = "cans"
+    WOOL = "wool"
+    JUICE = "juice"
+    COTTON = "cotton"
+    FLAX = "flax"
+    TEA = "tea"
+
+
+# Needs only ports feel, for goods no other building needs on their own
+# (railroads.sim.ports): a port may take or ship any good.
+PORT_NEEDS = (
+    Need.APPLES,
+    Need.BANANAS,
+    Need.DATES,
+    Need.ORANGES,
+    Need.CHICKENS,
+    Need.TOFU,
+    Need.MISO,
+    Need.DAIRY,
+    Need.SAUSAGES,
+    Need.CANS,
+    Need.WOOL,
+    Need.JUICE,
+    Need.COTTON,
+    Need.FLAX,
+    Need.TEA,
+)
 
 
 FRUITS = (Good.APPLES, Good.BANANAS, Good.DATES, Good.ORANGES, Good.SUGAR)
@@ -325,6 +362,8 @@ DIESEL_USERS: Mapping[BuildingKind, tuple[float, int]] = MappingProxyType(
         BuildingKind.LOGGING_CAMP: (3.0, 0),
         BuildingKind.FISHERY: (2.0, MOTOR_BOAT_YEAR),
         BuildingKind.PORT: (10.0, MOTOR_BOAT_YEAR),
+        BuildingKind.BIG_PORT: (20.0, MOTOR_BOAT_YEAR),
+        BuildingKind.MEGA_PORT: (40.0, MOTOR_BOAT_YEAR),
     }
 )
 # Boosts of what makes goods from the land that make up to so much more each, whatever else
@@ -357,11 +396,8 @@ KIND_NEED_YEARS: Mapping[tuple[BuildingKind, Need], int] = MappingProxyType(
     }
 )
 
-# Goods a kind of building makes only from a later year than everyone else: ports bring in natural
-# gas long after gasworks make town gas.
-KIND_GOOD_YEARS: Mapping[tuple[BuildingKind, Good], int] = MappingProxyType(
-    {(BuildingKind.PORT, Good.GAS): 1950}
-)
+# Goods a kind of building makes only from a later year than everyone else.
+KIND_GOOD_YEARS: Mapping[tuple[BuildingKind, Good], int] = MappingProxyType({})
 
 
 def good_exists(good: Good, year: int) -> bool:
@@ -749,7 +785,6 @@ MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
         BuildingKind.FISHERY: {Good.FISH: 10},
         BuildingKind.MINE: {Good.COAL: 100},
         BuildingKind.LOGGING_CAMP: {Good.LOGS: 20},
-        BuildingKind.PORT: {Good.GOODS: 20, Good.OIL: 50, Good.GAS: 50},
         BuildingKind.IRON_MINE: {Good.IRON: 100},
         BuildingKind.COPPER_MINE: {Good.COPPER: 40},
         BuildingKind.GOLD_MINE: {Good.GOLD: 20},
@@ -1079,6 +1114,7 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     BuildingKind.MEGA_FACTORY,
     BuildingKind.SHIPYARD,
     Need.GOODS,
+    *PORT_NEEDS,
 )
 PIPELINE: tuple[Need | BuildingKind, ...] = tuple(
     kind

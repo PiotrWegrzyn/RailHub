@@ -81,6 +81,7 @@ from railroads.sim.clock import HISTORY_START, MONTHS_PER_YEAR, START_YEAR
 from railroads.sim.constructions import (
     GREW_FROM,
     ONE_OFFS,
+    PORT_KINDS,
     Building,
     BuildingKind,
     Constructions,
@@ -105,6 +106,7 @@ from railroads.sim.ledger import Ledger
 from railroads.sim.move import Move
 from railroads.sim.ownership import Owners
 from railroads.sim.points import Points
+from railroads.sim.ports import Ports
 from railroads.sim.power_plants import build_power_plants
 from railroads.sim.railway import Railway
 from railroads.sim.room import Room
@@ -336,6 +338,8 @@ class Growth:
         # The buildings the player owns, the stations growth trades with, and the room it makes
         # (railroads.sim.ownership, railroads.sim.station_trade, railroads.sim.room).
         self.owners = Owners(self)
+        # What every port gives, takes and ships (railroads.sim.ports).
+        self.ports = Ports(self)
         self.ledger = Ledger()
         self.station_trade = StationTrade(self)
         self.room = Room(self)
@@ -467,13 +471,16 @@ class Growth:
         self.economy.bonus_per_good = BONUS_PER_GOOD
         if self.railway is not None:
             self.railway.station_trade = self.station_trade
+        self.ports.sync()
         yield
         self.last_trade = yield from self.economy.trade_steps(
             self.counts,
             self.station_trade.orders(),
             np.flatnonzero(self._occupied),
             self.owners.first_for_stations(),
+            self.ports.cell_goods(),
         )
+        self.ports.settle(self.last_trade)
         self.ledger.record(self.last_trade, max(0, self._months - 1))
         yield
         yield from self.station_trade.settle_steps(self.last_trade)
@@ -1008,6 +1015,8 @@ class Growth:
             merge = ladder.merges.get(small)
             if merge is None or self._around(small, neighbourhood) < merge.needed:
                 continue
+            if ladder.one_per_cell and self._held_after(ladder, cell, small, merge.pulled_down):
+                continue
             merged = self._replace(cell, neighbourhood, [(small, merge.pulled_down)], big)
             if merged is not None:
                 return merged
@@ -1033,8 +1042,7 @@ class Growth:
         in the cell, if none of that stands near; None, and nothing changed, otherwise."""
         if self._around(kind, neighbourhood) < join.needed:
             return None
-        built = self._counts[join.into]
-        if any(built[near] for near in self._grid.within(cell, join.apart)):
+        if any(self._counts[alone][cell] for alone in join.alone):
             return None
         return self._replace(cell, neighbourhood, [(kind, join.needed)], join.into)
 
@@ -1170,13 +1178,24 @@ class Growth:
             and self._nearby[Points.POPULATION][cell] >= ladder.crowded_at
         ):
             return False
-        if ladder.most_per_cell is not None and self._counts[first][cell] >= ladder.most_per_cell:
+        held = (
+            sum(int(self._counts[kind][cell]) for kind in ladder.kinds)
+            if ladder.one_per_cell
+            else int(self._counts[first][cell])
+        )
+        if ladder.most_per_cell is not None and held >= ladder.most_per_cell:
             return False
         if ladder.most_nearby is not None:
             neighbourhood = [cell, *self._grid.neighbours(*cell)]
             if self._around(first, neighbourhood) >= ladder.most_nearby:
                 return False
         return ladder.apart is None or not self._any_within(ladder, cell)
+
+    def _held_after(self, ladder: Ladder, cell: Cell, pulled: BuildingKind, many: int) -> bool:
+        """Whether the cell still holds any building of the ladder once so many of a kind are
+        pulled down in the neighbourhood, the cell's own first."""
+        held = sum(int(self._counts[kind][cell]) for kind in ladder.kinds)
+        return held - min(int(self._counts[pulled][cell]), many) > 0
 
     def _any_within(self, ladder: Ladder, cell: Cell) -> bool:
         """Whether any building on the ladder stands within its `apart` steps of the cell."""
@@ -1239,10 +1258,17 @@ class Growth:
         if new.space > self.constructions.space_left(cell) + freed:
             return None
         owned = 0
+        ports = [
+            port
+            for near, kind, _ in plan
+            if kind in PORT_KINDS and (port := self.ports.take(near)) is not None
+        ]
         for near, kind, take in plan:
             owned += self._pull_down(near, kind, take)
         moved = self.room.clear(cell, new.space)
         self.constructions.build(new)
+        if new_kind in PORT_KINDS[1:] and ports:
+            self.ports.merged(cell, new_kind, ports)
         self.add(cell, new_kind, 1)
         if owned:
             taken = sum(take for _, _, take in plan)
@@ -1347,6 +1373,7 @@ class Growth:
         growth.economy = self.economy.moved_into(growth.economy, move)
         growth.last_trade = None if self.last_trade is None else self.last_trade.moved(move)
         growth.owners.take_moved(self.owners, move)
+        growth.ports = self.ports.moved(growth, move)
         if self.novelties is not None:
             self.novelties.move(move)
         growth.novelties = self.novelties

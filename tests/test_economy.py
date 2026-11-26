@@ -477,9 +477,7 @@ def test_a_brewery_makes_no_beer_from_barrels_without_hops() -> None:
 
 
 @pytest.mark.parametrize(("wheat", "times"), [(0.0, 1.0), (60.0, 1.5), (120.0, 2.0)])
-def test_wheat_lets_a_cattle_ranch_raise_up_to_twice_the_cattle(
-    wheat: float, times: float
-) -> None:
+def test_wheat_lets_a_cattle_ranch_raise_up_to_twice_the_cattle(wheat: float, times: float) -> None:
     tile_map = make_map()
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 8), BuildingKind.CATTLE_RANCH, 1))
@@ -607,16 +605,6 @@ def test_houses_heat_with_logs_or_coal(fuel: str) -> None:
 
     burned, _ = trade.goods_got[(BuildingKind.HOUSE, Need.HEATING)]
     assert burned[position(trade, economy, (8, 9))] == 3.0
-
-
-@pytest.mark.parametrize(
-    ("year", "made"),
-    [(1949, {Good.GOODS, Good.OIL}), (1950, {Good.GOODS, Good.OIL, Good.GAS})],
-)
-def test_ports_bring_in_gas_only_once_there_is_any_in_1950(year: int, made: set) -> None:
-    makes = makes_of(BuildingKind.PORT, year)
-
-    assert set(makes) == made
 
 
 @pytest.mark.parametrize(

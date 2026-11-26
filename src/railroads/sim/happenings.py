@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from railroads.sim.clock import MONTH_NAMES, MONTHS_PER_YEAR
-from railroads.sim.constructions import Building, BuildingKind
+from railroads.sim.constructions import PORT_KINDS, Building, BuildingKind
 from railroads.sim.events import (
     EVENTS,
     PILGRIM_MONTHS,
@@ -172,7 +172,7 @@ class Happenings:
     def _open_gun_factories(self, growth: Growth) -> set[Cell]:
         from railroads.sim.novelties import by_biggest_town
 
-        ports = bool(growth.count(BuildingKind.PORT).any())
+        ports = any(growth.count(kind).any() for kind in PORT_KINDS)
         changed: set[Cell] = set()
         for _ in range(WAR_GUN_FACTORIES if ports else 2 * WAR_GUN_FACTORIES):
             built = by_biggest_town(growth, BuildingKind.GUN_FACTORY, self.gun_factories)

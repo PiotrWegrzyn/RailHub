@@ -14,6 +14,7 @@ from pathlib import Path
 from railroads.catalogue import BuildingHelp, EngineHelp, building_help, engine_help, fuel_use
 from railroads.sim.clock import END_YEAR, START_YEAR
 from railroads.sim.goods import BONUS_PART, TRAVELLERS, Good, Need, freight_of
+from railroads.sim.ports import TIER_GOODS, TIER_VALUES, monthly
 from railroads.sim.yearly import bonus_of, boosts_of
 from railroads.words import dollars
 
@@ -131,8 +132,19 @@ def engines_table() -> list[str]:
     return [head, "|" + "---|" * 12] + [engine_row(row) for row in engine_help()]
 
 
+def ports_table() -> list[str]:
+    """Every tier of goods ports draw, its value a month and how many units of each good that
+    makes at base prices."""
+    lines = ["| Tier | Worth a month | Goods, units a month |", "|---|---|---|"]
+    for tier, goods in TIER_GOODS.items():
+        named = ", ".join(f"{good.value} {monthly(good, tier):,.4g}" for good in goods)
+        lines.append(f"| {tier.value.title()} | {dollars(TIER_VALUES[tier])} | {named} |")
+    return lines
+
+
 TABLES: dict[str, Callable[[], list[str]]] = {
     "buildings": buildings_table,
+    "ports": ports_table,
     "freight": freight_table,
     "engines": engines_table,
 }

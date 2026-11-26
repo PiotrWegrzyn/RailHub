@@ -49,7 +49,7 @@ import numpy.typing as npt
 from railroads.sim import tiles
 from railroads.sim.amounts import EPSILON, divided, ratio
 from railroads.sim.clock import QUARTER, START_YEAR
-from railroads.sim.constructions import BuildingKind
+from railroads.sim.constructions import PORT_KINDS, BuildingKind
 from railroads.sim.events import in_eastern_bloc, rise_of
 from railroads.sim.goods import (
     BONUS_PART,
@@ -74,6 +74,7 @@ from railroads.sim.tilemap import TileMap
 from railroads.sim.trade import (
     BONUS_PER_GOOD,
     STOCKPILES,
+    CellGoods,
     OwnedShare,
     Satisfaction,
     StationOrder,
@@ -154,7 +155,7 @@ class Economy:
         self.tile_map = tile_map
         self.cells = tile_map.grid.rows * tile_map.grid.cols
         self.neighbourhoods = Neighbourhoods(tile_map.grid)
-        self.kinds = tuple(dict.fromkeys([*MAKES, *NEEDS]))
+        self.kinds = tuple(dict.fromkeys([*MAKES, *NEEDS, *PORT_KINDS]))
         # Each cell's satisfaction last month, which decides who is served first.
         self.levels = np.full(self.cells, Satisfaction.UNSATISFIED, dtype=np.int8)
         # The year, which decides what buildings need, and what each bonus good a building gets
@@ -181,12 +182,13 @@ class Economy:
         stations: Mapping[Cell, StationOrder] | None = None,
         cells: npt.NDArray[np.intp] | None = None,
         owned: Mapping[BuildingKind, OwnedShare] | None = None,
+        cell_goods: CellGoods | None = None,
     ) -> Trade:
         """Lets the stations hand out and gather one month of goods among the buildings counted
         in each cell, and the buildings sell what is left to each other. `cells`, the flat cells
         with any buildings, saves finding them again. `owned`, the player's part of the buildings they own, goes to
-        stations first."""
-        return finish(self.trade_steps(counts, stations, cells, owned))
+        stations first. `cell_goods` is what the kinds that trade cell by cell make and need."""
+        return finish(self.trade_steps(counts, stations, cells, owned, cell_goods))
 
     def trade_steps(
         self,
@@ -194,9 +196,10 @@ class Economy:
         stations: Mapping[Cell, StationOrder] | None = None,
         cells: npt.NDArray[np.intp] | None = None,
         owned: Mapping[BuildingKind, OwnedShare] | None = None,
+        cell_goods: CellGoods | None = None,
     ) -> Steps[Trade]:
         """trade, pausing about every STEP_SECONDS; nothing else may change the game between."""
-        return MonthOfTrade(self, counts, stations or {}, cells, owned).run_steps()
+        return MonthOfTrade(self, counts, stations or {}, cells, owned, cell_goods).run_steps()
 
     def _around(
         self,
@@ -276,6 +279,7 @@ class MonthOfTrade:
         stations: Mapping[Cell, StationOrder],
         cells: npt.NDArray[np.intp] | None = None,
         owned: Mapping[BuildingKind, OwnedShare] | None = None,
+        cell_goods: CellGoods | None = None,
     ) -> None:
         self.economy = economy
         self.stations = stations
@@ -290,7 +294,18 @@ class MonthOfTrade:
         self.cells = cells
         in_cells = ((k, n[cells]) for k, n in flat.items())
         self.count = {k: n.astype(np.float64) for k, n in in_cells if n.any()}
+        # What the kinds trading cell by cell make, take and store in each traded cell.
+        self.by_cell = frozenset() if cell_goods is None else cell_goods.kinds
+        self.cell_makes: dict[Good, FloatArray] = {}
+        self.cell_takes: dict[Need, FloatArray] = {}
+        self.cell_stores: dict[Need, FloatArray] = {}
+        if cell_goods is not None:
+            self.cell_makes = cell_goods.over(cell_goods.makes, cells)
+            self.cell_takes = cell_goods.over(cell_goods.takes, cells)
+            self.cell_stores = cell_goods.over(cell_goods.stores, cells)
         self.wanted = {kind: wants_of(kind, economy.year) for kind in self.count}
+        for kind in self.by_cell & set(self.count):
+            self.wanted[kind] = self.wanted[kind] | set(self.cell_takes) | set(self.cell_stores)
         self.zero = np.zeros(cells.size)
         self.station_pairs: _Pairs | None = None
         # What a unit handed out on its own is worth to each cell, times its price, and per good
@@ -316,10 +331,10 @@ class MonthOfTrade:
         # What buildings had taken as goods reached their station when their need was served:
         # what they take after that, while the month's trade is still going, counts for the next.
         self.counted: dict[tuple[BuildingKind, Need], dict[int, float]] = {}
-        for kind in MAKES:
+        for kind in dict.fromkeys([*MAKES, *self.by_cell]):
             if kind in RECIPES or kind not in self.count:
                 continue
-            for good, amount in makes_of(kind, economy.year).items():
+            for good, amount in self._makes(kind).items():
                 self.offers[(kind, good)] = self.count[kind] * amount
                 self.offered[good] += self.count[kind] * amount
                 if kind in self.owned:
@@ -401,11 +416,25 @@ class MonthOfTrade:
                 )
             else:
                 wants[kind] = self._count_for(kind, need) * self._amount(kind, need)
+                if kind in self.by_cell and need in self.cell_stores:
+                    wants[kind] = wants[kind] + n * self.cell_stores[need]
         return wants
 
-    def _amount(self, kind: BuildingKind, need: Need) -> float:
-        """What one building of a kind wants of a need in a month this year."""
-        return needs_of(kind, self.economy.year, self.economy.east).get(need, 0.0)
+    def _amount(self, kind: BuildingKind, need: Need) -> float | FloatArray:
+        """What one building of a kind wants of a need in a month this year, in each traded cell
+        for the kinds trading cell by cell."""
+        amount = needs_of(kind, self.economy.year, self.economy.east).get(need, 0.0)
+        if kind in self.by_cell and need in self.cell_takes:
+            return amount + self.cell_takes[need]
+        return amount
+
+    def _makes(self, kind: BuildingKind) -> Mapping[Good, float | FloatArray]:
+        """What one building of a kind makes of each good in a month this year, in each traded
+        cell for the kinds trading cell by cell."""
+        made = makes_of(kind, self.economy.year)
+        if kind not in self.by_cell:
+            return made
+        return {**made, **self.cell_makes}
 
     def _owned_of_taking(self, kind: BuildingKind) -> FloatArray:
         """The player's part of the buildings of a kind in each cell taking the boosts only their
@@ -602,7 +631,7 @@ class MonthOfTrade:
             ),
         )
         owned_only = (kind, need) in OWNED_BOOSTS
-        for good, amount in makes_of(kind, self.economy.year).items():
+        for good, amount in self._makes(kind).items():
             more = taking * amount * most * share
             self.offers[(kind, good)] = self.offers[(kind, good)] + more
             self.offered[good] = self.offered[good] + more
@@ -829,7 +858,10 @@ class MonthOfTrade:
         goods_got = {}
         for (kind, need), received in self.received.items():
             wanted = self._count_for(kind, need) * self._amount(kind, need)
-            goods_got[(kind, need)] = (received, wanted)
+            stored = self.zero
+            if kind in self.by_cell and need in self.cell_stores:
+                stored = self.count[kind] * self.cell_stores[need]
+            goods_got[(kind, need)] = (received, wanted + stored)
             if need in bonus_of(kind, self.economy.year):
                 part = divided(np.minimum(received, wanted), wanted)
                 bonus[kind] = bonus.get(kind, self.zero) + part
@@ -859,7 +891,7 @@ class MonthOfTrade:
             if good not in shares:
                 shares[good] = self._went(good)
             sent = given = offer * shares[good]
-            most = self.count[kind] * makes_of(kind, self.economy.year).get(good, 0.0)
+            most = self.count[kind] * self._makes(kind).get(good, 0.0)
             goods_gave[(kind, good)] = (given, most)
             gave[kind] += given
             could_make[kind] += most

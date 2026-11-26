@@ -48,6 +48,8 @@ DOTS: dict[BuildingKind, tuple[RGB, float]] = {
     BuildingKind.LOGGING_CAMP: ((128, 88, 52), 0.14),
     BuildingKind.SAWMILL: ((176, 130, 80), 0.14),
     BuildingKind.PORT: ((60, 110, 190), 0.16),
+    BuildingKind.BIG_PORT: ((48, 92, 172), 0.18),
+    BuildingKind.MEGA_PORT: ((36, 72, 150), 0.2),
     BuildingKind.FISHERY: ((110, 170, 200), 0.12),
     BuildingKind.SHEEP_FARM: ((236, 232, 216), 0.12),
     BuildingKind.COTTON_FIELD: ((246, 246, 240), 0.12),
