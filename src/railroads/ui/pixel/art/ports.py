@@ -13,7 +13,23 @@ origin."""
 import math
 from collections.abc import Callable
 
-from railroads.ui.pixel.art.built import gable_roof, modelled, upright, walls, window
+from railroads.ui.pixel.art.built import cone, gable_roof, modelled, upright, walls, window
+from railroads.ui.pixel.art.harbour import (
+    GLASS,
+    TRUCK_BLUE,
+    TRUCK_YELLOW,
+    box_wagon,
+    container_lorry,
+    container_ship,
+    dump_truck,
+    fishing_boat,
+    flat_wagon,
+    horse_cart,
+    open_wagon,
+    placed,
+    rowing_boat,
+    steamer,
+)
 from railroads.ui.pixel.art.painter import BRICK, RGB, Sprite, shade
 from railroads.ui.pixel.models import Face, Model
 
@@ -45,6 +61,14 @@ ASPHALT: RGB = (92, 94, 98)
 LAMP: RGB = (250, 230, 160)
 NET: RGB = (70, 86, 80)
 SACK: RGB = (204, 186, 146)
+DARK_TIMBER: RGB = (122, 96, 70)
+FISH: RGB = (190, 196, 200)
+LOGS: RGB = (140, 102, 66)
+TUFT: RGB = (92, 128, 62)
+TRACK: RGB = (160, 138, 100)
+COAL: RGB = (40, 40, 44)
+SAND: RGB = (214, 190, 132)
+WHITE_LINE: RGB = (226, 226, 220)
 CONTAINERS: tuple[RGB, ...] = (
     (176, 64, 52),
     (52, 104, 156),
@@ -164,66 +188,83 @@ def _stack(
                 _container(m, u + row * (width + 0.004), v, tier * height, color, False)
 
 
-def _crane(m: Model, u: float, v: float, reach: float, high: float, load: RGB) -> None:
-    """A slewing crane standing at (u, v), its jib reaching `reach` out along u over the water,
-    a cabin under the jib, a counterweight behind it and a load on its hook."""
-    m.box((u - 0.02, u + 0.02), (v - 0.02, v + 0.02), (0.0, 0.012), shade(CRANE, 0.6))
-    m.box((u - 0.006, u + 0.006), (v - 0.006, v + 0.006), (0.012, high), CRANE)
+def crane(reach: float, high: float, load: RGB) -> Model:
+    """A slewing crane on a portal of four legs, its lattice tower rising to a cabin under a
+    long jib reaching `reach` out along u, a counterweight behind and a load on its hook."""
+    m = Model()
+    for lu in (-0.022, 0.022):
+        for lv in (-0.022, 0.022):
+            m.box((lu - 0.004, lu + 0.004), (lv - 0.004, lv + 0.004), (0.0, 0.05), CRANE)
+    m.box((-0.028, 0.028), (-0.028, 0.028), (0.05, 0.062), shade(CRANE, 0.8))
+    m.box((-0.01, 0.01), (-0.01, 0.01), (0.062, high), CRANE)
     with m.fine():
-        rungs = 6
-        for k in range(1, rungs):
-            z = 0.012 + (high - 0.012) * k / rungs
+        rungs = 10
+        for k in range(rungs):
+            z = 0.062 + (high - 0.062) * k / rungs
+            m.box((-0.0108, 0.0108), (-0.0108, 0.0108), (z, z + 0.002), shade(CRANE, 0.65))
+    m.box((-0.02, 0.022), (-0.016, 0.016), (high - 0.04, high - 0.008), CABIN)
+    with m.fine():
+        m.panel((0.0, 0.018), (high - 0.034, high - 0.016), 0.0166, GLASS)
+    m.box((-0.1, reach), (-0.006, 0.006), (high, high + 0.012), CRANE)
+    with m.fine():
+        bays = max(2, round(reach / 0.03))
+        for k in range(bays):
+            at = reach * k / bays
             m.box(
-                (u - 0.0068, u + 0.0068),
-                (v - 0.0068, v + 0.0068),
-                (z, z + 0.002),
-                shade(CRANE, 0.7),
+                (at, at + 0.002), (-0.0064, 0.0064), (high + 0.012, high + 0.016), shade(CRANE, 0.6)
             )
-    m.box((u - 0.012, u + 0.012), (v - 0.011, v + 0.011), (high - 0.03, high - 0.008), CABIN)
-    m.box((u - 0.07, u + reach), (v - 0.004, v + 0.004), (high, high + 0.008), CRANE)
-    m.box(
-        (u - 0.075, u - 0.045),
-        (v - 0.012, v + 0.012),
-        (high - 0.016, high + 0.004),
-        shade(CRANE, 0.45),
-    )
-    hook = u + reach - 0.01
-    m.box((hook - 0.0012, hook + 0.0012), (v - 0.0012, v + 0.0012), (0.06, high), CABLE)
-    m.box((hook - 0.012, hook + 0.012), (v - 0.012, v + 0.012), (0.036, 0.06), load)
-
-
-def _gantry(m: Model, u: float, v: float, half: float, reach: float, high: float) -> None:
-    """A container gantry crane straddling a pier at (u, v), its legs `half` either side, its
-    boom `reach` out along u over the water, with its machinery house, its trolley and a
-    container hanging under it."""
-    legs = ((u - 0.03, v - half), (u - 0.03, v + half), (u + 0.03, v - half), (u + 0.03, v + half))
-    for lu, lv in legs:
-        m.box((lu - 0.005, lu + 0.005), (lv - 0.005, lv + 0.005), (0.0, high), GANTRY)
-    for side in (v - half, v + half):
-        m.box(
-            (u - 0.035, u + 0.035),
-            (side - 0.004, side + 0.004),
-            (high * 0.45, high * 0.45 + 0.008),
-            shade(GANTRY, 0.8),
+    m.box((-0.002, 0.002), (-0.002, 0.002), (high, high + 0.06), CRANE)
+    for side in (-0.0015, 0.0015):
+        m.slope(
+            (0.0, high + 0.06), (reach * 0.8, high + 0.012), (side - 0.0008, side + 0.0008), CABLE
         )
-        m.box((u - 0.12, u + reach), (side - 0.004, side + 0.004), (high, high + 0.012), GANTRY)
-    m.box(
-        (u - 0.12, u + reach),
-        (v - half, v + half),
-        (high + 0.012, high + 0.016),
-        shade(GANTRY, 0.75),
-    )
-    m.box((u - 0.12, u - 0.05), (v - half, v + half), (high + 0.016, high + 0.04), CABIN)
-    trolley = u + reach * 0.7
-    m.box((trolley - 0.014, trolley + 0.014), (v - 0.014, v + 0.014), (high - 0.012, high), CABIN)
-    for side in (v - 0.008, v + 0.008):
+    m.box((-0.11, -0.07), (-0.016, 0.016), (high - 0.02, high + 0.008), shade(CRANE, 0.45))
+    hook = reach - 0.015
+    m.box((hook - 0.0015, hook + 0.0015), (-0.0015, 0.0015), (0.09, high), CABLE)
+    m.box((hook - 0.016, hook + 0.016), (-0.016, 0.016), (0.06, 0.09), load)
+    return m
+
+
+def gantry(reach: float, high: float, half: float) -> Model:
+    """A container gantry crane on four legs `half` either side of the u axis, its boom reaching
+    `reach` out along u over the water, with its machinery house, a trolley and a container
+    hanging under it."""
+    m = Model()
+    for lu in (-0.04, 0.04):
+        for lv in (-half, half):
+            m.box((lu - 0.006, lu + 0.006), (lv - 0.006, lv + 0.006), (0.0, high), GANTRY)
         m.box(
-            (trolley - 0.001, trolley + 0.001),
-            (side - 0.001, side + 0.001),
-            (0.075, high - 0.012),
+            (lu - 0.008, lu + 0.008), (-half - 0.008, half + 0.008), (0.0, 0.01), shade(GANTRY, 0.5)
+        )
+    for z in (high * 0.35, high * 0.7):
+        for lv in (-half, half):
+            m.box((-0.04, 0.04), (lv - 0.004, lv + 0.004), (z, z + 0.008), shade(GANTRY, 0.8))
+    for lv in (-half, half):
+        m.box((-0.16, reach), (lv - 0.005, lv + 0.005), (high, high + 0.016), GANTRY)
+        with m.fine():
+            bays = max(2, round((reach + 0.16) / 0.035))
+            for k in range(bays):
+                at = -0.16 + (reach + 0.16) * k / bays
+                m.box(
+                    (at, at + 0.003),
+                    (lv - 0.0054, lv + 0.0054),
+                    (high + 0.016, high + 0.03),
+                    shade(GANTRY, 0.7),
+                )
+    m.box((-0.16, reach), (-half, half), (high + 0.016, high + 0.02), shade(GANTRY, 0.75))
+    m.box((-0.16, -0.07), (-half, half), (high + 0.02, high + 0.05), CABIN)
+    m.box((-0.02, 0.03), (-0.008, 0.008), (high + 0.02, high + 0.09), GANTRY)
+    trolley = reach * 0.7
+    m.box((trolley - 0.018, trolley + 0.018), (-0.018, 0.018), (high - 0.014, high), CABIN)
+    for side in (-0.01, 0.01):
+        m.box(
+            (trolley - 0.0012, trolley + 0.0012),
+            (side - 0.0012, side + 0.0012),
+            (0.1, high - 0.014),
             CABLE,
         )
-    _container(m, trolley, v, 0.045, CONTAINERS[1], True)
+    _container(m, trolley, 0.0, 0.07, CONTAINERS[1], True)
+    return m
 
 
 def _apothem() -> float:
@@ -269,15 +310,11 @@ def _quay(m: Model, start: float, top: RGB, wall: RGB) -> float:
     near, far = _across(start, edge / 0.97) * 0.97, _across(edge, edge / 0.97) * 0.97
     _slab(m, [(start, -near), (edge, -far), (edge, far), (start, near)], 0.012, top, wall)
     with m.fine():
-        rows = 8
+        rows = 6
         for k in range(1, rows):
-            t = k / rows
-            m.box(
-                (start, edge - 0.006),
-                (-near + 2 * near * t - 0.0006, -near + 2 * near * t + 0.0006),
-                (0.012, 0.0124),
-                shade(top, 0.85),
-            )
+            at = start + (edge - start) * k / rows
+            wide = _across(at, edge / 0.97) * 0.97
+            m.box((at - 0.0006, at + 0.0006), (-wide, wide), (0.012, 0.0124), shade(top, 0.85))
     return edge
 
 
@@ -349,13 +386,51 @@ def _office(m: Model) -> None:
     m.panel((0.015, 0.045), (0.0, 0.05), v[1] + 0.0006, DOORWAY)
 
 
+def _smokehouse(m: Model) -> None:
+    u, v, high = (-0.05, 0.05), (-0.045, 0.045), 0.05
+    walls(m, u, v, high, DARK_TIMBER, shade(DARK_TIMBER, 0.7))
+    gable_roof(m, u, v, (high, high + 0.03), SHED_ROOF, DARK_TIMBER, 0.008)
+    upright(m, 0.03, 0.0, 0.007, (high, high + 0.05), (120, 110, 100))
+
+
+def _fish_rack(m: Model, u: float, v: float) -> None:
+    """A rack of fish hung to dry on a pole between two posts."""
+    for at in (v - 0.05, v + 0.05):
+        m.box((u - 0.003, u + 0.003), (at - 0.003, at + 0.003), (0.0, 0.045), PILES)
+    m.box((u - 0.002, u + 0.002), (v - 0.05, v + 0.05), (0.042, 0.046), PILES)
+    for k in range(9):
+        at = v - 0.04 + 0.08 * k / 8
+        m.box((u - 0.0016, u + 0.0016), (at - 0.002, at + 0.002), (0.024, 0.042), FISH)
+
+
+def _woodpile(m: Model, u: float, v: float, along: float, across: float, high: float) -> None:
+    m.box((u - along, u + along), (v - across, v + across), (0.0, high), LOGS)
+    with m.fine():
+        for k in range(1, 4):
+            z = high * k / 4
+            m.box(
+                (u - along - 0.001, u + along + 0.001),
+                (v - across, v + across),
+                (z - 0.0008, z + 0.0008),
+                shade(LOGS, 0.7),
+            )
+
+
+def _grass(m: Model, points: list[tuple[float, float]]) -> None:
+    _slab(m, points, 0.0009, TUFT, TUFT)
+
+
 def port() -> Model:
-    """A fishing harbour: a timber shed on a yard of trodden earth filling its cell, nets drying
-    on a rack, barrels and crates, a boat pulled up on the beach, and a short wooden jetty on
-    piles running out over the water from a boardwalk on the shore, a rowing boat moored at its
-    end."""
+    """A fishing harbour: a yard of trodden earth filling its cell, worn into a track from the
+    shed to the shore, with tufts of grass at its edges; a timber shed, a smokehouse, racks of
+    fish drying, nets, a woodpile, crates and barrels, a horse and cart, a boat pulled up on the
+    beach, and a wooden jetty on piles running out from a boardwalk, fishing boats moored at
+    it."""
     m = Model()
     _yard(m, WORN_EARTH)
+    _grass(m, [(-0.62, -0.1), (-0.5, -0.32), (-0.36, -0.2), (-0.46, 0.02)])
+    _grass(m, [(-0.2, 0.5), (0.0, 0.62), (0.08, 0.5), (-0.1, 0.42)])
+    _slab(m, [(-0.1, -0.2), (0.5, -0.04), (0.5, 0.06), (-0.1, -0.1)], 0.0012, TRACK, TRACK)
     edge = _apothem() * 0.96
     _slab(
         m,
@@ -364,56 +439,90 @@ def port() -> Model:
         PLANKS,
         PILES,
     )
-    _moved(m, (-0.22, -0.26), _shed)
-    _barrel(m, -0.06, -0.14)
-    _barrel(m, -0.04, -0.11)
-    _crate(m, -0.1, -0.1)
-    _net_rack(m, -0.2, (0.08, 0.2))
-    _boat(m, 0.28, -0.36, 0.08)
+    _moved(m, (-0.24, -0.3), _shed)
+    _moved(m, (-0.36, 0.14), _smokehouse)
+    _fish_rack(m, -0.08, 0.26)
+    _fish_rack(m, 0.06, 0.32)
+    _net_rack(m, -0.34, (-0.02, -0.1))
+    _woodpile(m, -0.46, -0.08, 0.04, 0.02, 0.03)
+    _barrel(m, -0.1, -0.18)
+    _barrel(m, -0.08, -0.15)
+    _barrel(m, -0.11, -0.14)
+    _crate(m, -0.14, -0.13)
+    _crate(m, 0.5, 0.1, 0.006)
+    _crate(m, 0.48, 0.08, 0.006)
+    _crate(m, 0.52, 0.12, 0.006)
+    for k in range(4):
+        _barrel(m, 0.36 + 0.022 * k, 0.2 + 0.01 * (k % 2))
+    _fish_rack(m, 0.2, 0.36)
+    upright(m, -0.02, 0.0, 0.016, (0.0, 0.016), (150, 146, 136))
+    upright(m, -0.02, 0.0, 0.011, (0.0, 0.0165), (40, 60, 70))
+    placed(m, rowing_boat(), (-0.12, 0.48), 120)
+    _woodpile(m, 0.04, -0.42, 0.05, 0.025, 0.035)
+    placed(m, horse_cart(), (0.22, -0.1), 15)
+    placed(m, rowing_boat(), (0.46, -0.4), 35)
     _deck(m, (edge, edge + 0.5), 0.024, 0.02, 0.014, PLANKS, PILES, 0.08)
-    _boat(m, edge + 0.42, 0.065, 0.07)
+    placed(m, fishing_boat(), (edge + 0.26, 0.075), 0)
+    placed(m, fishing_boat(), (edge + 0.36, -0.035), 180)
     return m
 
 
 def big_port() -> Model:
-    """A merchant harbour filling its cell: a cobbled quay along the shore with a siding running
-    along it, a brick warehouse and a stone harbour office behind on gravel, a crane on the
-    quay's edge lifting a crate over the water, crates, barrels and sacks, lamps, and a stone pier
-    running out from the quay with a boat moored alongside."""
+    """A merchant harbour filling its cell: a cobbled quay along the shore with a siding of
+    wagons along it, a brick warehouse and a stone harbour office on gravel behind, heaps of coal
+    and sand with dump trucks taking them, timber stacked, two cranes, one on the quay and one on
+    the stone pier lifting cargo out of a steamer moored alongside, crates, barrels, sacks and
+    lamps."""
     m = Model()
     _yard(m, GRAVEL)
+    _grass(m, [(-0.64, 0.05), (-0.5, -0.24), (-0.44, 0.0)])
     edge = _quay(m, 0.26, COBBLES, QUAY_WALL)
     reach = _across(0.34, _apothem()) * 0.85
     _rails(m, 0.34, (-reach, reach), 0.012)
-    _moved(m, (-0.27, -0.22), _warehouse)
-    _moved(m, (-0.26, 0.24), _office)
+    for at, part in ((-0.36, open_wagon(COAL)), (-0.24, open_wagon(COAL)), (-0.08, box_wagon())):
+        placed(m, part, (0.34, at), 90)
+    _moved(m, (-0.3, -0.24), _warehouse)
+    _moved(m, (-0.3, 0.26), _office)
+    cone(m, 0.02, -0.46, 0.09, 0.06, COAL)
+    cone(m, 0.1, 0.36, 0.08, 0.05, SAND)
+    placed(m, dump_truck(TRUCK_YELLOW, COAL), (0.1, -0.3), 100)
+    placed(m, dump_truck(TRUCK_BLUE, SAND), (-0.02, 0.24), -60)
+    _woodpile(m, -0.1, 0.5, 0.06, 0.03, 0.04)
+    _woodpile(m, -0.22, 0.5, 0.05, 0.03, 0.03)
     _deck(m, (edge, edge + 0.8), 0.05, 0.18, 0.014, QUAY, None, 0.1)
-    _crane(m, edge - 0.08, -0.2, 0.2, 0.22, CRATE)
-    for cu, cv in ((0.46, -0.04), (0.48, -0.02), (0.47, -0.035)):
+    placed(m, steamer(), (edge + 0.42, 0.18 + 0.05 + 0.05), 0)
+    placed(m, crane(0.3, 0.4, CRATE), (edge - 0.1, -0.1), 0)
+    placed(m, crane(0.18, 0.36, (120, 96, 70)), (edge + 0.32, 0.18), 90)
+    for cu, cv in ((0.5, 0.02), (0.53, 0.04), (0.51, 0.06), (0.56, 0.02)):
         _crate(m, cu, cv, 0.012)
-    _barrel(m, 0.52, 0.04, 0.012)
-    _barrel(m, 0.54, 0.06, 0.012)
-    _sacks(m, 0.44, 0.3)
+    _barrel(m, 0.6, 0.22, 0.012)
+    _barrel(m, 0.62, 0.25, 0.012)
+    _sacks(m, 0.48, 0.3)
     for side in (-1, 1):
         _lamp(m, edge - 0.1, side * _across(edge, _apothem()) * 0.6)
-    _boat(m, edge + 0.62, 0.25, 0.1, (60, 76, 96))
     return m
 
 
 def mega_port() -> Model:
     """A container terminal filling its cell: a broad concrete quay along the shore with yellow
-    edges, its yard of asphalt behind stacked with ribbed containers in many colours by a long
-    steel warehouse, a siding, tall lamp masts, and two concrete piers running out from the quay
-    side by side, each with a gantry crane lifting a container."""
+    edges and a siding of container wagons, its yard of asphalt marked in lanes and stacked
+    with blocks of ribbed containers in many colours, lorries carrying containers, a long steel
+    warehouse, tall lamp masts, and two concrete piers with a container ship moored between
+    them, their two gantry cranes reaching over it."""
     m = Model()
     _yard(m, ASPHALT, 0.97)
+    with m.fine():
+        for lane in (-0.28, 0.06):
+            m.box((lane - 0.002, lane + 0.002), (-0.55, 0.55), (0.0006, 0.0012), WHITE_LINE)
     edge = _quay(m, 0.3, CONCRETE, shade(CONCRETE, 0.7))
     with m.fine():
         far = _across(edge, _apothem()) * 0.97
         m.box((edge - 0.012, edge), (-far, far), (0.012, 0.0128), EDGE)
-    reach = _across(0.22, _apothem()) * 0.85
-    _rails(m, 0.22, (-reach, reach))
-    u, v, high = (-0.52, -0.32), (-0.46, 0.0), 0.1
+    reach = _across(0.2, _apothem()) * 0.85
+    _rails(m, 0.2, (-reach, reach))
+    for k, at in enumerate((-0.42, -0.3, -0.18, 0.3, 0.42)):
+        placed(m, flat_wagon(CONTAINERS[k % len(CONTAINERS)]), (0.2, at), 90)
+    u, v, high = (-0.54, -0.36), (-0.46, -0.02), 0.1
     walls(m, u, v, high, HALL, shade(HALL, 0.6))
     gable_roof(m, u, v, (high, high + 0.025), HALL_ROOF, HALL, 0.008)
     with m.fine():
@@ -425,25 +534,35 @@ def mega_port() -> Model:
                 (0.004, high - 0.004),
                 shade(HALL, 0.75),
             )
-    for at in (-0.36, -0.23, -0.1):
+    for at in (-0.38, -0.24, -0.1):
         m.box((u[1] - 0.0002, u[1] + 0.0016), (at - 0.03, at + 0.03), (0.0, 0.07), DOORWAY)
-    _stack(m, -0.42, 0.1, 4, (3, 2, 3, 1), 0, True)
-    _stack(m, -0.3, 0.1, 4, (2, 3, 1, 2), 2, True)
-    _stack(m, -0.18, 0.1, 4, (1, 3, 2, 3), 4, True)
-    _stack(m, -0.06, 0.12, 3, (3, 1, 2), 1, True)
-    _stack(m, 0.4, -0.44, 3, (2, 1, 2), 3, True)
-    _stack(m, 0.52, -0.4, 2, (1, 2), 0, True)
-    for lamp in ((-0.12, -0.42), (-0.05, 0.46), (0.5, 0.0)):
-        _lamp(m, *lamp, 0.2)
-    for middle in (-0.22, 0.22):
+    for k, (su, sv) in enumerate(
+        (
+            (-0.46, 0.06),
+            (-0.36, 0.06),
+            (-0.26, 0.06),
+            (-0.16, 0.06),
+            (-0.46, 0.24),
+            (-0.36, 0.24),
+            (-0.26, 0.24),
+            (-0.2, -0.44),
+            (-0.1, -0.44),
+        )
+    ):
+        _stack(m, su, sv, 5 if sv > 0 else 4, (3, 2, 4, 1, 3), k, True)
+    placed(m, container_lorry(CONTAINERS[3]), (-0.02, -0.12), 90)
+    placed(m, container_lorry(CONTAINERS[0]), (0.08, 0.3), -90)
+    placed(m, container_lorry(CONTAINERS[2]), (-0.12, 0.5), 0)
+    for lamp in ((-0.3, -0.5), (-0.06, 0.6), (0.05, -0.32), (0.05, 0.12)):
+        _lamp(m, *lamp, 0.22)
+    for middle in (-0.24, 0.24):
         _deck(m, (edge, edge + 0.86), 0.065, middle, 0.012, CONCRETE, None, 0.1)
         with m.fine():
             for side in (middle - 0.063, middle + 0.063):
                 m.box((edge, edge + 0.86), (side - 0.002, side + 0.002), (0.012, 0.0128), EDGE)
-    _gantry(m, edge + 0.3, -0.22, 0.05, 0.34, 0.28)
-    _gantry(m, edge + 0.5, 0.22, 0.05, 0.3, 0.28)
-    _container(m, edge + 0.12, 0.22, 0.012, CONTAINERS[2], True)
-    _container(m, edge + 0.7, -0.22, 0.012, CONTAINERS[3], True)
+    placed(m, container_ship(CONTAINERS), (edge + 0.45, 0.0), 0)
+    placed(m, gantry(0.36, 0.46, 0.04), (edge + 0.3, -0.24), 90)
+    placed(m, gantry(0.36, 0.46, 0.04), (edge + 0.6, 0.24), -90)
     return m
 
 
