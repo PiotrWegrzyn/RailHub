@@ -247,6 +247,7 @@ The ideas every change to the game should follow.
   look.
 - One model at every zoom: it is drawn once at its largest and shrunk, never drawn again for each
   zoom, so the style never drifts.
+- At every zoom above 3 the ground looks the same.
 - One scale for every building, measured by houses: a barn a touch bigger than a house, a works
   bigger than a tenement, a station fitting the buildings around it.
 - A works' colours match what it makes.
