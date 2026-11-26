@@ -508,8 +508,8 @@ window (H) lists the same.
 | Building | Makes a month at most | Must get a month | Bonus goods and boosts a month |
 |---|---|---|---|
 | House |  | 10 food, 3 heating | 10 food, 0.5 soy sauce, 1 beer, 1 newspapers (from 1600), 5 common goods, 0.5 vodka (from 1600), 0.5 refined sugar (from 1800), 0.5 bricks, 0.2 glass, 0.5 limestone, 0.5 wax |
-| Tenement |  | 60 food, 60 common goods, 20 heating | 60 food, 5 soy sauce, 10 salt, 20 goods, 10 hot drinks (from 1700), 10 tools (from era 3), 10 beer, 10 vodka (from 1600), 10 bricks, 10 glass, 10 cement (from era 3), 10 refined sugar (from 1800), 10 newspapers (from 1600), 10 limestone, 5 porcelain (from 1710), 1 luxury goods (from 1700), 5 wax |
-| Block of flats |  | 200 food, 300 common goods, 80 heating | 200 food, 15 soy sauce, 30 salt, 40 goods, 30 hot drinks (from 1700), 10 tools (from era 3), 30 fuel (from era 2), 3 cars (from era 4), 30 beer, 30 vodka (from 1600), 50 bricks, 50 cement (from era 3), 50 glass, 30 newspapers (from 1600), 5 appliances (from era 6), 15 porcelain (from 1710), 30 refined sugar (from 1800), 5 luxury goods (from 1700) |
+| Tenement |  | 60 food, 60 common goods, 20 heating | 60 food, 5 soy sauce, 10 salt, 20 goods, 10 hot drinks (from 1700), 10 tools (from era 3), 10 beer, 10 vodka (from 1600), 10 bricks, 10 glass, 10 cement (from era 3), 10 refined sugar (from 1800), 10 newspapers (from 1600), 10 limestone, 1 luxury goods (from 1700), 5 wax |
+| Block of flats |  | 200 food, 300 common goods, 80 heating | 200 food, 15 soy sauce, 30 salt, 40 goods, 30 hot drinks (from 1700), 10 tools (from era 3), 30 fuel (from era 2), 3 cars (from era 4), 30 beer, 30 vodka (from 1600), 50 bricks, 50 cement (from era 3), 50 glass, 30 newspapers (from 1600), 5 appliances (from era 6), 30 refined sugar (from 1800), 5 luxury goods (from 1700) |
 | Farm | 10 wheat |  | 5 machinery (from machines and tools demand 10), 10 limestone (from ore and stone demand 3), 5 fertiliser (from chemicals and building demand 10), 2 fuel (from oil and fuel demand 11) |
 | Orchard | 10 apples |  |  |
 | Date palms | 10 dates |  |  |
@@ -683,7 +683,7 @@ window (H) lists the same.
 | Mega gasworks (era 2) | 1,250 gas | 625 coal (from 1700) |  |
 | Big porcelain works (1710) | 75 porcelain | 37.5 clay | 18.75 coal (from 1700) |
 | Mega porcelain works (1710) | 187.5 porcelain | 93.75 clay | 46.88 coal (from 1700) |
-| Skyscraper |  | 30 goods, 5 clothes (from 1780), 20 wine, 20 fuel (from era 2), 30 electronics (from era 6), 10 glass, 10 cement (from era 3), 20 paper (from 1150), 5 appliances (from era 6), 2 porcelain (from 1710), 2 luxury goods (from 1700) | 10 hot drinks (from 1700), 5 furniture, 20 newspapers (from 1600) |
+| Skyscraper |  | 30 goods, 5 clothes (from 1780), 20 wine, 20 fuel (from era 2), 30 electronics (from era 6), 10 glass, 10 cement (from era 3), 20 paper (from 1150), 5 appliances (from era 6), 2 porcelain, 2 luxury goods (from 1700) | 10 hot drinks (from 1700), 5 furniture, 20 newspapers (from 1600) |
 | Car dealer (era 4) |  | 20 cars (from era 4) | 10 rubber (from era 4) |
 | Jeweller |  | 20 gold, 10 diamonds |  |
 | Carpet weaver (1700) | 5 luxury goods | 20 fibre |  |
@@ -694,14 +694,14 @@ window (H) lists the same.
 | Hospital (1850) |  | 50 food, 5 heating, 10 chemicals (from era 3), 5 glass | 10 wax |
 | Space center |  | 300 electronics (from era 6), 1,000 fuel (from era 2), 300 food |  |
 | Pear Company headquarters |  | 500 electronics (from era 6), 1,000 food |  |
-| Royal palace |  | 200 food, 50 wine, 20 porcelain (from 1710) | 20 furniture, 20 wax |
+| Royal palace |  | 200 food, 50 wine, 20 porcelain | 20 furniture, 20 wax |
 | Spa resort |  | 100 food, 20 wine | 20 beer, 20 newspapers (from 1600) |
 | World's Fair hall |  | 200 goods, 100 glass, 100 steel (from era 2) |  |
 | Film studio |  | 50 chemicals (from era 3), 50 clothes (from 1780), 30 electronics (from era 6) |  |
 | Amusement park |  | 200 food, 50 fuel (from era 2) | 100 beer |
 | Olympic stadium |  | 500 food | 200 beer, 200 newspapers (from 1600) |
 | Tavern |  | 22 alcohol | 20 food |
-| Department store (1950) |  | 20 clothes (from 1780), 20 shoes (from 1850), 5 porcelain (from 1710), 10 appliances (from era 6) | 10 furniture |
+| Department store (1950) |  | 20 clothes (from 1780), 20 shoes (from 1850), 5 porcelain, 10 appliances (from era 6) | 10 furniture |
 | Hotel (1900) |  | 80 food, 10 wine | 10 beer, 10 newspapers (from 1600) |
 | Club (1900) |  | 88 alcohol | 5 chemicals (from era 3) |
 | Sushi hut |  | 60 fish, 60 rice | 10 soy sauce |
