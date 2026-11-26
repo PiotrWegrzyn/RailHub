@@ -2845,6 +2845,28 @@ def fine_pictures(
     return [painter.picture(index) for index in indices]
 
 
+def page_of(
+    pictures: list[Sprite], width: int
+) -> tuple[npt.NDArray[np.uint8], dict[int, tuple[int, int, int, int, int, int]]]:
+    """A look's pictures every way round packed in rows on one page at least `width` pixels
+    wide: its RGBA pixels, and each picture's x, y, width, height and anchor on it."""
+    width = max(width, *(p.image.size[0] for p in pictures))
+    spots = {}
+    x = y = row = 0
+    for index, picture in enumerate(pictures):
+        w, h = picture.image.size
+        if x + w > width:
+            x, y, row = 0, y + row + 1, 0
+        spots[index] = (x, y, w, h, *picture.anchor)
+        x += w + 1
+        row = max(row, h)
+    pixels = np.zeros((y + row, width, 4), dtype=np.uint8)
+    for index, picture in enumerate(pictures):
+        x, y, w, h, _, _ = spots[index]
+        pixels[y : y + h, x : x + w] = np.asarray(picture.image)
+    return pixels, spots
+
+
 def turned(heading: float) -> int:
     """Which of the HEADINGS pictures of a look runs closest to `heading` radians."""
     return round(heading / (2 * math.pi) * HEADINGS) % HEADINGS

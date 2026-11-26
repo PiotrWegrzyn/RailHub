@@ -6,8 +6,12 @@ out, which is quicker than working them out again and needs far less memory on t
 keeps up with the changes the world has since: buildings, track, stations and forests, taken up the
 way the world takes them up (PixelWorld.buildings_changed), and the satisfaction the ground glows
 with. Painted the same way from the same state, a copy's chunks are the very pixels the world
-paints itself. Nothing here needs imgui, which a worker doesn't load."""
+paints itself. Nothing here needs imgui, which a worker doesn't load.
 
+A worker also draws the fine pictures of a train's look (train_page), which take a frame of their
+own to make on the page."""
+
+import json
 import pickle
 from dataclasses import dataclass, field
 from typing import Self
@@ -16,6 +20,7 @@ import numpy as np
 import numpy.typing as npt
 
 from railroads.ui.pixel.projection import Rgba
+from railroads.ui.pixel.trains import fine_pictures, page_of
 from railroads.ui.pixel.world import PixelWorld
 
 type Drawing = tuple[int, int, int, bool, bool, bool, str]
@@ -148,3 +153,21 @@ class WorldCopy:
         if self.world is None or number != self.number:
             return None
         return paint(self.world, tuple(drawing))
+
+
+@dataclass(frozen=True)
+class TrainPage:
+    """A look's pictures every way round drawn finely (railroads.ui.pixel.trains.FinePainter) and
+    packed on one page (page_of), as a worker hands them back: its RGBA pixels, and each
+    picture's x, y, width, height and anchor on it, as JSON for the page to pass on."""
+
+    pixels: npt.NDArray[np.uint8]
+    spots_json: str
+
+
+def train_page(message: bytes) -> TrainPage:
+    """Draws the page a train layer asked for, pickled as its projection's matrix, the look, how
+    many times as fine as the sheet and how wide a page is at the least."""
+    matrix_key, look, times, width = pickle.loads(message)
+    pixels, spots = page_of(fine_pictures(matrix_key, look, times), width)
+    return TrainPage(np.ascontiguousarray(pixels), json.dumps(list(spots.values())))

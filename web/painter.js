@@ -8,6 +8,9 @@
 // {kind: "painted", world, job, pixels, shape, ms} with the pixels' buffer handed over rather than
 // copied, {kind: "failed", world, job, error}, and {kind: "dead", error} if the worker can't go on.
 // Pyodide runs only in module workers.
+// It also draws a train look's fine pictures for the page, {kind: "train page", job, data} with
+// the look and how fine pickled, and answers {kind: "train page", job, pixels, shape, spots, ms}
+// or {kind: "train page failed", job, error}.
 // A worker started to grow a new game's towns instead (railroads.ui.web_setup) is sent
 //     {kind: "setup", data}               the game's settings and how to picture it, pickled
 // and answers {kind: "progress", text}, {kind: "advance", done}, the share of the towns'
@@ -40,6 +43,10 @@ function handle(message) {
     const { kind, world } = message;
     if (kind === "paint") {
         paint(message);
+        return;
+    }
+    if (kind === "train page") {
+        trainPage(message);
         return;
     }
     if (kind === "setup") {
@@ -76,6 +83,28 @@ function paint({ world, job, chunk }) {
         postMessage({ kind: "failed", world, job, error: String(error?.message || error) });
     } finally {
         pixels?.destroy();
+    }
+}
+
+function trainPage({ job, data }) {
+    const started = performance.now();
+    let asked = null;
+    let page = null;
+    try {
+        asked = pyodide.toPy(data);
+        page = pyodide.pyimport("railroads.ui.pixel.copies").train_page(asked);
+        const buffer = page.pixels.getBuffer("u8");
+        const pixels = buffer.data.slice();
+        const shape = buffer.shape;
+        buffer.release();
+        const spots = page.spots_json;
+        const ms = performance.now() - started;
+        postMessage({ kind: "train page", job, pixels: pixels.buffer, shape, spots, ms }, [pixels.buffer]);
+    } catch (error) {
+        postMessage({ kind: "train page failed", job, error: String(error?.message || error) });
+    } finally {
+        asked?.destroy();
+        page?.destroy();
     }
 }
 

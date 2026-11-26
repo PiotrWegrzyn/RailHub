@@ -7,6 +7,7 @@ trains going opposite ways pass on different tracks."""
 import bisect
 import itertools
 import math
+import pickle
 import time
 from collections import OrderedDict
 from collections.abc import Container, Iterable, Mapping
@@ -40,10 +41,12 @@ from railroads.ui.pixel.trains import (
     Look,
     TrainSprites,
     fine_pictures,
+    page_of,
     turned,
 )
 
 type Pixels = npt.NDArray[np.uint8]
+from railroads.ui.pixel.web_painter import page_workers
 from railroads.ui.pixel.world import PixelWorld
 
 # Coal smoke leaves the chimney dark and thins out paler as it drifts back.
@@ -90,6 +93,10 @@ class TrainLayer:
         # Each look's pages by how many times as fine as the sheet they are drawn, kept for every
         # zoom shown, so coming back to a zoom shows them at once.
         self._pages: OrderedDict[tuple[object, int], _Page] = OrderedDict()
+        # Pages asked of the page's workers and not yet taken, and pages drawn here instead as
+        # a worker could not draw them.
+        self._asked: set[tuple[object, int]] = set()
+        self._local: set[tuple[object, int]] = set()
         # Pages being drawn a few pictures a frame: each look's painter and pictures so far.
         self._painting: dict[tuple[object, int], tuple[FinePainter, list[Sprite]]] = {}
         self.lanes = Lanes(world.track)
@@ -380,6 +387,24 @@ class TrainLayer:
         if page is not None:
             self._pages.move_to_end(key)
             return page
+        workers = page_workers()
+        if key not in self._local and workers is not None and workers.ready:
+            if key not in self._asked:
+                asked = pickle.dumps(
+                    (self._matrix, look, factor, PAGE_WIDTH * factor),
+                    protocol=pickle.HIGHEST_PROTOCOL,
+                )
+                if workers.ask_page(key, asked):
+                    self._asked.add(key)
+                    return None
+            elif key not in workers.pages:
+                return None
+            else:
+                self._asked.discard(key)
+                drawn = workers.pages.pop(key)
+                if drawn is not None:
+                    return self._made_page(key, *drawn)
+                self._local.add(key)
         if time.perf_counter() > self._paging_until:
             return None
         if key not in self._painting:
@@ -390,22 +415,19 @@ class TrainLayer:
         if len(pictures) < HEADINGS:
             return None
         del self._painting[key]
-        width = max(PAGE_WIDTH * factor, *(p.image.size[0] for p in pictures))
-        spots = {}
-        x = y = row = 0
-        for index, picture in enumerate(pictures):
-            w, h = picture.image.size
-            if x + w > width:
-                x, y, row = 0, y + row + 1, 0
-            spots[index] = (x, y, w, h, *picture.anchor)
-            x += w + 1
-            row = max(row, h)
-        pixels = np.zeros((y + row, width, 4), dtype=np.uint8)
-        for index, picture in enumerate(pictures):
-            x, y, w, h, _, _ = spots[index]
-            pixels[y : y + h, x : x + w] = np.asarray(picture.image)
+        return self._made_page(key, *page_of(pictures, PAGE_WIDTH * factor))
+
+    def _made_page(
+        self,
+        key: tuple[object, int],
+        pixels: npt.NDArray[np.uint8],
+        spots: dict[int, tuple[int, int, int, int, int, int]],
+    ) -> _Page:
+        """Keeps a page drawn here or in a worker, as a texture."""
         texture = hello_imgui.create_texture_gpu_from_rgba_data(np.ascontiguousarray(pixels))
-        page = self._pages[key] = _Page(texture, (width, pixels.shape[0]), spots, pixels.nbytes)
+        page = self._pages[key] = _Page(
+            texture, (pixels.shape[1], pixels.shape[0]), spots, pixels.nbytes
+        )
         return page
 
     def _let_go(self, drawn: set[tuple[object, int]]) -> None:

@@ -1,4 +1,5 @@
 import ctypes
+import pickle
 from types import SimpleNamespace
 from typing import Any
 
@@ -12,6 +13,7 @@ from railroads.ui.pixel import layer as layer_module
 from railroads.ui.pixel.chunk_painter import Painter
 from railroads.ui.pixel.copies import ChunkJob, WorldCopy
 from railroads.ui.pixel.layer import PixelLayer, painter_for
+from railroads.ui.pixel.trains import Look, fine_pictures, page_of
 from railroads.ui.pixel.web_painter import (
     JOBS_PER_WORKER,
     WorkerPainter,
@@ -60,6 +62,15 @@ class FakePage:
             queue, self.queues[worker] = self.queues[worker], []
             copy = self.copies[worker]
             for message in queue:
+                if message["kind"] == "train page":
+                    page = copies.train_page(message["data"])
+                    pixels = page.pixels
+                    self.inbox.append(
+                        {"worker": worker, "kind": "train page", "job": message["job"]}
+                        | {"pixels": pixels.tobytes(), "shape": list(pixels.shape)}
+                        | {"spots": page.spots_json}
+                    )
+                    continue
                 kind, number = message["kind"], message["world"]
                 if kind == "world":
                     copy.start(number, message["data"])
@@ -489,3 +500,46 @@ def test_a_message_whose_pixels_cant_be_copied_fails_and_the_others_still_come()
     assert taken[0]["job"] == 5
     assert "out of bounds" in taken[0]["error"]
     assert taken[1] == {"worker": 1, "kind": "dead"}
+
+
+LOOK_PAGE = ((1.0, 0.0, 0.0, 0.5), (Look.ENGINE, "puffing_billy"), 2, 64)
+
+
+def test_a_worker_draws_a_train_page_as_the_frames_would() -> None:
+    page = FakePage(1)
+    workers = Workers(page)
+    page.start(0)
+    workers.poll()
+    matrix, look, times, width = LOOK_PAGE
+    workers.ask_page("page", pickle.dumps(LOOK_PAGE))
+    page.work(0)
+
+    workers.poll()
+
+    pixels, spots = workers.pages["page"]  # type: ignore[misc]
+    here, here_spots = page_of(fine_pictures(matrix, look, times), width)
+    assert np.array_equal(pixels, here)
+    assert spots == here_spots
+
+
+def test_a_train_page_asked_of_a_worker_that_fails_is_left_to_the_frames() -> None:
+    page = FakePage(1)
+    workers = Workers(page)
+    page.start(0)
+    workers.poll()
+    workers.ask_page("page", pickle.dumps(LOOK_PAGE))
+    page.fail(0)
+
+    workers.poll()
+
+    assert workers.pages == {"page": None}
+
+
+def test_no_train_page_is_asked_for_before_a_worker_is_ready() -> None:
+    page = FakePage(1)
+    workers = Workers(page)
+
+    asked = workers.ask_page("page", pickle.dumps(LOOK_PAGE))
+
+    assert not asked
+    assert page.queues == [[]]

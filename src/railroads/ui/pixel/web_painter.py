@@ -14,6 +14,7 @@ and if every worker fails, chunks are painted on the frames the way Painter does
 worker could not paint is painted on a frame too."""
 
 import itertools
+import json
 import sys
 import weakref
 from collections.abc import Hashable
@@ -35,6 +36,8 @@ if sys.platform == "emscripten":
 JOBS_PER_WORKER = 2
 
 type Message = dict[str, Any]
+# A train page a worker drew: its RGBA pixels and each picture's x, y, width, height and anchor.
+type TrainPageDone = tuple[np.ndarray, dict[int, tuple[int, int, int, int, int, int]]]
 type Done = tuple[Hashable, object, BaseException | None]
 
 
@@ -63,6 +66,46 @@ class Workers:
         self.dead: set[int] = set()
         self._painter: weakref.ref[WorkerPainter] | None = None
         self._worlds = itertools.count(1)
+        # Train pages asked for (ask_page) by their job numbers, each with its key and worker,
+        # and those drawn, by key: their pixels and each picture's place, or None if the worker
+        # could not draw one.
+        self._pages_asked: dict[int, tuple[Hashable, int]] = {}
+        self.pages: dict[Hashable, TrainPageDone | None] = {}
+        self._page_jobs = itertools.count()
+        self._next_worker = 0
+
+    def ask_page(self, key: Hashable, message: bytes) -> bool:
+        """Asks a worker to draw a train look's page (copies.train_page) from its pickled
+        `message`, kept in `pages` by `key` once drawn; returns whether a worker was asked."""
+        if not self.ready:
+            return False
+        worker = self.ready[self._next_worker % len(self.ready)]
+        self._next_worker += 1
+        job = next(self._page_jobs)
+        try:
+            self.page.post(worker, {"kind": "train page", "job": job, "data": message})
+        except Exception as error:  # noqa: BLE001 - the frames draw the page instead
+            print(f"A worker can't be asked for a train page: {error}", file=sys.stderr)
+            return False
+        self._pages_asked[job] = (key, worker)
+        return True
+
+    def _heard_page(self, message: Message) -> None:
+        """Keeps a train page a worker drew, or that it could not."""
+        asked = self._pages_asked.pop(message.get("job"), None)
+        if asked is None:
+            return
+        key, _ = asked
+        if message["kind"] == "train page":
+            pixels = _pixels(message)
+            if pixels is not None:
+                spots = {
+                    index: tuple(spot) for index, spot in enumerate(json.loads(message["spots"]))
+                }
+                self.pages[key] = (pixels, spots)  # type: ignore[assignment]
+                return
+        print(f"A worker could not draw a train page: {message.get('error')}", file=sys.stderr)
+        self.pages[key] = None
 
     @property
     def painter(self) -> WorkerPainter | None:
@@ -84,6 +127,9 @@ class Workers:
         world."""
         for message in self.page.take():
             worker, kind = message["worker"], message["kind"]
+            if kind in ("train page", "train page failed"):
+                self._heard_page(message)
+                continue
             if kind == "ready" and message.get("version") != VERSION:
                 error = f"it runs version {message.get('version')}, not {VERSION}"
                 message = {"worker": worker, "kind": "dead", "error": error}
@@ -94,6 +140,10 @@ class Workers:
                 self.dead.add(worker)
                 if worker in self.ready:
                     self.ready.remove(worker)
+                for job, (key, holder) in list(self._pages_asked.items()):
+                    if holder == worker:
+                        del self._pages_asked[job]
+                        self.pages[key] = None
                 print(f"A painting worker failed: {message.get('error')}", file=sys.stderr)
             painter = self.painter
             if painter is not None:
