@@ -339,7 +339,7 @@ def facility_problem(
     if not any(
         cell in grid.within(own, FACILITY_REACH) for own in constructions.station_cells(station)
     ):
-        return "it must stand next to the station or a platform"
+        return f"it must stand within {FACILITY_REACH} cells of the station or a platform"
     if any(isinstance(built, Station | Annex) for built in constructions.at(cell)):
         return "the cell has a station or a facility in it"
     tile = constructions.tile_map.tile(cell)

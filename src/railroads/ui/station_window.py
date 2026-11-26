@@ -19,6 +19,7 @@ from railroads.sim.facilities import (
     Facility,
 )
 from railroads.sim.facilities import LEVEL as FACILITY_LEVEL
+from railroads.sim.facilities import REACH as FACILITY_REACH
 from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.finance import STATION_PRICE
 from railroads.sim.grids import Cell
@@ -224,7 +225,8 @@ def _draw_facilities(
     tip(
         "None costs anything to put up, but every month each uses a good and pays the market "
         f"price for it: {DELIVERED_SHARE:.0%} of that for what the station holds, gathered or "
-        "brought. An engine shed fills a cell next to the station with track of its own; the "
+        f"brought. An engine shed fills a cell up to {FACILITY_REACH} cells from the station with "
+        "track of its own; the "
         "others go in the station itself"
     )
     built = railway.facilities_at(station)
@@ -251,7 +253,9 @@ def _draw_facilities(
         if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
             lines = [uses]
             if facility in PLACED:
-                lines.append("Click, then the cell next to the station it goes in")
+                lines.append(
+                    f"Click, then the cell up to {FACILITY_REACH} cells from the station it goes in"
+                )
             if level < needed:
                 lines.append(f"Raise the station to level {needed} first")
             imgui.set_tooltip("\n".join(lines))

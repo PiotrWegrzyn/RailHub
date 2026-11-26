@@ -1,8 +1,9 @@
 """The facilities that stand on the map beside a station (railroads.sim.facilities), built as
 small lit models (railroads.ui.pixel.art.built) like the stations: an engine shed as a roundhouse
-of brick stalls fanned round a turntable, with an engine on its bridge and a brick workshop wing,
-filling its whole cell, its lead track running out to the station beside it, drawn turned
-towards each way a station can lie (SHED_HEADINGS); and cattle pens, a small fenced pen and shed.
+bigger than its cell, deep brick stalls with arched doors and smoke jacks fanned round a
+turntable with an engine on its bridge, a water tower and a coal stage by its lead track, drawn
+turned towards each way its lead can run (SHED_HEADINGS); and cattle pens, no longer put on the
+map, a small fenced pen and shed.
 
 Models are in cells: u and v across the ground, z up."""
 
@@ -14,22 +15,21 @@ from railroads.sim.sheds import (
     ROUNDHOUSE_SIZE,
     STALL_FROM,
     STALL_HEADINGS,
+    STALL_TO,
     TURNTABLE,
     TURNTABLE_RADIUS,
 )
 from railroads.ui.pixel.art.built import (
-    chimney,
-    footing,
+    dome,
     gable_roof,
     modelled,
     paddock,
     spot,
     upright,
     walls,
-    window,
 )
 from railroads.ui.pixel.art.painter import BRICK, RGB, Sprite, shade
-from railroads.ui.pixel.art.stations import PANE, ROOF_SLATE, STONE, TIMBER, TIMBER_TRIM
+from railroads.ui.pixel.art.stations import ROOF_SLATE, STONE, TIMBER, TIMBER_TRIM
 from railroads.ui.pixel.models import Face, Model
 
 ASH: RGB = (112, 106, 94)
@@ -45,12 +45,15 @@ ENGINE: RGB = (36, 36, 40)
 WHEEL: RGB = (176, 40, 36)
 CAB: RGB = (60, 112, 66)
 STRAW: RGB = (204, 178, 98)
+ARCH: RGB = (190, 170, 140)
+SOOT: RGB = (52, 48, 46)
+TANK: RGB = (70, 78, 84)
+COAL: RGB = (30, 30, 32)
 
 # The roundhouse, its lead track running out along u, built to the measures trains stand in it by
-# (railroads.sim.sheds): how big the yard round its turntable is, and where its lead track ends:
-# in the middle of the cell beside it, a cell away.
-YARD_RADIUS = 0.2
-LEAD_END = 1.0 / ROUNDHOUSE_SIZE
+# (railroads.sim.sheds): where its lead track ends, at the edge of its cell, where track laid to it
+# joins.
+LEAD_END = 0.5 / ROUNDHOUSE_SIZE
 # The ways an engine shed is drawn turned, its lead track running that way on the map, in
 # degrees from the map's x axis: every way a cell beside it lies on hexes and on squares.
 SHED_HEADINGS = tuple(range(0, 360, 30))
@@ -110,19 +113,25 @@ def _round(angle: float, radius: float) -> tuple[float, float]:
 
 
 def _stall(high: float) -> Model:
-    """One brick stall, its open door at u = 0 facing the turntable, under a slate roof with
-    skylights along its ridge."""
+    """One brick stall from its door at u = 0 back to STALL_TO, wide enough for an engine: a dark
+    arched doorway between stone-capped piers facing the turntable, a slate roof with skylights
+    along its ridge and a smoke jack over where an engine's chimney stands."""
     m = Model()
-    u, v = (0.0, 0.13), (-0.034, 0.034)
+    depth = STALL_TO - STALL_FROM
+    u, v = (0.0, depth), (-0.04, 0.04)
     walls(m, u, v, high, BRICK, STONE)
-    gable_roof(m, u, v, (high, high + 0.035), ROOF_SLATE, shade(BRICK, 0.9), 0.008)
-    m.box((-0.002, 0.0), (-0.026, 0.026), (0.008, high - 0.01), OPENING)
-    for side in ((-0.036, -0.026), (0.026, 0.036)):
-        m.box((-0.004, 0.0), side, (0.0, high), PIER)
+    gable_roof(m, u, v, (high, high + 0.04), ROOF_SLATE, shade(BRICK, 0.9), 0.008)
+    m.box((-0.002, 0.0), (-0.03, 0.03), (0.008, high - 0.014), OPENING)
+    for side in ((-0.042, -0.03), (0.03, 0.042)):
+        m.box((-0.006, 0.0), side, (0.0, high), PIER)
+        m.box((-0.008, 0.002), side, (high, high + 0.006), STONE)
     with m.fine():
-        for k in range(3):
-            low = 0.04 + k * 0.03
-            m.box((low, low + 0.015), (-0.005, 0.005), (high + 0.02, high + 0.034), SKYLIGHT)
+        m.box((-0.004, 0.0), (-0.032, 0.032), (high - 0.014, high - 0.006), ARCH)
+        for k in range(4):
+            low = 0.03 + k * 0.04
+            m.box((low, low + 0.022), (-0.006, 0.006), (high + 0.026, high + 0.04), SKYLIGHT)
+    m.box((0.05, 0.068), (-0.009, 0.009), (high + 0.03, high + 0.075), SOOT)
+    m.box((0.046, 0.072), (-0.012, 0.012), (high + 0.075, high + 0.082), SOOT)
     return m
 
 
@@ -157,40 +166,46 @@ def _track(m: Model, a: tuple[float, float], b: tuple[float, float]) -> None:
             )
 
 
-def _workshop() -> Model:
-    """The roundhouse's brick workshop wing along u, with windows down both sides and a
-    chimney."""
-    m = Model()
-    u, v, high = (0.1, 0.32), (-0.05, 0.05), 0.1
-    footing(m, u, v)
-    walls(m, u, v, high, WORKSHOP, STONE)
-    for k in range(4):
-        at = 0.125 + k * 0.05
-        window(m, (at - 0.012, at + 0.012), (0.03, 0.075), v[1], PANE)
-    gable_roof(m, u, v, (high, high + 0.05), ROOF_SLATE, WORKSHOP, 0.01)
-    chimney(m, 0.28, 0.0, (0.12, 0.2), BRICK)
-    return m
+def _water_tower(m: Model, u: float, v: float) -> None:
+    """A riveted iron water tank on four timber legs, with a hose swung out over the track."""
+    for du, dv in ((-0.02, -0.02), (-0.02, 0.02), (0.02, -0.02), (0.02, 0.02)):
+        upright(m, u + du, v + dv, 0.004, (0.0, 0.09), TIMBER)
+    upright(m, u, v, 0.036, (0.09, 0.15), TANK)
+    dome(m, u, v, 0.036, (0.15, 0.162), shade(TANK, 0.8))
+    with m.fine():
+        for high in (0.105, 0.135):
+            upright(m, u, v, 0.0365, (high, high + 0.003), shade(TANK, 0.7))
+        m.box((u - 0.004, u + 0.004), (v, v + 0.07 * (1 if v < 0 else -1)), (0.1, 0.106), TANK)
+
+
+def _coal_stage(m: Model, u: float, v: float) -> None:
+    """A timber coal stage beside the lead, heaped with coal."""
+    walls(m, (u - 0.05, u + 0.05), (v - 0.03, v + 0.03), 0.05, TIMBER)
+    m.box((u - 0.046, u + 0.046), (v - 0.026, v + 0.026), (0.05, 0.062), COAL)
+    with m.fine():
+        m.box((u - 0.03, u + 0.02), (v - 0.016, v + 0.016), (0.062, 0.072), COAL)
 
 
 def roundhouse() -> Model:
-    """An engine shed filling its cell: brick stalls fanned round the back of a turntable in a
-    yard of ash, their tracks running in to it, an engine on the turntable's bridge, the lead
-    track running out along u into the station's cell beside it, and a brick workshop wing with a chimney
-    beside it."""
+    """An engine shed bigger than its cell: brick stalls, each deep enough for a small engine,
+    fanned round the back of a turntable in a yard of ash, their tracks running in to it from the
+    stalls' arched doors, an engine on the turntable's bridge, the lead track running out along
+    u, and beside the lead a water tower and a coal stage."""
     m = Model()
-    _disc(m, TURNTABLE, YARD_RADIUS, ASH, 0.0004)
+    _disc(m, TURNTABLE, STALL_FROM + 0.12, ASH, 0.0004)
     _disc(m, TURNTABLE, TURNTABLE_RADIUS, PIT, 0.0008)
     _disc(m, TURNTABLE, TURNTABLE_RADIUS * 0.85, shade(PIT, 0.8), 0.001)
     for angle in STALL_HEADINGS:
-        _track(m, _round(angle, TURNTABLE_RADIUS), _round(angle, STALL_FROM))
+        _track(m, _round(angle, TURNTABLE_RADIUS), _round(angle, STALL_TO))
     _track(m, _round(0.0, TURNTABLE_RADIUS), (LEAD_END, 0.0))
     bridge = math.radians(20)
     ends = (_round(bridge + math.pi, TURNTABLE_RADIUS), _round(bridge, TURNTABLE_RADIUS))
     _strip(m, *ends, 0.018, DECK, 0.006)
     _turned_into(m, _engine(), bridge, *TURNTABLE)
     for angle in STALL_HEADINGS:
-        _turned_into(m, _stall(0.075), angle, *_round(angle, STALL_FROM))
-    _turned_into(m, _workshop(), 0.0, 0.0, 0.18)
+        _turned_into(m, _stall(0.085), angle, *_round(angle, STALL_FROM))
+    _water_tower(m, 0.2, -0.1)
+    _coal_stage(m, 0.22, 0.11)
     return m
 
 

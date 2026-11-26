@@ -21,6 +21,7 @@ from railroads.sim.demolition import (
     STATION_REMOVAL,
     TRACK_REMOVAL_SHARE,
 )
+from railroads.sim.facilities import REACH as FACILITY_REACH
 from railroads.sim.finance import (
     ELECTRIC_TRACK_FACTOR,
     ELECTRIC_TRACK_UPKEEP,
@@ -137,7 +138,8 @@ HINTS = {
         "there aside does. Right click cancels."
     ),
     Tool.ADD_FACILITY: (
-        "Click a cell next to the station or a platform for its engine shed: it fills the cell, "
+        f"Click a cell up to {FACILITY_REACH} cells from the station or a platform for its "
+        "engine shed: it fills the cell, "
         "taking the place of any track there with its own, which Q or the mouse wheel turns and "
         "track is laid to as to a station; trains waiting for a load wait in it. "
         "Clearing it costs what moving the buildings in the way aside does. Right click cancels."

@@ -22,7 +22,7 @@ from railroads.sim.constructions import Track, TrackWidth
 from railroads.sim.grids import Cell
 from railroads.sim.railway import Railway
 from railroads.sim.signals import blocks_of
-from railroads.sim.trains import Point, Train
+from railroads.sim.trains import IN_SHED, Point, Train
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, IsoCamera, Vec2
 from railroads.ui.pixel.art.registry import Sprite
 from railroads.ui.pixel.models import HEIGHT_PER_WIDTH
@@ -58,6 +58,9 @@ MAX_TEXTURE = 4096
 PAGE_WIDTH = 512
 PAGES_BUDGET = 128 * 1024 * 1024
 PAGES_TIME = 0.006
+# How many times smaller than on the line the engine of a train standing in an engine shed's stall
+# is drawn, so it fits its stall (railroads.sim.sheds).
+MINI = 0.45
 PUFFS = 5
 # The most trains whose parts' places on their track are kept while they stand.
 SHIFTS_KEPT = 4096
@@ -109,41 +112,46 @@ class TrainLayer:
         in_sight = self._in_sight(railway, origin, scale)
         seen = []
         for train in in_sight:
+            if train.shed == IN_SHED:
+                stalled = _in_stall(train)
+                if stalled is not None:
+                    seen.append((train, 0.0, (Look.ENGINE, train.engine), stalled, MINI))
+                continue
             for look, back in self._parts(train):
                 placed = railway.position(train, back)
                 if placed is not None and not _in_shed(railway, train, placed[0]):
-                    seen.append((train, back, look, placed))
+                    seen.append((train, back, look, placed, 1.0))
         hidden = self.world.underground_all(
-            [placed[0][0] for *_, placed in seen], [placed[0][1] for *_, placed in seen]
+            [placed[0][0] for *_, placed, _ in seen], [placed[0][1] for *_, placed, _ in seen]
         )
         four_lanes = blocks_of(railway.constructions).lane_cells
         found = []
         # Each train's lanes, found once for all its parts.
         lanes_of: dict[int, dict[Cell | None, int]] = {}
         version = railway.constructions.railway_version
-        for (train, back, look, placed), under in zip(seen, hidden, strict=True):
+        for (train, back, look, placed, size), under in zip(seen, hidden, strict=True):
             if not under:
                 lanes = lanes_of.get(id(train))
                 if lanes is None:
                     lanes = lanes_of[id(train)] = self.lanes.of(train, four_lanes)
-                found.append((placed, self._shift(train, back, lanes, version), look))
+                found.append((placed, self._shift(train, back, lanes, version), look, size))
         parts = []
         if found:
-            xs = np.array([placed[0][0] for placed, _, _ in found])
-            ys = np.array([placed[0][1] for placed, _, _ in found])
+            xs = np.array([placed[0][0] for placed, *_ in found])
+            ys = np.array([placed[0][1] for placed, *_ in found])
             ax, ay = projection.to_pixels(xs, ys)
             ay = ay - self.world.elevation.lift(xs, ys)
-            for k, (((_, _), (dx, dy)), shift, look) in enumerate(found):
+            for k, (((_, _), (dx, dy)), shift, look, size) in enumerate(found):
                 sx = origin[0] + round((float(ax[k]) + shift[0]) * snap) * scale / snap
                 sy = origin[1] + round((float(ay[k]) + shift[1]) * snap) * scale / snap
-                parts.append((sy, sx, look, math.atan2(dy, dx)))
+                parts.append((sy, sx, look, math.atan2(dy, dx), size))
         parts.sort(key=lambda part: part[0])
-        wanted = {look for _, _, look, _ in parts}
+        wanted = {look for _, _, look, _, _ in parts}
         for look in wanted:
             self.sprites.draw(look)
         drawn: set[tuple[object, int]] = set()
         self._paging_until = time.perf_counter() + PAGES_TIME
-        for sy, sx, look, heading in parts:
+        for sy, sx, look, heading, size in parts:
             page, fine = (None, factor) if factor == 1 else self._page_or_nearest(look, factor)
             if page is None:
                 px, py, w, h, anchor_x, anchor_y = self.sprites.place(look, heading)
@@ -156,6 +164,7 @@ class TrainLayer:
                 px, py, w, h, anchor_x, anchor_y = page.spots[turned(heading)]
                 texture, (width, height), per = page.texture, page.size, per_pixel / fine
                 drawn.add((look, fine))
+            per *= size
             left = sx - anchor_x * per
             top = sy - anchor_y * per
             draw_list.add_image(
@@ -746,6 +755,18 @@ def train_picture(
         spot = (round(left) - low_x, round(top) - low_y)
         canvas.alpha_composite(part, spot)
     return np.asarray(canvas).copy()
+
+
+def _in_stall(train: Train) -> tuple[Point, Point] | None:
+    """Where the engine of a train standing in an engine shed's stall, drawn MINI times its
+    size, stands, and which way it faces: out of the stall's door, its front where the train's
+    is (railroads.sim.sheds)."""
+    if len(train.path) < 2:
+        return None
+    (ax, ay), (bx, by) = train.path[0], train.path[-1]
+    length = math.hypot(bx - ax, by - ay) or 1.0
+    share = (train.along - ENGINES[train.engine].half * SCALE * MINI) / length
+    return (ax + (bx - ax) * share, ay + (by - ay) * share), (bx - ax, by - ay)
 
 
 def _in_shed(railway: Railway, train: Train, point: Point) -> bool:

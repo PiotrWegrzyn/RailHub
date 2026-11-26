@@ -89,8 +89,12 @@ def test_an_engine_shed_needs_the_station_raised_to_level_3() -> None:
     assert (early.ok, late.ok) == (False, True)
 
 
-@pytest.mark.parametrize(("cell", "ok"), [(BESIDE, True), ((4, 3), False), (STATION, False)])
-def test_an_engine_shed_stands_next_to_its_station(cell: tuple[int, int], ok: bool) -> None:
+@pytest.mark.parametrize(
+    ("cell", "ok"), [(BESIDE, True), ((4, 3), True), ((3, 3), False), (STATION, False)]
+)
+def test_an_engine_shed_stands_up_to_two_cells_from_its_station(
+    cell: tuple[int, int], ok: bool
+) -> None:
     game = _raised_game()
 
     done = game.add_facility(STATION, Facility.ENGINE_SHED, cell)

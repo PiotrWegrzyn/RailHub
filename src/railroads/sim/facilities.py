@@ -1,6 +1,6 @@
 """What the player can put up at a station besides raising it. An engine shed, a roundhouse round
-a turntable with track of its own that track is laid to as to a station, fills a cell beside the
-station or one of its platforms (railroads.sim.constructions.ANNEX_SPACE); the others stand in
+a turntable with track of its own that track is laid to as to a station, fills a cell up to REACH
+cells from the station or one of its platforms (railroads.sim.constructions.ANNEX_SPACE); the others stand in
 the station itself and take no room on the map:
 
 - trains waiting at the station for a full load it holds too little to fill wait in an engine
@@ -27,7 +27,7 @@ __all__ = ["Facility"]
 
 SAND_TOWER_PICKUP = 0.5
 WAREHOUSE_ROOM = 500.0
-REACH = 1
+REACH = 2
 DELIVERED_SHARE = 0.5
 
 

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from imgui_bundle import imgui
 
 from railroads.sim.constructions import Facility, Track
+from railroads.sim.facilities import REACH as FACILITY_REACH
 from railroads.sim.grids import Cell
 from railroads.sim.railway import PLATFORM_REACH
 from railroads.sim.routes import Route, plan_route_steps, station_way
@@ -153,7 +154,10 @@ class MapTools:
         build = self._view.build
         build.choose(Tool.ADD_FACILITY)
         build.moving, build.facility = station, facility
-        build.say(f"Click a cell next to the station for its {facility.value}.")
+        build.say(
+            f"Click a cell up to {FACILITY_REACH} cells from the station for its {facility.value}; "
+            "Q or the mouse wheel turns it."
+        )
 
     def start_adding_platform(self, station: Cell) -> None:
         """Lets the next click choose where a station's new platform goes."""

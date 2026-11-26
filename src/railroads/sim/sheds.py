@@ -1,9 +1,10 @@
 """Where trains waiting in an engine shed stand (railroads.sim.railway sends them there): the shed
 is a roundhouse, its stalls fanned round the back of a turntable and its lead track running out by
 the end of its own track that track joins (lead_end). A waiting train stands in a stall facing the
-turntable, its front NOSE out of the stall's door, and sets off from there across the turntable
-and out along the lead; inside the shed's cell it is out of sight
-(railroads.ui.pixel.train_layer), coming out of the shed onto its lead as it goes. The roundhouse's drawing
+turntable, its front NOSE out of the stall's door, its engine drawn small enough to fit
+(railroads.ui.pixel.train_layer), and sets off from there across the turntable and out along the
+lead; going in or out it is out of sight inside the shed's cell, coming out of the shed onto its
+lead. The roundhouse's drawing
 (railroads.ui.pixel.art.facilities) is built from the same measures, so trains stand at the stalls
 drawn.
 
@@ -16,15 +17,16 @@ from railroads.sim.constructions import Constructions
 from railroads.sim.grids import Cell
 from railroads.sim.trains import Point
 
-# How much bigger the roundhouse is drawn than built, so it fills its cell, a cell across between
-# opposite sides; where its turntable lies and how big it is, at which headings its stalls stand
+# How much bigger the roundhouse is drawn than built, a cell across between opposite sides, so its
+# stalls hold a small engine each and it spills a little past its cell; where its turntable lies
+# and how big it is, at which headings its stalls stand
 # round it, how far out their doors are and how far their backs.
-ROUNDHOUSE_SIZE = 1.3
-TURNTABLE = (-0.04, 0.0)
-TURNTABLE_RADIUS = 0.1
-STALL_HEADINGS = tuple(math.radians(a) for a in range(115, 246, 26))
-STALL_FROM = 0.15
-STALL_TO = 0.28
+ROUNDHOUSE_SIZE = 1.8
+TURNTABLE = (-0.02, 0.0)
+TURNTABLE_RADIUS = 0.09
+STALL_HEADINGS = tuple(math.radians(a) for a in range(120, 241, 24))
+STALL_FROM = 0.13
+STALL_TO = 0.33
 # The stalls trains take, by their place in STALL_HEADINGS: the middle ones first.
 STALL_ORDER = (2, 3, 1, 4, 0, 5)
 # How far a waiting train's front stands out of its stall's door, in cells.
