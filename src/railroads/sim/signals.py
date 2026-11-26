@@ -124,11 +124,11 @@ class Blocks:
                 known[cell, end] = found
             return found
 
-        def kind(cell: Cell) -> str:
-            here = pieces[cell]
-            if len(here) > 1:
-                return "junction"
-            return here[0].width.name.lower()
+        kinds = {
+            cell: "junction" if len(here) > 1 else here[0].width.name.lower()
+            for cell, here in pieces.items()
+        }
+        kind = kinds.__getitem__
 
         # Whether each cell is plain double track, and the pairs of points its double track
         # joins, where trains going opposite ways keep to their own tracks.

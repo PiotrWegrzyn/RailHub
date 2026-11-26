@@ -191,7 +191,7 @@ class TrainLayer:
             if nose is not None:
                 draw_list.pop_clip_rect()
         self._let_go(drawn)
-        self._smoke(draw_list, railway, in_sight, origin, scale)
+        self._smoke(draw_list, railway, in_sight, origin, scale, lanes_of)
         self.sprites.draw_ahead(self._paging_until)
 
     def _nose(self, way: list[Point], origin: tuple[int, int], scale: float) -> tuple[Vec2, Vec2]:
@@ -281,11 +281,12 @@ class TrainLayer:
         trains: list[Train],
         origin: tuple[int, int],
         scale: float,
+        lanes_of: dict[int, dict[Cell | None, int]],
     ) -> None:
         """Puffs of smoke rising from each chimney and drifting back over its train. The ground
         under every chimney and where every puff lies in the picture are worked out for all the
         trains at once: on hills a lift takes nearly as long for one point as for many."""
-        chimneys = self._chimneys(railway, trains)
+        chimneys = self._chimneys(railway, trains, lanes_of)
         if not chimneys:
             return
         projection = self.world.projection
@@ -305,23 +306,29 @@ class TrainLayer:
         ax, ay = projection.to_pixels(
             np.array([puff[2] for puff in puffs]), np.array([puff[3] for puff in puffs])
         )
-        for (index, age, _, _), x, y in zip(puffs, ax.tolist(), ay.tolist(), strict=True):
-            chimney = chimneys[index]
-            shift = chimney.shift
-            sx = origin[0] + (x + shift[0]) * scale
-            rise = (chimney.height + age * 0.35 * SCALE) * up
-            sy = origin[1] + (y + shift[1] - float(lifts[index]) - rise) * scale
-            radius = (1.5 + age * 4.0) * SCALE * scale
-            alpha = 0.75 * (1 - age)
-            shade = (
-                dark + (thin - dark) * age for dark, thin in zip(SMOKE, THIN_SMOKE, strict=True)
-            )
-            color = imgui.color_convert_float4_to_u32(imgui.ImVec4(*shade, alpha))
-            draw_list.add_circle_filled((sx, sy), radius, color)
+        index = np.array([puff[0] for puff in puffs])
+        age = np.array([puff[1] for puff in puffs])
+        shift_x = np.array([chimney.shift[0] for chimney in chimneys])[index]
+        shift_y = np.array([chimney.shift[1] for chimney in chimneys])[index]
+        height = np.array([chimney.height for chimney in chimneys])[index]
+        sx = origin[0] + (ax + shift_x) * scale
+        rise = (height + age * 0.35 * SCALE) * up
+        sy = origin[1] + (ay + shift_y - np.asarray(lifts)[index] - rise) * scale
+        radius = (1.5 + age * 4.0) * SCALE * scale
+        colours = _packed(
+            [dark + (thin - dark) * age for dark, thin in zip(SMOKE, THIN_SMOKE, strict=True)]
+            + [0.75 * (1 - age)]
+        )
+        for x, y, r, colour in zip(
+            sx.tolist(), sy.tolist(), radius.tolist(), colours.tolist(), strict=True
+        ):
+            draw_list.add_circle_filled((x, y), r, colour)
 
-    def _chimneys(self, railway: Railway, trains: list[Train]) -> list[_Chimney]:
+    def _chimneys(
+        self, railway: Railway, trains: list[Train], lanes_of: dict[int, dict[Cell | None, int]]
+    ) -> list[_Chimney]:
         """Where each of these trains' chimney is on the map, for those that have one in the
-        open."""
+        open, on the lanes found for each train this frame where they were (`lanes_of`)."""
         seen = []
         for train in trains:
             model = ENGINES[train.engine]
@@ -341,7 +348,9 @@ class TrainLayer:
                 continue
             model = ENGINES[train.engine]
             assert model.chimney is not None
-            lanes = self.lanes.of(train, four_lanes)
+            lanes = lanes_of.get(id(train))
+            if lanes is None:
+                lanes = lanes_of[id(train)] = self.lanes.of(train, four_lanes)
             shift = self._shift(train, back, lanes, railway.constructions.railway_version)
             phase = (train.along * 6.0) % 1.0
             chimneys.append(_Chimney(x, y, dx, dy, shift, model.chimney[1] * SCALE, phase))
@@ -441,6 +450,18 @@ class TrainLayer:
                 held -= self._pages.pop(key).bytes
 
 
+def _packed(channels: list[npt.NDArray[np.float64]]) -> npt.NDArray[np.uint32]:
+    """Red, green, blue and alpha from 0 to 1 packed as imgui packs a colour
+    (ImGui::ColorConvertFloat4ToU32), for many colours at once: each channel as a float, clamped
+    to 0 to 1, times 255 and rounded half up."""
+    packed = np.zeros(channels[0].shape, dtype=np.uint32)
+    for shift, channel in zip((0, 8, 16, 24), channels, strict=True):
+        value = np.clip(channel.astype(np.float32), np.float32(0), np.float32(1))
+        byte = (value * np.float32(255) + np.float32(0.5)).astype(np.uint32)
+        packed |= byte << np.uint32(shift)
+    return packed
+
+
 @dataclass(frozen=True)
 class _Page:
     """One look's pictures every way round on a texture of their own: the texture, its size,
@@ -492,6 +513,7 @@ class Lanes:
         self.track = track
         self._paths: dict[int, tuple[list[Point], int, list[_Stretch], list[float]]] = {}
         self._held: dict[str, tuple[list[Point] | None, dict[Cell, int]]] = {}
+        self._starts: dict[int, tuple[list[Point], Cell]] = {}
 
     def of(self, train: Train, four_lanes: Container[Cell]) -> dict[Cell | None, int]:
         """The track of quadruple track the train takes in each cell it holds (lanes_of), a
@@ -508,12 +530,21 @@ class Lanes:
         lanes |= behind
         sure |= behind
         if train.path:
-            row, col = self.track.tile_map.grid.cell_at(*train.path[0])
-            start = (int(row), int(col))
+            start = self._start_of(train.path)
             if start not in lanes:
                 lanes[start] = sure[start] = kept.get(start, lanes[None])
         self._held[train.name] = (train.path, sure)
         return lanes
+
+    def _start_of(self, path: list[Point]) -> Cell:
+        """The cell a path starts in, kept for the path last asked about by each first point."""
+        kept = self._starts.get(id(path))
+        if kept is None or kept[0] is not path:
+            if len(self._starts) > 1024:
+                self._starts.clear()
+            row, col = self.track.tile_map.grid.cell_at(*path[0])
+            kept = self._starts[id(path)] = (path, (int(row), int(col)))
+        return kept[1]
 
     def sideways(
         self, path: list[Point], along: float, lanes: Mapping[Cell | None, int] | None = None
@@ -639,33 +670,45 @@ class Lanes:
 
     def _lay_out(self, path: list[Point]) -> list[_Stretch]:
         """The stretches of a path that runs from cell middle to cell edge and on
-        (TrackNetwork.route)."""
+        (TrackNetwork.route), the cells and track points of all of them found at once."""
         grid = self.track.tile_map.grid
         constructions = self.track.constructions
         steps = grid.track_steps()
         matrix = self.track.projection.matrix
-        ways = []
-        for a, b in itertools.pairwise(path):
-            dx, dy = matrix @ (b[0] - a[0], b[1] - a[1])
-            length = math.hypot(dx, dy) or 1.0
-            ways.append((float(dx / length), float(dy / length)))
+        points = np.array(path, dtype=np.float64)
+        moves = matrix @ (points[1:] - points[:-1]).T
+        sizes = np.hypot(moves[0], moves[1])
+        sizes[sizes == 0] = 1.0
+        ways = list(zip((moves[0] / sizes).tolist(), (moves[1] / sizes).tolist(), strict=True))
+        middles = (points[1:] + points[:-1]) / 2
+        rows, cols = grid.cell_at(middles[:, 0], middles[:, 1])
+        cells = list(zip(np.asarray(rows).tolist(), np.asarray(cols).tolist(), strict=True))
+        cx, cy = (
+            np.asarray(v, dtype=np.float64) for v in grid.center(np.asarray(rows), np.asarray(cols))
+        )
+        count = len(cells)
+        # From each stretch's cell middle to the edge it crosses and to the point after it.
+        to_a = np.hypot(points[:-1, 0] - cx, points[:-1, 1] - cy)
+        to_b = np.hypot(points[1:, 0] - cx, points[1:, 1] - cy)
+        inward = to_b < to_a
+        edges = np.where(inward[:, None], points[:-1], points[1:])
+        beyond = np.where(inward, np.arange(count) + 2, np.arange(count) - 1)
+        reach = np.clip(beyond, 0, len(path) - 1)
+        edge_points = _points(steps, edges[:, 0] - cx, edges[:, 1] - cy)
+        beyond_points = _points(steps, points[reach, 0] - cx, points[reach, 1] - cy)
         stretches = []
         start = 0.0
         for index, (a, b) in enumerate(itertools.pairwise(path)):
             length = math.dist(a, b)
-            row, col = grid.cell_at((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
-            cell = (int(row), int(col))
-            cx, cy = (float(v) for v in grid.center(*cell))
-            inward = math.dist(b, (cx, cy)) < math.dist(a, (cx, cy))
-            edge = a if inward else b
-            point = _point(steps, edge[0] - cx, edge[1] - cy)
-            beyond = index + 2 if inward else index - 1
-            met = index + 1 if inward else index - 1
+            cell = cells[index]
+            into = bool(inward[index])
+            point = edge_points[index]
+            met = index + 1 if into else index - 1
             piece: Track | None = None
             if constructions.station_at(cell) is not None:
                 piece = self.track.station_piece(cell)
-            elif 0 <= beyond < len(path):
-                other = _point(steps, path[beyond][0] - cx, path[beyond][1] - cy)
+            elif 0 <= beyond[index] < len(path):
+                other = beyond_points[index]
                 piece = next(
                     (p for p in constructions.track_at(cell) if set(p.ends) == {point, other}),
                     None,
@@ -681,7 +724,7 @@ class Lanes:
                     start=start,
                     length=length,
                     piece=piece,
-                    inward=inward,
+                    inward=into,
                     at_first=piece is not None and point == piece.ends[0],
                     halves=halves,
                     way=ways[index],
@@ -741,9 +784,10 @@ def _held_lanes(
     return lanes, sure
 
 
-def _point(steps: np.ndarray, dx: float, dy: float) -> int:
-    """The track point this far from a cell's middle lies at."""
-    return int(np.argmin(np.hypot(steps[:, 0] / 2 - dx, steps[:, 1] / 2 - dy)))
+def _points(steps: np.ndarray, dx: np.ndarray, dy: np.ndarray) -> list[int]:
+    """The track point each of these offsets from a cell's middle lies at."""
+    gaps = np.hypot(steps[None, :, 0] / 2 - dx[:, None], steps[None, :, 1] / 2 - dy[:, None])
+    return np.argmin(gaps, axis=1).tolist()
 
 
 # Which way on the screen an engine shown on its own faces: to the right and a little down, so
