@@ -15,9 +15,10 @@ Stations come after (railroads.sim.railway), those joined by track to another st
 what it holds, what trains brought and its stockpile, to buildings within its delivery radius
 still short of a need, the same way,
 nearest first and shared by how much they still want, but taking all they want from any distance.
-Both go through one distribute. Once every need has been met, each station takes the spare goods no building
-took that buildings made within its collection radius into its stockpile, while it has room, for
-trains to carry away or to hand out the next month. The player's share of what the buildings they
+Both go through one distribute. Once every need has been met, the stations take the spare goods no
+building took that buildings made within their collection radius into their stockpiles, while they
+have room, for trains to carry away or to hand out the next month: through the same distribute,
+each cell's to the nearest station first, stations as near sharing them by the room they have left. The player's share of what the buildings they
 own make goes to the stations in reach before anything else: before it is handed out around them.
 
 Nothing is made that has nowhere to go: a processor uses up only the inputs for what left it; the
@@ -93,6 +94,12 @@ STEP_SECONDS = 0.008
 
 # Sellers and buyers in pairs, in order of how far apart they are, and where each distance starts.
 type _Pairs = tuple[npt.NDArray[np.intp], npt.NDArray[np.intp], tuple[int, ...]]
+# The traded cells near enough to a station to be gathered from, as positions among the traded
+# cells, and every one with every station gathering from it, by their places among those cells
+# and the stations, the nearest pairs first, with how many steps apart each pair is.
+type _Gathering = tuple[
+    npt.NDArray[np.intp], npt.NDArray[np.intp], npt.NDArray[np.intp], FloatArray
+]
 
 
 def distribute(
@@ -219,26 +226,6 @@ class Economy:
         positions, steps = positions[found], within.steps[found]
         order = np.argsort(steps, kind="stable")
         return positions[order], steps[order]
-
-    @staticmethod
-    def _gather(
-        room: float,
-        far: tuple[npt.NDArray[np.intp], FloatArray],
-        supply: FloatArray,
-        made: FloatArray,
-        sold: FloatArray,
-    ) -> float:
-        """Takes spare goods that buildings made from the cells around, evenly, up to the room
-        left; returns how much was taken."""
-        positions, _ = far
-        spare = np.maximum(supply[positions] - sold[positions], 0.0)
-        spare = np.minimum(spare, made[positions])
-        total = float(spare.sum())
-        if total <= 0 or room <= 0:
-            return 0.0
-        take = min(room, total)
-        sold[positions] += spare * (take / total)
-        return take
 
     def moved_into(self, new: Economy, move: Move) -> Economy:
         """`new`, an economy of the moved map, given what this one remembers, moved."""
@@ -375,9 +362,7 @@ class MonthOfTrade:
             )
             for station, order in stations.items()
         }
-        self._gathered_from: (
-            tuple[npt.NDArray[np.intp], npt.NDArray[np.intp], list[Cell]] | None
-        ) = None
+        self.gather_pairs: _Gathering | None = None
 
     def run_steps(self) -> Steps[Trade]:
         yield
@@ -403,7 +388,7 @@ class MonthOfTrade:
                 paused = time.perf_counter()
         for good in Good:
             self._gather_owned(good)
-            self._gather(good)
+        self._gather()
         return (yield from self._settle())
 
     def _wants(self, need: Need) -> dict[BuildingKind, FloatArray]:
@@ -692,20 +677,16 @@ class MonthOfTrade:
         if not left.any():
             return
         offered = left.copy()
-        for station in self._could_gather(left, left, self.zero):
-            room = self.room[station][good]
-            if room <= 0:
-                continue
-            _, far = self.reach[station]
-            took = self.zero.copy()
-            taken = self.economy._gather(room, far, left, left, took)
-            if taken > 0:
-                left -= took
-                self.sold[good] += took
-                self.brought[station][good] = self.brought[station].get(good, 0.0) + taken
+        near = self._gather_pairs()[0]
+        spare = left[near][None]
+        taken = self._take_in([good], spare)
+        left[near] = spare[0]
+        self.sold[good] += offered - left
+        for station, amount in zip(self.stations, taken[0].tolist(), strict=True):
+            if amount > 0:
+                self.brought[station][good] = self.brought[station].get(good, 0.0) + amount
                 owned = self.owned_brought[station]
-                owned[good] = owned.get(good, 0.0) + taken
-                self.room[station][good] -= taken
+                owned[good] = owned.get(good, 0.0) + amount
         sent = divided(offered - left, offered)
         for kind, part in parts.items():
             self.owned_sent[(kind, good)] = part * sent
@@ -747,46 +728,63 @@ class MonthOfTrade:
             self.padded = (padded.ravel(), offsets)
         return self.padded
 
-    def _could_gather(self, supply: FloatArray, made: FloatArray, sold: FloatArray) -> list[Cell]:
-        """The stations, in order, with any cell they gather from where some of the supply is
-        left over that was made there (Economy._gather): the others would take nothing, as all
-        that only grows less while the stations before them take their share. Found for all the
-        stations at once, the cells they gather from laid end to end."""
-        cells, starts, stations = self._gathering()
-        if not stations:
-            return []
-        spare = (supply > sold) & (made > 0)
-        found = np.add.reduceat(spare[cells].astype(np.int64), starts)
-        return [station for station, count in zip(stations, found.tolist(), strict=True) if count]
+    def _gather_pairs(self) -> _Gathering:
+        """The cells the stations gather from and the pairs of them and the stations (_Gathering),
+        worked out once a month."""
+        if self.gather_pairs is None:
+            far = [self.reach[station][1] for station in self.stations]
+            cells = np.concatenate([cells for cells, _ in far] or [np.zeros(0, np.intp)])
+            near, sellers = np.unique(cells, return_inverse=True)
+            buyers = np.repeat(np.arange(len(far)), [cells.size for cells, _ in far])
+            away = np.concatenate([steps for _, steps in far] or [np.zeros(0)])
+            order = np.argsort(away, kind="stable")
+            self.gather_pairs = (near, sellers[order], buyers[order], away[order])
+        return self.gather_pairs
 
-    def _gathering(self) -> tuple[npt.NDArray[np.intp], npt.NDArray[np.intp], list[Cell]]:
-        """The cells each station gathers from laid end to end, where each station's start, and
-        the stations in order, worked out once a month; a station gathering from no cell is left
-        out, as it takes nothing."""
-        if self._gathered_from is None:
-            stations = [s for s in self.stations if self.reach[s][1][0].size]
-            far = [self.reach[s][1][0] for s in stations]
-            cells = np.concatenate(far) if far else np.zeros(0, dtype=np.intp)
-            starts = np.cumsum([0, *(f.size for f in far[:-1])]).astype(np.intp)
-            self._gathered_from = (cells, starts, stations)
-        return self._gathered_from
+    def _take_in(self, goods: list[Good], spare: FloatArray) -> FloatArray:
+        """Lets the stations take the spare units of goods, a row of `spare` per good over the
+        cells they gather from (_Gathering), into their stockpiles while they have room: each
+        cell's to the nearest station first, stations as near sharing them by the room they have
+        left. Takes what went out of `spare`; returns how much each station took of each good, a
+        row per good. The goods never meet, so one distribute serves them all."""
+        stations = list(self.stations)
+        room = np.zeros((len(goods), len(stations)))
+        _, sellers, buyers, away = self._gather_pairs()
+        pair, row = np.nonzero(spare[:, sellers].T > EPSILON)
+        if not row.size:
+            return room
+        for good_at in np.unique(row).tolist():
+            room[good_at] = [self.room[station][goods[good_at]] for station in stations]
+        flat = spare.reshape(-1)
+        cells, seller = np.unique(row * spare.shape[1] + sellers[pair], return_inverse=True)
+        left = flat[cells]
+        short = room.reshape(-1).copy()
+        buyer = row * len(stations) + buyers[pair]
+        distribute(seller, buyer, ring_starts(away[pair]), left, short)
+        flat[cells] = left
+        taken = room - short.reshape(room.shape)
+        for good_at, station_at in zip(*np.nonzero(taken > 0), strict=True):
+            self.room[stations[station_at]][goods[good_at]] -= float(taken[good_at, station_at])
+        return taken
 
-    def _gather(self, good: Good) -> None:
-        """Lets every station take the spare units of a good no building took into its
-        stockpile, for trains. Where nothing is left or a station has no room, it takes
-        nothing."""
-        offered = self.offered[good]
-        if not offered.any():
+    def _gather(self) -> None:
+        """Lets the stations take the spare units of every good no building took into their
+        stockpiles, for trains."""
+        goods = [good for good in Good if self.offered[good].any()]
+        near = self._gather_pairs()[0]
+        if not goods or not near.size:
             return
-        for station in self._could_gather(offered, offered, self.sold[good]):
-            room = self.room[station][good]
-            if room <= 0:
-                continue
-            _, far = self.reach[station]
-            taken = self.economy._gather(room, far, offered, offered, self.sold[good])
-            if taken > 0:
-                self.gathered[station][good] = self.gathered[station].get(good, 0.0) + taken
-                self.room[station][good] -= taken
+        offered = np.stack([self.offered[good][near] for good in goods])
+        spare = np.maximum(offered - np.stack([self.sold[good][near] for good in goods]), 0.0)
+        left = spare.copy()
+        taken = self._take_in(goods, left)
+        for row in np.flatnonzero((left != spare).any(axis=1)).tolist():
+            self.sold[goods[row]][near] += spare[row] - left[row]
+        stations = list(self.stations)
+        for good_at, station_at in zip(*np.nonzero(taken > 0), strict=True):
+            gathered = self.gathered[stations[station_at]]
+            good = goods[good_at]
+            gathered[good] = gathered.get(good, 0.0) + float(taken[good_at, station_at])
 
     def _produce(self, kind: BuildingKind) -> None:
         """Offers what a kind of processor could make from its stockpile: what its inputs allow,

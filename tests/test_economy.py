@@ -693,6 +693,44 @@ def test_a_station_full_of_one_good_still_gathers_another() -> None:
     assert level_at(economy, trade, (8, 9), BuildingKind.FARM) == Satisfaction.THRIVING
 
 
+def test_the_nearer_station_gathers_what_a_farm_made() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.FARM, 1))
+    far = (8, 6)
+
+    trade = economy.trade(placed, {STATION: StationOrder({}, 100.0), far: StationOrder({}, 100.0)})
+
+    assert trade.gathered[STATION] == {Good.WHEAT: pytest.approx(FARM_MONTH)}
+    assert trade.gathered[far] == {}
+
+
+def test_stations_as_near_to_a_farm_share_what_it_made_by_their_room() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.FARM, 1))
+    other = (8, 8)
+
+    trade = economy.trade(
+        placed, {STATION: StationOrder({}, 100.0), other: StationOrder({}, 100.0)}
+    )
+
+    assert trade.gathered[STATION] == {Good.WHEAT: pytest.approx(FARM_MONTH / 2)}
+    assert trade.gathered[other] == {Good.WHEAT: pytest.approx(FARM_MONTH / 2)}
+
+
+def test_a_farther_station_gathers_what_a_full_nearer_one_has_no_room_for() -> None:
+    tile_map = make_map()
+    economy = Economy(tile_map)
+    placed = counts(tile_map, ((8, 9), BuildingKind.FARM, 1))
+    far = (8, 6)
+
+    trade = economy.trade(placed, {STATION: StationOrder({}, 0.0), far: StationOrder({}, 100.0)})
+
+    assert trade.gathered[STATION] == {}
+    assert trade.gathered[far] == {Good.WHEAT: pytest.approx(FARM_MONTH)}
+
+
 def test_a_station_full_of_a_good_gathers_no_more_of_it() -> None:
     tile_map = make_map()
     economy = Economy(tile_map)

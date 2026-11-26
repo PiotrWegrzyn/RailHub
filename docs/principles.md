@@ -62,8 +62,9 @@ The ideas every change to the game should follow.
   map, the nearest first, up to six cells away. Nothing is lost on the way, but the further a buyer
   is, the less of the maker's month it can take, by the Fibonacci numbers: all of it in the same
   cell, then 13, 8, 5, 3, 2 and 1 twenty-firsts of it from one to six cells away.
-- Only what is left after that goes to a station within reach; stations never take a good the
-  buildings around could have used.
+- Only what is left after that goes to a station within reach, the nearest one first, stations as
+  near sharing it by the room they have left; stations never take a good the buildings around
+  could have used.
 - A station hands out all it holds, what trains brought and what it gathered itself, the same
   way buildings hand out their own goods: the player's own buildings first, then the nearest
   first, buildings as near sharing by how short they are, but without the falloff within its
