@@ -13,8 +13,9 @@ way on from there to a station or double track (`_line_end`), which no train may
 meanwhile. The way is
 set for it only once no other train holds any of it, and then all at once; until then it stands
 SIGNAL_GAP short of the signal, red for it. Trains are let on in the order they asked, so as one
-train frees track the train that has waited longest for it gets it first. A train gives up track
-cell by cell as its tail leaves it.
+train frees track the train that has waited longest for it gets it first; but as a dispatcher
+would, track is not kept for a train that could not go anyway, as a third train holds some of its
+way, while another that would not follow that third train onto its track can use it now. A train gives up track cell by cell as its tail leaves it.
 
 On double track trains going opposite ways keep to their own tracks and never hold each other up;
 on quadruple track trains going the same way keep to its two tracks that way, taking one no train
@@ -720,11 +721,14 @@ class Signals:
     def _queued_before(self, train: Train, wanted: list[Pass]) -> Train | None:
         """A train that asked before this one and still waits for track this one wants, which it
         must leave to it: unless this one holds track that train waits for, or that train
-        waits, through the trains each waits for in turn, on this one."""
+        waits, through the trains each waits for in turn, on this one, or a third train this one
+        would not follow holds some of its way, so it could not go now anyway (_held_up)."""
         mine = {crossing.cell: (crossing.entry, crossing.exit) for crossing in wanted}
         holding = {claim[0] for claim in train.claims}
         for other, theirs in self._waiting:
             if any(crossing.cell in holding for crossing in theirs) or self._waits_on(other, train):
+                continue
+            if self._held_up(other, theirs, train, mine.keys()):
                 continue
             for crossing in theirs:
                 way = mine.get(crossing.cell)
@@ -733,6 +737,23 @@ class Signals:
                 ):
                     return other
         return None
+
+    def _held_up(
+        self, other: Train, theirs: list[Pass], train: Train, wanted: Iterable[Cell]
+    ) -> bool:
+        """Whether a train waiting for this way could not be let on now anyway, as a train other
+        than `train` holds track of it, on none of the cells `train` wants: as a dispatcher
+        would, the track goes to a train that can go instead of being kept for one that can't,
+        but not to one that would follow the train in the way onto its track, keeping the
+        waiting one out longer, as a line of trains one way would on a single line."""
+        cells = set(wanted)
+        for crossing in theirs:
+            holder = self._holder(other, crossing)
+            if holder is None or holder is train:
+                continue
+            if not any(held is holder for cell in cells for held, *_ in self._held.get(cell, ())):
+                return True
+        return False
 
     def _waits_on(self, other: Train, train: Train) -> bool:
         """Whether a train waits on another, through the trains each waits for in turn."""

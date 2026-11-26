@@ -9,6 +9,9 @@ from railroads.sim.railway import QUADRUPLE_ERA, Railway
 from railroads.sim.signals import (
     FAST_LANE,
     SLOW_LANE,
+    Pass,
+    Signals,
+    _claim,
     blocks_of,
     cleared_signals,
     passes,
@@ -185,23 +188,23 @@ def test_a_signal_shows_clear_once_the_way_past_it_is_set_for_a_train_coming_to_
 
 
 @pytest.mark.parametrize("width", [TrackWidth.SINGLE, TrackWidth.DOUBLE])
-def test_a_train_never_holds_track_another_holds_unless_they_pass_on_double_track(
+def test_trains_never_hold_track_against_each_other_unless_they_pass_on_double_track(
     width: TrackWidth,
 ) -> None:
     game = game_with((WEST, EAST, width))
     trains = [shuttle(game, WEST, EAST), shuttle(game, EAST, WEST), shuttle(game, WEST, EAST)]
-    shared = []
+    against = []
 
     for _ in range(int(6 / STEP)):
         game.railway.run(STEP)
         held = [
-            {(cell, entry, exit_) for cell, entry, exit_, *_ in train.claims} for train in trains
+            {cell: (entry, exit_) for cell, entry, exit_, *_ in train.claims} for train in trains
         ]
-        for one, other in ((0, 1), (1, 2)):
-            cells = {c for c, *_ in held[one]} & {c for c, *_ in held[other]}
-            shared += [(one, other, cell) for cell in cells]
+        for one, other in ((0, 1), (1, 2), (0, 2)):
+            cells = held[one].keys() & held[other].keys()
+            against += [cell for cell in cells if held[one][cell] != held[other][cell]]
 
-    assert bool(shared) is (width == TrackWidth.DOUBLE)
+    assert bool(against) is (width == TrackWidth.DOUBLE)
 
 
 def quadruple_game(monkeypatch: pytest.MonkeyPatch) -> Game:
@@ -619,3 +622,41 @@ def test_two_trains_coming_together_at_a_junction_of_quadruple_track_go_through_
 
     assert together > 0
     assert waited == 0
+
+
+def waiting_for_the_line(held_up: bool) -> tuple[Signals, Train, list[Pass]]:
+    game = game_with((WEST, EAST, TrackWidth.SINGLE))
+    network = game.railway.network
+    waiting, ahead = shuttle(game, WEST, EAST), shuttle(game, WEST, EAST)
+    for train in (waiting, ahead):
+        train.path, train.speeds = game.railway.route(WEST, EAST)
+    way = passes(network, waiting)
+    signals = Signals(network, [])
+    if held_up:
+        signals._hold(ahead, _claim(way[-1]))
+    signals._waiting.append((waiting, way))
+    return signals, waiting, way
+
+
+def test_track_is_kept_for_a_train_that_asked_first_and_could_go() -> None:
+    signals, waiting, way = waiting_for_the_line(held_up=False)
+
+    kept_for = signals._queued_before(Train("Later"), way[:3])
+
+    assert kept_for is waiting
+
+
+def test_track_is_not_kept_for_a_train_that_asked_first_but_a_third_train_holds_up() -> None:
+    signals, _, way = waiting_for_the_line(held_up=True)
+
+    kept_for = signals._queued_before(Train("Later"), way[:3])
+
+    assert kept_for is None
+
+
+def test_track_is_kept_from_a_train_that_would_follow_the_one_holding_up_the_first() -> None:
+    signals, waiting, way = waiting_for_the_line(held_up=True)
+
+    kept_for = signals._queued_before(Train("Later"), way)
+
+    assert kept_for is waiting

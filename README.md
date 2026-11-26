@@ -1338,7 +1338,10 @@ only once the way beyond it is set for it, up to the next signal where it could 
 blocking anyone but trains following it: in a station, or wholly on double track, never on a
 junction or single line. Until then the arm lies level and the lamp shows red, and the train
 stands before it; once the way is set the arm rises and the lamp turns green. Trains get the way
-in the order they asked, so the one that has waited longest goes first and none waits for ever.
+in the order they asked, so the one that has waited longest goes first and none waits for ever;
+but as a dispatcher would, a train that could not go anyway, as a third train holds some of its
+way, does not keep the track from a later one that can go now, unless that one would follow the
+third train onto its track, as trains one after another one way would on a single line.
 A train asks for the way on when it comes within 2 cells of the end of the way set for it, so it
 finds the next signal clear without slowing when the track is free. Within stations, and on double
 track for trains going opposite ways, trains pass each other without stopping. On quadruple track a
