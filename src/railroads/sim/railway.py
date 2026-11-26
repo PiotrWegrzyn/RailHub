@@ -35,7 +35,7 @@ train does calling at a station in railroads.sim.calls; Railway owns them all an
 import itertools
 import math
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -43,20 +43,22 @@ from railroads.places import StationNames
 from railroads.sim import tiles as boards
 from railroads.sim.calls import StationCalls
 from railroads.sim.clock import SECONDS_PER_MONTH, START_YEAR
-from railroads.sim.constructions import Constructions
+from railroads.sim.constructions import Annex, Constructions
 from railroads.sim.demand import StationDemand
 from railroads.sim.events import price_factor as history_price
-from railroads.sim.facilities import LEVEL as FACILITY_LEVEL
 from railroads.sim.facilities import (
+    BY_SHED,
     PLACED,
     SAND_TOWER_PICKUP,
+    SHED_LEVELS,
+    SHED_PRICES,
     WAREHOUSE_ROOM,
     Facility,
     monthly_cost,
     pay_factor,
-    shed_stalls,
     supply,
 )
+from railroads.sim.facilities import LEVEL as FACILITY_LEVEL
 from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.finance import (
     LEVEL_PRICES,
@@ -89,7 +91,7 @@ from railroads.sim.goods import (
 from railroads.sim.grids import Cell
 from railroads.sim.move import Move
 from railroads.sim.schedules import Schedule, Schedules, between_rounds
-from railroads.sim.sheds import STALL_ORDER, stall_way, standing, stood_at
+from railroads.sim.sheds import stall_way, stalls, standing, stood_at
 from railroads.sim.signals import Signals
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
@@ -823,6 +825,27 @@ class Railway:
         level, and gathers them from; each level a cell further."""
         return DELIVERY_RADIUS + level - 1, COLLECTION_RADIUS + level - 1
 
+    def shed_level(self, shed: Cell) -> int:
+        """The level of the engine shed in the cell, from 1 to SHED_LEVELS."""
+        annex = self.constructions.shed_at(shed)
+        return 1 if annex is None else annex.level
+
+    def shed_upgrade_price(self, shed: Cell) -> float | None:
+        """What raising the engine shed in the cell a level costs; None at the top level."""
+        level = self.shed_level(shed)
+        return SHED_PRICES[level - 1] if level < SHED_LEVELS else None
+
+    def upgrade_shed(self, shed: Cell) -> bool:
+        """Raises the engine shed in the cell a level, adding stalls to its roundhouse, if it can
+        go higher and there is the cash for it."""
+        annex = self.constructions.shed_at(shed)
+        price = self.shed_upgrade_price(shed)
+        if annex is None or price is None or not self.finances.pay(price, "station upgrades"):
+            return False
+        self.constructions.remove(annex)
+        self.constructions.build(replace(annex, level=annex.level + 1))
+        return True
+
     def upgrade_price(self, station: Cell) -> float | None:
         """What raising the station a level costs; None at the top level."""
         level = self.level(station)
@@ -849,26 +872,48 @@ class Railway:
         return STATION_UPKEEP[self.level(station) - 1] * rise
 
     def facilities_at(self, station: Cell) -> set[Facility]:
-        """The facilities put up at a station, in it or beside it (railroads.sim.facilities)."""
-        return set(self.constructions.annexes(station)) | (self.tucked or {}).get(station, set())
+        """The facilities put up at a station, in it or beside it, the sand tower by its engine
+        shed (railroads.sim.facilities)."""
+        built = set(self.constructions.annexes(station)) | (self.tucked or {}).get(station, set())
+        shed = self._shed_annex(station)
+        if shed is not None and shed.sand_tower:
+            built.add(Facility.SAND_TOWER)
+        return built
+
+    def _shed_annex(self, station: Cell) -> Annex | None:
+        shed = self.constructions.shed_of(station)
+        return None if shed is None else self.constructions.shed_at(shed)
 
     def put_up(self, station: Cell, facility: Facility) -> bool:
         """Puts up a facility that stands in the station itself, if it is high enough for it
-        and has none of the kind; it costs nothing until its month is paid for."""
+        and has none of the kind, a sand tower by its engine shed, which it needs (BY_SHED); it
+        costs nothing until its month is paid for."""
         if (
             facility in PLACED
             or self.level(station) < FACILITY_LEVEL[facility]
             or facility in self.facilities_at(station)
         ):
             return False
+        if facility in BY_SHED:
+            shed = self._shed_annex(station)
+            if shed is None:
+                return False
+            self.constructions.remove(shed)
+            self.constructions.build(replace(shed, sand_tower=True))
+            return True
         if self.tucked is None:
             self.tucked = {}
         self.tucked.setdefault(station, set()).add(facility)
         return True
 
     def close_facility(self, station: Cell, facility: Facility) -> None:
-        """Takes down a facility standing in the station itself, which stops its costs."""
+        """Takes down a facility standing in the station itself or by its engine shed, which
+        stops its costs."""
         (self.tucked or {}).get(station, set()).discard(facility)
+        shed = self._shed_annex(station)
+        if facility in BY_SHED and shed is not None and shed.sand_tower:
+            self.constructions.remove(shed)
+            self.constructions.build(replace(shed, sand_tower=False))
 
     def market_price(self, good: Good) -> float:
         """What a unit of a good fetches on the market now, as the boards price it: what the
@@ -882,7 +927,16 @@ class Railway:
         return monthly_cost(facility, held, self.market_price(good))
 
     def _supply_facilities(self) -> None:
-        """Lets every facility take a month of what it uses from its station and pays for it."""
+        """Lets every facility take a month of what it uses from its station and pays for it,
+        moving a sand tower put up in a station before it stood by an engine shed beside the
+        station's shed, where it is drawn."""
+        for station, tucked in (self.tucked or {}).items():
+            shed = self._shed_annex(station)
+            if Facility.SAND_TOWER in tucked and shed is not None:
+                tucked.discard(Facility.SAND_TOWER)
+                if not shed.sand_tower:
+                    self.constructions.remove(shed)
+                    self.constructions.build(replace(shed, sand_tower=True))
         cost = sum(
             supply(self.station_goods(station), facility, self.market_price)
             for station in self.stations()
@@ -1103,8 +1157,8 @@ class Railway:
         return False
 
     def _free_stall(self, shed: Cell, station: Cell) -> int | None:
-        """A stall of the station's engine shed no train stands in or is on its way to, the
-        middle ones first, while it has fewer than its level lets it hold (shed_stalls)."""
+        """A stall of the station's engine shed no train stands in or is on its way to, of
+        those its level gives it (shed_level), the middle ones first."""
         taken = {
             train.stall
             for train in self.trains
@@ -1114,8 +1168,7 @@ class Railway:
                 or (train.path and self.network.cell_at(train.path[-1]) == shed)
             )
         }
-        held = STALL_ORDER[: shed_stalls(self.level(station))]
-        return next((stall for stall in held if stall not in taken), None)
+        return next((stall for stall in stalls(self.shed_level(shed)) if stall not in taken), None)
 
     def _to_shed(self, train: Train, shed: Cell, stall: int) -> bool:
         """Sets a train waiting for a load off from where it stands into a stall of its

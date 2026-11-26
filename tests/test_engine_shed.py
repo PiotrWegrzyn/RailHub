@@ -4,6 +4,7 @@ import pytest
 
 from builders import joined_stations
 from railroads.sim.constructions import Facility
+from railroads.sim.facilities import SHED_PRICES
 from railroads.sim.goods import Good
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
@@ -149,24 +150,47 @@ def test_a_train_waiting_in_the_shed_stands_with_its_front_out_of_its_stalls_doo
     assert train.along == pytest.approx(math.dist(back, door) + NOSE)
 
 
-def test_an_engine_shed_holds_two_trains_a_station_level_from_level_3() -> None:
-    _, railway = with_shed(level=3)
-    trains = [waiting_for_wheat(railway) for _ in range(3)]
+def test_an_engine_shed_of_level_1_holds_three_trains() -> None:
+    _, railway = with_shed()
+    trains = [waiting_for_wheat(railway) for _ in range(4)]
 
-    run(railway, 40)
+    run(railway, 60)
 
-    shed = sorted(train.shed for train in trains)
-    assert shed == ["", IN_SHED, IN_SHED]
-    assert len({train.stall for train in trains if train.shed}) == 2
+    assert sum(train.shed == IN_SHED for train in trains) == 3
+    assert len({train.stall for train in trains if train.shed}) == 3
 
 
-def test_an_engine_shed_at_a_station_of_level_5_holds_six_trains() -> None:
-    _, railway = with_shed(level=5)
-    trains = [waiting_for_wheat(railway) for _ in range(7)]
+def test_an_engine_shed_raised_to_level_3_holds_nine_trains() -> None:
+    _, railway = with_shed()
+    railway.finances.earn(10_000_000.0, "test")
+    raised = [railway.upgrade_shed(SHED) for _ in range(3)]
+    trains = [waiting_for_wheat(railway) for _ in range(10)]
 
-    run(railway, 80)
+    run(railway, 120)
 
-    assert sum(train.shed == IN_SHED for train in trains) == 6
+    assert raised == [True, True, False]
+    assert railway.shed_level(SHED) == 3
+    assert sum(train.shed == IN_SHED for train in trains) == 9
+
+
+def test_raising_an_engine_shed_costs_its_price() -> None:
+    _, railway = with_shed()
+    railway.finances.earn(1_000_000.0, "test")
+    before = railway.finances.cash
+
+    railway.upgrade_shed(SHED)
+
+    assert before - railway.finances.cash == SHED_PRICES[0]
+
+
+def test_an_engine_shed_is_not_raised_without_the_cash() -> None:
+    _, railway = with_shed()
+    railway.finances.cash = SHED_PRICES[0] - 1.0
+
+    raised = railway.upgrade_shed(SHED)
+
+    assert not raised
+    assert railway.shed_level(SHED) == 1
 
 
 def test_a_train_waiting_in_the_shed_is_inside_it_and_not_drawn() -> None:
@@ -186,3 +210,47 @@ def test_a_train_on_its_way_elsewhere_is_drawn_even_beside_a_shed() -> None:
     hidden = _in_shed(railway, train, railway.constructions.tile_map.grid.center(*SHED))
 
     assert not hidden
+
+
+def test_a_sand_tower_needs_an_engine_shed() -> None:
+    _, railway = joined_stations()
+    railway.levels[STATION] = 3
+
+    put_up = railway.put_up(STATION, Facility.SAND_TOWER)
+
+    assert not put_up
+    assert Facility.SAND_TOWER not in railway.facilities_at(STATION)
+
+
+def test_a_sand_tower_stands_by_the_engine_shed() -> None:
+    _, railway = with_shed()
+
+    put_up = railway.put_up(STATION, Facility.SAND_TOWER)
+
+    shed = railway.constructions.shed_at(SHED)
+    assert put_up
+    assert shed is not None and shed.sand_tower
+    assert Facility.SAND_TOWER in railway.facilities_at(STATION)
+
+
+def test_closing_the_sand_tower_takes_it_from_beside_the_shed() -> None:
+    _, railway = with_shed()
+    railway.put_up(STATION, Facility.SAND_TOWER)
+
+    railway.close_facility(STATION, Facility.SAND_TOWER)
+
+    shed = railway.constructions.shed_at(SHED)
+    assert shed is not None and not shed.sand_tower
+    assert Facility.SAND_TOWER not in railway.facilities_at(STATION)
+
+
+def test_a_sand_tower_put_up_in_the_station_before_moves_beside_its_engine_shed() -> None:
+    _, railway = with_shed()
+    railway.tucked = {STATION: {Facility.SAND_TOWER}}
+
+    railway._supply_facilities()
+
+    shed = railway.constructions.shed_at(SHED)
+    assert shed is not None and shed.sand_tower
+    assert railway.tucked == {STATION: set()}
+    assert Facility.SAND_TOWER in railway.facilities_at(STATION)

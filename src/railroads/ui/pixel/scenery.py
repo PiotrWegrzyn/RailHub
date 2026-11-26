@@ -228,15 +228,15 @@ for _grown, _kind in GREW_FROM.items():
 
 
 def facility_spot(constructions: Constructions, annex: Annex) -> tuple[float, float, str]:
-    """Where an engine shed stands on the map and its sprite: in the middle of its cell, turned so
-    its lead track runs out by the end of its track that track joins, else the one nearer its
-    station (railroads.sim.sheds.lead_end)."""
+    """Where an engine shed stands on the map and its sprite, of its level: in the middle of its
+    cell, turned so its lead track runs out by the end of its track that track joins, else the one
+    nearer its station (railroads.sim.sheds.lead_end)."""
     grid = constructions.tile_map.grid
     x, y = grid.center(*annex.cell)
     lx, ly = grid.track_points()[lead_end(constructions, annex.cell)]
     angle = math.degrees(math.atan2(float(ly), float(lx)))
     step = SHED_HEADINGS[1] - SHED_HEADINGS[0]
-    return x, y, shed_sprite(round(angle / step) * step % 360)
+    return x, y, shed_sprite(round(angle / step) * step % 360, annex.level, annex.sand_tower)
 
 
 def platform_sprite(line: str | None = None) -> str:

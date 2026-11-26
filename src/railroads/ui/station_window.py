@@ -10,13 +10,16 @@ from imgui_bundle import icons_fontawesome_4 as fa
 from imgui_bundle import imgui
 
 from railroads.sim.facilities import (
+    BY_SHED,
     DELIVERED_SHARE,
     PAYS_MORE,
     PLACED,
     SAND_TOWER_PICKUP,
+    SHED_LEVELS,
     SHED_STALLS,
     WAREHOUSE_ROOM,
     Facility,
+    shed_stalls,
 )
 from railroads.sim.facilities import LEVEL as FACILITY_LEVEL
 from railroads.sim.facilities import REACH as FACILITY_REACH
@@ -62,10 +65,12 @@ class StationWindow:
         preview: Callable[[Cell], StationPreview] | None = None,
         add_platform: Callable[[Cell], None] = lambda _: None,
         add_facility: Callable[[Cell, Facility], None] = lambda _, __: None,
+        rebuilt: Callable[[set[Cell]], None] = lambda _: None,
     ) -> None:
         """`preview` says what a station reaches (StationTrade.preview);
         `add_platform` lets the player choose where a platform goes, which raising a station to
-        a level that allows one does at once, and `add_facility` where a facility goes."""
+        a level that allows one does at once, `add_facility` where a facility goes, and `rebuilt`
+        redraws the cells where what is built changed, as raising an engine shed does."""
         station = self.station
         if station is None:
             return
@@ -86,7 +91,7 @@ class StationWindow:
                     add_platform(cell)
 
             self._draw_body(railway, station, look_at, raised, preview)
-            _draw_facilities(railway, station, add_facility)
+            _draw_facilities(railway, station, add_facility, rebuilt)
             left = railway.platforms_left(station)
             if left:
                 label = f"{fa.ICON_FA_PLUS}  Add a platform beside it ({left} to add)"
@@ -201,8 +206,7 @@ def station_warning(railway: Railway, station: Cell) -> str:
 
 FACILITY_EFFECTS = {
     Facility.ENGINE_SHED: (
-        f"trains short of a full load wait in it, {SHED_STALLS} for each station level "
-        f"from {FACILITY_LEVEL[Facility.ENGINE_SHED]}"
+        f"trains short of a full load wait in it, {SHED_STALLS} for each of its levels"
     ),
     Facility.SAND_TOWER: f"trains leaving here pick up speed {1 / SAND_TOWER_PICKUP:.0f} times as fast",
     Facility.POST_OFFICE: f"mail delivered here pays {PAYS_MORE[Facility.POST_OFFICE][1] - 1:.0%} more",
@@ -214,7 +218,10 @@ FACILITY_EFFECTS = {
 
 
 def _draw_facilities(
-    railway: Railway, station: Cell, add: Callable[[Cell, Facility], None]
+    railway: Railway,
+    station: Cell,
+    add: Callable[[Cell, Facility], None],
+    rebuilt: Callable[[set[Cell]], None] = lambda _: None,
 ) -> None:
     """A line for each facility at the station with what its next month costs, those in the
     station itself with a button to close them, and a button for each of the others: those
@@ -239,15 +246,20 @@ def _draw_facilities(
             imgui.align_text_to_frame_padding()
             imgui.text(f"{name}: {dollars(cost)} a month")
             tip(uses)
+            if facility == Facility.ENGINE_SHED:
+                _draw_shed_level(railway, station, rebuilt)
             if facility not in PLACED:
                 imgui.same_line()
                 if imgui.small_button(f"Close##{facility.name}"):
                     railway.close_facility(station, facility)
+                    if facility in BY_SHED:
+                        rebuilt({railway.constructions.shed_of(station) or station})
                 tip("Closes it, so it costs nothing more")
             continue
         needed = FACILITY_LEVEL[facility]
+        no_shed = facility in BY_SHED and Facility.ENGINE_SHED not in built
         label = f"{fa.ICON_FA_PLUS}  {name}  {dollars(cost)} a month"
-        imgui.begin_disabled(level < needed)
+        imgui.begin_disabled(level < needed or no_shed)
         clicked = imgui.button(label, (-1, 0))
         imgui.end_disabled()
         if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled.value):
@@ -258,12 +270,34 @@ def _draw_facilities(
                 )
             if level < needed:
                 lines.append(f"Raise the station to level {needed} first")
+            if no_shed:
+                lines.append("Put up an engine shed first: it stands by its lead track")
             imgui.set_tooltip("\n".join(lines))
         if clicked:
             if facility in PLACED:
                 add(station, facility)
-            else:
-                railway.put_up(station, facility)
+            elif railway.put_up(station, facility) and facility in BY_SHED:
+                rebuilt({railway.constructions.shed_of(station) or station})
+
+
+def _draw_shed_level(railway: Railway, station: Cell, rebuilt: Callable[[set[Cell]], None]) -> None:
+    """The station's engine shed's level and how many trains it holds, and a button raising it a
+    level, adding stalls to its roundhouse, while it can go higher."""
+    shed = railway.constructions.shed_of(station)
+    if shed is None:
+        return
+    level = railway.shed_level(shed)
+    imgui.same_line()
+    imgui.text_disabled(f"level {level} of {SHED_LEVELS}, {shed_stalls(level)} trains")
+    price = railway.shed_upgrade_price(shed)
+    if price is None:
+        return
+    label = f"{fa.ICON_FA_ARROW_UP}  Engine shed level {level + 1}  {dollars(price)}"
+    detail = f"Adds {SHED_STALLS} stalls to its roundhouse, for {shed_stalls(level + 1)} trains"
+    if _priced_button(label, railway.finances.can_afford(price), detail) and railway.upgrade_shed(
+        shed
+    ):
+        rebuilt({shed})
 
 
 def _priced_button(label: str, affordable: bool, detail: str = "") -> bool:

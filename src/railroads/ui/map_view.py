@@ -307,6 +307,7 @@ class MapView:
             self._built_station_preview,
             self.tools.start_adding_platform,
             self.tools.start_adding_facility,
+            self.buildings_changed,
         )
         self.port_window.draw(self.growth, self.look_at, self.open_shares)
         self.summaries.draw(*self._map_rect, self.look_at, self.railway.name_of)

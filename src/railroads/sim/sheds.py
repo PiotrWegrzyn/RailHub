@@ -24,11 +24,20 @@ from railroads.sim.trains import Point
 ROUNDHOUSE_SIZE = 1.8
 TURNTABLE = (-0.02, 0.0)
 TURNTABLE_RADIUS = 0.09
-STALL_HEADINGS = tuple(math.radians(a) for a in range(120, 241, 24))
+STALL_HEADINGS = tuple(math.radians(a) for a in range(84, 277, 24))
 STALL_FROM = 0.13
 STALL_TO = 0.33
-# The stalls trains take, by their place in STALL_HEADINGS: the middle ones first.
-STALL_ORDER = (2, 3, 1, 4, 0, 5)
+# The stalls a roundhouse has at each of its levels, by their place in STALL_HEADINGS, from the
+# middle out: the middle three, then three more beside them, then all nine.
+BUILT = {1: (3, 4, 5), 2: (2, 3, 4, 5, 6, 7), 3: tuple(range(9))}
+
+
+def stalls(level: int) -> list[int]:
+    """The stalls of a roundhouse of `level`, the middle ones first, as trains take them."""
+    middle = len(STALL_HEADINGS) // 2
+    return sorted(BUILT[level], key=lambda stall: (abs(stall - middle), stall))
+
+
 # How far a waiting train's front stands out of its stall's door, in cells.
 NOSE = 0.035
 

@@ -4,8 +4,10 @@ cells from the station or one of its platforms (railroads.sim.constructions.ANNE
 the station itself and take no room on the map:
 
 - trains waiting at the station for a full load it holds too little to fill wait in an engine
-  shed, on its own track, SHED_STALLS of them for each level from its own (railroads.sim.sheds);
-- a sand tower lets them pick up speed in SAND_TOWER_PICKUP of the time;
+  shed, on its own track, SHED_STALLS of them for each of its SHED_LEVELS levels, which it is
+  raised through for SHED_PRICES (railroads.sim.sheds);
+- a sand tower, standing by the engine shed it needs (BY_SHED), lets them pick up speed in
+  SAND_TOWER_PICKUP of the time;
 - a post office, a refreshment room, a market hall and cattle pens make what is delivered at the
   station pay more (PAYS_MORE): mail, passengers, food and livestock;
 - a warehouse adds WAREHOUSE_ROOM to the room for every kind of freight.
@@ -32,6 +34,9 @@ DELIVERED_SHARE = 0.5
 
 
 # The facilities that stand in a cell beside their station rather than in the station itself.
+# The facilities that stand by a station's engine shed, which they need: the sand tower by its
+# lead track.
+BY_SHED = frozenset({Facility.SAND_TOWER})
 PLACED = frozenset(ANNEX_SPACE)
 # What each facility uses a month, and how much of it.
 USES: Mapping[Facility, tuple[Good, float]] = MappingProxyType(
@@ -58,14 +63,16 @@ LEVEL: Mapping[Facility, int] = MappingProxyType(
     }
 )
 
-# How many trains an engine shed holds for each level its station has from the shed's own LEVEL
-# on: one stall of its roundhouse each (railroads.sim.sheds).
-SHED_STALLS = 2
+# How many trains an engine shed holds for each of its levels, a stall of its roundhouse each
+# (railroads.sim.sheds), and what raising it to each level above the first costs.
+SHED_STALLS = 3
+SHED_PRICES = (200_000.0, 800_000.0)
+SHED_LEVELS = 1 + len(SHED_PRICES)
 
 
 def shed_stalls(level: int) -> int:
-    """How many trains the engine shed of a station raised to `level` holds."""
-    return SHED_STALLS * max(0, level - LEVEL[Facility.ENGINE_SHED] + 1)
+    """How many trains an engine shed of `level` holds."""
+    return SHED_STALLS * level
 
 
 # The goods each facility makes pay more where it stands, and how many times as much.
