@@ -27,8 +27,10 @@ from railroads.ui.pixel.art.built import modelled
 from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_peters
 from railroads.ui.pixel.art.commerce import (
     airport,
+    big_port,
     department_store,
     hotel,
+    mega_port,
     port,
     shop,
     sushi_hut,
@@ -280,6 +282,8 @@ BUILDINGS = (
     "logging_camp",
     "sawmill",
     "port",
+    "big_port",
+    "mega_port",
     "clay_pit",
     "limestone_quarry",
     "sand_pit",
@@ -350,6 +354,8 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "logging_camp": logging_camp,
     "sawmill": sawmill,
     "port": port,
+    "big_port": big_port,
+    "mega_port": mega_port,
     "orchard": orchard,
     "iron_mine": lambda: shaft_mine((104, 72, 62), (176, 98, 70)),
     "copper_mine": lambda: shaft_mine((96, 84, 66), (206, 130, 76)),

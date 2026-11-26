@@ -166,6 +166,8 @@ BUILDING_SPRITES = {
     BuildingKind.LOGGING_CAMP: "logging_camp",
     BuildingKind.SAWMILL: "sawmill",
     BuildingKind.PORT: "port",
+    BuildingKind.BIG_PORT: "big_port",
+    BuildingKind.MEGA_PORT: "mega_port",
     BuildingKind.CLAY_PIT: "clay_pit",
     BuildingKind.LIMESTONE_QUARRY: "limestone_quarry",
     BuildingKind.SAND_PIT: "sand_pit",

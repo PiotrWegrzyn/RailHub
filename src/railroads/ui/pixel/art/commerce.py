@@ -121,6 +121,125 @@ def port() -> Sprite:
     return p.sprite()
 
 
+CRANE: RGB = (214, 168, 40)
+GANTRY: RGB = (196, 74, 52)
+CONTAINERS: tuple[RGB, ...] = ((176, 64, 52), (52, 104, 156), (64, 132, 84), (204, 150, 48))
+
+
+def _quay(p: Painter, half: float) -> None:
+    """A paved quay on a 2:1 diamond `half` pixels across each way from the anchor, with seams
+    across it and a lit edge."""
+    rise = half / 2
+    p.polygon([(-half, 0), (0, rise), (half, 0), (0, -rise)], STONE, shade(STONE, 0.6))
+    for t in (0.25, 0.5, 0.75):
+        p.line(
+            [_on_wall((-half, 0), (0, -rise), t, 0), _on_wall((0, rise), (half, 0), t, 0)],
+            shade(STONE, 0.88),
+        )
+    p.line([(-half + 1, 0), (0, rise - 0.5), (half - 1, 0)], shade(STONE, 1.15))
+    p.line([(-half, 1), (0, rise + 1), (half, 1)], shade(STONE, 0.5))
+
+
+def _bollards(p: Painter, half: float, count: int) -> None:
+    """Bollards along the quay's front right edge."""
+    rise = half / 2
+    for k in range(count):
+        t = (k + 0.5) / count
+        x, y = half * t, rise * (1 - t) - 1
+        p.rect(x - 0.5, y - 1.5, x + 0.5, y, (64, 62, 64))
+
+
+def _warehouse(
+    p: Painter, x: float, y: float, half: float, height: float, wall: RGB, roof: RGB
+) -> None:
+    """A warehouse with a big cargo door and windows under a tiled gable roof."""
+    top = p.box(x, y, half, height, wall, None)
+    left, front, right, _ = top
+    _pale_plinth(p, top, height, wall)
+    _foot(p, top, height)
+    _patch(p, left, front, (0.38, 0.78), (2.2, height), DOOR)
+    _window(p, left, front, (0.1, 0.24), 2)
+    for span in ((0.28, 0.44), (0.62, 0.78)):
+        _window(p, front, right, span, 1.6, shade(WINDOW, 0.75))
+    p.gable(top, 3, roof, wall)
+    _tiles(p, top, 3, roof)
+
+
+def _crane(p: Painter, x: float, y: float, colour: RGB = CRANE, load: RGB = (120, 70, 50)) -> None:
+    """A crane standing at (x, y) with a cab, a counterweight and a jib lifting a load."""
+    p.rect(x - 2, y - 2, x + 1, y + 0.5, shade(STONE, 0.75))
+    p.line([(x, y), (x, y - 19)], colour)
+    p.line([(x - 1, y), (x - 1, y - 19)], shade(colour, 0.7))
+    for rung in (5, 10, 15):
+        p.line([(x - 1, y - rung), (x, y - rung - 2)], shade(colour, 0.55))
+    p.line([(x - 3, y - 19), (x - 0.5, y - 23), (x + 7, y - 17)], shade(colour, 0.6))
+    p.line([(x - 3, y - 19), (x + 7, y - 17)], colour)
+    p.rect(x - 3.5, y - 19, x - 2, y - 17, (88, 84, 82))
+    p.rect(x, y - 18, x + 2.5, y - 15, colour)
+    p.point(x + 1, y - 17, GLASS)
+    p.line([(x + 6, y - 17), (x + 6, y - 10)], (70, 64, 58))
+    p.rect(x + 5, y - 10, x + 7, y - 8, load)
+    p.line([(x + 5, y - 9), (x + 7, y - 9)], shade(load, 0.6))
+
+
+def _gantry(p: Painter, x: float, y: float) -> None:
+    """A tall container gantry on two legs at (x, y), its boom reaching out over the water."""
+    for leg in (-3.0, 3.0):
+        p.line([(x + leg, y), (x + leg, y - 22)], GANTRY)
+        p.line([(x + leg - 0.8, y), (x + leg - 0.8, y - 22)], shade(GANTRY, 0.7))
+    p.line([(x - 3, y - 12), (x + 3, y - 12)], shade(GANTRY, 0.6))
+    p.rect(x - 6, y - 24, x + 11, y - 22, GANTRY)
+    p.line([(x - 6, y - 22), (x + 11, y - 22)], shade(GANTRY, 0.55))
+    p.rect(x - 1.5, y - 22, x + 1.5, y - 19.5, (230, 226, 216))
+    p.point(x, y - 21, GLASS)
+    p.line([(x + 8, y - 22), (x + 8, y - 15)], (70, 64, 58))
+    p.box(x + 8, y - 13.5, 1.5, 1.5, CONTAINERS[1], shade(CONTAINERS[1], 1.2))
+
+
+def _containers(p: Painter, x: float, y: float, rows: int, tiers: int) -> None:
+    """Containers stacked in rows going back from (x, y), `tiers` high, in mixed colours."""
+    for row in range(rows):
+        for tier in range(tiers):
+            colour = CONTAINERS[(row * 3 + tier) % len(CONTAINERS)]
+            p.box(x - row * 2, y - row - tier * 2, 1.6, 2, colour, shade(colour, 1.25))
+
+
+def big_port() -> Sprite:
+    """Two ports' quays joined into one long one: two warehouses, two cranes lifting loads, crates
+    and casks, and bollards along the edge."""
+    p = Painter(44, 36, (21, 26))
+    _quay(p, 19)
+    _bollards(p, 19, 4)
+    p.shadow(12, 3)
+    _warehouse(p, -9, -1, 5, 6, (196, 186, 166), (64, 92, 124))
+    _warehouse(p, 1, -4, 5, 7, (186, 170, 150), (124, 72, 58))
+    for x, y in ((-3, 4), (-0.5, 5.5), (9, 1)):
+        _crate(p, x, y)
+    for x in (-14.5, -12.5):
+        _cask(p, x, 2.5)
+    _crane(p, 6, 2)
+    _crane(p, 15, -2, shade(CRANE, 0.9), CONTAINERS[0])
+    return p.sprite()
+
+
+def mega_port() -> Sprite:
+    """Two big ports grown into a container terminal: a long quay with three warehouses, stacks
+    of containers, two gantry cranes over the water and a crane, and bollards along the edge."""
+    p = Painter(58, 40, (26, 28))
+    _quay(p, 23)
+    _bollards(p, 23, 6)
+    p.shadow(15, 4)
+    _warehouse(p, -13, -1, 5, 6, (196, 186, 166), (64, 92, 124))
+    _warehouse(p, -4, -6, 5, 7, (186, 170, 150), (124, 72, 58))
+    _warehouse(p, 5, -10, 4, 6, (204, 196, 180), (84, 88, 96))
+    _containers(p, -1, 6, 3, 2)
+    _containers(p, 6, 3, 3, 3)
+    _crane(p, -17, 3)
+    _gantry(p, 11, 2)
+    _gantry(p, 18, -1)
+    return p.sprite()
+
+
 def shop(wall: RGB, awning: RGB, goods: RGB) -> Sprite:
     """A smart city shop: a striped awning over a big window full of its wares and a door, a floor
     of windows with sills above, a cornice and a chimney."""
