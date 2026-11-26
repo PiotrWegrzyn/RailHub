@@ -1,11 +1,10 @@
 """What the player can put up at a station besides raising it. An engine shed, a roundhouse round
 a turntable with track of its own that track is laid to as to a station, fills a cell beside the
-station or one of its platforms, and cattle pens take a little room in one (railroads.sim.constructions.ANNEX_SPACE);
-the others stand in the station itself and take no room on the map:
+station or one of its platforms (railroads.sim.constructions.ANNEX_SPACE); the others stand in
+the station itself and take no room on the map:
 
-- an engine shed lets trains setting off from the station run ENGINE_SHED_SPEED times as fast,
-  and trains waiting there for a full load the station holds too little to fill wait in it, on
-  its own track (railroads.sim.railway);
+- trains waiting at the station for a full load it holds too little to fill wait in an engine
+  shed, on its own track, SHED_STALLS of them for each level from its own (railroads.sim.sheds);
 - a sand tower lets them pick up speed in SAND_TOWER_PICKUP of the time;
 - a post office, a refreshment room, a market hall and cattle pens make what is delivered at the
   station pay more (PAYS_MORE): mail, passengers, food and livestock;
@@ -26,7 +25,6 @@ from railroads.sim.station_goods import StationGoods
 
 __all__ = ["Facility"]
 
-ENGINE_SHED_SPEED = 1.2
 SAND_TOWER_PICKUP = 0.5
 WAREHOUSE_ROOM = 500.0
 REACH = 1
@@ -38,13 +36,13 @@ PLACED = frozenset(ANNEX_SPACE)
 # What each facility uses a month, and how much of it.
 USES: Mapping[Facility, tuple[Good, float]] = MappingProxyType(
     {
-        Facility.ENGINE_SHED: (Good.COAL, 50.0),
-        Facility.SAND_TOWER: (Good.SAND, 15.0),
-        Facility.POST_OFFICE: (Good.PAPER, 10.0),
-        Facility.REFRESHMENT_ROOM: (Good.BEER, 5.0),
-        Facility.MARKET_HALL: (Good.PLANKS, 20.0),
-        Facility.CATTLE_PENS: (Good.WHEAT, 30.0),
-        Facility.WAREHOUSE: (Good.BRICKS, 20.0),
+        Facility.ENGINE_SHED: (Good.COAL, 25.0),
+        Facility.SAND_TOWER: (Good.SAND, 7.5),
+        Facility.POST_OFFICE: (Good.PAPER, 5.0),
+        Facility.REFRESHMENT_ROOM: (Good.BEER, 2.5),
+        Facility.MARKET_HALL: (Good.PLANKS, 10.0),
+        Facility.CATTLE_PENS: (Good.WHEAT, 15.0),
+        Facility.WAREHOUSE: (Good.BRICKS, 10.0),
     }
 )
 # The level a station must be raised to before each facility can go up beside it.
@@ -59,6 +57,16 @@ LEVEL: Mapping[Facility, int] = MappingProxyType(
         Facility.WAREHOUSE: 1,
     }
 )
+
+# How many trains an engine shed holds for each level its station has from the shed's own LEVEL
+# on: one stall of its roundhouse each (railroads.sim.sheds).
+SHED_STALLS = 2
+
+
+def shed_stalls(level: int) -> int:
+    """How many trains the engine shed of a station raised to `level` holds."""
+    return SHED_STALLS * max(0, level - LEVEL[Facility.ENGINE_SHED] + 1)
+
 
 # The goods each facility makes pay more where it stands, and how many times as much.
 PAYS_MORE: Mapping[Facility, tuple[frozenset[Good], float]] = MappingProxyType(

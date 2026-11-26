@@ -10,6 +10,13 @@ import math
 from collections.abc import Callable
 from dataclasses import replace
 
+from railroads.sim.sheds import (
+    ROUNDHOUSE_SIZE,
+    STALL_FROM,
+    STALL_HEADINGS,
+    TURNTABLE,
+    TURNTABLE_RADIUS,
+)
 from railroads.ui.pixel.art.built import (
     chimney,
     footing,
@@ -39,17 +46,10 @@ WHEEL: RGB = (176, 40, 36)
 CAB: RGB = (60, 112, 66)
 STRAW: RGB = (204, 178, 98)
 
-# The roundhouse, its lead track running out along u: how much bigger it is drawn than built, so
-# it fills its cell, a cell across between opposite sides; where its turntable lies, how big it
-# and the yard round it are, at which headings its stalls stand round it and how far out they
-# start, and where its lead track ends: in the middle of the station's cell beside it, a cell
-# away, where it meets the station's own track.
-ROUNDHOUSE_SIZE = 1.3
-TURNTABLE = (-0.04, 0.0)
-TURNTABLE_RADIUS = 0.1
+# The roundhouse, its lead track running out along u, built to the measures trains stand in it by
+# (railroads.sim.sheds): how big the yard round its turntable is, and where its lead track ends:
+# in the middle of the cell beside it, a cell away.
 YARD_RADIUS = 0.2
-STALL_HEADINGS = tuple(math.radians(a) for a in range(115, 246, 26))
-STALL_FROM = 0.15
 LEAD_END = 1.0 / ROUNDHOUSE_SIZE
 # The ways an engine shed is drawn turned, its lead track running that way on the map, in
 # degrees from the map's x axis: every way a cell beside it lies on hexes and on squares.

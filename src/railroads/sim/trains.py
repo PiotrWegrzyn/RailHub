@@ -964,9 +964,8 @@ class Train:
     # last looked for the quickest platform of the station it is bound for
     # (railroads.sim.railway.Railway._choose_platform).
     platform_check: tuple[float, int] = (-1.0, -1)
-    # Whether it set off from a station whose engine shed had its coal, and whose sand tower had
-    # its sand, this month (railroads.sim.facilities).
-    fuelled: bool = False
+    # Whether it set off from a station whose sand tower had its sand this month
+    # (railroads.sim.facilities).
     sanded: bool = False
     # The platform of its station the train stands at, which it sets off from: the station's own
     # cell, or one of the platforms added to it; None for the station's own cell.
@@ -974,6 +973,8 @@ class Train:
     # Where it is with waiting for a load in its station's engine shed: on its way there
     # (TO_SHED), standing in it (IN_SHED), back on its way to load (FROM_SHED), or "" for none.
     shed: str = ""
+    # The stall of the engine shed it stands in or is on its way to (railroads.sim.sheds).
+    stall: int = 0
     # The name the player gave it, if any.
     label: str = ""
     # The schedule it runs (railroads.sim.schedules), and the schedule and version of it its

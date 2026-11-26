@@ -1,16 +1,23 @@
+import math
+
+import pytest
+
 from builders import joined_stations
 from railroads.sim.constructions import Facility
 from railroads.sim.goods import Good
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
 from railroads.sim.routes import add_facility, build_station, lay_route, plan_route
+from railroads.sim.sheds import NOSE, stall_way
 from railroads.sim.trains import BULK_CAR, FROM_SHED, IN_SHED, Stop, Train
+from railroads.ui.pixel.train_layer import _in_shed
 
 STATION, SHED, FAR = (6, 3), (6, 2), (6, 20)
 
 
-def with_shed() -> tuple[Growth, Railway]:
+def with_shed(level: int = 3) -> tuple[Growth, Railway]:
     growth, railway = joined_stations()
+    railway.levels[STATION] = level
     add_facility(growth, STATION, Facility.ENGINE_SHED, SHED, (0, 6))
     return growth, railway
 
@@ -35,7 +42,6 @@ def test_a_train_short_of_a_full_load_waits_in_its_stations_engine_shed() -> Non
 
     assert train.shed == IN_SHED
     assert train.platform == SHED
-    assert train.path == []
     assert train.status == f"Waiting in the engine shed at {railway.name_of(STATION)}"
 
 
@@ -83,10 +89,12 @@ def test_a_train_going_back_to_load_runs_from_the_shed_to_the_station() -> None:
     run(railway, 20)
     railway.station_goods(STATION).stockpile[Good.WHEAT] = BULK_CAR + 10.0
 
+    stall = stall_way(railway.constructions, SHED, train.stall)
+
     railway.run(0.001)
 
     assert train.shed == FROM_SHED
-    assert railway.network.cell_at(train.path[0]) == SHED
+    assert train.path[:3] == list(stall)
     assert railway.network.cell_at(train.path[-1]) == STATION
 
 
@@ -128,3 +136,53 @@ def test_an_engine_shed_no_track_joins_turns_to_track_laid_into_its_side() -> No
 
     assert growth.constructions.station_ends(shed) != (0, 6)
     assert railway.route(north, shed) is not None
+
+
+def test_a_train_waiting_in_the_shed_stands_with_its_front_out_of_its_stalls_door() -> None:
+    _, railway = with_shed()
+    train = waiting_for_wheat(railway)
+
+    run(railway, 20)
+
+    back, door, _ = stall_way(railway.constructions, SHED, train.stall)
+    assert train.path[:2] == [back, door]
+    assert train.along == pytest.approx(math.dist(back, door) + NOSE)
+
+
+def test_an_engine_shed_holds_two_trains_a_station_level_from_level_3() -> None:
+    _, railway = with_shed(level=3)
+    trains = [waiting_for_wheat(railway) for _ in range(3)]
+
+    run(railway, 40)
+
+    shed = sorted(train.shed for train in trains)
+    assert shed == ["", IN_SHED, IN_SHED]
+    assert len({train.stall for train in trains if train.shed}) == 2
+
+
+def test_an_engine_shed_at_a_station_of_level_5_holds_six_trains() -> None:
+    _, railway = with_shed(level=5)
+    trains = [waiting_for_wheat(railway) for _ in range(7)]
+
+    run(railway, 80)
+
+    assert sum(train.shed == IN_SHED for train in trains) == 6
+
+
+def test_a_train_waiting_in_the_shed_is_inside_it_and_not_drawn() -> None:
+    _, railway = with_shed()
+    train = waiting_for_wheat(railway)
+    run(railway, 20)
+
+    hidden = _in_shed(railway, train, train.path[-1])
+
+    assert hidden
+
+
+def test_a_train_on_its_way_elsewhere_is_drawn_even_beside_a_shed() -> None:
+    _, railway = with_shed()
+    train = waiting_for_wheat(railway)
+
+    hidden = _in_shed(railway, train, railway.constructions.tile_map.grid.center(*SHED))
+
+    assert not hidden

@@ -111,7 +111,7 @@ class TrainLayer:
         for train in in_sight:
             for look, back in self._parts(train):
                 placed = railway.position(train, back)
-                if placed is not None:
+                if placed is not None and not _in_shed(railway, train, placed[0]):
                     seen.append((train, back, look, placed))
         hidden = self.world.underground_all(
             [placed[0][0] for *_, placed in seen], [placed[0][1] for *_, placed in seen]
@@ -746,3 +746,12 @@ def train_picture(
         spot = (round(left) - low_x, round(top) - low_y)
         canvas.alpha_composite(part, spot)
     return np.asarray(canvas).copy()
+
+
+def _in_shed(railway: Railway, train: Train, point: Point) -> bool:
+    """Whether a point of a train going into an engine shed, standing in it or coming out of it
+    lies in the shed's cell, where it is inside and not drawn, as a train in a tunnel isn't."""
+    if not train.shed:
+        return False
+    row, col = railway.constructions.tile_map.grid.cell_at(*point)
+    return railway.constructions.shed_at((int(row), int(col))) is not None

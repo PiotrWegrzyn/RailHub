@@ -36,7 +36,6 @@ class StationCalls:
             return
         working = self._railway.facilities_at(stop.cell)
         if stop.refuel_only:
-            train.fuelled = Facility.ENGINE_SHED in working
             train.sanded = Facility.SAND_TOWER in working
             return
         goods = self._railway.station_goods(stop.cell)
@@ -73,7 +72,6 @@ class StationCalls:
         dining = [Car(Good.PASSENGERS, dining=True, tare=coach)] if express else []
         train.cars = dining + aboard
         train.loaded_at = stop.cell
-        train.fuelled = Facility.ENGINE_SHED in working
         train.sanded = Facility.SAND_TOWER in working
         self.load(train, stop)
         if stop.wait_for_load and train.cars and not self.loaded(train, stop):

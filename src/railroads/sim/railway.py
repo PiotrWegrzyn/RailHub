@@ -46,17 +46,17 @@ from railroads.sim.clock import SECONDS_PER_MONTH, START_YEAR
 from railroads.sim.constructions import Constructions
 from railroads.sim.demand import StationDemand
 from railroads.sim.events import price_factor as history_price
+from railroads.sim.facilities import LEVEL as FACILITY_LEVEL
 from railroads.sim.facilities import (
-    ENGINE_SHED_SPEED,
     PLACED,
     SAND_TOWER_PICKUP,
     WAREHOUSE_ROOM,
     Facility,
     monthly_cost,
     pay_factor,
+    shed_stalls,
     supply,
 )
-from railroads.sim.facilities import LEVEL as FACILITY_LEVEL
 from railroads.sim.facilities import USES as FACILITY_USES
 from railroads.sim.finance import (
     LEVEL_PRICES,
@@ -89,6 +89,7 @@ from railroads.sim.goods import (
 from railroads.sim.grids import Cell
 from railroads.sim.move import Move
 from railroads.sim.schedules import Schedule, Schedules, between_rounds
+from railroads.sim.sheds import STALL_ORDER, stall_way, standing, stood_at
 from railroads.sim.signals import Signals
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
@@ -942,9 +943,13 @@ class Railway:
             return
         if len(train.stops) < 2:
             train.status = "Needs two stops"
-            train.path = []
+            train.path, train.shed = [], ""
             return
-        if not train.path:
+        if train.shed == IN_SHED:
+            leaving = train.stops[(train.heading - 1) % len(train.stops)]
+            if not self._wait_for_load(train, leaving, months):
+                return
+        elif not train.path:
             leaving = train.stops[(train.heading - 1) % len(train.stops)]
             if not train.called:
                 self.calls.arrive(train, leaving)
@@ -997,8 +1002,6 @@ class Railway:
         pickup = engine.pickup / SECONDS_PER_MONTH * (SAND_TOWER_PICKUP if train.sanded else 1.0)
         pace = train.speed_up(months, pickup)
         speed = engine.speed * pace
-        if train.fuelled:
-            speed *= ENGINE_SHED_SPEED
         wanted = train.along + (
             months * CELLS_PER_MONTH * self.network.speed_at(train) * self.pull(train) * speed
         )
@@ -1038,10 +1041,14 @@ class Railway:
             if ahead is not None:
                 train.status = f"Following {ahead.name}"
         train.along = allowed
-        if train.along >= self.network.length(train) and train.shed:
+        if train.along >= self.network.length(train) and train.shed == TO_SHED:
             train.platform = self.network.cell_at(train.path[-1])
-            train.path, train.pace = [], 0.0
-            train.shed = IN_SHED if train.shed == TO_SHED else ""
+            train.path = standing(self.constructions, train.platform, train.stall)
+            train.along, train.pace, train.shed = stood_at(train.path), 0.0, IN_SHED
+            return
+        if train.along >= self.network.length(train) and train.shed == FROM_SHED:
+            train.platform = self.network.cell_at(train.path[-1])
+            train.path, train.pace, train.shed = [], 0.0, ""
             return
         if train.along >= self.network.length(train):
             train.platform = self.network.cell_at(train.path[-1])
@@ -1069,8 +1076,11 @@ class Railway:
         it, then comes back to load (_to_shed); without one it waits at the platform."""
         name = self.name_of(stop.cell)
         if train.shed == IN_SHED:
+            if train.platform is None or self.constructions.shed_at(train.platform) is None:
+                train.path, train.shed = [], ""
+                return False
             if not self.calls.short(train, stop):
-                return self._to_shed(train, stop.cell, FROM_SHED)
+                return self._out_of_shed(train, stop.cell)
             train.waiting -= months
             train.status = f"Waiting in the engine shed at {name}"
             return False
@@ -1080,30 +1090,64 @@ class Railway:
             return True
         main = self.constructions.main_station(stop.cell) or stop.cell
         shed = self.constructions.shed_of(main)
+        stall = None if shed is None else self._free_stall(shed, main)
         if (
             shed is not None
+            and stall is not None
             and self.calls.short(train, stop)
-            and self._to_shed(train, shed, TO_SHED)
+            and self._to_shed(train, shed, stall)
         ):
             return True
         train.waiting -= months
         train.status = f"Loading at {name}"
         return False
 
-    def _to_shed(self, train: Train, target: Cell, shed: str) -> bool:
-        """Sets a train waiting for a load off from where it stands into its station's engine
-        shed (TO_SHED), or out of it back to the station to load (FROM_SHED); whether track
-        leads there."""
+    def _free_stall(self, shed: Cell, station: Cell) -> int | None:
+        """A stall of the station's engine shed no train stands in or is on its way to, the
+        middle ones first, while it has fewer than its level lets it hold (shed_stalls)."""
+        taken = {
+            train.stall
+            for train in self.trains
+            if train.shed in (TO_SHED, IN_SHED)
+            and (
+                train.platform == shed
+                or (train.path and self.network.cell_at(train.path[-1]) == shed)
+            )
+        }
+        held = STALL_ORDER[: shed_stalls(self.level(station))]
+        return next((stall for stall in held if stall not in taken), None)
+
+    def _to_shed(self, train: Train, shed: Cell, stall: int) -> bool:
+        """Sets a train waiting for a load off from where it stands into a stall of its
+        station's engine shed (TO_SHED); whether track leads there."""
         if train.platform is not None and self.constructions.is_stop(train.platform):
             start = train.platform
         else:
             start = train.stops[(train.heading - 1) % len(train.stops)].cell
         engine = ENGINES[train.engine]
-        way = self.route(start, target, engine.electric, engine.maglev)
+        way = self.route(start, shed, engine.electric, engine.maglev)
         if way is None:
             return False
         train.path, train.speeds = way
-        train.along, train.pace, train.shed = 0.0, 0.0, shed
+        train.along, train.pace, train.shed, train.stall = 0.0, 0.0, TO_SHED, stall
+        train.status = "Running"
+        return True
+
+    def _out_of_shed(self, train: Train, station: Cell) -> bool:
+        """Sets a train standing in a stall of an engine shed off back to its station to load
+        (FROM_SHED): out of its stall's door, across the turntable and out along the shed's
+        lead; whether track leads there."""
+        shed = train.platform
+        assert shed is not None
+        engine = ENGINES[train.engine]
+        way = self.route(shed, station, engine.electric, engine.maglev)
+        if way is None:
+            return False
+        back, door, turntable = stall_way(self.constructions, shed, train.stall)
+        points, speeds = way
+        train.path = [back, door, turntable, *points[1:]]
+        train.speeds = [speeds[0], speeds[0], *speeds]
+        train.pace, train.shed = 0.0, FROM_SHED
         train.status = "Running"
         return True
 

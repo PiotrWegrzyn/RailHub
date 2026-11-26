@@ -1,11 +1,10 @@
 import pytest
 
 from builders import joined_stations, make_game
-from railroads.sim.constructions import CELL_SPACE, Building, BuildingKind
+from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.demolition import bulldoze
 from railroads.sim.facilities import (
     DELIVERED_SHARE,
-    ENGINE_SHED_SPEED,
     USES,
     WAREHOUSE_ROOM,
     Facility,
@@ -16,7 +15,6 @@ from railroads.sim.goods import Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.railway import Railway
 from railroads.sim.routes import add_facility
-from railroads.sim.trains import Stop
 
 STATION = (6, 3)
 BESIDE = (5, 3)
@@ -79,17 +77,6 @@ def test_an_engine_shed_fills_its_cell_taking_the_buildings_there_down() -> None
     assert railway.facilities_at(STATION) == {Facility.ENGINE_SHED}
 
 
-@pytest.mark.parametrize(("houses", "left"), [(4, 4), (CELL_SPACE, CELL_SPACE - 1)])
-def test_cattle_pens_take_one_place_in_their_cell(houses: int, left: int) -> None:
-    growth, _ = joined_stations()
-    for _ in range(houses):
-        growth.build(Building(BESIDE, BuildingKind.HOUSE))
-
-    add_facility(growth, STATION, Facility.CATTLE_PENS, BESIDE)
-
-    assert len(growth.constructions.buildings_at(BESIDE)) == left
-
-
 def test_an_engine_shed_needs_the_station_raised_to_level_3() -> None:
     game = make_game(10_000_000.0)
     game.build_station(STATION)
@@ -122,16 +109,6 @@ def test_an_engine_shed_put_up_on_the_line_takes_the_place_of_its_track() -> Non
     assert game.constructions.shed_at(ON_THE_LINE) is not None
 
 
-def test_cattle_pens_stand_beside_the_track_on_the_line() -> None:
-    game = _raised_game()
-    game.lay_track(STATION, (6, 8))
-
-    pens = game.add_facility(STATION, Facility.CATTLE_PENS, ON_THE_LINE)
-
-    assert pens.ok
-    assert game.constructions.track_at(ON_THE_LINE) != ()
-
-
 def test_a_station_has_one_facility_of_each_kind() -> None:
     game = _raised_game()
     game.add_facility(STATION, Facility.ENGINE_SHED, BESIDE)
@@ -141,15 +118,18 @@ def test_a_station_has_one_facility_of_each_kind() -> None:
     assert again.ok is False
 
 
-def test_the_other_facilities_go_in_the_station_itself_and_not_on_the_map() -> None:
+@pytest.mark.parametrize("facility", [Facility.POST_OFFICE, Facility.CATTLE_PENS])
+def test_the_other_facilities_go_in_the_station_itself_and_not_on_the_map(
+    facility: Facility,
+) -> None:
     game = _raised_game()
 
-    placed = game.add_facility(STATION, Facility.POST_OFFICE, BESIDE)
-    put_up = game.railway.put_up(STATION, Facility.POST_OFFICE)
+    placed = game.add_facility(STATION, facility, BESIDE)
+    put_up = game.railway.put_up(STATION, facility)
 
     assert (placed.ok, put_up) == (False, True)
     assert game.constructions.at(BESIDE) == ()
-    assert game.railway.facilities_at(STATION) == {Facility.POST_OFFICE}
+    assert game.railway.facilities_at(STATION) == {facility}
 
 
 def test_closing_a_facility_in_the_station_stops_its_cost() -> None:
@@ -169,28 +149,6 @@ def test_bulldozing_a_station_takes_its_facilities_down() -> None:
 
     assert growth.constructions.annex_at(BESIDE) is None
     assert railway.facilities_at(STATION) == set()
-
-
-def test_a_fuelled_train_runs_faster_by_the_engine_shed_speed() -> None:
-    railways = [joined_stations()[1] for _ in range(2)]
-    trains = []
-    for railway in railways:
-        railway.finances.earn(1_000_000.0, "test")
-        train = railway.buy()
-        assert train is not None
-        train.stops = [Stop(STATION, wait_for_load=False), Stop((6, 20), wait_for_load=False)]
-        railway.run(0.01)
-        train.pace = 1.0
-        trains.append(train)
-    plain, fuelled = trains
-    fuelled.fuelled = True
-    before = (plain.along, fuelled.along)
-
-    for railway in railways:
-        railway.run(0.02)
-
-    gained = (plain.along - before[0], fuelled.along - before[1])
-    assert gained[1] == pytest.approx(gained[0] * ENGINE_SHED_SPEED, rel=0.05)
 
 
 def test_a_station_wants_what_its_facilities_will_use_beyond_what_it_holds() -> None:
@@ -222,12 +180,11 @@ def test_a_warehouse_gives_every_good_more_room() -> None:
     assert after == pytest.approx(before + WAREHOUSE_ROOM)
 
 
-@pytest.mark.parametrize("facility", [Facility.ENGINE_SHED, Facility.CATTLE_PENS])
-def test_no_station_or_platform_goes_up_on_a_facility(facility: Facility) -> None:
+def test_no_station_or_platform_goes_up_on_an_engine_shed() -> None:
     game = _raised_game()
     for _ in range(2):
         game.railway.upgrade(STATION)
-    assert game.add_facility(STATION, facility, BESIDE).ok
+    assert game.add_facility(STATION, Facility.ENGINE_SHED, BESIDE).ok
 
     quote = game.station_quote(BESIDE)
     platform = game.platform_quote(BESIDE)

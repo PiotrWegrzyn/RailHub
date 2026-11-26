@@ -22,6 +22,7 @@ from railroads.sim.constructions import (
     TrackWidth,
 )
 from railroads.sim.grids import BoolGrid, Cell, FloatArray, Grid, IntArray
+from railroads.sim.sheds import lead_end
 from railroads.sim.tilemap import Relief, Terrain, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.biomes import Biome, biome_grid
@@ -234,7 +235,7 @@ for _grown, _kind in GREW_FROM.items():
 def facility_spot(constructions: Constructions, annex: Annex) -> tuple[float, float, str]:
     """Where a facility beside a station stands on the map and its sprite: an engine shed in the
     middle of its cell, turned so its lead track runs out by the end of its track that track
-    joins, else the one nearer its station (_shed_lead), and cattle pens clear of the track in
+    joins, else the one nearer its station (railroads.sim.sheds.lead_end), and cattle pens clear of the track in
     their cell, as near it as they can stand (_pens_spot)."""
     grid = constructions.tile_map.grid
     x, y = grid.center(*annex.cell)
@@ -244,35 +245,12 @@ def facility_spot(constructions: Constructions, annex: Annex) -> tuple[float, fl
     )
     sx, sy = grid.center(*nearest)
     if annex.facility == Facility.ENGINE_SHED:
-        lx, ly = _shed_lead(constructions, annex, (sx - x, sy - y))
-        angle = math.degrees(math.atan2(ly, lx))
+        lx, ly = grid.track_points()[lead_end(constructions, annex.cell, (sx, sy))]
+        angle = math.degrees(math.atan2(float(ly), float(lx)))
         step = SHED_HEADINGS[1] - SHED_HEADINGS[0]
         return x, y, shed_sprite(round(angle / step) * step % 360)
     dx, dy = _pens_spot(constructions, annex.cell, (sx - x, sy - y))
     return x + dx, y + dy, PENS_SPRITE
-
-
-def _shed_lead(
-    constructions: Constructions, annex: Annex, towards: tuple[float, float]
-) -> tuple[float, float]:
-    """The way an engine shed's lead track runs out of its cell, from its middle: to the end of
-    its track that track or a station joins, else the end nearer `towards` its station."""
-    grid = constructions.tile_map.grid
-    points = grid.track_points()
-    ends = constructions.station_ends(annex.cell)
-
-    def joined(end: int) -> bool:
-        beyond, entry = grid.track_exit(annex.cell, end)
-        if not grid.contains(*beyond):
-            return False
-        if constructions.is_stop(beyond):
-            return entry in constructions.station_ends(beyond)
-        return any(entry in piece.ends for piece in constructions.track_at(beyond))
-
-    lead = next((end for end in ends if joined(end)), None)
-    if lead is None:
-        lead = min(ends, key=lambda end: math.dist((points[end][0], points[end][1]), towards))
-    return float(points[lead][0]), float(points[lead][1])
 
 
 def _pens_spot(
@@ -406,7 +384,11 @@ class Scenery:
                     ]
                 )
             )
-        annexes = [facility_spot(constructions, a) for a in constructions.every_annex()]
+        annexes = [
+            facility_spot(constructions, a)
+            for a in constructions.every_annex()
+            if a.facility == Facility.ENGINE_SHED
+        ]
         if annexes:
             xs.append(np.array([x for x, _, _ in annexes], dtype=np.float64))
             ys.append(np.array([y for _, y, _ in annexes], dtype=np.float64))

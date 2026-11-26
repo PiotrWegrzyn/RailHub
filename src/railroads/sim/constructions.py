@@ -520,7 +520,7 @@ class Facility(Enum):
 
 # The facilities that stand in a cell of their own beside their station, and how much room each
 # takes there; the others stand in the station itself and take none.
-ANNEX_SPACE = {Facility.ENGINE_SHED: CELL_SPACE, Facility.CATTLE_PENS: 1}
+ANNEX_SPACE = {Facility.ENGINE_SHED: CELL_SPACE}
 
 
 @dataclass(frozen=True, slots=True)
@@ -544,7 +544,7 @@ class Annex:
 
     @property
     def space(self) -> int:
-        return ANNEX_SPACE[self.facility]
+        return ANNEX_SPACE.get(self.facility, 0)
 
 
 type Construction = Track | Station | Annex | Building

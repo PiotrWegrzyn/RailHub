@@ -137,11 +137,10 @@ HINTS = {
         "there aside does. Right click cancels."
     ),
     Tool.ADD_FACILITY: (
-        "Click a cell next to the station or a platform for the facility: an engine shed fills "
-        "its cell, taking the place of any track there with its own, which Q or the mouse wheel "
-        "turns and track is laid to as to a station; trains waiting for a load wait in it. "
-        "Cattle pens take a little room. Clearing it costs what moving the buildings in the way "
-        "aside does. Right click cancels."
+        "Click a cell next to the station or a platform for its engine shed: it fills the cell, "
+        "taking the place of any track there with its own, which Q or the mouse wheel turns and "
+        "track is laid to as to a station; trains waiting for a load wait in it. "
+        "Clearing it costs what moving the buildings in the way aside does. Right click cancels."
     ),
     Tool.MOVE_STATION: (
         f"Click where the station goes: {dollars(STATION_PRICE)} and clearing the cell. Its trains, "

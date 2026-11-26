@@ -11,10 +11,10 @@ from imgui_bundle import imgui
 
 from railroads.sim.facilities import (
     DELIVERED_SHARE,
-    ENGINE_SHED_SPEED,
     PAYS_MORE,
     PLACED,
     SAND_TOWER_PICKUP,
+    SHED_STALLS,
     WAREHOUSE_ROOM,
     Facility,
 )
@@ -199,7 +199,10 @@ def station_warning(railway: Railway, station: Cell) -> str:
 
 
 FACILITY_EFFECTS = {
-    Facility.ENGINE_SHED: f"trains leaving here run {ENGINE_SHED_SPEED - 1:.0%} faster",
+    Facility.ENGINE_SHED: (
+        f"trains short of a full load wait in it, {SHED_STALLS} for each station level "
+        f"from {FACILITY_LEVEL[Facility.ENGINE_SHED]}"
+    ),
     Facility.SAND_TOWER: f"trains leaving here pick up speed {1 / SAND_TOWER_PICKUP:.0f} times as fast",
     Facility.POST_OFFICE: f"mail delivered here pays {PAYS_MORE[Facility.POST_OFFICE][1] - 1:.0%} more",
     Facility.REFRESHMENT_ROOM: f"passengers arriving here pay {PAYS_MORE[Facility.REFRESHMENT_ROOM][1] - 1:.0%} more",
@@ -221,8 +224,8 @@ def _draw_facilities(
     tip(
         "None costs anything to put up, but every month each uses a good and pays the market "
         f"price for it: {DELIVERED_SHARE:.0%} of that for what the station holds, gathered or "
-        "brought. An engine shed fills a cell next to the station, its track running into it; "
-        "cattle pens take a little room in one; the others go in the station itself"
+        "brought. An engine shed fills a cell next to the station with track of its own; the "
+        "others go in the station itself"
     )
     built = railway.facilities_at(station)
     level = railway.level(station)
