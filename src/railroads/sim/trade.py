@@ -208,6 +208,9 @@ class Trade:
     # Per kind of building and good, what of the player's share of it each cell sent into the
     # stations around.
     owned_sent: Mapping[tuple[BuildingKind, Good], FloatArray] = field(default_factory=dict)
+    # Per kind of building and good, what it made that nothing took: no building around and no
+    # station.
+    goods_left: Mapping[tuple[BuildingKind, Good], FloatArray] = field(default_factory=dict)
 
     def done(self, kinds: tuple[BuildingKind, ...]) -> FloatArray:
         return sum(
@@ -283,6 +286,7 @@ class Trade:
             gathered=move.keys(self.gathered),
             goods_got=arrays(self.goods_got),
             goods_gave=arrays(self.goods_gave),
+            goods_left=arrays(self.goods_left),
             handed_for=move.keys(self.handed_for),
             bonus=arrays(self.bonus),
             local=arrays(self.local),

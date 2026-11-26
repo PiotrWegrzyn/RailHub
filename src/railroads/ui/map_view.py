@@ -21,6 +21,7 @@ from railroads.sim.constructions import (
 )
 from railroads.sim.game import Game
 from railroads.sim.geo import Coord
+from railroads.sim.goods import Good
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.ladder_types import Ladder
@@ -37,6 +38,7 @@ from railroads.ui.build_menu import (
 )
 from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.buildings import dot_looks, draw_building_dots
+from railroads.ui.goods_search import draw_cell_good, draw_goods_legend
 from railroads.ui.ground_picture import GroundLayout, GroundPictures, Pixels, cell_colors
 from railroads.ui.growth_window import GrowthWindow, draw_cell_odds, draw_legend
 from railroads.ui.hex_details import draw_hex_details, draw_shares
@@ -120,11 +122,13 @@ SPOT_WIDTH = 4.0
 
 class Lens(Enum):
     """What the map can be tinted by: how satisfied buildings are, which town they are in, or
-    the chance of a kind of building coming up (railroads.ui.growth_window)."""
+    the chance of a kind of building coming up (railroads.ui.growth_window), or where a good is made
+    and wanted (railroads.ui.goods_search)."""
 
     SATISFACTION = "satisfaction"
     TOWNS = "towns"
     GROWTH = "growth"
+    GOODS = "goods"
 
 
 @cache
@@ -311,9 +315,10 @@ class MapView:
         )
         self.port_window.draw(self.growth, self.look_at, self.open_shares)
         self.summaries.draw(*self._map_rect, self.look_at, self.railway.name_of)
-        self.search.draw(self.growth, self.visit, self._view_center)
+        self.search.draw(self.growth, self.visit, self._view_center, self._good_picked)
         self.growth_window.draw(self.growth, self.visit, self._growth_picked)
         self._draw_growth_legend()
+        self._draw_goods_legend()
         self.land.confirm(self.game.lots, self.game.finances)
 
     @property
@@ -355,8 +360,39 @@ class MapView:
         self.lens = Lens.GROWTH
 
     def shows_growth(self) -> bool:
-        """Whether the growth lens is on."""
-        return self.lens == Lens.GROWTH
+        """Whether the growth or the goods lens is on, which right-clicks pick cells for."""
+        return self.lens in (Lens.GROWTH, Lens.GOODS)
+
+    def _good_picked(self) -> None:
+        """Turns the goods lens on for the good just picked in the search window."""
+        self.lens = Lens.GOODS
+
+    def _goods_lens(self) -> Good | None:
+        """The good the goods lens shows, if it is on with one picked."""
+        return self.search.goods.good if self.lens == Lens.GOODS else None
+
+    def _draw_goods_legend(self) -> None:
+        """The goods lens's scales over the map, above the lens buttons."""
+        good = self._goods_lens()
+        tints = self.search.goods.tints(self.growth)
+        if good is None or tints is None or self._lenses_top is None:
+            return
+        self._begin_legend()
+        draw_goods_legend(good, tints, self.search.goods.gaps)
+        imgui.end()
+
+    def _begin_legend(self) -> None:
+        """Begins a lens's legend window over the map, above the lens buttons."""
+        _, (right, _) = self._map_rect
+        imgui.set_next_window_pos(
+            (right - LENS_GAP, (self._lenses_top or 0.0) - LENS_GAP),
+            imgui.Cond_.always.value,
+            (1.0, 1.0),
+        )
+        imgui.push_style_color(imgui.Col_.window_bg, imgui.ImVec4(*DEEP))
+        imgui.begin("##lenslegend", flags=OVERLAY_FLAGS | imgui.WindowFlags_.no_move.value)
+        imgui.pop_style_color()
+        frame_window()
 
     def _growth_lens(self) -> Ladder | None:
         """The kind of building the growth lens shows, if it is on with one picked."""
@@ -367,14 +403,7 @@ class MapView:
         ladder = self._growth_lens()
         if ladder is None or self._lenses_top is None:
             return
-        _, (right, _) = self._map_rect
-        imgui.set_next_window_pos(
-            (right - LENS_GAP, self._lenses_top - LENS_GAP), imgui.Cond_.always.value, (1.0, 1.0)
-        )
-        imgui.push_style_color(imgui.Col_.window_bg, imgui.ImVec4(*DEEP))
-        imgui.begin("##growthlegend", flags=OVERLAY_FLAGS | imgui.WindowFlags_.no_move.value)
-        imgui.pop_style_color()
-        frame_window()
+        self._begin_legend()
         draw_legend(ladder, self.growth_window.odds.tints(self.growth, ladder))
         imgui.end()
 
@@ -431,6 +460,8 @@ class MapView:
                 if pressed is not None:
                     self.shares_of = (self.selected, pressed)
                     self._bought = ""
+                if (good := self._goods_lens()) is not None:
+                    draw_cell_good(self.growth, good, self.selected)
                 draw_cell_odds(
                     self.growth, self.growth_window.odds, self.selected, self._growth_lens()
                 )
@@ -665,6 +696,8 @@ class MapView:
             if self._showing_moods()
             else self._town_tints()
             if self.lens == Lens.TOWNS
+            else self._goods_tints()
+            if self.lens == Lens.GOODS
             else self._growth_tints()
         )
         if tints is not None and not self._draw_shaded_tints(
@@ -871,6 +904,12 @@ class MapView:
                 "Tint the land by town; passengers and mail only travel between towns",
             ),
             (
+                Lens.GOODS,
+                fa.ICON_FA_CUBES,
+                "Goods",
+                "Tint the land by where a good is made and wanted; pick it in the search window",
+            ),
+            (
                 Lens.GROWTH,
                 fa.ICON_FA_LEAF,
                 "Growth",
@@ -892,12 +931,23 @@ class MapView:
                 self.lens = None if self.lens == lens else lens
                 if self.lens == Lens.GROWTH and self.growth_window.ladder is None:
                     self.growth_window.open = True
+                if self.lens == Lens.GOODS and self.search.goods.good is None:
+                    if not self.search.open:
+                        self.toggle_search()
+                    self.search.goods_to_front = True
             spot(f"lens:{lens.value}")
 
     def _showing_moods(self) -> bool:
         """Whether the satisfaction lens is on, or Shift is held for it, not while typing."""
         io = imgui.get_io()
         return self.lens == Lens.SATISFACTION or (io.key_shift and not io.want_text_input)
+
+    def _goods_tints(self) -> tuple[npt.NDArray[np.intp], list[int]] | None:
+        """The goods lens's cells and tints, if it is on with a good picked."""
+        if self._goods_lens() is None:
+            return None
+        tints = self.search.goods.tints(self.growth)
+        return None if tints is None else (tints.cells, tints.colors)
 
     def _growth_tints(self) -> tuple[npt.NDArray[np.intp], list[int]] | None:
         """The growth lens's cells and tints, if it is on with a kind picked."""
@@ -961,6 +1011,10 @@ class MapView:
             text = with_legend(text, MOODS_LEGEND)
         elif self.lens == Lens.TOWNS:
             text = with_legend(text, TOWNS_LEGEND)
+        elif (good := self._goods_lens()) is not None:
+            text = with_legend(
+                text, f"Goods: where {good.value} is made (amber) and wanted (blue)."
+            )
         elif (ladder := self._growth_lens()) is not None:
             text = with_legend(text, f"Growth: the chance of a {ladder.name} a year.")
         below = draw_status(draw_list, top_left, bottom_right, text)

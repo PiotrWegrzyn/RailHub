@@ -1,5 +1,6 @@
 """The search window: finds a kind of building by its name or by a good it makes or wants, outlines
-every one on the map and steps from one to the next."""
+every one on the map and steps from one to the next, and in its goods tab where a good is made and
+wanted (railroads.ui.goods_search)."""
 
 import math
 from collections.abc import Callable
@@ -15,11 +16,12 @@ from railroads.sim.constructions import GREW_FROM, MERGED, BuildingKind
 from railroads.sim.goods import FITS, MAKES, NEEDS
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
+from railroads.ui.goods_search import GoodsSearch
 from railroads.ui.iso_camera import Vec2
 from railroads.ui.ornate import begin_ornate, end_ornate
 from railroads.ui.theme import SIDE_WINDOW_POS, TEXT, TEXT_DIM, color_u32, draw_good_icon
 
-WINDOW_SIZE = (360.0, 440.0)
+WINDOW_SIZE = (400.0, 560.0)
 ROW_HEIGHT = 24.0
 ROW_ICON = 18.0
 FOOTER_HEIGHT = 92.0
@@ -70,6 +72,9 @@ class BuildingSearch:
     # The rows and columns of `cells`, for drawing them.
     rows: npt.NDArray[np.intp] = field(default_factory=lambda: np.empty(0, dtype=np.intp))
     cols: npt.NDArray[np.intp] = field(default_factory=lambda: np.empty(0, dtype=np.intp))
+    # The goods tab, and whether it is to be brought to the front.
+    goods: GoodsSearch = field(default_factory=GoodsSearch)
+    goods_to_front: bool = False
 
     @property
     def current(self) -> Cell | None:
@@ -132,18 +137,28 @@ class BuildingSearch:
         growth: Growth,
         visit: Callable[[Cell], None],
         around: Callable[[], Vec2],
+        pick_good: Callable[[], None] = lambda: None,
     ) -> None:
-        """The window, if it is open: `visit` shows a cell and `around` is the view's centre."""
+        """The window, if it is open: `visit` shows a cell, `around` is the view's centre and
+        `pick_good` turns the goods lens on once a good is picked in the goods tab."""
         if not self.open:
             return
         imgui.set_next_window_pos(SIDE_WINDOW_POS, imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
-        expanded, still_open = begin_ornate(f"{fa.ICON_FA_SEARCH}  Find buildings###find")
-        if expanded:
-            self._draw_query(growth, around)
-            self._draw_results(growth, around)
-            if self.kind is not None:
-                self._draw_stepper(visit)
+        expanded, still_open = begin_ornate(f"{fa.ICON_FA_SEARCH}  Find buildings and goods###find")
+        if expanded and imgui.begin_tab_bar("findtabs"):
+            if imgui.begin_tab_item("Buildings")[0]:
+                self._draw_query(growth, around)
+                self._draw_results(growth, around)
+                if self.kind is not None:
+                    self._draw_stepper(visit)
+                imgui.end_tab_item()
+            front = imgui.TabItemFlags_.set_selected.value if self.goods_to_front else 0
+            self.goods_to_front = False
+            if imgui.begin_tab_item("Goods", None, front)[0]:
+                self.goods.draw(growth, visit, pick_good)
+                imgui.end_tab_item()
+            imgui.end_tab_bar()
         end_ornate()
         if not still_open:
             self.close()

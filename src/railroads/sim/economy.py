@@ -913,6 +913,7 @@ class MonthOfTrade:
             if kind in bonus:
                 bonus[kind] = np.where(hungry, 0.0, bonus[kind])
         goods_gave = {}
+        goods_left = {}
         shares: dict[Good, FloatArray] = {}
         for (kind, good), offer in self.offers.items():
             if good not in shares:
@@ -920,6 +921,7 @@ class MonthOfTrade:
             sent = given = offer * shares[good]
             most = self.count[kind] * self._makes(kind).get(good, 0.0)
             goods_gave[(kind, good)] = (given, most)
+            goods_left[(kind, good)] = np.maximum(offer - given, 0.0)
             gave[kind] += given
             could_make[kind] += most
             recipe = RECIPES.get(kind)
@@ -959,6 +961,7 @@ class MonthOfTrade:
             self.owned_brought,
             self.handed_worth,
             self.owned_sent,
+            goods_left,
         )
         self.economy.levels[:] = Satisfaction.UNSATISFIED
         self.economy.levels[self.cells] = trade.levels()
