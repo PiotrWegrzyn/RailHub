@@ -132,7 +132,7 @@ def other_ways(growth: Growth, ladder: Ladder) -> tuple[str, ...]:
     least = growth.least_of(ladder)
     tops_up = growth.rule.top_ups is None or first in growth.rule.top_ups
     if least and tops_up:
-        ways.append(f"The map keeps at least {least}: one more a year where likeliest.")
+        ways.append(f"The map keeps at least {least}: one more a year, drawn by these chances.")
     for small, big in pairwise(ladder.kinds):
         merge = ladder.merges.get(small)
         if merge is not None:

@@ -44,7 +44,8 @@ change to the counts goes through add, so it can also log them (log_changes): a 
 after.
 
 Once a year every ladder that has opened and stands below its least on the map (least_of) gets
-one more of its first kind, in its likeliest cell: at least one of everything that opens in some
+one more of its first kind, in a cell drawn at random weighted by the ladder's chances to grow
+there, so a likelier cell is drawn more often but never always: at least one of everything that opens in some
 year, and of the key buildings (KEY_BUILDINGS) at least KEY_LEAST on a map of REFERENCE_LAND land
 cells, more or fewer by the land, put on any land they could stand on where none is likely.
 
@@ -175,9 +176,9 @@ def inputs_of(kind: BuildingKind, year: int) -> tuple[frozenset[BuildingKind], .
 # land, once open: the only makers of what whole chains run on.
 KEY_BUILDINGS = frozenset({BuildingKind.OIL_WELL, BuildingKind.REFINERY})
 KEY_LEAST = 3
-# How many of a ladder's likeliest cells a top-up tries, and how many cells anywhere when none is
-# likely at all.
-LIKELIEST_TRIED = 20
+# How many cells, drawn by a ladder's chances, a top-up tries, and how many cells anywhere when
+# none is likely at all.
+DRAWN_TRIED = 20
 ANYWHERE_TRIED = 200
 
 
@@ -1084,7 +1085,7 @@ class Growth:
                 continue
             if not self.inputs_on_map(ladder):
                 continue
-            cell = self._likeliest(place, rng)
+            cell = self._drawn(place, rng)
             if cell is None:
                 continue
             kind = ladder.kinds[0]
@@ -1093,15 +1094,21 @@ class Growth:
             changed.add(cell)
         return changed
 
-    def _likeliest(self, place: _Place, rng: np.random.Generator) -> Cell | None:
-        """The cell a ladder's next building is likeliest in that it can go up in; for a key
-        building where none is likely, any cell it could stand on, picked at random."""
+    def _drawn(self, place: _Place, rng: np.random.Generator) -> Cell | None:
+        """A cell a ladder's next building can go up in, drawn at random weighted by its chances
+        there; for a key building where none is likely, any cell it could stand on, picked at
+        random."""
         ladder = place.ladder
         cells = place.cells[place.chances[place.cells] > 0]
         if cells.size and (ladder.needs or ladder.crowded_at is not None):
             cells = cells[self._meets_needs(place, cells)]
-        best = cells[np.argsort(place.chances[cells])[::-1][:LIKELIEST_TRIED]]
-        for index in best.tolist():
+        drawn = cells[:0]
+        if cells.size:
+            weights = place.chances[cells].astype(np.float64)
+            drawn = rng.choice(
+                cells, min(DRAWN_TRIED, cells.size), replace=False, p=weights / weights.sum()
+            )
+        for index in drawn.tolist():
             cell = divmod(index, self._grid.cols)
             if self._fits(ladder, cell):
                 return cell

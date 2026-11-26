@@ -97,3 +97,18 @@ def test_a_sawmill_opens_only_once_a_logging_camp_fells_logs_on_the_map(
     sawmills = grown(replace(SAWMILLS, base=50.0 / CHANCE_UNIT, merges={}), *standing)
 
     assert (sawmills > 0) == opens
+
+
+def test_a_yearly_top_up_draws_its_cell_by_chance_rather_than_always_the_likeliest() -> None:
+    later = replace(WINERIES, from_year=1, merges={}, base=1e-9)
+    cells = set()
+
+    for seed in range(6):
+        constructions = Constructions(flat_map())
+        build(constructions, (1, 2), BuildingKind.VINEYARD, 1)
+        growth = Growth(constructions, only(later))
+        for _ in range(12):
+            growth.month(np.random.default_rng(seed))
+        cells |= {tuple(cell) for cell in np.argwhere(growth.count(BuildingKind.WINERY) > 0)}
+
+    assert len(cells) > 1
