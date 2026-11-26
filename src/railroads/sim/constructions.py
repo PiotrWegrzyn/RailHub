@@ -8,9 +8,10 @@ biggest works and the novelties, and factories, canneries and mills take three.
 
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
-from enum import Enum, IntEnum
+from enum import IntEnum
 
 from railroads.sim.grids import Cell
+from railroads.sim.keyed import Keyed
 from railroads.sim.move import Move
 from railroads.sim.tilemap import Relief, Terrain, Tile, TileMap
 from railroads.sim.track_rules import BRIDGES, Bridge, TrackBed, carries, track_rules_for
@@ -33,7 +34,7 @@ class TrackWidth(IntEnum):
     QUADRUPLE = 4
 
 
-class BuildingKind(Enum):
+class BuildingKind(Keyed):
     FARM = "farm"
     HOUSE = "house"
     TENEMENT = "tenement"
@@ -522,7 +523,7 @@ class Building:
         return BUILDING_RULES[self.kind].space
 
 
-class Facility(Enum):
+class Facility(Keyed):
     """What the player can put up beside a station (railroads.sim.facilities)."""
 
     ENGINE_SHED = "engine shed"

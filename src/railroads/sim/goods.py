@@ -28,14 +28,14 @@ more with, as barrels for a brewery, wheat for animals and planks for mines.
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from enum import Enum
 from types import MappingProxyType
 
 from railroads.sim.constructions import MERGED, BuildingKind
+from railroads.sim.keyed import Keyed
 from railroads.sim.year_caches import on_forget
 
 
-class Good(Enum):
+class Good(Keyed):
     WHEAT = "wheat"
     APPLES = "apples"
     BANANAS = "bananas"
@@ -125,7 +125,7 @@ class Good(Enum):
     MAIL = "mail"
 
 
-class Need(Enum):
+class Need(Keyed):
     FOOD = "food"
     WHEAT = "wheat"
     FRUIT = "fruit"
@@ -286,7 +286,7 @@ PROCESSED_FOODS = (
 )
 
 
-class General(Enum):
+class General(Keyed):
     """A car for a whole kind of goods (railroads.sim.trains), which takes whichever of them pays
     best where the train goes next."""
 

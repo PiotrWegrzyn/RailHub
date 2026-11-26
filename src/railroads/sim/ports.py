@@ -24,7 +24,6 @@ from __future__ import annotations
 import weakref
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from enum import Enum
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -36,6 +35,7 @@ from railroads.sim.constructions import PORT_KINDS, BuildingKind
 from railroads.sim.events import make_factor, rise_of
 from railroads.sim.goods import PRICES, RECIPES, Good, Need, good_exists
 from railroads.sim.grids import Cell, FloatArray, Grid, HexGrid
+from railroads.sim.keyed import Keyed
 from railroads.sim.move import Move
 from railroads.sim.tiles import of_year
 from railroads.sim.trade import CellGoods, Trade
@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from railroads.sim.growth import Growth
 
 
-class Tier(Enum):
+class Tier(Keyed):
     COMMON = "common"
     RARE = "rare"
     EPIC = "epic"

@@ -12,12 +12,12 @@ Freight remembers where it came from as parcels: how much from each station."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from enum import Enum
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from railroads.sim.finance import TRAIN_PRICE
 from railroads.sim.goods import General, Good
+from railroads.sim.keyed import Keyed
 from railroads.sim.move import Move
 
 # What a stop asks for a car of: one good, or a whole kind of goods.
@@ -394,7 +394,7 @@ ENGINE_LENGTH = 0.8
 CAR_LENGTH = 0.42
 
 
-class Kind(Enum):
+class Kind(Keyed):
     """What an engine is for. Pioneers come before the Planet and are slow to get going. Light
     engines are cheap to buy and run and are up to speed at once, but pull three or four cars,
     slowly, and a heavy load slows them most: for short lines with many stops. General ones are
@@ -410,7 +410,7 @@ class Kind(Enum):
     EXPRESS = "express"
 
 
-class Power(Enum):
+class Power(Keyed):
     STEAM = "steam"
     DIESEL = "diesel"
     ELECTRIC = "electric"

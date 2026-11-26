@@ -4,12 +4,12 @@ bought, as what the simulation knows it by."""
 
 from collections import Counter
 from collections.abc import Iterable
-from enum import Enum
 
+from railroads.sim.keyed import Keyed
 from railroads.sim.trains import ENGINES, Cargo, Kind, Train
 
 
-class Category(Enum):
+class Category(Keyed):
     """What a train is at a glance, by its engine: an express, a local train behind a light engine
     or railcar, or a goods train behind a heavy freight engine. Pioneers and general engines pull
     normal trains, which have none."""

@@ -29,18 +29,18 @@ year the lowest tiles.
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
-from enum import Enum
 from functools import cache
 from types import MappingProxyType
 
 from railroads.sim.clock import FIRST_RAILWAY_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.goods import FITS, MAKES, NEEDS, Good, Need, need_year
+from railroads.sim.keyed import Keyed
 from railroads.sim.track_rules import Bridge
 from railroads.sim.year_caches import forget
 
 
-class Tile(Enum):
+class Tile(Keyed):
     COAL = "coal"
     ORE = "ore and stone"
     WOOD = "wood"
@@ -60,7 +60,7 @@ class Tile(Enum):
     MODERN = "modern goods"
 
 
-class Board(Enum):
+class Board(Keyed):
     SUPPLY = "supply"
     DEMAND = "demand"
 

@@ -4,9 +4,9 @@ a kind of bridge it opens for building; the buyers a demand level opens. A level
 special when it only adds its share."""
 
 from dataclasses import dataclass
-from enum import Enum
 from functools import cache
 
+from railroads.sim.keyed import Keyed
 from railroads.sim.tiles import (
     BRIDGES_OPENED_BY,
     ERAS,
@@ -20,7 +20,7 @@ from railroads.sim.track_rules import BRIDGES, Bridge
 from railroads.sim.trains import ENGINES, OPENED_BY
 
 
-class Perk(Enum):
+class Perk(Keyed):
     ERA = "era"
     ENGINE = "engine"
     BRIDGE = "bridge"

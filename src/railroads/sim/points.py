@@ -1,9 +1,9 @@
 """The kinds of points buildings give (railroads.sim.ladders says which give what)."""
 
-from enum import Enum
+from railroads.sim.keyed import Keyed
 
 
-class Points(Enum):
+class Points(Keyed):
     POPULATION = "population"
     FOOD = "food"
     ORE = "ore"

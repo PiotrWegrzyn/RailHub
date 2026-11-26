@@ -14,7 +14,6 @@ row ends the game.
 
 import weakref
 from dataclasses import dataclass, field
-from enum import Enum
 
 import numpy as np
 
@@ -29,6 +28,7 @@ from railroads.sim.finance import (
     track_price,
 )
 from railroads.sim.grids import Cell
+from railroads.sim.keyed import Keyed
 from railroads.sim.ownership import LOT, Owners
 from railroads.sim.railway import Railway
 from railroads.sim.trains import ENGINES
@@ -40,7 +40,7 @@ BOOK_SHARE = TRAIN_RESALE
 BANKRUPT_MONTHS = 6
 
 
-class Difficulty(Enum):
+class Difficulty(Keyed):
     EASY = "Easy"
     NORMAL = "Normal"
     HARD = "Hard"

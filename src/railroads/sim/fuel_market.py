@@ -28,7 +28,6 @@ cost more.
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from enum import Enum
 from types import MappingProxyType
 
 import numpy as np
@@ -39,12 +38,13 @@ from railroads.sim.constructions import BuildingKind
 from railroads.sim.events import electricity_price, electricity_use, price_factor
 from railroads.sim.goods import FITS, Good, Need
 from railroads.sim.goods import NEEDS as BUILDING_NEEDS
+from railroads.sim.keyed import Keyed
 from railroads.sim.trade import Trade
 from railroads.sim.trains import Engine, Power
 from railroads.sim.yearly import needs_of
 
 
-class Fuel(Enum):
+class Fuel(Keyed):
     COAL = "coal"
     WOOD = "wood"
     DIESEL = "diesel fuel"
