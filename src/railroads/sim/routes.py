@@ -212,13 +212,15 @@ def route_price(
     constructions: Constructions, route: Route, anger: int = 0, owners: Owners | None = None
 ) -> float:
     """What laying the route costs while the company's anger is `anger`: the price of each new
-    piece, less the price of the track it takes the place of, and the price of moving aside the
-    buildings in its way."""
+    piece, less the price of the track it takes the place of unless that is a bridge built again
+    of another kind, which costs all its price anew, and the price of moving aside the buildings
+    in its way."""
     tile_map = constructions.tile_map
     total = 0.0
     for piece, old in route.changes(constructions):
         tile = tile_map.tile(piece.cell)
-        total += track_price(piece, tile) - (0.0 if old is None else track_price(old, tile))
+        refund = 0.0 if old is None or _rebuilt(piece, old) else track_price(old, tile)
+        total += track_price(piece, tile) - refund
     return total + leaving_price(in_the_way(constructions, route), anger, owners)
 
 
@@ -877,7 +879,7 @@ class _Planner:
             if old is None:
                 piece = self._over_track(piece)
             if old is not None:
-                piece = _merged(piece, old)
+                piece = _merged(piece, old, self.bridging.picked)
                 if piece != old:
                     replaces[piece] = old
             pieces.append(piece)
@@ -1012,20 +1014,28 @@ def _dead_end(
     return None
 
 
-def _merged(piece: Track, old: Track) -> Track:
+def _rebuilt(piece: Track, old: Track) -> bool:
+    """Whether a piece takes the place of a bridge of another kind, built again from nothing."""
+    return old.bed == TrackBed.BRIDGE and piece.bridge != old.bridge
+
+
+def _merged(piece: Track, old: Track, picked: Bridge | None = None) -> Track:
     """The piece, as wide as the track it replaces, maglev if either is and else electric if
     either is: a guideway laid over rails takes their place, and rails laid along a guideway
-    keep it."""
+    keep it. A bridge is built again of the kind picked, if that carries the track and goes
+    where it stands, else of the kind the piece would take where the old one can't carry it."""
     maglev = piece.maglev or old.maglev
-    return Track(
-        piece.cell,
-        piece.ends,
-        max(piece.width, old.width),
-        old.bed,
-        (piece.electric or old.electric) and not maglev,
-        maglev,
-        max(piece.bridge, old.bridge) if old.bed == TrackBed.BRIDGE else old.bridge,
-    )
+    width = max(piece.width, old.width)
+    electric = (piece.electric or old.electric) and not maglev
+    bridge = old.bridge
+    if old.bed == TrackBed.BRIDGE:
+        flyover = piece.bed == TrackBed.GROUND
+        fits = picked is not None and carries(picked, int(width), electric, maglev)
+        if fits and (not flyover or BRIDGES[picked].over_track):
+            bridge = picked
+        elif not carries(old.bridge, int(width), electric, maglev):
+            bridge = max(piece.bridge, old.bridge)
+    return Track(piece.cell, piece.ends, width, old.bed, electric, maglev, bridge)
 
 
 def _is_station(constructions: Constructions, cell: Cell) -> bool:

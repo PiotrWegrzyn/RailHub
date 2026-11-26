@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from builders import flat_map, layer, open_boards
+from railroads.sim.clock import SECONDS_PER_MONTH
 from railroads.sim.constructions import Constructions, Track, TrackWidth
 from railroads.sim.finance import track_price
 from railroads.sim.game import Game
@@ -12,6 +13,7 @@ from railroads.sim.tilemap import Terrain, TileMap
 from railroads.sim.tiles import Board, Tile, activate, bridge_open
 from railroads.sim.track_network import TrackNetwork
 from railroads.sim.track_rules import BRIDGES, RAMP_RULES, Bridge, TrackBed, carries
+from railroads.sim.trains import Stop, Train
 
 WEST, EAST = (7, 2), (7, 17)
 NORTH, SOUTH = (1, 9), (13, 9)
@@ -195,3 +197,61 @@ def test_trains_slow_down_on_the_ramps_up_to_a_flyover() -> None:
 
     assert speeds == {RAMP_RULES.speed_factor}
     assert np.isclose(network._speed(CROSSING), 1.0)
+
+
+def test_a_bridge_laid_along_again_with_another_kind_picked_is_built_anew_at_its_full_price() -> (
+    None
+):
+    game = game_on(river_map())
+    game.lay_track(WEST, EAST)
+    activate(open_boards())
+    game.railway.year = 1950
+    route = plan_route(game.constructions, WEST, EAST, bridging=Bridging(Bridge.STEEL))
+    assert route is not None
+
+    price = game.track_quote(route).price
+    game.lay_track(WEST, EAST, planned=route, bridge=Bridge.STEEL)
+
+    bridges = [piece for piece in game.constructions.track() if piece.bed == TrackBed.BRIDGE]
+    assert {piece.bridge for piece in bridges} == {Bridge.STEEL}
+    assert price == sum(track_price(piece, game.tile_map.tile(piece.cell)) for piece in bridges)
+
+
+def test_a_flyover_stands_in_the_block_of_its_line_with_no_signal_at_it() -> None:
+    game = flyover_game()
+    grid = game.tile_map.grid
+    blocks = Blocks(game.constructions)
+    flyover = next(p for p in game.constructions.track_at(CROSSING) if p.bed == TrackBed.BRIDGE)
+    north, south = (grid.track_exit(CROSSING, end)[0] for end in flyover.ends)
+    way = [track_point(grid, CROSSING, end) for end in flyover.ends]
+
+    signalled = {spot.cell for spot in blocks.spots}
+
+    assert blocks.block_at(CROSSING, *way) == blocks.block[north] == blocks.block[south]
+    assert not {CROSSING, north, south} & signalled
+
+
+def test_trains_over_and_under_a_flyover_run_through_it_at_once() -> None:
+    game = game_on(flat_map(14, 20))
+    for cell in (WEST, EAST, NORTH, SOUTH):
+        assert game.build_station(cell).ok
+    activate(open_boards())
+    game.railway.year = 1950
+    assert game.lay_track(WEST, EAST, TrackWidth.DOUBLE).ok
+    assert game.lay_track(NORTH, SOUTH, TrackWidth.DOUBLE, bridge=Bridge.STEEL).ok
+    railway = game.railway
+    trains = [
+        Train("Under", stops=[Stop(WEST), Stop(EAST)], engine="planet"),
+        Train("Over", stops=[Stop(NORTH), Stop(SOUTH)], engine="planet"),
+    ]
+    railway.trains.extend(trains)
+    held = set()
+
+    for _ in range(60 * 300):
+        railway.run(1 / 60 / SECONDS_PER_MONTH)
+        held |= {train.giving_way for train in trains if train.giving_way}
+        if all(train.arrivals for train in trains):
+            break
+
+    assert all(train.arrivals for train in trains)
+    assert held == set()

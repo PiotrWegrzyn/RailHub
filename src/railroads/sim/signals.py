@@ -123,7 +123,19 @@ class Blocks:
         grid = constructions.tile_map.grid
         stations = set(constructions.every_station_cell())
         cells = sorted({piece.cell for piece in constructions.track()} - stations)
-        pieces = {cell: constructions.track_at(cell) for cell in cells}
+        # A flyover belongs to the line it carries, not to the track under it: the cells are cut
+        # into blocks by the track on the ground, and each flyover then joins the block of its
+        # line on both sides (`over`), so no signal stands at it.
+        flyovers = {
+            cell: piece
+            for cell in cells
+            for piece in constructions.track_at(cell)
+            if constructions.is_flyover(piece) and len(constructions.track_at(cell)) > 1
+        }
+        pieces = {
+            cell: tuple(p for p in constructions.track_at(cell) if p is not flyovers.get(cell))
+            for cell in cells
+        }
 
         def point(cell: Cell, end: int) -> Point:
             return track_point(grid, cell, end)
@@ -134,15 +146,13 @@ class Blocks:
         }
         # The ways across each cell with a flyover, by whether they run over it or under it:
         # trains on one never hold up trains on the other.
-        self.levels: dict[Cell, dict[frozenset[Point], bool]] = {}
-        for cell, here in pieces.items():
-            if len(here) > 1 and any(constructions.is_flyover(piece) for piece in here):
-                self.levels[cell] = {
-                    frozenset(point(cell, end) for end in piece.ends): constructions.is_flyover(
-                        piece
-                    )
-                    for piece in here
-                }
+        self.levels: dict[Cell, dict[frozenset[Point], bool]] = {
+            cell: {
+                frozenset(point(cell, end) for end in piece.ends): piece is flyover
+                for piece in constructions.track_at(cell)
+            }
+            for cell, flyover in flyovers.items()
+        }
         kind = kinds.__getitem__
 
         # Whether each cell is plain double track, and the pairs of points its double track
@@ -272,12 +282,71 @@ class Blocks:
                     for flank in grid.track_flanks(cell, end):
                         if flank in self.block and self.block[flank][0] != "junction":
                             self.block[flank] = self.block[cell]
+        # Each flyover's way across its cell, its block and whether a train may stand on it: in
+        # the block of its line where the line runs on as the same plain track on both sides.
+        self.over: dict[Cell, tuple[frozenset[Point], tuple[str, int], bool]] = {}
+        for number, (cell, flyover) in enumerate(flyovers.items(), start=len(cells)):
+            sides = []
+            for end in flyover.ends:
+                beside, entry = grid.track_exit(cell, end)
+                joined = any(entry in other.ends for other in pieces.get(beside, ()))
+                sides.append(self.block.get(beside) if joined else None)
+            first, second = sides
+            own = (flyover.width.name.lower(), number)
+            if first is not None and first[0] != "junction" and second in (first, None):
+                block = first
+            elif second is not None and second[0] != "junction" and first is None:
+                block = second
+            elif first is not None and second is not None and first[0] == second[0] != "junction":
+                block = first
+                for other, found in self.block.items():
+                    if found == second:
+                        self.block[other] = first
+                for other, (way, found, stands) in self.over.items():
+                    if found == second:
+                        self.over[other] = (way, first, stands)
+            else:
+                block = own
+            way = frozenset(point(cell, end) for end in flyover.ends)
+            stands = block[0] in ("double", "quadruple", "lanes")
+            self.over[cell] = (way, block, stands)
+            if flyover.width >= TrackWidth.DOUBLE:
+                self.lanes.setdefault(cell, set()).add(way)
         self.spots: list[SignalSpot] = []
-        for (cell, end), (beside, _) in exits.items():
+
+        def spot(cell: Cell, end: int) -> None:
+            at = point(cell, end)
+            x, y = grid.center(*cell)
+            self.spots.append(SignalSpot(at, (float(x) - at[0], float(y) - at[1]), cell))
+
+        for (cell, end), (beside, entry) in exits.items():
+            over = self.over.get(beside)
+            if over is not None and track_point(grid, beside, entry) in over[0]:
+                if over[1] != self.block[cell]:
+                    spot(cell, end)
+                continue
             if beside in stations or self.block.get(beside, self.block[cell]) != self.block[cell]:
-                at = point(cell, end)
-                x, y = grid.center(*cell)
-                self.spots.append(SignalSpot(at, (float(x) - at[0], float(y) - at[1]), cell))
+                spot(cell, end)
+        for cell, flyover in flyovers.items():
+            for end in flyover.ends:
+                beside, _ = grid.track_exit(cell, end)
+                if beside in stations or self.block.get(beside) != self.over[cell][1]:
+                    spot(cell, end)
+
+    def block_at(self, cell: Cell, entry: Point, exit_: Point) -> tuple[str, int] | None:
+        """The block of a way across a cell: a flyover's own, else the cell's."""
+        over = self.over.get(cell)
+        if over is not None and frozenset((entry, exit_)) == over[0]:
+            return over[1]
+        return self.block.get(cell)
+
+    def stands_on(self, cell: Cell, entry: Point, exit_: Point) -> bool:
+        """Whether a train may stand on this way across a cell: plain double track, a flyover
+        carrying it too."""
+        over = self.over.get(cell)
+        if over is not None and frozenset((entry, exit_)) == over[0]:
+            return over[2]
+        return self.double.get(cell, False)
 
     def apart(
         self,
@@ -297,6 +366,9 @@ class Blocks:
             over = levels.get(frozenset(one)), levels.get(frozenset(other))
             if None not in over and over[0] != over[1]:
                 return True
+            if over == (True, True):
+                reverse = one[0] == other[1] and one[1] == other[0]
+                return reverse and frozenset(one) in self.lanes.get(cell, set())
         if one == other:
             return lanes[0] != lanes[1] and (cell in self.four_lanes or self._laned(cell, one))
         if one[0] == other[1] and one[1] == other[0]:
@@ -307,7 +379,10 @@ class Blocks:
 
     def takes_lane(self, cell: Cell, entry: Point, exit_: Point) -> bool:
         """Whether a way across a cell runs on one of the two tracks of quadruple track going
-        its way."""
+        its way: never one over a flyover, which carries its own line."""
+        over = self.over.get(cell)
+        if over is not None and frozenset((entry, exit_)) == over[0]:
+            return False
         return cell in self.four_lanes or self._laned(cell, (entry, exit_))
 
     def natural_lane(self, cell: Cell, way: tuple[Point, Point]) -> int | None:
@@ -825,9 +900,9 @@ class Signals:
     def _on_double(self, crossings: list[Pass], start: float, stop: float) -> bool:
         """Whether the train's way between these places along its path runs only in stations and
         on plain double track, where a train standing blocks none but trains following it."""
-        double = self.blocks.double
+        stands_on = self.blocks.stands_on
         return all(
-            double.get(other.cell, False)
+            stands_on(other.cell, other.entry, other.exit)
             for other in crossings
             if not other.touch and other.end > start + SAME and other.start < stop - SAME
         )
@@ -841,7 +916,7 @@ class Signals:
         for crossing in crossings:
             if crossing.touch:
                 continue
-            block = blocks.block.get(crossing.cell)
+            block = blocks.block_at(crossing.cell, crossing.entry, crossing.exit)
             signal = before is None or block != before[1] or before[0] < crossing.start - SAME
             before = (crossing.end, block)
             if not signal or crossing.start <= train.cleared + SAME:
@@ -873,7 +948,7 @@ class Signals:
         blocks = self.blocks
         tail, ahead = signal - train.length + SAME, signal - SAME
         behind = {
-            blocks.block.get(crossing.cell)
+            blocks.block_at(crossing.cell, crossing.entry, crossing.exit)
             for crossing in crossings
             if not crossing.touch and crossing.end > tail and crossing.start < ahead
         }
@@ -890,7 +965,7 @@ class Signals:
             if crossing.touch:
                 way.append(crossing)
                 continue
-            block = blocks.block.get(crossing.cell)
+            block = blocks.block_at(crossing.cell, crossing.entry, crossing.exit)
             if block == line:
                 return None
             changes = before is None or block != before[1] or before[0] < crossing.start - SAME
