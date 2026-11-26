@@ -516,7 +516,8 @@ class GroundShader:
 
     def dress_onto(self, target: RenderTarget, chunk: tuple[int, int], k: int, times: int) -> None:
         """Draws what `lay_surfaces` worked out for a chunk into `target`, premultiplied by its
-        alpha, raised with the ground where it rises: `k` pixels to an art pixel, each repeated
+        alpha, raised with the ground where it rises and laid with the ground's texture finely,
+        crops out of the reach of crowns with blades: `k` pixels to an art pixel, blown up
         `times` times each way (DRESS)."""
         left, top = chunk[0] * CHUNK, chunk[1] * CHUNK
         uniforms = {
@@ -526,10 +527,12 @@ class GroundShader:
             "times": ("1i", (times,)),
             "relief_origin": ("2i", (left - 1, top - 1)),
             "metres_per_pixel": ("1f", (self._heights.metres_per_pixel,)),
+            "woods_origin": ("2i", (left - WOODS_MARGIN, top - WOODS_MARGIN)),
             "surface": ("1i", (0,)),
             "relief": ("1i", (1,)),
+            "edges": ("1i", (2,)),
         }
-        inputs = (self._canopy.texture, self._chunk_relief.texture)
+        inputs = (self._canopy.texture, self._chunk_relief.texture, self._edges.texture)
         self._run(target, self._programs.dress, uniforms, inputs)
 
     def chunk_inputs(self, chunk: tuple[int, int]) -> ChunkInputs:

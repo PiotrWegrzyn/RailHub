@@ -384,7 +384,18 @@ class PixelWorld:
             lambda layer, k, shown: (
                 self.ground.fields(layer, left, top, k, lit, shown=shown, points=points),
                 self.ground.yards(layer, left, top, k, shown=shown),
-                self.ground.canopy(layer, left, top, k, shown=shown, points=points),
+            ),
+            flat,
+            crops=True,
+        )
+        self._surfaces(
+            canvas,
+            left,
+            top,
+            resolution,
+            None,
+            lambda layer, k, shown: self.ground.canopy(
+                layer, left, top, k, shown=shown, points=points
             ),
             flat,
         )
@@ -394,7 +405,7 @@ class PixelWorld:
         else:
             canvas = raise_picture(canvas, offset, resolution, crossings(raised.lift, offset))
             if resolution > 1:
-                textured(canvas, left, top, resolution)
+                textured(canvas, left, top, resolution, bare=True)
             self._stand_scenery(canvas, left, top, resolution, under_track=True)
             self._lay_lifted_track(canvas, left, top, resolution, offset, resolution)
         self._stand_scenery(canvas, left, top, resolution)
@@ -409,12 +420,13 @@ class PixelWorld:
         shown: npt.NDArray[np.bool_] | None,
         paint: Callable[[FloatArray, int, npt.NDArray[np.bool_]], object],
         texture: bool = True,
+        crops: bool = False,
     ) -> None:
         """Lays what `paint` draws over the ground, fields, yards and woods, onto `canvas`, `k`
         pixels to an art pixel, where it shows the map (`shown`, or wherever it isn't clear).
         Above 1 they are drawn at no more than FINE, blended between their pixels up to `k` and
         laid with the ground's texture (railroads.ui.pixel.ground_texture), so they read as the
-        same lit surface as the ground under them."""
+        same lit surface as the ground under them; `crops` with blades on what grows."""
         on = canvas[..., 3] > 0 if shown is None else shown
         if k == 1:
             paint(canvas, 1, on)
@@ -426,7 +438,7 @@ class PixelWorld:
         if step > 1:
             layer = _smoothly_blown_up(layer[..., :3], layer[..., 3], step)
         if texture:
-            textured(layer, left, top, k)
+            textured(layer, left, top, k, crops=crops)
         canvas[...] = layer + canvas * (1 - layer[..., 3:])
 
     def _points(self, left: int, top: int, rows: int) -> Lattice:
@@ -510,12 +522,15 @@ class PixelWorld:
         take the ground's texture once raised with it."""
         ground = self.ground
 
-        def paint(layer: FloatArray, kk: int, on: npt.NDArray[np.bool_]) -> None:
+        def sow(layer: FloatArray, kk: int, on: npt.NDArray[np.bool_]) -> None:
             ground.fields(layer, left, top, kk, lit, shown=on, points=points)
             ground.yards(layer, left, top, kk, shown=on)
+
+        def plant(layer: FloatArray, kk: int, on: npt.NDArray[np.bool_]) -> None:
             ground.canopy(layer, left, top, kk, shown=on, points=points)
 
-        self._surfaces(canvas, left, top, k, shown, paint, lit is None)
+        self._surfaces(canvas, left, top, k, shown, sow, lit is None, crops=True)
+        self._surfaces(canvas, left, top, k, shown, plant, lit is None)
 
     def _render_fine(self, chunk_x: int, chunk_y: int, k: int, standing: bool = True) -> Rgba:
         left, top = chunk_x * CHUNK, chunk_y * CHUNK
@@ -561,7 +576,7 @@ class PixelWorld:
             False,
         )
         canvas = raise_picture(canvas, offset, 1, crossings(raised.lift, offset))
-        textured(canvas, left, top, k)
+        textured(canvas, left, top, k, bare=True)
         if standing:
             self._stand_scenery(canvas, left, top, k, under_track=True)
             self._lay_lifted_track(canvas, left, top, k, offset / k)
@@ -867,7 +882,7 @@ def _ground_blown_up(
         return _blown_up(rgb, alpha, k)
     picture = _smoothly_blown_up(rgb, alpha, k)
     if texture:
-        textured(picture, left, top, k)
+        textured(picture, left, top, k, bare=True)
     return picture
 
 

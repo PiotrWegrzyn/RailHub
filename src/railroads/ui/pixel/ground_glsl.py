@@ -8,6 +8,7 @@ from railroads.sim.tilemap import Deposit
 from railroads.ui.biomes import Biome
 from railroads.ui.iso_camera import TILT
 from railroads.ui.pixel import ground as cpu
+from railroads.ui.pixel import ground_texture as texture
 from railroads.ui.pixel import relief, streams
 from railroads.ui.pixel.noise import TABLE_SIZE
 from railroads.ui.pixel.relief import LIGHT
@@ -600,7 +601,9 @@ void main() {
 """
 
 
-# The texture of the ground up close, as railroads.ui.pixel.ground_texture lays it.
+# The texture of the ground up close, as railroads.ui.pixel.ground_texture lays it: `textured`
+# under fields, yards and woods, `detailed` on the bare ground, with its blades and flowers,
+# pebbles and ripples, `pixels` screen pixels to an art pixel.
 TEXTURE = """float hash(vec2 q) {
     return fract(sin(q.x * 127.1 + q.y * 311.7) * 43758.5453);
 }
@@ -616,7 +619,92 @@ float layer(vec2 p, vec3 wave) {
     float bottom = mix(hash(vec2(i0.x, i1.y)), hash(i1), t.x);
     return mix(top, bottom, t.y);
 }
-vec3 textured(vec3 rgb, vec2 p) {
+float visible(float size, float pixels) {
+    return smoothstep(0.0, 1.0, clamp((size * pixels - 1.0) / 2.0, 0.0, 1.0));
+}
+float square_hash(ivec2 g, vec2 size, int seed) {
+    ivec2 n = ivec2(round(@PERIOD@ / size));
+    ivec2 w = g - n * ivec2(floor(vec2(g) / vec2(n)));
+    uint h = (uint(w.x) * 73856093u) ^ (uint(w.y) * 19349663u) ^ (uint(seed) * 83492791u);
+    h ^= h >> 16u;
+    h *= 0x7FEB352Du;
+    h ^= h >> 15u;
+    h *= 0x846CA68Bu;
+    h ^= h >> 16u;
+    return float(h & 0xFFFFFFu) / 16777216.0;
+}
+float blades(vec2 p, float width, float height, int seed) {
+    vec2 size = vec2(width, height);
+    ivec2 c = ivec2(floor(p / size));
+    float value = @BLADE_GAP@;
+    float front = -1e30;
+    for (int dj = 0; dj <= 2; dj++) {
+        for (int di = -1; di <= 1; di++) {
+            ivec2 g = c + ivec2(di, dj);
+            float root_x = (float(g.x) + square_hash(g, size, seed)) * width;
+            float root_y = (float(g.y) + square_hash(g, size, seed + 1)) * height;
+            float tall = height * (1.0 + 0.5 * square_hash(g, size, seed + 2));
+            float t = (root_y - p.y) / tall;
+            float lean = (square_hash(g, size, seed + 3) - 0.5) * 1.6 * width;
+            float half_width = width * 0.34 * (1.0 - 0.8 * t);
+            float off = (p.x - root_x - lean * t * t) / max(half_width, 1e-6);
+            if (t >= 0.0 && t <= 1.0 && abs(off) < 1.0 && root_y > front) {
+                float tone = square_hash(g, size, seed + 4) - 0.5;
+                value = 0.5 + 0.55 * t + 0.25 * tone - 0.12 * off;
+                front = root_y;
+            }
+        }
+    }
+    return value;
+}
+const vec3 FLOWER_COLOURS[@FLOWER_COUNT@] = vec3[@FLOWER_COUNT@](@FLOWER_COLOURS@);
+vec4 flower(vec2 p, float pixels) {
+    vec2 size = vec2(@FLOWER_GAP@);
+    ivec2 g = ivec2(floor(p / size));
+    if (square_hash(g, size, 61) >= @FLOWER_SHARE@) return vec4(0.0);
+    vec2 c = (vec2(g) + 0.25 + 0.5 * vec2(square_hash(g, size, 62), square_hash(g, size, 63)))
+        * size;
+    float radius = @FLOWER_SIZE@ / 2.0 * (0.7 + 0.3 * square_hash(g, size, 64));
+    int pick = min(int(square_hash(g, size, 65) * float(@FLOWER_COUNT@)), @FLOWER_COUNT@ - 1);
+    float d = length(vec2(p.x - c.x, (p.y - c.y) * 1.4)) / radius;
+    float edge = 1.0 / (radius * max(pixels, 1e-6));
+    float cover = clamp((1.0 - d) / edge, 0.0, 1.0) * visible(@FLOWER_SIZE@, pixels);
+    float lit = 1.08 - 0.25 * clamp((p.x - c.x + p.y - c.y) / radius, -1.0, 1.0);
+    return vec4(d < 0.38 ? @FLOWER_EYE@ : FLOWER_COLOURS[pick] * lit, cover);
+}
+float pebbles(vec2 p) {
+    vec2 size = vec2(@PEBBLE_GAP@);
+    ivec2 g = ivec2(floor(p / size));
+    if (square_hash(g, size, 71) >= @PEBBLE_SHARE@) return 0.0;
+    vec2 c = (vec2(g) + 0.3 + 0.4 * vec2(square_hash(g, size, 72), square_hash(g, size, 73)))
+        * size;
+    float radius = 0.06 + 0.08 * square_hash(g, size, 74);
+    float tone = square_hash(g, size, 75) > 0.5 ? 0.7 : -0.5;
+    vec2 d = (p - c) / radius;
+    if (dot(d, d) < 1.0) return tone - 0.35 * clamp(d.x + d.y, -1.5, 1.5);
+    vec2 s = d - 0.45;
+    return dot(s, s) < 1.0 ? -0.6 : 0.0;
+}
+float ripples(vec2 p) {
+    vec2 size = @RIPPLE_BOX@;
+    ivec2 c = ivec2(floor(p / size));
+    float value = 0.0;
+    for (int dj = -1; dj <= 0; dj++) {
+        for (int di = -1; di <= 1; di++) {
+            ivec2 g = c + ivec2(di, dj);
+            if (square_hash(g, size, 84) >= @RIPPLE_SHARE@) continue;
+            float cx = (float(g.x) + square_hash(g, size, 81)) * size.x;
+            float cy = (float(g.y) + 0.2 + 0.6 * square_hash(g, size, 82)) * size.y;
+            float along = (p.x - cx) / (0.5 + 1.2 * square_hash(g, size, 83));
+            float taper = max(1.0 - along * along, 0.0);
+            float dy = p.y - cy;
+            float crest = @RIPPLE_CREST@;
+            value += taper * (abs(dy) < crest ? 1.0 : (dy >= crest && dy < 3.0 * crest ? -0.6 : 0.0));
+        }
+    }
+    return value;
+}
+vec3 laid(vec3 rgb, vec2 p, float pixels, bool bare, bool crops) {
     float green = rgb.g - max(rgb.r, rgb.b);
     float wet = rgb.b - max(rgb.r, rgb.g);
     vec3 tufts = vec3(1.5, 1.5, 0.0);
@@ -625,16 +713,43 @@ vec3 textured(vec3 rgb, vec2 p) {
     float light = clamp(1.0 - bump * 0.5, 0.78, 1.22);
     float shade_by = (0.76 + 0.1 * grain + 0.14 * layer(p, tufts) + 0.1 * layer(p, vec3(0.625, 0.625, 0.0)))
         * (1.0 + 0.12 * smoothstep(0.75, 0.9, layer(p, vec3(3.5, 3.5, 41.0))));
+    shade_by *= 1.0 + 0.12 * visible(1.0 / @CRUMBS@.x, pixels) * (layer(p, @CRUMBS@) - 0.5);
     float factor = shade_by * light;
     if (green > 0.0) {
         factor *= 1.0 - 0.2 * smoothstep(0.62, 0.8, layer(p, vec3(5.0, 1.125, 17.0)));
     } else {
+        if (bare) {
+            factor *= 1.0 + 0.22 * visible(0.2, pixels) * (pebbles(p) - (@PEBBLE_MEAN@));
+        }
         factor = 1.0 + (factor - 1.0) * 0.7;
+    }
+    bool grows = green > 0.0 || (crops && min(rgb.r, rgb.g) - rgb.b > @RIPE@);
+    if ((bare || crops) && grows) {
+        float more = 1.0;
+@BLADE_LAYERS@
+        factor *= more;
     }
     if (wet > 0.02) {
         factor = 1.0 + (factor - 1.0) * 0.25;
+        if (bare) {
+            float water = 1.0 + 0.1 * visible(1.0 / @SWELLS@.y, pixels) * (layer(p, @SWELLS@) - 0.5);
+            float shown = visible(2.0 * @RIPPLE_CREST@, pixels);
+            if (shown > 0.0) water += 0.3 * shown * (ripples(p) - (@RIPPLE_MEAN@));
+            factor *= water;
+        }
     }
-    return clamp(rgb * factor, 0.0, 1.0);
+    rgb *= factor;
+    if (bare && green > @FLOWER_GREEN@) {
+        vec4 bloom = flower(p, pixels);
+        rgb = mix(rgb, bloom.rgb, bloom.a);
+    }
+    return clamp(rgb, 0.0, 1.0);
+}
+vec3 textured(vec3 rgb, vec2 p, float pixels, bool crops) {
+    return laid(rgb, p, pixels, false, crops);
+}
+vec3 detailed(vec3 rgb, vec2 p, float pixels) {
+    return laid(rgb, p, pixels, true, false);
 }
 """
 
@@ -663,7 +778,7 @@ void main() {
     vec4 c = texelFetch(art, clamp(at + ivec2(0, 1), ivec2(0), last), 0);
     vec4 d = texelFetch(art, clamp(at + ivec2(1, 1), ivec2(0), last), 0);
     colour = mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-    colour.rgb = textured(colour.rgb, p);
+    colour.rgb = detailed(colour.rgb, p, scale);
 }
 """
 
@@ -1271,15 +1386,18 @@ uniform ivec2 relief_origin;
 uniform float metres_per_pixel;
 uniform highp sampler2D surface;
 uniform highp sampler2D relief;
+uniform ivec2 woods_origin;
+uniform highp sampler2D edges;
 @TEXTURE@
 float lift_at(ivec2 art) {
     float rise = texelFetch(relief, art - relief_origin, 0).x;
     return clamp(rise / metres_per_pixel * @EXAGGERATION@ * @TILT@, 0.0, @MOST_LIFT@);
 }
 
+// The surface at art point `at`, from the chunk's corner, blended between the middles of its
+// pixels where it is blown up, as the ground is.
 vec4 surface_at(vec2 at) {
     ivec2 last = textureSize(surface, 0) - 1;
-    if (drawn == k) return texelFetch(surface, min(ivec2(floor(at * float(k))), last), 0);
     vec2 q = clamp(at * float(drawn) - 0.5, vec2(0.0), vec2(last));
     ivec2 c0 = ivec2(floor(q));
     ivec2 c1 = min(c0 + 1, last);
@@ -1299,13 +1417,16 @@ void main() {
     float here = lift_at(art + ivec2(0, offset)) - float(offset);
     float drop = here - (lift_at(art + ivec2(0, offset + 1)) - float(offset) - 1.0);
     float share = drop > 0.0 ? clamp(here / drop, 0.0, 1.0) : 0.0;
-    vec2 at = (vec2(pixel) + 0.5) / float(k);
+    vec2 at = gl_FragCoord.xy / float(k * times);
     vec4 shown = surface_at(at + vec2(0.0, float(offset)));
     if (share > 0.0) {
         shown += (surface_at(at + vec2(0.0, float(offset + 1))) - shown) * share;
     }
-    if (k > 1 && shown.a > 0.0) {
-        shown.rgb = textured(shown.rgb / shown.a, at + vec2(chunk_origin)) * shown.a;
+    if (k * times > 1 && shown.a > 0.0) {
+        ivec2 under = clamp(art + ivec2(0, offset) - woods_origin, ivec2(0), textureSize(edges, 0) - 1);
+        bool crops = texelFetch(edges, under, 0).r < 0.5;
+        shown.rgb = textured(shown.rgb / shown.a, at + vec2(chunk_origin), float(k * times), crops)
+            * shown.a;
     }
     colour = shown;
 }
@@ -1691,11 +1812,46 @@ def dress_source() -> str:
     return fill_names(DRESS, names)
 
 
+def _texture_names() -> dict[str, str]:
+    """The numbers of railroads.ui.pixel.ground_texture written into TEXTURE."""
+    blades = "\n".join(
+        f"        more += {glsl_number(strength)} * visible({glsl_number(width)}, pixels)"
+        f" * (blades(p, {glsl_number(width)}, {glsl_number(height)}, {seed}) - {glsl_number(mean)});"
+        for (width, height, strength, seed), mean in zip(
+            texture.BLADES, texture.blade_means(), strict=True
+        )
+    )
+    return {
+        "PERIOD": glsl_number(texture.PERIOD),
+        "CRUMBS": _vec3(texture.CRUMBS),
+        "SWELLS": _vec3(texture.SWELLS),
+        "BLADE_LAYERS": blades,
+        "BLADE_GAP": glsl_number(texture.BLADE_GAP),
+        "FLOWER_GAP": glsl_number(texture.FLOWER_GAP),
+        "FLOWER_SHARE": glsl_number(texture.FLOWER_SHARE),
+        "FLOWER_SIZE": glsl_number(texture.FLOWER_SIZE),
+        "FLOWER_COUNT": str(len(texture.FLOWER_COLOURS)),
+        "FLOWER_COLOURS": ", ".join(_vec3(c) for c in texture.FLOWER_COLOURS),
+        "FLOWER_EYE": _vec3(texture.FLOWER_EYE),
+        "FLOWER_GREEN": glsl_number(texture.FLOWER_GREEN),
+        "RIPE": glsl_number(texture.RIPE),
+        "PEBBLE_GAP": glsl_number(texture.PEBBLE_GAP),
+        "PEBBLE_SHARE": glsl_number(texture.PEBBLE_SHARE),
+        "PEBBLE_MEAN": glsl_number(texture.pebble_mean()),
+        "RIPPLE_BOX": f"vec2({', '.join(glsl_number(v) for v in texture.RIPPLE_BOX)})",
+        "RIPPLE_SHARE": glsl_number(texture.RIPPLE_SHARE),
+        "RIPPLE_CREST": glsl_number(texture.RIPPLE_CREST),
+        "RIPPLE_MEAN": glsl_number(texture.ripple_mean()),
+    }
+
+
 def fill_names(source: str, names: dict[str, str]) -> str:
     source = source.replace("@NOISE@", NOISE).replace("@HEX@", HEX)
     source = source.replace("@RASTER@", RASTER).replace("@TEXTURE@", TEXTURE)
     source = source.replace("@SUN@", SUN).replace("@NATURAL@", NATURAL)
     source = source.replace("@FIELDS@", FIELDS).replace("@STREAM@", STREAM)
+    if TEXTURE in source:
+        names = _texture_names() | names
     for name, value in (names | {"MASK": str(TABLE_SIZE - 1)}).items():
         source = source.replace(f"@{name}@", value)
     assert "@" not in source
