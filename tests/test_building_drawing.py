@@ -258,3 +258,21 @@ def test_a_straight_line_of_track_moved_aside_runs_alongside_it(
     moved = _parallel_lines(xs, ys, 2.0)
 
     assert [(point.x, point.y) for point in moved[0]] == [(0.0, 7.0), (10.0, 7.0), (20.0, 7.0)]
+
+
+def test_track_drawn_again_from_the_same_view_draws_the_same_and_moves_with_the_view(
+    draw_list: imgui.ImDrawList,
+) -> None:
+    constructions = make_constructions()
+    camera = IsoCamera(center_x=2.5, center_y=2.0, angle_deg=0.0, cell_units=1.0)
+    camera.zoom_level = 2
+    draw_track(draw_list, constructions, camera, (640.0, 400.0))
+    first = draw_list.vtx_buffer.size()
+    draw_track(draw_list, constructions, camera, (640.0, 400.0))
+    again = draw_list.vtx_buffer.size() - first
+    camera.pan(5000.0, 0.0)
+
+    draw_track(draw_list, constructions, camera, (640.0, 400.0))
+
+    assert again == first
+    assert draw_list.vtx_buffer.size() == 2 * first

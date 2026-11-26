@@ -503,6 +503,43 @@ def draw_track(
     wooden deck on bridges and a dark line through tunnels, with a wire beside electric track,
     thicker the closer the view. All the beds go down before any rail, so pieces that meet in a
     cell make one junction or crossing."""
+    display = imgui.get_io().display_size
+    key = (
+        constructions,
+        constructions.railway_version,
+        camera.center_x,
+        camera.center_y,
+        camera.zoom_level,
+        camera.angle_deg,
+        camera.cell_units,
+        tuple(center),
+        (display.x, display.y),
+    )
+    global _DRAWN_TRACK
+    if planned is None and _DRAWN_TRACK is not None and _DRAWN_TRACK[0] == key:
+        lines = _DRAWN_TRACK[1]
+    else:
+        lines = _track_lines(constructions, camera, center, planned)
+        if planned is None:
+            _DRAWN_TRACK = (key, lines)
+    for points, color, thickness in lines:
+        draw_list.add_polyline(points, color, thickness, 0)
+
+
+# The lines draw_track drew the laid track with last, and what it drew them for: while the view
+# and the railway stay as they are, the next frame draws the same lines without working them out.
+_DRAWN_TRACK: tuple[tuple, list[tuple[list[imgui.ImVec2], int, float]]] | None = None
+
+
+def _track_lines(
+    constructions: Constructions,
+    camera: IsoCamera,
+    center: Vec2,
+    planned: list[Track] | None,
+) -> list[tuple[list[imgui.ImVec2], int, float]]:
+    """The lines draw_track draws, in the order it draws them: their points, colour and
+    thickness."""
+    lines: list[tuple[list[imgui.ImVec2], int, float]] = []
     width = max(1.5, camera.cell_width / 10)
     if planned is None:
         laid, plane = _laid_track(constructions)
@@ -520,11 +557,11 @@ def draw_track(
     for piece, points in pieces:
         bed = width * (1.6 + 1.4 * (int(piece.width) - 1))
         if piece.bed == TrackBed.BRIDGE:
-            draw_list.add_polyline(points, shade(DECK), bed + width * 1.4, 0)
+            lines.append((points, shade(DECK), bed + width * 1.4))
         if piece.bed == TrackBed.TUNNEL:
-            draw_list.add_polyline(points, shade(TUNNEL), bed, 0)
+            lines.append((points, shade(TUNNEL), bed))
         else:
-            draw_list.add_polyline(points, shade(BALLAST), bed, 0)
+            lines.append((points, shade(BALLAST), bed))
     spacing = camera.cell_width * FLAT_DOUBLE_SPACING / 2
     lanes: dict[float, list[list[imgui.ImVec2]]] = {}
 
@@ -544,14 +581,15 @@ def draw_track(
         for side in sides:
             lane = points if not side else lane_of(index, side)
             if piece.maglev:
-                draw_list.add_polyline(lane, shade(GUIDEWAY_EDGE), width * 1.3, 0)
-                draw_list.add_polyline(lane, shade(GUIDEWAY), width * 0.9, 0)
+                lines.append((lane, shade(GUIDEWAY_EDGE), width * 1.3))
+                lines.append((lane, shade(GUIDEWAY), width * 0.9))
             else:
-                draw_list.add_polyline(lane, shade(RAIL), max(1.0, width * 0.5), 0)
+                lines.append((lane, shade(RAIL), max(1.0, width * 0.5)))
     for piece, points in pieces:
         if piece.electric and piece.bed != TrackBed.TUNNEL:
             lifted = [imgui.ImVec2(point.x, point.y - width * 1.2) for point in points]
-            draw_list.add_polyline(lifted, shade(WIRE), max(1.0, width * 0.35), 0)
+            lines.append((lifted, shade(WIRE), max(1.0, width * 0.35)))
+    return lines
 
 
 def _greyed(rgba: Rgba) -> int:

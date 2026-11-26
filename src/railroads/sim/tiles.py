@@ -30,6 +30,7 @@ year the lowest tiles.
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from enum import Enum
+from functools import cache
 from types import MappingProxyType
 
 from railroads.sim.clock import FIRST_RAILWAY_YEAR
@@ -321,6 +322,7 @@ def demand_step(tile: Tile, level: int) -> float:
     return DEMAND_STEPS[tile]
 
 
+@cache
 def supply_factor(tile: Tile, entry: int, level: int) -> float:
     """How many times its base a tile's goods are made at a supply level: its BASE_LEVELS, or the level
     it came at, makes its base, every level above adds its period's share and every level below
@@ -331,6 +333,7 @@ def supply_factor(tile: Tile, entry: int, level: int) -> float:
     return 1.0 + added - taken
 
 
+@cache
 def demand_factor(tile: Tile, entry: int, level: int) -> float:
     """How many times its base ordinary buyers want of a tile's goods at a demand level, from its
     BASE_LEVELS, or the level it came at."""
