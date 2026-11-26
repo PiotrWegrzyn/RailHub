@@ -772,7 +772,7 @@ MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
         BuildingKind.TEA_PLANTATION: {Good.TEA: 20},
         BuildingKind.CATTLE_RANCH: {Good.CATTLE: 2, Good.MILK: 20},
         BuildingKind.PIG_FARM: {Good.PIGS: 12},
-        BuildingKind.CHICKEN_FARM: {Good.CHICKENS: 10, Good.EGGS: 7.5},
+        BuildingKind.CHICKEN_FARM: {Good.CHICKENS: 6, Good.EGGS: 10},
         BuildingKind.FLAX_FIELD: {Good.FLAX: 60},
         BuildingKind.HOP_GARDEN: {Good.HOPS: 40},
         BuildingKind.SALT_CATHEDRAL: {Good.SALT: 200},

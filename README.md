@@ -534,7 +534,7 @@ window (H) lists the same.
 | Fish drying shed | 60 dried fish | 24 fish, 6 salt |  |
 | Cattle ranch | 2 cattle, 20 milk |  | 120 wheat (from farming demand 2) |
 | Pig farm | 12 pigs |  | 60 wheat (from farming demand 2) |
-| Chicken farm | 10 chickens, 7.5 eggs |  | 30 wheat (from farming demand 2) |
+| Chicken farm | 6 chickens, 10 eggs |  | 30 wheat (from farming demand 2) |
 | Sausage maker (1850) | 240 sausages | 96 meat, 48 salt |  |
 | Flax field | 60 flax |  |  |
 | Hop garden | 40 hops |  |  |
