@@ -198,7 +198,8 @@ def draw_money(finances: Finances) -> None:
 
 
 def draw_view_controls(view: MapView) -> None:
-    """The view's buttons, on the current line: zoom, the two minimaps and the search."""
+    """The view's buttons, on the current line: zoom, the two minimaps, the search and the growth
+    window."""
     camera, minimap = view.camera, view.minimap
     if imgui.button(f"{fa.ICON_FA_SEARCH_MINUS}"):
         camera.zoom(-1, (0, 0), (0, 0))
@@ -216,3 +217,6 @@ def draw_view_controls(view: MapView) -> None:
     imgui.same_line()
     if toggle_button(f"{fa.ICON_FA_SEARCH}", view.search.open, "Find buildings (F)"):
         view.toggle_search()
+    imgui.same_line(0, 4)
+    if toggle_button(f"{fa.ICON_FA_LEAF}", view.growth_window.open, "Growth: what may come up"):
+        view.toggle_growth()

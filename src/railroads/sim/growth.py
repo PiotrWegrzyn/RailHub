@@ -805,11 +805,26 @@ class Growth:
     def chances(self, ladder: Ladder = TOWNS) -> FloatArray:
         """Each cell's chance of a turn on the ladder this month, the player's buildings of its
         kinds raising it (Owners.chance_factor)."""
-        place = next(place for place in self._places if place.ladder == ladder)
+        place = self._place_of(ladder)
         cells = np.arange(place.chances.size)
         factor = self.owners.chance_factor(ladder.kinds)
         chances = place.chances if factor is None else place.chances * factor
         return np.where(self._meets_needs(place, cells), chances, 0.0).reshape(self._grid.shape)
+
+    def land_weights(self, ladder: Ladder) -> FloatArray:
+        """Each flat cell's weight for the ladder's land, none on land the player has not bought."""
+        return self._place_of(ladder).land
+
+    @property
+    def land_cells(self) -> int:
+        """How many cells of the map are land."""
+        return self._land_cells
+
+    def _place_of(self, ladder: Ladder) -> _Place:
+        for place in self._places:
+            if place.ladder is ladder:
+                return place
+        return next(place for place in self._places if place.ladder == ladder)
 
     def month(self, rng: np.random.Generator) -> set[Cell]:
         """Grows one month; returns the cells whose buildings changed."""
@@ -1002,12 +1017,12 @@ class Growth:
                 return joined
         if (
             ladder.land_cells_each is not None
-            and self._as_many_as_first(ladder) >= self._land_cells // ladder.land_cells_each
+            and self.as_many_as_first(ladder) >= self._land_cells // ladder.land_cells_each
         ):
             return set()
         if not self.ladder_allows(ladder, cell) or self._not_open(ladder, cell, rng):
             return set()
-        if not self._inputs_on_map(ladder):
+        if not self.inputs_on_map(ladder):
             return set()
         return self.room.scatter(cell, ladder, rng)
 
@@ -1057,9 +1072,9 @@ class Growth:
                 continue
             if self.rule.top_ups is not None and ladder.kinds[0] not in self.rule.top_ups:
                 continue
-            if self._as_many_as_first(ladder) >= self.least_of(ladder):
+            if self.as_many_as_first(ladder) >= self.least_of(ladder):
                 continue
-            if not self._inputs_on_map(ladder):
+            if not self.inputs_on_map(ladder):
                 continue
             cell = self._likeliest(place, rng)
             if cell is None:
@@ -1109,7 +1124,7 @@ class Growth:
             and new.space <= self.constructions.space_left(cell)
         )
 
-    def _as_many_as_first(self, ladder: Ladder) -> int:
+    def as_many_as_first(self, ladder: Ladder) -> int:
         """How many of a ladder's first kind its buildings on the map stand for, counting each
         merged one as all those merged into it."""
         stands_for = 1
@@ -1120,7 +1135,7 @@ class Growth:
             stands_for *= merge.pulled_down if merge is not None else 1
         return total
 
-    def _inputs_on_map(self, ladder: Ladder) -> bool:
+    def inputs_on_map(self, ladder: Ladder) -> bool:
         """Whether something on the map makes each main input of the ladder's first kind
         (inputs_of)."""
         inputs = inputs_of(ladder.kinds[0], self.year)

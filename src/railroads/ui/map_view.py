@@ -23,6 +23,7 @@ from railroads.sim.game import Game
 from railroads.sim.geo import Coord
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
+from railroads.sim.ladder_types import Ladder
 from railroads.sim.railway import Railway
 from railroads.sim.station_trade import StationPreview
 from railroads.sim.steps import Steps, finish
@@ -37,6 +38,7 @@ from railroads.ui.build_menu import (
 from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.buildings import dot_looks, draw_building_dots
 from railroads.ui.ground_picture import GroundLayout, GroundPictures, Pixels, cell_colors
+from railroads.ui.growth_window import GrowthWindow, draw_cell_odds, draw_legend
 from railroads.ui.hex_details import draw_hex_details, draw_shares
 from railroads.ui.hex_rows import HexDetails, recently_described
 from railroads.ui.iso_camera import LOOKS, PIXEL_CELL_WIDTH, ZOOM_CELL_WIDTHS, IsoCamera, Vec2
@@ -116,10 +118,12 @@ SPOT_WIDTH = 4.0
 
 
 class Lens(Enum):
-    """What the map can be tinted by: how satisfied buildings are, or which town they are in."""
+    """What the map can be tinted by: how satisfied buildings are, which town they are in, or
+    the chance of a kind of building coming up (railroads.ui.growth_window)."""
 
     SATISFACTION = "satisfaction"
     TOWNS = "towns"
+    GROWTH = "growth"
 
 
 @cache
@@ -243,6 +247,10 @@ class MapView:
         self.summaries = SummariesPanel()
         self.station_window = StationWindow()
         self.search = BuildingSearch()
+        # The growth window and the kind the growth lens shows (railroads.ui.growth_window).
+        self.growth_window = GrowthWindow()
+        # The top of the lens buttons on screen, which the growth lens's legend sits above.
+        self._lenses_top: float | None = None
         # The land around the map the player can buy (railroads.ui.land_offers).
         self.land = LandOffers()
         # The cells the tutorial wants clicked, marked on the map (railroads.ui.spotlight).
@@ -300,6 +308,8 @@ class MapView:
         )
         self.summaries.draw(*self._map_rect, self.look_at, self.railway.name_of)
         self.search.draw(self.growth, self.visit, self._view_center)
+        self.growth_window.draw(self.growth, self.visit, self._growth_picked)
+        self._draw_growth_legend()
         self.land.confirm(self.game.lots, self.game.finances)
 
     def _view_center(self) -> Vec2:
@@ -325,9 +335,41 @@ class MapView:
             self.search.open = True
             self.search.refresh(self.growth)
 
+    def toggle_growth(self) -> None:
+        self.growth_window.open = not self.growth_window.open
+
+    def _growth_picked(self) -> None:
+        """Turns the growth lens on for the kind just picked in the growth window."""
+        self.lens = Lens.GROWTH
+
+    def shows_growth(self) -> bool:
+        """Whether the growth lens is on."""
+        return self.lens == Lens.GROWTH
+
+    def _growth_lens(self) -> Ladder | None:
+        """The kind of building the growth lens shows, if it is on with one picked."""
+        return self.growth_window.ladder if self.lens == Lens.GROWTH else None
+
+    def _draw_growth_legend(self) -> None:
+        """The growth lens's scale over the map, above the lens buttons."""
+        ladder = self._growth_lens()
+        if ladder is None or self._lenses_top is None:
+            return
+        _, (right, _) = self._map_rect
+        imgui.set_next_window_pos(
+            (right - LENS_GAP, self._lenses_top - LENS_GAP), imgui.Cond_.always.value, (1.0, 1.0)
+        )
+        imgui.push_style_color(imgui.Col_.window_bg, imgui.ImVec4(*DEEP))
+        imgui.begin("##growthlegend", flags=OVERLAY_FLAGS | imgui.WindowFlags_.no_move.value)
+        imgui.pop_style_color()
+        frame_window()
+        draw_legend(ladder, self.growth_window.odds.tints(self.growth, ladder))
+        imgui.end()
+
     def close_windows(self) -> None:
         """Closes the windows over the map: trains, stations, a station's, a cell's details and
-        its shares, a month's summary and the search."""
+        its shares, a month's summary, the search and the growth window."""
+        self.growth_window.open = False
         self.build.trains.open = self.build.trains.buy.open = False
         self.build.stations.open = False
         self.station_window.station = None
@@ -370,6 +412,9 @@ class MapView:
                 if pressed is not None:
                     self.shares_of = (self.selected, pressed)
                     self._bought = ""
+                draw_cell_odds(
+                    self.growth, self.growth_window.odds, self.selected, self._growth_lens()
+                )
         if not still_open:
             self.selected = None
             self.shares_of = None
@@ -601,7 +646,7 @@ class MapView:
             if self._showing_moods()
             else self._town_tints()
             if self.lens == Lens.TOWNS
-            else None
+            else self._growth_tints()
         )
         if tints is not None and not self._draw_shaded_tints(
             draw_list, center, top_left, bottom_right, *tints
@@ -779,6 +824,7 @@ class MapView:
         imgui.push_style_color(imgui.Col_.border, imgui.ImVec4(0, 0, 0, 0))
         imgui.begin("##lenses", flags=flags)
         imgui.pop_style_color(2)
+        self._lenses_top = imgui.get_window_pos().y
         frame_window()
         with bar_buttons():
             self._draw_lens_buttons(self._minimap_span is not None)
@@ -788,7 +834,10 @@ class MapView:
         """The lens buttons side by side, sharing the window's width between them if `fill`, and
         showing only their icons where their names would not fit."""
         spacing = imgui.get_style().item_spacing.x
-        width = (imgui.get_content_region_avail().x - spacing) / 2 if fill else 0.0
+        count = len(Lens)
+        width = (
+            (imgui.get_content_region_avail().x - spacing * (count - 1)) / count if fill else 0.0
+        )
         buttons = (
             (
                 Lens.SATISFACTION,
@@ -801,6 +850,12 @@ class MapView:
                 fa.ICON_FA_USERS,
                 "Towns",
                 "Tint the land by town; passengers and mail only travel between towns",
+            ),
+            (
+                Lens.GROWTH,
+                fa.ICON_FA_LEAF,
+                "Growth",
+                "Tint the land by the chance of a kind of building coming up in a year",
             ),
         )
         padding = 2 * imgui.get_style().frame_padding.x
@@ -816,12 +871,22 @@ class MapView:
                 imgui.same_line()
             if toggle_button(label, self.lens == lens, tooltip, (width, 0)):
                 self.lens = None if self.lens == lens else lens
+                if self.lens == Lens.GROWTH and self.growth_window.ladder is None:
+                    self.growth_window.open = True
             spot(f"lens:{lens.value}")
 
     def _showing_moods(self) -> bool:
         """Whether the satisfaction lens is on, or Shift is held for it, not while typing."""
         io = imgui.get_io()
         return self.lens == Lens.SATISFACTION or (io.key_shift and not io.want_text_input)
+
+    def _growth_tints(self) -> tuple[npt.NDArray[np.intp], list[int]] | None:
+        """The growth lens's cells and tints, if it is on with a kind picked."""
+        ladder = self._growth_lens()
+        if ladder is None:
+            return None
+        tints = self.growth_window.odds.tints(self.growth, ladder)
+        return tints.cells, tints.colors
 
     def _town_tints(self) -> tuple[npt.NDArray[np.intp], list[int]]:
         """town_cells, worked out again only once the buildings changed."""
@@ -877,6 +942,8 @@ class MapView:
             text = with_legend(text, MOODS_LEGEND)
         elif self.lens == Lens.TOWNS:
             text = with_legend(text, TOWNS_LEGEND)
+        elif (ladder := self._growth_lens()) is not None:
+            text = with_legend(text, f"Growth: the chance of a {ladder.name} a year.")
         below = draw_status(draw_list, top_left, bottom_right, text)
         if self.hovered is None or over_minimap:
             return

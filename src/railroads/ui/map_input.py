@@ -1,6 +1,7 @@
 """The mouse and keys on the map view: dragging pans, the wheel zooms, a press without a
 drag is a click for the build tools (railroads.ui.map_tools), a right click picks a cell or
-station or cancels building, and letter keys open windows and choose tools."""
+station or cancels building, or with the growth lens on picks a cell to show its chances, and
+letter keys open windows and choose tools."""
 
 from typing import TYPE_CHECKING, Literal
 
@@ -117,6 +118,9 @@ class MapInput:
         if view.build.tool != Tool.NONE:
             view.build.choose(Tool.NONE)
             view.build.say("Building cancelled.")
+        elif hovered is not None and view.shows_growth():
+            view.selected = hovered
+            view.station_window.station = None
         elif hovered is not None and any(
             isinstance(built, Station) for built in view.constructions.at(hovered)
         ):
