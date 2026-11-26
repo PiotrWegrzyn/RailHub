@@ -1259,9 +1259,10 @@ class TrainsWindow:
 
 
 def general_wanted(general: General, held: Callable[[Good], float], demand: StationDemand) -> bool:
-    """Whether a general car would load something here the next stop wants: one of its goods
-    both waits here and is used there."""
-    return any(held(good) > 0 and demand.monthly_want(good) > 0 for good in GENERAL_GOODS[general])
+    """Whether a general car would load only what the next stop wants: some of its goods wait
+    here and the next stop uses every one of them."""
+    waiting = [good for good in GENERAL_GOODS[general] if held(good) > 0]
+    return bool(waiting) and all(demand.monthly_want(good) > 0 for good in waiting)
 
 
 def sort_offers(offers: list[Offer], demand: StationDemand, by_wanted: bool) -> list[Offer]:

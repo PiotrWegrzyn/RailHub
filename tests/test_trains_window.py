@@ -532,13 +532,14 @@ def test_hovering_a_car_on_a_trains_stops_shows_on_its_map_where_that_good_is_wa
 
 
 @pytest.mark.parametrize(
-    ("next_stop_wants", "wanted"), [({Need.COAL: 40.0}, False), ({Need.FOOD: 40.0}, True)]
+    ("next_stop_wants", "wanted"),
+    [({Need.COAL: 40.0}, False), ({Need.FISH: 40.0}, False), ({Need.FOOD: 40.0}, True)],
 )
-def test_a_general_food_car_is_wanted_only_where_the_next_stop_wants_food_waiting_here(
+def test_a_general_food_car_is_wanted_only_where_the_next_stop_wants_every_food_waiting_here(
     next_stop_wants: dict[Need, float], wanted: bool
 ) -> None:
     demand = StationDemand(capacity=next_stop_wants)
-    waiting = {Good.WHEAT: 30.0}
+    waiting = {Good.WHEAT: 30.0, Good.FISH: 10.0}
 
     shown = general_wanted(General.FOOD, lambda good: waiting.get(good, 0.0), demand)
 
