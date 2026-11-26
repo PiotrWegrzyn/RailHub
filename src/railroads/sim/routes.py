@@ -55,7 +55,7 @@ from railroads.sim.ownership import Owners
 from railroads.sim.railway import PLATFORM_REACH, Railway
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Relief, Terrain, Tile
-from railroads.sim.track_rules import TrackBed, track_rules_for
+from railroads.sim.track_rules import BRIDGES, Bridge, TrackBed, carries, track_rules_for
 
 # How much each building that must move aside adds to a cell's cost, against a cell of new
 # track on open flat land, and how much more for each unit of room it takes.
@@ -138,6 +138,33 @@ def _ground_of(tile: Tile) -> _Ground:
 _GROUNDS: dict[tuple[int, int], _Ground] = {}
 
 
+@dataclass(frozen=True, slots=True)
+class Bridging:
+    """How new track bridges: the kind of bridge the player picked, None to leave it to the
+    planner, and the kinds the player can build. Over rivers and lakes the picked kind, or the
+    cheapest that carries the track; over track a flyover only of a kind picked that goes over
+    track, else a level crossing."""
+
+    picked: Bridge | None = None
+    open: tuple[Bridge, ...] = tuple(Bridge)
+
+    def over_water(self, width: TrackWidth, electric: bool, maglev: bool) -> Bridge | None:
+        """The kind of bridge track of this width, electric or maglev takes over water, None if
+        none can carry it."""
+        kinds = (self.picked,) if self.picked is not None else self.open
+        return next((kind for kind in kinds if carries(kind, int(width), electric, maglev)), None)
+
+    @property
+    def flyover(self) -> Bridge | None:
+        """The kind of bridge new track crossing laid track goes over it on, if any."""
+        picked = self.picked
+        return picked if picked is not None and BRIDGES[picked].over_track else None
+
+
+# Bridging left to the planner with every kind of bridge open.
+ANY_BRIDGE = Bridging()
+
+
 def plan_route(
     constructions: Constructions,
     start: Cell,
@@ -145,10 +172,11 @@ def plan_route(
     width: TrackWidth = TrackWidth.SINGLE,
     electric: bool = False,
     maglev: bool = False,
+    bridging: Bridging = ANY_BRIDGE,
 ) -> Route | None:
-    """The cheapest track of this width, electric, maglev or neither, from `start` to `end`, or
-    None if there is no way."""
-    return finish(plan_route_steps(constructions, start, end, width, electric, maglev))
+    """The cheapest track of this width, electric, maglev or neither, from `start` to `end`,
+    bridging as asked, or None if there is no way."""
+    return finish(plan_route_steps(constructions, start, end, width, electric, maglev, bridging))
 
 
 def plan_route_steps(
@@ -158,13 +186,15 @@ def plan_route_steps(
     width: TrackWidth = TrackWidth.SINGLE,
     electric: bool = False,
     maglev: bool = False,
+    bridging: Bridging = ANY_BRIDGE,
 ) -> Steps[Route | None]:
     """plan_route in steps of about PLAN_STEP cells searched, which a caller can spread over
     frames; the constructions mustn't change between them."""
     if start == end:
         return None
     electric = electric and not maglev
-    route = yield from _Planner(constructions, start, end, width, electric, maglev).plan()
+    planner = _Planner(constructions, start, end, width, electric, maglev, bridging)
+    route = yield from planner.plan()
     if route is None or not route.pieces:
         return route
     start_side = _side_station(constructions, route, route.pieces[0], start)
@@ -174,7 +204,7 @@ def plan_route_steps(
     start, end = start_side or start, end_side or end
     if start == end:
         return route
-    into = yield from _Planner(constructions, start, end, width, electric, maglev).plan()
+    into = yield from _Planner(constructions, start, end, width, electric, maglev, bridging).plan()
     return route if into is None else into
 
 
@@ -517,6 +547,7 @@ class _Planner:
     width: TrackWidth
     electric: bool
     maglev: bool
+    bridging: Bridging = field(default_factory=Bridging)
     _costs: dict[Cell, float | None] = field(default_factory=dict, init=False)
     _reach: float = field(default=0.0, init=False)
     _centers: tuple[tuple[float, float], tuple[float, float]] = field(init=False)
@@ -529,8 +560,11 @@ class _Planner:
     # running straight through it and out of one end, and comes into the last by one end.
     _ways_out: tuple[int, ...] = field(default=(), init=False)
     _ways_in: tuple[int, ...] = field(default=(), init=False)
+    # The kind of bridge the route crosses rivers and lakes on, None if none can carry it.
+    _water_bridge: Bridge | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
+        self._water_bridge = self.bridging.over_water(self.width, self.electric, self.maglev)
         grid = self.constructions.tile_map.grid
         start, end = grid.center(*self.start), grid.center(*self.end)
         self._reach = math.dist(start, end) + DETOUR_CELLS  # type: ignore[arg-type]
@@ -737,7 +771,9 @@ class _Planner:
     def _cell_cost(self, cell: Cell) -> float | None:
         """What new track in the cell costs the planner, or None where none can go."""
         if cell not in self._costs:
-            factor = self._ground(self._number(cell))[2]
+            bed, _, factor = self._ground(self._number(cell))
+            if bed == TrackBed.BRIDGE and self._water_bridge is None:
+                factor = None
             if factor is None:
                 self._costs[cell] = None
             else:
@@ -834,10 +870,12 @@ class _Planner:
                 ends = (entry, join) if join is not None else self._loose_end(cell, entry, bed)
             else:
                 ends = (entry, exit_point)
-            piece = Track(cell, ends, self.width, bed, self.electric, self.maglev)
+            piece = self._piece(cell, ends, bed)
             old = constructions.track_between(cell, ends)
             if old is None and joined is not None:
                 old = _dead_end(constructions, cell, joined, piece.ends)
+            if old is None:
+                piece = self._over_track(piece)
             if old is not None:
                 piece = _merged(piece, old)
                 if piece != old:
@@ -851,6 +889,23 @@ class _Planner:
                 if way is not None:
                     turns[grid.track_exit(piece.cell, point)[0]] = way
         return Route([cell for cell, _, _ in steps], pieces, cost, replaces, turns)
+
+    def _piece(self, cell: Cell, ends: tuple[int, int], bed: TrackBed) -> Track:
+        """New track of the route's kind in a cell, on its bridge over water."""
+        bridge = self._water_bridge if bed == TrackBed.BRIDGE else None
+        return Track(cell, ends, self.width, bed, self.electric, self.maglev, bridge or Bridge.WOOD)
+
+    def _over_track(self, piece: Track) -> Track:
+        """The piece on a flyover over the track in its cell, if the player picked a bridge that
+        goes over track and it would cross that track without joining it."""
+        bridge = self.bridging.flyover
+        if bridge is None or piece.bed != TrackBed.GROUND:
+            return piece
+        flyover = replace(piece, bed=TrackBed.BRIDGE, bridge=bridge)
+        under = self.constructions.track_at(piece.cell)
+        if under and self.constructions.why_not(flyover) is None:
+            return flyover
+        return piece
 
     def _loose_end(self, cell: Cell, joined: int, bed: TrackBed) -> tuple[int, int]:
         """The ends of the piece at an open end of a route: from the point it joins by, out the
@@ -867,7 +922,7 @@ class _Planner:
         for point in [straight, *others]:
             if turns[point] > MAX_TURN_DEG + TURN_SLACK_DEG:
                 continue
-            piece = Track(cell, (joined, point), self.width, bed, self.electric, self.maglev)
+            piece = self._piece(cell, (joined, point), bed)
             laid = constructions.track_between(cell, piece.ends) is not None
             if laid or constructions.why_not(piece) in (None, crowded):
                 return piece.ends
@@ -966,9 +1021,10 @@ def _merged(piece: Track, old: Track) -> Track:
         piece.cell,
         piece.ends,
         max(piece.width, old.width),
-        piece.bed,
+        old.bed,
         (piece.electric or old.electric) and not maglev,
         maglev,
+        max(piece.bridge, old.bridge) if old.bed == TrackBed.BRIDGE else old.bridge,
     )
 
 

@@ -88,6 +88,7 @@ class MapTools:
                     build.electric,
                     build.maglev,
                     planned,
+                    build.bridge,
                 )
                 if not self._said(done):
                     return
@@ -275,6 +276,8 @@ class MapTools:
             build.track_width,
             build.electric,
             build.maglev,
+            build.bridge,
+            build.bridges_open,
             self._view.constructions.version,
         )
 
@@ -302,6 +305,7 @@ class MapTools:
                     build.track_width,
                     build.electric,
                     build.maglev,
+                    self._view.game.bridging(build.bridge),
                 )
                 self._planning = wanted, steps
             route = _work_on(self._planning[1], PREVIEW_STEP_S)

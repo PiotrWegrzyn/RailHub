@@ -67,7 +67,7 @@ def storage_price(upgrades: int) -> float:
 
 def track_price(piece: Track, tile: Tile) -> float:
     """What laying this piece of track in this cell costs."""
-    bed = TRACK_PRICE * track_rules_for(tile, piece.bed).price_factor
+    bed = TRACK_PRICE * track_rules_for(tile, piece.bed, piece.bridge).price_factor
     guideway = MAGLEV_TRACK_PRICE if piece.maglev else 0.0
     wires = (ELECTRIC_TRACK_FACTOR - 1.0) * bed * int(piece.width) if piece.electric else 0.0
     return (bed + guideway) * TRACK_WIDTH_FACTORS[piece.width] + wires

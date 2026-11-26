@@ -309,11 +309,19 @@ def _star(middle: imgui.ImVec2, radius: float) -> list[imgui.ImVec2]:
 def _draw_sign(
     draw_list: imgui.ImDrawList, perk: Perk, middle: imgui.ImVec2, radius: float, ink: int
 ) -> None:
-    """A level's sign inside its mark: a star for new buyers, an engine for a new one for sale,
-    a wagon for an era."""
+    """A level's sign inside its mark: a star for new buyers, an arched bridge for a new kind
+    of bridge, an engine for a new one for sale, a wagon for an era."""
     x, y, r = middle.x, middle.y, radius
     if perk == Perk.BUYERS:
         draw_list.add_concave_poly_filled(_star(middle, r * 1.15), ink)
+        return
+    if perk == Perk.BRIDGE:
+        thick = max(1.0, r * 0.3)
+        draw_list.add_rect_filled((x - r, y - r * 0.55), (x + r, y - r * 0.55 + thick), ink)
+        for px in (x - r * 0.85, x + r * 0.85 - thick):
+            draw_list.add_rect_filled((px, y - r * 0.55), (px + thick, y + r * 0.8), ink)
+        draw_list.path_arc_to((x, y + r * 0.8), r * 0.55, math.pi, 2 * math.pi, 12)
+        draw_list.path_stroke(ink, 0, thick)
         return
     wheel = max(1.0, r * 0.28)
     if perk == Perk.ENGINE:

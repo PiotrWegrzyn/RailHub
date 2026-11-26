@@ -15,7 +15,7 @@ from railroads.sim.constructions import (
 )
 from railroads.sim.grids import Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Terrain, TileMap
-from railroads.sim.track_rules import TrackBed
+from railroads.sim.track_rules import Bridge, TrackBed
 
 LEGEND = {
     ".": (Terrain.LAND, Relief.FLAT),
@@ -91,14 +91,16 @@ def test_track_on_the_ground_needs_land_off_the_mountains(cells: str, problem: s
     [
         (".r.", None),
         (".l.", None),
-        (".s.", "Bridges go over rivers and lakes"),
-        ("...", "Bridges go over rivers and lakes"),
+        (".s.", "Bridges go over rivers, lakes and track"),
+        ("...", "A stone bridge goes only over rivers and lakes"),
     ],
 )
-def test_bridges_go_over_rivers_and_lakes(cells: str, problem: str | None) -> None:
+def test_stone_bridges_go_over_rivers_and_lakes(cells: str, problem: str | None) -> None:
     constructions = Constructions(make_map(cells))
 
-    found = constructions.why_not(Track((0, 1), (0, 6), TrackWidth.DOUBLE, TrackBed.BRIDGE))
+    found = constructions.why_not(
+        Track((0, 1), (0, 6), TrackWidth.DOUBLE, TrackBed.BRIDGE, bridge=Bridge.STONE)
+    )
 
     assert found == problem
 

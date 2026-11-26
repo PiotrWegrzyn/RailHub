@@ -13,7 +13,7 @@ from enum import Enum, IntEnum
 from railroads.sim.grids import Cell
 from railroads.sim.move import Move
 from railroads.sim.tilemap import Relief, Terrain, Tile, TileMap
-from railroads.sim.track_rules import TrackBed, track_rules_for
+from railroads.sim.track_rules import BRIDGES, Bridge, TrackBed, carries, track_rules_for
 
 CELL_SPACE = 6
 MAX_TURN_DEG = 60.0
@@ -466,7 +466,9 @@ class Track:
     """A piece of track inside one cell, between two of its track points; it joins the pieces
     in the cells those points lead to (see `Grid.track_exit`). Electric track has overhead
     wires along it, which electric engines need. Maglev track is a concrete guideway instead of
-    rails: only maglev engines run on it, and they run on nothing else."""
+    rails: only maglev engines run on it, and they run on nothing else. Track on a bridge is
+    carried by a bridge of its `bridge` kind; a bridge on land is a flyover over the track in its
+    cell, which it never joins."""
 
     cell: Cell
     ends: tuple[int, int]
@@ -474,6 +476,7 @@ class Track:
     bed: TrackBed = TrackBed.GROUND
     electric: bool = False
     maglev: bool = False
+    bridge: Bridge = Bridge.WOOD
 
     def __post_init__(self) -> None:
         start, end = sorted(self.ends)
@@ -862,8 +865,13 @@ class Constructions:
             return "Track runs across edges, or straight up and down through corners"
         if grid.track_turn(start, end) > MAX_TURN_DEG + TURN_SLACK_DEG:
             return f"Track can turn at most {MAX_TURN_DEG:g} degrees in one cell"
-        if (problem := self._bed_problem(track.cell, track.bed)) is not None:
+        if (problem := self._bed_problem(track.cell, track.bed, track.bridge)) is not None:
             return problem
+        if track.bed == TrackBed.BRIDGE and (problem := self._bridge_problem(track)) is not None:
+            return problem
+        flyovers = [piece for piece in self.track_at(track.cell) if self.is_flyover(piece)]
+        if any(not set(piece.ends).isdisjoint(track.ends) for piece in flyovers):
+            return "Track cannot join a flyover inside its cell"
         for point in track.ends:
             beyond = grid.track_exit(track.cell, point)[0]
             if not grid.contains(*beyond):
@@ -871,22 +879,54 @@ class Constructions:
             if self.tile_map.is_locked(beyond):
                 return LOCKED
             for side in grid.track_flanks(track.cell, point):
-                if self._bed_problem(side, track.bed) is not None:
+                if self._bed_problem(side, track.bed, track.bridge) is not None:
                     return "Track through a corner needs the cells on both sides to take it"
         if self.track_between(track.cell, track.ends) is not None:
             return "There is track between those points already"
         return None
 
-    def _bed_problem(self, cell: Cell, bed: TrackBed) -> str | None:
+    def is_flyover(self, track: Track) -> bool:
+        """Whether a piece of track is a flyover: on a bridge over land."""
+        return (
+            track.bed == TrackBed.BRIDGE and self.tile_map.tile(track.cell).terrain == Terrain.LAND
+        )
+
+    def _bridge_problem(self, track: Track) -> str | None:
+        """Why a piece of track can't go on its bridge: one that can't carry it, or a flyover
+        through a corner, or with no track under it to cross, or joining it."""
+        kind = BRIDGES[track.bridge]
+        if not carries(track.bridge, int(track.width), track.electric, track.maglev):
+            if int(track.width) > kind.tracks:
+                most = "one track" if kind.tracks == 1 else f"{kind.tracks} tracks"
+                return f"A {kind.name} bridge carries at most {most}"
+            needs = "maglev guideway" if track.maglev else "overhead wires"
+            return f"A {kind.name} bridge can't take a {needs}"
+        if not self.is_flyover(track):
+            return None
+        grid = self.tile_map.grid
+        if any(point not in grid.track_ends() for point in track.ends):
+            return "A flyover runs across edges, not through corners"
+        under = self.track_at(track.cell)
+        if not under or self.is_stop(track.cell):
+            return "A flyover goes over track"
+        if any(not set(piece.ends).isdisjoint(track.ends) for piece in under):
+            return "A flyover crosses the track under it without joining it"
+        if any(self.is_flyover(piece) for piece in under):
+            return "There is a flyover here already"
+        return None
+
+    def _bed_problem(self, cell: Cell, bed: TrackBed, bridge: Bridge = Bridge.WOOD) -> str | None:
         if not self.tile_map.grid.contains(*cell):
             return "That is off the map"
         if self.tile_map.is_locked(cell):
             return LOCKED
         tile = self.tile_map.tile(cell)
-        if track_rules_for(tile, bed).can_build:
+        if track_rules_for(tile, bed, bridge).can_build:
             return None
         if bed == TrackBed.BRIDGE:
-            return "Bridges go over rivers and lakes"
+            if tile.terrain == Terrain.LAND and not BRIDGES[bridge].over_track:
+                return f"A {BRIDGES[bridge].name} bridge goes only over rivers and lakes"
+            return "Bridges go over rivers, lakes and track"
         if bed == TrackBed.TUNNEL:
             return "Tunnels go through mountains"
         if tile.terrain == Terrain.SEA:

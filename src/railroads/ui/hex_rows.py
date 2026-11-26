@@ -29,6 +29,7 @@ from railroads.sim.ledger import Takings
 from railroads.sim.ownership import CONTROL, HOLD_MONTHS, LOT, LOTS, SHARES
 from railroads.sim.points import Points
 from railroads.sim.tilemap import Deposit, TileMap
+from railroads.sim.track_rules import bed_name
 from railroads.sim.trade import Satisfaction, Trade
 from railroads.sim.yearly import bonus_of, boosts_of, demands_of, makes_of
 from railroads.ui.biomes import biome_of
@@ -395,9 +396,12 @@ def _other(construction: Construction, growth: Growth) -> str:
             kind = (
                 ", maglev" if construction.maglev else ", electric" if construction.electric else ""
             )
-            return (
-                f"track ({construction.width.name.lower()}, {construction.bed.name.lower()}{kind})"
+            bed = bed_name(
+                construction.bed,
+                construction.bridge,
+                growth.constructions.is_flyover(construction),
             )
+            return f"track ({construction.width.name.lower()}, {bed}{kind})"
     return str(construction)
 
 

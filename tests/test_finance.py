@@ -3,7 +3,7 @@ import pytest
 from railroads.sim.constructions import Track, TrackWidth
 from railroads.sim.finance import START_CASH, Finances, track_price, track_upkeep
 from railroads.sim.tilemap import Relief, Temperature, Terrain, Tile, Vegetation
-from railroads.sim.track_rules import TrackBed
+from railroads.sim.track_rules import Bridge, TrackBed
 from railroads.words import dollars
 
 FLAT = Tile(Terrain.LAND, Vegetation.GRASS, Temperature.NORMAL, 0, Relief.FLAT)
@@ -47,7 +47,11 @@ def test_money_shows_in_whole_dollars(amount: float, shown: str) -> None:
         (Track((0, 0), (0, 6), TrackWidth.DOUBLE, electric=True), FLAT, 6600),
         (Track((0, 0), (0, 6), TrackWidth.QUADRUPLE), FLAT, 6000),
         (Track((0, 0), (0, 6), TrackWidth.QUADRUPLE, electric=True), FLAT, 15_600),
-        (Track((0, 0), (0, 6), TrackWidth.DOUBLE, TrackBed.BRIDGE), RIVER, 60_000),
+        (
+            Track((0, 0), (0, 6), TrackWidth.DOUBLE, TrackBed.BRIDGE, bridge=Bridge.STONE),
+            RIVER,
+            90_000,
+        ),
     ],
 )
 def test_double_track_costs_more_and_electric_track_more_again(

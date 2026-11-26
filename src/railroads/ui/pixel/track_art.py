@@ -12,6 +12,7 @@ climbs smoothly and keeps its tracks apart however steep the climb, and the lift
 it covers is kept, so the map can hide it behind raised ground in front of it
 (railroads.ui.pixel.world)."""
 
+import bisect
 import itertools
 import math
 from collections.abc import Sequence
@@ -26,7 +27,7 @@ from railroads.sim.constructions import Constructions, Track, TrackWidth
 from railroads.sim.grids import Cell, FloatArray, Grid
 from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Relief, TileMap
-from railroads.sim.track_rules import TrackBed
+from railroads.sim.track_rules import Bridge, TrackBed
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
 from railroads.ui.pixel.art.painter import PLATFORM, PLATFORM_EDGE
 from railroads.ui.pixel.projection import RGB, Path, PixelProjection, Point
@@ -108,9 +109,22 @@ GRAVEL: RGB = (98, 90, 80)
 SLEEPER: RGB = (46, 30, 20)
 RAIL: RGB = (238, 236, 230)
 RAIL_UNDER: RGB = (24, 22, 20)
-BRIDGE_DECK: RGB = (126, 86, 50)
-BRIDGE_SHADOW: RGB = (62, 42, 26)
-RAILING: RGB = (70, 48, 30)
+# Each kind of bridge's deck, the darker edge round it, its sides and how many art pixels wide
+# they are.
+BRIDGE_LOOKS: dict[Bridge, tuple[RGB, RGB, RGB, int]] = {
+    Bridge.WOOD: ((126, 86, 50), (62, 42, 26), (70, 48, 30), 1),
+    Bridge.STONE: ((150, 142, 128), (86, 80, 72), (118, 110, 98), 2),
+    Bridge.STEEL: ((84, 80, 78), (44, 40, 38), (150, 62, 44), 2),
+    Bridge.CONCRETE: ((204, 200, 192), (126, 122, 116), (170, 166, 158), 2),
+}
+# How far apart the braces across a steel bridge lie, in cells; how far down and right of a
+# flyover its shadow falls, in cells, and how dark it is from 0 to 255; how wide the earth of the
+# ramp up to it is, in cells, and its colour.
+GIRDER_BRACE = 0.05
+FLYOVER_SHADOW = 0.025
+FLYOVER_SHADE = 90
+RAMP_WIDTH = 0.11
+RAMP_EARTH: RGB = (150, 124, 88)
 PORTAL_STONE: RGB = (118, 112, 104)
 PORTAL_LIT: RGB = (168, 160, 148)
 PORTAL_EDGE: RGB = (58, 54, 50)
@@ -769,6 +783,32 @@ class TrackArt:
             drawn.append((each, line, lanes, lifts))
             if raise_up:
                 self._measure(measure, each, line, lanes, lifts, cell, s)
+        is_flyover = self.constructions.is_flyover
+        under = [item for item in drawn if not is_flyover(item[0].piece)]
+        over = [item for item in drawn if is_flyover(item[0].piece)]
+        self._lay_level(paint, shade, under, cell, wide, s, smoothing, thin_rails)
+        for _, _, lanes, lifts in over:
+            spread = (_lane_spread(lanes, cell) + BRIDGE_WIDTH / 2) * cell
+            middle = lanes[0] if len(lanes) == 1 else _middle(lanes)
+            cast = [(x + FLYOVER_SHADOW * cell, y + FLYOVER_SHADOW * cell) for x, y in middle]
+            paint.polygon(_raised_strip(cast, lifts, spread), fill=(0, 0, 0, FLYOVER_SHADE))
+        self._lay_level(paint, shade, over, cell, wide, s, smoothing, thin_rails)
+
+    def _lay_level(
+        self,
+        paint: Canvas,
+        shade: Canvas,
+        drawn: list[tuple[_Laid, Path, list[Path], list[float]]],
+        cell: float,
+        wide: float,
+        s: int,
+        smoothing: int,
+        thin_rails: bool,
+    ) -> None:
+        """Draws pieces laid out flat on the picture with how far each point is lifted: their
+        shadow, the bridges under them, the earth of the ramps up to flyovers, banks, beds,
+        sleepers, rails, tunnel portals and wires. Track on the ground and its flyovers are each
+        drawn so, the flyovers after, over the track they cross."""
         ground = [item for item in drawn if item[0].piece.bed != TrackBed.TUNNEL]
         for each, _, lanes, lifts in ground:
             half = (BRIDGE_WIDTH if each.piece.bed == TrackBed.BRIDGE else BANK) / 2
@@ -776,7 +816,12 @@ class TrackArt:
                 shade.polygon(_raised_strip(lane, lifts, (half + SHADOW_REACH) * wide), fill=255)
         for each, _, lanes, lifts in drawn:
             if each.piece.bed == TrackBed.BRIDGE:
-                self._lay_deck(paint, lanes, lifts, cell, s)
+                self._lay_deck(paint, lanes, lifts, cell, s, each.piece.bridge)
+        for each, _, lanes, lifts in ground:
+            if each.piece.bed == TrackBed.GROUND and self._ramp(each.piece):
+                for lane in lanes:
+                    ramp = _raised_strip(lane, lifts, RAMP_WIDTH / 2 * wide)
+                    paint.polygon(ramp, fill=(*RAMP_EARTH, 255))
         for each, _, lanes, lifts in ground:
             if each.piece.bed == TrackBed.GROUND:
                 for lane in lanes:
@@ -1231,16 +1276,42 @@ class TrackArt:
         lifts: list[float],
         cell: float,
         s: int,
+        bridge: Bridge = Bridge.WOOD,
     ) -> None:
-        """A timber deck under the tracks with a railing along each side."""
+        """A deck under the tracks with a side along each edge, looking like what the bridge is
+        built of (BRIDGE_LOOKS): timber with a thin railing, stone with a parapet, steel with
+        red girders braced across, or pale concrete with a low wall."""
+        deck_colour, edge_colour, side_colour, side_width = BRIDGE_LOOKS[bridge]
         spread = (_lane_spread(lanes, cell) + BRIDGE_WIDTH / 2) * cell
         middle = lanes[0] if len(lanes) == 1 else _middle(lanes)
         deck = _raised_strip(middle, lifts, spread + 0.03 * cell)
-        paint.polygon(deck, fill=(*BRIDGE_SHADOW, 255))
-        paint.polygon(_raised_strip(middle, lifts, spread), fill=(*BRIDGE_DECK, 255))
+        paint.polygon(deck, fill=(*edge_colour, 255))
+        paint.polygon(_raised_strip(middle, lifts, spread), fill=(*deck_colour, 255))
+        if bridge == Bridge.STEEL:
+            lengths = _lengths(middle)
+            along = GIRDER_BRACE * cell
+            while along < lengths[-1]:
+                (x, y), (dx, dy) = _point_at(middle, lengths, along)
+                lift = lifts[min(len(lifts) - 1, bisect.bisect(lengths, along))]
+                brace = [
+                    (x - dy * spread, y + dx * spread - lift),
+                    (x + dy * spread, y - dx * spread - lift),
+                ]
+                paint.line(brace, fill=(*side_colour, 255), width=s, joint="curve")
+                along += GIRDER_BRACE * cell
         for side in (-spread, spread):
             railing = _raised(_offset(middle, side), lifts)
-            paint.line(railing, fill=(*RAILING, 255), width=s, joint="curve")
+            paint.line(railing, fill=(*side_colour, 255), width=side_width * s, joint="curve")
+
+    def _ramp(self, piece: Track) -> bool:
+        """Whether a piece of track runs up onto a flyover in the cell beside it."""
+        grid = self.tile_map.grid
+        for point in piece.ends:
+            beyond, entry = grid.track_exit(piece.cell, point)
+            for other in self._track_at(beyond):
+                if entry in other.ends and self.constructions.is_flyover(other):
+                    return True
+        return False
 
     def _lay_platform(
         self,

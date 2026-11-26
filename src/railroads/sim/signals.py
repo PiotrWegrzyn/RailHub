@@ -132,6 +132,17 @@ class Blocks:
             cell: "junction" if len(here) > 1 else here[0].width.name.lower()
             for cell, here in pieces.items()
         }
+        # The ways across each cell with a flyover, by whether they run over it or under it:
+        # trains on one never hold up trains on the other.
+        self.levels: dict[Cell, dict[frozenset[Point], bool]] = {}
+        for cell, here in pieces.items():
+            if len(here) > 1 and any(constructions.is_flyover(piece) for piece in here):
+                self.levels[cell] = {
+                    frozenset(point(cell, end) for end in piece.ends): constructions.is_flyover(
+                        piece
+                    )
+                    for piece in here
+                }
         kind = kinds.__getitem__
 
         # Whether each cell is plain double track, and the pairs of points its double track
@@ -279,7 +290,13 @@ class Blocks:
         tracks of quadruple track, keep apart: on double or quadruple track going opposite ways,
         or on quadruple track going the same way on different tracks; through a junction of
         quadruple track also where they come together or part, the one on the side its tracks
-        that way lie on taking the outer one (_branches_apart)."""
+        that way lie on taking the outer one (_branches_apart); and wherever one runs over a
+        flyover and the other under it."""
+        levels = self.levels.get(cell)
+        if levels is not None:
+            over = levels.get(frozenset(one)), levels.get(frozenset(other))
+            if None not in over and over[0] != over[1]:
+                return True
         if one == other:
             return lanes[0] != lanes[1] and (cell in self.four_lanes or self._laned(cell, one))
         if one[0] == other[1] and one[1] == other[0]:

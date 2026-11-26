@@ -98,6 +98,7 @@ from railroads.sim.stats import History
 from railroads.sim.tilemap import TileMap
 from railroads.sim.tiles import Tiles
 from railroads.sim.track_network import TrackNetwork
+from railroads.sim.track_rules import Bridge
 from railroads.sim.trade import COLLECTION_RADIUS, DELIVERY_RADIUS, Trade
 from railroads.sim.train_names import train_titles
 from railroads.sim.trains import (
@@ -288,6 +289,11 @@ class Railway:
     def electric_open(self) -> bool:
         """Whether the player can lay electric track: once an electric engine is open."""
         return any(ENGINES[name].electric and self.engine_open(name) for name in ENGINES)
+
+    @property
+    def bridges_open(self) -> tuple[Bridge, ...]:
+        """The kinds of bridge the player can build now, oldest first (tiles.BRIDGES_OPENED_BY)."""
+        return tuple(bridge for bridge in Bridge if boards.bridge_open(bridge, self.year))
 
     def engines(self) -> list[str]:
         """The engines the player can buy now: those whose supply tile has reached its level

@@ -20,7 +20,7 @@ from railroads.sim.railway import Railway
 from railroads.sim.reach import LOCAL_REACH
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.towns import Towns
-from railroads.sim.track_rules import TrackBed
+from railroads.sim.track_rules import TrackBed, bed_name
 from railroads.sim.trade import HALF_SATISFIED, Satisfaction, Trade
 from railroads.sim.yearly import makes_of, needs_of
 from railroads.ui.biomes import biome_of
@@ -359,13 +359,13 @@ def _built_note(constructions: Constructions, cell: Cell) -> str:
     built = constructions.at(cell)
     if not built:
         return ""
-    counts = Counter(_construction_name(construction) for construction in built)
+    counts = Counter(_construction_name(construction, constructions) for construction in built)
     listed = ", ".join(times_over(name, n) for name, n in counts.items())
     left = constructions.space_left(cell)
     return f"; {listed}, " + (f"room for {left} more" if left else "full")
 
 
-def _construction_name(construction: Construction) -> str:
+def _construction_name(construction: Construction, constructions: Constructions) -> str:
     match construction:
         case Building():
             return construction.kind.value
@@ -374,7 +374,12 @@ def _construction_name(construction: Construction) -> str:
         case Annex():
             return construction.facility.value
         case Track():
-            bed = "" if construction.bed == TrackBed.GROUND else f" {construction.bed.name.lower()}"
+            over = constructions.is_flyover(construction)
+            bed = (
+                ""
+                if construction.bed == TrackBed.GROUND
+                else f" on a {bed_name(construction.bed, construction.bridge, over)}"
+            )
             kind = (
                 " maglev" if construction.maglev else " electric" if construction.electric else ""
             )

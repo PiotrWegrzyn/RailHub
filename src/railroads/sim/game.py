@@ -42,7 +42,8 @@ from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
 from railroads.sim.summaries import MonthSummary, Reach, summarize
 from railroads.sim.tilemap import TileMap
-from railroads.sim.tiles import Tiles, activate
+from railroads.sim.tiles import Tiles, activate, bridge_opened_from
+from railroads.sim.track_rules import BRIDGES, Bridge
 from railroads.words import dollars, either
 
 
@@ -260,19 +261,26 @@ class Game:
         electric: bool = False,
         maglev: bool = False,
         planned: routes.Route | None = None,
+        bridge: Bridge | None = None,
     ) -> Outcome:
         """Lays track from `start` to `end`: the route `planned` for it already, if it was
-        planned with these choices since anything was last built, else the cheapest."""
+        planned with these choices since anything was last built, else the cheapest, on bridges
+        of the kind picked, or the cheapest open one with None (routes.Bridging)."""
         if maglev and not self.railway.maglev_open:
             return Outcome("Maglev track needs a maglev engine on sale.")
         if electric and not self.railway.electric_open:
             return Outcome("Electric track needs an electric engine on sale.")
         if width == TrackWidth.QUADRUPLE and not self.railway.quadruple_open:
             return Outcome(f"Quadruple track comes with era {QUADRUPLE_ERA}.")
+        if bridge is not None and bridge not in self.railway.bridges_open:
+            opened = bridge_opened_from(bridge)
+            return Outcome(f"A {BRIDGES[bridge].name} bridge comes with {opened}.")
         route = (
             planned
             if planned is not None
-            else routes.plan_route(self.constructions, start, end, width, electric, maglev)
+            else routes.plan_route(
+                self.constructions, start, end, width, electric, maglev, self.bridging(bridge)
+            )
         )
         if route is None:
             return Outcome("No way for track to get there.")
@@ -290,6 +298,10 @@ class Game:
             else "That track is laid already."
         )
         return Outcome(message + self._angered(quote), changed, ok=True)
+
+    def bridging(self, bridge: Bridge | None = None) -> routes.Bridging:
+        """How new track bridges with this kind of bridge picked, None for the cheapest open."""
+        return routes.Bridging(bridge, self.railway.bridges_open)
 
     def bulldoze(self, cell: Cell) -> Outcome:
         finances = self.finances

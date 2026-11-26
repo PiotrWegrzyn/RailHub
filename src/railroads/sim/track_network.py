@@ -18,7 +18,7 @@ import numpy as np
 
 from railroads.sim.constructions import Constructions, Station, Track, TrackWidth
 from railroads.sim.grids import Cell, Grid
-from railroads.sim.track_rules import track_rules_for
+from railroads.sim.track_rules import RAMP_RULES, track_rules_for
 from railroads.sim.trains import Point, Train
 
 # A route: the points along it and the speed on each stretch between them.
@@ -583,11 +583,31 @@ class TrackNetwork:
         return found
 
     def _find_speed(self, cell: Cell) -> float:
-        tile = self.constructions.tile_map.tile(cell)
-        pieces = [b for b in self.constructions.at(cell) if isinstance(b, Track)]
+        """How fast trains run through a cell: by its track's bed, the track under a flyover
+        keeping its own, and no faster than up a ramp next to a flyover."""
+        constructions = self.constructions
+        tile = constructions.tile_map.tile(cell)
+        pieces = [b for b in constructions.at(cell) if isinstance(b, Track)]
         if not pieces:
             return 1.0
-        return max(0.2, track_rules_for(tile, pieces[0].bed).speed_factor)
+        under = [piece for piece in pieces if not constructions.is_flyover(piece)] or pieces
+        speed = min(track_rules_for(tile, piece.bed, piece.bridge).speed_factor for piece in under)
+        if self._ramp(cell, pieces):
+            speed = min(speed, RAMP_RULES.speed_factor)
+        return max(0.2, speed)
+
+    def _ramp(self, cell: Cell, pieces: list[Track]) -> bool:
+        """Whether track in the cell leads up onto a flyover in the cell beside it."""
+        constructions = self.constructions
+        for piece in pieces:
+            for point in piece.ends:
+                beyond, entry = self._track_exit(cell, point)
+                if any(
+                    entry in other.ends and constructions.is_flyover(other)
+                    for other in constructions.track_at(beyond)
+                ):
+                    return True
+        return False
 
     def _burn(self, cell: Cell) -> float:
         burns = self._memo().burns
@@ -601,7 +621,7 @@ class TrackNetwork:
         pieces = [b for b in self.constructions.at(cell) if isinstance(b, Track)]
         if not pieces:
             return 1.0
-        return track_rules_for(tile, pieces[0].bed).burn_factor
+        return track_rules_for(tile, pieces[0].bed, pieces[0].bridge).burn_factor
 
     def position(self, train: Train, back: float = 0.0) -> tuple[Point, Point] | None:
         """Where the train is on the map, or a point `back` cells behind its front, and which way

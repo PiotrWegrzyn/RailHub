@@ -1,18 +1,29 @@
 """What is special about a tile's level on a board (railroads.sim.tiles), for the marks above its
 card: an era its wagons come with, once every supply tile reaches it; an engine it opens for sale;
-the buyers a demand level opens. A level brings nothing special when it only adds its share."""
+a kind of bridge it opens for building; the buyers a demand level opens. A level brings nothing
+special when it only adds its share."""
 
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
 
-from railroads.sim.tiles import ERAS, KIND_ERAS, Board, Tile, era_news, unlocks_of
+from railroads.sim.tiles import (
+    BRIDGES_OPENED_BY,
+    ERAS,
+    KIND_ERAS,
+    Board,
+    Tile,
+    era_news,
+    unlocks_of,
+)
+from railroads.sim.track_rules import BRIDGES, Bridge
 from railroads.sim.trains import ENGINES, OPENED_BY
 
 
 class Perk(Enum):
     ERA = "era"
     ENGINE = "engine"
+    BRIDGE = "bridge"
     BUYERS = "buyers"
 
 
@@ -67,10 +78,23 @@ def _perks(board: Board, tile: Tile, level: int) -> tuple[LevelPerk, ...]:
     return tuple(_found_perks(board, tile, level))
 
 
+def bridge_text(bridge: Bridge) -> str:
+    """What a new kind of bridge brings, in words."""
+    kind = BRIDGES[bridge]
+    most = "one track" if kind.tracks == 1 else f"{kind.tracks} tracks"
+    text = f"New bridge: {kind.name}, {most}, trains at {kind.speed_factor:.0%}"
+    return text + (", and flyovers over track" if kind.over_track else "")
+
+
 def _found_perks(board: Board, tile: Tile, level: int) -> list[LevelPerk]:
+    bridges = [
+        LevelPerk(Perk.BRIDGE, bridge_text(bridge))
+        for bridge, opened in BRIDGES_OPENED_BY.items()
+        if opened == (board, tile, level)
+    ]
     if board == Board.DEMAND:
         buyers = opened_at(tile, level)
-        return [LevelPerk(Perk.BUYERS, buyers)] if buyers else []
+        return bridges + ([LevelPerk(Perk.BUYERS, buyers)] if buyers else [])
     found = [
         LevelPerk(Perk.ERA, era_text(number))
         for number, era in enumerate(ERAS, 1)
@@ -81,4 +105,4 @@ def _found_perks(board: Board, tile: Tile, level: int) -> list[LevelPerk]:
         for name, (of, at) in OPENED_BY.items()
         if of == tile and at == level
     ]
-    return found
+    return found + bridges

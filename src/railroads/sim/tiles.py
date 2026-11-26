@@ -36,6 +36,7 @@ from types import MappingProxyType
 from railroads.sim.clock import FIRST_RAILWAY_YEAR
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.goods import FITS, MAKES, NEEDS, Good, Need, need_year
+from railroads.sim.track_rules import Bridge
 from railroads.sim.year_caches import forget
 
 
@@ -303,6 +304,40 @@ UNLOCKS: Mapping[tuple[BuildingKind, Need], tuple[Tile, int]] = MappingProxyType
         **{(kind, Need.FUEL): (T.OIL, 11) for kind in _DIESEL},
     }
 )
+
+
+# The tile level on a board each kind of bridge after wood is built from: stone once ore and stone
+# are wanted two levels above where they start in 1850, steel and the flyovers it brings once
+# steel is made at level 16, about 1885, and concrete once chemicals and building materials are
+# at level 21, about 1925.
+BRIDGES_OPENED_BY: Mapping[Bridge, tuple[Board, Tile, int]] = MappingProxyType(
+    {
+        Bridge.STONE: (Board.DEMAND, T.ORE, 8),
+        Bridge.STEEL: (Board.SUPPLY, T.STEEL, 16),
+        Bridge.CONCRETE: (Board.SUPPLY, T.CHEMICALS, 21),
+    }
+)
+
+
+def bridge_open(bridge: Bridge, year: int) -> bool:
+    """Whether a kind of bridge can be built in a year: wood always, the others once their tile
+    reaches its level (BRIDGES_OPENED_BY)."""
+    opened = BRIDGES_OPENED_BY.get(bridge)
+    if opened is None:
+        return True
+    board, tile, level = opened
+    boards = of_year(year)
+    levels = boards.supply if board == Board.SUPPLY else boards.demand
+    return levels.get(tile, 0) >= level
+
+
+def bridge_opened_from(bridge: Bridge) -> str:
+    """From when a kind of bridge can be built, in a few words: "" for always."""
+    opened = BRIDGES_OPENED_BY.get(bridge)
+    if opened is None:
+        return ""
+    board, tile, level = opened
+    return f"{tile.value} {board.value} {level}"
 
 
 def supply_step(tile: Tile, level: int) -> float:

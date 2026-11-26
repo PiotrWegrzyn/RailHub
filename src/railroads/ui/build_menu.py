@@ -38,11 +38,15 @@ from railroads.sim.points import Points
 from railroads.sim.railway import PLATFORM_REACH, QUADRUPLE_ERA
 from railroads.sim.routes import Route
 from railroads.sim.tilemap import Relief
+from railroads.sim.tiles import bridge_opened_from
 from railroads.sim.track_rules import (
-    BRIDGE_RULES,
+    BRIDGES,
+    RAMP_PRICE_FACTOR,
+    RAMP_RULES,
     RELIEF_RULES,
     STREAM_FACTOR,
     TUNNEL_RULES,
+    Bridge,
     TrackBed,
 )
 from railroads.ui.iso_camera import IsoCamera, Vec2
@@ -55,6 +59,7 @@ from railroads.ui.theme import (
     Rgba,
     colored,
     rgba_u32,
+    tip,
     toggle_button,
 )
 from railroads.ui.trains_window import TrainsWindow
@@ -103,7 +108,7 @@ STATION_TOOLS = frozenset((Tool.STATION, Tool.MOVE_STATION, Tool.ADD_PLATFORM))
 PRICED_TOOLS = STATION_TOOLS | {Tool.BULLDOZE, Tool.ADD_FACILITY}
 
 HILLS_PRICE = TRACK_PRICE * RELIEF_RULES[Relief.HILLS].price_factor
-BRIDGE_PRICE = TRACK_PRICE * BRIDGE_RULES.price_factor
+BRIDGE_PRICE = TRACK_PRICE * BRIDGES[Bridge.WOOD].price_factor
 TUNNEL_PRICE = TRACK_PRICE * TUNNEL_RULES.price_factor
 HINTS = {
     Tool.STATION: (
@@ -115,7 +120,8 @@ HINTS = {
     Tool.TRACK: (
         f"Click where track starts, then where it goes; starting or ending on track joins it. "
         f"{dollars(TRACK_PRICE)} a cell on the flat, {dollars(HILLS_PRICE)} in hills, {times(STREAM_FACTOR)} that "
-        f"across a minor river, {dollars(BRIDGE_PRICE)} a bridge, {dollars(TUNNEL_PRICE)} a tunnel; "
+        f"across a minor river, {dollars(BRIDGE_PRICE)} a wooden bridge and more for newer ones, "
+        f"{dollars(TUNNEL_PRICE)} a tunnel; "
         f"double track {TRACK_WIDTH_FACTORS[TrackWidth.DOUBLE]:g} times as much, quadruple "
         f"{TRACK_WIDTH_FACTORS[TrackWidth.QUADRUPLE]:g} times, and wires "
         f"{ELECTRIC_TRACK_FACTOR - 1:g} times a single track's price again for each track. Laying it "
@@ -187,6 +193,39 @@ ELECTRIC_TIP = (
     f"{dollars(ELECTRIC_TRACK_UPKEEP)} a month more for each track. Lay it over your track to "
     "electrify that."
 )
+AUTO_BRIDGE_TIP = (
+    "Rivers and lakes are crossed on the cheapest bridge that carries the track; track is "
+    "crossed on the level."
+)
+
+
+def bridge_tip(bridge: Bridge) -> str:
+    """What a kind of bridge is like, for its tooltip."""
+    kind = BRIDGES[bridge]
+    most = "one track" if kind.tracks == 1 else f"up to {kind.tracks} tracks"
+    text = (
+        f"A {kind.name} bridge: {most}, {dollars(TRACK_PRICE * kind.price_factor)} a cell for "
+        f"one track, trains at {kind.speed_factor:.0%} of their speed."
+    )
+    if kind.over_track:
+        ramps = dollars(TRACK_PRICE * RAMP_PRICE_FACTOR)
+        text += (
+            f" Laid across your track it goes over it as a flyover, so trains on both run at "
+            f"once; the ramps on both sides cost {ramps} more a track and slow trains to "
+            f"{RAMP_RULES.speed_factor:.0%}."
+        )
+    else:
+        text += " It goes only over rivers and lakes."
+    if kind.maglev:
+        text += " The only bridge for maglev guideways."
+    elif kind.electric:
+        text += " Takes overhead wires."
+    opened = bridge_opened_from(bridge)
+    if opened:
+        text += f" Comes with {opened}."
+    return text
+
+
 MAGLEV_TIP = (
     f"A concrete guideway for maglev engines, which run on nothing else, and nothing else runs "
     f"on it: {dollars(MAGLEV_TRACK_PRICE)} a cell more, {dollars(MAGLEV_TRACK_UPKEEP)} a month "
@@ -235,6 +274,10 @@ class BuildMenu:
     electric_open: bool = False
     # Whether quadruple track can be laid yet (Railway.quadruple_open).
     quadruple_open: bool = False
+    # The kind of bridge the track tool builds, None for the cheapest that carries the track,
+    # and the kinds that can be built yet (Railway.bridges_open).
+    bridge: Bridge | None = None
+    bridges_open: tuple[Bridge, ...] = (Bridge.WOOD,)
     trains: TrainsWindow = field(default_factory=TrainsWindow)
     stations: StationsWindow = field(default_factory=StationsWindow)
 
@@ -302,11 +345,42 @@ class BuildMenu:
         if not self.maglev_open:
             if self.maglev:
                 self.lay(self.track_width, self.electric)
-            return
-        label = f"{fa.ICON_FA_MAGNET}  Maglev"
-        if toggle_button(label, self.maglev, MAGLEV_TIP, (0, BUTTON_HEIGHT)):
-            self.lay(self.track_width, False, not self.maglev)
+        else:
+            label = f"{fa.ICON_FA_MAGNET}  Maglev"
+            if toggle_button(label, self.maglev, MAGLEV_TIP, (0, BUTTON_HEIGHT)):
+                self.lay(self.track_width, False, not self.maglev)
+            imgui.same_line()
+        self._draw_bridge_picker()
+
+    def _draw_bridge_picker(self) -> None:
+        """The kind of bridge the track tool builds: Auto, or one that can be built yet; those
+        still to come show what brings them."""
+        if self.bridge is not None and self.bridge not in self.bridges_open:
+            self.pick_bridge(None)
+        shown = "Auto" if self.bridge is None else BRIDGES[self.bridge].name.capitalize()
+        imgui.set_next_item_width(130)
+        opened = imgui.begin_combo("##bridge", f"Bridge: {shown}")
+        tip(AUTO_BRIDGE_TIP if self.bridge is None else bridge_tip(self.bridge))
+        if opened:
+            if imgui.selectable("Auto", self.bridge is None)[0]:
+                self.pick_bridge(None)
+            tip(AUTO_BRIDGE_TIP)
+            for bridge in Bridge:
+                can = bridge in self.bridges_open
+                label = BRIDGES[bridge].name.capitalize()
+                if not can:
+                    label += f"  ({bridge_opened_from(bridge)})"
+                flags = 0 if can else imgui.SelectableFlags_.disabled.value
+                if imgui.selectable(f"{label}##{bridge.name}", self.bridge == bridge, flags)[0]:
+                    self.pick_bridge(bridge)
+                tip(bridge_tip(bridge), disabled=True)
+            imgui.end_combo()
         imgui.same_line()
+
+    def pick_bridge(self, bridge: Bridge | None) -> None:
+        """Sets the kind of bridge the track tool builds, and plans the previewed track again."""
+        self.bridge = bridge
+        self.preview_to = None
 
     def lay(self, width: TrackWidth, electric: bool, maglev: bool = False) -> None:
         """Sets what the track tool lays, and plans the previewed track again. Maglev track
