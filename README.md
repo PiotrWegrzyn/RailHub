@@ -1347,7 +1347,8 @@ finds the next signal clear without slowing when the track is free. Within stati
 track for trains going opposite ways, trains pass each other without stopping. On quadruple track a
 train takes the track each way that no train ahead runs on, even one it followed onto it, and stands
 on it short of where the tracks come together until that way is set for it, so a quicker train
-passes a slower one there. A train may follow
+passes a slower one there. Quadruple track running into a station keeps its two tracks each way
+right up to it, so two trains each way come in or leave at once. A train may follow
 another going its way onto track that one holds, single line too, as long as wherever they all
 stopped it would stand in a station or on double track; a train waiting to come the other way
 keeps later trains from joining, so it is not kept waiting for ever. A running train's Go first

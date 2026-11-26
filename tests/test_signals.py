@@ -660,3 +660,19 @@ def test_track_is_kept_from_a_train_that_would_follow_the_one_holding_up_the_fir
     kept_for = signals._queued_before(Train("Later"), way)
 
     assert kept_for is waiting
+
+
+def test_quadruple_track_running_into_a_station_keeps_two_tracks_each_way_up_to_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(Railway, "quadruple_open", property(lambda _: True))
+    game = Game(Constructions(flat_map(rows=16, cols=24)))
+    game.finances.cash = 1e9
+    for station in (WEST, EAST):
+        game.build_station(station)
+    assert game.lay_track(WEST, EAST, TrackWidth.QUADRUPLE).ok
+
+    lanes = blocks_of(game.constructions).four_lanes
+
+    track = {piece.cell for piece in game.constructions.track()}
+    assert track and track <= lanes

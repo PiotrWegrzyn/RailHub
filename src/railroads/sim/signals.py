@@ -23,7 +23,8 @@ ahead runs on, leaving one they followed onto it to run beside it, and through i
 where two trains coming together or parting run side by side, the one on the side those tracks lie
 on taking the outer track (Blocks.apart). Its two-track stretches are blocks of their own, apart
 from its ends where the tracks come together, so a train stands on its track short of an end until
-the way through it is set, and one beside it can pass.
+the way through it is set, and one beside it can pass; into a station they run on up to it, so
+two trains each way come in or leave at once.
 A train may follow another going its way onto track that one holds, FOLLOW_GAP behind it, as long
 as wherever all the trains ahead stopped it would stand clear too, and never past where theirs is
 set unless it runs beside it on quadruple track; anywhere else two trains never hold track in the same cell at once. Stations are no blocks:
@@ -158,13 +159,17 @@ class Blocks:
 
         def runs_on_four(cell: Cell, end: int) -> bool:
             beyond, entry = exits[(cell, end)]
-            return beyond in pieces and any(
-                piece.width == TrackWidth.QUADRUPLE and entry in piece.ends
-                for piece in pieces[beyond]
+            return beyond in stations or (
+                beyond in pieces
+                and any(
+                    piece.width == TrackWidth.QUADRUPLE and entry in piece.ends
+                    for piece in pieces[beyond]
+                )
             )
 
         # The cells of quadruple track that runs on as quadruple track at both ends, straight on
-        # or through a junction, where trains going the same way keep to two tracks.
+        # or through a junction, or into a station, where trains going the same way keep to two
+        # tracks: two trains a way can come into a station or leave it at once.
         self.four_lanes = {
             cell
             for cell in cells
