@@ -10,6 +10,33 @@ The ideas every rule of the game should follow, the most important first.
    flows of goods.** Trains pay for bringing goods to where they are missing, filling the gaps in
    the markets, and what they bring makes the places they serve grow.
 
+## How the game is made
+
+The ideas every change to the game should follow.
+
+- **The game is a simulation, not a script.** Towns, works and prices come out of simple rules of
+  land, needs and deliveries. Results are never set by hand: when something is missing, the rule
+  is fixed, not a building put in.
+- **One rule, no exceptions.** Numbers follow from formulas, such as an amount from its worth in
+  dollars or a level from merging two. An exception for one good or one building means the rule
+  is wrong.
+- **Everything is open and can be explained.** The player can always find out why something came
+  up, stands still, costs what it does or does not grow. There are no hidden limits or secret
+  multipliers, and every number sits at the building it belongs to.
+- **The player earns from what they add.** Money comes from filling the gaps in the economy and
+  from what would not exist without the player's railway, never from distance alone.
+- **Hard but fair.** Costs keep the player under pressure; every choice gives something and takes
+  something, and no option is pointless. Micromanagement pays, and technology takes it off the
+  player over time.
+- **Reality inspires, fun decides.** History, geography and technology are real where that makes
+  the game interesting; prices and amounts reward doing hard things rather than copy the real
+  world.
+- **One world: a moving model railway.** One style, one scale measured by houses and one model at
+  every zoom. The look tells what a thing is: a works' colours match what it makes and a
+  building's size what it holds.
+- **The game runs smoothly in the browser.** The web build is the main platform, and every new
+  mechanic has to fit in it.
+
 ## The goal
 
 - The player's aim is what their company is worth: its cash less any debt, its shares at what they
@@ -127,6 +154,10 @@ The ideas every rule of the game should follow, the most important first.
   shifts unannounced.
 - History is the same in every game, apart from what happens only in one part of the world, such
   as the market opening in the old Eastern Bloc in 1989.
+- Where an amount is set by worth, it is worked out from the good's price, so a new price rescales
+  it on its own: a port's monthly amount is its tier's worth in dollars over the good's price.
+- Passengers and mail wait only a month: every month brings new ones and the old ones are gone,
+  which is what makes expresses pay.
 
 ## Trains and technology
 
@@ -151,6 +182,9 @@ The ideas every rule of the game should follow, the most important first.
   gradually, a better one faster.
 - Changing a train's cargo or route does not break off its run; the change applies from its next
   visit.
+- What a train's cars and goods weigh slows it and makes it burn more, but never shortens its
+  range, which would confuse the player.
+- How fast a train picks up speed depends on its engine, not on its cars.
 
 ## How the map grows
 
@@ -177,6 +211,8 @@ The ideas every rule of the game should follow, the most important first.
   something on the map makes each of its main inputs. No vineyard, no winery.
 - Unique buildings come up in some games and not in others, two or three a game. They fit their era
   and only make or use goods the game already has.
+- No hidden caps: every limit on where or how many buildings come up is a rule the player can
+  read in the game, with the reason a chance is zero.
 
 ## Building
 
@@ -207,6 +243,18 @@ The ideas every rule of the game should follow, the most important first.
 - Every kind of building is recognisable at a glance and never looks like a house or like another
   kind.
 - Big and mega works have their own look, the same trade grown grander; a mega one is spectacular.
+- The game looks like a moving model railway, not pixel art; every new piece of art serves that
+  look.
+- One model at every zoom: it is drawn once at its largest and shrunk, never drawn again for each
+  zoom, so the style never drifts.
+- One scale for every building, measured by houses: a barn a touch bigger than a house, a works
+  bigger than a tenement, a station fitting the buildings around it.
+- A works' colours match what it makes.
+- Every building stands on the ground and inside its cell: nothing floats or sticks out of its hex.
+- Fields and farms blend into the colour of the land under them.
+- Trains, trees and buildings are realistic and detailed, like models on a layout, never toys.
+- A station looks its level and matches the other buildings.
+- Rarity has the same colours everywhere: green common, blue rare, purple epic, gold legendary.
 
 ## Windows
 
@@ -220,3 +268,5 @@ The ideas every rule of the game should follow, the most important first.
 - Choosing a cargo shows only what the station has, without scrolling, and what the next stop
   needs.
 - A window shows no numbers that tell the player nothing at that moment.
+- A pause always shows, readably, at the top in the middle of the screen.
+- The game says why something stands still: a train waiting for a way says so.
