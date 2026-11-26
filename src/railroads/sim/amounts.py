@@ -12,7 +12,9 @@ type Amounts = npt.ArrayLike
 
 def ratio(part: Amounts, whole: Amounts, empty: float = 0.0) -> npt.NDArray[np.float64]:
     """`part` as a share of `whole`, cell by cell, and `empty` where the whole is nothing."""
-    part, whole = np.broadcast_arrays(np.asarray(part, np.float64), np.asarray(whole, np.float64))
+    part, whole = np.asarray(part, np.float64), np.asarray(whole, np.float64)
+    if part.shape != whole.shape:
+        part, whole = np.broadcast_arrays(part, whole)
     return np.divide(part, whole, out=np.full(part.shape, empty), where=whole > 0)
 
 

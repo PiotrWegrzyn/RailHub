@@ -541,3 +541,32 @@ of simulation on desktop), which only an event-driven rewrite would cut; zoomed-
 graphics card would save about 1 ms, as trains, not track, are what costs zoomed out; running the
 simulation in a worker would take every frame's simulation and the months off the frames but needs
 the whole interface to work on a copy of the game.
+
+## The month of a big game (26 November, 0.5.290 to 0.5.291)
+
+The "big" save built on current code (Poland, 64 stations, 140 trains). Trains stand still while a
+month is worked out, a few frames of it at a time; the freezes are what the player sees.
+
+| Month freezes in the browser (ms, months 2 to 8) | Total |
+| --- | --- |
+| Before: 234, 167, 245, 166, 247, 256, 291 (and 232, 162, 200, 162, 216, 225, 261) | 1458–1606 |
+| After the enums and stations' goods: 213, 141, 198, 142, 207, 223, 268 (and 218, 134, 191, 137, 196, 216, 243) | 1335–1392 |
+
+A month on desktop went from about 52 ms to about 47 ms.
+
+- **Goods, needs and kinds of buildings were hashed by name in Python** (`Enum.__hash__`), 87,000
+  times a month, and in the browser that was the most costly function of all. They are now hashed
+  by identity in C (`railroads.sim.keyed.Keyed`), which keeps every dict and set the same.
+- **Stations gathered goods one after another**, in the order they were built; now each cell's
+  spare goods go to the nearest station first, stations as near sharing them by their room, for
+  every good in one `distribute`. A rule change: the principles say so.
+- **What stations hold and have room for** was looked up good by good and station by station; it
+  is now a table of goods by stations.
+- `ratio` no longer broadcasts arrays of the same shape, a station's demand subtracts what
+  buildings got locally in one sum, and `distribute` drops the pairs with nothing to give or want
+  once, skipping every distance left empty.
+
+Left, and why: the rest of a month is a long tail of parts that each take a few percent, the trade
+between buildings (`_sell_nearby` and `distribute`), placing the scenery again (about 10% in the
+browser) and the growth's books. Only letting trains run while the month is worked out would take
+the freezes away.

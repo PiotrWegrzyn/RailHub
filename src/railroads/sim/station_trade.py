@@ -62,6 +62,20 @@ MEETS: dict[Good, tuple[Need, ...]] = {
 # Where each kind stands in NEEDS, the order their needs are added up in (StationTrade._needs_in).
 _NEEDS_ORDER = {kind: index for index, kind in enumerate(NEEDS)}
 
+# The last trade asked about, where each need stands among its rows, and what buildings got of each
+# need from the goods handed out on their own, a row per need: kept off StationTrade, which is saved.
+_LOCAL: list[tuple[Trade, dict[Need, int], FloatArray]] = []
+
+
+def _local_of(trade: Trade) -> tuple[dict[Need, int], FloatArray]:
+    """What buildings got of each need from the goods handed out on their own in a trade, a row
+    per need, and where each need's row is."""
+    if not _LOCAL or _LOCAL[0][0] is not trade:
+        rows = {need: row for row, need in enumerate(trade.local)}
+        _LOCAL[:] = [(trade, rows, np.stack(list(trade.local.values())))]
+    _, rows, local = _LOCAL[0]
+    return rows, local
+
 
 class StationTrade:
     def __init__(self, growth: Growth) -> None:
@@ -155,12 +169,12 @@ class StationTrade:
             trade.cells[np.minimum(positions, trade.cells.size - 1)] == ring
         )
         positions = positions[inside]
-        short = {}
-        for need, amount in needs.items():
-            local = trade.local.get(need)
-            got = float(local[positions].sum()) if local is not None else 0.0
-            short[need] = max(0.0, amount - got)
-        return short
+        rows, local = _local_of(trade)
+        got = local[:, positions].sum(axis=1).tolist()
+        return {
+            need: max(0.0, amount - (got[rows[need]] if need in rows else 0.0))
+            for need, amount in needs.items()
+        }
 
     def hand_out_now(self, station: Cell, good: Good) -> None:
         """Hands a good trains have just brought to a station to the buildings around it that

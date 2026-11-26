@@ -82,7 +82,6 @@ from railroads.sim.trade import (
     Stockpiles,
     Trade,
     input_stock,
-    stores_together,
     worth_to,
 )
 from railroads.sim.year_caches import year_cached
@@ -90,6 +89,10 @@ from railroads.sim.yearly import bonus_of, bonus_part, boosts_of, makes_of, need
 
 # About how long a month's trade works before it pauses for the next frame.
 STEP_SECONDS = 0.008
+
+# Every good and where it stands among them, for what the stations hold, a row per good.
+GOODS = tuple(Good)
+GOOD_AT = {good: at for at, good in enumerate(GOODS)}
 
 
 # Sellers and buyers in pairs, in order of how far apart they are, and where each distance starts.
@@ -120,14 +123,20 @@ def distribute(
     pairs anything went between and how much."""
     went: list[npt.NDArray[np.intp]] = []
     amounts: list[FloatArray] = []
-    for ring, (start, end) in enumerate(pairwise(bounds)):
-        seller, buyer = sellers[start:end], buyers[start:end]
+    # Supply and shortfalls only shrink, so a pair with nothing to give or want at the start
+    # never trades: leave those out once, and every distance left with none of the rest.
+    alive = np.flatnonzero((short[buyers] > EPSILON) & (supply[sellers] > EPSILON))
+    for ring, (start, end) in enumerate(pairwise(np.searchsorted(alive, bounds).tolist())):
+        if start == end:
+            continue
+        pairs = alive[start:end]
+        seller, buyer = sellers[pairs], buyers[pairs]
         wanting = short[buyer]
         live = (wanting > EPSILON) & (supply[seller] > EPSILON)
         if not live.any():
             continue
-        seller, buyer, wanting = seller[live], buyer[live], wanting[live]
-        before = None if used is None else used[start:end][live]
+        pairs, seller, buyer, wanting = pairs[live], seller[live], buyer[live], wanting[live]
+        before = None if used is None else used[pairs]
         share = wanting / np.bincount(seller, wanting, minlength=supply.size)[seller]
         sent = supply[seller] * share
         if falloff is not None:
@@ -140,7 +149,7 @@ def distribute(
         sent *= np.minimum(1.0, short[buyer] / np.maximum(arriving, 1e-12))
         supply -= np.bincount(seller, sent, minlength=supply.size)
         short -= np.bincount(buyer, sent, minlength=short.size)
-        went.append(np.flatnonzero(live) + start)
+        went.append(pairs)
         amounts.append(sent)
         if supply.max() <= EPSILON or short.max() <= EPSILON:
             break
@@ -332,10 +341,18 @@ class MonthOfTrade:
         # of its boosts.
         self.uses: dict[BuildingKind, dict[Need, FloatArray]] = {}
         self.received: dict[tuple[BuildingKind, Need], FloatArray] = {}
-        self.brought = {
-            station: stores_together(order.brought, order.stockpile)
-            for station, order in stations.items()
-        }
+        # What each station holds of each good, brought and gathered before, and the room it has
+        # left for it: a row per good (GOOD_AT) and a column per station, in order.
+        self.station_cells = list(stations)
+        self.brought = np.zeros((len(GOODS), len(stations)))
+        self.room = np.zeros((len(GOODS), len(stations)))
+        for at, order in enumerate(stations.values()):
+            self.room[:, at] = order.limit
+            for store in (order.brought, order.stockpile):
+                for good, amount in store.items():
+                    self.brought[GOOD_AT[good], at] += amount
+                    self.room[GOOD_AT[good], at] -= amount
+        np.maximum(self.room, 0.0, out=self.room)
         self.handed: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
         self.handed_for: dict[Cell, dict[tuple[Need, Good], float]] = {
             station: {} for station in stations
@@ -346,15 +363,6 @@ class MonthOfTrade:
         self.gathered: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
         self.owned_brought: dict[Cell, dict[Good, float]] = {station: {} for station in stations}
         self.owned_sent: dict[tuple[BuildingKind, Good], FloatArray] = {}
-        self.room = {
-            station: {
-                good: max(
-                    0.0, order.limit - order.brought.get(good, 0.0) - order.stockpile.get(good, 0.0)
-                )
-                for good in Good
-            }
-            for station, order in stations.items()
-        }
         self.reach = {
             station: (
                 economy._around(station, cells, order.delivery, order.platforms),
@@ -542,8 +550,8 @@ class MonthOfTrade:
     def _hand_out(self, need: Need, good: Good, demand: FloatArray, received: FloatArray) -> None:
         """Lets every station hand out what trains brought of a good to the buildings within its
         delivery radius still short of it, the nearest first."""
-        stations = list(self.stations)
-        brought = np.array([self.brought[s].get(good, 0.0) for s in stations], dtype=np.float64)
+        row = GOOD_AT[good]
+        brought = self.brought[row]
         if not (brought > EPSILON).any():
             return
         sellers, buyers, bounds = self._station_pairs()
@@ -552,15 +560,14 @@ class MonthOfTrade:
         went, sent = distribute(sellers, buyers, bounds, left, short)
         received[:] = demand - short
         worth = np.bincount(
-            sellers[went], sent * self.worth_to[buyers[went]], minlength=len(stations)
+            sellers[went], sent * self.worth_to[buyers[went]], minlength=brought.size
         )
-        for station, before, after, weighed in zip(stations, brought, left, worth, strict=True):
-            given = float(before - after)
-            if given <= 0:
-                continue
+        gave = brought - left
+        self.brought[row] = left
+        for at in np.flatnonzero(gave > 0).tolist():
+            station, given = self.station_cells[at], float(gave[at])
             worths = self.handed_worth[station]
-            worths[(need, good)] = worths.get((need, good), 0.0) + float(weighed)
-            self.brought[station][good] = float(after)
+            worths[(need, good)] = worths.get((need, good), 0.0) + float(worth[at])
             self.handed[station][good] = self.handed[station].get(good, 0.0) + given
             handed_for = self.handed_for[station]
             handed_for[(need, good)] = handed_for.get((need, good), 0.0) + given
@@ -682,11 +689,10 @@ class MonthOfTrade:
         taken = self._take_in([good], spare)
         left[near] = spare[0]
         self.sold[good] += offered - left
-        for station, amount in zip(self.stations, taken[0].tolist(), strict=True):
-            if amount > 0:
-                self.brought[station][good] = self.brought[station].get(good, 0.0) + amount
-                owned = self.owned_brought[station]
-                owned[good] = owned.get(good, 0.0) + amount
+        self.brought[GOOD_AT[good]] += taken[0]
+        for at in np.flatnonzero(taken[0] > 0).tolist():
+            owned = self.owned_brought[self.station_cells[at]]
+            owned[good] = owned.get(good, 0.0) + float(taken[0, at])
         sent = divided(offered - left, offered)
         for kind, part in parts.items():
             self.owned_sent[(kind, good)] = part * sent
@@ -747,25 +753,21 @@ class MonthOfTrade:
         cell's to the nearest station first, stations as near sharing them by the room they have
         left. Takes what went out of `spare`; returns how much each station took of each good, a
         row per good. The goods never meet, so one distribute serves them all."""
-        stations = list(self.stations)
-        room = np.zeros((len(goods), len(stations)))
+        rows = [GOOD_AT[good] for good in goods]
+        room = self.room[rows]
         _, sellers, buyers, away = self._gather_pairs()
         pair, row = np.nonzero(spare[:, sellers].T > EPSILON)
         if not row.size:
-            return room
-        for good_at in np.unique(row).tolist():
-            room[good_at] = [self.room[station][goods[good_at]] for station in stations]
+            return np.zeros_like(room)
         flat = spare.reshape(-1)
         cells, seller = np.unique(row * spare.shape[1] + sellers[pair], return_inverse=True)
         left = flat[cells]
         short = room.reshape(-1).copy()
-        buyer = row * len(stations) + buyers[pair]
+        buyer = row * room.shape[1] + buyers[pair]
         distribute(seller, buyer, ring_starts(away[pair]), left, short)
         flat[cells] = left
-        taken = room - short.reshape(room.shape)
-        for good_at, station_at in zip(*np.nonzero(taken > 0), strict=True):
-            self.room[stations[station_at]][goods[good_at]] -= float(taken[good_at, station_at])
-        return taken
+        self.room[rows] = short.reshape(room.shape)
+        return room - self.room[rows]
 
     def _gather(self) -> None:
         """Lets the stations take the spare units of every good no building took into their
@@ -780,9 +782,8 @@ class MonthOfTrade:
         taken = self._take_in(goods, left)
         for row in np.flatnonzero((left != spare).any(axis=1)).tolist():
             self.sold[goods[row]][near] += spare[row] - left[row]
-        stations = list(self.stations)
         for good_at, station_at in zip(*np.nonzero(taken > 0), strict=True):
-            gathered = self.gathered[stations[station_at]]
+            gathered = self.gathered[self.station_cells[station_at]]
             good = goods[good_at]
             gathered[good] = gathered.get(good, 0.0) + float(taken[good_at, station_at])
 
