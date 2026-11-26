@@ -844,6 +844,7 @@ class Growth:
         if reached(MONTHS_PER_YEAR):
             changed |= build_power_plants(self)
             changed |= self._top_up(rng)
+            changed |= self._join_clusters()
         if self.happenings is not None:
             changed |= self.happenings.months(self, before + 1, self._months, rng)
         every = self.rule.forests_every_months
@@ -1014,21 +1015,28 @@ class Growth:
         self, cell: Cell, neighbourhood: list[Cell], kind: BuildingKind, join: Join
     ) -> set[Cell] | None:
         """Pulls down join.needed of a kind in the neighbourhood and puts up what they join into
-        in the cell, if the neighbourhood is busy enough and none of that stands near; None, and
-        nothing changed, otherwise."""
+        in the cell, if none of that stands near; None, and nothing changed, otherwise."""
         if self._around(kind, neighbourhood) < join.needed:
             return None
         built = self._counts[join.into]
         if any(built[near] for near in self._grid.within(cell, join.apart)):
             return None
-        tile_map = self.constructions.tile_map
-        land = sum(
-            tile_map.terrain[near] == Terrain.LAND and tile_map.relief[near] != Relief.MOUNTAINS
-            for near in neighbourhood
-        )
-        if not land or self._nearby[Points.POPULATION][cell] < join.people_per_cell * land:
-            return None
         return self._replace(cell, neighbourhood, [(kind, join.needed)], join.into)
+
+    def _join_clusters(self) -> set[Cell]:
+        """Joins every neighbourhood holding enough of a ladder's first kind into what they join
+        into (Ladder.joins), as a turn of the ladder there would, which may not come for years
+        where it hardly grows; returns the cells that changed."""
+        changed: set[Cell] = set()
+        for ladder in self.rule.ladders:
+            if ladder.joins is None:
+                continue
+            kind = ladder.kinds[0]
+            for row, col in np.argwhere(self._counts[kind] > 0).tolist():
+                cell = (row, col)
+                neighbourhood = [cell, *self._grid.neighbours(row, col)]
+                changed |= self._join(cell, neighbourhood, kind, ladder.joins) or set()
+        return changed
 
     def least_of(self, ladder: Ladder) -> int:
         """The fewest of a ladder's first kind the map keeps once it has opened: KEY_LEAST for

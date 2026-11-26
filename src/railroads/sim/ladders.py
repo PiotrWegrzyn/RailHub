@@ -391,15 +391,14 @@ PORTS = Ladder(
         water={Terrain.LAND: 0.0, Terrain.RIVER: 0.0, Terrain.SEA: 1.0, Terrain.LAKE: 0.3},
     ),
     base=8,
-    needs={Points.POPULATION: 4},
+    needs={Points.POPULATION: 2},
     most_per_cell=1,
     most_nearby=1,
 )
 
-# Three fisheries in a neighbourhood with four population points for each of its land cells off
-# the mountains join into a port, unless a port stands within two cells.
+# Three fisheries in a neighbourhood join into a port, however few live there, unless a port
+# stands within two cells.
 FISHERIES_PER_PORT = 3
-PORT_PEOPLE_PER_CELL = 4
 PORTS_APART = 2
 
 # Fisheries grow on the shore like farms on fields, mostly by the sea and far less by lakes and
@@ -411,7 +410,7 @@ FISHERIES = Ladder(
         water={Terrain.LAND: 0.0, Terrain.SEA: 1.0, Terrain.LAKE: 0.15, Terrain.RIVER: 0.1},
     ),
     base=100,
-    joins=Join(BuildingKind.PORT, FISHERIES_PER_PORT, PORT_PEOPLE_PER_CELL, PORTS_APART),
+    joins=Join(BuildingKind.PORT, FISHERIES_PER_PORT, PORTS_APART),
 )
 
 # Factories make goods from steel, copper and machinery brought to them and draw more factories,

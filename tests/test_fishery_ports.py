@@ -1,15 +1,10 @@
 import numpy as np
-import pytest
 from growing import build, make_map
 
 from builders import flat_map, layer
 from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import (
-    FISHERIES,
-    FISHERIES_PER_PORT,
-    PORT_PEOPLE_PER_CELL,
-)
+from railroads.sim.ladders import FISHERIES, FISHERIES_PER_PORT
 from railroads.sim.tilemap import Terrain, TileMap
 
 COAST = (5, 1)
@@ -37,8 +32,8 @@ def fishing_village(
     return Growth(constructions)
 
 
-def test_three_fisheries_among_enough_people_join_into_a_port() -> None:
-    growth = fishing_village(PORT_PEOPLE_PER_CELL)
+def test_three_fisheries_join_into_a_port() -> None:
+    growth = fishing_village(1)
 
     growth._turn(COAST, FISHERIES, np.random.default_rng(0))
 
@@ -46,26 +41,25 @@ def test_three_fisheries_among_enough_people_join_into_a_port() -> None:
     assert growth.count(BuildingKind.FISHERY).sum() == 0
 
 
-@pytest.mark.parametrize(
-    ("houses_per_cell", "fisheries"),
-    [
-        (PORT_PEOPLE_PER_CELL - 1, FISHERIES_PER_PORT),
-        (PORT_PEOPLE_PER_CELL, FISHERIES_PER_PORT - 1),
-    ],
-)
-def test_fisheries_stay_without_enough_people_or_enough_of_them(
-    houses_per_cell: int, fisheries: int
-) -> None:
-    growth = fishing_village(houses_per_cell, fisheries)
+def test_three_fisheries_on_an_empty_shore_join_into_a_port() -> None:
+    growth = fishing_village(0)
+
+    growth._turn(COAST, FISHERIES, np.random.default_rng(0))
+
+    assert growth.count(BuildingKind.PORT)[COAST] == 1
+
+
+def test_two_fisheries_stay_fisheries() -> None:
+    growth = fishing_village(1, FISHERIES_PER_PORT - 1)
 
     growth._turn(COAST, FISHERIES, np.random.default_rng(0))
 
     assert growth.count(BuildingKind.PORT).sum() == 0
-    assert growth.count(BuildingKind.FISHERY).sum() >= fisheries
+    assert growth.count(BuildingKind.FISHERY).sum() >= FISHERIES_PER_PORT - 1
 
 
 def test_fisheries_do_not_join_into_a_port_beside_another_port() -> None:
-    growth = fishing_village(PORT_PEOPLE_PER_CELL, port=(COAST[0] + 2, COAST[1]))
+    growth = fishing_village(1, port=(COAST[0] + 2, COAST[1]))
 
     growth._turn(COAST, FISHERIES, np.random.default_rng(0))
 
@@ -86,3 +80,13 @@ def test_fisheries_grow_mostly_by_the_sea_less_by_lakes_and_rivers_and_never_inl
     assert by_sea > by_lake > 0
     assert by_sea > by_river > 0
     assert inland == 0
+
+
+def test_fisheries_on_an_empty_shore_join_into_a_port_within_a_year_without_growing() -> None:
+    growth = fishing_village(0)
+    rng = np.random.default_rng(0)
+
+    for _ in range(12):
+        growth.month(rng)
+
+    assert growth.count(BuildingKind.PORT).sum() >= 1

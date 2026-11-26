@@ -25,12 +25,10 @@ class Merge:
 @dataclass(frozen=True, slots=True)
 class Join:
     """So many of a ladder's first kind in a neighbourhood that become one building of another
-    kind, once the neighbourhood holds at least so many population points for each of its land
-    cells off the mountains, and none of that kind stands within so many cells."""
+    kind, when none of that kind stands within so many cells."""
 
     into: BuildingKind
     needed: int
-    people_per_cell: float
     apart: int
 
 
