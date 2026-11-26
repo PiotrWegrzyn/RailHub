@@ -1257,22 +1257,28 @@ class Growth:
             )
         if new.space > self.constructions.space_left(cell) + freed:
             return None
-        owned = 0
-        ports = [
-            port
+        ports = {
+            near: port
             for near, kind, _ in plan
             if kind in PORT_KINDS and (port := self.ports.take(near)) is not None
-        ]
-        for near, kind, take in plan:
-            owned += self._pull_down(near, kind, take)
+        }
+        owned = [self._pull_down(near, kind, take) for near, kind, take in plan]
         moved = self.room.clear(cell, new.space)
         self.constructions.build(new)
         if new_kind in PORT_KINDS[1:] and ports:
             self.ports.merged(cell, new_kind, ports)
         self.add(cell, new_kind, 1)
-        if owned:
-            taken = sum(take for _, _, take in plan)
-            self.owners.own(cell, new_kind, round(owned / max(taken, 1)))
+        # A merged port keeps the player's biggest stake in any of the ports it merged; other
+        # buildings share out what the player held of all they pulled down.
+        takes = [take for _, _, take in plan]
+        if new_kind in PORT_KINDS:
+            stake = max(
+                (shares / take for shares, take in zip(owned, takes, strict=True)), default=0
+            )
+        else:
+            stake = sum(owned) / max(sum(takes), 1)
+        if stake:
+            self.owners.own(cell, new_kind, round(stake))
         return {cell} | {near for near, _, _ in plan} | moved
 
     @contextmanager

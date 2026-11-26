@@ -15,13 +15,14 @@ any tier for it to give.
 A port the player controls ships goods to another of theirs (SHIPS of them by its size): it
 buys each from trains into its store, STORE_MONTHS of what a ship carries, and every month a
 ship carries SHIP_WAGONS wagons of the era's worth to the other port, free, which gives it to
-trains.
+trains. Ports that merge keep what they ship and hold, ships bound for them sail to the merged
+port, and the player keeps their biggest stake in any of them (railroads.sim.growth).
 """
 
 from __future__ import annotations
 
 import weakref
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from types import MappingProxyType
@@ -229,11 +230,17 @@ class Port:
 
     def joined(self, other: Port) -> Port:
         """This port's goods and the other's, as one port that merged them: each good once,
-        neither port's pick nor what it ships."""
+        neither port's pick; what both ship, this port's first where both ship a good, and all
+        that both hold in store and landed from ships."""
         slots = [slot for slot in self.slots if not slot.picked]
         held = {slot.good for slot in slots}
         slots += [slot for slot in other.slots if not slot.picked and slot.good not in held]
-        return Port(slots)
+        return Port(
+            slots,
+            {**other.ships, **self.ships},
+            _summed(self.store, other.store),
+            _summed(self.landed, other.landed),
+        )
 
 
 def steps_from(
@@ -301,12 +308,17 @@ class Ports:
         self._draw(port, near, rng, HIGH_TIERS, gives=True)
         return port
 
-    def merged(self, cell: Cell, kind: BuildingKind, parts: Iterable[Port]) -> None:
-        """Puts up a port of a size merged from ports in a cell: all their goods and one more
-        epic or legendary good it gives."""
+    def merged(self, cell: Cell, kind: BuildingKind, parts: Mapping[Cell, Port]) -> None:
+        """Puts up a port of a size merged from the ports in these cells: all their goods, what
+        they ship and hold, and one more epic or legendary good it gives. Ships sailing to any of
+        them sail to it instead; none sails from it to itself."""
         port = Port()
-        for part in parts:
+        for part in parts.values():
             port = port.joined(part)
+        gone = {cell, *parts}
+        port.ships = {good: to for good, to in port.ships.items() if to not in gone}
+        for other in self.at.values():
+            other.ships = {good: cell if to in gone else to for good, to in other.ships.items()}
         near = _Makers(self._growth).near(cell)
         self._draw(port, near, self._rng(cell, kind), HIGH_TIERS, gives=True)
         self.at[cell] = port
@@ -571,6 +583,13 @@ class Ports:
 # What each game's ports trade this month (Ports.current), kept apart from the game so it is
 # never saved.
 _MONTHS: weakref.WeakKeyDictionary[Ports, CellGoods] = weakref.WeakKeyDictionary()
+
+
+def _summed(first: Mapping[Good, float], second: Mapping[Good, float]) -> dict[Good, float]:
+    together = dict(first)
+    for good, amount in second.items():
+        together[good] = together.get(good, 0.0) + amount
+    return together
 
 
 def _position(trade: Trade, flat: int) -> int | None:

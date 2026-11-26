@@ -138,7 +138,8 @@ PORTS_HELP = (
         f" a port {SHIPS[BuildingKind.PORT]}, a big port {SHIPS[BuildingKind.BIG_PORT]}, a mega"
         f" port {SHIPS[BuildingKind.MEGA_PORT]}. It buys the good from trains into its store, and"
         f" every month a ship carries {SHIP_WAGONS} wagons of it to the other port, free, which"
-        " gives it to trains. Right click a port to see its goods, pick and ship."
+        " gives it to trains. Ports that merge keep what they ship and hold, and your biggest"
+        " stake in any of them. Right click a port to see its goods, pick and ship."
     ),
 )
 PORT_GOOD_WIDTH = 110.0

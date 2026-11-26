@@ -274,3 +274,30 @@ def test_the_growth_odds_leave_no_room_for_a_port_in_a_cell_holding_a_mega_port(
     capped = _capped(growth, PORTS)
 
     assert capped[COAST[0] * growth.grid.cols + COAST[1]]
+
+
+def test_a_merged_port_keeps_the_players_biggest_stake_in_the_ports_it_merged() -> None:
+    growth = port_town((COAST, K.PORT), (NEXT, K.PORT))
+    growth.owners.own(NEXT, K.PORT, SHARES)
+    growth.owners.own(COAST, K.PORT, SHARES // 4)
+
+    growth._turn(COAST, PORTS, np.random.default_rng(0))
+
+    assert int(growth.owners.shares(K.BIG_PORT)[COAST]) == SHARES
+
+
+def test_a_merged_port_keeps_what_its_ports_shipped_and_held_and_ships_to_it_follow() -> None:
+    growth = port_town((COAST, K.PORT), (NEXT, K.PORT), (FAR, K.PORT))
+    growth.ports.sync()
+    growth.ports.at[NEXT].ships = {Good.COAL: FAR}
+    growth.ports.at[NEXT].store = {Good.COAL: 40.0}
+    growth.ports.at[COAST].landed = {Good.WOOL: 25.0}
+    growth.ports.at[FAR].ships = {Good.TEA: NEXT}
+
+    growth._turn(COAST, PORTS, np.random.default_rng(0))
+
+    big = growth.ports.at[COAST]
+    assert big.ships == {Good.COAL: FAR}
+    assert big.store == {Good.COAL: 40.0}
+    assert big.landed == {Good.WOOL: 25.0}
+    assert growth.ports.at[FAR].ships == {Good.TEA: COAST}

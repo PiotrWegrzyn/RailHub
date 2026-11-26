@@ -749,7 +749,8 @@ newspapers are never drawn.
 A port the player controls can ship goods to another port they control: an ordinary port one
 good, a big port two, a mega port four, of any tier. The sending port buys each from trains into
 its store, and every month a ship carries two wagons of the era's worth of it, free, to the other
-port, which gives it to trains. A port sends 18 passengers a month like a block of flats, a big
+port, which gives it to trains. Ports that merge keep what they shipped and held, ships bound for
+them sail to the merged port, and the player keeps their biggest stake in any of them. A port sends 18 passengers a month like a block of flats, a big
 port 36 and a mega port 72; from 1910 ports burn diesel in their boats like fisheries.
 
 Steel mills, canneries, factories, shipyards and every works are processors: each keeps a stockpile of two
