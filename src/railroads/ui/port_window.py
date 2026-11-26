@@ -76,7 +76,7 @@ class PortWindow:
         if cell is None:
             return
         kind = growth.ports.kind_at(cell)
-        port = growth.ports.at.get(cell)
+        port = growth.ports.port(cell)
         if kind is None or port is None:
             self.cell = None
             return

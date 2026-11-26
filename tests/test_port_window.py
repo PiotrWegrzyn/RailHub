@@ -79,3 +79,15 @@ def test_a_port_is_named_by_its_size_and_cell() -> None:
     name = port_name(growth, HOME)
 
     assert name == "Mega port at 4, 1"
+
+
+def test_the_port_window_opens_on_a_port_put_up_since_the_last_months_trade(gui: None) -> None:
+    growth = two_ports()
+    new = (8, 1)
+    growth.build(Building(new, BuildingKind.PORT))
+    window = PortWindow(cell=new)
+
+    draw_frames(window, growth, 1)
+
+    assert window.cell == new
+    assert growth.ports.at[new].slots

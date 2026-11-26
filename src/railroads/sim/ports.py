@@ -275,6 +275,13 @@ class Ports:
         built = sum((counts[kind] for kind in PORT_KINDS), start=np.zeros(self._growth.grid.shape))
         return [(int(row), int(col)) for row, col in np.argwhere(built > 0)]
 
+    def port(self, cell: Cell) -> Port | None:
+        """The port in a cell, its goods drawn now if it went up since the last month's trade
+        drew them (sync); None where no port stands."""
+        if cell not in self.at and self.kind_at(cell) is not None:
+            self.sync()
+        return self.at.get(cell)
+
     def sync(self) -> None:
         """Draws the goods of every port that has none yet and forgets those pulled down."""
         standing = set(self.cells())
@@ -365,7 +372,9 @@ class Ports:
     def pick(self, cell: Cell, good: Good | None, tier: Tier | None = None) -> None:
         """The owner of a mega port picks a good of a tier in the game this year for it to give,
         or none."""
-        port = self.at[cell]
+        port = self.port(cell)
+        if port is None:
+            return
         port.slots = [slot for slot in port.slots if not slot.picked]
         if good is None or tier is None or (good, tier) not in self.pick_choices():
             return
@@ -395,16 +404,16 @@ class Ports:
         owners = self._growth.owners
         return [
             cell
-            for cell in sorted(self.at)
+            for cell in self.cells()
             if (kind := self.kind_at(cell)) is not None and owners.controls(cell, kind)
         ]
 
     def ship(self, cell: Cell, good: Good, to: Cell | None) -> str | None:
         """Ships a good from a port the player controls to another of theirs, or stops shipping
         it; why not, if it can't."""
-        port = self.at[cell]
+        port = self.port(cell)
         kind = self.kind_at(cell)
-        if kind is None or cell not in self.controlled():
+        if port is None or kind is None or cell not in self.controlled():
             return "You don't control this port"
         if to is None:
             port.ships.pop(good, None)
@@ -489,7 +498,7 @@ class Ports:
 
     def gives_at(self, cell: Cell) -> dict[Good, float]:
         """What the port in a cell gives a month this year, drawn and landed from ships."""
-        port = self.at.get(cell)
+        port = self.port(cell)
         if port is None:
             return {}
         gives: dict[Good, float] = {}
@@ -503,7 +512,7 @@ class Ports:
 
     def takes_at(self, cell: Cell) -> dict[Need, float]:
         """What the port in a cell takes a month this year."""
-        port = self.at.get(cell)
+        port = self.port(cell)
         if port is None:
             return {}
         takes: dict[Need, float] = {}
