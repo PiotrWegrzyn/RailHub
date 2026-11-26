@@ -5,6 +5,11 @@ import pytest
 
 from builders import joined_stations
 from railroads.sim.constructions import Track
+from railroads.sim.grids import Cell
+from railroads.sim.growth import Growth
+from railroads.sim.ladders import GrowthRule
+from railroads.sim.railway import Railway
+from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.trains import Train
 
 
@@ -77,3 +82,38 @@ def test_a_routes_length_is_the_length_of_its_way_and_is_kept_until_track_change
 
     assert length == pytest.approx(sum(math.dist(a, b) for a, b in itertools.pairwise(points[:-1])))
     assert kept == length
+
+
+def three_stations() -> tuple[Railway, Cell, Cell, Cell]:
+    _, railway = joined_stations()
+    growth = Growth(railway.constructions, GrowthRule(trades=False))
+    build_station(growth, (10, 12))
+    route = plan_route(railway.constructions, (6, 20), (10, 12))
+    assert route is not None
+    lay_route(growth, route)
+    return railway, (6, 3), (6, 20), (10, 12)
+
+
+def test_ways_found_one_after_another_from_a_station_are_those_found_alone() -> None:
+    railway, west, east, south = three_stations()
+    network = railway.network
+    arrivals = {end: set(railway.constructions.station_cells(end)) for end in (west, east, south)}
+
+    found = [network.route(west, end) for end in (south, east)]
+
+    alone = [network._search(west, None, arrivals[end], False, False) for end in (south, east)]
+    assert found == alone
+    assert all(way is not None for way in found)
+
+
+def test_a_way_too_far_off_any_track_is_none_and_others_from_there_are_still_found() -> None:
+    railway, west, _east, south = three_stations()
+    network = railway.network
+
+    nowhere = network.route(west, (1, 1))
+    found = network.route(west, south)
+
+    assert nowhere is None
+    assert found == network._search(
+        west, None, set(railway.constructions.station_cells(south)), False, False
+    )

@@ -36,18 +36,89 @@ _ENTRIES: dict[Grid, dict[tuple[Cell, Point], int]] = {}
 class _Memo:
     """What finding a way asks of each cell (TrackNetwork._memo), kept until track or stations
     change, as after a change many trains look for their ways again over the same cells: the
-    railway version it was found for, the exits, whether a train can go on, the platforms beside
-    and whether an engine shed stands there."""
+    railway version it was found for, the exits, whether a train can go on, the platforms
+    beside, whether an engine shed stands there, the searches for ways from each station
+    (_Search), and how fast trains run and how much they burn through each cell."""
 
     version: int
     exits: dict[tuple[Cell, int | None, bool, bool], list[int]] = field(default_factory=dict)
     joins: dict[tuple[Cell, int], bool] = field(default_factory=dict)
     beside: dict[Cell, list[Cell]] = field(default_factory=dict)
     sheds: dict[Cell, bool] = field(default_factory=dict)
+    searches: dict[tuple[Cell, bool, bool], _Search] = field(default_factory=dict)
+    speeds: dict[Cell, float] = field(default_factory=dict)
+    burns: dict[Cell, float] = field(default_factory=dict)
 
 
-# Each network's _Memo, kept off the network so a saved game does not hold it.
+class _Search:
+    """A search for ways from a station (TrackNetwork._search with no entry), kept going as far
+    as each way asked for from it needs and taken up again for the next: it takes its steps in
+    the same order whatever it is looking for, so a way found here is the one a search of its
+    own would find, and many ways asked for from one station take one search. Each cell is kept
+    with where it was first reached from, and in what order."""
+
+    def __init__(self, start: Cell) -> None:
+        self.counter = itertools.count()
+        self.taken: list[tuple[int, Cell, int]] = []
+        self.frontier: list[tuple[float, int, Cell, int | None, int]] = [
+            (0.0, next(self.counter), start, None, -1)
+        ]
+        self.seen: set[tuple[Cell, int | None]] = set()
+        self.first: dict[Cell, tuple[int, int | None, int]] = {}
+        self.order = 0
+
+    def reach(
+        self, network: TrackNetwork, arrivals: set[Cell], electric: bool, maglev: bool
+    ) -> tuple[Cell, int | None, int] | None:
+        """The first of the arrivals the search reaches, with the point it comes in by and its
+        last step; None if it reaches none of them."""
+        reached = [(self.first[cell], cell) for cell in arrivals if cell in self.first]
+        if reached:
+            (_, entry, last), cell = min(reached)
+            return cell, entry, last
+        network._find_exits()
+        grid = network.constructions.tile_map.grid
+        lengths = [float(math.hypot(*step)) for step in grid.track_steps()]
+        frontier, taken, seen = self.frontier, self.taken, self.seen
+        while frontier:
+            cost, _, cell, entry, last = heapq.heappop(frontier)
+            arrived = False
+            if last >= 0 and cell not in self.first:
+                self.first[cell] = (self.order, entry, last)
+                self.order += 1
+                arrived = cell in arrivals
+            if (cell, entry) not in seen:
+                seen.add((cell, entry))
+                if not (last >= 0 and network._shed(cell)):
+                    for beside in network._platforms_beside(cell):
+                        taken.append((last, cell, CROSSING))
+                        heapq.heappush(
+                            frontier, (cost + 1.0, next(self.counter), beside, None, len(taken) - 1)
+                        )
+                    for exit_point in network._exits(cell, entry, electric, maglev):
+                        nxt, nxt_entry = network._track_exit(cell, exit_point)
+                        if not grid.contains(*nxt) or not network._joins(nxt, nxt_entry):
+                            continue
+                        taken.append((last, cell, exit_point))
+                        heapq.heappush(
+                            frontier,
+                            (
+                                cost + lengths[exit_point],
+                                next(self.counter),
+                                nxt,
+                                nxt_entry,
+                                len(taken) - 1,
+                            ),
+                        )
+            if arrived:
+                return cell, entry, last
+        return None
+
+
+# Each network's _Memo, kept off the network so a saved game does not hold it, and the network
+# last asked for its memo with that memo, found again without the weak dictionary.
 _MEMOS: weakref.WeakKeyDictionary[TrackNetwork, _Memo] = weakref.WeakKeyDictionary()
+_LAST_MEMO: list = [None, None]
 
 
 class TrackNetwork:
@@ -75,9 +146,13 @@ class TrackNetwork:
     def _memo(self) -> _Memo:
         """What finding a way has asked of each cell since track or stations last changed."""
         version = self.constructions.railway_version
+        network, memo = _LAST_MEMO
+        if network is self and memo is not None and memo.version == version:
+            return memo
         memo = _MEMOS.get(self)
         if memo is None or memo.version != version:
             memo = _MEMOS[self] = _Memo(version)
+        _LAST_MEMO[:] = [self, memo]
         return memo
 
     def _shed(self, cell: Cell) -> bool:
@@ -148,9 +223,6 @@ class TrackNetwork:
         self, start: Cell, end: Cell, electric: bool = False, maglev: bool = False
     ) -> float | None:
         """How long the way route finds is, in cells; None without one."""
-        way = self.route(start, end, electric, maglev)
-        if way is None:
-            return None
         version = self.constructions.railway_version
         if self._lengths[0] != version:
             self._lengths = (version, {})
@@ -158,8 +230,24 @@ class TrackNetwork:
         key = (start, end, electric, maglev)
         length = lengths.get(key)
         if length is None:
-            length = lengths[key] = sum(math.dist(a, b) for a, b in itertools.pairwise(way[0]))
+            points = self._route_points(start, end, electric, maglev)
+            if points is None:
+                return None
+            length = lengths[key] = sum(math.dist(a, b) for a, b in itertools.pairwise(points))
         return length
+
+    def _route_points(
+        self, start: Cell, end: Cell, electric: bool, maglev: bool
+    ) -> list[Point] | None:
+        """The points of the way route finds, without the speeds on it when it was not found
+        yet: planning refuelling stops asks only how long thousands of ways are."""
+        version = self.constructions.railway_version
+        if self._routes[0] == version:
+            way = self._routes[1].get((start, end, electric, maglev), False)
+            if way is not False:
+                return None if way is None else way[0]
+        found = self._found(start, end, electric, maglev)
+        return None if found is None else self._points(*found)
 
     def fuel_length(
         self, start: Cell, end: Cell, electric: bool = False, maglev: bool = False
@@ -188,12 +276,28 @@ class TrackNetwork:
         )
 
     def _find_way(self, start: Cell, end: Cell, electric: bool, maglev: bool) -> Way | None:
+        found = self._found(start, end, electric, maglev)
+        return None if found is None else self._way(*found)
+
+    def _found(
+        self, start: Cell, end: Cell, electric: bool, maglev: bool
+    ) -> tuple[list[tuple[Cell, int]], tuple[Cell, int]] | None:
+        """The steps of the way from one station to another and where it arrives, if any."""
         constructions = self.constructions
         if constructions.shed_at(end) is not None:
             arrivals = {end}
         else:
             arrivals = set(constructions.station_cells(constructions.main_station(end) or end))
-        return self._search(start, None, arrivals, electric, maglev)
+        searches = self._memo().searches
+        key = (start, electric, maglev)
+        search = searches.get(key)
+        if search is None:
+            search = searches[key] = _Search(start)
+        found = search.reach(self, arrivals, electric, maglev)
+        if found is None:
+            return None
+        cell, entry, last = found
+        return _trail(search.taken, last), (cell, entry or 0)
 
     def way_on(
         self, cell: Cell, entry: int, arrival: Cell, electric: bool = False, maglev: bool = False
@@ -378,26 +482,41 @@ class TrackNetwork:
         return any(isinstance(b, Track) and entry in b.ends for b in self.constructions.at(cell))
 
     def _way(self, trail: list[tuple[Cell, int]], arrival: tuple[Cell, int]) -> Way:
+        start_cell = trail[0][0]
+        speeds: list[float] = []
+        for cell, exit_point in trail:
+            if cell != start_cell:
+                speeds.append(self._speed(cell))
+            if exit_point != CROSSING:
+                speeds.append(self._speed(cell))
+        speeds.append(1.0)
+        return self._points(trail, arrival), speeds
+
+    def _points(self, trail: list[tuple[Cell, int]], arrival: tuple[Cell, int]) -> list[Point]:
+        """The points of a way found: the middle of each cell it passes and where it leaves it."""
         grid = self.constructions.tile_map.grid
         steps = grid.track_steps()
         start_cell = trail[0][0]
         points: list[Point] = [grid.center(*start_cell)]
-        speeds: list[float] = []
         for cell, exit_point in trail:
             cx, cy = grid.center(*cell)
             if cell != start_cell:
                 points.append((float(cx), float(cy)))
-                speeds.append(self._speed(cell))
             if exit_point == CROSSING:
                 continue
             sx, sy = steps[exit_point] / 2
             points.append((float(cx + sx), float(cy + sy)))
-            speeds.append(self._speed(cell))
         points.append(tuple(float(v) for v in grid.center(*arrival[0])))  # type: ignore[arg-type]
-        speeds.append(1.0)
-        return points, speeds
+        return points
 
     def _speed(self, cell: Cell) -> float:
+        speeds = self._memo().speeds
+        found = speeds.get(cell)
+        if found is None:
+            found = speeds[cell] = self._find_speed(cell)
+        return found
+
+    def _find_speed(self, cell: Cell) -> float:
         tile = self.constructions.tile_map.tile(cell)
         pieces = [b for b in self.constructions.at(cell) if isinstance(b, Track)]
         if not pieces:
@@ -405,6 +524,13 @@ class TrackNetwork:
         return max(0.2, track_rules_for(tile, pieces[0].bed).speed_factor)
 
     def _burn(self, cell: Cell) -> float:
+        burns = self._memo().burns
+        found = burns.get(cell)
+        if found is None:
+            found = burns[cell] = self._find_burn(cell)
+        return found
+
+    def _find_burn(self, cell: Cell) -> float:
         tile = self.constructions.tile_map.tile(cell)
         pieces = [b for b in self.constructions.at(cell) if isinstance(b, Track)]
         if not pieces:

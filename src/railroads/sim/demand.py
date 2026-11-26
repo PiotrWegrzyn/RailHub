@@ -67,12 +67,17 @@ class StationDemand:
         of demand left of the need it meets best as it came in."""
         earned = 0.0
         left = amount
+        # The needs the good meets here and each one's share left (best_need), the share worked
+        # out again only for the need a unit was just paid for: a train brings hundreds of units.
+        fits = [need for need in self.capacity if good in FITS[need] and self.capacity[need] > 0]
+        if not fits:
+            return earned
+        shares = {need: self._share(need) for need in fits}
         while left > EPSILON:
             unit = min(1.0, left)
-            need = self.best_need(good)
-            if need is None:
-                break
+            need = max(fits, key=shares.__getitem__)
             earned += self.pay(need, good, unit)
+            shares[need] = self._share(need)
             left -= unit
         return earned
 
