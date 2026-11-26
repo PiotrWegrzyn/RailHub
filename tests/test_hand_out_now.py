@@ -24,7 +24,8 @@ def test_houses_by_a_station_eat_food_the_moment_it_arrives_up_to_a_months_need(
 
     growth.station_trade.hand_out_now(STATION, Good.BREAD)
 
-    assert railway.station_goods(STATION).brought[Good.BREAD] == pytest.approx(50.0 - 2 * 20.0)
+    food = needs_of(BuildingKind.HOUSE, growth.year)[Need.FOOD]
+    assert railway.station_goods(STATION).brought[Good.BREAD] == pytest.approx(50.0 - 2 * food)
     assert railway.finances.month["cargo"] > 0
 
 
@@ -38,8 +39,9 @@ def test_food_taken_at_once_is_not_handed_out_again_and_counts_for_the_month() -
 
     assert growth.last_trade is not None
     eaten, _ = growth.last_trade.goods_got[(BuildingKind.HOUSE, Need.FOOD)]
-    assert float(eaten.sum()) == pytest.approx(20.0)
-    assert railway.station_goods(STATION).brought[Good.BREAD] == pytest.approx(30.0)
+    food = needs_of(BuildingKind.HOUSE, growth.year)[Need.FOOD]
+    assert float(eaten.sum()) == pytest.approx(food)
+    assert railway.station_goods(STATION).brought[Good.BREAD] == pytest.approx(50.0 - food)
 
 
 def test_freight_a_station_gathered_is_never_handed_out_at_once() -> None:
@@ -63,7 +65,7 @@ def test_a_station_is_short_only_of_what_its_buildings_still_lack_this_month() -
 
     growth.station_trade.hand_out_now(STATION, Good.BREAD)
 
-    assert hungry[Need.FOOD] == pytest.approx(20.0)
+    assert hungry[Need.FOOD] == pytest.approx(needs_of(BuildingKind.HOUSE, growth.year)[Need.FOOD])
     assert Need.FOOD not in growth.station_trade.short_of(STATION)
 
 

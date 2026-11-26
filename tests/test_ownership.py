@@ -3,7 +3,7 @@ import pytest
 
 from builders import QUIET, flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.goods import Good, Need, price_of
+from railroads.sim.goods import MAKES, Good, Need, price_of
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import FACTORIES, FARMS_CROWDED_OUT, GrowthRule
 from railroads.sim.ledger import _Books
@@ -17,6 +17,8 @@ from railroads.sim.ownership import (
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.tiles import Tiles, activate
+
+WHEAT_A_MONTH = MAKES[BuildingKind.FARM][Good.WHEAT]
 
 
 def grown(*placed: tuple[tuple[int, int], BuildingKind]) -> Growth:
@@ -47,7 +49,7 @@ def test_a_lot_of_shares_costs_its_part_of_payback_years_of_all_a_building_makes
 
     problem = growth.owners.buy((5, 5), BuildingKind.FARM)
 
-    price = 12 * PAYBACK_YEARS * 10 * price_of(Good.WHEAT) * LOT / SHARES
+    price = 12 * PAYBACK_YEARS * WHEAT_A_MONTH * price_of(Good.WHEAT) * LOT / SHARES
     assert problem is None
     assert growth.owners.shares(BuildingKind.FARM)[5, 5] == LOT
     assert growth.railway.finances.cash == pytest.approx(cash - price)
@@ -126,7 +128,9 @@ def test_a_station_hands_out_the_players_part_of_their_farm_and_earns_its_freigh
 
     growth.trade_goods()
 
-    assert growth.last_trade.handed[(6, 20)][Good.WHEAT] == pytest.approx(10 * shares / SHARES)
+    assert growth.last_trade.handed[(6, 20)][Good.WHEAT] == pytest.approx(
+        WHEAT_A_MONTH * shares / SHARES
+    )
     assert growth.railway.finances.month["owned buildings"] > 0
     assert growth.railway.finances.month["cargo"] > 0
 
@@ -187,7 +191,7 @@ def test_the_players_farm_sells_its_goods_at_the_market_price_as_they_enter_the_
     growth.trade_goods()
 
     sold = growth.railway.finances.month["owned buildings"]
-    assert sold == pytest.approx(10 * price_of(Good.WHEAT))
+    assert sold == pytest.approx(WHEAT_A_MONTH * price_of(Good.WHEAT))
     assert growth.railway.finances.month.get("cargo", 0.0) == 0.0
 
 
@@ -210,7 +214,9 @@ def test_shares_are_priced_by_the_buildings_own_satisfaction_not_the_rest_of_the
 
     price = growth.owners.lot_price((5, 5), BuildingKind.FARM)
 
-    assert price == pytest.approx(12 * PAYBACK_YEARS * 10 * price_of(Good.WHEAT) * LOT / SHARES)
+    assert price == pytest.approx(
+        12 * PAYBACK_YEARS * WHEAT_A_MONTH * price_of(Good.WHEAT) * LOT / SHARES
+    )
 
 
 def test_a_building_that_never_traded_is_priced_as_fully_satisfied() -> None:

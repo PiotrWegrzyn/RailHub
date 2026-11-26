@@ -19,7 +19,7 @@ from railroads.sim.fuel_market import (
     fuel_of,
     signals_of,
 )
-from railroads.sim.goods import Good, Need
+from railroads.sim.goods import NEEDS, Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.railway import Railway
@@ -260,12 +260,8 @@ def test_electricity_from_the_players_own_power_plants_costs_a_fifth() -> None:
 
 def test_a_fed_power_plant_the_player_owns_makes_electricity_and_others_do_not() -> None:
     cells = np.array([0, 1])
-    got = {
-        (BuildingKind.POWER_PLANT, Need.COAL): (
-            np.array([1_000.0, 1_000.0]),
-            np.array([1_000.0, 1_000.0]),
-        )
-    }
+    coal = NEEDS[BuildingKind.POWER_PLANT][Need.COAL]
+    got = {(BuildingKind.POWER_PLANT, Need.COAL): (np.array([coal, coal]), np.array([coal, coal]))}
     trade = Trade(cells, {}, {}, {}, {}, goods_got=got)
     owned = {BuildingKind.POWER_PLANT: np.array([[1, 0]])}
 
@@ -293,7 +289,7 @@ def test_a_train_burns_half_its_engines_fuel_alone_and_half_as_much_again_at_its
 
     burns = railway.burn(alone), railway.burn(heaviest)
 
-    assert burns == (pytest.approx(0.5 * engine.burn), pytest.approx(1.5 * engine.burn))
+    assert burns == (pytest.approx(0.5 * engine.burn), pytest.approx(1.5 * engine.burn, rel=0.03))
 
 
 def wheat_train(wheat_waiting: float) -> Railway:

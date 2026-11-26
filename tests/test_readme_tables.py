@@ -39,9 +39,9 @@ def test_a_house_must_get_half_its_food_and_its_heating_and_takes_the_rest_as_a_
 
     _, name, makes, must, bonus, _ = line.split("|")
     assert (name.strip(), makes.strip()) == ("House", "")
-    assert must.strip() == "10 food, 3 heating"
-    assert bonus.strip().startswith("10 food,")
-    assert "5 common goods" in bonus
+    assert must.strip() == "6 food, 2 heating"
+    assert bonus.strip().startswith("6 food,")
+    assert "3 common goods" in bonus
 
 
 def test_the_freight_table_puts_every_good_but_travellers_in_the_band_of_its_freight() -> None:

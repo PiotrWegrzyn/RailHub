@@ -62,18 +62,18 @@ JEWELLERS_APART = 10
 
 # Passengers each point of a building in a station's inner ring sends, and wants to receive, every
 # month.
-PASSENGERS_PER_POINT: Mapping[Points, int] = MappingProxyType(
+PASSENGERS_PER_POINT: Mapping[Points, float] = MappingProxyType(
     {
-        Points.POPULATION: 1,
-        Points.FOOD: 5,
-        Points.TIMBER: 5,
-        Points.ORE: 10,
-        Points.INDUSTRY: 10,
-        Points.TRADE: 18,
-        Points.CORPORATE: 20,
-        Points.MILITARY: 20,
-        Points.AIR: 200,
-        Points.WORSHIP: 1,
+        Points.POPULATION: 0.6,
+        Points.FOOD: 3.0,
+        Points.TIMBER: 3.0,
+        Points.ORE: 6.0,
+        Points.INDUSTRY: 6.0,
+        Points.TRADE: 11.0,
+        Points.CORPORATE: 12.0,
+        Points.MILITARY: 12.0,
+        Points.AIR: 120.0,
+        Points.WORSHIP: 0.6,
     }
 )
 

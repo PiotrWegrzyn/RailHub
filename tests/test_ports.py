@@ -38,7 +38,7 @@ def test_a_ports_monthly_amount_is_its_tiers_value_at_the_goods_base_price() -> 
     amounts = [monthly(Good.LIMESTONE, Tier.COMMON), monthly(Good.STEEL, Tier.EPIC)]
 
     assert amounts == [600 / PRICES[Good.LIMESTONE], 4800 / PRICES[Good.STEEL]]
-    assert amounts[0] == 60
+    assert amounts[0] == 40
 
 
 @pytest.mark.parametrize(
@@ -147,7 +147,7 @@ def test_ports_grow_by_the_sea_lakes_and_rivers_but_not_on_mountains() -> None:
     assert weights[6, 1] == 0 and weights[6, 6] == 0
 
 
-@pytest.mark.parametrize(("kind", "sent"), [(K.PORT, 18), (K.BIG_PORT, 36), (K.MEGA_PORT, 72)])
+@pytest.mark.parametrize(("kind", "sent"), [(K.PORT, 11), (K.BIG_PORT, 22), (K.MEGA_PORT, 44)])
 def test_ports_send_passengers_like_blocks_of_flats_more_for_bigger_ones(
     kind: BuildingKind, sent: int
 ) -> None:

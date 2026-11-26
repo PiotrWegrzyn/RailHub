@@ -53,22 +53,22 @@ def test_details_list_each_kind_of_building_with_what_it_makes_needs_and_traded(
 
     assert house.name == "house"
     assert house.count == 3
-    assert house.needs == [(Need.FOOD, 30), (Need.HEATING, 9)]
+    assert house.needs == [(Need.FOOD, 18), (Need.HEATING, 6)]
     assert dict(house.bonus) == {
-        Need.FOOD: 30,
+        Need.FOOD: 18,
         **{
             need: pytest.approx(3 * amount)
             for need, amount in bonus_of(BuildingKind.HOUSE, 1850).items()
         },
     }
-    assert got[Need.FOOD] == (pytest.approx(10 * 13 / 21), 30.0)
-    assert bonus_got[Need.FOOD] == (0.0, 30.0)
-    assert got[Need.HEATING] == (0.0, 9.0)
-    assert bonus_got[Need.BEER] == (0.0, 3.0)
+    assert got[Need.FOOD] == (pytest.approx(6 * 13 / 21), 18.0)
+    assert bonus_got[Need.FOOD] == (0.0, 18.0)
+    assert got[Need.HEATING] == (0.0, 6.0)
+    assert bonus_got[Need.BEER] == (0.0, pytest.approx(1.8))
     assert house.satisfaction == "short"
-    assert farm.makes == [(Good.WHEAT, 10)]
+    assert farm.makes == [(Good.WHEAT, 6)]
     assert [(flow.good, flow.done, flow.wanted) for flow in farm.gave] == [
-        (Good.WHEAT, pytest.approx(10 * 13 / 21), 10.0)
+        (Good.WHEAT, pytest.approx(6 * 13 / 21), 6.0)
     ]
     assert ("population", 3, 3) in details.points
     assert ("food", 0, 1) in details.points
@@ -97,8 +97,8 @@ def test_a_tenement_must_have_half_its_food_common_goods_and_heating_and_takes_t
     details = describe(growth, (5, 5))
 
     tenement = details.buildings[0]
-    assert tenement.needs == [(Need.FOOD, 60), (Need.COMMON, 60), (Need.HEATING, 20)]
-    assert dict(tenement.bonus) == {Need.FOOD: 60, **bonus_of(BuildingKind.TENEMENT, 1850)}
+    assert tenement.needs == [(Need.FOOD, 35), (Need.COMMON, 40), (Need.HEATING, 12)]
+    assert dict(tenement.bonus) == {Need.FOOD: 35, **bonus_of(BuildingKind.TENEMENT, 1850)}
     assert {flow.good for flow in tenement.got} == {Need.FOOD, Need.COMMON, Need.HEATING}
     assert {flow.good for flow in tenement.bonus_got} == {
         Need.FOOD,
@@ -114,7 +114,7 @@ def test_a_factory_without_planks_makes_none_of_the_most_it_could() -> None:
 
     details = describe(growth, (5, 5))
 
-    assert details.buildings[0].gave == [Flow(Good.GOODS, 0.0, 30.0)]
+    assert details.buildings[0].gave == [Flow(Good.GOODS, 0.0, 20.0)]
 
 
 def test_a_building_shows_its_mood_with_its_satisfaction_as_a_percentage() -> None:

@@ -47,13 +47,13 @@ def test_what_the_station_holds_costs_the_delivered_share(held: float) -> None:
 
 def test_a_facility_takes_what_the_station_holds_and_pays_less_for_it() -> None:
     _, railway = _with_shed()
-    railway.station_goods(STATION).stockpile[Good.COAL] = 20.0
+    railway.station_goods(STATION).stockpile[Good.COAL] = 10.0
 
     railway.turn_month({})
 
     spent = -railway.finances.month["station facilities"]
     price = railway.market_price(Good.COAL)
-    assert spent == pytest.approx((20.0 * DELIVERED_SHARE + COAL - 20.0) * price)
+    assert spent == pytest.approx((10.0 * DELIVERED_SHARE + COAL - 10.0) * price)
     assert railway.station_goods(STATION).held(Good.COAL) == pytest.approx(0.0)
 
 
@@ -138,11 +138,11 @@ def test_bulldozing_a_station_takes_its_facilities_down() -> None:
 def test_a_station_wants_what_its_facilities_will_use_beyond_what_it_holds() -> None:
     growth, railway = _with_shed()
     growth.trade_goods()
-    railway.station_goods(STATION).stockpile[Good.COAL] = 20.0
+    railway.station_goods(STATION).stockpile[Good.COAL] = 10.0
 
     short = growth.station_trade.short_of(STATION)
 
-    assert short[Need.COAL] == pytest.approx(COAL - 20.0)
+    assert short[Need.COAL] == pytest.approx(COAL - 10.0)
 
 
 def test_a_post_office_makes_mail_delivered_there_pay_half_as_much_again() -> None:

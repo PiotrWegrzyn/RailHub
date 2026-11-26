@@ -25,10 +25,10 @@ def test_the_help_lists_every_building_once() -> None:
 def test_the_help_gives_what_a_building_makes_and_wants_in_a_month() -> None:
     row = row_of(BuildingKind.WINERY)
 
-    assert row.makes == ((Good.WINE, 20),)
+    assert row.makes == ((Good.WINE, 12),)
     assert {need: amount for need, amount, _ in row.wants} == {
-        Need.GRAPES: 80.0,
-        Need.BARRELS: 40.0,
+        Need.GRAPES: 48.0,
+        Need.BARRELS: 24.0,
     }
 
 
@@ -42,26 +42,26 @@ def test_the_help_says_when_a_need_begins() -> None:
 @pytest.mark.parametrize(
     ("kind", "travellers", "space", "since"),
     [
-        (BuildingKind.HOUSE, 1, 1, ""),
-        (BuildingKind.ST_PETERS, 2137, 1, ""),
-        (BuildingKind.FACTORY, 10, 3, "1780"),
-        (BuildingKind.AIRPORT, 200, 1, "1920"),
-        (BuildingKind.STEEL_MILL, 30, 3, "era 2"),
+        (BuildingKind.HOUSE, 0.6, 1, ""),
+        (BuildingKind.ST_PETERS, 1282.2, 1, ""),
+        (BuildingKind.FACTORY, 6, 3, "1780"),
+        (BuildingKind.AIRPORT, 120, 1, "1920"),
+        (BuildingKind.STEEL_MILL, 18, 3, "era 2"),
     ],
 )
 def test_the_help_gives_travellers_space_and_when_it_opens(
-    kind: BuildingKind, travellers: int, space: int, since: str
+    kind: BuildingKind, travellers: float, space: int, since: str
 ) -> None:
     row = row_of(kind)
 
-    assert (row.travellers, row.space, row.since) == (travellers, space, since)
+    assert (row.travellers, row.space, row.since) == (pytest.approx(travellers), space, since)
 
 
 def test_the_help_gives_the_market_price_and_freight_of_every_good() -> None:
     prices = {row.good: (row.price, row.freight) for row in good_help()}
 
     assert set(prices) == set(Good)
-    assert prices[Good.INCENSE] == (pytest.approx(1500), pytest.approx(300))
+    assert prices[Good.INCENSE] == (pytest.approx(2500), pytest.approx(500))
 
 
 def test_the_help_says_who_makes_and_wants_a_good() -> None:

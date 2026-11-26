@@ -6,7 +6,7 @@ from railroads.sim.breeding import LIVELY_GROWTH
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.economy import Economy
 from railroads.sim.events import make_factor
-from railroads.sim.goods import DIESEL_BOOST, PIPELINE, Good, Need
+from railroads.sim.goods import DIESEL_BOOST, MAKES, PIPELINE, Good, Need
 from railroads.sim.tiles import Tiles, activate
 
 MINE = (8, 9)
@@ -41,7 +41,7 @@ def test_diesel_adds_its_half_to_a_farm_that_takes_no_limestone_or_machinery_unl
     trade = economy.trade(placed, holding(1000.0, FUEL=10.0, LIMESTONE=10.0, MACHINERY=10.0))
 
     assert trade.gathered[STATION][Good.WHEAT] == pytest.approx(
-        10 * (1 + DIESEL_BOOST) * make_factor(Good.WHEAT, 1950)
+        MAKES[BuildingKind.FARM][Good.WHEAT] * (1 + DIESEL_BOOST) * make_factor(Good.WHEAT, 1950)
     )
 
 

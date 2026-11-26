@@ -107,12 +107,12 @@ def test_only_the_most_crowded_cathedral_becomes_st_peters() -> None:
 @pytest.mark.parametrize(
     ("kind", "people"),
     [
-        (BuildingKind.BASILICA, 20),
-        (BuildingKind.CATHEDRAL, 50),
-        (BuildingKind.ST_PETERS, 2137),
+        (BuildingKind.BASILICA, 12),
+        (BuildingKind.CATHEDRAL, 30),
+        (BuildingKind.ST_PETERS, 1282.2),
     ],
 )
-def test_churches_send_their_congregation_as_passengers(kind: BuildingKind, people: int) -> None:
+def test_churches_send_their_congregation_as_passengers(kind: BuildingKind, people: float) -> None:
     constructions = Constructions(square_map())
     constructions.build(Building((5, 5), kind))
     growth = Growth(constructions)
@@ -120,7 +120,7 @@ def test_churches_send_their_congregation_as_passengers(kind: BuildingKind, peop
 
     travellers = growth.station_trade.travellers_in(flat)
 
-    assert travellers[Good.PASSENGERS] == people
+    assert travellers[Good.PASSENGERS] == pytest.approx(people)
 
 
 @pytest.mark.parametrize("need", [Need.WAX, Need.INCENSE])

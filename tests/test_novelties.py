@@ -142,7 +142,7 @@ def test_the_salt_mine_cathedral_stands_on_salt_and_digs_it() -> None:
     cell = place(growth, BuildingKind.SALT_CATHEDRAL, np.random.default_rng(0))
 
     assert cell == (30, 7)
-    assert MAKES[BuildingKind.SALT_CATHEDRAL] == {Good.SALT: 200}
+    assert MAKES[BuildingKind.SALT_CATHEDRAL] == {Good.SALT: 120}
 
 
 def test_novelties_want_only_goods_the_game_already_has_and_fill_a_whole_hex() -> None:

@@ -234,7 +234,7 @@ class HelpWindow:
             imgui.table_next_column()
             _draw_wants(row)
             imgui.table_next_column()
-            imgui.text(f"{row.travellers:,}" if row.travellers else "-")
+            imgui.text(f"{row.travellers:,g}" if row.travellers else "-")
             imgui.table_next_column()
             imgui.text(f"{row.space}/6")
             imgui.table_next_column()

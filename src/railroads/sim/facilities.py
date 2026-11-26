@@ -28,7 +28,7 @@ from railroads.sim.station_goods import StationGoods
 __all__ = ["Facility"]
 
 SAND_TOWER_PICKUP = 0.5
-WAREHOUSE_ROOM = 500.0
+WAREHOUSE_ROOM = 300.0
 REACH = 2
 DELIVERED_SHARE = 0.5
 
@@ -41,13 +41,13 @@ PLACED = frozenset(ANNEX_SPACE)
 # What each facility uses a month, and how much of it.
 USES: Mapping[Facility, tuple[Good, float]] = MappingProxyType(
     {
-        Facility.ENGINE_SHED: (Good.COAL, 25.0),
-        Facility.SAND_TOWER: (Good.SAND, 7.5),
-        Facility.POST_OFFICE: (Good.PAPER, 5.0),
-        Facility.REFRESHMENT_ROOM: (Good.BEER, 2.5),
-        Facility.MARKET_HALL: (Good.PLANKS, 10.0),
-        Facility.CATTLE_PENS: (Good.WHEAT, 15.0),
-        Facility.WAREHOUSE: (Good.BRICKS, 10.0),
+        Facility.ENGINE_SHED: (Good.COAL, 15.0),
+        Facility.SAND_TOWER: (Good.SAND, 4.5),
+        Facility.POST_OFFICE: (Good.PAPER, 3.0),
+        Facility.REFRESHMENT_ROOM: (Good.BEER, 1.5),
+        Facility.MARKET_HALL: (Good.PLANKS, 6.0),
+        Facility.CATTLE_PENS: (Good.WHEAT, 10.0),
+        Facility.WAREHOUSE: (Good.BRICKS, 6.0),
     }
 )
 # The level a station must be raised to before each facility can go up beside it.

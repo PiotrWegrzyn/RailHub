@@ -6,7 +6,7 @@ from railroads.mapgen.deposits import allowed_land, place_deposits
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.dying import dies_after
 from railroads.sim.events import want_factor
-from railroads.sim.goods import Need
+from railroads.sim.goods import NEEDS, Need
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import JEWELLERS, RESOURCES, WORKS, GrowthRule
@@ -110,7 +110,9 @@ def test_needs_start_in_the_era_of_their_goods() -> None:
     after = needs_of(BuildingKind.FLATS, 1843)
 
     assert Need.FUEL not in before
-    assert after[Need.FUEL] == pytest.approx(30 * want_factor(BuildingKind.FLATS, Need.FUEL, 1843))
+    assert after[Need.FUEL] == pytest.approx(
+        NEEDS[BuildingKind.FLATS][Need.FUEL] * want_factor(BuildingKind.FLATS, Need.FUEL, 1843)
+    )
 
 
 def test_works_with_nothing_to_work_from_close_after_exactly_thirty_years_starving() -> None:

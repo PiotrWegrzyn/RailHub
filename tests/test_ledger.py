@@ -3,7 +3,7 @@ import pytest
 
 from builders import flat_map
 from railroads.sim.constructions import Building, BuildingKind, Constructions
-from railroads.sim.goods import Good, freight_of, price_of
+from railroads.sim.goods import MAKES, Good, freight_of, price_of
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.ownership import HOLD_MONTHS, LOT, SHARES
@@ -11,6 +11,7 @@ from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 
 FARM = (6, 22)
+WHEAT_A_MONTH = MAKES[BuildingKind.FARM][Good.WHEAT]
 
 
 def joined_with_owned_farm(shares: int) -> Growth:
@@ -44,9 +45,9 @@ def test_last_year_holds_a_whole_year_of_what_the_players_farm_sold_and_its_frei
 
     taken = growth.ledger.last_year(BuildingKind.FARM, flat(growth, FARM))
     assert taken is not None
-    assert taken.sold == pytest.approx(12 * 10 * price_of(Good.WHEAT))
-    assert taken.freight == pytest.approx(12 * 10 * freight_of(Good.WHEAT))
-    assert taken.output == pytest.approx(12 * 10 * price_of(Good.WHEAT))
+    assert taken.sold == pytest.approx(12 * WHEAT_A_MONTH * price_of(Good.WHEAT))
+    assert taken.freight == pytest.approx(12 * WHEAT_A_MONTH * freight_of(Good.WHEAT))
+    assert taken.output == pytest.approx(12 * WHEAT_A_MONTH * price_of(Good.WHEAT))
     assert taken.yours == pytest.approx(taken.sold + taken.freight)
 
 
@@ -57,8 +58,8 @@ def test_the_players_part_of_a_farm_they_own_a_tenth_of_is_a_tenth_of_its_output
 
     taken = growth.ledger.last_year(BuildingKind.FARM, flat(growth, FARM))
     assert taken is not None
-    assert taken.sold == pytest.approx(12 * 1 * price_of(Good.WHEAT))
-    assert taken.output == pytest.approx(12 * 10 * price_of(Good.WHEAT))
+    assert taken.sold == pytest.approx(12 * WHEAT_A_MONTH * LOT / SHARES * price_of(Good.WHEAT))
+    assert taken.output == pytest.approx(12 * WHEAT_A_MONTH * price_of(Good.WHEAT))
 
 
 def test_there_is_no_last_year_before_a_whole_year_of_trade() -> None:
@@ -76,8 +77,8 @@ def test_the_forecast_is_the_last_quarter_for_a_whole_year() -> None:
 
     forecast = growth.ledger.forecast(BuildingKind.FARM, flat(growth, FARM))
     assert forecast is not None
-    assert forecast.sold == pytest.approx(12 * 10 * price_of(Good.WHEAT))
-    assert forecast.freight == pytest.approx(12 * 10 * freight_of(Good.WHEAT))
+    assert forecast.sold == pytest.approx(12 * WHEAT_A_MONTH * price_of(Good.WHEAT))
+    assert forecast.freight == pytest.approx(12 * WHEAT_A_MONTH * freight_of(Good.WHEAT))
 
 
 def test_a_farm_no_station_reaches_forecasts_its_output_but_nothing_for_the_player() -> None:

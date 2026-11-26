@@ -80,21 +80,21 @@ def generation_in(year: int) -> int:
 # car of it and a Fibonacci size up for each generation after. Cars, from about 1910, from the
 # fourth; tanks and planes, from the 1930s, from the fifth, from the first size.
 VEHICLES: Mapping[Good, tuple[int, float]] = MappingProxyType(
-    {Good.CARS: (4, 5.0), Good.PLANES: (5, 1.0), Good.TANKS: (5, 1.0)}
+    {Good.CARS: (4, 3.0), Good.PLANES: (5, 1.0), Good.TANKS: (5, 1.0)}
 )
 
-SMALL_CAR = 8.0
-MEDIUM_CAR = 21.0
-CAR_CAPACITY = 55.0
-BULK_CAR = 144.0
+SMALL_CAR = 5.0
+MEDIUM_CAR = 13.0
+CAR_CAPACITY = 34.0
+BULK_CAR = 89.0
 
 
 def _sized(size: float, *goods: Good) -> dict[Good, float]:
     return dict.fromkeys(goods, size)
 
 
-# How many units of each good a car of BASE_GENERATION holds, a size up
-# from what fits in a wagon of about 10 cubic metres bearing about 8 tonnes (UNIT_KG); goods not
+# How many units of each good a car of BASE_GENERATION holds, about what fits in a wagon of
+# about 10 cubic metres bearing about 8 tonnes, whichever runs out first (UNIT_KG); goods not
 # listed go CAR_CAPACITY to a car; VEHICLES have their own sizes.
 CAR_UNITS: Mapping[Good, float] = MappingProxyType(
     _sized(
@@ -114,7 +114,7 @@ CAR_UNITS: Mapping[Good, float] = MappingProxyType(
         Good.FERTILISER,
     )
     | _sized(
-        89.0,
+        55.0,
         Good.POTATOES,
         Good.SUGAR,
         Good.RUBBER,
@@ -128,7 +128,7 @@ CAR_UNITS: Mapping[Good, float] = MappingProxyType(
         Good.CHICKENS,
     )
     | _sized(
-        34.0,
+        21.0,
         Good.COTTON,
         Good.FLAX,
         Good.HOPS,
@@ -152,7 +152,7 @@ CAR_UNITS: Mapping[Good, float] = MappingProxyType(
         Good.CEMENT,
         Good.APPLIANCES,
     )
-    | _sized(13.0, Good.FURNITURE, Good.CATTLE)
+    | _sized(8.0, Good.FURNITURE, Good.CATTLE)
     | _sized(SMALL_CAR, Good.MACHINERY, Good.GOLD, Good.DIAMONDS)
 )
 
@@ -538,46 +538,46 @@ P, L, G, H, X = Kind.PIONEER, Kind.LIGHT, Kind.GENERAL, Kind.HEAVY, Kind.EXPRESS
 DIESEL, ELECTRIC, MAGLEV = Power.DIESEL, Power.ELECTRIC, Power.MAGLEV
 ENGINES: dict[str, Engine] = {
     "penydarren": Engine(
-        "Penydarren steam wagon", 1804, 0.25, 1, 1_000.0, P, pickup=45.0, tank=4.0, pull=10.4
+        "Penydarren steam wagon", 1804, 0.25, 1, 1_000.0, P, pickup=45.0, tank=4.0, pull=7.0
     ),
     "catch_me": Engine(
-        "Catch Me Who Can", 1808, 0.2, 1, 1_500.0, P, pickup=43.0, tank=5.0, pull=10.4
+        "Catch Me Who Can", 1808, 0.2, 1, 1_500.0, P, pickup=43.0, tank=5.0, pull=7.0
     ),
-    "salamanca": Engine("Salamanca", 1812, 0.2, 1, 2_000.0, P, pickup=42.0, tank=6.0, pull=10.4),
+    "salamanca": Engine("Salamanca", 1812, 0.2, 1, 2_000.0, P, pickup=42.0, tank=6.0, pull=7.0),
     "puffing_billy": Engine(
-        "Puffing Billy", 1815, 0.25, 1, 2_500.0, P, pickup=40.0, tank=7.0, pull=10.4
+        "Puffing Billy", 1815, 0.25, 1, 2_500.0, P, pickup=40.0, tank=7.0, pull=7.0
     ),
-    "locomotion": Engine("Locomotion", 1820, 0.3, 2, 4_000.0, P, pickup=38.0, tank=8.0, pull=20.8),
-    "rocket": Engine("Rocket", 1826, 0.4, 2, 6_000.0, P, pickup=36.0, tank=10.0, pull=11.4),
-    "lion": Engine("Lion", 1834, 0.45, 2, 8_000.0, P, pickup=35.0, tank=12.0, pull=20.8),
+    "locomotion": Engine("Locomotion", 1820, 0.3, 2, 4_000.0, P, pickup=38.0, tank=8.0, pull=14.0),
+    "rocket": Engine("Rocket", 1826, 0.4, 2, 6_000.0, P, pickup=36.0, tank=10.0, pull=8.0),
+    "lion": Engine("Lion", 1834, 0.45, 2, 8_000.0, P, pickup=35.0, tank=12.0, pull=14.0),
     "planet": Engine(
-        "Planet steam engine", 1840, 0.5, 3, TRAIN_PRICE, G, pickup=12.0, tank=21.0, pull=55.2
+        "Planet steam engine", 1840, 0.5, 3, TRAIN_PRICE, G, pickup=12.0, tank=21.0, pull=40.0
     ),
-    "tank": Engine("Tank engine", 1840, 0.4, 2, 3_000.0, L, pickup=3.0, tank=13.0, pull=22.1),
-    "goods": Engine("Goods engine", 1853, 0.35, 4, 15_000.0, H, pickup=50.0, tank=20.0, pull=73.6),
+    "tank": Engine("Tank engine", 1840, 0.4, 2, 3_000.0, L, pickup=3.0, tank=13.0, pull=16.0),
+    "goods": Engine("Goods engine", 1853, 0.35, 4, 15_000.0, H, pickup=50.0, tank=20.0, pull=55.0),
     "american": Engine(
-        "American 4-4-0", 1856, 0.7, 4, 30_000.0, G, pickup=11.0, tank=25.0, wood=True, pull=73.6
+        "American 4-4-0", 1856, 0.7, 4, 30_000.0, G, pickup=11.0, tank=25.0, wood=True, pull=55.0
     ),
     "single": Engine(
-        "Single-driver express", 1858, 1.0, 3, 40_000.0, X, pickup=12.0, tank=30.0, pull=88.1
+        "Single-driver express", 1858, 1.0, 3, 40_000.0, X, pickup=12.0, tank=30.0, pull=75.0
     ),
     "light_tank": Engine(
-        "Light tank engine", 1862, 0.55, 2, 9_000.0, L, pickup=3.0, tank=16.0, pull=22.1
+        "Light tank engine", 1862, 0.55, 2, 9_000.0, L, pickup=3.0, tank=16.0, pull=16.0
     ),
     "mogul": Engine(
-        "Mogul freight engine", 1865, 0.45, 5, 45_000.0, H, pickup=45.0, tank=30.0, pull=92.0
+        "Mogul freight engine", 1865, 0.45, 5, 45_000.0, H, pickup=45.0, tank=30.0, pull=65.0
     ),
     "atlantic": Engine(
-        "Atlantic express", 1900, 1.5, 4, 120_000.0, X, pickup=10.0, tank=50.0, pull=170.4
+        "Atlantic express", 1900, 1.5, 4, 120_000.0, X, pickup=10.0, tank=50.0, pull=150.0
     ),
     "mallet": Engine(
-        "Mallet articulated", 1905, 0.6, 6, 135_000.0, H, pickup=40.0, tank=50.0, pull=280.2
+        "Mallet articulated", 1905, 0.6, 6, 135_000.0, H, pickup=40.0, tank=50.0, pull=200.0
     ),
     "pacific": Engine(
-        "Pacific engine", 1910, 1.0, 5, 90_000.0, G, pickup=9.0, tank=50.0, pull=233.5
+        "Pacific engine", 1910, 1.0, 5, 90_000.0, G, pickup=9.0, tank=50.0, pull=170.0
     ),
     "boxcab": Engine(
-        "Boxcab electric", 1925, 1.6, 5, 270_000.0, G, ELECTRIC, pickup=6.0, pull=233.5
+        "Boxcab electric", 1925, 1.6, 5, 270_000.0, G, ELECTRIC, pickup=6.0, pull=170.0
     ),
     "railbus": Engine(
         "Railbus",
@@ -590,13 +590,13 @@ ENGINES: dict[str, Engine] = {
         pickup=2.0,
         tank=60.0,
         railcar=True,
-        pull=231.2,
+        pull=190.0,
     ),
     "streamliner": Engine(
-        "Streamliner", 1935, 2.3, 5, 360_000.0, X, pickup=8.0, tank=60.0, pull=462.4
+        "Streamliner", 1935, 2.3, 5, 360_000.0, X, pickup=8.0, tank=60.0, pull=380.0
     ),
     "big_boy": Engine(
-        "Big articulated", 1940, 0.7, 7, 405_000.0, H, pickup=35.0, tank=60.0, pull=525.0
+        "Big articulated", 1940, 0.7, 7, 405_000.0, H, pickup=35.0, tank=60.0, pull=370.0
     ),
     "mixed_diesel": Engine(
         "Mixed-traffic diesel",
@@ -608,16 +608,16 @@ ENGINES: dict[str, Engine] = {
         DIESEL,
         pickup=7.0,
         tank=100.0,
-        pull=450.0,
+        pull=320.0,
     ),
     "heavy_diesel": Engine(
-        "Heavy diesel", 1960, 0.9, 8, 1_200_000.0, H, DIESEL, pickup=30.0, tank=100.0, pull=933.6
+        "Heavy diesel", 1960, 0.9, 8, 1_200_000.0, H, DIESEL, pickup=30.0, tank=100.0, pull=640.0
     ),
     "bullet": Engine(
-        "Bullet train", 1964, 3.5, 6, 1_100_000.0, X, ELECTRIC, pickup=7.0, pull=794.5
+        "Bullet train", 1964, 3.5, 6, 1_100_000.0, X, ELECTRIC, pickup=7.0, pull=640.0
     ),
     "express": Engine(
-        "Universal electric", 1965, 2.4, 7, 2_400_000.0, G, ELECTRIC, pickup=5.0, pull=816.9
+        "Universal electric", 1965, 2.4, 7, 2_400_000.0, G, ELECTRIC, pickup=5.0, pull=560.0
     ),
     "sprinter": Engine(
         "Sprinter unit",
@@ -630,10 +630,10 @@ ENGINES: dict[str, Engine] = {
         pickup=2.0,
         tank=100.0,
         railcar=True,
-        pull=340.5,
+        pull=280.0,
     ),
     "high_speed": Engine(
-        "High-speed electric", 1990, 5.0, 8, 3_200_000.0, X, ELECTRIC, pickup=6.0, pull=1021.5
+        "High-speed electric", 1990, 5.0, 8, 3_200_000.0, X, ELECTRIC, pickup=6.0, pull=820.0
     ),
     "twin_diesel": Engine(
         "Twin-unit diesel",
@@ -645,10 +645,10 @@ ENGINES: dict[str, Engine] = {
         DIESEL,
         pickup=28.0,
         tank=150.0,
-        pull=1837.0,
+        pull=1250.0,
     ),
     "modern_electric": Engine(
-        "Modern electric", 2000, 3.2, 8, 7_200_000.0, G, ELECTRIC, pickup=4.0, pull=1469.6
+        "Modern electric", 2000, 3.2, 8, 7_200_000.0, G, ELECTRIC, pickup=4.0, pull=990.0
     ),
     "super_diesel": Engine(
         "Super-heavy diesel",
@@ -660,10 +660,10 @@ ENGINES: dict[str, Engine] = {
         DIESEL,
         pickup=25.0,
         tank=200.0,
-        pull=2204.4,
+        pull=1500.0,
     ),
     "maglev": Engine(
-        "Maglev", 2030, 500.0 / KMH_PER_SPEED, 10, 10_000_000.0, X, MAGLEV, pickup=5.0, pull=1248.5
+        "Maglev", 2030, 500.0 / KMH_PER_SPEED, 10, 10_000_000.0, X, MAGLEV, pickup=5.0, pull=1000.0
     ),
 }
 

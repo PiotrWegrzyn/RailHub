@@ -92,10 +92,10 @@ def test_a_house_eats_the_rice_a_station_brings() -> None:
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
 
-    trade = economy.trade(placed, holding(RICE=20.0))
+    trade = economy.trade(placed, holding(RICE=12.0))
 
     eaten, _ = trade.goods_got[(BuildingKind.HOUSE, Need.FOOD)]
-    assert eaten[position(trade, economy, (8, 9))] == pytest.approx(20.0)
+    assert eaten[position(trade, economy, (8, 9))] == pytest.approx(12.0)
 
 
 @pytest.mark.parametrize(("people", "opens"), [(SUSHI_TOWN - 1, False), (SUSHI_TOWN, True)])
@@ -119,8 +119,8 @@ def test_a_sushi_hut_takes_a_lot_of_fish_and_rice_and_livens_the_homes_around() 
     here = position(trade, economy, (8, 8))
     fish, _ = trade.goods_got[(BuildingKind.SUSHI_HUT, Need.FISH)]
     rice, _ = trade.goods_got[(BuildingKind.SUSHI_HUT, Need.RICE)]
-    assert fish[here] == pytest.approx(60.0)
-    assert rice[here] == pytest.approx(60.0)
+    assert fish[here] == pytest.approx(40.0)
+    assert rice[here] == pytest.approx(40.0)
     assert BuildingKind.SUSHI_HUT in VENUES
 
 
@@ -156,4 +156,4 @@ def test_a_tavern_takes_sake_for_its_alcohol() -> None:
     trade = economy.trade(placed, holding(SAKE=200.0))
 
     poured, _ = trade.goods_got[(BuildingKind.TAVERN, Need.ALCOHOL)]
-    assert poured[position(trade, economy, (8, 8))] == pytest.approx(22.0)
+    assert poured[position(trade, economy, (8, 8))] == pytest.approx(14.0)

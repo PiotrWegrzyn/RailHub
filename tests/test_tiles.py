@@ -5,7 +5,7 @@ from builders import flat_map
 from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.events import make_factor
 from railroads.sim.game import Game
-from railroads.sim.goods import Good, Need
+from railroads.sim.goods import MAKES, Good, Need
 from railroads.sim.tiles import (
     BASE_LEVELS,
     BENCHMARK_YEAR,
@@ -209,7 +209,9 @@ def test_buildings_make_and_homes_want_as_much_as_the_boards_of_the_game_in_play
     wheat = makes_of(BuildingKind.FARM, 1900)[Good.WHEAT]
     food = needs_of(BuildingKind.HOUSE, 1900)[Need.FOOD]
 
-    assert wheat == pytest.approx(10 * boards.of_year(1900).make_factor(Good.WHEAT))
+    assert wheat == pytest.approx(
+        MAKES[BuildingKind.FARM][Good.WHEAT] * boards.of_year(1900).make_factor(Good.WHEAT)
+    )
     assert food > needs_of(BuildingKind.HOUSE, 1700)[Need.FOOD]
 
 

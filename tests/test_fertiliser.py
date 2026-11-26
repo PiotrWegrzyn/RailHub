@@ -13,14 +13,14 @@ def test_a_chemical_works_leaves_half_a_unit_of_fertiliser_over_every_unit_of_ch
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 8), BuildingKind.CHEMICAL_WORKS, 1))
 
-    trade = economy.trade(placed, holding(1000.0, SALT=50.0, COAL=50.0))
+    trade = economy.trade(placed, holding(1000.0, SALT=30.0, COAL=30.0))
 
     made = trade.gathered[STATION]
-    assert made[Good.CHEMICALS] == pytest.approx(100.0)
-    assert made[Good.FERTILISER] == pytest.approx(50.0)
+    assert made[Good.CHEMICALS] == pytest.approx(60.0)
+    assert made[Good.FERTILISER] == pytest.approx(30.0)
 
 
-@pytest.mark.parametrize(("fertiliser", "wheat"), [(0.0, 10.0), (2.5, 12.5), (5.0, 15.0)])
+@pytest.mark.parametrize(("fertiliser", "wheat"), [(0.0, 6.0), (1.5, 7.5), (3.0, 9.0)])
 def test_fertiliser_lets_a_farm_grow_up_to_half_as_much_again(
     fertiliser: float, wheat: float
 ) -> None:
@@ -36,7 +36,7 @@ def test_fertiliser_lets_a_farm_grow_up_to_half_as_much_again(
 
 @pytest.mark.parametrize(
     ("kind", "good", "made"),
-    [(BuildingKind.MINE, Good.COAL, 150.0), (BuildingKind.IRON_MINE, Good.IRON, 150.0)],
+    [(BuildingKind.MINE, Good.COAL, 90.0), (BuildingKind.IRON_MINE, Good.IRON, 90.0)],
 )
 def test_machinery_lets_a_mine_dig_up_to_half_as_much_again(
     kind: BuildingKind, good: Good, made: float

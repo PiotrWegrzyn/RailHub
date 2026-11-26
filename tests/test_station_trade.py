@@ -3,13 +3,16 @@ import pytest
 from builders import boards_with, flat_map, joined_stations, open_boards
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.demand import DEMAND_PER_NEED
-from railroads.sim.goods import Good, Need
+from railroads.sim.goods import MAKES, Good, Need
 from railroads.sim.growth import Growth
-from railroads.sim.ladders import GrowthRule
+from railroads.sim.ladders import PASSENGERS_PER_POINT, GrowthRule
+from railroads.sim.points import Points
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station
 from railroads.sim.tiles import Tile, activate
 from railroads.sim.trade import input_stock
+
+A_HOUSE = DEMAND_PER_NEED * PASSENGERS_PER_POINT[Points.POPULATION]
 
 
 def close_stations() -> tuple[Growth, Railway]:
@@ -40,7 +43,10 @@ def test_stations_whose_rings_overlap_each_count_every_building_in_their_own_rin
         station: railway.station_demand(station).capacity[Need.PASSENGERS]
         for station in railway.stations()
     }
-    assert passengers == {(6, 10): DEMAND_PER_NEED * 3, (6, 13): DEMAND_PER_NEED * 5}
+    assert passengers == {
+        (6, 10): pytest.approx(A_HOUSE * 3),
+        (6, 13): pytest.approx(A_HOUSE * 5),
+    }
 
 
 def test_a_raised_station_counts_the_buildings_in_its_wider_ring() -> None:
@@ -53,7 +59,7 @@ def test_a_raised_station_counts_the_buildings_in_its_wider_ring() -> None:
     growth.trade_goods()
 
     assert before is None
-    assert railway.station_demand((6, 10)).capacity[Need.PASSENGERS] == DEMAND_PER_NEED * 4
+    assert railway.station_demand((6, 10)).capacity[Need.PASSENGERS] == pytest.approx(A_HOUSE * 4)
 
 
 def test_the_cells_in_reach_are_every_cell_any_station_hands_goods_out_to() -> None:
@@ -75,7 +81,7 @@ def test_goods_buildings_hand_out_on_their_own_by_a_station_earn_the_player_noth
 
     assert railway.finances.month["cargo"] == 0.0
     assert railway.station_goods((6, 20)).stockpile.get(Good.WHEAT, 0.0) == pytest.approx(
-        10 * 8 / 21
+        MAKES[BuildingKind.FARM][Good.WHEAT] * 8 / 21
     )
 
 
@@ -138,7 +144,7 @@ def test_a_station_about_to_be_built_shows_what_its_buildings_want_and_what_is_m
 
     preview = growth.station_trade.preview((6, 10))
 
-    assert preview.demand.capacity[Need.PASSENGERS] == DEMAND_PER_NEED * 3
+    assert preview.demand.capacity[Need.PASSENGERS] == pytest.approx(A_HOUSE * 3)
     assert preview.demand.capacity[Need.FOOD] > 0
     assert preview.made[Good.WHEAT] > 0
     assert preview.made[Good.PASSENGERS] > 0

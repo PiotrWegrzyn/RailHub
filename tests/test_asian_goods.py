@@ -102,10 +102,10 @@ def test_a_house_eats_the_tofu_a_station_brings() -> None:
     economy = Economy(tile_map)
     placed = counts(tile_map, ((8, 9), BuildingKind.HOUSE, 1))
 
-    trade = economy.trade(placed, holding(TOFU=20.0))
+    trade = economy.trade(placed, holding(TOFU=12.0))
 
     eaten, _ = trade.goods_got[(BuildingKind.HOUSE, Need.FOOD)]
-    assert eaten[position(trade, economy, (8, 9))] == pytest.approx(20.0)
+    assert eaten[position(trade, economy, (8, 9))] == pytest.approx(12.0)
 
 
 @pytest.mark.parametrize(

@@ -14,12 +14,18 @@ from railroads.sim.finance import (
     TRAIN_PRICE,
     car_trip_price,
 )
-from railroads.sim.goods import Good, Need, freight_of
+from railroads.sim.goods import MAKES, Good, Need, freight_of
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth
 from railroads.sim.railway import CELLS_PER_MONTH, NO_TRACK_ON, Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
-from railroads.sim.station_goods import STOCKPILE, STORAGE_STEP, WAITING, StationGoods
+from railroads.sim.station_goods import (
+    STOCKPILE,
+    STORAGE_STEP,
+    WAITING,
+    WAITING_STEP,
+    StationGoods,
+)
 from railroads.sim.trade import SCARCE_WORTH, StationOrder
 from railroads.sim.trains import (
     BULK_CAR,
@@ -61,17 +67,17 @@ def test_a_new_train_leaves_its_first_stop_with_that_stops_cars_full() -> None:
 @pytest.mark.parametrize(
     ("good", "load"),
     [
-        (Good.GOLD, 8.0),
-        (Good.STEEL, 21.0),
-        (Good.CATTLE, 13.0),
-        (Good.PIGS, 34.0),
-        (Good.OIL, 89.0),
-        (Good.FISH, 55.0),
-        (Good.IRON, 144.0),
-        (Good.WHEAT, 144.0),
-        (Good.BREAD, 144.0),
-        (Good.PASSENGERS, 55.0),
-        (Good.MAIL, 34.0),
+        (Good.GOLD, 5.0),
+        (Good.STEEL, 13.0),
+        (Good.CATTLE, 8.0),
+        (Good.PIGS, 21.0),
+        (Good.OIL, 55.0),
+        (Good.FISH, 34.0),
+        (Good.IRON, 89.0),
+        (Good.WHEAT, 89.0),
+        (Good.BREAD, 89.0),
+        (Good.PASSENGERS, 34.0),
+        (Good.MAIL, 21.0),
     ],
 )
 def test_a_car_of_the_planets_day_holds_as_many_units_as_fit_in_a_real_wagon_of_it(
@@ -133,7 +139,7 @@ def test_a_train_stops_waiting_as_soon_as_its_stop_no_longer_waits_for_a_full_lo
 def test_at_the_next_stop_it_unloads_and_takes_that_stops_cars() -> None:
     _, railway = joined_stations()
     railway.station_goods((6, 3)).stockpile[Good.WHEAT] = BULK_CAR
-    railway.station_goods((6, 20)).stockpile[Good.OIL] = 150.0
+    railway.station_goods((6, 20)).stockpile[Good.OIL] = car_size(Good.OIL) + 40.0
     train = railway.buy()
     train.stops = [Stop((6, 3), [Good.WHEAT]), Stop((6, 20), [Good.OIL, Good.OIL])]
 
@@ -142,7 +148,10 @@ def test_at_the_next_stop_it_unloads_and_takes_that_stops_cars() -> None:
 
     assert train.heading == 0
     assert railway.station_goods((6, 20)).brought[Good.WHEAT] == BULK_CAR
-    assert [(car.good, car.load) for car in train.cars] == [(Good.OIL, 89.0), (Good.OIL, 61.0)]
+    assert [(car.good, car.load) for car in train.cars] == [
+        (Good.OIL, car_size(Good.OIL)),
+        (Good.OIL, 40.0),
+    ]
 
 
 def test_each_car_fills_with_its_own_good_from_the_stockpile() -> None:
@@ -193,8 +202,9 @@ def test_a_station_hands_brought_goods_to_buildings_around_and_gathers_the_spare
 
     index = int(np.searchsorted(trade.cells, np.ravel_multi_index((6, 25), tile_map.grid.shape)))
     assert trade.handed[(6, 11)][Good.WHEAT] == pytest.approx(20.0)
-    assert trade.gathered[(6, 24)][Good.LOGS] == pytest.approx(20.0)
-    assert trade.gave[BuildingKind.LOGGING_CAMP][index] == pytest.approx(20.0)
+    logs = MAKES[BuildingKind.LOGGING_CAMP][Good.LOGS]
+    assert trade.gathered[(6, 24)][Good.LOGS] == pytest.approx(logs)
+    assert trade.gave[BuildingKind.LOGGING_CAMP][index] == pytest.approx(logs)
     assert sum(trade.gathered[(6, 24)].values()) <= 50.0
 
 
@@ -330,9 +340,10 @@ def test_cargo_earns_money_only_when_the_buildings_around_take_it() -> None:
     growth.trade_goods()
 
     goods = railway.station_goods((6, 20))
+    eaten = 4 * needs_of(BuildingKind.HOUSE, growth.year)[Need.FOOD]
     assert on_arrival == 0.0
-    assert goods.brought[Good.WHEAT] == pytest.approx(BULK_CAR - 80.0)
-    assert 0.0 < railway.finances.month["cargo"] <= 80 * freight_of(Good.WHEAT)
+    assert goods.brought[Good.WHEAT] == pytest.approx(BULK_CAR - eaten)
+    assert 0.0 < railway.finances.month["cargo"] <= eaten * freight_of(Good.WHEAT)
 
 
 def test_each_month_stations_and_track_cost_their_upkeep() -> None:
@@ -377,9 +388,9 @@ def test_stations_send_passengers_by_the_points_around_them_and_half_as_much_mai
 
     goods = railway.station_goods((6, 20))
     demand = railway.station_demand((6, 20))
-    assert goods.stockpile[Good.PASSENGERS] == 2 + 10 + 5
-    assert goods.stockpile[Good.MAIL] == 8
-    assert demand.capacity[Need.PASSENGERS] == 2 * 17
+    assert goods.stockpile[Good.PASSENGERS] == pytest.approx(2 * 0.6 + 6 + 3)
+    assert goods.stockpile[Good.MAIL] == 5
+    assert demand.capacity[Need.PASSENGERS] == pytest.approx(2 * 10.2)
 
 
 def test_waiting_passengers_have_their_own_room_and_leave_freight_its_stockpile() -> None:
@@ -475,7 +486,10 @@ def test_each_storage_upgrade_adds_to_each_good_and_to_the_waiting_room() -> Non
     railway.add_storage((6, 20))
 
     goods = railway.station_goods((6, 20))
-    assert (goods.limit, goods.waiting_limit) == (500.0 + 2 * 250, WAITING + 1000)
+    assert (goods.limit, goods.waiting_limit) == (
+        STOCKPILE + 2 * STORAGE_STEP,
+        WAITING + 2 * WAITING_STEP,
+    )
     assert railway.finances.cash == cash - STORAGE_PRICE * (1 + STORAGE_GROWTH)
 
 
@@ -501,7 +515,9 @@ def test_a_raised_station_gathers_from_further_away() -> None:
     growth.trade_goods()
 
     assert before == 0.0
-    assert railway.station_goods((6, 20)).stockpile[Good.LOGS] == pytest.approx(20.0)
+    assert railway.station_goods((6, 20)).stockpile[Good.LOGS] == pytest.approx(
+        MAKES[BuildingKind.LOGGING_CAMP][Good.LOGS]
+    )
 
 
 def test_every_car_costs_fifteen_and_a_dollar_for_every_ten_it_holds_each_time_it_sets_off() -> (
@@ -514,7 +530,7 @@ def test_every_car_costs_fifteen_and_a_dollar_for_every_ten_it_holds_each_time_i
 
     railway.run(0.01)
 
-    assert railway.finances.month["car trips"] == -2 * (CAR_TRIP_PRICE + 14)
+    assert railway.finances.month["car trips"] == -2 * (CAR_TRIP_PRICE + 8)
 
 
 def test_a_mine_feeds_a_steel_mill_two_cells_off_and_the_station_gathers_the_rest() -> None:
@@ -525,10 +541,11 @@ def test_a_mine_feeds_a_steel_mill_two_cells_off_and_the_station_gathers_the_res
     growth.trade_goods()
 
     mill = np.ravel_multi_index((6, 21), growth.constructions.tile_map.grid.shape)
+    coal = MAKES[BuildingKind.MINE][Good.COAL]
     assert growth.economy.stock[(BuildingKind.STEEL_MILL, Need.COAL)][mill] == pytest.approx(
-        100 * 8 / 21
+        coal * 8 / 21
     )
-    assert railway.station_goods((6, 20)).stockpile[Good.COAL] == pytest.approx(100 * 13 / 21)
+    assert railway.station_goods((6, 20)).stockpile[Good.COAL] == pytest.approx(coal * 13 / 21)
 
 
 def test_a_train_unloads_only_what_fits_and_keeps_the_rest_aboard() -> None:
@@ -665,15 +682,15 @@ def test_a_train_can_turn_round_at_a_station_it_passes_through() -> None:
     assert railway.network._exits((6, 3), None) == exits
 
 
-def test_a_station_holds_five_hundred_of_each_good_counting_what_trains_brought() -> None:
+def test_a_station_holds_three_hundred_of_each_good_counting_what_trains_brought() -> None:
     goods = StationGoods()
-    goods.stockpile[Good.COAL] = 300.0
-    goods.brought[Good.COAL] = 200.0
+    goods.stockpile[Good.COAL] = 180.0
+    goods.brought[Good.COAL] = 120.0
     goods.stockpile[Good.WHEAT] = 120.0
 
     rooms = (goods.room(Good.COAL), goods.room(Good.WHEAT), goods.room(Good.PLANKS))
 
-    assert rooms == (0.0, 380.0, 500.0)
+    assert rooms == (0.0, 180.0, 300.0)
 
 
 def test_a_train_unloads_a_good_at_a_station_full_of_another() -> None:
@@ -785,8 +802,9 @@ def test_a_town_eats_its_own_farms_food_the_month_it_is_made_and_only_the_rest_w
     growth.trade_goods()
 
     food, _ = food_and_heating(growth, (6, 21))
-    assert food == pytest.approx(10 * (13 + 3 * 8) / 21)
-    assert railway.station_goods((6, 20)).stockpile[Good.WHEAT] == pytest.approx(4 * 10 - food)
+    wheat = MAKES[BuildingKind.FARM][Good.WHEAT]
+    assert food == pytest.approx(wheat * (13 + 3 * 8) / 21)
+    assert railway.station_goods((6, 20)).stockpile[Good.WHEAT] == pytest.approx(4 * wheat - food)
 
 
 def test_coal_mined_near_a_station_heats_its_own_houses_before_waiting_for_trains() -> None:
@@ -797,11 +815,11 @@ def test_coal_mined_near_a_station_heats_its_own_houses_before_waiting_for_train
     growth.trade_goods()
 
     _, heating = food_and_heating(growth, (6, 21))
-    assert heating == pytest.approx(3.0)
-    assert railway.station_goods((6, 20)).stockpile[Good.COAL] == pytest.approx(97.0)
+    assert heating == pytest.approx(2.0)
+    assert railway.station_goods((6, 20)).stockpile[Good.COAL] == pytest.approx(58.0)
 
 
-@pytest.mark.parametrize(("farm", "demand"), [(False, 40.0), (True, 2 * (20 - 2 * 10 * 13 / 21))])
+@pytest.mark.parametrize(("farm", "demand"), [(False, 24.0), (True, 2 * (12 - 2 * 6 * 13 / 21))])
 def test_a_station_wants_only_what_its_houses_were_left_short_of_by_the_farms_around(
     farm: bool, demand: float
 ) -> None:

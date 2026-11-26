@@ -108,7 +108,7 @@ class BuildingHelp:
     # Each need, how much of it a month, and from when it is felt ("" for always): a year, or the
     # demand tile level that opens it.
     wants: tuple[tuple[Need, float, str], ...]
-    travellers: int
+    travellers: float
     space: int
     # From when it comes up: a year, its era, or "" for always.
     since: str

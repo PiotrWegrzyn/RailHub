@@ -8,7 +8,7 @@ from railroads.mapgen.deposits import GARRISON_SIZE, GARRISONS, place_deposits
 from railroads.mapgen.seeding import muster_garrisons
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.economy import Economy
-from railroads.sim.goods import Good, Need
+from railroads.sim.goods import NEEDS, Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import AIRPORTS, MILITARY, ORANGE_FARMS, GrowthRule
 from railroads.sim.tilemap import Deposit, Temperature, Vegetation
@@ -146,7 +146,7 @@ def test_a_gun_factory_arms_an_outpost_next_to_it_on_its_own() -> None:
     trade = economy.trade(placed)
 
     got, _ = trade.goods_got[(BuildingKind.OUTPOST, Need.GUNS)]
-    assert got.sum() == 60.0
+    assert got.sum() == NEEDS[BuildingKind.OUTPOST][Need.GUNS]
 
 
 def test_soldiers_travel_more_the_higher_their_rank() -> None:
