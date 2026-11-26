@@ -76,6 +76,7 @@ def summarize(
     if not moved:
         return None
     stations = []
+    order = {kind: index for index, kind in enumerate(kinds)}
     for station, (rows, cols) in reach.items():
         reached = zip(rows.tolist(), cols.tolist(), strict=True)
         cells = tuple(cell for cell in reached if cell in moved)
@@ -83,7 +84,10 @@ def summarize(
         for cell in cells:
             for kind, change in moved[cell].items():
                 totals[kind] = totals.get(kind, 0) + change
-        changes = {kind: totals[kind] for kind in kinds if totals.get(kind)}
+        changes = {
+            kind: totals[kind]
+            for kind in sorted((k for k in totals if totals[k] and k in order), key=order.get)
+        }
         if changes:
             stations.append(StationSummary(station, changes, cells))
     if not stations:

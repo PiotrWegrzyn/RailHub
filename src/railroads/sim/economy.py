@@ -375,6 +375,9 @@ class MonthOfTrade:
             )
             for station, order in stations.items()
         }
+        self._gathered_from: (
+            tuple[npt.NDArray[np.intp], npt.NDArray[np.intp], list[Cell]] | None
+        ) = None
 
     def run_steps(self) -> Steps[Trade]:
         yield
@@ -689,7 +692,7 @@ class MonthOfTrade:
         if not left.any():
             return
         offered = left.copy()
-        for station in self.stations:
+        for station in self._could_gather(left, left, self.zero):
             room = self.room[station][good]
             if room <= 0:
                 continue
@@ -744,6 +747,30 @@ class MonthOfTrade:
             self.padded = (padded.ravel(), offsets)
         return self.padded
 
+    def _could_gather(self, supply: FloatArray, made: FloatArray, sold: FloatArray) -> list[Cell]:
+        """The stations, in order, with any cell they gather from where some of the supply is
+        left over that was made there (Economy._gather): the others would take nothing, as all
+        that only grows less while the stations before them take their share. Found for all the
+        stations at once, the cells they gather from laid end to end."""
+        cells, starts, stations = self._gathering()
+        if not stations:
+            return []
+        spare = (supply > sold) & (made > 0)
+        found = np.add.reduceat(spare[cells].astype(np.int64), starts)
+        return [station for station, count in zip(stations, found.tolist(), strict=True) if count]
+
+    def _gathering(self) -> tuple[npt.NDArray[np.intp], npt.NDArray[np.intp], list[Cell]]:
+        """The cells each station gathers from laid end to end, where each station's start, and
+        the stations in order, worked out once a month; a station gathering from no cell is left
+        out, as it takes nothing."""
+        if self._gathered_from is None:
+            stations = [s for s in self.stations if self.reach[s][1][0].size]
+            far = [self.reach[s][1][0] for s in stations]
+            cells = np.concatenate(far) if far else np.zeros(0, dtype=np.intp)
+            starts = np.cumsum([0, *(f.size for f in far[:-1])]).astype(np.intp)
+            self._gathered_from = (cells, starts, stations)
+        return self._gathered_from
+
     def _gather(self, good: Good) -> None:
         """Lets every station take the spare units of a good no building took into its
         stockpile, for trains. Where nothing is left or a station has no room, it takes
@@ -751,7 +778,7 @@ class MonthOfTrade:
         offered = self.offered[good]
         if not offered.any():
             return
-        for station in self.stations:
+        for station in self._could_gather(offered, offered, self.sold[good]):
             room = self.room[station][good]
             if room <= 0:
                 continue
