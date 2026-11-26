@@ -21,9 +21,6 @@ class Holding:
     def __init__(self, held: set[tuple[int, int]]) -> None:
         self.held = held
 
-    def held_cells(self, train: Train) -> set[tuple[int, int]]:
-        return set(self.held)
-
     def blocked(self, train: Train, cell: tuple[int, int], way: object) -> bool:
         return cell in self.held
 

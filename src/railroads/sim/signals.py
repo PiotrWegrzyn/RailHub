@@ -448,14 +448,6 @@ class Signals:
                 if way:
                     self._kept.append((train, way))
 
-    def held_cells(self, train: Train) -> set[Cell]:
-        """The cells other trains hold track in."""
-        return {
-            cell
-            for cell, holds in self._held.items()
-            if any(other is not train for other, *_ in holds)
-        }
-
     def blocked(self, train: Train, cell: Cell, way: tuple[Point, Point]) -> bool:
         """Whether other trains hold track in the cell this way across it can't share on any
         track it could take there: on double track trains going the other way keep to their own

@@ -1,3 +1,5 @@
+import math
+
 import pytest
 
 from builders import flat_map
@@ -6,9 +8,9 @@ from railroads.sim.demolition import bulldoze
 from railroads.sim.grids import flat_within_any
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
-from railroads.sim.railway import Railway
+from railroads.sim.railway import HELD_WAY_COST, Railway
 from railroads.sim.routes import add_platform, build_station, lay_route, plan_route
-from railroads.sim.signals import Signals
+from railroads.sim.signals import Signals, rounded
 from railroads.sim.trains import Stop
 
 WEST, HUB, NORTH = (8, 3), (8, 12), (1, 12)
@@ -27,6 +29,23 @@ def junction(level: int = 4) -> tuple[Growth, Railway]:
     railway.finances.earn(10_000_000.0, "test")
     railway.levels[HUB] = level
     return growth, railway
+
+
+def way_into(
+    railway: Railway, line: list[tuple[int, int]], branch: list[tuple[int, int]]
+) -> tuple[tuple[int, int], tuple[tuple[float, float], tuple[float, float]]]:
+    """The way across the cell where a branch leaves a line that runs on along the line: the
+    track another train holds into the line's station."""
+    junction = [cell for cell in branch if cell in line][-1]
+    found = railway.route(line[0], line[-1])
+    assert found is not None
+    points = found[0]
+    at = next(
+        k
+        for k, point in enumerate(points)
+        if math.dist(point, railway.constructions.tile_map.grid.center(*junction)) < 1e-6
+    )
+    return junction, (rounded(points[at - 1]), rounded(points[at + 1]))
 
 
 def platform_cell(growth: Growth) -> tuple[int, int]:
@@ -141,10 +160,8 @@ def test_a_train_bound_for_a_station_takes_its_other_platform_when_the_way_to_on
     branch = plan_route(growth.constructions, WEST, platform)
     assert line is not None and branch is not None
     lay_route(growth, branch)
-    own = set(branch.cells) - set(line.cells)
-    monkeypatch.setattr(
-        Signals, "held_by_others", lambda _, __, cells: 0 if own & set(cells) else 1
-    )
+    held = way_into(railway, line.cells, branch.cells)
+    monkeypatch.setattr(Signals, "blocked", lambda _, __, cell, way: (cell, way) == held)
     train = railway.buy()
     assert train is not None
     train.stops = [Stop(WEST, wait_for_load=False), Stop(HUB, wait_for_load=False)]
@@ -188,10 +205,8 @@ def test_a_train_setting_off_far_away_takes_its_other_platform_when_the_way_to_o
     branch = plan_route(constructions, far, platform)
     assert branch is not None
     lay_route(growth, branch)
-    own = set(branch.cells) - set(line.cells)
-    monkeypatch.setattr(
-        Signals, "held_by_others", lambda _, __, cells: 0 if own & set(cells) else 1
-    )
+    held = way_into(railway, line.cells, branch.cells)
+    monkeypatch.setattr(Signals, "blocked", lambda _, __, cell, way: (cell, way) == held)
     train = railway.buy()
     assert train is not None
     train.stops = [Stop(far, wait_for_load=False), Stop(hub, wait_for_load=False)]
@@ -202,17 +217,19 @@ def test_a_train_setting_off_far_away_takes_its_other_platform_when_the_way_to_o
     assert railway.network.cell_at(train.path[-1]) == platform
 
 
-def test_the_way_on_from_a_platform_crosses_the_track_to_the_next_stop_and_none_in_its_station() -> (
-    None
-):
+def test_the_way_on_from_a_platform_counts_track_held_to_the_next_stop_and_none_in_its_station(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     growth, railway = junction()
     platform = platform_cell(growth)
     assert add_platform(growth, HUB, platform) is not None
     train = railway.buy()
     assert train is not None
+    monkeypatch.setattr(Signals, "blocked", lambda *_: True)
+    signals = Signals(railway.network, [])
 
-    onward = railway._onward_cells(HUB, WEST, train.engine)
-    within = railway._onward_cells(HUB, platform, train.engine)
+    onward = railway._onward_held_cost(train, signals, HUB, WEST)
+    within = railway._onward_held_cost(train, signals, HUB, platform)
 
-    assert (8, 7) in onward
-    assert within == set()
+    assert onward >= railway.onward_cost(HUB, WEST, train.engine) + HELD_WAY_COST * 5
+    assert within == 0.0

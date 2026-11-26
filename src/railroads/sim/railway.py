@@ -92,7 +92,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.move import Move
 from railroads.sim.schedules import Schedule, Schedules, between_rounds
 from railroads.sim.sheds import stall_way, stalls, standing, stood_at
-from railroads.sim.signals import Signals, passes, track_point
+from railroads.sim.signals import Signals, passes, rounded, track_point
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
 from railroads.sim.tilemap import TileMap
@@ -682,16 +682,38 @@ class Railway:
         onward = self.network.route_length(platform, after, electric, maglev)
         return math.inf if onward is None else onward
 
-    def _onward_cells(self, platform: Cell, after: Cell, engine: str) -> set[Cell]:
-        """The cells a train standing at a platform crosses on to its next stop: none if that is
-        at the same station or no track it runs on leads there."""
+    def _onward_held_cost(
+        self, train: Train, signals: Signals, platform: Cell, after: Cell
+    ) -> float:
+        """How far a train standing at a platform goes on to its next stop (onward_cost), with
+        HELD_WAY_COST cells more for each cell on the way that other trains block
+        (_blocked_along)."""
+        cost = self.onward_cost(platform, after, train.engine)
         main = self.constructions.main_station
         if (main(platform) or platform) == (main(after) or after):
-            return set()
-        way = self.route(platform, after, ENGINES[engine].electric, ENGINES[engine].maglev)
+            return cost
+        engine = ENGINES[train.engine]
+        way = self.route(platform, after, engine.electric, engine.maglev)
         if way is None:
-            return set()
-        return {self.network.cell_at(_middle(p, q)) for p, q in itertools.pairwise(way[0])}
+            return cost
+        return cost + HELD_WAY_COST * self._blocked_along(train, signals, way[0], set())
+
+    def _blocked_along(
+        self, train: Train, signals: Signals, points: list[Point], skip: set[Cell]
+    ) -> int:
+        """How many cells a way through these points crosses, apart from those in `skip`, where
+        other trains hold track this way across the cell can't share on any track it could take
+        there (Signals.blocked): a way runs from the middle of each cell it crosses to its edge,
+        and comes into the next cell by the edge it left the last one by."""
+        grid = self.constructions.tile_map.grid
+        count = 0
+        for before, here, after in zip(points, points[1:], points[2:], strict=False):
+            cell = self.network.cell_at(here)
+            if cell in skip or math.dist(here, grid.center(*cell)) > 1e-6:
+                continue
+            if signals.blocked(train, cell, (rounded(before), rounded(after))):
+                count += 1
+        return count
 
     def cargo_worth(self, train: Train) -> list[float]:
         """What each of a train's cars would earn if it were unloaded at its destination now
@@ -1354,13 +1376,10 @@ class Railway:
             return
         after = train.stops[(train.heading + 1) % len(train.stops)].cell
         engine = ENGINES[train.engine]
-        held = signals.held_cells(train)
         stations = set(cells)
 
         def onward(platform: Cell) -> float:
-            return self.onward_cost(platform, after, train.engine) + HELD_WAY_COST * len(
-                self._onward_cells(platform, after, train.engine) & held
-            )
+            return self._onward_held_cost(train, signals, platform, after)
 
         grid = self.constructions.tile_map.grid
 
@@ -1466,15 +1485,9 @@ class Railway:
             if way is None:
                 continue
             points = way[0]
-            crossed = {
-                self.network.cell_at(_middle(p, q)) for p, q in itertools.pairwise(points)
-            } - set(cells)
             cost = sum(math.dist(p, q) for p, q in itertools.pairwise(points))
-            cost += HELD_WAY_COST * signals.held_by_others(train, crossed)
-            cost += self.onward_cost(target, after, train.engine)
-            cost += HELD_WAY_COST * signals.held_by_others(
-                train, self._onward_cells(target, after, train.engine)
-            )
+            cost += HELD_WAY_COST * self._blocked_along(train, signals, [a, *points], set(cells))
+            cost += self._onward_held_cost(train, signals, target, after)
             if best is None or cost < best[0]:
                 best = (cost, target, way)
         if best is None and lost:
