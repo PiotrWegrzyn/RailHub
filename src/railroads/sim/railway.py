@@ -660,6 +660,17 @@ class Railway:
         onward = self.network.route_length(platform, after, electric, maglev)
         return math.inf if onward is None else onward
 
+    def _onward_cells(self, platform: Cell, after: Cell, engine: str) -> set[Cell]:
+        """The cells a train standing at a platform crosses on to its next stop: none if that is
+        at the same station or no track it runs on leads there."""
+        main = self.constructions.main_station
+        if (main(platform) or platform) == (main(after) or after):
+            return set()
+        way = self.route(platform, after, ENGINES[engine].electric, ENGINES[engine].maglev)
+        if way is None:
+            return set()
+        return {self.network.cell_at(_middle(p, q)) for p, q in itertools.pairwise(way[0])}
+
     def cargo_worth(self, train: Train) -> list[float]:
         """What each of a train's cars would earn if it were unloaded at its destination now
         (worth_at), passengers on an express paying its fare too; cargo that came from there
@@ -969,6 +980,11 @@ class Railway:
                 self.finances.spend(trips, "car trips")
                 train.leg -= trips
             train.takings += train.leg
+            bound = self.constructions.station_cells(
+                self.constructions.main_station(there) or there
+            )
+            if len(bound) > 1:
+                self._take_quickest(train, signals, bound)
         engine = ENGINES[train.engine]
         pickup = engine.pickup / SECONDS_PER_MONTH * (SAND_TOWER_PICKUP if train.sanded else 1.0)
         pace = train.speed_up(months, pickup)
@@ -1062,7 +1078,8 @@ class Railway:
 
     def _choose_platform(self, train: Train, signals: Signals) -> None:
         """Takes the quickest way on to the station the train is bound for and from it to the stop
-        after (onward_cost), if it has more than one platform: looked for again as the way set for it comes within PLATFORM_CHOICE cells
+        after (onward_cost), if it has more than one platform: chosen as it sets off (_run), and
+        looked for again as the way set for it comes within PLATFORM_CHOICE cells
         of the end of its path, and each PLATFORM_WAIT months it waits at a signal, from the end
         of the way set for it, a way counting HELD_WAY_COST cells longer for each cell of it
         another train holds."""
@@ -1129,7 +1146,7 @@ class Railway:
     ) -> bool:
         """Sets the train the quickest way on from the end of the track it holds to one of a
         station's cells and from it to the stop after, a way counting HELD_WAY_COST cells longer
-        for each cell of it another train holds: only if it ends elsewhere than the way set now,
+        for each cell of it, on either side of the station, another train holds: only if it ends elsewhere than the way set now,
         unless that one is `lost`: then from where the train came into the cell its front is in,
         as the track there may have changed too, taking the track under it again
         (railroads.sim.signals) as it next moves. Returns whether it looked for one: not while
@@ -1179,6 +1196,9 @@ class Railway:
             cost = sum(math.dist(p, q) for p, q in itertools.pairwise(points))
             cost += HELD_WAY_COST * signals.held_by_others(train, crossed)
             cost += self.onward_cost(target, after, train.engine)
+            cost += HELD_WAY_COST * signals.held_by_others(
+                train, self._onward_cells(target, after, train.engine)
+            )
             if best is None or cost < best[0]:
                 best = (cost, target, way)
         if best is None and lost:

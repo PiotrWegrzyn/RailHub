@@ -167,3 +167,52 @@ def test_the_way_on_from_a_station_is_measured_from_the_platform_a_train_pulls_i
 
     assert legs[1] == railway.network.route_length(platform, NORTH)
     assert legs[1] < railway.network.route_length(HUB, NORTH)
+
+
+def test_a_train_setting_off_far_away_takes_its_other_platform_when_the_way_to_one_is_held(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    constructions = Constructions(flat_map())
+    growth = Growth(constructions, GrowthRule(trades=False))
+    far, hub, platform = (8, 2), (8, 22), (10, 22)
+    for cell in (far, hub):
+        build_station(growth, cell)
+    line = plan_route(constructions, far, hub)
+    assert line is not None
+    lay_route(growth, line)
+    railway = Railway(constructions)
+    growth.railway = railway
+    railway.finances.earn(10_000_000.0, "test")
+    railway.levels[hub] = 4
+    assert add_platform(growth, hub, platform) is not None
+    branch = plan_route(constructions, far, platform)
+    assert branch is not None
+    lay_route(growth, branch)
+    own = set(branch.cells) - set(line.cells)
+    monkeypatch.setattr(
+        Signals, "held_by_others", lambda _, __, cells: 0 if own & set(cells) else 1
+    )
+    train = railway.buy()
+    assert train is not None
+    train.stops = [Stop(far, wait_for_load=False), Stop(hub, wait_for_load=False)]
+
+    railway.run(1e-4)
+
+    assert railway.network.length(train) > 10
+    assert railway.network.cell_at(train.path[-1]) == platform
+
+
+def test_the_way_on_from_a_platform_crosses_the_track_to_the_next_stop_and_none_in_its_station() -> (
+    None
+):
+    growth, railway = junction()
+    platform = platform_cell(growth)
+    assert add_platform(growth, HUB, platform) is not None
+    train = railway.buy()
+    assert train is not None
+
+    onward = railway._onward_cells(HUB, WEST, train.engine)
+    within = railway._onward_cells(HUB, platform, train.engine)
+
+    assert (8, 7) in onward
+    assert within == set()

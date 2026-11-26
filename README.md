@@ -1158,8 +1158,9 @@ offers it again until it is built. Track is laid to a platform as to any station
 no track joins either of its ends it turns to take track laid into its side. The station serves trains at all
 its platforms as one, with one stockpile, handing goods out and gathering them as far round each
 platform as round itself; trains cross between platforms beside each other inside the station,
-and over the last few blocks of their way take whichever platform they reach quickest, passing
-over one whose way another train holds, and set off again from there. Platforms go with
+and as they set off for it, and again over the last few blocks of their way, take whichever
+platform they reach quickest, counting the way on to the stop after and every cell of track other
+trains hold on either way as four cells more, and set off again from there. Platforms go with
 their station when it is bulldozed or moved. A station hands goods out and gathers them around
 every platform as well as its own cell. Level 4 is drawn as a junction station between two clock
 towers under a long glass shed, level 5 as a central station with a tall clock tower and three
