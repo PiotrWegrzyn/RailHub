@@ -964,6 +964,12 @@ class Train:
     # last looked for the quickest platform of the station it is bound for
     # (railroads.sim.railway.Railway._choose_platform).
     platform_check: tuple[float, int] = (-1.0, -1)
+    # How long the way set for it was when it set off, how many of the marks along it (half,
+    # a quarter, an eighth of it left) it has looked for a quicker way at, and how many spells of
+    # waiting at signals it has looked after (railroads.sim.railway.Railway._maybe_reroute).
+    leg_length: float = 0.0
+    reroute_marks: int = 0
+    reroute_waits: int = 0
     # Whether it set off from a station whose sand tower had its sand this month
     # (railroads.sim.facilities).
     sanded: bool = False

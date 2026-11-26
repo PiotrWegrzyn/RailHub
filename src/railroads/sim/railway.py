@@ -157,6 +157,13 @@ PLATFORM_REACH = 2
 PLATFORM_CHOICE = 10.0
 PLATFORM_WAIT = 0.02
 HELD_WAY_COST = 4.0
+# A train looks for a quicker way on to its station, round track other trains hold, as half, a
+# quarter and an eighth of the way set for it as it set off are left (REROUTE_MARKS of them),
+# and each REROUTE_WAIT months it has waited at signals; it takes one that costs no more than
+# REROUTE_GAIN of the way it is on, counted the same way (HELD_WAY_COST).
+REROUTE_MARKS = 3
+REROUTE_WAIT = 0.05
+REROUTE_GAIN = 0.85
 # The era of the boards from which quadruple track can be laid: the first lines of four tracks
 # came in the 1870s to 1890s.
 QUADRUPLE_ERA = 3
@@ -1041,6 +1048,9 @@ class Railway:
             train.along = 0.0
             train.pace = 0.0
             train.status = "Running"
+            train.leg_length = 0.0
+            train.reroute_marks = 0
+            train.reroute_waits = 0
             if train.cars:
                 places = (0.0 if car.dining else car.capacity for car in train.cars)
                 trips = sum(map(car_trip_price, places))
@@ -1065,6 +1075,7 @@ class Railway:
             train.pace = 0.0
             return
         self._choose_platform(train, signals)
+        self._maybe_reroute(train, signals)
         ask = self.asks + 1
         holder = signals.let_on(train, ask, wanted)
         if train.asked == ask:
@@ -1301,6 +1312,98 @@ class Railway:
             if not network.leads(cell, entry, exit_point, engine.electric, engine.maglev):
                 return False
         return True
+
+    def _maybe_reroute(self, train: Train, signals: Signals) -> None:
+        """Looks for a quicker way on to the station the train is bound for (_reroute) as half,
+        a quarter and an eighth of the way set for it as it set off are left, and each
+        REROUTE_WAIT months it has waited at signals on the way."""
+        if train.shed or len(train.path) < 2:
+            return
+        length = self.network.length(train)
+        if not train.leg_length:
+            train.leg_length = length
+        left = length - train.along
+        due = False
+        if train.reroute_marks < REROUTE_MARKS and left <= train.leg_length / 2 ** (
+            train.reroute_marks + 1
+        ):
+            while train.reroute_marks < REROUTE_MARKS and left <= train.leg_length / 2 ** (
+                train.reroute_marks + 1
+            ):
+                train.reroute_marks += 1
+            due = True
+        waits = int(train.waited / REROUTE_WAIT)
+        if train.giving_way and waits > train.reroute_waits:
+            train.reroute_waits = waits
+            due = True
+        if due:
+            self._reroute(train, signals)
+
+    def _reroute(self, train: Train, signals: Signals) -> None:
+        """Sets the train a way on from the end of the track it holds to any platform of the
+        station it is bound for, round track other trains hold, if it costs no more than
+        REROUTE_GAIN of the way set for it now: each way its length, HELD_WAY_COST cells for each
+        cell of it another train holds, and the way on from its platform to the stop after."""
+        at = self._held_end(train)
+        if at is None:
+            return
+        path = train.path
+        there = train.stops[train.heading % len(train.stops)].cell
+        cells = self.constructions.station_cells(self.constructions.main_station(there) or there)
+        if self.network.cell_at(path[-1]) not in cells:
+            return
+        after = train.stops[(train.heading + 1) % len(train.stops)].cell
+        engine = ENGINES[train.engine]
+        held = signals.held_cells(train)
+        stations = set(cells)
+
+        def onward(platform: Cell) -> float:
+            return self.onward_cost(platform, after, train.engine) + HELD_WAY_COST * len(
+                self._onward_cells(platform, after, train.engine) & held
+            )
+
+        rest = path[at:]
+        crossed = {self.network.cell_at(_middle(p, q)) for p, q in itertools.pairwise(rest)}
+        now = sum(math.dist(p, q) for p, q in itertools.pairwise(rest))
+        now += HELD_WAY_COST * len((crossed - stations) & held)
+        now += onward(self.network.cell_at(path[-1]))
+        cell = self.network.cell_at(_middle(path[at], path[at + 1]))
+        entry = self.network.entry_point(cell, path[at])
+        found = self.network.ways_avoiding(
+            cell, entry, stations, held, HELD_WAY_COST, engine.electric, engine.maglev, now
+        )
+        best: tuple[float, list[Point], list[float]] | None = None
+        for target, (cost, (points, speeds)) in found.items():
+            total = math.dist(path[at], points[0]) + cost + onward(target)
+            if best is None or total < best[0]:
+                best = (total, points, speeds)
+        if best is None or best[0] > now * REROUTE_GAIN:
+            return
+        _, points, speeds = best
+        if path[at:] == [path[at], *points] or path[at + 1 :] == points:
+            return
+        train.path = path[: at + 1] + points
+        train.speeds = train.speeds[:at] + [self.network.speed_in(cell)] + speeds
+        train.claims_for = train.path
+
+    def _held_end(self, train: Train) -> int | None:
+        """Where on its path the track the train holds ends and it may be set another way on
+        from, outside a station; None while it is still in the station it left or holds track
+        only part of the way into a cell."""
+        path = train.path
+        ends = self.network.ends(train)
+        at = next(
+            (
+                k
+                for k in range(len(path) - 1)
+                if ends[k] >= train.cleared - 1e-6
+                and not self.network.passing(_middle(path[k], path[k + 1]))[0]
+            ),
+            None,
+        )
+        if at is None or (ends[at] > train.cleared + 1e-6 and train.cleared > 0):
+            return None
+        return at
 
     def _take_quickest(
         self, train: Train, signals: Signals, cells: list[Cell], lost: bool = False

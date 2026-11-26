@@ -444,6 +444,14 @@ class Signals:
                 if way:
                     self._kept.append((train, way))
 
+    def held_cells(self, train: Train) -> set[Cell]:
+        """The cells other trains hold track in."""
+        return {
+            cell
+            for cell, holds in self._held.items()
+            if any(other is not train for other, *_ in holds)
+        }
+
     def held_by_others(self, train: Train, cells: Iterable[Cell]) -> int:
         """How many of these cells another train holds track in."""
         return sum(

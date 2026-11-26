@@ -321,6 +321,58 @@ class TrackNetwork:
         found = self._reach(cell, entry, {arrival}, electric, maglev)
         return None if found is None else self._way(*found)
 
+    def ways_avoiding(
+        self,
+        cell: Cell,
+        entry: int,
+        arrivals: set[Cell],
+        held: set[Cell],
+        penalty: float,
+        electric: bool = False,
+        maglev: bool = False,
+        most: float = math.inf,
+    ) -> dict[Cell, tuple[float, Way]]:
+        """The quickest way on to each of the arrivals for a train coming into a cell by this
+        point (way_on), counting each cell of `held` it runs into `penalty` cells longer, with
+        what it costs: a way round track other trains hold; only those costing no more than
+        `most`. Not kept, as the trains move on."""
+        self._find_exits()
+        grid = self.constructions.tile_map.grid
+        lengths = [float(math.hypot(*step)) for step in grid.track_steps()]
+        counter = itertools.count()
+        taken: list[tuple[int, Cell, int]] = []
+        frontier: list[tuple[float, int, Cell, int | None, int]] = [
+            (0.0, next(counter), cell, entry, -1)
+        ]
+        seen: set[tuple[Cell, int | None]] = set()
+        found: dict[Cell, tuple[float, Way]] = {}
+        while frontier and len(found) < len(arrivals):
+            cost, _, here, into, last = heapq.heappop(frontier)
+            if cost > most:
+                break
+            if here in arrivals and last >= 0 and here not in found:
+                found[here] = (cost, self._way(_trail(taken, last), (here, into or 0)))
+            if (here, into) in seen:
+                continue
+            seen.add((here, into))
+            if last >= 0 and self._shed(here):
+                continue
+            for beside in self._platforms_beside(here):
+                taken.append((last, here, CROSSING))
+                heapq.heappush(frontier, (cost + 1.0, next(counter), beside, None, len(taken) - 1))
+            for exit_point in self._exits(here, into, electric, maglev):
+                nxt, nxt_entry = self._track_exit(here, exit_point)
+                if not grid.contains(*nxt) or not self._joins(nxt, nxt_entry):
+                    continue
+                step = lengths[exit_point]
+                if nxt in held and nxt not in arrivals:
+                    step += penalty
+                taken.append((last, here, exit_point))
+                heapq.heappush(
+                    frontier, (cost + step, next(counter), nxt, nxt_entry, len(taken) - 1)
+                )
+        return found
+
     def entry_point(self, cell: Cell, point: Point) -> int:
         """The track point of a cell a point on its edge, as on a train's path, lies at; kept,
         as every train's way is checked against the track again whenever it changes."""
