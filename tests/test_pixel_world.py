@@ -8,6 +8,7 @@ from screens import PLAIN_LOOKS, make_tile_map, make_world
 from builders import flat_map
 from railroads.sim.constructions import (
     MERGED,
+    PORT_KINDS,
     Building,
     BuildingKind,
     Constructions,
@@ -20,6 +21,7 @@ from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetat
 from railroads.sim.trade import Satisfaction
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 from railroads.ui.pixel import track_art
+from railroads.ui.pixel.art.ports import port_sprite
 from railroads.ui.pixel.art.registry import SPRITES, draw_sheet
 from railroads.ui.pixel.art.stations import TURNED_LINES
 from railroads.ui.pixel.ground import _depths, _tallest_crown, crown_radii
@@ -319,12 +321,23 @@ def test_big_and_mega_works_have_sprites_of_their_own_no_smaller_than_the_one_th
     assert widths[0] < widths[2]
 
 
-def test_no_works_is_drawn_wider_than_a_cell(sheet: SpriteSheet) -> None:
-    names = set(BUILDING_SPRITES.values())
+def test_no_works_but_a_port_is_drawn_wider_than_a_cell(sheet: SpriteSheet) -> None:
+    names = {name for kind, name in BUILDING_SPRITES.items() if kind not in PORT_KINDS}
 
     widths = [painted_width(sheet, name) for name in names]
 
     assert max(widths) <= 26
+
+
+def test_a_port_is_drawn_with_its_pier_running_out_towards_the_water(sheet: SpriteSheet) -> None:
+    tile_map = make_tile_map()
+    constructions = Constructions(tile_map)
+    constructions.build(Building((6, 1), BuildingKind.BIG_PORT))
+    projection = PixelProjection.of(tile_map.grid, *GAME_LOOK)
+
+    scenery = Scenery.of(tile_map, constructions, projection, sheet)
+
+    assert sheet.index(port_sprite("big_port", 180)) in scenery.sprite.tolist()
 
 
 def test_a_mega_works_sharing_its_cell_stands_with_its_foot_inside_the_cell(

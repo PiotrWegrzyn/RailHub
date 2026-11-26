@@ -15,7 +15,7 @@ from functools import cache, partial
 import numpy as np
 from PIL import Image
 
-from railroads.sim.constructions import BUILDING_RULES, MERGED, BuildingKind
+from railroads.sim.constructions import BUILDING_RULES, MERGED, PORT_KINDS, BuildingKind
 from railroads.ui.pixel.art import (
     built_works,
     grand_crafts,
@@ -27,11 +27,8 @@ from railroads.ui.pixel.art.built import modelled
 from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_peters
 from railroads.ui.pixel.art.commerce import (
     airport,
-    big_port,
     department_store,
     hotel,
-    mega_port,
-    port,
     shop,
     sushi_hut,
     tavern,
@@ -155,6 +152,7 @@ from railroads.ui.pixel.art.painter import (
     drawn_at,
     shade,
 )
+from railroads.ui.pixel.art.ports import PORTS
 from railroads.ui.pixel.art.provisions import (
     bakery,
     big_bakery,
@@ -281,9 +279,6 @@ BUILDINGS = (
     "mine",
     "logging_camp",
     "sawmill",
-    "port",
-    "big_port",
-    "mega_port",
     "clay_pit",
     "limestone_quarry",
     "sand_pit",
@@ -353,9 +348,6 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "mine": mine,
     "logging_camp": logging_camp,
     "sawmill": sawmill,
-    "port": port,
-    "big_port": big_port,
-    "mega_port": mega_port,
     "orchard": orchard,
     "iron_mine": lambda: shaft_mine((104, 72, 62), (176, 98, 70)),
     "copper_mine": lambda: shaft_mine((96, 84, 66), (206, 130, 76)),
@@ -484,7 +476,7 @@ MASTER_RESOLUTION = 24
 # The buildings drawn from 3D models (railroads.ui.pixel.art.built) instead of painted: the
 # gasworks, whose brick rotunda took the place of its painted gasholder, and the stations.
 MODELS: dict[str, Callable[[], Sprite]] = {"gasworks": modelled(built_works.gasworks)}
-SPRITES |= MODELS | FACILITIES
+SPRITES |= MODELS | FACILITIES | PORTS
 
 # Big and mega works drawn as buildings of their own, by trade.
 for _module in (grand_fire, grand_food, grand_crafts, grand_modern):
@@ -511,7 +503,8 @@ for _kind in MERGED:
 
 # How wide a works may be drawn at most, in pixels, so it stands inside its cell, which is about
 # 25 pixels across: by how much of the cell it takes (railroads.sim.constructions.BUILDING_RULES),
-# and for big and mega works by their size, a mega one as wide as the cell.
+# and for big and mega works by their size, a mega one as wide as the cell. Ports are drawn true
+# to the map instead, so their piers reach out over the water (railroads.ui.pixel.art.ports).
 MOST_WIDTH = {1: 20, 2: 20, 3: 22, 4: 23, 5: 23, 6: 23}
 GROWN_MOST_WIDTH = {"big": 25, "mega": 26}
 # How much smaller a works is tried again when shrinking it pixel by pixel left it too wide.
@@ -547,7 +540,7 @@ def _scale_of(name: str) -> float:
     make a works wider than MOST_WIDTH lets it be."""
     scale = _base_scale(name)
     kind = BuildingKind.__members__.get(name.upper())
-    if kind is None or name in FARMSTEADS:
+    if kind is None or name in FARMSTEADS or kind in PORT_KINDS:
         return scale
     most = GROWN_MOST_WIDTH.get(name.partition("_")[0], MOST_WIDTH[BUILDING_RULES[kind].space])
     scale = min(scale, most / _width(_full_size(name)))

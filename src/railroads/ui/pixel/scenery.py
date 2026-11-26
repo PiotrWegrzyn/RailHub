@@ -14,6 +14,7 @@ from PIL import Image, ImageDraw
 from railroads.kept import KeptFor
 from railroads.sim.constructions import (
     GREW_FROM,
+    PORT_KINDS,
     Annex,
     BuildingKind,
     Constructions,
@@ -29,6 +30,7 @@ from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.building_spots import BuildingSpots
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
 from railroads.ui.pixel.art.facilities import SHED_HEADINGS, shed_sprite
+from railroads.ui.pixel.art.ports import PORT_HEADINGS, port_sprite
 from railroads.ui.pixel.ground_palette import FIELD_KINDS
 from railroads.ui.pixel.projection import PixelProjection, hash01
 from railroads.ui.pixel.relief import Elevation
@@ -239,6 +241,36 @@ def facility_spot(constructions: Constructions, annex: Annex) -> tuple[float, fl
     return x, y, shed_sprite(round(angle / step) * step % 360, annex.level, annex.sand_tower)
 
 
+# How far from the middle of its cell a port stands towards the water, in cells.
+PORT_SHORE = 0.15
+
+
+def _ports_facing(tile_map: TileMap, spots: BuildingSpots) -> dict[int, tuple[Cell, int]]:
+    """Every port among the spots, by its place among them, with its cell and the way its piers
+    run out on the map (PORT_HEADINGS): towards the water beside its cell, the middle way where
+    more than one cell beside it is water. Ports with no water beside them are left out."""
+    grid = tile_map.grid
+    facing: dict[int, tuple[Cell, int]] = {}
+    step = PORT_HEADINGS[1] - PORT_HEADINGS[0]
+    for at, kind in enumerate(spots.kinds):
+        if kind not in PORT_KINDS:
+            continue
+        rows, cols = grid.cell_at(spots.x[at], spots.y[at])
+        cell = (int(rows), int(cols))
+        cx, cy = grid.center(*cell)
+        dx = dy = 0.0
+        for near in grid.neighbours(*cell):
+            if tile_map.terrain[near] != Terrain.LAND:
+                nx, ny = grid.center(*near)
+                length = math.hypot(nx - cx, ny - cy) or 1.0
+                dx, dy = dx + (nx - cx) / length, dy + (ny - cy) / length
+        if dx == dy == 0.0:
+            continue
+        angle = math.degrees(math.atan2(dy, dx))
+        facing[at] = (cell, round(angle / step) * step % 360)
+    return facing
+
+
 def platform_sprite(line: str | None = None) -> str:
     """The sprite of a platform added to a station, turned like station_sprite."""
     return "platform" if line is None else f"platform_{line}"
@@ -357,8 +389,17 @@ class Scenery:
             dtype=np.int64,
         )
         before = sum(len(x) for x in xs)
-        xs.append(np.asarray(spots.x, dtype=np.float64))
-        ys.append(np.asarray(spots.y, dtype=np.float64))
+        spot_x = np.array(spots.x, dtype=np.float64)
+        spot_y = np.array(spots.y, dtype=np.float64)
+        facing = _ports_facing(tile_map, spots)
+        for at, (cell, heading) in facing.items():
+            built_looks[at] = sheet.index(port_sprite(BUILDING_SPRITES[spots.kinds[at]], heading))
+            cx, cy = grid.center(*cell)
+            turned = math.radians(heading)
+            spot_x[at] = cx + PORT_SHORE * math.cos(turned)
+            spot_y[at] = cy + PORT_SHORE * math.sin(turned)
+        xs.append(spot_x)
+        ys.append(spot_y)
         sprites.append(built_looks)
         mx, my = np.concatenate(xs), np.concatenate(ys)
         px, py = projection.to_pixels(mx, my)
@@ -369,14 +410,21 @@ class Scenery:
             in_rows[station_from : station_from + len(own)] = own[:, 0]
             in_cols[station_from : station_from + len(own)] = own[:, 1]
         depth = projection.to_pixels(*grid.center(in_rows, in_cols))[1]
-        fitted = np.flatnonzero(~np.isin(spots.kinds, list(FIELD_KINDS)))
+        fitted = np.array(
+            [
+                at
+                for at, kind in enumerate(spots.kinds)
+                if kind not in FIELD_KINDS and at not in facing
+            ],
+            dtype=np.int64,
+        )
         if fitted.size:
             px[before + fitted], py[before + fitted] = _inside_cells(
                 grid,
                 projection,
                 sheet,
-                spots.x[fitted],
-                spots.y[fitted],
+                spot_x[fitted],
+                spot_y[fitted],
                 built_looks[fitted],
             )
         px, py = np.rint(px).astype(np.int64), np.rint(py).astype(np.int64)
