@@ -4,6 +4,7 @@ import pytest
 from builders import flat_map
 from railroads.sim.constructions import (
     CELL_SPACE,
+    RAILWAY_LOG,
     Building,
     BuildingKind,
     CannotBuild,
@@ -321,3 +322,29 @@ def test_track_branching_off_track_in_its_cell_takes_only_the_room_its_widest_pi
 
     assert problem is None
     assert constructions.space_left((6, 6)) == CELL_SPACE - 4
+
+
+def test_the_railway_tells_the_cells_it_changed_in_since_a_version() -> None:
+    constructions = Constructions(flat_map())
+    before = constructions.railway_version
+    constructions.build(Track((2, 3), (0, 6)))
+    constructions.build(Building((4, 4), BuildingKind.HOUSE))
+    constructions.build(Track((5, 6), (0, 6)))
+
+    changed = constructions.railway_changed_since(before)
+
+    assert changed == {(2, 3), (5, 6)}
+    assert constructions.railway_changed_since(constructions.railway_version) == set()
+
+
+def test_the_railway_cannot_tell_what_changed_further_back_than_it_keeps() -> None:
+    constructions = Constructions(flat_map())
+    before = constructions.railway_version
+    for _ in range(RAILWAY_LOG // 2 + 1):
+        piece = Track((2, 3), (0, 6))
+        constructions.build(piece)
+        constructions.remove(piece)
+
+    changed = constructions.railway_changed_since(before)
+
+    assert changed is None

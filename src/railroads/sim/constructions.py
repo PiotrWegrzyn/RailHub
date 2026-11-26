@@ -21,6 +21,10 @@ MAX_TURN_DEG = 60.0
 TURN_SLACK_DEG = 1e-6
 
 
+# How many of the railway's last changes Constructions keeps the cells of.
+RAILWAY_LOG = 512
+
+
 class TrackWidth(IntEnum):
     """How many tracks run side by side, which is also how many units of room they take."""
 
@@ -573,6 +577,9 @@ class Constructions:
         self._annexes: dict[Cell, dict[Facility, Cell]] = {}
         self._track: dict[Cell, int] = {}
         self.railway_version = 0
+        # The cell each of the last few changes to the railway was in, with the railway_version
+        # it brought, so what is kept about the track can be worked out again only round them.
+        self._railway_log: list[tuple[int, Cell]] = []
         # A count that goes up whenever anything is built or removed.
         self.version = 0
 
@@ -813,6 +820,20 @@ class Constructions:
             case _:
                 return
         self.railway_version += 1
+        log = self.__dict__.setdefault("_railway_log", [])
+        log.append((self.railway_version, construction.cell))
+        if len(log) > RAILWAY_LOG:
+            del log[: len(log) - RAILWAY_LOG]
+
+    def railway_changed_since(self, version: int) -> set[Cell] | None:
+        """The cells the railway changed in since it was at `version`; None if that is further
+        back than the last RAILWAY_LOG changes, or the railway moved onto another map since."""
+        if version == self.railway_version:
+            return set()
+        log = self.__dict__.get("_railway_log", [])
+        if version < 0 or not log or log[0][0] > version + 1 or log[-1][0] != self.railway_version:
+            return None
+        return {cell for at, cell in log if at > version}
 
     def site_problem(self, building: Building) -> str | None:
         """Why the building cannot stand in its cell, leaving aside the room already taken."""

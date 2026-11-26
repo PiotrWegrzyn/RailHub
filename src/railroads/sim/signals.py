@@ -41,7 +41,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, replace
 
 from railroads.sim.constructions import Constructions, TrackWidth
-from railroads.sim.grids import Cell
+from railroads.sim.grids import Cell, Grid
 from railroads.sim.track_network import TrackNetwork
 from railroads.sim.trains import ENGINES, Claim, Point, Train
 
@@ -97,6 +97,11 @@ def rounded(point: Point) -> Point:
     return (round(point[0], 4), round(point[1], 4))
 
 
+# Each track point of each cell as signalling compares them, by grid (Blocks), kept as the
+# blocks are cut again whenever track or stations change.
+_ENDS: dict[Grid, dict[tuple[Cell, int], Point]] = {}
+
+
 class Blocks:
     """The blocks the track outside stations is cut into, and its signals, worked out once for
     each state of the track."""
@@ -109,9 +114,15 @@ class Blocks:
         cells = sorted({piece.cell for piece in constructions.track()} - stations)
         pieces = {cell: constructions.track_at(cell) for cell in cells}
 
+        known = _ENDS.setdefault(grid, {})
+
         def point(cell: Cell, end: int) -> Point:
-            x, y = grid.center(*cell)
-            return rounded((float(x) + steps[end][0] / 2, float(y) + steps[end][1] / 2))
+            found = known.get((cell, end))
+            if found is None:
+                x, y = grid.center(*cell)
+                found = rounded((float(x) + steps[end][0] / 2, float(y) + steps[end][1] / 2))
+                known[cell, end] = found
+            return found
 
         def kind(cell: Cell) -> str:
             here = pieces[cell]

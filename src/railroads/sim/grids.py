@@ -148,6 +148,9 @@ class Grid(ABC):
         point runs into, as an (n, 2) array. The points go round the cell, alternating the middle
         of an edge, which leads to the neighbour across it, and a corner, which leads along the
         edge between the two cells beside it to the cell beyond."""
+        return _track_steps(self).copy()
+
+    def _find_track_steps(self) -> FloatArray:
         normals = self.edge_normals()
         beyond_corners = normals + np.roll(normals, -1, axis=0)
         return np.stack([normals, beyond_corners], axis=1).reshape(-1, 2)
@@ -169,18 +172,27 @@ class Grid(ABC):
         return tuple(range(len(self.track_steps())))
 
     def track_exit(self, cell: Cell, point: int) -> tuple[Cell, int]:
-        """The cell that track leaving through this point runs into, and the point it enters by."""
-        steps = self.track_steps()
-        x, y = self.center(*cell)
-        row, col = self.cell_at(x + steps[point, 0], y + steps[point, 1])
-        return (int(row), int(col)), (point + len(steps) // 2) % len(steps)
+        """The cell that track leaving through this point runs into, and the point it enters by;
+        worked out once for each cell and point, as the railway asks thousands of times each
+        time it changes."""
+        exits = _EXITS.get(self)
+        if exits is None:
+            exits = _EXITS[self] = {}
+        key = (cell, point)
+        found = exits.get(key)
+        if found is None:
+            steps = _track_steps(self)
+            x, y = self.center(*cell)
+            row, col = self.cell_at(x + steps[point, 0], y + steps[point, 1])
+            found = exits[key] = ((int(row), int(col)), (point + len(steps) // 2) % len(steps))
+        return found
 
     def track_flanks(self, cell: Cell, point: int) -> list[Cell]:
         """The two cells that track through a corner runs between; none at the middle of an
         edge."""
         if point % 2 == 0:
             return []
-        count = len(self.track_steps())
+        count = len(_track_steps(self))
         return [self.track_exit(cell, side % count)[0] for side in (point - 1, point + 1)]
 
     def track_turn(self, start: int, end: int) -> float:
@@ -372,6 +384,23 @@ def flat_within_any(grid: Grid, cells: tuple[Cell, ...], steps: int) -> Within:
     found.setflags(write=False)
     away.setflags(write=False)
     return Within(found, away)
+
+
+# Where track leaving each cell by each point runs into, by grid (Grid.track_exit).
+_EXITS: dict[Grid, dict[tuple[Cell, int], tuple[Cell, int]]] = {}
+# Grid.track_steps of each kind of grid, which are the same for every grid of the kind.
+_STEPS: dict[type[Grid], FloatArray] = {}
+
+
+def _track_steps(grid: Grid) -> FloatArray:
+    """Grid.track_steps, worked out once for each kind of grid: track asks for them many
+    thousands of times when the railway changes. Never changed in place: Grid.track_steps
+    hands out copies."""
+    steps = _STEPS.get(type(grid))
+    if steps is None:
+        steps = _STEPS[type(grid)] = grid._find_track_steps()
+        steps.flags.writeable = False
+    return steps
 
 
 @lru_cache(maxsize=64)

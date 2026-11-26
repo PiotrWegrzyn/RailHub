@@ -10,11 +10,13 @@ import bisect
 import heapq
 import itertools
 import math
+import weakref
+from dataclasses import dataclass, field
 
 import numpy as np
 
 from railroads.sim.constructions import Constructions, Station, Track, TrackWidth
-from railroads.sim.grids import Cell
+from railroads.sim.grids import Cell, Grid
 from railroads.sim.track_rules import track_rules_for
 from railroads.sim.trains import Point, Train
 
@@ -22,6 +24,30 @@ from railroads.sim.trains import Point, Train
 type Way = tuple[list[Point], list[float]]
 # The step of a route that crosses from one platform of a station to the one beside it.
 CROSSING = -1
+
+
+# The track point each point on a cell's edge lies at (TrackNetwork.entry_point), by grid, for
+# at most ENTRIES_KEPT of them.
+ENTRIES_KEPT = 200_000
+_ENTRIES: dict[Grid, dict[tuple[Cell, Point], int]] = {}
+
+
+@dataclass
+class _Memo:
+    """What finding a way asks of each cell (TrackNetwork._memo), kept until track or stations
+    change, as after a change many trains look for their ways again over the same cells: the
+    railway version it was found for, the exits, whether a train can go on, the platforms beside
+    and whether an engine shed stands there."""
+
+    version: int
+    exits: dict[tuple[Cell, int | None, bool, bool], list[int]] = field(default_factory=dict)
+    joins: dict[tuple[Cell, int], bool] = field(default_factory=dict)
+    beside: dict[Cell, list[Cell]] = field(default_factory=dict)
+    sheds: dict[Cell, bool] = field(default_factory=dict)
+
+
+# Each network's _Memo, kept off the network so a saved game does not hold it.
+_MEMOS: weakref.WeakKeyDictionary[TrackNetwork, _Memo] = weakref.WeakKeyDictionary()
 
 
 class TrackNetwork:
@@ -45,6 +71,21 @@ class TrackNetwork:
     def __init__(self, constructions: Constructions) -> None:
         self.constructions = constructions
         self._connected: tuple[int, set[Cell]] | None = None
+
+    def _memo(self) -> _Memo:
+        """What finding a way has asked of each cell since track or stations last changed."""
+        version = self.constructions.railway_version
+        memo = _MEMOS.get(self)
+        if memo is None or memo.version != version:
+            memo = _MEMOS[self] = _Memo(version)
+        return memo
+
+    def _shed(self, cell: Cell) -> bool:
+        sheds = self._memo().sheds
+        found = sheds.get(cell)
+        if found is None:
+            found = sheds[cell] = self.constructions.shed_at(cell) is not None
+        return found
 
     def connected(self) -> set[Cell]:
         """The stations that track joins to at least one other station, worked out again only
@@ -163,12 +204,19 @@ class TrackNetwork:
         return self._search(cell, entry, {arrival}, electric, maglev)
 
     def entry_point(self, cell: Cell, point: Point) -> int:
-        """The track point of a cell a point on its edge, as on a train's path, lies at."""
+        """The track point of a cell a point on its edge, as on a train's path, lies at; kept,
+        as every train's way is checked against the track again whenever it changes."""
         grid = self.constructions.tile_map.grid
-        cx, cy = grid.center(*cell)
-        offsets = grid.track_steps() / 2
-        gaps = np.hypot(cx + offsets[:, 0] - point[0], cy + offsets[:, 1] - point[1])
-        return int(np.argmin(gaps))
+        entries = _ENTRIES.get(grid)
+        if entries is None or len(entries) >= ENTRIES_KEPT:
+            entries = _ENTRIES[grid] = {}
+        found = entries.get((cell, point))
+        if found is None:
+            cx, cy = grid.center(*cell)
+            offsets = grid.track_steps() / 2
+            gaps = np.hypot(cx + offsets[:, 0] - point[0], cy + offsets[:, 1] - point[1])
+            found = entries[cell, point] = int(np.argmin(gaps))
+        return found
 
     def speed_in(self, cell: Cell) -> float:
         """How fast trains run through a cell, as a share of their speed."""
@@ -199,7 +247,7 @@ class TrackNetwork:
             if (cell, entry) in seen:
                 continue
             seen.add((cell, entry))
-            if last >= 0 and self.constructions.shed_at(cell) is not None:
+            if last >= 0 and self._shed(cell):
                 continue
             for beside in self._platforms_beside(cell):
                 taken.append((last, cell, CROSSING))
@@ -217,6 +265,13 @@ class TrackNetwork:
 
     def _platforms_beside(self, cell: Cell) -> list[Cell]:
         """The other platforms of the station in a cell that lie beside it."""
+        beside = self._memo().beside
+        found = beside.get(cell)
+        if found is None:
+            found = beside[cell] = self._find_platforms_beside(cell)
+        return found
+
+    def _find_platforms_beside(self, cell: Cell) -> list[Cell]:
         constructions = self.constructions
         main = constructions.main_station(cell)
         if main is None:
@@ -234,6 +289,16 @@ class TrackNetwork:
         station, the one it came in by too, turning round there; else the other end of each
         piece of track, electrified if `electric` and maglev just when `maglev`, that starts
         where it came in."""
+        exits = self._memo().exits
+        key = (cell, entry, electric, maglev)
+        found = exits.get(key)
+        if found is None:
+            found = exits[key] = self._find_exits_of(cell, entry, electric, maglev)
+        return found
+
+    def _find_exits_of(
+        self, cell: Cell, entry: int | None, electric: bool, maglev: bool
+    ) -> list[int]:
         built = self.constructions.at(cell)
         if any(isinstance(b, Station) for b in built) or self.constructions.shed_at(cell):
             return list(self.constructions.station_ends(cell))
@@ -300,6 +365,14 @@ class TrackNetwork:
     def _joins(self, cell: Cell, entry: int) -> bool:
         """Whether a train coming in by `entry` can go on from this cell: by one of a station's
         ends, or onto track that starts there."""
+        joins = self._memo().joins
+        key = (cell, entry)
+        found = joins.get(key)
+        if found is None:
+            found = joins[key] = self._find_joins(cell, entry)
+        return found
+
+    def _find_joins(self, cell: Cell, entry: int) -> bool:
         if self.constructions.is_stop(cell):
             return entry in self.constructions.station_ends(cell)
         return any(isinstance(b, Track) and entry in b.ends for b in self.constructions.at(cell))

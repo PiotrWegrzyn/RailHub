@@ -221,10 +221,19 @@ class PixelWorld:
         if version == self._graded_version:
             return
         beds = []
+        # Whether each line runs over hills or mountains, kept by the line, which track art
+        # keeps for every piece that did not change.
+        raised: dict[int, tuple[FloatArray, bool]] = {}
+        kept = self.__dict__.get("_raised_lines", {})
         for line in self.track.beds():
-            mountains, hills = self.elevation.shares(*line)
-            if (mountains > 0).any() or (hills > 0).any():
+            found = kept.get(id(line))
+            if found is None or found[0] is not line:
+                mountains, hills = self.elevation.shares(*line)
+                found = (line, bool((mountains > 0).any() or (hills > 0).any()))
+            raised[id(line)] = found
+            if found[1]:
                 beds.append(line)
+        self._raised_lines = raised
         self.elevation.grade(beds)
         self._graded_version = version
 

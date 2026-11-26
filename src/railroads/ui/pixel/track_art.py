@@ -164,6 +164,12 @@ def _raised_strip(path: Path, lifts: list[float], left: float, right: float | No
     return _Strip(_raised(_offset(path, left), lifts) + _raised(_offset(path, right), lifts)[::-1])
 
 
+# How many cells from where track or stations change the look of a piece of track can change:
+# a piece follows the track it branches off in its cell, which follows how wide the track it
+# runs into is next door, which follows the station track beyond that.
+CHANGE_REACH = 3
+
+
 class _Strip(list[Point]):
     """The outline of a strip along a path: its points along one side, then back along the
     other, which the graphics card fills as the quads between the two sides."""
@@ -519,17 +525,46 @@ class TrackArt:
     def _keep_current(self) -> None:
         """Forgets what was kept about pieces of track before track or stations last changed,
         and how far they lift before the ground was last graded for track."""
-        if self._shapes_version != self.constructions.railway_version:
-            self._shapes.clear()
-            self._turnout_lanes.clear()
-            self._branches.clear()
-            self._profiles.clear()
-            self._forget_laid()
-            self._shapes_version = self.constructions.railway_version
+        now = self.constructions.railway_version
+        if self._shapes_version != now:
+            changed = self.constructions.railway_changed_since(self._shapes_version)
+            if changed is None:
+                self._shapes.clear()
+                self._turnout_lanes.clear()
+                self._branches.clear()
+                self._profiles.clear()
+                self._forget_laid()
+            else:
+                self._forget_round(changed, now)
+            self._shapes_version = now
         grades = 0 if self.elevation is None else self.elevation.grades
         if grades != self._grades:
             self._lifts.clear()
             self._grades = grades
+
+    def _forget_round(self, changed: set[Cell], now: int) -> None:
+        """Forgets what was kept about the pieces of track within CHANGE_REACH cells of the
+        cells where track or stations changed, all a piece's look depends on, and keeps the
+        rest for the railway as it is now: laying a few pieces leaves the thousands elsewhere
+        as they were."""
+        grid = self.tile_map.grid
+        near = {cell for each in changed for cell in grid.within(each, CHANGE_REACH)}
+        for kept in (self._shapes, self._turnout_lanes, self._profiles):
+            for piece in list(kept):
+                if piece.cell in near:
+                    kept.pop(piece, None)
+        for piece, point in list(self._branches):
+            if piece.cell in near:
+                self._branches.pop((piece, point), None)
+        for kept in (self._placed, self._lifts):
+            for piece, platform in list(kept):
+                if piece.cell in near:
+                    kept.pop((piece, platform), None)
+        for (piece, platform), (_, laid) in list(self._laid_pieces.items()):
+            if piece.cell in near:
+                self._laid_pieces.pop((piece, platform), None)
+            else:
+                self._laid_pieces[piece, platform] = (now, laid)
 
     def beds(self) -> list[FloatArray]:
         """The middle line through the plane of all track laid on the ground, through stations

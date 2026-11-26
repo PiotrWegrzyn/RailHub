@@ -279,3 +279,13 @@ def test_the_cells_kept_within_reach_cannot_be_changed() -> None:
 
     with pytest.raises(ValueError, match="read-only"):
         within.cells[0] = 0
+
+
+def test_track_steps_handed_out_can_be_changed_without_changing_the_grids() -> None:
+    grid = HexGrid(rows=4, cols=4, km_per_cell=2.0)
+    steps = grid.track_steps()
+
+    steps *= 0.0
+
+    assert grid.track_steps().any()
+    assert grid.track_exit((2, 2), 0)[0] != (2, 2)

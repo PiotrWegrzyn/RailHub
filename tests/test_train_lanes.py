@@ -320,3 +320,19 @@ def test_a_piece_ridden_before_the_track_it_branches_off_is_laid_is_ridden_as_a_
     assert before is None
     assert after is not None
     assert after[0] == main.ends[0]
+
+
+def test_double_track_closes_up_where_the_track_next_door_becomes_single() -> None:
+    _railway, track = line(TrackWidth.DOUBLE)
+    constructions = track.constructions
+    here = constructions.track_at((6, 11))[0]
+    beside = constructions.track_at((6, 12))[0]
+    toward = 0.0 if here.ends[0] == 0 else 1.0
+    before = track.riding_side(here, toward, True)
+
+    constructions.remove(beside)
+    constructions.build(Track((6, 12), beside.ends, TrackWidth.SINGLE))
+    after = track.riding_side(here, toward, True)
+
+    assert before == pytest.approx(FULL / PIXEL_CELL_WIDTH)
+    assert after == pytest.approx(0.0)
