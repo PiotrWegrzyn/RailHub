@@ -11,9 +11,10 @@ Models are in cells: u along the track, v across it towards the track, z up."""
 
 import math
 from collections.abc import Callable
-from functools import partial
+from functools import cache, partial
 
 import numpy as np
+import numpy.typing as npt
 
 from railroads.ui.pixel.art.built import (
     HEADING,
@@ -32,7 +33,7 @@ from railroads.ui.pixel.art.built import (
 )
 from railroads.ui.pixel.art.painter import BRICK, NAME_BOARD, RGB, VERDIGRIS, Sprite, shade
 from railroads.ui.pixel.models import Face, Model
-from railroads.ui.pixel.track_art import BANK, PLATFORM_WIDTH, SET_BACK
+from railroads.ui.pixel.track_art import BANK, SET_BACK
 
 # The station houses on hexes, drawn turned along the track through them: for each way track
 # runs on the screen, the heading the house's length lies along, chosen so its front, with the
@@ -63,6 +64,16 @@ PANE: RGB = (64, 78, 100)
 # How wide a station's shadow is beside its footprint: its long low wings cast less than a tall
 # building's.
 SHADOW = 0.6
+# How much of the platform's edge by the track shows in front of a station house standing on
+# its platform, in cells of the picture's width.
+PLATFORM_EDGE = 0.03
+# How far from the middle of a hex its edges lie, in cells, and which ways they face.
+APOTHEM = 0.5
+HEX_EDGES = np.array(
+    [(math.cos(math.radians(a)), math.sin(math.radians(a))) for a in range(0, 360, 60)]
+)
+# How much smaller a station house is tried again when it does not fit inside its hex.
+FIT_STEP = 0.98
 
 
 def _slope_normal(rise: float, run: float, way: tuple[float, float]) -> tuple[float, float, float]:
@@ -460,50 +471,120 @@ def island_platform() -> Model:
     return m
 
 
-# Each station's model, and how far out from where it stands its front lies, in cells: the wall
-# or train shed that meets the back of the platform.
-LEVELS: dict[str, tuple[Callable[[], Model], float]] = {
-    "station": (wooden_halt, 0.06),
-    "station_2": (brick_station, 0.075),
-    "station_3": (town_station, 0.09),
-    "station_4": (grand_station, 0.1),
-    "station_5": (terminus, 0.24),
-    "platform": (branch_station, 0.1 * PLATFORM_HOUSE),
+# Each station's model.
+LEVELS: dict[str, Callable[[], Model]] = {
+    "station": wooden_halt,
+    "station_2": brick_station,
+    "station_3": town_station,
+    "station_4": grand_station,
+    "station_5": terminus,
+    "platform": branch_station,
 }
 
 
-def by_platform(build: Callable[[], Model], front: float, heading: float) -> Model:
-    """The station built by `build`, moved across its track so that, seen turned `heading`, its
-    front meets the back of the platform: the house stands set back from its track across the
-    picture, past the bank and the platform (railroads.ui.pixel.track_art, which needs this
-    module's package first), and the cells across the track fill more or less of the picture by
-    the way it runs."""
-
+def by_platform(build: Callable[[], Model], heading: float) -> Model:
+    """The station built by `build`, turned `heading`, standing on its platform inside its own
+    hex: what reaches furthest towards the track, a canopy, wall or train shed, by the edge of the
+    platform along the track with that edge showing in front of it, its middle by the middle of
+    the hex along the track, and as big as it can be (_fit) so that whichever way its track runs,
+    none of it reaches past the hex's edges."""
     m = build()
-    if front == 0.0:
-        return m
-    gap = SET_BACK - BANK / 2 - PLATFORM_WIDTH
-    plane = PROJECTION.matrix
-    along = plane @ (math.cos(heading), math.sin(heading))
-    across = plane @ (-math.sin(heading), math.cos(heading))
-    towards = np.array([-along[1], along[0]]) / float(np.hypot(*along))
-    reach = abs(float(across @ towards))
-    shift = gap * float(np.hypot(*plane[:, 0])) / reach - front
-    m.move(0, 0.0, shift)
-    m.footprints = [(u, (v[0] + shift, v[1] + shift)) for u, v in m.footprints]
+    scale, front = _fit(build)
+    m = stretched(m, scale, scale)
+    slide, shift = _centred(heading), _front_at(heading) - front * scale
+    m.move(0, slide, shift)
+    m.footprints = [
+        ((u[0] + slide, u[1] + slide), (v[0] + shift, v[1] + shift)) for u, v in m.footprints
+    ]
     return m
 
 
-def turned(build: Callable[[], Model], front: float, heading: float) -> Callable[[], Sprite]:
-    """The sprite of a station built by `build`, its front `front` out, turned `heading`
-    radians and standing by its platform."""
-    return modelled(partial(by_platform, build, front, heading), shadow=SHADOW, heading=heading)
+def _plan(build: Callable[[], Model]) -> npt.NDArray[np.float64]:
+    """Where the corners of a model's faces drawn at every zoom lie on the ground, u by v."""
+    return np.array([c[:2] for face in build().faces if not face.fine for c in face.corners])
 
 
-SQUARE_STATIONS = {name: turned(*level, HEADING) for name, level in LEVELS.items()}
+@cache
+def _fit(build: Callable[[], Model]) -> tuple[float, float]:
+    """How big a station house is drawn, at most its full size, so that standing on its
+    platform (by_platform) its plan lies inside its hex whichever way its track runs, and how far
+    towards the track from where it stands it reaches at full size: by its faces drawn at every
+    zoom, so it is the same size at all of them."""
+    plan = _plan(build)
+    front = float(plan[:, 1].max())
+    scale = 1.0
+    while scale > FIT_STEP**100 and not all(
+        _inside(plan, scale, front, math.radians(heading)) for heading in TURNED_LINES.values()
+    ):
+        scale *= FIT_STEP
+    return scale, front
+
+
+def _inside(plan: npt.NDArray[np.float64], scale: float, front: float, heading: float) -> bool:
+    """Whether a house's plan, drawn `scale` times its size and turned `heading` by its
+    platform, lies inside its hex."""
+    u = plan[:, 0] * scale + _centred(heading)
+    v = plan[:, 1] * scale + _front_at(heading) - front * scale
+    cos, sin = math.cos(heading), math.sin(heading)
+    x, y = _stands_at(heading)
+    ground = np.stack([x + u * cos - v * sin, y + u * sin + v * cos], axis=1)
+    return bool((ground @ HEX_EDGES.T).max() <= APOTHEM + 1e-9)
+
+
+def _centred(heading: float) -> float:
+    """How far along its track, in cells, a house turned `heading` moves to stand by the middle
+    of its hex: set back square to the track across the picture (_stands_at), it stands off the
+    middle along track slanting across the map."""
+    return -float(_stands_at(heading) @ (math.cos(heading), math.sin(heading)))
+
+
+def _front_at(heading: float) -> float:
+    """How far across from where a house turned `heading` stands, in cells, the edge of its
+    platform by the track lies, less PLATFORM_EDGE (railroads.ui.pixel.track_art, which needs
+    this module's package first): the cells across the track fill more or less of the picture
+    by the way it runs."""
+    gap = SET_BACK - BANK / 2 - PLATFORM_EDGE
+    return gap * _cell() / _reach(heading)
+
+
+def _cell() -> float:
+    """How many pixels wide a cell is in the picture."""
+    return float(np.hypot(*PROJECTION.matrix[:, 0]))
+
+
+def _towards(heading: float) -> tuple[npt.NDArray[np.float64], float]:
+    """Which way across the picture, square to track turned `heading`, a house's front faces,
+    and how many pixels a cell across that track takes that way."""
+    plane = PROJECTION.matrix
+    along = plane @ (math.cos(heading), math.sin(heading))
+    across = plane @ (-math.sin(heading), math.cos(heading))
+    square = np.array([-along[1], along[0]]) / float(np.hypot(*along))
+    reach = float(across @ square)
+    return (square if reach > 0 else -square), abs(reach)
+
+
+def _reach(heading: float) -> float:
+    return _towards(heading)[1]
+
+
+def _stands_at(heading: float) -> npt.NDArray[np.float64]:
+    """Where a house turned `heading` stands from the middle of its hex, in cells: SET_BACK cells
+    of the picture's width from its track square across the picture, away from the track
+    (railroads.ui.pixel.scenery)."""
+    facing, _ = _towards(heading)
+    return np.linalg.solve(PROJECTION.matrix, -facing * SET_BACK * _cell())
+
+
+def turned(build: Callable[[], Model], heading: float) -> Callable[[], Sprite]:
+    """The sprite of a station built by `build`, turned `heading` radians and standing on its
+    platform."""
+    return modelled(partial(by_platform, build, heading), shadow=SHADOW, heading=heading)
+
+
+SQUARE_STATIONS = {name: turned(build, HEADING) for name, build in LEVELS.items()}
 
 TURNED_STATIONS = {
-    f"{name}_{line}": turned(*level, math.radians(heading))
-    for name, level in LEVELS.items()
+    f"{name}_{line}": turned(build, math.radians(heading))
+    for name, build in LEVELS.items()
     for line, heading in TURNED_LINES.items()
 }

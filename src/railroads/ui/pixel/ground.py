@@ -79,7 +79,9 @@ from railroads.ui.pixel.ground_palette import (
     FOOT_SHADE,
     FOOT_TINT,
     FURTHER,
+    GARDEN,
     GARDEN_LEAVES,
+    GARDEN_ROWS,
     GLOW,
     GOLDEN_GREENS,
     GRASSES,
@@ -733,9 +735,10 @@ class Ground:
             colour = base * (0.9 + 0.2 * table_hash(fx, fy, 31))[..., None]
             u = (fx + 0.5 - cx) / k
             v = (fy + 0.5 - cy) / k
-            garden = (u > 1.5) & (u < 6.5) & (v > -3.4) & (v < -0.6)
+            left, right, top, bottom = GARDEN
+            garden = (u > left) & (u < right) & (v > top) & (v < bottom)
             colour[garden] = SOIL * 0.95
-            rows = garden & (np.floor((v + 3.4) * 1.4) % 2 == 0)
+            rows = garden & (np.floor((v - top) * GARDEN_ROWS) % 2 == 0)
             leaves = rows & (table_hash(fx, fy, 32) > 0.25)
             colour[leaves] = (
                 GARDEN_LEAVES * (0.9 + 0.3 * table_hash(fx[leaves], fy[leaves], 33))[:, None]

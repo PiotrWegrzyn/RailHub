@@ -187,12 +187,17 @@ BUILDING_SCALE = 0.7
 
 HOMES = ("house", "tenement", "flats")
 
-HOME_SCALE = 0.59
+HOME_SCALE = 0.413
 
 # A farm's barn and an orchard's cottage stand a touch bigger than a house.
 FARMSTEADS = ("farm", "orchard", "orange_farm")
 
 FARMSTEAD_SCALE = 0.585
+
+# Small workshops drawn smaller than other works, by this share of the size they would have.
+WORKSHOPS = ("bakery", "distillery")
+
+WORKSHOP_SHARE = 0.7
 
 BUILDINGS = (
     "house",
@@ -542,7 +547,7 @@ def _scale_of(name: str) -> float:
     scale = min(scale, most / _width(_full_size(name)))
     while _shown_width(name, scale) > most:
         scale *= SHRINK_STEP
-    return scale
+    return scale * WORKSHOP_SHARE if name in WORKSHOPS else scale
 
 
 def _shown_width(name: str, scale: float) -> int:
@@ -570,8 +575,8 @@ def draw_sheets(
     resolutions: tuple[int, ...], padding: int = 1
 ) -> dict[str, tuple[Image.Image, dict[str, list[int]]]]:
     """A sheet (draw_sheet) at each of `resolutions`. Buildings other than stations are drawn at
-    BUILDING_SCALE, houses, tenements and flats at HOME_SCALE, and farms and orchards at
-    FARMSTEAD_SCALE. Each sprite is drawn once, MASTER_RESOLUTION times finer than an art pixel
+    BUILDING_SCALE, houses, tenements and flats at HOME_SCALE, farms and orchards at
+    FARMSTEAD_SCALE, and bakeries and distilleries WORKSHOP_SHARE of their size. Each sprite is drawn once, MASTER_RESOLUTION times finer than an art pixel
     (fine_sprite), and every sheet holds it shrunk from that drawing (shrunk_from), so a sprite
     is the very same picture on every sheet, only smaller or bigger: lines a pixel wide where it
     is drawn, such as the outline round a model, would make the coarse sheets look like other,

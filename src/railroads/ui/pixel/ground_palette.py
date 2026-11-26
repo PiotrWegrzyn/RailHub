@@ -374,20 +374,26 @@ AROUND = (
 )
 # The ground round buildings, so they stand in it rather than on untouched grass: trodden earth
 # round a cottage with a vegetable garden beside it and round a farmstead at the back of its
-# field, paving round town buildings and flagstones round churches and landmarks, gravel round
-# works, spoil round mines and pits, and sand under palms. Each is an oval its building's reach
-# across and half that down, its edge frayed; a cottage's and a farmstead's reach is fixed.
-YARD_REACH = {"cottage": 7.5, "farmyard": 11.0}
+# field, paving round town buildings and flagstones round churches and landmarks, spoil round
+# mines and pits, sand under palms, and worn earth round works and every other building. Each is
+# an oval its building's reach across and half that down, its edge frayed; a cottage's and a
+# farmstead's reach is fixed.
+YARD_REACH = {"cottage": 6.0, "farmyard": 11.0}
 YARD_COLOURS = {
     "cottage": (150, 128, 88),
     "farmyard": (150, 128, 88),
     "paved": (168, 164, 152),
     "flagstones": (182, 176, 160),
-    "gravel": (148, 142, 128),
+    "worn": (142, 122, 88),
     "spoil": (118, 102, 84),
     "sand": (214, 192, 134),
 }
 GARDEN_LEAVES = np.array((84, 132, 52), dtype=np.float32)
+# Where a cottage's vegetable garden lies from the middle of its yard, in art pixels: from the
+# first to the second across, and from the third to the fourth down; and how many rows of
+# leaves it holds to an art pixel down.
+GARDEN = (1.0, 4.6, -2.4, -0.4)
+GARDEN_ROWS = 2.0
 # How dark the grass in a tree's shade gets, and how far the shade reaches from its foot, in art
 # pixels across and down.
 TREE_SHADE = 0.24

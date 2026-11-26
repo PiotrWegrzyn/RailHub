@@ -772,27 +772,13 @@ class _Unpacked(Sequence[npt.NDArray[np.float32]]):
         return {"_bytes": self._bytes, "_premultiply": self._premultiply, "_made": {}}
 
 
-# Words in the names of works' sprites, which stand in a gravel yard.
-WORKS = (
-    "factory",
-    "works",
-    "mill",
-    "plant",
-    "refinery",
-    "brewery",
-    "distillery",
-    "tannery",
-    "bakery",
-    "winery",
-    "maker",
-    "shipyard",
-    "brickworks",
-    "glassworks",
-)
+# Sprites that stand in no yard of their own: trees, rocks, and stations and their facilities,
+# which stand by their track.
+UNYARDED = ("pine_", "leafy_", "rocks", "station", "platform", "engine_shed", "cattle_pens")
 
 
 # How far the ground round a building reaches, as a share of its sprite's width.
-YARD_SHARE = 0.42
+YARD_SHARE = 0.55
 CHURCHES = ("church", "basilica", "cathedral", "st_peters")
 LANDMARKS = (
     "royal_palace",
@@ -834,7 +820,7 @@ DIGGINGS = (
 
 def _yard_of(name: str) -> str:
     """What ground lies round the building a sprite shows (railroads.ui.pixel.ground.YARD_COLOURS),
-    or nothing."""
+    or nothing for what stands in no yard (UNYARDED)."""
     if name.startswith("house_"):
         return "cottage"
     if name.startswith(TOWN):
@@ -845,9 +831,9 @@ def _yard_of(name: str) -> str:
         return "spoil"
     if name in ("date_palms",):
         return "sand"
-    if any(word in name for word in WORKS):
-        return "gravel"
-    return ""
+    if name.startswith(UNYARDED):
+        return ""
+    return "worn"
 
 
 def _blend(canvas: FloatArray, sprite: npt.NDArray[np.float32], x: int, y: int) -> None:

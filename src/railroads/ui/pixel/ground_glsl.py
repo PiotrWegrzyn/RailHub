@@ -941,9 +941,10 @@ void lay_yards(ivec2 texel, inout vec4 layer) {
         if (kind == @COTTAGE@) {
             colour *= 0.9 + 0.2 * table_hash(texel.x, texel.y, 31);
             vec2 uv = (f - c) / float(k);
-            if (uv.x > 1.5 && uv.x < 6.5 && uv.y > -3.4 && uv.y < -0.6) {
+            if (uv.x > @GARDEN_LEFT@ && uv.x < @GARDEN_RIGHT@ && uv.y > @GARDEN_TOP@
+                    && uv.y < @GARDEN_BOTTOM@) {
                 colour = @SOIL@ * 0.95;
-                bool row = mod(floor((uv.y + 3.4) * 1.4), 2.0) == 0.0;
+                bool row = mod(floor((uv.y - @GARDEN_TOP@) * @GARDEN_ROWS@), 2.0) == 0.0;
                 if (row && table_hash(texel.x, texel.y, 32) > 0.25) {
                     colour = @GARDEN_LEAVES@ * (0.9 + 0.3 * table_hash(texel.x, texel.y, 33));
                 }
@@ -1595,6 +1596,11 @@ def _fields_names() -> dict[str, str]:
         "GROVE_FLOOR": glsl_number(cpu.GROVE_FLOOR),
         "GROVE_SHADOW": glsl_number(cpu.GROVE_SHADOW),
         "GARDEN_LEAVES": _vec3(cpu.GARDEN_LEAVES),
+        **{
+            f"GARDEN_{side}": glsl_number(edge)
+            for side, edge in zip(("LEFT", "RIGHT", "TOP", "BOTTOM"), cpu.GARDEN, strict=True)
+        },
+        "GARDEN_ROWS": glsl_number(cpu.GARDEN_ROWS),
     }
 
 

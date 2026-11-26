@@ -74,14 +74,15 @@ RAIL_WIDTH = 0.25
 # chunks round a view of a busy railway draw, and few enough that a big railway's pieces do not
 # fill memory.
 PIECES_KEPT = 1 << 11
-# A station's platform beside its track, and how far from the track's middle the station house
-# stands, in cells of the picture's width.
+# A station's platform beside its track, in cells of the picture's width.
 PLATFORM_WIDTH = 0.12
 # How far apart the two tracks either side of an island platform lie in a station on quadruple
 # track, in cells, and how far into the station's cell from each end they have opened out to that.
 ISLAND_TRACKS = 0.3
 ISLAND_FROM = 0.22
-SET_BACK = 0.34
+# How far from the track's middle a station house stands, in cells of the picture's width: on
+# its platform (railroads.ui.pixel.art.stations.by_platform).
+SET_BACK = 0.2
 # How gently a track branching off other track turns out of it: round a circle of this radius,
 # in cells, or as wide as there is room for; and how many cells along that track another track of
 # it crosses over to the track that turns out for each cell it crosses, as a crossover does.

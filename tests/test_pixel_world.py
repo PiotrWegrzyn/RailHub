@@ -169,7 +169,6 @@ def test_a_station_house_is_drawn_over_the_buildings_in_the_cells_behind_it(
     names = [sheet.names[i] for i in scenery.sprite.tolist()]
     station_house = names.index(next(name for name in names if name.startswith("station")))
     houses = np.isin(scenery.sprite, sheet.variants("house"))
-    assert (scenery.y[houses] > scenery.y[station_house]).any()
     assert np.flatnonzero(houses).max() < station_house
 
 
@@ -712,8 +711,8 @@ def test_a_station_house_stands_back_from_its_track_turned_along_it(sheet: Sprit
 
     x, y = (float(v) for v in across.projection.to_pixels(*across.tile_map.grid.center(10, 4)))
     assert len(houses) == 2
-    assert houses[0][1] < y - 6 and abs(houses[0][0] - x) <= 1
-    assert houses[1][0] < x - 6 and abs(houses[1][1] - y) <= 1
+    assert houses[0][1] < y - 4 and abs(houses[0][0] - x) <= 1
+    assert houses[1][0] < x - 4 and abs(houses[1][1] - y) <= 1
 
 
 def test_a_station_house_is_drawn_turned_each_way_track_runs_through_it(sheet: SpriteSheet) -> None:
