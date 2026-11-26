@@ -26,7 +26,7 @@ def fishing_village(
     constructions = Constructions(tile_map)
     if port is not None:
         build(constructions, port, BuildingKind.PORT, 1)
-    land = land_around(tile_map, COAST)
+    land = [cell for cell in land_around(tile_map, COAST) if cell != port]
     for cell in land:
         build(constructions, cell, BuildingKind.HOUSE, houses_per_cell)
     for cell in land[:fisheries]:
@@ -41,6 +41,16 @@ def test_three_fisheries_join_into_a_port() -> None:
 
     assert growth.count(BuildingKind.PORT)[COAST] == 1
     assert growth.count(BuildingKind.FISHERY).sum() == 0
+
+
+def test_a_port_joined_from_fisheries_moves_the_cells_other_buildings_aside() -> None:
+    growth = fishing_village(1)
+    houses = int(growth.count(BuildingKind.HOUSE).sum())
+
+    growth._turn(COAST, FISHERIES, np.random.default_rng(0))
+
+    assert [b.kind for b in growth.constructions.buildings_at(COAST)] == [BuildingKind.PORT]
+    assert int(growth.count(BuildingKind.HOUSE).sum()) == houses
 
 
 def test_three_fisheries_on_an_empty_shore_join_into_a_port() -> None:

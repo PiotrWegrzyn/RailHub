@@ -47,7 +47,7 @@ def coastal_town(port: tuple[int, int] | None = None) -> Growth:
     tile_map = make_map()
     constructions = Constructions(tile_map)
     for cell in [COAST, *tile_map.grid.neighbours(*COAST)]:
-        if tile_map.terrain[cell] == Terrain.LAND:
+        if tile_map.terrain[cell] == Terrain.LAND and cell != port:
             build(constructions, cell, BuildingKind.HOUSE, 1)
     if port is not None:
         build(constructions, port, BuildingKind.PORT, 1)

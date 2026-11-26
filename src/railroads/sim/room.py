@@ -1,5 +1,5 @@
 """Making room on the map (railroads.sim.growth keeps one Room): moving buildings aside for the
-player's track, stations and facilities, clearing a cell for a merged works, putting up a building
+player's track, stations and facilities and for a port, clearing a cell for a merged works, putting up a building
 that found no room in its own cell nearby, and housing people a skyscraper pulled their flats down
 on. A building moved aside spills: it goes up again in the nearest cell that will take it, as a
 building that found no room does, the player's shares in it with it, and comes down only where no
@@ -62,8 +62,8 @@ class Room:
     def move_aside(
         self, cell: Cell, units: int, keep_clear: Collection[Cell] = frozenset()
     ) -> set[Cell]:
-        """Makes `units` of room in the cell for the player's track, station or facility, the
-        smallest buildings first (railroads.sim.demolition prices them in the same order): each
+        """Makes `units` of room in the cell for the player's track, station or facility, or a
+        port, the smallest buildings first (railroads.sim.demolition prices them in the same order): each
         spills to the nearest cell outside `keep_clear` (the rest of the track being laid) that
         will take it, the player's shares in it with it, and comes down where none will. Returns
         the cells whose buildings changed."""

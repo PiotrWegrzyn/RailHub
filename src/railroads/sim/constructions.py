@@ -316,9 +316,10 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.MIRROR_MAKER,
         )
     },
-    BuildingKind.PORT: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True),
-    BuildingKind.BIG_PORT: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True, space=2),
-    BuildingKind.MEGA_PORT: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True, space=3),
+    # Ports fill their cell with their yard and quay (railroads.ui.pixel.art.ports).
+    BuildingKind.PORT: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True, space=CELL_SPACE),
+    BuildingKind.BIG_PORT: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True, space=CELL_SPACE),
+    BuildingKind.MEGA_PORT: BuildingRules(relief=_OFF_MOUNTAINS, by_water=True, space=CELL_SPACE),
     **{
         kind: BuildingRules(relief=_OFF_MOUNTAINS, space=CELL_SPACE)
         for kind in (

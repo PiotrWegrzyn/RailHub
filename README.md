@@ -725,7 +725,9 @@ window (H) lists the same.
 
 #### Ports
 
-Ports (`railroads.sim.ports`) have no fixed goods: each draws its own when it goes up. Every good
+Ports (`railroads.sim.ports`) have no fixed goods: each draws its own when it goes up. A port of
+any size takes its whole cell, its yard and quay filling it: the buildings in the cell when it
+comes up from fisheries or merges move to the nearest cell that takes them. Every good
 a port can draw has a tier, and every tier a value a month; a port gives or takes as many units of
 a good a month as its tier's value buys at the good's base price, and more as the good's supply
 grows. An ordinary port draws one good it gives and one it takes, both common or rare, from the

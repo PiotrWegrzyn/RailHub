@@ -1238,8 +1238,9 @@ class Growth:
     ) -> set[Cell] | None:
         """Pulls down so many of each kind in the neighbourhood, the cell's own first and then
         from the fullest cells, and puts up a building of the new kind in the cell; None, and
-        nothing pulled down, if there are too few or it would not fit. A big or mega works moves
-        the cell's other buildings out of its way (railroads.sim.room) if it must."""
+        nothing pulled down, if there are too few or it would not fit. A big or mega works pulls
+        the cell's other buildings down if it must (railroads.sim.room.clear), and a port, which
+        fills its cell, moves them aside (move_aside)."""
         new = Building(cell, new_kind)
         if self.constructions.site_problem(new) is not None:
             return None
@@ -1256,7 +1257,7 @@ class Growth:
                 wanted -= take
                 if not wanted:
                     break
-        if new_kind in GREW_FROM:
+        if new_kind in GREW_FROM or new_kind in PORT_KINDS:
             freed = sum(building.space for building in self.constructions.buildings_at(cell))
         else:
             freed = sum(
@@ -1270,7 +1271,11 @@ class Growth:
             if kind in PORT_KINDS and (port := self.ports.take(near)) is not None
         }
         owned = [self._pull_down(near, kind, take) for near, kind, take in plan]
-        moved = self.room.clear(cell, new.space)
+        moved = (
+            self.room.move_aside(cell, new.space)
+            if new_kind in PORT_KINDS
+            else self.room.clear(cell, new.space)
+        )
         self.constructions.build(new)
         if new_kind in PORT_KINDS[1:] and ports:
             self.ports.merged(cell, new_kind, ports)
