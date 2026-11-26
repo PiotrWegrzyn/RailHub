@@ -36,22 +36,22 @@ from railroads.ui.pixel.relief import MOST_LIFT, Elevation
 # far apart sleepers lie, a bridge deck's and a tunnel portal's width, and how far beyond the
 # bank its shadow reaches. The two tracks of double track lie DOUBLE_SPACING apart, and every
 # piece rounds its turn over the last BEND either side of the middle of its cell.
-BANK = 0.175
-TRACK_BED = 0.15
-GAUGE = 0.072
-SLEEPER_LENGTH = 0.14
-SLEEPER_WIDTH = 0.026
-SLEEPER_GAP = 0.05
-BRIDGE_WIDTH = 0.24
-PORTAL = 0.24
+BANK = 0.058
+TRACK_BED = 0.05
+GAUGE = 0.024
+SLEEPER_LENGTH = 0.047
+SLEEPER_WIDTH = 0.009
+SLEEPER_GAP = 0.017
+BRIDGE_WIDTH = 0.08
+PORTAL = 0.08
 # How tall a tunnel portal stands, in cells; how narrow it looks from the side, as a share of its
 # width seen from the front; and how far its track may run away from the viewer into it, as the
 # share of the way up the picture, for it to be seen.
-PORTAL_HEIGHT = 0.26
+PORTAL_HEIGHT = 0.09
 PORTAL_NARROWEST = 0.6
 PORTAL_FACING = 0.5
-SHADOW_REACH = 0.03
-DOUBLE_SPACING = 0.18
+SHADOW_REACH = 0.01
+DOUBLE_SPACING = 0.06
 # How far the outer tracks of quadruple track lie from its middle, in cells: as far from the inner
 # tracks as these lie from each other, close enough that two lines of it in cells beside each
 # other keep apart.
@@ -69,20 +69,23 @@ STEP = 1 / 12
 SMOOTHING = {1: 4, 2: 2}
 # How wide a rail is, in art pixels, though never narrower than a pixel shown.
 RAIL_WIDTH = 0.25
+# How many pixels shown a track's bank takes across at the least: far out, where the track at its
+# true size would show as a hairline, it is drawn wider, as a map draws a railway wider than it is.
+LEAST_BANK = 5.0
 # How many pieces of track are kept laid out, with where they land in the picture and how far
 # they are lifted, before all are forgotten and laid out again as they are drawn: more than the
 # chunks round a view of a busy railway draw, and few enough that a big railway's pieces do not
 # fill memory.
 PIECES_KEPT = 1 << 11
 # A station's platform beside its track, in cells of the picture's width.
-PLATFORM_WIDTH = 0.12
+PLATFORM_WIDTH = 0.06
 # How far apart the two tracks either side of an island platform lie in a station on quadruple
 # track, in cells, and how far into the station's cell from each end they have opened out to that.
-ISLAND_TRACKS = 0.3
+ISLAND_TRACKS = 0.1
 ISLAND_FROM = 0.22
 # How far from the track's middle a station house stands, in cells of the picture's width: on
 # its platform (railroads.ui.pixel.art.stations.by_platform).
-SET_BACK = 0.2
+SET_BACK = 0.1
 # How gently a track branching off other track turns out of it: round a circle of this radius,
 # in cells, or as wide as there is room for; and how many cells along that track another track of
 # it crosses over to the track that turns out for each cell it crosses, as a crossover does.
@@ -91,13 +94,13 @@ CROSSOVER_SLOPE = 4.0
 
 # Overhead wires on electric track: how far beside the track their masts stand and how far
 # apart, in cells, and how tall the masts are and how high the wires hang, in art pixels.
-MAST_SIDE = 0.13
+MAST_SIDE = 0.045
 MAST_GAP = 1.0
-MAST_HEIGHT = 6
-WIRE_HEIGHT = 4
+MAST_HEIGHT = 3
+WIRE_HEIGHT = 2
 # Maglev track's concrete beam: how wide it is and how wide its darker edges, in cells.
-GUIDEWAY_WIDTH = 0.16
-GUIDEWAY_RIM = 0.025
+GUIDEWAY_WIDTH = 0.055
+GUIDEWAY_RIM = 0.008
 
 BANK_EDGE: RGB = (58, 52, 44)
 GRAVEL: RGB = (98, 90, 80)
@@ -116,6 +119,12 @@ GUIDEWAY: RGB = (196, 194, 188)
 GUIDEWAY_EDGE: RGB = (112, 110, 108)
 GUIDEWAY_GROOVE: RGB = (70, 72, 80)
 WIRE: RGB = (40, 40, 46)
+
+
+def widened(pixels: float) -> float:
+    """How many times as wide as it is track is drawn `pixels` shown to an art pixel, so its
+    bank takes LEAST_BANK pixels at the least."""
+    return max(1.0, LEAST_BANK / (BANK * PIXEL_CELL_WIDTH * pixels))
 
 
 def _lay_guideway(
@@ -731,6 +740,7 @@ class TrackArt:
         pixel far off to show only as faint as its share of the pixel, as everything else
         drawn finely and shrunk does."""
         cell = PIXEL_CELL_WIDTH * s
+        wide = cell * widened(s / smoothing)
         raise_up = lifted and self.elevation is not None
 
         def screen(each: _Laid) -> tuple[Path, list[float]]:
@@ -752,37 +762,37 @@ class TrackArt:
         for each, _, lanes, lifts in ground:
             half = (BRIDGE_WIDTH if each.piece.bed == TrackBed.BRIDGE else BANK) / 2
             for lane in lanes:
-                shade.polygon(_raised_strip(lane, lifts, (half + SHADOW_REACH) * cell), fill=255)
+                shade.polygon(_raised_strip(lane, lifts, (half + SHADOW_REACH) * wide), fill=255)
         for each, _, lanes, lifts in drawn:
             if each.piece.bed == TrackBed.BRIDGE:
                 self._lay_deck(paint, lanes, lifts, cell, s)
         for each, _, lanes, lifts in ground:
             if each.piece.bed == TrackBed.GROUND:
                 for lane in lanes:
-                    bank = _raised_strip(lane, lifts, BANK / 2 * cell)
+                    bank = _raised_strip(lane, lifts, BANK / 2 * wide)
                     paint.polygon(bank, fill=(*BANK_EDGE, 255))
         for each, line, lanes, lifts in ground:
             if each.platform is not None:
-                self._lay_platform(paint, line, lanes, lifts, each.platform, cell, s)
+                self._lay_platform(paint, line, lanes, lifts, each.platform, (cell, wide), s)
         railed = [item for item in ground if not item[0].piece.maglev]
         for each, _, lanes, lifts in railed:
             if each.piece.bed == TrackBed.GROUND:
                 for lane in lanes:
-                    bed = _raised_strip(lane, lifts, TRACK_BED / 2 * cell)
+                    bed = _raised_strip(lane, lifts, TRACK_BED / 2 * wide)
                     paint.polygon(bed, fill=(*GRAVEL, 255))
         rail = max(1 if thin_rails else smoothing, round(RAIL_WIDTH * s))
         for each, _, lanes, lifts in ground:
             if each.piece.maglev:
-                _lay_guideway(paint, lanes, lifts, cell, rail)
+                _lay_guideway(paint, lanes, lifts, wide, rail)
         for each, _, lanes, lifts in railed:
             for lane in lanes:
-                for sleeper in _sleepers(lane, lifts, cell, self._bare(each, lanes, lane, cell)):
+                for sleeper in _sleepers(lane, lifts, wide, self._bare(each, lanes, lane, cell)):
                     paint.polygon(sleeper, fill=(*SLEEPER, 255))
         rails = [
             _crisp(_raised(_offset(lane, side), lifts), smoothing, max(rail, smoothing))
             for _, _, lanes, lifts in railed
             for lane in lanes
-            for side in (-GAUGE / 2 * cell, GAUGE / 2 * cell)
+            for side in (-GAUGE / 2 * wide, GAUGE / 2 * wide)
         ]
         for rail_line in rails:
             paint.line(rail_line, fill=(*RAIL_UNDER, 255), width=2 * rail, joint="curve")
@@ -1228,19 +1238,21 @@ class TrackArt:
         lanes: list[Path],
         lifts: list[float],
         side: Point,
-        cell: float,
+        cells: tuple[float, float],
         s: int,
     ) -> None:
         """A paved platform along the station's side of its track, its white edge by the
-        track; on quadruple track instead an island platform between the two tracks each way,
-        white edges along both."""
+        track's bank; on quadruple track instead an island platform between the two tracks each
+        way, white edges along both. `cells` is a cell's width in the picture's pixels, and as
+        wide as the track is drawn (widened)."""
+        cell, wide = cells
         if len(lanes) == 4:
             self._lay_islands(paint, line, lifts, cell, s)
             return
         (x0, y0), (x1, y1) = line[0], line[-1]
         nx, ny = -(y1 - y0), x1 - x0
         sign = 1.0 if nx * side[0] + ny * side[1] > 0 else -1.0
-        near = (_lane_spread(lanes, cell) + BANK / 2) * cell
+        near = _lane_spread(lanes, cell) * cell + BANK / 2 * wide
         far = near + PLATFORM_WIDTH * cell
         platform = _raised_strip(line, lifts, sign * near, sign * far)
         paint.polygon(platform, fill=(*PLATFORM, 255))

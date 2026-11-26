@@ -351,9 +351,11 @@ def test_a_mega_works_sharing_its_cell_stands_with_its_foot_inside_the_cell(
 
 
 def track_hidden(world: PixelWorld, sheet: SpriteSheet, building: int) -> int:
-    """How many pixels of the track drawn into the world one building in its scenery covers."""
+    """How many pixels of the track drawn into the world at its true size, as close up, one
+    building in its scenery covers: a pixel counts as track where most of it is solid track."""
     width, height = world.projection.size
-    track = world.track.layer(world.constructions.track(), 0, 0, width, height, 1)[..., 3] > 0.5
+    fine = world.track.layer(world.constructions.track(), 0, 0, width, height, FINEST)[..., 3]
+    track = fine.reshape(height, FINEST, width, FINEST).mean(axis=(1, 3)) > 0.5
     index = int(world.scenery.sprite[building])
     ax, ay = sheet.anchors[index]
     left, top = world.scenery.x[building] - ax, world.scenery.y[building] - ay
@@ -552,6 +554,7 @@ def track_chunk(
     pieces: list[Track],
     stations: tuple[Station, ...] = (),
     at: Cell = (10, 3),
+    resolution: int = 1,
 ) -> tuple[PixelWorld, np.ndarray]:
     tile_map = make_tile_map()
     constructions = Constructions(tile_map)
@@ -561,7 +564,7 @@ def track_chunk(
         constructions.build(station)
     world = PixelWorld(tile_map, constructions, sheet, *PLAIN_LOOKS[HexGrid])
     px, py = world.projection.to_pixels(*tile_map.grid.center(*at))
-    return world, world.render(int(px // CHUNK), int(py // CHUNK))
+    return world, world.render(int(px // CHUNK), int(py // CHUNK), resolution)
 
 
 def rails(chunk: np.ndarray) -> np.ndarray:
@@ -577,11 +580,12 @@ def rails_across(chunk: np.ndarray, column: int, rows: slice = slice(None)) -> i
     return int(peaks.sum())
 
 
-def at_cell(world: PixelWorld, cell: Cell, dx: float = 0.0) -> tuple[int, int]:
-    """Where a point `dx` cells right of a cell's centre lies in its chunk, as a column and row."""
+def at_cell(world: PixelWorld, cell: Cell, dx: float = 0.0, resolution: int = 1) -> tuple[int, int]:
+    """Where a point `dx` cells right of a cell's centre lies in its chunk drawn at `resolution`,
+    as a column and row."""
     x, y = world.tile_map.grid.center(*cell)
     px, py = world.projection.to_pixels(x + dx, y)
-    return int(px) % CHUNK, int(py) % CHUNK
+    return int(px % CHUNK * resolution), int(py % CHUNK * resolution)
 
 
 def test_track_crossing_in_a_cell_keeps_the_rails_of_both(sheet: SpriteSheet) -> None:
@@ -595,11 +599,11 @@ def test_track_crossing_in_a_cell_keeps_the_rails_of_both(sheet: SpriteSheet) ->
 
 
 def test_double_track_lays_two_tracks_side_by_side(sheet: SpriteSheet) -> None:
-    world, single = track_chunk(sheet, [Track((10, 3), (0, 6))])
+    world, single = track_chunk(sheet, [Track((10, 3), (0, 6))], resolution=FINEST)
 
-    _, double = track_chunk(sheet, [Track((10, 3), (0, 6), TrackWidth.DOUBLE)])
+    _, double = track_chunk(sheet, [Track((10, 3), (0, 6), TrackWidth.DOUBLE)], resolution=FINEST)
 
-    column, _ = at_cell(world, (10, 3))
+    column, _ = at_cell(world, (10, 3), resolution=FINEST)
     assert rails_across(single, column) == 2
     assert rails_across(double, column) == 4
 
@@ -636,10 +640,10 @@ def test_electric_track_hangs_wires_over_it(sheet: SpriteSheet) -> None:
 
 
 def test_maglev_track_is_a_beam_without_rails(sheet: SpriteSheet) -> None:
-    bare = track_chunk(sheet, [])[1]
-    plain = track_chunk(sheet, [Track((10, 3), (0, 6))])[1]
+    bare = track_chunk(sheet, [], resolution=FINEST)[1]
+    plain = track_chunk(sheet, [Track((10, 3), (0, 6))], resolution=FINEST)[1]
 
-    guideway = track_chunk(sheet, [Track((10, 3), (0, 6), maglev=True)])[1]
+    guideway = track_chunk(sheet, [Track((10, 3), (0, 6), maglev=True)], resolution=FINEST)[1]
 
     def rail_coloured(chunk: np.ndarray) -> int:
         return int((np.abs(chunk[..., :3].astype(int) - RAIL).max(axis=-1) < 12).sum())
@@ -688,15 +692,15 @@ def test_a_station_shows_a_guideway_where_only_maglev_track_comes_in(
 
 def test_track_into_a_station_runs_on_through_it_past_its_platform(sheet: SpriteSheet) -> None:
     line = [Track((10, c), (0, 6)) for c in (2, 3)]
-    world, chunk = track_chunk(sheet, line, stations=(Station((10, 4), (0, 6)),))
-    _, bare = track_chunk(sheet, line)
+    world, chunk = track_chunk(sheet, line, stations=(Station((10, 4), (0, 6)),), resolution=FINEST)
+    _, bare = track_chunk(sheet, line, resolution=FINEST)
 
-    column, row = at_cell(world, (10, 4), 0.4)
+    column, row = at_cell(world, (10, 4), 0.4, FINEST)
 
-    track = slice(row - 2, row + 3)
+    track = slice(row - 3, row + 4)
     assert rails_across(chunk, column, track) == 2
     assert rails_across(bare, column, track) == 0
-    assert (chunk[row - 8 : row, column, :3].min(axis=-1) > 170).any()
+    assert (chunk[row - 12 : row - 3, column, :3].min(axis=-1) > 170).any()
 
 
 def test_a_station_house_stands_back_from_its_track_turned_along_it(sheet: SpriteSheet) -> None:
@@ -711,8 +715,8 @@ def test_a_station_house_stands_back_from_its_track_turned_along_it(sheet: Sprit
 
     x, y = (float(v) for v in across.projection.to_pixels(*across.tile_map.grid.center(10, 4)))
     assert len(houses) == 2
-    assert houses[0][1] < y - 4 and abs(houses[0][0] - x) <= 1
-    assert houses[1][0] < x - 4 and abs(houses[1][1] - y) <= 1
+    assert houses[0][1] < y - 2 and abs(houses[0][0] - x) <= 1
+    assert houses[1][0] < x - 2 and abs(houses[1][1] - y) <= 1
 
 
 def test_a_station_house_is_drawn_turned_each_way_track_runs_through_it(sheet: SpriteSheet) -> None:
@@ -1220,7 +1224,7 @@ def test_a_raised_chunk_drawn_over_ground_leaves_its_ground_and_lifts_what_lies_
     assert np.percentile(difference, 99) <= 2
 
 
-@pytest.mark.parametrize("resolution", [1, FINE])
+@pytest.mark.parametrize("resolution", [FINE, FINEST])
 def test_both_rails_of_straight_track_show_as_full_bright_lines(
     sheet: SpriteSheet, resolution: int
 ) -> None:

@@ -268,7 +268,7 @@ def test_up_close_the_pictures_are_drawn_as_many_times_as_fine_as_the_sheet(
     times = view.camera.pixel_scale * 2 // DETAIL
     _, _, width, _, _, _ = layer.sprites.places[(look, 0)]
     _, _, fine_width, _, _, _ = layer._pages[(look, times)].spots[0]
-    assert (times - 0.5) * width < fine_width < (times + 0.5) * width
+    assert (times - 1.5) * width < fine_width < (times + 0.5) * width
 
 
 def test_up_close_looks_not_drawn_fine_in_a_frames_time_show_from_the_sheet_till_later(

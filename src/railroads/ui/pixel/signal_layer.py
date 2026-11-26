@@ -23,22 +23,22 @@ from railroads.ui.pixel.world import PixelWorld
 
 # How far to the side of the middle of the outer track a signal stands, in cells, beside single
 # or double track and beside quadruple track.
-SIDE = 0.16
+SIDE = 0.055
 # How tall a mast is, how wide, and how many red and white stripes it has, in cells; how long its
 # arm is and how thick; how big its lamp's glasses are.
-MAST = 0.38
-MAST_WIDTH = 0.022
+MAST = 0.13
+MAST_WIDTH = 0.0075
 STRIPES = 6
-ARM = 0.15
-ARM_WIDTH = 0.028
-GLASS = 0.022
+ARM = 0.05
+ARM_WIDTH = 0.0095
+GLASS = 0.0075
 # How far the arm rises at clear, in degrees.
 RISE = 45.0
 # How long a signal takes to change from danger to clear or back, in seconds.
 SWING = 0.5
 # How many screen pixels a cell must take before masts show; below it only the lamps do, and
 # below the second no signals at all.
-MASTS_FROM = 48.0
+MASTS_FROM = 96.0
 LAMPS_FROM = 10.0
 # Signals standing closer than this, in cells, share a mast, with an arm for each, at most
 # MOST_ARMS of them.

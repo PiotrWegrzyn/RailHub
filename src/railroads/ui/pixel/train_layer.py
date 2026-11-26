@@ -55,12 +55,12 @@ MAX_TEXTURE = 4096
 # How wide a page of one look's pictures is at the least, in sheet pixels, how many bytes the
 # pages, of every zoom shown, may take before those not drawn lately are let go, and how long a
 # frame may spend drawing pages: a look whose page is not drawn yet shows from the sheet meanwhile.
-PAGE_WIDTH = 512
+PAGE_WIDTH = 256
 PAGES_BUDGET = 128 * 1024 * 1024
 PAGES_TIME = 0.006
-# How many times smaller than on the line the engine of a train standing in an engine shed's stall
-# is drawn, so it fits its stall (railroads.sim.sheds).
-MINI = 0.45
+# How big the engine of a train standing in an engine shed's stall is drawn, as a share of its size
+# on the line: drawn at the houses' scale it fits its stall (railroads.sim.sheds) as it is.
+MINI = 1.0
 # How far round the way out of a stall's door the front of an engine standing in it shows, in
 # cells: the rest is inside, cut away.
 NOSE_ROUND = 0.025

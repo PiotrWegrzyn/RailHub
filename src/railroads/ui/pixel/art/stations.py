@@ -66,7 +66,7 @@ PANE: RGB = (64, 78, 100)
 SHADOW = 0.6
 # How much of the platform's edge by the track shows in front of a station house standing on
 # its platform, in cells of the picture's width.
-PLATFORM_EDGE = 0.03
+PLATFORM_EDGE = 0.01
 # How far from the middle of a hex its edges lie, in cells, and which ways they face.
 APOTHEM = 0.5
 HEX_EDGES = np.array(

@@ -621,8 +621,6 @@ def shrunk_from(sprite: Sprite, times: int) -> Sprite:
     """A sprite `times` times smaller each way, each pixel the average of those it covers,
     weighted by how solid each is, laid so its anchor falls on a pixel's corner as it does at
     full size, with the rows and columns left clear round it cut off."""
-    if times == 1:
-        return sprite
     ax, ay = sprite.anchor
     left, top = -ax % times, -ay % times
     pixels = np.asarray(sprite.image.convert("RGBA"), dtype=np.float64) / 255

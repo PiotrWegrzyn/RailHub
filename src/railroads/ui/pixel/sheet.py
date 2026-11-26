@@ -32,7 +32,7 @@ FINEST_INDEX = SHEET_DIR / "sprites@4x.json"
 # point. Those the CPU draws chunks from too are sheets of PNG; the others are kept as each
 # sprite's own PNG in a zip, so a sprite is unpacked only when a view shows it, rather than a
 # sheet of up to a hundred megabytes of pixels at once.
-DENSITIES = (1, 2, 3, 4, 6, 8, 12)
+DENSITIES = (1, 2, 3, 4, 6, 8, 12, 24)
 SHEETS = (1, FINE, FINEST)
 
 

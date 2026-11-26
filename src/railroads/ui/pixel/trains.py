@@ -50,7 +50,7 @@ HEADINGS = 24
 FINEST_FROM = 6
 DETAIL = 2
 # Trains are modelled in cells and drawn this much smaller, to sit on the narrow track.
-SCALE = 0.8
+SCALE = 0.27
 
 BLACK_IRON: RGB = (48, 48, 54)
 SMOKEBOX: RGB = (72, 72, 80)

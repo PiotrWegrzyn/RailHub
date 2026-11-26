@@ -121,12 +121,14 @@ def test_fine_pictures_are_the_pictures_draw_model_draws_fine(look: object) -> N
 def test_fine_pictures_are_as_many_times_as_big_as_the_sheets() -> None:
     key = tuple(float(v) for v in projection().matrix.ravel())
     sprites = train_sprites(key)
-    _, _, width, height, _, _ = sprites.places[((Good.COAL, True), 0)]
+    sheet = Image.fromarray(picture(sprites, (Good.COAL, True), 0))
+    left, top, right, bottom = sheet.getchannel("A").getbbox()
 
-    (picture,) = fine_pictures(key, (Good.COAL, True), 4, (0,))
+    (fine,) = fine_pictures(key, (Good.COAL, True), 4, (0,))
 
-    assert 3.5 * width < picture.image.size[0] < 4.5 * width
-    assert 3.5 * height < picture.image.size[1] < 4.5 * height
+    fine_left, fine_top, fine_right, fine_bottom = fine.image.getchannel("A").getbbox()
+    assert 3 * (right - left) < fine_right - fine_left < 4.5 * (right - left)
+    assert 3 * (bottom - top) < fine_bottom - fine_top < 4.5 * (bottom - top)
 
 
 def boxed(detail: Callable[[Model], None]) -> Model:

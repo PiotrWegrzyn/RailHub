@@ -123,7 +123,7 @@ def single_branch(main: TrackWidth) -> tuple[TrackArt, Track, float]:
 
 @pytest.mark.parametrize(
     ("main", "leaves_from"),
-    [(TrackWidth.DOUBLE, DOUBLE_SPACING / 2), (TrackWidth.QUADRUPLE, DOUBLE_SPACING / 2)],
+    [(TrackWidth.DOUBLE, DOUBLE_SPACING / 2), (TrackWidth.QUADRUPLE, QUADRUPLE_OUTER)],
 )
 def test_single_track_branching_off_wider_track_leaves_from_the_outermost_track_it_can_turn_out_of(
     main: TrackWidth, leaves_from: float

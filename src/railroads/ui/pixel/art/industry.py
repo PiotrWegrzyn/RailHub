@@ -1206,7 +1206,7 @@ def distillery() -> Sprite:
     _track(p, foot[0], foot[1], (0.48, 0.68), 3.5)
     _puddle(p, 9, 7.5, 1.6)
     slate = STILL_SLATE
-    cap = chimney_top(-4, -33)
+    cap = chimney_top(-4, -20)
     p.rect(3, cap, 4, -4, (150, 80, 60))
     for y in (cap + 2, (cap - 4) / 2):
         p.line([(3, y), (4, y)], (230, 228, 222))
