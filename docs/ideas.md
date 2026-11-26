@@ -28,3 +28,9 @@ tuning on Poland is done. Raised on 2026-11-21.
 Where much of a good is made and nobody nearby uses it, the works that would use it come up more
 likely: lots of coal and no steel mill makes a steel mill likelier, many cattle make a dairy
 likelier. Raised on 2026-11-21.
+
+## Land on other continents through a sea port
+
+For the next version of the game. Once the player has a port by the sea, they can buy lots on
+other continents, in nine places: Japan, Africa, three places in the USA, Russia, the UK and
+Australia. Raised on 2026-11-26.
