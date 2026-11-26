@@ -1255,8 +1255,8 @@ building wants it.
 Stations also send and want passengers and mail. Every month each building in a station's inner
 ring sends passengers by its points, the same number it wants to receive: 0.6 per population or worship point,
 3 per food or timber point, 6 per ore or industry point, 11 per trade point and 12 per corporate or
-military point. Half as many pieces of mail go with them, rounded down for the station as a whole. Up to 60
-passengers and 60 pieces of mail wait at a station, apart from the freight stockpile, and only
+military point. Half as many pieces of mail go with them, rounded down for the station as a whole. Up to 100
+passengers and 100 pieces of mail wait at a station, apart from the freight stockpile, and only
 for a month: those no train took are gone when the next month's come. They ride
 in passenger coaches of 34 and mail vans of 21 and earn money where they get off just like cargo,
 by the demand there, which only trains use up; they then go on their way rather than waiting to
@@ -1327,7 +1327,7 @@ the cells in it with a building that needs any of them. Clicking a station, left
 right, opens the station instead: its level and reach, its stockpile, waiting passengers and mail, demand and
 the trains that call there, with its reach shaded on the map. There it can be raised a level,
 up to level 5 (see the money above), each level handing goods out and gathering them one
-cell further (from 1 and 3 cells up to 5 and 7), and given more storage, 150 more of every good and 300 more passengers and mail each time,
+cell further (from 1 and 3 cells up to 5 and 7), and given more storage, 250 more of every good and 500 more passengers and mail each time,
 the first for $10,000 and each next one for twice the last. Each tree is drawn as a tree: every node in a row
 by how many nodes it builds on, under the first of them, with a line from each node it needs,
 bright once that one is taken.
@@ -1405,7 +1405,7 @@ buildings within its reach (1 cell at the first level), nearest first, earning f
 unit, and takes the spare goods no building took that buildings made within 3 cells into its
 stockpile, for trains or to hand out the next month; goods handed out on their own earn the player
 nothing. A station on its own, with no track
-to another, does nothing. A station holds up to 300 of each good, what trains brought and what it gathered together, so
+to another, does nothing. A station holds up to 500 of each good, what trains brought and what it gathered together, so
 one good piling up never blocks the others; a train unloads only what fits and keeps the rest aboard if its next leg pulls a car for that good,
 otherwise the rest is lost. Goods a train brought beyond what the area can use in a month can be
 loaded onto another train, so hubs can pass freight along. Freight remembers where it came from:

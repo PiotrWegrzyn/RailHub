@@ -28,7 +28,7 @@ from railroads.sim.station_goods import StationGoods
 __all__ = ["Facility"]
 
 SAND_TOWER_PICKUP = 0.5
-WAREHOUSE_ROOM = 300.0
+WAREHOUSE_ROOM = 500.0
 REACH = 2
 DELIVERED_SHARE = 0.5
 

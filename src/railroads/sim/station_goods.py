@@ -13,11 +13,11 @@ from railroads.sim.goods import TRAVELLERS, Good
 from railroads.sim.trains import Parcels, take_parcels
 
 # Most of each kind of freight a station holds, and most passengers, and mail, waiting there.
-STOCKPILE = 300.0
-WAITING = 60.0
+STOCKPILE = 500.0
+WAITING = 100.0
 # What each storage upgrade adds to them.
-STORAGE_STEP = 150
-WAITING_STEP = 300
+STORAGE_STEP = 250
+WAITING_STEP = 500
 
 
 @dataclass

@@ -682,15 +682,15 @@ def test_a_train_can_turn_round_at_a_station_it_passes_through() -> None:
     assert railway.network._exits((6, 3), None) == exits
 
 
-def test_a_station_holds_three_hundred_of_each_good_counting_what_trains_brought() -> None:
+def test_a_station_holds_five_hundred_of_each_good_counting_what_trains_brought() -> None:
     goods = StationGoods()
-    goods.stockpile[Good.COAL] = 180.0
-    goods.brought[Good.COAL] = 120.0
+    goods.stockpile[Good.COAL] = 300.0
+    goods.brought[Good.COAL] = 200.0
     goods.stockpile[Good.WHEAT] = 120.0
 
     rooms = (goods.room(Good.COAL), goods.room(Good.WHEAT), goods.room(Good.PLANKS))
 
-    assert rooms == (0.0, 180.0, 300.0)
+    assert rooms == (0.0, 380.0, 500.0)
 
 
 def test_a_train_unloads_a_good_at_a_station_full_of_another() -> None:
