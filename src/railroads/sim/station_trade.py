@@ -59,6 +59,10 @@ MEETS: dict[Good, tuple[Need, ...]] = {
 }
 
 
+# Where each kind stands in NEEDS, the order their needs are added up in (StationTrade._needs_in).
+_NEEDS_ORDER = {kind: index for index, kind in enumerate(NEEDS)}
+
+
 class StationTrade:
     def __init__(self, growth: Growth) -> None:
         self._growth = growth
@@ -517,9 +521,9 @@ class StationTrade:
         )
 
     def _ring_counts(self, stations: list[Cell]) -> list[dict[BuildingKind, int]]:
-        """How many buildings of each kind stand in each station's inner ring. The rings are laid
-        end to end and summed a kind at a time for all the stations at once; none is empty, as
-        each holds its station's own cell."""
+        """How many buildings of each kind stand in each station's inner ring, the kinds none
+        stand of left out. The rings are laid end to end and summed a kind at a time for all the
+        stations at once; none is empty, as each holds its station's own cell."""
         if not stations:
             return []
         rings = [self.inner_ring(station) for station in stations]
@@ -527,7 +531,10 @@ class StationTrade:
         cells = np.concatenate(rings)
         counts = self._growth.counts
         sums = [np.add.reduceat(count.ravel()[cells], starts).tolist() for count in counts.values()]
-        return [dict(zip(counts, summed, strict=True)) for summed in zip(*sums, strict=True)]
+        return [
+            {kind: count for kind, count in zip(counts, summed, strict=True) if count}
+            for summed in zip(*sums, strict=True)
+        ]
 
     def _travellers(self, counts: Mapping[BuildingKind, int]) -> dict[Good, float]:
         """The passengers and mail these many buildings of each kind send, and want, in a month,
@@ -559,10 +566,14 @@ class StationTrade:
         year = self._growth.year
         needs: dict[Need, float] = {}
         ring: npt.NDArray[np.intp] | None = None
-        for kind in NEEDS:
-            count = counts.get(kind)
-            if not count:
-                continue
+        # The kinds standing there that need anything, in the order of NEEDS, so the needs add
+        # up in the same order whichever kinds stand there.
+        standing = sorted(
+            (kind for kind, count in counts.items() if count and kind in _NEEDS_ORDER),
+            key=_NEEDS_ORDER.__getitem__,
+        )
+        for kind in standing:
+            count = counts[kind]
             for need, amount in needs_of(kind, year, self._growth.economy.east).items():
                 if (kind, need) in OWNED_BOOSTS:
                     taking = self._growth.owners.taking(kind, need)
