@@ -490,3 +490,54 @@ What is left:
 - **The waiting screen** still has six or seven frames of 60–140 ms while the map is prepared
   after the towns arrive (the pixel world's parts, the scenery, the ground pictures), and the first
   game frame about 34 ms.
+
+## Big games: the "slow" saves (26 November, 0.5.244 to 0.5.263)
+
+The player's saves "slow" and "slow2" (Poland, 1955–1957, 64 stations, 139 trains, maps of
+301 × 209 and 371 × 209 cells) ran at 20–25 frames a second in the browser. Measured in headless
+Chrome as above; when those saves stopped loading (ports came after them), on a game built the same
+size on the current code (64 stations at the biggest towns, track to the two nearest, 140 trains).
+Every change was checked to leave play exactly as it was: trains, loads and cash hashed over 1,500
+frames, three months, and laying track, building and clearing stations, on both saves; every route
+between every two stations; every train part's place on its track; every signal block.
+
+| Browser, GUI ms a frame (mean) | before | after |
+|---|---|---|
+| "slow", the save's own view (zoom 4) | 39.3 | 16.4 |
+| "slow", resting at zoom 4 / zoom 1 | 35.5 / 50.5 | 12.0 / 12.7 |
+| "slow", zooming in and out | 44.5 | 17.3 |
+| Laying track, building or clearing a station: the call and the next frame | ~540 + 220 ms | ~70 + 86 ms |
+| Big game, its own view / zoom 1 / zooming (worst) | 13.0 / 11.0 / 9.5 (62) | 9.0 / 7.0 / 5.9 (37) |
+| Big game, first frame zoomed out to zoom 0 | 96 ms | 46 ms |
+| Desktop: replanning every schedule after track changes ("slow2") | 2.8 s | 0.3 s |
+| Desktop: every route between every two stations ("slow2") | 7.8 s | 0.7 s |
+
+What it was, and what changed (no rule or number):
+
+- **Trains were put on their track again every frame**, each part of each train: which track of
+  double or quadruple track it rides was worked out from the track around it each time. What a
+  piece of track branches off and how its tracks lie are kept until track changes
+  (`TrackArt._branch_lanes`, `_side_profile`), a standing train's places are kept while it stands
+  (`TrainLayer._shift`), its lanes are found once a frame, and a path is laid out in one go.
+- **The tiles window worked out the eras' texts and the tiles' factors every frame**; they are kept.
+- **Zoomed-out track** is worked out in one go for all pieces on screen and redrawn from the lines
+  last worked out while the view stands still.
+- **Laying track, a station or clearing one** worked out every piece of track's art again (10,000
+  pieces) to grade the ground; now only the pieces within three cells of a change
+  (`Constructions.railway_changed_since`). The grid's track steps and exits, which never change,
+  are kept, and with them signal blocks are cut in 3.5 ms.
+- **Finding ways** started a search through the whole network for every way asked for; a search
+  from a station, or a point, is now taken up again for every way asked for from it since track
+  last changed (`track_network._Search`), visiting cells in the same order, so the ways are the
+  same. Route lengths for planning refuelling need no speeds.
+- **Fine train pictures** are drawn by the painting workers in the browser, so no frame stops for
+  the 50–110 ms a look's model takes to make.
+- Smaller: loading a train weighs it again only when a car changed; passengers getting off reweigh
+  only the need they met; the worth in the top bar sums the track's cost once a change; smoke puffs
+  are coloured all at once.
+
+Left, and why: signals are checked for every train every frame (about 1.4 ms of a big game's 2 ms
+of simulation on desktop), which only an event-driven rewrite would cut; zoomed-out track on the
+graphics card would save about 1 ms, as trains, not track, are what costs zoomed out; running the
+simulation in a worker would take every frame's simulation and the months off the frames but needs
+the whole interface to work on a copy of the game.
