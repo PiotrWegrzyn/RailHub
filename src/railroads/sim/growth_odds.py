@@ -260,7 +260,12 @@ def _capped(growth: Growth, ladder: Ladder) -> np.ndarray:
     first = growth.count(ladder.kinds[0]).ravel()
     capped = np.zeros(first.size, dtype=bool)
     if ladder.most_per_cell is not None:
-        capped |= first >= ladder.most_per_cell
+        held = (
+            sum(growth.count(kind).ravel() for kind in ladder.kinds)
+            if ladder.one_per_cell
+            else first
+        )
+        capped |= held >= ladder.most_per_cell
     if ladder.most_nearby is not None:
         padded = np.append(first, 0)
         capped |= first + padded[growth.near].sum(axis=0) >= ladder.most_nearby
@@ -276,7 +281,8 @@ def _capped(growth: Growth, ladder: Ladder) -> np.ndarray:
 def _cap_reasons(growth: Growth, ladder: Ladder, cell: Cell) -> list[str]:
     first = ladder.kinds[0]
     reasons = []
-    here = int(growth.count(first)[cell])
+    kinds = ladder.kinds if ladder.one_per_cell else (first,)
+    here = sum(int(growth.count(kind)[cell]) for kind in kinds)
     if ladder.most_per_cell is not None and here >= ladder.most_per_cell:
         reasons.append(f"{here} stand here already, the most a cell holds.")
     if ladder.most_nearby is not None:

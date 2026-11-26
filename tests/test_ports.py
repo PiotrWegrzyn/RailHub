@@ -6,6 +6,7 @@ from builders import flat_map, layer
 from railroads.sim.constructions import BuildingKind, Constructions
 from railroads.sim.goods import PRICES, Good, Need
 from railroads.sim.growth import Growth
+from railroads.sim.growth_odds import _cap_reasons, _capped
 from railroads.sim.ladders import PASSENGERS_PER_POINT, PORTS
 from railroads.sim.ownership import SHARES
 from railroads.sim.ports import (
@@ -257,3 +258,19 @@ def test_a_month_of_trade_settles_what_ports_ship() -> None:
     growth.ports.settle(trade)
 
     assert growth.ports.at[FAR].landed[Good.COAL] == pytest.approx(100.0)
+
+
+def test_the_growth_odds_count_a_big_port_against_another_port_in_its_cell() -> None:
+    growth = port_town((COAST, K.BIG_PORT))
+
+    reasons = _cap_reasons(growth, PORTS, COAST)
+
+    assert reasons == ["1 stand here already, the most a cell holds."]
+
+
+def test_the_growth_odds_leave_no_room_for_a_port_in_a_cell_holding_a_mega_port() -> None:
+    growth = port_town((COAST, K.MEGA_PORT))
+
+    capped = _capped(growth, PORTS)
+
+    assert capped[COAST[0] * growth.grid.cols + COAST[1]]
