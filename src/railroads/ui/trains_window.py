@@ -9,7 +9,7 @@ refuelling stops are set, and its stops as cards and on the map, as for a train.
 
 import math
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 from imgui_bundle import icons_fontawesome_4 as fa
@@ -1204,13 +1204,15 @@ class TrainsWindow:
         for number, general in enumerate(generals, start=len(offers)):
             next_good_slot(number, left, per_row, gap=4.0)
             waiting = sum(waiting_here.held(good) for good in GENERAL_GOODS[general])
+            wanted = general_wanted(general, waiting_here.held, demand)
             hint = (
                 f"{general.value}: a car that takes whichever of its goods pays best at the "
                 f"next stop; {waiting:.0f} of them waiting here"
+                + (" - wanted at the next stop" if wanted else "")
                 + adding_tip(full, railway.car_tonnes(general, train.engine, asked), spare)
             )
             imgui.begin_disabled(full or not fits(general))
-            if offer_chip(f"general{number}", general, f"{waiting:.0f}", waiting > 0, hint):
+            if offer_chip(f"general{number}", general, f"{waiting:.0f}", wanted, hint):
                 self._add_car(railway, train, stop, general, asked)
                 train.cars_changed(index)
             imgui.end_disabled()
@@ -1254,6 +1256,12 @@ class TrainsWindow:
             "older one that holds less and weighs less, for light engines and hills"
         )
         return asked
+
+
+def general_wanted(general: General, held: Callable[[Good], float], demand: StationDemand) -> bool:
+    """Whether a general car would load something here the next stop wants: one of its goods
+    both waits here and is used there."""
+    return any(held(good) > 0 and demand.monthly_want(good) > 0 for good in GENERAL_GOODS[general])
 
 
 def sort_offers(offers: list[Offer], demand: StationDemand, by_wanted: bool) -> list[Offer]:

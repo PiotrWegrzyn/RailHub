@@ -7,7 +7,7 @@ from screens import FakeTexture, gui_context
 from builders import joined_stations
 from railroads.catalogue import engine_figures
 from railroads.sim.demand import StationDemand
-from railroads.sim.goods import Good, Need
+from railroads.sim.goods import General, Good, Need
 from railroads.sim.railway import Railway, Ride
 from railroads.sim.trade import SCARCE_WORTH
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, OPENED_BY, Car, Stop, Train
@@ -18,7 +18,13 @@ from railroads.ui.train_texts import (
     ride_rows,
     train_warning,
 )
-from railroads.ui.trains_window import SCHEDULES, TRAINS, TrainsWindow, sort_offers
+from railroads.ui.trains_window import (
+    SCHEDULES,
+    TRAINS,
+    TrainsWindow,
+    general_wanted,
+    sort_offers,
+)
 from railroads.words import tonnes_text
 
 
@@ -523,3 +529,17 @@ def test_hovering_a_car_on_a_trains_stops_shows_on_its_map_where_that_good_is_wa
     draw_frames(window, railway, 2)
 
     assert window.map.good == Good.COAL
+
+
+@pytest.mark.parametrize(
+    ("next_stop_wants", "wanted"), [({Need.COAL: 40.0}, False), ({Need.FOOD: 40.0}, True)]
+)
+def test_a_general_food_car_is_wanted_only_where_the_next_stop_wants_food_waiting_here(
+    next_stop_wants: dict[Need, float], wanted: bool
+) -> None:
+    demand = StationDemand(capacity=next_stop_wants)
+    waiting = {Good.WHEAT: 30.0}
+
+    shown = general_wanted(General.FOOD, lambda good: waiting.get(good, 0.0), demand)
+
+    assert shown == wanted
