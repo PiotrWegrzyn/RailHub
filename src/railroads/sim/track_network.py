@@ -11,6 +11,7 @@ import heapq
 import itertools
 import math
 import weakref
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -326,16 +327,15 @@ class TrackNetwork:
         cell: Cell,
         entry: int,
         arrivals: set[Cell],
-        held: set[Cell],
-        penalty: float,
+        extra: Callable[[Cell, int, int], float],
         electric: bool = False,
         maglev: bool = False,
         most: float = math.inf,
     ) -> dict[Cell, tuple[float, Way]]:
         """The quickest way on to each of the arrivals for a train coming into a cell by this
-        point (way_on), counting each cell of `held` it runs into `penalty` cells longer, with
-        what it costs: a way round track other trains hold; only those costing no more than
-        `most`. Not kept, as the trains move on."""
+        point (way_on), each way across a cell outside them, in by one point and out by
+        another, counting `extra` cells longer, with what it costs: a way round track other
+        trains hold; only those costing no more than `most`. Not kept, as the trains move on."""
         self._find_exits()
         grid = self.constructions.tile_map.grid
         lengths = [float(math.hypot(*step)) for step in grid.track_steps()]
@@ -365,8 +365,8 @@ class TrackNetwork:
                 if not grid.contains(*nxt) or not self._joins(nxt, nxt_entry):
                     continue
                 step = lengths[exit_point]
-                if nxt in held and nxt not in arrivals:
-                    step += penalty
+                if into is not None and here not in arrivals:
+                    step += extra(here, into, exit_point)
                 taken.append((last, here, exit_point))
                 heapq.heappush(
                     frontier, (cost + step, next(counter), nxt, nxt_entry, len(taken) - 1)

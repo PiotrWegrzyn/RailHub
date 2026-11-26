@@ -92,7 +92,7 @@ from railroads.sim.grids import Cell
 from railroads.sim.move import Move
 from railroads.sim.schedules import Schedule, Schedules, between_rounds
 from railroads.sim.sheds import stall_way, stalls, standing, stood_at
-from railroads.sim.signals import Signals
+from railroads.sim.signals import Signals, passes, track_point
 from railroads.sim.station_goods import StationGoods
 from railroads.sim.stats import History
 from railroads.sim.tilemap import TileMap
@@ -1362,15 +1362,27 @@ class Railway:
                 self._onward_cells(platform, after, train.engine) & held
             )
 
+        grid = self.constructions.tile_map.grid
+
+        def extra(cell: Cell, entry: int, exit_: int) -> float:
+            way = (track_point(grid, cell, entry), track_point(grid, cell, exit_))
+            return HELD_WAY_COST if signals.blocked(train, cell, way) else 0.0
+
         rest = path[at:]
-        crossed = {self.network.cell_at(_middle(p, q)) for p, q in itertools.pairwise(rest)}
         now = sum(math.dist(p, q) for p, q in itertools.pairwise(rest))
-        now += HELD_WAY_COST * len((crossed - stations) & held)
+        start = self.network.ends(train)[at] - 1e-6
+        now += sum(
+            HELD_WAY_COST
+            for crossing in passes(self.network, train)
+            if crossing.start >= start
+            and crossing.cell not in stations
+            and signals.blocked(train, crossing.cell, (crossing.entry, crossing.exit))
+        )
         now += onward(self.network.cell_at(path[-1]))
         cell = self.network.cell_at(_middle(path[at], path[at + 1]))
         entry = self.network.entry_point(cell, path[at])
         found = self.network.ways_avoiding(
-            cell, entry, stations, held, HELD_WAY_COST, engine.electric, engine.maglev, now
+            cell, entry, stations, extra, engine.electric, engine.maglev, now
         )
         best: tuple[float, list[Point], list[float]] | None = None
         for target, (cost, (points, speeds)) in found.items():

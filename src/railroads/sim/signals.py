@@ -102,6 +102,18 @@ def rounded(point: Point) -> Point:
 _ENDS: dict[Grid, dict[tuple[Cell, int], Point]] = {}
 
 
+def track_point(grid: Grid, cell: Cell, end: int) -> Point:
+    """A track point of a cell as signalling compares them."""
+    known = _ENDS.setdefault(grid, {})
+    found = known.get((cell, end))
+    if found is None:
+        steps = grid.track_steps()
+        x, y = grid.center(*cell)
+        found = rounded((float(x) + steps[end][0] / 2, float(y) + steps[end][1] / 2))
+        known[cell, end] = found
+    return found
+
+
 class Blocks:
     """The blocks the track outside stations is cut into, and its signals, worked out once for
     each state of the track."""
@@ -109,20 +121,12 @@ class Blocks:
     def __init__(self, constructions: Constructions) -> None:
         self.version = constructions.railway_version
         grid = constructions.tile_map.grid
-        steps = grid.track_steps()
         stations = set(constructions.every_station_cell())
         cells = sorted({piece.cell for piece in constructions.track()} - stations)
         pieces = {cell: constructions.track_at(cell) for cell in cells}
 
-        known = _ENDS.setdefault(grid, {})
-
         def point(cell: Cell, end: int) -> Point:
-            found = known.get((cell, end))
-            if found is None:
-                x, y = grid.center(*cell)
-                found = rounded((float(x) + steps[end][0] / 2, float(y) + steps[end][1] / 2))
-                known[cell, end] = found
-            return found
+            return track_point(grid, cell, end)
 
         kinds = {
             cell: "junction" if len(here) > 1 else here[0].width.name.lower()
@@ -451,6 +455,24 @@ class Signals:
             for cell, holds in self._held.items()
             if any(other is not train for other, *_ in holds)
         }
+
+    def blocked(self, train: Train, cell: Cell, way: tuple[Point, Point]) -> bool:
+        """Whether other trains hold track in the cell this way across it can't share on any
+        track it could take there: on double track trains going the other way keep to their own
+        track, and on quadruple track a train can pass another going its way on the other
+        track (Blocks.apart)."""
+        holds = self._held.get(cell)
+        if not holds:
+            return False
+        lanes = (FAST_LANE, SLOW_LANE) if self.blocks.takes_lane(cell, *way) else (FAST_LANE,)
+        return all(
+            any(
+                other is not train
+                and not self.blocks.apart(cell, way, (entry, exit_), (lane, held))
+                for other, entry, exit_, _, held in holds
+            )
+            for lane in lanes
+        )
 
     def held_by_others(self, train: Train, cells: Iterable[Cell]) -> int:
         """How many of these cells another train holds track in."""
