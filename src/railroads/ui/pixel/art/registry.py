@@ -279,6 +279,9 @@ BUILDINGS = (
     "mine",
     "logging_camp",
     "sawmill",
+    "port",
+    "big_port",
+    "mega_port",
     "clay_pit",
     "limestone_quarry",
     "sand_pit",
@@ -503,8 +506,8 @@ for _kind in MERGED:
 
 # How wide a works may be drawn at most, in pixels, so it stands inside its cell, which is about
 # 25 pixels across: by how much of the cell it takes (railroads.sim.constructions.BUILDING_RULES),
-# and for big and mega works by their size, a mega one as wide as the cell. Ports are drawn true
-# to the map instead, so their piers reach out over the water (railroads.ui.pixel.art.ports).
+# and for big and mega works by their size, a mega one as wide as the cell. Ports fill their cell
+# to its edges and reach out of it over the water (railroads.ui.pixel.art.ports).
 MOST_WIDTH = {1: 20, 2: 20, 3: 22, 4: 23, 5: 23, 6: 23}
 GROWN_MOST_WIDTH = {"big": 25, "mega": 26}
 # How much smaller a works is tried again when shrinking it pixel by pixel left it too wide.

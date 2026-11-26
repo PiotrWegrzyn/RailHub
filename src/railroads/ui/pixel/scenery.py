@@ -242,10 +242,6 @@ def facility_spot(constructions: Constructions, annex: Annex) -> tuple[float, fl
     return x, y, shed_sprite(round(angle / step) * step % 360, annex.level, annex.sand_tower)
 
 
-# How far from the middle of its cell a port stands towards the water, in cells.
-PORT_SHORE = 0.15
-
-
 def _ports_facing(tile_map: TileMap, spots: BuildingSpots) -> dict[int, tuple[Cell, int]]:
     """Every port among the spots, by its place among them, with its cell and the way its piers
     run out on the map (PORT_HEADINGS): towards the water beside its cell, the middle way where
@@ -417,10 +413,7 @@ class Scenery:
         facing = _ports_facing(tile_map, spots)
         for at, (cell, heading) in facing.items():
             built_looks[at] = sheet.index(port_sprite(BUILDING_SPRITES[spots.kinds[at]], heading))
-            cx, cy = grid.center(*cell)
-            turned = math.radians(heading)
-            spot_x[at] = cx + PORT_SHORE * math.cos(turned)
-            spot_y[at] = cy + PORT_SHORE * math.sin(turned)
+            spot_x[at], spot_y[at] = grid.center(*cell)
         xs.append(spot_x)
         ys.append(spot_y)
         sprites.append(built_looks)
