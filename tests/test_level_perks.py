@@ -26,3 +26,12 @@ def test_a_level_that_only_adds_its_share_brings_nothing_special() -> None:
     supply, demand = perks(Board.SUPPLY, Tile.COAL, 10), perks(Board.DEMAND, Tile.COAL, 13)
 
     assert (supply, demand) == ([], [])
+
+
+def test_a_levels_perks_come_anew_each_time_they_are_asked_for() -> None:
+    first = perks(Board.SUPPLY, Tile.COAL, 13)
+    first.clear()
+
+    again = perks(Board.SUPPLY, Tile.COAL, 13)
+
+    assert again == [LevelPerk(Perk.ENGINE, "New engine for sale: Light tank engine")]

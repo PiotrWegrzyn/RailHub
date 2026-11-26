@@ -4,6 +4,7 @@ the buyers a demand level opens. A level brings nothing special when it only add
 
 from dataclasses import dataclass
 from enum import Enum
+from functools import cache
 
 from railroads.sim.tiles import ERAS, KIND_ERAS, Board, Tile, era_news, unlocks_of
 from railroads.sim.trains import ENGINES, OPENED_BY
@@ -40,8 +41,10 @@ def opened_at(tile: Tile, at: int) -> str:
     return f"{who[0].upper()}{who[1:]} take {', '.join(needs)}"
 
 
+@cache
 def era_text(number: int) -> str:
-    """What an era brings and what it waits for, in words."""
+    """What an era brings and what it waits for, in words; worked out once, as the tiles window
+    shows it for every tile every frame."""
     era = ERAS[number - 1]
     text = f"Era {number} comes once every supply tile is at level {era.level}. "
     news = era_news(era).removeprefix("A new era: ")
@@ -54,6 +57,17 @@ def era_text(number: int) -> str:
 
 def perks(board: Board, tile: Tile, level: int) -> list[LevelPerk]:
     """What a tile's level brings on a board beyond its share, the biggest first."""
+    return list(_perks(board, tile, level))
+
+
+@cache
+def _perks(board: Board, tile: Tile, level: int) -> tuple[LevelPerk, ...]:
+    """perks worked out once for each tile and level: the tiles window marks every level of
+    every tile every frame."""
+    return tuple(_found_perks(board, tile, level))
+
+
+def _found_perks(board: Board, tile: Tile, level: int) -> list[LevelPerk]:
     if board == Board.DEMAND:
         buyers = opened_at(tile, level)
         return [LevelPerk(Perk.BUYERS, buyers)] if buyers else []

@@ -301,3 +301,22 @@ def test_double_track_branching_off_quadruple_track_can_be_ridden_on_from_its_ou
     assert found is not None
     assert found[0] == main.ends[0]
     assert any(at_end == pytest.approx(outer) for _, at_end in found[1])
+
+
+def test_a_piece_ridden_before_the_track_it_branches_off_is_laid_is_ridden_as_a_branch_after() -> (
+    None
+):
+    _railway, track = line(TrackWidth.DOUBLE)
+    constructions = track.constructions
+    main = constructions.track_at((6, 11))[0]
+    constructions.remove(main)
+    branch = Track((6, 11), (main.ends[0], 4), TrackWidth.SINGLE)
+    constructions.build(branch)
+    before = track.riding_choices(branch, 0.0, True)
+
+    constructions.build(main)
+    after = track.riding_choices(branch, 0.0, True)
+
+    assert before is None
+    assert after is not None
+    assert after[0] == main.ends[0]

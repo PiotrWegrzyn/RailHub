@@ -180,6 +180,12 @@ class Owners:
         """Whether the player controls the buildings of any kind in a cell."""
         return any(self.controls(cell, kind) for kind in self.kinds())
 
+    def flags(self) -> list[tuple[Cell, bool]]:
+        """Every cell where the player owns shares of any building, and whether they control the
+        buildings of any kind there (controls_any), finding the kinds they own once for all."""
+        kinds = self.kinds()
+        return [(cell, any(self.controls(cell, kind) for kind in kinds)) for cell in self.cells()]
+
     def sellable(self, cell: Cell, kind: BuildingKind) -> int:
         """How many of the player's shares of a kind in a cell they may sell now: all but those
         bought less than HOLD_MONTHS ago."""

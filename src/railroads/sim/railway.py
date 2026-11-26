@@ -187,6 +187,11 @@ class Ride:
         return self.cargo - self.fuel - self.loaded_cars - self.empty_cars
 
 
+# Each engine's most pull (Engine.tonnes), worked out once for the engine it was worked out of:
+# every train asks for it every frame.
+_PULLS: dict[str, tuple[Engine, float]] = {}
+
+
 class Railway:
     """The trains on one map, and the goods held at its stations."""
 
@@ -420,7 +425,11 @@ class Railway:
 
     def max_pull(self, engine: str) -> float:
         """The most an engine pulls, in tonnes, whatever generation of cars it pulls."""
-        return ENGINES[engine].tonnes
+        record = ENGINES[engine]
+        known = _PULLS.get(engine)
+        if known is None or known[0] is not record:
+            known = _PULLS[engine] = (record, record.tonnes)
+        return known[1]
 
     def pull(self, train: Train) -> float:
         """How much of its engine's top speed a train makes with its cars behind it: all of it

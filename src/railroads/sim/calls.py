@@ -193,27 +193,35 @@ class StationCalls:
         buildings around it have no use for this month."""
         goods = self._railway.station_goods(stop.cell)
         most = self._railway.max_pull(train.engine)
+        # What the train weighs, weighed again only once a car changed: a train waiting to load
+        # is topped up every frame, and weighing it car by car for each of its cars cost most
+        # of a frame with many trains at stations.
+        tonnes = train.tonnes
         for car in train.cars:
             if car.dining:
                 continue
             if car.general is not None and car.load <= EPSILON:
                 self.pick_load(train, stop, car)
+                tonnes = train.tonnes
             if not self.boards(train, stop, car.good):
                 continue
-            take = min(self._room(train, car, most), goods.stockpile.get(car.good, 0.0))
+            take = min(self._room(tonnes, car, most), goods.stockpile.get(car.good, 0.0))
             if take > 0:
                 car.fill({stop.cell: take})
                 goods.stockpile[car.good] -= take
+                tonnes = train.tonnes
             spare = goods.brought.get(car.good, 0.0)
             spare -= self._railway.station_demand(stop.cell).monthly_want(car.good)
-            transfer = min(self._room(train, car, most), spare)
+            transfer = min(self._room(tonnes, car, most), spare)
             if transfer > 0:
                 car.fill(goods.release(car.good, transfer))
+                tonnes = train.tonnes
 
     @staticmethod
-    def _room(train: Train, car: Car, most: float) -> float:
-        """How much more a car takes: up to its capacity, and no more than its engine pulls."""
-        spare_tonnes = max(0.0, most - train.tonnes)
+    def _room(tonnes: float, car: Car, most: float) -> float:
+        """How much more a car takes: up to its capacity, and no more than its engine pulls
+        behind a train weighing `tonnes`."""
+        spare_tonnes = max(0.0, most - tonnes)
         return min(car.capacity - car.load, spare_tonnes / unit_tonnes(car.good))
 
     def spare(self, stop: Stop, good: Good) -> float:

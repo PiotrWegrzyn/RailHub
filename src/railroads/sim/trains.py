@@ -375,9 +375,13 @@ def unit_label(good: Good) -> str:
     return f"{good.value}: 1 {unit_name(good, 1)} = {GOOD_KG.get(good, UNIT_KG):,.0f} kg"
 
 
+# Every good's unit_tonnes, worked out once: trains are weighed many times a frame.
+_UNIT_TONNES: dict[Good, float] = {good: GOOD_KG.get(good, UNIT_KG) / 1_000.0 for good in Good}
+
+
 def unit_tonnes(good: Good) -> float:
     """What a unit of a good weighs, in tonnes."""
-    return GOOD_KG.get(good, UNIT_KG) / 1_000.0
+    return _UNIT_TONNES[good]
 
 
 def full_tonnes(good: Good, capacity: float, generation: int = BASE_GENERATION) -> float:

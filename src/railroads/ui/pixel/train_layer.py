@@ -59,6 +59,8 @@ PAGE_WIDTH = 512
 PAGES_BUDGET = 128 * 1024 * 1024
 PAGES_TIME = 0.006
 PUFFS = 5
+# The most trains whose parts' places on their track are kept while they stand.
+SHIFTS_KEPT = 4096
 
 
 class Texture(Protocol):
@@ -85,6 +87,10 @@ class TrainLayer:
         # Pages being drawn a few pictures a frame: each look's painter and pictures so far.
         self._painting: dict[tuple[object, int], tuple[FinePainter, list[Sprite]]] = {}
         self.lanes = Lanes(world.track)
+        # Where each train's parts were last moved to ride their track, while it stands.
+        self._shifts: dict[
+            int, tuple[list[Point], float, int, dict[Cell | None, int], dict[float, Point]]
+        ] = {}
 
     def draw(
         self, draw_list: imgui.ImDrawList, railway: Railway, camera: IsoCamera, center: Vec2
@@ -112,12 +118,15 @@ class TrainLayer:
         )
         four_lanes = blocks_of(railway.constructions).lane_cells
         found = []
+        # Each train's lanes, found once for all its parts.
+        lanes_of: dict[int, dict[Cell | None, int]] = {}
+        version = railway.constructions.railway_version
         for (train, back, look, placed), under in zip(seen, hidden, strict=True):
             if not under:
-                shift = self.lanes.sideways(
-                    train.path, train.along - back, self.lanes.of(train, four_lanes)
-                )
-                found.append((placed, shift, look))
+                lanes = lanes_of.get(id(train))
+                if lanes is None:
+                    lanes = lanes_of[id(train)] = self.lanes.of(train, four_lanes)
+                found.append((placed, self._shift(train, back, lanes, version), look))
         parts = []
         if found:
             xs = np.array([placed[0][0] for placed, _, _ in found])
@@ -159,6 +168,29 @@ class TrainLayer:
         self._let_go(drawn)
         self._smoke(draw_list, railway, in_sight, origin, scale)
         self.sprites.draw_ahead(self._paging_until)
+
+    def _shift(
+        self, train: Train, back: float, lanes: dict[Cell | None, int], version: int
+    ) -> Point:
+        """How far a part of the train `back` cells behind its front is moved to ride its track
+        (Lanes.sideways), kept while the train stands where it stood on the same path and lanes
+        and the track is as it was: many trains wait at stations and signals."""
+        if len(self._shifts) > SHIFTS_KEPT:
+            self._shifts.clear()
+        kept = self._shifts.get(id(train))
+        if (
+            kept is None
+            or kept[0] is not train.path
+            or kept[1] != train.along
+            or kept[2] != version
+            or kept[3] != lanes
+        ):
+            kept = self._shifts[id(train)] = (train.path, train.along, version, dict(lanes), {})
+        shifts = kept[4]
+        shift = shifts.get(back)
+        if shift is None:
+            shift = shifts[back] = self.lanes.sideways(train.path, train.along - back, lanes)
+        return shift
 
     @staticmethod
     def _parts(train: Train) -> list[tuple[object, float]]:
@@ -267,9 +299,8 @@ class TrainLayer:
                 continue
             model = ENGINES[train.engine]
             assert model.chimney is not None
-            shift = self.lanes.sideways(
-                train.path, train.along - back, self.lanes.of(train, four_lanes)
-            )
+            lanes = self.lanes.of(train, four_lanes)
+            shift = self._shift(train, back, lanes, railway.constructions.railway_version)
             phase = (train.along * 6.0) % 1.0
             chimneys.append(_Chimney(x, y, dx, dy, shift, model.chimney[1] * SCALE, phase))
         return chimneys

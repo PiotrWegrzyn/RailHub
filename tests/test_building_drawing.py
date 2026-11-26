@@ -11,7 +11,7 @@ from railroads.sim.geo import Bounds
 from railroads.sim.grids import Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
 from railroads.ui import building_spots
-from railroads.ui.build_menu import draw_track
+from railroads.ui.build_menu import _parallel_lines, draw_track
 from railroads.ui.building_spots import BuildingSpots, Plot, plots_of
 from railroads.ui.buildings import DOTS, dot_looks, draw_building_dots
 from railroads.ui.iso_camera import IsoCamera
@@ -248,3 +248,13 @@ def test_zoomed_out_track_is_drawn_anew_once_more_is_laid(draw_list: imgui.ImDra
     draw_track(draw_list, constructions, camera, (640.0, 400.0))
 
     assert draw_list.vtx_buffer.size() - once == 2 * once
+
+
+def test_a_straight_line_of_track_moved_aside_runs_alongside_it(
+    draw_list: imgui.ImDrawList,
+) -> None:
+    xs, ys = np.array([[0.0, 10.0, 20.0]]), np.array([[5.0, 5.0, 5.0]])
+
+    moved = _parallel_lines(xs, ys, 2.0)
+
+    assert [(point.x, point.y) for point in moved[0]] == [(0.0, 7.0), (10.0, 7.0), (20.0, 7.0)]

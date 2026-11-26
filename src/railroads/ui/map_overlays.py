@@ -203,9 +203,8 @@ def draw_owned_flags(
         return
     colours = rgba_u32(FLAG_POLE), rgba_u32(FLAG_CLOTH), rgba_u32(FLAG_STRIPE)
     now = imgui.get_time()
-    for cell in owners.cells():
+    for cell, big in owners.flags():
         x, y = camera.to_screen(*grid.center(*cell), center)
-        big = owners.controls_any(cell)
         height = width * FLAG_HEIGHT * (BIG_FLAG if big else 1.0)
         foot = (x + width * FLAG_RIGHT, y)
         top = (foot[0], y - height)

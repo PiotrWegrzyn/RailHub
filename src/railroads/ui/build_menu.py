@@ -2,7 +2,6 @@
 trains and stations windows; and drawing the track, routes, station reach and far-off trains."""
 
 import itertools
-import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -508,7 +507,7 @@ def draw_track(
         laid, plane = _laid_track(constructions)
     else:
         laid, plane = planned, _track_plane(planned, constructions.tile_map.grid)
-    pieces = _on_screen(laid, plane, camera, center, width * 4)
+    pieces, xs, ys = _on_screen(laid, plane, camera, center, width * 4)
     colors: dict[tuple[float, float, float, float], int] = {}
 
     def shade(rgba: tuple[float, float, float, float]) -> int:
@@ -526,7 +525,14 @@ def draw_track(
         else:
             draw_list.add_polyline(points, shade(BALLAST), bed, 0)
     spacing = camera.cell_width * FLAT_DOUBLE_SPACING / 2
-    for piece, points in pieces:
+    lanes: dict[float, list[list[imgui.ImVec2]]] = {}
+
+    def lane_of(index: int, side: float) -> list[imgui.ImVec2]:
+        if side not in lanes:
+            lanes[side] = _parallel_lines(xs, ys, side)
+        return lanes[side][index]
+
+    for index, (piece, points) in enumerate(pieces):
         if piece.bed == TrackBed.TUNNEL:
             continue
         sides = {
@@ -535,7 +541,7 @@ def draw_track(
             TrackWidth.QUADRUPLE: (-3 * spacing, -spacing, spacing, 3 * spacing),
         }[piece.width]
         for side in sides:
-            lane = _parallel(points, side)
+            lane = points if not side else lane_of(index, side)
             if piece.maglev:
                 draw_list.add_polyline(lane, shade(GUIDEWAY_EDGE), width * 1.3, 0)
                 draw_list.add_polyline(lane, shade(GUIDEWAY), width * 0.9, 0)
@@ -583,8 +589,9 @@ def _track_plane(pieces: list[Track], grid: Grid) -> FloatArray:
 
 def _on_screen(
     pieces: list[Track], plane: FloatArray, camera: IsoCamera, center: Vec2, margin: float
-) -> list[tuple[Track, list[imgui.ImVec2]]]:
-    """The pieces that show on the screen, each with its line's points on it."""
+) -> tuple[list[tuple[Track, list[imgui.ImVec2]]], FloatArray, FloatArray]:
+    """The pieces that show on the screen, each with its line's points on it, and those points'
+    x and y as rows of an array each."""
     xs, ys = camera.to_screen(plane[..., 0], plane[..., 1], center)
     display = imgui.get_io().display_size
     shown = (
@@ -594,25 +601,32 @@ def _on_screen(
         & (ys.min(axis=1) <= display.y + margin)
     )
     indices = np.flatnonzero(shown).tolist()
-    return [
+    xs, ys = xs[shown], ys[shown]
+    found = [
         (pieces[index], [imgui.ImVec2(x, y) for x, y in zip(row_x, row_y, strict=True)])
-        for index, row_x, row_y in zip(indices, xs[shown].tolist(), ys[shown].tolist(), strict=True)
+        for index, row_x, row_y in zip(indices, xs.tolist(), ys.tolist(), strict=True)
     ]
+    return found, xs, ys
 
 
-def _parallel(points: list[imgui.ImVec2], side: float) -> list[imgui.ImVec2]:
-    """The line moved `side` screen pixels to its left, joined where the moved lines meet."""
-    if not side:
-        return points
-    normals = []
-    for a, b in itertools.pairwise(points):
-        length = math.hypot(b.x - a.x, b.y - a.y) or 1.0
-        normals.append((-(b.y - a.y) / length, (b.x - a.x) / length))
-    moved = []
-    for index, point in enumerate(points):
-        before = normals[max(0, index - 1)]
-        after = normals[min(len(normals) - 1, index)]
-        mx, my = before[0] + after[0], before[1] + after[1]
-        dot = (mx * before[0] + my * before[1]) or 1.0
-        moved.append(imgui.ImVec2(point.x + mx / dot * side, point.y + my / dot * side))
-    return moved
+def _parallel_lines(xs: FloatArray, ys: FloatArray, side: float) -> list[list[imgui.ImVec2]]:
+    """Each line, its points' x and y a row of `xs` and `ys`, moved `side` screen pixels to its
+    left, joined where the moved lines meet: all of them at once, as there are thousands of
+    pieces of track on screen zoomed out."""
+    if not len(xs):
+        return []
+    dx, dy = np.diff(xs, axis=1), np.diff(ys, axis=1)
+    length = np.hypot(dx, dy)
+    length[length == 0] = 1.0
+    nx, ny = -dy / length, dx / length
+    before = np.concatenate([nx[:, :1], nx], axis=1), np.concatenate([ny[:, :1], ny], axis=1)
+    after = np.concatenate([nx, nx[:, -1:]], axis=1), np.concatenate([ny, ny[:, -1:]], axis=1)
+    mx, my = before[0] + after[0], before[1] + after[1]
+    dot = mx * before[0] + my * before[1]
+    dot[dot == 0] = 1.0
+    moved_x = (xs + mx / dot * side).tolist()
+    moved_y = (ys + my / dot * side).tolist()
+    return [
+        [imgui.ImVec2(x, y) for x, y in zip(row_x, row_y, strict=True)]
+        for row_x, row_y in zip(moved_x, moved_y, strict=True)
+    ]

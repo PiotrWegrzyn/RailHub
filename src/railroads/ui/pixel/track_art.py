@@ -499,6 +499,10 @@ class TrackArt:
         # PIECES_KEPT pieces.
         self._shapes: dict[Track, tuple[list[float], list[float]]] = {}
         self._turnout_lanes: dict[Track, tuple[FloatArray, list[FloatArray]]] = {}
+        self._branches: dict[tuple[Track, int], list[list[float]] | None] = {}
+        self._profiles: dict[
+            Track, tuple[list[float], float, tuple[list[float], list[float]]] | None
+        ] = {}
         self._laid_pieces: dict[tuple[Track, Point | None], tuple[int, _Laid]] = {}
         self._placed: dict[tuple[Track, Point | None], FloatArray] = {}
         self._lifts: dict[tuple[Track, Point | None], FloatArray] = {}
@@ -518,6 +522,8 @@ class TrackArt:
         if self._shapes_version != self.constructions.railway_version:
             self._shapes.clear()
             self._turnout_lanes.clear()
+            self._branches.clear()
+            self._profiles.clear()
             self._forget_laid()
             self._shapes_version = self.constructions.railway_version
         grades = 0 if self.elevation is None else self.elevation.grades
@@ -940,17 +946,12 @@ class TrackArt:
         of that one going its way (`_branch_lanes`), and with `forks` from each of the others
         going its way too, crossing the tracks between, each turning out of it in one curve
         (`_turnouts`)."""
-        if any(self._branch_lanes(piece, point) is not None for point in piece.ends):
+        profile = self._side_profile(piece)
+        if profile is None:
             along, turnouts = self._turnouts(piece)
             kept = turnouts if forks else turnouts[: int(piece.width)]
             return [np.interp(shares, along, lane).tolist() for lane in kept]
-        full = _lane_sides(int(piece.width))
-        opening = 2.0
-        if piece.width == TrackWidth.QUADRUPLE and self.constructions.station_at(piece.cell):
-            half = DOUBLE_SPACING / 2
-            full = [-(half + ISLAND_TRACKS), -half, half, half + ISLAND_TRACKS]
-            opening = 1 / ISLAND_FROM
-        at_start, at_end = self._ends(piece)
+        full, opening, (at_start, at_end) = profile
         lanes = []
         for index, middle in enumerate(full):
             sides = []
@@ -964,6 +965,28 @@ class TrackArt:
                 sides.append(side)
             lanes.append(sides)
         return lanes
+
+    def _side_profile(
+        self, piece: Track
+    ) -> tuple[list[float], float, tuple[list[float], list[float]]] | None:
+        """What `_sides_at` lays a piece's tracks out from where it branches off none: where each
+        lies in the middle of the cell, how quickly they open out to there, and where each lies
+        at the piece's ends; None for a piece that branches off other track. Kept until track or
+        stations change: trains are put on their track by it several times a frame."""
+        self._keep_current()
+        if piece in self._profiles:
+            return self._profiles[piece]
+        profile = None
+        if not any(self._branch_lanes(piece, point) is not None for point in piece.ends):
+            full = _lane_sides(int(piece.width))
+            opening = 2.0
+            if piece.width == TrackWidth.QUADRUPLE and self.constructions.station_at(piece.cell):
+                half = DOUBLE_SPACING / 2
+                full = [-(half + ISLAND_TRACKS), -half, half, half + ISLAND_TRACKS]
+                opening = 1 / ISLAND_FROM
+            profile = (full, opening, self._ends(piece))
+        self._profiles[piece] = profile
+        return profile
 
     def _turnouts(self, piece: Track) -> tuple[FloatArray, list[FloatArray]]:
         """How far to the left of the centre line of a piece branching off other track each of
@@ -1059,7 +1082,16 @@ class TrackArt:
         the piece is as wide its own, so the whole line forks; double off quadruple the pair on
         its side; single all of them. It leaves from the one furthest to the side it turns to,
         the others crossing over to that one (`_turnouts`), so a train off it keeps clear of the
-        rest. None where it branches off none."""
+        rest. None where it branches off none. Kept until track or stations change: a train is
+        put on its track by it several times a frame."""
+        self._keep_current()
+        key = (piece, point)
+        if key in self._branches:
+            return self._branches[key]
+        found = self._branches[key] = self._branch_lanes_now(piece, point)
+        return found
+
+    def _branch_lanes_now(self, piece: Track, point: int) -> list[list[float]] | None:
         grid = self.tile_map.grid
         turn = grid.track_turn(*piece.ends)
         mains = [

@@ -8,6 +8,7 @@ light fading from one to the other. From far off only the lamps show, as points 
 at a glance where trains wait."""
 
 import math
+from functools import cache
 
 import numpy as np
 import numpy.typing as npt
@@ -60,6 +61,7 @@ SHADOW = (0.0, 0.0, 0.0, 0.28)
 type Arm = tuple[float, float, tuple[float, float, float]]
 
 
+@cache
 def _u32(color: tuple[float, ...], alpha: float = 1.0) -> int:
     rgba = color if len(color) == 4 else (*color, alpha)
     return imgui.color_convert_float4_to_u32(imgui.ImVec4(*rgba))
@@ -71,6 +73,7 @@ class SignalLayer:
         # How clear each signal shows, from 0 at danger to 1 clear, by where it stands.
         self._clear: dict[tuple, float] = {}
         self._spread_for: tuple[list[SignalSpot], npt.NDArray[np.float64]] | None = None
+        self._placed_for: tuple[list[SignalSpot], tuple[npt.NDArray[np.float64], ...]] | None = None
 
     def _spreads(self, railway: Railway, spots: list[SignalSpot]) -> npt.NDArray[np.float64]:
         """How far the outer track lies from the middle of the track by each signal, in cells,
@@ -90,6 +93,27 @@ class SignalLayer:
         )
         self._spread_for = (spots, spreads)
         return spreads
+
+    def _placed(self, spots: list[SignalSpot]) -> tuple[npt.NDArray[np.float64], ...]:
+        """Where each signal stands on the map and in the picture, and the way it faces in the
+        picture as a unit vector: worked out again only when the signals change."""
+        kept = self._placed_for
+        if kept is not None and kept[0] is spots:
+            return kept[1]
+        projection = self.world.projection
+        xs = np.array([spot.at[0] for spot in spots])
+        ys = np.array([spot.at[1] for spot in spots])
+        lengths = np.array([math.hypot(*spot.heading) or 1.0 for spot in spots])
+        hx = np.array([spot.heading[0] for spot in spots]) / lengths
+        hy = np.array([spot.heading[1] for spot in spots]) / lengths
+        ax, ay = projection.to_pixels(xs, ys)
+        bx, by = projection.to_pixels(xs + hx * 0.1, ys + hy * 0.1)
+        dx, dy = bx - ax, by - ay
+        way = np.hypot(dx, dy)
+        way[way == 0] = 1.0
+        placed = (xs, ys, ax, ay, dx / way, dy / way)
+        self._placed_for = (spots, placed)
+        return placed
 
     def draw(
         self,
@@ -113,17 +137,7 @@ class SignalLayer:
             center[0] - float(camera_pixel[0]) * scale,
             center[1] - float(camera_pixel[1]) * scale,
         )
-        xs = np.array([spot.at[0] for spot in spots])
-        ys = np.array([spot.at[1] for spot in spots])
-        lengths = np.array([math.hypot(*spot.heading) or 1.0 for spot in spots])
-        hx = np.array([spot.heading[0] for spot in spots]) / lengths
-        hy = np.array([spot.heading[1] for spot in spots]) / lengths
-        ax, ay = projection.to_pixels(xs, ys)
-        bx, by = projection.to_pixels(xs + hx * 0.1, ys + hy * 0.1)
-        dx, dy = bx - ax, by - ay
-        way = np.hypot(dx, dy)
-        way[way == 0] = 1.0
-        dx, dy = dx / way, dy / way
+        xs, ys, ax, ay, dx, dy = self._placed(spots)
         side = (SIDE + self._spreads(railway, spots)) * PIXEL_CELL_WIDTH
         lift = self.world.elevation.lift(xs, ys)
         sx = origin[0] + (ax - dy * side) * scale
