@@ -162,6 +162,7 @@ class BuildingKind(Keyed):
     JUICE_WORKS = "juice works"
     BIG_JUICE_WORKS = "big juice works"
     MEGA_JUICE_WORKS = "mega juice works"
+    COLA_BOTTLER = "cola bottling plant"
     BIG_STEEL_MILL = "big steel mill"
     MEGA_STEEL_MILL = "mega steel mill"
     BIG_POTTER = "big potter"
@@ -431,6 +432,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.PORCELAIN_WORKS,
             BuildingKind.MEAT_FACTORY,
             BuildingKind.JUICE_WORKS,
+            BuildingKind.COLA_BOTTLER,
         )
     },
 }

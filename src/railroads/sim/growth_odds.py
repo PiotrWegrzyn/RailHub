@@ -23,7 +23,7 @@ from railroads.sim.ladders import MILITARY
 from railroads.sim.points import Points
 from railroads.sim.surroundings import Land, Surroundings
 from railroads.sim.tilemap import Relief, Temperature, Terrain, Vegetation
-from railroads.sim.tiles import era_come, kind_era
+from railroads.sim.tiles import KIND_OPENED_BY, era_come, kind_era, kind_opened
 from railroads.words import either, times_over
 
 WATERS = {Terrain.SEA: "the sea", Terrain.LAKE: "a lake", Terrain.RIVER: "a river"}
@@ -220,6 +220,9 @@ def _map_reasons(growth: Growth, ladder: Ladder) -> list[str]:
     era = kind_era(first)
     if not era_come(era, year):
         reasons.append(f"Comes with era {era}.")
+    if not kind_opened(first, year):
+        tile, level = KIND_OPENED_BY[first]
+        reasons.append(f"Comes once {tile.value} demand is at level {level}.")
     if not ladder_open(ladder, year):
         return reasons
     for makers in inputs_of(first, year):

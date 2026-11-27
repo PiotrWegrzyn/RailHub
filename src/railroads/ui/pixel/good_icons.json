@@ -103,108 +103,112 @@
   16,
   48
  ],
- "incense": [
+ "fertiliser": [
   32,
+  48
+ ],
+ "incense": [
+  48,
   48
  ],
  "steel": [
-  48,
+  64,
   48
  ],
  "tools": [
-  64,
+  80,
   48
  ],
  "fuel": [
-  80,
+  96,
   48
  ],
  "chemicals": [
-  96,
+  112,
   48
  ],
  "furniture": [
-  112,
-  48
+  0,
+  64
  ],
  "clothes": [
-  0,
+  16,
   64
  ],
  "barrels": [
-  16,
+  32,
   64
  ],
  "wine": [
-  32,
+  48,
   64
  ],
  "electronics": [
-  48,
+  64,
   64
  ],
  "cars": [
-  64,
+  80,
   64
  ],
  "guns": [
-  80,
+  96,
   64
  ],
  "tanks": [
-  96,
+  112,
   64
  ],
  "planes": [
-  112,
-  64
+  0,
+  80
  ],
  "goods": [
-  0,
+  16,
   80
  ],
  "passengers": [
-  16,
+  32,
   80
  ],
  "mail": [
-  32,
+  48,
   80
  ],
  "food": [
-  48,
-  80
- ],
- "fruit": [
   64,
   80
  ],
- "fibre": [
+ "fruit": [
   80,
   80
  ],
- "clay": [
+ "fibre": [
   96,
   80
  ],
- "limestone": [
+ "clay": [
   112,
   80
  ],
- "sand": [
+ "limestone": [
   0,
   96
  ],
- "potatoes": [
+ "sand": [
   16,
   96
  ],
- "rice": [
+ "potatoes": [
   32,
   96
  ],
- "cattle": [
+ "rice": [
   48,
+  96
+ ],
+ "cattle": [
+  64,
   96
  ],
  "milk": [
@@ -243,159 +247,159 @@
   80,
   112
  ],
- "general food": [
+ "cola": [
   96,
+  112
+ ],
+ "general food": [
+  112,
   112
  ],
  "general processed food": [
-  112,
-  112
+  0,
+  128
  ],
  "general common goods": [
-  0,
+  16,
   128
  ],
  "pigs": [
-  16,
+  32,
   128
  ],
  "chickens": [
-  32,
+  48,
   128
  ],
  "eggs": [
-  48,
+  64,
   128
  ],
  "animals": [
-  64,
+  80,
   128
  ],
  "flax": [
-  80,
+  96,
   128
  ],
  "hops": [
-  96,
+  112,
   128
  ],
  "machinery": [
-  112,
-  128
+  0,
+  144
  ],
  "bricks": [
-  0,
+  16,
   144
  ],
  "cement": [
-  16,
+  32,
   144
  ],
  "glass": [
-  32,
+  48,
   144
  ],
  "beer": [
-  48,
+  64,
   144
  ],
  "vodka": [
-  64,
+  80,
   144
  ],
  "sake": [
-  80,
+  96,
   144
  ],
  "soybeans": [
-  96,
+  112,
   144
  ],
  "soy sauce": [
-  112,
-  144
+  0,
+  160
  ],
  "tofu": [
-  0,
+  16,
   160
  ],
  "miso": [
-  16,
+  32,
   160
  ],
  "tea": [
-  32,
+  48,
   160
  ],
  "dried fish": [
-  48,
+  64,
   160
  ],
  "hot drinks": [
-  64,
+  80,
   160
  ],
  "alcohol": [
-  80,
+  96,
   160
  ],
  "leather": [
-  96,
+  112,
   160
  ],
  "shoes": [
-  112,
-  160
+  0,
+  176
  ],
  "plastics": [
-  0,
+  16,
   176
  ],
  "appliances": [
-  16,
+  32,
   176
  ],
  "paper": [
-  32,
+  48,
   176
  ],
  "newspapers": [
-  48,
-  176
- ],
- "refined sugar": [
   64,
   176
  ],
- "porcelain": [
+ "refined sugar": [
   80,
   176
  ],
- "sheep": [
+ "porcelain": [
   96,
   176
  ],
- "meat": [
+ "sheep": [
   112,
   176
  ],
- "livestock": [
+ "meat": [
   0,
   192
  ],
- "gas": [
+ "livestock": [
   16,
   192
  ],
- "heating": [
+ "gas": [
   32,
   192
  ],
- "boiler fuel": [
+ "heating": [
   48,
   192
  ],
- "fertiliser": [
+ "boiler fuel": [
   64,
   192
  ]

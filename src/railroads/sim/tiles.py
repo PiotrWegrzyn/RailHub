@@ -96,6 +96,7 @@ TILE_GOODS: Mapping[Tile, tuple[Good, ...]] = MappingProxyType(
             G.CANS,
             G.REFINED_SUGAR,
             G.JUICE,
+            G.COLA,
             G.BEER,
             G.WINE,
             G.VODKA,
@@ -302,7 +303,18 @@ UNLOCKS: Mapping[tuple[BuildingKind, Need], tuple[Tile, int]] = MappingProxyType
         (K.SHEEP_FARM, Need.MACHINERY): (T.MACHINES, 10),
         (K.FARM, Need.FERTILISER): (T.CHEMICALS, 10),
         **{(kind, Need.FUEL): (T.OIL, 11) for kind in _DIESEL},
+        **{(kind, Need.PAPER): (T.MAIL, 10) for kind in (K.FACTORY, K.BIG_FACTORY, K.MEGA_FACTORY)},
+        **{(kind, Need.COLA): (T.FOOD, 13) for kind in (K.HOUSE, K.TENEMENT, K.FLATS, K.MANOR)},
+        (K.TENEMENT, Need.CARS): (T.VEHICLES, 13),
+        (K.HOUSE, Need.CARS): (T.VEHICLES, 14),
+        (K.TENEMENT, Need.APPLIANCES): (T.MODERN, 14),
+        (K.HOUSE, Need.APPLIANCES): (T.MODERN, 15),
     }
+)
+# The demand level of a tile from which a kind of works comes up: cola bottling plants once homes
+# start to want cola.
+KIND_OPENED_BY: Mapping[BuildingKind, tuple[Tile, int]] = MappingProxyType(
+    {K.COLA_BOTTLER: UNLOCKS[(K.HOUSE, Need.COLA)]}
 )
 
 
@@ -610,6 +622,16 @@ def opens(kind: BuildingKind, need: Need, year: int) -> bool:
     if unlock is None:
         return True
     tile, level = unlock
+    return of_year(year).demand.get(tile, 0) >= level
+
+
+def kind_opened(kind: BuildingKind, year: int) -> bool:
+    """Whether a kind of works can come up in a year as far as the demand board goes: always,
+    unless a tile opens it (KIND_OPENED_BY) and is not at its level yet."""
+    opened = KIND_OPENED_BY.get(kind)
+    if opened is None:
+        return True
+    tile, level = opened
     return of_year(year).demand.get(tile, 0) >= level
 
 

@@ -224,6 +224,7 @@ BUILDING_SPRITES = {
     BuildingKind.DEPARTMENT_STORE: "department_store",
     BuildingKind.HOTEL: "hotel",
     BuildingKind.JUICE_WORKS: "winery",
+    BuildingKind.COLA_BOTTLER: "winery",
 }
 
 # Big and mega works have sprites of their own (railroads.ui.pixel.art.registry.GROWN_WIDTH).

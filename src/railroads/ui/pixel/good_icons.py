@@ -1203,6 +1203,20 @@ def juice() -> Sprite:
     return p.sprite()
 
 
+def cola() -> Sprite:
+    """A dark brown bottle of cola with a red label and a red cap."""
+    p = _canvas()
+    red: RGB = (190, 30, 36)
+    brown: RGB = (58, 30, 22)
+    p.rect(-1, -8, 1, -7, red)
+    p.rect(-1, -7, 1, -4, brown)
+    p.ellipse(-4, -4, 4, 7, brown)
+    p.rect(-4, 0, 4, 3, red)
+    p.line([(-3, 1), (3, 2)], (244, 240, 232))
+    p.line([(-3, -3), (-3, 5)], (110, 64, 46))
+    return p.sprite()
+
+
 ICONS: dict[str, Callable[[], Sprite]] = {
     "wheat": wheat,
     "apples": apples,
@@ -1266,6 +1280,7 @@ ICONS: dict[str, Callable[[], Sprite]] = {
     "luxury goods": luxuries,
     "common goods": common_goods,
     "juice": juice,
+    "cola": cola,
     "general food": general_food,
     "general processed food": general_processed_food,
     "general common goods": general_common_goods,

@@ -119,7 +119,7 @@ from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
 from railroads.sim.surroundings import Land, Surroundings
 from railroads.sim.tilemap import REFERENCE_LAND, Relief, Terrain, TileMap, Vegetation
-from railroads.sim.tiles import era_come, kind_era
+from railroads.sim.tiles import KIND_OPENED_BY, era_come, kind_era, kind_opened
 from railroads.sim.towns import Towns
 from railroads.sim.trade import BONUS_PER_GOOD, Trade, levels_of
 from railroads.sim.year_caches import year_cached
@@ -144,8 +144,10 @@ SKYSCRAPER_STARS = 4
 
 def ladder_open(ladder: Ladder, year: int) -> bool:
     """Whether a ladder has opened by a year: its year and the era of its first kind have come
-    (railroads.sim.tiles.kind_era)."""
-    return ladder.from_year <= year and era_come(kind_era(ladder.kinds[0]), year)
+    (railroads.sim.tiles.kind_era), and the demand tile that opens it is at its level
+    (railroads.sim.tiles.kind_opened)."""
+    kind = ladder.kinds[0]
+    return ladder.from_year <= year and era_come(kind_era(kind), year) and kind_opened(kind, year)
 
 
 @year_cached
@@ -1076,7 +1078,7 @@ class Growth:
         kind = ladder.kinds[0]
         if kind in KEY_BUILDINGS:
             return max(1, round(KEY_LEAST * self._land_cells / REFERENCE_LAND))
-        opens_later = ladder.from_year > 0 or kind_era(kind) > 1
+        opens_later = ladder.from_year > 0 or kind_era(kind) > 1 or kind in KIND_OPENED_BY
         return 1 if opens_later and kind not in ONE_OFFS else 0
 
     def _top_up(self, rng: np.random.Generator) -> set[Cell]:

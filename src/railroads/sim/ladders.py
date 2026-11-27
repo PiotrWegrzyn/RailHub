@@ -27,7 +27,7 @@ from types import MappingProxyType
 
 from railroads.sim.constructions import MERGED, PORT_KINDS, BuildingKind
 from railroads.sim.forests import FORESTS, ForestRule
-from railroads.sim.goods import RECIPES, merging
+from railroads.sim.goods import POTATO_YEAR, RECIPES, merging
 from railroads.sim.ladder_types import Join, Ladder, Merge, Rise
 from railroads.sim.points import Points
 from railroads.sim.surroundings import Land
@@ -203,6 +203,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.DEPARTMENT_STORE: (Points.CORPORATE, 3),
     BuildingKind.HOTEL: (Points.CORPORATE, 5),
     BuildingKind.JUICE_WORKS: (Points.INDUSTRY, 1),
+    BuildingKind.COLA_BOTTLER: (Points.INDUSTRY, 2),
 }
 
 # A big works gives the points of the works merged into it, and a mega one of the big ones.
@@ -652,6 +653,7 @@ TOWN_CRAFTS = (
     _town_craft(BuildingKind.MISO_MAKER, 5, least_people=FOOD_TOWN),
     _town_craft(BuildingKind.FISH_DRYER, 5, least_people=FOOD_TOWN),
     _town_craft(BuildingKind.JUICE_WORKS, 1, 1870, starving_years=50),
+    _town_craft(BuildingKind.COLA_BOTTLER, 1, starving_years=50),
     _town_craft(BuildingKind.CARPET_WEAVER, 2, 1700, LUXURY_TOWN, 250),
     _town_craft(BuildingKind.CLOCK_MAKER, 10, 1880, LUXURY_TOWN, 50),
     _town_craft(BuildingKind.MIRROR_MAKER, 10, 1700, LUXURY_TOWN, 50),
@@ -695,7 +697,7 @@ POTATO_FARMS = Ladder(
     ),
     base=4.68,
     crowded_at=FARMS_CROWDED_OUT,
-    from_year=1600,
+    from_year=POTATO_YEAR,
 )
 
 # Rice grows only in warm lands, within RICE_LATITUDE degrees of the equator, on flat land and in

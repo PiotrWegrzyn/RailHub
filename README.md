@@ -507,9 +507,9 @@ window (H) lists the same.
 <!-- table: buildings -->
 | Building | Makes a month at most | Must get a month | Bonus goods and boosts a month |
 |---|---|---|---|
-| House |  | 6 food, 2 heating | 6 food, 0.3 soy sauce, 0.6 beer, 0.6 newspapers (from 1600), 3 common goods, 0.3 vodka (from 1600), 0.3 refined sugar (from 1800), 0.05 bricks, 0.12 glass, 0.3 limestone, 0.3 wax |
-| Tenement |  | 35 food, 40 common goods, 12 heating | 35 food, 3 soy sauce, 6 salt, 12 goods, 6 hot drinks (from 1700), 6 tools (from era 3), 6 beer, 6 vodka (from 1600), 3 bricks, 6 glass, 3 cement (from era 3), 6 refined sugar (from 1800), 6 newspapers (from 1600), 6 limestone, 0.6 luxury goods (from 1700), 3 wax |
-| Block of flats |  | 125 food, 200 common goods, 50 heating | 125 food, 10 soy sauce, 20 salt, 25 goods, 20 hot drinks (from 1700), 6 tools (from era 3), 20 fuel (from era 2), 2 cars (from era 4), 20 beer, 20 vodka (from 1600), 12 bricks, 12 cement (from era 3), 30 glass, 20 newspapers (from 1600), 3 appliances (from era 6), 20 refined sugar (from 1800), 3 luxury goods (from 1700) |
+| House |  | 6 food, 2 heating | 6 food, 0.3 soy sauce, 0.6 beer, 0.6 newspapers (from 1600), 3 common goods, 0.3 vodka (from 1600), 0.3 refined sugar (from 1800), 0.05 bricks, 0.12 glass, 0.3 limestone, 0.3 wax, 0.6 cola (from food and drink demand 13), 0.05 cars (from vehicles demand 14), 0.1 appliances (from modern goods demand 15) |
+| Tenement |  | 35 food, 40 common goods, 12 heating | 35 food, 3 soy sauce, 6 salt, 12 goods, 6 hot drinks (from 1700), 6 tools (from era 3), 6 beer, 6 vodka (from 1600), 3 bricks, 6 glass, 3 cement (from era 3), 6 refined sugar (from 1800), 6 newspapers (from 1600), 6 limestone, 0.6 luxury goods (from 1700), 3 wax, 2 furniture, 6 cola (from food and drink demand 13), 0.3 cars (from vehicles demand 13), 0.5 appliances (from modern goods demand 14) |
+| Block of flats |  | 125 food, 200 common goods, 50 heating | 125 food, 10 soy sauce, 20 salt, 25 goods, 20 hot drinks (from 1700), 6 tools (from era 3), 20 fuel (from era 2), 2 cars (from era 4), 20 beer, 20 vodka (from 1600), 12 bricks, 12 cement (from era 3), 30 glass, 20 newspapers (from 1600), 3 appliances (from era 6), 20 refined sugar (from 1800), 3 luxury goods (from 1700), 12 furniture, 30 cola (from food and drink demand 13) |
 | Farm | 6 wheat |  | 3 machinery (from machines and tools demand 10), 6 limestone (from ore and stone demand 3), 3 fertiliser (from chemicals and building demand 10), 1.2 fuel (from oil and fuel demand 11) |
 | Orchard | 6 apples |  |  |
 | Date palms | 6 dates |  |  |
@@ -533,7 +533,7 @@ window (H) lists the same.
 | Miso maker | 40 miso | 10 soybeans, 6 rice, 4 salt |  |
 | Fish drying shed | 40 dried fish | 16 fish, 4 salt |  |
 | Cattle ranch | 2 cattle, 12 milk |  | 70 wheat (from farming demand 2) |
-| Pig farm | 8 pigs |  | 40 wheat (from farming demand 2) |
+| Pig farm | 8 pigs |  | 40 wheat (from farming demand 2), 20 potatoes (from 1600) |
 | Chicken farm | 4 chickens, 6 eggs |  | 20 wheat (from farming demand 2) |
 | Sausage maker (1850) | 150 sausages | 60 meat, 30 salt |  |
 | Flax field | 40 flax |  |  |
@@ -562,9 +562,9 @@ window (H) lists the same.
 | Port |  |  | 6 fuel (from era 2) |
 | Big port |  |  | 12 fuel (from era 2) |
 | Mega port |  |  | 25 fuel (from era 2) |
-| Factory (1780) | 20 goods | 6.667 planks, 6.667 steel (from era 2) | 1 bricks, 1 cement (from era 3) |
-| Big factory (1780) | 60 goods | 20 steel (from era 2), 20 copper (from era 4) | 3 bricks, 3 cement (from era 3) |
-| Mega factory (1780) | 170 goods | 56.67 steel (from era 2), 28.33 copper (from era 4), 28.33 machinery (from era 3) | 8 bricks, 8 cement (from era 3) |
+| Factory (1780) | 20 goods | 6.667 planks, 6.667 steel (from era 2) | 2 paper (from mail and press demand 10), 1 bricks, 1 cement (from era 3) |
+| Big factory (1780) | 60 goods | 20 steel (from era 2), 20 copper (from era 4) | 6 paper (from mail and press demand 10), 3 bricks, 3 cement (from era 3) |
+| Mega factory (1780) | 170 goods | 56.67 steel (from era 2), 28.33 copper (from era 4), 28.33 machinery (from era 3) | 17 paper (from mail and press demand 10), 8 bricks, 8 cement (from era 3) |
 | Cannery (1810) | 200 cans | 60 fruit, 20 steel (from era 2) |  |
 | Textile mill (1780) | 25 clothes | 62.5 fibre |  |
 | Furniture maker | 12 furniture | 48 planks | 6 wax |
@@ -572,7 +572,7 @@ window (H) lists the same.
 | Winery | 12 wine | 48 grapes | 24 barrels |
 | Barrel maker | 25 barrels | 12.5 planks |  |
 | Refinery (era 2) | 600 fuel | 600 oil (from era 2) |  |
-| Chemical works (era 3) | 60 chemicals, 30 fertiliser | 30 salt, 30 boiler fuel |  |
+| Chemical works (era 3) | 60 chemicals, 30 fertiliser | 30 salt, 30 boiler fuel | 15 limestone |
 | Electronics plant (era 6) | 30 electronics | 30 copper (from era 4), 30 chemicals (from era 3) |  |
 | Car factory (era 4) | 12 cars | 60 steel (from era 2), 24 fuel (from era 2) |  |
 | Gun factory (era 3) | 60 guns | 30 steel (from era 2), 15 planks |  |
@@ -611,6 +611,7 @@ window (H) lists the same.
 | Juice works (1870) | 60 juice | 30 fruit, 30 glass, 15 plastics (from era 6) | 6 refined sugar (from 1800) |
 | Big juice works (1870) | 225 juice | 112.5 fruit, 112.5 glass, 56.25 plastics (from era 6) | 22.5 refined sugar (from 1800) |
 | Mega juice works (1870) | 843.8 juice | 421.9 fruit, 421.9 glass, 210.9 plastics (from era 6) | 84.38 refined sugar (from 1800) |
+| Cola bottling plant | 60 cola | 15 refined sugar (from 1800), 6 chemicals (from era 3), 3 coffee (from 1700) | 12 glass |
 | Big steel mill (era 2) | 300 steel | 375 iron ore, 750 coal (from 1700) |  |
 | Mega steel mill (era 2) | 750 steel | 937.5 iron ore, 1,875 coal (from 1700) |  |
 | Big potter | 62.5 pots | 31.25 clay |  |
@@ -641,8 +642,8 @@ window (H) lists the same.
 | Mega winery | 75 wine | 300 grapes | 150 barrels |
 | Big refinery (era 2) | 1,500 fuel | 1,500 oil (from era 2) |  |
 | Mega refinery (era 2) | 3,750 fuel | 3,750 oil (from era 2) |  |
-| Big chemical works (era 3) | 150 chemicals, 75 fertiliser | 75 salt, 75 boiler fuel |  |
-| Mega chemical works (era 3) | 375 chemicals, 187.5 fertiliser | 187.5 salt, 187.5 boiler fuel |  |
+| Big chemical works (era 3) | 150 chemicals, 75 fertiliser | 75 salt, 75 boiler fuel | 37.5 limestone |
+| Mega chemical works (era 3) | 375 chemicals, 187.5 fertiliser | 187.5 salt, 187.5 boiler fuel | 93.75 limestone |
 | Big electronics plant (era 6) | 75 electronics | 75 copper (from era 4), 75 chemicals (from era 3) |  |
 | Mega electronics plant (era 6) | 187.5 electronics | 187.5 copper (from era 4), 187.5 chemicals (from era 3) |  |
 | Big car factory (era 4) | 30 cars | 150 steel (from era 2), 60 fuel (from era 2) |  |
@@ -689,8 +690,8 @@ window (H) lists the same.
 | Carpet weaver (1700) | 3 luxury goods | 12 fibre |  |
 | Clock maker (1880) | 3 luxury goods | 6 copper (from era 4), 3 glass |  |
 | Mirror maker (1700) | 3 luxury goods | 6 glass, 0.3 gold |  |
-| Manor |  | 60 food, 6 heating, 6 wine, 2 luxury goods (from 1700) | 3 furniture |
-| Theatre |  | 6 clothes (from 1780), 3 glass, 3 paper (from 1150) | 3 wax |
+| Manor |  | 60 food, 6 heating, 6 wine, 2 luxury goods (from 1700) | 3 furniture, 3 cola (from food and drink demand 13) |
+| Theatre |  | 6 clothes (from 1780), 3 glass, 3 paper (from 1150) | 3 wax, 1 luxury goods (from 1700) |
 | Hospital (1850) |  | 30 food, 3 heating, 6 chemicals (from era 3), 3 glass | 6 wax |
 | Space center |  | 200 electronics (from era 6), 600 fuel (from era 2), 200 food |  |
 | Pear Company headquarters |  | 300 electronics (from era 6), 600 food |  |
@@ -702,7 +703,7 @@ window (H) lists the same.
 | Olympic stadium |  | 300 food | 120 beer, 120 newspapers (from 1600) |
 | Tavern |  | 14 alcohol | 12 food |
 | Department store (1950) |  | 12 clothes (from 1780), 12 shoes (from 1850), 3 porcelain, 6 appliances (from era 6) | 6 furniture |
-| Hotel (1900) |  | 50 food, 6 wine | 6 beer, 6 newspapers (from 1600) |
+| Hotel (1900) |  | 50 food, 6 wine | 6 beer, 6 newspapers (from 1600), 2 luxury goods (from 1700) |
 | Club (1900) |  | 50 alcohol | 3 chemicals (from era 3) |
 | Sushi hut |  | 40 fish, 40 rice | 6 soy sauce |
 | Builder's yard |  | 2 bricks, 2 cement (from era 3), 6 glass | 20 planks |
@@ -1249,7 +1250,7 @@ what buildings' shares cost show the marked-up prices.
 |---|---|
 | $10 or less | bread 10, chickens 10, logs 10, milk 10, potatoes 10, rice 10, wheat 10 |
 | $11-20 | apples 12, bananas 12, dates 12, eggs 12, fish 12, meat 12, oranges 12, sand 12, soybeans 12, sugar 12, tofu 12, clay 15, coal 15, dairy products 15, gas 15, limestone 15, miso 15, newspapers 15, planks 15, pots 15, wood chips 15, dried fish 20, honey 20 |
-| $21-40 | pigs 22, refined sugar 22, sausages 22, barrels 25, fertiliser 25, salt 25, sheep 25, cans 30, cattle 30, fuel 30, glass 30, grapes 30, hops 30, iron ore 30, juice 30, paper 30, soy sauce 30, wool 30, chemicals 40, cotton 40, flax 40, leather 40, oil 40, stove tiles 40 |
+| $21-40 | pigs 22, refined sugar 22, sausages 22, barrels 25, fertiliser 25, salt 25, sheep 25, cans 30, cattle 30, fuel 30, glass 30, grapes 30, hops 30, iron ore 30, juice 30, paper 30, soy sauce 30, wool 30, chemicals 40, cola 40, cotton 40, flax 40, leather 40, oil 40, stove tiles 40 |
 | $41-200 | copper 45, castings 50, wax 50, plastics 60, rubber 60, tea 60, coffee 80, beer 100, furniture 100, porcelain 100, clothes 110, steel 130, sake 150, shoes 150, bricks 170, electronics 200, goods 200, vodka 200 |
 | over $200 | cement 250, guns 250, tools 250, wine 250, machinery 300, appliances 500, incense 500, luxury goods 500, gold 1,300, diamonds 3,000, cars 8,000, tanks 1.3e+04, planes 1.9e+04 |
 <!-- end table -->

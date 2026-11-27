@@ -122,6 +122,7 @@ class Good(Keyed):
     SAUSAGES = "sausages"
     LUXURIES = "luxury goods"
     JUICE = "juice"
+    COLA = "cola"
     PASSENGERS = "passengers"
     MAIL = "mail"
 
@@ -214,6 +215,7 @@ class Need(Keyed):
     CANS = "cans"
     WOOL = "wool"
     JUICE = "juice"
+    COLA = "cola"
     COTTON = "cotton"
     FLAX = "flax"
     TEA = "tea"
@@ -380,6 +382,7 @@ KIND_BOOST_MOST: Mapping[tuple[BuildingKind, Need], float] = MappingProxyType(
         (BuildingKind.MINE, Need.MACHINERY): 0.5,
         (BuildingKind.IRON_MINE, Need.MACHINERY): 0.5,
         (BuildingKind.FARM, Need.FERTILISER): 0.5,
+        (BuildingKind.PIG_FARM, Need.POTATOES): 0.5,
     }
 )
 # Boosts only the buildings the player controls take, once their tile opens them
@@ -392,9 +395,12 @@ OWNED_BOOSTS: Mapping[tuple[BuildingKind, Need], float] = MappingProxyType(
     }
 )
 
+# The year potatoes come to Europe, and pig farms are fed them (railroads.sim.ladders.POTATO_FARMS).
+POTATO_YEAR = 1600
 KIND_NEED_YEARS: Mapping[tuple[BuildingKind, Need], int] = MappingProxyType(
     {
         **{(kind, Need.FUEL): year for kind, (_, year) in DIESEL_USERS.items() if year},
+        (BuildingKind.PIG_FARM, Need.POTATOES): POTATO_YEAR,
     }
 )
 
@@ -457,6 +463,7 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.CASTINGS: 50,
         Good.SAUSAGES: 22,
         Good.JUICE: 30,
+        Good.COLA: 40,
         Good.LUXURIES: 500,
         Good.SHEEP: 25,
         Good.MEAT: 12,
@@ -543,6 +550,10 @@ TRAVELLERS = (Good.PASSENGERS, Good.MAIL)
 # How much more a building makes with all of what boosts it (boosts_of): its share of its boosts
 # times this, unless its recipe says otherwise.
 BOOST_MOST = 1.0
+# Factories pack what they make in paper once the mail and press tile opens it for them
+# (railroads.sim.tiles.UNLOCKS), and make up to PACKAGING_MOST more for it.
+PACKAGING: Mapping[Need, float] = MappingProxyType({Need.PAPER: 0.1})
+PACKAGING_MOST = 0.5
 # Furniture makers polish and shoe works blacken with wax, which makes them make up to this
 # much more.
 WAX_BOOST = 0.25
@@ -680,12 +691,33 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
                 swaps={Need.GLASS: (Need.PLASTICS, 2.0)},
                 boost_most=0.5,
             ),
-            BuildingKind.FACTORY: Recipe(Good.GOODS, 20, {Need.PLANKS: 1 / 3, Need.STEEL: 1 / 3}),
+            BuildingKind.COLA_BOTTLER: Recipe(
+                Good.COLA,
+                60,
+                {Need.REFINED_SUGAR: 0.25, Need.CHEMICALS: 0.1, Need.COFFEE: 0.05},
+                {Need.GLASS: 0.2},
+                boost_most=0.5,
+            ),
+            BuildingKind.FACTORY: Recipe(
+                Good.GOODS,
+                20,
+                {Need.PLANKS: 1 / 3, Need.STEEL: 1 / 3},
+                PACKAGING,
+                boost_most=PACKAGING_MOST,
+            ),
             BuildingKind.BIG_FACTORY: Recipe(
-                Good.GOODS, 60, {Need.STEEL: 1 / 3, Need.COPPER: 1 / 3}
+                Good.GOODS,
+                60,
+                {Need.STEEL: 1 / 3, Need.COPPER: 1 / 3},
+                PACKAGING,
+                boost_most=PACKAGING_MOST,
             ),
             BuildingKind.MEGA_FACTORY: Recipe(
-                Good.GOODS, 170, {Need.STEEL: 1 / 3, Need.COPPER: 1 / 6, Need.MACHINERY: 1 / 6}
+                Good.GOODS,
+                170,
+                {Need.STEEL: 1 / 3, Need.COPPER: 1 / 6, Need.MACHINERY: 1 / 6},
+                PACKAGING,
+                boost_most=PACKAGING_MOST,
             ),
             BuildingKind.SHIPYARD: Recipe(Good.GOODS, 20, {Need.STEEL: 2 / 3, Need.PLANKS: 1 / 3}),
             BuildingKind.TEXTILE_MILL: Recipe(Good.CLOTHES, 25, {Need.FIBRE: 2.5}),
@@ -700,6 +732,8 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
                 Good.CHEMICALS,
                 60,
                 {Need.SALT: 0.5, Need.BOILER_FUEL: 0.5},
+                {Need.LIMESTONE: 0.25},
+                boost_most=0.5,
                 also={Good.FERTILISER: 0.5},
             ),
             BuildingKind.ELECTRONICS_PLANT: Recipe(
@@ -849,6 +883,9 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.GLASS: 0.12,
             Need.LIMESTONE: 0.3,
             Need.WAX: 0.3,
+            Need.COLA: 0.6,
+            Need.CARS: 0.05,
+            Need.APPLIANCES: 0.1,
         },
         BuildingKind.MANOR: {
             Need.FOOD: 60,
@@ -856,8 +893,15 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.WINE: 6,
             Need.FURNITURE: 3,
             Need.LUXURIES: 2,
+            Need.COLA: 3,
         },
-        BuildingKind.THEATRE: {Need.CLOTHES: 6, Need.GLASS: 3, Need.PAPER: 3, Need.WAX: 3},
+        BuildingKind.THEATRE: {
+            Need.CLOTHES: 6,
+            Need.GLASS: 3,
+            Need.PAPER: 3,
+            Need.WAX: 3,
+            Need.LUXURIES: 1,
+        },
         BuildingKind.HOSPITAL: {
             Need.FOOD: 30,
             Need.HEATING: 3,
@@ -884,6 +928,10 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.LIMESTONE: 6,
             Need.LUXURIES: 0.6,
             Need.WAX: 3,
+            Need.FURNITURE: 2,
+            Need.COLA: 6,
+            Need.CARS: 0.3,
+            Need.APPLIANCES: 0.5,
         },
         BuildingKind.FLATS: {
             Need.FOOD: 250,
@@ -905,6 +953,8 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.REFINED_SUGAR: 20,
             Need.HEATING: 50,
             Need.LUXURIES: 3,
+            Need.FURNITURE: 12,
+            Need.COLA: 30,
         },
         BuildingKind.SKYSCRAPER: {
             Need.GOODS: 20,
@@ -956,7 +1006,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.AMUSEMENT_PARK: {Need.FOOD: 120, Need.BEER: 60, Need.FUEL: 30},
         BuildingKind.OLYMPIC_STADIUM: {Need.FOOD: 300, Need.BEER: 120, Need.NEWSPAPERS: 120},
         BuildingKind.CATTLE_RANCH: {Need.WHEAT: 70},
-        BuildingKind.PIG_FARM: {Need.WHEAT: 40},
+        BuildingKind.PIG_FARM: {Need.WHEAT: 40, Need.POTATOES: 20},
         BuildingKind.CHICKEN_FARM: {Need.WHEAT: 20},
         BuildingKind.SHEEP_FARM: {Need.WHEAT: 60, Need.MACHINERY: 3},
         BuildingKind.TAVERN: {Need.ALCOHOL: 14, Need.FOOD: 12},
@@ -975,7 +1025,13 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.PORCELAIN: 3,
             Need.APPLIANCES: 6,
         },
-        BuildingKind.HOTEL: {Need.FOOD: 50, Need.WINE: 6, Need.BEER: 6, Need.NEWSPAPERS: 6},
+        BuildingKind.HOTEL: {
+            Need.FOOD: 50,
+            Need.WINE: 6,
+            Need.BEER: 6,
+            Need.NEWSPAPERS: 6,
+            Need.LUXURIES: 2,
+        },
         BuildingKind.JEWELLER: {Need.GOLD: 12, Need.DIAMONDS: 6},
         BuildingKind.CAR_DEALER: {Need.CARS: 12, Need.RUBBER: 6},
         BuildingKind.OUTPOST: {Need.GUNS: 35, Need.CARS: 20},
@@ -1128,6 +1184,8 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.FRUIT,
     BuildingKind.FOOD_PLANT,
     BuildingKind.JUICE_WORKS,
+    BuildingKind.COLA_BOTTLER,
+    Need.COLA,
     Need.FOOD,
     BuildingKind.FACTORY,
     BuildingKind.BIG_FACTORY,
@@ -1146,7 +1204,7 @@ PIPELINE: tuple[Need | BuildingKind, ...] = tuple(
 
 
 # Needs buildings can do without but that raise their satisfaction: every special resource
-# (railroads.mapgen.deposits), beer, newspapers and furniture, the wheat animals are fed and the
+# (railroads.mapgen.deposits), beer, newspapers, furniture and cola, the wheat animals are fed and the
 # planks mines prop their shafts with. Wool, cotton and fish meet
 # needs that ordinary goods meet too (fibre and food), so those stay demands.
 BONUS_NEEDS = frozenset(
@@ -1166,6 +1224,7 @@ BONUS_NEEDS = frozenset(
         Need.BEER,
         Need.NEWSPAPERS,
         Need.FURNITURE,
+        Need.COLA,
         Need.WHEAT,
         Need.PLANKS,
         Need.LIMESTONE,
@@ -1208,11 +1267,13 @@ VENUE_BONUSES: Mapping[BuildingKind, frozenset[Need]] = MappingProxyType(
 )
 
 # Needs only some kinds of building take as a bonus: theatres and palaces light candles, which
-# churches must have, and hospitals make salves and dressings with wax.
+# churches must have, and hospitals make salves and dressings with wax; hotels and theatres
+# take luxury goods.
 KIND_BONUSES: Mapping[BuildingKind, frozenset[Need]] = MappingProxyType(
     {
-        BuildingKind.THEATRE: frozenset({Need.WAX}),
+        BuildingKind.THEATRE: frozenset({Need.WAX, Need.LUXURIES}),
         BuildingKind.ROYAL_PALACE: frozenset({Need.WAX}),
         BuildingKind.HOSPITAL: frozenset({Need.WAX}),
+        BuildingKind.HOTEL: frozenset({Need.LUXURIES}),
     }
 )
