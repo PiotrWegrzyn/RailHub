@@ -1,7 +1,7 @@
 """The goods tab of the search window and the goods lens: where a good is made and where it is
 wanted, from the last month of trade (railroads.sim.goods_map). The tab lists every good with what
-was left over and short of on the map; picking one tints the land by it, its makers in amber and
-its buyers in blue, by the gaps (what was left that nothing took, and what buyers were short of)
+was left over and short of on the map; picking one tints the land by it, its makers in purple and
+its buyers in red, by the gaps (what was left that nothing took, and what buyers were short of)
 or by the whole amounts made and wanted, and lists the biggest of each to step to. A cell's
 details then show what its buildings made, wanted and got of it, and from where."""
 
@@ -34,8 +34,8 @@ ROW_ICON = 16.0
 FOOTER_HEIGHT = 230.0
 # The colours of a good's makers and of its buyers on the lens, and how clear the least and the
 # most of either are, by a logarithmic scale over SCALE_SPAN down from the most on the map.
-MAKERS = (1.0, 0.68, 0.12)
-BUYERS = (0.25, 0.55, 1.0)
+MAKERS = (0.72, 0.36, 0.95)
+BUYERS = (0.95, 0.18, 0.16)
 LEAST_ALPHA = 0.15
 MOST_ALPHA = 0.75
 SCALE_SPAN = 100.0

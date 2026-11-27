@@ -353,28 +353,28 @@ class BuildMenu:
         self._draw_bridge_picker()
 
     def _draw_bridge_picker(self) -> None:
-        """The kind of bridge the track tool builds: Auto, or one that can be built yet; those
-        still to come show what brings them."""
+        """The kind of bridge the track tool builds, a button like the bar's others opening a list
+        of Auto and every kind, those not built yet greyed out (their tips say what brings them)."""
         if self.bridge is not None and self.bridge not in self.bridges_open:
             self.pick_bridge(None)
         shown = "Auto" if self.bridge is None else BRIDGES[self.bridge].name.capitalize()
-        imgui.set_next_item_width(130)
-        opened = imgui.begin_combo("##bridge", f"Bridge: {shown}")
-        tip(AUTO_BRIDGE_TIP if self.bridge is None else bridge_tip(self.bridge))
-        if opened:
+        picking = imgui.is_popup_open("##bridges")
+        tooltip = AUTO_BRIDGE_TIP if self.bridge is None else bridge_tip(self.bridge)
+        label = f"{fa.ICON_FA_ROAD}  Bridge: {shown}"
+        if toggle_button(label, picking, tooltip, (0, BUTTON_HEIGHT)):
+            imgui.open_popup("##bridges")
+        if imgui.begin_popup("##bridges"):
             if imgui.selectable("Auto", self.bridge is None)[0]:
                 self.pick_bridge(None)
             tip(AUTO_BRIDGE_TIP)
             for bridge in Bridge:
                 can = bridge in self.bridges_open
-                label = BRIDGES[bridge].name.capitalize()
-                if not can:
-                    label += f"  ({bridge_opened_from(bridge)})"
                 flags = 0 if can else imgui.SelectableFlags_.disabled.value
-                if imgui.selectable(f"{label}##{bridge.name}", self.bridge == bridge, flags)[0]:
+                name = BRIDGES[bridge].name.capitalize()
+                if imgui.selectable(f"{name}##{bridge.name}", self.bridge == bridge, flags)[0]:
                     self.pick_bridge(bridge)
                 tip(bridge_tip(bridge), disabled=True)
-            imgui.end_combo()
+            imgui.end_popup()
         imgui.same_line()
 
     def pick_bridge(self, bridge: Bridge | None) -> None:

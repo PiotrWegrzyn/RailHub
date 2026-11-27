@@ -120,7 +120,7 @@ def test_houses_nobody_serves_leave_the_base_chance_raised_by_the_people_around(
     chances = Growth(constructions, NO_TRADE).chances(TOWNS)
 
     for cell, people in (((5, 5), 2), (neighbour, 2), ((5, 8), 0), ((8, 3), 18)):
-        drawn = CHANCE_UNIT * TOWNS.base * (1 + np.log2(1 + 6 * people))
+        drawn = CHANCE_UNIT * TOWNS.base * (1 + np.log2(1 + 7 * people))
         assert chances[cell] == pytest.approx(drawn)
 
 
@@ -615,7 +615,7 @@ def test_served_buildings_add_their_points_by_the_share_they_are_served_to_their
 
     chances = growth.chances(TOWNS)
     base = CHANCE_UNIT * TOWNS.base
-    raised = (base + CHANCE_UNIT * TOWNS.per_doubling * multiplier * 4) * np.log2(1 + 6 * 4)
+    raised = (base + CHANCE_UNIT * TOWNS.per_doubling * multiplier * 4) * np.log2(1 + 7 * 4)
     assert chances[5, 5] == pytest.approx(base + raised)
     assert chances[neighbour] == pytest.approx(neighbour_before)
 
@@ -646,7 +646,7 @@ def test_a_served_house_breeds_faster_the_more_people_live_around_it(around: int
     growth._count_served(houses_trade(tile_map, (5, 5), 2.0, 2.0))
 
     base = CHANCE_UNIT * TOWNS.base
-    raised = (base + CHANCE_UNIT * TOWNS.per_doubling) * np.log2(1 + 6 * (1 + around))
+    raised = (base + CHANCE_UNIT * TOWNS.per_doubling) * np.log2(1 + 7 * (1 + around))
     assert growth.chances(TOWNS)[5, 5] == pytest.approx(base + raised)
 
 

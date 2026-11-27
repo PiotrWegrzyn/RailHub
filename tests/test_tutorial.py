@@ -22,6 +22,7 @@ from railroads.sim.reach import LOCAL_REACH
 from railroads.sim.schedules import Schedule
 from railroads.sim.steps import finish
 from railroads.sim.tilemap import LAYERS
+from railroads.sim.tiles import activate
 from railroads.sim.trade import BONUS_PER_GOOD, SCARCE_WORTH
 from railroads.sim.trains import Stop, Train
 from railroads.tutorial.game import make_tutorial
@@ -122,6 +123,7 @@ def test_the_tutorial_plays_its_first_year_the_same_every_time() -> None:
     first, second = make_tutorial(), make_tutorial()
 
     for saved in (first, second):
+        activate(saved.game.railway.tiles)
         for _ in range(12):
             saved.game.month(saved.rng)
 

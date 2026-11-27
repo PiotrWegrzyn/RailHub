@@ -2,9 +2,11 @@
 
 Each month a forest cell may be cleared, by chance: CLEARING_PER_POINT for every population or
 industry point in its neighbourhood (the cell and the cells next to it), and CLEARING_PER_MILL,
-seventy-five times as much, for every logging camp there. Open grassland may turn to forest, by
-SPREAD_PER_FOREST for every forest cell next to it, where nothing is built. A logging camp with
-fewer than MILLS_CLOSE_BELOW forest cells in its neighbourhood closes. POPULATION_PER_CLEARING_POINT
+110 times as much, for every logging camp there, so a camp among four to seven forest cells clears
+one every five to ten years. Open grassland may turn to forest, by SPREAD_PER_FOREST for every
+forest cell next to it, where nothing is built. A logging camp with fewer than MILLS_CLOSE_BELOW
+forest cells in its neighbourhood closes, and another comes up in the nearest cell one could go
+up in (Growth.fits), picked at random among those as near. POPULATION_PER_CLEARING_POINT
 population points clear a forest as fast as one point of industry.
 """
 
@@ -23,9 +25,11 @@ if TYPE_CHECKING:
     from railroads.sim.growth import Growth
 
 CLEARING_PER_POINT = 0.00002
-CLEARING_PER_MILL = 75 * CLEARING_PER_POINT
+CLEARING_PER_MILL = 110 * CLEARING_PER_POINT
 SPREAD_PER_FOREST = 0.00004
 MILLS_CLOSE_BELOW = 3
+# How far from a closed logging camp the next one is looked for, in cells.
+NEXT_CAMP_STEPS = 12
 POPULATION_PER_CLEARING_POINT = 4
 
 
@@ -117,10 +121,40 @@ def change_forests(
         mills = np.flatnonzero(count)
         forests = forests_nearby(tile_map, near, mills)
         closing = mills[forests < rule.mills_close_below]
+        closed = []
         for row, col in (divmod(int(index), cols) for index in closing):
             for _ in range(int(count[row, col])):
                 mill = Building((row, col), BuildingKind.LOGGING_CAMP)
                 growth.take_down(mill)
+                closed.append((row, col))
             changed.add((row, col))
+        growth.reweigh_land(changed_cells)
+        for cell in closed:
+            changed |= _next_camp(growth, cell, rng)
+        return changed
     growth.reweigh_land(changed_cells)
     return changed
+
+
+def _next_camp(growth: Growth, closed: Cell, rng: np.random.Generator) -> set[Cell]:
+    """Puts up a logging camp in place of one closed in a cell: in the nearest cell one could go
+    up in, picked at random among those as near; returns the cell, if it found one."""
+    ladder = next(
+        (ladder for ladder in growth.rule.ladders if ladder.kinds[0] == BuildingKind.LOGGING_CAMP),
+        None,
+    )
+    if ladder is None:
+        return set()
+    weights = growth.land_weights(ladder)
+    cols = growth.grid.cols
+    by_steps: dict[int, list[Cell]] = {}
+    for cell, steps in growth.grid.within(closed, NEXT_CAMP_STEPS).items():
+        if steps and weights[cell[0] * cols + cell[1]] > 0:
+            by_steps.setdefault(steps, []).append(cell)
+    for steps in sorted(by_steps):
+        cells = [cell for cell in by_steps[steps] if growth.fits(ladder, cell)]
+        if cells:
+            cell = cells[int(rng.integers(len(cells)))]
+            growth.build(Building(cell, BuildingKind.LOGGING_CAMP))
+            return {cell}
+    return set()

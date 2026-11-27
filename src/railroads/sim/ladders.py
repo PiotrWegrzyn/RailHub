@@ -255,7 +255,7 @@ FACTORY_LAND = Land(
 TOWNS = Ladder(
     kinds=(BuildingKind.HOUSE, BuildingKind.TENEMENT, BuildingKind.FLATS),
     land=TOWN_LAND,
-    base=16,
+    base=20,
     per_doubling=840,
     merges={
         BuildingKind.HOUSE: Merge(needed=6, pulled_down=6),
@@ -368,8 +368,9 @@ MINES = Ladder(
 )
 
 # Logging camps stand in forests with at least four forest cells around them and flat open land
-# beside them, best by a river to float the logs and near towns to buy them. They clear the forest
-# around them (railroads.sim.forests) and close once it is gone.
+# beside them, the likelier the more of the neighbourhood is forest, best by a river to float the
+# logs and near towns to buy them. They clear the forest around them (railroads.sim.forests) and
+# close once it is gone, another coming up in the nearest cell that suits one.
 LOGGING_CAMPS = Ladder(
     kinds=(BuildingKind.LOGGING_CAMP,),
     land=Land(
@@ -379,8 +380,9 @@ LOGGING_CAMPS = Ladder(
         water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.2, Terrain.SEA: 1.0},
         forest_edge=True,
         least_forest_nearby=4,
+        forest_share=True,
     ),
-    base=234,
+    base=468,
     most_per_cell=1,
     most_nearby=3,
 )
@@ -447,7 +449,7 @@ FOOD_PLANTS = _merges(
     )
 )
 
-# Steel mills make steel from iron ore and coal, near mines and among other industry, five times
+# Steel mills make steel from iron ore and coal, near mines and among other industry, four times
 # as often as they once did, as nearly everything wants steel.
 STEEL_MILLS = _merges(
     Ladder(
@@ -457,7 +459,7 @@ STEEL_MILLS = _merges(
             relief={Relief.HILLS: 0.8, Relief.MOUNTAINS: 0.0},
             water={Terrain.RIVER: 1.5, Terrain.LAKE: 1.2, Terrain.SEA: 1.2},
         ),
-        base=20,
+        base=16,
     )
 )
 

@@ -19,13 +19,24 @@ from railroads.ui.hex_rows import (
 )
 from railroads.ui.ornate import badge, bar, card, section
 from railroads.ui.spotlight import spot
-from railroads.ui.theme import BRASS, GONE, GROWN, TEXT_DIM, colored, good_amount, tip
+from railroads.ui.theme import (
+    BRASS,
+    GONE,
+    GROWN,
+    ICON_SIZE,
+    TEXT_DIM,
+    colored,
+    good_amount,
+    next_good_slot,
+    tip,
+)
 from railroads.words import dollars
 
 # Where the goods of a card's lines start, after their labels.
 CARD_LABEL = 56.0
-# How wide the bar after each good on a card's line is.
+# How wide the bar after each good on a card's line is, and the gap between goods.
 FLOW_BAR = 36.0
+SLOT_GAP = 14.0
 
 
 def draw_hex_details(details: HexDetails) -> BuildingKind | None:
@@ -118,17 +129,29 @@ def _draw_card_inside(row: BuildingRow) -> bool:
 
 
 def _draw_line(label: str, flows: list[Flow], meaning: str) -> None:
-    """A line of a card: what it is about, then each good's icon, how it went and a bar of it."""
+    """A line of a card: what it is about, then each good's icon, how it went and a bar of it,
+    in as many rows of equal slots as the card's width takes, as a station's goods are."""
     imgui.text_disabled(label)
     tip(f"Last month: {meaning}")
+    imgui.same_line(CARD_LABEL)
     if not flows:
-        imgui.same_line(CARD_LABEL)
         imgui.text_disabled("-")
+        return
+    widest = max(imgui.calc_text_size(flow.text).x for flow in flows)
+    slot = ICON_SIZE + 3 + widest + 6 + FLOW_BAR
+    per_row = max(1, int((imgui.get_content_region_avail().x + SLOT_GAP) // (slot + SLOT_GAP)))
+    left = imgui.get_cursor_pos_x()
     for index, flow in enumerate(flows):
-        imgui.same_line(CARD_LABEL if not index else 0, 0 if not index else 14)
+        next_good_slot(index, left, per_row, SLOT_GAP)
+        imgui.begin_group()
         good_amount(flow.good, flow.text)
         imgui.same_line(0, 6)
+        pad = widest - imgui.calc_text_size(flow.text).x
+        if pad > 0:
+            imgui.dummy((pad, 1))
+            imgui.same_line(0, 0)
         bar(flow.done / flow.wanted if flow.wanted > 0 else 0.0, BRASS, FLOW_BAR, 4.0)
+        imgui.end_group()
 
 
 def mood_colour(row: BuildingRow) -> tuple[float, float, float, float]:

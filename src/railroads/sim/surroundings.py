@@ -35,6 +35,8 @@ class Land:
     forest_edge: bool = False
     # Only where the neighbourhood holds at least this many forest cells.
     least_forest_nearby: int = 0
+    # Weighed by the share of the neighbourhood in forest, so the more forest the likelier.
+    forest_share: bool = False
     # Only on cells over this deposit (railroads.mapgen.deposits).
     deposit: Deposit | None = None
     # Only within this many degrees of the equator, north or south.
@@ -53,7 +55,7 @@ class Land:
     @property
     def on_forest_nearby(self) -> bool:
         """Whether a cell's weight changes with the forests around it, not just its own."""
-        return self.forest_edge or self.least_forest_nearby > 0
+        return self.forest_edge or self.least_forest_nearby > 0 or self.forest_share
 
     @property
     def _dry(self) -> float:
@@ -109,6 +111,8 @@ class Land:
             weight = weight * around.beside_open_flat
         if self.least_forest_nearby:
             weight = weight * (around.forests >= self.least_forest_nearby)
+        if self.forest_share:
+            weight = weight * around.forests / (around.around.shape[0] + 1)
         if self.deposit is not None:
             deposits = around.deposits
             on_it = deposits is not None and deposits == self.deposit

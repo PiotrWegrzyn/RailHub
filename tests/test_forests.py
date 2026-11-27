@@ -55,7 +55,7 @@ def test_people_and_industry_clear_the_forest_around_them() -> None:
     assert grown.size == 0
 
 
-def test_a_logging_camp_clears_forest_seventy_five_times_faster_than_a_house() -> None:
+def test_a_logging_camp_clears_forest_110_times_faster_than_a_house() -> None:
     tile_map = make_map(40)
     tile_map.set_vegetation(np.arange(40 * 40), Vegetation.FOREST)
     ones = np.ones(40 * 40, dtype=np.int64)
@@ -65,7 +65,7 @@ def test_a_logging_camp_clears_forest_seventy_five_times_faster_than_a_house() -
     by_mills, _ = forest_turn(tile_map, near(tile_map), ones * 0, ones, FORESTS, 100, rng)
 
     assert by_people.size < 15
-    assert 150 < by_mills.size < 300
+    assert 240 < by_mills.size < 420
 
 
 def test_forest_spreads_onto_grass_beside_it_but_not_onto_barren_land() -> None:
@@ -97,6 +97,37 @@ def test_a_logging_camp_left_with_too_little_forest_closes() -> None:
     assert (5, 2) in changed
     assert tile_map.vegetation[5, 2] == Vegetation.GRASS
     assert (5, 2) in growth.forests_changed
+
+
+def test_a_closed_logging_camp_comes_up_again_in_the_nearest_cell_that_suits_one() -> None:
+    tile_map = make_map()
+    constructions = Constructions(tile_map)
+    constructions.build(Building((5, 2), BuildingKind.LOGGING_CAMP))
+    growth = Growth(
+        constructions, GrowthRule(trades=False, ladders=(LOGGING_CAMPS,), forests=STILL)
+    )
+    clearing = ForestRule(clearing_per_mill=1.0, spread_per_forest=0.0)
+
+    changed = change_forests(growth, clearing, 1, np.random.default_rng(0))
+
+    camps = [tuple(cell) for cell in np.argwhere(growth.count(BuildingKind.LOGGING_CAMP) > 0)]
+    assert len(camps) == 1
+    camp = (int(camps[0][0]), int(camps[0][1]))
+    assert camp != (5, 2)
+    assert camp in changed
+    assert tile_map.vegetation[camp] == Vegetation.FOREST
+    assert growth.grid.within((5, 2), 3).get(camp) is not None
+
+
+def test_logging_camps_are_likelier_the_more_forest_is_around() -> None:
+    tile_map = make_map()
+    growth = Growth(Constructions(tile_map), GrowthRule(trades=False, ladders=(LOGGING_CAMPS,)))
+
+    land = growth.land_weights(LOGGING_CAMPS).reshape(tile_map.grid.shape)
+
+    assert land[5, 2] > 0
+    assert land[2, 4] > 0
+    assert land[5, 2] > land[2, 2]
 
 
 def test_forest_never_spreads_onto_built_cells() -> None:

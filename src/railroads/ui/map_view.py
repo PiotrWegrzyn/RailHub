@@ -1014,7 +1014,7 @@ class MapView:
             text = with_legend(text, TOWNS_LEGEND)
         elif (good := self._goods_lens()) is not None:
             text = with_legend(
-                text, f"Goods: where {good.value} is made (amber) and wanted (blue)."
+                text, f"Goods: where {good.value} is made (purple) and wanted (red)."
             )
         elif (ladder := self._growth_lens()) is not None:
             text = with_legend(text, f"Growth: the chance of a {ladder.name} a year.")

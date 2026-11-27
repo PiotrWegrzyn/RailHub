@@ -38,8 +38,6 @@ from railroads.ui.theme import (
 )
 
 WINDOW_SIZE = (380.0, 520.0)
-# Beside a cell's details, which open at SIDE_WINDOW_POS, so right-clicking cells leaves it seen.
-GROWTH_WINDOW_POS = (SIDE_WINDOW_POS[0] + 468.0, SIDE_WINDOW_POS[1])
 ROW_HEIGHT = 22.0
 FOOTER_HEIGHT = 150.0
 # The lens's scale runs from the likeliest cell's chance down this many times lower.
@@ -175,7 +173,7 @@ class GrowthWindow:
         kind is picked."""
         if not self.open:
             return
-        imgui.set_next_window_pos(GROWTH_WINDOW_POS, imgui.Cond_.first_use_ever.value)
+        imgui.set_next_window_pos(SIDE_WINDOW_POS, imgui.Cond_.first_use_ever.value)
         imgui.set_next_window_size(WINDOW_SIZE, imgui.Cond_.first_use_ever.value)
         expanded, still_open = begin_ornate(f"{fa.ICON_FA_LEAF}  Growth###growth")
         if expanded:

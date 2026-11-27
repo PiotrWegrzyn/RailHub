@@ -46,7 +46,7 @@ SOCIAL = {Points.POPULATION: 2.0}
 
 DRAWN_BY: Mapping[Points, Mapping[Points, float]] = MappingProxyType(
     {
-        Points.POPULATION: {Points.POPULATION: 6.0, Points.INDUSTRY: 2.0},
+        Points.POPULATION: {Points.POPULATION: 7.0, Points.INDUSTRY: 2.0},
         Points.FOOD: {Points.FOOD: 1.0, Points.POPULATION: 1.0},
         Points.ORE: INDUSTRIAL,
         Points.TIMBER: INDUSTRIAL,
@@ -60,15 +60,31 @@ DRAWN_BY: Mapping[Points, Mapping[Points, float]] = MappingProxyType(
 )
 
 
+# The farms that raise animals, which draw butchers as strongly as the people around do, each
+# point of them ANIMALS_DRAW times.
+ANIMAL_FARMS = (
+    BuildingKind.CATTLE_RANCH,
+    BuildingKind.PIG_FARM,
+    BuildingKind.CHICKEN_FARM,
+    BuildingKind.SHEEP_FARM,
+)
+ANIMALS_DRAW = 2.0
+
+
 # Kinds drawn by other points than the rest of their kind of points (refineries by the oil wells
-# and mines and the ports around them), and kinds that keep away
+# and mines and the ports around them, butchers by people and the animal farms), and kinds that
+# keep away
 # from some: their whole chance is divided by one plus the points they shun around them, each
 # times its weight, so heavy works stay out of towns.
-DRAWN_BY_KIND: Mapping[BuildingKind, Mapping[Points, float]] = MappingProxyType(
+DRAWN_BY_KIND: Mapping[BuildingKind, Mapping[Channel, float]] = MappingProxyType(
     {
         BuildingKind.REFINERY: {Points.ORE: 1.0, Points.TRADE: 2.0},
         BuildingKind.FACTORY: {Points.POPULATION: 1.0, Points.INDUSTRY: 1.5},
         BuildingKind.BAKERY: {Points.POPULATION: 1.0},
+        BuildingKind.MEAT_FACTORY: {
+            Points.POPULATION: 1.0,
+            **dict.fromkeys(ANIMAL_FARMS, ANIMALS_DRAW),
+        },
         BuildingKind.SAUSAGE_MAKER: {Points.POPULATION: 1.0},
         BuildingKind.CHEMICAL_WORKS: {Points.INDUSTRY: 1.5},
         BuildingKind.CEMENT_WORKS: {Points.INDUSTRY: 1.5},
@@ -138,15 +154,24 @@ def breeding_of(ladder: Ladder, points: Mapping[BuildingKind, tuple[Points, int]
 
 
 def kind_channels(rule: GrowthRule) -> dict[BuildingKind, BuildingKind]:
-    """Every kind on a ladder whose chances follow the points of its own ladder, to the first
-    kind of that ladder."""
+    """Every kind on a ladder whose points some ladder's chances follow apart from the rest of
+    their kind of points, its own or another's (DRAWN_BY_KIND), to the first kind of that
+    ladder; a kind followed whose ladder does not grow here, to itself."""
     channels: dict[BuildingKind, BuildingKind] = {}
+    breedings = [breeding_of(ladder, rule.points) for ladder in rule.ladders]
+    followed = {
+        channel
+        for breeding in breedings
+        for channel in (*breeding.drawn_by, *breeding.served_by)
+        if isinstance(channel, BuildingKind)
+    }
     for ladder in rule.ladders:
-        breeding = breeding_of(ladder, rule.points)
         first = ladder.kinds[0]
-        if first in breeding.drawn_by or first in breeding.served_by:
+        if first in followed:
             for kind in ladder.kinds:
                 channels[kind] = first
+    for kind in followed:
+        channels.setdefault(kind, kind)
     return channels
 
 

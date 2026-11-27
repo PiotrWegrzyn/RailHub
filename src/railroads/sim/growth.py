@@ -1110,14 +1110,14 @@ class Growth:
             )
         for index in drawn.tolist():
             cell = divmod(index, self._grid.cols)
-            if self._fits(ladder, cell):
+            if self.fits(ladder, cell):
                 return cell
         if ladder.kinds[0] not in KEY_BUILDINGS:
             return None
         anywhere = place.cells if place.cells.size else self._open_cells()
         for index in rng.choice(anywhere, min(ANYWHERE_TRIED, anywhere.size), replace=False):
             cell = divmod(int(index), self._grid.cols)
-            if self.constructions.tile_map.terrain[cell] == Terrain.LAND and self._fits(
+            if self.constructions.tile_map.terrain[cell] == Terrain.LAND and self.fits(
                 ladder, cell
             ):
                 return cell
@@ -1130,7 +1130,7 @@ class Growth:
             return np.arange(self._grid.rows * self._grid.cols)
         return np.flatnonzero(~locked)
 
-    def _fits(self, ladder: Ladder, cell: Cell) -> bool:
+    def fits(self, ladder: Ladder, cell: Cell) -> bool:
         """Whether one more of a ladder's first kind can go up in a cell as it stands."""
         new = Building(cell, ladder.kinds[0])
         return (

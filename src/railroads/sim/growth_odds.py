@@ -202,6 +202,8 @@ def _land_reason(rule: str, land: Land, around: Surroundings) -> str:
         case "deposit":
             assert land.deposit is not None
             return f"Only over {land.deposit.name.lower()} deposits."
+        case "forest_share":
+            return "Only among forest."
         case "most_latitude":
             return f"Only within {land.most_latitude:g}° of the equator."
         case _:
