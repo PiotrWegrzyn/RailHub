@@ -4,7 +4,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 from railroads.ui.pixel.projection import RGB, Point
 
@@ -193,6 +193,25 @@ class Painter:
             [(-half_width + 1, -half_height), (half_width + reach, half_height + 1)]
         )
         ImageDraw.Draw(overlay).ellipse((x0, y0, x1, y1), fill=SHADOW)
+        self.image.alpha_composite(overlay)
+
+    def soft(
+        self,
+        blobs: list[tuple[float, float, float, float]],
+        fill: RGB,
+        alpha: float,
+        blur: float,
+    ) -> None:
+        """Patches of `fill` over the ellipses `blobs` (left, top, right, bottom), `alpha` opaque
+        and softened `blur` units at their rims, so the ground under the sprite shows through them
+        and they melt into it."""
+        mask = Image.new("L", self.image.size, 0)
+        draw = ImageDraw.Draw(mask)
+        for left, top, right, bottom in blobs:
+            (x0, y0), (x1, y1) = self._at([(left, top), (right, bottom)])
+            draw.ellipse((x0, y0, x1, y1), fill=round(255 * alpha))
+        overlay = Image.new("RGBA", self.image.size, fill)
+        overlay.putalpha(mask.filter(ImageFilter.GaussianBlur(blur * self._k)))
         self.image.alpha_composite(overlay)
 
     def box(

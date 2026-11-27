@@ -196,6 +196,8 @@ HOME_SCALE = 0.413
 
 # A farm's barn and an orchard's cottage stand a touch bigger than a house.
 FARMSTEADS = ("farm", "orchard", "orange_farm")
+# Farms whose fenced paddock fills their whole cell, drawn to the cell and never shrunk to fit it.
+PENS = ("cattle_ranch", "pig_farm", "chicken_farm")
 
 FARMSTEAD_SCALE = 0.585
 
@@ -568,7 +570,7 @@ def _scale_of(name: str) -> float:
     make a works wider than MOST_WIDTH lets it be."""
     scale = _base_scale(name)
     kind = BuildingKind.__members__.get(name.upper())
-    if kind is None or name in FARMSTEADS or kind in PORT_KINDS:
+    if kind is None or name in FARMSTEADS or name in PENS or kind in PORT_KINDS:
         return scale * SHARES.get(name, 1.0)
     most = GROWN_MOST_WIDTH.get(name.partition("_")[0], MOST_WIDTH[BUILDING_RULES[kind].space])
     scale = min(scale, most / _width(_full_size(name)))

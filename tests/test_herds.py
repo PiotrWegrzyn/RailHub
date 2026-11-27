@@ -6,15 +6,7 @@ from railroads.ui.pixel.ground import herd_parts
 from railroads.ui.pixel.ground_palette import ART_METRE, GROVES
 
 
-@pytest.mark.parametrize(
-    "kind",
-    [
-        BuildingKind.SHEEP_FARM,
-        BuildingKind.CATTLE_RANCH,
-        BuildingKind.PIG_FARM,
-        BuildingKind.CHICKEN_FARM,
-    ],
-)
+@pytest.mark.parametrize("kind", [BuildingKind.SHEEP_FARM])
 def test_a_herds_animals_stand_at_their_true_length(kind: BuildingKind) -> None:
     grove = GROVES[kind]
     step = 0.01
@@ -29,15 +21,7 @@ def test_a_herds_animals_stand_at_their_true_length(kind: BuildingKind) -> None:
     assert longest == pytest.approx(grove.herd * ART_METRE, rel=0.1)
 
 
-@pytest.mark.parametrize(
-    "kind",
-    [
-        BuildingKind.SHEEP_FARM,
-        BuildingKind.CATTLE_RANCH,
-        BuildingKind.PIG_FARM,
-        BuildingKind.CHICKEN_FARM,
-    ],
-)
+@pytest.mark.parametrize("kind", [BuildingKind.SHEEP_FARM])
 def test_a_herd_gathers_in_groups_each_round_its_shelter(kind: BuildingKind) -> None:
     grove = GROVES[kind]
     flock = grove.flock * ART_METRE
