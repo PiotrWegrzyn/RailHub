@@ -898,7 +898,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.BEER: 20,
             Need.VODKA: 20,
             Need.BRICKS: 10,
-            Need.CEMENT: 10,
+            Need.CEMENT: 12,
             Need.GLASS: 30,
             Need.NEWSPAPERS: 20,
             Need.APPLIANCES: 3,
