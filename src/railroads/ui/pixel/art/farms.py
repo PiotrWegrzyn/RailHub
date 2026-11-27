@@ -62,21 +62,38 @@ _SCATTER: tuple[Point, ...] = (
 )
 
 
-def _footing(p: Painter, top: Top, height: float, colour: RGB = FOOTING) -> None:
-    """A dark damp strip on the ground where both walls of a block `height` high stand in it."""
+def _footing(p: Painter, top: Top, height: float, colour: RGB = FOOTING, reach: float = 1) -> None:
+    """A dark damp strip on the ground where both walls of a block `height` high stand in it,
+    `reach` times as wide as round a big block."""
     left, front, right, _ = top
     (lx, ly), (fx, fy), (rx, ry) = ((x, y + height) for x, y in (left, front, right))
+    out, low, deep = 0.8 * reach, 0.6 * reach, 1.1 * reach
     p.polygon(
         [
-            (lx - 0.8, ly),
+            (lx - out, ly),
             (fx, fy),
-            (rx + 0.8, ry),
-            (rx + 0.8, ry + 0.6),
-            (fx, fy + 1.1),
-            (lx - 0.8, ly + 0.6),
+            (rx + out, ry),
+            (rx + out, ry + low),
+            (fx, fy + deep),
+            (lx - out, ly + low),
         ],
         colour,
     )
+
+
+def _door_step(x: float, y: float, length: float, depth: float, along: float) -> Point:
+    """The ground before a door `along` the lit wall of a hall `length` by `depth` standing at
+    (x, y)."""
+    fx, fy = x + (length - depth) / 2, y + (length + depth) / 4
+    back = length * (1 - along)
+    return fx - back, fy - back / 2 + 0.3
+
+
+def _stack(p: Painter, x: float, y: float, half: float, tall: float, colour: RGB) -> None:
+    """A rounded haystack `half` across and `tall` high standing on (x, y), lit on the left."""
+    p.blob(x - half, y - tall, x + half, y + half * 0.3, shade(colour, 0.78))
+    p.blob(x - half, y - tall, x + half * 0.35, y, colour)
+    p.blob(x - half * 0.7, y - tall, x, y - tall * 0.6, shade(colour, 1.12))
 
 
 def _worn(p: Painter, x: float, y: float, half: float, colour: RGB = EARTH) -> None:
@@ -110,10 +127,23 @@ def _mud(p: Painter, x: float, y: float, half: float) -> None:
     p.line([(x - half * 0.4, y + half * 0.1), (x - half * 0.1, y + half * 0.1)], (132, 150, 156))
 
 
-def _strewn(p: Painter, x: float, y: float, half: float, colour: RGB, count: int = 5) -> None:
-    """`count` bits of `colour` dropped on the ground round (x, y), up to `half` away."""
+def _strewn(
+    p: Painter,
+    x: float,
+    y: float,
+    half: float,
+    colour: RGB,
+    count: int = 5,
+    bit: float | None = None,
+) -> None:
+    """`count` bits of `colour` dropped on the ground round (x, y), up to `half` away: dots, or
+    wisps `bit` across."""
     for k, (u, v) in enumerate(_SCATTER[:count]):
-        p.point(x + u * half, y + v * half / 2, shade(colour, 0.85 if k % 2 else 1))
+        bx, by, tone = x + u * half, y + v * half / 2, shade(colour, 0.85 if k % 2 else 1)
+        if bit is None:
+            p.point(bx, by, tone)
+        else:
+            p.blob(bx - bit, by - bit / 3, bx + bit, by + bit / 3, tone)
 
 
 def _chimney(
@@ -520,24 +550,27 @@ def fishery() -> Sprite:
 
 
 def pasture() -> Sprite:
-    """A sheep shed with a door and a window under a tiled roof, on grazing with a water trough
-    standing in trampled mud, a sheep track worn from the shed door to it and sheep around."""
+    """A sheep shed 8 by 5 m with a door and a window under a tiled roof, on grazing with a water
+    trough standing in trampled mud, a sheep track worn from the shed door to it and sheep
+    around."""
     p = Painter(30, 22, (15, 16))
-    _track(p, [(-6.8, 2.2), (-4, 3.6), (-1, 4)], 0.9)
-    _worn(p, -7, 2.6, 2.2)
+    m = METRE
+    long, deep, high = 8 * m, 5 * m, 2.8 * m
+    step = _door_step(-4, 0, long, deep, 0.62)
+    _track(p, [step, (-1, 3.4), (0.6, 4)], 0.9)
+    _worn(p, *step, 1.6)
     _mud(p, 1.2, 4, 3.6)
     wall, roof = (152, 124, 92), (110, 80, 60)
-    top = p.box(-5, 0, 5, 4, wall, None)
+    top = p.hall(-4, 0, long, deep, high, wall, None)
     left, front, right, _ = top
-    _footing(p, top, 4)
-    _boards(p, top, wall, (1.5,))
-    _plinth(p, top, wall, 4, 0.8)
-    _door(p, left, front, (0.5, 0.8), 1.2, 4, shade(DOOR, 0.9))
-    p.line([_on_wall(left, front, 0.5, 1.2), _on_wall(left, front, 0.8, 4)], shade(DOOR, 1.4))
-    _window(p, front, right, (0.35, 0.65), 1, shade(WINDOW, 0.8))
-    p.gable(top, 3, roof, wall)
-    _tiles(p, top, 3, roof, (0.5,))
-    p.hall(1, 3.5, 3.5, 1.2, 1, (122, 90, 60), WATER)
+    _footing(p, top, high, reach=0.5)
+    _boards(p, top, wall, (high * 0.4,))
+    _plinth(p, top, wall, high, 0.4 * m)
+    _door(p, left, front, (0.52, 0.72), high - 2 * m, high, shade(DOOR, 0.9))
+    _patch(p, front, right, (0.35, 0.65), (0.5 * m, 1.2 * m), shade(WINDOW, 0.8))
+    p.gable(top, 1.8 * m, roof, wall)
+    _tiles(p, top, 1.8 * m, roof, (0.5,))
+    p.hall(1, 3.5, 2.5 * m, 0.6 * m, 0.5 * m, (122, 90, 60), WATER)
     for x, y, facing in ((11, -3, 1), (3, -2, -1), (8, 1, 1), (5, 4.5, -1), (-9, 5, -1)):
         _sheep(p, x, y, facing)
     return p.sprite()
@@ -784,34 +817,36 @@ def tea_plantation() -> Sprite:
 
 
 def cattle_ranch() -> Sprite:
-    """A boarded cattle barn on a plinth with cross-braced doors, a hayloft hatch and a tiled
+    """A boarded cattle barn 12 by 8 m on a plinth with cross-braced doors, a hayloft hatch and a tiled
     roof, a haystack, and a fenced paddock with a water trough and brown and black-and-white cows
     in it."""
     p = Painter(34, 26, (16, 18))
     p.blob(-2, -0.4, 14, 5.6, WORN)
     p.blob(1, 1, 10, 4.6, shade(EARTH, 0.92))
     _mud(p, 10.4, 0.6, 3.6)
-    _track(p, [(-10.2, 1.2), (-6.6, 3), (-2, 3.4)])
-    _worn(p, -10.4, 1.4, 2.8)
-    _strewn(p, -12.5, 4, 3.6, (220, 186, 96), 7)
+    m = METRE / 0.72
+    step = _door_step(-7, -0.5, 12 * m, 8 * m, 0.64)
+    _track(p, [step, (-3, 3.2), (-1, 3.4)])
+    _worn(p, *step, 2)
+    _strewn(p, -11.5, 3.6, 2.4, (220, 186, 96), 7, 0.3 * m)
     p.shadow(12, 3.5)
     wood = (136, 86, 56)
-    top = p.box(-8, -2, 6, 6, wood, None)
+    long, deep, high = 12 * m, 8 * m, 4 * m
+    top = p.hall(-7, -0.5, long, deep, high, wood, None)
     left, front, right, _ = top
-    _footing(p, top, 6)
-    _boards(p, top, wood, (1.5, 3, 4.5))
-    _plinth(p, top, wood, 6)
+    _footing(p, top, high, reach=0.7)
+    _boards(p, top, wood, (high / 4, high / 2, high * 3 / 4))
+    _plinth(p, top, wood, high, 0.5 * m)
     trim = (236, 230, 214)
-    _patch(p, left, front, (0.45, 0.8), (1.5, 6), trim)
-    _patch(p, left, front, (0.52, 0.73), (2.5, 6), shade(wood, 0.7))
-    p.line([_on_wall(left, front, 0.52, 2.5), _on_wall(left, front, 0.73, 6)], trim)
-    p.line([_on_wall(left, front, 0.73, 2.5), _on_wall(left, front, 0.52, 6)], trim)
-    _patch(p, front, right, (0.35, 0.65), (1.4, 3), (60, 40, 30))
-    p.point(*_on_wall(front, right, 0.45, 2), (220, 186, 96))
-    p.gable(top, 4, (86, 74, 70), wood)
-    _tiles(p, top, 4, (86, 74, 70))
-    _heap(p, -12.5, 3.5, 2.6, 3.5, (220, 186, 96))
-    m = METRE / 0.72
+    door = high - 3.2 * m
+    _patch(p, left, front, (0.5, 0.78), (door, high), trim)
+    _patch(p, left, front, (0.53, 0.75), (door + 0.2 * m, high), shade(wood, 0.7))
+    p.line([_on_wall(left, front, 0.53, door), _on_wall(left, front, 0.75, high)], trim)
+    p.line([_on_wall(left, front, 0.75, door), _on_wall(left, front, 0.53, high)], trim)
+    _patch(p, front, right, (0.38, 0.62), (0.4 * m, 1.6 * m), (60, 40, 30))
+    p.gable(top, 3 * m, (86, 74, 70), wood)
+    _tiles(p, top, 3 * m, (86, 74, 70))
+    _stack(p, -11.5, 3, 1.4 * m, 2.4 * m, (220, 186, 96))
     left, back, right, front = _paddock(6, 2, 9)
     _fence(p, left, back, m)
     _fence(p, back, right, m)
@@ -833,26 +868,28 @@ def cattle_ranch() -> Sprite:
 
 
 def pig_farm() -> Sprite:
-    """A low boarded sty with a tiled roof over a plinth, a heap of straw, and a fenced pen of
-    trampled mud with a feeding trough and pink pigs in it."""
+    """A low boarded sty 6 by 4 m with a tiled roof over a plinth, a stack of straw, and a fenced
+    pen of trampled mud with a feeding trough and pink pigs in it."""
     p = Painter(34, 24, (16, 17))
+    m = METRE / 0.72
+    long, deep, high = 6 * m, 4 * m, 2.4 * m
     p.blob(-2, -0.4, 14, 5.6, WORN)
     _mud(p, 7, 1.4, 6)
-    _track(p, [(-10.2, 1.2), (-6.6, 3), (-2, 3.4)])
-    _worn(p, -10.4, 1.4, 2.8)
-    _strewn(p, -12.5, 4, 3.6, (220, 186, 96), 7)
+    step = _door_step(-5.5, 0.5, long, deep, 0.62)
+    _track(p, [step, (-2.6, 3.2), (-1, 3.4)])
+    _worn(p, *step, 1.6)
+    _strewn(p, -9.5, 3.4, 2.4, (220, 186, 96), 7, 0.3 * m)
     p.shadow(12, 3)
     wood = (150, 104, 72)
-    top = p.box(-8, -2, 6, 4.4, wood, None)
+    top = p.hall(-5.5, 0.5, long, deep, high, wood, None)
     left, front, right, _ = top
-    _footing(p, top, 4.4)
-    _boards(p, top, wood, (1.5, 3))
-    _plinth(p, top, wood, 4.4)
-    _patch(p, left, front, (0.5, 0.75), (1.4, 4.4), (60, 40, 30))
-    p.gable(top, 3, (150, 80, 60), wood)
-    _tiles(p, top, 3, (150, 80, 60))
-    _heap(p, -12.5, 3.5, 2.4, 3, (220, 186, 96))
-    m = METRE / 0.72
+    _footing(p, top, high, reach=0.5)
+    _boards(p, top, wood, (high / 3, high * 2 / 3))
+    _plinth(p, top, wood, high, 0.4 * m)
+    _patch(p, left, front, (0.52, 0.74), (high - 1.6 * m, high), (60, 40, 30))
+    p.gable(top, 1.4 * m, (150, 80, 60), wood)
+    _tiles(p, top, 1.4 * m, (150, 80, 60), (0.5,))
+    _stack(p, -9.5, 2.8, 1.3 * m, 2 * m, (220, 186, 96))
     left, back, right, front = _paddock(6, 2, 9)
     _fence(p, left, back, m)
     _fence(p, back, right, m)
@@ -875,29 +912,38 @@ def pig_farm() -> Sprite:
 
 
 def chicken_farm() -> Sprite:
-    """A whitewashed henhouse on stilts with a ramp up to its hatch and a tiled roof, nesting
+    """A whitewashed henhouse 4 by 2.6 m on stilts with a ramp up to its hatch and a tiled roof, nesting
     boxes along its side, and a fenced yard of scratched earth with white and brown hens and a
     rooster pecking about, grain strewn among them."""
     p = Painter(32, 24, (15, 17))
     p.blob(-2, -0.4, 13, 5.6, WORN)
     p.blob(0, 0.6, 12, 4.8, shade(EARTH, 0.95))
-    _track(p, [(-10.2, 1.2), (-6.6, 3), (-2, 3.4)])
+    _track(p, [(-6.4, 2.6), (-3.4, 3.2), (-1, 3.4)])
     for k, (u, v) in enumerate(_SCATTER):
         gx, gy = 6 + u * 4, 2.5 + v * 2
         p.blob(
             gx - 0.12, gy - 0.06, gx + 0.12, gy + 0.06, shade((226, 196, 110), 0.85 if k % 2 else 1)
         )
     p.shadow(10, 3)
-    top = p.box(-7, -1, 5, 4, WHITEWASH, None)
-    left, front, right, _ = top
-    _footing(p, top, 4)
-    _boards(p, top, WHITEWASH, (2,))
-    _patch(p, left, front, (0.55, 0.75), (2, 4), (70, 50, 36))
-    p.line([_on_wall(left, front, 0.65, 4), (-1.6, 4.6)], (150, 110, 70))
-    _patch(p, front, right, (0.2, 0.8), (2.6, 3.4), (150, 110, 70))
-    p.gable(top, 3, (150, 70, 52), WHITEWASH)
-    _tiles(p, top, 3, (150, 70, 52))
     m = METRE / 0.72
+    long, deep, high, legs = 4 * m, 2.6 * m, 2.2 * m, 0.6 * m
+    x, y = -4.5, 0.5
+    for u, v in ((0.1, 0.1), (0.9, 0.1), (0.1, 0.9), (0.9, 0.9)):
+        fx, fy = x + (long - deep) / 2, y + (long + deep) / 4
+        gx, gy = fx - long * (1 - u) + deep * v, fy - long * (1 - u) / 2 - deep * v / 2
+        if v < 0.5 or u > 0.5:
+            p.line([(gx, gy), (gx, gy - legs)], (110, 84, 60))
+    top = p.hall(x, y - legs, long, deep, high - legs, WHITEWASH, None)
+    left, front, right, _ = top
+    _boards(p, top, WHITEWASH, ((high - legs) / 2,))
+    _patch(p, left, front, (0.55, 0.75), (0.5 * m, high - legs), (70, 50, 36))
+    p.line(
+        [_on_wall(left, front, 0.65, high - legs), _door_step(x, y, long, deep, 0.4)],
+        (150, 110, 70),
+    )
+    _patch(p, front, right, (0.2, 0.8), (0.4 * m, 0.8 * m), (150, 110, 70))
+    p.gable(top, 1.2 * m, (150, 70, 52), WHITEWASH)
+    _tiles(p, top, 1.2 * m, (150, 70, 52), (0.5,))
     left, back, right, front = _paddock(6, 2, 8)
     _fence(p, left, back, m)
     _fence(p, back, right, m)
