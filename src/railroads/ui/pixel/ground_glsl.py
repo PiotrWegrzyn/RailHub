@@ -919,31 +919,68 @@ const float GROVE_ROWS[@GROVE_COUNT@] = float[@GROVE_COUNT@](@GROVE_ROWS@);
 const float GROVE_CROWN[@GROVE_COUNT@] = float[@GROVE_COUNT@](@GROVE_CROWN@);
 const float GROVE_HERD[@GROVE_COUNT@] = float[@GROVE_COUNT@](@GROVE_HERD@);
 const float GROVE_GAP[@GROVE_COUNT@] = float[@GROVE_COUNT@](@GROVE_GAP@);
+const float GROVE_FLOCK[@GROVE_COUNT@] = float[@GROVE_COUNT@](@GROVE_FLOCK@);
+const vec3 GROVE_TRODDEN[@GROVE_COUNT@] = vec3[@GROVE_COUNT@](@GROVE_TRODDEN@);
+const float GROVE_SHELTER[@GROVE_COUNT@] = float[@GROVE_COUNT@](@GROVE_SHELTER@);
+const vec3 GROVE_ROOF[@GROVE_COUNT@] = vec3[@GROVE_COUNT@](@GROVE_ROOF@);
 
-// A herd (herd_parts) at art point `q`: its ground, or an animal's shadow, body or head.
+// Where in its square `flock` art pixels a side the group of a herd gathers (_flock_centre).
+vec2 flock_centre(ivec2 f, float flock) {
+    return (vec2(f) + 0.5 + (vec2(table_hash(f.x, f.y, 95), table_hash(f.x, f.y, 97)) - 0.5) * 0.3)
+        * flock;
+}
+
+// A herd (herd_parts) at art point `q`: its ground, the trodden patch its group stands on, a
+// shadow, an animal's body or head, or the group's shelter.
 vec4 herd(vec2 q, ivec2 pixel, int grove, float fade) {
-    vec3 colour = GROVE_GROUND[grove] * (1.0 + 0.12 * (table_hash(pixel.x, pixel.y, 23) - 0.5));
+    float grain = 1.0 + 0.12 * (table_hash(pixel.x, pixel.y, 23) - 0.5);
+    vec3 colour = GROVE_GROUND[grove] * grain;
     float cover = fade * @GROVE_FLOOR@;
-    float gap = GROVE_GAP[grove] * @ART_METRE@;
-    float half_length = GROVE_HERD[grove] * @ART_METRE@ / 2.0;
-    ivec2 g = ivec2(floor(q / gap));
-    if (table_hash(g.x, g.y, 91) >= @HERD_SHARE@) return vec4(colour, cover);
-    vec2 jitter = vec2(table_hash(g.x, g.y, 92), table_hash(g.x, g.y, 93)) - 0.5;
-    vec2 d = (q - (vec2(g) + 0.5 + jitter * 0.5) * gap) / half_length;
-    float facing = table_hash(g.x, g.y, 94) > 0.5 ? 1.0 : -1.0;
-    vec2 shade = vec2(d.x - 0.2, (d.y - 0.45) / 0.35);
-    if (dot(shade, shade) < 1.0) {
+    float flock = GROVE_FLOCK[grove] * @ART_METRE@;
+    float reach = @HERD_PATCH@ * flock / 2.0;
+    ivec2 f = ivec2(floor(q / flock));
+    vec2 centre = flock_centre(f, flock);
+    vec2 e = (q - centre) / vec2(reach, reach * 0.7);
+    float wobble = 1.0 + 0.15 * sin(3.0 * atan(e.y, e.x) + 6.283 * table_hash(f.x, f.y, 96));
+    if (dot(e, e) < wobble * wobble) {
+        colour = GROVE_TRODDEN[grove] * grain;
+        cover = min(fade * 2.0, 1.0);
+    }
+    float long_half = GROVE_SHELTER[grove] * @ART_METRE@ / 2.0;
+    vec2 s = (q - centre + vec2(0.0, 0.45 * reach * 0.7)) / long_half;
+    if (abs(s.x - 0.25) < 1.0 && abs(s.y - 0.3) < 0.55) {
         colour = @SHADOW_COLOUR@;
         cover = fade * @GROVE_SHADOW@;
     }
-    vec2 body = vec2(d.x, d.y / 0.5);
-    if (dot(body, body) < 1.0) {
-        colour = GROVE_TREE[grove] * clamp(0.85 - 0.4 * d.y, 0.6, 1.1);
-        cover = min(fade * 3.0, 1.0);
+    float gap = GROVE_GAP[grove] * @ART_METRE@;
+    float half_length = GROVE_HERD[grove] * @ART_METRE@ / 2.0;
+    ivec2 g = ivec2(floor(q / gap));
+    vec2 middle = (vec2(g) + 0.5) * gap;
+    vec2 home = (middle - flock_centre(ivec2(floor(middle / flock)), flock))
+        / vec2(reach, reach * 0.7);
+    if (dot(home, home) < 0.7 && table_hash(g.x, g.y, 91) < @HERD_SHARE@) {
+        vec2 jitter = vec2(table_hash(g.x, g.y, 92), table_hash(g.x, g.y, 93)) - 0.5;
+        vec2 d = (q - middle - jitter * 0.5 * gap) / half_length;
+        float facing = table_hash(g.x, g.y, 94) > 0.5 ? 1.0 : -1.0;
+        vec2 shade = vec2(d.x - 0.2, (d.y - 0.45) / 0.35);
+        if (dot(shade, shade) < 1.0) {
+            colour = @SHADOW_COLOUR@;
+            cover = fade * @GROVE_SHADOW@;
+        }
+        vec2 body = vec2(d.x, d.y / 0.5);
+        if (dot(body, body) < 1.0) {
+            colour = GROVE_TREE[grove] * clamp(0.85 - 0.4 * d.y, 0.6, 1.1);
+            cover = min(fade * 3.0, 1.0);
+        }
+        vec2 head = vec2(d.x - facing * 0.95, d.y + 0.3);
+        if (dot(head, head) < 0.38 * 0.38) {
+            colour = GROVE_FRUIT[GROVE_FRUIT_FROM[grove]] * 0.95;
+            cover = min(fade * 3.0, 1.0);
+        }
     }
-    vec2 head = vec2(d.x - facing * 0.95, d.y + 0.3);
-    if (dot(head, head) < 0.38 * 0.38) {
-        colour = GROVE_FRUIT[GROVE_FRUIT_FROM[grove]] * 0.95;
+    if (abs(s.x) < 1.0 && abs(s.y) < 0.5) {
+        float arch = (s.y + 0.1) / 0.6;
+        colour = GROVE_ROOF[grove] * (0.7 + 0.5 * sqrt(clamp(1.0 - arch * arch, 0.0, 1.0)));
         cover = min(fade * 3.0, 1.0);
     }
     return vec4(colour, cover);
@@ -1801,6 +1838,11 @@ def _fields_names() -> dict[str, str]:
         "GROVE_CROWN": ", ".join(glsl_number(grove.crown) for grove in groves),
         "GROVE_HERD": ", ".join(glsl_number(grove.herd) for grove in groves),
         "GROVE_GAP": ", ".join(glsl_number(grove.gap) for grove in groves),
+        "GROVE_FLOCK": ", ".join(glsl_number(grove.flock) for grove in groves),
+        "GROVE_TRODDEN": ", ".join(_vec3(grove.trodden) for grove in groves),
+        "GROVE_SHELTER": ", ".join(glsl_number(grove.shelter) for grove in groves),
+        "GROVE_ROOF": ", ".join(_vec3(grove.roof) for grove in groves),
+        "HERD_PATCH": glsl_number(cpu.HERD_PATCH),
         "ART_METRE": glsl_number(cpu.ART_METRE),
         "HERD_SHARE": glsl_number(cpu.HERD_SHARE),
         "GROVES_FROM": str(1 + len(cpu.CROP_ROWS)),

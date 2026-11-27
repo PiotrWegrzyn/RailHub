@@ -29,13 +29,24 @@ def test_a_herds_animals_stand_at_their_true_length(kind: BuildingKind) -> None:
     assert longest == pytest.approx(grove.herd * ART_METRE, rel=0.1)
 
 
-def test_a_herd_leaves_some_of_its_squares_empty() -> None:
-    grove = GROVES[BuildingKind.PIG_FARM]
-    gap = grove.gap * ART_METRE
-    at = (np.arange(40 * 50) + 0.5) * gap / 50
+@pytest.mark.parametrize(
+    "kind",
+    [
+        BuildingKind.SHEEP_FARM,
+        BuildingKind.CATTLE_RANCH,
+        BuildingKind.PIG_FARM,
+        BuildingKind.CHICKEN_FARM,
+    ],
+)
+def test_a_herd_gathers_in_groups_each_round_its_shelter(kind: BuildingKind) -> None:
+    grove = GROVES[kind]
+    flock = grove.flock * ART_METRE
+    at = (np.arange(12 * 60) + 0.5) * flock / 60
     x, y = np.meshgrid(at, at)
 
     part, _ = herd_parts(x, y, grove)
 
-    squares = (part >= 2).reshape(40, 50, 40, 50).any(axis=(1, 3))
-    assert 0.3 < squares.mean() < 0.8
+    squares = part.reshape(12, 60, 12, 60).transpose(0, 2, 1, 3)
+    assert (squares == 5).any(axis=(2, 3)).all()
+    assert (squares == 2).any(axis=(2, 3)).mean() > 0.9
+    assert (squares[:, :, :3, :] == 2).sum() == 0

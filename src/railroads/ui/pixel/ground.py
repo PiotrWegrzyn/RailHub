@@ -91,6 +91,7 @@ from railroads.ui.pixel.ground_palette import (
     GROVE_FLOOR,
     GROVE_SHADOW,
     GROVES,
+    HERD_PATCH,
     HERD_SHARE,
     HILL_LIFT,
     HOLLOW_DARK,
@@ -1216,12 +1217,18 @@ class Ground:
         here = fade * GROVE_FLOOR
         if grove.herd:
             part, lit = herd_parts((px + 0.5) / k, (py + 0.5) / k, grove)
+            trodden = part == 4
+            colors[trodden] = np.array(grove.trodden, dtype=np.float32) * grain[trodden, None]
+            here[trodden] = np.minimum(fade[trodden] * 2, 1)
             colors[part == 1] = SHADOW_COLOUR
             here[part == 1] = fade[part == 1] * GROVE_SHADOW
             body = part == 2
             colors[body] = np.array(grove.tree, dtype=np.float32) * lit[body, None]
             colors[part == 3] = np.array(grove.fruit[0], dtype=np.float32) * 0.95
-            here[part >= 2] = np.minimum(fade[part >= 2] * 3, 1)
+            roof = part == 5
+            colors[roof] = np.array(grove.roof, dtype=np.float32) * lit[roof, None]
+            solid = (part == 2) | (part == 3) | roof
+            here[solid] = np.minimum(fade[solid] * 3, 1)
             colors *= self._natural(x[ground], y[ground])
             rgb[ground] = colors
             cover[ground] = here
@@ -1250,21 +1257,51 @@ class Ground:
 
 
 def herd_parts(qx: FloatArray, qy: FloatArray, grove: Grove) -> tuple[IntArray, FloatArray]:
-    """What of a herd shows at art points (qx, qy): 0 its ground, 1 an animal's shadow, 2 its
-    body or 3 its head, with how lit a body is there, lighter on its back."""
+    """What of a herd shows at art points (qx, qy): 0 its ground, 1 a shadow, 2 an animal's body
+    or 3 its head, 4 the trodden patch its group stands on or 5 the group's shelter, with how lit
+    a body or shelter is there, lighter on top and a shelter rounded like an ark."""
+    flock = grove.flock * ART_METRE
+    reach = HERD_PATCH * flock / 2
+    fx, fy = np.floor(qx / flock).astype(np.int64), np.floor(qy / flock).astype(np.int64)
+    centre_x, centre_y = _flock_centre(fx, fy, flock)
+    across, along = (qx - centre_x) / reach, (qy - centre_y) / (reach * 0.7)
+    wobble = 1 + 0.15 * np.sin(3 * np.arctan2(along, across) + 6.283 * table_hash(fx, fy, 96))
+    part = np.zeros(np.shape(qx), dtype=np.int64)
+    part[across * across + along * along < wobble * wobble] = 4
+    long = grove.shelter * ART_METRE / 2
+    sx, sy = (qx - centre_x) / long, (qy - centre_y + 0.45 * reach * 0.7) / long
+    part[(np.abs(sx - 0.25) < 1) & (np.abs(sy - 0.3) < 0.55)] = 1
     gap = grove.gap * ART_METRE
     half = grove.herd * ART_METRE / 2
     gx, gy = np.floor(qx / gap).astype(np.int64), np.floor(qy / gap).astype(np.int64)
-    there = table_hash(gx, gy, 91) < HERD_SHARE
-    cx = (gx + 0.5 + (table_hash(gx, gy, 92) - 0.5) * 0.5) * gap
-    cy = (gy + 0.5 + (table_hash(gx, gy, 93) - 0.5) * 0.5) * gap
+    middle_x, middle_y = (gx + 0.5) * gap, (gy + 0.5) * gap
+    home_x, home_y = _flock_centre(
+        np.floor(middle_x / flock).astype(np.int64),
+        np.floor(middle_y / flock).astype(np.int64),
+        flock,
+    )
+    inside = ((middle_x - home_x) / reach) ** 2 + ((middle_y - home_y) / (reach * 0.7)) ** 2 < 0.7
+    there = inside & (table_hash(gx, gy, 91) < HERD_SHARE)
+    cx = middle_x + (table_hash(gx, gy, 92) - 0.5) * 0.5 * gap
+    cy = middle_y + (table_hash(gx, gy, 93) - 0.5) * 0.5 * gap
     facing = np.where(table_hash(gx, gy, 94) > 0.5, 1.0, -1.0)
     dx, dy = (qx - cx) / half, (qy - cy) / half
-    part = np.zeros(np.shape(qx), dtype=np.int64)
     part[((dx - 0.2) ** 2 + ((dy - 0.45) / 0.35) ** 2 < 1) & there] = 1
     part[(dx * dx + (dy / 0.5) ** 2 < 1) & there] = 2
     part[((dx - facing * 0.95) ** 2 + (dy + 0.3) ** 2 < 0.38**2) & there] = 3
-    return part, np.clip(0.85 - 0.4 * dy, 0.6, 1.1)
+    roofed = (np.abs(sx) < 1) & (np.abs(sy) < 0.5)
+    part[roofed] = 5
+    arch = 0.7 + 0.5 * np.sqrt(np.clip(1 - ((sy + 0.1) / 0.6) ** 2, 0, 1))
+    lit = np.where(roofed, arch, np.clip(0.85 - 0.4 * dy, 0.6, 1.1))
+    return part, lit
+
+
+def _flock_centre(fx: IntArray, fy: IntArray, flock: float) -> tuple[FloatArray, FloatArray]:
+    """Where in its square `flock` art pixels a side the group of a herd gathers."""
+    return (
+        (fx + 0.5 + (table_hash(fx, fy, 95) - 0.5) * 0.3) * flock,
+        (fy + 0.5 + (table_hash(fx, fy, 97) - 0.5) * 0.3) * flock,
+    )
 
 
 def _depths(field: BoolArray, most: int) -> npt.NDArray[np.int16]:
