@@ -39,7 +39,6 @@ DEPOSITS: dict[Deposit, DepositRule] = {
     Deposit.COPPER: DepositRule(45_000, (4, 10)),
     Deposit.SALT: DepositRule(40_000, (5, 10)),
     Deposit.GRAPES: DepositRule(30_000, (5, 12)),
-    Deposit.IRON: DepositRule(20_000, (6, 14)),
     Deposit.WOOL: DepositRule(9_000, (6, 12)),
 }
 # Military ground, whose few clusters hold every outpost on the map: how many, and of how many cells.
@@ -62,7 +61,6 @@ def allowed_land(tile_map: TileMap) -> dict[Deposit, Mask]:
     hot = temperature == Temperature.HOT
     open_land = vegetation != Vegetation.FOREST
     return {
-        Deposit.IRON: rocky,
         Deposit.COPPER: rocky,
         Deposit.GOLD: rocky,
         Deposit.DIAMONDS: rocky,

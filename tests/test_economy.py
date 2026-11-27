@@ -744,7 +744,7 @@ def test_a_station_full_of_a_good_gathers_no_more_of_it() -> None:
     assert trade.gathered[STATION].get(Good.WHEAT, 0.0) == 0.0
 
 
-@pytest.mark.parametrize(("planks", "coal"), [(0.0, 60.0), (6.0, 90.0), (12.0, 120.0)])
+@pytest.mark.parametrize(("planks", "coal"), [(0.0, 30.0), (3.0, 45.0), (6.0, 60.0)])
 def test_planks_for_pit_props_lets_a_mine_dig_up_to_twice_the_coal(
     planks: float, coal: float
 ) -> None:

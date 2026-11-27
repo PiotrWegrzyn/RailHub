@@ -548,8 +548,8 @@ window (H) lists the same.
 | Mega miso maker | 562.5 miso | 140.6 soybeans, 84.38 rice, 56.25 salt |  |
 | Big fish drying shed | 150 dried fish | 60 fish, 15 salt |  |
 | Mega fish drying shed | 562.5 dried fish | 225 fish, 56.25 salt |  |
-| Mine (1700) | 60 coal |  | 12 planks (from wood demand 2), 3 machinery (from machines and tools demand 8), 6 fuel (from oil and fuel demand 11) |
-| Iron mine | 60 iron ore |  | 3 machinery (from machines and tools demand 8), 6 fuel (from oil and fuel demand 11) |
+| Mine (1700) | 30 coal |  | 6 planks (from wood demand 2), 1.5 machinery (from machines and tools demand 8), 3 fuel (from oil and fuel demand 11) |
+| Iron mine | 30 iron ore |  | 1.5 machinery (from machines and tools demand 8), 3 fuel (from oil and fuel demand 11) |
 | Copper mine (era 4) | 25 copper |  | 3 fuel (from oil and fuel demand 11) |
 | Gold mine | 12 gold |  | 1.2 fuel (from oil and fuel demand 11) |
 | Diamond mine | 6 diamonds |  | 1.2 fuel (from oil and fuel demand 11) |
