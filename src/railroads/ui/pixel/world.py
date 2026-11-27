@@ -793,7 +793,8 @@ class _Unpacked(Sequence[npt.NDArray[np.float32]]):
 
 
 # Sprites that stand in no yard of their own: trees, rocks, stations and their facilities, which
-# stand by their track, and ports, which lay their own ground over their whole cell.
+# stand by their track, ports, which lay their own ground over their whole cell, and the farms
+# that keep animals, which stand on their grazing with their own yards drawn round them.
 UNYARDED = (
     "pine_",
     "leafy_",
@@ -805,6 +806,10 @@ UNYARDED = (
     "port",
     "big_port",
     "mega_port",
+    "cattle_ranch",
+    "pig_farm",
+    "chicken_farm",
+    "sheep_farm",
 )
 
 
