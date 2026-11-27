@@ -1,15 +1,19 @@
-"""Shops, taverns, department stores, hotels, builder's yards and airports."""
+"""Car dealers, jewellers, taverns, department stores, hotels, builder's yards and airports."""
 
+import numpy as np
+
+from railroads.ui.pixel.art.churches import _ribs
 from railroads.ui.pixel.art.homes import _doorstep, _foot, _outward, _worn
 from railroads.ui.pixel.art.painter import (
     BARREL,
     BRICK,
-    CLOTH,
+    CAR_COLOURS,
     DOORWAY,
     GLASS,
     RGB,
     STONE,
     TIMBER,
+    VERDIGRIS,
     WINDOW,
     Painter,
     Point,
@@ -20,11 +24,13 @@ from railroads.ui.pixel.art.parts import (
     DOOR,
     LIT,
     METRE,
-    SILL,
     _band,
+    _bands,
     _bar,
     _fence,
     _flag,
+    _gable_across,
+    _iso,
     _on_wall,
     _paddock,
     _pale_plinth,
@@ -36,7 +42,6 @@ from railroads.ui.pixel.art.parts import (
 
 PAVING: RGB = (190, 184, 170)
 POST: RGB = (52, 50, 54)
-LEAF: RGB = (60, 112, 48)
 PLANK: RGB = (214, 178, 118)
 
 
@@ -63,47 +68,344 @@ def _street_lamp(p: Painter, x: float, y: float, height: float = 7) -> None:
     p.point(x - 0.5, y - height - 2.6, POST)
 
 
-def _bush(p: Painter, x: float, y: float, size: float = 1.6) -> None:
-    """A small round bush standing on the ground at (x, y)."""
-    p.ellipse(x - size, y - 1.6 * size, x + size, y, LEAF)
-    p.point(x - size * 0.5, y - 1.2 * size, shade(LEAF, 1.35))
+def _lamp_post(p: Painter, x: float, y: float, tall: float = 4, arms: int = 1) -> None:
+    """A black cast-iron lamp post `tall` metres high standing on (x, y) with a lit glass lantern
+    on top, or with `arms` 2 a lantern hung either side of a cross arm."""
+    m = METRE
+    top = y - tall * m
+    p.blob(x - 0.3 * m, y - 0.15 * m, x + 0.3 * m, y + 0.15 * m, POST)
+    _bar(p, (x, y), (x, top), 0.18 * m, POST)
+    heads = [(x, top)]
+    if arms == 2:
+        _bar(p, (x - 0.8 * m, top + 0.4 * m), (x + 0.8 * m, top + 0.4 * m), 0.12 * m, POST)
+        heads = [(x - 0.8 * m, top + 0.9 * m), (x + 0.8 * m, top + 0.9 * m), (x, top)]
+    for hx, hy in heads:
+        p.polygon(
+            [
+                (hx - 0.25 * m, hy),
+                (hx + 0.25 * m, hy),
+                (hx + 0.35 * m, hy - 0.75 * m),
+                (hx - 0.35 * m, hy - 0.75 * m),
+            ],
+            LIT,
+        )
+        p.polygon(
+            [(hx - 0.45 * m, hy - 0.75 * m), (hx + 0.45 * m, hy - 0.75 * m), (hx, hy - 1.05 * m)],
+            POST,
+        )
 
 
-def shop(wall: RGB, awning: RGB, goods: RGB) -> Sprite:
-    """A smart city shop: a striped awning over a big window full of its wares and a door, a floor
-    of windows with sills above, a cornice and a chimney."""
-    p = Painter(24, 26, (11, 20))
-    p.shadow(9, 3)
-    height = 12
-    _worn(p, (-8, -height), (0, 4 - height), (-0.05, 1.05), height, 2.5, PAVING)
-    top = p.box(0, 0, 8, height, wall, shade(wall, 0.7))
+SHOWROOM: RGB = (240, 240, 234)
+DEALER_RED: RGB = (204, 40, 46)
+CHROME: RGB = (204, 210, 216)
+PLATE_GLASS: RGB = (132, 178, 204)
+TYRE: RGB = (34, 34, 38)
+
+
+def _auto(p: Painter, x: float, y: float, colour: RGB) -> None:
+    """A car 4.4 m long and 1.8 m wide parked on (x, y) nose out towards the lit side: its
+    grille, bumper and headlamps on its lit end, its windscreen and side windows in a chrome-
+    trimmed cabin, and its wheels along its shaded side, lit on its top."""
+    m = METRE
+    p.blob(x - 2.2 * m, y - 1.2 * m, x + 2.6 * m, y + 1.4 * m, (60, 60, 64), 110)
+    body = p.hall(x, y - 0.3 * m, 1.8 * m, 4.4 * m, 0.75 * m, colour, shade(colour, 1.12))
+    left, front, right, _ = body
+    for t in (0.22, 0.78):
+        wx, wy = _on_wall(front, right, t, 0.75 * m)
+        p.ellipse(wx - 0.38 * m, wy - 0.3 * m, wx + 0.38 * m, wy + 0.45 * m, TYRE)
+        p.blob(wx - 0.14 * m, wy - 0.04 * m, wx + 0.14 * m, wy + 0.2 * m, CHROME)
+    _bar(p, _on_wall(left, front, 0, 0.6 * m), _on_wall(left, front, 1, 0.6 * m), 0.14 * m, CHROME)
+    _patch(p, left, front, (0.32, 0.68), (0.2 * m, 0.5 * m), shade(colour, 0.5))
+    for t in (0.14, 0.86):
+        hx, hy = _on_wall(left, front, t, 0.3 * m)
+        p.blob(hx - 0.16 * m, hy - 0.14 * m, hx + 0.16 * m, hy + 0.14 * m, (252, 246, 210))
+    cx, cy = _iso(x, y, 0, 0.35 * m)
+    cabin = p.hall(cx, cy - 1.05 * m, 1.6 * m, 2.3 * m, 0.6 * m, colour, shade(colour, 1.18))
+    c_left, c_front, c_right, _ = cabin
+    _patch(p, c_left, c_front, (0.08, 0.92), (0.08 * m, 0.55 * m), shade(PLATE_GLASS, 0.8))
+    _patch(p, c_front, c_right, (0.06, 0.46), (0.1 * m, 0.55 * m), shade(PLATE_GLASS, 0.62))
+    _patch(p, c_front, c_right, (0.54, 0.94), (0.1 * m, 0.55 * m), shade(PLATE_GLASS, 0.62))
+
+
+def _pennant_flag(p: Painter, x: float, y: float, tall: float, colour: RGB) -> None:
+    """A white flagpole `tall` metres high on (x, y) flying a flag of `colour` with a white
+    stripe, its top knob gilt."""
+    m = METRE
+    top = y - tall * m
+    _bar(p, (x, y), (x, top), 0.14 * m, (236, 236, 232))
+    p.polygon(
+        [
+            (x, top + 0.2 * m),
+            (x + 2 * m, top + 0.6 * m),
+            (x + 1.9 * m, top + 1.8 * m),
+            (x, top + 1.4 * m),
+        ],
+        colour,
+    )
+    _bar(p, (x, top + 0.8 * m), (x + 1.95 * m, top + 1.2 * m), 0.25 * m, (246, 244, 238))
+    p.blob(x - 0.15 * m, top - 0.25 * m, x + 0.15 * m, top + 0.05 * m, (228, 182, 70))
+
+
+def car_dealer() -> Sprite:
+    """A car dealer's showroom 20 by 14 m: a white hall walled in plate glass on chrome mullions
+    with new cars on show inside, a bold red fascia lettered in white along its flat roof, a
+    workshop door at its side, a row of new cars in bright colours parked nose out on its paved
+    forecourt, a tall red pylon sign with a white badge, and flags flying along its roof."""
+    m = METRE
+    p = Painter(42, 32, (21, 21))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 10) * m, (v - 4) * m)
+
+    high = 6 * m
+    p.polygon([at(-2, -9), at(23, -9), at(23, 14), at(20, 14), at(20, 0), at(-2, 0)], PAVING)
+    for u in range(0, 23, 4):
+        _bar(p, at(u, -9), at(u, -6.5), 0.12 * m, (246, 244, 238))
+    p.shadow(13, 4, 3)
+    top = p.hall(*at(10, 7), 20 * m, 14 * m, high, SHOWROOM, shade(SHOWROOM, 0.82))
     left, front, right, _ = top
-    _pale_plinth(p, top, height, wall)
-    _foot(p, top, height)
-    for a, b, tone in ((left, front, 1.15), (front, right, 0.88)):
-        _band(p, a, b, 0.6, shade(wall, tone))
-    glazing = WINDOW if sum(wall) > 300 else LIT
-    for span in ((0.14, 0.34), (0.56, 0.76)):
-        _patch(p, left, front, span, (1.6, 3.6), glazing)
-        p.line([_on_wall(left, front, span[0], 4), _on_wall(left, front, span[1], 4)], SILL)
-    for span in ((0.2, 0.4), (0.6, 0.8)):
-        for drop in (1.6, 6.6):
-            _patch(p, front, right, span, (drop, drop + 2), shade(WINDOW, 0.75))
-    _patch(p, left, front, (0, 1), (4.6, 6.6), awning)
-    for t in (0.2, 0.4, 0.6, 0.8):
-        p.line([_on_wall(left, front, t, 4.8), _on_wall(left, front, t, 6.4)], SILL)
-    _band(p, left, front, 6.8, shade(awning, 0.6))
-    _patch(p, left, front, (0.06, 0.62), (7.6, 11), glazing)
-    for t in (0.16, 0.42):
-        p.line([_on_wall(left, front, t, 9.8), _on_wall(left, front, t + 0.1, 9.8)], goods)
-        p.point(*_on_wall(left, front, t + 0.05, 8.8), goods)
-    _patch(p, left, front, (0.72, 0.9), (7.6, height), DOOR)
-    p.point(*_on_wall(left, front, 0.86, 10), shade(SILL, 0.8))
-    _doorstep(p, left, front, (0.68, 0.94), height, PAVING)
-    p.rect(3, -15, 5, -12.5, shade(wall, 0.6))
-    p.line([(3, -15.5), (5, -15.5)], shade(wall, 0.4))
-    _bush(p, *_out(left, front, 1, height, 1.2), 1.4)
-    _street_lamp(p, *_out(left, front, 0, height, 1.5), 8)
+    _pale_plinth(p, top, high, SHOWROOM, 0.5 * m)
+    _foot(p, top, high)
+    _patch(p, left, front, (0.03, 0.97), (1.7 * m, high - 0.5 * m), PLATE_GLASS)
+    _patch(p, front, right, (0.04, 0.55), (1.7 * m, high - 0.5 * m), shade(PLATE_GLASS, 0.78))
+    _patch(p, left, front, (0.03, 0.97), (high - 1.2 * m, high - 0.5 * m), shade(PLATE_GLASS, 0.72))
+    for k, t in ((4, 0.2), (1, 0.8)):
+        colour = CAR_COLOURS[k]
+        span = (t - 0.1, t + 0.1)
+        _patch(p, left, front, span, (high - 1.4 * m, high - 0.75 * m), colour)
+        _patch(
+            p,
+            left,
+            front,
+            (t - 0.055, t + 0.06),
+            (high - 1.95 * m, high - 1.4 * m),
+            shade(colour, 0.9),
+        )
+        _patch(
+            p,
+            left,
+            front,
+            (t - 0.045, t + 0.05),
+            (high - 1.85 * m, high - 1.45 * m),
+            shade(PLATE_GLASS, 1.1),
+        )
+        for s in (t - 0.065, t + 0.065):
+            wx, wy = _on_wall(left, front, s, high - 0.75 * m)
+            p.ellipse(wx - 0.35 * m, wy - 0.35 * m, wx + 0.35 * m, wy + 0.35 * m, TYRE)
+    for t in np.linspace(0.03, 0.97, 7):
+        _bar(
+            p,
+            _on_wall(left, front, t, 1.7 * m),
+            _on_wall(left, front, t, high - 0.5 * m),
+            0.12 * m,
+            CHROME,
+        )
+    for t in np.linspace(0.04, 0.55, 3):
+        _bar(
+            p,
+            _on_wall(front, right, t, 1.7 * m),
+            _on_wall(front, right, t, high - 0.5 * m),
+            0.12 * m,
+            shade(CHROME, 0.8),
+        )
+    _patch(p, front, right, (0.64, 0.94), (2 * m, high), (150, 152, 158))
+    for drop in np.arange(2.3 * m, high, 0.45 * m):
+        _bar(
+            p,
+            _on_wall(front, right, 0.64, drop),
+            _on_wall(front, right, 0.94, drop),
+            0.06 * m,
+            (120, 122, 128),
+        )
+    _patch(p, left, front, (0.42, 0.58), (2.6 * m, high - 0.5 * m), shade(PLATE_GLASS, 0.6))
+    _bar(
+        p,
+        _on_wall(left, front, 0.5, 2.6 * m),
+        _on_wall(left, front, 0.5, high - 0.5 * m),
+        0.1 * m,
+        CHROME,
+    )
+    for a, b, tone in ((left, front, 1.0), (front, right, 0.8)):
+        _patch(p, a, b, (0, 1), (-0.6 * m, 1.5 * m), shade(DEALER_RED, tone))
+        _bar(
+            p, _on_wall(a, b, 0, 1.5 * m), _on_wall(a, b, 1, 1.5 * m), 0.15 * m, shade(CHROME, tone)
+        )
+    for t0, t1 in ((0.12, 0.2), (0.24, 0.3), (0.34, 0.46), (0.5, 0.56), (0.6, 0.72), (0.76, 0.86)):
+        _bar(
+            p,
+            _on_wall(left, front, t0, 0.45 * m),
+            _on_wall(left, front, t1, 0.45 * m),
+            0.55 * m,
+            (250, 248, 244),
+        )
+    for u, v in ((5, 9), (13, 9)):
+        x, y = at(u, v)
+        p.hall(x, y - high, 5 * m, 3 * m, 0.5 * m, shade(SHOWROOM, 0.9), PLATE_GLASS)
+    for t, colour in ((0.06, CAR_COLOURS[1]), (0.38, DEALER_RED), (0.7, CAR_COLOURS[2])):
+        x, y = _on_wall(left, front, t, -0.6 * m)
+        _pennant_flag(p, x, y, 4, colour)
+    _pennant_flag(p, *_on_wall(front, right, 0.5, -0.6 * m), 4, DEALER_RED)
+    px, py = at(-1.5, -8)
+    _bar(p, (px, py), (px, py - 7 * m), 0.35 * m, (90, 92, 98))
+    p.rect(px - 1.6 * m, py - 10.4 * m, px + 1.6 * m, py - 6.6 * m, DEALER_RED)
+    p.ellipse(px - 1.1 * m, py - 9.6 * m, px + 1.1 * m, py - 7.4 * m, (250, 248, 244))
+    p.ellipse(px - 0.7 * m, py - 9.1 * m, px + 0.7 * m, py - 7.9 * m, shade(DEALER_RED, 0.9))
+    for u, k in ((2.6, 0), (7.2, 3), (11.8, 2), (16.4, 1)):
+        _auto(p, *at(u, -4.5), CAR_COLOURS[k])
+    return p.sprite()
+
+
+JEWEL_FRONT: RGB = (40, 42, 70)
+GOLD: RGB = (234, 188, 64)
+DIAMOND: RGB = (204, 240, 255)
+VELVET: RGB = (118, 30, 50)
+GLOW: RGB = (252, 234, 176)
+SPARK: RGB = (255, 255, 255)
+
+
+def _glint(p: Painter, x: float, y: float, size: float, colour: RGB = SPARK) -> None:
+    """A four-pointed glint of light at (x, y), `size` units from its middle to its tips."""
+    _bar(p, (x - size, y), (x + size, y), size * 0.35, colour)
+    _bar(p, (x, y - size), (x, y + size), size * 0.35, colour)
+
+
+def _diamond(p: Painter, x: float, y: float, wide: float) -> None:
+    """A brilliant-cut diamond `wide` across with the middle of its table at (x, y): a crown of
+    facets over a pavilion narrowing to its point, lit on the left and glinting."""
+    h = wide / 2
+    girdle, point = y + wide * 0.28, y + wide * 0.9
+    p.polygon([(x - h * 0.55, y), (x + h * 0.55, y), (x + h, girdle), (x - h, girdle)], DIAMOND)
+    p.polygon([(x, girdle), (x + h, girdle), (x, point)], shade(DIAMOND, 0.72))
+    p.polygon([(x - h, girdle), (x, girdle), (x, point)], shade(DIAMOND, 0.9))
+    edge = shade(DIAMOND, 0.55)
+    for a, b in (
+        ((x - h * 0.55, y), (x - h * 0.3, girdle)),
+        ((x + h * 0.55, y), (x + h * 0.3, girdle)),
+        ((x - h * 0.3, girdle), (x, point)),
+        ((x + h * 0.3, girdle), (x, point)),
+        ((x - h, girdle), (x + h, girdle)),
+    ):
+        _bar(p, a, b, wide * 0.04, edge)
+    _glint(p, x - h * 0.35, y + wide * 0.1, wide * 0.22)
+
+
+def _jewels(
+    p: Painter, a: Point, b: Point, span: tuple[float, float], drop: tuple[float, float]
+) -> None:
+    """A display window in a gilt frame on the wall under the edge from `a` to `b`: lit warm
+    inside, with shelves of dark red velvet laid with gold rings and chains and diamonds
+    glittering, from `span[0]` to `span[1]` along it and `drop[0]` to `drop[1]` down it."""
+    m = METRE
+    t0, t1 = span
+    d0, d1 = drop
+    _patch(p, a, b, span, (d0 - 0.15 * m, d1 + 0.15 * m), GOLD)
+    _patch(p, a, b, (t0 + 0.015, t1 - 0.015), drop, GLOW)
+    shelves = (d0 + (d1 - d0) * 0.45, d1 - 0.1 * m)
+    for shelf in shelves:
+        _patch(p, a, b, (t0 + 0.015, t1 - 0.015), (shelf - 0.25 * m, shelf), VELVET)
+    count = max(2, round((t1 - t0) * 16))
+    for k in range(count):
+        t = t0 + (t1 - t0) * (k + 0.5) / count
+        for row, shelf in enumerate(shelves):
+            x, y = _on_wall(a, b, t, shelf - 0.38 * m)
+            if (k + row) % 2:
+                p.blob(x - 0.2 * m, y - 0.2 * m, x + 0.2 * m, y + 0.12 * m, GOLD)
+                p.blob(x - 0.08 * m, y - 0.1 * m, x + 0.08 * m, y + 0.02 * m, GLOW)
+            else:
+                _glint(p, x, y - 0.05 * m, 0.22 * m)
+    for k in range(count - 1):
+        t = t0 + (t1 - t0) * (k + 1) / count
+        x, y = _on_wall(a, b, t, d0 + 0.3 * m)
+        _bar(p, (x - 0.25 * m, y), (x + 0.25 * m, y + 0.5 * m), 0.06 * m, GOLD)
+
+
+def _street_clock(p: Painter, x: float, y: float) -> None:
+    """A jeweller's gilt street clock on a fluted dark post 4.5 m tall standing on (x, y), a
+    round white face in a gold rim on top under a gilt finial."""
+    m = METRE
+    p.blob(x - 0.4 * m, y - 0.2 * m, x + 0.4 * m, y + 0.2 * m, POST)
+    p.rect(x - 0.3 * m, y - 1 * m, x + 0.3 * m, y, POST)
+    _bar(p, (x, y - 1 * m), (x, y - 3.6 * m), 0.28 * m, POST)
+    _bar(p, (x - 0.06 * m, y - 1 * m), (x - 0.06 * m, y - 3.6 * m), 0.06 * m, GOLD)
+    cy = y - 4.4 * m
+    p.ellipse(x - 0.95 * m, cy - 0.95 * m, x + 0.95 * m, cy + 0.95 * m, GOLD)
+    p.ellipse(x - 0.7 * m, cy - 0.7 * m, x + 0.7 * m, cy + 0.7 * m, (250, 248, 240))
+    _bar(p, (x, cy), (x, cy - 0.55 * m), 0.1 * m, (30, 30, 34))
+    _bar(p, (x, cy), (x + 0.4 * m, cy + 0.15 * m), 0.1 * m, (30, 30, 34))
+    p.polygon([(x - 0.3 * m, cy - 0.9 * m), (x + 0.3 * m, cy - 0.9 * m), (x, cy - 1.6 * m)], GOLD)
+
+
+def jeweller() -> Sprite:
+    """A jeweller's townhouse 8 by 8 m and two storeys high, its front painted a deep night
+    blue and trimmed in gold: two lit display windows in gilt frames glittering with gold rings,
+    chains and diamonds on red velvet, a glazed door under a gold fascia, gilt-framed windows
+    above, a gold cornice, a dark mansard roof with a gilded dormer, a great cut diamond on
+    a gilt stand on its roof, and a gilt street clock on the pavement before it."""
+    m = METRE
+    p = Painter(26, 30, (13, 21))
+    high = 9 * m
+    _worn(p, (-6, -high), (0, 3 - high), (-0.05, 1.05), high, 3, PAVING)
+    p.shadow(9, 3)
+    top = p.box(0, 0, 6, high, JEWEL_FRONT, (50, 54, 72))
+    left, front, right, _ = top
+    _pale_plinth(p, top, high, JEWEL_FRONT, 0.5 * m)
+    _foot(p, top, high)
+    for a, b, tone in ((left, front, 1.0), (front, right, 0.8)):
+        _patch(p, a, b, (0, 1), (0, 0.45 * m), shade(GOLD, tone))
+        _patch(p, a, b, (0, 1), (3.5 * m, 4.6 * m), shade(GOLD, tone))
+        _patch(p, a, b, (0.04, 0.96), (3.7 * m, 4.4 * m), shade(JEWEL_FRONT, 0.8 * tone))
+        for t in (0.02, 0.98):
+            _bar(
+                p,
+                _on_wall(a, b, t, 0.45 * m),
+                _on_wall(a, b, t, high),
+                0.3 * m,
+                shade(GOLD, tone * 0.9),
+            )
+    for t0, t1 in ((0.12, 0.22), (0.26, 0.4), (0.44, 0.52), (0.56, 0.72), (0.76, 0.88)):
+        _bar(
+            p,
+            _on_wall(left, front, t0, 4.05 * m),
+            _on_wall(left, front, t1, 4.05 * m),
+            0.35 * m,
+            GOLD,
+        )
+    _jewels(p, left, front, (0.07, 0.36), (5.4 * m, 8 * m))
+    _jewels(p, left, front, (0.64, 0.93), (5.4 * m, 8 * m))
+    _jewels(p, front, right, (0.12, 0.88), (5.4 * m, 8 * m))
+    _patch(p, left, front, (0.42, 0.58), (5 * m, high), GOLD)
+    _patch(p, left, front, (0.44, 0.56), (5.2 * m, high), (30, 30, 44))
+    _patch(p, left, front, (0.46, 0.54), (5.4 * m, high - 0.6 * m), shade(GLOW, 0.75))
+    kx, ky = _on_wall(left, front, 0.53, 7.4 * m)
+    p.blob(kx - 0.12 * m, ky - 0.12 * m, kx + 0.12 * m, ky + 0.12 * m, GOLD)
+    _doorstep(p, left, front, (0.4, 0.6), high, shade(PAVING, 1.1))
+    for a, b, spans, glass in (
+        (left, front, (0.25, 0.75), (60, 72, 104)),
+        (front, right, (0.3, 0.7), (48, 58, 86)),
+    ):
+        for t in spans:
+            _patch(p, a, b, (t - 0.1, t + 0.1), (0.9 * m, 3.2 * m), GOLD)
+            _patch(p, a, b, (t - 0.08, t + 0.08), (1.05 * m, 3.05 * m), glass)
+            _bar(p, _on_wall(a, b, t, 1.05 * m), _on_wall(a, b, t, 3.05 * m), 0.08 * m, GOLD)
+            _patch(p, a, b, (t - 0.12, t + 0.12), (0.6 * m, 0.85 * m), GOLD)
+    _patch(p, left, front, (0.4, 0.6), (1.6 * m, 2.6 * m), GOLD)
+    cx, cy = _on_wall(left, front, 0.5, 2.1 * m)
+    p.ellipse(cx - 0.4 * m, cy - 0.4 * m, cx + 0.4 * m, cy + 0.4 * m, JEWEL_FRONT)
+    _glint(p, cx, cy, 0.3 * m, DIAMOND)
+    slate = (50, 54, 72)
+    roof = p.box(0, -high, 5.2, 2.2 * m, slate, shade(slate, 1.2))
+    _bands(p, roof[0], roof[1], roof[2], 0.1 * m, GOLD, shade(GOLD, 0.8))
+    p.line([roof[0], roof[3], roof[2]], GOLD)
+    dormer = p.hall(*_on_wall(left, front, 0.5, -0.8 * m), 1.6 * m, 1 * m, 1.6 * m, slate, None)
+    _patch(p, dormer[0], dormer[1], (0.1, 0.9), (0.1 * m, 1.4 * m), GOLD)
+    _patch(p, dormer[0], dormer[1], (0.22, 0.78), (0.3 * m, 1.4 * m), (60, 72, 104))
+    _gable_across(p, dormer, 0.8 * m, slate, GOLD)
+    sy = -high - 2.2 * m
+    for dx in (-1, 1):
+        _bar(p, (dx * 1.1 * m, sy + 0.3 * m), (dx * 0.2 * m, sy - 1.6 * m), 0.2 * m, GOLD)
+    _diamond(p, 0, sy - 1.4 * m - 0.9 * 4.4 * m, 4.4 * m)
+    _glint(p, 1.8 * m, sy - 4.6 * m, 0.6 * m)
+    _street_clock(p, *_out(left, front, 0.12, high, 2.2))
     return p.sprite()
 
 
@@ -243,52 +545,145 @@ def sushi_hut() -> Sprite:
     return p.sprite()
 
 
+STORE_STONE: RGB = (236, 204, 160)
+STORE_GREEN: RGB = (34, 118, 80)
+STORE_CREAM: RGB = (248, 240, 222)
+BANNER: RGB = (192, 40, 52)
+FASHIONS: tuple[RGB, ...] = (
+    (214, 52, 70),
+    (60, 110, 196),
+    (240, 196, 60),
+    (60, 160, 110),
+    (226, 120, 170),
+    (150, 80, 170),
+)
+
+
+def _striped_awning(
+    p: Painter,
+    a: Point,
+    b: Point,
+    span: tuple[float, float],
+    drop: float,
+    reach: float,
+    stripes: int,
+) -> None:
+    """A green and cream striped awning sloping out `reach` from the wall under the edge from `a`
+    to `b`, from `span[0]` to `span[1]` along it and hung from `drop` down it, with a valance of
+    the same stripes along its front."""
+    t0, t1 = span
+    dx, dy = _outward(a, b, reach)
+    fall = reach * 0.9
+    for k in range(stripes):
+        s0, s1 = t0 + (t1 - t0) * k / stripes, t0 + (t1 - t0) * (k + 1) / stripes
+        colour = (STORE_GREEN, STORE_CREAM)[k % 2]
+        near = [_on_wall(a, b, s0, drop), _on_wall(a, b, s1, drop)]
+        out = [(x + dx, y + dy + fall) for x, y in near]
+        p.polygon([near[0], near[1], out[1], out[0]], colour)
+        p.polygon(
+            [
+                out[0],
+                out[1],
+                (out[1][0], out[1][1] + reach * 0.35),
+                (out[0][0], out[0][1] + reach * 0.35),
+            ],
+            shade(colour, 0.85),
+        )
+
+
+def _mannequins(
+    p: Painter, a: Point, b: Point, span: tuple[float, float], foot: float, tall: float
+) -> None:
+    """Dressed figures in a shop window on the wall under the edge from `a` to `b`, spread from
+    `span[0]` to `span[1]` along it and standing `foot` down it, `tall` high, each in a dress or
+    coat of its own colour under a hat."""
+    t0, t1 = span
+    count = max(2, round((t1 - t0) * 12))
+    for k in range(count):
+        t = t0 + (t1 - t0) * (k + 0.5) / count
+        colour = FASHIONS[(k * 2 + round(t0 * 10)) % len(FASHIONS)]
+        x, y = _on_wall(a, b, t, foot)
+        p.polygon(
+            [(x - 0.35, y), (x + 0.35, y), (x + 0.2, y - tall * 0.7), (x - 0.2, y - tall * 0.7)],
+            colour,
+        )
+        p.blob(x - 0.22, y - tall * 0.92, x + 0.22, y - tall * 0.68, (232, 196, 170))
+        p.polygon(
+            [(x - 0.4, y - tall * 0.86), (x + 0.4, y - tall * 0.86), (x, y - tall)],
+            shade(colour, 0.7),
+        )
+
+
 def department_store() -> Sprite:
-    """A wide, ornate store of three storeys: great display windows dressed with goods, a glazed
-    entrance under a gold sign, arched windows above, a corner dome and a flag."""
-    p = Painter(28, 42, (13, 32))
+    """A wide, ornate store of three storeys in warm sandstone with cream cornices: great display
+    windows lit and dressed with figures in bright fashions under green and cream striped
+    awnings, a glazed entrance in a gilt frame under a green sign lettered in gold, arched windows
+    above each under its own little striped awning, long red banners with gold edges hung down
+    its corners, a green copper dome ribbed in gold under a flag, pennants on its corners and
+    lamps before it."""
+    p = Painter(32, 44, (16, 33))
     p.shadow(11, 3.5)
-    wall = (234, 216, 184)
+    wall = STORE_STONE
     _worn(p, (-10, -13), (0, -8), (-0.05, 1.05), 13, 2.5, PAVING)
     top = p.box(0, 0, 10, 13, wall, (128, 118, 124))
     left, front, right, _ = top
-    display = (150, 196, 222)
+    display = (252, 238, 206)
     _patch(p, left, front, (0.05, 0.92), (9, 12), display)
-    _patch(p, front, right, (0.08, 0.95), (9, 12), shade(display, 0.75))
-    for k, t in enumerate((0.12, 0.22, 0.62, 0.74, 0.84)):
-        p.line([_on_wall(left, front, t, 11), _on_wall(left, front, t + 0.04, 11)], CLOTH[k % 3])
-    for t in (0.3, 0.68):
-        p.line([_on_wall(left, front, t, 9), _on_wall(left, front, t, 12)], shade(wall, 0.85))
-    for t in (0.36, 0.64):
-        p.line([_on_wall(front, right, t, 9), _on_wall(front, right, t, 12)], shade(wall, 0.65))
+    _patch(p, front, right, (0.08, 0.95), (9, 12), shade(display, 0.82))
+    _mannequins(p, left, front, (0.05, 0.36), 11.9, 2.1)
+    _mannequins(p, left, front, (0.6, 0.92), 11.9, 2.1)
+    _mannequins(p, front, right, (0.08, 0.95), 11.9, 2.1)
+    for a, b, spans, tone in (
+        (left, front, (0.05, 0.3, 0.68, 0.92), 0.85),
+        (front, right, (0.08, 0.36, 0.64, 0.95), 0.65),
+    ):
+        for t in spans:
+            p.line([_on_wall(a, b, t, 9), _on_wall(a, b, t, 12)], shade(wall, tone))
+    _patch(p, left, front, (0.38, 0.58), (9, 12.2), GOLD)
     _patch(p, left, front, (0.4, 0.56), (9.4, 12.2), DOORWAY)
+    _patch(p, left, front, (0.42, 0.54), (9.8, 12.2), shade(display, 0.7))
+    p.line([_on_wall(left, front, 0.48, 9.8), _on_wall(left, front, 0.48, 12.2)], GOLD)
     _pale_plinth(p, top, 13, wall, 0.8)
     _foot(p, top, 13)
     _doorstep(p, left, front, (0.36, 0.6), 13, shade(PAVING, 1.1))
-    for a, b in ((left, front), (front, right)):
-        _band(p, a, b, 1, shade(wall, 1.12))
-        _band(p, a, b, 8, shade(wall, 0.7))
-    sign = (196, 156, 60)
-    _patch(p, left, front, (0.32, 0.64), (7.6, 8.6), sign)
-    _windows(p, left, front, (0.12, 0.3, 0.48, 0.66), (2.5, 5.5), 2, arch=shade(wall, 0.72))
-    _windows(
-        p,
-        front,
-        right,
-        (0.34, 0.52, 0.7, 0.88),
-        (2.5, 5.5),
-        2,
-        shade(WINDOW, 0.75),
-        shade(wall, 0.6),
-    )
+    for a, b, tone in ((left, front, 1.0), (front, right, 0.8)):
+        _patch(p, a, b, (0, 1), (0, 1.2), shade(STORE_CREAM, tone))
+        _band(p, a, b, 1.2, shade(wall, 0.7 * tone))
+        _patch(p, a, b, (0, 1), (8, 8.8), shade(STORE_CREAM, tone))
+    _patch(p, left, front, (0.3, 0.66), (7.1, 8.5), GOLD)
+    _patch(p, left, front, (0.32, 0.64), (7.3, 8.3), STORE_GREEN)
+    for t0, t1 in ((0.35, 0.4), (0.42, 0.46), (0.48, 0.54), (0.56, 0.61)):
+        p.line([_on_wall(left, front, t0, 7.8), _on_wall(left, front, t1, 7.8)], GOLD)
+    _striped_awning(p, left, front, (0.05, 0.36), 8.9, 1.1, 6)
+    _striped_awning(p, left, front, (0.6, 0.92), 8.9, 1.1, 6)
+    _striped_awning(p, front, right, (0.08, 0.95), 8.9, 1.1, 12)
+    for a, b, spans, banner, glass in (
+        (left, front, (0.12, 0.3, 0.48, 0.66), 0.85, WINDOW),
+        (front, right, (0.34, 0.52, 0.7, 0.88), 0.15, shade(WINDOW, 0.75)),
+    ):
+        for row in (2.5, 5.5):
+            for k, t in enumerate(spans):
+                lit = (k + round(row)) % 3 == 0
+                _patch(p, a, b, (t - 0.045, t + 0.045), (row - 0.3, row + 2.2), STORE_CREAM)
+                _patch(p, a, b, (t - 0.03, t + 0.03), (row, row + 2), LIT if lit else glass)
+                _striped_awning(p, a, b, (t - 0.05, t + 0.05), row - 0.2, 0.7, 3)
+        _patch(p, a, b, (banner - 0.05, banner + 0.05), (1.6, 7.6), GOLD)
+        _patch(p, a, b, (banner - 0.04, banner + 0.04), (1.6, 7.2), BANNER)
+        cx, cy = _on_wall(a, b, banner, 3.4)
+        p.blob(cx - 0.5, cy - 0.5, cx + 0.5, cy + 0.5, GOLD)
     p.line([left, front, right], shade(wall, 1.15))
-    for x, y in (left, right):
-        p.rect(x - 0.5, y - 2, x + 0.5, y, shade(wall, 0.9))
-    _turned(p, 0, -8, [(0, 3), (3, 3)], wall)
+    for (x, y), colour in ((left, (60, 110, 196)), (right, (240, 196, 60))):
+        p.rect(x - 0.5, y - 2, x + 0.5, y, STORE_CREAM)
+        p.line([(x, y - 2), (x, y - 6)], POST)
+        p.polygon([(x, y - 6), (x + 3, y - 5.2), (x, y - 4.4)], colour)
+    _turned(p, 0, -8, [(0, 3), (3, 3)], STORE_CREAM)
     for dx in (-2, 0):
         p.line([(dx, -9), (dx, -10)], WINDOW)
-    _turned(p, 0, -11, [(0, 3.4), (2, 2.8), (3.5, 1.6), (4.5, 0)], (98, 150, 132))
-    _flag(p, 0, -15, 8)
+    dome = [(0, 3.4), (2, 2.8), (3.5, 1.6), (4.5, 0)]
+    _turned(p, 0, -11, dome, VERDIGRIS)
+    _ribs(p, 0, -11, dome, (1.1, 1.9, 2.6), GOLD)
+    p.blob(-0.5, -16.2, 0.5, -15.2, GOLD)
+    _flag(p, 0, -15, 8, BANNER)
     for t in (0, 1):
         _street_lamp(p, *_out(left, front, t, 13, 1.8), 7)
     return p.sprite()

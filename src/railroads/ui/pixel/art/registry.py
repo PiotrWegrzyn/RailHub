@@ -28,9 +28,10 @@ from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_pete
 from railroads.ui.pixel.art.commerce import (
     airport,
     builders_yard,
+    car_dealer,
     department_store,
     hotel,
-    shop,
+    jeweller,
     sushi_hut,
     tavern,
 )
@@ -240,8 +241,8 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "chemical_works": chemical_works,
     "electronics_plant": electronics_plant,
     "car_factory": car_factory,
-    "car_dealer": lambda: shop((226, 224, 218), (236, 80, 132), (60, 90, 170)),
-    "jeweller": lambda: shop((70, 62, 84), (232, 190, 70), (190, 238, 255)),
+    "car_dealer": car_dealer,
+    "jeweller": jeweller,
     "orange_farm": lambda: orchard([(244, 142, 36)]),
     "outpost": outpost,
     "base": base,

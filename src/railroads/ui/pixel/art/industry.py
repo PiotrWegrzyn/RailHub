@@ -4,6 +4,7 @@ import math
 
 import numpy as np
 
+from railroads.ui.pixel.art.commerce import _planks
 from railroads.ui.pixel.art.painter import (
     BARREL,
     BRICK,
@@ -26,6 +27,7 @@ from railroads.ui.pixel.art.painter import (
     shade,
 )
 from railroads.ui.pixel.art.parts import (
+    BEAST,
     DOOR,
     METRE,
     SILL,
@@ -69,27 +71,312 @@ OIL: RGB = (62, 60, 62)
 PUDDLE: RGB = (98, 126, 146)
 
 
+MILL_BRICK: RGB = (158, 74, 52)
+DRESSING: RGB = (230, 206, 158)
+MILL_SLATE: RGB = (80, 86, 100)
+NORTH_LIGHT: RGB = (178, 212, 228)
+MILL_GLASS: RGB = (66, 84, 106)
+CINDERS: RGB = (108, 100, 90)
+GOODS_CRATE: RGB = (184, 142, 90)
+GIRDER: RGB = (96, 102, 112)
+
+
+def _round_head(
+    a: Point, b: Point, length: float, t: float, wide: float, head: float, foot: float
+) -> list[Point]:
+    """The outline of an opening with a round head on the wall under the edge from `a` to `b`,
+    which is `length` units long: `wide` across about `t` of the way along it, from its crown
+    `head` down the wall to its foot `foot` down."""
+    half, r = wide / 2 / length, wide / 2
+    arc = [
+        _on_wall(a, b, t + half * math.cos(turn), head + r - r * math.sin(turn))
+        for turn in np.linspace(0, math.pi, 9)
+    ]
+    return [_on_wall(a, b, t - half, foot), _on_wall(a, b, t + half, foot), *arc]
+
+
+def _mill_window(
+    p: Painter,
+    a: Point,
+    b: Point,
+    length: float,
+    t: float,
+    wide: float,
+    span: tuple[float, float],
+    glass: RGB = MILL_GLASS,
+) -> None:
+    """A tall iron-framed window of many small panes with a round head under an arch of cream
+    brick and a stone sill, `wide` across about `t` along the wall under the edge from `a` to
+    `b`, which is `length` units long, from `span[0]` down the wall to `span[1]`."""
+    m = METRE
+    head, foot = span
+    half = wide / 2 / length
+    p.polygon(
+        _round_head(a, b, length, t, wide + 0.7 * m, head - 0.35 * m, head + wide / 2), DRESSING
+    )
+    p.polygon(_round_head(a, b, length, t, wide, head, foot), glass)
+    bar = shade(glass, 1.55)
+    _bar(p, _on_wall(a, b, t, head), _on_wall(a, b, t, foot), 0.07 * m, bar)
+    for drop in np.arange(head + wide / 2, foot - 0.3 * m, 0.75 * m):
+        _bar(p, _on_wall(a, b, t - half, drop), _on_wall(a, b, t + half, drop), 0.06 * m, bar)
+    p.polygon(
+        [
+            _on_wall(a, b, t - half * 1.3, foot),
+            _on_wall(a, b, t + half * 1.3, foot),
+            _on_wall(a, b, t + half * 1.3, foot + 0.25 * m),
+            _on_wall(a, b, t - half * 1.3, foot + 0.25 * m),
+        ],
+        DRESSING,
+    )
+
+
+def _north_lights(p: Painter, top: Top, teeth: int, rise: float, roof: RGB, wall: RGB) -> None:
+    """A north-light roof over a block's top: `teeth` ridges across it, each a slope of slates
+    rising from the back to a wall of glazing that faces the shaded side, its panes framed in
+    light bars, and capped along its crest."""
+    m = METRE
+    left, front, right, back = top
+    for k in range(teeth):
+        t0, t1 = k / teeth, (k + 1) / teeth
+        low_near, low_far = _on_wall(left, front, t0, 0), _on_wall(back, right, t0, 0)
+        foot_near, foot_far = _on_wall(left, front, t1, 0), _on_wall(back, right, t1, 0)
+        high_near, high_far = _on_wall(left, front, t1, -rise), _on_wall(back, right, t1, -rise)
+        p.polygon([low_near, high_near, high_far, low_far], roof, shade(roof, 0.6))
+        for up in (0.35, 0.7):
+            _bar(
+                p,
+                _on_wall(low_near, high_near, up, 0),
+                _on_wall(low_far, high_far, up, 0),
+                0.06 * m,
+                shade(roof, 0.8),
+            )
+        p.polygon(
+            [foot_near, high_near, high_far, foot_far],
+            shade(NORTH_LIGHT, 0.82),
+            shade(NORTH_LIGHT, 0.5),
+        )
+        for s in (0.2, 0.4, 0.6, 0.8):
+            _bar(
+                p,
+                _on_wall(foot_near, foot_far, s, 0),
+                _on_wall(foot_near, foot_far, s, -rise),
+                0.08 * m,
+                shade(NORTH_LIGHT, 0.55),
+            )
+        _bar(p, high_near, high_far, 0.18 * m, shade(roof, 1.35))
+        p.polygon([low_near, high_near, foot_near], wall, shade(wall, 0.55))
+
+
+def _crates(p: Painter, x: float, y: float, rows: tuple[int, ...]) -> None:
+    """Crates of goods a metre and a quarter a side stacked on (x, y): a row of `rows[0]` of them
+    running along the lit walls, `rows[1]` on top of those and so on, slatted and lit on top."""
+    m = METRE
+    side = 1.25 * m
+    for level, count in enumerate(rows):
+        for k in range(count):
+            cx, cy = _iso(x, y, (k + level * 0.5) * side, 0)
+            left, front, right, _ = p.hall(
+                cx, cy - level * side, side, side, side, GOODS_CRATE, shade(GOODS_CRATE, 1.15)
+            )
+            for a, b, tone in ((left, front, 0.72), (front, right, 0.55)):
+                _bar(
+                    p,
+                    _on_wall(a, b, 0, side / 2),
+                    _on_wall(a, b, 1, side / 2),
+                    0.08 * m,
+                    shade(GOODS_CRATE, tone),
+                )
+                _bar(
+                    p,
+                    _on_wall(a, b, 0.5, 0),
+                    _on_wall(a, b, 0.5, side),
+                    0.08 * m,
+                    shade(GOODS_CRATE, tone),
+                )
+
+
+def _girders(p: Painter, x: float, y: float, long: float, layers: int) -> None:
+    """Steel girders `long` metres long stacked `layers` deep on timber bearers at (x, y), their
+    dark I-shaped ends showing on the shaded side."""
+    m = METRE
+    for along in (-0.3, 0.3):
+        p.hall(
+            x + along * long * m,
+            y + along * long * m / 2,
+            0.3 * m,
+            2.2 * m,
+            0.2 * m,
+            shade(TIMBER, 0.6),
+            None,
+        )
+    high = 0.35 * m * layers
+    left, front, right, _ = p.hall(
+        x, y - 0.2 * m, long * m, 1.8 * m, high, GIRDER, shade(GIRDER, 1.3)
+    )
+    for k in range(1, layers):
+        _bar(
+            p,
+            _on_wall(left, front, 0, high * k / layers),
+            _on_wall(left, front, 1, high * k / layers),
+            0.06 * m,
+            shade(GIRDER, 0.6),
+        )
+    for k in range(layers):
+        for t in (0.25, 0.75):
+            ex, ey = _on_wall(front, right, t, high * (k + 0.5) / layers)
+            p.blob(ex - 0.2 * m, ey - 0.15 * m, ex + 0.2 * m, ey + 0.15 * m, shade(GIRDER, 0.4))
+
+
+def _tall_chimney(p: Painter, x: float, y: float, tall: float) -> None:
+    """A round brick mill chimney drawn for `tall` units and lowered (CHIMNEY_SHARE): a square
+    plinth with a cream band, a tapering shaft ringed with iron bands, a cream band and a
+    corbelled black crown at its top, smoking."""
+    m = METRE
+    tall *= CHIMNEY_SHARE
+    base = 3.2 * m
+    plinth = p.box(x, y, base / 2 * 1.4, base, MILL_BRICK, shade(MILL_BRICK, 1.1))
+    _bands(p, plinth[0], plinth[1], plinth[2], 0.4 * m, DRESSING, shade(DRESSING, 0.78))
+    foot = y - base
+    shaft = tall - base
+    r0, r1 = 1.5 * m, 0.95 * m
+    _turned(p, x, foot, [(0, r0), (shaft, r1)], MILL_BRICK)
+
+    def ring(up: float, wide: float, colour: RGB) -> None:
+        half = r0 + (r1 - r0) * up / shaft
+        y = foot - up
+        for a, b in (((x - half, y), (x, y + half / 2)), ((x, y + half / 2), (x + half, y))):
+            _bar(p, a, b, wide, colour)
+
+    for up in (0.3, 0.55, 0.78):
+        ring(shaft * up, 0.15 * m, (60, 52, 52))
+    ring(shaft - 1.6 * m, 0.6 * m, DRESSING)
+    _turned(
+        p,
+        x,
+        foot - shaft,
+        [(0, r1), (0.5 * m, r1 * 1.25), (1.3 * m, r1 * 1.25)],
+        (72, 50, 44),
+        (30, 28, 30),
+    )
+    _smoke(p, x + 1, foot - shaft - 4, (206, 206, 212), 2)
+
+
 def factory() -> Sprite:
-    """A small brick works with one chimney: a sawtooth roof glazed along its teeth, a row of
-    arched windows over a dark plinth, a loading door with a cart track worn out from it and
-    crates by it."""
-    p = Painter(20, 28, (9, 22))
-    foot = _footing(0, 0, 7, 7)
+    """A Victorian brick factory, 28 by 13 m and two storeys high: rows of tall iron-framed
+    windows with round heads under cream brick arches between pilasters, a north-light roof of
+    seven glazed teeth, a stair tower at its end with a clock under a slate pyramid, an engine
+    house with a tall round chimney smoking behind it, a big arched loading door with a hoist
+    over it and a cart track worn out of it, and a cinder yard of crated goods, sawn planks and
+    steel girders."""
+    m = METRE
+    p = Painter(48, 46, (24, 31))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 16.5) * m, (v - 6.5) * m)
+
+    length, depth, high = 28 * m, 13 * m, 9.5 * m
+    p.polygon([at(26, -4), at(36.5, -4), at(36.5, 13), at(26, 13)], CINDERS)
+    foot = _footing(*at(14, 6.5), length, depth)
     _bed(p, foot)
-    p.shadow(7, 2.5)
-    _track(p, foot[1], foot[2], (0.2, 0.5), 5)
-    top = p.box(0, 0, 7, 6, BRICK, (96, 94, 100))
+    _bed(p, _footing(*at(-2.5, 2.5), 5 * m, 5 * m), margin=0.5)
+    p.shadow(17, 5, 4)
+    _track(p, foot[0], foot[1], (0.6, 0.72), 6, (140, 122, 92))
+    _tall_chimney(p, *at(28, 17), 45 * m)
+    tower = p.hall(*at(-2.5, 2.5), 5 * m, 5 * m, 17 * m, MILL_BRICK, None)
+    t_left, t_front, t_right, _ = tower
+    _plinth(p, tower, 17 * m, MILL_BRICK)
+    for a, b in ((t_left, t_front), (t_front, t_right)):
+        for drop in (0.3 * m, 4.9 * m):
+            _bar(p, _on_wall(a, b, 0, drop), _on_wall(a, b, 1, drop), 0.3 * m, DRESSING)
+        for t in (0.03, 0.97):
+            _bar(p, _on_wall(a, b, t, 0), _on_wall(a, b, t, 16.3 * m), 0.35 * m, DRESSING)
+        for head in (6 * m, 10 * m, 13.6 * m):
+            _mill_window(p, a, b, 5 * m, 0.5, 1 * m, (head, head + 1.9 * m))
+    cx, cy = _on_wall(t_left, t_front, 0.5, 2.6 * m)
+    p.ellipse(cx - 1.5 * m, cy - 1.5 * m, cx + 1.5 * m, cy + 1.5 * m, DRESSING)
+    p.ellipse(cx - 1.2 * m, cy - 1.2 * m, cx + 1.2 * m, cy + 1.2 * m, (246, 242, 230))
+    _bar(p, (cx, cy), (cx, cy - 0.95 * m), 0.14 * m, (30, 30, 34))
+    _bar(p, (cx, cy), (cx + 0.65 * m, cy + 0.2 * m), 0.14 * m, (30, 30, 34))
+    apex = ((t_left[0] + t_right[0]) / 2, (t_left[1] + t_right[1]) / 2 - 4 * m)
+    p.polygon([t_left, t_front, apex], MILL_SLATE, shade(MILL_SLATE, 0.6))
+    p.polygon([t_front, t_right, apex], shade(MILL_SLATE, 0.72), shade(MILL_SLATE, 0.5))
+    _bar(p, apex, (apex[0], apex[1] - 2 * m), 0.12 * m, (50, 50, 56))
+    p.polygon(
+        [
+            (apex[0], apex[1] - 2 * m),
+            (apex[0] + 1.2 * m, apex[1] - 1.7 * m),
+            (apex[0], apex[1] - 1.3 * m),
+        ],
+        (214, 170, 70),
+    )
+    top = p.hall(*at(14, 6.5), length, depth, high, MILL_BRICK, None)
     left, front, right, _ = top
-    _plinth(p, top, 6, BRICK)
-    _stains(p, left, front, 6, (0.1, 0.5, 0.9), shade(BRICK, 0.62))
-    _windows(p, left, front, (0.15, 0.38, 0.62, 0.85), (2,), 2, WINDOW, shade(BRICK, 1.35))
-    _door(p, front, right, (0.2, 0.5), 2.5, 6, DOORWAY, shade(BRICK, 1.3))
-    _window(p, front, right, (0.7, 0.85), 2.2, shade(WINDOW, 0.8))
-    _sawtooth(p, top, 2, 2.5, METAL, (170, 200, 214), BRICK)
-    cap = _stack(p, 3, -6, -16, shade(BRICK, 0.8))
-    _smoke(p, 4.5, cap - 2, (214, 214, 218), 2)
-    for x, y in ((7.5, 1.2), (9, 0.4)):
-        _crate(p, x, y)
+    _plinth(p, top, high, MILL_BRICK, 0.7 * m)
+    _stains(p, left, front, high, (0.05, 0.31, 0.55, 0.93), shade(MILL_BRICK, 0.66), 1.6 * m)
+    bays = 8
+    for a, b in ((left, front), (front, right)):
+        for drop, wide in ((0, 0.5 * m), (4.6 * m, 0.25 * m)):
+            _bar(
+                p,
+                _on_wall(a, b, 0, drop + wide / 2),
+                _on_wall(a, b, 1, drop + wide / 2),
+                wide,
+                DRESSING,
+            )
+    for k in range(bays + 1):
+        t = k / bays
+        _bar(
+            p,
+            _on_wall(left, front, t, 0.5 * m),
+            _on_wall(left, front, t, high),
+            0.5 * m,
+            shade(MILL_BRICK, 0.86),
+        )
+    door = 5
+    for k in range(bays):
+        t = (k + 0.5) / bays
+        if k == door:
+            continue
+        _mill_window(p, left, front, length, t, 1.5 * m, (1.3 * m, 3.9 * m))
+        _mill_window(p, left, front, length, t, 1.7 * m, (5.4 * m, 8.4 * m))
+    t = (door + 0.5) / bays
+    p.polygon(_round_head(left, front, length, t, 3.6 * m, 4.9 * m, high), DRESSING)
+    p.polygon(_round_head(left, front, length, t, 3 * m, 5.2 * m, high), DOORWAY)
+    _patch(p, left, front, (t - 0.054, t - 0.002), (6.6 * m, high), DOOR)
+    for s in (t - 0.04, t - 0.02):
+        _bar(
+            p,
+            _on_wall(left, front, s, 6.6 * m),
+            _on_wall(left, front, s, high),
+            0.06 * m,
+            shade(DOOR, 0.7),
+        )
+    _patch(p, left, front, (t - 0.03, t + 0.03), (1.3 * m, 3.9 * m), DOOR)
+    beam = _on_wall(left, front, t, 0.9 * m)
+    _bar(p, beam, (beam[0] - 1.6 * m, beam[1] + 0.8 * m), 0.2 * m, (54, 50, 50))
+    hook = (beam[0] - 1.5 * m, beam[1] + 0.8 * m)
+    _bar(p, hook, (hook[0], hook[1] + 2.4 * m), 0.05 * m, (40, 38, 38))
+    for k in range(3):
+        t = (k + 0.5) / 3
+        _mill_window(
+            p, front, right, depth, t, 1.5 * m, (1.3 * m, 3.9 * m), shade(MILL_GLASS, 0.85)
+        )
+        _mill_window(
+            p, front, right, depth, t, 1.7 * m, (5.4 * m, 8.4 * m), shade(MILL_GLASS, 0.85)
+        )
+    _north_lights(p, top, 7, 2.8 * m, MILL_SLATE, MILL_BRICK)
+    engine = p.hall(*at(31, 9.5), 6 * m, 7 * m, 6 * m, MILL_BRICK, None)
+    e_left, e_front, e_right, _ = engine
+    _plinth(p, engine, 6 * m, MILL_BRICK, 0.6 * m)
+    _bands(p, e_left, e_front, e_right, 0.3 * m, DRESSING, shade(DRESSING, 0.78))
+    _mill_window(p, e_left, e_front, 6 * m, 0.5, 2 * m, (1.2 * m, 4.6 * m))
+    _patch(p, e_front, e_right, (0.3, 0.7), (2.4 * m, 6 * m), DOORWAY)
+    p.gable(engine, 2.2 * m, MILL_SLATE, MILL_BRICK)
+    _roof_rows(p, engine, 2.2 * m, MILL_SLATE)
+    _girders(p, *at(33, 2), 6, 3)
+    _planks(p, *at(28.5, -1.5), 5, 1)
+    _crates(p, *at(34, -2.5), (3, 2, 1))
+    _crates(p, *at(18.5, -3.5), (2, 1))
     return p.sprite()
 
 
@@ -1698,83 +1985,89 @@ def porcelain_works() -> Sprite:
 
 
 def meat_factory() -> Sprite:
-    """A brick slaughterhouse over a dark plinth with two rows of arched windows, a louvred vent on
-    its ridge and a ham hung out as its sign, a ramp up from a cattle pen trampled to mud, and a
-    white cold store with an insulated door, a track worn out of it past a puddle of melt water,
-    and a refrigeration unit and vent on its roof."""
-    p = Painter(36, 36, (17, 25))
-    foot = _footing(0, -3, 14, 8)
-    store_foot = _footing(11, 3, 5, 5)
+    """A brick slaughterhouse 15 by 8 m over a dark plinth with two rows of arched windows, a
+    louvred vent on its ridge and a ham hung out as its sign, a ramp up from a cattle pen trampled
+    to mud, and a white cold store with an insulated door, a track worn out of it past a puddle of
+    melt water, and a refrigeration unit and vent on its roof."""
+    p = Painter(30, 30, (14, 21))
+    foot = _footing(0, -2.4, 11, 6.2)
+    store_foot = _footing(8.6, 2.4, 3.9, 3.9)
     _bed(p, foot)
     _bed(p, store_foot, margin=1)
     mud = (112, 94, 66)
-    p.polygon(list(_paddock(-10, 3, 4.6)), mud)
-    for x, y in ((-12, 3), (-8, 5), (-10, 1.6)):
+    p.polygon(list(_paddock(-7.8, 2.3, 4.2)), mud)
+    for x, y in ((-9.4, 2.3), (-7.4, 2.6), (-7.8, 1.2)):
         p.point(x, y, shade(mud, 0.75))
-    p.shadow(15, 4.5)
-    _track(p, store_foot[1], store_foot[2], (0.3, 0.7), 2.5)
-    _puddle(p, 16, 7, 1.3)
+    p.shadow(12, 3.6)
+    _track(p, store_foot[1], store_foot[2], (0.3, 0.7), 2)
+    _puddle(p, 12.5, 5.5, 1)
     roof = (86, 80, 88)
     lintel = shade(BRICK, 1.3)
-    top = p.hall(0, -3, 14, 8, 8, BRICK, None)
+    high = 6.4
+    top = p.hall(0, -2.4, 11, 6.2, high, BRICK, None)
     left, front, *_ = top
-    _plinth(p, top, 8, BRICK)
-    _stains(p, left, front, 8, (0.06, 0.2, 0.55, 0.85), shade(BRICK, 0.62), 1.8)
-    _windows(p, left, front, (0.6, 0.75, 0.9), (2,), 2, arch=lintel)
-    _windows(p, left, front, (0.6, 0.75, 0.9), (5,), 1, arch=lintel)
-    _patch(p, left, front, (0.3, 0.45), (3, 6), (56, 44, 40))
-    p.line([_on_wall(left, front, 0.28, 2.4), _on_wall(left, front, 0.47, 2.4)], lintel)
-    p.gable(top, 4, roof, BRICK)
-    _roof_rows(p, top, 4, roof)
-    ridge_back, ridge_front = _ridge(top, 4)
+    _plinth(p, top, high, BRICK)
+    _stains(p, left, front, high, (0.06, 0.2, 0.55, 0.85), shade(BRICK, 0.62), 1.4)
+    _windows(p, left, front, (0.6, 0.75, 0.9), (1.6,), 1.6, arch=lintel)
+    _windows(p, left, front, (0.6, 0.75, 0.9), (3.9,), 0.8, arch=lintel)
+    _patch(p, left, front, (0.3, 0.45), (2.4, 4.8), (56, 44, 40))
+    p.line([_on_wall(left, front, 0.28, 1.9), _on_wall(left, front, 0.47, 1.9)], lintel)
+    p.gable(top, 3.2, roof, BRICK)
+    _roof_rows(p, top, 3.2, roof)
+    ridge_back, ridge_front = _ridge(top, 3.2)
     a, b = _on_wall(ridge_back, ridge_front, 0.4, 0), _on_wall(ridge_back, ridge_front, 0.7, 0)
-    p.polygon([(a[0], a[1] - 1.5), (b[0], b[1] - 1.5), b, a], (176, 168, 160), shade(roof, 0.8))
-    p.line([(a[0] - 0.5, a[1] - 2), (b[0] + 0.5, b[1] - 2)], shade(roof, 0.8))
-    bracket = _on_wall(left, front, 0.08, 2)
-    p.line([bracket, (bracket[0] - 3, bracket[1] + 1)], (60, 56, 54))
+    p.polygon([(a[0], a[1] - 1.2), (b[0], b[1] - 1.2), b, a], (176, 168, 160), shade(roof, 0.8))
+    p.line([(a[0] - 0.4, a[1] - 1.6), (b[0] + 0.4, b[1] - 1.6)], shade(roof, 0.8))
+    bracket = _on_wall(left, front, 0.08, 1.6)
+    p.line([bracket, (bracket[0] - 2.4, bracket[1] + 0.8)], (60, 56, 54))
     ham = (196, 76, 66)
-    hx, hy = bracket[0] - 3, bracket[1] + 4
-    p.ellipse(hx - 3, hy - 2, hx + 1, hy + 2, ham)
-    p.point(hx - 2, hy - 1, shade(ham, 1.3))
-    p.line([(hx + 1, hy - 1), (hx + 2, hy - 2)], (244, 238, 224))
-    p.point(hx + 3, hy - 3, (244, 238, 224))
-    ramp = [_on_wall(left, front, t, 6) for t in (0.3, 0.45)]
+    hx, hy = bracket[0] - 2.4, bracket[1] + 3.2
+    p.ellipse(hx - 2.4, hy - 1.6, hx + 0.8, hy + 1.6, ham)
+    p.point(hx - 1.6, hy - 0.8, shade(ham, 1.3))
+    p.line([(hx + 0.8, hy - 0.8), (hx + 1.6, hy - 1.6)], (244, 238, 224))
+    p.point(hx + 2.4, hy - 2.4, (244, 238, 224))
+    ramp = [_on_wall(left, front, t, 4.8) for t in (0.3, 0.45)]
     p.polygon(
-        [ramp[0], ramp[1], (ramp[1][0] - 4, ramp[1][1] + 4), (ramp[0][0] - 4, ramp[0][1] + 4)],
+        [
+            ramp[0],
+            ramp[1],
+            (ramp[1][0] - 3.2, ramp[1][1] + 3.2),
+            (ramp[0][0] - 3.2, ramp[0][1] + 3.2),
+        ],
         TIMBER,
         shade(TIMBER, 0.6),
     )
-    for k in (1, 2, 3):
+    for k in (0.8, 1.6, 2.4):
         p.line(
             [(ramp[0][0] - k, ramp[0][1] + k), (ramp[1][0] - k, ramp[1][1] + k)],
             shade(TIMBER, 0.75),
         )
-    pen_left, pen_back, pen_right, pen_front = _paddock(-10, 3, 5)
+    pen_left, pen_back, pen_right, pen_front = _paddock(-7.8, 2.3, 4.6)
     _fence(p, pen_left, pen_back, METRE)
     _fence(p, pen_back, pen_right, METRE)
-    for cx, cy, facing in ((-11, 2, 1), (-8, 4, -1), (-10.5, 4.6, 1)):
-        _cow(p, cx, cy, (138, 84, 50), (96, 58, 36), METRE, facing)
+    for cx, cy, facing in ((-9.2, 2.0, 1), (-6.4, 3.1, -1)):
+        _cow(p, cx, cy, (138, 84, 50), (96, 58, 36), BEAST, facing)
     _fence(p, pen_left, pen_front, METRE)
     _fence(p, pen_front, pen_right, METRE)
     cold = (234, 236, 238)
-    store = p.box(11, 3, 5, 6, cold, shade(cold, 0.88))
-    _plinth(p, store, 6, cold, 0.6)
-    _stains(p, store[1], store[2], 6, (0.15, 0.85), shade(cold, 0.66), 1.2)
+    store = p.box(8.6, 2.4, 3.9, 4.7, cold, shade(cold, 0.88))
+    _plinth(p, store, 4.7, cold, 0.5)
+    _stains(p, store[1], store[2], 4.7, (0.15, 0.85), shade(cold, 0.66), 0.9)
     for t in (0.25, 0.5, 0.75):
         p.line(
-            [_on_wall(store[0], store[1], t, 0.5), _on_wall(store[0], store[1], t, 5.4)],
+            [_on_wall(store[0], store[1], t, 0.4), _on_wall(store[0], store[1], t, 4.2)],
             shade(cold, 0.85),
         )
-    _patch(p, store[1], store[2], (0.3, 0.7), (2, 6), (150, 170, 186))
+    _patch(p, store[1], store[2], (0.3, 0.7), (1.6, 4.7), (150, 170, 186))
     p.line(
-        [_on_wall(store[1], store[2], 0.5, 2), _on_wall(store[1], store[2], 0.5, 6)],
+        [_on_wall(store[1], store[2], 0.5, 1.6), _on_wall(store[1], store[2], 0.5, 4.7)],
         shade(cold, 0.6),
     )
-    p.point(*_on_wall(store[1], store[2], 0.62, 4), (60, 62, 70))
-    p.box(12, -3.5, 2, 2, METAL, shade(METAL, 1.1))
-    p.blob(11, -7, 13, -5, (60, 62, 70))
-    p.line([(8, -4), (8, -9)], METAL)
-    p.rect(7, -10, 9, -9, shade(METAL, 0.8))
+    p.point(*_on_wall(store[1], store[2], 0.62, 3.1), (60, 62, 70))
+    p.box(9.4, -2.7, 1.6, 1.6, METAL, shade(METAL, 1.1))
+    p.blob(8.6, -5.1, 10.2, -3.5, (60, 62, 70))
+    p.line([(6.2, -3.1), (6.2, -7)], METAL)
+    p.rect(5.5, -7.8, 7, -7, shade(METAL, 0.8))
     return p.sprite()
 
 

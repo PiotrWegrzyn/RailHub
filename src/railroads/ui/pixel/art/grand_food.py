@@ -47,6 +47,7 @@ from railroads.ui.pixel.art.painter import (
     shade,
 )
 from railroads.ui.pixel.art.parts import (
+    BEAST,
     METRE,
     _band,
     _bands,
@@ -945,9 +946,8 @@ def _pen(p: Painter, x: float, y: float, half: float, cows: tuple[Point, ...]) -
         p.point(x + dx, y + dy, shade(MUD, 0.75))
     _fence(p, pen_left, pen_back, METRE)
     _fence(p, pen_back, pen_right, METRE)
-    for cx, cy in cows:
-        _cow(p, cx, cy, *STEER, METRE, 1)
-        _cow(p, cx + 1.6, cy + 1.1, *STEER, METRE, -1)
+    for k, (cx, cy) in enumerate(cows):
+        _cow(p, cx, cy, *STEER, BEAST, 1 if k % 2 else -1)
     _fence(p, pen_left, pen_front, METRE)
     _fence(p, pen_front, pen_right, METRE)
 
