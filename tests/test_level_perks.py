@@ -5,7 +5,7 @@ from railroads.sim.tiles import Board, Tile
 def test_a_supply_level_that_opens_an_engine_names_it() -> None:
     found = perks(Board.SUPPLY, Tile.COAL, 13)
 
-    assert found == [LevelPerk(Perk.ENGINE, "New engine for sale: Light tank engine")]
+    assert found == [LevelPerk(Perk.ENGINE, "New engine for sale: 0-6-2 tank engine")]
 
 
 def test_the_level_of_an_era_brings_its_wagons_on_every_supply_tile() -> None:
@@ -34,4 +34,4 @@ def test_a_levels_perks_come_anew_each_time_they_are_asked_for() -> None:
 
     again = perks(Board.SUPPLY, Tile.COAL, 13)
 
-    assert again == [LevelPerk(Perk.ENGINE, "New engine for sale: Light tank engine")]
+    assert again == [LevelPerk(Perk.ENGINE, "New engine for sale: 0-6-2 tank engine")]

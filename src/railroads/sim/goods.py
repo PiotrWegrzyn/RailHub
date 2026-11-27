@@ -462,7 +462,7 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.FLAX: 40,
         Good.HOPS: 30,
         Good.MACHINERY: 300,
-        Good.BRICKS: 12,
+        Good.BRICKS: 170,
         Good.CEMENT: 20,
         Good.GLASS: 30,
         Good.BEER: 100,
@@ -708,7 +708,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             BuildingKind.MACHINE_WORKS: Recipe(
                 Good.MACHINERY, 25, {Need.STEEL: 1.0, Need.COPPER: 0.5}
             ),
-            BuildingKind.BRICKWORKS: Recipe(Good.BRICKS, 90, {Need.CLAY: 0.5}, {Need.COAL: 0.25}),
+            BuildingKind.BRICKWORKS: Recipe(Good.BRICKS, 13, {Need.CLAY: 7.0}, {Need.COAL: 1.0}),
             BuildingKind.CEMENT_WORKS: Recipe(
                 Good.CEMENT, 60, {Need.LIMESTONE: 0.5}, {Need.COAL: 0.25}
             ),
@@ -833,7 +833,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.COMMON: 3,
             Need.VODKA: 0.3,
             Need.REFINED_SUGAR: 0.3,
-            Need.BRICKS: 0.3,
+            Need.BRICKS: 0.05,
             Need.GLASS: 0.12,
             Need.LIMESTONE: 0.3,
             Need.WAX: 0.3,
@@ -863,7 +863,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.TOOLS: 6,
             Need.BEER: 6,
             Need.VODKA: 6,
-            Need.BRICKS: 6,
+            Need.BRICKS: 1,
             Need.GLASS: 6,
             Need.CEMENT: 6,
             Need.REFINED_SUGAR: 6,
@@ -885,7 +885,7 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.CARS: 2,
             Need.BEER: 20,
             Need.VODKA: 20,
-            Need.BRICKS: 30,
+            Need.BRICKS: 5,
             Need.CEMENT: 30,
             Need.GLASS: 30,
             Need.NEWSPAPERS: 20,

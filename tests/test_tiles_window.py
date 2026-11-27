@@ -196,4 +196,4 @@ def test_supply_marks_reach_twice_as_far_ahead_as_demand_ones() -> None:
 def test_a_mark_tells_what_its_level_adds_and_brings() -> None:
     lines = mark_tip(Board.SUPPLY, Tile.COAL, 13)
 
-    assert lines == ["Level 13: +15% supply", "New engine for sale: Light tank engine"]
+    assert lines == ["Level 13: +15% supply", "New engine for sale: 0-6-2 tank engine"]

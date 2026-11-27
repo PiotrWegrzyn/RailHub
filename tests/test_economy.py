@@ -418,8 +418,8 @@ def test_farms_take_limestone_machinery_fertiliser_and_diesel_as_their_demand_ti
 @pytest.mark.parametrize(
     ("kind", "inputs", "made", "amount"),
     [
-        (BuildingKind.BRICKWORKS, {"CLAY": 10.0}, Good.BRICKS, 20.0),
-        (BuildingKind.BRICKWORKS, {"CLAY": 10.0, "COAL": 5.0}, Good.BRICKS, 40.0),
+        (BuildingKind.BRICKWORKS, {"CLAY": 70.0}, Good.BRICKS, 10.0),
+        (BuildingKind.BRICKWORKS, {"CLAY": 70.0, "COAL": 10.0}, Good.BRICKS, 20.0),
         (BuildingKind.TANNERY, {"CATTLE": 10.0}, Good.LEATHER, 20.0),
         (BuildingKind.SHOE_FACTORY, {"LEATHER": 10.0}, Good.SHOES, 5.0),
         (BuildingKind.GLASSWORKS, {"SAND": 10.0}, Good.GLASS, 20.0),

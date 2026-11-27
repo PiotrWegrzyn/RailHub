@@ -507,9 +507,9 @@ window (H) lists the same.
 <!-- table: buildings -->
 | Building | Makes a month at most | Must get a month | Bonus goods and boosts a month |
 |---|---|---|---|
-| House |  | 6 food, 2 heating | 6 food, 0.3 soy sauce, 0.6 beer, 0.6 newspapers (from 1600), 3 common goods, 0.3 vodka (from 1600), 0.3 refined sugar (from 1800), 0.3 bricks, 0.12 glass, 0.3 limestone, 0.3 wax |
-| Tenement |  | 35 food, 40 common goods, 12 heating | 35 food, 3 soy sauce, 6 salt, 12 goods, 6 hot drinks (from 1700), 6 tools (from era 3), 6 beer, 6 vodka (from 1600), 6 bricks, 6 glass, 6 cement (from era 3), 6 refined sugar (from 1800), 6 newspapers (from 1600), 6 limestone, 0.6 luxury goods (from 1700), 3 wax |
-| Block of flats |  | 125 food, 200 common goods, 50 heating | 125 food, 10 soy sauce, 20 salt, 25 goods, 20 hot drinks (from 1700), 6 tools (from era 3), 20 fuel (from era 2), 2 cars (from era 4), 20 beer, 20 vodka (from 1600), 30 bricks, 30 cement (from era 3), 30 glass, 20 newspapers (from 1600), 3 appliances (from era 6), 20 refined sugar (from 1800), 3 luxury goods (from 1700) |
+| House |  | 6 food, 2 heating | 6 food, 0.3 soy sauce, 0.6 beer, 0.6 newspapers (from 1600), 3 common goods, 0.3 vodka (from 1600), 0.3 refined sugar (from 1800), 0.05 bricks, 0.12 glass, 0.3 limestone, 0.3 wax |
+| Tenement |  | 35 food, 40 common goods, 12 heating | 35 food, 3 soy sauce, 6 salt, 12 goods, 6 hot drinks (from 1700), 6 tools (from era 3), 6 beer, 6 vodka (from 1600), 1 bricks, 6 glass, 6 cement (from era 3), 6 refined sugar (from 1800), 6 newspapers (from 1600), 6 limestone, 0.6 luxury goods (from 1700), 3 wax |
+| Block of flats |  | 125 food, 200 common goods, 50 heating | 125 food, 10 soy sauce, 20 salt, 25 goods, 20 hot drinks (from 1700), 6 tools (from era 3), 20 fuel (from era 2), 2 cars (from era 4), 20 beer, 20 vodka (from 1600), 5 bricks, 30 cement (from era 3), 30 glass, 20 newspapers (from 1600), 3 appliances (from era 6), 20 refined sugar (from 1800), 3 luxury goods (from 1700) |
 | Farm | 6 wheat |  | 3 machinery (from machines and tools demand 10), 6 limestone (from ore and stone demand 3), 3 fertiliser (from chemicals and building demand 10), 1.2 fuel (from oil and fuel demand 11) |
 | Orchard | 6 apples |  |  |
 | Date palms | 6 dates |  |  |
@@ -589,7 +589,7 @@ window (H) lists the same.
 | Dairy | 70 dairy products | 28 milk |  |
 | Railway works |  | 120 steel (from era 2) |  |
 | Machine works (era 3) | 25 machinery | 25 steel (from era 2), 12.5 copper (from era 4) |  |
-| Brickworks | 90 bricks | 45 clay | 22.5 coal (from 1700) |
+| Brickworks | 13 bricks | 91 clay | 13 coal (from 1700) |
 | Cement works (era 3) | 60 cement | 30 limestone | 15 coal (from 1700) |
 | Glassworks | 40 glass | 20 sand | 10 coal (from 1700), 10 limestone |
 | Brewery | 25 beer | 25 hops | 10 barrels (from wood demand 4) |
@@ -649,8 +649,8 @@ window (H) lists the same.
 | Mega car factory (era 4) | 75 cars | 375 steel (from era 2), 150 fuel (from era 2) |  |
 | Big machine works (era 3) | 62.5 machinery | 62.5 steel (from era 2), 31.25 copper (from era 4) |  |
 | Mega machine works (era 3) | 156.2 machinery | 156.2 steel (from era 2), 78.12 copper (from era 4) |  |
-| Big brickworks | 225 bricks | 112.5 clay | 56.25 coal (from 1700) |
-| Mega brickworks | 562.5 bricks | 281.2 clay | 140.6 coal (from 1700) |
+| Big brickworks | 32.5 bricks | 227.5 clay | 32.5 coal (from 1700) |
+| Mega brickworks | 81.25 bricks | 568.8 clay | 81.25 coal (from 1700) |
 | Big cement works (era 3) | 150 cement | 75 limestone | 37.5 coal (from 1700) |
 | Mega cement works (era 3) | 375 cement | 187.5 limestone | 93.75 coal (from 1700) |
 | Big glassworks | 100 glass | 50 sand | 25 coal (from 1700), 25 limestone |
@@ -742,7 +742,7 @@ newspapers are never drawn.
 <!-- table: ports -->
 | Tier | Worth a month | Goods, units a month |
 |---|---|---|
-| Common | $600 | wheat 60, logs 60, potatoes 60, rice 60, chickens 60, milk 60, apples 50, bananas 50, dates 50, oranges 50, sugar 50, fish 50, sand 50, soybeans 50, tofu 50, bricks 50, meat 50, dairy products 40, planks 40, wood chips 40, coal 40, gas 40, clay 40, limestone 40, miso 40, cement 30, steel 4.615 |
+| Common | $600 | wheat 60, logs 60, potatoes 60, rice 60, chickens 60, milk 60, apples 50, bananas 50, dates 50, oranges 50, sugar 50, fish 50, sand 50, soybeans 50, tofu 50, bricks 3.529, meat 50, dairy products 40, planks 40, wood chips 40, coal 40, gas 40, clay 40, limestone 40, miso 40, cement 30, steel 4.615 |
 | Rare | $2,400 | refined sugar 109.1, sausages 109.1, fertiliser 96, barrels 96, salt 96, iron ore 80, cans 80, wool 80, grapes 80, fuel 80, soy sauce 80, hops 80, glass 80, paper 80, juice 80, oil 60, cotton 60, flax 60, chemicals 60, leather 60, stove tiles 60, copper 53.33, wax 48, castings 48, incense 4.8, steel 18.46 |
 | Epic | $4,800 | rubber 80, tea 80, plastics 80, coffee 60, furniture 48, beer 48, porcelain 48, clothes 43.64, sake 32, shoes 32, electronics 24, goods 24, vodka 24, tools 19.2, wine 19.2, guns 19.2, machinery 16, appliances 9.6, luxury goods 9.6, steel 36.92 |
 | Legendary | $10,000 | gold 7.692, diamonds 3.333, cars 1.25, tanks 0.7692, planes 0.5263 |
@@ -1091,11 +1091,11 @@ own pixel art.
 | Rocket | pioneer | 1826–1834 (then the Lion) | coal supply level 7 | steam | 24 km/h | 36 s | 2 | $6,000 | 0.5 coal a cell half loaded | 10 cells | [Stephenson's Rocket, 1829](https://en.wikipedia.org/wiki/Stephenson%27s_Rocket) |
 | Lion | pioneer | 1834–1840 (then the Planet steam engine) | coal supply level 8 | steam | 27 km/h | 35 s | 2 | $8,000 | 0.5 coal a cell half loaded | 12 cells | [LMR 57 Lion, 1838](https://en.wikipedia.org/wiki/LMR_57_Lion) |
 | Planet steam engine | general | 1840–1856 (then the American 4-4-0) | coal supply level 9 | steam | 30 km/h | 12 s | 3 | $10,000 | 0.75 coal a cell half loaded | 21 cells | [Planet, 1830](https://en.wikipedia.org/wiki/Planet_(locomotive)) |
-| Tank engine | light | 1840–1862 (then the Light tank engine) | coal supply level 9 | steam | 24 km/h | 3 s | 2 | $3,000 | 0.25 coal a cell half loaded | 13 cells | [Tank locomotive (type)](https://en.wikipedia.org/wiki/Tank_locomotive) |
+| Tank engine | light | 1840–1862 (then the 0-6-2 tank engine) | coal supply level 9 | steam | 24 km/h | 3 s | 2 | $3,000 | 0.25 coal a cell half loaded | 13 cells | [Tank locomotive (type)](https://en.wikipedia.org/wiki/Tank_locomotive) |
 | Goods engine | heavy freight | 1853–1865 (then the Mogul freight engine) | steel and metals supply level 11 | steam | 21 km/h | 50 s | 4 | $15,000 | 1 coal a cell half loaded | 20 cells | [0-6-0 goods engine (type)](https://en.wikipedia.org/wiki/0-6-0) |
 | American 4-4-0 | general | 1856–1910 (then the Pacific engine) | wood supply level 12 | steam | 42 km/h | 11 s | 4 | $30,000 | 1 wood a cell half loaded | 25 cells | [4-4-0 American (type)](https://en.wikipedia.org/wiki/4-4-0), [The General, 1855](https://en.wikipedia.org/wiki/The_General_(locomotive)) |
 | Single-driver express | express | 1858–1900 (then the Atlantic express) | passengers supply level 12 | steam | 60 km/h | 12 s | 3 + dining car | $40,000 | 1 coal a cell half loaded | 30 cells | [GNR Stirling 4-2-2, 1870](https://en.wikipedia.org/wiki/GNR_Stirling_4-2-2) |
-| Light tank engine | light | 1862–1935 (then the Railbus) | coal supply level 13 | steam | 33 km/h | 3 s | 2 | $9,000 | 0.25 coal a cell half loaded | 16 cells | [0-6-2 tank engine (type)](https://en.wikipedia.org/wiki/0-6-2) |
+| 0-6-2 tank engine | light | 1862–1935 (then the Railbus) | coal supply level 13 | steam | 33 km/h | 3 s | 2 | $9,000 | 0.25 coal a cell half loaded | 16 cells | [0-6-2 tank engine (type)](https://en.wikipedia.org/wiki/0-6-2) |
 | Mogul freight engine | heavy freight | 1865–1905 (then the Mallet articulated) | steel and metals supply level 13 | steam | 27 km/h | 45 s | 5 | $45,000 | 1.2 coal a cell half loaded | 30 cells | [2-6-0 Mogul (type)](https://en.wikipedia.org/wiki/2-6-0) |
 | Atlantic express | express | 1900–1935 (then the Streamliner) | passengers supply level 18 | steam | 90 km/h | 10 s | 4 + dining car | $120,000 | 1.2 coal a cell half loaded | 50 cells | [4-4-2 Atlantic (type)](https://en.wikipedia.org/wiki/4-4-2_(locomotive)) |
 | Mallet articulated | heavy freight | 1905–1940 (then the Big articulated) | steel and metals supply level 19 | steam | 36 km/h | 40 s | 6 | $135,000 | 1.5 coal a cell half loaded | 50 cells | [Mallet locomotive (type)](https://en.wikipedia.org/wiki/Mallet_locomotive) |
@@ -1243,9 +1243,9 @@ what buildings' shares cost show the marked-up prices.
 | Freight a unit | Goods |
 |---|---|
 | $10 or less | bread 10, chickens 10, logs 10, milk 10, potatoes 10, rice 10, wheat 10 |
-| $11-20 | apples 12, bananas 12, bricks 12, dates 12, eggs 12, fish 12, meat 12, oranges 12, sand 12, soybeans 12, sugar 12, tofu 12, clay 15, coal 15, dairy products 15, gas 15, limestone 15, miso 15, newspapers 15, planks 15, pots 15, wood chips 15, cement 20, dried fish 20, honey 20 |
+| $11-20 | apples 12, bananas 12, dates 12, eggs 12, fish 12, meat 12, oranges 12, sand 12, soybeans 12, sugar 12, tofu 12, clay 15, coal 15, dairy products 15, gas 15, limestone 15, miso 15, newspapers 15, planks 15, pots 15, wood chips 15, cement 20, dried fish 20, honey 20 |
 | $21-40 | pigs 22, refined sugar 22, sausages 22, barrels 25, fertiliser 25, salt 25, sheep 25, cans 30, cattle 30, fuel 30, glass 30, grapes 30, hops 30, iron ore 30, juice 30, paper 30, soy sauce 30, wool 30, chemicals 40, cotton 40, flax 40, leather 40, oil 40, stove tiles 40 |
-| $41-200 | copper 45, castings 50, wax 50, plastics 60, rubber 60, tea 60, coffee 80, beer 100, furniture 100, porcelain 100, clothes 110, steel 130, sake 150, shoes 150, electronics 200, goods 200, vodka 200 |
+| $41-200 | copper 45, castings 50, wax 50, plastics 60, rubber 60, tea 60, coffee 80, beer 100, furniture 100, porcelain 100, clothes 110, steel 130, sake 150, shoes 150, bricks 170, electronics 200, goods 200, vodka 200 |
 | over $200 | guns 250, tools 250, wine 250, machinery 300, appliances 500, incense 500, luxury goods 500, gold 1,300, diamonds 3,000, cars 8,000, tanks 1.3e+04, planes 1.9e+04 |
 <!-- end table -->
 

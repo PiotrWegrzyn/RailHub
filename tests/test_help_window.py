@@ -95,7 +95,7 @@ def test_the_help_lists_every_engine_by_year() -> None:
     ("name", "sold_until"),
     [
         ("lion", (1840, "Planet steam engine")),
-        ("tank", (1862, "Light tank engine")),
+        ("tank", (1862, "0-6-2 tank engine")),
         ("light_tank", (1935, "Railbus")),
         ("big_boy", (1960, "Heavy diesel")),
         ("modern_electric", None),

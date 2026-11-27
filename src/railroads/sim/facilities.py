@@ -47,7 +47,7 @@ USES: Mapping[Facility, tuple[Good, float]] = MappingProxyType(
         Facility.REFRESHMENT_ROOM: (Good.BEER, 1.5),
         Facility.MARKET_HALL: (Good.PLANKS, 6.0),
         Facility.CATTLE_PENS: (Good.WHEAT, 10.0),
-        Facility.WAREHOUSE: (Good.BRICKS, 6.0),
+        Facility.WAREHOUSE: (Good.BRICKS, 1.0),
     }
 )
 # The level a station must be raised to before each facility can go up beside it.
