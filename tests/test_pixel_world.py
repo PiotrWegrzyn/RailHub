@@ -33,7 +33,15 @@ from railroads.ui.pixel.projection import CHUNK, ChunkPlacement, PixelProjection
 from railroads.ui.pixel.relief import MOST_LIFT, raycast
 from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
 from railroads.ui.pixel.sheet import FINE, FINEST, SHEET_INDEX, SpriteSheet
-from railroads.ui.pixel.track_art import RAIL, TrackShapes, _crisp, _raised_strip, _triangles
+from railroads.ui.pixel.track_art import (
+    GAUGE,
+    RAIL,
+    RAIL_HEAD,
+    TrackShapes,
+    _crisp,
+    _raised_strip,
+    _triangles,
+)
 from railroads.ui.pixel.track_preview import ghost
 from railroads.ui.pixel.world import CLOSE, PixelWorld
 
@@ -1308,21 +1316,22 @@ def offset_of(world: PixelWorld, cell: Cell = (10, 3)) -> tuple[int, int]:
     return chunk[0] * CHUNK, chunk[1] * CHUNK
 
 
-def test_rails_the_graphics_card_draws_are_a_quarter_of_an_art_pixel_wide_at_every_zoom(
+def test_rails_the_graphics_card_draws_are_a_tenth_of_the_gauge_wide_and_fade_far_off(
     sheet: SpriteSheet,
 ) -> None:
     world, _ = track_chunk(sheet, [Track((10, 3), (0, 6))])
     rail = np.array([*RAIL, 255]) / 255
 
     widths = {}
-    for scale in (2, 12):
+    for scale in (2, 24):
         shapes = track_shapes_of(world, (10, 3), scale)
         lit = shapes.triangles[np.all(np.isclose(shapes.triangles[:, 2:], rail), axis=1)]
         quads = lit[:6, :2] / shapes.quality
         widths[scale] = float(np.linalg.norm(quads[0] - quads[5]))
 
-    assert widths[2] == pytest.approx(0.5, abs=0.01)
-    assert widths[12] == pytest.approx(3.0, abs=0.01)
+    assert widths[2] < 1.0
+    assert widths[24] == pytest.approx(RAIL_HEAD * PIXEL_CELL_WIDTH * 24, abs=0.5)
+    assert widths[24] < GAUGE * PIXEL_CELL_WIDTH * 24 / 4
 
 
 def test_a_wide_straight_rail_is_moved_so_both_its_edges_lie_between_pixels() -> None:

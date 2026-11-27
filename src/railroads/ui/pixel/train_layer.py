@@ -28,7 +28,7 @@ from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, IsoCamera, Vec2
 from railroads.ui.pixel.art.registry import Sprite
 from railroads.ui.pixel.models import HEIGHT_PER_WIDTH
 from railroads.ui.pixel.relief import MOST_LIFT
-from railroads.ui.pixel.track_art import BEND, TrackArt
+from railroads.ui.pixel.track_art import TrackArt
 from railroads.ui.pixel.trains import (
     CAR_HALF,
     COUPLING,
@@ -68,6 +68,8 @@ MINI = 1.0
 # cells: the rest is inside, cut away.
 NOSE_ROUND = 0.025
 PUFFS = 5
+# How many pieces' centre lines trains are placed on are kept at once (Lanes._curve_at).
+CURVES_KEPT = 4096
 # The most trains whose parts' places on their track are kept while they stand.
 SHIFTS_KEPT = 4096
 
@@ -129,7 +131,7 @@ class TrainLayer:
                     seen.append((train, 0.0, (Look.ENGINE, train.engine), stalled, MINI, nose))
                 continue
             for look, back in self._parts(train):
-                placed = railway.position(train, back)
+                placed = self._placed(railway, train, back)
                 if placed is not None and not _in_shed(railway, train, placed[0]):
                     seen.append((train, back, look, placed, 1.0, None))
         hidden = self.world.underground_all(
@@ -210,6 +212,15 @@ class TrainLayer:
             (float(sx.min()) - pad, float(sy.min()) - pad - 2 * pad),
             (float(sx.max()) + pad, float(sy.max()) + pad),
         )
+
+    def _placed(self, railway: Railway, train: Train, back: float) -> tuple[Point, Point] | None:
+        """Where on the map a point of the train `back` cells behind its front is, and which way
+        it faces there, on the track drawn there (Lanes.placed); None for a point still inside
+        the station it left."""
+        placed = railway.position(train, back)
+        if placed is None:
+            return None
+        return self.lanes.placed(train.path, train.along - back) or placed
 
     def _shift(
         self, train: Train, back: float, lanes: dict[Cell | None, int], version: int
@@ -335,7 +346,7 @@ class TrainLayer:
             if model.chimney is None:
                 continue
             back = (model.half - model.chimney[0]) * SCALE
-            placed = railway.position(train, back)
+            placed = self._placed(railway, train, back)
             if placed is not None:
                 seen.append((train, back, placed))
         hidden = self.world.underground_all(
@@ -493,7 +504,7 @@ class _Stretch:
     """One stretch of a train's path, from the middle of a cell to an edge or back: how far into
     the path it starts and how long it is, the piece of track it runs along, whether it runs in
     to the middle, whether its edge is the piece's first end, how long each half of the piece is,
-    and which way it runs across the picture and the stretch it meets in the middle runs."""
+    """
 
     start: float
     length: float
@@ -501,8 +512,6 @@ class _Stretch:
     inward: bool
     at_first: bool
     halves: tuple[float, float]
-    way: Point
-    turn: Point | None
 
 
 class Lanes:
@@ -512,6 +521,10 @@ class Lanes:
     def __init__(self, track: TrackArt) -> None:
         self.track = track
         self._paths: dict[int, tuple[list[Point], int, list[_Stretch], list[float]]] = {}
+        # Each piece's centre line in the plane and how far along it each point lies, for the
+        # railway version they were laid out for.
+        self._curves: dict[Track, tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]] = {}
+        self._curves_version = -1
         self._held: dict[str, tuple[list[Point] | None, dict[Cell, int]]] = {}
         self._starts: dict[int, tuple[list[Point], Cell]] = {}
 
@@ -546,28 +559,75 @@ class Lanes:
             kept = self._starts[id(path)] = (path, (int(row), int(col)))
         return kept[1]
 
-    def sideways(
-        self, path: list[Point], along: float, lanes: Mapping[Cell | None, int] | None = None
-    ) -> Point:
-        """How far across the picture, in art pixels, a train `along` cells into its path is
-        moved off the path's centre line to ride the track drawn there: square to the way it
-        goes, turning smoothly with the track round the middle of a cell."""
+    def placed(self, path: list[Point], along: float) -> tuple[Point, Point] | None:
+        """Where on the map a point `along` cells into the path lies on the track drawn there,
+        and which way it goes: on its piece's centre line, which turns round the middle of its
+        cell in one curve from edge to edge, rather than on the path's straight stretches into
+        the middle and out, so trains follow the curve the track is drawn in. None off any
+        piece of track."""
+        found = self._on_piece(path, along)
+        if found is None:
+            return None
+        stretch, share, forward = found
+        assert stretch.piece is not None
+        point, (dx, dy) = self._curve_at(stretch.piece, share)
+        return point, (dx, dy) if forward else (-dx, -dy)
+
+    def _on_piece(self, path: list[Point], along: float) -> tuple[_Stretch, float, bool] | None:
+        """The stretch of the path a point `along` cells into it lies on, how far along its
+        piece of track it lies, as a share from the piece's first end to its second, and
+        whether the train goes from the first end to the second there; None off any piece."""
         stretches, starts = self._stretches(path)
         if not stretches:
-            return 0.0, 0.0
+            return None
         index = max(0, bisect.bisect_right(starts, along) - 1)
         stretch = stretches[index]
         if stretch.piece is None:
-            return 0.0, 0.0
+            return None
         t = min(1.0, max(0.0, (along - stretch.start) / (stretch.length or 1.0)))
         from_middle = (1 - t if stretch.inward else t) * stretch.length
         first, second = stretch.halves
         if stretch.at_first:
-            share, forward = (first - from_middle) / (first + second), stretch.inward
-        else:
-            share, forward = (first + from_middle) / (first + second), not stretch.inward
+            return stretch, (first - from_middle) / (first + second), stretch.inward
+        return stretch, (first + from_middle) / (first + second), not stretch.inward
+
+    def _curve_at(self, piece: Track, share: float) -> tuple[Point, Point]:
+        """The point `share` of the way along a piece's centre line (TrackArt.centre_of) from
+        its first end, and the way the line runs there in the plane."""
+        version = self.track.constructions.railway_version
+        if version != self._curves_version or len(self._curves) > CURVES_KEPT:
+            self._curves.clear()
+            self._curves_version = version
+        kept = self._curves.get(piece)
+        if kept is None:
+            line = np.array(self.track.centre_of(piece), dtype=np.float64)
+            steps = np.hypot(*np.diff(line, axis=0).T)
+            kept = self._curves[piece] = (line, np.concatenate([[0.0], np.cumsum(steps)]))
+        line, lengths = kept
+        at = min(1.0, max(0.0, share)) * lengths[-1]
+        index = min(int(np.searchsorted(lengths, at, side="right")) - 1, len(line) - 2)
+        index = max(index, 0)
+        a, b = line[index], line[index + 1]
+        span = lengths[index + 1] - lengths[index]
+        t = (at - lengths[index]) / span if span else 0.0
+        point = (float(a[0] + (b[0] - a[0]) * t), float(a[1] + (b[1] - a[1]) * t))
+        return point, (float(b[0] - a[0]), float(b[1] - a[1]))
+
+    def sideways(
+        self, path: list[Point], along: float, lanes: Mapping[Cell | None, int] | None = None
+    ) -> Point:
+        """How far across the picture, in art pixels, a train `along` cells into its path is
+        moved off the path's centre line to ride the track drawn there: square to the way the
+        track runs, turning with it round its curve."""
+        found = self._on_piece(path, along)
+        if found is None:
+            return 0.0, 0.0
+        stretch, share, forward = found
+        stretches, _ = self._stretches(path)
+        index = stretches.index(stretch)
         lanes = lanes or {}
         piece = stretch.piece
+        assert piece is not None
         lane = _lane_at(stretches, index, lanes)
         side = self.track.riding_side(piece, share, forward, lane)
         choices = self.track.riding_choices(piece, share, forward, lane)
@@ -585,10 +645,10 @@ class Lanes:
                 ) + share * self.track.riding_side(piece, share, forward, second)
         if side == 0.0:
             return 0.0, 0.0
-        dx, dy = stretch.way
-        if stretch.turn is not None and from_middle < BEND:
-            mix = 0.5 * (1 - from_middle / BEND)
-            dx, dy = (1 - mix) * dx + mix * stretch.turn[0], (1 - mix) * dy + mix * stretch.turn[1]
+        _, (tx, ty) = self._curve_at(piece, share)
+        if not forward:
+            tx, ty = -tx, -ty
+        dx, dy = (float(v) for v in self.track.projection.matrix @ np.array([tx, ty]))
         length = math.hypot(dx, dy) or 1.0
         return -dy / length * side * PIXEL_CELL_WIDTH, dx / length * side * PIXEL_CELL_WIDTH
 
@@ -674,12 +734,7 @@ class Lanes:
         grid = self.track.tile_map.grid
         constructions = self.track.constructions
         steps = grid.track_steps()
-        matrix = self.track.projection.matrix
         points = np.array(path, dtype=np.float64)
-        moves = matrix @ (points[1:] - points[:-1]).T
-        sizes = np.hypot(moves[0], moves[1])
-        sizes[sizes == 0] = 1.0
-        ways = list(zip((moves[0] / sizes).tolist(), (moves[1] / sizes).tolist(), strict=True))
         middles = (points[1:] + points[:-1]) / 2
         rows, cols = grid.cell_at(middles[:, 0], middles[:, 1])
         cells = list(zip(np.asarray(rows).tolist(), np.asarray(cols).tolist(), strict=True))
@@ -703,7 +758,6 @@ class Lanes:
             cell = cells[index]
             into = bool(inward[index])
             point = edge_points[index]
-            met = index + 1 if into else index - 1
             piece: Track | None = None
             if constructions.station_at(cell) is not None:
                 piece = self.track.station_piece(cell)
@@ -727,8 +781,6 @@ class Lanes:
                     inward=into,
                     at_first=piece is not None and point == piece.ends[0],
                     halves=halves,
-                    way=ways[index],
-                    turn=ways[met] if 0 <= met < len(ways) else None,
                 )
             )
             start += length

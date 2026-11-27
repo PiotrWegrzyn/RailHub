@@ -37,7 +37,8 @@ from railroads.ui.pixel.relief import MOST_LIFT, Elevation
 # and the gravel bed on it are, the gap between the rails, how long and wide a sleeper is and how
 # far apart sleepers lie, a bridge deck's and a tunnel portal's width, and how far beyond the
 # bank its shadow reaches. The two tracks of double track lie DOUBLE_SPACING apart, and every
-# piece rounds its turn over the last BEND either side of the middle of its cell.
+# piece turns in one curve from BEND before the middle of its cell to BEND after it: from edge
+# to edge of the cell, so curves run on smoothly from cell to cell.
 BANK = 0.058
 TRACK_BED = 0.05
 GAUGE = 0.024
@@ -58,7 +59,7 @@ DOUBLE_SPACING = 0.06
 # tracks as these lie from each other, close enough that two lines of it in cells beside each
 # other keep apart.
 QUADRUPLE_OUTER = 1.5 * DOUBLE_SPACING
-BEND = 0.2
+BEND = 0.5
 # How far a rail may wander across the picture, in pixels it is shown at, and still count as
 # running straight across or down it, to be kept to one row or column of pixels (_crisp).
 STRAIGHT_WITHIN = 0.25
@@ -69,8 +70,11 @@ STEP = 1 / 12
 # How many times finer than shown, each way, track is drawn before it is averaged down, by the
 # resolution it is shown at: enough to smooth it, without drawing a huge picture up close.
 SMOOTHING = {1: 4, 2: 2}
-# How wide a rail is, in art pixels, though never narrower than a pixel shown.
-RAIL_WIDTH = 0.25
+# How wide a rail's head is, in cells, and its dark side seen beside it as a share of that: the
+# rails as thin beside the sleepers as a model railway's, so the track reads as two rails on
+# sleepers rather than a band of metal.
+RAIL_HEAD = 0.1 * GAUGE
+RAIL_SIDE = 0.6
 # How many pixels shown a track's bank takes across at the least: far out, where the track at its
 # true size would show as a hairline, it is drawn wider, as a map draws a railway wider than it is.
 LEAST_BANK = 5.0
@@ -200,6 +204,13 @@ class _Strip(list[Point]):
     other, which the graphics card fills as the quads between the two sides."""
 
 
+# How much of the way from the middle of a cell to its edge a curve reaches at the most: nearly
+# all, stopping short of the edge so its ends don't fall on the points either side; and how many
+# straight steps draw it, enough for it to look round up close.
+CURVE_REACH = 0.98
+ARC_STEPS = 16
+
+
 def _bend(start: Point, middle: Point, end: Point, matrix: FloatArray, radius: float) -> Path:
     """The line from `start` through `middle` to `end`, rounded off round the middle instead of
     turning sharply there: on a circle in the picture, which `matrix` turns the map into, from
@@ -220,7 +231,7 @@ def _bend(start: Point, middle: Point, end: Point, matrix: FloatArray, radius: f
         BEND * seen_length / float(np.hypot(*arm))
         for arm, seen_length in zip(arms, lengths, strict=True)
     )
-    tangent = min(max(shortest, radius / math.tan(half)), 0.95 * min(lengths))
+    tangent = min(max(shortest, radius / math.tan(half)), CURVE_REACH * min(lengths))
     across = (ua + ub) / float(np.hypot(*(ua + ub)))
     hub = across * tangent / math.cos(half)
     p, q = ua * tangent - hub, ub * tangent - hub
@@ -229,7 +240,7 @@ def _bend(start: Point, middle: Point, end: Point, matrix: FloatArray, radius: f
     round_by = tangent * math.tan(half)
     seen_curve = [
         hub + round_by * np.array([math.cos(angle), math.sin(angle)])
-        for angle in (first + sweep * k / 8 for k in range(9))
+        for angle in (first + sweep * k / ARC_STEPS for k in range(ARC_STEPS + 1))
     ]
     back = np.linalg.inv(matrix)
     curve = [tuple(float(v) for v in centre + back @ point) for point in seen_curve]
@@ -760,7 +771,7 @@ class TrackArt:
     ) -> None:
         """Draws the laid pieces `s` pixels to an art pixel from (`left`, `top`): the track with
         `paint`, its shadow with `shade` and, raised, how far each stretch is lifted with
-        `measure`; `smoothing` pixels make one shown. Rails are RAIL_WIDTH wide, but never
+        `measure`; `smoothing` pixels make one shown. Rails are RAIL_HEAD wide, but never
         narrower than a pixel shown unless `thin_rails`, which leaves a rail narrower than a
         pixel far off to show only as faint as its share of the pixel, as everything else
         drawn finely and shrunk does."""
@@ -836,7 +847,8 @@ class TrackArt:
                 for lane in lanes:
                     bed = _raised_strip(lane, lifts, TRACK_BED / 2 * wide)
                     paint.polygon(bed, fill=(*GRAVEL, 255))
-        rail = max(1 if thin_rails else smoothing, round(RAIL_WIDTH * s))
+        rail = max(1 if thin_rails else smoothing, round(RAIL_HEAD * wide))
+        side = max(1, round(RAIL_SIDE * rail))
         for each, _, lanes, lifts in ground:
             if each.piece.maglev:
                 _lay_guideway(paint, lanes, lifts, wide, rail)
@@ -851,7 +863,7 @@ class TrackArt:
             for side in (-GAUGE / 2 * wide, GAUGE / 2 * wide)
         ]
         for rail_line in rails:
-            paint.line(rail_line, fill=(*RAIL_UNDER, 255), width=2 * rail, joint="curve")
+            paint.line(rail_line, fill=(*RAIL_UNDER, 255), width=rail + side, joint="curve")
         for rail_line in rails:
             paint.line(rail_line, fill=(*RAIL, 255), width=rail, joint="curve")
         for each, line, lanes, lifts in drawn:
@@ -1134,6 +1146,12 @@ class TrackArt:
         lanes = [np.array(_sides_along(line, _dense(path, STEP))) / abs(cell) for path in paths]
         found = self._turnout_lanes[piece] = (shares, lanes)
         return found
+
+    def centre_of(self, piece: Track) -> Path:
+        """The piece's centre line in the plane, as the track is drawn along it: from its first
+        end through the middle of its cell to its second, in one curve."""
+        xs, ys = self._laid(piece).line
+        return list(zip(xs.tolist(), ys.tolist(), strict=True))
 
     def _centre_line(self, piece: Track) -> Path:
         """The piece's centre line in the plane, rounded off round the middle of its cell enough

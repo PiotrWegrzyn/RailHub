@@ -336,3 +336,66 @@ def test_double_track_closes_up_where_the_track_next_door_becomes_single() -> No
 
     assert before == pytest.approx(FULL / PIXEL_CELL_WIDTH)
     assert after == pytest.approx(0.0)
+
+
+def curving_line() -> tuple[list, TrackArt]:
+    constructions = Constructions(flat_map())
+    growth = Growth(constructions, GrowthRule(trades=False))
+    start, end = (2, 3), (10, 14)
+    build_station(growth, start)
+    build_station(growth, end)
+    route = plan_route(constructions, start, end, TrackWidth.SINGLE)
+    assert route is not None
+    lay_route(growth, route)
+    projection = PixelProjection.of(constructions.tile_map.grid, 0.0, 1.0)
+    return path_of(Railway(constructions), start, end), TrackArt(
+        constructions.tile_map, constructions, projection
+    )
+
+
+def headings(lanes: Lanes, path: list, step: float) -> list[float]:
+    found = []
+    along = 0.0
+    while along < halfway(path) * 2:
+        placed = lanes.placed(path, along)
+        if placed is not None:
+            found.append(math.degrees(math.atan2(placed[1][1], placed[1][0])))
+        along += step
+    return found
+
+
+def test_a_train_turns_smoothly_round_a_curve_instead_of_all_at_once_in_the_middle() -> None:
+    path, track = curving_line()
+    turns = [abs((a - b + 180) % 360 - 180) for a, b in itertools.pairwise(path_turns(path))]
+    assert max(turns) >= 30
+
+    found = headings(Lanes(track), path, 0.02)
+
+    steps = [abs((b - a + 180) % 360 - 180) for a, b in itertools.pairwise(found)]
+    assert max(steps) < 6
+
+
+def path_turns(path: list) -> list[float]:
+    return [math.degrees(math.atan2(b[1] - a[1], b[0] - a[0])) for a, b in itertools.pairwise(path)]
+
+
+def test_a_train_rides_on_the_curve_its_track_is_drawn_along() -> None:
+    path, track = curving_line()
+    lanes = Lanes(track)
+    pieces = {piece.cell: piece for piece in track.constructions.track()}
+
+    off = []
+    along = 0.0
+    while along < halfway(path) * 2:
+        placed = lanes.placed(path, along)
+        if placed is not None:
+            (x, y), _ = placed
+            row, col = (int(v) for v in track.tile_map.grid.cell_at(x, y))
+            piece = pieces.get((row, col))
+            if piece is not None:
+                line = track.centre_of(piece)
+                off.append(min(math.dist((x, y), point) for point in line))
+        along += 0.05
+
+    assert off
+    assert max(off) < 0.05
