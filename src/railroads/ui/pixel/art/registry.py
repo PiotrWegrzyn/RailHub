@@ -27,6 +27,7 @@ from railroads.ui.pixel.art.built import modelled
 from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_peters
 from railroads.ui.pixel.art.commerce import (
     airport,
+    builders_yard,
     department_store,
     hotel,
     shop,
@@ -334,6 +335,7 @@ BUILDINGS = (
     "porcelain_works",
     "tavern",
     "sushi_hut",
+    "builders_yard",
     "department_store",
     "hotel",
     "meat_factory",
@@ -473,6 +475,7 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "porcelain_works": porcelain_works,
     "tavern": tavern,
     "sushi_hut": sushi_hut,
+    "builders_yard": builders_yard,
     "department_store": department_store,
     "hotel": hotel,
     "meat_factory": meat_factory,

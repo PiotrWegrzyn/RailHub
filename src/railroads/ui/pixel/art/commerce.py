@@ -1,4 +1,4 @@
-"""Shops, taverns, department stores, hotels and airports."""
+"""Shops, taverns, department stores, hotels, builder's yards and airports."""
 
 from railroads.ui.pixel.art.homes import _doorstep, _foot, _outward, _worn
 from railroads.ui.pixel.art.painter import (
@@ -9,6 +9,7 @@ from railroads.ui.pixel.art.painter import (
     GLASS,
     RGB,
     STONE,
+    TIMBER,
     WINDOW,
     Painter,
     Point,
@@ -18,10 +19,14 @@ from railroads.ui.pixel.art.painter import (
 from railroads.ui.pixel.art.parts import (
     DOOR,
     LIT,
+    METRE,
     SILL,
     _band,
+    _bar,
+    _fence,
     _flag,
     _on_wall,
+    _paddock,
     _pale_plinth,
     _patch,
     _tiles,
@@ -32,6 +37,7 @@ from railroads.ui.pixel.art.parts import (
 PAVING: RGB = (190, 184, 170)
 POST: RGB = (52, 50, 54)
 LEAF: RGB = (60, 112, 48)
+PLANK: RGB = (214, 178, 118)
 
 
 def _out(a: Point, b: Point, t: float, height: float, reach: float) -> Point:
@@ -348,4 +354,178 @@ def hotel() -> Sprite:
     p.rect(-9, -19, -7, -8, sign)
     for y in (-17, -15, -13, -11):
         p.point(-8, y, (250, 214, 96))
+    return p.sprite()
+
+
+GRAVEL: RGB = (176, 166, 142)
+SACK: RGB = (214, 210, 198)
+PANE: RGB = (156, 200, 216)
+SAND: RGB = (222, 196, 132)
+CART: RGB = (150, 70, 52)
+
+
+def _seam(p: Painter, a: Point, b: Point, drop: float, colour: RGB) -> None:
+    """A thin line right along the wall under the edge from `a` to `b`, `drop` down it, as fine
+    at every size as the thing it is drawn on."""
+    _bar(p, _on_wall(a, b, 0, drop), _on_wall(a, b, 1, drop), 0.07 * METRE, colour)
+
+
+def _pallet(p: Painter, x: float, y: float, tall: float, load: RGB, layers: int) -> None:
+    """A pallet a metre square standing on (x, y) with a load `tall` metres high on it in
+    `layers` layers, the pallet's timber showing at its foot."""
+    m = METRE
+    p.hall(x, y, m, m, 0.15 * m, shade(TIMBER, 0.85), None)
+    left, front, right, _ = p.hall(x, y - 0.15 * m, m, m, tall * m, load, shade(load, 1.12))
+    for k in range(1, layers):
+        drop = tall * m * k / layers
+        _seam(p, left, front, drop, shade(load, 0.68))
+        _seam(p, front, right, drop, shade(load, 0.55))
+
+
+def _planks(p: Painter, x: float, y: float, long: float, high: float) -> None:
+    """A stack of sawn planks `long` metres long and `high` high on bearers at (x, y), its
+    layers showing on its long side and the plank ends on its short one."""
+    m = METRE
+    for along in (-0.35, 0.35):
+        p.hall(
+            x + along * long * m,
+            y + along * long * m / 2,
+            0.25 * m,
+            1.5 * m,
+            0.2 * m,
+            shade(TIMBER, 0.6),
+            None,
+        )
+    left, front, right, _ = p.hall(
+        x, y - 0.2 * m, long * m, 1.2 * m, high * m, PLANK, shade(PLANK, 1.15)
+    )
+    layers = max(2, round(high / 0.25))
+    for k in range(1, layers):
+        _seam(p, left, front, high * m * k / layers, shade(PLANK, 0.72))
+        _seam(p, front, right, high * m * k / layers, shade(PLANK, 0.5))
+    for t in (1 / 3, 2 / 3):
+        _bar(
+            p,
+            _on_wall(front, right, t, 0),
+            _on_wall(front, right, t, high * m),
+            0.07 * m,
+            shade(PLANK, 0.5),
+        )
+
+
+def _sand(p: Painter, x: float, y: float, half: float, tall: float) -> None:
+    """A heap of building sand `half` across and `tall` high on (x, y), its top rounded and its
+    left side lit."""
+    h, t = half, tall
+    top = [(x - 0.45 * h, y - 0.8 * t), (x - 0.15 * h, y - t), (x + 0.2 * h, y - 0.95 * t)]
+    rim = [(x - h, y), *top, (x + 0.55 * h, y - 0.7 * t), (x + h, y), (x, y + 0.4 * h)]
+    p.polygon(rim, shade(SAND, 0.8), shade(SAND, 0.6))
+    p.polygon([(x - h, y), *top, (x + 0.1 * h, y + 0.36 * h)], SAND)
+    p.blob(x - 0.55 * h, y - 0.85 * t, x - 0.15 * h, y - 0.6 * t, shade(SAND, 1.1))
+
+
+def _glass_rack(p: Painter, x: float, y: float) -> None:
+    """An A-frame rack 3 m long with panes of glass leaning on both its sides, at (x, y)."""
+    m = METRE
+    long, tall = 3 * m, 2 * m
+    a, b = (x - long / 2, y - long / 4), (x + long / 2, y + long / 4)
+    _bar(p, (a[0] + 0.35 * m, a[1] - 0.2 * m), (a[0], a[1] - tall), 0.14 * m, TIMBER)
+    for lean, tone in ((-0.35, 0.82), (0.35, 1.0)):
+        p.polygon(
+            [
+                (a[0] + lean * m, a[1]),
+                (b[0] + lean * m, b[1]),
+                (b[0], b[1] - tall * 0.95),
+                (a[0], a[1] - tall * 0.95),
+            ],
+            shade(PANE, tone),
+            shade(PANE, 0.62),
+        )
+    for t in (0.2, 0.55):
+        sx, sy = a[0] + long * t, a[1] + long * t / 2
+        _bar(
+            p,
+            (sx + 0.1 * m, sy - tall * 0.25),
+            (sx + 0.5 * m, sy - tall * 0.7),
+            0.08 * m,
+            (238, 248, 252),
+        )
+    _bar(p, (b[0] - 0.35 * m, b[1] - 0.2 * m), (b[0], b[1] - tall), 0.14 * m, TIMBER)
+    _bar(p, (b[0] + 0.35 * m, b[1] - 0.2 * m), (b[0], b[1] - tall), 0.14 * m, shade(TIMBER, 0.8))
+
+
+def _hand_cart(p: Painter, x: float, y: float) -> None:
+    """A two-wheeled builder's hand cart 1.8 m long at (x, y), its shafts down on the ground."""
+    m = METRE
+    left, front, _, _ = p.hall(x, y - 0.6 * m, 1.8 * m, 1.1 * m, 0.4 * m, CART, shade(TIMBER, 0.9))
+    _bar(p, left, (left[0] - 1.3 * m, left[1] + 1.5 * m), 0.12 * m, shade(TIMBER, 0.75))
+    wx, wy = front[0] - 0.5 * m, front[1] + 0.1 * m
+    p.ellipse(wx - 0.45 * m, wy - 0.45 * m, wx + 0.45 * m, wy + 0.55 * m, (54, 50, 48))
+
+
+def builders_yard() -> Sprite:
+    """A builder's yard of trodden gravel behind a post-and-rail fence: a boarded timber store
+    14 by 7 m with planks and sacks in its open front, a small office with a yellow sign,
+    pallets of bricks and of cement sacks, stacks of sawn planks, a rack of glass panes, a heap
+    of sand and a hand cart, all at their true size beside the houses."""
+    p = Painter(30, 22, (15, 14))
+    m = METRE
+    yard = _paddock(0, 0, 12.5)
+    p.polygon(list(yard), GRAVEL, shade(GRAVEL, 0.8))
+    left_corner, back_corner, right_corner, front_corner = yard
+    _fence(p, left_corner, back_corner, m)
+    _fence(p, back_corner, right_corner, m)
+    _sand(p, 2, -3.2, 2.2, 1.7)
+    office = (226, 216, 190)
+    top = p.hall(6.2, -1.6, 5 * m, 4.5 * m, 2.7 * m, office, None)
+    left, front, right, _ = top
+    _foot(p, top, 2.7 * m)
+    _patch(p, left, front, (0.58, 0.8), (0.6 * m, 2.7 * m), DOOR)
+    _patch(p, left, front, (0.15, 0.42), (0.6 * m, 1.5 * m), WINDOW)
+    _patch(p, front, right, (0.3, 0.7), (0.6 * m, 1.5 * m), shade(WINDOW, 0.8))
+    p.gable(top, 1.4 * m, (150, 60, 46), office)
+    _patch(p, left, front, (0.1, 0.9), (-0.9 * m, 0.1 * m), (236, 194, 60))
+    store = (156, 118, 82)
+    high = 3.4 * m
+    top = p.hall(-3.2, -1, 14 * m, 7 * m, high, store, None)
+    left, front, right, _ = top
+    _foot(p, top, high)
+    for k in range(1, 7):
+        _bar(
+            p,
+            _on_wall(front, right, k / 7, 0),
+            _on_wall(front, right, k / 7, high),
+            0.1 * m,
+            shade(store, 0.62),
+        )
+    _patch(p, left, front, (0.08, 0.92), (0.5 * m, high), DOORWAY)
+    for k in range(4):
+        drop = high - (0.5 + 0.45 * k) * m
+        _patch(p, left, front, (0.12, 0.6), (drop - 0.35 * m, drop), shade(PLANK, 1 - 0.06 * k))
+    _patch(p, left, front, (0.66, 0.88), (2 * m, high), shade(SACK, 0.8))
+    for t in (0.08, 0.5, 0.92):
+        _bar(
+            p,
+            _on_wall(left, front, t, 0),
+            _on_wall(left, front, t, high),
+            0.18 * m,
+            shade(store, 0.75),
+        )
+    roof = (92, 96, 104)
+    p.gable(top, 1.8 * m, roof, store)
+    _tiles(p, top, 1.8 * m, roof, (0.5,))
+    _hand_cart(p, 2.4, 0.9)
+    _planks(p, 7.6, 1.5, 6, 1.2)
+    _planks(p, 4.6, 3.3, 5, 0.8)
+    for row, col, tall in ((0, 0, 2), (0, 1, 2), (0, 2, 1), (1, 0, 2), (1, 1, 1), (1, 2, 1)):
+        bx = -7.6 + (col + row) * 1.15 * m
+        by = 0.9 + (col - row) * 0.58 * m
+        _pallet(p, bx, by, tall, BRICK, 2 * tall)
+    for k, tall in enumerate((1.2, 0.9, 1.2)):
+        _pallet(p, -4 + k * 1.15 * m, 3.3 + k * 0.58 * m, tall, SACK, round(tall / 0.3))
+    _glass_rack(p, 0.8, 3)
+    gate = 0.42
+    _fence(p, left_corner, _on_wall(left_corner, front_corner, gate, 0), m)
+    _fence(p, _on_wall(left_corner, front_corner, gate + 0.18, 0), front_corner, m)
+    _fence(p, front_corner, right_corner, m)
     return p.sprite()
