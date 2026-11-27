@@ -12,6 +12,7 @@ from railroads.ui.pixel import ground_texture as texture
 from railroads.ui.pixel import relief, streams
 from railroads.ui.pixel.noise import TABLE_SIZE
 from railroads.ui.pixel.relief import LIGHT
+from railroads.ui.pixel.sheet import FINE
 
 # Each cell's glow is handed to the graphics card in steps of this much.
 GLOW_STEPS = 250
@@ -907,21 +908,84 @@ void main() {
 """
 
 
-# Fields, groves and the ground round buildings, as Ground.fields and Ground.yards paint them,
-# `k` pixels to an art pixel: the plots near the chunk in `plots`, a column each holding its cell
-# (row, column), the cell's middle on the plane, which way it faces, how wide it spreads and its
-# kind (its place in FIELD_KINDS); the buildings in `yards`, where each stands in the picture,
-# how far its yard reaches and which kind of yard it is.
-FIELDS = """@STREAM@
-const vec3 CROP_PLANT[@CROP_COUNT@] = vec3[@CROP_COUNT@](@CROP_PLANT@);
-const vec3 CROP_SOIL[@CROP_COUNT@] = vec3[@CROP_COUNT@](@CROP_SOIL@);
-const vec3 GROVE_GROUND[@GROVE_COUNT@] = vec3[@GROVE_COUNT@](@GROVE_GROUND@);
+# Groves and herds (Ground._plant), which the woods' pass leaves out and the chunk's texture lays
+# finely (DRESS): their tables, and the grove or herd at plane point `p`, art point `q`.
+GROVES = """const vec3 GROVE_GROUND[@GROVE_COUNT@] = vec3[@GROVE_COUNT@](@GROVE_GROUND@);
 const vec3 GROVE_TREE[@GROVE_COUNT@] = vec3[@GROVE_COUNT@](@GROVE_TREE@);
 const vec3 GROVE_FRUIT[@FRUIT_COUNT@] = vec3[@FRUIT_COUNT@](@GROVE_FRUIT@);
 const int GROVE_FRUIT_FROM[@GROVE_COUNT@] = int[@GROVE_COUNT@](@GROVE_FRUIT_FROM@);
 const int GROVE_FRUITS[@GROVE_COUNT@] = int[@GROVE_COUNT@](@GROVE_FRUITS@);
 const float GROVE_ROWS[@GROVE_COUNT@] = float[@GROVE_COUNT@](@GROVE_ROWS@);
 const float GROVE_CROWN[@GROVE_COUNT@] = float[@GROVE_COUNT@](@GROVE_CROWN@);
+const float GROVE_HERD[@GROVE_COUNT@] = float[@GROVE_COUNT@](@GROVE_HERD@);
+const float GROVE_GAP[@GROVE_COUNT@] = float[@GROVE_COUNT@](@GROVE_GAP@);
+
+// A herd (herd_parts) at art point `q`: its ground, or an animal's shadow, body or head.
+vec4 herd(vec2 q, ivec2 pixel, int grove, float fade) {
+    vec3 colour = GROVE_GROUND[grove] * (1.0 + 0.12 * (table_hash(pixel.x, pixel.y, 23) - 0.5));
+    float cover = fade * @GROVE_FLOOR@;
+    float gap = GROVE_GAP[grove] * @ART_METRE@;
+    float half_length = GROVE_HERD[grove] * @ART_METRE@ / 2.0;
+    ivec2 g = ivec2(floor(q / gap));
+    if (table_hash(g.x, g.y, 91) >= @HERD_SHARE@) return vec4(colour, cover);
+    vec2 jitter = vec2(table_hash(g.x, g.y, 92), table_hash(g.x, g.y, 93)) - 0.5;
+    vec2 d = (q - (vec2(g) + 0.5 + jitter * 0.5) * gap) / half_length;
+    float facing = table_hash(g.x, g.y, 94) > 0.5 ? 1.0 : -1.0;
+    vec2 shade = vec2(d.x - 0.2, (d.y - 0.45) / 0.35);
+    if (dot(shade, shade) < 1.0) {
+        colour = @SHADOW_COLOUR@;
+        cover = fade * @GROVE_SHADOW@;
+    }
+    vec2 body = vec2(d.x, d.y / 0.5);
+    if (dot(body, body) < 1.0) {
+        colour = GROVE_TREE[grove] * clamp(0.85 - 0.4 * d.y, 0.6, 1.1);
+        cover = min(fade * 3.0, 1.0);
+    }
+    vec2 head = vec2(d.x - facing * 0.95, d.y + 0.3);
+    if (dot(head, head) < 0.38 * 0.38) {
+        colour = GROVE_FRUIT[GROVE_FRUIT_FROM[grove]] * 0.95;
+        cover = min(fade * 3.0, 1.0);
+    }
+    return vec4(colour, cover);
+}
+
+// A grove of trees in rows (Ground._plant), with how fully it covers the ground.
+vec4 plant(vec2 p, vec2 q, ivec2 pixel, vec4 at, int grove, float fade) {
+    if (GROVE_HERD[grove] > 0.0) return herd(q, pixel, grove, fade);
+    vec2 uv = (p - at.zw) * GROVE_ROWS[grove] + 0.5;
+    vec2 d = uv - roundEven(uv);
+    float crown = GROVE_CROWN[grove];
+    float grain = 1.0 + 0.12 * (table_hash(pixel.x, pixel.y, 23) - 0.5);
+    vec3 colour = GROVE_GROUND[grove] * grain;
+    float cover = fade * @GROVE_FLOOR@;
+    if (length(d - vec2(0.12, 0.1)) < crown) {
+        colour = @SHADOW_COLOUR@;
+        cover = fade * @GROVE_SHADOW@;
+    }
+    if (length(d) < crown) {
+        float lit = clamp(0.82 + 0.3 * (-(d.x + d.y) / max(crown, 1e-6)), 0.62, 1.22);
+        colour = clamp(GROVE_TREE[grove] * (lit * grain), 0.0, 255.0);
+        cover = min(fade * 3.0, 1.0);
+        if (table_hash(pixel.x, pixel.y, 21) > 0.82) {
+            int pick = int(table_hash(pixel.x, pixel.y, 22) * float(GROVE_FRUITS[grove]));
+            colour = GROVE_FRUIT[GROVE_FRUIT_FROM[grove] + pick];
+        }
+    }
+    return vec4(colour, cover);
+}
+
+"""
+
+
+# Fields, groves and the ground round buildings, as Ground.fields and Ground.yards paint them,
+# `k` pixels to an art pixel: the plots near the chunk in `plots`, a column each holding its cell
+# (row, column), the cell's middle on the plane, which way it faces, how wide it spreads and its
+# kind (its place in FIELD_KINDS); the buildings in `yards`, where each stands in the picture,
+# how far its yard reaches and which kind of yard it is.
+FIELDS = """@STREAM@
+@GROVES@
+const vec3 CROP_PLANT[@CROP_COUNT@] = vec3[@CROP_COUNT@](@CROP_PLANT@);
+const vec3 CROP_SOIL[@CROP_COUNT@] = vec3[@CROP_COUNT@](@CROP_SOIL@);
 const vec3 YARD_COLOURS[@YARD_COUNT@] = vec3[@YARD_COUNT@](@YARD_COLOURS@);
 
 bool in_plot(vec2 p, vec4 at, vec4 shape) {
@@ -988,52 +1052,50 @@ vec3 sow(vec2 p, ivec2 pixel, vec4 at, int crop) {
     return grey + (sown - grey) * @FIELD_SATURATION@;
 }
 
-// A grove of trees in rows (Ground._plant), with how fully it covers the ground.
-vec4 plant(vec2 p, ivec2 pixel, vec4 at, int grove, float fade) {
-    vec2 uv = (p - at.zw) * GROVE_ROWS[grove] + 0.5;
-    vec2 d = uv - roundEven(uv);
-    float crown = GROVE_CROWN[grove];
-    float grain = 1.0 + 0.12 * (table_hash(pixel.x, pixel.y, 23) - 0.5);
-    vec3 colour = GROVE_GROUND[grove] * grain;
-    float cover = fade * @GROVE_FLOOR@;
-    if (length(d - vec2(0.12, 0.1)) < crown) {
-        colour = @SHADOW_COLOUR@;
-        cover = fade * @GROVE_SHADOW@;
-    }
-    if (length(d) < crown) {
-        float lit = clamp(0.82 + 0.3 * (-(d.x + d.y) / max(crown, 1e-6)), 0.62, 1.22);
-        colour = clamp(GROVE_TREE[grove] * (lit * grain), 0.0, 255.0);
-        cover = min(fade * 3.0, 1.0);
-        if (table_hash(pixel.x, pixel.y, 21) > 0.82) {
-            int pick = int(table_hash(pixel.x, pixel.y, 22) * float(GROVE_FRUITS[grove]));
-            colour = GROVE_FRUIT[GROVE_FRUIT_FROM[grove] + pick];
-        }
-    }
-    return vec4(colour, cover);
-}
-
 void lay(inout vec4 layer, vec3 colour, float cover) {
     layer.rgb = layer.rgb * (1.0 - cover) + colour * cover;
     layer.a = layer.a * (1.0 - cover) + cover;
 }
 
-// Lays the field or grove at picture point `q`, if any, lit by the slope it lies on (`lit`).
+// The plot at plane point `p` off the minor rivers, as its place in `plots`, or -1.
+int plot_at(vec2 p) {
+    if (on_stream(p)) return -1;
+    for (int i = 0; i < plot_count; i++) {
+        if (in_plot(p, texelFetch(plots, ivec2(i, 0), 0), texelFetch(plots, ivec2(i, 1), 0))) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Lays the field at picture point `q`, if any, lit by the slope it lies on (`lit`); groves and
+// herds the chunk's texture lays (DRESS).
 void lay_fields(vec2 q, ivec2 texel, float lit, inout vec4 layer) {
     vec2 p = to_plane * (q + projection_origin);
-    if (on_stream(p)) return;
-    for (int i = 0; i < plot_count; i++) {
-        vec4 at = texelFetch(plots, ivec2(i, 0), 0);
-        vec4 shape = texelFetch(plots, ivec2(i, 1), 0);
-        if (!in_plot(p, at, shape)) continue;
-        ivec2 pixel = chunk_origin * k + texel;
-        float fade = feathered(texel, at, shape, p);
-        int kind = int(shape.w);
-        vec4 sown = kind < @GROVES_FROM@ ? vec4(sow(p, pixel, at, kind - 1), fade)
-            : plant(p, pixel, at, kind - @GROVES_FROM@, fade);
-        vec3 colour = sown.rgb * natural(p, blended(light, p, @RELIEF_STEPS@)) * lit;
-        if (sown.a > 0.0) lay(layer, clamp(colour, 0.0, 255.0) / 255.0, sown.a);
-        return;
-    }
+    int i = plot_at(p);
+    if (i < 0) return;
+    vec4 at = texelFetch(plots, ivec2(i, 0), 0);
+    vec4 shape = texelFetch(plots, ivec2(i, 1), 0);
+    int kind = int(shape.w);
+    if (kind >= @GROVES_FROM@) return;
+    ivec2 pixel = chunk_origin * k + texel;
+    float fade = feathered(texel, at, shape, p);
+    vec3 colour = sow(p, pixel, at, kind - 1) * natural(p, blended(light, p, @RELIEF_STEPS@)) * lit;
+    lay(layer, clamp(colour, 0.0, 255.0) / 255.0, fade);
+}
+
+// What DRESS needs to lay the grove or herd at picture point `q`, if any: how its plains and
+// slope light it, and its place in `plots` plus how fully it covers the ground.
+vec4 grove_at(vec2 q, ivec2 texel, float lit) {
+    vec2 p = to_plane * (q + projection_origin);
+    int i = plot_at(p);
+    if (i < 0) return vec4(0.0);
+    vec4 at = texelFetch(plots, ivec2(i, 0), 0);
+    vec4 shape = texelFetch(plots, ivec2(i, 1), 0);
+    if (int(shape.w) < @GROVES_FROM@) return vec4(0.0);
+    float fade = feathered(texel, at, shape, p);
+    vec3 light_by = natural(p, blended(light, p, @RELIEF_STEPS@)) * lit;
+    return vec4(light_by, float(i + 1) + min(fade, 0.999));
 }
 
 // Lays the ground round each building near the chunk over `texel` (Ground._yard), worked out
@@ -1107,6 +1169,7 @@ uniform ivec2 relief_origin;
 uniform vec4 slope;
 uniform float metres_per_unit;
 uniform highp sampler2D relief;
+uniform int mode;
 @NOISE@
 @HEX@
 @RASTER@
@@ -1362,9 +1425,14 @@ void main() {
         colour = vec4(0.0);
         return;
     }
-    vec4 layer = vec4(0.0, 0.0, 0.0, here.g);
     vec4 raised = texelFetch(relief, art - relief_origin, 0);
-    lay_fields(q, texel, lit_by(sun(art).x, raised.y, raised.z), layer);
+    float lit = lit_by(sun(art).x, raised.y, raised.z);
+    if (mode == 1) {
+        colour = grove_at(q, texel, lit);
+        return;
+    }
+    vec4 layer = vec4(0.0, 0.0, 0.0, here.g);
+    lay_fields(q, texel, lit, layer);
     lay_yards(texel, layer);
     bool painted = false;
     if (edges_at(art).r > 0.5) painted = crowns(q, art, layer);
@@ -1388,7 +1456,14 @@ uniform highp sampler2D surface;
 uniform highp sampler2D relief;
 uniform ivec2 woods_origin;
 uniform highp sampler2D edges;
+uniform highp sampler2D groves;
+uniform highp sampler2D plots;
+uniform mat2 to_plane;
+uniform vec2 projection_origin;
 @TEXTURE@
+@NOISE@
+@RASTER@
+@GROVES@
 float lift_at(ivec2 art) {
     float rise = texelFetch(relief, art - relief_origin, 0).x;
     return clamp(rise / metres_per_pixel * @EXAGGERATION@ * @TILT@, 0.0, @MOST_LIFT@);
@@ -1407,6 +1482,33 @@ vec4 surface_at(vec2 at) {
     return mix(a, b, t.y);
 }
 
+// Lays the grove or herd (GROVES) at art point `at` from the chunk's corner under `shown`, worked
+// out at this pixel, lit and covering the ground as the woods' pass found (CANOPY, `grove_at`).
+vec4 under_grove(vec2 at, vec4 shown) {
+    ivec2 last = textureSize(groves, 0) - 1;
+    vec2 g = at * float(drawn);
+    vec4 here = texelFetch(groves, clamp(ivec2(floor(g)), ivec2(0), last), 0);
+    int id = int(floor(here.a));
+    if (id < 1) return shown;
+    vec2 c = clamp(g - 0.5, vec2(0.0), vec2(last));
+    ivec2 c0 = ivec2(floor(c));
+    vec2 t = c - vec2(c0);
+    float fades[4];
+    for (int n = 0; n < 4; n++) {
+        float a = texelFetch(groves, min(c0 + ivec2(n % 2, n / 2), last), 0).a;
+        fades[n] = int(floor(a)) == id ? fract(a) : 0.0;
+    }
+    float fade = mix(mix(fades[0], fades[1], t.x), mix(fades[2], fades[3], t.x), t.y);
+    vec4 plot = texelFetch(plots, ivec2(id - 1, 0), 0);
+    int kind = int(texelFetch(plots, ivec2(id - 1, 1), 0).w);
+    vec2 q = at + vec2(chunk_origin);
+    vec2 p = to_plane * (q + projection_origin);
+    ivec2 pixel = ivec2(floor(q * float(@FINE@)));
+    vec4 laid = plant(p, q, pixel, plot, kind - @GROVES_FROM@, fade);
+    vec3 colour = clamp(laid.rgb * here.rgb, 0.0, 255.0) / 255.0;
+    return shown + vec4(colour * laid.a, laid.a) * (1.0 - shown.a);
+}
+
 void main() {
     ivec2 pixel = ivec2(floor(gl_FragCoord.xy)) / times;
     ivec2 art = chunk_origin + pixel / k;
@@ -1422,6 +1524,7 @@ void main() {
     if (share > 0.0) {
         shown += (surface_at(at + vec2(0.0, float(offset + 1))) - shown) * share;
     }
+    shown = under_grove(at + vec2(0.0, float(offset)), shown);
     if (k * times > 1 && shown.a > 0.0) {
         ivec2 under = clamp(art + ivec2(0, offset) - woods_origin, ivec2(0), textureSize(edges, 0) - 1);
         bool crops = texelFetch(edges, under, 0).r < 0.5;
@@ -1696,6 +1799,10 @@ def _fields_names() -> dict[str, str]:
         "GROVE_FRUITS": ", ".join(str(len(grove.fruit)) for grove in groves),
         "GROVE_ROWS": ", ".join(glsl_number(grove.rows) for grove in groves),
         "GROVE_CROWN": ", ".join(glsl_number(grove.crown) for grove in groves),
+        "GROVE_HERD": ", ".join(glsl_number(grove.herd) for grove in groves),
+        "GROVE_GAP": ", ".join(glsl_number(grove.gap) for grove in groves),
+        "ART_METRE": glsl_number(cpu.ART_METRE),
+        "HERD_SHARE": glsl_number(cpu.HERD_SHARE),
         "GROVES_FROM": str(1 + len(cpu.CROP_ROWS)),
         "YARD_COUNT": str(len(yards)),
         "YARD_COLOURS": ", ".join(_vec3(colour) for colour in cpu.YARD_COLOURS.values()),
@@ -1802,8 +1909,11 @@ def canopy_source() -> str:
 
 
 def dress_source() -> str:
-    """The shader laying a chunk over its woods (DRESS), with Elevation's numbers written in."""
-    names = {
+    """The shader laying a chunk over its woods (DRESS), with Elevation's numbers and those of
+    groves and herds written in."""
+    names = _fields_names() | {
+        "FINE": str(FINE),
+        "SHADOW_COLOUR": _vec3(cpu.SHADOW_COLOUR),
         "EXAGGERATION": glsl_number(relief.EXAGGERATION),
         "TILT": glsl_number(TILT),
         "MOST_LIFT": glsl_number(relief.MOST_LIFT),
@@ -1850,6 +1960,7 @@ def fill_names(source: str, names: dict[str, str]) -> str:
     source = source.replace("@RASTER@", RASTER).replace("@TEXTURE@", TEXTURE)
     source = source.replace("@SUN@", SUN).replace("@NATURAL@", NATURAL)
     source = source.replace("@FIELDS@", FIELDS).replace("@STREAM@", STREAM)
+    source = source.replace("@GROVES@", GROVES)
     if TEXTURE in source:
         names = _texture_names() | names
     for name, value in (names | {"MASK": str(TABLE_SIZE - 1)}).items():

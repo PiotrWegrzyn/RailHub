@@ -10,6 +10,7 @@ import numpy as np
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.trade import Satisfaction
 from railroads.ui.biomes import Biome
+from railroads.ui.pixel.art.parts import METRE as SPRITE_METRE
 from railroads.ui.pixel.projection import RGB
 from railroads.ui.pixel.relief import (
     SHADOW_TINT,
@@ -78,8 +79,16 @@ UP_LEFT = [(1, 1), (2, 1), (2, 2)]
 FIELD_STRIPES = 9
 
 
+# A metre in art pixels, as the sprites measure it by the house: railroads.ui.pixel.art.parts.METRE
+# painter units, each 0.7 art pixels in a sprite drawn at BUILDING_SCALE.
+ART_METRE = SPRITE_METRE * 0.7
+
+
 # Groves of trees in rows over the ground of the cell: the ground, the trees, the colours of the
-# fruit some of them bear, how many rows a cell each way and how big each crown is.
+# fruit some of them bear, how many rows a cell each way and how big each crown is. A herd is a
+# grove of animals instead, at their true size: each `herd` metres long with its head in the
+# colour of its fruit, one to a square `gap` metres a side in HERD_SHARE of them, standing
+# anywhere in its middle half and facing either way.
 @dataclass(frozen=True)
 class Grove:
     ground: RGB
@@ -87,6 +96,11 @@ class Grove:
     fruit: tuple[RGB, ...]
     rows: int
     crown: float
+    herd: float = 0.0
+    gap: float = 0.0
+
+
+HERD_SHARE = 0.55
 
 
 GROVES: dict[BuildingKind, Grove] = {
@@ -99,10 +113,18 @@ GROVES: dict[BuildingKind, Grove] = {
     BuildingKind.VINEYARD: Grove((150, 150, 90), (70, 110, 50), ((104, 50, 124),), 8, 0.3),
     BuildingKind.COFFEE_PLANTATION: Grove((96, 120, 62), (40, 86, 44), ((190, 52, 44),), 7, 0.36),
     BuildingKind.RUBBER_PLANTATION: Grove((70, 104, 56), (36, 72, 40), ((226, 224, 210),), 5, 0.38),
-    BuildingKind.SHEEP_FARM: Grove((140, 182, 86), (238, 234, 222), ((60, 56, 54),), 4, 0.2),
-    BuildingKind.CATTLE_RANCH: Grove((132, 176, 80), (120, 78, 48), ((236, 232, 224),), 4, 0.24),
-    BuildingKind.PIG_FARM: Grove((140, 150, 90), (120, 92, 60), ((226, 160, 156),), 4, 0.24),
-    BuildingKind.CHICKEN_FARM: Grove((150, 176, 90), (196, 170, 110), ((244, 240, 230),), 5, 0.2),
+    BuildingKind.SHEEP_FARM: Grove(
+        (140, 182, 86), (238, 234, 222), ((60, 56, 54),), 4, 0.2, herd=1.3, gap=5.0
+    ),
+    BuildingKind.CATTLE_RANCH: Grove(
+        (132, 176, 80), (120, 78, 48), ((236, 232, 224),), 4, 0.24, herd=2.4, gap=8.0
+    ),
+    BuildingKind.PIG_FARM: Grove(
+        (138, 132, 88), (226, 160, 156), ((196, 118, 116),), 4, 0.24, herd=1.4, gap=4.0
+    ),
+    BuildingKind.CHICKEN_FARM: Grove(
+        (150, 176, 90), (244, 240, 230), ((200, 60, 40),), 5, 0.2, herd=0.4, gap=1.6
+    ),
     BuildingKind.HOP_GARDEN: Grove((150, 140, 96), (72, 132, 50), ((170, 214, 110),), 7, 0.34),
     BuildingKind.TEA_PLANTATION: Grove((128, 150, 80), (56, 120, 52), ((120, 176, 80),), 6, 0.3),
 }

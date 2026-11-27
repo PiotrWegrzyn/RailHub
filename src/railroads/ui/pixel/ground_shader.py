@@ -240,6 +240,8 @@ class GroundShader:
         self._wooded = RenderTarget(floats=True)
         self._edges = RenderTarget(floats=True)
         self._canopy = RenderTarget(floats=True)
+        self._groves = RenderTarget(floats=True)
+        self._chunk_plots = 0
 
     @classmethod
     def make(
@@ -449,8 +451,9 @@ class GroundShader:
     def lay_surfaces(self, chunk: tuple[int, int], k: int) -> None:
         """Works out what lies on a chunk's ground, `k` pixels to an art pixel (no finer than
         FINE): its raised ground (RELIEF), where woods cover it (WOODS) and how far round them
-        their crowns reach (EDGES), and the woods, the shade of trees, fields and yards over it
-        (CANOPY), for `dress_onto` to lay and for what stands on it to read (`chunk_inputs`)."""
+        their crowns reach (EDGES), the woods, the shade of trees, fields and yards over it
+        (CANOPY), and where its groves and herds lie and how they are lit (CANOPY's second
+        mode), for `dress_onto` to lay and for what stands on it to read (`chunk_inputs`)."""
         drawn = min(k, FINE)
         left, top = chunk[0] * CHUNK, chunk[1] * CHUNK
         rows = CHUNK + relief.MOST_LIFT + 2
@@ -460,6 +463,7 @@ class GroundShader:
         self._wooded.fit(CHUNK + 2 * WOODS_MARGIN, rows + 2 * WOODS_MARGIN)
         self._edges.fit(*self._wooded.size)
         self._canopy.fit(CHUNK * drawn, rows * drawn)
+        self._groves.fit(*self._canopy.size)
         plane = self._plane_uniforms()
         uniforms = plane | {
             "art_origin": ("2i", relief_origin),
@@ -508,17 +512,21 @@ class GroundShader:
             "plots": ("1i", (6,)),
             "yards": ("1i", (7,)),
         }
-        listed = (_floats(_columns(plots)), _floats(_row(yards)))
-        textures = (self._wooded.texture, self._edges.texture, *listed)
+        if self._chunk_plots:
+            GL.glDeleteTextures(1, [self._chunk_plots])
+        self._chunk_plots = _floats(_columns(plots))
+        listed = _floats(_row(yards))
+        textures = (self._wooded.texture, self._edges.texture, self._chunk_plots, listed)
         inputs = (self._cells, self._light, self._table, self._chunk_relief.texture, *textures)
-        self._run(self._canopy, self._programs.canopy, uniforms, inputs)
-        GL.glDeleteTextures(2, list(listed))
+        self._run(self._canopy, self._programs.canopy, uniforms | {"mode": ("1i", (0,))}, inputs)
+        self._run(self._groves, self._programs.canopy, uniforms | {"mode": ("1i", (1,))}, inputs)
+        GL.glDeleteTextures(1, [listed])
 
     def dress_onto(self, target: RenderTarget, chunk: tuple[int, int], k: int, times: int) -> None:
         """Draws what `lay_surfaces` worked out for a chunk into `target`, premultiplied by its
         alpha, raised with the ground where it rises and laid with the ground's texture finely,
-        crops out of the reach of crowns with blades: `k` pixels to an art pixel, blown up
-        `times` times each way (DRESS)."""
+        crops out of the reach of crowns with blades, groves and herds worked out at every pixel
+        under it: `k` pixels to an art pixel, blown up `times` times each way (DRESS)."""
         left, top = chunk[0] * CHUNK, chunk[1] * CHUNK
         uniforms = {
             "chunk_origin": ("2i", (left, top)),
@@ -531,8 +539,18 @@ class GroundShader:
             "surface": ("1i", (0,)),
             "relief": ("1i", (1,)),
             "edges": ("1i", (2,)),
-        }
-        inputs = (self._canopy.texture, self._chunk_relief.texture, self._edges.texture)
+            "groves": ("1i", (3,)),
+            "plots": ("1i", (4,)),
+            "table": ("1i", (5,)),
+        } | self._plane_uniforms()
+        inputs = (
+            self._canopy.texture,
+            self._chunk_relief.texture,
+            self._edges.texture,
+            self._groves.texture,
+            self._chunk_plots,
+            self._table,
+        )
         self._run(target, self._programs.dress, uniforms, inputs)
 
     def chunk_inputs(self, chunk: tuple[int, int]) -> ChunkInputs:

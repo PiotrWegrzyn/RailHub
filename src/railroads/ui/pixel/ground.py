@@ -22,6 +22,7 @@ from railroads.ui.building_spots import Plot, plots_of
 from railroads.ui.pixel.ground_palette import (
     APRON,
     AROUND,
+    ART_METRE,
     BANK_SHADE,
     BARE_ABOVE,
     BARE_MARGIN,
@@ -90,6 +91,7 @@ from railroads.ui.pixel.ground_palette import (
     GROVE_FLOOR,
     GROVE_SHADOW,
     GROVES,
+    HERD_SHARE,
     HILL_LIFT,
     HOLLOW_DARK,
     HOLLOWS,
@@ -1205,10 +1207,6 @@ class Ground:
         cover = np.zeros(ground.shape, dtype=np.float32)
         if not ground.any():
             return cover
-        u = (x[ground] - fx) * grove.rows + 0.5
-        v = (y[ground] - fy) * grove.rows + 0.5
-        du, dv = u - np.round(u), v - np.round(v)
-        near = np.hypot(du, dv)
         px, py = ix[ground], iy[ground]
         grain = 1 + 0.12 * (table_hash(px, py, 23) - 0.5)
         floor = np.array(grove.ground, dtype=np.float32)
@@ -1216,6 +1214,22 @@ class Ground:
         gx, gy = x[ground].astype(np.float32), y[ground].astype(np.float32)
         fade = self._feathered(ground, gx, gy, k)
         here = fade * GROVE_FLOOR
+        if grove.herd:
+            part, lit = herd_parts((px + 0.5) / k, (py + 0.5) / k, grove)
+            colors[part == 1] = SHADOW_COLOUR
+            here[part == 1] = fade[part == 1] * GROVE_SHADOW
+            body = part == 2
+            colors[body] = np.array(grove.tree, dtype=np.float32) * lit[body, None]
+            colors[part == 3] = np.array(grove.fruit[0], dtype=np.float32) * 0.95
+            here[part >= 2] = np.minimum(fade[part >= 2] * 3, 1)
+            colors *= self._natural(x[ground], y[ground])
+            rgb[ground] = colors
+            cover[ground] = here
+            return cover
+        u = (x[ground] - fx) * grove.rows + 0.5
+        v = (y[ground] - fy) * grove.rows + 0.5
+        du, dv = u - np.round(u), v - np.round(v)
+        near = np.hypot(du, dv)
         shadow = np.hypot(du - 0.12, dv - 0.1) < grove.crown
         colors[shadow] = SHADOW_COLOUR
         here[shadow] = fade[shadow] * GROVE_SHADOW
@@ -1233,6 +1247,24 @@ class Ground:
         rgb[ground] = colors
         cover[ground] = here
         return cover
+
+
+def herd_parts(qx: FloatArray, qy: FloatArray, grove: Grove) -> tuple[IntArray, FloatArray]:
+    """What of a herd shows at art points (qx, qy): 0 its ground, 1 an animal's shadow, 2 its
+    body or 3 its head, with how lit a body is there, lighter on its back."""
+    gap = grove.gap * ART_METRE
+    half = grove.herd * ART_METRE / 2
+    gx, gy = np.floor(qx / gap).astype(np.int64), np.floor(qy / gap).astype(np.int64)
+    there = table_hash(gx, gy, 91) < HERD_SHARE
+    cx = (gx + 0.5 + (table_hash(gx, gy, 92) - 0.5) * 0.5) * gap
+    cy = (gy + 0.5 + (table_hash(gx, gy, 93) - 0.5) * 0.5) * gap
+    facing = np.where(table_hash(gx, gy, 94) > 0.5, 1.0, -1.0)
+    dx, dy = (qx - cx) / half, (qy - cy) / half
+    part = np.zeros(np.shape(qx), dtype=np.int64)
+    part[((dx - 0.2) ** 2 + ((dy - 0.45) / 0.35) ** 2 < 1) & there] = 1
+    part[(dx * dx + (dy / 0.5) ** 2 < 1) & there] = 2
+    part[((dx - facing * 0.95) ** 2 + (dy + 0.3) ** 2 < 0.38**2) & there] = 3
+    return part, np.clip(0.85 - 0.4 * dy, 0.6, 1.1)
 
 
 def _depths(field: BoolArray, most: int) -> npt.NDArray[np.int16]:
