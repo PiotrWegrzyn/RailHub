@@ -85,7 +85,8 @@ The ideas every change to the game should follow.
   are, the more the more of what draws them stands around.
 - Producers of what the land gives never starve to death; fields go only when a town grows over
   them. Homes starving for ten years die out, everything else after thirty.
-- A processor is satisfied only by what it makes and sells, never by a full stockpile.
+- A processor is satisfied only by what it makes and sells and by the bonus goods it builds
+  with, such as bricks and cement for factories, never by a full stockpile.
 
 ## Economy
 
@@ -138,6 +139,8 @@ The ideas every change to the game should follow.
   one; the harder processors merge two at a time.
 - Towns start from simple local food makers, such as bakeries, not from farms.
 - Venues, such as taverns and clubs, make the homes around them grow faster.
+- Builder's yards, fed with bricks, cement and glass, make the homes and works around them come up
+  faster.
 - Every place that sends passengers belongs to a town. Whenever one is built, it and every such place
   next to it take the colour sending the most passengers there, and any other town with a place
   there joins that colour whole, so towns that grow into each other merge and never touch. A river

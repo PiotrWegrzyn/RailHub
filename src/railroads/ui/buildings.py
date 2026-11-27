@@ -135,6 +135,7 @@ DOTS: dict[BuildingKind, tuple[RGB, float]] = {
     BuildingKind.TAVERN: ((196, 130, 56), 0.1),
     BuildingKind.CLUB: ((150, 60, 130), 0.12),
     BuildingKind.SUSHI_HUT: ((214, 64, 52), 0.1),
+    BuildingKind.BUILDERS_YARD: ((176, 120, 90), 0.12),
     BuildingKind.FILLING_STATION: ((230, 200, 60), 0.12),
     BuildingKind.DEPARTMENT_STORE: ((232, 200, 110), 0.16),
     BuildingKind.HOTEL: ((200, 70, 90), 0.16),

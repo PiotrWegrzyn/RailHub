@@ -22,6 +22,7 @@ from railroads.sim.goods import (
     OWNED_BOOSTS,
     RECIPES,
     VENUE_BONUSES,
+    WORKS_BONUSES,
     Good,
     Need,
     good_exists,
@@ -118,6 +119,10 @@ def bonus_of(kind: BuildingKind, year: int, east: bool = False) -> Mapping[Need,
     all but food, common goods and heating; those of buildings that make goods boost what they make instead
     (boosts_of)."""
     needs = needs_of(kind, year, east)
+    if kind in WORKS_BONUSES:
+        return MappingProxyType(
+            {need: amount for need, amount in needs.items() if need in WORKS_BONUSES[kind]}
+        )
     if kind in VENUE_BONUSES:
         return MappingProxyType(
             {need: amount for need, amount in needs.items() if need in VENUE_BONUSES[kind]}

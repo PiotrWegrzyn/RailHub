@@ -186,3 +186,15 @@ VENUES = (
     BuildingKind.SUSHI_HUT,
     BuildingKind.FILLING_STATION,
 )
+
+
+# The homes and works around a builder's yard that gets all it needs come up this much faster,
+# and those around one that gets some of it that share as much faster; the land alone decides
+# where farms, mines and the like come up.
+BUILT_UP_GROWTH = 1.0
+
+
+BUILDERS = (BuildingKind.BUILDERS_YARD,)
+
+
+BUILT_UP = (Points.POPULATION, Points.INDUSTRY)

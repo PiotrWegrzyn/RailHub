@@ -39,6 +39,7 @@ from railroads.sim.steps import Steps, finish
 from railroads.sim.trade import (
     COLLECTION_RADIUS,
     DELIVERY_RADIUS,
+    STOCKED,
     StationOrder,
     Trade,
     input_stock,
@@ -209,7 +210,7 @@ class StationTrade:
                     cell = int(cells[at])
                     arrived = self._arrived.setdefault((kind, need), {})
                     arrived[cell] = arrived.get(cell, 0.0) + float(took[at])
-                    if kind in RECIPES:
+                    if (kind, need) in STOCKED:
                         economy.stock[(kind, need)][cell] += took[at]
                     else:
                         taken = economy.taken.setdefault((kind, need), {})
@@ -334,7 +335,7 @@ class StationTrade:
                 n = np.zeros(cells.size) if taking is None else taking[cells]
             if not n.any():
                 continue
-            if kind in RECIPES:
+            if (kind, need) in STOCKED:
                 want = input_stock(kind, need, growth.year) * n - economy.stock[(kind, need)][cells]
             else:
                 taken = taken_by.get((kind, need), {})
@@ -600,7 +601,7 @@ class StationTrade:
                 if many <= 0:
                     continue
                 wanted = many * amount
-                if kind in RECIPES:
+                if (kind, need) in STOCKED:
                     ring = cells() if ring is None else ring
                     wanted = min(wanted, self._stock_room(kind, need, ring))
                 if wanted > 0:

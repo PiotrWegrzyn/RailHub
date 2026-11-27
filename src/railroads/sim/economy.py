@@ -74,6 +74,7 @@ from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import TileMap
 from railroads.sim.trade import (
     BONUS_PER_GOOD,
+    STOCKED,
     STOCKPILES,
     CellGoods,
     HandOuts,
@@ -258,12 +259,16 @@ class Economy:
 
 @year_cached
 def wants_of(kind: BuildingKind, year: int) -> frozenset[Need]:
-    """The needs a kind wants in a given year: what a processor takes in or is boosted by, and
-    what the rest need."""
+    """The needs a kind wants in a given year: what a processor takes in, is boosted by or builds
+    with, and what the rest need."""
     recipe = RECIPES.get(kind)
     if recipe is None:
         return frozenset(needs_of(kind, year))
-    return frozenset(recipe.takes(year)) | frozenset(boosts_of(kind, year))
+    return (
+        frozenset(recipe.takes(year))
+        | frozenset(boosts_of(kind, year))
+        | frozenset(bonus_of(kind, year))
+    )
 
 
 class MonthOfTrade:
@@ -414,7 +419,7 @@ class MonthOfTrade:
         for kind, n in self.count.items():
             if need not in self.wanted[kind]:
                 continue
-            if kind in RECIPES:
+            if (kind, need) in STOCKED:
                 wants[kind] = np.maximum(
                     input_stock(kind, need, self.economy.year) * n - self.stock[(kind, need)], 0.0
                 )
@@ -496,7 +501,7 @@ class MonthOfTrade:
         wants = self._wants(need)
         if not wants:
             return
-        early = {kind: self._taken(kind, need) for kind in wants if kind not in RECIPES}
+        early = {kind: self._taken(kind, need) for kind in wants if (kind, need) not in STOCKED}
         for kind in early:
             self.counted[(kind, need)] = dict((self.economy.taken or {}).get((kind, need)) or {})
         for kind, taken in early.items():
@@ -524,7 +529,7 @@ class MonthOfTrade:
             key = (kind, need)
             got = got + early.get(kind, 0.0)
             self.received[key] = self.received.get(key, self.zero) + got
-            if kind in RECIPES:
+            if (kind, need) in STOCKED:
                 self.stock[key] = self.stock[key] + got
             else:
                 self._boost_from_land(kind, need, got)

@@ -219,6 +219,7 @@ BUILDING_SPRITES = {
     BuildingKind.TAVERN: "tavern",
     BuildingKind.CLUB: "tavern",
     BuildingKind.SUSHI_HUT: "sushi_hut",
+    BuildingKind.BUILDERS_YARD: "tile_works",
     BuildingKind.FILLING_STATION: "car_dealer",
     BuildingKind.DEPARTMENT_STORE: "department_store",
     BuildingKind.HOTEL: "hotel",

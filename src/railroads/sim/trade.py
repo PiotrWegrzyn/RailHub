@@ -345,6 +345,9 @@ class Trade:
 STOCKPILES = tuple(
     (kind, need) for kind, recipe in RECIPES.items() for need in Need if need in recipe.every_need
 )
+# The inputs processors keep in stock: what their recipes take, not the bonus goods they build
+# with.
+STOCKED = frozenset(STOCKPILES)
 
 
 class Stockpiles(dict[tuple[BuildingKind, Need], FloatArray]):

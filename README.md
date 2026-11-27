@@ -508,8 +508,8 @@ window (H) lists the same.
 | Building | Makes a month at most | Must get a month | Bonus goods and boosts a month |
 |---|---|---|---|
 | House |  | 6 food, 2 heating | 6 food, 0.3 soy sauce, 0.6 beer, 0.6 newspapers (from 1600), 3 common goods, 0.3 vodka (from 1600), 0.3 refined sugar (from 1800), 0.05 bricks, 0.12 glass, 0.3 limestone, 0.3 wax |
-| Tenement |  | 35 food, 40 common goods, 12 heating | 35 food, 3 soy sauce, 6 salt, 12 goods, 6 hot drinks (from 1700), 6 tools (from era 3), 6 beer, 6 vodka (from 1600), 1 bricks, 6 glass, 6 cement (from era 3), 6 refined sugar (from 1800), 6 newspapers (from 1600), 6 limestone, 0.6 luxury goods (from 1700), 3 wax |
-| Block of flats |  | 125 food, 200 common goods, 50 heating | 125 food, 10 soy sauce, 20 salt, 25 goods, 20 hot drinks (from 1700), 6 tools (from era 3), 20 fuel (from era 2), 2 cars (from era 4), 20 beer, 20 vodka (from 1600), 5 bricks, 30 cement (from era 3), 30 glass, 20 newspapers (from 1600), 3 appliances (from era 6), 20 refined sugar (from 1800), 3 luxury goods (from 1700) |
+| Tenement |  | 35 food, 40 common goods, 12 heating | 35 food, 3 soy sauce, 6 salt, 12 goods, 6 hot drinks (from 1700), 6 tools (from era 3), 6 beer, 6 vodka (from 1600), 3 bricks, 6 glass, 3 cement (from era 3), 6 refined sugar (from 1800), 6 newspapers (from 1600), 6 limestone, 0.6 luxury goods (from 1700), 3 wax |
+| Block of flats |  | 125 food, 200 common goods, 50 heating | 125 food, 10 soy sauce, 20 salt, 25 goods, 20 hot drinks (from 1700), 6 tools (from era 3), 20 fuel (from era 2), 2 cars (from era 4), 20 beer, 20 vodka (from 1600), 10 bricks, 10 cement (from era 3), 30 glass, 20 newspapers (from 1600), 3 appliances (from era 6), 20 refined sugar (from 1800), 3 luxury goods (from 1700) |
 | Farm | 6 wheat |  | 3 machinery (from machines and tools demand 10), 6 limestone (from ore and stone demand 3), 3 fertiliser (from chemicals and building demand 10), 1.2 fuel (from oil and fuel demand 11) |
 | Orchard | 6 apples |  |  |
 | Date palms | 6 dates |  |  |
@@ -562,9 +562,9 @@ window (H) lists the same.
 | Port |  |  | 6 fuel (from era 2) |
 | Big port |  |  | 12 fuel (from era 2) |
 | Mega port |  |  | 25 fuel (from era 2) |
-| Factory (1780) | 20 goods | 6.667 planks, 6.667 steel (from era 2) |  |
-| Big factory (1780) | 60 goods | 20 steel (from era 2), 20 copper (from era 4) |  |
-| Mega factory (1780) | 170 goods | 56.67 steel (from era 2), 28.33 copper (from era 4), 28.33 machinery (from era 3) |  |
+| Factory (1780) | 20 goods | 6.667 planks, 6.667 steel (from era 2) | 1 bricks, 1 cement (from era 3) |
+| Big factory (1780) | 60 goods | 20 steel (from era 2), 20 copper (from era 4) | 3 bricks, 3 cement (from era 3) |
+| Mega factory (1780) | 170 goods | 56.67 steel (from era 2), 28.33 copper (from era 4), 28.33 machinery (from era 3) | 8 bricks, 8 cement (from era 3) |
 | Cannery (1810) | 200 cans | 60 fruit, 20 steel (from era 2) |  |
 | Textile mill (1780) | 25 clothes | 62.5 fibre |  |
 | Furniture maker | 12 furniture | 48 planks | 6 wax |
@@ -590,7 +590,7 @@ window (H) lists the same.
 | Railway works |  | 120 steel (from era 2) |  |
 | Machine works (era 3) | 25 machinery | 25 steel (from era 2), 12.5 copper (from era 4) |  |
 | Brickworks | 13 bricks | 91 clay | 13 coal (from 1700) |
-| Cement works (era 3) | 60 cement | 30 limestone | 15 coal (from 1700) |
+| Cement works (era 3) | 9 cement | 90 limestone | 9 coal (from 1700) |
 | Glassworks | 40 glass | 20 sand | 10 coal (from 1700), 10 limestone |
 | Brewery | 25 beer | 25 hops | 10 barrels (from wood demand 4) |
 | Distillery (1600) | 6 vodka | 12 potatoes | 2.4 glass |
@@ -651,8 +651,8 @@ window (H) lists the same.
 | Mega machine works (era 3) | 156.2 machinery | 156.2 steel (from era 2), 78.12 copper (from era 4) |  |
 | Big brickworks | 32.5 bricks | 227.5 clay | 32.5 coal (from 1700) |
 | Mega brickworks | 81.25 bricks | 568.8 clay | 81.25 coal (from 1700) |
-| Big cement works (era 3) | 150 cement | 75 limestone | 37.5 coal (from 1700) |
-| Mega cement works (era 3) | 375 cement | 187.5 limestone | 93.75 coal (from 1700) |
+| Big cement works (era 3) | 22.5 cement | 225 limestone | 22.5 coal (from 1700) |
+| Mega cement works (era 3) | 56.25 cement | 562.5 limestone | 56.25 coal (from 1700) |
 | Big glassworks | 100 glass | 50 sand | 25 coal (from 1700), 25 limestone |
 | Mega glassworks | 250 glass | 125 sand | 62.5 coal (from 1700), 62.5 limestone |
 | Big brewery | 62.5 beer | 62.5 hops | 25 barrels (from wood demand 4) |
@@ -705,6 +705,7 @@ window (H) lists the same.
 | Hotel (1900) |  | 50 food, 6 wine | 6 beer, 6 newspapers (from 1600) |
 | Club (1900) |  | 50 alcohol | 3 chemicals (from era 3) |
 | Sushi hut |  | 40 fish, 40 rice | 6 soy sauce |
+| Builder's yard |  | 2 bricks, 2 cement (from era 3), 6 glass | 20 planks |
 | Filling station (1920) |  | 25 fuel (from era 2) |  |
 | Big carpet weaver (1700) | 7.5 luxury goods | 30 fibre |  |
 | Mega carpet weaver (1700) | 18.75 luxury goods | 75 fibre |  |
@@ -742,7 +743,7 @@ newspapers are never drawn.
 <!-- table: ports -->
 | Tier | Worth a month | Goods, units a month |
 |---|---|---|
-| Common | $600 | wheat 60, logs 60, potatoes 60, rice 60, chickens 60, milk 60, apples 50, bananas 50, dates 50, oranges 50, sugar 50, fish 50, sand 50, soybeans 50, tofu 50, bricks 3.529, meat 50, dairy products 40, planks 40, wood chips 40, coal 40, gas 40, clay 40, limestone 40, miso 40, cement 30, steel 4.615 |
+| Common | $600 | wheat 60, logs 60, potatoes 60, rice 60, chickens 60, milk 60, apples 50, bananas 50, dates 50, oranges 50, sugar 50, fish 50, sand 50, soybeans 50, tofu 50, bricks 3.529, meat 50, dairy products 40, planks 40, wood chips 40, coal 40, gas 40, clay 40, limestone 40, miso 40, cement 2.4, steel 4.615 |
 | Rare | $2,400 | refined sugar 109.1, sausages 109.1, fertiliser 96, barrels 96, salt 96, iron ore 80, cans 80, wool 80, grapes 80, fuel 80, soy sauce 80, hops 80, glass 80, paper 80, juice 80, oil 60, cotton 60, flax 60, chemicals 60, leather 60, stove tiles 60, copper 53.33, wax 48, castings 48, incense 4.8, steel 18.46 |
 | Epic | $4,800 | rubber 80, tea 80, plastics 80, coffee 60, furniture 48, beer 48, porcelain 48, clothes 43.64, sake 32, shoes 32, electronics 24, goods 24, vodka 24, tools 19.2, wine 19.2, guns 19.2, machinery 16, appliances 9.6, luxury goods 9.6, steel 36.92 |
 | Legendary | $10,000 | gold 7.692, diamonds 3.333, cars 1.25, tanks 0.7692, planes 0.5263 |
@@ -789,7 +790,10 @@ salt, grapes, coffee, rubber, incense), beer, newspapers and furniture as bonus 
 alcohol, any of beer, wine, vodka and sake; a tavern takes food as a bonus and a club a little of
 whatever chemicals it can get. Sushi huts need a lot of fish and a lot of rice, both demands, and
 fed, liven the homes around them as taverns do. They take soy sauce as a bonus, as
-homes do. Coffee and tea both meet the need for hot drinks of tenements, blocks of flats and
+homes do. Builder's yards open in towns as readily as taverns and must have bricks, cement and
+glass, taking planks as a bonus; the homes and works around one that gets all it must have come
+up twice as fast, and those around one that gets part of it as much faster, while farms, mines
+and the like still come up only where the land suits them. Coffee and tea both meet the need for hot drinks of tenements, blocks of flats and
 skyscrapers. Tofu, miso and dried fish are processed food, made in towns of 3 people from soy,
 from soy, rice and salt, and from fish and salt. Hovering the icon of such a category names what is in it.
 A building's satisfaction is the share of its demands it got, raised by 30% of itself for each bonus good it
@@ -808,8 +812,9 @@ supplier's place. A building
 that makes things counts what it gave away alongside what it got, and processors are judged on
 what they actually make, not on what they could.
 
-Processors have no bonus goods, only boosts that raise what they make: a steel mill needs its
-iron ore to make steel. A building whose every need is a bonus good keeps them as demands, since
+Processors have boosts that raise what they make, and bonus goods only for what they build
+with: a steel mill needs its iron ore to make steel, and factories take bricks and cement as
+bonus goods that raise their satisfaction but not what they make. A building whose every need is a bonus good keeps them as demands, since
 they are all it is for: a jeweller demands its gold and diamonds. The hex details show what each
 building got of what it must have and of its bonus goods apart, with its satisfaction as a
 percentage.
@@ -854,7 +859,7 @@ coffee for homes or incense for churches, and demands to the processors that wor
 
 Other works open anywhere by chance, a little likelier where people and industry are, whether
 or not their inputs are near, so their inputs usually have to be brought from far away. But a
-works, or a tavern, club, sushi hut or filling station, opens only once something on the map
+works, or a tavern, club, sushi hut, builder's yard or filling station, opens only once something on the map
 makes each of its main inputs (boosts are no main input): a winery needs a vineyard somewhere,
 a sushi hut a fishery and a rice paddy, a filling station a refinery. Only the land, then, decides
 where a chain can start: no grapes, no wine. Only
@@ -1243,10 +1248,10 @@ what buildings' shares cost show the marked-up prices.
 | Freight a unit | Goods |
 |---|---|
 | $10 or less | bread 10, chickens 10, logs 10, milk 10, potatoes 10, rice 10, wheat 10 |
-| $11-20 | apples 12, bananas 12, dates 12, eggs 12, fish 12, meat 12, oranges 12, sand 12, soybeans 12, sugar 12, tofu 12, clay 15, coal 15, dairy products 15, gas 15, limestone 15, miso 15, newspapers 15, planks 15, pots 15, wood chips 15, cement 20, dried fish 20, honey 20 |
+| $11-20 | apples 12, bananas 12, dates 12, eggs 12, fish 12, meat 12, oranges 12, sand 12, soybeans 12, sugar 12, tofu 12, clay 15, coal 15, dairy products 15, gas 15, limestone 15, miso 15, newspapers 15, planks 15, pots 15, wood chips 15, dried fish 20, honey 20 |
 | $21-40 | pigs 22, refined sugar 22, sausages 22, barrels 25, fertiliser 25, salt 25, sheep 25, cans 30, cattle 30, fuel 30, glass 30, grapes 30, hops 30, iron ore 30, juice 30, paper 30, soy sauce 30, wool 30, chemicals 40, cotton 40, flax 40, leather 40, oil 40, stove tiles 40 |
 | $41-200 | copper 45, castings 50, wax 50, plastics 60, rubber 60, tea 60, coffee 80, beer 100, furniture 100, porcelain 100, clothes 110, steel 130, sake 150, shoes 150, bricks 170, electronics 200, goods 200, vodka 200 |
-| over $200 | guns 250, tools 250, wine 250, machinery 300, appliances 500, incense 500, luxury goods 500, gold 1,300, diamonds 3,000, cars 8,000, tanks 1.3e+04, planes 1.9e+04 |
+| over $200 | cement 250, guns 250, tools 250, wine 250, machinery 300, appliances 500, incense 500, luxury goods 500, gold 1,300, diamonds 3,000, cars 8,000, tanks 1.3e+04, planes 1.9e+04 |
 <!-- end table -->
 
 Passengers pay $15 and mail $40, as they get off the train. A good is worth nothing where no

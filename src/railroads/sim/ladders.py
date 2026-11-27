@@ -198,6 +198,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.TAVERN: (Points.CORPORATE, 1),
     BuildingKind.CLUB: (Points.CORPORATE, 3),
     BuildingKind.SUSHI_HUT: (Points.CORPORATE, 1),
+    BuildingKind.BUILDERS_YARD: (Points.CORPORATE, 1),
     BuildingKind.FILLING_STATION: (Points.CORPORATE, 1),
     BuildingKind.DEPARTMENT_STORE: (Points.CORPORATE, 3),
     BuildingKind.HOTEL: (Points.CORPORATE, 5),
@@ -870,6 +871,11 @@ SUSHI_HUTS = replace(
     land_cells_each=SUSHI_LAND_CELLS,
 )
 
+# Builder's yards open in towns as readily as taverns, one to a neighbourhood, once something on
+# the map makes what they must have; getting it, they make the homes and works around them grow
+# faster (railroads.sim.breeding.BUILT_UP_GROWTH).
+BUILDERS_YARDS = replace(TAVERNS, kinds=(BuildingKind.BUILDERS_YARD,))
+
 # Filling stations open in towns once motor cars come, less often than taverns.
 FILLING_STATION_YEAR = 1920
 FILLING_STATIONS = replace(
@@ -1004,6 +1010,7 @@ LADDERS = (
     TAVERNS,
     CLUBS,
     SUSHI_HUTS,
+    BUILDERS_YARDS,
     FILLING_STATIONS,
     DEPARTMENT_STORES,
     HOTELS,

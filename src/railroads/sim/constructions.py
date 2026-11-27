@@ -157,6 +157,7 @@ class BuildingKind(Keyed):
     HOTEL = "hotel"
     CLUB = "club"
     SUSHI_HUT = "sushi hut"
+    BUILDERS_YARD = "builder's yard"
     FILLING_STATION = "filling station"
     JUICE_WORKS = "juice works"
     BIG_JUICE_WORKS = "big juice works"
@@ -350,6 +351,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     BuildingKind.TAVERN: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.CLUB: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.SUSHI_HUT: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.BUILDERS_YARD: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.FILLING_STATION: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.DEPARTMENT_STORE: BuildingRules(relief=frozenset(Relief)),
     BuildingKind.HOTEL: BuildingRules(relief=frozenset(Relief)),

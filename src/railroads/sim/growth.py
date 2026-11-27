@@ -71,6 +71,9 @@ import numpy.ma  # np.unique loads it on first use, which would stall the first 
 import numpy.typing as npt
 
 from railroads.sim.breeding import (
+    BUILDERS,
+    BUILT_UP,
+    BUILT_UP_GROWTH,
     LIVELY_GROWTH,
     VENUES,
     Breeding,
@@ -154,7 +157,8 @@ def makers_of(good: Good, year: int) -> frozenset[BuildingKind]:
 @year_cached
 def inputs_of(kind: BuildingKind, year: int) -> tuple[frozenset[BuildingKind], ...]:
     """For each main input a processor or a venue must have in a given year, the kinds of
-    building that make it, any one of which will do; nothing for other kinds. A processor's
+    building that make it, any one of which will do; nothing for other kinds. A builder's yard
+    must have its demands made as a venue must. A processor's
     boosts are no main input, and an input another can stand in for is met by either."""
     recipe = RECIPES.get(kind)
     if recipe is not None:
@@ -162,7 +166,7 @@ def inputs_of(kind: BuildingKind, year: int) -> tuple[frozenset[BuildingKind], .
         needs = [
             (need, *(swaps[need][:1] if need in swaps else ())) for need in recipe.inputs(year)
         ]
-    elif kind in VENUES:
+    elif kind in VENUES or kind in BUILDERS:
         needs = [(need,) for need in demands_of(kind, year)]
     else:
         return ()
@@ -559,6 +563,7 @@ class Growth:
         in the cells traded on, and the cells traded on last month that have no buildings now."""
         served = {channel: np.zeros(trade.cells.size) for channel in self._served}
         assumed = None if self.assumed_shares is None else self.assumed_shares[trade.cells]
+        built_up = 1.0 + BUILT_UP_GROWTH * self._near_best(trade, BUILDERS)
         for kind in trade.got:
             bonus = trade.bonus.get(kind)
             got_any = trade.done((kind,)).any() or (bonus is not None and bonus.any())
@@ -570,11 +575,13 @@ class Growth:
             points, value = self.rule.points[kind]
             count = self._counts[kind].ravel()[trade.cells].astype(np.float64)
             given = np.maximum(share, 0.0) * value * count
+            if points in BUILT_UP:
+                given = given * built_up
             served[points] += given
             channel = self._kind_channel.get(kind)
             if channel is not None:
                 served[channel] += given
-        served[Points.POPULATION] *= 1.0 + LIVELY_GROWTH * self._lively(trade)
+        served[Points.POPULATION] *= 1.0 + LIVELY_GROWTH * self._near_best(trade, VENUES)
         emptied = np.setdiff1d(self._traded, trade.cells, assume_unique=True)
         self._traded = trade.cells
         for points, here in served.items():
@@ -590,12 +597,13 @@ class Growth:
                 if points in self._served_by(self._breeding(place)):
                     self._reckon(place, cells)
 
-    def _lively(self, trade: Trade) -> FloatArray:
-        """How lively each traded cell is: the best share of what they need that the venues in
-        its neighbourhood got."""
+    def _near_best(self, trade: Trade, kinds: tuple[BuildingKind, ...]) -> FloatArray:
+        """For each traded cell, the best share of what they need that the buildings of these
+        kinds in its neighbourhood got: how lively venues make it, or how built up builder's
+        yards."""
         size = self._grid.rows * self._grid.cols
         poured = np.zeros(size + 1)
-        for kind in VENUES:
+        for kind in kinds:
             if kind in trade.got:
                 share = np.minimum(trade.share((kind,), empty=0.0), 1.0)
                 here = poured[trade.cells]

@@ -19,8 +19,9 @@ starts later is left out of a recipe until its year.
 
 What a building needs is split in two. Its demands (demands_of) are what it must get to be
 satisfied; a home's are food, common goods and heating (HOMES). Its bonus goods (bonus_of, from BONUS_NEEDS) it can do without, but each one it gets
-raises its satisfaction above what its demands give (railroads.sim.economy). Processors have no
-bonus goods: their inputs make what they make. A building that makes nothing whose every need is
+raises its satisfaction above what its demands give (railroads.sim.economy). A processor's
+inputs make what it makes; its only bonus goods are those it builds with (WORKS_BONUSES), as
+bricks and cement for factories. A building that makes nothing whose every need is
 a bonus good keeps them all as demands, since getting them is what it is there for. A building
 that makes goods has boosts instead (boosts_of): what it can do without but makes up to BOOST_MOST
 more with, as barrels for a brewery, wheat for animals and planks for mines.
@@ -463,7 +464,7 @@ PRICES: Mapping[Good, float] = MappingProxyType(
         Good.HOPS: 30,
         Good.MACHINERY: 300,
         Good.BRICKS: 170,
-        Good.CEMENT: 20,
+        Good.CEMENT: 250,
         Good.GLASS: 30,
         Good.BEER: 100,
         Good.VODKA: 200,
@@ -710,7 +711,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             ),
             BuildingKind.BRICKWORKS: Recipe(Good.BRICKS, 13, {Need.CLAY: 7.0}, {Need.COAL: 1.0}),
             BuildingKind.CEMENT_WORKS: Recipe(
-                Good.CEMENT, 60, {Need.LIMESTONE: 0.5}, {Need.COAL: 0.25}
+                Good.CEMENT, 9, {Need.LIMESTONE: 10.0}, {Need.COAL: 1.0}
             ),
             BuildingKind.GLASSWORKS: Recipe(
                 Good.GLASS, 40, {Need.SAND: 0.5}, {Need.COAL: 0.25, Need.LIMESTONE: 0.25}
@@ -822,6 +823,17 @@ MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
 
 # What each building needs in a month: consumers what they use, processors what they take in to
 # make all they can.
+# What processors can do without but that make them more satisfied, a month: factories build
+# with bricks and cement. They make no more for it: only what they make and sell, and these,
+# satisfy them.
+WORKS_BONUSES: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
+    {
+        BuildingKind.FACTORY: {Need.BRICKS: 1, Need.CEMENT: 1},
+        BuildingKind.BIG_FACTORY: {Need.BRICKS: 3, Need.CEMENT: 3},
+        BuildingKind.MEGA_FACTORY: {Need.BRICKS: 8, Need.CEMENT: 8},
+    }
+)
+
 _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
     {
         BuildingKind.HOUSE: {
@@ -863,9 +875,9 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.TOOLS: 6,
             Need.BEER: 6,
             Need.VODKA: 6,
-            Need.BRICKS: 1,
+            Need.BRICKS: 3,
             Need.GLASS: 6,
-            Need.CEMENT: 6,
+            Need.CEMENT: 3,
             Need.REFINED_SUGAR: 6,
             Need.NEWSPAPERS: 6,
             Need.HEATING: 12,
@@ -885,8 +897,8 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
             Need.CARS: 2,
             Need.BEER: 20,
             Need.VODKA: 20,
-            Need.BRICKS: 5,
-            Need.CEMENT: 30,
+            Need.BRICKS: 10,
+            Need.CEMENT: 10,
             Need.GLASS: 30,
             Need.NEWSPAPERS: 20,
             Need.APPLIANCES: 3,
@@ -950,6 +962,12 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.TAVERN: {Need.ALCOHOL: 14, Need.FOOD: 12},
         BuildingKind.CLUB: {Need.ALCOHOL: 50, Need.CHEMICALS: 3},
         BuildingKind.SUSHI_HUT: {Need.FISH: 40, Need.RICE: 40, Need.SOY_SAUCE: 6},
+        BuildingKind.BUILDERS_YARD: {
+            Need.BRICKS: 2,
+            Need.CEMENT: 2,
+            Need.GLASS: 6,
+            Need.PLANKS: 20,
+        },
         BuildingKind.DEPARTMENT_STORE: {
             Need.CLOTHES: 12,
             Need.SHOES: 12,
@@ -974,7 +992,10 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         BuildingKind.BASILICA: {Need.WAX: 20, Need.INCENSE: 12},
         BuildingKind.CATHEDRAL: {Need.WAX: 40, Need.INCENSE: 25},
         BuildingKind.ST_PETERS: {Need.WAX: 120, Need.INCENSE: 70},
-        **{kind: recipe.needs() for kind, recipe in RECIPES.items()},
+        **{
+            kind: {**recipe.needs(), **WORKS_BONUSES.get(kind, {})}
+            for kind, recipe in RECIPES.items()
+        },
     }
 )
 NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
