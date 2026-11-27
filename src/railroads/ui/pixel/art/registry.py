@@ -194,10 +194,25 @@ FARMSTEADS = ("farm", "orchard", "orange_farm")
 
 FARMSTEAD_SCALE = 0.585
 
-# Small workshops drawn smaller than other works, by this share of the size they would have.
-WORKSHOPS = ("bakery", "distillery")
-
-WORKSHOP_SHARE = 0.7
+# Buildings drawn smaller than others of their scale, so they stand as big beside a house as they
+# would: small workshops, and farmsteads whose barn would otherwise dwarf the houses, a barn only a
+# touch bigger than a house. Each the share of the size it would have.
+SHARES = {
+    "bakery": 0.47,
+    "distillery": 0.7,
+    "tavern": 0.7,
+    "sausage_maker": 0.77,
+    "farm": 0.8,
+    "orchard": 0.85,
+    "orange_farm": 0.85,
+    "potato_farm": 0.55,
+    "rice_paddy": 0.55,
+    "soy_field": 0.55,
+    "tea_plantation": 0.55,
+    "cattle_ranch": 0.72,
+    "pig_farm": 0.72,
+    "chicken_farm": 0.72,
+}
 
 BUILDINGS = (
     "house",
@@ -544,12 +559,12 @@ def _scale_of(name: str) -> float:
     scale = _base_scale(name)
     kind = BuildingKind.__members__.get(name.upper())
     if kind is None or name in FARMSTEADS or kind in PORT_KINDS:
-        return scale
+        return scale * SHARES.get(name, 1.0)
     most = GROWN_MOST_WIDTH.get(name.partition("_")[0], MOST_WIDTH[BUILDING_RULES[kind].space])
     scale = min(scale, most / _width(_full_size(name)))
     while _shown_width(name, scale) > most:
         scale *= SHRINK_STEP
-    return scale * WORKSHOP_SHARE if name in WORKSHOPS else scale
+    return scale * SHARES.get(name, 1.0)
 
 
 def _shown_width(name: str, scale: float) -> int:
@@ -578,7 +593,8 @@ def draw_sheets(
 ) -> dict[str, tuple[Image.Image, dict[str, list[int]]]]:
     """A sheet (draw_sheet) at each of `resolutions`. Buildings other than stations are drawn at
     BUILDING_SCALE, houses, tenements and flats at HOME_SCALE, farms and orchards at
-    FARMSTEAD_SCALE, and bakeries and distilleries WORKSHOP_SHARE of their size. Each sprite is drawn once, MASTER_RESOLUTION times finer than an art pixel
+    FARMSTEAD_SCALE, and some their share of that (SHARES). Each sprite is drawn
+    once, MASTER_RESOLUTION times finer than an art pixel
     (fine_sprite), and every sheet holds it shrunk from that drawing (shrunk_from), so a sprite
     is the very same picture on every sheet, only smaller or bigger: lines a pixel wide where it
     is drawn, such as the outline round a model, would make the coarse sheets look like other,

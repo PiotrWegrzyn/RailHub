@@ -44,10 +44,11 @@ def _hall(p: Painter, wall: RGB, roof: RGB, length: float = 16) -> tuple:
 
 
 def potter() -> Sprite:
-    """A potter's cottage with a round brick kiln beside it and pots set out to dry."""
+    """A potter's cottage washed terracotta like its pots, with a round brick kiln beside it and
+    pots set out to dry."""
     p = Painter(26, 22, (12, 16))
     p.shadow(9, 2.5)
-    _shop(p, -3, 0, WHITEWASH, ROOF, (176, 104, 70))
+    _shop(p, -3, 0, (204, 128, 88), ROOF, (176, 104, 70))
     p.ellipse(4, -6, 11, 2, shade(BRICK, 0.9))
     p.rect(6, -9, 9, -5, shade(BRICK, 0.8))
     for x in (-10, -7.5, 9, 11.5):
@@ -97,10 +98,11 @@ def foundry() -> Sprite:
 
 
 def sausage_maker() -> Sprite:
-    """A half-timbered butcher's shop with a smokehouse chimney and sausages hung over its door."""
+    """A butcher's shop washed the red of smoked ham, with a smokehouse chimney and sausages hung
+    over its door."""
     p = Painter(24, 22, (11, 16))
     p.shadow(9, 2.5)
-    _shop(p, -1, 0, (226, 210, 180), ROOF, (130, 80, 50))
+    _shop(p, -1, 0, (190, 106, 92), ROOF, (130, 80, 50))
     p.rect(6, -9, 8, 0, shade(BRICK, 0.8))
     for x in (-6, -4.5, -3):
         p.line([(x, -1), (x, 1.5)], (170, 74, 54))

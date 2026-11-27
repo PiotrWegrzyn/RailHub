@@ -799,7 +799,7 @@ def winery() -> Sprite:
     p.blob(-3, 7.5, 5, 10.5, (112, 92, 70))
     p.shadow(13, 3.5)
     _track(p, foot[0], foot[1], (0.54, 0.7), 3.5, ruts=False)
-    wall, roof = (238, 224, 192), (178, 86, 58)
+    wall, roof = (238, 224, 192), (118, 40, 66)
     top = p.hall(0, -2, 12, 7, 5, wall, None)
     left, front, right, _ = top
     _plinth(p, top, 5, wall)
@@ -1337,7 +1337,7 @@ def tannery() -> Sprite:
 
 
 def shoe_factory() -> Sprite:
-    """A narrow workshop of four storeys with cornices between its floors, windows with sills, a
+    """A narrow workshop of two storeys in leather brown with a cornice between its floors, windows with sills, a
     shop window and door on the ground floor, a chimney, a pavement of flags along its front with
     a worn path to the door, boxes of shoes at its foot and a big boot hung out from its wall as
     a sign."""
@@ -1353,8 +1353,8 @@ def shoe_factory() -> Sprite:
         )
     p.shadow(8, 2.5)
     _track(p, foot[0], foot[1], (0.55, 0.8), 2.4, shade(paving, 0.9), ruts=False)
-    wall, roof = (204, 170, 116), (124, 66, 52)
-    s, floors = 6, 4
+    wall, roof = (170, 112, 70), (92, 52, 40)
+    s, floors = 6, 2
     top = p.box(1, 0, s, 4 * floors, wall, None)
     left, front, right, _ = top
     _plinth(p, top, 4 * floors, wall)
@@ -1367,25 +1367,29 @@ def shoe_factory() -> Sprite:
     for f in range(floors):
         for t in (0.3, 0.7):
             _window(p, front, right, (t - 0.07, t + 0.07), 1.2 + 4 * f, shade(WINDOW, 0.75), 1.6)
-    _patch(p, left, front, (0.1, 0.42), (12.8, 14.8), GLASS)
-    p.line([_on_wall(left, front, 0.15, 13.4), _on_wall(left, front, 0.2, 13.2)], (220, 236, 244))
-    _patch(p, left, front, (0.08, 0.44), (12.2, 12.8), (124, 66, 52))
-    _door(p, left, front, (0.55, 0.8), 12.5, 16, (84, 60, 46))
-    p.point(*_on_wall(left, front, 0.75, 14.2), (226, 196, 120))
+    ground = 4 * (floors - 1)
+    _patch(p, left, front, (0.1, 0.42), (ground + 0.8, ground + 2.8), GLASS)
+    p.line(
+        [_on_wall(left, front, 0.15, ground + 1.4), _on_wall(left, front, 0.2, ground + 1.2)],
+        (220, 236, 244),
+    )
+    _patch(p, left, front, (0.08, 0.44), (ground + 0.2, ground + 0.8), (210, 186, 140))
+    _door(p, left, front, (0.55, 0.8), ground + 0.5, ground + 4, (60, 40, 30))
+    p.point(*_on_wall(left, front, 0.75, ground + 2.2), (226, 196, 120))
     p.gable(top, 4, roof, wall)
     _roof_rows(p, top, 4, roof)
     x, y = _on_roof(top, 4, 0.7, 0.9)
     p.rect(x - 1, y - 2.5, x, y, BRICK)
     p.line([(x - 1.5, y - 3), (x + 0.5, y - 3)], shade(BRICK, 0.55))
-    p.line([(-5, -12), (-8, -12)], (60, 56, 54))
+    p.line([(-5, -8.5), (-7.5, -8.5)], (60, 56, 54))
     boot = (140, 54, 40)
     p.polygon(
-        [(-9, -11), (-5, -11), (-5, -3), (-11, -3), (-11, -5), (-10, -6), (-9, -6)],
+        [(-8.5, -8), (-6, -8), (-6, -3.5), (-9.5, -3.5), (-9.5, -4.6), (-9, -5.2), (-8.5, -5.2)],
         boot,
         shade(boot, 0.5),
     )
-    p.line([(-8, -10), (-8, -6)], shade(boot, 1.4))
-    p.line([(-11, -3), (-5, -3)], (40, 32, 30))
+    p.line([(-7.6, -7.4), (-7.6, -5.4)], shade(boot, 1.4))
+    p.line([(-9.5, -3.5), (-6, -3.5)], (40, 32, 30))
     for x, y in ((6, 5), (8.5, 4)):
         _crate(p, x, y, (196, 160, 112))
     return p.sprite()
