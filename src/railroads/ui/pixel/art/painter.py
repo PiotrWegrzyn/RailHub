@@ -176,9 +176,13 @@ class Painter:
         (x0, y0), (x1, y1) = self._at([(left, top), (right, bottom)])
         self._draw.ellipse((x0, y0, x1, y1), fill=fill, outline=shade(fill, 0.65))
 
-    def blob(self, left: float, top: float, right: float, bottom: float, fill: RGB) -> None:
+    def blob(
+        self, left: float, top: float, right: float, bottom: float, fill: RGB, alpha: int = 255
+    ) -> None:
+        """A filled ellipse with no outline; with `alpha` below 255 it replaces what is under it
+        with that much cover, so the ground shows through it on the map."""
         (x0, y0), (x1, y1) = self._at([(left, top), (right, bottom)])
-        self._draw.ellipse((x0, y0, x1, y1), fill=fill)
+        self._draw.ellipse((x0, y0, x1, y1), fill=(*fill, alpha))
 
     def point(self, x: float, y: float, fill: RGB) -> None:
         if self._k == 1:

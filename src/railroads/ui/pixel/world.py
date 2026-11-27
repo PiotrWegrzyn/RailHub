@@ -837,6 +837,7 @@ TOWN = (
     "jeweller",
     "headquarters",
     "airport",
+    "builders_yard",
 )
 DIGGINGS = (
     "mine",

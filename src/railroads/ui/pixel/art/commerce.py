@@ -357,7 +357,11 @@ def hotel() -> Sprite:
     return p.sprite()
 
 
-GRAVEL: RGB = (176, 166, 142)
+RUT: RGB = (142, 138, 128)
+# The paving under a lot, the colour of the paved yards round town buildings
+# (railroads.ui.pixel.ground_palette.YARD_COLOURS).
+APRON: RGB = (164, 160, 148)
+GRAVEL: RGB = (186, 180, 166)
 SACK: RGB = (214, 210, 198)
 PANE: RGB = (156, 200, 216)
 SAND: RGB = (222, 196, 132)
@@ -463,21 +467,72 @@ def _hand_cart(p: Painter, x: float, y: float) -> None:
     p.ellipse(wx - 0.45 * m, wy - 0.45 * m, wx + 0.45 * m, wy + 0.55 * m, (54, 50, 48))
 
 
+def _ruts(p: Painter, a: Point, b: Point) -> None:
+    """The two wheel ruts carts have worn into the ground from `a` to `b`, a cart's width
+    apart."""
+    m = METRE
+    (ax, ay), (bx, by) = a, b
+    length = ((bx - ax) ** 2 + (2 * (by - ay)) ** 2) ** 0.5 or 1.0
+    dx, dy = -(by - ay) * 2 / length * 0.7 * m, (bx - ax) / length * 0.35 * m
+    for side in (-1, 1):
+        _bar(p, (ax + side * dx, ay + side * dy), (bx + side * dx, by + side * dy), 0.3 * m, RUT)
+
+
+def _spill(p: Painter, x: float, y: float, half: float, colour: RGB) -> None:
+    """A flat patch of something spilt or tipped on the ground at (x, y), `half` across."""
+    p.blob(x - half, y - half / 2, x + half, y + half / 2, colour)
+    p.blob(x - half * 0.5, y - half * 0.3, x + half * 0.2, y + half * 0.05, shade(colour, 1.06))
+
+
+def _apron(p: Painter, half: float) -> None:
+    """The paving a lot stands on, an oval `half` across and half that down, solid in its
+    middle and thinning out towards its uneven rim, so the ground round it shows through and
+    the slabs give out into the grass."""
+    for share, alpha in ((1.0, 50), (0.92, 100), (0.84, 160), (0.76, 220), (0.7, 255)):
+        reach = half * share
+        p.blob(-reach, -reach / 2, reach, reach / 2, APRON, alpha)
+    for k, (u, v) in enumerate(_RIM):
+        x, y = u * half * 0.86, v * half * 0.43
+        size = half * (0.1 + 0.03 * (k % 3))
+        p.blob(x - size, y - size / 2, x + size, y + size / 2, APRON, 120)
+
+
+# Where an apron's rim reaches out, as shares of its half width across and half height down.
+_RIM = (
+    (-0.96, 0.18),
+    (-0.7, -0.66),
+    (-0.2, -0.95),
+    (0.42, -0.86),
+    (0.9, -0.36),
+    (0.88, 0.42),
+    (0.4, 0.88),
+    (-0.3, 0.92),
+    (-0.82, 0.5),
+)
+
+
 def builders_yard() -> Sprite:
-    """A builder's yard of trodden gravel behind a post-and-rail fence: a boarded timber store
-    14 by 7 m with planks and sacks in its open front, a small office with a yellow sign,
+    """A builder's yard behind a post-and-rail fence on a paved lot: a boarded timber store
+    12 by 6 m with planks and sacks in its open front, a small office with a yellow sign,
     pallets of bricks and of cement sacks, stacks of sawn planks, a rack of glass panes, a heap
-    of sand and a hand cart, all at their true size beside the houses."""
+    of sand and a hand cart, wheel ruts worn through its gate, all at their true size beside
+    the houses."""
     p = Painter(30, 22, (15, 14))
     m = METRE
-    yard = _paddock(0, 0, 12.5)
-    p.polygon(list(yard), GRAVEL, shade(GRAVEL, 0.8))
+    _apron(p, 13.6)
+    yard = _paddock(0, 0, 9.6)
     left_corner, back_corner, right_corner, front_corner = yard
+    for x, y, half in ((-2.4, 2.7, 1.9), (4.4, 1.9, 2), (-6.2, 0.6, 1.4)):
+        _spill(p, x, y, half, GRAVEL)
+    _spill(p, 2.2, -1.4, 2.2, shade(SAND, 0.94))
+    gate = 0.42
+    middle = _on_wall(left_corner, front_corner, gate + 0.09, 0)
+    _ruts(p, (middle[0] - 4.2, middle[1] + 2.1), (middle[0] + 4, middle[1] - 2))
     _fence(p, left_corner, back_corner, m)
     _fence(p, back_corner, right_corner, m)
-    _sand(p, 2, -3.2, 2.2, 1.7)
+    _sand(p, 1.6, -2.5, 1.9, 1.5)
     office = (226, 216, 190)
-    top = p.hall(6.2, -1.6, 5 * m, 4.5 * m, 2.7 * m, office, None)
+    top = p.hall(4.9, -1.2, 5 * m, 4.5 * m, 2.7 * m, office, None)
     left, front, right, _ = top
     _foot(p, top, 2.7 * m)
     _patch(p, left, front, (0.58, 0.8), (0.6 * m, 2.7 * m), DOOR)
@@ -487,7 +542,7 @@ def builders_yard() -> Sprite:
     _patch(p, left, front, (0.1, 0.9), (-0.9 * m, 0.1 * m), (236, 194, 60))
     store = (156, 118, 82)
     high = 3.4 * m
-    top = p.hall(-3.2, -1, 14 * m, 7 * m, high, store, None)
+    top = p.hall(-2.5, -0.9, 12 * m, 6 * m, high, store, None)
     left, front, right, _ = top
     _foot(p, top, high)
     for k in range(1, 7):
@@ -514,17 +569,16 @@ def builders_yard() -> Sprite:
     roof = (92, 96, 104)
     p.gable(top, 1.8 * m, roof, store)
     _tiles(p, top, 1.8 * m, roof, (0.5,))
-    _hand_cart(p, 2.4, 0.9)
-    _planks(p, 7.6, 1.5, 6, 1.2)
-    _planks(p, 4.6, 3.3, 5, 0.8)
+    _hand_cart(p, 1.9, 0.8)
+    _planks(p, 5.8, 1.2, 6, 1.2)
+    _planks(p, 3.6, 2.6, 5, 0.8)
     for row, col, tall in ((0, 0, 2), (0, 1, 2), (0, 2, 1), (1, 0, 2), (1, 1, 1), (1, 2, 1)):
-        bx = -7.6 + (col + row) * 1.15 * m
-        by = 0.9 + (col - row) * 0.58 * m
+        bx = -5.9 + (col + row) * 1.15 * m
+        by = 0.7 + (col - row) * 0.58 * m
         _pallet(p, bx, by, tall, BRICK, 2 * tall)
     for k, tall in enumerate((1.2, 0.9, 1.2)):
-        _pallet(p, -4 + k * 1.15 * m, 3.3 + k * 0.58 * m, tall, SACK, round(tall / 0.3))
-    _glass_rack(p, 0.8, 3)
-    gate = 0.42
+        _pallet(p, -3.2 + k * 1.15 * m, 2.6 + k * 0.58 * m, tall, SACK, round(tall / 0.3))
+    _glass_rack(p, 0.6, 2.4)
     _fence(p, left_corner, _on_wall(left_corner, front_corner, gate, 0), m)
     _fence(p, _on_wall(left_corner, front_corner, gate + 0.18, 0), front_corner, m)
     _fence(p, front_corner, right_corner, m)
