@@ -243,6 +243,33 @@ def test_a_chunk_over_ground_leaves_its_fields_to_the_graphics_card_when_asked(
     assert (bare[sown][:, 3] == 0).mean() > 0.5
 
 
+def ground_laid_in(world: PixelWorld, cell: Cell) -> float:
+    grid = world.tile_map.grid
+    canvas = np.zeros((CHUNK, CHUNK, 4), dtype=np.float32)
+    px, py = world.projection.to_pixels(*grid.center(*cell))
+    left, top = int(px) - CHUNK // 2, int(py) - CHUNK // 2
+    world.ground.yards(canvas, left, top, 1, shown=np.ones((CHUNK, CHUNK), dtype=bool))
+    iy, ix = np.mgrid[0:CHUNK, 0:CHUNK]
+    r, c = grid.cell_at(*world.projection.to_plane(left + ix + 0.5, top + iy + 0.5))
+    in_cell = (r == cell[0]) & (c == cell[1])
+    return float((canvas[..., 3][in_cell] > 0.9).mean())
+
+
+def test_a_works_lays_town_ground_over_its_whole_cell_and_a_mine_keeps_its_land(
+    sheet: SpriteSheet,
+) -> None:
+    world = make_world(sheet, houses=0)
+    world.constructions.build(Building((10, 3), BuildingKind.BREWERY))
+    world.constructions.build(Building((13, 3), BuildingKind.MINE))
+    world.buildings_changed({(10, 3), (13, 3)})
+
+    works = ground_laid_in(world, (10, 3))
+    mine = ground_laid_in(world, (13, 3))
+
+    assert works > 0.8
+    assert mine < 0.5
+
+
 def canopy_round(world: PixelWorld, cell: Cell) -> tuple[np.ndarray, int, int]:
     grid = world.tile_map.grid
     canvas = np.ones((CHUNK, CHUNK, 4), dtype=np.float32)

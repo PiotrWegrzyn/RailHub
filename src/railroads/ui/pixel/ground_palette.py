@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from railroads.sim.constructions import BuildingKind
+from railroads.sim.goods import HOMES, MAKES, RECIPES
 from railroads.sim.trade import Satisfaction
 from railroads.ui.biomes import Biome
 from railroads.ui.pixel.art.parts import METRE as SPRITE_METRE
@@ -419,6 +420,30 @@ YARD_COLOURS = {
     "spoil": (118, 102, 84),
     "sand": (214, 192, 134),
 }
+# A building stands on the land it works with: homes, and what takes raw goods straight from the
+# land (fields, farms, groves, herds, mines, pits, quarries, wells, logging camps, fisheries),
+# keep their cell's own ground. Every other building, works making goods from goods, shops,
+# churches, landmarks, ports and bases, lays town ground over its whole cell: setts in rows
+# TOWN_STONE art pixels across and down, laid half a stone along each row, each stone its own
+# shade, joints TOWN_JOINT of an art pixel wide showing once the stones are big enough, patches of
+# packed earth where the TOWN_EARTH noise is high and grass through the holes where the
+# TOWN_HOLES noise is. It covers where the share of town cells AROUND a point, drawn in to
+# TOWN_BLEND of its reach, frayed by noise TOWN_FRAY deep, is over TOWN_FROM, so it fills its cell and gives out into the grass at its edge, and runs on
+# unbroken into a town cell beside it.
+ON_THE_LAND = HOMES | {kind for kind in MAKES if kind not in RECIPES}
+TOWN_SETTS = np.array((132, 126, 114), dtype=np.float32)
+TOWN_JOINTS = np.array((96, 90, 80), dtype=np.float32)
+TOWN_EARTH_COLOUR = np.array((138, 118, 86), dtype=np.float32)
+TOWN_STONE = (2.0, 1.0)
+TOWN_JOINT = 0.18
+TOWN_FROM = 0.3
+TOWN_BLEND = 0.4
+TOWN_FRAY = 0.5
+TOWN_SOFT = 5.0
+# How far town ground may reach from the middle of its cell, in art pixels: past its corners.
+TOWN_REACH = 24.0
+TOWN_EARTH = (0.32, 0.6)
+TOWN_HOLES = (0.07, 0.84)
 GARDEN_LEAVES = np.array((84, 132, 52), dtype=np.float32)
 # Where a cottage's vegetable garden lies from the middle of its yard, in art pixels: from the
 # first to the second across, and from the third to the fourth down; and how many rows of

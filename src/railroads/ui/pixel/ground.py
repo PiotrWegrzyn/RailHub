@@ -105,6 +105,7 @@ from railroads.ui.pixel.ground_palette import (
     MAX_SLOPE_SHADES,
     MEADOWS,
     OLD,
+    ON_THE_LAND,
     OPEN_WATER,
     ORE_ROCK,
     OVERHANG,
@@ -141,6 +142,18 @@ from railroads.ui.pixel.ground_palette import (
     STAND_SPAN,
     THIN_SPAN,
     THINNED,
+    TOWN_BLEND,
+    TOWN_EARTH,
+    TOWN_EARTH_COLOUR,
+    TOWN_FRAY,
+    TOWN_FROM,
+    TOWN_HOLES,
+    TOWN_JOINT,
+    TOWN_JOINTS,
+    TOWN_REACH,
+    TOWN_SETTS,
+    TOWN_SOFT,
+    TOWN_STONE,
     TREE_SHADE,
     TRUNK_BARK,
     TRUNK_BELOW,
@@ -273,6 +286,14 @@ class Ground:
         # 0 for open land, and CLEARING where anything else is built, so the woods give it room.
         woods = np.isin(self._biomes, WOODS) | woodland
         self._woods = np.where(built, CLEARING, woods).astype(np.float32)
+        town = np.zeros(self.tile_map.grid.shape, dtype=bool)
+        for construction in self.constructions:
+            if isinstance(construction, Building) and construction.kind not in ON_THE_LAND:
+                town[construction.cell] = True
+        self._town = (town & self._land).astype(np.float32)
+        rows, cols = np.nonzero(self._town)
+        px, py = self.projection.to_pixels(*self.tile_map.grid.center(rows, cols))
+        self._town_pixels = (np.atleast_1d(px), np.atleast_1d(py))
         grid = self.tile_map.grid
         self._plots = plots_of(self.constructions, FIELD_KINDS)
         # Where each kind's fields sit in the picture, to find those near a block quickly.
@@ -507,9 +528,14 @@ class Ground:
 
     @property
     def woodland(self) -> FloatArray:
-        """Each cell's say in whether woods cover a point near it and 1 where it is land, as
-        (rows, cols, 2) floats, for the graphics card."""
-        return np.stack([self._woods, self._land.astype(np.float32)], axis=-1)
+        """Each cell's say in whether woods cover a point near it, 1 where it is land and 1 where
+        it lays town ground (ON_THE_LAND), as (rows, cols, 3) floats, for the graphics card."""
+        return np.stack([self._woods, self._land.astype(np.float32), self._town], axis=-1)
+
+    @property
+    def town_pixels(self) -> tuple[FloatArray, FloatArray]:
+        """Where the middle of each cell laying town ground lies in the picture."""
+        return self._town_pixels
 
     @property
     def plot_table(self) -> FloatArray:
@@ -712,6 +738,7 @@ class Ground:
         """Paints the ground round buildings over a picture of the ground from (`left`, `top`),
         `k` pixels to an art pixel, RGB from 0 to 1 multiplied by its alpha (YARD_REACH), where
         the picture shows the map, as `fields` says."""
+        self._pave_town(canvas, left, top, k, shown)
         xs, ys, kinds, reaches = self.buildings
         rows, cols = canvas.shape[0] // k, canvas.shape[1] // k
         reach = float(reaches.max()) if reaches.size else 0.0
@@ -728,6 +755,50 @@ class Ground:
             strict=True,
         ):
             self._yard(canvas, shown, (x0 - left) * k, (y0 - top) * k, kind, out, k)
+
+    def _pave_town(
+        self, canvas: FloatArray, left: int, top: int, k: int, shown: BoolArray | None
+    ) -> None:
+        """Lays town ground over the cells that lay it (ON_THE_LAND) in a picture of the ground
+        from (`left`, `top`), `k` pixels to an art pixel, off the minor rivers, given out into
+        the grass at its frayed edge."""
+        if not self._town.any():
+            return
+        rows, cols = canvas.shape[0] // k, canvas.shape[1] // k
+        grid = self.tile_map.grid
+        px, py = self._town_pixels
+        reach = TOWN_REACH
+        near = (px > left - reach) & (px < left + cols + reach)
+        near &= (py > top - reach) & (py < top + rows + reach)
+        if not near.any():
+            return
+        first_col = max(int((px[near].min() - reach - left) * k), 0)
+        last_col = min(int((px[near].max() + reach - left) * k) + 1, cols * k)
+        first_row = max(int((py[near].min() - reach - top) * k), 0)
+        last_row = min(int((py[near].max() + reach - top) * k) + 1, rows * k)
+        if first_col >= last_col or first_row >= last_row:
+            return
+        box = (first_row, last_row, first_col, last_col)
+        place = (slice(first_row, last_row), slice(first_col, last_col))
+        x, y, flat, ix, iy = self._patch_points(box, left, top, k, None)
+        x, y = x.astype(np.float32), y.astype(np.float32)
+        land = self._land.ravel()[flat]
+        share = np.zeros(x.shape, dtype=np.float32)
+        for dx, dy in AROUND:
+            sr, sc = grid.cell_on_map(x + dx * TOWN_BLEND, y + dy * TOWN_BLEND)
+            share += self._town[sr, sc]
+        share /= len(AROUND)
+        edge = noise(x, y, 0.55, 63) * 0.55 + noise(x, y, 0.16, 64) * 0.3
+        cover = np.clip((share + (edge - 0.42) * TOWN_FRAY - TOWN_FROM) * TOWN_SOFT, 0, 1)
+        cover *= land
+        holes_size, holes_from = TOWN_HOLES
+        cover[noise(x, y, holes_size, 66) > holes_from] = 0
+        if not (cover > 0).any():
+            return
+        cover *= _on_map(canvas, shown)[place]
+        cover *= self._off_streams(x, y, flat)
+        colour = town_ground(x, y, ix, iy, k)
+        _over(canvas[place], colour / 255, cover)
 
     def _yard(
         self,
@@ -1336,6 +1407,25 @@ def _shrunk(inside: BoolArray) -> BoolArray:
     both[:, :-1] &= rows[:, 1:]
     both[:, -1:] &= rows[:, :1]
     return both
+
+
+def town_ground(x: FloatArray, y: FloatArray, ix: IntArray, iy: IntArray, k: int) -> FloatArray:
+    """The colour of town ground at plane points `x`, `y`, pixels `ix`, `iy` of a picture `k`
+    to an art pixel (ON_THE_LAND), RGB from 0 to 255."""
+    u = (ix + 0.5) / k
+    v = (iy + 0.5) / k
+    width, height = TOWN_STONE
+    row = np.floor(v / height)
+    along = u / width + 0.5 * (row % 2)
+    stone = np.floor(along)
+    tone = 0.88 + 0.16 * table_hash(stone.astype(np.int64), row.astype(np.int64), 91)
+    colour = TOWN_SETTS * tone[..., None]
+    joint = ((along - stone) * width < TOWN_JOINT) | ((v / height - row) * height < TOWN_JOINT)
+    colour[joint] = TOWN_JOINTS
+    size, earth_from = TOWN_EARTH
+    earth = np.clip((noise(x, y, size, 65) - earth_from) * 6, 0, 1)[..., None]
+    colour = colour * (1 - earth) + TOWN_EARTH_COLOUR * earth
+    return colour * (0.94 + 0.1 * table_hash(ix, iy, 92))[..., None]
 
 
 def _on_map(canvas: FloatArray, shown: BoolArray | None) -> BoolArray:

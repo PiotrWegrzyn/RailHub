@@ -251,6 +251,8 @@ The ideas every change to the game should follow.
 - The perspective is consistent, as in Railroad Tycoon 2: track lies under the trees and stations
   stand turned along their track. The art is our own.
 - A building stands on the land it works with: a logging camp among trees.
+- Homes and what takes raw goods from the land keep their cell's own ground; every other building
+  turns its whole cell into town ground, with a little grass at its edge.
 - Every kind of building is recognisable at a glance and never looks like a house or like another
   kind.
 - Big and mega works have their own look, the same trade grown grander; a mega one is spectacular.
