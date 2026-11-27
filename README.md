@@ -509,7 +509,7 @@ window (H) lists the same.
 |---|---|---|---|
 | House |  | 6 food, 2 heating | 6 food, 0.3 soy sauce, 0.6 beer, 0.6 newspapers (from 1600), 3 common goods, 0.3 vodka (from 1600), 0.3 refined sugar (from 1800), 0.05 bricks, 0.12 glass, 0.3 limestone, 0.3 wax |
 | Tenement |  | 35 food, 40 common goods, 12 heating | 35 food, 3 soy sauce, 6 salt, 12 goods, 6 hot drinks (from 1700), 6 tools (from era 3), 6 beer, 6 vodka (from 1600), 3 bricks, 6 glass, 3 cement (from era 3), 6 refined sugar (from 1800), 6 newspapers (from 1600), 6 limestone, 0.6 luxury goods (from 1700), 3 wax |
-| Block of flats |  | 125 food, 200 common goods, 50 heating | 125 food, 10 soy sauce, 20 salt, 25 goods, 20 hot drinks (from 1700), 6 tools (from era 3), 20 fuel (from era 2), 2 cars (from era 4), 20 beer, 20 vodka (from 1600), 10 bricks, 12 cement (from era 3), 30 glass, 20 newspapers (from 1600), 3 appliances (from era 6), 20 refined sugar (from 1800), 3 luxury goods (from 1700) |
+| Block of flats |  | 125 food, 200 common goods, 50 heating | 125 food, 10 soy sauce, 20 salt, 25 goods, 20 hot drinks (from 1700), 6 tools (from era 3), 20 fuel (from era 2), 2 cars (from era 4), 20 beer, 20 vodka (from 1600), 12 bricks, 12 cement (from era 3), 30 glass, 20 newspapers (from 1600), 3 appliances (from era 6), 20 refined sugar (from 1800), 3 luxury goods (from 1700) |
 | Farm | 6 wheat |  | 3 machinery (from machines and tools demand 10), 6 limestone (from ore and stone demand 3), 3 fertiliser (from chemicals and building demand 10), 1.2 fuel (from oil and fuel demand 11) |
 | Orchard | 6 apples |  |  |
 | Date palms | 6 dates |  |  |
