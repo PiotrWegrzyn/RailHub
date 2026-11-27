@@ -41,7 +41,6 @@ class Vegetation(IntEnum):
 
 class Deposit(IntEnum):
     NONE = 0
-    IRON = 1
     COPPER = 2
     GOLD = 3
     DIAMONDS = 4

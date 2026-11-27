@@ -816,7 +816,7 @@ def test_coal_mined_near_a_station_heats_its_own_houses_before_waiting_for_train
 
     _, heating = food_and_heating(growth, (6, 21))
     assert heating == pytest.approx(2.0)
-    assert railway.station_goods((6, 20)).stockpile[Good.COAL] == pytest.approx(58.0)
+    assert railway.station_goods((6, 20)).stockpile[Good.COAL] == pytest.approx(28.0)
 
 
 @pytest.mark.parametrize(("farm", "demand"), [(False, 24.0), (True, 2 * (12 - 2 * 6 * 13 / 21))])

@@ -354,19 +354,27 @@ SUGAR_FIELDS = Ladder(
 )
 
 # Mines are dug in and beside mountains and in hills, where finding ore draws more digging nearby,
-# so they gather in mining districts.
+# so they gather in mining districts: coal mines, and far fewer iron mines on the same land.
+MINING_LAND = Land(
+    vegetation={Vegetation.FOREST: 0.6, Vegetation.GRASS: 0.8},
+    relief={Relief.FLAT: 0.01, Relief.HILLS: 0.4, Relief.MOUNTAINS: 1.0},
+    temperature={Temperature.COLD: 0.8},
+    beside_mountains=3.0,
+)
 MINES = Ladder(
     kinds=(BuildingKind.MINE,),
-    land=Land(
-        vegetation={Vegetation.FOREST: 0.6, Vegetation.GRASS: 0.8},
-        relief={Relief.FLAT: 0.01, Relief.HILLS: 0.4, Relief.MOUNTAINS: 1.0},
-        temperature={Temperature.COLD: 0.8},
-        beside_mountains=3.0,
-    ),
-    base=56,
+    land=MINING_LAND,
+    base=28,
     most_per_cell=2,
     most_nearby=8,
     from_year=1700,
+)
+IRON_MINES = Ladder(
+    kinds=(BuildingKind.IRON_MINE,),
+    land=MINING_LAND,
+    base=0.6,
+    most_per_cell=1,
+    most_nearby=2,
 )
 
 # Logging camps stand in forests with at least four forest cells around them and flat open land
@@ -523,7 +531,6 @@ def _works(
 
 # Rare resources, each on the deposits a map was given.
 RESOURCES = (
-    _resource(BuildingKind.IRON_MINE, Deposit.IRON),
     _resource(BuildingKind.COPPER_MINE, Deposit.COPPER, 0, 30_000),
     _resource(BuildingKind.GOLD_MINE, Deposit.GOLD),
     _resource(BuildingKind.DIAMOND_MINE, Deposit.DIAMONDS),
@@ -976,6 +983,7 @@ LADDERS = (
     ORANGE_FARMS,
     SUGAR_FIELDS,
     MINES,
+    IRON_MINES,
     LOGGING_CAMPS,
     PORTS,
     FISHERIES,

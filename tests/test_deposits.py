@@ -56,7 +56,7 @@ def test_a_map_without_the_land_for_a_resource_simply_has_none() -> None:
 
     layer = place_deposits(tile_map, np.random.default_rng(1))
 
-    assert not np.isin(layer, [Deposit.GOLD, Deposit.IRON, Deposit.DIAMONDS]).any()
+    assert not np.isin(layer, [Deposit.GOLD, Deposit.COPPER, Deposit.DIAMONDS]).any()
     assert (layer == Deposit.OIL).any()
 
 
@@ -65,7 +65,7 @@ def test_where_little_land_allows_a_resource_its_clusters_still_fit() -> None:
 
     layer = place_deposits(tile_map, np.random.default_rng(2))
 
-    assert (layer == Deposit.IRON).sum() >= 6
+    assert (layer == Deposit.COPPER).sum() >= 4
 
 
 def test_a_mine_opens_only_on_its_deposit() -> None:

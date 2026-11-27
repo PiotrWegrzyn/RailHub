@@ -36,7 +36,7 @@ def test_fertiliser_lets_a_farm_grow_up_to_half_as_much_again(
 
 @pytest.mark.parametrize(
     ("kind", "good", "made"),
-    [(BuildingKind.MINE, Good.COAL, 90.0), (BuildingKind.IRON_MINE, Good.IRON, 90.0)],
+    [(BuildingKind.MINE, Good.COAL, 45.0), (BuildingKind.IRON_MINE, Good.IRON, 45.0)],
 )
 def test_machinery_lets_a_mine_dig_up_to_half_as_much_again(
     kind: BuildingKind, good: Good, made: float
