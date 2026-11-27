@@ -92,8 +92,8 @@ def rowing_boat(color: RGB = WOOD) -> Model:
 
 def sailing_barge() -> Model:
     """A flat sailing barge with a black hull: green covers over its two holds, a tall mast with
-    its tan sails brailed up along the mast and the sprit reaching aft, a mizzen at the stern and
-    its leeboard down on one side."""
+    its red-brown sails set, the big spritsail aft of it on the sprit, a topsail over it and a
+    foresail out to the bow, a mizzen at the stern and its leeboard down on one side."""
     m = Model()
     length, half, high = 0.34, 0.042, 0.024
     _hull(m, length, half, high, HULL_BLACK, RED_BOTTOM)
@@ -108,16 +108,40 @@ def sailing_barge() -> Model:
                     (high + 0.008, high + 0.0086),
                     shade(HATCH, 0.7),
                 )
-    m.box((-0.0035, 0.0035), (-0.0035, 0.0035), (high, 0.3), DARK_WOOD)
-    m.box((-0.008, 0.008), (-0.006, 0.006), (0.05, 0.27), TAN_SAIL)
-    m.slope((0.0, 0.06), (-0.14, 0.26), (-0.002, 0.002), DARK_WOOD)
-    m.slope((0.004, 0.07), (-0.12, 0.24), (-0.005, 0.005), TAN_SAIL)
-    m.box((0.012, 0.03), (-0.005, 0.005), (0.06, 0.2), shade(TAN_SAIL, 1.08))
+    m.box((-0.0025, 0.0025), (-0.0025, 0.0025), (high, 0.3), DARK_WOOD)
+    _sail(m, [(-0.004, 0.045), (-0.13, 0.045), (-0.15, 0.27), (-0.004, 0.22)], TAN_SAIL, 0.0)
+    _sail(m, [(-0.004, 0.225), (-0.14, 0.272), (-0.004, 0.294)], shade(TAN_SAIL, 1.1), 0.001)
+    _sail(m, [(0.004, 0.035), (0.165, 0.03), (0.004, 0.2)], shade(TAN_SAIL, 0.92), 0.0)
+    m.slope((-0.004, 0.05), (-0.155, 0.275), (-0.0015, 0.0015), DARK_WOOD)
     stern = -length / 2
-    m.box((stern + 0.01, stern + 0.016), (-0.0025, 0.0025), (high, 0.12), DARK_WOOD)
-    m.box((stern + 0.004, stern + 0.022), (-0.004, 0.004), (0.05, 0.11), TAN_SAIL)
+    m.box((stern + 0.011, stern + 0.016), (-0.002, 0.002), (high, 0.13), DARK_WOOD)
+    _sail(
+        m,
+        [
+            (stern + 0.011, 0.045),
+            (stern - 0.035, 0.045),
+            (stern - 0.04, 0.115),
+            (stern + 0.011, 0.12),
+        ],
+        TAN_SAIL,
+        0.0,
+    )
     m.box((-0.03, 0.02), (half, half + 0.004), (0.0, high), DARK_WOOD)
     return m
+
+
+def _sail(m: Model, points: list[tuple[float, float]], color: RGB, v: float) -> None:
+    """A sail of cloth set along the hull through `points`, each a (u, z) corner, `v` off its
+    middle, seen from either side."""
+    _flat(m, [(u, v, z) for u, z in points], color)
+
+
+def _flat(m: Model, corners: list[tuple[float, float, float]], color: RGB) -> None:
+    """A thin flat piece upright along u through `corners`, seen from either side."""
+    if m.skipping:
+        return
+    m.faces.append(Face(corners, color, (0.0, -1.0, 0.0)))
+    m.faces.append(Face(corners[::-1], color, (0.0, 1.0, 0.0)))
 
 
 def steamer() -> Model:
@@ -177,23 +201,108 @@ def container_ship(colors: tuple[RGB, ...]) -> Model:
     return m
 
 
+def _ring(v: float, z: float, half: float, high: float) -> list[tuple[float, float]]:
+    """An oval cross section round (v, z), `half` wide either side and `high` up and down,
+    closed by its first point again."""
+    points = [
+        (v + half * math.sin(2 * math.pi * k / 10), z + high * math.cos(2 * math.pi * k / 10))
+        for k in range(10)
+    ]
+    return [*points, points[0]]
+
+
+def _horse(m: Model) -> None:
+    """A bay horse standing along u, its head at +u: a rounded barrel of a body on four slim
+    legs with dark hooves, an arched neck with its mane up to a long head, its ears pricked, and a
+    dark tail."""
+    m.loft(
+        [
+            (0.021, _ring(0.0, 0.022, 0.001, 0.001)),
+            (0.023, _ring(0.0, 0.0215, 0.0042, 0.0052)),
+            (0.028, _ring(0.0, 0.021, 0.0054, 0.0066)),
+            (0.038, _ring(0.0, 0.0208, 0.0054, 0.0068)),
+            (0.045, _ring(0.0, 0.0215, 0.0046, 0.0062)),
+            (0.0475, _ring(0.0, 0.023, 0.0024, 0.0034)),
+        ],
+        HORSE,
+    )
+    m.loft(
+        [
+            (0.042, _ring(0.0, 0.024, 0.003, 0.0048)),
+            (0.047, _ring(0.0, 0.0295, 0.0024, 0.0038)),
+            (0.0515, _ring(0.0, 0.035, 0.002, 0.0028)),
+        ],
+        HORSE,
+    )
+    m.loft(
+        [
+            (0.0505, _ring(0.0, 0.036, 0.0022, 0.0028)),
+            (0.055, _ring(0.0, 0.034, 0.0019, 0.0024)),
+            (0.0605, _ring(0.0, 0.03, 0.0014, 0.0017)),
+        ],
+        HORSE,
+    )
+    for side in (-0.0011, 0.0011):
+        m.box((0.0505, 0.0515), (side - 0.0005, side + 0.0005), (0.0375, 0.04), HORSE)
+    m.slope((0.0415, 0.0292), (0.0515, 0.0382), (-0.0007, 0.0007), MANE)
+    m.slope((0.0215, 0.024), (0.0185, 0.011), (-0.0009, 0.0009), MANE)
+    for lu in (0.0255, 0.0425):
+        for side in (-0.0026, 0.0026):
+            m.box(
+                (lu - 0.0011, lu + 0.0011), (side - 0.0011, side + 0.0011), (0.0015, 0.0165), HORSE
+            )
+            m.box((lu - 0.0013, lu + 0.0013), (side - 0.0013, side + 0.0013), (0.0, 0.0015), MANE)
+    m.box((0.0425, 0.045), (-0.0034, 0.0034), (0.022, 0.0285), DARK_WOOD)
+
+
+def _cart_wheel(m: Model, u: float, v: float, radius: float) -> None:
+    """A spoked wooden cart wheel standing at `u`, `v` across, `radius` round: a rim of felloes,
+    eight spokes and a hub."""
+    rim, sides = radius * 0.16, 16
+    for k in range(sides):
+        a0, a1 = 2 * math.pi * k / sides, 2 * math.pi * (k + 1) / sides
+        outer = [(u + radius * math.cos(a), radius + radius * math.sin(a)) for a in (a0, a1)]
+        inner = [
+            (u + (radius - rim) * math.cos(a), radius + (radius - rim) * math.sin(a))
+            for a in (a1, a0)
+        ]
+        _flat(m, [(pu, v, pz) for pu, pz in outer + inner], DARK_WOOD)
+    for k in range(8):
+        a = 2 * math.pi * k / 8
+        du, dz = math.cos(a), math.sin(a)
+        nu, nz = -dz * radius * 0.05, du * radius * 0.05
+        hub, out = radius * 0.2, radius - rim
+        _flat(
+            m,
+            [
+                (u + du * hub + nu, v, radius + dz * hub + nz),
+                (u + du * out + nu, v, radius + dz * out + nz),
+                (u + du * out - nu, v, radius + dz * out - nz),
+                (u + du * hub - nu, v, radius + dz * hub - nz),
+            ],
+            WOOD,
+        )
+    m.box(
+        (u - radius * 0.22, u + radius * 0.22),
+        (v - 0.002, v + 0.002),
+        (radius * 0.78, radius * 1.22),
+        DARK_WOOD,
+    )
+
+
 def horse_cart() -> Model:
     """A horse drawing a two-wheeled cart loaded with sacks."""
     m = Model()
-    m.box((-0.045, 0.0), (-0.016, 0.016), (0.012, 0.016), WOOD)
-    for side in (-0.017, 0.017):
-        m.box((-0.045, 0.0), (side - 0.0015, side + 0.0015), (0.016, 0.026), DARK_WOOD)
-    m.wheels([-0.022], 0.011, DARK_WOOD, 0.02)
-    m.box((-0.04, -0.006), (-0.012, 0.012), (0.016, 0.028), (204, 186, 146))
-    for side in (-0.01, 0.01):
-        m.box((0.0, 0.05), (side - 0.0012, side + 0.0012), (0.014, 0.016), DARK_WOOD)
-    m.box((0.02, 0.05), (-0.006, 0.006), (0.016, 0.03), HORSE)
-    for lu in (0.023, 0.047):
-        for side in (-0.004, 0.004):
-            m.box((lu - 0.002, lu + 0.002), (side - 0.002, side + 0.002), (0.0, 0.017), HORSE)
-    m.box((0.046, 0.056), (-0.003, 0.003), (0.026, 0.04), HORSE)
-    m.box((0.052, 0.066), (-0.0035, 0.0035), (0.034, 0.042), HORSE)
-    m.box((0.044, 0.052), (-0.0015, 0.0015), (0.03, 0.043), MANE)
+    m.box((-0.04, 0.0), (-0.013, 0.013), (0.012, 0.016), WOOD)
+    for side in (-0.014, 0.014):
+        m.box((-0.04, 0.0), (side - 0.0015, side + 0.0015), (0.016, 0.026), DARK_WOOD)
+    for side in (-0.016, 0.016):
+        _cart_wheel(m, -0.022, side, 0.011)
+    m.box((-0.026, -0.018), (-0.016, 0.016), (0.0102, 0.0118), DARK_WOOD)
+    m.box((-0.036, -0.006), (-0.01, 0.01), (0.016, 0.026), (204, 186, 146))
+    for side in (-0.0068, 0.0068):
+        m.slope((0.0, 0.016), (0.044, 0.022), (side - 0.0008, side + 0.0008), DARK_WOOD)
+    _horse(m)
     return m
 
 

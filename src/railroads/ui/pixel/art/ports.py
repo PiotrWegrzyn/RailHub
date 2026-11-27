@@ -17,10 +17,7 @@ import random
 from collections.abc import Callable
 
 from railroads.ui.pixel.art.built import (
-    SOIL,
-    WINDOW,
     WORN,
-    chimney,
     cone,
     dome,
     door,
@@ -53,7 +50,6 @@ from railroads.ui.pixel.models import Face, Model
 
 PLANKS: RGB = (150, 112, 74)
 PILES: RGB = (88, 64, 46)
-SHED: RGB = (176, 150, 112)
 SHED_ROOF: RGB = (96, 100, 106)
 SLATE: RGB = (80, 86, 98)
 QUAY: RGB = (150, 146, 136)
@@ -75,34 +71,27 @@ QUAY_WALL: RGB = (112, 108, 100)
 STONE_WALL: RGB = (196, 188, 172)
 ASPHALT: RGB = (92, 94, 98)
 LAMP: RGB = (250, 230, 160)
-NET: RGB = (118, 138, 128)
 SACK: RGB = (204, 186, 146)
 DARK_TIMBER: RGB = (122, 96, 70)
 FISH: RGB = (190, 196, 200)
 LOGS: RGB = (140, 102, 66)
 RUT: RGB = (84, 70, 52)
-PUDDLE: RGB = (92, 104, 112)
-SHINE: RGB = (150, 166, 176)
 COAL: RGB = (40, 40, 44)
 SAND: RGB = (214, 190, 132)
 WHITE_LINE: RGB = (226, 226, 220)
-TRACK: RGB = (178, 156, 116)
 SHED_RENDER: RGB = (206, 186, 150)
 RUST_ROOF: RGB = (142, 96, 70)
 WEATHERED: RGB = (170, 150, 120)
+KERB: RGB = (128, 124, 116)
+ICE: RGB = (224, 234, 238)
+AWNING_RED: RGB = (176, 48, 42)
+AWNING_BLUE: RGB = (52, 90, 150)
+AWNING_GREEN: RGB = (56, 118, 72)
 WHARF_FACE: RGB = (62, 52, 44)
 WHITEWASH: RGB = (236, 232, 218)
-RED_ROOF: RGB = (172, 74, 50)
-BOARDS: RGB = (156, 54, 42)
 LEAVES: RGB = (78, 124, 50)
-CABBAGE: RGB = (120, 160, 90)
 TRUNK: RGB = (92, 70, 50)
 FENCE: RGB = (176, 146, 104)
-PICKET: RGB = (226, 222, 208)
-BOAT_BLUE: RGB = (58, 104, 158)
-BOAT_WHITE: RGB = (226, 222, 210)
-BOAT_GREEN: RGB = (70, 126, 86)
-SMOKE: RGB = (214, 214, 218)
 STEEL_POST: RGB = (150, 154, 158)
 CONTAINERS: tuple[RGB, ...] = (
     (176, 64, 52),
@@ -118,6 +107,8 @@ PORT_HEADINGS = tuple(range(0, 360, 60))
 
 # A container's length, width and height, in cells.
 CONTAINER = (0.075, 0.028, 0.028)
+# How much bigger the small port's horse and cart is drawn than its model, to the house's scale.
+CART_SCALE = 1.6
 
 
 def _deck(
@@ -442,13 +433,6 @@ def _office(m: Model) -> None:
     m.panel((0.015, 0.045), (0.0, 0.05), v[1] + 0.0006, DOORWAY)
 
 
-def _smokehouse(m: Model) -> None:
-    u, v, high = (-0.05, 0.05), (-0.045, 0.045), 0.05
-    walls(m, u, v, high, DARK_TIMBER, shade(DARK_TIMBER, 0.7))
-    gable_roof(m, u, v, (high, high + 0.03), SHED_ROOF, DARK_TIMBER, 0.008)
-    upright(m, 0.03, 0.0, 0.007, (high, high + 0.05), (120, 110, 100))
-
-
 def _woodpile(m: Model, u: float, v: float, along: float, across: float, high: float) -> None:
     m.box((u - along, u + along), (v - across, v + across), (0.0, high), LOGS)
     with m.fine():
@@ -580,25 +564,6 @@ def _tree(m: Model, u: float, v: float, radius: float, color: RGB = LEAVES) -> N
     )
 
 
-def _garden(m: Model, u: tuple[float, float], v: tuple[float, float]) -> None:
-    """A kitchen garden: dug earth in rows of green plants across u, a picket fence round it."""
-    (u0, u1), (v0, v1) = u, v
-    _slab(m, _rect(u, v), 0.0008, SOIL, SOIL)
-    rows = max(2, round((u1 - u0) / 0.024))
-    for k in range(rows):
-        at = u0 + (u1 - u0) * (k + 0.5) / rows
-        for plant in range(max(2, round((v1 - v0) / 0.022))):
-            pv = v0 + 0.012 + plant * 0.022
-            if pv < v1 - 0.008:
-                dome(m, at, pv, 0.007, (0.0, 0.01), CABBAGE if k % 2 else LEAVES)
-    _fence(
-        m, [(u0 - 0.01, v0 - 0.01), (u1 + 0.01, v0 - 0.01), (u1 + 0.01, v1 + 0.01)], 0.02, PICKET
-    )
-    _fence(
-        m, [(u1 + 0.01, v1 + 0.01), (u0 - 0.01, v1 + 0.01), (u0 - 0.01, v0 - 0.01)], 0.02, PICKET
-    )
-
-
 def _road_out(
     m: Model, points: list[tuple[float, float]], half: float, color: RGB, rim: RGB = WORN
 ) -> None:
@@ -606,42 +571,6 @@ def _road_out(
     that edge, so it runs on into the land beyond, worn into the grass along its sides."""
     _strip(m, points, half + 0.014, 0.0005, rim)
     _strip(m, points, half, 0.0009, color)
-
-
-def _cottage(m: Model) -> None:
-    """A fisherman's cottage: whitewashed walls under a red tiled roof, a chimney smoking, its
-    door and windows on the long walls."""
-    u, v, high = (-0.08, 0.08), (-0.05, 0.05), 0.055
-    walls(m, u, v, high, WHITEWASH, shade(WHITEWASH, 0.75))
-    gable_roof(m, u, v, (high, high + 0.045), RED_ROOF, WHITEWASH, 0.012)
-    door(m, (-0.012, 0.012), 0.04, v[1])
-    for at in ((-0.06, -0.035), (0.035, 0.06)):
-        window(m, at, (0.022, 0.04), v[1], WINDOW)
-    chimney(m, 0.05, 0.0, (high + 0.02, high + 0.06), (196, 190, 180))
-    for k, (du, dz, r) in enumerate(((0.0, 0.07, 0.008), (0.008, 0.085, 0.011))):
-        dome(m, 0.05 + du, -du, r, (high + dz, high + dz + r * 1.4), shade(SMOKE, 1 - 0.04 * k))
-
-
-def _boathouse(m: Model) -> None:
-    """A boathouse of red-painted boards with white corners, its wide doors open to the water at
-    its end along +u."""
-    u, v, high = (-0.1, 0.1), (-0.055, 0.055), 0.055
-    walls(m, u, v, high, BOARDS, shade(BOARDS, 0.7))
-    gable_roof(m, u, v, (high, high + 0.04), SHED_ROOF, BOARDS, 0.01)
-    m.box((u[1] - 0.0002, u[1] + 0.0016), (-0.035, 0.035), (0.0, 0.045), DOORWAY)
-    with m.fine():
-        for cu in u:
-            for cv in v:
-                m.box((cu - 0.003, cu + 0.003), (cv - 0.003, cv + 0.003), (0.0, high), WHITEWASH)
-        for k in range(1, 12):
-            at = u[0] + (u[1] - u[0]) * k / 12
-            m.panel(
-                (at - 0.0006, at + 0.0006),
-                (0.004, high - 0.002),
-                v[1] + 0.0008,
-                shade(BOARDS, 0.75),
-            )
-    window(m, (-0.05, -0.02), (0.022, 0.04), v[1], WINDOW)
 
 
 def _chain_link(m: Model, points: list[tuple[float, float]], high: float = 0.04) -> None:
@@ -688,21 +617,144 @@ def _turned(m: Model, at: tuple[float, float], build: Callable[[Model], None]) -
 def _goods_shed(m: Model) -> None:
     """A goods shed of weathered render under a rusty corrugated roof, its gable end to the
     water with a wide door in it, small windows along its sides."""
-    u, v, high = (-0.13, 0.13), (-0.085, 0.085), 0.085
+    u, v, high = (-0.195, 0.195), (-0.13, 0.13), 0.11
     walls(m, u, v, high, SHED_RENDER, shade(SHED_RENDER, 0.72))
-    gable_roof(m, u, v, (high, high + 0.05), RUST_ROOF, SHED_RENDER, 0.008)
-    m.box((u[1] - 0.0002, u[1] + 0.0016), (-0.04, 0.04), (0.0, 0.066), DOORWAY)
-    for at in ((-0.1, -0.08), (-0.04, -0.02), (0.02, 0.04), (0.08, 0.1)):
-        window(m, at, (0.05, 0.066), v[1], (58, 64, 70))
+    gable_roof(m, u, v, (high, high + 0.07), RUST_ROOF, SHED_RENDER, 0.01)
+    m.box((u[1] - 0.0002, u[1] + 0.0016), (-0.06, 0.06), (0.0, 0.088), DOORWAY)
+    for k in range(6):
+        at = u[0] + 0.035 + k * 0.064
+        window(m, (at, at + 0.024), (0.064, 0.088), v[1], (58, 64, 70))
     with m.fine():
-        for k in range(1, 16):
-            at = v[0] + (v[1] - v[0]) * k / 16
+        for k in range(1, 24):
+            at = v[0] + (v[1] - v[0]) * k / 24
             m.box(
                 (u[1] - 0.0004, u[1] + 0.0004),
                 (at - 0.0005, at + 0.0005),
-                (high, high + 0.05 * (1 - abs(at) / (v[1] + 0.008))),
+                (high, high + 0.07 * (1 - abs(at) / (v[1] + 0.01))),
                 shade(RUST_ROOF, 0.8),
             )
+
+
+def _stall(m: Model, awning: RGB) -> None:
+    """A fish stall: a striped awning on four posts over a counter of fish on ice, which
+    stands out in front of it along -v, boxes of fish stacked behind."""
+    posts = ((-0.042, -0.02), (0.042, -0.02), (-0.042, 0.034), (0.042, 0.034))
+    for pu, pv in posts:
+        m.box((pu - 0.0025, pu + 0.0025), (pv - 0.0025, pv + 0.0025), (0.0, 0.058), DARK_TIMBER)
+    stripes = 7
+    for k in range(stripes):
+        u0 = -0.048 + 0.096 * k / stripes
+        color = awning if k % 2 == 0 else WHITEWASH
+        m.box((u0, u0 + 0.096 / stripes), (-0.028, 0.04), (0.058, 0.061), color)
+        m.box((u0, u0 + 0.096 / stripes), (-0.0295, -0.028), (0.046, 0.061), color)
+    m.box((-0.042, 0.042), (-0.046, -0.016), (0.0, 0.02), WOOD)
+    m.box((-0.038, 0.038), (-0.043, -0.019), (0.02, 0.022), ICE)
+    rng = random.Random(int(awning[0] * 7 + awning[2]))
+    for k in range(9):
+        fu = -0.032 + k * 0.008
+        fv = rng.uniform(-0.038, -0.024)
+        m.box((fu - 0.0025, fu + 0.0025), (fv - 0.007, fv + 0.007), (0.022, 0.025), FISH)
+    for k, (bu, bv) in enumerate(((-0.025, 0.012), (0.0, 0.012), (0.025, 0.012), (-0.012, 0.012))):
+        _fish_box(m, bu, bv, 0.0 if k < 3 else 0.012)
+
+
+def _fish_box(m: Model, u: float, v: float, z: float) -> None:
+    """A shallow wooden box of fish on ice."""
+    m.box((u - 0.011, u + 0.011), (v - 0.008, v + 0.008), (z, z + 0.011), WEATHERED)
+    m.box((u - 0.009, u + 0.009), (v - 0.006, v + 0.006), (z + 0.011, z + 0.012), FISH)
+
+
+def _crate_stack(m: Model, u: float, v: float, heights: tuple[tuple[int, ...], ...]) -> None:
+    """Big wooden crates stacked in rows along v from (u, v), each row of columns along u
+    `heights[row][column]` crates high, with their boards and battens up close."""
+    size = 0.036
+    rng = random.Random(int(u * 1000 + v * 77))
+    for row, columns in enumerate(heights):
+        for column, tiers in enumerate(columns):
+            cu, cv = u + column * (size + 0.003), v + row * (size + 0.003)
+            for tier in range(tiers):
+                z = tier * size
+                tone = shade(CRATE, rng.uniform(0.86, 1.1))
+                half = size / 2
+                m.box((cu - half, cu + half), (cv - half, cv + half), (z, z + size), tone)
+                with m.fine():
+                    for band in (z + 0.004, z + size - 0.006):
+                        m.box(
+                            (cu - half - 0.0006, cu + half + 0.0006),
+                            (cv - half - 0.0006, cv + half + 0.0006),
+                            (band, band + 0.002),
+                            shade(tone, 0.72),
+                        )
+
+
+def _cobbles(m: Model, points: list[tuple[float, float]], seed: int) -> None:
+    """Cobbled ground through `points` round it, a rectangle, its setts up close laid in rows
+    across u, every other row shifted by half a sett, in a few shades over the dark joints."""
+    _slab(m, points, 0.0012, COBBLES, KERB)
+    (u0, v0), (u1, v1) = points[0], points[2]
+    sett, joint = 0.012, 0.0022
+    rng = random.Random(seed)
+    with m.fine():
+        _slab(m, points, 0.0014, shade(COBBLES, 0.7), KERB)
+        for row in range(int((u1 - u0) / sett)):
+            su = u0 + row * sett
+            offset = sett / 2 if row % 2 else 0.0
+            for column in range(int((v1 - v0 - offset) / sett)):
+                sv = v0 + offset + column * sett
+                tone = shade(COBBLES, rng.choice((0.88, 0.94, 1.0, 1.06, 1.12)))
+                m.faces.append(
+                    Face(
+                        [
+                            (su + joint, sv + joint, 0.0016),
+                            (su + sett, sv + joint, 0.0016),
+                            (su + sett, sv + sett, 0.0016),
+                            (su + joint, sv + sett, 0.0016),
+                        ],
+                        tone,
+                        (0.0, 0.0, 1.0),
+                    )
+                )
+
+
+def _yard_fence(m: Model, u: tuple[float, float], v: tuple[float, float]) -> None:
+    """A fence of boards round a yard on the land's side and along both its ends out to the
+    water, a little outside its edge."""
+    (u0, u1), (v0, v1) = u, v
+    out = 0.012
+    _boards(m, [(u1, v0 - out), (u0 - out, v0 - out), (u0 - out, v1 + out), (u1, v1 + out)])
+
+
+def _boards(m: Model, points: list[tuple[float, float]], high: float = 0.036) -> None:
+    """A fence of upright boards nailed to rails between posts along the ground through
+    `points`, with the gaps between its boards up close."""
+    for a, b in itertools.pairwise(points):
+        _beam(m, a, b, (0.0, high), 0.0016, FENCE)
+        length = math.hypot(b[0] - a[0], b[1] - a[1])
+        posts = max(1, round(length / 0.06))
+        for k in range(posts + 1):
+            t = k / posts
+            pu, pv = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+            m.box(
+                (pu - 0.003, pu + 0.003),
+                (pv - 0.003, pv + 0.003),
+                (0.0, high + 0.004),
+                shade(FENCE, 0.7),
+            )
+        with m.fine():
+            gaps = max(1, round(length / 0.006))
+            for k in range(1, gaps):
+                t = k / gaps
+                gu, gv = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+                du = (b[0] - a[0]) / length * 0.0004
+                dv = (b[1] - a[1]) / length * 0.0004
+                _beam(
+                    m,
+                    (gu - du, gv - dv),
+                    (gu + du, gv + dv),
+                    (0.002, high),
+                    0.0018,
+                    shade(FENCE, 0.72),
+                )
 
 
 def _hut(m: Model) -> None:
@@ -773,34 +825,29 @@ def _pier_head(m: Model, u: tuple[float, float], half: float, z: float) -> None:
 
 
 def port() -> Model:
-    """A timber harbour: a wharf of planks on piles along the shore with a siding behind it and
-    old wagons standing on it, two goods sheds of weathered render under rusty roofs, their gable
-    ends to the water, a timber pier out over the water to a head with a shed and a hand crane,
-    a sailing barge moored at it with its tan sails brailed up and a rowing boat at the wharf,
-    a gravel yard with a hut, sacks, barrels and a horse and cart, a track out to the land, a
-    harbourmaster's cottage with its garden behind, and trees and bushes round about."""
+    """A timber harbour: a wharf of planks on piles along the shore, a big goods shed of
+    weathered render under a rusty roof, its gable end to the water, a row of fish stalls under
+    striped awnings, a timber pier out over the water to a head with a shed and a hand crane, a
+    sailing barge moored at it with its tan sails brailed up and a rowing boat at the wharf, a
+    cobbled yard fenced round on the land's side with stacks of big crates, barrels, sacks and a
+    horse and cart, and trees and bushes round about."""
     m = Model()
-    _gravel(m, (-0.14, 0.5), (-0.42, 0.42), 11)
-    track = [(-_apothem(), -0.03), (-0.46, -0.04), (-0.18, -0.05), (0.3, -0.05)]
-    _road_out(m, track, 0.032, TRACK)
-    _ruts(m, track[1:])
-    edge = _wharf(m, 0.5, 0.36)
-    _rails(m, 0.43, (-0.5, 0.5))
-    for at, part in (
-        (-0.36, box_wagon()),
-        (-0.22, open_wagon(COAL)),
-        (0.24, open_wagon(SAND)),
-    ):
-        placed(m, part, (0.43, at), 90)
-    _moved(m, (0.16, -0.27), _goods_shed)
-    _moved(m, (0.16, 0.2), _goods_shed)
-    _moved(m, (0.3, 0.38), _hut)
-    _sacks(m, 0.3, -0.08)
-    for bu, bv in ((0.32, 0.04), (0.34, 0.06), (0.31, 0.07)):
+    yard_u, yard_v = (-0.22, 0.48), (-0.46, 0.46)
+    _cobbles(m, _rect(yard_u, yard_v), 11)
+    _yard_fence(m, yard_u, yard_v)
+    edge = _wharf(m, 0.48, 0.36)
+    _moved(m, (0.12, -0.26), _goods_shed)
+    for at, awning in ((0.02, AWNING_RED), (0.13, AWNING_BLUE), (0.24, AWNING_GREEN)):
+        _moved(m, (at, 0.25), lambda part, awning=awning: _stall(part, awning))
+    _moved(m, (0.36, 0.38), _hut)
+    _crate_stack(m, -0.17, -0.4, ((2, 2, 1), (3, 2), (1,)))
+    _crate_stack(m, 0.36, -0.34, ((1, 2, 2), (2, 1)))
+    _crate_stack(m, 0.32, 0.1, ((2, 1), (1,)))
+    _crate_stack(m, -0.16, 0.2, ((1, 2), (2, 1, 1)))
+    _sacks(m, 0.42, -0.2)
+    for bu, bv in ((0.43, 0.04), (0.45, 0.06), (0.42, 0.065)):
         _barrel(m, bu, bv)
-    _crate(m, 0.0, 0.05)
-    _crate(m, 0.02, 0.07)
-    placed(m, horse_cart(), (-0.08, -0.06), 0)
+    placed(m, stretched(horse_cart(), CART_SCALE, CART_SCALE), (0.36, -0.02), 90)
     pier_v = -0.04
     _deck(m, (edge - 0.01, edge + 0.3), 0.032, pier_v, 0.016, PLANKS, PILES, 0.06)
     head = (edge + 0.3, edge + 0.46)
@@ -809,27 +856,28 @@ def port() -> Model:
     m.move(begin, 0.0, pier_v)
     placed(m, sailing_barge(), (edge + 0.2, pier_v - 0.032 - 0.048), 180)
     placed(m, stretched(rowing_boat(WOOD), 1.5, 1.4), (edge + 0.035, 0.28), 90)
-    _lamp(m, 0.36, -0.12, 0.08)
-    _lamp(m, 0.36, 0.06, 0.08)
-    _turned(m, (-0.32, 0.3), _cottage)
-    _garden(m, (-0.5, -0.36), (0.2, 0.4))
-    _woodpile(m, -0.22, 0.2, 0.03, 0.015, 0.024)
+    _lamp(m, 0.44, -0.1, 0.08)
+    _lamp(m, 0.44, 0.14, 0.08)
     for tu, tv, r in (
-        (-0.3, -0.3, 0.06),
-        (-0.52, -0.12, 0.055),
-        (-0.2, 0.52, 0.055),
+        (-0.34, -0.3, 0.06),
+        (-0.52, -0.08, 0.055),
+        (-0.34, 0.3, 0.06),
+        (-0.5, 0.2, 0.055),
+        (-0.36, 0.04, 0.05),
         (-0.06, -0.58, 0.05),
         (0.06, 0.6, 0.05),
-        (-0.48, 0.5, 0.05),
+        (-0.2, 0.56, 0.05),
     ):
         _tree(m, *_inside(tu, tv, 0.9), r)
     for bu, bv, r in (
-        (-0.36, -0.14, 0.026),
-        (-0.62, 0.06, 0.024),
+        (-0.42, -0.14, 0.026),
+        (-0.62, 0.08, 0.024),
         (0.14, 0.54, 0.024),
-        (0.12, -0.52, 0.026),
+        (0.12, -0.53, 0.026),
         (-0.42, -0.46, 0.028),
-        (-0.18, 0.34, 0.024),
+        (-0.3, 0.14, 0.024),
+        (-0.44, 0.44, 0.026),
+        (-0.28, -0.12, 0.022),
     ):
         _bush(m, *_inside(bu, bv, 0.92), r)
     return m
