@@ -359,7 +359,7 @@ def test_zoomed_out_past_the_pixel_art_trains_still_show_their_pictures(context:
     assert layer._sheet is not None
 
 
-def test_a_signal_s_lamp_turns_from_red_to_green_once_the_way_past_it_is_set(
+def test_signals_show_clear_on_free_track_and_danger_behind_a_train(
     context: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     view = railway_seen_in_pixel_art()
@@ -384,9 +384,10 @@ def test_a_signal_s_lamp_turns_from_red_to_green_once_the_way_past_it_is_set(
     train = view.railway.buy()
     assert train is not None
     train.stops = [Stop((10, 6)), Stop((10, 16))]
-    view.railway.run(1e-4)
+    while train.along < 1.5:
+        view.railway.run(1e-3)
 
     after = drawn()
 
-    assert before and all(color == signal_layer.RED for color in before)
-    assert any(color == pytest.approx(signal_layer.GREEN) for color in after)
+    assert before and all(color == pytest.approx(signal_layer.GREEN) for color in before)
+    assert any(color == pytest.approx(signal_layer.RED) for color in after)

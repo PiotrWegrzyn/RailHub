@@ -236,7 +236,7 @@ class Blocks:
             }
             if kind(cell) == "junction" and ways:
                 self.laned_ways[cell] = ways
-        self.middles = {cell: rounded(grid.center(*cell)) for cell in self.laned_ways}
+        self.middles = {cell: rounded(grid.center(*cell)) for cell in cells}
         # The cells where trains going the same way keep to the two tracks of quadruple track.
         self.lane_cells = self.four_lanes | set(self.laned_ways)
         # The block of each cell outside stations.
@@ -373,6 +373,8 @@ class Blocks:
             return lanes[0] != lanes[1] and (cell in self.four_lanes or self._laned(cell, one))
         if one[0] == other[1] and one[1] == other[0]:
             return frozenset(one) in self.lanes.get(cell, set())
+        if self._turns_apart(cell, one, other):
+            return True
         if lanes[0] == lanes[1] or not (self._laned(cell, one) and self._laned(cell, other)):
             return False
         return self._branches_apart(cell, one, other, lanes)
@@ -410,6 +412,30 @@ class Blocks:
 
     def _laned(self, cell: Cell, way: tuple[Point, Point]) -> bool:
         return frozenset(way) in self.laned_ways.get(cell, ())
+
+    def _turns_apart(
+        self, cell: Cell, one: tuple[Point, Point], other: tuple[Point, Point]
+    ) -> bool:
+        """Whether two ways across a junction going opposite ways on the double track they share
+        beyond one end, one coming in by it and the other going out by it from or to another
+        branch, keep apart: trains keep to the track to the left of the way they go, so the one
+        going out crosses the track of the one coming in only where the branch it takes lies
+        further to the left than the one the other comes from."""
+        if one[1] == other[0] and one[0] != other[1]:
+            shared, coming, going = one[1], one[0], other[1]
+        elif one[0] == other[1] and one[1] != other[0]:
+            shared, coming, going = one[0], other[0], one[1]
+        else:
+            return False
+        doubled = self.lanes.get(cell, set())
+        if frozenset(one) not in doubled or frozenset(other) not in doubled:
+            return False
+        middle = self.middles[cell]
+        way = (shared[0] - middle[0], shared[1] - middle[1])
+        left = [
+            way[0] * (end[1] - middle[1]) - way[1] * (end[0] - middle[0]) for end in (coming, going)
+        ]
+        return left[1] < left[0] - SAME
 
     def _branches_apart(
         self,
@@ -744,11 +770,15 @@ class Signals:
             crossing = _crossing(held)
             leaders = self._still_ahead(leaders, crossing)
             leaders |= self._going_my_way(train, crossing)
+        if train.first:
+            for crossing in wanted:
+                holder = self._holder(train, crossing, follow=True)
+                while holder is not None and self._give_way(holder, crossing):
+                    holder = self._holder(train, crossing, follow=True)
+            return None
         for crossing in wanted:
             leaders = self._still_ahead(leaders, crossing)
             holder = self._holder(train, crossing, follow=True)
-            while holder is not None and train.first and self._give_way(holder, crossing):
-                holder = self._holder(train, crossing, follow=True)
             alongside = self._going_my_way(train, crossing)
             if holder is None and not leaders.keys() <= alongside.keys():
                 holder = next(iter(leaders.values()))[0]
@@ -774,23 +804,24 @@ class Signals:
                     continue
                 if not (arriving and not leaders and self._ends_with(other, way)):
                     return other
-        if not train.first:
-            return self._queued_before(train, wanted)
-        return None
+        return self._queued_before(train, wanted)
 
     def _still_ahead(
         self, leaders: dict[int, tuple[Train, float]], crossing: Pass
     ) -> dict[int, tuple[Train, float]]:
         """The trains a train follows but those that are set the way across this cell of
-        quadruple track on its other track going the same way: from there they run side by
-        side, so it may pass them."""
+        quadruple track on its other track going the same way with all of them on it: from there
+        they run side by side, so it may pass them. One whose tail still stands on the track
+        before, which the two share, is still in its way."""
         if not leaders or not self.blocks.takes_lane(crossing.cell, crossing.entry, crossing.exit):
             return leaders
         way = (crossing.entry, crossing.exit)
         beside = {
             id(other)
-            for other, entry, exit_, _, lane in self._held.get(crossing.cell, ())
-            if (entry, exit_) == way and lane != crossing.lane
+            for other, entry, exit_, start, lane in self._held.get(crossing.cell, ())
+            if (entry, exit_) == way
+            and lane != crossing.lane
+            and other.along - other.length >= start - SAME
         }
         return {key: pair for key, pair in leaders.items() if key not in beside}
 
@@ -825,27 +856,20 @@ class Signals:
         )
 
     def _give_way(self, other: Train, crossing: Pass) -> bool:
-        """Takes back from another train the way set for it from the cell a train put first wants
-        on, if it can be: if it has not come to any of it yet, could stop short of it, and would
-        stand clear there, with no train following it on any of it. Whether it did."""
+        """Takes from another train the way set for it from the cell a train put first wants on,
+        whatever that leaves it, unless it has already come to it. Whether it did."""
         cell = crossing.cell
         taken = [claim for claim in other.claims if claim[0] == cell and not claim[5]]
         if not taken:
             return False
         back = min(claim[3] for claim in taken)
-        if other.along > back - SIGNAL_GAP - SAME:
-            return False
-        if not self._on_double(passes(self.network, other), back - other.length, back):
+        if other.along > back - SAME:
             return False
         given = [claim for claim in other.claims if claim[3] >= back - SAME]
-        for cell_given, entry, exit_, _, _, _, lane in given:
-            for holder, *way in self._held.get(cell_given, ()):
-                if holder is not other and (way[0], way[1], way[3]) == (entry, exit_, lane):
-                    return False
         other.claims = [claim for claim in other.claims if claim[3] < back - SAME]
         for claim in given:
             self._let_go(other, claim)
-        other.cleared = back
+        other.cleared = max(other.along, back - SIGNAL_GAP)
         return True
 
     def _queued_before(self, train: Train, wanted: list[Pass]) -> Train | None:
@@ -1055,3 +1079,27 @@ def cleared_signals(trains: Iterable[Train]) -> set[tuple[Cell, Point]]:
         for cell, entry, _, start, _, soft, _ in train.claims
         if not soft and start > train.along
     }
+
+
+def occupied_signals(blocks: Blocks, trains: Iterable[Train]) -> set[tuple[Cell, Point]]:
+    """The signals showing danger: those into a block a train holds track in, on double track
+    only one holding it going their way. Every other signal shows clear."""
+    held: dict[tuple[str, int], list[Point]] = {}
+    for train in trains:
+        for cell, entry, exit_, _, _, soft, _ in train.claims:
+            block = blocks.block_at(cell, entry, exit_)
+            if soft or block is None:
+                continue
+            held.setdefault(block, []).append((exit_[0] - entry[0], exit_[1] - entry[1]))
+    occupied = set()
+    for spot in blocks.spots:
+        block = blocks.block.get(spot.cell)
+        ways = held.get(block) if block is not None else None
+        if not ways:
+            continue
+        if block[0] in ("double", "quadruple", "lanes") and not any(
+            dx * spot.heading[0] + dy * spot.heading[1] > 0 for dx, dy in ways
+        ):
+            continue
+        occupied.add((spot.cell, spot.at))
+    return occupied

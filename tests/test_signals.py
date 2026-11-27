@@ -676,3 +676,40 @@ def test_quadruple_track_running_into_a_station_keeps_two_tracks_each_way_up_to_
 
     track = {piece.cell for piece in game.constructions.track()}
     assert track and track <= lanes
+
+
+def test_a_train_put_first_takes_a_single_line_from_a_train_already_on_it_and_sets_off() -> None:
+    game = game_with((WEST, EAST, TrackWidth.SINGLE))
+    holder = shuttle(game, WEST, EAST)
+    run_months(game, 0.02)
+    first = shuttle(game, EAST, WEST)
+    run_months(game, 0.005)
+    assert holder.cleared > 5 and first.along < 0.5
+    first.first = True
+
+    run_months(game, 0.2)
+
+    assert first.along > 1.0
+    assert holder.cleared < 1.0
+
+
+def test_of_two_trains_turning_opposite_ways_at_a_double_junction_only_the_one_crossing_waits() -> (
+    None
+):
+    game = game_with((WEST, EAST, TrackWidth.DOUBLE), (NORTH, EAST, TrackWidth.DOUBLE))
+    blocks = blocks_of(game.constructions)
+    turns = []
+    for cell, ways in blocks.lanes.items():
+        for one in ways:
+            for other in ways - {one}:
+                shared = one & other
+                if len(shared) == 1:
+                    (end,) = shared
+                    (a,) = one - shared
+                    (b,) = other - shared
+                    turns.append((cell, (a, end), (end, b)))
+
+    kept_apart = [blocks.apart(cell, coming, going) for cell, coming, going in turns]
+
+    assert turns
+    assert any(kept_apart) and not all(kept_apart)

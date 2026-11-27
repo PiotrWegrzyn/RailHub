@@ -34,9 +34,9 @@ def picker_good(train: Train) -> Good:
 
 
 FIRST_TIP = (
-    "Puts it first in every queue at the signals until it reaches its next stop: it gets the\n"
-    "way on before any train waiting there, and takes back the way set for a train that has\n"
-    "yet to come to it. It still never runs into a train standing on the track."
+    "Sends it on to its next stop at once: it takes the way from every train holding any of\n"
+    "it and runs on, past trains standing in its way, keeping behind only a train ahead\n"
+    "going its way. For untangling a jam."
 )
 
 

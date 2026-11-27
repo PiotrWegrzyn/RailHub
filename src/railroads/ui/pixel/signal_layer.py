@@ -15,7 +15,7 @@ import numpy.typing as npt
 from imgui_bundle import imgui
 
 from railroads.sim.railway import Railway
-from railroads.sim.signals import SignalSpot, blocks_of, cleared_signals
+from railroads.sim.signals import SignalSpot, blocks_of, cleared_signals, occupied_signals
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, IsoCamera, Vec2
 from railroads.ui.pixel.models import HEIGHT_PER_WIDTH
 from railroads.ui.pixel.track_art import DOUBLE_SPACING, track_spread
@@ -151,6 +151,7 @@ class SignalLayer:
             return
         hidden = self.world.underground_all(xs[indices].tolist(), ys[indices].tolist())
         cleared = cleared_signals(railway.trains)
+        occupied = occupied_signals(blocks_of(railway.constructions), railway.trains)
         step = min(1.0, imgui.get_io().delta_time / SWING)
         up = float(np.hypot(*projection.matrix[:, 0])) * HEIGHT_PER_WIDTH * scale
         masts = per_cell >= MASTS_FROM
@@ -163,7 +164,7 @@ class SignalLayer:
         for y, x, k in order:
             spot = spots[k]
             key = (spot.cell, spot.at)
-            wanted = 1.0 if key in cleared else 0.0
+            wanted = 1.0 if key in cleared or key not in occupied else 0.0
             clear = self._clear.get(key, wanted)
             clear += max(-step, min(step, wanted - clear))
             self._clear[key] = clear
