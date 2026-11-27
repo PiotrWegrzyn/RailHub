@@ -1,7 +1,7 @@
 """Ports (railroads.sim.ports) built as small lit models (railroads.ui.pixel.art.built) at the
 works' scale, filling their cell with their own ground and only their piers reaching out of it
-over the water beside it: a port is a fishing harbour of a shingle beach, a trodden yard, a
-boathouse and a cottage with its garden, a big port a walled yard of gravel with a brick
+over the water beside it: a port is a timber wharf with a siding, goods sheds and a pier out
+to a head with a hand crane and a sailing barge, a big port a walled yard of gravel with a brick
 warehouse, a harbour office, cranes and a stone pier, and a mega port a fenced container terminal
 with a long warehouse and stacks of ribbed containers by two concrete piers, each with a gantry
 crane over the water. A way runs from each out to the land at its cell's far edge, and trees and
@@ -26,6 +26,7 @@ from railroads.ui.pixel.art.built import (
     door,
     gable_roof,
     modelled,
+    stretched,
     upright,
     walls,
     window,
@@ -34,16 +35,17 @@ from railroads.ui.pixel.art.harbour import (
     GLASS,
     TRUCK_BLUE,
     TRUCK_YELLOW,
+    WOOD,
     box_wagon,
     container_lorry,
     container_ship,
     dump_truck,
-    fishing_boat,
     flat_wagon,
     horse_cart,
     open_wagon,
     placed,
     rowing_boat,
+    sailing_barge,
     steamer,
 )
 from railroads.ui.pixel.art.painter import BRICK, RGB, Sprite, shade
@@ -84,8 +86,11 @@ SHINE: RGB = (150, 166, 176)
 COAL: RGB = (40, 40, 44)
 SAND: RGB = (214, 190, 132)
 WHITE_LINE: RGB = (226, 226, 220)
-SHINGLE: RGB = (200, 190, 164)
-YARD_EARTH: RGB = (156, 132, 92)
+TRACK: RGB = (178, 156, 116)
+SHED_RENDER: RGB = (206, 186, 150)
+RUST_ROOF: RGB = (142, 96, 70)
+WEATHERED: RGB = (170, 150, 120)
+WHARF_FACE: RGB = (62, 52, 44)
 WHITEWASH: RGB = (236, 232, 218)
 RED_ROOF: RGB = (172, 74, 50)
 BOARDS: RGB = (156, 54, 42)
@@ -356,11 +361,6 @@ def _ruts(m: Model, points: list[tuple[float, float]]) -> None:
             )
 
 
-def _puddle(m: Model, u: float, v: float, ru: float, rv: float) -> None:
-    _slab(m, _ellipse(u, v, ru, rv), 0.001, PUDDLE, PUDDLE)
-    _slab(m, _ellipse(u - ru * 0.3, v - rv * 0.3, ru * 0.35, rv * 0.25, 8), 0.0011, SHINE, SHINE)
-
-
 def _gravel(m: Model, u: tuple[float, float], v: tuple[float, float], seed: int) -> None:
     """A yard of gravel, up close strewn with bigger stones."""
     _yard(m, u, v, GRAVEL)
@@ -401,14 +401,6 @@ def _lamp(m: Model, u: float, v: float, high: float = 0.09) -> None:
     upright(m, u, v, 0.0025, (0.0, high), (52, 48, 46))
     with m.fine():
         m.box((u - 0.005, u + 0.005), (v - 0.005, v + 0.005), (high - 0.002, high + 0.008), LAMP)
-
-
-def _net_rack(m: Model, u: float, v: tuple[float, float]) -> None:
-    """Fishing nets hung to dry on a rack of two posts and a pole."""
-    for at in v:
-        m.box((u - 0.003, u + 0.003), (at - 0.003, at + 0.003), (0.0, 0.05), PILES)
-    m.box((u - 0.002, u + 0.002), v, (0.046, 0.05), PILES)
-    m.box((u - 0.0008, u + 0.0008), (v[0] + 0.004, v[1] - 0.004), (0.012, 0.046), NET)
 
 
 def _sacks(m: Model, u: float, v: float) -> None:
@@ -457,16 +449,6 @@ def _smokehouse(m: Model) -> None:
     upright(m, 0.03, 0.0, 0.007, (high, high + 0.05), (120, 110, 100))
 
 
-def _fish_rack(m: Model, u: float, v: float) -> None:
-    """A rack of fish hung to dry on a pole between two posts."""
-    for at in (v - 0.05, v + 0.05):
-        m.box((u - 0.003, u + 0.003), (at - 0.003, at + 0.003), (0.0, 0.045), PILES)
-    m.box((u - 0.002, u + 0.002), (v - 0.05, v + 0.05), (0.042, 0.046), PILES)
-    for k in range(9):
-        at = v - 0.04 + 0.08 * k / 8
-        m.box((u - 0.0016, u + 0.0016), (at - 0.002, at + 0.002), (0.024, 0.042), FISH)
-
-
 def _woodpile(m: Model, u: float, v: float, along: float, across: float, high: float) -> None:
     m.box((u - along, u + along), (v - across, v + across), (0.0, high), LOGS)
     with m.fine():
@@ -488,37 +470,6 @@ def _inside(u: float, v: float, room: float = 0.97) -> tuple[float, float]:
     if out <= room:
         return u, v
     return u * room / out, v * room / out
-
-
-def _blotch(
-    m: Model,
-    middle: tuple[float, float],
-    reach: tuple[float, float],
-    seed: int,
-    z: float,
-    color: RGB,
-) -> None:
-    """A patch on the ground round `middle`, `reach` out along u and v, its outline a rounded
-    oblong frayed a little at random, kept inside the cell."""
-    rng = random.Random(seed)
-    points = []
-    sides = 28
-    for k in range(sides):
-        a = 2 * math.pi * k / sides
-        c, s = math.cos(a), math.sin(a)
-        fray = rng.uniform(0.9, 1.0)
-        u = middle[0] + reach[0] * fray * math.copysign(abs(c) ** 0.5, c)
-        v = middle[1] + reach[1] * fray * math.copysign(abs(s) ** 0.5, s)
-        points.append(_inside(u, v))
-    m.faces.append(Face([(u, v, z) for u, v in points], color, (0.0, 0.0, 1.0)))
-
-
-def _worn_patch(
-    m: Model, middle: tuple[float, float], reach: tuple[float, float], seed: int, color: RGB
-) -> None:
-    """A patch of `color` worn into the grass: a frayed rim of bare earth round it."""
-    _blotch(m, middle, (reach[0] + 0.04, reach[1] + 0.04), seed + 100, 0.0004, WORN)
-    _blotch(m, middle, reach, seed, 0.0007, color)
 
 
 def _strip(m: Model, points: list[tuple[float, float]], half: float, z: float, color: RGB) -> None:
@@ -726,67 +677,161 @@ def _greenery(m: Model, seed: int) -> None:
                 _bush(m, u, v, rng.uniform(0.022, 0.032))
 
 
-def _beached(m: Model, u: float, v: float, angle: float, color: RGB) -> None:
-    """A rowing boat pulled up on the beach, lying on its keel."""
-    placed(m, rowing_boat(color), (u, v), angle)
+def _turned(m: Model, at: tuple[float, float], build: Callable[[Model], None]) -> None:
+    """A building built round the model's middle along u, turned to stand along v at `at`, its
+    long walls facing the water and the land."""
+    part = Model()
+    build(part)
+    placed(m, part, at, 90)
+
+
+def _goods_shed(m: Model) -> None:
+    """A goods shed of weathered render under a rusty corrugated roof, its gable end to the
+    water with a wide door in it, small windows along its sides."""
+    u, v, high = (-0.13, 0.13), (-0.085, 0.085), 0.085
+    walls(m, u, v, high, SHED_RENDER, shade(SHED_RENDER, 0.72))
+    gable_roof(m, u, v, (high, high + 0.05), RUST_ROOF, SHED_RENDER, 0.008)
+    m.box((u[1] - 0.0002, u[1] + 0.0016), (-0.04, 0.04), (0.0, 0.066), DOORWAY)
+    for at in ((-0.1, -0.08), (-0.04, -0.02), (0.02, 0.04), (0.08, 0.1)):
+        window(m, at, (0.05, 0.066), v[1], (58, 64, 70))
+    with m.fine():
+        for k in range(1, 16):
+            at = v[0] + (v[1] - v[0]) * k / 16
+            m.box(
+                (u[1] - 0.0004, u[1] + 0.0004),
+                (at - 0.0005, at + 0.0005),
+                (high, high + 0.05 * (1 - abs(at) / (v[1] + 0.008))),
+                shade(RUST_ROOF, 0.8),
+            )
+
+
+def _hut(m: Model) -> None:
+    """A small timber hut with a felt roof and a stovepipe."""
+    u, v, high = (-0.035, 0.035), (-0.03, 0.03), 0.045
+    walls(m, u, v, high, DARK_TIMBER, shade(DARK_TIMBER, 0.7))
+    gable_roof(m, u, v, (high, high + 0.022), SHED_ROOF, DARK_TIMBER, 0.006)
+    door(m, (-0.008, 0.008), 0.034, v[1])
+    upright(m, 0.02, 0.0, 0.003, (high, high + 0.03), (60, 58, 56))
+
+
+def _wharf(m: Model, start: float, half: float) -> float:
+    """A timber wharf along the shore from `start` out to the cell's edge, `half` either side:
+    a deck of planks across it, its face of dark baulks on a row of piles standing in the water;
+    returns where its face stands."""
+    edge = _apothem() * 0.97
+    top = 0.016
+    _slab(m, _rect((start, edge), (-half, half)), top, PLANKS, WHARF_FACE)
+    with m.fine():
+        for k in range(1, round((edge - start) / 0.016)):
+            at = start + (edge - start) * k / round((edge - start) / 0.016)
+            m.box(
+                (at - 0.0006, at + 0.0006), (-half, half), (top, top + 0.0005), shade(PLANKS, 0.8)
+            )
+    m.box((edge - 0.008, edge), (-half, half), (top, top + 0.006), WHARF_FACE)
+    for k in range(round(2 * half / 0.045) + 1):
+        at = -half + k * 2 * half / round(2 * half / 0.045)
+        m.box((edge, edge + 0.008), (at - 0.004, at + 0.004), (0.0, top + 0.01), PILES)
+    return edge
+
+
+def _derrick(m: Model, u: float, v: float, z: float) -> None:
+    """A wooden hand crane on `z`: a post braced at its foot, a jib reaching out along u, its
+    rope and a crate on the hook, a winch at its foot."""
+    m.box((u - 0.005, u + 0.005), (v - 0.005, v + 0.005), (z, z + 0.12), DARK_TIMBER)
+    m.slope((u, z + 0.03), (u + 0.1, z + 0.115), (v - 0.003, v + 0.003), DARK_TIMBER)
+    m.box((u - 0.008, u + 0.004), (v - 0.003, v + 0.003), (z + 0.11, z + 0.125), DARK_TIMBER)
+    m.slope((u, z + 0.12), (u + 0.1, z + 0.115), (v - 0.0008, v + 0.0008), CABLE)
+    m.box((u + 0.0985, u + 0.1015), (v - 0.0012, v + 0.0012), (z + 0.05, z + 0.115), CABLE)
+    m.box((u + 0.088, u + 0.112), (v - 0.012, v + 0.012), (z + 0.03, z + 0.05), CRATE)
+    m.box((u - 0.03, u - 0.012), (v - 0.012, v + 0.012), (z, z + 0.016), shade(DARK_TIMBER, 0.8))
+    for side in (-1, 1):
+        m.slope(
+            (u - 0.03, z),
+            (u, z + 0.05),
+            (v + side * 0.004 - 0.002, v + side * 0.004 + 0.002),
+            DARK_TIMBER,
+        )
+
+
+def _pier_head(m: Model, u: tuple[float, float], half: float, z: float) -> None:
+    """The head of a timber pier: a wider platform on piles with a shed and a hand crane on it,
+    barrels and a crate waiting."""
+    _deck(m, u, half, 0.0, z, PLANKS, PILES, 0.05)
+    shed_u, shed_v = (u[0] + 0.015, u[0] + 0.075), (-half + 0.012, -half + 0.075)
+    m.box(shed_u, shed_v, (z, z + 0.05), WEATHERED)
+    gable_roof(m, shed_u, shed_v, (z + 0.05, z + 0.075), RUST_ROOF, WEATHERED, 0.006)
+    m.box(
+        (shed_u[1] - 0.0002, shed_u[1] + 0.0014),
+        (shed_v[0] + 0.02, shed_v[1] - 0.02),
+        (z, z + 0.04),
+        DOORWAY,
+    )
+    _derrick(m, u[1] - 0.05, half - 0.03, z)
+    _barrel(m, u[0] + 0.03, half - 0.02, z)
+    _barrel(m, u[0] + 0.045, half - 0.03, z)
+    _crate(m, u[0] + 0.1, -half + 0.03, z)
 
 
 def port() -> Model:
-    """A fishing harbour: a beach of shingle along the shore with boats pulled up on it, a
-    wooden jetty on piles out over the water with fishing boats moored at it, a trodden yard
-    with a red boathouse, racks of fish and nets drying, barrels and crates, a whitewashed
-    cottage with its kitchen garden behind, and a cart track out to the land, a fence along it
-    and trees and bushes round about."""
+    """A timber harbour: a wharf of planks on piles along the shore with a siding behind it and
+    old wagons standing on it, two goods sheds of weathered render under rusty roofs, their gable
+    ends to the water, a timber pier out over the water to a head with a shed and a hand crane,
+    a sailing barge moored at it with its tan sails brailed up and a rowing boat at the wharf,
+    a gravel yard with a hut, sacks, barrels and a horse and cart, a track out to the land, a
+    harbourmaster's cottage with its garden behind, and trees and bushes round about."""
     m = Model()
-    edge = _apothem() * 0.96
-    _blotch(m, (0.5, 0.0), (0.13, 0.46), 3, 0.0006, SHINGLE)
-    rng = random.Random(4)
-    with m.fine():
-        for _ in range(160):
-            pu, pv = rng.uniform(0.39, 0.61), rng.uniform(-0.38, 0.38)
-            pu, pv = _inside(pu, pv, 0.95)
-            tone = shade(SHINGLE, rng.choice((0.78, 0.88, 1.1)))
-            _slab(m, _ellipse(pu, pv, 0.004, 0.003, 5), 0.0011, tone, tone)
-    _worn_patch(m, (0.04, -0.02), (0.26, 0.24), 5, YARD_EARTH)
-    track = [(-_apothem(), 0.14), (-0.46, 0.1), (-0.2, 0.02), (0.1, -0.02), (0.38, 0.02)]
-    _road_out(m, track, 0.032, YARD_EARTH)
+    _gravel(m, (-0.14, 0.5), (-0.42, 0.42), 11)
+    track = [(-_apothem(), -0.03), (-0.46, -0.04), (-0.18, -0.05), (0.3, -0.05)]
+    _road_out(m, track, 0.032, TRACK)
     _ruts(m, track[1:])
-    _fence(m, [(-0.68, 0.22), (-0.46, 0.19), (-0.26, 0.12)])
-    _puddle(m, -0.1, 0.06, 0.03, 0.018)
-    _moved(m, (0.26, -0.24), _boathouse)
-    _moved(m, (-0.34, -0.2), _cottage)
-    _garden(m, (-0.5, -0.32), (-0.46, -0.3))
-    _woodpile(m, -0.2, -0.3, 0.03, 0.015, 0.025)
-    _moved(m, (-0.02, 0.24), _smokehouse)
-    _fish_rack(m, 0.18, 0.2)
-    _fish_rack(m, 0.3, 0.26)
-    _net_rack(m, -0.04, (-0.2, -0.12))
-    for k, (bu, bv) in enumerate(((0.36, -0.12), (0.38, -0.09), (0.35, -0.07), (0.1, -0.2))):
-        _barrel(m, bu, bv)
-        if k == 3:
-            _crate(m, bu + 0.03, bv + 0.01)
-    _crate(m, 0.34, 0.12)
-    _crate(m, 0.36, 0.14, 0.024)
-    placed(m, horse_cart(), (-0.3, 0.06), 10)
-    _beached(m, 0.48, -0.28, 75, BOAT_BLUE)
-    _beached(m, 0.52, -0.18, 95, BOAT_WHITE)
-    _beached(m, 0.5, 0.28, 105, BOAT_GREEN)
-    _deck(m, (0.44, edge + 0.36), 0.026, 0.06, 0.014, PLANKS, PILES, 0.07)
-    placed(m, fishing_boat(BOAT_BLUE), (edge + 0.2, 0.12), 0)
-    placed(m, fishing_boat(BOAT_WHITE), (edge + 0.28, -0.0), 180)
-    _tree(m, -0.12, 0.5, 0.06)
-    _tree(m, 0.06, 0.6, 0.05, shade(LEAVES, 1.1))
-    _tree(m, -0.56, -0.08, 0.055)
-    _tree(m, -0.06, -0.58, 0.05)
-    for bu, bv, r in (
-        (-0.3, 0.42, 0.03),
-        (-0.22, 0.56, 0.025),
-        (0.22, 0.46, 0.028),
-        (-0.5, 0.32, 0.03),
-        (0.14, -0.5, 0.026),
-        (-0.2, -0.5, 0.022),
+    edge = _wharf(m, 0.5, 0.36)
+    _rails(m, 0.43, (-0.5, 0.5))
+    for at, part in (
+        (-0.36, box_wagon()),
+        (-0.22, open_wagon(COAL)),
+        (0.24, open_wagon(SAND)),
     ):
-        _bush(m, bu, bv, r)
+        placed(m, part, (0.43, at), 90)
+    _moved(m, (0.16, -0.27), _goods_shed)
+    _moved(m, (0.16, 0.2), _goods_shed)
+    _moved(m, (0.3, 0.38), _hut)
+    _sacks(m, 0.3, -0.08)
+    for bu, bv in ((0.32, 0.04), (0.34, 0.06), (0.31, 0.07)):
+        _barrel(m, bu, bv)
+    _crate(m, 0.0, 0.05)
+    _crate(m, 0.02, 0.07)
+    placed(m, horse_cart(), (-0.08, -0.06), 0)
+    pier_v = -0.04
+    _deck(m, (edge - 0.01, edge + 0.3), 0.032, pier_v, 0.016, PLANKS, PILES, 0.06)
+    head = (edge + 0.3, edge + 0.46)
+    begin = len(m.faces)
+    _pier_head(m, head, 0.08, 0.016)
+    m.move(begin, 0.0, pier_v)
+    placed(m, sailing_barge(), (edge + 0.2, pier_v - 0.032 - 0.048), 180)
+    placed(m, stretched(rowing_boat(WOOD), 1.5, 1.4), (edge + 0.035, 0.28), 90)
+    _lamp(m, 0.36, -0.12, 0.08)
+    _lamp(m, 0.36, 0.06, 0.08)
+    _turned(m, (-0.32, 0.3), _cottage)
+    _garden(m, (-0.5, -0.36), (0.2, 0.4))
+    _woodpile(m, -0.22, 0.2, 0.03, 0.015, 0.024)
+    for tu, tv, r in (
+        (-0.3, -0.3, 0.06),
+        (-0.52, -0.12, 0.055),
+        (-0.2, 0.52, 0.055),
+        (-0.06, -0.58, 0.05),
+        (0.06, 0.6, 0.05),
+        (-0.48, 0.5, 0.05),
+    ):
+        _tree(m, *_inside(tu, tv, 0.9), r)
+    for bu, bv, r in (
+        (-0.36, -0.14, 0.026),
+        (-0.62, 0.06, 0.024),
+        (0.14, 0.54, 0.024),
+        (0.12, -0.52, 0.026),
+        (-0.42, -0.46, 0.028),
+        (-0.18, 0.34, 0.024),
+    ):
+        _bush(m, *_inside(bu, bv, 0.92), r)
     return m
 
 

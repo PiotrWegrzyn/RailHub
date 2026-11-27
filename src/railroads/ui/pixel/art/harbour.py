@@ -32,6 +32,8 @@ TRUCK_BLUE: RGB = (52, 92, 150)
 TRUCK_RED: RGB = (176, 56, 44)
 BOGIE: RGB = (48, 46, 46)
 DECK: RGB = (170, 146, 108)
+TAN_SAIL: RGB = (156, 62, 44)
+HATCH: RGB = (74, 116, 86)
 
 
 def placed(m: Model, part: Model, at: tuple[float, float], angle: float = 0.0) -> None:
@@ -85,6 +87,36 @@ def rowing_boat(color: RGB = WOOD) -> Model:
     with m.fine():
         for at in (-0.015, 0.008):
             m.box((at - 0.003, at + 0.003), (-0.013, 0.013), (0.012, 0.014), DARK_WOOD)
+    return m
+
+
+def sailing_barge() -> Model:
+    """A flat sailing barge with a black hull: green covers over its two holds, a tall mast with
+    its tan sails brailed up along the mast and the sprit reaching aft, a mizzen at the stern and
+    its leeboard down on one side."""
+    m = Model()
+    length, half, high = 0.34, 0.042, 0.024
+    _hull(m, length, half, high, HULL_BLACK, RED_BOTTOM)
+    for middle in (-0.07, 0.06):
+        m.box((middle - 0.045, middle + 0.045), (-0.03, 0.03), (high, high + 0.008), HATCH)
+        with m.fine():
+            for k in range(1, 4):
+                at = middle - 0.045 + 0.09 * k / 4
+                m.box(
+                    (at - 0.001, at + 0.001),
+                    (-0.031, 0.031),
+                    (high + 0.008, high + 0.0086),
+                    shade(HATCH, 0.7),
+                )
+    m.box((-0.0035, 0.0035), (-0.0035, 0.0035), (high, 0.3), DARK_WOOD)
+    m.box((-0.008, 0.008), (-0.006, 0.006), (0.05, 0.27), TAN_SAIL)
+    m.slope((0.0, 0.06), (-0.14, 0.26), (-0.002, 0.002), DARK_WOOD)
+    m.slope((0.004, 0.07), (-0.12, 0.24), (-0.005, 0.005), TAN_SAIL)
+    m.box((0.012, 0.03), (-0.005, 0.005), (0.06, 0.2), shade(TAN_SAIL, 1.08))
+    stern = -length / 2
+    m.box((stern + 0.01, stern + 0.016), (-0.0025, 0.0025), (high, 0.12), DARK_WOOD)
+    m.box((stern + 0.004, stern + 0.022), (-0.004, 0.004), (0.05, 0.11), TAN_SAIL)
+    m.box((-0.03, 0.02), (half, half + 0.004), (0.0, high), DARK_WOOD)
     return m
 
 
