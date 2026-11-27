@@ -106,8 +106,8 @@ def test_the_menu_starts_on_normal_with_its_cash(tmp_path: Any) -> None:
 @pytest.mark.parametrize(
     ("difficulty", "shown"),
     [
-        (Difficulty.EASY, ["$150,000", "2 times their usual prices"]),
-        (Difficulty.NORMAL, ["$100,000", "1.5 times their usual prices"]),
+        (Difficulty.EASY, ["$150,000", "1.5 times their usual prices"]),
+        (Difficulty.NORMAL, ["$100,000", "1.25 times their usual prices"]),
         (Difficulty.HARD, ["$80,000", "their usual prices"]),
     ],
 )

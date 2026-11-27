@@ -832,7 +832,7 @@ def test_plastic_bottles_only_once_there_is_plastic_in_its_era() -> None:
     assert trade.gathered[STATION].get(Good.JUICE, 0.0) == 0.0
 
 
-@pytest.mark.parametrize(("sugar", "bread"), [(0.0, 12.5), (1.0, 18.75)])
+@pytest.mark.parametrize(("sugar", "bread"), [(0.0, 12.5), (2.5, 18.75)])
 def test_refined_sugar_lets_a_bakery_bake_half_as_much_bread_again(
     sugar: float, bread: float
 ) -> None:

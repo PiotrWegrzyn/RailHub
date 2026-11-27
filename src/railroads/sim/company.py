@@ -56,8 +56,8 @@ TARGETS = {
 # How many times the price the supply and demand boards give every good fetches at each
 # difficulty, for the whole game (railroads.sim.tiles.Tiles.markup).
 PRICE_FACTORS = {
-    Difficulty.EASY: 2.0,
-    Difficulty.NORMAL: 1.5,
+    Difficulty.EASY: 1.5,
+    Difficulty.NORMAL: 1.25,
     Difficulty.HARD: 1.0,
 }
 

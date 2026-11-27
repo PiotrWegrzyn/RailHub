@@ -669,7 +669,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             ),
             BuildingKind.FOOD_PLANT: Recipe(Good.CANS, 200, {Need.FRUIT: 0.3, Need.STEEL: 0.1}),
             BuildingKind.BAKERY: Recipe(
-                Good.BREAD, 70, {Need.WHEAT: 0.4}, {Need.REFINED_SUGAR: 0.05}, boost_most=0.5
+                Good.BREAD, 70, {Need.WHEAT: 0.4}, {Need.REFINED_SUGAR: 0.2}, boost_most=0.5
             ),
             BuildingKind.JUICE_WORKS: Recipe(
                 Good.JUICE,
@@ -708,7 +708,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             BuildingKind.MACHINE_WORKS: Recipe(
                 Good.MACHINERY, 25, {Need.STEEL: 1.0, Need.COPPER: 0.5}
             ),
-            BuildingKind.BRICKWORKS: Recipe(Good.BRICKS, 60, {Need.CLAY: 0.5}, {Need.COAL: 0.25}),
+            BuildingKind.BRICKWORKS: Recipe(Good.BRICKS, 90, {Need.CLAY: 0.5}, {Need.COAL: 0.25}),
             BuildingKind.CEMENT_WORKS: Recipe(
                 Good.CEMENT, 60, {Need.LIMESTONE: 0.5}, {Need.COAL: 0.25}
             ),
@@ -797,14 +797,14 @@ MAKES: Mapping[BuildingKind, Mapping[Good, float]] = MappingProxyType(
         BuildingKind.RUBBER_PLANTATION: {Good.RUBBER: 40},
         BuildingKind.BEEKEEPER: {Good.HONEY: 1.2, Good.WAX: 6},
         BuildingKind.INCENSE_GROVE: {Good.INCENSE: 20},
-        BuildingKind.CLAY_PIT: {Good.CLAY: 40},
+        BuildingKind.CLAY_PIT: {Good.CLAY: 90},
         BuildingKind.LIMESTONE_QUARRY: {Good.LIMESTONE: 40},
         BuildingKind.SAND_PIT: {Good.SAND: 40},
         BuildingKind.POTATO_FARM: {Good.POTATOES: 6},
         BuildingKind.RICE_PADDY: {Good.RICE: 6},
         BuildingKind.SOY_FIELD: {Good.SOYBEANS: 6},
         BuildingKind.TEA_PLANTATION: {Good.TEA: 12},
-        BuildingKind.CATTLE_RANCH: {Good.CATTLE: 1.2, Good.MILK: 12},
+        BuildingKind.CATTLE_RANCH: {Good.CATTLE: 2, Good.MILK: 12},
         BuildingKind.PIG_FARM: {Good.PIGS: 8},
         BuildingKind.CHICKEN_FARM: {Good.CHICKENS: 4, Good.EGGS: 6},
         BuildingKind.FLAX_FIELD: {Good.FLAX: 40},

@@ -32,7 +32,7 @@ storage upgrades and facilities), track and trains would cost today, as a train 
 price. The new game page offers three difficulties, each with one target: Easy $50,000,000, Normal
 $100,000,000 and Hard $150,000,000. Each also sets the starting cash and marks every good's price
 up for the whole game (`START_CASHES` and `PRICE_FACTORS`): Easy starts with $150,000 and goods pay
-2 times the boards' price, Normal $100,000 and 1.5 times, Hard $80,000 and the boards' price
+1.5 times the boards' price, Normal $100,000 and 1.25 times, Hard $80,000 and the boards' price
 itself. The page lists all three for the difficulty picked. The top bar shows the worth against the target, with what
 it is made of on hover, and the Reports window charts it at the start of every month. The game
 says when the company is first worth the target, and on 1 January 2050 whether it still is, the
@@ -516,7 +516,7 @@ window (H) lists the same.
 | Orange farm | 6 oranges |  |  |
 | Banana plantation | 6 bananas |  |  |
 | Sugar field | 6 sugar |  |  |
-| Bakery | 70 bread | 28 wheat | 3.5 refined sugar (from 1800) |
+| Bakery | 70 bread | 28 wheat | 14 refined sugar (from 1800) |
 | Fishery | 6 fish |  | 1.2 fuel (from era 2) |
 | Sheep farm | 12 wool, 6 sheep |  | 60 wheat (from farming demand 2), 3 machinery (from machines and tools demand 10) |
 | Cotton field | 50 cotton |  |  |
@@ -532,7 +532,7 @@ window (H) lists the same.
 | Tofu maker | 40 tofu | 16 soybeans |  |
 | Miso maker | 40 miso | 10 soybeans, 6 rice, 4 salt |  |
 | Fish drying shed | 40 dried fish | 16 fish, 4 salt |  |
-| Cattle ranch | 1.2 cattle, 12 milk |  | 70 wheat (from farming demand 2) |
+| Cattle ranch | 2 cattle, 12 milk |  | 70 wheat (from farming demand 2) |
 | Pig farm | 8 pigs |  | 40 wheat (from farming demand 2) |
 | Chicken farm | 4 chickens, 6 eggs |  | 20 wheat (from farming demand 2) |
 | Sausage maker (1850) | 150 sausages | 60 meat, 30 salt |  |
@@ -540,8 +540,8 @@ window (H) lists the same.
 | Hop garden | 25 hops |  |  |
 | Big sausage maker (1850) | 562.5 sausages | 225 meat, 112.5 salt |  |
 | Mega sausage maker (1850) | 2,109 sausages | 843.8 meat, 421.9 salt |  |
-| Big bakery | 262.5 bread | 105 wheat | 13.12 refined sugar (from 1800) |
-| Mega bakery | 984.4 bread | 393.8 wheat | 49.22 refined sugar (from 1800) |
+| Big bakery | 262.5 bread | 105 wheat | 52.5 refined sugar (from 1800) |
+| Mega bakery | 984.4 bread | 393.8 wheat | 196.9 refined sugar (from 1800) |
 | Big tofu maker | 150 tofu | 60 soybeans |  |
 | Mega tofu maker | 562.5 tofu | 225 soybeans |  |
 | Big miso maker | 150 miso | 37.5 soybeans, 22.5 rice, 15 salt |  |
@@ -555,7 +555,7 @@ window (H) lists the same.
 | Diamond mine | 6 diamonds |  | 1.2 fuel (from oil and fuel demand 11) |
 | Oil well (era 2) | 100 oil, 30 gas |  |  |
 | Salt works | 40 salt |  | 3 fuel (from oil and fuel demand 11) |
-| Clay pit | 40 clay |  | 3 fuel (from oil and fuel demand 11) |
+| Clay pit | 90 clay |  | 3 fuel (from oil and fuel demand 11) |
 | Limestone quarry | 40 limestone |  | 3 fuel (from oil and fuel demand 11) |
 | Sand pit | 40 sand |  | 3 fuel (from oil and fuel demand 11) |
 | Logging camp | 12 logs |  | 3 machinery (from era 3), 2 fuel (from oil and fuel demand 11) |
@@ -589,7 +589,7 @@ window (H) lists the same.
 | Dairy | 70 dairy products | 28 milk |  |
 | Railway works |  | 120 steel (from era 2) |  |
 | Machine works (era 3) | 25 machinery | 25 steel (from era 2), 12.5 copper (from era 4) |  |
-| Brickworks | 60 bricks | 30 clay | 15 coal (from 1700) |
+| Brickworks | 90 bricks | 45 clay | 22.5 coal (from 1700) |
 | Cement works (era 3) | 60 cement | 30 limestone | 15 coal (from 1700) |
 | Glassworks | 40 glass | 20 sand | 10 coal (from 1700), 10 limestone |
 | Brewery | 25 beer | 25 hops | 10 barrels (from wood demand 4) |
@@ -649,8 +649,8 @@ window (H) lists the same.
 | Mega car factory (era 4) | 75 cars | 375 steel (from era 2), 150 fuel (from era 2) |  |
 | Big machine works (era 3) | 62.5 machinery | 62.5 steel (from era 2), 31.25 copper (from era 4) |  |
 | Mega machine works (era 3) | 156.2 machinery | 156.2 steel (from era 2), 78.12 copper (from era 4) |  |
-| Big brickworks | 150 bricks | 75 clay | 37.5 coal (from 1700) |
-| Mega brickworks | 375 bricks | 187.5 clay | 93.75 coal (from 1700) |
+| Big brickworks | 225 bricks | 112.5 clay | 56.25 coal (from 1700) |
+| Mega brickworks | 562.5 bricks | 281.2 clay | 140.6 coal (from 1700) |
 | Big cement works (era 3) | 150 cement | 75 limestone | 37.5 coal (from 1700) |
 | Mega cement works (era 3) | 375 cement | 187.5 limestone | 93.75 coal (from 1700) |
 | Big glassworks | 100 glass | 50 sand | 25 coal (from 1700), 25 limestone |
@@ -1235,7 +1235,7 @@ grows faster than demand, margins shrink: in 2050 coal, ore, steel and chemicals
 fifth of their base, farming, animals, wood and textiles a little over a quarter, passengers and
 mail over a third and luxuries about half. The player's own buildings sell to their stations at
 that price too. The Reports window's Prices tab charts every tile's price over the years and
-lists the boards now. All of that is on Hard: Normal marks every price up 1.5 times and Easy 2
+lists the boards now. All of that is on Hard: Normal marks every price up 1.25 times and Easy 1.5
 times for the whole game (`Tiles.markup`), and the supply and demand screen, the Reports window and
 what buildings' shares cost show the marked-up prices.
 

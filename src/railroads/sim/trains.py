@@ -553,7 +553,7 @@ ENGINES: dict[str, Engine] = {
     "planet": Engine(
         "Planet steam engine", 1840, 0.5, 3, TRAIN_PRICE, G, pickup=12.0, tank=21.0, pull=40.0
     ),
-    "tank": Engine("Tank engine", 1840, 0.4, 2, 3_000.0, L, pickup=3.0, tank=13.0, pull=16.0),
+    "tank": Engine("Tank engine", 1840, 0.4, 2, 3_000.0, L, pickup=3.0, tank=13.0, pull=17.0),
     "goods": Engine("Goods engine", 1853, 0.35, 4, 15_000.0, H, pickup=50.0, tank=20.0, pull=55.0),
     "american": Engine(
         "American 4-4-0", 1856, 0.7, 4, 30_000.0, G, pickup=11.0, tank=25.0, wood=True, pull=55.0
@@ -562,7 +562,7 @@ ENGINES: dict[str, Engine] = {
         "Single-driver express", 1858, 1.0, 3, 40_000.0, X, pickup=12.0, tank=30.0, pull=75.0
     ),
     "light_tank": Engine(
-        "Light tank engine", 1862, 0.55, 2, 9_000.0, L, pickup=3.0, tank=16.0, pull=16.0
+        "Light tank engine", 1862, 0.55, 2, 9_000.0, L, pickup=3.0, tank=16.0, pull=17.0
     ),
     "mogul": Engine(
         "Mogul freight engine", 1865, 0.45, 5, 45_000.0, H, pickup=45.0, tank=30.0, pull=65.0
