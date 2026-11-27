@@ -792,9 +792,20 @@ class _Unpacked(Sequence[npt.NDArray[np.float32]]):
         return {"_bytes": self._bytes, "_premultiply": self._premultiply, "_made": {}}
 
 
-# Sprites that stand in no yard of their own: trees, rocks, and stations and their facilities,
-# which stand by their track.
-UNYARDED = ("pine_", "leafy_", "rocks", "station", "platform", "engine_shed", "cattle_pens")
+# Sprites that stand in no yard of their own: trees, rocks, stations and their facilities, which
+# stand by their track, and ports, which lay their own ground over their whole cell.
+UNYARDED = (
+    "pine_",
+    "leafy_",
+    "rocks",
+    "station",
+    "platform",
+    "engine_shed",
+    "cattle_pens",
+    "port",
+    "big_port",
+    "mega_port",
+)
 
 
 # How far the ground round a building reaches, as a share of its sprite's width.
@@ -823,7 +834,6 @@ TOWN = (
     "jeweller",
     "headquarters",
     "airport",
-    "port",
 )
 DIGGINGS = (
     "mine",

@@ -66,19 +66,22 @@ def _hull(m: Model, length: float, half: float, high: float, color: RGB, bottom:
         m.box((stern, bow), (-half - 0.0006, half + 0.0006), (high - 0.004, high - 0.0028), WHITE)
 
 
-def fishing_boat() -> Model:
-    """A small wooden fishing boat with a mast and a furled sail."""
+def fishing_boat(color: RGB = WOOD) -> Model:
+    """A small fishing boat painted `color` with a mast, a furled sail and a wheelhouse."""
     m = Model()
-    _hull(m, 0.09, 0.018, 0.016, WOOD, DARK_WOOD)
+    _hull(m, 0.09, 0.018, 0.016, color, RED_BOTTOM)
     m.box((-0.003, 0.003), (-0.002, 0.002), (0.016, 0.09), DARK_WOOD)
     m.box((-0.03, 0.0), (-0.003, 0.003), (0.03, 0.036), SAIL)
-    m.box((-0.03, -0.024), (-0.008, 0.008), (0.016, 0.026), DARK_WOOD)
+    m.box((-0.03, -0.012), (-0.01, 0.01), (0.016, 0.034), WHITE)
+    with m.fine():
+        m.panel((-0.028, -0.014), (0.024, 0.03), 0.0106, GLASS)
     return m
 
 
-def rowing_boat() -> Model:
+def rowing_boat(color: RGB = WOOD) -> Model:
+    """A rowing boat painted `color` outside, its thwarts across it."""
     m = Model()
-    _hull(m, 0.07, 0.014, 0.012, WOOD, DARK_WOOD)
+    _hull(m, 0.07, 0.014, 0.012, color, DARK_WOOD)
     with m.fine():
         for at in (-0.015, 0.008):
             m.box((at - 0.003, at + 0.003), (-0.013, 0.013), (0.012, 0.014), DARK_WOOD)
