@@ -31,6 +31,7 @@ from railroads.ui.pixel.art.parts import (
     SILL,
     _band,
     _bands,
+    _bar,
     _barrel,
     _cow,
     _fence,
@@ -2373,3 +2374,150 @@ def _locomotive(p: Painter, x: float, y: float) -> None:
     p.line([(x - 5.4, y - 2.6), (x - 5.4, y - 1)], red)
     for wx in (x - 2.5, x, x + 3.2):
         p.ellipse(wx - 1.1, y - 1.8, wx + 1.1, y + 0.4, red)
+
+
+COLA_RED: RGB = (176, 28, 34)
+COLA_BROWN: RGB = (74, 42, 30)
+COLA_WALL: RGB = (232, 226, 212)
+CONCRETE: RGB = (176, 172, 164)
+
+
+def _bottle_crates(p: Painter, x: float, y: float, high: int) -> None:
+    """A pallet a metre square stacked `high` red crates high with dark bottles, their caps
+    showing in the top crate."""
+    m = METRE
+    p.hall(x, y, m, m, 0.15 * m, shade(TIMBER, 0.85), None)
+    crate = 0.32 * m
+    for k in range(high):
+        top = p.hall(x, y - 0.15 * m - k * crate, m, m, crate, COLA_RED, COLA_BROWN)
+    left, front, _, back = top
+    for u in (0.25, 0.5, 0.75):
+        for v in (0.3, 0.7):
+            bx = left[0] + (front[0] - left[0]) * u + (back[0] - left[0]) * v
+            by = left[1] + (front[1] - left[1]) * u + (back[1] - left[1]) * v
+            p.blob(bx - 0.1 * m, by - 0.06 * m, bx + 0.1 * m, by + 0.06 * m, (214, 190, 120))
+
+
+def _sign_bottle(p: Painter, a: Point, b: Point, t: float, drop: float, tall: float) -> None:
+    """A white bottle drawn on a sign on the wall under the edge from `a` to `b`, `t` along it
+    with its foot `drop` down and `tall` high."""
+    fx, fy = _on_wall(a, b, t, drop)
+    w = tall * 0.18
+    p.polygon(
+        [
+            (fx - w, fy),
+            (fx - w, fy - tall * 0.55),
+            (fx - w * 0.35, fy - tall * 0.8),
+            (fx - w * 0.35, fy - tall),
+            (fx + w * 0.35, fy - tall),
+            (fx + w * 0.35, fy - tall * 0.8),
+            (fx + w, fy - tall * 0.55),
+            (fx + w, fy),
+        ],
+        (246, 242, 236),
+    )
+
+
+def _van(p: Painter, x: float, y: float) -> None:
+    """A red delivery van backed up to a dock, its box body on (x, y) and its white cab further
+    out, with dark wheels."""
+    m = METRE
+    body, cab_length = 4.4 * m, 1.8 * m
+    for u in (-0.3, 0.35):
+        wx, wy = _iso(x, y, u * body, 1.1 * m)
+        p.ellipse(wx - 0.4 * m, wy - 0.45 * m, wx + 0.4 * m, wy + 0.45 * m, (40, 38, 38))
+    left, front, right, _ = p.hall(x, y - 0.5 * m, body, 2.2 * m, 2.6 * m, COLA_RED, COLA_RED)
+    _band(p, left, front, 1.5 * m, (246, 242, 236))
+    _band(p, front, right, 1.5 * m, (230, 226, 220))
+    cx, cy = _iso(x, y, (body + cab_length) / 2, 0)
+    cab = p.hall(cx, cy - 0.5 * m, cab_length, 2.2 * m, 1.9 * m, (236, 234, 228), (236, 234, 228))
+    _patch(p, cab[1], cab[2], (0.1, 0.9), (0.2 * m, 0.9 * m), (130, 170, 200))
+    _patch(p, cab[0], cab[1], (0.45, 0.95), (0.2 * m, 0.8 * m), (130, 170, 200))
+
+
+def _syrup_tank(p: Painter, x: float, y: float) -> None:
+    """A dark brown syrup tank 2.6 m across and 8 m tall standing on (x, y), with a red band round
+    it, a lighter domed top and a ladder up its side."""
+    m = METRE
+    r, tall = 1.3 * m, 8 * m
+    p.ellipse(x - r, y - r / 2, x + r, y + r / 2, shade(COLA_BROWN, 0.7))
+    p.rect(x - r, y - tall, x + r, y, COLA_BROWN)
+    p.rect(x - r, y - tall * 0.62, x + r, y - tall * 0.52, COLA_RED)
+    p.ellipse(x - r, y - tall - r / 2, x + r, y - tall + r / 2, shade(COLA_BROWN, 1.35))
+    _bar(p, (x + 0.4 * r, y), (x + 0.4 * r, y - tall), 0.12 * m, (150, 146, 140))
+    _bar(p, (x - 0.6 * r, y - 0.2 * m), (x - 0.6 * r, y - tall), 0.18 * m, shade(COLA_BROWN, 1.2))
+
+
+def cola_bottler() -> Sprite:
+    """A cola bottling plant: a whitewashed bottling hall 22 by 14 m on a brown plinth under a
+    dark brown roof with vents, a broad red band round its top and a red sign with a white
+    bottle on it, windows showing bottles going by on the line inside, a syrup tank beside it,
+    a loading dock with a red delivery van backed up to it, and red crates of dark bottles
+    stacked on pallets by its door, on a concrete yard, all at their true size beside the
+    houses."""
+    p = Painter(30, 28, (15, 19))
+    m = METRE
+    length, depth, high = 22 * m, 14 * m, 7.5 * m
+    x, y = -1.5, -1
+    foot = _footing(x, y, length, depth)
+    _bed(p, foot, CONCRETE)
+    p.shadow(8, 2.5, reach=2)
+    _track(p, foot[0], foot[1], (0.6, 0.78), 3, shade(CONCRETE, 0.9), ruts=False)
+    top = p.hall(x, y, length, depth, high, COLA_WALL, None)
+    left, front, right, _ = top
+    _plinth(p, top, high, COLA_BROWN, 0.9 * m, 1.0, 0.8)
+    for a, b, tone in ((left, front, 1.0), (front, right, 0.78)):
+        _patch(p, a, b, (0, 1), (0, 1.3 * m), shade(COLA_RED, tone))
+    glass = shade(GLAZING, 0.82)
+    for t0 in (0.06, 0.2, 0.34):
+        _patch(p, left, front, (t0, t0 + 0.11), (2.4 * m, 4.4 * m), glass)
+        for k in range(3):
+            bx, by = _on_wall(left, front, t0 + 0.025 + 0.03 * k, 4.4 * m)
+            p.rect(bx - 0.1 * m, by - 0.8 * m, bx + 0.1 * m, by - 0.1 * m, COLA_BROWN)
+    _patch(p, left, front, (0.52, 0.96), (1.9 * m, 4 * m), COLA_RED)
+    for drop in (2.7 * m, 3.3 * m):
+        _band_on(p, left, front, (0.64, 0.92), drop)
+    _sign_bottle(p, left, front, 0.57, 3.7 * m, 1.6 * m)
+    _door(p, left, front, (0.66, 0.8), 4.8 * m, high, DOORWAY)
+    _patch(p, front, right, (0.1, 0.36), (2.4 * m, 4.2 * m), shade(glass, 0.8))
+    _door(p, front, right, (0.5, 0.86), 3.4 * m, high - 1.2 * m, (96, 92, 88))
+    rise = 2 * m
+    p.gable(top, rise, COLA_BROWN, COLA_WALL)
+    _roof_rows(p, top, rise, COLA_BROWN, (0.5,))
+    for along in (0.3, 0.6):
+        vx, vy = _on_roof(top, rise, along, 0.55)
+        p.box(vx, vy, 0.8 * m, 1 * m, (150, 146, 140), shade((150, 146, 140), 1.15))
+    dock = [
+        _on_wall(front, right, 0.46, high - 1.2 * m),
+        _on_wall(front, right, 0.92, high - 1.2 * m),
+    ]
+    ox, oy = 2 * m, m
+    edge = [(dock[1][0] + ox, dock[1][1] + oy), (dock[0][0] + ox, dock[0][1] + oy)]
+    p.polygon([dock[0], dock[1], *edge], CONCRETE, shade(CONCRETE, 0.7))
+    p.polygon(
+        [*edge, (edge[0][0], edge[0][1] + 1.2 * m), (edge[1][0], edge[1][1] + 1.2 * m)][::1],
+        shade(CONCRETE, 0.75),
+    )
+    for t in (0.52, 0.64):
+        bx, by = _on_wall(front, right, t, high - 1.2 * m)
+        _bottle_crates(p, bx + 0.9 * m, by + 0.7 * m, 3)
+    mx, my = _on_wall(front, right, 0.72, high)
+    _van(p, *_iso(mx, my, 2 * m + 2.4 * m, 0))
+    lx, ly = foot[0]
+    _syrup_tank(p, lx - 1.2, ly + 1.4)
+    for k, (u, crates) in enumerate(((0.36, 4), (0.46, 3), (0.56, 4))):
+        cx, cy = _on_wall(foot[0], foot[1], u, 0)
+        _bottle_crates(p, cx - 1.5 * m - 0.3 * k * m, cy + 0.8 * m + 0.15 * k * m, crates)
+    return p.sprite()
+
+
+def _band_on(p: Painter, a: Point, b: Point, span: tuple[float, float], drop: float) -> None:
+    """A white stripe of lettering on a sign from `span[0]` to `span[1]` along the wall under the
+    edge from `a` to `b`, `drop` down it."""
+    _bar(
+        p,
+        _on_wall(a, b, span[0], drop),
+        _on_wall(a, b, span[1], drop),
+        0.3 * METRE,
+        (246, 242, 236),
+    )
