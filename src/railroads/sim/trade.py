@@ -160,6 +160,52 @@ class CellGoods:
         return result
 
 
+@dataclass(frozen=True)
+class HandOuts:
+    """Where what the buildings in each cell made went in a month: per good, to the buildings in
+    other cells (flat cells of sellers and buyers, and how much), and into stations (flat cells
+    of sellers, the stations, and how much)."""
+
+    to_cells: Mapping[Good, tuple[npt.NDArray[np.intp], npt.NDArray[np.intp], FloatArray]]
+    to_stations: Mapping[Good, tuple[npt.NDArray[np.intp], tuple[Cell, ...], FloatArray]]
+
+    def from_cell(self, flat: int) -> list[tuple[Good, int | Cell, bool, float]]:
+        """What went from one flat cell: each good, where it went (a flat cell, or a station's
+        cell), whether that is a station, and how much, the most first."""
+        went: dict[tuple[Good, int | Cell, bool], float] = {}
+        for good, (sellers, buyers, amounts) in self.to_cells.items():
+            for buyer, amount in zip(
+                buyers[sellers == flat].tolist(), amounts[sellers == flat].tolist(), strict=True
+            ):
+                key = (good, int(buyer), False)
+                went[key] = went.get(key, 0.0) + amount
+        for good, (sellers, stations, amounts) in self.to_stations.items():
+            for station, amount in zip(
+                [s for s, here in zip(stations, sellers == flat, strict=True) if here],
+                amounts[sellers == flat].tolist(),
+                strict=True,
+            ):
+                key = (good, station, True)
+                went[key] = went.get(key, 0.0) + amount
+        rows = [(good, to, station, amount) for (good, to, station), amount in went.items()]
+        return sorted((row for row in rows if row[3] > EPSILON), key=lambda row: -row[3])
+
+
+# Where each trade's goods went (HandOuts), by the trade's id, while the trade lasts: kept apart
+# from the trade, which is saved with the game.
+_HAND_OUTS: dict[int, HandOuts] = {}
+
+
+def keep_hand_outs(trade: Trade, hand_outs: HandOuts) -> None:
+    _HAND_OUTS[id(trade)] = hand_outs
+    weakref.finalize(trade, _HAND_OUTS.pop, id(trade), None)
+
+
+def hand_outs_of(trade: Trade) -> HandOuts | None:
+    """Where a month's goods went, if it is known: not for a trade loaded with a saved game."""
+    return _HAND_OUTS.get(id(trade))
+
+
 # What Trade.share works out, by the trade's id and kinds, while the trade lasts: a trade is
 # saved with the game, so it keeps none of it itself.
 _SHARES: dict[int, dict[tuple[BuildingKind, ...], tuple[FloatArray, npt.NDArray[np.bool_]]]] = {}

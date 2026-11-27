@@ -64,7 +64,26 @@ def draw_hex_details(details: HexDetails) -> BuildingKind | None:
             shares = row.kind
     for other in details.others:
         imgui.bullet_text(other)
+    _draw_handed(details)
     return shares
+
+
+# How many of the places a cell's goods went to its details list, the most first.
+HANDED_SHOWN = 8
+
+
+def _draw_handed(details: HexDetails) -> None:
+    """Where what the buildings here made went last month: each good, how much and to whom."""
+    if not details.handed:
+        return
+    section("Handed out to")
+    for good, to, amount in details.handed[:HANDED_SHOWN]:
+        good_amount(good, f"{amount:,.1f}" if amount < 10 else f"{amount:,.0f}")
+        imgui.same_line(0, 8)
+        imgui.text_disabled(to)
+    hidden = len(details.handed) - HANDED_SHOWN
+    if hidden > 0:
+        imgui.text_disabled(f"and {hidden} more")
 
 
 def _draw_card(row: BuildingRow) -> bool:

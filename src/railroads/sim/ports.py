@@ -522,6 +522,11 @@ class Ports:
                 takes[need] = takes.get(need, 0.0) + self.amount(slot)
         return takes
 
+    def ship_needs_at(self, cell: Cell) -> set[Need]:
+        """The needs of the goods the port in a cell buys to ship."""
+        port = self.at.get(cell)
+        return set() if port is None else {need_of(good) for good in port.ships}
+
     def gives_in(self, cells: npt.NDArray[np.intp]) -> dict[Good, float]:
         """What the ports in these flat cells give this month."""
         month = self.current()

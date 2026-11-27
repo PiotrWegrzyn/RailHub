@@ -13,6 +13,7 @@ from railroads.sim.ladders import GrowthRule
 from railroads.sim.ledger import Takings
 from railroads.sim.ownership import HOLD_MONTHS
 from railroads.sim.points import Points
+from railroads.sim.ports import Port, Slot, Tier
 from railroads.sim.tilemap import Terrain, TileMap
 from railroads.sim.trade import Satisfaction
 from railroads.sim.yearly import bonus_of
@@ -270,3 +271,39 @@ def test_the_shares_window_says_from_how_many_shares_the_player_controls_the_bui
     lines = {label: value for label, value, _ in share_lines(row)}
 
     assert lines["Control"] == control
+
+
+def test_a_port_shows_only_the_goods_it_gives_itself() -> None:
+    constructions = Constructions(make_map())
+    for cell in ((2, 1), (7, 1)):
+        constructions.build(Building(cell, BuildingKind.PORT))
+    growth = Growth(constructions, GrowthRule(trades=True, ladders=()))
+
+    (port,) = describe(growth, (2, 1)).buildings
+
+    assert {flow.good for flow in port.gave} == set(growth.ports.gives_at((2, 1)))
+
+
+def test_a_farm_says_whom_it_handed_its_wheat_to() -> None:
+    constructions = Constructions(make_map())
+    for _ in range(3):
+        constructions.build(Building((5, 5), BuildingKind.HOUSE))
+    constructions.build(Building((5, 4), BuildingKind.FARM))
+    growth = Growth(constructions, GrowthRule(trades=True, ladders=()))
+
+    handed = describe(growth, (5, 4)).handed
+
+    assert handed == [(Good.WHEAT, "house x3 at 5, 5", pytest.approx(6 * 13 / 21))]
+
+
+def test_a_farm_says_it_handed_wheat_to_a_port_taking_it() -> None:
+    constructions = Constructions(make_map())
+    constructions.build(Building((5, 1), BuildingKind.PORT))
+    constructions.build(Building((5, 2), BuildingKind.FARM))
+    growth = Growth(constructions, GrowthRule(trades=False, ladders=()))
+    growth.ports.at[(5, 1)] = Port([Slot(Good.WHEAT, Tier.COMMON, False)])
+    growth.trade_goods()
+
+    handed = describe(growth, (5, 2)).handed
+
+    assert [(good, to) for good, to, _ in handed] == [(Good.WHEAT, "port at 5, 1")]

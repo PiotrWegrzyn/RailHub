@@ -76,12 +76,14 @@ from railroads.sim.trade import (
     BONUS_PER_GOOD,
     STOCKPILES,
     CellGoods,
+    HandOuts,
     OwnedShare,
     Satisfaction,
     StationOrder,
     Stockpiles,
     Trade,
     input_stock,
+    keep_hand_outs,
     worth_to,
 )
 from railroads.sim.year_caches import year_cached
@@ -323,6 +325,12 @@ class MonthOfTrade:
         self.position = np.full(economy.cells, -1, dtype=np.intp)
         self.position[cells] = np.arange(cells.size)
         self.pairs: dict[Good, tuple[*_Pairs, tuple[float, ...]]] = {}
+        # Per good, where what each traded cell made went, as positions among the traded cells:
+        # to other cells, and into stations, by their place among them (_hand_outs).
+        self.to_cells: dict[Good, list[tuple[npt.NDArray[np.intp], ...]]] = {}
+        self.to_stations: dict[Good, list[tuple[npt.NDArray[np.intp], ...]]] = {}
+        self.to_cell_amounts: dict[Good, list[FloatArray]] = {}
+        self.to_station_amounts: dict[Good, list[FloatArray]] = {}
         self.padded: tuple[npt.NDArray[np.intp], tuple[npt.NDArray[np.intp], ...]] | None = None
         # What buildings had taken as goods reached their station when their need was served:
         # what they take after that, while the month's trade is still going, counts for the next.
@@ -659,6 +667,8 @@ class MonthOfTrade:
         )
         used = np.zeros(sellers.size) if used is None else used
         used[went] += sent
+        self.to_cells.setdefault(good, []).append((sellers[went], buyers[went]))
+        self.to_cell_amounts.setdefault(good, []).append(sent)
         above = np.bincount(
             sellers[went], sent * (self.worth_to[buyers[went]] - 1.0), minlength=self.cells.size
         )
@@ -764,7 +774,15 @@ class MonthOfTrade:
         left = flat[cells]
         short = room.reshape(-1).copy()
         buyer = row * room.shape[1] + buyers[pair]
-        distribute(seller, buyer, ring_starts(away[pair]), left, short)
+        went, sent = distribute(seller, buyer, ring_starts(away[pair]), left, short)
+        good_rows, near_at = np.divmod(cells[seller[went]], spare.shape[1])
+        station_at = buyer[went] % room.shape[1]
+        near = self._gather_pairs()[0]
+        for good_row in np.unique(good_rows).tolist():
+            here = good_rows == good_row
+            good = goods[good_row]
+            self.to_stations.setdefault(good, []).append((near[near_at[here]], station_at[here]))
+            self.to_station_amounts.setdefault(good, []).append(sent[here])
         flat[cells] = left
         self.room[rows] = short.reshape(room.shape)
         return room - self.room[rows]
@@ -786,6 +804,26 @@ class MonthOfTrade:
             gathered = self.gathered[self.station_cells[station_at]]
             good = goods[good_at]
             gathered[good] = gathered.get(good, 0.0) + float(taken[good_at, station_at])
+
+    def _hand_outs(self) -> HandOuts:
+        """Where the month's goods went, as flat cells over the map (HandOuts)."""
+        to_cells = {
+            good: (
+                self.cells[np.concatenate([sellers for sellers, _ in parts])],
+                self.cells[np.concatenate([buyers for _, buyers in parts])],
+                np.concatenate(self.to_cell_amounts[good]),
+            )
+            for good, parts in self.to_cells.items()
+        }
+        to_stations = {
+            good: (
+                self.cells[np.concatenate([sellers for sellers, _ in parts])],
+                tuple(self.station_cells[at] for _, stations in parts for at in stations.tolist()),
+                np.concatenate(self.to_station_amounts[good]),
+            )
+            for good, parts in self.to_stations.items()
+        }
+        return HandOuts(to_cells, to_stations)
 
     def _produce(self, kind: BuildingKind) -> None:
         """Offers what a kind of processor could make from its stockpile: what its inputs allow,
@@ -962,6 +1000,7 @@ class MonthOfTrade:
             self.owned_sent,
             goods_left,
         )
+        keep_hand_outs(trade, self._hand_outs())
         self.economy.levels[:] = Satisfaction.UNSATISFIED
         self.economy.levels[self.cells] = trade.levels()
         month = np.ones(self.economy.cells)

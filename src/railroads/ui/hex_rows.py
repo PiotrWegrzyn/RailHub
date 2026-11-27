@@ -22,15 +22,17 @@ from railroads.sim.constructions import (
     Station,
     Track,
 )
+from railroads.sim.economy import wants_of
 from railroads.sim.goods import BONUS_PART, RECIPES, Good, Need
 from railroads.sim.grids import Cell, FloatArray
 from railroads.sim.growth import Growth
 from railroads.sim.ledger import Takings
 from railroads.sim.ownership import CONTROL, HOLD_MONTHS, LOT, LOTS, SHARES
 from railroads.sim.points import Points
+from railroads.sim.station_trade import MEETS
 from railroads.sim.tilemap import Deposit, TileMap
 from railroads.sim.track_rules import bed_name
-from railroads.sim.trade import Satisfaction, Trade
+from railroads.sim.trade import Satisfaction, Trade, hand_outs_of
 from railroads.sim.yearly import bonus_of, boosts_of, demands_of, makes_of
 from railroads.ui.biomes import biome_of
 from railroads.words import dollars
@@ -61,6 +63,9 @@ class HexDetails:
     points: list[tuple[str, int, int]]
     buildings: list[BuildingRow]
     others: list[str]
+    # Where what the buildings here made went last month: each good, to whom and how much, the
+    # most first.
+    handed: list[tuple[Good, str, float]] = field(default_factory=list)
 
 
 # How long the player must hold shares before they may sell them.
@@ -192,6 +197,7 @@ def describe(
         buildings=rows,
         others=[_other(c, growth) for c in built if not isinstance(c, Building)]
         + _flag_note(growth, rows),
+        handed=handed_to(growth, flat),
     )
 
 
@@ -364,10 +370,14 @@ def _per_good(
     count: int = 1,
 ) -> list[Flow]:
     """How much of each good the buildings got or gave, out of what they needed or made; for
-    goods made, also the most they could make with all their inputs."""
+    goods made, also the most they could make with all their inputs. A good the buildings make
+    shows even when none of it went, but only theirs: a port's goods are its own (`most`), not
+    every port's."""
     flows = []
     for (of, good), (done, wanted) in goods.items():
-        if of != kind or (wanted[position] <= 0 and not most):
+        if of != kind:
+            continue
+        if wanted[position] <= EPSILON and (most is None or good not in most):
             continue
         limit = most.get(good, 0) * count if most else 0
         flows.append(
@@ -379,6 +389,54 @@ def _per_good(
             )
         )
     return flows
+
+
+def handed_to(growth: Growth, flat: int) -> list[tuple[Good, str, float]]:
+    """Where what the buildings in a flat cell made went in the last month's trade: each good,
+    to the buildings that took it in each cell or into which station, and how much, the most
+    first; nothing before a month's trade."""
+    trade = growth.last_trade
+    hand_outs = None if trade is None else hand_outs_of(trade)
+    if hand_outs is None:
+        return []
+    cols = growth.grid.cols
+    rows = []
+    for good, to, station, amount in hand_outs.from_cell(flat):
+        if station:
+            assert isinstance(to, tuple)
+            name = growth.railway.name_of(to) if growth.railway is not None else "a station"
+            rows.append((good, f"station {name}", amount))
+            continue
+        assert isinstance(to, int)
+        rows.append((good, _takers(growth, divmod(to, cols), good), amount))
+    return rows
+
+
+def _takers(growth: Growth, cell: Cell, good: Good) -> str:
+    """The buildings in a cell taking a good, and where they stand."""
+    year = growth.year
+    needs = MEETS[good]
+    kinds = Counter(
+        building.kind
+        for building in growth.constructions.buildings_at(cell)
+        if needs_taken(growth, cell, building.kind, needs, year)
+    )
+    names = ", ".join(
+        f"{kind.value} x{count}" if count > 1 else kind.value for kind, count in kinds.items()
+    )
+    return f"{names or 'buildings'} at {cell[0]}, {cell[1]}"
+
+
+def needs_taken(
+    growth: Growth, cell: Cell, kind: BuildingKind, needs: tuple[Need, ...], year: int
+) -> bool:
+    """Whether buildings of a kind in a cell take any of these needs: a port by the goods it
+    takes (railroads.sim.ports), the rest by what their kind wants."""
+    if kind in PORT_KINDS:
+        taken = set(growth.ports.takes_at(cell)) | growth.ports.ship_needs_at(cell)
+        return not taken.isdisjoint(needs)
+    wanted = wants_of(kind, year)
+    return any(need in wanted for need in needs)
 
 
 def _other(construction: Construction, growth: Growth) -> str:
