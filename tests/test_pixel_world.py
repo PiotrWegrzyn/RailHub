@@ -449,10 +449,10 @@ def test_buildings_in_a_cell_with_track_stand_off_the_track(
 def test_a_building_with_no_room_clear_of_the_track_is_drawn_under_it(sheet: SpriteSheet) -> None:
     tile_map = make_tile_map()
     constructions = Constructions(tile_map)
-    constructions.build(Building((10, 4), BuildingKind.BIG_FACTORY))
+    constructions.build(Building((10, 4), BuildingKind.MEGA_STEEL_MILL))
     for ends in [(0, 6), (2, 8), (4, 10)]:
         constructions.build(Track((10, 4), ends))
-    factory = sheet.index(BUILDING_SPRITES[BuildingKind.BIG_FACTORY])
+    factory = sheet.index(BUILDING_SPRITES[BuildingKind.MEGA_STEEL_MILL])
 
     world = PixelWorld(tile_map, constructions, sheet, *PLAIN_LOOKS[HexGrid])
     at = int(np.flatnonzero(world.scenery.sprite == factory)[0])

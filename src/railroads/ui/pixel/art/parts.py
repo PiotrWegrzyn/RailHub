@@ -258,9 +258,13 @@ def _portal(
     )
 
 
-# How many painter units a metre takes in a sprite drawn at BUILDING_SCALE, measured by the
-# house: its 8 m wall is 6 units drawn at HOME_SCALE (railroads.ui.pixel.art.registry).
-METRE = 6 * 0.413 / 8 / 0.7
+# How many art pixels a painter unit takes in every building sprite: the one scale every building
+# is drawn at (railroads.ui.pixel.art.registry).
+SCALE = 0.413
+
+# How many painter units a metre takes in a building sprite, measured by the house: its 8 m wall
+# is 6 units (railroads.ui.pixel.art.homes.house).
+METRE = 6 / 8
 
 
 def _bar(p: Painter, a: Point, b: Point, wide: float, colour: RGB) -> None:

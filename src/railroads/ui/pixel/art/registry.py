@@ -52,6 +52,7 @@ from railroads.ui.pixel.art.crafts import (
 )
 from railroads.ui.pixel.art.facilities import FACILITIES
 from railroads.ui.pixel.art.farms import (
+    PEN_SCALE,
     bananas,
     beekeeper,
     cattle_ranch,
@@ -154,6 +155,7 @@ from railroads.ui.pixel.art.painter import (
     drawn_at,
     shade,
 )
+from railroads.ui.pixel.art.parts import SCALE
 from railroads.ui.pixel.art.ports import PORTS
 from railroads.ui.pixel.art.provisions import (
     bakery,
@@ -185,178 +187,24 @@ __all__ = [
     "shrunk_from",
 ]
 
-BUILDING_SCALE = 0.7
-
+# Every building, a works as much as a house, is drawn at one scale, the houses': a metre is as
+# long in every one of them (railroads.ui.pixel.art.parts.METRE), so a barn stands a touch bigger
+# than a house and a works bigger than a tenement because they are, never because they are drawn
+# bigger. A works that would not fit its cell at it is drawn smaller (MOST_WIDTH).
+#
 # How big the trees standing alone on meadows are drawn: their crowns as big as those of the
 # woods (railroads.ui.pixel.ground_palette.CROWN_SIZE), so a lone tree is one of them.
 TREE_SCALES = {"pine_": 0.66, "leafy_": 0.55}
 
 HOMES = ("house", "tenement", "flats")
 
-HOME_SCALE = 0.413
+# Ports fill their cell to its edges and reach out of it over the water
+# (railroads.ui.pixel.art.ports), drawn to the cell at a scale of their own.
+PORT_SCALE = 0.7
 
-# A farm's barn and an orchard's cottage stand a touch bigger than a house.
-FARMSTEADS = ("farm", "orchard", "orange_farm")
-# Farms whose fenced paddock fills their whole cell, drawn to the cell and never shrunk to fit it.
+# Farms whose fenced paddock fills their whole cell, drawn to the cell and never shrunk to fit it,
+# at a scale of their own (railroads.ui.pixel.art.farms.PEN_SCALE).
 PENS = ("cattle_ranch", "pig_farm", "chicken_farm")
-
-FARMSTEAD_SCALE = 0.585
-
-# Buildings drawn smaller than others of their scale, so they stand as big beside a house as they
-# would: small workshops, and farmsteads whose barn would otherwise dwarf the houses, a barn only a
-# touch bigger than a house. Each the share of the size it would have.
-SHARES = {
-    "bakery": 0.47,
-    "distillery": 0.7,
-    "tavern": 0.7,
-    "sausage_maker": 0.77,
-    "farm": 0.8,
-    "orchard": 0.85,
-    "orange_farm": 0.85,
-    "potato_farm": 0.55,
-    "rice_paddy": 0.55,
-    "soy_field": 0.55,
-    "tea_plantation": 0.55,
-    "cattle_ranch": 0.72,
-    "pig_farm": 0.72,
-    "chicken_farm": 0.72,
-}
-
-BUILDINGS = (
-    "house",
-    "tenement",
-    "flats",
-    "farm",
-    "orchard",
-    "date_palms",
-    "bananas",
-    "sugar",
-    "iron_mine",
-    "copper_mine",
-    "gold_mine",
-    "diamond_mine",
-    "oil_well",
-    "salt_works",
-    "fishery",
-    "sheep_farm",
-    "cotton_field",
-    "vineyard",
-    "coffee_plantation",
-    "rubber_plantation",
-    "textile_mill",
-    "furniture_maker",
-    "tool_works",
-    "winery",
-    "refinery",
-    "chemical_works",
-    "electronics_plant",
-    "car_factory",
-    "car_dealer",
-    "jeweller",
-    "orange_farm",
-    "outpost",
-    "base",
-    "headquarters",
-    "gun_factory",
-    "tank_factory",
-    "plane_factory",
-    "airport",
-    "barrel_maker",
-    "beekeeper",
-    "incense_grove",
-    "church",
-    "basilica",
-    "cathedral",
-    "st_peters",
-    "factory",
-    "big_factory",
-    "mega_factory",
-    "skyscraper",
-    "food_plant",
-    "bakery",
-    "big_bakery",
-    "mega_bakery",
-    "gasworks",
-    "potter",
-    "tile_works",
-    "foundry",
-    "dairy",
-    "big_dairy",
-    "mega_dairy",
-    "sausage_maker",
-    "carpet_weaver",
-    "clock_maker",
-    "big_clock_maker",
-    "mega_clock_maker",
-    "mirror_maker",
-    "big_mirror_maker",
-    "mega_mirror_maker",
-    "manor",
-    "theatre",
-    "hospital",
-    "railway_works",
-    "steel_mill",
-    "big_steel_mill",
-    "mega_steel_mill",
-    "shipyard",
-    "mine",
-    "logging_camp",
-    "sawmill",
-    "port",
-    "big_port",
-    "mega_port",
-    "clay_pit",
-    "limestone_quarry",
-    "sand_pit",
-    "potato_farm",
-    "rice_paddy",
-    "soy_field",
-    "tea_plantation",
-    "soy_sauce_brewery",
-    "tofu_maker",
-    "miso_maker",
-    "fish_dryer",
-    "cattle_ranch",
-    "pig_farm",
-    "chicken_farm",
-    "flax_field",
-    "hop_garden",
-    "machine_works",
-    "brickworks",
-    "cement_works",
-    "glassworks",
-    "brewery",
-    "distillery",
-    "sake_brewery",
-    "tannery",
-    "shoe_factory",
-    "plastics_works",
-    "appliance_factory",
-    "paper_mill",
-    "printing_works",
-    "sugar_refinery",
-    "porcelain_works",
-    "cola_bottler",
-    "tavern",
-    "sushi_hut",
-    "builders_yard",
-    "department_store",
-    "hotel",
-    "meat_factory",
-    "power_plant",
-    "diesel_power_plant",
-    "gas_power_plant",
-    "space_center",
-    "pear_hq",
-    "gigafactory",
-    "royal_palace",
-    "salt_cathedral",
-    "spa_resort",
-    "worlds_fair",
-    "film_studio",
-    "amusement_park",
-    "olympic_stadium",
-)
 
 SPRITES: dict[str, Callable[[], Sprite]] = {
     **{f"pine_{i}": (lambda c=c, i=i: pine(c, i)) for i, c in enumerate(PINES)},
@@ -527,7 +375,7 @@ for _kind in MERGED:
         for _size, _most in GROWN_WIDTH.items():
             SPRITES.setdefault(
                 f"{_size}_{_base}",
-                partial(grown, SPRITES[_base], _size, _most / BUILDING_SCALE),
+                partial(grown, SPRITES[_base], _size, _most / SCALE),
             )
 
 
@@ -542,17 +390,16 @@ SHRINK_STEP = 0.98
 
 
 def _base_scale(name: str) -> float:
-    size, _, base = name.partition("_")
-    if size in GROWN_WIDTH and name not in BUILDINGS and base in SPRITES:
-        return _base_scale(base)
-    if name.startswith(HOMES):
-        return HOME_SCALE
     for prefix, tree_scale in TREE_SCALES.items():
         if name.startswith(prefix):
             return tree_scale
-    if name in FARMSTEADS:
-        return FARMSTEAD_SCALE
-    return BUILDING_SCALE if name.startswith(BUILDINGS) else 1.0
+    if name in PORTS or BuildingKind.__members__.get(name.upper()) in PORT_KINDS:
+        return PORT_SCALE
+    if name in PENS:
+        return PEN_SCALE
+    if name.startswith(HOMES) or name.upper() in BuildingKind.__members__:
+        return SCALE
+    return 1.0
 
 
 @cache
@@ -569,17 +416,17 @@ def _width(sprite: Sprite) -> int:
 
 @cache
 def _scale_of(name: str) -> float:
-    """How big a sprite is drawn on the map: its kind's scale, and smaller still if that would
-    make a works wider than MOST_WIDTH lets it be."""
+    """How big a sprite is drawn on the map: the one scale of every building (SCALE), and smaller
+    still if that would make a works wider than MOST_WIDTH lets it be."""
     scale = _base_scale(name)
     kind = BuildingKind.__members__.get(name.upper())
-    if kind is None or name in FARMSTEADS or name in PENS or kind in PORT_KINDS:
-        return scale * SHARES.get(name, 1.0)
+    if kind is None or name in PENS or kind in PORT_KINDS:
+        return scale
     most = GROWN_MOST_WIDTH.get(name.partition("_")[0], MOST_WIDTH[BUILDING_RULES[kind].space])
     scale = min(scale, most / _width(_full_size(name)))
     while _shown_width(name, scale) > most:
         scale *= SHRINK_STEP
-    return scale * SHARES.get(name, 1.0)
+    return scale
 
 
 def _shown_width(name: str, scale: float) -> int:
@@ -606,10 +453,9 @@ def draw_sheet(padding: int = 1, resolution: int = 1) -> tuple[Image.Image, dict
 def draw_sheets(
     resolutions: tuple[int, ...], padding: int = 1
 ) -> dict[str, tuple[Image.Image, dict[str, list[int]]]]:
-    """A sheet (draw_sheet) at each of `resolutions`. Buildings other than stations are drawn at
-    BUILDING_SCALE, houses, tenements and flats at HOME_SCALE, farms and orchards at
-    FARMSTEAD_SCALE, and some their share of that (SHARES). Each sprite is drawn
-    once, MASTER_RESOLUTION times finer than an art pixel
+    """A sheet (draw_sheet) at each of `resolutions`. Every building is drawn at SCALE, but for
+    ports and pens, drawn to their cell, and works too wide for their cell (_scale_of). Each
+    sprite is drawn once, MASTER_RESOLUTION times finer than an art pixel
     (fine_sprite), and every sheet holds it shrunk from that drawing (shrunk_from), so a sprite
     is the very same picture on every sheet, only smaller or bigger: lines a pixel wide where it
     is drawn, such as the outline round a model, would make the coarse sheets look like other,

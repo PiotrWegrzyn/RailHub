@@ -283,10 +283,10 @@ def gantry(reach: float, high: float, half: float) -> Model:
 
 def _apothem() -> float:
     """How far the middle of a port's cell lies from its edges in the model's units: half a cell,
-    as the model is drawn at the works' scale (railroads.ui.pixel.art.registry.BUILDING_SCALE)."""
-    from railroads.ui.pixel.art.registry import BUILDING_SCALE
+    as the model is drawn at the ports' scale (railroads.ui.pixel.art.registry.PORT_SCALE)."""
+    from railroads.ui.pixel.art.registry import PORT_SCALE
 
-    return 0.5 / BUILDING_SCALE
+    return 0.5 / PORT_SCALE
 
 
 def _across(u: float, apothem: float) -> float:

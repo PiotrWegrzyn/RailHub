@@ -23,6 +23,7 @@ from railroads.ui.pixel.art.painter import (
 from railroads.ui.pixel.art.parts import (
     DOOR,
     METRE,
+    SCALE,
     SILL,
     _band,
     _bands,
@@ -251,17 +252,17 @@ def farm() -> Sprite:
     _strewn(p, -8.2, 3.6, 2.4, hay, 6)
     p.shadow(8, 3)
     _heap(p, -8, 3, 2, 3, hay)
-    top = p.box(-1, 0, 7, 6, barn, None)
+    top = p.box(-1, 0, 7, 4.5, barn, None)
     left, front, right, _ = top
-    _footing(p, top, 6)
-    _patch(p, left, front, (0, 1), (5.2, 6), shade(barn, 0.65))
-    _patch(p, left, front, (0.3, 0.72), (1.6, 6), shade(barn, 0.6))
+    _footing(p, top, 4.5)
+    _patch(p, left, front, (0, 1), (3.8, 4.5), shade(barn, 0.65))
+    _patch(p, left, front, (0.3, 0.72), (1, 4.5), shade(barn, 0.6))
     trim = (232, 226, 210)
-    door = [_on_wall(left, front, t, d) for t, d in ((0.3, 1.6), (0.72, 1.6), (0.72, 6), (0.3, 6))]
+    door = [_on_wall(left, front, t, d) for t, d in ((0.3, 1), (0.72, 1), (0.72, 4.5), (0.3, 4.5))]
     p.line([door[0], door[1], door[2], door[3], door[0]], trim)
     p.line([door[0], door[2]], trim)
     p.line([door[1], door[3]], trim)
-    _patch(p, front, right, (0.2, 0.4), (2, 3.4), shade(barn, 0.45))
+    _patch(p, front, right, (0.2, 0.4), (1.4, 2.6), shade(barn, 0.45))
     p.gable(top, 4, (112, 98, 84), barn)
     gx, gy = (front[0] + right[0]) / 2, (front[1] + right[1]) / 2 - 1.5
     p.rect(gx - 1, gy - 1, gx, gy, (60, 36, 28))
@@ -806,6 +807,10 @@ def tea_plantation() -> Sprite:
 # A pen farm's paddock: centred a touch below its cell's middle and as big as the cell lets its
 # fence stand.
 PEN = (0.0, 0.5, 27.0)
+# How big pen farms are drawn, as they fill their cell (railroads.ui.pixel.art.registry.PENS), and
+# how many painter units a metre takes in them, so they stand as big beside a house as they are.
+PEN_SCALE = 0.504
+PEN_METRE = METRE * SCALE / PEN_SCALE
 
 
 def _grazing(count: int, hall: tuple[float, float, float, float, float]) -> list[Point]:
@@ -852,7 +857,7 @@ def cattle_ranch() -> Sprite:
     round bales of hay stacked by its gable, milk churns by the door, and brown and
     black-and-white cows about the rack and the trough and out grazing, calves among them."""
     p = Painter(64, 42, (32, 24))
-    m = METRE / 0.72
+    m = PEN_METRE
     x, y, long, deep, high, rise = 8.4, -3.7, 28 * m, 12 * m, 4.5 * m, 3.6 * m
     rack, trough = (-5.0, 3.5), (7.0, 6.5)
     pen = _pen(p, m)
@@ -1033,7 +1038,7 @@ def pig_farm() -> Sprite:
     straw by its gable, and herds of pink pigs about the troughs, in the wallow and out on the
     grass, a sow among them with her piglets."""
     p = Painter(64, 42, (32, 24))
-    m = METRE / 0.72
+    m = PEN_METRE
     hx, hy, runs = 8.4, -3.7, 5
     troughs = ((-4.0, 4.0), (10.0, 6.5))
     wallow = (-10.0, 1.5)
@@ -1088,7 +1093,7 @@ def chicken_farm() -> Sprite:
     scratched soft and dusty round its feeders and drinkers, and flocks of white and brown hens
     pecking about them and out over the grass, roosters among them."""
     p = Painter(64, 42, (32, 24))
-    m = METRE / 0.72
+    m = PEN_METRE
     x, y, long, deep, high, rise = 8.4, -3.7, 22 * m, 7 * m, 2.2 * m, 1.8 * m
     feeders = ((-3.0, 1.5), (6.0, 5.0), (-10.0, 5.5))
     pen = _pen(p, m)

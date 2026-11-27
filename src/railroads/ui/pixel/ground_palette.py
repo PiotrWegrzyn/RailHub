@@ -12,6 +12,7 @@ from railroads.sim.goods import HOMES, MAKES, RECIPES
 from railroads.sim.trade import Satisfaction
 from railroads.ui.biomes import Biome
 from railroads.ui.pixel.art.parts import METRE as SPRITE_METRE
+from railroads.ui.pixel.art.parts import SCALE as SPRITE_SCALE
 from railroads.ui.pixel.projection import RGB
 from railroads.ui.pixel.relief import (
     SHADOW_TINT,
@@ -81,8 +82,8 @@ FIELD_STRIPES = 9
 
 
 # A metre in art pixels, as the sprites measure it by the house: railroads.ui.pixel.art.parts.METRE
-# painter units, each 0.7 art pixels in a sprite drawn at BUILDING_SCALE.
-ART_METRE = SPRITE_METRE * 0.7
+# painter units, each SPRITE_SCALE art pixels in a building's sprite.
+ART_METRE = SPRITE_METRE * SPRITE_SCALE
 
 
 # Groves of trees in rows over the ground of the cell: the ground, the trees, the colours of the
