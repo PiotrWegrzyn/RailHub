@@ -305,7 +305,7 @@ def test_a_logging_camp_stands_in_a_small_clearing_with_woods_round_it_in_its_ce
     r, c = grid.cell_at(*world.projection.to_plane(left + ix + 0.5, top + iy + 0.5))
     in_cell = (r == mill.cell[0]) & (c == mill.cell[1])
     wooded = (canvas[..., :3] < 1).any(axis=-1)
-    yard = canvas[int(y) - top + 4 : int(y) - top + 6, int(x) - left - 3 : int(x) - left + 4, :3]
+    yard = canvas[int(y) - top + 2 : int(y) - top + 4, int(x) - left - 3 : int(x) - left + 4, :3]
     assert (yard == 1).all()
     assert wooded[in_cell].mean() > 0.6
 

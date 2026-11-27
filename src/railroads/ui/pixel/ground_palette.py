@@ -132,7 +132,7 @@ GROVES: dict[BuildingKind, Grove] = {
         0.2,
         herd=2.6,
         gap=4.8,
-        flock=21.0,
+        flock=28.0,
         trodden=(156, 164, 100),
         shelter=3.0,
         roof=(206, 176, 92),
