@@ -40,3 +40,10 @@ Australia. Raised on 2026-11-26.
 Ships that carry goods between the player's ports (railroads.sim.ports) sail on the map along the
 water between them, instead of the goods only arriving each month: sailing ships first, then
 steamers, then motor ships and container ships as the eras change. Raised on 2026-11-26.
+
+## Companies and corporations
+
+For the future. Owning several works of one kind lets the player join them into a business: with
+three butchers bought, the player founds a company that raises what those three make. With ten
+of a kind, the company becomes a corporation, which can put up new works of that kind for a large
+sum. Raised on 2026-11-27.
