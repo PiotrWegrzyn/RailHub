@@ -52,7 +52,6 @@ from railroads.ui.pixel.art.crafts import (
 )
 from railroads.ui.pixel.art.facilities import FACILITIES
 from railroads.ui.pixel.art.farms import (
-    PEN_SCALE,
     bananas,
     beekeeper,
     cattle_ranch,
@@ -201,10 +200,6 @@ HOMES = ("house", "tenement", "flats")
 # Ports fill their cell to its edges and reach out of it over the water
 # (railroads.ui.pixel.art.ports), drawn to the cell at a scale of their own.
 PORT_SCALE = 0.7
-
-# Farms whose fenced paddock fills their whole cell, drawn to the cell and never shrunk to fit it,
-# at a scale of their own (railroads.ui.pixel.art.farms.PEN_SCALE).
-PENS = ("cattle_ranch", "pig_farm", "chicken_farm")
 
 SPRITES: dict[str, Callable[[], Sprite]] = {
     **{f"pine_{i}": (lambda c=c, i=i: pine(c, i)) for i, c in enumerate(PINES)},
@@ -395,8 +390,6 @@ def _base_scale(name: str) -> float:
             return tree_scale
     if name in PORTS or BuildingKind.__members__.get(name.upper()) in PORT_KINDS:
         return PORT_SCALE
-    if name in PENS:
-        return PEN_SCALE
     if name.startswith(HOMES) or name.upper() in BuildingKind.__members__:
         return SCALE
     return 1.0
@@ -420,7 +413,7 @@ def _scale_of(name: str) -> float:
     still if that would make a works wider than MOST_WIDTH lets it be."""
     scale = _base_scale(name)
     kind = BuildingKind.__members__.get(name.upper())
-    if kind is None or name in PENS or kind in PORT_KINDS:
+    if kind is None or kind in PORT_KINDS:
         return scale
     most = GROWN_MOST_WIDTH.get(name.partition("_")[0], MOST_WIDTH[BUILDING_RULES[kind].space])
     scale = min(scale, most / _width(_full_size(name)))
@@ -454,7 +447,7 @@ def draw_sheets(
     resolutions: tuple[int, ...], padding: int = 1
 ) -> dict[str, tuple[Image.Image, dict[str, list[int]]]]:
     """A sheet (draw_sheet) at each of `resolutions`. Every building is drawn at SCALE, but for
-    ports and pens, drawn to their cell, and works too wide for their cell (_scale_of). Each
+    ports, drawn to their cell, and works too wide for their cell (_scale_of). Each
     sprite is drawn once, MASTER_RESOLUTION times finer than an art pixel
     (fine_sprite), and every sheet holds it shrunk from that drawing (shrunk_from), so a sprite
     is the very same picture on every sheet, only smaller or bigger: lines a pixel wide where it

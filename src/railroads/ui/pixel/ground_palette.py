@@ -88,8 +88,9 @@ ART_METRE = SPRITE_METRE * SPRITE_SCALE
 
 # Groves of trees in rows over the ground of the cell: the ground, the trees, the colours of the
 # fruit some of them bear, how many rows a cell each way and how big each crown is. A herd is a
-# grove of animals instead, at their true size: each `herd` metres long with its head in the
-# colour of its fruit. They gather in groups, one to a square `flock` metres a side, on a patch
+# grove of animals instead, twice their true size as the farms draw them
+# (railroads.ui.pixel.art.parts.BEAST): each `herd` metres long with its head in the colour of
+# its fruit. They gather in groups, one to a square `flock` metres a side, on a patch
 # of `trodden` ground HERD_PATCH of that square across round a hay rack `shelter` metres long
 # with a roof of the `roof` colour, that marks from afar what grazes there. In the patch the
 # animals stand one to a square `gap` metres a side in HERD_SHARE of them, anywhere in its middle
@@ -129,8 +130,8 @@ GROVES: dict[BuildingKind, Grove] = {
         ((60, 56, 54),),
         4,
         0.2,
-        herd=1.3,
-        gap=2.4,
+        herd=2.6,
+        gap=4.8,
         flock=21.0,
         trodden=(156, 164, 100),
         shelter=3.0,

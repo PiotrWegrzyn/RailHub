@@ -33,6 +33,7 @@ from railroads.ui.pixel.art.painter import (
 )
 from railroads.ui.pixel.art.parts import (
     DOOR,
+    METRE,
     _heap,
     _on_wall,
     _patch,
@@ -186,37 +187,51 @@ def sawmill() -> Sprite:
 
 
 def logging_camp() -> Sprite:
-    """A log cabin with a stone chimney in a clearing of fresh stumps, one with an axe in it,
-    and the felled trunks stacked beside it waiting for the cart."""
-    p = Painter(28, 24, (13, 19))
-    _ruts(p, [(5, 3.2), (9, 4.4), (13, 5.4)])
-    _worn(p, -1.4, 2.6, 3.4)
-    p.blob(-11.4, -0.6, -1.4, 5, FOOTING)
-    p.blob(1.4, -1.6, 13.4, 3.6, FOOTING)
-    p.shadow(10, 3)
+    """A log cabin 6 m square with a stone chimney in a clearing of fresh stumps, one with an axe
+    in it, and the felled trunks stacked beside it waiting for the cart."""
+    p = Painter(24, 18, (11, 13))
+    m = METRE
+    _ruts(p, [(3.6, 2.6), (6.6, 3.4), (10, 4.2)])
+    _worn(p, -1, 2, 2.6)
+    p.blob(-9, -0.4, -1, 3.8, FOOTING)
+    _worn(p, 4.4, 4.2, 3.6)
+    p.shadow(5, 2, 1)
     cabin = shade(TRUNK, 1.18)
-    top = p.box(-6, 0, 5, 5, cabin, None)
+    high, rise = 2.6 * m, 2.2 * m
+    top = p.box(-5, 0, 4.5 * m, high, cabin, None)
     left, front, _, _ = top
-    _footing(p, top, 5)
-    _boards(p, top, cabin, (1, 2, 3, 4))
-    _window(p, left, front, (0.16, 0.38), 1.4)
-    _door(p, left, front, (0.56, 0.8), 1.6, 5)
+    _footing(p, top, high)
+    _boards(p, top, cabin, (high / 4, high / 2, high * 3 / 4))
+    _window(p, left, front, (0.16, 0.36), 0.7 * m)
+    _door(p, left, front, (0.56, 0.8), high - 1.9 * m, high)
     roof = (84, 70, 52)
-    p.gable(top, 3.4, roof, cabin)
-    _tiles(p, top, 3.4, roof)
-    _chimney(p, top, 3.4, 0.8, 2, (128, 124, 116))
+    p.gable(top, rise, roof, cabin)
+    _tiles(p, top, rise, roof)
+    _chimney(p, top, rise, 0.8, 1.4, (128, 124, 116))
     log, end = (128, 88, 52), (214, 176, 122)
-    for x, y in ((2, -1), (3, 1.2), (2.6, -3.2), (4.4, -1), (3.6, 3.4)):
-        p.rect(x, y - 2, x + 8, y, log)
-        p.line([(x + 0.5, y - 1), (x + 7, y - 1)], shade(log, 0.78))
-        p.ellipse(x + 7, y - 2.2, x + 9.2, y + 0.2, end)
-        p.point(x + 8, y - 1, shade(end, 0.7))
-    for x, y in ((-12, 3.4), (-2, 5.6), (11, -3.4), (-11, -2)):
-        p.rect(x - 1, y - 1.4, x + 1, y, shade(log, 0.9))
-        p.ellipse(x - 1.2, y - 2.2, x + 1.2, y - 0.8, end)
-        p.point(x, y - 1.5, shade(end, 0.72))
-    p.line([(-1.8, 3.6), (-0.6, 2.2)], (112, 84, 54))
-    p.rect(-2.6, 3.2, -1.4, 3.8, METAL)
+    long, thick = 6 * m, 0.9 * m
+    for row, count in enumerate((4, 3, 2)):
+        for k in range(count):
+            x = 1.4 + (k + row / 2) * thick
+            y = 2.2 + 0.5 * k - row * thick * 0.85
+            p.polygon(
+                [
+                    (x, y - thick),
+                    (x + long, y - thick + long / 2),
+                    (x + long, y + long / 2),
+                    (x, y),
+                ],
+                log,
+                shade(log, 0.7),
+            )
+            ex, ey = x + long, y + long / 2
+            p.ellipse(ex - thick / 2, ey - thick, ex + thick / 2, ey, end)
+            p.point(ex, ey - thick / 2, shade(end, 0.7))
+    for x, y in ((-9.6, 2.8), (-1.6, 4.4), (8.8, -2.4), (-8.6, -1.4)):
+        p.rect(x - 0.4, y - 0.6, x + 0.4, y, shade(log, 0.9))
+        p.ellipse(x - 0.5, y - 0.9, x + 0.5, y - 0.4, end)
+    p.line([(-1.4, 2.8), (-0.6, 1.9)], (112, 84, 54))
+    p.rect(-1.9, 2.5, -1.1, 2.9, METAL)
     return p.sprite()
 
 
