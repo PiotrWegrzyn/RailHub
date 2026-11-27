@@ -86,6 +86,12 @@ class Row:
     last_round: float | None = None
 
 
+def row_pitch() -> float:
+    """How far apart a row of the table and the next are: ROW_HEIGHT and the cell padding above
+    and below it. The clipper skips rows out of sight by it, so the table scrolls to its last."""
+    return ROW_HEIGHT + 2 * imgui.get_style().cell_padding.y
+
+
 def carried(train: Train) -> tuple[tuple[Good, float], ...]:
     """What the train carries now, each good once with its load over all its cars, the most
     first."""
@@ -232,9 +238,8 @@ class TrainTable:
         )
         outer = (0.0, 0.0)
         if rows_shown:
-            padding = 2 * imgui.get_style().cell_padding.y
-            header = imgui.get_text_line_height() + padding
-            outer = (0.0, header + min(max(len(rows), 1), rows_shown) * (ROW_HEIGHT + padding))
+            header = imgui.get_text_line_height() + 2 * imgui.get_style().cell_padding.y
+            outer = (0.0, header + min(max(len(rows), 1), rows_shown) * row_pitch())
         if not imgui.begin_table("trains", len(COLUMNS), flags, outer):
             return None, False
         imgui.table_setup_scroll_freeze(0, 1)
@@ -261,7 +266,7 @@ class TrainTable:
         shown = sort_rows(kept, self.sorted_by, self.descending)
         self.shown = [row.train.name for row in shown]
         clipper = imgui.ListClipper()
-        clipper.begin(len(shown), ROW_HEIGHT)
+        clipper.begin(len(shown), row_pitch())
         while clipper.step():
             for row in shown[clipper.display_start : clipper.display_end]:
                 if self._draw_row(row, row.train.name == chosen, picture, picking):

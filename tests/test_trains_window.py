@@ -13,6 +13,7 @@ from railroads.sim.trade import SCARCE_WORTH
 from railroads.sim.trains import ENGINES, EXPRESS_FARE, OPENED_BY, Car, Stop, Train
 from railroads.ui import buy_train
 from railroads.ui.station_offers import Offer
+from railroads.ui.train_table import Row, TrainTable, row_pitch
 from railroads.ui.train_texts import (
     carried_in,
     ride_rows,
@@ -544,3 +545,28 @@ def test_a_general_food_car_is_wanted_only_where_the_next_stop_wants_every_food_
     shown = general_wanted(General.FOOD, lambda good: waiting.get(good, 0.0), demand)
 
     assert shown == wanted
+
+
+def test_a_long_table_scrolls_far_enough_to_show_its_last_train(
+    gui: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rows = [Row(Train(f"Train {number:02}"), f"Train {number:02}") for number in range(60)]
+    table = TrainTable()
+    reach: list[float] = []
+    draw_row = TrainTable._draw_row
+
+    def measured(self: TrainTable, *args: object) -> bool:
+        reach.append(imgui.get_scroll_max_y() + imgui.get_window_height())
+        return draw_row(self, *args)
+
+    monkeypatch.setattr(TrainTable, "_draw_row", measured)
+
+    for _ in range(3):
+        imgui.new_frame()
+        imgui.set_next_window_size((900.0, 400.0))
+        imgui.begin("table")
+        table.draw(rows, None, picture)
+        imgui.end()
+        imgui.end_frame()
+
+    assert reach[-1] >= len(rows) * row_pitch()
