@@ -22,15 +22,19 @@ from railroads.ui.pixel.art.painter import (
 )
 from railroads.ui.pixel.art.parts import (
     DOOR,
+    METRE,
     SILL,
     _band,
     _bands,
     _cow,
     _fence,
     _heap,
+    _hen,
+    _legs,
     _on_wall,
     _paddock,
     _patch,
+    _pig,
     _ridge,
     _tiles,
     _turned,
@@ -178,16 +182,33 @@ def _basket(p: Painter, x: float, y: float, load: RGB) -> None:
     p.point(x - 1, y - 3.5, shade(load, 1.3))
 
 
-def _sheep(p: Painter, x: float, y: float, facing: int = 1) -> None:
-    face = (50, 46, 44)
-    p.blob(x - 1.6, y + 0.4, x + 2.6, y + 1.8, (70, 98, 44))
-    p.point(x - 1, y + 0.5, face)
-    p.point(x + 1, y + 0.5, face)
-    p.blob(x - 2, y - 1, x + 2, y + 1, WOOL)
-    p.blob(x - 1.5, y - 1.2, x + 0.5, y, shade(WOOL, 1.06))
-    head = x + 2 if facing > 0 else x - 3
-    p.point(head, y - 1, face)
-    p.point(head, y, face)
+def _sheep(p: Painter, x: float, y: float, facing: int = 1, metre: float = METRE) -> None:
+    """A sheep grazing at (x, y), 1.3 m long: a thick fleece, a dark face and dark legs."""
+    m, f = metre, facing
+    face: RGB = (54, 48, 46)
+    half, high, belly = 0.6 * m, 0.85 * m, 0.35 * m
+    p.blob(x - 1.2 * half, y - 0.18 * m, x + 1.2 * half, y + 0.22 * m, (70, 98, 44))
+    _legs(p, x, y, half * 0.85, belly, m, face)
+    p.blob(x - half, y - high, x + half, y - belly + 0.08 * m, WOOL)
+    p.blob(
+        x - 0.8 * half, y - high + 0.02 * m, x + 0.4 * half, y - high + 0.3 * m, shade(WOOL, 1.06)
+    )
+    p.blob(
+        x - 0.85 * half,
+        y - belly - 0.2 * m,
+        x + 0.85 * half,
+        y - belly + 0.08 * m,
+        shade(WOOL, 0.85),
+    )
+    hx = x + f * (half + 0.08 * m)
+    p.blob(hx - 0.18 * m, y - high + 0.22 * m, hx + 0.18 * m, y - belly + 0.05 * m, face)
+    p.blob(
+        hx - f * 0.12 * m - 0.08 * m,
+        y - high + 0.24 * m,
+        hx - f * 0.12 * m + 0.08 * m,
+        y - high + 0.34 * m,
+        face,
+    )
 
 
 def _arc(p: Painter, x: float, y: float, half: float, colour: RGB) -> None:
@@ -790,33 +811,25 @@ def cattle_ranch() -> Sprite:
     p.gable(top, 4, (86, 74, 70), wood)
     _tiles(p, top, 4, (86, 74, 70))
     _heap(p, -12.5, 3.5, 2.6, 3.5, (220, 186, 96))
+    m = METRE / 0.72
     left, back, right, front = _paddock(6, 2, 9)
-    _fence(p, left, back)
-    _fence(p, back, right)
-    p.hall(10.5, 0, 4, 1.4, 1.2, (122, 90, 60), WATER)
-    _cow(p, 6, 0, (138, 84, 50), (96, 58, 36))
-    _cow(p, 10, 4, (240, 238, 232), (40, 38, 42))
-    _cow(p, 3, 4, (40, 38, 42), (240, 238, 232))
-    _fence(p, left, front)
-    _fence(p, front, right)
+    _fence(p, left, back, m)
+    _fence(p, back, right, m)
+    p.hall(10.5, 0.5, 3 * m, 0.7 * m, 0.6 * m, (122, 90, 60), WATER)
+    brown, black, white = (138, 84, 50), (40, 38, 42), (240, 238, 232)
+    for x, y, hide, patch, facing in (
+        (4, -0.5, brown, shade(brown, 0.7), 1),
+        (8.5, -0.2, white, black, -1),
+        (1.5, 2, black, white, 1),
+        (6, 2.2, white, black, -1),
+        (10, 2.6, brown, white, -1),
+        (3.5, 4.4, white, black, 1),
+        (8, 5, black, white, -1),
+    ):
+        _cow(p, x, y, hide, patch, m, facing)
+    _fence(p, left, front, m)
+    _fence(p, front, right, m)
     return p.sprite()
-
-
-def _pig(p: Painter, x: float, y: float) -> None:
-    skin: RGB = (232, 166, 160)
-    p.line([(x - 2, y - 1), (x - 2, y)], shade(skin, 0.6))
-    p.line([(x + 1, y - 1), (x + 1, y)], shade(skin, 0.6))
-    p.ellipse(x - 3, y - 3.5, x + 2.5, y - 0.5, skin)
-    p.rect(x - 4.5, y - 3, x - 3, y - 1.5, shade(skin, 0.9))
-    p.point(x - 4.5, y - 2, shade(skin, 0.6))
-    p.point(x + 2.5, y - 3, shade(skin, 0.75))
-
-
-def _hen(p: Painter, x: float, y: float, feathers: RGB) -> None:
-    p.ellipse(x - 1.5, y - 2, x + 1, y, feathers)
-    p.point(x - 1.5, y - 2.5, feathers)
-    p.point(x - 2, y - 2, (222, 160, 60))
-    p.point(x - 1.5, y - 3, (200, 50, 44))
 
 
 def pig_farm() -> Sprite:
@@ -839,15 +852,25 @@ def pig_farm() -> Sprite:
     p.gable(top, 3, (150, 80, 60), wood)
     _tiles(p, top, 3, (150, 80, 60))
     _heap(p, -12.5, 3.5, 2.4, 3, (220, 186, 96))
+    m = METRE / 0.72
     left, back, right, front = _paddock(6, 2, 9)
-    _fence(p, left, back)
-    _fence(p, back, right)
-    p.hall(9, 0.2, 4, 1.4, 1.2, (122, 90, 60), (150, 120, 70))
-    _pig(p, 4, 1)
-    _pig(p, 9, 4)
-    _pig(p, 2, 4.5)
-    _fence(p, left, front)
-    _fence(p, front, right)
+    _fence(p, left, back, m)
+    _fence(p, back, right, m)
+    p.hall(9, 0.5, 3 * m, 0.6 * m, 0.5 * m, (122, 90, 60), (150, 120, 70))
+    for x, y, facing in (
+        (3, 0, 1),
+        (6, 0.8, -1),
+        (8.2, 1.6, 1),
+        (2, 2.6, -1),
+        (5, 3, 1),
+        (9.5, 3.2, -1),
+        (3.6, 4.6, 1),
+        (7, 4.6, -1),
+        (11, 2.2, 1),
+    ):
+        _pig(p, x, y, m, facing)
+    _fence(p, left, front, m)
+    _fence(p, front, right, m)
     return p.sprite()
 
 
@@ -859,7 +882,11 @@ def chicken_farm() -> Sprite:
     p.blob(-2, -0.4, 13, 5.6, WORN)
     p.blob(0, 0.6, 12, 4.8, shade(EARTH, 0.95))
     _track(p, [(-10.2, 1.2), (-6.6, 3), (-2, 3.4)])
-    _strewn(p, 6, 2.5, 4, (226, 196, 110), 9)
+    for k, (u, v) in enumerate(_SCATTER):
+        gx, gy = 6 + u * 4, 2.5 + v * 2
+        p.blob(
+            gx - 0.12, gy - 0.06, gx + 0.12, gy + 0.06, shade((226, 196, 110), 0.85 if k % 2 else 1)
+        )
     p.shadow(10, 3)
     top = p.box(-7, -1, 5, 4, WHITEWASH, None)
     left, front, right, _ = top
@@ -870,19 +897,31 @@ def chicken_farm() -> Sprite:
     _patch(p, front, right, (0.2, 0.8), (2.6, 3.4), (150, 110, 70))
     p.gable(top, 3, (150, 70, 52), WHITEWASH)
     _tiles(p, top, 3, (150, 70, 52))
+    m = METRE / 0.72
     left, back, right, front = _paddock(6, 2, 8)
-    _fence(p, left, back)
-    _fence(p, back, right)
-    for x, y, feathers in (
-        (3, 1, (244, 240, 230)),
-        (7, 3, (176, 108, 60)),
-        (9, 0.5, (244, 240, 230)),
-        (5, 4.5, (244, 240, 230)),
-        (10, 3.6, (120, 70, 40)),
-    ):
-        _hen(p, x, y, feathers)
-    _fence(p, left, front)
-    _fence(p, front, right)
+    _fence(p, left, back, m)
+    _fence(p, back, right, m)
+    white, brown, dark = (244, 240, 230), (176, 108, 60), (120, 70, 40)
+    hens = (
+        (2.5, 1, white),
+        (4, 0, brown),
+        (5.5, 1.4, white),
+        (7, -0.2, white),
+        (8.5, 1, dark),
+        (3, 2.6, brown),
+        (4.8, 3.2, white),
+        (6.5, 2.4, white),
+        (8, 3.4, brown),
+        (10, 2.2, white),
+        (5.5, 4.6, white),
+        (7.5, 4.8, brown),
+        (9.5, 3.8, white),
+        (3.8, 4.2, dark),
+    )
+    for k, (x, y, feathers) in enumerate(hens):
+        _hen(p, x, y, feathers, m, 1 if k % 3 else -1)
+    _fence(p, left, front, m)
+    _fence(p, front, right, m)
     return p.sprite()
 
 

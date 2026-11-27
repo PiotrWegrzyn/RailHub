@@ -25,7 +25,7 @@ from railroads.ui.pixel.art.painter import (
     Top,
     shade,
 )
-from railroads.ui.pixel.art.parts import _cow, _fence, _on_wall, _paddock, _patch, _plinth
+from railroads.ui.pixel.art.parts import METRE, _cow, _fence, _on_wall, _paddock, _patch, _plinth
 
 CRUST: RGB = (236, 180, 96)
 BAKERY_ROOF: RGB = (172, 66, 46)
@@ -197,15 +197,17 @@ def _churns(p: Painter, x: float, y: float, count: int) -> None:
 
 
 def _cow_yard(p: Painter, x: float, y: float, half: float, cows: tuple[Point, ...]) -> None:
-    """A fenced yard of trodden grass centred at (x, y) with black-and-white cows in it."""
+    """A fenced yard of trodden grass centred at (x, y) with a herd of black-and-white cows in it,
+    two by each of `cows`, at their true size."""
     left, back, right, near = _paddock(x, y, half)
     p.polygon([left, back, right, near], (118, 150, 70))
-    _fence(p, left, back)
-    _fence(p, back, right)
+    _fence(p, left, back, METRE)
+    _fence(p, back, right, METRE)
     for cx, cy in cows:
-        _cow(p, cx, cy, HIDE, PATCH)
-    _fence(p, left, near)
-    _fence(p, near, right)
+        _cow(p, cx, cy, HIDE, PATCH, METRE, 1)
+        _cow(p, cx + 1.6, cy + 1.1, HIDE, PATCH, METRE, -1)
+    _fence(p, left, near, METRE)
+    _fence(p, near, right, METRE)
 
 
 def _dairy_trim(p: Painter, top: Top, height: float) -> None:

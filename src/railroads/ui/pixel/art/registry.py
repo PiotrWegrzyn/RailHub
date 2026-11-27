@@ -185,6 +185,10 @@ __all__ = [
 
 BUILDING_SCALE = 0.7
 
+# How big the trees standing alone on meadows are drawn: their crowns as big as those of the
+# woods (railroads.ui.pixel.ground_palette.CROWN_SIZE), so a lone tree is one of them.
+TREE_SCALES = {"pine_": 0.66, "leafy_": 0.55}
+
 HOMES = ("house", "tenement", "flats")
 
 HOME_SCALE = 0.413
@@ -375,10 +379,10 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "salt_works": salt_works,
     "fishery": fishery,
     "sheep_farm": pasture,
-    "cotton_field": lambda: plantation((196, 176, 136), (130, 92, 62)),
-    "vineyard": lambda: plantation((220, 204, 170), (160, 84, 56)),
-    "coffee_plantation": lambda: plantation((186, 150, 108), (96, 66, 44)),
-    "rubber_plantation": lambda: plantation((150, 136, 104), (72, 92, 62)),
+    "cotton_field": lambda: plantation((240, 236, 226), (176, 168, 150)),
+    "vineyard": lambda: plantation((220, 204, 170), (118, 40, 66)),
+    "coffee_plantation": lambda: plantation((170, 118, 76), (78, 50, 34)),
+    "rubber_plantation": lambda: plantation((150, 136, 104), (40, 44, 40)),
     "textile_mill": textile_mill,
     "furniture_maker": furniture_maker,
     "tool_works": tool_works,
@@ -535,6 +539,9 @@ def _base_scale(name: str) -> float:
         return _base_scale(base)
     if name.startswith(HOMES):
         return HOME_SCALE
+    for prefix, tree_scale in TREE_SCALES.items():
+        if name.startswith(prefix):
+            return tree_scale
     if name in FARMSTEADS:
         return FARMSTEAD_SCALE
     return BUILDING_SCALE if name.startswith(BUILDINGS) else 1.0

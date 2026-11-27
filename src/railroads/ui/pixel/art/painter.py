@@ -16,9 +16,9 @@ SHADOW = (0, 0, 0, 72)
 TRUNK: RGB = (88, 60, 38)
 
 PINES: list[tuple[RGB, RGB, RGB]] = [
-    ((25, 49, 33), (38, 71, 45), (59, 95, 60)),
-    ((28, 54, 30), (43, 77, 41), (67, 104, 58)),
-    ((24, 46, 38), (35, 66, 53), (55, 91, 73)),
+    ((34, 58, 38), (52, 84, 54), (76, 110, 70)),
+    ((36, 62, 36), (56, 88, 50), (82, 116, 66)),
+    ((32, 56, 44), (48, 80, 62), (70, 104, 82)),
 ]
 
 LEAVES: list[tuple[RGB, RGB, RGB]] = [
@@ -29,13 +29,17 @@ LEAVES: list[tuple[RGB, RGB, RGB]] = [
 
 WALLS: list[RGB] = [(226, 214, 190), (210, 176, 146), (232, 228, 218)]
 
-ROOFS: list[RGB] = [(176, 70, 52), (106, 102, 112), (150, 92, 56), (72, 94, 132)]
+# Each tier of homes has roofs of its own colour, so a glance tells them apart: houses blue,
+# tenements red, blocks of flats green.
+ROOFS: list[RGB] = [(52, 98, 172), (38, 78, 146), (72, 122, 190), (44, 90, 156)]
 
 TENEMENT_WALLS: list[RGB] = [(232, 196, 120), (220, 160, 150), (170, 204, 176), (214, 210, 196)]
 
-TENEMENT_ROOFS: list[RGB] = [(164, 74, 50), (130, 70, 56)]
+TENEMENT_ROOFS: list[RGB] = [(196, 76, 46), (170, 58, 40)]
 
 FLAT_WALLS: list[RGB] = [(196, 190, 178), (214, 200, 160), (176, 184, 190)]
+
+FLAT_ROOF: RGB = (58, 140, 104)
 
 WINDOW: RGB = (58, 70, 92)
 

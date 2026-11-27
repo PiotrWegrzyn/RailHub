@@ -2,6 +2,7 @@
 
 from railroads.ui.pixel.art.painter import (
     BRICK,
+    FLAT_ROOF,
     GLASS,
     METAL,
     RGB,
@@ -165,7 +166,7 @@ def flats(wall: RGB) -> Sprite:
     p.shadow(8, 3, reach=5)
     s, floors = 7, 5
     height = 3 * floors + 1
-    top = p.box(0, 0, s, height, wall, shade(wall, 0.62))
+    top = p.box(0, 0, s, height, wall, FLAT_ROOF)
     left, front, right, _ = top
     for floor in range(floors):
         drop = 1 + 3 * floor
@@ -188,8 +189,8 @@ def flats(wall: RGB) -> Sprite:
         [_on_wall(left, front, 0.38, height - 2.8), _on_wall(left, front, 0.64, height - 2.8)],
         shade(wall, 0.55),
     )
-    p.line([left, front, right], shade(wall, 1.15))
-    p.rect(-1, -height - 3, 1, -height - 1, shade(wall, 0.7))
+    p.line([left, front, right], shade(FLAT_ROOF, 1.25))
+    p.rect(-1, -height - 3, 1, -height - 1, shade(FLAT_ROOF, 0.75))
     p.point(0, -height - 2, shade(METAL, 0.8))
     return p.sprite()
 

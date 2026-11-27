@@ -143,12 +143,12 @@ def carpet_weaver() -> Sprite:
 
 
 def clock_maker() -> Sprite:
-    """A townhouse shop with a dark green sign and a clock face showing in its window, under a
-    little clock turret with a big white face."""
-    p = _luxury_shop((40, 90, 60), (232, 190, 70))
-    turret = (40, 90, 60)
-    p.rect(-2.5, -15, 2.5, -9, turret)
-    p.polygon([(-3.2, -15), (0, -19), (3.2, -15)], SLATE, shade(SLATE, 0.6))
+    """A townhouse shop with a brass sign and a clock face showing in its window, under a little
+    brass clock turret with a big white face and a gilt spire, the colours of its clocks."""
+    brass = (190, 150, 68)
+    p = _luxury_shop(brass, (232, 190, 70))
+    p.rect(-2.5, -15, 2.5, -9, brass)
+    p.polygon([(-3.2, -15), (0, -19), (3.2, -15)], (214, 176, 80), shade(brass, 0.6))
     p.ellipse(-2, -14.4, 2, -10.4, (246, 244, 236))
     p.line([(0, -12.4), (0, -14)], (30, 30, 34))
     p.line([(0, -12.4), (1.2, -12.4)], (30, 30, 34))
@@ -289,11 +289,11 @@ def tofu_maker() -> Sprite:
 
 
 def miso_maker() -> Sprite:
-    """A plastered storehouse on a dark skirt where miso ripens, its tubs of it weighted down
-    with stones outside and a sack of rice by the door."""
+    """A storehouse washed the warm brown of miso, on a dark skirt, where it ripens, its tubs of it
+    weighted down with stones outside and a sack of rice by the door."""
     p = Painter(26, 24, (12, 18))
     p.shadow(10, 2.5)
-    _shop(p, -1, 0, PLASTER, BLACK_TILE, (150, 104, 62))
+    _shop(p, -1, 0, (196, 146, 92), BLACK_TILE, (150, 104, 62))
     for x, y in ((-9, 3), (-5.5, 4.5)):
         _vat(p, x, y, 2, 2.5)
         p.blob(x - 1.2, y - 4, x + 1.2, y - 2.4, (150, 150, 146))

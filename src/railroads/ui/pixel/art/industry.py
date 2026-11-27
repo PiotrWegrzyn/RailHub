@@ -27,6 +27,7 @@ from railroads.ui.pixel.art.painter import (
 )
 from railroads.ui.pixel.art.parts import (
     DOOR,
+    METRE,
     SILL,
     _band,
     _bands,
@@ -956,19 +957,20 @@ def machine_works() -> Sprite:
     for dx, dy in ((0, 0), (5.6, -2.8)):
         p.line([(10.4 + dx, 6.9 + dy), (13 + dx, 8.2 + dy)], (96, 92, 90))
     _oil(p, 14, 5.4, 1.2)
-    top = p.hall(-2, -2, 16, 9, 10, BRICK, None)
+    steel = (104, 118, 136)
+    top = p.hall(-2, -2, 16, 9, 10, steel, None)
     left, front, right, _ = top
-    lintel = shade(BRICK, 1.3)
-    _plinth(p, top, 10, BRICK)
-    _stains(p, left, front, 10, (0.04, 0.21, 0.39, 0.57, 0.73), shade(BRICK, 0.62), 2)
-    _stains(p, front, right, 10, (0.2, 0.8), shade(BRICK, 0.5), 2)
-    _bands(p, left, front, right, 1, lintel, shade(BRICK, 1.05))
+    lintel = shade(steel, 1.3)
+    _plinth(p, top, 10, steel)
+    _stains(p, left, front, 10, (0.04, 0.21, 0.39, 0.57, 0.73), shade(steel, 0.62), 2)
+    _stains(p, front, right, 10, (0.2, 0.8), shade(steel, 0.5), 2)
+    _bands(p, left, front, right, 1, lintel, shade(steel, 1.05))
     _windows(p, left, front, (0.12, 0.3, 0.48, 0.66), (2.5,), 5, arch=lintel)
-    _windows(p, left, front, (0.12, 0.3, 0.48, 0.66), (8,), 1, shade(BRICK, 1.15))
+    _windows(p, left, front, (0.12, 0.3, 0.48, 0.66), (8,), 1, shade(steel, 1.15))
     p.line([_on_wall(left, front, 0.76, 1.4), _on_wall(left, front, 0.76, 9.6)], (74, 64, 62))
     _door(p, left, front, (0.8, 0.94), 5, 10, (58, 48, 44), lintel)
     p.line([_on_wall(left, front, 0.87, 5), _on_wall(left, front, 0.87, 10)], (44, 36, 34))
-    p.gable(top, 5, (82, 84, 96), BRICK)
+    p.gable(top, 5, (82, 84, 96), steel)
     _skylight(p, top, 5, (0.08, 0.92))
     _gear(p, *_on_wall(front, right, 0.5, 5), 2.5, (222, 180, 74))
     _lengths(p, -14, 3, (96, 100, 112))
@@ -1518,7 +1520,7 @@ def paper_mill() -> Sprite:
     p.shadow(11, 4)
     _track(p, foot[1], foot[2], (0.4, 0.65), 4)
     _smoking_chimney(p, 8, -4, -30)
-    wall, roof = (192, 168, 136), (100, 86, 80)
+    wall, roof = (236, 232, 220), (120, 124, 130)
     top = p.hall(-1, -3, 12, 8, 9, wall, None)
     left, front, right, _ = top
     _plinth(p, top, 9, wall)
@@ -1747,11 +1749,12 @@ def meat_factory() -> Sprite:
             shade(TIMBER, 0.75),
         )
     pen_left, pen_back, pen_right, pen_front = _paddock(-10, 3, 5)
-    _fence(p, pen_left, pen_back)
-    _fence(p, pen_back, pen_right)
-    _cow(p, -8, 4, (138, 84, 50), (96, 58, 36))
-    _fence(p, pen_left, pen_front)
-    _fence(p, pen_front, pen_right)
+    _fence(p, pen_left, pen_back, METRE)
+    _fence(p, pen_back, pen_right, METRE)
+    for cx, cy, facing in ((-11, 2, 1), (-8, 4, -1), (-10.5, 4.6, 1)):
+        _cow(p, cx, cy, (138, 84, 50), (96, 58, 36), METRE, facing)
+    _fence(p, pen_left, pen_front, METRE)
+    _fence(p, pen_front, pen_right, METRE)
     cold = (234, 236, 238)
     store = p.box(11, 3, 5, 6, cold, shade(cold, 0.88))
     _plinth(p, store, 6, cold, 0.6)
@@ -2052,55 +2055,69 @@ def mega_factory() -> Sprite:
     return p.sprite()
 
 
+OIL_YELLOW: RGB = (232, 184, 40)
+TANK_WHITE: RGB = (226, 226, 222)
+
+
+def _storage_tank(p: Painter, x: float, y: float, r: float, h: float) -> None:
+    """A big round oil storage tank on the ground at (x, y), `r` across and `h` tall: a low earth
+    bund round it, white steel walls with a yellow band, a shallow domed roof, and a stair
+    climbing its lit side."""
+    p.blob(x - r - 1.6, y - r / 2 - 0.8, x + r + 1.6, y + r / 2 + 0.8, (150, 136, 108))
+    p.blob(x - r - 0.8, y - r / 2 - 0.4, x + r + 0.8, y + r / 2 + 0.4, (176, 168, 150))
+    profile = [(0, r), (h, r), (h + 0.5, r * 0.9), (h + 0.9, r * 0.62), (h + 1.1, r * 0.2)]
+    _turned(p, x, y, profile, TANK_WHITE)
+    for drop in (h * 0.6, h * 0.6 + 0.8):
+        _ring(p, x, y - drop, r, OIL_YELLOW)
+    _ring(p, x, y - h, r, shade(TANK_WHITE, 0.62))
+    stair = shade(TANK_WHITE, 0.45)
+    p.line([(x - r + 0.3, y - 0.2), (x - r * 0.55, y + r * 0.18 - h)], stair)
+    p.line([(x - r + 0.9, y + 0.2), (x - r * 0.55 + 0.6, y + r * 0.22 - h)], stair)
+
+
 def refinery() -> Sprite:
-    """An oil refinery filling its cell: tall silver distillation columns ringed with walkways and
-    climbed by ladders, squat white storage tanks with stairs up their sides, pipe racks with red
-    valves and a flare burning on a tall red-and-white stack."""
-    p = Painter(50, 58, (24, 46))
+    """An oil refinery filling its cell, after the great refineries of the oil age: two tall brick
+    chimneys smoking at the back, tall silver distillation columns ringed with yellow walkways, a
+    pipe rack carrying yellow pipes, a flare burning on a red-and-white stack, and at the front
+    big round white storage tanks banded in oil yellow, each in its earth bund with a stair up
+    its side."""
+    p = Painter(50, 64, (24, 52))
     plate = (168, 164, 156)
     _plate(p, plate)
-    p.polygon(
-        [_iso(0, 0, u, v) for u, v in ((-10.2, -10.2), (9.8, -10.2), (9.8, -3.6), (-10.2, -3.6))],
-        shade(plate, 0.92),
-        shade(plate, 0.6),
-    )
-    for u, v in ((-7, 2), (-2, 2), (3, 3)):
-        x, y = _iso(0, 0, u, v)
-        p.blob(x - 4, y - 1.6, x + 4, y + 2, shade(plate, 0.74))
-    for u, v in ((-4.5, -6.5), (2.5, -8.5), (5, 0.5)):
-        _oil(p, *_iso(0, 0, u, v), 1.2)
-    metal, white = (176, 178, 184), (224, 226, 228)
-    fx, fy = _iso(0, 0, 9, 9)
+    for x, y in ((-3, -6), (9, -3), (-12, 1)):
+        _oil(p, x, y, 1.2)
+    for x, y in ((-13, -3.5), (-9.5, -5.5)):
+        _smoking_chimney(p, x, y, y - 34, shade(BRICK, 0.95), smoke=(150, 148, 150))
+    fx, fy = 12, -4
     p.line([(fx, fy), (fx, fy - 36)], (90, 90, 96))
     p.line([(fx + 1, fy), (fx + 1, fy - 36)], (124, 124, 130))
     for y in (-34, -30, -26):
         p.line([(fx, fy + y), (fx + 1, fy + y)], (206, 60, 50))
     p.blob(fx - 2, fy - 43, fx + 3, fy - 36, (246, 150, 40))
     p.blob(fx - 0.5, fy - 40, fx + 1.5, fy - 37, (255, 220, 120))
-    for u, v in ((-9, 8), (-3, 9)):
-        x, y = _iso(0, 0, u, v)
-        _turned(p, x, y, [(0, 4.5), (4, 4.5)], white, cap=shade(white, 1.08))
-        p.line([(x - 4, y - 0.5), (x - 1, y - 4.5)], shade(white, 0.65))
-    for u, v, r, h in ((-7, 2, 2, 18), (-2, 2, 2.5, 30), (3, 3, 3, 24)):
-        x, y = _iso(0, 0, u, v)
+    metal = (176, 178, 184)
+    for x, y, r, h in ((1, -5, 2, 22), (5.5, -3.5, 2.5, 30), (-3, -2.5, 2, 18)):
         _turned(p, x, y, [(0, r), (h, r), (h + 1.5, r * 0.6)], metal)
         for ring in range(6, h, 6):
-            p.line([(x - r - 1, y - ring), (x + r + 1, y - ring)], shade(metal, 0.6))
+            p.line([(x - r - 1, y - ring), (x + r + 1, y - ring)], OIL_YELLOW)
+            p.line(
+                [(x - r - 1, y - ring + 0.5), (x + r + 1, y - ring + 0.5)], shade(OIL_YELLOW, 0.6)
+            )
         p.line([(x + r - 0.5, y - 1), (x + r - 0.5, y - h)], shade(metal, 0.62))
     rack = (96, 96, 104)
-    for u in (-9, -3, 3, 9):
-        x, y = _iso(0, 0, u, -2)
-        p.line([(x, y), (x, y - 6)], rack)
-    for h, colour in ((6, rack), (4.5, (150, 120, 60))):
-        a, b = _iso(0, 0, -9, -2), _iso(0, 0, 9, -2)
-        p.line([(a[0], a[1] - h), (b[0], b[1] - h)], colour)
-    for u in (-6, 0, 6):
-        x, y = _iso(0, 0, u, -2)
-        p.point(x, y - 5.5, (206, 60, 50))
-    for u, v in ((-8, -6), (-1, -7.5), (6, -7)):
-        x, y = _iso(0, 0, u, v)
-        _turned(p, x, y, [(0, 3.5), (3.5, 3.5)], white, cap=shade(white, 1.08))
-        p.line([(x - 3, y - 0.5), (x - 0.5, y - 3.5)], shade(white, 0.65))
+    for x in (-15, -8, -1, 6, 13):
+        p.line([(x, 0), (x, -6)], rack)
+    for h, colour in (
+        (6, rack),
+        (5, OIL_YELLOW),
+        (4, shade(OIL_YELLOW, 0.75)),
+        (3, (120, 120, 128)),
+    ):
+        p.line([(-15, -h), (13, -h)], colour)
+    for x in (-11, -4, 3, 10):
+        p.point(x, -5.5, (206, 60, 50))
+    for x, y, r, h in ((12.5, 1.5, 3.5, 3.5), (-8.5, 3.5, 5, 4.5), (3, 5.5, 5, 4.5)):
+        _storage_tank(p, x, y, r, h)
     return p.sprite()
 
 

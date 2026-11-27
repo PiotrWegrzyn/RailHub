@@ -47,6 +47,7 @@ from railroads.ui.pixel.art.painter import (
     shade,
 )
 from railroads.ui.pixel.art.parts import (
+    METRE,
     _band,
     _bands,
     _barrel,
@@ -942,12 +943,13 @@ def _pen(p: Painter, x: float, y: float, half: float, cows: tuple[Point, ...]) -
     p.polygon(list(corners), MUD)
     for dx, dy in ((-2, 0), (2, 2), (0, -1.4), (-half * 0.6, 1)):
         p.point(x + dx, y + dy, shade(MUD, 0.75))
-    _fence(p, pen_left, pen_back)
-    _fence(p, pen_back, pen_right)
+    _fence(p, pen_left, pen_back, METRE)
+    _fence(p, pen_back, pen_right, METRE)
     for cx, cy in cows:
-        _cow(p, cx, cy, *STEER)
-    _fence(p, pen_left, pen_front)
-    _fence(p, pen_front, pen_right)
+        _cow(p, cx, cy, *STEER, METRE, 1)
+        _cow(p, cx + 1.6, cy + 1.1, *STEER, METRE, -1)
+    _fence(p, pen_left, pen_front, METRE)
+    _fence(p, pen_front, pen_right, METRE)
 
 
 def _cold_store(p: Painter, x: float, y: float, length: float, depth: float, height: float) -> Top:

@@ -258,13 +258,151 @@ def _portal(
     )
 
 
-def _cow(p: Painter, x: float, y: float, hide: RGB, patch: RGB) -> None:
-    p.line([(x - 2, y - 1), (x - 2, y)], shade(hide, 0.5))
-    p.line([(x + 2, y - 1), (x + 2, y)], shade(hide, 0.5))
-    p.ellipse(x - 3, y - 4, x + 3, y - 1, hide)
-    p.point(x + 1, y - 3, patch)
-    p.rect(x - 5, y - 5, x - 3, y - 3, hide)
-    p.point(x - 5, y - 6, (232, 222, 196))
+# How many painter units a metre takes in a sprite drawn at BUILDING_SCALE, measured by the
+# house: its 8 m wall is 6 units drawn at HOME_SCALE (railroads.ui.pixel.art.registry).
+METRE = 6 * 0.413 / 8 / 0.7
+
+
+def _bar(p: Painter, a: Point, b: Point, wide: float, colour: RGB) -> None:
+    """A straight bar `wide` units thick from `a` to `b`, thinner than Painter.line can draw."""
+    (ax, ay), (bx, by) = a, b
+    length = math.hypot(bx - ax, by - ay) or 1.0
+    nx, ny = -(by - ay) / length * wide / 2, (bx - ax) / length * wide / 2
+    p.polygon(
+        [(ax + nx, ay + ny), (bx + nx, by + ny), (bx - nx, by - ny), (ax - nx, ay - ny)], colour
+    )
+
+
+def _legs(p: Painter, x: float, y: float, half: float, low: float, m: float, colour: RGB) -> None:
+    """Four legs under an animal's body `half` long either side of (x, y), `low` tall."""
+    for dx, dy in ((-0.78, -0.12), (0.62, -0.12), (-0.62, 0.12), (0.78, 0.12)):
+        foot = (x + dx * half, y + dy * m)
+        _bar(p, foot, (foot[0], foot[1] - low), 0.13 * m, colour)
+
+
+def _cow(
+    p: Painter, x: float, y: float, hide: RGB, patch: RGB, metre: float = METRE, facing: int = -1
+) -> None:
+    """A cow standing at (x, y) on the ground, at its true size beside the houses, `metre` units
+    to a metre: 2.4 m long and 1.4 m to the shoulder, on four legs, with patches on its hide,
+    a head with a pale muzzle and short horns, and a tail; facing left, or right with `facing`
+    1."""
+    m, f = metre, facing
+    half, high, belly = 0.95 * m, 1.4 * m, 0.7 * m
+    p.blob(x - 1.25 * half, y - 0.22 * m, x + 1.25 * half, y + 0.3 * m, (62, 84, 40))
+    _legs(p, x, y, half, belly, m, shade(hide, 0.55))
+    p.blob(x - half, y - high, x + half, y - belly + 0.12 * m, hide)
+    p.blob(
+        x - 0.9 * half, y - belly - 0.3 * m, x + 0.9 * half, y - belly + 0.12 * m, shade(hide, 0.8)
+    )
+    p.blob(
+        x - 0.8 * half, y - high + 0.02 * m, x + 0.5 * half, y - high + 0.3 * m, shade(hide, 1.12)
+    )
+    p.blob(x - 0.1 * m, y - high + 0.15 * m, x + 0.55 * m, y - belly - 0.05 * m, patch)
+    p.blob(x - 0.85 * m, y - high + 0.1 * m, x - 0.45 * m, y - high + 0.45 * m, patch)
+    hx = x + f * (half + 0.22 * m)
+    p.blob(hx - 0.3 * m, y - high - 0.08 * m, hx + 0.3 * m, y - high + 0.5 * m, hide)
+    p.blob(
+        hx + f * 0.12 * m - 0.17 * m,
+        y - high + 0.26 * m,
+        hx + f * 0.12 * m + 0.17 * m,
+        y - high + 0.52 * m,
+        (214, 176, 164),
+    )
+    for side in (-0.2, 0.2):
+        _bar(
+            p,
+            (hx + side * m, y - high - 0.02 * m),
+            (hx + side * 1.5 * m, y - high - 0.2 * m),
+            0.07 * m,
+            (236, 226, 200),
+        )
+    tail = x - f * half
+    _bar(
+        p,
+        (tail, y - high + 0.15 * m),
+        (tail - f * 0.12 * m, y - belly - 0.1 * m),
+        0.08 * m,
+        shade(hide, 0.6),
+    )
+
+
+def _pig(p: Painter, x: float, y: float, metre: float = METRE, facing: int = -1) -> None:
+    """A pink pig standing at (x, y), 1.4 m long and 0.7 m high: a round body lit on top, short
+    legs, a snout, a flopped ear and a curled tail."""
+    m, f = metre, facing
+    skin: RGB = (234, 168, 160)
+    half, high, belly = 0.65 * m, 0.75 * m, 0.25 * m
+    p.blob(x - 1.2 * half, y - 0.18 * m, x + 1.2 * half, y + 0.22 * m, (92, 74, 54))
+    _legs(p, x, y, half * 0.9, belly, m, shade(skin, 0.6))
+    p.blob(x - half, y - high, x + half, y - belly + 0.05 * m, skin)
+    p.blob(
+        x - 0.85 * half,
+        y - belly - 0.18 * m,
+        x + 0.85 * half,
+        y - belly + 0.05 * m,
+        shade(skin, 0.82),
+    )
+    p.blob(
+        x - 0.7 * half, y - high + 0.02 * m, x + 0.4 * half, y - high + 0.22 * m, shade(skin, 1.08)
+    )
+    hx = x + f * (half + 0.05 * m)
+    p.blob(hx - 0.24 * m, y - high + 0.12 * m, hx + 0.24 * m, y - belly - 0.05 * m, skin)
+    snout = hx + f * 0.24 * m
+    p.blob(
+        snout - 0.09 * m,
+        y - high + 0.3 * m,
+        snout + 0.09 * m,
+        y - high + 0.48 * m,
+        shade(skin, 0.85),
+    )
+    p.polygon(
+        [
+            (hx - 0.05 * m, y - high + 0.14 * m),
+            (hx + f * 0.18 * m, y - high + 0.08 * m),
+            (hx + f * 0.1 * m, y - high + 0.3 * m),
+        ],
+        shade(skin, 0.75),
+    )
+    tail = x - f * half
+    _bar(
+        p,
+        (tail, y - high + 0.2 * m),
+        (tail - f * 0.1 * m, y - high + 0.1 * m),
+        0.06 * m,
+        shade(skin, 0.7),
+    )
+
+
+def _hen(
+    p: Painter, x: float, y: float, feathers: RGB, metre: float = METRE, facing: int = -1
+) -> None:
+    """A hen pecking about at (x, y), 0.45 m long: a plump body, a tail of feathers held up, a
+    red comb and wattle and a yellow beak."""
+    m, f = metre, facing
+    p.blob(x - 0.22 * m, y - 0.05 * m, x + 0.22 * m, y + 0.08 * m, (96, 80, 60))
+    _bar(p, (x, y), (x, y - 0.12 * m), 0.04 * m, (214, 160, 60))
+    p.blob(x - 0.22 * m, y - 0.42 * m, x + 0.2 * m, y - 0.1 * m, feathers)
+    p.blob(x - 0.16 * m, y - 0.4 * m, x + 0.06 * m, y - 0.28 * m, shade(feathers, 1.08))
+    p.polygon(
+        [
+            (x - f * 0.14 * m, y - 0.3 * m),
+            (x - f * 0.3 * m, y - 0.55 * m),
+            (x - f * 0.22 * m, y - 0.25 * m),
+        ],
+        shade(feathers, 0.8),
+    )
+    hx = x + f * 0.2 * m
+    p.blob(hx - 0.09 * m, y - 0.52 * m, hx + 0.09 * m, y - 0.36 * m, feathers)
+    p.blob(hx - 0.06 * m, y - 0.6 * m, hx + 0.06 * m, y - 0.5 * m, (206, 40, 36))
+    p.polygon(
+        [
+            (hx + f * 0.07 * m, y - 0.46 * m),
+            (hx + f * 0.16 * m, y - 0.43 * m),
+            (hx + f * 0.07 * m, y - 0.4 * m),
+        ],
+        (230, 176, 50),
+    )
 
 
 def _paddock(x: float, y: float, half: float) -> Top:
@@ -272,12 +410,25 @@ def _paddock(x: float, y: float, half: float) -> Top:
     return (x - half, y), (x, y - half / 2), (x + half, y), (x, y + half / 2)
 
 
-def _fence(p: Painter, a: Point, b: Point) -> None:
-    """A post-and-rail fence along the ground from `a` to `b`."""
-    for k in range(4):
-        px, py = _on_wall(a, b, k / 3, 0)
-        p.line([(px, py), (px, py - 3)], (122, 90, 60))
-    p.line([_on_wall(a, b, 0, -2), _on_wall(a, b, 1, -2)], (206, 176, 126))
+def _fence(p: Painter, a: Point, b: Point, metre: float | None = None) -> None:
+    """A post-and-rail fence along the ground from `a` to `b`: four posts and a rail far out, or
+    at `metre` units to a metre a fence at its true size, a post every 2.5 m, 1.2 m tall, with two
+    rails."""
+    if metre is None:
+        for k in range(4):
+            px, py = _on_wall(a, b, k / 3, 0)
+            p.line([(px, py), (px, py - 3)], (122, 90, 60))
+        p.line([_on_wall(a, b, 0, -2), _on_wall(a, b, 1, -2)], (206, 176, 126))
+        return
+    m = metre
+    span = math.hypot(b[0] - a[0], (b[1] - a[1]) * 2) / m
+    posts = max(2, round(span / 2.5) + 1)
+    post, rail = (112, 84, 56), (196, 166, 118)
+    for k in range(posts):
+        px, py = _on_wall(a, b, k / (posts - 1), 0)
+        _bar(p, (px, py), (px, py - 1.2 * m), 0.14 * m, post)
+    for drop in (0.55, 1.05):
+        _bar(p, _on_wall(a, b, 0, -drop * m), _on_wall(a, b, 1, -drop * m), 0.09 * m, rail)
 
 
 def _plate(p: Painter, fill: RGB, half: float = 21, sides: int = 4) -> None:

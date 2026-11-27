@@ -354,53 +354,125 @@ def clay_pit() -> Sprite:
 
 
 def limestone_quarry() -> Sprite:
-    """A pale limestone face cut in steps into a grassy hill, its courses split into blocks, with
-    a derrick crane lowering a block, and sawn blocks waiting below beside a wagon."""
-    p = Painter(34, 34, (17, 24))
-    stone = (222, 218, 202)
-    dust = (200, 196, 176)
-    p.blob(-15, -0.4, 15, 9, WORN)
-    p.blob(-12.4, 0.8, 12.6, 8, dust)
-    _ruts(p, [(-9, 5.4), (-12, 7.4), (-15.6, 9.4)], dust)
-    p.shadow(13, 4)
-    terrace = shade(stone, 0.9)
-    for (x, y, h), top in (
-        ((3, -6, 11), (118, 148, 80)),
-        ((-1, -4, 7), terrace),
-        ((-5, -2, 3), terrace),
+    """A limestone quarry cut into a grassy hill: a tall pale face of cream rock streaked by
+    rain and split into its beds, a ragged lip of turf and bushes along its top, a lower bench
+    and screes of broken stone at its foot on a dusty floor, a round lime kiln smoking beside
+    it, a derrick crane lowering a block, and cut blocks waiting by a wagon on a track out."""
+    p = Painter(34, 36, (17, 25))
+    stone = (226, 220, 200)
+    dust = (206, 200, 180)
+    grass = (110, 142, 74)
+    p.blob(-16, -3, 16, 9, WORN)
+    floor = [(-14, 3), (-9, -1.5), (6, -4), (14, 0), (10, 6), (-4, 8)]
+    p.polygon(floor, dust, shade(dust, 0.8))
+    _ruts(p, [(-9, 5.6), (-12.5, 7.6), (-16, 9.4)], dust)
+    hill = [
+        (-14, -1),
+        (-12, -10),
+        (-5, -16),
+        (4, -17.5),
+        (12, -14),
+        (16, -6),
+        (14.5, -0.5),
+        (6, -4),
+    ]
+    p.polygon(hill, grass)
+    p.polygon(
+        [(-12, -10), (-5, -16), (4, -17.5), (12, -14), (6, -12.4), (-4, -11.6)], shade(grass, 1.1)
+    )
+    face = [
+        (-11, -2.2),
+        (-10, -8.5),
+        (-7, -10),
+        (-4, -11.6),
+        (0, -12),
+        (3, -11),
+        (6, -12.4),
+        (9, -11),
+        (11, -8.2),
+        (12, -4.6),
+        (6, -4.2),
+        (-9, -1.8),
+    ]
+    p.polygon(face, stone)
+    p.polygon(
+        [(-10.6, -4.2), (-3, -5.6), (5, -6), (11.8, -5.2), (12, -4.6), (6, -4.2), (-9, -1.8)],
+        shade(stone, 0.86),
+    )
+    p.polygon(
+        [
+            (-10, -8.5),
+            (-7, -10),
+            (-4, -11.6),
+            (0, -12),
+            (3, -11),
+            (6, -12.4),
+            (9, -11),
+            (11, -8.2),
+            (10, -9.2),
+            (5, -10.6),
+            (-1, -10.4),
+            (-7, -9),
+        ],
+        shade(stone, 1.06),
+    )
+    side = [(11, -8.2), (12, -4.6), (14.5, -0.6), (14.2, -5.2)]
+    p.polygon(side, shade(stone, 0.66))
+    for x in (-9, -6.5, -3.5, -1, 2, 4.5, 7.5, 10):
+        top = -11.2 if -5 < x < 8 else -8.6
+        p.line([(x, top + 0.6), (x + 0.4, -3.2 + abs(x) * 0.05)], shade(stone, 0.74))
+    for y in (-9.5, -7, -4.8):
+        p.line([(-10.2, y + 0.9), (-3, y - 0.2), (5, y - 0.6), (11.4, y + 0.6)], shade(stone, 0.7))
+    p.polygon(
+        [(-9, -1.8), (6, -4.2), (12, -4.6), (11, -3.4), (5, -2.8), (-8, -0.6)], (150, 144, 124)
+    )
+    for x, y in ((-6, -8.2), (1, -9.8), (7, -6.2), (-2, -5.4)):
+        p.blob(x - 1.2, y - 0.3, x + 1.2, y + 0.5, shade(stone, 0.86))
+    lip = [
+        (-11, -2.2),
+        (-10, -8.5),
+        (-7, -10),
+        (-4, -11.6),
+        (0, -12),
+        (3, -11),
+        (6, -12.4),
+        (9, -11),
+        (11, -8.2),
+    ]
+    p.line([(x, y - 0.4) for x, y in lip], shade(grass, 0.75))
+    for x, y in ((-8.5, -9.6), (-2.5, -12.8), (4, -12.4), (9.5, -12), (13, -7.5), (-11.5, -6)):
+        p.blob(x - 1.4, y - 1.2, x + 1.4, y + 0.6, shade(grass, 0.7))
+        p.blob(x - 0.9, y - 1.2, x + 0.5, y - 0.2, shade(grass, 0.95))
+    for x, y, half, h in (
+        (-7, -0.4, 3.4, 3),
+        (7.5, -1.6, 3.6, 3.4),
+        (1, -1.4, 2.6, 2),
+        (-1.5, 1.6, 1.8, 1.2),
     ):
-        face = p.hall(x, y, 16, 5, h, stone, top)
-        left, front, *_ = face
-        if h == 3:
-            _footing(p, face, h, shade(dust, 0.62))
-        joint = shade(stone, 0.8)
-        for drop in range(3, h, 3):
-            p.line([_on_wall(left, front, 0.05, drop), _on_wall(left, front, 0.95, drop)], joint)
-        for row, drop in enumerate(range(0, h, 3)):
-            for t in (0.2, 0.45, 0.7) if row % 2 else (0.32, 0.58, 0.84):
-                bottom = min(drop + 3, h)
-                p.line(
-                    [_on_wall(left, front, t, drop + 0.5), _on_wall(left, front, t, bottom)], joint
-                )
-    for x, y in ((-12, 0), (-9, 2.5), (1, 5)):
-        p.point(x, y, shade(stone, 0.75))
-    _strewn(p, -1, 4.4, 7, stone, 7)
-    for x, y, h in ((10, 0, 2.5), (10, 3, 3), (6, 5, 3)):
-        block = p.box(x, y, 2.5, h, stone, shade(stone, 1.08))
+        _heap(p, x, y, half, h, shade(stone, 0.9))
+    _strewn(p, 0, 4.4, 7, shade(stone, 0.8), 7)
+    kx, ky = -12, 4.6
+    _turned(p, kx, ky, [(0, 2.6), (3.6, 2.3), (4.6, 1.6)], (176, 162, 140), cap=(70, 64, 60))
+    _patch(p, (kx - 2.4, ky - 0.4), (kx, ky + 0.9), (0.3, 0.75), (2.2, 3.6), (52, 40, 34))
+    p.point(kx - 1.2, ky - 0.6, (240, 150, 60))
+    for k, (dx, dy, r) in enumerate(((0.4, -6.4, 1.2), (1.4, -8, 1.6), (2.8, -9.8, 1.9))):
+        grey = shade((206, 204, 200), 1 - 0.06 * k)
+        p.blob(kx + dx - r, ky + dy - r, kx + dx + r, ky + dy + r, grey)
+    for x, y, h in ((9.5, 3.5, 2), (11.5, 4.6, 2), (10.5, 2.4, 1.6)):
+        block = p.box(x, y, 1.6, h, stone, shade(stone, 1.08))
         _footing(p, block, h, shade(dust, 0.62))
-    p.blob(-12, 3.4, -4, 7.2, shade(dust, 0.7))
-    p.hall(-8, 4, 5, 2.4, 1, TIMBER, shade(TIMBER, 1.15))
-    p.box(-8, 3, 1.6, 1.8, stone, shade(stone, 1.08))
-    for x, y in ((-10.5, 4.6), (-6.5, 6.6)):
-        p.ellipse(x - 1, y - 1, x + 1, y + 1, (66, 60, 56))
-    p.line([(-11.7, 3.4), (-14, 2.2)], TRUNK)
-    p.line([(8, -12), (8, -23)], TRUNK)
-    p.line([(8, -23), (12, -13)], (110, 104, 96))
-    p.line([(8, -22), (0, -17)], TRUNK)
-    p.line([(8, -15), (2, -17.2)], shade(TRUNK, 1.2))
-    p.rect(7, -14, 9, -12, shade(TRUNK, 1.2))
-    p.line([(0, -17), (0, -12)], (60, 56, 54))
-    p.rect(-1, -12, 1, -10, stone)
+    p.blob(-8, 4.6, -1, 8, shade(dust, 0.72))
+    p.hall(-4.5, 5.4, 4, 2, 0.9, TIMBER, shade(TIMBER, 1.15))
+    p.box(-4.5, 4.6, 1.3, 1.4, stone, shade(stone, 1.08))
+    for x, y in ((-6.6, 5.9), (-3, 7.6)):
+        p.ellipse(x - 0.8, y - 0.8, x + 0.8, y + 0.8, (66, 60, 56))
+    p.line([(-7.6, 5), (-9.6, 4)], TRUNK)
+    p.line([(4, -2), (4, -15)], TRUNK)
+    p.line([(4, -15), (8, -4)], (110, 104, 96))
+    p.line([(4, -14), (-3, -10)], TRUNK)
+    p.line([(4, -8), (-2, -10.2)], shade(TRUNK, 1.2))
+    p.line([(-3, -10), (-3, -6)], (60, 56, 54))
+    p.rect(-4, -6, -2, -4.6, stone)
     return p.sprite()
 
 
