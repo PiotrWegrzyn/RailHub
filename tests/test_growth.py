@@ -6,7 +6,7 @@ from growing import NO_TRADE, build, make_map, only
 
 from builders import flat_map, layer
 from railroads.sim.breeding import BREEDING_TIMES, CATEGORY_SHARE, OWN_KIND_TIMES, breeding_of
-from railroads.sim.constructions import BuildingKind, Constructions
+from railroads.sim.constructions import CELL_SPACE, Building, BuildingKind, Constructions
 from railroads.sim.dying import UNDYING
 from railroads.sim.grids import Cell
 from railroads.sim.growth import Growth, _allowed
@@ -405,9 +405,6 @@ def test_three_factories_merge_into_a_big_factory_on_a_factory_turn() -> None:
     assert growth.points(Points.INDUSTRY).sum() == 3
 
 
-SURE_SKYSCRAPERS = GrowthRule(skyscraper_people=60, skyscraper_chance=1.0)
-
-
 def flats_around(constructions: Constructions, blocks: tuple[int, int]) -> list[tuple[int, int]]:
     neighbours = constructions.tile_map.grid.neighbours(5, 5)
     for near, n in zip(neighbours, blocks, strict=False):
@@ -415,10 +412,10 @@ def flats_around(constructions: Constructions, blocks: tuple[int, int]) -> list[
     return neighbours
 
 
-def test_a_big_enough_neighbourhood_trades_three_blocks_of_flats_for_a_skyscraper() -> None:
+def test_three_blocks_of_flats_nearby_make_way_for_a_skyscraper() -> None:
     constructions = Constructions(make_map())
     neighbours = flats_around(constructions, (2, 2))
-    growth = Growth(constructions, SURE_SKYSCRAPERS)
+    growth = Growth(constructions)
 
     changed = growth._turn((5, 5), TOWNS, np.random.default_rng(0))
 
@@ -431,7 +428,7 @@ def test_a_big_enough_neighbourhood_trades_three_blocks_of_flats_for_a_skyscrape
 def test_the_people_of_the_pulled_down_flats_move_into_ten_houses_nearby() -> None:
     constructions = Constructions(make_map())
     flats_around(constructions, (2, 2))
-    growth = Growth(constructions, SURE_SKYSCRAPERS)
+    growth = Growth(constructions)
 
     changed = growth._turn((5, 5), TOWNS, np.random.default_rng(0))
 
@@ -446,28 +443,23 @@ def test_a_skyscraper_needs_three_blocks_of_flats_however_many_people_live_near(
     constructions = Constructions(make_map())
     neighbours = flats_around(constructions, (2,))
     build(constructions, neighbours[1], BuildingKind.TENEMENT, 6)
-    growth = Growth(constructions, SURE_SKYSCRAPERS)
-
-    growth._turn((5, 5), TOWNS, np.random.default_rng(0))
-
-    assert growth.count(BuildingKind.SKYSCRAPER).sum() == 0
-
-
-def test_too_small_a_neighbourhood_gets_no_skyscraper() -> None:
-    constructions = Constructions(make_map())
-    flats_around(constructions, (2, 2))
     growth = Growth(constructions)
 
     growth._turn((5, 5), TOWNS, np.random.default_rng(0))
 
     assert growth.count(BuildingKind.SKYSCRAPER).sum() == 0
-    assert growth.count(BuildingKind.FLATS).sum() == 4
+
+
+def test_a_skyscraper_takes_half_a_hex() -> None:
+    skyscraper = Building((5, 5), BuildingKind.SKYSCRAPER)
+
+    assert skyscraper.space * 2 == CELL_SPACE
 
 
 def test_farms_never_merge_or_raise_skyscrapers() -> None:
     constructions = Constructions(make_map())
     flats_around(constructions, (2, 2))
-    growth = Growth(constructions, GrowthRule(skyscraper_people=1, skyscraper_chance=1.0))
+    growth = Growth(constructions)
 
     changed = growth._turn((5, 5), PLAIN_FARMS, np.random.default_rng(0))
 

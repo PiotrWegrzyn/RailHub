@@ -171,8 +171,6 @@ def rules_rows() -> list[list[object]]:
         ["LIVELY_GROWTH", breeding.LIVELY_GROWTH, "breeding.py", "Homes by served venues."],
         ["OPEN_FIELD", ladders.OPEN_FIELD, "ladders.py", "Fields on open flat grass."],
         ["FARMS_CROWDED_OUT", ladders.FARMS_CROWDED_OUT, "ladders.py", "Fields go here."],
-        ["SKYSCRAPER_PEOPLE", ladders.SKYSCRAPER_PEOPLE, "ladders.py", ""],
-        ["SKYSCRAPER_CHANCE", ladders.SKYSCRAPER_CHANCE, "ladders.py", ""],
         ["KEY_LEAST", growth.KEY_LEAST, "growth.py", "Oil wells, refineries kept."],
         ["CLEARING_PER_POINT", forests.CLEARING_PER_POINT, "forests.py", "A month a cell."],
         ["CLEARING_PER_MILL", forests.CLEARING_PER_MILL, "forests.py", "A month a cell."],

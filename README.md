@@ -541,12 +541,11 @@ houses gather into towns. On its turn a ladder builds its
 first kind, unless it can merge: 16 houses nearby let six of them make way for a tenement and
 five tenements let three make way for a block of flats; three factories nearby make a big factory
 and three big factories a mega factory; two ports nearby make a big port and two big ports a mega
-port. On a town turn, a neighbourhood with 150 population
-points and three blocks of flats puts up a skyscraper instead, one turn in 200: a business centre
-worth 10 corporate points, so it sends and wants 120 passengers and 60 pieces of mail a month. It
-pulls down the three blocks of flats, and their people move into 10 houses in the nearest cells
-with room for them, up to 6 hexes away. On Poland with the stand-in player (below) that gives
-about one by 1950 and 20 to 40 by 2050.
+port. On a town turn, a neighbourhood with three blocks of flats puts up a skyscraper instead, as
+houses merge into tenements: a business centre worth 10 corporate points that takes half its hex,
+so it sends and wants 120 passengers and 60 pieces of mail a month. It pulls down the three blocks
+of flats, and their people move into 10 houses in the nearest cells with room for them, up to 6
+hexes away.
 
 A building that finds no room in its cell spills over: it goes up in the nearest cell, at most 3
 cells away, with room for it, land its ladder grows on and nothing the ladder's own caps forbid

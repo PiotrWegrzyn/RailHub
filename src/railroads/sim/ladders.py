@@ -43,10 +43,6 @@ OPEN_FIELD = 10.0
 
 TRADE_EVERY_MONTHS = 1
 
-SKYSCRAPER_PEOPLE = 150
-
-SKYSCRAPER_CHANCE = 0.005
-
 # Factories gather into districts: industry nearby draws more of them only from this many points,
 # more than a lone steel mill, and then strongly, so that they meet and merge.
 FACTORIES_DRAW_FROM = 5
@@ -1042,8 +1038,6 @@ class GrowthRule:
     trade_every_months: int = TRADE_EVERY_MONTHS
     ladders: tuple[Ladder, ...] = LADDERS
     points: Mapping[BuildingKind, tuple[Points, int]] = field(default=POINTS)
-    skyscraper_people: int = SKYSCRAPER_PEOPLE
-    skyscraper_chance: float = SKYSCRAPER_CHANCE
     # How forests are cleared and spread, if they change at all, and how often.
     forests: ForestRule | None = FORESTS
     forests_every_months: int = 1

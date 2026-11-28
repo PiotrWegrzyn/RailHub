@@ -22,10 +22,9 @@ chance in their cell, of more coming up and of merging, by their part of its bui
 goes up in it or a random cell next to it, and one that finds no room there spills over further
 (railroads.sim.room).
 
-On town turns, a neighbourhood with SKYSCRAPER_PEOPLE population and SKYSCRAPER_FLATS blocks of
-flats may put up a skyscraper, SKYSCRAPER_CHANCE of the time: a business centre that pulls down the
-flats and gives corporate points, whose people move into SKYSCRAPER_HOMES houses in the nearest
-cells with room for them.
+On town turns, a neighbourhood with SKYSCRAPER_FLATS blocks of flats puts up a skyscraper, as
+houses merge into tenements: a business centre that pulls down the flats and gives corporate
+points, whose people move into SKYSCRAPER_HOMES houses in the nearest cells with room for them.
 
 Every TRADE_EVERY_MONTHS the stations hand out their goods and buildings sell to each other
 (railroads.sim.economy, settled with the railway by railroads.sim.station_trade), which leaves each
@@ -1036,7 +1035,7 @@ class Growth:
 
     def _turn(self, cell: Cell, ladder: Ladder, rng: np.random.Generator) -> set[Cell]:
         neighbourhood = [cell, *self._grid.neighbours(*cell)]
-        if ladder.skyscrapers and (built := self._skyscraper(cell, neighbourhood, rng)):
+        if ladder.skyscrapers and (built := self._skyscraper(cell, neighbourhood)):
             return built
         for small, big in reversed(list(pairwise(ladder.kinds))):
             merge = ladder.merges.get(small)
@@ -1296,15 +1295,8 @@ class Growth:
         count = self._counts[kind]
         return sum(int(count[near]) for near in neighbourhood)
 
-    def _skyscraper(
-        self, cell: Cell, neighbourhood: list[Cell], rng: np.random.Generator
-    ) -> set[Cell] | None:
-        rule = self.rule
-        if self._nearby[Points.POPULATION][cell] < rule.skyscraper_people:
-            return None
+    def _skyscraper(self, cell: Cell, neighbourhood: list[Cell]) -> set[Cell] | None:
         if self._around(BuildingKind.FLATS, neighbourhood) < SKYSCRAPER_FLATS:
-            return None
-        if rng.random() >= rule.skyscraper_chance:
             return None
         takes = [(BuildingKind.FLATS, SKYSCRAPER_FLATS)]
         built = self._replace(cell, neighbourhood, takes, BuildingKind.SKYSCRAPER)

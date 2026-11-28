@@ -3,7 +3,7 @@
 Every cell has room for CELL_SPACE units. A single track takes one unit and a double track two,
 and a station or an engine shed fills its whole cell, and cattle pens take ANNEX_SPACE of it. Most buildings take one unit, so a cell with a double track
 through it still fits four houses. Farms, orchards and other fields fill a whole cell, as do the
-biggest works and the novelties, and factories, canneries and mills take three.
+biggest works and the novelties, and factories, canneries, mills and skyscrapers take three.
 """
 
 from collections.abc import Iterator
@@ -299,7 +299,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
     BuildingKind.FACTORY: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.BIG_FACTORY: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.MEGA_FACTORY: BuildingRules(relief=_OFF_MOUNTAINS, space=CELL_SPACE),
-    BuildingKind.SKYSCRAPER: BuildingRules(relief=frozenset(Relief)),
+    BuildingKind.SKYSCRAPER: BuildingRules(relief=frozenset(Relief), space=3),
     BuildingKind.LOGGING_CAMP: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.SAWMILL: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
     BuildingKind.GASWORKS: BuildingRules(relief=_OFF_MOUNTAINS, space=3),
