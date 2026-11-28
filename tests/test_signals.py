@@ -601,6 +601,36 @@ def test_no_train_stands_on_the_way_on_kept_by_a_train_at_the_end_of_a_single_li
     assert all(train.arrivals > old for train, old in zip(trains, before, strict=True))
 
 
+def test_of_two_trains_level_where_their_ways_come_together_the_one_bought_first_goes_ahead() -> (
+    None
+):
+    game = Game(Constructions(flat_map(rows=14, cols=18)))
+    game.finances.cash = 1e9
+    town, branch, junction_side = (8, 5), (1, 9), (4, 8)
+    for station in (town, branch, junction_side):
+        game.build_station(station)
+    assert game.lay_track(town, junction_side, TrackWidth.DOUBLE).ok
+    assert game.lay_track(town, branch, TrackWidth.DOUBLE).ok
+    network = game.railway.network
+    first, second = shuttle(game, branch, town), shuttle(game, junction_side, town)
+    for train in (first, second):
+        train.path, train.speeds = game.railway.route(train.stops[0].cell, town)
+    shared = {crossing.cell for crossing in passes(network, second)}
+    junction = next(p.cell for p in passes(network, first) if p.cell in shared)
+    for train in (first, second):
+        way = passes(network, train)
+        train.along = next(crossing.start for crossing in way if crossing.cell == junction)
+        train.cleared = network.length(train)
+        train.claims = [_claim(p) for p in way if p.end > train.along - train.length]
+        train.claims_for = train.path
+    signals = Signals(network, [first, second])
+
+    (first_limit, first_ahead), (_, second_ahead) = signals.limit(first), signals.limit(second)
+
+    assert first_ahead is None and first_limit > first.along
+    assert second_ahead is first
+
+
 def test_two_trains_coming_together_at_a_junction_of_quadruple_track_go_through_side_by_side(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
