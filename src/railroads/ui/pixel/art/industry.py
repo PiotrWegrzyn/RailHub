@@ -38,6 +38,7 @@ from railroads.ui.pixel.art.parts import (
     _cow,
     _fence,
     _flag,
+    _gable_across,
     _heap,
     _iso,
     _on_wall,
@@ -226,18 +227,18 @@ def _girders(p: Painter, x: float, y: float, long: float, layers: int) -> None:
             p.blob(ex - 0.2 * m, ey - 0.15 * m, ex + 0.2 * m, ey + 0.15 * m, shade(GIRDER, 0.4))
 
 
-def _tall_chimney(p: Painter, x: float, y: float, tall: float) -> None:
-    """A round brick mill chimney drawn for `tall` units and lowered (CHIMNEY_SHARE): a square
-    plinth with a cream band, a tapering shaft ringed with iron bands, a cream band and a
-    corbelled black crown at its top, smoking."""
+def _tall_chimney(p: Painter, x: float, y: float, tall: float, girth: float = 1) -> None:
+    """A round brick mill chimney drawn for `tall` units and lowered (CHIMNEY_SHARE), `girth`
+    times as stout as a small works' one: a square plinth with a cream band, a tapering shaft
+    ringed with iron bands, a cream band and a corbelled black crown at its top, smoking."""
     m = METRE
     tall *= CHIMNEY_SHARE
-    base = 3.2 * m
+    base = 3.2 * m * girth
     plinth = p.box(x, y, base / 2 * 1.4, base, MILL_BRICK, shade(MILL_BRICK, 1.1))
     _bands(p, plinth[0], plinth[1], plinth[2], 0.4 * m, DRESSING, shade(DRESSING, 0.78))
     foot = y - base
     shaft = tall - base
-    r0, r1 = 1.5 * m, 0.95 * m
+    r0, r1 = 1.5 * m * girth, 0.95 * m * girth
     _turned(p, x, foot, [(0, r0), (shaft, r1)], MILL_BRICK)
 
     def ring(up: float, wide: float, colour: RGB) -> None:
@@ -379,34 +380,320 @@ def factory() -> Sprite:
     return p.sprite()
 
 
-def big_factory() -> Sprite:
-    """A big brick works: sheds under a glazed sawtooth roof, rows of arched windows over a dark
-    plinth, a loading door with cart ruts worn out from it past a coal heap, and two banded
-    chimneys."""
-    p = Painter(30, 40, (14, 33))
-    foot = _footing(0, 0, 12, 12)
-    _bed(p, foot)
-    _spill(p, -9, 5, 2.5, (48, 46, 50))
-    p.shadow(12, 4)
-    _track(p, foot[1], foot[2], (0.15, 0.45), 3)
-    top = p.box(0, 0, 12, 8, BRICK, (96, 94, 100))
+WORKS_IRON: RGB = (70, 78, 80)
+WORKS_STONE: RGB = (178, 170, 156)
+WORKS_BALLAST: RGB = (128, 122, 114)
+WORKS_SLEEPER: RGB = (86, 66, 50)
+WORKS_RAIL: RGB = (150, 152, 158)
+WORKS_VAN: RGB = (132, 58, 44)
+
+
+def _works_hall(
+    p: Painter,
+    x: float,
+    y: float,
+    size: tuple[float, float, float],
+    teeth: int,
+    door: int | None = None,
+) -> Top:
+    """A red-brick works hall `size` (length, depth and wall height) standing on (x, y): two rows
+    of tall iron-framed windows with round heads under cream arches between pilasters, cream
+    bands at its eaves and between its floors, a big arched loading door with a hoist in bay
+    `door` of its lit side, and a north-light roof of `teeth` glazed teeth."""
+    m = METRE
+    length, depth, high = size
+    top = p.hall(x, y, length, depth, high, MILL_BRICK, None)
     left, front, right, _ = top
-    _plinth(p, top, 8, BRICK)
-    _stains(p, left, front, 8, (0.04, 0.3, 0.55, 0.8), shade(BRICK, 0.62))
-    _stains(p, front, right, 8, (0.6, 0.9), shade(BRICK, 0.5))
-    spans = tuple(0.08 + k * 0.12 for k in range(8))
-    _windows(p, left, front, spans, (2,), 2, WINDOW, shade(BRICK, 1.35))
-    _windows(p, left, front, spans, (5,), 1, WINDOW)
-    _windows(p, front, right, (0.6, 0.75, 0.9), (2,), 2, shade(WINDOW, 0.8))
-    _door(p, front, right, (0.15, 0.45), 3.5, 8, DOORWAY, shade(BRICK, 1.3))
-    _sawtooth(p, top, 3, 3, METAL, (170, 200, 214), BRICK)
-    for x in (-6, 4):
-        cap = _stack(p, x, -9, -24, shade(BRICK, 0.8))
-    for i, (x, y, r) in enumerate([(-5, -27, 2), (-3, -30, 2.5), (5, -27, 2), (7, -30, 2.5)]):
-        y += cap + 24
-        p.blob(x - r, y - r, x + r, y + r, (226, 226, 230) if i % 2 else (204, 204, 210))
-    _heap(p, -9, 5, 2.5, 2, (48, 46, 50))
-    _oil(p, 8.5, 5.4, 1.2)
+    _plinth(p, top, high, MILL_BRICK, 0.7 * m)
+    _stains(p, left, front, high, (0.05, 0.31, 0.55, 0.93), shade(MILL_BRICK, 0.66), 1.6 * m)
+    for a, b in ((left, front), (front, right)):
+        for drop, wide in ((0, 0.5 * m), (high * 0.48, 0.25 * m)):
+            _bar(
+                p,
+                _on_wall(a, b, 0, drop + wide / 2),
+                _on_wall(a, b, 1, drop + wide / 2),
+                wide,
+                DRESSING,
+            )
+    upper, lower = (high * 0.137, high * 0.41), (high * 0.57, high * 0.884)
+    bays = max(2, round(length / (3.5 * m)))
+    for k in range(bays + 1):
+        t = k / bays
+        _bar(
+            p,
+            _on_wall(left, front, t, 0.5 * m),
+            _on_wall(left, front, t, high),
+            0.5 * m,
+            shade(MILL_BRICK, 0.86),
+        )
+    for k in range(bays):
+        t = (k + 0.5) / bays
+        if k == door:
+            p.polygon(_round_head(left, front, length, t, 3.6 * m, high * 0.52, high), DRESSING)
+            p.polygon(_round_head(left, front, length, t, 3 * m, high * 0.55, high), DOORWAY)
+            _patch(
+                p,
+                left,
+                front,
+                (t - 1.5 * m / length, t - 0.05 * m / length),
+                (high * 0.7, high),
+                DOOR,
+            )
+            _patch(p, left, front, (t - 0.8 * m / length, t + 0.8 * m / length), upper, DOOR)
+            beam = _on_wall(left, front, t, 0.9 * m)
+            _bar(p, beam, (beam[0] - 1.6 * m, beam[1] + 0.8 * m), 0.2 * m, (54, 50, 50))
+            _bar(
+                p,
+                (beam[0] - 1.5 * m, beam[1] + 0.8 * m),
+                (beam[0] - 1.5 * m, beam[1] + 3.2 * m),
+                0.05 * m,
+                (40, 38, 38),
+            )
+            continue
+        _mill_window(p, left, front, length, t, 1.5 * m, upper)
+        _mill_window(p, left, front, length, t, 1.7 * m, lower)
+    side_bays = max(2, round(depth / (4 * m)))
+    for k in range(side_bays):
+        t = (k + 0.5) / side_bays
+        _mill_window(p, front, right, depth, t, 1.5 * m, upper, shade(MILL_GLASS, 0.85))
+        _mill_window(p, front, right, depth, t, 1.7 * m, lower, shade(MILL_GLASS, 0.85))
+    _north_lights(p, top, teeth, 2.8 * m, MILL_SLATE, MILL_BRICK)
+    return top
+
+
+def _works_clock(p: Painter, x: float, y: float, r: float) -> None:
+    """A white clock face `r` across its middle at (x, y) in a cream rim, its hands at ten past
+    twelve."""
+    m = METRE
+    p.ellipse(x - r * 1.25, y - r * 1.25, x + r * 1.25, y + r * 1.25, DRESSING)
+    p.ellipse(x - r, y - r, x + r, y + r, (246, 242, 230))
+    _bar(p, (x, y), (x, y - r * 0.8), 0.14 * m, (30, 30, 34))
+    _bar(p, (x, y), (x + r * 0.55, y + r * 0.15), 0.14 * m, (30, 30, 34))
+
+
+def _works_pyramid(p: Painter, top: Top, rise: float, vane: bool = True) -> Point:
+    """A slate pyramid roof `rise` high on a square top, with a gilt weather vane on its point if
+    `vane`. Returns its point."""
+    m = METRE
+    left, front, right, _ = top
+    apex = ((left[0] + right[0]) / 2, (left[1] + right[1]) / 2 - rise)
+    p.polygon([left, front, apex], MILL_SLATE, shade(MILL_SLATE, 0.6))
+    p.polygon([front, right, apex], shade(MILL_SLATE, 0.72), shade(MILL_SLATE, 0.5))
+    if vane:
+        _bar(p, apex, (apex[0], apex[1] - 2 * m), 0.12 * m, (50, 50, 56))
+        p.polygon(
+            [
+                (apex[0], apex[1] - 2 * m),
+                (apex[0] + 1.2 * m, apex[1] - 1.7 * m),
+                (apex[0], apex[1] - 1.3 * m),
+            ],
+            (214, 170, 70),
+        )
+    return apex
+
+
+def _works_tower(p: Painter, x: float, y: float, side: float, tall: float) -> None:
+    """A red-brick clock and water tower `side` square and `tall` high standing on (x, y): cream
+    quoins and bands, tiers of round-headed windows, a clock face on each side under an iron
+    water tank riveted in bands, and a slate pyramid with a gilt vane on top."""
+    m = METRE
+    tower = p.hall(x, y, side, side, tall, MILL_BRICK, None)
+    left, front, right, _ = tower
+    _plinth(p, tower, tall, MILL_BRICK)
+    for a, b in ((left, front), (front, right)):
+        for drop in (0.3 * m, 5.4 * m):
+            _bar(p, _on_wall(a, b, 0, drop), _on_wall(a, b, 1, drop), 0.3 * m, DRESSING)
+        for t in (0.03, 0.97):
+            _bar(p, _on_wall(a, b, t, 0), _on_wall(a, b, t, tall - 0.7 * m), 0.35 * m, DRESSING)
+        for head in np.arange(7 * m, tall - 3 * m, 4 * m):
+            _mill_window(p, a, b, side, 0.5, 1.1 * m, (head, head + 2 * m))
+    for a, b in ((left, front), (front, right)):
+        _works_clock(p, *_on_wall(a, b, 0.5, 2.8 * m), 1.3 * m)
+    tank = p.hall(x, y - tall, side + 1 * m, side + 1 * m, 3.4 * m, WORKS_IRON, None)
+    t_left, t_front, t_right, _ = tank
+    for drop in (0.8 * m, 1.7 * m, 2.6 * m):
+        _bands(p, t_left, t_front, t_right, drop, shade(WORKS_IRON, 1.3), shade(WORKS_IRON, 1.1))
+    _works_pyramid(p, tank, 3 * m)
+
+
+def _works_engine_house(p: Painter, x: float, y: float, size: tuple[float, float, float]) -> None:
+    """A red-brick engine house `size` (length, depth and wall height) standing on (x, y): cream
+    bands, a tall round-headed window and a dark doorway, under a slate roof."""
+    m = METRE
+    length, depth, high = size
+    engine = p.hall(x, y, length, depth, high, MILL_BRICK, None)
+    left, front, right, _ = engine
+    _plinth(p, engine, high, MILL_BRICK, 0.6 * m)
+    _bands(p, left, front, right, 0.3 * m, DRESSING, shade(DRESSING, 0.78))
+    for t in (0.3, 0.7):
+        _mill_window(p, left, front, length, t, 1.8 * m, (1.2 * m, high - 1.4 * m))
+    _patch(p, front, right, (0.3, 0.7), (high - 3.6 * m, high), DOORWAY)
+    p.gable(engine, 2.2 * m, MILL_SLATE, MILL_BRICK)
+    _roof_rows(p, engine, 2.2 * m, MILL_SLATE)
+
+
+def _works_siding(p: Painter, a: Point, b: Point) -> None:
+    """A standard-gauge siding along the ground from `a` to `b`, which run the way lit walls do:
+    a bed of grey ballast, timber sleepers across it and two steel rails."""
+    m = METRE
+    across = (m, -m / 2)
+    edge = [(a[0] + across[0] * s, a[1] + across[1] * s) for s in (-1.5, 1.5)]
+    far = [(b[0] + across[0] * s, b[1] + across[1] * s) for s in (1.5, -1.5)]
+    p.polygon([edge[0], edge[1], far[0], far[1]], WORKS_BALLAST)
+    length = math.hypot(b[0] - a[0], 2 * (b[1] - a[1])) / m
+    count = round(length / 0.75)
+    for k in range(count):
+        t = (k + 0.5) / count
+        cx, cy = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+        _bar(
+            p,
+            (cx - across[0] * 1.25, cy - across[1] * 1.25),
+            (cx + across[0] * 1.25, cy + across[1] * 1.25),
+            0.25 * m,
+            WORKS_SLEEPER,
+        )
+    for s in (-0.72, 0.72):
+        _bar(
+            p,
+            (a[0] + across[0] * s, a[1] + across[1] * s),
+            (b[0] + across[0] * s, b[1] + across[1] * s),
+            0.1 * m,
+            WORKS_RAIL,
+        )
+
+
+def _works_wagon(p: Painter, x: float, y: float, covered: bool) -> None:
+    """A four-wheeled goods wagon 7 m long standing on a siding at (x, y) along the lit walls: a
+    red-brown van with a pale arched roof and a sliding door if `covered`, or a grey open wagon
+    piled with crated goods, on spoked wheels with buffers at its ends."""
+    m = METRE
+    for t in (0.22, 0.78):
+        wx, wy = _iso(x, y, (t - 0.5) * 7 * m, 0.7 * m)
+        p.ellipse(wx - 0.5 * m, wy - 1 * m, wx + 0.5 * m, wy, (40, 38, 40))
+    p.hall(x, y - 0.6 * m, 7 * m, 2.2 * m, 0.4 * m, (44, 42, 44), None)
+    for t in (0.22, 0.78):
+        wx, wy = _iso(x, y, (t - 0.5) * 7 * m, -0.7 * m)
+        p.ellipse(wx - 0.5 * m, wy - 1 * m, wx + 0.5 * m, wy, (36, 34, 36))
+        p.blob(wx - 0.15 * m, wy - 0.65 * m, wx + 0.15 * m, wy - 0.35 * m, (120, 118, 120))
+    for u in (-3.7, 3.7):
+        bx, by = _iso(x, y, u * m, 0)
+        _bar(
+            p,
+            (bx, by - 1.1 * m),
+            _iso(bx, by - 1.1 * m, 0.3 * m if u > 0 else -0.3 * m, 0),
+            0.25 * m,
+            (40, 38, 40),
+        )
+    if covered:
+        body = p.hall(x, y - 1 * m, 7 * m, 2.6 * m, 2.3 * m, WORKS_VAN, None)
+        left, front, right, _ = body
+        for t in np.linspace(0.06, 0.94, 12):
+            _bar(
+                p,
+                _on_wall(left, front, t, 0),
+                _on_wall(left, front, t, 2.3 * m),
+                0.04 * m,
+                shade(WORKS_VAN, 0.82),
+            )
+        _patch(p, left, front, (0.38, 0.62), (0.3 * m, 2.2 * m), shade(WORKS_VAN, 0.86))
+        _bar(
+            p,
+            _on_wall(left, front, 0.38, 0.3 * m),
+            _on_wall(left, front, 0.62, 2.2 * m),
+            0.08 * m,
+            shade(WORKS_VAN, 0.65),
+        )
+        _bar(
+            p,
+            _on_wall(left, front, 0.62, 0.3 * m),
+            _on_wall(left, front, 0.38, 2.2 * m),
+            0.08 * m,
+            shade(WORKS_VAN, 0.65),
+        )
+        p.gable(body, 0.5 * m, (200, 198, 192), WORKS_VAN)
+        return
+    grey = (104, 106, 110)
+    body = p.hall(x, y - 1 * m, 7 * m, 2.6 * m, 1.1 * m, grey, shade(grey, 0.6))
+    left, front, right, back = body
+    for t in np.linspace(0.12, 0.88, 6):
+        _bar(
+            p,
+            _on_wall(left, front, t, 0),
+            _on_wall(left, front, t, 1.1 * m),
+            0.06 * m,
+            shade(grey, 0.75),
+        )
+    for k in range(4):
+        cx, cy = _on_wall(
+            _on_wall(left, back, 0.5, 0), _on_wall(front, right, 0.5, 0), (k + 0.5) / 4, 0
+        )
+        p.hall(
+            cx,
+            cy + 0.3 * m,
+            1.3 * m,
+            1.3 * m,
+            0.9 * m + 0.3 * m * (k % 2),
+            GOODS_CRATE,
+            shade(GOODS_CRATE, 1.15),
+        )
+
+
+def _works_water_tower(p: Painter, x: float, y: float) -> None:
+    """A water tower standing on (x, y): a red-brick tower 5 m square and 13 m high with cream
+    bands and round-headed openings, carrying a round iron tank riveted in bands under a low
+    cone of a roof."""
+    m = METRE
+    tall = 13 * m
+    tower = p.hall(x, y, 5 * m, 5 * m, tall, MILL_BRICK, None)
+    left, front, right, _ = tower
+    _plinth(p, tower, tall, MILL_BRICK)
+    for a, b in ((left, front), (front, right)):
+        _bar(p, _on_wall(a, b, 0, 0.3 * m), _on_wall(a, b, 1, 0.3 * m), 0.4 * m, DRESSING)
+        for head in (3 * m, 7.5 * m):
+            _mill_window(p, a, b, 5 * m, 0.5, 1.2 * m, (head, head + 2.4 * m))
+    r, high = 3.4 * m, 4.2 * m
+    _turned(p, x, y - tall, [(0, r), (high, r)], WORKS_IRON)
+    for f in (0.25, 0.5, 0.75):
+        hoop = [
+            (x + r * math.cos(a), y - tall - high * f + r / 2 * math.sin(a))
+            for a in np.linspace(0, math.pi, 9)
+        ]
+        for k in range(len(hoop) - 1):
+            _bar(p, hoop[k], hoop[k + 1], 0.1 * m, shade(WORKS_IRON, 1.35))
+    _turned(p, x, y - tall - high, [(0, r * 1.05), (1.4 * m, 0)], MILL_SLATE)
+
+
+def big_factory() -> Sprite:
+    """A big Victorian brick works round a yard: two long red-brick halls under north-light roofs
+    of glazed teeth set at a right angle, rows of round-headed iron-framed windows under cream
+    arches, arched loading doors with hoists, a clock tower at the corner carrying an iron water
+    tank, an engine house and a taller round chimney smoking behind, a siding along the front
+    with a red van and an open wagon of crated goods, and crates stacked in the yard."""
+    m = METRE
+    p = Painter(60, 58, (30, 40))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 20) * m, (v - 7) * m)
+
+    p.polygon([at(2, -9), at(46, -9), at(46, 0), at(2, 0)], CINDERS)
+    for (u, v), length, depth in (
+        ((15, 6), 30, 12),
+        ((39.5, 8.5), 11, 17),
+        ((-3.25, 3.25), 6.5, 6.5),
+    ):
+        _bed(p, _footing(*at(u, v), length * m, depth * m), margin=0.6)
+    p.shadow(22, 6, 3)
+    _tall_chimney(p, *at(29, 24), 60 * m, 1.3)
+    _works_engine_house(p, *at(22, 20), (10 * m, 7 * m, 7 * m))
+    _works_tower(p, *at(-3.25, 3.25), 6.5 * m, 21 * m)
+    _works_hall(p, *at(15, 6), (30 * m, 12 * m, 10 * m), 8, door=5)
+    _works_hall(p, *at(39.5, 8.5), (11 * m, 17 * m, 10 * m), 3, door=1)
+    _works_siding(p, at(0, -6), at(46, -6))
+    _works_wagon(p, *at(9, -6), True)
+    _works_wagon(p, *at(18.5, -6), False)
+    _crates(p, *at(29, -2.5), (3, 2, 1))
+    _crates(p, *at(33.5, -2.2), (2, 1))
+    _girders(p, *at(40, -2.5), 6, 3)
     return p.sprite()
 
 
@@ -2776,47 +3063,160 @@ def tank_factory() -> Sprite:
     return p.sprite()
 
 
+def _works_office(p: Painter, x: float, y: float, length: float, depth: float) -> None:
+    """A works office block four storeys high, `length` by `depth`, standing on (x, y): red
+    brick on a stone plinth with cream quoins, string courses and a cornice, rows of
+    round-headed windows, a slate roof, a central bay standing forward under a pediment with a
+    round window over an arched entrance up steps, and a clock tower rising from its roof to a
+    slate pyramid and a gilt vane."""
+    m = METRE
+    storey, storeys = 3.8 * m, 4
+    high = storey * storeys
+    top = p.hall(x, y, length, depth, high, MILL_BRICK, None)
+    left, front, right, _ = top
+
+    def dress(
+        a: Point, b: Point, span: float, bays: int, skip: tuple[float, float], tone: float
+    ) -> None:
+        _patch(p, a, b, (0, 1), (high - 1.1 * m, high), shade(WORKS_STONE, tone))
+        _patch(p, a, b, (0, 1), (0, 0.7 * m), shade(DRESSING, tone))
+        for k in range(1, storeys):
+            _bar(
+                p,
+                _on_wall(a, b, 0, k * storey),
+                _on_wall(a, b, 1, k * storey),
+                0.25 * m,
+                shade(DRESSING, tone),
+            )
+        for t in (0.015, 0.985):
+            _bar(
+                p,
+                _on_wall(a, b, t, 0.7 * m),
+                _on_wall(a, b, t, high - 1.1 * m),
+                0.6 * m,
+                shade(DRESSING, tone),
+            )
+        for k in range(bays):
+            t = (k + 0.5) / bays
+            if skip[0] < t < skip[1]:
+                continue
+            for s in range(storeys):
+                head = s * storey + 0.9 * m
+                tall = 2.6 * m if s == storeys - 1 else 2.1 * m
+                _mill_window(
+                    p, a, b, span, t, 1.1 * m, (head, head + tall), shade(MILL_GLASS, tone)
+                )
+
+    dress(left, front, length, max(3, round(length / (2.8 * m))), (0.34, 0.66), 1.0)
+    dress(front, right, depth, max(2, round(depth / (2.8 * m))), (2, 2), 0.85)
+    p.gable(top, 3 * m, MILL_SLATE, MILL_BRICK)
+    _roof_rows(p, top, 3 * m, MILL_SLATE)
+    cx, cy = _iso(x, y, 0, -(depth / 2 + 0.5 * m))
+    bay = p.hall(cx, cy, length * 0.32, 1.6 * m, high + 0.6 * m, shade(MILL_BRICK, 1.04), None)
+    b_left, b_front, b_right, _ = bay
+    span = length * 0.32
+    _patch(p, b_left, b_front, (0, 1), (high - 0.5 * m, high + 0.6 * m), WORKS_STONE)
+    _patch(p, b_front, b_right, (0, 1), (high - 0.5 * m, high + 0.6 * m), shade(WORKS_STONE, 0.8))
+    for k in range(1, storeys):
+        _bar(
+            p,
+            _on_wall(b_left, b_front, 0, k * storey + 0.6 * m),
+            _on_wall(b_left, b_front, 1, k * storey + 0.6 * m),
+            0.25 * m,
+            DRESSING,
+        )
+    for t in (0.04, 0.96):
+        _bar(
+            p,
+            _on_wall(b_left, b_front, t, 0),
+            _on_wall(b_left, b_front, t, high),
+            0.6 * m,
+            DRESSING,
+        )
+    for s in range(storeys - 1):
+        head = s * storey + 1.5 * m
+        for t in (0.3, 0.7):
+            _mill_window(p, b_left, b_front, span, t, 1.1 * m, (head, head + 2.1 * m))
+    p.polygon(
+        _round_head(b_left, b_front, span, 0.5, 3 * m, high - 3.8 * m, high + 0.6 * m), DRESSING
+    )
+    p.polygon(
+        _round_head(b_left, b_front, span, 0.5, 2.4 * m, high - 3.5 * m, high + 0.6 * m), DOOR
+    )
+    _bar(
+        p,
+        _on_wall(b_left, b_front, 0.5, high - 2.4 * m),
+        _on_wall(b_left, b_front, 0.5, high + 0.6 * m),
+        0.08 * m,
+        shade(DOOR, 0.6),
+    )
+    for k in range(3):
+        sx, sy = _iso(cx, cy, 0, -(1.2 + 0.5 * k) * m)
+        p.hall(
+            sx,
+            sy,
+            4.4 * m + k * 0.8 * m,
+            0.5 * m,
+            (0.6 - 0.2 * k) * m,
+            WORKS_STONE,
+            shade(WORKS_STONE, 1.1),
+        )
+    _bands(p, b_left, b_front, b_right, 0.3 * m, DRESSING, shade(DRESSING, 0.78))
+    _gable_across(p, bay, 2.8 * m, MILL_SLATE, shade(MILL_BRICK, 1.04))
+    ox, oy = _on_wall(b_left, b_front, 0.5, -1 * m)
+    p.ellipse(ox - 0.75 * m, oy - 0.75 * m, ox + 0.75 * m, oy + 0.75 * m, DRESSING)
+    p.ellipse(ox - 0.5 * m, oy - 0.5 * m, ox + 0.5 * m, oy + 0.5 * m, MILL_GLASS)
+    tx, ty = _iso(x, y, 0, 0.5 * m)
+    rise = high + 1.6 * m
+    tower = p.hall(tx, ty - rise, 4.6 * m, 4.6 * m, 9 * m, MILL_BRICK, None)
+    t_left, t_front, t_right, _ = tower
+    for a, b in ((t_left, t_front), (t_front, t_right)):
+        for drop in (0.3 * m, 4.6 * m):
+            _bar(p, _on_wall(a, b, 0, drop), _on_wall(a, b, 1, drop), 0.3 * m, DRESSING)
+        for t in (0.04, 0.96):
+            _bar(p, _on_wall(a, b, t, 0), _on_wall(a, b, t, 9 * m), 0.35 * m, DRESSING)
+        _works_clock(p, *_on_wall(a, b, 0.5, 2.5 * m), 1.2 * m)
+        _mill_window(p, a, b, 4.6 * m, 0.5, 1.1 * m, (5.6 * m, 8 * m))
+    _works_pyramid(p, tower, 3.6 * m)
+
+
 def mega_factory() -> Sprite:
-    """A great works filling its cell: three long brick halls on dark plinths under sawtooth roofs,
-    with loading doors in their ends, a row of tall banded chimneys behind them and a round
-    gasholder in its guide frame."""
-    p = Painter(50, 63, (24, 51))
-    _plate(p, (150, 146, 140))
-    under = shade((150, 146, 140), 0.76)
-    for v in (6, 0, -6):
-        foot = _footing(*_iso(0, 0, -1, v), 18, 5)
-        _bed(p, foot, under, 0.8)
-        _track(p, foot[1], foot[2], (0.25, 0.75), 2.2, shade((150, 146, 140), 1.1))
-    _spill(p, *_iso(0, 0, 7, -9), 1.8, (48, 46, 50))
-    _oil(p, *_iso(0, 0, -6, -7), 1.2)
-    _puddle(p, *_iso(0, 0, 3, -9), 1.3)
-    for u in (-9, -4, 1, 6):
-        x, y = _iso(0, 0, u, 10)
-        _smoking_chimney(p, x, y - 4, y - 30, shade(BRICK, 0.8), smoke=(214, 214, 218))
-    lintel = shade(BRICK, 1.3)
-    for v, height, tone in ((6, 8, 0.9), (0, 9, 1.0), (-6, 7, 1.08)):
-        wall = shade(BRICK, tone)
-        top = p.hall(*_iso(0, 0, -1, v), 18, 5, height, wall, None)
-        _plinth(p, top, height, wall)
-        _windows(p, top[0], top[1], tuple(k / 8 for k in range(1, 8)), (2.5,), 2, arch=lintel)
-        _door(p, top[1], top[2], (0.25, 0.75), 3, height, DOORWAY, lintel)
-        _sawtooth(p, top, 5, 3, METAL, (170, 200, 220), wall)
-    gx, gy = _iso(0, 0, 9.5, 2)
-    holder = (118, 126, 118)
-    _turned(p, gx, gy, [(0, 4.5), (8, 4.5)], holder, cap=(138, 146, 138))
-    for h in (3, 6):
-        _ring(p, gx, gy - h, 4.5, shade(holder, 0.75))
-    frame = (86, 92, 86)
-    tops = []
-    for a in np.linspace(0.3, math.pi - 0.3, 5):
-        fx, fy = gx + 5 * math.cos(a), gy + 2.5 * math.sin(a)
-        p.line([(fx, fy), (fx, fy - 10)], frame)
-        tops.append((fx, fy - 10))
-    p.line(tops, frame)
-    for u, v in ((-9, -9), (-6.5, -9.5)):
-        _crate(p, *_iso(0, 0, u, v))
-    _barrel(p, *_iso(0, 0, -3.5, -9.5))
-    _heap(p, *_iso(0, 0, 7, -9), 1.8, 1.5, (48, 46, 50))
+    """A whole works quarter: a four-storey red-brick office block with a pediment over its
+    entrance and a clock tower rising from its roof, three long halls under north-light roofs
+    of glazed teeth with rows of round-headed windows under cream arches and arched loading
+    doors with hoists, two tall round chimneys smoking, a brick water tower carrying a riveted
+    iron tank, a siding along the front with vans and open wagons of crated goods, and crates
+    and girders stacked in the yard."""
+    m = METRE
+    p = Painter(66, 66, (33, 46))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 24) * m, (v - 9) * m)
+
+    p.polygon([at(2, -10), at(55, -10), at(55, 0), at(2, 0)], CINDERS)
+    halls = (
+        ((13, 21), (26, 12, 10), 7, 3),
+        ((35, 22), (10, 12, 10), 3, 1),
+        ((38, 6.5), (28, 13, 10.5), 8, 2),
+    )
+    for (u, v), (length, depth, _), _, _ in halls:
+        _bed(p, _footing(*at(u, v), length * m, depth * m), margin=0.6)
+    _bed(p, _footing(*at(11, 6), 22 * m, 12 * m), margin=0.6)
+    p.shadow(26, 7, 3)
+    _works_water_tower(p, *at(27.5, 31))
+    for (u, v), (length, depth, high), teeth, door in halls[:2]:
+        _works_hall(p, *at(u, v), (length * m, depth * m, high * m), teeth, door)
+    _tall_chimney(p, *at(28, 14), 70 * m, 1.45)
+    _tall_chimney(p, *at(47, 15), 62 * m, 1.3)
+    _works_office(p, *at(11, 6), 22 * m, 12 * m)
+    (u, v), (length, depth, high), teeth, door = halls[2]
+    _works_hall(p, *at(u, v), (length * m, depth * m, high * m), teeth, door)
+    _works_siding(p, at(3, -7), at(54, -7))
+    for u, covered in ((10, True), (19, False), (28, True)):
+        _works_wagon(p, *at(u, -7), covered)
+    _crates(p, *at(38, -3), (3, 2, 1))
+    _crates(p, *at(42.5, -2.7), (2, 2))
+    _girders(p, *at(49, -3), 6, 3)
     return p.sprite()
 
 
